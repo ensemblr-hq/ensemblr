@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|shell|local_shell|shell_command|exec_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -lc 'repo=$(git rev-parse --show-toplevel 2>/dev/null || pwd); bash \"$repo/.codex/hooks/enforce-bun-package-manager.sh\"'",
+            "statusMessage": "Enforcing Bun package manager"
+          }
+        ]
+      }
+    ]
+  }
+}
