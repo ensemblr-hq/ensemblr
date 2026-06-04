@@ -8,6 +8,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "electron-squirrel-startup": "^1.0.1",
+        "jotai": "^2.20.0",
         "lucide-react": "^1.17.0",
         "radix-ui": "^1.4.3",
         "react": "^19",
@@ -1083,6 +1084,8 @@
     "jiti": ["jiti@2.7.0", "", { "bin": { "jiti": "lib/jiti-cli.mjs" } }, "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ=="],
 
     "jose": ["jose@6.2.3", "", {}, "sha512-YYVDInQKFJfR/xa3ojUTl8c2KoTwiL1R5Wg9YCydwH0x0B9grbzlg5HC7mMjCtUJjbQ/YnGEZIhI5tCgfTb4Hw=="],
+
+    "jotai": ["jotai@2.20.0", "", { "peerDependencies": { "@babel/core": ">=7.0.0", "@babel/template": ">=7.0.0", "@types/react": ">=17.0.0", "react": ">=17.0.0" }, "optionalPeers": ["@babel/core", "@babel/template", "@types/react", "react"] }, "sha512-b5GAqgmXmXzB4WPaTH26ppk9Sl7AA9WSQX7yfdM+gJ1rFROiWcVbi97gFuN/yVCojOcbcvop2sfLL+fjxW0JVg=="],
 
     "js-tokens": ["js-tokens@4.0.0", "", {}, "sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ=="],
 
