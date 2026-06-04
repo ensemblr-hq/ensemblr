@@ -13,7 +13,11 @@ import {
 	resolveDefaultDatabasePath,
 } from '../../src/main/storage/database.ts';
 
-const EXPECTED_MIGRATIONS = ['001_foundation_metadata', '002_secret_metadata'];
+const EXPECTED_MIGRATIONS = [
+	'001_foundation_metadata',
+	'002_secret_metadata',
+	'003_root_directory_metadata',
+];
 
 function createTestDatabasePath(): {
 	cleanup: () => void;
@@ -75,6 +79,7 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		'integration_metadata',
 		'process_records',
 		'repositories',
+		'root_directories',
 		'schema_migrations',
 		'secret_metadata',
 		'sessions',

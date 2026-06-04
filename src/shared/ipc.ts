@@ -1,5 +1,6 @@
 export const IPC_CHANNELS = {
 	health: 'piductor:health',
+	rootDirectory: 'piductor:root-directory',
 	settingsResolution: 'piductor:settings-resolution',
 } as const;
 
@@ -99,8 +100,47 @@ export interface SettingsResolutionSnapshot {
 	repository?: SettingsResolutionGroupSnapshot;
 }
 
+export type RootDirectoryStatus = 'error' | 'ok' | 'warning';
+export type RootDirectoryDiagnosticSeverity = 'error' | 'info' | 'warning';
+export type RootDirectoryManagedPathKey =
+	| 'archived-contexts'
+	| 'repos'
+	| 'workspaces';
+export type RootDirectoryManagedPathStatus =
+	| 'created'
+	| 'invalid'
+	| 'missing'
+	| 'present';
+
+export interface RootDirectoryDiagnostic {
+	code: string;
+	message: string;
+	path?: string;
+	severity: RootDirectoryDiagnosticSeverity;
+}
+
+export interface RootDirectoryManagedPathSnapshot {
+	key: RootDirectoryManagedPathKey;
+	path: string;
+	status: RootDirectoryManagedPathStatus;
+}
+
+export interface RootDirectorySnapshot {
+	archivedContextsPath: string;
+	createdPaths: string[];
+	diagnostics: RootDirectoryDiagnostic[];
+	managedPaths: RootDirectoryManagedPathSnapshot[];
+	path: string;
+	repositoriesPath: string;
+	setting: ResolvedSettingSnapshot | null;
+	source: SettingsResolutionSource | null;
+	status: RootDirectoryStatus;
+	workspacesPath: string;
+}
+
 export interface PiductorApi {
 	health: () => Promise<HealthSnapshot>;
+	rootDirectory: () => Promise<RootDirectorySnapshot>;
 	resolveSettings: (
 		request?: SettingsResolutionRequest,
 	) => Promise<SettingsResolutionSnapshot>;
