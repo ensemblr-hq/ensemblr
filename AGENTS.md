@@ -46,3 +46,28 @@ This repository uses Biome instead of ESLint and Prettier.
 - Use `bun run check:fix` to apply safe Biome fixes, including formatting and import organization.
 - Keep `bun run typecheck` as a separate verification step for TypeScript type errors.
 - Do not add ESLint or Prettier configuration unless the user explicitly asks for it.
+
+## Tailwind Policy
+
+- Use Tailwind built-in scales instead of arbitrary pixel values.
+- Never write square-bracket pixel utilities such as `w-[13px]`, `p-[18px]`, or `text-[13px]`.
+- For spacing, sizing, radius, and layout values, convert pixels to the Tailwind scale where available: intended pixel value divided by 4 equals the Tailwind spacing token, for example `16px` -> `4`, `14px` -> `3.5`, `2px` -> `0.5`.
+- Use canonical Tailwind classes before arbitrary values. For example, use `text-xs` instead of `text-[0.75rem]`, `rounded-2xl` instead of `rounded-[0.375rem]`, and `rounded-sm` instead of `rounded-[0.125rem]`.
+- If a value is not available as a canonical Tailwind class, use rem-based arbitrary values instead of px-based arbitrary values, especially for typography: use `text-[0.8125rem]` instead of `text-[13px]`.
+- Prefer semantic or existing tokenized utilities over new arbitrary values when the design system already exposes the needed value.
+- `bun run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. Update that script when adding another canonical class equivalence that agents should preserve.
+
+## Module And File Organization
+
+- Check for shallow modules before adding new abstractions. Prefer deep modules: small public interfaces that hide meaningful implementation complexity.
+- Avoid shallow modules: large interfaces, many props or methods, or wrappers that mostly pass values through without reducing complexity.
+- Before introducing a helper, wrapper, hook, or component, ask whether it reduces the number of methods, simplifies parameters, or hides complexity inside the module. If not, inline it or consolidate it with a more appropriate module.
+- Organize `lib`, `utils`, and `components` by scope or concern. Avoid catch-all files and directories that mix unrelated domains.
+- Keep broadly reusable primitives in shared locations, and keep feature-specific helpers/components under the feature or concern that owns them.
+
+## Type Organization
+
+- If the project has a dedicated types folder or type module, use it for exported types that are shared across files or concerns.
+- Co-locate types with implementation only when they are not exported and are not used elsewhere.
+- Prefer inline prop types when a component has only a small number of props and the inline type remains readable.
+- Avoid creating one-off exported `Props` or domain type names unless they are reused, part of a public module interface, or materially improve readability.

@@ -10,6 +10,9 @@
 		"moduleResolution": "bundler",
 		"noEmit": true,
 		"noImplicitAny": true,
+		"paths": {
+			"@/*": ["./src/*"]
+		},
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"sourceMap": true,
