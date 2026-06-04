@@ -1,0 +1,71 @@
+# 0025. Use Pi CLI RPC with Executable Discovery
+
+Date: 2026-06-04
+
+## Status
+
+Accepted
+
+## Context
+
+Piductor must preserve the user's Pi environment and support variants or wrappers such as `oh-my-pi`. The previous v1 decision embedded `@earendil-works/pi-coding-agent` directly in Electron main, but that couples Piductor to a bundled SDK version and weakens parity with the exact Pi runtime the user expects.
+
+Pi's documented CLI RPC mode launches the agent as a subprocess and communicates over stdin/stdout using LF-delimited JSONL:
+
+```bash
+pi --mode rpc
+```
+
+Pi also supports flags that can disable sessions, tools, extensions, skills, prompt templates, themes, and context files. Piductor should not use those disabling flags by default because the requirement is that the user's Pi configuration, skills, extensions, plugins, prompts, themes, context files, credentials, models, and sessions work as they do in Pi itself.
+
+## Decision
+
+Piductor v1 will use a Pi CLI RPC subprocess as the default Pi runtime boundary.
+
+Runtime behavior:
+
+- Launch the selected Pi executable with `--mode rpc` from the workspace directory.
+- Use the workspace path as the process `cwd` so project `.pi`, `AGENTS.md`, `CLAUDE.md`, and cwd-based resources resolve like the Pi CLI.
+- Preserve the user's normal Pi agent directory by default; do not set `PI_CODING_AGENT_DIR` unless the user explicitly configures it.
+- Do not pass `--no-session`, `--no-tools`, `--no-builtin-tools`, `--no-extensions`, `--no-skills`, `--no-prompt-templates`, `--no-themes`, or `--no-context-files` by default.
+- Stream RPC events into Piductor's structured timeline through a `PiAgentClient` interface.
+- Keep terminal panes separate from Pi RPC; xterm.js is for shells, setup/run scripts, logs, and optional manual terminals.
+
+Executable discovery:
+
+1. Use an explicit executable path from Piductor app settings or `~/.config/piductor/config.json` when provided.
+2. Discover `pi` from the user's shell environment and `PATH`.
+3. Check common local binary locations when shell discovery fails.
+4. Let users browse/select an executable or wrapper manually.
+
+The override may point to the normal `pi` executable, a wrapper script, or an alternate distribution/launcher such as `oh-my-pi`, as long as it supports Pi's CLI RPC contract.
+
+Setup gate checks:
+
+- A Pi-compatible executable is discoverable or explicitly configured.
+- The executable can report version/help information where supported.
+- The executable can start `--mode rpc` from a test workspace and produce valid JSONL RPC behavior.
+- Piductor can launch the executable with the expected shell-derived environment.
+- Provider/model readiness is checked through Pi-compatible commands or a safe RPC smoke test where practical.
+
+## Alternatives Considered
+
+### Embedded Pi SDK
+
+Embedding the SDK gives direct typed access and avoids requiring a separate executable, but it couples Piductor to a bundled Pi SDK version and may execute Pi extensions/packages inside Electron main. That decision was accepted in ADR 0005 and is superseded by this ADR.
+
+### SDK sidecar
+
+A sidecar could combine SDK control with process isolation. It remains a future fallback if CLI RPC cannot expose enough UI behavior, but it adds a custom process/protocol and packaging complexity.
+
+### Managed Pi runtime installer
+
+Piductor could install and manage its own Pi runtime. This remains deferred because users may want their existing Pi or wrappers such as `oh-my-pi`, and managed runtime ownership adds update/compatibility burden.
+
+## Consequences
+
+- Piductor uses the same Pi runtime users can run in a terminal, improving compatibility with `~/.pi` and custom Pi distributions.
+- Users can override the executable path for wrappers or alternate Pi launchers.
+- Piductor needs a robust RPC process supervisor: start, stop, abort, restart, stderr capture, JSONL parsing, backpressure, and crash recovery.
+- Piductor is constrained by the RPC protocol surface; missing capabilities may require future SDK sidecar support.
+- Setup/onboarding must handle missing or invalid Pi executables with clear remediation.
