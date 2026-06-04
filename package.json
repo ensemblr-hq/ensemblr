@@ -15,10 +15,12 @@
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:db": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/database.test.ts",
+		"test:secrets": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/secret-store.test.ts",
 		"typecheck": "tsc --noEmit",
 		"build": "electron-forge package",
 		"package": "electron-forge package",
-		"make": "electron-forge make"
+		"make": "electron-forge make",
+		"doctor": "bunx react-doctor@latest"
 	},
 	"keywords": [
 		"electron",
@@ -34,6 +36,7 @@
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
 		"electron-squirrel-startup": "^1.0.1",
+		"jotai": "^2.20.0",
 		"lucide-react": "^1.17.0",
 		"radix-ui": "^1.4.3",
 		"react": "^19",
