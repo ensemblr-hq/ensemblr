@@ -2,6 +2,7 @@ import path from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
 
+import { createPiductorConfigService } from './config/config-loader';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
 import { createPiductorDatabaseService } from './storage/database';
@@ -52,12 +53,14 @@ function createMainWindow(): BrowserWindow {
 
 app.setName('Piductor');
 
+const configService = createPiductorConfigService();
 const databaseService = createPiductorDatabaseService();
 
 app.whenReady().then(() => {
+	configService.load();
 	databaseService.open();
 	installApplicationMenu();
-	registerIpcHandlers({ databaseService });
+	registerIpcHandlers({ configService, databaseService });
 	createMainWindow();
 });
 

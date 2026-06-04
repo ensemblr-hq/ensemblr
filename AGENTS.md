@@ -79,3 +79,8 @@ This repository uses Biome instead of ESLint and Prettier.
 - Co-locate types with implementation only when they are not exported and are not used elsewhere.
 - Prefer inline prop types when a component has only a small number of props and the inline type remains readable.
 - Avoid creating one-off exported `Props` or domain type names unless they are reused, part of a public module interface, or materially improve readability.
+
+## Linear And Pull Request Workflow
+
+- Never mark Linear tickets as `Done` from agent work. When implementation and verification are complete, move the ticket to `In Review`.
+- When creating a pull request for Linear-backed work, include the actual Linear issue code in the PR title, for example `THE-105`. Do not use only a local planning ID such as `PID-005`.
