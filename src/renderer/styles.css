@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@theme {
+	--color-canvas: #f3efe5;
+	--color-cream: #fff8e9;
+	--color-ink: #17211c;
+	--color-pane: #e8ddca;
+	--color-rust: #a64f2f;
+	--font-sans: "Avenir Next", "SF Pro Display", "Helvetica Neue", sans-serif;
+	--font-mono: "JetBrains Mono", "SFMono-Regular", monospace;
+	--shadow-soft: 0 24px 80px rgb(23 33 28 / 0.12);
+}
+
+:root {
+	color: var(--color-ink);
+	font-family: var(--font-sans);
+	font-synthesis: none;
+	text-rendering: optimizeLegibility;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+}
+
+button {
+	font: inherit;
+}
+
+.bg-radial-warm {
+	background:
+		radial-gradient(circle at 12% 18%, rgb(166 79 47 / 0.18), transparent 34%),
+		radial-gradient(circle at 86% 2%, rgb(23 33 28 / 0.11), transparent 28%),
+		linear-gradient(145deg, rgb(243 239 229), rgb(255 248 233));
+}
+
+.nav-item {
+	align-items: flex-start;
+	border: 1px solid transparent;
+	border-radius: 18px;
+	color: rgb(23 33 28 / 0.68);
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 14px 16px;
+	text-align: left;
+	transition:
+		background 160ms ease,
+		border-color 160ms ease,
+		color 160ms ease,
+		transform 160ms ease;
+	width: 100%;
+}
+
+.nav-item:hover {
+	background: rgb(255 255 255 / 0.55);
+	color: var(--color-ink);
+	transform: translateX(2px);
+}
+
+.nav-item[data-active="true"] {
+	background: var(--color-ink);
+	border-color: rgb(23 33 28 / 0.18);
+	color: #fff8e9;
+}
+
+.nav-item small {
+	color: currentcolor;
+	font-size: 0.72rem;
+	opacity: 0.65;
+}
