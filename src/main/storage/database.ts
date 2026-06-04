@@ -199,6 +199,31 @@ CREATE INDEX idx_process_records_session_id ON process_records(session_id);
 CREATE INDEX idx_process_records_status ON process_records(status);
 `,
 	},
+	{
+		id: '002_secret_metadata',
+		version: 2,
+		sql: `
+CREATE TABLE secret_metadata (
+	id TEXT PRIMARY KEY,
+	scope TEXT NOT NULL CHECK (scope IN ('app', 'repository', 'workspace')),
+	scope_id TEXT NOT NULL DEFAULT '',
+	name TEXT NOT NULL,
+	backend TEXT NOT NULL DEFAULT 'macos-keychain' CHECK (backend IN ('macos-keychain')),
+	service TEXT NOT NULL,
+	account TEXT NOT NULL,
+	display_name TEXT NOT NULL,
+	masked_display TEXT NOT NULL,
+	character_count INTEGER NOT NULL DEFAULT 0 CHECK (character_count >= 0),
+	metadata_json TEXT NOT NULL DEFAULT '{}',
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	UNIQUE(scope, scope_id, name),
+	UNIQUE(service, account)
+) STRICT;
+
+CREATE INDEX idx_secret_metadata_scope ON secret_metadata(scope, scope_id);
+`,
+	},
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.at(-1)?.version ?? 0;

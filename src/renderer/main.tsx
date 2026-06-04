@@ -1,3 +1,4 @@
+import { Provider as JotaiProvider } from 'jotai';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -12,6 +13,8 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
 	<StrictMode>
-		<App />
+		<JotaiProvider>
+			<App />
+		</JotaiProvider>
 	</StrictMode>,
 );

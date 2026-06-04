@@ -1,3 +1,4 @@
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import {
 	ActivityIcon,
 	BadgeCheckIcon,
@@ -12,7 +13,7 @@ import {
 	SlidersHorizontalIcon,
 	WrenchIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 
 import {
 	AppFrame,
@@ -25,9 +26,13 @@ import { StatusBadge } from '@/components/status-badge';
 import { TerminalDock } from '@/components/terminal-dock';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+	activeRouteAtom,
+	healthAtom,
+	healthErrorAtom,
+	type RouteId,
+} from '@/renderer/state/app-state';
 import type { HealthSnapshot } from '@/shared/ipc';
-
-type RouteId = 'dashboard' | 'setup' | 'workspace' | 'settings';
 
 const ROUTES: readonly ShellRoute<RouteId>[] = [
 	{
@@ -131,16 +136,17 @@ const changedFiles = [
 ];
 
 export function App() {
-	const [activeRoute, setActiveRoute] = useState<RouteId>('dashboard');
-	const [health, setHealth] = useState<HealthSnapshot | null>(null);
-	const [healthError, setHealthError] = useState<string | null>(null);
+	const [activeRoute, setActiveRoute] = useAtom(activeRouteAtom);
+	const health = useAtomValue(healthAtom);
+	const healthError = useAtomValue(healthErrorAtom);
+	const setHealth = useSetAtom(healthAtom);
+	const setHealthError = useSetAtom(healthErrorAtom);
 
 	useEffect(() => {
 		let isMounted = true;
 		const piductor = window.piductor;
 
 		if (!piductor) {
-			setHealthError('Electron preload bridge is unavailable in this context.');
 			return () => {
 				isMounted = false;
 			};
@@ -164,7 +170,7 @@ export function App() {
 		return () => {
 			isMounted = false;
 		};
-	}, []);
+	}, [setHealth, setHealthError]);
 
 	const shellHealth = useMemo<ShellHealth>(() => {
 		if (health) {
