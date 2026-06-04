@@ -1,5 +1,6 @@
 export const IPC_CHANNELS = {
 	health: 'piductor:health',
+	settingsResolution: 'piductor:settings-resolution',
 } as const;
 
 export type ConfigStatus = 'error' | 'invalid' | 'missing' | 'ok';
@@ -43,6 +44,64 @@ export interface HealthSnapshot {
 	};
 }
 
+export type SettingsResolutionScope = 'app' | 'repository';
+export type SettingsResolutionSource =
+	| 'built-in-default'
+	| 'conductor-config'
+	| 'config-default'
+	| 'managed-config'
+	| 'piductor-config'
+	| 'sqlite';
+export type SettingsResolutionCandidateStatus =
+	| 'ignored'
+	| 'invalid'
+	| 'selected';
+
+export interface SettingResolutionCandidateSnapshot {
+	reason: string;
+	source: SettingsResolutionSource;
+	status: SettingsResolutionCandidateStatus;
+}
+
+export interface ResolvedSettingSnapshot {
+	candidates: SettingResolutionCandidateSnapshot[];
+	key: string;
+	locked: boolean;
+	source: SettingsResolutionSource;
+	value: unknown;
+}
+
+export interface SettingsResolutionDiagnostic {
+	key: string;
+	message: string;
+	scope: SettingsResolutionScope;
+	source: SettingsResolutionSource;
+	status: SettingsResolutionCandidateStatus;
+}
+
+export interface SettingsResolutionGroupSnapshot {
+	diagnostics: SettingsResolutionDiagnostic[];
+	settings: ResolvedSettingSnapshot[];
+}
+
+export interface RepositorySettingsResolutionRequest {
+	conductorConfig?: Record<string, unknown>;
+	piductorConfig?: Record<string, unknown>;
+	repositoryId: string;
+}
+
+export interface SettingsResolutionRequest {
+	repository?: RepositorySettingsResolutionRequest;
+}
+
+export interface SettingsResolutionSnapshot {
+	app: SettingsResolutionGroupSnapshot;
+	repository?: SettingsResolutionGroupSnapshot;
+}
+
 export interface PiductorApi {
 	health: () => Promise<HealthSnapshot>;
+	resolveSettings: (
+		request?: SettingsResolutionRequest,
+	) => Promise<SettingsResolutionSnapshot>;
 }
