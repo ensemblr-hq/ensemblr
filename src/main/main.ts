@@ -3,6 +3,7 @@ import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
 
 import { createPiductorConfigService } from './config/config-loader';
+import { createPiductorConfigResolutionService } from './config/config-resolution';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
 import { createPiductorDatabaseService } from './storage/database';
@@ -55,12 +56,20 @@ app.setName('Piductor');
 
 const configService = createPiductorConfigService();
 const databaseService = createPiductorDatabaseService();
+const settingsResolutionService = createPiductorConfigResolutionService({
+	configService,
+	databaseService,
+});
 
 app.whenReady().then(() => {
 	configService.load();
 	databaseService.open();
 	installApplicationMenu();
-	registerIpcHandlers({ configService, databaseService });
+	registerIpcHandlers({
+		configService,
+		databaseService,
+		settingsResolutionService,
+	});
 	createMainWindow();
 });
 
