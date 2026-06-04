@@ -182,8 +182,23 @@ export function App() {
 				};
 			}
 
+			if (health.config.blocksReadiness) {
+				return {
+					detail:
+						health.config.diagnostics[0]?.message ??
+						'Declarative config blocks readiness.',
+					label: `${health.appName} config requires attention`,
+					state: 'unavailable',
+				};
+			}
+
+			const configDetail =
+				health.config.status === 'ok'
+					? 'Config loaded.'
+					: `Config ${health.config.status}.`;
+
 			return {
-				detail: `Electron ${health.versions.electron} on ${health.platform}. Database schema v${health.database.schemaVersion}.`,
+				detail: `Electron ${health.versions.electron} on ${health.platform}. Database schema v${health.database.schemaVersion}. ${configDetail}`,
 				label: `${health.appName} IPC online`,
 				state: 'online',
 			};
@@ -221,7 +236,7 @@ export function App() {
 						<div className='flex flex-col gap-3'>
 							<ShellPanel
 								action={
-									<StatusBadge tone='info'>THE-102 / PID-002</StatusBadge>
+									<StatusBadge tone='info'>THE-105 / PID-005</StatusBadge>
 								}
 								description={foundation.summary}
 								eyebrow={activeRouteConfig.eyebrow}
@@ -253,6 +268,7 @@ export function App() {
 				</section>
 
 				<WorkspaceInspector
+					config={health?.config ?? null}
 					database={health?.database ?? null}
 					health={shellHealth}
 				/>
@@ -262,11 +278,20 @@ export function App() {
 }
 
 interface WorkspaceInspectorProps {
+	config: HealthSnapshot['config'] | null;
 	database: HealthSnapshot['database'] | null;
 	health: ShellHealth;
 }
 
-function WorkspaceInspector({ database, health }: WorkspaceInspectorProps) {
+function WorkspaceInspector({
+	config,
+	database,
+	health,
+}: WorkspaceInspectorProps) {
+	const configStatus = config
+		? `${config.status} / v${config.schemaVersion ?? 'unknown'}`
+		: 'pending';
+	const configPath = config?.displayPath ?? 'Waiting for health snapshot.';
 	const databaseStatus = database
 		? `${database.status} / v${database.schemaVersion}`
 		: 'pending';
@@ -336,6 +361,12 @@ function WorkspaceInspector({ database, health }: WorkspaceInspectorProps) {
 							state={database?.status === 'error' ? 'error' : 'ok'}
 							value={databaseStatus}
 						/>
+						<MetricRow
+							icon={SlidersHorizontalIcon}
+							label='Declarative config'
+							state={getConfigMetricState(config)}
+							value={configStatus}
+						/>
 						<MetricRow icon={WrenchIcon} label='Package manager' value='Bun' />
 						<MetricRow
 							icon={SlidersHorizontalIcon}
@@ -346,6 +377,25 @@ function WorkspaceInspector({ database, health }: WorkspaceInspectorProps) {
 						<p className='text-muted-foreground text-xs leading-5'>
 							{health.detail}
 						</p>
+						<p className='break-all text-muted-foreground text-xs leading-5'>
+							{configPath}
+						</p>
+						{config?.diagnostics.length ? (
+							<div className='flex flex-col gap-1 rounded-md border border-border bg-pane/80 p-2'>
+								{config.diagnostics.slice(0, 3).map((diagnostic) => (
+									<p
+										className='text-muted-foreground text-xs leading-5'
+										key={`${diagnostic.code}-${diagnostic.fieldPath ?? ''}-${diagnostic.line ?? ''}-${diagnostic.column ?? ''}`}
+									>
+										<span className='font-medium text-foreground'>
+											{diagnostic.code}
+										</span>
+										{': '}
+										{diagnostic.message}
+									</p>
+								))}
+							</div>
+						) : null}
 						<p className='break-all text-muted-foreground text-xs leading-5'>
 							{databasePath}
 						</p>
@@ -394,13 +444,16 @@ function InspectorRow({ badge, icon: Icon, label }: InspectorRowProps) {
 interface MetricRowProps {
 	icon: typeof ActivityIcon;
 	label: string;
-	state?: 'error' | 'ok';
+	state?: 'error' | 'ok' | 'warning';
 	value: string;
 }
 
 function MetricRow({ icon: Icon, label, state = 'ok', value }: MetricRowProps) {
-	const statusColor =
-		state === 'error' ? 'text-status-danger' : 'text-status-ok';
+	const statusColor: Record<NonNullable<MetricRowProps['state']>, string> = {
+		error: 'text-status-danger',
+		ok: 'text-status-ok',
+		warning: 'text-status-warning',
+	};
 
 	return (
 		<div className='flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-muted'>
@@ -411,10 +464,20 @@ function MetricRow({ icon: Icon, label, state = 'ok', value }: MetricRowProps) {
 			<div className='flex items-center gap-1.5 font-medium text-xs'>
 				<CircleDotIcon
 					aria-hidden='true'
-					className={`size-3 shrink-0 ${statusColor}`}
+					className={`size-3 shrink-0 ${statusColor[state]}`}
 				/>
 				<span>{value}</span>
 			</div>
 		</div>
 	);
+}
+
+function getConfigMetricState(
+	config: HealthSnapshot['config'] | null,
+): MetricRowProps['state'] {
+	if (!config || config.status === 'ok' || config.status === 'missing') {
+		return 'ok';
+	}
+
+	return config.blocksReadiness ? 'error' : 'warning';
 }

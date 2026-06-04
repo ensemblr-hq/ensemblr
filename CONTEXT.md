@@ -1,3 +1,4 @@
+<!-- TODO: Purge from git history when v1 is live -->
 # Piductor
 
 Piductor is a Pi-native macOS workbench for running coding-agent work in isolated project workspaces. It borrows the workspace-and-review operating model from Conductor while using Pi as the agent runtime.
