@@ -9,8 +9,18 @@ if (started) {
 	app.quit();
 }
 
+const macosChromeOptions =
+	process.platform === 'darwin'
+		? {
+				titleBarStyle: 'hiddenInset' as const,
+				trafficLightPosition: { x: 14, y: 14 },
+			}
+		: {};
+
 function createMainWindow(): BrowserWindow {
 	const mainWindow = new BrowserWindow({
+		...macosChromeOptions,
+		backgroundColor: '#0b0808',
 		height: 820,
 		minHeight: 640,
 		minWidth: 960,
