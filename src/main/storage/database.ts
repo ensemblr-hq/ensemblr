@@ -224,6 +224,26 @@ CREATE TABLE secret_metadata (
 CREATE INDEX idx_secret_metadata_scope ON secret_metadata(scope, scope_id);
 `,
 	},
+	{
+		id: '003_root_directory_metadata',
+		version: 3,
+		sql: `
+CREATE TABLE root_directories (
+	id TEXT PRIMARY KEY,
+	path TEXT NOT NULL UNIQUE,
+	source TEXT NOT NULL CHECK (source IN ('built-in-default', 'conductor-config', 'config-default', 'managed-config', 'piductor-config', 'sqlite')),
+	status TEXT NOT NULL CHECK (status IN ('ok', 'warning', 'error')),
+	repositories_path TEXT NOT NULL,
+	workspaces_path TEXT NOT NULL,
+	archived_contexts_path TEXT NOT NULL,
+	first_seen_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	last_seen_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	metadata_json TEXT NOT NULL DEFAULT '{}'
+) STRICT;
+
+CREATE INDEX idx_root_directories_status ON root_directories(status);
+`,
+	},
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.at(-1)?.version ?? 0;
