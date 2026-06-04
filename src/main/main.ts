@@ -4,6 +4,7 @@ import started from 'electron-squirrel-startup';
 
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
+import { createPiductorDatabaseService } from './storage/database';
 
 if (started) {
 	app.quit();
@@ -51,10 +52,17 @@ function createMainWindow(): BrowserWindow {
 
 app.setName('Piductor');
 
+const databaseService = createPiductorDatabaseService();
+
 app.whenReady().then(() => {
+	databaseService.open();
 	installApplicationMenu();
-	registerIpcHandlers();
+	registerIpcHandlers({ databaseService });
 	createMainWindow();
+});
+
+app.on('before-quit', () => {
+	databaseService.close();
 });
 
 app.on('window-all-closed', () => {

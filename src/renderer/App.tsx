@@ -2,6 +2,7 @@ import {
 	ActivityIcon,
 	BadgeCheckIcon,
 	CircleDotIcon,
+	DatabaseIcon,
 	FileCodeIcon,
 	FolderGit2Icon,
 	GitBranchIcon,
@@ -167,8 +168,16 @@ export function App() {
 
 	const shellHealth = useMemo<ShellHealth>(() => {
 		if (health) {
+			if (health.database.status === 'error') {
+				return {
+					detail: health.database.error ?? 'Database failed to open.',
+					label: `${health.appName} database unavailable`,
+					state: 'unavailable',
+				};
+			}
+
 			return {
-				detail: `Electron ${health.versions.electron} on ${health.platform}.`,
+				detail: `Electron ${health.versions.electron} on ${health.platform}. Database schema v${health.database.schemaVersion}.`,
 				label: `${health.appName} IPC online`,
 				state: 'online',
 			};
@@ -237,17 +246,26 @@ export function App() {
 					</div>
 				</section>
 
-				<WorkspaceInspector health={shellHealth} />
+				<WorkspaceInspector
+					database={health?.database ?? null}
+					health={shellHealth}
+				/>
 			</div>
 		</AppFrame>
 	);
 }
 
 interface WorkspaceInspectorProps {
+	database: HealthSnapshot['database'] | null;
 	health: ShellHealth;
 }
 
-function WorkspaceInspector({ health }: WorkspaceInspectorProps) {
+function WorkspaceInspector({ database, health }: WorkspaceInspectorProps) {
+	const databaseStatus = database
+		? `${database.status} / v${database.schemaVersion}`
+		: 'pending';
+	const databasePath = database?.path ?? 'Waiting for health snapshot.';
+
 	return (
 		<aside className='hidden min-h-0 flex-col bg-card lg:flex'>
 			<Tabs className='min-h-0 flex-1 gap-0' defaultValue='changes'>
@@ -306,6 +324,12 @@ function WorkspaceInspector({ health }: WorkspaceInspectorProps) {
 							label='IPC boundary'
 							value={health.state}
 						/>
+						<MetricRow
+							icon={DatabaseIcon}
+							label='SQLite database'
+							state={database?.status === 'error' ? 'error' : 'ok'}
+							value={databaseStatus}
+						/>
 						<MetricRow icon={WrenchIcon} label='Package manager' value='Bun' />
 						<MetricRow
 							icon={SlidersHorizontalIcon}
@@ -315,6 +339,9 @@ function WorkspaceInspector({ health }: WorkspaceInspectorProps) {
 						<Separator />
 						<p className='text-muted-foreground text-xs leading-5'>
 							{health.detail}
+						</p>
+						<p className='break-all text-muted-foreground text-xs leading-5'>
+							{databasePath}
 						</p>
 					</InspectorSection>
 				</TabsContent>
@@ -361,10 +388,14 @@ function InspectorRow({ badge, icon: Icon, label }: InspectorRowProps) {
 interface MetricRowProps {
 	icon: typeof ActivityIcon;
 	label: string;
+	state?: 'error' | 'ok';
 	value: string;
 }
 
-function MetricRow({ icon: Icon, label, value }: MetricRowProps) {
+function MetricRow({ icon: Icon, label, state = 'ok', value }: MetricRowProps) {
+	const statusColor =
+		state === 'error' ? 'text-status-danger' : 'text-status-ok';
+
 	return (
 		<div className='flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-muted'>
 			<div className='flex items-center gap-2 text-muted-foreground text-xs'>
@@ -374,7 +405,7 @@ function MetricRow({ icon: Icon, label, value }: MetricRowProps) {
 			<div className='flex items-center gap-1.5 font-medium text-xs'>
 				<CircleDotIcon
 					aria-hidden='true'
-					className='size-3 shrink-0 text-status-ok'
+					className={`size-3 shrink-0 ${statusColor}`}
 				/>
 				<span>{value}</span>
 			</div>

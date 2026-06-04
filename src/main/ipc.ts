@@ -1,11 +1,19 @@
 import { app, ipcMain } from 'electron';
 
 import { type HealthSnapshot, IPC_CHANNELS } from '../shared/ipc';
+import type { PiductorDatabaseService } from './storage/database';
 
-export function registerIpcHandlers(): void {
+interface RegisterIpcHandlersOptions {
+	databaseService: PiductorDatabaseService;
+}
+
+export function registerIpcHandlers({
+	databaseService,
+}: RegisterIpcHandlersOptions): void {
 	ipcMain.handle(IPC_CHANNELS.health, (): HealthSnapshot => {
 		return {
 			appName: app.getName(),
+			database: databaseService.getHealth(),
 			platform: process.platform,
 			status: 'ok',
 			timestamp: new Date().toISOString(),
