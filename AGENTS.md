@@ -47,6 +47,14 @@ This repository uses Biome instead of ESLint and Prettier.
 - Keep `bun run typecheck` as a separate verification step for TypeScript type errors.
 - Do not add ESLint or Prettier configuration unless the user explicitly asks for it.
 
+## State Management Policy
+
+- Use Jotai as the only app-level state management solution.
+- Define shared renderer state with Jotai atoms, preferably in feature-owned state modules or `src/renderer/state/` for cross-feature app state.
+- Do not add or use Redux, Zustand, Recoil, Valtio, MobX, Nanostores, XState, Effector, or custom global store implementations.
+- React `useState` is allowed for ephemeral state owned by one component. If state crosses feature or component boundaries, model it as Jotai atoms.
+- React context is allowed only for structural provider APIs and compound-component wiring, not as an app state store.
+
 ## Tailwind Policy
 
 - Use Tailwind built-in scales instead of arbitrary pixel values.

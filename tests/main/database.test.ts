@@ -13,6 +13,8 @@ import {
 	resolveDefaultDatabasePath,
 } from '../../src/main/storage/database.ts';
 
+const EXPECTED_MIGRATIONS = ['001_foundation_metadata', '002_secret_metadata'];
+
 function createTestDatabasePath(): {
 	cleanup: () => void;
 	databasePath: string;
@@ -54,9 +56,10 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		getCurrentSchemaVersion(connection.database),
 		LATEST_SCHEMA_VERSION,
 	);
-	assert.deepEqual(listAppliedMigrationIds(connection.database), [
-		'001_foundation_metadata',
-	]);
+	assert.deepEqual(
+		listAppliedMigrationIds(connection.database),
+		EXPECTED_MIGRATIONS,
+	);
 	assert.equal(existsSync(fixture.databasePath), true);
 
 	const tables = connection.database
@@ -73,6 +76,7 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		'process_records',
 		'repositories',
 		'schema_migrations',
+		'secret_metadata',
 		'sessions',
 		'settings',
 		'terminal_sessions',
@@ -99,10 +103,11 @@ test('runs migrations idempotently on reopen', (t) => {
 		.prepare('SELECT COUNT(*) AS count FROM schema_migrations')
 		.get() as { count: number };
 
-	assert.equal(migrationRows.count, 1);
-	assert.deepEqual(listAppliedMigrationIds(secondConnection.database), [
-		'001_foundation_metadata',
-	]);
+	assert.equal(migrationRows.count, EXPECTED_MIGRATIONS.length);
+	assert.deepEqual(
+		listAppliedMigrationIds(secondConnection.database),
+		EXPECTED_MIGRATIONS,
+	);
 	assert.equal(
 		getCurrentSchemaVersion(secondConnection.database),
 		LATEST_SCHEMA_VERSION,
@@ -200,6 +205,60 @@ SELECT
 			todos: 1,
 			workspaces: 1,
 		},
+	);
+});
+
+test('stores only secret metadata and keychain references in SQLite', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openPiductorDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	const rawSecretValue = 'piductor-raw-secret-value-not-persisted';
+	const maskedDisplay = '****sted';
+
+	connection.database
+		.prepare(
+			`INSERT INTO secret_metadata (
+				id,
+				scope,
+				scope_id,
+				name,
+				backend,
+				service,
+				account,
+				display_name,
+				masked_display,
+				character_count,
+				metadata_json
+			)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		)
+		.run(
+			'secret-1',
+			'app',
+			'',
+			'PIDUCTOR_TEST_SECRET',
+			'macos-keychain',
+			'com.piductor.app.secret-store',
+			'v1:app::PIDUCTOR_TEST_SECRET',
+			'Piductor test secret',
+			maskedDisplay,
+			rawSecretValue.length,
+			'{"source":"test"}',
+		);
+
+	const rows = connection.database
+		.prepare('SELECT * FROM secret_metadata')
+		.all();
+
+	assert.equal(JSON.stringify(rows).includes(rawSecretValue), false);
+	assert.equal(
+		(rows[0] as { masked_display: string }).masked_display,
+		maskedDisplay,
 	);
 });
 
