@@ -14,6 +14,7 @@
 		"check:fix": "biome check --write .",
 		"format": "biome format --write .",
 		"lint": "biome lint .",
+		"test:config": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/config-loader.test.ts",
 		"test:db": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/database.test.ts",
 		"test:secrets": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/secret-store.test.ts",
 		"typecheck": "tsc --noEmit",
