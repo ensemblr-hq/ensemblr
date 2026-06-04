@@ -6,6 +6,7 @@ import { createPiductorConfigService } from './config/config-loader';
 import { createPiductorConfigResolutionService } from './config/config-resolution';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
+import { createPiductorRootDirectoryService } from './root/root-directory';
 import { createPiductorDatabaseService } from './storage/database';
 
 if (started) {
@@ -60,14 +61,20 @@ const settingsResolutionService = createPiductorConfigResolutionService({
 	configService,
 	databaseService,
 });
+const rootDirectoryService = createPiductorRootDirectoryService({
+	databaseService,
+	settingsResolutionService,
+});
 
 app.whenReady().then(() => {
 	configService.load();
 	databaseService.open();
+	rootDirectoryService.ensure();
 	installApplicationMenu();
 	registerIpcHandlers({
 		configService,
 		databaseService,
+		rootDirectoryService,
 		settingsResolutionService,
 	});
 	createMainWindow();

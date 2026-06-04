@@ -4,6 +4,7 @@ import {
 	type HealthSnapshot,
 	IPC_CHANNELS,
 	type PiductorApi,
+	type RootDirectorySnapshot,
 	type SettingsResolutionRequest,
 	type SettingsResolutionSnapshot,
 } from '../shared/ipc';
@@ -11,6 +12,10 @@ import {
 const api: PiductorApi = {
 	health: () =>
 		ipcRenderer.invoke(IPC_CHANNELS.health) as Promise<HealthSnapshot>,
+	rootDirectory: () =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.rootDirectory,
+		) as Promise<RootDirectorySnapshot>,
 	resolveSettings: (request?: SettingsResolutionRequest) =>
 		ipcRenderer.invoke(
 			IPC_CHANNELS.settingsResolution,
