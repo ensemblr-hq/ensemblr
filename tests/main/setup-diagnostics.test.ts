@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { LocalCommandService } from '../../src/main/commands/local-command.ts';
+import type {
+	LocalCommandFailureCode,
+	LocalCommandResult,
+	LocalCommandService,
+} from '../../src/main/commands/local-command.ts';
 import type { PiductorConfigService } from '../../src/main/config/config-loader.ts';
 import type { PiductorRootDirectoryService } from '../../src/main/root/root-directory.ts';
 import {
@@ -18,14 +22,12 @@ import type {
 	SetupCheckGroupId,
 	SetupCheckId,
 	SetupCheckSnapshot,
+	SetupDiagnosticsSnapshot,
 } from '../../src/shared/ipc.ts';
 
 const NOW = new Date('2026-06-05T00:00:00.000Z');
 const HOME = '/Users/alice';
-const FUTURE_REQUIRED_CHECKS: readonly SetupCheckId[] = [
-	'git-executable',
-	'gh-cli',
-	'gh-auth',
+const DEFERRED_REQUIRED_CHECKS: readonly SetupCheckId[] = [
 	'pi-executable',
 	'pi-agent-directory',
 	'pi-rpc',
@@ -61,6 +63,17 @@ const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
 	'shell-process-launch': 'core',
 	'sqlite-database': 'storage',
 };
+
+interface FakeCommandOutcome {
+	exitCode?: number | null;
+	failureCode?: LocalCommandFailureCode;
+	failureMessage?: string;
+	status?: LocalCommandResult['status'];
+	stderr?: string;
+	stderrTruncated?: boolean;
+	stdout?: string;
+	stdoutTruncated?: boolean;
+}
 
 function createConfigService(
 	snapshot: Partial<ConfigStatusSnapshot> = {},
@@ -151,6 +164,7 @@ function createRootDirectoryService(
 
 function createLocalCommandService(
 	options: {
+		commandResults?: Record<string, FakeCommandOutcome>;
 		environmentDiagnostics?: {
 			code: string;
 			message: string;
@@ -171,30 +185,117 @@ function createLocalCommandService(
 			shell: '/bin/sh',
 			source: options.source ?? 'shell',
 		}),
-		run: async () => ({
-			args: ['-lc', 'printf piductor-process-ok'],
-			command: '/bin/sh',
-			cwd: HOME,
-			durationMs: 1,
-			endedAt: NOW.toISOString(),
-			environment: null,
-			exitCode: 0,
-			logs: {
-				command: '/bin/sh -lc printf',
-				cwd: HOME,
-				env: {},
-				stderr: '',
-				stdout: options.stdout ?? 'piductor-process-ok',
-			},
-			signal: null,
-			startedAt: NOW.toISOString(),
-			status: 'success',
-			stderr: '',
-			stderrTruncated: false,
-			stdout: options.stdout ?? 'piductor-process-ok',
-			stdoutTruncated: false,
-		}),
+		run: async (request) => {
+			const args = Array.from(request.args ?? []);
+			const outcome =
+				options.commandResults?.[formatCommandKey(request.command, args)] ??
+				createDefaultCommandOutcome(request.command, args, options.stdout);
+
+			return createLocalCommandResult(request.command, args, outcome);
+		},
 	};
+}
+
+function createDefaultCommandOutcome(
+	command: string,
+	args: string[],
+	shellStdout = 'piductor-process-ok',
+): FakeCommandOutcome {
+	const argsKey = args.join('\u0000');
+
+	if (
+		command === '/bin/sh' &&
+		argsKey === '-lc\u0000printf piductor-process-ok'
+	) {
+		return {
+			stdout: shellStdout,
+		};
+	}
+
+	if (command === 'git' && argsKey === '--version') {
+		return {
+			stdout: 'git version 2.45.1',
+		};
+	}
+
+	if (command === 'gh' && argsKey === '--version') {
+		return {
+			stdout: 'gh version 2.52.0 (2026-05-01)\nhttps://github.com/cli/cli',
+		};
+	}
+
+	if (
+		command === 'gh' &&
+		argsKey === 'auth\u0000status\u0000--hostname\u0000github.com\u0000--active'
+	) {
+		return {
+			stdout: 'github.com\n  ✓ Logged in to github.com account alice (keyring)',
+		};
+	}
+
+	return {
+		exitCode: null,
+		failureCode: 'command-not-found',
+		failureMessage: `Command not found: ${command}.`,
+		status: 'failure',
+	};
+}
+
+function createLocalCommandResult(
+	command: string,
+	args: string[],
+	outcome: FakeCommandOutcome,
+): LocalCommandResult {
+	const status = outcome.status ?? 'success';
+	const exitCode =
+		outcome.exitCode ??
+		(status === 'success'
+			? 0
+			: outcome.failureCode === 'command-not-found'
+				? null
+				: 1);
+	const failure =
+		status === 'success'
+			? undefined
+			: {
+					code: outcome.failureCode ?? 'nonzero-exit',
+					exitCode,
+					message:
+						outcome.failureMessage ??
+						`Command exited with code ${String(exitCode)}.`,
+					signal: null,
+				};
+	const stdout = outcome.stdout ?? '';
+	const stderr = outcome.stderr ?? '';
+
+	return {
+		args,
+		command,
+		cwd: HOME,
+		durationMs: 1,
+		endedAt: NOW.toISOString(),
+		environment: null,
+		exitCode,
+		failure,
+		logs: {
+			command: formatCommandKey(command, args),
+			cwd: HOME,
+			env: {},
+			stderr,
+			stdout,
+		},
+		signal: null,
+		startedAt: NOW.toISOString(),
+		status,
+		stderr,
+		stderrTruncated: outcome.stderrTruncated ?? false,
+		stdout,
+		stdoutTruncated: outcome.stdoutTruncated ?? false,
+	};
+}
+
+function formatCommandKey(command: string, args: string[]): string {
+	return [command, ...args].join(' ');
 }
 
 function createProvider(
@@ -220,7 +321,7 @@ function createFutureProviders(
 ): Partial<Record<SetupCheckId, SetupCheckProvider>> {
 	return {
 		...Object.fromEntries(
-			FUTURE_REQUIRED_CHECKS.map((id) => [id, createProvider(id)]),
+			DEFERRED_REQUIRED_CHECKS.map((id) => [id, createProvider(id)]),
 		),
 		'linear-oauth': createProvider('linear-oauth', 'warning', false),
 		...overrides,
@@ -251,13 +352,38 @@ async function getSnapshot(
 	return service.getSnapshot();
 }
 
+function getCheck(
+	snapshot: SetupDiagnosticsSnapshot,
+	id: SetupCheckId,
+): SetupCheckSnapshot {
+	const check = snapshot.checks.find((candidate) => candidate.id === id);
+
+	if (!check) {
+		assert.fail(`Expected setup check "${id}"`);
+	}
+
+	return check;
+}
+
 test('reports ready when required checks pass and Linear is optional', async () => {
 	const snapshot = await getSnapshot();
+	const gitCheck = getCheck(snapshot, 'git-executable');
+	const ghCliCheck = getCheck(snapshot, 'gh-cli');
+	const ghAuthCheck = getCheck(snapshot, 'gh-auth');
 
 	assert.equal(snapshot.status, 'ready');
 	assert.equal(snapshot.blockedCount, 0);
 	assert.equal(snapshot.optionalCount, 1);
 	assert.equal(snapshot.warningCount, 1);
+	assert.equal(gitCheck.status, 'success');
+	assert.match(gitCheck.detail, /git version 2\.45\.1/);
+	assert.equal(ghCliCheck.status, 'success');
+	assert.match(ghCliCheck.detail, /gh version 2\.52\.0/);
+	assert.equal(ghAuthCheck.status, 'success');
+	assert.equal(
+		ghAuthCheck.detail,
+		'GitHub CLI is authenticated for github.com.',
+	);
 	assert.equal(
 		snapshot.checks.find((check) => check.id === 'linear-oauth')?.blocking,
 		false,
@@ -267,16 +393,124 @@ test('reports ready when required checks pass and Linear is optional', async () 
 test('blocks readiness when a required provider check fails', async () => {
 	const snapshot = await getSnapshot({
 		checkProviders: {
-			'git-executable': createProvider('git-executable', 'failure'),
+			'pi-executable': createProvider('pi-executable', 'failure'),
 		},
 	});
 
 	assert.equal(snapshot.status, 'blocked');
 	assert.equal(snapshot.blockedCount, 1);
 	assert.equal(
-		snapshot.checks.find((check) => check.id === 'git-executable')?.status,
+		snapshot.checks.find((check) => check.id === 'pi-executable')?.status,
 		'failure',
 	);
+});
+
+test('blocks readiness when git is missing', async () => {
+	const snapshot = await getSnapshot({
+		localCommandService: createLocalCommandService({
+			commandResults: {
+				'git --version': {
+					exitCode: null,
+					failureCode: 'command-not-found',
+					failureMessage: 'Command not found: git.',
+					status: 'failure',
+				},
+			},
+		}),
+	});
+	const gitCheck = getCheck(snapshot, 'git-executable');
+
+	assert.equal(snapshot.status, 'blocked');
+	assert.equal(snapshot.blockedCount, 1);
+	assert.equal(gitCheck.status, 'failure');
+	assert.match(gitCheck.detail, /Git was not found/);
+	assert.equal(
+		gitCheck.remediationActions.some(
+			(action) => action.command === 'xcode-select --install',
+		),
+		true,
+	);
+});
+
+test('blocks readiness when gh is missing', async () => {
+	const snapshot = await getSnapshot({
+		localCommandService: createLocalCommandService({
+			commandResults: {
+				'gh --version': {
+					exitCode: null,
+					failureCode: 'command-not-found',
+					failureMessage: 'Command not found: gh.',
+					status: 'failure',
+				},
+			},
+		}),
+	});
+	const ghCliCheck = getCheck(snapshot, 'gh-cli');
+
+	assert.equal(snapshot.status, 'blocked');
+	assert.equal(snapshot.blockedCount, 1);
+	assert.equal(ghCliCheck.status, 'failure');
+	assert.match(ghCliCheck.detail, /GitHub CLI was not found/);
+	assert.equal(
+		ghCliCheck.remediationActions.some(
+			(action) => action.target === 'https://cli.github.com/',
+		),
+		true,
+	);
+});
+
+test('blocks readiness when gh auth status is nonzero', async () => {
+	const snapshot = await getSnapshot({
+		localCommandService: createLocalCommandService({
+			commandResults: {
+				'gh auth status --hostname github.com --active': {
+					exitCode: 1,
+					failureCode: 'nonzero-exit',
+					failureMessage: 'Command exited with code 1.',
+					status: 'failure',
+					stderr:
+						'You are not logged into any GitHub hosts. Run gh auth login.',
+				},
+			},
+		}),
+	});
+	const ghAuthCheck = getCheck(snapshot, 'gh-auth');
+
+	assert.equal(snapshot.status, 'blocked');
+	assert.equal(snapshot.blockedCount, 1);
+	assert.equal(ghAuthCheck.status, 'failure');
+	assert.match(ghAuthCheck.detail, /gh auth login --hostname github\.com/);
+	assert.equal(
+		ghAuthCheck.remediationActions.some(
+			(action) => action.command === 'gh auth login --hostname github.com',
+		),
+		true,
+	);
+	assert.equal(
+		ghAuthCheck.logs.some((log) => log.text.includes('not logged into')),
+		true,
+	);
+});
+
+test('surfaces gh auth status timeouts as blocking failures', async () => {
+	const snapshot = await getSnapshot({
+		localCommandService: createLocalCommandService({
+			commandResults: {
+				'gh auth status --hostname github.com --active': {
+					exitCode: null,
+					failureCode: 'timeout',
+					failureMessage: 'The command timed out.',
+					status: 'failure',
+				},
+			},
+		}),
+	});
+	const ghAuthCheck = getCheck(snapshot, 'gh-auth');
+
+	assert.equal(snapshot.status, 'blocked');
+	assert.equal(snapshot.blockedCount, 1);
+	assert.equal(ghAuthCheck.status, 'failure');
+	assert.match(ghAuthCheck.detail, /timed out/);
 });
 
 test('does not block readiness for warnings on required checks', async () => {
@@ -299,6 +533,34 @@ test('does not block readiness for warnings on required checks', async () => {
 			?.status,
 		'warning',
 	);
+});
+
+test('redacts token-like diagnostics from GitHub auth logs', async () => {
+	const token = 'ghp_1234567890abcdefghijklmnopQRSTUV';
+	const maskedToken = 'gho_************************************';
+	const snapshot = await getSnapshot({
+		localCommandService: createLocalCommandService({
+			commandResults: {
+				'gh auth status --hostname github.com --active': {
+					exitCode: 1,
+					failureCode: 'nonzero-exit',
+					failureMessage: 'Command exited with code 1.',
+					status: 'failure',
+					stderr: `Token: ${token}\nToken: ${maskedToken}\nGITHUB_TOKEN=${token}\n${HOME}/.config/gh/hosts.yml`,
+				},
+			},
+		}),
+	});
+	const ghAuthCheck = getCheck(snapshot, 'gh-auth');
+	const diagnosticText = [
+		ghAuthCheck.detail,
+		...ghAuthCheck.logs.map((log) => log.text),
+	].join('\n');
+
+	assert.equal(diagnosticText.includes(token), false);
+	assert.equal(diagnosticText.includes(maskedToken), false);
+	assert.equal(diagnosticText.includes('[REDACTED]'), true);
+	assert.equal(diagnosticText.includes('~/.config/gh/hosts.yml'), true);
 });
 
 test('redacts sensitive log assignments and collapses home paths', async () => {
