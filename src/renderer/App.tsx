@@ -157,7 +157,6 @@ export function App({
 			dockTabId={activeDockTab}
 			health={shellHealth}
 			isSetupRefreshing={setupDiagnostics.isFetching}
-			onDashboardSelect={() => navigate({ to: '/' })}
 			onDockTabChange={(dock) => updateSearch({ dock })}
 			onHistorySelect={() => navigate({ to: '/history' })}
 			onReviewTabChange={(review) => updateSearch({ review })}

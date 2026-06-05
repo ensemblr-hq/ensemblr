@@ -56,10 +56,42 @@ export interface ReviewFileSummary {
 	status: 'added' | 'deleted' | 'modified' | 'renamed' | 'untracked';
 }
 
+export interface WorkspaceFileSummary {
+	id: string;
+	kind: 'directory' | 'file';
+	name: string;
+	path: string;
+}
+
 export interface DockTabModel {
 	id: DockTabId;
 	label: string;
 	status: 'idle' | 'ready' | 'running' | 'warning';
+}
+
+export interface WorkspaceScriptSummary {
+	command?: string;
+	lines: string[];
+	port?: number;
+	status: 'missing' | 'not-run' | 'running' | 'stopped' | 'succeeded';
+}
+
+export type WorkspaceOpenTargetKind =
+	| 'editor'
+	| 'file-manager'
+	| 'source-control'
+	| 'terminal'
+	| 'utility';
+
+export interface WorkspaceOpenTarget {
+	iconName: string;
+	id: string;
+	installed: boolean;
+	isPrimary?: boolean;
+	kind: WorkspaceOpenTargetKind;
+	label: string;
+	numberShortcutLabel: string;
+	shortcutLabel?: string;
 }
 
 export interface ComposerShellState {
@@ -85,6 +117,7 @@ export interface WorkspaceShellModel {
 	dockTabs: DockTabModel[];
 	id: string;
 	name: string;
+	openTargets: WorkspaceOpenTarget[];
 	pathLabel: string;
 	projectId: string;
 	pullRequest: {
@@ -101,14 +134,23 @@ export interface WorkspaceShellModel {
 		url?: string;
 	};
 	reviewFiles: ReviewFileSummary[];
+	scripts: {
+		run: WorkspaceScriptSummary;
+		setup: WorkspaceScriptSummary;
+	};
 	sessions: SessionTabModel[];
 	sourceSummary: string;
 	status: WorkspaceStatus;
+	workspaceFiles: WorkspaceFileSummary[];
 }
 
 export interface ProjectShellModel {
 	id: string;
 	name: string;
+	owner: {
+		avatarUrl?: string;
+		name: string;
+	};
 	pathLabel: string;
 	workspaces: WorkspaceShellModel[];
 }
@@ -122,10 +164,228 @@ export interface WorkbenchRouteSearch {
 export const DEFAULT_REVIEW_TAB: ReviewPanelTab = 'changes';
 export const DEFAULT_DOCK_TAB: DockTabId = 'setup';
 
+const defaultWorkspaceOpenTargets: WorkspaceOpenTarget[] = [
+	{
+		iconName: 'lucide:folder',
+		id: 'finder',
+		installed: true,
+		kind: 'file-manager',
+		label: 'Finder',
+		numberShortcutLabel: '1',
+	},
+	{
+		iconName: 'vscode-icons:file-type-vscode',
+		id: 'vscode',
+		installed: true,
+		isPrimary: true,
+		kind: 'editor',
+		label: 'VS Code',
+		numberShortcutLabel: '2',
+		shortcutLabel: '⌘O',
+	},
+	{
+		iconName: 'lucide:file-code',
+		id: 'zed',
+		installed: true,
+		kind: 'editor',
+		label: 'Zed',
+		numberShortcutLabel: '3',
+	},
+	{
+		iconName: 'lucide:wrench',
+		id: 'xcode',
+		installed: true,
+		kind: 'editor',
+		label: 'Xcode',
+		numberShortcutLabel: '4',
+	},
+	{
+		iconName: 'lucide:square-terminal',
+		id: 'ghostty',
+		installed: true,
+		kind: 'terminal',
+		label: 'Ghostty',
+		numberShortcutLabel: '5',
+	},
+	{
+		iconName: 'lucide:square-terminal',
+		id: 'warp',
+		installed: true,
+		kind: 'terminal',
+		label: 'Warp',
+		numberShortcutLabel: '6',
+	},
+	{
+		iconName: 'lucide:square-terminal',
+		id: 'terminal',
+		installed: true,
+		kind: 'terminal',
+		label: 'Terminal',
+		numberShortcutLabel: '7',
+	},
+	{
+		iconName: 'vscode-icons:folder-type-github',
+		id: 'github-desktop',
+		installed: true,
+		kind: 'source-control',
+		label: 'GitHub Desktop',
+		numberShortcutLabel: '8',
+	},
+	{
+		iconName: 'lucide:copy',
+		id: 'copy-path',
+		installed: true,
+		kind: 'utility',
+		label: 'Copy path',
+		numberShortcutLabel: '9',
+		shortcutLabel: '⌘⇧C',
+	},
+];
+
+const piductorWorkspaceFiles: WorkspaceFileSummary[] = [
+	{ id: 'dir-agents', kind: 'directory', name: '.agents', path: '.agents' },
+	{ id: 'dir-claude', kind: 'directory', name: '.claude', path: '.claude' },
+	{ id: 'dir-codex', kind: 'directory', name: '.codex', path: '.codex' },
+	{ id: 'dir-context', kind: 'directory', name: '.context', path: '.context' },
+	{ id: 'dir-github', kind: 'directory', name: '.github', path: '.github' },
+	{ id: 'dir-vite', kind: 'directory', name: '.vite', path: '.vite' },
+	{ id: 'dir-docs', kind: 'directory', name: 'docs', path: 'docs' },
+	{
+		id: 'dir-node-modules',
+		kind: 'directory',
+		name: 'node_modules',
+		path: 'node_modules',
+	},
+	{ id: 'dir-out', kind: 'directory', name: 'out', path: 'out' },
+	{ id: 'dir-scripts', kind: 'directory', name: 'scripts', path: 'scripts' },
+	{ id: 'dir-src', kind: 'directory', name: 'src', path: 'src' },
+	{ id: 'dir-tests', kind: 'directory', name: 'tests', path: 'tests' },
+	{ id: 'file-git', kind: 'file', name: '.git', path: '.git' },
+	{
+		id: 'file-gitignore',
+		kind: 'file',
+		name: '.gitignore',
+		path: '.gitignore',
+	},
+	{
+		id: 'file-gitkeep',
+		kind: 'file',
+		name: '.gitkeep',
+		path: '.gitkeep',
+	},
+	{ id: 'file-agents', kind: 'file', name: 'AGENTS.md', path: 'AGENTS.md' },
+	{ id: 'file-biome', kind: 'file', name: 'biome.json', path: 'biome.json' },
+	{ id: 'file-bun-lock', kind: 'file', name: 'bun.lock', path: 'bun.lock' },
+	{
+		id: 'file-components',
+		kind: 'file',
+		name: 'components.json',
+		path: 'components.json',
+	},
+	{
+		id: 'file-conductor',
+		kind: 'file',
+		name: 'conductor.json',
+		path: 'conductor.json',
+	},
+	{ id: 'file-context', kind: 'file', name: 'CONTEXT.md', path: 'CONTEXT.md' },
+	{
+		id: 'file-forge-config',
+		kind: 'file',
+		name: 'forge.config.ts',
+		path: 'forge.config.ts',
+	},
+	{
+		id: 'file-package',
+		kind: 'file',
+		name: 'package.json',
+		path: 'package.json',
+	},
+	{ id: 'file-readme', kind: 'file', name: 'README.md', path: 'README.md' },
+];
+
+const agentLabWorkspaceFiles: WorkspaceFileSummary[] = [
+	{ id: 'dir-docs', kind: 'directory', name: 'docs', path: 'docs' },
+	{ id: 'dir-src', kind: 'directory', name: 'src', path: 'src' },
+	{ id: 'dir-tests', kind: 'directory', name: 'tests', path: 'tests' },
+	{
+		id: 'file-package',
+		kind: 'file',
+		name: 'package.json',
+		path: 'package.json',
+	},
+	{ id: 'file-readme', kind: 'file', name: 'README.md', path: 'README.md' },
+];
+
+const runningDevScripts = {
+	run: {
+		command: 'bun run dev',
+		lines: [
+			'$ bun run dev',
+			'VITE v5.4.21 ready in 418 ms',
+			'Local: http://localhost:5173/',
+			'Press h + enter to show help',
+		],
+		port: 5173,
+		status: 'running',
+	},
+	setup: {
+		command: 'bun install',
+		lines: [
+			'$ bun install',
+			'Resolved, downloaded and extracted [9]',
+			'Saved lockfile',
+			'Done in 1.2s',
+		],
+		status: 'succeeded',
+	},
+} satisfies WorkspaceShellModel['scripts'];
+
+const setupPendingScripts = {
+	run: {
+		command: 'bun run dev',
+		lines: [],
+		status: 'stopped',
+	},
+	setup: {
+		command: 'bun install',
+		lines: [],
+		status: 'not-run',
+	},
+} satisfies WorkspaceShellModel['scripts'];
+
+const stoppedRunScripts = {
+	run: {
+		command: 'bun run dev',
+		lines: ['$ bun run dev', 'Run script has not started for this workspace.'],
+		status: 'stopped',
+	},
+	setup: {
+		command: 'bun install',
+		lines: ['$ bun install', 'Dependencies are already up to date.'],
+		status: 'succeeded',
+	},
+} satisfies WorkspaceShellModel['scripts'];
+
+const missingScripts = {
+	run: {
+		lines: [],
+		status: 'missing',
+	},
+	setup: {
+		lines: [],
+		status: 'missing',
+	},
+} satisfies WorkspaceShellModel['scripts'];
+
 export const shellFixtureProjects: ProjectShellModel[] = [
 	{
 		id: 'piductor',
 		name: 'piductor',
+		owner: {
+			avatarUrl: 'https://github.com/psoldunov.png',
+			name: 'psoldunov',
+		},
 		pathLabel: '~/Piductor/repos/piductor',
 		workspaces: [
 			{
@@ -148,6 +408,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				id: 'san-antonio',
 				name: 'Conductor shell rework',
+				openTargets: defaultWorkspaceOpenTargets,
 				pathLabel: '~/Piductor/workspaces/piductor/san-antonio',
 				projectId: 'piductor',
 				pullRequest: {
@@ -225,6 +486,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 						status: 'modified',
 					},
 				],
+				scripts: runningDevScripts,
 				sessions: [
 					{
 						id: 'review-shell',
@@ -237,7 +499,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						id: 'setup-thread',
 						label: 'Setup notes',
-						status: 'blocked',
+						status: 'working',
 						summary:
 							'Setup diagnostics remain visible in the dock instead of taking over the route.',
 						updatedLabel: '12m ago',
@@ -245,6 +507,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'branched from master with copied local context',
 				status: 'needs-setup',
+				workspaceFiles: piductorWorkspaceFiles,
 			},
 			{
 				branchName: 'linear-issue-flow',
@@ -265,6 +528,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				id: 'linear-issue-flow',
 				name: 'Linear issue flow',
+				openTargets: defaultWorkspaceOpenTargets,
 				pathLabel: '~/Piductor/workspaces/piductor/linear-issue-flow',
 				projectId: 'piductor',
 				pullRequest: {
@@ -293,6 +557,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					todos: [],
 				},
 				reviewFiles: [],
+				scripts: setupPendingScripts,
 				sessions: [
 					{
 						id: 'issue-kickoff',
@@ -304,6 +569,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'fixture workspace from future issue picker',
 				status: 'idle',
+				workspaceFiles: piductorWorkspaceFiles,
 			},
 			{
 				branchName: 'normal-right-header',
@@ -325,6 +591,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				id: 'normal-right-header',
 				name: 'Normal right header',
+				openTargets: defaultWorkspaceOpenTargets,
 				pathLabel: '~/Piductor/workspaces/piductor/normal-right-header',
 				projectId: 'piductor',
 				pullRequest: {
@@ -342,6 +609,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					todos: [],
 				},
 				reviewFiles: [],
+				scripts: missingScripts,
 				sessions: [
 					{
 						id: 'plain-header',
@@ -354,6 +622,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'fixture branch for the normal right sidebar header',
 				status: 'working',
+				workspaceFiles: piductorWorkspaceFiles,
 			},
 			{
 				branchName: 'changed-right-header',
@@ -375,6 +644,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				id: 'changed-right-header',
 				name: 'Changed right header',
+				openTargets: defaultWorkspaceOpenTargets,
 				pathLabel: '~/Piductor/workspaces/piductor/changed-right-header',
 				projectId: 'piductor',
 				pullRequest: {
@@ -400,6 +670,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 						status: 'modified',
 					},
 				],
+				scripts: stoppedRunScripts,
 				sessions: [
 					{
 						id: 'changed-header',
@@ -412,12 +683,16 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'fixture branch for the changed right sidebar header',
 				status: 'working',
+				workspaceFiles: piductorWorkspaceFiles,
 			},
 		],
 	},
 	{
 		id: 'agent-lab',
 		name: 'agent-lab',
+		owner: {
+			name: 'agent-lab',
+		},
 		pathLabel: '~/Piductor/repos/agent-lab',
 		workspaces: [
 			{
@@ -439,6 +714,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				id: 'review-checks',
 				name: 'Review checks',
+				openTargets: defaultWorkspaceOpenTargets,
 				pathLabel: '~/Piductor/workspaces/agent-lab/review-checks',
 				projectId: 'agent-lab',
 				pullRequest: {
@@ -468,6 +744,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					todos: [],
 				},
 				reviewFiles: [],
+				scripts: runningDevScripts,
 				sessions: [
 					{
 						id: 'checks-pass',
@@ -479,6 +756,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'fixture branch for review panel shape',
 				status: 'working',
+				workspaceFiles: agentLabWorkspaceFiles,
 			},
 		],
 	},
