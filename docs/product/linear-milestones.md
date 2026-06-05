@@ -7,7 +7,7 @@ These milestones are intended to be copied into Linear as project milestones. Is
 ## 1. Foundation
 
 Goal:
-Establish the application, persistence, secret, configuration, root-directory, and command-execution foundations needed by every later workflow.
+Establish the application shell, Router/Query renderer boundary, persistence, secret, configuration, root-directory, and command-execution foundations needed by every later workflow.
 
 Included issues:
 
@@ -23,6 +23,8 @@ Included issues:
 Exit criteria:
 
 - Electron main and React renderer can start in development.
+- Renderer uses TanStack Router for durable navigation/search state and TanStack Query for preload/backend snapshots.
+- The Conductor-style shell scaffold exists with fixture project/workspace rows, chat tabs, right review panel tabs, and setup/run/terminal dock regions.
 - Main-process services expose typed IPC boundaries for storage, config, root, secrets, and local commands.
 - SQLite migrations run against a local app-support database and test database.
 - Secrets can be stored through a Keychain abstraction and mocked in tests.
@@ -87,6 +89,7 @@ Included issues:
 Exit criteria:
 
 - Users can add or clone a project into the managed root.
+- Existing shell regions render live repository/workspace records instead of fixture shell data.
 - Users can create a git worktree workspace from the configured branch source.
 - `.context/` exists for workspace handoff files.
 - Eligible gitignored files are copied through `.worktreeinclude`, repository settings, or defaults.
@@ -151,7 +154,7 @@ Included issues:
 Exit criteria:
 
 - Setup, run, archive, and named terminal sessions execute from workspace directories.
-- xterm.js can render output, handle resize, copy/paste, scrollback, and process termination states.
+- xterm.js replaces the existing dock placeholder and can render output, handle resize, copy/paste, scrollback, and process termination states.
 - Scripts receive native `PIDUCTOR_*` variables and compatibility `CONDUCTOR_*` variables when appropriate.
 - Run script modes support concurrent and nonconcurrent behavior.
 - Preview URL and spotlight testing uncertainties are documented before build work proceeds.

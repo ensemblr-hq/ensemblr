@@ -20,8 +20,11 @@ Piductor should match Conductor's observable workflows and information architect
 Piductor equivalent:
 
 - Use Electron native menu APIs for macOS menus.
+- Use TanStack Router for durable app navigation and workspace/search state such as selected workspace, chat tab, review tab, and dock tab.
+- Use TanStack Query for backend/preload snapshots such as health, setup diagnostics, repository/workspace records, file status, terminal metadata, and PR/check state.
 - Use a Piductor-specific React/shadcn visual language, not Conductor's visual identity.
 - Preserve the same pane hierarchy so Conductor users can transfer workflows.
+- Build the structural shell early with fixture data; later service tickets should wire live data into the existing sidebar, timeline, review panel, and dock regions instead of creating new regions.
 
 ### Settings Shell
 
@@ -114,15 +117,15 @@ Piductor equivalent:
 
 ## Prioritized Implementation Checklist
 
-1. Build app shell: sidebar projects/workspaces, center tabbed workspace, right panel tabs, terminal dock.
+1. Build app shell: sidebar projects/workspaces, center tabbed workspace, right panel tabs, terminal dock, Router search state, and Query-backed setup/health snapshots.
 2. Build settings shell: app settings sections plus repository settings from the screenshot inventory.
 3. Implement setup gate: git, `gh`, Pi executable/RPC/provider, root directory, SQLite, and process environment checks.
 4. Implement repository add/open/clone: add menu, clone modal, clone progress log, post-clone workspace landing.
 5. Implement workspace core: worktree creation, default branch/remote, copied files, setup script, placeholder naming, context folder.
 6. Implement Pi timeline: session creation, event rendering, tool calls, runtime errors, retry/fork actions, composer controls.
-7. Implement terminal dock: setup/run output, named terminals, rerun/stop/run controls, PTY lifecycle.
-8. Implement file/diff panel: all-files tree, changes tree, diff body, search, review mode, local comments.
-9. Implement PR/checks panel: no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state.
+7. Wire terminal dock: replace shell placeholder logs with setup/run output, named terminals, rerun/stop/run controls, PTY lifecycle.
+8. Wire file/diff panel: replace fixture rows with all-files tree, changes tree, diff body, search, review mode, local comments.
+9. Wire PR/checks panel: replace fixture checks with no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state.
 10. Implement repository action preferences: review, create PR, fix errors, resolve conflicts, branch rename, and general Pi instructions.
 11. Add polish/settings parity: appearance previews, keyboard shortcuts, command palette, non-deferred feature flags, resource usage, and big terminal mode. Voice remains post-core deferred.
 12. Revisit advanced integrations: Graphite stack support, direct GitHub API, cloud/remote workspace SSH behavior. Linear issue workflows are v1 scope.

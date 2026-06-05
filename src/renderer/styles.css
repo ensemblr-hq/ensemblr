@@ -245,15 +245,51 @@
 		backdrop-filter: blur(18px) saturate(1.3);
 	}
 
+	.sidebar-collapsed-trigger {
+		display: none;
+	}
+
+	.no-scrollbar {
+		scrollbar-width: none;
+	}
+
+	.no-scrollbar::-webkit-scrollbar {
+		display: none;
+	}
+
+	.review-panel {
+		container-type: inline-size;
+	}
+
+	.review-panel-action-label {
+		display: inline;
+	}
+
+	@container (width < 24rem) {
+		.review-panel-action-label {
+			display: none;
+		}
+	}
+
 	[data-slot="sidebar"][data-collapsible="offcanvas"]
 		~ [data-slot="sidebar-inset"]
 		.native-toolbar {
 		padding-inline-start: var(--piductor-traffic-light-safe-inline);
 	}
 
+	[data-slot="sidebar"][data-state="collapsed"]
+		~ [data-slot="sidebar-inset"]
+		.sidebar-collapsed-trigger {
+		display: inline-flex;
+	}
+
 	@media (width < 48rem) {
 		.native-toolbar {
 			padding-inline-start: var(--piductor-traffic-light-safe-inline);
+		}
+
+		.sidebar-collapsed-trigger {
+			display: inline-flex;
 		}
 	}
 

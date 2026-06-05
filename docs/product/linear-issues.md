@@ -17,15 +17,18 @@ Create the initial Electron + React + TypeScript application skeleton with typed
 Scope:
 - Configure Electron main process, preload, React renderer, TypeScript, Tailwind, and development scripts.
 - Add typed IPC scaffolding for future app services.
-- Add basic routing between app shell, setup gate placeholder, workspace shell placeholder, and settings placeholder.
+- Add TanStack Router and TanStack Query providers for renderer navigation and backend/preload snapshots.
+- Add the typed route tree for dashboard, history, settings, and workspace routes.
 
 Out of scope:
 - Full visual design and app feature implementation.
+- Live repository/workspace, terminal, file, diff, or checks services.
 - Packaging, signing, notarization, or auto-update.
 
 Acceptance criteria:
 - The app starts in development with main and renderer processes.
 - Renderer can call a typed no-op IPC health endpoint.
+- Renderer has Router and Query providers available without relying on Jotai route state.
 - Main process owns native lifecycle hooks and menu placeholder wiring.
 - Development build and typecheck pass.
 
@@ -56,7 +59,9 @@ Define the initial Piductor-owned visual system using shadcn/ui source, Tailwind
 Scope:
 - Add shadcn/ui component foundation as owned source.
 - Define color, spacing, typography, radius, pane, code, diff, and terminal tokens.
+- Build the Conductor-style shell scaffold: project/workspace sidebar, project/branch header, chat tabs, center timeline/composer, right All files/Changes/Checks panel, and lower Setup/Run/Terminal dock.
 - Build compact shell primitives for sidebar, tabs, panels, dock, forms, dialogs, banners, and status badges.
+- Use fixture/local renderer models only for scaffold data; live services wire in later tickets.
 
 Out of scope:
 - Pixel-copying Conductor visuals.
@@ -65,6 +70,7 @@ Out of scope:
 Acceptance criteria:
 - Core shell components render from Piductor-owned tokens.
 - The style direction is distinct from Conductor and not stock shadcn defaults.
+- Setup-blocked state disables the composer while keeping the workbench visible and selecting the setup dock.
 - Components support light/dark or theme token switching if the app foundation already exposes it.
 
 Verification:
@@ -738,16 +744,17 @@ Priority: P0
 Dependencies: PID-002, PID-003
 
 Summary:
-Implement the persistent app shell navigation for repositories and workspaces.
+Wire the persistent app shell navigation to live repository and workspace records.
 
 Scope:
-- Sidebar with Dashboard, History placeholder, repositories, nested workspaces, settings/help footer, and compact status stats.
-- Center workspace outlet and right panel/dock placeholders.
+- Replace fixture project/workspace sidebar rows with SQLite-backed repository and workspace records.
+- Keep the existing Dashboard, History, settings/help footer, chat-tab strip, right panel, and dock regions.
 - Repository context menu for create workspace, create from issue/PR placeholders, settings, hide, and remove.
-- Persist selected repository/workspace UI state.
+- Persist selected repository/workspace defaults where route/search state is not enough.
 
 Out of scope:
 - Full dashboard/history implementations.
+- Rebuilding the structural shell regions already established by the Foundation UI pass.
 - Full files/checks/terminal contents.
 
 Acceptance criteria:
@@ -853,13 +860,13 @@ Priority: P0
 Dependencies: PID-020, PID-021, PID-022
 
 Summary:
-Show the new-workspace landing state with branch, copy, setup, file panel, checks panel, dock placeholders, and Pi composer shell.
+Wire live new-workspace landing data into the existing workbench shell.
 
 Scope:
-- Render landing card after workspace creation.
+- Render landing state after workspace creation inside the existing center timeline/composer region.
 - Show branch source, copied-file count, setup-script guidance, and linked issue metadata when present.
-- Show empty file/checks states and terminal dock placeholders.
-- Include composer shell that will start a Pi session after runtime tickets land.
+- Populate existing empty file/checks and dock regions with workspace-specific placeholder state.
+- Keep the composer shell ready to start a Pi session after runtime tickets land.
 
 Out of scope:
 - Actual Pi prompt submission.
@@ -1388,11 +1395,11 @@ Priority: P0
 Dependencies: PID-002, PID-036
 
 Summary:
-Implement the renderer terminal adapter and dock UI using xterm.js.
+Replace the setup/run/terminal dock placeholder with the xterm.js renderer adapter.
 
 Scope:
 - Integrate xterm.js behind a terminal adapter.
-- Add Setup, Run, and named terminal tabs in the lower-right dock.
+- Wire Setup, Run, and named terminal tabs in the existing lower-right dock.
 - Support fit/resize, scrollback, copy/paste, links where available, and status badges.
 - Keep dock visible alongside timeline and right panel.
 
@@ -1882,7 +1889,7 @@ Implement workspace file status and all-files tree services.
 Scope:
 - Query repository file tree and workspace git status.
 - Report tracked, modified, added, deleted, renamed, untracked, and ignored states where relevant.
-- Expose all-files tree to right panel.
+- Replace fixture rows in the existing All files tab with the workspace tree.
 - Cache only derived UI metadata as needed.
 
 Out of scope:
@@ -1915,10 +1922,10 @@ Priority: P0
 Dependencies: PID-050
 
 Summary:
-Build the Changes panel with grouped file status, search, display controls, and unified diff viewer.
+Wire the existing Changes panel to grouped file status and unified diffs.
 
 Scope:
-- Folder-grouped changed-file tree with status badges and line counts.
+- Replace fixture change rows with a folder-grouped changed-file tree with status badges and line counts.
 - Search/filter and list/tree display controls.
 - Unified diff viewer with code theme support.
 - Commit filtering support where practical.
@@ -2143,10 +2150,10 @@ Priority: P0
 Dependencies: PID-052, PID-055, PID-056
 
 Summary:
-Build the Checks panel states for GitHub PR metadata, checks, comments, todos, deployments, and blockers.
+Wire the existing Checks panel to GitHub PR metadata, checks, comments, todos, deployments, and blockers.
 
 Scope:
-- Render no-PR, uncommitted, pending/failing, and ready-to-merge state shells.
+- Replace fixture checks with no-PR, uncommitted, pending/failing, and ready-to-merge state shells.
 - Show PR metadata, external PR link, git status, checks, deployments where available, comments/review threads where available, and todos.
 - Poll/refresh metadata through service with manual refresh.
 - Show add-to-Pi-context actions for supported items.

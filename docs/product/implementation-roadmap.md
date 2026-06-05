@@ -10,7 +10,7 @@ V1 builds a Pi-focused Electron desktop app with Conductor-style local workspace
 
 In scope for v1:
 
-- Electron main process, React/TypeScript renderer, shadcn/ui, Tailwind, and Piductor-owned design tokens.
+- Electron main process, React/TypeScript renderer, TanStack Router, TanStack Query, shadcn/ui, Tailwind, and Piductor-owned design tokens.
 - Local SQLite database for mutable app metadata and UI/review state.
 - macOS Keychain for secret values, with SQLite storing metadata only.
 - Declarative user config at `~/.config/piductor/config.json` with JSON schema validation.
@@ -26,6 +26,7 @@ In scope for v1:
 - First-class Linear OAuth integration with issue create/read/update/comment and workspace creation from issues.
 - GitHub PR/check/comment/merge workflows through authenticated `gh` CLI where practical.
 - Settings shell, repository settings, keyboard shortcuts, command palette, deep links, diagnostics, and non-deferred polish.
+- Foundation shell placeholders for the Conductor-style sidebar, workspace chat tabs, right review panel, and setup/run/terminal dock. Live repository/workspace, terminal, file, diff, and checks services remain in their original milestone tickets.
 
 Explicitly deferred until post-core:
 
@@ -44,7 +45,7 @@ Explicitly deferred until post-core:
 
 | Milestone | Focus | Exit criteria |
 | --- | --- | --- |
-| 1. Foundation | App shell, storage, config, root, Keychain, process boundary. | The app can boot, persist metadata, load config, resolve settings, create managed directories, and run local commands through main-process services. |
+| 1. Foundation | App shell, storage, config, root, Keychain, process boundary. | The app can boot into the Conductor-style shell scaffold, persist metadata, load config, resolve settings, create managed directories, and run local commands through main-process services. |
 | 2. Setup Gate and Configuration | First-run diagnostics, `gh` requirement, Pi executable discovery, root warnings, env/secrets, repo config parsing. | Users cannot enter core workflows until required checks pass; each failure has remediation; Linear is offered but only blocks Linear workflows. |
 | 3. Repository and Workspace Core | Add/open/clone repositories, worktree workspace creation, files-to-copy, landing state, adoption, archive context. | A user can register or clone a project, create/adopt a workspace, see it in the sidebar, and land in a ready workspace shell. |
 | 4. Pi CLI RPC Runtime and Agent Timeline | RPC client, process supervision, Pi sessions, composer, timeline, checkpoints, capability discovery. | A user can start a Pi session in a workspace and see structured events, errors, controls, and checkpoint-backed turn state. |
@@ -60,6 +61,7 @@ Explicitly deferred until post-core:
 - Discovery tasks answer known implementation uncertainties without forcing a product decision.
 - Product-decision tasks are separate and should not block unrelated engineering work.
 - Each ticket should fit one agent/workspace when practical.
+- Treat the Foundation workbench shell as the structural UI contract. Later tickets should replace fixture/local renderer data through TanStack Query and IPC-backed services rather than rebuilding navigation, review, or dock regions.
 - Prefer boundaries that preserve future pivots: `PiAgentClient`, `GitHubService`, `LinearService`, `ConfigService`, `SecretStore`, `TerminalService`, and `WorkspaceService`.
 - Do not read or write Conductor's private SQLite database.
 - Do not pass Pi disabling flags by default.

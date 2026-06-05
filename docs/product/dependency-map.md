@@ -6,13 +6,14 @@ This map is generated from the local planning IDs in `docs/product/linear-issues
 
 ## Critical Path
 
-- Foundation services (`PID-001` through `PID-008`) unblock setup, repositories, storage, config, secrets, root, and command execution.
+- Foundation services (`PID-001` through `PID-008`) unblock setup, repositories, storage, config, secrets, root, command execution, and establish the structural workbench shell.
+- Foundation UI creates fixture-backed sidebar, chat tab, review panel, and dock regions. Later workspace, terminal, and review tickets wire live TanStack Query/IPC data into those regions instead of rebuilding them.
 - Setup/config (`PID-009` through `PID-016`) unblocks ready-state gating, Pi executable/RPC checks, `gh`, env/secrets, repository config, and safe root changes.
-- Workspace core (`PID-017` through `PID-025`) unblocks Pi sessions, terminal/scripts, Linear workspace creation, and GitHub review flows.
+- Workspace core (`PID-017` through `PID-025`) replaces fixture shell data with live repository/workspace records and unblocks Pi sessions, terminal/scripts, Linear workspace creation, and GitHub review flows.
 - Pi runtime (`PID-026` through `PID-035`) unblocks agent timeline, checkpoints, context-to-Pi, and agent-assisted review/PR work.
-- Terminal/scripts (`PID-036` through `PID-042`) unblocks setup/run/archive execution, env injection, and process UI.
+- Terminal/scripts (`PID-036` through `PID-042`) replaces the dock log placeholders with setup/run/archive execution, env injection, and process UI.
 - Linear (`PID-043` through `PID-049`) depends on Keychain/SQLite/setup surfaces and workspace core for workspace-from-issue.
-- GitHub/review (`PID-050` through `PID-060`) depends on workspace core, `gh`, git status, Pi composer, and checks metadata.
+- GitHub/review (`PID-050` through `PID-060`) wires the existing All files/Changes/Checks regions and depends on workspace core, `gh`, git status, Pi composer, and checks metadata.
 - Settings/polish (`PID-061` through `PID-069`) depends on underlying services so settings show real state and source diagnostics.
 - Deferred issues (`PID-070` through `PID-074`) should not block core milestones.
 
