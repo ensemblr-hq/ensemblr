@@ -5,27 +5,27 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 import {
-	PIDUCTOR_CONFIG_SCHEMA_VERSION,
-	type PiductorConfig,
+	ENSEMBLE_CONFIG_SCHEMA_VERSION,
+	type EnsembleConfig,
 } from '../../src/main/config/config-loader.ts';
 import {
 	normalizeSettingsResolutionRequest,
 	resolveSettings,
 } from '../../src/main/config/config-resolution.ts';
-import { openPiductorDatabase } from '../../src/main/storage/database.ts';
+import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
 import type { SettingsResolutionGroupSnapshot } from '../../src/shared/ipc.ts';
 
 let settingCounter = 0;
-const previewUrlTemplate = 'http://localhost:$' + '{PIDUCTOR_PORT}';
+const previewUrlTemplate = 'http://localhost:$' + '{ENSEMBLE_PORT}';
 
-function createConfig(overrides: Partial<PiductorConfig> = {}): PiductorConfig {
+function createConfig(overrides: Partial<EnsembleConfig> = {}): EnsembleConfig {
 	return {
 		app: {},
 		environment: {},
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: PIDUCTOR_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 		...overrides,
@@ -33,9 +33,9 @@ function createConfig(overrides: Partial<PiductorConfig> = {}): PiductorConfig {
 }
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
-	const directory = mkdtempSync(path.join(tmpdir(), 'piductor-resolution-'));
-	const connection = openPiductorDatabase({
-		databasePath: path.join(directory, 'piductor-test.db'),
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-resolution-'));
+	const connection = openEnsembleDatabase({
+		databasePath: path.join(directory, 'ensemble-test.db'),
 	});
 
 	t.after(() => {
@@ -117,7 +117,7 @@ test('resolves app settings from sqlite, config defaults, and built-in defaults'
 		},
 		{
 			source: 'built-in-default',
-			value: '/Users/example/Piductor',
+			value: '/Users/example/Ensemble',
 		},
 	);
 });
@@ -236,9 +236,9 @@ test('resolves repository settings from sqlite and provided config snapshots', (
 					setup: 'bun install',
 				},
 			},
-			piductorConfig: {
+			ensembleConfig: {
 				previewUrlTemplate,
-				scripts: { run: 'bun run piductor' },
+				scripts: { run: 'bun run ensemble' },
 			},
 			repositoryId: 'repo-1',
 		},
@@ -261,7 +261,7 @@ test('resolves repository settings from sqlite and provided config snapshots', (
 			value: getSetting(snapshot.repository, 'previewUrlTemplate').value,
 		},
 		{
-			source: 'piductor-config',
+			source: 'ensemble-config',
 			value: previewUrlTemplate,
 		},
 	);
@@ -294,7 +294,7 @@ test('resolves repository settings from sqlite and provided config snapshots', (
 		},
 		{
 			reason: 'Ignored because sqlite has higher precedence.',
-			source: 'piductor-config',
+			source: 'ensemble-config',
 			status: 'ignored',
 		},
 		{
@@ -315,7 +315,7 @@ test('explicit repository sources override inferred conductor compatibility', ()
 		config: createConfig(),
 		repository: {
 			conductorConfig: { scripts: { setup: 'bun install' } },
-			piductorConfig: { conductorCompatibility: false },
+			ensembleConfig: { conductorCompatibility: false },
 			repositoryId: 'repo-1',
 		},
 	});
@@ -329,7 +329,7 @@ test('explicit repository sources override inferred conductor compatibility', ()
 			source: getSetting(snapshot.repository, 'conductorCompatibility').source,
 			value: getSetting(snapshot.repository, 'conductorCompatibility').value,
 		},
-		{ source: 'piductor-config', value: false },
+		{ source: 'ensemble-config', value: false },
 	);
 });
 
@@ -339,14 +339,14 @@ test('normalizes IPC settings resolution requests', () => {
 		normalizeSettingsResolutionRequest({
 			repository: {
 				conductorConfig: [],
-				piductorConfig: { scripts: { run: 'bun run dev' } },
+				ensembleConfig: { scripts: { run: 'bun run dev' } },
 				repositoryId: ' repo-1 ',
 			},
 		}),
 		{
 			repository: {
 				conductorConfig: undefined,
-				piductorConfig: { scripts: { run: 'bun run dev' } },
+				ensembleConfig: { scripts: { run: 'bun run dev' } },
 				repositoryId: 'repo-1',
 			},
 		},

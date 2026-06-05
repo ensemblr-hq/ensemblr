@@ -2,7 +2,7 @@
 
 Date: 2026-06-04
 
-Piductor targets feature parity with Conductor's publicly observable and documented workflows, adapted for Pi. This matrix is a living checklist, not a copied product spec.
+Ensemble targets feature parity with Conductor's publicly observable and documented workflows, adapted for Pi. This matrix is a living checklist, not a copied product spec.
 
 Sources checked:
 
@@ -21,7 +21,7 @@ Sources checked:
 - MCP: https://www.conductor.build/docs/reference/mcp
 - Keyboard shortcuts: https://www.conductor.build/docs/reference/keyboard-shortcuts
 - User-provided screenshot inventory: `.context/conductor-screens/`, summarized in `docs/product/screen-inventory.md`
-- Implemented Piductor shell inventory: `docs/product/current-shell-inventory.md`
+- Implemented Ensemble shell inventory: `docs/product/current-shell-inventory.md`
 
 ## Implemented Shell Direction
 
@@ -40,7 +40,7 @@ if original screenshot evidence is unavailable.
 
 ## Product Model
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Project | One app entry for a codebase with repository settings and workspaces. | Same model, with Pi-specific repository settings. |
 | Repository | Git codebase from a local folder, GitHub project, or starter flow. | Same target. |
@@ -51,7 +51,7 @@ if original screenshot evidence is unavailable.
 
 ## Workspace And Parallel Work
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Independent tasks | Multiple workspaces for independently mergeable streams. | Same target. |
 | Shared work | Multiple agents in one workspace when they share branch/context. | Same target, represented as multiple Pi sessions in one workspace. |
@@ -62,7 +62,7 @@ if original screenshot evidence is unavailable.
 
 ## Pi Agent Runtime
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Agent types | Claude Code and Codex. | Pi only for v1. |
 | Session controls | Plan mode, fast mode, reasoning, personality, checkpoints. | Adapt to Pi capabilities: model, thinking level, session tree, compaction, steering/follow-up, checkpoints. |
@@ -74,7 +74,7 @@ if original screenshot evidence is unavailable.
 
 ## Scripts And Local Runtime
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Setup script | Runs when workspace is created. | Same target. |
 | Run script | Runs from Run button inside workspace. | Same target. |
@@ -86,7 +86,7 @@ if original screenshot evidence is unavailable.
 
 ## Files To Copy
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Purpose | Copy selected gitignored local files into new workspaces. | Same target. |
 | Resolution order | `.worktreeinclude`, repo settings, default `.env*`. | Same target; `.worktreeinclude` wins when present. |
@@ -95,28 +95,28 @@ if original screenshot evidence is unavailable.
 
 ## Repository Configuration
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
-| Shared file | `conductor.json` at repo root. | Support `piductor.json` first, then `conductor.json` for migration and tool-switching compatibility. |
-| Fields | `scripts.setup`, `scripts.run`, `scripts.archive`, `runScriptMode`, `enterpriseDataPrivacy`. | Same functional fields where applicable; Pi-specific fields belong in `piductor.json`. |
-| Preview URL | Repository settings can define a preview URL template using workspace environment variables. | Same target with `PIDUCTOR_*` variables and `CONDUCTOR_*` compatibility for Conductor-compatible repos or explicit opt-in. |
+| Shared file | `conductor.json` at repo root. | Support `ensemble.json` first, then `conductor.json` for migration and tool-switching compatibility. |
+| Fields | `scripts.setup`, `scripts.run`, `scripts.archive`, `runScriptMode`, `enterpriseDataPrivacy`. | Same functional fields where applicable; Pi-specific fields belong in `ensemble.json`. |
+| Preview URL | Repository settings can define a preview URL template using workspace environment variables. | Same target with `ENSEMBLE_*` variables and `CONDUCTOR_*` compatibility for Conductor-compatible repos or explicit opt-in. |
 | Action preferences | Repository settings include per-action agent instructions for review, PR creation, fixing errors, conflict resolution, branch naming, and general chats. | Same target as Pi instruction templates with personal and shared sources. |
 | Precedence | Personal repository settings override shared config. | Same target. |
 | Shell | Scripts run from workspace directory with workspace env vars. | Same target. |
 
 ## Environment Variables
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
-| Workspace name | `CONDUCTOR_WORKSPACE_NAME`. | Expose `PIDUCTOR_WORKSPACE_NAME`; expose `CONDUCTOR_WORKSPACE_NAME` for compatibility. |
-| Workspace path | `CONDUCTOR_WORKSPACE_PATH`. | Expose `PIDUCTOR_WORKSPACE_PATH`; expose `CONDUCTOR_WORKSPACE_PATH` for compatibility. |
-| Root path | `CONDUCTOR_ROOT_PATH`. | Expose `PIDUCTOR_ROOT_PATH`; expose `CONDUCTOR_ROOT_PATH` for compatibility. |
-| Default branch | `CONDUCTOR_DEFAULT_BRANCH`. | Expose `PIDUCTOR_DEFAULT_BRANCH`; expose `CONDUCTOR_DEFAULT_BRANCH` for compatibility. |
-| Port range | `CONDUCTOR_PORT` plus allocated nearby ports. | Expose `PIDUCTOR_PORT`; expose `CONDUCTOR_PORT` for compatibility. |
+| Workspace name | `CONDUCTOR_WORKSPACE_NAME`. | Expose `ENSEMBLE_WORKSPACE_NAME`; expose `CONDUCTOR_WORKSPACE_NAME` for compatibility. |
+| Workspace path | `CONDUCTOR_WORKSPACE_PATH`. | Expose `ENSEMBLE_WORKSPACE_PATH`; expose `CONDUCTOR_WORKSPACE_PATH` for compatibility. |
+| Root path | `CONDUCTOR_ROOT_PATH`. | Expose `ENSEMBLE_ROOT_PATH`; expose `CONDUCTOR_ROOT_PATH` for compatibility. |
+| Default branch | `CONDUCTOR_DEFAULT_BRANCH`. | Expose `ENSEMBLE_DEFAULT_BRANCH`; expose `CONDUCTOR_DEFAULT_BRANCH` for compatibility. |
+| Port range | `CONDUCTOR_PORT` plus allocated nearby ports. | Expose `ENSEMBLE_PORT`; expose `CONDUCTOR_PORT` for compatibility. |
 
 ## Review Flow
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Diff viewer | Changed file list, unified diff, commit filtering. | Same target. |
 | Changes tree | Folder-grouped changed-file tree with status badges, addition/deletion counts, search, and display controls. | Same target. |
@@ -131,7 +131,7 @@ if original screenshot evidence is unavailable.
 
 ## Checkpoints
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Snapshot timing | Captures state before supported agent responses. | Same target around Pi turns. |
 | Storage | Private local refs separate from branch history. | Same target. |
@@ -139,7 +139,7 @@ if original screenshot evidence is unavailable.
 
 ## Integrations
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | GitHub | Issues, PRs, checks, comments, merge flow. | Same target. |
 | Linear | Workspace creation from Linear issues. | First-class v1 integration: OAuth login, issue CRUD, and workspace creation from issues. |
@@ -149,60 +149,60 @@ if original screenshot evidence is unavailable.
 
 ## App Shell And UX
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Command palette | Global command palette. | Same target. |
-| Keyboard shortcuts | Navigation, workspace, chat, review, Git, terminal actions. | Same target with Piductor-specific labels. |
-| Pane layout | Sidebar, center agent timeline, right files/changes/checks panel, and lower terminal dock remain visible during work. | Same target with Piductor-specific styling. The current implemented shell locks this pane layout. |
+| Keyboard shortcuts | Navigation, workspace, chat, review, Git, terminal actions. | Same target with Ensemble-specific labels. |
+| Pane layout | Sidebar, center agent timeline, right files/changes/checks panel, and lower terminal dock remain visible during work. | Same target with Ensemble-specific styling. The current implemented shell locks this pane layout. |
 | Settings | App settings and repository settings. | Same target with sections inventoried in `docs/product/settings-inventory.md`. |
 | Feature flags | Experimental settings expose big terminal, many tabs, dashboard visibility, voice, resource usage, Graphite, and React profiler controls. | Same target where useful; voice, Graphite, cloud SSH, and production React profiler controls are deferred or hidden for v1. |
-| Deep links | App URL scheme that opens/acts on workspace state. | Same target with Piductor scheme. |
+| Deep links | App URL scheme that opens/acts on workspace state. | Same target with Ensemble scheme. |
 | Privacy/security | Local execution, permissions controls, privacy settings. | Same target adapted to Pi. |
 
 ## Local Storage And Declarative Config
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
-| App database | Local app-support SQLite database for repositories, workspaces, sessions, messages, terminals, settings, comments, attachments, env vars, and related metadata. | Same storage class using `~/Library/Application Support/com.piductor.app/piductor.db`. |
-| Declarative config | Not documented as a primary Conductor feature. | Support `~/.config/piductor/` for dotfile-managed preferences and policy-like settings. |
+| App database | Local app-support SQLite database for repositories, workspaces, sessions, messages, terminals, settings, comments, attachments, env vars, and related metadata. | Same storage class using `~/Library/Application Support/com.ensemble.app/ensemble.db`. |
+| Declarative config | Not documented as a primary Conductor feature. | Support `~/.config/ensemble/` for dotfile-managed preferences and policy-like settings. |
 | Secrets | Environment/provider tokens are masked in settings. | Store secret values in macOS Keychain, with SQLite metadata only. |
 | Runtime state | Mutable local app metadata. | Stored in SQLite, not declarative config files. |
 | Pi state | Not applicable to Conductor. | `~/.pi/agent` remains source of truth for Pi auth, models, settings, resources, and Pi sessions. |
 
 ## Root Directory And Workspace Layout
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
-| Root directory | User-configurable root directory for managed repositories and workspaces. | Same target, defaulting to `~/Piductor`. |
-| Repository storage | Managed under the Conductor root. | Store under `<piductor-root>/repos/<repo-slug>`. |
-| Workspace storage | Managed under the Conductor root. | Store under `<piductor-root>/workspaces/<repo-slug>/<workspace-slug>`. |
-| Archived context | Local archived context under the Conductor root. | Store under `<piductor-root>/archived-contexts/`. |
-| Root override | Configurable from app settings. | Configurable from app settings and `~/.config/piductor/config.json`; may point at the same root as Conductor for filesystem/worktree/config interoperability. |
+| Root directory | User-configurable root directory for managed repositories and workspaces. | Same target, defaulting to `~/Ensemble`. |
+| Repository storage | Managed under the Conductor root. | Store under `<ensemble-root>/repos/<repo-slug>`. |
+| Workspace storage | Managed under the Conductor root. | Store under `<ensemble-root>/workspaces/<repo-slug>/<workspace-slug>`. |
+| Archived context | Local archived context under the Conductor root. | Store under `<ensemble-root>/archived-contexts/`. |
+| Root override | Configurable from app settings. | Configurable from app settings and `~/.config/ensemble/config.json`; may point at the same root as Conductor for filesystem/worktree/config interoperability. |
 
 
 ## Conductor Interoperability
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
-| Shared root | Conductor stores managed repos and workspaces under a configurable root. | Piductor can point at the same root and use the same `repos/`, `workspaces/`, and `archived-contexts/` layout. |
+| Shared root | Conductor stores managed repos and workspaces under a configurable root. | Ensemble can point at the same root and use the same `repos/`, `workspaces/`, and `archived-contexts/` layout. |
 | Existing workspaces | Conductor workspaces are git worktrees. | Discover and adopt existing git worktree workspaces from the shared root when possible. |
 | Shared config | `conductor.json` and `.worktreeinclude` configure repo behavior. | Support both files for migration and switching between apps. |
-| Private app DB | Conductor stores private app metadata in its own SQLite DB. | Do not read/write Conductor's private DB as a source of truth. Store Piductor metadata separately. |
-| Cross-app continuity | Conductor can continue its own sessions. | Guarantee filesystem/git/config continuity where possible; Pi session continuity remains Piductor-specific. |
+| Private app DB | Conductor stores private app metadata in its own SQLite DB. | Do not read/write Conductor's private DB as a source of truth. Store Ensemble metadata separately. |
+| Cross-app continuity | Conductor can continue its own sessions. | Guarantee filesystem/git/config continuity where possible; Pi session continuity remains Ensemble-specific. |
 
 ## Checkpoint Implementation
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
-| Snapshot storage | Private local Git refs. | Store private refs under `refs/piductor/checkpoints/<workspace-id>/<turn-id>`. |
+| Snapshot storage | Private local Git refs. | Store private refs under `refs/ensemble/checkpoints/<workspace-id>/<turn-id>`. |
 | Snapshot timing | Before supported agent response. | Before each Pi user prompt executes. |
 | Turn diff | Show code changes by turn. | Diff checkpoint ref against post-turn workspace state. |
-| Restore | Revert code and later chat state. | Revert files and invalidate later Piductor-visible continuation state without destructively editing Pi session files in v1. |
+| Restore | Revert code and later chat state. | Revert files and invalidate later Ensemble-visible continuation state without destructively editing Pi session files in v1. |
 | Shared-root compatibility | Conductor refs may exist privately. | Do not depend on Conductor checkpoint refs for v1. |
 
 ## GitHub Integration Implementation
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Auth | Requires GitHub authentication in the terminal environment; users verify with `gh auth status`. | Require authenticated `gh` CLI during setup for v1. |
 | PR create/view | Create and inspect pull requests. | Use `gh pr create` and `gh pr view` from Electron main. |
@@ -213,7 +213,7 @@ if original screenshot evidence is unavailable.
 
 ## Security And Permissions Implementation
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Local execution | Agents run locally with the user's Mac permissions. | Same target. |
 | Workspace trust | Workspaces are isolated task environments. | Default to `workspace-trusted`: broad agent freedom inside the workspace. |
@@ -224,7 +224,7 @@ if original screenshot evidence is unavailable.
 
 ## MVP Sequencing
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Product scope | Full app workflows across setup, workspaces, agents, review, checks, settings. | Build every major Conductor workflow adapted for Pi; sequence as thin vertical slices rather than reducing final scope. |
 | Packaging | Native macOS app distribution. | Deferred until after core product completion. |
@@ -233,7 +233,7 @@ if original screenshot evidence is unavailable.
 
 ## Remaining Product Decisions Resolved
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Chat tab limit | Allows multiple open chat tabs; user observation indicates five open chat tabs. | Allow five open chat tabs per workspace; document/file previews do not count. |
 | Merge flow | Ready-to-merge action when checks pass, followed by final merge/archive flow. | Require merge confirmation; default block merge with failing required checks; archive after merge according to setting. |
@@ -243,7 +243,7 @@ if original screenshot evidence is unavailable.
 
 ## Linear Integration Implementation
 
-| Area | Conductor Behavior | Piductor Target |
+| Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Login | Connected Linear integration enables issue workflows. | Linear OAuth login with PKCE where practical; tokens in macOS Keychain. |
 | Issue browsing | Select issues for workspace creation. | List/search/read issues, teams, projects, statuses, labels, cycles, assignees. |

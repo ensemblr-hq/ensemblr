@@ -7,20 +7,20 @@ import {
 	type SettingsResolutionSnapshot,
 	type SetupDiagnosticsSnapshot,
 } from '../shared/ipc';
-import type { PiductorConfigService } from './config/config-loader';
-import type { PiductorConfigResolutionService } from './config/config-resolution';
-import type { PiductorRootDirectoryService } from './root/root-directory';
+import type { EnsembleConfigService } from './config/config-loader';
+import type { EnsembleConfigResolutionService } from './config/config-resolution';
+import type { EnsembleRootDirectoryService } from './root/root-directory';
 import type { SetupDiagnosticsService } from './setup/setup-diagnostics';
-import type { PiductorDatabaseService } from './storage/database';
+import type { EnsembleDatabaseService } from './storage/database';
 
 const MAX_ENSURED_WINDOW_WIDTH = 2400;
 
 interface RegisterIpcHandlersOptions {
-	configService: PiductorConfigService;
-	databaseService: PiductorDatabaseService;
-	rootDirectoryService: PiductorRootDirectoryService;
+	configService: EnsembleConfigService;
+	databaseService: EnsembleDatabaseService;
+	rootDirectoryService: EnsembleRootDirectoryService;
 	setupDiagnosticsService: SetupDiagnosticsService;
-	settingsResolutionService: PiductorConfigResolutionService;
+	settingsResolutionService: EnsembleConfigResolutionService;
 }
 
 export function registerIpcHandlers({

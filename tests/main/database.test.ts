@@ -5,11 +5,11 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
-	createPiductorDatabaseService,
+	createEnsembleDatabaseService,
 	getCurrentSchemaVersion,
 	LATEST_SCHEMA_VERSION,
 	listAppliedMigrationIds,
-	openPiductorDatabase,
+	openEnsembleDatabase,
 	resolveDefaultDatabasePath,
 } from '../../src/main/storage/database.ts';
 
@@ -23,11 +23,11 @@ function createTestDatabasePath(): {
 	cleanup: () => void;
 	databasePath: string;
 } {
-	const directory = mkdtempSync(path.join(tmpdir(), 'piductor-db-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-db-'));
 
 	return {
 		cleanup: () => rmSync(directory, { force: true, recursive: true }),
-		databasePath: path.join(directory, 'piductor-test.db'),
+		databasePath: path.join(directory, 'ensemble-test.db'),
 	};
 }
 
@@ -37,19 +37,19 @@ test('resolves the macOS app-support database path', () => {
 	if (process.platform === 'darwin') {
 		assert.equal(
 			databasePath,
-			'/Users/example/Library/Application Support/com.piductor.app/piductor.db',
+			'/Users/example/Library/Application Support/com.ensemble.app/ensemble.db',
 		);
 		return;
 	}
 
-	assert.equal(databasePath, '/Users/example/.config/piductor/piductor.db');
+	assert.equal(databasePath, '/Users/example/.config/ensemble/ensemble.db');
 });
 
 test('opens an isolated database and applies foundation migrations', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openPiductorDatabase({
+	const connection = openEnsembleDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -94,12 +94,12 @@ test('runs migrations idempotently on reopen', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const firstConnection = openPiductorDatabase({
+	const firstConnection = openEnsembleDatabase({
 		databasePath: fixture.databasePath,
 	});
 	firstConnection.database.close();
 
-	const secondConnection = openPiductorDatabase({
+	const secondConnection = openEnsembleDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => secondConnection.database.close());
@@ -123,7 +123,7 @@ test('enforces foreign keys', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openPiductorDatabase({
+	const connection = openEnsembleDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -142,7 +142,7 @@ test('supports basic CRUD fixtures for foundational tables', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openPiductorDatabase({
+	const connection = openEnsembleDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -150,10 +150,10 @@ test('supports basic CRUD fixtures for foundational tables', (t) => {
 
 	database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-1', 'piductor', 'Piductor', '/tmp/piductor/repo', 'master');
+VALUES ('repo-1', 'ensemble', 'Ensemble', '/tmp/ensemble/repo', 'master');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch)
-VALUES ('workspace-1', 'repo-1', 'the-103', 'THE-103', '/tmp/piductor/workspaces/the-103', 'philipp/the-103', 'master');
+VALUES ('workspace-1', 'repo-1', 'the-103', 'THE-103', '/tmp/ensemble/workspaces/the-103', 'philipp/the-103', 'master');
 
 INSERT INTO settings (id, scope, scope_id, key, value_json)
 VALUES ('setting-1', 'repository', 'repo-1', 'setup.autoRun', 'false');
@@ -162,10 +162,10 @@ INSERT INTO sessions (id, workspace_id, title, status)
 VALUES ('session-1', 'workspace-1', 'SQLite implementation', 'running');
 
 INSERT INTO terminal_sessions (id, workspace_id, session_id, title, shell, cwd, status)
-VALUES ('terminal-1', 'workspace-1', 'session-1', 'Setup', '/bin/zsh', '/tmp/piductor/repo', 'running');
+VALUES ('terminal-1', 'workspace-1', 'session-1', 'Setup', '/bin/zsh', '/tmp/ensemble/repo', 'running');
 
 INSERT INTO checkpoints (id, workspace_id, session_id, git_ref, label)
-VALUES ('checkpoint-1', 'workspace-1', 'session-1', 'refs/piductor/checkpoints/1', 'Before turn');
+VALUES ('checkpoint-1', 'workspace-1', 'session-1', 'refs/ensemble/checkpoints/1', 'Before turn');
 
 INSERT INTO comments (id, workspace_id, session_id, checkpoint_id, file_path, line_number, body)
 VALUES ('comment-1', 'workspace-1', 'session-1', 'checkpoint-1', 'src/main/storage/database.ts', 42, 'Review note');
@@ -217,12 +217,12 @@ test('stores only secret metadata and keychain references in SQLite', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openPiductorDatabase({
+	const connection = openEnsembleDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
 
-	const rawSecretValue = 'piductor-raw-secret-value-not-persisted';
+	const rawSecretValue = 'ensemble-raw-secret-value-not-persisted';
 	const maskedDisplay = '****sted';
 
 	connection.database
@@ -246,11 +246,11 @@ test('stores only secret metadata and keychain references in SQLite', (t) => {
 			'secret-1',
 			'app',
 			'',
-			'PIDUCTOR_TEST_SECRET',
+			'ENSEMBLE_TEST_SECRET',
 			'macos-keychain',
-			'com.piductor.app.secret-store',
-			'v1:app::PIDUCTOR_TEST_SECRET',
-			'Piductor test secret',
+			'com.ensemble.app.secret-store',
+			'v1:app::ENSEMBLE_TEST_SECRET',
+			'Ensemble test secret',
 			maskedDisplay,
 			rawSecretValue.length,
 			'{"source":"test"}',
@@ -271,7 +271,7 @@ test('schema does not define raw secret value columns', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openPiductorDatabase({
+	const connection = openEnsembleDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -296,7 +296,7 @@ test('database service reports health without throwing on open', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const service = createPiductorDatabaseService({
+	const service = createEnsembleDatabaseService({
 		databasePath: fixture.databasePath,
 	});
 	t.after(service.close);

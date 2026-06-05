@@ -10,9 +10,9 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
-import type { PiductorConfigService } from '../config/config-loader';
-import type { PiductorRootDirectoryService } from '../root/root-directory';
-import type { PiductorDatabaseService } from '../storage/database';
+import type { EnsembleConfigService } from '../config/config-loader';
+import type { EnsembleRootDirectoryService } from '../root/root-directory';
+import type { EnsembleDatabaseService } from '../storage/database';
 
 export interface SetupDiagnosticsService {
 	getSnapshot: () => Promise<SetupDiagnosticsSnapshot>;
@@ -29,12 +29,12 @@ export type SetupCheckProvider = (
 
 interface CreateSetupDiagnosticsServiceOptions {
 	checkProviders?: Partial<Record<SetupCheckId, SetupCheckProvider>>;
-	configService: PiductorConfigService;
-	databaseService: PiductorDatabaseService;
+	configService: EnsembleConfigService;
+	databaseService: EnsembleDatabaseService;
 	homeDirectory?: string;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
-	rootDirectoryService: PiductorRootDirectoryService;
+	rootDirectoryService: EnsembleRootDirectoryService;
 }
 
 const SETUP_CHECK_ORDER: readonly SetupCheckId[] = [
@@ -109,7 +109,7 @@ export function createSetupDiagnosticsService({
 		'pi-agent-directory': () =>
 			createPendingCheck({
 				detail:
-					'Pi agent directory discovery will be implemented by THE-112. Piductor will preserve the normal Pi environment by default.',
+					'Pi agent directory discovery will be implemented by THE-112. Ensemble will preserve the normal Pi environment by default.',
 				group: 'pi',
 				id: 'pi-agent-directory',
 				title: 'Pi agent directory',
@@ -188,7 +188,7 @@ function getConfigCheck({
 	configService,
 	context,
 }: {
-	configService: PiductorConfigService;
+	configService: EnsembleConfigService;
 	context: SetupCheckProviderContext;
 }): SetupCheckSnapshot {
 	const config = configService.getSnapshot();
@@ -209,7 +209,7 @@ function getConfigCheck({
 	return createSetupCheckSnapshot({
 		blocking: true,
 		description:
-			'Loads ~/.config/piductor/config.json and validates whether config can be trusted before setup continues.',
+			'Loads ~/.config/ensemble/config.json and validates whether config can be trusted before setup continues.',
 		detail,
 		group: 'core',
 		id: 'config',
@@ -241,7 +241,7 @@ function getDatabaseCheck({
 	databaseService,
 }: {
 	context: SetupCheckProviderContext;
-	databaseService: PiductorDatabaseService;
+	databaseService: EnsembleDatabaseService;
 }): SetupCheckSnapshot {
 	const database = databaseService.getHealth();
 	const status = database.status === 'ok' ? 'success' : 'failure';
@@ -290,7 +290,7 @@ function getRootDirectoryCheck({
 	rootDirectoryService,
 }: {
 	context: SetupCheckProviderContext;
-	rootDirectoryService: PiductorRootDirectoryService;
+	rootDirectoryService: EnsembleRootDirectoryService;
 }): SetupCheckSnapshot {
 	const root =
 		rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
@@ -302,12 +302,12 @@ function getRootDirectoryCheck({
 				: 'failure';
 	const safePath = formatSafeText(root.path, context.homeDirectory);
 	const detail =
-		root.diagnostics[0]?.message ?? `Piductor root is ready at ${safePath}.`;
+		root.diagnostics[0]?.message ?? `Ensemble root is ready at ${safePath}.`;
 
 	return createSetupCheckSnapshot({
 		blocking: true,
 		description:
-			'Validates the configured Piductor root directory before repositories and workspaces are created.',
+			'Validates the configured Ensemble root directory before repositories and workspaces are created.',
 		detail,
 		group: 'storage',
 		id: 'root-directory',
@@ -349,7 +349,7 @@ function getManagedDirectoriesCheck({
 	rootDirectoryService,
 }: {
 	context: SetupCheckProviderContext;
-	rootDirectoryService: PiductorRootDirectoryService;
+	rootDirectoryService: EnsembleRootDirectoryService;
 }): SetupCheckSnapshot {
 	const root =
 		rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
@@ -402,7 +402,7 @@ async function getShellProcessCheck({
 	try {
 		const environment = await localCommandService.getEnvironment();
 		const result = await localCommandService.run({
-			args: ['-lc', 'printf piductor-process-ok'],
+			args: ['-lc', 'printf ensemble-process-ok'],
 			command: environment.shell,
 			maxOutputBytes: 1024,
 			timeoutMs: 1500,

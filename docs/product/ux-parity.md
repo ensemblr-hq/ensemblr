@@ -2,7 +2,7 @@
 
 Date: 2026-06-04
 
-Piductor should match Conductor's observable workflows and information architecture where practical, while using distinct Piductor visual design, copy, branding, icons, and Pi-specific runtime behavior.
+Ensemble should match Conductor's observable workflows and information architecture where practical, while using distinct Ensemble visual design, copy, branding, icons, and Pi-specific runtime behavior.
 
 ## Current Shell Contract
 
@@ -45,7 +45,7 @@ runtime event rendering, and session tree behavior to Pi runtime tickets.
 - Lower-right dock switches between Setup, Run, and terminal tabs. The Setup
   tab is for workspace/project setup command output only, not app diagnostics.
 
-Piductor equivalent:
+Ensemble equivalent:
 
 - Use Electron native menu APIs for macOS menus.
 - Use TanStack Router for durable app navigation and workspace/search state such as selected workspace, chat tab, review tab, and dock tab.
@@ -53,7 +53,7 @@ Piductor equivalent:
 - Use Jotai atoms in `src/renderer/state/` for durable renderer-only UI state
   that crosses shell modules, such as pinned workspace IDs, collapsed project
   IDs, project order, and closed session tab IDs.
-- Use a Piductor-specific React/shadcn visual language, not Conductor's visual identity.
+- Use an Ensemble-specific React/shadcn visual language, not Conductor's visual identity.
 - Preserve the same pane hierarchy so Conductor users can transfer workflows.
 - Keep app diagnostics in the left sidebar footer/status area. Do not render app
   setup diagnostics in the lower Setup dock.
@@ -67,10 +67,10 @@ Piductor equivalent:
 - App settings cover General, Models, Providers, Environment, Appearance, Git, Account, Experimental, and Advanced.
 - Repository settings are selected from the same sidebar and expose path, branch, remote, preview, copy, script, spotlight, instruction, and removal controls.
 
-Piductor equivalent:
+Ensemble equivalent:
 
 - Keep app settings and repository settings in one settings shell.
-- Store high-churn mutable settings in SQLite, declarative defaults in `~/.config/piductor/config.json`, shared repository behavior in `piductor.json`/`conductor.json`, and secrets outside plain config files.
+- Store high-churn mutable settings in SQLite, declarative defaults in `~/.config/ensemble/config.json`, shared repository behavior in `ensemble.json`/`conductor.json`, and secrets outside plain config files.
 
 ### Workspace Landing
 
@@ -78,10 +78,10 @@ Piductor equivalent:
 - The summary shows that a new isolated copy was created, the branch source, copied-file count, and optional setup-script guidance.
 - Composer, file tree, checks, and run controls are immediately available.
 
-Piductor equivalent:
+Ensemble equivalent:
 
 - Create a git worktree workspace, show branch/copy/setup status, and open the Pi composer immediately.
-- Auto-generated placeholder names are acceptable, but Piductor should not copy Conductor's naming style if it is distinctive.
+- Auto-generated placeholder names are acceptable, but Ensemble should not copy Conductor's naming style if it is distinctive.
 
 ### Agent Timeline
 
@@ -90,7 +90,7 @@ Piductor equivalent:
 - Composer supports text prompt, file/PR references, slash/run commands, attachments, voice input when enabled, model selection, reasoning/thinking level, and submit/stop controls.
 - Runtime errors are inline cards with retry actions.
 
-Piductor equivalent:
+Ensemble equivalent:
 
 - Keep the implemented chat tab strip, center timeline location, and bottom composer location as the app-shell contract.
 - Keep chat and prompt input behavior deferred until Pi integration. The current mock transcript, attach button, send button, and model/thinking badges should not be treated as final behavior.
@@ -105,7 +105,7 @@ Piductor equivalent:
 - Checks tab shows PR metadata, git status, checks, deployments, comments/review threads, todos, and merge readiness.
 - The panel remains visible while the agent works or terminals run.
 
-Piductor equivalent:
+Ensemble equivalent:
 
 - Keep the implemented All files / Changes / Checks tab order and right-sidebar location.
 - Treat file/diff/checks state as workspace metadata synchronized from git and GitHub/`gh`.
@@ -121,12 +121,12 @@ Piductor equivalent:
 - Dock actions are script-state aware: show Setup Scripts when no scripts are configured, Run setup script before setup has run, Run when the dev server is stopped, and Open :PORT plus Stop when the dev server is running.
 - Experimental settings can enable a bigger terminal-centric layout and more tabs.
 
-Piductor equivalent:
+Ensemble equivalent:
 
 - Keep the implemented lower-right dock placement, tab names, collapse behavior, and script-state action affordances.
 - Use xterm.js behind a terminal adapter.
 - Main process owns PTY/process supervision.
-- Expose `PIDUCTOR_*` variables and compatible `CONDUCTOR_*` variables for Conductor-compatible repositories or explicit opt-in.
+- Expose `ENSEMBLE_*` variables and compatible `CONDUCTOR_*` variables for Conductor-compatible repositories or explicit opt-in.
 
 ### PR and Merge Flow
 
@@ -135,7 +135,7 @@ Piductor equivalent:
 - Ready state uses a prominent status banner, external PR/preview links, passed deployments/checks, comments, todos, and merge action.
 - Failing or pending states show blockers and may expose a warning merge path.
 
-Piductor equivalent:
+Ensemble equivalent:
 
 - Use `gh` CLI for v1 PR creation, metadata, checks, comments where possible, and merge.
 - Cache PR/check/comment data in SQLite but treat GitHub as source of truth.
@@ -143,17 +143,17 @@ Piductor equivalent:
 
 ## Pi-Specific Changes
 
-| Conductor concept | Piductor equivalent |
+| Conductor concept | Ensemble equivalent |
 | --- | --- |
 | Claude Code and Codex providers | Selected Pi CLI RPC runtime and Pi provider/model readiness. |
 | Claude/Codex model defaults | Pi model defaults and thinking-level controls. |
 | Claude/Codex config sync | Pi resource/config discovery from `~/.pi/agent`, project `.pi`, skills, prompts, themes, and context files. |
-| Claude tool approvals | Piductor permission modes mapped to Pi tool restrictions where available. |
+| Claude tool approvals | Ensemble permission modes mapped to Pi tool restrictions where available. |
 | Retry in new chat | Pi session tree fork/continuation behavior plus file checkpoint policy. |
 | Review/create-PR/fix prompt templates | Pi instruction templates stored per user/repository with source precedence. |
 | Provider environment catalog | Pi-relevant provider/env catalog plus generic environment variables. |
-| Conductor root path labels | Piductor root directory, with optional Conductor-compatible shared root support. |
-| `CONDUCTOR_*` environment variables | Native `PIDUCTOR_*` plus compatibility `CONDUCTOR_*` for Conductor-compatible repositories or explicit opt-in. |
+| Conductor root path labels | Ensemble root directory, with optional Conductor-compatible shared root support. |
+| `CONDUCTOR_*` environment variables | Native `ENSEMBLE_*` plus compatibility `CONDUCTOR_*` for Conductor-compatible repositories or explicit opt-in. |
 
 ## Prioritized Implementation Checklist
 

@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "piductor",
+      "name": "ensemble",
       "dependencies": {
         "@fontsource-variable/jetbrains-mono": "^5.2.8",
         "@iconify-json/vscode-icons": "^1.2.54",

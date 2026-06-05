@@ -16,15 +16,15 @@ export interface OpenDatabaseOptions {
 	databasePath?: string;
 }
 
-export interface PiductorDatabaseConnection {
+export interface EnsembleDatabaseConnection {
 	database: DatabaseSync;
 	path: string;
 	schemaVersion: number;
 }
 
-export interface PiductorDatabaseService {
+export interface EnsembleDatabaseService {
 	close: () => void;
-	getConnection: () => PiductorDatabaseConnection | null;
+	getConnection: () => EnsembleDatabaseConnection | null;
 	getHealth: () => DatabaseHealthSnapshot;
 	open: () => DatabaseHealthSnapshot;
 }
@@ -35,7 +35,7 @@ interface Migration {
 	version: number;
 }
 
-const DATABASE_FILENAME = 'piductor.db';
+const DATABASE_FILENAME = 'ensemble.db';
 const SQLITE_MEMORY_PATH = ':memory:';
 const MIGRATIONS: readonly Migration[] = [
 	{
@@ -231,7 +231,7 @@ CREATE INDEX idx_secret_metadata_scope ON secret_metadata(scope, scope_id);
 CREATE TABLE root_directories (
 	id TEXT PRIMARY KEY,
 	path TEXT NOT NULL UNIQUE,
-	source TEXT NOT NULL CHECK (source IN ('built-in-default', 'conductor-config', 'config-default', 'managed-config', 'piductor-config', 'sqlite')),
+	source TEXT NOT NULL CHECK (source IN ('built-in-default', 'conductor-config', 'config-default', 'managed-config', 'ensemble-config', 'sqlite')),
 	status TEXT NOT NULL CHECK (status IN ('ok', 'warning', 'error')),
 	repositories_path TEXT NOT NULL,
 	workspaces_path TEXT NOT NULL,
@@ -254,17 +254,17 @@ export function resolveDefaultDatabasePath(homeDirectory = homedir()): string {
 			homeDirectory,
 			'Library',
 			'Application Support',
-			'com.piductor.app',
+			'com.ensemble.app',
 			DATABASE_FILENAME,
 		);
 	}
 
-	return path.join(homeDirectory, '.config', 'piductor', DATABASE_FILENAME);
+	return path.join(homeDirectory, '.config', 'ensemble', DATABASE_FILENAME);
 }
 
-export function openPiductorDatabase(
+export function openEnsembleDatabase(
 	options: OpenDatabaseOptions = {},
-): PiductorDatabaseConnection {
+): EnsembleDatabaseConnection {
 	const databasePath = options.databasePath ?? resolveDefaultDatabasePath();
 
 	if (databasePath !== SQLITE_MEMORY_PATH) {
@@ -293,10 +293,10 @@ export function openPiductorDatabase(
 	}
 }
 
-export function createPiductorDatabaseService(
+export function createEnsembleDatabaseService(
 	options: OpenDatabaseOptions = {},
-): PiductorDatabaseService {
-	let connection: PiductorDatabaseConnection | null = null;
+): EnsembleDatabaseService {
+	let connection: EnsembleDatabaseConnection | null = null;
 	let health: DatabaseHealthSnapshot = {
 		path: options.databasePath ?? resolveDefaultDatabasePath(),
 		schemaVersion: 0,
@@ -309,7 +309,7 @@ export function createPiductorDatabaseService(
 		}
 
 		try {
-			connection = openPiductorDatabase(options);
+			connection = openEnsembleDatabase(options);
 			health = {
 				path: connection.path,
 				schemaVersion: connection.schemaVersion,

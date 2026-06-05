@@ -8,15 +8,15 @@ Accepted
 
 ## Context
 
-Piductor is a macOS desktop workbench for Pi coding-agent workflows. The app needs to manage local repositories, git worktrees, long-running Pi sessions, project commands, review flows, and native desktop affordances such as a macOS menu bar.
+Ensemble is a macOS desktop workbench for Pi coding-agent workflows. The app needs to manage local repositories, git worktrees, long-running Pi sessions, project commands, review flows, and native desktop affordances such as a macOS menu bar.
 
 The primary maintainer is strongest in React and TypeScript and wants to avoid making Xcode and SwiftUI expertise a core maintenance requirement.
 
-Pi exposes integration modes suitable for desktop apps, including `pi --mode rpc` over stdin/stdout JSONL. Piductor uses that CLI RPC boundary for v1 so users can run the same Pi runtime or compatible wrapper they use in the terminal.
+Pi exposes integration modes suitable for desktop apps, including `pi --mode rpc` over stdin/stdout JSONL. Ensemble uses that CLI RPC boundary for v1 so users can run the same Pi runtime or compatible wrapper they use in the terminal.
 
 ## Decision
 
-Build Piductor as an Electron app with:
+Build Ensemble as an Electron app with:
 
 - Electron main process for native app lifecycle, macOS menu bar, local process management, git/filesystem access, and Pi agent runtime orchestration.
 - React and TypeScript renderer for the user interface.
@@ -37,11 +37,11 @@ Tauri would keep the renderer in React/TypeScript and produce smaller binaries, 
 
 ### Electron without shadcn/ui
 
-A fully custom React UI would maximize control, but would slow down early product development. Piductor needs many standard desktop controls: dialogs, menus, popovers, forms, resizable panes, tabs, command palettes, tooltips, and tables.
+A fully custom React UI would maximize control, but would slow down early product development. Ensemble needs many standard desktop controls: dialogs, menus, popovers, forms, resizable panes, tabs, command palettes, tooltips, and tables.
 
 ### macOS-themed React libraries
 
-macOS-themed React kits can help with inspiration but are too risky as core dependencies unless they prove long-term maintenance, accessibility, and component coverage. Piductor should own its design system rather than depend on a cosmetic macOS clone library.
+macOS-themed React kits can help with inspiration but are too risky as core dependencies unless they prove long-term maintenance, accessibility, and component coverage. Ensemble should own its design system rather than depend on a cosmetic macOS clone library.
 
 ## Consequences
 

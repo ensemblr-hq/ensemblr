@@ -1,24 +1,24 @@
 <!-- TODO: Purge from git history when v1 is live -->
-# Piductor
+# Ensemble
 
-Piductor is a Pi-native macOS workbench for running coding-agent work in isolated project workspaces. It borrows the workspace-and-review operating model from Conductor while using Pi as the agent runtime.
+Ensemble is a Pi-native macOS workbench for running coding-agent work in isolated project workspaces. It borrows the workspace-and-review operating model from Conductor while using Pi as the agent runtime.
 
 ## Language
 
-**Piductor**:
+**Ensemble**:
 The product being built: a native desktop application for managing Pi coding-agent work across projects and workspaces.
 _Avoid_: Conductor clone, Pi Conductor
 
-**Piductor Root Directory**:
-The user-visible directory where Piductor stores managed repositories, workspaces, and archived workspace context.
+**Ensemble Root Directory**:
+The user-visible directory where Ensemble stores managed repositories, workspaces, and archived workspace context.
 _Avoid_: App support directory, project folder
 
 **Conductor Parity Target**:
-The product goal that Piductor should match Conductor's publicly observable workflows and capabilities, except where Pi-specific behavior requires a different implementation.
+The product goal that Ensemble should match Conductor's publicly observable workflows and capabilities, except where Pi-specific behavior requires a different implementation.
 _Avoid_: Copying Conductor, visual clone
 
 **Project**:
-A tracked codebase that Piductor can open, configure, and use as the source for isolated workspaces.
+A tracked codebase that Ensemble can open, configure, and use as the source for isolated workspaces.
 _Avoid_: Repo entry, app folder
 
 **Workspace**:
@@ -35,7 +35,7 @@ _Avoid_: Chat, terminal session
 
 **Pi User Environment**:
 The user's existing Pi configuration and resources, including credentials, model configuration, settings, packages, extensions, skills, prompt templates, themes, context files, and saved sessions.
-_Avoid_: Piductor config, imported Pi settings
+_Avoid_: Ensemble config, imported Pi settings
 
 **Session Branch**:
 A branch within Pi's tree-structured session history that lets a user continue from an earlier conversation point without losing the rest of the session history.

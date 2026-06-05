@@ -12,11 +12,11 @@ import {
 
 const TEST_SHELL = '/bin/sh';
 const TEST_PATH = '/usr/bin:/bin:/usr/sbin:/sbin';
-const SHELL_ENVIRONMENT_BEGIN_SENTINEL = '__PIDUCTOR_SHELL_ENV_BEGIN__';
-const SHELL_ENVIRONMENT_END_SENTINEL = '__PIDUCTOR_SHELL_ENV_END__';
+const SHELL_ENVIRONMENT_BEGIN_SENTINEL = '__ENSEMBLE_SHELL_ENV_BEGIN__';
+const SHELL_ENVIRONMENT_END_SENTINEL = '__ENSEMBLE_SHELL_ENV_END__';
 
 function createDirectoryFixture(t: TestContext): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'piductor-command-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-command-'));
 
 	t.after(() => {
 		rmSync(directory, { force: true, recursive: true });
@@ -154,11 +154,11 @@ test('passes cwd and environment overrides to commands', async (t) => {
 	const cwd = createDirectoryFixture(t);
 	const service = createTestService();
 	const result = await service.run({
-		args: ['-c', 'printf "%s|%s" "$PWD" "$PIDUCTOR_TEST_VALUE"'],
+		args: ['-c', 'printf "%s|%s" "$PWD" "$ENSEMBLE_TEST_VALUE"'],
 		command: TEST_SHELL,
 		cwd,
 		env: {
-			PIDUCTOR_TEST_VALUE: 'from-override',
+			ENSEMBLE_TEST_VALUE: 'from-override',
 		},
 	});
 
@@ -184,7 +184,7 @@ test('returns typed failure for nonzero exit', async () => {
 test('returns typed failure for missing commands', async () => {
 	const service = createTestService();
 	const result = await service.run({
-		command: 'piductor-definitely-missing-command',
+		command: 'ensemble-definitely-missing-command',
 	});
 
 	assert.equal(result.status, 'failure');
@@ -299,9 +299,9 @@ test('sanitizes full sensitive values that contain spaces', async () => {
 
 test('git version smoke runs through local command service when enabled', {
 	skip:
-		process.env.PIDUCTOR_RUN_COMMAND_SMOKE === '1'
+		process.env.ENSEMBLE_RUN_COMMAND_SMOKE === '1'
 			? false
-			: 'Set PIDUCTOR_RUN_COMMAND_SMOKE=1 to run the git command smoke test.',
+			: 'Set ENSEMBLE_RUN_COMMAND_SMOKE=1 to run the git command smoke test.',
 }, async () => {
 	const service = createLocalCommandService();
 	const result = await service.run({

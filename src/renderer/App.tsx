@@ -9,7 +9,7 @@ import {
 import {
 	healthQuery,
 	setupDiagnosticsQuery,
-} from '@/renderer/api/piductor-queries';
+} from '@/renderer/api/ensemble-queries';
 import {
 	DEFAULT_DOCK_TAB,
 	DEFAULT_REVIEW_TAB,
@@ -90,7 +90,7 @@ export function App({
 
 			if (!setupSnapshot) {
 				return {
-					detail: 'Piductor is collecting setup readiness checks.',
+					detail: 'Ensemble is collecting setup readiness checks.',
 					label: 'Checking setup',
 					state: 'pending',
 				};

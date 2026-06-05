@@ -8,20 +8,20 @@ Accepted
 
 ## Context
 
-Piductor uses a configurable root directory for managed repositories, workspaces, and archived contexts. Conductor's settings copy warns that changing the root can delete existing repos and workspaces. Piductor also targets shared-root interoperability with Conductor, so destructive root behavior would be risky.
+Ensemble uses a configurable root directory for managed repositories, workspaces, and archived contexts. Conductor's settings copy warns that changing the root can delete existing repos and workspaces. Ensemble also targets shared-root interoperability with Conductor, so destructive root behavior would be risky.
 
 ## Decision
 
-Piductor will not automatically delete existing repositories or workspaces when the root directory changes.
+Ensemble will not automatically delete existing repositories or workspaces when the root directory changes.
 
-Changing the root directory means Piductor will switch to the selected root and reindex/adopt repositories and workspaces found there. Existing files in the previous root remain on disk unless the user explicitly chooses a separate cleanup/delete action.
+Changing the root directory means Ensemble will switch to the selected root and reindex/adopt repositories and workspaces found there. Existing files in the previous root remain on disk unless the user explicitly chooses a separate cleanup/delete action.
 
 Migration behavior:
 
 - Reindex/adopt is the default root-change behavior.
 - Moving repositories/workspaces from one root to another is an explicit migration action.
 - Deleting old root contents is an explicit destructive action requiring confirmation.
-- If the new root is shared with Conductor, Piductor applies the shared-root interoperability rules.
+- If the new root is shared with Conductor, Ensemble applies the shared-root interoperability rules.
 
 ## Consequences
 

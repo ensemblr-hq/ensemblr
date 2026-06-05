@@ -26,7 +26,7 @@ Date: 2026-06-04
 
 ## Needs Product Decision
 
-- Whether to support Conductor's remove/soften AI-certainty phrase setting in Piductor. If supported, decide whether it is Pi output post-processing, a prompt preset, or a settings omission.
+- Whether to support Conductor's remove/soften AI-certainty phrase setting in Ensemble. If supported, decide whether it is Pi output post-processing, a prompt preset, or a settings omission.
 - Which non-deferred experimental settings are v1 scope versus post-core flags, especially dashboard/sidebar visibility and sidebar resource usage. Voice, Graphite, cloud/remote SSH, production React profiler, and the chat-tab limit are already resolved by ADRs.
 - Whether the current workspace-row status context menu should change local workspace lifecycle state, linked Linear issue status, both, or another status model.
 - Whether the current workspace-row Mark as unread action represents local workspace attention, chat unread state, or linked external issue state.
@@ -52,7 +52,7 @@ Date: 2026-06-04
 
 - Root directory changes: switch root and reindex/adopt by default; migration/delete are explicit actions.
 - Secret storage: use macOS Keychain from the start; SQLite stores metadata only.
-- Piductor account model: defer app account/sign-in for v1; local-first with external auth.
+- Ensemble account model: defer app account/sign-in for v1; local-first with external auth.
 - Pi runtime: use selected Pi-compatible CLI executable with `--mode rpc` for v1; keep SDK sidecar as fallback if RPC lacks needed capabilities.
 - Linear integration: first-class v1 OAuth login, issue CRUD, and workspace creation from issues.
 - Voice mode, Graphite support, and cloud/remote SSH settings: defer until after core completion.
