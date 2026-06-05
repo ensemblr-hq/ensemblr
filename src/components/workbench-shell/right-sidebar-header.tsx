@@ -27,6 +27,17 @@ import {
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import type { WorkspaceShellModel } from '@/renderer/workbench/workbench-model';
+import {
+	classifyPermissionAction,
+	DEFAULT_PERMISSION_MODE,
+	getPermissionBoundaryLabel,
+} from '@/shared/permissions';
+
+const mergeBoundary = classifyPermissionAction({
+	action: 'pull-request-merge',
+	mode: DEFAULT_PERMISSION_MODE,
+});
+const mergeBoundaryLabel = getPermissionBoundaryLabel(mergeBoundary.boundary);
 
 export function RightSidebarHeader({
 	activeWorkspace,
@@ -74,10 +85,12 @@ export function RightSidebarHeader({
 				{isMergeReady ? (
 					<Button
 						className='h-7 rounded-md bg-status-ok px-2.5 text-primary-foreground hover:bg-status-ok/90'
+						data-permission-boundary={mergeBoundary.boundary}
 						size='sm'
 					>
 						<GitMergeIcon data-icon='inline-start' />
 						Merge
+						<span className='sr-only'>{mergeBoundaryLabel}</span>
 					</Button>
 				) : isInFlight && hasPullRequestNumber ? (
 					<div

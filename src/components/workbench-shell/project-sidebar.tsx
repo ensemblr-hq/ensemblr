@@ -29,8 +29,21 @@ import {
 import { SidebarGroupAction, SidebarGroupLabel } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import type { ProjectShellModel } from '@/renderer/workbench/workbench-model';
+import {
+	classifyPermissionAction,
+	DEFAULT_PERMISSION_MODE,
+	getPermissionBoundaryLabel,
+} from '@/shared/permissions';
 
 import { ProjectAvatar } from './project-avatar';
+
+const repositoryRemovalBoundary = classifyPermissionAction({
+	action: 'repository-removal',
+	mode: DEFAULT_PERMISSION_MODE,
+});
+const repositoryRemovalBoundaryLabel = getPermissionBoundaryLabel(
+	repositoryRemovalBoundary.boundary,
+);
 
 const recentProjectPaths = [
 	'~/Projects/Boundary/haartz-next',
@@ -192,9 +205,15 @@ function ProjectContextMenuContent({
 			</ContextMenuGroup>
 			<ContextMenuSeparator />
 			<ContextMenuGroup>
-				<ProjectContextMenuItem variant='destructive'>
+				<ProjectContextMenuItem
+					data-permission-boundary={repositoryRemovalBoundary.boundary}
+					variant='destructive'
+				>
 					<Trash2Icon aria-hidden='true' />
 					<span className='min-w-0 flex-1'>Remove repository</span>
+					<ContextMenuShortcut>
+						{repositoryRemovalBoundaryLabel}
+					</ContextMenuShortcut>
 				</ProjectContextMenuItem>
 			</ContextMenuGroup>
 		</ContextMenuContent>
