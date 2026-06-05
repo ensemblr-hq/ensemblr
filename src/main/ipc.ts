@@ -7,6 +7,7 @@ import {
 } from 'electron';
 
 import {
+	type EnvironmentVariablesSnapshot,
 	type HealthSnapshot,
 	IPC_CHANNELS,
 	type PiExecutableSelectionResult,
@@ -16,6 +17,7 @@ import {
 } from '../shared/ipc';
 import type { EnsembleConfigService } from './config/config-loader';
 import type { EnsembleConfigResolutionService } from './config/config-resolution';
+import type { EnvironmentVariablesService } from './environment/environment-variables';
 import type { PiExecutableService } from './pi/pi-executable';
 import type { EnsembleRootDirectoryService } from './root/root-directory';
 import type { SetupDiagnosticsService } from './setup/setup-diagnostics';
@@ -26,6 +28,7 @@ const MAX_ENSURED_WINDOW_WIDTH = 2400;
 interface RegisterIpcHandlersOptions {
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
+	environmentVariablesService: EnvironmentVariablesService;
 	piExecutableService: PiExecutableService;
 	rootDirectoryService: EnsembleRootDirectoryService;
 	setupDiagnosticsService: SetupDiagnosticsService;
@@ -35,6 +38,7 @@ interface RegisterIpcHandlersOptions {
 export function registerIpcHandlers({
 	configService,
 	databaseService,
+	environmentVariablesService,
 	piExecutableService,
 	rootDirectoryService,
 	setupDiagnosticsService,
@@ -64,6 +68,13 @@ export function registerIpcHandlers({
 			if (width < targetWidth) {
 				window.setSize(targetWidth, height);
 			}
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.environmentVariables,
+		(): Promise<EnvironmentVariablesSnapshot> => {
+			return environmentVariablesService.getSnapshot();
 		},
 	);
 

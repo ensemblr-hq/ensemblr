@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 
 import type {
+	EnvironmentVariablesSnapshot,
 	SetupCheckId,
 	SetupCheckLogSnapshot,
 	SetupCheckSnapshot,
@@ -12,6 +13,7 @@ import type {
 	LocalCommandService,
 } from '../commands/local-command';
 import type { EnsembleConfigService } from '../config/config-loader';
+import type { EnvironmentVariablesService } from '../environment/environment-variables';
 import type {
 	PiExecutableService,
 	PiExecutableSnapshot,
@@ -43,6 +45,7 @@ interface CreateSetupDiagnosticsServiceOptions {
 	checkProviders?: Partial<Record<SetupCheckId, SetupCheckProvider>>;
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
+	environmentVariablesService: EnvironmentVariablesService;
 	homeDirectory?: string;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
@@ -57,6 +60,7 @@ const SETUP_CHECK_ORDER: readonly SetupCheckId[] = [
 	'root-directory',
 	'managed-directories',
 	'shell-process-launch',
+	'environment-variables',
 	'git-executable',
 	'gh-cli',
 	'gh-auth',
@@ -83,6 +87,7 @@ export function createSetupDiagnosticsService({
 	checkProviders = {},
 	configService,
 	databaseService,
+	environmentVariablesService,
 	homeDirectory = homedir(),
 	localCommandService,
 	now = () => new Date(),
@@ -93,6 +98,11 @@ export function createSetupDiagnosticsService({
 	const context = { homeDirectory, now };
 	const builtInProviders: Record<SetupCheckId, SetupCheckProvider> = {
 		config: () => getConfigCheck({ configService, context }),
+		'environment-variables': () =>
+			getEnvironmentVariablesCheck({
+				context,
+				environmentVariablesService,
+			}),
 		'gh-auth': () => getGitHubAuthCheck({ context, localCommandService }),
 		'gh-cli': () => getGitHubCliCheck({ context, localCommandService }),
 		'git-executable': () =>
@@ -222,6 +232,74 @@ function getConfigCheck({
 		title: 'Declarative config',
 		updatedAt: context.now().toISOString(),
 	});
+}
+
+async function getEnvironmentVariablesCheck({
+	context,
+	environmentVariablesService,
+}: {
+	context: SetupCheckProviderContext;
+	environmentVariablesService: EnvironmentVariablesService;
+}): Promise<SetupCheckSnapshot> {
+	try {
+		const snapshot = await environmentVariablesService.getSnapshot();
+		const errorCount = snapshot.diagnostics.filter(
+			(diagnostic) => diagnostic.severity === 'error',
+		).length;
+		const warningCount = snapshot.diagnostics.filter(
+			(diagnostic) => diagnostic.severity === 'warning',
+		).length;
+		const blocking = snapshot.requiredCount > 0;
+		const status =
+			snapshot.missingRequiredCount > 0
+				? 'failure'
+				: errorCount > 0 || warningCount > 0
+					? 'warning'
+					: 'success';
+		const detail = getEnvironmentVariablesDetail(snapshot);
+
+		return createSetupCheckSnapshot({
+			blocking,
+			description:
+				'Checks the global environment variable catalog and safe secret metadata without printing values.',
+			detail,
+			group: 'core',
+			id: 'environment-variables',
+			logs: createEnvironmentVariablesLogs(snapshot),
+			remediationActions: [
+				{
+					id: 'open-environment-settings',
+					kind: 'open-settings',
+					label: 'Open environment settings',
+					target: 'environment',
+				},
+				{
+					id: 'retry-environment-variables',
+					kind: 'retry',
+					label: 'Retry environment check',
+				},
+			],
+			status,
+			title: 'Environment variables',
+			updatedAt: context.now().toISOString(),
+		});
+	} catch (error) {
+		return createSetupCheckSnapshot({
+			blocking: false,
+			description:
+				'Checks the global environment variable catalog and safe secret metadata without printing values.',
+			detail:
+				error instanceof Error
+					? error.message
+					: 'Unknown environment variable check error.',
+			group: 'core',
+			id: 'environment-variables',
+			logs: [],
+			status: 'warning',
+			title: 'Environment variables',
+			updatedAt: context.now().toISOString(),
+		});
+	}
 }
 
 function getDatabaseCheck({
@@ -997,6 +1075,65 @@ function createPiExecutableRemediationActions(
 	});
 
 	return actions;
+}
+
+function getEnvironmentVariablesDetail(
+	snapshot: EnvironmentVariablesSnapshot,
+): string {
+	if (snapshot.missingRequiredCount > 0) {
+		return `${snapshot.missingRequiredCount} required environment variables are unset.`;
+	}
+
+	const configuredCount = snapshot.variables.filter(
+		(variable) => variable.status === 'set' || variable.status === 'masked',
+	).length;
+	const maskedCount = snapshot.variables.filter(
+		(variable) => variable.status === 'masked',
+	).length;
+	const reservedCount = snapshot.variables.filter(
+		(variable) => variable.status === 'reserved',
+	).length;
+
+	return `${configuredCount} configured variables, ${maskedCount} masked secrets, and ${reservedCount} reserved runtime variables are cataloged.`;
+}
+
+function createEnvironmentVariablesLogs(
+	snapshot: EnvironmentVariablesSnapshot,
+): SetupCheckLogSnapshot[] {
+	const configuredCount = snapshot.variables.filter(
+		(variable) => variable.status === 'set' || variable.status === 'masked',
+	).length;
+	const maskedCount = snapshot.variables.filter(
+		(variable) => variable.status === 'masked',
+	).length;
+	const reservedCount = snapshot.variables.filter(
+		(variable) => variable.status === 'reserved',
+	).length;
+
+	return [
+		{
+			label: 'Catalog entries',
+			text: String(snapshot.catalog.length),
+		},
+		{
+			label: 'Configured variables',
+			text: String(configuredCount),
+		},
+		{
+			label: 'Masked secrets',
+			text: String(maskedCount),
+		},
+		{
+			label: 'Reserved runtime variables',
+			text: String(reservedCount),
+		},
+		...snapshot.diagnostics.map((diagnostic) => ({
+			label: diagnostic.code,
+			text: diagnostic.key
+				? `${diagnostic.key}: ${diagnostic.message}`
+				: diagnostic.message,
+		})),
+	];
 }
 
 function createCommandLogs(
