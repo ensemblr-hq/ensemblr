@@ -92,6 +92,10 @@ test('renders loading setup diagnostics state', () => {
 	expect(markup).toContain('Checking setup readiness');
 	expect(markup).toContain('Loading setup diagnostics');
 	expect(markup).toContain('Retry checks');
+	expect(markup).toContain('data-local-execution-notice="true"');
+	expect(markup).toContain(
+		'Agents, scripts, terminals, and tools run locally with your macOS account permissions.',
+	);
 });
 
 test('renders success state for ready diagnostics', () => {
@@ -110,6 +114,7 @@ test('renders success state for ready diagnostics', () => {
 	expect(markup).toContain('Core workflows ready');
 	expect(markup).toContain('Declarative config');
 	expect(markup).toContain('SQLite database');
+	expect(markup).toContain('Workspace trusted mode is the default');
 });
 
 test('renders failure state with remediation actions', () => {

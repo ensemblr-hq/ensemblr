@@ -59,15 +59,25 @@ const REPOSITORY_SOURCE_ORDER: readonly SettingsResolutionSource[] = [
 	'built-in-default',
 ];
 
+const DEFAULT_PERMISSION_MODE = 'workspace-trusted';
+const VALID_PERMISSION_MODES = [
+	'workspace-trusted',
+	'approval-required',
+	'read-only',
+] as const;
+
 const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> = {
 	conductorCompatibility: false,
 	filesToCopy: ['.env*'],
 	previewUrlTemplate: null,
 	runScriptMode: 'concurrent',
+	'security.permissionMode': DEFAULT_PERMISSION_MODE,
 	'scripts.archive': null,
 	'scripts.run': null,
 	'scripts.setup': null,
 };
+
+const VALIDATED_SETTING_KEYS = new Set(['security.permissionMode']);
 
 export function createEnsembleConfigResolutionService({
 	configService,
@@ -335,8 +345,9 @@ function addCandidates(
 ): void {
 	for (const [key, value] of values) {
 		const candidate = isCandidate(value) ? value : { source, value };
+		const validatedCandidate = validateSettingCandidate(key, candidate);
 		const existing = candidatesByKey.get(key) ?? [];
-		existing.push(candidate);
+		existing.push(validatedCandidate);
 		candidatesByKey.set(key, existing);
 	}
 }
@@ -346,10 +357,49 @@ function collectAppBuiltInDefaults(
 ): Map<string, unknown> {
 	return new Map([
 		['rootDirectory', path.join(homeDirectory, 'Ensemble')],
-		['security.permissionMode', 'workspace-trusted'],
+		['security.permissionMode', DEFAULT_PERMISSION_MODE],
 		['sendShortcut', 'enter'],
 		['ui.theme', 'system'],
 	]);
+}
+
+function validateSettingCandidate(
+	key: string,
+	candidate: Candidate,
+): Candidate {
+	if (candidate.invalidReason || !VALIDATED_SETTING_KEYS.has(key)) {
+		return candidate;
+	}
+
+	if (key === 'security.permissionMode') {
+		const invalidReason = getInvalidPermissionModeReason(candidate.value);
+
+		if (invalidReason) {
+			return {
+				...candidate,
+				invalidReason,
+				value: undefined,
+			};
+		}
+	}
+
+	return candidate;
+}
+
+function getInvalidPermissionModeReason(value: unknown): string | null {
+	if (
+		typeof value === 'string' &&
+		VALID_PERMISSION_MODES.includes(
+			value as (typeof VALID_PERMISSION_MODES)[number],
+		)
+	) {
+		return null;
+	}
+
+	const formattedValue =
+		typeof value === 'string' ? `"${value}"` : typeof value;
+
+	return `Invalid permission mode ${formattedValue}. Expected one of: ${VALID_PERMISSION_MODES.join(', ')}.`;
 }
 
 function collectConductorConfigCandidates(

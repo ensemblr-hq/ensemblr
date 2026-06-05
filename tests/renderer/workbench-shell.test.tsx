@@ -98,6 +98,7 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('Reorder project ensemble');
 	expect(markup).toContain('Open workspace Conductor shell rework');
 	expect(markup).toContain('Archive workspace Conductor shell rework');
+	expect(markup).toContain('data-permission-boundary="confirmation-required"');
 	expect(markup).toContain('data-slot="reorder-list-group"');
 	expect(markup).toContain('data-slot="reorder-list-item"');
 	expect(markup).toContain('Conductor shell rework');
@@ -130,6 +131,7 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('Open current workspace in VS Code');
 	expect(markup).toContain('Open current workspace app options');
 	expect(markup).toContain('Ask Pi to continue review shell');
+	expect(markup).toContain('Requires confirmation');
 	expect(markup).not.toContain('Open pull request menu');
 	expect(markup).not.toContain('Open workspace menu');
 	expect(markup).not.toContain('Dashboard');
@@ -231,6 +233,8 @@ test('renders merge-ready pull request state in the right header', () => {
 	expect(markup).toContain('Ready to merge');
 	expect(markup).toContain('All required checks passed.');
 	expect(markup).toContain('Merge');
+	expect(markup).toContain('Requires confirmation');
+	expect(markup).toContain('data-permission-boundary="confirmation-required"');
 	expect(markup).not.toContain('Create PR');
 });
 

@@ -15,7 +15,7 @@
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:commands": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/local-command.test.ts",
-		"test:config": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/config-loader.test.ts tests/main/config-resolution.test.ts",
+		"test:config": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/config-loader.test.ts tests/main/config-resolution.test.ts tests/main/permissions.test.ts",
 		"test:db": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/database.test.ts",
 		"test:pi": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-executable.test.ts tests/main/pi-readiness.test.ts",
 		"test:renderer": "bun test tests/renderer/*.test.tsx",
