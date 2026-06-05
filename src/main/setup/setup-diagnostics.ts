@@ -16,6 +16,13 @@ import type {
 	PiExecutableService,
 	PiExecutableSnapshot,
 } from '../pi/pi-executable';
+import type {
+	PiAgentDirectorySnapshot,
+	PiAgentDirectorySource,
+	PiProviderModelSnapshot,
+	PiReadinessService,
+	PiRpcSmokeSnapshot,
+} from '../pi/pi-readiness';
 import type { EnsembleRootDirectoryService } from '../root/root-directory';
 import type { EnsembleDatabaseService } from '../storage/database';
 
@@ -40,6 +47,7 @@ interface CreateSetupDiagnosticsServiceOptions {
 	localCommandService: LocalCommandService;
 	now?: () => Date;
 	piExecutableService: PiExecutableService;
+	piReadinessService: PiReadinessService;
 	rootDirectoryService: EnsembleRootDirectoryService;
 }
 
@@ -79,6 +87,7 @@ export function createSetupDiagnosticsService({
 	localCommandService,
 	now = () => new Date(),
 	piExecutableService,
+	piReadinessService,
 	rootDirectoryService,
 }: CreateSetupDiagnosticsServiceOptions): SetupDiagnosticsService {
 	const context = { homeDirectory, now };
@@ -114,33 +123,12 @@ export function createSetupDiagnosticsService({
 		'managed-directories': () =>
 			getManagedDirectoriesCheck({ context, rootDirectoryService }),
 		'pi-agent-directory': () =>
-			createPendingCheck({
-				detail:
-					'Pi agent directory discovery will be implemented by THE-112. Ensemble will preserve the normal Pi environment by default.',
-				group: 'pi',
-				id: 'pi-agent-directory',
-				title: 'Pi agent directory',
-				updatedAt: now().toISOString(),
-			}),
+			getPiAgentDirectoryCheck({ context, piReadinessService }),
 		'pi-executable': () =>
 			getPiExecutableCheck({ context, piExecutableService }),
 		'pi-provider-model': () =>
-			createPendingCheck({
-				detail:
-					'Pi provider and model readiness will be implemented by THE-112.',
-				group: 'pi',
-				id: 'pi-provider-model',
-				title: 'Pi provider and model readiness',
-				updatedAt: now().toISOString(),
-			}),
-		'pi-rpc': () =>
-			createPendingCheck({
-				detail: 'Pi RPC smoke checks will be implemented by THE-112.',
-				group: 'pi',
-				id: 'pi-rpc',
-				title: 'Pi RPC startup',
-				updatedAt: now().toISOString(),
-			}),
+			getPiProviderModelCheck({ context, piReadinessService }),
+		'pi-rpc': () => getPiRpcCheck({ context, piReadinessService }),
 		'root-directory': () =>
 			getRootDirectoryCheck({ context, rootDirectoryService }),
 		'shell-process-launch': () =>
@@ -743,6 +731,182 @@ async function getGitHubAuthCheck({
 	}
 }
 
+async function getPiAgentDirectoryCheck({
+	context,
+	piReadinessService,
+}: {
+	context: SetupCheckProviderContext;
+	piReadinessService: PiReadinessService;
+}): Promise<SetupCheckSnapshot> {
+	try {
+		const readiness = await piReadinessService.getSnapshot();
+		const agentDirectory = readiness.agentDirectory;
+		const status = agentDirectory.status === 'success' ? 'success' : 'failure';
+		const detail =
+			status === 'success'
+				? `Pi agent directory resolves from ${formatPiAgentDirectorySource(
+						agentDirectory.source,
+					)}: ${agentDirectory.path}.`
+				: getPiAgentDirectoryFailureDetail(agentDirectory);
+
+		return createSetupCheckSnapshot({
+			blocking: true,
+			description:
+				'Verifies the normal Pi agent directory without redirecting Pi resource discovery.',
+			detail,
+			group: 'pi',
+			id: 'pi-agent-directory',
+			logs: createPiAgentDirectoryLogs(agentDirectory),
+			remediationActions: [
+				{
+					id: 'retry-pi-agent-directory',
+					kind: 'retry',
+					label: 'Retry Pi agent directory check',
+				},
+			],
+			status,
+			title: 'Pi agent directory',
+			updatedAt: context.now().toISOString(),
+		});
+	} catch (error) {
+		return createSetupCheckSnapshot({
+			blocking: true,
+			description:
+				'Verifies the normal Pi agent directory without redirecting Pi resource discovery.',
+			detail:
+				error instanceof Error
+					? error.message
+					: 'Unknown Pi agent directory check error.',
+			group: 'pi',
+			id: 'pi-agent-directory',
+			logs: [],
+			status: 'failure',
+			title: 'Pi agent directory',
+			updatedAt: context.now().toISOString(),
+		});
+	}
+}
+
+async function getPiRpcCheck({
+	context,
+	piReadinessService,
+}: {
+	context: SetupCheckProviderContext;
+	piReadinessService: PiReadinessService;
+}): Promise<SetupCheckSnapshot> {
+	try {
+		const readiness = await piReadinessService.getSnapshot();
+		const rpc = readiness.rpc;
+		const status = rpc.status === 'success' ? 'success' : 'failure';
+		const detail =
+			status === 'success'
+				? `Pi RPC startup produced a valid ${rpc.firstFrame?.type ?? 'JSONL'} frame from ${rpc.cwd}.`
+				: (rpc.failure?.message ??
+					'Pi RPC startup did not produce valid JSONL.');
+
+		return createSetupCheckSnapshot({
+			blocking: true,
+			description:
+				'Launches the selected Pi executable with --mode rpc from a managed setup smoke workspace.',
+			detail,
+			group: 'pi',
+			id: 'pi-rpc',
+			logs: createPiRpcLogs(rpc),
+			remediationActions: [
+				{
+					id: 'select-pi-executable-for-rpc',
+					kind: 'select-path',
+					label: 'Select Pi executable',
+					target: 'pi.executablePath',
+				},
+				{
+					id: 'retry-pi-rpc',
+					kind: 'retry',
+					label: 'Retry Pi RPC check',
+				},
+			],
+			status,
+			title: 'Pi RPC startup',
+			updatedAt: context.now().toISOString(),
+		});
+	} catch (error) {
+		return createSetupCheckSnapshot({
+			blocking: true,
+			description:
+				'Launches the selected Pi executable with --mode rpc from a managed setup smoke workspace.',
+			detail:
+				error instanceof Error ? error.message : 'Unknown Pi RPC check error.',
+			group: 'pi',
+			id: 'pi-rpc',
+			logs: [],
+			status: 'failure',
+			title: 'Pi RPC startup',
+			updatedAt: context.now().toISOString(),
+		});
+	}
+}
+
+async function getPiProviderModelCheck({
+	context,
+	piReadinessService,
+}: {
+	context: SetupCheckProviderContext;
+	piReadinessService: PiReadinessService;
+}): Promise<SetupCheckSnapshot> {
+	try {
+		const readiness = await piReadinessService.getSnapshot();
+		const providerModels = readiness.providerModels;
+		const status = providerModels.status === 'success' ? 'success' : 'failure';
+		const detail =
+			status === 'success'
+				? `Pi listed ${providerModels.modelCount} models across ${providerModels.providerCount} providers.`
+				: (providerModels.failure?.message ??
+					'Pi provider/model readiness could not be verified.');
+
+		return createSetupCheckSnapshot({
+			blocking: true,
+			description:
+				'Runs pi --list-models through the selected executable to verify provider/model readiness.',
+			detail,
+			group: 'pi',
+			id: 'pi-provider-model',
+			logs: createPiProviderModelLogs(providerModels),
+			remediationActions: [
+				{
+					id: 'open-pi-provider-settings',
+					kind: 'open-settings',
+					label: 'Open Pi provider settings',
+					target: 'pi.providers',
+				},
+				{
+					id: 'retry-pi-provider-model',
+					kind: 'retry',
+					label: 'Retry provider/model check',
+				},
+			],
+			status,
+			title: 'Pi provider and model readiness',
+			updatedAt: context.now().toISOString(),
+		});
+	} catch (error) {
+		return createSetupCheckSnapshot({
+			blocking: true,
+			description:
+				'Runs pi --list-models through the selected executable to verify provider/model readiness.',
+			detail:
+				error instanceof Error
+					? error.message
+					: 'Unknown Pi provider/model check error.',
+			group: 'pi',
+			id: 'pi-provider-model',
+			logs: [],
+			status: 'failure',
+			title: 'Pi provider and model readiness',
+			updatedAt: context.now().toISOString(),
+		});
+	}
+}
+
 async function getPiExecutableCheck({
 	context,
 	piExecutableService,
@@ -871,6 +1035,107 @@ function createCommandLogs(
 	return logs;
 }
 
+function createPiAgentDirectoryLogs(
+	agentDirectory: PiAgentDirectorySnapshot,
+): SetupCheckLogSnapshot[] {
+	return [
+		{
+			label: 'Agent directory path',
+			text: agentDirectory.path,
+		},
+		{
+			label: 'Source',
+			text: formatPiAgentDirectorySource(agentDirectory.source),
+		},
+		...agentDirectory.diagnostics.map((diagnostic) => ({
+			label: diagnostic.code,
+			text: diagnostic.path
+				? `${diagnostic.message} ${diagnostic.path}`
+				: diagnostic.message,
+		})),
+	];
+}
+
+function createPiRpcLogs(rpc: PiRpcSmokeSnapshot): SetupCheckLogSnapshot[] {
+	const logs: SetupCheckLogSnapshot[] = [
+		{
+			label: 'Command',
+			text: rpc.logs.command,
+		},
+		{
+			label: 'cwd',
+			text: rpc.logs.cwd,
+		},
+	];
+
+	if (rpc.firstFrame) {
+		logs.push({
+			label: 'First JSONL frame',
+			text: rpc.firstFrame.type,
+		});
+	}
+
+	if (rpc.logs.stdout) {
+		logs.push({
+			label: 'stdout',
+			text: rpc.logs.stdout,
+			truncated: rpc.stdoutTruncated,
+		});
+	}
+
+	if (rpc.logs.stderr) {
+		logs.push({
+			label: 'stderr',
+			text: rpc.logs.stderr,
+			truncated: rpc.stderrTruncated,
+		});
+	}
+
+	if (rpc.failure) {
+		logs.push({
+			label: rpc.failure.code,
+			text: rpc.failure.message,
+		});
+	}
+
+	return logs;
+}
+
+function createPiProviderModelLogs(
+	providerModels: PiProviderModelSnapshot,
+): SetupCheckLogSnapshot[] {
+	const resultLogs = providerModels.result
+		? createCommandLogs(providerModels.result)
+		: [
+				{
+					label: 'Command',
+					text: providerModels.command
+						? `${providerModels.command} --list-models`
+						: '',
+				},
+			];
+
+	return [
+		...resultLogs,
+		{
+			label: 'Model count',
+			text: String(providerModels.modelCount),
+		},
+		{
+			label: 'Provider count',
+			text: String(providerModels.providerCount),
+		},
+		...(providerModels.failure
+			? [
+					{
+						label: providerModels.failure.code,
+						text: providerModels.failure.message,
+					},
+				]
+			: []),
+	];
+}
+
 function createPiExecutableLogs(
 	executable: Awaited<ReturnType<PiExecutableService['getSnapshot']>>,
 ): SetupCheckLogSnapshot[] {
@@ -907,6 +1172,26 @@ function createPiExecutableLogs(
 	}
 
 	return logs;
+}
+
+function formatPiAgentDirectorySource(source: PiAgentDirectorySource): string {
+	return source === 'environment'
+		? 'PI_CODING_AGENT_DIR'
+		: 'Pi default ~/.pi/agent';
+}
+
+function getPiAgentDirectoryFailureDetail(
+	agentDirectory: PiAgentDirectorySnapshot,
+): string {
+	const diagnostic =
+		agentDirectory.diagnostics.find(
+			(candidate) => candidate.severity === 'error',
+		) ?? agentDirectory.diagnostics.at(-1);
+
+	return (
+		diagnostic?.message ??
+		'Pi agent directory could not be verified. Fix the Pi environment path or directory permissions, then retry.'
+	);
 }
 
 function formatSourceLabel(
