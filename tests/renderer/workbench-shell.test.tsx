@@ -93,9 +93,9 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('History');
 	expect(markup).toContain('Projects');
 	expect(markup).toContain('Open project creation menu');
-	expect(markup).toContain('Collapse project piductor');
+	expect(markup).toContain('Collapse project ensemble');
 	expect(markup).toContain('data-slot="context-menu-trigger"');
-	expect(markup).toContain('Reorder project piductor');
+	expect(markup).toContain('Reorder project ensemble');
 	expect(markup).toContain('Open workspace Conductor shell rework');
 	expect(markup).toContain('Archive workspace Conductor shell rework');
 	expect(markup).toContain('data-slot="reorder-list-group"');
@@ -168,9 +168,9 @@ test('marks setup notes tab as active agent activity', () => {
 });
 
 test('models project owner avatars with repo-icon fallback', () => {
-	const [piductorProject, agentLabProject] = shellFixtureProjects;
+	const [ensembleProject, agentLabProject] = shellFixtureProjects;
 
-	expect(piductorProject.owner).toEqual({
+	expect(ensembleProject.owner).toEqual({
 		avatarUrl: 'https://github.com/psoldunov.png',
 		name: 'psoldunov',
 	});

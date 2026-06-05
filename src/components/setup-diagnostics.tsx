@@ -302,7 +302,7 @@ function getSetupSummary(
 	if (!snapshot) {
 		return {
 			badge: 'Loading',
-			detail: 'Piductor is collecting setup diagnostics.',
+			detail: 'Ensemble is collecting setup diagnostics.',
 			title: 'Checking setup readiness',
 			tone: 'muted',
 		};

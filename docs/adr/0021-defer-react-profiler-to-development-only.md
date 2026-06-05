@@ -12,7 +12,7 @@ Screenshot inventory surfaced a React profiler/developer diagnostics setting. Th
 
 ## Decision
 
-Piductor will not ship React profiler controls as a normal production user setting in v1.
+Ensemble will not ship React profiler controls as a normal production user setting in v1.
 
 React profiler and developer diagnostics may exist in development builds or behind an internal debug flag, but they are not a v1 product feature.
 

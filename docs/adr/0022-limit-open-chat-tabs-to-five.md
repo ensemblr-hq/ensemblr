@@ -10,11 +10,11 @@ Accepted
 
 Conductor supports multiple open chat tabs in a workspace. The screenshot review and user observation indicate Conductor allows five open chat tabs. Document previews are separate and do not count against the chat-tab limit.
 
-Piductor should match this behavior for Conductor parity and to avoid unbounded Pi session/UI resource usage.
+Ensemble should match this behavior for Conductor parity and to avoid unbounded Pi session/UI resource usage.
 
 ## Decision
 
-Piductor will allow up to five open chat tabs per workspace.
+Ensemble will allow up to five open chat tabs per workspace.
 
 Rules:
 
@@ -25,7 +25,7 @@ Rules:
 
 ## Consequences
 
-- Piductor matches observed Conductor tab behavior.
+- Ensemble matches observed Conductor tab behavior.
 - Memory and Pi session UI resource usage are bounded.
 - The workspace data model must distinguish chat tabs from preview tabs.
 - The active Pi session history may contain more sessions than are currently open as tabs.

@@ -3,7 +3,7 @@
 Date: 2026-06-04
 
 Scope:
-Audit the initial `THE-101 / PID-001` Electron app scaffold against the current official generator output and document every intentional deviation.
+Audit the initial `THE-101 / ENS-001` Electron app scaffold against the current official generator output and document every intentional deviation.
 
 ## Sources Used
 
@@ -100,7 +100,7 @@ The root scaffold uses current TypeScript 6 and React TSX. The generated templat
   - `src/renderer/styles.css`
 
 Reason:
-`PID-001` requires typed main/preload/renderer boundaries and a typed IPC health endpoint. Keeping shared IPC types under `src/shared` gives later app services a stable place to grow.
+`ENS-001` requires typed main/preload/renderer boundaries and a typed IPC health endpoint. Keeping shared IPC types under `src/shared` gives later app services a stable place to grow.
 
 ### Main Process
 
@@ -109,15 +109,15 @@ Reason:
 - Added packaged roadmap resource handling via `extraResource` and `process.resourcesPath`.
 
 Reason:
-The generated lifecycle is preserved, while `PID-001` requires native lifecycle/menu ownership and typed IPC.
+The generated lifecycle is preserved, while `ENS-001` requires native lifecycle/menu ownership and typed IPC.
 
 ### Preload and IPC
 
-- Replaced the generated placeholder preload with `contextBridge.exposeInMainWorld('piductor', api)`.
-- Added `window.piductor.health()` backed by `ipcMain.handle`.
+- Replaced the generated placeholder preload with `contextBridge.exposeInMainWorld('ensemble', api)`.
+- Added `window.ensemble.health()` backed by `ipcMain.handle`.
 
 Reason:
-`PID-001` acceptance criteria require the renderer to call a typed no-op IPC health endpoint.
+`ENS-001` acceptance criteria require the renderer to call a typed no-op IPC health endpoint.
 
 ### Renderer
 
@@ -129,7 +129,7 @@ Reason:
 - Added Tailwind v4 CSS tokens and placeholder UI styling.
 
 Reason:
-`PID-001` requires basic routing between app shell, setup gate placeholder, workspace shell placeholder, and settings placeholder. ADR 0001 requires React, Tailwind, and a compact Piductor-owned UI direction.
+`ENS-001` requires basic routing between app shell, setup gate placeholder, workspace shell placeholder, and settings placeholder. ADR 0001 requires React, Tailwind, and a compact Ensemble-owned UI direction.
 
 ### Conductor Configuration
 

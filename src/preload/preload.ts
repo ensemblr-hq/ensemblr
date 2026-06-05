@@ -1,16 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 import {
+	type EnsembleApi,
 	type HealthSnapshot,
 	IPC_CHANNELS,
-	type PiductorApi,
 	type RootDirectorySnapshot,
 	type SettingsResolutionRequest,
 	type SettingsResolutionSnapshot,
 	type SetupDiagnosticsSnapshot,
 } from '../shared/ipc';
 
-const api: PiductorApi = {
+const api: EnsembleApi = {
 	ensureWindowWidth: (minimumWidth: number) =>
 		ipcRenderer.invoke(
 			IPC_CHANNELS.ensureWindowWidth,
@@ -33,4 +33,4 @@ const api: PiductorApi = {
 		) as Promise<SettingsResolutionSnapshot>,
 };
 
-contextBridge.exposeInMainWorld('piductor', api);
+contextBridge.exposeInMainWorld('ensemble', api);

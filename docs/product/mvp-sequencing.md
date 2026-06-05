@@ -2,7 +2,7 @@
 
 Date: 2026-06-04
 
-Piductor targets Conductor feature parity adapted for Pi. MVP sequencing is about implementation order, not reduced product ambition.
+Ensemble targets Conductor feature parity adapted for Pi. MVP sequencing is about implementation order, not reduced product ambition.
 
 ## Principle
 
@@ -13,9 +13,9 @@ Build every major Conductor workflow, adapted for Pi, in thin vertical slices be
 - Electron + React + TypeScript app shell.
 - shadcn/ui + Tailwind design foundation.
 - SQLite database and migrations.
-- `~/.config/piductor/config.json` loader and schema stub.
-- Piductor root directory management.
-- Conductor-compatible config loader for `piductor.json`, `conductor.json`, and `.worktreeinclude`.
+- `~/.config/ensemble/config.json` loader and schema stub.
+- Ensemble root directory management.
+- Conductor-compatible config loader for `ensemble.json`, `conductor.json`, and `.worktreeinclude`.
 - Setup gate checks.
 - Linear OAuth connection surface and token storage foundation.
 
@@ -49,7 +49,7 @@ Build every major Conductor workflow, adapted for Pi, in thin vertical slices be
 - PTY/process service.
 - Run script button and lifecycle.
 - Setup/archive/run logs.
-- `PIDUCTOR_*` and `CONDUCTOR_*` env vars.
+- `ENSEMBLE_*` and `CONDUCTOR_*` env vars.
 - Concurrent/nonconcurrent run script modes.
 
 ## Milestone 4: Review Flow

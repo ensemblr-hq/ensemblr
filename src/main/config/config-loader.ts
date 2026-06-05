@@ -10,9 +10,9 @@ import type {
 
 export type { ConfigDiagnostic, ConfigStatusSnapshot };
 
-export const PIDUCTOR_CONFIG_SCHEMA_VERSION = 1;
+export const ENSEMBLE_CONFIG_SCHEMA_VERSION = 1;
 
-export const PIDUCTOR_CONFIG_SCHEMA = {
+export const ENSEMBLE_CONFIG_SCHEMA = {
 	$schema: 'https://json-schema.org/draft/2020-12/schema',
 	additionalProperties: false,
 	properties: {
@@ -24,39 +24,39 @@ export const PIDUCTOR_CONFIG_SCHEMA = {
 			items: { type: 'object' },
 			type: 'array',
 		},
-		schemaVersion: { const: PIDUCTOR_CONFIG_SCHEMA_VERSION },
+		schemaVersion: { const: ENSEMBLE_CONFIG_SCHEMA_VERSION },
 		security: { type: 'object' },
 		ui: { type: 'object' },
 	},
-	title: 'Piductor Config',
+	title: 'Ensemble Config',
 	type: 'object',
 } as const;
 
-export interface PiductorConfig {
+export interface EnsembleConfig {
 	app: Record<string, unknown>;
 	environment: Record<string, unknown>;
 	managed: Record<string, unknown>;
 	repositoryDefaults: Record<string, unknown>;
 	repositoryRules: Record<string, unknown>[];
-	schemaVersion: typeof PIDUCTOR_CONFIG_SCHEMA_VERSION;
+	schemaVersion: typeof ENSEMBLE_CONFIG_SCHEMA_VERSION;
 	security: Record<string, unknown>;
 	ui: Record<string, unknown>;
 }
 
-export interface LoadPiductorConfigOptions {
+export interface LoadEnsembleConfigOptions {
 	configPath?: string;
 	homeDirectory?: string;
 	now?: () => Date;
 	requireTrustedManagedConfig?: boolean;
 }
 
-export interface PiductorConfigLoadResult {
-	config: PiductorConfig;
+export interface EnsembleConfigLoadResult {
+	config: EnsembleConfig;
 	snapshot: ConfigStatusSnapshot;
 }
 
-export interface PiductorConfigService {
-	getConfig: () => PiductorConfig;
+export interface EnsembleConfigService {
+	getConfig: () => EnsembleConfig;
 	getSnapshot: () => ConfigStatusSnapshot;
 	load: () => ConfigStatusSnapshot;
 }
@@ -69,7 +69,7 @@ type SectionName =
 	| 'security'
 	| 'ui';
 
-const CONFIG_DIRECTORY = '.config/piductor';
+const CONFIG_DIRECTORY = '.config/ensemble';
 const CONFIG_FILENAME = 'config.json';
 const ALLOWED_TOP_LEVEL_KEYS = new Set([
 	'app',
@@ -99,16 +99,16 @@ const SENSITIVE_KEY_PARTS = [
 	'token',
 ];
 
-export function resolvePiductorConfigPath(homeDirectory = homedir()): string {
+export function resolveEnsembleConfigPath(homeDirectory = homedir()): string {
 	return path.join(homeDirectory, CONFIG_DIRECTORY, CONFIG_FILENAME);
 }
 
-export function loadPiductorConfig(
-	options: LoadPiductorConfigOptions = {},
-): PiductorConfigLoadResult {
+export function loadEnsembleConfig(
+	options: LoadEnsembleConfigOptions = {},
+): EnsembleConfigLoadResult {
 	const configPath =
 		options.configPath ??
-		resolvePiductorConfigPath(options.homeDirectory ?? homedir());
+		resolveEnsembleConfigPath(options.homeDirectory ?? homedir());
 	const displayPath = formatDisplayPath(
 		configPath,
 		options.homeDirectory ?? homedir(),
@@ -131,7 +131,7 @@ export function loadPiductorConfig(
 			],
 			displayPath,
 			loadedAt,
-			schemaVersion: PIDUCTOR_CONFIG_SCHEMA_VERSION,
+			schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
 			status: 'missing',
 		});
 	}
@@ -202,7 +202,7 @@ export function loadPiductorConfig(
 		});
 	}
 
-	const validation = validatePiductorConfig(parsed);
+	const validation = validateEnsembleConfig(parsed);
 	const schemaVersion = getSchemaVersion(parsed);
 	const blocksReadiness =
 		requireTrustedManagedConfig ||
@@ -223,13 +223,13 @@ export function loadPiductorConfig(
 	};
 }
 
-export function createPiductorConfigService(
-	options: LoadPiductorConfigOptions = {},
-): PiductorConfigService {
-	let cachedResult: PiductorConfigLoadResult | null = null;
+export function createEnsembleConfigService(
+	options: LoadEnsembleConfigOptions = {},
+): EnsembleConfigService {
+	let cachedResult: EnsembleConfigLoadResult | null = null;
 
-	function ensureLoaded(): PiductorConfigLoadResult {
-		cachedResult ??= loadPiductorConfig(options);
+	function ensureLoaded(): EnsembleConfigLoadResult {
+		cachedResult ??= loadEnsembleConfig(options);
 		return cachedResult;
 	}
 
@@ -240,18 +240,18 @@ export function createPiductorConfigService(
 	};
 }
 
-function validatePiductorConfig(config: Record<string, unknown>): {
-	config: PiductorConfig;
+function validateEnsembleConfig(config: Record<string, unknown>): {
+	config: EnsembleConfig;
 	diagnostics: ConfigDiagnostic[];
 } {
 	const diagnostics: ConfigDiagnostic[] = [];
 	const schemaVersion = getSchemaVersion(config);
 
-	if (schemaVersion !== PIDUCTOR_CONFIG_SCHEMA_VERSION) {
+	if (schemaVersion !== ENSEMBLE_CONFIG_SCHEMA_VERSION) {
 		diagnostics.push({
 			code: 'unsupported-schema-version',
 			fieldPath: '$.schemaVersion',
-			message: `Unsupported config schema version ${String(schemaVersion)}. Expected ${PIDUCTOR_CONFIG_SCHEMA_VERSION}.`,
+			message: `Unsupported config schema version ${String(schemaVersion)}. Expected ${ENSEMBLE_CONFIG_SCHEMA_VERSION}.`,
 			severity: 'error',
 		});
 	}
@@ -325,14 +325,14 @@ function validatePiductorConfig(config: Record<string, unknown>): {
 	};
 }
 
-function createEmptyConfig(): PiductorConfig {
+function createEmptyConfig(): EnsembleConfig {
 	return {
 		app: {},
 		environment: {},
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: PIDUCTOR_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 	};
@@ -354,7 +354,7 @@ function createResult({
 	loadedAt: string;
 	schemaVersion: number | null;
 	status: ConfigStatus;
-}): PiductorConfigLoadResult {
+}): EnsembleConfigLoadResult {
 	return {
 		config: createEmptyConfig(),
 		snapshot: {
@@ -373,7 +373,7 @@ function getSchemaVersion(config: Record<string, unknown>): number | null {
 	const value = config.schemaVersion;
 
 	if (value === undefined) {
-		return PIDUCTOR_CONFIG_SCHEMA_VERSION;
+		return ENSEMBLE_CONFIG_SCHEMA_VERSION;
 	}
 
 	return typeof value === 'number' && Number.isInteger(value) ? value : null;

@@ -2,116 +2,116 @@
 
 Date: 2026-06-04
 
-This map is generated from the local planning IDs in `docs/product/linear-issues.md`. Replace `PID-*` IDs with Linear issue keys after import.
+This map is generated from the local planning IDs in `docs/product/linear-issues.md`. Replace `ENS-*` IDs with Linear issue keys after import.
 
 ## Critical Path
 
-- Foundation services (`PID-001` through `PID-008`) unblock setup, repositories, storage, config, secrets, root, command execution, and establish the structural workbench shell contract.
+- Foundation services (`ENS-001` through `ENS-008`) unblock setup, repositories, storage, config, secrets, root, command execution, and establish the structural workbench shell contract.
 - Foundation UI creates fixture-backed sidebar, workspace header, chat tab, review panel, PR-state header, and dock regions. Later workspace, Pi, terminal, Linear, GitHub, and review tickets wire live TanStack Query/IPC data into those regions instead of rebuilding them.
-- Setup/config (`PID-009` through `PID-016`) unblocks ready-state gating, Pi executable/RPC checks, `gh`, env/secrets, repository config, and safe root changes.
-- Workspace core (`PID-017` through `PID-025`) replaces fixture shell data with live repository/workspace records and unblocks Pi sessions, terminal/scripts, Linear workspace creation, and GitHub review flows while preserving current navigation, pinning, context-menu, header, and open-target affordances.
-- Pi runtime (`PID-026` through `PID-035`) unblocks agent timeline, checkpoints, context-to-Pi, and agent-assisted review/PR work.
-- Terminal/scripts (`PID-036` through `PID-042`) replaces the existing dock log placeholders in place with setup/run/archive execution, env injection, and process UI.
-- Linear (`PID-043` through `PID-049`) depends on Keychain/SQLite/setup surfaces and workspace core for workspace-from-issue.
-- GitHub/review (`PID-050` through `PID-060`) wires the existing All files/Changes/Checks regions and right PR header, and depends on workspace core, `gh`, git status, Pi composer, and checks metadata.
-- Settings/polish (`PID-061` through `PID-069`) depends on underlying services so settings show real state and source diagnostics.
-- Deferred issues (`PID-070` through `PID-074`) should not block core milestones.
+- Setup/config (`ENS-009` through `ENS-016`) unblocks ready-state gating, Pi executable/RPC checks, `gh`, env/secrets, repository config, and safe root changes.
+- Workspace core (`ENS-017` through `ENS-025`) replaces fixture shell data with live repository/workspace records and unblocks Pi sessions, terminal/scripts, Linear workspace creation, and GitHub review flows while preserving current navigation, pinning, context-menu, header, and open-target affordances.
+- Pi runtime (`ENS-026` through `ENS-035`) unblocks agent timeline, checkpoints, context-to-Pi, and agent-assisted review/PR work.
+- Terminal/scripts (`ENS-036` through `ENS-042`) replaces the existing dock log placeholders in place with setup/run/archive execution, env injection, and process UI.
+- Linear (`ENS-043` through `ENS-049`) depends on Keychain/SQLite/setup surfaces and workspace core for workspace-from-issue.
+- GitHub/review (`ENS-050` through `ENS-060`) wires the existing All files/Changes/Checks regions and right PR header, and depends on workspace core, `gh`, git status, Pi composer, and checks metadata.
+- Settings/polish (`ENS-061` through `ENS-069`) depends on underlying services so settings show real state and source diagnostics.
+- Deferred issues (`ENS-070` through `ENS-074`) should not block core milestones.
 
 ## Mermaid Graph
 
 ```mermaid
 flowchart TD
   subgraph S1__Foundation["1. Foundation"]
-    P001["PID-001 Electron App Shell Scaffold"]
-    P002["PID-002 Piductor Design System Foundation"]
-    P003["PID-003 SQLite Database and Migrations"]
-    P004["PID-004 Keychain Secret Store"]
-    P005["PID-005 Declarative Config Loader and JSON Schema Stub"]
-    P006["PID-006 Configuration Resolution Engine"]
-    P007["PID-007 Root Directory Service"]
-    P008["PID-008 Local Command Environment Service"]
+    P001["ENS-001 Electron App Shell Scaffold"]
+    P002["ENS-002 Ensemble Design System Foundation"]
+    P003["ENS-003 SQLite Database and Migrations"]
+    P004["ENS-004 Keychain Secret Store"]
+    P005["ENS-005 Declarative Config Loader and JSON Schema Stub"]
+    P006["ENS-006 Configuration Resolution Engine"]
+    P007["ENS-007 Root Directory Service"]
+    P008["ENS-008 Local Command Environment Service"]
   end
   subgraph S2__Setup_Gate_and_Configuration["2. Setup Gate and Configuration"]
-    P009["PID-009 Setup Gate Diagnostics UI and Model"]
-    P010["PID-010 Git and gh Readiness Checks"]
-    P011["PID-011 Pi Executable Discovery and Override"]
-    P012["PID-012 Pi RPC and Provider Readiness Smoke Checks"]
-    P013["PID-013 Workspace Trust and Permission-Mode Baseline"]
-    P014["PID-014 Environment Variable Catalog and Secret Metadata"]
-    P015["PID-015 Repository Config Parser for piductor.json, conductor.json, and .worktreeinclude"]
-    P016["PID-016 Root Switch Reindex/Adopt Flow"]
+    P009["ENS-009 Setup Gate Diagnostics UI and Model"]
+    P010["ENS-010 Git and gh Readiness Checks"]
+    P011["ENS-011 Pi Executable Discovery and Override"]
+    P012["ENS-012 Pi RPC and Provider Readiness Smoke Checks"]
+    P013["ENS-013 Workspace Trust and Permission-Mode Baseline"]
+    P014["ENS-014 Environment Variable Catalog and Secret Metadata"]
+    P015["ENS-015 Repository Config Parser for ensemble.json, conductor.json, and .worktreeinclude"]
+    P016["ENS-016 Root Switch Reindex/Adopt Flow"]
   end
   subgraph S3__Repository_and_Workspace_Core["3. Repository and Workspace Core"]
-    P017["PID-017 Project Add Menu and Recents"]
-    P018["PID-018 Local Repository Registration"]
-    P019["PID-019 GitHub Clone Flow with Progress and Errors"]
-    P020["PID-020 Sidebar Repository/Workspace Navigation"]
-    P021["PID-021 Git Worktree Workspace Creation"]
-    P022["PID-022 Files-to-Copy Implementation"]
-    P023["PID-023 Workspace Landing Summary and First Composer Surface"]
-    P024["PID-024 Shared-Root Workspace Adoption and Reconciliation"]
-    P025["PID-025 Workspace Archive and Context Lifecycle"]
+    P017["ENS-017 Project Add Menu and Recents"]
+    P018["ENS-018 Local Repository Registration"]
+    P019["ENS-019 GitHub Clone Flow with Progress and Errors"]
+    P020["ENS-020 Sidebar Repository/Workspace Navigation"]
+    P021["ENS-021 Git Worktree Workspace Creation"]
+    P022["ENS-022 Files-to-Copy Implementation"]
+    P023["ENS-023 Workspace Landing Summary and First Composer Surface"]
+    P024["ENS-024 Shared-Root Workspace Adoption and Reconciliation"]
+    P025["ENS-025 Workspace Archive and Context Lifecycle"]
   end
   subgraph S4__Pi_CLI_RPC_Runtime_and_Agent_Timeline["4. Pi CLI RPC Runtime and Agent Timeline"]
-    P026["PID-026 PiAgentClient RPC Boundary"]
-    P027["PID-027 RPC Process Supervisor and JSONL Stream Handling"]
-    P028["PID-028 Pi Session Metadata Mapping"]
-    P029["PID-029 Pi Composer Submit, Stop, and Model Controls"]
-    P030["PID-030 Structured Pi Timeline Rendering"]
-    P031["PID-031 Runtime Error Retry and Session-Fork Discovery"]
-    P032["PID-032 Git-Backed Checkpoint Capture"]
-    P033["PID-033 Checkpoint Restore and Turn Diff"]
-    P034["PID-034 Chat Tab Limit and Session Tab Model"]
-    P035["PID-035 Pi Capability Discovery for Modes, Context, Browser, and Permissions"]
+    P026["ENS-026 PiAgentClient RPC Boundary"]
+    P027["ENS-027 RPC Process Supervisor and JSONL Stream Handling"]
+    P028["ENS-028 Pi Session Metadata Mapping"]
+    P029["ENS-029 Pi Composer Submit, Stop, and Model Controls"]
+    P030["ENS-030 Structured Pi Timeline Rendering"]
+    P031["ENS-031 Runtime Error Retry and Session-Fork Discovery"]
+    P032["ENS-032 Git-Backed Checkpoint Capture"]
+    P033["ENS-033 Checkpoint Restore and Turn Diff"]
+    P034["ENS-034 Chat Tab Limit and Session Tab Model"]
+    P035["ENS-035 Pi Capability Discovery for Modes, Context, Browser, and Permissions"]
   end
   subgraph S5__Terminal__Scripts__and_Processes["5. Terminal, Scripts, and Processes"]
-    P036["PID-036 Main-Process PTY Service"]
-    P037["PID-037 xterm.js Terminal Adapter and Dock UI"]
-    P038["PID-038 Setup, Run, and Archive Script Lifecycle"]
-    P039["PID-039 Workspace Environment Variables and Port Allocation"]
-    P040["PID-040 Run Script Concurrency and Process Controls"]
-    P041["PID-041 Preview URL Detection Discovery"]
-    P042["PID-042 Spotlight Testing Discovery"]
+    P036["ENS-036 Main-Process PTY Service"]
+    P037["ENS-037 xterm.js Terminal Adapter and Dock UI"]
+    P038["ENS-038 Setup, Run, and Archive Script Lifecycle"]
+    P039["ENS-039 Workspace Environment Variables and Port Allocation"]
+    P040["ENS-040 Run Script Concurrency and Process Controls"]
+    P041["ENS-041 Preview URL Detection Discovery"]
+    P042["ENS-042 Spotlight Testing Discovery"]
   end
   subgraph S6__Linear_Integration["6. Linear Integration"]
-    P043["PID-043 Linear OAuth PKCE and Token Lifecycle"]
-    P044["PID-044 Linear API Schema and Capability Discovery"]
-    P045["PID-045 Linear Cache and Sync Service"]
-    P046["PID-046 Linear Issue Browse, Search, and Read UI"]
-    P047["PID-047 Linear Issue Create, Update, and Comment UI"]
-    P048["PID-048 Workspace Creation from Linear Issue"]
-    P049["PID-049 Linear Issue Status Linking and Remediation"]
+    P043["ENS-043 Linear OAuth PKCE and Token Lifecycle"]
+    P044["ENS-044 Linear API Schema and Capability Discovery"]
+    P045["ENS-045 Linear Cache and Sync Service"]
+    P046["ENS-046 Linear Issue Browse, Search, and Read UI"]
+    P047["ENS-047 Linear Issue Create, Update, and Comment UI"]
+    P048["ENS-048 Workspace Creation from Linear Issue"]
+    P049["ENS-049 Linear Issue Status Linking and Remediation"]
   end
   subgraph S7__GitHub__Review__Checks__and_Merge["7. GitHub, Review, Checks, and Merge"]
-    P050["PID-050 Git File Status and All-Files Tree"]
-    P051["PID-051 Changes Tree and Unified Diff Viewer"]
-    P052["PID-052 Local Diff Comments and Todos"]
-    P053["PID-053 Send Review/Check Context to Pi"]
-    P054["PID-054 gh Commit, Push, and PR-Create Service"]
-    P055["PID-055 gh PR/Check Metadata Service"]
-    P056["PID-056 GitHub Comments and Deployments Discovery"]
-    P057["PID-057 Checks Panel States and Polling"]
-    P058["PID-058 Merge Readiness and Confirmation Flow"]
-    P059["PID-059 Agent-Assisted Review, PR, and Fix Action Templates"]
-    P060["PID-060 Archive-After-Merge and Branch Cleanup"]
+    P050["ENS-050 Git File Status and All-Files Tree"]
+    P051["ENS-051 Changes Tree and Unified Diff Viewer"]
+    P052["ENS-052 Local Diff Comments and Todos"]
+    P053["ENS-053 Send Review/Check Context to Pi"]
+    P054["ENS-054 gh Commit, Push, and PR-Create Service"]
+    P055["ENS-055 gh PR/Check Metadata Service"]
+    P056["ENS-056 GitHub Comments and Deployments Discovery"]
+    P057["ENS-057 Checks Panel States and Polling"]
+    P058["ENS-058 Merge Readiness and Confirmation Flow"]
+    P059["ENS-059 Agent-Assisted Review, PR, and Fix Action Templates"]
+    P060["ENS-060 Archive-After-Merge and Branch Cleanup"]
   end
   subgraph S8__Settings_and_Parity_Polish["8. Settings and Parity Polish"]
-    P061["PID-061 Settings Shell with App and Repository Sections"]
-    P062["PID-062 App Settings Sections for General, Models, Providers, Integrations, and Security"]
-    P063["PID-063 Repository Settings Source Diagnostics"]
-    P064["PID-064 Appearance Settings and Previews"]
-    P065["PID-065 Command Palette and Keyboard Shortcuts"]
-    P066["PID-066 Deep Links and External-Open Actions"]
-    P067["PID-067 Error, Empty, Loading, and Diagnostics Logs"]
-    P068["PID-068 Resource Usage, Sidebar, and Experimental Flag Discovery"]
-    P069["PID-069 Product Decision for AI Certainty Phrase Setting"]
+    P061["ENS-061 Settings Shell with App and Repository Sections"]
+    P062["ENS-062 App Settings Sections for General, Models, Providers, Integrations, and Security"]
+    P063["ENS-063 Repository Settings Source Diagnostics"]
+    P064["ENS-064 Appearance Settings and Previews"]
+    P065["ENS-065 Command Palette and Keyboard Shortcuts"]
+    P066["ENS-066 Deep Links and External-Open Actions"]
+    P067["ENS-067 Error, Empty, Loading, and Diagnostics Logs"]
+    P068["ENS-068 Resource Usage, Sidebar, and Experimental Flag Discovery"]
+    P069["ENS-069 Product Decision for AI Certainty Phrase Setting"]
   end
   subgraph S9__Deferred___Post_Core["9. Deferred / Post-Core"]
-    P070["PID-070 Post-Core Packaging, Signing, Notarization, and Auto-Update"]
-    P071["PID-071 Post-Core Direct GitHub API and OAuth"]
-    P072["PID-072 Post-Core SDK Sidecar Fallback"]
-    P073["PID-073 Post-Core Managed Pi Runtime Installer"]
-    P074["PID-074 Post-Core Voice, Graphite, Cloud SSH, and Production Profiler"]
+    P070["ENS-070 Post-Core Packaging, Signing, Notarization, and Auto-Update"]
+    P071["ENS-071 Post-Core Direct GitHub API and OAuth"]
+    P072["ENS-072 Post-Core SDK Sidecar Fallback"]
+    P073["ENS-073 Post-Core Managed Pi Runtime Installer"]
+    P074["ENS-074 Post-Core Voice, Graphite, Cloud SSH, and Production Profiler"]
   end
   P001 --> P002
   P001 --> P003
@@ -306,86 +306,86 @@ flowchart TD
 
 ## Plain Text Dependencies
 
-- PID-001 Electron App Shell Scaffold: None
-- PID-002 Piductor Design System Foundation: PID-001
-- PID-003 SQLite Database and Migrations: PID-001
-- PID-004 Keychain Secret Store: PID-001, PID-003
-- PID-005 Declarative Config Loader and JSON Schema Stub: PID-001
-- PID-006 Configuration Resolution Engine: PID-003, PID-005
-- PID-007 Root Directory Service: PID-003, PID-006
-- PID-008 Local Command Environment Service: PID-001, PID-007
-- PID-009 Setup Gate Diagnostics UI and Model: PID-003, PID-007, PID-008
-- PID-010 Git and gh Readiness Checks: PID-008, PID-009
-- PID-011 Pi Executable Discovery and Override: PID-005, PID-006, PID-008, PID-009
-- PID-012 Pi RPC and Provider Readiness Smoke Checks: PID-008, PID-009, PID-011
-- PID-013 Workspace Trust and Permission-Mode Baseline: PID-006, PID-009
-- PID-014 Environment Variable Catalog and Secret Metadata: PID-004, PID-006, PID-013
-- PID-015 Repository Config Parser for piductor.json, conductor.json, and .worktreeinclude: PID-006, PID-008
-- PID-016 Root Switch Reindex/Adopt Flow: PID-007, PID-009, PID-013
-- PID-017 Project Add Menu and Recents: PID-020
-- PID-018 Local Repository Registration: PID-007, PID-015, PID-020
-- PID-019 GitHub Clone Flow with Progress and Errors: PID-007, PID-008, PID-010, PID-015, PID-020
-- PID-020 Sidebar Repository/Workspace Navigation: PID-002, PID-003
-- PID-021 Git Worktree Workspace Creation: PID-007, PID-010, PID-015, PID-020
-- PID-022 Files-to-Copy Implementation: PID-015, PID-021
-- PID-023 Workspace Landing Summary and First Composer Surface: PID-020, PID-021, PID-022
-- PID-024 Shared-Root Workspace Adoption and Reconciliation: PID-007, PID-015, PID-016, PID-021
-- PID-025 Workspace Archive and Context Lifecycle: PID-013, PID-021
-- PID-026 PiAgentClient RPC Boundary: PID-011, PID-012, PID-021
-- PID-027 RPC Process Supervisor and JSONL Stream Handling: PID-008, PID-026
-- PID-028 Pi Session Metadata Mapping: PID-003, PID-026, PID-027
-- PID-029 Pi Composer Submit, Stop, and Model Controls: PID-023, PID-026, PID-027, PID-028
-- PID-030 Structured Pi Timeline Rendering: PID-027, PID-028, PID-029
-- PID-031 Runtime Error Retry and Session-Fork Discovery: PID-026, PID-027, PID-035
-- PID-032 Git-Backed Checkpoint Capture: PID-021, PID-028
-- PID-033 Checkpoint Restore and Turn Diff: PID-030, PID-032
-- PID-034 Chat Tab Limit and Session Tab Model: PID-028, PID-030
-- PID-035 Pi Capability Discovery for Modes, Context, Browser, and Permissions: PID-011, PID-012, PID-026
-- PID-036 Main-Process PTY Service: PID-008, PID-021
-- PID-037 xterm.js Terminal Adapter and Dock UI: PID-002, PID-036
-- PID-038 Setup, Run, and Archive Script Lifecycle: PID-015, PID-021, PID-036, PID-037
-- PID-039 Workspace Environment Variables and Port Allocation: PID-006, PID-014, PID-021, PID-038
-- PID-040 Run Script Concurrency and Process Controls: PID-038, PID-039
-- PID-041 Preview URL Detection Discovery: PID-038, PID-039
-- PID-042 Spotlight Testing Discovery: PID-021, PID-038
-- PID-043 Linear OAuth PKCE and Token Lifecycle: PID-004, PID-009
-- PID-044 Linear API Schema and Capability Discovery: PID-043
-- PID-045 Linear Cache and Sync Service: PID-003, PID-043, PID-044
-- PID-046 Linear Issue Browse, Search, and Read UI: PID-043, PID-045
-- PID-047 Linear Issue Create, Update, and Comment UI: PID-045, PID-046
-- PID-048 Workspace Creation from Linear Issue: PID-021, PID-023, PID-045, PID-046
-- PID-049 Linear Issue Status Linking and Remediation: PID-045, PID-047, PID-048
-- PID-050 Git File Status and All-Files Tree: PID-021, PID-008
-- PID-051 Changes Tree and Unified Diff Viewer: PID-050
-- PID-052 Local Diff Comments and Todos: PID-003, PID-051
-- PID-053 Send Review/Check Context to Pi: PID-029, PID-051, PID-052, PID-057
-- PID-054 gh Commit, Push, and PR-Create Service: PID-010, PID-021, PID-050
-- PID-055 gh PR/Check Metadata Service: PID-010, PID-054
-- PID-056 GitHub Comments and Deployments Discovery: PID-055
-- PID-057 Checks Panel States and Polling: PID-052, PID-055, PID-056
-- PID-058 Merge Readiness and Confirmation Flow: PID-013, PID-055, PID-057
-- PID-059 Agent-Assisted Review, PR, and Fix Action Templates: PID-029, PID-053, PID-054, PID-057, PID-063
-- PID-060 Archive-After-Merge and Branch Cleanup: PID-025, PID-058
-- PID-061 Settings Shell with App and Repository Sections: PID-002, PID-003, PID-020
-- PID-062 App Settings Sections for General, Models, Providers, Integrations, and Security: PID-006, PID-009, PID-013, PID-014, PID-035, PID-043, PID-061
-- PID-063 Repository Settings Source Diagnostics: PID-006, PID-015, PID-038, PID-059, PID-061
-- PID-064 Appearance Settings and Previews: PID-002, PID-037, PID-051, PID-061
-- PID-065 Command Palette and Keyboard Shortcuts: PID-020, PID-023, PID-037, PID-057, PID-061
-- PID-066 Deep Links and External-Open Actions: PID-020, PID-021, PID-046, PID-057
-- PID-067 Error, Empty, Loading, and Diagnostics Logs: PID-009, PID-027, PID-038, PID-045, PID-055, PID-061
-- PID-068 Resource Usage, Sidebar, and Experimental Flag Discovery: PID-036, PID-061
-- PID-069 Product Decision for AI Certainty Phrase Setting: PID-030, PID-062
-- PID-070 Post-Core Packaging, Signing, Notarization, and Auto-Update: Core product completion
-- PID-071 Post-Core Direct GitHub API and OAuth: PID-056, core GitHub flow completion
-- PID-072 Post-Core SDK Sidecar Fallback: PID-035, core Pi runtime completion
-- PID-073 Post-Core Managed Pi Runtime Installer: core setup and Pi runtime completion
-- PID-074 Post-Core Voice, Graphite, Cloud SSH, and Production Profiler: Core product completion
+- ENS-001 Electron App Shell Scaffold: None
+- ENS-002 Ensemble Design System Foundation: ENS-001
+- ENS-003 SQLite Database and Migrations: ENS-001
+- ENS-004 Keychain Secret Store: ENS-001, ENS-003
+- ENS-005 Declarative Config Loader and JSON Schema Stub: ENS-001
+- ENS-006 Configuration Resolution Engine: ENS-003, ENS-005
+- ENS-007 Root Directory Service: ENS-003, ENS-006
+- ENS-008 Local Command Environment Service: ENS-001, ENS-007
+- ENS-009 Setup Gate Diagnostics UI and Model: ENS-003, ENS-007, ENS-008
+- ENS-010 Git and gh Readiness Checks: ENS-008, ENS-009
+- ENS-011 Pi Executable Discovery and Override: ENS-005, ENS-006, ENS-008, ENS-009
+- ENS-012 Pi RPC and Provider Readiness Smoke Checks: ENS-008, ENS-009, ENS-011
+- ENS-013 Workspace Trust and Permission-Mode Baseline: ENS-006, ENS-009
+- ENS-014 Environment Variable Catalog and Secret Metadata: ENS-004, ENS-006, ENS-013
+- ENS-015 Repository Config Parser for ensemble.json, conductor.json, and .worktreeinclude: ENS-006, ENS-008
+- ENS-016 Root Switch Reindex/Adopt Flow: ENS-007, ENS-009, ENS-013
+- ENS-017 Project Add Menu and Recents: ENS-020
+- ENS-018 Local Repository Registration: ENS-007, ENS-015, ENS-020
+- ENS-019 GitHub Clone Flow with Progress and Errors: ENS-007, ENS-008, ENS-010, ENS-015, ENS-020
+- ENS-020 Sidebar Repository/Workspace Navigation: ENS-002, ENS-003
+- ENS-021 Git Worktree Workspace Creation: ENS-007, ENS-010, ENS-015, ENS-020
+- ENS-022 Files-to-Copy Implementation: ENS-015, ENS-021
+- ENS-023 Workspace Landing Summary and First Composer Surface: ENS-020, ENS-021, ENS-022
+- ENS-024 Shared-Root Workspace Adoption and Reconciliation: ENS-007, ENS-015, ENS-016, ENS-021
+- ENS-025 Workspace Archive and Context Lifecycle: ENS-013, ENS-021
+- ENS-026 PiAgentClient RPC Boundary: ENS-011, ENS-012, ENS-021
+- ENS-027 RPC Process Supervisor and JSONL Stream Handling: ENS-008, ENS-026
+- ENS-028 Pi Session Metadata Mapping: ENS-003, ENS-026, ENS-027
+- ENS-029 Pi Composer Submit, Stop, and Model Controls: ENS-023, ENS-026, ENS-027, ENS-028
+- ENS-030 Structured Pi Timeline Rendering: ENS-027, ENS-028, ENS-029
+- ENS-031 Runtime Error Retry and Session-Fork Discovery: ENS-026, ENS-027, ENS-035
+- ENS-032 Git-Backed Checkpoint Capture: ENS-021, ENS-028
+- ENS-033 Checkpoint Restore and Turn Diff: ENS-030, ENS-032
+- ENS-034 Chat Tab Limit and Session Tab Model: ENS-028, ENS-030
+- ENS-035 Pi Capability Discovery for Modes, Context, Browser, and Permissions: ENS-011, ENS-012, ENS-026
+- ENS-036 Main-Process PTY Service: ENS-008, ENS-021
+- ENS-037 xterm.js Terminal Adapter and Dock UI: ENS-002, ENS-036
+- ENS-038 Setup, Run, and Archive Script Lifecycle: ENS-015, ENS-021, ENS-036, ENS-037
+- ENS-039 Workspace Environment Variables and Port Allocation: ENS-006, ENS-014, ENS-021, ENS-038
+- ENS-040 Run Script Concurrency and Process Controls: ENS-038, ENS-039
+- ENS-041 Preview URL Detection Discovery: ENS-038, ENS-039
+- ENS-042 Spotlight Testing Discovery: ENS-021, ENS-038
+- ENS-043 Linear OAuth PKCE and Token Lifecycle: ENS-004, ENS-009
+- ENS-044 Linear API Schema and Capability Discovery: ENS-043
+- ENS-045 Linear Cache and Sync Service: ENS-003, ENS-043, ENS-044
+- ENS-046 Linear Issue Browse, Search, and Read UI: ENS-043, ENS-045
+- ENS-047 Linear Issue Create, Update, and Comment UI: ENS-045, ENS-046
+- ENS-048 Workspace Creation from Linear Issue: ENS-021, ENS-023, ENS-045, ENS-046
+- ENS-049 Linear Issue Status Linking and Remediation: ENS-045, ENS-047, ENS-048
+- ENS-050 Git File Status and All-Files Tree: ENS-021, ENS-008
+- ENS-051 Changes Tree and Unified Diff Viewer: ENS-050
+- ENS-052 Local Diff Comments and Todos: ENS-003, ENS-051
+- ENS-053 Send Review/Check Context to Pi: ENS-029, ENS-051, ENS-052, ENS-057
+- ENS-054 gh Commit, Push, and PR-Create Service: ENS-010, ENS-021, ENS-050
+- ENS-055 gh PR/Check Metadata Service: ENS-010, ENS-054
+- ENS-056 GitHub Comments and Deployments Discovery: ENS-055
+- ENS-057 Checks Panel States and Polling: ENS-052, ENS-055, ENS-056
+- ENS-058 Merge Readiness and Confirmation Flow: ENS-013, ENS-055, ENS-057
+- ENS-059 Agent-Assisted Review, PR, and Fix Action Templates: ENS-029, ENS-053, ENS-054, ENS-057, ENS-063
+- ENS-060 Archive-After-Merge and Branch Cleanup: ENS-025, ENS-058
+- ENS-061 Settings Shell with App and Repository Sections: ENS-002, ENS-003, ENS-020
+- ENS-062 App Settings Sections for General, Models, Providers, Integrations, and Security: ENS-006, ENS-009, ENS-013, ENS-014, ENS-035, ENS-043, ENS-061
+- ENS-063 Repository Settings Source Diagnostics: ENS-006, ENS-015, ENS-038, ENS-059, ENS-061
+- ENS-064 Appearance Settings and Previews: ENS-002, ENS-037, ENS-051, ENS-061
+- ENS-065 Command Palette and Keyboard Shortcuts: ENS-020, ENS-023, ENS-037, ENS-057, ENS-061
+- ENS-066 Deep Links and External-Open Actions: ENS-020, ENS-021, ENS-046, ENS-057
+- ENS-067 Error, Empty, Loading, and Diagnostics Logs: ENS-009, ENS-027, ENS-038, ENS-045, ENS-055, ENS-061
+- ENS-068 Resource Usage, Sidebar, and Experimental Flag Discovery: ENS-036, ENS-061
+- ENS-069 Product Decision for AI Certainty Phrase Setting: ENS-030, ENS-062
+- ENS-070 Post-Core Packaging, Signing, Notarization, and Auto-Update: Core product completion
+- ENS-071 Post-Core Direct GitHub API and OAuth: ENS-056, core GitHub flow completion
+- ENS-072 Post-Core SDK Sidecar Fallback: ENS-035, core Pi runtime completion
+- ENS-073 Post-Core Managed Pi Runtime Installer: core setup and Pi runtime completion
+- ENS-074 Post-Core Voice, Graphite, Cloud SSH, and Production Profiler: Core product completion
 
 ## Discovery and Decision Nodes
 
-- Discovery: `PID-031`, `PID-035`, `PID-041`, `PID-042`, `PID-044`, `PID-056`, `PID-068`.
-- Product decision: `PID-069`.
-- Post-core deferred: `PID-070`, `PID-071`, `PID-072`, `PID-073`, `PID-074`.
+- Discovery: `ENS-031`, `ENS-035`, `ENS-041`, `ENS-042`, `ENS-044`, `ENS-056`, `ENS-068`.
+- Product decision: `ENS-069`.
+- Post-core deferred: `ENS-070`, `ENS-071`, `ENS-072`, `ENS-073`, `ENS-074`.
 
 ## Import Notes
 

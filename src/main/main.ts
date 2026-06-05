@@ -3,13 +3,13 @@ import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
 
 import { createLocalCommandService } from './commands/local-command';
-import { createPiductorConfigService } from './config/config-loader';
-import { createPiductorConfigResolutionService } from './config/config-resolution';
+import { createEnsembleConfigService } from './config/config-loader';
+import { createEnsembleConfigResolutionService } from './config/config-resolution';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
-import { createPiductorRootDirectoryService } from './root/root-directory';
+import { createEnsembleRootDirectoryService } from './root/root-directory';
 import { createSetupDiagnosticsService } from './setup/setup-diagnostics';
-import { createPiductorDatabaseService } from './storage/database';
+import { createEnsembleDatabaseService } from './storage/database';
 
 if (started) {
 	app.quit();
@@ -31,7 +31,7 @@ function createMainWindow(): BrowserWindow {
 		minHeight: 640,
 		minWidth: 960,
 		show: false,
-		title: 'Piductor',
+		title: 'Ensemble',
 		width: 1280,
 		webPreferences: {
 			contextIsolation: true,
@@ -55,16 +55,16 @@ function createMainWindow(): BrowserWindow {
 	return mainWindow;
 }
 
-app.setName('Piductor');
+app.setName('Ensemble');
 
-const configService = createPiductorConfigService();
-const databaseService = createPiductorDatabaseService();
+const configService = createEnsembleConfigService();
+const databaseService = createEnsembleDatabaseService();
 const localCommandService = createLocalCommandService();
-const settingsResolutionService = createPiductorConfigResolutionService({
+const settingsResolutionService = createEnsembleConfigResolutionService({
 	configService,
 	databaseService,
 });
-const rootDirectoryService = createPiductorRootDirectoryService({
+const rootDirectoryService = createEnsembleRootDirectoryService({
 	databaseService,
 	settingsResolutionService,
 });

@@ -8,7 +8,7 @@ Accepted
 
 ## Context
 
-Piductor needs terminal panes for workspace shells, run scripts, command output, checks, logs, and optional raw Pi interactive sessions. The renderer must handle interactive PTYs, resize events, large output streams, ANSI escape sequences, copy/paste, scrollback, and predictable behavior inside Electron.
+Ensemble needs terminal panes for workspace shells, run scripts, command output, checks, logs, and optional raw Pi interactive sessions. The renderer must handle interactive PTYs, resize events, large output streams, ANSI escape sequences, copy/paste, scrollback, and predictable behavior inside Electron.
 
 wterm was considered because it offers a React package, DOM rendering, native browser text selection, accessibility advantages, WASM-based parsing, and a modern terminal architecture. It is promising but still comparatively young.
 
@@ -16,7 +16,7 @@ xterm.js is the established web terminal renderer used by mature developer tools
 
 ## Decision
 
-Use xterm.js as Piductor's terminal renderer.
+Use xterm.js as Ensemble's terminal renderer.
 
 Terminal integration will be isolated behind a renderer-side terminal adapter so future renderer swaps remain possible. The Electron main process will own PTY/process supervision and expose terminal sessions to the renderer through explicit IPC channels.
 
@@ -28,11 +28,11 @@ wterm is attractive for native DOM selection, browser find, accessibility, and a
 
 ### Custom terminal renderer
 
-A custom renderer would provide maximum control but is unjustified. Terminal emulation is deep, error-prone, and not core product differentiation for Piductor.
+A custom renderer would provide maximum control but is unjustified. Terminal emulation is deep, error-prone, and not core product differentiation for Ensemble.
 
 ## Consequences
 
-- Piductor starts with the most proven Electron-compatible terminal path.
+- Ensemble starts with the most proven Electron-compatible terminal path.
 - The app can use known xterm.js addons for fitting, search, links, WebGL rendering, and serialization when needed.
 - The renderer will not get native DOM text selection by default in the same way wterm provides.
 - Terminal behavior must be tested with interactive CLI programs such as `vim`, `less`, shell prompts, long-running run scripts, and Pi interactive mode.

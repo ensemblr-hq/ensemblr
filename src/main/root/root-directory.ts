@@ -19,8 +19,8 @@ import type {
 	SettingsResolutionSnapshot,
 	SettingsResolutionSource,
 } from '../../shared/ipc';
-import type { PiductorConfigResolutionService } from '../config/config-resolution';
-import type { PiductorDatabaseService } from '../storage/database';
+import type { EnsembleConfigResolutionService } from '../config/config-resolution';
+import type { EnsembleDatabaseService } from '../storage/database';
 
 export interface EnsureRootDirectoryOptions {
 	allowCreate?: boolean;
@@ -30,17 +30,17 @@ export interface EnsureRootDirectoryOptions {
 	settingsSnapshot: SettingsResolutionSnapshot;
 }
 
-export interface PiductorRootDirectoryService {
+export interface EnsembleRootDirectoryService {
 	ensure: () => RootDirectorySnapshot;
 	getSnapshot: () => RootDirectorySnapshot | null;
 }
 
-interface CreatePiductorRootDirectoryServiceOptions {
+interface CreateEnsembleRootDirectoryServiceOptions {
 	allowCreate?: boolean;
-	databaseService: PiductorDatabaseService;
+	databaseService: EnsembleDatabaseService;
 	homeDirectory?: string;
 	now?: () => Date;
-	settingsResolutionService: PiductorConfigResolutionService;
+	settingsResolutionService: EnsembleConfigResolutionService;
 }
 
 const CURRENT_ROOT_ID = 'current';
@@ -61,13 +61,13 @@ const MANAGED_DIRECTORY_NAMES = new Set(
 );
 const IGNORED_ROOT_ENTRY_NAMES = new Set(['.DS_Store']);
 
-export function createPiductorRootDirectoryService({
+export function createEnsembleRootDirectoryService({
 	allowCreate = true,
 	databaseService,
 	homeDirectory,
 	now,
 	settingsResolutionService,
-}: CreatePiductorRootDirectoryServiceOptions): PiductorRootDirectoryService {
+}: CreateEnsembleRootDirectoryServiceOptions): EnsembleRootDirectoryService {
 	let snapshot: RootDirectorySnapshot | null = null;
 
 	function ensure(): RootDirectorySnapshot {

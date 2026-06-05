@@ -242,7 +242,7 @@ const defaultWorkspaceOpenTargets: WorkspaceOpenTarget[] = [
 	},
 ];
 
-const piductorWorkspaceFiles: WorkspaceFileSummary[] = [
+const ensembleWorkspaceFiles: WorkspaceFileSummary[] = [
 	{ id: 'dir-agents', kind: 'directory', name: '.agents', path: '.agents' },
 	{ id: 'dir-claude', kind: 'directory', name: '.claude', path: '.claude' },
 	{ id: 'dir-codex', kind: 'directory', name: '.codex', path: '.codex' },
@@ -380,13 +380,13 @@ const missingScripts = {
 
 export const shellFixtureProjects: ProjectShellModel[] = [
 	{
-		id: 'piductor',
-		name: 'piductor',
+		id: 'ensemble',
+		name: 'ensemble',
 		owner: {
 			avatarUrl: 'https://github.com/psoldunov.png',
 			name: 'psoldunov',
 		},
-		pathLabel: '~/Piductor/repos/piductor',
+		pathLabel: '~/Ensemble/repos/ensemble',
 		workspaces: [
 			{
 				branchName: 'san-antonio',
@@ -409,8 +409,8 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				id: 'san-antonio',
 				name: 'Conductor shell rework',
 				openTargets: defaultWorkspaceOpenTargets,
-				pathLabel: '~/Piductor/workspaces/piductor/san-antonio',
-				projectId: 'piductor',
+				pathLabel: '~/Ensemble/workspaces/ensemble/san-antonio',
+				projectId: 'ensemble',
 				pullRequest: {
 					checks: [
 						{
@@ -507,7 +507,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'branched from master with copied local context',
 				status: 'needs-setup',
-				workspaceFiles: piductorWorkspaceFiles,
+				workspaceFiles: ensembleWorkspaceFiles,
 			},
 			{
 				branchName: 'linear-issue-flow',
@@ -529,8 +529,8 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				id: 'linear-issue-flow',
 				name: 'Linear issue flow',
 				openTargets: defaultWorkspaceOpenTargets,
-				pathLabel: '~/Piductor/workspaces/piductor/linear-issue-flow',
-				projectId: 'piductor',
+				pathLabel: '~/Ensemble/workspaces/ensemble/linear-issue-flow',
+				projectId: 'ensemble',
 				pullRequest: {
 					checks: [
 						{
@@ -569,7 +569,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'fixture workspace from future issue picker',
 				status: 'idle',
-				workspaceFiles: piductorWorkspaceFiles,
+				workspaceFiles: ensembleWorkspaceFiles,
 			},
 			{
 				branchName: 'normal-right-header',
@@ -592,8 +592,8 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				id: 'normal-right-header',
 				name: 'Normal right header',
 				openTargets: defaultWorkspaceOpenTargets,
-				pathLabel: '~/Piductor/workspaces/piductor/normal-right-header',
-				projectId: 'piductor',
+				pathLabel: '~/Ensemble/workspaces/ensemble/normal-right-header',
+				projectId: 'ensemble',
 				pullRequest: {
 					checks: [],
 					comments: [],
@@ -622,7 +622,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'fixture branch for the normal right sidebar header',
 				status: 'working',
-				workspaceFiles: piductorWorkspaceFiles,
+				workspaceFiles: ensembleWorkspaceFiles,
 			},
 			{
 				branchName: 'changed-right-header',
@@ -645,8 +645,8 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				id: 'changed-right-header',
 				name: 'Changed right header',
 				openTargets: defaultWorkspaceOpenTargets,
-				pathLabel: '~/Piductor/workspaces/piductor/changed-right-header',
-				projectId: 'piductor',
+				pathLabel: '~/Ensemble/workspaces/ensemble/changed-right-header',
+				projectId: 'ensemble',
 				pullRequest: {
 					checks: [],
 					comments: [],
@@ -683,7 +683,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'fixture branch for the changed right sidebar header',
 				status: 'working',
-				workspaceFiles: piductorWorkspaceFiles,
+				workspaceFiles: ensembleWorkspaceFiles,
 			},
 		],
 	},
@@ -693,7 +693,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 		owner: {
 			name: 'agent-lab',
 		},
-		pathLabel: '~/Piductor/repos/agent-lab',
+		pathLabel: '~/Ensemble/repos/agent-lab',
 		workspaces: [
 			{
 				branchName: 'review-checks',
@@ -715,7 +715,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				id: 'review-checks',
 				name: 'Review checks',
 				openTargets: defaultWorkspaceOpenTargets,
-				pathLabel: '~/Piductor/workspaces/agent-lab/review-checks',
+				pathLabel: '~/Ensemble/workspaces/agent-lab/review-checks',
 				projectId: 'agent-lab',
 				pullRequest: {
 					checks: [
@@ -830,7 +830,7 @@ export function getComposerState({
 	if (!setupDiagnostics) {
 		return {
 			disabled: true,
-			disabledReason: 'Piductor is still checking setup readiness.',
+			disabledReason: 'Ensemble is still checking setup readiness.',
 			modelLabel: 'Pi model pending',
 			placeholder: 'Setup checks are still loading.',
 			thinkingLabel: 'Thinking pending',

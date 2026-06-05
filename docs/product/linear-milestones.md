@@ -11,14 +11,14 @@ Establish the implemented workbench shell contract, Router/Query renderer bounda
 
 Included issues:
 
-- `PID-001` Electron app shell scaffold
-- `PID-002` Piductor design system foundation
-- `PID-003` SQLite database and migrations
-- `PID-004` Keychain secret store
-- `PID-005` Declarative config loader and JSON schema stub
-- `PID-006` Configuration resolution engine
-- `PID-007` Root directory service
-- `PID-008` Local command environment service
+- `ENS-001` Electron app shell scaffold
+- `ENS-002` Ensemble design system foundation
+- `ENS-003` SQLite database and migrations
+- `ENS-004` Keychain secret store
+- `ENS-005` Declarative config loader and JSON schema stub
+- `ENS-006` Configuration resolution engine
+- `ENS-007` Root directory service
+- `ENS-008` Local command environment service
 
 Exit criteria:
 
@@ -45,14 +45,14 @@ Make first launch and readiness checks explicit, actionable, and aligned with Co
 
 Included issues:
 
-- `PID-009` Setup gate diagnostics UI and model
-- `PID-010` Git and gh readiness checks
-- `PID-011` Pi executable discovery and override
-- `PID-012` Pi RPC and provider readiness smoke checks
-- `PID-013` Workspace trust and permission-mode baseline
-- `PID-014` Environment variable catalog and secret metadata
-- `PID-015` Repository config parser for `piductor.json`, `conductor.json`, and `.worktreeinclude`
-- `PID-016` Root switch reindex/adopt flow
+- `ENS-009` Setup gate diagnostics UI and model
+- `ENS-010` Git and gh readiness checks
+- `ENS-011` Pi executable discovery and override
+- `ENS-012` Pi RPC and provider readiness smoke checks
+- `ENS-013` Workspace trust and permission-mode baseline
+- `ENS-014` Environment variable catalog and secret metadata
+- `ENS-015` Repository config parser for `ensemble.json`, `conductor.json`, and `.worktreeinclude`
+- `ENS-016` Root switch reindex/adopt flow
 
 Exit criteria:
 
@@ -77,15 +77,15 @@ Provide the local project and git-worktree operating model: add/open/clone repos
 
 Included issues:
 
-- `PID-017` Project add menu and recents
-- `PID-018` Local repository registration
-- `PID-019` GitHub clone flow with progress and errors
-- `PID-020` Sidebar repository/workspace navigation
-- `PID-021` Git worktree workspace creation
-- `PID-022` Files-to-copy implementation
-- `PID-023` Workspace landing summary and first composer surface
-- `PID-024` Shared-root workspace adoption and reconciliation
-- `PID-025` Workspace archive and context lifecycle
+- `ENS-017` Project add menu and recents
+- `ENS-018` Local repository registration
+- `ENS-019` GitHub clone flow with progress and errors
+- `ENS-020` Sidebar repository/workspace navigation
+- `ENS-021` Git worktree workspace creation
+- `ENS-022` Files-to-copy implementation
+- `ENS-023` Workspace landing summary and first composer surface
+- `ENS-024` Shared-root workspace adoption and reconciliation
+- `ENS-025` Workspace archive and context lifecycle
 
 Exit criteria:
 
@@ -112,16 +112,16 @@ Run Pi through a selected CLI RPC executable, preserve the Pi user environment, 
 
 Included issues:
 
-- `PID-026` PiAgentClient RPC boundary
-- `PID-027` RPC process supervisor and JSONL stream handling
-- `PID-028` Pi session metadata mapping
-- `PID-029` Pi composer submit, stop, and model controls
-- `PID-030` Structured Pi timeline rendering
-- `PID-031` Runtime error retry and session-fork discovery
-- `PID-032` Git-backed checkpoint capture
-- `PID-033` Checkpoint restore and turn diff
-- `PID-034` Chat tab limit and session tab model
-- `PID-035` Pi capability discovery for modes, context, browser, and permissions
+- `ENS-026` PiAgentClient RPC boundary
+- `ENS-027` RPC process supervisor and JSONL stream handling
+- `ENS-028` Pi session metadata mapping
+- `ENS-029` Pi composer submit, stop, and model controls
+- `ENS-030` Structured Pi timeline rendering
+- `ENS-031` Runtime error retry and session-fork discovery
+- `ENS-032` Git-backed checkpoint capture
+- `ENS-033` Checkpoint restore and turn diff
+- `ENS-034` Chat tab limit and session tab model
+- `ENS-035` Pi capability discovery for modes, context, browser, and permissions
 
 Exit criteria:
 
@@ -145,19 +145,19 @@ Deliver the terminal dock and local process lifecycle for setup, run, archive, m
 
 Included issues:
 
-- `PID-036` Main-process PTY service
-- `PID-037` xterm.js terminal adapter and dock UI
-- `PID-038` Setup, run, and archive script lifecycle
-- `PID-039` Workspace environment variables and port allocation
-- `PID-040` Run script concurrency and process controls
-- `PID-041` Preview URL detection discovery
-- `PID-042` Spotlight testing discovery
+- `ENS-036` Main-process PTY service
+- `ENS-037` xterm.js terminal adapter and dock UI
+- `ENS-038` Setup, run, and archive script lifecycle
+- `ENS-039` Workspace environment variables and port allocation
+- `ENS-040` Run script concurrency and process controls
+- `ENS-041` Preview URL detection discovery
+- `ENS-042` Spotlight testing discovery
 
 Exit criteria:
 
 - Setup, run, archive, and named terminal sessions execute from workspace directories.
 - xterm.js replaces the existing dock placeholder in place and can render output, handle resize, copy/paste, scrollback, and process termination states.
-- Scripts receive native `PIDUCTOR_*` variables and compatibility `CONDUCTOR_*` variables when appropriate.
+- Scripts receive native `ENSEMBLE_*` variables and compatibility `CONDUCTOR_*` variables when appropriate.
 - Run script modes support concurrent and nonconcurrent behavior.
 - Preview URL and spotlight testing uncertainties are documented before build work proceeds.
 
@@ -175,13 +175,13 @@ Provide first-class Linear issue workflows through OAuth, Keychain token storage
 
 Included issues:
 
-- `PID-043` Linear OAuth PKCE and token lifecycle
-- `PID-044` Linear API schema and capability discovery
-- `PID-045` Linear cache and sync service
-- `PID-046` Linear issue browse, search, and read UI
-- `PID-047` Linear issue create, update, and comment UI
-- `PID-048` Workspace creation from Linear issue
-- `PID-049` Linear issue status linking and remediation
+- `ENS-043` Linear OAuth PKCE and token lifecycle
+- `ENS-044` Linear API schema and capability discovery
+- `ENS-045` Linear cache and sync service
+- `ENS-046` Linear issue browse, search, and read UI
+- `ENS-047` Linear issue create, update, and comment UI
+- `ENS-048` Workspace creation from Linear issue
+- `ENS-049` Linear issue status linking and remediation
 
 Exit criteria:
 
@@ -189,7 +189,7 @@ Exit criteria:
 - Linear tokens are stored in Keychain and never in JSON or SQLite.
 - Issue/team/project/status/label/cycle/assignee metadata is cached for UI responsiveness.
 - Users can browse, read, create, update, and comment on issues where permissions allow.
-- Users can create a Piductor workspace from a Linear issue, with issue metadata linked to the workspace.
+- Users can create an Ensemble workspace from a Linear issue, with issue metadata linked to the workspace.
 - Linear issue workflows use dedicated issue browse/read/workspace-from-issue surfaces unless a later decision adds Linear to the current project-add menu.
 - Archive/delete support is not implemented until schema/permission discovery confirms safe behavior.
 
@@ -206,17 +206,17 @@ Implement the review flow: file status, diffs, local comments, todos, context-to
 
 Included issues:
 
-- `PID-050` Git file status and all-files tree
-- `PID-051` Changes tree and unified diff viewer
-- `PID-052` Local diff comments and todos
-- `PID-053` Send review/check context to Pi
-- `PID-054` gh commit, push, and PR-create service
-- `PID-055` gh PR/check metadata service
-- `PID-056` GitHub comments and deployments discovery
-- `PID-057` Checks panel states and polling
-- `PID-058` Merge readiness and confirmation flow
-- `PID-059` Agent-assisted review, PR, and fix action templates
-- `PID-060` Archive-after-merge and branch cleanup
+- `ENS-050` Git file status and all-files tree
+- `ENS-051` Changes tree and unified diff viewer
+- `ENS-052` Local diff comments and todos
+- `ENS-053` Send review/check context to Pi
+- `ENS-054` gh commit, push, and PR-create service
+- `ENS-055` gh PR/check metadata service
+- `ENS-056` GitHub comments and deployments discovery
+- `ENS-057` Checks panel states and polling
+- `ENS-058` Merge readiness and confirmation flow
+- `ENS-059` Agent-assisted review, PR, and fix action templates
+- `ENS-060` Archive-after-merge and branch cleanup
 
 Exit criteria:
 
@@ -242,15 +242,15 @@ Expose the settings, diagnostics, and interaction polish needed to operate the c
 
 Included issues:
 
-- `PID-061` Settings shell with app and repository sections
-- `PID-062` App settings sections for general, models, providers, integrations, and security
-- `PID-063` Repository settings source diagnostics
-- `PID-064` Appearance settings and previews
-- `PID-065` Command palette and keyboard shortcuts
-- `PID-066` Deep links and external-open actions
-- `PID-067` Error, empty, loading, and diagnostics logs
-- `PID-068` Resource usage, sidebar, and experimental flag discovery
-- `PID-069` Product decision for AI certainty phrase setting
+- `ENS-061` Settings shell with app and repository sections
+- `ENS-062` App settings sections for general, models, providers, integrations, and security
+- `ENS-063` Repository settings source diagnostics
+- `ENS-064` Appearance settings and previews
+- `ENS-065` Command palette and keyboard shortcuts
+- `ENS-066` Deep links and external-open actions
+- `ENS-067` Error, empty, loading, and diagnostics logs
+- `ENS-068` Resource usage, sidebar, and experimental flag discovery
+- `ENS-069` Product decision for AI certainty phrase setting
 
 Exit criteria:
 
@@ -274,11 +274,11 @@ Track known post-core work without letting it block v1 implementation.
 
 Included issues:
 
-- `PID-070` Post-core packaging, signing, notarization, and auto-update
-- `PID-071` Post-core direct GitHub API and OAuth
-- `PID-072` Post-core SDK sidecar fallback
-- `PID-073` Post-core managed Pi runtime installer
-- `PID-074` Post-core voice, Graphite, cloud SSH, and production profiler
+- `ENS-070` Post-core packaging, signing, notarization, and auto-update
+- `ENS-071` Post-core direct GitHub API and OAuth
+- `ENS-072` Post-core SDK sidecar fallback
+- `ENS-073` Post-core managed Pi runtime installer
+- `ENS-074` Post-core voice, Graphite, cloud SSH, and production profiler
 
 Exit criteria:
 

@@ -10,19 +10,19 @@ V1 builds a Pi-focused Electron desktop app with Conductor-style local workspace
 
 In scope for v1:
 
-- Electron main process, React/TypeScript renderer, TanStack Router, TanStack Query, shadcn/ui, Tailwind, and Piductor-owned design tokens.
+- Electron main process, React/TypeScript renderer, TanStack Router, TanStack Query, shadcn/ui, Tailwind, and Ensemble-owned design tokens.
 - Local SQLite database for mutable app metadata and UI/review state.
 - macOS Keychain for secret values, with SQLite storing metadata only.
-- Declarative user config at `~/.config/piductor/config.json` with JSON schema validation.
-- Default Piductor root at `~/Piductor`, with configurable root and shared-root interoperability.
-- Repository config precedence: personal SQLite settings, `piductor.json`, `conductor.json`, built-in defaults.
+- Declarative user config at `~/.config/ensemble/config.json` with JSON schema validation.
+- Default Ensemble root at `~/Ensemble`, with configurable root and shared-root interoperability.
+- Repository config precedence: personal SQLite settings, `ensemble.json`, `conductor.json`, built-in defaults.
 - `.worktreeinclude` support and Conductor-compatible script/env behavior.
 - Setup gate requiring git, authenticated `gh`, Pi executable/RPC readiness, root, SQLite, and process environment checks.
 - Pi runtime through selected CLI-compatible executable launched as `--mode rpc` from workspace `cwd`.
 - Preservation of the Pi user environment, including `~/.pi/agent`, project `.pi`, context files, sessions, skills, extensions, prompts, themes, tools, and provider/model configuration.
 - Git worktree workspace creation, workspace adoption from shared Conductor roots, `.context` folder support, and archive lifecycle.
 - xterm.js terminal dock backed by main-process PTY/process supervision.
-- Git-backed checkpoints under `refs/piductor/checkpoints/<workspace-id>/<turn-id>`.
+- Git-backed checkpoints under `refs/ensemble/checkpoints/<workspace-id>/<turn-id>`.
 - First-class Linear OAuth integration with issue create/read/update/comment and workspace creation from issues.
 - GitHub PR/check/comment/merge workflows through authenticated `gh` CLI where practical.
 - Settings shell, repository settings, keyboard shortcuts, command palette, deep links, diagnostics, and non-deferred polish.
@@ -39,7 +39,7 @@ Explicitly deferred until post-core:
 - Graphite stack support.
 - Cloud or remote workspace SSH settings.
 - Production React profiler controls.
-- Piductor account, cloud sync, hosted team features, billing, or app-owned backend services.
+- Ensemble account, cloud sync, hosted team features, billing, or app-owned backend services.
 
 ## Roadmap Sequence
 
@@ -87,13 +87,13 @@ Explicitly deferred until post-core:
 
 Discovery tickets are intentionally separate from build tickets:
 
-- `PID-031` - Runtime error retry and session-fork discovery.
-- `PID-035` - Pi capability discovery for model listing, review model, plan mode, fast mode, browser control, context usage, compaction, and permission restrictions.
-- `PID-041` - Preview URL detection discovery from setup/run output.
-- `PID-042` - Spotlight testing discovery for safe root/workspace synchronization.
-- `PID-044` - Linear schema and permission discovery, including archive/delete support, pagination, filtering, labels, cycles, and cache metadata.
-- `PID-056` - GitHub comments, review threads, deployments, and add-all-comments coverage through `gh`.
-- `PID-068` - Non-deferred experimental feature discovery for dashboard/sidebar visibility and resource usage.
+- `ENS-031` - Runtime error retry and session-fork discovery.
+- `ENS-035` - Pi capability discovery for model listing, review model, plan mode, fast mode, browser control, context usage, compaction, and permission restrictions.
+- `ENS-041` - Preview URL detection discovery from setup/run output.
+- `ENS-042` - Spotlight testing discovery for safe root/workspace synchronization.
+- `ENS-044` - Linear schema and permission discovery, including archive/delete support, pagination, filtering, labels, cycles, and cache metadata.
+- `ENS-056` - GitHub comments, review threads, deployments, and add-all-comments coverage through `gh`.
+- `ENS-068` - Non-deferred experimental feature discovery for dashboard/sidebar visibility and resource usage.
 - Current shell uncertainty to resolve before implementing related behavior: workspace-row status actions, mark-unread semantics, Dashboard visibility, and the Changes tab Review action. See `docs/product/current-shell-inventory.md`.
 
 Discovery outputs should be short design notes committed with the ticket, or appended to the source product docs if they change planning guidance.
@@ -102,8 +102,8 @@ Discovery outputs should be short design notes committed with the ticket, or app
 
 These are product decisions, not implementation guesses:
 
-- `PID-069` - Decide whether to support Conductor's remove/soften AI-certainty phrase setting in Piductor. If supported, decide whether it is Pi output post-processing, a prompt preset, or a settings omission.
-- `PID-068` - Decide which non-deferred experimental settings are v1 scope versus post-core flags, especially dashboard/sidebar visibility and sidebar resource usage. Voice, Graphite, cloud/remote SSH, production React profiler, and the five-chat-tab limit are already resolved by ADRs.
+- `ENS-069` - Decide whether to support Conductor's remove/soften AI-certainty phrase setting in Ensemble. If supported, decide whether it is Pi output post-processing, a prompt preset, or a settings omission.
+- `ENS-068` - Decide which non-deferred experimental settings are v1 scope versus post-core flags, especially dashboard/sidebar visibility and sidebar resource usage. Voice, Graphite, cloud/remote SSH, production React profiler, and the five-chat-tab limit are already resolved by ADRs.
 
 If another ticket encounters ambiguity that would alter behavior, create a new Decision Needed item instead of guessing.
 

@@ -6,15 +6,15 @@ No onboarding screenshots were captured under `.context/conductor-screens/01-onb
 
 ## Setup Gate Sequence
 
-Piductor should not drop users into a workspace that cannot run the core workflow. First launch should perform a required setup gate, then open the first useful project/workspace path.
+Ensemble should not drop users into a workspace that cannot run the core workflow. First launch should perform a required setup gate, then open the first useful project/workspace path.
 
 1. Welcome and local-execution notice
 
-   Explain that Piductor runs Pi, git, scripts, terminals, and tools locally with the user's macOS account permissions. Link to security/privacy settings.
+   Explain that Ensemble runs Pi, git, scripts, terminals, and tools locally with the user's macOS account permissions. Link to security/privacy settings.
 
 2. Root directory selection
 
-   Choose or confirm the Piductor root directory. Default to `~/Piductor`. Show that managed repositories, workspaces, and archived contexts live under this root. Warn before using a non-empty or shared Conductor root.
+   Choose or confirm the Ensemble root directory. Default to `~/Ensemble`. Show that managed repositories, workspaces, and archived contexts live under this root. Warn before using a non-empty or shared Conductor root.
 
 3. Core local tooling checks
 
@@ -82,13 +82,13 @@ Piductor should not drop users into a workspace that cannot run the core workflo
 
 ### Root Directory Not Writable
 
-- Show: Piductor needs a writable managed root for repositories and workspaces.
+- Show: Ensemble needs a writable managed root for repositories and workspaces.
 - Actions: choose another folder, retry, open folder permissions guidance.
 - Blocking: yes.
 
 ### Shared or Non-Empty Root Warning
 
-- Show: the selected root may contain existing Conductor/Piductor-managed content.
+- Show: the selected root may contain existing Conductor/Ensemble-managed content.
 - Actions: adopt/reindex existing workspaces when supported, choose another root, or continue with explicit confirmation.
 - Blocking: only if unsafe or not writable.
 
@@ -106,23 +106,23 @@ Piductor should not drop users into a workspace that cannot run the core workflo
 
 ## First Successful Path Into First Workspace
 
-1. User launches Piductor.
+1. User launches Ensemble.
 2. Setup gate runs and shows required checks.
 3. User confirms root directory or chooses a new one.
 4. Required checks pass.
 5. User chooses Clone GitHub project, Open local project, Quick start, a recent project, or the dedicated Linear issue workflow.
-6. If the user selected a Linear issue through the Linear workflow, Piductor links the issue metadata and uses it to seed workspace name, branch, and initial Pi context.
-7. Piductor creates or registers the repository under the root layout.
-8. Piductor creates the first git worktree workspace from the configured default branch.
-9. Piductor copies eligible gitignored files according to `.worktreeinclude`, repository settings, or defaults.
-10. Piductor runs setup script if configured, or shows optional setup-script guidance if missing.
-11. Piductor opens the workspace landing state with file tree, checks panel, terminal dock, linked Linear issue context when present, and Pi composer ready.
+6. If the user selected a Linear issue through the Linear workflow, Ensemble links the issue metadata and uses it to seed workspace name, branch, and initial Pi context.
+7. Ensemble creates or registers the repository under the root layout.
+8. Ensemble creates the first git worktree workspace from the configured default branch.
+9. Ensemble copies eligible gitignored files according to `.worktreeinclude`, repository settings, or defaults.
+10. Ensemble runs setup script if configured, or shows optional setup-script guidance if missing.
+11. Ensemble opens the workspace landing state with file tree, checks panel, terminal dock, linked Linear issue context when present, and Pi composer ready.
 12. First prompt creates a Pi session using workspace `cwd` and normal Pi resource discovery.
 
-## Piductor-Specific Copy and UI Guidance
+## Ensemble-Specific Copy and UI Guidance
 
 - Do not use Conductor screenshots as visual templates.
-- Use Piductor labels, icons, empty states, and remediation copy.
+- Use Ensemble labels, icons, empty states, and remediation copy.
 - Keep first-run language explicit about local execution and Pi environment preservation.
 - Make every failed check actionable with a retry button and log details.
 - Do not print secrets, tokens, private account identifiers, or private repository paths in remediation text unless the user explicitly expands diagnostic detail.
