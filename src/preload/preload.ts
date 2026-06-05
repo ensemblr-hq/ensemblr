@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 import {
 	type EnsembleApi,
+	type EnvironmentVariablesSnapshot,
 	type HealthSnapshot,
 	IPC_CHANNELS,
 	type PiExecutableSelectionResult,
@@ -17,6 +18,10 @@ const api: EnsembleApi = {
 			IPC_CHANNELS.ensureWindowWidth,
 			minimumWidth,
 		) as Promise<void>,
+	environmentVariables: () =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.environmentVariables,
+		) as Promise<EnvironmentVariablesSnapshot>,
 	health: () =>
 		ipcRenderer.invoke(IPC_CHANNELS.health) as Promise<HealthSnapshot>,
 	rootDirectory: () =>

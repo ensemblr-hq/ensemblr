@@ -6,6 +6,7 @@ import type {
 	LocalCommandService,
 } from '../../src/main/commands/local-command.ts';
 import type { EnsembleConfigService } from '../../src/main/config/config-loader.ts';
+import type { EnvironmentVariablesService } from '../../src/main/environment/environment-variables.ts';
 import type {
 	PiExecutableService,
 	PiExecutableSnapshot,
@@ -41,6 +42,7 @@ const CHECK_ORDER: readonly SetupCheckId[] = [
 	'root-directory',
 	'managed-directories',
 	'shell-process-launch',
+	'environment-variables',
 	'git-executable',
 	'gh-cli',
 	'gh-auth',
@@ -52,6 +54,7 @@ const CHECK_ORDER: readonly SetupCheckId[] = [
 ];
 const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
 	config: 'core',
+	'environment-variables': 'core',
 	'gh-auth': 'github',
 	'gh-cli': 'github',
 	'git-executable': 'github',
@@ -195,6 +198,31 @@ function createLocalCommandService(
 
 			return createLocalCommandResult(request.command, args, outcome);
 		},
+	};
+}
+
+function createEnvironmentVariablesService(): EnvironmentVariablesService {
+	return {
+		assembleEnvironment: async () => ({
+			diagnostics: [],
+			env: {},
+			redactValues: [],
+		}),
+		getSnapshot: async () => ({
+			catalog: [],
+			diagnostics: [],
+			generatedAt: NOW.toISOString(),
+			missingRequiredCount: 0,
+			requiredCount: 0,
+			variables: [],
+		}),
+		setPlainValue: () => {
+			throw new Error('setPlainValue is not used by setup diagnostics tests.');
+		},
+		setSecretValue: async () => {
+			throw new Error('setSecretValue is not used by setup diagnostics tests.');
+		},
+		unsetValue: async () => undefined,
 	};
 }
 
@@ -429,6 +457,7 @@ async function getSnapshot(
 		checkProviders?: Partial<Record<SetupCheckId, SetupCheckProvider>>;
 		configService?: EnsembleConfigService;
 		databaseService?: EnsembleDatabaseService;
+		environmentVariablesService?: EnvironmentVariablesService;
 		localCommandService?: LocalCommandService;
 		piExecutableService?: PiExecutableService;
 		piReadinessService?: PiReadinessService;
@@ -439,6 +468,9 @@ async function getSnapshot(
 		checkProviders: createFutureProviders(options.checkProviders),
 		configService: options.configService ?? createConfigService(),
 		databaseService: options.databaseService ?? createDatabaseService(),
+		environmentVariablesService:
+			options.environmentVariablesService ??
+			createEnvironmentVariablesService(),
 		homeDirectory: HOME,
 		localCommandService:
 			options.localCommandService ?? createLocalCommandService(),
@@ -476,11 +508,14 @@ test('reports ready when required checks pass and Linear is optional', async () 
 	const piAgentDirectoryCheck = getCheck(snapshot, 'pi-agent-directory');
 	const piRpcCheck = getCheck(snapshot, 'pi-rpc');
 	const piProviderModelCheck = getCheck(snapshot, 'pi-provider-model');
+	const environmentVariablesCheck = getCheck(snapshot, 'environment-variables');
 
 	assert.equal(snapshot.status, 'ready');
 	assert.equal(snapshot.blockedCount, 0);
-	assert.equal(snapshot.optionalCount, 1);
+	assert.equal(snapshot.optionalCount, 2);
 	assert.equal(snapshot.warningCount, 1);
+	assert.equal(environmentVariablesCheck.blocking, false);
+	assert.equal(environmentVariablesCheck.status, 'success');
 	assert.equal(gitCheck.status, 'success');
 	assert.match(gitCheck.detail, /git version 2\.45\.1/);
 	assert.equal(ghCliCheck.status, 'success');
