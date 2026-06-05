@@ -4,6 +4,14 @@ Date: 2026-06-04
 
 These issue templates are ready to copy into Linear. `PID-*` IDs are local planning IDs for dependencies and can be replaced by Linear issue keys after import.
 
+Current shell alignment:
+
+- The implemented shell in `src/components/workbench-shell.tsx` is now the product source of truth for app-shell layout and visible affordances.
+- Use `docs/product/current-shell-inventory.md` with these issue templates.
+- Future tickets should wire live services into the current sidebar, header, chat/session tab strip, center timeline/composer placement, right PR/review panel, and lower dock.
+- Chat transcript content and prompt/composer behavior remain deferred until Pi runtime integration.
+- Some visible command/menu items are placeholders or unresolved; do not infer behavior beyond the inventory and open decisions.
+
 ## PID-001 Electron App Shell Scaffold
 
 Milestone: 1. Foundation
@@ -59,9 +67,9 @@ Define the initial Piductor-owned visual system using shadcn/ui source, Tailwind
 Scope:
 - Add shadcn/ui component foundation as owned source.
 - Define color, spacing, typography, radius, pane, code, diff, and terminal tokens.
-- Build the Conductor-style shell scaffold: project/workspace sidebar, project/branch header, chat tabs, center timeline/composer, right All files/Changes/Checks panel, and lower Setup/Run/Terminal dock.
+- Own and maintain the implemented Conductor-style shell contract: project/workspace sidebar, project/branch header, open-workspace launcher, chat tabs, center timeline/composer placement, right PR header, All files/Changes/Checks panel, and lower Setup/Run/Terminal dock.
 - Build compact shell primitives for sidebar, tabs, panels, dock, forms, dialogs, banners, and status badges.
-- Use fixture/local renderer models only for scaffold data; live services wire in later tickets.
+- Keep fixture/local renderer models clearly separated from shell layout; live services wire in later tickets.
 
 Out of scope:
 - Pixel-copying Conductor visuals.
@@ -71,6 +79,7 @@ Acceptance criteria:
 - Core shell components render from Piductor-owned tokens.
 - The style direction is distinct from Conductor and not stock shadcn defaults.
 - Setup-blocked state disables the composer while keeping the workbench visible and selecting the setup dock.
+- The visible shell matches `docs/product/current-shell-inventory.md`; placeholder actions are documented as placeholders or open decisions.
 - Components support light/dark or theme token switching if the app foundation already exposes it.
 
 Verification:
@@ -79,6 +88,7 @@ Verification:
 
 Source:
 - `docs/adr/0001-electron-react-shadcn.md`
+- `docs/product/current-shell-inventory.md`
 - `docs/product/ux-parity.md`
 - `docs/product/settings-inventory.md`
 
@@ -629,28 +639,31 @@ Priority: P0
 Dependencies: PID-020
 
 Summary:
-Build the project add menu with local open, GitHub clone/open, Linear issue entry, quick start placeholder, and local recents.
+Wire the current project add menu with local open, GitHub clone/open, quick start placeholder, and local recents.
 
 Scope:
-- Add sidebar add-project popover.
-- Show Open local project, Open GitHub project, Open Linear issue, Quick start, and recent local paths.
+- Use the existing sidebar add-project popover.
+- Show Open local project, Open GitHub project, Quick start, and recent local paths.
 - Persist recents locally.
 - Hide or disable entries when setup requirements are missing.
 
 Out of scope:
 - Full clone, local registration, Linear browse, or quick-start implementations.
+- Adding Linear issue entry to this menu unless the Linear issue workflow explicitly chooses that entry point later.
 
 Acceptance criteria:
 - Add menu is reachable while a workspace is open.
 - Recents are local-only and avoid telemetry.
 - Disabled entries explain missing prerequisites.
 - Entry selections route to the relevant flow.
+- Linear issue workspace creation remains v1 scope through `PID-046` and `PID-048`, but is not a required current-shell add-menu item.
 
 Verification:
 - Component tests for menu states.
 - Manual navigation through each entry point.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/product/screen-inventory.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/onboarding-flow.md`
@@ -748,7 +761,8 @@ Wire the persistent app shell navigation to live repository and workspace record
 
 Scope:
 - Replace fixture project/workspace sidebar rows with SQLite-backed repository and workspace records.
-- Keep the existing Dashboard, History, settings/help footer, chat-tab strip, right panel, and dock regions.
+- Keep the existing visible History and Settings entries, health footer, chat-tab strip, right panel, PR header, open-workspace launcher, and dock regions.
+- Preserve implemented sidebar affordances: project collapse, project reorder, pinned workspaces, workspace diff counts, workspace status icons, archive affordance, and context menus.
 - Repository context menu for create workspace, create from issue/PR placeholders, settings, hide, and remove.
 - Persist selected repository/workspace defaults where route/search state is not enough.
 
@@ -756,10 +770,12 @@ Out of scope:
 - Full dashboard/history implementations.
 - Rebuilding the structural shell regions already established by the Foundation UI pass.
 - Full files/checks/terminal contents.
+- Defining unresolved workspace-row status or mark-unread semantics beyond the current inventory/open decisions.
 
 Acceptance criteria:
 - Repository and workspace records render from SQLite state.
 - Workspace selection updates center/right/dock context.
+- Pinning, collapse/reorder, and active workspace header still behave with live records.
 - Hide/remove actions are gated or placeholder-confirmed without deleting files.
 - Empty state guides users to add a project after setup passes.
 
@@ -768,6 +784,7 @@ Verification:
 - Manual navigation across multiple fixture records.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/product/ux-parity.md`
 - `docs/product/screen-inventory.md`
 - `docs/product/conductor-parity.md`
@@ -866,23 +883,26 @@ Scope:
 - Render landing state after workspace creation inside the existing center timeline/composer region.
 - Show branch source, copied-file count, setup-script guidance, and linked issue metadata when present.
 - Populate existing empty file/checks and dock regions with workspace-specific placeholder state.
-- Keep the composer shell ready to start a Pi session after runtime tickets land.
+- Keep the current composer placement ready to start a Pi session after runtime tickets land.
 
 Out of scope:
 - Actual Pi prompt submission.
 - Full terminal, files, or checks implementation.
+- Redesigning or finalizing prompt input behavior before Pi runtime integration.
 
 Acceptance criteria:
 - New workspace opens immediately after creation or clone flow.
 - Landing summary matches stored workspace creation data.
 - Setup script guidance is visible when configured or missing.
 - Composer is ready visually but disabled/explained if Pi runtime is not ready.
+- Chat and composer behavior remains explicitly deferred to Pi runtime tickets.
 
 Verification:
 - Component tests for local, clone, and Linear-linked landing variants.
 - Manual create workspace and inspect landing state.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/product/screen-inventory.md`
 - `docs/product/ux-parity.md`
 - `docs/product/onboarding-flow.md`
@@ -1097,7 +1117,7 @@ Connect the composer shell to Pi session creation, prompt submission, stop contr
 Scope:
 - Submit first and follow-up prompts to Pi RPC sessions.
 - Support stop/abort control.
-- Render model and thinking-level controls from resolved settings and discovered capabilities where available.
+- Wire the existing composer placement, model badge/control area, send, stop, and attach affordances to resolved settings and discovered capabilities where available.
 - Support attachments/context references as structured placeholders for later review/file integrations.
 
 Out of scope:
@@ -1109,12 +1129,14 @@ Acceptance criteria:
 - Stop control aborts current work and updates UI state.
 - Model/thinking controls degrade gracefully when capability discovery is incomplete.
 - Submit is blocked with remediation if Pi runtime readiness fails.
+- The existing shell placement is preserved; this ticket wires behavior rather than redesigning the composer.
 
 Verification:
 - Component/integration tests with fake `PiAgentClient`.
 - Manual prompt through fake or real Pi RPC process.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/product/ux-parity.md`
 - `docs/product/screen-inventory.md`
 - `docs/adr/0025-use-pi-cli-rpc-with-executable-discovery.md`
@@ -1135,7 +1157,7 @@ Render Pi RPC events as a structured workspace timeline.
 Scope:
 - Render user messages, assistant messages, status/thinking sections, tool calls, tool results, stdout/stderr cards, elapsed time, and completion state.
 - Render runtime error cards with remediation affordances.
-- Keep right panel and terminal dock visible during timeline work.
+- Keep the current center timeline placement, right panel, and terminal dock visible during timeline work.
 - Persist and rehydrate timeline from SQLite event history.
 
 Out of scope:
@@ -1153,6 +1175,7 @@ Verification:
 - Manual stream test with fake RPC events.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/product/ux-parity.md`
 - `docs/product/screen-inventory.md`
 - `docs/product/conductor-parity.md`
@@ -1399,7 +1422,7 @@ Replace the setup/run/terminal dock placeholder with the xterm.js renderer adapt
 
 Scope:
 - Integrate xterm.js behind a terminal adapter.
-- Wire Setup, Run, and named terminal tabs in the existing lower-right dock.
+- Wire Setup, Run, and named terminal tabs in the existing lower-right dock without changing the dock placement, tab names, or collapse behavior.
 - Support fit/resize, scrollback, copy/paste, links where available, and status badges.
 - Keep dock visible alongside timeline and right panel.
 
@@ -1412,12 +1435,14 @@ Acceptance criteria:
 - Dock can switch between setup, run, and named terminals.
 - Terminal sessions show running, exited, failed, and stopped states.
 - Renderer can be swapped later through adapter boundary.
+- The current dock script-state action placement is preserved.
 
 Verification:
 - Component/integration tests with fake PTY stream.
 - Manual terminal smoke test in a temporary workspace.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/adr/0002-xterm-terminal-renderer.md`
 - `docs/product/ux-parity.md`
 - `docs/product/screen-inventory.md`
@@ -1858,6 +1883,7 @@ Scope:
 Out of scope:
 - Silent automatic status changes.
 - Archive/delete mutations unless discovery validates them.
+- Treating the current workspace-row Set status context menu as Linear issue status without a product decision.
 
 Acceptance criteria:
 - Linked workspaces show current issue status and URL.
@@ -1870,6 +1896,7 @@ Verification:
 - Component tests for linked issue banners/cards.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/adr/0024-use-linear-oauth-for-v1-issue-integration.md`
 - `docs/product/conductor-parity.md`
 
@@ -1890,6 +1917,7 @@ Scope:
 - Query repository file tree and workspace git status.
 - Report tracked, modified, added, deleted, renamed, untracked, and ignored states where relevant.
 - Replace fixture rows in the existing All files tab with the workspace tree.
+- Preserve the current All files tab placement and command-style file search affordance.
 - Cache only derived UI metadata as needed.
 
 Out of scope:
@@ -1901,12 +1929,14 @@ Acceptance criteria:
 - Git status is accurate for fixture repositories.
 - Service handles large repositories with reasonable performance.
 - Errors are surfaced without corrupting workspace state.
+- This ticket wires live data into the current All files tab rather than creating a separate file browser.
 
 Verification:
 - Fixture repo tests for file states.
 - Manual inspect status versus `git status --short`.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/ux-parity.md`
 - `docs/product/screen-inventory.md`
@@ -1925,8 +1955,9 @@ Summary:
 Wire the existing Changes panel to grouped file status and unified diffs.
 
 Scope:
-- Replace fixture change rows with a folder-grouped changed-file tree with status badges and line counts.
-- Search/filter and list/tree display controls.
+- Replace fixture change rows with a folder-grouped changed-file tree with status badges and line counts inside the existing Changes tab.
+- Preserve the current list/tree toggle, folder collapse pattern, and review/action area.
+- Search/filter controls.
 - Unified diff viewer with code theme support.
 - Commit filtering support where practical.
 
@@ -1939,12 +1970,14 @@ Acceptance criteria:
 - Selecting a file displays a unified diff.
 - Empty and error states are implemented.
 - UI can stay visible while timeline/terminal work continues.
+- The current Changes tab remains the entry point; full diff body and review behavior are added behind it.
 
 Verification:
 - Component tests with diff fixtures.
 - Integration test against fixture repository changes.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/product/screen-inventory.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/ux-parity.md`
@@ -2153,7 +2186,7 @@ Summary:
 Wire the existing Checks panel to GitHub PR metadata, checks, comments, todos, deployments, and blockers.
 
 Scope:
-- Replace fixture checks with no-PR, uncommitted, pending/failing, and ready-to-merge state shells.
+- Replace fixture checks with no-PR, uncommitted, pending/failing, and ready-to-merge state data inside the existing right PR header and Checks tab.
 - Show PR metadata, external PR link, git status, checks, deployments where available, comments/review threads where available, and todos.
 - Poll/refresh metadata through service with manual refresh.
 - Show add-to-Pi-context actions for supported items.
@@ -2167,12 +2200,14 @@ Acceptance criteria:
 - Pending/failing states show blockers.
 - Ready state only appears when policy signals are satisfied.
 - Data source and refresh errors are visible.
+- The existing right PR header and Checks panel layout are preserved.
 
 Verification:
 - Component tests with fixture state payloads.
 - Integration tests with mocked GitHub service.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/product/screen-inventory.md`
 - `docs/product/ux-parity.md`
 - `docs/product/conductor-parity.md`
@@ -2305,7 +2340,7 @@ Summary:
 Build the full-window settings shell with app-wide sections and local repository sections.
 
 Scope:
-- Settings route/window with Back to app action.
+- Build from the current Settings route/sidebar entry toward a full settings route/window with Back to app action.
 - Sidebar sections for General, Models, Providers, Environment, Appearance, Git, Account/Integrations, Experimental, Advanced.
 - Repository settings entries below app-wide sections.
 - Narrow centered forms with inline controls and source-diagnostics slots.
@@ -2319,12 +2354,14 @@ Acceptance criteria:
 - Back to app returns to prior workspace context.
 - Repository settings list reflects known repositories.
 - Empty/loading/error states exist.
+- The current visible Settings entry remains the navigation entry point.
 
 Verification:
 - Component tests for navigation and section switching.
 - Manual navigation from app shell to settings and back.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/product/settings-inventory.md`
 - `docs/product/screen-inventory.md`
 - `docs/product/ux-parity.md`
@@ -2460,6 +2497,7 @@ Implement global command palette and keyboard shortcuts for core Piductor workfl
 
 Scope:
 - Command palette with project, workspace, chat, review, Git, terminal, settings, and navigation actions.
+- Include actions for current shell command surfaces where backing behavior exists or has explicit placeholders: file search, create PR options, open workspace targets, dock tabs, review tabs, and settings.
 - Keyboard shortcuts with settings-visible labels.
 - User/default keybinding source support through config/settings.
 - Disabled states and explanations when prerequisites are missing.
@@ -2473,12 +2511,14 @@ Acceptance criteria:
 - Shortcuts work in appropriate focus contexts.
 - Conflicts are detected or prevented.
 - Settings can display and update supported keybindings.
+- Placeholder command entries stay disabled or explanatory until their backing services exist.
 
 Verification:
 - Component tests for command search and action execution.
 - Keyboard interaction tests for key workflows.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/ux-parity.md`
 - `docs/product/settings-inventory.md`
@@ -2499,7 +2539,7 @@ Implement Piductor URL scheme/deep links and external-open actions for workspace
 Scope:
 - Register and handle Piductor deep-link scheme in development/runtime where supported.
 - Open app to repository, workspace, Linear issue link, PR/checks state, or file selection.
-- External-open actions for GitHub PR, Linear issue, preview URL, workspace folder, repository folder, and editor/IDE paths.
+- External-open actions for GitHub PR, Linear issue, preview URL, workspace folder, repository folder, and the current open-workspace launcher targets.
 - Validate inputs and avoid unsafe path traversal.
 
 Out of scope:
@@ -2511,12 +2551,14 @@ Acceptance criteria:
 - External-open actions use native shell APIs safely.
 - Invalid or stale links do not crash the app.
 - Links do not leak secrets in logs.
+- The current header open-workspace launcher becomes the primary surface for editor, terminal, source-control, Finder, and copy-path actions.
 
 Verification:
 - Unit tests for URL parsing and route resolution.
 - Manual dev deep-link test if supported by Electron configuration.
 
 Source:
+- `docs/product/current-shell-inventory.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/ux-parity.md`
 
