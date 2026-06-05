@@ -51,5 +51,6 @@ Piductor could borrow only broad concepts from Conductor. This is rejected becau
 - The roadmap should be organized as a Conductor parity matrix.
 - Architecture decisions must preserve worktree-based parallelism, reviewability, and local script/process workflows.
 - UX can be distinct, but workflows should feel familiar to Conductor users.
+- The implemented workbench shell is the current product contract for Conductor-style layout and visible affordances; future work should wire behavior into those surfaces rather than redesigning the app shell.
 - Pi-specific differences must be explicit rather than accidental.
 - Implementation should prioritize the highest-leverage parity features before polish.

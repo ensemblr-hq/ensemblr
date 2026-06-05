@@ -1,4 +1,5 @@
 export const IPC_CHANNELS = {
+	ensureWindowWidth: 'piductor:ensure-window-width',
 	health: 'piductor:health',
 	rootDirectory: 'piductor:root-directory',
 	setupDiagnostics: 'piductor:setup-diagnostics',
@@ -207,6 +208,7 @@ export interface SetupDiagnosticsSnapshot {
 }
 
 export interface PiductorApi {
+	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
 	health: () => Promise<HealthSnapshot>;
 	rootDirectory: () => Promise<RootDirectorySnapshot>;
 	resolveSettings: (

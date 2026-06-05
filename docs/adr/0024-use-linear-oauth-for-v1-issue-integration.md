@@ -72,6 +72,6 @@ Rejected. Linear workspace creation is part of the desired Conductor parity targ
 - Linear becomes a first-class v1 integration, not a deferred feature.
 - Piductor needs OAuth callback handling, PKCE/state validation, token refresh, disconnect, and Keychain storage.
 - Settings must include Linear connection state and remediation.
-- Workspace creation must support Linear issue entry points alongside local project, GitHub project, and quick start flows.
+- Workspace creation must support Linear issue entry points through dedicated Linear issue browse/read/workspace-from-issue surfaces; the current project-add menu does not need to expose Linear unless a later product decision adds that entry point.
 - Implementation must handle Linear API rate limits, pagination, filtering, OAuth token refresh, and permissions errors.
 - Archive/delete mutation support must be verified against the current Linear schema before implementation.

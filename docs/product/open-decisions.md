@@ -18,6 +18,7 @@ Date: 2026-06-04
 - Settings hierarchy: app settings sections plus local repository settings in the same settings shell.
 - Repository settings surface: paths, branch source, remote, preview URL, files-to-copy, scripts, spotlight testing, action-specific agent preferences, and remove repository.
 - Main workspace layout: sidebar, center agent timeline, right files/changes/checks panel, lower setup/run/terminal dock.
+- Current implemented shell contract: project/workspace sidebar with pinning/collapse/reorder, project add menu, workspace header/open-target launcher, chat/session tabs, right PR header, All files/Changes/Checks tabs, and lower Setup/Run/Terminal dock.
 - Agent error state: inline runtime error cards with retry and retry-in-new-chat actions.
 - Terminal setup output state: setup output appears in the dock with rerun control.
 - Checks/PR states: no PR, uncommitted changes, pending/failing checks, deployments/checks/comments/todos, and ready-to-merge state.
@@ -27,6 +28,10 @@ Date: 2026-06-04
 
 - Whether to support Conductor's remove/soften AI-certainty phrase setting in Piductor. If supported, decide whether it is Pi output post-processing, a prompt preset, or a settings omission.
 - Which non-deferred experimental settings are v1 scope versus post-core flags, especially dashboard/sidebar visibility and sidebar resource usage. Voice, Graphite, cloud/remote SSH, production React profiler, and the chat-tab limit are already resolved by ADRs.
+- Whether the current workspace-row status context menu should change local workspace lifecycle state, linked Linear issue status, both, or another status model.
+- Whether the current workspace-row Mark as unread action represents local workspace attention, chat unread state, or linked external issue state.
+- Whether the Dashboard route should become a visible sidebar entry later or remain hidden behind other navigation.
+- Whether the Changes tab Review action opens local diff-comment review mode, starts an agent review workflow, or toggles a review filter/state.
 
 ## Needs Implementation Discovery
 
@@ -41,6 +46,7 @@ Date: 2026-06-04
 - Whether a `.conductor` folder exists in any real repositories and whether it has a documented/public meaning.
 - How to detect preview URLs from run/setup output robustly.
 - How to safely implement spotlight testing without overwriting root changes.
+- Which current command/menu placeholders should be keyboard-shortcut/global-command entries before their backing services exist.
 
 ## Resolved Since Screenshot Review
 
