@@ -120,6 +120,16 @@ test('resolves app settings from sqlite, config defaults, and built-in defaults'
 			value: '/Users/example/Ensemble',
 		},
 	);
+	assert.deepEqual(
+		{
+			source: getSetting(snapshot.app, 'security.permissionMode').source,
+			value: getSetting(snapshot.app, 'security.permissionMode').value,
+		},
+		{
+			source: 'built-in-default',
+			value: 'workspace-trusted',
+		},
+	);
 });
 
 test('managed locked settings override sqlite user settings', (t) => {
@@ -286,6 +296,13 @@ test('resolves repository settings from sqlite and provided config snapshots', (
 		},
 		{ source: 'built-in-default', value: ['.env*'] },
 	);
+	assert.deepEqual(
+		{
+			source: getSetting(snapshot.repository, 'security.permissionMode').source,
+			value: getSetting(snapshot.repository, 'security.permissionMode').value,
+		},
+		{ source: 'built-in-default', value: 'workspace-trusted' },
+	);
 	assert.deepEqual(getSetting(snapshot.repository, 'scripts.run').candidates, [
 		{
 			reason: 'Selected by precedence.',
@@ -331,6 +348,95 @@ test('explicit repository sources override inferred conductor compatibility', ()
 		},
 		{ source: 'ensemble-config', value: false },
 	);
+});
+
+test('invalid app permission mode falls back to the next valid source', (t) => {
+	const database = createDatabaseFixture(t);
+	insertSetting({
+		database,
+		key: 'security.permissionMode',
+		scope: 'app',
+		valueJson: JSON.stringify('sandboxed'),
+	});
+
+	const snapshot = resolveSettings({
+		config: createConfig({
+			security: { permissionMode: 'approval-required' },
+		}),
+		database,
+	});
+	const permissionMode = getSetting(snapshot.app, 'security.permissionMode');
+
+	assert.equal(permissionMode.source, 'config-default');
+	assert.equal(permissionMode.value, 'approval-required');
+	assert.deepEqual(permissionMode.candidates, [
+		{
+			reason:
+				'Invalid permission mode "sandboxed". Expected one of: workspace-trusted, approval-required, read-only.',
+			source: 'sqlite',
+			status: 'invalid',
+		},
+		{
+			reason: 'Selected by precedence.',
+			source: 'config-default',
+			status: 'selected',
+		},
+		{
+			reason: 'Ignored because config-default has higher precedence.',
+			source: 'built-in-default',
+			status: 'ignored',
+		},
+	]);
+	assert.equal(
+		snapshot.app.diagnostics.some(
+			(diagnostic) =>
+				diagnostic.key === 'security.permissionMode' &&
+				diagnostic.source === 'sqlite' &&
+				diagnostic.status === 'invalid',
+		),
+		true,
+	);
+});
+
+test('invalid repository permission mode falls back by source precedence', () => {
+	const snapshot = resolveSettings({
+		config: createConfig(),
+		repository: {
+			conductorConfig: { security: { permissionMode: 'approval-required' } },
+			ensembleConfig: { security: { permissionMode: 'sandboxed' } },
+			repositoryId: 'repo-1',
+		},
+	});
+
+	if (!snapshot.repository) {
+		assert.fail('Expected repository settings resolution');
+	}
+
+	const permissionMode = getSetting(
+		snapshot.repository,
+		'security.permissionMode',
+	);
+
+	assert.equal(permissionMode.source, 'conductor-config');
+	assert.equal(permissionMode.value, 'approval-required');
+	assert.deepEqual(permissionMode.candidates, [
+		{
+			reason:
+				'Invalid permission mode "sandboxed". Expected one of: workspace-trusted, approval-required, read-only.',
+			source: 'ensemble-config',
+			status: 'invalid',
+		},
+		{
+			reason: 'Selected by precedence.',
+			source: 'conductor-config',
+			status: 'selected',
+		},
+		{
+			reason: 'Ignored because conductor-config has higher precedence.',
+			source: 'built-in-default',
+			status: 'ignored',
+		},
+	]);
 });
 
 test('normalizes IPC settings resolution requests', () => {

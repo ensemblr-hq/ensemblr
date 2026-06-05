@@ -33,6 +33,19 @@ import {
 import { SidebarMenuButton } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 import type { WorkspaceShellModel } from '@/renderer/workbench/workbench-model';
+import {
+	classifyPermissionAction,
+	DEFAULT_PERMISSION_MODE,
+	getPermissionBoundaryLabel,
+} from '@/shared/permissions';
+
+const archiveBoundary = classifyPermissionAction({
+	action: 'workspace-archive-delete',
+	mode: DEFAULT_PERMISSION_MODE,
+});
+const archiveBoundaryLabel = getPermissionBoundaryLabel(
+	archiveBoundary.boundary,
+);
 
 export function WorkspaceSidebarItem({
 	isActive,
@@ -89,8 +102,9 @@ export function WorkspaceSidebarItem({
 						</div>
 					</SidebarMenuButton>
 					<Button
-						aria-label={`Archive workspace ${workspace.name}`}
+						aria-label={`Archive workspace ${workspace.name}; ${archiveBoundaryLabel}`}
 						className='absolute right-1.5 bottom-1.5 size-6 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:opacity-100 group-hover/workspace-sidebar-item:opacity-100'
+						data-permission-boundary={archiveBoundary.boundary}
 						onClick={(event) => {
 							event.stopPropagation();
 						}}
@@ -100,6 +114,7 @@ export function WorkspaceSidebarItem({
 						variant='ghost'
 					>
 						<ArchiveIcon aria-hidden='true' />
+						<span className='sr-only'>{archiveBoundaryLabel}</span>
 					</Button>
 				</div>
 			</ContextMenuTrigger>
@@ -249,10 +264,12 @@ function WorkspaceContextMenuContent({
 			</ContextMenuGroup>
 			<ContextMenuSeparator />
 			<ContextMenuGroup>
-				<SidebarContextMenuItem>
+				<SidebarContextMenuItem
+					data-permission-boundary={archiveBoundary.boundary}
+				>
 					<ArchiveIcon aria-hidden='true' />
 					<span className='min-w-0 flex-1'>Archive</span>
-					<ContextMenuShortcut>⌘⇧A</ContextMenuShortcut>
+					<ContextMenuShortcut>{archiveBoundaryLabel}</ContextMenuShortcut>
 				</SidebarContextMenuItem>
 			</ContextMenuGroup>
 		</ContextMenuContent>
