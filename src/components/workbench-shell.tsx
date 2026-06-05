@@ -21,7 +21,7 @@ async function ensureWindowCanShowRightSidebar() {
 		return;
 	}
 
-	await window.piductor?.ensureWindowWidth(RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH);
+	await window.ensemble?.ensureWindowWidth(RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH);
 }
 
 export function WorkbenchShell({

@@ -2,7 +2,7 @@
 
 Date: 2026-06-04
 
-This inventory summarizes Conductor screenshots as UX evidence for Piductor implementation. It intentionally avoids copying Conductor branding, visual identity, private repository names, account data, tokens, issue text, PR text, and chat content. Exact file paths are included only for the screenshot evidence files.
+This inventory summarizes Conductor screenshots as UX evidence for Ensemble implementation. It intentionally avoids copying Conductor branding, visual identity, private repository names, account data, tokens, issue text, PR text, and chat content. Exact file paths are included only for the screenshot evidence files.
 
 The original screenshot files may be unavailable in later workspaces. This
 document is historical parity evidence, not the current shell source of truth.
@@ -17,7 +17,7 @@ when planning app-shell work.
 - The annotated June 5, 2026 screenshot at `.context/attachments/NJpu5l/CleanShot 2026-06-05 at 08.42.35@2x.png` clarifies the main workspace shell structure: project/workspace sidebar, project/branch breadcrumb, chat tabs, center agent timeline and composer, right All files/Changes/Checks panel, and lower Setup/Run/Terminal dock.
 - The implemented shell in `src/components/workbench-shell.tsx` and
   `src/components/workbench-shell/` now supersedes older speculative shell
-  notes. Use `docs/product/current-shell-inventory.md` for the current Piductor
+  notes. Use `docs/product/current-shell-inventory.md` for the current Ensemble
   shell contract, and use this screenshot inventory as evidence for Conductor
   workflow parity.
 
@@ -35,7 +35,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Not captured.
 - Data shown: Not captured.
 - Settings or configuration implied: Inferred from settings and ADR 0014: git, GitHub CLI auth, Pi runtime/provider readiness, root directory, SQLite, process environment.
-- Piductor parity requirement: Implement a setup gate with concrete remediation states, but do not claim exact visual parity until screenshots exist.
+- Ensemble parity requirement: Implement a setup gate with concrete remediation states, but do not claim exact visual parity until screenshots exist.
 - Pi-specific adaptation: Replace Claude/Codex provider checks with Pi CLI RPC runtime, Pi agent directory, and Pi model/provider discovery.
 - Risks or implementation notes: The exact first-run sequence remains an open UX gap.
 
@@ -53,9 +53,9 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: No loading or error state visible.
 - Data shown: Current global defaults for message sending, follow-up/steering, notifications, sound, context display, sleep prevention, MCP status display, and tool-call expansion.
 - Settings or configuration implied: Global UI/agent preferences, notification permission, sound preference, power-management behavior, MCP visibility.
-- Piductor parity requirement: Provide compact global settings with toggles, selects, sync actions, and local project shortcuts.
+- Ensemble parity requirement: Provide compact global settings with toggles, selects, sync actions, and local project shortcuts.
 - Pi-specific adaptation: Replace Claude/Codex sync with Pi resource/config sync or inspection around `~/.pi/agent`, project `.pi`, skills, prompts, and MCP-equivalent resources.
-- Risks or implementation notes: Some Conductor behaviors are provider-specific; Piductor should expose only Pi-supported controls and keep unsupported parity items visible as future work.
+- Risks or implementation notes: Some Conductor behaviors are provider-specific; Ensemble should expose only Pi-supported controls and keep unsupported parity items visible as future work.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.55.25@2x.png`
 
@@ -69,7 +69,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: No loading or error state visible.
 - Data shown: Current model names, thinking levels, personality/default style, plan and fast mode toggles.
 - Settings or configuration implied: Separate model defaults for normal chat and code review; per-session behavior defaults.
-- Piductor parity requirement: Support default model/reasoning/personality-like controls for new chats and review-specific workflows.
+- Ensemble parity requirement: Support default model/reasoning/personality-like controls for new chats and review-specific workflows.
 - Pi-specific adaptation: Map to Pi model identifiers, thinking levels, Pi steering/follow-up behavior, and any Pi-supported review model separation.
 - Risks or implementation notes: Exact Pi model capabilities and whether review can use a separate model need SDK discovery.
 
@@ -85,9 +85,9 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Connected state visible; no failed auth state captured.
 - Data shown: Provider, plan, organization, and account metadata are visible but treated as sensitive and not transcribed.
 - Settings or configuration implied: Provider auth mode, provider settings path, login command, refresh action.
-- Piductor parity requirement: Provide a provider readiness screen that explains current auth state and remediation.
+- Ensemble parity requirement: Provide a provider readiness screen that explains current auth state and remediation.
 - Pi-specific adaptation: Replace multi-provider Claude/Codex tabs with Pi CLI/RPC auth/model/provider readiness and Pi agent directory/resource discovery.
-- Risks or implementation notes: Piductor should not expose tokens or account identifiers unnecessarily; secret values should be hidden and stored outside plain JSON.
+- Risks or implementation notes: Ensemble should not expose tokens or account identifiers unnecessarily; secret values should be hidden and stored outside plain JSON.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.55.51@2x.png`
 
@@ -101,9 +101,9 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Most catalog entries show an unset state; no error visible.
 - Data shown: Variable names and descriptions for proxy, provider, cloud, OpenAI, and gateway-related configuration. No values are visible.
 - Settings or configuration implied: App-level environment store, secret masking, provider-specific documented variable catalog.
-- Piductor parity requirement: Support global environment variables, documented variable hints, hidden values, unset/set status, and per-variable edit/add actions.
+- Ensemble parity requirement: Support global environment variables, documented variable hints, hidden values, unset/set status, and per-variable edit/add actions.
 - Pi-specific adaptation: Replace Claude/Codex-specific catalog items with Pi-relevant variables and still allow generic variables for scripts, tools, and provider SDKs.
-- Risks or implementation notes: Secret storage should not use repository config or `~/.config/piductor/config.json`; use macOS Keychain with SQLite metadata.
+- Risks or implementation notes: Secret storage should not use repository config or `~/.config/ensemble/config.json`; use macOS Keychain with SQLite metadata.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.56.01@2x.png`
 
@@ -117,9 +117,9 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: No loading or error state visible.
 - Data shown: Current theme choices, preview samples, font names, font-size slider.
 - Settings or configuration implied: App appearance, accessibility colors, diff color policy, code/terminal font preferences.
-- Piductor parity requirement: Provide appearance settings with immediate previews for code, markdown, and terminal surfaces.
-- Pi-specific adaptation: Keep independent Piductor visual identity while matching functional customization; previews should use Piductor sample text and Pi terminal examples.
-- Risks or implementation notes: Avoid inheriting Conductor color palette or typography exactly; define Piductor-specific design tokens.
+- Ensemble parity requirement: Provide appearance settings with immediate previews for code, markdown, and terminal surfaces.
+- Pi-specific adaptation: Keep independent Ensemble visual identity while matching functional customization; previews should use Ensemble sample text and Pi terminal examples.
+- Risks or implementation notes: Avoid inheriting Conductor color palette or typography exactly; define Ensemble-specific design tokens.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.56.11@2x.png`
 
@@ -133,8 +133,8 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: No loading or error state visible.
 - Data shown: Branch prefix options, current toggle states, detected GitHub username represented generically.
 - Settings or configuration implied: GitHub identity awareness, workspace naming policy, archive cleanup policy, merge workflow policy.
-- Piductor parity requirement: Provide global Git workflow preferences and apply them during workspace creation, archive, PR, and merge actions.
-- Pi-specific adaptation: None for Pi runtime; preserve git behavior while using Piductor labels and environment variables.
+- Ensemble parity requirement: Provide global Git workflow preferences and apply them during workspace creation, archive, PR, and merge actions.
+- Pi-specific adaptation: None for Pi runtime; preserve git behavior while using Ensemble labels and environment variables.
 - Risks or implementation notes: Destructive archive/delete behavior needs confirmation and must not remove user changes unexpectedly.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.56.19@2x.png`
@@ -149,8 +149,8 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Connected/ready states visible; no disconnected state captured.
 - Data shown: Personal account details and token-shaped values are visible but intentionally not transcribed.
 - Settings or configuration implied: Account identity, Linear linkage, GitHub CLI auth, optional GitHub token, enterprise privacy, tool approval policy.
-- Piductor parity requirement: Provide a consolidated account/integrations/privacy surface.
-- Pi-specific adaptation: Piductor account/sign-in is deferred for v1; focus this surface on `gh` CLI status, Linear OAuth status, Pi permission mode, and enterprise privacy adapted to Pi.
+- Ensemble parity requirement: Provide a consolidated account/integrations/privacy surface.
+- Pi-specific adaptation: Ensemble account/sign-in is deferred for v1; focus this surface on `gh` CLI status, Linear OAuth status, Pi permission mode, and enterprise privacy adapted to Pi.
 - Risks or implementation notes: V1 GitHub uses authenticated `gh`; any direct GitHub token field is post-v1/direct-API scope and must use macOS Keychain.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.56.30@2x.png`
@@ -165,7 +165,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: No loading or error state visible.
 - Data shown: Experimental feature names and warnings.
 - Settings or configuration implied: Feature flags, developer diagnostics, optional integrations, UI density/visibility settings.
-- Piductor parity requirement: Maintain a feature-flag surface for non-core parity features and diagnostics.
+- Ensemble parity requirement: Maintain a feature-flag surface for non-core parity features and diagnostics.
 - Pi-specific adaptation: Voice and terminal features are runtime-agnostic; Graphite stack support depends on git workflow integration, not Pi. React profiler applies to Electron/React implementation.
 - Risks or implementation notes: Voice and Graphite are deferred by ADR 0020; production React profiler is deferred by ADR 0021; the chat-tab limit is resolved by ADR 0022.
 
@@ -181,7 +181,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: No loading or error state visible.
 - Data shown: Local root path and executable path examples are visible but not transcribed.
 - Settings or configuration implied: Managed root directory, external executable overrides, SSH key path for cloud/remote access, git upstream behavior.
-- Piductor parity requirement: Provide advanced path/runtime controls and clear warnings around root changes.
+- Ensemble parity requirement: Provide advanced path/runtime controls and clear warnings around root changes.
 - Pi-specific adaptation: Replace Claude/Codex executable paths with Pi executable diagnostics and optional executable override for wrappers such as oh-my-pi.
 - Risks or implementation notes: ADR 0017 resolves root changes: switch root and reindex/adopt by default; migration and deletion are explicit separate actions.
 
@@ -197,8 +197,8 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Files-to-copy section shows no matching ignored files for the current patterns.
 - Data shown: Private repository name, paths, and script commands are visible but described generically.
 - Settings or configuration implied: Repository root path, workspace path, default branch, remote origin, preview URL template, files-to-copy patterns, scripts.
-- Piductor parity requirement: Provide repository-scoped settings that override shared config and expose config/source diagnostics.
-- Pi-specific adaptation: Support both `piductor.json` and `conductor.json`, expose `PIDUCTOR_*` and compatible `CONDUCTOR_*` variables in preview URLs and scripts.
+- Ensemble parity requirement: Provide repository-scoped settings that override shared config and expose config/source diagnostics.
+- Pi-specific adaptation: Support both `ensemble.json` and `conductor.json`, expose `ENSEMBLE_*` and compatible `CONDUCTOR_*` variables in preview URLs and scripts.
 - Risks or implementation notes: Do not move/delete repository or workspace directories from settings; archive or remove through explicit lifecycle actions.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.56.59@2x.png`
@@ -213,8 +213,8 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: No loading or error state visible.
 - Data shown: Private script commands are visible but described generically.
 - Settings or configuration implied: Shared config generation, spotlight testing, review/PR/fix/conflict/branch-rename/general instruction overrides.
-- Piductor parity requirement: Support repository action-specific instruction templates and spotlight testing behavior.
-- Pi-specific adaptation: Store Pi-specific instruction templates in `piductor.json` or personal settings, while preserving `conductor.json` script compatibility.
+- Ensemble parity requirement: Support repository action-specific instruction templates and spotlight testing behavior.
+- Pi-specific adaptation: Store Pi-specific instruction templates in `ensemble.json` or personal settings, while preserving `conductor.json` script compatibility.
 - Risks or implementation notes: Repository removal is destructive/high-impact and must distinguish removing from app records versus deleting files.
 
 ## 03-add-repo
@@ -231,9 +231,9 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: No loading or error state visible.
 - Data shown: Private project names, paths, chat text, and files are visible but not transcribed.
 - Settings or configuration implied: Recents list, project storage, GitHub project integration, quick-start templates.
-- Piductor parity requirement: Provide project-add menu with local open, GitHub clone/open, quick-start, and recents.
-- Current Piductor shell alignment: The visible project-add menu already establishes Open project, Open GitHub project, Quick start, and recents as the shell contract. Linear issue entry remains v1 scope through the Linear issue workflow, not a required item in this menu.
-- Pi-specific adaptation: New projects should initialize Piductor/Pi repository settings and preserve Pi project context files.
+- Ensemble parity requirement: Provide project-add menu with local open, GitHub clone/open, quick-start, and recents.
+- Current Ensemble shell alignment: The visible project-add menu already establishes Open project, Open GitHub project, Quick start, and recents as the shell contract. Linear issue entry remains v1 scope through the Linear issue workflow, not a required item in this menu.
+- Pi-specific adaptation: New projects should initialize Ensemble/Pi repository settings and preserve Pi project context files.
 - Risks or implementation notes: Recents may expose private paths; avoid unnecessary telemetry and store locally.
 
 ### `.context/conductor-screens/03-add-repo/CleanShot 2026-06-04 at 17.57.35@2x.png`
@@ -248,7 +248,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Clone button appears inactive until required input is valid.
 - Data shown: Private recent repository names and local path are visible but not transcribed.
 - Settings or configuration implied: GitHub recents, default managed repos location, `gh`/git clone readiness.
-- Piductor parity requirement: Provide a modal clone flow with recents, URL entry, managed-location default, and validation.
+- Ensemble parity requirement: Provide a modal clone flow with recents, URL entry, managed-location default, and validation.
 - Pi-specific adaptation: No runtime adaptation; after clone, initialize repository settings and Pi workspace context.
 - Risks or implementation notes: Validate URLs and handle private repo auth failures from `gh`/git with actionable remediation.
 
@@ -264,7 +264,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Loading/progress state visible with git output lines.
 - Data shown: Private repository URL/path and clone output are visible but generalized.
 - Settings or configuration implied: Persistent clone location, command logging, project creation lifecycle.
-- Piductor parity requirement: Show clone progress inline with command output and disabled duplicate-submit control.
+- Ensemble parity requirement: Show clone progress inline with command output and disabled duplicate-submit control.
 - Pi-specific adaptation: No Pi runtime adaptation until the first workspace/session is created.
 - Risks or implementation notes: Error state was not captured; implement auth/network/path-exists failures with remediation.
 
@@ -280,7 +280,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: New workspace empty chat state with landing card and optional setup-script prompt.
 - Data shown: Private repository/workspace names and file tree are visible but not transcribed.
 - Settings or configuration implied: Repository context menu actions, workspace placeholder naming, default branch and copied-file count.
-- Piductor parity requirement: After clone, land in an isolated workspace with branch/copy summary and repository management menu.
+- Ensemble parity requirement: After clone, land in an isolated workspace with branch/copy summary and repository management menu.
 - Pi-specific adaptation: Start a Pi session from the new workspace with Pi model controls in the composer.
 - Risks or implementation notes: Distinguish repository-level actions from workspace-level actions in state and storage.
 
@@ -298,7 +298,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Empty new-chat state; no setup output yet.
 - Data shown: Private project/workspace names are visible but generalized; summary shows branch source and copied-file count.
 - Settings or configuration implied: Auto-generated placeholder workspace name, branch from configured default branch, files-to-copy behavior, optional setup script.
-- Piductor parity requirement: Create a worktree, name it, branch from configured default, copy eligible files, and show a concise success summary.
+- Ensemble parity requirement: Create a worktree, name it, branch from configured default, copy eligible files, and show a concise success summary.
 - Pi-specific adaptation: Composer should use Pi model/thinking/session controls and create a Pi session on first prompt.
 - Risks or implementation notes: The actual workspace-creation form is not captured; only the success state is known.
 
@@ -316,8 +316,8 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Provider/session-limit error visible; setup tab empty with run setup action; no todos state.
 - Data shown: Private chat content and file details are visible but not transcribed; visible status includes no PR, uncommitted changes, and no todos.
 - Settings or configuration implied: Retry behavior, model and reasoning controls, setup/run lifecycle, PR/check/todo state.
-- Piductor parity requirement: Render structured agent events, tool calls, runtime errors, retry actions, composer controls, and side-panel status without losing workspace context.
-- Current Piductor shell alignment: The tab strip, timeline location, setup warning, and composer placement are locked. Chat content and prompt behavior remain deferred until Pi integration.
+- Ensemble parity requirement: Render structured agent events, tool calls, runtime errors, retry actions, composer controls, and side-panel status without losing workspace context.
+- Current Ensemble shell alignment: The tab strip, timeline location, setup warning, and composer placement are locked. Chat content and prompt behavior remain deferred until Pi integration.
 - Pi-specific adaptation: Replace provider-limit errors with Pi CLI/RPC runtime error cards, Pi session retry/fork behavior, and Pi model/thinking controls.
 - Risks or implementation notes: Retrying in a new chat must preserve file state and make session branching understandable.
 
@@ -335,9 +335,9 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Completed setup output visible; no error state captured.
 - Data shown: Private command output is visible but generalized.
 - Settings or configuration implied: Setup script command, captured process logs, terminal tab persistence.
-- Piductor parity requirement: Provide docked setup/run/terminal panes with output capture and rerun controls.
-- Current Piductor shell alignment: The lower-right Setup / Run / Terminal dock, collapse affordance, and script-state action placement are already represented. Future terminal tickets should replace placeholder logs with live process/PTY data in place.
-- Pi-specific adaptation: Run scripts are independent of Pi but should include `PIDUCTOR_*` and compatibility environment variables.
+- Ensemble parity requirement: Provide docked setup/run/terminal panes with output capture and rerun controls.
+- Current Ensemble shell alignment: The lower-right Setup / Run / Terminal dock, collapse affordance, and script-state action placement are already represented. Future terminal tickets should replace placeholder logs with live process/PTY data in place.
+- Pi-specific adaptation: Run scripts are independent of Pi but should include `ENSEMBLE_*` and compatibility environment variables.
 - Risks or implementation notes: Large output, interactive prompts, and process cancellation need terminal/process supervision.
 
 ## 07-diff-review
@@ -354,8 +354,8 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: No empty or error state; populated changes tree visible.
 - Data shown: Private file names and change counts are visible but generalized.
 - Settings or configuration implied: File status calculation, diff color policy, review-mode preference.
-- Piductor parity requirement: Provide a structured changes tree with file statuses, additions/deletions, grouping, search, and review controls.
-- Current Piductor shell alignment: All files / Changes / Checks tab placement, changes list/tree toggle, folder grouping, and command-style file search are represented in the current shell. Future work should wire git/diff data into these surfaces.
+- Ensemble parity requirement: Provide a structured changes tree with file statuses, additions/deletions, grouping, search, and review controls.
+- Current Ensemble shell alignment: All files / Changes / Checks tab placement, changes list/tree toggle, folder grouping, and command-style file search are represented in the current shell. Future work should wire git/diff data into these surfaces.
 - Pi-specific adaptation: Diff/review data is runtime-agnostic; selected diff/comment context should be sendable to Pi.
 - Risks or implementation notes: Full diff body and line-comment UI are not captured in this screenshot set.
 
@@ -373,7 +373,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Agent working/loading state visible; checks still show no PR/uncommitted state at start.
 - Data shown: Private PR instruction content and chat details are visible but not transcribed.
 - Settings or configuration implied: Create-PR instruction template, git staging/commit/push behavior, `gh` integration.
-- Piductor parity requirement: Represent PR creation as an agent-assisted workflow with status in the main timeline and side-panel state updates.
+- Ensemble parity requirement: Represent PR creation as an agent-assisted workflow with status in the main timeline and side-panel state updates.
 - Pi-specific adaptation: Use Pi to generate or execute PR workflow steps, with `gh` CLI as source of GitHub state.
 - Risks or implementation notes: Must guard against committing unrelated files and should stage only requested workspace changes.
 
@@ -389,8 +389,8 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Pending check state and no-todos state visible.
 - Data shown: PR title/description, check provider names, comment identifiers, and private content are visible but generalized.
 - Settings or configuration implied: PR metadata cache, CI/check status polling, comment ingestion, merge policy, todo storage.
-- Piductor parity requirement: Show PR metadata, check states, comments, todos, external links, and merge blockers in one checks panel.
-- Current Piductor shell alignment: The right PR header and Checks panel already represent the no-PR, checking, blocked, and ready state shape. Future work should wire `gh`/GitHub metadata and merge confirmation into the existing surfaces.
+- Ensemble parity requirement: Show PR metadata, check states, comments, todos, external links, and merge blockers in one checks panel.
+- Current Ensemble shell alignment: The right PR header and Checks panel already represent the no-PR, checking, blocked, and ready state shape. Future work should wire `gh`/GitHub metadata and merge confirmation into the existing surfaces.
 - Pi-specific adaptation: Add comments/review context to Pi chat rather than Claude/Codex chat.
 - Risks or implementation notes: `gh` may not expose all comment/review-thread detail needed; direct GitHub API may be required later.
 
@@ -406,6 +406,6 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Ready-to-merge state and no-todos state visible.
 - Data shown: PR metadata and deployment/comment identifiers are visible but generalized.
 - Settings or configuration implied: Deployment status tracking, ready-to-merge calculation, merge action authorization.
-- Piductor parity requirement: Provide a distinct ready state with prominent merge action once PR, checks, and deployments satisfy policy.
+- Ensemble parity requirement: Provide a distinct ready state with prominent merge action once PR, checks, and deployments satisfy policy.
 - Pi-specific adaptation: Runtime-agnostic; Pi can be used to resolve comments or failures before merge.
 - Risks or implementation notes: Merge is externally visible and should require confirmation or respect repository merge policy.

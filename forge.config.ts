@@ -10,9 +10,9 @@ import type { ForgeConfig } from '@electron-forge/shared-types';
 const config: ForgeConfig = {
 	packagerConfig: {
 		asar: true,
-		appBundleId: 'com.piductor.app',
+		appBundleId: 'com.ensemble.app',
 		extraResource: ['docs/product/mvp-sequencing.md'],
-		name: 'Piductor',
+		name: 'Ensemble',
 	},
 	rebuildConfig: {},
 	makers: [

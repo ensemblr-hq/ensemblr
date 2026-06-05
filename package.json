@@ -1,6 +1,6 @@
 {
-	"name": "piductor",
-	"productName": "Piductor",
+	"name": "ensemble",
+	"productName": "Ensemble",
 	"version": "0.1.0",
 	"description": "A Pi-native macOS workbench for isolated coding-agent workflows.",
 	"main": ".vite/build/main.js",
@@ -29,7 +29,7 @@
 	},
 	"keywords": [
 		"electron",
-		"piductor",
+		"ensemble",
 		"pi"
 	],
 	"author": {

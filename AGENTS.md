@@ -85,8 +85,8 @@ This repository uses Biome instead of ESLint and Prettier.
 
 ## Linear And Pull Request Workflow
 
-- Linear project lookup defaults: team `The Swiss Cheese`, project `Piductor`, issue key prefix `THE`.
-- Local planning IDs such as `PID-006` are roadmap IDs, not Linear issue keys. Use Linear issue identifiers such as `THE-106` for branch names, PR titles, commits, and status updates.
-- When asked to grab the next issue, inspect Linear project `Piductor` first, then use `docs/product/linear-issues.md`, `docs/product/linear-milestones.md`, `docs/product/dependency-map.md`, and `docs/product/implementation-roadmap.md` to confirm roadmap order, dependencies, and acceptance criteria.
+- Linear project lookup defaults: team `The Swiss Cheese`, project `Ensemble`, issue key prefix `THE`.
+- Local planning IDs such as `ENS-006` are roadmap IDs, not Linear issue keys. Use Linear issue identifiers such as `THE-106` for branch names, PR titles, commits, and status updates.
+- When asked to grab the next issue, inspect Linear project `Ensemble` first, then use `docs/product/linear-issues.md`, `docs/product/linear-milestones.md`, `docs/product/dependency-map.md`, and `docs/product/implementation-roadmap.md` to confirm roadmap order, dependencies, and acceptance criteria.
 - Never mark Linear tickets as `Done` from agent work. When implementation and verification are complete, move the ticket to `In Review`.
-- When creating a pull request for Linear-backed work, include the actual Linear issue code in the PR title, for example `THE-105`. Do not use only a local planning ID such as `PID-005`.
+- When creating a pull request for Linear-backed work, include the actual Linear issue code in the PR title, for example `THE-105`. Do not use only a local planning ID such as `ENS-005`.

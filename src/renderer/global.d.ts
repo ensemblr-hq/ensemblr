@@ -1,7 +1,7 @@
-import type { PiductorApi } from '../shared/ipc';
+import type { EnsembleApi } from '../shared/ipc';
 
 declare global {
 	interface Window {
-		piductor?: PiductorApi;
+		ensemble?: EnsembleApi;
 	}
 }

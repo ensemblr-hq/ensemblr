@@ -5,8 +5,8 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../../src/main/commands/local-command.ts';
-import type { PiductorConfigService } from '../../src/main/config/config-loader.ts';
-import type { PiductorRootDirectoryService } from '../../src/main/root/root-directory.ts';
+import type { EnsembleConfigService } from '../../src/main/config/config-loader.ts';
+import type { EnsembleRootDirectoryService } from '../../src/main/root/root-directory.ts';
 import {
 	createSetupCheckSnapshot,
 	createSetupDiagnosticsService,
@@ -14,7 +14,7 @@ import {
 } from '../../src/main/setup/setup-diagnostics.ts';
 import type {
 	DatabaseHealthSnapshot,
-	PiductorDatabaseService,
+	EnsembleDatabaseService,
 } from '../../src/main/storage/database.ts';
 import type {
 	ConfigStatusSnapshot,
@@ -77,13 +77,13 @@ interface FakeCommandOutcome {
 
 function createConfigService(
 	snapshot: Partial<ConfigStatusSnapshot> = {},
-): PiductorConfigService {
+): EnsembleConfigService {
 	const configSnapshot: ConfigStatusSnapshot = {
 		blocksReadiness: false,
 		diagnostics: [],
-		displayPath: '~/.config/piductor/config.json',
+		displayPath: '~/.config/ensemble/config.json',
 		loadedAt: NOW.toISOString(),
-		path: `${HOME}/.config/piductor/config.json`,
+		path: `${HOME}/.config/ensemble/config.json`,
 		schemaVersion: 1,
 		status: 'ok',
 		...snapshot,
@@ -107,9 +107,9 @@ function createConfigService(
 
 function createDatabaseService(
 	health: Partial<DatabaseHealthSnapshot> = {},
-): PiductorDatabaseService {
+): EnsembleDatabaseService {
 	const snapshot: DatabaseHealthSnapshot = {
-		path: `${HOME}/Library/Application Support/com.piductor.app/piductor.db`,
+		path: `${HOME}/Library/Application Support/com.ensemble.app/ensemble.db`,
 		schemaVersion: 3,
 		status: 'ok',
 		...health,
@@ -125,34 +125,34 @@ function createDatabaseService(
 
 function createRootDirectoryService(
 	snapshot: Partial<RootDirectorySnapshot> = {},
-): PiductorRootDirectoryService {
+): EnsembleRootDirectoryService {
 	const rootSnapshot: RootDirectorySnapshot = {
-		archivedContextsPath: `${HOME}/Piductor/archived-contexts`,
+		archivedContextsPath: `${HOME}/Ensemble/archived-contexts`,
 		createdPaths: [],
 		diagnostics: [],
 		managedPaths: [
 			{
 				key: 'repos',
-				path: `${HOME}/Piductor/repos`,
+				path: `${HOME}/Ensemble/repos`,
 				status: 'present',
 			},
 			{
 				key: 'workspaces',
-				path: `${HOME}/Piductor/workspaces`,
+				path: `${HOME}/Ensemble/workspaces`,
 				status: 'present',
 			},
 			{
 				key: 'archived-contexts',
-				path: `${HOME}/Piductor/archived-contexts`,
+				path: `${HOME}/Ensemble/archived-contexts`,
 				status: 'present',
 			},
 		],
-		path: `${HOME}/Piductor`,
-		repositoriesPath: `${HOME}/Piductor/repos`,
+		path: `${HOME}/Ensemble`,
+		repositoriesPath: `${HOME}/Ensemble/repos`,
 		setting: null,
 		source: 'built-in-default',
 		status: 'ok',
-		workspacesPath: `${HOME}/Piductor/workspaces`,
+		workspacesPath: `${HOME}/Ensemble/workspaces`,
 		...snapshot,
 	};
 
@@ -199,13 +199,13 @@ function createLocalCommandService(
 function createDefaultCommandOutcome(
 	command: string,
 	args: string[],
-	shellStdout = 'piductor-process-ok',
+	shellStdout = 'ensemble-process-ok',
 ): FakeCommandOutcome {
 	const argsKey = args.join('\u0000');
 
 	if (
 		command === '/bin/sh' &&
-		argsKey === '-lc\u0000printf piductor-process-ok'
+		argsKey === '-lc\u0000printf ensemble-process-ok'
 	) {
 		return {
 			stdout: shellStdout,
@@ -331,10 +331,10 @@ function createFutureProviders(
 async function getSnapshot(
 	options: {
 		checkProviders?: Partial<Record<SetupCheckId, SetupCheckProvider>>;
-		configService?: PiductorConfigService;
-		databaseService?: PiductorDatabaseService;
+		configService?: EnsembleConfigService;
+		databaseService?: EnsembleDatabaseService;
 		localCommandService?: LocalCommandService;
-		rootDirectoryService?: PiductorRootDirectoryService;
+		rootDirectoryService?: EnsembleRootDirectoryService;
 	} = {},
 ) {
 	const service = createSetupDiagnosticsService({
@@ -566,7 +566,7 @@ test('redacts token-like diagnostics from GitHub auth logs', async () => {
 test('redacts sensitive log assignments and collapses home paths', async () => {
 	const snapshot = await getSnapshot({
 		localCommandService: createLocalCommandService({
-			stdout: `API_TOKEN=abc123 ${HOME}/Piductor/workspaces/demo`,
+			stdout: `API_TOKEN=abc123 ${HOME}/Ensemble/workspaces/demo`,
 		}),
 	});
 	const shellCheck = snapshot.checks.find(
@@ -580,7 +580,7 @@ test('redacts sensitive log assignments and collapses home paths', async () => {
 	);
 	assert.equal(
 		shellCheck.logs.some((log) =>
-			log.text.includes('API_TOKEN=[REDACTED] ~/Piductor/workspaces/demo'),
+			log.text.includes('API_TOKEN=[REDACTED] ~/Ensemble/workspaces/demo'),
 		),
 		true,
 	);

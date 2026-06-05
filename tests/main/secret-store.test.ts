@@ -11,17 +11,17 @@ import {
 	maskSecret,
 	SecretStoreError,
 } from '../../src/main/secrets/secret-store.ts';
-import { openPiductorDatabase } from '../../src/main/storage/database.ts';
+import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
 
 function createTestDatabasePath(): {
 	cleanup: () => void;
 	databasePath: string;
 } {
-	const directory = mkdtempSync(path.join(tmpdir(), 'piductor-secrets-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-secrets-'));
 
 	return {
 		cleanup: () => rmSync(directory, { force: true, recursive: true }),
-		databasePath: path.join(directory, 'piductor-test.db'),
+		databasePath: path.join(directory, 'ensemble-test.db'),
 	};
 }
 
@@ -135,7 +135,7 @@ test('mock store reports duplicate, missing, and invalid operations with typed e
 	const store = createMockSecretStore();
 
 	await store.create({
-		key: 'PIDUCTOR_SECRET',
+		key: 'ENSEMBLE_SECRET',
 		scope: 'app',
 		value: 'first-secret',
 	});
@@ -143,7 +143,7 @@ test('mock store reports duplicate, missing, and invalid operations with typed e
 	await assert.rejects(
 		() =>
 			store.create({
-				key: 'PIDUCTOR_SECRET',
+				key: 'ENSEMBLE_SECRET',
 				scope: 'app',
 				value: 'second-secret',
 			}),
@@ -174,17 +174,17 @@ test('mock store reports duplicate, missing, and invalid operations with typed e
 test('macOS keychain smoke stores values outside SQLite when explicitly enabled', {
 	skip:
 		process.platform !== 'darwin' ||
-		process.env.PIDUCTOR_RUN_KEYCHAIN_SMOKE !== '1'
-			? 'Set PIDUCTOR_RUN_KEYCHAIN_SMOKE=1 on macOS to run this Keychain smoke test.'
+		process.env.ENSEMBLE_RUN_KEYCHAIN_SMOKE !== '1'
+			? 'Set ENSEMBLE_RUN_KEYCHAIN_SMOKE=1 on macOS to run this Keychain smoke test.'
 			: false,
 }, async (t) => {
 	const fixture = createTestDatabasePath();
-	const connection = openPiductorDatabase({
+	const connection = openEnsembleDatabase({
 		databasePath: fixture.databasePath,
 	});
-	const serviceName = `com.piductor.app.test.${randomUUID()}`;
-	const key = `PIDUCTOR_SMOKE_${randomUUID()}`;
-	const value = `piductor-smoke-${randomUUID()}`;
+	const serviceName = `com.ensemble.app.test.${randomUUID()}`;
+	const key = `ENSEMBLE_SMOKE_${randomUUID()}`;
+	const value = `ensemble-smoke-${randomUUID()}`;
 	const store = createMacosKeychainSecretStore({
 		database: connection.database,
 		serviceName,
@@ -197,7 +197,7 @@ test('macOS keychain smoke stores values outside SQLite when explicitly enabled'
 	});
 
 	const metadata = await store.create({
-		displayName: 'Piductor smoke test secret',
+		displayName: 'Ensemble smoke test secret',
 		key,
 		scope: 'app',
 		value,

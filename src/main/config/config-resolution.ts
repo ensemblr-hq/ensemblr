@@ -13,23 +13,23 @@ import type {
 	SettingsResolutionSnapshot,
 	SettingsResolutionSource,
 } from '../../shared/ipc';
-import type { PiductorDatabaseService } from '../storage/database';
-import type { PiductorConfig, PiductorConfigService } from './config-loader';
+import type { EnsembleDatabaseService } from '../storage/database';
+import type { EnsembleConfig, EnsembleConfigService } from './config-loader';
 
 export interface ResolveSettingsOptions {
-	config: PiductorConfig;
+	config: EnsembleConfig;
 	database?: DatabaseSync | null;
 	homeDirectory?: string;
 	repository?: RepositorySettingsResolutionRequest;
 }
 
-export interface PiductorConfigResolutionService {
+export interface EnsembleConfigResolutionService {
 	resolve: (request?: unknown) => SettingsResolutionSnapshot;
 }
 
-interface CreatePiductorConfigResolutionServiceOptions {
-	configService: PiductorConfigService;
-	databaseService: PiductorDatabaseService;
+interface CreateEnsembleConfigResolutionServiceOptions {
+	configService: EnsembleConfigService;
+	databaseService: EnsembleDatabaseService;
 	homeDirectory?: string;
 }
 
@@ -54,7 +54,7 @@ const APP_SOURCE_ORDER: readonly SettingsResolutionSource[] = [
 
 const REPOSITORY_SOURCE_ORDER: readonly SettingsResolutionSource[] = [
 	'sqlite',
-	'piductor-config',
+	'ensemble-config',
 	'conductor-config',
 	'built-in-default',
 ];
@@ -69,11 +69,11 @@ const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> = {
 	'scripts.setup': null,
 };
 
-export function createPiductorConfigResolutionService({
+export function createEnsembleConfigResolutionService({
 	configService,
 	databaseService,
 	homeDirectory,
-}: CreatePiductorConfigResolutionServiceOptions): PiductorConfigResolutionService {
+}: CreateEnsembleConfigResolutionServiceOptions): EnsembleConfigResolutionService {
 	return {
 		resolve: (request) =>
 			resolveSettings({
@@ -131,8 +131,8 @@ export function resolveSettings({
 		);
 		addCandidates(
 			repositoryCandidates,
-			flattenRecord(repository.piductorConfig ?? {}),
-			'piductor-config',
+			flattenRecord(repository.ensembleConfig ?? {}),
+			'ensemble-config',
 		);
 		addCandidates(
 			repositoryCandidates,
@@ -181,8 +181,8 @@ export function normalizeSettingsResolutionRequest(
 			conductorConfig: isPlainRecord(request.repository.conductorConfig)
 				? request.repository.conductorConfig
 				: undefined,
-			piductorConfig: isPlainRecord(request.repository.piductorConfig)
-				? request.repository.piductorConfig
+			ensembleConfig: isPlainRecord(request.repository.ensembleConfig)
+				? request.repository.ensembleConfig
 				: undefined,
 			repositoryId,
 		},
@@ -345,7 +345,7 @@ function collectAppBuiltInDefaults(
 	homeDirectory: string,
 ): Map<string, unknown> {
 	return new Map([
-		['rootDirectory', path.join(homeDirectory, 'Piductor')],
+		['rootDirectory', path.join(homeDirectory, 'Ensemble')],
 		['security.permissionMode', 'workspace-trusted'],
 		['sendShortcut', 'enter'],
 		['ui.theme', 'system'],
@@ -365,7 +365,7 @@ function collectConductorConfigCandidates(
 }
 
 function collectAppConfigDefaults(
-	config: PiductorConfig,
+	config: EnsembleConfig,
 ): Map<string, unknown> {
 	const defaults = new Map<string, unknown>();
 
@@ -392,7 +392,7 @@ function collectAppConfigDefaults(
 }
 
 function collectManagedAppCandidates(
-	config: PiductorConfig,
+	config: EnsembleConfig,
 	appConfigDefaults: Map<string, unknown>,
 	lockedKeys: Set<string>,
 ): Map<string, unknown> {

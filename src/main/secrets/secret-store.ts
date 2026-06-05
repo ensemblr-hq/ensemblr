@@ -107,7 +107,7 @@ interface SecurityCommandResult {
 	stdout: string;
 }
 
-const DEFAULT_KEYCHAIN_SERVICE_NAME = 'com.piductor.app.secret-store';
+const DEFAULT_KEYCHAIN_SERVICE_NAME = 'com.ensemble.app.secret-store';
 const SECURITY_COMMAND_PATH = '/usr/bin/security';
 const MASK_VISIBLE_SUFFIX_LENGTH = 4;
 const MASK_PREFIX = '****';
@@ -185,7 +185,7 @@ export function createMacosKeychainSecretStore({
 			'-l',
 			input.displayName,
 			'-j',
-			`Piductor ${input.scope} secret metadata entry`,
+			`Ensemble ${input.scope} secret metadata entry`,
 			'-U',
 			'-X',
 			encodedValue,
@@ -309,7 +309,7 @@ export function createMacosKeychainSecretStore({
 export function createMockSecretStore({
 	idFactory = randomUUID,
 	now = () => new Date(),
-	serviceName = 'mock.piductor.secret-store',
+	serviceName = 'mock.ensemble.secret-store',
 }: MockSecretStoreOptions = {}): SecretStore {
 	const records = new Map<
 		string,

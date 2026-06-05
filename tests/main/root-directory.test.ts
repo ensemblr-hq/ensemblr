@@ -13,12 +13,12 @@ import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 
 import {
-	PIDUCTOR_CONFIG_SCHEMA_VERSION,
-	type PiductorConfig,
+	ENSEMBLE_CONFIG_SCHEMA_VERSION,
+	type EnsembleConfig,
 } from '../../src/main/config/config-loader.ts';
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
 import { ensureRootDirectory } from '../../src/main/root/root-directory.ts';
-import { openPiductorDatabase } from '../../src/main/storage/database.ts';
+import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
 import type {
 	RootDirectoryDiagnostic,
 	RootDirectorySnapshot,
@@ -27,14 +27,14 @@ import type {
 
 let settingCounter = 0;
 
-function createConfig(overrides: Partial<PiductorConfig> = {}): PiductorConfig {
+function createConfig(overrides: Partial<EnsembleConfig> = {}): EnsembleConfig {
 	return {
 		app: {},
 		environment: {},
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: PIDUCTOR_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 		...overrides,
@@ -42,7 +42,7 @@ function createConfig(overrides: Partial<PiductorConfig> = {}): PiductorConfig {
 }
 
 function createDirectoryFixture(t: TestContext): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'piductor-root-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-root-'));
 
 	t.after(() => {
 		rmSync(directory, { force: true, recursive: true });
@@ -53,8 +53,8 @@ function createDirectoryFixture(t: TestContext): string {
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
 	const directory = createDirectoryFixture(t);
-	const connection = openPiductorDatabase({
-		databasePath: path.join(directory, 'piductor-test.db'),
+	const connection = openEnsembleDatabase({
+		databasePath: path.join(directory, 'ensemble-test.db'),
 	});
 
 	t.after(() => {
@@ -69,7 +69,7 @@ function createSettingsSnapshot({
 	database = null,
 	homeDirectory,
 }: {
-	config?: PiductorConfig;
+	config?: EnsembleConfig;
 	database?: DatabaseSync | null;
 	homeDirectory: string;
 }): SettingsResolutionSnapshot {
@@ -119,7 +119,7 @@ test('creates the default temp-home root and managed directories', (t) => {
 		homeDirectory,
 		settingsSnapshot: createSettingsSnapshot({ homeDirectory }),
 	});
-	const expectedRoot = path.join(homeDirectory, 'Piductor');
+	const expectedRoot = path.join(homeDirectory, 'Ensemble');
 
 	assert.equal(snapshot.status, 'ok');
 	assert.equal(snapshot.path, expectedRoot);
@@ -287,7 +287,7 @@ test('warns about existing managed content as a shared-looking root', (t) => {
 	mkdirSync(reposPath);
 	mkdirSync(workspacesPath);
 	mkdirSync(archivedContextsPath);
-	writeFileSync(path.join(reposPath, 'piductor-marker'), 'repo content');
+	writeFileSync(path.join(reposPath, 'ensemble-marker'), 'repo content');
 	writeFileSync(
 		path.join(workspacesPath, 'workspace-marker'),
 		'workspace content',

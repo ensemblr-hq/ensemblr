@@ -1,9 +1,9 @@
 export const IPC_CHANNELS = {
-	ensureWindowWidth: 'piductor:ensure-window-width',
-	health: 'piductor:health',
-	rootDirectory: 'piductor:root-directory',
-	setupDiagnostics: 'piductor:setup-diagnostics',
-	settingsResolution: 'piductor:settings-resolution',
+	ensureWindowWidth: 'ensemble:ensure-window-width',
+	health: 'ensemble:health',
+	rootDirectory: 'ensemble:root-directory',
+	setupDiagnostics: 'ensemble:setup-diagnostics',
+	settingsResolution: 'ensemble:settings-resolution',
 } as const;
 
 export type ConfigStatus = 'error' | 'invalid' | 'missing' | 'ok';
@@ -53,7 +53,7 @@ export type SettingsResolutionSource =
 	| 'conductor-config'
 	| 'config-default'
 	| 'managed-config'
-	| 'piductor-config'
+	| 'ensemble-config'
 	| 'sqlite';
 export type SettingsResolutionCandidateStatus =
 	| 'ignored'
@@ -89,7 +89,7 @@ export interface SettingsResolutionGroupSnapshot {
 
 export interface RepositorySettingsResolutionRequest {
 	conductorConfig?: Record<string, unknown>;
-	piductorConfig?: Record<string, unknown>;
+	ensembleConfig?: Record<string, unknown>;
 	repositoryId: string;
 }
 
@@ -207,7 +207,7 @@ export interface SetupDiagnosticsSnapshot {
 	warningCount: number;
 }
 
-export interface PiductorApi {
+export interface EnsembleApi {
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
 	health: () => Promise<HealthSnapshot>;
 	rootDirectory: () => Promise<RootDirectorySnapshot>;

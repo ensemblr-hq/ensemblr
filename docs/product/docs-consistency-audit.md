@@ -32,7 +32,7 @@ The generated planning docs are broadly consistent with the latest accepted ADRs
 
 ## Remaining Ambiguities
 
-- Whether to support the Conductor-style remove/soften AI-certainty phrase setting in Piductor.
+- Whether to support the Conductor-style remove/soften AI-certainty phrase setting in Ensemble.
 - Which non-deferred experimental settings belong in v1, especially dashboard/sidebar visibility and sidebar resource usage.
 - Exact Pi CLI/RPC capabilities for permission brokering, session tree navigation/forking, compaction UI, model listing, plan/fast modes, browser control, and context usage.
 - Exact `gh` coverage for review comments, deployments, add-all-comments-to-chat, and review-thread resolution.
@@ -41,7 +41,7 @@ The generated planning docs are broadly consistent with the latest accepted ADRs
 
 ## Implementation Risks
 
-- Pi CLI RPC runtime v1 preserves `~/.pi/agent` compatibility and keeps Pi execution in a subprocess, but Piductor still launches local tools with the user's account permissions; keep the `PiAgentClient` boundary ready for SDK sidecar migration if RPC lacks needed capabilities.
+- Pi CLI RPC runtime v1 preserves `~/.pi/agent` compatibility and keeps Pi execution in a subprocess, but Ensemble still launches local tools with the user's account permissions; keep the `PiAgentClient` boundary ready for SDK sidecar migration if RPC lacks needed capabilities.
 - Shared-root adoption must never read/write Conductor's private SQLite database and must avoid deleting or renaming unknown filesystem content.
 - Checkpoint restore must revert file state without destructively editing Pi session files.
 - `gh` output parsing may not expose every PR comment/check/deployment detail needed for full parity.

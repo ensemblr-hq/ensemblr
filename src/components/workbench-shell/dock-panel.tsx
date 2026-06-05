@@ -109,7 +109,7 @@ export function DockPanel({
 				<LogDockContent
 					lines={[
 						'$ zsh',
-						'Interactive PTY rendering is intentionally deferred to PID-037.',
+						'Interactive PTY rendering is intentionally deferred to ENS-037.',
 						'This placeholder preserves the terminal tab contract.',
 					]}
 					title='Terminal'

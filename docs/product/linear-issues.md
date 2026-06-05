@@ -2,7 +2,7 @@
 
 Date: 2026-06-04
 
-These issue templates are ready to copy into Linear. `PID-*` IDs are local planning IDs for dependencies and can be replaced by Linear issue keys after import.
+These issue templates are ready to copy into Linear. `ENS-*` IDs are local planning IDs for dependencies and can be replaced by Linear issue keys after import.
 
 Current shell alignment:
 
@@ -13,7 +13,7 @@ Current shell alignment:
 - Chat transcript content and prompt/composer behavior remain deferred until Pi runtime integration.
 - Some visible command/menu items are placeholders or unresolved; do not infer behavior beyond the inventory and open decisions.
 
-## PID-001 Electron App Shell Scaffold
+## ENS-001 Electron App Shell Scaffold
 
 Milestone: 1. Foundation
 Type: Cross-cutting
@@ -55,15 +55,15 @@ Implementation notes:
 - Keep native capabilities in Electron main, not the renderer.
 - Leave clear service boundaries for storage, config, root, Pi, terminal, GitHub, and Linear.
 
-## PID-002 Piductor Design System Foundation
+## ENS-002 Ensemble Design System Foundation
 
 Milestone: 1. Foundation
 Type: Frontend
 Priority: P0
-Dependencies: PID-001
+Dependencies: ENS-001
 
 Summary:
-Define the initial Piductor-owned visual system using shadcn/ui source, Tailwind, and product-specific tokens.
+Define the initial Ensemble-owned visual system using shadcn/ui source, Tailwind, and product-specific tokens.
 
 Scope:
 - Add shadcn/ui component foundation as owned source.
@@ -78,7 +78,7 @@ Out of scope:
 - Final appearance settings UI.
 
 Acceptance criteria:
-- Core shell components render from Piductor-owned tokens.
+- Core shell components render from Ensemble-owned tokens.
 - The style direction is distinct from Conductor and not stock shadcn defaults.
 - Setup-blocked state disables the composer while keeping the workbench visible and surfacing app diagnostics in the left sidebar footer/status area.
 - The lower Setup dock remains reserved for workspace/project setup command output, such as dependency install logs.
@@ -99,15 +99,15 @@ Implementation notes:
 - Keep tokens centralized so appearance settings can later bind to them.
 - Preserve accessibility basics for keyboard focus and color contrast.
 
-## PID-003 SQLite Database and Migrations
+## ENS-003 SQLite Database and Migrations
 
 Milestone: 1. Foundation
 Type: Database
 Priority: P0
-Dependencies: PID-001
+Dependencies: ENS-001
 
 Summary:
-Add the local SQLite persistence layer for mutable Piductor app metadata.
+Add the local SQLite persistence layer for mutable Ensemble app metadata.
 
 Scope:
 - Create database open/close service under the macOS app-support path.
@@ -120,7 +120,7 @@ Out of scope:
 - Secret value storage.
 
 Acceptance criteria:
-- Database opens at `~/Library/Application Support/com.piductor.app/piductor.db` in normal mode.
+- Database opens at `~/Library/Application Support/com.ensemble.app/ensemble.db` in normal mode.
 - Migrations run idempotently.
 - Tests can use an isolated temporary database.
 - Raw secrets are not represented as persistent values in SQLite.
@@ -135,15 +135,15 @@ Source:
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
-- SQLite stores mutable Piductor metadata and cache only.
+- SQLite stores mutable Ensemble metadata and cache only.
 - Git, Linear, GitHub, and Pi remain their respective sources of truth.
 
-## PID-004 Keychain Secret Store
+## ENS-004 Keychain Secret Store
 
 Milestone: 1. Foundation
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-001, PID-003
+Dependencies: ENS-001, ENS-003
 
 Summary:
 Implement a macOS Keychain-backed secret-store abstraction with a test mock.
@@ -176,18 +176,18 @@ Implementation notes:
 - Pi-owned provider secrets remain in the Pi user environment.
 - Use service names/account names that can be migrated later.
 
-## PID-005 Declarative Config Loader and JSON Schema Stub
+## ENS-005 Declarative Config Loader and JSON Schema Stub
 
 Milestone: 1. Foundation
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-001
+Dependencies: ENS-001
 
 Summary:
-Load and validate declarative user configuration from `~/.config/piductor/config.json`.
+Load and validate declarative user configuration from `~/.config/ensemble/config.json`.
 
 Scope:
-- Add config path resolution for `~/.config/piductor/config.json`.
+- Add config path resolution for `~/.config/ensemble/config.json`.
 - Parse strict JSON and report validation errors with file location context where practical.
 - Add a versioned schema stub for app preferences, repository defaults, repository matching rules, environment policy, security preferences, and UI defaults.
 - Expose config status to the renderer.
@@ -215,24 +215,24 @@ Implementation notes:
 - Prefer standard JSON parsing and explicit schema validation.
 - Keep high-churn runtime state out of config.
 
-## PID-006 Configuration Resolution Engine
+## ENS-006 Configuration Resolution Engine
 
 Milestone: 1. Foundation
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-003, PID-005
+Dependencies: ENS-003, ENS-005
 
 Summary:
 Implement source precedence and diagnostics for app-wide and repository settings.
 
 Scope:
 - Resolve app settings from managed config, SQLite user settings, config defaults, and built-in defaults.
-- Resolve repository behavior from personal SQLite settings, `piductor.json`, `conductor.json`, and built-in defaults.
+- Resolve repository behavior from personal SQLite settings, `ensemble.json`, `conductor.json`, and built-in defaults.
 - Track which source won per field.
 - Expose source diagnostics to settings and setup workflows.
 
 Out of scope:
-- Parsing actual repository config files, covered by `PID-015`.
+- Parsing actual repository config files, covered by `ENS-015`.
 - Full settings UI, covered by later tickets.
 
 Acceptance criteria:
@@ -253,25 +253,25 @@ Source:
 Implementation notes:
 - Make this a reusable service instead of duplicating precedence logic in UI screens.
 
-## PID-007 Root Directory Service
+## ENS-007 Root Directory Service
 
 Milestone: 1. Foundation
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-003, PID-006
+Dependencies: ENS-003, ENS-006
 
 Summary:
-Create the Piductor root-directory service and managed subdirectory layout.
+Create the Ensemble root-directory service and managed subdirectory layout.
 
 Scope:
-- Default root to `~/Piductor` unless config/settings override it.
+- Default root to `~/Ensemble` unless config/settings override it.
 - Create and validate `repos/`, `workspaces/`, and `archived-contexts/`.
 - Persist current root metadata in SQLite and expose absolute paths.
 - Detect missing, unwritable, non-empty, or shared-looking roots.
 
 Out of scope:
-- Root switch UX and reindex/adopt flow, covered by `PID-016`.
-- Workspace adoption, covered by `PID-024`.
+- Root switch UX and reindex/adopt flow, covered by `ENS-016`.
+- Workspace adoption, covered by `ENS-024`.
 
 Acceptance criteria:
 - Root and managed subdirectories are created when allowed.
@@ -290,12 +290,12 @@ Source:
 Implementation notes:
 - Workspace records should store absolute paths so future root changes remain explicit.
 
-## PID-008 Local Command Environment Service
+## ENS-008 Local Command Environment Service
 
 Milestone: 1. Foundation
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-001, PID-007
+Dependencies: ENS-001, ENS-007
 
 Summary:
 Add a main-process service for launching local commands with the expected shell-derived environment.
@@ -307,7 +307,7 @@ Scope:
 - Add cancellation and timeout support for non-PTY commands.
 
 Out of scope:
-- Interactive PTY support, covered by `PID-036`.
+- Interactive PTY support, covered by `ENS-036`.
 - GitHub, Pi, or script domain logic.
 
 Acceptance criteria:
@@ -328,15 +328,15 @@ Source:
 Implementation notes:
 - This service is the base for git, `gh`, Pi discovery, and setup diagnostics.
 
-## PID-009 Setup Gate Diagnostics UI and Model
+## ENS-009 Setup Gate Diagnostics UI and Model
 
 Milestone: 2. Setup Gate and Configuration
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-003, PID-007, PID-008
+Dependencies: ENS-003, ENS-007, ENS-008
 
 Summary:
-Build the Conductor-style setup gate model and UI for required Piductor readiness checks.
+Build the Conductor-style setup gate model and UI for required Ensemble readiness checks.
 
 Scope:
 - Define stable check IDs, statuses, remediation actions, log references, and retry behavior.
@@ -366,12 +366,12 @@ Source:
 Implementation notes:
 - Treat setup checks as reusable diagnostics after first launch.
 
-## PID-010 Git and gh Readiness Checks
+## ENS-010 Git and gh Readiness Checks
 
 Milestone: 2. Setup Gate and Configuration
 Type: Integration
 Priority: P0
-Dependencies: PID-008, PID-009
+Dependencies: ENS-008, ENS-009
 
 Summary:
 Implement setup checks for git and authenticated GitHub CLI.
@@ -404,18 +404,18 @@ Source:
 Implementation notes:
 - Prefer `gh` JSON output where available for future workflows.
 
-## PID-011 Pi Executable Discovery and Override
+## ENS-011 Pi Executable Discovery and Override
 
 Milestone: 2. Setup Gate and Configuration
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-005, PID-006, PID-008, PID-009
+Dependencies: ENS-005, ENS-006, ENS-008, ENS-009
 
 Summary:
 Discover the Pi-compatible executable and support explicit user overrides.
 
 Scope:
-- Resolve explicit executable path from app settings or `~/.config/piductor/config.json`.
+- Resolve explicit executable path from app settings or `~/.config/ensemble/config.json`.
 - Discover `pi` from shell environment and PATH.
 - Check common local binary locations when shell discovery fails.
 - Allow manual selection of executable or wrapper script.
@@ -443,12 +443,12 @@ Source:
 Implementation notes:
 - Keep executable discovery separate from RPC readiness so users can diagnose each layer.
 
-## PID-012 Pi RPC and Provider Readiness Smoke Checks
+## ENS-012 Pi RPC and Provider Readiness Smoke Checks
 
 Milestone: 2. Setup Gate and Configuration
 Type: Integration
 Priority: P0
-Dependencies: PID-008, PID-009, PID-011
+Dependencies: ENS-008, ENS-009, ENS-011
 
 Summary:
 Verify that the selected Pi-compatible executable can start in RPC mode and reach usable provider/model readiness.
@@ -482,15 +482,15 @@ Source:
 Implementation notes:
 - Reuse lower-level launch code later in `PiAgentClient`, but keep setup tests short and safe.
 
-## PID-013 Workspace Trust and Permission-Mode Baseline
+## ENS-013 Workspace Trust and Permission-Mode Baseline
 
 Milestone: 2. Setup Gate and Configuration
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-006, PID-009
+Dependencies: ENS-006, ENS-009
 
 Summary:
-Model Piductor's local execution trust posture and permission modes.
+Model Ensemble's local execution trust posture and permission modes.
 
 Scope:
 - Add permission modes: `workspace-trusted`, `approval-required`, and `read-only`.
@@ -499,7 +499,7 @@ Scope:
 - Persist app/repository mode settings with source diagnostics.
 
 Out of scope:
-- Full Pi permission brokering, covered by discovery in `PID-035`.
+- Full Pi permission brokering, covered by discovery in `ENS-035`.
 - Enterprise policy management beyond settings storage.
 
 Acceptance criteria:
@@ -520,12 +520,12 @@ Source:
 Implementation notes:
 - Do not weaken Pi environment compatibility by disabling tools by default.
 
-## PID-014 Environment Variable Catalog and Secret Metadata
+## ENS-014 Environment Variable Catalog and Secret Metadata
 
 Milestone: 2. Setup Gate and Configuration
 Type: Cross-cutting
 Priority: P1
-Dependencies: PID-004, PID-006, PID-013
+Dependencies: ENS-004, ENS-006, ENS-013
 
 Summary:
 Implement the global environment variable catalog and safe storage metadata for secret and non-secret variables.
@@ -537,8 +537,8 @@ Scope:
 - Expose set/unset/masked status to settings and process environment builders.
 
 Out of scope:
-- Full app settings UI, covered by `PID-062`.
-- Workspace env var injection, covered by `PID-039`.
+- Full app settings UI, covered by `ENS-062`.
+- Workspace env var injection, covered by `ENS-039`.
 
 Acceptance criteria:
 - Secret values are masked and never persisted as raw JSON/SQLite values by default.
@@ -555,20 +555,20 @@ Source:
 - `docs/product/screen-inventory.md`
 
 Implementation notes:
-- Do not duplicate Pi-owned provider secrets unless explicitly configured as Piductor-specific secrets.
+- Do not duplicate Pi-owned provider secrets unless explicitly configured as Ensemble-specific secrets.
 
-## PID-015 Repository Config Parser for piductor.json, conductor.json, and .worktreeinclude
+## ENS-015 Repository Config Parser for ensemble.json, conductor.json, and .worktreeinclude
 
 Milestone: 2. Setup Gate and Configuration
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-006, PID-008
+Dependencies: ENS-006, ENS-008
 
 Summary:
 Parse repository configuration files and `.worktreeinclude` with Conductor-compatible precedence and diagnostics.
 
 Scope:
-- Parse `piductor.json` and `conductor.json` from repository roots.
+- Parse `ensemble.json` and `conductor.json` from repository roots.
 - Support shared script fields: `scripts.setup`, `scripts.run`, `scripts.archive`, and `runScriptMode`.
 - Support `enterpriseDataPrivacy` and other compatible fields where accepted.
 - Parse `.worktreeinclude` gitignore-style patterns.
@@ -579,7 +579,7 @@ Out of scope:
 - Executing scripts or copying files.
 
 Acceptance criteria:
-- Personal settings can override `piductor.json`, then `conductor.json`, then defaults.
+- Personal settings can override `ensemble.json`, then `conductor.json`, then defaults.
 - `.worktreeinclude` wins over personal files-to-copy settings when present.
 - Unsupported fields do not crash parsing and are visible in diagnostics.
 - `CONDUCTOR_*` compatibility eligibility can be derived.
@@ -593,14 +593,14 @@ Source:
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
-- Keep Piductor-specific fields in `piductor.json`; do not overload `conductor.json` with Pi-only semantics.
+- Keep Ensemble-specific fields in `ensemble.json`; do not overload `conductor.json` with Pi-only semantics.
 
-## PID-016 Root Switch Reindex/Adopt Flow
+## ENS-016 Root Switch Reindex/Adopt Flow
 
 Milestone: 2. Setup Gate and Configuration
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-007, PID-009, PID-013
+Dependencies: ENS-007, ENS-009, ENS-013
 
 Summary:
 Implement root-directory change behavior that switches root and reindexes/adopts by default.
@@ -613,7 +613,7 @@ Scope:
 - Preserve old root contents unless user explicitly chooses a separate destructive action.
 
 Out of scope:
-- Full shared-root workspace adoption logic, covered by `PID-024`.
+- Full shared-root workspace adoption logic, covered by `ENS-024`.
 - Moving repositories/workspaces between roots.
 
 Acceptance criteria:
@@ -634,12 +634,12 @@ Source:
 Implementation notes:
 - Never read or write Conductor's private SQLite database.
 
-## PID-017 Project Add Menu and Recents
+## ENS-017 Project Add Menu and Recents
 
 Milestone: 3. Repository and Workspace Core
 Type: Frontend
 Priority: P0
-Dependencies: PID-020
+Dependencies: ENS-020
 
 Summary:
 Wire the current project add menu with local open, GitHub clone/open, quick start placeholder, and local recents.
@@ -659,7 +659,7 @@ Acceptance criteria:
 - Recents are local-only and avoid telemetry.
 - Disabled entries explain missing prerequisites.
 - Entry selections route to the relevant flow.
-- Linear issue workspace creation remains v1 scope through `PID-046` and `PID-048`, but is not a required current-shell add-menu item.
+- Linear issue workspace creation remains v1 scope through `ENS-046` and `ENS-048`, but is not a required current-shell add-menu item.
 
 Verification:
 - Component tests for menu states.
@@ -674,15 +674,15 @@ Source:
 Implementation notes:
 - Treat project and workspace actions as distinct in menu state.
 
-## PID-018 Local Repository Registration
+## ENS-018 Local Repository Registration
 
 Milestone: 3. Repository and Workspace Core
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-007, PID-015, PID-020
+Dependencies: ENS-007, ENS-015, ENS-020
 
 Summary:
-Register an existing local git repository as a Piductor project.
+Register an existing local git repository as an Ensemble project.
 
 Scope:
 - Validate selected local path is a git repository.
@@ -713,12 +713,12 @@ Source:
 Implementation notes:
 - The exact local-project open flow is a screenshot gap; keep the implementation conservative and documented.
 
-## PID-019 GitHub Clone Flow with Progress and Errors
+## ENS-019 GitHub Clone Flow with Progress and Errors
 
 Milestone: 3. Repository and Workspace Core
 Type: Integration
 Priority: P0
-Dependencies: PID-007, PID-008, PID-010, PID-015, PID-020
+Dependencies: ENS-007, ENS-008, ENS-010, ENS-015, ENS-020
 
 Summary:
 Implement the GitHub clone modal and progress lifecycle for adding managed repositories.
@@ -732,7 +732,7 @@ Scope:
 
 Out of scope:
 - Direct GitHub API/OAuth.
-- Full first workspace creation after clone, covered by `PID-021` and `PID-023`.
+- Full first workspace creation after clone, covered by `ENS-021` and `ENS-023`.
 
 Acceptance criteria:
 - Clone button is disabled until required input is valid.
@@ -752,12 +752,12 @@ Source:
 Implementation notes:
 - Error states were not captured in screenshots; make each failure actionable rather than visually exact.
 
-## PID-020 Sidebar Repository/Workspace Navigation
+## ENS-020 Sidebar Repository/Workspace Navigation
 
 Milestone: 3. Repository and Workspace Core
 Type: Frontend
 Priority: P0
-Dependencies: PID-002, PID-003
+Dependencies: ENS-002, ENS-003
 
 Summary:
 Wire the persistent app shell navigation to live repository and workspace records.
@@ -793,14 +793,14 @@ Source:
 - `docs/product/conductor-parity.md`
 
 Implementation notes:
-- Keep Piductor labels and identity distinct while preserving Conductor-like information architecture.
+- Keep Ensemble labels and identity distinct while preserving Conductor-like information architecture.
 
-## PID-021 Git Worktree Workspace Creation
+## ENS-021 Git Worktree Workspace Creation
 
 Milestone: 3. Repository and Workspace Core
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-007, PID-010, PID-015, PID-020
+Dependencies: ENS-007, ENS-010, ENS-015, ENS-020
 
 Summary:
 Create isolated git worktree workspaces under the managed root.
@@ -813,7 +813,7 @@ Scope:
 - Create `.context/` in each workspace.
 
 Out of scope:
-- Files-to-copy implementation, covered by `PID-022`.
+- Files-to-copy implementation, covered by `ENS-022`.
 - Pi session start, covered by runtime tickets.
 
 Acceptance criteria:
@@ -834,12 +834,12 @@ Source:
 Implementation notes:
 - Keep one workspace per shippable stream of work as the default model.
 
-## PID-022 Files-to-Copy Implementation
+## ENS-022 Files-to-Copy Implementation
 
 Milestone: 3. Repository and Workspace Core
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-015, PID-021
+Dependencies: ENS-015, ENS-021
 
 Summary:
 Copy eligible gitignored files into new workspaces using `.worktreeinclude`, repository settings, or defaults.
@@ -872,12 +872,12 @@ Source:
 Implementation notes:
 - Preserve Conductor-compatible behavior without relying on Conductor private state.
 
-## PID-023 Workspace Landing Summary and First Composer Surface
+## ENS-023 Workspace Landing Summary and First Composer Surface
 
 Milestone: 3. Repository and Workspace Core
 Type: Frontend
 Priority: P0
-Dependencies: PID-020, PID-021, PID-022
+Dependencies: ENS-020, ENS-021, ENS-022
 
 Summary:
 Wire live new-workspace landing data into the existing workbench shell.
@@ -913,12 +913,12 @@ Source:
 Implementation notes:
 - Do not copy Conductor placeholder naming style if it is distinctive.
 
-## PID-024 Shared-Root Workspace Adoption and Reconciliation
+## ENS-024 Shared-Root Workspace Adoption and Reconciliation
 
 Milestone: 3. Repository and Workspace Core
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-007, PID-015, PID-016, PID-021
+Dependencies: ENS-007, ENS-015, ENS-016, ENS-021
 
 Summary:
 Discover and adopt repositories/workspaces from a shared Conductor-style root using filesystem and git metadata only.
@@ -926,7 +926,7 @@ Discover and adopt repositories/workspaces from a shared Conductor-style root us
 Scope:
 - Scan `<root>/repos/<repo-slug>` and `<root>/workspaces/<repo-slug>/<workspace-slug>`.
 - Inspect git metadata, worktree relationship, branch, remote, default branch, and PR state where available.
-- Create missing Piductor SQLite records for valid discovered items.
+- Create missing Ensemble SQLite records for valid discovered items.
 - Mark adopted workspaces and explain origin in UI.
 - Detect possible active workspace collisions.
 
@@ -935,7 +935,7 @@ Out of scope:
 - Importing Claude/Codex sessions, Conductor local comments, or private terminal state.
 
 Acceptance criteria:
-- Valid Conductor-created worktrees can appear in Piductor.
+- Valid Conductor-created worktrees can appear in Ensemble.
 - Unknown files/directories are left untouched.
 - Adoption is idempotent and repairs stale SQLite records where safe.
 - The UI can distinguish created vs adopted workspaces.
@@ -952,26 +952,26 @@ Source:
 Implementation notes:
 - Do not require or interpret a `.conductor` folder for v1.
 
-## PID-025 Workspace Archive and Context Lifecycle
+## ENS-025 Workspace Archive and Context Lifecycle
 
 Milestone: 3. Repository and Workspace Core
 Type: Cross-cutting
 Priority: P1
-Dependencies: PID-013, PID-021
+Dependencies: ENS-013, ENS-021
 
 Summary:
 Implement safe workspace archive lifecycle, `.context` preservation, and archived-context records.
 
 Scope:
-- Record archive intent and prepare the lifecycle hook that `PID-038` uses to run archive scripts.
+- Record archive intent and prepare the lifecycle hook that `ENS-038` uses to run archive scripts.
 - Move or record archived workspace context under `<root>/archived-contexts/` according to product behavior.
 - Support explicit branch cleanup settings with confirmation.
 - Preserve `.context/` handoff files and archive metadata.
 - Distinguish archive, hide, remove from app, and delete files.
 
 Out of scope:
-- Archive script execution, covered by `PID-038`.
-- Archive-after-merge, covered by `PID-060`.
+- Archive script execution, covered by `ENS-038`.
+- Archive-after-merge, covered by `ENS-060`.
 - Destructive root cleanup or migration.
 
 Acceptance criteria:
@@ -992,12 +992,12 @@ Source:
 Implementation notes:
 - Archive is a lifecycle action, not a filesystem shortcut.
 
-## PID-026 PiAgentClient RPC Boundary
+## ENS-026 PiAgentClient RPC Boundary
 
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-011, PID-012, PID-021
+Dependencies: ENS-011, ENS-012, ENS-021
 
 Summary:
 Define the `PiAgentClient` interface for CLI RPC sessions and future runtime pivots.
@@ -1030,12 +1030,12 @@ Source:
 Implementation notes:
 - Keep terminal panes separate from Pi RPC.
 
-## PID-027 RPC Process Supervisor and JSONL Stream Handling
+## ENS-027 RPC Process Supervisor and JSONL Stream Handling
 
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-008, PID-026
+Dependencies: ENS-008, ENS-026
 
 Summary:
 Implement the CLI RPC process supervisor for Pi sessions.
@@ -1069,15 +1069,15 @@ Source:
 Implementation notes:
 - Keep stderr and protocol events distinct in storage and UI.
 
-## PID-028 Pi Session Metadata Mapping
+## ENS-028 Pi Session Metadata Mapping
 
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Database
 Priority: P0
-Dependencies: PID-003, PID-026, PID-027
+Dependencies: ENS-003, ENS-026, ENS-027
 
 Summary:
-Persist Piductor mappings between workspaces, Pi sessions, local tabs, turns, events, and runtime state.
+Persist Ensemble mappings between workspaces, Pi sessions, local tabs, turns, events, and runtime state.
 
 Scope:
 - Add/update tables for Pi sessions, session branches, events, turns, tab state, runtime state, and workspace links.
@@ -1090,7 +1090,7 @@ Out of scope:
 - Full retry/fork semantics, covered by discovery.
 
 Acceptance criteria:
-- Piductor can reopen known workspace sessions from local metadata.
+- Ensemble can reopen known workspace sessions from local metadata.
 - Adopted workspaces can exist without imported Pi sessions.
 - Event history is queryable by workspace and session.
 - Schema supports checkpoint mapping by turn.
@@ -1107,12 +1107,12 @@ Source:
 Implementation notes:
 - Conversation history and file checkpoints are related but separate concepts.
 
-## PID-029 Pi Composer Submit, Stop, and Model Controls
+## ENS-029 Pi Composer Submit, Stop, and Model Controls
 
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Frontend
 Priority: P0
-Dependencies: PID-023, PID-026, PID-027, PID-028
+Dependencies: ENS-023, ENS-026, ENS-027, ENS-028
 
 Summary:
 Connect the composer shell to Pi session creation, prompt submission, stop controls, and available model/thinking settings.
@@ -1147,12 +1147,12 @@ Source:
 Implementation notes:
 - Preserve Pi `cwd` resource behavior for project `.pi`, context files, and AGENTS/CLAUDE files.
 
-## PID-030 Structured Pi Timeline Rendering
+## ENS-030 Structured Pi Timeline Rendering
 
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Frontend
 Priority: P0
-Dependencies: PID-027, PID-028, PID-029
+Dependencies: ENS-027, ENS-028, ENS-029
 
 Summary:
 Render Pi RPC events as a structured workspace timeline.
@@ -1186,12 +1186,12 @@ Source:
 Implementation notes:
 - Do not treat Pi RPC as a terminal transcript; keep the event model structured.
 
-## PID-031 Runtime Error Retry and Session-Fork Discovery
+## ENS-031 Runtime Error Retry and Session-Fork Discovery
 
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Docs
 Priority: P0
-Dependencies: PID-026, PID-027, PID-035
+Dependencies: ENS-026, ENS-027, ENS-035
 
 Summary:
 Discover how Pi CLI/RPC supports retry, retry-in-new-chat, session tree navigation, continuation, fork behavior, and compaction UI.
@@ -1222,20 +1222,20 @@ Source:
 - `docs/product/ux-parity.md`
 
 Implementation notes:
-- Piductor-visible continuation can diverge from underlying Pi session history in v1 if clearly explained.
+- Ensemble-visible continuation can diverge from underlying Pi session history in v1 if clearly explained.
 
-## PID-032 Git-Backed Checkpoint Capture
+## ENS-032 Git-Backed Checkpoint Capture
 
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-021, PID-028
+Dependencies: ENS-021, ENS-028
 
 Summary:
 Capture private git checkpoints before each Pi user prompt executes.
 
 Scope:
-- Create private refs under `refs/piductor/checkpoints/<workspace-id>/<turn-id>`.
+- Create private refs under `refs/ensemble/checkpoints/<workspace-id>/<turn-id>`.
 - Associate checkpoint metadata with workspace, Pi session, turn, and git ref in SQLite.
 - Capture file state before prompt execution.
 - Handle dirty workspaces, untracked files policy, and checkpoint errors safely.
@@ -1252,7 +1252,7 @@ Acceptance criteria:
 
 Verification:
 - Fixture repo tests for clean, dirty, and untracked states.
-- Manual inspect `git show-ref refs/piductor/checkpoints/...` in a temporary workspace.
+- Manual inspect `git show-ref refs/ensemble/checkpoints/...` in a temporary workspace.
 
 Source:
 - `docs/adr/0012-use-git-backed-checkpoints-for-pi-turns.md`
@@ -1261,12 +1261,12 @@ Source:
 Implementation notes:
 - Avoid destructive git operations and do not touch unrelated refs.
 
-## PID-033 Checkpoint Restore and Turn Diff
+## ENS-033 Checkpoint Restore and Turn Diff
 
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-030, PID-032
+Dependencies: ENS-030, ENS-032
 
 Summary:
 Implement checkpoint turn diff and restore behavior for workspace file state.
@@ -1274,7 +1274,7 @@ Implement checkpoint turn diff and restore behavior for workspace file state.
 Scope:
 - Show diff between checkpoint ref and post-turn workspace state.
 - Restore workspace files to selected checkpoint state.
-- Hide or invalidate later Piductor-visible messages/events after restore.
+- Hide or invalidate later Ensemble-visible messages/events after restore.
 - Warn when same-workspace multi-session state may conflict.
 - Do not destructively edit Pi session files.
 
@@ -1284,7 +1284,7 @@ Out of scope:
 
 Acceptance criteria:
 - Users can inspect code changes by turn.
-- Restore affects workspace files and Piductor-visible continuation state only.
+- Restore affects workspace files and Ensemble-visible continuation state only.
 - Restore requires confirmation and explains Pi session-history implications.
 - Restore does not delete unrelated user changes outside selected scope.
 
@@ -1300,12 +1300,12 @@ Source:
 Implementation notes:
 - Same-workspace multi-session restore must be conservative.
 
-## PID-034 Chat Tab Limit and Session Tab Model
+## ENS-034 Chat Tab Limit and Session Tab Model
 
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Cross-cutting
 Priority: P1
-Dependencies: PID-028, PID-030
+Dependencies: ENS-028, ENS-030
 
 Summary:
 Model chat tabs, preview tabs, and the five-open-chat-tab limit per workspace.
@@ -1337,12 +1337,12 @@ Source:
 Implementation notes:
 - The active Pi session history can contain more sessions than the tab strip.
 
-## PID-035 Pi Capability Discovery for Modes, Context, Browser, and Permissions
+## ENS-035 Pi Capability Discovery for Modes, Context, Browser, and Permissions
 
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Docs
 Priority: P0
-Dependencies: PID-011, PID-012, PID-026
+Dependencies: ENS-011, ENS-012, ENS-026
 
 Summary:
 Discover current Pi CLI/RPC support for model listing, review model separation, plan mode, fast mode, browser control, context usage, compaction, and permission brokering.
@@ -1375,12 +1375,12 @@ Source:
 Implementation notes:
 - Do not pass disabling flags by default while probing.
 
-## PID-036 Main-Process PTY Service
+## ENS-036 Main-Process PTY Service
 
 Milestone: 5. Terminal, Scripts, and Processes
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-008, PID-021
+Dependencies: ENS-008, ENS-021
 
 Summary:
 Add the main-process PTY service used by terminal tabs and interactive script output.
@@ -1413,12 +1413,12 @@ Source:
 Implementation notes:
 - Main process owns PTY supervision; renderer only renders terminal data.
 
-## PID-037 xterm.js Terminal Adapter and Dock UI
+## ENS-037 xterm.js Terminal Adapter and Dock UI
 
 Milestone: 5. Terminal, Scripts, and Processes
 Type: Frontend
 Priority: P0
-Dependencies: PID-002, PID-036
+Dependencies: ENS-002, ENS-036
 
 Summary:
 Replace the setup/run/terminal dock placeholder with the xterm.js renderer adapter.
@@ -1454,12 +1454,12 @@ Source:
 Implementation notes:
 - Keep Pi RPC timeline separate from manual/raw terminal sessions.
 
-## PID-038 Setup, Run, and Archive Script Lifecycle
+## ENS-038 Setup, Run, and Archive Script Lifecycle
 
 Milestone: 5. Terminal, Scripts, and Processes
 Type: Integration
 Priority: P0
-Dependencies: PID-015, PID-021, PID-036, PID-037
+Dependencies: ENS-015, ENS-021, ENS-036, ENS-037
 
 Summary:
 Run repository setup, run, and archive scripts inside workspace context with visible output and controls.
@@ -1472,8 +1472,8 @@ Scope:
 - Store process metadata and logs as appropriate.
 
 Out of scope:
-- Run mode concurrency details, covered by `PID-040`.
-- Full archive lifecycle, covered by `PID-025`.
+- Run mode concurrency details, covered by `ENS-040`.
+- Full archive lifecycle, covered by `ENS-025`.
 
 Acceptance criteria:
 - Scripts run from workspace directory.
@@ -1493,24 +1493,24 @@ Source:
 Implementation notes:
 - Scripts must use resolved repository config and environment variables.
 
-## PID-039 Workspace Environment Variables and Port Allocation
+## ENS-039 Workspace Environment Variables and Port Allocation
 
 Milestone: 5. Terminal, Scripts, and Processes
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-006, PID-014, PID-021, PID-038
+Dependencies: ENS-006, ENS-014, ENS-021, ENS-038
 
 Summary:
 Inject native and Conductor-compatible workspace environment variables into scripts, terminals, and Pi sessions as appropriate.
 
 Scope:
-- Define `PIDUCTOR_WORKSPACE_NAME`, `PIDUCTOR_WORKSPACE_PATH`, `PIDUCTOR_ROOT_PATH`, `PIDUCTOR_DEFAULT_BRANCH`, `PIDUCTOR_PORT`, and related variables.
+- Define `ENSEMBLE_WORKSPACE_NAME`, `ENSEMBLE_WORKSPACE_PATH`, `ENSEMBLE_ROOT_PATH`, `ENSEMBLE_DEFAULT_BRANCH`, `ENSEMBLE_PORT`, and related variables.
 - Expose matching `CONDUCTOR_*` variables for Conductor-compatible repositories or explicit opt-in.
 - Allocate stable workspace port ranges.
 - Include configured environment variables and secrets safely.
 
 Out of scope:
-- Provider-specific Pi secrets not owned by Piductor.
+- Provider-specific Pi secrets not owned by Ensemble.
 - Preview URL detection.
 
 Acceptance criteria:
@@ -1531,12 +1531,12 @@ Source:
 Implementation notes:
 - Environment construction should be reusable by terminal, script, Pi, and GitHub workflows.
 
-## PID-040 Run Script Concurrency and Process Controls
+## ENS-040 Run Script Concurrency and Process Controls
 
 Milestone: 5. Terminal, Scripts, and Processes
 Type: Integration
 Priority: P1
-Dependencies: PID-038, PID-039
+Dependencies: ENS-038, ENS-039
 
 Summary:
 Implement `concurrent` and `nonconcurrent` run script modes and reliable run controls.
@@ -1568,19 +1568,19 @@ Source:
 Implementation notes:
 - Store enough process metadata to recover after app reload.
 
-## PID-041 Preview URL Detection Discovery
+## ENS-041 Preview URL Detection Discovery
 
 Milestone: 5. Terminal, Scripts, and Processes
 Type: Docs
 Priority: P1
-Dependencies: PID-038, PID-039
+Dependencies: ENS-038, ENS-039
 
 Summary:
 Discover safe preview URL detection from setup/run output and repository preview URL templates.
 
 Scope:
 - Evaluate log parsing patterns for localhost/server URLs.
-- Determine how preview templates should expand `PIDUCTOR_*` and compatibility variables.
+- Determine how preview templates should expand `ENSEMBLE_*` and compatibility variables.
 - Identify false positive and privacy risks.
 - Recommend build scope for automatic detection versus explicit template configuration.
 
@@ -1605,12 +1605,12 @@ Source:
 Implementation notes:
 - Explicit repository preview URL templates are safer than aggressive log scraping.
 
-## PID-042 Spotlight Testing Discovery
+## ENS-042 Spotlight Testing Discovery
 
 Milestone: 5. Terminal, Scripts, and Processes
 Type: Docs
 Priority: P1
-Dependencies: PID-021, PID-038
+Dependencies: ENS-021, ENS-038
 
 Summary:
 Discover how to implement spotlight testing without overwriting root changes or violating workspace isolation.
@@ -1642,12 +1642,12 @@ Source:
 Implementation notes:
 - Treat this as high-risk until conflict behavior is proven.
 
-## PID-043 Linear OAuth PKCE and Token Lifecycle
+## ENS-043 Linear OAuth PKCE and Token Lifecycle
 
 Milestone: 6. Linear Integration
 Type: Integration
 Priority: P0
-Dependencies: PID-004, PID-009
+Dependencies: ENS-004, ENS-009
 
 Summary:
 Implement Linear OAuth login, callback handling, token refresh, disconnect, and Keychain storage.
@@ -1682,12 +1682,12 @@ Source:
 Implementation notes:
 - If desktop PKCE constraints require a variation, document it before merging.
 
-## PID-044 Linear API Schema and Capability Discovery
+## ENS-044 Linear API Schema and Capability Discovery
 
 Milestone: 6. Linear Integration
 Type: Docs
 Priority: P0
-Dependencies: PID-043
+Dependencies: ENS-043
 
 Summary:
 Discover current Linear SDK/GraphQL schema coverage, permissions, pagination, filtering, and archive/delete support.
@@ -1718,12 +1718,12 @@ Source:
 Implementation notes:
 - Do not use the Linear connector for this planning task; app implementation will use Linear APIs/SDK.
 
-## PID-045 Linear Cache and Sync Service
+## ENS-045 Linear Cache and Sync Service
 
 Milestone: 6. Linear Integration
 Type: Database
 Priority: P0
-Dependencies: PID-003, PID-043, PID-044
+Dependencies: ENS-003, ENS-043, ENS-044
 
 Summary:
 Implement Linear API client, sync, and SQLite cache for issue and metadata responsiveness.
@@ -1755,12 +1755,12 @@ Source:
 Implementation notes:
 - Keep remote IDs, identifiers, URLs, team, and title available for workspace linking.
 
-## PID-046 Linear Issue Browse, Search, and Read UI
+## ENS-046 Linear Issue Browse, Search, and Read UI
 
 Milestone: 6. Linear Integration
 Type: Frontend
 Priority: P0
-Dependencies: PID-043, PID-045
+Dependencies: ENS-043, ENS-045
 
 Summary:
 Build the Linear issue browsing, searching, and read-detail UI.
@@ -1791,14 +1791,14 @@ Source:
 - `docs/product/onboarding-flow.md`
 
 Implementation notes:
-- Keep workspace creation action visible but disabled until `PID-048` lands.
+- Keep workspace creation action visible but disabled until `ENS-048` lands.
 
-## PID-047 Linear Issue Create, Update, and Comment UI
+## ENS-047 Linear Issue Create, Update, and Comment UI
 
 Milestone: 6. Linear Integration
 Type: Integration
 Priority: P1
-Dependencies: PID-045, PID-046
+Dependencies: ENS-045, ENS-046
 
 Summary:
 Implement first-class Linear issue create, update, and comment actions.
@@ -1830,15 +1830,15 @@ Source:
 Implementation notes:
 - Treat field-level support as capability-dependent and schema-driven.
 
-## PID-048 Workspace Creation from Linear Issue
+## ENS-048 Workspace Creation from Linear Issue
 
 Milestone: 6. Linear Integration
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-021, PID-023, PID-045, PID-046
+Dependencies: ENS-021, ENS-023, ENS-045, ENS-046
 
 Summary:
-Create a Piductor workspace from a selected Linear issue and seed workspace context from issue metadata.
+Create an Ensemble workspace from a selected Linear issue and seed workspace context from issue metadata.
 
 Scope:
 - Add create-workspace action on Linear issue detail/list.
@@ -1868,12 +1868,12 @@ Source:
 Implementation notes:
 - Use same worktree creation path as local/GitHub workspace creation.
 
-## PID-049 Linear Issue Status Linking and Remediation
+## ENS-049 Linear Issue Status Linking and Remediation
 
 Milestone: 6. Linear Integration
 Type: Integration
 Priority: P1
-Dependencies: PID-045, PID-047, PID-048
+Dependencies: ENS-045, ENS-047, ENS-048
 
 Summary:
 Expose linked Linear issue status on workspaces and support explicit status updates/remediation.
@@ -1907,12 +1907,12 @@ Source:
 Implementation notes:
 - Linear remains source of truth for issue state.
 
-## PID-050 Git File Status and All-Files Tree
+## ENS-050 Git File Status and All-Files Tree
 
 Milestone: 7. GitHub, Review, Checks, and Merge
 Type: Backend/main-process
 Priority: P0
-Dependencies: PID-021, PID-008
+Dependencies: ENS-021, ENS-008
 
 Summary:
 Implement workspace file status and all-files tree services.
@@ -1948,12 +1948,12 @@ Source:
 Implementation notes:
 - Git/worktree state is source of truth for files and diffs.
 
-## PID-051 Changes Tree and Unified Diff Viewer
+## ENS-051 Changes Tree and Unified Diff Viewer
 
 Milestone: 7. GitHub, Review, Checks, and Merge
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-050
+Dependencies: ENS-050
 
 Summary:
 Wire the existing Changes panel to grouped file status and unified diffs.
@@ -1967,7 +1967,7 @@ Scope:
 
 Out of scope:
 - Local line comments.
-- Turn diff from checkpoints, covered by `PID-033` and UI reuse.
+- Turn diff from checkpoints, covered by `ENS-033` and UI reuse.
 
 Acceptance criteria:
 - Changes tree reflects current git status.
@@ -1989,12 +1989,12 @@ Source:
 Implementation notes:
 - The screenshot set lacks full line-comment details, so keep diff viewer extensible.
 
-## PID-052 Local Diff Comments and Todos
+## ENS-052 Local Diff Comments and Todos
 
 Milestone: 7. GitHub, Review, Checks, and Merge
 Type: Database
 Priority: P1
-Dependencies: PID-003, PID-051
+Dependencies: ENS-003, ENS-051
 
 Summary:
 Implement local review comments and todos stored in SQLite.
@@ -2007,7 +2007,7 @@ Scope:
 
 Out of scope:
 - GitHub review-thread mutation.
-- Sending context to Pi, covered by `PID-053`.
+- Sending context to Pi, covered by `ENS-053`.
 
 Acceptance criteria:
 - Users can add local comments to diff lines.
@@ -2025,14 +2025,14 @@ Source:
 - `docs/adr/0008-use-sqlite-with-declarative-user-config.md`
 
 Implementation notes:
-- Prefer GitHub-visible state for cross-app continuity when available; local comments are Piductor-specific.
+- Prefer GitHub-visible state for cross-app continuity when available; local comments are Ensemble-specific.
 
-## PID-053 Send Review/Check Context to Pi
+## ENS-053 Send Review/Check Context to Pi
 
 Milestone: 7. GitHub, Review, Checks, and Merge
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-029, PID-051, PID-052, PID-057
+Dependencies: ENS-029, ENS-051, ENS-052, ENS-057
 
 Summary:
 Allow selected files, diffs, comments, todos, check failures, and review context to be added to Pi chat context.
@@ -2063,14 +2063,14 @@ Source:
 - `docs/product/screen-inventory.md`
 
 Implementation notes:
-- If Pi context usage is unavailable, use conservative size limits until `PID-035` clarifies capability.
+- If Pi context usage is unavailable, use conservative size limits until `ENS-035` clarifies capability.
 
-## PID-054 gh Commit, Push, and PR-Create Service
+## ENS-054 gh Commit, Push, and PR-Create Service
 
 Milestone: 7. GitHub, Review, Checks, and Merge
 Type: Integration
 Priority: P0
-Dependencies: PID-010, PID-021, PID-050
+Dependencies: ENS-010, ENS-021, ENS-050
 
 Summary:
 Implement service operations for committing, pushing, and creating pull requests through git and `gh`.
@@ -2084,7 +2084,7 @@ Scope:
 
 Out of scope:
 - Direct GitHub API/OAuth.
-- Full agent-assisted PR workflow UI, covered by `PID-059`.
+- Full agent-assisted PR workflow UI, covered by `ENS-059`.
 
 Acceptance criteria:
 - PR creation uses workspace branch and repository remote context.
@@ -2104,12 +2104,12 @@ Source:
 Implementation notes:
 - Keep a `GitHubService` boundary so direct API can be added later.
 
-## PID-055 gh PR/Check Metadata Service
+## ENS-055 gh PR/Check Metadata Service
 
 Milestone: 7. GitHub, Review, Checks, and Merge
 Type: Integration
 Priority: P0
-Dependencies: PID-010, PID-054
+Dependencies: ENS-010, ENS-054
 
 Summary:
 Fetch and cache PR metadata and check status through authenticated `gh`.
@@ -2121,8 +2121,8 @@ Scope:
 - Surface missing PR, uncommitted, pending, failing, passed, and permissions states.
 
 Out of scope:
-- Comment/review-thread detail discovery, covered by `PID-056`.
-- Merge action, covered by `PID-058`.
+- Comment/review-thread detail discovery, covered by `ENS-056`.
+- Merge action, covered by `ENS-058`.
 
 Acceptance criteria:
 - Service can detect no-PR and existing-PR states.
@@ -2142,12 +2142,12 @@ Source:
 Implementation notes:
 - Use direct API only as deferred follow-up if `gh` coverage is insufficient.
 
-## PID-056 GitHub Comments and Deployments Discovery
+## ENS-056 GitHub Comments and Deployments Discovery
 
 Milestone: 7. GitHub, Review, Checks, and Merge
 Type: Docs
 Priority: P0
-Dependencies: PID-055
+Dependencies: ENS-055
 
 Summary:
 Discover whether `gh` exposes enough detail for review comments, review threads, deployments, add-all-comments-to-chat, and failed-check remediation.
@@ -2179,12 +2179,12 @@ Source:
 Implementation notes:
 - Do not promote direct GitHub API into v1 unless product scope changes.
 
-## PID-057 Checks Panel States and Polling
+## ENS-057 Checks Panel States and Polling
 
 Milestone: 7. GitHub, Review, Checks, and Merge
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-052, PID-055, PID-056
+Dependencies: ENS-052, ENS-055, ENS-056
 
 Summary:
 Wire the existing Checks panel to GitHub PR metadata, checks, comments, todos, deployments, and blockers.
@@ -2217,14 +2217,14 @@ Source:
 - `docs/product/conductor-parity.md`
 
 Implementation notes:
-- Keep merge action disabled or hidden until `PID-058` lands.
+- Keep merge action disabled or hidden until `ENS-058` lands.
 
-## PID-058 Merge Readiness and Confirmation Flow
+## ENS-058 Merge Readiness and Confirmation Flow
 
 Milestone: 7. GitHub, Review, Checks, and Merge
 Type: Integration
 Priority: P0
-Dependencies: PID-013, PID-055, PID-057
+Dependencies: ENS-013, ENS-055, ENS-057
 
 Summary:
 Implement Conductor-style ready-to-merge action and explicit final merge confirmation through `gh pr merge`.
@@ -2258,12 +2258,12 @@ Source:
 Implementation notes:
 - Merge is externally visible and should be treated as irreversible/high-impact.
 
-## PID-059 Agent-Assisted Review, PR, and Fix Action Templates
+## ENS-059 Agent-Assisted Review, PR, and Fix Action Templates
 
 Milestone: 7. GitHub, Review, Checks, and Merge
 Type: Cross-cutting
 Priority: P1
-Dependencies: PID-029, PID-053, PID-054, PID-057, PID-063
+Dependencies: ENS-029, ENS-053, ENS-054, ENS-057, ENS-063
 
 Summary:
 Implement repository action preferences and agent-assisted workflows for review, create PR, fix errors, resolve conflicts, branch rename, and general Pi instructions.
@@ -2294,14 +2294,14 @@ Source:
 - `docs/product/conductor-parity.md`
 
 Implementation notes:
-- Store Pi-specific shared templates in `piductor.json` when shared config is appropriate.
+- Store Pi-specific shared templates in `ensemble.json` when shared config is appropriate.
 
-## PID-060 Archive-After-Merge and Branch Cleanup
+## ENS-060 Archive-After-Merge and Branch Cleanup
 
 Milestone: 7. GitHub, Review, Checks, and Merge
 Type: Cross-cutting
 Priority: P1
-Dependencies: PID-025, PID-058
+Dependencies: ENS-025, ENS-058
 
 Summary:
 Apply archive-after-merge and local branch cleanup settings after successful merge.
@@ -2333,12 +2333,12 @@ Source:
 Implementation notes:
 - Keep archive behavior consistent whether triggered manually or after merge.
 
-## PID-061 Settings Shell with App and Repository Sections
+## ENS-061 Settings Shell with App and Repository Sections
 
 Milestone: 8. Settings and Parity Polish
 Type: Frontend
 Priority: P0
-Dependencies: PID-002, PID-003, PID-020
+Dependencies: ENS-002, ENS-003, ENS-020
 
 Summary:
 Build the full-window settings shell with app-wide sections and local repository sections.
@@ -2351,7 +2351,7 @@ Scope:
 
 Out of scope:
 - Implementing every settings form field.
-- Piductor account/sign-in.
+- Ensemble account/sign-in.
 
 Acceptance criteria:
 - Settings shell can switch app and repository sections.
@@ -2373,12 +2373,12 @@ Source:
 Implementation notes:
 - Do not expose deferred account/cloud features as active v1 settings.
 
-## PID-062 App Settings Sections for General, Models, Providers, Integrations, and Security
+## ENS-062 App Settings Sections for General, Models, Providers, Integrations, and Security
 
 Milestone: 8. Settings and Parity Polish
 Type: Frontend
 Priority: P0
-Dependencies: PID-006, PID-009, PID-013, PID-014, PID-035, PID-043, PID-061
+Dependencies: ENS-006, ENS-009, ENS-013, ENS-014, ENS-035, ENS-043, ENS-061
 
 Summary:
 Implement app-wide settings forms for core behavior, Pi model/provider readiness, environment, GitHub CLI, Linear, privacy, and permission modes.
@@ -2391,7 +2391,7 @@ Scope:
 - Advanced settings for root and Pi executable paths.
 
 Out of scope:
-- Piductor account sign-in.
+- Ensemble account sign-in.
 - Direct GitHub token field for v1.
 - Voice, Graphite, cloud SSH, and production React profiler controls.
 
@@ -2408,18 +2408,18 @@ Verification:
 Source:
 - `docs/product/settings-inventory.md`
 - `docs/product/screen-inventory.md`
-- `docs/adr/0019-defer-piductor-account-for-v1.md`
+- `docs/adr/0019-defer-ensemble-account-for-v1.md`
 - `docs/adr/0024-use-linear-oauth-for-v1-issue-integration.md`
 
 Implementation notes:
 - Direct GitHub API/OAuth remains post-core; v1 uses authenticated `gh`.
 
-## PID-063 Repository Settings Source Diagnostics
+## ENS-063 Repository Settings Source Diagnostics
 
 Milestone: 8. Settings and Parity Polish
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-006, PID-015, PID-038, PID-059, PID-061
+Dependencies: ENS-006, ENS-015, ENS-038, ENS-059, ENS-061
 
 Summary:
 Implement repository settings forms and source diagnostics for paths, branch, remote, preview, files-to-copy, scripts, spotlight, action preferences, and removal.
@@ -2427,7 +2427,7 @@ Implement repository settings forms and source diagnostics for paths, branch, re
 Scope:
 - Repository identity/path, branch source, remote origin, branch naming, preview template, files-to-copy, scripts, run mode, create shared config file, spotlight flag, action preferences, hide/remove actions.
 - Show which source won per field.
-- Write personal overrides to SQLite and shared team config to `piductor.json` where explicitly requested.
+- Write personal overrides to SQLite and shared team config to `ensemble.json` where explicitly requested.
 - Preserve `conductor.json` compatibility and diagnostics.
 
 Out of scope:
@@ -2437,12 +2437,12 @@ Out of scope:
 Acceptance criteria:
 - Users can inspect and edit repository overrides.
 - Source precedence is visible and correct.
-- Creating shared config writes `piductor.json` first.
+- Creating shared config writes `ensemble.json` first.
 - Remove repository distinguishes app record removal from deleting files.
 
 Verification:
 - Component tests with source-diagnostics fixtures.
-- Integration tests for writing personal overrides and `piductor.json`.
+- Integration tests for writing personal overrides and `ensemble.json`.
 
 Source:
 - `docs/product/settings-inventory.md`
@@ -2452,12 +2452,12 @@ Source:
 Implementation notes:
 - Never move/delete repository or workspace directories from normal settings edits.
 
-## PID-064 Appearance Settings and Previews
+## ENS-064 Appearance Settings and Previews
 
 Milestone: 8. Settings and Parity Polish
 Type: Frontend
 Priority: P1
-Dependencies: PID-002, PID-037, PID-051, PID-061
+Dependencies: ENS-002, ENS-037, ENS-051, ENS-061
 
 Summary:
 Implement appearance settings for themes, accessibility, code/diff rendering, markdown, and terminal typography with live previews.
@@ -2474,7 +2474,7 @@ Out of scope:
 Acceptance criteria:
 - Preferences update previews immediately.
 - Settings persist and apply to relevant surfaces.
-- Defaults use Piductor visual identity and tokens.
+- Defaults use Ensemble visual identity and tokens.
 - Accessibility variants maintain readable contrast.
 
 Verification:
@@ -2489,15 +2489,15 @@ Source:
 Implementation notes:
 - Avoid generic stock shadcn dashboard aesthetics.
 
-## PID-065 Command Palette and Keyboard Shortcuts
+## ENS-065 Command Palette and Keyboard Shortcuts
 
 Milestone: 8. Settings and Parity Polish
 Type: Frontend
 Priority: P1
-Dependencies: PID-020, PID-023, PID-037, PID-057, PID-061
+Dependencies: ENS-020, ENS-023, ENS-037, ENS-057, ENS-061
 
 Summary:
-Implement global command palette and keyboard shortcuts for core Piductor workflows.
+Implement global command palette and keyboard shortcuts for core Ensemble workflows.
 
 Scope:
 - Command palette with project, workspace, chat, review, Git, terminal, settings, and navigation actions.
@@ -2528,20 +2528,20 @@ Source:
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
-- Use Piductor-specific labels while preserving workflow semantics.
+- Use Ensemble-specific labels while preserving workflow semantics.
 
-## PID-066 Deep Links and External-Open Actions
+## ENS-066 Deep Links and External-Open Actions
 
 Milestone: 8. Settings and Parity Polish
 Type: Cross-cutting
 Priority: P1
-Dependencies: PID-020, PID-021, PID-046, PID-057
+Dependencies: ENS-020, ENS-021, ENS-046, ENS-057
 
 Summary:
-Implement Piductor URL scheme/deep links and external-open actions for workspaces, repositories, files, PRs, Linear issues, and local folders.
+Implement Ensemble URL scheme/deep links and external-open actions for workspaces, repositories, files, PRs, Linear issues, and local folders.
 
 Scope:
-- Register and handle Piductor deep-link scheme in development/runtime where supported.
+- Register and handle Ensemble deep-link scheme in development/runtime where supported.
 - Open app to repository, workspace, Linear issue link, PR/checks state, or file selection.
 - External-open actions for GitHub PR, Linear issue, preview URL, workspace folder, repository folder, and the current open-workspace launcher targets.
 - Validate inputs and avoid unsafe path traversal.
@@ -2569,12 +2569,12 @@ Source:
 Implementation notes:
 - Production URL scheme registration may need packaging follow-up but local handler logic can be built now.
 
-## PID-067 Error, Empty, Loading, and Diagnostics Logs
+## ENS-067 Error, Empty, Loading, and Diagnostics Logs
 
 Milestone: 8. Settings and Parity Polish
 Type: Cross-cutting
 Priority: P0
-Dependencies: PID-009, PID-027, PID-038, PID-045, PID-055, PID-061
+Dependencies: ENS-009, ENS-027, ENS-038, ENS-045, ENS-055, ENS-061
 
 Summary:
 Add consistent error, empty, loading, retry, and diagnostics log patterns across core workflows.
@@ -2605,14 +2605,14 @@ Source:
 - `docs/product/docs-consistency-audit.md`
 
 Implementation notes:
-- Piductor can ask users to use Help/Feedback later, but logs should be locally useful first.
+- Ensemble can ask users to use Help/Feedback later, but logs should be locally useful first.
 
-## PID-068 Resource Usage, Sidebar, and Experimental Flag Discovery
+## ENS-068 Resource Usage, Sidebar, and Experimental Flag Discovery
 
 Milestone: 8. Settings and Parity Polish
 Type: Docs
 Priority: P1
-Dependencies: PID-036, PID-061
+Dependencies: ENS-036, ENS-061
 
 Summary:
 Decide and document which non-deferred experimental settings are v1 scope, especially dashboard/sidebar visibility and sidebar resource usage.
@@ -2646,20 +2646,20 @@ Source:
 Implementation notes:
 - This is a product/discovery issue; do not silently implement ambiguous flags.
 
-## PID-069 Product Decision for AI Certainty Phrase Setting
+## ENS-069 Product Decision for AI Certainty Phrase Setting
 
 Milestone: 8. Settings and Parity Polish
 Type: Docs
 Priority: P2
-Dependencies: PID-030, PID-062
+Dependencies: ENS-030, ENS-062
 
 Summary:
-Decide whether Piductor should support Conductor's remove/soften AI-certainty phrase setting.
+Decide whether Ensemble should support Conductor's remove/soften AI-certainty phrase setting.
 
 Scope:
 - Evaluate whether the setting makes sense for Pi output.
 - If supported, choose between Pi output post-processing, prompt preset, repository/user instruction, or another mechanism.
-- If omitted, document why it is not part of Piductor v1.
+- If omitted, document why it is not part of Ensemble v1.
 - Update settings inventory/open decisions after decision.
 
 Out of scope:
@@ -2682,7 +2682,7 @@ Source:
 Implementation notes:
 - Avoid hidden post-processing that changes agent output without user awareness.
 
-## PID-070 Post-Core Packaging, Signing, Notarization, and Auto-Update
+## ENS-070 Post-Core Packaging, Signing, Notarization, and Auto-Update
 
 Milestone: 9. Deferred / Post-Core
 Type: Cross-cutting
@@ -2715,18 +2715,18 @@ Source:
 Implementation notes:
 - This ticket exists to prevent accidental scope creep.
 
-## PID-071 Post-Core Direct GitHub API and OAuth
+## ENS-071 Post-Core Direct GitHub API and OAuth
 
 Milestone: 9. Deferred / Post-Core
 Type: Integration
 Priority: Post-core
-Dependencies: PID-056, core GitHub flow completion
+Dependencies: ENS-056, core GitHub flow completion
 
 Summary:
 Track direct GitHub API/OAuth as deferred follow-up after `gh`-based v1 workflows are proven.
 
 Scope:
-- Use `PID-056` discoveries to identify `gh` gaps.
+- Use `ENS-056` discoveries to identify `gh` gaps.
 - Define OAuth scopes, token storage, API rate-limit, and security requirements.
 - Plan direct REST/GraphQL implementation behind `GitHubService` boundary.
 
@@ -2748,12 +2748,12 @@ Source:
 Implementation notes:
 - If `gh` cannot support a critical v1 path, raise a product decision instead of silently expanding scope.
 
-## PID-072 Post-Core SDK Sidecar Fallback
+## ENS-072 Post-Core SDK Sidecar Fallback
 
 Milestone: 9. Deferred / Post-Core
 Type: Backend/main-process
 Priority: Post-core
-Dependencies: PID-035, core Pi runtime completion
+Dependencies: ENS-035, core Pi runtime completion
 
 Summary:
 Track SDK sidecar runtime fallback as deferred work if CLI RPC lacks needed capabilities.
@@ -2772,7 +2772,7 @@ Acceptance criteria:
 - Runtime boundaries remain sidecar-ready.
 
 Verification:
-- Architecture review after `PID-035`.
+- Architecture review after `ENS-035`.
 
 Source:
 - `docs/adr/0005-use-embedded-pi-sdk-for-v1.md`
@@ -2781,7 +2781,7 @@ Source:
 Implementation notes:
 - Sidecar must preserve Pi user environment compatibility if it becomes necessary.
 
-## PID-073 Post-Core Managed Pi Runtime Installer
+## ENS-073 Post-Core Managed Pi Runtime Installer
 
 Milestone: 9. Deferred / Post-Core
 Type: Integration
@@ -2815,7 +2815,7 @@ Source:
 Implementation notes:
 - Managed runtime adds update and compatibility burden; keep it post-core.
 
-## PID-074 Post-Core Voice, Graphite, Cloud SSH, and Production Profiler
+## ENS-074 Post-Core Voice, Graphite, Cloud SSH, and Production Profiler
 
 Milestone: 9. Deferred / Post-Core
 Type: Cross-cutting
@@ -2847,4 +2847,4 @@ Source:
 - `docs/product/open-decisions.md`
 
 Implementation notes:
-- The five-chat-tab limit is not deferred; it is handled by `PID-034`.
+- The five-chat-tab limit is not deferred; it is handled by `ENS-034`.
