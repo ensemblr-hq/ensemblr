@@ -14,6 +14,7 @@ import type {
 const NOW = '2026-06-05T00:00:00.000Z';
 const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
 	config: 'core',
+	'environment-variables': 'core',
 	'gh-auth': 'github',
 	'gh-cli': 'github',
 	'git-executable': 'github',

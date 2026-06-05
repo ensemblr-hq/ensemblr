@@ -4,6 +4,8 @@ import type { EnsembleApi } from '@/shared/ipc';
 
 export const ensembleQueryKeys = {
 	all: ['ensemble'] as const,
+	environmentVariables: () =>
+		[...ensembleQueryKeys.all, 'environment-variables'] as const,
 	health: () => [...ensembleQueryKeys.all, 'health'] as const,
 	setupDiagnostics: () =>
 		[...ensembleQueryKeys.all, 'setup-diagnostics'] as const,
@@ -22,6 +24,12 @@ function getEnsembleApi(): EnsembleApi {
 export const healthQuery = queryOptions({
 	queryFn: () => getEnsembleApi().health(),
 	queryKey: ensembleQueryKeys.health(),
+	staleTime: 5000,
+});
+
+export const environmentVariablesQuery = queryOptions({
+	queryFn: () => getEnsembleApi().environmentVariables(),
+	queryKey: ensembleQueryKeys.environmentVariables(),
 	staleTime: 5000,
 });
 

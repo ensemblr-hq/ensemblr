@@ -5,11 +5,13 @@ import started from 'electron-squirrel-startup';
 import { createLocalCommandService } from './commands/local-command';
 import { createEnsembleConfigService } from './config/config-loader';
 import { createEnsembleConfigResolutionService } from './config/config-resolution';
+import { createEnvironmentVariablesService } from './environment/environment-variables';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
 import { createPiExecutableService } from './pi/pi-executable';
 import { createPiReadinessService } from './pi/pi-readiness';
 import { createEnsembleRootDirectoryService } from './root/root-directory';
+import { createMacosKeychainSecretStore } from './secrets/secret-store';
 import { createSetupDiagnosticsService } from './setup/setup-diagnostics';
 import { createEnsembleDatabaseService } from './storage/database';
 
@@ -62,6 +64,14 @@ app.setName('Ensemble');
 const configService = createEnsembleConfigService();
 const databaseService = createEnsembleDatabaseService();
 const localCommandService = createLocalCommandService();
+const environmentVariablesService = createEnvironmentVariablesService({
+	configService,
+	databaseService,
+	secretStoreFactory: (database) =>
+		process.platform === 'darwin'
+			? createMacosKeychainSecretStore({ database })
+			: null,
+});
 const settingsResolutionService = createEnsembleConfigResolutionService({
 	configService,
 	databaseService,
@@ -83,6 +93,7 @@ const piReadinessService = createPiReadinessService({
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
 	databaseService,
+	environmentVariablesService,
 	localCommandService,
 	piExecutableService,
 	piReadinessService,
@@ -97,6 +108,7 @@ app.whenReady().then(() => {
 	registerIpcHandlers({
 		configService,
 		databaseService,
+		environmentVariablesService,
 		piExecutableService,
 		rootDirectoryService,
 		setupDiagnosticsService,
