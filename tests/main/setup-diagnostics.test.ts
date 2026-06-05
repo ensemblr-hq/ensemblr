@@ -10,6 +10,10 @@ import type {
 	PiExecutableService,
 	PiExecutableSnapshot,
 } from '../../src/main/pi/pi-executable.ts';
+import type {
+	PiReadinessService,
+	PiReadinessSnapshot,
+} from '../../src/main/pi/pi-readiness.ts';
 import type { EnsembleRootDirectoryService } from '../../src/main/root/root-directory.ts';
 import {
 	createSetupCheckSnapshot,
@@ -31,11 +35,6 @@ import type {
 
 const NOW = new Date('2026-06-05T00:00:00.000Z');
 const HOME = '/Users/alice';
-const DEFERRED_REQUIRED_CHECKS: readonly SetupCheckId[] = [
-	'pi-agent-directory',
-	'pi-rpc',
-	'pi-provider-model',
-];
 const CHECK_ORDER: readonly SetupCheckId[] = [
 	'config',
 	'sqlite-database',
@@ -327,6 +326,73 @@ function createPiExecutableService(
 	};
 }
 
+function createPiReadinessService(
+	snapshot: Partial<PiReadinessSnapshot> = {},
+): PiReadinessService {
+	const executable = snapshot.executable ?? {
+		command: `${HOME}/bin/pi`,
+		diagnostics: [],
+		displayPath: '~/bin/pi',
+		path: `${HOME}/bin/pi`,
+		probe: {
+			args: ['--version'],
+			detail: 'pi version 1.2.3',
+			kind: 'version',
+			status: 'success',
+		},
+		setting: null,
+		source: 'path',
+		status: 'ok',
+		updatedAt: NOW.toISOString(),
+	};
+	const readinessSnapshot: PiReadinessSnapshot = {
+		agentDirectory: {
+			diagnostics: [],
+			path: `${HOME}/.pi/agent`,
+			source: 'default',
+			status: 'success',
+		},
+		executable,
+		generatedAt: NOW.toISOString(),
+		providerModels: {
+			command: executable.command,
+			modelCount: 2,
+			providerCount: 1,
+			result: createLocalCommandResult(executable.command, ['--list-models'], {
+				stdout:
+					'provider      model       context\nopenai-codex  gpt-5.5     272K\nopenai-codex  gpt-5.4     272K\n',
+			}),
+			status: 'success',
+		},
+		rpc: {
+			args: ['--mode', 'rpc'],
+			command: executable.command,
+			cwd: `${HOME}/Ensemble/workspaces/.setup-smoke`,
+			durationMs: 2,
+			endedAt: NOW.toISOString(),
+			firstFrame: {
+				type: 'extension_ui_request',
+			},
+			logs: {
+				command: `${executable.command} --mode rpc`,
+				cwd: `${HOME}/Ensemble/workspaces/.setup-smoke`,
+				stderr: '',
+				stdout: '{"type":"extension_ui_request"}\n',
+			},
+			signal: 'SIGTERM',
+			startedAt: NOW.toISOString(),
+			status: 'success',
+			stderrTruncated: false,
+			stdoutTruncated: false,
+		},
+		...snapshot,
+	};
+
+	return {
+		getSnapshot: async () => readinessSnapshot,
+	};
+}
+
 function formatCommandKey(command: string, args: string[]): string {
 	return [command, ...args].join(' ');
 }
@@ -353,9 +419,6 @@ function createFutureProviders(
 	overrides: Partial<Record<SetupCheckId, SetupCheckProvider>> = {},
 ): Partial<Record<SetupCheckId, SetupCheckProvider>> {
 	return {
-		...Object.fromEntries(
-			DEFERRED_REQUIRED_CHECKS.map((id) => [id, createProvider(id)]),
-		),
 		'linear-oauth': createProvider('linear-oauth', 'warning', false),
 		...overrides,
 	};
@@ -368,6 +431,7 @@ async function getSnapshot(
 		databaseService?: EnsembleDatabaseService;
 		localCommandService?: LocalCommandService;
 		piExecutableService?: PiExecutableService;
+		piReadinessService?: PiReadinessService;
 		rootDirectoryService?: EnsembleRootDirectoryService;
 	} = {},
 ) {
@@ -381,6 +445,8 @@ async function getSnapshot(
 		now: () => NOW,
 		piExecutableService:
 			options.piExecutableService ?? createPiExecutableService(),
+		piReadinessService:
+			options.piReadinessService ?? createPiReadinessService(),
 		rootDirectoryService:
 			options.rootDirectoryService ?? createRootDirectoryService(),
 	});
@@ -407,6 +473,9 @@ test('reports ready when required checks pass and Linear is optional', async () 
 	const ghCliCheck = getCheck(snapshot, 'gh-cli');
 	const ghAuthCheck = getCheck(snapshot, 'gh-auth');
 	const piCheck = getCheck(snapshot, 'pi-executable');
+	const piAgentDirectoryCheck = getCheck(snapshot, 'pi-agent-directory');
+	const piRpcCheck = getCheck(snapshot, 'pi-rpc');
+	const piProviderModelCheck = getCheck(snapshot, 'pi-provider-model');
 
 	assert.equal(snapshot.status, 'ready');
 	assert.equal(snapshot.blockedCount, 0);
@@ -423,6 +492,12 @@ test('reports ready when required checks pass and Linear is optional', async () 
 	);
 	assert.equal(piCheck.status, 'success');
 	assert.match(piCheck.detail, /pi version 1\.2\.3/);
+	assert.equal(piAgentDirectoryCheck.status, 'success');
+	assert.match(piAgentDirectoryCheck.detail, /~\/\.pi\/agent/);
+	assert.equal(piRpcCheck.status, 'success');
+	assert.match(piRpcCheck.detail, /valid extension_ui_request frame/);
+	assert.equal(piProviderModelCheck.status, 'success');
+	assert.match(piProviderModelCheck.detail, /2 models across 1 providers/);
 	assert.equal(
 		snapshot.checks.find((check) => check.id === 'linear-oauth')?.blocking,
 		false,
@@ -692,6 +767,35 @@ test('redacts sensitive log assignments and collapses home paths', async () => {
 		),
 		true,
 	);
+});
+
+test('redacts sensitive Pi provider/model diagnostics', async () => {
+	const snapshot = await getSnapshot({
+		piReadinessService: createPiReadinessService({
+			providerModels: {
+				command: `${HOME}/bin/pi`,
+				failure: {
+					code: 'no-models',
+					message:
+						'Pi listed zero usable provider models. OPENAI_API_KEY=provider-secret',
+				},
+				modelCount: 0,
+				providerCount: 0,
+				result: createLocalCommandResult(`${HOME}/bin/pi`, ['--list-models'], {
+					stdout: 'provider      model\nOPENAI_API_KEY=provider-secret\n',
+				}),
+				status: 'failure',
+			},
+		}),
+	});
+	const providerCheck = getCheck(snapshot, 'pi-provider-model');
+	const diagnosticText = [
+		providerCheck.detail,
+		...providerCheck.logs.map((log) => log.text),
+	].join('\n');
+
+	assert.equal(diagnosticText.includes('provider-secret'), false);
+	assert.equal(diagnosticText.includes('OPENAI_API_KEY=[REDACTED]'), true);
 });
 
 test('keeps a stable setup check ordering', async () => {
