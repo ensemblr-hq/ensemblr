@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-Date: 2026-06-04
+Date: 2026-06-05
 
 This roadmap converts the accepted ADRs and product parity docs into a Linear-ready implementation plan. It is an implementation roadmap, not a product-decision source. Accepted ADRs remain the source of truth when there is a conflict.
 
@@ -48,11 +48,11 @@ Explicitly deferred until post-core:
 | 1. Foundation | App shell, storage, config, root, Keychain, process boundary. | The app can boot into the implemented Conductor-style shell contract, persist metadata, load config, resolve settings, create managed directories, and run local commands through main-process services. |
 | 2. Setup Gate and Configuration | First-run diagnostics, `gh` requirement, Pi executable discovery, root warnings, env/secrets, repo config parsing. | Users cannot enter core workflows until required checks pass; each failure has remediation; Linear is offered but only blocks Linear workflows. |
 | 3. Repository and Workspace Core | Add/open/clone repositories, worktree workspace creation, files-to-copy, landing state, adoption, archive context. | A user can register or clone a project, create/adopt a workspace, see it in the sidebar, and land in a ready workspace shell. |
-| 4. Pi CLI RPC Runtime and Agent Timeline | RPC client, process supervision, Pi sessions, composer, timeline, checkpoints, capability discovery. | A user can start a Pi session in a workspace and see structured events, errors, controls, and checkpoint-backed turn state. |
+| 4. Pi CLI RPC Runtime and Agent Timeline | RPC client, process supervision, Pi sessions, composer, timeline, checkpoints, capability discovery. | A user can start a Pi session in a workspace and see structured events, errors, controls, and checkpoint-backed turn state; an interactive chat-pane UX/UI session has recorded the accepted agent chat experience. |
 | 5. Terminal, Scripts, and Processes | PTY, xterm.js, setup/run/archive scripts, env vars, ports, run modes, preview and spotlight discovery. | Setup/run/archive commands execute inside workspaces with visible output, controls, env vars, and terminal tabs. |
 | 6. Linear Integration | OAuth, token lifecycle, schema discovery, sync/cache, issue UI, workspace-from-issue. | A user can sign in to Linear, browse issues, edit/comment, and create a workspace seeded from an issue. |
 | 7. GitHub, Review, Checks, and Merge | File/diff review, comments/todos, context-to-Pi, PR create, checks, comments discovery, merge confirmation. | A user can review changes, create a PR through `gh`, track checks/comments, send context to Pi, and merge only through confirmation. |
-| 8. Settings and Parity Polish | Settings shell, app/repo settings, source diagnostics, appearance, shortcuts, deep links, diagnostics, remaining decisions. | The app exposes parity settings and non-deferred polish needed to operate and troubleshoot the completed core workflows. |
+| 8. Settings and Parity Polish | Settings shell, app/repo settings, source diagnostics, appearance, shortcuts, deep links, diagnostics, remaining decisions. | The app exposes parity settings and non-deferred polish needed to operate and troubleshoot the completed core workflows; an interactive settings-screen UX/UI session has recorded the accepted app settings experience. |
 | 9. Deferred / Post-Core | Document deferred implementation tracks. | Deferred items are tracked without blocking core completion. |
 
 ## Workstream Rules
@@ -97,6 +97,13 @@ Discovery tickets are intentionally separate from build tickets:
 - Current shell uncertainty to resolve before implementing related behavior: workspace-row status actions, mark-unread semantics, Dashboard visibility, and the Changes tab Review action. See `docs/product/current-shell-inventory.md`.
 
 Discovery outputs should be short design notes committed with the ticket, or appended to the source product docs if they change planning guidance.
+
+## Product Working Sessions
+
+These tickets require an interactive session with the user before downstream build tickets lock in UI details:
+
+- `ENS-075` - Agent chat pane UX/UI working session, after basic Pi composer/timeline integration and capability discovery.
+- `ENS-076` - App settings screen UX/UI working session, before the full settings shell and forms are built.
 
 ## Decision Needed
 

@@ -1,6 +1,6 @@
 # Dependency Map
 
-Date: 2026-06-04
+Date: 2026-06-05
 
 This map is generated from the local planning IDs in `docs/product/linear-issues.md`. Replace `ENS-*` IDs with Linear issue keys after import.
 
@@ -10,11 +10,11 @@ This map is generated from the local planning IDs in `docs/product/linear-issues
 - Foundation UI creates fixture-backed sidebar, workspace header, chat tab, review panel, PR-state header, and dock regions. Later workspace, Pi, terminal, Linear, GitHub, and review tickets wire live TanStack Query/IPC data into those regions instead of rebuilding them.
 - Setup/config (`ENS-009` through `ENS-016`) unblocks ready-state gating, Pi executable/RPC checks, `gh`, env/secrets, repository config, and safe root changes.
 - Workspace core (`ENS-017` through `ENS-025`) replaces fixture shell data with live repository/workspace records and unblocks Pi sessions, terminal/scripts, Linear workspace creation, and GitHub review flows while preserving current navigation, pinning, context-menu, header, and open-target affordances.
-- Pi runtime (`ENS-026` through `ENS-035`) unblocks agent timeline, checkpoints, context-to-Pi, and agent-assisted review/PR work.
+- Pi runtime (`ENS-026` through `ENS-035`, plus `ENS-075`) unblocks agent timeline, checkpoints, context-to-Pi, and agent-assisted review/PR work.
 - Terminal/scripts (`ENS-036` through `ENS-042`) replaces the existing dock log placeholders in place with setup/run/archive execution, env injection, and process UI.
 - Linear (`ENS-043` through `ENS-049`) depends on Keychain/SQLite/setup surfaces and workspace core for workspace-from-issue.
 - GitHub/review (`ENS-050` through `ENS-060`) wires the existing All files/Changes/Checks regions and right PR header, and depends on workspace core, `gh`, git status, Pi composer, and checks metadata.
-- Settings/polish (`ENS-061` through `ENS-069`) depends on underlying services so settings show real state and source diagnostics.
+- Settings/polish (`ENS-061` through `ENS-069`, plus `ENS-076`) depends on underlying services so settings show real state and source diagnostics.
 - Deferred issues (`ENS-070` through `ENS-074`) should not block core milestones.
 
 ## Mermaid Graph
@@ -58,6 +58,7 @@ flowchart TD
     P028["ENS-028 Pi Session Metadata Mapping"]
     P029["ENS-029 Pi Composer Submit, Stop, and Model Controls"]
     P030["ENS-030 Structured Pi Timeline Rendering"]
+    P075["ENS-075 Agent Chat Pane UX/UI Working Session"]
     P031["ENS-031 Runtime Error Retry and Session-Fork Discovery"]
     P032["ENS-032 Git-Backed Checkpoint Capture"]
     P033["ENS-033 Checkpoint Restore and Turn Diff"]
@@ -96,6 +97,7 @@ flowchart TD
     P060["ENS-060 Archive-After-Merge and Branch Cleanup"]
   end
   subgraph S8__Settings_and_Parity_Polish["8. Settings and Parity Polish"]
+    P076["ENS-076 App Settings Screen UX/UI Working Session"]
     P061["ENS-061 Settings Shell with App and Repository Sections"]
     P062["ENS-062 App Settings Sections for General, Models, Providers, Integrations, and Security"]
     P063["ENS-063 Repository Settings Source Diagnostics"]
@@ -187,15 +189,19 @@ flowchart TD
   P027 --> P030
   P028 --> P030
   P029 --> P030
+  P030 --> P075
+  P035 --> P075
   P026 --> P031
   P027 --> P031
   P035 --> P031
+  P075 --> P031
   P021 --> P032
   P028 --> P032
   P030 --> P033
   P032 --> P033
   P028 --> P034
   P030 --> P034
+  P075 --> P034
   P011 --> P035
   P012 --> P035
   P026 --> P035
@@ -262,9 +268,10 @@ flowchart TD
   P063 --> P059
   P025 --> P060
   P058 --> P060
-  P002 --> P061
+  P002 --> P076
+  P020 --> P076
   P003 --> P061
-  P020 --> P061
+  P076 --> P061
   P006 --> P062
   P009 --> P062
   P013 --> P062
@@ -336,10 +343,11 @@ flowchart TD
 - ENS-028 Pi Session Metadata Mapping: ENS-003, ENS-026, ENS-027
 - ENS-029 Pi Composer Submit, Stop, and Model Controls: ENS-023, ENS-026, ENS-027, ENS-028
 - ENS-030 Structured Pi Timeline Rendering: ENS-027, ENS-028, ENS-029
-- ENS-031 Runtime Error Retry and Session-Fork Discovery: ENS-026, ENS-027, ENS-035
+- ENS-075 Agent Chat Pane UX/UI Working Session: ENS-030, ENS-035
+- ENS-031 Runtime Error Retry and Session-Fork Discovery: ENS-026, ENS-027, ENS-035, ENS-075
 - ENS-032 Git-Backed Checkpoint Capture: ENS-021, ENS-028
 - ENS-033 Checkpoint Restore and Turn Diff: ENS-030, ENS-032
-- ENS-034 Chat Tab Limit and Session Tab Model: ENS-028, ENS-030
+- ENS-034 Chat Tab Limit and Session Tab Model: ENS-028, ENS-030, ENS-075
 - ENS-035 Pi Capability Discovery for Modes, Context, Browser, and Permissions: ENS-011, ENS-012, ENS-026
 - ENS-036 Main-Process PTY Service: ENS-008, ENS-021
 - ENS-037 xterm.js Terminal Adapter and Dock UI: ENS-002, ENS-036
@@ -366,7 +374,8 @@ flowchart TD
 - ENS-058 Merge Readiness and Confirmation Flow: ENS-013, ENS-055, ENS-057
 - ENS-059 Agent-Assisted Review, PR, and Fix Action Templates: ENS-029, ENS-053, ENS-054, ENS-057, ENS-063
 - ENS-060 Archive-After-Merge and Branch Cleanup: ENS-025, ENS-058
-- ENS-061 Settings Shell with App and Repository Sections: ENS-002, ENS-003, ENS-020
+- ENS-076 App Settings Screen UX/UI Working Session: ENS-002, ENS-020
+- ENS-061 Settings Shell with App and Repository Sections: ENS-003, ENS-076
 - ENS-062 App Settings Sections for General, Models, Providers, Integrations, and Security: ENS-006, ENS-009, ENS-013, ENS-014, ENS-035, ENS-043, ENS-061
 - ENS-063 Repository Settings Source Diagnostics: ENS-006, ENS-015, ENS-038, ENS-059, ENS-061
 - ENS-064 Appearance Settings and Previews: ENS-002, ENS-037, ENS-051, ENS-061
@@ -384,6 +393,7 @@ flowchart TD
 ## Discovery and Decision Nodes
 
 - Discovery: `ENS-031`, `ENS-035`, `ENS-041`, `ENS-042`, `ENS-044`, `ENS-056`, `ENS-068`.
+- Product working sessions: `ENS-075`, `ENS-076`.
 - Product decision: `ENS-069`.
 - Post-core deferred: `ENS-070`, `ENS-071`, `ENS-072`, `ENS-073`, `ENS-074`.
 
@@ -391,6 +401,7 @@ flowchart TD
 
 - Import Foundation first, then Setup Gate and Configuration, then Repository and Workspace Core.
 - After import, replace local dependency IDs with actual Linear issue keys.
+- `ENS-075` and `ENS-076` use appended local IDs but should be imported in their logical milestone order.
 - Keep discovery tickets separate from build tickets so ambiguous API/schema behavior does not block unrelated implementation.
 - Do not create actual Linear issues until explicitly asked.
 - Current shell uncertainties that should not be guessed in implementation tickets: workspace-row status target, mark-unread semantics, visible Dashboard entry, and the Changes tab Review action.

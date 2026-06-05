@@ -6,6 +6,10 @@ import type {
 	LocalCommandService,
 } from '../../src/main/commands/local-command.ts';
 import type { EnsembleConfigService } from '../../src/main/config/config-loader.ts';
+import type {
+	PiExecutableService,
+	PiExecutableSnapshot,
+} from '../../src/main/pi/pi-executable.ts';
 import type { EnsembleRootDirectoryService } from '../../src/main/root/root-directory.ts';
 import {
 	createSetupCheckSnapshot,
@@ -28,7 +32,6 @@ import type {
 const NOW = new Date('2026-06-05T00:00:00.000Z');
 const HOME = '/Users/alice';
 const DEFERRED_REQUIRED_CHECKS: readonly SetupCheckId[] = [
-	'pi-executable',
 	'pi-agent-directory',
 	'pi-rpc',
 	'pi-provider-model',
@@ -294,6 +297,36 @@ function createLocalCommandResult(
 	};
 }
 
+function createPiExecutableService(
+	snapshot: Partial<PiExecutableSnapshot> = {},
+): PiExecutableService {
+	const piSnapshot: PiExecutableSnapshot = {
+		command: `${HOME}/bin/pi`,
+		diagnostics: [],
+		displayPath: '~/bin/pi',
+		path: `${HOME}/bin/pi`,
+		probe: {
+			args: ['--version'],
+			detail: 'pi version 1.2.3',
+			kind: 'version',
+			status: 'success',
+		},
+		setting: null,
+		source: 'path',
+		status: 'ok',
+		updatedAt: NOW.toISOString(),
+		...snapshot,
+	};
+
+	return {
+		getSnapshot: async () => piSnapshot,
+		saveOverride: (selectedPath) => ({
+			canceled: false,
+			selectedPath,
+		}),
+	};
+}
+
 function formatCommandKey(command: string, args: string[]): string {
 	return [command, ...args].join(' ');
 }
@@ -334,6 +367,7 @@ async function getSnapshot(
 		configService?: EnsembleConfigService;
 		databaseService?: EnsembleDatabaseService;
 		localCommandService?: LocalCommandService;
+		piExecutableService?: PiExecutableService;
 		rootDirectoryService?: EnsembleRootDirectoryService;
 	} = {},
 ) {
@@ -345,6 +379,8 @@ async function getSnapshot(
 		localCommandService:
 			options.localCommandService ?? createLocalCommandService(),
 		now: () => NOW,
+		piExecutableService:
+			options.piExecutableService ?? createPiExecutableService(),
 		rootDirectoryService:
 			options.rootDirectoryService ?? createRootDirectoryService(),
 	});
@@ -370,6 +406,7 @@ test('reports ready when required checks pass and Linear is optional', async () 
 	const gitCheck = getCheck(snapshot, 'git-executable');
 	const ghCliCheck = getCheck(snapshot, 'gh-cli');
 	const ghAuthCheck = getCheck(snapshot, 'gh-auth');
+	const piCheck = getCheck(snapshot, 'pi-executable');
 
 	assert.equal(snapshot.status, 'ready');
 	assert.equal(snapshot.blockedCount, 0);
@@ -384,24 +421,95 @@ test('reports ready when required checks pass and Linear is optional', async () 
 		ghAuthCheck.detail,
 		'GitHub CLI is authenticated for github.com.',
 	);
+	assert.equal(piCheck.status, 'success');
+	assert.match(piCheck.detail, /pi version 1\.2\.3/);
 	assert.equal(
 		snapshot.checks.find((check) => check.id === 'linear-oauth')?.blocking,
 		false,
 	);
 });
 
-test('blocks readiness when a required provider check fails', async () => {
+test('blocks readiness when Pi executable discovery fails', async () => {
 	const snapshot = await getSnapshot({
-		checkProviders: {
-			'pi-executable': createProvider('pi-executable', 'failure'),
-		},
+		piExecutableService: createPiExecutableService({
+			command: '',
+			diagnostics: [
+				{
+					code: 'pi-executable-missing',
+					message: 'Configured Pi executable does not exist.',
+					severity: 'error',
+				},
+			],
+			displayPath: '',
+			path: '',
+			probe: null,
+			source: 'config-default',
+			status: 'error',
+		}),
 	});
+	const piCheck = getCheck(snapshot, 'pi-executable');
 
 	assert.equal(snapshot.status, 'blocked');
 	assert.equal(snapshot.blockedCount, 1);
+	assert.equal(piCheck.status, 'failure');
+	assert.match(piCheck.detail, /Configured Pi executable does not exist/);
 	assert.equal(
-		snapshot.checks.find((check) => check.id === 'pi-executable')?.status,
-		'failure',
+		piCheck.remediationActions.some(
+			(action) =>
+				action.kind === 'select-path' && action.target === 'pi.executablePath',
+		),
+		true,
+	);
+});
+
+test('does not offer Pi executable picker for locked managed config', async () => {
+	const snapshot = await getSnapshot({
+		piExecutableService: createPiExecutableService({
+			command: '',
+			diagnostics: [
+				{
+					code: 'pi-executable-missing',
+					message: 'Managed Pi executable does not exist.',
+					severity: 'error',
+					source: 'managed-config',
+				},
+			],
+			displayPath: '',
+			path: '',
+			probe: null,
+			setting: {
+				candidates: [
+					{
+						reason: 'Selected by precedence.',
+						source: 'managed-config',
+						status: 'selected',
+					},
+				],
+				key: 'pi.executablePath',
+				locked: true,
+				source: 'managed-config',
+				value: '/opt/managed/pi',
+			},
+			source: 'managed-config',
+			status: 'error',
+		}),
+	});
+	const piCheck = getCheck(snapshot, 'pi-executable');
+
+	assert.equal(piCheck.status, 'failure');
+	assert.equal(
+		piCheck.remediationActions.some(
+			(action) =>
+				action.kind === 'select-path' && action.target === 'pi.executablePath',
+		),
+		false,
+	);
+	assert.equal(
+		piCheck.remediationActions.some(
+			(action) =>
+				action.kind === 'retry' && action.id === 'retry-pi-executable',
+		),
+		true,
 	);
 });
 

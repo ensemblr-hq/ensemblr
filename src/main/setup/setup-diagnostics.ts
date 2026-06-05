@@ -5,12 +5,17 @@ import type {
 	SetupCheckLogSnapshot,
 	SetupCheckSnapshot,
 	SetupDiagnosticsSnapshot,
+	SetupRemediationAction,
 } from '../../shared/ipc';
 import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
 import type { EnsembleConfigService } from '../config/config-loader';
+import type {
+	PiExecutableService,
+	PiExecutableSnapshot,
+} from '../pi/pi-executable';
 import type { EnsembleRootDirectoryService } from '../root/root-directory';
 import type { EnsembleDatabaseService } from '../storage/database';
 
@@ -34,6 +39,7 @@ interface CreateSetupDiagnosticsServiceOptions {
 	homeDirectory?: string;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
+	piExecutableService: PiExecutableService;
 	rootDirectoryService: EnsembleRootDirectoryService;
 }
 
@@ -72,6 +78,7 @@ export function createSetupDiagnosticsService({
 	homeDirectory = homedir(),
 	localCommandService,
 	now = () => new Date(),
+	piExecutableService,
 	rootDirectoryService,
 }: CreateSetupDiagnosticsServiceOptions): SetupDiagnosticsService {
 	const context = { homeDirectory, now };
@@ -116,14 +123,7 @@ export function createSetupDiagnosticsService({
 				updatedAt: now().toISOString(),
 			}),
 		'pi-executable': () =>
-			createPendingCheck({
-				detail:
-					'Pi executable discovery and overrides will be implemented by THE-111.',
-				group: 'pi',
-				id: 'pi-executable',
-				title: 'Pi executable',
-				updatedAt: now().toISOString(),
-			}),
+			getPiExecutableCheck({ context, piExecutableService }),
 		'pi-provider-model': () =>
 			createPendingCheck({
 				detail:
@@ -743,6 +743,98 @@ async function getGitHubAuthCheck({
 	}
 }
 
+async function getPiExecutableCheck({
+	context,
+	piExecutableService,
+}: {
+	context: SetupCheckProviderContext;
+	piExecutableService: PiExecutableService;
+}): Promise<SetupCheckSnapshot> {
+	try {
+		const executable = await piExecutableService.getSnapshot();
+		const status =
+			executable.status === 'ok'
+				? 'success'
+				: executable.status === 'warning'
+					? 'warning'
+					: 'failure';
+		const detail =
+			status === 'success'
+				? `Pi executable selected from ${formatSourceLabel(
+						executable.source,
+					)}: ${executable.displayPath}. ${formatProbeDetail(executable)}`
+				: status === 'warning'
+					? `Pi executable is present at ${executable.displayPath}, but version/help probing needs attention.`
+					: getPiExecutableFailureDetail(executable.diagnostics);
+
+		return createSetupCheckSnapshot({
+			blocking: true,
+			description:
+				'Discovers a Pi-compatible executable without changing the normal Pi user environment.',
+			detail,
+			group: 'pi',
+			id: 'pi-executable',
+			logs: createPiExecutableLogs(executable),
+			remediationActions: createPiExecutableRemediationActions(executable),
+			status,
+			title: 'Pi executable',
+			updatedAt: context.now().toISOString(),
+		});
+	} catch (error) {
+		return createSetupCheckSnapshot({
+			blocking: true,
+			description:
+				'Discovers a Pi-compatible executable without changing the normal Pi user environment.',
+			detail:
+				error instanceof Error
+					? error.message
+					: 'Unknown Pi executable check error.',
+			group: 'pi',
+			id: 'pi-executable',
+			logs: [],
+			remediationActions: [
+				{
+					id: 'select-pi-executable',
+					kind: 'select-path',
+					label: 'Select Pi executable',
+					target: 'pi.executablePath',
+				},
+				{
+					id: 'retry-pi-executable',
+					kind: 'retry',
+					label: 'Retry Pi executable check',
+				},
+			],
+			status: 'failure',
+			title: 'Pi executable',
+			updatedAt: context.now().toISOString(),
+		});
+	}
+}
+
+function createPiExecutableRemediationActions(
+	executable?: PiExecutableSnapshot,
+): SetupRemediationAction[] {
+	const actions: SetupRemediationAction[] = [];
+
+	if (!executable?.setting?.locked) {
+		actions.push({
+			id: 'select-pi-executable',
+			kind: 'select-path',
+			label: 'Select Pi executable',
+			target: 'pi.executablePath',
+		});
+	}
+
+	actions.push({
+		id: 'retry-pi-executable',
+		kind: 'retry',
+		label: 'Retry Pi executable check',
+	});
+
+	return actions;
+}
+
 function createCommandLogs(
 	result: LocalCommandResult,
 ): SetupCheckLogSnapshot[] {
@@ -777,6 +869,94 @@ function createCommandLogs(
 	}
 
 	return logs;
+}
+
+function createPiExecutableLogs(
+	executable: Awaited<ReturnType<PiExecutableService['getSnapshot']>>,
+): SetupCheckLogSnapshot[] {
+	const logs: SetupCheckLogSnapshot[] = [];
+
+	if (executable.path) {
+		logs.push({
+			label: 'Executable path',
+			text: executable.path,
+		});
+	}
+
+	if (executable.source) {
+		logs.push({
+			label: 'Source',
+			text: formatSourceLabel(executable.source),
+		});
+	}
+
+	if (executable.probe) {
+		logs.push({
+			label: `${executable.probe.kind} probe`,
+			text: executable.probe.detail,
+		});
+	}
+
+	for (const diagnostic of executable.diagnostics) {
+		logs.push({
+			label: diagnostic.code,
+			text: diagnostic.path
+				? `${diagnostic.message} ${diagnostic.path}`
+				: diagnostic.message,
+		});
+	}
+
+	return logs;
+}
+
+function formatSourceLabel(
+	source: Awaited<ReturnType<PiExecutableService['getSnapshot']>>['source'],
+): string {
+	switch (source) {
+		case 'common-location':
+			return 'common local binary location';
+		case 'config-default':
+			return 'declarative config';
+		case 'managed-config':
+			return 'managed config';
+		case 'path':
+			return 'shell PATH';
+		case 'sqlite':
+			return 'user override';
+		case 'built-in-default':
+			return 'built-in default';
+		case 'conductor-config':
+			return 'Conductor config';
+		case 'ensemble-config':
+			return 'Ensemble repository config';
+		default:
+			return 'unknown source';
+	}
+}
+
+function formatProbeDetail(
+	executable: Awaited<ReturnType<PiExecutableService['getSnapshot']>>,
+): string {
+	if (!executable.probe) {
+		return 'No version/help probe ran.';
+	}
+
+	return `${executable.probe.kind} probe returned: ${executable.probe.detail}`;
+}
+
+function getPiExecutableFailureDetail(
+	diagnostics: Awaited<
+		ReturnType<PiExecutableService['getSnapshot']>
+	>['diagnostics'],
+): string {
+	const blockingDiagnostic =
+		diagnostics.find((diagnostic) => diagnostic.severity === 'error') ??
+		diagnostics.at(-1);
+
+	return (
+		blockingDiagnostic?.message ??
+		'Pi executable could not be discovered. Install Pi, select a compatible executable or wrapper, then retry.'
+	);
 }
 
 function getFirstOutputLine(output: string): string | null {

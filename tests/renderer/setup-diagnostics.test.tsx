@@ -8,6 +8,7 @@ import type {
 	SetupCheckSnapshot,
 	SetupCheckStatus,
 	SetupDiagnosticsSnapshot,
+	SetupRemediationAction,
 } from '../../src/shared/ipc';
 
 const NOW = '2026-06-05T00:00:00.000Z';
@@ -33,10 +34,12 @@ function createCheck({
 	id,
 	status = 'success',
 	title,
+	remediationActions,
 }: {
 	blocking?: boolean;
 	detail?: string;
 	id: SetupCheckId;
+	remediationActions?: SetupRemediationAction[];
 	status?: SetupCheckStatus;
 	title?: string;
 }): SetupCheckSnapshot {
@@ -47,7 +50,7 @@ function createCheck({
 		group: GROUPS[id],
 		id,
 		logs: [],
-		remediationActions: [
+		remediationActions: remediationActions ?? [
 			{
 				id: `retry-${id}`,
 				kind: 'retry',
@@ -165,4 +168,54 @@ test('renders optional Linear state without blocking language', () => {
 	expect(markup).toContain('Optional');
 	expect(markup).toContain('Linear OAuth is optional');
 	expect(markup).not.toContain('Core workflows are blocked');
+});
+
+test('renders only the Pi executable select-path remediation as an action button', () => {
+	const snapshot = createSnapshot(
+		[
+			createCheck({
+				id: 'pi-executable',
+				remediationActions: [
+					{
+						id: 'select-pi-executable',
+						kind: 'select-path',
+						label: 'Select Pi executable',
+						target: 'pi.executablePath',
+					},
+					{
+						id: 'retry-pi-executable',
+						kind: 'retry',
+						label: 'Retry Pi executable check',
+					},
+				],
+				status: 'failure',
+				title: 'Pi executable',
+			}),
+			createCheck({
+				id: 'root-directory',
+				remediationActions: [
+					{
+						id: 'choose-root-directory',
+						kind: 'select-path',
+						label: 'Choose another root',
+					},
+				],
+				status: 'failure',
+				title: 'Root directory',
+			}),
+		],
+		'blocked',
+	);
+	const markup = renderToStaticMarkup(
+		<SetupDiagnosticsPanel snapshot={snapshot} />,
+	);
+
+	expect(markup).toContain('data-remediation-action="select-pi-executable"');
+	expect(markup).toContain('Select Pi executable');
+	expect(markup).toContain('Retry Pi executable check');
+	expect(markup).toContain('Choose another root');
+	expect(markup).not.toContain(
+		'data-remediation-action="choose-root-directory"',
+	);
+	expect(markup).not.toContain('data-remediation-action="retry-pi-executable"');
 });

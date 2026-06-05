@@ -1,6 +1,6 @@
 # Linear Milestones
 
-Date: 2026-06-04
+Date: 2026-06-05
 
 These milestones are intended to be copied into Linear as project milestones. Issue IDs refer to the local planning IDs in `docs/product/linear-issues.md`.
 
@@ -117,6 +117,7 @@ Included issues:
 - `ENS-028` Pi session metadata mapping
 - `ENS-029` Pi composer submit, stop, and model controls
 - `ENS-030` Structured Pi timeline rendering
+- `ENS-075` Agent chat pane UX/UI working session
 - `ENS-031` Runtime error retry and session-fork discovery
 - `ENS-032` Git-backed checkpoint capture
 - `ENS-033` Checkpoint restore and turn diff
@@ -128,6 +129,7 @@ Exit criteria:
 - Pi sessions launch from workspace `cwd` with normal Pi resource discovery enabled.
 - RPC stdout/stderr, JSONL events, crashes, aborts, and retries are surfaced clearly.
 - Timeline events show messages, tool calls, output, runtime errors, and status.
+- Agent chat pane UX/UI decisions are recorded after realistic Pi composer/timeline behavior exists.
 - Checkpoints are captured before Pi user prompts and mapped to workspace/session/turn metadata.
 - Users can inspect turn diffs and restore files without mutating Pi session files.
 - At most five chat tabs can be open per workspace; preview tabs do not count.
@@ -242,6 +244,7 @@ Expose the settings, diagnostics, and interaction polish needed to operate the c
 
 Included issues:
 
+- `ENS-076` App settings screen UX/UI working session
 - `ENS-061` Settings shell with app and repository sections
 - `ENS-062` App settings sections for general, models, providers, integrations, and security
 - `ENS-063` Repository settings source diagnostics
@@ -255,6 +258,7 @@ Included issues:
 Exit criteria:
 
 - Settings contain app-wide and repository-specific sections in one shell, starting from the current visible Settings entry and shell route.
+- App settings screen UX/UI decisions are recorded before the settings shell and forms are locked in.
 - Source precedence is visible for app and repository configuration.
 - Security, permissions, Linear, `gh`, Pi readiness, and enterprise privacy are inspectable.
 - Appearance controls affect code, markdown, and terminal previews.

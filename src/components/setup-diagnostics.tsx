@@ -17,11 +17,16 @@ import type {
 	SetupCheckSnapshot,
 	SetupCheckStatus,
 	SetupDiagnosticsSnapshot,
+	SetupRemediationAction,
 } from '@/shared/ipc';
 
 interface SetupDiagnosticsPanelProps {
 	error?: string | null;
 	isRetrying?: boolean;
+	onRemediationAction?: (
+		action: SetupRemediationAction,
+		check: SetupCheckSnapshot,
+	) => void | Promise<void>;
 	onRetry?: () => void;
 	snapshot: SetupDiagnosticsSnapshot | null;
 }
@@ -72,6 +77,7 @@ const CHECK_STATUS_ICON = {
 export function SetupDiagnosticsPanel({
 	error,
 	isRetrying = false,
+	onRemediationAction,
 	onRetry,
 	snapshot,
 }: SetupDiagnosticsPanelProps) {
@@ -133,7 +139,12 @@ export function SetupDiagnosticsPanel({
 										</div>
 										<div className='flex flex-col divide-y divide-border rounded-md border border-border bg-pane'>
 											{checks.map((check) => (
-												<SetupCheckRow check={check} key={check.id} />
+												<SetupCheckRow
+													check={check}
+													key={check.id}
+													onRemediationAction={onRemediationAction}
+													onRetry={onRetry}
+												/>
 											))}
 										</div>
 									</section>
@@ -182,8 +193,34 @@ export function SetupDiagnosticsCompact({
 	);
 }
 
-function SetupCheckRow({ check }: { check: SetupCheckSnapshot }) {
+function SetupCheckRow({
+	check,
+	onRemediationAction,
+	onRetry,
+}: {
+	check: SetupCheckSnapshot;
+	onRemediationAction?: (
+		action: SetupRemediationAction,
+		check: SetupCheckSnapshot,
+	) => void | Promise<void>;
+	onRetry?: () => void;
+}) {
 	const Icon = CHECK_STATUS_ICON[check.status];
+	const handleRemediationAction = async (action: SetupRemediationAction) => {
+		if (onRemediationAction) {
+			await onRemediationAction(action, check);
+			return;
+		}
+
+		if (
+			action.kind === 'select-path' &&
+			action.target === 'pi.executablePath' &&
+			check.id === 'pi-executable'
+		) {
+			await window.ensemble?.selectPiExecutable();
+			onRetry?.();
+		}
+	};
 
 	return (
 		<div className='flex flex-col gap-2 px-3 py-2.5'>
@@ -224,14 +261,30 @@ function SetupCheckRow({ check }: { check: SetupCheckSnapshot }) {
 
 			{check.remediationActions.length ? (
 				<div className='flex flex-wrap gap-1.5 pl-6'>
-					{check.remediationActions.map((action) => (
-						<span
-							className='rounded-sm border border-border bg-muted px-1.5 py-1 text-[0.6875rem] text-muted-foreground leading-none'
-							key={action.id}
-						>
-							{action.label}
-						</span>
-					))}
+					{check.remediationActions.map((action) =>
+						isPiExecutablePickerAction(action, check) ? (
+							<Button
+								className='h-6 px-2 text-[0.6875rem] leading-none'
+								data-remediation-action={action.id}
+								key={action.id}
+								onClick={() => {
+									void handleRemediationAction(action);
+								}}
+								size='xs'
+								type='button'
+								variant='outline'
+							>
+								{action.label}
+							</Button>
+						) : (
+							<span
+								className='rounded-sm border border-border bg-muted px-1.5 py-1 text-[0.6875rem] text-muted-foreground leading-none'
+								key={action.id}
+							>
+								{action.label}
+							</span>
+						),
+					)}
 				</div>
 			) : null}
 
@@ -256,6 +309,17 @@ function SetupCheckRow({ check }: { check: SetupCheckSnapshot }) {
 				</details>
 			) : null}
 		</div>
+	);
+}
+
+function isPiExecutablePickerAction(
+	action: SetupRemediationAction,
+	check: SetupCheckSnapshot,
+): boolean {
+	return (
+		check.id === 'pi-executable' &&
+		action.kind === 'select-path' &&
+		action.target === 'pi.executablePath'
 	);
 }
 

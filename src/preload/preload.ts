@@ -4,6 +4,7 @@ import {
 	type EnsembleApi,
 	type HealthSnapshot,
 	IPC_CHANNELS,
+	type PiExecutableSelectionResult,
 	type RootDirectorySnapshot,
 	type SettingsResolutionRequest,
 	type SettingsResolutionSnapshot,
@@ -26,6 +27,10 @@ const api: EnsembleApi = {
 		ipcRenderer.invoke(
 			IPC_CHANNELS.setupDiagnostics,
 		) as Promise<SetupDiagnosticsSnapshot>,
+	selectPiExecutable: () =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.selectPiExecutable,
+		) as Promise<PiExecutableSelectionResult>,
 	resolveSettings: (request?: SettingsResolutionRequest) =>
 		ipcRenderer.invoke(
 			IPC_CHANNELS.settingsResolution,
