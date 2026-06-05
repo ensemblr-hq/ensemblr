@@ -135,7 +135,8 @@
 		-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
 	--font-sans:
 		-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-	--font-mono: "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+	--font-mono:
+		"JetBrains Mono Variable", "JetBrains Mono", Menlo, Consolas, monospace;
 	--color-canvas: var(--piductor-canvas);
 	--color-toolbar: var(--piductor-toolbar);
 	--color-surface: var(--piductor-surface);
@@ -243,6 +244,41 @@
 	.native-toolbar {
 		background: var(--piductor-toolbar);
 		backdrop-filter: blur(18px) saturate(1.3);
+	}
+
+	.right-sidebar-header[data-pr-tone="ready"] {
+		background: color-mix(in oklch, var(--piductor-status-ok), transparent 84%);
+		border-color: color-mix(
+			in oklch,
+			var(--piductor-status-ok),
+			transparent 68%
+		);
+	}
+
+	.right-sidebar-header[data-pr-tone="pending"] {
+		background: color-mix(
+			in oklch,
+			var(--piductor-status-warning),
+			transparent 88%
+		);
+		border-color: color-mix(
+			in oklch,
+			var(--piductor-status-warning),
+			transparent 72%
+		);
+	}
+
+	.right-sidebar-header[data-pr-tone="blocked"] {
+		background: color-mix(
+			in oklch,
+			var(--piductor-status-danger),
+			transparent 88%
+		);
+		border-color: color-mix(
+			in oklch,
+			var(--piductor-status-danger),
+			transparent 72%
+		);
 	}
 
 	.sidebar-collapsed-trigger {

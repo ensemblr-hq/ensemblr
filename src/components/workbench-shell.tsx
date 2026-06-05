@@ -1,13 +1,16 @@
 import {
 	ActivityIcon,
+	ArrowUpRightIcon,
 	CheckCircle2Icon,
+	CheckIcon,
 	ChevronDownIcon,
 	CircleDashedIcon,
+	CircleIcon,
+	CircleSlashIcon,
 	CogIcon,
 	ExternalLinkIcon,
 	EyeIcon,
 	FileCodeIcon,
-	FileSearchIcon,
 	FolderIcon,
 	GitBranchIcon,
 	GitMergeIcon,
@@ -24,6 +27,7 @@ import {
 	PlayIcon,
 	PlusIcon,
 	RefreshCwIcon,
+	SearchIcon,
 	SquareIcon,
 	SquareTerminalIcon,
 	WrenchIcon,
@@ -41,7 +45,6 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Progress } from '@/components/ui/progress';
 import {
 	ResizableHandle,
 	ResizablePanel,
@@ -451,123 +454,136 @@ function RightSidebarHeader({
 	activeWorkspace: WorkspaceShellModel;
 }) {
 	const pullRequest = activeWorkspace.pullRequest;
-	const isIdle = pullRequest.status === 'idle';
-	const isMergeReady = pullRequest.status === 'ready-to-merge';
-	const StatusIcon = getPullRequestStatusIcon(pullRequest.status);
+	const headerTone = getPullRequestHeaderTone(pullRequest.status);
+	const isMergeReady = headerTone === 'ready';
+	const isInFlight =
+		pullRequest.status === 'agent-working' || pullRequest.status === 'checking';
+	const pullRequestNumber = pullRequest.number;
+	const hasPullRequestNumber = typeof pullRequestNumber === 'number';
+	const hasWorkspaceChanges = activeWorkspace.changeSummary.files > 0;
+	const shouldShowHeaderLabel =
+		hasPullRequestNumber || headerTone !== 'neutral';
 
 	return (
 		<header
-			className={cn(
-				'native-toolbar flex h-12 w-full shrink-0 items-center gap-3 border-border border-b px-3',
-				isMergeReady && 'border-status-ok/30 bg-status-ok/10',
-				pullRequest.status === 'blocked' &&
-					'border-status-danger/30 bg-status-danger/10',
-				pullRequest.status === 'checking' &&
-					'border-status-warning/30 bg-status-warning/10',
-			)}
+			className='native-toolbar right-sidebar-header flex h-12 w-full shrink-0 items-center gap-3 border-border border-b px-3'
+			data-pr-tone={headerTone}
 		>
-			<div className='flex min-w-0 flex-1 items-center gap-2'>
-				{isIdle ? null : (
-					<div
+			<div className='flex min-w-0 flex-1 items-center gap-2.5'>
+				{hasPullRequestNumber ? (
+					<PullRequestNumberButton
+						number={pullRequestNumber}
+						tone={headerTone}
+					/>
+				) : null}
+				{shouldShowHeaderLabel ? (
+					<p
 						className={cn(
-							'grid size-6 shrink-0 place-items-center rounded-sm border border-border bg-pane text-muted-foreground',
-							isMergeReady && 'border-status-ok/30 text-status-ok',
-							pullRequest.status === 'blocked' &&
-								'border-status-danger/30 text-status-danger',
-							pullRequest.status === 'checking' &&
-								'border-status-warning/30 text-status-warning',
+							'min-w-0 truncate font-semibold text-sm leading-none',
+							headerTone === 'ready' && 'text-status-ok',
+							headerTone === 'pending' && 'text-foreground',
+							headerTone === 'blocked' && 'text-status-danger',
+							headerTone === 'neutral' && 'text-muted-foreground',
 						)}
 					>
-						<StatusIcon
-							aria-hidden='true'
-							className={cn(
-								'size-3.5',
-								pullRequest.status === 'checking' && 'animate-spin',
-							)}
-						/>
-					</div>
-				)}
-				{isIdle ? null : (
-					<div className='min-w-0'>
-						<p className='truncate font-medium text-xs'>{pullRequest.label}</p>
-						<p className='truncate text-[0.6875rem] text-muted-foreground'>
-							{pullRequest.detail}
-						</p>
-					</div>
-				)}
+						{getPullRequestHeaderLabel(pullRequest)}
+					</p>
+				) : null}
 			</div>
 			<div className='ml-auto flex shrink-0 items-center justify-end'>
-				<PullRequestHeaderAction pullRequest={pullRequest} />
+				{isMergeReady ? (
+					<Button
+						className='h-7 rounded-md bg-status-ok px-2.5 text-primary-foreground hover:bg-status-ok/90'
+						size='sm'
+					>
+						<GitMergeIcon data-icon='inline-start' />
+						Merge
+					</Button>
+				) : isInFlight && hasPullRequestNumber ? (
+					<div
+						aria-label='Pull request activity in progress'
+						className='grid size-7 place-items-center text-muted-foreground'
+						role='status'
+					>
+						<LoaderCircleIcon
+							aria-hidden='true'
+							className='size-4 animate-spin'
+						/>
+					</div>
+				) : hasWorkspaceChanges && !hasPullRequestNumber ? (
+					<CreatePullRequestMenu />
+				) : headerTone !== 'neutral' ? (
+					<Button size='icon-sm' variant='ghost'>
+						<MoreVerticalIcon />
+						<span className='sr-only'>Open pull request menu</span>
+					</Button>
+				) : null}
 			</div>
 		</header>
 	);
 }
 
-function PullRequestHeaderAction({
-	pullRequest,
+function PullRequestNumberButton({
+	number,
+	tone,
 }: {
-	pullRequest: WorkspaceShellModel['pullRequest'];
+	number: number;
+	tone: 'blocked' | 'neutral' | 'pending' | 'ready';
 }) {
-	if (pullRequest.status === 'ready-to-merge') {
-		return (
-			<Button
-				className='bg-status-ok text-primary-foreground hover:bg-status-ok/90'
-				size='sm'
-			>
-				<GitMergeIcon data-icon='inline-start' />
-				Merge
-			</Button>
-		);
-	}
-
-	if (pullRequest.status === 'checking') {
-		return (
-			<Button disabled size='sm' variant='outline'>
-				<LoaderCircleIcon className='animate-spin' data-icon='inline-start' />
-				Checking
-			</Button>
-		);
-	}
-
-	if (pullRequest.status === 'agent-working') {
-		return (
-			<Button disabled size='sm' variant='outline'>
-				<FileSearchIcon data-icon='inline-start' />
-				Working
-			</Button>
-		);
-	}
-
-	if (pullRequest.status === 'blocked') {
-		return (
-			<Button disabled size='sm' variant='destructive'>
-				Blocked
-			</Button>
-		);
-	}
-
-	return <CreatePullRequestMenu />;
+	return (
+		<Button
+			aria-label={`Open pull request #${number}`}
+			className={cn(
+				'h-6.5 rounded-sm border px-1.75 font-semibold text-xs',
+				tone === 'ready' &&
+					'border-status-ok/35 bg-status-ok/10 text-status-ok hover:bg-status-ok/15',
+				tone === 'pending' &&
+					'border-status-warning/35 bg-status-warning/10 text-foreground hover:bg-status-warning/15',
+				tone === 'blocked' &&
+					'border-status-danger/35 bg-status-danger/10 text-status-danger hover:bg-status-danger/15',
+				tone === 'neutral' &&
+					'border-border bg-transparent text-muted-foreground hover:bg-muted/70',
+			)}
+			size='sm'
+			variant='outline'
+		>
+			<span className='font-mono tabular-nums'>#{number}</span>
+			<ArrowUpRightIcon aria-hidden='true' className='size-3.5' />
+		</Button>
+	);
 }
 
 function CreatePullRequestMenu() {
+	const [isOpen, setIsOpen] = useState(false);
+
 	return (
-		<div className='flex shrink-0 items-center' data-slot='button-group'>
-			<Button className='rounded-r-none' size='sm' variant='outline'>
+		<div className='flex h-7 shrink-0 items-center overflow-hidden rounded-md border border-border bg-background'>
+			<Button
+				className='h-7 rounded-none border-0 bg-transparent px-2.5'
+				size='sm'
+				variant='ghost'
+			>
 				<GitPullRequestCreateIcon data-icon='inline-start' />
 				Create PR
 			</Button>
-			<DropdownMenu>
+			<span aria-hidden='true' className='h-4 w-px shrink-0 bg-border' />
+			<DropdownMenu onOpenChange={setIsOpen} open={isOpen}>
 				<DropdownMenuTrigger asChild>
 					<Button
 						aria-label='Open create pull request options'
-						className='rounded-l-none border-l-0'
+						className='size-7 rounded-none border-0 bg-transparent'
 						size='icon-sm'
-						variant='outline'
+						variant='ghost'
 					>
 						<ChevronDownIcon aria-hidden='true' />
 					</Button>
 				</DropdownMenuTrigger>
-				<DropdownMenuContent align='end' className='w-56'>
+				<DropdownMenuContent
+					align='end'
+					className='w-56'
+					onFocusOutside={() => setIsOpen(false)}
+					onPointerDownOutside={() => setIsOpen(false)}
+				>
 					<DropdownMenuGroup>
 						<DropdownMenuItem>
 							<GitPullRequestDraftIcon aria-hidden='true' />
@@ -584,22 +600,33 @@ function CreatePullRequestMenu() {
 	);
 }
 
-function getPullRequestStatusIcon(
+function getPullRequestHeaderTone(
 	status: WorkspaceShellModel['pullRequest']['status'],
-) {
+): 'blocked' | 'neutral' | 'pending' | 'ready' {
 	if (status === 'ready-to-merge') {
-		return GitMergeIcon;
+		return 'ready';
 	}
 
 	if (status === 'checking') {
-		return LoaderCircleIcon;
+		return 'pending';
 	}
 
-	if (status === 'agent-working') {
-		return FileSearchIcon;
+	if (status === 'blocked') {
+		return 'blocked';
 	}
 
-	return CircleDashedIcon;
+	return 'neutral';
+}
+
+function getPullRequestHeaderLabel({
+	label,
+	status,
+}: WorkspaceShellModel['pullRequest']) {
+	if (status === 'idle' || status === 'agent-working') {
+		return 'Working...';
+	}
+
+	return label;
 }
 
 function SessionTabs({
@@ -812,7 +839,7 @@ function ReviewPanel({
 			onValueChange={(value) => onTabChange(value as ReviewPanelTab)}
 			value={activeTab}
 		>
-			<div className='flex h-12 shrink-0 items-center justify-between gap-2 overflow-hidden border-border border-b px-2'>
+			<div className='flex h-12 shrink-0 items-center justify-between gap-2 overflow-hidden border-border border-b px-3'>
 				<div className='no-scrollbar min-w-0 flex-1 overflow-x-auto overflow-y-hidden'>
 					<div className='flex w-max min-w-full items-center gap-1'>
 						{reviewTabs.map((tab) => (
@@ -826,24 +853,7 @@ function ReviewPanel({
 						))}
 					</div>
 				</div>
-				<div className='flex shrink-0 items-center gap-0.5'>
-					<Button
-						className='text-accent-strong hover:text-foreground'
-						size='xs'
-						variant='ghost'
-					>
-						<EyeIcon data-icon='inline-start' />
-						<span className='review-panel-action-label'>Review</span>
-					</Button>
-					<Button size='icon-sm' variant='ghost'>
-						<ListTreeIcon />
-						<span className='sr-only'>Toggle file tree</span>
-					</Button>
-					<Button size='icon-sm' variant='ghost'>
-						<MoreVerticalIcon />
-						<span className='sr-only'>Open review menu</span>
-					</Button>
-				</div>
+				<ReviewPanelActions activeTab={activeTab} />
 			</div>
 			<TabsContent className='min-h-0 overflow-hidden' value='files'>
 				<ReviewFileList files={workspace.reviewFiles} mode='files' />
@@ -855,6 +865,40 @@ function ReviewPanel({
 				<ChecksPanel workspace={workspace} />
 			</TabsContent>
 		</Tabs>
+	);
+}
+
+function ReviewPanelActions({ activeTab }: { activeTab: ReviewPanelTab }) {
+	if (activeTab === 'checks') {
+		return <div className='w-0 shrink-0' />;
+	}
+
+	return (
+		<div className='flex shrink-0 items-center gap-0.5'>
+			<Button
+				className='text-accent-strong hover:text-foreground'
+				size='xs'
+				variant='ghost'
+			>
+				<EyeIcon data-icon='inline-start' />
+				<span className='review-panel-action-label'>Review</span>
+			</Button>
+			<Button size='icon-sm' variant='ghost'>
+				<ListTreeIcon />
+				<span className='sr-only'>Toggle file tree</span>
+			</Button>
+			{activeTab === 'files' ? (
+				<Button size='icon-sm' variant='ghost'>
+					<SearchIcon />
+					<span className='sr-only'>Search files</span>
+				</Button>
+			) : (
+				<Button size='icon-sm' variant='ghost'>
+					<MoreVerticalIcon />
+					<span className='sr-only'>Open review menu</span>
+				</Button>
+			)}
+		</div>
 	);
 }
 
@@ -943,55 +987,297 @@ function ReviewFileList({
 }
 
 function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
-	const progressValue =
-		workspace.checks.status === 'ready'
-			? 100
-			: workspace.checks.status === 'pending'
-				? 48
-				: 12;
+	const pullRequest = workspace.pullRequest;
+
+	if (typeof pullRequest.number !== 'number') {
+		return <ChecksEmptyState workspace={workspace} />;
+	}
 
 	return (
-		<ScrollArea className='h-full'>
-			<div className='flex flex-col gap-3 p-3'>
-				<section className='rounded-md border border-border bg-pane p-3'>
-					<div className='flex items-start justify-between gap-3'>
-						<div className='min-w-0'>
-							<p className='font-medium text-sm'>{workspace.checks.label}</p>
-							<p className='mt-1 text-muted-foreground text-xs leading-5'>
-								{workspace.checks.detail}
+		<ScrollArea className='h-full overflow-hidden'>
+			<div className='flex min-w-0 max-w-full flex-col gap-4 overflow-hidden p-3'>
+				<section className='flex min-w-0 flex-col gap-2'>
+					<h2 className='min-w-0 truncate font-semibold text-sm'>
+						{pullRequest.title}
+					</h2>
+					<div className='flex min-w-0 flex-col gap-2 text-muted-foreground text-xs leading-4'>
+						{pullRequest.description.map((paragraph) => (
+							<p className='min-w-0 break-words' key={paragraph}>
+								{paragraph}
 							</p>
-						</div>
-						<StatusBadge
-							tone={
-								workspace.checks.status === 'ready'
-									? 'ok'
-									: workspace.checks.status === 'blocked'
-										? 'danger'
-										: 'warning'
-							}
-						>
-							{workspace.checks.status}
-						</StatusBadge>
+						))}
 					</div>
-					<Progress className='mt-3' value={progressValue} />
 				</section>
-				<section className='flex flex-col gap-2'>
-					<CheckRow label='Git status' value='fixture only' />
-					<CheckRow label='Pull request' value='not created' />
-					<CheckRow label='Comments' value='0 open' />
-					<CheckRow label='Todos' value='0 unresolved' />
+
+				<section className='flex min-w-0 flex-col gap-1.5'>
+					<ChecksSectionHeader label='Git status' />
+					<PullRequestStatusRow status={pullRequest.gitStatus} />
+				</section>
+
+				<section className='flex min-w-0 flex-col gap-1.5'>
+					<ChecksSectionHeader label='Checks' />
+					{pullRequest.checks.map((check) => (
+						<PullRequestCheckRow check={check} key={check.id} />
+					))}
+				</section>
+
+				<section className='flex min-w-0 flex-col gap-1.5'>
+					<ChecksSectionHeader
+						actionLabel={
+							pullRequest.comments.length ? 'Add all to chat' : undefined
+						}
+						label='Comments'
+					/>
+					{pullRequest.comments.length ? (
+						pullRequest.comments.map((comment) => (
+							<PullRequestCommentRow comment={comment} key={comment.id} />
+						))
+					) : (
+						<p className='text-muted-foreground text-xs'>No comments yet</p>
+					)}
+				</section>
+
+				<section className='flex min-w-0 flex-col gap-1.5'>
+					<ChecksSectionHeader actionLabel='+ Add' label='Your todos' />
+					{pullRequest.todos.length ? (
+						pullRequest.todos.map((todo) => (
+							<div
+								className='flex min-h-7 min-w-0 items-center gap-2 px-1'
+								key={todo.id}
+							>
+								<CircleIcon
+									aria-hidden='true'
+									className='size-3 shrink-0 text-muted-foreground'
+								/>
+								<span className='min-w-0 truncate text-xs'>{todo.label}</span>
+							</div>
+						))
+					) : (
+						<p className='text-muted-foreground text-xs'>No todos yet</p>
+					)}
 				</section>
 			</div>
 		</ScrollArea>
 	);
 }
 
-function CheckRow({ label, value }: { label: string; value: string }) {
+function ChecksEmptyState({ workspace }: { workspace: WorkspaceShellModel }) {
 	return (
-		<div className='flex items-center justify-between gap-3 rounded-md px-2 py-1.5 hover:bg-muted'>
-			<span className='text-muted-foreground text-xs'>{label}</span>
-			<span className='font-medium text-xs'>{value}</span>
+		<ScrollArea className='h-full overflow-hidden'>
+			<div className='flex min-w-0 max-w-full flex-col gap-4 overflow-hidden p-3'>
+				<section className='flex min-w-0 flex-col gap-2'>
+					<h2 className='font-semibold text-muted-foreground text-sm'>
+						PR title
+					</h2>
+					<p className='text-muted-foreground text-xs'>PR description</p>
+				</section>
+
+				<section className='flex min-w-0 flex-col gap-1.5'>
+					<ChecksSectionHeader label='Git status' />
+					<ChecksActionRow actionLabel='Create PR' label='No PR open' />
+					<ChecksActionRow
+						actionLabel='Commit and push'
+						label={`${workspace.changeSummary.files} uncommitted changes`}
+					/>
+				</section>
+
+				<section className='flex min-w-0 flex-col gap-1.5'>
+					<ChecksSectionHeader actionLabel='+ Add' label='Your todos' />
+					<p className='text-muted-foreground text-xs'>No todos yet</p>
+				</section>
+			</div>
+		</ScrollArea>
+	);
+}
+
+function ChecksSectionHeader({
+	actionLabel,
+	label,
+}: {
+	actionLabel?: string;
+	label: string;
+}) {
+	return (
+		<div className='flex min-h-6 min-w-0 items-center justify-between gap-2'>
+			<h3 className='font-semibold text-muted-foreground text-xs'>{label}</h3>
+			{actionLabel ? (
+				<Button
+					className='h-6 px-1.5 text-muted-foreground text-xs hover:text-foreground'
+					size='xs'
+					variant='ghost'
+				>
+					{actionLabel}
+				</Button>
+			) : null}
 		</div>
+	);
+}
+
+function PullRequestStatusRow({
+	status,
+}: {
+	status: WorkspaceShellModel['pullRequest']['gitStatus'];
+}) {
+	return (
+		<div className='flex min-h-7 min-w-0 items-center justify-between gap-2 px-1'>
+			<div className='flex min-w-0 items-center gap-2 overflow-hidden'>
+				<CircleIcon
+					aria-hidden='true'
+					className='size-3 shrink-0 text-muted-foreground'
+				/>
+				<span className='min-w-0 truncate font-medium text-xs'>
+					{status.label}
+				</span>
+			</div>
+			{status.actionLabel ? (
+				<Button
+					className='h-6 px-1.5 text-muted-foreground text-xs hover:text-foreground'
+					size='xs'
+					variant='ghost'
+				>
+					{status.actionLabel}
+				</Button>
+			) : null}
+		</div>
+	);
+}
+
+function ChecksActionRow({
+	actionLabel,
+	label,
+}: {
+	actionLabel: string;
+	label: string;
+}) {
+	return (
+		<div className='flex min-h-7 min-w-0 items-center justify-between gap-2 px-1'>
+			<div className='flex min-w-0 items-center gap-2 overflow-hidden'>
+				<CircleIcon
+					aria-hidden='true'
+					className='size-3 shrink-0 text-muted-foreground'
+				/>
+				<span className='min-w-0 truncate text-xs'>{label}</span>
+			</div>
+			<Button
+				className='h-6 px-1.5 text-muted-foreground text-xs hover:text-foreground'
+				size='xs'
+				variant='ghost'
+			>
+				{actionLabel}
+			</Button>
+		</div>
+	);
+}
+
+function PullRequestCheckRow({
+	check,
+}: {
+	check: WorkspaceShellModel['pullRequest']['checks'][number];
+}) {
+	return (
+		<div className='flex min-h-7 min-w-0 items-center justify-between gap-2 px-1'>
+			<div className='flex min-w-0 items-center gap-2 overflow-hidden'>
+				<PullRequestCheckStatusIcon status={check.status} />
+				<ProviderMark provider={check.provider} />
+				<div className='flex min-w-0 items-center gap-2'>
+					<span className='min-w-0 truncate font-medium text-xs'>
+						{check.label}
+					</span>
+					{check.durationLabel ? (
+						<span className='shrink-0 text-muted-foreground text-xs'>
+							{check.durationLabel}
+						</span>
+					) : null}
+				</div>
+			</div>
+			<Button className='size-6' size='icon-xs' variant='ghost'>
+				<ExternalLinkIcon />
+				<span className='sr-only'>Open check</span>
+			</Button>
+		</div>
+	);
+}
+
+function PullRequestCommentRow({
+	comment,
+}: {
+	comment: WorkspaceShellModel['pullRequest']['comments'][number];
+}) {
+	return (
+		<div className='flex min-h-7 min-w-0 items-center gap-2 overflow-hidden px-1'>
+			<CircleIcon
+				aria-hidden='true'
+				className='size-3 shrink-0 text-muted-foreground'
+			/>
+			<ProviderMark provider={comment.provider} />
+			<div className='flex min-w-0 items-center gap-2 overflow-hidden'>
+				<span className='max-w-28 shrink-0 truncate font-semibold text-xs'>
+					{comment.provider}
+				</span>
+				<span className='min-w-0 truncate text-muted-foreground text-xs'>
+					{comment.detail}
+				</span>
+			</div>
+		</div>
+	);
+}
+
+function PullRequestCheckStatusIcon({
+	status,
+}: {
+	status: WorkspaceShellModel['pullRequest']['checks'][number]['status'];
+}) {
+	if (status === 'ready') {
+		return (
+			<CheckIcon
+				aria-hidden='true'
+				className='size-3 shrink-0 text-status-ok'
+			/>
+		);
+	}
+
+	if (status === 'pending') {
+		return (
+			<LoaderCircleIcon
+				aria-hidden='true'
+				className='size-3 shrink-0 animate-spin text-status-warning'
+			/>
+		);
+	}
+
+	return (
+		<CircleDashedIcon
+			aria-hidden='true'
+			className='size-3 shrink-0 text-status-danger'
+		/>
+	);
+}
+
+function ProviderMark({
+	provider,
+}: {
+	provider:
+		| WorkspaceShellModel['pullRequest']['checks'][number]['provider']
+		| WorkspaceShellModel['pullRequest']['comments'][number]['provider'];
+}) {
+	const isGithubProvider =
+		provider === 'github' || provider === 'github-actions';
+
+	return (
+		<span
+			className={cn(
+				'grid size-3.5 shrink-0 place-items-center rounded-full',
+				isGithubProvider
+					? 'bg-foreground text-background'
+					: 'bg-muted text-muted-foreground',
+			)}
+		>
+			{isGithubProvider ? (
+				<GitBranchIcon aria-hidden='true' className='size-2.5' />
+			) : (
+				<CircleSlashIcon aria-hidden='true' className='size-2.5' />
+			)}
+		</span>
 	);
 }
 
