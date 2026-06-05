@@ -1,6 +1,6 @@
 # Open Decisions
 
-Date: 2026-06-04
+Date: 2026-06-05
 
 ## Screenshot Gaps Remaining
 
@@ -32,6 +32,11 @@ Date: 2026-06-04
 - Whether the current workspace-row Mark as unread action represents local workspace attention, chat unread state, or linked external issue state.
 - Whether the Dashboard route should become a visible sidebar entry later or remain hidden behind other navigation.
 - Whether the Changes tab Review action opens local diff-comment review mode, starts an agent review workflow, or toggles a review filter/state.
+
+## Needs Product Working Session
+
+- `ENS-075` Agent chat pane UX/UI working session after basic Pi composer/timeline integration and capability discovery.
+- `ENS-076` App settings screen UX/UI working session before the full settings shell and forms are built.
 
 ## Needs Implementation Discovery
 
