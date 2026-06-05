@@ -2,11 +2,13 @@ import path from 'node:path';
 import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
 
+import { createLocalCommandService } from './commands/local-command';
 import { createPiductorConfigService } from './config/config-loader';
 import { createPiductorConfigResolutionService } from './config/config-resolution';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
 import { createPiductorRootDirectoryService } from './root/root-directory';
+import { createSetupDiagnosticsService } from './setup/setup-diagnostics';
 import { createPiductorDatabaseService } from './storage/database';
 
 if (started) {
@@ -57,6 +59,7 @@ app.setName('Piductor');
 
 const configService = createPiductorConfigService();
 const databaseService = createPiductorDatabaseService();
+const localCommandService = createLocalCommandService();
 const settingsResolutionService = createPiductorConfigResolutionService({
 	configService,
 	databaseService,
@@ -64,6 +67,12 @@ const settingsResolutionService = createPiductorConfigResolutionService({
 const rootDirectoryService = createPiductorRootDirectoryService({
 	databaseService,
 	settingsResolutionService,
+});
+const setupDiagnosticsService = createSetupDiagnosticsService({
+	configService,
+	databaseService,
+	localCommandService,
+	rootDirectoryService,
 });
 
 app.whenReady().then(() => {
@@ -75,6 +84,7 @@ app.whenReady().then(() => {
 		configService,
 		databaseService,
 		rootDirectoryService,
+		setupDiagnosticsService,
 		settingsResolutionService,
 	});
 	createMainWindow();

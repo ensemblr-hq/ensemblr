@@ -3,9 +3,10 @@ import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
-type StatusTone = 'info' | 'muted' | 'ok' | 'warning';
+type StatusTone = 'danger' | 'info' | 'muted' | 'ok' | 'warning';
 
 const toneClasses: Record<StatusTone, string> = {
+	danger: 'border-status-danger/30 bg-status-danger/10 text-status-danger',
 	info: 'border-accent/30 bg-accent/10 text-accent',
 	muted: 'border-border bg-muted text-muted-foreground',
 	ok: 'border-status-ok/25 bg-status-ok/10 text-status-ok',
@@ -13,6 +14,7 @@ const toneClasses: Record<StatusTone, string> = {
 };
 
 const dotClasses: Record<StatusTone, string> = {
+	danger: 'bg-status-danger',
 	info: 'bg-accent',
 	muted: 'bg-muted-foreground',
 	ok: 'bg-status-ok',
