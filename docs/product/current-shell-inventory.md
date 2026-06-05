@@ -3,8 +3,11 @@
 Date: 2026-06-05
 
 This inventory describes the implemented shell in `src/renderer/App.tsx`,
-`src/components/workbench-shell.tsx`, `src/renderer/workbench/workbench-model.ts`,
-`src/renderer/styles.css`, `src/components/shadix-ui/`, and `src/components/ui/`.
+`src/components/workbench-shell.tsx`, `src/components/workbench-shell/`,
+`src/renderer/state/workbench-shell.ts`,
+`src/renderer/types/workbench-shell.ts`,
+`src/renderer/workbench/workbench-model.ts`, `src/renderer/styles.css`,
+`src/components/shadix-ui/`, and `src/components/ui/`.
 Treat this shell as the product source of truth for app layout and visible
 affordances. Future tickets should wire live services into these regions instead
 of redesigning the shell.
@@ -16,6 +19,19 @@ decisions unless a direct product contradiction appears.
 
 Chat transcript rendering and the prompt composer are intentionally visible but
 not behaviorally finalized. They remain deferred until Pi integration work.
+
+## Implementation Boundaries
+
+- `src/components/workbench-shell.tsx` is the public component entrypoint and
+  should stay focused on shell orchestration.
+- Private shell components and local shell hooks live under
+  `src/components/workbench-shell/`.
+- Durable renderer UI state that crosses shell modules lives in Jotai atoms under
+  `src/renderer/state/workbench-shell.ts`.
+- Shared exported shell types live under
+  `src/renderer/types/workbench-shell.ts`.
+- Ephemeral animation and timer state can remain in component hooks when it is
+  owned by one rendered surface.
 
 ## Inventory
 

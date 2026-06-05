@@ -10,6 +10,12 @@ As of 2026-06-05, the implemented workbench shell is the product source of
 truth for layout and visible affordances. See
 `docs/product/current-shell-inventory.md`.
 
+The shell is implemented through a stable public entrypoint at
+`src/components/workbench-shell.tsx`, private feature modules under
+`src/components/workbench-shell/`, shared Jotai atoms in
+`src/renderer/state/workbench-shell.ts`, and shared exported shell types in
+`src/renderer/types/workbench-shell.ts`.
+
 Future work should wire live repository, workspace, Pi, terminal, file, diff,
 GitHub, Linear, settings, and diagnostics services into the existing shell
 regions. Do not redesign the shell or move major surfaces unless a later product
@@ -44,6 +50,9 @@ Piductor equivalent:
 - Use Electron native menu APIs for macOS menus.
 - Use TanStack Router for durable app navigation and workspace/search state such as selected workspace, chat tab, review tab, and dock tab.
 - Use TanStack Query for backend/preload snapshots such as health, setup diagnostics, repository/workspace records, file status, terminal metadata, and PR/check state.
+- Use Jotai atoms in `src/renderer/state/` for durable renderer-only UI state
+  that crosses shell modules, such as pinned workspace IDs, collapsed project
+  IDs, project order, and closed session tab IDs.
 - Use a Piductor-specific React/shadcn visual language, not Conductor's visual identity.
 - Preserve the same pane hierarchy so Conductor users can transfer workflows.
 - Keep app diagnostics in the left sidebar footer/status area. Do not render app
