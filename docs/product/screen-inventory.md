@@ -15,7 +15,11 @@ when planning app-shell work.
 - `01-onboarding` contains no screenshots. Its local note says to infer onboarding from the rest of the UI; inferred onboarding details are documented in `docs/product/onboarding-flow.md`.
 - Repository names, local user paths, account names, email addresses, PR descriptions, chat content, and private file details visible in screenshots are described generically.
 - The annotated June 5, 2026 screenshot at `.context/attachments/NJpu5l/CleanShot 2026-06-05 at 08.42.35@2x.png` clarifies the main workspace shell structure: project/workspace sidebar, project/branch breadcrumb, chat tabs, center agent timeline and composer, right All files/Changes/Checks panel, and lower Setup/Run/Terminal dock.
-- The implemented shell in `src/components/workbench-shell.tsx` now supersedes older speculative shell notes. Use `docs/product/current-shell-inventory.md` for the current Piductor shell contract, and use this screenshot inventory as evidence for Conductor workflow parity.
+- The implemented shell in `src/components/workbench-shell.tsx` and
+  `src/components/workbench-shell/` now supersedes older speculative shell
+  notes. Use `docs/product/current-shell-inventory.md` for the current Piductor
+  shell contract, and use this screenshot inventory as evidence for Conductor
+  workflow parity.
 
 ## 01-onboarding
 
