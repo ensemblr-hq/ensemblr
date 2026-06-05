@@ -21,6 +21,22 @@ Sources checked:
 - MCP: https://www.conductor.build/docs/reference/mcp
 - Keyboard shortcuts: https://www.conductor.build/docs/reference/keyboard-shortcuts
 - User-provided screenshot inventory: `.context/conductor-screens/`, summarized in `docs/product/screen-inventory.md`
+- Implemented Piductor shell inventory: `docs/product/current-shell-inventory.md`
+
+## Implemented Shell Direction
+
+The current React workbench shell is now a product contract, not a disposable
+mockup. It establishes the sidebar/project/workspace hierarchy, active
+workspace header, open-workspace launcher, chat/session tab strip, center
+timeline and composer placement, right All files / Changes / Checks panel,
+right PR-state header, and lower Setup / Run / Terminal dock.
+
+Future parity work should replace fixture/local renderer data with live
+services through TanStack Query, typed IPC, and app services. It should not
+recreate the same shell surfaces from scratch. Chat transcript content and
+prompt-composer behavior remain deferred until Pi runtime integration.
+The current shell is the intended closest match to Conductor's own shell, even
+if original screenshot evidence is unavailable.
 
 ## Product Model
 
@@ -137,7 +153,7 @@ Sources checked:
 | --- | --- | --- |
 | Command palette | Global command palette. | Same target. |
 | Keyboard shortcuts | Navigation, workspace, chat, review, Git, terminal actions. | Same target with Piductor-specific labels. |
-| Pane layout | Sidebar, center agent timeline, right files/changes/checks panel, and lower terminal dock remain visible during work. | Same target with Piductor-specific styling. |
+| Pane layout | Sidebar, center agent timeline, right files/changes/checks panel, and lower terminal dock remain visible during work. | Same target with Piductor-specific styling. The current implemented shell locks this pane layout. |
 | Settings | App settings and repository settings. | Same target with sections inventoried in `docs/product/settings-inventory.md`. |
 | Feature flags | Experimental settings expose big terminal, many tabs, dashboard visibility, voice, resource usage, Graphite, and React profiler controls. | Same target where useful; voice, Graphite, cloud SSH, and production React profiler controls are deferred or hidden for v1. |
 | Deep links | App URL scheme that opens/acts on workspace state. | Same target with Piductor scheme. |

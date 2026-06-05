@@ -10,7 +10,7 @@ V1 builds a Pi-focused Electron desktop app with Conductor-style local workspace
 
 In scope for v1:
 
-- Electron main process, React/TypeScript renderer, shadcn/ui, Tailwind, and Piductor-owned design tokens.
+- Electron main process, React/TypeScript renderer, TanStack Router, TanStack Query, shadcn/ui, Tailwind, and Piductor-owned design tokens.
 - Local SQLite database for mutable app metadata and UI/review state.
 - macOS Keychain for secret values, with SQLite storing metadata only.
 - Declarative user config at `~/.config/piductor/config.json` with JSON schema validation.
@@ -26,6 +26,7 @@ In scope for v1:
 - First-class Linear OAuth integration with issue create/read/update/comment and workspace creation from issues.
 - GitHub PR/check/comment/merge workflows through authenticated `gh` CLI where practical.
 - Settings shell, repository settings, keyboard shortcuts, command palette, deep links, diagnostics, and non-deferred polish.
+- Implemented Conductor-style workbench shell contract for the sidebar, workspace chat tabs, right review panel, PR-state header, and setup/run/terminal dock. Live repository/workspace, terminal, file, diff, checks, Linear, GitHub, and Pi services remain in their milestone tickets and should wire into those regions.
 
 Explicitly deferred until post-core:
 
@@ -44,7 +45,7 @@ Explicitly deferred until post-core:
 
 | Milestone | Focus | Exit criteria |
 | --- | --- | --- |
-| 1. Foundation | App shell, storage, config, root, Keychain, process boundary. | The app can boot, persist metadata, load config, resolve settings, create managed directories, and run local commands through main-process services. |
+| 1. Foundation | App shell, storage, config, root, Keychain, process boundary. | The app can boot into the implemented Conductor-style shell contract, persist metadata, load config, resolve settings, create managed directories, and run local commands through main-process services. |
 | 2. Setup Gate and Configuration | First-run diagnostics, `gh` requirement, Pi executable discovery, root warnings, env/secrets, repo config parsing. | Users cannot enter core workflows until required checks pass; each failure has remediation; Linear is offered but only blocks Linear workflows. |
 | 3. Repository and Workspace Core | Add/open/clone repositories, worktree workspace creation, files-to-copy, landing state, adoption, archive context. | A user can register or clone a project, create/adopt a workspace, see it in the sidebar, and land in a ready workspace shell. |
 | 4. Pi CLI RPC Runtime and Agent Timeline | RPC client, process supervision, Pi sessions, composer, timeline, checkpoints, capability discovery. | A user can start a Pi session in a workspace and see structured events, errors, controls, and checkpoint-backed turn state. |
@@ -60,6 +61,9 @@ Explicitly deferred until post-core:
 - Discovery tasks answer known implementation uncertainties without forcing a product decision.
 - Product-decision tasks are separate and should not block unrelated engineering work.
 - Each ticket should fit one agent/workspace when practical.
+- Treat the current workbench shell as the structural UI contract. Later tickets should replace fixture/local renderer data through TanStack Query and IPC-backed services rather than rebuilding navigation, review, PR header, chat tab, composer placement, or dock regions.
+- Treat the current shell as the closest intended Conductor-shell match. Lost or unavailable screenshots are not a reason to restart shell parity design.
+- Preserve the explicit Pi deferral: chat transcript content and prompt/composer behavior are not final until Pi runtime work wires structured sessions, model/thinking controls, attachments, stop/submit, and retry/fork behavior.
 - Prefer boundaries that preserve future pivots: `PiAgentClient`, `GitHubService`, `LinearService`, `ConfigService`, `SecretStore`, `TerminalService`, and `WorkspaceService`.
 - Do not read or write Conductor's private SQLite database.
 - Do not pass Pi disabling flags by default.
@@ -89,6 +93,7 @@ Discovery tickets are intentionally separate from build tickets:
 - `PID-044` - Linear schema and permission discovery, including archive/delete support, pagination, filtering, labels, cycles, and cache metadata.
 - `PID-056` - GitHub comments, review threads, deployments, and add-all-comments coverage through `gh`.
 - `PID-068` - Non-deferred experimental feature discovery for dashboard/sidebar visibility and resource usage.
+- Current shell uncertainty to resolve before implementing related behavior: workspace-row status actions, mark-unread semantics, Dashboard visibility, and the Changes tab Review action. See `docs/product/current-shell-inventory.md`.
 
 Discovery outputs should be short design notes committed with the ticket, or appended to the source product docs if they change planning guidance.
 
@@ -117,6 +122,7 @@ If another ticket encounters ambiguity that would alter behavior, create a new D
 - `CONTEXT.md`
 - `docs/adr/*.md`
 - `docs/product/conductor-parity.md`
+- `docs/product/current-shell-inventory.md`
 - `docs/product/mvp-sequencing.md`
 - `docs/product/ux-parity.md`
 - `docs/product/onboarding-flow.md`

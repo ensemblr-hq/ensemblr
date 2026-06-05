@@ -135,7 +135,8 @@
 		-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
 	--font-sans:
 		-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-	--font-mono: "SF Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+	--font-mono:
+		"JetBrains Mono Variable", "JetBrains Mono", Menlo, Consolas, monospace;
 	--color-canvas: var(--piductor-canvas);
 	--color-toolbar: var(--piductor-toolbar);
 	--color-surface: var(--piductor-surface);
@@ -245,15 +246,97 @@
 		backdrop-filter: blur(18px) saturate(1.3);
 	}
 
+	.project-workspace-collapse {
+		display: grid;
+		grid-template-rows: 1fr;
+		opacity: 1;
+		transition:
+			grid-template-rows 160ms ease,
+			opacity 120ms ease;
+	}
+
+	.project-workspace-collapse.is-collapsed {
+		grid-template-rows: 0fr;
+		opacity: 0;
+		pointer-events: none;
+	}
+
+	.project-workspace-collapse-inner {
+		min-height: 0;
+		overflow: hidden;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.project-workspace-collapse {
+			transition: none;
+		}
+	}
+
+	.right-sidebar-header[data-pr-tone="ready"] {
+		background: color-mix(in oklch, var(--piductor-status-ok), transparent 84%);
+	}
+
+	.right-sidebar-header[data-pr-tone="pending"] {
+		background: color-mix(
+			in oklch,
+			var(--piductor-status-warning),
+			transparent 88%
+		);
+	}
+
+	.right-sidebar-header[data-pr-tone="blocked"] {
+		background: color-mix(
+			in oklch,
+			var(--piductor-status-danger),
+			transparent 88%
+		);
+	}
+
+	.sidebar-collapsed-trigger {
+		display: none;
+	}
+
+	.no-scrollbar {
+		scrollbar-width: none;
+	}
+
+	.no-scrollbar::-webkit-scrollbar {
+		display: none;
+	}
+
+	.review-panel {
+		container-type: inline-size;
+	}
+
+	.review-panel-action-label {
+		display: inline;
+	}
+
+	@container (width < 24rem) {
+		.review-panel-action-label {
+			display: none;
+		}
+	}
+
 	[data-slot="sidebar"][data-collapsible="offcanvas"]
 		~ [data-slot="sidebar-inset"]
 		.native-toolbar {
 		padding-inline-start: var(--piductor-traffic-light-safe-inline);
 	}
 
+	[data-slot="sidebar"][data-state="collapsed"]
+		~ [data-slot="sidebar-inset"]
+		.sidebar-collapsed-trigger {
+		display: inline-flex;
+	}
+
 	@media (width < 48rem) {
 		.native-toolbar {
 			padding-inline-start: var(--piductor-traffic-light-safe-inline);
+		}
+
+		.sidebar-collapsed-trigger {
+			display: inline-flex;
 		}
 	}
 

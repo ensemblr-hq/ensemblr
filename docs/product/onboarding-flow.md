@@ -38,7 +38,7 @@ Piductor should not drop users into a workspace that cannot run the core workflo
 
 8. First project path
 
-   Offer Open local project, Clone GitHub project, Open Linear issue, and Quick start. If recent projects exist, show recents after required checks pass.
+   Offer the current project-add menu entries: Open local project, Clone GitHub project, Quick start, and recents after required checks pass. Offer Linear issue browsing/workspace creation through the Linear workflow when the user chooses Linear.
 
 9. First workspace path
 
@@ -110,8 +110,8 @@ Piductor should not drop users into a workspace that cannot run the core workflo
 2. Setup gate runs and shows required checks.
 3. User confirms root directory or chooses a new one.
 4. Required checks pass.
-5. User chooses Clone GitHub project, Open local project, Open Linear issue, or Quick start.
-6. If the user selected a Linear issue, Piductor links the issue metadata and uses it to seed workspace name, branch, and initial Pi context.
+5. User chooses Clone GitHub project, Open local project, Quick start, a recent project, or the dedicated Linear issue workflow.
+6. If the user selected a Linear issue through the Linear workflow, Piductor links the issue metadata and uses it to seed workspace name, branch, and initial Pi context.
 7. Piductor creates or registers the repository under the root layout.
 8. Piductor creates the first git worktree workspace from the configured default branch.
 9. Piductor copies eligible gitignored files according to `.worktreeinclude`, repository settings, or defaults.

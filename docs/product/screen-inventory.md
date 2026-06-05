@@ -4,11 +4,18 @@ Date: 2026-06-04
 
 This inventory summarizes Conductor screenshots as UX evidence for Piductor implementation. It intentionally avoids copying Conductor branding, visual identity, private repository names, account data, tokens, issue text, PR text, and chat content. Exact file paths are included only for the screenshot evidence files.
 
+The original screenshot files may be unavailable in later workspaces. This
+document is historical parity evidence, not the current shell source of truth.
+Use `docs/product/current-shell-inventory.md` and the implemented renderer shell
+when planning app-shell work.
+
 ## Evidence Notes
 
 - `.context/conductor-screens/manifest.json` still contains only a placeholder entry, so this inventory was built from the PNG files directly.
 - `01-onboarding` contains no screenshots. Its local note says to infer onboarding from the rest of the UI; inferred onboarding details are documented in `docs/product/onboarding-flow.md`.
 - Repository names, local user paths, account names, email addresses, PR descriptions, chat content, and private file details visible in screenshots are described generically.
+- The annotated June 5, 2026 screenshot at `.context/attachments/NJpu5l/CleanShot 2026-06-05 at 08.42.35@2x.png` clarifies the main workspace shell structure: project/workspace sidebar, project/branch breadcrumb, chat tabs, center agent timeline and composer, right All files/Changes/Checks panel, and lower Setup/Run/Terminal dock.
+- The implemented shell in `src/components/workbench-shell.tsx` now supersedes older speculative shell notes. Use `docs/product/current-shell-inventory.md` for the current Piductor shell contract, and use this screenshot inventory as evidence for Conductor workflow parity.
 
 ## 01-onboarding
 
@@ -221,6 +228,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: Private project names, paths, chat text, and files are visible but not transcribed.
 - Settings or configuration implied: Recents list, project storage, GitHub project integration, quick-start templates.
 - Piductor parity requirement: Provide project-add menu with local open, GitHub clone/open, quick-start, and recents.
+- Current Piductor shell alignment: The visible project-add menu already establishes Open project, Open GitHub project, Quick start, and recents as the shell contract. Linear issue entry remains v1 scope through the Linear issue workflow, not a required item in this menu.
 - Pi-specific adaptation: New projects should initialize Piductor/Pi repository settings and preserve Pi project context files.
 - Risks or implementation notes: Recents may expose private paths; avoid unnecessary telemetry and store locally.
 
@@ -305,6 +313,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: Private chat content and file details are visible but not transcribed; visible status includes no PR, uncommitted changes, and no todos.
 - Settings or configuration implied: Retry behavior, model and reasoning controls, setup/run lifecycle, PR/check/todo state.
 - Piductor parity requirement: Render structured agent events, tool calls, runtime errors, retry actions, composer controls, and side-panel status without losing workspace context.
+- Current Piductor shell alignment: The tab strip, timeline location, setup warning, and composer placement are locked. Chat content and prompt behavior remain deferred until Pi integration.
 - Pi-specific adaptation: Replace provider-limit errors with Pi CLI/RPC runtime error cards, Pi session retry/fork behavior, and Pi model/thinking controls.
 - Risks or implementation notes: Retrying in a new chat must preserve file state and make session branching understandable.
 
@@ -323,6 +332,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: Private command output is visible but generalized.
 - Settings or configuration implied: Setup script command, captured process logs, terminal tab persistence.
 - Piductor parity requirement: Provide docked setup/run/terminal panes with output capture and rerun controls.
+- Current Piductor shell alignment: The lower-right Setup / Run / Terminal dock, collapse affordance, and script-state action placement are already represented. Future terminal tickets should replace placeholder logs with live process/PTY data in place.
 - Pi-specific adaptation: Run scripts are independent of Pi but should include `PIDUCTOR_*` and compatibility environment variables.
 - Risks or implementation notes: Large output, interactive prompts, and process cancellation need terminal/process supervision.
 
@@ -341,6 +351,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: Private file names and change counts are visible but generalized.
 - Settings or configuration implied: File status calculation, diff color policy, review-mode preference.
 - Piductor parity requirement: Provide a structured changes tree with file statuses, additions/deletions, grouping, search, and review controls.
+- Current Piductor shell alignment: All files / Changes / Checks tab placement, changes list/tree toggle, folder grouping, and command-style file search are represented in the current shell. Future work should wire git/diff data into these surfaces.
 - Pi-specific adaptation: Diff/review data is runtime-agnostic; selected diff/comment context should be sendable to Pi.
 - Risks or implementation notes: Full diff body and line-comment UI are not captured in this screenshot set.
 
@@ -375,6 +386,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: PR title/description, check provider names, comment identifiers, and private content are visible but generalized.
 - Settings or configuration implied: PR metadata cache, CI/check status polling, comment ingestion, merge policy, todo storage.
 - Piductor parity requirement: Show PR metadata, check states, comments, todos, external links, and merge blockers in one checks panel.
+- Current Piductor shell alignment: The right PR header and Checks panel already represent the no-PR, checking, blocked, and ready state shape. Future work should wire `gh`/GitHub metadata and merge confirmation into the existing surfaces.
 - Pi-specific adaptation: Add comments/review context to Pi chat rather than Claude/Codex chat.
 - Risks or implementation notes: `gh` may not expose all comment/review-thread detail needed; direct GitHub API may be required later.
 
