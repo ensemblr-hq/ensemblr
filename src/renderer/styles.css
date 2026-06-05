@@ -274,11 +274,6 @@
 
 	.right-sidebar-header[data-pr-tone="ready"] {
 		background: color-mix(in oklch, var(--piductor-status-ok), transparent 84%);
-		border-color: color-mix(
-			in oklch,
-			var(--piductor-status-ok),
-			transparent 68%
-		);
 	}
 
 	.right-sidebar-header[data-pr-tone="pending"] {
@@ -287,11 +282,6 @@
 			var(--piductor-status-warning),
 			transparent 88%
 		);
-		border-color: color-mix(
-			in oklch,
-			var(--piductor-status-warning),
-			transparent 72%
-		);
 	}
 
 	.right-sidebar-header[data-pr-tone="blocked"] {
@@ -299,11 +289,6 @@
 			in oklch,
 			var(--piductor-status-danger),
 			transparent 88%
-		);
-		border-color: color-mix(
-			in oklch,
-			var(--piductor-status-danger),
-			transparent 72%
 		);
 	}
 

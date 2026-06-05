@@ -159,17 +159,14 @@ interface WorkbenchShellProps {
 	composer: ComposerShellState;
 	dockTabId: DockTabId;
 	health: WorkbenchHealth;
-	isSetupRefreshing: boolean;
 	onDockTabChange: (tab: DockTabId) => void;
 	onHistorySelect: () => void;
 	onReviewTabChange: (tab: ReviewPanelTab) => void;
 	onSessionTabChange: (sessionId: string) => void;
 	onSettingsSelect: () => void;
-	onSetupRetry: () => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projects: ProjectShellModel[];
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
-	setupError: string | null;
 }
 
 type ChangesViewMode = 'folders' | 'list';
@@ -200,6 +197,8 @@ const fileStatusLabel: Record<ReviewFileSummary['status'], string> = {
 	untracked: 'U',
 };
 
+const RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH = 1024;
+
 function getReorderedShellItems<T extends { id: string }>(
 	items: T[],
 	reorderedElements: ReactElement[],
@@ -225,6 +224,17 @@ function normalizeReorderElementKey(key: ReactElement['key']) {
 	return String(key).replace(/^\.\$/, '').replace(/^\./, '');
 }
 
+async function ensureWindowCanShowRightSidebar() {
+	if (
+		window.matchMedia(`(min-width: ${RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH}px)`)
+			.matches
+	) {
+		return;
+	}
+
+	await window.piductor?.ensureWindowWidth(RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH);
+}
+
 export function WorkbenchShell({
 	activeProject,
 	activeReviewTab,
@@ -245,6 +255,7 @@ export function WorkbenchShell({
 }: WorkbenchShellProps) {
 	const rightSidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const dockPanelRef = useRef<PanelImperativeHandle | null>(null);
+	const rightSidebarCollapsedByViewportRef = useRef(false);
 	const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
 	const [isDockCollapsed, setIsDockCollapsed] = useState(false);
 	const projectNavigation = useProjectNavigationState(projects);
@@ -254,12 +265,18 @@ export function WorkbenchShell({
 		onSessionTabChange,
 	});
 	const collapseRightSidebar = () => {
+		rightSidebarCollapsedByViewportRef.current = false;
 		rightSidebarPanelRef.current?.collapse();
 		setIsRightSidebarCollapsed(true);
 	};
-	const expandRightSidebar = () => {
-		rightSidebarPanelRef.current?.expand();
-		setIsRightSidebarCollapsed(false);
+	const expandRightSidebar = async () => {
+		rightSidebarCollapsedByViewportRef.current = false;
+		await ensureWindowCanShowRightSidebar();
+
+		window.requestAnimationFrame(() => {
+			rightSidebarPanelRef.current?.expand();
+			setIsRightSidebarCollapsed(false);
+		});
 	};
 	const toggleDockPanel = () => {
 		if (dockPanelRef.current?.isCollapsed() || isDockCollapsed) {
@@ -271,6 +288,58 @@ export function WorkbenchShell({
 		dockPanelRef.current?.collapse();
 		setIsDockCollapsed(true);
 	};
+
+	useEffect(() => {
+		const narrowViewportQuery = window.matchMedia(
+			`(max-width: ${RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH - 1}px)`,
+		);
+		let restoreFrame: number | null = null;
+		const syncRightSidebarWithViewport = () => {
+			if (narrowViewportQuery.matches) {
+				if (restoreFrame !== null) {
+					window.cancelAnimationFrame(restoreFrame);
+					restoreFrame = null;
+				}
+
+				const wasAlreadyCollapsed =
+					rightSidebarPanelRef.current?.isCollapsed() ||
+					isRightSidebarCollapsed;
+
+				rightSidebarPanelRef.current?.collapse();
+				setIsRightSidebarCollapsed(true);
+
+				if (!wasAlreadyCollapsed) {
+					rightSidebarCollapsedByViewportRef.current = true;
+				}
+				return;
+			}
+
+			if (rightSidebarCollapsedByViewportRef.current) {
+				restoreFrame = window.requestAnimationFrame(() => {
+					rightSidebarPanelRef.current?.expand();
+					setIsRightSidebarCollapsed(false);
+					rightSidebarCollapsedByViewportRef.current = false;
+					restoreFrame = null;
+				});
+			}
+		};
+
+		syncRightSidebarWithViewport();
+		narrowViewportQuery.addEventListener(
+			'change',
+			syncRightSidebarWithViewport,
+		);
+
+		return () => {
+			if (restoreFrame !== null) {
+				window.cancelAnimationFrame(restoreFrame);
+			}
+			narrowViewportQuery.removeEventListener(
+				'change',
+				syncRightSidebarWithViewport,
+			);
+		};
+	}, [isRightSidebarCollapsed]);
 
 	return (
 		<TooltipProvider>
@@ -621,7 +690,7 @@ function SidebarPrimaryNavigation({
 }) {
 	return (
 		<>
-			<SidebarGroup className='min-h-[2.9375rem] justify-center py-1'>
+			<SidebarGroup className='min-h-11.75 justify-center py-1'>
 				<SidebarGroupContent>
 					<SidebarMenu className='gap-1'>
 						<SidebarMenuItem>
@@ -1944,7 +2013,7 @@ function SessionTabs({
 						return (
 							<div
 								className={cn(
-									'group/session-tab relative flex h-12 min-w-[7.5rem] flex-none items-center overflow-hidden border-transparent border-b-2 text-xs transition-colors',
+									'group/session-tab relative flex h-12 min-w-30 flex-none items-center overflow-hidden border-transparent border-b-2 text-xs transition-colors',
 									isActive
 										? 'border-primary bg-muted/50 text-foreground'
 										: 'text-muted-foreground hover:text-foreground',
@@ -1972,7 +2041,7 @@ function SessionTabs({
 										<span
 											aria-hidden='true'
 											className={cn(
-												'pointer-events-none absolute inset-y-0 right-0 w-16 bg-gradient-to-l to-transparent opacity-0 transition-opacity group-hover/session-tab:opacity-100',
+												'pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent opacity-0 transition-opacity group-hover/session-tab:opacity-100',
 												isActive
 													? 'from-muted via-muted/90'
 													: 'from-background via-background/90',
@@ -2088,7 +2157,7 @@ function WorkspaceTimeline({
 							</p>
 							<p className='mt-1 text-muted-foreground text-xs leading-5'>
 								The workbench remains visible while setup diagnostics block the
-								composer. Use the setup dock to inspect remediation.
+								composer. Check the left sidebar footer for app readiness.
 							</p>
 						</div>
 					</div>

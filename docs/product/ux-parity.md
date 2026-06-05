@@ -33,10 +33,11 @@ runtime event rendering, and session tree behavior to Pi runtime tickets.
   exists in the renderer but is not a visible current-shell sidebar item.
 - Projects grouped in the sidebar, each containing one or more workspaces.
 - Workspace rows show the current task/branch plus compact change statistics.
-- Sidebar footer exposes app health/readiness status.
+- Sidebar footer exposes app health/readiness status and app diagnostics.
 - Center pane is the active workspace surface, usually a tabbed agent timeline.
 - Right pane switches between All files, Changes, and Checks.
-- Lower-right dock switches between Setup, Run, and terminal tabs.
+- Lower-right dock switches between Setup, Run, and terminal tabs. The Setup
+  tab is for workspace/project setup command output only, not app diagnostics.
 
 Piductor equivalent:
 
@@ -45,6 +46,8 @@ Piductor equivalent:
 - Use TanStack Query for backend/preload snapshots such as health, setup diagnostics, repository/workspace records, file status, terminal metadata, and PR/check state.
 - Use a Piductor-specific React/shadcn visual language, not Conductor's visual identity.
 - Preserve the same pane hierarchy so Conductor users can transfer workflows.
+- Keep app diagnostics in the left sidebar footer/status area. Do not render app
+  setup diagnostics in the lower Setup dock.
 - Treat the current shell as locked product direction. Later service tickets should replace fixture data inside the existing sidebar, timeline, review panel, and dock regions instead of creating new regions.
 
 ### Settings Shell

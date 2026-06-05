@@ -13,7 +13,6 @@ import {
 import {
 	DEFAULT_DOCK_TAB,
 	DEFAULT_REVIEW_TAB,
-	type DockTabId,
 	findProject,
 	findSession,
 	findWorkspace,
@@ -49,14 +48,9 @@ export function App({
 		: getDefaultWorkspace();
 	const activeSession = findSession(activeWorkspace, search?.chat);
 	const activeReviewTab = search?.review ?? DEFAULT_REVIEW_TAB;
-	const requestedDockTab = search?.dock ?? DEFAULT_DOCK_TAB;
+	const activeDockTab = search?.dock ?? DEFAULT_DOCK_TAB;
 	const setupError = getErrorMessage(setupDiagnostics.error);
 	const setupSnapshot = setupDiagnostics.data ?? null;
-	const setupBlocksComposer =
-		!!setupError || !setupSnapshot || setupSnapshot.status !== 'ready';
-	const activeDockTab: DockTabId = setupBlocksComposer
-		? 'setup'
-		: requestedDockTab;
 
 	const composer = getComposerState({
 		activeSession,
@@ -86,6 +80,34 @@ export function App({
 				};
 			}
 
+			if (setupError) {
+				return {
+					detail: setupError,
+					label: 'Setup diagnostics unavailable',
+					state: 'unavailable',
+				};
+			}
+
+			if (!setupSnapshot) {
+				return {
+					detail: 'Piductor is collecting setup readiness checks.',
+					label: 'Checking setup',
+					state: 'pending',
+				};
+			}
+
+			if (setupSnapshot.status !== 'ready') {
+				return {
+					detail: `${setupSnapshot.blockedCount} required setup checks need attention.`,
+					label:
+						setupSnapshot.status === 'checking'
+							? 'Setup checks pending'
+							: 'Setup blocked',
+					state:
+						setupSnapshot.status === 'checking' ? 'pending' : 'unavailable',
+				};
+			}
+
 			return {
 				detail: `Electron ${snapshot.versions.electron} on ${snapshot.platform}. Database schema v${snapshot.database.schemaVersion}.`,
 				label: `${snapshot.appName} IPC online`,
@@ -109,7 +131,7 @@ export function App({
 			label: 'Checking IPC',
 			state: 'pending',
 		};
-	}, [health.data, health.error]);
+	}, [health.data, health.error, setupError, setupSnapshot]);
 
 	function navigateToWorkspace(nextProjectId: string, nextWorkspaceId: string) {
 		const nextProject = findProject(nextProjectId);
@@ -156,19 +178,14 @@ export function App({
 			composer={composer}
 			dockTabId={activeDockTab}
 			health={shellHealth}
-			isSetupRefreshing={setupDiagnostics.isFetching}
 			onDockTabChange={(dock) => updateSearch({ dock })}
 			onHistorySelect={() => navigate({ to: '/history' })}
 			onReviewTabChange={(review) => updateSearch({ review })}
 			onSessionTabChange={(chat) => updateSearch({ chat })}
 			onSettingsSelect={() => navigate({ to: '/settings' })}
-			onSetupRetry={() => {
-				setupDiagnostics.refetch();
-			}}
 			onWorkspaceSelect={navigateToWorkspace}
 			projects={shellFixtureProjects}
 			setupDiagnostics={setupSnapshot}
-			setupError={setupError}
 		/>
 	);
 }

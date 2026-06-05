@@ -11,6 +11,11 @@ import {
 } from '../shared/ipc';
 
 const api: PiductorApi = {
+	ensureWindowWidth: (minimumWidth: number) =>
+		ipcRenderer.invoke(
+			IPC_CHANNELS.ensureWindowWidth,
+			minimumWidth,
+		) as Promise<void>,
 	health: () =>
 		ipcRenderer.invoke(IPC_CHANNELS.health) as Promise<HealthSnapshot>,
 	rootDirectory: () =>

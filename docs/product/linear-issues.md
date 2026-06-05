@@ -78,7 +78,8 @@ Out of scope:
 Acceptance criteria:
 - Core shell components render from Piductor-owned tokens.
 - The style direction is distinct from Conductor and not stock shadcn defaults.
-- Setup-blocked state disables the composer while keeping the workbench visible and selecting the setup dock.
+- Setup-blocked state disables the composer while keeping the workbench visible and surfacing app diagnostics in the left sidebar footer/status area.
+- The lower Setup dock remains reserved for workspace/project setup command output, such as dependency install logs.
 - The visible shell matches `docs/product/current-shell-inventory.md`; placeholder actions are documented as placeholders or open decisions.
 - Components support light/dark or theme token switching if the app foundation already exposes it.
 
@@ -1425,6 +1426,7 @@ Scope:
 - Wire Setup, Run, and named terminal tabs in the existing lower-right dock without changing the dock placement, tab names, or collapse behavior.
 - Support fit/resize, scrollback, copy/paste, links where available, and status badges.
 - Keep dock visible alongside timeline and right panel.
+- Keep the Setup tab scoped to workspace/project setup command output. App setup diagnostics belong in the left sidebar footer/status area, not in the dock.
 
 Out of scope:
 - Big terminal mode, covered by polish/discovery.

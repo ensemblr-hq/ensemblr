@@ -1,4 +1,4 @@
-import { app, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 
 import {
 	type HealthSnapshot,
@@ -12,6 +12,8 @@ import type { PiductorConfigResolutionService } from './config/config-resolution
 import type { PiductorRootDirectoryService } from './root/root-directory';
 import type { SetupDiagnosticsService } from './setup/setup-diagnostics';
 import type { PiductorDatabaseService } from './storage/database';
+
+const MAX_ENSURED_WINDOW_WIDTH = 2400;
 
 interface RegisterIpcHandlersOptions {
 	configService: PiductorConfigService;
@@ -28,6 +30,33 @@ export function registerIpcHandlers({
 	setupDiagnosticsService,
 	settingsResolutionService,
 }: RegisterIpcHandlersOptions): void {
+	ipcMain.handle(
+		IPC_CHANNELS.ensureWindowWidth,
+		(event, minimumWidth: unknown) => {
+			const requestedWidth =
+				typeof minimumWidth === 'number' && Number.isFinite(minimumWidth)
+					? Math.ceil(minimumWidth)
+					: 0;
+
+			if (requestedWidth <= 0) {
+				return;
+			}
+
+			const window = BrowserWindow.fromWebContents(event.sender);
+
+			if (!window || window.isDestroyed() || window.isFullScreen()) {
+				return;
+			}
+
+			const targetWidth = Math.min(requestedWidth, MAX_ENSURED_WINDOW_WIDTH);
+			const [width, height] = window.getSize();
+
+			if (width < targetWidth) {
+				window.setSize(targetWidth, height);
+			}
+		},
+	);
+
 	ipcMain.handle(IPC_CHANNELS.health, (): HealthSnapshot => {
 		return {
 			appName: app.getName(),

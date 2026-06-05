@@ -65,17 +65,14 @@ function renderWorkbench(
 				label: 'IPC online',
 				state: 'online',
 			}}
-			isSetupRefreshing={false}
 			onDockTabChange={() => undefined}
 			onHistorySelect={() => undefined}
 			onReviewTabChange={() => undefined}
 			onSessionTabChange={() => undefined}
 			onSettingsSelect={() => undefined}
-			onSetupRetry={() => undefined}
 			onWorkspaceSelect={() => undefined}
 			projects={shellFixtureProjects}
 			setupDiagnostics={snapshot}
-			setupError={null}
 		/>,
 	);
 }
@@ -497,6 +494,9 @@ test('keeps blocked setup inside the workbench and disables the composer', () =>
 	expect(markup).toContain('Fix setup blockers before sending a prompt.');
 	expect(markup).toContain('disabled');
 	expect(markup).toContain('bun install');
+	expect(markup).not.toContain('Core workflows blocked');
+	expect(markup).not.toContain('Git executable');
+	expect(markup).not.toContain('Retry checks');
 	expect(markup).toContain('Open :5173');
 });
 
