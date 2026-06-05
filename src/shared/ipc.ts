@@ -2,6 +2,7 @@ export const IPC_CHANNELS = {
 	ensureWindowWidth: 'ensemble:ensure-window-width',
 	health: 'ensemble:health',
 	rootDirectory: 'ensemble:root-directory',
+	selectPiExecutable: 'ensemble:select-pi-executable',
 	setupDiagnostics: 'ensemble:setup-diagnostics',
 	settingsResolution: 'ensemble:settings-resolution',
 } as const;
@@ -207,6 +208,12 @@ export interface SetupDiagnosticsSnapshot {
 	warningCount: number;
 }
 
+export interface PiExecutableSelectionResult {
+	canceled: boolean;
+	error?: string;
+	selectedPath?: string;
+}
+
 export interface EnsembleApi {
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
 	health: () => Promise<HealthSnapshot>;
@@ -214,5 +221,6 @@ export interface EnsembleApi {
 	resolveSettings: (
 		request?: SettingsResolutionRequest,
 	) => Promise<SettingsResolutionSnapshot>;
+	selectPiExecutable: () => Promise<PiExecutableSelectionResult>;
 	setupDiagnostics: () => Promise<SetupDiagnosticsSnapshot>;
 }

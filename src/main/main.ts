@@ -7,6 +7,7 @@ import { createEnsembleConfigService } from './config/config-loader';
 import { createEnsembleConfigResolutionService } from './config/config-resolution';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
+import { createPiExecutableService } from './pi/pi-executable';
 import { createEnsembleRootDirectoryService } from './root/root-directory';
 import { createSetupDiagnosticsService } from './setup/setup-diagnostics';
 import { createEnsembleDatabaseService } from './storage/database';
@@ -68,10 +69,16 @@ const rootDirectoryService = createEnsembleRootDirectoryService({
 	databaseService,
 	settingsResolutionService,
 });
+const piExecutableService = createPiExecutableService({
+	databaseService,
+	localCommandService,
+	settingsResolutionService,
+});
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
 	databaseService,
 	localCommandService,
+	piExecutableService,
 	rootDirectoryService,
 });
 
@@ -83,6 +90,7 @@ app.whenReady().then(() => {
 	registerIpcHandlers({
 		configService,
 		databaseService,
+		piExecutableService,
 		rootDirectoryService,
 		setupDiagnosticsService,
 		settingsResolutionService,

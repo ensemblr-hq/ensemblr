@@ -1,6 +1,6 @@
 # Linear Issues
 
-Date: 2026-06-04
+Date: 2026-06-05
 
 These issue templates are ready to copy into Linear. `ENS-*` IDs are local planning IDs for dependencies and can be replaced by Linear issue keys after import.
 
@@ -1186,12 +1186,52 @@ Source:
 Implementation notes:
 - Do not treat Pi RPC as a terminal transcript; keep the event model structured.
 
+## ENS-075 Agent Chat Pane UX/UI Working Session
+
+Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
+Type: Docs
+Priority: P0
+Dependencies: ENS-030, ENS-035
+
+Summary:
+Run an interactive product session with the user after Pi composer/timeline integration to finalize the agent chat pane UX/UI.
+
+Scope:
+- Review realistic Pi timeline output, composer behavior, model/thinking controls, attachment/context chips, tool-call rendering, runtime errors, stop/retry/fork affordances, compaction/context indicators, and chat/session tab behavior.
+- Decide which controls are visible by default, collapsed, disabled, or deferred.
+- Capture responsive layout and empty, running, blocked, error, and long-session states for the center chat pane.
+- Update product docs and downstream tickets with the accepted behavior.
+
+Out of scope:
+- Implementing chat pane UI changes in this session.
+- Revisiting the selected Pi CLI RPC runtime boundary.
+- Voice input.
+
+Acceptance criteria:
+- Decision note records accepted chat pane information architecture and interaction states.
+- Open questions from the session are converted into explicit follow-up tickets or Decision Needed items.
+- Retry/fork discovery and chat-tab refinement tickets have enough UX direction to proceed without guessing.
+- Deferred behavior is named explicitly.
+
+Verification:
+- Product review with the user using current app state, screenshots, or realistic fixtures.
+- Docs updated consistently after the session.
+
+Source:
+- `docs/product/current-shell-inventory.md`
+- `docs/product/ux-parity.md`
+- `docs/product/screen-inventory.md`
+- `docs/product/open-decisions.md`
+
+Implementation notes:
+- Schedule after basic Pi composer/timeline integration so decisions are grounded in realistic Pi behavior instead of static shell placeholders.
+
 ## ENS-031 Runtime Error Retry and Session-Fork Discovery
 
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Docs
 Priority: P0
-Dependencies: ENS-026, ENS-027, ENS-035
+Dependencies: ENS-026, ENS-027, ENS-035, ENS-075
 
 Summary:
 Discover how Pi CLI/RPC supports retry, retry-in-new-chat, session tree navigation, continuation, fork behavior, and compaction UI.
@@ -1305,7 +1345,7 @@ Implementation notes:
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Cross-cutting
 Priority: P1
-Dependencies: ENS-028, ENS-030
+Dependencies: ENS-028, ENS-030, ENS-075
 
 Summary:
 Model chat tabs, preview tabs, and the five-open-chat-tab limit per workspace.
@@ -2333,12 +2373,53 @@ Source:
 Implementation notes:
 - Keep archive behavior consistent whether triggered manually or after merge.
 
+## ENS-076 App Settings Screen UX/UI Working Session
+
+Milestone: 8. Settings and Parity Polish
+Type: Docs
+Priority: P0
+Dependencies: ENS-002, ENS-020
+
+Summary:
+Run an interactive product session with the user to finalize the app settings page/screen before building the full settings shell and forms.
+
+Scope:
+- Review the current Settings entry, settings inventory, app-wide section order, repository-section placement, source-diagnostics pattern, status/health rows, advanced root/Pi executable flows, and save/revert/error behavior.
+- Decide navigation behavior, page density, section grouping, inline editing rules, disabled states, and which settings are visible for v1 versus deferred.
+- Confirm how setup readiness, security, permissions, Linear, `gh`, Pi readiness, environment variables, appearance, and experimental flags appear in app settings.
+- Update settings inventory, roadmap guidance, and downstream settings tickets with the accepted behavior.
+
+Out of scope:
+- Implementing settings shell or form fields in this session.
+- Reopening deferred account/cloud, voice, Graphite, cloud SSH, or production profiler decisions.
+- Creating actual Linear issues.
+
+Acceptance criteria:
+- Decision note records accepted settings information architecture, section order, interaction states, and save semantics.
+- Deferred or omitted settings are named explicitly.
+- Settings shell and app settings implementation tickets have enough UX direction to proceed without guessing.
+- Any new ambiguity is converted into explicit follow-up tickets or Decision Needed items.
+
+Verification:
+- Product review with the user using current app state, screenshots, inventory docs, or realistic wireframe fixtures.
+- Docs updated consistently after the session.
+
+Source:
+- `docs/product/settings-inventory.md`
+- `docs/product/current-shell-inventory.md`
+- `docs/product/screen-inventory.md`
+- `docs/product/ux-parity.md`
+- `docs/product/open-decisions.md`
+
+Implementation notes:
+- Schedule before the full settings shell/form implementation so build tickets do not lock in unreviewed settings IA.
+
 ## ENS-061 Settings Shell with App and Repository Sections
 
 Milestone: 8. Settings and Parity Polish
 Type: Frontend
 Priority: P0
-Dependencies: ENS-002, ENS-003, ENS-020
+Dependencies: ENS-003, ENS-076
 
 Summary:
 Build the full-window settings shell with app-wide sections and local repository sections.
