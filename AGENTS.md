@@ -50,7 +50,8 @@ This repository uses Biome instead of ESLint and Prettier.
 ## State Management Policy
 
 - Use Jotai as the only app-level state management solution.
-- Define shared renderer state with Jotai atoms, preferably in feature-owned state modules or `src/renderer/state/` for cross-feature app state.
+- Define shared renderer state with Jotai atoms in feature-owned modules under `src/renderer/state/`, for example `src/renderer/state/workbench-shell.ts`.
+- Do not place shared Jotai atoms under `src/components/`. Component modules may read/write atoms, but durable state definitions belong in `src/renderer/state/`.
 - Do not add or use Redux, Zustand, Recoil, Valtio, MobX, Nanostores, XState, Effector, or custom global store implementations.
 - React `useState` is allowed for ephemeral state owned by one component. If state crosses feature or component boundaries, model it as Jotai atoms.
 - React context is allowed only for structural provider APIs and compound-component wiring, not as an app state store.
@@ -72,10 +73,12 @@ This repository uses Biome instead of ESLint and Prettier.
 - Before introducing a helper, wrapper, hook, or component, ask whether it reduces the number of methods, simplifies parameters, or hides complexity inside the module. If not, inline it or consolidate it with a more appropriate module.
 - Organize `lib`, `utils`, and `components` by scope or concern. Avoid catch-all files and directories that mix unrelated domains.
 - Keep broadly reusable primitives in shared locations, and keep feature-specific helpers/components under the feature or concern that owns them.
+- Large feature surfaces should keep a stable public entrypoint and move private pieces into a sibling feature folder, for example `src/components/workbench-shell.tsx` plus `src/components/workbench-shell/`.
 
 ## Type Organization
 
-- If the project has a dedicated types folder or type module, use it for exported types that are shared across files or concerns.
+- Put exported renderer types that are shared across files or concerns in feature-owned modules under `src/renderer/types/`, for example `src/renderer/types/workbench-shell.ts`.
+- Do not place shared exported renderer types in component-local `types.ts` files under `src/components/`.
 - Co-locate types with implementation only when they are not exported and are not used elsewhere.
 - Prefer inline prop types when a component has only a small number of props and the inline type remains readable.
 - Avoid creating one-off exported `Props` or domain type names unless they are reused, part of a public module interface, or materially improve readability.

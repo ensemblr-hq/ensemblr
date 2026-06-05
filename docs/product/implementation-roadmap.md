@@ -26,7 +26,7 @@ In scope for v1:
 - First-class Linear OAuth integration with issue create/read/update/comment and workspace creation from issues.
 - GitHub PR/check/comment/merge workflows through authenticated `gh` CLI where practical.
 - Settings shell, repository settings, keyboard shortcuts, command palette, deep links, diagnostics, and non-deferred polish.
-- Implemented Conductor-style workbench shell contract for the sidebar, workspace chat tabs, right review panel, PR-state header, and setup/run/terminal dock. Live repository/workspace, terminal, file, diff, checks, Linear, GitHub, and Pi services remain in their milestone tickets and should wire into those regions.
+- Implemented Conductor-style workbench shell contract for the sidebar, workspace chat tabs, right review panel, PR-state header, and setup/run/terminal dock. The shell uses `src/components/workbench-shell.tsx` as the public entrypoint, private modules under `src/components/workbench-shell/`, Jotai atoms in `src/renderer/state/workbench-shell.ts`, and shared shell types in `src/renderer/types/workbench-shell.ts`. Live repository/workspace, terminal, file, diff, checks, Linear, GitHub, and Pi services remain in their milestone tickets and should wire into those regions.
 
 Explicitly deferred until post-core:
 
@@ -62,6 +62,7 @@ Explicitly deferred until post-core:
 - Product-decision tasks are separate and should not block unrelated engineering work.
 - Each ticket should fit one agent/workspace when practical.
 - Treat the current workbench shell as the structural UI contract. Later tickets should replace fixture/local renderer data through TanStack Query and IPC-backed services rather than rebuilding navigation, review, PR header, chat tab, composer placement, or dock regions.
+- Keep durable renderer-only UI state in feature-owned Jotai atom modules under `src/renderer/state/`, and keep shared exported renderer types under `src/renderer/types/`.
 - Treat the current shell as the closest intended Conductor-shell match. Lost or unavailable screenshots are not a reason to restart shell parity design.
 - Preserve the explicit Pi deferral: chat transcript content and prompt/composer behavior are not final until Pi runtime work wires structured sessions, model/thinking controls, attachments, stop/submit, and retry/fork behavior.
 - Prefer boundaries that preserve future pivots: `PiAgentClient`, `GitHubService`, `LinearService`, `ConfigService`, `SecretStore`, `TerminalService`, and `WorkspaceService`.
