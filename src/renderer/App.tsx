@@ -13,7 +13,7 @@ import {
 	SlidersHorizontalIcon,
 	WrenchIcon,
 } from 'lucide-react';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
 	AppFrame,
@@ -21,6 +21,10 @@ import {
 	type ShellRoute,
 } from '@/components/app-frame';
 import { DesignSystemPreview } from '@/components/design-system-preview';
+import {
+	SetupDiagnosticsCompact,
+	SetupDiagnosticsPanel,
+} from '@/components/setup-diagnostics';
 import { ShellPanel } from '@/components/shell-panel';
 import { StatusBadge } from '@/components/status-badge';
 import { TerminalDock } from '@/components/terminal-dock';
@@ -31,8 +35,10 @@ import {
 	healthAtom,
 	healthErrorAtom,
 	type RouteId,
+	setupDiagnosticsAtom,
+	setupDiagnosticsErrorAtom,
 } from '@/renderer/state/app-state';
-import type { HealthSnapshot } from '@/shared/ipc';
+import type { HealthSnapshot, SetupDiagnosticsSnapshot } from '@/shared/ipc';
 
 const ROUTES: readonly ShellRoute<RouteId>[] = [
 	{
@@ -139,8 +145,40 @@ export function App() {
 	const [activeRoute, setActiveRoute] = useAtom(activeRouteAtom);
 	const health = useAtomValue(healthAtom);
 	const healthError = useAtomValue(healthErrorAtom);
+	const setupDiagnostics = useAtomValue(setupDiagnosticsAtom);
+	const setupDiagnosticsError = useAtomValue(setupDiagnosticsErrorAtom);
 	const setHealth = useSetAtom(healthAtom);
 	const setHealthError = useSetAtom(healthErrorAtom);
+	const setSetupDiagnostics = useSetAtom(setupDiagnosticsAtom);
+	const setSetupDiagnosticsError = useSetAtom(setupDiagnosticsErrorAtom);
+	const [isSetupRetrying, setIsSetupRetrying] = useState(false);
+
+	const refreshSetupDiagnostics = useCallback(() => {
+		const piductor = window.piductor;
+
+		if (!piductor) {
+			setSetupDiagnosticsError(
+				'Electron preload bridge is unavailable in this context.',
+			);
+			return;
+		}
+
+		setIsSetupRetrying(true);
+		setSetupDiagnosticsError(null);
+		piductor
+			.setupDiagnostics()
+			.then((snapshot) => {
+				setSetupDiagnostics(snapshot);
+			})
+			.catch((error: unknown) => {
+				setSetupDiagnosticsError(
+					error instanceof Error ? error.message : 'Unknown setup IPC failure',
+				);
+			})
+			.finally(() => {
+				setIsSetupRetrying(false);
+			});
+	}, [setSetupDiagnostics, setSetupDiagnosticsError]);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -167,10 +205,42 @@ export function App() {
 				}
 			});
 
+		piductor
+			.setupDiagnostics()
+			.then((snapshot) => {
+				if (isMounted) {
+					setSetupDiagnostics(snapshot);
+				}
+			})
+			.catch((error: unknown) => {
+				if (isMounted) {
+					setSetupDiagnosticsError(
+						error instanceof Error
+							? error.message
+							: 'Unknown setup IPC failure',
+					);
+				}
+			});
+
 		return () => {
 			isMounted = false;
 		};
-	}, [setHealth, setHealthError]);
+	}, [
+		setHealth,
+		setHealthError,
+		setSetupDiagnostics,
+		setSetupDiagnosticsError,
+	]);
+
+	useEffect(() => {
+		if (
+			setupDiagnostics &&
+			setupDiagnostics.status !== 'ready' &&
+			(activeRoute === 'dashboard' || activeRoute === 'workspace')
+		) {
+			setActiveRoute('setup');
+		}
+	}, [activeRoute, setActiveRoute, setupDiagnostics]);
 
 	const shellHealth = useMemo<ShellHealth>(() => {
 		if (health) {
@@ -189,6 +259,18 @@ export function App() {
 						'Declarative config blocks readiness.',
 					label: `${health.appName} config requires attention`,
 					state: 'unavailable',
+				};
+			}
+
+			if (setupDiagnostics && setupDiagnostics.status !== 'ready') {
+				return {
+					detail: `${setupDiagnostics.blockedCount} required setup checks are not ready.`,
+					label:
+						setupDiagnostics.status === 'checking'
+							? 'Setup checks pending'
+							: 'Setup blocked',
+					state:
+						setupDiagnostics.status === 'checking' ? 'pending' : 'unavailable',
 				};
 			}
 
@@ -217,7 +299,7 @@ export function App() {
 			label: 'Checking IPC',
 			state: 'pending',
 		};
-	}, [health, healthError]);
+	}, [health, healthError, setupDiagnostics]);
 
 	const activeRouteConfig =
 		ROUTES.find((route) => route.id === activeRoute) ?? ROUTES[0];
@@ -234,31 +316,42 @@ export function App() {
 				<section className='flex min-h-0 flex-col overflow-hidden border-border lg:border-r'>
 					<div className='min-h-0 flex-1 overflow-y-auto p-3'>
 						<div className='flex flex-col gap-3'>
-							<ShellPanel
-								action={
-									<StatusBadge tone='info'>THE-105 / PID-005</StatusBadge>
-								}
-								description={foundation.summary}
-								eyebrow={activeRouteConfig.eyebrow}
-								title={foundation.status}
-							>
-								<div className='flex flex-col divide-y divide-border rounded-md border border-border bg-pane'>
-									{foundation.items.map((item) => (
-										<div
-											className='flex items-start gap-2 px-3 py-2'
-											key={item}
-										>
-											<BadgeCheckIcon
-												aria-hidden='true'
-												className='mt-1 size-3.5 shrink-0 text-status-ok'
-											/>
-											<p className='text-xs leading-5'>{item}</p>
+							{activeRoute === 'setup' ? (
+								<SetupDiagnosticsPanel
+									error={setupDiagnosticsError}
+									isRetrying={isSetupRetrying}
+									onRetry={refreshSetupDiagnostics}
+									snapshot={setupDiagnostics}
+								/>
+							) : (
+								<>
+									<ShellPanel
+										action={
+											<StatusBadge tone='info'>THE-109 / PID-009</StatusBadge>
+										}
+										description={foundation.summary}
+										eyebrow={activeRouteConfig.eyebrow}
+										title={foundation.status}
+									>
+										<div className='flex flex-col divide-y divide-border rounded-md border border-border bg-pane'>
+											{foundation.items.map((item) => (
+												<div
+													className='flex items-start gap-2 px-3 py-2'
+													key={item}
+												>
+													<BadgeCheckIcon
+														aria-hidden='true'
+														className='mt-1 size-3.5 shrink-0 text-status-ok'
+													/>
+													<p className='text-xs leading-5'>{item}</p>
+												</div>
+											))}
 										</div>
-									))}
-								</div>
-							</ShellPanel>
+									</ShellPanel>
 
-							<DesignSystemPreview />
+									<DesignSystemPreview />
+								</>
+							)}
 						</div>
 					</div>
 
@@ -271,6 +364,7 @@ export function App() {
 					config={health?.config ?? null}
 					database={health?.database ?? null}
 					health={shellHealth}
+					setupDiagnostics={setupDiagnostics}
 				/>
 			</div>
 		</AppFrame>
@@ -281,12 +375,14 @@ interface WorkspaceInspectorProps {
 	config: HealthSnapshot['config'] | null;
 	database: HealthSnapshot['database'] | null;
 	health: ShellHealth;
+	setupDiagnostics: SetupDiagnosticsSnapshot | null;
 }
 
 function WorkspaceInspector({
 	config,
 	database,
 	health,
+	setupDiagnostics,
 }: WorkspaceInspectorProps) {
 	const configStatus = config
 		? `${config.status} / v${config.schemaVersion ?? 'unknown'}`
@@ -350,6 +446,12 @@ function WorkspaceInspector({
 					value='checks'
 				>
 					<InspectorSection title='Readiness'>
+						{setupDiagnostics ? (
+							<>
+								<SetupDiagnosticsCompact snapshot={setupDiagnostics} />
+								<Separator />
+							</>
+						) : null}
 						<MetricRow
 							icon={ActivityIcon}
 							label='IPC boundary'
