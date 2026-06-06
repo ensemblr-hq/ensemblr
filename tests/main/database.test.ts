@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { getRepositoryWorkspaceNavigationSnapshot } from '../../src/main/ipc/repository-workspace-navigation.ts';
 import {
 	createEnsembleDatabaseService,
 	getCurrentSchemaVersion,
@@ -308,4 +309,82 @@ test('database service reports health without throwing on open', (t) => {
 	});
 	assert.equal(service.getConnection()?.path, fixture.databasePath);
 	assert.equal(service.getHealth().status, 'ok');
+});
+
+test('repository workspace navigation snapshot nests active workspaces', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsembleDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	connection.database.exec(`
+INSERT INTO repositories (id, slug, name, path, default_branch, metadata_json)
+VALUES
+	('repo-1', 'ensemble', 'Ensemble', '/tmp/ensemble/repo', 'master', '{"owner":"alice","avatarUrl":"https://example.com/avatar.png"}'),
+	('repo-2', 'agent-lab', 'Agent Lab', '/tmp/agent-lab/repo', 'main', '{invalid');
+
+INSERT INTO workspaces (
+	id,
+	repository_id,
+	slug,
+	name,
+	path,
+	branch_name,
+	base_branch,
+	archived_at,
+	metadata_json
+)
+VALUES
+	('workspace-1', 'repo-1', 'the-120', 'THE-120', '/tmp/ensemble/workspaces/the-120', 'philipp/the-120', 'master', NULL, '{"linearIssue":"THE-120"}'),
+	('workspace-archived', 'repo-1', 'archived', 'Archived', '/tmp/ensemble/workspaces/archived', 'archived', 'master', '2026-06-01T00:00:00.000Z', '{}'),
+	('workspace-2', 'repo-2', 'draft', 'Draft', '/tmp/agent-lab/workspaces/draft', NULL, NULL, NULL, '{bad');
+`);
+
+	const snapshot = getRepositoryWorkspaceNavigationSnapshot(
+		connection.database,
+	);
+
+	assert.match(snapshot.generatedAt, /^\d{4}-\d{2}-\d{2}T/);
+	assert.equal(snapshot.repositories.length, 2);
+	assert.deepEqual(
+		snapshot.repositories.map((repository) => repository.id),
+		['repo-2', 'repo-1'],
+	);
+	assert.deepEqual(snapshot.repositories[0]?.metadata, {});
+	assert.equal(snapshot.repositories[0]?.workspaces.length, 1);
+	assert.deepEqual(snapshot.repositories[0]?.workspaces[0]?.metadata, {});
+	assert.equal(snapshot.repositories[1]?.metadata.owner, 'alice');
+	assert.deepEqual(
+		snapshot.repositories[1]?.workspaces.map((workspace) => workspace.id),
+		['workspace-1'],
+	);
+	assert.equal(
+		snapshot.repositories[1]?.workspaces[0]?.metadata.linearIssue,
+		'THE-120',
+	);
+});
+
+test('repository workspace navigation snapshot handles empty database', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsembleDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	const snapshot = getRepositoryWorkspaceNavigationSnapshot(
+		connection.database,
+	);
+
+	assert.deepEqual(snapshot.repositories, []);
+});
+
+test('repository workspace navigation snapshot handles unavailable database', () => {
+	const snapshot = getRepositoryWorkspaceNavigationSnapshot(null);
+
+	assert.deepEqual(snapshot.repositories, []);
 });

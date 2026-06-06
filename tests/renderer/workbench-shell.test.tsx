@@ -91,7 +91,9 @@ function renderWorkbench(
 				label: 'IPC online',
 				state: 'online',
 			}}
+			onDashboardSelect={() => undefined}
 			onDockTabChange={() => undefined}
+			onHelpSelect={() => undefined}
 			onHistorySelect={() => undefined}
 			onReviewTabChange={() => undefined}
 			onSessionTabChange={() => undefined}
@@ -116,12 +118,19 @@ test('renders the Conductor-style workbench shell regions', () => {
 		'checks',
 	);
 
+	expect(markup).toContain('Dashboard');
 	expect(markup).toContain('History');
-	expect(markup).toContain('Projects');
-	expect(markup).toContain('Open project creation menu');
-	expect(markup).toContain('Collapse project ensemble');
+	expect(markup).toContain('Help');
+	expect(markup).toContain('Repositories');
+	expect(markup).toContain('Open repository creation menu');
+	expect(markup).toContain('Collapse repository ensemble');
 	expect(markup).toContain('data-slot="context-menu-trigger"');
-	expect(markup).toContain('Reorder project ensemble');
+	expect(markup).toContain('Reorder repository ensemble');
+	expect(markup).toContain(
+		'data-action-placeholder="workspace-archive-confirmation"',
+	);
+	expect(markup).toContain('2 repos');
+	expect(markup).toContain('5 workspaces');
 	expect(markup).toContain('Open workspace Conductor shell rework');
 	expect(markup).toContain('Archive workspace Conductor shell rework');
 	expect(markup).toContain('data-permission-boundary="confirmation-required"');
@@ -164,7 +173,6 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('Requires confirmation');
 	expect(markup).not.toContain('Open pull request menu');
 	expect(markup).not.toContain('Open workspace menu');
-	expect(markup).not.toContain('Dashboard');
 	expect(markup).not.toContain('Changed files');
 	expect(markup).not.toContain('Review state');
 });

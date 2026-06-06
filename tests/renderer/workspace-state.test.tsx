@@ -9,6 +9,7 @@ import {
 	collapsedProjectIdsAtom,
 	getPreferredDockTab,
 	getPreferredReviewTab,
+	lastWorkspaceSelectionAtom,
 	orderedProjectIdsAtom,
 	pinnedWorkspaceIdsAtom,
 	rightSidebarCollapsedAtom,
@@ -23,6 +24,7 @@ const STORAGE_KEYS = {
 	closedSessionIdsByWorkspace:
 		'ensemble_workspace_closed_session_ids_by_workspace',
 	collapsedProjectIds: 'ensemble_workspace_collapsed_project_ids',
+	lastWorkspaceSelection: 'ensemble_workspace_last_selection',
 	orderedProjectIds: 'ensemble_workspace_ordered_project_ids',
 	pinnedWorkspaceIds: 'ensemble_workspace_pinned_workspace_ids',
 	rightSidebarCollapsed: 'ensemble_workspace_right_sidebar_collapsed',
@@ -96,6 +98,10 @@ test('hydrates workspace navigation atoms from localStorage when mounted', () =>
 		}),
 		[STORAGE_KEYS.changesViewMode]: JSON.stringify('folders'),
 		[STORAGE_KEYS.collapsedProjectIds]: JSON.stringify(['project-a']),
+		[STORAGE_KEYS.lastWorkspaceSelection]: JSON.stringify({
+			projectId: 'project-a',
+			workspaceId: 'workspace-a',
+		}),
 		[STORAGE_KEYS.orderedProjectIds]: JSON.stringify([
 			'project-b',
 			'project-a',
@@ -110,6 +116,7 @@ test('hydrates workspace navigation atoms from localStorage when mounted', () =>
 		store.sub(activeDockTabByWorkspaceAtom, () => undefined),
 		store.sub(activeReviewTabByWorkspaceAtom, () => undefined),
 		store.sub(changesViewModeAtom, () => undefined),
+		store.sub(lastWorkspaceSelectionAtom, () => undefined),
 		store.sub(orderedProjectIdsAtom, () => undefined),
 		store.sub(collapsedProjectIdsAtom, () => undefined),
 		store.sub(pinnedWorkspaceIdsAtom, () => undefined),
@@ -126,6 +133,10 @@ test('hydrates workspace navigation atoms from localStorage when mounted', () =>
 			'workspace-a': 'checks',
 		});
 		expect(store.get(changesViewModeAtom)).toBe('folders');
+		expect(store.get(lastWorkspaceSelectionAtom)).toEqual({
+			projectId: 'project-a',
+			workspaceId: 'workspace-a',
+		});
 		expect(store.get(orderedProjectIdsAtom)).toEqual([
 			'project-b',
 			'project-a',
@@ -151,6 +162,10 @@ test('writes workspace navigation atom changes to localStorage', () => {
 	store.set(activeDockTabByWorkspaceAtom, { 'workspace-b': 'terminal:logs' });
 	store.set(activeReviewTabByWorkspaceAtom, { 'workspace-b': 'files' });
 	store.set(changesViewModeAtom, 'folders');
+	store.set(lastWorkspaceSelectionAtom, {
+		projectId: 'project-b',
+		workspaceId: 'workspace-b',
+	});
 	store.set(orderedProjectIdsAtom, ['project-a', 'project-b']);
 	store.set(collapsedProjectIdsAtom, ['project-b']);
 	store.set(pinnedWorkspaceIdsAtom, ['workspace-b']);
@@ -168,6 +183,12 @@ test('writes workspace navigation atom changes to localStorage', () => {
 	);
 	expect(storage.getItem(STORAGE_KEYS.changesViewMode)).toBe(
 		JSON.stringify('folders'),
+	);
+	expect(storage.getItem(STORAGE_KEYS.lastWorkspaceSelection)).toBe(
+		JSON.stringify({
+			projectId: 'project-b',
+			workspaceId: 'workspace-b',
+		}),
 	);
 	expect(storage.getItem(STORAGE_KEYS.orderedProjectIds)).toBe(
 		JSON.stringify(['project-a', 'project-b']),

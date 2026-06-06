@@ -59,7 +59,9 @@ export function WorkbenchShell({
 	dockActions,
 	dockTabId,
 	health,
+	onDashboardSelect,
 	onDockTabChange,
+	onHelpSelect,
 	onHistorySelect,
 	onReviewTabChange,
 	onSessionTabChange,
@@ -225,10 +227,13 @@ export function WorkbenchShell({
 					activeView={activeView}
 					activeWorkspace={activeWorkspace}
 					health={health}
+					onDashboardSelect={onDashboardSelect}
+					onHelpSelect={onHelpSelect}
 					onHistorySelect={onHistorySelect}
 					onSettingsSelect={onSettingsSelect}
 					onWorkspaceSelect={onWorkspaceSelect}
 					projectNavigation={projectNavigation}
+					projects={projects}
 				/>
 				<WorkbenchPanelLayout
 					activeProject={activeProject}

@@ -30,6 +30,12 @@ const historyRoute = createRoute({
 	path: '/history',
 });
 
+const helpRoute = createRoute({
+	component: () => <App view='help' />,
+	getParentRoute: () => rootRoute,
+	path: '/help',
+});
+
 const settingsRoute = createRoute({
 	component: () => <App view='settings' />,
 	getParentRoute: () => rootRoute,
@@ -45,6 +51,7 @@ const workspaceRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
 	indexRoute,
+	helpRoute,
 	historyRoute,
 	settingsRoute,
 	workspaceRoute,

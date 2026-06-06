@@ -1,10 +1,12 @@
 import {
 	ChevronDownIcon,
 	CogIcon,
+	EyeOffIcon,
 	FolderIcon,
 	FolderPlusIcon,
+	GitPullRequestIcon,
 	GlobeIcon,
-	LinkIcon,
+	ListTodoIcon,
 	PlusIcon,
 	Trash2Icon,
 } from 'lucide-react';
@@ -63,7 +65,7 @@ export function ProjectCreationMenu() {
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<SidebarGroupAction
-					aria-label='Open project creation menu'
+					aria-label='Open repository creation menu'
 					className='top-2 size-6 [&>svg]:size-3.5'
 					type='button'
 				>
@@ -132,9 +134,9 @@ export function ProjectSidebarHeader({
 					<span className='flex min-w-0 items-center gap-2'>
 						<button
 							aria-expanded={!isCollapsed}
-							aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} project ${
-								project.name
-							}`}
+							aria-label={`${
+								isCollapsed ? 'Expand' : 'Collapse'
+							} repository ${project.name}`}
 							className='relative size-4 shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
 							onClick={(event) => {
 								event.stopPropagation();
@@ -186,7 +188,7 @@ function ProjectContextMenuContent({
 }) {
 	return (
 		<ContextMenuContent
-			aria-label={`${project.name} project actions`}
+			aria-label={`${project.name} repository actions`}
 			className='w-56 bg-muted p-1'
 		>
 			<ContextMenuGroup>
@@ -195,9 +197,20 @@ function ProjectContextMenuContent({
 					<span className='min-w-0 flex-1'>New workspace</span>
 					<ContextMenuShortcut>⌘N</ContextMenuShortcut>
 				</ProjectContextMenuItem>
-				<ProjectContextMenuItem>
-					<LinkIcon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>Create from...</span>
+				<ProjectContextMenuItem
+					data-action-placeholder='create-workspace-from-issue'
+					disabled
+				>
+					<ListTodoIcon aria-hidden='true' />
+					<span className='min-w-0 flex-1'>Create from issue</span>
+					<ContextMenuShortcut>Planned</ContextMenuShortcut>
+				</ProjectContextMenuItem>
+				<ProjectContextMenuItem
+					data-action-placeholder='create-workspace-from-pr'
+					disabled
+				>
+					<GitPullRequestIcon aria-hidden='true' />
+					<span className='min-w-0 flex-1'>Create from pull request</span>
 					<ContextMenuShortcut>⌘⇧N</ContextMenuShortcut>
 				</ProjectContextMenuItem>
 				<ProjectContextMenuItem onSelect={onRepositorySettingsSelect}>
@@ -209,7 +222,20 @@ function ProjectContextMenuContent({
 			<ContextMenuSeparator />
 			<ContextMenuGroup>
 				<ProjectContextMenuItem
+					data-action-placeholder='repository-hide-confirmation'
 					data-permission-boundary={repositoryRemovalBoundary.boundary}
+					disabled
+				>
+					<EyeOffIcon aria-hidden='true' />
+					<span className='min-w-0 flex-1'>Hide repository</span>
+					<ContextMenuShortcut>
+						{repositoryRemovalBoundaryLabel}
+					</ContextMenuShortcut>
+				</ProjectContextMenuItem>
+				<ProjectContextMenuItem
+					data-action-placeholder='repository-remove-confirmation'
+					data-permission-boundary={repositoryRemovalBoundary.boundary}
+					disabled
 					variant='destructive'
 				>
 					<Trash2Icon aria-hidden='true' />

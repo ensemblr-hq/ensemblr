@@ -7,6 +7,7 @@ export const IPC_CHANNELS = {
 	previewRepositoryConfigMigration:
 		'ensemble:preview-repository-config-migration',
 	repositoryConfig: 'ensemble:repository-config',
+	repositoryWorkspaceNavigation: 'ensemble:repository-workspace-navigation',
 	rootDirectory: 'ensemble:root-directory',
 	selectPiExecutable: 'ensemble:select-pi-executable',
 	selectRootDirectory: 'ensemble:select-root-directory',
