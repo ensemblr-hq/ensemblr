@@ -2,6 +2,10 @@
 
 These instructions apply to this repository.
 
+## Project Naming
+
+- This project was previously called `piductor`. If agents find references to `piductor` in code, documentation, branches, commits, issues, or planning notes, interpret them as references to `Ensemble` unless the local context clearly says otherwise.
+
 ## App Scaffolding Requires Current Official Docs
 
 When scaffolding an app, project, framework integration, SDK integration, CLI setup, or cloud-service setup, agents must not rely on training data, memory, or recalled commands.
