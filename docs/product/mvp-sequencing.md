@@ -79,7 +79,6 @@ Build every major Conductor workflow, adapted for Pi, in thin vertical slices be
 ## Deferred Until After Core Completion
 
 - Packaging, signing, notarization, and auto-update.
-- Direct GitHub API/OAuth integration.
 - SDK sidecar process isolation.
 - Managed/bundled Pi runtime installer.
 - Full Conductor checkpoint-ref interoperability.

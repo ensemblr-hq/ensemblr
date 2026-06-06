@@ -110,7 +110,7 @@ flowchart TD
   end
   subgraph S9__Deferred___Post_Core["9. Deferred / Post-Core"]
     P070["ENS-070 Post-Core Packaging, Signing, Notarization, and Auto-Update"]
-    P071["ENS-071 Post-Core Direct GitHub API and OAuth"]
+    P071["ENS-071 Post-Core GitHub CLI Capability Gap Review"]
     P072["ENS-072 Post-Core SDK Sidecar Fallback"]
     P073["ENS-073 Post-Core Managed Pi Runtime Installer"]
     P074["ENS-074 Post-Core Voice, Graphite, Cloud SSH, and Production Profiler"]
@@ -385,7 +385,7 @@ flowchart TD
 - ENS-068 Resource Usage, Sidebar, and Experimental Flag Discovery: ENS-036, ENS-061
 - ENS-069 Product Decision for AI Certainty Phrase Setting: ENS-030, ENS-062
 - ENS-070 Post-Core Packaging, Signing, Notarization, and Auto-Update: Core product completion
-- ENS-071 Post-Core Direct GitHub API and OAuth: ENS-056, core GitHub flow completion
+- ENS-071 Post-Core GitHub CLI Capability Gap Review: ENS-056, core GitHub flow completion
 - ENS-072 Post-Core SDK Sidecar Fallback: ENS-035, core Pi runtime completion
 - ENS-073 Post-Core Managed Pi Runtime Installer: core setup and Pi runtime completion
 - ENS-074 Post-Core Voice, Graphite, Cloud SSH, and Production Profiler: Core product completion

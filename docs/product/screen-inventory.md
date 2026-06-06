@@ -15,8 +15,8 @@ when planning app-shell work.
 - `01-onboarding` contains no screenshots. Its local note says to infer onboarding from the rest of the UI; inferred onboarding details are documented in `docs/product/onboarding-flow.md`.
 - Repository names, local user paths, account names, email addresses, PR descriptions, chat content, and private file details visible in screenshots are described generically.
 - The annotated June 5, 2026 screenshot at `.context/attachments/NJpu5l/CleanShot 2026-06-05 at 08.42.35@2x.png` clarifies the main workspace shell structure: project/workspace sidebar, project/branch breadcrumb, chat tabs, center agent timeline and composer, right All files/Changes/Checks panel, and lower Setup/Run/Terminal dock.
-- The implemented shell in `src/components/workbench-shell.tsx` and
-  `src/components/workbench-shell/` now supersedes older speculative shell
+- The implemented shell in `src/renderer/components/workbench-shell.tsx` and
+  `src/renderer/components/workbench-shell/` now supersedes older speculative shell
   notes. Use `docs/product/current-shell-inventory.md` for the current Ensemble
   shell contract, and use this screenshot inventory as evidence for Conductor
   workflow parity.
@@ -143,15 +143,15 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Screen name: App Settings - Account and Integrations
 - User goal: Inspect account, integration, privacy, token, and permission status.
 - Entry point: Settings sidebar, Account tab.
-- Primary actions: Manage Linear integration, verify GitHub CLI readiness, paste/update GitHub token, toggle enterprise data privacy, toggle tool approval requirement, sign out.
+- Primary actions: Manage Linear integration, verify GitHub CLI readiness, inspect the Conductor token field, toggle enterprise data privacy, toggle tool approval requirement, sign out.
 - Secondary actions: Reveal/hide a token field and inspect integration status indicators.
 - Visible UI regions: account identity card, integration status rows, masked token field, privacy/permission toggles, sign-out action.
 - Empty/loading/error states: Connected/ready states visible; no disconnected state captured.
 - Data shown: Personal account details and token-shaped values are visible but intentionally not transcribed.
-- Settings or configuration implied: Account identity, Linear linkage, GitHub CLI auth, optional GitHub token, enterprise privacy, tool approval policy.
+- Settings or configuration implied: Account identity, Linear linkage, GitHub CLI auth, Conductor-only GitHub token UI, enterprise privacy, tool approval policy.
 - Ensemble parity requirement: Provide a consolidated account/integrations/privacy surface.
 - Pi-specific adaptation: Ensemble account/sign-in is deferred for v1; focus this surface on `gh` CLI status, Linear OAuth status, Pi permission mode, and enterprise privacy adapted to Pi.
-- Risks or implementation notes: V1 GitHub uses authenticated `gh`; any direct GitHub token field is post-v1/direct-API scope and must use macOS Keychain.
+- Risks or implementation notes: Ensemble omits the GitHub token field; GitHub access uses authenticated `gh`, including `gh api`.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.56.30@2x.png`
 
@@ -335,8 +335,8 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Empty/loading/error states: Completed setup output visible; no error state captured.
 - Data shown: Private command output is visible but generalized.
 - Settings or configuration implied: Setup script command, captured process logs, terminal tab persistence.
-- Ensemble parity requirement: Provide docked setup/run/terminal panes with output capture and rerun controls.
-- Current Ensemble shell alignment: The lower-right Setup / Run / Terminal dock, collapse affordance, and script-state action placement are already represented. Future terminal tickets should replace placeholder logs with live process/PTY data in place.
+- Ensemble parity requirement: Provide docked read-only setup/run output panes plus default and user-spawned interactive terminal panes with output capture and rerun controls.
+- Current Ensemble shell alignment: The lower-right Setup / Run / Terminal dock, collapse affordance, and script-state action placement are already represented. Future terminal tickets should replace placeholder logs with live process/PTY data in place while keeping Setup/Run separate from user terminal sessions.
 - Pi-specific adaptation: Run scripts are independent of Pi but should include `ENSEMBLE_*` and compatibility environment variables.
 - Risks or implementation notes: Large output, interactive prompts, and process cancellation need terminal/process supervision.
 
@@ -390,9 +390,9 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: PR title/description, check provider names, comment identifiers, and private content are visible but generalized.
 - Settings or configuration implied: PR metadata cache, CI/check status polling, comment ingestion, merge policy, todo storage.
 - Ensemble parity requirement: Show PR metadata, check states, comments, todos, external links, and merge blockers in one checks panel.
-- Current Ensemble shell alignment: The right PR header and Checks panel already represent the no-PR, checking, blocked, and ready state shape. Future work should wire `gh`/GitHub metadata and merge confirmation into the existing surfaces.
+- Current Ensemble shell alignment: The right PR header and Checks panel already represent the no-PR, create-PR, working, checking, blocked, open, and ready state shape. Future work should wire `gh`/GitHub metadata and merge confirmation into the existing surfaces without making idle/open PRs look like active agent work.
 - Pi-specific adaptation: Add comments/review context to Pi chat rather than Claude/Codex chat.
-- Risks or implementation notes: `gh` may not expose all comment/review-thread detail needed; direct GitHub API may be required later.
+- Risks or implementation notes: first-class `gh` commands may not expose all comment/review-thread detail needed; authenticated `gh api` is the REST/GraphQL path.
 
 ### `.context/conductor-screens/08-checks-pr/CleanShot 2026-06-04 at 18.02.16@2x.png`
 

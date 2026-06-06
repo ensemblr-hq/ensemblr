@@ -80,7 +80,7 @@ if original screenshot evidence is unavailable.
 | Run script | Runs from Run button inside workspace. | Same target. |
 | Archive script | Runs before workspace archive. | Same target. |
 | Run script mode | `concurrent` or `nonconcurrent`. | Same target. |
-| Terminal dock | Setup, Run, and named terminal tabs stay visible beside chat/files/checks. | Same target with xterm.js and Electron process supervision. |
+| Terminal dock | Fixed read-only Setup and Run output tabs plus default and user-spawned terminal tabs stay visible beside chat/files/checks. | Same target with xterm.js and Electron process supervision; user terminals are independent IDE-style terminal sessions. |
 | Spotlight testing | Syncs workspace changes back to repo root for root-only projects. | Same target after core workspace flow. |
 | Process shutdown | Stop sends SIGHUP, then SIGKILL if still running. | Match behavior where practical. |
 
@@ -125,7 +125,7 @@ if original screenshot evidence is unavailable.
 | PR actions | Create PR, respond to feedback, fix checks, merge. | Same target. |
 | Checks tab | Git status, PR metadata, CI/status checks, deployments, comments/review threads, todos. | Same target. |
 | PR readiness states | No-PR, uncommitted, pending/failing checks, and ready-to-merge states have distinct UI. | Same target with `gh`/git state cached in SQLite. |
-| Deployments | Deployment/preview status appears with external links. | Same target where `gh`/provider data exposes it; direct API may be needed later. |
+| Deployments | Deployment/preview status appears with external links. | Same target, deriving preview URLs from GitHub deployment/status, check, or bot-comment data through `gh` for v1 without Vercel/Netlify login; direct provider APIs are deferred unless GitHub data proves insufficient. |
 | Todos | Users can add local review todos in checks/review context. | Same target, stored in SQLite and optionally sent to Pi. |
 | Blockers | Discourage/block merge when unresolved work exists. | Same target. |
 
@@ -205,9 +205,10 @@ if original screenshot evidence is unavailable.
 | Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Auth | Requires GitHub authentication in the terminal environment; users verify with `gh auth status`. | Require authenticated `gh` CLI during setup for v1. |
+| API access | Uses the user's GitHub-connected environment. | Use first-class `gh` commands where available and authenticated `gh api` for REST/GraphQL gaps; do not store GitHub tokens in Ensemble. |
 | PR create/view | Create and inspect pull requests. | Use `gh pr create` and `gh pr view` from Electron main. |
-| Checks | Show CI/status checks. | Use `gh pr checks` and cache results in SQLite. |
-| Comments/reviews | Show and respond to GitHub comments where available. | Use `gh` JSON output where practical; defer direct API if needed. |
+| Checks | Show CI/status checks. | Use `gh pr checks`; use `gh api` for deeper annotations only when needed; cache results in SQLite. |
+| Comments/reviews | Show and respond to GitHub comments where available. | Use `gh pr view --comments`, REST through authenticated `gh api`, and GraphQL through `gh api graphql` for review threads where practical. |
 | Merge | Merge ready PRs. | Use `gh pr merge` where permissions allow. |
 | Missing integration | Conductor setup checks guide users through missing GitHub auth. | Block full readiness and show `gh` install/auth guidance. |
 

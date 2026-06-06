@@ -4,9 +4,9 @@ import '@fontsource-variable/jetbrains-mono/wght.css';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { queryClient } from './query-client';
-import { router } from './router';
-import './styles.css';
+import { queryClient } from './api/query-client';
+import { router } from './routing/router';
+import './styles/index.css';
 
 const rootElement = document.getElementById('root');
 

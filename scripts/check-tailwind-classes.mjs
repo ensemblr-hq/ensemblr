@@ -1,7 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-const roots = ['src/renderer', 'src/components'];
+const roots = ['src/renderer'];
 const extensions = new Set(['.css', '.js', '.jsx', '.ts', '.tsx']);
 
 const canonicalClasses = new Map([

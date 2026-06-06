@@ -1,17 +1,26 @@
 import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { WorkbenchShell } from '../../src/components/workbench-shell';
-import type { WorkspaceShellModel } from '../../src/renderer/workbench/workbench-model';
+import { WorkbenchShell } from '../../src/renderer/components/workbench-shell';
 import {
 	DEFAULT_DOCK_TAB,
 	DEFAULT_REVIEW_TAB,
-	findSession,
+	DEFAULT_TERMINAL_DOCK_TAB_ID,
 	getComposerState,
+	normalizeWorkbenchSearch,
+} from '../../src/renderer/lib/workbench';
+import {
+	findSession,
 	getDefaultProject,
 	getDefaultWorkspace,
 	shellFixtureProjects,
-} from '../../src/renderer/workbench/workbench-model';
+} from '../../src/renderer/mocks/workbench';
+import type {
+	DockTabId,
+	ProjectShellModel,
+	WorkspaceShellModel,
+} from '../../src/renderer/types/workbench';
+import type { WorkbenchDockActions } from '../../src/renderer/types/workbench-shell';
 import type {
 	SetupCheckGroupId,
 	SetupCheckId,
@@ -38,14 +47,29 @@ const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
 	'sqlite-database': 'storage',
 };
 
+const DOCK_ACTIONS: WorkbenchDockActions = {
+	onNewTerminal: () => undefined,
+	onOpenRunPort: () => undefined,
+	onOpenSetupScripts: () => undefined,
+	onRunScript: () => undefined,
+	onRunSetupScript: () => undefined,
+	onStopRunScript: () => undefined,
+};
+
 function renderWorkbench(
 	snapshot: SetupDiagnosticsSnapshot | null,
 	workspaceOverride?: WorkspaceShellModel,
 	activeReviewTab = DEFAULT_REVIEW_TAB,
-	activeDockTab = DEFAULT_DOCK_TAB,
+	activeDockTab: DockTabId = DEFAULT_DOCK_TAB,
+	projectsOverride: ProjectShellModel[] = shellFixtureProjects,
 ) {
-	const activeProject = getDefaultProject();
 	const activeWorkspace = workspaceOverride ?? getDefaultWorkspace();
+	const activeProject =
+		projectsOverride.find((project) =>
+			project.workspaces.some(
+				(workspace) => workspace.id === activeWorkspace.id,
+			),
+		) ?? getDefaultProject();
 	const activeSession = findSession(activeWorkspace);
 
 	return renderToStaticMarkup(
@@ -60,6 +84,7 @@ function renderWorkbench(
 				setupDiagnostics: snapshot,
 				setupError: null,
 			})}
+			dockActions={DOCK_ACTIONS}
 			dockTabId={activeDockTab}
 			health={{
 				detail: 'Renderer query fixture',
@@ -72,7 +97,7 @@ function renderWorkbench(
 			onSessionTabChange={() => undefined}
 			onSettingsSelect={() => undefined}
 			onWorkspaceSelect={() => undefined}
-			projects={shellFixtureProjects}
+			projects={projectsOverride}
 			setupDiagnostics={snapshot}
 		/>,
 	);
@@ -102,6 +127,10 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('data-permission-boundary="confirmation-required"');
 	expect(markup).toContain('data-slot="reorder-list-group"');
 	expect(markup).toContain('data-slot="reorder-list-item"');
+	expect(markup).toContain('data-workspace-sidebar-state="pr-working"');
+	expect(markup).toContain('data-workspace-sidebar-state="pr-checking"');
+	expect(markup).toContain('data-workspace-sidebar-state="workspace-working"');
+	expect(markup).toContain('data-workspace-sidebar-state="pr-ready"');
 	expect(markup).toContain('Conductor shell rework');
 	expect(markup).toContain('Review shell');
 	expect(markup).toContain('Mock agent chat');
@@ -162,6 +191,86 @@ test('models installed workspace open targets for the header launcher', () => {
 	);
 });
 
+test('models fixed script output tabs separately from interactive terminals', () => {
+	const [setupTab, runTab, terminalTab] = getDefaultWorkspace().dockTabs;
+
+	expect(setupTab).toMatchObject({
+		id: 'setup',
+		kind: 'setup-script',
+		label: 'Setup',
+	});
+	expect(runTab).toMatchObject({
+		id: 'run',
+		kind: 'run-script',
+		label: 'Run',
+	});
+	expect(terminalTab).toMatchObject({
+		id: DEFAULT_TERMINAL_DOCK_TAB_ID,
+		isDefault: true,
+		kind: 'terminal',
+		label: 'Terminal',
+		sessionId: 'terminal-default',
+	});
+});
+
+test('normalizes dock route state for terminal session tabs', () => {
+	expect(normalizeWorkbenchSearch({ dock: 'terminal' }).dock).toBe(
+		DEFAULT_TERMINAL_DOCK_TAB_ID,
+	);
+	expect(normalizeWorkbenchSearch({ dock: 'terminal:logs' }).dock).toBe(
+		'terminal:logs',
+	);
+	expect(normalizeWorkbenchSearch({ dock: 'terminal:' }).dock).toBe(
+		DEFAULT_DOCK_TAB,
+	);
+});
+
+test('renders additional user terminal tabs as independent interactive sessions', () => {
+	const activeWorkspace: WorkspaceShellModel = {
+		...getDefaultWorkspace(),
+		dockTabs: [
+			...getDefaultWorkspace().dockTabs,
+			{
+				id: 'terminal:logs',
+				kind: 'terminal',
+				label: 'Terminal 2',
+				lines: ['$ tail -f app.log', 'ready'],
+				sessionId: 'terminal-logs',
+				status: 'running',
+			},
+		],
+	};
+	const snapshot = createSnapshot(
+		[
+			createCheck({ id: 'config', title: 'Declarative config' }),
+			createCheck({ id: 'sqlite-database', title: 'SQLite database' }),
+		],
+		'ready',
+	);
+	const markup = renderWorkbench(
+		snapshot,
+		activeWorkspace,
+		'checks',
+		'terminal:logs',
+	);
+	const setupMarkup = renderWorkbench(
+		snapshot,
+		activeWorkspace,
+		'checks',
+		DEFAULT_DOCK_TAB,
+	);
+
+	expect(markup).toContain('data-dock-tab-kind="setup-script"');
+	expect(markup).toContain('data-dock-tab-kind="run-script"');
+	expect(markup).toContain('data-dock-tab-kind="terminal"');
+	expect(markup).toContain('Terminal 2');
+	expect(markup).toContain('data-terminal-session-id="terminal-logs"');
+	expect(markup).toContain('data-terminal-surface="interactive"');
+	expect(setupMarkup).toContain(
+		'data-terminal-surface="readonly-script-output"',
+	);
+});
+
 test('marks setup notes tab as active agent activity', () => {
 	const setupNotesSession = getDefaultWorkspace().sessions.find(
 		(session) => session.id === 'setup-thread',
@@ -203,6 +312,11 @@ test('does not show a close control when only one chat tab remains', () => {
 test('renders merge-ready pull request state in the right header', () => {
 	const activeWorkspace: WorkspaceShellModel = {
 		...getDefaultWorkspace(),
+		checks: {
+			...getDefaultWorkspace().checks,
+			status: 'blocked',
+		},
+		status: 'working',
 		pullRequest: {
 			...getDefaultWorkspace().pullRequest,
 			description: ['All required checks passed.'],
@@ -214,9 +328,21 @@ test('renders merge-ready pull request state in the right header', () => {
 			},
 			label: 'Ready to merge',
 			number: 29,
+			previewDeployment: {
+				label: 'Preview',
+				provider: 'vercel',
+				source: 'github-deployment',
+				status: 'ready',
+				url: 'https://ensemble-ready.vercel.app',
+			},
 			status: 'ready-to-merge',
 			title: 'Ready fixture',
+			url: 'https://github.com/psoldunov/ensemble/pull/29',
 		},
+	};
+	const activeProject: ProjectShellModel = {
+		...getDefaultProject(),
+		workspaces: [activeWorkspace],
 	};
 	const markup = renderWorkbench(
 		createSnapshot(
@@ -228,14 +354,124 @@ test('renders merge-ready pull request state in the right header', () => {
 		),
 		activeWorkspace,
 		'checks',
+		DEFAULT_DOCK_TAB,
+		[activeProject],
 	);
 
 	expect(markup).toContain('#29');
+	expect(markup).toContain(
+		'href="https://github.com/psoldunov/ensemble/pull/29"',
+	);
 	expect(markup).toContain('Ready to merge');
+	expect(markup).toContain('data-workspace-sidebar-state="pr-ready"');
+	expect(markup).not.toContain(
+		'data-workspace-sidebar-state="workspace-blocked"',
+	);
+	expect(markup).toContain('data-checks-panel-state="pr-ready"');
+	expect(markup).toContain('Preview');
+	expect(markup).toContain('Open Vercel preview deployment');
+	expect(markup).toContain('href="https://ensemble-ready.vercel.app"');
+	expect(markup).toContain('Deployments');
+	expect(markup).toContain('Open scan check');
+	expect(markup).toContain(
+		'href="https://github.com/psoldunov/ensemble/actions/runs/102"',
+	);
 	expect(markup).toContain('All required checks passed.');
 	expect(markup).toContain('Merge');
 	expect(markup).toContain('Requires confirmation');
 	expect(markup).toContain('data-permission-boundary="confirmation-required"');
+	expect(markup).not.toContain('Create PR');
+});
+
+test('renders an open idle pull request without working affordances', () => {
+	const activeWorkspace: WorkspaceShellModel = {
+		...getDefaultWorkspace(),
+		checks: {
+			...getDefaultWorkspace().checks,
+			status: 'blocked',
+		},
+		status: 'working',
+		pullRequest: {
+			...getDefaultWorkspace().pullRequest,
+			checks: [],
+			comments: [],
+			description: [],
+			detail: 'Pull request is open.',
+			gitStatus: {
+				label: 'Open',
+				status: 'open',
+			},
+			label: 'Open PR fixture',
+			number: 31,
+			status: 'idle',
+			title: 'Open fixture',
+		},
+	};
+	const activeProject: ProjectShellModel = {
+		...getDefaultProject(),
+		workspaces: [activeWorkspace],
+	};
+	const markup = renderWorkbench(
+		createSnapshot(
+			[
+				createCheck({ id: 'config', title: 'Declarative config' }),
+				createCheck({ id: 'sqlite-database', title: 'SQLite database' }),
+			],
+			'ready',
+		),
+		activeWorkspace,
+		'checks',
+		DEFAULT_DOCK_TAB,
+		[activeProject],
+	);
+
+	expect(markup).toContain('#31');
+	expect(markup).toContain('Open PR fixture');
+	expect(markup).toContain('data-workspace-sidebar-state="pr-open"');
+	expect(markup).not.toContain(
+		'data-workspace-sidebar-state="workspace-blocked"',
+	);
+	expect(markup).toContain('data-checks-panel-state="pr-open"');
+	expect(markup).toContain('Pull request is open.');
+	expect(markup).toContain('No checks reported yet');
+	expect(markup).toContain('No description provided');
+	expect(markup).toContain('Open pull request menu');
+	expect(markup).not.toContain('Working...');
+	expect(markup).not.toContain('Pull request activity in progress');
+	expect(markup).not.toContain('Create PR');
+});
+
+test('renders a blocked pull request header with danger state actions', () => {
+	const activeWorkspace: WorkspaceShellModel = {
+		...getDefaultWorkspace(),
+		pullRequest: {
+			...getDefaultWorkspace().pullRequest,
+			gitStatus: {
+				label: 'Checks failed',
+				status: 'blocked',
+			},
+			label: 'Checks failed',
+			number: 32,
+			status: 'blocked',
+			title: 'Blocked fixture',
+		},
+	};
+	const markup = renderWorkbench(
+		createSnapshot(
+			[
+				createCheck({ id: 'config', title: 'Declarative config' }),
+				createCheck({ id: 'sqlite-database', title: 'SQLite database' }),
+			],
+			'ready',
+		),
+		activeWorkspace,
+	);
+
+	expect(markup).toContain('#32');
+	expect(markup).toContain('Checks failed');
+	expect(markup).toContain('data-pr-tone="blocked"');
+	expect(markup).toContain('Open pull request menu');
+	expect(markup).not.toContain('Pull request activity in progress');
 	expect(markup).not.toContain('Create PR');
 });
 
@@ -253,7 +489,7 @@ test('shows review action and changes menu only on changes tab', () => {
 	expect(changesMarkup).toContain('review-panel-action-label">Review</span>');
 	expect(changesMarkup).toContain('Show changes as folders');
 	expect(changesMarkup).toContain(
-		'Open src/components/workbench-shell.tsx diff',
+		'Open src/renderer/components/workbench-shell.tsx diff',
 	);
 	expect(changesMarkup).toContain('Open changes menu');
 	expect(checksMarkup).not.toContain(
@@ -389,6 +625,11 @@ test('renders run action when dev server is stopped', () => {
 test('renders no pull request empty state in the checks tab', () => {
 	const activeWorkspace: WorkspaceShellModel = {
 		...getDefaultWorkspace(),
+		changeSummary: {
+			additions: 0,
+			deletions: 0,
+			files: 0,
+		},
 		pullRequest: {
 			...getDefaultWorkspace().pullRequest,
 			comments: [],
@@ -417,12 +658,14 @@ test('renders no pull request empty state in the checks tab', () => {
 		'checks',
 	);
 
-	expect(markup).toContain('PR title');
-	expect(markup).toContain('PR description');
+	expect(markup).toContain('data-checks-panel-state="empty"');
+	expect(markup).toContain('No local changes to review.');
 	expect(markup).toContain('No PR open');
-	expect(markup).toContain('Create PR');
-	expect(markup).toContain('Open create pull request options');
-	expect(markup).toContain('Commit and push');
+	expect(markup).not.toContain('PR title');
+	expect(markup).not.toContain('PR description');
+	expect(markup).not.toContain('Create PR');
+	expect(markup).not.toContain('Open create pull request options');
+	expect(markup).not.toContain('Commit and push');
 });
 
 test('renders create pull request action when changed workspace has no pull request', () => {
@@ -450,6 +693,37 @@ test('renders create pull request action when changed workspace has no pull requ
 	expect(markup).toContain('Open create pull request options');
 	expect(markup).not.toContain('Working...');
 	expect(markup).not.toContain('Pull request activity in progress');
+});
+
+test('renders uncommitted no pull request state in the checks tab', () => {
+	const activeWorkspace = shellFixtureProjects[0].workspaces.find(
+		(workspace) => workspace.id === 'changed-right-header',
+	);
+
+	if (!activeWorkspace) {
+		throw new Error('Changed right header fixture was not found.');
+	}
+
+	const markup = renderWorkbench(
+		createSnapshot(
+			[
+				createCheck({ id: 'config', title: 'Declarative config' }),
+				createCheck({ id: 'sqlite-database', title: 'SQLite database' }),
+			],
+			'ready',
+		),
+		activeWorkspace,
+		'checks',
+	);
+
+	expect(markup).toContain('data-checks-panel-state="uncommitted"');
+	expect(markup).toContain('1 uncommitted change ready for PR setup.');
+	expect(markup).toContain('No PR open');
+	expect(markup).toContain('Create PR');
+	expect(markup).toContain('Open create pull request options');
+	expect(markup).toContain('Commit and push');
+	expect(markup).not.toContain('PR title');
+	expect(markup).not.toContain('PR description');
 });
 
 test('renders plain working header fixture without pull request number', () => {

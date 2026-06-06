@@ -279,7 +279,7 @@ Track known post-core work without letting it block v1 implementation.
 Included issues:
 
 - `ENS-070` Post-core packaging, signing, notarization, and auto-update
-- `ENS-071` Post-core direct GitHub API and OAuth
+- `ENS-071` Post-core GitHub CLI capability gap review
 - `ENS-072` Post-core SDK sidecar fallback
 - `ENS-073` Post-core managed Pi runtime installer
 - `ENS-074` Post-core voice, Graphite, cloud SSH, and production profiler

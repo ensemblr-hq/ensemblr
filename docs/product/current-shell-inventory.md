@@ -2,12 +2,12 @@
 
 Date: 2026-06-05
 
-This inventory describes the implemented shell in `src/renderer/App.tsx`,
-`src/components/workbench-shell.tsx`, `src/components/workbench-shell/`,
-`src/renderer/state/workbench-shell.ts`,
+This inventory describes the implemented shell in `src/renderer/components/app.tsx`,
+`src/renderer/components/workbench-shell.tsx`, `src/renderer/components/workbench-shell/`,
+`src/renderer/state/workspace`,
 `src/renderer/types/workbench-shell.ts`,
-`src/renderer/workbench/workbench-model.ts`, `src/renderer/styles.css`,
-`src/components/shadix-ui/`, and `src/components/ui/`.
+`src/renderer/mocks/workbench/projects.ts`, `src/renderer/styles/index.css`,
+`src/renderer/components/shadix-ui/`, and `src/renderer/components/ui/`.
 Treat this shell as the product source of truth for app layout and visible
 affordances. Future tickets should wire live services into these regions instead
 of redesigning the shell.
@@ -22,12 +22,12 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 
 ## Implementation Boundaries
 
-- `src/components/workbench-shell.tsx` is the public component entrypoint and
+- `src/renderer/components/workbench-shell.tsx` is the public component entrypoint and
   should stay focused on shell orchestration.
 - Private shell components and local shell hooks live under
-  `src/components/workbench-shell/`.
+  `src/renderer/components/workbench-shell/`.
 - Durable renderer UI state that crosses shell modules lives in Jotai atoms under
-  `src/renderer/state/workbench-shell.ts`.
+  `src/renderer/state/workspace`.
 - Shared exported shell types live under
   `src/renderer/types/workbench-shell.ts`.
 - Ephemeral animation and timer state can remain in component hooks when it is
@@ -41,7 +41,7 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 | Left primary navigation | Global History and Settings are reachable without leaving workspace context. | Implemented behavior | `History` and `Settings` buttons navigate to route-backed shell views. `Dashboard` exists as a route state but is not a visible sidebar item in the current shell. |
 | Sidebar project groups | Repositories/projects contain workspace rows, can collapse, and can be reordered. | Implemented behavior | Project collapse and renderer-local reorder state are live. Persistence and SQLite-backed records are future work. |
 | Pinned workspace group | Users can pin workspaces above their project groups for fast access. | Implemented behavior | Pin/unpin is renderer-local and removes pinned rows from the normal project group. Persistence is future work. |
-| Workspace rows | Workspace status, branch, change counts, selection, and archive affordance. | Locked product direction | Status icons cover blocked, ready-to-merge, working, checking, and neutral branch states. Row selection is implemented; archive is a placeholder action. |
+| Workspace rows | Workspace status, branch, change counts, selection, and archive affordance. | Locked product direction | Status icons follow the documented workspace sidebar state contract. Row selection is implemented; archive is a placeholder action. |
 | Workspace context menu | Mark unread, pin, set status, rename, and archive actions. | Visual placeholder for planned behavior | Pin is implemented. Mark unread, rename, archive, and status changes have visible affordances but no durable behavior. The status target needs confirmation before implementation. |
 | Project add menu | Add/open projects from local path, GitHub, quick start, and recent local paths. | Locked product direction | The currently visible menu does not include a Linear issue entry. Linear remains v1 scope through its own issue browsing/workspace creation flow. |
 | Project context menu | Create workspace, create from source, repository settings, and remove repository. | Visual placeholder for planned behavior | Repository settings routes to the settings shell. Create/remove behavior is future work and must preserve destructive-action guardrails. |
@@ -57,12 +57,110 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 | All files tab | Browse and search repository files. | Visual placeholder for planned behavior | File rows and the command-style search dialog are implemented against fixture data. Opening previews is future work. |
 | Changes tab | Changed-file list/tree with folder grouping, collapse, status labels, line counts, review action, and history/filter menu. | Implemented shell behavior | List/tree toggle and folder collapse work against fixture data. Full diff body, search, review mode, comments, and commit filtering are future review work. |
 | Checks tab | PR title/description, git status, checks, comments, todos, no-PR state, and ready-to-merge flow. | Visual placeholder for planned behavior | Sections and state shapes are visible. Live `gh` metadata, polling, comments, todos, context-to-Pi, and merge confirmation are future work. |
-| Dock tabs | Bottom-right Setup, Run, and Terminal tabs stay visible with review/timeline context. | Implemented shell behavior | Dock tab state is route-backed and the dock is collapsible/resizable. Process-backed content is future work. The Setup tab is only for workspace/project setup command output, such as dependency install logs. |
-| Dock script actions | Script-state-aware actions: Setup Scripts, Run setup script, Run, Open :PORT, and Stop. | Locked product direction | Actions render from fixture script status. Process execution and PTY lifecycle are future terminal/script work. |
-| Terminal tab | Generic manual terminal panel and plus button for new terminal tabs. | Visual placeholder for planned behavior | Terminal content explicitly states interactive PTY rendering is deferred to `ENS-037`. |
+| Dock tabs | Bottom-right fixed Setup and Run script-output tabs plus terminal session tabs stay visible with review/timeline context. | Implemented shell behavior | Dock tab state is route-backed and the dock is collapsible/resizable. Process-backed content is future work. Setup and Run are read-only output tabs for their respective configured commands. |
+| Dock script actions | Script-state-aware actions: Setup Scripts, Run setup script, Run, Open :PORT, and Stop. | Locked product direction | Actions render from fixture script status. Process execution and PTY lifecycle are future terminal/script work. Script actions must target the fixed Setup/Run panes, not user-spawned terminals. |
+| Terminal tabs | One default generic manual terminal panel plus a plus button for additional terminal tabs. | Visual placeholder for planned behavior | Terminal content explicitly states interactive PTY rendering is deferred to `ENS-037`. User-spawned terminals are regular IDE-style interactive terminals backed by stable terminal session IDs. |
 | Sidebar health footer | App health, setup readiness, and app diagnostics remain visible in the shell. | Implemented behavior | Health and setup diagnostics use TanStack Query over the typed preload bridge. This footer is the only current-shell place for app diagnostics; do not place app diagnostics in the Setup/Run/Terminal dock. |
 | Settings shell entry | Settings remains part of global navigation. | Implemented shell behavior | Current route still renders the workbench shell with Settings active. Full settings forms are future work. |
 | Command surfaces | File search dialog and Create PR command popover use command primitives. | Visual placeholder for planned behavior | These establish command UI patterns. A global command palette remains a later settings/polish ticket. |
+
+## Workspace Sidebar State Contract
+
+The workspace row icon derives one compact status from `workspace.pullRequest`,
+`workspace.status`, and `workspace.checks`. When a PR number exists, PR state
+owns the sidebar icon so the row aligns with the right PR header. Broader
+workspace health only fills no-PR rows, where the right PR header is quiet or
+showing the create-PR action.
+
+| State | Model condition | Icon behavior |
+| --- | --- | --- |
+| PR ready | PR number exists and status is `ready-to-merge` | Green pull-request-ready icon |
+| PR checking | PR number exists and status is `checking` | Warning pending icon |
+| PR blocked | PR number exists and status is `blocked` | Danger conflict icon |
+| PR working | PR number exists and status is `agent-working` | Muted spinning activity icon |
+| PR open | PR number exists and status is `idle` or another non-active open state | Muted pull request icon |
+| Workspace blocked | No PR number and `workspace.checks.status` is `blocked` | Danger conflict icon |
+| Workspace working | No PR number and `workspace.status` is `working` | Muted spinning activity icon |
+| Workspace checking | No PR number and `workspace.checks.status` is `pending` | Warning pending icon |
+| Branch | No PR number and no workspace health/activity signal | Muted branch icon |
+
+`pullRequest.status` is treated as PR state only when `pullRequest.number`
+exists. No-PR local changes remain visible through row diff stats and the right
+PR header's create-PR affordance rather than by overloading the row icon.
+
+## Right PR Header State Contract
+
+The right PR header derives one render state from `workspace.pullRequest` and
+`workspace.changeSummary`.
+
+| State | Model condition | Header label | Left affordance | Right action | Tone |
+| --- | --- | --- | --- | --- | --- |
+| Empty | No PR number and no changed files | None | None | None | Neutral |
+| Create PR | No PR number and changed files exist | None | None | `Create PR` split button | Neutral |
+| PR working | PR number exists and status is `agent-working` | `Working...` | PR number external/open button | Spinner | Neutral |
+| PR checking | PR number exists and status is `checking` | PR status label | PR number external/open button | Spinner | Pending |
+| PR blocked | PR number exists and status is `blocked` | PR status label | PR number external/open button | Overflow/remediation menu | Blocked |
+| PR ready | PR number exists and status is `ready-to-merge` | PR status label, usually `Ready to merge` | PR number external/open button | `Merge` | Ready |
+| PR open | PR number exists and status is `idle` or another non-active open state | PR label, PR title, or PR number fallback | PR number external/open button | Overflow menu | Neutral |
+
+`Working...` is reserved for `agent-working`; an idle/open PR must not display
+working affordances. No-PR/no-change workspaces stay visually quiet in this
+header because workspace and agent activity are already represented in the
+sidebar, chat tabs, and timeline.
+
+If `pullRequest.previewDeployment` is present while a PR number exists, render a
+`Preview` external-link button immediately beside the PR number. The v1 data
+source must be GitHub-derived through `gh`, without requiring a Vercel or Netlify
+login: prefer GitHub deployment statuses filtered by branch/ref and use
+`environment_url` before `target_url`; fall back to `gh pr checks` links when the
+provider publishes a usable preview URL there; parse provider bot PR comments
+only if GitHub deployment/status data is unavailable.
+
+## Checks Panel State Contract
+
+The Checks panel derives its own render state from the same
+`workspace.pullRequest` and `workspace.changeSummary` inputs, but it owns the
+evidence body rather than the compact header action.
+
+| State | Model condition | Body behavior |
+| --- | --- | --- |
+| Empty | No PR number and no changed files | Quiet no-PR summary, no create/commit action, todos section only. |
+| Uncommitted | No PR number and changed files exist | Show changed count, `Create PR`, and `Commit and push` rows. |
+| PR working | PR number exists and status is `agent-working` | Show PR metadata, current git/check evidence, comments, and todos without ready/blocker framing. |
+| PR checking | PR number exists and status is `checking` | Show pending summary, check rows, comments, todos, and refresh/polling affordance when live data lands. |
+| PR blocked | PR number exists and status is `blocked` | Surface blocker summary, failed checks/comments, todos, and add-to-chat/fix-context affordances. |
+| PR ready | PR number exists and status is `ready-to-merge` | Show readiness evidence, passed checks, deployments, comments, and todos. Merge remains owned by the right PR header confirmation flow. |
+| PR open | PR number exists and status is `idle` or another non-active open state | Show PR identity and metadata without `Working...`, spinner, or fake check rows. |
+
+Empty checks, comments, descriptions, and todos must render explicit empty text
+instead of blank sections. Check rows should render an external link only when
+the model includes a check URL. Preview deployments should appear in a
+Deployments section as well as beside the PR number in the header.
+
+## GitHub PR Data Source Contract
+
+V1 PR/check data must come through the authenticated GitHub CLI, including
+`gh api` for REST/GraphQL endpoints. This keeps v1 aligned with the setup gate:
+users authenticate once with `gh auth login`, Ensemble verifies with
+`gh auth status`, and Ensemble does not store GitHub tokens itself.
+
+| `pullRequest` surface | Primary source | Notes |
+| --- | --- | --- |
+| PR number, title, body/description, URL, branch refs, draft/open state, mergeability, review decision, status rollup | `gh pr view --json number,title,body,url,state,headRefName,baseRefName,isDraft,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup` | Prefer branch argument when resolving the current workspace PR. |
+| Check rows and check links | `gh pr checks --json bucket,completedAt,description,event,link,name,startedAt,state,workflow` | Normalize `state`/`bucket` into ready, pending, or blocked panel states. |
+| Deployment/preview URLs | `gh api -X GET repos/{owner}/{repo}/deployments -f ref="$branch" -F latest=true`, then `gh api repos/{owner}/{repo}/deployments/{id}/statuses` | Prefer deployment status `environment_url`, then `target_url`, then check links, then provider bot PR comments. |
+| PR comments | `gh pr view --comments --json comments` first, then `gh api repos/{owner}/{repo}/issues/{number}/comments --paginate` when structured paging is needed | Treat bot comments as a fallback source for preview URLs. |
+| Review comments | `gh api repos/{owner}/{repo}/pulls/{number}/comments --paginate` | Use for file/path/line-level review context. |
+| Review threads and resolved state | `gh api graphql` using the authenticated CLI token | Required when thread resolution state is needed; first-class `gh pr` commands are not enough. |
+| Local changed/uncommitted state | `git status --porcelain=v1`, diff stats, and local branch metadata | Local git remains the source for no-PR and uncommitted panel states. |
+| Local todos | Ensemble SQLite | Todos are app-owned review context, not GitHub-owned state. |
+
+When adding query parameters to a GET request with `gh api`, pass `-X GET`
+explicitly because `-f` and `-F` fields otherwise switch the request to POST.
+Use `{owner}` and `{repo}` placeholders where possible so `gh` resolves the
+current repository context. Provider-specific APIs such as Vercel or Netlify are
+deferred unless GitHub-derived deployment/status/check/comment data proves
+insufficient.
 
 ## Current Unknowns
 

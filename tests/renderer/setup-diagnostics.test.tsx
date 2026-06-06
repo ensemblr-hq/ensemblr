@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import {
 	RootDirectoryChangeContent,
 	SetupDiagnosticsPanel,
-} from '../../src/components/setup-diagnostics';
+} from '../../src/renderer/components/setup-diagnostics';
 import type {
 	RootDirectoryChangeApplyResult,
 	RootDirectoryChangePreview,

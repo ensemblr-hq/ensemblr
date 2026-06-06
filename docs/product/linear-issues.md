@@ -6,8 +6,8 @@ These issue templates are ready to copy into Linear. `ENS-*` IDs are local plann
 
 Current shell alignment:
 
-- The implemented shell in `src/components/workbench-shell.tsx` plus private modules under `src/components/workbench-shell/` is now the product source of truth for app-shell layout and visible affordances.
-- Shared renderer-only shell state lives in Jotai atoms under `src/renderer/state/workbench-shell.ts`, and shared exported shell types live under `src/renderer/types/workbench-shell.ts`.
+- The implemented shell in `src/renderer/components/workbench-shell.tsx` plus private modules under `src/renderer/components/workbench-shell/` is now the product source of truth for app-shell layout and visible affordances.
+- Shared renderer-only shell state lives in Jotai atoms under `src/renderer/state/workspace`, and shared exported shell types live under `src/renderer/types/workbench-shell.ts`.
 - Use `docs/product/current-shell-inventory.md` with these issue templates.
 - Future tickets should wire live services into the current sidebar, header, chat/session tab strip, center timeline/composer placement, right PR/review panel, and lower dock.
 - Chat transcript content and prompt/composer behavior remain deferred until Pi runtime integration.
@@ -69,7 +69,7 @@ Scope:
 - Add shadcn/ui component foundation as owned source.
 - Define color, spacing, typography, radius, pane, code, diff, and terminal tokens.
 - Own and maintain the implemented Conductor-style shell contract: project/workspace sidebar, project/branch header, open-workspace launcher, chat tabs, center timeline/composer placement, right PR header, All files/Changes/Checks panel, and lower Setup/Run/Terminal dock.
-- Keep shell components split behind `src/components/workbench-shell.tsx`, with shared renderer shell state in `src/renderer/state/workbench-shell.ts` and shared shell types in `src/renderer/types/workbench-shell.ts`.
+- Keep shell components split behind `src/renderer/components/workbench-shell.tsx`, with shared renderer shell state in `src/renderer/state/workspace` and shared shell types in `src/renderer/types/workbench-shell.ts`.
 - Build compact shell primitives for sidebar, tabs, panels, dock, forms, dialogs, banners, and status badges.
 - Keep fixture/local renderer models clearly separated from shell layout; live services wire in later tickets.
 
@@ -156,7 +156,7 @@ Scope:
 
 Out of scope:
 - Linear OAuth implementation.
-- Direct GitHub token support for v1.
+- Any GitHub token field; GitHub auth is owned by `gh`.
 
 Acceptance criteria:
 - Secret values are never written to JSON or SQLite by default.
@@ -384,7 +384,7 @@ Scope:
 
 Out of scope:
 - PR/check workflow implementation.
-- Direct GitHub OAuth/API.
+- GitHub OAuth/token storage; all GitHub access uses `gh`.
 
 Acceptance criteria:
 - Setup gate reports git version on success.
@@ -731,7 +731,7 @@ Scope:
 - Create repository record after successful clone.
 
 Out of scope:
-- Direct GitHub API/OAuth.
+- GitHub OAuth/token storage; all GitHub access uses `gh`.
 - Full first workspace creation after clone, covered by `ENS-021` and `ENS-023`.
 
 Acceptance criteria:
@@ -765,7 +765,7 @@ Wire the persistent app shell navigation to live repository and workspace record
 Scope:
 - Replace fixture project/workspace sidebar rows with SQLite-backed repository and workspace records.
 - Keep the existing visible History and Settings entries, health footer, chat-tab strip, right panel, PR header, open-workspace launcher, and dock regions.
-- Preserve implemented sidebar affordances: project collapse, project reorder, pinned workspaces, workspace diff counts, workspace status icons, archive affordance, and context menus.
+- Preserve implemented sidebar affordances: project collapse, project reorder, pinned workspaces, workspace diff counts, the documented workspace sidebar state contract, archive affordance, and context menus.
 - Repository context menu for create workspace, create from issue/PR placeholders, settings, hide, and remove.
 - Persist selected repository/workspace defaults where route/search state is not enough.
 
@@ -773,7 +773,7 @@ Out of scope:
 - Full dashboard/history implementations.
 - Rebuilding the structural shell regions already established by the Foundation UI pass.
 - Full files/checks/terminal contents.
-- Defining unresolved workspace-row status or mark-unread semantics beyond the current inventory/open decisions.
+- Defining unresolved mark-unread semantics beyond the current inventory/open decisions.
 
 Acceptance criteria:
 - Repository and workspace records render from SQLite state.
@@ -1465,7 +1465,10 @@ Replace the setup/run/terminal dock placeholder with the xterm.js renderer adapt
 
 Scope:
 - Integrate xterm.js behind a terminal adapter.
-- Wire Setup, Run, and named terminal tabs in the existing lower-right dock without changing the dock placement, tab names, or collapse behavior.
+- Wire fixed Setup and Run script-output tabs plus named terminal session tabs in the existing lower-right dock without changing the dock placement, tab names, or collapse behavior.
+- Keep Setup and Run as read-only output panes for their respective configured commands.
+- Keep one default interactive Terminal tab per workspace and allow users to spawn additional regular IDE-style terminal tabs.
+- Model user-spawned terminal tabs with stable terminal session IDs rather than overloading the fixed Setup, Run, or default terminal labels.
 - Support fit/resize, scrollback, copy/paste, links where available, and status badges.
 - Keep dock visible alongside timeline and right panel.
 - Keep the Setup tab scoped to workspace/project setup command output. App setup diagnostics belong in the left sidebar footer/status area, not in the dock.
@@ -1476,7 +1479,9 @@ Out of scope:
 
 Acceptance criteria:
 - xterm.js renders PTY output and accepts input.
-- Dock can switch between setup, run, and named terminals.
+- Dock can switch between setup output, run output, the default terminal, and additional named terminals.
+- New-terminal action creates another terminal session tab and never creates additional Setup or Run tabs.
+- Setup and Run panes display process output but do not accept terminal input.
 - Terminal sessions show running, exited, failed, and stopped states.
 - Renderer can be swapped later through adapter boundary.
 - The current dock script-state action placement is preserved.
@@ -1493,6 +1498,7 @@ Source:
 
 Implementation notes:
 - Keep Pi RPC timeline separate from manual/raw terminal sessions.
+- Keep app setup diagnostics and app health logs outside the dock; the dock Setup tab is only workspace/project setup command output.
 
 ## ENS-038 Setup, Run, and Archive Script Lifecycle
 
@@ -1508,7 +1514,8 @@ Scope:
 - Execute `scripts.setup` on workspace creation or manual rerun.
 - Execute `scripts.run` from Run tab/button.
 - Execute `scripts.archive` before archive lifecycle.
-- Show output in terminal dock with rerun, stop, success, and failure states.
+- Show setup output in the fixed read-only Setup dock tab with rerun, success, and failure states.
+- Show run output in the fixed read-only Run dock tab with run, stop, port-open, success, and failure states.
 - Store process metadata and logs as appropriate.
 
 Out of scope:
@@ -1519,6 +1526,7 @@ Acceptance criteria:
 - Scripts run from workspace directory.
 - Script source and command are visible without exposing secrets.
 - Setup output remains visible while user works elsewhere.
+- Setup and Run script output remains separate from user-spawned interactive terminal sessions.
 - Failures are actionable and do not leave process state stuck.
 
 Verification:
@@ -2123,7 +2131,7 @@ Scope:
 - Surface auth, permission, remote, merge-base, and dirty-state errors.
 
 Out of scope:
-- Direct GitHub API/OAuth.
+- GitHub OAuth/token storage; all GitHub access uses `gh`.
 - Full agent-assisted PR workflow UI, covered by `ENS-059`.
 
 Acceptance criteria:
@@ -2142,7 +2150,7 @@ Source:
 - `docs/product/conductor-parity.md`
 
 Implementation notes:
-- Keep a `GitHubService` boundary so direct API can be added later.
+- Keep `GitHubService` as the command boundary for `gh` and `gh api`.
 
 ## ENS-055 gh PR/Check Metadata Service
 
@@ -2155,18 +2163,21 @@ Summary:
 Fetch and cache PR metadata and check status through authenticated `gh`.
 
 Scope:
-- Use `gh pr view`, `gh pr checks`, and related commands where practical.
-- Cache PR number, title, body, URL, branch, status, checks, deployments where exposed, and mergeability signals in SQLite.
+- Use `gh pr view`, `gh pr checks`, and authenticated `gh api` where first-class `gh pr` commands do not expose the needed REST/GraphQL fields.
+- Cache PR number, title, body, URL, branch, status, checks, check links, deployments/preview links where exposed, and mergeability signals in SQLite.
 - Treat GitHub as source of truth and refresh on demand/polling.
 - Surface missing PR, uncommitted, pending, failing, passed, and permissions states.
+- Keep all `gh` and `gh api` calls behind the `GitHubService` boundary.
 
 Out of scope:
 - Comment/review-thread detail discovery, covered by `ENS-056`.
 - Merge action, covered by `ENS-058`.
+- GitHub OAuth/token storage.
 
 Acceptance criteria:
 - Service can detect no-PR and existing-PR states.
 - Checks are parsed into stable status models.
+- `gh api` GET calls that pass fields use `-X GET` explicitly.
 - Cache refresh is idempotent.
 - `gh` parse failures are visible and do not crash checks panel.
 
@@ -2180,7 +2191,7 @@ Source:
 - `docs/product/screen-inventory.md`
 
 Implementation notes:
-- Use direct API only as deferred follow-up if `gh` coverage is insufficient.
+- Authenticated `gh api` is part of `gh` coverage; do not add app-owned GitHub OAuth/API as a fallback.
 
 ## ENS-056 GitHub Comments and Deployments Discovery
 
@@ -2193,17 +2204,20 @@ Summary:
 Discover whether `gh` exposes enough detail for review comments, review threads, deployments, add-all-comments-to-chat, and failed-check remediation.
 
 Scope:
-- Evaluate `gh` commands and JSON fields for PR comments, review threads, checks, annotations, deployments, and preview URLs.
+- Evaluate first-class `gh` commands and authenticated `gh api` REST/GraphQL calls for PR comments, review threads, checks, annotations, deployments, and preview URLs.
+- For hosted preview URLs, validate the v1 source order: GitHub deployment statuses via authenticated `gh api` first, `gh pr checks` links second, and provider bot PR comments only as fallback.
 - Determine whether comments can be resolved or responded to through `gh` for v1.
-- Identify gaps requiring direct GitHub API post-core.
+- Identify gaps that remain unavailable through `gh` and `gh api`.
 - Recommend minimum v1 checks-panel comment behavior.
 
 Out of scope:
-- Implementing direct GitHub API.
+- Implementing GitHub OAuth/token storage.
 - Building comment mutation UI.
 
 Acceptance criteria:
-- Discovery note maps each needed capability to `gh`, unavailable, or deferred API path.
+- Discovery note maps each needed capability to first-class `gh`, `gh api`, unavailable, or intentionally unsupported.
+- Preview URL discovery does not require Vercel, Netlify, or other deployment-provider auth for v1.
+- Review-thread resolution state is checked through `gh api graphql`.
 - Add-all-comments-to-chat feasibility is documented.
 - Failed-check remediation data availability is documented.
 
@@ -2217,7 +2231,7 @@ Source:
 - `docs/product/docs-consistency-audit.md`
 
 Implementation notes:
-- Do not promote direct GitHub API into v1 unless product scope changes.
+- Do not add app-owned GitHub OAuth/API. Authenticated `gh api` remains allowed because it uses existing `gh` auth.
 
 ## ENS-057 Checks Panel States and Polling
 
@@ -2231,7 +2245,9 @@ Wire the existing Checks panel to GitHub PR metadata, checks, comments, todos, d
 
 Scope:
 - Replace fixture checks with no-PR, uncommitted, pending/failing, and ready-to-merge state data inside the existing right PR header and Checks tab.
-- Show PR metadata, external PR link, git status, checks, deployments where available, comments/review threads where available, and todos.
+- Preserve the right PR header state contract from `docs/product/current-shell-inventory.md`: empty, create-PR, PR working, PR checking, PR blocked, PR ready, and PR open.
+- Preserve the Checks panel state contract from `docs/product/current-shell-inventory.md`: empty, uncommitted, PR working, PR checking, PR blocked, PR ready, and PR open.
+- Show PR metadata, external PR link, preview deployment link beside the PR link when available, git status, checks, deployments where available, comments/review threads where available, and todos.
 - Poll/refresh metadata through service with manual refresh.
 - Show add-to-Pi-context actions for supported items.
 
@@ -2241,6 +2257,12 @@ Out of scope:
 
 Acceptance criteria:
 - Each documented checks state has a distinct UI.
+- Idle/open PRs show PR identity and overflow actions, not `Working...` or spinner affordances.
+- No-PR/no-change workspaces keep the right PR header visually quiet.
+- Preview deployment URLs render next to the PR link when GitHub-derived deployment data exposes them.
+- Preview deployments also render in the Checks panel Deployments section.
+- Empty checks, descriptions, comments, and todos render explicit empty copy instead of blank sections.
+- Check rows only render external-link actions when the model includes a URL.
 - Pending/failing states show blockers.
 - Ready state only appears when policy signals are satisfied.
 - Data source and refresh errors are visible.
@@ -2278,7 +2300,7 @@ Scope:
 
 Out of scope:
 - Automerge beyond explicit supported action.
-- Direct GitHub API merge.
+- Merging through an app-owned GitHub API client.
 
 Acceptance criteria:
 - Merge never happens on the first click.
@@ -2473,7 +2495,7 @@ Scope:
 
 Out of scope:
 - Ensemble account sign-in.
-- Direct GitHub token field for v1.
+- GitHub token field; GitHub auth remains owned by `gh`.
 - Voice, Graphite, cloud SSH, and production React profiler controls.
 
 Acceptance criteria:
@@ -2493,7 +2515,7 @@ Source:
 - `docs/adr/0024-use-linear-oauth-for-v1-issue-integration.md`
 
 Implementation notes:
-- Direct GitHub API/OAuth remains post-core; v1 uses authenticated `gh`.
+- No app-owned GitHub API/OAuth is planned; GitHub work uses authenticated `gh`, including `gh api`.
 
 ## ENS-063 Repository Settings Source Diagnostics
 
@@ -2796,28 +2818,30 @@ Source:
 Implementation notes:
 - This ticket exists to prevent accidental scope creep.
 
-## ENS-071 Post-Core Direct GitHub API and OAuth
+## ENS-071 Post-Core GitHub CLI Capability Gap Review
 
 Milestone: 9. Deferred / Post-Core
-Type: Integration
+Type: Docs
 Priority: Post-core
 Dependencies: ENS-056, core GitHub flow completion
 
 Summary:
-Track direct GitHub API/OAuth as deferred follow-up after `gh`-based v1 workflows are proven.
+Track any GitHub workflow gaps left after authenticated `gh` and `gh api` workflows are proven.
 
 Scope:
-- Use `ENS-056` discoveries to identify `gh` gaps.
-- Define OAuth scopes, token storage, API rate-limit, and security requirements.
-- Plan direct REST/GraphQL implementation behind `GitHubService` boundary.
+- Use `ENS-056` discoveries to identify `gh` and `gh api` gaps.
+- Document whether each gap should stay unsupported or be handled with additional `gh`/`gh api` commands.
+- Record CLI limitations, required `gh` versions, permission failures, and user-facing remediation.
 
 Out of scope:
 - Replacing required `gh` in v1.
-- Storing GitHub tokens during core milestones.
+- Building an app-owned GitHub OAuth/API client.
+- Storing GitHub tokens in Ensemble.
 
 Acceptance criteria:
 - Deferred status is explicit.
-- No core v1 issue depends on direct GitHub API/OAuth.
+- No issue depends on app-owned GitHub API/OAuth.
+- Authenticated `gh api` remains the REST/GraphQL path.
 
 Verification:
 - Docs review only.
