@@ -1,7 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
 
-import { createMainWindow } from './app';
+import { createMainWindow, createMainWindowStateStore } from './app';
 import { createLocalCommandService } from './commands';
 import {
 	createEnsembleConfigResolutionService,
@@ -66,6 +66,9 @@ const setupDiagnosticsService = createSetupDiagnosticsService({
 	piReadinessService,
 	rootDirectoryService,
 });
+const mainWindowStateStore = createMainWindowStateStore({
+	databaseService,
+});
 
 app.whenReady().then(() => {
 	configService.load();
@@ -82,10 +85,10 @@ app.whenReady().then(() => {
 		setupDiagnosticsService,
 		settingsResolutionService,
 	});
-	createMainWindow();
+	createMainWindow({ windowStateStore: mainWindowStateStore });
 });
 
-app.on('before-quit', () => {
+app.on('will-quit', () => {
 	databaseService.close();
 });
 
@@ -97,6 +100,6 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
 	if (BrowserWindow.getAllWindows().length === 0) {
-		createMainWindow();
+		createMainWindow({ windowStateStore: mainWindowStateStore });
 	}
 });
