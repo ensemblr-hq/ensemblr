@@ -16,7 +16,7 @@ import {
 	PencilIcon,
 	PinIcon,
 } from 'lucide-react';
-import type { ComponentProps } from 'react';
+import type { ComponentProps, ReactElement } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -33,7 +33,11 @@ import {
 } from '@/renderer/components/ui/context-menu';
 import { SidebarMenuButton } from '@/renderer/components/ui/sidebar';
 import { cn } from '@/renderer/lib/utils';
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import type {
+	WorkbenchRouteSearch,
+	WorkspaceShellModel,
+} from '@/renderer/types/workbench';
+import type { WorkbenchWorkspaceNavigationLinkTarget } from '@/renderer/types/workbench-shell';
 import {
 	classifyPermissionAction,
 	DEFAULT_PERMISSION_MODE,
@@ -53,12 +57,19 @@ export function WorkspaceSidebarItem({
 	isPinned,
 	onPinToggle,
 	onSelect,
+	renderNavigationLink,
+	routeSearch,
 	workspace,
 }: {
 	isActive: boolean;
 	isPinned: boolean;
 	onPinToggle: () => void;
 	onSelect: () => void;
+	renderNavigationLink?: (
+		target: WorkbenchWorkspaceNavigationLinkTarget,
+		children: ReactElement,
+	) => ReactElement;
+	routeSearch: WorkbenchRouteSearch;
 	workspace: WorkspaceShellModel;
 }) {
 	const sidebarState = getWorkspaceSidebarState(workspace);
@@ -66,6 +77,31 @@ export function WorkspaceSidebarItem({
 	const hasDiffStats =
 		workspace.changeSummary.additions > 0 ||
 		workspace.changeSummary.deletions > 0;
+	const buttonContent = (
+		<>
+			<div className='mt-0.5 grid size-5 shrink-0 place-items-center'>
+				<WorkspaceIcon
+					aria-hidden='true'
+					className={cn(
+						'size-3.5',
+						sidebarState.className,
+						sidebarState.isSpinning && 'animate-spin',
+					)}
+				/>
+			</div>
+			<div className='min-w-0 flex-1'>
+				<div className='flex min-w-0 items-start justify-between gap-2'>
+					<span className='truncate font-medium text-[0.8125rem]'>
+						{workspace.name}
+					</span>
+					{hasDiffStats ? <WorkspaceDiffStats workspace={workspace} /> : null}
+				</div>
+				<div className='mt-1 flex min-w-0 items-center gap-1.5 text-[0.6875rem] text-muted-foreground'>
+					<span className='truncate'>{workspace.branchName}</span>
+				</div>
+			</div>
+		</>
+	);
 
 	return (
 		<ContextMenu>
@@ -73,35 +109,22 @@ export function WorkspaceSidebarItem({
 				<div className='group/workspace-sidebar-item relative min-w-0'>
 					<SidebarMenuButton
 						aria-label={`Open workspace ${workspace.name}`}
+						asChild={Boolean(renderNavigationLink)}
 						className='h-auto min-h-12 items-start gap-2 py-2'
 						data-workspace-sidebar-state={sidebarState.kind}
 						isActive={isActive}
-						onClick={onSelect}
+						onClick={renderNavigationLink ? undefined : onSelect}
 						tooltip={workspace.name}
 					>
-						<div className='mt-0.5 grid size-5 shrink-0 place-items-center'>
-							<WorkspaceIcon
-								aria-hidden='true'
-								className={cn(
-									'size-3.5',
-									sidebarState.className,
-									sidebarState.isSpinning && 'animate-spin',
-								)}
-							/>
-						</div>
-						<div className='min-w-0 flex-1'>
-							<div className='flex min-w-0 items-start justify-between gap-2'>
-								<span className='truncate font-medium text-[0.8125rem]'>
-									{workspace.name}
-								</span>
-								{hasDiffStats ? (
-									<WorkspaceDiffStats workspace={workspace} />
-								) : null}
-							</div>
-							<div className='mt-1 flex min-w-0 items-center gap-1.5 text-[0.6875rem] text-muted-foreground'>
-								<span className='truncate'>{workspace.branchName}</span>
-							</div>
-						</div>
+						{renderNavigationLink
+							? renderNavigationLink(
+									{
+										search: routeSearch,
+										workspace,
+									},
+									buttonContent,
+								)
+							: buttonContent}
 					</SidebarMenuButton>
 					<Button
 						aria-label={`Archive workspace ${workspace.name}; ${archiveBoundaryLabel}`}

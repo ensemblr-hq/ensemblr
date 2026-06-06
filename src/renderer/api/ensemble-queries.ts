@@ -1,5 +1,6 @@
 import { queryOptions } from '@tanstack/react-query';
 
+import { profileElectronIpcCall } from '@/renderer/lib/instrumentation/route-profiler';
 import type { EnsembleApi } from '@/shared/ipc';
 
 export const ensembleQueryKeys = {
@@ -28,25 +29,44 @@ export function isEnsembleApiAvailable(): boolean {
 }
 
 export const healthQuery = queryOptions({
-	queryFn: () => getEnsembleApi().health(),
+	queryFn: () =>
+		profileElectronIpcCall(
+			{ channel: 'ensemble:health', usesDatabase: true },
+			() => getEnsembleApi().health(),
+		),
 	queryKey: ensembleQueryKeys.health(),
 	staleTime: 5000,
 });
 
 export const environmentVariablesQuery = queryOptions({
-	queryFn: () => getEnsembleApi().environmentVariables(),
+	queryFn: () =>
+		profileElectronIpcCall(
+			{ channel: 'ensemble:environment-variables', usesDatabase: false },
+			() => getEnsembleApi().environmentVariables(),
+		),
 	queryKey: ensembleQueryKeys.environmentVariables(),
 	staleTime: 5000,
 });
 
 export const repositoryWorkspaceNavigationQuery = queryOptions({
-	queryFn: () => getEnsembleApi().repositoryWorkspaceNavigation(),
+	queryFn: () =>
+		profileElectronIpcCall(
+			{
+				channel: 'ensemble:repository-workspace-navigation',
+				usesDatabase: true,
+			},
+			() => getEnsembleApi().repositoryWorkspaceNavigation(),
+		),
 	queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
 	staleTime: 2000,
 });
 
 export const setupDiagnosticsQuery = queryOptions({
-	queryFn: () => getEnsembleApi().setupDiagnostics(),
+	queryFn: () =>
+		profileElectronIpcCall(
+			{ channel: 'ensemble:setup-diagnostics', usesDatabase: true },
+			() => getEnsembleApi().setupDiagnostics(),
+		),
 	queryKey: ensembleQueryKeys.setupDiagnostics(),
 	staleTime: 2000,
 });

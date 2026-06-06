@@ -1,26 +1,27 @@
-import {
-	SidebarInset,
-	SidebarProvider,
-} from '@/renderer/components/ui/sidebar';
-import { TooltipProvider } from '@/renderer/components/ui/tooltip';
-import { useProjectNavigationState } from '@/renderer/state/workspace';
-import type { ProjectShellModel } from '@/renderer/types/workbench';
+import type { ReactElement } from 'react';
+import { SidebarInset } from '@/renderer/components/ui/sidebar';
+import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
+import type {
+	ProjectShellModel,
+	WorkbenchRouteSearch,
+} from '@/renderer/types/workbench';
 import type {
 	WorkbenchActiveView,
 	WorkbenchHealth,
+	WorkbenchStaticNavigationTarget,
+	WorkbenchWorkspaceNavigationLinkTarget,
 } from '@/renderer/types/workbench-shell';
-import { WorkspaceNavigationSidebar } from './workbench-shell/navigation-sidebar';
+import { WorkbenchFrame } from './workbench-shell';
 
 export function WorkbenchEmptyStateShell({
 	activeView,
 	emptyState,
 	health,
-	onDashboardSelect,
-	onHelpSelect,
-	onHistorySelect,
-	onSettingsSelect,
+	onStaticNavigationSelect,
 	onWorkspaceSelect,
 	projects,
+	renderStaticNavigationLink,
+	renderWorkspaceNavigationLink,
 }: {
 	activeView: WorkbenchActiveView;
 	emptyState: {
@@ -28,44 +29,64 @@ export function WorkbenchEmptyStateShell({
 		title: string;
 	};
 	health: WorkbenchHealth;
-	onDashboardSelect: () => void;
-	onHelpSelect: () => void;
-	onHistorySelect: () => void;
-	onSettingsSelect: () => void;
+	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projects: ProjectShellModel[];
+	renderStaticNavigationLink?: (
+		target: WorkbenchStaticNavigationTarget,
+		children: ReactElement,
+	) => ReactElement;
+	renderWorkspaceNavigationLink?: (
+		target: WorkbenchWorkspaceNavigationLinkTarget,
+		children: ReactElement,
+	) => ReactElement;
 }) {
-	const projectNavigation = useProjectNavigationState(projects);
+	useRouteProfilerMount('WorkbenchEmptyStateShell');
 
 	return (
-		<TooltipProvider>
-			<SidebarProvider>
-				<WorkspaceNavigationSidebar
-					activeProject={null}
-					activeView={activeView}
-					activeWorkspace={null}
-					health={health}
-					onDashboardSelect={onDashboardSelect}
-					onHelpSelect={onHelpSelect}
-					onHistorySelect={onHistorySelect}
-					onSettingsSelect={onSettingsSelect}
-					onWorkspaceSelect={onWorkspaceSelect}
-					projectNavigation={projectNavigation}
-					projects={projects}
-				/>
-				<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
-					<main className='flex min-h-0 flex-1 items-center justify-center px-8 py-10'>
-						<section className='max-w-md text-center'>
-							<h1 className='font-semibold text-2xl text-foreground tracking-normal'>
-								{emptyState.title}
-							</h1>
-							<p className='mt-3 text-muted-foreground text-sm leading-6'>
-								{emptyState.detail}
-							</p>
-						</section>
-					</main>
-				</SidebarInset>
-			</SidebarProvider>
-		</TooltipProvider>
+		<WorkbenchFrame
+			activeProject={null}
+			activeView={activeView}
+			activeWorkspace={null}
+			health={health}
+			onStaticNavigationSelect={onStaticNavigationSelect}
+			onWorkspaceSelect={onWorkspaceSelect}
+			projects={projects}
+			resolveWorkspaceRouteSearch={resolveEmptyStateWorkspaceRouteSearch}
+			renderStaticNavigationLink={renderStaticNavigationLink}
+			renderWorkspaceNavigationLink={renderWorkspaceNavigationLink}
+		>
+			<WorkbenchEmptyStateContent emptyState={emptyState} />
+		</WorkbenchFrame>
 	);
+}
+
+export function WorkbenchEmptyStateContent({
+	emptyState,
+}: {
+	emptyState: {
+		detail: string;
+		title: string;
+	};
+}) {
+	useRouteProfilerMount('WorkbenchEmptyStateContent');
+
+	return (
+		<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
+			<main className='flex min-h-0 flex-1 items-center justify-center px-8 py-10'>
+				<section className='max-w-md text-center'>
+					<h1 className='font-semibold text-2xl text-foreground tracking-normal'>
+						{emptyState.title}
+					</h1>
+					<p className='mt-3 text-muted-foreground text-sm leading-6'>
+						{emptyState.detail}
+					</p>
+				</section>
+			</main>
+		</SidebarInset>
+	);
+}
+
+function resolveEmptyStateWorkspaceRouteSearch(): WorkbenchRouteSearch {
+	return {};
 }

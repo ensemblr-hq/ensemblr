@@ -14,7 +14,6 @@ export function normalizeWorkbenchSearch(
 	search: Record<string, unknown>,
 ): WorkbenchRouteSearch {
 	return {
-		chat: typeof search.chat === 'string' ? search.chat : undefined,
 		dock: 'dock' in search ? normalizeDockTab(search.dock) : undefined,
 		review:
 			'review' in search

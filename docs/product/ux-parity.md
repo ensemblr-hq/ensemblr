@@ -10,7 +10,11 @@ As of 2026-06-05, the implemented workbench shell is the product source of
 truth for layout and visible affordances. See
 `docs/product/current-shell-inventory.md`.
 
-The shell is implemented through a stable public entrypoint at
+The shell is composed from file-based TanStack routes under
+`src/renderer/routing/routes/` (see
+`docs/adr/0026-use-file-based-tanstack-routing.md`), with shell composition in
+`src/renderer/components/workbench-shell/route-layout.tsx`, the `WorkbenchFrame`
+and `WorkspaceWorkbenchContent` entrypoints in
 `src/renderer/components/workbench-shell.tsx`, private feature modules under
 `src/renderer/components/workbench-shell/`, shared Jotai atoms in
 `src/renderer/state/workspace`, and shared exported shell types in
@@ -35,8 +39,7 @@ runtime event rendering, and session tree behavior to Pi runtime tickets.
 ### App Shell
 
 - Persistent macOS desktop window with native menu bar support.
-- Left sidebar with visible History and Settings entries. The Dashboard route
-  exists in the renderer but is not a visible current-shell sidebar item.
+- Left sidebar with visible Dashboard, History, Settings, and Help entries.
 - Projects grouped in the sidebar, each containing one or more workspaces.
 - Workspace rows show the current task/branch plus compact change statistics.
 - Sidebar footer exposes app health/readiness status and app diagnostics.
@@ -48,7 +51,7 @@ runtime event rendering, and session tree behavior to Pi runtime tickets.
 Ensemble equivalent:
 
 - Use Electron native menu APIs for macOS menus.
-- Use TanStack Router for durable app navigation and workspace/search state such as selected workspace, chat tab, review tab, and dock tab.
+- Use file-based TanStack Router for durable app navigation. The selected workspace and chat tab are URL path params (`/projects/$projectId/workspaces/$workspaceId/chats/$chatId`); review and dock tabs are validated search params. Per-workspace dock, review, and last-chat selections are persisted so switching workspaces restores them.
 - Use TanStack Query for backend/preload snapshots such as health, setup diagnostics, repository/workspace records, file status, terminal metadata, and PR/check state.
 - Use Jotai atoms in `src/renderer/state/` for durable renderer-only UI state
   that crosses shell modules, such as pinned workspace IDs, collapsed project
@@ -160,7 +163,7 @@ Ensemble equivalent:
 
 ## Prioritized Implementation Checklist
 
-1. Maintain the implemented app shell contract: sidebar projects/workspaces, center tabbed workspace, right panel tabs, terminal dock, Router search state, and Query-backed setup/health snapshots.
+1. Maintain the implemented app shell contract: sidebar projects/workspaces, center tabbed workspace, right panel tabs, terminal dock, file-based route state (path-based workspace/chat selection plus `dock`/`review` search params), and Query-backed setup/health snapshots.
 2. Build settings shell: app settings sections plus repository settings from the screenshot inventory.
 3. Implement setup gate: git, `gh`, Pi executable/RPC/provider, root directory, SQLite, and process environment checks.
 4. Implement repository add/open/clone: add menu, clone modal, clone progress log, post-clone workspace landing.

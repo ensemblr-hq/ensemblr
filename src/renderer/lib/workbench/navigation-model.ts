@@ -219,7 +219,7 @@ export function getPreferredSession(
 }
 
 export interface WorkspaceRouteParams {
-	chat: string;
+	chatId: string;
 	projectId: string;
 	workspaceId: string;
 }
@@ -240,7 +240,7 @@ export function resolveWorkspaceRouteParams(
 	}
 
 	return {
-		chat: getPreferredSession(selection.workspace).id,
+		chatId: getPreferredSession(selection.workspace).id,
 		projectId: selection.project.id,
 		workspaceId: selection.workspace.id,
 	};

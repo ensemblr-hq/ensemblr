@@ -1,9 +1,16 @@
 import { useAtom } from 'jotai';
-import { useEffect, useRef, useState } from 'react';
+import {
+	type ComponentType,
+	type ReactNode,
+	useEffect,
+	useRef,
+	useState,
+} from 'react';
 import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
 
 import { SidebarProvider } from '@/renderer/components/ui/sidebar';
 import { TooltipProvider } from '@/renderer/components/ui/tooltip';
+import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
 import {
 	rightSidebarCollapsedAtom,
 	rightSidebarSizePercentAtom,
@@ -49,30 +56,98 @@ function canPersistRightSidebarResize() {
 		.matches;
 }
 
-export function WorkbenchShell({
+export function WorkbenchFrame({
+	activeProject,
+	activeView,
+	activeWorkspace,
+	children,
+	health,
+	onStaticNavigationSelect,
+	onWorkspaceSelect,
+	projects,
+	renderStaticNavigationLink,
+	renderWorkspaceNavigationLink,
+	resolveWorkspaceRouteSearch,
+}: Pick<
+	WorkbenchShellProps,
+	| 'activeView'
+	| 'health'
+	| 'onStaticNavigationSelect'
+	| 'onWorkspaceSelect'
+	| 'projects'
+	| 'renderStaticNavigationLink'
+	| 'renderWorkspaceNavigationLink'
+	| 'resolveWorkspaceRouteSearch'
+> & {
+	activeProject: WorkbenchShellProps['activeProject'] | null;
+	activeWorkspace: WorkbenchShellProps['activeWorkspace'] | null;
+	children: ReactNode;
+}) {
+	useRouteProfilerMount('WorkbenchFrame');
+
+	const projectNavigation = useProjectNavigationState(projects);
+
+	return (
+		<TooltipProvider>
+			<SidebarProvider>
+				<WorkspaceNavigationSidebar
+					activeProject={activeProject}
+					activeView={activeView}
+					activeWorkspace={activeWorkspace}
+					health={health}
+					onStaticNavigationSelect={onStaticNavigationSelect}
+					onWorkspaceSelect={onWorkspaceSelect}
+					projectNavigation={projectNavigation}
+					projects={projects}
+					resolveWorkspaceRouteSearch={
+						resolveWorkspaceRouteSearch ?? resolveDefaultWorkspaceRouteSearch
+					}
+					renderStaticNavigationLink={renderStaticNavigationLink}
+					renderWorkspaceNavigationLink={renderWorkspaceNavigationLink}
+				/>
+				{children}
+			</SidebarProvider>
+		</TooltipProvider>
+	);
+}
+
+export function WorkspaceWorkbenchContent({
 	activeProject,
 	activeReviewTab,
 	activeSession,
-	activeView,
 	activeWorkspace,
 	composer,
 	dockActions,
 	dockTabId,
-	health,
-	onDashboardSelect,
 	onDockTabChange,
-	onHelpSelect,
-	onHistorySelect,
 	onReviewTabChange,
 	onSessionTabChange,
-	onSettingsSelect,
-	onWorkspaceSelect,
-	projects,
 	setupDiagnostics,
 	setupDiagnosticsError,
 	isSetupDiagnosticsRetrying,
 	onSetupDiagnosticsRetry,
-}: WorkbenchShellProps) {
+	MainContent,
+}: Pick<
+	WorkbenchShellProps,
+	| 'activeProject'
+	| 'activeReviewTab'
+	| 'activeSession'
+	| 'activeWorkspace'
+	| 'composer'
+	| 'dockActions'
+	| 'dockTabId'
+	| 'onDockTabChange'
+	| 'onReviewTabChange'
+	| 'onSessionTabChange'
+	| 'setupDiagnostics'
+	| 'setupDiagnosticsError'
+	| 'isSetupDiagnosticsRetrying'
+	| 'onSetupDiagnosticsRetry'
+> & {
+	MainContent: ComponentType<WorkspaceMainContentState>;
+}) {
+	useRouteProfilerMount('WorkspaceWorkbenchContent');
+
 	const rightSidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const dockPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const rightSidebarCollapsedByViewportRef = useRef(false);
@@ -93,12 +168,25 @@ export function WorkbenchShell({
 		storedRightSidebarCollapsed,
 	);
 	const [isDockCollapsed, setIsDockCollapsed] = useState(false);
-	const projectNavigation = useProjectNavigationState(projects);
 	const sessionNavigation = useSessionTabState({
 		activeSession,
 		activeWorkspace,
 		onSessionTabChange,
 	});
+	const mainContentState: WorkspaceMainContentState = {
+		activeSession: sessionNavigation.effectiveActiveSession,
+		activeWorkspace,
+		closedSessions: sessionNavigation.closedSessions,
+		composer,
+		onSessionTabChange,
+		onSessionTabClose: sessionNavigation.closeSessionTab,
+		onSessionTabRestore: sessionNavigation.restoreSessionTab,
+		sessionTabs: sessionNavigation.sessionTabs,
+		setupDiagnostics,
+		setupDiagnosticsError,
+		isSetupDiagnosticsRetrying,
+		onSetupDiagnosticsRetry,
+	};
 	useEffect(() => {
 		rightSidebarCollapsedPreferenceRef.current = storedRightSidebarCollapsed;
 	}, [storedRightSidebarCollapsed]);
@@ -220,52 +308,46 @@ export function WorkbenchShell({
 	}, [isRightSidebarCollapsed]);
 
 	return (
-		<TooltipProvider>
-			<SidebarProvider>
-				<WorkspaceNavigationSidebar
-					activeProject={activeProject}
-					activeView={activeView}
-					activeWorkspace={activeWorkspace}
-					health={health}
-					onDashboardSelect={onDashboardSelect}
-					onHelpSelect={onHelpSelect}
-					onHistorySelect={onHistorySelect}
-					onSettingsSelect={onSettingsSelect}
-					onWorkspaceSelect={onWorkspaceSelect}
-					projectNavigation={projectNavigation}
-					projects={projects}
-				/>
-				<WorkbenchPanelLayout
-					activeProject={activeProject}
-					activeReviewTab={activeReviewTab}
-					activeSession={sessionNavigation.effectiveActiveSession}
-					activeWorkspace={activeWorkspace}
-					closedSessions={sessionNavigation.closedSessions}
-					composer={composer}
-					dockActions={dockActions}
-					dockPanelRef={dockPanelRef}
-					dockTabId={dockTabId}
-					isDockCollapsed={isDockCollapsed}
-					isRightSidebarCollapsed={isRightSidebarCollapsed}
-					onDockResize={(isCollapsed) => setIsDockCollapsed(isCollapsed)}
-					onDockTabChange={onDockTabChange}
-					onDockToggle={toggleDockPanel}
-					onReviewTabChange={onReviewTabChange}
-					onRightSidebarCollapse={collapseRightSidebar}
-					onRightSidebarOpen={expandRightSidebar}
-					onRightSidebarResize={handleRightSidebarResize}
-					rightSidebarSizePercent={preferredRightSidebarSizePercent}
-					onSessionTabChange={onSessionTabChange}
-					onSessionTabClose={sessionNavigation.closeSessionTab}
-					onSessionTabRestore={sessionNavigation.restoreSessionTab}
-					rightSidebarPanelRef={rightSidebarPanelRef}
-					sessionTabs={sessionNavigation.sessionTabs}
-					setupDiagnostics={setupDiagnostics}
-					setupDiagnosticsError={setupDiagnosticsError}
-					isSetupDiagnosticsRetrying={isSetupDiagnosticsRetrying}
-					onSetupDiagnosticsRetry={onSetupDiagnosticsRetry}
-				/>
-			</SidebarProvider>
-		</TooltipProvider>
+		<WorkbenchPanelLayout
+			activeProject={activeProject}
+			activeReviewTab={activeReviewTab}
+			activeWorkspace={activeWorkspace}
+			dockActions={dockActions}
+			dockPanelRef={dockPanelRef}
+			dockTabId={dockTabId}
+			isDockCollapsed={isDockCollapsed}
+			isRightSidebarCollapsed={isRightSidebarCollapsed}
+			mainContent={<MainContent {...mainContentState} />}
+			onDockResize={(isCollapsed) => setIsDockCollapsed(isCollapsed)}
+			onDockTabChange={onDockTabChange}
+			onDockToggle={toggleDockPanel}
+			onReviewTabChange={onReviewTabChange}
+			onRightSidebarCollapse={collapseRightSidebar}
+			onRightSidebarOpen={expandRightSidebar}
+			onRightSidebarResize={handleRightSidebarResize}
+			rightSidebarSizePercent={preferredRightSidebarSizePercent}
+			rightSidebarPanelRef={rightSidebarPanelRef}
+		/>
 	);
+}
+
+export type WorkspaceMainContentState = Pick<
+	WorkbenchShellProps,
+	| 'activeWorkspace'
+	| 'composer'
+	| 'onSessionTabChange'
+	| 'setupDiagnostics'
+	| 'setupDiagnosticsError'
+	| 'isSetupDiagnosticsRetrying'
+	| 'onSetupDiagnosticsRetry'
+> & {
+	activeSession: WorkbenchShellProps['activeSession'];
+	closedSessions: WorkbenchShellProps['activeWorkspace']['sessions'];
+	onSessionTabClose: (sessionId: string) => void;
+	onSessionTabRestore: (sessionId: string) => void;
+	sessionTabs: WorkbenchShellProps['activeWorkspace']['sessions'];
+};
+
+function resolveDefaultWorkspaceRouteSearch() {
+	return {};
 }

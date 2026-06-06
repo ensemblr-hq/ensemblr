@@ -27,10 +27,9 @@ Date: 2026-06-05
 ## Needs Product Decision
 
 - Whether to support Conductor's remove/soften AI-certainty phrase setting in Ensemble. If supported, decide whether it is Pi output post-processing, a prompt preset, or a settings omission.
-- Which non-deferred experimental settings are v1 scope versus post-core flags, especially dashboard/sidebar visibility and sidebar resource usage. Voice, Graphite, cloud/remote SSH, production React profiler, and the chat-tab limit are already resolved by ADRs.
+- Which non-deferred experimental settings are v1 scope versus post-core flags, especially sidebar visibility/resource usage. Voice, Graphite, cloud/remote SSH, production React profiler, and the chat-tab limit are already resolved by ADRs.
 - Whether the current workspace-row status context menu should change local workspace lifecycle state, linked Linear issue status, both, or another status model.
 - Whether the current workspace-row Mark as unread action represents local workspace attention, chat unread state, or linked external issue state.
-- Whether the Dashboard route should become a visible sidebar entry later or remain hidden behind other navigation.
 - Whether the Changes tab Review action opens local diff-comment review mode, starts an agent review workflow, or toggles a review filter/state.
 
 ## Needs Product Working Session
@@ -66,6 +65,7 @@ Date: 2026-06-05
 - Merge confirmation: prominent ready action when checks pass, then explicit confirmation/final merge/archive flow.
 - Hosted deployment preview URLs: derive from GitHub data through `gh` for v1, preferring deployment status `environment_url`/`target_url`, then check links, then provider bot PR comments. Do not require Vercel or Netlify login for the right PR header preview link.
 - GitHub integration model: `gh` and `gh api` are the GitHub integration path. Ensemble does not build or store credentials for an app-owned GitHub OAuth/API layer.
+- Renderer routing: file-based TanStack routing with loader-driven data and redirects. Workspace and chat identity are URL path params, `dock`/`review` are search params, and per-workspace dock/review/chat selection is persisted. See `docs/adr/0026-use-file-based-tanstack-routing.md`.
 
 ## Deferred
 

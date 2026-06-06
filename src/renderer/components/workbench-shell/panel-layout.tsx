@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
 
 import {
@@ -32,15 +32,13 @@ import { WorkbenchHeader } from './workbench-header';
 export function WorkbenchPanelLayout({
 	activeProject,
 	activeReviewTab,
-	activeSession,
 	activeWorkspace,
-	closedSessions,
-	composer,
 	dockActions,
 	dockPanelRef,
 	dockTabId,
 	isDockCollapsed,
 	isRightSidebarCollapsed,
+	mainContent,
 	onDockResize,
 	onDockTabChange,
 	onDockToggle,
@@ -48,28 +46,18 @@ export function WorkbenchPanelLayout({
 	onRightSidebarCollapse,
 	onRightSidebarOpen,
 	onRightSidebarResize,
-	onSessionTabChange,
-	onSessionTabClose,
-	onSessionTabRestore,
 	rightSidebarPanelRef,
 	rightSidebarSizePercent,
-	sessionTabs,
-	setupDiagnostics,
-	setupDiagnosticsError,
-	isSetupDiagnosticsRetrying,
-	onSetupDiagnosticsRetry,
 }: {
 	activeProject: ProjectShellModel;
 	activeReviewTab: ReviewPanelTab;
-	activeSession: SessionTabModel;
 	activeWorkspace: WorkspaceShellModel;
-	closedSessions: SessionTabModel[];
-	composer: ComposerShellState;
 	dockActions: WorkbenchDockActions;
 	dockPanelRef: RefObject<PanelImperativeHandle | null>;
 	dockTabId: DockTabId;
 	isDockCollapsed: boolean;
 	isRightSidebarCollapsed: boolean;
+	mainContent: ReactNode;
 	onDockResize: (isCollapsed: boolean) => void;
 	onDockTabChange: (tab: DockTabId) => void;
 	onDockToggle: () => void;
@@ -77,38 +65,21 @@ export function WorkbenchPanelLayout({
 	onRightSidebarCollapse: () => void;
 	onRightSidebarOpen: () => void;
 	onRightSidebarResize: (size: PanelSize) => void;
-	onSessionTabChange: (sessionId: string) => void;
-	onSessionTabClose: (sessionId: string) => void;
-	onSessionTabRestore: (sessionId: string) => void;
 	rightSidebarPanelRef: RefObject<PanelImperativeHandle | null>;
 	rightSidebarSizePercent: number;
-	sessionTabs: SessionTabModel[];
-	setupDiagnostics: SetupDiagnosticsSnapshot | null;
-	setupDiagnosticsError?: string | null;
-	isSetupDiagnosticsRetrying?: boolean;
-	onSetupDiagnosticsRetry?: () => void;
 }) {
 	return (
 		<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
 			<ResizablePanelGroup className='min-h-0 flex-1' orientation='horizontal'>
-				<MainConversationPanel
+				<MainWorkspacePanel
 					activeProject={activeProject}
-					activeSession={activeSession}
 					activeWorkspace={activeWorkspace}
-					closedSessions={closedSessions}
-					composer={composer}
 					isRightSidebarCollapsed={isRightSidebarCollapsed}
 					onRightSidebarCollapse={onRightSidebarCollapse}
 					onRightSidebarOpen={onRightSidebarOpen}
-					onSessionTabChange={onSessionTabChange}
-					onSessionTabClose={onSessionTabClose}
-					onSessionTabRestore={onSessionTabRestore}
-					sessionTabs={sessionTabs}
-					setupDiagnostics={setupDiagnostics}
-					setupDiagnosticsError={setupDiagnosticsError}
-					isSetupDiagnosticsRetrying={isSetupDiagnosticsRetrying}
-					onSetupDiagnosticsRetry={onSetupDiagnosticsRetry}
-				/>
+				>
+					{mainContent}
+				</MainWorkspacePanel>
 				<ResizableHandle className='hidden lg:flex' />
 				<ReviewDockPanel
 					activeReviewTab={activeReviewTab}
@@ -131,40 +102,20 @@ export function WorkbenchPanelLayout({
 	);
 }
 
-function MainConversationPanel({
+function MainWorkspacePanel({
 	activeProject,
-	activeSession,
 	activeWorkspace,
-	closedSessions,
-	composer,
+	children,
 	isRightSidebarCollapsed,
 	onRightSidebarCollapse,
 	onRightSidebarOpen,
-	onSessionTabChange,
-	onSessionTabClose,
-	onSessionTabRestore,
-	sessionTabs,
-	setupDiagnostics,
-	setupDiagnosticsError,
-	isSetupDiagnosticsRetrying,
-	onSetupDiagnosticsRetry,
 }: {
 	activeProject: ProjectShellModel;
-	activeSession: SessionTabModel;
 	activeWorkspace: WorkspaceShellModel;
-	closedSessions: SessionTabModel[];
-	composer: ComposerShellState;
+	children: ReactNode;
 	isRightSidebarCollapsed: boolean;
 	onRightSidebarCollapse: () => void;
 	onRightSidebarOpen: () => void;
-	onSessionTabChange: (sessionId: string) => void;
-	onSessionTabClose: (sessionId: string) => void;
-	onSessionTabRestore: (sessionId: string) => void;
-	sessionTabs: SessionTabModel[];
-	setupDiagnostics: SetupDiagnosticsSnapshot | null;
-	setupDiagnosticsError?: string | null;
-	isSetupDiagnosticsRetrying?: boolean;
-	onSetupDiagnosticsRetry?: () => void;
 }) {
 	return (
 		<ResizablePanel defaultSize='66%' minSize='32rem'>
@@ -176,30 +127,62 @@ function MainConversationPanel({
 					onRightSidebarCollapse={onRightSidebarCollapse}
 					onRightSidebarOpen={onRightSidebarOpen}
 				/>
-				<section className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-					<SessionTabs
-						activeSession={activeSession}
-						closedSessions={closedSessions}
-						onSessionTabClose={onSessionTabClose}
-						onSessionTabChange={onSessionTabChange}
-						onSessionTabRestore={onSessionTabRestore}
-						sessions={sessionTabs}
-					/>
-					<ScrollArea className='min-h-0 flex-1'>
-						<WorkspaceTimeline
-							activeSession={activeSession}
-							composer={composer}
-							setupDiagnostics={setupDiagnostics}
-							setupDiagnosticsError={setupDiagnosticsError}
-							isSetupDiagnosticsRetrying={isSetupDiagnosticsRetrying}
-							onSetupDiagnosticsRetry={onSetupDiagnosticsRetry}
-							workspace={activeWorkspace}
-						/>
-					</ScrollArea>
-					<ComposerPanel composer={composer} />
-				</section>
+				{children}
 			</div>
 		</ResizablePanel>
+	);
+}
+
+export function WorkspaceConversationContent({
+	activeSession,
+	activeWorkspace,
+	closedSessions,
+	composer,
+	onSessionTabChange,
+	onSessionTabClose,
+	onSessionTabRestore,
+	sessionTabs,
+	setupDiagnostics,
+	setupDiagnosticsError,
+	isSetupDiagnosticsRetrying,
+	onSetupDiagnosticsRetry,
+}: {
+	activeSession: SessionTabModel;
+	activeWorkspace: WorkspaceShellModel;
+	closedSessions: SessionTabModel[];
+	composer: ComposerShellState;
+	onSessionTabChange: (sessionId: string) => void;
+	onSessionTabClose: (sessionId: string) => void;
+	onSessionTabRestore: (sessionId: string) => void;
+	sessionTabs: SessionTabModel[];
+	setupDiagnostics: SetupDiagnosticsSnapshot | null;
+	setupDiagnosticsError?: string | null;
+	isSetupDiagnosticsRetrying?: boolean;
+	onSetupDiagnosticsRetry?: () => void;
+}) {
+	return (
+		<section className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+			<SessionTabs
+				activeSession={activeSession}
+				closedSessions={closedSessions}
+				onSessionTabClose={onSessionTabClose}
+				onSessionTabChange={onSessionTabChange}
+				onSessionTabRestore={onSessionTabRestore}
+				sessions={sessionTabs}
+			/>
+			<ScrollArea className='min-h-0 flex-1'>
+				<WorkspaceTimeline
+					activeSession={activeSession}
+					composer={composer}
+					setupDiagnostics={setupDiagnostics}
+					setupDiagnosticsError={setupDiagnosticsError}
+					isSetupDiagnosticsRetrying={isSetupDiagnosticsRetrying}
+					onSetupDiagnosticsRetry={onSetupDiagnosticsRetry}
+					workspace={activeWorkspace}
+				/>
+			</ScrollArea>
+			<ComposerPanel composer={composer} />
+		</section>
 	);
 }
 
