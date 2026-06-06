@@ -11,9 +11,9 @@ truth for layout and visible affordances. See
 `docs/product/current-shell-inventory.md`.
 
 The shell is implemented through a stable public entrypoint at
-`src/components/workbench-shell.tsx`, private feature modules under
-`src/components/workbench-shell/`, shared Jotai atoms in
-`src/renderer/state/workbench-shell.ts`, and shared exported shell types in
+`src/renderer/components/workbench-shell.tsx`, private feature modules under
+`src/renderer/components/workbench-shell/`, shared Jotai atoms in
+`src/renderer/state/workspace`, and shared exported shell types in
 `src/renderer/types/workbench-shell.ts`.
 
 Future work should wire live repository, workspace, Pi, terminal, file, diff,
@@ -113,12 +113,15 @@ Ensemble equivalent:
 
 ### Terminal and Run Dock
 
-- Bottom-right dock provides Setup, Run, and named terminal tabs.
-- Setup displays setup script terminal output, for example dependency install logs.
-- Run displays run command terminal output, for example a dev server process.
-- Terminal and subsequently spawned terminal tabs are generic manual terminal panels.
+- Bottom-right dock provides fixed Setup and Run script-output tabs plus user-spawned terminal tabs.
+- Setup is a read-only output tab for the workspace/project setup command, for example dependency install logs.
+- Run is a read-only output tab for the workspace run command, for example a dev server process.
+- Each workspace starts with one default Terminal tab. Users can spawn additional named terminal tabs when they need more manual shells.
+- User-spawned terminal tabs are regular IDE-style interactive terminals backed by terminal session IDs.
 - Setup/run output remains visible while the user reviews chat, files, or checks.
 - Dock actions are script-state aware: show Setup Scripts when no scripts are configured, Run setup script before setup has run, Run when the dev server is stopped, and Open :PORT plus Stop when the dev server is running.
+- The new-terminal action creates another terminal session. It never creates additional Setup or Run tabs.
+- Pi RPC transcripts, app setup diagnostics, app health logs, and workspace setup/run script output must not be merged into user-spawned terminal sessions.
 - Experimental settings can enable a bigger terminal-centric layout and more tabs.
 
 Ensemble equivalent:
@@ -168,4 +171,4 @@ Ensemble equivalent:
 9. Wire PR/checks panel: replace fixture checks with no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state.
 10. Implement repository action preferences: review, create PR, fix errors, resolve conflicts, branch rename, and general Pi instructions.
 11. Add polish/settings parity: appearance previews, keyboard shortcuts, command palette, non-deferred feature flags, resource usage, and big terminal mode. Voice remains post-core deferred.
-12. Revisit advanced integrations: Graphite stack support, direct GitHub API, cloud/remote workspace SSH behavior. Linear issue workflows are v1 scope.
+12. Revisit advanced integrations: Graphite stack support and cloud/remote workspace SSH behavior. Linear issue workflows are v1 scope, and GitHub workflows stay on `gh`/`gh api`.

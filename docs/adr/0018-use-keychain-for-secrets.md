@@ -21,10 +21,10 @@ SQLite may store secret metadata such as key names, scopes, masked display state
 Secrets include:
 
 - Environment variable values marked secret.
-- Optional GitHub tokens if direct API support is later added.
 - Optional Linear tokens if direct integration requires them.
 - Any Ensemble-owned provider or account tokens.
 
+GitHub CLI tokens are owned by `gh` and must not be copied into Ensemble's Keychain entries.
 Pi-owned secrets remain in the Pi user environment where Pi stores them. Ensemble should not duplicate Pi provider secrets unless a user explicitly configures an Ensemble-specific secret.
 
 ## Consequences

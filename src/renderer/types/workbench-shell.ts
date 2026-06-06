@@ -7,13 +7,22 @@ import type {
 	ReviewPanelTab,
 	SessionTabModel,
 	WorkspaceShellModel,
-} from '@/renderer/workbench/workbench-model';
+} from '@/renderer/types/workbench';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
 
 export interface WorkbenchHealth {
 	detail: string;
 	label: string;
 	state: 'online' | 'pending' | 'unavailable';
+}
+
+export interface WorkbenchDockActions {
+	onNewTerminal: () => void;
+	onOpenRunPort: (port: number) => void;
+	onOpenSetupScripts: () => void;
+	onRunScript: () => void;
+	onRunSetupScript: () => void;
+	onStopRunScript: () => void;
 }
 
 export interface WorkbenchShellProps {
@@ -23,6 +32,7 @@ export interface WorkbenchShellProps {
 	activeView: 'dashboard' | 'history' | 'settings' | 'workspace';
 	activeWorkspace: WorkspaceShellModel;
 	composer: ComposerShellState;
+	dockActions: WorkbenchDockActions;
 	dockTabId: DockTabId;
 	health: WorkbenchHealth;
 	onDockTabChange: (tab: DockTabId) => void;

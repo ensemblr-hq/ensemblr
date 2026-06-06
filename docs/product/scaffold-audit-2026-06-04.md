@@ -89,15 +89,17 @@ The root scaffold uses current TypeScript 6 and React TSX. The generated templat
 
 ### Source Layout
 
-- Generated source files were split into clearer boundaries:
-  - `src/main/main.ts`
-  - `src/main/ipc.ts`
-  - `src/main/menu.ts`
-  - `src/preload/preload.ts`
-  - `src/shared/ipc.ts`
-  - `src/renderer/main.tsx`
-  - `src/renderer/App.tsx`
-  - `src/renderer/styles.css`
+- Generated source files were split into clearer boundaries and later organized
+  behind scoped public entrypoints:
+  - `src/main/main.ts` remains the Electron main-process entrypoint, with
+    implementation grouped by concern under `src/main/app/`, `src/main/ipc/`,
+    `src/main/menu/`, and the existing main-process service folders.
+  - `src/preload/preload.ts` remains the Electron preload entrypoint, with the
+    typed context bridge API built under `src/preload/bridge/`.
+  - `src/shared/ipc.ts` remains the public IPC contract entrypoint, with channel
+    constants and contract types grouped under `src/shared/ipc/`.
+  - `src/renderer/main.tsx` remains the renderer entrypoint, with renderer code
+    organized under the scoped buckets documented in `src/renderer/AGENTS.md`.
 
 Reason:
 `ENS-001` requires typed main/preload/renderer boundaries and a typed IPC health endpoint. Keeping shared IPC types under `src/shared` gives later app services a stable place to grow.
@@ -176,4 +178,3 @@ When an official generator exists:
 3. Copy/adapt generated files instead of recreating structure from memory.
 4. Stop and ask if generator behavior conflicts with Bun, hooks, or local policy.
 5. Record docs source, exact generator command, generated files used, and intentional deviations.
-

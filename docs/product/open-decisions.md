@@ -44,7 +44,7 @@ Date: 2026-06-05
 - Pi CLI/RPC APIs for session tree navigation/forking, retry-in-new-chat behavior, and compaction UI.
 - Pi CLI/RPC APIs for model listing, review-model separation, plan mode, fast mode, browser control, and context usage display.
 - How to represent Pi sessions when a workspace is adopted from Conductor.
-- Best way to parse GitHub review comments, deployments, and check details through `gh`; direct API may be needed later.
+- Exact review-thread/comment mutation coverage through first-class `gh` and authenticated `gh api`; any gaps should be documented as unsupported or limited rather than solved with an app-owned GitHub auth layer.
 - Linear archive/delete schema and permission support. Create/read/update/comment and workspace-from-issue are resolved v1 scope, but field-level SDK/GraphQL mapping, pagination, filtering, labels, cycles, and metadata caching still need implementation discovery.
 - Whether `gh` exposes enough data for add-all-comments-to-chat and review-thread resolution.
 - Conductor checkpoint git refs, if any, and whether they can be safely detected without relying on private app DB.
@@ -64,12 +64,13 @@ Date: 2026-06-05
 - React profiler/developer diagnostics: development/internal diagnostics only, not a normal v1 production setting.
 - Many-tab mode: allow five open chat tabs per workspace; document/file previews do not count.
 - Merge confirmation: prominent ready action when checks pass, then explicit confirmation/final merge/archive flow.
+- Hosted deployment preview URLs: derive from GitHub data through `gh` for v1, preferring deployment status `environment_url`/`target_url`, then check links, then provider bot PR comments. Do not require Vercel or Netlify login for the right PR header preview link.
+- GitHub integration model: `gh` and `gh api` are the GitHub integration path. Ensemble does not build or store credentials for an app-owned GitHub OAuth/API layer.
 
 ## Deferred
 
 - Packaging and signing.
 - Auto-update.
-- Direct GitHub OAuth/API.
 - SDK sidecar.
 - Managed/bundled Pi runtime installer.
 - Full visual polish after workflow parity is implemented.
