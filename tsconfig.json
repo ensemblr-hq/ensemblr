@@ -1,5 +1,6 @@
 {
 	"compilerOptions": {
+		"allowImportingTsExtensions": true,
 		"allowJs": false,
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true,

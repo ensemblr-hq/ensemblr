@@ -1,3 +1,4 @@
+import { useAtom } from 'jotai';
 import {
 	CheckIcon,
 	EyeIcon,
@@ -19,6 +20,7 @@ import {
 } from '@/renderer/components/ui/dropdown-menu';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
 import { cn } from '@/renderer/lib/utils';
+import { changesViewModeAtom } from '@/renderer/state/workspace';
 import type {
 	ReviewPanelTab,
 	WorkspaceShellModel,
@@ -41,8 +43,7 @@ export function ReviewPanel({
 	onTabChange: (tab: ReviewPanelTab) => void;
 	workspace: WorkspaceShellModel;
 }) {
-	const [changesViewMode, setChangesViewMode] =
-		useState<ChangesViewMode>('list');
+	const [changesViewMode, setChangesViewMode] = useAtom(changesViewModeAtom);
 	const [isFileSearchOpen, setIsFileSearchOpen] = useState(false);
 	const reviewTabs: Array<{
 		count?: number;

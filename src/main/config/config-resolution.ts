@@ -15,6 +15,7 @@ import type {
 } from '../../shared/ipc';
 import type { EnsembleDatabaseService } from '../storage/database';
 import type { EnsembleConfig, EnsembleConfigService } from './config-loader';
+import { loadRepositoryConfig } from './repository-config.ts';
 
 export interface ResolveSettingsOptions {
 	config: EnsembleConfig;
@@ -53,9 +54,12 @@ const APP_SOURCE_ORDER: readonly SettingsResolutionSource[] = [
 ];
 
 const REPOSITORY_SOURCE_ORDER: readonly SettingsResolutionSource[] = [
+	'worktreeinclude',
 	'sqlite',
+	'conductor-local-config',
 	'ensemble-config',
 	'conductor-config',
+	'conductor-legacy-config',
 	'built-in-default',
 ];
 
@@ -133,7 +137,17 @@ export function resolveSettings({
 
 	if (repository) {
 		const repositoryCandidates = new Map<string, Candidate[]>();
+		const repositoryFileConfig = repository.repositoryPath
+			? loadRepositoryConfig({ repositoryPath: repository.repositoryPath })
+			: null;
 
+		if (repositoryFileConfig?.worktreeincludeConfig) {
+			addCandidates(
+				repositoryCandidates,
+				flattenRecord(repositoryFileConfig.worktreeincludeConfig),
+				'worktreeinclude',
+			);
+		}
 		addCandidates(
 			repositoryCandidates,
 			collectSqliteSettings(database, 'repository', repository.repositoryId),
@@ -141,13 +155,32 @@ export function resolveSettings({
 		);
 		addCandidates(
 			repositoryCandidates,
-			flattenRecord(repository.ensembleConfig ?? {}),
+			collectConductorConfigCandidates(
+				repositoryFileConfig?.conductorLocalConfig,
+			),
+			'conductor-local-config',
+		);
+		addCandidates(
+			repositoryCandidates,
+			flattenRecord(
+				repository.ensembleConfig ?? repositoryFileConfig?.ensembleConfig ?? {},
+			),
 			'ensemble-config',
 		);
 		addCandidates(
 			repositoryCandidates,
-			collectConductorConfigCandidates(repository.conductorConfig),
+			collectConductorConfigCandidates(
+				repository.conductorConfig ??
+					repositoryFileConfig?.conductorSharedConfig,
+			),
 			'conductor-config',
+		);
+		addCandidates(
+			repositoryCandidates,
+			collectConductorConfigCandidates(
+				repositoryFileConfig?.conductorLegacyConfig,
+			),
+			'conductor-legacy-config',
 		);
 		addCandidates(
 			repositoryCandidates,
@@ -181,8 +214,12 @@ export function normalizeSettingsResolutionRequest(
 		typeof request.repository.repositoryId === 'string'
 			? request.repository.repositoryId.trim()
 			: '';
+	const repositoryPath =
+		typeof request.repository.repositoryPath === 'string'
+			? request.repository.repositoryPath.trim()
+			: '';
 
-	if (!repositoryId) {
+	if (!repositoryId && !repositoryPath) {
 		return {};
 	}
 
@@ -194,7 +231,8 @@ export function normalizeSettingsResolutionRequest(
 			ensembleConfig: isPlainRecord(request.repository.ensembleConfig)
 				? request.repository.ensembleConfig
 				: undefined,
-			repositoryId,
+			repositoryId: repositoryId || repositoryPath,
+			...(repositoryPath ? { repositoryPath } : {}),
 		},
 	};
 }

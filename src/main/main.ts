@@ -6,6 +6,7 @@ import { createLocalCommandService } from './commands';
 import {
 	createEnsembleConfigResolutionService,
 	createEnsembleConfigService,
+	createRepositoryConfigService,
 } from './config';
 import { createEnvironmentVariablesService } from './environment';
 import { registerIpcHandlers } from './ipc';
@@ -40,6 +41,7 @@ const settingsResolutionService = createEnsembleConfigResolutionService({
 	configService,
 	databaseService,
 });
+const repositoryConfigService = createRepositoryConfigService();
 const rootDirectoryService = createEnsembleRootDirectoryService({
 	databaseService,
 	reconcileRootDirectory,
@@ -75,6 +77,7 @@ app.whenReady().then(() => {
 		databaseService,
 		environmentVariablesService,
 		piExecutableService,
+		repositoryConfigService,
 		rootDirectoryService,
 		setupDiagnosticsService,
 		settingsResolutionService,

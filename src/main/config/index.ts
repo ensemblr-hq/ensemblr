@@ -22,3 +22,16 @@ export {
 	normalizeSettingsResolutionRequest,
 	resolveSettings,
 } from './config-resolution';
+export type {
+	LoadedRepositoryConfig,
+	LoadRepositoryConfigOptions,
+	RepositoryConfigService,
+} from './repository-config';
+export {
+	applyRepositoryConfigMigration,
+	createRepositoryConfigService,
+	isRepositoryConfigPathAllowed,
+	loadRepositoryConfig,
+	normalizeRepositoryConfigRequest,
+	previewRepositoryConfigMigration,
+} from './repository-config';
