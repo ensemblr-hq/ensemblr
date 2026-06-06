@@ -6,6 +6,11 @@ import {
 	type HealthSnapshot,
 	IPC_CHANNELS,
 	type PiExecutableSelectionResult,
+	type RepositoryConfigMigrationPreview,
+	type RepositoryConfigMigrationRequest,
+	type RepositoryConfigMigrationResult,
+	type RepositoryConfigRequest,
+	type RepositoryConfigSnapshot,
 	type RootDirectoryChangeApplyResult,
 	type RootDirectoryChangeRequest,
 	type RootDirectorySelectionResult,
@@ -17,6 +22,13 @@ import {
 
 export function createEnsembleApi(): EnsembleApi {
 	return {
+		applyRepositoryConfigMigration: (
+			request: RepositoryConfigMigrationRequest,
+		) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.applyRepositoryConfigMigration,
+				request,
+			) as Promise<RepositoryConfigMigrationResult>,
 		confirmRootDirectoryChange: (request: RootDirectoryChangeRequest) =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.confirmRootDirectoryChange,
@@ -33,6 +45,18 @@ export function createEnsembleApi(): EnsembleApi {
 			) as Promise<EnvironmentVariablesSnapshot>,
 		health: () =>
 			ipcRenderer.invoke(IPC_CHANNELS.health) as Promise<HealthSnapshot>,
+		previewRepositoryConfigMigration: (
+			request: RepositoryConfigMigrationRequest,
+		) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.previewRepositoryConfigMigration,
+				request,
+			) as Promise<RepositoryConfigMigrationPreview>,
+		repositoryConfig: (request: RepositoryConfigRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.repositoryConfig,
+				request,
+			) as Promise<RepositoryConfigSnapshot>,
 		rootDirectory: () =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.rootDirectory,

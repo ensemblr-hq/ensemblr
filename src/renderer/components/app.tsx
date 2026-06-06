@@ -6,11 +6,7 @@ import {
 	setupDiagnosticsQuery,
 } from '@/renderer/api/ensemble-queries';
 import { WorkbenchShell } from '@/renderer/components/workbench-shell';
-import {
-	DEFAULT_DOCK_TAB,
-	DEFAULT_REVIEW_TAB,
-	getComposerState,
-} from '@/renderer/lib/workbench';
+import { getComposerState } from '@/renderer/lib/workbench';
 import {
 	findProject,
 	findSession,
@@ -19,6 +15,7 @@ import {
 	getDefaultWorkspace,
 	shellFixtureProjects,
 } from '@/renderer/mocks/workbench';
+import { useWorkspacePanelTabState } from '@/renderer/state/workspace';
 import type { WorkbenchRouteSearch } from '@/renderer/types/workbench';
 import type {
 	WorkbenchDockActions,
@@ -49,8 +46,12 @@ export function App({
 		? findWorkspace(activeProject, workspaceId)
 		: getDefaultWorkspace();
 	const activeSession = findSession(activeWorkspace, search?.chat);
-	const activeReviewTab = search?.review ?? DEFAULT_REVIEW_TAB;
-	const activeDockTab = search?.dock ?? DEFAULT_DOCK_TAB;
+	const panelTabs = useWorkspacePanelTabState({
+		activeWorkspace,
+		search,
+	});
+	const activeReviewTab = panelTabs.activeReviewTab;
+	const activeDockTab = panelTabs.activeDockTab;
 	const setupError = getErrorMessage(setupDiagnostics.error);
 	const setupSnapshot = setupDiagnostics.data ?? null;
 
@@ -151,6 +152,7 @@ export function App({
 		const nextProject = findProject(nextProjectId);
 		const nextWorkspace = findWorkspace(nextProject, nextWorkspaceId);
 		const nextSession = findSession(nextWorkspace);
+		const preferredTabs = panelTabs.getPreferredTabsForWorkspace(nextWorkspace);
 
 		navigate({
 			params: {
@@ -159,14 +161,21 @@ export function App({
 			},
 			search: {
 				chat: nextSession.id,
-				dock: DEFAULT_DOCK_TAB,
-				review: DEFAULT_REVIEW_TAB,
+				dock: preferredTabs.dock,
+				review: preferredTabs.review,
 			},
 			to: '/projects/$projectId/workspaces/$workspaceId',
 		});
 	}
 
 	function updateSearch(nextSearch: WorkbenchRouteSearch) {
+		if (nextSearch.review) {
+			panelTabs.setWorkspaceReviewTab(activeWorkspace.id, nextSearch.review);
+		}
+		if (nextSearch.dock) {
+			panelTabs.setWorkspaceDockTab(activeWorkspace.id, nextSearch.dock);
+		}
+
 		navigate({
 			params: {
 				projectId: activeProject.id,

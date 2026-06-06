@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import type { PanelImperativeHandle } from 'react-resizable-panels';
+import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
 
 import {
 	ResizableHandle,
@@ -52,6 +52,7 @@ export function WorkbenchPanelLayout({
 	onSessionTabClose,
 	onSessionTabRestore,
 	rightSidebarPanelRef,
+	rightSidebarSizePercent,
 	sessionTabs,
 	setupDiagnostics,
 	setupDiagnosticsError,
@@ -75,11 +76,12 @@ export function WorkbenchPanelLayout({
 	onReviewTabChange: (tab: ReviewPanelTab) => void;
 	onRightSidebarCollapse: () => void;
 	onRightSidebarOpen: () => void;
-	onRightSidebarResize: (isCollapsed: boolean) => void;
+	onRightSidebarResize: (size: PanelSize) => void;
 	onSessionTabChange: (sessionId: string) => void;
 	onSessionTabClose: (sessionId: string) => void;
 	onSessionTabRestore: (sessionId: string) => void;
 	rightSidebarPanelRef: RefObject<PanelImperativeHandle | null>;
+	rightSidebarSizePercent: number;
 	sessionTabs: SessionTabModel[];
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
 	setupDiagnosticsError?: string | null;
@@ -115,12 +117,14 @@ export function WorkbenchPanelLayout({
 					dockPanelRef={dockPanelRef}
 					dockTabId={dockTabId}
 					isDockCollapsed={isDockCollapsed}
+					isRightSidebarCollapsed={isRightSidebarCollapsed}
 					onDockResize={onDockResize}
 					onDockTabChange={onDockTabChange}
 					onDockToggle={onDockToggle}
 					onReviewTabChange={onReviewTabChange}
 					onRightSidebarResize={onRightSidebarResize}
 					rightSidebarPanelRef={rightSidebarPanelRef}
+					rightSidebarSizePercent={rightSidebarSizePercent}
 				/>
 			</ResizablePanelGroup>
 		</SidebarInset>
@@ -206,12 +210,14 @@ function ReviewDockPanel({
 	dockPanelRef,
 	dockTabId,
 	isDockCollapsed,
+	isRightSidebarCollapsed,
 	onDockResize,
 	onDockTabChange,
 	onDockToggle,
 	onReviewTabChange,
 	onRightSidebarResize,
 	rightSidebarPanelRef,
+	rightSidebarSizePercent,
 }: {
 	activeReviewTab: ReviewPanelTab;
 	activeWorkspace: WorkspaceShellModel;
@@ -219,24 +225,26 @@ function ReviewDockPanel({
 	dockPanelRef: RefObject<PanelImperativeHandle | null>;
 	dockTabId: DockTabId;
 	isDockCollapsed: boolean;
+	isRightSidebarCollapsed: boolean;
 	onDockResize: (isCollapsed: boolean) => void;
 	onDockTabChange: (tab: DockTabId) => void;
 	onDockToggle: () => void;
 	onReviewTabChange: (tab: ReviewPanelTab) => void;
-	onRightSidebarResize: (isCollapsed: boolean) => void;
+	onRightSidebarResize: (size: PanelSize) => void;
 	rightSidebarPanelRef: RefObject<PanelImperativeHandle | null>;
+	rightSidebarSizePercent: number;
 }) {
 	return (
 		<ResizablePanel
 			className='hidden min-w-0 lg:flex'
 			collapsedSize='0rem'
 			collapsible
-			defaultSize='34%'
+			defaultSize={
+				isRightSidebarCollapsed ? '0rem' : `${rightSidebarSizePercent}%`
+			}
 			maxSize='68%'
 			minSize='22rem'
-			onResize={(size) => {
-				onRightSidebarResize(size.asPercentage <= 1);
-			}}
+			onResize={onRightSidebarResize}
 			panelRef={rightSidebarPanelRef}
 		>
 			<aside className='flex h-full w-full min-w-0 flex-col bg-card'>

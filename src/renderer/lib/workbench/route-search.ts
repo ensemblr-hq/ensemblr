@@ -15,8 +15,13 @@ export function normalizeWorkbenchSearch(
 ): WorkbenchRouteSearch {
 	return {
 		chat: typeof search.chat === 'string' ? search.chat : undefined,
-		dock: normalizeDockTab(search.dock),
-		review: isReviewTab(search.review) ? search.review : DEFAULT_REVIEW_TAB,
+		dock: 'dock' in search ? normalizeDockTab(search.dock) : undefined,
+		review:
+			'review' in search
+				? isReviewTab(search.review)
+					? search.review
+					: DEFAULT_REVIEW_TAB
+				: undefined,
 	};
 }
 

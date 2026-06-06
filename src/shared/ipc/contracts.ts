@@ -43,10 +43,13 @@ export type SettingsResolutionScope = 'app' | 'repository';
 export type SettingsResolutionSource =
 	| 'built-in-default'
 	| 'conductor-config'
+	| 'conductor-legacy-config'
+	| 'conductor-local-config'
 	| 'config-default'
 	| 'managed-config'
 	| 'ensemble-config'
-	| 'sqlite';
+	| 'sqlite'
+	| 'worktreeinclude';
 export type SettingsResolutionCandidateStatus =
 	| 'ignored'
 	| 'invalid'
@@ -83,6 +86,7 @@ export interface RepositorySettingsResolutionRequest {
 	conductorConfig?: Record<string, unknown>;
 	ensembleConfig?: Record<string, unknown>;
 	repositoryId: string;
+	repositoryPath?: string;
 }
 
 export interface SettingsResolutionRequest {
@@ -92,6 +96,67 @@ export interface SettingsResolutionRequest {
 export interface SettingsResolutionSnapshot {
 	app: SettingsResolutionGroupSnapshot;
 	repository?: SettingsResolutionGroupSnapshot;
+}
+
+export type RepositoryConfigSourceStatus =
+	| 'ignored'
+	| 'invalid'
+	| 'loaded'
+	| 'missing';
+
+export interface RepositoryConfigSourceSnapshot {
+	displayPath: string;
+	path: string;
+	settings: Record<string, unknown>;
+	source: SettingsResolutionSource;
+	status: RepositoryConfigSourceStatus;
+}
+
+export interface RepositoryConfigSnapshot {
+	diagnostics: ConfigDiagnostic[];
+	loadedAt: string;
+	repositoryPath: string;
+	sources: RepositoryConfigSourceSnapshot[];
+}
+
+export interface RepositoryConfigRequest {
+	repositoryPath: string;
+}
+
+export type RepositoryConfigMigrationChangeStatus =
+	| 'added'
+	| 'conflict'
+	| 'overwritten'
+	| 'unchanged';
+
+export interface RepositoryConfigMigrationChange {
+	existingValue?: unknown;
+	incomingValue: unknown;
+	key: string;
+	source: SettingsResolutionSource;
+	status: RepositoryConfigMigrationChangeStatus;
+}
+
+export interface RepositoryConfigMigrationRequest {
+	overwrite?: boolean;
+	repositoryPath: string;
+}
+
+export interface RepositoryConfigMigrationPreview {
+	canApply: boolean;
+	changes: RepositoryConfigMigrationChange[];
+	diagnostics: ConfigDiagnostic[];
+	repositoryPath: string;
+	resultingConfig: Record<string, unknown>;
+	sourcePath: string | null;
+	targetExists: boolean;
+	targetPath: string;
+}
+
+export interface RepositoryConfigMigrationResult
+	extends RepositoryConfigMigrationPreview {
+	applied: boolean;
+	error?: string;
 }
 
 export type EnvironmentVariableScope = 'app' | 'repository' | 'workspace';
@@ -312,9 +377,18 @@ export interface EnsembleApi {
 	confirmRootDirectoryChange: (
 		request: RootDirectoryChangeRequest,
 	) => Promise<RootDirectoryChangeApplyResult>;
+	applyRepositoryConfigMigration: (
+		request: RepositoryConfigMigrationRequest,
+	) => Promise<RepositoryConfigMigrationResult>;
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
 	environmentVariables: () => Promise<EnvironmentVariablesSnapshot>;
 	health: () => Promise<HealthSnapshot>;
+	previewRepositoryConfigMigration: (
+		request: RepositoryConfigMigrationRequest,
+	) => Promise<RepositoryConfigMigrationPreview>;
+	repositoryConfig: (
+		request: RepositoryConfigRequest,
+	) => Promise<RepositoryConfigSnapshot>;
 	rootDirectory: () => Promise<RootDirectorySnapshot>;
 	resolveSettings: (
 		request?: SettingsResolutionRequest,

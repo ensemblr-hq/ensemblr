@@ -214,6 +214,8 @@ test('models fixed script output tabs separately from interactive terminals', ()
 });
 
 test('normalizes dock route state for terminal session tabs', () => {
+	expect(normalizeWorkbenchSearch({}).dock).toBeUndefined();
+	expect(normalizeWorkbenchSearch({}).review).toBeUndefined();
 	expect(normalizeWorkbenchSearch({ dock: 'terminal' }).dock).toBe(
 		DEFAULT_TERMINAL_DOCK_TAB_ID,
 	);
