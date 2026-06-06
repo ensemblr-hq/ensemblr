@@ -1,9 +1,12 @@
+import { useAtom } from 'jotai';
 import { useEffect, useRef, useState } from 'react';
-import type { PanelImperativeHandle } from 'react-resizable-panels';
+import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
 
 import { SidebarProvider } from '@/renderer/components/ui/sidebar';
 import { TooltipProvider } from '@/renderer/components/ui/tooltip';
 import {
+	rightSidebarCollapsedAtom,
+	rightSidebarSizePercentAtom,
 	useProjectNavigationState,
 	useSessionTabState,
 } from '@/renderer/state/workspace';
@@ -12,6 +15,9 @@ import { WorkspaceNavigationSidebar } from './workbench-shell/navigation-sidebar
 import { WorkbenchPanelLayout } from './workbench-shell/panel-layout';
 
 const RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH = 1024;
+const RIGHT_SIDEBAR_DEFAULT_SIZE_PERCENT = 34;
+const RIGHT_SIDEBAR_MAX_SIZE_PERCENT = 68;
+const RIGHT_SIDEBAR_COLLAPSED_THRESHOLD_PERCENT = 1;
 
 async function ensureWindowCanShowRightSidebar() {
 	if (
@@ -22,6 +28,25 @@ async function ensureWindowCanShowRightSidebar() {
 	}
 
 	await window.ensemble?.ensureWindowWidth(RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH);
+}
+
+function getClampedRightSidebarSizePercent(sizePercent: number) {
+	if (!Number.isFinite(sizePercent)) {
+		return RIGHT_SIDEBAR_DEFAULT_SIZE_PERCENT;
+	}
+
+	return Math.min(
+		RIGHT_SIDEBAR_MAX_SIZE_PERCENT,
+		Math.max(
+			RIGHT_SIDEBAR_COLLAPSED_THRESHOLD_PERCENT,
+			Math.round(sizePercent * 100) / 100,
+		),
+	);
+}
+
+function canPersistRightSidebarResize() {
+	return window.matchMedia(`(min-width: ${RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH}px)`)
+		.matches;
 }
 
 export function WorkbenchShell({
@@ -49,7 +74,22 @@ export function WorkbenchShell({
 	const rightSidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const dockPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const rightSidebarCollapsedByViewportRef = useRef(false);
-	const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
+	const [storedRightSidebarCollapsed, setStoredRightSidebarCollapsed] = useAtom(
+		rightSidebarCollapsedAtom,
+	);
+	const [rightSidebarSizePercent, setRightSidebarSizePercent] = useAtom(
+		rightSidebarSizePercentAtom,
+	);
+	const preferredRightSidebarSizePercent = getClampedRightSidebarSizePercent(
+		rightSidebarSizePercent,
+	);
+	const rightSidebarCollapsedPreferenceRef = useRef(
+		storedRightSidebarCollapsed,
+	);
+	const rightSidebarSizePercentRef = useRef(preferredRightSidebarSizePercent);
+	const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(
+		storedRightSidebarCollapsed,
+	);
 	const [isDockCollapsed, setIsDockCollapsed] = useState(false);
 	const projectNavigation = useProjectNavigationState(projects);
 	const sessionNavigation = useSessionTabState({
@@ -57,10 +97,18 @@ export function WorkbenchShell({
 		activeWorkspace,
 		onSessionTabChange,
 	});
+	useEffect(() => {
+		rightSidebarCollapsedPreferenceRef.current = storedRightSidebarCollapsed;
+	}, [storedRightSidebarCollapsed]);
+	useEffect(() => {
+		rightSidebarSizePercentRef.current = preferredRightSidebarSizePercent;
+	}, [preferredRightSidebarSizePercent]);
 	const collapseRightSidebar = () => {
 		rightSidebarCollapsedByViewportRef.current = false;
 		rightSidebarPanelRef.current?.collapse();
+		rightSidebarCollapsedPreferenceRef.current = true;
 		setIsRightSidebarCollapsed(true);
+		setStoredRightSidebarCollapsed(true);
 	};
 	const expandRightSidebar = async () => {
 		rightSidebarCollapsedByViewportRef.current = false;
@@ -68,8 +116,34 @@ export function WorkbenchShell({
 
 		window.requestAnimationFrame(() => {
 			rightSidebarPanelRef.current?.expand();
+			rightSidebarPanelRef.current?.resize(
+				`${rightSidebarSizePercentRef.current}%`,
+			);
+			rightSidebarCollapsedPreferenceRef.current = false;
 			setIsRightSidebarCollapsed(false);
+			setStoredRightSidebarCollapsed(false);
 		});
+	};
+	const handleRightSidebarResize = (size: PanelSize) => {
+		const isCollapsed =
+			size.asPercentage <= RIGHT_SIDEBAR_COLLAPSED_THRESHOLD_PERCENT;
+
+		setIsRightSidebarCollapsed(isCollapsed);
+
+		if (!canPersistRightSidebarResize()) {
+			return;
+		}
+
+		setStoredRightSidebarCollapsed(isCollapsed);
+		rightSidebarCollapsedPreferenceRef.current = isCollapsed;
+
+		if (!isCollapsed) {
+			const nextSizePercent = getClampedRightSidebarSizePercent(
+				size.asPercentage,
+			);
+			rightSidebarSizePercentRef.current = nextSizePercent;
+			setRightSidebarSizePercent(nextSizePercent);
+		}
 	};
 	const toggleDockPanel = () => {
 		if (dockPanelRef.current?.isCollapsed() || isDockCollapsed) {
@@ -107,14 +181,23 @@ export function WorkbenchShell({
 				return;
 			}
 
-			if (rightSidebarCollapsedByViewportRef.current) {
+			if (
+				rightSidebarCollapsedByViewportRef.current &&
+				!rightSidebarCollapsedPreferenceRef.current
+			) {
 				restoreFrame = window.requestAnimationFrame(() => {
 					rightSidebarPanelRef.current?.expand();
+					rightSidebarPanelRef.current?.resize(
+						`${rightSidebarSizePercentRef.current}%`,
+					);
 					setIsRightSidebarCollapsed(false);
 					rightSidebarCollapsedByViewportRef.current = false;
 					restoreFrame = null;
 				});
+				return;
 			}
+
+			rightSidebarCollapsedByViewportRef.current = false;
 		};
 
 		syncRightSidebarWithViewport();
@@ -165,9 +248,8 @@ export function WorkbenchShell({
 					onReviewTabChange={onReviewTabChange}
 					onRightSidebarCollapse={collapseRightSidebar}
 					onRightSidebarOpen={expandRightSidebar}
-					onRightSidebarResize={(isCollapsed) =>
-						setIsRightSidebarCollapsed(isCollapsed)
-					}
+					onRightSidebarResize={handleRightSidebarResize}
+					rightSidebarSizePercent={preferredRightSidebarSizePercent}
 					onSessionTabChange={onSessionTabChange}
 					onSessionTabClose={sessionNavigation.closeSessionTab}
 					onSessionTabRestore={sessionNavigation.restoreSessionTab}
