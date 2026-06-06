@@ -1,7 +1,11 @@
 import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { WorkbenchShell } from '../../src/renderer/components/workbench-shell';
+import {
+	WorkbenchFrame,
+	WorkspaceWorkbenchContent,
+} from '../../src/renderer/components/workbench-shell';
+import { WorkspaceConversationContent } from '../../src/renderer/components/workbench-shell/panel-layout';
 import {
 	DEFAULT_DOCK_TAB,
 	DEFAULT_REVIEW_TAB,
@@ -73,35 +77,40 @@ function renderWorkbench(
 	const activeSession = findSession(activeWorkspace);
 
 	return renderToStaticMarkup(
-		<WorkbenchShell
+		<WorkbenchFrame
 			activeProject={activeProject}
-			activeReviewTab={activeReviewTab}
-			activeSession={activeSession}
 			activeView='workspace'
 			activeWorkspace={activeWorkspace}
-			composer={getComposerState({
-				activeSession,
-				setupDiagnostics: snapshot,
-				setupError: null,
-			})}
-			dockActions={DOCK_ACTIONS}
-			dockTabId={activeDockTab}
 			health={{
 				detail: 'Renderer query fixture',
 				label: 'IPC online',
 				state: 'online',
 			}}
-			onDashboardSelect={() => undefined}
-			onDockTabChange={() => undefined}
-			onHelpSelect={() => undefined}
-			onHistorySelect={() => undefined}
-			onReviewTabChange={() => undefined}
-			onSessionTabChange={() => undefined}
-			onSettingsSelect={() => undefined}
+			onStaticNavigationSelect={() => undefined}
 			onWorkspaceSelect={() => undefined}
 			projects={projectsOverride}
-			setupDiagnostics={snapshot}
-		/>,
+		>
+			<WorkspaceWorkbenchContent
+				activeProject={activeProject}
+				activeReviewTab={activeReviewTab}
+				activeSession={activeSession}
+				activeWorkspace={activeWorkspace}
+				composer={getComposerState({
+					activeSession,
+					setupDiagnostics: snapshot,
+					setupError: null,
+				})}
+				dockActions={DOCK_ACTIONS}
+				dockTabId={activeDockTab}
+				onDockTabChange={() => undefined}
+				onReviewTabChange={() => undefined}
+				onSessionTabChange={() => undefined}
+				setupDiagnostics={snapshot}
+				renderMainContent={(mainContent) => (
+					<WorkspaceConversationContent {...mainContent} />
+				)}
+			/>
+		</WorkbenchFrame>,
 	);
 }
 
@@ -175,6 +184,32 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).not.toContain('Open workspace menu');
 	expect(markup).not.toContain('Changed files');
 	expect(markup).not.toContain('Review state');
+});
+
+test('does not mark a workspace active on static workbench routes', () => {
+	const activeWorkspace = getDefaultWorkspace();
+	const activeProject = getDefaultProject();
+	const markup = renderToStaticMarkup(
+		<WorkbenchFrame
+			activeProject={activeProject}
+			activeView='dashboard'
+			activeWorkspace={activeWorkspace}
+			health={{
+				detail: 'Renderer query fixture',
+				label: 'IPC online',
+				state: 'online',
+			}}
+			onStaticNavigationSelect={() => undefined}
+			onWorkspaceSelect={() => undefined}
+			projects={shellFixtureProjects}
+		>
+			<div />
+		</WorkbenchFrame>,
+	);
+
+	expect(markup).toContain('Dashboard');
+	expect(markup).toContain('Conductor shell rework');
+	expect(markup.match(/data-active="true"/g)).toHaveLength(1);
 });
 
 test('models installed workspace open targets for the header launcher', () => {

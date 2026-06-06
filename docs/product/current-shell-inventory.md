@@ -2,12 +2,17 @@
 
 Date: 2026-06-05
 
-This inventory describes the implemented shell in `src/renderer/components/app.tsx`,
-`src/renderer/components/workbench-shell.tsx`, `src/renderer/components/workbench-shell/`,
-`src/renderer/state/workspace`,
+This inventory describes the implemented shell. Navigation is file-based
+(TanStack Router): `src/renderer/components/app.tsx` is now only the router
+`<Outlet />` host, route files live in `src/renderer/routing/routes/` (compiled
+to the generated `src/renderer/routing/routeTree.gen.ts`), and shell composition
+lives in `src/renderer/components/workbench-shell/route-layout.tsx`. Supporting
+shell code is in `src/renderer/components/workbench-shell.tsx`,
+`src/renderer/components/workbench-shell/`, `src/renderer/state/workspace`,
 `src/renderer/types/workbench-shell.ts`,
 `src/renderer/mocks/workbench/projects.ts`, `src/renderer/styles/index.css`,
-`src/renderer/components/shadix-ui/`, and `src/renderer/components/ui/`.
+`src/renderer/components/shadix-ui/`, and `src/renderer/components/ui/`. See
+`docs/adr/0026-use-file-based-tanstack-routing.md` for the routing architecture.
 Treat this shell as the product source of truth for app layout and visible
 affordances. Future tickets should wire live services into these regions instead
 of redesigning the shell.
@@ -22,12 +27,24 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 
 ## Implementation Boundaries
 
-- `src/renderer/components/workbench-shell.tsx` is the public component entrypoint and
-  should stay focused on shell orchestration.
-- Private shell components and local shell hooks live under
+- Navigation is file-based TanStack routing. Route files live under
+  `src/renderer/routing/routes/` and compile to the generated
+  `src/renderer/routing/routeTree.gen.ts`, which is never hand-edited. See
+  `docs/adr/0026-use-file-based-tanstack-routing.md`.
+- Route loaders own data loading and redirects. The pathless `_workbench` route
+  loads shared shell data through TanStack Query, `_workbench/_shell` re-exposes it
+  to descendants and renders the chrome, and Settings is a full-window route
+  outside `_shell`. The active workspace and chat are URL path params; `dock` and
+  `review` are validated search params.
+- `src/renderer/components/workbench-shell/route-layout.tsx` composes the shell
+  from route data and renders the frame, workspace content, and placeholder pages.
+- `src/renderer/components/workbench-shell.tsx` is the shell component entrypoint;
+  it exports the `WorkbenchFrame` chrome and `WorkspaceWorkbenchContent`. Private
+  shell components and local shell hooks live under
   `src/renderer/components/workbench-shell/`.
 - Durable renderer UI state that crosses shell modules lives in Jotai atoms under
-  `src/renderer/state/workspace`.
+  `src/renderer/state/workspace`, including per-workspace dock, review, and chat
+  tab selection.
 - Shared exported shell types live under
   `src/renderer/types/workbench-shell.ts`.
 - Ephemeral animation and timer state can remain in component hooks when it is
@@ -38,7 +55,7 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 | Surface | Product capability implied | Status | Implementation notes |
 | --- | --- | --- | --- |
 | Electron workbench frame | A compact macOS desktop workbench with native-window spacing, persistent side navigation, and resizable panes. | Locked product direction | Renderer layout uses `SidebarProvider`, horizontal and vertical `ResizablePanelGroup`s, and Ensemble-owned design tokens. |
-| Left primary navigation | Global History and Settings are reachable without leaving workspace context. | Implemented behavior | `History` and `Settings` buttons navigate to route-backed shell views. `Dashboard` exists as a route state but is not a visible sidebar item in the current shell. |
+| Left primary navigation | Dashboard, History, Help, and Settings are visible from the primary sidebar. | Implemented behavior | `Dashboard`, `History`, and `Help` navigate to route-backed shell views. `Settings` opens the separate full-window settings route with a Back to app action. |
 | Sidebar project groups | Repositories/projects contain workspace rows, can collapse, and can be reordered. | Implemented behavior | Project collapse and renderer-local reorder state are live. Persistence and SQLite-backed records are future work. |
 | Pinned workspace group | Users can pin workspaces above their project groups for fast access. | Implemented behavior | Pin/unpin is renderer-local and removes pinned rows from the normal project group. Persistence is future work. |
 | Workspace rows | Workspace status, branch, change counts, selection, and archive affordance. | Locked product direction | Status icons follow the documented workspace sidebar state contract. Row selection is implemented; archive is a placeholder action. |
@@ -49,7 +66,7 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 | Open workspace launcher | Open the workspace in Finder, editors, terminals, source-control apps, or copy path. | Locked product direction | Visible targets are Finder, VS Code, Zed, Xcode, Ghostty, Warp, Terminal, GitHub Desktop, and Copy path. Button behavior is future external-open work. |
 | Right sidebar visibility control | Users can collapse and reopen the review sidebar. | Implemented behavior | Collapse/expand uses resizable panel handles and header icon state. |
 | Right PR header | PR number, working/checking/blocked/ready states, Create PR, Merge, and overflow affordances. | Locked product direction | States are fixture-backed. `Create PR`, `Merge`, external PR, and overflow actions are future GitHub/gh behavior. |
-| Chat/session tabs | Multiple Pi sessions per workspace with active tab, close, restore, and new-chat affordances. | Implemented shell behavior | Route-backed active session and renderer-local close/restore are implemented. New chat and five-tab enforcement remain future Pi/session work. |
+| Chat/session tabs | Multiple Pi sessions per workspace with active tab, close, restore, and new-chat affordances. | Implemented shell behavior | The active session is a URL path param (`/chats/$chatId`) remembered per workspace, so switching workspaces restores the last open chat; renderer-local close/restore are implemented. New chat and five-tab enforcement remain future Pi/session work. |
 | Center chat timeline | Agent conversation, tool activity, setup warning, and status continuity while side panels remain visible. | Visual placeholder for planned behavior | Current messages are mock data. Structured Pi RPC timeline, runtime errors, retry/fork behavior, and real session history remain deferred to Pi runtime tickets. |
 | Composer | Prompt text area, model/thinking badges, setup-disabled reason, attach, and send controls. | Visual placeholder for planned behavior | Setup diagnostics can disable the composer today. Prompt submit, stop, attachments, and model controls are deferred to Pi integration. Do not redesign or finalize this area before Pi work. |
 | Setup diagnostics banner | Setup blockers keep the shell visible while app readiness status stays in the left sidebar footer. | Implemented behavior | App setup diagnostics may disable the composer but must not render in, or force-select, the lower Setup dock. |
@@ -61,7 +78,7 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 | Dock script actions | Script-state-aware actions: Setup Scripts, Run setup script, Run, Open :PORT, and Stop. | Locked product direction | Actions render from fixture script status. Process execution and PTY lifecycle are future terminal/script work. Script actions must target the fixed Setup/Run panes, not user-spawned terminals. |
 | Terminal tabs | One default generic manual terminal panel plus a plus button for additional terminal tabs. | Visual placeholder for planned behavior | Terminal content explicitly states interactive PTY rendering is deferred to `ENS-037`. User-spawned terminals are regular IDE-style interactive terminals backed by stable terminal session IDs. |
 | Sidebar health footer | App health, setup readiness, and app diagnostics remain visible in the shell. | Implemented behavior | Health and setup diagnostics use TanStack Query over the typed preload bridge. This footer is the only current-shell place for app diagnostics; do not place app diagnostics in the Setup/Run/Terminal dock. |
-| Settings shell entry | Settings remains part of global navigation. | Implemented shell behavior | Current route still renders the workbench shell with Settings active. Full settings forms are future work. |
+| Settings shell entry | Settings remains part of global navigation. | Implemented shell behavior | Settings opens a separate full-window route (`/settings`) rendered outside the workbench chrome, with a Back to app action. Full settings forms are future work. |
 | Command surfaces | File search dialog and Create PR command popover use command primitives. | Visual placeholder for planned behavior | These establish command UI patterns. A global command palette remains a later settings/polish ticket. |
 
 ## Workspace Sidebar State Contract
@@ -166,5 +183,4 @@ insufficient.
 
 - `WorkspaceContextMenuContent` status actions: confirm whether these change a local workspace lifecycle state, a linked Linear issue status, both, or another status model.
 - `Mark as unread`: confirm whether this is a local workspace attention marker, chat unread state, or linked external issue state.
-- `Dashboard` route: confirm whether the Dashboard route should get a visible sidebar entry later or remain hidden while History/Settings are the only top-level visible entries.
 - `Review` button in the Changes tab: confirm whether this opens review mode for local diff comments, starts an agent review workflow, or toggles filtered review state.

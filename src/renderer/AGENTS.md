@@ -9,14 +9,16 @@ These instructions apply to everything under `src/renderer/`.
 - Use the established top-level buckets:
   - `api/` for TanStack Query clients, query options, and preload-backed data access.
   - `components/` for React components and UI composition.
+  - `config/` for renderer-scoped configuration constants and knobs.
   - `hooks/` for renderer hooks that are not durable shared app state.
   - `lib/` for runtime helpers, grouped by concern.
   - `mocks/` for mock, fixture, demo, and placeholder data.
-  - `routing/` for TanStack Router route trees and route helpers.
+  - `routing/` for TanStack Router file-based routes, generated route trees, and route helpers.
   - `state/` for durable renderer UI state.
   - `styles/` for renderer CSS entrypoints and style assets.
   - `types/` for shared exported renderer types and ambient declarations.
 - Do not create concern folders directly under `src/renderer/`, for example `src/renderer/workbench/`. Put the concern inside the right type bucket, for example `lib/workbench/`, `mocks/workbench/`, `state/workspace/`, or `types/workbench.ts`.
+- Do not put mutable app state, fixture data, route files, or feature implementation in `config/`; keep it for stable renderer constants such as route stale times.
 
 ## Components
 
@@ -24,6 +26,17 @@ These instructions apply to everything under `src/renderer/`.
 - Keep composed product components under `components/<concern>.tsx` plus private sibling folders, for example `components/workbench-shell.tsx` and `components/workbench-shell/`.
 - Do not define shared exported renderer types in component folders. Import them from `types/`.
 - Do not keep mock or fixture data inside components. Import it from `mocks/<concern>/`.
+
+## Routing
+
+- Use TanStack Router file-based routing under `routing/routes/`.
+- Define route files with `createFileRoute` and export the route as `Route`. Keep the root route in `routing/routes/__root.tsx` with `createRootRouteWithContext`.
+- Use TanStack Router filename conventions in `routing/routes/`: leading `_` for pathless layout routes and `$param` segments for dynamic params.
+- Treat `routing/routeTree.gen.ts` as generated output from the Vite TanStack Router plugin. Do not hand-edit it; update route files and let the plugin regenerate the tree.
+- Keep router construction, hash history, router context, and module registration in `routing/router.tsx`.
+- Keep reusable route loading, redirect, and canonicalization orchestration in `routing/*-route-loaders.ts`. Keep pure domain helpers in `lib/<concern>/`.
+- Keep shared route components, layouts, and route boundary UI under `components/<concern>/`; route files should wire routes to those components rather than accumulating large UI implementations.
+- Put route params, router context, and exported loader-data types in `types/routing.ts`. Search param domain types belong with the concern they describe, such as `types/workbench.ts`.
 
 ## State
 

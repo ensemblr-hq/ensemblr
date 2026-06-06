@@ -1,6 +1,10 @@
 import { useAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
-import { DEFAULT_DOCK_TAB, DEFAULT_REVIEW_TAB } from '@/renderer/lib/workbench';
+import {
+	DEFAULT_DOCK_TAB,
+	DEFAULT_REVIEW_TAB,
+	getPreferredSession,
+} from '@/renderer/lib/workbench';
 import type {
 	DockTabId,
 	ReviewPanelTab,
@@ -8,17 +12,21 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import {
+	activeChatTabByWorkspaceAtom,
 	activeDockTabByWorkspaceAtom,
 	activeReviewTabByWorkspaceAtom,
 } from './atoms';
 
 type ReviewTabPreferences = Record<string, unknown>;
 type DockTabPreferences = Record<string, unknown>;
+type ChatTabPreferences = Record<string, unknown>;
 
 export function useWorkspacePanelTabState({
+	activeChatId,
 	activeWorkspace,
 	search,
 }: {
+	activeChatId?: string;
 	activeWorkspace: WorkspaceShellModel;
 	search?: WorkbenchRouteSearch;
 }) {
@@ -28,6 +36,7 @@ export function useWorkspacePanelTabState({
 	const [dockTabsByWorkspace, setDockTabsByWorkspace] = useAtom(
 		activeDockTabByWorkspaceAtom,
 	);
+	const [, setChatTabsByWorkspace] = useAtom(activeChatTabByWorkspaceAtom);
 	const activeReviewTab = getPreferredReviewTab({
 		reviewTabsByWorkspace,
 		routeReviewTab: search?.review,
@@ -54,6 +63,18 @@ export function useWorkspacePanelTabState({
 				: { ...current, [activeWorkspace.id]: activeDockTab },
 		);
 	}, [activeDockTab, activeWorkspace.id, setDockTabsByWorkspace]);
+
+	useEffect(() => {
+		if (!activeChatId) {
+			return;
+		}
+
+		setChatTabsByWorkspace((current) =>
+			current[activeWorkspace.id] === activeChatId
+				? current
+				: { ...current, [activeWorkspace.id]: activeChatId },
+		);
+	}, [activeChatId, activeWorkspace.id, setChatTabsByWorkspace]);
 
 	const getPreferredTabsForWorkspace = useCallback(
 		(workspace: WorkspaceShellModel) => ({
@@ -137,6 +158,23 @@ export function getPreferredDockTab({
 	}
 
 	return workspace.dockTabs[0]?.id ?? DEFAULT_DOCK_TAB;
+}
+
+export function getPreferredChatId({
+	chatTabsByWorkspace,
+	routeChatId,
+	workspace,
+}: {
+	chatTabsByWorkspace: ChatTabPreferences;
+	routeChatId?: string;
+	workspace: WorkspaceShellModel;
+}) {
+	const storedChatId = chatTabsByWorkspace[workspace.id];
+	const preferredChatId =
+		routeChatId ??
+		(typeof storedChatId === 'string' ? storedChatId : undefined);
+
+	return getPreferredSession(workspace, preferredChatId).id;
 }
 
 function hasDockTab(

@@ -9,11 +9,14 @@ const workspaceStorageOptions = { getOnInit: true };
 export const lastWorkspaceNavigationRenderStateAtom =
 	atom<WorkspaceNavigationRenderState | null>(null);
 
+export const LAST_WORKSPACE_SELECTION_STORAGE_KEY =
+	'ensemble_workspace_last_selection';
+
 export const lastWorkspaceSelectionAtom = atomWithStorage<{
 	projectId: string;
 	workspaceId: string;
 } | null>(
-	'ensemble_workspace_last_selection',
+	LAST_WORKSPACE_SELECTION_STORAGE_KEY,
 	null,
 	undefined,
 	workspaceStorageOptions,
@@ -83,6 +86,15 @@ export const activeDockTabByWorkspaceAtom = atomWithStorage<
 	Record<string, DockTabId>
 >(
 	'ensemble_workspace_active_dock_tab_by_workspace',
+	{},
+	undefined,
+	workspaceStorageOptions,
+);
+
+export const activeChatTabByWorkspaceAtom = atomWithStorage<
+	Record<string, string>
+>(
+	'ensemble_workspace_active_chat_tab_by_workspace',
 	{},
 	undefined,
 	workspaceStorageOptions,

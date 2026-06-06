@@ -8,7 +8,12 @@
 	"files": {
 		"ignoreUnknown": false,
 		"maxSize": 200000,
-		"includes": ["**", "!src/components/ui", "!src/hooks/ui"]
+		"includes": [
+			"**",
+			"!src/components/ui",
+			"!src/hooks/ui",
+			"!src/renderer/routing/routeTree.gen.ts"
+		]
 	},
 	"formatter": {
 		"enabled": true,

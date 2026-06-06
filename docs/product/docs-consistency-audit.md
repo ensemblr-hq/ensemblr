@@ -33,7 +33,7 @@ The generated planning docs are broadly consistent with the latest accepted ADRs
 ## Remaining Ambiguities
 
 - Whether to support the Conductor-style remove/soften AI-certainty phrase setting in Ensemble.
-- Which non-deferred experimental settings belong in v1, especially dashboard/sidebar visibility and sidebar resource usage.
+- Which non-deferred experimental settings belong in v1, especially workspace/sidebar visibility and sidebar resource usage.
 - Exact Pi CLI/RPC capabilities for permission brokering, session tree navigation/forking, compaction UI, model listing, plan/fast modes, browser control, and context usage.
 - Exact `gh` coverage for review comments, deployments, add-all-comments-to-chat, and review-thread resolution.
 - Linear archive/delete schema and permission support.
@@ -46,3 +46,36 @@ The generated planning docs are broadly consistent with the latest accepted ADRs
 - Checkpoint restore must revert file state without destructively editing Pi session files.
 - `gh` output parsing may not expose every PR comment/check/deployment detail needed for full parity.
 - Linear OAuth token refresh, pagination, rate limits, and permission failures need explicit handling.
+
+## 2026-06-07 File-Based Routing Alignment
+
+The renderer moved from hand-defined routes and effect-based redirects to
+file-based TanStack routing. Docs were realigned to that reality.
+
+### Added
+
+- `docs/adr/0026-use-file-based-tanstack-routing.md` records the file-based
+  routing decision, URL contract, loader-driven redirects, pathless
+  `_workbench`/`_shell` layouts, and the development-only route/IPC profiler.
+
+### Updated
+
+- `docs/adr/0021-defer-react-profiler-to-development-only.md`: noted the profiler
+  is implemented as the dev-gated route/IPC navigation profiler.
+- `docs/product/current-shell-inventory.md`: `app.tsx` is now the router outlet
+  host; shell composition lives in `workbench-shell/route-layout.tsx`; added the
+  routing boundaries; corrected the Settings entry (full-window route outside the
+  shell) and the chat-tab row (path param remembered per workspace).
+- `docs/product/ux-parity.md`: clarified path vs search route state and
+  per-workspace dock/review/chat persistence.
+- `docs/product/open-decisions.md`: added renderer routing to resolved decisions.
+- `docs/product/dependency-map.md`: noted file-based routing for the shell regions.
+- `docs/product/linear-issues.md`: aligned the shell-scaffold (ENS-001) and
+  sidebar-navigation (ENS-020) ticket text with the routing reality.
+
+### Not done
+
+- Live Linear tickets were not updated. The connected Linear workspace is
+  `boundaryla`, not the Ensemble "The Swiss Cheese" workspace, so `THE-*` issues
+  are unreachable from this session. The in-repo `linear-issues.md` mirror is the
+  aligned source to sync once the correct workspace is connected.

@@ -21,3 +21,4 @@ React profiler and developer diagnostics may exist in development builds or behi
 - Production settings stay focused on user workflows.
 - Developer diagnostics can still be added when performance work requires them.
 - Any production diagnostic feature must avoid exposing secrets, private paths, or session content.
+- This is implemented as the route/IPC navigation profiler in `src/renderer/lib/instrumentation/route-profiler.ts`, which instruments route loaders, Electron IPC calls, and layout remounts. It is gated to `import.meta.env.DEV` and installed on the renderer router; see ADR 0026.

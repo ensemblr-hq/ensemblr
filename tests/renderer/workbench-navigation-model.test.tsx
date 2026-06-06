@@ -113,7 +113,7 @@ test('resolves workspace route params for live targets and rejects missing ones'
 	expect(
 		resolveWorkspaceRouteParams(projects, 'repo-2', 'workspace-2'),
 	).toEqual({
-		chat: 'workspace-2:overview',
+		chatId: 'workspace-2:overview',
 		projectId: 'repo-2',
 		workspaceId: 'workspace-2',
 	});
@@ -320,10 +320,7 @@ test('renders live navigation records and true empty repository state', () => {
 				label: 'IPC online',
 				state: 'online',
 			}}
-			onDashboardSelect={() => undefined}
-			onHelpSelect={() => undefined}
-			onHistorySelect={() => undefined}
-			onSettingsSelect={() => undefined}
+			onStaticNavigationSelect={() => undefined}
 			onWorkspaceSelect={() => undefined}
 			projects={projects}
 		/>,
@@ -341,10 +338,7 @@ test('renders live navigation records and true empty repository state', () => {
 				label: 'IPC online',
 				state: 'online',
 			}}
-			onDashboardSelect={() => undefined}
-			onHelpSelect={() => undefined}
-			onHistorySelect={() => undefined}
-			onSettingsSelect={() => undefined}
+			onStaticNavigationSelect={() => undefined}
 			onWorkspaceSelect={() => undefined}
 			projects={[]}
 		/>,

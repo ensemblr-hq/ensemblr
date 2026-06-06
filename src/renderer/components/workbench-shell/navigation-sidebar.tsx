@@ -5,6 +5,7 @@ import {
 	LayoutDashboardIcon,
 	PlusIcon,
 } from 'lucide-react';
+import type { ReactElement } from 'react';
 
 import { ReorderList } from '@/renderer/components/shadix-ui/components/reorder-list';
 import { StatusBadge } from '@/renderer/components/status-badge';
@@ -27,12 +28,15 @@ import {
 import { cn } from '@/renderer/lib/utils';
 import type {
 	ProjectShellModel,
+	WorkbenchRouteSearch,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type {
 	ProjectNavigationState,
 	WorkbenchActiveView,
 	WorkbenchHealth,
+	WorkbenchStaticNavigationTarget,
+	WorkbenchWorkspaceNavigationLinkTarget,
 } from '@/renderer/types/workbench-shell';
 
 import { ProjectCreationMenu, ProjectSidebarHeader } from './project-sidebar';
@@ -50,26 +54,39 @@ export function WorkspaceNavigationSidebar({
 	activeView,
 	activeWorkspace,
 	health,
-	onDashboardSelect,
-	onHelpSelect,
-	onHistorySelect,
-	onSettingsSelect,
+	onStaticNavigationSelect,
 	onWorkspaceSelect,
 	projectNavigation,
 	projects,
+	renderStaticNavigationLink,
+	renderWorkspaceNavigationLink,
+	resolveWorkspaceRouteSearch,
 }: {
 	activeProject: ProjectShellModel | null;
 	activeView: WorkbenchActiveView;
 	activeWorkspace: WorkspaceShellModel | null;
 	health: WorkbenchHealth;
-	onDashboardSelect: () => void;
-	onHelpSelect: () => void;
-	onHistorySelect: () => void;
-	onSettingsSelect: () => void;
+	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projectNavigation: ProjectNavigationState;
 	projects: ProjectShellModel[];
+	renderStaticNavigationLink?: (
+		target: WorkbenchStaticNavigationTarget,
+		children: ReactElement,
+	) => ReactElement;
+	renderWorkspaceNavigationLink?: (
+		target: WorkbenchWorkspaceNavigationLinkTarget,
+		children: ReactElement,
+	) => ReactElement;
+	resolveWorkspaceRouteSearch: (
+		workspace: WorkspaceShellModel,
+	) => WorkbenchRouteSearch;
 }) {
+	const activeNavigationProject =
+		activeView === 'workspace' ? activeProject : null;
+	const activeNavigationWorkspace =
+		activeView === 'workspace' ? activeWorkspace : null;
+
 	return (
 		<Sidebar className='border-sidebar-border' collapsible='offcanvas'>
 			<SidebarHeader className='h-12 border-sidebar-border border-b p-0'>
@@ -81,23 +98,25 @@ export function WorkspaceNavigationSidebar({
 			<SidebarContent>
 				<SidebarPrimaryNavigation
 					activeView={activeView}
-					onDashboardSelect={onDashboardSelect}
-					onHelpSelect={onHelpSelect}
-					onHistorySelect={onHistorySelect}
-					onSettingsSelect={onSettingsSelect}
+					onStaticNavigationSelect={onStaticNavigationSelect}
+					renderNavigationLink={renderStaticNavigationLink}
 				/>
 				<PinnedWorkspaceGroup
-					activeProject={activeProject}
-					activeWorkspace={activeWorkspace}
+					activeProject={activeNavigationProject}
+					activeWorkspace={activeNavigationWorkspace}
 					onWorkspaceSelect={onWorkspaceSelect}
 					projectNavigation={projectNavigation}
+					renderNavigationLink={renderWorkspaceNavigationLink}
+					resolveWorkspaceRouteSearch={resolveWorkspaceRouteSearch}
 				/>
 				<ProjectNavigationGroups
-					activeProject={activeProject}
-					activeWorkspace={activeWorkspace}
-					onSettingsSelect={onSettingsSelect}
+					activeProject={activeNavigationProject}
+					activeWorkspace={activeNavigationWorkspace}
+					onStaticNavigationSelect={onStaticNavigationSelect}
 					onWorkspaceSelect={onWorkspaceSelect}
 					projectNavigation={projectNavigation}
+					renderWorkspaceNavigationLink={renderWorkspaceNavigationLink}
+					resolveWorkspaceRouteSearch={resolveWorkspaceRouteSearch}
 				/>
 			</SidebarContent>
 
@@ -109,64 +128,55 @@ export function WorkspaceNavigationSidebar({
 
 function SidebarPrimaryNavigation({
 	activeView,
-	onDashboardSelect,
-	onHelpSelect,
-	onHistorySelect,
-	onSettingsSelect,
+	onStaticNavigationSelect,
+	renderNavigationLink,
 }: {
 	activeView: WorkbenchActiveView;
-	onDashboardSelect: () => void;
-	onHelpSelect: () => void;
-	onHistorySelect: () => void;
-	onSettingsSelect: () => void;
+	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
+	renderNavigationLink?: (
+		target: WorkbenchStaticNavigationTarget,
+		children: ReactElement,
+	) => ReactElement;
 }) {
 	return (
 		<>
 			<SidebarGroup className='min-h-11.75 justify-center py-1'>
 				<SidebarGroupContent>
 					<SidebarMenu className='gap-1'>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								isActive={activeView === 'dashboard'}
-								onClick={onDashboardSelect}
-								tooltip='Dashboard'
-							>
-								<LayoutDashboardIcon aria-hidden='true' />
-								<span>Dashboard</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								isActive={activeView === 'history'}
-								onClick={onHistorySelect}
-								tooltip='History'
-							>
-								<HistoryIcon aria-hidden='true' />
-								<span>History</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								aria-label='Open app settings'
-								isActive={activeView === 'settings'}
-								onClick={onSettingsSelect}
-								tooltip='Settings'
-							>
-								<CogIcon aria-hidden='true' />
-								<span>Settings</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
-						<SidebarMenuItem>
-							<SidebarMenuButton
-								aria-label='Open help'
-								isActive={activeView === 'help'}
-								onClick={onHelpSelect}
-								tooltip='Help'
-							>
-								<CircleHelpIcon aria-hidden='true' />
-								<span>Help</span>
-							</SidebarMenuButton>
-						</SidebarMenuItem>
+						<StaticNavigationItem
+							icon={<LayoutDashboardIcon aria-hidden='true' />}
+							isActive={activeView === 'dashboard'}
+							label='Dashboard'
+							onSelect={onStaticNavigationSelect}
+							renderNavigationLink={renderNavigationLink}
+							target='dashboard'
+						/>
+						<StaticNavigationItem
+							icon={<HistoryIcon aria-hidden='true' />}
+							isActive={activeView === 'history'}
+							label='History'
+							onSelect={onStaticNavigationSelect}
+							renderNavigationLink={renderNavigationLink}
+							target='history'
+						/>
+						<StaticNavigationItem
+							ariaLabel='Open app settings'
+							icon={<CogIcon aria-hidden='true' />}
+							isActive={activeView === 'settings'}
+							label='Settings'
+							onSelect={onStaticNavigationSelect}
+							renderNavigationLink={renderNavigationLink}
+							target='settings'
+						/>
+						<StaticNavigationItem
+							ariaLabel='Open help'
+							icon={<CircleHelpIcon aria-hidden='true' />}
+							isActive={activeView === 'help'}
+							label='Help'
+							onSelect={onStaticNavigationSelect}
+							renderNavigationLink={renderNavigationLink}
+							target='help'
+						/>
 					</SidebarMenu>
 				</SidebarGroupContent>
 			</SidebarGroup>
@@ -176,16 +186,67 @@ function SidebarPrimaryNavigation({
 	);
 }
 
+function StaticNavigationItem({
+	ariaLabel,
+	icon,
+	isActive,
+	label,
+	onSelect,
+	renderNavigationLink,
+	target,
+}: {
+	ariaLabel?: string;
+	icon: ReactElement;
+	isActive: boolean;
+	label: string;
+	onSelect: (target: WorkbenchStaticNavigationTarget) => void;
+	renderNavigationLink?: (
+		target: WorkbenchStaticNavigationTarget,
+		children: ReactElement,
+	) => ReactElement;
+	target: WorkbenchStaticNavigationTarget;
+}) {
+	const content = (
+		<>
+			{icon}
+			<span>{label}</span>
+		</>
+	);
+
+	return (
+		<SidebarMenuItem>
+			<SidebarMenuButton
+				aria-label={ariaLabel}
+				asChild={Boolean(renderNavigationLink)}
+				isActive={isActive}
+				onClick={renderNavigationLink ? undefined : () => onSelect(target)}
+				tooltip={label}
+			>
+				{renderNavigationLink ? renderNavigationLink(target, content) : content}
+			</SidebarMenuButton>
+		</SidebarMenuItem>
+	);
+}
+
 function PinnedWorkspaceGroup({
 	activeProject,
 	activeWorkspace,
 	onWorkspaceSelect,
 	projectNavigation,
+	renderNavigationLink,
+	resolveWorkspaceRouteSearch,
 }: {
 	activeProject: ProjectShellModel | null;
 	activeWorkspace: WorkspaceShellModel | null;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projectNavigation: ProjectNavigationState;
+	renderNavigationLink?: (
+		target: WorkbenchWorkspaceNavigationLinkTarget,
+		children: ReactElement,
+	) => ReactElement;
+	resolveWorkspaceRouteSearch: (
+		workspace: WorkspaceShellModel,
+	) => WorkbenchRouteSearch;
 }) {
 	const {
 		pinnedWorkspaceEntries,
@@ -214,6 +275,8 @@ function PinnedWorkspaceGroup({
 							key={workspace.id}
 							onPinToggle={() => toggleWorkspacePinned(workspace.id)}
 							onSelect={() => onWorkspaceSelect(project.id, workspace.id)}
+							renderNavigationLink={renderNavigationLink}
+							routeSearch={resolveWorkspaceRouteSearch(workspace)}
 							workspace={workspace}
 						/>
 					))}
@@ -226,15 +289,24 @@ function PinnedWorkspaceGroup({
 function ProjectNavigationGroups({
 	activeProject,
 	activeWorkspace,
-	onSettingsSelect,
+	onStaticNavigationSelect,
 	onWorkspaceSelect,
 	projectNavigation,
+	renderWorkspaceNavigationLink,
+	resolveWorkspaceRouteSearch,
 }: {
 	activeProject: ProjectShellModel | null;
 	activeWorkspace: WorkspaceShellModel | null;
-	onSettingsSelect: () => void;
+	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projectNavigation: ProjectNavigationState;
+	renderWorkspaceNavigationLink?: (
+		target: WorkbenchWorkspaceNavigationLinkTarget,
+		children: ReactElement,
+	) => ReactElement;
+	resolveWorkspaceRouteSearch: (
+		workspace: WorkspaceShellModel,
+	) => WorkbenchRouteSearch;
 }) {
 	const {
 		collapsedProjectIdSet,
@@ -276,11 +348,13 @@ function ProjectNavigationGroups({
 							isCollapsed={isProjectCollapsed}
 							key={project.id}
 							onProjectToggle={() => toggleProjectCollapsed(project.id)}
-							onSettingsSelect={onSettingsSelect}
+							onStaticNavigationSelect={onStaticNavigationSelect}
 							onWorkspacePinToggle={toggleWorkspacePinned}
 							onWorkspaceSelect={onWorkspaceSelect}
 							pinnedWorkspaceIdSet={pinnedWorkspaceIdSet}
 							project={project}
+							renderWorkspaceNavigationLink={renderWorkspaceNavigationLink}
+							resolveWorkspaceRouteSearch={resolveWorkspaceRouteSearch}
 							workspaces={visibleProjectWorkspaces}
 						/>
 					);
@@ -295,22 +369,31 @@ function ProjectWorkspaceGroup({
 	activeWorkspace,
 	isCollapsed,
 	onProjectToggle,
-	onSettingsSelect,
+	onStaticNavigationSelect,
 	onWorkspacePinToggle,
 	onWorkspaceSelect,
 	pinnedWorkspaceIdSet,
 	project,
+	renderWorkspaceNavigationLink,
+	resolveWorkspaceRouteSearch,
 	workspaces,
 }: {
 	activeProject: ProjectShellModel | null;
 	activeWorkspace: WorkspaceShellModel | null;
 	isCollapsed: boolean;
 	onProjectToggle: () => void;
-	onSettingsSelect: () => void;
+	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 	onWorkspacePinToggle: (workspaceId: string) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	pinnedWorkspaceIdSet: Set<string>;
 	project: ProjectShellModel;
+	renderWorkspaceNavigationLink?: (
+		target: WorkbenchWorkspaceNavigationLinkTarget,
+		children: ReactElement,
+	) => ReactElement;
+	resolveWorkspaceRouteSearch: (
+		workspace: WorkspaceShellModel,
+	) => WorkbenchRouteSearch;
 	workspaces: WorkspaceShellModel[];
 }) {
 	return (
@@ -320,7 +403,7 @@ function ProjectWorkspaceGroup({
 		>
 			<ProjectSidebarHeader
 				isCollapsed={isCollapsed}
-				onRepositorySettingsSelect={onSettingsSelect}
+				onRepositorySettingsSelect={() => onStaticNavigationSelect('settings')}
 				onToggle={onProjectToggle}
 				project={project}
 				workspaceCount={workspaces.length}
@@ -355,6 +438,8 @@ function ProjectWorkspaceGroup({
 								key={workspace.id}
 								onPinToggle={() => onWorkspacePinToggle(workspace.id)}
 								onSelect={() => onWorkspaceSelect(project.id, workspace.id)}
+								renderNavigationLink={renderWorkspaceNavigationLink}
+								routeSearch={resolveWorkspaceRouteSearch(workspace)}
 								workspace={workspace}
 							/>
 						))}

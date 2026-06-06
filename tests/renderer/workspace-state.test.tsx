@@ -2,11 +2,13 @@ import { afterEach, expect, test } from 'bun:test';
 import { createStore } from 'jotai';
 import { getDefaultWorkspace } from '../../src/renderer/mocks/workbench';
 import {
+	activeChatTabByWorkspaceAtom,
 	activeDockTabByWorkspaceAtom,
 	activeReviewTabByWorkspaceAtom,
 	changesViewModeAtom,
 	closedSessionIdsByWorkspaceAtom,
 	collapsedProjectIdsAtom,
+	getPreferredChatId,
 	getPreferredDockTab,
 	getPreferredReviewTab,
 	lastWorkspaceSelectionAtom,
@@ -17,6 +19,7 @@ import {
 } from '../../src/renderer/state/workspace';
 
 const STORAGE_KEYS = {
+	activeChatTabByWorkspace: 'ensemble_workspace_active_chat_tab_by_workspace',
 	activeDockTabByWorkspace: 'ensemble_workspace_active_dock_tab_by_workspace',
 	activeReviewTabByWorkspace:
 		'ensemble_workspace_active_review_tab_by_workspace',
@@ -87,6 +90,9 @@ afterEach(() => {
 
 test('hydrates workspace navigation atoms from localStorage when mounted', () => {
 	installLocalStorage({
+		[STORAGE_KEYS.activeChatTabByWorkspace]: JSON.stringify({
+			'workspace-a': 'session-a',
+		}),
 		[STORAGE_KEYS.activeDockTabByWorkspace]: JSON.stringify({
 			'workspace-a': 'run',
 		}),
@@ -113,6 +119,7 @@ test('hydrates workspace navigation atoms from localStorage when mounted', () =>
 
 	const store = createStore();
 	const unsubscribes = [
+		store.sub(activeChatTabByWorkspaceAtom, () => undefined),
 		store.sub(activeDockTabByWorkspaceAtom, () => undefined),
 		store.sub(activeReviewTabByWorkspaceAtom, () => undefined),
 		store.sub(changesViewModeAtom, () => undefined),
@@ -126,6 +133,9 @@ test('hydrates workspace navigation atoms from localStorage when mounted', () =>
 	];
 
 	try {
+		expect(store.get(activeChatTabByWorkspaceAtom)).toEqual({
+			'workspace-a': 'session-a',
+		});
 		expect(store.get(activeDockTabByWorkspaceAtom)).toEqual({
 			'workspace-a': 'run',
 		});
@@ -159,6 +169,7 @@ test('writes workspace navigation atom changes to localStorage', () => {
 	const storage = installLocalStorage();
 	const store = createStore();
 
+	store.set(activeChatTabByWorkspaceAtom, { 'workspace-b': 'session-b' });
 	store.set(activeDockTabByWorkspaceAtom, { 'workspace-b': 'terminal:logs' });
 	store.set(activeReviewTabByWorkspaceAtom, { 'workspace-b': 'files' });
 	store.set(changesViewModeAtom, 'folders');
@@ -175,6 +186,9 @@ test('writes workspace navigation atom changes to localStorage', () => {
 		'workspace-b': ['session-b'],
 	});
 
+	expect(storage.getItem(STORAGE_KEYS.activeChatTabByWorkspace)).toBe(
+		JSON.stringify({ 'workspace-b': 'session-b' }),
+	);
 	expect(storage.getItem(STORAGE_KEYS.activeDockTabByWorkspace)).toBe(
 		JSON.stringify({ 'workspace-b': 'terminal:logs' }),
 	);
@@ -251,4 +265,35 @@ test('resolves per-workspace review and dock tab preferences', () => {
 			workspace,
 		}),
 	).toBe('terminal:default');
+});
+
+test('resolves the remembered chat tab per workspace', () => {
+	const workspace = getDefaultWorkspace();
+	const [firstSession, secondSession] = workspace.sessions;
+
+	expect(
+		getPreferredChatId({
+			chatTabsByWorkspace: {},
+			workspace,
+		}),
+	).toBe(firstSession.id);
+	expect(
+		getPreferredChatId({
+			chatTabsByWorkspace: { [workspace.id]: secondSession.id },
+			workspace,
+		}),
+	).toBe(secondSession.id);
+	expect(
+		getPreferredChatId({
+			chatTabsByWorkspace: { [workspace.id]: 'missing-session' },
+			workspace,
+		}),
+	).toBe(firstSession.id);
+	expect(
+		getPreferredChatId({
+			chatTabsByWorkspace: { [workspace.id]: secondSession.id },
+			routeChatId: firstSession.id,
+			workspace,
+		}),
+	).toBe(firstSession.id);
 });

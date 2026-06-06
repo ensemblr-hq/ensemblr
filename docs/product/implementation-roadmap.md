@@ -92,8 +92,8 @@ Discovery tickets are intentionally separate from build tickets:
 - `ENS-042` - Spotlight testing discovery for safe root/workspace synchronization.
 - `ENS-044` - Linear schema and permission discovery, including archive/delete support, pagination, filtering, labels, cycles, and cache metadata.
 - `ENS-056` - GitHub comments, review threads, deployments, and add-all-comments coverage through `gh` and `gh api`.
-- `ENS-068` - Non-deferred experimental feature discovery for dashboard/sidebar visibility and resource usage.
-- Current shell uncertainty to resolve before implementing related behavior: workspace-row status actions, mark-unread semantics, Dashboard visibility, and the Changes tab Review action. See `docs/product/current-shell-inventory.md`.
+- `ENS-068` - Non-deferred experimental feature discovery for sidebar visibility and resource usage.
+- Current shell uncertainty to resolve before implementing related behavior: workspace-row status actions, mark-unread semantics, and the Changes tab Review action. See `docs/product/current-shell-inventory.md`.
 
 Discovery outputs should be short design notes committed with the ticket, or appended to the source product docs if they change planning guidance.
 
@@ -109,7 +109,7 @@ These tickets require an interactive session with the user before downstream bui
 These are product decisions, not implementation guesses:
 
 - `ENS-069` - Decide whether to support Conductor's remove/soften AI-certainty phrase setting in Ensemble. If supported, decide whether it is Pi output post-processing, a prompt preset, or a settings omission.
-- `ENS-068` - Decide which non-deferred experimental settings are v1 scope versus post-core flags, especially dashboard/sidebar visibility and sidebar resource usage. Voice, Graphite, cloud/remote SSH, production React profiler, and the five-chat-tab limit are already resolved by ADRs.
+- `ENS-068` - Decide which non-deferred experimental settings are v1 scope versus post-core flags, especially workspace/sidebar visibility and sidebar resource usage. Voice, Graphite, cloud/remote SSH, production React profiler, and the five-chat-tab limit are already resolved by ADRs.
 
 If another ticket encounters ambiguity that would alter behavior, create a new Decision Needed item instead of guessing.
 

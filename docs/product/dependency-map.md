@@ -7,7 +7,7 @@ This map is generated from the local planning IDs in `docs/product/linear-issues
 ## Critical Path
 
 - Foundation services (`ENS-001` through `ENS-008`) unblock setup, repositories, storage, config, secrets, root, command execution, and establish the structural workbench shell contract.
-- Foundation UI creates fixture-backed sidebar, workspace header, chat tab, review panel, PR-state header, and dock regions. Later workspace, Pi, terminal, Linear, GitHub, and review tickets wire live TanStack Query/IPC data into those regions instead of rebuilding them.
+- Foundation UI creates fixture-backed sidebar, workspace header, chat tab, review panel, PR-state header, and dock regions. Later workspace, Pi, terminal, Linear, GitHub, and review tickets wire live TanStack Query/IPC data into those regions instead of rebuilding them. Navigation across these regions is file-based TanStack routing with loader-driven data and redirects (see `docs/adr/0026-use-file-based-tanstack-routing.md`).
 - Setup/config (`ENS-009` through `ENS-016`) unblocks ready-state gating, Pi executable/RPC checks, `gh`, env/secrets, repository config, and safe root changes.
 - Workspace core (`ENS-017` through `ENS-025`) replaces fixture shell data with live repository/workspace records and unblocks Pi sessions, terminal/scripts, Linear workspace creation, and GitHub review flows while preserving current navigation, pinning, context-menu, header, and open-target affordances.
 - Pi runtime (`ENS-026` through `ENS-035`, plus `ENS-075`) unblocks agent timeline, checkpoints, context-to-Pi, and agent-assisted review/PR work.
@@ -404,4 +404,4 @@ flowchart TD
 - `ENS-075` and `ENS-076` use appended local IDs but should be imported in their logical milestone order.
 - Keep discovery tickets separate from build tickets so ambiguous API/schema behavior does not block unrelated implementation.
 - Do not create actual Linear issues until explicitly asked.
-- Current shell uncertainties that should not be guessed in implementation tickets: workspace-row status target, mark-unread semantics, visible Dashboard entry, and the Changes tab Review action.
+- Current shell uncertainties that should not be guessed in implementation tickets: workspace-row status target, mark-unread semantics, and the Changes tab Review action.
