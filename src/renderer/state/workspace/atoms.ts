@@ -4,6 +4,16 @@ import type { ChangesViewMode } from '@/renderer/types/workbench-shell';
 
 const workspaceStorageOptions = { getOnInit: true };
 
+export const lastWorkspaceSelectionAtom = atomWithStorage<{
+	projectId: string;
+	workspaceId: string;
+} | null>(
+	'ensemble_workspace_last_selection',
+	null,
+	undefined,
+	workspaceStorageOptions,
+);
+
 export const orderedProjectIdsAtom = atomWithStorage<string[]>(
 	'ensemble_workspace_ordered_project_ids',
 	[],

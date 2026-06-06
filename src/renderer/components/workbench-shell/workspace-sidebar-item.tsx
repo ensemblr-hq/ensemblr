@@ -106,7 +106,9 @@ export function WorkspaceSidebarItem({
 					<Button
 						aria-label={`Archive workspace ${workspace.name}; ${archiveBoundaryLabel}`}
 						className='absolute right-1.5 bottom-1.5 size-6 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:opacity-100 group-hover/workspace-sidebar-item:opacity-100'
+						data-action-placeholder='workspace-archive-confirmation'
 						data-permission-boundary={archiveBoundary.boundary}
+						disabled
 						onClick={(event) => {
 							event.stopPropagation();
 						}}
@@ -324,7 +326,9 @@ function WorkspaceContextMenuContent({
 			<ContextMenuSeparator />
 			<ContextMenuGroup>
 				<SidebarContextMenuItem
+					data-action-placeholder='workspace-archive-confirmation'
 					data-permission-boundary={archiveBoundary.boundary}
+					disabled
 				>
 					<ArchiveIcon aria-hidden='true' />
 					<span className='min-w-0 flex-1'>Archive</span>

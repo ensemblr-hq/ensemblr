@@ -29,13 +29,15 @@ export interface WorkbenchShellProps {
 	activeProject: ProjectShellModel;
 	activeReviewTab: ReviewPanelTab;
 	activeSession: SessionTabModel;
-	activeView: 'dashboard' | 'history' | 'settings' | 'workspace';
+	activeView: 'dashboard' | 'help' | 'history' | 'settings' | 'workspace';
 	activeWorkspace: WorkspaceShellModel;
 	composer: ComposerShellState;
 	dockActions: WorkbenchDockActions;
 	dockTabId: DockTabId;
 	health: WorkbenchHealth;
+	onDashboardSelect: () => void;
 	onDockTabChange: (tab: DockTabId) => void;
+	onHelpSelect: () => void;
 	onHistorySelect: () => void;
 	onReviewTabChange: (tab: ReviewPanelTab) => void;
 	onSessionTabChange: (sessionId: string) => void;

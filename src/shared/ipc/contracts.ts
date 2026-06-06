@@ -159,6 +159,41 @@ export interface RepositoryConfigMigrationResult
 	error?: string;
 }
 
+export interface RepositoryWorkspaceNavigationMetadata {
+	[key: string]: unknown;
+}
+
+export interface RepositoryWorkspaceNavigationWorkspace {
+	archivedAt: string | null;
+	baseBranch: string | null;
+	branchName: string | null;
+	createdAt: string;
+	id: string;
+	metadata: RepositoryWorkspaceNavigationMetadata;
+	name: string;
+	path: string;
+	repositoryId: string;
+	slug: string;
+	updatedAt: string;
+}
+
+export interface RepositoryWorkspaceNavigationRepository {
+	createdAt: string;
+	defaultBranch: string | null;
+	id: string;
+	metadata: RepositoryWorkspaceNavigationMetadata;
+	name: string;
+	path: string;
+	slug: string;
+	updatedAt: string;
+	workspaces: RepositoryWorkspaceNavigationWorkspace[];
+}
+
+export interface RepositoryWorkspaceNavigationSnapshot {
+	generatedAt: string;
+	repositories: RepositoryWorkspaceNavigationRepository[];
+}
+
 export type EnvironmentVariableScope = 'app' | 'repository' | 'workspace';
 export type EnvironmentVariableValueKind = 'plain' | 'runtime' | 'secret';
 export type EnvironmentVariableStatus =
@@ -389,6 +424,7 @@ export interface EnsembleApi {
 	repositoryConfig: (
 		request: RepositoryConfigRequest,
 	) => Promise<RepositoryConfigSnapshot>;
+	repositoryWorkspaceNavigation: () => Promise<RepositoryWorkspaceNavigationSnapshot>;
 	rootDirectory: () => Promise<RootDirectorySnapshot>;
 	resolveSettings: (
 		request?: SettingsResolutionRequest,

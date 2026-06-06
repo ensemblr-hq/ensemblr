@@ -16,6 +16,7 @@ import {
 	type RepositoryConfigMigrationResult,
 	type RepositoryConfigRequest,
 	type RepositoryConfigSnapshot,
+	type RepositoryWorkspaceNavigationSnapshot,
 	type RootDirectoryChangeApplyResult,
 	type RootDirectoryChangeRequest,
 	type RootDirectorySelectionResult,
@@ -34,6 +35,7 @@ import type { PiExecutableService } from '../pi';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsembleDatabaseService } from '../storage';
+import { getRepositoryWorkspaceNavigationSnapshot } from './repository-workspace-navigation';
 
 const MAX_ENSURED_WINDOW_WIDTH = 2400;
 
@@ -127,6 +129,15 @@ export function registerIpcHandlers({
 			}
 
 			return repositoryConfigService.load(normalizedRequest);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.repositoryWorkspaceNavigation,
+		(): RepositoryWorkspaceNavigationSnapshot => {
+			return getRepositoryWorkspaceNavigationSnapshot(
+				databaseService.getConnection()?.database ?? null,
+			);
 		},
 	);
 

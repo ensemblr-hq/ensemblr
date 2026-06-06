@@ -11,6 +11,7 @@ import {
 	type RepositoryConfigMigrationResult,
 	type RepositoryConfigRequest,
 	type RepositoryConfigSnapshot,
+	type RepositoryWorkspaceNavigationSnapshot,
 	type RootDirectoryChangeApplyResult,
 	type RootDirectoryChangeRequest,
 	type RootDirectorySelectionResult,
@@ -57,6 +58,10 @@ export function createEnsembleApi(): EnsembleApi {
 				IPC_CHANNELS.repositoryConfig,
 				request,
 			) as Promise<RepositoryConfigSnapshot>,
+		repositoryWorkspaceNavigation: () =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.repositoryWorkspaceNavigation,
+			) as Promise<RepositoryWorkspaceNavigationSnapshot>,
 		rootDirectory: () =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.rootDirectory,

@@ -1,31 +1,39 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useMemo } from 'react';
+import { useAtom } from 'jotai';
+import { useEffect, useMemo } from 'react';
 import {
 	healthQuery,
+	isEnsembleApiAvailable,
+	repositoryWorkspaceNavigationQuery,
 	setupDiagnosticsQuery,
 } from '@/renderer/api/ensemble-queries';
+import { WorkbenchEmptyStateShell } from '@/renderer/components/workbench-empty-state';
 import { WorkbenchShell } from '@/renderer/components/workbench-shell';
-import { getComposerState } from '@/renderer/lib/workbench';
 import {
-	findProject,
-	findSession,
-	findWorkspace,
-	getDefaultProject,
-	getDefaultWorkspace,
-	shellFixtureProjects,
-} from '@/renderer/mocks/workbench';
-import { useWorkspacePanelTabState } from '@/renderer/state/workspace';
+	findWorkspaceNavigationSelection,
+	getComposerState,
+	getPreferredSession,
+	mapNavigationSnapshotToProjects,
+	resolveWorkspaceNavigationSelection,
+	type WorkspaceNavigationSelection,
+} from '@/renderer/lib/workbench';
+import { shellFixtureProjects } from '@/renderer/mocks/workbench';
+import {
+	lastWorkspaceSelectionAtom,
+	useWorkspacePanelTabState,
+} from '@/renderer/state/workspace';
 import type { WorkbenchRouteSearch } from '@/renderer/types/workbench';
 import type {
 	WorkbenchDockActions,
 	WorkbenchHealth,
 } from '@/renderer/types/workbench-shell';
+import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
 
 interface AppProps {
 	projectId?: string;
 	search?: WorkbenchRouteSearch;
-	view?: 'dashboard' | 'history' | 'settings' | 'workspace';
+	view?: 'dashboard' | 'help' | 'history' | 'settings' | 'workspace';
 	workspaceId?: string;
 }
 
@@ -36,32 +44,51 @@ export function App({
 	workspaceId,
 }: AppProps) {
 	const navigate = useNavigate();
-	const health = useQuery(healthQuery);
-	const setupDiagnostics = useQuery(setupDiagnosticsQuery);
-
-	const activeProject = projectId
-		? findProject(projectId)
-		: getDefaultProject();
-	const activeWorkspace = workspaceId
-		? findWorkspace(activeProject, workspaceId)
-		: getDefaultWorkspace();
-	const activeSession = findSession(activeWorkspace, search?.chat);
-	const panelTabs = useWorkspacePanelTabState({
-		activeWorkspace,
-		search,
+	const hasPreloadBridge = isEnsembleApiAvailable();
+	const health = useQuery({
+		...healthQuery,
+		enabled: hasPreloadBridge,
 	});
-	const activeReviewTab = panelTabs.activeReviewTab;
-	const activeDockTab = panelTabs.activeDockTab;
+	const repositoryWorkspaceNavigation = useQuery({
+		...repositoryWorkspaceNavigationQuery,
+		enabled: hasPreloadBridge,
+	});
+	const setupDiagnostics = useQuery({
+		...setupDiagnosticsQuery,
+		enabled: hasPreloadBridge,
+	});
+	const [lastWorkspaceSelection, setLastWorkspaceSelection] = useAtom(
+		lastWorkspaceSelectionAtom,
+	);
 	const setupError = getErrorMessage(setupDiagnostics.error);
 	const setupSnapshot = setupDiagnostics.data ?? null;
-
-	const composer = getComposerState({
-		activeSession,
-		setupDiagnostics: setupSnapshot,
-		setupError,
-	});
+	const projects = useMemo(
+		() =>
+			hasPreloadBridge
+				? mapNavigationSnapshotToProjects(repositoryWorkspaceNavigation.data)
+				: shellFixtureProjects,
+		[hasPreloadBridge, repositoryWorkspaceNavigation.data],
+	);
+	const selection = useMemo(
+		() =>
+			resolveWorkspaceNavigationSelection({
+				projects,
+				routeProjectId: projectId,
+				routeWorkspaceId: workspaceId,
+				storedSelection: lastWorkspaceSelection,
+			}),
+		[projectId, projects, lastWorkspaceSelection, workspaceId],
+	);
 
 	const shellHealth = useMemo<WorkbenchHealth>(() => {
+		if (!hasPreloadBridge) {
+			return {
+				detail: 'Electron preload bridge is unavailable in this context.',
+				label: 'IPC unavailable',
+				state: 'unavailable',
+			};
+		}
+
 		const snapshot = health.data;
 
 		if (snapshot) {
@@ -134,8 +161,149 @@ export function App({
 			label: 'Checking IPC',
 			state: 'pending',
 		};
-	}, [health.data, health.error, setupError, setupSnapshot]);
+	}, [hasPreloadBridge, health.data, health.error, setupError, setupSnapshot]);
 
+	useEffect(() => {
+		if (!selection) {
+			return;
+		}
+
+		const nextSelection = {
+			projectId: selection.project.id,
+			workspaceId: selection.workspace.id,
+		};
+
+		setLastWorkspaceSelection((currentSelection) =>
+			currentSelection?.projectId === nextSelection.projectId &&
+			currentSelection.workspaceId === nextSelection.workspaceId
+				? currentSelection
+				: nextSelection,
+		);
+	}, [selection, setLastWorkspaceSelection]);
+
+	useEffect(() => {
+		if (!selection || view !== 'workspace') {
+			return;
+		}
+
+		if (
+			projectId === selection.project.id &&
+			workspaceId === selection.workspace.id
+		) {
+			return;
+		}
+
+		const activeSession = getPreferredSession(
+			selection.workspace,
+			search?.chat,
+		);
+
+		navigate({
+			params: {
+				projectId: selection.project.id,
+				workspaceId: selection.workspace.id,
+			},
+			replace: true,
+			search: {
+				chat: activeSession.id,
+			},
+			to: '/projects/$projectId/workspaces/$workspaceId',
+		});
+	}, [navigate, projectId, search?.chat, selection, view, workspaceId]);
+
+	const onDashboardSelect = () => navigate({ to: '/' });
+	const onHelpSelect = () => navigate({ to: '/help' });
+	const onHistorySelect = () => navigate({ to: '/history' });
+	const onSettingsSelect = () => navigate({ to: '/settings' });
+
+	if (!selection) {
+		return (
+			<WorkbenchEmptyStateShell
+				activeView={view}
+				emptyState={getEmptyStateCopy({
+					isLoading: repositoryWorkspaceNavigation.isLoading,
+					navigationError: getErrorMessage(repositoryWorkspaceNavigation.error),
+					projectCount: projects.length,
+					setupStatus: setupSnapshot?.status,
+				})}
+				health={shellHealth}
+				onDashboardSelect={onDashboardSelect}
+				onHelpSelect={onHelpSelect}
+				onHistorySelect={onHistorySelect}
+				onSettingsSelect={onSettingsSelect}
+				onWorkspaceSelect={() => undefined}
+				projects={projects}
+			/>
+		);
+	}
+
+	return (
+		<WorkspaceAppShell
+			activeView={view}
+			health={shellHealth}
+			onDashboardSelect={onDashboardSelect}
+			onHelpSelect={onHelpSelect}
+			onHistorySelect={onHistorySelect}
+			onSettingsSelect={onSettingsSelect}
+			projects={projects}
+			search={search}
+			selection={selection}
+			setupDiagnostics={setupSnapshot}
+			setupDiagnosticsError={setupError}
+			isSetupDiagnosticsRetrying={setupDiagnostics.isFetching}
+			onSetupDiagnosticsRetry={() => {
+				if (hasPreloadBridge) {
+					void setupDiagnostics.refetch();
+				}
+			}}
+		/>
+	);
+}
+
+function WorkspaceAppShell({
+	activeView,
+	health,
+	onDashboardSelect,
+	onHelpSelect,
+	onHistorySelect,
+	onSettingsSelect,
+	projects,
+	search,
+	selection,
+	setupDiagnostics,
+	setupDiagnosticsError,
+	isSetupDiagnosticsRetrying,
+	onSetupDiagnosticsRetry,
+}: {
+	activeView: NonNullable<AppProps['view']>;
+	health: WorkbenchHealth;
+	onDashboardSelect: () => void;
+	onHelpSelect: () => void;
+	onHistorySelect: () => void;
+	onSettingsSelect: () => void;
+	projects: ReturnType<typeof mapNavigationSnapshotToProjects>;
+	search?: WorkbenchRouteSearch;
+	selection: WorkspaceNavigationSelection;
+	setupDiagnostics: SetupDiagnosticsSnapshot | null;
+	setupDiagnosticsError: string | null;
+	isSetupDiagnosticsRetrying: boolean;
+	onSetupDiagnosticsRetry: () => void;
+}) {
+	const navigate = useNavigate();
+	const activeProject = selection.project;
+	const activeWorkspace = selection.workspace;
+	const activeSession = getPreferredSession(activeWorkspace, search?.chat);
+	const panelTabs = useWorkspacePanelTabState({
+		activeWorkspace,
+		search,
+	});
+	const activeReviewTab = panelTabs.activeReviewTab;
+	const activeDockTab = panelTabs.activeDockTab;
+	const composer = getComposerState({
+		activeSession,
+		setupDiagnostics,
+		setupError: setupDiagnosticsError,
+	});
 	const dockActions = useMemo<WorkbenchDockActions>(
 		() => ({
 			onNewTerminal: () => undefined,
@@ -149,15 +317,25 @@ export function App({
 	);
 
 	function navigateToWorkspace(nextProjectId: string, nextWorkspaceId: string) {
-		const nextProject = findProject(nextProjectId);
-		const nextWorkspace = findWorkspace(nextProject, nextWorkspaceId);
-		const nextSession = findSession(nextWorkspace);
-		const preferredTabs = panelTabs.getPreferredTabsForWorkspace(nextWorkspace);
+		const nextSelection = findWorkspaceNavigationSelection(
+			projects,
+			nextProjectId,
+			nextWorkspaceId,
+		);
+
+		if (!nextSelection) {
+			return;
+		}
+
+		const nextSession = getPreferredSession(nextSelection.workspace);
+		const preferredTabs = panelTabs.getPreferredTabsForWorkspace(
+			nextSelection.workspace,
+		);
 
 		navigate({
 			params: {
-				projectId: nextProject.id,
-				workspaceId: nextWorkspace.id,
+				projectId: nextSelection.project.id,
+				workspaceId: nextSelection.workspace.id,
 			},
 			search: {
 				chat: nextSession.id,
@@ -196,27 +374,73 @@ export function App({
 			activeProject={activeProject}
 			activeReviewTab={activeReviewTab}
 			activeSession={activeSession}
-			activeView={view}
+			activeView={activeView ?? 'workspace'}
 			activeWorkspace={activeWorkspace}
 			composer={composer}
 			dockActions={dockActions}
 			dockTabId={activeDockTab}
-			health={shellHealth}
+			health={health}
+			onDashboardSelect={onDashboardSelect}
 			onDockTabChange={(dock) => updateSearch({ dock })}
-			onHistorySelect={() => navigate({ to: '/history' })}
+			onHelpSelect={onHelpSelect}
+			onHistorySelect={onHistorySelect}
 			onReviewTabChange={(review) => updateSearch({ review })}
 			onSessionTabChange={(chat) => updateSearch({ chat })}
-			onSettingsSelect={() => navigate({ to: '/settings' })}
+			onSettingsSelect={onSettingsSelect}
 			onWorkspaceSelect={navigateToWorkspace}
-			projects={shellFixtureProjects}
-			setupDiagnostics={setupSnapshot}
-			setupDiagnosticsError={setupError}
-			isSetupDiagnosticsRetrying={setupDiagnostics.isFetching}
-			onSetupDiagnosticsRetry={() => {
-				void setupDiagnostics.refetch();
-			}}
+			projects={projects}
+			setupDiagnostics={setupDiagnostics}
+			setupDiagnosticsError={setupDiagnosticsError}
+			isSetupDiagnosticsRetrying={isSetupDiagnosticsRetrying}
+			onSetupDiagnosticsRetry={onSetupDiagnosticsRetry}
 		/>
 	);
+}
+
+function getEmptyStateCopy({
+	isLoading,
+	navigationError,
+	projectCount,
+	setupStatus,
+}: {
+	isLoading: boolean;
+	navigationError: string | null;
+	projectCount: number;
+	setupStatus?: string;
+}) {
+	if (isLoading) {
+		return {
+			detail: 'Ensemble is reading repositories and workspaces from SQLite.',
+			title: 'Loading repositories',
+		};
+	}
+
+	if (navigationError) {
+		return {
+			detail: navigationError,
+			title: 'Repository navigation unavailable',
+		};
+	}
+
+	if (setupStatus !== 'ready') {
+		return {
+			detail: 'Complete setup checks before creating or opening workspaces.',
+			title: 'Setup required',
+		};
+	}
+
+	if (projectCount > 0) {
+		return {
+			detail:
+				'Repositories are registered, but none have active workspaces yet.',
+			title: 'No active workspaces',
+		};
+	}
+
+	return {
+		detail: 'Open or create a repository to populate the workspace navigation.',
+		title: 'No repositories yet',
+	};
 }
 
 function getErrorMessage(error: unknown): string | null {

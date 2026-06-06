@@ -4,6 +4,7 @@ export {
 	changesViewModeAtom,
 	closedSessionIdsByWorkspaceAtom,
 	collapsedProjectIdsAtom,
+	lastWorkspaceSelectionAtom,
 	orderedProjectIdsAtom,
 	pinnedWorkspaceIdsAtom,
 	rightSidebarCollapsedAtom,
