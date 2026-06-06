@@ -16,7 +16,9 @@ export {
 	getPreferredSession,
 	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
+	mapRepositoriesToProjects,
 	resolveWorkspaceNavigationRenderState,
 	resolveWorkspaceNavigationSelection,
+	resolveWorkspaceRouteParams,
 } from './navigation-model';
 export { normalizeWorkbenchSearch } from './route-search';

@@ -32,49 +32,57 @@ export interface WorkspaceNavigationRenderState {
 	source: 'current' | 'previous';
 }
 
-const placeholderOpenTargets: WorkspaceOpenTarget[] = [
-	{
-		iconName: 'lucide:folder',
-		id: 'finder',
-		installed: true,
-		kind: 'file-manager',
-		label: 'Finder',
-		numberShortcutLabel: '1',
-	},
-	{
-		iconName: 'vscode-icons:file-type-vscode',
-		id: 'vscode',
-		installed: true,
-		isPrimary: true,
-		kind: 'editor',
-		label: 'VS Code',
-		numberShortcutLabel: '2',
-		shortcutLabel: '⌘O',
-	},
-	{
-		iconName: 'lucide:square-terminal',
-		id: 'terminal',
-		installed: true,
-		kind: 'terminal',
-		label: 'Terminal',
-		numberShortcutLabel: '3',
-	},
-	{
-		iconName: 'lucide:copy',
-		id: 'copy-path',
-		installed: true,
-		kind: 'utility',
-		label: 'Copy path',
-		numberShortcutLabel: '4',
-		shortcutLabel: '⌘⇧C',
-	},
-];
+function createPlaceholderOpenTargets(): WorkspaceOpenTarget[] {
+	return [
+		{
+			iconName: 'lucide:folder',
+			id: 'finder',
+			installed: true,
+			kind: 'file-manager',
+			label: 'Finder',
+			numberShortcutLabel: '1',
+		},
+		{
+			iconName: 'vscode-icons:file-type-vscode',
+			id: 'vscode',
+			installed: true,
+			isPrimary: true,
+			kind: 'editor',
+			label: 'VS Code',
+			numberShortcutLabel: '2',
+			shortcutLabel: '⌘O',
+		},
+		{
+			iconName: 'lucide:square-terminal',
+			id: 'terminal',
+			installed: true,
+			kind: 'terminal',
+			label: 'Terminal',
+			numberShortcutLabel: '3',
+		},
+		{
+			iconName: 'lucide:copy',
+			id: 'copy-path',
+			installed: true,
+			kind: 'utility',
+			label: 'Copy path',
+			numberShortcutLabel: '4',
+			shortcutLabel: '⌘⇧C',
+		},
+	];
+}
 
 export function mapNavigationSnapshotToProjects(
 	snapshot?: RepositoryWorkspaceNavigationSnapshot | null,
 ): ProjectShellModel[] {
+	return mapRepositoriesToProjects(snapshot?.repositories);
+}
+
+export function mapRepositoriesToProjects(
+	repositories?: RepositoryWorkspaceNavigationRepository[] | null,
+): ProjectShellModel[] {
 	return (
-		snapshot?.repositories.map((repository) =>
+		repositories?.map((repository) =>
 			mapRepositoryNavigationSnapshot(repository),
 		) ?? []
 	);
@@ -101,18 +109,13 @@ export function resolveWorkspaceNavigationSelection({
 	routeWorkspaceId?: string;
 	storedSelection?: StoredWorkspaceSelection | null;
 }): WorkspaceNavigationSelection | null {
-	const routeSelection =
-		routeProjectId && routeWorkspaceId
-			? findWorkspaceNavigationSelection(
-					projects,
-					routeProjectId,
-					routeWorkspaceId,
-					'route',
-				)
-			: null;
-
 	if (routeProjectId && routeWorkspaceId) {
-		return routeSelection;
+		return findWorkspaceNavigationSelection(
+			projects,
+			routeProjectId,
+			routeWorkspaceId,
+			'route',
+		);
 	}
 
 	const storedWorkspaceSelection = storedSelection
@@ -131,11 +134,15 @@ export function resolveWorkspaceNavigationRenderState({
 	canUsePreviousState,
 	previousState,
 	projects,
+	routeProjectId,
+	routeWorkspaceId,
 	selection,
 }: {
 	canUsePreviousState: boolean;
 	previousState?: WorkspaceNavigationRenderState | null;
 	projects: ProjectShellModel[];
+	routeProjectId?: string;
+	routeWorkspaceId?: string;
 	selection: WorkspaceNavigationSelection | null;
 }): WorkspaceNavigationRenderState | null {
 	if (selection) {
@@ -147,6 +154,30 @@ export function resolveWorkspaceNavigationRenderState({
 	}
 
 	if (canUsePreviousState && previousState) {
+		if (routeProjectId && routeWorkspaceId) {
+			const previousRouteSelection = findWorkspaceNavigationSelection(
+				previousState.projects,
+				routeProjectId,
+				routeWorkspaceId,
+				'route',
+			);
+
+			if (previousRouteSelection) {
+				return {
+					projects: previousState.projects,
+					selection: previousRouteSelection,
+					source: 'previous',
+				};
+			}
+
+			if (
+				previousState.selection.project.id !== routeProjectId ||
+				previousState.selection.workspace.id !== routeWorkspaceId
+			) {
+				return null;
+			}
+		}
+
 		return {
 			...previousState,
 			source: 'previous',
@@ -185,6 +216,34 @@ export function getPreferredSession(
 		workspace.sessions[0] ??
 		createPlaceholderSession(workspace)
 	);
+}
+
+export interface WorkspaceRouteParams {
+	chat: string;
+	projectId: string;
+	workspaceId: string;
+}
+
+export function resolveWorkspaceRouteParams(
+	projects: ProjectShellModel[],
+	projectId: string,
+	workspaceId: string,
+): WorkspaceRouteParams | null {
+	const selection = findWorkspaceNavigationSelection(
+		projects,
+		projectId,
+		workspaceId,
+	);
+
+	if (!selection) {
+		return null;
+	}
+
+	return {
+		chat: getPreferredSession(selection.workspace).id,
+		projectId: selection.project.id,
+		workspaceId: selection.workspace.id,
+	};
 }
 
 function getFirstWorkspaceSelection(
@@ -258,7 +317,7 @@ function mapWorkspaceNavigationSnapshot(
 		dockTabs: createPlaceholderDockTabs(),
 		id: workspace.id,
 		name: workspace.name || workspace.slug,
-		openTargets: placeholderOpenTargets,
+		openTargets: createPlaceholderOpenTargets(),
 		pathLabel: workspace.path,
 		projectId: repository.id,
 		pullRequest: {

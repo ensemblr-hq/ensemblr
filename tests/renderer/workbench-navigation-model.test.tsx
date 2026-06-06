@@ -5,8 +5,10 @@ import { WorkbenchEmptyStateShell } from '../../src/renderer/components/workbenc
 import {
 	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
+	mapRepositoriesToProjects,
 	resolveWorkspaceNavigationRenderState,
 	resolveWorkspaceNavigationSelection,
+	resolveWorkspaceRouteParams,
 } from '../../src/renderer/lib/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '../../src/shared/ipc';
 
@@ -95,6 +97,30 @@ test('maps SQLite navigation snapshot into workbench shell projects', () => {
 		sourceSummary: 'repository default branch main',
 	});
 	expect(JSON.stringify(projects)).not.toContain('Conductor shell rework');
+});
+
+test('maps repositories array identically to snapshot mapping', () => {
+	expect(mapRepositoriesToProjects(navigationSnapshot.repositories)).toEqual(
+		mapNavigationSnapshotToProjects(navigationSnapshot),
+	);
+	expect(mapRepositoriesToProjects(undefined)).toEqual([]);
+	expect(mapRepositoriesToProjects(null)).toEqual([]);
+});
+
+test('resolves workspace route params for live targets and rejects missing ones', () => {
+	const projects = mapNavigationSnapshotToProjects(navigationSnapshot);
+
+	expect(
+		resolveWorkspaceRouteParams(projects, 'repo-2', 'workspace-2'),
+	).toEqual({
+		chat: 'workspace-2:overview',
+		projectId: 'repo-2',
+		workspaceId: 'workspace-2',
+	});
+	expect(resolveWorkspaceRouteParams(projects, 'repo-1', 'missing')).toBeNull();
+	expect(
+		resolveWorkspaceRouteParams(projects, 'missing', 'workspace-1'),
+	).toBeNull();
 });
 
 test('keeps cached navigation snapshot renderable while live query is pending', () => {
@@ -230,6 +256,51 @@ test('keeps previous navigation render state during transient loading gaps', () 
 			canUsePreviousState: false,
 			previousState: currentState,
 			projects: [],
+			selection: null,
+		}),
+	).toBeNull();
+});
+
+test('uses previous navigation projects for route changes during loading gaps', () => {
+	const projects = mapNavigationSnapshotToProjects(navigationSnapshot);
+	const selection = resolveWorkspaceNavigationSelection({
+		projects,
+		routeProjectId: 'repo-1',
+		routeWorkspaceId: 'workspace-1',
+	});
+	const previousState = resolveWorkspaceNavigationRenderState({
+		canUsePreviousState: false,
+		previousState: null,
+		projects,
+		selection,
+	});
+
+	expect(previousState).toBeTruthy();
+	expect(
+		resolveWorkspaceNavigationRenderState({
+			canUsePreviousState: true,
+			previousState,
+			projects: [],
+			routeProjectId: 'repo-2',
+			routeWorkspaceId: 'workspace-2',
+			selection: null,
+		}),
+	).toMatchObject({
+		source: 'previous',
+		selection: {
+			source: 'route',
+			workspace: {
+				id: 'workspace-2',
+			},
+		},
+	});
+	expect(
+		resolveWorkspaceNavigationRenderState({
+			canUsePreviousState: true,
+			previousState,
+			projects: [],
+			routeProjectId: 'repo-2',
+			routeWorkspaceId: 'missing',
 			selection: null,
 		}),
 	).toBeNull();
