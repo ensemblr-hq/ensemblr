@@ -18,6 +18,7 @@
 		"test:config": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/config-loader.test.ts tests/main/config-resolution.test.ts tests/main/repository-config.test.ts tests/main/permissions.test.ts",
 		"test:db": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/database.test.ts",
 		"test:environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/environment-variables.test.ts",
+		"test:app": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/main-window-state.test.ts",
 		"test:pi": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-executable.test.ts tests/main/pi-readiness.test.ts",
 		"test:renderer": "bun test tests/renderer/*.test.tsx",
 		"test:root": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/root-directory.test.ts",
