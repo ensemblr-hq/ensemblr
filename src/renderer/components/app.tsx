@@ -1,4 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import {
+	keepPreviousData,
+	useQuery,
+	useQueryClient,
+} from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
 import { useEffect, useMemo } from 'react';
@@ -14,6 +18,7 @@ import {
 	findWorkspaceNavigationSelection,
 	getComposerState,
 	getPreferredSession,
+	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
 	resolveWorkspaceNavigationSelection,
 	type WorkspaceNavigationSelection,
@@ -28,7 +33,10 @@ import type {
 	WorkbenchDockActions,
 	WorkbenchHealth,
 } from '@/renderer/types/workbench-shell';
-import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
+import type {
+	RepositoryWorkspaceNavigationSnapshot,
+	SetupDiagnosticsSnapshot,
+} from '@/shared/ipc';
 
 interface AppProps {
 	projectId?: string;
@@ -44,6 +52,7 @@ export function App({
 	workspaceId,
 }: AppProps) {
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 	const hasPreloadBridge = isEnsembleApiAvailable();
 	const health = useQuery({
 		...healthQuery,
@@ -52,6 +61,7 @@ export function App({
 	const repositoryWorkspaceNavigation = useQuery({
 		...repositoryWorkspaceNavigationQuery,
 		enabled: hasPreloadBridge,
+		placeholderData: keepPreviousData,
 	});
 	const setupDiagnostics = useQuery({
 		...setupDiagnosticsQuery,
@@ -62,12 +72,20 @@ export function App({
 	);
 	const setupError = getErrorMessage(setupDiagnostics.error);
 	const setupSnapshot = setupDiagnostics.data ?? null;
+	const cachedNavigationSnapshot =
+		queryClient.getQueryData<RepositoryWorkspaceNavigationSnapshot>(
+			repositoryWorkspaceNavigationQuery.queryKey,
+		);
+	const navigationSnapshot = getRenderableNavigationSnapshot({
+		cachedSnapshot: cachedNavigationSnapshot,
+		querySnapshot: repositoryWorkspaceNavigation.data,
+	});
 	const projects = useMemo(
 		() =>
 			hasPreloadBridge
-				? mapNavigationSnapshotToProjects(repositoryWorkspaceNavigation.data)
+				? mapNavigationSnapshotToProjects(navigationSnapshot)
 				: shellFixtureProjects,
-		[hasPreloadBridge, repositoryWorkspaceNavigation.data],
+		[hasPreloadBridge, navigationSnapshot],
 	);
 	const selection = useMemo(
 		() =>
@@ -221,8 +239,11 @@ export function App({
 			<WorkbenchEmptyStateShell
 				activeView={view}
 				emptyState={getEmptyStateCopy({
-					isLoading: repositoryWorkspaceNavigation.isLoading,
-					navigationError: getErrorMessage(repositoryWorkspaceNavigation.error),
+					isLoading:
+						!navigationSnapshot && repositoryWorkspaceNavigation.isLoading,
+					navigationError: navigationSnapshot
+						? null
+						: getErrorMessage(repositoryWorkspaceNavigation.error),
 					projectCount: projects.length,
 					setupStatus: setupSnapshot?.status,
 				})}

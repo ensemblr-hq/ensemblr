@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { WorkbenchEmptyStateShell } from '../../src/renderer/components/workbench-empty-state';
 import {
+	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
 	resolveWorkspaceNavigationSelection,
 } from '../../src/renderer/lib/workbench';
@@ -93,6 +94,33 @@ test('maps SQLite navigation snapshot into workbench shell projects', () => {
 		sourceSummary: 'repository default branch main',
 	});
 	expect(JSON.stringify(projects)).not.toContain('Conductor shell rework');
+});
+
+test('keeps cached navigation snapshot renderable while live query is pending', () => {
+	expect(
+		getRenderableNavigationSnapshot({
+			cachedSnapshot: navigationSnapshot,
+			querySnapshot: undefined,
+		}),
+	).toBe(navigationSnapshot);
+	expect(
+		getRenderableNavigationSnapshot({
+			cachedSnapshot: navigationSnapshot,
+			querySnapshot: {
+				generatedAt: '2026-06-06T00:00:01.000Z',
+				repositories: [],
+			},
+		}),
+	).toEqual({
+		generatedAt: '2026-06-06T00:00:01.000Z',
+		repositories: [],
+	});
+	expect(
+		getRenderableNavigationSnapshot({
+			cachedSnapshot: undefined,
+			querySnapshot: undefined,
+		}),
+	).toBeNull();
 });
 
 test('resolves route, stored, and first workspace selections in order', () => {

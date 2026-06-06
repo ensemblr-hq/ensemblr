@@ -13,6 +13,7 @@ export {
 	DEFAULT_LIVE_WORKSPACE_DOCK_TAB,
 	findWorkspaceNavigationSelection,
 	getPreferredSession,
+	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
 	resolveWorkspaceNavigationSelection,
 } from './navigation-model';

@@ -74,6 +74,16 @@ export function mapNavigationSnapshotToProjects(
 	);
 }
 
+export function getRenderableNavigationSnapshot({
+	cachedSnapshot,
+	querySnapshot,
+}: {
+	cachedSnapshot?: RepositoryWorkspaceNavigationSnapshot;
+	querySnapshot?: RepositoryWorkspaceNavigationSnapshot;
+}): RepositoryWorkspaceNavigationSnapshot | null {
+	return querySnapshot ?? cachedSnapshot ?? null;
+}
+
 export function resolveWorkspaceNavigationSelection({
 	projects,
 	routeProjectId,
