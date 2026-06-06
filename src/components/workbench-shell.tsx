@@ -41,6 +41,9 @@ export function WorkbenchShell({
 	onWorkspaceSelect,
 	projects,
 	setupDiagnostics,
+	setupDiagnosticsError,
+	isSetupDiagnosticsRetrying,
+	onSetupDiagnosticsRetry,
 }: WorkbenchShellProps) {
 	const rightSidebarPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const dockPanelRef = useRef<PanelImperativeHandle | null>(null);
@@ -169,6 +172,9 @@ export function WorkbenchShell({
 					rightSidebarPanelRef={rightSidebarPanelRef}
 					sessionTabs={sessionNavigation.sessionTabs}
 					setupDiagnostics={setupDiagnostics}
+					setupDiagnosticsError={setupDiagnosticsError}
+					isSetupDiagnosticsRetrying={isSetupDiagnosticsRetrying}
+					onSetupDiagnosticsRetry={onSetupDiagnosticsRetry}
 				/>
 			</SidebarProvider>
 		</TooltipProvider>

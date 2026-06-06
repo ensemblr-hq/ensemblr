@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
 	accessSync,
 	constants,
@@ -12,9 +13,13 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type {
 	ResolvedSettingSnapshot,
+	RootDirectoryChangeApplyResult,
+	RootDirectoryChangePreview,
+	RootDirectoryChangeRequest,
 	RootDirectoryDiagnostic,
 	RootDirectoryManagedPathKey,
 	RootDirectoryManagedPathSnapshot,
+	RootDirectoryReconciliationSnapshot,
 	RootDirectorySnapshot,
 	SettingsResolutionSnapshot,
 	SettingsResolutionSource,
@@ -31,8 +36,12 @@ export interface EnsureRootDirectoryOptions {
 }
 
 export interface EnsembleRootDirectoryService {
+	applyChange: (
+		request: RootDirectoryChangeRequest,
+	) => RootDirectoryChangeApplyResult;
 	ensure: () => RootDirectorySnapshot;
 	getSnapshot: () => RootDirectorySnapshot | null;
+	previewChange: (nextRootPath: string) => RootDirectoryChangePreview;
 }
 
 interface CreateEnsembleRootDirectoryServiceOptions {
@@ -40,8 +49,14 @@ interface CreateEnsembleRootDirectoryServiceOptions {
 	databaseService: EnsembleDatabaseService;
 	homeDirectory?: string;
 	now?: () => Date;
+	reconcileRootDirectory?: RootDirectoryReconciler;
 	settingsResolutionService: EnsembleConfigResolutionService;
 }
+
+type RootDirectoryReconciler = (options: {
+	now?: () => Date;
+	root: RootDirectorySnapshot;
+}) => RootDirectoryReconciliationSnapshot;
 
 const CURRENT_ROOT_ID = 'current';
 const ROOT_DIRECTORY_KEY = 'rootDirectory';
@@ -66,6 +81,7 @@ export function createEnsembleRootDirectoryService({
 	databaseService,
 	homeDirectory,
 	now,
+	reconcileRootDirectory = createEmptyRootDirectoryReconciliation,
 	settingsResolutionService,
 }: CreateEnsembleRootDirectoryServiceOptions): EnsembleRootDirectoryService {
 	let snapshot: RootDirectorySnapshot | null = null;
@@ -83,8 +99,36 @@ export function createEnsembleRootDirectoryService({
 	}
 
 	return {
+		applyChange: (request) => {
+			const previousRoot = snapshot ?? ensure();
+			const result = applyRootDirectoryChange({
+				database: databaseService.getConnection()?.database ?? null,
+				homeDirectory,
+				nextRootPath: request.path,
+				now,
+				previousRoot,
+				reconcileRootDirectory,
+				resolveSettingsSnapshot: () => settingsResolutionService.resolve(),
+			});
+
+			if (result.newRoot) {
+				snapshot = result.newRoot;
+			}
+
+			return result;
+		},
 		ensure,
 		getSnapshot: () => snapshot,
+		previewChange: (nextRootPath) => {
+			const previousRoot = snapshot ?? ensure();
+
+			return previewRootDirectoryChange({
+				homeDirectory,
+				nextRootPath,
+				previousRoot,
+				settingsSnapshot: settingsResolutionService.resolve(),
+			});
+		},
 	};
 }
 
@@ -128,6 +172,204 @@ export function ensureRootDirectory({
 	return snapshot;
 }
 
+export function previewRootDirectoryChange({
+	homeDirectory = homedir(),
+	nextRootPath,
+	previousRoot,
+	settingsSnapshot,
+}: {
+	homeDirectory?: string;
+	nextRootPath: string;
+	previousRoot: RootDirectorySnapshot | null;
+	settingsSnapshot: SettingsResolutionSnapshot;
+}): RootDirectoryChangePreview {
+	const diagnostics: RootDirectoryDiagnostic[] = [];
+	const currentSetting = findRootDirectorySetting(settingsSnapshot);
+	const newRoot = inspectRootPathValue({
+		allowCreate: false,
+		homeDirectory,
+		missingManagedDirectorySeverity: 'info',
+		rootPathValue: nextRootPath,
+	});
+
+	if (currentSetting?.locked) {
+		diagnostics.push({
+			code: 'root-setting-locked',
+			message:
+				'The rootDirectory setting is locked by managed config and cannot be changed here.',
+			severity: 'error',
+		});
+	}
+
+	diagnostics.push(...newRoot.diagnostics);
+
+	return {
+		canApply: !diagnostics.some(
+			(diagnostic) => diagnostic.severity === 'error',
+		),
+		diagnostics,
+		newRoot,
+		oldRoot: previousRoot,
+		oldRootPreserved: true,
+	};
+}
+
+export function applyRootDirectoryChange({
+	database,
+	homeDirectory = homedir(),
+	nextRootPath,
+	now = () => new Date(),
+	previousRoot,
+	reconcileRootDirectory = createEmptyRootDirectoryReconciliation,
+	resolveSettingsSnapshot,
+}: {
+	database: DatabaseSync | null;
+	homeDirectory?: string;
+	nextRootPath: string;
+	now?: () => Date;
+	previousRoot: RootDirectorySnapshot | null;
+	reconcileRootDirectory?: RootDirectoryReconciler;
+	resolveSettingsSnapshot: () => SettingsResolutionSnapshot;
+}): RootDirectoryChangeApplyResult {
+	const currentSettings = resolveSettingsSnapshot();
+	const preview = previewRootDirectoryChange({
+		homeDirectory,
+		nextRootPath,
+		previousRoot,
+		settingsSnapshot: currentSettings,
+	});
+
+	if (!preview.canApply) {
+		return {
+			applied: false,
+			error:
+				preview.diagnostics.find(
+					(diagnostic) => diagnostic.severity === 'error',
+				)?.message ?? 'The selected root directory cannot be applied.',
+			newRoot: preview.newRoot,
+			oldRoot: previousRoot,
+			oldRootPreserved: true,
+			reconciliation: null,
+		};
+	}
+
+	if (!database) {
+		return {
+			applied: false,
+			error: 'SQLite is unavailable; the root directory change was not saved.',
+			newRoot: preview.newRoot,
+			oldRoot: previousRoot,
+			oldRootPreserved: true,
+			reconciliation: null,
+		};
+	}
+
+	try {
+		saveRootDirectoryOverride({
+			database,
+			now,
+			rootPath: preview.newRoot.path,
+		});
+	} catch (error) {
+		return {
+			applied: false,
+			error:
+				error instanceof Error
+					? error.message
+					: 'The root directory change was not saved.',
+			newRoot: preview.newRoot,
+			oldRoot: previousRoot,
+			oldRootPreserved: true,
+			reconciliation: null,
+		};
+	}
+
+	const newRoot = ensureRootDirectory({
+		allowCreate: true,
+		database,
+		homeDirectory,
+		now,
+		settingsSnapshot: resolveSettingsSnapshot(),
+	});
+	const reconciliation = reconcileRootDirectory({ now, root: newRoot });
+
+	return {
+		applied: true,
+		error:
+			newRoot.status === 'error'
+				? (newRoot.diagnostics.find(
+						(diagnostic) => diagnostic.severity === 'error',
+					)?.message ?? 'The root directory change was saved but setup failed.')
+				: undefined,
+		newRoot,
+		oldRoot: previousRoot,
+		oldRootPreserved: true,
+		reconciliation,
+	};
+}
+
+function createEmptyRootDirectoryReconciliation({
+	now = () => new Date(),
+	root,
+}: {
+	now?: () => Date;
+	root: RootDirectorySnapshot;
+}): RootDirectoryReconciliationSnapshot {
+	return {
+		diagnostics: root.status === 'error' ? root.diagnostics : [],
+		repositoryDirectoryCount: 0,
+		scannedAt: now().toISOString(),
+		status:
+			root.status === 'error'
+				? 'error'
+				: root.status === 'warning'
+					? 'warning'
+					: 'ok',
+		workspaceDirectoryCount: 0,
+	};
+}
+
+function inspectRootPathValue({
+	allowCreate,
+	homeDirectory,
+	missingManagedDirectorySeverity,
+	rootPathValue,
+}: {
+	allowCreate: boolean;
+	homeDirectory: string;
+	missingManagedDirectorySeverity?: RootDirectoryDiagnostic['severity'] | null;
+	rootPathValue: string;
+}): RootDirectorySnapshot {
+	const createdPaths: string[] = [];
+	const diagnostics: RootDirectoryDiagnostic[] = [];
+	const setting = createRootDirectorySettingSnapshot(rootPathValue);
+	const normalizedRoot = normalizeRootPath(setting, homeDirectory);
+
+	diagnostics.push(...normalizedRoot.diagnostics);
+
+	const managedPaths = createManagedPathSnapshots(normalizedRoot.path);
+
+	if (normalizedRoot.path) {
+		inspectRootDirectory({
+			allowCreate,
+			createdPaths,
+			diagnostics,
+			managedPaths,
+			missingManagedDirectorySeverity,
+			rootPath: normalizedRoot.path,
+		});
+	}
+
+	return createRootDirectorySnapshot({
+		createdPaths,
+		diagnostics,
+		managedPaths,
+		rootPath: normalizedRoot.path,
+		setting,
+		source: setting.source,
+	});
+}
+
 function findRootDirectorySetting(
 	settingsSnapshot: SettingsResolutionSnapshot,
 ): ResolvedSettingSnapshot | null {
@@ -136,6 +378,24 @@ function findRootDirectorySetting(
 			(setting) => setting.key === ROOT_DIRECTORY_KEY,
 		) ?? null
 	);
+}
+
+function createRootDirectorySettingSnapshot(
+	rootPathValue: string,
+): ResolvedSettingSnapshot {
+	return {
+		candidates: [
+			{
+				reason: 'Selected for root directory change preview.',
+				source: 'sqlite',
+				status: 'selected',
+			},
+		],
+		key: ROOT_DIRECTORY_KEY,
+		locked: false,
+		source: 'sqlite',
+		value: rootPathValue,
+	};
 }
 
 function normalizeRootPath(
@@ -226,12 +486,14 @@ function inspectRootDirectory({
 	createdPaths,
 	diagnostics,
 	managedPaths,
+	missingManagedDirectorySeverity = 'error',
 	rootPath,
 }: {
 	allowCreate: boolean;
 	createdPaths: string[];
 	diagnostics: RootDirectoryDiagnostic[];
 	managedPaths: RootDirectoryManagedPathSnapshot[];
+	missingManagedDirectorySeverity?: RootDirectoryDiagnostic['severity'] | null;
 	rootPath: string;
 }): void {
 	if (!existsSync(rootPath)) {
@@ -312,6 +574,7 @@ function inspectRootDirectory({
 		createdPaths,
 		diagnostics,
 		managedPaths,
+		missingManagedDirectorySeverity,
 	});
 }
 
@@ -320,22 +583,29 @@ function inspectManagedDirectories({
 	createdPaths,
 	diagnostics,
 	managedPaths,
+	missingManagedDirectorySeverity = 'error',
 }: {
 	allowCreate: boolean;
 	createdPaths: string[];
 	diagnostics: RootDirectoryDiagnostic[];
 	managedPaths: RootDirectoryManagedPathSnapshot[];
+	missingManagedDirectorySeverity?: RootDirectoryDiagnostic['severity'] | null;
 }): void {
 	for (const managedPath of managedPaths) {
 		if (!existsSync(managedPath.path)) {
 			if (!allowCreate) {
 				managedPath.status = 'missing';
-				diagnostics.push({
-					code: 'managed-directory-missing',
-					message: `Managed directory "${managedPath.key}" is missing.`,
-					path: managedPath.path,
-					severity: 'error',
-				});
+				if (missingManagedDirectorySeverity) {
+					diagnostics.push({
+						code: 'managed-directory-missing',
+						message:
+							missingManagedDirectorySeverity === 'info'
+								? `Managed directory "${managedPath.key}" will be created after confirmation.`
+								: `Managed directory "${managedPath.key}" is missing.`,
+						path: managedPath.path,
+						severity: missingManagedDirectorySeverity,
+					});
+				}
 				continue;
 			}
 
@@ -580,6 +850,44 @@ function persistRootDirectorySnapshot(
 						}
 					: null,
 			}),
+		);
+}
+
+function saveRootDirectoryOverride({
+	database,
+	now,
+	rootPath,
+}: {
+	database: DatabaseSync;
+	now: () => Date;
+	rootPath: string;
+}): void {
+	const timestamp = now().toISOString();
+
+	database
+		.prepare(
+			`INSERT INTO settings (
+				id,
+				scope,
+				scope_id,
+				key,
+				value_json,
+				source,
+				locked,
+				updated_at
+			)
+			VALUES (?, 'app', '', ?, ?, 'sqlite', 0, ?)
+			ON CONFLICT(scope, scope_id, key) DO UPDATE SET
+				value_json = excluded.value_json,
+				source = 'sqlite',
+				locked = 0,
+				updated_at = excluded.updated_at`,
+		)
+		.run(
+			`setting-${randomUUID()}`,
+			ROOT_DIRECTORY_KEY,
+			JSON.stringify(rootPath),
+			timestamp,
 		);
 }
 

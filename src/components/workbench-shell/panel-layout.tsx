@@ -52,6 +52,9 @@ export function WorkbenchPanelLayout({
 	rightSidebarPanelRef,
 	sessionTabs,
 	setupDiagnostics,
+	setupDiagnosticsError,
+	isSetupDiagnosticsRetrying,
+	onSetupDiagnosticsRetry,
 }: {
 	activeProject: ProjectShellModel;
 	activeReviewTab: ReviewPanelTab;
@@ -76,6 +79,9 @@ export function WorkbenchPanelLayout({
 	rightSidebarPanelRef: RefObject<PanelImperativeHandle | null>;
 	sessionTabs: SessionTabModel[];
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
+	setupDiagnosticsError?: string | null;
+	isSetupDiagnosticsRetrying?: boolean;
+	onSetupDiagnosticsRetry?: () => void;
 }) {
 	return (
 		<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
@@ -94,6 +100,9 @@ export function WorkbenchPanelLayout({
 					onSessionTabRestore={onSessionTabRestore}
 					sessionTabs={sessionTabs}
 					setupDiagnostics={setupDiagnostics}
+					setupDiagnosticsError={setupDiagnosticsError}
+					isSetupDiagnosticsRetrying={isSetupDiagnosticsRetrying}
+					onSetupDiagnosticsRetry={onSetupDiagnosticsRetry}
 				/>
 				<ResizableHandle className='hidden lg:flex' />
 				<ReviewDockPanel
@@ -128,6 +137,9 @@ function MainConversationPanel({
 	onSessionTabRestore,
 	sessionTabs,
 	setupDiagnostics,
+	setupDiagnosticsError,
+	isSetupDiagnosticsRetrying,
+	onSetupDiagnosticsRetry,
 }: {
 	activeProject: ProjectShellModel;
 	activeSession: SessionTabModel;
@@ -142,6 +154,9 @@ function MainConversationPanel({
 	onSessionTabRestore: (sessionId: string) => void;
 	sessionTabs: SessionTabModel[];
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
+	setupDiagnosticsError?: string | null;
+	isSetupDiagnosticsRetrying?: boolean;
+	onSetupDiagnosticsRetry?: () => void;
 }) {
 	return (
 		<ResizablePanel defaultSize='66%' minSize='32rem'>
@@ -167,6 +182,9 @@ function MainConversationPanel({
 							activeSession={activeSession}
 							composer={composer}
 							setupDiagnostics={setupDiagnostics}
+							setupDiagnosticsError={setupDiagnosticsError}
+							isSetupDiagnosticsRetrying={isSetupDiagnosticsRetrying}
+							onSetupDiagnosticsRetry={onSetupDiagnosticsRetry}
 							workspace={activeWorkspace}
 						/>
 					</ScrollArea>

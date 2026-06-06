@@ -33,6 +33,9 @@ export interface WorkbenchShellProps {
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projects: ProjectShellModel[];
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
+	setupDiagnosticsError?: string | null;
+	isSetupDiagnosticsRetrying?: boolean;
+	onSetupDiagnosticsRetry?: () => void;
 }
 
 export type WorkbenchActiveView = WorkbenchShellProps['activeView'];

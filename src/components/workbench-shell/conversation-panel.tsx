@@ -14,7 +14,7 @@ import {
 	UserIcon,
 	XIcon,
 } from 'lucide-react';
-
+import { SetupDiagnosticsPanel } from '@/components/setup-diagnostics';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -184,34 +184,49 @@ function ClosedSessionHistoryMenu({
 export function WorkspaceTimeline({
 	activeSession,
 	composer,
+	isSetupDiagnosticsRetrying,
+	onSetupDiagnosticsRetry,
+	setupDiagnosticsError,
 	setupDiagnostics,
 	workspace,
 }: {
 	activeSession: SessionTabModel;
 	composer: ComposerShellState;
+	isSetupDiagnosticsRetrying?: boolean;
+	onSetupDiagnosticsRetry?: () => void;
+	setupDiagnosticsError?: string | null;
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
 	workspace: WorkspaceShellModel;
 }) {
 	return (
 		<div className='mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-5'>
 			{setupDiagnostics?.status !== 'ready' ? (
-				<section className='flex flex-col gap-2 rounded-md border border-status-warning/30 bg-status-warning/10 p-3'>
-					<div className='flex items-start gap-2'>
-						<CircleDashedIcon
-							aria-hidden='true'
-							className='mt-0.5 size-4 shrink-0 text-status-warning'
-						/>
-						<div className='min-w-0'>
-							<p className='font-medium text-sm'>
-								Setup keeps the shell in place
-							</p>
-							<p className='mt-1 text-muted-foreground text-xs leading-5'>
-								The workbench remains visible while setup diagnostics block the
-								composer. Check the left sidebar footer for app readiness.
-							</p>
+				<>
+					<section className='flex flex-col gap-2 rounded-md border border-status-warning/30 bg-status-warning/10 p-3'>
+						<div className='flex items-start gap-2'>
+							<CircleDashedIcon
+								aria-hidden='true'
+								className='mt-0.5 size-4 shrink-0 text-status-warning'
+							/>
+							<div className='min-w-0'>
+								<p className='font-medium text-sm'>
+									Setup keeps the shell in place
+								</p>
+								<p className='mt-1 text-muted-foreground text-xs leading-5'>
+									The workbench remains visible while setup diagnostics block
+									the composer. Use the setup gate panel to resolve app
+									readiness.
+								</p>
+							</div>
 						</div>
-					</div>
-				</section>
+					</section>
+					<SetupDiagnosticsPanel
+						error={setupDiagnosticsError}
+						isRetrying={isSetupDiagnosticsRetrying}
+						onRetry={onSetupDiagnosticsRetry}
+						snapshot={setupDiagnostics}
+					/>
+				</>
 			) : null}
 
 			<AgentChatThread

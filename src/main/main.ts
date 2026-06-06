@@ -11,6 +11,7 @@ import { installApplicationMenu } from './menu';
 import { createPiExecutableService } from './pi/pi-executable';
 import { createPiReadinessService } from './pi/pi-readiness';
 import { createEnsembleRootDirectoryService } from './root/root-directory';
+import { reconcileRootDirectory } from './root/root-reconciliation';
 import { createMacosKeychainSecretStore } from './secrets/secret-store';
 import { createSetupDiagnosticsService } from './setup/setup-diagnostics';
 import { createEnsembleDatabaseService } from './storage/database';
@@ -78,6 +79,7 @@ const settingsResolutionService = createEnsembleConfigResolutionService({
 });
 const rootDirectoryService = createEnsembleRootDirectoryService({
 	databaseService,
+	reconcileRootDirectory,
 	settingsResolutionService,
 });
 const piExecutableService = createPiExecutableService({
