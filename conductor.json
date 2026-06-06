@@ -1,7 +1,0 @@
-{
-	"scripts": {
-		"setup": "bun install",
-		"run": "bun run dev"
-	},
-	"runScriptMode": "concurrent"
-}
