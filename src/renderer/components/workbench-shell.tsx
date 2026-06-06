@@ -1,5 +1,11 @@
 import { useAtom } from 'jotai';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import {
+	type ComponentType,
+	type ReactNode,
+	useEffect,
+	useRef,
+	useState,
+} from 'react';
 import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
 
 import { SidebarProvider } from '@/renderer/components/ui/sidebar';
@@ -120,7 +126,7 @@ export function WorkspaceWorkbenchContent({
 	setupDiagnosticsError,
 	isSetupDiagnosticsRetrying,
 	onSetupDiagnosticsRetry,
-	renderMainContent,
+	MainContent,
 }: Pick<
 	WorkbenchShellProps,
 	| 'activeProject'
@@ -138,7 +144,7 @@ export function WorkspaceWorkbenchContent({
 	| 'isSetupDiagnosticsRetrying'
 	| 'onSetupDiagnosticsRetry'
 > & {
-	renderMainContent: (state: WorkspaceMainContentState) => ReactNode;
+	MainContent: ComponentType<WorkspaceMainContentState>;
 }) {
 	useRouteProfilerMount('WorkspaceWorkbenchContent');
 
@@ -311,7 +317,7 @@ export function WorkspaceWorkbenchContent({
 			dockTabId={dockTabId}
 			isDockCollapsed={isDockCollapsed}
 			isRightSidebarCollapsed={isRightSidebarCollapsed}
-			mainContent={renderMainContent(mainContentState)}
+			mainContent={<MainContent {...mainContentState} />}
 			onDockResize={(isCollapsed) => setIsDockCollapsed(isCollapsed)}
 			onDockTabChange={onDockTabChange}
 			onDockToggle={toggleDockPanel}

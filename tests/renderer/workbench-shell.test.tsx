@@ -106,7 +106,7 @@ function renderWorkbench(
 				onReviewTabChange={() => undefined}
 				onSessionTabChange={() => undefined}
 				setupDiagnostics={snapshot}
-				renderMainContent={(mainContent) => (
+				MainContent={(mainContent) => (
 					<WorkspaceConversationContent {...mainContent} />
 				)}
 			/>

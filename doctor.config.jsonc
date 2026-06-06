@@ -1,0 +1,25 @@
+{
+	"$schema": "https://react.doctor/schema/config.json",
+	"ignore": {
+		"overrides": [
+			{
+				// TanStack Router file-based routes must `export const Route` (see
+				// src/renderer/AGENTS.md → Routing). That non-component export is
+				// HMR-safe (TanStack Router supports Fast Refresh), like a Remix
+				// loader/meta export, so only-export-components is a false positive here.
+				"files": ["src/renderer/routing/routes/**"],
+				"rules": ["react-doctor/only-export-components"]
+			},
+			{
+				// Pending/error/not-found are one cohesive route-boundary set, shared by
+				// __root, _workbench and _shell. Renderer AGENTS.md keeps route boundary
+				// UI together under components/<concern>/; splitting into per-component
+				// files would create shallow duplicate modules.
+				"files": [
+					"src/renderer/components/workbench-shell/route-boundaries.tsx"
+				],
+				"rules": ["react-doctor/no-multi-comp"]
+			}
+		]
+	}
+}

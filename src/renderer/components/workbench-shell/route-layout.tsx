@@ -14,8 +14,8 @@ import { useAtom, useAtomValue } from 'jotai';
 import {
 	createContext,
 	type ReactElement,
+	use,
 	useCallback,
-	useContext,
 	useEffect,
 	useMemo,
 } from 'react';
@@ -206,7 +206,7 @@ export function WorkspaceWorkbenchLayout() {
 }
 
 export function WorkspaceChatPage() {
-	const mainContent = useContext(WorkspaceMainContentContext);
+	const mainContent = use(WorkspaceMainContentContext);
 
 	if (!mainContent) {
 		throw new Error(
@@ -314,17 +314,21 @@ function WorkspaceRouteContent({
 			setupDiagnosticsError={model.setupDiagnosticsError}
 			isSetupDiagnosticsRetrying={model.isSetupDiagnosticsRetrying}
 			onSetupDiagnosticsRetry={model.onSetupDiagnosticsRetry}
-			renderMainContent={(mainContent) => (
-				<WorkspaceMainContentContext.Provider value={mainContent}>
-					<Outlet />
-				</WorkspaceMainContentContext.Provider>
-			)}
+			MainContent={WorkspaceMainContentOutlet}
 		/>
 	);
 }
 
+function WorkspaceMainContentOutlet(state: WorkspaceMainContentState) {
+	return (
+		<WorkspaceMainContentContext.Provider value={state}>
+			<Outlet />
+		</WorkspaceMainContentContext.Provider>
+	);
+}
+
 function useWorkbenchLayoutRouteModel() {
-	const model = useContext(WorkbenchLayoutModelContext);
+	const model = use(WorkbenchLayoutModelContext);
 
 	if (!model) {
 		throw new Error('Workbench layout model is only available below _shell.');
