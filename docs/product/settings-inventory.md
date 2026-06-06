@@ -95,7 +95,7 @@ This inventory comes from the settings screenshots plus accepted ADRs. It separa
 | App account identity | Direct in Conductor. | Deferred for v1; Ensemble is local-first. | Not applicable in v1. |
 | Linear integration | Direct. | First-class v1 integration with OAuth login, issue CRUD, and workspace creation from issues. | Tokens in Keychain; connection/cache metadata in SQLite. |
 | GitHub CLI integration | Direct. | Required `gh auth status` for v1. | SQLite cache; `gh` config external source. |
-| GitHub token field | Direct. | Post-v1 only if direct GitHub API support is added; v1 uses authenticated `gh`. | macOS Keychain; SQLite metadata. |
+| GitHub token field | Direct. | Do not implement in Ensemble; GitHub access uses authenticated `gh`, including `gh api`. | Not applicable. |
 | Enterprise data privacy | Direct. | Same concept, adapted to Pi and external-provider features. | SQLite/config; repo override in repository config. |
 | Tool approvals | Direct concept. | Ensemble permission mode mapped to Pi CLI/RPC tool allow/exclude controls where available. | SQLite/config; repo policy override possible. |
 | Sign out | Direct if cloud account exists. | Deferred unless a future Ensemble account exists. | Not applicable in v1. |

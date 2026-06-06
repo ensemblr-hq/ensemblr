@@ -5,7 +5,7 @@
 	"tsx": true,
 	"tailwind": {
 		"config": "",
-		"css": "src/renderer/styles.css",
+		"css": "src/renderer/styles/index.css",
 		"baseColor": "neutral",
 		"cssVariables": true,
 		"prefix": ""
@@ -13,11 +13,11 @@
 	"iconLibrary": "lucide",
 	"rtl": false,
 	"aliases": {
-		"components": "@/components",
-		"utils": "@/lib/utils",
-		"ui": "@/components/ui",
-		"lib": "@/lib",
-		"hooks": "@/hooks/ui"
+		"components": "@/renderer/components",
+		"utils": "@/renderer/lib/utils",
+		"ui": "@/renderer/components/ui",
+		"lib": "@/renderer/lib",
+		"hooks": "@/renderer/hooks/ui"
 	},
 	"menuColor": "default",
 	"menuAccent": "subtle",

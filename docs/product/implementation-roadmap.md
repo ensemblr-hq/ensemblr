@@ -24,14 +24,13 @@ In scope for v1:
 - xterm.js terminal dock backed by main-process PTY/process supervision.
 - Git-backed checkpoints under `refs/ensemble/checkpoints/<workspace-id>/<turn-id>`.
 - First-class Linear OAuth integration with issue create/read/update/comment and workspace creation from issues.
-- GitHub PR/check/comment/merge workflows through authenticated `gh` CLI where practical.
+- GitHub PR/check/comment/merge workflows through authenticated `gh` CLI and `gh api`.
 - Settings shell, repository settings, keyboard shortcuts, command palette, deep links, diagnostics, and non-deferred polish.
-- Implemented Conductor-style workbench shell contract for the sidebar, workspace chat tabs, right review panel, PR-state header, and setup/run/terminal dock. The shell uses `src/components/workbench-shell.tsx` as the public entrypoint, private modules under `src/components/workbench-shell/`, Jotai atoms in `src/renderer/state/workbench-shell.ts`, and shared shell types in `src/renderer/types/workbench-shell.ts`. Live repository/workspace, terminal, file, diff, checks, Linear, GitHub, and Pi services remain in their milestone tickets and should wire into those regions.
+- Implemented Conductor-style workbench shell contract for the sidebar, workspace chat tabs, right review panel, PR-state header, and setup/run/terminal dock. The shell uses `src/renderer/components/workbench-shell.tsx` as the public entrypoint, private modules under `src/renderer/components/workbench-shell/`, Jotai atoms in `src/renderer/state/workspace`, and shared shell types in `src/renderer/types/workbench-shell.ts`. Live repository/workspace, terminal, file, diff, checks, Linear, GitHub, and Pi services remain in their milestone tickets and should wire into those regions.
 
 Explicitly deferred until post-core:
 
 - Packaging, signing, notarization, and auto-update.
-- Direct GitHub OAuth/API.
 - SDK sidecar runtime fallback.
 - Managed or bundled Pi runtime installer.
 - Full Conductor checkpoint-ref interoperability.
@@ -62,10 +61,10 @@ Explicitly deferred until post-core:
 - Product-decision tasks are separate and should not block unrelated engineering work.
 - Each ticket should fit one agent/workspace when practical.
 - Treat the current workbench shell as the structural UI contract. Later tickets should replace fixture/local renderer data through TanStack Query and IPC-backed services rather than rebuilding navigation, review, PR header, chat tab, composer placement, or dock regions.
-- Keep durable renderer-only UI state in feature-owned Jotai atom modules under `src/renderer/state/`, and keep shared exported renderer types under `src/renderer/types/`.
+- Keep durable renderer-only UI state in concern-owned Jotai atom modules under `src/renderer/state/`, and keep shared exported renderer types under `src/renderer/types/`.
 - Treat the current shell as the closest intended Conductor-shell match. Lost or unavailable screenshots are not a reason to restart shell parity design.
 - Preserve the explicit Pi deferral: chat transcript content and prompt/composer behavior are not final until Pi runtime work wires structured sessions, model/thinking controls, attachments, stop/submit, and retry/fork behavior.
-- Prefer boundaries that preserve future pivots: `PiAgentClient`, `GitHubService`, `LinearService`, `ConfigService`, `SecretStore`, `TerminalService`, and `WorkspaceService`.
+- Prefer boundaries that keep implementations testable: `PiAgentClient`, `GitHubService`, `LinearService`, `ConfigService`, `SecretStore`, `TerminalService`, and `WorkspaceService`. `GitHubService` is a `gh`/`gh api` command boundary, not an app-owned GitHub auth client.
 - Do not read or write Conductor's private SQLite database.
 - Do not pass Pi disabling flags by default.
 - Do not store raw secrets in JSON or SQLite.
@@ -92,7 +91,7 @@ Discovery tickets are intentionally separate from build tickets:
 - `ENS-041` - Preview URL detection discovery from setup/run output.
 - `ENS-042` - Spotlight testing discovery for safe root/workspace synchronization.
 - `ENS-044` - Linear schema and permission discovery, including archive/delete support, pagination, filtering, labels, cycles, and cache metadata.
-- `ENS-056` - GitHub comments, review threads, deployments, and add-all-comments coverage through `gh`.
+- `ENS-056` - GitHub comments, review threads, deployments, and add-all-comments coverage through `gh` and `gh api`.
 - `ENS-068` - Non-deferred experimental feature discovery for dashboard/sidebar visibility and resource usage.
 - Current shell uncertainty to resolve before implementing related behavior: workspace-row status actions, mark-unread semantics, Dashboard visibility, and the Changes tab Review action. See `docs/product/current-shell-inventory.md`.
 

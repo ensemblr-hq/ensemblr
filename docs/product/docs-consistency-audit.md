@@ -25,7 +25,7 @@ The generated planning docs are broadly consistent with the latest accepted ADRs
 - Marked ADR 0004 and ADR 0005 runtime choices as historical/superseded and pointed current guidance to ADR 0025.
 - Removed active v1 wording for voice mode, Graphite, cloud/remote SSH, production React profiler, embedded Pi SDK, and direct GitHub token/API paths.
 - Aligned Linear guidance with ADR 0024: OAuth and create/read/update/comment/workspace-from-issue are v1 scope; archive/delete remains schema/permission discovery.
-- Aligned GitHub guidance with ADR 0013: authenticated `gh` is required for v1; direct GitHub API/OAuth remains deferred.
+- Aligned GitHub guidance with ADR 0013: authenticated `gh` is required; authenticated `gh api` is allowed for REST/GraphQL gaps; app-owned GitHub API/OAuth is not planned.
 - Aligned root-change guidance with ADR 0017: switching roots reindexes/adopts by default; migration/delete are explicit separate actions.
 - Aligned secret storage wording with ADR 0018: macOS Keychain stores secrets; SQLite stores metadata only.
 - Moved unresolved settings/product questions into `docs/product/open-decisions.md`.
