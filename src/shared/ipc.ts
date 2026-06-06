@@ -1,9 +1,11 @@
 export const IPC_CHANNELS = {
+	confirmRootDirectoryChange: 'ensemble:confirm-root-directory-change',
 	ensureWindowWidth: 'ensemble:ensure-window-width',
 	environmentVariables: 'ensemble:environment-variables',
 	health: 'ensemble:health',
 	rootDirectory: 'ensemble:root-directory',
 	selectPiExecutable: 'ensemble:select-pi-executable',
+	selectRootDirectory: 'ensemble:select-root-directory',
 	setupDiagnostics: 'ensemble:setup-diagnostics',
 	settingsResolution: 'ensemble:settings-resolution',
 } as const;
@@ -207,6 +209,43 @@ export interface RootDirectorySnapshot {
 	workspacesPath: string;
 }
 
+export type RootDirectoryReconciliationStatus = 'error' | 'ok' | 'warning';
+
+export interface RootDirectoryReconciliationSnapshot {
+	diagnostics: RootDirectoryDiagnostic[];
+	repositoryDirectoryCount: number;
+	scannedAt: string;
+	status: RootDirectoryReconciliationStatus;
+	workspaceDirectoryCount: number;
+}
+
+export interface RootDirectoryChangePreview {
+	canApply: boolean;
+	diagnostics: RootDirectoryDiagnostic[];
+	newRoot: RootDirectorySnapshot;
+	oldRoot: RootDirectorySnapshot | null;
+	oldRootPreserved: true;
+}
+
+export interface RootDirectorySelectionResult {
+	canceled: boolean;
+	error?: string;
+	preview?: RootDirectoryChangePreview;
+}
+
+export interface RootDirectoryChangeRequest {
+	path: string;
+}
+
+export interface RootDirectoryChangeApplyResult {
+	applied: boolean;
+	error?: string;
+	newRoot: RootDirectorySnapshot | null;
+	oldRoot: RootDirectorySnapshot | null;
+	oldRootPreserved: true;
+	reconciliation: RootDirectoryReconciliationSnapshot | null;
+}
+
 export type SetupDiagnosticsStatus = 'blocked' | 'checking' | 'ready';
 export type SetupCheckGroupId = 'core' | 'github' | 'linear' | 'pi' | 'storage';
 export type SetupCheckId =
@@ -282,6 +321,9 @@ export interface PiExecutableSelectionResult {
 }
 
 export interface EnsembleApi {
+	confirmRootDirectoryChange: (
+		request: RootDirectoryChangeRequest,
+	) => Promise<RootDirectoryChangeApplyResult>;
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
 	environmentVariables: () => Promise<EnvironmentVariablesSnapshot>;
 	health: () => Promise<HealthSnapshot>;
@@ -290,5 +332,6 @@ export interface EnsembleApi {
 		request?: SettingsResolutionRequest,
 	) => Promise<SettingsResolutionSnapshot>;
 	selectPiExecutable: () => Promise<PiExecutableSelectionResult>;
+	selectRootDirectory: () => Promise<RootDirectorySelectionResult>;
 	setupDiagnostics: () => Promise<SetupDiagnosticsSnapshot>;
 }

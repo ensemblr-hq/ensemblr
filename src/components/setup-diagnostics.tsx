@@ -6,13 +6,24 @@ import {
 	RefreshCwIcon,
 	ShieldAlertIcon,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 
 import { ShellPanel } from '@/components/shell-panel';
 import { StatusBadge } from '@/components/status-badge';
 import { Button } from '@/components/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type {
+	RootDirectoryChangeApplyResult,
+	RootDirectoryChangePreview,
+	RootDirectorySelectionResult,
 	SetupCheckGroupId,
 	SetupCheckSnapshot,
 	SetupCheckStatus,
@@ -82,6 +93,90 @@ export function SetupDiagnosticsPanel({
 	snapshot,
 }: SetupDiagnosticsPanelProps) {
 	const summary = getSetupSummary(snapshot, error);
+	const [rootSelection, setRootSelection] =
+		useState<RootDirectorySelectionResult | null>(null);
+	const [rootApplyResult, setRootApplyResult] =
+		useState<RootDirectoryChangeApplyResult | null>(null);
+	const [rootActionError, setRootActionError] = useState<string | null>(null);
+	const [isApplyingRootChange, setIsApplyingRootChange] = useState(false);
+	const handleRemediationAction = async (
+		action: SetupRemediationAction,
+		check: SetupCheckSnapshot,
+	) => {
+		if (isRootDirectoryPickerAction(action, check)) {
+			setRootActionError(null);
+			setRootApplyResult(null);
+
+			const selection = await window.ensemble?.selectRootDirectory();
+
+			if (!selection) {
+				setRootActionError(
+					'Root directory selection is unavailable in this context.',
+				);
+				return;
+			}
+
+			if (selection.canceled) {
+				return;
+			}
+
+			if (selection.error || !selection.preview) {
+				setRootActionError(
+					selection.error ??
+						'The selected root directory could not be previewed.',
+				);
+				return;
+			}
+
+			setRootSelection(selection);
+			return;
+		}
+
+		if (isPiExecutablePickerAction(action, check)) {
+			await window.ensemble?.selectPiExecutable();
+			onRetry?.();
+			return;
+		}
+
+		await onRemediationAction?.(action, check);
+	};
+	const confirmRootDirectoryChange = async () => {
+		const path = rootSelection?.preview?.newRoot.path;
+
+		if (!path) {
+			setRootActionError('No root directory path was selected.');
+			return;
+		}
+
+		setIsApplyingRootChange(true);
+		setRootActionError(null);
+
+		try {
+			const result = await window.ensemble?.confirmRootDirectoryChange({
+				path,
+			});
+
+			if (!result) {
+				setRootActionError(
+					'Root directory changes are unavailable in this context.',
+				);
+				return;
+			}
+
+			setRootApplyResult(result);
+			onRetry?.();
+
+			if (
+				result.applied &&
+				!result.error &&
+				result.reconciliation?.status !== 'error'
+			) {
+				setRootSelection(null);
+			}
+		} finally {
+			setIsApplyingRootChange(false);
+		}
+	};
 
 	return (
 		<ShellPanel
@@ -111,6 +206,11 @@ export function SetupDiagnosticsPanel({
 				{error ? (
 					<div className='rounded-md border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-status-danger text-xs leading-5'>
 						{error}
+					</div>
+				) : null}
+				{rootActionError ? (
+					<div className='rounded-md border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-status-danger text-xs leading-5'>
+						{rootActionError}
 					</div>
 				) : null}
 
@@ -144,7 +244,7 @@ export function SetupDiagnosticsPanel({
 												<SetupCheckRow
 													check={check}
 													key={check.id}
-													onRemediationAction={onRemediationAction}
+													onRemediationAction={handleRemediationAction}
 													onRetry={onRetry}
 												/>
 											))}
@@ -161,6 +261,20 @@ export function SetupDiagnosticsPanel({
 					</div>
 				)}
 			</div>
+			<RootDirectoryChangeDialog
+				applyResult={rootApplyResult}
+				isApplying={isApplyingRootChange}
+				onConfirm={() => {
+					void confirmRootDirectoryChange();
+				}}
+				onOpenChange={(open) => {
+					if (!open) {
+						setRootSelection(null);
+						setRootApplyResult(null);
+					}
+				}}
+				selection={rootSelection}
+			/>
 		</ShellPanel>
 	);
 }
@@ -288,7 +402,7 @@ function SetupCheckRow({
 			{check.remediationActions.length ? (
 				<div className='flex flex-wrap gap-1.5 pl-6'>
 					{check.remediationActions.map((action) =>
-						isPiExecutablePickerAction(action, check) ? (
+						isRemediationActionButton(action, check) ? (
 							<Button
 								className='h-6 px-2 text-[0.6875rem] leading-none'
 								data-remediation-action={action.id}
@@ -347,6 +461,258 @@ function isPiExecutablePickerAction(
 		action.kind === 'select-path' &&
 		action.target === 'pi.executablePath'
 	);
+}
+
+function isRootDirectoryPickerAction(
+	action: SetupRemediationAction,
+	check: SetupCheckSnapshot,
+): boolean {
+	return (
+		check.id === 'root-directory' &&
+		action.kind === 'select-path' &&
+		(action.target === 'rootDirectory' || action.id === 'choose-root-directory')
+	);
+}
+
+function isRemediationActionButton(
+	action: SetupRemediationAction,
+	check: SetupCheckSnapshot,
+): boolean {
+	return (
+		isPiExecutablePickerAction(action, check) ||
+		isRootDirectoryPickerAction(action, check)
+	);
+}
+
+export function RootDirectoryChangeDialog({
+	applyResult,
+	isApplying,
+	onConfirm,
+	onOpenChange,
+	selection,
+}: {
+	applyResult: RootDirectoryChangeApplyResult | null;
+	isApplying: boolean;
+	onConfirm: () => void;
+	onOpenChange: (open: boolean) => void;
+	selection: RootDirectorySelectionResult | null;
+}) {
+	const preview = selection?.preview ?? null;
+	const canApply = Boolean(preview?.canApply) && !isApplying;
+
+	return (
+		<Dialog onOpenChange={onOpenChange} open={Boolean(selection)}>
+			<DialogContent className='sm:max-w-lg'>
+				<RootDirectoryChangeContent
+					applyResult={applyResult}
+					canApply={canApply}
+					isApplying={isApplying}
+					onConfirm={onConfirm}
+					preview={preview}
+					useDialogHeader
+				/>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+export function RootDirectoryChangeContent({
+	applyResult,
+	canApply,
+	isApplying,
+	onConfirm,
+	preview,
+	useDialogHeader = false,
+}: {
+	applyResult: RootDirectoryChangeApplyResult | null;
+	canApply: boolean;
+	isApplying: boolean;
+	onConfirm: () => void;
+	preview: RootDirectoryChangePreview | null;
+	useDialogHeader?: boolean;
+}) {
+	return (
+		<>
+			{useDialogHeader ? (
+				<DialogHeader>
+					<DialogTitle>Change root directory</DialogTitle>
+					<DialogDescription>
+						Switch Ensemble to the selected root and reindex/adopt from that
+						filesystem layout after confirmation.
+					</DialogDescription>
+				</DialogHeader>
+			) : (
+				<div className='flex flex-col gap-2'>
+					<h2 className='font-heading font-medium text-base leading-none'>
+						Change root directory
+					</h2>
+					<p className='text-muted-foreground text-sm'>
+						Switch Ensemble to the selected root and reindex/adopt from that
+						filesystem layout after confirmation.
+					</p>
+				</div>
+			)}
+
+			{preview ? (
+				<div className='flex flex-col gap-3'>
+					<RootPathPreview preview={preview} />
+					<section className='rounded-md border border-status-warning/30 bg-status-warning/10 px-3 py-2.5 text-xs leading-5'>
+						<p className='font-medium text-foreground'>
+							Old root contents are preserved.
+						</p>
+						<p className='mt-1 text-muted-foreground'>
+							Switching changes where Ensemble looks for repos, workspaces, and
+							archived contexts. Reindex/adopt is the default behavior.
+							Migration is a separate action. Delete or cleanup is a separate
+							destructive action.
+						</p>
+						<p className='mt-1 text-muted-foreground'>
+							Shared Conductor root continuity covers filesystem, git, and
+							config only; chat/session/checkpoint continuity is not guaranteed
+							across apps.
+						</p>
+					</section>
+					<RootDirectoryDiagnostics
+						diagnostics={preview.diagnostics}
+						emptyLabel='No blocking root warnings.'
+					/>
+					{applyResult ? (
+						<RootDirectoryApplyResult result={applyResult} />
+					) : null}
+				</div>
+			) : null}
+
+			<DialogFooter>
+				<Button
+					disabled={!canApply}
+					onClick={onConfirm}
+					type='button'
+					variant='default'
+				>
+					{isApplying ? 'Applying' : 'Switch root'}
+				</Button>
+			</DialogFooter>
+		</>
+	);
+}
+
+function RootPathPreview({ preview }: { preview: RootDirectoryChangePreview }) {
+	return (
+		<div className='grid gap-2 text-xs'>
+			<div className='rounded-md border border-border bg-background/60 px-3 py-2'>
+				<p className='font-medium'>Current root</p>
+				<code className='mt-1 block break-all text-muted-foreground'>
+					{preview.oldRoot?.path ?? 'No current root snapshot'}
+				</code>
+			</div>
+			<div className='rounded-md border border-border bg-background/60 px-3 py-2'>
+				<p className='font-medium'>Selected root</p>
+				<code className='mt-1 block break-all text-muted-foreground'>
+					{preview.newRoot.path}
+				</code>
+			</div>
+		</div>
+	);
+}
+
+function RootDirectoryDiagnostics({
+	diagnostics,
+	emptyLabel,
+}: {
+	diagnostics: RootDirectoryChangePreview['diagnostics'];
+	emptyLabel: string;
+}) {
+	if (!diagnostics.length) {
+		return (
+			<p className='text-muted-foreground text-xs leading-5'>{emptyLabel}</p>
+		);
+	}
+
+	return (
+		<div className='flex flex-col gap-1.5'>
+			{diagnostics.map((diagnostic) => (
+				<div
+					className='rounded-md border border-border bg-muted px-2 py-1.5 text-xs leading-5'
+					key={`${diagnostic.code}-${diagnostic.path ?? diagnostic.message}`}
+				>
+					<div className='flex flex-wrap items-center gap-1.5'>
+						<StatusBadge
+							tone={
+								diagnostic.severity === 'error'
+									? 'danger'
+									: diagnostic.severity === 'warning'
+										? 'warning'
+										: 'info'
+							}
+						>
+							{diagnostic.severity}
+						</StatusBadge>
+						<span className='font-medium'>{diagnostic.code}</span>
+					</div>
+					<p className='mt-1 text-muted-foreground'>{diagnostic.message}</p>
+					{diagnostic.path ? (
+						<code className='mt-1 block break-all text-muted-foreground'>
+							{diagnostic.path}
+						</code>
+					) : null}
+				</div>
+			))}
+		</div>
+	);
+}
+
+function RootDirectoryApplyResult({
+	result,
+}: {
+	result: RootDirectoryChangeApplyResult;
+}) {
+	return (
+		<section className='rounded-md border border-border bg-background/60 px-3 py-2 text-xs leading-5'>
+			<div className='flex items-center gap-2'>
+				<StatusBadge tone={getRootDirectoryApplyResultTone(result)}>
+					{result.applied ? 'Applied' : 'Not applied'}
+				</StatusBadge>
+				<span className='font-medium'>Root switch result</span>
+			</div>
+			{result.error ? (
+				<p className='mt-1 text-status-danger'>{result.error}</p>
+			) : null}
+			{result.reconciliation ? (
+				<p className='mt-1 text-muted-foreground'>
+					Reconciliation scanned{' '}
+					{result.reconciliation.repositoryDirectoryCount} repository
+					directories and {result.reconciliation.workspaceDirectoryCount}{' '}
+					workspace directories.
+				</p>
+			) : null}
+			{result.reconciliation?.diagnostics.length ? (
+				<div className='mt-2'>
+					<RootDirectoryDiagnostics
+						diagnostics={result.reconciliation.diagnostics}
+						emptyLabel='No reconciliation warnings.'
+					/>
+				</div>
+			) : null}
+		</section>
+	);
+}
+
+function getRootDirectoryApplyResultTone(
+	result: RootDirectoryChangeApplyResult,
+) {
+	if (
+		result.error ||
+		!result.applied ||
+		result.reconciliation?.status === 'error'
+	) {
+		return 'danger';
+	}
+
+	if (result.reconciliation?.status === 'warning') {
+		return 'warning';
+	}
+
+	return 'ok';
 }
 
 function CompactMetric({
