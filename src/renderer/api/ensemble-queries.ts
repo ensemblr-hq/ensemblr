@@ -7,6 +7,8 @@ export const ensembleQueryKeys = {
 	environmentVariables: () =>
 		[...ensembleQueryKeys.all, 'environment-variables'] as const,
 	health: () => [...ensembleQueryKeys.all, 'health'] as const,
+	repositoryWorkspaceNavigation: () =>
+		[...ensembleQueryKeys.all, 'repository-workspace-navigation'] as const,
 	setupDiagnostics: () =>
 		[...ensembleQueryKeys.all, 'setup-diagnostics'] as const,
 };
@@ -21,6 +23,10 @@ function getEnsembleApi(): EnsembleApi {
 	return ensemble;
 }
 
+export function isEnsembleApiAvailable(): boolean {
+	return typeof window !== 'undefined' && Boolean(window.ensemble);
+}
+
 export const healthQuery = queryOptions({
 	queryFn: () => getEnsembleApi().health(),
 	queryKey: ensembleQueryKeys.health(),
@@ -31,6 +37,12 @@ export const environmentVariablesQuery = queryOptions({
 	queryFn: () => getEnsembleApi().environmentVariables(),
 	queryKey: ensembleQueryKeys.environmentVariables(),
 	staleTime: 5000,
+});
+
+export const repositoryWorkspaceNavigationQuery = queryOptions({
+	queryFn: () => getEnsembleApi().repositoryWorkspaceNavigation(),
+	queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+	staleTime: 2000,
 });
 
 export const setupDiagnosticsQuery = queryOptions({

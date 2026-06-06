@@ -5,4 +5,20 @@ export {
 	DEFAULT_TERMINAL_DOCK_TAB_ID,
 } from './constants';
 export { getWorkspaceFileIconName } from './file-icons';
+export type {
+	StoredWorkspaceSelection,
+	WorkspaceNavigationRenderState,
+	WorkspaceNavigationSelection,
+} from './navigation-model';
+export {
+	DEFAULT_LIVE_WORKSPACE_DOCK_TAB,
+	findWorkspaceNavigationSelection,
+	getPreferredSession,
+	getRenderableNavigationSnapshot,
+	mapNavigationSnapshotToProjects,
+	mapRepositoriesToProjects,
+	resolveWorkspaceNavigationRenderState,
+	resolveWorkspaceNavigationSelection,
+	resolveWorkspaceRouteParams,
+} from './navigation-model';
 export { normalizeWorkbenchSearch } from './route-search';

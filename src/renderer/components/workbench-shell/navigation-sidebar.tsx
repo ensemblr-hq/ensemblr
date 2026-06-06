@@ -1,4 +1,10 @@
-import { CogIcon, HistoryIcon, PlusIcon } from 'lucide-react';
+import {
+	CircleHelpIcon,
+	CogIcon,
+	HistoryIcon,
+	LayoutDashboardIcon,
+	PlusIcon,
+} from 'lucide-react';
 
 import { ReorderList } from '@/renderer/components/shadix-ui/components/reorder-list';
 import { StatusBadge } from '@/renderer/components/status-badge';
@@ -44,19 +50,25 @@ export function WorkspaceNavigationSidebar({
 	activeView,
 	activeWorkspace,
 	health,
+	onDashboardSelect,
+	onHelpSelect,
 	onHistorySelect,
 	onSettingsSelect,
 	onWorkspaceSelect,
 	projectNavigation,
+	projects,
 }: {
-	activeProject: ProjectShellModel;
+	activeProject: ProjectShellModel | null;
 	activeView: WorkbenchActiveView;
-	activeWorkspace: WorkspaceShellModel;
+	activeWorkspace: WorkspaceShellModel | null;
 	health: WorkbenchHealth;
+	onDashboardSelect: () => void;
+	onHelpSelect: () => void;
 	onHistorySelect: () => void;
 	onSettingsSelect: () => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projectNavigation: ProjectNavigationState;
+	projects: ProjectShellModel[];
 }) {
 	return (
 		<Sidebar className='border-sidebar-border' collapsible='offcanvas'>
@@ -69,6 +81,8 @@ export function WorkspaceNavigationSidebar({
 			<SidebarContent>
 				<SidebarPrimaryNavigation
 					activeView={activeView}
+					onDashboardSelect={onDashboardSelect}
+					onHelpSelect={onHelpSelect}
 					onHistorySelect={onHistorySelect}
 					onSettingsSelect={onSettingsSelect}
 				/>
@@ -87,7 +101,7 @@ export function WorkspaceNavigationSidebar({
 				/>
 			</SidebarContent>
 
-			<SidebarHealthFooter health={health} />
+			<SidebarHealthFooter health={health} projects={projects} />
 			<SidebarRail />
 		</Sidebar>
 	);
@@ -95,10 +109,14 @@ export function WorkspaceNavigationSidebar({
 
 function SidebarPrimaryNavigation({
 	activeView,
+	onDashboardSelect,
+	onHelpSelect,
 	onHistorySelect,
 	onSettingsSelect,
 }: {
 	activeView: WorkbenchActiveView;
+	onDashboardSelect: () => void;
+	onHelpSelect: () => void;
 	onHistorySelect: () => void;
 	onSettingsSelect: () => void;
 }) {
@@ -107,6 +125,16 @@ function SidebarPrimaryNavigation({
 			<SidebarGroup className='min-h-11.75 justify-center py-1'>
 				<SidebarGroupContent>
 					<SidebarMenu className='gap-1'>
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								isActive={activeView === 'dashboard'}
+								onClick={onDashboardSelect}
+								tooltip='Dashboard'
+							>
+								<LayoutDashboardIcon aria-hidden='true' />
+								<span>Dashboard</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
 						<SidebarMenuItem>
 							<SidebarMenuButton
 								isActive={activeView === 'history'}
@@ -128,6 +156,17 @@ function SidebarPrimaryNavigation({
 								<span>Settings</span>
 							</SidebarMenuButton>
 						</SidebarMenuItem>
+						<SidebarMenuItem>
+							<SidebarMenuButton
+								aria-label='Open help'
+								isActive={activeView === 'help'}
+								onClick={onHelpSelect}
+								tooltip='Help'
+							>
+								<CircleHelpIcon aria-hidden='true' />
+								<span>Help</span>
+							</SidebarMenuButton>
+						</SidebarMenuItem>
 					</SidebarMenu>
 				</SidebarGroupContent>
 			</SidebarGroup>
@@ -143,8 +182,8 @@ function PinnedWorkspaceGroup({
 	onWorkspaceSelect,
 	projectNavigation,
 }: {
-	activeProject: ProjectShellModel;
-	activeWorkspace: WorkspaceShellModel;
+	activeProject: ProjectShellModel | null;
+	activeWorkspace: WorkspaceShellModel | null;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projectNavigation: ProjectNavigationState;
 }) {
@@ -168,8 +207,8 @@ function PinnedWorkspaceGroup({
 					{pinnedWorkspaceEntries.map(({ project, workspace }) => (
 						<WorkspaceSidebarItem
 							isActive={
-								activeProject.id === project.id &&
-								activeWorkspace.id === workspace.id
+								activeProject?.id === project.id &&
+								activeWorkspace?.id === workspace.id
 							}
 							isPinned={pinnedWorkspaceIdSet.has(workspace.id)}
 							key={workspace.id}
@@ -191,8 +230,8 @@ function ProjectNavigationGroups({
 	onWorkspaceSelect,
 	projectNavigation,
 }: {
-	activeProject: ProjectShellModel;
-	activeWorkspace: WorkspaceShellModel;
+	activeProject: ProjectShellModel | null;
+	activeWorkspace: WorkspaceShellModel | null;
 	onSettingsSelect: () => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projectNavigation: ProjectNavigationState;
@@ -212,7 +251,7 @@ function ProjectNavigationGroups({
 		<>
 			<SidebarGroup className='gap-1 py-1.5'>
 				<SidebarGroupLabel className='h-7 justify-between pr-7'>
-					<span className='truncate'>Projects</span>
+					<span className='truncate'>Repositories</span>
 				</SidebarGroupLabel>
 				<ProjectCreationMenu />
 			</SidebarGroup>
@@ -263,8 +302,8 @@ function ProjectWorkspaceGroup({
 	project,
 	workspaces,
 }: {
-	activeProject: ProjectShellModel;
-	activeWorkspace: WorkspaceShellModel;
+	activeProject: ProjectShellModel | null;
+	activeWorkspace: WorkspaceShellModel | null;
 	isCollapsed: boolean;
 	onProjectToggle: () => void;
 	onSettingsSelect: () => void;
@@ -276,7 +315,7 @@ function ProjectWorkspaceGroup({
 }) {
 	return (
 		<SidebarGroup
-			aria-label={`Reorder project ${project.name}`}
+			aria-label={`Reorder repository ${project.name}`}
 			className='gap-1 py-1.5'
 		>
 			<ProjectSidebarHeader
@@ -309,8 +348,8 @@ function ProjectWorkspaceGroup({
 						{workspaces.map((workspace) => (
 							<WorkspaceSidebarItem
 								isActive={
-									activeProject.id === project.id &&
-									activeWorkspace.id === workspace.id
+									activeProject?.id === project.id &&
+									activeWorkspace?.id === workspace.id
 								}
 								isPinned={pinnedWorkspaceIdSet.has(workspace.id)}
 								key={workspace.id}
@@ -326,13 +365,29 @@ function ProjectWorkspaceGroup({
 	);
 }
 
-function SidebarHealthFooter({ health }: { health: WorkbenchHealth }) {
+function SidebarHealthFooter({
+	health,
+	projects,
+}: {
+	health: WorkbenchHealth;
+	projects: ProjectShellModel[];
+}) {
+	const repositoryCount = projects.length;
+	const workspaceCount = projects.reduce(
+		(count, project) => count + project.workspaces.length,
+		0,
+	);
+
 	return (
 		<SidebarFooter className='border-sidebar-border border-t p-2'>
 			<div className='flex flex-col gap-1 rounded-md px-2 py-1.5'>
 				<StatusBadge tone={healthTone[health.state]}>
 					{health.label}
 				</StatusBadge>
+				<div className='flex items-center gap-2 font-mono text-[0.6875rem] text-muted-foreground leading-4'>
+					<span>{repositoryCount} repos</span>
+					<span>{workspaceCount} workspaces</span>
+				</div>
 				<p className='line-clamp-2 text-[0.6875rem] text-muted-foreground leading-4'>
 					{health.detail}
 				</p>
