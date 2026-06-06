@@ -397,6 +397,7 @@ function getRootDirectoryCheck({
 				id: 'choose-root-directory',
 				kind: 'select-path',
 				label: 'Choose another root',
+				target: 'rootDirectory',
 			},
 			{
 				id: 'retry-root-directory',

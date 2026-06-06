@@ -499,9 +499,9 @@ test('keeps blocked setup inside the workbench and disables the composer', () =>
 	expect(markup).toContain('Fix setup blockers before sending a prompt.');
 	expect(markup).toContain('disabled');
 	expect(markup).toContain('bun install');
-	expect(markup).not.toContain('Core workflows blocked');
-	expect(markup).not.toContain('Git executable');
-	expect(markup).not.toContain('Retry checks');
+	expect(markup).toContain('Core workflows are blocked');
+	expect(markup).toContain('Git executable');
+	expect(markup).toContain('Retry checks');
 	expect(markup).toContain('Open :5173');
 });
 

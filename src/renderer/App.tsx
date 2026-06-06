@@ -186,6 +186,11 @@ export function App({
 			onWorkspaceSelect={navigateToWorkspace}
 			projects={shellFixtureProjects}
 			setupDiagnostics={setupSnapshot}
+			setupDiagnosticsError={setupError}
+			isSetupDiagnosticsRetrying={setupDiagnostics.isFetching}
+			onSetupDiagnosticsRetry={() => {
+				void setupDiagnostics.refetch();
+			}}
 		/>
 	);
 }

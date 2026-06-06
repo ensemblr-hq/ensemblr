@@ -162,8 +162,28 @@ function createRootDirectoryService(
 	};
 
 	return {
+		applyChange: () => ({
+			applied: true,
+			newRoot: rootSnapshot,
+			oldRoot: rootSnapshot,
+			oldRootPreserved: true,
+			reconciliation: {
+				diagnostics: [],
+				repositoryDirectoryCount: 0,
+				scannedAt: NOW,
+				status: 'ok',
+				workspaceDirectoryCount: 0,
+			},
+		}),
 		ensure: () => rootSnapshot,
 		getSnapshot: () => rootSnapshot,
+		previewChange: () => ({
+			canApply: true,
+			diagnostics: [],
+			newRoot: rootSnapshot,
+			oldRoot: rootSnapshot,
+			oldRootPreserved: true,
+		}),
 	};
 }
 

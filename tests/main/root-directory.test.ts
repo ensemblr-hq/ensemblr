@@ -17,7 +17,12 @@ import {
 	type EnsembleConfig,
 } from '../../src/main/config/config-loader.ts';
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
-import { ensureRootDirectory } from '../../src/main/root/root-directory.ts';
+import {
+	applyRootDirectoryChange,
+	ensureRootDirectory,
+	previewRootDirectoryChange,
+} from '../../src/main/root/root-directory.ts';
+import { reconcileRootDirectory } from '../../src/main/root/root-reconciliation.ts';
 import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
 import type {
 	RootDirectoryDiagnostic,
@@ -411,5 +416,214 @@ test('rejects relative configured root paths', (t) => {
 	assert.equal(
 		getDiagnostic(snapshot, 'root-setting-relative').severity,
 		'error',
+	);
+});
+
+test('previews a root switch without creating missing managed directories', (t) => {
+	const homeDirectory = createDirectoryFixture(t);
+	const currentRoot = ensureRootDirectory({
+		homeDirectory,
+		settingsSnapshot: createSettingsSnapshot({ homeDirectory }),
+	});
+	const nextRoot = path.join(homeDirectory, 'NextRoot');
+
+	mkdirSync(nextRoot);
+
+	const preview = previewRootDirectoryChange({
+		homeDirectory,
+		nextRootPath: nextRoot,
+		previousRoot: currentRoot,
+		settingsSnapshot: createSettingsSnapshot({ homeDirectory }),
+	});
+
+	assert.equal(preview.canApply, true);
+	assert.equal(preview.oldRootPreserved, true);
+	assert.equal(preview.oldRoot?.path, currentRoot.path);
+	assert.equal(preview.newRoot.path, nextRoot);
+	assert.deepEqual(preview.newRoot.createdPaths, []);
+	assert.equal(existsSync(path.join(nextRoot, 'repos')), false);
+	assert.equal(
+		preview.diagnostics.filter(
+			(diagnostic) => diagnostic.code === 'managed-directory-missing',
+		).length,
+		3,
+	);
+	assert.equal(
+		preview.diagnostics.every((diagnostic) => diagnostic.severity !== 'error'),
+		true,
+	);
+});
+
+test('applies root switch, preserves old root contents, and reconciles new root', (t) => {
+	const homeDirectory = createDirectoryFixture(t);
+	const database = createDatabaseFixture(t);
+	const currentRoot = ensureRootDirectory({
+		database,
+		homeDirectory,
+		now: () => new Date('2026-06-06T08:00:00.000Z'),
+		settingsSnapshot: createSettingsSnapshot({ database, homeDirectory }),
+	});
+	const oldMarker = path.join(currentRoot.repositoriesPath, 'old-repo-marker');
+	const nextRoot = path.join(homeDirectory, 'NextRoot');
+
+	writeFileSync(oldMarker, 'old root content');
+	mkdirSync(nextRoot);
+
+	const result = applyRootDirectoryChange({
+		database,
+		homeDirectory,
+		nextRootPath: nextRoot,
+		now: () => new Date('2026-06-06T08:05:00.000Z'),
+		previousRoot: currentRoot,
+		reconcileRootDirectory,
+		resolveSettingsSnapshot: () =>
+			createSettingsSnapshot({ database, homeDirectory }),
+	});
+
+	assert.equal(result.applied, true);
+	assert.equal(result.error, undefined);
+	assert.equal(result.oldRootPreserved, true);
+	assert.equal(result.oldRoot?.path, currentRoot.path);
+	assert.equal(result.newRoot?.path, nextRoot);
+	assert.equal(existsSync(oldMarker), true);
+	assert.deepEqual(readdirSync(nextRoot).sort(), [
+		'archived-contexts',
+		'repos',
+		'workspaces',
+	]);
+	assert.equal(result.reconciliation?.status, 'ok');
+	assert.equal(result.reconciliation?.repositoryDirectoryCount, 0);
+	assert.equal(result.reconciliation?.workspaceDirectoryCount, 0);
+
+	const settingRow = database
+		.prepare(
+			`SELECT value_json, updated_at
+			 FROM settings
+			 WHERE scope = 'app' AND scope_id = '' AND key = 'rootDirectory'`,
+		)
+		.get() as { updated_at: string; value_json: string };
+
+	assert.equal(JSON.parse(settingRow.value_json), nextRoot);
+	assert.equal(settingRow.updated_at, '2026-06-06T08:05:00.000Z');
+});
+
+test('blocks root switch when selected root has unmanaged top-level content', (t) => {
+	const homeDirectory = createDirectoryFixture(t);
+	const database = createDatabaseFixture(t);
+	const currentRoot = ensureRootDirectory({
+		database,
+		homeDirectory,
+		settingsSnapshot: createSettingsSnapshot({ database, homeDirectory }),
+	});
+	const unsafeRoot = path.join(homeDirectory, 'UnsafeRoot');
+
+	mkdirSync(unsafeRoot);
+	writeFileSync(path.join(unsafeRoot, 'notes.txt'), 'user content');
+
+	const result = applyRootDirectoryChange({
+		database,
+		homeDirectory,
+		nextRootPath: unsafeRoot,
+		previousRoot: currentRoot,
+		reconcileRootDirectory,
+		resolveSettingsSnapshot: () =>
+			createSettingsSnapshot({ database, homeDirectory }),
+	});
+
+	assert.equal(result.applied, false);
+	assert.equal(result.reconciliation, null);
+	assert.equal(result.newRoot?.status, 'error');
+	assert.equal(existsSync(path.join(unsafeRoot, 'repos')), false);
+	assert.match(result.error ?? '', /unmanaged top-level content/);
+});
+
+test('blocks root switch when rootDirectory is locked by managed config', (t) => {
+	const homeDirectory = createDirectoryFixture(t);
+	const database = createDatabaseFixture(t);
+	const managedRoot = path.join(homeDirectory, 'ManagedRoot');
+	const currentRoot = ensureRootDirectory({
+		database,
+		homeDirectory,
+		settingsSnapshot: createSettingsSnapshot({
+			config: createConfig({
+				managed: {
+					locked: { rootDirectory: true },
+					values: { rootDirectory: managedRoot },
+				},
+			}),
+			database,
+			homeDirectory,
+		}),
+	});
+	const nextRoot = path.join(homeDirectory, 'NextRoot');
+
+	mkdirSync(nextRoot);
+
+	const result = applyRootDirectoryChange({
+		database,
+		homeDirectory,
+		nextRootPath: nextRoot,
+		previousRoot: currentRoot,
+		reconcileRootDirectory,
+		resolveSettingsSnapshot: () =>
+			createSettingsSnapshot({
+				config: createConfig({
+					managed: {
+						locked: { rootDirectory: true },
+						values: { rootDirectory: managedRoot },
+					},
+				}),
+				database,
+				homeDirectory,
+			}),
+	});
+
+	assert.equal(result.applied, false);
+	assert.equal(result.reconciliation, null);
+	assert.match(result.error ?? '', /locked by managed config/);
+	assert.equal(existsSync(path.join(nextRoot, 'repos')), false);
+});
+
+test('reconciles shared-looking root contents after applying a switch', (t) => {
+	const homeDirectory = createDirectoryFixture(t);
+	const database = createDatabaseFixture(t);
+	const currentRoot = ensureRootDirectory({
+		database,
+		homeDirectory,
+		settingsSnapshot: createSettingsSnapshot({ database, homeDirectory }),
+	});
+	const sharedRoot = path.join(homeDirectory, 'SharedRoot');
+	const sharedRepoPath = path.join(sharedRoot, 'repos', 'ensemble');
+	const sharedWorkspacePath = path.join(
+		sharedRoot,
+		'workspaces',
+		'ensemble',
+		'nagoya',
+	);
+
+	mkdirSync(sharedRepoPath, { recursive: true });
+	mkdirSync(sharedWorkspacePath, { recursive: true });
+	mkdirSync(path.join(sharedRoot, 'archived-contexts'), { recursive: true });
+
+	const result = applyRootDirectoryChange({
+		database,
+		homeDirectory,
+		nextRootPath: sharedRoot,
+		previousRoot: currentRoot,
+		reconcileRootDirectory,
+		resolveSettingsSnapshot: () =>
+			createSettingsSnapshot({ database, homeDirectory }),
+	});
+
+	assert.equal(result.applied, true);
+	assert.equal(result.newRoot?.status, 'warning');
+	assert.equal(result.reconciliation?.status, 'warning');
+	assert.equal(result.reconciliation?.repositoryDirectoryCount, 1);
+	assert.equal(result.reconciliation?.workspaceDirectoryCount, 1);
+	assert.equal(
+		result.newRoot?.diagnostics.some(
+			(diagnostic) => diagnostic.code === 'shared-root-content',
+		),
+		true,
 	);
 });
