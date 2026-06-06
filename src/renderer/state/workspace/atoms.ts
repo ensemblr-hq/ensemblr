@@ -1,8 +1,13 @@
+import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
+import type { WorkspaceNavigationRenderState } from '@/renderer/lib/workbench';
 import type { DockTabId, ReviewPanelTab } from '@/renderer/types/workbench';
 import type { ChangesViewMode } from '@/renderer/types/workbench-shell';
 
 const workspaceStorageOptions = { getOnInit: true };
+
+export const lastWorkspaceNavigationRenderStateAtom =
+	atom<WorkspaceNavigationRenderState | null>(null);
 
 export const lastWorkspaceSelectionAtom = atomWithStorage<{
 	projectId: string;

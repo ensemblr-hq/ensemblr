@@ -20,11 +20,13 @@ import {
 	getPreferredSession,
 	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
+	resolveWorkspaceNavigationRenderState,
 	resolveWorkspaceNavigationSelection,
 	type WorkspaceNavigationSelection,
 } from '@/renderer/lib/workbench';
 import { shellFixtureProjects } from '@/renderer/mocks/workbench';
 import {
+	lastWorkspaceNavigationRenderStateAtom,
 	lastWorkspaceSelectionAtom,
 	useWorkspacePanelTabState,
 } from '@/renderer/state/workspace';
@@ -70,6 +72,10 @@ export function App({
 	const [lastWorkspaceSelection, setLastWorkspaceSelection] = useAtom(
 		lastWorkspaceSelectionAtom,
 	);
+	const [
+		lastWorkspaceNavigationRenderState,
+		setLastWorkspaceNavigationRenderState,
+	] = useAtom(lastWorkspaceNavigationRenderStateAtom);
 	const setupError = getErrorMessage(setupDiagnostics.error);
 	const setupSnapshot = setupDiagnostics.data ?? null;
 	const cachedNavigationSnapshot =
@@ -87,7 +93,7 @@ export function App({
 				: shellFixtureProjects,
 		[hasPreloadBridge, navigationSnapshot],
 	);
-	const selection = useMemo(
+	const currentSelection = useMemo(
 		() =>
 			resolveWorkspaceNavigationSelection({
 				projects,
@@ -97,6 +103,33 @@ export function App({
 			}),
 		[projectId, projects, lastWorkspaceSelection, workspaceId],
 	);
+	const navigationRenderState = useMemo(
+		() =>
+			resolveWorkspaceNavigationRenderState({
+				canUsePreviousState:
+					hasPreloadBridge &&
+					!currentSelection &&
+					(repositoryWorkspaceNavigation.isLoading ||
+						repositoryWorkspaceNavigation.isFetching ||
+						repositoryWorkspaceNavigation.isPlaceholderData ||
+						!navigationSnapshot),
+				previousState: lastWorkspaceNavigationRenderState,
+				projects,
+				selection: currentSelection,
+			}),
+		[
+			currentSelection,
+			hasPreloadBridge,
+			lastWorkspaceNavigationRenderState,
+			navigationSnapshot,
+			projects,
+			repositoryWorkspaceNavigation.isFetching,
+			repositoryWorkspaceNavigation.isLoading,
+			repositoryWorkspaceNavigation.isPlaceholderData,
+		],
+	);
+	const displayProjects = navigationRenderState?.projects ?? projects;
+	const displaySelection = navigationRenderState?.selection ?? null;
 
 	const shellHealth = useMemo<WorkbenchHealth>(() => {
 		if (!hasPreloadBridge) {
@@ -182,13 +215,13 @@ export function App({
 	}, [hasPreloadBridge, health.data, health.error, setupError, setupSnapshot]);
 
 	useEffect(() => {
-		if (!selection) {
+		if (!currentSelection) {
 			return;
 		}
 
 		const nextSelection = {
-			projectId: selection.project.id,
-			workspaceId: selection.workspace.id,
+			projectId: currentSelection.project.id,
+			workspaceId: currentSelection.workspace.id,
 		};
 
 		setLastWorkspaceSelection((currentSelection) =>
@@ -197,29 +230,47 @@ export function App({
 				? currentSelection
 				: nextSelection,
 		);
-	}, [selection, setLastWorkspaceSelection]);
+		setLastWorkspaceNavigationRenderState((currentRenderState) =>
+			currentRenderState?.selection.project.id ===
+				currentSelection.project.id &&
+			currentRenderState.selection.workspace.id ===
+				currentSelection.workspace.id &&
+			currentRenderState.projects === projects
+				? currentRenderState
+				: {
+						projects,
+						selection: currentSelection,
+						source: 'current',
+					},
+		);
+	}, [
+		currentSelection,
+		projects,
+		setLastWorkspaceNavigationRenderState,
+		setLastWorkspaceSelection,
+	]);
 
 	useEffect(() => {
-		if (!selection || view !== 'workspace') {
+		if (!currentSelection || view !== 'workspace') {
 			return;
 		}
 
 		if (
-			projectId === selection.project.id &&
-			workspaceId === selection.workspace.id
+			projectId === currentSelection.project.id &&
+			workspaceId === currentSelection.workspace.id
 		) {
 			return;
 		}
 
 		const activeSession = getPreferredSession(
-			selection.workspace,
+			currentSelection.workspace,
 			search?.chat,
 		);
 
 		navigate({
 			params: {
-				projectId: selection.project.id,
-				workspaceId: selection.workspace.id,
+				projectId: currentSelection.project.id,
+				workspaceId: currentSelection.workspace.id,
 			},
 			replace: true,
 			search: {
@@ -227,14 +278,14 @@ export function App({
 			},
 			to: '/projects/$projectId/workspaces/$workspaceId',
 		});
-	}, [navigate, projectId, search?.chat, selection, view, workspaceId]);
+	}, [currentSelection, navigate, projectId, search?.chat, view, workspaceId]);
 
 	const onDashboardSelect = () => navigate({ to: '/' });
 	const onHelpSelect = () => navigate({ to: '/help' });
 	const onHistorySelect = () => navigate({ to: '/history' });
 	const onSettingsSelect = () => navigate({ to: '/settings' });
 
-	if (!selection) {
+	if (!displaySelection) {
 		return (
 			<WorkbenchEmptyStateShell
 				activeView={view}
@@ -253,7 +304,7 @@ export function App({
 				onHistorySelect={onHistorySelect}
 				onSettingsSelect={onSettingsSelect}
 				onWorkspaceSelect={() => undefined}
-				projects={projects}
+				projects={displayProjects}
 			/>
 		);
 	}
@@ -266,9 +317,9 @@ export function App({
 			onHelpSelect={onHelpSelect}
 			onHistorySelect={onHistorySelect}
 			onSettingsSelect={onSettingsSelect}
-			projects={projects}
+			projects={displayProjects}
 			search={search}
-			selection={selection}
+			selection={displaySelection}
 			setupDiagnostics={setupSnapshot}
 			setupDiagnosticsError={setupError}
 			isSetupDiagnosticsRetrying={setupDiagnostics.isFetching}

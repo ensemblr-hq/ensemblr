@@ -5,6 +5,7 @@ import { WorkbenchEmptyStateShell } from '../../src/renderer/components/workbenc
 import {
 	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
+	resolveWorkspaceNavigationRenderState,
 	resolveWorkspaceNavigationSelection,
 } from '../../src/renderer/lib/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '../../src/shared/ipc';
@@ -172,6 +173,57 @@ test('resolves route, stored, and first workspace selections in order', () => {
 			id: 'workspace-1',
 		},
 	});
+});
+
+test('keeps previous navigation render state during transient loading gaps', () => {
+	const projects = mapNavigationSnapshotToProjects(navigationSnapshot);
+	const selection = resolveWorkspaceNavigationSelection({
+		projects,
+		routeProjectId: 'repo-1',
+		routeWorkspaceId: 'workspace-1',
+	});
+
+	expect(selection).toBeTruthy();
+
+	const currentState = resolveWorkspaceNavigationRenderState({
+		canUsePreviousState: false,
+		previousState: null,
+		projects,
+		selection,
+	});
+
+	expect(currentState).toMatchObject({
+		source: 'current',
+		selection: {
+			workspace: {
+				id: 'workspace-1',
+			},
+		},
+	});
+	expect(
+		resolveWorkspaceNavigationRenderState({
+			canUsePreviousState: true,
+			previousState: currentState,
+			projects: [],
+			selection: null,
+		}),
+	).toMatchObject({
+		projects,
+		source: 'previous',
+		selection: {
+			workspace: {
+				id: 'workspace-1',
+			},
+		},
+	});
+	expect(
+		resolveWorkspaceNavigationRenderState({
+			canUsePreviousState: false,
+			previousState: currentState,
+			projects: [],
+			selection: null,
+		}),
+	).toBeNull();
 });
 
 test('renders live navigation records and true empty repository state', () => {

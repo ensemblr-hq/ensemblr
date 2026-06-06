@@ -26,6 +26,12 @@ export interface StoredWorkspaceSelection {
 	workspaceId: string;
 }
 
+export interface WorkspaceNavigationRenderState {
+	projects: ProjectShellModel[];
+	selection: WorkspaceNavigationSelection;
+	source: 'current' | 'previous';
+}
+
 const placeholderOpenTargets: WorkspaceOpenTarget[] = [
 	{
 		iconName: 'lucide:folder',
@@ -119,6 +125,35 @@ export function resolveWorkspaceNavigationSelection({
 		: null;
 
 	return storedWorkspaceSelection ?? getFirstWorkspaceSelection(projects);
+}
+
+export function resolveWorkspaceNavigationRenderState({
+	canUsePreviousState,
+	previousState,
+	projects,
+	selection,
+}: {
+	canUsePreviousState: boolean;
+	previousState?: WorkspaceNavigationRenderState | null;
+	projects: ProjectShellModel[];
+	selection: WorkspaceNavigationSelection | null;
+}): WorkspaceNavigationRenderState | null {
+	if (selection) {
+		return {
+			projects,
+			selection,
+			source: 'current',
+		};
+	}
+
+	if (canUsePreviousState && previousState) {
+		return {
+			...previousState,
+			source: 'previous',
+		};
+	}
+
+	return null;
 }
 
 export function findWorkspaceNavigationSelection(

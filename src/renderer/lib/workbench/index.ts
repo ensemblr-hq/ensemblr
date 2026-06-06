@@ -7,6 +7,7 @@ export {
 export { getWorkspaceFileIconName } from './file-icons';
 export type {
 	StoredWorkspaceSelection,
+	WorkspaceNavigationRenderState,
 	WorkspaceNavigationSelection,
 } from './navigation-model';
 export {
@@ -15,6 +16,7 @@ export {
 	getPreferredSession,
 	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
+	resolveWorkspaceNavigationRenderState,
 	resolveWorkspaceNavigationSelection,
 } from './navigation-model';
 export { normalizeWorkbenchSearch } from './route-search';
