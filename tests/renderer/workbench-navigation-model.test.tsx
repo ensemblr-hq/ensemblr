@@ -153,6 +153,15 @@ test('resolves route, stored, and first workspace selections in order', () => {
 				workspaceId: 'workspace-1',
 			},
 		}),
+	).toBeNull();
+	expect(
+		resolveWorkspaceNavigationSelection({
+			projects,
+			storedSelection: {
+				projectId: 'repo-1',
+				workspaceId: 'workspace-1',
+			},
+		}),
 	).toMatchObject({
 		source: 'stored',
 		workspace: {

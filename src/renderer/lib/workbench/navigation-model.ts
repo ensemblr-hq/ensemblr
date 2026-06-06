@@ -111,7 +111,7 @@ export function resolveWorkspaceNavigationSelection({
 				)
 			: null;
 
-	if (routeSelection) {
+	if (routeProjectId && routeWorkspaceId) {
 		return routeSelection;
 	}
 
