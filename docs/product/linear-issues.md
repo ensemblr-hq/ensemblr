@@ -26,8 +26,8 @@ Create the initial Electron + React + TypeScript application skeleton with typed
 Scope:
 - Configure Electron main process, preload, React renderer, TypeScript, Tailwind, and development scripts.
 - Add typed IPC scaffolding for future app services.
-- Add TanStack Router and TanStack Query providers for renderer navigation and backend/preload snapshots.
-- Add the typed route tree for dashboard, history, settings, and workspace routes.
+- Add TanStack Query providers and file-based TanStack Router for renderer navigation and backend/preload snapshots.
+- Generate the route tree from files under `src/renderer/routing/routes/` (committed `routeTree.gen.ts` via the `@tanstack/router-plugin` Vite plugin), covering dashboard, history, help, settings, and `projects/$projectId/workspaces/$workspaceId/chats/$chatId`, with loaders owning shell data and redirects. See `docs/adr/0026-use-file-based-tanstack-routing.md`.
 
 Out of scope:
 - Full visual design and app feature implementation.
@@ -37,7 +37,7 @@ Out of scope:
 Acceptance criteria:
 - The app starts in development with main and renderer processes.
 - Renderer can call a typed no-op IPC health endpoint.
-- Renderer has Router and Query providers available without relying on Jotai route state.
+- Renderer has file-based Router (generated route tree) and Query providers available without relying on Jotai route state.
 - Main process owns native lifecycle hooks and menu placeholder wiring.
 - Development build and typecheck pass.
 
@@ -48,6 +48,7 @@ Verification:
 
 Source:
 - `docs/adr/0001-electron-react-shadcn.md`
+- `docs/adr/0026-use-file-based-tanstack-routing.md`
 - `docs/product/mvp-sequencing.md`
 - `docs/product/ux-parity.md`
 
@@ -767,7 +768,7 @@ Scope:
 - Keep the existing visible History and Settings entries, health footer, chat-tab strip, right panel, PR header, open-workspace launcher, and dock regions.
 - Preserve implemented sidebar affordances: project collapse, project reorder, pinned workspaces, workspace diff counts, the documented workspace sidebar state contract, archive affordance, and context menus.
 - Repository context menu for create workspace, create from issue/PR placeholders, settings, hide, and remove.
-- Persist selected repository/workspace defaults where route/search state is not enough.
+- Drive workspace selection through file-based route params (`/projects/$projectId/workspaces/$workspaceId/chats/$chatId`) and persist per-workspace dock, review, and last-chat defaults in renderer state so switching workspaces restores them.
 
 Out of scope:
 - Full dashboard/history implementations.
@@ -778,6 +779,7 @@ Out of scope:
 Acceptance criteria:
 - Repository and workspace records render from SQLite state.
 - Workspace selection updates center/right/dock context.
+- Selecting a workspace navigates to its route and restores its last chat, dock, and review selection.
 - Pinning, collapse/reorder, and active workspace header still behave with live records.
 - Hide/remove actions are gated or placeholder-confirmed without deleting files.
 - Empty state guides users to add a project after setup passes.
@@ -2718,10 +2720,10 @@ Priority: P1
 Dependencies: ENS-036, ENS-061
 
 Summary:
-Decide and document which non-deferred experimental settings are v1 scope, especially dashboard/sidebar visibility and sidebar resource usage.
+Decide and document which non-deferred experimental settings are v1 scope, especially workspace/sidebar visibility and sidebar resource usage.
 
 Scope:
-- Evaluate dashboard/sidebar visibility flags.
+- Evaluate workspace/sidebar visibility flags.
 - Evaluate resource usage display for workspace processes and Pi sessions.
 - Decide whether big terminal mode needs additional build work beyond terminal dock.
 - Confirm voice, Graphite, cloud SSH, production profiler, and chat-tab limit remain resolved by ADRs.

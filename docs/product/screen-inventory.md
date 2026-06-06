@@ -159,7 +159,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Screen name: App Settings - Experimental
 - User goal: Enable under-development or power-user features.
 - Entry point: Settings sidebar, Experimental tab.
-- Primary actions: Toggle big terminal mode, many-tab mode, dashboard/sidebar visibility, voice dictation, sidebar resource usage, Graphite stack support, and React profiler button.
+- Primary actions: Toggle big terminal mode, many-tab mode, workspace/sidebar visibility, voice dictation, sidebar resource usage, Graphite stack support, and React profiler button.
 - Secondary actions: Read caveat/warning text for unstable features.
 - Visible UI regions: settings sidebar, experimental feature list with toggles and descriptions.
 - Empty/loading/error states: No loading or error state visible.

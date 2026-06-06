@@ -6,6 +6,7 @@ import type {
 	ProjectShellModel,
 	ReviewPanelTab,
 	SessionTabModel,
+	WorkbenchRouteSearch,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
@@ -25,6 +26,17 @@ export interface WorkbenchDockActions {
 	onStopRunScript: () => void;
 }
 
+export type WorkbenchStaticNavigationTarget =
+	| 'dashboard'
+	| 'help'
+	| 'history'
+	| 'settings';
+
+export interface WorkbenchWorkspaceNavigationLinkTarget {
+	search: WorkbenchRouteSearch;
+	workspace: WorkspaceShellModel;
+}
+
 export interface WorkbenchShellProps {
 	activeProject: ProjectShellModel;
 	activeReviewTab: ReviewPanelTab;
@@ -35,15 +47,23 @@ export interface WorkbenchShellProps {
 	dockActions: WorkbenchDockActions;
 	dockTabId: DockTabId;
 	health: WorkbenchHealth;
-	onDashboardSelect: () => void;
 	onDockTabChange: (tab: DockTabId) => void;
-	onHelpSelect: () => void;
-	onHistorySelect: () => void;
 	onReviewTabChange: (tab: ReviewPanelTab) => void;
 	onSessionTabChange: (sessionId: string) => void;
-	onSettingsSelect: () => void;
+	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projects: ProjectShellModel[];
+	renderStaticNavigationLink?: (
+		target: WorkbenchStaticNavigationTarget,
+		children: ReactElement,
+	) => ReactElement;
+	renderWorkspaceNavigationLink?: (
+		target: WorkbenchWorkspaceNavigationLinkTarget,
+		children: ReactElement,
+	) => ReactElement;
+	resolveWorkspaceRouteSearch?: (
+		workspace: WorkspaceShellModel,
+	) => WorkbenchRouteSearch;
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
 	setupDiagnosticsError?: string | null;
 	isSetupDiagnosticsRetrying?: boolean;

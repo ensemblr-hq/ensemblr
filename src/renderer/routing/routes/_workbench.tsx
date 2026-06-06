@@ -1,0 +1,38 @@
+import { createFileRoute, Outlet } from '@tanstack/react-router';
+import {
+	WorkbenchRouteError,
+	WorkbenchRouteNotFound,
+	WorkbenchRoutePending,
+} from '@/renderer/components/workbench-shell/route-boundaries';
+import { WORKBENCH_ROUTE_STALE_TIME_MS } from '@/renderer/config/routing';
+import { profileRouteLoader } from '@/renderer/lib/instrumentation/route-profiler';
+import { loadWorkbenchRouteData } from '@/renderer/routing/workbench-route-loaders';
+
+export const Route = createFileRoute('/_workbench')({
+	component: WorkbenchDataLayoutRoute,
+	errorComponent: WorkbenchRouteError,
+	loader: {
+		handler: ({ cause, context, deps, location, params, preload }) =>
+			profileRouteLoader(
+				{
+					cause,
+					deps,
+					href: location.href,
+					params,
+					preload,
+					routeId: '/_workbench',
+					staleReloadMode: 'background',
+				},
+				() => loadWorkbenchRouteData(context.queryClient),
+			),
+		staleReloadMode: 'background',
+	},
+	loaderDeps: () => ({}),
+	notFoundComponent: WorkbenchRouteNotFound,
+	pendingComponent: WorkbenchRoutePending,
+	staleTime: WORKBENCH_ROUTE_STALE_TIME_MS,
+});
+
+function WorkbenchDataLayoutRoute() {
+	return <Outlet />;
+}

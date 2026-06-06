@@ -1,3 +1,9 @@
+import type {
+	HealthSnapshot,
+	RepositoryWorkspaceNavigationSnapshot,
+	SetupDiagnosticsSnapshot,
+} from '@/shared/ipc';
+
 export type ReviewPanelTab = 'changes' | 'checks' | 'files';
 
 export type FixedDockTabId = 'run' | 'setup';
@@ -189,8 +195,23 @@ export interface ProjectShellModel {
 	workspaces: WorkspaceShellModel[];
 }
 
+export interface WorkbenchShellData {
+	hasPreloadBridge: boolean;
+	healthError: string | null;
+	healthSnapshot: HealthSnapshot | null;
+	navigationError: string | null;
+	navigationSnapshot: RepositoryWorkspaceNavigationSnapshot | null;
+	projects: ProjectShellModel[];
+	setupError: string | null;
+	setupSnapshot: SetupDiagnosticsSnapshot | null;
+}
+
+export interface WorkspaceShellData {
+	project: ProjectShellModel;
+	workspace: WorkspaceShellModel;
+}
+
 export interface WorkbenchRouteSearch {
-	chat?: string;
 	dock?: DockTabId;
 	review?: ReviewPanelTab;
 }

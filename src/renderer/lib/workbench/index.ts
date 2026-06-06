@@ -1,3 +1,4 @@
+export { isWorkbenchActiveView } from './active-view';
 export { getComposerState } from './composer';
 export {
 	DEFAULT_DOCK_TAB,
@@ -22,3 +23,10 @@ export {
 	resolveWorkspaceRouteParams,
 } from './navigation-model';
 export { normalizeWorkbenchSearch } from './route-search';
+export {
+	getEmptyStateCopy,
+	getErrorMessage,
+	getWorkbenchHealth,
+	loadWorkbenchShellData,
+} from './shell-data';
+export { getWorkbenchStaticRoute } from './static-navigation';
