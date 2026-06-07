@@ -1,4 +1,6 @@
 import { Outlet, useChildMatches } from '@tanstack/react-router';
+import { useAtom } from 'jotai';
+import { CloneGithubDialog } from '@/renderer/components/welcome/clone-github-dialog';
 import {
 	NavigationProvider,
 	SetupDiagnosticsProvider,
@@ -10,6 +12,7 @@ import {
 	getWorkbenchStaticView,
 	isWorkbenchActiveView,
 } from '@/renderer/lib/workbench';
+import { cloneDialogOpenAtom } from '@/renderer/state/clone-dialog';
 import type {
 	WorkbenchChildMatch,
 	WorkbenchShellRouteState,
@@ -31,6 +34,7 @@ export function WorkbenchShellLayout() {
 		loaderData,
 		routeState,
 	});
+	const [cloneOpen, setCloneOpen] = useAtom(cloneDialogOpenAtom);
 
 	return (
 		<NavigationProvider value={navigation}>
@@ -41,6 +45,7 @@ export function WorkbenchShellLayout() {
 					activeWorkspace={model.activeWorkspace}
 					addProjectMenu={model.addProjectMenu}
 					health={model.health}
+					onAddProject={model.onAddProject}
 					onStaticNavigationSelect={model.navigateToStaticRoute}
 					onWorkspaceSelect={model.navigateToWorkspace}
 					projects={model.displayProjects}
@@ -50,6 +55,7 @@ export function WorkbenchShellLayout() {
 						<Outlet />
 					</WorkbenchLayoutModelProvider>
 				</WorkbenchFrame>
+				<CloneGithubDialog onOpenChange={setCloneOpen} open={cloneOpen} />
 			</SetupDiagnosticsProvider>
 		</NavigationProvider>
 	);

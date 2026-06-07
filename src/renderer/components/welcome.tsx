@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSetAtom } from 'jotai';
 import { FolderIcon, FolderPlusIcon, GlobeIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
@@ -10,8 +11,8 @@ import {
 	selectLocalRepository,
 } from '@/renderer/api/ensemble-queries';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
+import { cloneDialogOpenAtom } from '@/renderer/state/clone-dialog';
 
-import { CloneGithubDialog } from './welcome/clone-github-dialog';
 import { WelcomeActionCard } from './welcome/welcome-action-card';
 import { WelcomeWordmark } from './welcome/welcome-wordmark';
 
@@ -23,10 +24,10 @@ interface WelcomeNotice {
 
 /** Default landing view shown when no project/workspace is selected. */
 export function Welcome() {
-	const [cloneOpen, setCloneOpen] = useState(false);
 	const [notice, setNotice] = useState<WelcomeNotice | null>(null);
 	const [isOpeningProject, setIsOpeningProject] = useState(false);
 	const queryClient = useQueryClient();
+	const setCloneOpen = useSetAtom(cloneDialogOpenAtom);
 	useQuery({
 		...githubRepositoryListQuery,
 		enabled: isEnsembleApiAvailable(),
@@ -131,8 +132,6 @@ export function Welcome() {
 					) : null}
 				</section>
 			</main>
-
-			<CloneGithubDialog onOpenChange={setCloneOpen} open={cloneOpen} />
 		</SidebarInset>
 	);
 }
