@@ -12,7 +12,7 @@ import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
 import type { RecentGithubRepo } from '@/renderer/types/workbench';
 
-const DEFAULT_LOCATION = '~/Projects/Conductor/repos';
+const DEFAULT_LOCATION = '~/Projects/Ensemble/repos';
 
 interface CloneGithubDialogProps {
 	onOpenChange: (open: boolean) => void;
