@@ -10,8 +10,10 @@ import type {
 
 export type { ConfigDiagnostic, ConfigStatusSnapshot };
 
+/** Schema version embedded in `~/.config/ensemble/config.json`. */
 export const ENSEMBLE_CONFIG_SCHEMA_VERSION = 1;
 
+/** JSON Schema describing the supported top-level shape of the Ensemble config. */
 export const ENSEMBLE_CONFIG_SCHEMA = {
 	$schema: 'https://json-schema.org/draft/2020-12/schema',
 	additionalProperties: false,
@@ -32,6 +34,7 @@ export const ENSEMBLE_CONFIG_SCHEMA = {
 	type: 'object',
 } as const;
 
+/** Validated declarative config loaded from `~/.config/ensemble/config.json`. */
 export interface EnsembleConfig {
 	app: Record<string, unknown>;
 	environment: Record<string, unknown>;
@@ -43,6 +46,7 @@ export interface EnsembleConfig {
 	ui: Record<string, unknown>;
 }
 
+/** Options for {@link loadEnsembleConfig}. */
 export interface LoadEnsembleConfigOptions {
 	configPath?: string;
 	homeDirectory?: string;
@@ -50,11 +54,13 @@ export interface LoadEnsembleConfigOptions {
 	requireTrustedManagedConfig?: boolean;
 }
 
+/** Combined result of validating the on-disk config file. */
 export interface EnsembleConfigLoadResult {
 	config: EnsembleConfig;
 	snapshot: ConfigStatusSnapshot;
 }
 
+/** Public surface of the cached config service. */
 export interface EnsembleConfigService {
 	getConfig: () => EnsembleConfig;
 	getSnapshot: () => ConfigStatusSnapshot;
@@ -99,10 +105,21 @@ const SENSITIVE_KEY_PARTS = [
 	'token',
 ];
 
+/**
+ * Computes the absolute path to the Ensemble config file inside a home directory.
+ * @param homeDirectory - Home directory to resolve against; defaults to `os.homedir()`.
+ * @returns Absolute path to `config.json`.
+ */
 export function resolveEnsembleConfigPath(homeDirectory = homedir()): string {
 	return path.join(homeDirectory, CONFIG_DIRECTORY, CONFIG_FILENAME);
 }
 
+/**
+ * Reads and validates the Ensemble config file, returning the validated config
+ * and a diagnostic snapshot suitable for IPC.
+ * @param options - Optional path and clock overrides.
+ * @returns The validated config and snapshot.
+ */
 export function loadEnsembleConfig(
 	options: LoadEnsembleConfigOptions = {},
 ): EnsembleConfigLoadResult {
@@ -223,11 +240,17 @@ export function loadEnsembleConfig(
 	};
 }
 
+/**
+ * Builds the cached config service used by every consumer in the main process.
+ * @param options - Forwarded to {@link loadEnsembleConfig} on first access.
+ * @returns A service that lazily loads and caches the config on first call.
+ */
 export function createEnsembleConfigService(
 	options: LoadEnsembleConfigOptions = {},
 ): EnsembleConfigService {
 	let cachedResult: EnsembleConfigLoadResult | null = null;
 
+	/** Loads the config on first call and caches the result. */
 	function ensureLoaded(): EnsembleConfigLoadResult {
 		cachedResult ??= loadEnsembleConfig(options);
 		return cachedResult;
@@ -240,6 +263,12 @@ export function createEnsembleConfigService(
 	};
 }
 
+/**
+ * Type-checks a parsed config record against the supported schema, collecting
+ * diagnostics and returning a sanitised {@link EnsembleConfig}.
+ * @param config - Parsed JSON record.
+ * @returns The validated config and accumulated diagnostics.
+ */
 function validateEnsembleConfig(config: Record<string, unknown>): {
 	config: EnsembleConfig;
 	diagnostics: ConfigDiagnostic[];
@@ -325,6 +354,10 @@ function validateEnsembleConfig(config: Record<string, unknown>): {
 	};
 }
 
+/**
+ * Builds an {@link EnsembleConfig} populated with safe defaults.
+ * @returns A defaulted config record.
+ */
 function createEmptyConfig(): EnsembleConfig {
 	return {
 		app: {},
@@ -338,6 +371,11 @@ function createEmptyConfig(): EnsembleConfig {
 	};
 }
 
+/**
+ * Helper that pairs default config with the failure snapshot for early-return paths.
+ * @param input - Snapshot fields.
+ * @returns A load result with defaulted config and the provided snapshot.
+ */
 function createResult({
 	blocksReadiness,
 	configPath,
@@ -369,6 +407,11 @@ function createResult({
 	};
 }
 
+/**
+ * Reads the `schemaVersion` field, defaulting when missing and rejecting non-integers.
+ * @param config - Parsed config record.
+ * @returns The schema version, or `null` when the field is the wrong type.
+ */
 function getSchemaVersion(config: Record<string, unknown>): number | null {
 	const value = config.schemaVersion;
 
@@ -379,6 +422,11 @@ function getSchemaVersion(config: Record<string, unknown>): number | null {
 	return typeof value === 'number' && Number.isInteger(value) ? value : null;
 }
 
+/**
+ * Maps a diagnostic set to the overall config status.
+ * @param diagnostics - Collected diagnostics.
+ * @returns `'invalid'` when any error is present, otherwise `'ok'`.
+ */
 function getStatus(diagnostics: ConfigDiagnostic[]): ConfigStatus {
 	if (hasErrorDiagnostics(diagnostics)) {
 		return 'invalid';
@@ -387,10 +435,21 @@ function getStatus(diagnostics: ConfigDiagnostic[]): ConfigStatus {
 	return 'ok';
 }
 
+/**
+ * Tests whether any diagnostic has `error` severity.
+ * @param diagnostics - Diagnostics to inspect.
+ * @returns True when at least one error is present.
+ */
 function hasErrorDiagnostics(diagnostics: ConfigDiagnostic[]): boolean {
 	return diagnostics.some((diagnostic) => diagnostic.severity === 'error');
 }
 
+/**
+ * Decides whether failures in the `managed` section should block app readiness.
+ * @param config - Parsed config record.
+ * @param diagnostics - Collected diagnostics.
+ * @returns True when readiness should be blocked.
+ */
 function hasInvalidManagedSettings(
 	config: Record<string, unknown>,
 	diagnostics: ConfigDiagnostic[],
@@ -408,9 +467,21 @@ function hasInvalidManagedSettings(
 	);
 }
 
+/**
+ * Walks a value recursively and emits an error diagnostic for any sensitive-named
+ * field that contains a non-empty raw string.
+ * @param value - Config root or sub-tree to scan.
+ * @returns A list of diagnostics, one per offending raw secret value.
+ */
 function findRawSecretDiagnostics(value: unknown): ConfigDiagnostic[] {
 	const diagnostics: ConfigDiagnostic[] = [];
 
+	/**
+	 * Recursive walker that flags raw secret strings encountered under sensitive keys.
+	 * @param current - Current value being visited.
+	 * @param fieldPath - JSONPath used in diagnostic messages.
+	 * @param keyName - Key that pointed at `current`, used for sensitivity checks.
+	 */
 	function visit(current: unknown, fieldPath: string, keyName = '') {
 		if (typeof current === 'string' && isSensitiveKey(keyName) && current) {
 			diagnostics.push({
@@ -444,12 +515,24 @@ function findRawSecretDiagnostics(value: unknown): ConfigDiagnostic[] {
 	return diagnostics;
 }
 
+/**
+ * Tests whether a key name looks sensitive (e.g. contains "token" or "secret").
+ * @param keyName - Key to test.
+ * @returns True when the normalised key contains a sensitive substring.
+ */
 function isSensitiveKey(keyName: string): boolean {
 	const normalized = keyName.replace(/[-_]/g, '').toLowerCase();
 
 	return SENSITIVE_KEY_PARTS.some((part) => normalized.includes(part));
 }
 
+/**
+ * Extracts a line/column hint from a JSON parser error message, recognising
+ * both `position N` and `line N column M` shapes.
+ * @param source - Raw JSON source text.
+ * @param error - The parser error thrown by `JSON.parse`.
+ * @returns A partial diagnostic with `line` and `column`, when available.
+ */
 function getJsonErrorLocation(
 	source: string,
 	error: unknown,
@@ -474,6 +557,12 @@ function getJsonErrorLocation(
 	return {};
 }
 
+/**
+ * Converts a character offset into a 1-based `(line, column)` pair.
+ * @param source - Source text.
+ * @param position - Character offset within `source`.
+ * @returns A partial diagnostic with `line` and `column`.
+ */
 function getLocationForPosition(
 	source: string,
 	position: number,
@@ -487,6 +576,12 @@ function getLocationForPosition(
 	};
 }
 
+/**
+ * Renders the config path with `~` substitution for diagnostic display.
+ * @param configPath - Absolute config path.
+ * @param homeDirectory - User home directory used to compute `~`.
+ * @returns A short, user-friendly path string.
+ */
 function formatDisplayPath(configPath: string, homeDirectory: string): string {
 	const resolvedHome = path.resolve(homeDirectory);
 	const resolvedPath = path.resolve(configPath);
@@ -502,10 +597,21 @@ function formatDisplayPath(configPath: string, homeDirectory: string): string {
 	return configPath;
 }
 
+/**
+ * Coerces an unknown thrown value to a user-facing message.
+ * @param error - Thrown value.
+ * @param fallback - Fallback message when `error` is not an `Error`.
+ * @returns A human-readable message.
+ */
 function formatErrorMessage(error: unknown, fallback: string): string {
 	return error instanceof Error ? error.message : fallback;
 }
 
+/**
+ * Type guard that excludes arrays from the structural-record check.
+ * @param value - Candidate value.
+ * @returns True when `value` is a non-null, non-array object.
+ */
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

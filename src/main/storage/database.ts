@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 export type DatabaseStatus = 'ok' | 'error';
 
+/** IPC-safe snapshot of the database connection's health. */
 export interface DatabaseHealthSnapshot {
 	error?: string;
 	path: string;
@@ -12,16 +13,19 @@ export interface DatabaseHealthSnapshot {
 	status: DatabaseStatus;
 }
 
+/** Options for {@link openEnsembleDatabase} / {@link createEnsembleDatabaseService}. */
 export interface OpenDatabaseOptions {
 	databasePath?: string;
 }
 
+/** A live SQLite connection plus its file path and applied schema version. */
 export interface EnsembleDatabaseConnection {
 	database: DatabaseSync;
 	path: string;
 	schemaVersion: number;
 }
 
+/** Public surface of the database service held by the main process. */
 export interface EnsembleDatabaseService {
 	close: () => void;
 	getConnection: () => EnsembleDatabaseConnection | null;
@@ -29,6 +33,7 @@ export interface EnsembleDatabaseService {
 	open: () => DatabaseHealthSnapshot;
 }
 
+/** Internal: one declarative schema migration. */
 interface Migration {
 	id: string;
 	sql: string;
@@ -246,8 +251,15 @@ CREATE INDEX idx_root_directories_status ON root_directories(status);
 	},
 ];
 
+/** Highest declared migration version embedded in this build. */
 export const LATEST_SCHEMA_VERSION = MIGRATIONS.at(-1)?.version ?? 0;
 
+/**
+ * Computes the default SQLite database path inside a home directory, branching
+ * by platform (macOS Application Support vs. XDG-style `.config`).
+ * @param homeDirectory - Home directory; defaults to `os.homedir()`.
+ * @returns Absolute database path.
+ */
 export function resolveDefaultDatabasePath(homeDirectory = homedir()): string {
 	if (process.platform === 'darwin') {
 		return path.join(
@@ -262,6 +274,12 @@ export function resolveDefaultDatabasePath(homeDirectory = homedir()): string {
 	return path.join(homeDirectory, '.config', 'ensemble', DATABASE_FILENAME);
 }
 
+/**
+ * Opens the SQLite database, ensures its parent directory exists, configures
+ * pragmas, and applies any pending migrations.
+ * @param options - Optional path override; `:memory:` is honored for tests.
+ * @returns An open {@link EnsembleDatabaseConnection}.
+ */
 export function openEnsembleDatabase(
 	options: OpenDatabaseOptions = {},
 ): EnsembleDatabaseConnection {
@@ -293,6 +311,12 @@ export function openEnsembleDatabase(
 	}
 }
 
+/**
+ * Builds a lazily-opening database service whose lifecycle is owned by the
+ * Electron main process.
+ * @param options - Forwarded to {@link openEnsembleDatabase} on first open.
+ * @returns A {@link EnsembleDatabaseService}.
+ */
 export function createEnsembleDatabaseService(
 	options: OpenDatabaseOptions = {},
 ): EnsembleDatabaseService {
@@ -303,6 +327,7 @@ export function createEnsembleDatabaseService(
 		status: 'error',
 	};
 
+	/** Opens the database if not already open; returns the current health snapshot. */
 	function open(): DatabaseHealthSnapshot {
 		if (connection) {
 			return health;
@@ -327,6 +352,7 @@ export function createEnsembleDatabaseService(
 		return health;
 	}
 
+	/** Closes the database, if open. Safe to call when no connection exists. */
 	function close(): void {
 		if (!connection) {
 			return;
@@ -344,6 +370,11 @@ export function createEnsembleDatabaseService(
 	};
 }
 
+/**
+ * Reads `PRAGMA user_version` to determine the active schema version.
+ * @param database - Open SQLite connection.
+ * @returns The version, or `0` when the pragma row is unexpected.
+ */
 export function getCurrentSchemaVersion(database: DatabaseSync): number {
 	const row = database.prepare('PRAGMA user_version').get();
 
@@ -354,6 +385,11 @@ export function getCurrentSchemaVersion(database: DatabaseSync): number {
 	return row.user_version;
 }
 
+/**
+ * Lists migration identifiers already applied to the database.
+ * @param database - Open SQLite connection.
+ * @returns Ordered list of applied migration ids.
+ */
 export function listAppliedMigrationIds(database: DatabaseSync): string[] {
 	ensureMigrationTable(database);
 
@@ -364,6 +400,10 @@ export function listAppliedMigrationIds(database: DatabaseSync): string[] {
 	return rows.flatMap((row) => (isMigrationIdRow(row) ? [row.id] : []));
 }
 
+/**
+ * Applies connection-wide pragmas (foreign keys, busy timeout, WAL journal).
+ * @param database - Open SQLite connection.
+ */
 function configureDatabase(database: DatabaseSync): void {
 	database.exec(`
 PRAGMA foreign_keys = ON;
@@ -372,6 +412,11 @@ PRAGMA journal_mode = WAL;
 `);
 }
 
+/**
+ * Runs every unapplied migration in declared order, returning the final version.
+ * @param database - Open SQLite connection.
+ * @returns The active schema version after migration.
+ */
 function runMigrations(database: DatabaseSync): number {
 	ensureMigrationTable(database);
 
@@ -388,6 +433,10 @@ function runMigrations(database: DatabaseSync): number {
 	return getCurrentSchemaVersion(database);
 }
 
+/**
+ * Creates `schema_migrations` if it does not already exist.
+ * @param database - Open SQLite connection.
+ */
 function ensureMigrationTable(database: DatabaseSync): void {
 	database.exec(`
 CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -399,6 +448,12 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 `);
 }
 
+/**
+ * Applies a single migration inside a transaction, recording the row in
+ * `schema_migrations` and updating `PRAGMA user_version`.
+ * @param database - Open SQLite connection.
+ * @param migration - Migration to apply.
+ */
 function runMigration(database: DatabaseSync, migration: Migration): void {
 	database.exec('BEGIN IMMEDIATE;');
 
@@ -417,10 +472,20 @@ function runMigration(database: DatabaseSync, migration: Migration): void {
 	}
 }
 
+/**
+ * Coerces a thrown value into a user-facing message.
+ * @param error - Thrown value.
+ * @returns Human-readable message.
+ */
 function formatDatabaseError(error: unknown): string {
 	return error instanceof Error ? error.message : 'Unknown database error';
 }
 
+/**
+ * Type guard for the row shape of `SELECT id FROM schema_migrations`.
+ * @param row - Candidate row.
+ * @returns True when the row has a string `id` column.
+ */
 function isMigrationIdRow(row: unknown): row is { id: string } {
 	return (
 		typeof row === 'object' &&
@@ -430,6 +495,11 @@ function isMigrationIdRow(row: unknown): row is { id: string } {
 	);
 }
 
+/**
+ * Type guard for the row shape of `PRAGMA user_version`.
+ * @param row - Candidate row.
+ * @returns True when the row has a numeric `user_version` column.
+ */
 function isUserVersionRow(row: unknown): row is { user_version: number } {
 	return (
 		typeof row === 'object' &&

@@ -48,6 +48,11 @@ const fileIconByExtension: Record<string, string> = {
 
 type WorkspaceFileIconTarget = Pick<WorkspaceFileSummary, 'kind' | 'name'>;
 
+/**
+ * Picks the appropriate VSCode icon name for a workspace file or folder.
+ * @param file - File/folder name and kind.
+ * @returns A fully-qualified iconify name (e.g. `vscode-icons:file-type-js`).
+ */
 export function getWorkspaceFileIconName(
 	file: WorkspaceFileIconTarget,
 ): string {
@@ -61,6 +66,11 @@ export function getWorkspaceFileIconName(
 	return `${iconPrefix}:${iconName}`;
 }
 
+/**
+ * Returns the lowercase extension of a file name, or empty string when absent.
+ * @param name - File name.
+ * @returns The extension, without the leading dot.
+ */
 function getFileExtension(name: string) {
 	const extensionStart = name.lastIndexOf('.');
 

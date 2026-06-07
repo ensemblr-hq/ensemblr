@@ -6,6 +6,7 @@ import type {
 	RepositoryWorkspaceNavigationSnapshot,
 } from '../../shared/ipc';
 
+/** Internal: shape of a repository row read from SQLite. */
 interface RepositoryRow {
 	createdAt: string;
 	defaultBranch: string | null;
@@ -17,6 +18,7 @@ interface RepositoryRow {
 	updatedAt: string;
 }
 
+/** Internal: shape of a workspace row read from SQLite. */
 interface WorkspaceRow {
 	archivedAt: string | null;
 	baseBranch: string | null;
@@ -31,6 +33,12 @@ interface WorkspaceRow {
 	updatedAt: string;
 }
 
+/**
+ * Builds the repository/workspace navigation snapshot consumed by the renderer
+ * sidebar, grouping non-archived workspaces under their parent repository.
+ * @param database - Open SQLite connection or `null`.
+ * @returns A navigation snapshot, empty when no database is available.
+ */
 export function getRepositoryWorkspaceNavigationSnapshot(
 	database: DatabaseSync | null,
 ): RepositoryWorkspaceNavigationSnapshot {
@@ -124,6 +132,11 @@ ORDER BY lower(name), lower(slug), id
 	};
 }
 
+/**
+ * Parses the `metadata_json` column safely, defaulting to `{}` on any failure.
+ * @param metadataJson - Raw column value.
+ * @returns The parsed metadata record.
+ */
 function parseMetadataJson(
 	metadataJson: string,
 ): RepositoryWorkspaceNavigationMetadata {
@@ -136,6 +149,11 @@ function parseMetadataJson(
 	}
 }
 
+/**
+ * Type guard for a non-null, non-array object value.
+ * @param value - Candidate value.
+ * @returns True when the shape matches.
+ */
 function isJsonRecord(
 	value: unknown,
 ): value is RepositoryWorkspaceNavigationMetadata {

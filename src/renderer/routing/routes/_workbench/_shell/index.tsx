@@ -9,6 +9,7 @@ export const Route = createFileRoute('/_workbench/_shell/')({
 	},
 });
 
+/** Dashboard workbench view (placeholder pending content). */
 function DashboardRoute() {
 	return <WorkbenchPlaceholderPage view='dashboard' />;
 }

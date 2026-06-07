@@ -9,6 +9,7 @@ export const Route = createFileRoute('/_workbench/_shell/help')({
 	},
 });
 
+/** Help workbench view (placeholder pending content). */
 function HelpRoute() {
 	return <WorkbenchPlaceholderPage view='help' />;
 }

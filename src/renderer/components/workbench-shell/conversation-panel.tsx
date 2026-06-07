@@ -36,6 +36,7 @@ import type {
 } from '@/renderer/types/workbench';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
 
+/** Horizontal session-tab bar with close, restore, and new-tab controls. */
 export function SessionTabs({
 	activeSession,
 	closedSessions,
@@ -133,6 +134,7 @@ export function SessionTabs({
 	);
 }
 
+/** Dropdown listing recently-closed session tabs for restoration. */
 function ClosedSessionHistoryMenu({
 	closedSessions,
 	onSessionTabRestore,
@@ -185,6 +187,7 @@ function ClosedSessionHistoryMenu({
 	);
 }
 
+/** Scrollable timeline content shown above the composer. */
 export function WorkspaceTimeline({
 	activeSession,
 	composer,
@@ -242,6 +245,7 @@ export function WorkspaceTimeline({
 	);
 }
 
+/** Mock agent chat thread rendered from the fixture chat builder. */
 function AgentChatThread({
 	activeSession,
 	composer,
@@ -269,6 +273,7 @@ function AgentChatThread({
 	);
 }
 
+/** Single chat message bubble with avatar, body and optional tool list. */
 function ChatMessage({
 	author,
 	body,
@@ -327,6 +332,7 @@ function ChatMessage({
 	);
 }
 
+/** Round chat avatar with tone-driven coloring and working-state animation. */
 function ChatAvatar({
 	icon: AvatarIcon,
 	isWorking = false,
@@ -366,6 +372,7 @@ const chatToolIconByName: Record<ChatToolActivity['icon'], LucideIcon> = {
 	terminal: SquareTerminalIcon,
 };
 
+/** Renders the list of tool calls attached to a chat message. */
 function ChatToolList({ tools }: { tools: ChatToolActivity[] }) {
 	return (
 		<div className='mt-3 flex flex-col gap-1.5'>
@@ -400,6 +407,7 @@ function ChatToolList({ tools }: { tools: ChatToolActivity[] }) {
 	);
 }
 
+/** Sticky bottom composer with textarea, status badges and send/attach. */
 export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 	return (
 		<footer className='shrink-0 border-border border-t bg-background p-3'>

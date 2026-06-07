@@ -64,6 +64,7 @@ const addProjectActionIcons: Record<AddProjectActionId, LucideIcon> = {
 	'quick-start': FolderPlusIcon,
 };
 
+/** Dropdown that adds new projects via action items or selected recents. */
 export function ProjectCreationMenu({
 	model,
 	onSelectAction,
@@ -123,7 +124,7 @@ export function ProjectCreationMenu({
 								<span className='min-w-0 flex-1 truncate'>{action.label}</span>
 							</span>
 							{reason ? (
-								<span className='pl-6 text-[0.6875rem] text-muted-foreground leading-4'>
+								<span className='pl-6 text-muted-foreground text-xxs leading-4'>
 									{reason}
 								</span>
 							) : null}
@@ -162,6 +163,7 @@ export function ProjectCreationMenu({
 	);
 }
 
+/** Picks the disabled-reason for an add-project action (or null when enabled). */
 function resolveActionReason({
 	action,
 	wired,
@@ -175,6 +177,7 @@ function resolveActionReason({
 	return wired ? null : COMING_SOON_REASON;
 }
 
+/** Project group header with avatar, collapse toggle, and inline action buttons. */
 export function ProjectSidebarHeader({
 	isCollapsed,
 	onCreateFromSourceSelect,
@@ -272,6 +275,7 @@ export function ProjectSidebarHeader({
 	);
 }
 
+/** Right-click context menu surfacing project workspace/settings actions. */
 function ProjectContextMenuContent({
 	onCreateFromSourceSelect,
 	onRepositorySettingsSelect,
@@ -340,6 +344,7 @@ function ProjectContextMenuContent({
 	);
 }
 
+/** Styled wrapper around `ContextMenuItem` for the project context menu. */
 function ProjectContextMenuItem({
 	className,
 	...props
@@ -352,6 +357,7 @@ function ProjectContextMenuItem({
 	);
 }
 
+/** Small square button rendered in the project group header on hover. */
 function ProjectHeaderActionButton({
 	className,
 	...props

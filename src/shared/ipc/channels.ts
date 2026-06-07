@@ -1,3 +1,8 @@
+/**
+ * Registry of IPC channel names exchanged between the Electron main process and
+ * the renderer. Each value is the wire identifier used by `ipcMain.handle` /
+ * `ipcRenderer.invoke`; keys are the camelCase handles used in the preload bridge.
+ */
 export const IPC_CHANNELS = {
 	applyRepositoryConfigMigration: 'ensemble:apply-repository-config-migration',
 	confirmRootDirectoryChange: 'ensemble:confirm-root-directory-change',

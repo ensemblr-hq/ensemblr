@@ -52,6 +52,7 @@ const archiveBoundaryLabel = getPermissionBoundaryLabel(
 	archiveBoundary.boundary,
 );
 
+/** Sidebar row for a single workspace, with state icon, diff stats and context menu. */
 export function WorkspaceSidebarItem({
 	isActive,
 	isPinned,
@@ -96,7 +97,7 @@ export function WorkspaceSidebarItem({
 					</span>
 					{hasDiffStats ? <WorkspaceDiffStats workspace={workspace} /> : null}
 				</div>
-				<div className='mt-1 flex min-w-0 items-center gap-1.5 text-[0.6875rem] text-muted-foreground'>
+				<div className='mt-1 flex min-w-0 items-center gap-1.5 text-muted-foreground text-xxs'>
 					<span className='truncate'>{workspace.branchName}</span>
 				</div>
 			</div>
@@ -154,9 +155,10 @@ export function WorkspaceSidebarItem({
 	);
 }
 
+/** Inline +/- diff stats for the workspace row. */
 function WorkspaceDiffStats({ workspace }: { workspace: WorkspaceShellModel }) {
 	return (
-		<div className='flex shrink-0 items-center gap-1.5 font-mono text-[0.6875rem] leading-4'>
+		<div className='flex shrink-0 items-center gap-1.5 font-mono text-xxs leading-4'>
 			{workspace.changeSummary.additions > 0 ? (
 				<span className='text-status-ok'>
 					+{workspace.changeSummary.additions}
@@ -189,6 +191,7 @@ type WorkspaceSidebarStateKind =
 	| 'workspace-checking'
 	| 'workspace-working';
 
+/** Derives the icon and tone for a workspace sidebar row from its status. */
 function getWorkspaceSidebarState(
 	workspace: WorkspaceShellModel,
 ): WorkspaceSidebarState {
@@ -230,6 +233,7 @@ function getWorkspaceSidebarState(
 	};
 }
 
+/** PR-derived sidebar state, or `null` when no PR is attached to the workspace. */
 function getPullRequestSidebarState(
 	workspace: WorkspaceShellModel,
 ): WorkspaceSidebarState | null {
@@ -277,6 +281,7 @@ function getPullRequestSidebarState(
 	};
 }
 
+/** Right-click context menu for a workspace row (pin, status, archive). */
 function WorkspaceContextMenuContent({
 	isPinned,
 	onPinToggle,
@@ -362,6 +367,7 @@ function WorkspaceContextMenuContent({
 	);
 }
 
+/** Single workspace-status submenu row with optional check mark. */
 function WorkspaceStatusMenuItem({
 	icon: StatusIcon,
 	iconClassName,
@@ -387,6 +393,7 @@ function WorkspaceStatusMenuItem({
 	);
 }
 
+/** Styled wrapper around `ContextMenuItem` for workspace context menus. */
 function SidebarContextMenuItem({
 	className,
 	...props

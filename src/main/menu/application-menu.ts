@@ -1,6 +1,10 @@
 import path from 'node:path';
 import { app, Menu, type MenuItemConstructorOptions, shell } from 'electron';
 
+/**
+ * Returns the on-disk path to the bundled product roadmap markdown.
+ * @returns Absolute path to `mvp-sequencing.md`.
+ */
 function getProductRoadmapPath(): string {
 	if (app.isPackaged) {
 		return path.join(process.resourcesPath, 'mvp-sequencing.md');
@@ -9,6 +13,10 @@ function getProductRoadmapPath(): string {
 	return path.join(app.getAppPath(), 'docs/product/mvp-sequencing.md');
 }
 
+/**
+ * Builds and installs the Ensemble application menu, with the macOS app menu
+ * appearing only on darwin platforms.
+ */
 export function installApplicationMenu(): void {
 	const appMenu: MenuItemConstructorOptions[] =
 		process.platform === 'darwin'

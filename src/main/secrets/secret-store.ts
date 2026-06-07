@@ -13,18 +13,21 @@ export type SecretStoreErrorCode =
 	| 'not-found'
 	| 'unsupported-platform';
 
+/** Identifies a secret entry by `(scope, scopeId, key)`. */
 export interface SecretLookup {
 	key: string;
 	scope: SecretScope;
 	scopeId?: string;
 }
 
+/** Secret write payload: identity plus value and optional metadata. */
 export interface SecretWriteInput extends SecretLookup {
 	displayName?: string;
 	metadata?: Record<string, unknown>;
 	value: string;
 }
 
+/** Persistable, non-sensitive view of a secret entry. */
 export interface SecretMetadata {
 	account: string;
 	backend: SecretBackend;
@@ -41,11 +44,13 @@ export interface SecretMetadata {
 	updatedAt: string;
 }
 
+/** Optional filter for {@link SecretStore.listMetadata}. */
 export interface SecretMetadataFilter {
 	scope?: SecretScope;
 	scopeId?: string;
 }
 
+/** Public interface of every secret-store backend. */
 export interface SecretStore {
 	create: (input: SecretWriteInput) => Promise<SecretMetadata>;
 	delete: (lookup: SecretLookup) => Promise<void>;
@@ -55,6 +60,7 @@ export interface SecretStore {
 	update: (input: SecretWriteInput) => Promise<SecretMetadata>;
 }
 
+/** Options for {@link createMacosKeychainSecretStore}. */
 export interface MacosKeychainSecretStoreOptions {
 	commandPath?: string;
 	database: DatabaseSync;
@@ -63,29 +69,34 @@ export interface MacosKeychainSecretStoreOptions {
 	serviceName?: string;
 }
 
+/** Options for {@link createMockSecretStore}. */
 export interface MockSecretStoreOptions {
 	idFactory?: () => string;
 	now?: () => Date;
 	serviceName?: string;
 }
 
+/** Internal: normalised secret lookup with non-optional `scopeId`. */
 interface NormalizedLookup {
 	key: string;
 	scope: SecretScope;
 	scopeId: string;
 }
 
+/** Internal: normalised write input with defaults applied. */
 interface NormalizedWriteInput extends NormalizedLookup {
 	displayName: string;
 	metadata: Record<string, unknown>;
 	value: string;
 }
 
+/** Internal: Keychain identity `(service, account)` pair. */
 interface KeychainReference {
 	account: string;
 	service: string;
 }
 
+/** Internal: raw row shape stored in the `secret_metadata` table. */
 interface SecretMetadataRow {
 	account: string;
 	backend: SecretBackend;
@@ -102,6 +113,7 @@ interface SecretMetadataRow {
 	updated_at: string;
 }
 
+/** Internal: captured output of `/usr/bin/security` command. */
 interface SecurityCommandResult {
 	stderr: string;
 	stdout: string;
@@ -117,12 +129,18 @@ const SECRET_SCOPES: readonly SecretScope[] = [
 	'workspace',
 ];
 
+/** Typed error thrown by every secret-store operation. */
 export class SecretStoreError extends Error {
 	readonly code: SecretStoreErrorCode;
 	readonly command?: string;
 	readonly exitCode?: number;
 	readonly stderr?: string;
 
+	/**
+	 * @param code - Machine-readable failure category.
+	 * @param message - Human-readable description.
+	 * @param options - Optional command, exit code, stderr and cause for diagnostics.
+	 */
 	constructor(
 		code: SecretStoreErrorCode,
 		message: string,
@@ -142,6 +160,11 @@ export class SecretStoreError extends Error {
 	}
 }
 
+/**
+ * Renders a masked preview of a secret value, exposing only the last few characters.
+ * @param value - Secret value.
+ * @returns Masked display string.
+ */
 export function maskSecret(value: string): string {
 	if (value.length === 0) {
 		return MASK_PREFIX;
@@ -154,6 +177,12 @@ export function maskSecret(value: string): string {
 	return `${MASK_PREFIX}${value.slice(-MASK_VISIBLE_SUFFIX_LENGTH)}`;
 }
 
+/**
+ * Builds a macOS Keychain-backed secret store, persisting non-sensitive metadata
+ * in SQLite while holding the encrypted values inside the user's Keychain.
+ * @param options - Service dependencies and tuning.
+ * @returns A {@link SecretStore} implementation. Throws on non-darwin platforms.
+ */
 export function createMacosKeychainSecretStore({
 	commandPath = SECURITY_COMMAND_PATH,
 	database,
@@ -170,6 +199,11 @@ export function createMacosKeychainSecretStore({
 
 	const metadataStore = createSqliteSecretMetadataStore(database);
 
+	/**
+	 * Adds or replaces a Keychain item via `/usr/bin/security add-generic-password`.
+	 * @param reference - Keychain identity pair.
+	 * @param input - Normalised write input.
+	 */
 	async function writeKeychainItem(
 		reference: KeychainReference,
 		input: NormalizedWriteInput,
@@ -192,6 +226,11 @@ export function createMacosKeychainSecretStore({
 		]);
 	}
 
+	/**
+	 * Removes a Keychain item, optionally suppressing the "not found" error.
+	 * @param reference - Keychain identity pair.
+	 * @param ignoreMissing - When true, suppresses the not-found error.
+	 */
 	async function deleteKeychainItem(
 		reference: KeychainReference,
 		ignoreMissing: boolean,
@@ -306,6 +345,11 @@ export function createMacosKeychainSecretStore({
 	};
 }
 
+/**
+ * Builds an in-memory secret store for tests and platforms without a Keychain.
+ * @param options - Optional clock, id factory, and service-name overrides.
+ * @returns A {@link SecretStore} backed by a private `Map`.
+ */
 export function createMockSecretStore({
 	idFactory = randomUUID,
 	now = () => new Date(),
@@ -316,10 +360,19 @@ export function createMockSecretStore({
 		{ metadata: SecretMetadata; value: string }
 	>();
 
+	/** Retrieves the in-memory record for a normalised lookup. */
 	function getRecord(lookup: NormalizedLookup) {
 		return records.get(createIdentityKey(lookup));
 	}
 
+	/**
+	 * Constructs a metadata object for an in-memory secret.
+	 * @param input - Normalised write input.
+	 * @param reference - Keychain identity pair (synthetic for the mock).
+	 * @param timestamp - ISO timestamp.
+	 * @param id - Explicit identifier (default generated by `idFactory`).
+	 * @returns A {@link SecretMetadata} value.
+	 */
 	function createMetadata(
 		input: NormalizedWriteInput,
 		reference: KeychainReference,
@@ -410,8 +463,14 @@ export function createMockSecretStore({
 	};
 }
 
+/**
+ * Builds the SQLite-backed metadata store used by the Keychain backend.
+ * @param database - Open SQLite connection.
+ * @returns Object exposing `get/insert/update/delete/list` over `secret_metadata`.
+ */
 function createSqliteSecretMetadataStore(database: DatabaseSync) {
 	return {
+		/** Deletes the metadata row matching the lookup. */
 		delete(lookup: NormalizedLookup): void {
 			database
 				.prepare(
@@ -420,6 +479,7 @@ function createSqliteSecretMetadataStore(database: DatabaseSync) {
 				)
 				.run(lookup.scope, lookup.scopeId, lookup.key);
 		},
+		/** Loads the metadata row matching the lookup, or `null`. */
 		get(lookup: NormalizedLookup): SecretMetadata | null {
 			const row = database
 				.prepare(
@@ -431,6 +491,7 @@ function createSqliteSecretMetadataStore(database: DatabaseSync) {
 
 			return row ? parseMetadataRow(row) : null;
 		},
+		/** Inserts a new metadata row, returning the persisted shape. */
 		insert(
 			input: NormalizedWriteInput &
 				KeychainReference & {
@@ -486,6 +547,7 @@ function createSqliteSecretMetadataStore(database: DatabaseSync) {
 
 			return inserted;
 		},
+		/** Lists every matching metadata row, ordered by `(scope, scope_id, name)`. */
 		list(filter: SecretMetadataFilter = {}): SecretMetadata[] {
 			if (filter.scope && filter.scopeId !== undefined) {
 				const rows = database
@@ -523,6 +585,7 @@ function createSqliteSecretMetadataStore(database: DatabaseSync) {
 
 			return rows.map(parseMetadataRow);
 		},
+		/** Updates an existing metadata row, returning the persisted shape. */
 		update(
 			input: NormalizedWriteInput &
 				KeychainReference & {
@@ -574,6 +637,11 @@ function createSqliteSecretMetadataStore(database: DatabaseSync) {
 	};
 }
 
+/**
+ * Validates a write input, throwing on missing or wrong-typed fields.
+ * @param input - Caller-supplied secret write payload.
+ * @returns A normalised write input with defaults applied.
+ */
 function normalizeWriteInput(input: SecretWriteInput): NormalizedWriteInput {
 	const lookup = normalizeLookup(input);
 
@@ -592,6 +660,11 @@ function normalizeWriteInput(input: SecretWriteInput): NormalizedWriteInput {
 	};
 }
 
+/**
+ * Validates a lookup, requiring a non-empty `scopeId` for non-app scopes.
+ * @param input - Caller-supplied secret lookup.
+ * @returns A normalised lookup.
+ */
 function normalizeLookup(input: SecretLookup): NormalizedLookup {
 	if (!SECRET_SCOPES.includes(input.scope)) {
 		throw new SecretStoreError(
@@ -625,6 +698,11 @@ function normalizeLookup(input: SecretLookup): NormalizedLookup {
 	};
 }
 
+/**
+ * Validates an optional filter, defaulting an `app`-scope filter to `scopeId: ''`.
+ * @param filter - Caller-supplied filter.
+ * @returns The normalised filter.
+ */
 function normalizeFilter(filter?: SecretMetadataFilter): SecretMetadataFilter {
 	if (!filter?.scope) {
 		return {};
@@ -651,6 +729,12 @@ function normalizeFilter(filter?: SecretMetadataFilter): SecretMetadataFilter {
 	};
 }
 
+/**
+ * Trims a display name and falls back to the secret key when empty.
+ * @param displayName - Caller value.
+ * @param fallback - Fallback display name (usually the key).
+ * @returns The chosen display name.
+ */
 function normalizeDisplayName(
 	displayName: string | undefined,
 	fallback: string,
@@ -659,12 +743,23 @@ function normalizeDisplayName(
 	return normalized || fallback;
 }
 
+/**
+ * Returns a shallow copy of caller metadata, defaulting to `{}` when omitted.
+ * @param metadata - Caller metadata.
+ * @returns A safe-to-mutate metadata object.
+ */
 function normalizeMetadata(
 	metadata: Record<string, unknown> | undefined,
 ): Record<string, unknown> {
 	return metadata ? { ...metadata } : {};
 }
 
+/**
+ * Composes the `(service, account)` pair used in the Keychain.
+ * @param serviceName - Service identifier.
+ * @param lookup - Normalised secret lookup.
+ * @returns The Keychain reference.
+ */
 function createKeychainReference(
 	serviceName: string,
 	lookup: NormalizedLookup,
@@ -675,10 +770,21 @@ function createKeychainReference(
 	};
 }
 
+/**
+ * Builds the in-memory composite key used by the mock store's `Map`.
+ * @param lookup - Normalised lookup.
+ * @returns A NUL-separated composite key.
+ */
 function createIdentityKey(lookup: NormalizedLookup): string {
 	return `${lookup.scope}\u0000${lookup.scopeId}\u0000${lookup.key}`;
 }
 
+/**
+ * Applies a filter and stable sort to an in-memory metadata list.
+ * @param metadata - Metadata list.
+ * @param filter - Filter to apply.
+ * @returns A new sorted/filtered array.
+ */
 function filterMetadata(
 	metadata: SecretMetadata[],
 	filter: SecretMetadataFilter = {},
@@ -702,6 +808,11 @@ function filterMetadata(
 		);
 }
 
+/**
+ * Maps a raw SQLite row to the {@link SecretMetadata} shape, validating the row.
+ * @param row - Raw row value.
+ * @returns The structured metadata.
+ */
 function parseMetadataRow(row: unknown): SecretMetadata {
 	if (!isSecretMetadataRow(row)) {
 		throw new SecretStoreError(
@@ -727,6 +838,11 @@ function parseMetadataRow(row: unknown): SecretMetadata {
 	};
 }
 
+/**
+ * Type guard for the `secret_metadata` table row shape.
+ * @param row - Candidate row value.
+ * @returns True when every expected column is present and well-typed.
+ */
 function isSecretMetadataRow(row: unknown): row is SecretMetadataRow {
 	if (typeof row !== 'object' || row === null) {
 		return false;
@@ -751,6 +867,11 @@ function isSecretMetadataRow(row: unknown): row is SecretMetadataRow {
 	);
 }
 
+/**
+ * Parses the `metadata_json` column, requiring it to be a JSON object.
+ * @param value - Raw `metadata_json` string.
+ * @returns The parsed record.
+ */
 function parseMetadataJson(value: string): Record<string, unknown> {
 	try {
 		const parsed = JSON.parse(value);
@@ -775,6 +896,14 @@ function parseMetadataJson(value: string): Record<string, unknown> {
 	);
 }
 
+/**
+ * Spawns `/usr/bin/security` with the given args and resolves with its output,
+ * mapping non-zero exits to {@link SecretStoreError}s.
+ * @param commandPath - Path to the `security` binary.
+ * @param args - Command-line arguments.
+ * @param stdin - Optional stdin payload.
+ * @returns Captured stdout/stderr on success.
+ */
 function runSecurityCommand(
 	commandPath: string,
 	args: string[],
@@ -816,6 +945,14 @@ function runSecurityCommand(
 	});
 }
 
+/**
+ * Maps a non-zero `security` exit into a typed {@link SecretStoreError}, with
+ * special handling for the "item not found" pattern.
+ * @param command - Subcommand name.
+ * @param exitCode - Observed exit code.
+ * @param stderr - Captured stderr.
+ * @returns The structured error.
+ */
 function createSecurityCommandError(
 	command: string,
 	exitCode: number | null,
@@ -838,10 +975,21 @@ function createSecurityCommandError(
 	});
 }
 
+/**
+ * Tests whether an error is a {@link SecretStoreError} with `not-found` code.
+ * @param error - Thrown value.
+ * @returns True for not-found errors.
+ */
 function isNotFoundError(error: unknown): boolean {
 	return error instanceof SecretStoreError && error.code === 'not-found';
 }
 
+/**
+ * Wraps an unknown error as a `metadata-error` unless it is already a typed
+ * {@link SecretStoreError}.
+ * @param error - Thrown value.
+ * @returns A typed error.
+ */
 function toMetadataError(error: unknown): SecretStoreError {
 	if (error instanceof SecretStoreError) {
 		return error;
@@ -854,10 +1002,20 @@ function toMetadataError(error: unknown): SecretStoreError {
 	);
 }
 
+/**
+ * Trims and length-caps stderr for inclusion in error diagnostics.
+ * @param stderr - Raw stderr.
+ * @returns A bounded, trimmed copy.
+ */
 function sanitizeStderr(stderr: string): string {
 	return stderr.trim().slice(0, 1000);
 }
 
+/**
+ * Renders a lookup as a user-facing identifier (e.g. `repository:r1:key`).
+ * @param lookup - Normalised lookup.
+ * @returns The formatted string.
+ */
 function formatLookup(lookup: NormalizedLookup): string {
 	return `${lookup.scope}:${lookup.scopeId || '<app>'}:${lookup.key}`;
 }

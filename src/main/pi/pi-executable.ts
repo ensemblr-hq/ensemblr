@@ -31,6 +31,7 @@ export type PiExecutableSource =
 export type PiExecutableProbeKind = 'help' | 'version';
 export type PiExecutableProbeStatus = 'failure' | 'success';
 
+/** One advisory diagnostic emitted during Pi executable discovery. */
 export interface PiExecutableDiagnostic {
 	code: string;
 	message: string;
@@ -39,6 +40,7 @@ export interface PiExecutableDiagnostic {
 	source?: PiExecutableSource;
 }
 
+/** Result of `--version`/`--help` probing of a candidate executable. */
 export interface PiExecutableProbeSnapshot {
 	args: string[];
 	detail: string;
@@ -46,6 +48,7 @@ export interface PiExecutableProbeSnapshot {
 	status: PiExecutableProbeStatus;
 }
 
+/** IPC-safe snapshot describing the currently-resolved Pi executable. */
 export interface PiExecutableSnapshot {
 	command: string;
 	diagnostics: PiExecutableDiagnostic[];
@@ -58,17 +61,20 @@ export interface PiExecutableSnapshot {
 	updatedAt: string;
 }
 
+/** Result of {@link PiExecutableService.saveOverride}. */
 export interface PiExecutableSelectionResult {
 	canceled: boolean;
 	error?: string;
 	selectedPath?: string;
 }
 
+/** Public surface of the Pi executable service. */
 export interface PiExecutableService {
 	getSnapshot: () => Promise<PiExecutableSnapshot>;
 	saveOverride: (executablePath: string) => PiExecutableSelectionResult;
 }
 
+/** Options for {@link resolvePiExecutable}. */
 export interface ResolvePiExecutableOptions {
 	commonCandidatePaths?: readonly string[];
 	homeDirectory?: string;
@@ -78,6 +84,7 @@ export interface ResolvePiExecutableOptions {
 	settingsSnapshot: SettingsResolutionSnapshot;
 }
 
+/** Options for {@link createPiExecutableService}. */
 interface CreatePiExecutableServiceOptions {
 	commonCandidatePaths?: readonly string[];
 	databaseService: EnsembleDatabaseService;
@@ -88,11 +95,13 @@ interface CreatePiExecutableServiceOptions {
 	settingsResolutionService: EnsembleConfigResolutionService;
 }
 
+/** Internal: candidate executable path plus the source that produced it. */
 interface Candidate {
 	path: string;
 	source: PiExecutableSource;
 }
 
+/** Internal: validated candidate with a render-ready display path. */
 interface ValidatedCandidate extends Candidate {
 	displayPath: string;
 }
@@ -109,6 +118,12 @@ const COMMON_PI_CANDIDATE_PATHS = [
 	'/bin/pi',
 ] as const;
 
+/**
+ * Builds the Pi executable service used by IPC handlers to discover, validate,
+ * and persist a user-selected Pi binary.
+ * @param options - Service dependencies and tuning.
+ * @returns A {@link PiExecutableService}.
+ */
 export function createPiExecutableService({
 	commonCandidatePaths,
 	databaseService,
@@ -136,6 +151,12 @@ export function createPiExecutableService({
 	};
 }
 
+/**
+ * Resolves the Pi executable from the user override, then PATH, then known
+ * common locations, returning a snapshot describing the chosen executable.
+ * @param options - Settings snapshot and discovery dependencies.
+ * @returns A {@link PiExecutableSnapshot}.
+ */
 export async function resolvePiExecutable({
 	commonCandidatePaths = COMMON_PI_CANDIDATE_PATHS,
 	homeDirectory = homedir(),
@@ -229,6 +250,11 @@ export async function resolvePiExecutable({
 	return createFailureSnapshot({ diagnostics, setting: null, updatedAt });
 }
 
+/**
+ * Persists the user's Pi executable override into the SQLite `settings` table.
+ * @param input - Database and selected path.
+ * @returns A {@link PiExecutableSelectionResult}.
+ */
 export function savePiExecutableOverride({
 	database,
 	executablePath,
@@ -297,6 +323,7 @@ export function savePiExecutableOverride({
 	}
 }
 
+/** Picks the resolved `pi.executablePath` setting from the snapshot. */
 function findPiExecutableSetting(
 	settingsSnapshot: SettingsResolutionSnapshot,
 ): ResolvedSettingSnapshot | null {
@@ -307,6 +334,12 @@ function findPiExecutableSetting(
 	);
 }
 
+/**
+ * Validates an explicitly-configured Pi path, expanding `~` and resolving
+ * bare-command names against the shell PATH.
+ * @param input - Setting context plus diagnostic sink.
+ * @returns A validated candidate, or `null` when the setting is unusable.
+ */
 async function createExplicitCandidate({
 	diagnostics,
 	homeDirectory,
@@ -390,6 +423,7 @@ async function createExplicitCandidate({
 	});
 }
 
+/** Resolves a configured path, expanding `~`. */
 function normalizeConfiguredPath(
 	rawPath: string,
 	homeDirectory: string,
@@ -405,10 +439,16 @@ function normalizeConfiguredPath(
 	return path.resolve(rawPath);
 }
 
+/** True when the path looks like a bare command name (no `/` or path sep). */
 function isBareCommand(rawPath: string): boolean {
 	return !rawPath.includes('/') && !rawPath.includes(path.sep);
 }
 
+/**
+ * Walks the shell PATH looking for an executable named `command`.
+ * @param input - Command, PATH value, source label and diagnostic sink.
+ * @returns A validated candidate, or `null` when the command is absent.
+ */
 function findExecutableInPath({
 	command,
 	diagnostics,
@@ -441,6 +481,11 @@ function findExecutableInPath({
 	return null;
 }
 
+/**
+ * Verifies a candidate path exists, is not a directory, and is executable.
+ * @param input - Candidate path, source label, and diagnostic sink.
+ * @returns A validated candidate, or `null` on any validation failure.
+ */
 function validateExecutableCandidate({
 	diagnostics,
 	path: candidatePath,
@@ -508,6 +553,7 @@ function validateExecutableCandidate({
 	};
 }
 
+/** Wraps `statSync` with diagnostic-aware error reporting. */
 function getCandidateStats(
 	candidatePath: string,
 	diagnostics: PiExecutableDiagnostic[],
@@ -531,6 +577,12 @@ function getCandidateStats(
 	}
 }
 
+/**
+ * Probes a validated candidate with `--version`/`--help` and assembles the
+ * resulting snapshot.
+ * @param input - Candidate plus probing dependencies and diagnostic sink.
+ * @returns A {@link PiExecutableSnapshot}.
+ */
 async function createSnapshotForCandidate({
 	candidate,
 	diagnostics,
@@ -577,6 +629,11 @@ async function createSnapshotForCandidate({
 	};
 }
 
+/**
+ * Tries `--version` first, then `--help` if version fails, to probe a candidate.
+ * @param input - Executable path and probing dependencies.
+ * @returns A {@link PiExecutableProbeSnapshot}.
+ */
 async function probeExecutable({
 	executablePath,
 	localCommandService,
@@ -607,6 +664,13 @@ async function probeExecutable({
 	return createProbeSnapshot('help', helpResult);
 }
 
+/**
+ * Renders a {@link LocalCommandResult} as a probe snapshot, picking the first
+ * non-empty output line for the headline detail.
+ * @param kind - Probe kind (`version` or `help`).
+ * @param result - Local command result.
+ * @returns A {@link PiExecutableProbeSnapshot}.
+ */
 function createProbeSnapshot(
 	kind: PiExecutableProbeKind,
 	result: LocalCommandResult,
@@ -627,6 +691,7 @@ function createProbeSnapshot(
 	};
 }
 
+/** Builds an `error`-status snapshot used when no candidate could be resolved. */
 function createFailureSnapshot({
 	diagnostics,
 	setting,
@@ -649,6 +714,7 @@ function createFailureSnapshot({
 	};
 }
 
+/** Returns the first non-empty trimmed line of `output`, or `null`. */
 function getFirstOutputLine(output: string): string | null {
 	const line = output
 		.split(/\r?\n/)

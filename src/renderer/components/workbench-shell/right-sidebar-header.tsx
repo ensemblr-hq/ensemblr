@@ -60,6 +60,7 @@ type RightSidebarHeaderState =
 
 type PullRequestHeaderTone = 'blocked' | 'neutral' | 'pending' | 'ready';
 
+/** Header above the review sidebar — shows PR number, tone, and primary action. */
 export function RightSidebarHeader({
 	activeWorkspace,
 }: {
@@ -140,6 +141,7 @@ export function RightSidebarHeader({
 	);
 }
 
+/** Pill-shaped PR number button, opening the URL when provided. */
 function PullRequestNumberButton({
 	number,
 	tone,
@@ -195,6 +197,7 @@ function PullRequestNumberButton({
 	);
 }
 
+/** Pill-shaped preview-deployment button that opens the provider's URL. */
 function PreviewDeploymentButton({
 	deployment,
 }: {
@@ -232,6 +235,7 @@ function PreviewDeploymentButton({
 	);
 }
 
+/** Renders a deployment provider as a short display label. */
 function getPreviewDeploymentProviderLabel(
 	provider: NonNullable<
 		WorkspaceShellModel['pullRequest']['previewDeployment']
@@ -248,6 +252,7 @@ function getPreviewDeploymentProviderLabel(
 	return 'deployment';
 }
 
+/** Split-button + popover surfacing PR creation actions. */
 function CreatePullRequestMenu() {
 	const [isOpen, setIsOpen] = useState(false);
 	const closeMenu = () => setIsOpen(false);
@@ -303,6 +308,12 @@ function CreatePullRequestMenu() {
 	);
 }
 
+/**
+ * Derives the right-sidebar header state (kind, label, tone, URL) from the
+ * workspace's pull-request status.
+ * @param workspace - Active workspace shell model.
+ * @returns The header state used by {@link RightSidebarHeader}.
+ */
 function getRightSidebarHeaderState(
 	workspace: WorkspaceShellModel,
 ): RightSidebarHeaderState {

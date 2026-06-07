@@ -16,11 +16,13 @@ import type {
 	SettingsResolutionSource,
 } from '../../shared/ipc';
 
+/** Options for {@link loadRepositoryConfig}. */
 export interface LoadRepositoryConfigOptions {
 	now?: () => Date;
 	repositoryPath: string;
 }
 
+/** Aggregated result of loading every supported repository config source. */
 export interface LoadedRepositoryConfig {
 	conductorLegacyConfig?: Record<string, unknown>;
 	conductorLocalConfig?: Record<string, unknown>;
@@ -30,6 +32,7 @@ export interface LoadedRepositoryConfig {
 	worktreeincludeConfig?: Record<string, unknown>;
 }
 
+/** Service exposed to IPC handlers for inspecting and migrating repo config. */
 export interface RepositoryConfigService {
 	applyMigration: (
 		request: RepositoryConfigMigrationRequest,
@@ -40,11 +43,13 @@ export interface RepositoryConfigService {
 	) => RepositoryConfigMigrationPreview;
 }
 
+/** Inputs for {@link isRepositoryConfigPathAllowed}. */
 export interface RepositoryConfigPathAuthorizationOptions {
 	database: DatabaseSync | null;
 	repositoryPath: string;
 }
 
+/** Internal: result of reading a single config file from disk. */
 interface ParsedConfigSource {
 	diagnostics: ConfigDiagnostic[];
 	path: string;
@@ -52,11 +57,13 @@ interface ParsedConfigSource {
 	status: RepositoryConfigSourceStatus;
 }
 
+/** Internal: result of normalising a parsed config file. */
 interface NormalizedConfigSource {
 	diagnostics: ConfigDiagnostic[];
 	settings: Record<string, unknown>;
 }
 
+/** Internal: one key/value pair flagged for migration. */
 interface MigrationEntry {
 	key: string;
 	source: SettingsResolutionSource;
@@ -128,6 +135,11 @@ const STRING_SETTING_KEYS = new Set([
 	'runScriptMode',
 ]);
 
+/**
+ * Builds the {@link RepositoryConfigService} used by IPC handlers to load and
+ * migrate per-repository configuration files.
+ * @returns A fresh service instance with no internal state.
+ */
 export function createRepositoryConfigService(): RepositoryConfigService {
 	return {
 		applyMigration: (request) => applyRepositoryConfigMigration(request),
@@ -137,6 +149,12 @@ export function createRepositoryConfigService(): RepositoryConfigService {
 	};
 }
 
+/**
+ * Returns whether the repository path is currently tracked (as either a
+ * repository or a workspace), gating repository-config IPC writes.
+ * @param options - Open database and candidate path.
+ * @returns True when the path matches a tracked entry.
+ */
 export function isRepositoryConfigPathAllowed({
 	database,
 	repositoryPath,
@@ -165,6 +183,13 @@ LIMIT 1
 	}
 }
 
+/**
+ * Loads every supported repository config source (ensemble.json, conductor
+ * shared/local TOML, legacy conductor.json, .worktreeinclude), normalises each,
+ * and returns both raw parsed records and an IPC-safe snapshot.
+ * @param options - Repository path and optional clock.
+ * @returns The parsed config sources plus a transport snapshot.
+ */
 export function loadRepositoryConfig({
 	now = () => new Date(),
 	repositoryPath,
@@ -293,6 +318,12 @@ export function loadRepositoryConfig({
 	};
 }
 
+/**
+ * Coerces an arbitrary IPC payload into a {@link LoadRepositoryConfigOptions},
+ * returning an empty path when the shape is invalid.
+ * @param request - Raw IPC payload.
+ * @returns Safe-to-use options.
+ */
 export function normalizeRepositoryConfigRequest(
 	request: unknown,
 ): LoadRepositoryConfigOptions {
@@ -307,6 +338,12 @@ export function normalizeRepositoryConfigRequest(
 	return { repositoryPath: request.repositoryPath.trim() };
 }
 
+/**
+ * Computes what {@link applyRepositoryConfigMigration} would do, including the
+ * resulting `ensemble.json`, per-key change classifications, and diagnostics.
+ * @param request - Migration request (path + overwrite flag).
+ * @returns Preview describing whether the migration can apply and what changes.
+ */
 export function previewRepositoryConfigMigration(
 	request: RepositoryConfigMigrationRequest,
 ): RepositoryConfigMigrationPreview {
@@ -408,6 +445,11 @@ export function previewRepositoryConfigMigration(
 	};
 }
 
+/**
+ * Builds an empty preview used for early-return error cases.
+ * @param input - Diagnostics and repository path to surface.
+ * @returns A migration preview with `canApply: false` and no changes.
+ */
 function createEmptyMigrationPreview({
 	diagnostics,
 	repositoryPath,
@@ -429,6 +471,12 @@ function createEmptyMigrationPreview({
 	};
 }
 
+/**
+ * Writes the migrated `ensemble.json` to disk after computing a preview, leaving
+ * the file untouched when the preview indicates the change is unsafe.
+ * @param request - Migration request (path + overwrite flag).
+ * @returns The applied result, including any write error.
+ */
 export function applyRepositoryConfigMigration(
 	request: RepositoryConfigMigrationRequest,
 ): RepositoryConfigMigrationResult {
@@ -465,6 +513,11 @@ export function applyRepositoryConfigMigration(
 	}
 }
 
+/**
+ * Reads and normalises a JSON repository config file.
+ * @param input - Parsing context (kind, source identifier, path).
+ * @returns Diagnostics plus the snapshot describing the source.
+ */
 function loadJsonSource({
 	kind,
 	repositoryPath,
@@ -500,6 +553,11 @@ function loadJsonSource({
 	};
 }
 
+/**
+ * Reads and normalises a TOML repository config file.
+ * @param input - Source identifier and path.
+ * @returns Diagnostics plus the snapshot describing the source.
+ */
 function loadTomlSource({
 	repositoryPath,
 	source,
@@ -529,6 +587,12 @@ function loadTomlSource({
 	};
 }
 
+/**
+ * Parses a `.worktreeinclude` file (one path per line) into a `filesToCopy`
+ * setting, skipping blanks and `#`-prefixed comments.
+ * @param repositoryPath - Repository root.
+ * @returns Diagnostics, derived settings, and source status.
+ */
 function loadWorktreeincludeSource(repositoryPath: string): {
 	diagnostics: ConfigDiagnostic[];
 	settings: Record<string, unknown>;
@@ -579,6 +643,11 @@ function loadWorktreeincludeSource(repositoryPath: string): {
 	};
 }
 
+/**
+ * Reads a JSON file from disk and reports parse/IO errors as diagnostics.
+ * @param input - File kind and path.
+ * @returns The parsed record (or `null`) plus status diagnostics.
+ */
 function readJsonFile({
 	kind,
 	source,
@@ -661,6 +730,11 @@ function readJsonFile({
 	}
 }
 
+/**
+ * Reads a TOML file from disk and reports parse/IO errors as diagnostics.
+ * @param input - File path.
+ * @returns The parsed record (or `null`) plus status diagnostics.
+ */
 function readTomlFile({
 	sourcePath,
 }: {
@@ -723,6 +797,12 @@ function readTomlFile({
 	}
 }
 
+/**
+ * Maps a parsed JSON config record onto the canonical Ensemble setting keys,
+ * collecting per-field diagnostics for unsupported or wrongly-typed values.
+ * @param input - Parsed record plus kind and source labels.
+ * @returns Normalised settings and diagnostics.
+ */
 function normalizeJsonRepositoryConfig({
 	config,
 	kind,
@@ -777,6 +857,13 @@ function normalizeJsonRepositoryConfig({
 	return { diagnostics, settings };
 }
 
+/**
+ * Maps a parsed TOML config record onto the canonical Ensemble setting keys,
+ * applying snake-to-camel renames and collecting per-field diagnostics.
+ * @param config - Parsed TOML record.
+ * @param source - Source identifier used in diagnostics.
+ * @returns Normalised settings and diagnostics.
+ */
 function normalizeTomlRepositoryConfig(
 	config: Record<string, unknown>,
 	source: SettingsResolutionSource,
@@ -826,6 +913,15 @@ function normalizeTomlRepositoryConfig(
 	return { diagnostics, settings };
 }
 
+/**
+ * Normalises the `scripts` block (setup/run/archive plus optional `run_mode`),
+ * collecting diagnostics for unsupported keys and non-string values.
+ * @param value - Raw `scripts` value to normalise.
+ * @param fieldPath - JSONPath used in diagnostic messages.
+ * @param source - Source identifier used in diagnostics.
+ * @param supportRunMode - Whether to accept the TOML-only `run_mode` key.
+ * @returns Partial settings record (may include the special `__diagnostics` key).
+ */
 function normalizeScripts(
 	value: unknown,
 	fieldPath: string,
@@ -891,6 +987,11 @@ function normalizeScripts(
 	return settings;
 }
 
+/**
+ * Type-checks a single setting value against the expected shape for its key.
+ * @param input - Key plus the candidate value and diagnostic context.
+ * @returns Either an `accepted` value or a `diagnostic` describing the mismatch.
+ */
 function normalizeSettingValue({
 	fieldPath,
 	key,
@@ -971,6 +1072,12 @@ function normalizeSettingValue({
 	return { accepted: true, value };
 }
 
+/**
+ * Builds the IPC-safe snapshot describing a single config source, stripping the
+ * internal `__diagnostics` carrier and clearing settings when not `loaded`.
+ * @param input - Source identifier, status, path and settings.
+ * @returns A snapshot for transport across IPC.
+ */
 function createSourceSnapshot({
 	repositoryPath,
 	settings,
@@ -996,6 +1103,10 @@ function createSourceSnapshot({
 	};
 }
 
+/**
+ * Appends a freshly-built source snapshot to the in-progress `sources` list.
+ * @param input - Source identifier and snapshot fields plus the target list.
+ */
 function pushSourceSnapshot({
 	repositoryPath,
 	settings,
@@ -1022,12 +1133,23 @@ function pushSourceSnapshot({
 	);
 }
 
+/**
+ * Returns the snapshot's settings only when its status is `loaded`.
+ * @param snapshot - Source snapshot.
+ * @returns The settings, or `undefined`.
+ */
 function getLoadedSettings(
 	snapshot: RepositoryConfigSourceSnapshot,
 ): Record<string, unknown> | undefined {
 	return getLoadedSettingsForStatus(snapshot.settings, snapshot.status);
 }
 
+/**
+ * Status-gated accessor used by sources that don't have a snapshot yet.
+ * @param settings - Candidate settings record.
+ * @param status - Source status.
+ * @returns The settings when status is `loaded`, otherwise `undefined`.
+ */
 function getLoadedSettingsForStatus(
 	settings: Record<string, unknown>,
 	status: RepositoryConfigSourceStatus,
@@ -1039,6 +1161,11 @@ function getLoadedSettingsForStatus(
 	return settings;
 }
 
+/**
+ * Picks the loaded Conductor source to migrate, preferring TOML over legacy JSON.
+ * @param sources - All loaded config sources.
+ * @returns The source to migrate, or `null` when no Conductor config is loaded.
+ */
 function getMigrationSource(
 	sources: readonly RepositoryConfigSourceSnapshot[],
 ): RepositoryConfigSourceSnapshot | null {
@@ -1056,6 +1183,13 @@ function getMigrationSource(
 	);
 }
 
+/**
+ * Flattens Conductor settings into the migration entries written into
+ * `ensemble.json`, expanding `scripts.*` keys and excluding compat flags.
+ * @param settings - Source settings.
+ * @param source - Source identifier propagated onto every entry.
+ * @returns Sorted migration entries.
+ */
 function collectMigrationEntries(
 	settings: Record<string, unknown>,
 	source: SettingsResolutionSource,
@@ -1085,6 +1219,12 @@ function collectMigrationEntries(
 	return entries.sort((left, right) => left.key.localeCompare(right.key));
 }
 
+/**
+ * Merges `source` into `target` in place, preserving and concatenating the
+ * internal `__diagnostics` carrier and deep-merging `scripts`.
+ * @param target - Settings record to update.
+ * @param source - Partial settings to merge in.
+ */
 function mergeSettings(
 	target: Record<string, unknown>,
 	source: Record<string, unknown>,
@@ -1113,6 +1253,12 @@ function mergeSettings(
 	}
 }
 
+/**
+ * Attaches a diagnostic to a settings record via the internal `__diagnostics`
+ * carrier so it can be hoisted later by {@link takeNestedDiagnostics}.
+ * @param settings - Settings record being normalised.
+ * @param diagnostic - Diagnostic to append.
+ */
 function pushNestedDiagnostic(
 	settings: Record<string, unknown>,
 	diagnostic: ConfigDiagnostic,
@@ -1123,6 +1269,11 @@ function pushNestedDiagnostic(
 	];
 }
 
+/**
+ * Extracts and removes accumulated nested diagnostics from a settings record.
+ * @param settings - Settings record to drain.
+ * @returns The previously-collected diagnostics.
+ */
 function takeNestedDiagnostics(
 	settings: Record<string, unknown>,
 ): ConfigDiagnostic[] {
@@ -1132,6 +1283,13 @@ function takeNestedDiagnostics(
 	return Array.isArray(diagnostics) ? diagnostics : [];
 }
 
+/**
+ * Walks a dotted path inside a record, reporting whether a value exists at the
+ * leaf and what it currently is.
+ * @param record - Record to inspect.
+ * @param fieldPath - Dotted path (e.g. `scripts.setup`).
+ * @returns Whether a value exists, and the value itself when found.
+ */
 function inspectValueAtPath(
 	record: Record<string, unknown>,
 	fieldPath: string,
@@ -1162,6 +1320,13 @@ function inspectValueAtPath(
 	return { existingValue: current, hasExistingValue: true };
 }
 
+/**
+ * Sets a dotted-path value inside a record, creating intermediate objects when
+ * they are missing or shadowing non-object values.
+ * @param record - Record to mutate.
+ * @param fieldPath - Dotted path (e.g. `scripts.setup`).
+ * @param value - Value to set at the leaf.
+ */
 function setValueAtPath(
 	record: Record<string, unknown>,
 	fieldPath: string,
@@ -1203,14 +1368,32 @@ function setValueAtPath(
 	}
 }
 
+/**
+ * Returns a structurally-cloned copy of a JSON-safe record.
+ * @param record - Record to clone.
+ * @returns A deep clone of `record`.
+ */
 function cloneRecord(record: Record<string, unknown>): Record<string, unknown> {
 	return JSON.parse(JSON.stringify(record)) as Record<string, unknown>;
 }
 
+/**
+ * Compares two JSON-safe values for structural equality.
+ * @param left - First value.
+ * @param right - Second value.
+ * @returns True when their JSON serialisations match.
+ */
 function areJsonValuesEqual(left: unknown, right: unknown): boolean {
 	return JSON.stringify(left) === JSON.stringify(right);
 }
 
+/**
+ * Builds an "unsupported field" warning diagnostic.
+ * @param key - Field key.
+ * @param source - Source identifier.
+ * @param fieldPath - JSONPath for the field.
+ * @returns A warning diagnostic.
+ */
 function createUnsupportedFieldDiagnostic(
 	key: string,
 	source: SettingsResolutionSource,
@@ -1224,6 +1407,14 @@ function createUnsupportedFieldDiagnostic(
 	};
 }
 
+/**
+ * Builds an "invalid field type" warning diagnostic.
+ * @param key - Field key.
+ * @param source - Source identifier.
+ * @param fieldPath - JSONPath for the field.
+ * @param expected - Human-readable expected type.
+ * @returns A warning diagnostic.
+ */
 function createInvalidFieldDiagnostic(
 	key: string,
 	source: SettingsResolutionSource,
@@ -1238,6 +1429,11 @@ function createInvalidFieldDiagnostic(
 	};
 }
 
+/**
+ * Maps a settings source identifier to its on-disk filename for diagnostics.
+ * @param source - Source identifier.
+ * @returns Human-readable file name.
+ */
 function formatSourceName(source: SettingsResolutionSource): string {
 	if (source === 'conductor-config') {
 		return '.conductor/settings.toml';
@@ -1262,6 +1458,12 @@ function formatSourceName(source: SettingsResolutionSource): string {
 	return source;
 }
 
+/**
+ * Renders a source path relative to the repository root when possible.
+ * @param sourcePath - Absolute source path.
+ * @param repositoryPath - Repository root.
+ * @returns Relative path, or `sourcePath` when it lives outside the repo.
+ */
 function formatRepositoryDisplayPath(
 	sourcePath: string,
 	repositoryPath: string,
@@ -1275,6 +1477,12 @@ function formatRepositoryDisplayPath(
 	return relativePath;
 }
 
+/**
+ * Extracts a line/column hint from a JSON parser error message.
+ * @param source - Raw JSON source text.
+ * @param error - The parser error thrown by `JSON.parse`.
+ * @returns A partial diagnostic with `line` and `column`, when available.
+ */
 function getJsonErrorLocation(
 	source: string,
 	error: unknown,
@@ -1296,20 +1504,41 @@ function getJsonErrorLocation(
 	return {};
 }
 
+/**
+ * Coerces an unknown thrown value to a user-facing message.
+ * @param error - Thrown value.
+ * @param fallback - Fallback message when `error` is not an `Error`.
+ * @returns A human-readable message.
+ */
 function formatErrorMessage(error: unknown, fallback: string): string {
 	return error instanceof Error ? error.message : fallback;
 }
 
+/**
+ * Type guard for an array of strings.
+ * @param value - Candidate value.
+ * @returns True when every element is a string.
+ */
 function isStringArray(value: unknown): value is string[] {
 	return (
 		Array.isArray(value) && value.every((item) => typeof item === 'string')
 	);
 }
 
+/**
+ * Type guard that excludes arrays from the structural-record check.
+ * @param value - Candidate value.
+ * @returns True when `value` is a non-null, non-array object.
+ */
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Type guard for the row shape returned by the path-authorisation query.
+ * @param row - Candidate row value.
+ * @returns True when the row exposes a string `path` column.
+ */
 function isPathRow(row: unknown): row is { path: string } {
 	return (
 		typeof row === 'object' &&

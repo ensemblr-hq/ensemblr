@@ -27,6 +27,7 @@ import type {
 import type { EnsembleConfigResolutionService } from '../config/config-resolution';
 import type { EnsembleDatabaseService } from '../storage/database';
 
+/** Options for {@link ensureRootDirectory}. */
 export interface EnsureRootDirectoryOptions {
 	allowCreate?: boolean;
 	database?: DatabaseSync | null;
@@ -35,6 +36,7 @@ export interface EnsureRootDirectoryOptions {
 	settingsSnapshot: SettingsResolutionSnapshot;
 }
 
+/** Public surface of the Ensemble root-directory service. */
 export interface EnsembleRootDirectoryService {
 	applyChange: (
 		request: RootDirectoryChangeRequest,
@@ -44,6 +46,7 @@ export interface EnsembleRootDirectoryService {
 	previewChange: (nextRootPath: string) => RootDirectoryChangePreview;
 }
 
+/** Options for {@link createEnsembleRootDirectoryService}. */
 interface CreateEnsembleRootDirectoryServiceOptions {
 	allowCreate?: boolean;
 	databaseService: EnsembleDatabaseService;
@@ -53,6 +56,7 @@ interface CreateEnsembleRootDirectoryServiceOptions {
 	settingsResolutionService: EnsembleConfigResolutionService;
 }
 
+/** Hook used to scan and reconcile a root directory after a change. */
 type RootDirectoryReconciler = (options: {
 	now?: () => Date;
 	root: RootDirectorySnapshot;
@@ -76,6 +80,12 @@ const MANAGED_DIRECTORY_NAMES = new Set(
 );
 const IGNORED_ROOT_ENTRY_NAMES = new Set(['.DS_Store']);
 
+/**
+ * Builds the root-directory service that ensures the Ensemble root exists,
+ * exposes change preview/apply, and caches the last snapshot for callers.
+ * @param options - Service dependencies and tuning.
+ * @returns A {@link EnsembleRootDirectoryService}.
+ */
 export function createEnsembleRootDirectoryService({
 	allowCreate = true,
 	databaseService,
@@ -86,6 +96,7 @@ export function createEnsembleRootDirectoryService({
 }: CreateEnsembleRootDirectoryServiceOptions): EnsembleRootDirectoryService {
 	let snapshot: RootDirectorySnapshot | null = null;
 
+	/** Resolves settings, ensures the root exists and caches the snapshot. */
 	function ensure(): RootDirectorySnapshot {
 		snapshot = ensureRootDirectory({
 			allowCreate,
@@ -132,6 +143,12 @@ export function createEnsembleRootDirectoryService({
 	};
 }
 
+/**
+ * Resolves the rootDirectory setting, verifies (and optionally creates) the
+ * root and its managed subdirectories, then persists the snapshot to SQLite.
+ * @param options - Settings snapshot, database, and tuning overrides.
+ * @returns A {@link RootDirectorySnapshot}.
+ */
 export function ensureRootDirectory({
 	allowCreate = true,
 	database = null,
@@ -172,6 +189,12 @@ export function ensureRootDirectory({
 	return snapshot;
 }
 
+/**
+ * Computes a non-destructive preview of a root-directory change, reporting
+ * blockers such as the setting being locked or the candidate path being invalid.
+ * @param input - Candidate path, previous root, and current settings snapshot.
+ * @returns A {@link RootDirectoryChangePreview}.
+ */
 export function previewRootDirectoryChange({
 	homeDirectory = homedir(),
 	nextRootPath,
@@ -214,6 +237,12 @@ export function previewRootDirectoryChange({
 	};
 }
 
+/**
+ * Persists a root-directory change after preview validation, then re-runs
+ * `ensureRootDirectory` and reconciliation against the new root.
+ * @param input - Database, new path, previous root, settings refresher, and reconciler.
+ * @returns A {@link RootDirectoryChangeApplyResult}.
+ */
 export function applyRootDirectoryChange({
 	database,
 	homeDirectory = homedir(),
@@ -308,6 +337,7 @@ export function applyRootDirectoryChange({
 	};
 }
 
+/** No-op reconciler used when no full scanner is wired up. */
 function createEmptyRootDirectoryReconciliation({
 	now = () => new Date(),
 	root,
@@ -329,6 +359,12 @@ function createEmptyRootDirectoryReconciliation({
 	};
 }
 
+/**
+ * Validates and inspects a candidate root path value without depending on the
+ * resolved settings snapshot.
+ * @param input - Candidate path and inspection options.
+ * @returns A {@link RootDirectorySnapshot}.
+ */
 function inspectRootPathValue({
 	allowCreate,
 	homeDirectory,
@@ -370,6 +406,7 @@ function inspectRootPathValue({
 	});
 }
 
+/** Picks the resolved `rootDirectory` setting from the settings snapshot. */
 function findRootDirectorySetting(
 	settingsSnapshot: SettingsResolutionSnapshot,
 ): ResolvedSettingSnapshot | null {
@@ -380,6 +417,7 @@ function findRootDirectorySetting(
 	);
 }
 
+/** Builds a synthetic setting snapshot used during preview/inspection paths. */
 function createRootDirectorySettingSnapshot(
 	rootPathValue: string,
 ): ResolvedSettingSnapshot {
@@ -398,6 +436,12 @@ function createRootDirectorySettingSnapshot(
 	};
 }
 
+/**
+ * Validates and resolves the `rootDirectory` setting value, expanding `~`.
+ * @param setting - Resolved setting (may be null).
+ * @param homeDirectory - User home directory.
+ * @returns The resolved absolute path plus diagnostics describing any problem.
+ */
 function normalizeRootPath(
 	setting: ResolvedSettingSnapshot | null,
 	homeDirectory: string,
@@ -471,6 +515,7 @@ function normalizeRootPath(
 	return { diagnostics: [], path: path.resolve(rawPath) };
 }
 
+/** Builds default `missing` managed-path snapshots under the given root. */
 function createManagedPathSnapshots(
 	rootPath: string,
 ): RootDirectoryManagedPathSnapshot[] {
@@ -481,6 +526,11 @@ function createManagedPathSnapshots(
 	}));
 }
 
+/**
+ * Inspects the root directory itself plus its managed subdirectories,
+ * creating missing entries when `allowCreate` is true and the root is empty.
+ * @param input - Inspection options and diagnostic sinks.
+ */
 function inspectRootDirectory({
 	allowCreate,
 	createdPaths,
@@ -578,6 +628,11 @@ function inspectRootDirectory({
 	});
 }
 
+/**
+ * Inspects each managed subdirectory under the root, creating missing ones when
+ * permitted and surfacing existing-content warnings.
+ * @param input - Inspection options and diagnostic sinks.
+ */
 function inspectManagedDirectories({
 	allowCreate,
 	createdPaths,
@@ -655,6 +710,12 @@ function inspectManagedDirectories({
 	}
 }
 
+/**
+ * Warns when a managed subdirectory already contains content (possibly from a
+ * shared or previously used root).
+ * @param managedPath - Managed-path snapshot.
+ * @param diagnostics - Diagnostic sink.
+ */
 function detectSharedManagedContent(
 	managedPath: RootDirectoryManagedPathSnapshot,
 	diagnostics: RootDirectoryDiagnostic[],
@@ -678,6 +739,16 @@ function detectSharedManagedContent(
 	});
 }
 
+/**
+ * Creates a directory recursively, recording the path on success or appending
+ * a diagnostic on failure.
+ * @param directoryPath - Directory to create.
+ * @param createdPaths - Sink for successfully-created paths.
+ * @param diagnostics - Diagnostic sink.
+ * @param errorCode - Diagnostic code for generic failures.
+ * @param permissionCode - Diagnostic code for permission failures.
+ * @returns True on success.
+ */
 function createDirectory(
 	directoryPath: string,
 	createdPaths: string[],
@@ -700,6 +771,7 @@ function createDirectory(
 	}
 }
 
+/** Wraps `statSync` with diagnostic-aware error reporting. */
 function getDirectoryStats(
 	directoryPath: string,
 	diagnostics: RootDirectoryDiagnostic[],
@@ -718,6 +790,7 @@ function getDirectoryStats(
 	}
 }
 
+/** Wraps `readdirSync` with diagnostic-aware error reporting, returning a sorted list. */
 function readDirectoryEntries(
 	directoryPath: string,
 	diagnostics: RootDirectoryDiagnostic[],
@@ -737,6 +810,7 @@ function readDirectoryEntries(
 	}
 }
 
+/** Records a diagnostic when the directory is not writable. */
 function assertWritable(
 	directoryPath: string,
 	diagnostics: RootDirectoryDiagnostic[],
@@ -754,6 +828,12 @@ function assertWritable(
 	}
 }
 
+/**
+ * Assembles the final {@link RootDirectorySnapshot} including derived managed
+ * paths and the overall status computed from diagnostics.
+ * @param input - Snapshot fields.
+ * @returns A {@link RootDirectorySnapshot}.
+ */
 function createRootDirectorySnapshot({
 	createdPaths,
 	diagnostics,
@@ -794,6 +874,12 @@ function createRootDirectorySnapshot({
 	};
 }
 
+/**
+ * Upserts the current root snapshot into the `root_directories` table.
+ * @param database - Open SQLite connection or `null`.
+ * @param snapshot - Snapshot to persist.
+ * @param now - Clock injection point.
+ */
 function persistRootDirectorySnapshot(
 	database: DatabaseSync | null,
 	snapshot: RootDirectorySnapshot,
@@ -853,6 +939,10 @@ function persistRootDirectorySnapshot(
 		);
 }
 
+/**
+ * Persists the user's `rootDirectory` override into the SQLite `settings` table.
+ * @param input - Database, clock, and new path.
+ */
 function saveRootDirectoryOverride({
 	database,
 	now,
@@ -891,6 +981,7 @@ function saveRootDirectoryOverride({
 		);
 }
 
+/** Tests whether a Node.js filesystem error is a permission failure. */
 function isPermissionError(error: unknown): boolean {
 	return (
 		typeof error === 'object' &&
@@ -900,6 +991,7 @@ function isPermissionError(error: unknown): boolean {
 	);
 }
 
+/** Coerces a thrown filesystem value into a user-facing message. */
 function formatFilesystemError(error: unknown, fallback: string): string {
 	return error instanceof Error ? error.message : fallback;
 }

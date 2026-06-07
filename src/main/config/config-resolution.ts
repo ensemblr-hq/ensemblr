@@ -17,6 +17,7 @@ import type { EnsembleDatabaseService } from '../storage/database';
 import type { EnsembleConfig, EnsembleConfigService } from './config-loader';
 import { loadRepositoryConfig } from './repository-config.ts';
 
+/** Inputs for the pure {@link resolveSettings} function. */
 export interface ResolveSettingsOptions {
 	config: EnsembleConfig;
 	database?: DatabaseSync | null;
@@ -24,22 +25,26 @@ export interface ResolveSettingsOptions {
 	repository?: RepositorySettingsResolutionRequest;
 }
 
+/** Service that resolves settings on demand for IPC consumers. */
 export interface EnsembleConfigResolutionService {
 	resolve: (request?: unknown) => SettingsResolutionSnapshot;
 }
 
+/** Options for {@link createEnsembleConfigResolutionService}. */
 interface CreateEnsembleConfigResolutionServiceOptions {
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
 	homeDirectory?: string;
 }
 
+/** Internal: one candidate value for a setting, before precedence selection. */
 interface Candidate {
 	invalidReason?: string;
 	source: SettingsResolutionSource;
 	value?: unknown;
 }
 
+/** Internal: shape of a row read from the SQLite `settings` table. */
 interface SqliteSettingRow {
 	key: string;
 	source: string;
@@ -83,6 +88,12 @@ const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> = {
 
 const VALIDATED_SETTING_KEYS = new Set(['security.permissionMode']);
 
+/**
+ * Builds the settings-resolution service consumed by IPC handlers, wiring the
+ * config and database services together.
+ * @param options - Service dependencies and home-directory override.
+ * @returns A {@link EnsembleConfigResolutionService}.
+ */
 export function createEnsembleConfigResolutionService({
 	configService,
 	databaseService,
@@ -99,6 +110,12 @@ export function createEnsembleConfigResolutionService({
 	};
 }
 
+/**
+ * Resolves the effective app (and optional repository) settings by merging every
+ * supported source and applying precedence rules.
+ * @param options - Validated config, database, repository, and home-directory inputs.
+ * @returns A diagnostic-rich snapshot of every resolved setting.
+ */
 export function resolveSettings({
 	config,
 	database = null,
@@ -199,6 +216,12 @@ export function resolveSettings({
 	return snapshot;
 }
 
+/**
+ * Coerces an IPC payload into a {@link SettingsResolutionRequest}, rejecting
+ * requests that lack both a repository ID and path.
+ * @param request - Raw IPC payload.
+ * @returns A safe-to-use request.
+ */
 export function normalizeSettingsResolutionRequest(
 	request: unknown,
 ): SettingsResolutionRequest {
@@ -237,6 +260,12 @@ export function normalizeSettingsResolutionRequest(
 	};
 }
 
+/**
+ * Resolves a single scope (app or repository) by selecting one candidate per
+ * key according to source order and locked-key rules.
+ * @param input - Candidates, locked keys, scope identifier and source order.
+ * @returns The resolved settings plus per-candidate diagnostics.
+ */
 function resolveCandidateGroup({
 	candidatesByKey,
 	lockedKeys,
@@ -290,6 +319,14 @@ function resolveCandidateGroup({
 	return { diagnostics, settings };
 }
 
+/**
+ * Picks the first valid candidate, skipping invalid ones and SQLite candidates
+ * whose key is locked by managed config.
+ * @param key - Setting key.
+ * @param candidates - Pre-ordered candidates.
+ * @param lockedKeys - Keys locked by managed config.
+ * @returns The selected candidate, or `null` when none are valid.
+ */
 function selectCandidate(
 	key: string,
 	candidates: readonly Candidate[],
@@ -310,6 +347,12 @@ function selectCandidate(
 	return null;
 }
 
+/**
+ * Converts ordered candidates into per-source snapshot rows with status and
+ * reason strings explaining why each was selected or ignored.
+ * @param input - Candidates plus the chosen one and locked-key context.
+ * @returns One snapshot row per candidate.
+ */
 function createCandidateSnapshots({
 	candidates,
 	key,
@@ -356,6 +399,12 @@ function createCandidateSnapshots({
 	});
 }
 
+/**
+ * Sorts candidates by source precedence; unknown sources fall after every known one.
+ * @param candidates - Candidates to order.
+ * @param sourceOrder - Precedence array.
+ * @returns A new array sorted by source rank.
+ */
 function orderCandidates(
 	candidates: readonly Candidate[],
 	sourceOrder: readonly SettingsResolutionSource[],
@@ -376,6 +425,13 @@ function orderCandidates(
 	});
 }
 
+/**
+ * Adds candidate values from a single source into the per-key candidate map,
+ * validating each entry before appending.
+ * @param candidatesByKey - Mutable map of accumulated candidates.
+ * @param values - Either raw values or already-built {@link Candidate}s.
+ * @param source - Source identifier assigned to raw values.
+ */
 function addCandidates(
 	candidatesByKey: Map<string, Candidate[]>,
 	values: Map<string, unknown | Candidate>,
@@ -390,6 +446,12 @@ function addCandidates(
 	}
 }
 
+/**
+ * Built-in fallback defaults for the app scope, including the default Ensemble
+ * root directory derived from the user's home.
+ * @param homeDirectory - User home directory.
+ * @returns Flat map of `key -> value`.
+ */
 function collectAppBuiltInDefaults(
 	homeDirectory: string,
 ): Map<string, unknown> {
@@ -401,6 +463,13 @@ function collectAppBuiltInDefaults(
 	]);
 }
 
+/**
+ * Applies per-key validation to a candidate, marking invalid candidates with a
+ * reason rather than discarding them.
+ * @param key - Setting key.
+ * @param candidate - Candidate to validate.
+ * @returns The original candidate or a copy with `invalidReason` set.
+ */
 function validateSettingCandidate(
 	key: string,
 	candidate: Candidate,
@@ -424,6 +493,11 @@ function validateSettingCandidate(
 	return candidate;
 }
 
+/**
+ * Returns a diagnostic reason when a value is not a valid permission mode.
+ * @param value - Candidate value.
+ * @returns Reason string, or `null` when valid.
+ */
 function getInvalidPermissionModeReason(value: unknown): string | null {
 	if (
 		typeof value === 'string' &&
@@ -440,6 +514,12 @@ function getInvalidPermissionModeReason(value: unknown): string | null {
 	return `Invalid permission mode ${formattedValue}. Expected one of: ${VALID_PERMISSION_MODES.join(', ')}.`;
 }
 
+/**
+ * Flattens a Conductor config and forces `conductorCompatibility` to true when
+ * the source provided any settings at all.
+ * @param conductorConfig - Conductor settings, when present.
+ * @returns Flat map of `key -> value`.
+ */
 function collectConductorConfigCandidates(
 	conductorConfig?: Record<string, unknown>,
 ): Map<string, unknown> {
@@ -452,6 +532,12 @@ function collectConductorConfigCandidates(
 	return candidates;
 }
 
+/**
+ * Builds the app-scope `config-default` candidates by flattening the relevant
+ * sections of the declarative config under their canonical key prefixes.
+ * @param config - Validated declarative config.
+ * @returns Flat map of `key -> value`.
+ */
 function collectAppConfigDefaults(
 	config: EnsembleConfig,
 ): Map<string, unknown> {
@@ -479,6 +565,14 @@ function collectAppConfigDefaults(
 	return defaults;
 }
 
+/**
+ * For each locked key, returns the managed value (if any) or falls back to the
+ * matching config default.
+ * @param config - Declarative config.
+ * @param appConfigDefaults - Already-flattened app defaults.
+ * @param lockedKeys - Keys locked by managed config.
+ * @returns Flat map of `key -> value`.
+ */
 function collectManagedAppCandidates(
 	config: EnsembleConfig,
 	appConfigDefaults: Map<string, unknown>,
@@ -501,6 +595,12 @@ function collectManagedAppCandidates(
 	return candidates;
 }
 
+/**
+ * Extracts managed values from both the `managed.values` block and the legacy
+ * top-level managed keys, ignoring the `locked` block.
+ * @param managed - Raw `managed` config section.
+ * @returns Flat map of `key -> value`.
+ */
 function collectManagedValues(
 	managed: Record<string, unknown>,
 ): Map<string, unknown> {
@@ -529,6 +629,11 @@ function collectManagedValues(
 	return values;
 }
 
+/**
+ * Reads the boolean `managed.locked` tree and returns the set of locked keys.
+ * @param managed - Raw `managed` config section.
+ * @returns Set of dotted locked keys.
+ */
 function collectManagedLockedKeys(
 	managed: Record<string, unknown>,
 ): Set<string> {
@@ -547,6 +652,14 @@ function collectManagedLockedKeys(
 	return lockedKeys;
 }
 
+/**
+ * Reads persisted setting candidates from the SQLite `settings` table, marking
+ * rows with unparseable JSON as invalid rather than dropping them.
+ * @param database - Open SQLite connection or `null`.
+ * @param scope - Settings scope.
+ * @param scopeId - Scope identifier (e.g. repository id).
+ * @returns Map of `key -> candidate`.
+ */
 function collectSqliteSettings(
 	database: DatabaseSync | null,
 	scope: SettingsResolutionScope,
@@ -588,6 +701,13 @@ function collectSqliteSettings(
 	return candidates;
 }
 
+/**
+ * Flattens a nested object into a dotted-key map; arrays and primitives become
+ * leaves at their containing path.
+ * @param record - Source record.
+ * @param prefix - Key prefix used during recursion.
+ * @returns Flat map of dotted-keys to leaf values.
+ */
 function flattenRecord(
 	record: Record<string, unknown>,
 	prefix = '',
@@ -610,6 +730,11 @@ function flattenRecord(
 	return flattened;
 }
 
+/**
+ * Type guard for already-built {@link Candidate} entries.
+ * @param value - Candidate value.
+ * @returns True when the shape matches.
+ */
 function isCandidate(value: unknown): value is Candidate {
 	return (
 		isPlainRecord(value) &&
@@ -618,10 +743,20 @@ function isCandidate(value: unknown): value is Candidate {
 	);
 }
 
+/**
+ * Type guard that excludes arrays from the structural-record check.
+ * @param value - Candidate value.
+ * @returns True when `value` is a non-null, non-array object.
+ */
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/**
+ * Type guard for the row shape returned by the settings table query.
+ * @param row - Candidate row value.
+ * @returns True when the row has the expected columns.
+ */
 function isSqliteSettingRow(row: unknown): row is SqliteSettingRow {
 	return (
 		isPlainRecord(row) &&

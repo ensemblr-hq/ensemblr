@@ -137,6 +137,7 @@
 		-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
 	--font-mono:
 		"JetBrains Mono Variable", "JetBrains Mono", Menlo, Consolas, monospace;
+	--text-xxs: 0.6875rem;
 	--color-canvas: var(--ensemble-canvas);
 	--color-toolbar: var(--ensemble-toolbar);
 	--color-surface: var(--ensemble-surface);

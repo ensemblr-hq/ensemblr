@@ -18,6 +18,12 @@ import {
 	mapRepositoriesToProjects,
 } from './navigation-model';
 
+/**
+ * Loads every dataset the workbench shell needs (health, navigation, setup),
+ * falling back to mocks when the preload bridge is absent.
+ * @param queryClient - Shared TanStack Query client.
+ * @returns A {@link WorkbenchShellData} for the shell renderer.
+ */
 export async function loadWorkbenchShellData(
 	queryClient: QueryClient,
 ): Promise<WorkbenchShellData> {
@@ -84,6 +90,12 @@ export async function loadWorkbenchShellData(
 	};
 }
 
+/**
+ * Reduces the loaded shell data into a single {@link WorkbenchHealth} value
+ * suitable for the header status badge.
+ * @param input - Shell data subset (bridge state, health, setup).
+ * @returns A workbench health summary.
+ */
 export function getWorkbenchHealth({
 	hasPreloadBridge,
 	healthError,
@@ -174,6 +186,12 @@ export function getWorkbenchHealth({
 	};
 }
 
+/**
+ * Picks the empty-state title and detail surfaced by the workspace navigation
+ * sidebar based on loading state, errors and project count.
+ * @param input - Loading state, navigation error, project count, setup status.
+ * @returns A `{ title, detail }` empty-state copy block.
+ */
 export function getEmptyStateCopy({
 	isLoading,
 	navigationError,
@@ -220,6 +238,11 @@ export function getEmptyStateCopy({
 	};
 }
 
+/**
+ * Coerces an unknown thrown value into a renderer-safe error message.
+ * @param error - Thrown value.
+ * @returns The message, or `null` for falsy inputs.
+ */
 export function getErrorMessage(error: unknown): string | null {
 	if (!error) {
 		return null;

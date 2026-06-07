@@ -7,11 +7,18 @@ import type {
 	RootDirectorySnapshot,
 } from '../../shared/ipc';
 
+/** Options for {@link reconcileRootDirectory}. */
 export interface ReconcileRootDirectoryOptions {
 	now?: () => Date;
 	root: RootDirectorySnapshot;
 }
 
+/**
+ * Scans the root directory's managed subdirectories, counting repositories and
+ * workspaces and surfacing reconciliation diagnostics.
+ * @param options - Root snapshot and clock.
+ * @returns A {@link RootDirectoryReconciliationSnapshot}.
+ */
 export function reconcileRootDirectory({
 	now = () => new Date(),
 	root,
@@ -49,6 +56,7 @@ export function reconcileRootDirectory({
 	});
 }
 
+/** Counts workspace directories grouped under per-repository subfolders. */
 function countWorkspaceDirectories({
 	diagnostics,
 	workspacesPath,
@@ -101,6 +109,7 @@ function countWorkspaceDirectories({
 	return workspaceCount;
 }
 
+/** Counts the immediate subdirectories of `directoryPath`, ignoring files. */
 function countDirectChildDirectories({
 	diagnostics,
 	directoryPath,
@@ -150,6 +159,7 @@ function countDirectChildDirectories({
 	return count;
 }
 
+/** Wraps `readdirSync` with diagnostic-aware error reporting. */
 function readDirectoryEntries({
 	diagnostics,
 	directoryPath,
@@ -175,6 +185,7 @@ function readDirectoryEntries({
 	}
 }
 
+/** Wraps `statSync` with diagnostic-aware error reporting. */
 function getStats({
 	diagnostics,
 	pathLabel,
@@ -200,6 +211,7 @@ function getStats({
 	}
 }
 
+/** Builds the reconciliation snapshot, deriving status from the root + diagnostics. */
 function createSnapshot({
 	diagnostics,
 	now,
@@ -231,6 +243,7 @@ function createSnapshot({
 	};
 }
 
+/** Coerces a thrown filesystem value into a user-facing message. */
 function formatFilesystemError(error: unknown, fallback: string): string {
 	return error instanceof Error ? error.message : fallback;
 }

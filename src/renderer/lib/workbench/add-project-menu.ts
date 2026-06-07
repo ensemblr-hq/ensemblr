@@ -6,6 +6,7 @@ import type {
 } from '@/renderer/types/workbench';
 import type { SetupCheckId, SetupDiagnosticsSnapshot } from '@/shared/ipc';
 
+/** One entry in the add-project menu, with its prerequisite setup checks. */
 interface AddProjectActionDefinition {
 	id: AddProjectActionId;
 	label: string;
@@ -48,6 +49,12 @@ const ADD_PROJECT_ACTION_DEFINITIONS: readonly AddProjectActionDefinition[] = [
 	},
 ];
 
+/**
+ * Builds the add-project menu model, resolving each action's availability
+ * against the latest setup diagnostics snapshot.
+ * @param input - Recent projects and the setup snapshot.
+ * @returns The fully-resolved {@link AddProjectMenuModel}.
+ */
 export function buildAddProjectMenuModel({
 	recents,
 	setupSnapshot,
@@ -63,6 +70,13 @@ export function buildAddProjectMenuModel({
 	};
 }
 
+/**
+ * Resolves one action definition into a UI-ready {@link AddProjectActionModel}
+ * by consulting the current setup snapshot.
+ * @param definition - Action definition.
+ * @param setupSnapshot - Latest setup snapshot, or `null` when still loading.
+ * @returns A resolved action.
+ */
 function resolveAddProjectAction(
 	definition: AddProjectActionDefinition,
 	setupSnapshot: SetupDiagnosticsSnapshot | null,
@@ -79,6 +93,13 @@ function resolveAddProjectAction(
 	};
 }
 
+/**
+ * Returns the first definitively-failed prerequisite check's message, or `null`
+ * when nothing blocks the action.
+ * @param definition - Action definition.
+ * @param setupSnapshot - Latest setup snapshot.
+ * @returns A user-facing block reason, or `null`.
+ */
 function resolveBlockingReason(
 	definition: AddProjectActionDefinition,
 	setupSnapshot: SetupDiagnosticsSnapshot,
@@ -102,6 +123,13 @@ function resolveBlockingReason(
 	return null;
 }
 
+/**
+ * Renders a user-facing description for a failed check, preferring its detail
+ * over its title.
+ * @param detail - Failed-check detail string.
+ * @param title - Failed-check title.
+ * @returns A short message, or `null` when both inputs are empty.
+ */
 function describeFailedCheck(
 	detail: string | undefined,
 	title: string | undefined,

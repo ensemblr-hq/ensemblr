@@ -11,6 +11,13 @@ import {
 	pinnedWorkspaceIdsAtom,
 } from './atoms';
 
+/**
+ * Re-orders a list of `{ id }` items to match the React element key order
+ * produced by a drag-and-drop reorder.
+ * @param items - Source items.
+ * @param reorderedElements - React elements in their new order.
+ * @returns The re-ordered items (or the original list if reconciliation fails).
+ */
 function getReorderedShellItems<T extends { id: string }>(
 	items: T[],
 	reorderedElements: ReactElement[],
@@ -28,6 +35,7 @@ function getReorderedShellItems<T extends { id: string }>(
 	return nextItems;
 }
 
+/** Strips React-internal key prefixes so the original id can be recovered. */
 function normalizeReorderElementKey(key: ReactElement['key']) {
 	if (key == null) {
 		return null;
@@ -36,6 +44,12 @@ function normalizeReorderElementKey(key: ReactElement['key']) {
 	return String(key).replace(/^\.\$/, '').replace(/^\./, '');
 }
 
+/**
+ * Returns items in the user-defined order, with unknown items appended.
+ * @param items - Source items.
+ * @param orderedIds - Persisted id order.
+ * @returns Items ordered by `orderedIds` first, then any new items.
+ */
 function getOrderedShellItems<T extends { id: string }>(
 	items: T[],
 	orderedIds: string[],
@@ -50,6 +64,13 @@ function getOrderedShellItems<T extends { id: string }>(
 	return [...orderedItems, ...unorderedItems];
 }
 
+/**
+ * Reconciles the persisted id order with the live item list, dropping stale ids
+ * and appending newly-seen ones.
+ * @param items - Source items.
+ * @param orderedIds - Persisted id order.
+ * @returns A reconciled id list.
+ */
 function getReconciledShellItemIds<T extends { id: string }>(
 	items: T[],
 	orderedIds: string[],
@@ -64,6 +85,12 @@ function getReconciledShellItemIds<T extends { id: string }>(
 	return [...orderedExistingIds, ...newIds];
 }
 
+/**
+ * React hook that exposes project sidebar state — order, collapse, pin, and
+ * reorder helpers — backed by persisted Jotai atoms.
+ * @param projects - Active project shell models.
+ * @returns A {@link ProjectNavigationState} for the sidebar.
+ */
 export function useProjectNavigationState(
 	projects: ProjectShellModel[],
 ): ProjectNavigationState {
@@ -150,6 +177,7 @@ export function useProjectNavigationState(
 		[],
 	);
 
+	/** Persists a new project order after a drag-and-drop reorder. */
 	const reorderProjects = (reorderedElements: ReactElement[]) => {
 		setOrderedProjectIds(
 			getReorderedShellItems(orderedProjects, reorderedElements).map(
@@ -157,6 +185,7 @@ export function useProjectNavigationState(
 			),
 		);
 	};
+	/** Briefly suppresses size animations during a collapse-toggle reflow. */
 	const activatePositionOnlyProjectReorderLayout = () => {
 		if (projectCollapseMotionTimeoutRef.current) {
 			clearTimeout(projectCollapseMotionTimeoutRef.current);
@@ -168,6 +197,7 @@ export function useProjectNavigationState(
 			projectCollapseMotionTimeoutRef.current = null;
 		}, 180);
 	};
+	/** Toggles whether a project's workspace group is collapsed. */
 	const toggleProjectCollapsed = (projectId: string) => {
 		activatePositionOnlyProjectReorderLayout();
 		setCollapsedProjectIds((currentProjectIds) =>
@@ -178,6 +208,7 @@ export function useProjectNavigationState(
 				: [...currentProjectIds, projectId],
 		);
 	};
+	/** Briefly disables layout animation during a pin-toggle reflow. */
 	const disableProjectReorderLayoutAnimation = () => {
 		if (projectPinMotionTimeoutRef.current) {
 			clearTimeout(projectPinMotionTimeoutRef.current);
@@ -189,6 +220,7 @@ export function useProjectNavigationState(
 			projectPinMotionTimeoutRef.current = null;
 		}, 180);
 	};
+	/** Toggles whether a workspace is pinned to the top of the sidebar. */
 	const toggleWorkspacePinned = (workspaceId: string) => {
 		disableProjectReorderLayoutAnimation();
 		setPinnedWorkspaceIds((currentWorkspaceIds) =>

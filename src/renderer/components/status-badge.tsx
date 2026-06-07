@@ -21,21 +21,20 @@ const dotClasses: Record<StatusTone, string> = {
 	warning: 'bg-status-warning',
 };
 
-interface StatusBadgeProps {
-	children: ReactNode;
-	className?: string;
-	tone?: StatusTone;
-}
-
+/** Compact pill-shaped status indicator with a colored leading dot. */
 export function StatusBadge({
 	children,
 	className,
 	tone = 'muted',
-}: StatusBadgeProps) {
+}: {
+	children: ReactNode;
+	className?: string;
+	tone?: StatusTone;
+}) {
 	return (
 		<Badge
 			className={cn(
-				'h-5 gap-1.5 rounded-md px-1.5 text-[0.6875rem]',
+				'h-5 gap-1.5 rounded-md px-1.5 text-xxs',
 				toneClasses[tone],
 				className,
 			)}

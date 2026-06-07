@@ -45,6 +45,7 @@ type ProviderMarkKind =
 			WorkspaceShellModel['pullRequest']['previewDeployment']
 	  >['provider'];
 
+/** Review-panel "Checks" tab — renders PR metadata, statuses, comments and todos. */
 export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 	const panelState = getChecksPanelState(workspace);
 
@@ -121,6 +122,7 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 	);
 }
 
+/** Derives the checks-panel summary state from the workspace + PR. */
 function getChecksPanelState(workspace: WorkspaceShellModel): ChecksPanelState {
 	const { pullRequest } = workspace;
 	const hasPullRequest = typeof pullRequest.number === 'number';
@@ -205,6 +207,7 @@ function getChecksPanelState(workspace: WorkspaceShellModel): ChecksPanelState {
 	};
 }
 
+/** Empty-state shown when the workspace has no PR yet. */
 function ChecksNoPullRequestState({
 	state,
 	workspace,
@@ -245,6 +248,7 @@ function ChecksNoPullRequestState({
 	);
 }
 
+/** Top summary block describing PR readiness in plain language. */
 function ChecksPanelSummary({ state }: { state: ChecksPanelState }) {
 	return (
 		<section
@@ -281,6 +285,7 @@ function ChecksPanelSummary({ state }: { state: ChecksPanelState }) {
 	);
 }
 
+/** Status icon rendered next to the checks summary headline. */
 function ChecksPanelSummaryIcon({
 	status,
 }: {
@@ -321,6 +326,7 @@ function ChecksPanelSummaryIcon({
 	);
 }
 
+/** PR title and description block. */
 function PullRequestMetadata({
 	pullRequest,
 }: {
@@ -346,6 +352,7 @@ function PullRequestMetadata({
 	);
 }
 
+/** Section header used inside the checks panel (label + optional action). */
 function ChecksSectionHeader({
 	actionLabel,
 	label,
@@ -369,6 +376,7 @@ function ChecksSectionHeader({
 	);
 }
 
+/** Row showing the PR's current git status with optional action button. */
 function PullRequestStatusRow({
 	hideAction = false,
 	status,
@@ -400,6 +408,7 @@ function PullRequestStatusRow({
 	);
 }
 
+/** Reusable row with leading icon, label/detail text, and trailing action. */
 function ChecksActionRow({
 	actionLabel,
 	label,
@@ -429,6 +438,7 @@ function ChecksActionRow({
 	);
 }
 
+/** Single PR check row with provider icon, label, and ask-for-help action. */
 function PullRequestCheckRow({
 	check,
 }: {
@@ -466,6 +476,7 @@ function PullRequestCheckRow({
 	);
 }
 
+/** Preview-deployment row showing provider, status, and external open action. */
 function PullRequestPreviewDeploymentRow({
 	deployment,
 }: {
@@ -507,6 +518,7 @@ function PullRequestPreviewDeploymentRow({
 	);
 }
 
+/** Single PR comment row with author, body, and reply action. */
 function PullRequestCommentRow({
 	comment,
 }: {
@@ -531,6 +543,7 @@ function PullRequestCommentRow({
 	);
 }
 
+/** Single PR todo row with checkbox and label. */
 function PullRequestTodoRow({
 	todo,
 }: {
@@ -547,6 +560,7 @@ function PullRequestTodoRow({
 	);
 }
 
+/** Lucide icon mapped to the check status (success/warning/blocked/etc). */
 function PullRequestCheckStatusIcon({
 	status,
 }: {
@@ -578,6 +592,7 @@ function PullRequestCheckStatusIcon({
 	);
 }
 
+/** Renders the provider's brand mark (GitHub/Linear/Vercel/etc) inline. */
 function ProviderMark({ provider }: { provider: ProviderMarkKind }) {
 	const isGithubProvider =
 		provider === 'github' || provider === 'github-actions';
@@ -600,14 +615,17 @@ function ProviderMark({ provider }: { provider: ProviderMarkKind }) {
 	);
 }
 
+/** Centered empty-state message for checks-panel sections. */
 function ChecksEmptyMessage({ label }: { label: string }) {
 	return <p className='text-muted-foreground text-xs'>{label}</p>;
 }
 
+/** Pluralizes a count with a fallback singular noun (`1 file` vs `2 files`). */
 function formatCount(count: number, singular: string) {
 	return `${count} ${count === 1 ? singular : `${singular}s`}`;
 }
 
+/** Maps a {@link ProviderMarkKind} to a short display label. */
 function getProviderLabel(provider: ProviderMarkKind) {
 	if (provider === 'github') {
 		return 'GitHub';

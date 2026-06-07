@@ -21,14 +21,21 @@ import type {
 const WORKSPACE_SEARCH_KEYS = new Set(['dock', 'review']);
 const LEGACY_CHAT_SEARCH_KEY = 'chat';
 
+/** Subset of the workbench parent match consumed by descendant loaders. */
 interface WorkbenchParentRouteMatch {
 	loaderData?: WorkbenchRouteLoaderData;
 }
 
+/** Subset of the workspace parent match consumed by descendant loaders. */
 interface WorkspaceParentRouteMatch {
 	loaderData?: WorkspaceRouteLoaderData;
 }
 
+/**
+ * Loader for the `/_workbench` route — fetches every dataset the shell needs.
+ * @param queryClient - Shared TanStack Query client.
+ * @returns The workbench loader data.
+ */
 export function loadWorkbenchRouteData(
 	queryClient: QueryClient,
 ): Promise<WorkbenchRouteLoaderData> {
@@ -55,6 +62,12 @@ export async function loadShellWorkbenchRoute({
 	return parentMatch.loaderData;
 }
 
+/**
+ * Loader for project routes. Redirects to the stored/fallback workspace when
+ * the URL project id is not present in the loaded data.
+ * @param input - Parent match plus URL params.
+ * @returns Parent loader data, or redirects.
+ */
 export async function loadProjectWorkbenchRoute({
 	parentMatchPromise,
 	params,
@@ -84,6 +97,13 @@ export async function loadProjectWorkbenchRoute({
 	return loaderData;
 }
 
+/**
+ * Loader for workspace routes. Resolves the (project, workspace) selection,
+ * migrates the legacy `?chat=` query into the canonical `/chats/:chatId` route,
+ * and redirects to a fallback when the URL workspace is missing.
+ * @param input - Parent match, URL params, parsed and raw search.
+ * @returns The workspace loader data, or redirects.
+ */
 export async function loadWorkspaceWorkbenchRoute({
 	parentMatchPromise,
 	params,
@@ -136,6 +156,10 @@ export async function loadWorkspaceWorkbenchRoute({
 	};
 }
 
+/**
+ * Loader for the workspace index route — redirects to the preferred chat.
+ * @param input - Parent match, URL params, canonical search.
+ */
 export async function loadWorkspaceIndexRoute({
 	parentMatchPromise,
 	params,
@@ -160,6 +184,11 @@ export async function loadWorkspaceIndexRoute({
 	});
 }
 
+/**
+ * Loader for the workspace chat route. Redirects to the canonical chat id and
+ * search shape when the URL drifts from the workspace's preferred session.
+ * @param input - Parent match, URL params, parsed and raw search.
+ */
 export async function loadWorkspaceChatRoute({
 	parentMatchPromise,
 	params,
@@ -196,6 +225,7 @@ export async function loadWorkspaceChatRoute({
 	}
 }
 
+/** Resolves the fallback workspace selection from persisted/first-available. */
 function resolveFallbackWorkspaceSelection(projects: ProjectShellModel[]) {
 	return resolveWorkspaceNavigationSelection({
 		projects,
@@ -203,6 +233,7 @@ function resolveFallbackWorkspaceSelection(projects: ProjectShellModel[]) {
 	});
 }
 
+/** Builds a TanStack Router redirect into the chosen workspace's chat route. */
 function redirectToWorkspaceSelection(
 	selection: NonNullable<
 		ReturnType<typeof resolveWorkspaceNavigationSelection>
@@ -219,6 +250,7 @@ function redirectToWorkspaceSelection(
 	});
 }
 
+/** Builds a TanStack Router redirect into a canonical chat route. */
 function redirectToWorkspaceChat({
 	chatId,
 	projectId,
@@ -240,6 +272,7 @@ function redirectToWorkspaceChat({
 	});
 }
 
+/** True when the URL search drifts from the canonical {@link WorkbenchRouteSearch}. */
 function shouldRedirectToCanonicalWorkspaceSearch(
 	rawSearch: Record<string, unknown>,
 	search: WorkbenchRouteSearch,
@@ -251,10 +284,12 @@ function shouldRedirectToCanonicalWorkspaceSearch(
 	);
 }
 
+/** True when the search includes a key outside the canonical workspace set. */
 function hasUnknownWorkspaceSearch(search: Record<string, unknown>) {
 	return Object.keys(search).some((key) => !WORKSPACE_SEARCH_KEYS.has(key));
 }
 
+/** True when the raw search value for `key` does not match the canonical value. */
 function isNonCanonicalSearchValue(
 	rawSearch: Record<string, unknown>,
 	key: 'dock' | 'review',
@@ -263,6 +298,7 @@ function isNonCanonicalSearchValue(
 	return Object.hasOwn(rawSearch, key) && rawSearch[key] !== value;
 }
 
+/** Returns the string-valued search param at `key`, or `undefined`. */
 function getStringSearchValue(search: Record<string, unknown>, key: string) {
 	const value = search[key];
 

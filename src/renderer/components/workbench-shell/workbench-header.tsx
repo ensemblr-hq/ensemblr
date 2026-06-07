@@ -29,6 +29,7 @@ import type {
 
 import { ProjectAvatar } from './project-avatar';
 
+/** Top toolbar showing project/workspace path, open-in menu and sidebar toggle. */
 export function WorkbenchHeader({
 	activeProject,
 	activeWorkspace,
@@ -60,7 +61,7 @@ export function WorkbenchHeader({
 								{activeWorkspace.branchName}
 							</span>
 						</div>
-						<p className='truncate text-[0.6875rem] text-muted-foreground'>
+						<p className='truncate text-muted-foreground text-xxs'>
 							{activeWorkspace.pathLabel}
 						</p>
 					</div>
@@ -89,6 +90,7 @@ export function WorkbenchHeader({
 	);
 }
 
+/** Split button + dropdown to open the workspace in installed apps. */
 function OpenWorkspaceMenu({ workspace }: { workspace: WorkspaceShellModel }) {
 	const openTargets = workspace.openTargets.filter(
 		(target) => target.installed || target.kind === 'utility',
@@ -150,6 +152,7 @@ function OpenWorkspaceMenu({ workspace }: { workspace: WorkspaceShellModel }) {
 	);
 }
 
+/** Renders the appropriate icon for an open-in target (iconify or lucide). */
 function OpenTargetIcon({
 	className,
 	target,
