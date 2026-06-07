@@ -12,11 +12,11 @@ import {
 
 import { SetupDiagnosticsPanel } from '@/renderer/components/setup-diagnostics';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/contexts';
-import { cn } from '@/renderer/lib/utils';
 import {
 	getWorkbenchMockChatThread,
 	type WorkbenchMockChatTool,
-} from '@/renderer/mocks/workbench';
+} from '@/renderer/fixtures/workbench';
+import { cn } from '@/renderer/lib/utils';
 import type {
 	ComposerShellState,
 	SessionTabModel,

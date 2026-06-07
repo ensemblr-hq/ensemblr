@@ -1,18 +1,23 @@
 import {
 	keepPreviousData,
+	type QueryClient,
 	useQuery,
 	useQueryClient,
 } from '@tanstack/react-query';
 import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { type ReactElement, useCallback, useEffect, useMemo } from 'react';
 
 import {
+	ensembleQueryKeys,
 	healthQuery,
 	isEnsembleApiAvailable,
+	registerLocalRepository,
 	repositoryWorkspaceNavigationQuery,
+	selectLocalRepository,
 	setupDiagnosticsQuery,
 } from '@/renderer/api/ensemble-queries';
+import { shellFixtureProjects } from '@/renderer/fixtures/workbench';
 import { getErrorMessage } from '@/renderer/lib/error';
 import {
 	buildAddProjectMenuModel,
@@ -24,7 +29,8 @@ import {
 	resolveWorkspaceNavigationRenderState,
 	resolveWorkspaceNavigationSelection,
 } from '@/renderer/lib/workbench';
-import { shellFixtureProjects } from '@/renderer/mocks/workbench';
+import { cloneDialogOpenAtom } from '@/renderer/state/clone-dialog';
+import { quickStartDialogOpenAtom } from '@/renderer/state/quick-start-dialog';
 import { recentProjectsAtom } from '@/renderer/state/recents';
 import {
 	activeChatTabByWorkspaceAtom,
@@ -42,6 +48,7 @@ import type {
 	SetupDiagnosticsContextValue,
 } from '@/renderer/types/contexts';
 import type {
+	AddProjectActionId,
 	WorkbenchRouteSearch,
 	WorkbenchShellData,
 	WorkspaceShellModel,
@@ -304,11 +311,24 @@ export function useWorkbenchLayoutModel({
 			}),
 		[recentProjects, setupSnapshot],
 	);
-	// Add-project + recents handlers stay undefined until the local-open /
-	// clone / quick-start flows land. The menu surface renders disabled entries
-	// with a "Coming soon" reason in that state. When the action handlers ship,
-	// they will write back via `useSetAtom(recentProjectsAtom)` to promote a
-	// freshly opened project to the top of the list.
+	const setCloneDialogOpen = useSetAtom(cloneDialogOpenAtom);
+	const setQuickStartDialogOpen = useSetAtom(quickStartDialogOpenAtom);
+	const onAddProject = useCallback(
+		(id: AddProjectActionId) => {
+			if (id === 'open-github') {
+				setCloneDialogOpen(true);
+				return;
+			}
+			if (id === 'open-local') {
+				void openLocalRepositoryFlow({ queryClient });
+				return;
+			}
+			if (id === 'quick-start') {
+				setQuickStartDialogOpen(true);
+			}
+		},
+		[queryClient, setCloneDialogOpen, setQuickStartDialogOpen],
+	);
 	const onSetupDiagnosticsRetry = useCallback(() => {
 		if (hasPreloadBridge) {
 			void refetchSetupDiagnostics();
@@ -324,6 +344,7 @@ export function useWorkbenchLayoutModel({
 		health: shellHealth,
 		navigateToStaticRoute,
 		navigateToWorkspace,
+		onAddProject,
 		resolveWorkspaceRouteSearch,
 	};
 	const navigation: NavigationContextValue = {
@@ -392,4 +413,30 @@ function renderStaticWorkbenchNavigationLink(
 			{children}
 		</Link>
 	);
+}
+
+/**
+ * Drives the "Open local project" sidebar action through the native picker and
+ * the repository-registration IPC, then refreshes the navigation snapshot so
+ * the new repo appears in the sidebar.
+ */
+async function openLocalRepositoryFlow({
+	queryClient,
+}: {
+	queryClient: QueryClient;
+}): Promise<void> {
+	if (!isEnsembleApiAvailable()) {
+		return;
+	}
+	const selection = await selectLocalRepository();
+	if (selection.canceled || !selection.path) {
+		return;
+	}
+	const result = await registerLocalRepository({ path: selection.path });
+	if (!result.registered) {
+		return;
+	}
+	await queryClient.invalidateQueries({
+		queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+	});
 }

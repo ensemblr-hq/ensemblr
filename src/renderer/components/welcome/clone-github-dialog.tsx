@@ -1,6 +1,13 @@
+import { useQuery } from '@tanstack/react-query';
 import type { KeyboardEvent } from 'react';
 import { useCallback, useState } from 'react';
 
+import {
+	githubRepositoryListQuery,
+	isEnsembleApiAvailable,
+	rootDirectoryQuery,
+	selectCloneDestination,
+} from '@/renderer/api/ensemble-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -10,29 +17,35 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
-import type { RecentGithubRepo } from '@/renderer/types/workbench';
+import type { GithubRepositoryEntry } from '@/shared/ipc';
 
-const DEFAULT_LOCATION = '~/Projects/Ensemble/repos';
+import { joinDestination } from './clone-destination.ts';
+import { CloneGithubDiagnostics } from './clone-github-diagnostics.tsx';
+import { CloneGithubProgressLog } from './clone-github-progress-log.tsx';
+import { CloneGithubRecentRepos } from './clone-github-recent-repos.tsx';
+import { type CloneStage, useCloneFlow } from './use-clone-flow.ts';
 
 interface CloneGithubDialogProps {
 	onOpenChange: (open: boolean) => void;
 	open: boolean;
-	recentRepos: RecentGithubRepo[];
 }
 
-/** Modal for cloning a GitHub repository (UI-only mock). */
+/** Modal for cloning a GitHub repository into the managed root. */
 export function CloneGithubDialog({
 	onOpenChange,
 	open,
-	recentRepos,
 }: CloneGithubDialogProps) {
 	return (
-		<Dialog onOpenChange={onOpenChange} open={open}>
-			<DialogContent className='gap-3 sm:max-w-md'>
+		<Dialog
+			onOpenChange={(next) => {
+				onOpenChange(next);
+			}}
+			open={open}
+		>
+			<DialogContent className='gap-3 sm:max-w-lg'>
 				<CloneGithubDialogForm
 					key={open ? 'open' : 'closed'}
 					onOpenChange={onOpenChange}
-					recentRepos={recentRepos}
 				/>
 			</DialogContent>
 		</Dialog>
@@ -42,23 +55,65 @@ export function CloneGithubDialog({
 /** State-owned clone form content that resets when the dialog open state changes. */
 function CloneGithubDialogForm({
 	onOpenChange,
-	recentRepos,
 }: {
 	onOpenChange: (open: boolean) => void;
-	recentRepos: RecentGithubRepo[];
 }) {
+	const { data: rootDirectoryData } = useQuery({
+		...rootDirectoryQuery,
+		enabled: isEnsembleApiAvailable(),
+	});
+	const defaultParentPath = rootDirectoryData?.repositoriesPath ?? '';
+
+	const { data: githubRepoListData, isLoading: isGithubRepoListLoading } =
+		useQuery({
+			...githubRepositoryListQuery,
+			enabled: isEnsembleApiAvailable(),
+		});
+	const displayedEntries: GithubRepositoryEntry[] =
+		githubRepoListData?.entries ?? [];
+	const liveError =
+		githubRepoListData?.status === 'failure'
+			? githubRepoListData.error
+			: undefined;
+
 	const [url, setUrl] = useState('');
-	const [location, setLocation] = useState(DEFAULT_LOCATION);
+	const [locationOverride, setLocationOverride] = useState<string | null>(null);
 
-	const canClone = url.trim().length > 0;
+	const { diagnostics, isBusy, logs, retry, stage, startClone, successResult } =
+		useCloneFlow();
 
-	const handleClone = useCallback(() => {
+	// Derive the shown location: user override if they touched it, else the
+	// managed default once the query resolves. Avoids a sync effect.
+	const location = locationOverride ?? defaultParentPath;
+	const trimmedUrl = url.trim();
+	const canClone = !isBusy && trimmedUrl.length > 0 && isEnsembleApiAvailable();
+	const locationPlaceholder = defaultParentPath || 'Managed repos directory';
+
+	const handleBrowse = useCallback(async () => {
+		if (!isEnsembleApiAvailable()) {
+			return;
+		}
+		const selection = await selectCloneDestination();
+		if (selection.canceled || !selection.path) {
+			return;
+		}
+		setLocationOverride(selection.path);
+	}, []);
+
+	const handleClone = useCallback(async () => {
 		if (!canClone) {
 			return;
 		}
-		// TODO: invoke clone IPC with { url, location } before closing
-		onOpenChange(false);
-	}, [canClone, onOpenChange]);
+		const parentOverride = location.trim();
+		const destinationPath = parentOverride
+			? joinDestination(parentOverride, trimmedUrl)
+			: undefined;
+		await startClone(
+			destinationPath !== undefined
+				? { destinationPath, url: trimmedUrl }
+				: { url: trimmedUrl },
+		);
+	}, [canClone, location, startClone, trimmedUrl]);
 
 	const handleSubmitKey = useCallback(
 		(event: KeyboardEvent<HTMLInputElement>) => {
@@ -69,6 +124,10 @@ function CloneGithubDialogForm({
 		},
 		[handleClone],
 	);
+
+	const handleClose = useCallback(() => {
+		onOpenChange(false);
+	}, [onOpenChange]);
 
 	return (
 		<>
@@ -85,6 +144,7 @@ function CloneGithubDialogForm({
 				<Input
 					autoFocus
 					className='h-9'
+					disabled={isBusy}
 					id='clone-github-url'
 					onChange={(event) => setUrl(event.target.value)}
 					onKeyDown={handleSubmitKey}
@@ -95,11 +155,16 @@ function CloneGithubDialogForm({
 
 			<div className='flex flex-col gap-1.5'>
 				<Label className='text-xs'>Recent repos</Label>
-				<RecentReposList
+				<CloneGithubRecentRepos
+					disabled={isBusy}
+					isLoading={isGithubRepoListLoading}
 					onSelect={(repo) => setUrl(`https://github.com/${repo.fullName}.git`)}
-					repos={recentRepos}
+					repos={displayedEntries}
 					selectedUrl={url}
 				/>
+				{liveError ? (
+					<p className='text-muted-foreground text-xxs'>{liveError}</p>
+				) : null}
 			</div>
 
 			<div className='flex flex-col gap-1.5'>
@@ -109,91 +174,100 @@ function CloneGithubDialogForm({
 				<div className='flex gap-2'>
 					<Input
 						className='h-9 flex-1 font-mono text-xs'
+						disabled={isBusy}
 						id='clone-github-location'
-						onChange={(event) => setLocation(event.target.value)}
+						onChange={(event) => {
+							setLocationOverride(event.target.value);
+						}}
 						onKeyDown={handleSubmitKey}
+						placeholder={locationPlaceholder}
 						value={location}
 					/>
 					<Button
 						className='h-9'
-						onClick={() => {
-							/* TODO: wire to native folder picker */
-						}}
+						disabled={isBusy || !isEnsembleApiAvailable()}
+						onClick={handleBrowse}
 						type='button'
 						variant='outline'
 					>
 						Browse
 					</Button>
 				</div>
+				{locationOverride !== null &&
+				defaultParentPath &&
+				location !== defaultParentPath ? (
+					<button
+						className='self-start text-muted-foreground text-xxs underline-offset-2 hover:underline'
+						onClick={() => {
+							setLocationOverride(null);
+						}}
+						type='button'
+					>
+						Reset to managed repos directory
+					</button>
+				) : null}
 			</div>
 
-			<div className='-mx-4 -mb-4 flex justify-end rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
-				<Button
-					className='h-8 gap-2'
-					disabled={!canClone}
-					onClick={handleClone}
-					type='button'
-					variant='default'
-				>
-					Clone repo
-					<span
-						aria-hidden='true'
-						className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'
+			{logs.length > 0 ? <CloneGithubProgressLog logs={logs} /> : null}
+
+			{stage === 'failure' && diagnostics.length > 0 ? (
+				<CloneGithubDiagnostics diagnostics={diagnostics} />
+			) : null}
+
+			{stage === 'success' && successResult?.repository ? (
+				<p className='text-emerald-500 text-xs'>
+					Cloned {successResult.repository.name} to{' '}
+					<span className='font-mono'>{successResult.repository.path}</span>.
+				</p>
+			) : null}
+
+			<div className='-mx-4 -mb-4 flex justify-end gap-2 rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
+				{stage === 'failure' ? (
+					<Button
+						className='h-8'
+						onClick={retry}
+						type='button'
+						variant='outline'
 					>
-						⌘↵
-					</span>
-				</Button>
+						Try again
+					</Button>
+				) : null}
+				{stage === 'success' ? (
+					<Button className='h-8' onClick={handleClose} type='button'>
+						Done
+					</Button>
+				) : (
+					<Button
+						className='h-8 gap-2'
+						disabled={!canClone}
+						onClick={handleClone}
+						type='button'
+						variant='default'
+					>
+						{getCloneButtonLabel(stage)}
+						<span
+							aria-hidden='true'
+							className='ml-1 inline-flex items-center gap-0.5 text-xxs opacity-70'
+						>
+							⌘↵
+						</span>
+					</Button>
+				)}
 			</div>
 		</>
 	);
 }
 
-interface RecentReposListProps {
-	onSelect: (repo: RecentGithubRepo) => void;
-	repos: RecentGithubRepo[];
-	selectedUrl: string;
-}
-
-function RecentReposList({
-	onSelect,
-	repos,
-	selectedUrl,
-}: RecentReposListProps) {
-	return (
-		<ul className='flex max-h-44 flex-col overflow-y-auto rounded-lg border border-border bg-background/40'>
-			{repos.map((repo) => {
-				const expectedUrl = `https://github.com/${repo.fullName}.git`;
-				const isSelected = selectedUrl === expectedUrl;
-				return (
-					<li key={repo.fullName}>
-						<button
-							aria-pressed={isSelected}
-							className='flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-muted/60 aria-pressed:bg-muted'
-							onClick={() => onSelect(repo)}
-							type='button'
-						>
-							<span
-								aria-hidden='true'
-								className='size-5 shrink-0 rounded-full ring-1 ring-foreground/10'
-								style={{
-									backgroundColor:
-										repo.ownerAvatarColor ?? 'oklch(0.5 0.04 260)',
-								}}
-							/>
-							<span className='flex min-w-0 flex-col leading-tight'>
-								<span className='truncate text-foreground text-xs'>
-									{repo.fullName}
-								</span>
-								{repo.description ? (
-									<span className='truncate text-[0.6875rem] text-muted-foreground'>
-										{repo.description}
-									</span>
-								) : null}
-							</span>
-						</button>
-					</li>
-				);
-			})}
-		</ul>
-	);
+/** Picks the clone button label that matches the current stage. */
+function getCloneButtonLabel(stage: CloneStage): string {
+	switch (stage) {
+		case 'preparing':
+			return 'Preparing…';
+		case 'cloning':
+			return 'Cloning…';
+		case 'failure':
+		case 'idle':
+		case 'success':
+			return 'Clone repo';
+	}
 }

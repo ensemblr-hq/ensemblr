@@ -2,6 +2,7 @@ import { createContext, type ReactNode, use } from 'react';
 
 import type { WorkspaceNavigationSelection } from '@/renderer/lib/workbench';
 import type {
+	AddProjectActionId,
 	AddProjectMenuModel,
 	ProjectShellModel,
 	WorkbenchRouteSearch,
@@ -21,6 +22,7 @@ export interface WorkbenchLayoutModel {
 	health: WorkbenchHealth;
 	navigateToStaticRoute: (target: WorkbenchStaticNavigationTarget) => void;
 	navigateToWorkspace: (projectId: string, workspaceId: string) => void;
+	onAddProject: (id: AddProjectActionId) => void;
 	resolveWorkspaceRouteSearch: (
 		workspace: WorkspaceShellModel,
 	) => WorkbenchRouteSearch;
