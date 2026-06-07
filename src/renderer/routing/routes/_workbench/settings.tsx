@@ -17,7 +17,7 @@ function SettingsRoute() {
 
 	return (
 		<main className='flex h-svh min-h-svh flex-col bg-background text-foreground'>
-			<header className='macos-traffic-light-spacer flex h-12 shrink-0 items-center gap-2 border-b px-3'>
+			<header className='macos-traffic-light-spacer flex h-12 shrink-0 items-center gap-2 border-b pr-3 pl-[var(--ensemble-traffic-light-safe-inline)]'>
 				<Button asChild size='sm' variant='ghost'>
 					<Link preload='intent' to='/'>
 						<ArrowLeftIcon aria-hidden='true' />
