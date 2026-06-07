@@ -69,7 +69,7 @@ function useWorkbenchShellRouteState(): WorkbenchShellRouteState {
 		.find((match) => isWorkbenchActiveView(match.view));
 	const view = isWorkbenchActiveView(viewMatch?.view)
 		? viewMatch.view
-		: 'dashboard';
+		: 'welcome';
 
 	if (view !== 'workspace') {
 		return { view };

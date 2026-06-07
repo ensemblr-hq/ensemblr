@@ -1,12 +1,16 @@
 import type { WorkbenchStaticNavigationTarget } from '@/renderer/types/workbench-shell';
 
-export type WorkbenchStaticRouteTo = '/' | '/help' | '/history' | '/settings';
+export type WorkbenchStaticRouteTo =
+	| '/dashboard'
+	| '/help'
+	| '/history'
+	| '/settings';
 
 const staticNavigationRouteByTarget: Record<
 	WorkbenchStaticNavigationTarget,
 	WorkbenchStaticRouteTo
 > = {
-	dashboard: '/',
+	dashboard: '/dashboard',
 	help: '/help',
 	history: '/history',
 	settings: '/settings',

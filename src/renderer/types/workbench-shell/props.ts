@@ -18,7 +18,13 @@ export interface WorkbenchShellProps {
 	activeProject: ProjectShellModel;
 	activeReviewTab: ReviewPanelTab;
 	activeSession: SessionTabModel;
-	activeView: 'dashboard' | 'help' | 'history' | 'settings' | 'workspace';
+	activeView:
+		| 'dashboard'
+		| 'help'
+		| 'history'
+		| 'settings'
+		| 'welcome'
+		| 'workspace';
 	activeWorkspace: WorkspaceShellModel;
 	addProjectMenu?: AddProjectMenuModel;
 	composer: ComposerShellState;

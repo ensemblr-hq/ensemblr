@@ -9,7 +9,7 @@ import { useWorkbenchLayoutRouteModel } from './layout-model-context';
 export function WorkbenchPlaceholderPage({
 	view,
 }: {
-	view: Exclude<WorkbenchActiveView, 'workspace'>;
+	view: Exclude<WorkbenchActiveView, 'welcome' | 'workspace'>;
 }) {
 	const model = useWorkbenchLayoutRouteModel();
 	const { state: setupDiagnosticsState } = useSetupDiagnostics();
@@ -33,7 +33,7 @@ function getWorkbenchPlaceholderCopy({
 }: {
 	projectCount: number;
 	setupStatus?: string;
-	view: Exclude<WorkbenchActiveView, 'workspace'>;
+	view: Exclude<WorkbenchActiveView, 'welcome' | 'workspace'>;
 }) {
 	if (setupStatus !== 'ready') {
 		return getEmptyStateCopy({
@@ -62,8 +62,12 @@ function getWorkbenchPlaceholderCopy({
 			};
 		case 'dashboard':
 			return {
-				detail: 'Workspace overview is not connected yet.',
+				detail: 'Kanban board is not connected yet.',
 				title: 'Dashboard',
 			};
+		default: {
+			const exhaustive: never = view;
+			return exhaustive;
+		}
 	}
 }
