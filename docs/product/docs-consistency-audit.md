@@ -79,3 +79,66 @@ file-based TanStack routing. Docs were realigned to that reality.
   `boundaryla`, not the Ensemble "The Swiss Cheese" workspace, so `THE-*` issues
   are unreachable from this session. The in-repo `linear-issues.md` mirror is the
   aligned source to sync once the correct workspace is connected.
+
+## 2026-06-07 Workbench Decomposition + Welcome Screen Alignment
+
+The composition refactor landed (commit `6fddcf5 refactor(renderer): decompose
+workbench shell modules`) and the welcome screen plus clone dialog landed
+(commit `caf02c3 feat(renderer): add welcome screen + clone dialog`). Several
+docs still referenced the pre-refactor entrypoints. Docs were realigned to the
+shipped structure.
+
+### Path drift fixed
+
+- `src/renderer/components/workbench-shell.tsx` no longer exists. Its public
+  exports moved to `src/renderer/components/workbench-shell/frame.tsx`
+  (`WorkbenchFrame`) and `src/renderer/components/workbench-shell/workspace-content.tsx`
+  (`WorkspaceWorkbenchContent`).
+- `src/renderer/components/workbench-shell/route-layout.tsx` is now the
+  `route-layout/` folder with `index.ts` as the barrel.
+- `src/renderer/types/workbench-shell.ts` is now the
+  `src/renderer/types/workbench-shell/` folder with `index.ts` as the barrel.
+- Cross-cutting layout / setup-diagnostics / navigation flags moved out of
+  prop-drilling into `src/renderer/components/workbench-shell/contexts/`.
+
+### Added structure (no prior docs)
+
+- `src/renderer/components/dashboard-welcome.tsx` + `dashboard-welcome/`:
+  welcome wordmark, three add-project cards, and a UI-only
+  `CloneGithubDialog`. Mounted at the `_workbench/_shell/` index route.
+- `src/renderer/components/workbench-empty-state.tsx`: full shell rendered
+  when no workspace is selectable.
+- The `_workbench/_shell/dashboard.tsx` route now renders a
+  `WorkbenchPlaceholderPage` reserved for the future kanban board (it is no
+  longer the implicit landing).
+
+### Updated
+
+- `docs/product/current-shell-inventory.md`: path block, implementation
+  boundaries, and a new Welcome landing row added; dashboard row updated to
+  reflect the placeholder state.
+- `docs/product/ux-parity.md`: shell-contract paths updated.
+- `docs/product/screen-inventory.md`: implemented-shell pointer updated.
+- `docs/product/implementation-roadmap.md`: scope-baseline shell summary
+  updated.
+- `docs/product/linear-issues.md`: current-shell-alignment preamble and the
+  `ENS-002` shell-split implementation note updated.
+- `docs/product/onboarding-flow.md`: 2026-06-07 implementation-status block
+  added describing the live welcome view, clone-dialog stub, and add-project
+  menu parity.
+- `docs/adr/0026-use-file-based-tanstack-routing.md`: shell-composition
+  paragraph updated for the new frame / workspace-content split, the
+  no-project shell, and the welcome landing.
+- `docs/refactor/composition-refactor-plan.md`: marked Landed with the
+  shipped outcomes summary.
+- `src/renderer/AGENTS.md`: components-section example updated to use
+  `dashboard-welcome` for the small case and the workbench-shell named
+  entrypoints for the large case.
+
+### Not done
+
+- `AGENTS.md` (repo root) was not edited in this pass; its current language
+  references scoped sub-`AGENTS.md` files generically and does not name
+  shell paths.
+- The connected Linear workspace mismatch noted in the 2026-06-07 routing
+  alignment is still unresolved; live `THE-*` tickets were not synced.

@@ -23,7 +23,7 @@ These instructions apply to everything under `src/renderer/`.
 ## Components
 
 - Keep shadcn and shared UI primitives under `components/ui/`.
-- Keep composed product components under `components/<concern>.tsx` plus private sibling folders, for example `components/workbench-shell.tsx` and `components/workbench-shell/`.
+- Keep composed product components under `components/<concern>.tsx` plus a private sibling folder when one is needed, for example `components/dashboard-welcome.tsx` and `components/dashboard-welcome/`. Larger concerns may live entirely inside the folder with named entrypoints, for example `components/workbench-shell/frame.tsx`, `components/workbench-shell/workspace-content.tsx`, and `components/workbench-shell/route-layout/index.ts`.
 - Do not define shared exported renderer types in component folders. Import them from `types/`.
 - Do not keep mock or fixture data inside components. Import it from `mocks/<concern>/`.
 

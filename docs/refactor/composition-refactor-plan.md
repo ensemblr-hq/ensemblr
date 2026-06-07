@@ -2,6 +2,42 @@
 
 Reference: Fernando Rojo, "Composition Is All You Need" (React Universe Conf 2025).
 
+## Status
+
+Landed (commit `6fddcf5 refactor(renderer): decompose workbench shell modules`,
+2026-06-07).
+
+Outcomes shipped:
+
+- `components/setup-diagnostics.tsx` → `components/setup-diagnostics/` folder
+  (`panel.tsx`, `compact.tsx`, `local-execution-notice.tsx`,
+  `root-directory-change-dialog.tsx`, `root-path-preview.tsx`,
+  `setup-check-row.tsx`, `index.ts`).
+- `workbench-shell/checks-panel.tsx` → `workbench-shell/checks-panel/` folder
+  with compound subcomponents (`summary.tsx`, `pr-metadata.tsx`, `pr-rows.tsx`,
+  `provider-mark.tsx`, `status-icon.tsx`, `empty-states.tsx`).
+- `workbench-shell/navigation-sidebar.tsx`,
+  `workbench-shell/workspace-sidebar-item.tsx`,
+  `workbench-shell/conversation-panel.tsx`,
+  `workbench-shell/dock-panel.tsx`,
+  `workbench-shell/review-files.tsx`,
+  `workbench-shell/right-sidebar-header.tsx`,
+  `workbench-shell/project-sidebar.tsx`,
+  `workbench-shell/route-layout.tsx` → matching feature folders with
+  per-concern sibling files.
+- `workbench-shell.tsx` decomposed to
+  `workbench-shell/frame.tsx` (`WorkbenchFrame`) and
+  `workbench-shell/workspace-content.tsx` (`WorkspaceWorkbenchContent`).
+  Top-level `workbench-empty-state.tsx` extracted for the no-project shell.
+- Cross-cutting flag drilling removed via
+  `workbench-shell/contexts/` (`WorkbenchLayoutProvider`,
+  `SetupDiagnosticsProvider`, `NavigationProvider`).
+- Shared shell types moved from `types/workbench-shell.ts` (file) to
+  `types/workbench-shell/` (folder + `index.ts` barrel).
+
+This file is kept as historical context for the decomposition; see
+`docs/product/current-shell-inventory.md` for the current shell contract.
+
 ## Phase 1 — Inventory
 
 Scanned `src/**/*.tsx` (68 files). Excluded vendored shadcn primitives in `src/renderer/components/ui/*` and route shells in `routing/routes/*` (small + already split).
