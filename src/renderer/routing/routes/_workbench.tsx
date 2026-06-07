@@ -33,6 +33,7 @@ export const Route = createFileRoute('/_workbench')({
 	staleTime: WORKBENCH_ROUTE_STALE_TIME_MS,
 });
 
+/** Pathless layout route that fetches workbench data and renders descendants. */
 function WorkbenchDataLayoutRoute() {
 	return <Outlet />;
 }

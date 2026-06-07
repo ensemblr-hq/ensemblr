@@ -29,6 +29,7 @@ import { ReviewPanel } from './review-panel';
 import { RightSidebarHeader } from './right-sidebar-header';
 import { WorkbenchHeader } from './workbench-header';
 
+/** Top-level resizable layout housing the main workspace and the review dock. */
 export function WorkbenchPanelLayout({
 	activeProject,
 	activeReviewTab,
@@ -102,6 +103,7 @@ export function WorkbenchPanelLayout({
 	);
 }
 
+/** Left resizable panel containing the workbench header and main content. */
 function MainWorkspacePanel({
 	activeProject,
 	activeWorkspace,
@@ -133,6 +135,7 @@ function MainWorkspacePanel({
 	);
 }
 
+/** Conversation surface — session tabs, scrollable timeline, and composer. */
 export function WorkspaceConversationContent({
 	activeSession,
 	activeWorkspace,
@@ -186,6 +189,7 @@ export function WorkspaceConversationContent({
 	);
 }
 
+/** Right-hand collapsible review panel plus the bottom dock panel group. */
 function ReviewDockPanel({
 	activeReviewTab,
 	activeWorkspace,

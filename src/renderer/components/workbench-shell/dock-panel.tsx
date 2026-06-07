@@ -28,9 +28,11 @@ import type {
 } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 
-// Setup and Run are fixed, read-only script output panes. Terminal tabs are
-// independent interactive sessions: every user-spawned terminal needs its own
-// `terminal:*` tab id and persisted terminal session id.
+/**
+ * Bottom dock panel hosting fixed Setup/Run output tabs plus user-spawned
+ * terminal tabs. Setup and Run are read-only script outputs; terminal tabs are
+ * independent interactive sessions keyed by `terminal:*` ids.
+ */
 export function DockPanel({
 	actions,
 	activeTab,
@@ -142,6 +144,7 @@ export function DockPanel({
 	);
 }
 
+/** Renders the appropriate setup/run/stop button cluster on the dock header. */
 function DockPanelActions({
 	actions,
 	workspace,
@@ -209,6 +212,7 @@ function DockPanelActions({
 	);
 }
 
+/** Renders the Setup script output or the appropriate empty state. */
 function SetupScriptOutputPanel({
 	onOpenSetupScripts,
 	onRunSetupScript,
@@ -248,6 +252,7 @@ function SetupScriptOutputPanel({
 	);
 }
 
+/** Renders the Run script output or the appropriate empty state. */
 function RunScriptOutputPanel({
 	onOpenSetupScripts,
 	onRunScript,
@@ -287,6 +292,7 @@ function RunScriptOutputPanel({
 	);
 }
 
+/** Generic dock empty state with title, body and primary action. */
 function ScriptEmptyState({
 	actionLabel,
 	detail,
@@ -314,6 +320,7 @@ function ScriptEmptyState({
 	);
 }
 
+/** Interactive terminal tab content (one session id per tab). */
 function InteractiveTerminalPanel({ tab }: { tab: TerminalDockTabModel }) {
 	return (
 		<LogDockContent
@@ -324,6 +331,7 @@ function InteractiveTerminalPanel({ tab }: { tab: TerminalDockTabModel }) {
 	);
 }
 
+/** Read-only output stream used by Setup/Run tabs. */
 function ReadOnlyCommandOutput({
 	lines,
 	title,
@@ -334,6 +342,7 @@ function ReadOnlyCommandOutput({
 	return <LogDockContent isReadOnly lines={lines} title={title} />;
 }
 
+/** Terminal-style scroll area that renders one numbered line per entry. */
 function LogDockContent({
 	isReadOnly = false,
 	lines,
@@ -371,6 +380,7 @@ function LogDockContent({
 	);
 }
 
+/** Maps a dock tab kind to its lucide icon component. */
 function getDockTabIcon(tab: DockTabModel) {
 	switch (tab.kind) {
 		case 'run-script':
@@ -382,6 +392,7 @@ function getDockTabIcon(tab: DockTabModel) {
 	}
 }
 
+/** Type guard for terminal-kind dock tabs. */
 function isTerminalDockTab(tab: DockTabModel): tab is TerminalDockTabModel {
 	return tab.kind === 'terminal';
 }

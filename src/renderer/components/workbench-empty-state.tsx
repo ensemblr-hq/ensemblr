@@ -13,6 +13,7 @@ import type {
 } from '@/renderer/types/workbench-shell';
 import { WorkbenchFrame } from './workbench-shell';
 
+/** Full workbench shell rendered when no workspace is selectable. */
 export function WorkbenchEmptyStateShell({
 	activeView,
 	emptyState,
@@ -61,6 +62,7 @@ export function WorkbenchEmptyStateShell({
 	);
 }
 
+/** Inner content for the workbench empty state — title + detail copy. */
 export function WorkbenchEmptyStateContent({
 	emptyState,
 }: {
@@ -87,6 +89,7 @@ export function WorkbenchEmptyStateContent({
 	);
 }
 
+/** Empty-state mode does not surface workspace search params. */
 function resolveEmptyStateWorkspaceRouteSearch(): WorkbenchRouteSearch {
 	return {};
 }

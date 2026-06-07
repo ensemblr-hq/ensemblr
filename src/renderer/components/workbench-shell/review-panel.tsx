@@ -34,6 +34,7 @@ import {
 	ReviewFileList,
 } from './review-files';
 
+/** Tabbed review surface for files, changes, and checks. */
 export function ReviewPanel({
 	activeTab,
 	onTabChange,
@@ -136,6 +137,7 @@ export function ReviewPanel({
 	);
 }
 
+/** Tab-aware action cluster on the review panel header. */
 function ReviewPanelActions({
 	activeTab,
 	changesViewMode,
@@ -201,6 +203,7 @@ function ReviewPanelActions({
 	);
 }
 
+/** Dropdown listing commit ranges and uncommitted-changes options. */
 function ChangesOverflowMenu({
 	workspace,
 }: {
@@ -260,6 +263,7 @@ function ChangesOverflowMenu({
 	);
 }
 
+/** Individual tab button rendered inside the review-panel header. */
 function ReviewTabButton({
 	count,
 	isActive,

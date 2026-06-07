@@ -7,6 +7,7 @@ export const Route = createFileRoute('/_workbench/_shell/projects/$projectId')({
 		loadProjectWorkbenchRoute({ parentMatchPromise, params }),
 });
 
+/** Layout route under `/projects/$projectId` — renders workspace descendants. */
 function ProjectLayoutRoute() {
 	return <Outlet />;
 }

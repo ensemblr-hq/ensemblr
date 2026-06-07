@@ -3,9 +3,12 @@ import { atomWithStorage, createJSONStorage } from 'jotai/utils';
 
 import type { RecentProject } from '@/renderer/types/workbench';
 
+/** localStorage key holding the persisted recent-projects envelope. */
 export const RECENT_PROJECTS_STORAGE_KEY = 'ensemble_recent_projects';
+/** Schema version embedded in the persisted recent-projects envelope. */
 export const RECENT_PROJECTS_STORAGE_VERSION = 1;
 
+/** Versioned localStorage envelope wrapping the recent-projects list. */
 interface RecentProjectsStorageEnvelope {
 	entries: RecentProject[];
 	version: number;

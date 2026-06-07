@@ -12,6 +12,11 @@ const staticNavigationRouteByTarget: Record<
 	settings: '/settings',
 };
 
+/**
+ * Maps a workbench navigation target to its TanStack Router `to` value.
+ * @param target - Static target enum value.
+ * @returns A typed router `to` path.
+ */
 export function getWorkbenchStaticRoute(
 	target: WorkbenchStaticNavigationTarget,
 ) {

@@ -127,6 +127,7 @@ const WorkbenchLayoutModelContext = createContext<WorkbenchLayoutModel | null>(
 const WorkspaceMainContentContext =
 	createContext<WorkspaceMainContentState | null>(null);
 
+/** Workbench shell layout — builds the layout model and renders the navigation frame. */
 export function WorkbenchShellLayout() {
 	useRouteProfilerMount('WorkbenchShellLayout');
 
@@ -155,6 +156,7 @@ export function WorkbenchShellLayout() {
 	);
 }
 
+/** Placeholder content for dashboard/history/help/settings views. */
 export function WorkbenchPlaceholderPage({
 	view,
 }: {
@@ -173,6 +175,7 @@ export function WorkbenchPlaceholderPage({
 	);
 }
 
+/** Layout route for `/projects/:projectId/workspaces/:workspaceId`. */
 export function WorkspaceWorkbenchLayout() {
 	useRouteProfilerMount('WorkspaceWorkbenchLayout');
 
@@ -210,6 +213,7 @@ export function WorkspaceWorkbenchLayout() {
 	);
 }
 
+/** Chat-route content — renders the workspace conversation surface. */
 export function WorkspaceChatPage() {
 	const mainContent = use(WorkspaceMainContentContext);
 
@@ -222,10 +226,12 @@ export function WorkspaceChatPage() {
 	return <WorkspaceConversationContent {...mainContent} />;
 }
 
+/** Sentinel route component used while the chat redirect resolves. */
 export function WorkspaceNoChatPage() {
 	return null;
 }
 
+/** Workspace shell content — wires panel tabs, composer state, and navigation. */
 function WorkspaceRouteContent({
 	chatId,
 	model,
@@ -265,6 +271,7 @@ function WorkspaceRouteContent({
 		[],
 	);
 
+	/** Navigates to the canonical chat route, preserving existing search state. */
 	function navigateToWorkspaceChat({
 		nextChatId,
 		nextSearch,
@@ -287,6 +294,7 @@ function WorkspaceRouteContent({
 		});
 	}
 
+	/** Persists tab changes to local prefs and forwards them to the URL. */
 	function updateSearch(nextSearch: WorkbenchRouteSearch) {
 		if (nextSearch.review) {
 			panelTabs.setWorkspaceReviewTab(activeWorkspace.id, nextSearch.review);
@@ -324,6 +332,7 @@ function WorkspaceRouteContent({
 	);
 }
 
+/** Provides workspace main-content state to the nested chat route via context. */
 function WorkspaceMainContentOutlet(state: WorkspaceMainContentState) {
 	return (
 		<WorkspaceMainContentContext.Provider value={state}>
@@ -332,6 +341,7 @@ function WorkspaceMainContentOutlet(state: WorkspaceMainContentState) {
 	);
 }
 
+/** Consumes the workbench layout model context; throws when used outside `_shell`. */
 function useWorkbenchLayoutRouteModel() {
 	const model = use(WorkbenchLayoutModelContext);
 
@@ -342,6 +352,10 @@ function useWorkbenchLayoutRouteModel() {
 	return model;
 }
 
+/**
+ * Builds the workbench layout model — combining loader data, live queries,
+ * persisted prefs, and navigation handlers — for descendant routes.
+ */
 function useWorkbenchLayoutModel({
 	loaderData,
 	routeState,
@@ -599,6 +613,7 @@ function useWorkbenchLayoutModel({
 	};
 }
 
+/** Derives the active workbench view + URL params from the current router match. */
 function useWorkbenchShellRouteState(): WorkbenchShellRouteState {
 	const childMatches = useChildMatches({
 		select: (matches): WorkbenchChildMatch[] =>
@@ -636,6 +651,7 @@ function useWorkbenchShellRouteState(): WorkbenchShellRouteState {
 	};
 }
 
+/** Extracts the `$chatId` URL param when the active route exposes it. */
 function useActiveWorkspaceChatId() {
 	const childMatches = useChildMatches({
 		select: (matches): Array<Record<string, unknown>> =>
@@ -650,6 +666,7 @@ function useActiveWorkspaceChatId() {
 	return getStringRouteParam(chatMatch, 'chatId');
 }
 
+/** Builds the TanStack Router link renderers passed to the navigation sidebar. */
 function useWorkbenchNavigationLinkRenderers({
 	resolveWorkspaceChatId,
 }: {
@@ -686,6 +703,7 @@ function useWorkbenchNavigationLinkRenderers({
 	};
 }
 
+/** Wraps static-navigation children with an intent-preload `Link`. */
 function renderStaticWorkbenchNavigationLink(
 	target: WorkbenchStaticNavigationTarget,
 	children: ReactElement,
@@ -697,6 +715,7 @@ function renderStaticWorkbenchNavigationLink(
 	);
 }
 
+/** Picks placeholder title + detail copy for non-workspace workbench views. */
 function getWorkbenchPlaceholderCopy({
 	projectCount,
 	setupStatus,
@@ -739,6 +758,7 @@ function getWorkbenchPlaceholderCopy({
 	}
 }
 
+/** Safely extracts a string route param from a router match. */
 function getStringRouteParam(
 	params: Record<string, unknown> | undefined,
 	key: string,
@@ -748,6 +768,7 @@ function getStringRouteParam(
 	return typeof value === 'string' ? value : undefined;
 }
 
+/** Extracts the `workbenchView` value from a route's `staticData` payload. */
 function getWorkbenchStaticView(staticData: unknown) {
 	if (typeof staticData !== 'object' || staticData === null) {
 		return undefined;

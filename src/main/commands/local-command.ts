@@ -17,12 +17,14 @@ export type LocalCommandFailureCode =
 	| 'spawn-error'
 	| 'timeout';
 
+/** Single advisory diagnostic emitted while resolving the command environment. */
 export interface CommandEnvironmentDiagnostic {
 	code: string;
 	message: string;
 	severity: CommandDiagnosticSeverity;
 }
 
+/** Resolved environment used to launch local commands. */
 export interface CommandEnvironmentSnapshot {
 	diagnostics: CommandEnvironmentDiagnostic[];
 	env: Record<string, string>;
@@ -32,6 +34,7 @@ export interface CommandEnvironmentSnapshot {
 	source: CommandEnvironmentSource;
 }
 
+/** Caller-provided description of a local command to run. */
 export interface LocalCommandRequest {
 	args?: readonly string[];
 	command: string;
@@ -42,6 +45,7 @@ export interface LocalCommandRequest {
 	timeoutMs?: number;
 }
 
+/** Failure metadata attached to a non-success {@link LocalCommandResult}. */
 export interface LocalCommandFailure {
 	code: LocalCommandFailureCode;
 	exitCode: number | null;
@@ -49,6 +53,7 @@ export interface LocalCommandFailure {
 	signal: NodeJS.Signals | string | null;
 }
 
+/** Sanitized log payload safe for persistence and surface to the renderer. */
 export interface LocalCommandSanitizedLogs {
 	command: string;
 	cwd: string;
@@ -57,6 +62,7 @@ export interface LocalCommandSanitizedLogs {
 	stdout: string;
 }
 
+/** Result of a {@link LocalCommandService.run} call. */
 export interface LocalCommandResult {
 	args: string[];
 	command: string;
@@ -76,10 +82,12 @@ export interface LocalCommandResult {
 	stdoutTruncated: boolean;
 }
 
+/** Per-call options for {@link LocalCommandService.run}. */
 export interface LocalCommandRunOptions {
 	signal?: AbortSignal;
 }
 
+/** Public surface of the local command service. */
 export interface LocalCommandService {
 	getEnvironment: () => Promise<CommandEnvironmentSnapshot>;
 	run: (
@@ -88,12 +96,14 @@ export interface LocalCommandService {
 	) => Promise<LocalCommandResult>;
 }
 
+/** Input passed to a {@link ShellEnvironmentLoader}. */
 export interface ShellEnvironmentLoaderRequest {
 	baseEnv: Record<string, string>;
 	shell: string;
 	timeoutMs: number;
 }
 
+/** Result of a single shell-environment loader invocation. */
 export interface ShellEnvironmentLoaderResult {
 	error?: Error;
 	exitCode: number | null;
@@ -103,10 +113,12 @@ export interface ShellEnvironmentLoaderResult {
 	timedOut?: boolean;
 }
 
+/** Pluggable hook that runs a login shell and captures its environment. */
 export type ShellEnvironmentLoader = (
 	request: ShellEnvironmentLoaderRequest,
 ) => Promise<ShellEnvironmentLoaderResult>;
 
+/** Options for {@link createLocalCommandService}. */
 export interface CreateLocalCommandServiceOptions {
 	baseEnv?: NodeJS.ProcessEnv | Record<string, string | undefined>;
 	commonPathEntries?: readonly string[];
@@ -138,6 +150,12 @@ const SENSITIVE_KEY_PARTS = [
 const SENSITIVE_ASSIGNMENT_PATTERN =
 	/\b([A-Z0-9_.-]*(?:ACCESS[_-]?TOKEN|API[_-]?KEY|CREDENTIAL|PASSWORD|PRIVATE[_-]?KEY|SECRET|TOKEN)[A-Z0-9_.-]*)(\s*[=:]\s*)(["']?)([^\s"',;]+)/gi;
 
+/**
+ * Builds a service that runs local commands with sanitized logs and a
+ * lazily-resolved shell environment, protecting Ensemble from PATH/secret leaks.
+ * @param options - Optional dependency overrides and tuning knobs.
+ * @returns A {@link LocalCommandService} instance.
+ */
 export function createLocalCommandService(
 	options: CreateLocalCommandServiceOptions = {},
 ): LocalCommandService {
@@ -153,6 +171,11 @@ export function createLocalCommandService(
 		options.shellEnvironmentLoader ?? loadShellEnvironment;
 	let environmentPromise: Promise<CommandEnvironmentSnapshot> | null = null;
 
+	/**
+	 * Resolves the shell environment on first call and returns a defensive clone
+	 * on every subsequent call.
+	 * @returns A cloned environment snapshot.
+	 */
 	async function getEnvironment(): Promise<CommandEnvironmentSnapshot> {
 		environmentPromise ??= resolveCommandEnvironment({
 			baseEnv,
@@ -166,6 +189,13 @@ export function createLocalCommandService(
 		return cloneEnvironmentSnapshot(await environmentPromise);
 	}
 
+	/**
+	 * Validates the request, prepares the spawn environment and runs the command,
+	 * returning a sanitized result regardless of whether the process exited cleanly.
+	 * @param request - Command, args, cwd, env overrides and limits.
+	 * @param runOptions - Optional abort signal.
+	 * @returns A {@link LocalCommandResult} describing the outcome.
+	 */
 	async function run(
 		request: LocalCommandRequest,
 		runOptions: LocalCommandRunOptions = {},
@@ -289,6 +319,12 @@ export function createLocalCommandService(
 	};
 }
 
+/**
+ * Validates and defaults a {@link LocalCommandRequest}, surfacing the first
+ * shape problem as an `invalid-input` failure instead of throwing.
+ * @param request - Raw caller-provided request.
+ * @returns Normalised fields plus an optional failure when input is invalid.
+ */
 function normalizeLocalCommandRequest(request: LocalCommandRequest): {
 	args: string[];
 	command: string;
@@ -431,6 +467,11 @@ function normalizeLocalCommandRequest(request: LocalCommandRequest): {
 	};
 }
 
+/**
+ * Resolves the candidate working directory and confirms it exists.
+ * @param cwd - Candidate path.
+ * @returns The resolved absolute path plus an optional failure.
+ */
 function validateCwd(cwd: string): {
 	failure?: LocalCommandFailure;
 	path: string;
@@ -476,6 +517,12 @@ function validateCwd(cwd: string): {
 	return { path: resolvedPath };
 }
 
+/**
+ * Spawns the child process, captures stdout/stderr under the output cap,
+ * enforces the timeout/abort signal, and resolves once the process exits.
+ * @param input - Pre-validated command, environment and limits.
+ * @returns A {@link LocalCommandResult} for the completed (or terminated) process.
+ */
 function runSpawnedCommand({
 	args,
 	command,
@@ -523,6 +570,12 @@ function runSpawnedCommand({
 		let killTimer: NodeJS.Timeout | null = null;
 		let timeoutTimer: NodeJS.Timeout | null = null;
 
+		/**
+		 * Resolves the outer promise exactly once, clearing pending timers and
+		 * assembling the sanitized result.
+		 * @param status - Final status to report.
+		 * @param failure - Failure metadata when `status` is `failure`.
+		 */
 		function settle(
 			status: LocalCommandStatus,
 			failure?: LocalCommandFailure,
@@ -575,6 +628,11 @@ function runSpawnedCommand({
 			);
 		}
 
+		/**
+		 * Sends SIGTERM and schedules a SIGKILL fallback, recording the
+		 * termination cause for the eventual failure reason.
+		 * @param reason - Why the command is being terminated.
+		 */
 		function terminate(reason: TerminationReason): void {
 			if (terminationReason) {
 				return;
@@ -594,10 +652,17 @@ function runSpawnedCommand({
 			}, killGraceMs);
 		}
 
+		/** Abort-signal handler that cancels the running command. */
 		function abortListener(): void {
 			terminate('canceled');
 		}
 
+		/**
+		 * Appends a chunk to the per-stream buffer, applying the output cap and
+		 * triggering termination on overflow.
+		 * @param stream - Which stream produced the chunk.
+		 * @param chunk - Raw bytes from the stream.
+		 */
 		function captureChunk(stream: 'stderr' | 'stdout', chunk: Buffer): void {
 			const chunks = stream === 'stdout' ? stdoutChunks : stderrChunks;
 			const currentBytes = stream === 'stdout' ? stdoutBytes : stderrBytes;
@@ -703,6 +768,13 @@ function runSpawnedCommand({
 	});
 }
 
+/**
+ * Resolves the command environment by invoking the configured shell loader,
+ * recording diagnostics on each failure mode and falling back to the Electron
+ * process environment when the shell cannot be consulted.
+ * @param input - Loader dependencies and configuration.
+ * @returns The resolved environment snapshot.
+ */
 async function resolveCommandEnvironment({
 	baseEnv,
 	commonPathEntries,
@@ -795,6 +867,12 @@ async function resolveCommandEnvironment({
 	};
 }
 
+/**
+ * Default {@link ShellEnvironmentLoader} that spawns the configured login shell
+ * and prints sentinel-delimited NUL-separated environment entries to stdout.
+ * @param input - Loader request.
+ * @returns Captured exit metadata and stdout/stderr.
+ */
 function loadShellEnvironment({
 	baseEnv,
 	shell,
@@ -823,6 +901,10 @@ function loadShellEnvironment({
 			child.kill('SIGTERM');
 		}, timeoutMs);
 
+		/**
+		 * Resolves the loader promise exactly once.
+		 * @param result - Loader result to surface.
+		 */
 		function settle(result: ShellEnvironmentLoaderResult): void {
 			if (settled) {
 				return;
@@ -857,6 +939,12 @@ function loadShellEnvironment({
 	});
 }
 
+/**
+ * Parses sentinel-delimited NUL-separated environment dump produced by the
+ * default shell loader.
+ * @param stdout - Captured shell stdout.
+ * @returns A `KEY=value` map, or `null` when sentinels are missing/malformed.
+ */
 function parseShellEnvironmentOutput(
 	stdout: string,
 ): Record<string, string> | null {
@@ -897,6 +985,12 @@ function parseShellEnvironmentOutput(
 	return Object.keys(env).length > 0 ? env : null;
 }
 
+/**
+ * Filters an environment map to entries with safe keys and string values,
+ * rejecting NUL bytes and `=` in keys.
+ * @param env - Environment to normalise.
+ * @returns A new map containing only safe entries.
+ */
 function normalizeEnvironment(
 	env: NodeJS.ProcessEnv | Record<string, string | undefined>,
 ): Record<string, string> {
@@ -917,6 +1011,12 @@ function normalizeEnvironment(
 	return normalized;
 }
 
+/**
+ * Returns a clone of `env` with its `PATH` augmented by the common path entries.
+ * @param env - Base environment.
+ * @param commonPathEntries - Entries to append to `PATH` when missing.
+ * @returns The augmented environment.
+ */
 function ensureEnvironmentPath(
 	env: Record<string, string>,
 	commonPathEntries: readonly string[],
@@ -927,6 +1027,13 @@ function ensureEnvironmentPath(
 	};
 }
 
+/**
+ * Applies caller overrides onto a base environment; `null`/`undefined` entries
+ * delete the matching key.
+ * @param env - Base environment.
+ * @param overrides - Caller-supplied overrides.
+ * @returns A new environment with overrides applied.
+ */
 function mergeEnvironment(
 	env: Record<string, string>,
 	overrides: Record<string, string | null | undefined>,
@@ -945,6 +1052,13 @@ function mergeEnvironment(
 	return merged;
 }
 
+/**
+ * Merges a `PATH` string with extra entries while preserving order and
+ * deduplicating.
+ * @param pathValue - Existing PATH value, possibly undefined.
+ * @param commonPathEntries - Entries to append when not already present.
+ * @returns The combined PATH string.
+ */
 function mergePath(
 	pathValue: string | undefined,
 	commonPathEntries: readonly string[],
@@ -965,6 +1079,12 @@ function mergePath(
 	return entries.join(path.delimiter);
 }
 
+/**
+ * Picks the login shell to consult, preferring `$SHELL` and falling back to
+ * platform defaults.
+ * @param baseEnv - Process environment to inspect.
+ * @returns Absolute path to the shell.
+ */
 function resolveDefaultShell(baseEnv: Record<string, string>): string {
 	if (baseEnv.SHELL) {
 		return baseEnv.SHELL;
@@ -977,6 +1097,10 @@ function resolveDefaultShell(baseEnv: Record<string, string>): string {
 	return '/bin/sh';
 }
 
+/**
+ * Returns the platform-appropriate PATH entries appended to the shell PATH.
+ * @returns A readonly array of directory paths.
+ */
 function getDefaultCommonPathEntries(): readonly string[] {
 	if (process.platform === 'darwin') {
 		return [
@@ -992,6 +1116,11 @@ function getDefaultCommonPathEntries(): readonly string[] {
 	return ['/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'];
 }
 
+/**
+ * Returns a deep clone of an environment snapshot so callers can mutate it safely.
+ * @param snapshot - Snapshot to clone.
+ * @returns A new snapshot whose nested collections are fresh copies.
+ */
 function cloneEnvironmentSnapshot(
 	snapshot: CommandEnvironmentSnapshot,
 ): CommandEnvironmentSnapshot {
@@ -1002,6 +1131,12 @@ function cloneEnvironmentSnapshot(
 	};
 }
 
+/**
+ * Assembles the final {@link LocalCommandResult} from spawn-side data and the
+ * sanitized log payload.
+ * @param input - Result fields plus performance timestamps.
+ * @returns The fully populated result.
+ */
 function createLocalCommandResult({
 	args,
 	command,
@@ -1055,6 +1190,14 @@ function createLocalCommandResult({
 	};
 }
 
+/**
+ * Builds a {@link LocalCommandFailure} record.
+ * @param code - Failure category.
+ * @param message - Human-readable message.
+ * @param exitCode - Observed exit code, if any.
+ * @param signal - Terminating signal, if any.
+ * @returns The failure record.
+ */
 function createFailure(
 	code: LocalCommandFailureCode,
 	message: string,
@@ -1069,6 +1212,11 @@ function createFailure(
 	};
 }
 
+/**
+ * Maps a termination cause to a human-readable failure message.
+ * @param reason - Why the command was terminated.
+ * @returns The corresponding message.
+ */
 function createTerminationMessage(reason: TerminationReason): string {
 	switch (reason) {
 		case 'canceled':
@@ -1080,6 +1228,11 @@ function createTerminationMessage(reason: TerminationReason): string {
 	}
 }
 
+/**
+ * Builds the sanitized log payload by redacting secrets in every textual field.
+ * @param input - Raw command, args, env and output streams.
+ * @returns A {@link LocalCommandSanitizedLogs} payload safe to persist.
+ */
 function createSanitizedLogs({
 	args,
 	command,
@@ -1108,6 +1261,13 @@ function createSanitizedLogs({
 	};
 }
 
+/**
+ * Builds a redactor that replaces sensitive environment values and inline
+ * secret-shaped assignments with a placeholder.
+ * @param env - Environment to scan for sensitive entries.
+ * @param explicitValues - Caller-supplied secret values to redact.
+ * @returns A `{ redact }` helper.
+ */
 function createRedactor(
 	env: Record<string, string>,
 	explicitValues: readonly string[],
@@ -1131,6 +1291,12 @@ function createRedactor(
 	);
 
 	return {
+		/**
+		 * Returns the input with all known secret values and inline secret
+		 * assignments replaced by the redaction placeholder.
+		 * @param value - Text to redact.
+		 * @returns Redacted text.
+		 */
 		redact(value) {
 			let redacted = value;
 
@@ -1147,6 +1313,13 @@ function createRedactor(
 	};
 }
 
+/**
+ * Returns a sorted clone of `env` where sensitive keys are wholly redacted and
+ * other values pass through the redactor.
+ * @param env - Environment to sanitize.
+ * @param redactor - Redactor used for non-sensitive values.
+ * @returns The sanitized environment map.
+ */
 function sanitizeEnvironment(
 	env: Record<string, string>,
 	redactor: { redact: (value: string) => string },
@@ -1160,6 +1333,13 @@ function sanitizeEnvironment(
 	return sanitized;
 }
 
+/**
+ * Renders the command line as a shell-safe, redacted single-line string.
+ * @param command - Command executable.
+ * @param args - Positional arguments.
+ * @param redactor - Redactor applied to each rendered part.
+ * @returns The sanitized command line.
+ */
 function formatCommandLabel(
 	command: string,
 	args: readonly string[],
@@ -1170,6 +1350,13 @@ function formatCommandLabel(
 		.join(' ');
 }
 
+/**
+ * Redacts argument values that follow a known secret-shaped flag and any inline
+ * `--secret=value` arguments.
+ * @param args - Positional arguments.
+ * @param redactor - Redactor for arguments that don't match the secret patterns.
+ * @returns A new array of sanitized arguments.
+ */
 function sanitizeArgs(
 	args: readonly string[],
 	redactor: { redact: (value: string) => string },
@@ -1196,6 +1383,12 @@ function sanitizeArgs(
 	return sanitized;
 }
 
+/**
+ * Tests whether an argument looks like a `--secret`-style flag whose value
+ * should be redacted in the following position.
+ * @param arg - Argument to test.
+ * @returns True for flag-shaped, secret-named arguments.
+ */
 function isSensitiveFlag(arg: string): boolean {
 	if (!arg.startsWith('-') || arg.includes('=')) {
 		return false;
@@ -1204,6 +1397,13 @@ function isSensitiveFlag(arg: string): boolean {
 	return isSensitiveKey(arg.replace(/^-+/, ''));
 }
 
+/**
+ * Redacts a single inline `key=value` argument when the key matches a known
+ * sensitive name; otherwise defers to the generic redactor.
+ * @param arg - Argument to consider.
+ * @param redactor - Fallback redactor.
+ * @returns The (possibly) redacted argument.
+ */
 function redactSensitiveInlineArg(
 	arg: string,
 	redactor: { redact: (value: string) => string },
@@ -1217,6 +1417,11 @@ function redactSensitiveInlineArg(
 	return redactor.redact(arg);
 }
 
+/**
+ * Quotes a command-line token for safe shell rendering, escaping single quotes.
+ * @param part - Token to quote.
+ * @returns A shell-safe representation of `part`.
+ */
 function quoteCommandPart(part: string): string {
 	if (part === '') {
 		return "''";
@@ -1229,12 +1434,22 @@ function quoteCommandPart(part: string): string {
 	return `'${part.replace(/'/g, "'\\''")}'`;
 }
 
+/**
+ * Tests whether a key name looks sensitive (e.g. contains "token" or "secret").
+ * @param key - Key to test.
+ * @returns True when the normalised key contains a sensitive substring.
+ */
 function isSensitiveKey(key: string): boolean {
 	const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 	return SENSITIVE_KEY_PARTS.some((part) => normalized.includes(part));
 }
 
+/**
+ * Extracts the conventional Node.js `code` property from an error, if any.
+ * @param error - Error instance to inspect.
+ * @returns The `code` string, or `undefined`.
+ */
 function getErrorCode(error: Error): string | undefined {
 	return 'code' in error && typeof error.code === 'string'
 		? error.code

@@ -4,6 +4,12 @@ import type {
 } from '@/renderer/types/workbench';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
 
+/**
+ * Computes the composer shell state from setup readiness and the active session,
+ * disabling the composer when setup is not yet ready or has errors.
+ * @param input - Active session, latest setup snapshot, and any setup error.
+ * @returns A {@link ComposerShellState} the composer can render directly.
+ */
 export function getComposerState({
 	activeSession,
 	setupDiagnostics,

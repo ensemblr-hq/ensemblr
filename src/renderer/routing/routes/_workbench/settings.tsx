@@ -11,6 +11,7 @@ export const Route = createFileRoute('/_workbench/settings')({
 	},
 });
 
+/** Full-screen settings route rendered outside the workbench shell layout. */
 function SettingsRoute() {
 	useRouteProfilerMount('SettingsRoute');
 

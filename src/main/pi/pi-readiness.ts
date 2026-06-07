@@ -37,6 +37,7 @@ export type PiProviderModelFailureCode =
 	| 'output-truncated'
 	| 'timeout';
 
+/** One advisory diagnostic emitted while assessing Pi readiness. */
 export interface PiReadinessDiagnostic {
 	code: string;
 	message: string;
@@ -44,6 +45,7 @@ export interface PiReadinessDiagnostic {
 	severity: PiReadinessDiagnosticSeverity;
 }
 
+/** Snapshot of the Pi agent directory's location and accessibility. */
 export interface PiAgentDirectorySnapshot {
 	diagnostics: PiReadinessDiagnostic[];
 	path: string;
@@ -51,10 +53,12 @@ export interface PiAgentDirectorySnapshot {
 	status: PiReadinessStatus;
 }
 
+/** Parsed JSONL startup frame emitted by `pi --mode rpc`. */
 export interface PiRpcFrameSnapshot {
 	type: string;
 }
 
+/** Failure metadata for the Pi RPC smoke check. */
 export interface PiRpcSmokeFailure {
 	code: PiRpcSmokeFailureCode;
 	exitCode: number | null;
@@ -62,6 +66,7 @@ export interface PiRpcSmokeFailure {
 	signal: NodeJS.Signals | string | null;
 }
 
+/** Captured command and logs for the Pi RPC smoke check. */
 export interface PiRpcSmokeLogs {
 	command: string;
 	cwd: string;
@@ -69,6 +74,7 @@ export interface PiRpcSmokeLogs {
 	stdout: string;
 }
 
+/** Result of the `pi --mode rpc` startup smoke check. */
 export interface PiRpcSmokeSnapshot {
 	args: string[];
 	command: string;
@@ -85,6 +91,7 @@ export interface PiRpcSmokeSnapshot {
 	stdoutTruncated: boolean;
 }
 
+/** Result of the `pi --list-models` provider/model readiness check. */
 export interface PiProviderModelSnapshot {
 	command: string;
 	failure?: {
@@ -97,6 +104,7 @@ export interface PiProviderModelSnapshot {
 	status: PiReadinessStatus;
 }
 
+/** Aggregate Pi readiness snapshot returned by {@link PiReadinessService}. */
 export interface PiReadinessSnapshot {
 	agentDirectory: PiAgentDirectorySnapshot;
 	executable: PiExecutableSnapshot;
@@ -105,6 +113,7 @@ export interface PiReadinessSnapshot {
 	rpc: PiRpcSmokeSnapshot;
 }
 
+/** Request payload for a {@link PiRpcSmokeRunner}. */
 export interface PiRpcSmokeRunnerRequest {
 	args: readonly string[];
 	command: string;
@@ -116,10 +125,12 @@ export interface PiRpcSmokeRunnerRequest {
 	timeoutMs: number;
 }
 
+/** Pluggable hook that runs the Pi RPC smoke check. */
 export type PiRpcSmokeRunner = (
 	request: PiRpcSmokeRunnerRequest,
 ) => Promise<PiRpcSmokeSnapshot>;
 
+/** Options for {@link createPiReadinessService}. */
 export interface CreatePiReadinessServiceOptions {
 	homeDirectory?: string;
 	localCommandService: LocalCommandService;
@@ -133,6 +144,7 @@ export interface CreatePiReadinessServiceOptions {
 	rpcTimeoutMs?: number;
 }
 
+/** Options for {@link resolvePiReadiness}. */
 export interface ResolvePiReadinessOptions {
 	homeDirectory?: string;
 	localCommandService: LocalCommandService;
@@ -146,6 +158,7 @@ export interface ResolvePiReadinessOptions {
 	rpcTimeoutMs?: number;
 }
 
+/** Public surface of the Pi readiness service. */
 export interface PiReadinessService {
 	getSnapshot: () => Promise<PiReadinessSnapshot>;
 }
@@ -160,6 +173,12 @@ const PI_LIST_MODELS_ARGS = ['--list-models'] as const;
 const PI_AGENT_DIRECTORY_ENV_KEY = 'PI_CODING_AGENT_DIR';
 const SETUP_SMOKE_WORKSPACE_DIRECTORY = '.setup-smoke';
 
+/**
+ * Builds the Pi readiness service that aggregates agent-directory, RPC smoke,
+ * and provider/model checks, deduplicating concurrent snapshot requests.
+ * @param options - Service dependencies and tuning.
+ * @returns A {@link PiReadinessService}.
+ */
 export function createPiReadinessService({
 	homeDirectory,
 	localCommandService,
@@ -196,6 +215,11 @@ export function createPiReadinessService({
 	};
 }
 
+/**
+ * Resolves every readiness check in parallel and assembles a single snapshot.
+ * @param options - Service dependencies and tuning.
+ * @returns A {@link PiReadinessSnapshot}.
+ */
 export async function resolvePiReadiness({
 	homeDirectory = homedir(),
 	localCommandService,
@@ -244,6 +268,12 @@ export async function resolvePiReadiness({
 	};
 }
 
+/**
+ * Resolves the Pi agent directory from `PI_CODING_AGENT_DIR` or the default
+ * `~/.pi/agent` and verifies it is a readable, writable directory.
+ * @param input - Environment snapshot and home directory override.
+ * @returns A {@link PiAgentDirectorySnapshot}.
+ */
 export function resolvePiAgentDirectory({
 	environment,
 	homeDirectory = homedir(),
@@ -310,6 +340,12 @@ export function resolvePiAgentDirectory({
 	};
 }
 
+/**
+ * Runs the Pi RPC startup smoke check (or returns a synthetic failure when the
+ * executable or smoke workspace is unavailable).
+ * @param input - Environment, executable, smoke workspace, and tuning.
+ * @returns A {@link PiRpcSmokeSnapshot}.
+ */
 export async function resolvePiRpcSmoke({
 	environment,
 	executable,
@@ -364,6 +400,12 @@ export async function resolvePiRpcSmoke({
 	});
 }
 
+/**
+ * Runs `pi --list-models` and counts unique providers and models, surfacing
+ * failure metadata when the command does not succeed or returns no models.
+ * @param input - Executable, command service, and timeout.
+ * @returns A {@link PiProviderModelSnapshot}.
+ */
 export async function resolvePiProviderModels({
 	executable,
 	localCommandService,
@@ -438,6 +480,11 @@ export async function resolvePiProviderModels({
 	};
 }
 
+/**
+ * Parses the columnar `pi --list-models` output into provider/model counts.
+ * @param output - Raw stdout from `pi --list-models`.
+ * @returns Distinct provider and model counts.
+ */
 export function parsePiListModelsOutput(output: string): {
 	modelCount: number;
 	providerCount: number;
@@ -468,6 +515,13 @@ export function parsePiListModelsOutput(output: string): {
 	};
 }
 
+/**
+ * Default {@link PiRpcSmokeRunner} that spawns `pi --mode rpc`, watches stdout
+ * for the first valid JSONL frame, enforces an output cap and a timeout, and
+ * terminates the process group when finished.
+ * @param request - Spawn args, environment, and tuning.
+ * @returns A {@link PiRpcSmokeSnapshot}.
+ */
 export function runPiRpcSmokeProcess({
 	args,
 	command,
@@ -512,6 +566,7 @@ export function runPiRpcSmokeProcess({
 			terminateChild();
 		}, timeoutMs);
 
+		/** Sends SIGTERM (and SIGKILL after the grace period) to the child process group. */
 		function terminateChild(): void {
 			if (killTimer || !isChildRunning()) {
 				return;
@@ -525,10 +580,16 @@ export function runPiRpcSmokeProcess({
 			}, killGraceMs);
 		}
 
+		/** True when the child is still alive and the promise has not resolved. */
 		function isChildRunning(): boolean {
 			return !settled && child.exitCode === null;
 		}
 
+		/**
+		 * Sends a signal to the child, preferring the process group on POSIX so
+		 * spawned subprocesses also receive it.
+		 * @param signal - Signal name to send.
+		 */
 		function signalChild(signal: NodeJS.Signals): void {
 			if (shouldDetachChild && child.pid) {
 				try {
@@ -545,6 +606,7 @@ export function runPiRpcSmokeProcess({
 			}
 		}
 
+		/** Resolves the outer promise exactly once, synthesising a failure if needed. */
 		function settle(): void {
 			if (settled) {
 				return;
@@ -591,6 +653,12 @@ export function runPiRpcSmokeProcess({
 			});
 		}
 
+		/**
+		 * Appends a chunk to the per-stream buffer, enforces the output cap, and
+		 * feeds new stdout content into the JSONL inspector.
+		 * @param stream - Which stream produced the chunk.
+		 * @param chunk - Raw bytes from the stream.
+		 */
 		function captureOutput(stream: 'stderr' | 'stdout', chunk: Buffer): void {
 			const text = chunk.toString('utf8');
 			const current = stream === 'stdout' ? stdout : stderr;
@@ -640,6 +708,7 @@ export function runPiRpcSmokeProcess({
 			}
 		}
 
+		/** Scans the stdout buffer for completed lines, parsing the first JSONL frame. */
 		function inspectRpcStdoutLines(): void {
 			while (stdoutBuffer.includes('\n')) {
 				const separatorIndex = stdoutBuffer.indexOf('\n');
@@ -694,6 +763,12 @@ export function runPiRpcSmokeProcess({
 	});
 }
 
+/**
+ * Ensures a dedicated `.setup-smoke` workspace exists under the root, used as
+ * the cwd for the Pi RPC startup check.
+ * @param rootDirectoryService - Active root-directory service.
+ * @returns The workspace path plus any error encountered.
+ */
 function ensureSetupSmokeWorkspace(
 	rootDirectoryService: EnsembleRootDirectoryService,
 ): { error?: string; path: string } {
@@ -733,6 +808,11 @@ function ensureSetupSmokeWorkspace(
 	}
 }
 
+/**
+ * Builds a failure-shaped RPC smoke snapshot for early-return paths.
+ * @param input - Failure code, command, cwd, message and clock.
+ * @returns A {@link PiRpcSmokeSnapshot} with `status: 'failure'`.
+ */
 function createFailedRpcSnapshot({
 	code,
 	command,
@@ -774,6 +854,7 @@ function createFailedRpcSnapshot({
 	};
 }
 
+/** Builds a {@link PiRpcSmokeFailure} record. */
 function createRpcFailure({
 	code,
 	exitCode,
@@ -793,6 +874,7 @@ function createRpcFailure({
 	};
 }
 
+/** Maps a `pi --list-models` failure to a user-facing message. */
 function getProviderModelFailureMessage(result: LocalCommandResult): string {
 	switch (result.failure?.code) {
 		case 'command-not-found':
@@ -808,6 +890,7 @@ function getProviderModelFailureMessage(result: LocalCommandResult): string {
 	}
 }
 
+/** Maps the local-command failure code to the matching provider/model code. */
 function mapProviderModelFailureCode(
 	code: LocalCommandFailureCode | undefined,
 ): PiProviderModelFailureCode {
@@ -823,10 +906,16 @@ function mapProviderModelFailureCode(
 	}
 }
 
+/** True when the Pi executable snapshot is good enough to run readiness checks. */
 function isExecutableReady(executable: PiExecutableSnapshot): boolean {
 	return Boolean(executable.command) && executable.status !== 'error';
 }
 
+/**
+ * Parses a single JSON line into a {@link PiRpcFrameSnapshot}.
+ * @param line - A single line from `pi --mode rpc` stdout.
+ * @returns The frame snapshot, or `null` on parse or shape failure.
+ */
 function parseRpcFrame(line: string): PiRpcFrameSnapshot | null {
 	try {
 		const parsed = JSON.parse(line) as unknown;
@@ -846,6 +935,7 @@ function parseRpcFrame(line: string): PiRpcFrameSnapshot | null {
 	return null;
 }
 
+/** Resolves a configured path, expanding `~`. */
 function normalizeConfiguredPath(
 	rawPath: string,
 	homeDirectory: string,
@@ -861,6 +951,7 @@ function normalizeConfiguredPath(
 	return path.resolve(rawPath);
 }
 
+/** Extracts the Node.js `code` property from an error, if any. */
 function getNodeErrorCode(error: Error): string | null {
 	return 'code' in error && typeof error.code === 'string' ? error.code : null;
 }

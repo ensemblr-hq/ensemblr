@@ -20,6 +20,7 @@ import { createMacosKeychainSecretStore } from './secrets';
 import { createSetupDiagnosticsService } from './setup';
 import { createEnsembleDatabaseService } from './storage';
 
+// Quit early on Windows when invoked by the Squirrel installer.
 if (started) {
 	app.quit();
 }
