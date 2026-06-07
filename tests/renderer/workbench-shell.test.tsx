@@ -8,18 +8,18 @@ import { WorkspaceConversationContent } from '../../src/renderer/components/work
 import { WorkbenchFrame } from '../../src/renderer/components/workbench-shell/frame';
 import { WorkspaceWorkbenchContent } from '../../src/renderer/components/workbench-shell/workspace-content';
 import {
+	findSession,
+	getDefaultProject,
+	getDefaultWorkspace,
+	shellFixtureProjects,
+} from '../../src/renderer/fixtures/workbench';
+import {
 	DEFAULT_DOCK_TAB,
 	DEFAULT_REVIEW_TAB,
 	DEFAULT_TERMINAL_DOCK_TAB_ID,
 	getComposerState,
 	normalizeWorkbenchSearch,
 } from '../../src/renderer/lib/workbench';
-import {
-	findSession,
-	getDefaultProject,
-	getDefaultWorkspace,
-	shellFixtureProjects,
-} from '../../src/renderer/fixtures/workbench';
 import type {
 	DockTabId,
 	ProjectShellModel,

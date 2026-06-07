@@ -14,7 +14,6 @@ import type {
 	SettingsResolutionSource,
 } from '../../shared/ipc';
 import {
-	areJsonValuesEqual,
 	cloneRecord,
 	formatErrorMessage,
 	isPlainRecord,
@@ -1128,4 +1127,3 @@ function isStringArray(value: unknown): value is string[] {
 		Array.isArray(value) && value.every((item) => typeof item === 'string')
 	);
 }
-

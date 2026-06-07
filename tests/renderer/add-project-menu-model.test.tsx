@@ -1,7 +1,6 @@
 import { expect, test } from 'bun:test';
-
-import { buildAddProjectMenuModel } from '../../src/renderer/lib/workbench';
 import { defaultRecentProjects } from '../../src/renderer/fixtures/workbench';
+import { buildAddProjectMenuModel } from '../../src/renderer/lib/workbench';
 import type { RecentProject } from '../../src/renderer/types/workbench';
 import type {
 	SetupCheckGroupId,

@@ -1,16 +1,12 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import type { KeyboardEvent } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import {
-	ensembleQueryKeys,
 	githubRepositoryListQuery,
 	isEnsembleApiAvailable,
-	prepareCloneGithubRepository,
 	rootDirectoryQuery,
 	selectCloneDestination,
-	startCloneGithubRepository,
-	subscribeCloneGithubRepositoryProgress,
 } from '@/renderer/api/ensemble-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -21,13 +17,13 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
-import { ScrollArea } from '@/renderer/components/ui/scroll-area';
-import type {
-	CloneGithubRepositoryDiagnostic,
-	CloneGithubRepositoryProgressEvent,
-	CloneGithubRepositoryStartResult,
-	GithubRepositoryEntry,
-} from '@/shared/ipc';
+import type { GithubRepositoryEntry } from '@/shared/ipc';
+
+import { joinDestination } from './clone-destination.ts';
+import { CloneGithubDiagnostics } from './clone-github-diagnostics.tsx';
+import { CloneGithubProgressLog } from './clone-github-progress-log.tsx';
+import { CloneGithubRecentRepos } from './clone-github-recent-repos.tsx';
+import { type CloneStage, useCloneFlow } from './use-clone-flow.ts';
 
 interface CloneGithubDialogProps {
 	onOpenChange: (open: boolean) => void;
@@ -56,16 +52,12 @@ export function CloneGithubDialog({
 	);
 }
 
-/** Top-level UI states the dialog moves through. */
-type CloneStage = 'idle' | 'preparing' | 'cloning' | 'success' | 'failure';
-
 /** State-owned clone form content that resets when the dialog open state changes. */
 function CloneGithubDialogForm({
 	onOpenChange,
 }: {
 	onOpenChange: (open: boolean) => void;
 }) {
-	const queryClient = useQueryClient();
 	const rootDirectory = useQuery({
 		...rootDirectoryQuery,
 		enabled: isEnsembleApiAvailable(),
@@ -86,31 +78,13 @@ function CloneGithubDialogForm({
 	const [url, setUrl] = useState('');
 	const [location, setLocation] = useState('');
 	const [locationTouched, setLocationTouched] = useState(false);
-	const [stage, setStage] = useState<CloneStage>('idle');
-	const [diagnostics, setDiagnostics] = useState<
-		CloneGithubRepositoryDiagnostic[]
-	>([]);
-	const [logs, setLogs] = useState<CloneGithubRepositoryProgressEvent[]>([]);
-	const [activeJobId, setActiveJobId] = useState<string | null>(null);
-	const [successResult, setSuccessResult] =
-		useState<CloneGithubRepositoryStartResult | null>(null);
+
+	const { diagnostics, isBusy, logs, retry, stage, startClone, successResult } =
+		useCloneFlow();
 
 	const trimmedUrl = url.trim();
-	const canClone =
-		stage !== 'preparing' &&
-		stage !== 'cloning' &&
-		trimmedUrl.length > 0 &&
-		isEnsembleApiAvailable();
+	const canClone = !isBusy && trimmedUrl.length > 0 && isEnsembleApiAvailable();
 	const locationPlaceholder = defaultParentPath || 'Managed repos directory';
-
-	const logRef = useRef<HTMLOListElement | null>(null);
-
-	useEffect(() => {
-		if (!logRef.current) {
-			return;
-		}
-		logRef.current.scrollTop = logRef.current.scrollHeight;
-	}, []);
 
 	useEffect(() => {
 		if (locationTouched || !defaultParentPath) {
@@ -118,21 +92,6 @@ function CloneGithubDialogForm({
 		}
 		setLocation(defaultParentPath);
 	}, [defaultParentPath, locationTouched]);
-
-	useEffect(() => {
-		if (!activeJobId) {
-			return;
-		}
-		const unsubscribe = subscribeCloneGithubRepositoryProgress((event) => {
-			if (event.jobId !== activeJobId) {
-				return;
-			}
-			setLogs((current) => [...current, event]);
-		});
-		return () => {
-			unsubscribe();
-		};
-	}, [activeJobId]);
 
 	const handleBrowse = useCallback(async () => {
 		if (!isEnsembleApiAvailable()) {
@@ -150,52 +109,16 @@ function CloneGithubDialogForm({
 		if (!canClone) {
 			return;
 		}
-
-		setStage('preparing');
-		setDiagnostics([]);
-		setLogs([]);
-		setSuccessResult(null);
-		setActiveJobId(null);
-
 		const parentOverride = location.trim();
 		const destinationPath = parentOverride
 			? joinDestination(parentOverride, trimmedUrl)
 			: undefined;
-
-		const preparation = await prepareCloneGithubRepository(
+		await startClone(
 			destinationPath !== undefined
 				? { destinationPath, url: trimmedUrl }
 				: { url: trimmedUrl },
 		);
-
-		if (!preparation.ok) {
-			setStage('failure');
-			setDiagnostics(preparation.diagnostics);
-			return;
-		}
-
-		setActiveJobId(preparation.preparation.jobId);
-		setStage('cloning');
-
-		const result = await startCloneGithubRepository({
-			jobId: preparation.preparation.jobId,
-		});
-
-		setLogs(result.logs);
-		setActiveJobId(null);
-
-		if (result.status === 'success' && result.repository) {
-			setStage('success');
-			setSuccessResult(result);
-			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
-			});
-			return;
-		}
-
-		setStage('failure');
-		setDiagnostics(result.diagnostics);
-	}, [canClone, location, queryClient, trimmedUrl]);
+	}, [canClone, location, startClone, trimmedUrl]);
 
 	const handleSubmitKey = useCallback(
 		(event: KeyboardEvent<HTMLInputElement>) => {
@@ -210,13 +133,6 @@ function CloneGithubDialogForm({
 	const handleClose = useCallback(() => {
 		onOpenChange(false);
 	}, [onOpenChange]);
-
-	const handleRetry = useCallback(() => {
-		setStage('idle');
-		setDiagnostics([]);
-	}, []);
-
-	const isBusy = stage === 'preparing' || stage === 'cloning';
 
 	return (
 		<>
@@ -244,7 +160,7 @@ function CloneGithubDialogForm({
 
 			<div className='flex flex-col gap-1.5'>
 				<Label className='text-xs'>Recent repos</Label>
-				<RecentReposList
+				<CloneGithubRecentRepos
 					disabled={isBusy}
 					isLoading={githubRepoList.isLoading}
 					onSelect={(repo) => setUrl(`https://github.com/${repo.fullName}.git`)}
@@ -299,12 +215,10 @@ function CloneGithubDialogForm({
 				) : null}
 			</div>
 
-			{logs.length > 0 ? (
-				<CloneProgressLog logRef={logRef} logs={logs} />
-			) : null}
+			{logs.length > 0 ? <CloneGithubProgressLog logs={logs} /> : null}
 
 			{stage === 'failure' && diagnostics.length > 0 ? (
-				<CloneDiagnosticsList diagnostics={diagnostics} />
+				<CloneGithubDiagnostics diagnostics={diagnostics} />
 			) : null}
 
 			{stage === 'success' && successResult?.repository ? (
@@ -318,7 +232,7 @@ function CloneGithubDialogForm({
 				{stage === 'failure' ? (
 					<Button
 						className='h-8'
-						onClick={handleRetry}
+						onClick={retry}
 						type='button'
 						variant='outline'
 					>
@@ -351,200 +265,6 @@ function CloneGithubDialogForm({
 	);
 }
 
-interface CloneProgressLogProps {
-	logRef: React.MutableRefObject<HTMLOListElement | null>;
-	logs: CloneGithubRepositoryProgressEvent[];
-}
-
-/** Live, scrollable progress log used while the clone runs. */
-function CloneProgressLog({ logRef, logs }: CloneProgressLogProps) {
-	// biome-ignore lint/correctness/useExhaustiveDependencies: logs.length triggers the auto-scroll when new lines arrive.
-	useEffect(() => {
-		if (!logRef.current) {
-			return;
-		}
-		logRef.current.scrollTop = logRef.current.scrollHeight;
-	}, [logRef, logs.length]);
-
-	return (
-		<ol
-			className='max-h-40 overflow-y-auto rounded-md border border-border bg-background/60 px-2 py-1.5 font-mono text-muted-foreground text-xxs'
-			data-testid='clone-progress-log'
-			ref={logRef}
-		>
-			{logs.map((event, index) => (
-				<li
-					className={
-						event.kind === 'status'
-							? 'text-foreground'
-							: event.kind === 'stderr'
-								? 'text-amber-500'
-								: 'text-muted-foreground'
-					}
-					data-kind={event.kind}
-					key={`${event.timestamp}-${index}`}
-				>
-					{event.text}
-				</li>
-			))}
-		</ol>
-	);
-}
-
-interface CloneDiagnosticsListProps {
-	diagnostics: CloneGithubRepositoryDiagnostic[];
-}
-
-/** Failure detail card listing each diagnostic in execution order. */
-function CloneDiagnosticsList({ diagnostics }: CloneDiagnosticsListProps) {
-	return (
-		<ul
-			className='rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive text-xs'
-			data-testid='clone-diagnostics'
-		>
-			{diagnostics.map((diagnostic) => (
-				<li className='flex flex-col gap-0.5' key={diagnostic.code}>
-					<span className='font-medium'>{diagnostic.message}</span>
-					{diagnostic.path ? (
-						<span className='font-mono text-xxs opacity-80'>
-							{diagnostic.path}
-						</span>
-					) : null}
-				</li>
-			))}
-		</ul>
-	);
-}
-
-interface RecentReposListProps {
-	disabled: boolean;
-	isLoading: boolean;
-	onSelect: (repo: GithubRepositoryEntry) => void;
-	repos: GithubRepositoryEntry[];
-	selectedUrl: string;
-}
-
-/** Pickable list of GitHub repos surfaced as quick-fill suggestions. */
-function RecentReposList({
-	disabled,
-	isLoading,
-	onSelect,
-	repos,
-	selectedUrl,
-}: RecentReposListProps) {
-	if (isLoading && repos.length === 0) {
-		return (
-			<div className='flex items-center justify-center rounded-lg border border-border bg-background/40 px-2.5 py-3 text-muted-foreground text-xxs'>
-				Loading repos from GitHub…
-			</div>
-		);
-	}
-
-	if (repos.length === 0) {
-		return (
-			<div className='flex items-center justify-center rounded-lg border border-border bg-background/40 px-2.5 py-3 text-muted-foreground text-xxs'>
-				No repos to suggest yet.
-			</div>
-		);
-	}
-
-	return (
-		<ScrollArea className='h-44 rounded-lg border border-border bg-background/40'>
-			<ul className='flex flex-col'>
-				{repos.map((repo) => {
-					const expectedUrl = `https://github.com/${repo.fullName}.git`;
-					const isSelected = selectedUrl === expectedUrl;
-					return (
-						<li key={repo.fullName}>
-							<button
-								aria-pressed={isSelected}
-								className='flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-60 aria-pressed:bg-muted'
-								disabled={disabled}
-								onClick={() => onSelect(repo)}
-								type='button'
-							>
-								<OwnerAvatar
-									avatarUrl={repo.avatarUrl}
-									ownerLogin={repo.ownerLogin}
-								/>
-								<span className='flex min-w-0 flex-col leading-tight'>
-									<span className='flex min-w-0 items-center gap-1.5 truncate text-foreground text-xs'>
-										<span className='truncate'>{repo.fullName}</span>
-										{repo.isPrivate ? (
-											<span className='shrink-0 rounded-sm bg-muted px-1 py-px text-[0.625rem] text-muted-foreground uppercase tracking-wide'>
-												Private
-											</span>
-										) : null}
-									</span>
-									{repo.description ? (
-										<span className='truncate text-muted-foreground text-xxs'>
-											{repo.description}
-										</span>
-									) : null}
-								</span>
-							</button>
-						</li>
-					);
-				})}
-			</ul>
-		</ScrollArea>
-	);
-}
-
-/** Avatar bubble for a repo owner, with an image fallback to a tinted swatch. */
-function OwnerAvatar({
-	avatarUrl,
-	ownerLogin,
-}: {
-	avatarUrl: string | null;
-	ownerLogin: string;
-}) {
-	const [failed, setFailed] = useState(false);
-
-	if (avatarUrl && !failed) {
-		return (
-			<img
-				alt=''
-				className='size-5 shrink-0 rounded-full bg-background object-cover ring-1 ring-foreground/10'
-				draggable={false}
-				loading='lazy'
-				onError={() => setFailed(true)}
-				referrerPolicy='no-referrer'
-				src={withAvatarSize(avatarUrl, 40)}
-			/>
-		);
-	}
-
-	return (
-		<span
-			aria-hidden='true'
-			className='size-5 shrink-0 rounded-full ring-1 ring-foreground/10'
-			style={{ backgroundColor: ownerAvatarColor(ownerLogin) }}
-		/>
-	);
-}
-
-/** Appends `?s=<size>` to a GitHub avatar URL so we fetch a small thumbnail. */
-function withAvatarSize(url: string, size: number): string {
-	if (url.includes('?')) {
-		return `${url}&s=${size}`;
-	}
-	return `${url}?s=${size}`;
-}
-
-/** Stable color swatch per owner login, derived without external assets. */
-function ownerAvatarColor(login: string): string {
-	if (!login) {
-		return 'oklch(0.5 0.04 260)';
-	}
-	let hash = 0;
-	for (let index = 0; index < login.length; index += 1) {
-		hash = (hash * 31 + login.charCodeAt(index)) >>> 0;
-	}
-	const hue = hash % 360;
-	return `oklch(0.62 0.13 ${hue})`;
-}
-
 /** Picks the clone button label that matches the current stage. */
 function getCloneButtonLabel(stage: CloneStage): string {
 	switch (stage) {
@@ -557,39 +277,4 @@ function getCloneButtonLabel(stage: CloneStage): string {
 		case 'success':
 			return 'Clone repo';
 	}
-}
-
-/**
- * Derives the full clone target directory from a parent override and the URL,
- * appending the repository name extracted from the URL. Returns the raw parent
- * when no repository name can be parsed so the main process surfaces the
- * validation diagnostic.
- */
-function joinDestination(parent: string, url: string): string {
-	const name = extractRepositoryName(url);
-	if (!name) {
-		return parent;
-	}
-	return `${stripTrailingSlash(parent)}/${name}`;
-}
-
-/** Strips the final `/` from a path so segments can be re-joined. */
-function stripTrailingSlash(value: string): string {
-	return value.endsWith('/') ? value.replace(/\/+$/, '') : value;
-}
-
-const REPO_NAME_PATTERN =
-	/(?:[/:])([\w.-]+?)(?:\.git)?(?:\/?$)|^([\w.-]+)\/([\w.-]+?)(?:\.git)?$/i;
-
-/** Best-effort extraction of the repository name segment from a GitHub URL. */
-function extractRepositoryName(url: string): string | null {
-	const match = url.trim().match(REPO_NAME_PATTERN);
-	if (!match) {
-		return null;
-	}
-	const captured = match[1] ?? match[3];
-	if (!captured) {
-		return null;
-	}
-	return captured.replace(/\.git$/i, '');
 }

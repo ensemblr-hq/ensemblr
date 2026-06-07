@@ -1,4 +1,9 @@
-import { BrowserWindow, dialog, ipcMain, type OpenDialogOptions } from 'electron';
+import {
+	BrowserWindow,
+	dialog,
+	ipcMain,
+	type OpenDialogOptions,
+} from 'electron';
 
 import {
 	type CloneDestinationSelectionResult,

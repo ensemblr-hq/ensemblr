@@ -17,6 +17,7 @@ import {
 	selectLocalRepository,
 	setupDiagnosticsQuery,
 } from '@/renderer/api/ensemble-queries';
+import { shellFixtureProjects } from '@/renderer/fixtures/workbench';
 import { getErrorMessage } from '@/renderer/lib/error';
 import {
 	buildAddProjectMenuModel,
@@ -28,7 +29,6 @@ import {
 	resolveWorkspaceNavigationRenderState,
 	resolveWorkspaceNavigationSelection,
 } from '@/renderer/lib/workbench';
-import { shellFixtureProjects } from '@/renderer/fixtures/workbench';
 import { cloneDialogOpenAtom } from '@/renderer/state/clone-dialog';
 import { quickStartDialogOpenAtom } from '@/renderer/state/quick-start-dialog';
 import { recentProjectsAtom } from '@/renderer/state/recents';

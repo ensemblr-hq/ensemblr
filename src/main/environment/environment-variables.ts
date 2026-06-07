@@ -35,8 +35,8 @@ import type {
 	PlainValueCandidate,
 } from './environment-variable-types.ts';
 
-export { isEnvironmentVariableKey } from './environment-variable-keys.ts';
 export { BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG } from './environment-variable-catalog.ts';
+export { isEnvironmentVariableKey } from './environment-variable-keys.ts';
 
 export type EnvironmentVariablesErrorCode =
 	| 'database-unavailable'

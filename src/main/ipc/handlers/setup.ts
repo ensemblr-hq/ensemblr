@@ -1,6 +1,9 @@
 import { ipcMain } from 'electron';
 
-import { IPC_CHANNELS, type SetupDiagnosticsSnapshot } from '../../../shared/ipc';
+import {
+	IPC_CHANNELS,
+	type SetupDiagnosticsSnapshot,
+} from '../../../shared/ipc';
 import type { SetupDiagnosticsService } from '../../setup';
 
 /** Service dependencies used by the setup-diagnostics IPC handlers. */

@@ -597,4 +597,3 @@ function formatDisplayPath(configPath: string, homeDirectory: string): string {
 
 	return configPath;
 }
-

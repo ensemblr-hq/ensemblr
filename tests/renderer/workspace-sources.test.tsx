@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-
+import { defaultWorkspaceSources } from '../../src/renderer/fixtures/workbench';
 import {
 	filterWorkspaceSourcesByKind,
 	getWorkspaceSourceActions,
@@ -7,7 +7,6 @@ import {
 	getWorkspaceSourceProviderLabel,
 	WORKSPACE_SOURCE_KINDS,
 } from '../../src/renderer/lib/workbench';
-import { defaultWorkspaceSources } from '../../src/renderer/fixtures/workbench';
 import type { WorkspaceSource } from '../../src/renderer/types/workbench';
 
 const SOURCES: WorkspaceSource[] = [

@@ -9,7 +9,6 @@ import type {
 	CloneGithubRepositoryStartRequest,
 	CloneGithubRepositoryStartResult,
 	EnsembleApi,
-	GithubRepositoryListResult,
 	LocalRepositorySelectionResult,
 	QuickStartProjectRequest,
 	QuickStartProjectResult,
