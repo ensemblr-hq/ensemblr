@@ -21,6 +21,7 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
+import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import type { RecentGithubRepo } from '@/renderer/types/workbench';
 import type {
 	CloneGithubRepositoryDiagnostic,
@@ -462,46 +463,48 @@ function RecentReposList({
 	}
 
 	return (
-		<ul className='flex max-h-44 flex-col overflow-y-auto rounded-lg border border-border bg-background/40'>
-			{repos.map((repo) => {
-				const expectedUrl = `https://github.com/${repo.fullName}.git`;
-				const isSelected = selectedUrl === expectedUrl;
-				return (
-					<li key={repo.fullName}>
-						<button
-							aria-pressed={isSelected}
-							className='flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-60 aria-pressed:bg-muted'
-							disabled={disabled}
-							onClick={() => onSelect(repo)}
-							type='button'
-						>
-							<span
-								aria-hidden='true'
-								className='size-5 shrink-0 rounded-full ring-1 ring-foreground/10'
-								style={{
-									backgroundColor: ownerAvatarColor(repo.ownerLogin),
-								}}
-							/>
-							<span className='flex min-w-0 flex-col leading-tight'>
-								<span className='flex min-w-0 items-center gap-1.5 truncate text-foreground text-xs'>
-									<span className='truncate'>{repo.fullName}</span>
-									{repo.isPrivate ? (
-										<span className='shrink-0 rounded-sm bg-muted px-1 py-px text-[0.625rem] text-muted-foreground uppercase tracking-wide'>
-											Private
+		<ScrollArea className='h-44 rounded-lg border border-border bg-background/40'>
+			<ul className='flex flex-col'>
+				{repos.map((repo) => {
+					const expectedUrl = `https://github.com/${repo.fullName}.git`;
+					const isSelected = selectedUrl === expectedUrl;
+					return (
+						<li key={repo.fullName}>
+							<button
+								aria-pressed={isSelected}
+								className='flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-60 aria-pressed:bg-muted'
+								disabled={disabled}
+								onClick={() => onSelect(repo)}
+								type='button'
+							>
+								<span
+									aria-hidden='true'
+									className='size-5 shrink-0 rounded-full ring-1 ring-foreground/10'
+									style={{
+										backgroundColor: ownerAvatarColor(repo.ownerLogin),
+									}}
+								/>
+								<span className='flex min-w-0 flex-col leading-tight'>
+									<span className='flex min-w-0 items-center gap-1.5 truncate text-foreground text-xs'>
+										<span className='truncate'>{repo.fullName}</span>
+										{repo.isPrivate ? (
+											<span className='shrink-0 rounded-sm bg-muted px-1 py-px text-[0.625rem] text-muted-foreground uppercase tracking-wide'>
+												Private
+											</span>
+										) : null}
+									</span>
+									{repo.description ? (
+										<span className='truncate text-[0.6875rem] text-muted-foreground'>
+											{repo.description}
 										</span>
 									) : null}
 								</span>
-								{repo.description ? (
-									<span className='truncate text-[0.6875rem] text-muted-foreground'>
-										{repo.description}
-									</span>
-								) : null}
-							</span>
-						</button>
-					</li>
-				);
-			})}
-		</ul>
+							</button>
+						</li>
+					);
+				})}
+			</ul>
+		</ScrollArea>
 	);
 }
 
