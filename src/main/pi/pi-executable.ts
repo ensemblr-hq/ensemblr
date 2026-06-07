@@ -21,6 +21,7 @@ import type {
 } from '../commands/local-command';
 import type { EnsembleConfigResolutionService } from '../config/config-resolution';
 import type { EnsembleDatabaseService } from '../storage/database';
+import { normalizeConfiguredPath } from './internal/normalize-configured-path.ts';
 
 export type PiExecutableStatus = 'error' | 'ok' | 'warning';
 export type PiExecutableDiagnosticSeverity = 'error' | 'info' | 'warning';
@@ -424,21 +425,6 @@ async function createExplicitCandidate({
 }
 
 /** Resolves a configured path, expanding `~`. */
-function normalizeConfiguredPath(
-	rawPath: string,
-	homeDirectory: string,
-): string {
-	if (rawPath === '~') {
-		return path.resolve(homeDirectory);
-	}
-
-	if (rawPath.startsWith('~/')) {
-		return path.resolve(homeDirectory, rawPath.slice(2));
-	}
-
-	return path.resolve(rawPath);
-}
-
 /** True when the path looks like a bare command name (no `/` or path sep). */
 function isBareCommand(rawPath: string): boolean {
 	return !rawPath.includes('/') && !rawPath.includes(path.sep);

@@ -10,7 +10,10 @@ import {
 	type EnvironmentVariablesSnapshot,
 	type HealthSnapshot,
 	IPC_CHANNELS,
+	type LocalRepositorySelectionResult,
 	type PiExecutableSelectionResult,
+	type RegisterLocalRepositoryRequest,
+	type RegisterLocalRepositoryResult,
 	type RepositoryConfigMigrationPreview,
 	type RepositoryConfigMigrationRequest,
 	type RepositoryConfigMigrationResult,
@@ -32,6 +35,7 @@ import type {
 import { isRepositoryConfigPathAllowed } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
 import type { PiExecutableService } from '../pi';
+import type { LocalRepositoryRegistrationService } from '../repository';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsembleDatabaseService } from '../storage';
@@ -44,6 +48,7 @@ interface RegisterIpcHandlersOptions {
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
 	environmentVariablesService: EnvironmentVariablesService;
+	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
 	repositoryConfigService: RepositoryConfigService;
 	rootDirectoryService: EnsembleRootDirectoryService;
@@ -60,6 +65,7 @@ export function registerIpcHandlers({
 	configService,
 	databaseService,
 	environmentVariablesService,
+	localRepositoryRegistrationService,
 	piExecutableService,
 	repositoryConfigService,
 	rootDirectoryService,
@@ -199,6 +205,38 @@ export function registerIpcHandlers({
 	}
 
 	ipcMain.handle(
+		IPC_CHANNELS.selectLocalRepository,
+		async (event): Promise<LocalRepositorySelectionResult> => {
+			const window = BrowserWindow.fromWebContents(event.sender);
+			const options: OpenDialogOptions = {
+				buttonLabel: 'Register repository',
+				message:
+					'Select an existing local git repository to register with Ensemble.',
+				properties: ['openDirectory'],
+				title: 'Register local repository',
+			};
+			const result = window
+				? await dialog.showOpenDialog(window, options)
+				: await dialog.showOpenDialog(options);
+
+			if (result.canceled || !result.filePaths[0]) {
+				return { canceled: true };
+			}
+
+			return { canceled: false, path: result.filePaths[0] };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.registerLocalRepository,
+		(_event, request: unknown): Promise<RegisterLocalRepositoryResult> => {
+			return localRepositoryRegistrationService.register(
+				normalizeRegisterLocalRepositoryRequest(request),
+			);
+		},
+	);
+
+	ipcMain.handle(
 		IPC_CHANNELS.selectRootDirectory,
 		async (event): Promise<RootDirectorySelectionResult> => {
 			const window = BrowserWindow.fromWebContents(event.sender);
@@ -296,6 +334,22 @@ export function registerIpcHandlers({
 function normalizeRootDirectoryChangeRequest(
 	request: unknown,
 ): RootDirectoryChangeRequest {
+	if (
+		typeof request !== 'object' ||
+		request === null ||
+		!('path' in request) ||
+		typeof request.path !== 'string'
+	) {
+		return { path: '' };
+	}
+
+	return { path: request.path.trim() };
+}
+
+/** Coerces an IPC payload into a {@link RegisterLocalRepositoryRequest}. */
+function normalizeRegisterLocalRepositoryRequest(
+	request: unknown,
+): RegisterLocalRepositoryRequest {
 	if (
 		typeof request !== 'object' ||
 		request === null ||

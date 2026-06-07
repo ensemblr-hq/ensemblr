@@ -12,6 +12,7 @@ import { createEnvironmentVariablesService } from './environment';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
 import { createPiExecutableService, createPiReadinessService } from './pi';
+import { createLocalRepositoryRegistrationService } from './repository';
 import {
 	createEnsembleRootDirectoryService,
 	reconcileRootDirectory,
@@ -58,6 +59,10 @@ const piReadinessService = createPiReadinessService({
 	piExecutableService,
 	rootDirectoryService,
 });
+const localRepositoryRegistrationService =
+	createLocalRepositoryRegistrationService({
+		databaseService,
+	});
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
 	databaseService,
@@ -80,6 +85,7 @@ app.whenReady().then(() => {
 		configService,
 		databaseService,
 		environmentVariablesService,
+		localRepositoryRegistrationService,
 		piExecutableService,
 		repositoryConfigService,
 		rootDirectoryService,

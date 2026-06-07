@@ -11,9 +11,11 @@ export const IPC_CHANNELS = {
 	health: 'ensemble:health',
 	previewRepositoryConfigMigration:
 		'ensemble:preview-repository-config-migration',
+	registerLocalRepository: 'ensemble:register-local-repository',
 	repositoryConfig: 'ensemble:repository-config',
 	repositoryWorkspaceNavigation: 'ensemble:repository-workspace-navigation',
 	rootDirectory: 'ensemble:root-directory',
+	selectLocalRepository: 'ensemble:select-local-repository',
 	selectPiExecutable: 'ensemble:select-pi-executable',
 	selectRootDirectory: 'ensemble:select-root-directory',
 	setupDiagnostics: 'ensemble:setup-diagnostics',
