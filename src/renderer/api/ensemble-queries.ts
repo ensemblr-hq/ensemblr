@@ -11,6 +11,8 @@ import type {
 	EnsembleApi,
 	GithubRepositoryListResult,
 	LocalRepositorySelectionResult,
+	QuickStartProjectRequest,
+	QuickStartProjectResult,
 	RegisterLocalRepositoryRequest,
 	RegisterLocalRepositoryResult,
 } from '@/shared/ipc';
@@ -116,6 +118,16 @@ export function selectLocalRepository(): Promise<LocalRepositorySelectionResult>
 	return profileElectronIpcCall(
 		{ channel: 'ensemble:select-local-repository', usesDatabase: false },
 		() => getEnsembleApi().selectLocalRepository(),
+	);
+}
+
+/** Scaffolds a new local project under the managed root and registers it. */
+export function quickStartProject(
+	request: QuickStartProjectRequest,
+): Promise<QuickStartProjectResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:quick-start-project', usesDatabase: true },
+		() => getEnsembleApi().quickStartProject(request),
 	);
 }
 

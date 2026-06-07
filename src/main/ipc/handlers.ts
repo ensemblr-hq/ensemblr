@@ -18,6 +18,8 @@ import {
 	IPC_CHANNELS,
 	type LocalRepositorySelectionResult,
 	type PiExecutableSelectionResult,
+	type QuickStartProjectRequest,
+	type QuickStartProjectResult,
 	type RegisterLocalRepositoryRequest,
 	type RegisterLocalRepositoryResult,
 	type RepositoryConfigMigrationPreview,
@@ -45,6 +47,7 @@ import type {
 	GithubCloneService,
 	GithubRepositoryListService,
 	LocalRepositoryRegistrationService,
+	QuickStartProjectService,
 } from '../repository';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { SetupDiagnosticsService } from '../setup';
@@ -62,6 +65,7 @@ interface RegisterIpcHandlersOptions {
 	githubRepositoryListService: GithubRepositoryListService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
+	quickStartProjectService: QuickStartProjectService;
 	repositoryConfigService: RepositoryConfigService;
 	rootDirectoryService: EnsembleRootDirectoryService;
 	setupDiagnosticsService: SetupDiagnosticsService;
@@ -81,6 +85,7 @@ export function registerIpcHandlers({
 	githubRepositoryListService,
 	localRepositoryRegistrationService,
 	piExecutableService,
+	quickStartProjectService,
 	repositoryConfigService,
 	rootDirectoryService,
 	setupDiagnosticsService,
@@ -246,6 +251,15 @@ export function registerIpcHandlers({
 		(_event, request: unknown): Promise<RegisterLocalRepositoryResult> => {
 			return localRepositoryRegistrationService.register(
 				normalizeRegisterLocalRepositoryRequest(request),
+			);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.quickStartProject,
+		(_event, request: unknown): Promise<QuickStartProjectResult> => {
+			return quickStartProjectService.create(
+				normalizeQuickStartProjectRequest(request),
 			);
 		},
 	);
@@ -449,6 +463,24 @@ function normalizeCloneGithubRepositoryStartRequest(
 	}
 
 	return { jobId: request.jobId };
+}
+
+/** Coerces an IPC payload into a {@link QuickStartProjectRequest}. */
+function normalizeQuickStartProjectRequest(
+	request: unknown,
+): QuickStartProjectRequest {
+	if (typeof request !== 'object' || request === null) {
+		return { name: '' };
+	}
+
+	const name =
+		'name' in request && typeof request.name === 'string' ? request.name : '';
+	const parentPath =
+		'parentPath' in request && typeof request.parentPath === 'string'
+			? request.parentPath
+			: undefined;
+
+	return parentPath !== undefined ? { name, parentPath } : { name };
 }
 
 /** Coerces an IPC payload into a {@link RegisterLocalRepositoryRequest}. */

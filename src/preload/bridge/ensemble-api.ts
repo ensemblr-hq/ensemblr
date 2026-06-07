@@ -14,6 +14,8 @@ import {
 	IPC_CHANNELS,
 	type LocalRepositorySelectionResult,
 	type PiExecutableSelectionResult,
+	type QuickStartProjectRequest,
+	type QuickStartProjectResult,
 	type RegisterLocalRepositoryRequest,
 	type RegisterLocalRepositoryResult,
 	type RepositoryConfigMigrationPreview,
@@ -109,6 +111,11 @@ export function createEnsembleApi(): EnsembleApi {
 				IPC_CHANNELS.previewRepositoryConfigMigration,
 				request,
 			) as Promise<RepositoryConfigMigrationPreview>,
+		quickStartProject: (request: QuickStartProjectRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.quickStartProject,
+				request,
+			) as Promise<QuickStartProjectResult>,
 		repositoryConfig: (request: RepositoryConfigRequest) =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.repositoryConfig,

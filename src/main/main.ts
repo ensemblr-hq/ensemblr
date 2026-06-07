@@ -16,6 +16,7 @@ import {
 	createGithubCloneService,
 	createGithubRepositoryListService,
 	createLocalRepositoryRegistrationService,
+	createQuickStartProjectService,
 } from './repository';
 import {
 	createEnsembleRootDirectoryService,
@@ -74,6 +75,11 @@ const githubCloneService = createGithubCloneService({
 const githubRepositoryListService = createGithubRepositoryListService({
 	localCommandService,
 });
+const quickStartProjectService = createQuickStartProjectService({
+	localCommandService,
+	registrationService: localRepositoryRegistrationService,
+	rootDirectoryService,
+});
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
 	databaseService,
@@ -100,6 +106,7 @@ app.whenReady().then(() => {
 		githubRepositoryListService,
 		localRepositoryRegistrationService,
 		piExecutableService,
+		quickStartProjectService,
 		repositoryConfigService,
 		rootDirectoryService,
 		setupDiagnosticsService,

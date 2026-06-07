@@ -20,6 +20,15 @@ export type {
 } from './list-github-repositories.ts';
 export { createGithubRepositoryListService } from './list-github-repositories.ts';
 export type {
+	CreateQuickStartProjectServiceOptions,
+	QuickStartProjectService,
+} from './quick-start-project.ts';
+export {
+	createQuickStartProjectService,
+	getQuickStartInitialBranch,
+	getQuickStartNameRules,
+} from './quick-start-project.ts';
+export type {
 	CreateLocalRepositoryRegistrationServiceOptions,
 	LocalRepositoryRegistrationService,
 } from './register-repository.ts';

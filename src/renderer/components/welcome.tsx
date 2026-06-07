@@ -12,6 +12,7 @@ import {
 } from '@/renderer/api/ensemble-queries';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
 import { cloneDialogOpenAtom } from '@/renderer/state/clone-dialog';
+import { quickStartDialogOpenAtom } from '@/renderer/state/quick-start-dialog';
 
 import { WelcomeActionCard } from './welcome/welcome-action-card';
 import { WelcomeWordmark } from './welcome/welcome-wordmark';
@@ -28,6 +29,7 @@ export function Welcome() {
 	const [isOpeningProject, setIsOpeningProject] = useState(false);
 	const queryClient = useQueryClient();
 	const setCloneOpen = useSetAtom(cloneDialogOpenAtom);
+	const setQuickStartOpen = useSetAtom(quickStartDialogOpenAtom);
 	useQuery({
 		...githubRepositoryListQuery,
 		enabled: isEnsembleApiAvailable(),
@@ -112,9 +114,7 @@ export function Welcome() {
 						<WelcomeActionCard
 							icon={FolderPlusIcon}
 							label='Quick start'
-							onClick={() => {
-								/* TODO: wire to quick-start flow */
-							}}
+							onClick={() => setQuickStartOpen(true)}
 						/>
 					</div>
 					{notice ? (

@@ -30,6 +30,7 @@ import {
 } from '@/renderer/lib/workbench';
 import { shellFixtureProjects } from '@/renderer/mocks/workbench';
 import { cloneDialogOpenAtom } from '@/renderer/state/clone-dialog';
+import { quickStartDialogOpenAtom } from '@/renderer/state/quick-start-dialog';
 import { recentProjectsAtom } from '@/renderer/state/recents';
 import {
 	activeChatTabByWorkspaceAtom,
@@ -311,6 +312,7 @@ export function useWorkbenchLayoutModel({
 		[recentProjects, setupSnapshot],
 	);
 	const setCloneDialogOpen = useSetAtom(cloneDialogOpenAtom);
+	const setQuickStartDialogOpen = useSetAtom(quickStartDialogOpenAtom);
 	const onAddProject = useCallback(
 		(id: AddProjectActionId) => {
 			if (id === 'open-github') {
@@ -321,9 +323,11 @@ export function useWorkbenchLayoutModel({
 				void openLocalRepositoryFlow({ queryClient });
 				return;
 			}
-			// 'quick-start' remains TODO until that flow lands.
+			if (id === 'quick-start') {
+				setQuickStartDialogOpen(true);
+			}
 		},
-		[queryClient, setCloneDialogOpen],
+		[queryClient, setCloneDialogOpen, setQuickStartDialogOpen],
 	);
 	const onSetupDiagnosticsRetry = useCallback(() => {
 		if (hasPreloadBridge) {

@@ -15,6 +15,7 @@ export const IPC_CHANNELS = {
 	health: 'ensemble:health',
 	previewRepositoryConfigMigration:
 		'ensemble:preview-repository-config-migration',
+	quickStartProject: 'ensemble:quick-start-project',
 	registerLocalRepository: 'ensemble:register-local-repository',
 	repositoryConfig: 'ensemble:repository-config',
 	repositoryWorkspaceNavigation: 'ensemble:repository-workspace-navigation',

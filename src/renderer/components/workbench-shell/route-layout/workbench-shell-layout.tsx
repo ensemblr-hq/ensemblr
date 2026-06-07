@@ -1,6 +1,7 @@
 import { Outlet, useChildMatches } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
 import { CloneGithubDialog } from '@/renderer/components/welcome/clone-github-dialog';
+import { QuickStartDialog } from '@/renderer/components/welcome/quick-start-dialog';
 import {
 	NavigationProvider,
 	SetupDiagnosticsProvider,
@@ -13,6 +14,7 @@ import {
 	isWorkbenchActiveView,
 } from '@/renderer/lib/workbench';
 import { cloneDialogOpenAtom } from '@/renderer/state/clone-dialog';
+import { quickStartDialogOpenAtom } from '@/renderer/state/quick-start-dialog';
 import type {
 	WorkbenchChildMatch,
 	WorkbenchShellRouteState,
@@ -35,6 +37,7 @@ export function WorkbenchShellLayout() {
 		routeState,
 	});
 	const [cloneOpen, setCloneOpen] = useAtom(cloneDialogOpenAtom);
+	const [quickStartOpen, setQuickStartOpen] = useAtom(quickStartDialogOpenAtom);
 
 	return (
 		<NavigationProvider value={navigation}>
@@ -56,6 +59,10 @@ export function WorkbenchShellLayout() {
 					</WorkbenchLayoutModelProvider>
 				</WorkbenchFrame>
 				<CloneGithubDialog onOpenChange={setCloneOpen} open={cloneOpen} />
+				<QuickStartDialog
+					onOpenChange={setQuickStartOpen}
+					open={quickStartOpen}
+				/>
 			</SetupDiagnosticsProvider>
 		</NavigationProvider>
 	);
