@@ -27,22 +27,19 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
+import { useWorkbenchLayout } from './contexts/layout-context';
 import { ProjectAvatar } from './project-avatar';
 
 /** Top toolbar showing project/workspace path, open-in menu and sidebar toggle. */
 export function WorkbenchHeader({
 	activeProject,
 	activeWorkspace,
-	isRightSidebarCollapsed,
-	onRightSidebarCollapse,
-	onRightSidebarOpen,
 }: {
 	activeProject: ProjectShellModel;
 	activeWorkspace: WorkspaceShellModel;
-	isRightSidebarCollapsed: boolean;
-	onRightSidebarCollapse: () => void;
-	onRightSidebarOpen: () => void;
 }) {
+	const { state, actions } = useWorkbenchLayout();
+	const isRightSidebarCollapsed = state.isRightSidebarCollapsed;
 	const RightSidebarToggleIcon = isRightSidebarCollapsed
 		? PanelRightOpenIcon
 		: PanelRightCloseIcon;
@@ -72,8 +69,8 @@ export function WorkbenchHeader({
 				<Button
 					onClick={
 						isRightSidebarCollapsed
-							? onRightSidebarOpen
-							: onRightSidebarCollapse
+							? actions.expandRightSidebar
+							: actions.collapseRightSidebar
 					}
 					size='icon-sm'
 					variant='ghost'

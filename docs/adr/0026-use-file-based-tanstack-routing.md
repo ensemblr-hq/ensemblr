@@ -77,10 +77,15 @@ Pending, error, and not-found boundaries render shared empty-state shells.
 - Route components read `_workbench` loader data through
   `getRouteApi('/_workbench')`, not the parent-match chain.
 - Shell composition moved out of `app.tsx` (now only `<Outlet />`):
-  `components/workbench-shell/route-layout.tsx` hosts the layouts and pages;
-  `workbench-shell.tsx` exports `WorkbenchFrame` (chrome) and
+  `components/workbench-shell/route-layout/` hosts the layouts and pages and
+  re-exports through `route-layout/index.ts`;
+  `components/workbench-shell/frame.tsx` exports `WorkbenchFrame` (chrome) and
+  `components/workbench-shell/workspace-content.tsx` exports
   `WorkspaceWorkbenchContent`; `panel-layout.tsx` exports
-  `WorkspaceConversationContent`.
+  `WorkspaceConversationContent`. The no-project shell lives in
+  `components/workbench-empty-state.tsx` and the welcome landing in
+  `components/dashboard-welcome.tsx` (mounted from the `_workbench/_shell/`
+  index route).
 
 ## Alternatives Considered
 

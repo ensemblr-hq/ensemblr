@@ -1,0 +1,32 @@
+{
+	"permissions": {
+		"defaultMode": "acceptEdits",
+		"additionalDirectories": ["/tmp"],
+		"allow": ["Bash", "Read", "Edit", "Write", "WebFetch", "Agent"],
+		"deny": ["Read(./.env)", "Read(./.env.*)", "Read(**/.env)"]
+	},
+	"enableAllProjectMcpServers": true,
+	"enabledMcpjsonServers": ["shadcn"],
+	"hooks": {
+		"PreToolUse": [
+			{
+				"matcher": "Bash",
+				"hooks": [
+					{
+						"type": "command",
+						"command": ".claude/hooks/enforce-bun.sh"
+					}
+				]
+			},
+			{
+				"matcher": "Write|Edit|MultiEdit",
+				"hooks": [
+					{
+						"type": "command",
+						"command": ".claude/hooks/check-api-route.sh"
+					}
+				]
+			}
+		]
+	}
+}

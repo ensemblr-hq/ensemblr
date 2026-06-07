@@ -6,8 +6,8 @@ These issue templates are ready to copy into Linear. `ENS-*` IDs are local plann
 
 Current shell alignment:
 
-- The implemented shell in `src/renderer/components/workbench-shell.tsx` plus private modules under `src/renderer/components/workbench-shell/` is now the product source of truth for app-shell layout and visible affordances.
-- Shared renderer-only shell state lives in Jotai atoms under `src/renderer/state/workspace`, and shared exported shell types live under `src/renderer/types/workbench-shell.ts`.
+- The implemented shell — `WorkbenchFrame` (`src/renderer/components/workbench-shell/frame.tsx`), `WorkspaceWorkbenchContent` (`src/renderer/components/workbench-shell/workspace-content.tsx`), the no-project shell (`src/renderer/components/workbench-empty-state.tsx`), the welcome landing (`src/renderer/components/dashboard-welcome.tsx`), and the private feature folders under `src/renderer/components/workbench-shell/` — is now the product source of truth for app-shell layout and visible affordances.
+- Shared renderer-only shell state lives in Jotai atoms under `src/renderer/state/workspace`, and shared exported shell types live under `src/renderer/types/workbench-shell/` (barrel `index.ts`).
 - Use `docs/product/current-shell-inventory.md` with these issue templates.
 - Future tickets should wire live services into the current sidebar, header, chat/session tab strip, center timeline/composer placement, right PR/review panel, and lower dock.
 - Chat transcript content and prompt/composer behavior remain deferred until Pi runtime integration.
@@ -70,7 +70,7 @@ Scope:
 - Add shadcn/ui component foundation as owned source.
 - Define color, spacing, typography, radius, pane, code, diff, and terminal tokens.
 - Own and maintain the implemented Conductor-style shell contract: project/workspace sidebar, project/branch header, open-workspace launcher, chat tabs, center timeline/composer placement, right PR header, All files/Changes/Checks panel, and lower Setup/Run/Terminal dock.
-- Keep shell components split behind `src/renderer/components/workbench-shell.tsx`, with shared renderer shell state in `src/renderer/state/workspace` and shared shell types in `src/renderer/types/workbench-shell.ts`.
+- Keep shell components split behind the `WorkbenchFrame` / `WorkspaceWorkbenchContent` entrypoints (`src/renderer/components/workbench-shell/frame.tsx` and `workspace-content.tsx`) and the private feature folders under `src/renderer/components/workbench-shell/<feature>/`, with shared renderer shell state in `src/renderer/state/workspace` and shared shell types in `src/renderer/types/workbench-shell/`.
 - Build compact shell primitives for sidebar, tabs, panels, dock, forms, dialogs, banners, and status badges.
 - Keep fixture/local renderer models clearly separated from shell layout; live services wire in later tickets.
 

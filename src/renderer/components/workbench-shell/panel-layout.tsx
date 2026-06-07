@@ -1,32 +1,23 @@
-import type { ReactNode, RefObject } from 'react';
-import type { PanelImperativeHandle, PanelSize } from 'react-resizable-panels';
+import type { ReactNode } from 'react';
 
 import {
 	ResizableHandle,
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/renderer/components/ui/resizable';
-import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
 import type {
-	ComposerShellState,
 	DockTabId,
 	ProjectShellModel,
 	ReviewPanelTab,
-	SessionTabModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
-import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
 
-import {
-	ComposerPanel,
-	SessionTabs,
-	WorkspaceTimeline,
-} from './conversation-panel';
-import { DockPanel } from './dock-panel';
+import { useWorkbenchLayout } from './contexts/layout-context';
+import { DockPanel } from './dock-panel/dock-panel';
 import { ReviewPanel } from './review-panel';
-import { RightSidebarHeader } from './right-sidebar-header';
+import { RightSidebarHeader } from './right-sidebar-header/right-sidebar-header';
 import { WorkbenchHeader } from './workbench-header';
 
 /** Top-level resizable layout housing the main workspace and the review dock. */
@@ -35,39 +26,19 @@ export function WorkbenchPanelLayout({
 	activeReviewTab,
 	activeWorkspace,
 	dockActions,
-	dockPanelRef,
 	dockTabId,
-	isDockCollapsed,
-	isRightSidebarCollapsed,
 	mainContent,
-	onDockResize,
 	onDockTabChange,
-	onDockToggle,
 	onReviewTabChange,
-	onRightSidebarCollapse,
-	onRightSidebarOpen,
-	onRightSidebarResize,
-	rightSidebarPanelRef,
-	rightSidebarSizePercent,
 }: {
 	activeProject: ProjectShellModel;
 	activeReviewTab: ReviewPanelTab;
 	activeWorkspace: WorkspaceShellModel;
 	dockActions: WorkbenchDockActions;
-	dockPanelRef: RefObject<PanelImperativeHandle | null>;
 	dockTabId: DockTabId;
-	isDockCollapsed: boolean;
-	isRightSidebarCollapsed: boolean;
 	mainContent: ReactNode;
-	onDockResize: (isCollapsed: boolean) => void;
 	onDockTabChange: (tab: DockTabId) => void;
-	onDockToggle: () => void;
 	onReviewTabChange: (tab: ReviewPanelTab) => void;
-	onRightSidebarCollapse: () => void;
-	onRightSidebarOpen: () => void;
-	onRightSidebarResize: (size: PanelSize) => void;
-	rightSidebarPanelRef: RefObject<PanelImperativeHandle | null>;
-	rightSidebarSizePercent: number;
 }) {
 	return (
 		<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
@@ -75,9 +46,6 @@ export function WorkbenchPanelLayout({
 				<MainWorkspacePanel
 					activeProject={activeProject}
 					activeWorkspace={activeWorkspace}
-					isRightSidebarCollapsed={isRightSidebarCollapsed}
-					onRightSidebarCollapse={onRightSidebarCollapse}
-					onRightSidebarOpen={onRightSidebarOpen}
 				>
 					{mainContent}
 				</MainWorkspacePanel>
@@ -86,17 +54,9 @@ export function WorkbenchPanelLayout({
 					activeReviewTab={activeReviewTab}
 					activeWorkspace={activeWorkspace}
 					dockActions={dockActions}
-					dockPanelRef={dockPanelRef}
 					dockTabId={dockTabId}
-					isDockCollapsed={isDockCollapsed}
-					isRightSidebarCollapsed={isRightSidebarCollapsed}
-					onDockResize={onDockResize}
 					onDockTabChange={onDockTabChange}
-					onDockToggle={onDockToggle}
 					onReviewTabChange={onReviewTabChange}
-					onRightSidebarResize={onRightSidebarResize}
-					rightSidebarPanelRef={rightSidebarPanelRef}
-					rightSidebarSizePercent={rightSidebarSizePercent}
 				/>
 			</ResizablePanelGroup>
 		</SidebarInset>
@@ -108,16 +68,10 @@ function MainWorkspacePanel({
 	activeProject,
 	activeWorkspace,
 	children,
-	isRightSidebarCollapsed,
-	onRightSidebarCollapse,
-	onRightSidebarOpen,
 }: {
 	activeProject: ProjectShellModel;
 	activeWorkspace: WorkspaceShellModel;
 	children: ReactNode;
-	isRightSidebarCollapsed: boolean;
-	onRightSidebarCollapse: () => void;
-	onRightSidebarOpen: () => void;
 }) {
 	return (
 		<ResizablePanel defaultSize='66%' minSize='32rem'>
@@ -125,67 +79,10 @@ function MainWorkspacePanel({
 				<WorkbenchHeader
 					activeProject={activeProject}
 					activeWorkspace={activeWorkspace}
-					isRightSidebarCollapsed={isRightSidebarCollapsed}
-					onRightSidebarCollapse={onRightSidebarCollapse}
-					onRightSidebarOpen={onRightSidebarOpen}
 				/>
 				{children}
 			</div>
 		</ResizablePanel>
-	);
-}
-
-/** Conversation surface — session tabs, scrollable timeline, and composer. */
-export function WorkspaceConversationContent({
-	activeSession,
-	activeWorkspace,
-	closedSessions,
-	composer,
-	onSessionTabChange,
-	onSessionTabClose,
-	onSessionTabRestore,
-	sessionTabs,
-	setupDiagnostics,
-	setupDiagnosticsError,
-	isSetupDiagnosticsRetrying,
-	onSetupDiagnosticsRetry,
-}: {
-	activeSession: SessionTabModel;
-	activeWorkspace: WorkspaceShellModel;
-	closedSessions: SessionTabModel[];
-	composer: ComposerShellState;
-	onSessionTabChange: (sessionId: string) => void;
-	onSessionTabClose: (sessionId: string) => void;
-	onSessionTabRestore: (sessionId: string) => void;
-	sessionTabs: SessionTabModel[];
-	setupDiagnostics: SetupDiagnosticsSnapshot | null;
-	setupDiagnosticsError?: string | null;
-	isSetupDiagnosticsRetrying?: boolean;
-	onSetupDiagnosticsRetry?: () => void;
-}) {
-	return (
-		<section className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-			<SessionTabs
-				activeSession={activeSession}
-				closedSessions={closedSessions}
-				onSessionTabClose={onSessionTabClose}
-				onSessionTabChange={onSessionTabChange}
-				onSessionTabRestore={onSessionTabRestore}
-				sessions={sessionTabs}
-			/>
-			<ScrollArea className='min-h-0 flex-1'>
-				<WorkspaceTimeline
-					activeSession={activeSession}
-					composer={composer}
-					setupDiagnostics={setupDiagnostics}
-					setupDiagnosticsError={setupDiagnosticsError}
-					isSetupDiagnosticsRetrying={isSetupDiagnosticsRetrying}
-					onSetupDiagnosticsRetry={onSetupDiagnosticsRetry}
-					workspace={activeWorkspace}
-				/>
-			</ScrollArea>
-			<ComposerPanel composer={composer} />
-		</section>
 	);
 }
 
@@ -194,45 +91,33 @@ function ReviewDockPanel({
 	activeReviewTab,
 	activeWorkspace,
 	dockActions,
-	dockPanelRef,
 	dockTabId,
-	isDockCollapsed,
-	isRightSidebarCollapsed,
-	onDockResize,
 	onDockTabChange,
-	onDockToggle,
 	onReviewTabChange,
-	onRightSidebarResize,
-	rightSidebarPanelRef,
-	rightSidebarSizePercent,
 }: {
 	activeReviewTab: ReviewPanelTab;
 	activeWorkspace: WorkspaceShellModel;
 	dockActions: WorkbenchDockActions;
-	dockPanelRef: RefObject<PanelImperativeHandle | null>;
 	dockTabId: DockTabId;
-	isDockCollapsed: boolean;
-	isRightSidebarCollapsed: boolean;
-	onDockResize: (isCollapsed: boolean) => void;
 	onDockTabChange: (tab: DockTabId) => void;
-	onDockToggle: () => void;
 	onReviewTabChange: (tab: ReviewPanelTab) => void;
-	onRightSidebarResize: (size: PanelSize) => void;
-	rightSidebarPanelRef: RefObject<PanelImperativeHandle | null>;
-	rightSidebarSizePercent: number;
 }) {
+	const { state, actions, meta } = useWorkbenchLayout();
+
 	return (
 		<ResizablePanel
 			className='hidden min-w-0 lg:flex'
 			collapsedSize='0rem'
 			collapsible
 			defaultSize={
-				isRightSidebarCollapsed ? '0rem' : `${rightSidebarSizePercent}%`
+				state.isRightSidebarCollapsed
+					? '0rem'
+					: `${state.rightSidebarSizePercent}%`
 			}
 			maxSize='68%'
 			minSize='22rem'
-			onResize={onRightSidebarResize}
-			panelRef={rightSidebarPanelRef}
+			onResize={actions.handleRightSidebarResize}
+			panelRef={meta.rightSidebarPanelRef}
 		>
 			<aside className='flex h-full w-full min-w-0 flex-col bg-card'>
 				<RightSidebarHeader activeWorkspace={activeWorkspace} />
@@ -254,16 +139,14 @@ function ReviewDockPanel({
 						maxSize='70%'
 						minSize='9rem'
 						onResize={(size) => {
-							onDockResize(size.inPixels <= 40);
+							actions.handleDockResize(size.inPixels <= 40);
 						}}
-						panelRef={dockPanelRef}
+						panelRef={meta.dockPanelRef}
 					>
 						<DockPanel
 							actions={dockActions}
 							activeTab={dockTabId}
-							isCollapsed={isDockCollapsed}
 							onTabChange={onDockTabChange}
-							onToggleCollapsed={onDockToggle}
 							workspace={activeWorkspace}
 						/>
 					</ResizablePanel>

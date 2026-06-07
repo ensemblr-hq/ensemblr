@@ -1,15 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { WorkbenchPlaceholderPage } from '@/renderer/components/workbench-shell/route-layout';
+import { DashboardWelcome } from '@/renderer/components/dashboard-welcome';
+import { defaultRecentGithubRepos } from '@/renderer/mocks/workbench';
 
 export const Route = createFileRoute('/_workbench/_shell/')({
-	component: DashboardRoute,
+	component: WelcomeRoute,
 	staticData: {
-		workbenchView: 'dashboard',
+		workbenchView: 'welcome',
 	},
 });
 
-/** Dashboard workbench view (placeholder pending content). */
-function DashboardRoute() {
-	return <WorkbenchPlaceholderPage view='dashboard' />;
+/** Welcome view shown when no project is selected. */
+function WelcomeRoute() {
+	return <DashboardWelcome recentGithubRepos={defaultRecentGithubRepos} />;
 }

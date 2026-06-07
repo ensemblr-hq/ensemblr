@@ -1,11 +1,12 @@
 import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
-
 import {
-	WorkbenchFrame,
-	WorkspaceWorkbenchContent,
-} from '../../src/renderer/components/workbench-shell';
-import { WorkspaceConversationContent } from '../../src/renderer/components/workbench-shell/panel-layout';
+	NavigationProvider,
+	SetupDiagnosticsProvider,
+} from '../../src/renderer/components/workbench-shell/contexts';
+import { WorkspaceConversationContent } from '../../src/renderer/components/workbench-shell/conversation-panel';
+import { WorkbenchFrame } from '../../src/renderer/components/workbench-shell/frame';
+import { WorkspaceWorkbenchContent } from '../../src/renderer/components/workbench-shell/workspace-content';
 import {
 	DEFAULT_DOCK_TAB,
 	DEFAULT_REVIEW_TAB,
@@ -22,6 +23,7 @@ import {
 import type {
 	DockTabId,
 	ProjectShellModel,
+	WorkbenchRouteSearch,
 	WorkspaceShellModel,
 } from '../../src/renderer/types/workbench';
 import type { WorkbenchDockActions } from '../../src/renderer/types/workbench-shell';
@@ -60,6 +62,8 @@ const DOCK_ACTIONS: WorkbenchDockActions = {
 	onStopRunScript: () => undefined,
 };
 
+const EMPTY_ROUTE_SEARCH = (): WorkbenchRouteSearch => ({});
+
 function renderWorkbench(
 	snapshot: SetupDiagnosticsSnapshot | null,
 	workspaceOverride?: WorkspaceShellModel,
@@ -77,40 +81,55 @@ function renderWorkbench(
 	const activeSession = findSession(activeWorkspace);
 
 	return renderToStaticMarkup(
-		<WorkbenchFrame
-			activeProject={activeProject}
-			activeView='workspace'
-			activeWorkspace={activeWorkspace}
-			health={{
-				detail: 'Renderer query fixture',
-				label: 'IPC online',
-				state: 'online',
-			}}
-			onStaticNavigationSelect={() => undefined}
-			onWorkspaceSelect={() => undefined}
-			projects={projectsOverride}
+		<NavigationProvider
+			value={{ renderStaticLink: undefined, renderWorkspaceLink: undefined }}
 		>
-			<WorkspaceWorkbenchContent
-				activeProject={activeProject}
-				activeReviewTab={activeReviewTab}
-				activeSession={activeSession}
-				activeWorkspace={activeWorkspace}
-				composer={getComposerState({
-					activeSession,
-					setupDiagnostics: snapshot,
-					setupError: null,
-				})}
-				dockActions={DOCK_ACTIONS}
-				dockTabId={activeDockTab}
-				onDockTabChange={() => undefined}
-				onReviewTabChange={() => undefined}
-				onSessionTabChange={() => undefined}
-				setupDiagnostics={snapshot}
-				MainContent={(mainContent) => (
-					<WorkspaceConversationContent {...mainContent} />
-				)}
-			/>
-		</WorkbenchFrame>,
+			<SetupDiagnosticsProvider
+				value={{
+					state: {
+						setupDiagnostics: snapshot,
+						setupDiagnosticsError: null,
+						isSetupDiagnosticsRetrying: false,
+					},
+					actions: { onSetupDiagnosticsRetry: () => undefined },
+				}}
+			>
+				<WorkbenchFrame
+					activeProject={activeProject}
+					activeView='workspace'
+					activeWorkspace={activeWorkspace}
+					health={{
+						detail: 'Renderer query fixture',
+						label: 'IPC online',
+						state: 'online',
+					}}
+					onStaticNavigationSelect={() => undefined}
+					onWorkspaceSelect={() => undefined}
+					projects={projectsOverride}
+					resolveWorkspaceRouteSearch={EMPTY_ROUTE_SEARCH}
+				>
+					<WorkspaceWorkbenchContent
+						activeProject={activeProject}
+						activeReviewTab={activeReviewTab}
+						activeSession={activeSession}
+						activeWorkspace={activeWorkspace}
+						composer={getComposerState({
+							activeSession,
+							setupDiagnostics: snapshot,
+							setupError: null,
+						})}
+						dockActions={DOCK_ACTIONS}
+						dockTabId={activeDockTab}
+						onDockTabChange={() => undefined}
+						onReviewTabChange={() => undefined}
+						onSessionTabChange={() => undefined}
+						MainContent={(mainContent) => (
+							<WorkspaceConversationContent {...mainContent} />
+						)}
+					/>
+				</WorkbenchFrame>
+			</SetupDiagnosticsProvider>
+		</NavigationProvider>,
 	);
 }
 
@@ -190,21 +209,26 @@ test('does not mark a workspace active on static workbench routes', () => {
 	const activeWorkspace = getDefaultWorkspace();
 	const activeProject = getDefaultProject();
 	const markup = renderToStaticMarkup(
-		<WorkbenchFrame
-			activeProject={activeProject}
-			activeView='dashboard'
-			activeWorkspace={activeWorkspace}
-			health={{
-				detail: 'Renderer query fixture',
-				label: 'IPC online',
-				state: 'online',
-			}}
-			onStaticNavigationSelect={() => undefined}
-			onWorkspaceSelect={() => undefined}
-			projects={shellFixtureProjects}
+		<NavigationProvider
+			value={{ renderStaticLink: undefined, renderWorkspaceLink: undefined }}
 		>
-			<div />
-		</WorkbenchFrame>,
+			<WorkbenchFrame
+				activeProject={activeProject}
+				activeView='dashboard'
+				activeWorkspace={activeWorkspace}
+				health={{
+					detail: 'Renderer query fixture',
+					label: 'IPC online',
+					state: 'online',
+				}}
+				onStaticNavigationSelect={() => undefined}
+				onWorkspaceSelect={() => undefined}
+				projects={shellFixtureProjects}
+				resolveWorkspaceRouteSearch={EMPTY_ROUTE_SEARCH}
+			>
+				<div />
+			</WorkbenchFrame>
+		</NavigationProvider>,
 	);
 
 	expect(markup).toContain('Dashboard');
