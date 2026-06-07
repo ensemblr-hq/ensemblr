@@ -6,7 +6,7 @@ import {
 	GitPullRequestIcon,
 	GlobeIcon,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -79,13 +79,15 @@ export function CreateWorkspaceSourceDialog({
 	const selectedRepo =
 		projects.find((candidate) => candidate.id === repoId) ?? project ?? null;
 
-	// Reset the picker to the chosen repository each time it opens.
-	useEffect(() => {
+	// Reset the picker to the chosen repository each time the dialog opens.
+	const [wasOpen, setWasOpen] = useState(open);
+	if (open !== wasOpen) {
+		setWasOpen(open);
 		if (open && project) {
 			setRepoId(project.id);
 			setKind('pull-request');
 		}
-	}, [open, project]);
+	}
 
 	const dispatchAction = (
 		source: WorkspaceSource,
