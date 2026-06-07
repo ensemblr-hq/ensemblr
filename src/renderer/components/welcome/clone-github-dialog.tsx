@@ -252,13 +252,13 @@ function CloneGithubDialogForm({
 					selectedUrl={url}
 				/>
 				{liveError ? (
-					<p className='text-[0.6875rem] text-muted-foreground'>{liveError}</p>
+					<p className='text-muted-foreground text-xxs'>{liveError}</p>
 				) : null}
 			</div>
 
 			<div className='flex flex-col gap-1.5'>
 				<Label className='text-xs' htmlFor='clone-github-location'>
-					Destination parent
+					Location
 				</Label>
 				<div className='flex gap-2'>
 					<Input
@@ -287,7 +287,7 @@ function CloneGithubDialogForm({
 				defaultParentPath &&
 				location !== defaultParentPath ? (
 					<button
-						className='self-start text-[0.6875rem] text-muted-foreground underline-offset-2 hover:underline'
+						className='self-start text-muted-foreground text-xxs underline-offset-2 hover:underline'
 						onClick={() => {
 							setLocationTouched(false);
 							setLocation(defaultParentPath);
@@ -340,7 +340,7 @@ function CloneGithubDialogForm({
 						{getCloneButtonLabel(stage)}
 						<span
 							aria-hidden='true'
-							className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'
+							className='ml-1 inline-flex items-center gap-0.5 text-xxs opacity-70'
 						>
 							⌘↵
 						</span>
@@ -368,7 +368,7 @@ function CloneProgressLog({ logRef, logs }: CloneProgressLogProps) {
 
 	return (
 		<ol
-			className='max-h-40 overflow-y-auto rounded-md border border-border bg-background/60 px-2 py-1.5 font-mono text-[0.6875rem] text-muted-foreground'
+			className='max-h-40 overflow-y-auto rounded-md border border-border bg-background/60 px-2 py-1.5 font-mono text-muted-foreground text-xxs'
 			data-testid='clone-progress-log'
 			ref={logRef}
 		>
@@ -406,7 +406,7 @@ function CloneDiagnosticsList({ diagnostics }: CloneDiagnosticsListProps) {
 				<li className='flex flex-col gap-0.5' key={diagnostic.code}>
 					<span className='font-medium'>{diagnostic.message}</span>
 					{diagnostic.path ? (
-						<span className='font-mono text-[0.6875rem] opacity-80'>
+						<span className='font-mono text-xxs opacity-80'>
 							{diagnostic.path}
 						</span>
 					) : null}
@@ -434,7 +434,7 @@ function RecentReposList({
 }: RecentReposListProps) {
 	if (isLoading && repos.length === 0) {
 		return (
-			<div className='flex items-center justify-center rounded-lg border border-border bg-background/40 px-2.5 py-3 text-[0.6875rem] text-muted-foreground'>
+			<div className='flex items-center justify-center rounded-lg border border-border bg-background/40 px-2.5 py-3 text-muted-foreground text-xxs'>
 				Loading repos from GitHub…
 			</div>
 		);
@@ -442,7 +442,7 @@ function RecentReposList({
 
 	if (repos.length === 0) {
 		return (
-			<div className='flex items-center justify-center rounded-lg border border-border bg-background/40 px-2.5 py-3 text-[0.6875rem] text-muted-foreground'>
+			<div className='flex items-center justify-center rounded-lg border border-border bg-background/40 px-2.5 py-3 text-muted-foreground text-xxs'>
 				No repos to suggest yet.
 			</div>
 		);
@@ -477,7 +477,7 @@ function RecentReposList({
 										) : null}
 									</span>
 									{repo.description ? (
-										<span className='truncate text-[0.6875rem] text-muted-foreground'>
+										<span className='truncate text-muted-foreground text-xxs'>
 											{repo.description}
 										</span>
 									) : null}
