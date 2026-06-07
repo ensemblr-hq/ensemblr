@@ -5,7 +5,7 @@ import {
 	repositoryWorkspaceNavigationQuery,
 	setupDiagnosticsQuery,
 } from '@/renderer/api/ensemble-queries';
-import { shellFixtureProjects } from '@/renderer/mocks/workbench';
+import { shellFixtureProjects } from '@/renderer/fixtures/workbench';
 import type { WorkbenchShellData } from '@/renderer/types/workbench';
 import type { WorkbenchHealth } from '@/renderer/types/workbench-shell';
 import type {

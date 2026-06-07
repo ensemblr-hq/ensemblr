@@ -33,7 +33,7 @@ import {
 	getWorkspaceSourceKindLabel,
 	WORKSPACE_SOURCE_KINDS,
 } from '@/renderer/lib/workbench';
-import { defaultWorkspaceSources } from '@/renderer/mocks/workbench';
+import { defaultWorkspaceSources } from '@/renderer/fixtures/workbench';
 import type {
 	ProjectShellModel,
 	WorkspaceSource,

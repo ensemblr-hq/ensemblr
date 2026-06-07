@@ -13,9 +13,11 @@ import type {
 import {
 	areJsonValuesEqual,
 	cloneRecord,
-	ENSEMBLE_CONFIG_FILENAME,
 	formatErrorMessage,
 	isPlainRecord,
+} from './json-utils.ts';
+import {
+	ENSEMBLE_CONFIG_FILENAME,
 	type LoadRepositoryConfigOptions,
 	loadRepositoryConfig,
 	readJsonFile,

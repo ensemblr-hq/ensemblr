@@ -16,7 +16,7 @@ import { cn } from '@/renderer/lib/utils';
 import {
 	getWorkbenchMockChatThread,
 	type WorkbenchMockChatTool,
-} from '@/renderer/mocks/workbench';
+} from '@/renderer/fixtures/workbench';
 import type {
 	ComposerShellState,
 	SessionTabModel,

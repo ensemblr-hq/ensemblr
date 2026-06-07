@@ -7,6 +7,7 @@ import type {
 	ConfigStatus,
 	ConfigStatusSnapshot,
 } from '../../shared/ipc';
+import { formatErrorMessage, isPlainRecord } from './json-utils.ts';
 
 export type { ConfigDiagnostic, ConfigStatusSnapshot };
 
@@ -597,21 +598,3 @@ function formatDisplayPath(configPath: string, homeDirectory: string): string {
 	return configPath;
 }
 
-/**
- * Coerces an unknown thrown value to a user-facing message.
- * @param error - Thrown value.
- * @param fallback - Fallback message when `error` is not an `Error`.
- * @returns A human-readable message.
- */
-function formatErrorMessage(error: unknown, fallback: string): string {
-	return error instanceof Error ? error.message : fallback;
-}
-
-/**
- * Type guard that excludes arrays from the structural-record check.
- * @param value - Candidate value.
- * @returns True when `value` is a non-null, non-array object.
- */
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}

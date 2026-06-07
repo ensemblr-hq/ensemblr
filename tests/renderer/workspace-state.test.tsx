@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'bun:test';
 import { createStore } from 'jotai';
-import { getDefaultWorkspace } from '../../src/renderer/mocks/workbench';
+import { getDefaultWorkspace } from '../../src/renderer/fixtures/workbench';
 import {
 	activeChatTabByWorkspaceAtom,
 	activeDockTabByWorkspaceAtom,

@@ -109,7 +109,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 						additions: 96,
 						deletions: 0,
 						id: 'workbench-fixtures',
-						path: 'src/renderer/mocks/workbench/projects.ts',
+						path: 'src/renderer/fixtures/workbench/projects.ts',
 						status: 'added',
 					},
 					{

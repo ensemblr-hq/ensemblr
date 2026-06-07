@@ -12,12 +12,12 @@ These instructions apply to everything under `src/renderer/`.
   - `config/` for renderer-scoped configuration constants and knobs.
   - `hooks/` for renderer hooks that are not durable shared app state.
   - `lib/` for runtime helpers, grouped by concern.
-  - `mocks/` for mock, fixture, demo, and placeholder data.
+  - `fixtures/` for fixture, demo, and placeholder data that production code may consume while a feature is still fixture-backed.
   - `routing/` for TanStack Router file-based routes, generated route trees, and route helpers.
   - `state/` for durable renderer UI state.
   - `styles/` for renderer CSS entrypoints and style assets.
   - `types/` for shared exported renderer types and ambient declarations.
-- Do not create concern folders directly under `src/renderer/`, for example `src/renderer/workbench/`. Put the concern inside the right type bucket, for example `lib/workbench/`, `mocks/workbench/`, `state/workspace/`, or `types/workbench.ts`.
+- Do not create concern folders directly under `src/renderer/`, for example `src/renderer/workbench/`. Put the concern inside the right type bucket, for example `lib/workbench/`, `fixtures/workbench/`, `state/workspace/`, or `types/workbench.ts`.
 - Do not put mutable app state, fixture data, route files, or feature implementation in `config/`; keep it for stable renderer constants such as route stale times.
 
 ## Components
@@ -25,7 +25,7 @@ These instructions apply to everything under `src/renderer/`.
 - Keep shadcn and shared UI primitives under `components/ui/`.
 - Keep composed product components under `components/<concern>.tsx` plus a private sibling folder when one is needed, for example `components/welcome.tsx` and `components/welcome/`. Larger concerns may live entirely inside the folder with named entrypoints, for example `components/workbench-shell/frame.tsx`, `components/workbench-shell/workspace-content.tsx`, and `components/workbench-shell/route-layout/index.ts`.
 - Do not define shared exported renderer types in component folders. Import them from `types/`.
-- Do not keep mock or fixture data inside components. Import it from `mocks/<concern>/`.
+- Do not keep fixture data inside components. Import it from `fixtures/<concern>/`.
 
 ## Routing
 
@@ -53,14 +53,14 @@ These instructions apply to everything under `src/renderer/`.
 - Do not export shared types from `lib/` barrels. Shared exported renderer types belong in `types/`.
 - Put ambient renderer declarations, such as `Window` bridge types, under `types/`.
 
-## Mock Data
+## Fixture Data
 
-- Put mock, fixture, demo, and placeholder data under `mocks/<concern>/`.
-- Mock selectors and mock-specific builders belong with the mock data.
-- Production components and runtime helpers may import mock data only while the feature is fixture-backed; keep that dependency explicit with `@/renderer/mocks/<concern>`.
+- Put fixture, demo, and placeholder data under `fixtures/<concern>/`.
+- Fixture selectors and fixture-specific builders belong with the data.
+- Production components and runtime helpers may import fixture data only while the feature is fixture-backed; keep that dependency explicit with `@/renderer/fixtures/<concern>`. The folder name communicates that production paths still rely on placeholder data.
 
 ## Verification
 
 - For changes touching renderer JavaScript, TypeScript, JSX, TSX, CSS, or JSON, run `bun run check`.
 - Run `bun run typecheck` after moving renderer files or changing imports.
-- Run `bun run test:renderer` after changing renderer behavior, component structure, state, routing, or mocks.
+- Run `bun run test:renderer` after changing renderer behavior, component structure, state, routing, or fixtures.

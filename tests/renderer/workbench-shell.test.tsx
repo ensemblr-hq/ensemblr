@@ -19,7 +19,7 @@ import {
 	getDefaultProject,
 	getDefaultWorkspace,
 	shellFixtureProjects,
-} from '../../src/renderer/mocks/workbench';
+} from '../../src/renderer/fixtures/workbench';
 import type {
 	DockTabId,
 	ProjectShellModel,
