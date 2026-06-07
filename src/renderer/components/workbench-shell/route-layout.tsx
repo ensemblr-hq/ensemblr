@@ -35,6 +35,7 @@ import {
 import { WorkspaceConversationContent } from '@/renderer/components/workbench-shell/panel-layout';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
 import {
+	buildAddProjectMenuModel,
 	findWorkspaceNavigationSelection,
 	getComposerState,
 	getEmptyStateCopy,
@@ -50,6 +51,7 @@ import {
 	type WorkspaceNavigationSelection,
 } from '@/renderer/lib/workbench';
 import { shellFixtureProjects } from '@/renderer/mocks/workbench';
+import { recentProjectsAtom } from '@/renderer/state/recents';
 import {
 	activeChatTabByWorkspaceAtom,
 	activeDockTabByWorkspaceAtom,
@@ -62,6 +64,7 @@ import {
 	useWorkspacePanelTabState,
 } from '@/renderer/state/workspace';
 import type {
+	AddProjectMenuModel,
 	DockTabId,
 	ProjectShellModel,
 	WorkbenchRouteSearch,
@@ -91,6 +94,7 @@ interface WorkbenchChildMatch {
 interface WorkbenchLayoutModel {
 	activeProject: ProjectShellModel | null;
 	activeWorkspace: WorkspaceShellModel | null;
+	addProjectMenu: AddProjectMenuModel;
 	displayProjects: ProjectShellModel[];
 	displaySelection: WorkspaceNavigationSelection | null;
 	health: WorkbenchHealth;
@@ -135,6 +139,7 @@ export function WorkbenchShellLayout() {
 			activeProject={model.activeProject}
 			activeView={routeState.view}
 			activeWorkspace={model.activeWorkspace}
+			addProjectMenu={model.addProjectMenu}
 			health={model.health}
 			onStaticNavigationSelect={model.navigateToStaticRoute}
 			onWorkspaceSelect={model.navigateToWorkspace}
@@ -367,6 +372,7 @@ function useWorkbenchLayoutModel({
 		lastWorkspaceNavigationRenderState,
 		setLastWorkspaceNavigationRenderState,
 	] = useAtom(lastWorkspaceNavigationRenderStateAtom);
+	const recentProjects = useAtomValue(recentProjectsAtom);
 	const reviewTabsByWorkspace = useAtomValue(activeReviewTabByWorkspaceAtom);
 	const dockTabsByWorkspace = useAtomValue(activeDockTabByWorkspaceAtom);
 	const chatTabsByWorkspace = useAtomValue(activeChatTabByWorkspaceAtom);
@@ -555,20 +561,36 @@ function useWorkbenchLayoutModel({
 		],
 	);
 
+	const addProjectMenu = useMemo(
+		() =>
+			buildAddProjectMenuModel({
+				recents: recentProjects,
+				setupSnapshot,
+			}),
+		[recentProjects, setupSnapshot],
+	);
+	// Add-project + recents handlers stay undefined until the local-open /
+	// clone / quick-start flows land. The menu surface renders disabled entries
+	// with a "Coming soon" reason in that state. When the action handlers ship,
+	// they will write back via `useSetAtom(recentProjectsAtom)` to promote a
+	// freshly opened project to the top of the list.
+	const onSetupDiagnosticsRetry = useCallback(() => {
+		if (hasPreloadBridge) {
+			void setupDiagnostics.refetch();
+		}
+	}, [hasPreloadBridge, setupDiagnostics.refetch]);
+
 	return {
 		activeProject: displaySelection?.project ?? null,
 		activeWorkspace: displaySelection?.workspace ?? null,
+		addProjectMenu,
 		displayProjects,
 		displaySelection,
 		health: shellHealth,
 		isSetupDiagnosticsRetrying: setupDiagnostics.isFetching,
 		navigateToStaticRoute,
 		navigateToWorkspace,
-		onSetupDiagnosticsRetry: () => {
-			if (hasPreloadBridge) {
-				void setupDiagnostics.refetch();
-			}
-		},
+		onSetupDiagnosticsRetry,
 		renderStaticNavigationLink,
 		renderWorkspaceNavigationLink,
 		resolveWorkspaceRouteSearch,

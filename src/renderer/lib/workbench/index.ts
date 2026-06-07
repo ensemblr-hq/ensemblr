@@ -1,4 +1,5 @@
 export { isWorkbenchActiveView } from './active-view';
+export { buildAddProjectMenuModel } from './add-project-menu';
 export { getComposerState } from './composer';
 export {
 	DEFAULT_DOCK_TAB,
@@ -30,3 +31,10 @@ export {
 	loadWorkbenchShellData,
 } from './shell-data';
 export { getWorkbenchStaticRoute } from './static-navigation';
+export {
+	filterWorkspaceSourcesByKind,
+	getWorkspaceSourceActions,
+	getWorkspaceSourceKindLabel,
+	getWorkspaceSourceProviderLabel,
+	WORKSPACE_SOURCE_KINDS,
+} from './workspace-sources';
