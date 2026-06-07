@@ -5,16 +5,23 @@
  */
 export const IPC_CHANNELS = {
 	applyRepositoryConfigMigration: 'ensemble:apply-repository-config-migration',
+	cloneGithubRepositoryPrepare: 'ensemble:clone-github-repository:prepare',
+	cloneGithubRepositoryProgress: 'ensemble:clone-github-repository:progress',
+	cloneGithubRepositoryStart: 'ensemble:clone-github-repository:start',
 	confirmRootDirectoryChange: 'ensemble:confirm-root-directory-change',
 	ensureWindowWidth: 'ensemble:ensure-window-width',
 	environmentVariables: 'ensemble:environment-variables',
+	githubRepositoryList: 'ensemble:github-repository-list',
 	health: 'ensemble:health',
+	initialShellSnapshot: 'ensemble:initial-shell-snapshot',
 	previewRepositoryConfigMigration:
 		'ensemble:preview-repository-config-migration',
+	quickStartProject: 'ensemble:quick-start-project',
 	registerLocalRepository: 'ensemble:register-local-repository',
 	repositoryConfig: 'ensemble:repository-config',
 	repositoryWorkspaceNavigation: 'ensemble:repository-workspace-navigation',
 	rootDirectory: 'ensemble:root-directory',
+	selectCloneDestination: 'ensemble:select-clone-destination',
 	selectLocalRepository: 'ensemble:select-local-repository',
 	selectPiExecutable: 'ensemble:select-pi-executable',
 	selectRootDirectory: 'ensemble:select-root-directory',

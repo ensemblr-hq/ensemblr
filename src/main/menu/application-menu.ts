@@ -53,6 +53,33 @@ export function installApplicationMenu(): void {
 			],
 		},
 		{
+			label: 'Edit',
+			submenu: [
+				{ role: 'undo' },
+				{ role: 'redo' },
+				{ type: 'separator' },
+				{ role: 'cut' },
+				{ role: 'copy' },
+				{ role: 'paste' },
+				...(process.platform === 'darwin'
+					? ([
+							{ role: 'pasteAndMatchStyle' },
+							{ role: 'delete' },
+							{ role: 'selectAll' },
+							{ type: 'separator' },
+							{
+								label: 'Speech',
+								submenu: [{ role: 'startSpeaking' }, { role: 'stopSpeaking' }],
+							},
+						] as MenuItemConstructorOptions[])
+					: ([
+							{ role: 'delete' },
+							{ type: 'separator' },
+							{ role: 'selectAll' },
+						] as MenuItemConstructorOptions[])),
+			],
+		},
+		{
 			label: 'View',
 			submenu: [
 				{ role: 'reload' },

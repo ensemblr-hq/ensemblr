@@ -1,3 +1,11 @@
+/**
+ * UI-shell scaffolding types for the workbench: navigation targets and
+ * state, shell props, active view, dock actions, health primitives, and
+ * session tab state.
+ *
+ * For domain model types — projects, workspaces, sessions, dock tabs,
+ * review, pull requests — see `types/workbench/`.
+ */
 export type {
 	WorkbenchStaticNavigationTarget,
 	WorkbenchWorkspaceNavigationLinkTarget,

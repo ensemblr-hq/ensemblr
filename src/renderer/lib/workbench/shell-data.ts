@@ -5,8 +5,7 @@ import {
 	repositoryWorkspaceNavigationQuery,
 	setupDiagnosticsQuery,
 } from '@/renderer/api/ensemble-queries';
-import { getErrorMessage } from '@/renderer/lib/error';
-import { shellFixtureProjects } from '@/renderer/mocks/workbench';
+import { shellFixtureProjects } from '@/renderer/fixtures/workbench';
 import type { WorkbenchShellData } from '@/renderer/types/workbench';
 import type { WorkbenchHealth } from '@/renderer/types/workbench-shell';
 import type {
@@ -43,51 +42,40 @@ export async function loadWorkbenchShellData(
 		};
 	}
 
-	const [healthResult, navigationResult, setupResult] =
-		await Promise.allSettled([
-			queryClient.fetchQuery(healthQuery),
-			queryClient.fetchQuery(repositoryWorkspaceNavigationQuery),
-			queryClient.fetchQuery(setupDiagnosticsQuery),
-		]);
+	// Kick off background refreshes but never block the loader: the renderer
+	// reads from the TanStack Query cache (seeded by the preload script at boot)
+	// and the navigation/setup hooks subscribe to refetches once they land.
+	void queryClient.prefetchQuery(healthQuery).catch(() => undefined);
+	void queryClient
+		.prefetchQuery(repositoryWorkspaceNavigationQuery)
+		.catch(() => undefined);
+	void queryClient.prefetchQuery(setupDiagnosticsQuery).catch(() => undefined);
+
 	const cachedNavigationSnapshot =
 		queryClient.getQueryData<RepositoryWorkspaceNavigationSnapshot>(
 			repositoryWorkspaceNavigationQuery.queryKey,
 		);
+	const cachedHealthSnapshot = queryClient.getQueryData<HealthSnapshot>(
+		healthQuery.queryKey,
+	);
+	const cachedSetupSnapshot =
+		queryClient.getQueryData<SetupDiagnosticsSnapshot>(
+			setupDiagnosticsQuery.queryKey,
+		);
 	const navigationSnapshot = getRenderableNavigationSnapshot({
 		cachedSnapshot: cachedNavigationSnapshot,
-		querySnapshot:
-			navigationResult.status === 'fulfilled'
-				? navigationResult.value
-				: undefined,
+		querySnapshot: undefined,
 	});
 
 	return {
 		hasPreloadBridge,
-		healthError:
-			healthResult.status === 'rejected'
-				? getErrorMessage(healthResult.reason)
-				: null,
-		healthSnapshot:
-			healthResult.status === 'fulfilled'
-				? healthResult.value
-				: (queryClient.getQueryData<HealthSnapshot>(healthQuery.queryKey) ??
-					null),
-		navigationError:
-			navigationResult.status === 'rejected'
-				? getErrorMessage(navigationResult.reason)
-				: null,
+		healthError: null,
+		healthSnapshot: cachedHealthSnapshot ?? null,
+		navigationError: null,
 		navigationSnapshot,
 		projects: mapRepositoriesToProjects(navigationSnapshot?.repositories),
-		setupError:
-			setupResult.status === 'rejected'
-				? getErrorMessage(setupResult.reason)
-				: null,
-		setupSnapshot:
-			setupResult.status === 'fulfilled'
-				? setupResult.value
-				: (queryClient.getQueryData<SetupDiagnosticsSnapshot>(
-						setupDiagnosticsQuery.queryKey,
-					) ?? null),
+		setupError: null,
+		setupSnapshot: cachedSetupSnapshot ?? null,
 	};
 }
 

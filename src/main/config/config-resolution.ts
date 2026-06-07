@@ -15,6 +15,7 @@ import type {
 } from '../../shared/ipc';
 import type { EnsembleDatabaseService } from '../storage/database';
 import type { EnsembleConfig, EnsembleConfigService } from './config-loader';
+import { isPlainRecord } from './json-utils.ts';
 import { loadRepositoryConfig } from './repository-config.ts';
 
 /** Inputs for the pure {@link resolveSettings} function. */
@@ -741,15 +742,6 @@ function isCandidate(value: unknown): value is Candidate {
 		typeof value.source === 'string' &&
 		('value' in value || 'invalidReason' in value)
 	);
-}
-
-/**
- * Type guard that excludes arrays from the structural-record check.
- * @param value - Candidate value.
- * @returns True when `value` is a non-null, non-array object.
- */
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
