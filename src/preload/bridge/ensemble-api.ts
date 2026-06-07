@@ -9,6 +9,7 @@ import {
 	type CloneGithubRepositoryStartResult,
 	type EnsembleApi,
 	type EnvironmentVariablesSnapshot,
+	type GithubRepositoryListResult,
 	type HealthSnapshot,
 	IPC_CHANNELS,
 	type LocalRepositorySelectionResult,
@@ -58,6 +59,10 @@ export function createEnsembleApi(): EnsembleApi {
 			ipcRenderer.invoke(
 				IPC_CHANNELS.environmentVariables,
 			) as Promise<EnvironmentVariablesSnapshot>,
+		githubRepositoryList: () =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.githubRepositoryList,
+			) as Promise<GithubRepositoryListResult>,
 		health: () =>
 			ipcRenderer.invoke(IPC_CHANNELS.health) as Promise<HealthSnapshot>,
 		onCloneGithubRepositoryProgress: (

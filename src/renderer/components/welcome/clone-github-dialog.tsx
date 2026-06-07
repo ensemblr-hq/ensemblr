@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
 	ensembleQueryKeys,
+	githubRepositoryListQuery,
 	isEnsembleApiAvailable,
 	prepareCloneGithubRepository,
 	rootDirectoryQuery,
@@ -25,6 +26,7 @@ import type {
 	CloneGithubRepositoryDiagnostic,
 	CloneGithubRepositoryProgressEvent,
 	CloneGithubRepositoryStartResult,
+	GithubRepositoryEntry,
 } from '@/shared/ipc';
 
 interface CloneGithubDialogProps {
@@ -74,6 +76,25 @@ function CloneGithubDialogForm({
 		enabled: isEnsembleApiAvailable(),
 	});
 	const defaultParentPath = rootDirectory.data?.repositoriesPath ?? '';
+
+	const githubRepoList = useQuery({
+		...githubRepositoryListQuery,
+		enabled: isEnsembleApiAvailable(),
+	});
+	const liveEntries = githubRepoList.data?.entries ?? [];
+	const liveError =
+		githubRepoList.data?.status === 'failure'
+			? githubRepoList.data.error
+			: undefined;
+	const fallbackEntries: GithubRepositoryEntry[] = recentRepos.map((repo) => ({
+		description: repo.description ?? null,
+		fullName: repo.fullName,
+		isPrivate: false,
+		ownerLogin: repo.fullName.split('/')[0] ?? '',
+		updatedAt: '',
+	}));
+	const displayedEntries =
+		liveEntries.length > 0 ? liveEntries : fallbackEntries;
 
 	const [url, setUrl] = useState('');
 	const [location, setLocation] = useState('');
@@ -238,10 +259,14 @@ function CloneGithubDialogForm({
 				<Label className='text-xs'>Recent repos</Label>
 				<RecentReposList
 					disabled={isBusy}
+					isLoading={githubRepoList.isLoading}
 					onSelect={(repo) => setUrl(`https://github.com/${repo.fullName}.git`)}
-					repos={recentRepos}
+					repos={displayedEntries}
 					selectedUrl={url}
 				/>
+				{liveError ? (
+					<p className='text-[0.6875rem] text-muted-foreground'>{liveError}</p>
+				) : null}
 			</div>
 
 			<div className='flex flex-col gap-1.5'>
@@ -406,18 +431,36 @@ function CloneDiagnosticsList({ diagnostics }: CloneDiagnosticsListProps) {
 
 interface RecentReposListProps {
 	disabled: boolean;
-	onSelect: (repo: RecentGithubRepo) => void;
-	repos: RecentGithubRepo[];
+	isLoading: boolean;
+	onSelect: (repo: GithubRepositoryEntry) => void;
+	repos: GithubRepositoryEntry[];
 	selectedUrl: string;
 }
 
 /** Pickable list of GitHub repos surfaced as quick-fill suggestions. */
 function RecentReposList({
 	disabled,
+	isLoading,
 	onSelect,
 	repos,
 	selectedUrl,
 }: RecentReposListProps) {
+	if (isLoading && repos.length === 0) {
+		return (
+			<div className='flex items-center justify-center rounded-lg border border-border bg-background/40 px-2.5 py-3 text-[0.6875rem] text-muted-foreground'>
+				Loading repos from GitHub…
+			</div>
+		);
+	}
+
+	if (repos.length === 0) {
+		return (
+			<div className='flex items-center justify-center rounded-lg border border-border bg-background/40 px-2.5 py-3 text-[0.6875rem] text-muted-foreground'>
+				No repos to suggest yet.
+			</div>
+		);
+	}
+
 	return (
 		<ul className='flex max-h-44 flex-col overflow-y-auto rounded-lg border border-border bg-background/40'>
 			{repos.map((repo) => {
@@ -436,13 +479,17 @@ function RecentReposList({
 								aria-hidden='true'
 								className='size-5 shrink-0 rounded-full ring-1 ring-foreground/10'
 								style={{
-									backgroundColor:
-										repo.ownerAvatarColor ?? 'oklch(0.5 0.04 260)',
+									backgroundColor: ownerAvatarColor(repo.ownerLogin),
 								}}
 							/>
 							<span className='flex min-w-0 flex-col leading-tight'>
-								<span className='truncate text-foreground text-xs'>
-									{repo.fullName}
+								<span className='flex min-w-0 items-center gap-1.5 truncate text-foreground text-xs'>
+									<span className='truncate'>{repo.fullName}</span>
+									{repo.isPrivate ? (
+										<span className='shrink-0 rounded-sm bg-muted px-1 py-px text-[0.625rem] text-muted-foreground uppercase tracking-wide'>
+											Private
+										</span>
+									) : null}
 								</span>
 								{repo.description ? (
 									<span className='truncate text-[0.6875rem] text-muted-foreground'>
@@ -456,6 +503,19 @@ function RecentReposList({
 			})}
 		</ul>
 	);
+}
+
+/** Stable color swatch per owner login, derived without external assets. */
+function ownerAvatarColor(login: string): string {
+	if (!login) {
+		return 'oklch(0.5 0.04 260)';
+	}
+	let hash = 0;
+	for (let index = 0; index < login.length; index += 1) {
+		hash = (hash * 31 + login.charCodeAt(index)) >>> 0;
+	}
+	const hue = hash % 360;
+	return `oklch(0.62 0.13 ${hue})`;
 }
 
 /** Picks the clone button label that matches the current stage. */

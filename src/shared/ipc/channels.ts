@@ -11,6 +11,7 @@ export const IPC_CHANNELS = {
 	confirmRootDirectoryChange: 'ensemble:confirm-root-directory-change',
 	ensureWindowWidth: 'ensemble:ensure-window-width',
 	environmentVariables: 'ensemble:environment-variables',
+	githubRepositoryList: 'ensemble:github-repository-list',
 	health: 'ensemble:health',
 	previewRepositoryConfigMigration:
 		'ensemble:preview-repository-config-migration',

@@ -13,6 +13,7 @@ import {
 	type CloneGithubRepositoryStartRequest,
 	type CloneGithubRepositoryStartResult,
 	type EnvironmentVariablesSnapshot,
+	type GithubRepositoryListResult,
 	type HealthSnapshot,
 	IPC_CHANNELS,
 	type LocalRepositorySelectionResult,
@@ -42,6 +43,7 @@ import type { EnvironmentVariablesService } from '../environment';
 import type { PiExecutableService } from '../pi';
 import type {
 	GithubCloneService,
+	GithubRepositoryListService,
 	LocalRepositoryRegistrationService,
 } from '../repository';
 import type { EnsembleRootDirectoryService } from '../root';
@@ -57,6 +59,7 @@ interface RegisterIpcHandlersOptions {
 	databaseService: EnsembleDatabaseService;
 	environmentVariablesService: EnvironmentVariablesService;
 	githubCloneService: GithubCloneService;
+	githubRepositoryListService: GithubRepositoryListService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
 	repositoryConfigService: RepositoryConfigService;
@@ -75,6 +78,7 @@ export function registerIpcHandlers({
 	databaseService,
 	environmentVariablesService,
 	githubCloneService,
+	githubRepositoryListService,
 	localRepositoryRegistrationService,
 	piExecutableService,
 	repositoryConfigService,
@@ -322,6 +326,13 @@ export function registerIpcHandlers({
 			}
 
 			return piExecutableService.saveOverride(result.filePaths[0]);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.githubRepositoryList,
+		(): Promise<GithubRepositoryListResult> => {
+			return githubRepositoryListService.list();
 		},
 	);
 

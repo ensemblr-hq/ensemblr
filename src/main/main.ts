@@ -14,6 +14,7 @@ import { installApplicationMenu } from './menu';
 import { createPiExecutableService, createPiReadinessService } from './pi';
 import {
 	createGithubCloneService,
+	createGithubRepositoryListService,
 	createLocalRepositoryRegistrationService,
 } from './repository';
 import {
@@ -70,6 +71,9 @@ const githubCloneService = createGithubCloneService({
 	registrationService: localRepositoryRegistrationService,
 	rootDirectoryService,
 });
+const githubRepositoryListService = createGithubRepositoryListService({
+	localCommandService,
+});
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
 	databaseService,
@@ -93,6 +97,7 @@ app.whenReady().then(() => {
 		databaseService,
 		environmentVariablesService,
 		githubCloneService,
+		githubRepositoryListService,
 		localRepositoryRegistrationService,
 		piExecutableService,
 		repositoryConfigService,

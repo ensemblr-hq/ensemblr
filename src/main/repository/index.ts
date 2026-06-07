@@ -15,6 +15,11 @@ export type {
 } from './git-probe.ts';
 export { probeGitRepository } from './git-probe.ts';
 export type {
+	CreateGithubRepositoryListServiceOptions,
+	GithubRepositoryListService,
+} from './list-github-repositories.ts';
+export { createGithubRepositoryListService } from './list-github-repositories.ts';
+export type {
 	CreateLocalRepositoryRegistrationServiceOptions,
 	LocalRepositoryRegistrationService,
 } from './register-repository.ts';

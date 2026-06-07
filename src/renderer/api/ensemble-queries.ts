@@ -9,6 +9,7 @@ import type {
 	CloneGithubRepositoryStartRequest,
 	CloneGithubRepositoryStartResult,
 	EnsembleApi,
+	GithubRepositoryListResult,
 	LocalRepositorySelectionResult,
 	RegisterLocalRepositoryRequest,
 	RegisterLocalRepositoryResult,
@@ -19,6 +20,8 @@ export const ensembleQueryKeys = {
 	all: ['ensemble'] as const,
 	environmentVariables: () =>
 		[...ensembleQueryKeys.all, 'environment-variables'] as const,
+	githubRepositoryList: () =>
+		[...ensembleQueryKeys.all, 'github-repository-list'] as const,
 	health: () => [...ensembleQueryKeys.all, 'health'] as const,
 	repositoryWorkspaceNavigation: () =>
 		[...ensembleQueryKeys.all, 'repository-workspace-navigation'] as const,
@@ -70,6 +73,17 @@ export const environmentVariablesQuery = queryOptions({
 		),
 	queryKey: ensembleQueryKeys.environmentVariables(),
 	staleTime: 5000,
+});
+
+/** Query options for the gh-backed GitHub repository list. */
+export const githubRepositoryListQuery = queryOptions({
+	queryFn: () =>
+		profileElectronIpcCall(
+			{ channel: 'ensemble:github-repository-list', usesDatabase: false },
+			() => getEnsembleApi().githubRepositoryList(),
+		),
+	queryKey: ensembleQueryKeys.githubRepositoryList(),
+	staleTime: 60_000,
 });
 
 /** Query options for the renderer-side root directory snapshot. */

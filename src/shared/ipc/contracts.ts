@@ -534,6 +534,23 @@ export interface CloneDestinationSelectionResult {
 	path?: string;
 }
 
+export interface GithubRepositoryEntry {
+	description: string | null;
+	fullName: string;
+	isPrivate: boolean;
+	ownerLogin: string;
+	updatedAt: string;
+}
+
+export type GithubRepositoryListStatus = 'failure' | 'success';
+
+export interface GithubRepositoryListResult {
+	entries: GithubRepositoryEntry[];
+	error?: string;
+	generatedAt: string;
+	status: GithubRepositoryListStatus;
+}
+
 export interface EnsembleApi {
 	confirmRootDirectoryChange: (
 		request: RootDirectoryChangeRequest,
@@ -543,6 +560,7 @@ export interface EnsembleApi {
 	) => Promise<RepositoryConfigMigrationResult>;
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
 	environmentVariables: () => Promise<EnvironmentVariablesSnapshot>;
+	githubRepositoryList: () => Promise<GithubRepositoryListResult>;
 	health: () => Promise<HealthSnapshot>;
 	onCloneGithubRepositoryProgress: (
 		listener: (event: CloneGithubRepositoryProgressEvent) => void,
