@@ -5,7 +5,10 @@ import {
 	type EnvironmentVariablesSnapshot,
 	type HealthSnapshot,
 	IPC_CHANNELS,
+	type LocalRepositorySelectionResult,
 	type PiExecutableSelectionResult,
+	type RegisterLocalRepositoryRequest,
+	type RegisterLocalRepositoryResult,
 	type RepositoryConfigMigrationPreview,
 	type RepositoryConfigMigrationRequest,
 	type RepositoryConfigMigrationResult,
@@ -51,6 +54,15 @@ export function createEnsembleApi(): EnsembleApi {
 			) as Promise<EnvironmentVariablesSnapshot>,
 		health: () =>
 			ipcRenderer.invoke(IPC_CHANNELS.health) as Promise<HealthSnapshot>,
+		registerLocalRepository: (request: RegisterLocalRepositoryRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.registerLocalRepository,
+				request,
+			) as Promise<RegisterLocalRepositoryResult>,
+		selectLocalRepository: () =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.selectLocalRepository,
+			) as Promise<LocalRepositorySelectionResult>,
 		previewRepositoryConfigMigration: (
 			request: RepositoryConfigMigrationRequest,
 		) =>

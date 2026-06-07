@@ -408,6 +408,47 @@ export interface PiExecutableSelectionResult {
 	selectedPath?: string;
 }
 
+export type RegisterLocalRepositoryDiagnosticSeverity =
+	| 'error'
+	| 'info'
+	| 'warning';
+
+export interface RegisterLocalRepositoryDiagnostic {
+	code: string;
+	message: string;
+	path?: string;
+	severity: RegisterLocalRepositoryDiagnosticSeverity;
+}
+
+export interface RegisteredRepositorySnapshot {
+	createdAt: string;
+	defaultBranch: string | null;
+	id: string;
+	metadata: Record<string, unknown>;
+	name: string;
+	path: string;
+	remoteUrl: string | null;
+	slug: string;
+	updatedAt: string;
+}
+
+export interface RegisterLocalRepositoryRequest {
+	path: string;
+}
+
+export interface RegisterLocalRepositoryResult {
+	diagnostics: RegisterLocalRepositoryDiagnostic[];
+	registered: boolean;
+	repository: RegisteredRepositorySnapshot | null;
+	settingsSources: RepositoryConfigSourceSnapshot[];
+}
+
+export interface LocalRepositorySelectionResult {
+	canceled: boolean;
+	error?: string;
+	path?: string;
+}
+
 export interface EnsembleApi {
 	confirmRootDirectoryChange: (
 		request: RootDirectoryChangeRequest,
@@ -424,11 +465,15 @@ export interface EnsembleApi {
 	repositoryConfig: (
 		request: RepositoryConfigRequest,
 	) => Promise<RepositoryConfigSnapshot>;
+	registerLocalRepository: (
+		request: RegisterLocalRepositoryRequest,
+	) => Promise<RegisterLocalRepositoryResult>;
 	repositoryWorkspaceNavigation: () => Promise<RepositoryWorkspaceNavigationSnapshot>;
 	rootDirectory: () => Promise<RootDirectorySnapshot>;
 	resolveSettings: (
 		request?: SettingsResolutionRequest,
 	) => Promise<SettingsResolutionSnapshot>;
+	selectLocalRepository: () => Promise<LocalRepositorySelectionResult>;
 	selectPiExecutable: () => Promise<PiExecutableSelectionResult>;
 	selectRootDirectory: () => Promise<RootDirectorySelectionResult>;
 	setupDiagnostics: () => Promise<SetupDiagnosticsSnapshot>;

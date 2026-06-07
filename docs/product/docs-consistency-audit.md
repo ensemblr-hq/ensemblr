@@ -103,7 +103,7 @@ shipped structure.
 
 ### Added structure (no prior docs)
 
-- `src/renderer/components/dashboard-welcome.tsx` + `dashboard-welcome/`:
+- `src/renderer/components/welcome.tsx` + `welcome/`:
   welcome wordmark, three add-project cards, and a UI-only
   `CloneGithubDialog`. Mounted at the `_workbench/_shell/` index route.
 - `src/renderer/components/workbench-empty-state.tsx`: full shell rendered
@@ -132,7 +132,7 @@ shipped structure.
 - `docs/refactor/composition-refactor-plan.md`: marked Landed with the
   shipped outcomes summary.
 - `src/renderer/AGENTS.md`: components-section example updated to use
-  `dashboard-welcome` for the small case and the workbench-shell named
+  `welcome` for the small case and the workbench-shell named
   entrypoints for the large case.
 
 ### Not done

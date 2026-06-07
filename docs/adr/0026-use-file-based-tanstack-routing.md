@@ -84,7 +84,7 @@ Pending, error, and not-found boundaries render shared empty-state shells.
   `WorkspaceWorkbenchContent`; `panel-layout.tsx` exports
   `WorkspaceConversationContent`. The no-project shell lives in
   `components/workbench-empty-state.tsx` and the welcome landing in
-  `components/dashboard-welcome.tsx` (mounted from the `_workbench/_shell/`
+  `components/welcome.tsx` (mounted from the `_workbench/_shell/`
   index route).
 
 ## Alternatives Considered

@@ -1,12 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import type { DatabaseSync } from 'node:sqlite';
 
 import { load } from 'js-toml';
 
 import type {
 	ConfigDiagnostic,
-	RepositoryConfigMigrationChange,
 	RepositoryConfigMigrationPreview,
 	RepositoryConfigMigrationRequest,
 	RepositoryConfigMigrationResult,
@@ -15,6 +13,11 @@ import type {
 	RepositoryConfigSourceStatus,
 	SettingsResolutionSource,
 } from '../../shared/ipc';
+import {
+	applyRepositoryConfigMigration,
+	normalizeRepositoryConfigRequest,
+	previewRepositoryConfigMigration,
+} from './repository-config-migration.ts';
 
 /** Options for {@link loadRepositoryConfig}. */
 export interface LoadRepositoryConfigOptions {
@@ -43,11 +46,8 @@ export interface RepositoryConfigService {
 	) => RepositoryConfigMigrationPreview;
 }
 
-/** Inputs for {@link isRepositoryConfigPathAllowed}. */
-export interface RepositoryConfigPathAuthorizationOptions {
-	database: DatabaseSync | null;
-	repositoryPath: string;
-}
+export type { RepositoryConfigPathAuthorizationOptions } from './repository-config-auth.ts';
+export { isRepositoryConfigPathAllowed } from './repository-config-auth.ts';
 
 /** Internal: result of reading a single config file from disk. */
 interface ParsedConfigSource {
@@ -63,14 +63,7 @@ interface NormalizedConfigSource {
 	settings: Record<string, unknown>;
 }
 
-/** Internal: one key/value pair flagged for migration. */
-interface MigrationEntry {
-	key: string;
-	source: SettingsResolutionSource;
-	value: unknown;
-}
-
-const ENSEMBLE_CONFIG_FILENAME = 'ensemble.json';
+export const ENSEMBLE_CONFIG_FILENAME = 'ensemble.json';
 const LEGACY_CONDUCTOR_CONFIG_FILENAME = 'conductor.json';
 const CONDUCTOR_DIRECTORY = '.conductor';
 const CONDUCTOR_SHARED_SETTINGS_FILENAME = 'settings.toml';
@@ -149,39 +142,11 @@ export function createRepositoryConfigService(): RepositoryConfigService {
 	};
 }
 
-/**
- * Returns whether the repository path is currently tracked (as either a
- * repository or a workspace), gating repository-config IPC writes.
- * @param options - Open database and candidate path.
- * @returns True when the path matches a tracked entry.
- */
-export function isRepositoryConfigPathAllowed({
-	database,
-	repositoryPath,
-}: RepositoryConfigPathAuthorizationOptions): boolean {
-	if (!database || !repositoryPath.trim()) {
-		return false;
-	}
-
-	const resolvedRepositoryPath = path.resolve(repositoryPath);
-
-	try {
-		const row = database
-			.prepare(
-				`
-SELECT path FROM repositories WHERE path = ?
-UNION
-SELECT path FROM workspaces WHERE path = ?
-LIMIT 1
-`,
-			)
-			.get(resolvedRepositoryPath, resolvedRepositoryPath);
-
-		return isPathRow(row);
-	} catch {
-		return false;
-	}
-}
+export {
+	applyRepositoryConfigMigration,
+	normalizeRepositoryConfigRequest,
+	previewRepositoryConfigMigration,
+} from './repository-config-migration.ts';
 
 /**
  * Loads every supported repository config source (ensemble.json, conductor
@@ -319,201 +284,6 @@ export function loadRepositoryConfig({
 }
 
 /**
- * Coerces an arbitrary IPC payload into a {@link LoadRepositoryConfigOptions},
- * returning an empty path when the shape is invalid.
- * @param request - Raw IPC payload.
- * @returns Safe-to-use options.
- */
-export function normalizeRepositoryConfigRequest(
-	request: unknown,
-): LoadRepositoryConfigOptions {
-	if (
-		!isPlainRecord(request) ||
-		typeof request.repositoryPath !== 'string' ||
-		!request.repositoryPath.trim()
-	) {
-		return { repositoryPath: '' };
-	}
-
-	return { repositoryPath: request.repositoryPath.trim() };
-}
-
-/**
- * Computes what {@link applyRepositoryConfigMigration} would do, including the
- * resulting `ensemble.json`, per-key change classifications, and diagnostics.
- * @param request - Migration request (path + overwrite flag).
- * @returns Preview describing whether the migration can apply and what changes.
- */
-export function previewRepositoryConfigMigration(
-	request: RepositoryConfigMigrationRequest,
-): RepositoryConfigMigrationPreview {
-	if (!request.repositoryPath.trim()) {
-		return createEmptyMigrationPreview({
-			diagnostics: [
-				{
-					code: 'repository-path-missing',
-					message: 'No repository path was provided.',
-					severity: 'error',
-				},
-			],
-			repositoryPath: '',
-		});
-	}
-
-	const repositoryPath = path.resolve(request.repositoryPath);
-	const overwrite = request.overwrite === true;
-	const loaded = loadRepositoryConfig({ repositoryPath });
-	const targetPath = path.join(repositoryPath, ENSEMBLE_CONFIG_FILENAME);
-	const diagnostics = [...loaded.snapshot.diagnostics];
-	const target = readJsonFile({
-		kind: 'ensemble',
-		source: 'ensemble-config',
-		sourcePath: targetPath,
-	});
-	const sourceSnapshot = getMigrationSource(loaded.snapshot.sources);
-	const sourcePath = sourceSnapshot?.path ?? null;
-	const entries = sourceSnapshot
-		? collectMigrationEntries(sourceSnapshot.settings, sourceSnapshot.source)
-		: [];
-
-	if (!sourceSnapshot) {
-		diagnostics.push({
-			code: 'migration-source-missing',
-			message:
-				'No shared Conductor repository config was found to migrate into ensemble.json.',
-			severity: 'info',
-		});
-	}
-
-	const targetConfig = target.record ?? {};
-	const targetIsInvalid = target.status === 'invalid';
-	const resultingConfig = cloneRecord(targetConfig);
-	const changes: RepositoryConfigMigrationChange[] = [];
-
-	if (!targetIsInvalid) {
-		for (const entry of entries) {
-			const existingPath = inspectValueAtPath(targetConfig, entry.key);
-			const existingValue = existingPath.existingValue;
-			const hasExistingValue = existingPath.hasExistingValue;
-			const valuesMatch =
-				hasExistingValue && areJsonValuesEqual(existingValue, entry.value);
-			const status = valuesMatch
-				? 'unchanged'
-				: hasExistingValue
-					? overwrite
-						? 'overwritten'
-						: 'conflict'
-					: 'added';
-
-			changes.push({
-				...(hasExistingValue ? { existingValue } : {}),
-				incomingValue: entry.value,
-				key: entry.key,
-				source: entry.source,
-				status,
-			});
-
-			if (status === 'added' || status === 'overwritten') {
-				setValueAtPath(resultingConfig, entry.key, entry.value);
-			}
-		}
-	}
-
-	if (targetIsInvalid) {
-		diagnostics.push({
-			code: 'migration-target-invalid',
-			message:
-				'ensemble.json is invalid, so migration cannot safely merge settings.',
-			severity: 'error',
-		});
-	}
-
-	return {
-		canApply:
-			!targetIsInvalid &&
-			changes.some(
-				(change) =>
-					change.status === 'added' || change.status === 'overwritten',
-			),
-		changes,
-		diagnostics,
-		repositoryPath,
-		resultingConfig,
-		sourcePath,
-		targetExists: target.status !== 'missing',
-		targetPath,
-	};
-}
-
-/**
- * Builds an empty preview used for early-return error cases.
- * @param input - Diagnostics and repository path to surface.
- * @returns A migration preview with `canApply: false` and no changes.
- */
-function createEmptyMigrationPreview({
-	diagnostics,
-	repositoryPath,
-}: {
-	diagnostics: ConfigDiagnostic[];
-	repositoryPath: string;
-}): RepositoryConfigMigrationPreview {
-	return {
-		canApply: false,
-		changes: [],
-		diagnostics,
-		repositoryPath,
-		resultingConfig: {},
-		sourcePath: null,
-		targetExists: false,
-		targetPath: repositoryPath
-			? path.join(repositoryPath, ENSEMBLE_CONFIG_FILENAME)
-			: '',
-	};
-}
-
-/**
- * Writes the migrated `ensemble.json` to disk after computing a preview, leaving
- * the file untouched when the preview indicates the change is unsafe.
- * @param request - Migration request (path + overwrite flag).
- * @returns The applied result, including any write error.
- */
-export function applyRepositoryConfigMigration(
-	request: RepositoryConfigMigrationRequest,
-): RepositoryConfigMigrationResult {
-	const preview = previewRepositoryConfigMigration(request);
-
-	if (!preview.canApply) {
-		return {
-			...preview,
-			applied: false,
-		};
-	}
-
-	try {
-		mkdirSync(path.dirname(preview.targetPath), { recursive: true });
-		writeFileSync(
-			preview.targetPath,
-			`${JSON.stringify(preview.resultingConfig, null, '\t')}\n`,
-		);
-
-		return {
-			...preview,
-			applied: true,
-			targetExists: true,
-		};
-	} catch (error) {
-		return {
-			...preview,
-			applied: false,
-			error: formatErrorMessage(
-				error,
-				'Failed to write migrated ensemble.json.',
-			),
-		};
-	}
-}
-
-/**
  * Reads and normalises a JSON repository config file.
  * @param input - Parsing context (kind, source identifier, path).
  * @returns Diagnostics plus the snapshot describing the source.
@@ -648,7 +418,7 @@ function loadWorktreeincludeSource(repositoryPath: string): {
  * @param input - File kind and path.
  * @returns The parsed record (or `null`) plus status diagnostics.
  */
-function readJsonFile({
+export function readJsonFile({
 	kind,
 	source,
 	sourcePath,
@@ -1162,64 +932,6 @@ function getLoadedSettingsForStatus(
 }
 
 /**
- * Picks the loaded Conductor source to migrate, preferring TOML over legacy JSON.
- * @param sources - All loaded config sources.
- * @returns The source to migrate, or `null` when no Conductor config is loaded.
- */
-function getMigrationSource(
-	sources: readonly RepositoryConfigSourceSnapshot[],
-): RepositoryConfigSourceSnapshot | null {
-	return (
-		sources.find(
-			(source) =>
-				source.source === 'conductor-config' && source.status === 'loaded',
-		) ??
-		sources.find(
-			(source) =>
-				source.source === 'conductor-legacy-config' &&
-				source.status === 'loaded',
-		) ??
-		null
-	);
-}
-
-/**
- * Flattens Conductor settings into the migration entries written into
- * `ensemble.json`, expanding `scripts.*` keys and excluding compat flags.
- * @param settings - Source settings.
- * @param source - Source identifier propagated onto every entry.
- * @returns Sorted migration entries.
- */
-function collectMigrationEntries(
-	settings: Record<string, unknown>,
-	source: SettingsResolutionSource,
-): MigrationEntry[] {
-	const entries: MigrationEntry[] = [];
-
-	if (isPlainRecord(settings.scripts)) {
-		for (const key of ['setup', 'run', 'archive']) {
-			if (settings.scripts[key] !== undefined) {
-				entries.push({
-					key: `scripts.${key}`,
-					source,
-					value: settings.scripts[key],
-				});
-			}
-		}
-	}
-
-	for (const [key, value] of Object.entries(settings)) {
-		if (key === 'scripts' || key === 'conductorCompatibility') {
-			continue;
-		}
-
-		entries.push({ key, source, value });
-	}
-
-	return entries.sort((left, right) => left.key.localeCompare(right.key));
-}
-
-/**
  * Merges `source` into `target` in place, preserving and concatenating the
  * internal `__diagnostics` carrier and deep-merging `scripts`.
  * @param target - Settings record to update.
@@ -1284,96 +996,13 @@ function takeNestedDiagnostics(
 }
 
 /**
- * Walks a dotted path inside a record, reporting whether a value exists at the
- * leaf and what it currently is.
- * @param record - Record to inspect.
- * @param fieldPath - Dotted path (e.g. `scripts.setup`).
- * @returns Whether a value exists, and the value itself when found.
- */
-function inspectValueAtPath(
-	record: Record<string, unknown>,
-	fieldPath: string,
-): {
-	existingValue?: unknown;
-	hasExistingValue: boolean;
-} {
-	const [head, ...tail] = fieldPath.split('.');
-
-	if (!head || !Object.hasOwn(record, head)) {
-		return { hasExistingValue: false };
-	}
-
-	let current: unknown = record[head];
-
-	for (const part of tail) {
-		if (!isPlainRecord(current)) {
-			return { existingValue: current, hasExistingValue: true };
-		}
-
-		if (!Object.hasOwn(current, part)) {
-			return { hasExistingValue: false };
-		}
-
-		current = current[part];
-	}
-
-	return { existingValue: current, hasExistingValue: true };
-}
-
-/**
- * Sets a dotted-path value inside a record, creating intermediate objects when
- * they are missing or shadowing non-object values.
- * @param record - Record to mutate.
- * @param fieldPath - Dotted path (e.g. `scripts.setup`).
- * @param value - Value to set at the leaf.
- */
-function setValueAtPath(
-	record: Record<string, unknown>,
-	fieldPath: string,
-	value: unknown,
-): void {
-	const [head, ...tail] = fieldPath.split('.');
-
-	if (!head) {
-		return;
-	}
-
-	if (tail.length === 0) {
-		record[head] = value;
-		return;
-	}
-
-	const existingHead = record[head];
-
-	if (!isPlainRecord(existingHead)) {
-		record[head] = {};
-	}
-
-	let current = record[head] as Record<string, unknown>;
-
-	for (const part of tail.slice(0, -1)) {
-		const existing = current[part];
-
-		if (!isPlainRecord(existing)) {
-			current[part] = {};
-		}
-
-		current = current[part] as Record<string, unknown>;
-	}
-
-	const leaf = tail.at(-1);
-
-	if (leaf) {
-		current[leaf] = value;
-	}
-}
-
-/**
  * Returns a structurally-cloned copy of a JSON-safe record.
  * @param record - Record to clone.
  * @returns A deep clone of `record`.
  */
-function cloneRecord(record: Record<string, unknown>): Record<string, unknown> {
+export function cloneRecord(
+	record: Record<string, unknown>,
+): Record<string, unknown> {
 	return JSON.parse(JSON.stringify(record)) as Record<string, unknown>;
 }
 
@@ -1383,7 +1012,7 @@ function cloneRecord(record: Record<string, unknown>): Record<string, unknown> {
  * @param right - Second value.
  * @returns True when their JSON serialisations match.
  */
-function areJsonValuesEqual(left: unknown, right: unknown): boolean {
+export function areJsonValuesEqual(left: unknown, right: unknown): boolean {
 	return JSON.stringify(left) === JSON.stringify(right);
 }
 
@@ -1510,7 +1139,7 @@ function getJsonErrorLocation(
  * @param fallback - Fallback message when `error` is not an `Error`.
  * @returns A human-readable message.
  */
-function formatErrorMessage(error: unknown, fallback: string): string {
+export function formatErrorMessage(error: unknown, fallback: string): string {
 	return error instanceof Error ? error.message : fallback;
 }
 
@@ -1530,20 +1159,8 @@ function isStringArray(value: unknown): value is string[] {
  * @param value - Candidate value.
  * @returns True when `value` is a non-null, non-array object.
  */
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
+export function isPlainRecord(
+	value: unknown,
+): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-/**
- * Type guard for the row shape returned by the path-authorisation query.
- * @param row - Candidate row value.
- * @returns True when the row exposes a string `path` column.
- */
-function isPathRow(row: unknown): row is { path: string } {
-	return (
-		typeof row === 'object' &&
-		row !== null &&
-		'path' in row &&
-		typeof row.path === 'string'
-	);
 }
