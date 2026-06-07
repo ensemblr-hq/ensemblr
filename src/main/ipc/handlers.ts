@@ -15,6 +15,7 @@ import {
 	type EnvironmentVariablesSnapshot,
 	type GithubRepositoryListResult,
 	type HealthSnapshot,
+	type InitialShellSnapshot,
 	IPC_CHANNELS,
 	type LocalRepositorySelectionResult,
 	type PiExecutableSelectionResult,
@@ -126,6 +127,40 @@ export function registerIpcHandlers({
 	);
 
 	ipcMain.handle(IPC_CHANNELS.health, (): HealthSnapshot => {
+		return buildHealthSnapshot();
+	});
+
+	ipcMain.on(IPC_CHANNELS.initialShellSnapshot, (event) => {
+		const snapshot: InitialShellSnapshot = {
+			capturedAt: new Date().toISOString(),
+			health: safeBuildHealthSnapshot(),
+			navigation: safeBuildNavigationSnapshot(),
+		};
+		event.returnValue = snapshot;
+	});
+
+	/** Builds a health snapshot, swallowing failures so the sync channel never throws. */
+	function safeBuildHealthSnapshot(): HealthSnapshot | null {
+		try {
+			return buildHealthSnapshot();
+		} catch {
+			return null;
+		}
+	}
+
+	/** Builds the navigation snapshot when SQLite is available; null otherwise. */
+	function safeBuildNavigationSnapshot() {
+		try {
+			return getRepositoryWorkspaceNavigationSnapshot(
+				databaseService.getConnection()?.database ?? null,
+			);
+		} catch {
+			return null;
+		}
+	}
+
+	/** Single source of truth for the health-snapshot shape returned by both channels. */
+	function buildHealthSnapshot(): HealthSnapshot {
 		return {
 			appName: app.getName(),
 			config: configService.getSnapshot(),
@@ -139,7 +174,7 @@ export function registerIpcHandlers({
 				node: process.versions.node,
 			},
 		};
-	});
+	}
 
 	ipcMain.handle(IPC_CHANNELS.rootDirectory, (): RootDirectorySnapshot => {
 		return rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();

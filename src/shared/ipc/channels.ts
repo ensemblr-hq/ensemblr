@@ -13,6 +13,7 @@ export const IPC_CHANNELS = {
 	environmentVariables: 'ensemble:environment-variables',
 	githubRepositoryList: 'ensemble:github-repository-list',
 	health: 'ensemble:health',
+	initialShellSnapshot: 'ensemble:initial-shell-snapshot',
 	previewRepositoryConfigMigration:
 		'ensemble:preview-repository-config-migration',
 	quickStartProject: 'ensemble:quick-start-project',

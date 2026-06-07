@@ -543,6 +543,12 @@ export interface GithubRepositoryEntry {
 	updatedAt: string;
 }
 
+export interface InitialShellSnapshot {
+	capturedAt: string;
+	health: HealthSnapshot | null;
+	navigation: RepositoryWorkspaceNavigationSnapshot | null;
+}
+
 export type GithubRepositoryListStatus = 'failure' | 'success';
 
 export interface GithubRepositoryListResult {

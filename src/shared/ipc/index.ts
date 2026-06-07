@@ -31,6 +31,7 @@ export type {
 	GithubRepositoryListResult,
 	GithubRepositoryListStatus,
 	HealthSnapshot,
+	InitialShellSnapshot,
 	LocalRepositorySelectionResult,
 	PiExecutableSelectionResult,
 	QuickStartProjectDiagnostic,
