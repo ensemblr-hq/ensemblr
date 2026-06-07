@@ -11,6 +11,7 @@ import type {
 	LocalCommandService,
 } from '../commands/local-command';
 import type { EnsembleRootDirectoryService } from '../root/root-directory';
+import { normalizeConfiguredPath } from './internal/normalize-configured-path.ts';
 import type {
 	PiExecutableService,
 	PiExecutableSnapshot,
@@ -936,21 +937,6 @@ function parseRpcFrame(line: string): PiRpcFrameSnapshot | null {
 }
 
 /** Resolves a configured path, expanding `~`. */
-function normalizeConfiguredPath(
-	rawPath: string,
-	homeDirectory: string,
-): string {
-	if (rawPath === '~') {
-		return path.resolve(homeDirectory);
-	}
-
-	if (rawPath.startsWith('~/')) {
-		return path.resolve(homeDirectory, rawPath.slice(2));
-	}
-
-	return path.resolve(rawPath);
-}
-
 /** Extracts the Node.js `code` property from an error, if any. */
 function getNodeErrorCode(error: Error): string | null {
 	return 'code' in error && typeof error.code === 'string' ? error.code : null;

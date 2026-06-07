@@ -20,7 +20,7 @@ when planning app-shell work.
   `WorkspaceWorkbenchContent` in
   `src/renderer/components/workbench-shell/workspace-content.tsx`, the
   no-project shell in `src/renderer/components/workbench-empty-state.tsx`, the
-  welcome landing in `src/renderer/components/dashboard-welcome.tsx`, and the
+  welcome landing in `src/renderer/components/welcome.tsx`, and the
   private feature folders under `src/renderer/components/workbench-shell/` —
   now supersedes older speculative shell notes. Use
   `docs/product/current-shell-inventory.md` for the current Ensemble shell

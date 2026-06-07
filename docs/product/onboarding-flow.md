@@ -7,11 +7,11 @@ No onboarding screenshots were captured under `.context/conductor-screens/01-onb
 ## Implementation Status (2026-06-07)
 
 - Welcome landing UI is implemented in
-  `src/renderer/components/dashboard-welcome.tsx` and mounted from the
+  `src/renderer/components/welcome.tsx` and mounted from the
   `_workbench/_shell/` index route. It renders the Ensemble wordmark plus three
   cards: Open project, Open GitHub project, and Quick start.
 - The Open GitHub project card opens a UI-only `CloneGithubDialog`
-  (`src/renderer/components/dashboard-welcome/clone-github-dialog.tsx`) with URL
+  (`src/renderer/components/welcome/clone-github-dialog.tsx`) with URL
   and destination inputs. Clone IPC wiring is future work (`ENS-019`).
 - Open project and Quick start cards are visible but not yet wired to native
   pickers or the quick-start flow.

@@ -14,6 +14,7 @@ These instructions apply to everything under `src/main/`.
   - `ipc/` for main-process IPC handler registration and request validation.
   - `menu/` for native Electron menus.
   - `pi/` for Pi executable and readiness checks.
+  - `repository/` for repository registration, git probing, and lifecycle.
   - `root/` for managed root directory resolution and reconciliation.
   - `secrets/` for secret storage backends and metadata.
   - `setup/` for setup diagnostics orchestration.

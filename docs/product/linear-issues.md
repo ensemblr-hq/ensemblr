@@ -6,7 +6,7 @@ These issue templates are ready to copy into Linear. `ENS-*` IDs are local plann
 
 Current shell alignment:
 
-- The implemented shell — `WorkbenchFrame` (`src/renderer/components/workbench-shell/frame.tsx`), `WorkspaceWorkbenchContent` (`src/renderer/components/workbench-shell/workspace-content.tsx`), the no-project shell (`src/renderer/components/workbench-empty-state.tsx`), the welcome landing (`src/renderer/components/dashboard-welcome.tsx`), and the private feature folders under `src/renderer/components/workbench-shell/` — is now the product source of truth for app-shell layout and visible affordances.
+- The implemented shell — `WorkbenchFrame` (`src/renderer/components/workbench-shell/frame.tsx`), `WorkspaceWorkbenchContent` (`src/renderer/components/workbench-shell/workspace-content.tsx`), the no-project shell (`src/renderer/components/workbench-empty-state.tsx`), the welcome landing (`src/renderer/components/welcome.tsx`), and the private feature folders under `src/renderer/components/workbench-shell/` — is now the product source of truth for app-shell layout and visible affordances.
 - Shared renderer-only shell state lives in Jotai atoms under `src/renderer/state/workspace`, and shared exported shell types live under `src/renderer/types/workbench-shell/` (barrel `index.ts`).
 - Use `docs/product/current-shell-inventory.md` with these issue templates.
 - Future tickets should wire live services into the current sidebar, header, chat/session tab strip, center timeline/composer placement, right PR/review panel, and lower dock.

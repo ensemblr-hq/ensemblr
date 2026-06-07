@@ -3,7 +3,6 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type {
 	EnvironmentVariableCatalogEntrySnapshot,
-	EnvironmentVariableCategory,
 	EnvironmentVariableDiagnostic,
 	EnvironmentVariableScope,
 	EnvironmentVariableSnapshot,
@@ -14,6 +13,15 @@ import type {
 import type { EnsembleConfigService } from '../config/config-loader';
 import type { SecretMetadata, SecretStore } from '../secrets/secret-store';
 import type { EnsembleDatabaseService } from '../storage/database';
+import {
+	compareCatalogEntries,
+	createCatalogMap,
+	createCustomCatalogEntry,
+	getCatalogEntryForKey,
+	isSensitiveEnvironmentVariableName,
+} from './environment-variable-catalog.ts';
+
+export { BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG } from './environment-variable-catalog.ts';
 
 export type EnvironmentVariablesErrorCode =
 	| 'database-unavailable'
@@ -121,133 +129,6 @@ const ENVIRONMENT_SETTING_PREFIX = 'environment.variables.';
 const SECRET_ENVIRONMENT_KEY_PREFIX = 'environment:variables:';
 const ENVIRONMENT_VARIABLE_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const REDACTED_DISPLAY_VALUE = '[set]';
-const SENSITIVE_KEY_PARTS = [
-	'accesstoken',
-	'apikey',
-	'auth',
-	'credential',
-	'password',
-	'privatekey',
-	'secret',
-	'token',
-];
-
-/** Built-in catalog of environment variables Ensemble understands out-of-the-box. */
-export const BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG: readonly EnvironmentVariableCatalogEntrySnapshot[] =
-	[
-		{
-			category: 'pi',
-			description:
-				'Optional Pi agent directory override. Leave unset to preserve the normal Pi user environment.',
-			key: 'PI_CODING_AGENT_DIR',
-			required: false,
-			reserved: false,
-			scope: 'app',
-			title: 'Pi agent directory',
-			valueKind: 'plain',
-		},
-		{
-			category: 'proxy',
-			description:
-				'HTTP proxy used by tools that honor standard proxy environment variables.',
-			key: 'HTTP_PROXY',
-			required: false,
-			reserved: false,
-			scope: 'app',
-			title: 'HTTP proxy',
-			valueKind: 'secret',
-		},
-		{
-			category: 'proxy',
-			description:
-				'HTTPS proxy used by tools that honor standard proxy environment variables.',
-			key: 'HTTPS_PROXY',
-			required: false,
-			reserved: false,
-			scope: 'app',
-			title: 'HTTPS proxy',
-			valueKind: 'secret',
-		},
-		{
-			category: 'proxy',
-			description: 'Fallback proxy used by tools that support ALL_PROXY.',
-			key: 'ALL_PROXY',
-			required: false,
-			reserved: false,
-			scope: 'app',
-			title: 'All-protocol proxy',
-			valueKind: 'secret',
-		},
-		{
-			category: 'proxy',
-			description:
-				'Comma-separated hosts that should bypass configured proxy variables.',
-			key: 'NO_PROXY',
-			required: false,
-			reserved: false,
-			scope: 'app',
-			title: 'Proxy bypass list',
-			valueKind: 'plain',
-		},
-		...[
-			'OPENAI_API_KEY',
-			'ANTHROPIC_API_KEY',
-			'GOOGLE_API_KEY',
-			'GEMINI_API_KEY',
-			'GROQ_API_KEY',
-			'MISTRAL_API_KEY',
-			'OPENROUTER_API_KEY',
-			'VERCEL_AI_GATEWAY_API_KEY',
-		].map((key) =>
-			createCatalogEntry({
-				category: 'provider',
-				description:
-					'Optional Ensemble-owned provider credential. Pi-owned provider credentials should stay in the Pi user environment unless explicitly overridden here.',
-				key,
-				title: formatEnvironmentVariableTitle(key),
-				valueKind: 'secret',
-			}),
-		),
-		createCatalogEntry({
-			category: 'generic',
-			description:
-				'Generic debug selector for tools and scripts that honor DEBUG.',
-			key: 'DEBUG',
-			title: 'Debug selector',
-			valueKind: 'plain',
-		}),
-		createCatalogEntry({
-			category: 'generic',
-			description:
-				'Generic CI flag for tools and scripts that alter behavior in continuous-integration mode.',
-			key: 'CI',
-			title: 'CI mode',
-			valueKind: 'plain',
-		}),
-		...[
-			'ENSEMBLE_WORKSPACE_NAME',
-			'ENSEMBLE_WORKSPACE_PATH',
-			'ENSEMBLE_ROOT_PATH',
-			'ENSEMBLE_DEFAULT_BRANCH',
-			'ENSEMBLE_PORT',
-			'CONDUCTOR_WORKSPACE_NAME',
-			'CONDUCTOR_WORKSPACE_PATH',
-			'CONDUCTOR_ROOT_PATH',
-			'CONDUCTOR_DEFAULT_BRANCH',
-			'CONDUCTOR_PORT',
-		].map((key) =>
-			createCatalogEntry({
-				category: 'runtime',
-				description:
-					'Reserved workspace runtime variable populated by later workspace environment injection.',
-				key,
-				reserved: true,
-				scope: 'workspace',
-				title: formatEnvironmentVariableTitle(key),
-				valueKind: 'runtime',
-			}),
-		),
-	];
 
 /** Domain-specific error thrown by the environment-variables service. */
 export class EnvironmentVariablesError extends Error {
@@ -601,42 +482,6 @@ export function createEnvironmentVariablesService({
  */
 export function isEnvironmentVariableKey(value: string): boolean {
 	return ENVIRONMENT_VARIABLE_KEY_PATTERN.test(value);
-}
-
-/**
- * Builds a catalog entry with defaults applied.
- * @param input - Catalog fields.
- * @returns A fully-populated catalog snapshot.
- */
-function createCatalogEntry({
-	category,
-	description,
-	key,
-	required = false,
-	reserved = false,
-	scope = 'app',
-	title,
-	valueKind,
-}: {
-	category: EnvironmentVariableCategory;
-	description: string;
-	key: string;
-	required?: boolean;
-	reserved?: boolean;
-	scope?: EnvironmentVariableScope;
-	title: string;
-	valueKind: EnvironmentVariableValueKind;
-}): EnvironmentVariableCatalogEntrySnapshot {
-	return {
-		category,
-		description,
-		key,
-		required,
-		reserved,
-		scope,
-		title,
-		valueKind,
-	};
 }
 
 /**
@@ -1105,54 +950,6 @@ async function collectSecretMetadata({
 }
 
 /**
- * Returns a deep-cloned `key -> catalog entry` map seeded from the built-in catalog.
- * @returns A fresh catalog map.
- */
-function createCatalogMap(): Map<
-	string,
-	EnvironmentVariableCatalogEntrySnapshot
-> {
-	return new Map(
-		BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG.map((entry) => [
-			entry.key,
-			{ ...entry },
-		]),
-	);
-}
-
-/**
- * Returns the catalog entry for `key`, manufacturing a custom entry if absent.
- * @param key - Variable name.
- * @param catalogByKey - Active catalog map.
- * @returns The catalog entry.
- */
-function getCatalogEntryForKey(
-	key: string,
-	catalogByKey: Map<string, EnvironmentVariableCatalogEntrySnapshot>,
-): EnvironmentVariableCatalogEntrySnapshot {
-	return catalogByKey.get(key) ?? createCustomCatalogEntry(key);
-}
-
-/**
- * Builds a custom catalog entry for a user-defined variable, classifying it
- * as secret when the name looks sensitive.
- * @param key - Variable name.
- * @returns A custom catalog entry.
- */
-function createCustomCatalogEntry(
-	key: string,
-): EnvironmentVariableCatalogEntrySnapshot {
-	return createCatalogEntry({
-		category: 'custom',
-		description:
-			'User-defined environment variable prepared for future settings and process environment flows.',
-		key,
-		title: formatEnvironmentVariableTitle(key),
-		valueKind: isSensitiveEnvironmentVariableName(key) ? 'secret' : 'plain',
-	});
-}
-
-/**
  * Validates and de-duplicates the caller-supplied required-key list, emitting
  * diagnostics for malformed keys.
  * @param requiredKeys - Caller list.
@@ -1368,17 +1165,6 @@ function isSecretEnvironmentVariableKey(
 }
 
 /**
- * Tests whether a variable name contains a sensitive substring (e.g. `TOKEN`).
- * @param key - Variable name.
- * @returns True when the normalised name matches a sensitive part.
- */
-function isSensitiveEnvironmentVariableName(key: string): boolean {
-	const normalized = key.replace(/[-_]/g, '').toLowerCase();
-
-	return SENSITIVE_KEY_PARTS.some((part) => normalized.includes(part));
-}
-
-/**
  * Maps a variable name to its `settings` table key.
  * @param key - Variable name.
  * @returns The qualified setting key.
@@ -1446,21 +1232,6 @@ function isSecretStoreAlreadyExistsError(
 }
 
 /**
- * Comparator that orders catalog entries by `category:key`.
- * @param left - First entry.
- * @param right - Second entry.
- * @returns Standard comparator number.
- */
-function compareCatalogEntries(
-	left: EnvironmentVariableCatalogEntrySnapshot,
-	right: EnvironmentVariableCatalogEntrySnapshot,
-): number {
-	return `${left.category}:${left.key}`.localeCompare(
-		`${right.category}:${right.key}`,
-	);
-}
-
-/**
  * Type guard for the row shape returned by the env-var SQLite query.
  * @param row - Candidate row value.
  * @returns True when the row exposes string `key` and `value_json` columns.
@@ -1474,21 +1245,4 @@ function isSqliteEnvironmentRow(row: unknown): row is SqliteEnvironmentRow {
 		typeof row.key === 'string' &&
 		typeof row.value_json === 'string'
 	);
-}
-
-/**
- * Renders a variable name as a Title-Case label for catalog display.
- * @param key - Variable name.
- * @returns A user-facing title.
- */
-function formatEnvironmentVariableTitle(key: string): string {
-	return key
-		.split('_')
-		.filter(Boolean)
-		.map((part) =>
-			part.length <= 3
-				? part.toUpperCase()
-				: `${part[0]?.toUpperCase() ?? ''}${part.slice(1).toLowerCase()}`,
-		)
-		.join(' ');
 }

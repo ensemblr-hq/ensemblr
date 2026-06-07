@@ -18,8 +18,8 @@ chrome in `src/renderer/components/workbench-shell/frame.tsx`,
 `WorkspaceWorkbenchContent` in
 `src/renderer/components/workbench-shell/workspace-content.tsx`, the
 no-project shell in `src/renderer/components/workbench-empty-state.tsx`, the
-welcome landing in `src/renderer/components/dashboard-welcome.tsx` plus
-`src/renderer/components/dashboard-welcome/`, private feature modules under
+welcome landing in `src/renderer/components/welcome.tsx` plus
+`src/renderer/components/welcome/`, private feature modules under
 `src/renderer/components/workbench-shell/<feature>/`, cross-cutting shell
 contexts in `src/renderer/components/workbench-shell/contexts/`, shared Jotai
 atoms in `src/renderer/state/workspace`, and shared exported shell types in

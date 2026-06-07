@@ -11,8 +11,8 @@ shell code is in `src/renderer/components/workbench-shell/`
 (`frame.tsx` for the chrome, `workspace-content.tsx` for the active-workspace
 content, plus private feature folders),
 `src/renderer/components/workbench-empty-state.tsx` for the no-project shell,
-`src/renderer/components/dashboard-welcome.tsx` plus
-`src/renderer/components/dashboard-welcome/` for the welcome landing view,
+`src/renderer/components/welcome.tsx` plus
+`src/renderer/components/welcome/` for the welcome landing view,
 `src/renderer/state/workspace`,
 `src/renderer/types/workbench-shell/` (barrel `index.ts`),
 `src/renderer/mocks/workbench/`, `src/renderer/styles/index.css`,
@@ -57,7 +57,7 @@ not behaviorally finalized. They remain deferred until Pi integration work.
   (`WorkbenchLayoutProvider`, `SetupDiagnosticsProvider`, `NavigationProvider`).
 - `src/renderer/components/workbench-empty-state.tsx` wraps `WorkbenchFrame`
   for the no-project / empty navigation state.
-- `src/renderer/components/dashboard-welcome.tsx` renders the no-project
+- `src/renderer/components/welcome.tsx` renders the no-project
   welcome landing (wordmark + Open project / Open GitHub project / Quick start
   cards + clone-github modal stub) and is mounted from the `_workbench/_shell/`
   index route.
@@ -74,7 +74,7 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 | Surface | Product capability implied | Status | Implementation notes |
 | --- | --- | --- | --- |
 | Electron workbench frame | A compact macOS desktop workbench with native-window spacing, persistent side navigation, and resizable panes. | Locked product direction | Renderer layout uses `SidebarProvider`, horizontal and vertical `ResizablePanelGroup`s, and Ensemble-owned design tokens. |
-| Welcome landing view | First-run / no-project state shows the Ensemble wordmark and the three add-project actions inline on the main canvas. | Implemented shell behavior | `DashboardWelcome` renders Open project, Open GitHub project (mounts `CloneGithubDialog` UI-only stub), and Quick start cards from `mocks/workbench`. Clone/open IPC wiring is future work. Mounted at the `_workbench/_shell/` index route. |
+| Welcome landing view | First-run / no-project state shows the Ensemble wordmark and the three add-project actions inline on the main canvas. | Implemented shell behavior | `Welcome` renders Open project, Open GitHub project (mounts `CloneGithubDialog` UI-only stub), and Quick start cards from `mocks/workbench`. Clone/open IPC wiring is future work. Mounted at the `_workbench/_shell/` index route. |
 | Left primary navigation | Dashboard, History, Help, and Settings are visible from the primary sidebar. | Implemented behavior | `Dashboard` routes to a `WorkbenchPlaceholderPage` reserved for the future kanban board. `History` and `Help` navigate to route-backed shell placeholders. `Settings` opens the separate full-window settings route with a Back to app action. |
 | Sidebar project groups | Repositories/projects contain workspace rows, can collapse, and can be reordered. | Implemented behavior | Project collapse and renderer-local reorder state are live. Persistence and SQLite-backed records are future work. |
 | Pinned workspace group | Users can pin workspaces above their project groups for fast access. | Implemented behavior | Pin/unpin is renderer-local and removes pinned rows from the normal project group. Persistence is future work. |

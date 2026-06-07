@@ -1,7 +1,12 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation/route-profiler';
-import type { EnsembleApi } from '@/shared/ipc';
+import type {
+	EnsembleApi,
+	LocalRepositorySelectionResult,
+	RegisterLocalRepositoryRequest,
+	RegisterLocalRepositoryResult,
+} from '@/shared/ipc';
 
 /** Hierarchical TanStack Query keys for every Ensemble IPC-backed query. */
 export const ensembleQueryKeys = {
@@ -73,6 +78,24 @@ export const repositoryWorkspaceNavigationQuery = queryOptions({
 	queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
 	staleTime: 2000,
 });
+
+/** Opens the native folder picker via the main process to choose a local repository. */
+export function selectLocalRepository(): Promise<LocalRepositorySelectionResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:select-local-repository', usesDatabase: false },
+		() => getEnsembleApi().selectLocalRepository(),
+	);
+}
+
+/** Registers a previously-selected local repository path with Ensemble. */
+export function registerLocalRepository(
+	request: RegisterLocalRepositoryRequest,
+): Promise<RegisterLocalRepositoryResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:register-local-repository', usesDatabase: true },
+		() => getEnsembleApi().registerLocalRepository(request),
+	);
+}
 
 /** Query options for the renderer-side setup-diagnostics snapshot. */
 export const setupDiagnosticsQuery = queryOptions({

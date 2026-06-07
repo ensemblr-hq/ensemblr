@@ -2,7 +2,16 @@
 	"permissions": {
 		"defaultMode": "acceptEdits",
 		"additionalDirectories": ["/tmp"],
-		"allow": ["Bash", "Read", "Edit", "Write", "WebFetch", "Agent"],
+		"allow": [
+			"Bash",
+			"Read",
+			"Edit",
+			"Write",
+			"WebFetch",
+			"Agent",
+			"mcp__claude_ai_Linear",
+			"mcp__plugin_context-mode_context-mode"
+		],
 		"deny": ["Read(./.env)", "Read(./.env.*)", "Read(**/.env)"]
 	},
 	"enableAllProjectMcpServers": true,
