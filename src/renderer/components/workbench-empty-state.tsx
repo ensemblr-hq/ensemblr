@@ -1,6 +1,8 @@
-import type { ReactElement } from 'react';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
+import { NavigationProvider } from '@/renderer/components/workbench-shell/contexts';
+import { WorkbenchFrame } from '@/renderer/components/workbench-shell/frame';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
+import type { NavigationContextValue } from '@/renderer/types/contexts';
 import type {
 	ProjectShellModel,
 	WorkbenchRouteSearch,
@@ -9,20 +11,22 @@ import type {
 	WorkbenchActiveView,
 	WorkbenchHealth,
 	WorkbenchStaticNavigationTarget,
-	WorkbenchWorkspaceNavigationLinkTarget,
 } from '@/renderer/types/workbench-shell';
-import { WorkbenchFrame } from './workbench-shell';
+
+const EMPTY_NAVIGATION: NavigationContextValue = {
+	renderStaticLink: undefined,
+	renderWorkspaceLink: undefined,
+};
 
 /** Full workbench shell rendered when no workspace is selectable. */
 export function WorkbenchEmptyStateShell({
 	activeView,
 	emptyState,
 	health,
+	navigation = EMPTY_NAVIGATION,
 	onStaticNavigationSelect,
 	onWorkspaceSelect,
 	projects,
-	renderStaticNavigationLink,
-	renderWorkspaceNavigationLink,
 }: {
 	activeView: WorkbenchActiveView;
 	emptyState: {
@@ -30,35 +34,28 @@ export function WorkbenchEmptyStateShell({
 		title: string;
 	};
 	health: WorkbenchHealth;
+	navigation?: NavigationContextValue;
 	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projects: ProjectShellModel[];
-	renderStaticNavigationLink?: (
-		target: WorkbenchStaticNavigationTarget,
-		children: ReactElement,
-	) => ReactElement;
-	renderWorkspaceNavigationLink?: (
-		target: WorkbenchWorkspaceNavigationLinkTarget,
-		children: ReactElement,
-	) => ReactElement;
 }) {
 	useRouteProfilerMount('WorkbenchEmptyStateShell');
 
 	return (
-		<WorkbenchFrame
-			activeProject={null}
-			activeView={activeView}
-			activeWorkspace={null}
-			health={health}
-			onStaticNavigationSelect={onStaticNavigationSelect}
-			onWorkspaceSelect={onWorkspaceSelect}
-			projects={projects}
-			resolveWorkspaceRouteSearch={resolveEmptyStateWorkspaceRouteSearch}
-			renderStaticNavigationLink={renderStaticNavigationLink}
-			renderWorkspaceNavigationLink={renderWorkspaceNavigationLink}
-		>
-			<WorkbenchEmptyStateContent emptyState={emptyState} />
-		</WorkbenchFrame>
+		<NavigationProvider value={navigation}>
+			<WorkbenchFrame
+				activeProject={null}
+				activeView={activeView}
+				activeWorkspace={null}
+				health={health}
+				onStaticNavigationSelect={onStaticNavigationSelect}
+				onWorkspaceSelect={onWorkspaceSelect}
+				projects={projects}
+				resolveWorkspaceRouteSearch={resolveEmptyStateWorkspaceRouteSearch}
+			>
+				<WorkbenchEmptyStateContent emptyState={emptyState} />
+			</WorkbenchFrame>
+		</NavigationProvider>
 	);
 }
 

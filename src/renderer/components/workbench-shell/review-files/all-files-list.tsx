@@ -1,0 +1,42 @@
+import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
+
+import { WorkspaceFileIcon } from './workspace-file-icon';
+
+/** Flat scrollable list of every workspace file (files tab). */
+export function AllFilesList({ files }: { files: WorkspaceFileSummary[] }) {
+	return (
+		<ScrollArea className='h-full'>
+			<ul className='flex flex-col gap-0.5 p-2.5'>
+				{files.length ? (
+					files.map((file) => (
+						<li key={file.id}>
+							<button
+								aria-label={getWorkspaceFileActionLabel(file)}
+								className='flex min-h-7 w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-0.5 text-left text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
+								type='button'
+							>
+								<WorkspaceFileIcon file={file} />
+								<span className='min-w-0 truncate font-mono text-xs leading-none'>
+									{file.name}
+								</span>
+							</button>
+						</li>
+					))
+				) : (
+					<li className='rounded-md border border-border bg-pane px-3 py-4 text-muted-foreground text-xs leading-5'>
+						Repository files will appear here when the workspace file service is
+						wired.
+					</li>
+				)}
+			</ul>
+		</ScrollArea>
+	);
+}
+
+/** Computes the aria-label for an All-files row, branching on file vs. folder. */
+function getWorkspaceFileActionLabel(file: WorkspaceFileSummary) {
+	return file.kind === 'directory'
+		? `Open ${file.name} directory`
+		: `Open ${file.name} preview`;
+}

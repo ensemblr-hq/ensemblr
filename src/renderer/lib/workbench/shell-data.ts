@@ -5,6 +5,7 @@ import {
 	repositoryWorkspaceNavigationQuery,
 	setupDiagnosticsQuery,
 } from '@/renderer/api/ensemble-queries';
+import { getErrorMessage } from '@/renderer/lib/error';
 import { shellFixtureProjects } from '@/renderer/mocks/workbench';
 import type { WorkbenchShellData } from '@/renderer/types/workbench';
 import type { WorkbenchHealth } from '@/renderer/types/workbench-shell';
@@ -236,19 +237,4 @@ export function getEmptyStateCopy({
 		detail: 'Open or create a repository to populate the workspace navigation.',
 		title: 'No repositories yet',
 	};
-}
-
-/**
- * Coerces an unknown thrown value into a renderer-safe error message.
- * @param error - Thrown value.
- * @returns The message, or `null` for falsy inputs.
- */
-export function getErrorMessage(error: unknown): string | null {
-	if (!error) {
-		return null;
-	}
-
-	return error instanceof Error
-		? error.message
-		: 'Unknown renderer query error';
 }

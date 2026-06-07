@@ -22,7 +22,7 @@ import {
 } from '@/renderer/components/ui/tooltip';
 import { useIsMobile } from '@/renderer/hooks/ui/use-mobile';
 import { cn } from '@/renderer/lib/utils';
-import { sidebarOpenAtom } from '@/renderer/state/sidebar';
+import { sidebarOpenAtom } from '@/renderer/state/sidebar/atoms';
 
 const SIDEBAR_WIDTH = '16rem';
 const SIDEBAR_WIDTH_MOBILE = '18rem';

@@ -27,7 +27,7 @@ import type {
 } from '@/renderer/types/workbench';
 import type { ChangesViewMode } from '@/renderer/types/workbench-shell';
 
-import { ChecksPanel } from './checks-panel';
+import { ChecksPanel } from './checks-panel/checks-panel';
 import {
 	AllFilesList,
 	AllFilesSearchDialog,
