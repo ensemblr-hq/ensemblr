@@ -22,7 +22,6 @@ import {
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
-import type { RecentGithubRepo } from '@/renderer/types/workbench';
 import type {
 	CloneGithubRepositoryDiagnostic,
 	CloneGithubRepositoryProgressEvent,
@@ -33,14 +32,12 @@ import type {
 interface CloneGithubDialogProps {
 	onOpenChange: (open: boolean) => void;
 	open: boolean;
-	recentRepos: RecentGithubRepo[];
 }
 
 /** Modal for cloning a GitHub repository into the managed root. */
 export function CloneGithubDialog({
 	onOpenChange,
 	open,
-	recentRepos,
 }: CloneGithubDialogProps) {
 	return (
 		<Dialog
@@ -53,7 +50,6 @@ export function CloneGithubDialog({
 				<CloneGithubDialogForm
 					key={open ? 'open' : 'closed'}
 					onOpenChange={onOpenChange}
-					recentRepos={recentRepos}
 				/>
 			</DialogContent>
 		</Dialog>
@@ -66,10 +62,8 @@ type CloneStage = 'idle' | 'preparing' | 'cloning' | 'success' | 'failure';
 /** State-owned clone form content that resets when the dialog open state changes. */
 function CloneGithubDialogForm({
 	onOpenChange,
-	recentRepos,
 }: {
 	onOpenChange: (open: boolean) => void;
-	recentRepos: RecentGithubRepo[];
 }) {
 	const queryClient = useQueryClient();
 	const rootDirectory = useQuery({
@@ -82,21 +76,12 @@ function CloneGithubDialogForm({
 		...githubRepositoryListQuery,
 		enabled: isEnsembleApiAvailable(),
 	});
-	const liveEntries = githubRepoList.data?.entries ?? [];
+	const displayedEntries: GithubRepositoryEntry[] =
+		githubRepoList.data?.entries ?? [];
 	const liveError =
 		githubRepoList.data?.status === 'failure'
 			? githubRepoList.data.error
 			: undefined;
-	const fallbackEntries: GithubRepositoryEntry[] = recentRepos.map((repo) => ({
-		avatarUrl: null,
-		description: repo.description ?? null,
-		fullName: repo.fullName,
-		isPrivate: false,
-		ownerLogin: repo.fullName.split('/')[0] ?? '',
-		updatedAt: '',
-	}));
-	const displayedEntries =
-		liveEntries.length > 0 ? liveEntries : fallbackEntries;
 
 	const [url, setUrl] = useState('');
 	const [location, setLocation] = useState('');

@@ -24,7 +24,6 @@ export type {
 	PullRequestShellStatus,
 	PullRequestTodoSummary,
 } from './pull-request';
-export type { RecentGithubRepo } from './recent-github-repo';
 export type {
 	ReviewFileSummary,
 	ReviewPanelTab,

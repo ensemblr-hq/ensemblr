@@ -1,23 +1,19 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FolderIcon, FolderPlusIcon, GlobeIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import {
 	ensembleQueryKeys,
+	githubRepositoryListQuery,
 	isEnsembleApiAvailable,
 	registerLocalRepository,
 	selectLocalRepository,
 } from '@/renderer/api/ensemble-queries';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
-import type { RecentGithubRepo } from '@/renderer/types/workbench';
 
 import { CloneGithubDialog } from './welcome/clone-github-dialog';
 import { WelcomeActionCard } from './welcome/welcome-action-card';
 import { WelcomeWordmark } from './welcome/welcome-wordmark';
-
-interface WelcomeProps {
-	recentGithubRepos: RecentGithubRepo[];
-}
 
 /** Status banner state shown when a local-repository registration completes. */
 interface WelcomeNotice {
@@ -26,11 +22,15 @@ interface WelcomeNotice {
 }
 
 /** Default landing view shown when no project/workspace is selected. */
-export function Welcome({ recentGithubRepos }: WelcomeProps) {
+export function Welcome() {
 	const [cloneOpen, setCloneOpen] = useState(false);
 	const [notice, setNotice] = useState<WelcomeNotice | null>(null);
 	const [isOpeningProject, setIsOpeningProject] = useState(false);
 	const queryClient = useQueryClient();
+	useQuery({
+		...githubRepositoryListQuery,
+		enabled: isEnsembleApiAvailable(),
+	});
 
 	const onOpenLocalProject = useCallback(async () => {
 		if (!isEnsembleApiAvailable()) {
@@ -132,11 +132,7 @@ export function Welcome({ recentGithubRepos }: WelcomeProps) {
 				</section>
 			</main>
 
-			<CloneGithubDialog
-				onOpenChange={setCloneOpen}
-				open={cloneOpen}
-				recentRepos={recentGithubRepos}
-			/>
+			<CloneGithubDialog onOpenChange={setCloneOpen} open={cloneOpen} />
 		</SidebarInset>
 	);
 }
