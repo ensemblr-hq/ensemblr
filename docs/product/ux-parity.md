@@ -1,24 +1,29 @@
 # UX Parity
 
-Date: 2026-06-04
+Date: 2026-06-07
 
 Ensemble should match Conductor's observable workflows and information architecture where practical, while using distinct Ensemble visual design, copy, branding, icons, and Pi-specific runtime behavior.
 
 ## Current Shell Contract
 
-As of 2026-06-05, the implemented workbench shell is the product source of
+As of 2026-06-07, the implemented workbench shell is the product source of
 truth for layout and visible affordances. See
 `docs/product/current-shell-inventory.md`.
 
 The shell is composed from file-based TanStack routes under
 `src/renderer/routing/routes/` (see
 `docs/adr/0026-use-file-based-tanstack-routing.md`), with shell composition in
-`src/renderer/components/workbench-shell/route-layout.tsx`, the `WorkbenchFrame`
-and `WorkspaceWorkbenchContent` entrypoints in
-`src/renderer/components/workbench-shell.tsx`, private feature modules under
-`src/renderer/components/workbench-shell/`, shared Jotai atoms in
-`src/renderer/state/workspace`, and shared exported shell types in
-`src/renderer/types/workbench-shell.ts`.
+`src/renderer/components/workbench-shell/route-layout/`, the `WorkbenchFrame`
+chrome in `src/renderer/components/workbench-shell/frame.tsx`,
+`WorkspaceWorkbenchContent` in
+`src/renderer/components/workbench-shell/workspace-content.tsx`, the
+no-project shell in `src/renderer/components/workbench-empty-state.tsx`, the
+welcome landing in `src/renderer/components/dashboard-welcome.tsx` plus
+`src/renderer/components/dashboard-welcome/`, private feature modules under
+`src/renderer/components/workbench-shell/<feature>/`, cross-cutting shell
+contexts in `src/renderer/components/workbench-shell/contexts/`, shared Jotai
+atoms in `src/renderer/state/workspace`, and shared exported shell types in
+`src/renderer/types/workbench-shell/`.
 
 Future work should wire live repository, workspace, Pi, terminal, file, diff,
 GitHub, Linear, settings, and diagnostics services into the existing shell

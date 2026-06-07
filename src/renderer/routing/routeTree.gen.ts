@@ -15,6 +15,7 @@ import { Route as WorkbenchShellRouteImport } from './routes/_workbench/_shell'
 import { Route as WorkbenchShellIndexRouteImport } from './routes/_workbench/_shell/index'
 import { Route as WorkbenchShellHistoryRouteImport } from './routes/_workbench/_shell/history'
 import { Route as WorkbenchShellHelpRouteImport } from './routes/_workbench/_shell/help'
+import { Route as WorkbenchShellDashboardRouteImport } from './routes/_workbench/_shell/dashboard'
 import { Route as WorkbenchShellProjectsProjectIdRouteRouteImport } from './routes/_workbench/_shell/projects/$projectId/route'
 import { Route as WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdRouteRouteImport } from './routes/_workbench/_shell/projects/$projectId/workspaces/$workspaceId/route'
 import { Route as WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdIndexRouteImport } from './routes/_workbench/_shell/projects/$projectId/workspaces/$workspaceId/index'
@@ -46,6 +47,11 @@ const WorkbenchShellHistoryRoute = WorkbenchShellHistoryRouteImport.update({
 const WorkbenchShellHelpRoute = WorkbenchShellHelpRouteImport.update({
   id: '/help',
   path: '/help',
+  getParentRoute: () => WorkbenchShellRoute,
+} as any)
+const WorkbenchShellDashboardRoute = WorkbenchShellDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
   getParentRoute: () => WorkbenchShellRoute,
 } as any)
 const WorkbenchShellProjectsProjectIdRouteRoute =
@@ -80,6 +86,7 @@ const WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdChatsChatIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof WorkbenchShellIndexRoute
   '/settings': typeof WorkbenchSettingsRoute
+  '/dashboard': typeof WorkbenchShellDashboardRoute
   '/help': typeof WorkbenchShellHelpRoute
   '/history': typeof WorkbenchShellHistoryRoute
   '/projects/$projectId': typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
@@ -90,6 +97,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof WorkbenchShellIndexRoute
   '/settings': typeof WorkbenchSettingsRoute
+  '/dashboard': typeof WorkbenchShellDashboardRoute
   '/help': typeof WorkbenchShellHelpRoute
   '/history': typeof WorkbenchShellHistoryRoute
   '/projects/$projectId': typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/_workbench': typeof WorkbenchRouteWithChildren
   '/_workbench/_shell': typeof WorkbenchShellRouteWithChildren
   '/_workbench/settings': typeof WorkbenchSettingsRoute
+  '/_workbench/_shell/dashboard': typeof WorkbenchShellDashboardRoute
   '/_workbench/_shell/help': typeof WorkbenchShellHelpRoute
   '/_workbench/_shell/history': typeof WorkbenchShellHistoryRoute
   '/_workbench/_shell/': typeof WorkbenchShellIndexRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/settings'
+    | '/dashboard'
     | '/help'
     | '/history'
     | '/projects/$projectId'
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/settings'
+    | '/dashboard'
     | '/help'
     | '/history'
     | '/projects/$projectId'
@@ -134,6 +145,7 @@ export interface FileRouteTypes {
     | '/_workbench'
     | '/_workbench/_shell'
     | '/_workbench/settings'
+    | '/_workbench/_shell/dashboard'
     | '/_workbench/_shell/help'
     | '/_workbench/_shell/history'
     | '/_workbench/_shell/'
@@ -189,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/help'
       fullPath: '/help'
       preLoaderRoute: typeof WorkbenchShellHelpRouteImport
+      parentRoute: typeof WorkbenchShellRoute
+    }
+    '/_workbench/_shell/dashboard': {
+      id: '/_workbench/_shell/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof WorkbenchShellDashboardRouteImport
       parentRoute: typeof WorkbenchShellRoute
     }
     '/_workbench/_shell/projects/$projectId': {
@@ -256,6 +275,7 @@ const WorkbenchShellProjectsProjectIdRouteRouteWithChildren =
   )
 
 interface WorkbenchShellRouteChildren {
+  WorkbenchShellDashboardRoute: typeof WorkbenchShellDashboardRoute
   WorkbenchShellHelpRoute: typeof WorkbenchShellHelpRoute
   WorkbenchShellHistoryRoute: typeof WorkbenchShellHistoryRoute
   WorkbenchShellIndexRoute: typeof WorkbenchShellIndexRoute
@@ -263,6 +283,7 @@ interface WorkbenchShellRouteChildren {
 }
 
 const WorkbenchShellRouteChildren: WorkbenchShellRouteChildren = {
+  WorkbenchShellDashboardRoute: WorkbenchShellDashboardRoute,
   WorkbenchShellHelpRoute: WorkbenchShellHelpRoute,
   WorkbenchShellHistoryRoute: WorkbenchShellHistoryRoute,
   WorkbenchShellIndexRoute: WorkbenchShellIndexRoute,

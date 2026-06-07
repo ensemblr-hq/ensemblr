@@ -5,6 +5,7 @@ export type {
 } from './chat-thread';
 export { getWorkbenchMockChatThread } from './chat-thread';
 export { shellFixtureProjects } from './projects';
+export { defaultRecentGithubRepos } from './recent-github-repos';
 export { defaultRecentProjects } from './recent-projects';
 export {
 	findProject,

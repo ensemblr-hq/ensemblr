@@ -1,8 +1,27 @@
 # Onboarding Flow
 
-Date: 2026-06-04
+Date: 2026-06-07
 
 No onboarding screenshots were captured under `.context/conductor-screens/01-onboarding/`. This flow is inferred from ADR 0014 and from the setup, provider, root, repository, clone, and workspace screens in the screenshot inventory.
+
+## Implementation Status (2026-06-07)
+
+- Welcome landing UI is implemented in
+  `src/renderer/components/dashboard-welcome.tsx` and mounted from the
+  `_workbench/_shell/` index route. It renders the Ensemble wordmark plus three
+  cards: Open project, Open GitHub project, and Quick start.
+- The Open GitHub project card opens a UI-only `CloneGithubDialog`
+  (`src/renderer/components/dashboard-welcome/clone-github-dialog.tsx`) with URL
+  and destination inputs. Clone IPC wiring is future work (`ENS-019`).
+- Open project and Quick start cards are visible but not yet wired to native
+  pickers or the quick-start flow.
+- The setup gate (`src/renderer/components/setup-diagnostics/`) and its
+  remediation states (git/gh/Pi/root) are running ahead of the welcome view via
+  the loader chain; the welcome view assumes diagnostics either pass or surface
+  in the sidebar footer.
+- The project add menu in the sidebar (`workbench-shell/project-sidebar/project-creation-menu.tsx`)
+  mirrors the welcome cards (Open project, Open GitHub project, Quick start)
+  for users who already have at least one project added.
 
 ## Setup Gate Sequence
 

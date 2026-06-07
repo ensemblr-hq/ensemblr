@@ -13,6 +13,7 @@ export function isWorkbenchActiveView(
 		view === 'help' ||
 		view === 'history' ||
 		view === 'settings' ||
+		view === 'welcome' ||
 		view === 'workspace'
 	);
 }

@@ -1,16 +1,21 @@
 # Current Shell Inventory
 
-Date: 2026-06-05
+Date: 2026-06-07
 
 This inventory describes the implemented shell. Navigation is file-based
 (TanStack Router): `src/renderer/components/app.tsx` is now only the router
 `<Outlet />` host, route files live in `src/renderer/routing/routes/` (compiled
 to the generated `src/renderer/routing/routeTree.gen.ts`), and shell composition
-lives in `src/renderer/components/workbench-shell/route-layout.tsx`. Supporting
-shell code is in `src/renderer/components/workbench-shell.tsx`,
-`src/renderer/components/workbench-shell/`, `src/renderer/state/workspace`,
-`src/renderer/types/workbench-shell.ts`,
-`src/renderer/mocks/workbench/projects.ts`, `src/renderer/styles/index.css`,
+lives in `src/renderer/components/workbench-shell/route-layout/`. Supporting
+shell code is in `src/renderer/components/workbench-shell/`
+(`frame.tsx` for the chrome, `workspace-content.tsx` for the active-workspace
+content, plus private feature folders),
+`src/renderer/components/workbench-empty-state.tsx` for the no-project shell,
+`src/renderer/components/dashboard-welcome.tsx` plus
+`src/renderer/components/dashboard-welcome/` for the welcome landing view,
+`src/renderer/state/workspace`,
+`src/renderer/types/workbench-shell/` (barrel `index.ts`),
+`src/renderer/mocks/workbench/`, `src/renderer/styles/index.css`,
 `src/renderer/components/shadix-ui/`, and `src/renderer/components/ui/`. See
 `docs/adr/0026-use-file-based-tanstack-routing.md` for the routing architecture.
 Treat this shell as the product source of truth for app layout and visible
@@ -36,17 +41,31 @@ not behaviorally finalized. They remain deferred until Pi integration work.
   to descendants and renders the chrome, and Settings is a full-window route
   outside `_shell`. The active workspace and chat are URL path params; `dock` and
   `review` are validated search params.
-- `src/renderer/components/workbench-shell/route-layout.tsx` composes the shell
-  from route data and renders the frame, workspace content, and placeholder pages.
-- `src/renderer/components/workbench-shell.tsx` is the shell component entrypoint;
-  it exports the `WorkbenchFrame` chrome and `WorkspaceWorkbenchContent`. Private
-  shell components and local shell hooks live under
-  `src/renderer/components/workbench-shell/`.
+- `src/renderer/components/workbench-shell/route-layout/` composes the shell
+  from route data and renders the frame, workspace content, placeholder pages,
+  and route boundaries. Public exports come through `route-layout/index.ts`.
+- `src/renderer/components/workbench-shell/frame.tsx` exports the
+  `WorkbenchFrame` chrome; `workspace-content.tsx` exports
+  `WorkspaceWorkbenchContent`. Private feature modules live under
+  `src/renderer/components/workbench-shell/<feature>/` (e.g. `checks-panel/`,
+  `conversation-panel/`, `dock-panel/`, `navigation-sidebar/`,
+  `project-sidebar/`, `review-files/`, `right-sidebar-header/`,
+  `workspace-sidebar-item/`).
+- Cross-cutting shell state (layout flags, setup diagnostics, navigation
+  link rendering) is provided through React contexts under
+  `src/renderer/components/workbench-shell/contexts/`
+  (`WorkbenchLayoutProvider`, `SetupDiagnosticsProvider`, `NavigationProvider`).
+- `src/renderer/components/workbench-empty-state.tsx` wraps `WorkbenchFrame`
+  for the no-project / empty navigation state.
+- `src/renderer/components/dashboard-welcome.tsx` renders the no-project
+  welcome landing (wordmark + Open project / Open GitHub project / Quick start
+  cards + clone-github modal stub) and is mounted from the `_workbench/_shell/`
+  index route.
 - Durable renderer UI state that crosses shell modules lives in Jotai atoms under
   `src/renderer/state/workspace`, including per-workspace dock, review, and chat
   tab selection.
 - Shared exported shell types live under
-  `src/renderer/types/workbench-shell.ts`.
+  `src/renderer/types/workbench-shell/` (re-exported via `index.ts`).
 - Ephemeral animation and timer state can remain in component hooks when it is
   owned by one rendered surface.
 
@@ -55,7 +74,8 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 | Surface | Product capability implied | Status | Implementation notes |
 | --- | --- | --- | --- |
 | Electron workbench frame | A compact macOS desktop workbench with native-window spacing, persistent side navigation, and resizable panes. | Locked product direction | Renderer layout uses `SidebarProvider`, horizontal and vertical `ResizablePanelGroup`s, and Ensemble-owned design tokens. |
-| Left primary navigation | Dashboard, History, Help, and Settings are visible from the primary sidebar. | Implemented behavior | `Dashboard`, `History`, and `Help` navigate to route-backed shell views. `Settings` opens the separate full-window settings route with a Back to app action. |
+| Welcome landing view | First-run / no-project state shows the Ensemble wordmark and the three add-project actions inline on the main canvas. | Implemented shell behavior | `DashboardWelcome` renders Open project, Open GitHub project (mounts `CloneGithubDialog` UI-only stub), and Quick start cards from `mocks/workbench`. Clone/open IPC wiring is future work. Mounted at the `_workbench/_shell/` index route. |
+| Left primary navigation | Dashboard, History, Help, and Settings are visible from the primary sidebar. | Implemented behavior | `Dashboard` routes to a `WorkbenchPlaceholderPage` reserved for the future kanban board. `History` and `Help` navigate to route-backed shell placeholders. `Settings` opens the separate full-window settings route with a Back to app action. |
 | Sidebar project groups | Repositories/projects contain workspace rows, can collapse, and can be reordered. | Implemented behavior | Project collapse and renderer-local reorder state are live. Persistence and SQLite-backed records are future work. |
 | Pinned workspace group | Users can pin workspaces above their project groups for fast access. | Implemented behavior | Pin/unpin is renderer-local and removes pinned rows from the normal project group. Persistence is future work. |
 | Workspace rows | Workspace status, branch, change counts, selection, and archive affordance. | Locked product direction | Status icons follow the documented workspace sidebar state contract. Row selection is implemented; archive is a placeholder action. |

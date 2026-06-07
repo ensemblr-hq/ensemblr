@@ -158,9 +158,9 @@ export function CreateWorkspaceSourceDialog({
 									value={source.id}
 								>
 									<WorkspaceSourceIcon source={source} />
-									<span className='itext-xxsp-1.5 flex min-w-0 flex-1'>
+									<span className='flex min-w-0 flex-1 items-center gap-1 p-1.5'>
 										{source.reference ? (
-											<span className='shrink-0 font-mono text-[0.6875rem] text-muted-foreground'>
+											<span className='shrink-0 font-mono text-muted-foreground text-xxs'>
 												[{source.reference}]
 											</span>
 										) : null}
@@ -213,7 +213,7 @@ function WorkspaceSourceActions({
 					text-xxs
 				>
 					{action.label}
-					<span className='text-[0.6875rem] opacity-70'>{action.shortcut}</span>
+					<span className='text-xxs opacity-70'>{action.shortcut}</span>
 				</Button>
 			))}
 		</span>

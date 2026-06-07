@@ -1,0 +1,6 @@
+export { SetupDiagnosticsCompact } from './compact';
+export { SetupDiagnosticsPanel } from './panel';
+export {
+	RootDirectoryChangeContent,
+	RootDirectoryChangeDialog,
+} from './root-directory-change-dialog';
