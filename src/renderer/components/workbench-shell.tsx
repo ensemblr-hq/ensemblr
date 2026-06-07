@@ -60,8 +60,11 @@ export function WorkbenchFrame({
 	activeProject,
 	activeView,
 	activeWorkspace,
+	addProjectMenu,
 	children,
 	health,
+	onAddProject,
+	onOpenRecentProject,
 	onStaticNavigationSelect,
 	onWorkspaceSelect,
 	projects,
@@ -71,7 +74,10 @@ export function WorkbenchFrame({
 }: Pick<
 	WorkbenchShellProps,
 	| 'activeView'
+	| 'addProjectMenu'
 	| 'health'
+	| 'onAddProject'
+	| 'onOpenRecentProject'
 	| 'onStaticNavigationSelect'
 	| 'onWorkspaceSelect'
 	| 'projects'
@@ -94,7 +100,10 @@ export function WorkbenchFrame({
 					activeProject={activeProject}
 					activeView={activeView}
 					activeWorkspace={activeWorkspace}
+					addProjectMenu={addProjectMenu}
 					health={health}
+					onAddProject={onAddProject}
+					onOpenRecentProject={onOpenRecentProject}
 					onStaticNavigationSelect={onStaticNavigationSelect}
 					onWorkspaceSelect={onWorkspaceSelect}
 					projectNavigation={projectNavigation}

@@ -1,9 +1,12 @@
 import type { ReactElement } from 'react';
 
 import type {
+	AddProjectActionId,
+	AddProjectMenuModel,
 	ComposerShellState,
 	DockTabId,
 	ProjectShellModel,
+	RecentProject,
 	ReviewPanelTab,
 	SessionTabModel,
 	WorkbenchRouteSearch,
@@ -43,11 +46,14 @@ export interface WorkbenchShellProps {
 	activeSession: SessionTabModel;
 	activeView: 'dashboard' | 'help' | 'history' | 'settings' | 'workspace';
 	activeWorkspace: WorkspaceShellModel;
+	addProjectMenu?: AddProjectMenuModel;
 	composer: ComposerShellState;
 	dockActions: WorkbenchDockActions;
 	dockTabId: DockTabId;
 	health: WorkbenchHealth;
+	onAddProject?: (action: AddProjectActionId) => void;
 	onDockTabChange: (tab: DockTabId) => void;
+	onOpenRecentProject?: (recent: RecentProject) => void;
 	onReviewTabChange: (tab: ReviewPanelTab) => void;
 	onSessionTabChange: (sessionId: string) => void;
 	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
