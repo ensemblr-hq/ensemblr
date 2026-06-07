@@ -28,11 +28,9 @@ import type {
 import type { ChangesViewMode } from '@/renderer/types/workbench-shell';
 
 import { ChecksPanel } from './checks-panel/checks-panel';
-import {
-	AllFilesList,
-	AllFilesSearchDialog,
-	ReviewFileList,
-} from './review-files';
+import { AllFilesList } from './review-files/all-files-list';
+import { AllFilesSearchDialog } from './review-files/all-files-search-dialog';
+import { ReviewFileList } from './review-files/review-file-list';
 
 /** Tabbed review surface for files, changes, and checks. */
 export function ReviewPanel({

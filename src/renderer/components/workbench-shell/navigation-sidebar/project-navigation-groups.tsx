@@ -19,7 +19,7 @@ import type {
 } from '@/renderer/types/workbench-shell';
 
 import { CreateWorkspaceSourceDialog } from '../create-workspace-source-dialog';
-import { ProjectCreationMenu } from '../project-sidebar';
+import { ProjectCreationMenu } from '../project-sidebar/project-creation-menu';
 import { ProjectWorkspaceGroup } from './project-workspace-group';
 
 /** Reorderable list of project groups plus the create-workspace dialog mount. */

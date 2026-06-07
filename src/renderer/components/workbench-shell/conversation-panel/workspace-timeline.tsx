@@ -23,6 +23,10 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
+type ChatToolActivity = WorkbenchMockChatTool;
+
+const EMPTY_CHAT_TOOLS: ChatToolActivity[] = [];
+
 /** Scrollable timeline content shown above the composer. */
 export function WorkspaceTimeline({
 	activeSession,
@@ -115,7 +119,7 @@ function ChatMessage({
 	speaker,
 	status,
 	time,
-	tools = [],
+	tools = EMPTY_CHAT_TOOLS,
 }: {
 	author: string;
 	body: string[];
@@ -195,8 +199,6 @@ function ChatAvatar({
 		</div>
 	);
 }
-
-type ChatToolActivity = WorkbenchMockChatTool;
 
 const chatToolIconByName: Record<ChatToolActivity['icon'], LucideIcon> = {
 	check: CheckCircle2Icon,

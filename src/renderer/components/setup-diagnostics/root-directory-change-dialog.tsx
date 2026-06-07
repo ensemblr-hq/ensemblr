@@ -13,11 +13,9 @@ import type {
 	RootDirectorySelectionResult,
 } from '@/shared/ipc';
 
-import {
-	RootDirectoryApplyResult,
-	RootDirectoryDiagnostics,
-	RootPathPreview,
-} from './root-path-preview';
+import { RootDirectoryApplyResult } from './root-directory-apply-result';
+import { RootDirectoryDiagnostics } from './root-directory-diagnostics';
+import { RootPathPreview } from './root-path-preview';
 
 /** Modal dialog wrapping the root-directory change flow. */
 export function RootDirectoryChangeDialog({

@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -26,15 +26,29 @@ export function CloneGithubDialog({
 	open,
 	recentRepos,
 }: CloneGithubDialogProps) {
+	return (
+		<Dialog onOpenChange={onOpenChange} open={open}>
+			<DialogContent className='gap-3 sm:max-w-md'>
+				<CloneGithubDialogForm
+					key={open ? 'open' : 'closed'}
+					onOpenChange={onOpenChange}
+					recentRepos={recentRepos}
+				/>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+/** State-owned clone form content that resets when the dialog open state changes. */
+function CloneGithubDialogForm({
+	onOpenChange,
+	recentRepos,
+}: {
+	onOpenChange: (open: boolean) => void;
+	recentRepos: RecentGithubRepo[];
+}) {
 	const [url, setUrl] = useState('');
 	const [location, setLocation] = useState(DEFAULT_LOCATION);
-
-	useEffect(() => {
-		if (!open) {
-			setUrl('');
-			setLocation(DEFAULT_LOCATION);
-		}
-	}, [open]);
 
 	const canClone = url.trim().length > 0;
 
@@ -57,84 +71,80 @@ export function CloneGithubDialog({
 	);
 
 	return (
-		<Dialog onOpenChange={onOpenChange} open={open}>
-			<DialogContent className='gap-3 sm:max-w-md'>
-				<DialogHeader>
-					<DialogTitle className='font-medium text-[0.9375rem]'>
-						Clone GitHub repo
-					</DialogTitle>
-				</DialogHeader>
+		<>
+			<DialogHeader>
+				<DialogTitle className='font-medium text-[0.9375rem]'>
+					Clone GitHub repo
+				</DialogTitle>
+			</DialogHeader>
 
-				<div className='flex flex-col gap-1.5'>
-					<Label className='text-xs' htmlFor='clone-github-url'>
-						Repository URL
-					</Label>
+			<div className='flex flex-col gap-1.5'>
+				<Label className='text-xs' htmlFor='clone-github-url'>
+					Repository URL
+				</Label>
+				<Input
+					autoFocus
+					className='h-9'
+					id='clone-github-url'
+					onChange={(event) => setUrl(event.target.value)}
+					onKeyDown={handleSubmitKey}
+					placeholder='https://github.com/user/repo.git'
+					value={url}
+				/>
+			</div>
+
+			<div className='flex flex-col gap-1.5'>
+				<Label className='text-xs'>Recent repos</Label>
+				<RecentReposList
+					onSelect={(repo) => setUrl(`https://github.com/${repo.fullName}.git`)}
+					repos={recentRepos}
+					selectedUrl={url}
+				/>
+			</div>
+
+			<div className='flex flex-col gap-1.5'>
+				<Label className='text-xs' htmlFor='clone-github-location'>
+					Location
+				</Label>
+				<div className='flex gap-2'>
 					<Input
-						autoFocus
-						className='h-9'
-						id='clone-github-url'
-						onChange={(event) => setUrl(event.target.value)}
+						className='h-9 flex-1 font-mono text-xs'
+						id='clone-github-location'
+						onChange={(event) => setLocation(event.target.value)}
 						onKeyDown={handleSubmitKey}
-						placeholder='https://github.com/user/repo.git'
-						value={url}
+						value={location}
 					/>
-				</div>
-
-				<div className='flex flex-col gap-1.5'>
-					<Label className='text-xs'>Recent repos</Label>
-					<RecentReposList
-						onSelect={(repo) =>
-							setUrl(`https://github.com/${repo.fullName}.git`)
-						}
-						repos={recentRepos}
-						selectedUrl={url}
-					/>
-				</div>
-
-				<div className='flex flex-col gap-1.5'>
-					<Label className='text-xs' htmlFor='clone-github-location'>
-						Location
-					</Label>
-					<div className='flex gap-2'>
-						<Input
-							className='h-9 flex-1 font-mono text-xs'
-							id='clone-github-location'
-							onChange={(event) => setLocation(event.target.value)}
-							onKeyDown={handleSubmitKey}
-							value={location}
-						/>
-						<Button
-							className='h-9'
-							onClick={() => {
-								/* TODO: wire to native folder picker */
-							}}
-							type='button'
-							variant='outline'
-						>
-							Browse
-						</Button>
-					</div>
-				</div>
-
-				<div className='-mx-4 -mb-4 flex justify-end rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
 					<Button
-						className='h-8 gap-2'
-						disabled={!canClone}
-						onClick={handleClone}
+						className='h-9'
+						onClick={() => {
+							/* TODO: wire to native folder picker */
+						}}
 						type='button'
-						variant='default'
+						variant='outline'
 					>
-						Clone repo
-						<span
-							aria-hidden='true'
-							className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'
-						>
-							⌘↵
-						</span>
+						Browse
 					</Button>
 				</div>
-			</DialogContent>
-		</Dialog>
+			</div>
+
+			<div className='-mx-4 -mb-4 flex justify-end rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
+				<Button
+					className='h-8 gap-2'
+					disabled={!canClone}
+					onClick={handleClone}
+					type='button'
+					variant='default'
+				>
+					Clone repo
+					<span
+						aria-hidden='true'
+						className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'
+					>
+						⌘↵
+					</span>
+				</Button>
+			</div>
+		</>
 	);
 }
 
@@ -150,20 +160,16 @@ function RecentReposList({
 	selectedUrl,
 }: RecentReposListProps) {
 	return (
-		<ul
-			className='flex max-h-44 flex-col overflow-y-auto rounded-lg border border-border bg-background/40'
-			role='listbox'
-		>
+		<ul className='flex max-h-44 flex-col overflow-y-auto rounded-lg border border-border bg-background/40'>
 			{repos.map((repo) => {
 				const expectedUrl = `https://github.com/${repo.fullName}.git`;
 				const isSelected = selectedUrl === expectedUrl;
 				return (
-					<li key={repo.fullName} role='presentation'>
+					<li key={repo.fullName}>
 						<button
-							aria-selected={isSelected}
-							className='flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-muted/60 aria-selected:bg-muted'
+							aria-pressed={isSelected}
+							className='flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-muted/60 aria-pressed:bg-muted'
 							onClick={() => onSelect(repo)}
-							role='option'
 							type='button'
 						>
 							<span

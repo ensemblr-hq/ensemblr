@@ -10,7 +10,7 @@ import type {
 } from '@/renderer/types/workbench';
 import type { WorkbenchStaticNavigationTarget } from '@/renderer/types/workbench-shell';
 
-import { ProjectSidebarHeader } from '../project-sidebar';
+import { ProjectSidebarHeader } from '../project-sidebar/project-sidebar-header';
 import { WorkspaceSidebarItem } from '../workspace-sidebar-item/workspace-sidebar-item';
 
 /** Collapsible per-project workspace group rendered inside the reorder list. */

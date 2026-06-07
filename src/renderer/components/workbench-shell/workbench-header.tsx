@@ -27,7 +27,7 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
-import { useWorkbenchLayout } from './contexts';
+import { useWorkbenchLayout } from './contexts/layout-context';
 import { ProjectAvatar } from './project-avatar';
 
 /** Top toolbar showing project/workspace path, open-in menu and sidebar toggle. */

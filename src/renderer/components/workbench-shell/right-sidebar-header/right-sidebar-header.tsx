@@ -96,16 +96,15 @@ function RightSidebarHeaderAction({
 		case 'pr-working':
 		case 'pr-checking':
 			return (
-				<div
+				<output
 					aria-label='Pull request activity in progress'
 					className='grid size-7 place-items-center text-muted-foreground'
-					role='status'
 				>
 					<LoaderCircleIcon
 						aria-hidden='true'
 						className='size-4 animate-spin'
 					/>
-				</div>
+				</output>
 			);
 		case 'create-pr':
 			return <CreatePullRequestMenu />;

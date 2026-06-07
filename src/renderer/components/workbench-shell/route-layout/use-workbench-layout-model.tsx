@@ -77,16 +77,26 @@ export function useWorkbenchLayoutModel({
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const hasPreloadBridge = isEnsembleApiAvailable();
-	const health = useQuery({
+	const { data: healthData, error: healthErrorResult } = useQuery({
 		...healthQuery,
 		enabled: hasPreloadBridge,
 	});
-	const repositoryWorkspaceNavigation = useQuery({
+	const {
+		data: repositoryWorkspaceNavigationData,
+		isFetching: isRepositoryWorkspaceNavigationFetching,
+		isLoading: isRepositoryWorkspaceNavigationLoading,
+		isPlaceholderData: isRepositoryWorkspaceNavigationPlaceholderData,
+	} = useQuery({
 		...repositoryWorkspaceNavigationQuery,
 		enabled: hasPreloadBridge,
 		placeholderData: keepPreviousData,
 	});
-	const setupDiagnostics = useQuery({
+	const {
+		data: setupDiagnosticsData,
+		error: setupDiagnosticsErrorResult,
+		isFetching: isSetupDiagnosticsFetching,
+		refetch: refetchSetupDiagnostics,
+	} = useQuery({
 		...setupDiagnosticsQuery,
 		enabled: hasPreloadBridge,
 	});
@@ -102,9 +112,9 @@ export function useWorkbenchLayoutModel({
 	const dockTabsByWorkspace = useAtomValue(activeDockTabByWorkspaceAtom);
 	const chatTabsByWorkspace = useAtomValue(activeChatTabByWorkspaceAtom);
 	const setupError =
-		getErrorMessage(setupDiagnostics.error) ?? loaderData.setupError;
+		getErrorMessage(setupDiagnosticsErrorResult) ?? loaderData.setupError;
 	const setupSnapshot =
-		setupDiagnostics.data ?? loaderData.setupSnapshot ?? null;
+		setupDiagnosticsData ?? loaderData.setupSnapshot ?? null;
 	const cachedNavigationSnapshot =
 		queryClient.getQueryData<RepositoryWorkspaceNavigationSnapshot>(
 			repositoryWorkspaceNavigationQuery.queryKey,
@@ -112,7 +122,7 @@ export function useWorkbenchLayoutModel({
 	const navigationSnapshot = getRenderableNavigationSnapshot({
 		cachedSnapshot: cachedNavigationSnapshot,
 		querySnapshot:
-			repositoryWorkspaceNavigation.data ??
+			repositoryWorkspaceNavigationData ??
 			loaderData.navigationSnapshot ??
 			undefined,
 	});
@@ -148,9 +158,9 @@ export function useWorkbenchLayoutModel({
 				canUsePreviousState:
 					hasPreloadBridge &&
 					!currentSelection &&
-					(repositoryWorkspaceNavigation.isLoading ||
-						repositoryWorkspaceNavigation.isFetching ||
-						repositoryWorkspaceNavigation.isPlaceholderData ||
+					(isRepositoryWorkspaceNavigationLoading ||
+						isRepositoryWorkspaceNavigationFetching ||
+						isRepositoryWorkspaceNavigationPlaceholderData ||
 						!navigationSnapshot),
 				previousState: lastWorkspaceNavigationRenderState,
 				projects,
@@ -164,9 +174,9 @@ export function useWorkbenchLayoutModel({
 			lastWorkspaceNavigationRenderState,
 			navigationSnapshot,
 			projects,
-			repositoryWorkspaceNavigation.isFetching,
-			repositoryWorkspaceNavigation.isLoading,
-			repositoryWorkspaceNavigation.isPlaceholderData,
+			isRepositoryWorkspaceNavigationFetching,
+			isRepositoryWorkspaceNavigationLoading,
+			isRepositoryWorkspaceNavigationPlaceholderData,
 			routeState.routeProjectId,
 			routeState.routeWorkspaceId,
 		],
@@ -174,19 +184,19 @@ export function useWorkbenchLayoutModel({
 	const displayProjects = navigationRenderState?.projects ?? projects;
 	const displaySelection = navigationRenderState?.selection ?? null;
 	const healthError =
-		getErrorMessage(health.error) ?? loaderData.healthError ?? null;
+		getErrorMessage(healthErrorResult) ?? loaderData.healthError ?? null;
 	const shellHealth = useMemo<WorkbenchHealth>(
 		() =>
 			getWorkbenchHealth({
 				hasPreloadBridge,
 				healthError,
-				healthSnapshot: health.data ?? loaderData.healthSnapshot ?? null,
+				healthSnapshot: healthData ?? loaderData.healthSnapshot ?? null,
 				setupError,
 				setupSnapshot,
 			}),
 		[
 			hasPreloadBridge,
-			health.data,
+			healthData,
 			healthError,
 			loaderData.healthSnapshot,
 			setupError,
@@ -301,9 +311,9 @@ export function useWorkbenchLayoutModel({
 	// freshly opened project to the top of the list.
 	const onSetupDiagnosticsRetry = useCallback(() => {
 		if (hasPreloadBridge) {
-			void setupDiagnostics.refetch();
+			void refetchSetupDiagnostics();
 		}
-	}, [hasPreloadBridge, setupDiagnostics.refetch]);
+	}, [hasPreloadBridge, refetchSetupDiagnostics]);
 
 	const model: WorkbenchLayoutModel = {
 		activeProject: displaySelection?.project ?? null,
@@ -324,7 +334,7 @@ export function useWorkbenchLayoutModel({
 		state: {
 			setupDiagnostics: setupSnapshot,
 			setupDiagnosticsError: setupError,
-			isSetupDiagnosticsRetrying: setupDiagnostics.isFetching,
+			isSetupDiagnosticsRetrying: isSetupDiagnosticsFetching,
 		},
 		actions: {
 			onSetupDiagnosticsRetry,

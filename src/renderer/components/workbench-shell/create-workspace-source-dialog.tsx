@@ -158,7 +158,7 @@ export function CreateWorkspaceSourceDialog({
 									value={source.id}
 								>
 									<WorkspaceSourceIcon source={source} />
-									<span className='itext-xxsp-1.5 flex min-w-0 flex-1'>
+									<span className='flex min-w-0 flex-1 items-center gap-1 p-1.5'>
 										{source.reference ? (
 											<span className='shrink-0 font-mono text-muted-foreground text-xxs'>
 												[{source.reference}]

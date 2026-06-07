@@ -14,7 +14,7 @@ import type {
 } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 
-import { useWorkbenchLayout } from './contexts';
+import { useWorkbenchLayout } from './contexts/layout-context';
 import { DockPanel } from './dock-panel/dock-panel';
 import { ReviewPanel } from './review-panel';
 import { RightSidebarHeader } from './right-sidebar-header/right-sidebar-header';
