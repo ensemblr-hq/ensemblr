@@ -11,6 +11,7 @@ import {
 } from '@/renderer/components/ui/card';
 import { cn } from '@/renderer/lib/utils';
 
+/** Props for {@link ShellPanel}. */
 interface ShellPanelProps {
 	action?: ReactNode;
 	children: ReactNode;
@@ -22,6 +23,7 @@ interface ShellPanelProps {
 	title: string;
 }
 
+/** Card-shaped panel used to group setup, status and configuration sections. */
 export function ShellPanel({
 	action,
 	children,
@@ -40,7 +42,7 @@ export function ShellPanel({
 			<CardHeader className='gap-1.5 border-border border-b px-3 py-2.5'>
 				<div className='flex min-w-0 flex-col gap-0.5'>
 					{eyebrow ? (
-						<p className='font-medium text-[0.6875rem] text-muted-foreground uppercase tracking-wide'>
+						<p className='font-medium text-muted-foreground text-xxs uppercase tracking-wide'>
 							{eyebrow}
 						</p>
 					) : null}

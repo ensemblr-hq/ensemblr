@@ -11,6 +11,7 @@ import {
 	trackMainWindowState,
 } from './window-state';
 
+/** Options for {@link createMainWindow}. */
 interface CreateMainWindowOptions {
 	windowStateStore?: MainWindowStateStore;
 }
@@ -23,6 +24,12 @@ const macosChromeOptions =
 			}
 		: {};
 
+/**
+ * Creates the Ensemble main BrowserWindow, restoring persisted bounds and
+ * wiring the Vite-served renderer (dev URL or built bundle).
+ * @param options - Optional dependencies including the persisted window-state store.
+ * @returns The created {@link BrowserWindow}.
+ */
 export function createMainWindow({
 	windowStateStore,
 }: CreateMainWindowOptions = {}): BrowserWindow {
@@ -70,6 +77,12 @@ export function createMainWindow({
 	return mainWindow;
 }
 
+/**
+ * Applies persisted window-state flags (e.g. maximized) once the window is
+ * ready to show. Full-screen restoration is handled by the caller.
+ * @param mainWindow - The window to update.
+ * @param state - Persisted state to apply, or `null` to leave defaults.
+ */
 function restoreMainWindowState(
 	mainWindow: BrowserWindow,
 	state: MainWindowState | null,

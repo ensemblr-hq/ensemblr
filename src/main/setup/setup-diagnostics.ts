@@ -28,19 +28,23 @@ import type {
 import type { EnsembleRootDirectoryService } from '../root/root-directory';
 import type { EnsembleDatabaseService } from '../storage/database';
 
+/** Public surface of the setup-diagnostics service. */
 export interface SetupDiagnosticsService {
 	getSnapshot: () => Promise<SetupDiagnosticsSnapshot>;
 }
 
+/** Shared context passed to every {@link SetupCheckProvider}. */
 export interface SetupCheckProviderContext {
 	homeDirectory: string;
 	now: () => Date;
 }
 
+/** Function that produces one {@link SetupCheckSnapshot} for the diagnostics view. */
 export type SetupCheckProvider = (
 	context: SetupCheckProviderContext,
 ) => Promise<SetupCheckSnapshot> | SetupCheckSnapshot;
 
+/** Options for {@link createSetupDiagnosticsService}. */
 interface CreateSetupDiagnosticsServiceOptions {
 	checkProviders?: Partial<Record<SetupCheckId, SetupCheckProvider>>;
 	configService: EnsembleConfigService;
@@ -83,6 +87,12 @@ const GIT_VERSION_TIMEOUT_MS = 3000;
 const GITHUB_CLI_TIMEOUT_MS = 3000;
 const GITHUB_AUTH_TIMEOUT_MS = 5000;
 
+/**
+ * Builds the diagnostics service that orchestrates every setup check, allowing
+ * callers to override individual checks via `checkProviders` for tests.
+ * @param options - Service dependencies and provider overrides.
+ * @returns A {@link SetupDiagnosticsService}.
+ */
 export function createSetupDiagnosticsService({
 	checkProviders = {},
 	configService,
@@ -162,6 +172,12 @@ export function createSetupDiagnosticsService({
 	};
 }
 
+/**
+ * Helper that builds a complete {@link SetupCheckSnapshot} from a partial input,
+ * defaulting logs, remediation actions and timestamp.
+ * @param check - Required fields plus optional overrides for defaults.
+ * @returns A fully-populated snapshot.
+ */
 export function createSetupCheckSnapshot(
 	check: Omit<SetupCheckSnapshot, 'logs' | 'remediationActions' | 'updatedAt'> &
 		Partial<
@@ -182,6 +198,7 @@ export function createSetupCheckSnapshot(
 	};
 }
 
+/** Builds the snapshot for the declarative-config setup check. */
 function getConfigCheck({
 	configService,
 	context,
@@ -234,6 +251,7 @@ function getConfigCheck({
 	});
 }
 
+/** Builds the snapshot for the environment-variables setup check. */
 async function getEnvironmentVariablesCheck({
 	context,
 	environmentVariablesService,
@@ -302,6 +320,7 @@ async function getEnvironmentVariablesCheck({
 	}
 }
 
+/** Builds the snapshot for the SQLite database setup check. */
 function getDatabaseCheck({
 	context,
 	databaseService,
@@ -351,6 +370,7 @@ function getDatabaseCheck({
 	});
 }
 
+/** Builds the snapshot for the Ensemble root-directory setup check. */
 function getRootDirectoryCheck({
 	context,
 	rootDirectoryService,
@@ -411,6 +431,7 @@ function getRootDirectoryCheck({
 	});
 }
 
+/** Builds the snapshot for the managed-directories setup check. */
 function getManagedDirectoriesCheck({
 	context,
 	rootDirectoryService,
@@ -459,6 +480,7 @@ function getManagedDirectoriesCheck({
 	});
 }
 
+/** Builds the snapshot for the shell-process-launch setup check. */
 async function getShellProcessCheck({
 	context,
 	localCommandService,
@@ -550,6 +572,7 @@ async function getShellProcessCheck({
 	}
 }
 
+/** Builds the snapshot for the `git --version` setup check. */
 async function getGitExecutableCheck({
 	context,
 	localCommandService,
@@ -641,6 +664,7 @@ async function getGitExecutableCheck({
 	}
 }
 
+/** Builds the snapshot for the `gh --version` setup check. */
 async function getGitHubCliCheck({
 	context,
 	localCommandService,
@@ -728,6 +752,7 @@ async function getGitHubCliCheck({
 	}
 }
 
+/** Builds the snapshot for the `gh auth status` setup check. */
 async function getGitHubAuthCheck({
 	context,
 	localCommandService,
@@ -810,6 +835,7 @@ async function getGitHubAuthCheck({
 	}
 }
 
+/** Builds the snapshot for the Pi agent-directory readiness check. */
 async function getPiAgentDirectoryCheck({
 	context,
 	piReadinessService,
@@ -866,6 +892,7 @@ async function getPiAgentDirectoryCheck({
 	}
 }
 
+/** Builds the snapshot for the Pi RPC startup smoke check. */
 async function getPiRpcCheck({
 	context,
 	piReadinessService,
@@ -925,6 +952,7 @@ async function getPiRpcCheck({
 	}
 }
 
+/** Builds the snapshot for the Pi provider/model readiness check. */
 async function getPiProviderModelCheck({
 	context,
 	piReadinessService,
@@ -986,6 +1014,7 @@ async function getPiProviderModelCheck({
 	}
 }
 
+/** Builds the snapshot for the Pi executable discovery check. */
 async function getPiExecutableCheck({
 	context,
 	piExecutableService,
@@ -1055,6 +1084,7 @@ async function getPiExecutableCheck({
 	}
 }
 
+/** Builds the remediation actions surfaced by the Pi executable check. */
 function createPiExecutableRemediationActions(
 	executable?: PiExecutableSnapshot,
 ): SetupRemediationAction[] {
@@ -1078,6 +1108,7 @@ function createPiExecutableRemediationActions(
 	return actions;
 }
 
+/** Renders the headline detail string for the env-vars check. */
 function getEnvironmentVariablesDetail(
 	snapshot: EnvironmentVariablesSnapshot,
 ): string {
@@ -1098,6 +1129,7 @@ function getEnvironmentVariablesDetail(
 	return `${configuredCount} configured variables, ${maskedCount} masked secrets, and ${reservedCount} reserved runtime variables are cataloged.`;
 }
 
+/** Renders the per-variable counts and diagnostics as setup check logs. */
 function createEnvironmentVariablesLogs(
 	snapshot: EnvironmentVariablesSnapshot,
 ): SetupCheckLogSnapshot[] {
@@ -1137,6 +1169,7 @@ function createEnvironmentVariablesLogs(
 	];
 }
 
+/** Renders a {@link LocalCommandResult} as a setup check log set. */
 function createCommandLogs(
 	result: LocalCommandResult,
 ): SetupCheckLogSnapshot[] {
@@ -1173,6 +1206,7 @@ function createCommandLogs(
 	return logs;
 }
 
+/** Renders Pi agent-directory metadata as setup check logs. */
 function createPiAgentDirectoryLogs(
 	agentDirectory: PiAgentDirectorySnapshot,
 ): SetupCheckLogSnapshot[] {
@@ -1194,6 +1228,7 @@ function createPiAgentDirectoryLogs(
 	];
 }
 
+/** Renders Pi RPC smoke metadata as setup check logs. */
 function createPiRpcLogs(rpc: PiRpcSmokeSnapshot): SetupCheckLogSnapshot[] {
 	const logs: SetupCheckLogSnapshot[] = [
 		{
@@ -1239,6 +1274,7 @@ function createPiRpcLogs(rpc: PiRpcSmokeSnapshot): SetupCheckLogSnapshot[] {
 	return logs;
 }
 
+/** Renders Pi provider/model metadata as setup check logs. */
 function createPiProviderModelLogs(
 	providerModels: PiProviderModelSnapshot,
 ): SetupCheckLogSnapshot[] {
@@ -1274,6 +1310,7 @@ function createPiProviderModelLogs(
 	];
 }
 
+/** Renders Pi executable metadata as setup check logs. */
 function createPiExecutableLogs(
 	executable: Awaited<ReturnType<PiExecutableService['getSnapshot']>>,
 ): SetupCheckLogSnapshot[] {
@@ -1312,12 +1349,14 @@ function createPiExecutableLogs(
 	return logs;
 }
 
+/** Renders the Pi agent directory source as a human-readable label. */
 function formatPiAgentDirectorySource(source: PiAgentDirectorySource): string {
 	return source === 'environment'
 		? 'PI_CODING_AGENT_DIR'
 		: 'Pi default ~/.pi/agent';
 }
 
+/** Picks the headline failure detail for the Pi agent-directory check. */
 function getPiAgentDirectoryFailureDetail(
 	agentDirectory: PiAgentDirectorySnapshot,
 ): string {
@@ -1332,6 +1371,7 @@ function getPiAgentDirectoryFailureDetail(
 	);
 }
 
+/** Renders the Pi executable source as a human-readable label. */
 function formatSourceLabel(
 	source: Awaited<ReturnType<PiExecutableService['getSnapshot']>>['source'],
 ): string {
@@ -1357,6 +1397,7 @@ function formatSourceLabel(
 	}
 }
 
+/** Renders the Pi executable probe result as a short string. */
 function formatProbeDetail(
 	executable: Awaited<ReturnType<PiExecutableService['getSnapshot']>>,
 ): string {
@@ -1367,6 +1408,7 @@ function formatProbeDetail(
 	return `${executable.probe.kind} probe returned: ${executable.probe.detail}`;
 }
 
+/** Picks the headline failure detail for the Pi executable check. */
 function getPiExecutableFailureDetail(
 	diagnostics: Awaited<
 		ReturnType<PiExecutableService['getSnapshot']>
@@ -1382,6 +1424,7 @@ function getPiExecutableFailureDetail(
 	);
 }
 
+/** Returns the first non-empty trimmed line of `output`, or `null`. */
 function getFirstOutputLine(output: string): string | null {
 	const line = output
 		.split(/\r?\n/)
@@ -1391,6 +1434,7 @@ function getFirstOutputLine(output: string): string | null {
 	return line ?? null;
 }
 
+/** Maps a `git --version` failure to a user-facing message. */
 function getGitFailureDetail(result: LocalCommandResult): string {
 	switch (result.failure?.code) {
 		case 'command-not-found':
@@ -1406,6 +1450,7 @@ function getGitFailureDetail(result: LocalCommandResult): string {
 	}
 }
 
+/** Maps a `gh --version` failure to a user-facing message. */
 function getGitHubCliFailureDetail(result: LocalCommandResult): string {
 	switch (result.failure?.code) {
 		case 'command-not-found':
@@ -1421,6 +1466,7 @@ function getGitHubCliFailureDetail(result: LocalCommandResult): string {
 	}
 }
 
+/** Maps a `gh auth status` failure to a user-facing message. */
 function getGitHubAuthFailureDetail(result: LocalCommandResult): string {
 	switch (result.failure?.code) {
 		case 'command-not-found':
@@ -1434,6 +1480,7 @@ function getGitHubAuthFailureDetail(result: LocalCommandResult): string {
 	}
 }
 
+/** Builds a `pending` setup check snapshot for not-yet-implemented checks. */
 function createPendingCheck({
 	blocking = true,
 	detail,
@@ -1464,6 +1511,13 @@ function createPendingCheck({
 	});
 }
 
+/**
+ * Aggregates per-check results into the top-level diagnostics snapshot, deriving
+ * blocked/checking/ready status from blocking-check outcomes.
+ * @param checks - Per-check snapshots, in display order.
+ * @param generatedAt - ISO timestamp of the aggregate snapshot.
+ * @returns A {@link SetupDiagnosticsSnapshot}.
+ */
 function createDiagnosticsSnapshot(
 	checks: SetupCheckSnapshot[],
 	generatedAt: string,
@@ -1496,10 +1550,12 @@ function createDiagnosticsSnapshot(
 	};
 }
 
+/** Returns true when the check status counts as a pass (success or warning). */
 function isPassingStatus(status: SetupCheckSnapshot['status']): boolean {
 	return status === 'success' || status === 'warning';
 }
 
+/** Applies home-directory collapse and secret redaction to a check snapshot. */
 function sanitizeCheck(
 	check: SetupCheckSnapshot,
 	homeDirectory: string,
@@ -1514,6 +1570,13 @@ function sanitizeCheck(
 	};
 }
 
+/**
+ * Renders text safely for diagnostic display by collapsing the user's home
+ * directory to `~` and redacting GitHub tokens and secret-shaped assignments.
+ * @param text - Raw text to sanitise.
+ * @param homeDirectory - Home directory to collapse.
+ * @returns Safe text suitable for surfacing in the UI.
+ */
 function formatSafeText(text: string, homeDirectory: string): string {
 	const collapsedHome = homeDirectory
 		? text.replaceAll(homeDirectory, '~')

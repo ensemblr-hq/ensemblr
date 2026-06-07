@@ -39,6 +39,7 @@ import { getRepositoryWorkspaceNavigationSnapshot } from './repository-workspace
 
 const MAX_ENSURED_WINDOW_WIDTH = 2400;
 
+/** Dependency bundle wired into the renderer-facing IPC handlers. */
 interface RegisterIpcHandlersOptions {
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
@@ -50,6 +51,11 @@ interface RegisterIpcHandlersOptions {
 	settingsResolutionService: EnsembleConfigResolutionService;
 }
 
+/**
+ * Registers every renderer-facing `ipcMain` handler against the
+ * preload-bridge contracts in {@link IPC_CHANNELS}.
+ * @param options - Service dependencies the handlers delegate to.
+ */
 export function registerIpcHandlers({
 	configService,
 	databaseService,
@@ -184,6 +190,7 @@ export function registerIpcHandlers({
 		},
 	);
 
+	/** Wraps {@link isRepositoryConfigPathAllowed} with the current database connection. */
 	function isAllowedRepositoryConfigPath(repositoryPath: string): boolean {
 		return isRepositoryConfigPathAllowed({
 			database: databaseService.getConnection()?.database ?? null,
@@ -285,6 +292,7 @@ export function registerIpcHandlers({
 	);
 }
 
+/** Coerces an IPC payload into a {@link RootDirectoryChangeRequest}. */
 function normalizeRootDirectoryChangeRequest(
 	request: unknown,
 ): RootDirectoryChangeRequest {
@@ -300,6 +308,7 @@ function normalizeRootDirectoryChangeRequest(
 	return { path: request.path.trim() };
 }
 
+/** Coerces an IPC payload into a {@link RepositoryConfigRequest}. */
 function normalizeRepositoryConfigRequest(
 	request: unknown,
 ): RepositoryConfigRequest {
@@ -315,6 +324,7 @@ function normalizeRepositoryConfigRequest(
 	return { repositoryPath: request.repositoryPath.trim() };
 }
 
+/** Coerces an IPC payload into a {@link RepositoryConfigMigrationRequest}. */
 function normalizeRepositoryConfigMigrationRequest(
 	request: unknown,
 ): RepositoryConfigMigrationRequest {
@@ -334,6 +344,7 @@ function normalizeRepositoryConfigMigrationRequest(
 	};
 }
 
+/** Returns a synthetic snapshot used when a path is not authorised. */
 function createDeniedRepositoryConfigSnapshot(
 	repositoryPath: string,
 ): RepositoryConfigSnapshot {
@@ -352,6 +363,7 @@ function createDeniedRepositoryConfigSnapshot(
 	};
 }
 
+/** Returns a synthetic migration preview used when a path is not authorised. */
 function createDeniedRepositoryConfigMigrationPreview(
 	repositoryPath: string,
 ): RepositoryConfigMigrationPreview {

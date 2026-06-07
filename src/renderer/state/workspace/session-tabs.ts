@@ -6,6 +6,12 @@ import type {
 import type { SessionTabState } from '@/renderer/types/workbench-shell';
 import { closedSessionIdsByWorkspaceAtom } from './atoms';
 
+/**
+ * React hook that exposes session-tab state for a workspace — visible vs.
+ * closed sessions plus close/restore helpers backed by a persisted atom.
+ * @param input - Active session/workspace plus tab-change callback.
+ * @returns A {@link SessionTabState} for the conversation bar.
+ */
 export function useSessionTabState({
 	activeSession,
 	activeWorkspace,
@@ -34,6 +40,7 @@ export function useSessionTabState({
 		sessionTabs[0] ??
 		activeSession;
 
+	/** Persists a session as closed and advances to a neighboring tab. */
 	const closeSessionTab = (sessionId: string) => {
 		if (sessionTabs.length <= 1) {
 			return;
@@ -64,6 +71,7 @@ export function useSessionTabState({
 			onSessionTabChange(nextSession.id);
 		}
 	};
+	/** Re-opens a previously-closed session tab and activates it. */
 	const restoreSessionTab = (sessionId: string) => {
 		setClosedSessionIdsByWorkspace((current) => {
 			const workspaceClosedIds = current[activeWorkspace.id] ?? [];

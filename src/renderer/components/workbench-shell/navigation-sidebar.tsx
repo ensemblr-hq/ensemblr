@@ -51,6 +51,7 @@ const healthTone: Record<WorkbenchHealth['state'], 'muted' | 'ok' | 'warning'> =
 		unavailable: 'warning',
 	};
 
+/** Off-canvas workbench sidebar housing primary nav, pins, projects, and health. */
 export function WorkspaceNavigationSidebar({
 	activeProject,
 	activeView,
@@ -137,6 +138,7 @@ export function WorkspaceNavigationSidebar({
 	);
 }
 
+/** Top-of-sidebar static navigation group (dashboard, history, settings, help). */
 function SidebarPrimaryNavigation({
 	activeView,
 	onStaticNavigationSelect,
@@ -197,6 +199,7 @@ function SidebarPrimaryNavigation({
 	);
 }
 
+/** Single static-navigation menu entry, wrapped in a router link when supplied. */
 function StaticNavigationItem({
 	ariaLabel,
 	icon,
@@ -239,6 +242,7 @@ function StaticNavigationItem({
 	);
 }
 
+/** Sidebar group rendering user-pinned workspaces above the project list. */
 function PinnedWorkspaceGroup({
 	activeProject,
 	activeWorkspace,
@@ -297,6 +301,7 @@ function PinnedWorkspaceGroup({
 	);
 }
 
+/** Reorderable list of project groups plus the create-workspace dialog mount. */
 function ProjectNavigationGroups({
 	activeProject,
 	activeWorkspace,
@@ -399,6 +404,7 @@ function ProjectNavigationGroups({
 	);
 }
 
+/** Collapsible per-project workspace group rendered inside the reorder list. */
 function ProjectWorkspaceGroup({
 	activeProject,
 	activeWorkspace,
@@ -480,6 +486,7 @@ function ProjectWorkspaceGroup({
 	);
 }
 
+/** Bottom-of-sidebar footer showing health badge, repo/workspace counts and detail. */
 function SidebarHealthFooter({
 	health,
 	projects,
@@ -499,11 +506,11 @@ function SidebarHealthFooter({
 				<StatusBadge tone={healthTone[health.state]}>
 					{health.label}
 				</StatusBadge>
-				<div className='flex items-center gap-2 font-mono text-[0.6875rem] text-muted-foreground leading-4'>
+				<div className='flex items-center gap-2 font-mono text-muted-foreground text-xxs leading-4'>
 					<span>{repositoryCount} repos</span>
 					<span>{workspaceCount} workspaces</span>
 				</div>
-				<p className='line-clamp-2 text-[0.6875rem] text-muted-foreground leading-4'>
+				<p className='line-clamp-2 text-muted-foreground text-xxs leading-4'>
 					{health.detail}
 				</p>
 			</div>

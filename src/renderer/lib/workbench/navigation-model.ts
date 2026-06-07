@@ -15,23 +15,27 @@ import type {
 	RepositoryWorkspaceNavigationWorkspace,
 } from '@/shared/ipc';
 
+/** Identifies the active project/workspace and how it was chosen. */
 export interface WorkspaceNavigationSelection {
 	project: ProjectShellModel;
 	source: 'first' | 'route' | 'stored';
 	workspace: WorkspaceShellModel;
 }
 
+/** Persisted last-known workspace selection. */
 export interface StoredWorkspaceSelection {
 	projectId: string;
 	workspaceId: string;
 }
 
+/** Render-time projection of the workspace navigation state. */
 export interface WorkspaceNavigationRenderState {
 	projects: ProjectShellModel[];
 	selection: WorkspaceNavigationSelection;
 	source: 'current' | 'previous';
 }
 
+/** Returns placeholder "open in" targets surfaced before integrations are wired. */
 function createPlaceholderOpenTargets(): WorkspaceOpenTarget[] {
 	return [
 		{
@@ -72,12 +76,22 @@ function createPlaceholderOpenTargets(): WorkspaceOpenTarget[] {
 	];
 }
 
+/**
+ * Maps a navigation snapshot to renderer project shell models.
+ * @param snapshot - Navigation snapshot or null.
+ * @returns Project shell models (possibly empty).
+ */
 export function mapNavigationSnapshotToProjects(
 	snapshot?: RepositoryWorkspaceNavigationSnapshot | null,
 ): ProjectShellModel[] {
 	return mapRepositoriesToProjects(snapshot?.repositories);
 }
 
+/**
+ * Maps repository navigation rows to renderer project shell models.
+ * @param repositories - Repository rows.
+ * @returns Project shell models (possibly empty).
+ */
 export function mapRepositoriesToProjects(
 	repositories?: RepositoryWorkspaceNavigationRepository[] | null,
 ): ProjectShellModel[] {
@@ -88,6 +102,12 @@ export function mapRepositoriesToProjects(
 	);
 }
 
+/**
+ * Picks the navigation snapshot to render, preferring fresh query data over a
+ * previously-cached snapshot.
+ * @param input - Both snapshots; either may be absent.
+ * @returns The chosen snapshot, or `null` when both are missing.
+ */
 export function getRenderableNavigationSnapshot({
 	cachedSnapshot,
 	querySnapshot,
@@ -98,6 +118,12 @@ export function getRenderableNavigationSnapshot({
 	return querySnapshot ?? cachedSnapshot ?? null;
 }
 
+/**
+ * Picks the active workspace selection, preferring the URL route, then the
+ * stored selection, then the first available workspace.
+ * @param input - Projects plus route ids and stored selection.
+ * @returns The chosen selection, or `null` when there is none.
+ */
 export function resolveWorkspaceNavigationSelection({
 	projects,
 	routeProjectId,
@@ -130,6 +156,12 @@ export function resolveWorkspaceNavigationSelection({
 	return storedWorkspaceSelection ?? getFirstWorkspaceSelection(projects);
 }
 
+/**
+ * Computes the render state, falling back to the previous snapshot when the
+ * fresh selection is unavailable but a valid previous one exists.
+ * @param input - Selection plus previous render state and route ids.
+ * @returns The next render state, or `null` when nothing should render.
+ */
 export function resolveWorkspaceNavigationRenderState({
 	canUsePreviousState,
 	previousState,
@@ -187,6 +219,14 @@ export function resolveWorkspaceNavigationRenderState({
 	return null;
 }
 
+/**
+ * Looks up a (project, workspace) selection by id pair.
+ * @param projects - Project shell models.
+ * @param projectId - Target project id.
+ * @param workspaceId - Target workspace id.
+ * @param source - Source label assigned to the resulting selection.
+ * @returns The matching selection, or `null` when no project/workspace pair matches.
+ */
 export function findWorkspaceNavigationSelection(
 	projects: ProjectShellModel[],
 	projectId: string,
@@ -207,6 +247,13 @@ export function findWorkspaceNavigationSelection(
 		: null;
 }
 
+/**
+ * Picks the session to surface for a workspace, preferring an explicit id and
+ * falling back to the first session or a placeholder.
+ * @param workspace - Active workspace.
+ * @param sessionId - Optional explicit session id.
+ * @returns A {@link SessionTabModel}.
+ */
 export function getPreferredSession(
 	workspace: WorkspaceShellModel,
 	sessionId?: string,
@@ -218,12 +265,21 @@ export function getPreferredSession(
 	);
 }
 
+/** Route params for a fully-resolved workspace navigation target. */
 export interface WorkspaceRouteParams {
 	chatId: string;
 	projectId: string;
 	workspaceId: string;
 }
 
+/**
+ * Resolves a (project, workspace) target into the matching route params,
+ * including a preferred chat id.
+ * @param projects - Project shell models.
+ * @param projectId - Target project id.
+ * @param workspaceId - Target workspace id.
+ * @returns Resolved route params, or `null` when no match exists.
+ */
 export function resolveWorkspaceRouteParams(
 	projects: ProjectShellModel[],
 	projectId: string,
@@ -246,6 +302,7 @@ export function resolveWorkspaceRouteParams(
 	};
 }
 
+/** Returns the first available (project, workspace) pair as a selection. */
 function getFirstWorkspaceSelection(
 	projects: ProjectShellModel[],
 ): WorkspaceNavigationSelection | null {
@@ -264,6 +321,7 @@ function getFirstWorkspaceSelection(
 	return null;
 }
 
+/** Maps one repository row to a project shell model, with placeholder workspace data. */
 function mapRepositoryNavigationSnapshot(
 	repository: RepositoryWorkspaceNavigationRepository,
 ): ProjectShellModel {
@@ -291,6 +349,7 @@ function mapRepositoryNavigationSnapshot(
 	};
 }
 
+/** Maps one workspace row to a workspace shell model with placeholder details. */
 function mapWorkspaceNavigationSnapshot(
 	repository: RepositoryWorkspaceNavigationRepository,
 	workspace: RepositoryWorkspaceNavigationWorkspace,
@@ -343,6 +402,7 @@ function mapWorkspaceNavigationSnapshot(
 	};
 }
 
+/** Returns the placeholder dock tabs (setup/run/default terminal). */
 function createPlaceholderDockTabs(): DockTabModel[] {
 	return [
 		{
@@ -372,6 +432,7 @@ function createPlaceholderDockTabs(): DockTabModel[] {
 	];
 }
 
+/** Returns placeholder run/setup script blocks marked as missing. */
 function createPlaceholderScripts(): WorkspaceShellModel['scripts'] {
 	return {
 		run: {
@@ -385,6 +446,7 @@ function createPlaceholderScripts(): WorkspaceShellModel['scripts'] {
 	};
 }
 
+/** Builds a placeholder session tab from a workspace navigation row. */
 function createPlaceholderSessionFromSnapshot(
 	workspace: RepositoryWorkspaceNavigationWorkspace,
 ): SessionTabModel {
@@ -398,6 +460,7 @@ function createPlaceholderSessionFromSnapshot(
 	};
 }
 
+/** Builds a placeholder session tab from a workspace shell model. */
 function createPlaceholderSession(
 	workspace: WorkspaceShellModel,
 ): SessionTabModel {
@@ -410,6 +473,12 @@ function createPlaceholderSession(
 	};
 }
 
+/**
+ * Renders a short summary of the workspace's source branch.
+ * @param repository - Parent repository row.
+ * @param workspace - Workspace row.
+ * @returns A user-facing summary string.
+ */
 function getWorkspaceSourceSummary(
 	repository: RepositoryWorkspaceNavigationRepository,
 	workspace: RepositoryWorkspaceNavigationWorkspace,
@@ -425,6 +494,12 @@ function getWorkspaceSourceSummary(
 	return 'workspace loaded from SQLite';
 }
 
+/**
+ * Returns the first non-empty trimmed string value found at any of the candidate keys.
+ * @param metadata - Source metadata record.
+ * @param keys - Candidate keys, in priority order.
+ * @returns The first matching string, or `null`.
+ */
 function getMetadataString(
 	metadata: Record<string, unknown>,
 	keys: string[],
@@ -440,6 +515,11 @@ function getMetadataString(
 	return null;
 }
 
+/**
+ * Extracts the parent directory name from a posix-style path.
+ * @param filePath - File path.
+ * @returns The parent directory name, or `null` when none can be determined.
+ */
 function getParentDirectoryName(filePath: string): string | null {
 	const normalizedPath = filePath.replace(/\/+$/, '');
 	const parentDirectory = normalizedPath.split('/').at(-2);
@@ -447,4 +527,5 @@ function getParentDirectoryName(filePath: string): string | null {
 	return parentDirectory || null;
 }
 
+/** Default dock tab used for live workspaces backed by the SQLite navigation. */
 export const DEFAULT_LIVE_WORKSPACE_DOCK_TAB = DEFAULT_DOCK_TAB;

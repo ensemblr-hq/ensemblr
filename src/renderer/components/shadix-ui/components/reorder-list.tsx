@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useRaisedShadow } from '@/renderer/hooks/ui/useRaisedShadow';
 import { cn } from '@/renderer/lib/utils';
 
+/** Drag-and-drop reorderable list backed by motion's `Reorder.Group`. */
 const ReorderList: React.FC<ReorderListProps> = ({
 	className,
 	disableLayoutAnimation = false,
@@ -56,6 +57,7 @@ const ReorderList: React.FC<ReorderListProps> = ({
 		});
 	}, [childKeys]);
 
+	/** Persists the new order and forwards it to the parent callback as React elements. */
 	const handleReorderFinish = (newOrder: unknown[]) => {
 		const nextKeys = newOrder as string[];
 		setOrderedKeys(nextKeys);
@@ -101,6 +103,7 @@ const ReorderList: React.FC<ReorderListProps> = ({
 	);
 };
 
+/** Picks a stable string key for a reorder element, falling back to index. */
 function getReorderElementKey(
 	key: React.ReactElement['key'],
 	index: number,
@@ -112,6 +115,7 @@ function getReorderElementKey(
 	return String(key).replace(/^\.\$/, '').replace(/^\./, '');
 }
 
+/** Shallow equality check for two string arrays. */
 function areStringArraysEqual(first: string[], second: string[]) {
 	return (
 		first.length === second.length &&
@@ -119,6 +123,7 @@ function areStringArraysEqual(first: string[], second: string[]) {
 	);
 }
 
+/** Single item inside {@link ReorderList} with optional drag handle and raised-shadow effect. */
 const ReorderListItem: React.FC<{
 	disableLayoutAnimation?: boolean;
 	item: React.ReactElement;

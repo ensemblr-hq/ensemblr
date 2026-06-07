@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { cn } from '@/renderer/lib/utils';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 
+/** Square project avatar with image fallback to a folder-git icon. */
 export function ProjectAvatar({
 	className,
 	project,

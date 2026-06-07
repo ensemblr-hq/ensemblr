@@ -21,6 +21,11 @@ import {
 	type SetupDiagnosticsSnapshot,
 } from '../../shared/ipc';
 
+/**
+ * Builds the `window.ensemble` bridge object exposed to the renderer, mapping
+ * each typed method to its corresponding `ipcRenderer.invoke` call.
+ * @returns A fully-populated {@link EnsembleApi}.
+ */
 export function createEnsembleApi(): EnsembleApi {
 	return {
 		applyRepositoryConfigMigration: (

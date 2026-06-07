@@ -39,6 +39,7 @@ interface MutableReviewFileTreeNode extends ReviewFileTreeNode {
 	directoryMap: Map<string, MutableReviewFileTreeNode>;
 }
 
+/** Renders the changes panel as either a flat list or a collapsible folder tree. */
 export function ReviewFileList({
 	files,
 	viewMode,
@@ -69,6 +70,7 @@ export function ReviewFileList({
 	);
 }
 
+/** Collapsible directory tree of changed files. */
 function ReviewFileTree({ files }: { files: ReviewFileSummary[] }) {
 	const [collapsedDirectoryPaths, setCollapsedDirectoryPaths] = useState<
 		Set<string>
@@ -106,6 +108,7 @@ function ReviewFileTree({ files }: { files: ReviewFileSummary[] }) {
 	);
 }
 
+/** Single directory branch in the review file tree, with collapsible children. */
 function ReviewDirectoryBranch({
 	collapsedDirectoryPaths,
 	level,
@@ -154,6 +157,7 @@ function ReviewDirectoryBranch({
 	);
 }
 
+/** Single folder row in the review tree, with collapse chevron and label. */
 function ReviewFolderRow({
 	isCollapsed,
 	labelParts,
@@ -204,6 +208,7 @@ function ReviewFolderRow({
 	);
 }
 
+/** Clickable row representing a single file change. */
 function ReviewFileButton({
 	file,
 	level = 0,
@@ -241,6 +246,7 @@ function ReviewFileButton({
 	);
 }
 
+/** Renders a file path with a dimmed directory prefix. */
 function ReviewFilePath({ path }: { path: string }) {
 	const directory = getReviewFileDirectory(path);
 	const fileName = getReviewFileName(path);
@@ -255,6 +261,7 @@ function ReviewFilePath({ path }: { path: string }) {
 	);
 }
 
+/** Trailing status badge and +/- diff numbers for a file row. */
 function ReviewFileStats({ file }: { file: ReviewFileSummary }) {
 	const statusLabel =
 		file.status === 'modified' ? null : fileStatusLabel[file.status];
@@ -274,6 +281,11 @@ function ReviewFileStats({ file }: { file: ReviewFileSummary }) {
 	);
 }
 
+/**
+ * Builds a tree structure from flat review-file rows by their path segments.
+ * @param files - Flat list of file changes.
+ * @returns The root tree node.
+ */
 function buildReviewFileTree(
 	files: ReviewFileSummary[],
 ): MutableReviewFileTreeNode {
@@ -310,6 +322,7 @@ function buildReviewFileTree(
 	return root;
 }
 
+/** Constructs an empty mutable tree node for a directory. */
 function createReviewFileTreeNode(
 	name: string,
 	path: string,
@@ -323,6 +336,12 @@ function createReviewFileTreeNode(
 	};
 }
 
+/**
+ * Walks down chains of single-child directories so the tree shows `a/b/c` as
+ * one row instead of three.
+ * @param node - Starting directory.
+ * @returns The compact node plus the label parts that were merged.
+ */
 function getCompactReviewDirectory(node: ReviewFileTreeNode): {
 	labelParts: string[];
 	node: ReviewFileTreeNode;
@@ -341,18 +360,21 @@ function getCompactReviewDirectory(node: ReviewFileTreeNode): {
 	return { labelParts, node: compactNode };
 }
 
+/** Returns the parent-directory portion of a file path, or `''` when none. */
 function getReviewFileDirectory(path: string) {
 	const lastSeparatorIndex = path.lastIndexOf('/');
 
 	return lastSeparatorIndex === -1 ? '' : path.slice(0, lastSeparatorIndex);
 }
 
+/** Returns the basename portion of a file path. */
 function getReviewFileName(path: string) {
 	const lastSeparatorIndex = path.lastIndexOf('/');
 
 	return lastSeparatorIndex === -1 ? path : path.slice(lastSeparatorIndex + 1);
 }
 
+/** Maps a tree depth to the matching Tailwind left-padding class. */
 function reviewFileIndentClassName(level: number) {
 	if (level <= 0) {
 		return '';
@@ -373,6 +395,7 @@ function reviewFileIndentClassName(level: number) {
 	return 'pl-16';
 }
 
+/** Flat scrollable list of every workspace file (files tab). */
 export function AllFilesList({ files }: { files: WorkspaceFileSummary[] }) {
 	return (
 		<ScrollArea className='h-full'>
@@ -403,6 +426,7 @@ export function AllFilesList({ files }: { files: WorkspaceFileSummary[] }) {
 	);
 }
 
+/** ⌘P-style file search dialog that opens a preview when a file is selected. */
 export function AllFilesSearchDialog({
 	files,
 	onOpenChange,
@@ -418,7 +442,7 @@ export function AllFilesSearchDialog({
 	};
 
 	return (
-		<CommandDialog
+		<CommandDialogtext-xxs
 			className='top-20 max-w-xl translate-y-0 shadow-2xl sm:max-w-xl'
 			description='Open a repository file from the All files tab.'
 			onOpenChange={onOpenChange}
@@ -456,12 +480,14 @@ export function AllFilesSearchDialog({
 	);
 }
 
+/** Computes the aria-label for an All-files row, branching on file vs. folder. */
 function getWorkspaceFileActionLabel(file: WorkspaceFileSummary) {
 	return file.kind === 'directory'
 		? `Open ${file.name} directory`
 		: `Open ${file.name} preview`;
 }
 
+/** Renders the VSCode-style icon for a workspace file or folder. */
 function WorkspaceFileIcon({ file }: { file: WorkspaceFileSummary }) {
 	return (
 		<Icon

@@ -21,6 +21,12 @@ type ReviewTabPreferences = Record<string, unknown>;
 type DockTabPreferences = Record<string, unknown>;
 type ChatTabPreferences = Record<string, unknown>;
 
+/**
+ * React hook that resolves the active review/dock/chat tab for the current
+ * workspace from URL search params plus persisted per-workspace preferences.
+ * @param input - Active workspace, optional chat id, and URL search.
+ * @returns The active tab values plus setter callbacks.
+ */
 export function useWorkspacePanelTabState({
 	activeChatId,
 	activeWorkspace,
@@ -121,6 +127,12 @@ export function useWorkspacePanelTabState({
 	};
 }
 
+/**
+ * Picks the review-tab to render, preferring the URL value and falling back to
+ * persisted preferences or the canonical default.
+ * @param input - Persisted prefs, URL override and workspace id.
+ * @returns The chosen review tab.
+ */
 export function getPreferredReviewTab({
 	reviewTabsByWorkspace,
 	routeReviewTab,
@@ -138,6 +150,12 @@ export function getPreferredReviewTab({
 	);
 }
 
+/**
+ * Picks the dock-tab to render, preferring the URL value, then the persisted
+ * preference, then the default, then the first available tab on the workspace.
+ * @param input - Persisted prefs, URL override and workspace.
+ * @returns The chosen dock tab.
+ */
 export function getPreferredDockTab({
 	dockTabsByWorkspace,
 	routeDockTab,
@@ -160,6 +178,12 @@ export function getPreferredDockTab({
 	return workspace.dockTabs[0]?.id ?? DEFAULT_DOCK_TAB;
 }
 
+/**
+ * Picks the chat session id to render, preferring URL, then persisted, then
+ * the workspace's preferred session.
+ * @param input - Persisted prefs, URL override and workspace.
+ * @returns The chosen chat session id.
+ */
 export function getPreferredChatId({
 	chatTabsByWorkspace,
 	routeChatId,
@@ -177,6 +201,7 @@ export function getPreferredChatId({
 	return getPreferredSession(workspace, preferredChatId).id;
 }
 
+/** Type guard checking the workspace exposes the candidate dock tab. */
 function hasDockTab(
 	workspace: WorkspaceShellModel,
 	dockTab: unknown,
@@ -187,6 +212,7 @@ function hasDockTab(
 	);
 }
 
+/** Type guard for review-panel tab enum values. */
 function isReviewTab(value: unknown): value is ReviewPanelTab {
 	return value === 'files' || value === 'changes' || value === 'checks';
 }

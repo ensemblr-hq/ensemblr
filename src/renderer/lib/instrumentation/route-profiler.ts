@@ -76,6 +76,11 @@ const preloadsByHref = new Map<string, PreloadProfileRecord>();
 let activeNavigation: NavigationProfile | null = null;
 let nextNavigationId = 1;
 
+/**
+ * Installs dev-mode TanStack Router subscriptions that record loader/IPC/layout
+ * timings for each navigation, logging a console summary on render.
+ * @param router - Router instance to instrument; multiple calls are deduped.
+ */
 export function installRouteNavigationProfiler(router: AnyRouter): void {
 	if (!enabled || installedRouters.has(router)) {
 		return;
@@ -113,6 +118,13 @@ export function installRouteNavigationProfiler(router: AnyRouter): void {
 	});
 }
 
+/**
+ * Wraps a route loader, recording its duration and dependency-change
+ * description on the active navigation profile (or as a preload entry).
+ * @param metadata - Loader context (route id, params, cause, etc.).
+ * @param load - Underlying loader function.
+ * @returns The loader's result.
+ */
 export async function profileRouteLoader<T>(
 	metadata: LoaderProfileMetadata,
 	load: () => Promise<T> | T,
@@ -148,6 +160,13 @@ export async function profileRouteLoader<T>(
 	}
 }
 
+/**
+ * Wraps an IPC invoke call, recording its duration on the active navigation
+ * profile so the post-navigation log includes per-channel timings.
+ * @param metadata - IPC call context.
+ * @param call - The actual `ipcRenderer.invoke` call.
+ * @returns The IPC response.
+ */
 export async function profileElectronIpcCall<T>(
 	metadata: IpcProfileMetadata,
 	call: () => Promise<T>,
@@ -169,6 +188,11 @@ export async function profileElectronIpcCall<T>(
 	}
 }
 
+/**
+ * React effect hook that records mount/unmount events for layout components
+ * onto the active navigation profile.
+ * @param component - Label of the component being instrumented.
+ */
 export function useRouteProfilerMount(component: string): void {
 	const useProfilerEffect =
 		typeof window === 'undefined' ? useEffect : useLayoutEffect;
@@ -180,6 +204,11 @@ export function useRouteProfilerMount(component: string): void {
 	}, [component]);
 }
 
+/**
+ * Monkey-patches `router.preloadRoute` so each intent-based preload is recorded
+ * for the eventual navigation profile.
+ * @param router - Router to patch.
+ */
 function patchPreloadRoute(router: AnyRouter): void {
 	type PreloadRouteOptions = Parameters<AnyRouter['preloadRoute']>[0];
 	type PreloadRouteResult = ReturnType<AnyRouter['preloadRoute']>;
@@ -188,6 +217,12 @@ function patchPreloadRoute(router: AnyRouter): void {
 		options: PreloadRouteOptions,
 	) => PreloadRouteResult;
 
+	/**
+	 * Wrapped `preloadRoute` that records start/resolve/fail metadata for each
+	 * preload attempt.
+	 * @param options - Original preload options.
+	 * @returns The result of the underlying `preloadRoute` call.
+	 */
 	const preloadRouteWithProfile = (
 		options: PreloadRouteOptions,
 	): PreloadRouteResult => {
@@ -236,6 +271,13 @@ function patchPreloadRoute(router: AnyRouter): void {
 	router.preloadRoute = preloadRouteWithProfile as AnyRouter['preloadRoute'];
 }
 
+/**
+ * Resolves the href that a preload call targets, returning `null` when the
+ * router cannot build the location.
+ * @param router - Router used to resolve the location.
+ * @param options - Preload options forwarded to `buildLocation`.
+ * @returns The target href, or `null`.
+ */
 function getPreloadHref(
 	router: AnyRouter,
 	options: Parameters<AnyRouter['preloadRoute']>[0],
@@ -249,6 +291,7 @@ function getPreloadHref(
 	}
 }
 
+/** Appends a layout mount/unmount record to the active navigation profile. */
 function recordLayoutEvent(
 	component: string,
 	event: LayoutProfileRecord['event'],
@@ -264,6 +307,12 @@ function recordLayoutEvent(
 	});
 }
 
+/**
+ * Compares this loader run's params/deps against the previous run for the same
+ * route id and returns a human-readable summary of what changed.
+ * @param metadata - Loader profile metadata.
+ * @returns A short description of the change since the last invocation.
+ */
 function describeRouteInputChange(metadata: LoaderProfileMetadata): string {
 	const previous = lastInputsByRouteId.get(metadata.routeId);
 	const current = {
@@ -292,6 +341,12 @@ function describeRouteInputChange(metadata: LoaderProfileMetadata): string {
 	return 'loaderDeps unchanged';
 }
 
+/**
+ * Returns the keys whose JSON-stringified values differ between two records.
+ * @param previous - Previous value.
+ * @param next - Next value.
+ * @returns Changed keys, or `['value']` for non-object diffs.
+ */
 function getChangedKeys(previous: unknown, next: unknown): string[] {
 	const previousRecord = toRecord(previous);
 	const nextRecord = toRecord(next);
@@ -310,12 +365,14 @@ function getChangedKeys(previous: unknown, next: unknown): string[] {
 	);
 }
 
+/** Coerces an unknown value to a record, or `null` for non-object inputs. */
 function toRecord(value: unknown): Record<string, unknown> | null {
 	return typeof value === 'object' && value !== null
 		? (value as Record<string, unknown>)
 		: null;
 }
 
+/** Picks the loader mode label (preload, background, or blocking). */
 function getLoaderMode(
 	metadata: LoaderProfileMetadata,
 ): LoaderProfileRecord['mode'] {
@@ -330,6 +387,12 @@ function getLoaderMode(
 	return 'blocking';
 }
 
+/**
+ * Emits the dev-console summary for one completed navigation, including loader
+ * rows, IPC rows, layout-remount counts and preload state.
+ * @param navigation - Completed navigation profile.
+ * @param matches - Active route matches at render time.
+ */
 function logNavigationProfile(
 	navigation: NavigationProfile,
 	matches: AnyRouteMatch[],
@@ -404,6 +467,7 @@ function logNavigationProfile(
 	console.groupEnd();
 }
 
+/** Aggregates per-loader modes into one descriptor for the navigation. */
 function getNavigationMode(records: LoaderProfileRecord[]) {
 	if (!records.length) {
 		return 'background/no loader work';
@@ -420,18 +484,26 @@ function getNavigationMode(records: LoaderProfileRecord[]) {
 	return 'preload';
 }
 
+/** Renders a parsed location's href, falling back to `(initial)` when absent. */
 function getLocationHref(location: ParsedLocation | undefined): string {
 	return location?.href ?? '(initial)';
 }
 
+/** Returns a monotonic millisecond timestamp from `performance.now`. */
 function now(): number {
 	return performance.now();
 }
 
+/** Rounds a duration in ms to a single decimal place for readable logs. */
 function roundMs(value: number): number {
 	return Math.round(value * 10) / 10;
 }
 
+/**
+ * Stringifies a value in a stable, dev-only-friendly way for diffing.
+ * @param value - Value to stringify.
+ * @returns A JSON-ish string representation.
+ */
 function stableJson(value: unknown): string {
 	if (value === undefined) {
 		return 'undefined';

@@ -9,6 +9,7 @@ export const Route = createFileRoute('/_workbench/_shell/history')({
 	},
 });
 
+/** History workbench view (placeholder pending content). */
 function HistoryRoute() {
 	return <WorkbenchPlaceholderPage view='history' />;
 }

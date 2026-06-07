@@ -26,6 +26,7 @@ const RIGHT_SIDEBAR_DEFAULT_SIZE_PERCENT = 34;
 const RIGHT_SIDEBAR_MAX_SIZE_PERCENT = 68;
 const RIGHT_SIDEBAR_COLLAPSED_THRESHOLD_PERCENT = 1;
 
+/** Asks the main process to grow the window to fit the right sidebar minimum. */
 async function ensureWindowCanShowRightSidebar() {
 	if (
 		window.matchMedia(`(min-width: ${RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH}px)`)
@@ -37,6 +38,7 @@ async function ensureWindowCanShowRightSidebar() {
 	await window.ensemble?.ensureWindowWidth(RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH);
 }
 
+/** Clamps a sidebar size percentage to the supported range, defaulting on NaN. */
 function getClampedRightSidebarSizePercent(sizePercent: number) {
 	if (!Number.isFinite(sizePercent)) {
 		return RIGHT_SIDEBAR_DEFAULT_SIZE_PERCENT;
@@ -51,11 +53,13 @@ function getClampedRightSidebarSizePercent(sizePercent: number) {
 	);
 }
 
+/** True when the viewport is wide enough to persist user-driven sidebar sizes. */
 function canPersistRightSidebarResize() {
 	return window.matchMedia(`(min-width: ${RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH}px)`)
 		.matches;
 }
 
+/** Workbench frame — sidebar + tooltip providers wrapping the main content. */
 export function WorkbenchFrame({
 	activeProject,
 	activeView,
@@ -120,6 +124,10 @@ export function WorkbenchFrame({
 	);
 }
 
+/**
+ * Active-workspace shell content — owns review/dock collapse state, viewport
+ * syncing, and session-tab navigation.
+ */
 export function WorkspaceWorkbenchContent({
 	activeProject,
 	activeReviewTab,
@@ -202,6 +210,7 @@ export function WorkspaceWorkbenchContent({
 	useEffect(() => {
 		rightSidebarSizePercentRef.current = preferredRightSidebarSizePercent;
 	}, [preferredRightSidebarSizePercent]);
+	/** Collapses the right sidebar and persists the preference. */
 	const collapseRightSidebar = () => {
 		rightSidebarCollapsedByViewportRef.current = false;
 		rightSidebarPanelRef.current?.collapse();
@@ -209,6 +218,7 @@ export function WorkspaceWorkbenchContent({
 		setIsRightSidebarCollapsed(true);
 		setStoredRightSidebarCollapsed(true);
 	};
+	/** Asks the window to widen if needed, then expands the right sidebar. */
 	const expandRightSidebar = async () => {
 		rightSidebarCollapsedByViewportRef.current = false;
 		await ensureWindowCanShowRightSidebar();
@@ -223,6 +233,7 @@ export function WorkspaceWorkbenchContent({
 			setStoredRightSidebarCollapsed(false);
 		});
 	};
+	/** Persists user-driven resizes and toggles the collapsed flag. */
 	const handleRightSidebarResize = (size: PanelSize) => {
 		const isCollapsed =
 			size.asPercentage <= RIGHT_SIDEBAR_COLLAPSED_THRESHOLD_PERCENT;
@@ -244,6 +255,7 @@ export function WorkspaceWorkbenchContent({
 			setRightSidebarSizePercent(nextSizePercent);
 		}
 	};
+	/** Toggles the dock panel between collapsed and expanded states. */
 	const toggleDockPanel = () => {
 		if (dockPanelRef.current?.isCollapsed() || isDockCollapsed) {
 			dockPanelRef.current?.expand();
@@ -357,6 +369,7 @@ export type WorkspaceMainContentState = Pick<
 	sessionTabs: WorkbenchShellProps['activeWorkspace']['sessions'];
 };
 
+/** Default search resolver used when callers do not supply one. */
 function resolveDefaultWorkspaceRouteSearch() {
 	return {};
 }

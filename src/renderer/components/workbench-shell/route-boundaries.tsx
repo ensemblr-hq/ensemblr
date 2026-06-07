@@ -7,6 +7,7 @@ import {
 } from '@/renderer/lib/workbench';
 import type { WorkbenchStaticNavigationTarget } from '@/renderer/types/workbench-shell';
 
+/** TanStack Router `pendingComponent` rendered while a route loader is in-flight. */
 export function WorkbenchRoutePending() {
 	return (
 		<WorkbenchEmptyStateShell
@@ -28,6 +29,7 @@ export function WorkbenchRoutePending() {
 	);
 }
 
+/** TanStack Router `errorComponent` rendered when a route loader throws. */
 export function WorkbenchRouteError({ error }: ErrorComponentProps) {
 	return (
 		<WorkbenchEmptyStateShell
@@ -49,6 +51,7 @@ export function WorkbenchRouteError({ error }: ErrorComponentProps) {
 	);
 }
 
+/** TanStack Router `notFoundComponent` rendered for unmatched routes. */
 export function WorkbenchRouteNotFound() {
 	return (
 		<WorkbenchEmptyStateShell
@@ -70,6 +73,7 @@ export function WorkbenchRouteNotFound() {
 	);
 }
 
+/** Wraps boundary-mode static navigation items with a router `Link`. */
 function renderStaticNavigationLink(
 	target: WorkbenchStaticNavigationTarget,
 	children: ReactElement,

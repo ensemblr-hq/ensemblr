@@ -85,6 +85,7 @@ const CHECK_STATUS_ICON = {
 	warning: ShieldAlertIcon,
 } satisfies Record<SetupCheckStatus, typeof AlertCircleIcon>;
 
+/** Full setup-diagnostics panel — groups checks, surfaces remediation actions. */
 export function SetupDiagnosticsPanel({
 	error,
 	isRetrying = false,
@@ -279,6 +280,7 @@ export function SetupDiagnosticsPanel({
 	);
 }
 
+/** Inline notice explaining local-execution guarantees beneath the checks list. */
 function LocalExecutionNotice() {
 	return (
 		<section
@@ -303,6 +305,7 @@ function LocalExecutionNotice() {
 	);
 }
 
+/** Compact summary variant for the setup diagnostics, used in dense panels. */
 export function SetupDiagnosticsCompact({
 	snapshot,
 }: {
@@ -333,6 +336,7 @@ export function SetupDiagnosticsCompact({
 	);
 }
 
+/** Single setup-check row showing status, detail, logs, and remediation actions. */
 function SetupCheckRow({
 	check,
 	onRemediationAction,
@@ -389,7 +393,7 @@ function SetupCheckRow({
 						<p className='mt-1 text-muted-foreground text-xs leading-5'>
 							{check.detail}
 						</p>
-						<p className='mt-1 text-[0.6875rem] text-muted-foreground leading-4'>
+						<p className='mt-1 text-muted-foreground text-xxs leading-4'>
 							{check.description}
 						</p>
 					</div>
@@ -404,7 +408,7 @@ function SetupCheckRow({
 					{check.remediationActions.map((action) =>
 						isRemediationActionButton(action, check) ? (
 							<Button
-								className='h-6 px-2 text-[0.6875rem] leading-none'
+								className='h-6 px-2 text-xxs leading-none'
 								data-remediation-action={action.id}
 								key={action.id}
 								onClick={() => {
@@ -418,7 +422,7 @@ function SetupCheckRow({
 							</Button>
 						) : (
 							<span
-								className='rounded-sm border border-border bg-muted px-1.5 py-1 text-[0.6875rem] text-muted-foreground leading-none'
+								className='rounded-sm border border-border bg-muted px-1.5 py-1 text-muted-foreground text-xxs leading-none'
 								key={action.id}
 							>
 								{action.label}
@@ -452,6 +456,7 @@ function SetupCheckRow({
 	);
 }
 
+/** Type guard for the Pi-executable picker remediation action. */
 function isPiExecutablePickerAction(
 	action: SetupRemediationAction,
 	check: SetupCheckSnapshot,
@@ -463,6 +468,7 @@ function isPiExecutablePickerAction(
 	);
 }
 
+/** Type guard for the root-directory picker remediation action. */
 function isRootDirectoryPickerAction(
 	action: SetupRemediationAction,
 	check: SetupCheckSnapshot,
@@ -474,6 +480,7 @@ function isRootDirectoryPickerAction(
 	);
 }
 
+/** Returns true when a remediation action should render as an inline button. */
 function isRemediationActionButton(
 	action: SetupRemediationAction,
 	check: SetupCheckSnapshot,
@@ -484,6 +491,7 @@ function isRemediationActionButton(
 	);
 }
 
+/** Modal dialog wrapping the root-directory change flow. */
 export function RootDirectoryChangeDialog({
 	applyResult,
 	isApplying,
@@ -516,6 +524,7 @@ export function RootDirectoryChangeDialog({
 	);
 }
 
+/** Inner content of the root-directory change dialog (preview + apply). */
 export function RootDirectoryChangeContent({
 	applyResult,
 	canApply,
@@ -596,6 +605,7 @@ export function RootDirectoryChangeContent({
 	);
 }
 
+/** Read-only preview block showing what a root-directory change will do. */
 function RootPathPreview({ preview }: { preview: RootDirectoryChangePreview }) {
 	return (
 		<div className='grid gap-2 text-xs'>
@@ -615,6 +625,7 @@ function RootPathPreview({ preview }: { preview: RootDirectoryChangePreview }) {
 	);
 }
 
+/** Renders the list of diagnostics surfaced by the root-directory preview. */
 function RootDirectoryDiagnostics({
 	diagnostics,
 	emptyLabel,
@@ -661,6 +672,7 @@ function RootDirectoryDiagnostics({
 	);
 }
 
+/** Renders the outcome of a root-directory apply call (success/error/blocked). */
 function RootDirectoryApplyResult({
 	result,
 }: {
@@ -697,6 +709,7 @@ function RootDirectoryApplyResult({
 	);
 }
 
+/** Picks the surface tone for a root-directory apply-result panel. */
 function getRootDirectoryApplyResultTone(
 	result: RootDirectoryChangeApplyResult,
 ) {
@@ -715,6 +728,7 @@ function getRootDirectoryApplyResultTone(
 	return 'ok';
 }
 
+/** Single metric tile used by the compact diagnostics variant. */
 function CompactMetric({
 	children,
 	label,
@@ -727,7 +741,7 @@ function CompactMetric({
 	return (
 		<div className='flex min-h-16 flex-col justify-between rounded-md border border-border bg-pane px-2.5 py-2'>
 			<div className='flex items-center justify-between gap-2'>
-				<span className='text-[0.6875rem] text-muted-foreground uppercase tracking-wide'>
+				<span className='text-muted-foreground text-xxs uppercase tracking-wide'>
 					{label}
 				</span>
 				<StatusBadge tone={tone}>{label}</StatusBadge>
@@ -737,6 +751,7 @@ function CompactMetric({
 	);
 }
 
+/** Renders a one-line summary for the snapshot — counts plus blocking notice. */
 function getSetupSummary(
 	snapshot: SetupDiagnosticsSnapshot | null,
 	error?: string | null,
@@ -790,6 +805,7 @@ function getSetupSummary(
 	};
 }
 
+/** Maps a setup snapshot to its overall surface tone. */
 function getSnapshotTone(
 	snapshot: SetupDiagnosticsSnapshot,
 ): 'danger' | 'ok' | 'warning' {

@@ -50,6 +50,7 @@ const searchPlaceholders: Record<WorkspaceSourceKind, string> = {
 	'pull-request': 'Search by title, number, or author',
 };
 
+/** Command-palette dialog for creating a workspace from a branch, PR, or issue. */
 export function CreateWorkspaceSourceDialog({
 	onCreateWorkspace,
 	onOpenChange,
@@ -89,6 +90,7 @@ export function CreateWorkspaceSourceDialog({
 		}
 	}
 
+	/** Forwards an action selection to the parent and closes the dialog. */
 	const dispatchAction = (
 		source: WorkspaceSource,
 		action: WorkspaceSourceAction,
@@ -156,7 +158,7 @@ export function CreateWorkspaceSourceDialog({
 									value={source.id}
 								>
 									<WorkspaceSourceIcon source={source} />
-									<span className='flex min-w-0 flex-1 items-baseline gap-1.5'>
+									<span className='itext-xxsp-1.5 flex min-w-0 flex-1'>
 										{source.reference ? (
 											<span className='shrink-0 font-mono text-[0.6875rem] text-muted-foreground'>
 												[{source.reference}]
@@ -180,6 +182,7 @@ export function CreateWorkspaceSourceDialog({
 	);
 }
 
+/** Trailing action buttons rendered next to a workspace-source row on hover. */
 function WorkspaceSourceActions({
 	actions,
 	onAction,
@@ -189,7 +192,7 @@ function WorkspaceSourceActions({
 }) {
 	return (
 		<span
-			className='ml-auto hidden shrink-0 items-center gap-1.5 pl-2 group-hover/command-item:flex group-aria-[selected=true]/command-item:flex'
+			className='ml-auto hidden shrink-0 items-center gap-1.5 pl-2 group-hover/command-item:flex group-aria-selected/command-item:flex'
 			data-slot='command-shortcut'
 		>
 			{actions.map((action) => (
@@ -207,6 +210,7 @@ function WorkspaceSourceActions({
 					}}
 					size='sm'
 					variant='ghost'
+					text-xxs
 				>
 					{action.label}
 					<span className='text-[0.6875rem] opacity-70'>{action.shortcut}</span>
@@ -216,6 +220,7 @@ function WorkspaceSourceActions({
 	);
 }
 
+/** Popover with repository picker, narrowing the dialog's source list. */
 function WorkspaceRepoSelector({
 	onSelect,
 	projects,
@@ -290,6 +295,7 @@ function WorkspaceRepoSelector({
 	);
 }
 
+/** Renders the appropriate provider/kind icon for a workspace source row. */
 function WorkspaceSourceIcon({ source }: { source: WorkspaceSource }) {
 	const className = 'size-4 shrink-0 text-muted-foreground';
 

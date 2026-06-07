@@ -23,12 +23,14 @@ export type EnvironmentVariablesErrorCode =
 	| 'secret-store-unavailable'
 	| 'secret-value-required';
 
+/** Options for {@link EnvironmentVariablesService.getSnapshot}. */
 export interface EnvironmentVariablesSnapshotOptions {
 	requiredKeys?: readonly string[];
 	scope?: EnvironmentVariableScope;
 	scopeId?: string;
 }
 
+/** Input for plain/secret env-var write operations. */
 export interface EnvironmentVariableWriteInput {
 	key: string;
 	scope?: EnvironmentVariableScope;
@@ -36,12 +38,14 @@ export interface EnvironmentVariableWriteInput {
 	value: string;
 }
 
+/** Input for env-var unset operations. */
 export interface EnvironmentVariableUnsetInput {
 	key: string;
 	scope?: EnvironmentVariableScope;
 	scopeId?: string;
 }
 
+/** Options for {@link EnvironmentVariablesService.assembleEnvironment}. */
 export interface EnvironmentVariablesAssemblyOptions {
 	includeSecrets?: boolean;
 	requiredKeys?: readonly string[];
@@ -49,12 +53,14 @@ export interface EnvironmentVariablesAssemblyOptions {
 	scopeId?: string;
 }
 
+/** Assembled environment for command execution, plus advisory diagnostics. */
 export interface EnvironmentVariablesAssembly {
 	diagnostics: EnvironmentVariableDiagnostic[];
 	env: Record<string, string>;
 	redactValues: string[];
 }
 
+/** Public surface of the environment-variables service. */
 export interface EnvironmentVariablesService {
 	assembleEnvironment: (
 		options?: EnvironmentVariablesAssemblyOptions,
@@ -71,6 +77,7 @@ export interface EnvironmentVariablesService {
 	unsetValue: (input: EnvironmentVariableUnsetInput) => Promise<void>;
 }
 
+/** Options for {@link createEnvironmentVariablesService}. */
 export interface CreateEnvironmentVariablesServiceOptions {
 	configService: EnsembleConfigService;
 	database?: DatabaseSync | null;
@@ -80,21 +87,25 @@ export interface CreateEnvironmentVariablesServiceOptions {
 	secretStoreFactory?: (database: DatabaseSync) => SecretStore | null;
 }
 
+/** Internal: normalised `(scope, scopeId)` pair. */
 interface NormalizedScope {
 	scope: EnvironmentVariableScope;
 	scopeId: string;
 }
 
+/** Internal: one plain-string candidate value with its source. */
 interface PlainValueCandidate {
 	source: Extract<SettingsResolutionSource, 'config-default' | 'sqlite'>;
 	value: string;
 }
 
+/** Internal: shape of an environment-variable row in the settings table. */
 interface SqliteEnvironmentRow {
 	key: string;
 	value_json: string;
 }
 
+/** Internal: accumulated state used to render a snapshot or assembled env. */
 interface EnvironmentState {
 	catalogByKey: Map<string, EnvironmentVariableCatalogEntrySnapshot>;
 	diagnostics: EnvironmentVariableDiagnostic[];
@@ -121,6 +132,7 @@ const SENSITIVE_KEY_PARTS = [
 	'token',
 ];
 
+/** Built-in catalog of environment variables Ensemble understands out-of-the-box. */
 export const BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG: readonly EnvironmentVariableCatalogEntrySnapshot[] =
 	[
 		{
@@ -237,9 +249,14 @@ export const BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG: readonly EnvironmentVariable
 		),
 	];
 
+/** Domain-specific error thrown by the environment-variables service. */
 export class EnvironmentVariablesError extends Error {
 	readonly code: EnvironmentVariablesErrorCode;
 
+	/**
+	 * @param code - Machine-readable failure category.
+	 * @param message - Human-readable failure description.
+	 */
 	constructor(code: EnvironmentVariablesErrorCode, message: string) {
 		super(message);
 		this.name = 'EnvironmentVariablesError';
@@ -247,6 +264,12 @@ export class EnvironmentVariablesError extends Error {
 	}
 }
 
+/**
+ * Builds the environment-variables service used by IPC handlers to read,
+ * write, unset, and assemble env vars across app/repository/workspace scopes.
+ * @param options - Service dependencies (config, database, secret store, clock).
+ * @returns A fresh {@link EnvironmentVariablesService}.
+ */
 export function createEnvironmentVariablesService({
 	configService,
 	database = undefined,
@@ -255,6 +278,7 @@ export function createEnvironmentVariablesService({
 	secretStore,
 	secretStoreFactory = createDefaultSecretStore,
 }: CreateEnvironmentVariablesServiceOptions): EnvironmentVariablesService {
+	/** Resolves the active SQLite handle from the injected database or service. */
 	function getDatabase(): DatabaseSync | null {
 		if (database !== undefined) {
 			return database;
@@ -263,6 +287,11 @@ export function createEnvironmentVariablesService({
 		return databaseService?.getConnection()?.database ?? null;
 	}
 
+	/**
+	 * Resolves a secret store from explicit override, factory, or `null` when unavailable.
+	 * @param databaseConnection - Active SQLite handle for factory creation.
+	 * @returns A secret store, or `null`.
+	 */
 	function getSecretStore(
 		databaseConnection: DatabaseSync | null,
 	): SecretStore | null {
@@ -277,6 +306,11 @@ export function createEnvironmentVariablesService({
 		return secretStoreFactory(databaseConnection);
 	}
 
+	/**
+	 * Builds an IPC-safe snapshot of every env var visible at the requested scope.
+	 * @param options - Optional scope and required-key filter.
+	 * @returns A {@link EnvironmentVariablesSnapshot}.
+	 */
 	async function getSnapshot(
 		options: EnvironmentVariablesSnapshotOptions = {},
 	): Promise<EnvironmentVariablesSnapshot> {
@@ -303,6 +337,12 @@ export function createEnvironmentVariablesService({
 		};
 	}
 
+	/**
+	 * Materialises the effective `KEY=value` environment for command execution,
+	 * resolving secrets when permitted and collecting required-variable diagnostics.
+	 * @param options - Optional scope, required keys, and secret-inclusion flag.
+	 * @returns The assembled env plus diagnostics and secret values to redact.
+	 */
 	async function assembleEnvironment(
 		options: EnvironmentVariablesAssemblyOptions = {},
 	): Promise<EnvironmentVariablesAssembly> {
@@ -386,6 +426,12 @@ export function createEnvironmentVariablesService({
 		};
 	}
 
+	/**
+	 * Persists a plain-string env var to SQLite, rejecting reserved or
+	 * secret-classified keys and removing any conflicting secret-store entry.
+	 * @param input - Key, scope, and value.
+	 * @returns The resulting variable snapshot.
+	 */
 	async function setPlainValue(
 		input: EnvironmentVariableWriteInput,
 	): Promise<EnvironmentVariableSnapshot> {
@@ -438,6 +484,12 @@ export function createEnvironmentVariablesService({
 		};
 	}
 
+	/**
+	 * Persists a secret env var to the secret store, removing any conflicting
+	 * plain SQLite entry.
+	 * @param input - Key, scope, and value.
+	 * @returns The resulting variable snapshot (masked).
+	 */
 	async function setSecretValue(
 		input: EnvironmentVariableWriteInput,
 	): Promise<EnvironmentVariableSnapshot> {
@@ -503,6 +555,10 @@ export function createEnvironmentVariablesService({
 		};
 	}
 
+	/**
+	 * Removes the env var from both SQLite and the secret store, if present.
+	 * @param input - Key and scope to clear.
+	 */
 	async function unsetValue(
 		input: EnvironmentVariableUnsetInput,
 	): Promise<void> {
@@ -538,10 +594,20 @@ export function createEnvironmentVariablesService({
 	};
 }
 
+/**
+ * Tests whether a string matches the POSIX environment-variable-name shape.
+ * @param value - Candidate key.
+ * @returns True for valid env var names.
+ */
 export function isEnvironmentVariableKey(value: string): boolean {
 	return ENVIRONMENT_VARIABLE_KEY_PATTERN.test(value);
 }
 
+/**
+ * Builds a catalog entry with defaults applied.
+ * @param input - Catalog fields.
+ * @returns A fully-populated catalog snapshot.
+ */
 function createCatalogEntry({
 	category,
 	description,
@@ -573,6 +639,12 @@ function createCatalogEntry({
 	};
 }
 
+/**
+ * Collects every input the snapshot/assembly renderers need (config defaults,
+ * SQLite rows, secret metadata, catalog) for the requested scope.
+ * @param input - Service dependencies and request options.
+ * @returns The merged environment state.
+ */
 async function collectEnvironmentState({
 	configService,
 	database,
@@ -655,6 +727,13 @@ async function collectEnvironmentState({
 	};
 }
 
+/**
+ * Renders one snapshot per known key (catalog, plain, secret, required, invalid)
+ * sorted alphabetically, and emits a missing-required diagnostic for each unset
+ * required key.
+ * @param state - Collected environment state.
+ * @returns An array of per-variable snapshots.
+ */
 function createVariableSnapshots(
 	state: EnvironmentState,
 ): EnvironmentVariableSnapshot[] {
@@ -684,6 +763,13 @@ function createVariableSnapshots(
 	return variables;
 }
 
+/**
+ * Renders a single variable snapshot from collected state, honoring reserved
+ * keys, invalid keys, and the secret-vs-plain precedence rules.
+ * @param key - Variable name.
+ * @param state - Collected environment state.
+ * @returns The variable snapshot.
+ */
 function createVariableSnapshot(
 	key: string,
 	state: EnvironmentState,
@@ -780,6 +866,12 @@ function createVariableSnapshot(
 	};
 }
 
+/**
+ * Determines whether a variable should be treated as runtime/secret/plain at
+ * snapshot time, escalating to `secret` whenever metadata or name signals it.
+ * @param input - Catalog entry, key, and any secret metadata.
+ * @returns The effective value kind.
+ */
 function getEffectiveValueKind({
 	catalog,
 	key,
@@ -803,6 +895,12 @@ function getEffectiveValueKind({
 	return catalog.valueKind;
 }
 
+/**
+ * Pulls plain env-var defaults from the declarative `environment` config block,
+ * registering custom catalog entries and rejecting secret-classified keys.
+ * @param input - Catalog, raw config block, and diagnostic sinks.
+ * @returns Map of `key -> plain candidate`.
+ */
 function collectConfigDefaults({
 	catalogByKey,
 	configEnvironment,
@@ -863,6 +961,12 @@ function collectConfigDefaults({
 	return values;
 }
 
+/**
+ * Reads plain env-var values persisted in the SQLite `settings` table for the
+ * given scope, emitting diagnostics for malformed rows.
+ * @param input - Database, scope, and diagnostic sinks.
+ * @returns Map of `key -> plain candidate`.
+ */
 function collectSqlitePlainValues({
 	database,
 	diagnostics,
@@ -937,6 +1041,12 @@ function collectSqlitePlainValues({
 	return values;
 }
 
+/**
+ * Lists secret metadata for the scope and maps each entry to its env var key,
+ * surfacing store failures as warnings rather than throwing.
+ * @param input - Scope, store, and diagnostic sink.
+ * @returns Map of `variable key -> metadata`.
+ */
 async function collectSecretMetadata({
 	diagnostics,
 	scope,
@@ -994,6 +1104,10 @@ async function collectSecretMetadata({
 	return metadataByVariableKey;
 }
 
+/**
+ * Returns a deep-cloned `key -> catalog entry` map seeded from the built-in catalog.
+ * @returns A fresh catalog map.
+ */
 function createCatalogMap(): Map<
 	string,
 	EnvironmentVariableCatalogEntrySnapshot
@@ -1006,6 +1120,12 @@ function createCatalogMap(): Map<
 	);
 }
 
+/**
+ * Returns the catalog entry for `key`, manufacturing a custom entry if absent.
+ * @param key - Variable name.
+ * @param catalogByKey - Active catalog map.
+ * @returns The catalog entry.
+ */
 function getCatalogEntryForKey(
 	key: string,
 	catalogByKey: Map<string, EnvironmentVariableCatalogEntrySnapshot>,
@@ -1013,6 +1133,12 @@ function getCatalogEntryForKey(
 	return catalogByKey.get(key) ?? createCustomCatalogEntry(key);
 }
 
+/**
+ * Builds a custom catalog entry for a user-defined variable, classifying it
+ * as secret when the name looks sensitive.
+ * @param key - Variable name.
+ * @returns A custom catalog entry.
+ */
 function createCustomCatalogEntry(
 	key: string,
 ): EnvironmentVariableCatalogEntrySnapshot {
@@ -1026,6 +1152,13 @@ function createCustomCatalogEntry(
 	});
 }
 
+/**
+ * Validates and de-duplicates the caller-supplied required-key list, emitting
+ * diagnostics for malformed keys.
+ * @param requiredKeys - Caller list.
+ * @param diagnostics - Diagnostic sink.
+ * @returns A clean set of valid required keys.
+ */
 function normalizeRequiredKeys(
 	requiredKeys: readonly string[] | undefined,
 	diagnostics: EnvironmentVariableDiagnostic[],
@@ -1051,6 +1184,11 @@ function normalizeRequiredKeys(
 	return normalizedKeys;
 }
 
+/**
+ * Trims and validates a write-operation key, throwing on invalid input.
+ * @param key - Caller-supplied key.
+ * @returns The trimmed key.
+ */
 function normalizeEnvironmentVariableKey(key: string): string {
 	const normalized = key.trim();
 
@@ -1064,6 +1202,12 @@ function normalizeEnvironmentVariableKey(key: string): string {
 	return normalized;
 }
 
+/**
+ * Coerces caller-supplied scope/scopeId into a normalised pair, requiring a
+ * non-empty `scopeId` for non-app scopes.
+ * @param input - Scope and optional scope id.
+ * @returns The normalised pair.
+ */
 function normalizeScope({
 	scope = 'app',
 	scopeId,
@@ -1093,6 +1237,10 @@ function normalizeScope({
 	};
 }
 
+/**
+ * Inserts or updates a plain env var row in the SQLite `settings` table.
+ * @param input - Database, key, scope, and string value.
+ */
 function upsertPlainSetting({
 	database,
 	key,
@@ -1135,6 +1283,10 @@ function upsertPlainSetting({
 		);
 }
 
+/**
+ * Removes the plain env var row from the SQLite `settings` table, if any.
+ * @param input - Database, key, and scope.
+ */
 function deletePlainSetting({
 	database,
 	key,
@@ -1152,6 +1304,11 @@ function deletePlainSetting({
 		.run(scope.scope, scope.scopeId, toSettingKey(key));
 }
 
+/**
+ * Asserts a database handle is available, throwing a typed error otherwise.
+ * @param database - Candidate database handle.
+ * @returns The handle.
+ */
 function requireDatabase(database: DatabaseSync | null): DatabaseSync {
 	if (!database) {
 		throw new EnvironmentVariablesError(
@@ -1163,6 +1320,11 @@ function requireDatabase(database: DatabaseSync | null): DatabaseSync {
 	return database;
 }
 
+/**
+ * Asserts a secret store is available, throwing a typed error otherwise.
+ * @param secretStore - Candidate store.
+ * @returns The store.
+ */
 function requireSecretStore(secretStore: SecretStore | null): SecretStore {
 	if (!secretStore) {
 		throw new EnvironmentVariablesError(
@@ -1174,6 +1336,12 @@ function requireSecretStore(secretStore: SecretStore | null): SecretStore {
 	return secretStore;
 }
 
+/**
+ * Tests whether a key is flagged `reserved` in the catalog.
+ * @param key - Variable name.
+ * @param catalogByKey - Active catalog map.
+ * @returns True when reserved.
+ */
 function isReservedEnvironmentVariableKey(
 	key: string,
 	catalogByKey: Map<string, EnvironmentVariableCatalogEntrySnapshot>,
@@ -1181,6 +1349,12 @@ function isReservedEnvironmentVariableKey(
 	return catalogByKey.get(key)?.reserved ?? false;
 }
 
+/**
+ * Tests whether a key is catalog-classified or name-shaped as a secret.
+ * @param key - Variable name.
+ * @param catalogByKey - Active catalog map.
+ * @returns True when secret-classified.
+ */
 function isSecretEnvironmentVariableKey(
 	key: string,
 	catalogByKey: Map<string, EnvironmentVariableCatalogEntrySnapshot>,
@@ -1193,20 +1367,40 @@ function isSecretEnvironmentVariableKey(
 	);
 }
 
+/**
+ * Tests whether a variable name contains a sensitive substring (e.g. `TOKEN`).
+ * @param key - Variable name.
+ * @returns True when the normalised name matches a sensitive part.
+ */
 function isSensitiveEnvironmentVariableName(key: string): boolean {
 	const normalized = key.replace(/[-_]/g, '').toLowerCase();
 
 	return SENSITIVE_KEY_PARTS.some((part) => normalized.includes(part));
 }
 
+/**
+ * Maps a variable name to its `settings` table key.
+ * @param key - Variable name.
+ * @returns The qualified setting key.
+ */
 function toSettingKey(key: string): string {
 	return `${ENVIRONMENT_SETTING_PREFIX}${key}`;
 }
 
+/**
+ * Maps a variable name to its secret-store key.
+ * @param key - Variable name.
+ * @returns The qualified secret-store key.
+ */
 function toSecretStoreKey(key: string): string {
 	return `${SECRET_ENVIRONMENT_KEY_PREFIX}${key}`;
 }
 
+/**
+ * Extracts the env var name from a secret store metadata entry.
+ * @param metadata - Secret store metadata.
+ * @returns The variable name, or `null` when the entry is unrelated.
+ */
 function getEnvironmentVariableKeyFromSecretMetadata(
 	metadata: SecretMetadata,
 ): string | null {
@@ -1226,10 +1420,20 @@ function getEnvironmentVariableKeyFromSecretMetadata(
 	return null;
 }
 
+/**
+ * Default factory that yields no secret store; callers wire a platform-specific
+ * store at service construction time.
+ * @returns Always `null`.
+ */
 function createDefaultSecretStore(_database: DatabaseSync): SecretStore | null {
 	return null;
 }
 
+/**
+ * Type guard for the secret-store "already exists" error shape.
+ * @param error - Thrown value.
+ * @returns True when the error indicates an existing entry.
+ */
 function isSecretStoreAlreadyExistsError(
 	error: unknown,
 ): error is { code: 'already-exists' } {
@@ -1241,6 +1445,12 @@ function isSecretStoreAlreadyExistsError(
 	);
 }
 
+/**
+ * Comparator that orders catalog entries by `category:key`.
+ * @param left - First entry.
+ * @param right - Second entry.
+ * @returns Standard comparator number.
+ */
 function compareCatalogEntries(
 	left: EnvironmentVariableCatalogEntrySnapshot,
 	right: EnvironmentVariableCatalogEntrySnapshot,
@@ -1250,6 +1460,11 @@ function compareCatalogEntries(
 	);
 }
 
+/**
+ * Type guard for the row shape returned by the env-var SQLite query.
+ * @param row - Candidate row value.
+ * @returns True when the row exposes string `key` and `value_json` columns.
+ */
 function isSqliteEnvironmentRow(row: unknown): row is SqliteEnvironmentRow {
 	return (
 		typeof row === 'object' &&
@@ -1261,6 +1476,11 @@ function isSqliteEnvironmentRow(row: unknown): row is SqliteEnvironmentRow {
 	);
 }
 
+/**
+ * Renders a variable name as a Title-Case label for catalog display.
+ * @param key - Variable name.
+ * @returns A user-facing title.
+ */
 function formatEnvironmentVariableTitle(key: string): string {
 	return key
 		.split('_')
