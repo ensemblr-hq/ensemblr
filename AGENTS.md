@@ -93,7 +93,23 @@ This repository uses Biome instead of ESLint and Prettier.
 - Put exported types in the concern-owned type or contract module that represents their public boundary.
 - Co-locate types with implementation only when they are not exported and are not used elsewhere.
 - Prefer inline prop and options types when the shape is small and the inline type remains readable.
+- For React components: if the component takes four or fewer props and the prop type is not exported, inline the prop shape directly on the function parameter. Lift it into a named `Props` interface only when it grows beyond four props, is exported, or is referenced from more than one place.
 - Avoid creating one-off exported `Props`, `Options`, or domain type names unless they are reused, part of a public module interface, or materially improve readability.
+
+## Documentation Policy
+
+Every function, hook, React component, Jotai atom, and IPC contract in `src/main`, `src/preload`, `src/shared`, and `src/renderer` carries a JSDoc block. Apply the following rules when adding or modifying code:
+
+- Place a `/** ... */` JSDoc block immediately above every declaration: named functions, arrow functions assigned to `const`/`let`, methods on classes and object literals, React components, and exported `const`s that hold function or atom values. Document internal helpers, not just exports.
+- Keep the description concise. One sentence is usually enough; two if the behavior is non-obvious. Describe what the symbol does and why, not how.
+- For non-component functions, use `@param name - description` for each parameter and `@returns description` only when the function returns a non-void value. Omit empty `@param` and `@returns` tags entirely when there is nothing useful to say.
+- For React components, write a description-only block on the component itself. Do not list props as `@param` tags. Document each prop on the corresponding interface or inline shape field only when the prop name does not already make its purpose obvious.
+- For interfaces and type aliases, write a single description block above the declaration. Do not annotate every field with its own JSDoc unless a specific field has non-obvious semantics that the type name cannot convey.
+- For Jotai atoms (including derived atoms) and exported plain-data constants, describe the slice of state or the meaning of the value, plus any persistence or scope notes. Skip the JSDoc when the constant's name is self-explanatory.
+- For TanStack Router route definitions and loaders, describe the route's purpose, what data it loads, and any params or search params it consumes.
+- For IPC channel and contract definitions, describe what the channel does, who sends it, and who receives it.
+- Excluded by policy: shadcn UI primitives under `src/renderer/components/ui/`, type-only files (`*.d.ts`, anything under `types/`), the generated `routeTree.gen.ts`, mock fixtures under `src/renderer/mocks/`, pure barrel `index.ts` re-export files, and tests. `src/shared/ipc/contracts.ts` is also treated as type-only.
+- When updating existing code, leave correct JSDoc in place and refresh it when behavior changes. Do not introduce new code without the appropriate JSDoc block.
 
 ## Linear And Pull Request Workflow
 
