@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { KeyboardEvent } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import {
 	githubRepositoryListQuery,
@@ -77,22 +77,17 @@ function CloneGithubDialogForm({
 			: undefined;
 
 	const [url, setUrl] = useState('');
-	const [location, setLocation] = useState('');
-	const [locationTouched, setLocationTouched] = useState(false);
+	const [locationOverride, setLocationOverride] = useState<string | null>(null);
 
 	const { diagnostics, isBusy, logs, retry, stage, startClone, successResult } =
 		useCloneFlow();
 
+	// Derive the shown location: user override if they touched it, else the
+	// managed default once the query resolves. Avoids a sync effect.
+	const location = locationOverride ?? defaultParentPath;
 	const trimmedUrl = url.trim();
 	const canClone = !isBusy && trimmedUrl.length > 0 && isEnsembleApiAvailable();
 	const locationPlaceholder = defaultParentPath || 'Managed repos directory';
-
-	useEffect(() => {
-		if (locationTouched || !defaultParentPath) {
-			return;
-		}
-		setLocation(defaultParentPath);
-	}, [defaultParentPath, locationTouched]);
 
 	const handleBrowse = useCallback(async () => {
 		if (!isEnsembleApiAvailable()) {
@@ -102,8 +97,7 @@ function CloneGithubDialogForm({
 		if (selection.canceled || !selection.path) {
 			return;
 		}
-		setLocationTouched(true);
-		setLocation(selection.path);
+		setLocationOverride(selection.path);
 	}, []);
 
 	const handleClone = useCallback(async () => {
@@ -183,8 +177,7 @@ function CloneGithubDialogForm({
 						disabled={isBusy}
 						id='clone-github-location'
 						onChange={(event) => {
-							setLocationTouched(true);
-							setLocation(event.target.value);
+							setLocationOverride(event.target.value);
 						}}
 						onKeyDown={handleSubmitKey}
 						placeholder={locationPlaceholder}
@@ -200,14 +193,13 @@ function CloneGithubDialogForm({
 						Browse
 					</Button>
 				</div>
-				{locationTouched &&
+				{locationOverride !== null &&
 				defaultParentPath &&
 				location !== defaultParentPath ? (
 					<button
 						className='self-start text-muted-foreground text-xxs underline-offset-2 hover:underline'
 						onClick={() => {
-							setLocationTouched(false);
-							setLocation(defaultParentPath);
+							setLocationOverride(null);
 						}}
 						type='button'
 					>

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { KeyboardEvent } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import {
 	ensembleQueryKeys,
@@ -65,8 +65,9 @@ function QuickStartDialogForm({
 	const defaultParentPath = rootDirectoryData?.repositoriesPath ?? '';
 
 	const [name, setName] = useState('');
-	const [parentPath, setParentPath] = useState('');
-	const [parentTouched, setParentTouched] = useState(false);
+	const [parentPathOverride, setParentPathOverride] = useState<string | null>(
+		null,
+	);
 	const [stage, setStage] = useState<QuickStartStage>('idle');
 	const [diagnostics, setDiagnostics] = useState<QuickStartProjectDiagnostic[]>(
 		[],
@@ -74,12 +75,9 @@ function QuickStartDialogForm({
 	const [successResult, setSuccessResult] =
 		useState<QuickStartProjectResult | null>(null);
 
-	useEffect(() => {
-		if (parentTouched || !defaultParentPath) {
-			return;
-		}
-		setParentPath(defaultParentPath);
-	}, [defaultParentPath, parentTouched]);
+	// Derive the shown path: user override if they touched it, else the
+	// managed default once the query resolves. Avoids a sync effect.
+	const parentPath = parentPathOverride ?? defaultParentPath;
 
 	const trimmedName = name.trim();
 	const localValidation = validateNameLocally(trimmedName);
@@ -98,8 +96,7 @@ function QuickStartDialogForm({
 		if (selection.canceled || !selection.path) {
 			return;
 		}
-		setParentTouched(true);
-		setParentPath(selection.path);
+		setParentPathOverride(selection.path);
 	}, []);
 
 	const handleCreate = useCallback(async () => {
@@ -198,8 +195,7 @@ function QuickStartDialogForm({
 						disabled={isBusy}
 						id='quick-start-parent'
 						onChange={(event) => {
-							setParentTouched(true);
-							setParentPath(event.target.value);
+							setParentPathOverride(event.target.value);
 						}}
 						onKeyDown={handleSubmitKey}
 						placeholder={parentPlaceholder}
@@ -215,14 +211,13 @@ function QuickStartDialogForm({
 						Browse
 					</Button>
 				</div>
-				{parentTouched &&
+				{parentPathOverride !== null &&
 				defaultParentPath &&
 				parentPath !== defaultParentPath ? (
 					<button
 						className='self-start text-[0.6875rem] text-muted-foreground underline-offset-2 hover:underline'
 						onClick={() => {
-							setParentTouched(false);
-							setParentPath(defaultParentPath);
+							setParentPathOverride(null);
 						}}
 						type='button'
 					>
