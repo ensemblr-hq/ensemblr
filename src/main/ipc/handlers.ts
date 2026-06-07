@@ -7,6 +7,11 @@ import {
 } from 'electron';
 
 import {
+	type CloneDestinationSelectionResult,
+	type CloneGithubRepositoryPrepareResult,
+	type CloneGithubRepositoryRequest,
+	type CloneGithubRepositoryStartRequest,
+	type CloneGithubRepositoryStartResult,
 	type EnvironmentVariablesSnapshot,
 	type HealthSnapshot,
 	IPC_CHANNELS,
@@ -35,7 +40,10 @@ import type {
 import { isRepositoryConfigPathAllowed } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
 import type { PiExecutableService } from '../pi';
-import type { LocalRepositoryRegistrationService } from '../repository';
+import type {
+	GithubCloneService,
+	LocalRepositoryRegistrationService,
+} from '../repository';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsembleDatabaseService } from '../storage';
@@ -48,6 +56,7 @@ interface RegisterIpcHandlersOptions {
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
 	environmentVariablesService: EnvironmentVariablesService;
+	githubCloneService: GithubCloneService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
 	repositoryConfigService: RepositoryConfigService;
@@ -65,6 +74,7 @@ export function registerIpcHandlers({
 	configService,
 	databaseService,
 	environmentVariablesService,
+	githubCloneService,
 	localRepositoryRegistrationService,
 	piExecutableService,
 	repositoryConfigService,
@@ -316,6 +326,56 @@ export function registerIpcHandlers({
 	);
 
 	ipcMain.handle(
+		IPC_CHANNELS.selectCloneDestination,
+		async (event): Promise<CloneDestinationSelectionResult> => {
+			const window = BrowserWindow.fromWebContents(event.sender);
+			const options: OpenDialogOptions = {
+				buttonLabel: 'Select destination',
+				message:
+					'Select the parent directory where the GitHub repository should be cloned.',
+				properties: ['openDirectory', 'createDirectory'],
+				title: 'Select clone destination',
+			};
+			const result = window
+				? await dialog.showOpenDialog(window, options)
+				: await dialog.showOpenDialog(options);
+
+			if (result.canceled || !result.filePaths[0]) {
+				return { canceled: true };
+			}
+
+			return { canceled: false, path: result.filePaths[0] };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.cloneGithubRepositoryPrepare,
+		(_event, request: unknown): Promise<CloneGithubRepositoryPrepareResult> => {
+			return githubCloneService.prepare(
+				normalizeCloneGithubRepositoryRequest(request),
+			);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.cloneGithubRepositoryStart,
+		(event, request: unknown): Promise<CloneGithubRepositoryStartResult> => {
+			const normalized = normalizeCloneGithubRepositoryStartRequest(request);
+			return githubCloneService.start(normalized, {
+				onProgress: (payload) => {
+					if (event.sender.isDestroyed()) {
+						return;
+					}
+					event.sender.send(
+						IPC_CHANNELS.cloneGithubRepositoryProgress,
+						payload,
+					);
+				},
+			});
+		},
+	);
+
+	ipcMain.handle(
 		IPC_CHANNELS.setupDiagnostics,
 		(): Promise<SetupDiagnosticsSnapshot> => {
 			return setupDiagnosticsService.getSnapshot();
@@ -344,6 +404,40 @@ function normalizeRootDirectoryChangeRequest(
 	}
 
 	return { path: request.path.trim() };
+}
+
+/** Coerces an IPC payload into a {@link CloneGithubRepositoryRequest}. */
+function normalizeCloneGithubRepositoryRequest(
+	request: unknown,
+): CloneGithubRepositoryRequest {
+	if (typeof request !== 'object' || request === null) {
+		return { url: '' };
+	}
+
+	const url =
+		'url' in request && typeof request.url === 'string' ? request.url : '';
+	const destinationPath =
+		'destinationPath' in request && typeof request.destinationPath === 'string'
+			? request.destinationPath
+			: undefined;
+
+	return destinationPath !== undefined ? { destinationPath, url } : { url };
+}
+
+/** Coerces an IPC payload into a {@link CloneGithubRepositoryStartRequest}. */
+function normalizeCloneGithubRepositoryStartRequest(
+	request: unknown,
+): CloneGithubRepositoryStartRequest {
+	if (
+		typeof request !== 'object' ||
+		request === null ||
+		!('jobId' in request) ||
+		typeof request.jobId !== 'string'
+	) {
+		return { jobId: '' };
+	}
+
+	return { jobId: request.jobId };
 }
 
 /** Coerces an IPC payload into a {@link RegisterLocalRepositoryRequest}. */

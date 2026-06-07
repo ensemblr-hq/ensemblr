@@ -1,5 +1,17 @@
 export { IPC_CHANNELS } from './channels';
 export type {
+	CloneDestinationSelectionResult,
+	CloneGithubRepositoryDiagnostic,
+	CloneGithubRepositoryDiagnosticCode,
+	CloneGithubRepositoryDiagnosticSeverity,
+	CloneGithubRepositoryPreparation,
+	CloneGithubRepositoryPrepareResult,
+	CloneGithubRepositoryProgressEvent,
+	CloneGithubRepositoryProgressKind,
+	CloneGithubRepositoryRequest,
+	CloneGithubRepositoryStartRequest,
+	CloneGithubRepositoryStartResult,
+	CloneGithubRepositoryStartStatus,
 	ConfigDiagnostic,
 	ConfigDiagnosticSeverity,
 	ConfigStatus,

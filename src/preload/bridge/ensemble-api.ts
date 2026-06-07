@@ -1,6 +1,12 @@
-import { ipcRenderer } from 'electron';
+import { type IpcRendererEvent, ipcRenderer } from 'electron';
 
 import {
+	type CloneDestinationSelectionResult,
+	type CloneGithubRepositoryPrepareResult,
+	type CloneGithubRepositoryProgressEvent,
+	type CloneGithubRepositoryRequest,
+	type CloneGithubRepositoryStartRequest,
+	type CloneGithubRepositoryStartResult,
 	type EnsembleApi,
 	type EnvironmentVariablesSnapshot,
 	type HealthSnapshot,
@@ -54,15 +60,43 @@ export function createEnsembleApi(): EnsembleApi {
 			) as Promise<EnvironmentVariablesSnapshot>,
 		health: () =>
 			ipcRenderer.invoke(IPC_CHANNELS.health) as Promise<HealthSnapshot>,
+		onCloneGithubRepositoryProgress: (
+			listener: (event: CloneGithubRepositoryProgressEvent) => void,
+		) => {
+			const wrapped = (
+				_event: IpcRendererEvent,
+				payload: CloneGithubRepositoryProgressEvent,
+			) => {
+				listener(payload);
+			};
+			ipcRenderer.on(IPC_CHANNELS.cloneGithubRepositoryProgress, wrapped);
+			return () => {
+				ipcRenderer.off(IPC_CHANNELS.cloneGithubRepositoryProgress, wrapped);
+			};
+		},
+		prepareCloneGithubRepository: (request: CloneGithubRepositoryRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.cloneGithubRepositoryPrepare,
+				request,
+			) as Promise<CloneGithubRepositoryPrepareResult>,
 		registerLocalRepository: (request: RegisterLocalRepositoryRequest) =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.registerLocalRepository,
 				request,
 			) as Promise<RegisterLocalRepositoryResult>,
+		selectCloneDestination: () =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.selectCloneDestination,
+			) as Promise<CloneDestinationSelectionResult>,
 		selectLocalRepository: () =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.selectLocalRepository,
 			) as Promise<LocalRepositorySelectionResult>,
+		startCloneGithubRepository: (request: CloneGithubRepositoryStartRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.cloneGithubRepositoryStart,
+				request,
+			) as Promise<CloneGithubRepositoryStartResult>,
 		previewRepositoryConfigMigration: (
 			request: RepositoryConfigMigrationRequest,
 		) =>

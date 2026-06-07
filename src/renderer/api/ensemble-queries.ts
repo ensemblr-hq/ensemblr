@@ -2,6 +2,12 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation/route-profiler';
 import type {
+	CloneDestinationSelectionResult,
+	CloneGithubRepositoryPrepareResult,
+	CloneGithubRepositoryProgressEvent,
+	CloneGithubRepositoryRequest,
+	CloneGithubRepositoryStartRequest,
+	CloneGithubRepositoryStartResult,
 	EnsembleApi,
 	LocalRepositorySelectionResult,
 	RegisterLocalRepositoryRequest,
@@ -16,6 +22,7 @@ export const ensembleQueryKeys = {
 	health: () => [...ensembleQueryKeys.all, 'health'] as const,
 	repositoryWorkspaceNavigation: () =>
 		[...ensembleQueryKeys.all, 'repository-workspace-navigation'] as const,
+	rootDirectory: () => [...ensembleQueryKeys.all, 'root-directory'] as const,
 	setupDiagnostics: () =>
 		[...ensembleQueryKeys.all, 'setup-diagnostics'] as const,
 };
@@ -65,6 +72,17 @@ export const environmentVariablesQuery = queryOptions({
 	staleTime: 5000,
 });
 
+/** Query options for the renderer-side root directory snapshot. */
+export const rootDirectoryQuery = queryOptions({
+	queryFn: () =>
+		profileElectronIpcCall(
+			{ channel: 'ensemble:root-directory', usesDatabase: true },
+			() => getEnsembleApi().rootDirectory(),
+		),
+	queryKey: ensembleQueryKeys.rootDirectory(),
+	staleTime: 5000,
+});
+
 /** Query options for the renderer-side repository/workspace navigation snapshot. */
 export const repositoryWorkspaceNavigationQuery = queryOptions({
 	queryFn: () =>
@@ -95,6 +113,50 @@ export function registerLocalRepository(
 		{ channel: 'ensemble:register-local-repository', usesDatabase: true },
 		() => getEnsembleApi().registerLocalRepository(request),
 	);
+}
+
+/** Opens the native folder picker to choose a clone destination parent folder. */
+export function selectCloneDestination(): Promise<CloneDestinationSelectionResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:select-clone-destination', usesDatabase: false },
+		() => getEnsembleApi().selectCloneDestination(),
+	);
+}
+
+/** Validates a GitHub clone request and allocates a jobId. */
+export function prepareCloneGithubRepository(
+	request: CloneGithubRepositoryRequest,
+): Promise<CloneGithubRepositoryPrepareResult> {
+	return profileElectronIpcCall(
+		{
+			channel: 'ensemble:clone-github-repository:prepare',
+			usesDatabase: false,
+		},
+		() => getEnsembleApi().prepareCloneGithubRepository(request),
+	);
+}
+
+/** Executes a previously-prepared GitHub clone job. */
+export function startCloneGithubRepository(
+	request: CloneGithubRepositoryStartRequest,
+): Promise<CloneGithubRepositoryStartResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:clone-github-repository:start', usesDatabase: true },
+		() => getEnsembleApi().startCloneGithubRepository(request),
+	);
+}
+
+/** Subscribes to clone-progress events; returns an unsubscribe function. */
+export function subscribeCloneGithubRepositoryProgress(
+	listener: (event: CloneGithubRepositoryProgressEvent) => void,
+): () => void {
+	const api = window.ensemble;
+	if (!api) {
+		return () => {
+			// noop in environments without the preload bridge.
+		};
+	}
+	return api.onCloneGithubRepositoryProgress(listener);
 }
 
 /** Query options for the renderer-side setup-diagnostics snapshot. */

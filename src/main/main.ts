@@ -12,7 +12,10 @@ import { createEnvironmentVariablesService } from './environment';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
 import { createPiExecutableService, createPiReadinessService } from './pi';
-import { createLocalRepositoryRegistrationService } from './repository';
+import {
+	createGithubCloneService,
+	createLocalRepositoryRegistrationService,
+} from './repository';
 import {
 	createEnsembleRootDirectoryService,
 	reconcileRootDirectory,
@@ -63,6 +66,10 @@ const localRepositoryRegistrationService =
 	createLocalRepositoryRegistrationService({
 		databaseService,
 	});
+const githubCloneService = createGithubCloneService({
+	registrationService: localRepositoryRegistrationService,
+	rootDirectoryService,
+});
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
 	databaseService,
@@ -85,6 +92,7 @@ app.whenReady().then(() => {
 		configService,
 		databaseService,
 		environmentVariablesService,
+		githubCloneService,
 		localRepositoryRegistrationService,
 		piExecutableService,
 		repositoryConfigService,

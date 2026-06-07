@@ -21,7 +21,7 @@
 		"test:app": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/main-window-state.test.ts",
 		"test:pi": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-executable.test.ts tests/main/pi-readiness.test.ts",
 		"test:renderer": "bun test tests/renderer/*.test.tsx",
-		"test:repository": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/register-repository.test.ts",
+		"test:repository": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/register-repository.test.ts tests/main/clone-repository.test.ts",
 		"test:root": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/root-directory.test.ts",
 		"test:secrets": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/secret-store.test.ts",
 		"test:setup": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/setup-diagnostics.test.ts",
