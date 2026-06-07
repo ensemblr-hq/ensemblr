@@ -77,6 +77,7 @@ function CloneGithubDialogForm({
 
 	const [url, setUrl] = useState('');
 	const [location, setLocation] = useState('');
+	const [locationTouched, setLocationTouched] = useState(false);
 	const [stage, setStage] = useState<CloneStage>('idle');
 	const [diagnostics, setDiagnostics] = useState<
 		CloneGithubRepositoryDiagnostic[]
@@ -104,6 +105,13 @@ function CloneGithubDialogForm({
 	}, []);
 
 	useEffect(() => {
+		if (locationTouched || !defaultParentPath) {
+			return;
+		}
+		setLocation(defaultParentPath);
+	}, [defaultParentPath, locationTouched]);
+
+	useEffect(() => {
 		if (!activeJobId) {
 			return;
 		}
@@ -126,6 +134,7 @@ function CloneGithubDialogForm({
 		if (selection.canceled || !selection.path) {
 			return;
 		}
+		setLocationTouched(true);
 		setLocation(selection.path);
 	}, []);
 
@@ -244,7 +253,10 @@ function CloneGithubDialogForm({
 						className='h-9 flex-1 font-mono text-xs'
 						disabled={isBusy}
 						id='clone-github-location'
-						onChange={(event) => setLocation(event.target.value)}
+						onChange={(event) => {
+							setLocationTouched(true);
+							setLocation(event.target.value);
+						}}
 						onKeyDown={handleSubmitKey}
 						placeholder={locationPlaceholder}
 						value={location}
@@ -259,10 +271,19 @@ function CloneGithubDialogForm({
 						Browse
 					</Button>
 				</div>
-				{!location && defaultParentPath ? (
-					<p className='text-[0.6875rem] text-muted-foreground'>
-						Defaults to {defaultParentPath}
-					</p>
+				{locationTouched &&
+				defaultParentPath &&
+				location !== defaultParentPath ? (
+					<button
+						className='self-start text-[0.6875rem] text-muted-foreground underline-offset-2 hover:underline'
+						onClick={() => {
+							setLocationTouched(false);
+							setLocation(defaultParentPath);
+						}}
+						type='button'
+					>
+						Reset to managed repos directory
+					</button>
 				) : null}
 			</div>
 
