@@ -88,6 +88,7 @@ function CloneGithubDialogForm({
 			? githubRepoList.data.error
 			: undefined;
 	const fallbackEntries: GithubRepositoryEntry[] = recentRepos.map((repo) => ({
+		avatarUrl: null,
 		description: repo.description ?? null,
 		fullName: repo.fullName,
 		isPrivate: false,
@@ -477,12 +478,9 @@ function RecentReposList({
 								onClick={() => onSelect(repo)}
 								type='button'
 							>
-								<span
-									aria-hidden='true'
-									className='size-5 shrink-0 rounded-full ring-1 ring-foreground/10'
-									style={{
-										backgroundColor: ownerAvatarColor(repo.ownerLogin),
-									}}
+								<OwnerAvatar
+									avatarUrl={repo.avatarUrl}
+									ownerLogin={repo.ownerLogin}
 								/>
 								<span className='flex min-w-0 flex-col leading-tight'>
 									<span className='flex min-w-0 items-center gap-1.5 truncate text-foreground text-xs'>
@@ -506,6 +504,47 @@ function RecentReposList({
 			</ul>
 		</ScrollArea>
 	);
+}
+
+/** Avatar bubble for a repo owner, with an image fallback to a tinted swatch. */
+function OwnerAvatar({
+	avatarUrl,
+	ownerLogin,
+}: {
+	avatarUrl: string | null;
+	ownerLogin: string;
+}) {
+	const [failed, setFailed] = useState(false);
+
+	if (avatarUrl && !failed) {
+		return (
+			<img
+				alt=''
+				className='size-5 shrink-0 rounded-full bg-background object-cover ring-1 ring-foreground/10'
+				draggable={false}
+				loading='lazy'
+				onError={() => setFailed(true)}
+				referrerPolicy='no-referrer'
+				src={withAvatarSize(avatarUrl, 40)}
+			/>
+		);
+	}
+
+	return (
+		<span
+			aria-hidden='true'
+			className='size-5 shrink-0 rounded-full ring-1 ring-foreground/10'
+			style={{ backgroundColor: ownerAvatarColor(ownerLogin) }}
+		/>
+	);
+}
+
+/** Appends `?s=<size>` to a GitHub avatar URL so we fetch a small thumbnail. */
+function withAvatarSize(url: string, size: number): string {
+	if (url.includes('?')) {
+		return `${url}&s=${size}`;
+	}
+	return `${url}?s=${size}`;
 }
 
 /** Stable color swatch per owner login, derived without external assets. */

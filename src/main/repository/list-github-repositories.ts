@@ -27,7 +27,7 @@ const GH_REPO_LIST_QUERY = `user/repos?sort=updated&per_page=${GH_REPO_LIST_LIMI
 interface RawGithubRepository {
 	description?: unknown;
 	full_name?: unknown;
-	owner?: { login?: unknown } | null;
+	owner?: { avatar_url?: unknown; login?: unknown } | null;
 	private?: unknown;
 	updated_at?: unknown;
 }
@@ -124,8 +124,13 @@ function toEntry(raw: unknown): GithubRepositoryEntry | null {
 		record.owner && typeof record.owner.login === 'string'
 			? record.owner.login
 			: (record.full_name.split('/')[0] ?? '');
+	const avatarUrl =
+		record.owner && typeof record.owner.avatar_url === 'string'
+			? record.owner.avatar_url
+			: null;
 
 	return {
+		avatarUrl,
 		description:
 			typeof record.description === 'string' ? record.description : null,
 		fullName: record.full_name,

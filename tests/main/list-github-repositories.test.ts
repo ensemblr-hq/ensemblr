@@ -100,7 +100,10 @@ test('list maps gh api JSON into GithubRepositoryEntry rows', async () => {
 		{
 			description: 'A repository for ensemble',
 			full_name: 'psoldunov/ensemble',
-			owner: { login: 'psoldunov' },
+			owner: {
+				avatar_url: 'https://avatars.githubusercontent.com/u/1?v=4',
+				login: 'psoldunov',
+			},
 			private: false,
 			updated_at: '2026-06-06T17:30:00.000Z',
 		},
@@ -127,8 +130,13 @@ test('list maps gh api JSON into GithubRepositoryEntry rows', async () => {
 	assert.equal(result.entries.length, 2);
 	assert.equal(result.entries[0]?.fullName, 'psoldunov/ensemble');
 	assert.equal(result.entries[0]?.isPrivate, false);
+	assert.equal(
+		result.entries[0]?.avatarUrl,
+		'https://avatars.githubusercontent.com/u/1?v=4',
+	);
 	assert.equal(result.entries[1]?.fullName, 'the-set-set/website');
 	assert.equal(result.entries[1]?.isPrivate, true);
+	assert.equal(result.entries[1]?.avatarUrl, null);
 	assert.equal(calls.length, 1);
 	assert.equal(calls[0]?.command, 'gh');
 	assert.deepEqual(calls[0]?.args, [

@@ -535,6 +535,7 @@ export interface CloneDestinationSelectionResult {
 }
 
 export interface GithubRepositoryEntry {
+	avatarUrl: string | null;
 	description: string | null;
 	fullName: string;
 	isPrivate: boolean;
