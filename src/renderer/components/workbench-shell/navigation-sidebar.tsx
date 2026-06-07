@@ -1,11 +1,10 @@
 import {
 	CircleHelpIcon,
-	CogIcon,
 	HistoryIcon,
 	LayoutDashboardIcon,
-	PlusIcon,
+	SettingsIcon,
 } from 'lucide-react';
-import type { ReactElement } from 'react';
+import { type ReactElement, useState } from 'react';
 
 import { ReorderList } from '@/renderer/components/shadix-ui/components/reorder-list';
 import { StatusBadge } from '@/renderer/components/status-badge';
@@ -14,7 +13,6 @@ import {
 	SidebarContent,
 	SidebarFooter,
 	SidebarGroup,
-	SidebarGroupAction,
 	SidebarGroupContent,
 	SidebarGroupLabel,
 	SidebarHeader,
@@ -27,7 +25,10 @@ import {
 } from '@/renderer/components/ui/sidebar';
 import { cn } from '@/renderer/lib/utils';
 import type {
+	AddProjectActionId,
+	AddProjectMenuModel,
 	ProjectShellModel,
+	RecentProject,
 	WorkbenchRouteSearch,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
@@ -39,6 +40,7 @@ import type {
 	WorkbenchWorkspaceNavigationLinkTarget,
 } from '@/renderer/types/workbench-shell';
 
+import { CreateWorkspaceSourceDialog } from './create-workspace-source-dialog';
 import { ProjectCreationMenu, ProjectSidebarHeader } from './project-sidebar';
 import { WorkspaceSidebarItem } from './workspace-sidebar-item';
 
@@ -53,7 +55,10 @@ export function WorkspaceNavigationSidebar({
 	activeProject,
 	activeView,
 	activeWorkspace,
+	addProjectMenu,
 	health,
+	onAddProject,
+	onOpenRecentProject,
 	onStaticNavigationSelect,
 	onWorkspaceSelect,
 	projectNavigation,
@@ -65,7 +70,10 @@ export function WorkspaceNavigationSidebar({
 	activeProject: ProjectShellModel | null;
 	activeView: WorkbenchActiveView;
 	activeWorkspace: WorkspaceShellModel | null;
+	addProjectMenu?: AddProjectMenuModel;
 	health: WorkbenchHealth;
+	onAddProject?: (action: AddProjectActionId) => void;
+	onOpenRecentProject?: (recent: RecentProject) => void;
 	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projectNavigation: ProjectNavigationState;
@@ -112,6 +120,9 @@ export function WorkspaceNavigationSidebar({
 				<ProjectNavigationGroups
 					activeProject={activeNavigationProject}
 					activeWorkspace={activeNavigationWorkspace}
+					addProjectMenu={addProjectMenu}
+					onAddProject={onAddProject}
+					onOpenRecentProject={onOpenRecentProject}
 					onStaticNavigationSelect={onStaticNavigationSelect}
 					onWorkspaceSelect={onWorkspaceSelect}
 					projectNavigation={projectNavigation}
@@ -161,7 +172,7 @@ function SidebarPrimaryNavigation({
 						/>
 						<StaticNavigationItem
 							ariaLabel='Open app settings'
-							icon={<CogIcon aria-hidden='true' />}
+							icon={<SettingsIcon aria-hidden='true' />}
 							isActive={activeView === 'settings'}
 							label='Settings'
 							onSelect={onStaticNavigationSelect}
@@ -289,6 +300,9 @@ function PinnedWorkspaceGroup({
 function ProjectNavigationGroups({
 	activeProject,
 	activeWorkspace,
+	addProjectMenu,
+	onAddProject,
+	onOpenRecentProject,
 	onStaticNavigationSelect,
 	onWorkspaceSelect,
 	projectNavigation,
@@ -297,6 +311,9 @@ function ProjectNavigationGroups({
 }: {
 	activeProject: ProjectShellModel | null;
 	activeWorkspace: WorkspaceShellModel | null;
+	addProjectMenu?: AddProjectMenuModel;
+	onAddProject?: (action: AddProjectActionId) => void;
+	onOpenRecentProject?: (recent: RecentProject) => void;
 	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projectNavigation: ProjectNavigationState;
@@ -318,6 +335,8 @@ function ProjectNavigationGroups({
 		toggleProjectCollapsed,
 		toggleWorkspacePinned,
 	} = projectNavigation;
+	const [createSourceProject, setCreateSourceProject] =
+		useState<ProjectShellModel | null>(null);
 
 	return (
 		<>
@@ -325,7 +344,11 @@ function ProjectNavigationGroups({
 				<SidebarGroupLabel className='h-7 justify-between pr-7'>
 					<span className='truncate'>Repositories</span>
 				</SidebarGroupLabel>
-				<ProjectCreationMenu />
+				<ProjectCreationMenu
+					model={addProjectMenu ?? { actions: [], recents: [] }}
+					onSelectAction={onAddProject}
+					onSelectRecent={onOpenRecentProject}
+				/>
 			</SidebarGroup>
 
 			<ReorderList
@@ -347,6 +370,7 @@ function ProjectNavigationGroups({
 							activeWorkspace={activeWorkspace}
 							isCollapsed={isProjectCollapsed}
 							key={project.id}
+							onCreateFromSourceSelect={() => setCreateSourceProject(project)}
 							onProjectToggle={() => toggleProjectCollapsed(project.id)}
 							onStaticNavigationSelect={onStaticNavigationSelect}
 							onWorkspacePinToggle={toggleWorkspacePinned}
@@ -360,6 +384,17 @@ function ProjectNavigationGroups({
 					);
 				})}
 			</ReorderList>
+
+			<CreateWorkspaceSourceDialog
+				onOpenChange={(open) => {
+					if (!open) {
+						setCreateSourceProject(null);
+					}
+				}}
+				open={createSourceProject !== null}
+				project={createSourceProject}
+				projects={orderedProjects}
+			/>
 		</>
 	);
 }
@@ -368,6 +403,7 @@ function ProjectWorkspaceGroup({
 	activeProject,
 	activeWorkspace,
 	isCollapsed,
+	onCreateFromSourceSelect,
 	onProjectToggle,
 	onStaticNavigationSelect,
 	onWorkspacePinToggle,
@@ -381,6 +417,7 @@ function ProjectWorkspaceGroup({
 	activeProject: ProjectShellModel | null;
 	activeWorkspace: WorkspaceShellModel | null;
 	isCollapsed: boolean;
+	onCreateFromSourceSelect: () => void;
 	onProjectToggle: () => void;
 	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 	onWorkspacePinToggle: (workspaceId: string) => void;
@@ -403,19 +440,12 @@ function ProjectWorkspaceGroup({
 		>
 			<ProjectSidebarHeader
 				isCollapsed={isCollapsed}
+				onCreateFromSourceSelect={onCreateFromSourceSelect}
 				onRepositorySettingsSelect={() => onStaticNavigationSelect('settings')}
 				onToggle={onProjectToggle}
 				project={project}
 				workspaceCount={workspaces.length}
 			/>
-			<SidebarGroupAction
-				aria-label={`Create workspace in ${project.name}`}
-				className='top-2 size-6 [&>svg]:size-4'
-				onPointerDown={(event) => event.stopPropagation()}
-				type='button'
-			>
-				<PlusIcon aria-hidden='true' />
-			</SidebarGroupAction>
 			<SidebarGroupContent
 				aria-hidden={isCollapsed}
 				className={cn(

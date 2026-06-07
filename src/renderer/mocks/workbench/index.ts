@@ -5,6 +5,7 @@ export type {
 } from './chat-thread';
 export { getWorkbenchMockChatThread } from './chat-thread';
 export { shellFixtureProjects } from './projects';
+export { defaultRecentProjects } from './recent-projects';
 export {
 	findProject,
 	findSession,
@@ -12,3 +13,4 @@ export {
 	getDefaultProject,
 	getDefaultWorkspace,
 } from './selectors';
+export { defaultWorkspaceSources } from './workspace-sources';
