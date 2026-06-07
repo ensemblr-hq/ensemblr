@@ -58,11 +58,11 @@ function QuickStartDialogForm({
 	onOpenChange: (open: boolean) => void;
 }) {
 	const queryClient = useQueryClient();
-	const rootDirectory = useQuery({
+	const { data: rootDirectoryData } = useQuery({
 		...rootDirectoryQuery,
 		enabled: isEnsembleApiAvailable(),
 	});
-	const defaultParentPath = rootDirectory.data?.repositoriesPath ?? '';
+	const defaultParentPath = rootDirectoryData?.repositoriesPath ?? '';
 
 	const [name, setName] = useState('');
 	const [parentPath, setParentPath] = useState('');

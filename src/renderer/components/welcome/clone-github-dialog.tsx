@@ -58,21 +58,22 @@ function CloneGithubDialogForm({
 }: {
 	onOpenChange: (open: boolean) => void;
 }) {
-	const rootDirectory = useQuery({
+	const { data: rootDirectoryData } = useQuery({
 		...rootDirectoryQuery,
 		enabled: isEnsembleApiAvailable(),
 	});
-	const defaultParentPath = rootDirectory.data?.repositoriesPath ?? '';
+	const defaultParentPath = rootDirectoryData?.repositoriesPath ?? '';
 
-	const githubRepoList = useQuery({
-		...githubRepositoryListQuery,
-		enabled: isEnsembleApiAvailable(),
-	});
+	const { data: githubRepoListData, isLoading: isGithubRepoListLoading } =
+		useQuery({
+			...githubRepositoryListQuery,
+			enabled: isEnsembleApiAvailable(),
+		});
 	const displayedEntries: GithubRepositoryEntry[] =
-		githubRepoList.data?.entries ?? [];
+		githubRepoListData?.entries ?? [];
 	const liveError =
-		githubRepoList.data?.status === 'failure'
-			? githubRepoList.data.error
+		githubRepoListData?.status === 'failure'
+			? githubRepoListData.error
 			: undefined;
 
 	const [url, setUrl] = useState('');
@@ -162,7 +163,7 @@ function CloneGithubDialogForm({
 				<Label className='text-xs'>Recent repos</Label>
 				<CloneGithubRecentRepos
 					disabled={isBusy}
-					isLoading={githubRepoList.isLoading}
+					isLoading={isGithubRepoListLoading}
 					onSelect={(repo) => setUrl(`https://github.com/${repo.fullName}.git`)}
 					repos={displayedEntries}
 					selectedUrl={url}
