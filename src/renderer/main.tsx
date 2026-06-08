@@ -5,6 +5,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { queryClient } from './api/query-client';
+import { Toaster } from './components/ui/sonner';
 import { router } from './routing/router';
 import './styles/index.css';
 
@@ -18,6 +19,7 @@ createRoot(rootElement).render(
 	<StrictMode>
 		<QueryClientProvider client={queryClient}>
 			<RouterProvider router={router} />
+			<Toaster position='bottom-right' />
 		</QueryClientProvider>
 	</StrictMode>,
 );

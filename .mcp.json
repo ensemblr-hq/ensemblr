@@ -5,7 +5,7 @@
 			"args": ["shadcn@latest", "mcp"]
 		},
 		"fallow": {
-      "command": "fallow-mcp"
-    }
+			"command": "fallow-mcp"
+		}
 	}
 }

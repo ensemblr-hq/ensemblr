@@ -82,7 +82,7 @@ SELECT
 	metadata_json AS metadataJson
 FROM workspaces
 WHERE archived_at IS NULL
-ORDER BY lower(name), lower(slug), id
+ORDER BY created_at DESC, id DESC
 `)
 		.all() as unknown as WorkspaceRow[];
 	const repositoriesById = new Map<

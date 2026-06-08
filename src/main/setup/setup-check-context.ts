@@ -39,17 +39,15 @@ export function createSetupCheckSnapshot(
 	};
 }
 
-/** Renders a {@link LocalCommandResult} as a setup check log set. */
-export function createCommandLogs(
+/**
+ * Appends `stdout` and `stderr` log entries from a command result, mirroring
+ * the truncation flags. Shared between `createCommandLogs` and callers that
+ * build their own log prefix (e.g. environment-diagnostics).
+ */
+export function appendCommandStreamLogs(
+	logs: SetupCheckLogSnapshot[],
 	result: LocalCommandResult,
-): SetupCheckLogSnapshot[] {
-	const logs: SetupCheckLogSnapshot[] = [
-		{
-			label: 'Command',
-			text: result.logs.command,
-		},
-	];
-
+): void {
 	if (result.logs.stdout) {
 		logs.push({
 			label: 'stdout',
@@ -65,6 +63,20 @@ export function createCommandLogs(
 			truncated: result.stderrTruncated,
 		});
 	}
+}
+
+/** Renders a {@link LocalCommandResult} as a setup check log set. */
+export function createCommandLogs(
+	result: LocalCommandResult,
+): SetupCheckLogSnapshot[] {
+	const logs: SetupCheckLogSnapshot[] = [
+		{
+			label: 'Command',
+			text: result.logs.command,
+		},
+	];
+
+	appendCommandStreamLogs(logs, result);
 
 	if (result.failure) {
 		logs.push({

@@ -1,7 +1,7 @@
 import { getRouteApi, useChildMatches } from '@tanstack/react-router';
 
 import { WorkbenchEmptyStateContent } from '@/renderer/components/workbench-empty-state';
-import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/contexts';
+import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
 import {
 	findWorkspaceNavigationSelection,
@@ -9,7 +9,7 @@ import {
 	getStringRouteParam,
 } from '@/renderer/lib/workbench';
 
-import { useWorkbenchLayoutRouteModel } from './layout-model-context';
+import { useWorkbenchLayoutRouteModel } from '../shell-contexts';
 import { WorkspaceRouteContent } from './workspace-route-content';
 
 const workspaceRouteApi = getRouteApi(

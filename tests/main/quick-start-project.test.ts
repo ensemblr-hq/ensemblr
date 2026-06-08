@@ -11,12 +11,8 @@ import type {
 } from '../../src/main/commands/local-command';
 import { createQuickStartProjectService } from '../../src/main/repository/quick-start-project.ts';
 import type { LocalRepositoryRegistrationService } from '../../src/main/repository/register-repository.ts';
-import type { EnsembleRootDirectoryService } from '../../src/main/root';
-import type {
-	RegisteredRepositorySnapshot,
-	RegisterLocalRepositoryResult,
-	RootDirectorySnapshot,
-} from '../../src/shared/ipc';
+import { buildRegistrationStub } from './helpers/registration-stub.ts';
+import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
 const fixedNow = () => new Date('2026-06-07T12:00:00.000Z');
 
@@ -35,45 +31,8 @@ function createWorkspace(t: TestContext): {
 	return { parentPath: root, repositoriesPath };
 }
 
-function rootDirectoryStub(
-	repositoriesPath: string,
-): EnsembleRootDirectoryService {
-	const snapshot: RootDirectorySnapshot = {
-		archivedContextsPath: path.join(
-			repositoriesPath,
-			'..',
-			'archived-contexts',
-		),
-		createdPaths: [],
-		diagnostics: [],
-		managedPaths: [],
-		path: path.dirname(repositoriesPath),
-		repositoriesPath,
-		setting: null,
-		source: null,
-		status: 'ok',
-		workspacesPath: path.join(repositoriesPath, '..', 'workspaces'),
-	};
-
-	return {
-		applyChange: () => ({
-			applied: false,
-			newRoot: snapshot,
-			oldRoot: snapshot,
-			oldRootPreserved: true,
-			reconciliation: null,
-		}),
-		ensure: () => snapshot,
-		getSnapshot: () => snapshot,
-		previewChange: () => ({
-			canApply: false,
-			diagnostics: [],
-			newRoot: snapshot,
-			oldRoot: snapshot,
-			oldRootPreserved: true,
-		}),
-	};
-}
+const rootDirectoryStub = (repositoriesPath: string) =>
+	buildRootDirectoryStub({ repositoriesPath });
 
 function commandServiceStub({
 	calls,
@@ -160,38 +119,8 @@ function gitInitFailure(
 	};
 }
 
-function registrationStub(targetPath: string): {
-	calls: { path: string }[];
-	service: LocalRepositoryRegistrationService;
-} {
-	const calls: { path: string }[] = [];
-	const repository: RegisteredRepositorySnapshot = {
-		createdAt: '2026-06-07T12:00:00.000Z',
-		defaultBranch: 'main',
-		id: 'repository-test',
-		metadata: {},
-		name: path.basename(targetPath),
-		path: targetPath,
-		remoteUrl: null,
-		slug: path.basename(targetPath),
-		updatedAt: '2026-06-07T12:00:00.000Z',
-	};
-	return {
-		calls,
-		service: {
-			register: async (request) => {
-				calls.push({ path: request.path });
-				const result: RegisterLocalRepositoryResult = {
-					diagnostics: [],
-					registered: true,
-					repository,
-					settingsSources: [],
-				};
-				return result;
-			},
-		},
-	};
-}
+const registrationStub = (targetPath: string) =>
+	buildRegistrationStub(targetPath);
 
 function failingRegistrationStub(): LocalRepositoryRegistrationService {
 	return {
@@ -229,9 +158,15 @@ test('create scaffolds a folder, runs git init, and registers the repo', async (
 	assert.equal(result.repository?.name, 'my-app');
 	assert.equal(result.targetPath, path.join(repositoriesPath, 'my-app'));
 	assert.equal(existsSync(path.join(repositoriesPath, 'my-app')), true);
-	assert.equal(calls.length, 1);
+	assert.equal(calls.length, 2);
 	assert.equal(calls[0]?.command, 'git');
 	assert.deepEqual(Array.from(calls[0]?.args ?? []), ['init', '-b', 'main']);
+	assert.equal(calls[1]?.command, 'git');
+	assert.deepEqual(Array.from(calls[1]?.args ?? []).slice(-3), [
+		'--allow-empty',
+		'-m',
+		'Initial commit',
+	]);
 	assert.equal(
 		registration.calls[0]?.path,
 		path.join(repositoriesPath, 'my-app'),
@@ -262,22 +197,23 @@ test('create rejects invalid project names', async (t) => {
 	assert.equal(calls.length, 0);
 });
 
-test('create fails when the target directory already exists', async (t) => {
+test('create auto-suffixes the target folder when the original name is already on disk', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
 	const existing = path.join(repositoriesPath, 'my-app');
 	mkdirSync(existing);
 
 	const calls: LocalCommandRequest[] = [];
+	const suffixed = path.join(repositoriesPath, 'my-app-2');
 	const service = createQuickStartProjectService({
 		localCommandService: commandServiceStub({ calls, onRun: gitInitSuccess }),
-		registrationService: registrationStub(existing).service,
+		registrationService: registrationStub(suffixed).service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
 	});
 
 	const result = await service.create({ name: 'my-app' });
-	assert.equal(result.status, 'failure');
-	assert.equal(result.diagnostics[0]?.code, 'destination-exists');
-	assert.equal(calls.length, 0);
+	assert.equal(result.status, 'success');
+	assert.equal(result.targetPath, suffixed);
+	assert.equal(existsSync(suffixed), true);
 });
 
 test('create rolls back the directory when git init fails', async (t) => {

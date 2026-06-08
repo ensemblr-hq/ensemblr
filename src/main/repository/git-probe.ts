@@ -17,6 +17,24 @@ export type GitRepositoryProbeFn = (
 	repositoryPath: string,
 ) => Promise<GitRepositoryProbe>;
 
+/** Outcome of inspecting a candidate path as a git worktree. */
+export interface GitWorktreeMetadata {
+	defaultBranch: string | null;
+	error?: string;
+	gitCommonDir: string | null;
+	gitDir: string | null;
+	headBranch: string | null;
+	isWorktree: boolean;
+	mainRepositoryPath: string | null;
+	remoteUrl: string | null;
+	topLevel: string | null;
+}
+
+/** Pluggable hook used to probe a candidate worktree path; swapped in tests. */
+export type GitWorktreeProbeFn = (
+	worktreePath: string,
+) => Promise<GitWorktreeMetadata>;
+
 const execFileAsync = promisify(execFile);
 const GIT_COMMAND_TIMEOUT_MS = 5000;
 
@@ -84,6 +102,118 @@ export async function probeGitRepository(
 		isGitRepository: true,
 		remoteUrl,
 		topLevel: resolved,
+	};
+}
+
+/**
+ * Inspects a candidate path as a git worktree, extracting head branch, main
+ * repository path, remote URL, and the locally configured default branch.
+ *
+ * A path qualifies as a linked worktree when `git rev-parse --git-common-dir`
+ * resolves outside the candidate's own `.git` directory; main checkouts are
+ * reported with `isWorktree: false` so callers can skip them.
+ * @param worktreePath - Absolute filesystem path to inspect.
+ * @returns A {@link GitWorktreeMetadata} describing what was found.
+ */
+export async function probeGitWorktreeMetadata(
+	worktreePath: string,
+): Promise<GitWorktreeMetadata> {
+	if (!worktreePath.trim()) {
+		return emptyWorktreeMetadata('No worktree path was provided.');
+	}
+
+	const resolved = path.resolve(worktreePath);
+
+	if (!existsSync(resolved)) {
+		return emptyWorktreeMetadata('The selected path does not exist.');
+	}
+
+	if (!isDirectory(resolved)) {
+		return emptyWorktreeMetadata('The selected path is not a directory.');
+	}
+
+	let topLevel: string;
+
+	try {
+		topLevel = await runGitCommand(resolved, ['rev-parse', '--show-toplevel']);
+	} catch (error) {
+		return {
+			defaultBranch: null,
+			error: formatGitError(
+				error,
+				'The selected path is not inside a git repository.',
+			),
+			gitCommonDir: null,
+			gitDir: null,
+			headBranch: null,
+			isWorktree: false,
+			mainRepositoryPath: null,
+			remoteUrl: null,
+			topLevel: null,
+		};
+	}
+
+	const resolvedTopLevel = path.resolve(topLevel);
+
+	if (resolvedTopLevel !== resolved) {
+		return {
+			defaultBranch: null,
+			error: 'The path is inside a worktree but not at the worktree top level.',
+			gitCommonDir: null,
+			gitDir: null,
+			headBranch: null,
+			isWorktree: false,
+			mainRepositoryPath: null,
+			remoteUrl: null,
+			topLevel: resolvedTopLevel,
+		};
+	}
+
+	let gitDir: string;
+	let gitCommonDir: string;
+
+	try {
+		[gitDir, gitCommonDir] = await Promise.all([
+			runGitCommand(resolved, ['rev-parse', '--absolute-git-dir']),
+			runGitCommand(resolved, ['rev-parse', '--git-common-dir']),
+		]);
+	} catch (error) {
+		return {
+			defaultBranch: null,
+			error: formatGitError(error, 'Failed to inspect the worktree git dir.'),
+			gitCommonDir: null,
+			gitDir: null,
+			headBranch: null,
+			isWorktree: false,
+			mainRepositoryPath: null,
+			remoteUrl: null,
+			topLevel: resolvedTopLevel,
+		};
+	}
+
+	const resolvedGitDir = path.resolve(gitDir);
+	const resolvedCommonDir = path.isAbsolute(gitCommonDir)
+		? path.resolve(gitCommonDir)
+		: path.resolve(resolved, gitCommonDir);
+	const isWorktree = resolvedGitDir !== resolvedCommonDir;
+	const mainRepositoryPath = isWorktree
+		? deriveMainRepositoryPath(resolvedCommonDir)
+		: resolvedTopLevel;
+	const [headBranch, remoteUrl, defaultBranch] = await Promise.all([
+		readHeadBranch(resolved),
+		readRemoteUrl(resolved),
+		readDefaultBranch(resolved),
+	]);
+
+	return {
+		defaultBranch,
+		gitCommonDir: resolvedCommonDir,
+		gitDir: resolvedGitDir,
+		headBranch,
+		isWorktree,
+		mainRepositoryPath,
+		remoteUrl,
+		topLevel: resolvedTopLevel,
 	};
 }
 
@@ -167,6 +297,60 @@ async function runGitCommand(
 	);
 
 	return stdout.toString().trim();
+}
+
+/**
+ * Reads the worktree's current HEAD branch, returning `null` for detached HEAD.
+ * @param worktreePath - Resolved worktree top level.
+ * @returns The branch name or `null`.
+ */
+async function readHeadBranch(worktreePath: string): Promise<string | null> {
+	try {
+		const head = await runGitCommand(worktreePath, [
+			'rev-parse',
+			'--abbrev-ref',
+			'HEAD',
+		]);
+
+		return head && head !== 'HEAD' ? head : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Derives the main repository path from a `git-common-dir`, stripping the
+ * trailing `.git` segment when present.
+ * @param commonDir - Resolved common git dir.
+ * @returns The repository top level, or `null` if unable to derive.
+ */
+function deriveMainRepositoryPath(commonDir: string): string | null {
+	const base = path.basename(commonDir);
+
+	if (base === '.git') {
+		return path.dirname(commonDir);
+	}
+
+	if (base === 'git') {
+		return path.dirname(commonDir);
+	}
+
+	return path.dirname(commonDir);
+}
+
+/** Builds a metadata describing a non-worktree candidate with a single error. */
+function emptyWorktreeMetadata(error: string): GitWorktreeMetadata {
+	return {
+		defaultBranch: null,
+		error,
+		gitCommonDir: null,
+		gitDir: null,
+		headBranch: null,
+		isWorktree: false,
+		mainRepositoryPath: null,
+		remoteUrl: null,
+		topLevel: null,
+	};
 }
 
 /** Tests whether a resolved path is a directory; missing entries return `false`. */

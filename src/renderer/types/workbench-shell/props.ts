@@ -11,8 +11,27 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
-import type { WorkbenchStaticNavigationTarget } from './navigation';
 import type { WorkbenchDockActions, WorkbenchHealth } from './primitives';
+
+export type WorkbenchStaticNavigationTarget =
+	| 'dashboard'
+	| 'help'
+	| 'history'
+	| 'settings'
+	| { kind: 'repo-settings'; repoId: string };
+
+export interface WorkbenchWorkspaceNavigationLinkTarget {
+	search: WorkbenchRouteSearch;
+	workspace: WorkspaceShellModel;
+}
+
+export interface SessionTabState {
+	closedSessions: SessionTabModel[];
+	closeSessionTab: (sessionId: string) => void;
+	effectiveActiveSession: SessionTabModel;
+	restoreSessionTab: (sessionId: string) => void;
+	sessionTabs: SessionTabModel[];
+}
 
 export interface WorkbenchShellProps {
 	activeProject: ProjectShellModel;

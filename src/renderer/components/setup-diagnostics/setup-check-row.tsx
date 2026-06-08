@@ -63,6 +63,12 @@ export function SetupCheckRow({
 			return;
 		}
 
+		// Standalone fallback: when this row is mounted without a parent
+		// `onRemediationAction` (e.g. the compact panel), drive the Pi
+		// executable picker directly. Kept intentionally as a self-contained
+		// escape hatch so the compact view can ship without a parent
+		// controller. TODO: require onRemediationAction once compact panel
+		// gets its own remediation controller.
 		if (
 			action.kind === 'select-path' &&
 			action.target === 'pi.executablePath' &&

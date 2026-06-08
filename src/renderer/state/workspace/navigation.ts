@@ -234,6 +234,7 @@ export function useProjectNavigationState(
 
 	return {
 		collapsedProjectIdSet,
+		disableProjectReorderLayoutAnimation,
 		isProjectReorderLayoutAnimationDisabled,
 		isProjectReorderPositionOnlyLayout,
 		orderedProjects,

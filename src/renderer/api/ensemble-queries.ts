@@ -2,18 +2,26 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation/route-profiler';
 import type {
+	ArchiveRepositoryRequest,
+	ArchiveRepositoryResult,
+	ArchiveWorkspaceRequest,
+	ArchiveWorkspaceResult,
 	CloneDestinationSelectionResult,
 	CloneGithubRepositoryPrepareResult,
 	CloneGithubRepositoryProgressEvent,
 	CloneGithubRepositoryRequest,
 	CloneGithubRepositoryStartRequest,
 	CloneGithubRepositoryStartResult,
+	CreateWorkspaceRequest,
+	CreateWorkspaceResult,
 	EnsembleApi,
 	LocalRepositorySelectionResult,
 	QuickStartProjectRequest,
 	QuickStartProjectResult,
 	RegisterLocalRepositoryRequest,
 	RegisterLocalRepositoryResult,
+	RenameWorkspaceRequest,
+	RenameWorkspaceResult,
 } from '@/shared/ipc';
 
 /** Hierarchical TanStack Query keys for every Ensemble IPC-backed query. */
@@ -47,11 +55,23 @@ function getEnsembleApi(): EnsembleApi {
 }
 
 /**
+ * Returns the `window.ensemble` bridge if present, otherwise `null`. Use for
+ * subscription/notification call sites where a missing bridge should degrade
+ * to a no-op rather than throw.
+ */
+function getEnsembleApiOrNull(): EnsembleApi | null {
+	if (typeof window === 'undefined') {
+		return null;
+	}
+	return window.ensemble ?? null;
+}
+
+/**
  * Tests whether the preload bridge has been wired into the current window.
  * @returns True when `window.ensemble` is present.
  */
 export function isEnsembleApiAvailable(): boolean {
-	return typeof window !== 'undefined' && Boolean(window.ensemble);
+	return getEnsembleApiOrNull() !== null;
 }
 
 /** Query options for the renderer-side health snapshot. */
@@ -140,6 +160,50 @@ export function registerLocalRepository(
 	);
 }
 
+/** Creates an isolated git worktree workspace under the managed root. */
+export function createWorkspace(
+	request: CreateWorkspaceRequest,
+): Promise<CreateWorkspaceResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:create-workspace', usesDatabase: true },
+		() => getEnsembleApi().createWorkspace(request),
+	);
+}
+
+/** Renames an existing workspace, moving its worktree and (optionally) branch. */
+export function renameWorkspace(
+	request: RenameWorkspaceRequest,
+): Promise<RenameWorkspaceResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:rename-workspace', usesDatabase: true },
+		() => getEnsembleApi().renameWorkspace(request),
+	);
+}
+
+/** Permanently deletes a workspace from disk and SQLite. No merge prompt. */
+export function archiveWorkspace(
+	request: ArchiveWorkspaceRequest,
+): Promise<ArchiveWorkspaceResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:archive-workspace', usesDatabase: true },
+		() => getEnsembleApi().archiveWorkspace(request),
+	);
+}
+
+/**
+ * Removes the repository and its workspaces from SQLite, destructively cleans
+ * each child worktree (folder + branch), but preserves the repository folder
+ * on disk so it can be re-registered later.
+ */
+export function archiveRepository(
+	request: ArchiveRepositoryRequest,
+): Promise<ArchiveRepositoryResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:archive-repository', usesDatabase: true },
+		() => getEnsembleApi().archiveRepository(request),
+	);
+}
+
 /** Opens the native folder picker to choose a clone destination parent folder. */
 export function selectCloneDestination(): Promise<CloneDestinationSelectionResult> {
 	return profileElectronIpcCall(
@@ -175,7 +239,7 @@ export function startCloneGithubRepository(
 export function subscribeCloneGithubRepositoryProgress(
 	listener: (event: CloneGithubRepositoryProgressEvent) => void,
 ): () => void {
-	const api = window.ensemble;
+	const api = getEnsembleApiOrNull();
 	if (!api) {
 		return () => {
 			// noop in environments without the preload bridge.

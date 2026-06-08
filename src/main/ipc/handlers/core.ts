@@ -72,14 +72,14 @@ export function registerCoreHandlers({
 	);
 
 	ipcMain.handle(IPC_CHANNELS.health, (): HealthSnapshot => {
-		return buildHealthSnapshot();
+		return buildHealthSnapshot(configService, databaseService);
 	});
 
 	ipcMain.on(IPC_CHANNELS.initialShellSnapshot, (event) => {
 		const snapshot: InitialShellSnapshot = {
 			capturedAt: new Date().toISOString(),
-			health: safeBuildHealthSnapshot(),
-			navigation: safeBuildNavigationSnapshot(),
+			health: safeBuildHealthSnapshot(configService, databaseService),
+			navigation: safeBuildNavigationSnapshot(databaseService),
 		};
 		event.returnValue = snapshot;
 	});
@@ -99,41 +99,49 @@ export function registerCoreHandlers({
 			return settingsResolutionService.resolve(request);
 		},
 	);
+}
 
-	/** Builds a health snapshot, swallowing failures so the sync channel never throws. */
-	function safeBuildHealthSnapshot(): HealthSnapshot | null {
-		try {
-			return buildHealthSnapshot();
-		} catch {
-			return null;
-		}
+/** Single source of truth for the health-snapshot shape returned by both channels. */
+function buildHealthSnapshot(
+	configService: EnsembleConfigService,
+	databaseService: EnsembleDatabaseService,
+): HealthSnapshot {
+	return {
+		appName: app.getName(),
+		config: configService.getSnapshot(),
+		database: databaseService.getHealth(),
+		platform: process.platform,
+		status: 'ok',
+		timestamp: new Date().toISOString(),
+		versions: {
+			chrome: process.versions.chrome,
+			electron: process.versions.electron,
+			node: process.versions.node,
+		},
+	};
+}
+
+/** Builds a health snapshot, swallowing failures so the sync channel never throws. */
+function safeBuildHealthSnapshot(
+	configService: EnsembleConfigService,
+	databaseService: EnsembleDatabaseService,
+): HealthSnapshot | null {
+	try {
+		return buildHealthSnapshot(configService, databaseService);
+	} catch {
+		return null;
 	}
+}
 
-	/** Builds the navigation snapshot when SQLite is available; null otherwise. */
-	function safeBuildNavigationSnapshot() {
-		try {
-			return getRepositoryWorkspaceNavigationSnapshot(
-				databaseService.getConnection()?.database ?? null,
-			);
-		} catch {
-			return null;
-		}
-	}
-
-	/** Single source of truth for the health-snapshot shape returned by both channels. */
-	function buildHealthSnapshot(): HealthSnapshot {
-		return {
-			appName: app.getName(),
-			config: configService.getSnapshot(),
-			database: databaseService.getHealth(),
-			platform: process.platform,
-			status: 'ok',
-			timestamp: new Date().toISOString(),
-			versions: {
-				chrome: process.versions.chrome,
-				electron: process.versions.electron,
-				node: process.versions.node,
-			},
-		};
+/** Builds the navigation snapshot when SQLite is available; null otherwise. */
+function safeBuildNavigationSnapshot(
+	databaseService: EnsembleDatabaseService,
+): RepositoryWorkspaceNavigationSnapshot | null {
+	try {
+		return getRepositoryWorkspaceNavigationSnapshot(
+			databaseService.getConnection()?.database ?? null,
+		);
+	} catch {
+		return null;
 	}
 }

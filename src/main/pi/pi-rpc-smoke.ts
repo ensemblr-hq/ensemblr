@@ -5,8 +5,10 @@ import { performance } from 'node:perf_hooks';
 
 import type { CommandEnvironmentSnapshot } from '../commands/local-command';
 import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
-import type { PiExecutableSnapshot } from './pi-executable';
-import { isExecutableReady } from './pi-executable-ready.ts';
+import {
+	isExecutableReady,
+	type PiExecutableSnapshot,
+} from './pi-executable.ts';
 import type {
 	PiRpcFrameSnapshot,
 	PiRpcSmokeFailure,

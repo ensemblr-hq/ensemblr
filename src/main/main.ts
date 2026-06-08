@@ -13,10 +13,14 @@ import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
 import { createPiExecutableService, createPiReadinessService } from './pi';
 import {
+	createArchiveRepositoryService,
+	createArchiveWorkspaceService,
 	createGithubCloneService,
 	createGithubRepositoryListService,
 	createLocalRepositoryRegistrationService,
 	createQuickStartProjectService,
+	createRenameWorkspaceService,
+	createSharedRootAdoptionService,
 	createWorkspaceService,
 } from './repository';
 import {
@@ -70,6 +74,7 @@ const localRepositoryRegistrationService =
 		databaseService,
 	});
 const githubCloneService = createGithubCloneService({
+	databaseService,
 	registrationService: localRepositoryRegistrationService,
 	rootDirectoryService,
 });
@@ -85,6 +90,22 @@ const createWorkspaceServiceInstance = createWorkspaceService({
 	databaseService,
 	localCommandService,
 	rootDirectoryService,
+});
+const sharedRootAdoptionService = createSharedRootAdoptionService({
+	databaseService,
+	rootDirectoryService,
+});
+const renameWorkspaceService = createRenameWorkspaceService({
+	databaseService,
+	localCommandService,
+});
+const archiveWorkspaceService = createArchiveWorkspaceService({
+	databaseService,
+	localCommandService,
+});
+const archiveRepositoryService = createArchiveRepositoryService({
+	databaseService,
+	localCommandService,
 });
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
@@ -103,8 +124,11 @@ app.whenReady().then(() => {
 	configService.load();
 	databaseService.open();
 	rootDirectoryService.ensure();
+	void sharedRootAdoptionService.reconcile();
 	installApplicationMenu();
 	registerIpcHandlers({
+		archiveRepositoryService,
+		archiveWorkspaceService,
 		configService,
 		createWorkspaceService: createWorkspaceServiceInstance,
 		databaseService,
@@ -114,10 +138,12 @@ app.whenReady().then(() => {
 		localRepositoryRegistrationService,
 		piExecutableService,
 		quickStartProjectService,
+		renameWorkspaceService,
 		repositoryConfigService,
 		rootDirectoryService,
 		setupDiagnosticsService,
 		settingsResolutionService,
+		sharedRootAdoptionService,
 	});
 	createMainWindow({ windowStateStore: mainWindowStateStore });
 });

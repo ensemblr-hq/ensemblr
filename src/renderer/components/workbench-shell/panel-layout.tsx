@@ -13,11 +13,10 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
-
-import { useWorkbenchLayout } from './contexts/layout-context';
 import { DockPanel } from './dock-panel/dock-panel';
 import { ReviewPanel } from './review-panel';
 import { RightSidebarHeader } from './right-sidebar-header/right-sidebar-header';
+import { useWorkbenchLayout } from './shell-contexts';
 import { WorkbenchHeader } from './workbench-header';
 
 /** Top-level resizable layout housing the main workspace and the review dock. */

@@ -15,13 +15,12 @@ import test, { type TestContext } from 'node:test';
 
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
-import type { EnsembleRootDirectoryService } from '../../src/main/root';
 import {
 	type EnsembleDatabaseConnection,
 	type EnsembleDatabaseService,
 	openEnsembleDatabase,
 } from '../../src/main/storage/database.ts';
-import type { RootDirectorySnapshot } from '../../src/shared/ipc';
+import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 
@@ -110,40 +109,13 @@ function wrapConnection(
 	};
 }
 
-function rootDirectoryStub(
+const rootDirectoryStub = (
 	harness: Pick<Harness, 'rootPath' | 'workspacesPath'>,
-): EnsembleRootDirectoryService {
-	const snapshot: RootDirectorySnapshot = {
-		archivedContextsPath: path.join(harness.rootPath, 'archived-contexts'),
-		createdPaths: [],
-		diagnostics: [],
-		managedPaths: [],
-		path: harness.rootPath,
-		repositoriesPath: path.join(harness.rootPath, 'repos'),
-		setting: null,
-		source: null,
-		status: 'ok',
+) =>
+	buildRootDirectoryStub({
+		rootPath: harness.rootPath,
 		workspacesPath: harness.workspacesPath,
-	};
-	return {
-		applyChange: () => ({
-			applied: false,
-			newRoot: snapshot,
-			oldRoot: snapshot,
-			oldRootPreserved: true,
-			reconciliation: null,
-		}),
-		ensure: () => snapshot,
-		getSnapshot: () => snapshot,
-		previewChange: () => ({
-			canApply: false,
-			diagnostics: [],
-			newRoot: snapshot,
-			oldRoot: snapshot,
-			oldRootPreserved: true,
-		}),
-	};
-}
+	});
 
 function runGit(cwd: string, args: string[]): string {
 	return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();

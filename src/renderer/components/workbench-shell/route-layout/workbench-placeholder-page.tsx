@@ -1,9 +1,9 @@
 import { WorkbenchEmptyStateContent } from '@/renderer/components/workbench-empty-state';
-import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/contexts';
+import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { getEmptyStateCopy } from '@/renderer/lib/workbench';
 import type { WorkbenchActiveView } from '@/renderer/types/workbench-shell';
 
-import { useWorkbenchLayoutRouteModel } from './layout-model-context';
+import { useWorkbenchLayoutRouteModel } from '../shell-contexts';
 
 /** Placeholder content for dashboard/history/help/settings views. */
 export function WorkbenchPlaceholderPage({

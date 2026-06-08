@@ -15,8 +15,9 @@ import type {
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleRootDirectoryService } from '../root';
+import { firstLine } from './first-line.ts';
 import type { LocalRepositoryRegistrationService } from './register-repository.ts';
-
+import { allocateUniqueTargetPath } from './target-path.ts';
 /** Public surface of the quick-start project service. */
 export interface QuickStartProjectService {
 	create: (
@@ -34,6 +35,7 @@ export interface CreateQuickStartProjectServiceOptions {
 const PROJECT_NAME_PATTERN = /^[A-Za-z0-9._-]+$/;
 const PROJECT_NAME_MAX_LENGTH = 100;
 const GIT_INIT_TIMEOUT_MS = 5000;
+const GIT_COMMIT_TIMEOUT_MS = 5000;
 const DEFAULT_INITIAL_BRANCH = 'main';
 
 /**
@@ -81,19 +83,7 @@ export function createQuickStartProjectService({
 		}
 
 		const parentPath = parentResolution.parentPath;
-		const targetPath = path.resolve(parentPath, name);
-
-		if (existsSync(targetPath)) {
-			return failureResult({
-				diagnostic: {
-					code: 'destination-exists',
-					message: `A file or directory already exists at ${targetPath}. Pick a different name or remove it.`,
-					path: targetPath,
-					severity: 'error',
-				},
-				targetPath,
-			});
-		}
+		const targetPath = allocateUniqueTargetPath(parentPath, name);
 
 		const parentReady = ensureParentDirectory(parentPath);
 		if (parentReady.diagnostic) {
@@ -117,7 +107,23 @@ export function createQuickStartProjectService({
 			return failureResult({ diagnostic: gitInitDiagnostic, targetPath });
 		}
 
+		// Empty initial commit so the default branch has a tip ref. Worktrees
+		// created later (`git worktree add -b X path base`) need a real commit
+		// to branch from; without this the very first `New workspace` fails.
+		const initialCommitDiagnostic = await runInitialCommit({
+			cwd: targetPath,
+			localCommandService,
+		});
+		if (initialCommitDiagnostic) {
+			cleanupTargetDirectory(targetPath);
+			return failureResult({
+				diagnostic: initialCommitDiagnostic,
+				targetPath,
+			});
+		}
+
 		const registration = await registrationService.register({
+			name,
 			path: targetPath,
 		});
 		if (!registration.registered || !registration.repository) {
@@ -325,6 +331,60 @@ async function runGitInit({
 	};
 }
 
+/**
+ * Records an empty initial commit so the default branch points at a real
+ * object. `git worktree add -b <branch> <path> <base>` requires `<base>` to
+ * resolve to a commit — a bare `git init` repo doesn't, so workspace creation
+ * would fail until the user committed something themselves.
+ *
+ * `user.name` / `user.email` are passed inline via `-c` so the command works
+ * even when the user has no global git identity configured. The values are
+ * never written into the repo's own config.
+ */
+async function runInitialCommit({
+	cwd,
+	localCommandService,
+}: {
+	cwd: string;
+	localCommandService: LocalCommandService;
+}): Promise<QuickStartProjectDiagnostic | null> {
+	const result = await localCommandService.run({
+		args: [
+			'-c',
+			'user.name=Ensemble',
+			'-c',
+			'user.email=ensemble@local',
+			'commit',
+			'--allow-empty',
+			'-m',
+			'Initial commit',
+		],
+		command: 'git',
+		cwd,
+		maxOutputBytes: 16 * 1024,
+		timeoutMs: GIT_COMMIT_TIMEOUT_MS,
+	});
+
+	if (result.status === 'success') {
+		return null;
+	}
+
+	if (result.failure?.code === 'command-not-found') {
+		return {
+			code: 'git-not-installed',
+			message: 'git was not found in PATH. Install git, then retry.',
+			severity: 'error',
+		};
+	}
+
+	return {
+		code: 'git-init-failed',
+		message: firstLine(result.stderr) || 'git commit --allow-empty failed.',
+		path: cwd,
+		severity: 'error',
+	};
+}
+
 /** Removes a half-created project directory so retries do not collide. */
 function cleanupTargetDirectory(targetPath: string): void {
 	try {
@@ -348,17 +408,6 @@ function failureResult({
 		status: 'failure',
 		targetPath,
 	};
-}
-
-/** Returns the first non-blank line of `text`; empty string otherwise. */
-function firstLine(text: string): string {
-	for (const line of text.split(/\r?\n/)) {
-		const trimmed = line.trim();
-		if (trimmed) {
-			return trimmed;
-		}
-	}
-	return '';
 }
 
 /** Surfaces the configured initial branch name (so renderer + tests can show it). */

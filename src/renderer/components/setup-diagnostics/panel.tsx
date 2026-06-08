@@ -1,17 +1,10 @@
 import { ClockIcon, RefreshCwIcon } from 'lucide-react';
-import { useState } from 'react';
 
 import { ShellPanel } from '@/renderer/components/shell-panel';
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
-import {
-	isPiExecutablePickerAction,
-	isRootDirectoryPickerAction,
-} from '@/renderer/lib/setup-diagnostics';
 import { cn } from '@/renderer/lib/utils';
 import type {
-	RootDirectoryChangeApplyResult,
-	RootDirectorySelectionResult,
 	SetupCheckGroupId,
 	SetupCheckSnapshot,
 	SetupDiagnosticsSnapshot,
@@ -22,6 +15,7 @@ import { SetupDiagnosticsCompact } from './compact';
 import { LocalExecutionNotice } from './local-execution-notice';
 import { RootDirectoryChangeDialog } from './root-directory-change-dialog';
 import { SetupCheckRow } from './setup-check-row';
+import { useRootDirectoryChange } from './use-root-directory-change';
 
 interface SetupDiagnosticsPanelProps {
 	error?: string | null;
@@ -59,90 +53,15 @@ export function SetupDiagnosticsPanel({
 	snapshot,
 }: SetupDiagnosticsPanelProps) {
 	const summary = getSetupSummary(snapshot, error);
-	const [rootSelection, setRootSelection] =
-		useState<RootDirectorySelectionResult | null>(null);
-	const [rootApplyResult, setRootApplyResult] =
-		useState<RootDirectoryChangeApplyResult | null>(null);
-	const [rootActionError, setRootActionError] = useState<string | null>(null);
-	const [isApplyingRootChange, setIsApplyingRootChange] = useState(false);
-	const handleRemediationAction = async (
-		action: SetupRemediationAction,
-		check: SetupCheckSnapshot,
-	) => {
-		if (isRootDirectoryPickerAction(action, check)) {
-			setRootActionError(null);
-			setRootApplyResult(null);
-
-			const selection = await window.ensemble?.selectRootDirectory();
-
-			if (!selection) {
-				setRootActionError(
-					'Root directory selection is unavailable in this context.',
-				);
-				return;
-			}
-
-			if (selection.canceled) {
-				return;
-			}
-
-			if (selection.error || !selection.preview) {
-				setRootActionError(
-					selection.error ??
-						'The selected root directory could not be previewed.',
-				);
-				return;
-			}
-
-			setRootSelection(selection);
-			return;
-		}
-
-		if (isPiExecutablePickerAction(action, check)) {
-			await window.ensemble?.selectPiExecutable();
-			onRetry?.();
-			return;
-		}
-
-		await onRemediationAction?.(action, check);
-	};
-	const confirmRootDirectoryChange = async () => {
-		const path = rootSelection?.preview?.newRoot.path;
-
-		if (!path) {
-			setRootActionError('No root directory path was selected.');
-			return;
-		}
-
-		setIsApplyingRootChange(true);
-		setRootActionError(null);
-
-		try {
-			const result = await window.ensemble?.confirmRootDirectoryChange({
-				path,
-			});
-
-			if (!result) {
-				setRootActionError(
-					'Root directory changes are unavailable in this context.',
-				);
-				return;
-			}
-
-			setRootApplyResult(result);
-			onRetry?.();
-
-			if (
-				result.applied &&
-				!result.error &&
-				result.reconciliation?.status !== 'error'
-			) {
-				setRootSelection(null);
-			}
-		} finally {
-			setIsApplyingRootChange(false);
-		}
-	};
+	const {
+		actionError: rootActionError,
+		applyResult: rootApplyResult,
+		confirm: confirmRootDirectoryChange,
+		dismiss: dismissRootDirectoryChange,
+		handleRemediationAction,
+		isApplying: isApplyingRootChange,
+		selection: rootSelection,
+	} = useRootDirectoryChange({ onRemediationAction, onRetry });
 
 	return (
 		<ShellPanel
@@ -235,8 +154,7 @@ export function SetupDiagnosticsPanel({
 				}}
 				onOpenChange={(open) => {
 					if (!open) {
-						setRootSelection(null);
-						setRootApplyResult(null);
+						dismissRootDirectoryChange();
 					}
 				}}
 				selection={rootSelection}

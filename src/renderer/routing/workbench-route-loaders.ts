@@ -1,8 +1,10 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { redirect } from '@tanstack/react-router';
+import { repositoryWorkspaceNavigationQuery } from '@/renderer/api/ensemble-queries';
 import {
 	getPreferredSession,
 	loadWorkbenchShellData,
+	mapRepositoriesToProjects,
 	resolveWorkspaceNavigationSelection,
 } from '@/renderer/lib/workbench';
 import { readStoredWorkspaceSelection } from '@/renderer/state/workspace';
@@ -17,6 +19,7 @@ import type {
 	ProjectShellModel,
 	WorkbenchRouteSearch,
 } from '@/renderer/types/workbench';
+import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc';
 
 const WORKSPACE_SEARCH_KEYS = new Set(['dock', 'review']);
 const LEGACY_CHAT_SEARCH_KEY = 'chat';
@@ -101,17 +104,24 @@ export async function loadProjectWorkbenchRoute({
  * Loader for workspace routes. Resolves the (project, workspace) selection,
  * migrates the legacy `?chat=` query into the canonical `/chats/:chatId` route,
  * and redirects to a fallback when the URL workspace is missing.
- * @param input - Parent match, URL params, parsed and raw search.
+ *
+ * Reads the live navigation snapshot from `queryClient` as a fallback when the
+ * cached parent loaderData does not yet contain the requested workspace —
+ * needed for the `createWorkspace` flow, where the parent `_workbench` match
+ * may still hold a stale projects list at the moment the child loader runs.
+ * @param input - Parent match, URL params, query client, parsed and raw search.
  * @returns The workspace loader data, or redirects.
  */
 export async function loadWorkspaceWorkbenchRoute({
 	parentMatchPromise,
 	params,
+	queryClient,
 	rawSearch,
 	search,
 }: {
 	parentMatchPromise: Promise<WorkbenchParentRouteMatch>;
 	params: WorkspaceRouteParams;
+	queryClient?: QueryClient;
 	rawSearch: Record<string, unknown>;
 	search: WorkbenchRouteSearch;
 }): Promise<WorkspaceRouteLoaderData | undefined> {
@@ -122,14 +132,19 @@ export async function loadWorkspaceWorkbenchRoute({
 		return undefined;
 	}
 
-	const currentSelection = resolveWorkspaceNavigationSelection({
-		projects: loaderData.projects,
+	const projects = resolveFreshProjects({
+		fallbackProjects: loaderData.projects,
+		queryClient,
 		routeProjectId: params.projectId,
 		routeWorkspaceId: params.workspaceId,
 	});
-	const fallbackSelection = resolveFallbackWorkspaceSelection(
-		loaderData.projects,
-	);
+
+	const currentSelection = resolveWorkspaceNavigationSelection({
+		projects,
+		routeProjectId: params.projectId,
+		routeWorkspaceId: params.workspaceId,
+	});
+	const fallbackSelection = resolveFallbackWorkspaceSelection(projects);
 
 	if (!currentSelection && fallbackSelection) {
 		throw redirectToWorkspaceSelection(fallbackSelection);
@@ -154,6 +169,63 @@ export async function loadWorkspaceWorkbenchRoute({
 		project: currentSelection.project,
 		workspace: currentSelection.workspace,
 	};
+}
+
+/**
+ * Returns the project list to resolve the URL workspace against. Prefers the
+ * parent's cached projects, but re-derives from the live TanStack Query cache
+ * when the requested workspace is missing — covers the post-create race where
+ * the parent `_workbench` match still holds a pre-creation snapshot.
+ */
+function resolveFreshProjects({
+	fallbackProjects,
+	queryClient,
+	routeProjectId,
+	routeWorkspaceId,
+}: {
+	fallbackProjects: ProjectShellModel[];
+	queryClient: QueryClient | undefined;
+	routeProjectId: string;
+	routeWorkspaceId: string;
+}): ProjectShellModel[] {
+	if (
+		hasWorkspaceInProjects(
+			fallbackProjects,
+			routeProjectId,
+			routeWorkspaceId,
+		) ||
+		!queryClient
+	) {
+		return fallbackProjects;
+	}
+
+	const cached =
+		queryClient.getQueryData<RepositoryWorkspaceNavigationSnapshot>(
+			repositoryWorkspaceNavigationQuery.queryKey,
+		);
+
+	if (!cached) {
+		return fallbackProjects;
+	}
+
+	const freshProjects = mapRepositoriesToProjects(cached.repositories);
+
+	return hasWorkspaceInProjects(freshProjects, routeProjectId, routeWorkspaceId)
+		? freshProjects
+		: fallbackProjects;
+}
+
+/** True when the project list contains the (projectId, workspaceId) pair. */
+function hasWorkspaceInProjects(
+	projects: ProjectShellModel[],
+	projectId: string,
+	workspaceId: string,
+): boolean {
+	const project = projects.find((candidate) => candidate.id === projectId);
+
+	return Boolean(
+		project?.workspaces.some((workspace) => workspace.id === workspaceId),
+	);
 }
 
 /**

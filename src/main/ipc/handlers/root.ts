@@ -1,9 +1,4 @@
-import {
-	BrowserWindow,
-	dialog,
-	ipcMain,
-	type OpenDialogOptions,
-} from 'electron';
+import { ipcMain } from 'electron';
 
 import {
 	IPC_CHANNELS,
@@ -12,11 +7,14 @@ import {
 	type RootDirectorySelectionResult,
 	type RootDirectorySnapshot,
 } from '../../../shared/ipc';
+import type { SharedRootAdoptionService } from '../../repository';
 import type { EnsembleRootDirectoryService } from '../../root';
+import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the root-directory IPC handlers. */
 export interface RootHandlersOptions {
 	rootDirectoryService: EnsembleRootDirectoryService;
+	sharedRootAdoptionService: SharedRootAdoptionService;
 }
 
 /**
@@ -26,6 +24,7 @@ export interface RootHandlersOptions {
  */
 export function registerRootHandlers({
 	rootDirectoryService,
+	sharedRootAdoptionService,
 }: RootHandlersOptions): void {
 	ipcMain.handle(IPC_CHANNELS.rootDirectory, (): RootDirectorySnapshot => {
 		return rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
@@ -34,26 +33,22 @@ export function registerRootHandlers({
 	ipcMain.handle(
 		IPC_CHANNELS.selectRootDirectory,
 		async (event): Promise<RootDirectorySelectionResult> => {
-			const window = BrowserWindow.fromWebContents(event.sender);
-			const options: OpenDialogOptions = {
+			const selection = await showDirectorySelectionDialog(event, {
 				buttonLabel: 'Preview root',
 				message:
 					'Select the Ensemble root directory to switch to. Existing contents are only inspected before confirmation.',
 				properties: ['openDirectory', 'createDirectory'],
 				title: 'Select Ensemble root directory',
-			};
-			const result = window
-				? await dialog.showOpenDialog(window, options)
-				: await dialog.showOpenDialog(options);
+			});
 
-			if (result.canceled || !result.filePaths[0]) {
+			if (selection.canceled) {
 				return { canceled: true };
 			}
 
 			try {
 				return {
 					canceled: false,
-					preview: rootDirectoryService.previewChange(result.filePaths[0]),
+					preview: rootDirectoryService.previewChange(selection.path),
 				};
 			} catch (error) {
 				return {
@@ -83,7 +78,13 @@ export function registerRootHandlers({
 				};
 			}
 
-			return rootDirectoryService.applyChange(normalizedRequest);
+			const result = rootDirectoryService.applyChange(normalizedRequest);
+
+			if (result.applied) {
+				void sharedRootAdoptionService.reconcile();
+			}
+
+			return result;
 		},
 	);
 }

@@ -6,7 +6,7 @@ import {
 	ContextMenuTrigger,
 } from '@/renderer/components/ui/context-menu';
 import { SidebarMenuButton } from '@/renderer/components/ui/sidebar';
-import { useNavigation } from '@/renderer/components/workbench-shell/contexts';
+import { useNavigation } from '@/renderer/components/workbench-shell/shell-contexts';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import type {
@@ -34,14 +34,18 @@ const archiveBoundaryLabel = getPermissionBoundaryLabel(
 export function WorkspaceSidebarItem({
 	isActive,
 	isPinned,
+	onArchiveSelect,
 	onPinToggle,
+	onRenameSelect,
 	onSelect,
 	routeSearch,
 	workspace,
 }: {
 	isActive: boolean;
 	isPinned: boolean;
+	onArchiveSelect?: () => void;
 	onPinToggle: () => void;
+	onRenameSelect?: () => void;
 	onSelect: () => void;
 	routeSearch: WorkbenchRouteSearch;
 	workspace: WorkspaceShellModel;
@@ -101,28 +105,31 @@ export function WorkspaceSidebarItem({
 								)
 							: buttonContent}
 					</SidebarMenuButton>
-					<Button
-						aria-label={`Archive workspace ${workspace.name}; ${archiveBoundaryLabel}`}
-						className='absolute right-1.5 bottom-1.5 size-6 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:opacity-100 group-hover/workspace-sidebar-item:opacity-100'
-						data-action-placeholder='workspace-archive-confirmation'
-						data-permission-boundary={archiveBoundary.boundary}
-						disabled
-						onClick={(event) => {
-							event.stopPropagation();
-						}}
-						onPointerDown={(event) => event.stopPropagation()}
-						size='icon-xs'
-						type='button'
-						variant='ghost'
-					>
-						<ArchiveIcon aria-hidden='true' />
-						<span className='sr-only'>{archiveBoundaryLabel}</span>
-					</Button>
+					{onArchiveSelect ? (
+						<Button
+							aria-label={`Archive workspace ${workspace.name}; ${archiveBoundaryLabel}`}
+							className='absolute right-1.5 bottom-1.5 size-6 opacity-0 transition-opacity hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:opacity-100 group-hover/workspace-sidebar-item:opacity-100'
+							data-permission-boundary={archiveBoundary.boundary}
+							onClick={(event) => {
+								event.stopPropagation();
+								onArchiveSelect();
+							}}
+							onPointerDown={(event) => event.stopPropagation()}
+							size='icon-xs'
+							type='button'
+							variant='ghost'
+						>
+							<ArchiveIcon aria-hidden='true' />
+							<span className='sr-only'>{archiveBoundaryLabel}</span>
+						</Button>
+					) : null}
 				</div>
 			</ContextMenuTrigger>
 			<WorkspaceContextMenuContent
 				isPinned={isPinned}
+				onArchiveSelect={onArchiveSelect}
 				onPinToggle={onPinToggle}
+				onRenameSelect={onRenameSelect}
 				workspace={workspace}
 			/>
 		</ContextMenu>

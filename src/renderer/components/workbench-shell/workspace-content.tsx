@@ -4,9 +4,8 @@ import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-prof
 import { useSessionTabState } from '@/renderer/state/workspace';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type { WorkbenchShellProps } from '@/renderer/types/workbench-shell';
-
-import { WorkbenchLayoutProvider } from './contexts/layout-context';
 import { WorkbenchPanelLayout } from './panel-layout';
+import { WorkbenchLayoutProvider } from './shell-contexts';
 import { useDockController } from './use-dock-controller';
 import { useRightSidebarController } from './use-right-sidebar-controller';
 

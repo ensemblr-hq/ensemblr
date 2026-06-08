@@ -26,9 +26,8 @@ import type {
 	WorkspaceOpenTarget,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-
-import { useWorkbenchLayout } from './contexts/layout-context';
 import { ProjectAvatar } from './project-avatar';
+import { useWorkbenchLayout } from './shell-contexts';
 
 /** Top toolbar showing project/workspace path, open-in menu and sidebar toggle. */
 export function WorkbenchHeader({

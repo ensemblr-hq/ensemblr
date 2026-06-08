@@ -4,7 +4,7 @@ import {
 	SidebarMenuButton,
 	SidebarMenuItem,
 } from '@/renderer/components/ui/sidebar';
-import { useNavigation } from '@/renderer/components/workbench-shell/contexts';
+import { useNavigation } from '@/renderer/components/workbench-shell/shell-contexts';
 import type { WorkbenchStaticNavigationTarget } from '@/renderer/types/workbench-shell';
 
 /** Single static-navigation menu entry, wrapped in a router link when supplied. */
