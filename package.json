@@ -17,6 +17,7 @@
 		"test:commands": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/local-command.test.ts",
 		"test:config": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/config-loader.test.ts tests/main/config-resolution.test.ts tests/main/repository-config.test.ts tests/main/permissions.test.ts",
 		"test:db": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/database.test.ts",
+		"test:pi-storage": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-session-repository.test.ts tests/main/pi-event-repository.test.ts tests/main/chat-tab-repository.test.ts",
 		"test:environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/environment-variables.test.ts",
 		"test:app": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/main-window-state.test.ts",
 		"test:pi": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-executable.test.ts tests/main/pi-readiness.test.ts",
