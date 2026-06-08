@@ -83,8 +83,9 @@ function renderStaticLink(
 	target: WorkbenchStaticNavigationTarget,
 	children: ReactElement,
 ) {
+	const spec = getWorkbenchStaticRoute(target);
 	return (
-		<Link preload='intent' to={getWorkbenchStaticRoute(target)}>
+		<Link params={spec.params} preload='intent' to={spec.to}>
 			{children}
 		</Link>
 	);
