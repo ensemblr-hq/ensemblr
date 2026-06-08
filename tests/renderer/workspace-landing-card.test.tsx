@@ -7,7 +7,20 @@ import type {
 	WorkspaceLandingSummary,
 } from '../../src/renderer/types/workbench';
 
+const COMPOSER_DEFAULTS = {
+	availableModels: [],
+	availableThinkingLevels: [],
+	isStreaming: false,
+	modelId: 'gpt-5.5',
+	onModelChange: () => undefined,
+	onStop: () => undefined,
+	onSubmit: () => undefined,
+	onThinkingChange: () => undefined,
+	thinkingLevel: 'high',
+} as const;
+
 const READY_COMPOSER: ComposerShellState = {
+	...COMPOSER_DEFAULTS,
 	disabled: false,
 	disabledReason: null,
 	modelLabel: 'GPT-5.5 via Pi',
@@ -16,6 +29,7 @@ const READY_COMPOSER: ComposerShellState = {
 };
 
 const BLOCKED_COMPOSER: ComposerShellState = {
+	...COMPOSER_DEFAULTS,
 	disabled: true,
 	disabledReason: '3 required setup checks need attention.',
 	modelLabel: 'Pi model pending',

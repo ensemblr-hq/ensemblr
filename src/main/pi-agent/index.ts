@@ -5,6 +5,11 @@ export type {
 } from './cli-rpc-pi-agent-adapter';
 export { createCliRpcPiAgentAdapter } from './cli-rpc-pi-agent-adapter';
 export type {
+	FakePiAgentAdapterController,
+	FakePiAgentAdapterSessionController,
+} from './fake-pi-agent-client';
+export { createFakePiAgentAdapter } from './fake-pi-agent-client';
+export type {
 	JsonlLineStream,
 	JsonlLineStreamOptions,
 } from './jsonl-line-stream';
@@ -37,3 +42,15 @@ export type {
 	PiAgentSubscription,
 	PiAgentThinkingMetadata,
 } from './pi-agent-types';
+export type {
+	OpenPiSessionRequest as PiSessionOpenRequest,
+	PiSessionService,
+	PiSessionSnapshot,
+	StopPiSessionRequest as PiSessionStopRequest,
+	SubmitPiPromptRequest as PiSessionSubmitRequest,
+	SubmitPiPromptResult as PiSessionSubmitResult,
+} from './pi-session-service';
+export {
+	createPiSessionService,
+	PiSessionServiceError,
+} from './pi-session-service';

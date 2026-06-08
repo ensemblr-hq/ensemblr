@@ -21,6 +21,9 @@ export const IPC_CHANNELS = {
 	health: 'ensemble:health',
 	initialShellSnapshot: 'ensemble:initial-shell-snapshot',
 	listArchivedWorkspaces: 'ensemble:list-archived-workspaces',
+	listPiModels: 'ensemble:list-pi-models',
+	listPiSessions: 'ensemble:list-pi-sessions',
+	openPiSession: 'ensemble:open-pi-session',
 	previewRepositoryConfigMigration:
 		'ensemble:preview-repository-config-migration',
 	quickStartProject: 'ensemble:quick-start-project',
@@ -34,6 +37,8 @@ export const IPC_CHANNELS = {
 	selectPiExecutable: 'ensemble:select-pi-executable',
 	selectRootDirectory: 'ensemble:select-root-directory',
 	setupDiagnostics: 'ensemble:setup-diagnostics',
+	stopPiSession: 'ensemble:stop-pi-session',
+	submitPiPrompt: 'ensemble:submit-pi-prompt',
 	settingsResolution: 'ensemble:settings-resolution',
 	sharedRootAdoption: 'ensemble:shared-root-adoption',
 	unarchiveWorkspace: 'ensemble:unarchive-workspace',

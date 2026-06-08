@@ -5,6 +5,7 @@ import type {
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
 import type { PiExecutableService } from '../pi';
+import type { PiSessionService } from '../pi-agent/pi-session-service';
 import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
@@ -27,6 +28,7 @@ import type { EnsembleDatabaseService } from '../storage';
 import { registerCloneHandlers } from './handlers/clone';
 import { registerCoreHandlers } from './handlers/core';
 import { registerPiHandlers } from './handlers/pi';
+import { registerPiSessionHandlers } from './handlers/pi-session';
 import { registerRepositoryHandlers } from './handlers/repository';
 import { registerRepositoryConfigHandlers } from './handlers/repository-config';
 import { registerRootHandlers } from './handlers/root';
@@ -48,6 +50,7 @@ interface RegisterIpcHandlersOptions {
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
+	piSessionService: PiSessionService;
 	quickStartProjectService: QuickStartProjectService;
 	renameWorkspaceService: RenameWorkspaceService;
 	repositoryConfigService: RepositoryConfigService;
@@ -79,6 +82,7 @@ export function registerIpcHandlers({
 	listArchivedWorkspacesService,
 	localRepositoryRegistrationService,
 	piExecutableService,
+	piSessionService,
 	quickStartProjectService,
 	renameWorkspaceService,
 	repositoryConfigService,
@@ -118,5 +122,6 @@ export function registerIpcHandlers({
 		githubRepositoryListService,
 	});
 	registerPiHandlers({ piExecutableService });
+	registerPiSessionHandlers({ piExecutableService, piSessionService });
 	registerSetupHandlers({ setupDiagnosticsService });
 }
