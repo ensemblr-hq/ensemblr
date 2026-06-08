@@ -100,7 +100,7 @@ export function Welcome() {
 		<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
 			<main className='flex min-h-0 flex-1 items-center justify-center px-8 py-10'>
 				<section className='flex flex-col items-center gap-12'>
-					<WelcomeWordmark className='blur-[0.75px]' />
+					<WelcomeWordmark className='blur-[0.046875rem]' />
 					<div className='flex flex-wrap items-center justify-center gap-3'>
 						<WelcomeActionCard
 							disabled={isOpeningProject}
