@@ -87,12 +87,14 @@ function BrowseArchiveDialogBody({
 	} | null>(null);
 
 	const invalidate = useCallback(async () => {
-		await queryClient.invalidateQueries({
-			queryKey: ensembleQueryKeys.archivedWorkspaces(project.id),
-		});
-		await queryClient.invalidateQueries({
-			queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
-		});
+		await Promise.all([
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.archivedWorkspaces(project.id),
+			}),
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+			}),
+		]);
 		await onChange(project.id);
 	}, [onChange, project.id, queryClient]);
 

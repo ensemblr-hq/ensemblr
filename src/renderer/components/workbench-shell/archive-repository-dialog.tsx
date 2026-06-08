@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import {
 	archiveRepository,
@@ -71,10 +71,7 @@ function ArchiveRepositoryDialogForm({
 	const canArchive = stage !== 'archiving' && isEnsembleApiAvailable();
 	const workspaceCount = project.workspaces.length;
 	const hasWorkspaces = workspaceCount > 0;
-	const checkboxId = useMemo(
-		() => `archive-repository-branch-cleanup-${project.id}`,
-		[project.id],
-	);
+	const checkboxId = `archive-repository-branch-cleanup-${project.id}`;
 
 	const handleArchive = useCallback(async () => {
 		if (!canArchive) {
