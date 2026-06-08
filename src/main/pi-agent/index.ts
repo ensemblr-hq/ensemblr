@@ -1,4 +1,15 @@
 export type {
+	ChildLike,
+	CreateCliRpcPiAgentAdapterOptions,
+	SpawnFn,
+} from './cli-rpc-pi-agent-adapter';
+export { createCliRpcPiAgentAdapter } from './cli-rpc-pi-agent-adapter';
+export type {
+	JsonlLineStream,
+	JsonlLineStreamOptions,
+} from './jsonl-line-stream';
+export { createJsonlLineStream } from './jsonl-line-stream';
+export type {
 	PiAgentAdapter,
 	PiAgentAdapterCreateSessionInput,
 	PiAgentAdapterSession,
