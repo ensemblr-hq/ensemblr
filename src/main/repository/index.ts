@@ -10,6 +10,11 @@ export type {
 } from './clone-repository.ts';
 export { createGithubCloneService } from './clone-repository.ts';
 export type {
+	CreateWorkspaceService,
+	CreateWorkspaceServiceOptions,
+} from './create-workspace.ts';
+export { createWorkspaceService } from './create-workspace.ts';
+export type {
 	GitRepositoryProbe,
 	GitRepositoryProbeFn,
 } from './git-probe.ts';

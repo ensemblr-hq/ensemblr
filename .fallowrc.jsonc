@@ -1,0 +1,79 @@
+{
+	"$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+
+	// Electron Forge + Vite entries. The main/preload/renderer trio is the
+	// authoritative entry surface; vite + forge configs feed the bundler.
+	"entry": [
+		"src/main/main.ts",
+		"src/preload/preload.ts",
+		"src/renderer/main.tsx",
+		"forge.config.ts",
+		"vite.main.config.mts",
+		"vite.preload.config.mts",
+		"vite.renderer.config.mts",
+		// Bun runs renderer tests directly; treat each file as an entry so
+		// fallow doesn't flag them as unused.
+		"tests/**/*.test.{ts,tsx}",
+		"scripts/**/*.mjs"
+	],
+
+	"ignorePatterns": [
+		// Build / cache output
+		".vite/**",
+		"out/**",
+		".fallow/**",
+		// Vendored shadcn/ui primitives kept for future composition.
+		"src/renderer/components/ui/**"
+	],
+
+	// Sidebar (vendored shadcn) is the sole consumer of these hooks/atoms.
+	// Treat them as dynamically loaded so fallow stops marking them dead.
+	"dynamicallyLoaded": [
+		"src/renderer/hooks/ui/use-mobile.ts",
+		"src/renderer/state/sidebar/atoms.ts"
+	],
+
+	// Tests import the shared/ipc barrel via the implicit `index` resolution
+	// that tsconfig `bundler` moduleResolution handles. Fallow's resolver
+	// doesn't honor that for explicit `.ts` extensions, so silence the noise.
+	"ignoreUnresolvedImports": [
+		"../../src/shared/ipc.ts"
+	],
+
+	// electron-forge consumes this as a peer dep transitively via the maker
+	// plugins; the type-only import in forge.config.ts is legitimate.
+	"ignoreDependencies": [
+		"@electron-forge/shared-types"
+	],
+
+	// shadcn/ui registry components are vendored verbatim; the unused
+	// surface is intentional API completeness for future composition.
+	"ignoreExports": [
+		{ "file": "src/renderer/components/ui/**/*.tsx", "exports": ["*"] }
+	],
+
+	"duplicates": {
+		// Pair-only clones are too noisy in a 350-file Electron app.
+		"minOccurrences": 2,
+		"minTokens": 60,
+		"ignore": [
+			"src/renderer/routing/routeTree.gen.ts",
+			"tests/**"
+		]
+	},
+
+	"health": {
+		"maxCognitive": 20,
+		"maxCyclomatic": 25
+	},
+
+	"rules": {
+		// shadcn/ui dumps full primitive surfaces; demote to warn so the
+		// signal/noise ratio for real dead code stays high.
+		"unused-exports": "warn",
+		"unused-types": "warn",
+		// Barrel re-exports across feature folders are an architectural
+		// choice here, not a bug.
+		"re-export-cycle": "off"
+	}
+}

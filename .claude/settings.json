@@ -1,41 +1,43 @@
 {
-	"permissions": {
-		"defaultMode": "acceptEdits",
-		"additionalDirectories": ["/tmp"],
-		"allow": [
-			"Bash",
-			"Read",
-			"Edit",
-			"Write",
-			"WebFetch",
-			"Agent",
-			"mcp__claude_ai_Linear",
-			"mcp__plugin_context-mode_context-mode"
-		],
-		"deny": ["Read(./.env)", "Read(./.env.*)", "Read(**/.env)"]
-	},
-	"enableAllProjectMcpServers": true,
-	"enabledMcpjsonServers": ["shadcn"],
-	"hooks": {
-		"PreToolUse": [
-			{
-				"matcher": "Bash",
-				"hooks": [
-					{
-						"type": "command",
-						"command": ".claude/hooks/enforce-bun.sh"
-					}
-				]
-			},
-			{
-				"matcher": "Write|Edit|MultiEdit",
-				"hooks": [
-					{
-						"type": "command",
-						"command": ".claude/hooks/check-api-route.sh"
-					}
-				]
-			}
-		]
-	}
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "WebFetch",
+      "Agent",
+      "mcp__claude_ai_Linear",
+      "mcp__plugin_context-mode_context-mode"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/.env)"
+    ],
+    "defaultMode": "acceptEdits",
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "shadcn"
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/enforce-bun.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "fallow@fallow-skills": true
+  }
 }

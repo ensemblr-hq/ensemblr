@@ -6,6 +6,7 @@ import type {
 import type { EnvironmentVariablesService } from '../environment';
 import type { PiExecutableService } from '../pi';
 import type {
+	CreateWorkspaceService,
 	GithubCloneService,
 	GithubRepositoryListService,
 	LocalRepositoryRegistrationService,
@@ -25,6 +26,7 @@ import { registerSetupHandlers } from './handlers/setup';
 /** Dependency bundle wired into the renderer-facing IPC handlers. */
 interface RegisterIpcHandlersOptions {
 	configService: EnsembleConfigService;
+	createWorkspaceService: CreateWorkspaceService;
 	databaseService: EnsembleDatabaseService;
 	environmentVariablesService: EnvironmentVariablesService;
 	githubCloneService: GithubCloneService;
@@ -46,6 +48,7 @@ interface RegisterIpcHandlersOptions {
  */
 export function registerIpcHandlers({
 	configService,
+	createWorkspaceService,
 	databaseService,
 	environmentVariablesService,
 	githubCloneService,
@@ -70,6 +73,7 @@ export function registerIpcHandlers({
 		repositoryConfigService,
 	});
 	registerRepositoryHandlers({
+		createWorkspaceService,
 		localRepositoryRegistrationService,
 		quickStartProjectService,
 	});

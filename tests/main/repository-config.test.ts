@@ -17,9 +17,11 @@ import {
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
 import {
 	applyRepositoryConfigMigration,
+	previewRepositoryConfigMigration,
+} from '../../src/main/config/repository-config-migration.ts';
+import {
 	isRepositoryConfigPathAllowed,
 	loadRepositoryConfig,
-	previewRepositoryConfigMigration,
 } from '../../src/main/config/repository-config.ts';
 import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
 import type {

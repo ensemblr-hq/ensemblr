@@ -4,7 +4,7 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
 import type { CommandEnvironmentSnapshot } from '../commands/local-command';
-import type { EnsembleRootDirectoryService } from '../root/root-directory';
+import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
 import type { PiExecutableSnapshot } from './pi-executable';
 import { isExecutableReady } from './pi-executable-ready.ts';
 import type {

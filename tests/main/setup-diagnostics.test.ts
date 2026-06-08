@@ -15,12 +15,12 @@ import type {
 	PiReadinessService,
 	PiReadinessSnapshot,
 } from '../../src/main/pi/pi-readiness.ts';
-import type { EnsembleRootDirectoryService } from '../../src/main/root/root-directory.ts';
+import type { EnsembleRootDirectoryService } from '../../src/main/root/root-directory-service.ts';
 import {
 	createSetupCheckSnapshot,
-	createSetupDiagnosticsService,
 	type SetupCheckProvider,
-} from '../../src/main/setup/setup-diagnostics.ts';
+} from '../../src/main/setup/setup-check-context.ts';
+import { createSetupDiagnosticsService } from '../../src/main/setup/setup-diagnostics.ts';
 import type {
 	DatabaseHealthSnapshot,
 	EnsembleDatabaseService,
