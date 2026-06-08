@@ -22,8 +22,10 @@ export const IPC_CHANNELS = {
 	initialShellSnapshot: 'ensemble:initial-shell-snapshot',
 	listArchivedWorkspaces: 'ensemble:list-archived-workspaces',
 	listPiModels: 'ensemble:list-pi-models',
+	listPiSessionEvents: 'ensemble:list-pi-session-events',
 	listPiSessions: 'ensemble:list-pi-sessions',
 	openPiSession: 'ensemble:open-pi-session',
+	piSessionEvent: 'ensemble:pi-session-event',
 	previewRepositoryConfigMigration:
 		'ensemble:preview-repository-config-migration',
 	quickStartProject: 'ensemble:quick-start-project',

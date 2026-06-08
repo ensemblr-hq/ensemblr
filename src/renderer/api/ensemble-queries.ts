@@ -22,10 +22,12 @@ import type {
 	DeleteWorkspaceResult,
 	EnsembleApi,
 	ListPiModelsResult,
+	ListPiSessionEventsResult,
 	ListPiSessionsResult,
 	LocalRepositorySelectionResult,
 	OpenPiSessionRequest,
 	OpenPiSessionResult,
+	PiSessionEventBroadcast,
 	QuickStartProjectRequest,
 	QuickStartProjectResult,
 	RegisterLocalRepositoryRequest,
@@ -51,6 +53,8 @@ export const ensembleQueryKeys = {
 		[...ensembleQueryKeys.all, 'github-repository-list'] as const,
 	health: () => [...ensembleQueryKeys.all, 'health'] as const,
 	piModels: () => [...ensembleQueryKeys.all, 'pi-models'] as const,
+	piSessionEvents: (branchId: string) =>
+		[...ensembleQueryKeys.all, 'pi-session-events', branchId] as const,
 	piSessionsForWorkspace: (workspaceId: string) =>
 		[...ensembleQueryKeys.all, 'pi-sessions', workspaceId] as const,
 	repositoryWorkspaceNavigation: () =>
@@ -390,6 +394,34 @@ export function submitPiPrompt(
 		{ channel: 'ensemble:submit-pi-prompt', usesDatabase: true },
 		() => getEnsembleApi().submitPiPrompt(request),
 	);
+}
+
+/** Query options for the persisted Pi events of a branch. */
+export function piSessionEventsQuery(branchId: string) {
+	return queryOptions({
+		enabled: branchId.length > 0,
+		queryFn: (): Promise<ListPiSessionEventsResult> =>
+			profileElectronIpcCall(
+				{
+					channel: 'ensemble:list-pi-session-events',
+					usesDatabase: true,
+				},
+				() => getEnsembleApi().listPiSessionEvents({ branchId }),
+			),
+		queryKey: ensembleQueryKeys.piSessionEvents(branchId),
+		staleTime: 0,
+	});
+}
+
+/** Subscribes to live Pi RPC event broadcasts. Returns an unsubscribe fn. */
+export function subscribePiSessionEvents(
+	listener: (event: PiSessionEventBroadcast) => void,
+): () => void {
+	const api = getEnsembleApiOrNull();
+	if (!api) {
+		return () => undefined;
+	}
+	return api.onPiSessionEvent(listener);
 }
 
 /** Aborts the in-flight turn of an open Pi session. */

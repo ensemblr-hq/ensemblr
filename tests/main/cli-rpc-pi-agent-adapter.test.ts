@@ -283,8 +283,10 @@ test('submit writes a JSONL frame to stdin, emits user message, returns turn id'
 
 	const stdinChunks = child.getStdinChunks();
 	assert.equal(stdinChunks.length, 1);
-	assert.match(stdinChunks[0]!, /"type":"submit"/);
-	assert.match(stdinChunks[0]!, /"prompt":"do the thing"/);
+	// Pi RPC protocol (@earendil-works/pi-coding-agent): `prompt` command
+	// with `message` field, one JSONL frame per line.
+	assert.match(stdinChunks[0]!, /"type":"prompt"/);
+	assert.match(stdinChunks[0]!, /"message":"do the thing"/);
 	assert.match(stdinChunks[0]!, /\n$/);
 
 	const userMessage = events.find(

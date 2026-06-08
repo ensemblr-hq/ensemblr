@@ -291,6 +291,7 @@ function createCliRpcSession({
 
 		const typed = frame as Record<string, unknown>;
 		switch (typed.type) {
+			// `session` (legacy/future) — explicit session id frame.
 			case 'session': {
 				const sessionId =
 					typeof typed.sessionId === 'string' ? typed.sessionId : null;
@@ -300,8 +301,64 @@ function createCliRpcSession({
 				setStatus('streaming');
 				return;
 			}
+			// Pi command ack: `{"type":"response","command":"prompt","success":bool}`.
+			case 'response': {
+				const success = typed.success !== false;
+				if (!success) {
+					emitError(
+						'adapter-failure',
+						typeof typed.error === 'string'
+							? typed.error
+							: 'Pi RPC command failed.',
+						typeof typed.command === 'string'
+							? `command=${typed.command}`
+							: undefined,
+						true,
+					);
+				}
+				return;
+			}
+			// Pi lifecycle: `agent_start` / `agent_end` / `turn_start` / `turn_end`.
+			case 'agent_start':
+				setStatus('streaming');
+				return;
+			case 'turn_start':
+				return;
+			case 'turn_end':
+			case 'agent_end':
+				setStatus('idle');
+				return;
+			// Pi message lifecycle: `message_start` / `message_end` carry a
+			// `message` object with role + content[]. We collapse to a single
+			// renderer event using `message_end` so the UI sees the complete
+			// payload rather than two partial frames.
+			case 'message_end':
+			case 'message_start': {
+				if (typed.type === 'message_start') {
+					return;
+				}
+				const message = (typed.message ?? {}) as Record<string, unknown>;
+				const role = isMessageRole(message.role) ? message.role : 'agent';
+				const turnId =
+					typeof typed.turnId === 'string' ? typed.turnId : null;
+				emit({
+					at: now().toISOString(),
+					payload: { content: message.content, role },
+					role,
+					turnId,
+					type: 'message',
+				});
+				return;
+			}
+			// Pi tool calls / results — pass through as agent messages today.
+			case 'tool_call':
+			case 'tool_result':
 			case 'message': {
-				const role = isMessageRole(typed.role) ? typed.role : 'agent';
+				const role = isMessageRole(typed.role)
+					? typed.role
+					: typed.type === 'tool_result' || typed.type === 'tool_call'
+						? 'tool'
+						: 'agent';
 				const turnId = typeof typed.turnId === 'string' ? typed.turnId : null;
 				emit({
 					at: now().toISOString(),
@@ -329,6 +386,9 @@ function createCliRpcSession({
 				return;
 			}
 			default:
+				// Unknown frame — surface as agent message so the timeline at least
+				// records it instead of dropping silently. Future versions of Pi may
+				// add frame types we have not modelled yet.
 				emit({
 					at: now().toISOString(),
 					payload: typed,
@@ -449,12 +509,17 @@ function createCliRpcSession({
 		}
 		const turnId = turnIdFactory();
 		const acceptedAt = now().toISOString();
+		// Pi RPC protocol (@earendil-works/pi-coding-agent >= 0.79):
+		//   {"type":"prompt","message":"<text>"}
+		// `turnId` and attachments are Ensemble-side metadata that the runtime
+		// ignores today; we keep them on the frame so a future Pi build that
+		// accepts them needs no client change.
 		const frame = {
 			attachments: request.attachments ?? [],
+			message: request.prompt,
 			modelOverride: request.modelOverride,
-			prompt: request.prompt,
 			turnId,
-			type: 'submit' as const,
+			type: 'prompt' as const,
 		};
 		const line = `${JSON.stringify(frame)}\n`;
 		const writeResult = child.stdin.write(line, 'utf8');

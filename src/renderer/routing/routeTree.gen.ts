@@ -20,6 +20,7 @@ import { Route as WorkbenchSettingsGitRouteImport } from './routes/_workbench/se
 import { Route as WorkbenchSettingsGeneralRouteImport } from './routes/_workbench/settings/general'
 import { Route as WorkbenchSettingsExperimentalRouteImport } from './routes/_workbench/settings/experimental'
 import { Route as WorkbenchSettingsEnvironmentRouteImport } from './routes/_workbench/settings/environment'
+import { Route as WorkbenchSettingsDiagnosticsRouteImport } from './routes/_workbench/settings/diagnostics'
 import { Route as WorkbenchSettingsAppearanceRouteImport } from './routes/_workbench/settings/appearance'
 import { Route as WorkbenchSettingsAdvancedRouteImport } from './routes/_workbench/settings/advanced'
 import { Route as WorkbenchShellHistoryRouteImport } from './routes/_workbench/_shell/history'
@@ -93,6 +94,12 @@ const WorkbenchSettingsEnvironmentRoute =
   WorkbenchSettingsEnvironmentRouteImport.update({
     id: '/environment',
     path: '/environment',
+    getParentRoute: () => WorkbenchSettingsRoute,
+  } as any)
+const WorkbenchSettingsDiagnosticsRoute =
+  WorkbenchSettingsDiagnosticsRouteImport.update({
+    id: '/diagnostics',
+    path: '/diagnostics',
     getParentRoute: () => WorkbenchSettingsRoute,
   } as any)
 const WorkbenchSettingsAppearanceRoute =
@@ -207,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/history': typeof WorkbenchShellHistoryRoute
   '/settings/advanced': typeof WorkbenchSettingsAdvancedRoute
   '/settings/appearance': typeof WorkbenchSettingsAppearanceRoute
+  '/settings/diagnostics': typeof WorkbenchSettingsDiagnosticsRoute
   '/settings/environment': typeof WorkbenchSettingsEnvironmentRoute
   '/settings/experimental': typeof WorkbenchSettingsExperimentalRoute
   '/settings/general': typeof WorkbenchSettingsGeneralRoute
@@ -234,6 +242,7 @@ export interface FileRoutesByTo {
   '/history': typeof WorkbenchShellHistoryRoute
   '/settings/advanced': typeof WorkbenchSettingsAdvancedRoute
   '/settings/appearance': typeof WorkbenchSettingsAppearanceRoute
+  '/settings/diagnostics': typeof WorkbenchSettingsDiagnosticsRoute
   '/settings/environment': typeof WorkbenchSettingsEnvironmentRoute
   '/settings/experimental': typeof WorkbenchSettingsExperimentalRoute
   '/settings/general': typeof WorkbenchSettingsGeneralRoute
@@ -262,6 +271,7 @@ export interface FileRoutesById {
   '/_workbench/_shell/history': typeof WorkbenchShellHistoryRoute
   '/_workbench/settings/advanced': typeof WorkbenchSettingsAdvancedRoute
   '/_workbench/settings/appearance': typeof WorkbenchSettingsAppearanceRoute
+  '/_workbench/settings/diagnostics': typeof WorkbenchSettingsDiagnosticsRoute
   '/_workbench/settings/environment': typeof WorkbenchSettingsEnvironmentRoute
   '/_workbench/settings/experimental': typeof WorkbenchSettingsExperimentalRoute
   '/_workbench/settings/general': typeof WorkbenchSettingsGeneralRoute
@@ -293,6 +303,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/settings/advanced'
     | '/settings/appearance'
+    | '/settings/diagnostics'
     | '/settings/environment'
     | '/settings/experimental'
     | '/settings/general'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/settings/advanced'
     | '/settings/appearance'
+    | '/settings/diagnostics'
     | '/settings/environment'
     | '/settings/experimental'
     | '/settings/general'
@@ -347,6 +359,7 @@ export interface FileRouteTypes {
     | '/_workbench/_shell/history'
     | '/_workbench/settings/advanced'
     | '/_workbench/settings/appearance'
+    | '/_workbench/settings/diagnostics'
     | '/_workbench/settings/environment'
     | '/_workbench/settings/experimental'
     | '/_workbench/settings/general'
@@ -450,6 +463,13 @@ declare module '@tanstack/react-router' {
       path: '/environment'
       fullPath: '/settings/environment'
       preLoaderRoute: typeof WorkbenchSettingsEnvironmentRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/settings/diagnostics': {
+      id: '/_workbench/settings/diagnostics'
+      path: '/diagnostics'
+      fullPath: '/settings/diagnostics'
+      preLoaderRoute: typeof WorkbenchSettingsDiagnosticsRouteImport
       parentRoute: typeof WorkbenchSettingsRoute
     }
     '/_workbench/settings/appearance': {
@@ -659,6 +679,7 @@ const WorkbenchSettingsRepoRepoIdRouteWithChildren =
 interface WorkbenchSettingsRouteChildren {
   WorkbenchSettingsAdvancedRoute: typeof WorkbenchSettingsAdvancedRoute
   WorkbenchSettingsAppearanceRoute: typeof WorkbenchSettingsAppearanceRoute
+  WorkbenchSettingsDiagnosticsRoute: typeof WorkbenchSettingsDiagnosticsRoute
   WorkbenchSettingsEnvironmentRoute: typeof WorkbenchSettingsEnvironmentRoute
   WorkbenchSettingsExperimentalRoute: typeof WorkbenchSettingsExperimentalRoute
   WorkbenchSettingsGeneralRoute: typeof WorkbenchSettingsGeneralRoute
@@ -673,6 +694,7 @@ interface WorkbenchSettingsRouteChildren {
 const WorkbenchSettingsRouteChildren: WorkbenchSettingsRouteChildren = {
   WorkbenchSettingsAdvancedRoute: WorkbenchSettingsAdvancedRoute,
   WorkbenchSettingsAppearanceRoute: WorkbenchSettingsAppearanceRoute,
+  WorkbenchSettingsDiagnosticsRoute: WorkbenchSettingsDiagnosticsRoute,
   WorkbenchSettingsEnvironmentRoute: WorkbenchSettingsEnvironmentRoute,
   WorkbenchSettingsExperimentalRoute: WorkbenchSettingsExperimentalRoute,
   WorkbenchSettingsGeneralRoute: WorkbenchSettingsGeneralRoute,

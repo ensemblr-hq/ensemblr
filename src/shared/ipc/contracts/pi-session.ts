@@ -98,6 +98,22 @@ export interface ListPiSessionsResult {
 	sessions: readonly PiSessionSnapshotWire[];
 }
 
+/** Read persisted events for a branch (rehydrating the timeline on reopen). */
+export interface ListPiSessionEventsRequest {
+	branchId: string;
+}
+
+export interface ListPiSessionEventsResult {
+	events: readonly PiSessionEventWire[];
+}
+
+/** Live envelope pushed from the main process when an event lands. */
+export interface PiSessionEventBroadcast {
+	event: PiSessionEventWire;
+	sessionId: string;
+	workspaceId: string;
+}
+
 /** Lightweight static model descriptor surfaced by the discovery stub. */
 export interface PiModelOptionWire {
 	displayName: string;

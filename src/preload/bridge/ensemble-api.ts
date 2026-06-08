@@ -27,12 +27,15 @@ import {
 	type ListArchivedWorkspacesRequest,
 	type ListArchivedWorkspacesResult,
 	type ListPiModelsResult,
+	type ListPiSessionEventsRequest,
+	type ListPiSessionEventsResult,
 	type ListPiSessionsRequest,
 	type ListPiSessionsResult,
 	type LocalRepositorySelectionResult,
 	type OpenPiSessionRequest,
 	type OpenPiSessionResult,
 	type PiExecutableSelectionResult,
+	type PiSessionEventBroadcast,
 	type QuickStartProjectRequest,
 	type QuickStartProjectResult,
 	type RegisterLocalRepositoryRequest,
@@ -139,11 +142,28 @@ export function createEnsembleApi(): EnsembleApi {
 			ipcRenderer.invoke(
 				IPC_CHANNELS.listPiModels,
 			) as Promise<ListPiModelsResult>,
+		listPiSessionEvents: (request: ListPiSessionEventsRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.listPiSessionEvents,
+				request,
+			) as Promise<ListPiSessionEventsResult>,
 		listPiSessions: (request: ListPiSessionsRequest) =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.listPiSessions,
 				request,
 			) as Promise<ListPiSessionsResult>,
+		onPiSessionEvent: (listener: (event: PiSessionEventBroadcast) => void) => {
+			const wrapped = (
+				_event: IpcRendererEvent,
+				payload: PiSessionEventBroadcast,
+			) => {
+				listener(payload);
+			};
+			ipcRenderer.on(IPC_CHANNELS.piSessionEvent, wrapped);
+			return () => {
+				ipcRenderer.off(IPC_CHANNELS.piSessionEvent, wrapped);
+			};
+		},
 		openPiSession: (request: OpenPiSessionRequest) =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.openPiSession,

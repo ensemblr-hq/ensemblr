@@ -8,6 +8,7 @@ import {
 	type PiExecutableSnapshot,
 } from './pi-executable.ts';
 import type {
+	PiModelOption,
 	PiProviderModelFailureCode,
 	PiProviderModelSnapshot,
 } from './pi-readiness';
@@ -43,6 +44,7 @@ export async function resolvePiProviderModels({
 					'Pi executable is not ready enough to list provider models.',
 			},
 			modelCount: 0,
+			models: [],
 			providerCount: 0,
 			result: null,
 			status: 'failure',
@@ -64,13 +66,22 @@ export async function resolvePiProviderModels({
 				message: getProviderModelFailureMessage(result),
 			},
 			modelCount: 0,
+			models: [],
 			providerCount: 0,
 			result,
 			status: 'failure',
 		};
 	}
 
-	const modelSummary = parsePiListModelsOutput(result.stdout);
+	// Pi distributions vary in which stream they print the model table on:
+	// some write to stdout, others (e.g. the bun-installed
+	// @earendil-works/pi-coding-agent wrapper) emit the table on stderr. Try
+	// stdout first, fall back to stderr when stdout has no rows.
+	const stdoutSummary = parsePiListModelsOutput(result.stdout);
+	const modelSummary =
+		stdoutSummary.modelCount > 0
+			? stdoutSummary
+			: parsePiListModelsOutput(result.stderr);
 
 	if (modelSummary.modelCount === 0) {
 		return {
@@ -81,6 +92,7 @@ export async function resolvePiProviderModels({
 					'Pi listed zero usable provider models. Configure at least one provider or model, then retry.',
 			},
 			modelCount: 0,
+			models: [],
 			providerCount: 0,
 			result,
 			status: 'failure',
@@ -90,6 +102,7 @@ export async function resolvePiProviderModels({
 	return {
 		command: executable.command,
 		modelCount: modelSummary.modelCount,
+		models: modelSummary.models,
 		providerCount: modelSummary.providerCount,
 		result,
 		status: 'success',
@@ -97,16 +110,19 @@ export async function resolvePiProviderModels({
 }
 
 /**
- * Parses the columnar `pi --list-models` output into provider/model counts.
- * @param output - Raw stdout from `pi --list-models`.
- * @returns Distinct provider and model counts.
+ * Parses the columnar `pi --list-models` output into provider/model rows plus
+ * deduplicated counts.
+ * @param output - Raw stdout (or stderr) from `pi --list-models`.
+ * @returns Parsed rows alongside distinct provider and model counts.
  */
 export function parsePiListModelsOutput(output: string): {
 	modelCount: number;
+	models: readonly PiModelOption[];
 	providerCount: number;
 } {
 	const providers = new Set<string>();
-	let modelCount = 0;
+	const models: PiModelOption[] = [];
+	const seenIds = new Set<string>();
 
 	for (const line of output.split(/\r?\n/)) {
 		const trimmedLine = line.trim();
@@ -115,18 +131,37 @@ export function parsePiListModelsOutput(output: string): {
 			continue;
 		}
 
-		const columns = trimmedLine.split(/\s{2,}/).filter(Boolean);
+		// Pi table columns may be separated by tabs, multi-spaces, or single
+		// spaces — different distributions format differently. Split on any
+		// whitespace and accept the first column as the provider name.
+		const columns = trimmedLine.split(/\s+/).filter(Boolean);
 
 		if (columns.length < 2) {
 			continue;
 		}
 
-		providers.add(columns[0]);
-		modelCount += 1;
+		const provider = columns[0];
+		const model = columns[1];
+		if (!provider || !/^[A-Za-z][\w-]*$/.test(provider)) {
+			continue;
+		}
+		if (!model) {
+			continue;
+		}
+
+		providers.add(provider);
+
+		const id = `${provider}/${model}`;
+		if (seenIds.has(id)) {
+			continue;
+		}
+		seenIds.add(id);
+		models.push({ id, model, provider });
 	}
 
 	return {
-		modelCount,
+		modelCount: models.length,
+		models,
 		providerCount: providers.size,
 	};
 }

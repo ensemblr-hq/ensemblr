@@ -1,3 +1,4 @@
+import type { LocalCommandService } from '../commands/local-command';
 import type {
 	EnsembleConfigResolutionService,
 	EnsembleConfigService,
@@ -48,6 +49,7 @@ interface RegisterIpcHandlersOptions {
 	githubCloneService: GithubCloneService;
 	githubRepositoryListService: GithubRepositoryListService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
+	localCommandService: LocalCommandService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
 	piSessionService: PiSessionService;
@@ -80,6 +82,7 @@ export function registerIpcHandlers({
 	githubCloneService,
 	githubRepositoryListService,
 	listArchivedWorkspacesService,
+	localCommandService,
 	localRepositoryRegistrationService,
 	piExecutableService,
 	piSessionService,
@@ -122,6 +125,10 @@ export function registerIpcHandlers({
 		githubRepositoryListService,
 	});
 	registerPiHandlers({ piExecutableService });
-	registerPiSessionHandlers({ piExecutableService, piSessionService });
+	registerPiSessionHandlers({
+		localCommandService,
+		piExecutableService,
+		piSessionService,
+	});
 	registerSetupHandlers({ setupDiagnosticsService });
 }

@@ -3,18 +3,24 @@ import { ipcMain } from 'electron';
 import {
 	IPC_CHANNELS,
 	type ListPiModelsResult,
+	type ListPiSessionEventsRequest,
+	type ListPiSessionEventsResult,
 	type ListPiSessionsRequest,
 	type ListPiSessionsResult,
 	type OpenPiSessionRequest,
 	type OpenPiSessionResult,
 	type PiChatTabWire,
+	type PiModelOptionWire,
+	type PiSessionEventWire,
 	type PiSessionSnapshotWire,
 	type StopPiSessionRequest,
 	type StopPiSessionResult,
 	type SubmitPiPromptRequest,
 	type SubmitPiPromptResult,
 } from '../../../shared/ipc';
+import type { LocalCommandService } from '../../commands/local-command';
 import type { PiExecutableService } from '../../pi';
+import { resolvePiProviderModels } from '../../pi/pi-provider-models.ts';
 import type {
 	PiSessionService,
 	PiSessionSnapshot,
@@ -22,28 +28,18 @@ import type {
 
 /** Service dependencies used by the Pi session IPC handlers. */
 export interface PiSessionHandlersOptions {
+	localCommandService: LocalCommandService;
 	piExecutableService: PiExecutableService;
 	piSessionService: PiSessionService;
 }
 
-/** Static placeholder model catalog — replaced when capability discovery (THE-135) lands. */
-const STATIC_PI_MODELS: ListPiModelsResult = {
-	defaultModelId: 'gpt-5.5',
-	defaultThinkingLevel: 'high',
-	models: [
-		{
-			displayName: 'GPT-5.5 via Pi',
-			id: 'gpt-5.5',
-			provider: 'pi',
-			thinkingLevels: ['low', 'medium', 'high'],
-		},
-		{
-			displayName: 'GPT-5.5 Mini',
-			id: 'gpt-5.5-mini',
-			provider: 'pi',
-			thinkingLevels: ['low', 'medium'],
-		},
-	],
+const DEFAULT_THINKING_LEVELS = ['low', 'medium', 'high'] as const;
+const DEFAULT_THINKING_LEVEL = 'medium';
+
+const EMPTY_PI_MODELS: ListPiModelsResult = {
+	defaultModelId: null,
+	defaultThinkingLevel: null,
+	models: [],
 };
 
 /**
@@ -51,6 +47,7 @@ const STATIC_PI_MODELS: ListPiModelsResult = {
  * @param options - Required services.
  */
 export function registerPiSessionHandlers({
+	localCommandService,
 	piExecutableService,
 	piSessionService,
 }: PiSessionHandlersOptions): void {
@@ -145,9 +142,55 @@ export function registerPiSessionHandlers({
 		},
 	);
 
-	ipcMain.handle(IPC_CHANNELS.listPiModels, (): Promise<ListPiModelsResult> => {
-		return Promise.resolve(STATIC_PI_MODELS);
-	});
+	ipcMain.handle(
+		IPC_CHANNELS.listPiModels,
+		async (): Promise<ListPiModelsResult> => {
+			try {
+				const executable = await piExecutableService.getSnapshot();
+				const snapshot = await resolvePiProviderModels({
+					executable,
+					localCommandService,
+				});
+				if (snapshot.status !== 'success' || snapshot.models.length === 0) {
+					return EMPTY_PI_MODELS;
+				}
+				const models: PiModelOptionWire[] = snapshot.models.map((row) => ({
+					displayName: `${row.model} (${row.provider})`,
+					id: row.id,
+					provider: row.provider,
+					thinkingLevels: DEFAULT_THINKING_LEVELS,
+				}));
+				return {
+					defaultModelId: models[0]?.id ?? null,
+					defaultThinkingLevel: DEFAULT_THINKING_LEVEL,
+					models,
+				};
+			} catch {
+				return EMPTY_PI_MODELS;
+			}
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.listPiSessionEvents,
+		(
+			_event,
+			request: ListPiSessionEventsRequest,
+		): Promise<ListPiSessionEventsResult> => {
+			const rows = piSessionService.listEvents(request.branchId);
+			const events: PiSessionEventWire[] = rows.map((row) => ({
+				branchId: row.branchId,
+				createdAt: row.createdAt,
+				eventType: row.eventType,
+				id: row.id,
+				ordinal: row.ordinal,
+				payload: row.payload,
+				stream: row.stream,
+				turnId: row.turnId,
+			}));
+			return Promise.resolve({ events });
+		},
+	);
 }
 
 function snapshotToWire(snapshot: PiSessionSnapshot): PiSessionSnapshotWire {

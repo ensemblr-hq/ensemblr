@@ -81,11 +81,11 @@ test('local-branch landing card surfaces branch source and missing setup script 
 	expect(markup).toContain('master');
 	expect(markup).toContain('3');
 	expect(markup).toContain('files copied');
-	expect(markup).toContain('Add a setup script');
-	expect(markup).toContain('No setup script is configured');
-	expect(markup).toContain('data-landing-composer-state="ready"');
 	expect(markup).not.toContain('Linked issue');
+	// Diagnostic surface area is gone — chat tab stays chat-only (THE-130).
 	expect(markup).not.toContain('Pi composer not ready');
+	expect(markup).not.toContain('Add a setup script');
+	expect(markup).not.toContain('data-landing-composer-state');
 });
 
 test('cloned-repo landing card shows clone-specific copy and run-script command', () => {
@@ -114,8 +114,9 @@ test('cloned-repo landing card shows clone-specific copy and run-script command'
 	expect(markup).toContain('Repository cloned');
 	expect(markup).toContain('Fresh clone checked out the default branch.');
 	expect(markup).toContain('files skipped');
-	expect(markup).toContain('Configured');
-	expect(markup).toContain('bun install');
+	// Setup-script badge + command moved out of the chat tab.
+	expect(markup).not.toContain('Configured');
+	expect(markup).not.toContain('bun install');
 	expect(markup).not.toContain('files copied');
 });
 
@@ -157,10 +158,12 @@ test('linear-linked landing card shows linked issue metadata and composer-blocke
 	expect(markup).toContain('linear');
 	expect(markup).toContain('Workspace creation from Linear issue');
 	expect(markup).toContain('Ensemble · Todo');
-	expect(markup).toContain('Not run yet');
-	expect(markup).toContain('data-landing-composer-state="disabled"');
-	expect(markup).toContain('Pi composer not ready');
-	expect(markup).toContain('3 required setup checks need attention.');
+	// Diagnostic content (setup state, composer-not-ready, blocked counts)
+	// belongs in the sidebar footer + settings → diagnostics now (THE-130).
+	expect(markup).not.toContain('Not run yet');
+	expect(markup).not.toContain('data-landing-composer-state');
+	expect(markup).not.toContain('Pi composer not ready');
+	expect(markup).not.toContain('3 required setup checks need attention.');
 });
 
 test('omits the landing card when no summary is provided', () => {

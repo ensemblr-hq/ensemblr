@@ -4,6 +4,11 @@ import { type FormEvent, useState } from 'react';
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
 import { Textarea } from '@/renderer/components/ui/textarea';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from '@/renderer/components/ui/tooltip';
 import type { ComposerShellState } from '@/renderer/types/workbench';
 
 /** Sticky bottom composer with textarea, status badges and send/stop. */
@@ -52,14 +57,6 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 					<div className='flex flex-wrap items-center gap-1.5'>
 						<ModelSelect composer={composer} />
 						<ThinkingSelect composer={composer} />
-						{composer.disabledReason ? (
-							<StatusBadge
-								className='min-w-0 max-w-full truncate'
-								tone='warning'
-							>
-								{composer.disabledReason}
-							</StatusBadge>
-						) : null}
 					</div>
 					<div className='flex items-center gap-1.5'>
 						<Button disabled={composer.disabled} size='sm' variant='outline'>
@@ -76,6 +73,17 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 								<SquareIcon data-icon='inline-start' />
 								Stop
 							</Button>
+						) : composer.disabled && composer.disabledReason ? (
+							<Tooltip>
+								<TooltipTrigger asChild>
+									<span>
+										<Button disabled size='sm' type='button'>
+											Send
+										</Button>
+									</span>
+								</TooltipTrigger>
+								<TooltipContent>{composer.disabledReason}</TooltipContent>
+							</Tooltip>
 						) : (
 							<Button disabled={submitDisabled} size='sm' type='submit'>
 								Send

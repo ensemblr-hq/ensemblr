@@ -92,6 +92,13 @@ export interface PiRpcSmokeSnapshot {
 	stdoutTruncated: boolean;
 }
 
+/** A single provider/model row parsed from `pi --list-models`. */
+export interface PiModelOption {
+	id: string;
+	model: string;
+	provider: string;
+}
+
 /** Result of the `pi --list-models` provider/model readiness check. */
 export interface PiProviderModelSnapshot {
 	command: string;
@@ -100,6 +107,7 @@ export interface PiProviderModelSnapshot {
 		message: string;
 	};
 	modelCount: number;
+	models: readonly PiModelOption[];
 	providerCount: number;
 	result: LocalCommandResult | null;
 	status: PiReadinessStatus;

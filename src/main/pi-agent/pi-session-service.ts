@@ -75,8 +75,16 @@ export interface StopPiSessionRequest {
 	sessionId: string;
 }
 
+/** Side-channel called once per persisted event so callers can broadcast it. */
+export type PiSessionEventSink = (input: {
+	event: PiEventRow;
+	sessionId: string;
+	workspaceId: string;
+}) => void;
+
 export interface PiSessionServiceOptions {
 	databaseService: EnsembleDatabaseService;
+	eventSink?: PiSessionEventSink;
 	piAgentClient: PiAgentClient;
 	now?: () => Date;
 }
@@ -103,6 +111,7 @@ export interface PiSessionService {
  */
 export function createPiSessionService({
 	databaseService,
+	eventSink,
 	piAgentClient,
 	now = () => new Date(),
 }: PiSessionServiceOptions): PiSessionService {
@@ -296,11 +305,24 @@ export function createPiSessionService({
 					: 'protocol',
 			turnId: active?.activeTurnId ?? null,
 		};
+		let persistedRow: PiEventRow | null = null;
 		try {
-			appendPiEvent({ database, input });
+			persistedRow = appendPiEvent({ database, input });
 		} catch {
 			// Persistence is best-effort on the live path; the timeline rehydrates
 			// from whatever events did land.
+		}
+
+		if (persistedRow && eventSink && active) {
+			try {
+				eventSink({
+					event: persistedRow,
+					sessionId,
+					workspaceId: active.row.workspaceId,
+				});
+			} catch {
+				// Sink failures (renderer gone, IPC closed) must not break persistence.
+			}
 		}
 
 		if (event.type === 'metadata' && event.metadata.sessionId) {

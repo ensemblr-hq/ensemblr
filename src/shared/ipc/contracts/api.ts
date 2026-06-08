@@ -12,10 +12,13 @@ import type { HealthSnapshot } from './health';
 import type { PiExecutableSelectionResult } from './pi';
 import type {
 	ListPiModelsResult,
+	ListPiSessionEventsRequest,
+	ListPiSessionEventsResult,
 	ListPiSessionsRequest,
 	ListPiSessionsResult,
 	OpenPiSessionRequest,
 	OpenPiSessionResult,
+	PiSessionEventBroadcast,
 	StopPiSessionRequest,
 	StopPiSessionResult,
 	SubmitPiPromptRequest,
@@ -107,9 +110,15 @@ export interface EnsembleApi {
 	githubRepositoryList: () => Promise<GithubRepositoryListResult>;
 	health: () => Promise<HealthSnapshot>;
 	listPiModels: () => Promise<ListPiModelsResult>;
+	listPiSessionEvents: (
+		request: ListPiSessionEventsRequest,
+	) => Promise<ListPiSessionEventsResult>;
 	listPiSessions: (
 		request: ListPiSessionsRequest,
 	) => Promise<ListPiSessionsResult>;
+	onPiSessionEvent: (
+		listener: (event: PiSessionEventBroadcast) => void,
+	) => () => void;
 	openPiSession: (
 		request: OpenPiSessionRequest,
 	) => Promise<OpenPiSessionResult>;

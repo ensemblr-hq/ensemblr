@@ -53,6 +53,8 @@ export type { PiExecutableSelectionResult } from './pi';
 export type {
 	ChatTabKindWire,
 	ListPiModelsResult,
+	ListPiSessionEventsRequest,
+	ListPiSessionEventsResult,
 	ListPiSessionsRequest,
 	ListPiSessionsResult,
 	OpenPiSessionRequest,
@@ -60,6 +62,7 @@ export type {
 	PiChatTabWire,
 	PiEventStreamWire,
 	PiModelOptionWire,
+	PiSessionEventBroadcast,
 	PiSessionEventWire,
 	PiSessionSnapshotWire,
 	PiSessionStatusWire,
