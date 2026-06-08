@@ -1,4 +1,4 @@
-name: React Doctor
+name: Checks
 
 on:
   pull_request:

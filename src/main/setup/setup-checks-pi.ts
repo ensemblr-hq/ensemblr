@@ -18,7 +18,7 @@ import {
 	createCommandLogs,
 	createSetupCheckSnapshot,
 	type SetupCheckProviderContext,
-} from './setup-diagnostics.ts';
+} from './setup-check-context.ts';
 
 /** Builds the snapshot for the Pi agent-directory readiness check. */
 export async function getPiAgentDirectoryCheck({

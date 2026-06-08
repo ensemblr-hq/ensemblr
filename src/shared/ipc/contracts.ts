@@ -194,6 +194,57 @@ export interface RepositoryWorkspaceNavigationSnapshot {
 	repositories: RepositoryWorkspaceNavigationRepository[];
 }
 
+export type CreateWorkspaceDiagnosticCode =
+	| 'context-directory-failed'
+	| 'database-unavailable'
+	| 'destination-exists'
+	| 'destination-not-writable'
+	| 'git-not-installed'
+	| 'git-worktree-failed'
+	| 'name-invalid'
+	| 'repositories-path-missing'
+	| 'repository-id-required'
+	| 'repository-not-found'
+	| 'workspace-insert-failed';
+
+export type CreateWorkspaceDiagnosticSeverity = 'error' | 'info' | 'warning';
+
+export interface CreateWorkspaceDiagnostic {
+	code: CreateWorkspaceDiagnosticCode;
+	message: string;
+	path?: string;
+	severity: CreateWorkspaceDiagnosticSeverity;
+}
+
+export interface CreateWorkspaceRequest {
+	baseBranch?: string;
+	branchName?: string;
+	name?: string;
+	repositoryId: string;
+}
+
+export interface CreatedWorkspaceSnapshot {
+	archivedAt: string | null;
+	baseBranch: string | null;
+	branchName: string | null;
+	createdAt: string;
+	id: string;
+	metadata: Record<string, unknown>;
+	name: string;
+	path: string;
+	repositoryId: string;
+	slug: string;
+	updatedAt: string;
+}
+
+export type CreateWorkspaceStatus = 'failure' | 'success';
+
+export interface CreateWorkspaceResult {
+	diagnostics: CreateWorkspaceDiagnostic[];
+	status: CreateWorkspaceStatus;
+	workspace: CreatedWorkspaceSnapshot | null;
+}
+
 export type EnvironmentVariableScope = 'app' | 'repository' | 'workspace';
 export type EnvironmentVariableValueKind = 'plain' | 'runtime' | 'secret';
 export type EnvironmentVariableStatus =
@@ -600,6 +651,9 @@ export interface EnsembleApi {
 	applyRepositoryConfigMigration: (
 		request: RepositoryConfigMigrationRequest,
 	) => Promise<RepositoryConfigMigrationResult>;
+	createWorkspace: (
+		request: CreateWorkspaceRequest,
+	) => Promise<CreateWorkspaceResult>;
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
 	environmentVariables: () => Promise<EnvironmentVariablesSnapshot>;
 	githubRepositoryList: () => Promise<GithubRepositoryListResult>;

@@ -3,6 +3,9 @@
 		"shadcn": {
 			"command": "npx",
 			"args": ["shadcn@latest", "mcp"]
-		}
+		},
+		"fallow": {
+      "command": "fallow-mcp"
+    }
 	}
 }

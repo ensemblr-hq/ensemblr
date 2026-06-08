@@ -1,7 +1,9 @@
 import { Button } from '@/renderer/components/ui/button';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
-import { ChecksEmptyMessage } from './empty-states';
+export function ChecksEmptyMessage({ label }: { label: string }) {
+	return <p className='text-muted-foreground text-xs'>{label}</p>;
+}
 
 /** PR title and description block. */
 export function PullRequestMetadata({

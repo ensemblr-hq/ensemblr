@@ -6,8 +6,10 @@ import { formatCount } from '@/renderer/lib/format';
 import type { ChecksPanelState } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
-import { ChecksSectionHeader } from './pr-metadata';
+import { ChecksEmptyMessage, ChecksSectionHeader } from './pr-metadata';
 import { ChecksPanelSummary } from './summary';
+
+export { ChecksEmptyMessage };
 
 /** Empty-state shown when the workspace has no PR yet. */
 export function ChecksNoPullRequestState({
@@ -80,7 +82,3 @@ function ChecksActionRow({
 	);
 }
 
-/** Centered empty-state message for checks-panel sections. */
-export function ChecksEmptyMessage({ label }: { label: string }) {
-	return <p className='text-muted-foreground text-xs'>{label}</p>;
-}

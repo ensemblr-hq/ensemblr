@@ -9,6 +9,7 @@ export const IPC_CHANNELS = {
 	cloneGithubRepositoryProgress: 'ensemble:clone-github-repository:progress',
 	cloneGithubRepositoryStart: 'ensemble:clone-github-repository:start',
 	confirmRootDirectoryChange: 'ensemble:confirm-root-directory-change',
+	createWorkspace: 'ensemble:create-workspace',
 	ensureWindowWidth: 'ensemble:ensure-window-width',
 	environmentVariables: 'ensemble:environment-variables',
 	githubRepositoryList: 'ensemble:github-repository-list',

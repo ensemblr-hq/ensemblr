@@ -5,9 +5,6 @@ import { load } from 'js-toml';
 
 import type {
 	ConfigDiagnostic,
-	RepositoryConfigMigrationPreview,
-	RepositoryConfigMigrationRequest,
-	RepositoryConfigMigrationResult,
 	RepositoryConfigSnapshot,
 	RepositoryConfigSourceSnapshot,
 	RepositoryConfigSourceStatus,
@@ -18,11 +15,6 @@ import {
 	formatErrorMessage,
 	isPlainRecord,
 } from './json-utils.ts';
-import {
-	applyRepositoryConfigMigration,
-	normalizeRepositoryConfigRequest,
-	previewRepositoryConfigMigration,
-} from './repository-config-migration.ts';
 
 /** Options for {@link loadRepositoryConfig}. */
 export interface LoadRepositoryConfigOptions {
@@ -38,17 +30,6 @@ export interface LoadedRepositoryConfig {
 	ensembleConfig?: Record<string, unknown>;
 	snapshot: RepositoryConfigSnapshot;
 	worktreeincludeConfig?: Record<string, unknown>;
-}
-
-/** Service exposed to IPC handlers for inspecting and migrating repo config. */
-export interface RepositoryConfigService {
-	applyMigration: (
-		request: RepositoryConfigMigrationRequest,
-	) => RepositoryConfigMigrationResult;
-	load: (request: unknown) => RepositoryConfigSnapshot;
-	previewMigration: (
-		request: RepositoryConfigMigrationRequest,
-	) => RepositoryConfigMigrationPreview;
 }
 
 export type { RepositoryConfigPathAuthorizationOptions } from './repository-config-auth.ts';
@@ -132,26 +113,6 @@ const STRING_SETTING_KEYS = new Set([
 	'piExecutablePath',
 	'runScriptMode',
 ]);
-
-/**
- * Builds the {@link RepositoryConfigService} used by IPC handlers to load and
- * migrate per-repository configuration files.
- * @returns A fresh service instance with no internal state.
- */
-export function createRepositoryConfigService(): RepositoryConfigService {
-	return {
-		applyMigration: (request) => applyRepositoryConfigMigration(request),
-		load: (request) =>
-			loadRepositoryConfig(normalizeRepositoryConfigRequest(request)).snapshot,
-		previewMigration: (request) => previewRepositoryConfigMigration(request),
-	};
-}
-
-export {
-	applyRepositoryConfigMigration,
-	normalizeRepositoryConfigRequest,
-	previewRepositoryConfigMigration,
-} from './repository-config-migration.ts';
 
 /**
  * Loads every supported repository config source (ensemble.json, conductor
