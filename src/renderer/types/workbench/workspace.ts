@@ -19,6 +19,56 @@ export interface WorkspaceScriptSummary {
 	status: 'missing' | 'not-run' | 'running' | 'stopped' | 'succeeded';
 }
 
+export type WorkspaceLandingKind =
+	| 'cloned-repo'
+	| 'linked-issue'
+	| 'local-branch';
+
+export type WorkspaceLinkedIssueProvider = 'github' | 'linear';
+
+export interface WorkspaceLinkedIssueSummary {
+	provider: WorkspaceLinkedIssueProvider;
+	reference: string;
+	subtitle?: string;
+	title: string;
+	url?: string;
+}
+
+export interface WorkspaceLandingBranchSummary {
+	baseBranch?: string;
+	branchName: string;
+	detail: string;
+}
+
+export type WorkspaceLandingCopyState = 'copied' | 'skipped' | 'unavailable';
+
+export interface WorkspaceLandingCopySummary {
+	count: number;
+	detail: string;
+	state: WorkspaceLandingCopyState;
+}
+
+export type WorkspaceLandingSetupState =
+	| 'configured'
+	| 'missing'
+	| 'pending'
+	| 'succeeded';
+
+export interface WorkspaceLandingSetupSummary {
+	command?: string;
+	detail: string;
+	state: WorkspaceLandingSetupState;
+}
+
+export interface WorkspaceLandingSummary {
+	branchSource: WorkspaceLandingBranchSummary;
+	copiedFiles: WorkspaceLandingCopySummary;
+	headline: string;
+	kind: WorkspaceLandingKind;
+	linkedIssue?: WorkspaceLinkedIssueSummary;
+	setupGuidance: WorkspaceLandingSetupSummary;
+}
+
 export type WorkspaceOpenTargetKind =
 	| 'editor'
 	| 'file-manager'
@@ -51,6 +101,7 @@ export interface WorkspaceShellModel {
 	};
 	dockTabs: DockTabModel[];
 	id: string;
+	landingSummary?: WorkspaceLandingSummary;
 	name: string;
 	openTargets: WorkspaceOpenTarget[];
 	pathLabel: string;
