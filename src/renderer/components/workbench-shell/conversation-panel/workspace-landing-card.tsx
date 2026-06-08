@@ -206,6 +206,7 @@ const SETUP_STATE_CONFIG: Record<
 	succeeded: { label: 'Ready', tone: 'ok' },
 };
 
+/** Renders one labeled metadata row inside the workspace landing summary. */
 function LandingRow({
 	children,
 	detail,
@@ -238,6 +239,7 @@ function LandingRow({
 	);
 }
 
+/** Renders the setup script status label for the workspace landing summary. */
 function SetupStateBadge({ state }: { state: WorkspaceLandingSetupState }) {
 	const { label, tone } = SETUP_STATE_CONFIG[state];
 
