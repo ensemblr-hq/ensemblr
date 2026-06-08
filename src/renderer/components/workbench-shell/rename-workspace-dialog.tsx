@@ -1,5 +1,5 @@
 import type { KeyboardEvent } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -62,7 +62,8 @@ function RenameWorkspaceDialogForm({
 }) {
 	const [name, setName] = useState(workspace.name);
 	const [branchName, setBranchName] = useState(workspace.branchName);
-	const [branchTouched, setBranchTouched] = useState(false);
+	// Handler-only flag (never read during render): a ref avoids needless state.
+	const branchTouchedRef = useRef(false);
 	const [stage, setStage] = useState<RenameWorkspaceStage>('idle');
 	const [diagnostics, setDiagnostics] = useState<RenameWorkspaceDiagnostic[]>(
 		[],
@@ -160,7 +161,7 @@ function RenameWorkspaceDialogForm({
 					onChange={(event) => {
 						const next = event.target.value;
 						setName(next);
-						if (!branchTouched) {
+						if (!branchTouchedRef.current) {
 							setBranchName(toBranchSlug(next));
 						}
 					}}
@@ -181,7 +182,7 @@ function RenameWorkspaceDialogForm({
 					disabled={isBusy}
 					id='rename-workspace-branch'
 					onChange={(event) => {
-						setBranchTouched(true);
+						branchTouchedRef.current = true;
 						setBranchName(event.target.value);
 					}}
 					onKeyDown={handleSubmitKey}
