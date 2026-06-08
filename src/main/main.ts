@@ -12,6 +12,8 @@ import { createEnvironmentVariablesService } from './environment';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
 import { createPiExecutableService, createPiReadinessService } from './pi';
+import { createFakePiAgentAdapter, createPiAgentClient } from './pi-agent';
+import { createPiSessionService } from './pi-agent/pi-session-service';
 import {
 	createArchiveLifecycleService,
 	createArchiveRepositoryService,
@@ -74,6 +76,16 @@ const piReadinessService = createPiReadinessService({
 	localCommandService,
 	piExecutableService,
 	rootDirectoryService,
+});
+// TODO(THE-127): swap the fake adapter for `createCliRpcPiAgentAdapter` once
+// the real CLI RPC adapter merges. Until then, the fake adapter accepts
+// sessions and emits no events — enough to exercise persistence + IPC plumbing
+// without a real Pi binary.
+const piAgentAdapter = createFakePiAgentAdapter().adapter;
+const piAgentClient = createPiAgentClient({ adapter: piAgentAdapter });
+const piSessionService = createPiSessionService({
+	databaseService,
+	piAgentClient,
 });
 const localRepositoryRegistrationService =
 	createLocalRepositoryRegistrationService({
@@ -172,6 +184,7 @@ app.whenReady().then(() => {
 		listArchivedWorkspacesService,
 		localRepositoryRegistrationService,
 		piExecutableService,
+		piSessionService,
 		quickStartProjectService,
 		renameWorkspaceService,
 		repositoryConfigService,

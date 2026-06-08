@@ -115,8 +115,17 @@ function renderWorkbench(
 						activeWorkspace={activeWorkspace}
 						composer={getComposerState({
 							activeSession,
+							availableModels: [],
+							availableThinkingLevels: [],
+							isStreaming: false,
+							modelId: 'gpt-5.5',
+							onModelChange: () => undefined,
+							onStop: () => undefined,
+							onSubmit: () => undefined,
+							onThinkingChange: () => undefined,
 							setupDiagnostics: snapshot,
 							setupError: null,
+							thinkingLevel: 'high',
 						})}
 						dockActions={DOCK_ACTIONS}
 						dockTabId={activeDockTab}

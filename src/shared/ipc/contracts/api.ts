@@ -11,6 +11,17 @@ import type { EnvironmentVariablesSnapshot } from './environment';
 import type { HealthSnapshot } from './health';
 import type { PiExecutableSelectionResult } from './pi';
 import type {
+	ListPiModelsResult,
+	ListPiSessionsRequest,
+	ListPiSessionsResult,
+	OpenPiSessionRequest,
+	OpenPiSessionResult,
+	StopPiSessionRequest,
+	StopPiSessionResult,
+	SubmitPiPromptRequest,
+	SubmitPiPromptResult,
+} from './pi-session';
+import type {
 	QuickStartProjectRequest,
 	QuickStartProjectResult,
 } from './quick-start';
@@ -95,6 +106,19 @@ export interface EnsembleApi {
 	environmentVariables: () => Promise<EnvironmentVariablesSnapshot>;
 	githubRepositoryList: () => Promise<GithubRepositoryListResult>;
 	health: () => Promise<HealthSnapshot>;
+	listPiModels: () => Promise<ListPiModelsResult>;
+	listPiSessions: (
+		request: ListPiSessionsRequest,
+	) => Promise<ListPiSessionsResult>;
+	openPiSession: (
+		request: OpenPiSessionRequest,
+	) => Promise<OpenPiSessionResult>;
+	stopPiSession: (
+		request: StopPiSessionRequest,
+	) => Promise<StopPiSessionResult>;
+	submitPiPrompt: (
+		request: SubmitPiPromptRequest,
+	) => Promise<SubmitPiPromptResult>;
 	onCloneGithubRepositoryProgress: (
 		listener: (event: CloneGithubRepositoryProgressEvent) => void,
 	) => () => void;
