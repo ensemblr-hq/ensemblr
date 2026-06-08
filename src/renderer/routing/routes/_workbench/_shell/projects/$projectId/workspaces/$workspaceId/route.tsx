@@ -10,7 +10,15 @@ export const Route = createFileRoute(
 )({
 	component: WorkspaceWorkbenchLayout,
 	loader: {
-		handler: ({ cause, deps, location, params, parentMatchPromise, preload }) =>
+		handler: ({
+			cause,
+			context,
+			deps,
+			location,
+			params,
+			parentMatchPromise,
+			preload,
+		}) =>
 			profileRouteLoader(
 				{
 					cause,
@@ -26,6 +34,7 @@ export const Route = createFileRoute(
 					loadWorkspaceWorkbenchRoute({
 						parentMatchPromise,
 						params,
+						queryClient: context.queryClient,
 						rawSearch: location.search,
 						search: deps,
 					}),

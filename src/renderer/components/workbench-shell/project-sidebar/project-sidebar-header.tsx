@@ -20,20 +20,25 @@ import { ProjectContextMenuContent } from './project-context-menu';
 /** Project group header with avatar, collapse toggle, and inline action buttons. */
 export function ProjectSidebarHeader({
 	isCollapsed,
+	onArchiveSelect,
 	onCreateFromSourceSelect,
+	onCreateWorkspaceSelect,
 	onRepositorySettingsSelect,
 	onToggle,
 	project,
 	workspaceCount,
 }: {
 	isCollapsed: boolean;
+	onArchiveSelect?: () => void;
 	onCreateFromSourceSelect?: () => void;
+	onCreateWorkspaceSelect?: () => void;
 	onRepositorySettingsSelect: () => void;
 	onToggle: () => void;
 	project: ProjectShellModel;
 	workspaceCount: number;
 }) {
 	const createFromSourceWired = Boolean(onCreateFromSourceSelect);
+	const createWorkspaceWired = Boolean(onCreateWorkspaceSelect);
 	return (
 		<ContextMenu>
 			<ContextMenuTrigger asChild>
@@ -99,6 +104,10 @@ export function ProjectSidebarHeader({
 						<ProjectHeaderActionButton
 							aria-label={`Create workspace in ${project.name}`}
 							data-action-scope='workspace'
+							disabled={!createWorkspaceWired}
+							onClick={
+								createWorkspaceWired ? onCreateWorkspaceSelect : undefined
+							}
 							onPointerDown={(event) => event.stopPropagation()}
 						>
 							<PlusIcon aria-hidden='true' />
@@ -107,6 +116,7 @@ export function ProjectSidebarHeader({
 				</SidebarGroupLabel>
 			</ContextMenuTrigger>
 			<ProjectContextMenuContent
+				onArchiveSelect={onArchiveSelect}
 				onCreateFromSourceSelect={onCreateFromSourceSelect}
 				onRepositorySettingsSelect={onRepositorySettingsSelect}
 				project={project}

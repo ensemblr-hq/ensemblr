@@ -4,17 +4,7 @@ import type {
 	EnvironmentVariableScope,
 	EnvironmentVariableValueKind,
 } from '../../shared/ipc';
-
-const SENSITIVE_KEY_PARTS = [
-	'accesstoken',
-	'apikey',
-	'auth',
-	'credential',
-	'password',
-	'privatekey',
-	'secret',
-	'token',
-];
+import { isSensitiveKeyName } from '../config/json-utils.ts';
 
 /** Built-in catalog of environment variables Ensemble understands out-of-the-box. */
 export const BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG: readonly EnvironmentVariableCatalogEntrySnapshot[] =
@@ -238,9 +228,7 @@ export function compareCatalogEntries(
  * @returns True when the normalised name matches a sensitive part.
  */
 export function isSensitiveEnvironmentVariableName(key: string): boolean {
-	const normalized = key.replace(/[-_]/g, '').toLowerCase();
-
-	return SENSITIVE_KEY_PARTS.some((part) => normalized.includes(part));
+	return isSensitiveKeyName(key);
 }
 
 /**

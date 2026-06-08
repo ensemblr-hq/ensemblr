@@ -19,9 +19,13 @@ export function ProjectWorkspaceGroup({
 	activeWorkspace,
 	isCollapsed,
 	onCreateFromSourceSelect,
+	onCreateWorkspaceSelect,
+	onProjectArchiveSelect,
 	onProjectToggle,
 	onStaticNavigationSelect,
+	onWorkspaceArchiveSelect,
 	onWorkspacePinToggle,
+	onWorkspaceRenameSelect,
 	onWorkspaceSelect,
 	pinnedWorkspaceIdSet,
 	project,
@@ -32,9 +36,13 @@ export function ProjectWorkspaceGroup({
 	activeWorkspace: WorkspaceShellModel | null;
 	isCollapsed: boolean;
 	onCreateFromSourceSelect: () => void;
+	onCreateWorkspaceSelect: () => void;
+	onProjectArchiveSelect?: () => void;
 	onProjectToggle: () => void;
 	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
+	onWorkspaceArchiveSelect?: (workspace: WorkspaceShellModel) => void;
 	onWorkspacePinToggle: (workspaceId: string) => void;
+	onWorkspaceRenameSelect?: (workspace: WorkspaceShellModel) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	pinnedWorkspaceIdSet: Set<string>;
 	project: ProjectShellModel;
@@ -50,7 +58,9 @@ export function ProjectWorkspaceGroup({
 		>
 			<ProjectSidebarHeader
 				isCollapsed={isCollapsed}
+				onArchiveSelect={onProjectArchiveSelect}
 				onCreateFromSourceSelect={onCreateFromSourceSelect}
+				onCreateWorkspaceSelect={onCreateWorkspaceSelect}
 				onRepositorySettingsSelect={() =>
 					onStaticNavigationSelect({
 						kind: 'repo-settings',
@@ -81,7 +91,17 @@ export function ProjectWorkspaceGroup({
 								}
 								isPinned={pinnedWorkspaceIdSet.has(workspace.id)}
 								key={workspace.id}
+								onArchiveSelect={
+									onWorkspaceArchiveSelect
+										? () => onWorkspaceArchiveSelect(workspace)
+										: undefined
+								}
 								onPinToggle={() => onWorkspacePinToggle(workspace.id)}
+								onRenameSelect={
+									onWorkspaceRenameSelect
+										? () => onWorkspaceRenameSelect(workspace)
+										: undefined
+								}
 								onSelect={() => onWorkspaceSelect(project.id, workspace.id)}
 								routeSearch={resolveWorkspaceRouteSearch(workspace)}
 								workspace={workspace}

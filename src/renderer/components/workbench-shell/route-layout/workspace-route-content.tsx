@@ -1,6 +1,6 @@
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useMemo } from 'react';
-import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/contexts';
+import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
 import type { WorkspaceNavigationSelection } from '@/renderer/lib/workbench';
 import {
@@ -15,7 +15,7 @@ import type {
 } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 
-import { WorkspaceMainContentProvider } from './main-content-context';
+import { WorkspaceMainContentProvider } from '../shell-contexts';
 
 /** Workspace shell content — wires panel tabs, composer state, and navigation. */
 export function WorkspaceRouteContent({

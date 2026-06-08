@@ -15,7 +15,7 @@ import {
 	TabsList,
 	TabsTrigger,
 } from '@/renderer/components/ui/tabs';
-import { useWorkbenchLayout } from '@/renderer/components/workbench-shell/contexts';
+import { useWorkbenchLayout } from '@/renderer/components/workbench-shell/shell-contexts';
 import { DEFAULT_DOCK_TAB } from '@/renderer/lib/workbench';
 import type {
 	DockTabId,

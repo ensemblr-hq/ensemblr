@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { accessSync, constants } from 'node:fs';
+import { accessSync, constants, rmSync } from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-
 import type {
 	RegisteredRepositorySnapshot,
 	RegisterLocalRepositoryDiagnostic,
@@ -16,11 +15,13 @@ import {
 	loadRepositoryConfig,
 } from '../config/repository-config.ts';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { ARCHIVED_REPOSITORY_MARKER } from './archived-marker.ts';
 import {
 	type GitRepositoryProbe,
 	type GitRepositoryProbeFn,
 	probeGitRepository,
 } from './git-probe.ts';
+import { toSlug } from './slug.ts';
 
 /** Public surface of the local repository registration service. */
 export interface LocalRepositoryRegistrationService {
@@ -143,7 +144,11 @@ export async function registerLocalRepository({
 		});
 	}
 
-	const existingDiagnostic = findExistingDuplicate(database, repositoryPath);
+	const existingDiagnostic = findExistingDuplicate(
+		database,
+		repositoryPath,
+		probe.remoteUrl,
+	);
 
 	if (existingDiagnostic) {
 		return failureResult(diagnostics, existingDiagnostic);
@@ -152,8 +157,11 @@ export async function registerLocalRepository({
 	const loadedConfig = loadConfig({ now, repositoryPath });
 	const settingsSources = loadedConfig.snapshot.sources;
 	const timestamp = now().toISOString();
+	const nameOverride =
+		typeof request.name === 'string' ? request.name.trim() : '';
 	const prepared = prepareRepositoryRecord({
 		database,
+		nameOverride: nameOverride || undefined,
 		probe,
 		repositoryPath,
 		settingsSources,
@@ -179,6 +187,16 @@ export async function registerLocalRepository({
 			path: repositoryPath,
 			severity: 'error',
 		});
+	}
+
+	// User re-adding a previously-archived folder is an explicit "un-archive"
+	// — drop the marker so future restarts adopt this repo normally.
+	try {
+		rmSync(path.join(repositoryPath, ARCHIVED_REPOSITORY_MARKER), {
+			force: true,
+		});
+	} catch {
+		// Non-fatal: registration already succeeded.
 	}
 
 	const repository: RegisteredRepositorySnapshot = {
@@ -229,12 +247,14 @@ function assertWritablePath(
 }
 
 /**
- * Returns a duplicate diagnostic when the path is already tracked as a
- * repository or workspace.
+ * Returns a duplicate diagnostic when the path, the path-as-workspace, or the
+ * upstream remote URL is already tracked. The remote-URL check is what blocks
+ * a user from cloning the same GitHub repo twice into different folders.
  */
 function findExistingDuplicate(
 	database: DatabaseSync,
 	repositoryPath: string,
+	remoteUrl: string | null,
 ): RegisterLocalRepositoryDiagnostic | null {
 	const repositoryRow = database
 		.prepare('SELECT id FROM repositories WHERE path = ?')
@@ -263,7 +283,82 @@ function findExistingDuplicate(
 		};
 	}
 
+	if (isRemoteUrlTracked(database, remoteUrl)) {
+		return {
+			code: 'repository-remote-already-registered',
+			message:
+				'Another registered repository already tracks this remote. Remove it before re-adding.',
+			path: repositoryPath,
+			severity: 'error',
+		};
+	}
+
 	return null;
+}
+
+/**
+ * Returns true when any registered repository's metadata `remoteUrl` matches
+ * `candidate` after canonicalisation. Exported so the clone service can
+ * pre-flight the same check before it spawns `git`.
+ */
+export function isRemoteUrlTracked(
+	database: DatabaseSync,
+	candidate: string | null,
+): boolean {
+	const normalized = normalizeRemoteUrl(candidate);
+	if (!normalized) {
+		return false;
+	}
+	const candidateRows = database
+		.prepare('SELECT metadata_json AS metadataJson FROM repositories')
+		.all();
+	for (const row of candidateRows) {
+		if (typeof row !== 'object' || row === null) {
+			continue;
+		}
+		const raw = (row as { metadataJson?: unknown }).metadataJson;
+		if (typeof raw !== 'string' || !raw) {
+			continue;
+		}
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(raw);
+		} catch {
+			continue;
+		}
+		if (typeof parsed !== 'object' || parsed === null) {
+			continue;
+		}
+		const existing = (parsed as { remoteUrl?: unknown }).remoteUrl;
+		if (typeof existing !== 'string') {
+			continue;
+		}
+		if (normalizeRemoteUrl(existing) === normalized) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Reduces a git remote URL to a canonical `host/owner/repo` key so equivalent
+ * `git@github.com:owner/repo`, `ssh://git@github.com/owner/repo.git`, and
+ * `https://github.com/owner/repo.git` forms all collide on the same value.
+ */
+export function normalizeRemoteUrl(value: string | null): string | null {
+	if (!value) {
+		return null;
+	}
+	let candidate = value.trim().toLowerCase();
+	if (!candidate) {
+		return null;
+	}
+	candidate = candidate.replace(/^(?:https?|ssh|git):\/\//, '');
+	candidate = candidate.replace(/^git@/, '');
+	candidate = candidate.replace(':', '/');
+	candidate = candidate.replace(/\.git$/i, '');
+	candidate = candidate.replace(/\/+$/, '');
+	return candidate || null;
 }
 
 /**
@@ -272,18 +367,23 @@ function findExistingDuplicate(
  */
 function prepareRepositoryRecord({
 	database,
+	nameOverride,
 	probe,
 	repositoryPath,
 	settingsSources,
 	timestamp,
 }: {
 	database: DatabaseSync;
+	nameOverride: string | undefined;
 	probe: GitRepositoryProbe;
 	repositoryPath: string;
 	settingsSources: RepositoryConfigSourceSnapshot[];
 	timestamp: string;
 }): PreparedRepository {
-	const baseName = path.basename(repositoryPath) || 'repository';
+	const baseName =
+		nameOverride && nameOverride.length > 0
+			? nameOverride
+			: path.basename(repositoryPath) || 'repository';
 	const slug = allocateUniqueSlug(database, baseName);
 	const metadata: Record<string, unknown> = {
 		adoptionMode: 'adopt-in-place',
@@ -352,7 +452,7 @@ function insertRepositoryRow({
  * suffixing `-2`, `-3`, ... until a free slot is found.
  */
 function allocateUniqueSlug(database: DatabaseSync, baseName: string): string {
-	const baseSlug = toSlug(baseName);
+	const baseSlug = toRepositorySlug(baseName);
 	let candidate = baseSlug;
 	let suffix = 2;
 
@@ -374,13 +474,8 @@ function slugExists(database: DatabaseSync, slug: string): boolean {
 }
 
 /** Normalises a candidate name into a URL-safe slug with stable fallback. */
-function toSlug(value: string): string {
-	const slug = value
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '');
-
-	return slug || 'repository';
+function toRepositorySlug(value: string): string {
+	return toSlug(value, 'repository');
 }
 
 /** Builds the failure shape returned for any rejected registration request. */

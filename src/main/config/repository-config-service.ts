@@ -4,12 +4,12 @@ import type {
 	RepositoryConfigMigrationResult,
 	RepositoryConfigSnapshot,
 } from '../../shared/ipc';
+import { loadRepositoryConfig } from './repository-config.ts';
 import {
 	applyRepositoryConfigMigration,
 	normalizeRepositoryConfigRequest,
 	previewRepositoryConfigMigration,
 } from './repository-config-migration.ts';
-import { loadRepositoryConfig } from './repository-config.ts';
 
 /** Service exposed to IPC handlers for inspecting and migrating repo config. */
 export interface RepositoryConfigService {

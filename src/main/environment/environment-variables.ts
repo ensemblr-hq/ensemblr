@@ -13,14 +13,8 @@ import type { EnsembleDatabaseService } from '../storage/database';
 import {
 	compareCatalogEntries,
 	createCatalogMap,
-	createCustomCatalogEntry,
 	getCatalogEntryForKey,
 } from './environment-variable-catalog.ts';
-import {
-	collectConfigDefaults,
-	collectSecretMetadata,
-	collectSqlitePlainValues,
-} from './environment-variable-collectors.ts';
 import {
 	isEnvironmentVariableKey,
 	isReservedEnvironmentVariableKey,
@@ -28,12 +22,9 @@ import {
 	toSecretStoreKey,
 	toSettingKey,
 } from './environment-variable-keys.ts';
+import { resolveEnvironmentVariables } from './environment-variable-resolution.ts';
 import { createVariableSnapshots } from './environment-variable-snapshots.ts';
-import type {
-	EnvironmentState,
-	NormalizedScope,
-	PlainValueCandidate,
-} from './environment-variable-types.ts';
+import type { NormalizedScope } from './environment-variable-types.ts';
 
 export { BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG } from './environment-variable-catalog.ts';
 export { isEnvironmentVariableKey } from './environment-variable-keys.ts';
@@ -175,12 +166,14 @@ export function createEnvironmentVariablesService({
 	async function getSnapshot(
 		options: EnvironmentVariablesSnapshotOptions = {},
 	): Promise<EnvironmentVariablesSnapshot> {
-		const state = await collectEnvironmentState({
+		const databaseConnection = getDatabase();
+		const state = await resolveEnvironmentVariables({
 			configService,
-			database: getDatabase(),
+			database: databaseConnection,
 			now,
-			options,
-			secretStore: getSecretStore(getDatabase()),
+			requiredKeys: options.requiredKeys,
+			scope: normalizeScope(options),
+			secretStore: getSecretStore(databaseConnection),
 		});
 		const variables = createVariableSnapshots(state);
 
@@ -208,11 +201,12 @@ export function createEnvironmentVariablesService({
 		options: EnvironmentVariablesAssemblyOptions = {},
 	): Promise<EnvironmentVariablesAssembly> {
 		const databaseConnection = getDatabase();
-		const state = await collectEnvironmentState({
+		const state = await resolveEnvironmentVariables({
 			configService,
 			database: databaseConnection,
 			now,
-			options,
+			requiredKeys: options.requiredKeys,
+			scope: normalizeScope(options),
 			secretStore: getSecretStore(databaseConnection),
 		});
 		const env: Record<string, string> = {};
@@ -453,126 +447,6 @@ export function createEnvironmentVariablesService({
 		setSecretValue,
 		unsetValue,
 	};
-}
-
-/**
- * Collects every input the snapshot/assembly renderers need (config defaults,
- * SQLite rows, secret metadata, catalog) for the requested scope.
- * @param input - Service dependencies and request options.
- * @returns The merged environment state.
- */
-async function collectEnvironmentState({
-	configService,
-	database,
-	now: _now,
-	options,
-	secretStore,
-}: {
-	configService: EnsembleConfigService;
-	database: DatabaseSync | null;
-	now: () => Date;
-	options:
-		| EnvironmentVariablesSnapshotOptions
-		| EnvironmentVariablesAssemblyOptions;
-	secretStore: SecretStore | null;
-}): Promise<EnvironmentState> {
-	const scope = normalizeScope(options);
-	const diagnostics: EnvironmentVariableDiagnostic[] = [];
-	const invalidKeys = new Set<string>();
-	const catalogByKey = createCatalogMap();
-	const requiredKeys = normalizeRequiredKeys(options.requiredKeys, diagnostics);
-
-	for (const requiredKey of requiredKeys) {
-		if (!catalogByKey.has(requiredKey)) {
-			catalogByKey.set(requiredKey, createCustomCatalogEntry(requiredKey));
-		}
-	}
-
-	const plainValues = new Map<string, PlainValueCandidate>();
-
-	if (scope.scope === 'app') {
-		for (const [key, candidate] of collectConfigDefaults({
-			catalogByKey,
-			configEnvironment: configService.getConfig().environment,
-			diagnostics,
-			invalidKeys,
-		})) {
-			plainValues.set(key, candidate);
-		}
-	}
-
-	if (database) {
-		for (const [key, candidate] of collectSqlitePlainValues({
-			database,
-			diagnostics,
-			invalidKeys,
-			scope,
-		})) {
-			plainValues.set(key, candidate);
-
-			if (!catalogByKey.has(key)) {
-				catalogByKey.set(key, createCustomCatalogEntry(key));
-			}
-		}
-	}
-
-	const secretMetadata = await collectSecretMetadata({
-		diagnostics,
-		scope,
-		secretStore,
-	});
-
-	for (const key of secretMetadata.keys()) {
-		if (!catalogByKey.has(key)) {
-			catalogByKey.set(key, {
-				...createCustomCatalogEntry(key),
-				valueKind: 'secret',
-			});
-		}
-	}
-
-	return {
-		catalogByKey,
-		diagnostics,
-		invalidKeys,
-		plainValues,
-		requiredKeys,
-		scope,
-		secretMetadata,
-		secretStore,
-	};
-}
-
-/**
- * Validates and de-duplicates the caller-supplied required-key list, emitting
- * diagnostics for malformed keys.
- * @param requiredKeys - Caller list.
- * @param diagnostics - Diagnostic sink.
- * @returns A clean set of valid required keys.
- */
-function normalizeRequiredKeys(
-	requiredKeys: readonly string[] | undefined,
-	diagnostics: EnvironmentVariableDiagnostic[],
-): Set<string> {
-	const normalizedKeys = new Set<string>();
-
-	for (const key of requiredKeys ?? []) {
-		const normalized = typeof key === 'string' ? key.trim() : '';
-
-		if (!isEnvironmentVariableKey(normalized)) {
-			diagnostics.push({
-				code: 'invalid-required-variable-key',
-				key: normalized || undefined,
-				message: `Required environment variable key "${String(key)}" is invalid.`,
-				severity: 'error',
-			});
-			continue;
-		}
-
-		normalizedKeys.add(normalized);
-	}
-
-	return normalizedKeys;
 }
 
 /**

@@ -6,13 +6,12 @@ import type {
 } from '../../shared/ipc';
 import type { EnsembleConfigResolutionService } from '../config/config-resolution';
 import type { EnsembleDatabaseService } from '../storage/database';
+import { ensureRootDirectory } from './root-directory.ts';
 import {
 	applyRootDirectoryChange,
-	createEmptyRootDirectoryReconciliation,
 	previewRootDirectoryChange,
 	type RootDirectoryReconciler,
 } from './root-directory-change.ts';
-import { ensureRootDirectory } from './root-directory.ts';
 
 /** Public surface of the Ensemble root-directory service. */
 export interface EnsembleRootDirectoryService {
@@ -42,7 +41,7 @@ export function createEnsembleRootDirectoryService({
 	databaseService,
 	homeDirectory,
 	now,
-	reconcileRootDirectory = createEmptyRootDirectoryReconciliation,
+	reconcileRootDirectory,
 	settingsResolutionService,
 }: CreateEnsembleRootDirectoryServiceOptions): EnsembleRootDirectoryService {
 	let snapshot: RootDirectorySnapshot | null = null;
@@ -72,7 +71,7 @@ export function createEnsembleRootDirectoryService({
 				resolveSettingsSnapshot: () => settingsResolutionService.resolve(),
 			});
 
-			if (result.newRoot) {
+			if (result.applied && result.newRoot) {
 				snapshot = result.newRoot;
 			}
 

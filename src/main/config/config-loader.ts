@@ -7,7 +7,12 @@ import type {
 	ConfigStatus,
 	ConfigStatusSnapshot,
 } from '../../shared/ipc';
-import { formatErrorMessage, isPlainRecord } from './json-utils.ts';
+import {
+	formatErrorMessage,
+	getJsonErrorLocation,
+	isPlainRecord,
+	isSensitiveKeyName,
+} from './json-utils.ts';
 
 export type { ConfigDiagnostic, ConfigStatusSnapshot };
 
@@ -96,16 +101,6 @@ const OBJECT_SECTIONS: readonly SectionName[] = [
 	'security',
 	'ui',
 ];
-const SENSITIVE_KEY_PARTS = [
-	'accesstoken',
-	'apikey',
-	'credential',
-	'password',
-	'privatekey',
-	'secret',
-	'token',
-];
-
 /**
  * Computes the absolute path to the Ensemble config file inside a home directory.
  * @param homeDirectory - Home directory to resolve against; defaults to `os.homedir()`.
@@ -484,7 +479,7 @@ function findRawSecretDiagnostics(value: unknown): ConfigDiagnostic[] {
 	 * @param keyName - Key that pointed at `current`, used for sensitivity checks.
 	 */
 	function visit(current: unknown, fieldPath: string, keyName = '') {
-		if (typeof current === 'string' && isSensitiveKey(keyName) && current) {
+		if (typeof current === 'string' && isSensitiveKeyName(keyName) && current) {
 			diagnostics.push({
 				code: 'raw-secret-value',
 				fieldPath,
@@ -514,67 +509,6 @@ function findRawSecretDiagnostics(value: unknown): ConfigDiagnostic[] {
 	visit(value, '$');
 
 	return diagnostics;
-}
-
-/**
- * Tests whether a key name looks sensitive (e.g. contains "token" or "secret").
- * @param keyName - Key to test.
- * @returns True when the normalised key contains a sensitive substring.
- */
-function isSensitiveKey(keyName: string): boolean {
-	const normalized = keyName.replace(/[-_]/g, '').toLowerCase();
-
-	return SENSITIVE_KEY_PARTS.some((part) => normalized.includes(part));
-}
-
-/**
- * Extracts a line/column hint from a JSON parser error message, recognising
- * both `position N` and `line N column M` shapes.
- * @param source - Raw JSON source text.
- * @param error - The parser error thrown by `JSON.parse`.
- * @returns A partial diagnostic with `line` and `column`, when available.
- */
-function getJsonErrorLocation(
-	source: string,
-	error: unknown,
-): Pick<ConfigDiagnostic, 'column' | 'line'> {
-	const message = error instanceof Error ? error.message : '';
-	const positionMatch = /position (\d+)/i.exec(message);
-
-	if (positionMatch) {
-		const position = Number(positionMatch[1]);
-		return getLocationForPosition(source, position);
-	}
-
-	const lineColumnMatch = /line (\d+) column (\d+)/i.exec(message);
-
-	if (lineColumnMatch) {
-		return {
-			column: Number(lineColumnMatch[2]),
-			line: Number(lineColumnMatch[1]),
-		};
-	}
-
-	return {};
-}
-
-/**
- * Converts a character offset into a 1-based `(line, column)` pair.
- * @param source - Source text.
- * @param position - Character offset within `source`.
- * @returns A partial diagnostic with `line` and `column`.
- */
-function getLocationForPosition(
-	source: string,
-	position: number,
-): Pick<ConfigDiagnostic, 'column' | 'line'> {
-	const beforePosition = source.slice(0, Math.max(0, position));
-	const lines = beforePosition.split('\n');
-
-	return {
-		column: (lines.at(-1)?.length ?? 0) + 1,
-		line: lines.length,
-	};
 }
 
 /**

@@ -62,6 +62,11 @@ export interface PiExecutableSnapshot {
 	updatedAt: string;
 }
 
+/** True when the Pi executable snapshot is good enough to run readiness checks. */
+export function isExecutableReady(executable: PiExecutableSnapshot): boolean {
+	return Boolean(executable.command) && executable.status !== 'error';
+}
+
 /** Result of {@link PiExecutableService.saveOverride}. */
 export interface PiExecutableSelectionResult {
 	canceled: boolean;

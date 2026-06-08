@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { StatusBadge } from '@/renderer/components/status-badge';
+import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import {
 	Sidebar,
 	SidebarContent,
@@ -22,6 +24,7 @@ import type {
 	WorkbenchHealth,
 	WorkbenchStaticNavigationTarget,
 } from '@/renderer/types/workbench-shell';
+import { RenameWorkspaceDialog } from '../rename-workspace-dialog';
 
 import { PinnedWorkspaceGroup } from './pinned-workspace-group';
 import { ProjectNavigationGroups } from './project-navigation-groups';
@@ -61,6 +64,8 @@ export function WorkspaceNavigationSidebar({
 		activeView === 'workspace' ? activeProject : null;
 	const activeNavigationWorkspace =
 		activeView === 'workspace' ? activeWorkspace : null;
+	const [renameWorkspaceTarget, setRenameWorkspaceTarget] =
+		useState<WorkspaceShellModel | null>(null);
 
 	return (
 		<Sidebar className='border-sidebar-border' collapsible='offcanvas'>
@@ -70,33 +75,46 @@ export function WorkspaceNavigationSidebar({
 				</div>
 			</SidebarHeader>
 
-			<SidebarContent>
+			<SidebarContent className='overflow-visible'>
 				<SidebarPrimaryNavigation
 					activeView={activeView}
 					onStaticNavigationSelect={onStaticNavigationSelect}
 				/>
-				<PinnedWorkspaceGroup
-					activeProject={activeNavigationProject}
-					activeWorkspace={activeNavigationWorkspace}
-					onWorkspaceSelect={onWorkspaceSelect}
-					projectNavigation={projectNavigation}
-					resolveWorkspaceRouteSearch={resolveWorkspaceRouteSearch}
-				/>
-				<ProjectNavigationGroups
-					activeProject={activeNavigationProject}
-					activeWorkspace={activeNavigationWorkspace}
-					addProjectMenu={addProjectMenu}
-					onAddProject={onAddProject}
-					onOpenRecentProject={onOpenRecentProject}
-					onStaticNavigationSelect={onStaticNavigationSelect}
-					onWorkspaceSelect={onWorkspaceSelect}
-					projectNavigation={projectNavigation}
-					resolveWorkspaceRouteSearch={resolveWorkspaceRouteSearch}
-				/>
+				<ScrollArea className='flex min-h-0 flex-1 flex-col'>
+					<PinnedWorkspaceGroup
+						activeProject={activeNavigationProject}
+						activeWorkspace={activeNavigationWorkspace}
+						onWorkspaceRenameSelect={setRenameWorkspaceTarget}
+						onWorkspaceSelect={onWorkspaceSelect}
+						projectNavigation={projectNavigation}
+						resolveWorkspaceRouteSearch={resolveWorkspaceRouteSearch}
+					/>
+					<ProjectNavigationGroups
+						activeProject={activeNavigationProject}
+						activeWorkspace={activeNavigationWorkspace}
+						addProjectMenu={addProjectMenu}
+						onAddProject={onAddProject}
+						onOpenRecentProject={onOpenRecentProject}
+						onStaticNavigationSelect={onStaticNavigationSelect}
+						onWorkspaceRenameSelect={setRenameWorkspaceTarget}
+						onWorkspaceSelect={onWorkspaceSelect}
+						projectNavigation={projectNavigation}
+						resolveWorkspaceRouteSearch={resolveWorkspaceRouteSearch}
+					/>
+				</ScrollArea>
 			</SidebarContent>
 
 			<SidebarHealthFooter health={health} projects={projects} />
 			<SidebarRail />
+			<RenameWorkspaceDialog
+				onOpenChange={(open) => {
+					if (!open) {
+						setRenameWorkspaceTarget(null);
+					}
+				}}
+				open={renameWorkspaceTarget !== null}
+				workspace={renameWorkspaceTarget}
+			/>
 		</Sidebar>
 	);
 }

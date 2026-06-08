@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -40,43 +42,49 @@ export function RootDirectoryChangeDialog({
 				<RootDirectoryChangeContent
 					applyResult={applyResult}
 					canApply={canApply}
+					header={
+						<DialogHeader>
+							<DialogTitle>Change root directory</DialogTitle>
+							<DialogDescription>
+								Switch Ensemble to the selected root and reindex/adopt from that
+								filesystem layout after confirmation.
+							</DialogDescription>
+						</DialogHeader>
+					}
 					isApplying={isApplying}
 					onConfirm={onConfirm}
 					preview={preview}
-					useDialogHeader
 				/>
 			</DialogContent>
 		</Dialog>
 	);
 }
 
-/** Inner content of the root-directory change dialog (preview + apply). */
+/**
+ * Inner content of the root-directory change dialog (preview + apply).
+ *
+ * `header` is an optional render-prop: the dialog wrapper passes a
+ * `<DialogHeader>` so it lives inside the dialog tree; the embedded panel
+ * variant passes nothing, and a plain heading is rendered by default.
+ */
 export function RootDirectoryChangeContent({
 	applyResult,
 	canApply,
+	header,
 	isApplying,
 	onConfirm,
 	preview,
-	useDialogHeader = false,
 }: {
 	applyResult: RootDirectoryChangeApplyResult | null;
 	canApply: boolean;
+	header?: ReactNode;
 	isApplying: boolean;
 	onConfirm: () => void;
 	preview: RootDirectoryChangePreview | null;
-	useDialogHeader?: boolean;
 }) {
 	return (
 		<>
-			{useDialogHeader ? (
-				<DialogHeader>
-					<DialogTitle>Change root directory</DialogTitle>
-					<DialogDescription>
-						Switch Ensemble to the selected root and reindex/adopt from that
-						filesystem layout after confirmation.
-					</DialogDescription>
-				</DialogHeader>
-			) : (
+			{header ?? (
 				<div className='flex flex-col gap-2'>
 					<h2 className='font-heading font-medium text-base leading-none'>
 						Change root directory

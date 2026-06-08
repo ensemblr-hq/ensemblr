@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { KeyboardEvent } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import {
 	githubRepositoryListQuery,
@@ -79,8 +79,14 @@ function CloneGithubDialogForm({
 	const [url, setUrl] = useState('');
 	const [locationOverride, setLocationOverride] = useState<string | null>(null);
 
-	const { diagnostics, isBusy, logs, retry, stage, startClone, successResult } =
+	const { diagnostics, isBusy, logs, retry, stage, startClone } =
 		useCloneFlow();
+
+	useEffect(() => {
+		if (stage === 'success') {
+			onOpenChange(false);
+		}
+	}, [onOpenChange, stage]);
 
 	// Derive the shown location: user override if they touched it, else the
 	// managed default once the query resolves. Avoids a sync effect.
@@ -124,10 +130,6 @@ function CloneGithubDialogForm({
 		},
 		[handleClone],
 	);
-
-	const handleClose = useCallback(() => {
-		onOpenChange(false);
-	}, [onOpenChange]);
 
 	return (
 		<>
@@ -214,13 +216,6 @@ function CloneGithubDialogForm({
 				<CloneGithubDiagnostics diagnostics={diagnostics} />
 			) : null}
 
-			{stage === 'success' && successResult?.repository ? (
-				<p className='text-emerald-500 text-xs'>
-					Cloned {successResult.repository.name} to{' '}
-					<span className='font-mono'>{successResult.repository.path}</span>.
-				</p>
-			) : null}
-
 			<div className='-mx-4 -mb-4 flex justify-end gap-2 rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
 				{stage === 'failure' ? (
 					<Button
@@ -232,27 +227,21 @@ function CloneGithubDialogForm({
 						Try again
 					</Button>
 				) : null}
-				{stage === 'success' ? (
-					<Button className='h-8' onClick={handleClose} type='button'>
-						Done
-					</Button>
-				) : (
-					<Button
-						className='h-8 gap-2'
-						disabled={!canClone}
-						onClick={handleClone}
-						type='button'
-						variant='default'
+				<Button
+					className='h-8 gap-2'
+					disabled={!canClone}
+					onClick={handleClone}
+					type='button'
+					variant='default'
+				>
+					{getCloneButtonLabel(stage)}
+					<span
+						aria-hidden='true'
+						className='ml-1 inline-flex items-center gap-0.5 text-xxs opacity-70'
 					>
-						{getCloneButtonLabel(stage)}
-						<span
-							aria-hidden='true'
-							className='ml-1 inline-flex items-center gap-0.5 text-xxs opacity-70'
-						>
-							⌘↵
-						</span>
-					</Button>
-				)}
+						⌘↵
+					</span>
+				</Button>
 			</div>
 		</>
 	);

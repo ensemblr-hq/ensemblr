@@ -1,66 +1,19 @@
-import {
-	keepPreviousData,
-	type QueryClient,
-	useQuery,
-	useQueryClient,
-} from '@tanstack/react-query';
-import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { type ReactElement, useCallback, useEffect, useMemo } from 'react';
+import { getRouteApi } from '@tanstack/react-router';
+import { useCallback, useMemo } from 'react';
 
-import {
-	ensembleQueryKeys,
-	healthQuery,
-	isEnsembleApiAvailable,
-	registerLocalRepository,
-	repositoryWorkspaceNavigationQuery,
-	selectLocalRepository,
-	setupDiagnosticsQuery,
-} from '@/renderer/api/ensemble-queries';
-import { shellFixtureProjects } from '@/renderer/fixtures/workbench';
 import { getErrorMessage } from '@/renderer/lib/error';
-import {
-	buildAddProjectMenuModel,
-	findWorkspaceNavigationSelection,
-	getRenderableNavigationSnapshot,
-	getWorkbenchHealth,
-	getWorkbenchStaticRoute,
-	mapRepositoriesToProjects,
-	resolveWorkspaceNavigationRenderState,
-	resolveWorkspaceNavigationSelection,
-} from '@/renderer/lib/workbench';
-import { cloneDialogOpenAtom } from '@/renderer/state/clone-dialog';
-import { quickStartDialogOpenAtom } from '@/renderer/state/quick-start-dialog';
-import { recentProjectsAtom } from '@/renderer/state/recents';
-import {
-	activeChatTabByWorkspaceAtom,
-	activeDockTabByWorkspaceAtom,
-	activeReviewTabByWorkspaceAtom,
-	getPreferredChatId,
-	getPreferredDockTab,
-	getPreferredReviewTab,
-	lastWorkspaceNavigationRenderStateAtom,
-	lastWorkspaceSelectionAtom,
-} from '@/renderer/state/workspace';
+import { getWorkbenchHealth } from '@/renderer/lib/workbench';
 import type { WorkbenchShellRouteState } from '@/renderer/types/components';
 import type {
 	NavigationContextValue,
 	SetupDiagnosticsContextValue,
 } from '@/renderer/types/contexts';
-import type {
-	AddProjectActionId,
-	WorkbenchRouteSearch,
-	WorkbenchShellData,
-	WorkspaceShellModel,
-} from '@/renderer/types/workbench';
-import type {
-	WorkbenchHealth,
-	WorkbenchStaticNavigationTarget,
-	WorkbenchWorkspaceNavigationLinkTarget,
-} from '@/renderer/types/workbench-shell';
-import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc';
+import type { WorkbenchShellData } from '@/renderer/types/workbench';
 
-import type { WorkbenchLayoutModel } from './layout-model-context';
+import type { WorkbenchLayoutModel } from '../shell-contexts';
+import { useWorkbenchNavigation } from './use-workbench-navigation';
+import { useWorkbenchQueries } from './use-workbench-queries';
+import { useWorkspaceSelectionPersistence } from './use-workspace-selection-persistence';
 
 export const workbenchRouteApi = getRouteApi('/_workbench');
 
@@ -71,8 +24,10 @@ export interface WorkbenchLayoutModelBundle {
 }
 
 /**
- * Builds the workbench layout model — combining loader data, live queries,
- * persisted prefs, and navigation handlers — for descendant routes.
+ * Thin compositor that wires together three focused hooks:
+ *  - {@link useWorkbenchQueries} for the live IPC-backed data
+ *  - {@link useWorkspaceSelectionPersistence} for selection state
+ *  - {@link useWorkbenchNavigation} for routing and add-project actions
  */
 export function useWorkbenchLayoutModel({
 	loaderData,
@@ -81,129 +36,43 @@ export function useWorkbenchLayoutModel({
 	loaderData: WorkbenchShellData;
 	routeState: WorkbenchShellRouteState;
 }): WorkbenchLayoutModelBundle {
-	const navigate = useNavigate();
-	const queryClient = useQueryClient();
-	const hasPreloadBridge = isEnsembleApiAvailable();
-	const { data: healthData, error: healthErrorResult } = useQuery({
-		...healthQuery,
-		enabled: hasPreloadBridge,
-	});
-	const {
-		data: repositoryWorkspaceNavigationData,
-		isFetching: isRepositoryWorkspaceNavigationFetching,
-		isLoading: isRepositoryWorkspaceNavigationLoading,
-		isPlaceholderData: isRepositoryWorkspaceNavigationPlaceholderData,
-	} = useQuery({
-		...repositoryWorkspaceNavigationQuery,
-		enabled: hasPreloadBridge,
-		placeholderData: keepPreviousData,
-	});
-	const {
-		data: setupDiagnosticsData,
-		error: setupDiagnosticsErrorResult,
-		isFetching: isSetupDiagnosticsFetching,
-		refetch: refetchSetupDiagnostics,
-	} = useQuery({
-		...setupDiagnosticsQuery,
-		enabled: hasPreloadBridge,
-	});
-	const [lastWorkspaceSelection, setLastWorkspaceSelection] = useAtom(
-		lastWorkspaceSelectionAtom,
-	);
-	const [
-		lastWorkspaceNavigationRenderState,
-		setLastWorkspaceNavigationRenderState,
-	] = useAtom(lastWorkspaceNavigationRenderStateAtom);
-	const recentProjects = useAtomValue(recentProjectsAtom);
-	const reviewTabsByWorkspace = useAtomValue(activeReviewTabByWorkspaceAtom);
-	const dockTabsByWorkspace = useAtomValue(activeDockTabByWorkspaceAtom);
-	const chatTabsByWorkspace = useAtomValue(activeChatTabByWorkspaceAtom);
+	const queries = useWorkbenchQueries({ loaderData });
 	const setupError =
-		getErrorMessage(setupDiagnosticsErrorResult) ?? loaderData.setupError;
+		getErrorMessage(queries.setupDiagnosticsErrorResult) ??
+		loaderData.setupError;
 	const setupSnapshot =
-		setupDiagnosticsData ?? loaderData.setupSnapshot ?? null;
-	const cachedNavigationSnapshot =
-		queryClient.getQueryData<RepositoryWorkspaceNavigationSnapshot>(
-			repositoryWorkspaceNavigationQuery.queryKey,
-		);
-	const navigationSnapshot = getRenderableNavigationSnapshot({
-		cachedSnapshot: cachedNavigationSnapshot,
-		querySnapshot:
-			repositoryWorkspaceNavigationData ??
-			loaderData.navigationSnapshot ??
-			undefined,
-	});
-	const navigationRepositories = navigationSnapshot?.repositories;
-	const projects = useMemo(
-		() =>
-			hasPreloadBridge
-				? mapRepositoriesToProjects(navigationRepositories)
-				: shellFixtureProjects,
-		[hasPreloadBridge, navigationRepositories],
-	);
-	const currentSelection = useMemo(
-		() =>
-			resolveWorkspaceNavigationSelection({
-				projects,
-				routeProjectId: routeState.routeProjectId,
-				routeWorkspaceId: routeState.routeWorkspaceId,
-				storedSelection:
-					routeState.routeProjectId && routeState.routeWorkspaceId
-						? undefined
-						: lastWorkspaceSelection,
-			}),
-		[
-			projects,
-			routeState.routeProjectId,
-			routeState.routeWorkspaceId,
-			lastWorkspaceSelection,
-		],
-	);
-	const navigationRenderState = useMemo(
-		() =>
-			resolveWorkspaceNavigationRenderState({
-				canUsePreviousState:
-					hasPreloadBridge &&
-					!currentSelection &&
-					(isRepositoryWorkspaceNavigationLoading ||
-						isRepositoryWorkspaceNavigationFetching ||
-						isRepositoryWorkspaceNavigationPlaceholderData ||
-						!navigationSnapshot),
-				previousState: lastWorkspaceNavigationRenderState,
-				projects,
-				routeProjectId: routeState.routeProjectId,
-				routeWorkspaceId: routeState.routeWorkspaceId,
-				selection: currentSelection,
-			}),
-		[
-			currentSelection,
-			hasPreloadBridge,
-			lastWorkspaceNavigationRenderState,
-			navigationSnapshot,
-			projects,
-			isRepositoryWorkspaceNavigationFetching,
-			isRepositoryWorkspaceNavigationLoading,
-			isRepositoryWorkspaceNavigationPlaceholderData,
-			routeState.routeProjectId,
-			routeState.routeWorkspaceId,
-		],
-	);
-	const displayProjects = navigationRenderState?.projects ?? projects;
-	const displaySelection = navigationRenderState?.selection ?? null;
+		queries.setupDiagnosticsData ?? loaderData.setupSnapshot ?? null;
 	const healthError =
-		getErrorMessage(healthErrorResult) ?? loaderData.healthError ?? null;
-	const shellHealth = useMemo<WorkbenchHealth>(
+		getErrorMessage(queries.healthErrorResult) ??
+		loaderData.healthError ??
+		null;
+
+	const { displayProjects, displaySelection } =
+		useWorkspaceSelectionPersistence({
+			hasPreloadBridge: queries.hasPreloadBridge,
+			isRepositoryWorkspaceNavigationFetching:
+				queries.isRepositoryWorkspaceNavigationFetching,
+			isRepositoryWorkspaceNavigationLoading:
+				queries.isRepositoryWorkspaceNavigationLoading,
+			isRepositoryWorkspaceNavigationPlaceholderData:
+				queries.isRepositoryWorkspaceNavigationPlaceholderData,
+			navigationSnapshot: queries.navigationSnapshot,
+			projects: queries.projects,
+			routeState,
+		});
+
+	const shellHealth = useMemo(
 		() =>
 			getWorkbenchHealth({
-				hasPreloadBridge,
+				hasPreloadBridge: queries.hasPreloadBridge,
 				healthError,
-				healthSnapshot: healthData ?? loaderData.healthSnapshot ?? null,
+				healthSnapshot: queries.healthData ?? loaderData.healthSnapshot ?? null,
 				setupError,
 				setupSnapshot,
 			}),
 		[
-			hasPreloadBridge,
-			healthData,
+			queries.hasPreloadBridge,
+			queries.healthData,
 			healthError,
 			loaderData.healthSnapshot,
 			setupError,
@@ -211,233 +80,37 @@ export function useWorkbenchLayoutModel({
 		],
 	);
 
-	useEffect(() => {
-		if (!currentSelection) {
-			return;
-		}
+	const nav = useWorkbenchNavigation({ displayProjects, setupSnapshot });
 
-		const nextSelection = {
-			projectId: currentSelection.project.id,
-			workspaceId: currentSelection.workspace.id,
-		};
-
-		setLastWorkspaceSelection((currentSelection) =>
-			currentSelection?.projectId === nextSelection.projectId &&
-			currentSelection.workspaceId === nextSelection.workspaceId
-				? currentSelection
-				: nextSelection,
-		);
-		setLastWorkspaceNavigationRenderState((currentRenderState) =>
-			currentRenderState?.selection.project.id ===
-				currentSelection.project.id &&
-			currentRenderState.selection.workspace.id ===
-				currentSelection.workspace.id &&
-			currentRenderState.projects === projects
-				? currentRenderState
-				: {
-						projects,
-						selection: currentSelection,
-						source: 'current',
-					},
-		);
-	}, [
-		currentSelection,
-		projects,
-		setLastWorkspaceNavigationRenderState,
-		setLastWorkspaceSelection,
-	]);
-
-	const resolveWorkspaceRouteSearch = useCallback(
-		(workspace: WorkspaceShellModel): WorkbenchRouteSearch => ({
-			dock: getPreferredDockTab({
-				dockTabsByWorkspace,
-				workspace,
-			}),
-			review: getPreferredReviewTab({
-				reviewTabsByWorkspace,
-				workspaceId: workspace.id,
-			}),
-		}),
-		[dockTabsByWorkspace, reviewTabsByWorkspace],
-	);
-	const resolveWorkspaceChatId = useCallback(
-		(workspace: WorkspaceShellModel) =>
-			getPreferredChatId({ chatTabsByWorkspace, workspace }),
-		[chatTabsByWorkspace],
-	);
-	const { renderStaticLink, renderWorkspaceLink } =
-		useWorkbenchNavigationLinkRenderers({ resolveWorkspaceChatId });
-	const navigateToStaticRoute = useCallback(
-		(target: WorkbenchStaticNavigationTarget) => {
-			navigate(getWorkbenchStaticRoute(target));
-		},
-		[navigate],
-	);
-	const navigateToWorkspace = useCallback(
-		(nextProjectId: string, nextWorkspaceId: string) => {
-			const target = findWorkspaceNavigationSelection(
-				displayProjects,
-				nextProjectId,
-				nextWorkspaceId,
-			);
-
-			if (!target) {
-				return;
-			}
-
-			navigate({
-				params: {
-					chatId: resolveWorkspaceChatId(target.workspace),
-					projectId: target.project.id,
-					workspaceId: target.workspace.id,
-				},
-				search: resolveWorkspaceRouteSearch(target.workspace),
-				to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
-			});
-		},
-		[
-			displayProjects,
-			navigate,
-			resolveWorkspaceChatId,
-			resolveWorkspaceRouteSearch,
-		],
-	);
-
-	const addProjectMenu = useMemo(
-		() =>
-			buildAddProjectMenuModel({
-				recents: recentProjects,
-				setupSnapshot,
-			}),
-		[recentProjects, setupSnapshot],
-	);
-	const setCloneDialogOpen = useSetAtom(cloneDialogOpenAtom);
-	const setQuickStartDialogOpen = useSetAtom(quickStartDialogOpenAtom);
-	const onAddProject = useCallback(
-		(id: AddProjectActionId) => {
-			if (id === 'open-github') {
-				setCloneDialogOpen(true);
-				return;
-			}
-			if (id === 'open-local') {
-				void openLocalRepositoryFlow({ queryClient });
-				return;
-			}
-			if (id === 'quick-start') {
-				setQuickStartDialogOpen(true);
-			}
-		},
-		[queryClient, setCloneDialogOpen, setQuickStartDialogOpen],
-	);
 	const onSetupDiagnosticsRetry = useCallback(() => {
-		if (hasPreloadBridge) {
-			void refetchSetupDiagnostics();
+		if (queries.hasPreloadBridge) {
+			void queries.refetchSetupDiagnostics();
 		}
-	}, [hasPreloadBridge, refetchSetupDiagnostics]);
+	}, [queries.hasPreloadBridge, queries.refetchSetupDiagnostics]);
 
 	const model: WorkbenchLayoutModel = {
 		activeProject: displaySelection?.project ?? null,
 		activeWorkspace: displaySelection?.workspace ?? null,
-		addProjectMenu,
+		addProjectMenu: nav.addProjectMenu,
 		displayProjects,
 		displaySelection,
 		health: shellHealth,
-		navigateToStaticRoute,
-		navigateToWorkspace,
-		onAddProject,
-		resolveWorkspaceRouteSearch,
-	};
-	const navigation: NavigationContextValue = {
-		renderStaticLink,
-		renderWorkspaceLink,
-	};
-	const setupDiagnosticsValue: SetupDiagnosticsContextValue = {
-		state: {
-			setupDiagnostics: setupSnapshot,
-			setupDiagnosticsError: setupError,
-			isSetupDiagnosticsRetrying: isSetupDiagnosticsFetching,
-		},
-		actions: {
-			onSetupDiagnosticsRetry,
-		},
+		navigateToStaticRoute: nav.navigateToStaticRoute,
+		navigateToWorkspace: nav.navigateToWorkspace,
+		onAddProject: nav.onAddProject,
+		resolveWorkspaceRouteSearch: nav.resolveWorkspaceRouteSearch,
 	};
 
 	return {
 		model,
-		navigation,
-		setupDiagnostics: setupDiagnosticsValue,
+		navigation: nav.navigation,
+		setupDiagnostics: {
+			state: {
+				setupDiagnostics: setupSnapshot,
+				setupDiagnosticsError: setupError,
+				isSetupDiagnosticsRetrying: queries.isSetupDiagnosticsFetching,
+			},
+			actions: { onSetupDiagnosticsRetry },
+		},
 	};
-}
-
-/** Builds the TanStack Router link renderers passed via the navigation context. */
-function useWorkbenchNavigationLinkRenderers({
-	resolveWorkspaceChatId,
-}: {
-	resolveWorkspaceChatId: (workspace: WorkspaceShellModel) => string;
-}) {
-	const renderStaticLink = useCallback(renderStaticWorkbenchNavigationLink, []);
-	const renderWorkspaceLink = useCallback(
-		(
-			target: WorkbenchWorkspaceNavigationLinkTarget,
-			children: ReactElement,
-		) => (
-			<Link
-				params={{
-					chatId: resolveWorkspaceChatId(target.workspace),
-					projectId: target.workspace.projectId,
-					workspaceId: target.workspace.id,
-				}}
-				preload='intent'
-				search={target.search}
-				to='/projects/$projectId/workspaces/$workspaceId/chats/$chatId'
-			>
-				{children}
-			</Link>
-		),
-		[resolveWorkspaceChatId],
-	);
-
-	return {
-		renderStaticLink,
-		renderWorkspaceLink,
-	};
-}
-
-/** Wraps static-navigation children with an intent-preload `Link`. */
-function renderStaticWorkbenchNavigationLink(
-	target: WorkbenchStaticNavigationTarget,
-	children: ReactElement,
-) {
-	const spec = getWorkbenchStaticRoute(target);
-	return (
-		<Link params={spec.params} preload='intent' to={spec.to}>
-			{children}
-		</Link>
-	);
-}
-
-/**
- * Drives the "Open local project" sidebar action through the native picker and
- * the repository-registration IPC, then refreshes the navigation snapshot so
- * the new repo appears in the sidebar.
- */
-async function openLocalRepositoryFlow({
-	queryClient,
-}: {
-	queryClient: QueryClient;
-}): Promise<void> {
-	if (!isEnsembleApiAvailable()) {
-		return;
-	}
-	const selection = await selectLocalRepository();
-	if (selection.canceled || !selection.path) {
-		return;
-	}
-	const result = await registerLocalRepository({ path: selection.path });
-	if (!result.registered) {
-		return;
-	}
-	await queryClient.invalidateQueries({
-		queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
-	});
 }

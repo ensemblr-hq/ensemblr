@@ -3,8 +3,10 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
-import type { PiExecutableSnapshot } from './pi-executable';
-import { isExecutableReady } from './pi-executable-ready.ts';
+import {
+	isExecutableReady,
+	type PiExecutableSnapshot,
+} from './pi-executable.ts';
 import type {
 	PiProviderModelFailureCode,
 	PiProviderModelSnapshot,

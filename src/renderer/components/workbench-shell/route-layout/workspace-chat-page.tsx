@@ -1,6 +1,6 @@
 import { WorkspaceConversationContent } from '@/renderer/components/workbench-shell/conversation-panel';
 
-import { useWorkspaceMainContent } from './main-content-context';
+import { useWorkspaceMainContent } from '../shell-contexts';
 
 /** Chat-route content — renders the workspace conversation surface. */
 export function WorkspaceChatPage() {

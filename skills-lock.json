@@ -1,17 +1,17 @@
 {
-  "version": 1,
-  "skills": {
-    "fallow": {
-      "source": "fallow-rs/fallow-skills",
-      "sourceType": "github",
-      "skillPath": "fallow/skills/fallow/SKILL.md",
-      "computedHash": "5332dbfe13554088531be2cfaa0a81c66a35b8ad544c5a2d46a29e0a6ef64e0c"
-    },
-    "shadcn": {
-      "source": "shadcn/ui",
-      "sourceType": "github",
-      "skillPath": "skills/shadcn/SKILL.md",
-      "computedHash": "8f8bcc9024aa068245fac646d654a18c80280e4b06112ccd3e691a8c96cd66bd"
-    }
-  }
+	"version": 1,
+	"skills": {
+		"fallow": {
+			"source": "fallow-rs/fallow-skills",
+			"sourceType": "github",
+			"skillPath": "fallow/skills/fallow/SKILL.md",
+			"computedHash": "5332dbfe13554088531be2cfaa0a81c66a35b8ad544c5a2d46a29e0a6ef64e0c"
+		},
+		"shadcn": {
+			"source": "shadcn/ui",
+			"sourceType": "github",
+			"skillPath": "skills/shadcn/SKILL.md",
+			"computedHash": "8f8bcc9024aa068245fac646d654a18c80280e4b06112ccd3e691a8c96cd66bd"
+		}
+	}
 }

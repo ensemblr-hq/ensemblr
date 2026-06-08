@@ -1,12 +1,10 @@
-import type {
-	SetupCheckLogSnapshot,
-	SetupCheckSnapshot,
-} from '../../shared/ipc';
+import type { SetupCheckSnapshot } from '../../shared/ipc';
 import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
 import {
+	createCommandLogs,
 	createSetupCheckSnapshot,
 	type SetupCheckProviderContext,
 } from './setup-check-context.ts';
@@ -277,43 +275,6 @@ export async function getGitHubAuthCheck({
 			updatedAt: context.now().toISOString(),
 		});
 	}
-}
-
-/** Renders a {@link LocalCommandResult} as a setup check log set. */
-function createCommandLogs(
-	result: LocalCommandResult,
-): SetupCheckLogSnapshot[] {
-	const logs: SetupCheckLogSnapshot[] = [
-		{
-			label: 'Command',
-			text: result.logs.command,
-		},
-	];
-
-	if (result.logs.stdout) {
-		logs.push({
-			label: 'stdout',
-			text: result.logs.stdout,
-			truncated: result.stdoutTruncated,
-		});
-	}
-
-	if (result.logs.stderr) {
-		logs.push({
-			label: 'stderr',
-			text: result.logs.stderr,
-			truncated: result.stderrTruncated,
-		});
-	}
-
-	if (result.failure) {
-		logs.push({
-			label: result.failure.code,
-			text: result.failure.message,
-		});
-	}
-
-	return logs;
 }
 
 /** Returns the first non-blank line in a command output, or `null`. */

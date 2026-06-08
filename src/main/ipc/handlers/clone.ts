@@ -1,9 +1,4 @@
-import {
-	BrowserWindow,
-	dialog,
-	ipcMain,
-	type OpenDialogOptions,
-} from 'electron';
+import { ipcMain } from 'electron';
 
 import {
 	type CloneDestinationSelectionResult,
@@ -18,6 +13,7 @@ import type {
 	GithubCloneService,
 	GithubRepositoryListService,
 } from '../../repository';
+import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the GitHub clone IPC handlers. */
 export interface CloneHandlersOptions {
@@ -43,25 +39,14 @@ export function registerCloneHandlers({
 
 	ipcMain.handle(
 		IPC_CHANNELS.selectCloneDestination,
-		async (event): Promise<CloneDestinationSelectionResult> => {
-			const window = BrowserWindow.fromWebContents(event.sender);
-			const options: OpenDialogOptions = {
+		(event): Promise<CloneDestinationSelectionResult> =>
+			showDirectorySelectionDialog(event, {
 				buttonLabel: 'Select destination',
 				message:
 					'Select the parent directory where the GitHub repository should be cloned.',
 				properties: ['openDirectory', 'createDirectory'],
 				title: 'Select clone destination',
-			};
-			const result = window
-				? await dialog.showOpenDialog(window, options)
-				: await dialog.showOpenDialog(options);
-
-			if (result.canceled || !result.filePaths[0]) {
-				return { canceled: true };
-			}
-
-			return { canceled: false, path: result.filePaths[0] };
-		},
+			}),
 	);
 
 	ipcMain.handle(

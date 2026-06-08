@@ -23,7 +23,8 @@ import {
 	createFilesToCopyService,
 	type FilesToCopyService,
 } from './files-to-copy.ts';
-
+import { firstLine } from './first-line.ts';
+import { toSlug } from './slug.ts';
 /** Public surface of the workspace creation service. */
 export interface CreateWorkspaceService {
 	create: (request: CreateWorkspaceRequest) => Promise<CreateWorkspaceResult>;
@@ -61,7 +62,7 @@ interface PreparedWorkspace {
 
 const DEFAULT_WORKSPACE_NAME = 'workspace';
 const DEFAULT_FALLBACK_BRANCH = 'main';
-const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9._-]+$/;
+const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9 ._-]+$/;
 const WORKSPACE_NAME_MAX_LENGTH = 100;
 const GIT_WORKTREE_TIMEOUT_MS = 15_000;
 const CONTEXT_DIRECTORY = '.context';
@@ -165,6 +166,17 @@ export function createWorkspaceService({
 				workspacePath: prepared.path,
 			});
 			if (worktreeDiagnostic) {
+				// If the target now exists despite the pre-check, another worker
+				// won a TOCTOU race or the directory materialized concurrently.
+				// Do not delete it — it belongs to whoever got there first.
+				if (existsSync(prepared.path)) {
+					return failure({
+						code: 'destination-exists',
+						message: `A file or directory already exists at ${prepared.path}.`,
+						path: prepared.path,
+						severity: 'error',
+					});
+				}
 				cleanupDirectory(prepared.path);
 				return failure(worktreeDiagnostic);
 			}
@@ -201,12 +213,20 @@ export function createWorkspaceService({
 					workspacePath: prepared.path,
 				});
 				cleanupDirectory(prepared.path);
+				const message = error instanceof Error ? error.message : '';
+				// SQLite's UNIQUE(repository_id, slug) is the authoritative
+				// guard against concurrent same-slug workspace creation.
+				if (/UNIQUE constraint failed/i.test(message)) {
+					return failure({
+						code: 'destination-exists',
+						message: `A workspace with slug "${prepared.slug}" already exists for this repository.`,
+						path: prepared.path,
+						severity: 'error',
+					});
+				}
 				return failure({
 					code: 'workspace-insert-failed',
-					message:
-						error instanceof Error
-							? error.message
-							: 'Failed to write the workspace record to SQLite.',
+					message: message || 'Failed to write the workspace record to SQLite.',
 					path: prepared.path,
 					severity: 'error',
 				});
@@ -355,7 +375,7 @@ function validateName(name: unknown): CreateWorkspaceDiagnostic | null {
 		return {
 			code: 'name-invalid',
 			message:
-				'Workspace names may only contain letters, numbers, dots, dashes, or underscores.',
+				'Workspace names may only contain letters, numbers, spaces, dots, dashes, or underscores.',
 			severity: 'error',
 		};
 	}
@@ -410,7 +430,7 @@ function prepareWorkspace({
 		typeof nameInput === 'string' && nameInput.trim()
 			? nameInput.trim()
 			: DEFAULT_WORKSPACE_NAME;
-	const baseSlug = toSlug(trimmedName);
+	const baseSlug = toWorkspaceSlug(trimmedName);
 	const slug = allocateUniqueWorkspaceSlug({
 		baseSlug,
 		database,
@@ -474,12 +494,8 @@ function workspaceSlugExists(
 }
 
 /** Normalises a candidate name into a URL-safe slug with stable fallback. */
-function toSlug(value: string): string {
-	const slug = value
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '');
-	return slug || DEFAULT_WORKSPACE_NAME;
+function toWorkspaceSlug(value: string): string {
+	return toSlug(value, DEFAULT_WORKSPACE_NAME);
 }
 
 /**
@@ -652,17 +668,6 @@ function insertWorkspaceRow({
 		database.exec('ROLLBACK');
 		throw error;
 	}
-}
-
-/** Returns the first non-blank line of `text`; empty string otherwise. */
-function firstLine(text: string): string {
-	for (const line of text.split(/\r?\n/)) {
-		const trimmed = line.trim();
-		if (trimmed) {
-			return trimmed;
-		}
-	}
-	return '';
 }
 
 /** Type guard for repository rows returned by the lookup query. */

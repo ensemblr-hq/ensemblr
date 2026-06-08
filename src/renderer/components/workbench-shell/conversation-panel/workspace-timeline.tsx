@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 import { SetupDiagnosticsPanel } from '@/renderer/components/setup-diagnostics';
-import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/contexts';
+import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import {
 	getWorkbenchMockChatThread,
 	type WorkbenchMockChatTool,

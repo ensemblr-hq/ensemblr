@@ -172,7 +172,7 @@ export function applyRootDirectoryChange({
 }
 
 /** No-op reconciler used when no full scanner is wired up. */
-export function createEmptyRootDirectoryReconciliation({
+function createEmptyRootDirectoryReconciliation({
 	now = () => new Date(),
 	root,
 }: {

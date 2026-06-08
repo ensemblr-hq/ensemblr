@@ -1,12 +1,13 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 import {
-	ensembleQueryKeys,
 	prepareCloneGithubRepository,
 	startCloneGithubRepository,
 	subscribeCloneGithubRepositoryProgress,
 } from '@/renderer/api/ensemble-queries';
+import { seedFirstWorkspace } from '@/renderer/lib/workbench/seed-first-workspace';
 import type {
 	CloneGithubRepositoryDiagnostic,
 	CloneGithubRepositoryProgressEvent,
@@ -40,7 +41,8 @@ export interface UseCloneFlowResult {
  * @returns Flow state plus `startClone` / `retry` handlers.
  */
 export function useCloneFlow(): UseCloneFlowResult {
-	const queryClient = useQueryClient();
+	const navigate = useNavigate();
+	const router = useRouter();
 	const [stage, setStage] = useState<CloneStage>('idle');
 	const [diagnostics, setDiagnostics] = useState<
 		CloneGithubRepositoryDiagnostic[]
@@ -100,18 +102,28 @@ export function useCloneFlow(): UseCloneFlowResult {
 			setActiveJobId(null);
 
 			if (result.status === 'success' && result.repository) {
+				const repository = result.repository;
 				setStage('success');
 				setSuccessResult(result);
-				await queryClient.invalidateQueries({
-					queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+				const seed = await seedFirstWorkspace({
+					navigate,
+					repositoryId: repository.id,
+					router,
 				});
+				if (seed.status === 'success') {
+					toast.success(`Cloned ${repository.name}.`);
+				} else {
+					toast.error(
+						seed.error ?? `Cloned ${repository.name}, opening failed.`,
+					);
+				}
 				return;
 			}
 
 			setStage('failure');
 			setDiagnostics(result.diagnostics);
 		},
-		[queryClient],
+		[navigate, router],
 	);
 
 	const retry = useCallback(() => {

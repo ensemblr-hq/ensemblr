@@ -1,4 +1,22 @@
 export type {
+	CreateSharedRootAdoptionServiceOptions,
+	SharedRootAdoptionService,
+} from './adopt-shared-root.ts';
+export {
+	createSharedRootAdoptionService,
+	reconcileSharedRoot,
+} from './adopt-shared-root.ts';
+export type {
+	ArchiveRepositoryService,
+	CreateArchiveRepositoryServiceOptions,
+} from './archive-repository.ts';
+export { createArchiveRepositoryService } from './archive-repository.ts';
+export type {
+	ArchiveWorkspaceService,
+	CreateArchiveWorkspaceServiceOptions,
+} from './archive-workspace.ts';
+export { createArchiveWorkspaceService } from './archive-workspace.ts';
+export type {
 	CloneCommandRunHandlers,
 	CloneCommandRunner,
 	CloneCommandRunRequest,
@@ -17,8 +35,13 @@ export { createWorkspaceService } from './create-workspace.ts';
 export type {
 	GitRepositoryProbe,
 	GitRepositoryProbeFn,
+	GitWorktreeMetadata,
+	GitWorktreeProbeFn,
 } from './git-probe.ts';
-export { probeGitRepository } from './git-probe.ts';
+export {
+	probeGitRepository,
+	probeGitWorktreeMetadata,
+} from './git-probe.ts';
 export type {
 	CreateGithubRepositoryListServiceOptions,
 	GithubRepositoryListService,
@@ -41,3 +64,8 @@ export {
 	createLocalRepositoryRegistrationService,
 	registerLocalRepository,
 } from './register-repository.ts';
+export type {
+	CreateRenameWorkspaceServiceOptions,
+	RenameWorkspaceService,
+} from './rename-workspace.ts';
+export { createRenameWorkspaceService } from './rename-workspace.ts';
