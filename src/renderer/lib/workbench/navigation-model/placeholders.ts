@@ -2,10 +2,15 @@ import { DEFAULT_TERMINAL_DOCK_TAB_ID } from '@/renderer/lib/workbench/constants
 import type {
 	DockTabModel,
 	SessionTabModel,
+	WorkspaceLandingKind,
+	WorkspaceLandingSummary,
 	WorkspaceOpenTarget,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type { RepositoryWorkspaceNavigationWorkspace } from '@/shared/ipc';
+import type {
+	RepositoryWorkspaceNavigationRepository,
+	RepositoryWorkspaceNavigationWorkspace,
+} from '@/shared/ipc';
 
 /** Returns placeholder "open in" targets surfaced before integrations are wired. */
 export function createPlaceholderOpenTargets(): WorkspaceOpenTarget[] {
@@ -117,4 +122,66 @@ export function createPlaceholderSession(
 		summary: 'Workspace session placeholder.',
 		updatedLabel: 'loaded',
 	};
+}
+
+/**
+ * Builds a landing summary for a SQLite-backed workspace navigation row.
+ * Pi runtime + files-to-copy + setup-script data aren't wired into the
+ * navigation snapshot yet, so values stay neutral until those integrations
+ * land; the card still shows branch source and a copy/setup placeholder so the
+ * new-workspace landing surface is never blank.
+ */
+export function createPlaceholderLandingSummary(
+	repository: RepositoryWorkspaceNavigationRepository,
+	workspace: RepositoryWorkspaceNavigationWorkspace,
+): WorkspaceLandingSummary {
+	const baseBranch = workspace.baseBranch ?? repository.defaultBranch ?? null;
+	const branchName =
+		workspace.branchName ?? workspace.slug ?? workspace.name ?? 'workspace';
+	const kind = inferPlaceholderLandingKind({ baseBranch, branchName });
+	const branchDetail = baseBranch
+		? `Worktree branched from ${baseBranch}.`
+		: 'Worktree created from repository default branch.';
+	const headline =
+		kind === 'cloned-repo' ? 'Repository cloned' : 'New workspace ready';
+
+	return {
+		branchSource: {
+			...(baseBranch ? { baseBranch } : {}),
+			branchName,
+			detail: branchDetail,
+		},
+		copiedFiles: {
+			count: 0,
+			detail: 'Copied files will be shown here once workspace setup completes.',
+			state: 'unavailable',
+		},
+		headline,
+		kind,
+		setupGuidance: {
+			detail:
+				'No setup script is configured for this repository. Add one to bootstrap dependencies before the first Pi turn.',
+			state: 'missing',
+		},
+	};
+}
+
+/**
+ * Best-effort kind inference until workspace creation provenance is wired
+ * through the navigation snapshot. A workspace that has no diverged branch
+ * (branch matches the base) reads as a fresh clone; anything else is treated
+ * as a new local branch.
+ */
+function inferPlaceholderLandingKind({
+	baseBranch,
+	branchName,
+}: {
+	baseBranch: string | null;
+	branchName: string;
+}): WorkspaceLandingKind {
+	if (baseBranch && branchName === baseBranch) {
+		return 'cloned-repo';
+	}
+
+	return 'local-branch';
 }

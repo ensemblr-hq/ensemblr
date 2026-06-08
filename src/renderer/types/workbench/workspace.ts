@@ -19,6 +19,65 @@ export interface WorkspaceScriptSummary {
 	status: 'missing' | 'not-run' | 'running' | 'stopped' | 'succeeded';
 }
 
+/** Classifies the provenance used to explain why a workspace was created. */
+export type WorkspaceLandingKind =
+	| 'cloned-repo'
+	| 'linked-issue'
+	| 'local-branch';
+
+/** Names the external issue tracker connected to a workspace landing summary. */
+export type WorkspaceLinkedIssueProvider = 'github' | 'linear';
+
+/** Describes the issue that seeded a workspace when one is linked. */
+export interface WorkspaceLinkedIssueSummary {
+	provider: WorkspaceLinkedIssueProvider;
+	reference: string;
+	subtitle?: string;
+	title: string;
+	url?: string;
+}
+
+/** Describes the branch and base branch shown in the workspace landing card. */
+export interface WorkspaceLandingBranchSummary {
+	baseBranch?: string;
+	branchName: string;
+	detail: string;
+}
+
+/** Describes whether local-only files were copied into the workspace. */
+export type WorkspaceLandingCopyState = 'copied' | 'skipped' | 'unavailable';
+
+/** Summarizes files-to-copy results for a newly created workspace. */
+export interface WorkspaceLandingCopySummary {
+	count: number;
+	detail: string;
+	state: WorkspaceLandingCopyState;
+}
+
+/** Describes the configured setup-script state for a workspace. */
+export type WorkspaceLandingSetupState =
+	| 'configured'
+	| 'missing'
+	| 'pending'
+	| 'succeeded';
+
+/** Summarizes setup guidance shown before the first workspace agent turn. */
+export interface WorkspaceLandingSetupSummary {
+	command?: string;
+	detail: string;
+	state: WorkspaceLandingSetupState;
+}
+
+/** Aggregates the initial workspace context shown above the first chat thread. */
+export interface WorkspaceLandingSummary {
+	branchSource: WorkspaceLandingBranchSummary;
+	copiedFiles: WorkspaceLandingCopySummary;
+	headline: string;
+	kind: WorkspaceLandingKind;
+	linkedIssue?: WorkspaceLinkedIssueSummary;
+	setupGuidance: WorkspaceLandingSetupSummary;
+}
+
 export type WorkspaceOpenTargetKind =
 	| 'editor'
 	| 'file-manager'
@@ -51,6 +110,7 @@ export interface WorkspaceShellModel {
 	};
 	dockTabs: DockTabModel[];
 	id: string;
+	landingSummary?: WorkspaceLandingSummary;
 	name: string;
 	openTargets: WorkspaceOpenTarget[];
 	pathLabel: string;

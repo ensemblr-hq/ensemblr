@@ -41,6 +41,15 @@ export type { WorkbenchRouteSearch } from './route-search';
 export type { ComposerShellState, SessionTabModel } from './session';
 export type { WorkbenchShellData, WorkspaceShellData } from './shell-data';
 export type {
+	WorkspaceLandingBranchSummary,
+	WorkspaceLandingCopyState,
+	WorkspaceLandingCopySummary,
+	WorkspaceLandingKind,
+	WorkspaceLandingSetupState,
+	WorkspaceLandingSetupSummary,
+	WorkspaceLandingSummary,
+	WorkspaceLinkedIssueProvider,
+	WorkspaceLinkedIssueSummary,
 	WorkspaceOpenTarget,
 	WorkspaceOpenTargetKind,
 	WorkspaceScriptSummary,

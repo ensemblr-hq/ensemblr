@@ -23,6 +23,8 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
+import { WorkspaceLandingCard } from './workspace-landing-card';
+
 type ChatToolActivity = WorkbenchMockChatTool;
 
 const EMPTY_CHAT_TOOLS: ChatToolActivity[] = [];
@@ -75,6 +77,12 @@ export function WorkspaceTimeline({
 				</>
 			) : null}
 
+			<WorkspaceLandingCard
+				composer={composer}
+				landingSummary={workspace.landingSummary}
+				name={workspace.name}
+				pathLabel={workspace.pathLabel}
+			/>
 			<AgentChatThread
 				activeSession={activeSession}
 				composer={composer}

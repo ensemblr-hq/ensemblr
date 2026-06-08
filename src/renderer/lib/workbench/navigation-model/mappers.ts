@@ -10,6 +10,7 @@ import type {
 
 import {
 	createPlaceholderDockTabs,
+	createPlaceholderLandingSummary,
 	createPlaceholderOpenTargets,
 	createPlaceholderScripts,
 	createPlaceholderSessionFromSnapshot,
@@ -105,6 +106,7 @@ function mapWorkspaceNavigationSnapshot(
 		},
 		dockTabs: createPlaceholderDockTabs(),
 		id: workspace.id,
+		landingSummary: createPlaceholderLandingSummary(repository, workspace),
 		name: workspace.name || workspace.slug,
 		openTargets: createPlaceholderOpenTargets(),
 		pathLabel: workspace.path,
