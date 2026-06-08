@@ -20,7 +20,7 @@
 		"test:environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/environment-variables.test.ts",
 		"test:app": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/main-window-state.test.ts",
 		"test:pi": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-executable.test.ts tests/main/pi-readiness.test.ts",
-		"test:pi-agent": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-agent-client.test.ts",
+		"test:pi-agent": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-agent-client.test.ts tests/main/jsonl-line-stream.test.ts tests/main/cli-rpc-pi-agent-adapter.test.ts",
 		"test:renderer": "bun test tests/renderer/*.test.tsx",
 		"test:repository": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/register-repository.test.ts tests/main/clone-repository.test.ts tests/main/list-github-repositories.test.ts tests/main/quick-start-project.test.ts",
 		"test:workspace": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/create-workspace.test.ts",
