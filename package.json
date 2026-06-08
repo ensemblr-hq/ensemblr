@@ -23,6 +23,7 @@
 		"test:renderer": "bun test tests/renderer/*.test.tsx",
 		"test:repository": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/register-repository.test.ts tests/main/clone-repository.test.ts tests/main/list-github-repositories.test.ts tests/main/quick-start-project.test.ts",
 		"test:workspace": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/create-workspace.test.ts",
+		"test:archive": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/archive-lifecycle.test.ts tests/main/archive-workspace.test.ts tests/main/archive-repository.test.ts tests/main/delete-workspace.test.ts tests/main/delete-repository.test.ts tests/main/browse-archive.test.ts",
 		"test:root": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/root-directory.test.ts",
 		"test:secrets": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/secret-store.test.ts",
 		"test:setup": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/setup-diagnostics.test.ts",

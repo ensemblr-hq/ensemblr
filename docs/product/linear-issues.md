@@ -767,7 +767,7 @@ Scope:
 - Replace fixture project/workspace sidebar rows with SQLite-backed repository and workspace records.
 - Keep the existing visible History and Settings entries, health footer, chat-tab strip, right panel, PR header, open-workspace launcher, and dock regions.
 - Preserve implemented sidebar affordances: project collapse, project reorder, pinned workspaces, workspace diff counts, the documented workspace sidebar state contract, archive affordance, and context menus.
-- Repository context menu for create workspace, create from issue/PR placeholders, settings, hide, and remove.
+- Repository context menu for create workspace, create from issue/PR placeholders, settings, archive, and remove.
 - Drive workspace selection through file-based route params (`/projects/$projectId/workspaces/$workspaceId/chats/$chatId`) and persist per-workspace dock, review, and last-chat defaults in renderer state so switching workspaces restores them.
 
 Out of scope:
@@ -781,7 +781,7 @@ Acceptance criteria:
 - Workspace selection updates center/right/dock context.
 - Selecting a workspace navigates to its route and restores its last chat, dock, and review selection.
 - Pinning, collapse/reorder, and active workspace header still behave with live records.
-- Hide/remove actions are gated or placeholder-confirmed without deleting files.
+- Archive/remove actions are gated or placeholder-confirmed without deleting files.
 - Empty state guides users to add a project after setup passes.
 
 Verification:
@@ -969,7 +969,7 @@ Scope:
 - Move or record archived workspace context under `<root>/archived-contexts/` according to product behavior.
 - Support explicit branch cleanup settings with confirmation.
 - Preserve `.context/` handoff files and archive metadata.
-- Distinguish archive, hide, remove from app, and delete files.
+- Distinguish archive, remove from app, and delete files.
 
 Out of scope:
 - Archive script execution, covered by `ENS-038`.
@@ -2530,7 +2530,7 @@ Summary:
 Implement repository settings forms and source diagnostics for paths, branch, remote, preview, files-to-copy, scripts, spotlight, action preferences, and removal.
 
 Scope:
-- Repository identity/path, branch source, remote origin, branch naming, preview template, files-to-copy, scripts, run mode, create shared config file, spotlight flag, action preferences, hide/remove actions.
+- Repository identity/path, branch source, remote origin, branch naming, preview template, files-to-copy, scripts, run mode, create shared config file, spotlight flag, action preferences, archive/remove actions.
 - Show which source won per field.
 - Write personal overrides to SQLite and shared team config to `ensemble.json` where explicitly requested.
 - Preserve `conductor.json` compatibility and diagnostics.

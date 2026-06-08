@@ -12,11 +12,15 @@ export const IPC_CHANNELS = {
 	cloneGithubRepositoryStart: 'ensemble:clone-github-repository:start',
 	confirmRootDirectoryChange: 'ensemble:confirm-root-directory-change',
 	createWorkspace: 'ensemble:create-workspace',
+	deleteArchivedWorkspace: 'ensemble:delete-archived-workspace',
+	deleteRepository: 'ensemble:delete-repository',
+	deleteWorkspace: 'ensemble:delete-workspace',
 	ensureWindowWidth: 'ensemble:ensure-window-width',
 	environmentVariables: 'ensemble:environment-variables',
 	githubRepositoryList: 'ensemble:github-repository-list',
 	health: 'ensemble:health',
 	initialShellSnapshot: 'ensemble:initial-shell-snapshot',
+	listArchivedWorkspaces: 'ensemble:list-archived-workspaces',
 	previewRepositoryConfigMigration:
 		'ensemble:preview-repository-config-migration',
 	quickStartProject: 'ensemble:quick-start-project',
@@ -32,4 +36,5 @@ export const IPC_CHANNELS = {
 	setupDiagnostics: 'ensemble:setup-diagnostics',
 	settingsResolution: 'ensemble:settings-resolution',
 	sharedRootAdoption: 'ensemble:shared-root-adoption',
+	unarchiveWorkspace: 'ensemble:unarchive-workspace',
 } as const;

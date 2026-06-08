@@ -1,19 +1,19 @@
-import { existsSync, rmSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
 	ArchivedRepositorySnapshot,
+	ArchiveLifecycleDiagnostic,
 	ArchiveRepositoryDiagnostic,
 	ArchiveRepositoryDiagnosticCode,
 	ArchiveRepositoryRequest,
 	ArchiveRepositoryResult,
 } from '../../shared/ipc';
-import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
-import { ARCHIVED_REPOSITORY_MARKER } from './archived-marker.ts';
-import { firstLine } from './first-line.ts';
-/** Public surface of the repository archive service. */
+import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
+import type { ArchiveWorkspaceService } from './archive-workspace.ts';
+
+/** Public surface of the repository lifecycle archive service. */
 export interface ArchiveRepositoryService {
 	archive: (
 		request: ArchiveRepositoryRequest,
@@ -22,39 +22,40 @@ export interface ArchiveRepositoryService {
 
 /** Options for {@link createArchiveRepositoryService}. */
 export interface CreateArchiveRepositoryServiceOptions {
+	archiveLifecycleService: ArchiveLifecycleService;
+	archiveWorkspaceService: ArchiveWorkspaceService;
 	databaseService: EnsembleDatabaseService;
-	localCommandService: LocalCommandService;
+	now?: () => Date;
 }
 
-/** Internal: repository row enriched with the child workspaces we need to clean. */
 interface SourceRepository {
+	archivedAt: string | null;
 	id: string;
 	name: string;
 	path: string;
+	slug: string;
 	workspaces: SourceWorkspace[];
 }
 
 interface SourceWorkspace {
-	branchName: string | null;
+	archivedAt: string | null;
 	id: string;
 	name: string;
-	path: string;
 }
 
-const GIT_WORKTREE_TIMEOUT_MS = 15_000;
-const GIT_BRANCH_TIMEOUT_MS = 5_000;
-
 /**
- * Builds the service that archives a repository: every child workspace is
- * destructively cleaned (worktree removed, branch dropped), workspace rows and
- * the repository row are wiped from SQLite, but the repository's own folder on
- * disk is left intact so re-adopting it later is just a re-register.
- * @param options - Service dependencies.
- * @returns An {@link ArchiveRepositoryService}.
+ * Builds the service that archives a repository as a lifecycle state. Each
+ * unarchived child workspace is funnelled through the workspace archive
+ * service (so it reuses the same hooks + `.context/` preservation), then the
+ * repository row is stamped with `archived_at` and a repository-level row is
+ * inserted into `archive_records`. Pre-/post-archive-repository hooks run
+ * around the cascade.
  */
 export function createArchiveRepositoryService({
+	archiveLifecycleService,
+	archiveWorkspaceService,
 	databaseService,
-	localCommandService,
+	now = () => new Date(),
 }: CreateArchiveRepositoryServiceOptions): ArchiveRepositoryService {
 	return {
 		archive: async (request) => {
@@ -88,81 +89,182 @@ export function createArchiveRepositoryService({
 				});
 			}
 
-			const diagnostics: ArchiveRepositoryDiagnostic[] = [];
-
-			for (const workspace of source.workspaces) {
-				await runWorktreeRemove({
-					diagnostics,
-					localCommandService,
-					repositoryPath: source.path,
-					workspace,
+			if (source.archivedAt) {
+				return failure({
+					code: 'repository-already-archived',
+					message: `Repository "${source.name}" was already archived at ${source.archivedAt}.`,
+					severity: 'info',
 				});
-
-				removeWorkspaceDirectory({
-					diagnostics,
-					workspace,
-				});
-
-				if (workspace.branchName) {
-					await runBranchDelete({
-						branchName: workspace.branchName,
-						diagnostics,
-						localCommandService,
-						repositoryPath: source.path,
-						workspaceId: workspace.id,
-					});
-				}
 			}
 
-			try {
-				deleteRepositoryRows({ database, repositoryId: source.id });
-			} catch (error) {
-				diagnostics.push({
-					code: 'repository-delete-failed',
-					message:
-						error instanceof Error
-							? error.message
-							: 'Failed to delete the repository row.',
-					severity: 'error',
-				});
+			const branchCleanup = request.branchCleanup === true;
+			const reason =
+				typeof request.reason === 'string' && request.reason.trim()
+					? request.reason.trim()
+					: null;
+			const archivedAt = now().toISOString();
+			const diagnostics: ArchiveRepositoryDiagnostic[] = [];
+
+			const preHookOutcome = await archiveLifecycleService.invoke(
+				'pre-archive-repository',
+				{
+					archivedAt,
+					archivedContextPath: null,
+					branchCleanup,
+					repository: {
+						id: source.id,
+						name: source.name,
+						path: source.path,
+						slug: source.slug,
+					},
+					workspace: null,
+				},
+			);
+			pushLifecycleDiagnostics(diagnostics, preHookOutcome.diagnostics);
+
+			if (preHookOutcome.aborted) {
 				return {
-					diagnostics,
+					archiveRecordId: null,
+					diagnostics: [
+						...diagnostics,
+						{
+							code: 'archive-aborted-by-hook',
+							message: preHookOutcome.aborted.message,
+							severity: 'error',
+						},
+					],
 					repository: null,
-					status: 'failure',
+					status: 'aborted',
 					workspacesArchived: 0,
 				};
 			}
 
-			writeArchivedMarker({ diagnostics, repositoryPath: source.path });
+			const archivedWorkspaceIds: string[] = [];
+			let workspacesArchived = 0;
+			let cascadeFailed = false;
+
+			for (const workspace of source.workspaces) {
+				if (workspace.archivedAt) {
+					archivedWorkspaceIds.push(workspace.id);
+					continue;
+				}
+				const workspaceResult = await archiveWorkspaceService.archive({
+					branchCleanup,
+					workspaceId: workspace.id,
+					...(reason ? { reason } : {}),
+				});
+
+				for (const diagnostic of workspaceResult.diagnostics) {
+					diagnostics.push({
+						code:
+							diagnostic.code === 'workspace-update-failed'
+								? 'workspace-archive-failed'
+								: 'workspace-archive-failed',
+						message: `Workspace "${workspace.name}": ${diagnostic.message}`,
+						path: diagnostic.path,
+						severity: diagnostic.severity,
+						workspaceId: workspace.id,
+					});
+				}
+
+				if (workspaceResult.status === 'success') {
+					archivedWorkspaceIds.push(workspace.id);
+					workspacesArchived += 1;
+					continue;
+				}
+
+				cascadeFailed = true;
+				break;
+			}
+
+			if (cascadeFailed) {
+				return {
+					archiveRecordId: null,
+					diagnostics,
+					repository: null,
+					status: 'failure',
+					workspacesArchived,
+				};
+			}
+
+			const recordId = `archive-${randomUUID()}`;
+
+			try {
+				stampArchivedAt({
+					archivedAt,
+					branchCleanup,
+					database,
+					reason,
+					recordId,
+					source,
+				});
+			} catch (error) {
+				diagnostics.push({
+					code: 'repository-update-failed',
+					message:
+						error instanceof Error
+							? error.message
+							: 'Failed to record the repository archive lifecycle row.',
+					severity: 'error',
+				});
+				return {
+					archiveRecordId: null,
+					diagnostics,
+					repository: null,
+					status: 'failure',
+					workspacesArchived,
+				};
+			}
+
+			const postHookOutcome = await archiveLifecycleService.invoke(
+				'post-archive-repository',
+				{
+					archivedAt,
+					archivedContextPath: null,
+					branchCleanup,
+					repository: {
+						id: source.id,
+						name: source.name,
+						path: source.path,
+						slug: source.slug,
+					},
+					workspace: null,
+				},
+			);
+			pushLifecycleDiagnostics(diagnostics, postHookOutcome.diagnostics);
 
 			const repository: ArchivedRepositorySnapshot = {
-				archivedWorkspaceIds: source.workspaces.map((w) => w.id),
+				archivedAt,
+				archivedWorkspaceIds,
 				id: source.id,
 				name: source.name,
 				path: source.path,
+				slug: source.slug,
 			};
 
 			return {
+				archiveRecordId: recordId,
 				diagnostics,
 				repository,
 				status: 'success',
-				workspacesArchived: source.workspaces.length,
+				workspacesArchived,
 			};
 		},
 	};
 }
 
-/**
- * Reads the repository row and its child workspaces. Returns `null` when the
- * repository cannot be resolved.
- */
 function readRepository(
 	database: DatabaseSync,
 	repositoryId: string,
 ): SourceRepository | null {
 	const repositoryRow = database
 		.prepare(
-			`SELECT id AS id, name AS name, path AS path
+			`SELECT
+				id AS id,
+				slug AS slug,
+				name AS name,
+				path AS path,
+				archived_at AS archivedAt
 			FROM repositories
 			WHERE id = ?`,
 		)
@@ -177,10 +279,10 @@ function readRepository(
 			`SELECT
 				id AS id,
 				name AS name,
-				path AS path,
-				branch_name AS branchName
+				archived_at AS archivedAt
 			FROM workspaces
-			WHERE repository_id = ?`,
+			WHERE repository_id = ?
+			ORDER BY created_at`,
 		)
 		.all(repositoryId);
 
@@ -191,165 +293,61 @@ function readRepository(
 		}
 	}
 
-	return {
-		id: repositoryRow.id,
-		name: repositoryRow.name,
-		path: repositoryRow.path,
-		workspaces,
-	};
+	return { ...repositoryRow, workspaces };
 }
 
-/**
- * Runs `git worktree remove --force <path>` inside the source repository.
- * Surfaces a warning on failure; cleanup continues regardless.
- */
-async function runWorktreeRemove({
-	diagnostics,
-	localCommandService,
-	repositoryPath,
-	workspace,
-}: {
-	diagnostics: ArchiveRepositoryDiagnostic[];
-	localCommandService: LocalCommandService;
-	repositoryPath: string;
-	workspace: SourceWorkspace;
-}): Promise<void> {
-	try {
-		const result = await localCommandService.run({
-			args: ['worktree', 'remove', '--force', workspace.path],
-			command: 'git',
-			cwd: repositoryPath,
-			maxOutputBytes: 16 * 1024,
-			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
-		});
-
-		if (result.status === 'success') {
-			return;
-		}
-
-		diagnostics.push({
-			code: 'workspace-cleanup-failed',
-			message:
-				firstLine(result.stderr) ||
-				`git worktree remove --force exited with status ${result.status}.`,
-			path: workspace.path,
-			severity: 'warning',
-			workspaceId: workspace.id,
-		});
-	} catch (error) {
-		diagnostics.push({
-			code: 'workspace-cleanup-failed',
-			message:
-				error instanceof Error
-					? error.message
-					: 'git worktree remove --force threw unexpectedly.',
-			path: workspace.path,
-			severity: 'warning',
-			workspaceId: workspace.id,
-		});
-	}
-}
-
-/**
- * Removes the workspace directory from disk. Warns on failure; not fatal.
- */
-function removeWorkspaceDirectory({
-	diagnostics,
-	workspace,
-}: {
-	diagnostics: ArchiveRepositoryDiagnostic[];
-	workspace: SourceWorkspace;
-}): void {
-	try {
-		rmSync(workspace.path, { force: true, recursive: true });
-	} catch (error) {
-		if (existsSync(workspace.path)) {
-			diagnostics.push({
-				code: 'workspace-cleanup-failed',
-				message:
-					error instanceof Error
-						? error.message
-						: 'Failed to remove the workspace directory.',
-				path: workspace.path,
-				severity: 'warning',
-				workspaceId: workspace.id,
-			});
-		}
-	}
-}
-
-/**
- * Runs `git branch -D <branch>` inside the source repository. Warns on
- * failure — losing a stray local branch is not a hard error.
- */
-async function runBranchDelete({
-	branchName,
-	diagnostics,
-	localCommandService,
-	repositoryPath,
-	workspaceId,
-}: {
-	branchName: string;
-	diagnostics: ArchiveRepositoryDiagnostic[];
-	localCommandService: LocalCommandService;
-	repositoryPath: string;
-	workspaceId: string;
-}): Promise<void> {
-	try {
-		const result = await localCommandService.run({
-			args: ['branch', '-D', branchName],
-			command: 'git',
-			cwd: repositoryPath,
-			maxOutputBytes: 16 * 1024,
-			timeoutMs: GIT_BRANCH_TIMEOUT_MS,
-		});
-
-		if (result.status === 'success') {
-			return;
-		}
-
-		const stderr = result.stderr || '';
-		if (stderr.includes('not found') || stderr.includes('No such branch')) {
-			return;
-		}
-
-		diagnostics.push({
-			code: 'workspace-cleanup-failed',
-			message: firstLine(stderr) || 'git branch -D failed.',
-			severity: 'warning',
-			workspaceId,
-		});
-	} catch (error) {
-		diagnostics.push({
-			code: 'workspace-cleanup-failed',
-			message:
-				error instanceof Error
-					? error.message
-					: 'git branch -D threw unexpectedly.',
-			severity: 'warning',
-			workspaceId,
-		});
-	}
-}
-
-/**
- * Deletes child workspace rows and the repository row in a single transaction.
- * Both must succeed or both roll back; partial DB state is the only outcome we
- * cannot tolerate.
- */
-function deleteRepositoryRows({
+function stampArchivedAt({
+	archivedAt,
+	branchCleanup,
 	database,
-	repositoryId,
+	reason,
+	recordId,
+	source,
 }: {
+	archivedAt: string;
+	branchCleanup: boolean;
 	database: DatabaseSync;
-	repositoryId: string;
+	reason: string | null;
+	recordId: string;
+	source: SourceRepository;
 }): void {
 	database.exec('BEGIN');
 	try {
 		database
-			.prepare('DELETE FROM workspaces WHERE repository_id = ?')
-			.run(repositoryId);
-		database.prepare('DELETE FROM repositories WHERE id = ?').run(repositoryId);
+			.prepare(
+				`UPDATE repositories
+				SET archived_at = ?, updated_at = ?
+				WHERE id = ?`,
+			)
+			.run(archivedAt, archivedAt, source.id);
+		database
+			.prepare(
+				`INSERT INTO archive_records (
+					id,
+					record_type,
+					repository_id,
+					workspace_id,
+					repository_slug,
+					workspace_slug,
+					branch_name,
+					base_branch,
+					source_path,
+					archived_context_path,
+					branch_cleanup,
+					archive_reason,
+					archived_at
+				)
+				VALUES (?, 'repository', ?, NULL, ?, NULL, NULL, NULL, ?, NULL, ?, ?, ?)`,
+			)
+			.run(
+				recordId,
+				source.id,
+				source.slug,
+				source.path,
+				branchCleanup ? 1 : 0,
+				reason,
+				archivedAt,
+			);
 		database.exec('COMMIT');
 	} catch (error) {
 		database.exec('ROLLBACK');
@@ -357,45 +355,25 @@ function deleteRepositoryRows({
 	}
 }
 
-/**
- * Drops the sentinel file Ensemble looks for during shared-root adoption.
- * Without this, the next app start would scan the still-on-disk folder and
- * re-register the repository the user just archived. Failure is non-fatal —
- * the row deletion already succeeded, so we surface a warning and continue.
- */
-function writeArchivedMarker({
-	diagnostics,
-	repositoryPath,
-}: {
-	diagnostics: ArchiveRepositoryDiagnostic[];
-	repositoryPath: string;
-}): void {
-	if (!existsSync(repositoryPath)) {
-		return;
-	}
-	try {
-		writeFileSync(
-			path.join(repositoryPath, ARCHIVED_REPOSITORY_MARKER),
-			`Archived by Ensemble.\nDelete this file to allow the repository to be re-adopted automatically.\n`,
-		);
-	} catch (error) {
+function pushLifecycleDiagnostics(
+	diagnostics: ArchiveRepositoryDiagnostic[],
+	lifecycle: ArchiveLifecycleDiagnostic[],
+): void {
+	for (const entry of lifecycle) {
 		diagnostics.push({
-			code: 'workspace-cleanup-failed',
-			message:
-				error instanceof Error
-					? error.message
-					: 'Failed to write the archive marker.',
-			path: repositoryPath,
-			severity: 'warning',
+			code: 'lifecycle-hook-failed',
+			message: entry.message,
+			path: entry.path,
+			severity: entry.severity,
 		});
 	}
 }
 
-/** Builds the standard failure shape for any rejected archive request. */
 function failure(
 	diagnostic: ArchiveRepositoryDiagnostic,
 ): ArchiveRepositoryResult {
 	return {
+		archiveRecordId: null,
 		diagnostics: [diagnostic],
 		repository: null,
 		status: 'failure',
@@ -403,11 +381,12 @@ function failure(
 	};
 }
 
-/** Type guard for the repository lookup row. */
 function isRepositoryRow(row: unknown): row is {
+	archivedAt: string | null;
 	id: string;
 	name: string;
 	path: string;
+	slug: string;
 } {
 	if (typeof row !== 'object' || row === null) {
 		return false;
@@ -415,12 +394,13 @@ function isRepositoryRow(row: unknown): row is {
 	const candidate = row as Record<string, unknown>;
 	return (
 		typeof candidate.id === 'string' &&
+		typeof candidate.slug === 'string' &&
 		typeof candidate.name === 'string' &&
-		typeof candidate.path === 'string'
+		typeof candidate.path === 'string' &&
+		(candidate.archivedAt === null || typeof candidate.archivedAt === 'string')
 	);
 }
 
-/** Type guard for the workspace lookup row. */
 function isWorkspaceRow(row: unknown): row is SourceWorkspace {
 	if (typeof row !== 'object' || row === null) {
 		return false;
@@ -429,10 +409,8 @@ function isWorkspaceRow(row: unknown): row is SourceWorkspace {
 	return (
 		typeof candidate.id === 'string' &&
 		typeof candidate.name === 'string' &&
-		typeof candidate.path === 'string' &&
-		(candidate.branchName === null || typeof candidate.branchName === 'string')
+		(candidate.archivedAt === null || typeof candidate.archivedAt === 'string')
 	);
 }
 
-/** Diagnostic type re-export for IPC handler normalisation. */
 export type { ArchiveRepositoryDiagnosticCode };

@@ -57,8 +57,10 @@ if original screenshot evidence is unavailable.
 | Shared work | Multiple agents in one workspace when they share branch/context. | Same target, represented as multiple Pi sessions in one workspace. |
 | Workspace creation | New workspace from branch, PR, issue, or Linear issue. | Same target; Linear issue workspaces are v1 scope and GitHub issue/PR entry points use `gh` where practical. |
 | Workspace landing | New workspaces show branch source, copied-file count, and setup-script guidance before the first prompt. | Same target with Pi composer ready on first prompt. |
-| Archive | Archive finished/discarded workspaces and run archive script first. | Same target. |
-| Workspace context | `.context` folder for uncommitted handoff files. | Same target. |
+| Archive | Archive finished/discarded workspaces and run archive script first. | Lifecycle state in SQLite (`workspaces.archived_at` + `archive_records`) with `.context/` preserved under `archived-contexts/` and a hook surface for `ENS-038`'s archive script and `ENS-060`'s after-merge cleanup; branch cleanup is opt-in. See ADR 0027. |
+| Unarchive | Implicit through "restore" affordances on archived workspaces. | Repository context menu's **Browse archive…** entry opens a dialog listing archived workspaces. Restore NULLs `archived_at`, restores the preserved `.context/`, and recreates the worktree from the recorded base branch when archive ran with branch cleanup. |
+| Delete vs archive | Single destructive action. | Distinct intents: archive keeps state and context, delete drops the worktree + branch + row and writes the `.ensemble-archived` sentinel. Both require explicit confirmation. Destructive repository delete also wipes `<root>/archived-contexts/<repo-slug>/`. |
+| Workspace context | `.context` folder for uncommitted handoff files. | Same target; preserved verbatim into `archived-contexts/<repo>/<workspace>-<timestamp>/.context/` on archive, with a sibling `archive-metadata.json` snapshot. |
 
 ## Pi Agent Runtime
 
@@ -78,7 +80,7 @@ if original screenshot evidence is unavailable.
 | --- | --- | --- |
 | Setup script | Runs when workspace is created. | Same target. |
 | Run script | Runs from Run button inside workspace. | Same target. |
-| Archive script | Runs before workspace archive. | Same target. |
+| Archive script | Runs before workspace archive. | Same target via the lifecycle hook registry from ADR 0027; `ENS-038` registers a `pre-archive-workspace` subscriber that runs the configured archive script and can veto archive on failure. |
 | Run script mode | `concurrent` or `nonconcurrent`. | Same target. |
 | Terminal dock | Fixed read-only Setup and Run output tabs plus default and user-spawned terminal tabs stay visible beside chat/files/checks. | Same target with xterm.js and Electron process supervision; user terminals are independent IDE-style terminal sessions. |
 | Spotlight testing | Syncs workspace changes back to repo root for root-only projects. | Same target after core workspace flow. |

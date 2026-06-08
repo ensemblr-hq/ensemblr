@@ -130,7 +130,7 @@ This inventory comes from the settings screenshots plus accepted ADRs. It separa
 | Repository record/name/icon | Direct. | Same, with Ensemble icon choices. | SQLite. |
 | Root path | Direct. | Path to managed or adopted repository. | SQLite only. |
 | Workspaces path | Direct. | Path to workspaces under Ensemble/shared root. | SQLite only. |
-| Hide repository | Direct. | Hide from sidebar without deleting files. | SQLite. |
+| Archive repository | Direct. | Lifecycle state with preserved `.context/` under `archived-contexts/`; reversible. | SQLite (`repositories.archived_at` + `archive_records`); filesystem snapshot under managed root. |
 | Remove repository | Direct. | Remove from app records; deleting files, if supported, must be explicit. | SQLite lifecycle; filesystem action explicit. |
 
 ### Branch and Remote

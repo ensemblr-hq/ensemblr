@@ -1,0 +1,531 @@
+import { cpSync, existsSync, mkdirSync } from 'node:fs';
+import path from 'node:path';
+import type { DatabaseSync } from 'node:sqlite';
+
+import type {
+	ArchiveLifecycleDiagnostic,
+	UnarchivedWorkspaceSnapshot,
+	UnarchiveWorkspaceDiagnostic,
+	UnarchiveWorkspaceDiagnosticCode,
+	UnarchiveWorkspaceRequest,
+	UnarchiveWorkspaceResult,
+} from '../../shared/ipc';
+import type { LocalCommandService } from '../commands/local-command';
+import type { EnsembleDatabaseService } from '../storage/database.ts';
+import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
+import { firstLine } from './first-line.ts';
+
+/** Public surface of the workspace unarchive service. */
+export interface UnarchiveWorkspaceService {
+	unarchive: (
+		request: UnarchiveWorkspaceRequest,
+	) => Promise<UnarchiveWorkspaceResult>;
+}
+
+/** Options for {@link createUnarchiveWorkspaceService}. */
+export interface CreateUnarchiveWorkspaceServiceOptions {
+	archiveLifecycleService: ArchiveLifecycleService;
+	databaseService: EnsembleDatabaseService;
+	localCommandService: LocalCommandService;
+	now?: () => Date;
+}
+
+/** Archived workspace state needed to drive the reverse lifecycle. */
+interface ArchivedWorkspace {
+	archivedAt: string | null;
+	archivedContextPath: string | null;
+	archiveRecordId: string | null;
+	baseBranch: string | null;
+	branchCleanup: boolean;
+	branchName: string | null;
+	id: string;
+	name: string;
+	path: string;
+	repositoryId: string;
+	repositoryName: string;
+	repositoryPath: string;
+	repositorySlug: string;
+	slug: string;
+}
+
+const CONTEXT_DIRECTORY = '.context';
+const GIT_WORKTREE_TIMEOUT_MS = 15_000;
+
+/**
+ * Builds the service that reverses a workspace lifecycle archive. NULLs
+ * `archived_at`, restores the preserved `.context/` directory back into the
+ * worktree, and re-runs lifecycle hooks. When the original archive recorded
+ * `branch_cleanup = 1` (worktree + branch already destroyed), the service
+ * recreates the worktree from the recorded base branch before restoring
+ * context.
+ */
+export function createUnarchiveWorkspaceService({
+	archiveLifecycleService,
+	databaseService,
+	localCommandService,
+	now = () => new Date(),
+}: CreateUnarchiveWorkspaceServiceOptions): UnarchiveWorkspaceService {
+	return {
+		unarchive: async (request) => {
+			const database = databaseService.getConnection()?.database;
+			if (!database) {
+				return failure({
+					code: 'database-unavailable',
+					message: 'SQLite is unavailable; the workspace was not unarchived.',
+					severity: 'error',
+				});
+			}
+
+			const workspaceId =
+				typeof request.workspaceId === 'string'
+					? request.workspaceId.trim()
+					: '';
+			if (!workspaceId) {
+				return failure({
+					code: 'workspace-id-required',
+					message: 'A workspace id is required to unarchive a workspace.',
+					severity: 'error',
+				});
+			}
+
+			const source = readArchivedWorkspace(database, workspaceId);
+			if (!source) {
+				return failure({
+					code: 'workspace-not-found',
+					message: `No workspace is registered with id ${workspaceId}.`,
+					severity: 'error',
+				});
+			}
+
+			if (!source.archivedAt) {
+				return failure({
+					code: 'workspace-not-archived',
+					message: `Workspace "${source.name}" is not archived.`,
+					severity: 'info',
+				});
+			}
+			const archivedAt = source.archivedAt;
+
+			const diagnostics: UnarchiveWorkspaceDiagnostic[] = [];
+			const unarchivedAt = now().toISOString();
+
+			const preHookOutcome = await archiveLifecycleService.invoke(
+				'pre-unarchive-workspace',
+				{
+					archivedAt,
+					archivedContextPath: source.archivedContextPath,
+					branchCleanup: source.branchCleanup,
+					repository: {
+						id: source.repositoryId,
+						name: source.repositoryName,
+						path: source.repositoryPath,
+						slug: source.repositorySlug,
+					},
+					workspace: {
+						branchName: source.branchName,
+						id: source.id,
+						name: source.name,
+						path: source.path,
+						repositoryId: source.repositoryId,
+						slug: source.slug,
+					},
+				},
+			);
+			pushLifecycleDiagnostics(diagnostics, preHookOutcome.diagnostics);
+
+			if (preHookOutcome.aborted) {
+				return {
+					diagnostics: [
+						...diagnostics,
+						{
+							code: 'unarchive-aborted-by-hook',
+							message: preHookOutcome.aborted.message,
+							severity: 'error',
+						},
+					],
+					status: 'aborted',
+					workspace: null,
+				};
+			}
+
+			let branchRecreated = false;
+			if (source.branchCleanup) {
+				if (!source.archiveRecordId) {
+					return failure({
+						code: 'archive-record-missing',
+						message:
+							'No archive record was found for this workspace; the original worktree path cannot be recreated.',
+						severity: 'error',
+					});
+				}
+				if (!source.branchName) {
+					return failure({
+						code: 'base-branch-missing',
+						message:
+							'The archived branch name was not preserved; the worktree cannot be recreated.',
+						severity: 'error',
+					});
+				}
+				if (!source.baseBranch) {
+					return failure({
+						code: 'base-branch-missing',
+						message:
+							'The base branch was not preserved in the archive record; the worktree cannot be recreated.',
+						severity: 'error',
+					});
+				}
+
+				const recreateDiagnostic = await runWorktreeAdd({
+					baseBranch: source.baseBranch,
+					branchName: source.branchName,
+					localCommandService,
+					repositoryPath: source.repositoryPath,
+					workspacePath: source.path,
+				});
+				if (recreateDiagnostic) {
+					diagnostics.push(recreateDiagnostic);
+					return {
+						diagnostics,
+						status: 'failure',
+						workspace: null,
+					};
+				}
+				branchRecreated = true;
+			} else if (!existsSync(source.path)) {
+				return failure({
+					code: 'worktree-recreate-failed',
+					message: `Worktree path is missing on disk: ${source.path}. Run delete-from-archive to clean up the orphaned record.`,
+					path: source.path,
+					severity: 'error',
+				});
+			}
+
+			// Clear archived_at before restoring .context/ so a failed file copy
+			// leaves the row in the live state (with a warning), not in a
+			// half-archived state with restored context on disk.
+			try {
+				clearArchivedAt({ database, unarchivedAt, workspaceId: source.id });
+			} catch (error) {
+				diagnostics.push({
+					code: 'workspace-update-failed',
+					message:
+						error instanceof Error
+							? error.message
+							: 'Failed to clear archived_at.',
+					severity: 'error',
+				});
+				return {
+					diagnostics,
+					status: 'failure',
+					workspace: null,
+				};
+			}
+
+			const contextRestored = restoreContextDirectory({
+				diagnostics,
+				source,
+			});
+
+			const postHookOutcome = await archiveLifecycleService.invoke(
+				'post-unarchive-workspace',
+				{
+					archivedAt,
+					archivedContextPath: source.archivedContextPath,
+					branchCleanup: source.branchCleanup,
+					repository: {
+						id: source.repositoryId,
+						name: source.repositoryName,
+						path: source.repositoryPath,
+						slug: source.repositorySlug,
+					},
+					workspace: {
+						branchName: source.branchName,
+						id: source.id,
+						name: source.name,
+						path: source.path,
+						repositoryId: source.repositoryId,
+						slug: source.slug,
+					},
+				},
+			);
+			pushLifecycleDiagnostics(diagnostics, postHookOutcome.diagnostics);
+
+			const workspace: UnarchivedWorkspaceSnapshot = {
+				branchName: source.branchName,
+				branchRecreated,
+				contextRestored,
+				id: source.id,
+				name: source.name,
+				path: source.path,
+				repositoryId: source.repositoryId,
+				slug: source.slug,
+				unarchivedAt,
+			};
+
+			return {
+				diagnostics,
+				status: 'success',
+				workspace,
+			};
+		},
+	};
+}
+
+function readArchivedWorkspace(
+	database: DatabaseSync,
+	workspaceId: string,
+): ArchivedWorkspace | null {
+	const row = database
+		.prepare(
+			`SELECT
+				w.id AS id,
+				w.slug AS slug,
+				w.repository_id AS repositoryId,
+				w.name AS name,
+				w.path AS path,
+				w.branch_name AS branchName,
+				w.archived_at AS archivedAt,
+				r.path AS repositoryPath,
+				r.name AS repositoryName,
+				r.slug AS repositorySlug,
+				a.id AS archiveRecordId,
+				a.base_branch AS baseBranch,
+				a.archived_context_path AS archivedContextPath,
+				a.branch_cleanup AS branchCleanupRaw
+			FROM workspaces w
+			INNER JOIN repositories r ON r.id = w.repository_id
+			LEFT JOIN archive_records a
+				ON a.workspace_id = w.id
+				AND a.record_type = 'workspace'
+				AND a.id = (
+					SELECT id FROM archive_records
+					WHERE workspace_id = w.id AND record_type = 'workspace'
+					ORDER BY archived_at DESC
+					LIMIT 1
+				)
+			WHERE w.id = ?`,
+		)
+		.get(workspaceId);
+
+	if (!isWorkspaceRow(row)) {
+		return null;
+	}
+
+	return {
+		archivedAt: row.archivedAt,
+		archivedContextPath: row.archivedContextPath,
+		archiveRecordId: row.archiveRecordId,
+		baseBranch: row.baseBranch,
+		branchCleanup: row.branchCleanupRaw === 1,
+		branchName: row.branchName,
+		id: row.id,
+		name: row.name,
+		path: row.path,
+		repositoryId: row.repositoryId,
+		repositoryName: row.repositoryName,
+		repositoryPath: row.repositoryPath,
+		repositorySlug: row.repositorySlug,
+		slug: row.slug,
+	};
+}
+
+async function runWorktreeAdd({
+	baseBranch,
+	branchName,
+	localCommandService,
+	repositoryPath,
+	workspacePath,
+}: {
+	baseBranch: string;
+	branchName: string;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+	workspacePath: string;
+}): Promise<UnarchiveWorkspaceDiagnostic | null> {
+	try {
+		const result = await localCommandService.run({
+			args: ['worktree', 'add', '-b', branchName, workspacePath, baseBranch],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 64 * 1024,
+			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+		});
+
+		if (result.status === 'success') {
+			return null;
+		}
+
+		return {
+			code: 'worktree-recreate-failed',
+			message:
+				firstLine(result.stderr) ||
+				`git worktree add failed for branch ${branchName}.`,
+			path: workspacePath,
+			severity: 'error',
+		};
+	} catch (error) {
+		return {
+			code: 'worktree-recreate-failed',
+			message:
+				error instanceof Error
+					? error.message
+					: 'git worktree add threw unexpectedly.',
+			path: workspacePath,
+			severity: 'error',
+		};
+	}
+}
+
+function restoreContextDirectory({
+	diagnostics,
+	source,
+}: {
+	diagnostics: UnarchiveWorkspaceDiagnostic[];
+	source: ArchivedWorkspace;
+}): boolean {
+	if (!source.archivedContextPath) {
+		diagnostics.push({
+			code: 'archived-context-missing',
+			message:
+				'No archived context path was recorded; skipped .context/ restore.',
+			severity: 'warning',
+		});
+		return false;
+	}
+
+	const preservedContextDir = path.join(
+		source.archivedContextPath,
+		CONTEXT_DIRECTORY,
+	);
+	if (!existsSync(preservedContextDir)) {
+		diagnostics.push({
+			code: 'archived-context-missing',
+			message: `No .context/ directory found under ${source.archivedContextPath}; skipped restore.`,
+			path: source.archivedContextPath,
+			severity: 'warning',
+		});
+		return false;
+	}
+
+	const targetContextDir = path.join(source.path, CONTEXT_DIRECTORY);
+	try {
+		mkdirSync(source.path, { recursive: true });
+		cpSync(preservedContextDir, targetContextDir, {
+			dereference: false,
+			errorOnExist: false,
+			force: true,
+			preserveTimestamps: true,
+			recursive: true,
+			verbatimSymlinks: true,
+		});
+		return true;
+	} catch (error) {
+		diagnostics.push({
+			code: 'archived-context-restore-failed',
+			message:
+				error instanceof Error
+					? error.message
+					: 'Failed to restore the .context/ directory.',
+			path: targetContextDir,
+			severity: 'warning',
+		});
+		return false;
+	}
+}
+
+function clearArchivedAt({
+	database,
+	unarchivedAt,
+	workspaceId,
+}: {
+	database: DatabaseSync;
+	unarchivedAt: string;
+	workspaceId: string;
+}): void {
+	database.exec('BEGIN');
+	try {
+		database
+			.prepare(
+				`UPDATE workspaces
+				SET archived_at = NULL, updated_at = ?
+				WHERE id = ?`,
+			)
+			.run(unarchivedAt, workspaceId);
+		database.exec('COMMIT');
+	} catch (error) {
+		database.exec('ROLLBACK');
+		throw error;
+	}
+}
+
+function pushLifecycleDiagnostics(
+	diagnostics: UnarchiveWorkspaceDiagnostic[],
+	lifecycle: ArchiveLifecycleDiagnostic[],
+): void {
+	for (const entry of lifecycle) {
+		diagnostics.push({
+			code: 'lifecycle-hook-failed',
+			message: entry.message,
+			path: entry.path,
+			severity: entry.severity,
+		});
+	}
+}
+
+function failure(
+	diagnostic: UnarchiveWorkspaceDiagnostic,
+): UnarchiveWorkspaceResult {
+	return {
+		diagnostics: [diagnostic],
+		status: 'failure',
+		workspace: null,
+	};
+}
+
+interface WorkspaceRow {
+	archiveRecordId: string | null;
+	archivedAt: string | null;
+	archivedContextPath: string | null;
+	baseBranch: string | null;
+	branchCleanupRaw: number | null;
+	branchName: string | null;
+	id: string;
+	name: string;
+	path: string;
+	repositoryId: string;
+	repositoryName: string;
+	repositoryPath: string;
+	repositorySlug: string;
+	slug: string;
+}
+
+function isWorkspaceRow(row: unknown): row is WorkspaceRow {
+	if (typeof row !== 'object' || row === null) {
+		return false;
+	}
+	const candidate = row as Record<string, unknown>;
+	return (
+		typeof candidate.id === 'string' &&
+		typeof candidate.slug === 'string' &&
+		typeof candidate.name === 'string' &&
+		typeof candidate.path === 'string' &&
+		typeof candidate.repositoryId === 'string' &&
+		typeof candidate.repositoryName === 'string' &&
+		typeof candidate.repositoryPath === 'string' &&
+		typeof candidate.repositorySlug === 'string' &&
+		(candidate.branchName === null ||
+			typeof candidate.branchName === 'string') &&
+		(candidate.archivedAt === null ||
+			typeof candidate.archivedAt === 'string') &&
+		(candidate.archiveRecordId === null ||
+			typeof candidate.archiveRecordId === 'string') &&
+		(candidate.archivedContextPath === null ||
+			typeof candidate.archivedContextPath === 'string') &&
+		(candidate.baseBranch === null ||
+			typeof candidate.baseBranch === 'string') &&
+		(candidate.branchCleanupRaw === null ||
+			typeof candidate.branchCleanupRaw === 'number')
+	);
+}
+
+export type { UnarchiveWorkspaceDiagnosticCode };

@@ -1,8 +1,10 @@
 import {
 	ArchiveIcon,
+	ArchiveRestoreIcon,
 	GitBranchPlusIcon,
 	PlusIcon,
 	SettingsIcon,
+	Trash2Icon,
 } from 'lucide-react';
 
 import {
@@ -28,17 +30,23 @@ const repositoryRemovalBoundary = classifyPermissionAction({
 /** Right-click context menu surfacing project workspace/settings actions. */
 export function ProjectContextMenuContent({
 	onArchiveSelect,
+	onBrowseArchiveSelect,
 	onCreateFromSourceSelect,
+	onDeleteSelect,
 	onRepositorySettingsSelect,
 	project,
 }: {
 	onArchiveSelect?: () => void;
+	onBrowseArchiveSelect?: () => void;
 	onCreateFromSourceSelect?: () => void;
+	onDeleteSelect?: () => void;
 	onRepositorySettingsSelect: () => void;
 	project: ProjectShellModel;
 }) {
 	const createFromSourceWired = Boolean(onCreateFromSourceSelect);
 	const archiveWired = Boolean(onArchiveSelect);
+	const browseArchiveWired = Boolean(onBrowseArchiveSelect);
+	const deleteWired = Boolean(onDeleteSelect);
 
 	return (
 		<ContextMenuContent
@@ -61,6 +69,14 @@ export function ProjectContextMenuContent({
 					<span className='min-w-0 flex-1'>Create from…</span>
 					<ContextMenuShortcut>⌘⇧N</ContextMenuShortcut>
 				</SidebarContextMenuItem>
+				<SidebarContextMenuItem
+					data-action-placeholder='repository-browse-archive'
+					disabled={!browseArchiveWired}
+					onSelect={onBrowseArchiveSelect}
+				>
+					<ArchiveRestoreIcon aria-hidden='true' />
+					<span className='min-w-0 flex-1'>Workspace archive</span>
+				</SidebarContextMenuItem>
 				<SidebarContextMenuItem onSelect={onRepositorySettingsSelect}>
 					<SettingsIcon aria-hidden='true' />
 					<span className='min-w-0 flex-1'>Repository settings</span>
@@ -74,10 +90,19 @@ export function ProjectContextMenuContent({
 					data-permission-boundary={repositoryRemovalBoundary.boundary}
 					disabled={!archiveWired}
 					onSelect={onArchiveSelect}
-					variant='destructive'
 				>
 					<ArchiveIcon aria-hidden='true' />
 					<span className='min-w-0 flex-1'>Archive repository</span>
+				</SidebarContextMenuItem>
+				<SidebarContextMenuItem
+					data-action-placeholder='repository-delete-confirmation'
+					data-permission-boundary={repositoryRemovalBoundary.boundary}
+					disabled={!deleteWired}
+					onSelect={onDeleteSelect}
+					variant='destructive'
+				>
+					<Trash2Icon aria-hidden='true' />
+					<span className='min-w-0 flex-1'>Delete repository…</span>
 				</SidebarContextMenuItem>
 			</ContextMenuGroup>
 		</ContextMenuContent>

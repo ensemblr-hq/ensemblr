@@ -4,6 +4,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	rmSync,
 	writeFileSync,
 } from 'node:fs';
@@ -13,6 +14,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
+import { createArchiveLifecycleService } from '../../src/main/repository/archive-lifecycle.ts';
 import { createArchiveWorkspaceService } from '../../src/main/repository/archive-workspace.ts';
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
 import {
@@ -25,6 +27,7 @@ import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 
 interface Harness {
+	archivedContextsPath: string;
 	databaseService: EnsembleDatabaseService;
 	repositoryId: string;
 	repositoryPath: string;
@@ -34,11 +37,15 @@ interface Harness {
 }
 
 function createHarness(t: TestContext): Harness {
-	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemble-archive-'));
+	const rootPath = mkdtempSync(
+		path.join(tmpdir(), 'ensemble-archive-lifecycle-'),
+	);
 	const repositoriesPath = path.join(rootPath, 'repos');
 	const workspacesPath = path.join(rootPath, 'workspaces');
+	const archivedContextsPath = path.join(rootPath, 'archived-contexts');
 	mkdirSync(repositoriesPath, { recursive: true });
 	mkdirSync(workspacesPath, { recursive: true });
+	mkdirSync(archivedContextsPath, { recursive: true });
 
 	const repositoryPath = path.join(repositoriesPath, 'demo');
 	mkdirSync(repositoryPath);
@@ -77,6 +84,7 @@ function createHarness(t: TestContext): Harness {
 	});
 
 	return {
+		archivedContextsPath,
 		databaseService,
 		repositoryId,
 		repositoryPath,
@@ -105,10 +113,10 @@ function wrapConnection(
 	};
 }
 
-const rootDirectoryStub = (
-	harness: Pick<Harness, 'rootPath' | 'workspacesPath'>,
-) =>
+const rootDirectoryStub = (harness: Harness) =>
 	buildRootDirectoryStub({
+		archivedContextsPath: harness.archivedContextsPath,
+		repositoriesPath: path.join(harness.rootPath, 'repos'),
 		rootPath: harness.rootPath,
 		workspacesPath: harness.workspacesPath,
 	});
@@ -126,6 +134,17 @@ function workspaceRow(
 	return row as Record<string, unknown> | undefined;
 }
 
+function archiveRecord(
+	databaseService: EnsembleDatabaseService,
+	id: string,
+): Record<string, unknown> | undefined {
+	const database = databaseService.getConnection()?.database as DatabaseSync;
+	const row = database
+		.prepare('SELECT * FROM archive_records WHERE id = ?')
+		.get(id);
+	return row as Record<string, unknown> | undefined;
+}
+
 function listBranches(repositoryPath: string): string[] {
 	return runGit(repositoryPath, [
 		'branch',
@@ -135,13 +154,6 @@ function listBranches(repositoryPath: string): string[] {
 		.split(/\r?\n/)
 		.map((branch) => branch.trim())
 		.filter((branch) => branch.length > 0);
-}
-
-function listWorktreePaths(repositoryPath: string): string[] {
-	return runGit(repositoryPath, ['worktree', 'list', '--porcelain'])
-		.split(/\r?\n/)
-		.filter((line) => line.startsWith('worktree '))
-		.map((line) => line.slice('worktree '.length));
 }
 
 async function seedWorkspace(harness: Harness, name: string) {
@@ -155,72 +167,180 @@ async function seedWorkspace(harness: Harness, name: string) {
 		name,
 		repositoryId: harness.repositoryId,
 	});
-
 	if (result.status !== 'success' || !result.workspace) {
 		throw new Error(`failed to seed workspace ${name}`);
 	}
 	return result.workspace;
 }
 
-test('archive removes the worktree, drops the branch, and deletes the row', async (t) => {
+function makeArchiveService(
+	harness: Harness,
+	lifecycle = createArchiveLifecycleService(),
+) {
+	return {
+		lifecycle,
+		service: createArchiveWorkspaceService({
+			archiveLifecycleService: lifecycle,
+			databaseService: harness.databaseService,
+			localCommandService: createLocalCommandService(),
+			now: fixedNow,
+			rootDirectoryService: rootDirectoryStub(harness),
+		}),
+	};
+}
+
+test('lifecycle archive preserves .context/, stamps archived_at, leaves worktree + branch alone', async (t) => {
 	const harness = createHarness(t);
-	const workspace = await seedWorkspace(harness, 'cleanup-me');
+	const workspace = await seedWorkspace(harness, 'handoff');
 
-	const archiveService = createArchiveWorkspaceService({
-		databaseService: harness.databaseService,
-		localCommandService: createLocalCommandService(),
-	});
+	const handoffPath = path.join(workspace.path, '.context', 'handoff.md');
+	writeFileSync(handoffPath, '# Handoff\nremember to push\n');
 
-	const result = await archiveService.archive({ workspaceId: workspace.id });
+	const { service } = makeArchiveService(harness);
+
+	const result = await service.archive({ workspaceId: workspace.id });
 
 	assert.equal(result.status, 'success');
 	assert.ok(result.workspace);
-	assert.equal(result.workspace?.id, workspace.id);
-	assert.equal(result.pathRemoved, true);
-	assert.equal(result.branchDeleted, true);
-	assert.equal(existsSync(workspace.path), false);
-	assert.equal(workspaceRow(harness.databaseService, workspace.id), undefined);
+	assert.equal(result.workspace?.archivedAt, fixedNow().toISOString());
+	assert.equal(result.workspace?.branchCleanup, false);
+	assert.equal(result.workspace?.branchDeleted, false);
 
-	const remainingBranches = listBranches(harness.repositoryPath);
-	assert.equal(remainingBranches.includes('cleanup-me'), false);
+	const preservedRoot = result.workspace?.archivedContextPath;
+	assert.ok(preservedRoot);
+	if (!preservedRoot) {
+		return;
+	}
+	assert.equal(
+		existsSync(path.join(preservedRoot, '.context/handoff.md')),
+		true,
+	);
+	assert.equal(
+		readFileSync(path.join(preservedRoot, '.context/handoff.md'), 'utf8'),
+		'# Handoff\nremember to push\n',
+	);
 
-	const remainingWorktrees = listWorktreePaths(harness.repositoryPath);
-	assert.equal(remainingWorktrees.includes(workspace.path), false);
+	const metadataPath = path.join(preservedRoot, 'archive-metadata.json');
+	assert.equal(existsSync(metadataPath), true);
+	const metadata = JSON.parse(readFileSync(metadataPath, 'utf8'));
+	assert.equal(metadata.archiveRecordId, result.archiveRecordId);
+	assert.equal(metadata.workspace.slug, workspace.slug);
+	assert.equal(metadata.branchCleanup, false);
+
+	const row = workspaceRow(harness.databaseService, workspace.id);
+	assert.equal(row?.archived_at, fixedNow().toISOString());
+	assert.equal(existsSync(workspace.path), true);
+
+	assert.equal(
+		listBranches(harness.repositoryPath).includes(workspace.branchName ?? ''),
+		true,
+	);
+
+	const archiveRow = result.archiveRecordId
+		? archiveRecord(harness.databaseService, result.archiveRecordId)
+		: undefined;
+	assert.ok(archiveRow);
+	assert.equal(archiveRow?.record_type, 'workspace');
+	assert.equal(archiveRow?.workspace_id, workspace.id);
+	assert.equal(archiveRow?.repository_id, harness.repositoryId);
+	assert.equal(archiveRow?.branch_cleanup, 0);
 });
 
-test('archive succeeds even when the worktree directory was already removed', async (t) => {
+test('branchCleanup opt-in removes the worktree registration and drops the local branch', async (t) => {
 	const harness = createHarness(t);
-	const workspace = await seedWorkspace(harness, 'already-gone');
+	const workspace = await seedWorkspace(harness, 'cleanup-branch');
 
-	// Simulate the user (or another tool) blowing the workspace directory away
-	// out-of-band — archive should still wipe the row.
-	rmSync(workspace.path, { force: true, recursive: true });
-	assert.equal(existsSync(workspace.path), false);
+	const handoffPath = path.join(workspace.path, '.context', 'handoff.md');
+	writeFileSync(handoffPath, 'pushed work\n');
 
-	const archiveService = createArchiveWorkspaceService({
-		databaseService: harness.databaseService,
-		localCommandService: createLocalCommandService(),
+	const { service } = makeArchiveService(harness);
+
+	const result = await service.archive({
+		branchCleanup: true,
+		workspaceId: workspace.id,
 	});
-
-	const result = await archiveService.archive({ workspaceId: workspace.id });
 
 	assert.equal(result.status, 'success');
-	assert.equal(result.pathRemoved, true);
-	assert.equal(workspaceRow(harness.databaseService, workspace.id), undefined);
+	assert.equal(result.workspace?.branchCleanup, true);
+	assert.equal(result.workspace?.branchDeleted, true);
+
+	// Branch and worktree registration are both gone — `.context/` survives
+	// under archived-contexts/ because we copy it before tearing down the
+	// worktree.
+	assert.equal(
+		listBranches(harness.repositoryPath).includes(workspace.branchName ?? ''),
+		false,
+	);
+	assert.equal(existsSync(workspace.path), false);
+
+	const preservedRoot = result.workspace?.archivedContextPath;
+	assert.ok(preservedRoot);
+	if (preservedRoot) {
+		assert.equal(
+			existsSync(path.join(preservedRoot, '.context/handoff.md')),
+			true,
+		);
+	}
+
+	const archiveRow = result.archiveRecordId
+		? archiveRecord(harness.databaseService, result.archiveRecordId)
+		: undefined;
+	assert.equal(archiveRow?.branch_cleanup, 1);
 });
 
-test('archive rejects when the workspace id is missing or unknown', async (t) => {
+test('pre-archive hook abort short-circuits the lifecycle without stamping archived_at', async (t) => {
 	const harness = createHarness(t);
-	const archiveService = createArchiveWorkspaceService({
-		databaseService: harness.databaseService,
-		localCommandService: createLocalCommandService(),
-	});
+	const workspace = await seedWorkspace(harness, 'guarded');
 
-	const missingId = await archiveService.archive({ workspaceId: '' });
+	const lifecycle = createArchiveLifecycleService();
+	lifecycle.subscribe('pre-archive-workspace', () => ({
+		abort: {
+			code: 'workspace-busy',
+			message: 'Pi session is still running.',
+		},
+	}));
+
+	const { service } = makeArchiveService(harness, lifecycle);
+
+	const result = await service.archive({ workspaceId: workspace.id });
+
+	assert.equal(result.status, 'aborted');
+	assert.equal(result.archiveRecordId, null);
+	assert.equal(result.workspace, null);
+	assert.equal(
+		result.diagnostics.some(
+			(diagnostic) => diagnostic.code === 'archive-aborted-by-hook',
+		),
+		true,
+	);
+
+	const row = workspaceRow(harness.databaseService, workspace.id);
+	assert.equal(row?.archived_at, null);
+});
+
+test('archiving the same workspace twice is rejected with workspace-already-archived', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'already-archived');
+
+	const { service } = makeArchiveService(harness);
+
+	const first = await service.archive({ workspaceId: workspace.id });
+	assert.equal(first.status, 'success');
+
+	const second = await service.archive({ workspaceId: workspace.id });
+	assert.equal(second.status, 'failure');
+	assert.equal(second.diagnostics[0]?.code, 'workspace-already-archived');
+});
+
+test('archive validates the workspace id and rejects unknown ids', async (t) => {
+	const harness = createHarness(t);
+	const { service } = makeArchiveService(harness);
+
+	const missingId = await service.archive({ workspaceId: '' });
 	assert.equal(missingId.status, 'failure');
 	assert.equal(missingId.diagnostics[0]?.code, 'workspace-id-required');
 
-	const notFound = await archiveService.archive({
+	const notFound = await service.archive({
 		workspaceId: 'workspace-not-real',
 	});
 	assert.equal(notFound.status, 'failure');

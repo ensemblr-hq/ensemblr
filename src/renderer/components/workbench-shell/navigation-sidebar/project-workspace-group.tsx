@@ -21,9 +21,12 @@ export function ProjectWorkspaceGroup({
 	onCreateFromSourceSelect,
 	onCreateWorkspaceSelect,
 	onProjectArchiveSelect,
+	onProjectBrowseArchiveSelect,
+	onProjectDeleteSelect,
 	onProjectToggle,
 	onStaticNavigationSelect,
 	onWorkspaceArchiveSelect,
+	onWorkspaceDeleteSelect,
 	onWorkspacePinToggle,
 	onWorkspaceRenameSelect,
 	onWorkspaceSelect,
@@ -38,9 +41,12 @@ export function ProjectWorkspaceGroup({
 	onCreateFromSourceSelect: () => void;
 	onCreateWorkspaceSelect: () => void;
 	onProjectArchiveSelect?: () => void;
+	onProjectBrowseArchiveSelect?: () => void;
+	onProjectDeleteSelect?: () => void;
 	onProjectToggle: () => void;
 	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
 	onWorkspaceArchiveSelect?: (workspace: WorkspaceShellModel) => void;
+	onWorkspaceDeleteSelect?: (workspace: WorkspaceShellModel) => void;
 	onWorkspacePinToggle: (workspaceId: string) => void;
 	onWorkspaceRenameSelect?: (workspace: WorkspaceShellModel) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
@@ -59,8 +65,10 @@ export function ProjectWorkspaceGroup({
 			<ProjectSidebarHeader
 				isCollapsed={isCollapsed}
 				onArchiveSelect={onProjectArchiveSelect}
+				onBrowseArchiveSelect={onProjectBrowseArchiveSelect}
 				onCreateFromSourceSelect={onCreateFromSourceSelect}
 				onCreateWorkspaceSelect={onCreateWorkspaceSelect}
+				onDeleteSelect={onProjectDeleteSelect}
 				onRepositorySettingsSelect={() =>
 					onStaticNavigationSelect({
 						kind: 'repo-settings',
@@ -94,6 +102,11 @@ export function ProjectWorkspaceGroup({
 								onArchiveSelect={
 									onWorkspaceArchiveSelect
 										? () => onWorkspaceArchiveSelect(workspace)
+										: undefined
+								}
+								onDeleteSelect={
+									onWorkspaceDeleteSelect
+										? () => onWorkspaceDeleteSelect(workspace)
 										: undefined
 								}
 								onPinToggle={() => onWorkspacePinToggle(workspace.id)}

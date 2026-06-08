@@ -13,14 +13,20 @@ import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
 import { createPiExecutableService, createPiReadinessService } from './pi';
 import {
+	createArchiveLifecycleService,
 	createArchiveRepositoryService,
 	createArchiveWorkspaceService,
+	createDeleteArchivedWorkspaceService,
+	createDeleteRepositoryService,
+	createDeleteWorkspaceService,
 	createGithubCloneService,
 	createGithubRepositoryListService,
+	createListArchivedWorkspacesService,
 	createLocalRepositoryRegistrationService,
 	createQuickStartProjectService,
 	createRenameWorkspaceService,
 	createSharedRootAdoptionService,
+	createUnarchiveWorkspaceService,
 	createWorkspaceService,
 } from './repository';
 import {
@@ -99,13 +105,38 @@ const renameWorkspaceService = createRenameWorkspaceService({
 	databaseService,
 	localCommandService,
 });
+const archiveLifecycleService = createArchiveLifecycleService();
 const archiveWorkspaceService = createArchiveWorkspaceService({
+	archiveLifecycleService,
+	databaseService,
+	localCommandService,
+	rootDirectoryService,
+});
+const archiveRepositoryService = createArchiveRepositoryService({
+	archiveLifecycleService,
+	archiveWorkspaceService,
+	databaseService,
+});
+const deleteWorkspaceService = createDeleteWorkspaceService({
 	databaseService,
 	localCommandService,
 });
-const archiveRepositoryService = createArchiveRepositoryService({
+const deleteRepositoryService = createDeleteRepositoryService({
 	databaseService,
 	localCommandService,
+	rootDirectoryService,
+});
+const unarchiveWorkspaceService = createUnarchiveWorkspaceService({
+	archiveLifecycleService,
+	databaseService,
+	localCommandService,
+});
+const deleteArchivedWorkspaceService = createDeleteArchivedWorkspaceService({
+	databaseService,
+	localCommandService,
+});
+const listArchivedWorkspacesService = createListArchivedWorkspacesService({
+	databaseService,
 });
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
@@ -132,9 +163,13 @@ app.whenReady().then(() => {
 		configService,
 		createWorkspaceService: createWorkspaceServiceInstance,
 		databaseService,
+		deleteArchivedWorkspaceService,
+		deleteRepositoryService,
+		deleteWorkspaceService,
 		environmentVariablesService,
 		githubCloneService,
 		githubRepositoryListService,
+		listArchivedWorkspacesService,
 		localRepositoryRegistrationService,
 		piExecutableService,
 		quickStartProjectService,
@@ -144,6 +179,7 @@ app.whenReady().then(() => {
 		setupDiagnosticsService,
 		settingsResolutionService,
 		sharedRootAdoptionService,
+		unarchiveWorkspaceService,
 	});
 	createMainWindow({ windowStateStore: mainWindowStateStore });
 });

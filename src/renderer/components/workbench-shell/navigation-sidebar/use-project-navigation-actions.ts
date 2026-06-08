@@ -16,6 +16,24 @@ import type {
 import type { CreateWorkspaceDiagnostic } from '@/shared/ipc';
 
 /**
+ * Returns a callback the browse-archive dialog calls after every successful
+ * unarchive or purge. Reuses the navigation cache invalidation + router
+ * refresh so the sidebar reflects the updated workspace list immediately.
+ */
+export function useArchiveBrowseChange() {
+	const router = useRouter();
+	return useCallback(
+		async (_repositoryId: string) => {
+			await queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+			});
+			await router.invalidate();
+		},
+		[router],
+	);
+}
+
+/**
  * Picks the workspace to surface after archiving, preferring another workspace
  * in the same project before falling back to the first available elsewhere.
  */
