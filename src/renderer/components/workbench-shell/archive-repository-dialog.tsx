@@ -1,16 +1,18 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import {
 	archiveRepository,
 	isEnsembleApiAvailable,
 } from '@/renderer/api/ensemble-queries';
 import { Button } from '@/renderer/components/ui/button';
+import { Checkbox } from '@/renderer/components/ui/checkbox';
 import {
 	Dialog,
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
+import { Label } from '@/renderer/components/ui/label';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type { ArchiveRepositoryDiagnostic } from '@/shared/ipc';
@@ -22,7 +24,11 @@ interface ArchiveRepositoryDialogProps {
 	project: ProjectShellModel | null;
 }
 
-/** Destructive confirmation dialog for archiving a project repository. */
+/**
+ * Lifecycle archive dialog for a repository. Cascades to each child workspace;
+ * branch cleanup is opt-in. Worktree folders are preserved so PID-038/PID-060
+ * subscribers can still inspect them.
+ */
 export function ArchiveRepositoryDialog({
 	onArchived,
 	onOpenChange,
@@ -47,7 +53,6 @@ export function ArchiveRepositoryDialog({
 
 type ArchiveStage = 'archiving' | 'failure' | 'idle';
 
-/** Inner state-owned form that resets each time the dialog re-opens. */
 function ArchiveRepositoryDialogForm({
 	onArchived,
 	onOpenChange,
@@ -58,12 +63,18 @@ function ArchiveRepositoryDialogForm({
 	project: ProjectShellModel;
 }) {
 	const [stage, setStage] = useState<ArchiveStage>('idle');
+	const [branchCleanup, setBranchCleanup] = useState(false);
 	const [diagnostics, setDiagnostics] = useState<ArchiveRepositoryDiagnostic[]>(
 		[],
 	);
 
 	const canArchive = stage !== 'archiving' && isEnsembleApiAvailable();
 	const workspaceCount = project.workspaces.length;
+	const hasWorkspaces = workspaceCount > 0;
+	const checkboxId = useMemo(
+		() => `archive-repository-branch-cleanup-${project.id}`,
+		[project.id],
+	);
 
 	const handleArchive = useCallback(async () => {
 		if (!canArchive) {
@@ -72,7 +83,10 @@ function ArchiveRepositoryDialogForm({
 		setStage('archiving');
 		setDiagnostics([]);
 
-		const result = await archiveRepository({ repositoryId: project.id });
+		const result = await archiveRepository({
+			branchCleanup: branchCleanup && hasWorkspaces,
+			repositoryId: project.id,
+		});
 
 		if (result.status === 'success') {
 			await onArchived(project.id);
@@ -82,7 +96,14 @@ function ArchiveRepositoryDialogForm({
 
 		setStage('failure');
 		setDiagnostics(result.diagnostics);
-	}, [canArchive, onArchived, onOpenChange, project.id]);
+	}, [
+		branchCleanup,
+		canArchive,
+		hasWorkspaces,
+		onArchived,
+		onOpenChange,
+		project.id,
+	]);
 
 	const handleClose = useCallback(() => {
 		onOpenChange(false);
@@ -97,11 +118,12 @@ function ArchiveRepositoryDialogForm({
 					Archive repository?
 				</DialogTitle>
 				<p className='text-muted-foreground text-xs'>
-					Removes the repository and {workspaceCount}{' '}
-					{workspaceCount === 1 ? 'workspace' : 'workspaces'} from Ensemble.
-					Every workspace's worktree folder is deleted and its local branch is
-					dropped. The repository folder itself stays on disk so you can
-					re-register it later.
+					Marks the repository and {workspaceCount}{' '}
+					{workspaceCount === 1 ? 'workspace' : 'workspaces'} as archived. Each
+					workspace's <span className='font-mono'>.context/</span> handoff files
+					are preserved under{' '}
+					<span className='font-mono'>archived-contexts/</span>. Worktrees and
+					the repository folder stay on disk.
 				</p>
 			</DialogHeader>
 
@@ -111,6 +133,27 @@ function ArchiveRepositoryDialogForm({
 					{project.pathLabel}
 				</span>
 			</div>
+
+			{hasWorkspaces ? (
+				<div className='flex items-start gap-2 rounded-md border border-border bg-background px-3 py-2'>
+					<Checkbox
+						checked={branchCleanup}
+						disabled={isBusy}
+						id={checkboxId}
+						onCheckedChange={(value) => setBranchCleanup(value === true)}
+					/>
+					<div className='flex flex-col gap-0.5'>
+						<Label className='text-xs' htmlFor={checkboxId}>
+							Also remove each worktree and drop its local branch
+						</Label>
+						<span className='text-[0.6875rem] text-muted-foreground'>
+							The per-workspace <span className='font-mono'>.context/</span>{' '}
+							handoff files are preserved; anything else not pushed will be
+							lost.
+						</span>
+					</div>
+				</div>
+			) : null}
 
 			{stage === 'failure' && diagnostics.length > 0 ? (
 				<ArchiveDiagnosticsList
@@ -134,7 +177,7 @@ function ArchiveRepositoryDialogForm({
 					disabled={!canArchive}
 					onClick={handleArchive}
 					type='button'
-					variant='destructive'
+					variant={branchCleanup ? 'destructive' : 'default'}
 				>
 					{isBusy ? 'Archiving…' : 'Archive'}
 				</Button>

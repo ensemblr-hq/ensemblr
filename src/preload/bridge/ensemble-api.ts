@@ -13,11 +13,19 @@ import {
 	type CloneGithubRepositoryStartResult,
 	type CreateWorkspaceRequest,
 	type CreateWorkspaceResult,
+	type DeleteArchivedWorkspaceRequest,
+	type DeleteArchivedWorkspaceResult,
+	type DeleteRepositoryRequest,
+	type DeleteRepositoryResult,
+	type DeleteWorkspaceRequest,
+	type DeleteWorkspaceResult,
 	type EnsembleApi,
 	type EnvironmentVariablesSnapshot,
 	type GithubRepositoryListResult,
 	type HealthSnapshot,
 	IPC_CHANNELS,
+	type ListArchivedWorkspacesRequest,
+	type ListArchivedWorkspacesResult,
 	type LocalRepositorySelectionResult,
 	type PiExecutableSelectionResult,
 	type QuickStartProjectRequest,
@@ -40,6 +48,8 @@ import {
 	type SettingsResolutionSnapshot,
 	type SetupDiagnosticsSnapshot,
 	type SharedRootAdoptionSnapshot,
+	type UnarchiveWorkspaceRequest,
+	type UnarchiveWorkspaceResult,
 } from '../../shared/ipc';
 
 /**
@@ -76,6 +86,31 @@ export function createEnsembleApi(): EnsembleApi {
 				IPC_CHANNELS.createWorkspace,
 				request,
 			) as Promise<CreateWorkspaceResult>,
+		deleteArchivedWorkspace: (request: DeleteArchivedWorkspaceRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.deleteArchivedWorkspace,
+				request,
+			) as Promise<DeleteArchivedWorkspaceResult>,
+		deleteRepository: (request: DeleteRepositoryRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.deleteRepository,
+				request,
+			) as Promise<DeleteRepositoryResult>,
+		deleteWorkspace: (request: DeleteWorkspaceRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.deleteWorkspace,
+				request,
+			) as Promise<DeleteWorkspaceResult>,
+		listArchivedWorkspaces: (request: ListArchivedWorkspacesRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.listArchivedWorkspaces,
+				request,
+			) as Promise<ListArchivedWorkspacesResult>,
+		unarchiveWorkspace: (request: UnarchiveWorkspaceRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.unarchiveWorkspace,
+				request,
+			) as Promise<UnarchiveWorkspaceResult>,
 		ensureWindowWidth: (minimumWidth: number) =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.ensureWindowWidth,

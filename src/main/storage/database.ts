@@ -249,6 +249,37 @@ CREATE TABLE root_directories (
 CREATE INDEX idx_root_directories_status ON root_directories(status);
 `,
 	},
+	{
+		id: '004_archive_lifecycle',
+		version: 4,
+		sql: `
+ALTER TABLE repositories ADD COLUMN archived_at TEXT;
+
+CREATE INDEX idx_workspaces_archived_at ON workspaces(archived_at);
+CREATE INDEX idx_repositories_archived_at ON repositories(archived_at);
+
+CREATE TABLE archive_records (
+	id TEXT PRIMARY KEY,
+	record_type TEXT NOT NULL CHECK (record_type IN ('workspace', 'repository')),
+	repository_id TEXT NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
+	workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
+	repository_slug TEXT NOT NULL,
+	workspace_slug TEXT,
+	branch_name TEXT,
+	base_branch TEXT,
+	source_path TEXT NOT NULL,
+	archived_context_path TEXT,
+	branch_cleanup INTEGER NOT NULL DEFAULT 0 CHECK (branch_cleanup IN (0, 1)),
+	archive_reason TEXT,
+	archived_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	metadata_json TEXT NOT NULL DEFAULT '{}'
+) STRICT;
+
+CREATE INDEX idx_archive_records_repository_id ON archive_records(repository_id);
+CREATE INDEX idx_archive_records_workspace_id ON archive_records(workspace_id);
+CREATE INDEX idx_archive_records_type ON archive_records(record_type);
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

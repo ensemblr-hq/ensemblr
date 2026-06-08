@@ -13,7 +13,9 @@ import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
+import { createArchiveLifecycleService } from '../../src/main/repository/archive-lifecycle.ts';
 import { createArchiveRepositoryService } from '../../src/main/repository/archive-repository.ts';
+import { createArchiveWorkspaceService } from '../../src/main/repository/archive-workspace.ts';
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
 import {
 	type EnsembleDatabaseConnection,
@@ -25,6 +27,7 @@ import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 
 interface Harness {
+	archivedContextsPath: string;
 	databaseService: EnsembleDatabaseService;
 	repositoryId: string;
 	repositoryPath: string;
@@ -34,12 +37,14 @@ interface Harness {
 
 function createHarness(t: TestContext): Harness {
 	const rootPath = mkdtempSync(
-		path.join(tmpdir(), 'ensemble-archive-repository-'),
+		path.join(tmpdir(), 'ensemble-archive-repo-lifecycle-'),
 	);
 	const repositoriesPath = path.join(rootPath, 'repos');
 	const workspacesPath = path.join(rootPath, 'workspaces');
+	const archivedContextsPath = path.join(rootPath, 'archived-contexts');
 	mkdirSync(repositoriesPath, { recursive: true });
 	mkdirSync(workspacesPath, { recursive: true });
+	mkdirSync(archivedContextsPath, { recursive: true });
 
 	const repositoryPath = path.join(repositoriesPath, 'demo');
 	mkdirSync(repositoryPath);
@@ -77,6 +82,7 @@ function createHarness(t: TestContext): Harness {
 	});
 
 	return {
+		archivedContextsPath,
 		databaseService,
 		repositoryId,
 		repositoryPath,
@@ -104,10 +110,9 @@ function wrapConnection(
 	};
 }
 
-const rootDirectoryStub = (
-	harness: Pick<Harness, 'rootPath' | 'workspacesPath'>,
-) =>
+const rootDirectoryStub = (harness: Harness) =>
 	buildRootDirectoryStub({
+		archivedContextsPath: harness.archivedContextsPath,
 		rootPath: harness.rootPath,
 		workspacesPath: harness.workspacesPath,
 	});
@@ -127,33 +132,23 @@ function repositoryRow(
 	return row as Record<string, unknown> | undefined;
 }
 
-function workspaceRowsForRepository(
+function workspaceRow(
+	databaseService: EnsembleDatabaseService,
+	id: string,
+): Record<string, unknown> | undefined {
+	const database = databaseService.getConnection()?.database as DatabaseSync;
+	const row = database.prepare('SELECT * FROM workspaces WHERE id = ?').get(id);
+	return row as Record<string, unknown> | undefined;
+}
+
+function archiveRecords(
 	databaseService: EnsembleDatabaseService,
 	repositoryId: string,
 ): Record<string, unknown>[] {
 	const database = databaseService.getConnection()?.database as DatabaseSync;
-	const rows = database
-		.prepare('SELECT * FROM workspaces WHERE repository_id = ?')
-		.all(repositoryId);
-	return rows as Record<string, unknown>[];
-}
-
-function listBranches(repositoryPath: string): string[] {
-	return runGit(repositoryPath, [
-		'branch',
-		'--list',
-		'--format=%(refname:short)',
-	])
-		.split(/\r?\n/)
-		.map((branch) => branch.trim())
-		.filter((branch) => branch.length > 0);
-}
-
-function listWorktreePaths(repositoryPath: string): string[] {
-	return runGit(repositoryPath, ['worktree', 'list', '--porcelain'])
-		.split(/\r?\n/)
-		.filter((line) => line.startsWith('worktree '))
-		.map((line) => line.slice('worktree '.length));
+	return database
+		.prepare('SELECT * FROM archive_records WHERE repository_id = ?')
+		.all(repositoryId) as Record<string, unknown>[];
 }
 
 async function seedWorkspace(harness: Harness, name: string) {
@@ -167,22 +162,38 @@ async function seedWorkspace(harness: Harness, name: string) {
 		name,
 		repositoryId: harness.repositoryId,
 	});
-
 	if (result.status !== 'success' || !result.workspace) {
 		throw new Error(`failed to seed workspace ${name}`);
 	}
 	return result.workspace;
 }
 
-test('archive drops every workspace and the repository row, preserves repo folder', async (t) => {
+function makeArchiveService(
+	harness: Harness,
+	lifecycle = createArchiveLifecycleService(),
+) {
+	const archiveWorkspaceService = createArchiveWorkspaceService({
+		archiveLifecycleService: lifecycle,
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+	const service = createArchiveRepositoryService({
+		archiveLifecycleService: lifecycle,
+		archiveWorkspaceService,
+		databaseService: harness.databaseService,
+		now: fixedNow,
+	});
+	return { lifecycle, service };
+}
+
+test('lifecycle archive cascades to every workspace, stamps both rows, records two archive_records', async (t) => {
 	const harness = createHarness(t);
 	const ws1 = await seedWorkspace(harness, 'cleanup-one');
 	const ws2 = await seedWorkspace(harness, 'cleanup-two');
 
-	const service = createArchiveRepositoryService({
-		databaseService: harness.databaseService,
-		localCommandService: createLocalCommandService(),
-	});
+	const { service } = makeArchiveService(harness);
 
 	const result = await service.archive({ repositoryId: harness.repositoryId });
 
@@ -194,89 +205,95 @@ test('archive drops every workspace and the repository row, preserves repo folde
 	);
 
 	assert.equal(
-		repositoryRow(harness.databaseService, harness.repositoryId),
-		undefined,
+		repositoryRow(harness.databaseService, harness.repositoryId)?.archived_at,
+		fixedNow().toISOString(),
 	);
 	assert.equal(
-		workspaceRowsForRepository(harness.databaseService, harness.repositoryId)
-			.length,
-		0,
+		workspaceRow(harness.databaseService, ws1.id)?.archived_at,
+		fixedNow().toISOString(),
+	);
+	assert.equal(
+		workspaceRow(harness.databaseService, ws2.id)?.archived_at,
+		fixedNow().toISOString(),
 	);
 
-	assert.equal(existsSync(ws1.path), false);
-	assert.equal(existsSync(ws2.path), false);
-	// Repository folder itself is preserved on disk for later re-adoption.
+	// Worktree folders + repo folder are preserved.
+	assert.equal(existsSync(ws1.path), true);
+	assert.equal(existsSync(ws2.path), true);
 	assert.equal(existsSync(harness.repositoryPath), true);
 
-	const branches = listBranches(harness.repositoryPath);
-	assert.equal(branches.includes('cleanup-one'), false);
-	assert.equal(branches.includes('cleanup-two'), false);
-
-	const worktrees = listWorktreePaths(harness.repositoryPath);
-	assert.equal(worktrees.includes(ws1.path), false);
-	assert.equal(worktrees.includes(ws2.path), false);
+	const records = archiveRecords(harness.databaseService, harness.repositoryId);
+	assert.equal(records.length, 3);
+	const types = records.map((row) => row.record_type).sort();
+	assert.deepEqual(types, ['repository', 'workspace', 'workspace']);
 });
 
-test('archive drops a sentinel file so the reconciler will not re-adopt the folder', async (t) => {
+test('repository with no workspaces still flips archived_at and records the repository row', async (t) => {
 	const harness = createHarness(t);
-
-	const service = createArchiveRepositoryService({
-		databaseService: harness.databaseService,
-		localCommandService: createLocalCommandService(),
-	});
-
-	const result = await service.archive({ repositoryId: harness.repositoryId });
-	assert.equal(result.status, 'success');
-
-	const markerPath = path.join(harness.repositoryPath, '.ensemble-archived');
-	assert.equal(existsSync(markerPath), true);
-});
-
-test('archive succeeds for a repository with no workspaces', async (t) => {
-	const harness = createHarness(t);
-
-	const service = createArchiveRepositoryService({
-		databaseService: harness.databaseService,
-		localCommandService: createLocalCommandService(),
-	});
+	const { service } = makeArchiveService(harness);
 
 	const result = await service.archive({ repositoryId: harness.repositoryId });
 
 	assert.equal(result.status, 'success');
 	assert.equal(result.workspacesArchived, 0);
 	assert.equal(
-		repositoryRow(harness.databaseService, harness.repositoryId),
-		undefined,
+		repositoryRow(harness.databaseService, harness.repositoryId)?.archived_at,
+		fixedNow().toISOString(),
 	);
-	assert.equal(existsSync(harness.repositoryPath), true);
+	const records = archiveRecords(harness.databaseService, harness.repositoryId);
+	assert.equal(records.length, 1);
+	assert.equal(records[0]?.record_type, 'repository');
 });
 
-test('archive succeeds even when a workspace directory was removed out-of-band', async (t) => {
+test('archiving a repository twice is rejected once it carries archived_at', async (t) => {
 	const harness = createHarness(t);
-	const ws = await seedWorkspace(harness, 'already-gone');
-	rmSync(ws.path, { force: true, recursive: true });
-	assert.equal(existsSync(ws.path), false);
+	const { service } = makeArchiveService(harness);
 
-	const service = createArchiveRepositoryService({
-		databaseService: harness.databaseService,
-		localCommandService: createLocalCommandService(),
-	});
+	const first = await service.archive({ repositoryId: harness.repositoryId });
+	assert.equal(first.status, 'success');
+
+	const second = await service.archive({ repositoryId: harness.repositoryId });
+	assert.equal(second.status, 'failure');
+	assert.equal(second.diagnostics[0]?.code, 'repository-already-archived');
+});
+
+test('pre-archive-repository hook abort stops the cascade before any workspace flips', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'guarded');
+
+	const lifecycle = createArchiveLifecycleService();
+	lifecycle.subscribe('pre-archive-repository', () => ({
+		abort: {
+			code: 'repository-busy',
+			message: 'Open Pi sessions in this repository.',
+		},
+	}));
+
+	const { service } = makeArchiveService(harness, lifecycle);
 
 	const result = await service.archive({ repositoryId: harness.repositoryId });
 
-	assert.equal(result.status, 'success');
+	assert.equal(result.status, 'aborted');
+	assert.equal(result.workspacesArchived, 0);
 	assert.equal(
-		repositoryRow(harness.databaseService, harness.repositoryId),
-		undefined,
+		result.diagnostics.some(
+			(diagnostic) => diagnostic.code === 'archive-aborted-by-hook',
+		),
+		true,
+	);
+	assert.equal(
+		repositoryRow(harness.databaseService, harness.repositoryId)?.archived_at,
+		null,
+	);
+	assert.equal(
+		workspaceRow(harness.databaseService, workspace.id)?.archived_at,
+		null,
 	);
 });
 
 test('archive rejects when the repository id is missing or unknown', async (t) => {
 	const harness = createHarness(t);
-	const service = createArchiveRepositoryService({
-		databaseService: harness.databaseService,
-		localCommandService: createLocalCommandService(),
-	});
+	const { service } = makeArchiveService(harness);
 
 	const missing = await service.archive({ repositoryId: '' });
 	assert.equal(missing.status, 'failure');

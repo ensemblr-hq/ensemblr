@@ -281,7 +281,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - User goal: Start working in the newly cloned repository/workspace and manage repository actions.
 - Entry point: Clone completion opens a new workspace.
 - Primary actions: Prompt the agent, run workspace command, inspect files, create another workspace, create from issue/PR, open repository settings.
-- Secondary actions: Change repository icon, hide repository, remove repository.
+- Secondary actions: Change repository icon, archive repository, remove repository.
 - Visible UI regions: project/workspace sidebar, repository context menu, center new-workspace landing card, composer, right file tree, bottom run dock.
 - Empty/loading/error states: New workspace empty chat state with landing card and optional setup-script prompt.
 - Data shown: Private repository/workspace names and file tree are visible but not transcribed.

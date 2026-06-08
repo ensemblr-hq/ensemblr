@@ -17,6 +17,8 @@ import type {
 import type {
 	ArchiveRepositoryRequest,
 	ArchiveRepositoryResult,
+	DeleteRepositoryRequest,
+	DeleteRepositoryResult,
 	LocalRepositorySelectionResult,
 	RegisterLocalRepositoryRequest,
 	RegisterLocalRepositoryResult,
@@ -46,8 +48,16 @@ import type {
 	ArchiveWorkspaceResult,
 	CreateWorkspaceRequest,
 	CreateWorkspaceResult,
+	DeleteArchivedWorkspaceRequest,
+	DeleteArchivedWorkspaceResult,
+	DeleteWorkspaceRequest,
+	DeleteWorkspaceResult,
+	ListArchivedWorkspacesRequest,
+	ListArchivedWorkspacesResult,
 	RenameWorkspaceRequest,
 	RenameWorkspaceResult,
+	UnarchiveWorkspaceRequest,
+	UnarchiveWorkspaceResult,
 } from './workspace';
 
 export interface EnsembleApi {
@@ -66,7 +76,22 @@ export interface EnsembleApi {
 	createWorkspace: (
 		request: CreateWorkspaceRequest,
 	) => Promise<CreateWorkspaceResult>;
+	deleteArchivedWorkspace: (
+		request: DeleteArchivedWorkspaceRequest,
+	) => Promise<DeleteArchivedWorkspaceResult>;
+	deleteRepository: (
+		request: DeleteRepositoryRequest,
+	) => Promise<DeleteRepositoryResult>;
+	deleteWorkspace: (
+		request: DeleteWorkspaceRequest,
+	) => Promise<DeleteWorkspaceResult>;
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
+	listArchivedWorkspaces: (
+		request: ListArchivedWorkspacesRequest,
+	) => Promise<ListArchivedWorkspacesResult>;
+	unarchiveWorkspace: (
+		request: UnarchiveWorkspaceRequest,
+	) => Promise<UnarchiveWorkspaceResult>;
 	environmentVariables: () => Promise<EnvironmentVariablesSnapshot>;
 	githubRepositoryList: () => Promise<GithubRepositoryListResult>;
 	health: () => Promise<HealthSnapshot>;

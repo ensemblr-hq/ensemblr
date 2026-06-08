@@ -7,6 +7,11 @@ export {
 	reconcileSharedRoot,
 } from './adopt-shared-root.ts';
 export type {
+	ArchiveLifecycleHandler,
+	ArchiveLifecycleService,
+} from './archive-lifecycle.ts';
+export { createArchiveLifecycleService } from './archive-lifecycle.ts';
+export type {
 	ArchiveRepositoryService,
 	CreateArchiveRepositoryServiceOptions,
 } from './archive-repository.ts';
@@ -33,6 +38,21 @@ export type {
 } from './create-workspace.ts';
 export { createWorkspaceService } from './create-workspace.ts';
 export type {
+	CreateDeleteArchivedWorkspaceServiceOptions,
+	DeleteArchivedWorkspaceService,
+} from './delete-archived-workspace.ts';
+export { createDeleteArchivedWorkspaceService } from './delete-archived-workspace.ts';
+export type {
+	CreateDeleteRepositoryServiceOptions,
+	DeleteRepositoryService,
+} from './delete-repository.ts';
+export { createDeleteRepositoryService } from './delete-repository.ts';
+export type {
+	CreateDeleteWorkspaceServiceOptions,
+	DeleteWorkspaceService,
+} from './delete-workspace.ts';
+export { createDeleteWorkspaceService } from './delete-workspace.ts';
+export type {
 	GitRepositoryProbe,
 	GitRepositoryProbeFn,
 	GitWorktreeMetadata,
@@ -42,6 +62,11 @@ export {
 	probeGitRepository,
 	probeGitWorktreeMetadata,
 } from './git-probe.ts';
+export type {
+	CreateListArchivedWorkspacesServiceOptions,
+	ListArchivedWorkspacesService,
+} from './list-archived-workspaces.ts';
+export { createListArchivedWorkspacesService } from './list-archived-workspaces.ts';
 export type {
 	CreateGithubRepositoryListServiceOptions,
 	GithubRepositoryListService,
@@ -69,3 +94,8 @@ export type {
 	RenameWorkspaceService,
 } from './rename-workspace.ts';
 export { createRenameWorkspaceService } from './rename-workspace.ts';
+export type {
+	CreateUnarchiveWorkspaceServiceOptions,
+	UnarchiveWorkspaceService,
+} from './unarchive-workspace.ts';
+export { createUnarchiveWorkspaceService } from './unarchive-workspace.ts';

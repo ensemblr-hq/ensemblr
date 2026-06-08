@@ -18,6 +18,7 @@ const EXPECTED_MIGRATIONS = [
 	'001_foundation_metadata',
 	'002_secret_metadata',
 	'003_root_directory_metadata',
+	'004_archive_lifecycle',
 ];
 
 function createTestDatabasePath(): {
@@ -75,6 +76,7 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		.map((row) => (row as { name: string }).name);
 
 	assert.deepEqual(tables, [
+		'archive_records',
 		'checkpoints',
 		'comments',
 		'integration_metadata',

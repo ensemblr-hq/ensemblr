@@ -22,6 +22,7 @@ import {
 } from './project-navigation-dialogs';
 import { ProjectWorkspaceGroup } from './project-workspace-group';
 import {
+	useArchiveBrowseChange,
 	useArchiveProjectAction,
 	useArchiveWorkspaceAction,
 	useCreateWorkspaceFromProject,
@@ -69,18 +70,25 @@ export function ProjectNavigationGroups({
 		controller,
 		setArchiveProjectTarget,
 		setArchiveWorkspaceTarget,
+		setBrowseArchiveProject,
 		setCreateSourceProject,
+		setDeleteProjectTarget,
+		setDeleteWorkspaceTarget,
 		state,
 	} = useProjectNavigationDialogs();
 
-	const handleWorkspaceArchived = useArchiveWorkspaceAction({
+	// Lifecycle archive + destructive delete share the same post-action cache
+	// invalidation + navigation fallback. The dialogs decide which IPC ran; the
+	// callback only sees the workspace/project id that disappeared from the
+	// active surface.
+	const handleWorkspaceLifecycleAction = useArchiveWorkspaceAction({
 		activeProjectId: activeProject?.id ?? null,
 		activeWorkspaceId: activeWorkspace?.id ?? null,
 		disableProjectReorderLayoutAnimation,
 		orderedProjects,
 	});
 
-	const handleProjectArchived = useArchiveProjectAction({
+	const handleProjectLifecycleAction = useArchiveProjectAction({
 		activeProjectId: activeProject?.id ?? null,
 		disableProjectReorderLayoutAnimation,
 		orderedProjects,
@@ -89,6 +97,8 @@ export function ProjectNavigationGroups({
 	const { create: handleCreateWorkspace } = useCreateWorkspaceFromProject({
 		disableProjectReorderLayoutAnimation,
 	});
+
+	const handleArchiveBrowseChange = useArchiveBrowseChange();
 
 	return (
 		<>
@@ -131,12 +141,21 @@ export function ProjectNavigationGroups({
 							onProjectArchiveSelect={() =>
 								controller.openArchiveProject(project)
 							}
+							onProjectBrowseArchiveSelect={() =>
+								controller.openBrowseArchive(project)
+							}
+							onProjectDeleteSelect={() =>
+								controller.openDeleteProject(project)
+							}
 							onProjectToggle={() => toggleProjectCollapsed(project.id)}
 							onStaticNavigationSelect={onStaticNavigationSelect}
 							onWorkspacePinToggle={toggleWorkspacePinned}
 							onWorkspaceRenameSelect={onWorkspaceRenameSelect}
 							onWorkspaceArchiveSelect={(workspace) =>
 								controller.openArchiveWorkspace(workspace)
+							}
+							onWorkspaceDeleteSelect={(workspace) =>
+								controller.openDeleteWorkspace(workspace)
 							}
 							onWorkspaceSelect={onWorkspaceSelect}
 							pinnedWorkspaceIdSet={pinnedWorkspaceIdSet}
@@ -151,13 +170,22 @@ export function ProjectNavigationGroups({
 			<ProjectNavigationDialogs
 				archiveProjectTarget={state.archiveProjectTarget}
 				archiveWorkspaceTarget={state.archiveWorkspaceTarget}
+				browseArchiveProject={state.browseArchiveProject}
 				createSourceProject={state.createSourceProject}
-				onProjectArchived={handleProjectArchived}
-				onWorkspaceArchived={handleWorkspaceArchived}
+				deleteProjectTarget={state.deleteProjectTarget}
+				deleteWorkspaceTarget={state.deleteWorkspaceTarget}
+				onArchiveBrowseChange={handleArchiveBrowseChange}
+				onProjectArchived={handleProjectLifecycleAction}
+				onProjectDeleted={handleProjectLifecycleAction}
+				onWorkspaceArchived={handleWorkspaceLifecycleAction}
+				onWorkspaceDeleted={handleWorkspaceLifecycleAction}
 				orderedProjects={orderedProjects}
 				setArchiveProjectTarget={setArchiveProjectTarget}
 				setArchiveWorkspaceTarget={setArchiveWorkspaceTarget}
+				setBrowseArchiveProject={setBrowseArchiveProject}
 				setCreateSourceProject={setCreateSourceProject}
+				setDeleteProjectTarget={setDeleteProjectTarget}
+				setDeleteWorkspaceTarget={setDeleteWorkspaceTarget}
 			/>
 		</>
 	);
