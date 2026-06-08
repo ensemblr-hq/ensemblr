@@ -9,6 +9,7 @@ import {
 	SidebarRail,
 	SidebarTrigger,
 } from '@/renderer/components/ui/sidebar';
+import { useSetupDiagnosticsOptional } from '@/renderer/components/workbench-shell/shell-contexts';
 import { healthTone } from '@/renderer/lib/workbench';
 import type {
 	AddProjectActionId,
@@ -24,6 +25,7 @@ import type {
 	WorkbenchHealth,
 	WorkbenchStaticNavigationTarget,
 } from '@/renderer/types/workbench-shell';
+import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
 import { RenameWorkspaceDialog } from '../rename-workspace-dialog';
 
 import { PinnedWorkspaceGroup } from './pinned-workspace-group';
@@ -119,7 +121,12 @@ export function WorkspaceNavigationSidebar({
 	);
 }
 
-/** Bottom-of-sidebar footer showing health badge, repo/workspace counts and detail. */
+/**
+ * Bottom-of-sidebar footer: app health badge plus a single-line setup status
+ * with a deep link to /settings/diagnostics. This is the ONLY place in the
+ * shell where setup/blocked counts surface outside the diagnostics screen —
+ * the chat tab stays free of any diagnostic UI.
+ */
 function SidebarHealthFooter({
 	health,
 	projects,
@@ -131,6 +138,10 @@ function SidebarHealthFooter({
 	const workspaceCount = projects.reduce(
 		(count, project) => count + project.workspaces.length,
 		0,
+	);
+	const setupContext = useSetupDiagnosticsOptional();
+	const setupLine = describeSetupLine(
+		setupContext?.state.setupDiagnostics ?? null,
 	);
 
 	return (
@@ -146,7 +157,32 @@ function SidebarHealthFooter({
 				<p className='line-clamp-2 text-muted-foreground text-xxs leading-4'>
 					{health.detail}
 				</p>
+				{setupLine ? (
+					<a
+						className='text-status-warning text-xxs leading-4 underline-offset-2 hover:underline'
+						data-sidebar-setup-status='blocked'
+						href='#/settings/diagnostics'
+					>
+						{setupLine}
+					</a>
+				) : null}
 			</div>
 		</SidebarFooter>
 	);
+}
+
+function describeSetupLine(
+	snapshot: SetupDiagnosticsSnapshot | null,
+): string | null {
+	if (!snapshot || snapshot.status === 'ready') {
+		return null;
+	}
+	if (snapshot.status === 'checking') {
+		return 'Setup checks running…';
+	}
+	const blocked = snapshot.blockedCount ?? 0;
+	if (blocked > 0) {
+		return `${blocked} setup check${blocked === 1 ? '' : 's'} blocked — open diagnostics`;
+	}
+	return 'Setup not ready — open diagnostics';
 }

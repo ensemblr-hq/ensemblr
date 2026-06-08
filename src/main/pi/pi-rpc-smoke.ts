@@ -111,8 +111,23 @@ export function runPiRpcSmokeProcess({
 			detached: shouldDetachChild,
 			env,
 			shell: false,
-			stdio: ['ignore', 'pipe', 'pipe'],
+			// Open stdin as a pipe — Pi's RPC mode reads commands from stdin
+			// and exits silently on EOF. We send one probe frame below to
+			// elicit any JSONL response (success or structured error) which
+			// proves the RPC loop is alive.
+			stdio: ['pipe', 'pipe', 'pipe'],
 		});
+
+		try {
+			// `{"type":"prompt"}` with no `message` makes Pi reply with a
+			// structured `{"type":"response","success":false,"error":"..."}`
+			// frame — still valid JSONL, satisfies the smoke check, and avoids
+			// triggering an actual model call.
+			child.stdin?.write('{"type":"prompt"}\n');
+			child.stdin?.end();
+		} catch {
+			// stdin may already be closed if spawn failed; exit handler covers it.
+		}
 		let endedAt = startedAt;
 		let exitCode: number | null = null;
 		let failure: PiRpcSmokeFailure | undefined;

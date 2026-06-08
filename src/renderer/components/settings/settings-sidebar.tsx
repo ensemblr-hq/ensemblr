@@ -7,6 +7,7 @@ import {
 	CableIcon,
 	FlaskConicalIcon,
 	GitBranchIcon,
+	HeartPulseIcon,
 	KeyRoundIcon,
 	PuzzleIcon,
 	ScrollIcon,
@@ -60,6 +61,13 @@ const USER_NAV: UserNavItem[] = [
 		to: '/settings/integrations',
 		label: 'Integrations',
 		icon: PuzzleIcon,
+	},
+	{
+		group: 'more',
+		icon: HeartPulseIcon,
+		kind: 'user',
+		label: 'Diagnostics',
+		to: '/settings/diagnostics',
 	},
 	{
 		group: 'more',

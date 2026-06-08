@@ -166,6 +166,23 @@ export function listOpenChatTabs({
 	return rows.map(mapTabRow);
 }
 
+/** Returns all open tabs bound to a given Pi session, in position order. */
+export function listOpenChatTabsBySession({
+	database,
+	sessionId,
+}: {
+	database: DatabaseSync;
+	sessionId: string;
+}): readonly ChatTabRow[] {
+	const rows = database
+		.prepare(
+			`${SELECT_TAB} WHERE pi_session_id = ? AND closed_at IS NULL ORDER BY position ASC, opened_at ASC`,
+		)
+		.all(sessionId) as unknown as ChatTabRowShape[];
+
+	return rows.map(mapTabRow);
+}
+
 /** Reorders open tabs to match the supplied id sequence. */
 export function reorderChatTabs({
 	database,

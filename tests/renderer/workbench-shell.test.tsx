@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { WorkspaceConversationContent } from '../../src/renderer/components/workbench-shell/conversation-panel';
 import { WorkbenchFrame } from '../../src/renderer/components/workbench-shell/frame';
@@ -80,56 +81,70 @@ function renderWorkbench(
 		) ?? getDefaultProject();
 	const activeSession = findSession(activeWorkspace);
 
+	const queryClient = new QueryClient({
+		defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+	});
 	return renderToStaticMarkup(
-		<NavigationProvider
-			value={{ renderStaticLink: undefined, renderWorkspaceLink: undefined }}
-		>
-			<SetupDiagnosticsProvider
-				value={{
-					state: {
-						setupDiagnostics: snapshot,
-						setupDiagnosticsError: null,
-						isSetupDiagnosticsRetrying: false,
-					},
-					actions: { onSetupDiagnosticsRetry: () => undefined },
-				}}
+		<QueryClientProvider client={queryClient}>
+			<NavigationProvider
+				value={{ renderStaticLink: undefined, renderWorkspaceLink: undefined }}
 			>
-				<WorkbenchFrame
-					activeProject={activeProject}
-					activeView='workspace'
-					activeWorkspace={activeWorkspace}
-					health={{
-						detail: 'Renderer query fixture',
-						label: 'IPC online',
-						state: 'online',
-					}}
-					onStaticNavigationSelect={() => undefined}
-					onWorkspaceSelect={() => undefined}
-					projects={projectsOverride}
-					resolveWorkspaceRouteSearch={EMPTY_ROUTE_SEARCH}
-				>
-					<WorkspaceWorkbenchContent
-						activeProject={activeProject}
-						activeReviewTab={activeReviewTab}
-						activeSession={activeSession}
-						activeWorkspace={activeWorkspace}
-						composer={getComposerState({
-							activeSession,
+				<SetupDiagnosticsProvider
+					value={{
+						state: {
 							setupDiagnostics: snapshot,
-							setupError: null,
-						})}
-						dockActions={DOCK_ACTIONS}
-						dockTabId={activeDockTab}
-						onDockTabChange={() => undefined}
-						onReviewTabChange={() => undefined}
-						onSessionTabChange={() => undefined}
-						MainContent={(mainContent) => (
-							<WorkspaceConversationContent {...mainContent} />
-						)}
-					/>
-				</WorkbenchFrame>
-			</SetupDiagnosticsProvider>
-		</NavigationProvider>,
+							setupDiagnosticsError: null,
+							isSetupDiagnosticsRetrying: false,
+						},
+						actions: { onSetupDiagnosticsRetry: () => undefined },
+					}}
+				>
+					<WorkbenchFrame
+						activeProject={activeProject}
+						activeView='workspace'
+						activeWorkspace={activeWorkspace}
+						health={{
+							detail: 'Renderer query fixture',
+							label: 'IPC online',
+							state: 'online',
+						}}
+						onStaticNavigationSelect={() => undefined}
+						onWorkspaceSelect={() => undefined}
+						projects={projectsOverride}
+						resolveWorkspaceRouteSearch={EMPTY_ROUTE_SEARCH}
+					>
+						<WorkspaceWorkbenchContent
+							activeProject={activeProject}
+							activeReviewTab={activeReviewTab}
+							activeSession={activeSession}
+							activeWorkspace={activeWorkspace}
+							composer={getComposerState({
+								activeSession,
+								availableModels: [],
+								availableThinkingLevels: [],
+								isStreaming: false,
+								modelId: 'gpt-5.5',
+								onModelChange: () => undefined,
+								onStop: () => undefined,
+								onSubmit: () => undefined,
+								onThinkingChange: () => undefined,
+								setupDiagnostics: snapshot,
+								setupError: null,
+								thinkingLevel: 'high',
+							})}
+							dockActions={DOCK_ACTIONS}
+							dockTabId={activeDockTab}
+							onDockTabChange={() => undefined}
+							onReviewTabChange={() => undefined}
+							onSessionTabChange={() => undefined}
+							MainContent={(mainContent) => (
+								<WorkspaceConversationContent {...mainContent} />
+							)}
+						/>
+					</WorkbenchFrame>
+				</SetupDiagnosticsProvider>
+			</NavigationProvider>
+		</QueryClientProvider>,
 	);
 }
 
@@ -167,9 +182,12 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('data-workspace-sidebar-state="pr-ready"');
 	expect(markup).toContain('Conductor shell rework');
 	expect(markup).toContain('Review shell');
-	expect(markup).toContain('Mock agent chat');
-	expect(markup).toContain('Chat mock in progress');
-	expect(markup).toContain('Renderer tests');
+	// THE-130: the mock chat fixture is gone; the structured Pi RPC
+	// timeline renderer is what fills the chat surface now.
+	expect(markup).toContain('Pi session timeline');
+	expect(markup).not.toContain('Mock agent chat');
+	expect(markup).not.toContain('Chat mock in progress');
+	expect(markup).not.toContain('Renderer tests');
 	expect(markup).toContain('Close Review shell tab');
 	expect(markup).toContain('Close Setup notes tab');
 	expect(markup).toContain('Open closed chat tabs');
@@ -835,13 +853,17 @@ test('keeps blocked setup inside the workbench and disables the composer', () =>
 		),
 	);
 
-	expect(markup).toContain('Setup keeps the shell in place');
+	// THE-130: the chat tab no longer hosts diagnostic UI. Blocked-setup
+	// status lives in the sidebar footer (with a link to /settings/diagnostics)
+	// and the composer disables silently — no panel inside the chat scroll.
+	expect(markup).not.toContain('Setup keeps the shell in place');
+	expect(markup).not.toContain('SetupDiagnosticsPanel');
 	expect(markup).toContain('Fix setup blockers before sending a prompt.');
 	expect(markup).toContain('disabled');
-	expect(markup).toContain('bun install');
-	expect(markup).toContain('Core workflows are blocked');
-	expect(markup).toContain('Git executable');
-	expect(markup).toContain('Retry checks');
+	// Sidebar footer carries the brief setup-status line.
+	expect(markup).toContain('data-sidebar-setup-status="blocked"');
+	expect(markup).toContain('#/settings/diagnostics');
+	// Workbench scaffolding still renders.
 	expect(markup).toContain('Open :5173');
 });
 

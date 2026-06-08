@@ -21,13 +21,23 @@ import type {
 	DeleteWorkspaceRequest,
 	DeleteWorkspaceResult,
 	EnsembleApi,
+	ListPiModelsResult,
+	ListPiSessionEventsResult,
+	ListPiSessionsResult,
 	LocalRepositorySelectionResult,
+	OpenPiSessionRequest,
+	OpenPiSessionResult,
+	PiSessionEventBroadcast,
 	QuickStartProjectRequest,
 	QuickStartProjectResult,
 	RegisterLocalRepositoryRequest,
 	RegisterLocalRepositoryResult,
 	RenameWorkspaceRequest,
 	RenameWorkspaceResult,
+	StopPiSessionRequest,
+	StopPiSessionResult,
+	SubmitPiPromptRequest,
+	SubmitPiPromptResult,
 	UnarchiveWorkspaceRequest,
 	UnarchiveWorkspaceResult,
 } from '@/shared/ipc';
@@ -42,6 +52,11 @@ export const ensembleQueryKeys = {
 	githubRepositoryList: () =>
 		[...ensembleQueryKeys.all, 'github-repository-list'] as const,
 	health: () => [...ensembleQueryKeys.all, 'health'] as const,
+	piModels: () => [...ensembleQueryKeys.all, 'pi-models'] as const,
+	piSessionEvents: (branchId: string) =>
+		[...ensembleQueryKeys.all, 'pi-session-events', branchId] as const,
+	piSessionsForWorkspace: (workspaceId: string) =>
+		[...ensembleQueryKeys.all, 'pi-sessions', workspaceId] as const,
 	repositoryWorkspaceNavigation: () =>
 		[...ensembleQueryKeys.all, 'repository-workspace-navigation'] as const,
 	rootDirectory: () => [...ensembleQueryKeys.all, 'root-directory'] as const,
@@ -334,6 +349,89 @@ export function subscribeCloneGithubRepositoryProgress(
 		};
 	}
 	return api.onCloneGithubRepositoryProgress(listener);
+}
+
+/** Query options for the static Pi model catalog. */
+export const piModelsQuery = queryOptions({
+	queryFn: (): Promise<ListPiModelsResult> =>
+		profileElectronIpcCall(
+			{ channel: 'ensemble:list-pi-models', usesDatabase: false },
+			() => getEnsembleApi().listPiModels(),
+		),
+	queryKey: ensembleQueryKeys.piModels(),
+	staleTime: 60_000,
+});
+
+/** Query options for the persisted Pi sessions of a single workspace. */
+export function piSessionsForWorkspaceQuery(workspaceId: string) {
+	return queryOptions({
+		enabled: workspaceId.length > 0,
+		queryFn: (): Promise<ListPiSessionsResult> =>
+			profileElectronIpcCall(
+				{ channel: 'ensemble:list-pi-sessions', usesDatabase: true },
+				() => getEnsembleApi().listPiSessions({ workspaceId }),
+			),
+		queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
+		staleTime: 2000,
+	});
+}
+
+/** Opens (or attaches to) a Pi session for the given workspace. */
+export function openPiSession(
+	request: OpenPiSessionRequest,
+): Promise<OpenPiSessionResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:open-pi-session', usesDatabase: true },
+		() => getEnsembleApi().openPiSession(request),
+	);
+}
+
+/** Submits a prompt to an open Pi session. */
+export function submitPiPrompt(
+	request: SubmitPiPromptRequest,
+): Promise<SubmitPiPromptResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:submit-pi-prompt', usesDatabase: true },
+		() => getEnsembleApi().submitPiPrompt(request),
+	);
+}
+
+/** Query options for the persisted Pi events of a branch. */
+export function piSessionEventsQuery(branchId: string) {
+	return queryOptions({
+		enabled: branchId.length > 0,
+		queryFn: (): Promise<ListPiSessionEventsResult> =>
+			profileElectronIpcCall(
+				{
+					channel: 'ensemble:list-pi-session-events',
+					usesDatabase: true,
+				},
+				() => getEnsembleApi().listPiSessionEvents({ branchId }),
+			),
+		queryKey: ensembleQueryKeys.piSessionEvents(branchId),
+		staleTime: 0,
+	});
+}
+
+/** Subscribes to live Pi RPC event broadcasts. Returns an unsubscribe fn. */
+export function subscribePiSessionEvents(
+	listener: (event: PiSessionEventBroadcast) => void,
+): () => void {
+	const api = getEnsembleApiOrNull();
+	if (!api) {
+		return () => undefined;
+	}
+	return api.onPiSessionEvent(listener);
+}
+
+/** Aborts the in-flight turn of an open Pi session. */
+export function stopPiSession(
+	request: StopPiSessionRequest,
+): Promise<StopPiSessionResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:stop-pi-session', usesDatabase: true },
+		() => getEnsembleApi().stopPiSession(request),
+	);
 }
 
 /** Query options for the renderer-side setup-diagnostics snapshot. */

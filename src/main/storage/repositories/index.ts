@@ -9,6 +9,7 @@ export {
 	getChatTabById,
 	getRuntimeState,
 	listOpenChatTabs,
+	listOpenChatTabsBySession,
 	openChatTab,
 	renameChatTab,
 	reorderChatTabs,
@@ -52,3 +53,4 @@ export {
 	updatePiSession,
 	updateTurn,
 } from './pi-session-repository';
+export { getRepositoryWorkspaceNavigationSnapshot } from './repository-workspace-navigation-repository';

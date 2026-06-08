@@ -309,35 +309,10 @@ export function isRemoteUrlTracked(
 	if (!normalized) {
 		return false;
 	}
-	const candidateRows = database
-		.prepare('SELECT metadata_json AS metadataJson FROM repositories')
-		.all();
-	for (const row of candidateRows) {
-		if (typeof row !== 'object' || row === null) {
-			continue;
-		}
-		const raw = (row as { metadataJson?: unknown }).metadataJson;
-		if (typeof raw !== 'string' || !raw) {
-			continue;
-		}
-		let parsed: unknown;
-		try {
-			parsed = JSON.parse(raw);
-		} catch {
-			continue;
-		}
-		if (typeof parsed !== 'object' || parsed === null) {
-			continue;
-		}
-		const existing = (parsed as { remoteUrl?: unknown }).remoteUrl;
-		if (typeof existing !== 'string') {
-			continue;
-		}
-		if (normalizeRemoteUrl(existing) === normalized) {
-			return true;
-		}
-	}
-	return false;
+	const row = database
+		.prepare('SELECT id FROM repositories WHERE remote_url = ? LIMIT 1')
+		.get(normalized);
+	return isIdRow(row);
 }
 
 /**
@@ -431,9 +406,10 @@ function insertRepositoryRow({
 				default_branch,
 				created_at,
 				updated_at,
-				metadata_json
+				metadata_json,
+				remote_url
 			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.run(
 			prepared.id,
@@ -444,6 +420,7 @@ function insertRepositoryRow({
 			timestamp,
 			timestamp,
 			JSON.stringify(prepared.metadata),
+			normalizeRemoteUrl(prepared.remoteUrl) ?? '',
 		);
 }
 

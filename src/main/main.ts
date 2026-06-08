@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
+import { IPC_CHANNELS, type PiSessionEventBroadcast } from '../shared/ipc';
 
 import { createMainWindow, createMainWindowStateStore } from './app';
 import { createLocalCommandService } from './commands';
@@ -12,6 +13,11 @@ import { createEnvironmentVariablesService } from './environment';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
 import { createPiExecutableService, createPiReadinessService } from './pi';
+import {
+	createCliRpcPiAgentAdapter,
+	createPiAgentClient,
+} from './pi-agent';
+import { createPiSessionService } from './pi-agent/pi-session-service';
 import {
 	createArchiveLifecycleService,
 	createArchiveRepositoryService,
@@ -74,6 +80,33 @@ const piReadinessService = createPiReadinessService({
 	localCommandService,
 	piExecutableService,
 	rootDirectoryService,
+});
+const piAgentAdapter = createCliRpcPiAgentAdapter();
+const piAgentClient = createPiAgentClient({ adapter: piAgentAdapter });
+const piSessionService = createPiSessionService({
+	databaseService,
+	eventSink: ({ event, sessionId, workspaceId }) => {
+		const payload: PiSessionEventBroadcast = {
+			event: {
+				branchId: event.branchId,
+				createdAt: event.createdAt,
+				eventType: event.eventType,
+				id: event.id,
+				ordinal: event.ordinal,
+				payload: event.payload,
+				stream: event.stream,
+				turnId: event.turnId,
+			},
+			sessionId,
+			workspaceId,
+		};
+		for (const window of BrowserWindow.getAllWindows()) {
+			if (!window.isDestroyed()) {
+				window.webContents.send(IPC_CHANNELS.piSessionEvent, payload);
+			}
+		}
+	},
+	piAgentClient,
 });
 const localRepositoryRegistrationService =
 	createLocalRepositoryRegistrationService({
@@ -170,8 +203,10 @@ app.whenReady().then(() => {
 		githubCloneService,
 		githubRepositoryListService,
 		listArchivedWorkspacesService,
+		localCommandService,
 		localRepositoryRegistrationService,
 		piExecutableService,
+		piSessionService,
 		quickStartProjectService,
 		renameWorkspaceService,
 		repositoryConfigService,
