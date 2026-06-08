@@ -29,6 +29,9 @@ const KNOWN_REPO_SECTIONS = Object.keys(
 	REPO_SECTION_TARGETS,
 ) as RepoSectionId[];
 
+// TODO: wire to native file-open IPC — opens user config.json or per-repo ensemble.json in OS default editor.
+function handleEditConfig() {}
+
 function getRepoSectionFromPath(pathname: string): RepoSectionId {
 	const last = pathname.split('/').filter(Boolean).at(-1) ?? '';
 	return (
@@ -73,8 +76,6 @@ export function SettingsHeader({
 	const disableRepoTab = projects.length === 0;
 	const configLabel =
 		scope === 'user' ? 'Edit in config.json' : 'Edit in ensemble.json';
-	// TODO: wire to native file-open IPC — opens user config.json or per-repo ensemble.json in OS default editor.
-	const handleEditConfig = () => {};
 
 	return (
 		<header className='native-toolbar macos-traffic-light-spacer flex h-11 shrink-0 items-center gap-3 border-b pr-3 pl-[var(--ensemble-traffic-light-safe-inline)]'>
