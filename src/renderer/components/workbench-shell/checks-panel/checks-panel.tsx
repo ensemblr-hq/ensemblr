@@ -15,12 +15,25 @@ import {
 import { ChecksPanelSummary } from './summary';
 
 /** Review-panel "Checks" tab — renders PR metadata, statuses, comments and todos. */
-export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
+export function ChecksPanel({
+	onCommitAndPush,
+	onCreatePullRequest,
+	workspace,
+}: {
+	onCommitAndPush?: () => void;
+	onCreatePullRequest?: () => void;
+	workspace: WorkspaceShellModel;
+}) {
 	const panelState = getChecksPanelState(workspace);
 
 	if (!panelState.hasPullRequest) {
 		return (
-			<ChecksNoPullRequestState state={panelState} workspace={workspace} />
+			<ChecksNoPullRequestState
+				onCommitAndPush={onCommitAndPush}
+				onCreatePullRequest={onCreatePullRequest}
+				state={panelState}
+				workspace={workspace}
+			/>
 		);
 	}
 

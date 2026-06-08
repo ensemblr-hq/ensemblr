@@ -42,14 +42,27 @@
 
 	// electron-forge consumes this as a peer dep transitively via the maker
 	// plugins; the type-only import in forge.config.ts is legitimate.
+	// cva / cmdk / radix-ui are imported only from the vendored shadcn/ui
+	// surface in src/renderer/components/ui (ignored above), so fallow
+	// can't see those edges; allowlist them explicitly.
 	"ignoreDependencies": [
-		"@electron-forge/shared-types"
+		"@electron-forge/shared-types",
+		"class-variance-authority",
+		"cmdk",
+		"radix-ui"
 	],
 
 	// shadcn/ui registry components are vendored verbatim; the unused
 	// surface is intentional API completeness for future composition.
+	// Domain constants below are deliberately public for future callers
+	// even though current consumption lives in their declaring file.
 	"ignoreExports": [
-		{ "file": "src/renderer/components/ui/**/*.tsx", "exports": ["*"] }
+		{ "file": "src/renderer/components/ui/**/*.tsx", "exports": ["*"] },
+		{ "file": "src/shared/permissions.ts", "exports": ["PERMISSION_MODES"] },
+		{
+			"file": "src/renderer/state/recents/atoms.ts",
+			"exports": ["RECENT_PROJECTS_STORAGE_KEY", "RECENT_PROJECTS_STORAGE_VERSION"]
+		}
 	],
 
 	"duplicates": {

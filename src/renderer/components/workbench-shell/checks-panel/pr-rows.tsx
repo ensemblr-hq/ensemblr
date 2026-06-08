@@ -43,9 +43,11 @@ export function PullRequestStatusRow({
 export function ChecksActionRow({
 	actionLabel,
 	label,
+	onAction,
 }: {
 	actionLabel?: string;
 	label: string;
+	onAction?: () => void;
 }) {
 	return (
 		<div className='flex min-h-7 min-w-0 items-center justify-between gap-2 px-1'>
@@ -59,6 +61,7 @@ export function ChecksActionRow({
 			{actionLabel ? (
 				<Button
 					className='h-6 px-1.5 text-muted-foreground text-xs hover:text-foreground'
+					onClick={onAction}
 					size='xs'
 					variant='ghost'
 				>
