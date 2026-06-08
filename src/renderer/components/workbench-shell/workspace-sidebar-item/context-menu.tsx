@@ -9,6 +9,7 @@ import {
 	MailIcon,
 	PencilIcon,
 	PinIcon,
+	Trash2Icon,
 } from 'lucide-react';
 
 import {
@@ -32,16 +33,18 @@ const archiveBoundary = classifyPermissionAction({
 	mode: DEFAULT_PERMISSION_MODE,
 });
 
-/** Right-click context menu for a workspace row (pin, status, archive). */
+/** Right-click context menu for a workspace row (pin, status, archive, delete). */
 export function WorkspaceContextMenuContent({
 	isPinned,
 	onArchiveSelect,
+	onDeleteSelect,
 	onPinToggle,
 	onRenameSelect,
 	workspace,
 }: {
 	isPinned: boolean;
 	onArchiveSelect?: () => void;
+	onDeleteSelect?: () => void;
 	onPinToggle: () => void;
 	onRenameSelect?: () => void;
 	workspace: WorkspaceShellModel;
@@ -118,6 +121,15 @@ export function WorkspaceContextMenuContent({
 				>
 					<ArchiveIcon aria-hidden='true' />
 					<span className='min-w-0 flex-1'>Archive</span>
+				</SidebarContextMenuItem>
+				<SidebarContextMenuItem
+					data-permission-boundary={archiveBoundary.boundary}
+					disabled={!onDeleteSelect}
+					onSelect={onDeleteSelect}
+					variant='destructive'
+				>
+					<Trash2Icon aria-hidden='true' />
+					<span className='min-w-0 flex-1'>Delete…</span>
 				</SidebarContextMenuItem>
 			</ContextMenuGroup>
 		</ContextMenuContent>

@@ -14,6 +14,12 @@ import type {
 	CloneGithubRepositoryStartResult,
 	CreateWorkspaceRequest,
 	CreateWorkspaceResult,
+	DeleteArchivedWorkspaceRequest,
+	DeleteArchivedWorkspaceResult,
+	DeleteRepositoryRequest,
+	DeleteRepositoryResult,
+	DeleteWorkspaceRequest,
+	DeleteWorkspaceResult,
 	EnsembleApi,
 	LocalRepositorySelectionResult,
 	QuickStartProjectRequest,
@@ -22,11 +28,15 @@ import type {
 	RegisterLocalRepositoryResult,
 	RenameWorkspaceRequest,
 	RenameWorkspaceResult,
+	UnarchiveWorkspaceRequest,
+	UnarchiveWorkspaceResult,
 } from '@/shared/ipc';
 
 /** Hierarchical TanStack Query keys for every Ensemble IPC-backed query. */
 export const ensembleQueryKeys = {
 	all: ['ensemble'] as const,
+	archivedWorkspaces: (repositoryId: string) =>
+		[...ensembleQueryKeys.all, 'archived-workspaces', repositoryId] as const,
 	environmentVariables: () =>
 		[...ensembleQueryKeys.all, 'environment-variables'] as const,
 	githubRepositoryList: () =>
@@ -180,7 +190,12 @@ export function renameWorkspace(
 	);
 }
 
-/** Permanently deletes a workspace from disk and SQLite. No merge prompt. */
+/**
+ * Lifecycle archive: preserves the workspace `.context/` under
+ * `<root>/archived-contexts/`, stamps `workspaces.archived_at`, and records a
+ * row in `archive_records`. The worktree folder stays on disk; branch cleanup
+ * is opt-in via `request.branchCleanup`.
+ */
 export function archiveWorkspace(
 	request: ArchiveWorkspaceRequest,
 ): Promise<ArchiveWorkspaceResult> {
@@ -191,9 +206,9 @@ export function archiveWorkspace(
 }
 
 /**
- * Removes the repository and its workspaces from SQLite, destructively cleans
- * each child worktree (folder + branch), but preserves the repository folder
- * on disk so it can be re-registered later.
+ * Lifecycle archive of a repository: cascades the workspace archive flow to
+ * every child workspace, stamps `repositories.archived_at`, and records the
+ * decision in `archive_records`.
  */
 export function archiveRepository(
 	request: ArchiveRepositoryRequest,
@@ -201,6 +216,79 @@ export function archiveRepository(
 	return profileElectronIpcCall(
 		{ channel: 'ensemble:archive-repository', usesDatabase: true },
 		() => getEnsembleApi().archiveRepository(request),
+	);
+}
+
+/**
+ * Lists archived workspaces for a repository, joined with the latest archive
+ * record so the renderer can show branch cleanup status, preserved context
+ * path, and base branch.
+ */
+export function archivedWorkspacesQuery(repositoryId: string) {
+	return queryOptions({
+		enabled: repositoryId.length > 0,
+		queryFn: () =>
+			profileElectronIpcCall(
+				{
+					channel: 'ensemble:list-archived-workspaces',
+					usesDatabase: true,
+				},
+				() => getEnsembleApi().listArchivedWorkspaces({ repositoryId }),
+			),
+		queryKey: ensembleQueryKeys.archivedWorkspaces(repositoryId),
+		staleTime: 2000,
+	});
+}
+
+/**
+ * Reverses a workspace lifecycle archive. Restores `.context/` from the
+ * preserved snapshot; recreates the worktree from the recorded base branch
+ * when the original archive ran with branch cleanup.
+ */
+export function unarchiveWorkspace(
+	request: UnarchiveWorkspaceRequest,
+): Promise<UnarchiveWorkspaceResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:unarchive-workspace', usesDatabase: true },
+		() => getEnsembleApi().unarchiveWorkspace(request),
+	);
+}
+
+/**
+ * Permanently purges an archived workspace: drops the workspace row, removes
+ * the preserved archived-contexts directory, and cleans up the worktree and
+ * branch if still present on disk.
+ */
+export function deleteArchivedWorkspace(
+	request: DeleteArchivedWorkspaceRequest,
+): Promise<DeleteArchivedWorkspaceResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:delete-archived-workspace', usesDatabase: true },
+		() => getEnsembleApi().deleteArchivedWorkspace(request),
+	);
+}
+
+/** Permanently deletes a workspace from disk and SQLite. Destructive. */
+export function deleteWorkspace(
+	request: DeleteWorkspaceRequest,
+): Promise<DeleteWorkspaceResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:delete-workspace', usesDatabase: true },
+		() => getEnsembleApi().deleteWorkspace(request),
+	);
+}
+
+/**
+ * Permanently deletes a repository and its workspaces from Ensemble. Wipes
+ * each worktree + branch and writes the `.ensemble-archived` sentinel so the
+ * shared-root reconciler does not re-adopt the still-on-disk folder.
+ */
+export function deleteRepository(
+	request: DeleteRepositoryRequest,
+): Promise<DeleteRepositoryResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:delete-repository', usesDatabase: true },
+		() => getEnsembleApi().deleteRepository(request),
 	);
 }
 

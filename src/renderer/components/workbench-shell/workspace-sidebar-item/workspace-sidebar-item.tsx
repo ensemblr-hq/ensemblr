@@ -35,6 +35,7 @@ export function WorkspaceSidebarItem({
 	isActive,
 	isPinned,
 	onArchiveSelect,
+	onDeleteSelect,
 	onPinToggle,
 	onRenameSelect,
 	onSelect,
@@ -44,6 +45,7 @@ export function WorkspaceSidebarItem({
 	isActive: boolean;
 	isPinned: boolean;
 	onArchiveSelect?: () => void;
+	onDeleteSelect?: () => void;
 	onPinToggle: () => void;
 	onRenameSelect?: () => void;
 	onSelect: () => void;
@@ -128,6 +130,7 @@ export function WorkspaceSidebarItem({
 			<WorkspaceContextMenuContent
 				isPinned={isPinned}
 				onArchiveSelect={onArchiveSelect}
+				onDeleteSelect={onDeleteSelect}
 				onPinToggle={onPinToggle}
 				onRenameSelect={onRenameSelect}
 				workspace={workspace}

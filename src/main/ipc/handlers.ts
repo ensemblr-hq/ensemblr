@@ -9,12 +9,17 @@ import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
 	CreateWorkspaceService,
+	DeleteArchivedWorkspaceService,
+	DeleteRepositoryService,
+	DeleteWorkspaceService,
 	GithubCloneService,
 	GithubRepositoryListService,
+	ListArchivedWorkspacesService,
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
 	RenameWorkspaceService,
 	SharedRootAdoptionService,
+	UnarchiveWorkspaceService,
 } from '../repository';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { SetupDiagnosticsService } from '../setup';
@@ -34,9 +39,13 @@ interface RegisterIpcHandlersOptions {
 	configService: EnsembleConfigService;
 	createWorkspaceService: CreateWorkspaceService;
 	databaseService: EnsembleDatabaseService;
+	deleteArchivedWorkspaceService: DeleteArchivedWorkspaceService;
+	deleteRepositoryService: DeleteRepositoryService;
+	deleteWorkspaceService: DeleteWorkspaceService;
 	environmentVariablesService: EnvironmentVariablesService;
 	githubCloneService: GithubCloneService;
 	githubRepositoryListService: GithubRepositoryListService;
+	listArchivedWorkspacesService: ListArchivedWorkspacesService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
 	quickStartProjectService: QuickStartProjectService;
@@ -46,6 +55,7 @@ interface RegisterIpcHandlersOptions {
 	sharedRootAdoptionService: SharedRootAdoptionService;
 	setupDiagnosticsService: SetupDiagnosticsService;
 	settingsResolutionService: EnsembleConfigResolutionService;
+	unarchiveWorkspaceService: UnarchiveWorkspaceService;
 }
 
 /**
@@ -60,9 +70,13 @@ export function registerIpcHandlers({
 	configService,
 	createWorkspaceService,
 	databaseService,
+	deleteArchivedWorkspaceService,
+	deleteRepositoryService,
+	deleteWorkspaceService,
 	environmentVariablesService,
 	githubCloneService,
 	githubRepositoryListService,
+	listArchivedWorkspacesService,
 	localRepositoryRegistrationService,
 	piExecutableService,
 	quickStartProjectService,
@@ -72,6 +86,7 @@ export function registerIpcHandlers({
 	setupDiagnosticsService,
 	settingsResolutionService,
 	sharedRootAdoptionService,
+	unarchiveWorkspaceService,
 }: RegisterIpcHandlersOptions): void {
 	registerCoreHandlers({
 		configService,
@@ -88,10 +103,15 @@ export function registerIpcHandlers({
 		archiveRepositoryService,
 		archiveWorkspaceService,
 		createWorkspaceService,
+		deleteArchivedWorkspaceService,
+		deleteRepositoryService,
+		deleteWorkspaceService,
+		listArchivedWorkspacesService,
 		localRepositoryRegistrationService,
 		quickStartProjectService,
 		renameWorkspaceService,
 		sharedRootAdoptionService,
+		unarchiveWorkspaceService,
 	});
 	registerCloneHandlers({
 		githubCloneService,

@@ -7,7 +7,15 @@ import {
 	type ArchiveWorkspaceResult,
 	type CreateWorkspaceRequest,
 	type CreateWorkspaceResult,
+	type DeleteArchivedWorkspaceRequest,
+	type DeleteArchivedWorkspaceResult,
+	type DeleteRepositoryRequest,
+	type DeleteRepositoryResult,
+	type DeleteWorkspaceRequest,
+	type DeleteWorkspaceResult,
 	IPC_CHANNELS,
+	type ListArchivedWorkspacesRequest,
+	type ListArchivedWorkspacesResult,
 	type LocalRepositorySelectionResult,
 	type QuickStartProjectRequest,
 	type QuickStartProjectResult,
@@ -16,15 +24,22 @@ import {
 	type RenameWorkspaceRequest,
 	type RenameWorkspaceResult,
 	type SharedRootAdoptionSnapshot,
+	type UnarchiveWorkspaceRequest,
+	type UnarchiveWorkspaceResult,
 } from '../../../shared/ipc';
 import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
 	CreateWorkspaceService,
+	DeleteArchivedWorkspaceService,
+	DeleteRepositoryService,
+	DeleteWorkspaceService,
+	ListArchivedWorkspacesService,
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
 	RenameWorkspaceService,
 	SharedRootAdoptionService,
+	UnarchiveWorkspaceService,
 } from '../../repository';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
@@ -33,10 +48,15 @@ export interface RepositoryHandlersOptions {
 	archiveRepositoryService: ArchiveRepositoryService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
 	createWorkspaceService: CreateWorkspaceService;
+	deleteArchivedWorkspaceService: DeleteArchivedWorkspaceService;
+	deleteRepositoryService: DeleteRepositoryService;
+	deleteWorkspaceService: DeleteWorkspaceService;
+	listArchivedWorkspacesService: ListArchivedWorkspacesService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	quickStartProjectService: QuickStartProjectService;
 	renameWorkspaceService: RenameWorkspaceService;
 	sharedRootAdoptionService: SharedRootAdoptionService;
+	unarchiveWorkspaceService: UnarchiveWorkspaceService;
 }
 
 /**
@@ -48,10 +68,15 @@ export function registerRepositoryHandlers({
 	archiveRepositoryService,
 	archiveWorkspaceService,
 	createWorkspaceService,
+	deleteArchivedWorkspaceService,
+	deleteRepositoryService,
+	deleteWorkspaceService,
+	listArchivedWorkspacesService,
 	localRepositoryRegistrationService,
 	quickStartProjectService,
 	renameWorkspaceService,
 	sharedRootAdoptionService,
+	unarchiveWorkspaceService,
 }: RepositoryHandlersOptions): void {
 	ipcMain.handle(
 		IPC_CHANNELS.selectLocalRepository,
@@ -122,6 +147,51 @@ export function registerRepositoryHandlers({
 		(_event, request: unknown): Promise<ArchiveRepositoryResult> => {
 			return archiveRepositoryService.archive(
 				normalizeArchiveRepositoryRequest(request),
+			);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.deleteWorkspace,
+		(_event, request: unknown): Promise<DeleteWorkspaceResult> => {
+			return deleteWorkspaceService.delete(
+				normalizeDeleteWorkspaceRequest(request),
+			);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.deleteRepository,
+		(_event, request: unknown): Promise<DeleteRepositoryResult> => {
+			return deleteRepositoryService.delete(
+				normalizeDeleteRepositoryRequest(request),
+			);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.listArchivedWorkspaces,
+		(_event, request: unknown): Promise<ListArchivedWorkspacesResult> => {
+			return listArchivedWorkspacesService.list(
+				normalizeListArchivedWorkspacesRequest(request),
+			);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.unarchiveWorkspace,
+		(_event, request: unknown): Promise<UnarchiveWorkspaceResult> => {
+			return unarchiveWorkspaceService.unarchive(
+				normalizeUnarchiveWorkspaceRequest(request),
+			);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.deleteArchivedWorkspace,
+		(_event, request: unknown): Promise<DeleteArchivedWorkspaceResult> => {
+			return deleteArchivedWorkspaceService.delete(
+				normalizeDeleteArchivedWorkspaceRequest(request),
 			);
 		},
 	);
@@ -198,7 +268,14 @@ function normalizeArchiveWorkspaceRequest(
 	const candidate = request as Record<string, unknown>;
 	const workspaceId =
 		typeof candidate.workspaceId === 'string' ? candidate.workspaceId : '';
-	return { workspaceId };
+	const normalized: ArchiveWorkspaceRequest = { workspaceId };
+	if (typeof candidate.branchCleanup === 'boolean') {
+		normalized.branchCleanup = candidate.branchCleanup;
+	}
+	if (typeof candidate.reason === 'string') {
+		normalized.reason = candidate.reason;
+	}
+	return normalized;
 }
 
 /** Coerces an IPC payload into a {@link ArchiveRepositoryRequest}. */
@@ -211,7 +288,83 @@ function normalizeArchiveRepositoryRequest(
 	const candidate = request as Record<string, unknown>;
 	const repositoryId =
 		typeof candidate.repositoryId === 'string' ? candidate.repositoryId : '';
+	const normalized: ArchiveRepositoryRequest = { repositoryId };
+	if (typeof candidate.branchCleanup === 'boolean') {
+		normalized.branchCleanup = candidate.branchCleanup;
+	}
+	if (typeof candidate.reason === 'string') {
+		normalized.reason = candidate.reason;
+	}
+	return normalized;
+}
+
+/** Coerces an IPC payload into a {@link DeleteWorkspaceRequest}. */
+function normalizeDeleteWorkspaceRequest(
+	request: unknown,
+): DeleteWorkspaceRequest {
+	if (typeof request !== 'object' || request === null) {
+		return { workspaceId: '' };
+	}
+	const candidate = request as Record<string, unknown>;
+	const workspaceId =
+		typeof candidate.workspaceId === 'string' ? candidate.workspaceId : '';
+	return { workspaceId };
+}
+
+/** Coerces an IPC payload into a {@link DeleteRepositoryRequest}. */
+function normalizeDeleteRepositoryRequest(
+	request: unknown,
+): DeleteRepositoryRequest {
+	if (typeof request !== 'object' || request === null) {
+		return { repositoryId: '' };
+	}
+	const candidate = request as Record<string, unknown>;
+	const repositoryId =
+		typeof candidate.repositoryId === 'string' ? candidate.repositoryId : '';
 	return { repositoryId };
+}
+
+/** Coerces an IPC payload into a {@link ListArchivedWorkspacesRequest}. */
+function normalizeListArchivedWorkspacesRequest(
+	request: unknown,
+): ListArchivedWorkspacesRequest {
+	if (typeof request !== 'object' || request === null) {
+		return { repositoryId: '' };
+	}
+	const candidate = request as Record<string, unknown>;
+	const repositoryId =
+		typeof candidate.repositoryId === 'string' ? candidate.repositoryId : '';
+	return { repositoryId };
+}
+
+/** Coerces an IPC payload into a {@link UnarchiveWorkspaceRequest}. */
+function normalizeUnarchiveWorkspaceRequest(
+	request: unknown,
+): UnarchiveWorkspaceRequest {
+	if (typeof request !== 'object' || request === null) {
+		return { workspaceId: '' };
+	}
+	const candidate = request as Record<string, unknown>;
+	const workspaceId =
+		typeof candidate.workspaceId === 'string' ? candidate.workspaceId : '';
+	const normalized: UnarchiveWorkspaceRequest = { workspaceId };
+	if (typeof candidate.reason === 'string') {
+		normalized.reason = candidate.reason;
+	}
+	return normalized;
+}
+
+/** Coerces an IPC payload into a {@link DeleteArchivedWorkspaceRequest}. */
+function normalizeDeleteArchivedWorkspaceRequest(
+	request: unknown,
+): DeleteArchivedWorkspaceRequest {
+	if (typeof request !== 'object' || request === null) {
+		return { workspaceId: '' };
+	}
+	const candidate = request as Record<string, unknown>;
+	const workspaceId =
+		typeof candidate.workspaceId === 'string' ? candidate.workspaceId : '';
+	return { workspaceId };
 }
 
 /** Coerces an IPC payload into a {@link CreateWorkspaceRequest}. */

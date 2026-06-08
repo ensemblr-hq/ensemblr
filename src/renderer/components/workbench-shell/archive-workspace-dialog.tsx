@@ -5,12 +5,14 @@ import {
 	isEnsembleApiAvailable,
 } from '@/renderer/api/ensemble-queries';
 import { Button } from '@/renderer/components/ui/button';
+import { Checkbox } from '@/renderer/components/ui/checkbox';
 import {
 	Dialog,
 	DialogContent,
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
+import { Label } from '@/renderer/components/ui/label';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc';
@@ -22,7 +24,11 @@ interface ArchiveWorkspaceDialogProps {
 	workspace: WorkspaceShellModel | null;
 }
 
-/** Destructive confirmation dialog for permanently deleting a workspace. */
+/**
+ * Lifecycle archive dialog: preserves the workspace `.context/` folder and
+ * archives the workspace as a state. Branch cleanup is opt-in and gated by a
+ * second confirmation checkbox so a misclick never drops a stray local branch.
+ */
 export function ArchiveWorkspaceDialog({
 	onArchived,
 	onOpenChange,
@@ -47,7 +53,6 @@ export function ArchiveWorkspaceDialog({
 
 type ArchiveStage = 'archiving' | 'failure' | 'idle';
 
-/** Inner state-owned form that resets each time the dialog re-opens. */
 function ArchiveWorkspaceDialogForm({
 	onArchived,
 	onOpenChange,
@@ -58,11 +63,13 @@ function ArchiveWorkspaceDialogForm({
 	workspace: WorkspaceShellModel;
 }) {
 	const [stage, setStage] = useState<ArchiveStage>('idle');
+	const [branchCleanup, setBranchCleanup] = useState(false);
 	const [diagnostics, setDiagnostics] = useState<ArchiveWorkspaceDiagnostic[]>(
 		[],
 	);
 
 	const canArchive = stage !== 'archiving' && isEnsembleApiAvailable();
+	const hasBranch = Boolean(workspace.branchName);
 
 	const handleArchive = useCallback(async () => {
 		if (!canArchive) {
@@ -71,12 +78,12 @@ function ArchiveWorkspaceDialogForm({
 		setStage('archiving');
 		setDiagnostics([]);
 
-		const result = await archiveWorkspace({ workspaceId: workspace.id });
+		const result = await archiveWorkspace({
+			branchCleanup: branchCleanup && hasBranch,
+			workspaceId: workspace.id,
+		});
 
 		if (result.status === 'success') {
-			// Let the parent run cache invalidation + navigation so it can suppress
-			// the reorder layout animation BEFORE the sidebar reflows around the
-			// removed workspace.
 			await onArchived(workspace.id);
 			onOpenChange(false);
 			return;
@@ -84,7 +91,14 @@ function ArchiveWorkspaceDialogForm({
 
 		setStage('failure');
 		setDiagnostics(result.diagnostics);
-	}, [canArchive, onArchived, onOpenChange, workspace.id]);
+	}, [
+		branchCleanup,
+		canArchive,
+		hasBranch,
+		onArchived,
+		onOpenChange,
+		workspace.id,
+	]);
 
 	const handleClose = useCallback(() => {
 		onOpenChange(false);
@@ -99,9 +113,11 @@ function ArchiveWorkspaceDialogForm({
 					Archive workspace?
 				</DialogTitle>
 				<p className='text-muted-foreground text-xs'>
-					Permanently deletes the worktree folder, drops the local branch, and
-					removes the workspace from Ensemble. Anything not pushed to the remote
-					is lost.
+					Marks the workspace as archived and preserves its{' '}
+					<span className='font-mono'>.context/</span> handoff files under{' '}
+					<span className='font-mono'>archived-contexts/</span>. By default the
+					worktree folder and local branch stay on disk; nothing is committed or
+					pushed.
 				</p>
 			</DialogHeader>
 
@@ -114,6 +130,30 @@ function ArchiveWorkspaceDialogForm({
 					{workspace.pathLabel}
 				</span>
 			</div>
+
+			{hasBranch ? (
+				<div className='flex items-start gap-2 rounded-md border border-border bg-background px-3 py-2'>
+					<Checkbox
+						checked={branchCleanup}
+						disabled={isBusy}
+						id={`archive-workspace-branch-cleanup-${workspace.id}`}
+						onCheckedChange={(value) => setBranchCleanup(value === true)}
+					/>
+					<div className='flex flex-col gap-0.5'>
+						<Label
+							className='text-xs'
+							htmlFor={`archive-workspace-branch-cleanup-${workspace.id}`}
+						>
+							Also remove the worktree and drop the branch{' '}
+							<span className='font-mono'>{workspace.branchName}</span>
+						</Label>
+						<span className='text-[0.6875rem] text-muted-foreground'>
+							The <span className='font-mono'>.context/</span> handoff files are
+							preserved; anything else not pushed to the remote will be lost.
+						</span>
+					</div>
+				</div>
+			) : null}
 
 			{stage === 'failure' && diagnostics.length > 0 ? (
 				<ArchiveDiagnosticsList
@@ -137,7 +177,7 @@ function ArchiveWorkspaceDialogForm({
 					disabled={!canArchive}
 					onClick={handleArchive}
 					type='button'
-					variant='destructive'
+					variant={branchCleanup ? 'destructive' : 'default'}
 				>
 					{isBusy ? 'Archiving…' : 'Archive'}
 				</Button>

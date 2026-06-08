@@ -21,8 +21,10 @@ import { ProjectContextMenuContent } from './project-context-menu';
 export function ProjectSidebarHeader({
 	isCollapsed,
 	onArchiveSelect,
+	onBrowseArchiveSelect,
 	onCreateFromSourceSelect,
 	onCreateWorkspaceSelect,
+	onDeleteSelect,
 	onRepositorySettingsSelect,
 	onToggle,
 	project,
@@ -30,8 +32,10 @@ export function ProjectSidebarHeader({
 }: {
 	isCollapsed: boolean;
 	onArchiveSelect?: () => void;
+	onBrowseArchiveSelect?: () => void;
 	onCreateFromSourceSelect?: () => void;
 	onCreateWorkspaceSelect?: () => void;
+	onDeleteSelect?: () => void;
 	onRepositorySettingsSelect: () => void;
 	onToggle: () => void;
 	project: ProjectShellModel;
@@ -117,7 +121,9 @@ export function ProjectSidebarHeader({
 			</ContextMenuTrigger>
 			<ProjectContextMenuContent
 				onArchiveSelect={onArchiveSelect}
+				onBrowseArchiveSelect={onBrowseArchiveSelect}
 				onCreateFromSourceSelect={onCreateFromSourceSelect}
+				onDeleteSelect={onDeleteSelect}
 				onRepositorySettingsSelect={onRepositorySettingsSelect}
 				project={project}
 			/>
