@@ -16,12 +16,14 @@ import { WorkspaceSidebarItem } from '../workspace-sidebar-item/workspace-sideba
 export function PinnedWorkspaceGroup({
 	activeProject,
 	activeWorkspace,
+	onWorkspaceRenameSelect,
 	onWorkspaceSelect,
 	projectNavigation,
 	resolveWorkspaceRouteSearch,
 }: {
 	activeProject: ProjectShellModel | null;
 	activeWorkspace: WorkspaceShellModel | null;
+	onWorkspaceRenameSelect?: (workspace: WorkspaceShellModel) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projectNavigation: ProjectNavigationState;
 	resolveWorkspaceRouteSearch: (
@@ -54,6 +56,11 @@ export function PinnedWorkspaceGroup({
 							isPinned={pinnedWorkspaceIdSet.has(workspace.id)}
 							key={workspace.id}
 							onPinToggle={() => toggleWorkspacePinned(workspace.id)}
+							onRenameSelect={
+								onWorkspaceRenameSelect
+									? () => onWorkspaceRenameSelect(workspace)
+									: undefined
+							}
 							onSelect={() => onWorkspaceSelect(project.id, workspace.id)}
 							routeSearch={resolveWorkspaceRouteSearch(workspace)}
 							workspace={workspace}

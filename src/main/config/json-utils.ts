@@ -47,3 +47,78 @@ export function isPlainRecord(
 ): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
+
+/**
+ * Lowercased substrings that, when present in a setting/env-var key, mark it
+ * as secret-like for redaction and classification. Single source of truth used
+ * by config loaders and the environment-variable catalog.
+ */
+export const SENSITIVE_KEY_PARTS: readonly string[] = [
+	'accesstoken',
+	'apikey',
+	'auth',
+	'credential',
+	'password',
+	'privatekey',
+	'secret',
+	'token',
+];
+
+/**
+ * Returns true when a key name contains a known sensitive substring.
+ * Comparison is case-insensitive and strips dashes/underscores so both
+ * `apiKey` and `api_key` match `apikey`.
+ */
+export function isSensitiveKeyName(key: string): boolean {
+	const normalized = key.replace(/[-_]/g, '').toLowerCase();
+	return SENSITIVE_KEY_PARTS.some((part) => normalized.includes(part));
+}
+
+/** A line/column pair extracted from a JSON parser error. */
+export interface JsonErrorLocation {
+	column?: number;
+	line?: number;
+}
+
+/**
+ * Converts a character offset into a 1-based `(line, column)` pair.
+ */
+export function getLocationForPosition(
+	source: string,
+	position: number,
+): JsonErrorLocation {
+	const beforePosition = source.slice(0, Math.max(0, position));
+	const lines = beforePosition.split('\n');
+
+	return {
+		column: (lines.at(-1)?.length ?? 0) + 1,
+		line: lines.length,
+	};
+}
+
+/**
+ * Extracts a line/column hint from a JSON parser error message, recognising
+ * both `position N` and `line N column M` shapes.
+ */
+export function getJsonErrorLocation(
+	source: string,
+	error: unknown,
+): JsonErrorLocation {
+	const message = error instanceof Error ? error.message : '';
+	const positionMatch = /position (\d+)/i.exec(message);
+
+	if (positionMatch) {
+		return getLocationForPosition(source, Number(positionMatch[1]));
+	}
+
+	const lineColumnMatch = /line (\d+) column (\d+)/i.exec(message);
+
+	if (lineColumnMatch) {
+		return {
+			column: Number(lineColumnMatch[2]),
+			line: Number(lineColumnMatch[1]),
+		};
+	}
+
+	return {};
+}

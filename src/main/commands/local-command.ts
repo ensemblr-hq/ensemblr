@@ -202,14 +202,16 @@ export function createLocalCommandService(
 	): Promise<LocalCommandResult> {
 		const input = normalizeLocalCommandRequest(request);
 
-		if (input.failure) {
-			return createLocalCommandResult({
+		const buildPreSpawnFailure = (
+			failure: LocalCommandFailure,
+		): LocalCommandResult =>
+			createLocalCommandResult({
 				args: input.args,
 				command: input.command,
 				cwd: input.cwd ?? process.cwd(),
 				environment: null,
 				exitCode: null,
-				failure: input.failure,
+				failure,
 				logs: createSanitizedLogs({
 					args: input.args,
 					command: input.command,
@@ -227,35 +229,15 @@ export function createLocalCommandService(
 				stdout: '',
 				stdoutTruncated: false,
 			});
+
+		if (input.failure) {
+			return buildPreSpawnFailure(input.failure);
 		}
 
 		const cwd = validateCwd(input.cwd ?? process.cwd());
 
 		if (cwd.failure) {
-			return createLocalCommandResult({
-				args: input.args,
-				command: input.command,
-				cwd: input.cwd ?? process.cwd(),
-				environment: null,
-				exitCode: null,
-				failure: cwd.failure,
-				logs: createSanitizedLogs({
-					args: input.args,
-					command: input.command,
-					cwd: input.cwd ?? process.cwd(),
-					env: {},
-					stderr: '',
-					stdout: '',
-				}),
-				signal: null,
-				startedAt: now().toISOString(),
-				startedMs: performance.now(),
-				status: 'failure',
-				stderr: '',
-				stderrTruncated: false,
-				stdout: '',
-				stdoutTruncated: false,
-			});
+			return buildPreSpawnFailure(cwd.failure);
 		}
 
 		const environment = await getEnvironment();

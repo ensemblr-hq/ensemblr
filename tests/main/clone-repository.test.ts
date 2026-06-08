@@ -8,12 +8,9 @@ import {
 	createGithubCloneService,
 } from '../../src/main/repository/clone-repository.ts';
 import type { LocalRepositoryRegistrationService } from '../../src/main/repository/register-repository.ts';
-import type { EnsembleRootDirectoryService } from '../../src/main/root';
-import type {
-	RegisteredRepositorySnapshot,
-	RegisterLocalRepositoryResult,
-	RootDirectorySnapshot,
-} from '../../src/shared/ipc';
+import type { EnsembleDatabaseService } from '../../src/main/storage/database.ts';
+import { buildRegistrationStub } from './helpers/registration-stub.ts';
+import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
 function createWorkspace(t: TestContext): {
 	parentPath: string;
@@ -30,79 +27,11 @@ function createWorkspace(t: TestContext): {
 	return { parentPath: root, repositoriesPath };
 }
 
-function rootDirectoryStub(
-	repositoriesPath: string,
-): EnsembleRootDirectoryService {
-	const snapshot: RootDirectorySnapshot = {
-		archivedContextsPath: path.join(
-			repositoriesPath,
-			'..',
-			'archived-contexts',
-		),
-		createdPaths: [],
-		diagnostics: [],
-		managedPaths: [],
-		path: path.dirname(repositoriesPath),
-		repositoriesPath,
-		setting: null,
-		source: null,
-		status: 'ok',
-		workspacesPath: path.join(repositoriesPath, '..', 'workspaces'),
-	};
+const rootDirectoryStub = (repositoriesPath: string) =>
+	buildRootDirectoryStub({ repositoriesPath });
 
-	return {
-		applyChange: () => ({
-			applied: false,
-			newRoot: snapshot,
-			oldRoot: snapshot,
-			oldRootPreserved: true,
-			reconciliation: null,
-		}),
-		ensure: () => snapshot,
-		getSnapshot: () => snapshot,
-		previewChange: () => ({
-			canApply: false,
-			diagnostics: [],
-			newRoot: snapshot,
-			oldRoot: snapshot,
-			oldRootPreserved: true,
-		}),
-	};
-}
-
-function registrationStub(repositoryPath: string): {
-	calls: { path: string }[];
-	service: LocalRepositoryRegistrationService;
-} {
-	const calls: { path: string }[] = [];
-	const repository: RegisteredRepositorySnapshot = {
-		createdAt: '2026-06-07T12:00:00.000Z',
-		defaultBranch: 'main',
-		id: 'repository-test',
-		metadata: {},
-		name: path.basename(repositoryPath),
-		path: repositoryPath,
-		remoteUrl: null,
-		slug: path.basename(repositoryPath),
-		updatedAt: '2026-06-07T12:00:00.000Z',
-	};
-
-	return {
-		calls,
-		service: {
-			register: async (request) => {
-				calls.push({ path: request.path });
-				const result: RegisterLocalRepositoryResult = {
-					diagnostics: [],
-					registered: true,
-					repository,
-					settingsSources: [],
-				};
-				return result;
-			},
-		},
-	};
-}
+const registrationStub = (repositoryPath: string) =>
+	buildRegistrationStub(repositoryPath);
 
 function failingRegistrationStub(): LocalRepositoryRegistrationService {
 	return {
@@ -123,10 +52,26 @@ function failingRegistrationStub(): LocalRepositoryRegistrationService {
 
 const fixedNow = () => new Date('2026-06-07T12:00:00.000Z');
 
+/** Stub that reports no SQLite connection — clone tests do not need the dup check. */
+function databaseServiceStub(): EnsembleDatabaseService {
+	const snapshot = {
+		path: ':memory:',
+		schemaVersion: 0,
+		status: 'ok' as const,
+	};
+	return {
+		close: () => undefined,
+		getConnection: () => null,
+		getHealth: () => snapshot,
+		open: () => snapshot,
+	};
+}
+
 test('prepare validates an https GitHub URL and resolves the default target', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
 	const service = createGithubCloneService({
 		commandRunner: async () => ({ exitCode: 0, signal: null }),
+		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
 			path.join(repositoriesPath, 'ensemble'),
@@ -158,6 +103,7 @@ test('prepare accepts ssh and shorthand URL forms', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
 	const service = createGithubCloneService({
 		commandRunner: async () => ({ exitCode: 0, signal: null }),
+		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
 			path.join(repositoriesPath, 'ensemble'),
@@ -184,6 +130,7 @@ test('prepare rejects empty, malformed, and non-GitHub URLs', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
 	const service = createGithubCloneService({
 		commandRunner: async () => ({ exitCode: 0, signal: null }),
+		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
 			path.join(repositoriesPath, 'ensemble'),
@@ -210,6 +157,7 @@ test('prepare rejects a relative destination override', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
 	const service = createGithubCloneService({
 		commandRunner: async () => ({ exitCode: 0, signal: null }),
+		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
 			path.join(repositoriesPath, 'ensemble'),
@@ -226,13 +174,14 @@ test('prepare rejects a relative destination override', async (t) => {
 	assert.equal(result.diagnostics[0]?.code, 'destination-path-relative');
 });
 
-test('prepare rejects a target whose path already exists', async (t) => {
+test('prepare auto-suffixes the target when the default path is already on disk', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
 	const existing = path.join(repositoriesPath, 'ensemble');
 	mkdirSync(existing, { recursive: true });
 
 	const service = createGithubCloneService({
 		commandRunner: async () => ({ exitCode: 0, signal: null }),
+		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(existing).service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
@@ -242,14 +191,78 @@ test('prepare rejects a target whose path already exists', async (t) => {
 		url: 'https://github.com/psoldunov/ensemble.git',
 	});
 
+	assert.equal(result.ok, true);
+	assert.equal(
+		result.preparation?.targetPath,
+		path.join(repositoriesPath, 'ensemble-2'),
+	);
+});
+
+test('prepare rejects the clone when another repository already tracks the remote', async (t) => {
+	const { repositoriesPath } = createWorkspace(t);
+	// Real in-memory DB with one pre-existing repo whose remote matches.
+	const { openEnsembleDatabase } = await import(
+		'../../src/main/storage/database.ts'
+	);
+	const connection = openEnsembleDatabase({ databasePath: ':memory:' });
+	t.after(() => connection.database.close());
+	connection.database
+		.prepare(
+			`INSERT INTO repositories (id, slug, name, path, default_branch, created_at, updated_at, metadata_json)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		)
+		.run(
+			'repository-existing',
+			'ensemble',
+			'ensemble',
+			path.join(repositoriesPath, 'ensemble'),
+			'main',
+			fixedNow().toISOString(),
+			fixedNow().toISOString(),
+			JSON.stringify({
+				remoteUrl: 'git@github.com:psoldunov/ensemble.git',
+			}),
+		);
+
+	const databaseService: EnsembleDatabaseService = {
+		close: () => connection.database.close(),
+		getConnection: () => connection,
+		getHealth: () => ({
+			path: connection.path,
+			schemaVersion: connection.schemaVersion,
+			status: 'ok',
+		}),
+		open: () => ({
+			path: connection.path,
+			schemaVersion: connection.schemaVersion,
+			status: 'ok',
+		}),
+	};
+
+	const service = createGithubCloneService({
+		commandRunner: async () => ({ exitCode: 0, signal: null }),
+		databaseService,
+		now: fixedNow,
+		registrationService: registrationStub(
+			path.join(repositoriesPath, 'ensemble'),
+		).service,
+		rootDirectoryService: rootDirectoryStub(repositoriesPath),
+	});
+
+	const result = await service.prepare({
+		// HTTPS form of the existing SSH remote — pre-flight should still match.
+		url: 'https://github.com/psoldunov/ensemble.git',
+	});
+
 	assert.equal(result.ok, false);
-	assert.equal(result.diagnostics[0]?.code, 'destination-exists');
+	assert.equal(result.diagnostics[0]?.code, 'remote-already-registered');
 });
 
 test('start refuses an unknown jobId', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
 	const service = createGithubCloneService({
 		commandRunner: async () => ({ exitCode: 0, signal: null }),
+		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
 			path.join(repositoriesPath, 'ensemble'),
@@ -281,6 +294,7 @@ test('start spawns gh, streams progress, and registers on success', async (t) =>
 
 	const service = createGithubCloneService({
 		commandRunner: runner,
+		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registration.service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
@@ -323,6 +337,7 @@ test('start classifies an authentication failure', async (t) => {
 
 	const service = createGithubCloneService({
 		commandRunner: runner,
+		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
 			path.join(repositoriesPath, 'ensemble'),
@@ -368,6 +383,7 @@ test('start falls back to git when gh is not installed', async (t) => {
 
 	const service = createGithubCloneService({
 		commandRunner: runner,
+		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registration.service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
@@ -400,6 +416,7 @@ test('start reports git-not-installed when both binaries are missing', async (t)
 
 	const service = createGithubCloneService({
 		commandRunner: runner,
+		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
 			path.join(repositoriesPath, 'ensemble'),
@@ -434,6 +451,7 @@ test('start surfaces register-failed when registration rejects the cloned repo',
 
 	const service = createGithubCloneService({
 		commandRunner: runner,
+		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: failingRegistrationStub(),
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),

@@ -17,13 +17,18 @@ import {
 	type EnsembleConfig,
 } from '../../src/main/config/config-loader.ts';
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
+import { ensureRootDirectory } from '../../src/main/root/root-directory.ts';
 import {
 	applyRootDirectoryChange,
 	previewRootDirectoryChange,
 } from '../../src/main/root/root-directory-change.ts';
-import { ensureRootDirectory } from '../../src/main/root/root-directory.ts';
+import { createEnsembleRootDirectoryService } from '../../src/main/root/root-directory-service.ts';
 import { reconcileRootDirectory } from '../../src/main/root/root-reconciliation.ts';
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import {
+	type EnsembleDatabaseConnection,
+	type EnsembleDatabaseService,
+	openEnsembleDatabase,
+} from '../../src/main/storage/database.ts';
 import type {
 	RootDirectoryDiagnostic,
 	RootDirectorySnapshot,
@@ -582,6 +587,60 @@ test('blocks root switch when rootDirectory is locked by managed config', (t) =>
 	assert.equal(result.reconciliation, null);
 	assert.match(result.error ?? '', /locked by managed config/);
 	assert.equal(existsSync(path.join(nextRoot, 'repos')), false);
+});
+
+test('service does not cache snapshot when applyChange fails (managed-locked)', (t) => {
+	const homeDirectory = createDirectoryFixture(t);
+	const database = createDatabaseFixture(t);
+
+	let lockedManagedRoot: string | null = null;
+	const databaseService: EnsembleDatabaseService = {
+		close: () => {},
+		getConnection: (): EnsembleDatabaseConnection => ({
+			database,
+			path: ':memory:',
+			schemaVersion: 1,
+		}),
+		getHealth: () => ({ path: ':memory:', schemaVersion: 1, status: 'ok' }),
+		open: () => ({ path: ':memory:', schemaVersion: 1, status: 'ok' }),
+	};
+	const settingsResolutionService = {
+		resolve: () =>
+			createSettingsSnapshot({
+				config: lockedManagedRoot
+					? createConfig({
+							managed: {
+								locked: { rootDirectory: true },
+								values: { rootDirectory: lockedManagedRoot },
+							},
+						})
+					: createConfig(),
+				database,
+				homeDirectory,
+			}),
+	};
+
+	const service = createEnsembleRootDirectoryService({
+		databaseService,
+		homeDirectory,
+		reconcileRootDirectory,
+		settingsResolutionService,
+	});
+
+	const initialPath = service.ensure().path;
+
+	lockedManagedRoot = path.join(homeDirectory, 'ManagedRoot');
+	const attemptedRoot = path.join(homeDirectory, 'AttemptedRoot');
+	mkdirSync(attemptedRoot);
+
+	const result = service.applyChange({ path: attemptedRoot });
+
+	assert.equal(result.applied, false);
+	// Cached snapshot must remain the originally-ensured root, NOT the
+	// failed candidate. Regression guard for the stale-snapshot bug fixed
+	// in root-directory-service.ts.
+	assert.equal(service.getSnapshot()?.path, initialPath);
+	assert.notEqual(service.getSnapshot()?.path, attemptedRoot);
 });
 
 test('reconciles shared-looking root contents after applying a switch', (t) => {

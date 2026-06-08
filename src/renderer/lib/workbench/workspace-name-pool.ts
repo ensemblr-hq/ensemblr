@@ -1,0 +1,208 @@
+/**
+ * Surnames of well-known composers spanning classical, romantic, modernist,
+ * contemporary, film, and game-music eras. Used to seed a workspace name when
+ * the user clicks the project-header "+" button. Agents may rename the
+ * workspace later, so this is only a deterministic-looking placeholder.
+ *
+ * Entries are restricted to ASCII letters and spaces. The backend slug
+ * pipeline (`/[^a-z0-9]+/g` → `-`) collapses spaces into dashes, so a name
+ * like `Gregson Williams` becomes branch `gregson-williams`. No duplicates.
+ */
+export const COMPOSER_SURNAMES: readonly string[] = [
+	// Baroque
+	'Bach',
+	'Handel',
+	'Vivaldi',
+	'Telemann',
+	'Purcell',
+	'Scarlatti',
+	'Pachelbel',
+	'Monteverdi',
+	'Corelli',
+	'Rameau',
+	// Classical
+	'Mozart',
+	'Haydn',
+	'Beethoven',
+	'Gluck',
+	'Salieri',
+	'Boccherini',
+	'Clementi',
+	'Cherubini',
+	// Romantic
+	'Schubert',
+	'Schumann',
+	'Chopin',
+	'Liszt',
+	'Mendelssohn',
+	'Berlioz',
+	'Brahms',
+	'Wagner',
+	'Verdi',
+	'Bizet',
+	'Tchaikovsky',
+	'Mahler',
+	'Bruckner',
+	'Dvorak',
+	'Grieg',
+	'Sibelius',
+	'Rachmaninov',
+	'Rimsky-Korsakov',
+	'Mussorgsky',
+	'Borodin',
+	'Glinka',
+	'Balakirev',
+	'Cui',
+	'Scriabin',
+	'Glazunov',
+	'Lyadov',
+	'Taneyev',
+	'Arensky',
+	'Medtner',
+	'Gliere',
+	'Faure',
+	'Saint Saens',
+	'Rossini',
+	'Puccini',
+	'Strauss',
+	'Smetana',
+	'Janacek',
+	// Twentieth century
+	'Debussy',
+	'Ravel',
+	'Stravinsky',
+	'Schoenberg',
+	'Berg',
+	'Webern',
+	'Bartok',
+	'Prokofiev',
+	'Shostakovich',
+	'Khachaturian',
+	'Kabalevsky',
+	'Sviridov',
+	'Schnittke',
+	'Gubaidulina',
+	'Denisov',
+	'Kalinnikov',
+	'Holst',
+	'Elgar',
+	'Britten',
+	'Copland',
+	'Gershwin',
+	'Ives',
+	'Bernstein',
+	'Messiaen',
+	'Ligeti',
+	'Stockhausen',
+	'Boulez',
+	'Cage',
+	'Satie',
+	'Hindemith',
+	'Poulenc',
+	'Milhaud',
+	'Ginastera',
+	// Minimalist and contemporary
+	'Glass',
+	'Reich',
+	'Adams',
+	'Riley',
+	'Part',
+	'Gorecki',
+	'Penderecki',
+	'Tavener',
+	'Andriessen',
+	'Nyman',
+	'Einaudi',
+	'Richter',
+	'Yiruma',
+	// Film and television
+	'Williams',
+	'Zimmer',
+	'Morricone',
+	'Goldsmith',
+	'Horner',
+	'Elfman',
+	'Shore',
+	'Newman',
+	'Mancini',
+	'Herrmann',
+	'Jarre',
+	'Barry',
+	'Desplat',
+	'Marianelli',
+	'Powell',
+	'Giacchino',
+	'Howard',
+	'Silvestri',
+	'Goransson',
+	'Britell',
+	'Greenwood',
+	'Gregson-Williams',
+	// Electronic, ambient, and stage
+	'Moroder',
+	'Faltermeyer',
+	'Reznor',
+	'Eno',
+	'Sakamoto',
+	'Vangelis',
+	'Tangerine',
+	'Carpenter',
+	'Hisaishi',
+	'Yoshimatsu',
+	// Game music — Japanese
+	'Uematsu',
+	'Mitsuda',
+	'Kondo',
+	'Iwata',
+	'Sugiyama',
+	'Yamaoka',
+	'Soken',
+	'Shimomura',
+	// Game music — western
+	'Wintory',
+	'Schyman',
+	'Spear',
+	'Kyd',
+	'Soule',
+	'Zur',
+	'ODonnell',
+	'Salvatori',
+	'Gordon',
+	'Coker',
+	'Tin',
+	'McCreary',
+	'Korb',
+	'Fox',
+	'Raine',
+	'Rosenfeld',
+	'Larkin',
+	'Slavov',
+	'Graves',
+	'Velasco',
+	'Balfe',
+	'Vreeland',
+	'Deriviere',
+	'Brower',
+];
+
+/**
+ * Picks a composer surname at random, optionally avoiding names already in
+ * use. Falls back to the random choice when every entry is taken so the
+ * backend can append `-2` style suffixes.
+ * @param options.exclude - Lowercased existing names/slugs to skip when possible.
+ * @returns A composer surname suitable as a workspace name.
+ */
+export function pickComposerSurname({
+	exclude = [],
+}: {
+	exclude?: readonly string[];
+} = {}): string {
+	const taken = new Set(exclude.map((value) => value.toLowerCase()));
+	const fallback = COMPOSER_SURNAMES[0] ?? 'workspace';
+	const available = COMPOSER_SURNAMES.filter(
+		(name) => !taken.has(name.toLowerCase()),
+	);
+	const pool = available.length > 0 ? available : COMPOSER_SURNAMES;
+	const index = Math.floor(Math.random() * pool.length);
+	return pool[index] ?? fallback;
+}

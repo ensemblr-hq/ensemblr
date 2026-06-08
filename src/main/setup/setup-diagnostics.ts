@@ -7,10 +7,7 @@ import type {
 	SetupCheckSnapshot,
 	SetupDiagnosticsSnapshot,
 } from '../../shared/ipc';
-import type {
-	LocalCommandResult,
-	LocalCommandService,
-} from '../commands/local-command';
+import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleConfigService } from '../config/config-loader';
 import type { EnvironmentVariablesService } from '../environment/environment-variables';
 import type { PiExecutableService } from '../pi/pi-executable';
@@ -18,7 +15,7 @@ import type { PiReadinessService } from '../pi/pi-readiness';
 import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
 import type { EnsembleDatabaseService } from '../storage/database';
 import {
-	createCommandLogs,
+	appendCommandStreamLogs,
 	createSetupCheckSnapshot,
 	type SetupCheckProvider,
 	type SetupCheckProviderContext,
@@ -461,28 +458,14 @@ async function getShellProcessCheck({
 			maxOutputBytes: 1024,
 			timeoutMs: 1500,
 		});
-		const logs: SetupCheckLogSnapshot[] = [
-			...environment.diagnostics.map((diagnostic) => ({
+		const logs: SetupCheckLogSnapshot[] = environment.diagnostics.map(
+			(diagnostic) => ({
 				label: diagnostic.code,
 				text: diagnostic.message,
-			})),
-		];
+			}),
+		);
 
-		if (result.logs.stdout) {
-			logs.push({
-				label: 'stdout',
-				text: result.logs.stdout,
-				truncated: result.stdoutTruncated,
-			});
-		}
-
-		if (result.logs.stderr) {
-			logs.push({
-				label: 'stderr',
-				text: result.logs.stderr,
-				truncated: result.stderrTruncated,
-			});
-		}
+		appendCommandStreamLogs(logs, result);
 
 		if (result.status !== 'success') {
 			return createSetupCheckSnapshot({
@@ -537,6 +520,34 @@ async function getShellProcessCheck({
 	}
 }
 
+/** Per-status counts derived from an env-vars snapshot. */
+interface EnvironmentVariableStatusCounts {
+	configured: number;
+	masked: number;
+	reserved: number;
+}
+
+/** Counts how many variables fall into each status bucket. */
+function countEnvironmentVariableStatuses(
+	snapshot: EnvironmentVariablesSnapshot,
+): EnvironmentVariableStatusCounts {
+	let configured = 0;
+	let masked = 0;
+	let reserved = 0;
+	for (const variable of snapshot.variables) {
+		if (variable.status === 'set' || variable.status === 'masked') {
+			configured += 1;
+		}
+		if (variable.status === 'masked') {
+			masked += 1;
+		}
+		if (variable.status === 'reserved') {
+			reserved += 1;
+		}
+	}
+	return { configured, masked, reserved };
+}
+
 /** Renders the headline detail string for the env-vars check. */
 function getEnvironmentVariablesDetail(
 	snapshot: EnvironmentVariablesSnapshot,
@@ -545,32 +556,18 @@ function getEnvironmentVariablesDetail(
 		return `${snapshot.missingRequiredCount} required environment variables are unset.`;
 	}
 
-	const configuredCount = snapshot.variables.filter(
-		(variable) => variable.status === 'set' || variable.status === 'masked',
-	).length;
-	const maskedCount = snapshot.variables.filter(
-		(variable) => variable.status === 'masked',
-	).length;
-	const reservedCount = snapshot.variables.filter(
-		(variable) => variable.status === 'reserved',
-	).length;
+	const { configured, masked, reserved } =
+		countEnvironmentVariableStatuses(snapshot);
 
-	return `${configuredCount} configured variables, ${maskedCount} masked secrets, and ${reservedCount} reserved runtime variables are cataloged.`;
+	return `${configured} configured variables, ${masked} masked secrets, and ${reserved} reserved runtime variables are cataloged.`;
 }
 
 /** Renders the per-variable counts and diagnostics as setup check logs. */
 function createEnvironmentVariablesLogs(
 	snapshot: EnvironmentVariablesSnapshot,
 ): SetupCheckLogSnapshot[] {
-	const configuredCount = snapshot.variables.filter(
-		(variable) => variable.status === 'set' || variable.status === 'masked',
-	).length;
-	const maskedCount = snapshot.variables.filter(
-		(variable) => variable.status === 'masked',
-	).length;
-	const reservedCount = snapshot.variables.filter(
-		(variable) => variable.status === 'reserved',
-	).length;
+	const { configured, masked, reserved } =
+		countEnvironmentVariableStatuses(snapshot);
 
 	return [
 		{
@@ -579,15 +576,15 @@ function createEnvironmentVariablesLogs(
 		},
 		{
 			label: 'Configured variables',
-			text: String(configuredCount),
+			text: String(configured),
 		},
 		{
 			label: 'Masked secrets',
-			text: String(maskedCount),
+			text: String(masked),
 		},
 		{
 			label: 'Reserved runtime variables',
-			text: String(reservedCount),
+			text: String(reserved),
 		},
 		...snapshot.diagnostics.map((diagnostic) => ({
 			label: diagnostic.code,

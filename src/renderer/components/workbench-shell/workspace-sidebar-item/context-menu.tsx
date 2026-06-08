@@ -10,42 +10,40 @@ import {
 	PencilIcon,
 	PinIcon,
 } from 'lucide-react';
-import type { ComponentProps } from 'react';
 
 import {
 	ContextMenuContent,
 	ContextMenuGroup,
-	ContextMenuItem,
 	ContextMenuSeparator,
 	ContextMenuShortcut,
 	ContextMenuSub,
 	ContextMenuSubContent,
 	ContextMenuSubTrigger,
 } from '@/renderer/components/ui/context-menu';
-import { cn } from '@/renderer/lib/utils';
+import { SidebarContextMenuItem } from '@/renderer/components/workbench-shell/sidebar-context-menu-item';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import {
 	classifyPermissionAction,
 	DEFAULT_PERMISSION_MODE,
-	getPermissionBoundaryLabel,
 } from '@/shared/permissions';
 
 const archiveBoundary = classifyPermissionAction({
 	action: 'workspace-archive-delete',
 	mode: DEFAULT_PERMISSION_MODE,
 });
-const archiveBoundaryLabel = getPermissionBoundaryLabel(
-	archiveBoundary.boundary,
-);
 
 /** Right-click context menu for a workspace row (pin, status, archive). */
 export function WorkspaceContextMenuContent({
 	isPinned,
+	onArchiveSelect,
 	onPinToggle,
+	onRenameSelect,
 	workspace,
 }: {
 	isPinned: boolean;
+	onArchiveSelect?: () => void;
 	onPinToggle: () => void;
+	onRenameSelect?: () => void;
 	workspace: WorkspaceShellModel;
 }) {
 	return (
@@ -103,7 +101,10 @@ export function WorkspaceContextMenuContent({
 						</ContextMenuGroup>
 					</ContextMenuSubContent>
 				</ContextMenuSub>
-				<SidebarContextMenuItem>
+				<SidebarContextMenuItem
+					disabled={!onRenameSelect}
+					onSelect={onRenameSelect}
+				>
 					<PencilIcon aria-hidden='true' />
 					<span className='min-w-0 flex-1'>Rename</span>
 				</SidebarContextMenuItem>
@@ -111,13 +112,12 @@ export function WorkspaceContextMenuContent({
 			<ContextMenuSeparator />
 			<ContextMenuGroup>
 				<SidebarContextMenuItem
-					data-action-placeholder='workspace-archive-confirmation'
 					data-permission-boundary={archiveBoundary.boundary}
-					disabled
+					disabled={!onArchiveSelect}
+					onSelect={onArchiveSelect}
 				>
 					<ArchiveIcon aria-hidden='true' />
 					<span className='min-w-0 flex-1'>Archive</span>
-					<ContextMenuShortcut>{archiveBoundaryLabel}</ContextMenuShortcut>
 				</SidebarContextMenuItem>
 			</ContextMenuGroup>
 		</ContextMenuContent>
@@ -147,18 +147,5 @@ function WorkspaceStatusMenuItem({
 				/>
 			) : null}
 		</SidebarContextMenuItem>
-	);
-}
-
-/** Styled wrapper around `ContextMenuItem` for workspace context menus. */
-function SidebarContextMenuItem({
-	className,
-	...props
-}: ComponentProps<typeof ContextMenuItem>) {
-	return (
-		<ContextMenuItem
-			className={cn('h-8 gap-2 px-2 text-[0.8125rem]', className)}
-			{...props}
-		/>
 	);
 }

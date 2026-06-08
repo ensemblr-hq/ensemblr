@@ -15,7 +15,6 @@ export type {
 	WorkspaceNavigationSelection,
 } from './navigation-model';
 export {
-	DEFAULT_LIVE_WORKSPACE_DOCK_TAB,
 	findWorkspaceNavigationSelection,
 	getPreferredSession,
 	getRenderableNavigationSnapshot,

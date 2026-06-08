@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import { QueryClient } from '@tanstack/react-query';
 import { isRedirect } from '@tanstack/react-router';
 
+import { repositoryWorkspaceNavigationQuery } from '../../src/renderer/api/ensemble-queries';
 import { normalizeWorkbenchSearch } from '../../src/renderer/lib/workbench';
 import {
 	loadProjectWorkbenchRoute,
@@ -12,6 +13,7 @@ import {
 	loadWorkspaceWorkbenchRoute,
 } from '../../src/renderer/routing/workbench-route-loaders';
 import type { WorkspaceRouteLoaderData } from '../../src/renderer/types/routing';
+import type { RepositoryWorkspaceNavigationSnapshot } from '../../src/shared/ipc';
 
 async function catchProjectRouteRedirect({
 	params,
@@ -284,6 +286,95 @@ test('redirects invalid typed chat route params to the default chat', async () =
 		},
 		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
 	});
+});
+
+test('reads fresh navigation cache when parent loaderData lacks the workspace', async () => {
+	Reflect.deleteProperty(globalThis, 'window');
+	const queryClient = new QueryClient();
+	const loaderData = await loadWorkbenchRouteData(queryClient);
+
+	const seededWorkspaceId = 'workspace-test-fresh-cache';
+	const seededSnapshot: RepositoryWorkspaceNavigationSnapshot = {
+		generatedAt: '2026-06-08T00:00:00.000Z',
+		repositories: [
+			{
+				createdAt: '2026-06-08T00:00:00.000Z',
+				defaultBranch: 'main',
+				id: 'ensemble',
+				metadata: {},
+				name: 'ensemble',
+				path: '/tmp/ensemble',
+				slug: 'ensemble',
+				updatedAt: '2026-06-08T00:00:00.000Z',
+				workspaces: [
+					{
+						archivedAt: null,
+						baseBranch: 'main',
+						branchName: 'feature/test-fresh',
+						createdAt: '2026-06-08T00:00:00.000Z',
+						id: seededWorkspaceId,
+						metadata: {},
+						name: 'Test Fresh',
+						path: '/tmp/ensemble/test-fresh',
+						repositoryId: 'ensemble',
+						slug: 'test-fresh',
+						updatedAt: '2026-06-08T00:00:00.000Z',
+					},
+				],
+			},
+		],
+	};
+	queryClient.setQueryData(
+		repositoryWorkspaceNavigationQuery.queryKey,
+		seededSnapshot,
+	);
+
+	const workspaceData = await loadWorkspaceWorkbenchRoute({
+		parentMatchPromise: Promise.resolve({ loaderData }),
+		params: {
+			projectId: 'ensemble',
+			workspaceId: seededWorkspaceId,
+		},
+		queryClient,
+		rawSearch: {},
+		search: normalizeWorkbenchSearch({}),
+	});
+
+	expect(workspaceData).toBeDefined();
+	expect(workspaceData?.project.id).toBe('ensemble');
+	expect(workspaceData?.workspace.id).toBe(seededWorkspaceId);
+});
+
+test('still redirects when neither parent loaderData nor fresh cache has the workspace', async () => {
+	Reflect.deleteProperty(globalThis, 'window');
+	const queryClient = new QueryClient();
+	const loaderData = await loadWorkbenchRouteData(queryClient);
+
+	try {
+		await loadWorkspaceWorkbenchRoute({
+			parentMatchPromise: Promise.resolve({ loaderData }),
+			params: {
+				projectId: 'missing-project',
+				workspaceId: 'missing-workspace',
+			},
+			queryClient,
+			rawSearch: {},
+			search: normalizeWorkbenchSearch({}),
+		});
+	} catch (error) {
+		if (isRedirect(error)) {
+			expect(error.options).toMatchObject({
+				replace: true,
+				to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
+			});
+
+			return;
+		}
+
+		throw error;
+	}
+
+	throw new Error('Expected workspace route loader to redirect.');
 });
 
 test('shell pass-through feeds workbench data to descendant loaders', async () => {

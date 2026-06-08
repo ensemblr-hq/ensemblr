@@ -1,6 +1,6 @@
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
-import { NavigationProvider } from '@/renderer/components/workbench-shell/contexts';
 import { WorkbenchFrame } from '@/renderer/components/workbench-shell/frame';
+import { NavigationProvider } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
 import type { NavigationContextValue } from '@/renderer/types/contexts';
 import type {

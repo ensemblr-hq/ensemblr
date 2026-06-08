@@ -56,15 +56,24 @@ export function getRenderableNavigationSnapshot({
 function mapRepositoryNavigationSnapshot(
 	repository: RepositoryWorkspaceNavigationRepository,
 ): ProjectShellModel {
+	const remoteUrl = getMetadataString(repository.metadata, [
+		'remoteUrl',
+		'originUrl',
+	]);
+	const githubOwner = parseGithubOwnerFromRemoteUrl(remoteUrl);
 	const ownerName =
 		getMetadataString(repository.metadata, ['ownerName', 'owner']) ??
+		githubOwner ??
 		getParentDirectoryName(repository.path) ??
 		repository.slug;
-	const avatarUrl = getMetadataString(repository.metadata, [
+	const explicitAvatarUrl = getMetadataString(repository.metadata, [
 		'avatarUrl',
 		'ownerAvatarUrl',
 		'githubAvatarUrl',
 	]);
+	const avatarUrl =
+		explicitAvatarUrl ??
+		(githubOwner ? `https://github.com/${githubOwner}.png?size=80` : null);
 
 	return {
 		id: repository.id,
@@ -172,4 +181,23 @@ function getParentDirectoryName(filePath: string): string | null {
 	const parentDirectory = normalizedPath.split('/').at(-2);
 
 	return parentDirectory || null;
+}
+
+/**
+ * Extracts the GitHub owner segment from a remote URL, covering HTTPS, SSH, and
+ * `git@`-style remotes. Returns `null` when the host is not github.com or the
+ * URL cannot be parsed.
+ */
+function parseGithubOwnerFromRemoteUrl(
+	remoteUrl: string | null,
+): string | null {
+	if (!remoteUrl) {
+		return null;
+	}
+
+	const match = remoteUrl
+		.trim()
+		.match(/github\.com[/:]([^/:]+)\/[^/]+?(?:\.git)?\/?$/i);
+
+	return match?.[1] ?? null;
 }

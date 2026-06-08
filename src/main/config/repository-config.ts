@@ -1,7 +1,5 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
-
-import { load } from 'js-toml';
 
 import type {
 	ConfigDiagnostic,
@@ -10,11 +8,16 @@ import type {
 	RepositoryConfigSourceStatus,
 	SettingsResolutionSource,
 } from '../../shared/ipc';
+import { cloneRecord, isPlainRecord } from './json-utils.ts';
 import {
-	cloneRecord,
-	formatErrorMessage,
-	isPlainRecord,
-} from './json-utils.ts';
+	formatSourceName,
+	loadWorktreeincludeSource,
+	readJsonFile,
+	readTomlFile,
+	WORKTREE_INCLUDE_FILENAME,
+} from './repository-config-loaders.ts';
+
+export { readJsonFile } from './repository-config-loaders.ts';
 
 /** Options for {@link loadRepositoryConfig}. */
 export interface LoadRepositoryConfigOptions {
@@ -35,14 +38,6 @@ export interface LoadedRepositoryConfig {
 export type { RepositoryConfigPathAuthorizationOptions } from './repository-config-auth.ts';
 export { isRepositoryConfigPathAllowed } from './repository-config-auth.ts';
 
-/** Internal: result of reading a single config file from disk. */
-interface ParsedConfigSource {
-	diagnostics: ConfigDiagnostic[];
-	path: string;
-	record: Record<string, unknown> | null;
-	status: RepositoryConfigSourceStatus;
-}
-
 /** Internal: result of normalising a parsed config file. */
 interface NormalizedConfigSource {
 	diagnostics: ConfigDiagnostic[];
@@ -54,7 +49,6 @@ const LEGACY_CONDUCTOR_CONFIG_FILENAME = 'conductor.json';
 const CONDUCTOR_DIRECTORY = '.conductor';
 const CONDUCTOR_SHARED_SETTINGS_FILENAME = 'settings.toml';
 const CONDUCTOR_LOCAL_SETTINGS_FILENAME = 'settings.local.toml';
-const WORKTREE_INCLUDE_FILENAME = '.worktreeinclude';
 
 const SCRIPT_FIELD_MAP = new Map([
 	['archive', 'archive'],
@@ -324,216 +318,6 @@ function loadTomlSource({
 }
 
 /**
- * Parses a `.worktreeinclude` file (one path per line) into a `filesToCopy`
- * setting, skipping blanks and `#`-prefixed comments.
- * @param repositoryPath - Repository root.
- * @returns Diagnostics, derived settings, and source status.
- */
-function loadWorktreeincludeSource(repositoryPath: string): {
-	diagnostics: ConfigDiagnostic[];
-	settings: Record<string, unknown>;
-	status: RepositoryConfigSourceStatus;
-} {
-	const sourcePath = path.join(repositoryPath, WORKTREE_INCLUDE_FILENAME);
-
-	if (!existsSync(sourcePath)) {
-		return { diagnostics: [], settings: {}, status: 'missing' };
-	}
-
-	let source: string;
-
-	try {
-		source = readFileSync(sourcePath, 'utf8');
-	} catch (error) {
-		return {
-			diagnostics: [
-				{
-					code: 'repository-config-read-error',
-					message: formatErrorMessage(
-						error,
-						'Failed to read .worktreeinclude.',
-					),
-					severity: 'error',
-				},
-			],
-			settings: {},
-			status: 'invalid',
-		};
-	}
-
-	const filesToCopy = source
-		.split(/\r?\n/)
-		.map((line) => line.trim())
-		.flatMap((line) => {
-			if (!line || line.startsWith('#')) {
-				return [];
-			}
-
-			return [line.startsWith('\\#') ? line.slice(1) : line];
-		});
-
-	return {
-		diagnostics: [],
-		settings: { filesToCopy },
-		status: 'loaded',
-	};
-}
-
-/**
- * Reads a JSON file from disk and reports parse/IO errors as diagnostics.
- * @param input - File kind and path.
- * @returns The parsed record (or `null`) plus status diagnostics.
- */
-export function readJsonFile({
-	kind,
-	source,
-	sourcePath,
-}: {
-	kind: 'conductor' | 'ensemble';
-	source: SettingsResolutionSource;
-	sourcePath: string;
-}): ParsedConfigSource {
-	if (!existsSync(sourcePath)) {
-		return {
-			diagnostics: [],
-			path: sourcePath,
-			record: null,
-			status: 'missing',
-		};
-	}
-
-	let rawSource: string;
-
-	try {
-		rawSource = readFileSync(sourcePath, 'utf8');
-	} catch (error) {
-		return {
-			diagnostics: [
-				{
-					code: 'repository-config-read-error',
-					message: formatErrorMessage(error, 'Failed to read config file.'),
-					severity: 'error',
-				},
-			],
-			path: sourcePath,
-			record: null,
-			status: 'invalid',
-		};
-	}
-
-	try {
-		const parsed = JSON.parse(rawSource);
-
-		if (!isPlainRecord(parsed)) {
-			return {
-				diagnostics: [
-					{
-						code: 'invalid-repository-config-root',
-						fieldPath: '$',
-						message: `${formatSourceName(source)} root must be a JSON object.`,
-						severity: 'error',
-					},
-				],
-				path: sourcePath,
-				record: null,
-				status: 'invalid',
-			};
-		}
-
-		return {
-			diagnostics: [],
-			path: sourcePath,
-			record: parsed,
-			status: 'loaded',
-		};
-	} catch (error) {
-		return {
-			diagnostics: [
-				{
-					...getJsonErrorLocation(rawSource, error),
-					code: 'invalid-repository-json',
-					message: formatErrorMessage(
-						error,
-						`${kind === 'ensemble' ? 'ensemble.json' : 'conductor.json'} is not valid JSON.`,
-					),
-					severity: 'error',
-				},
-			],
-			path: sourcePath,
-			record: null,
-			status: 'invalid',
-		};
-	}
-}
-
-/**
- * Reads a TOML file from disk and reports parse/IO errors as diagnostics.
- * @param input - File path.
- * @returns The parsed record (or `null`) plus status diagnostics.
- */
-function readTomlFile({
-	sourcePath,
-}: {
-	sourcePath: string;
-}): ParsedConfigSource {
-	if (!existsSync(sourcePath)) {
-		return {
-			diagnostics: [],
-			path: sourcePath,
-			record: null,
-			status: 'missing',
-		};
-	}
-
-	let rawSource: string;
-
-	try {
-		rawSource = readFileSync(sourcePath, 'utf8');
-	} catch (error) {
-		return {
-			diagnostics: [
-				{
-					code: 'repository-config-read-error',
-					message: formatErrorMessage(
-						error,
-						'Failed to read TOML config file.',
-					),
-					severity: 'error',
-				},
-			],
-			path: sourcePath,
-			record: null,
-			status: 'invalid',
-		};
-	}
-
-	try {
-		return {
-			diagnostics: [],
-			path: sourcePath,
-			record: load(rawSource),
-			status: 'loaded',
-		};
-	} catch (error) {
-		return {
-			diagnostics: [
-				{
-					code: 'invalid-repository-toml',
-					message: formatErrorMessage(
-						error,
-						'Conductor TOML settings are not valid TOML.',
-					),
-					severity: 'error',
-				},
-			],
-			path: sourcePath,
-			record: null,
-			status: 'invalid',
-		};
-	}
-}
-
-/**
  * Maps a parsed JSON config record onto the canonical Ensemble setting keys,
  * collecting per-field diagnostics for unsupported or wrongly-typed values.
  * @param input - Parsed record plus kind and source labels.
@@ -551,16 +335,54 @@ function normalizeJsonRepositoryConfig({
 	const diagnostics: ConfigDiagnostic[] = [];
 	const settings: Record<string, unknown> = {};
 
+	normalizeRepositoryConfigFields({
+		config,
+		diagnostics,
+		fieldMap: JSON_FIELD_MAP,
+		scriptSupportsRunMode: false,
+		settings,
+		source,
+	});
+
+	if (kind === 'conductor' && Object.keys(settings).length > 0) {
+		settings.conductorCompatibility ??= true;
+	}
+
+	diagnostics.push(...takeNestedDiagnostics(settings));
+
+	return { diagnostics, settings };
+}
+
+/**
+ * Shared per-field normalisation loop used by both JSON and TOML parsers.
+ * Handles the special `scripts` key, looks up the field map for the
+ * canonical key, and accumulates accepted values + diagnostics in-place.
+ */
+function normalizeRepositoryConfigFields({
+	config,
+	diagnostics,
+	fieldMap,
+	scriptSupportsRunMode,
+	settings,
+	source,
+}: {
+	config: Record<string, unknown>;
+	diagnostics: ConfigDiagnostic[];
+	fieldMap: ReadonlyMap<string, string>;
+	scriptSupportsRunMode: boolean;
+	settings: Record<string, unknown>;
+	source: SettingsResolutionSource;
+}): void {
 	for (const [key, value] of Object.entries(config)) {
 		if (key === 'scripts') {
 			mergeSettings(
 				settings,
-				normalizeScripts(value, '$.scripts', source, false),
+				normalizeScripts(value, '$.scripts', source, scriptSupportsRunMode),
 			);
 			continue;
 		}
 
-		const normalizedKey = JSON_FIELD_MAP.get(key);
+		const normalizedKey = fieldMap.get(key);
 
 		if (!normalizedKey) {
 			diagnostics.push(
@@ -583,14 +405,6 @@ function normalizeJsonRepositoryConfig({
 
 		diagnostics.push(normalizedValue.diagnostic);
 	}
-
-	if (kind === 'conductor' && Object.keys(settings).length > 0) {
-		settings.conductorCompatibility ??= true;
-	}
-
-	diagnostics.push(...takeNestedDiagnostics(settings));
-
-	return { diagnostics, settings };
 }
 
 /**
@@ -607,38 +421,14 @@ function normalizeTomlRepositoryConfig(
 	const diagnostics: ConfigDiagnostic[] = [];
 	const settings: Record<string, unknown> = {};
 
-	for (const [key, value] of Object.entries(config)) {
-		if (key === 'scripts') {
-			mergeSettings(
-				settings,
-				normalizeScripts(value, '$.scripts', source, true),
-			);
-			continue;
-		}
-
-		const normalizedKey = TOML_FIELD_MAP.get(key);
-
-		if (!normalizedKey) {
-			diagnostics.push(
-				createUnsupportedFieldDiagnostic(key, source, `$.${key}`),
-			);
-			continue;
-		}
-
-		const normalizedValue = normalizeSettingValue({
-			fieldPath: `$.${key}`,
-			key: normalizedKey,
-			source,
-			value,
-		});
-
-		if (normalizedValue.accepted) {
-			settings[normalizedKey] = normalizedValue.value;
-			continue;
-		}
-
-		diagnostics.push(normalizedValue.diagnostic);
-	}
+	normalizeRepositoryConfigFields({
+		config,
+		diagnostics,
+		fieldMap: TOML_FIELD_MAP,
+		scriptSupportsRunMode: true,
+		settings,
+		source,
+	});
 
 	if (Object.keys(settings).length > 0) {
 		settings.conductorCompatibility ??= true;
@@ -1004,35 +794,6 @@ function createInvalidFieldDiagnostic(
 }
 
 /**
- * Maps a settings source identifier to its on-disk filename for diagnostics.
- * @param source - Source identifier.
- * @returns Human-readable file name.
- */
-function formatSourceName(source: SettingsResolutionSource): string {
-	if (source === 'conductor-config') {
-		return '.conductor/settings.toml';
-	}
-
-	if (source === 'conductor-local-config') {
-		return '.conductor/settings.local.toml';
-	}
-
-	if (source === 'conductor-legacy-config') {
-		return 'conductor.json';
-	}
-
-	if (source === 'ensemble-config') {
-		return 'ensemble.json';
-	}
-
-	if (source === 'worktreeinclude') {
-		return '.worktreeinclude';
-	}
-
-	return source;
-}
-
-/**
  * Renders a source path relative to the repository root when possible.
  * @param sourcePath - Absolute source path.
  * @param repositoryPath - Repository root.
@@ -1049,33 +810,6 @@ function formatRepositoryDisplayPath(
 	}
 
 	return relativePath;
-}
-
-/**
- * Extracts a line/column hint from a JSON parser error message.
- * @param source - Raw JSON source text.
- * @param error - The parser error thrown by `JSON.parse`.
- * @returns A partial diagnostic with `line` and `column`, when available.
- */
-function getJsonErrorLocation(
-	source: string,
-	error: unknown,
-): Pick<ConfigDiagnostic, 'column' | 'line'> {
-	const message = error instanceof Error ? error.message : '';
-	const positionMatch = /position (\d+)/i.exec(message);
-
-	if (positionMatch) {
-		const position = Number(positionMatch[1]);
-		const beforePosition = source.slice(0, Math.max(0, position));
-		const lines = beforePosition.split('\n');
-
-		return {
-			column: (lines.at(-1)?.length ?? 0) + 1,
-			line: lines.length,
-		};
-	}
-
-	return {};
 }
 
 /**

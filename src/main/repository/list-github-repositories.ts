@@ -6,7 +6,7 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
-
+import { firstLine } from './first-line.ts';
 /** Public surface of the gh-backed repository listing service. */
 export interface GithubRepositoryListService {
 	list: () => Promise<GithubRepositoryListResult>;
@@ -161,15 +161,4 @@ function mapFailure(result: LocalCommandResult): string {
 		default:
 			return result.failure?.message ?? 'gh api failed.';
 	}
-}
-
-/** Returns the first non-blank line of `text`, trimmed; empty string otherwise. */
-function firstLine(text: string): string {
-	for (const line of text.split(/\r?\n/)) {
-		const trimmed = line.trim();
-		if (trimmed) {
-			return trimmed;
-		}
-	}
-	return '';
 }

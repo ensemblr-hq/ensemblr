@@ -1,6 +1,10 @@
 import { type IpcRendererEvent, ipcRenderer } from 'electron';
 
 import {
+	type ArchiveRepositoryRequest,
+	type ArchiveRepositoryResult,
+	type ArchiveWorkspaceRequest,
+	type ArchiveWorkspaceResult,
 	type CloneDestinationSelectionResult,
 	type CloneGithubRepositoryPrepareResult,
 	type CloneGithubRepositoryProgressEvent,
@@ -20,6 +24,8 @@ import {
 	type QuickStartProjectResult,
 	type RegisterLocalRepositoryRequest,
 	type RegisterLocalRepositoryResult,
+	type RenameWorkspaceRequest,
+	type RenameWorkspaceResult,
 	type RepositoryConfigMigrationPreview,
 	type RepositoryConfigMigrationRequest,
 	type RepositoryConfigMigrationResult,
@@ -33,6 +39,7 @@ import {
 	type SettingsResolutionRequest,
 	type SettingsResolutionSnapshot,
 	type SetupDiagnosticsSnapshot,
+	type SharedRootAdoptionSnapshot,
 } from '../../shared/ipc';
 
 /**
@@ -49,6 +56,16 @@ export function createEnsembleApi(): EnsembleApi {
 				IPC_CHANNELS.applyRepositoryConfigMigration,
 				request,
 			) as Promise<RepositoryConfigMigrationResult>,
+		archiveRepository: (request: ArchiveRepositoryRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.archiveRepository,
+				request,
+			) as Promise<ArchiveRepositoryResult>,
+		archiveWorkspace: (request: ArchiveWorkspaceRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.archiveWorkspace,
+				request,
+			) as Promise<ArchiveWorkspaceResult>,
 		confirmRootDirectoryChange: (request: RootDirectoryChangeRequest) =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.confirmRootDirectoryChange,
@@ -98,6 +115,11 @@ export function createEnsembleApi(): EnsembleApi {
 				IPC_CHANNELS.registerLocalRepository,
 				request,
 			) as Promise<RegisterLocalRepositoryResult>,
+		renameWorkspace: (request: RenameWorkspaceRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.renameWorkspace,
+				request,
+			) as Promise<RenameWorkspaceResult>,
 		selectCloneDestination: () =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.selectCloneDestination,
@@ -140,6 +162,10 @@ export function createEnsembleApi(): EnsembleApi {
 			ipcRenderer.invoke(
 				IPC_CHANNELS.setupDiagnostics,
 			) as Promise<SetupDiagnosticsSnapshot>,
+		sharedRootAdoption: () =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.sharedRootAdoption,
+			) as Promise<SharedRootAdoptionSnapshot>,
 		selectPiExecutable: () =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.selectPiExecutable,

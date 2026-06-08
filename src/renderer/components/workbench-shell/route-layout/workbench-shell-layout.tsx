@@ -2,25 +2,27 @@ import { Outlet, useChildMatches } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
 import { CloneGithubDialog } from '@/renderer/components/welcome/clone-github-dialog';
 import { QuickStartDialog } from '@/renderer/components/welcome/quick-start-dialog';
+import { WorkbenchFrame } from '@/renderer/components/workbench-shell/frame';
 import {
 	NavigationProvider,
 	SetupDiagnosticsProvider,
-} from '@/renderer/components/workbench-shell/contexts';
-import { WorkbenchFrame } from '@/renderer/components/workbench-shell/frame';
+} from '@/renderer/components/workbench-shell/shell-contexts';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
 import {
 	getStringRouteParam,
 	getWorkbenchStaticView,
 	isWorkbenchActiveView,
 } from '@/renderer/lib/workbench';
-import { cloneDialogOpenAtom } from '@/renderer/state/clone-dialog';
-import { quickStartDialogOpenAtom } from '@/renderer/state/quick-start-dialog';
+import {
+	cloneDialogOpenAtom,
+	quickStartDialogOpenAtom,
+} from '@/renderer/state/dialogs';
 import type {
 	WorkbenchChildMatch,
 	WorkbenchShellRouteState,
 } from '@/renderer/types/components';
 
-import { WorkbenchLayoutModelProvider } from './layout-model-context';
+import { WorkbenchLayoutModelProvider } from '../shell-contexts';
 import {
 	useWorkbenchLayoutModel,
 	workbenchRouteApi,

@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { WorkspaceConversationContent } from '../../src/renderer/components/workbench-shell/conversation-panel';
+import { WorkbenchFrame } from '../../src/renderer/components/workbench-shell/frame';
 import {
 	NavigationProvider,
 	SetupDiagnosticsProvider,
-} from '../../src/renderer/components/workbench-shell/contexts';
-import { WorkspaceConversationContent } from '../../src/renderer/components/workbench-shell/conversation-panel';
-import { WorkbenchFrame } from '../../src/renderer/components/workbench-shell/frame';
+} from '../../src/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '../../src/renderer/components/workbench-shell/workspace-content';
 import {
 	findSession,
@@ -154,9 +154,6 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('Collapse repository ensemble');
 	expect(markup).toContain('data-slot="context-menu-trigger"');
 	expect(markup).toContain('Reorder repository ensemble');
-	expect(markup).toContain(
-		'data-action-placeholder="workspace-archive-confirmation"',
-	);
 	expect(markup).toContain('2 repos');
 	expect(markup).toContain('5 workspaces');
 	expect(markup).toContain('Open workspace Conductor shell rework');

@@ -226,6 +226,73 @@ test('rejects a duplicate registration with a clear diagnostic', async (t) => {
 	assert.equal(second.diagnostics[0]?.code, 'repository-already-registered');
 });
 
+test('honours an explicit name override so folder suffixes do not leak into the row', async (t) => {
+	const directory = mkdtempSync(
+		path.join(tmpdir(), 'ensemble-repo-fixture-suffix-'),
+	);
+	t.after(() => {
+		rmSync(directory, { force: true, recursive: true });
+	});
+	const suffixed = path.join(directory, 'haartz-next-2');
+	mkdirSync(suffixed);
+	const database = createDatabaseFixture(t);
+
+	const result = await registerLocalRepository({
+		database,
+		gitProbe: gitProbeStub({
+			defaultBranch: 'main',
+			isGitRepository: true,
+			remoteUrl: 'git@github.com:psoldunov/haartz-next.git',
+			topLevel: suffixed,
+		}),
+		loadConfig: loadRepositoryConfig,
+		now: fixedNow,
+		request: { name: 'haartz-next', path: suffixed },
+	});
+
+	assert.equal(result.registered, true);
+	assert.equal(result.repository?.name, 'haartz-next');
+	assert.equal(result.repository?.slug, 'haartz-next');
+	assert.equal(result.repository?.path, suffixed);
+});
+
+test('rejects a re-add when another repository tracks the same remote URL', async (t) => {
+	const first = createFixtureDirectory(t);
+	const second = createFixtureDirectory(t);
+	const database = createDatabaseFixture(t);
+
+	const initial = await registerLocalRepository({
+		database,
+		gitProbe: gitProbeStub({
+			isGitRepository: true,
+			remoteUrl: 'https://github.com/psoldunov/haartz-next.git',
+			topLevel: first,
+		}),
+		loadConfig: loadRepositoryConfig,
+		now: fixedNow,
+		request: { path: first },
+	});
+	assert.equal(initial.registered, true);
+
+	const reAdd = await registerLocalRepository({
+		database,
+		gitProbe: gitProbeStub({
+			isGitRepository: true,
+			// Equivalent SSH form of the same upstream — should still collide.
+			remoteUrl: 'git@github.com:psoldunov/haartz-next',
+			topLevel: second,
+		}),
+		loadConfig: loadRepositoryConfig,
+		now: fixedNow,
+		request: { path: second },
+	});
+	assert.equal(reAdd.registered, false);
+	assert.equal(
+		reAdd.diagnostics[0]?.code,
+		'repository-remote-already-registered',
+	);
+});
+
 test('captures settings-source diagnostics in metadata_json', async (t) => {
 	const directory = createFixtureDirectory(t);
 	const database = createDatabaseFixture(t);

@@ -22,7 +22,12 @@ import type {
 	RegisteredRepositorySnapshot,
 } from '../../shared/ipc';
 import type { EnsembleRootDirectoryService } from '../root';
-import type { LocalRepositoryRegistrationService } from './register-repository.ts';
+import type { EnsembleDatabaseService } from '../storage/database.ts';
+import {
+	isRemoteUrlTracked,
+	type LocalRepositoryRegistrationService,
+} from './register-repository.ts';
+import { allocateUniqueTargetPath } from './target-path.ts';
 
 /** Streamed update sent back while a clone job runs. */
 export type CloneProgressListener = (
@@ -75,6 +80,7 @@ export interface CloneCommandRunResult {
 /** Construction options for {@link createGithubCloneService}. */
 export interface CreateGithubCloneServiceOptions {
 	commandRunner?: CloneCommandRunner;
+	databaseService: EnsembleDatabaseService;
 	now?: () => Date;
 	registrationService: LocalRepositoryRegistrationService;
 	rootDirectoryService: EnsembleRootDirectoryService;
@@ -103,6 +109,7 @@ interface PreparedJob {
  */
 export function createGithubCloneService({
 	commandRunner = runCloneCommand,
+	databaseService,
 	now = () => new Date(),
 	registrationService,
 	rootDirectoryService,
@@ -136,6 +143,17 @@ export function createGithubCloneService({
 					code === 'url-required'
 						? 'A GitHub repository URL is required.'
 						: 'Enter a GitHub URL such as https://github.com/owner/repo or git@github.com:owner/repo.',
+				severity: 'error',
+			});
+			return { diagnostics, ok: false };
+		}
+
+		const database = databaseService.getConnection()?.database;
+		if (database && isRemoteUrlTracked(database, parsedUrl.sanitizedUrl)) {
+			diagnostics.push({
+				code: 'remote-already-registered',
+				message:
+					'This repository is already registered with Ensemble. Remove it first or open the existing project.',
 				severity: 'error',
 			});
 			return { diagnostics, ok: false };
@@ -315,6 +333,7 @@ export function createGithubCloneService({
 		emit('status', 'Clone succeeded; registering repository…');
 
 		const registration = await registrationService.register({
+			name: preparation.repositoryName,
 			path: preparation.targetPath,
 		});
 
@@ -440,7 +459,13 @@ function resolveDestination({
 				targetPath: overrideRaw,
 			};
 		}
-		return { targetPath: path.resolve(overrideRaw) };
+		const resolved = path.resolve(overrideRaw);
+		return {
+			targetPath: allocateUniqueTargetPath(
+				path.dirname(resolved),
+				path.basename(resolved),
+			),
+		};
 	}
 
 	if (!defaultParentPath) {
@@ -456,26 +481,18 @@ function resolveDestination({
 	}
 
 	return {
-		targetPath: path.resolve(defaultParentPath, repositoryName),
+		targetPath: allocateUniqueTargetPath(defaultParentPath, repositoryName),
 	};
 }
 
 /**
- * Confirms the resolved target path does not already exist and that its parent
- * directory will accept new writes.
+ * Confirms the parent directory of the resolved target will accept new writes.
+ * Existence collisions on the leaf are handled upstream by
+ * {@link allocateUniqueTargetPath} so they never bubble up as failures here.
  */
 function assertTargetWritable(
 	targetPath: string,
 ): CloneGithubRepositoryDiagnostic | null {
-	if (existsSync(targetPath)) {
-		return {
-			code: 'destination-exists',
-			message: `A file or directory already exists at ${targetPath}. Choose a different location or remove it.`,
-			path: targetPath,
-			severity: 'error',
-		};
-	}
-
 	const parent = path.dirname(targetPath);
 	try {
 		accessSync(parent, constants.W_OK);

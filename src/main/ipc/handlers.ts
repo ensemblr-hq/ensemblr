@@ -6,11 +6,15 @@ import type {
 import type { EnvironmentVariablesService } from '../environment';
 import type { PiExecutableService } from '../pi';
 import type {
+	ArchiveRepositoryService,
+	ArchiveWorkspaceService,
 	CreateWorkspaceService,
 	GithubCloneService,
 	GithubRepositoryListService,
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
+	RenameWorkspaceService,
+	SharedRootAdoptionService,
 } from '../repository';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { SetupDiagnosticsService } from '../setup';
@@ -25,6 +29,8 @@ import { registerSetupHandlers } from './handlers/setup';
 
 /** Dependency bundle wired into the renderer-facing IPC handlers. */
 interface RegisterIpcHandlersOptions {
+	archiveRepositoryService: ArchiveRepositoryService;
+	archiveWorkspaceService: ArchiveWorkspaceService;
 	configService: EnsembleConfigService;
 	createWorkspaceService: CreateWorkspaceService;
 	databaseService: EnsembleDatabaseService;
@@ -34,8 +40,10 @@ interface RegisterIpcHandlersOptions {
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
 	quickStartProjectService: QuickStartProjectService;
+	renameWorkspaceService: RenameWorkspaceService;
 	repositoryConfigService: RepositoryConfigService;
 	rootDirectoryService: EnsembleRootDirectoryService;
+	sharedRootAdoptionService: SharedRootAdoptionService;
 	setupDiagnosticsService: SetupDiagnosticsService;
 	settingsResolutionService: EnsembleConfigResolutionService;
 }
@@ -47,6 +55,8 @@ interface RegisterIpcHandlersOptions {
  * @param options - Service dependencies the handlers delegate to.
  */
 export function registerIpcHandlers({
+	archiveRepositoryService,
+	archiveWorkspaceService,
 	configService,
 	createWorkspaceService,
 	databaseService,
@@ -56,10 +66,12 @@ export function registerIpcHandlers({
 	localRepositoryRegistrationService,
 	piExecutableService,
 	quickStartProjectService,
+	renameWorkspaceService,
 	repositoryConfigService,
 	rootDirectoryService,
 	setupDiagnosticsService,
 	settingsResolutionService,
+	sharedRootAdoptionService,
 }: RegisterIpcHandlersOptions): void {
 	registerCoreHandlers({
 		configService,
@@ -67,15 +79,19 @@ export function registerIpcHandlers({
 		environmentVariablesService,
 		settingsResolutionService,
 	});
-	registerRootHandlers({ rootDirectoryService });
+	registerRootHandlers({ rootDirectoryService, sharedRootAdoptionService });
 	registerRepositoryConfigHandlers({
 		databaseService,
 		repositoryConfigService,
 	});
 	registerRepositoryHandlers({
+		archiveRepositoryService,
+		archiveWorkspaceService,
 		createWorkspaceService,
 		localRepositoryRegistrationService,
 		quickStartProjectService,
+		renameWorkspaceService,
+		sharedRootAdoptionService,
 	});
 	registerCloneHandlers({
 		githubCloneService,

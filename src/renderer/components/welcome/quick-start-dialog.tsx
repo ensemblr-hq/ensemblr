@@ -1,14 +1,7 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { KeyboardEvent } from 'react';
 import { useCallback, useState } from 'react';
 
-import {
-	ensembleQueryKeys,
-	isEnsembleApiAvailable,
-	quickStartProject,
-	rootDirectoryQuery,
-	selectCloneDestination,
-} from '@/renderer/api/ensemble-queries';
+import { isEnsembleApiAvailable } from '@/renderer/api/ensemble-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -18,10 +11,8 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
-import type {
-	QuickStartProjectDiagnostic,
-	QuickStartProjectResult,
-} from '@/shared/ipc';
+import { useQuickStartFlow } from '@/renderer/components/welcome/use-quick-start-flow';
+import type { QuickStartProjectDiagnostic } from '@/shared/ipc';
 
 interface QuickStartDialogProps {
 	onOpenChange: (open: boolean) => void;
@@ -45,9 +36,6 @@ export function QuickStartDialog({
 	);
 }
 
-/** UI states the dialog moves through. */
-type QuickStartStage = 'creating' | 'failure' | 'idle' | 'success';
-
 const NAME_PATTERN = /^[A-Za-z0-9._-]+$/;
 const NAME_MAX_LENGTH = 100;
 
@@ -57,74 +45,41 @@ function QuickStartDialogForm({
 }: {
 	onOpenChange: (open: boolean) => void;
 }) {
-	const queryClient = useQueryClient();
-	const { data: rootDirectoryData } = useQuery({
-		...rootDirectoryQuery,
-		enabled: isEnsembleApiAvailable(),
+	const {
+		defaultParentPath,
+		diagnostics,
+		isBusy,
+		parentPath,
+		parentPathOverride,
+		pickParentPath,
+		resetParentPath,
+		retry,
+		setParentPathOverride,
+		stage,
+		startQuickStart,
+	} = useQuickStartFlow({
+		onSuccess: () => {
+			onOpenChange(false);
+		},
 	});
-	const defaultParentPath = rootDirectoryData?.repositoriesPath ?? '';
 
 	const [name, setName] = useState('');
-	const [parentPathOverride, setParentPathOverride] = useState<string | null>(
-		null,
-	);
-	const [stage, setStage] = useState<QuickStartStage>('idle');
-	const [diagnostics, setDiagnostics] = useState<QuickStartProjectDiagnostic[]>(
-		[],
-	);
-	const [successResult, setSuccessResult] =
-		useState<QuickStartProjectResult | null>(null);
-
-	// Derive the shown path: user override if they touched it, else the
-	// managed default once the query resolves. Avoids a sync effect.
-	const parentPath = parentPathOverride ?? defaultParentPath;
 
 	const trimmedName = name.trim();
 	const localValidation = validateNameLocally(trimmedName);
 	const canCreate =
-		stage !== 'creating' &&
+		!isBusy &&
 		trimmedName.length > 0 &&
 		localValidation === null &&
 		isEnsembleApiAvailable();
 	const parentPlaceholder = defaultParentPath || 'Managed repos directory';
 
-	const handleBrowse = useCallback(async () => {
-		if (!isEnsembleApiAvailable()) {
-			return;
-		}
-		const selection = await selectCloneDestination();
-		if (selection.canceled || !selection.path) {
-			return;
-		}
-		setParentPathOverride(selection.path);
-	}, []);
-
 	const handleCreate = useCallback(async () => {
 		if (!canCreate) {
 			return;
 		}
-		setStage('creating');
-		setDiagnostics([]);
-		setSuccessResult(null);
-
-		const parentOverride = parentPath.trim();
-		const result = await quickStartProject({
-			name: trimmedName,
-			...(parentOverride ? { parentPath: parentOverride } : {}),
-		});
-
-		if (result.status === 'success' && result.repository) {
-			setStage('success');
-			setSuccessResult(result);
-			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
-			});
-			return;
-		}
-
-		setStage('failure');
-		setDiagnostics(result.diagnostics);
-	}, [canCreate, parentPath, queryClient, trimmedName]);
+		await startQuickStart({ name: trimmedName });
+	}, [canCreate, startQuickStart, trimmedName]);
 
 	const handleSubmitKey = useCallback(
 		(event: KeyboardEvent<HTMLInputElement>) => {
@@ -135,17 +90,6 @@ function QuickStartDialogForm({
 		},
 		[handleCreate],
 	);
-
-	const handleClose = useCallback(() => {
-		onOpenChange(false);
-	}, [onOpenChange]);
-
-	const handleRetry = useCallback(() => {
-		setStage('idle');
-		setDiagnostics([]);
-	}, []);
-
-	const isBusy = stage === 'creating';
 
 	return (
 		<>
@@ -204,7 +148,7 @@ function QuickStartDialogForm({
 					<Button
 						className='h-9'
 						disabled={isBusy || !isEnsembleApiAvailable()}
-						onClick={handleBrowse}
+						onClick={pickParentPath}
 						type='button'
 						variant='outline'
 					>
@@ -216,9 +160,7 @@ function QuickStartDialogForm({
 				parentPath !== defaultParentPath ? (
 					<button
 						className='self-start text-[0.6875rem] text-muted-foreground underline-offset-2 hover:underline'
-						onClick={() => {
-							setParentPathOverride(null);
-						}}
+						onClick={resetParentPath}
 						type='button'
 					>
 						Reset to managed repos directory
@@ -230,44 +172,31 @@ function QuickStartDialogForm({
 				<QuickStartDiagnosticsList diagnostics={diagnostics} />
 			) : null}
 
-			{stage === 'success' && successResult?.repository ? (
-				<p className='text-emerald-500 text-xs'>
-					Created {successResult.repository.name} at{' '}
-					<span className='font-mono'>{successResult.repository.path}</span>.
-				</p>
-			) : null}
-
 			<div className='-mx-4 -mb-4 flex justify-end gap-2 rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
 				{stage === 'failure' ? (
 					<Button
 						className='h-8'
-						onClick={handleRetry}
+						onClick={retry}
 						type='button'
 						variant='outline'
 					>
 						Try again
 					</Button>
 				) : null}
-				{stage === 'success' ? (
-					<Button className='h-8' onClick={handleClose} type='button'>
-						Done
-					</Button>
-				) : (
-					<Button
-						className='h-8 gap-2'
-						disabled={!canCreate}
-						onClick={handleCreate}
-						type='button'
+				<Button
+					className='h-8 gap-2'
+					disabled={!canCreate}
+					onClick={handleCreate}
+					type='button'
+				>
+					{stage === 'creating' ? 'Creating…' : 'Create'}
+					<span
+						aria-hidden='true'
+						className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'
 					>
-						{stage === 'creating' ? 'Creating…' : 'Create'}
-						<span
-							aria-hidden='true'
-							className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'
-						>
-							⌘↵
-						</span>
-					</Button>
-				)}
+						⌘↵
+					</span>
+				</Button>
 			</div>
 		</>
 	);

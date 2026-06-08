@@ -1,35 +1,36 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useSetAtom } from 'jotai';
 import { FolderIcon, FolderPlusIcon, GlobeIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { toast } from 'sonner';
 
 import {
-	ensembleQueryKeys,
 	githubRepositoryListQuery,
 	isEnsembleApiAvailable,
 	registerLocalRepository,
 	selectLocalRepository,
 } from '@/renderer/api/ensemble-queries';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
-import { cloneDialogOpenAtom } from '@/renderer/state/clone-dialog';
-import { quickStartDialogOpenAtom } from '@/renderer/state/quick-start-dialog';
+import { seedFirstWorkspace } from '@/renderer/lib/workbench/seed-first-workspace';
+import {
+	cloneDialogOpenAtom,
+	quickStartDialogOpenAtom,
+} from '@/renderer/state/dialogs';
 
 import { WelcomeActionCard } from './welcome/welcome-action-card';
 import { WelcomeWordmark } from './welcome/welcome-wordmark';
 
-/** Status banner state shown when a local-repository registration completes. */
-interface WelcomeNotice {
-	tone: 'error' | 'success';
-	text: string;
-}
-
 /** Default landing view shown when no project/workspace is selected. */
 export function Welcome() {
-	const [notice, setNotice] = useState<WelcomeNotice | null>(null);
 	const [isOpeningProject, setIsOpeningProject] = useState(false);
-	const queryClient = useQueryClient();
+	const navigate = useNavigate();
+	const router = useRouter();
 	const setCloneOpen = useSetAtom(cloneDialogOpenAtom);
 	const setQuickStartOpen = useSetAtom(quickStartDialogOpenAtom);
+	// Warm the GitHub repo-list cache so CloneGithubDialog opens with
+	// a populated list instead of an empty spinner. Result is intentionally
+	// discarded; the dialog reads from the React Query cache.
 	useQuery({
 		...githubRepositoryListQuery,
 		enabled: isEnsembleApiAvailable(),
@@ -37,15 +38,11 @@ export function Welcome() {
 
 	const onOpenLocalProject = useCallback(async () => {
 		if (!isEnsembleApiAvailable()) {
-			setNotice({
-				text: 'Preload bridge is unavailable in this context.',
-				tone: 'error',
-			});
+			toast.error('Preload bridge is unavailable in this context.');
 			return;
 		}
 
 		setIsOpeningProject(true);
-		setNotice(null);
 
 		try {
 			const selection = await selectLocalRepository();
@@ -55,7 +52,7 @@ export function Welcome() {
 			}
 
 			if (selection.error) {
-				setNotice({ text: selection.error, tone: 'error' });
+				toast.error(selection.error);
 				return;
 			}
 
@@ -70,35 +67,40 @@ export function Welcome() {
 					result.diagnostics.find(
 						(diagnostic) => diagnostic.severity === 'error',
 					)?.message ?? 'The repository could not be registered.';
-				setNotice({ text: reason, tone: 'error' });
+				toast.error(reason);
 				return;
 			}
 
-			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+			const repository = result.repository;
+			const seed = await seedFirstWorkspace({
+				navigate,
+				repositoryId: repository.id,
+				router,
 			});
-			setNotice({
-				text: `Registered ${result.repository.name} (${result.repository.path}).`,
-				tone: 'success',
-			});
+			if (seed.status === 'success') {
+				toast.success(`Opened ${repository.name}.`);
+			} else {
+				toast.error(
+					seed.error ??
+						`Registered ${repository.name} but couldn't open a workspace.`,
+				);
+			}
 		} catch (error) {
-			setNotice({
-				text:
-					error instanceof Error
-						? error.message
-						: 'The repository could not be registered.',
-				tone: 'error',
-			});
+			toast.error(
+				error instanceof Error
+					? error.message
+					: 'The repository could not be registered.',
+			);
 		} finally {
 			setIsOpeningProject(false);
 		}
-	}, [queryClient]);
+	}, [navigate, router]);
 
 	return (
 		<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
 			<main className='flex min-h-0 flex-1 items-center justify-center px-8 py-10'>
 				<section className='flex flex-col items-center gap-12'>
-					<WelcomeWordmark />
+					<WelcomeWordmark className='blur-[0.75px]' />
 					<div className='flex flex-wrap items-center justify-center gap-3'>
 						<WelcomeActionCard
 							disabled={isOpeningProject}
@@ -117,19 +119,6 @@ export function Welcome() {
 							onClick={() => setQuickStartOpen(true)}
 						/>
 					</div>
-					{notice ? (
-						<p
-							className={
-								notice.tone === 'error'
-									? 'max-w-md text-center text-destructive text-sm'
-									: 'max-w-md text-center text-muted-foreground text-sm'
-							}
-							data-testid='welcome-notice'
-							data-tone={notice.tone}
-						>
-							{notice.text}
-						</p>
-					) : null}
 				</section>
 			</main>
 		</SidebarInset>

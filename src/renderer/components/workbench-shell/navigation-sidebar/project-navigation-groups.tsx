@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 import { ReorderList } from '@/renderer/components/shadix-ui/components/reorder-list';
 import {
 	SidebarGroup,
@@ -17,10 +15,17 @@ import type {
 	ProjectNavigationState,
 	WorkbenchStaticNavigationTarget,
 } from '@/renderer/types/workbench-shell';
-
-import { CreateWorkspaceSourceDialog } from '../create-workspace-source-dialog';
 import { ProjectCreationMenu } from '../project-sidebar/project-creation-menu';
+import {
+	ProjectNavigationDialogs,
+	useProjectNavigationDialogs,
+} from './project-navigation-dialogs';
 import { ProjectWorkspaceGroup } from './project-workspace-group';
+import {
+	useArchiveProjectAction,
+	useArchiveWorkspaceAction,
+	useCreateWorkspaceFromProject,
+} from './use-project-navigation-actions';
 
 /** Reorderable list of project groups plus the create-workspace dialog mount. */
 export function ProjectNavigationGroups({
@@ -30,6 +35,7 @@ export function ProjectNavigationGroups({
 	onAddProject,
 	onOpenRecentProject,
 	onStaticNavigationSelect,
+	onWorkspaceRenameSelect,
 	onWorkspaceSelect,
 	projectNavigation,
 	resolveWorkspaceRouteSearch,
@@ -40,6 +46,7 @@ export function ProjectNavigationGroups({
 	onAddProject?: (action: AddProjectActionId) => void;
 	onOpenRecentProject?: (recent: RecentProject) => void;
 	onStaticNavigationSelect: (target: WorkbenchStaticNavigationTarget) => void;
+	onWorkspaceRenameSelect?: (workspace: WorkspaceShellModel) => void;
 	onWorkspaceSelect: (projectId: string, workspaceId: string) => void;
 	projectNavigation: ProjectNavigationState;
 	resolveWorkspaceRouteSearch: (
@@ -48,6 +55,7 @@ export function ProjectNavigationGroups({
 }) {
 	const {
 		collapsedProjectIdSet,
+		disableProjectReorderLayoutAnimation,
 		isProjectReorderLayoutAnimationDisabled,
 		isProjectReorderPositionOnlyLayout,
 		orderedProjects,
@@ -56,8 +64,31 @@ export function ProjectNavigationGroups({
 		toggleProjectCollapsed,
 		toggleWorkspacePinned,
 	} = projectNavigation;
-	const [createSourceProject, setCreateSourceProject] =
-		useState<ProjectShellModel | null>(null);
+
+	const {
+		controller,
+		setArchiveProjectTarget,
+		setArchiveWorkspaceTarget,
+		setCreateSourceProject,
+		state,
+	} = useProjectNavigationDialogs();
+
+	const handleWorkspaceArchived = useArchiveWorkspaceAction({
+		activeProjectId: activeProject?.id ?? null,
+		activeWorkspaceId: activeWorkspace?.id ?? null,
+		disableProjectReorderLayoutAnimation,
+		orderedProjects,
+	});
+
+	const handleProjectArchived = useArchiveProjectAction({
+		activeProjectId: activeProject?.id ?? null,
+		disableProjectReorderLayoutAnimation,
+		orderedProjects,
+	});
+
+	const { create: handleCreateWorkspace } = useCreateWorkspaceFromProject({
+		disableProjectReorderLayoutAnimation,
+	});
 
 	return (
 		<>
@@ -91,10 +122,22 @@ export function ProjectNavigationGroups({
 							activeWorkspace={activeWorkspace}
 							isCollapsed={isProjectCollapsed}
 							key={project.id}
-							onCreateFromSourceSelect={() => setCreateSourceProject(project)}
+							onCreateFromSourceSelect={() =>
+								controller.openCreateSource(project)
+							}
+							onCreateWorkspaceSelect={() => {
+								void handleCreateWorkspace(project);
+							}}
+							onProjectArchiveSelect={() =>
+								controller.openArchiveProject(project)
+							}
 							onProjectToggle={() => toggleProjectCollapsed(project.id)}
 							onStaticNavigationSelect={onStaticNavigationSelect}
 							onWorkspacePinToggle={toggleWorkspacePinned}
+							onWorkspaceRenameSelect={onWorkspaceRenameSelect}
+							onWorkspaceArchiveSelect={(workspace) =>
+								controller.openArchiveWorkspace(workspace)
+							}
 							onWorkspaceSelect={onWorkspaceSelect}
 							pinnedWorkspaceIdSet={pinnedWorkspaceIdSet}
 							project={project}
@@ -105,15 +148,16 @@ export function ProjectNavigationGroups({
 				})}
 			</ReorderList>
 
-			<CreateWorkspaceSourceDialog
-				onOpenChange={(open) => {
-					if (!open) {
-						setCreateSourceProject(null);
-					}
-				}}
-				open={createSourceProject !== null}
-				project={createSourceProject}
-				projects={orderedProjects}
+			<ProjectNavigationDialogs
+				archiveProjectTarget={state.archiveProjectTarget}
+				archiveWorkspaceTarget={state.archiveWorkspaceTarget}
+				createSourceProject={state.createSourceProject}
+				onProjectArchived={handleProjectArchived}
+				onWorkspaceArchived={handleWorkspaceArchived}
+				orderedProjects={orderedProjects}
+				setArchiveProjectTarget={setArchiveProjectTarget}
+				setArchiveWorkspaceTarget={setArchiveWorkspaceTarget}
+				setCreateSourceProject={setCreateSourceProject}
 			/>
 		</>
 	);
