@@ -19,6 +19,7 @@ const EXPECTED_MIGRATIONS = [
 	'002_secret_metadata',
 	'003_root_directory_metadata',
 	'004_archive_lifecycle',
+	'005_pi_session_metadata',
 ];
 
 function createTestDatabasePath(): {
@@ -77,9 +78,15 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 
 	assert.deepEqual(tables, [
 		'archive_records',
+		'chat_tabs',
 		'checkpoints',
 		'comments',
 		'integration_metadata',
+		'pi_runtime_state',
+		'pi_session_branches',
+		'pi_session_events',
+		'pi_sessions',
+		'pi_turns',
 		'process_records',
 		'repositories',
 		'root_directories',
@@ -212,6 +219,141 @@ SELECT
 			terminal_sessions: 1,
 			todos: 1,
 			workspaces: 1,
+		},
+	);
+});
+
+test('migration 005 supports Pi session metadata round-trip', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsembleDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+	const { database } = connection;
+
+	database.exec(`
+INSERT INTO repositories (id, slug, name, path, default_branch)
+VALUES ('repo-pi-1', 'pi-runtime', 'Pi Runtime', '/tmp/ensemble/pi-runtime', 'main');
+
+INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch)
+VALUES ('ws-pi-1', 'repo-pi-1', 'the-128', 'THE-128', '/tmp/ensemble/workspaces/the-128', 'philipp/the-128', 'main');
+
+INSERT INTO pi_sessions (id, workspace_id, pi_session_id, executable_id, model, status, cwd)
+VALUES ('pi-session-1', 'ws-pi-1', 'pi-runtime-session-7', 'pi-default', 'gpt-5.5', 'streaming', '/tmp/ensemble/workspaces/the-128');
+
+INSERT INTO pi_session_branches (id, pi_session_id, kind)
+VALUES ('branch-main', 'pi-session-1', 'main');
+
+INSERT INTO pi_turns (id, branch_id, ordinal, prompt_text, status)
+VALUES ('turn-0', 'branch-main', 0, 'hello pi', 'completed');
+
+INSERT INTO pi_session_events (id, branch_id, turn_id, ordinal, event_type, stream, payload_json)
+VALUES
+	('evt-0', 'branch-main', 'turn-0', 0, 'message', 'protocol', '{"role":"user","text":"hello pi"}'),
+	('evt-1', 'branch-main', 'turn-0', 1, 'message', 'protocol', '{"role":"agent","text":"hi"}'),
+	('evt-stderr', 'branch-main', NULL, 2, 'stderr', 'stderr', '{"line":"warning"}');
+
+INSERT INTO chat_tabs (id, workspace_id, pi_session_id, kind, title, position)
+VALUES ('tab-1', 'ws-pi-1', 'pi-session-1', 'chat', 'Chat', 0);
+
+INSERT INTO pi_runtime_state (workspace_id, active_tab_id, last_active_session_id)
+VALUES ('ws-pi-1', 'tab-1', 'pi-session-1');
+`);
+
+	const counts = database
+		.prepare(`
+SELECT
+	(SELECT COUNT(*) FROM pi_sessions) AS pi_sessions,
+	(SELECT COUNT(*) FROM pi_session_branches) AS pi_session_branches,
+	(SELECT COUNT(*) FROM pi_turns) AS pi_turns,
+	(SELECT COUNT(*) FROM pi_session_events) AS pi_session_events,
+	(SELECT COUNT(*) FROM chat_tabs) AS chat_tabs,
+	(SELECT COUNT(*) FROM pi_runtime_state) AS pi_runtime_state
+`)
+		.get() as Record<string, number>;
+
+	assert.deepEqual(
+		{ ...counts },
+		{
+			chat_tabs: 1,
+			pi_runtime_state: 1,
+			pi_session_branches: 1,
+			pi_session_events: 3,
+			pi_sessions: 1,
+			pi_turns: 1,
+		},
+	);
+
+	assert.throws(() => {
+		database
+			.prepare(
+				`INSERT INTO pi_turns (id, branch_id, ordinal, prompt_text)
+				 VALUES ('turn-dup', 'branch-main', 0, 'duplicate')`,
+			)
+			.run();
+	}, /UNIQUE/i);
+
+	assert.throws(() => {
+		database
+			.prepare(
+				`INSERT INTO pi_session_events (id, branch_id, ordinal, event_type)
+				 VALUES ('evt-dup', 'branch-main', 0, 'message')`,
+			)
+			.run();
+	}, /UNIQUE/i);
+});
+
+test('migration 005 cascades pi session deletes on workspace removal', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsembleDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+	const { database } = connection;
+
+	database.exec(`
+INSERT INTO repositories (id, slug, name, path, default_branch)
+VALUES ('repo-pi-2', 'pi-runtime-2', 'Pi Runtime 2', '/tmp/ensemble/pi-runtime-2', 'main');
+
+INSERT INTO workspaces (id, repository_id, slug, name, path)
+VALUES ('ws-pi-2', 'repo-pi-2', 'the-129', 'THE-129', '/tmp/ensemble/workspaces/the-129');
+
+INSERT INTO pi_sessions (id, workspace_id, status, cwd)
+VALUES ('pi-session-2', 'ws-pi-2', 'idle', '/tmp/ensemble/workspaces/the-129');
+
+INSERT INTO pi_session_branches (id, pi_session_id, kind)
+VALUES ('branch-cascade', 'pi-session-2', 'main');
+
+INSERT INTO pi_session_events (id, branch_id, ordinal, event_type)
+VALUES ('evt-cascade', 'branch-cascade', 0, 'metadata');
+
+INSERT INTO chat_tabs (id, workspace_id, pi_session_id, kind, title)
+VALUES ('tab-cascade', 'ws-pi-2', 'pi-session-2', 'chat', 'Chat');
+`);
+
+	database.prepare(`DELETE FROM workspaces WHERE id = ?`).run('ws-pi-2');
+
+	const counts = database
+		.prepare(`
+SELECT
+	(SELECT COUNT(*) FROM pi_sessions) AS pi_sessions,
+	(SELECT COUNT(*) FROM pi_session_branches) AS pi_session_branches,
+	(SELECT COUNT(*) FROM pi_session_events) AS pi_session_events,
+	(SELECT COUNT(*) FROM chat_tabs) AS chat_tabs
+`)
+		.get() as Record<string, number>;
+
+	assert.deepEqual(
+		{ ...counts },
+		{
+			chat_tabs: 0,
+			pi_session_branches: 0,
+			pi_session_events: 0,
+			pi_sessions: 0,
 		},
 	);
 });

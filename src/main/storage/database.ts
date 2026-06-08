@@ -280,6 +280,103 @@ CREATE INDEX idx_archive_records_workspace_id ON archive_records(workspace_id);
 CREATE INDEX idx_archive_records_type ON archive_records(record_type);
 `,
 	},
+	{
+		id: '005_pi_session_metadata',
+		version: 5,
+		sql: `
+CREATE TABLE pi_sessions (
+	id TEXT PRIMARY KEY,
+	workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+	pi_session_id TEXT,
+	executable_id TEXT,
+	executable_path TEXT,
+	model TEXT,
+	thinking_level TEXT,
+	status TEXT NOT NULL DEFAULT 'idle' CHECK (status IN ('idle', 'starting', 'streaming', 'closed', 'errored')),
+	last_error TEXT,
+	cwd TEXT NOT NULL,
+	label TEXT,
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	closed_at TEXT,
+	metadata_json TEXT NOT NULL DEFAULT '{}'
+) STRICT;
+
+CREATE INDEX idx_pi_sessions_workspace_id ON pi_sessions(workspace_id);
+CREATE INDEX idx_pi_sessions_status ON pi_sessions(status);
+CREATE INDEX idx_pi_sessions_pi_session_id ON pi_sessions(pi_session_id);
+
+CREATE TABLE pi_session_branches (
+	id TEXT PRIMARY KEY,
+	pi_session_id TEXT NOT NULL REFERENCES pi_sessions(id) ON DELETE CASCADE,
+	parent_branch_id TEXT REFERENCES pi_session_branches(id) ON DELETE SET NULL,
+	forked_from_turn_id TEXT,
+	kind TEXT NOT NULL CHECK (kind IN ('main', 'retry', 'fork')),
+	label TEXT,
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	metadata_json TEXT NOT NULL DEFAULT '{}'
+) STRICT;
+
+CREATE INDEX idx_pi_session_branches_session_id ON pi_session_branches(pi_session_id);
+CREATE INDEX idx_pi_session_branches_parent ON pi_session_branches(parent_branch_id);
+
+CREATE TABLE pi_turns (
+	id TEXT PRIMARY KEY,
+	branch_id TEXT NOT NULL REFERENCES pi_session_branches(id) ON DELETE CASCADE,
+	ordinal INTEGER NOT NULL,
+	status TEXT NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted', 'streaming', 'completed', 'aborted', 'errored')),
+	prompt_text TEXT NOT NULL DEFAULT '',
+	model TEXT,
+	thinking_level TEXT,
+	submitted_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	completed_at TEXT,
+	turn_metadata_json TEXT NOT NULL DEFAULT '{}',
+	UNIQUE(branch_id, ordinal)
+) STRICT;
+
+CREATE INDEX idx_pi_turns_branch_ordinal ON pi_turns(branch_id, ordinal);
+CREATE INDEX idx_pi_turns_status ON pi_turns(status);
+
+CREATE TABLE pi_session_events (
+	id TEXT PRIMARY KEY,
+	branch_id TEXT NOT NULL REFERENCES pi_session_branches(id) ON DELETE CASCADE,
+	turn_id TEXT REFERENCES pi_turns(id) ON DELETE SET NULL,
+	ordinal INTEGER NOT NULL,
+	event_type TEXT NOT NULL,
+	stream TEXT NOT NULL DEFAULT 'protocol' CHECK (stream IN ('protocol', 'stderr')),
+	payload_json TEXT NOT NULL DEFAULT '{}',
+	created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	UNIQUE(branch_id, ordinal)
+) STRICT;
+
+CREATE INDEX idx_pi_session_events_branch_ordinal ON pi_session_events(branch_id, ordinal);
+CREATE INDEX idx_pi_session_events_turn_id ON pi_session_events(turn_id);
+CREATE INDEX idx_pi_session_events_type ON pi_session_events(event_type);
+
+CREATE TABLE chat_tabs (
+	id TEXT PRIMARY KEY,
+	workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+	pi_session_id TEXT REFERENCES pi_sessions(id) ON DELETE SET NULL,
+	kind TEXT NOT NULL CHECK (kind IN ('chat', 'preview')),
+	title TEXT NOT NULL,
+	position INTEGER NOT NULL DEFAULT 0,
+	opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	closed_at TEXT,
+	metadata_json TEXT NOT NULL DEFAULT '{}'
+) STRICT;
+
+CREATE INDEX idx_chat_tabs_workspace_id ON chat_tabs(workspace_id);
+CREATE INDEX idx_chat_tabs_session_id ON chat_tabs(pi_session_id);
+CREATE INDEX idx_chat_tabs_open ON chat_tabs(workspace_id, closed_at);
+
+CREATE TABLE pi_runtime_state (
+	workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+	active_tab_id TEXT REFERENCES chat_tabs(id) ON DELETE SET NULL,
+	last_active_session_id TEXT REFERENCES pi_sessions(id) ON DELETE SET NULL,
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+) STRICT;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */
