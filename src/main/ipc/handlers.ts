@@ -1,3 +1,4 @@
+import type { LocalCommandService } from '../commands/local-command';
 import type {
 	EnsembleConfigResolutionService,
 	EnsembleConfigService,
@@ -5,6 +6,7 @@ import type {
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
 import type { PiExecutableService } from '../pi';
+import type { PiSessionService } from '../pi-agent/pi-session-service';
 import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
@@ -25,12 +27,17 @@ import type { EnsembleRootDirectoryService } from '../root';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsembleDatabaseService } from '../storage';
 import { registerCloneHandlers } from './handlers/clone';
-import { registerCoreHandlers } from './handlers/core';
+import { registerEnvironmentHandlers } from './handlers/environment';
+import { registerHealthHandlers } from './handlers/health';
+import { registerNavigationHandlers } from './handlers/navigation';
 import { registerPiHandlers } from './handlers/pi';
+import { registerPiSessionHandlers } from './handlers/pi-session';
 import { registerRepositoryHandlers } from './handlers/repository';
 import { registerRepositoryConfigHandlers } from './handlers/repository-config';
 import { registerRootHandlers } from './handlers/root';
+import { registerSettingsHandlers } from './handlers/settings';
 import { registerSetupHandlers } from './handlers/setup';
+import { registerWindowHandlers } from './handlers/window';
 
 /** Dependency bundle wired into the renderer-facing IPC handlers. */
 interface RegisterIpcHandlersOptions {
@@ -46,8 +53,10 @@ interface RegisterIpcHandlersOptions {
 	githubCloneService: GithubCloneService;
 	githubRepositoryListService: GithubRepositoryListService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
+	localCommandService: LocalCommandService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
+	piSessionService: PiSessionService;
 	quickStartProjectService: QuickStartProjectService;
 	renameWorkspaceService: RenameWorkspaceService;
 	repositoryConfigService: RepositoryConfigService;
@@ -77,8 +86,10 @@ export function registerIpcHandlers({
 	githubCloneService,
 	githubRepositoryListService,
 	listArchivedWorkspacesService,
+	localCommandService,
 	localRepositoryRegistrationService,
 	piExecutableService,
+	piSessionService,
 	quickStartProjectService,
 	renameWorkspaceService,
 	repositoryConfigService,
@@ -88,12 +99,11 @@ export function registerIpcHandlers({
 	sharedRootAdoptionService,
 	unarchiveWorkspaceService,
 }: RegisterIpcHandlersOptions): void {
-	registerCoreHandlers({
-		configService,
-		databaseService,
-		environmentVariablesService,
-		settingsResolutionService,
-	});
+	registerWindowHandlers();
+	registerEnvironmentHandlers({ environmentVariablesService });
+	registerHealthHandlers({ configService, databaseService });
+	registerNavigationHandlers({ databaseService });
+	registerSettingsHandlers({ settingsResolutionService });
 	registerRootHandlers({ rootDirectoryService, sharedRootAdoptionService });
 	registerRepositoryConfigHandlers({
 		databaseService,
@@ -118,5 +128,10 @@ export function registerIpcHandlers({
 		githubRepositoryListService,
 	});
 	registerPiHandlers({ piExecutableService });
+	registerPiSessionHandlers({
+		localCommandService,
+		piExecutableService,
+		piSessionService,
+	});
 	registerSetupHandlers({ setupDiagnosticsService });
 }

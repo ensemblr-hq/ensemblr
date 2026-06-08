@@ -434,9 +434,70 @@ test('parses pi --list-models provider/model output', () => {
 		),
 		{
 			modelCount: 2,
+			models: [
+				{
+					id: 'openai-codex/gpt-5.5',
+					model: 'gpt-5.5',
+					provider: 'openai-codex',
+				},
+				{ id: 'anthropic/claude', model: 'claude', provider: 'anthropic' },
+			],
 			providerCount: 2,
 		},
 	);
+});
+
+test('parses single-space-separated table rows', () => {
+	assert.deepEqual(
+		parsePiListModelsOutput(
+			`provider model context max-out thinking images
+google gemini-2.0-flash 1.0M 8.2K no yes
+google gemini-2.5-pro 1.0M 65.5K yes yes
+anthropic claude-sonnet-4 200K 8.0K yes yes
+`,
+		),
+		{
+			modelCount: 3,
+			models: [
+				{
+					id: 'google/gemini-2.0-flash',
+					model: 'gemini-2.0-flash',
+					provider: 'google',
+				},
+				{
+					id: 'google/gemini-2.5-pro',
+					model: 'gemini-2.5-pro',
+					provider: 'google',
+				},
+				{
+					id: 'anthropic/claude-sonnet-4',
+					model: 'claude-sonnet-4',
+					provider: 'anthropic',
+				},
+			],
+			providerCount: 2,
+		},
+	);
+});
+
+test('falls back to stderr when pi --list-models prints the table there', async () => {
+	const requests: Array<{ args: string[]; command: string }> = [];
+	const snapshot = await resolvePiProviderModels({
+		executable: createPiExecutableSnapshot({ command: '/opt/bin/pi' }),
+		localCommandService: createLocalCommandService(
+			{
+				stderr:
+					'provider model context\ngoogle gemini-2.5-pro 1.0M\nanthropic claude-sonnet-4 200K\n',
+				stdout: '',
+			},
+			requests,
+		),
+		timeoutMs: 1000,
+	});
+
+	assert.equal(snapshot.status, 'success');
+	assert.equal(snapshot.modelCount, 2);
+	assert.equal(snapshot.providerCount, 2);
 });
 
 test('passes provider readiness when pi --list-models returns at least one model', async () => {

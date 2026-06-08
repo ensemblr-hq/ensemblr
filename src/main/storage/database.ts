@@ -377,6 +377,27 @@ CREATE TABLE pi_runtime_state (
 ) STRICT;
 `,
 	},
+	{
+		id: '006_repository_remote_url_index',
+		version: 6,
+		sql: `
+ALTER TABLE repositories ADD COLUMN remote_url TEXT NOT NULL DEFAULT '';
+
+UPDATE repositories
+SET remote_url = COALESCE(lower(trim(json_extract(metadata_json, '$.remoteUrl'))), '');
+
+UPDATE repositories SET remote_url = substr(remote_url, 9) WHERE remote_url LIKE 'https://%';
+UPDATE repositories SET remote_url = substr(remote_url, 8) WHERE remote_url LIKE 'http://%';
+UPDATE repositories SET remote_url = substr(remote_url, 7) WHERE remote_url LIKE 'ssh://%';
+UPDATE repositories SET remote_url = substr(remote_url, 7) WHERE remote_url LIKE 'git://%';
+UPDATE repositories SET remote_url = substr(remote_url, 5) WHERE remote_url LIKE 'git@%';
+UPDATE repositories SET remote_url = replace(remote_url, ':', '/') WHERE remote_url LIKE '%:%';
+UPDATE repositories SET remote_url = substr(remote_url, 1, length(remote_url) - 4) WHERE remote_url LIKE '%.git';
+UPDATE repositories SET remote_url = rtrim(remote_url, '/') WHERE remote_url LIKE '%/';
+
+CREATE INDEX idx_repositories_remote_url ON repositories(remote_url) WHERE remote_url <> '';
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

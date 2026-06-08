@@ -38,7 +38,12 @@ export type {
 	WorkspaceFileSummary,
 } from './review';
 export type { WorkbenchRouteSearch } from './route-search';
-export type { ComposerShellState, SessionTabModel } from './session';
+export type {
+	ComposerModelOption,
+	ComposerShellState,
+	ComposerThinkingOption,
+	SessionTabModel,
+} from './session';
 export type { WorkbenchShellData, WorkspaceShellData } from './shell-data';
 export type {
 	WorkspaceLandingBranchSummary,

@@ -7,6 +7,7 @@ import {
 	getComposerState,
 	getPreferredSession,
 } from '@/renderer/lib/workbench';
+import { usePiComposerController } from '@/renderer/state/pi-composer';
 import { useWorkspacePanelTabState } from '@/renderer/state/workspace';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type {
@@ -39,10 +40,23 @@ export function WorkspaceRouteContent({
 	const activeReviewTab = panelTabs.activeReviewTab;
 	const activeDockTab = panelTabs.activeDockTab;
 	const { state: setupDiagnosticsState } = useSetupDiagnostics();
+	const piComposer = usePiComposerController({
+		workspaceCwd: activeWorkspace.pathLabel,
+		workspaceId: activeWorkspace.id,
+	});
 	const composer = getComposerState({
 		activeSession,
+		availableModels: piComposer.availableModels,
+		availableThinkingLevels: piComposer.availableThinkingLevels,
+		isStreaming: piComposer.isStreaming,
+		modelId: piComposer.modelId,
+		onModelChange: piComposer.onModelChange,
+		onStop: piComposer.onStop,
+		onSubmit: piComposer.onSubmit,
+		onThinkingChange: piComposer.onThinkingChange,
 		setupDiagnostics: setupDiagnosticsState.setupDiagnostics,
 		setupError: setupDiagnosticsState.setupDiagnosticsError,
+		thinkingLevel: piComposer.thinkingLevel,
 	});
 	const dockActions = useMemo<WorkbenchDockActions>(
 		() => ({

@@ -1,76 +1,30 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, ipcMain } from 'electron';
 
 import {
-	type EnvironmentVariablesSnapshot,
 	type HealthSnapshot,
 	type InitialShellSnapshot,
 	IPC_CHANNELS,
 	type RepositoryWorkspaceNavigationSnapshot,
-	type SettingsResolutionSnapshot,
 } from '../../../shared/ipc';
-import type {
-	EnsembleConfigResolutionService,
-	EnsembleConfigService,
-} from '../../config';
-import type { EnvironmentVariablesService } from '../../environment';
+import type { EnsembleConfigService } from '../../config';
 import type { EnsembleDatabaseService } from '../../storage';
 import { getRepositoryWorkspaceNavigationSnapshot } from '../repository-workspace-navigation';
 
-const MAX_ENSURED_WINDOW_WIDTH = 2400;
-
-/** Service dependencies used by the cross-cutting "core" IPC handlers. */
-export interface CoreHandlersOptions {
+/** Service dependencies used by the health-snapshot IPC handlers. */
+export interface HealthHandlersOptions {
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
-	environmentVariablesService: EnvironmentVariablesService;
-	settingsResolutionService: EnsembleConfigResolutionService;
 }
 
 /**
- * Registers cross-cutting IPC handlers — window sizing, environment
- * variables, health, settings resolution, and the initial shell snapshot.
+ * Registers IPC handlers for the async health snapshot and the synchronous
+ * initial-shell snapshot used by the preload bootstrap.
  * @param options - Required services.
  */
-export function registerCoreHandlers({
+export function registerHealthHandlers({
 	configService,
 	databaseService,
-	environmentVariablesService,
-	settingsResolutionService,
-}: CoreHandlersOptions): void {
-	ipcMain.handle(
-		IPC_CHANNELS.ensureWindowWidth,
-		(event, minimumWidth: unknown) => {
-			const requestedWidth =
-				typeof minimumWidth === 'number' && Number.isFinite(minimumWidth)
-					? Math.ceil(minimumWidth)
-					: 0;
-
-			if (requestedWidth <= 0) {
-				return;
-			}
-
-			const window = BrowserWindow.fromWebContents(event.sender);
-
-			if (!window || window.isDestroyed() || window.isFullScreen()) {
-				return;
-			}
-
-			const targetWidth = Math.min(requestedWidth, MAX_ENSURED_WINDOW_WIDTH);
-			const [width, height] = window.getSize();
-
-			if (width < targetWidth) {
-				window.setSize(targetWidth, height);
-			}
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.environmentVariables,
-		(): Promise<EnvironmentVariablesSnapshot> => {
-			return environmentVariablesService.getSnapshot();
-		},
-	);
-
+}: HealthHandlersOptions): void {
 	ipcMain.handle(IPC_CHANNELS.health, (): HealthSnapshot => {
 		return buildHealthSnapshot(configService, databaseService);
 	});
@@ -83,22 +37,6 @@ export function registerCoreHandlers({
 		};
 		event.returnValue = snapshot;
 	});
-
-	ipcMain.handle(
-		IPC_CHANNELS.repositoryWorkspaceNavigation,
-		(): RepositoryWorkspaceNavigationSnapshot => {
-			return getRepositoryWorkspaceNavigationSnapshot(
-				databaseService.getConnection()?.database ?? null,
-			);
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.settingsResolution,
-		(_event, request: unknown): SettingsResolutionSnapshot => {
-			return settingsResolutionService.resolve(request);
-		},
-	);
 }
 
 /** Single source of truth for the health-snapshot shape returned by both channels. */

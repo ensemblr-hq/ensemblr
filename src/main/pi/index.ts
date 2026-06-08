@@ -19,6 +19,7 @@ export type {
 	CreatePiReadinessServiceOptions,
 	PiAgentDirectorySnapshot,
 	PiAgentDirectorySource,
+	PiModelOption,
 	PiProviderModelFailureCode,
 	PiProviderModelSnapshot,
 	PiReadinessDiagnostic,

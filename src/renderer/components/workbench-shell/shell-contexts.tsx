@@ -28,6 +28,8 @@ import type {
 interface ShellContext<T> {
 	Provider: (props: { value: T; children: ReactNode }) => ReactElement;
 	use: () => T;
+	/** Non-throwing accessor — returns `null` when no provider is mounted. */
+	useOptional: () => T | null;
 }
 
 /**
@@ -56,7 +58,11 @@ function makeShellContext<T>(name: string): ShellContext<T> {
 		return value;
 	}
 
-	return { Provider, use: useValue };
+	function useOptional(): T | null {
+		return use(Context);
+	}
+
+	return { Provider, use: useValue, useOptional };
 }
 
 const LayoutContext =
@@ -74,6 +80,8 @@ const SetupDiagnosticsContext = makeShellContext<SetupDiagnosticsContextValue>(
 );
 export const SetupDiagnosticsProvider = SetupDiagnosticsContext.Provider;
 export const useSetupDiagnostics = SetupDiagnosticsContext.use;
+/** Non-throwing variant for shell chrome that may render in isolation. */
+export const useSetupDiagnosticsOptional = SetupDiagnosticsContext.useOptional;
 
 /** Layout model exposed below the `_shell` route. */
 export interface WorkbenchLayoutModel {

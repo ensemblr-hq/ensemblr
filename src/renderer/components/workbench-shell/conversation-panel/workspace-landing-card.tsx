@@ -1,10 +1,7 @@
 import {
-	CircleAlertIcon,
-	CircleDashedIcon,
 	FilesIcon,
 	GitBranchIcon,
 	type LucideIcon,
-	SettingsIcon,
 	SparklesIcon,
 	TagIcon,
 } from 'lucide-react';
@@ -12,18 +9,18 @@ import {
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { cn } from '@/renderer/lib/utils';
 import type {
-	ComposerShellState,
 	WorkspaceLandingKind,
-	WorkspaceLandingSetupState,
 	WorkspaceLandingSummary,
 } from '@/renderer/types/workbench';
 
 /**
  * Workspace-landing summary card shown above the chat thread for new
- * workspaces. Surfaces branch source, copied-file count, setup-script
- * guidance, and any linked Linear/GitHub issue metadata. When the composer is
- * disabled, a separate notice explains why so the empty chat surface is never
- * silent.
+ * workspaces. Surfaces branch source, copied-file count, and any linked
+ * Linear/GitHub issue metadata — workspace *identity*, not diagnostics.
+ *
+ * Diagnostic state (setup readiness, composer not-ready reasons, setup-script
+ * status) lives in the sidebar footer and the settings → diagnostics screen.
+ * Keep this card free of any "Pi is not ready" UI; the chat tab is for chat.
  *
  * Dismissal contract: render-time visibility is driven purely by
  * `landingSummary`. The card hides itself when the prop is `null`/`undefined`,
@@ -31,12 +28,10 @@ import type {
  * the workspace transitions out of its new state (e.g. first agent turn).
  */
 export function WorkspaceLandingCard({
-	composer,
 	landingSummary,
 	name,
 	pathLabel,
 }: {
-	composer: ComposerShellState;
 	landingSummary: WorkspaceLandingSummary | null | undefined;
 	name: string;
 	pathLabel: string;
@@ -111,19 +106,6 @@ export function WorkspaceLandingCard({
 					</span>
 				</LandingRow>
 
-				<LandingRow
-					detail={landingSummary.setupGuidance.detail}
-					icon={SettingsIcon}
-					title='Setup script'
-				>
-					<SetupStateBadge state={landingSummary.setupGuidance.state} />
-					{landingSummary.setupGuidance.command ? (
-						<code className='ml-2 rounded-sm bg-muted/45 px-1.5 py-0.5 font-mono text-[0.6875rem]'>
-							{landingSummary.setupGuidance.command}
-						</code>
-					) : null}
-				</LandingRow>
-
 				{landingSummary.linkedIssue ? (
 					<LandingRow
 						detail={landingSummary.linkedIssue.subtitle ?? ''}
@@ -143,40 +125,6 @@ export function WorkspaceLandingCard({
 					</LandingRow>
 				) : null}
 			</dl>
-
-			{composer.disabled ? (
-				<div
-					className='flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning/10 p-3'
-					data-landing-composer-state='disabled'
-				>
-					<CircleAlertIcon
-						aria-hidden='true'
-						className='mt-0.5 size-4 shrink-0 text-status-warning'
-					/>
-					<div className='min-w-0'>
-						<p className='font-medium text-foreground text-xs'>
-							Pi composer not ready
-						</p>
-						<p className='mt-0.5 text-muted-foreground text-xs leading-5'>
-							{composer.disabledReason ??
-								'The composer becomes available once Pi runtime is ready.'}
-						</p>
-					</div>
-				</div>
-			) : (
-				<div
-					className='flex items-start gap-2 rounded-md border border-border bg-background p-3'
-					data-landing-composer-state='ready'
-				>
-					<CircleDashedIcon
-						aria-hidden='true'
-						className='mt-0.5 size-4 shrink-0 text-muted-foreground'
-					/>
-					<p className='text-muted-foreground text-xs leading-5'>
-						Send the first prompt below to start a Pi session in this workspace.
-					</p>
-				</div>
-			)}
 		</section>
 	);
 }
@@ -194,16 +142,6 @@ const COPY_STATE_LABEL: Record<
 	copied: 'files copied',
 	skipped: 'files skipped',
 	unavailable: 'files unavailable',
-};
-
-const SETUP_STATE_CONFIG: Record<
-	WorkspaceLandingSetupState,
-	{ label: string; tone: 'muted' | 'ok' | 'warning' }
-> = {
-	configured: { label: 'Configured', tone: 'muted' },
-	missing: { label: 'Add a setup script', tone: 'warning' },
-	pending: { label: 'Not run yet', tone: 'muted' },
-	succeeded: { label: 'Ready', tone: 'ok' },
 };
 
 /** Renders one labeled metadata row inside the workspace landing summary. */
@@ -237,11 +175,4 @@ function LandingRow({
 			</div>
 		</div>
 	);
-}
-
-/** Renders the setup script status label for the workspace landing summary. */
-function SetupStateBadge({ state }: { state: WorkspaceLandingSetupState }) {
-	const { label, tone } = SETUP_STATE_CONFIG[state];
-
-	return <StatusBadge tone={tone}>{label}</StatusBadge>;
 }

@@ -12,6 +12,7 @@ import type { EnsembleDatabaseService } from '../storage/database.ts';
 import { firstLine } from './first-line.ts';
 import { parseMetadata } from './metadata.ts';
 import { toSlug } from './slug.ts';
+import { validateWorkspaceName as validateWorkspaceNameShared } from './workspace-validation.ts';
 /** Public surface of the workspace rename service. */
 export interface RenameWorkspaceService {
 	rename: (request: RenameWorkspaceRequest) => Promise<RenameWorkspaceResult>;
@@ -38,8 +39,6 @@ interface SourceWorkspace {
 	slug: string;
 }
 
-const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9 ._-]+$/;
-const WORKSPACE_NAME_MAX_LENGTH = 100;
 const BRANCH_NAME_MAX_LENGTH = 255;
 const GIT_BRANCH_TIMEOUT_MS = 5_000;
 
@@ -236,36 +235,15 @@ function readWorkspace(
 
 /** Validates `name`, returning a diagnostic when the input is rejected. */
 function validateWorkspaceName(name: string): RenameWorkspaceDiagnostic | null {
-	if (!name) {
-		return {
-			code: 'name-invalid',
-			message: 'Workspace name cannot be empty.',
-			severity: 'error',
-		};
+	const result = validateWorkspaceNameShared(name);
+	if (result.valid) {
+		return null;
 	}
-	if (name.length > WORKSPACE_NAME_MAX_LENGTH) {
-		return {
-			code: 'name-invalid',
-			message: `Workspace names must be ${WORKSPACE_NAME_MAX_LENGTH} characters or fewer.`,
-			severity: 'error',
-		};
-	}
-	if (name === '.' || name === '..' || name.startsWith('.')) {
-		return {
-			code: 'name-invalid',
-			message: 'Workspace names cannot start with a dot.',
-			severity: 'error',
-		};
-	}
-	if (!WORKSPACE_NAME_PATTERN.test(name)) {
-		return {
-			code: 'name-invalid',
-			message:
-				'Workspace names may only contain letters, numbers, spaces, dots, dashes, or underscores.',
-			severity: 'error',
-		};
-	}
-	return null;
+	return {
+		code: 'name-invalid',
+		message: result.message,
+		severity: 'error',
+	};
 }
 
 /** Validates `branchName`, returning a diagnostic when the input is rejected. */

@@ -13,7 +13,7 @@ import type {
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
-import { firstLine } from './first-line.ts';
+import { runWorktreeAdd as runWorktreeAddShared } from './git-ops.ts';
 
 /** Public surface of the workspace unarchive service. */
 export interface UnarchiveWorkspaceService {
@@ -49,7 +49,6 @@ interface ArchivedWorkspace {
 }
 
 const CONTEXT_DIRECTORY = '.context';
-const GIT_WORKTREE_TIMEOUT_MS = 15_000;
 
 /**
  * Builds the service that reverses a workspace lifecycle archive. NULLs
@@ -342,38 +341,29 @@ async function runWorktreeAdd({
 	repositoryPath: string;
 	workspacePath: string;
 }): Promise<UnarchiveWorkspaceDiagnostic | null> {
-	try {
-		const result = await localCommandService.run({
-			args: ['worktree', 'add', '-b', branchName, workspacePath, baseBranch],
-			command: 'git',
-			cwd: repositoryPath,
-			maxOutputBytes: 64 * 1024,
-			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
-		});
+	const outcome = await runWorktreeAddShared({
+		baseBranch,
+		branchName,
+		localCommandService,
+		repositoryPath,
+		workspacePath,
+	});
 
-		if (result.status === 'success') {
-			return null;
-		}
-
-		return {
-			code: 'worktree-recreate-failed',
-			message:
-				firstLine(result.stderr) ||
-				`git worktree add failed for branch ${branchName}.`,
-			path: workspacePath,
-			severity: 'error',
-		};
-	} catch (error) {
-		return {
-			code: 'worktree-recreate-failed',
-			message:
-				error instanceof Error
-					? error.message
-					: 'git worktree add threw unexpectedly.',
-			path: workspacePath,
-			severity: 'error',
-		};
+	if (outcome.status === 'success') {
+		return null;
 	}
+
+	const message =
+		outcome.status === 'git-missing'
+			? outcome.message
+			: outcome.message || `git worktree add failed for branch ${branchName}.`;
+
+	return {
+		code: 'worktree-recreate-failed',
+		message,
+		path: workspacePath,
+		severity: 'error',
+	};
 }
 
 function restoreContextDirectory({

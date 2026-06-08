@@ -51,6 +51,27 @@ export type {
 } from './health';
 export type { PiExecutableSelectionResult } from './pi';
 export type {
+	ChatTabKindWire,
+	ListPiModelsResult,
+	ListPiSessionEventsRequest,
+	ListPiSessionEventsResult,
+	ListPiSessionsRequest,
+	ListPiSessionsResult,
+	OpenPiSessionRequest,
+	OpenPiSessionResult,
+	PiChatTabWire,
+	PiEventStreamWire,
+	PiModelOptionWire,
+	PiSessionEventBroadcast,
+	PiSessionEventWire,
+	PiSessionSnapshotWire,
+	PiSessionStatusWire,
+	StopPiSessionRequest,
+	StopPiSessionResult,
+	SubmitPiPromptRequest,
+	SubmitPiPromptResult,
+} from './pi-session';
+export type {
 	QuickStartProjectDiagnostic,
 	QuickStartProjectDiagnosticCode,
 	QuickStartProjectDiagnosticSeverity,

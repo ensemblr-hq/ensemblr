@@ -26,8 +26,16 @@ import {
 	IPC_CHANNELS,
 	type ListArchivedWorkspacesRequest,
 	type ListArchivedWorkspacesResult,
+	type ListPiModelsResult,
+	type ListPiSessionEventsRequest,
+	type ListPiSessionEventsResult,
+	type ListPiSessionsRequest,
+	type ListPiSessionsResult,
 	type LocalRepositorySelectionResult,
+	type OpenPiSessionRequest,
+	type OpenPiSessionResult,
 	type PiExecutableSelectionResult,
+	type PiSessionEventBroadcast,
 	type QuickStartProjectRequest,
 	type QuickStartProjectResult,
 	type RegisterLocalRepositoryRequest,
@@ -48,6 +56,10 @@ import {
 	type SettingsResolutionSnapshot,
 	type SetupDiagnosticsSnapshot,
 	type SharedRootAdoptionSnapshot,
+	type StopPiSessionRequest,
+	type StopPiSessionResult,
+	type SubmitPiPromptRequest,
+	type SubmitPiPromptResult,
 	type UnarchiveWorkspaceRequest,
 	type UnarchiveWorkspaceResult,
 } from '../../shared/ipc';
@@ -126,6 +138,47 @@ export function createEnsembleApi(): EnsembleApi {
 			) as Promise<GithubRepositoryListResult>,
 		health: () =>
 			ipcRenderer.invoke(IPC_CHANNELS.health) as Promise<HealthSnapshot>,
+		listPiModels: () =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.listPiModels,
+			) as Promise<ListPiModelsResult>,
+		listPiSessionEvents: (request: ListPiSessionEventsRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.listPiSessionEvents,
+				request,
+			) as Promise<ListPiSessionEventsResult>,
+		listPiSessions: (request: ListPiSessionsRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.listPiSessions,
+				request,
+			) as Promise<ListPiSessionsResult>,
+		onPiSessionEvent: (listener: (event: PiSessionEventBroadcast) => void) => {
+			const wrapped = (
+				_event: IpcRendererEvent,
+				payload: PiSessionEventBroadcast,
+			) => {
+				listener(payload);
+			};
+			ipcRenderer.on(IPC_CHANNELS.piSessionEvent, wrapped);
+			return () => {
+				ipcRenderer.off(IPC_CHANNELS.piSessionEvent, wrapped);
+			};
+		},
+		openPiSession: (request: OpenPiSessionRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.openPiSession,
+				request,
+			) as Promise<OpenPiSessionResult>,
+		stopPiSession: (request: StopPiSessionRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.stopPiSession,
+				request,
+			) as Promise<StopPiSessionResult>,
+		submitPiPrompt: (request: SubmitPiPromptRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.submitPiPrompt,
+				request,
+			) as Promise<SubmitPiPromptResult>,
 		onCloneGithubRepositoryProgress: (
 			listener: (event: CloneGithubRepositoryProgressEvent) => void,
 		) => {

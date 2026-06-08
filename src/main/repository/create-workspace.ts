@@ -23,8 +23,14 @@ import {
 	createFilesToCopyService,
 	type FilesToCopyService,
 } from './files-to-copy.ts';
-import { firstLine } from './first-line.ts';
+import {
+	DEFAULT_FALLBACK_BRANCH,
+	GIT_WORKTREE_TIMEOUT_MS,
+	runWorktreeAdd as runWorktreeAddShared,
+} from './git-ops.ts';
 import { toSlug } from './slug.ts';
+import { validateWorkspaceName } from './workspace-validation.ts';
+
 /** Public surface of the workspace creation service. */
 export interface CreateWorkspaceService {
 	create: (request: CreateWorkspaceRequest) => Promise<CreateWorkspaceResult>;
@@ -61,10 +67,6 @@ interface PreparedWorkspace {
 }
 
 const DEFAULT_WORKSPACE_NAME = 'workspace';
-const DEFAULT_FALLBACK_BRANCH = 'main';
-const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9 ._-]+$/;
-const WORKSPACE_NAME_MAX_LENGTH = 100;
-const GIT_WORKTREE_TIMEOUT_MS = 15_000;
 const CONTEXT_DIRECTORY = '.context';
 
 /**
@@ -340,6 +342,10 @@ function readRepository(
 /**
  * Validates an optional workspace name; rejects path separators, unsafe chars,
  * leading dots, and overlong values.
+ *
+ * `undefined`, `null`, and empty/whitespace strings are treated as "no name
+ * provided" and pass through — the create flow substitutes a default name
+ * downstream. All other invalid inputs return a `name-invalid` diagnostic.
  * @param name - Caller-provided name; `undefined` is allowed (placeholder used).
  */
 function validateName(name: unknown): CreateWorkspaceDiagnostic | null {
@@ -357,29 +363,15 @@ function validateName(name: unknown): CreateWorkspaceDiagnostic | null {
 	if (!trimmed) {
 		return null;
 	}
-	if (trimmed.length > WORKSPACE_NAME_MAX_LENGTH) {
-		return {
-			code: 'name-invalid',
-			message: `Workspace names must be ${WORKSPACE_NAME_MAX_LENGTH} characters or fewer.`,
-			severity: 'error',
-		};
+	const result = validateWorkspaceName(trimmed);
+	if (result.valid) {
+		return null;
 	}
-	if (trimmed === '.' || trimmed === '..' || trimmed.startsWith('.')) {
-		return {
-			code: 'name-invalid',
-			message: 'Workspace names cannot start with a dot.',
-			severity: 'error',
-		};
-	}
-	if (!WORKSPACE_NAME_PATTERN.test(trimmed)) {
-		return {
-			code: 'name-invalid',
-			message:
-				'Workspace names may only contain letters, numbers, spaces, dots, dashes, or underscores.',
-			severity: 'error',
-		};
-	}
-	return null;
+	return {
+		code: 'name-invalid',
+		message: result.message,
+		severity: 'error',
+	};
 }
 
 /**
@@ -522,7 +514,9 @@ function ensureParentDirectory(
 }
 
 /**
- * Runs `git worktree add -b <branch> <path> <base>` inside the source repo.
+ * Runs `git worktree add -b <branch> <path> <base>` inside the source repo
+ * by delegating to the shared {@link runWorktreeAddShared} helper, mapping its
+ * outcome onto this service's diagnostic shape.
  * @returns A diagnostic on failure; `null` on success.
  */
 async function runWorktreeAdd({
@@ -538,29 +532,29 @@ async function runWorktreeAdd({
 	repositoryPath: string;
 	workspacePath: string;
 }): Promise<CreateWorkspaceDiagnostic | null> {
-	const result = await localCommandService.run({
-		args: ['worktree', 'add', '-b', branchName, workspacePath, baseBranch],
-		command: 'git',
-		cwd: repositoryPath,
-		maxOutputBytes: 64 * 1024,
-		timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+	const outcome = await runWorktreeAddShared({
+		baseBranch,
+		branchName,
+		localCommandService,
+		repositoryPath,
+		workspacePath,
 	});
 
-	if (result.status === 'success') {
+	if (outcome.status === 'success') {
 		return null;
 	}
 
-	if (result.failure?.code === 'command-not-found') {
+	if (outcome.status === 'git-missing') {
 		return {
 			code: 'git-not-installed',
-			message: 'git was not found in PATH. Install git, then retry.',
+			message: outcome.message,
 			severity: 'error',
 		};
 	}
 
 	return {
 		code: 'git-worktree-failed',
-		message: firstLine(result.stderr) || 'git worktree add failed.',
+		message: outcome.message,
 		path: workspacePath,
 		severity: 'error',
 	};
