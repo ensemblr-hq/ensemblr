@@ -15,8 +15,14 @@ import type { EnsembleConfigService } from '../config/config-loader';
 import type { EnvironmentVariablesService } from '../environment/environment-variables';
 import type { PiExecutableService } from '../pi/pi-executable';
 import type { PiReadinessService } from '../pi/pi-readiness';
-import type { EnsembleRootDirectoryService } from '../root/root-directory';
+import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
 import type { EnsembleDatabaseService } from '../storage/database';
+import {
+	createCommandLogs,
+	createSetupCheckSnapshot,
+	type SetupCheckProvider,
+	type SetupCheckProviderContext,
+} from './setup-check-context.ts';
 import {
 	getGitExecutableCheck,
 	getGitHubAuthCheck,
@@ -33,17 +39,6 @@ import {
 export interface SetupDiagnosticsService {
 	getSnapshot: () => Promise<SetupDiagnosticsSnapshot>;
 }
-
-/** Shared context passed to every {@link SetupCheckProvider}. */
-export interface SetupCheckProviderContext {
-	homeDirectory: string;
-	now: () => Date;
-}
-
-/** Function that produces one {@link SetupCheckSnapshot} for the diagnostics view. */
-export type SetupCheckProvider = (
-	context: SetupCheckProviderContext,
-) => Promise<SetupCheckSnapshot> | SetupCheckSnapshot;
 
 /** Options for {@link createSetupDiagnosticsService}. */
 interface CreateSetupDiagnosticsServiceOptions {
@@ -165,32 +160,6 @@ export function createSetupDiagnosticsService({
 
 			return createDiagnosticsSnapshot(checks, now().toISOString());
 		},
-	};
-}
-
-/**
- * Helper that builds a complete {@link SetupCheckSnapshot} from a partial input,
- * defaulting logs, remediation actions and timestamp.
- * @param check - Required fields plus optional overrides for defaults.
- * @returns A fully-populated snapshot.
- */
-export function createSetupCheckSnapshot(
-	check: Omit<SetupCheckSnapshot, 'logs' | 'remediationActions' | 'updatedAt'> &
-		Partial<
-			Pick<SetupCheckSnapshot, 'logs' | 'remediationActions' | 'updatedAt'>
-		>,
-): SetupCheckSnapshot {
-	return {
-		logs: check.logs ?? [],
-		remediationActions: check.remediationActions ?? [
-			{
-				id: `retry-${check.id}`,
-				kind: 'retry',
-				label: 'Retry check',
-			},
-		],
-		updatedAt: check.updatedAt ?? new Date(0).toISOString(),
-		...check,
 	};
 }
 
@@ -627,43 +596,6 @@ function createEnvironmentVariablesLogs(
 				: diagnostic.message,
 		})),
 	];
-}
-
-/** Renders a {@link LocalCommandResult} as a setup check log set. */
-export function createCommandLogs(
-	result: LocalCommandResult,
-): SetupCheckLogSnapshot[] {
-	const logs: SetupCheckLogSnapshot[] = [
-		{
-			label: 'Command',
-			text: result.logs.command,
-		},
-	];
-
-	if (result.logs.stdout) {
-		logs.push({
-			label: 'stdout',
-			text: result.logs.stdout,
-			truncated: result.stdoutTruncated,
-		});
-	}
-
-	if (result.logs.stderr) {
-		logs.push({
-			label: 'stderr',
-			text: result.logs.stderr,
-			truncated: result.stderrTruncated,
-		});
-	}
-
-	if (result.failure) {
-		logs.push({
-			label: result.failure.code,
-			text: result.failure.message,
-		});
-	}
-
-	return logs;
 }
 
 /** Builds a `pending` setup check snapshot for not-yet-implemented checks. */

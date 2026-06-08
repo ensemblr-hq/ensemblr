@@ -6,6 +6,8 @@ import {
 } from 'electron';
 
 import {
+	type CreateWorkspaceRequest,
+	type CreateWorkspaceResult,
 	IPC_CHANNELS,
 	type LocalRepositorySelectionResult,
 	type QuickStartProjectRequest,
@@ -14,12 +16,14 @@ import {
 	type RegisterLocalRepositoryResult,
 } from '../../../shared/ipc';
 import type {
+	CreateWorkspaceService,
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
 } from '../../repository';
 
 /** Service dependencies used by the local-repository IPC handlers. */
 export interface RepositoryHandlersOptions {
+	createWorkspaceService: CreateWorkspaceService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	quickStartProjectService: QuickStartProjectService;
 }
@@ -30,6 +34,7 @@ export interface RepositoryHandlersOptions {
  * @param options - Required services.
  */
 export function registerRepositoryHandlers({
+	createWorkspaceService,
 	localRepositoryRegistrationService,
 	quickStartProjectService,
 }: RepositoryHandlersOptions): void {
@@ -73,6 +78,15 @@ export function registerRepositoryHandlers({
 			);
 		},
 	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.createWorkspace,
+		(_event, request: unknown): Promise<CreateWorkspaceResult> => {
+			return createWorkspaceService.create(
+				normalizeCreateWorkspaceRequest(request),
+			);
+		},
+	);
 }
 
 /** Coerces an IPC payload into a {@link RegisterLocalRepositoryRequest}. */
@@ -107,4 +121,27 @@ function normalizeQuickStartProjectRequest(
 			: undefined;
 
 	return parentPath !== undefined ? { name, parentPath } : { name };
+}
+
+/** Coerces an IPC payload into a {@link CreateWorkspaceRequest}. */
+function normalizeCreateWorkspaceRequest(
+	request: unknown,
+): CreateWorkspaceRequest {
+	if (typeof request !== 'object' || request === null) {
+		return { repositoryId: '' };
+	}
+	const candidate = request as Record<string, unknown>;
+	const repositoryId =
+		typeof candidate.repositoryId === 'string' ? candidate.repositoryId : '';
+	const normalized: CreateWorkspaceRequest = { repositoryId };
+	if (typeof candidate.name === 'string') {
+		normalized.name = candidate.name;
+	}
+	if (typeof candidate.branchName === 'string') {
+		normalized.branchName = candidate.branchName;
+	}
+	if (typeof candidate.baseBranch === 'string') {
+		normalized.baseBranch = candidate.baseBranch;
+	}
+	return normalized;
 }

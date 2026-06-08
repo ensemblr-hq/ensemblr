@@ -9,7 +9,7 @@ import type {
 import {
 	createSetupCheckSnapshot,
 	type SetupCheckProviderContext,
-} from './setup-diagnostics.ts';
+} from './setup-check-context.ts';
 
 const GITHUB_HOSTNAME = 'github.com';
 const GIT_VERSION_TIMEOUT_MS = 3000;

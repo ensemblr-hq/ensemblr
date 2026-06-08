@@ -17,6 +17,7 @@ import {
 	createGithubRepositoryListService,
 	createLocalRepositoryRegistrationService,
 	createQuickStartProjectService,
+	createWorkspaceService,
 } from './repository';
 import {
 	createEnsembleRootDirectoryService,
@@ -80,6 +81,11 @@ const quickStartProjectService = createQuickStartProjectService({
 	registrationService: localRepositoryRegistrationService,
 	rootDirectoryService,
 });
+const createWorkspaceServiceInstance = createWorkspaceService({
+	databaseService,
+	localCommandService,
+	rootDirectoryService,
+});
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
 	databaseService,
@@ -100,6 +106,7 @@ app.whenReady().then(() => {
 	installApplicationMenu();
 	registerIpcHandlers({
 		configService,
+		createWorkspaceService: createWorkspaceServiceInstance,
 		databaseService,
 		environmentVariablesService,
 		githubCloneService,

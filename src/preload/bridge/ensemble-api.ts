@@ -7,6 +7,8 @@ import {
 	type CloneGithubRepositoryRequest,
 	type CloneGithubRepositoryStartRequest,
 	type CloneGithubRepositoryStartResult,
+	type CreateWorkspaceRequest,
+	type CreateWorkspaceResult,
 	type EnsembleApi,
 	type EnvironmentVariablesSnapshot,
 	type GithubRepositoryListResult,
@@ -52,6 +54,11 @@ export function createEnsembleApi(): EnsembleApi {
 				IPC_CHANNELS.confirmRootDirectoryChange,
 				request,
 			) as Promise<RootDirectoryChangeApplyResult>,
+		createWorkspace: (request: CreateWorkspaceRequest) =>
+			ipcRenderer.invoke(
+				IPC_CHANNELS.createWorkspace,
+				request,
+			) as Promise<CreateWorkspaceResult>,
 		ensureWindowWidth: (minimumWidth: number) =>
 			ipcRenderer.invoke(
 				IPC_CHANNELS.ensureWindowWidth,

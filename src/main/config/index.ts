@@ -25,13 +25,15 @@ export {
 export type {
 	LoadedRepositoryConfig,
 	LoadRepositoryConfigOptions,
-	RepositoryConfigService,
+} from './repository-config';
+export {
+	isRepositoryConfigPathAllowed,
+	loadRepositoryConfig,
 } from './repository-config';
 export {
 	applyRepositoryConfigMigration,
-	createRepositoryConfigService,
-	isRepositoryConfigPathAllowed,
-	loadRepositoryConfig,
 	normalizeRepositoryConfigRequest,
 	previewRepositoryConfigMigration,
-} from './repository-config';
+} from './repository-config-migration';
+export type { RepositoryConfigService } from './repository-config-service';
+export { createRepositoryConfigService } from './repository-config-service';

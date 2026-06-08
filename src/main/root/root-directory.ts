@@ -12,9 +12,6 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type {
 	ResolvedSettingSnapshot,
-	RootDirectoryChangeApplyResult,
-	RootDirectoryChangePreview,
-	RootDirectoryChangeRequest,
 	RootDirectoryDiagnostic,
 	RootDirectoryManagedPathKey,
 	RootDirectoryManagedPathSnapshot,
@@ -22,21 +19,6 @@ import type {
 	SettingsResolutionSnapshot,
 	SettingsResolutionSource,
 } from '../../shared/ipc';
-import type { EnsembleConfigResolutionService } from '../config/config-resolution';
-import type { EnsembleDatabaseService } from '../storage/database';
-import {
-	applyRootDirectoryChange,
-	createEmptyRootDirectoryReconciliation,
-	previewRootDirectoryChange,
-	type RootDirectoryReconciler,
-} from './root-directory-change.ts';
-
-export type { RootDirectoryReconciler } from './root-directory-change.ts';
-export {
-	applyRootDirectoryChange,
-	createEmptyRootDirectoryReconciliation,
-	previewRootDirectoryChange,
-} from './root-directory-change.ts';
 
 /** Options for {@link ensureRootDirectory}. */
 export interface EnsureRootDirectoryOptions {
@@ -45,26 +27,6 @@ export interface EnsureRootDirectoryOptions {
 	homeDirectory?: string;
 	now?: () => Date;
 	settingsSnapshot: SettingsResolutionSnapshot;
-}
-
-/** Public surface of the Ensemble root-directory service. */
-export interface EnsembleRootDirectoryService {
-	applyChange: (
-		request: RootDirectoryChangeRequest,
-	) => RootDirectoryChangeApplyResult;
-	ensure: () => RootDirectorySnapshot;
-	getSnapshot: () => RootDirectorySnapshot | null;
-	previewChange: (nextRootPath: string) => RootDirectoryChangePreview;
-}
-
-/** Options for {@link createEnsembleRootDirectoryService}. */
-interface CreateEnsembleRootDirectoryServiceOptions {
-	allowCreate?: boolean;
-	databaseService: EnsembleDatabaseService;
-	homeDirectory?: string;
-	now?: () => Date;
-	reconcileRootDirectory?: RootDirectoryReconciler;
-	settingsResolutionService: EnsembleConfigResolutionService;
 }
 
 const CURRENT_ROOT_ID = 'current';
@@ -84,69 +46,6 @@ const MANAGED_DIRECTORY_NAMES = new Set(
 	MANAGED_DIRECTORIES.map((directory) => directory.name),
 );
 const IGNORED_ROOT_ENTRY_NAMES = new Set(['.DS_Store']);
-
-/**
- * Builds the root-directory service that ensures the Ensemble root exists,
- * exposes change preview/apply, and caches the last snapshot for callers.
- * @param options - Service dependencies and tuning.
- * @returns A {@link EnsembleRootDirectoryService}.
- */
-export function createEnsembleRootDirectoryService({
-	allowCreate = true,
-	databaseService,
-	homeDirectory,
-	now,
-	reconcileRootDirectory = createEmptyRootDirectoryReconciliation,
-	settingsResolutionService,
-}: CreateEnsembleRootDirectoryServiceOptions): EnsembleRootDirectoryService {
-	let snapshot: RootDirectorySnapshot | null = null;
-
-	/** Resolves settings, ensures the root exists and caches the snapshot. */
-	function ensure(): RootDirectorySnapshot {
-		snapshot = ensureRootDirectory({
-			allowCreate,
-			database: databaseService.getConnection()?.database ?? null,
-			homeDirectory,
-			now,
-			settingsSnapshot: settingsResolutionService.resolve(),
-		});
-
-		return snapshot;
-	}
-
-	return {
-		applyChange: (request) => {
-			const previousRoot = snapshot ?? ensure();
-			const result = applyRootDirectoryChange({
-				database: databaseService.getConnection()?.database ?? null,
-				homeDirectory,
-				nextRootPath: request.path,
-				now,
-				previousRoot,
-				reconcileRootDirectory,
-				resolveSettingsSnapshot: () => settingsResolutionService.resolve(),
-			});
-
-			if (result.newRoot) {
-				snapshot = result.newRoot;
-			}
-
-			return result;
-		},
-		ensure,
-		getSnapshot: () => snapshot,
-		previewChange: (nextRootPath) => {
-			const previousRoot = snapshot ?? ensure();
-
-			return previewRootDirectoryChange({
-				homeDirectory,
-				nextRootPath,
-				previousRoot,
-				settingsSnapshot: settingsResolutionService.resolve(),
-			});
-		},
-	};
-}
 
 /**
  * Resolves the rootDirectory setting, verifies (and optionally creates) the

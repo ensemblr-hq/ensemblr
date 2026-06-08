@@ -19,9 +19,9 @@ import {
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
 import {
 	applyRootDirectoryChange,
-	ensureRootDirectory,
 	previewRootDirectoryChange,
-} from '../../src/main/root/root-directory.ts';
+} from '../../src/main/root/root-directory-change.ts';
+import { ensureRootDirectory } from '../../src/main/root/root-directory.ts';
 import { reconcileRootDirectory } from '../../src/main/root/root-reconciliation.ts';
 import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
 import type {

@@ -4,7 +4,7 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
-import type { EnsembleRootDirectoryService } from '../root/root-directory';
+import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
 import { resolvePiAgentDirectory } from './pi-agent-directory-resolver.ts';
 import type {
 	PiExecutableService,
