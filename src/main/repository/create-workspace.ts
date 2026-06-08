@@ -9,6 +9,7 @@ import type {
 	CreateWorkspaceDiagnosticCode,
 	CreateWorkspaceRequest,
 	CreateWorkspaceResult,
+	FilesToCopySnapshot,
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import {
@@ -18,6 +19,10 @@ import {
 } from '../config/repository-config.ts';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import {
+	createFilesToCopyService,
+	type FilesToCopyService,
+} from './files-to-copy.ts';
 
 /** Public surface of the workspace creation service. */
 export interface CreateWorkspaceService {
@@ -27,6 +32,7 @@ export interface CreateWorkspaceService {
 /** Options for {@link createWorkspaceService}. */
 export interface CreateWorkspaceServiceOptions {
 	databaseService: EnsembleDatabaseService;
+	filesToCopyService?: FilesToCopyService;
 	loadConfig?: (options: LoadRepositoryConfigOptions) => LoadedRepositoryConfig;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
@@ -69,11 +75,14 @@ const CONTEXT_DIRECTORY = '.context';
  */
 export function createWorkspaceService({
 	databaseService,
+	filesToCopyService,
 	loadConfig = loadRepositoryConfig,
 	localCommandService,
 	now = () => new Date(),
 	rootDirectoryService,
 }: CreateWorkspaceServiceOptions): CreateWorkspaceService {
+	const filesToCopy =
+		filesToCopyService ?? createFilesToCopyService({ localCommandService });
 	return {
 		create: async (request) => {
 			const database = databaseService.getConnection()?.database;
@@ -171,6 +180,13 @@ export function createWorkspaceService({
 				return failure(contextDiagnostic);
 			}
 
+			const filesToCopySnapshot = await runFilesToCopy({
+				config,
+				filesToCopyService: filesToCopy,
+				repositoryPath: repository.path,
+				workspacePath: prepared.path,
+			});
+
 			const timestamp = now().toISOString();
 			try {
 				insertWorkspaceRow({
@@ -212,11 +228,55 @@ export function createWorkspaceService({
 
 			return {
 				diagnostics: [],
+				filesToCopy: filesToCopySnapshot,
 				status: 'success',
 				workspace,
 			};
 		},
 	};
+}
+
+/**
+ * Runs the files-to-copy step, swallowing service-level exceptions into a
+ * warning so a partial failure never aborts a freshly-created workspace.
+ * @param input - The active config, copy service, and source/target paths.
+ * @returns A snapshot describing the copy outcome; never throws.
+ */
+async function runFilesToCopy({
+	config,
+	filesToCopyService,
+	repositoryPath,
+	workspacePath,
+}: {
+	config: LoadedRepositoryConfig;
+	filesToCopyService: FilesToCopyService;
+	repositoryPath: string;
+	workspacePath: string;
+}): Promise<FilesToCopySnapshot> {
+	try {
+		return await filesToCopyService.copy({
+			config,
+			repositoryPath,
+			workspacePath,
+		});
+	} catch (error) {
+		return {
+			copied: [],
+			diagnostics: [
+				{
+					code: 'copy-failed',
+					message:
+						error instanceof Error
+							? error.message
+							: 'Files-to-copy failed unexpectedly.',
+					severity: 'warning',
+				},
+			],
+			patterns: [],
+			skipped: [],
+			source: 'default',
+		};
+	}
 }
 
 /**
@@ -226,6 +286,7 @@ export function createWorkspaceService({
 function failure(diagnostic: CreateWorkspaceDiagnostic): CreateWorkspaceResult {
 	return {
 		diagnostics: [diagnostic],
+		filesToCopy: null,
 		status: 'failure',
 		workspace: null,
 	};

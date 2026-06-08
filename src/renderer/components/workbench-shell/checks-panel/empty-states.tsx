@@ -1,21 +1,23 @@
-import { CircleIcon } from 'lucide-react';
-
-import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { formatCount } from '@/renderer/lib/format';
 import type { ChecksPanelState } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 import { ChecksEmptyMessage, ChecksSectionHeader } from './pr-metadata';
+import { ChecksActionRow } from './pr-rows';
 import { ChecksPanelSummary } from './summary';
 
 export { ChecksEmptyMessage };
 
 /** Empty-state shown when the workspace has no PR yet. */
 export function ChecksNoPullRequestState({
+	onCommitAndPush,
+	onCreatePullRequest,
 	state,
 	workspace,
 }: {
+	onCommitAndPush?: () => void;
+	onCreatePullRequest?: () => void;
 	state: Extract<ChecksPanelState, { hasPullRequest: false }>;
 	workspace: WorkspaceShellModel;
 }) {
@@ -31,6 +33,7 @@ export function ChecksNoPullRequestState({
 					<ChecksActionRow
 						actionLabel={hasChanges ? 'Create PR' : undefined}
 						label='No PR open'
+						onAction={onCreatePullRequest}
 					/>
 					{hasChanges ? (
 						<ChecksActionRow
@@ -39,6 +42,7 @@ export function ChecksNoPullRequestState({
 								workspace.changeSummary.files,
 								'uncommitted change',
 							)}
+							onAction={onCommitAndPush}
 						/>
 					) : null}
 				</section>
@@ -49,36 +53,6 @@ export function ChecksNoPullRequestState({
 				</section>
 			</div>
 		</ScrollArea>
-	);
-}
-
-/** Reusable row with leading icon, label/detail text, and trailing action. */
-function ChecksActionRow({
-	actionLabel,
-	label,
-}: {
-	actionLabel?: string;
-	label: string;
-}) {
-	return (
-		<div className='flex min-h-7 min-w-0 items-center justify-between gap-2 px-1'>
-			<div className='flex min-w-0 items-center gap-2 overflow-hidden'>
-				<CircleIcon
-					aria-hidden='true'
-					className='size-3 shrink-0 text-muted-foreground'
-				/>
-				<span className='min-w-0 truncate text-xs'>{label}</span>
-			</div>
-			{actionLabel ? (
-				<Button
-					className='h-6 px-1.5 text-muted-foreground text-xs hover:text-foreground'
-					size='xs'
-					variant='ghost'
-				>
-					{actionLabel}
-				</Button>
-			) : null}
-		</div>
 	);
 }
 

@@ -239,8 +239,48 @@ export interface CreatedWorkspaceSnapshot {
 
 export type CreateWorkspaceStatus = 'failure' | 'success';
 
+export type FilesToCopySource =
+	| 'conductor-config'
+	| 'conductor-legacy-config'
+	| 'conductor-local-config'
+	| 'default'
+	| 'ensemble-config'
+	| 'worktreeinclude';
+
+export type FilesToCopyDiagnosticCode =
+	| 'copy-failed'
+	| 'invalid-pattern'
+	| 'pattern-listing-failed'
+	| 'source-path-missing'
+	| 'tracked-skipped';
+
+export type FilesToCopyDiagnosticSeverity = 'error' | 'info' | 'warning';
+
+export interface FilesToCopyDiagnostic {
+	code: FilesToCopyDiagnosticCode;
+	message: string;
+	path?: string;
+	pattern?: string;
+	severity: FilesToCopyDiagnosticSeverity;
+}
+
+export interface FilesToCopyEntry {
+	from: string;
+	relativePath: string;
+	to: string;
+}
+
+export interface FilesToCopySnapshot {
+	copied: FilesToCopyEntry[];
+	diagnostics: FilesToCopyDiagnostic[];
+	patterns: string[];
+	skipped: FilesToCopyDiagnostic[];
+	source: FilesToCopySource;
+}
+
 export interface CreateWorkspaceResult {
 	diagnostics: CreateWorkspaceDiagnostic[];
+	filesToCopy: FilesToCopySnapshot | null;
 	status: CreateWorkspaceStatus;
 	workspace: CreatedWorkspaceSnapshot | null;
 }
