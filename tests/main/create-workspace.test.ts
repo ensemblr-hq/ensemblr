@@ -356,6 +356,60 @@ test('create rolls back the directory and skips the SQLite row when git fails', 
 	assert.equal(count.count, 0);
 });
 
+test('create records files-to-copy snapshot in the success result', async (t) => {
+	const harness = createHarness(t);
+	writeFileSync(path.join(harness.repositoryPath, '.gitignore'), '.env*\n');
+	writeFileSync(
+		path.join(harness.repositoryPath, '.env.local'),
+		'API_KEY=secret\n',
+	);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'with-copies',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.ok(result.filesToCopy);
+	assert.equal(result.filesToCopy?.source, 'default');
+	assert.deepEqual(result.filesToCopy?.patterns, ['.env*']);
+	assert.equal(result.filesToCopy?.copied.length, 1);
+	assert.equal(result.filesToCopy?.copied[0]?.relativePath, '.env.local');
+	if (!result.workspace) {
+		throw new Error('workspace missing');
+	}
+	assert.equal(
+		existsSync(path.join(result.workspace.path, '.env.local')),
+		true,
+	);
+});
+
+test('create returns null filesToCopy snapshot when it fails before copying', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		baseBranch: 'does-not-exist',
+		name: 'bad-base-copies',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.filesToCopy, null);
+});
+
 test('create honors caller-supplied branchName and baseBranch', async (t) => {
 	const harness = createHarness(t);
 	runGit(harness.repositoryPath, ['branch', 'develop']);
