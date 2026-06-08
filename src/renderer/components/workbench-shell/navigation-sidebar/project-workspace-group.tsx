@@ -51,7 +51,12 @@ export function ProjectWorkspaceGroup({
 			<ProjectSidebarHeader
 				isCollapsed={isCollapsed}
 				onCreateFromSourceSelect={onCreateFromSourceSelect}
-				onRepositorySettingsSelect={() => onStaticNavigationSelect('settings')}
+				onRepositorySettingsSelect={() =>
+					onStaticNavigationSelect({
+						kind: 'repo-settings',
+						repoId: project.id,
+					})
+				}
 				onToggle={onProjectToggle}
 				project={project}
 				workspaceCount={workspaces.length}

@@ -7,7 +7,8 @@ export type WorkbenchStaticNavigationTarget =
 	| 'dashboard'
 	| 'help'
 	| 'history'
-	| 'settings';
+	| 'settings'
+	| { kind: 'repo-settings'; repoId: string };
 
 export interface WorkbenchWorkspaceNavigationLinkTarget {
 	search: WorkbenchRouteSearch;

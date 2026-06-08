@@ -75,7 +75,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-	:root {
+	:root:not(.light) {
 		--ensemble-canvas: oklch(0.135 0.006 35);
 		--ensemble-toolbar: oklch(0.18 0.006 35 / 94%);
 		--ensemble-surface: oklch(0.16 0.006 35);

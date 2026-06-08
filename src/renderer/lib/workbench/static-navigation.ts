@@ -4,10 +4,16 @@ export type WorkbenchStaticRouteTo =
 	| '/dashboard'
 	| '/help'
 	| '/history'
-	| '/settings';
+	| '/settings'
+	| '/settings/repo/$repoId/environment';
 
-const staticNavigationRouteByTarget: Record<
-	WorkbenchStaticNavigationTarget,
+export interface WorkbenchStaticRouteSpec {
+	to: WorkbenchStaticRouteTo;
+	params?: Record<string, string>;
+}
+
+const literalRouteByTarget: Record<
+	Exclude<WorkbenchStaticNavigationTarget, { kind: string }>,
 	WorkbenchStaticRouteTo
 > = {
 	dashboard: '/dashboard',
@@ -17,12 +23,23 @@ const staticNavigationRouteByTarget: Record<
 };
 
 /**
- * Maps a workbench navigation target to its TanStack Router `to` value.
- * @param target - Static target enum value.
- * @returns A typed router `to` path.
+ * Maps a workbench navigation target to its TanStack Router link spec.
+ * @param target - Static target enum value or discriminated variant.
+ * @returns A `to` path with optional params, ready for `Link` / `navigate`.
  */
 export function getWorkbenchStaticRoute(
 	target: WorkbenchStaticNavigationTarget,
-) {
-	return staticNavigationRouteByTarget[target];
+): WorkbenchStaticRouteSpec {
+	if (typeof target !== 'string') {
+		if (target.kind === 'repo-settings') {
+			return {
+				params: { repoId: target.repoId },
+				to: '/settings/repo/$repoId/environment',
+			};
+		}
+		throw new Error(
+			`Unknown static navigation variant: ${JSON.stringify(target)}`,
+		);
+	}
+	return { to: literalRouteByTarget[target] };
 }
