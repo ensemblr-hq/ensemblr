@@ -9,10 +9,7 @@ import {
 	type ListPiSessionsResult,
 	type OpenPiSessionRequest,
 	type OpenPiSessionResult,
-	type PiChatTabWire,
-	type PiModelOptionWire,
 	type PiSessionEventWire,
-	type PiSessionSnapshotWire,
 	type StopPiSessionRequest,
 	type StopPiSessionResult,
 	type SubmitPiPromptRequest,
@@ -20,10 +17,13 @@ import {
 } from '../../../shared/ipc';
 import type { LocalCommandService } from '../../commands/local-command';
 import type { PiExecutableService } from '../../pi';
-import { resolvePiProviderModels } from '../../pi/pi-provider-models.ts';
-import type {
-	PiSessionService,
-	PiSessionSnapshot,
+import {
+	presentPiModels,
+	resolvePiProviderModels,
+} from '../../pi/pi-provider-models.ts';
+import {
+	type PiSessionService,
+	snapshotToWire,
 } from '../../pi-agent/pi-session-service.ts';
 
 /** Service dependencies used by the Pi session IPC handlers. */
@@ -32,9 +32,6 @@ export interface PiSessionHandlersOptions {
 	piExecutableService: PiExecutableService;
 	piSessionService: PiSessionService;
 }
-
-const DEFAULT_THINKING_LEVELS = ['low', 'medium', 'high'] as const;
-const DEFAULT_THINKING_LEVEL = 'medium';
 
 const EMPTY_PI_MODELS: ListPiModelsResult = {
 	defaultModelId: null,
@@ -151,20 +148,7 @@ export function registerPiSessionHandlers({
 					executable,
 					localCommandService,
 				});
-				if (snapshot.status !== 'success' || snapshot.models.length === 0) {
-					return EMPTY_PI_MODELS;
-				}
-				const models: PiModelOptionWire[] = snapshot.models.map((row) => ({
-					displayName: `${row.model} (${row.provider})`,
-					id: row.id,
-					provider: row.provider,
-					thinkingLevels: DEFAULT_THINKING_LEVELS,
-				}));
-				return {
-					defaultModelId: models[0]?.id ?? null,
-					defaultThinkingLevel: DEFAULT_THINKING_LEVEL,
-					models,
-				};
+				return presentPiModels(snapshot);
 			} catch {
 				return EMPTY_PI_MODELS;
 			}
@@ -193,29 +177,3 @@ export function registerPiSessionHandlers({
 	);
 }
 
-function snapshotToWire(snapshot: PiSessionSnapshot): PiSessionSnapshotWire {
-	const tabs: PiChatTabWire[] = snapshot.openedTabs.map((tab) => ({
-		id: tab.id,
-		kind: tab.kind,
-		openedAt: tab.openedAt,
-		piSessionId: tab.piSessionId,
-		position: tab.position,
-		title: tab.title,
-		workspaceId: tab.workspaceId,
-	}));
-	return {
-		branchId: snapshot.branchId,
-		closedAt: snapshot.row.closedAt,
-		createdAt: snapshot.row.createdAt,
-		cwd: snapshot.row.cwd,
-		id: snapshot.row.id,
-		label: snapshot.row.label,
-		model: snapshot.row.model,
-		openedTabs: tabs,
-		piSessionId: snapshot.row.piSessionId,
-		status: snapshot.row.status,
-		thinkingLevel: snapshot.row.thinkingLevel,
-		updatedAt: snapshot.row.updatedAt,
-		workspaceId: snapshot.row.workspaceId,
-	};
-}

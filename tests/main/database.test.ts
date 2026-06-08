@@ -20,6 +20,7 @@ const EXPECTED_MIGRATIONS = [
 	'003_root_directory_metadata',
 	'004_archive_lifecycle',
 	'005_pi_session_metadata',
+	'006_repository_remote_url_index',
 ];
 
 function createTestDatabasePath(): {

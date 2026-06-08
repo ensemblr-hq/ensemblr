@@ -208,8 +208,8 @@ test('prepare rejects the clone when another repository already tracks the remot
 	t.after(() => connection.database.close());
 	connection.database
 		.prepare(
-			`INSERT INTO repositories (id, slug, name, path, default_branch, created_at, updated_at, metadata_json)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			`INSERT INTO repositories (id, slug, name, path, default_branch, created_at, updated_at, metadata_json, remote_url)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.run(
 			'repository-existing',
@@ -222,6 +222,7 @@ test('prepare rejects the clone when another repository already tracks the remot
 			JSON.stringify({
 				remoteUrl: 'git@github.com:psoldunov/ensemble.git',
 			}),
+			'github.com/psoldunov/ensemble',
 		);
 
 	const databaseService: EnsembleDatabaseService = {

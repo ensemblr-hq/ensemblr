@@ -17,7 +17,7 @@ import { WorkspaceLandingCard } from './workspace-landing-card';
  */
 export function WorkspaceTimeline({
 	activeSession,
-	composer,
+	composer: _composer,
 	workspace,
 }: {
 	activeSession: SessionTabModel;
@@ -27,7 +27,6 @@ export function WorkspaceTimeline({
 	return (
 		<div className='mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-5'>
 			<WorkspaceLandingCard
-				composer={composer}
 				landingSummary={workspace.landingSummary}
 				name={workspace.name}
 				pathLabel={workspace.pathLabel}

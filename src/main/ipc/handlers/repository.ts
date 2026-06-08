@@ -92,298 +92,103 @@ export function registerRepositoryHandlers({
 
 	ipcMain.handle(
 		IPC_CHANNELS.registerLocalRepository,
-		(_event, request: unknown): Promise<RegisterLocalRepositoryResult> => {
-			return localRepositoryRegistrationService.register(
-				normalizeRegisterLocalRepositoryRequest(request),
-			);
-		},
+		(
+			_event,
+			request: RegisterLocalRepositoryRequest,
+		): Promise<RegisterLocalRepositoryResult> =>
+			localRepositoryRegistrationService.register(request),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.quickStartProject,
-		(_event, request: unknown): Promise<QuickStartProjectResult> => {
-			return quickStartProjectService.create(
-				normalizeQuickStartProjectRequest(request),
-			);
-		},
+		(
+			_event,
+			request: QuickStartProjectRequest,
+		): Promise<QuickStartProjectResult> =>
+			quickStartProjectService.create(request),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.createWorkspace,
-		(_event, request: unknown): Promise<CreateWorkspaceResult> => {
-			return createWorkspaceService.create(
-				normalizeCreateWorkspaceRequest(request),
-			);
-		},
+		(
+			_event,
+			request: CreateWorkspaceRequest,
+		): Promise<CreateWorkspaceResult> => createWorkspaceService.create(request),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.sharedRootAdoption,
-		(): Promise<SharedRootAdoptionSnapshot> => {
-			return sharedRootAdoptionService.reconcile();
-		},
+		(): Promise<SharedRootAdoptionSnapshot> =>
+			sharedRootAdoptionService.reconcile(),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.renameWorkspace,
-		(_event, request: unknown): Promise<RenameWorkspaceResult> => {
-			return renameWorkspaceService.rename(
-				normalizeRenameWorkspaceRequest(request),
-			);
-		},
+		(
+			_event,
+			request: RenameWorkspaceRequest,
+		): Promise<RenameWorkspaceResult> => renameWorkspaceService.rename(request),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.archiveWorkspace,
-		(_event, request: unknown): Promise<ArchiveWorkspaceResult> => {
-			return archiveWorkspaceService.archive(
-				normalizeArchiveWorkspaceRequest(request),
-			);
-		},
+		(
+			_event,
+			request: ArchiveWorkspaceRequest,
+		): Promise<ArchiveWorkspaceResult> =>
+			archiveWorkspaceService.archive(request),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.archiveRepository,
-		(_event, request: unknown): Promise<ArchiveRepositoryResult> => {
-			return archiveRepositoryService.archive(
-				normalizeArchiveRepositoryRequest(request),
-			);
-		},
+		(
+			_event,
+			request: ArchiveRepositoryRequest,
+		): Promise<ArchiveRepositoryResult> =>
+			archiveRepositoryService.archive(request),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.deleteWorkspace,
-		(_event, request: unknown): Promise<DeleteWorkspaceResult> => {
-			return deleteWorkspaceService.delete(
-				normalizeDeleteWorkspaceRequest(request),
-			);
-		},
+		(
+			_event,
+			request: DeleteWorkspaceRequest,
+		): Promise<DeleteWorkspaceResult> => deleteWorkspaceService.delete(request),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.deleteRepository,
-		(_event, request: unknown): Promise<DeleteRepositoryResult> => {
-			return deleteRepositoryService.delete(
-				normalizeDeleteRepositoryRequest(request),
-			);
-		},
+		(
+			_event,
+			request: DeleteRepositoryRequest,
+		): Promise<DeleteRepositoryResult> =>
+			deleteRepositoryService.delete(request),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.listArchivedWorkspaces,
-		(_event, request: unknown): Promise<ListArchivedWorkspacesResult> => {
-			return listArchivedWorkspacesService.list(
-				normalizeListArchivedWorkspacesRequest(request),
-			);
-		},
+		(
+			_event,
+			request: ListArchivedWorkspacesRequest,
+		): Promise<ListArchivedWorkspacesResult> =>
+			listArchivedWorkspacesService.list(request),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.unarchiveWorkspace,
-		(_event, request: unknown): Promise<UnarchiveWorkspaceResult> => {
-			return unarchiveWorkspaceService.unarchive(
-				normalizeUnarchiveWorkspaceRequest(request),
-			);
-		},
+		(
+			_event,
+			request: UnarchiveWorkspaceRequest,
+		): Promise<UnarchiveWorkspaceResult> =>
+			unarchiveWorkspaceService.unarchive(request),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.deleteArchivedWorkspace,
-		(_event, request: unknown): Promise<DeleteArchivedWorkspaceResult> => {
-			return deleteArchivedWorkspaceService.delete(
-				normalizeDeleteArchivedWorkspaceRequest(request),
-			);
-		},
+		(
+			_event,
+			request: DeleteArchivedWorkspaceRequest,
+		): Promise<DeleteArchivedWorkspaceResult> =>
+			deleteArchivedWorkspaceService.delete(request),
 	);
-}
-
-/** Coerces an IPC payload into a {@link RegisterLocalRepositoryRequest}. */
-function normalizeRegisterLocalRepositoryRequest(
-	request: unknown,
-): RegisterLocalRepositoryRequest {
-	if (
-		typeof request !== 'object' ||
-		request === null ||
-		!('path' in request) ||
-		typeof request.path !== 'string'
-	) {
-		return { path: '' };
-	}
-
-	const candidate = request as Record<string, unknown>;
-	const normalized: RegisterLocalRepositoryRequest = {
-		path: (candidate.path as string).trim(),
-	};
-	if (typeof candidate.name === 'string') {
-		normalized.name = candidate.name;
-	}
-	return normalized;
-}
-
-/** Coerces an IPC payload into a {@link QuickStartProjectRequest}. */
-function normalizeQuickStartProjectRequest(
-	request: unknown,
-): QuickStartProjectRequest {
-	if (typeof request !== 'object' || request === null) {
-		return { name: '' };
-	}
-
-	const name =
-		'name' in request && typeof request.name === 'string' ? request.name : '';
-	const parentPath =
-		'parentPath' in request && typeof request.parentPath === 'string'
-			? request.parentPath
-			: undefined;
-
-	return parentPath !== undefined ? { name, parentPath } : { name };
-}
-
-/** Coerces an IPC payload into a {@link RenameWorkspaceRequest}. */
-function normalizeRenameWorkspaceRequest(
-	request: unknown,
-): RenameWorkspaceRequest {
-	if (typeof request !== 'object' || request === null) {
-		return { workspaceId: '' };
-	}
-	const candidate = request as Record<string, unknown>;
-	const workspaceId =
-		typeof candidate.workspaceId === 'string' ? candidate.workspaceId : '';
-	const normalized: RenameWorkspaceRequest = { workspaceId };
-	if (typeof candidate.name === 'string') {
-		normalized.name = candidate.name;
-	}
-	if (typeof candidate.branchName === 'string') {
-		normalized.branchName = candidate.branchName;
-	}
-	return normalized;
-}
-
-/** Coerces an IPC payload into a {@link ArchiveWorkspaceRequest}. */
-function normalizeArchiveWorkspaceRequest(
-	request: unknown,
-): ArchiveWorkspaceRequest {
-	if (typeof request !== 'object' || request === null) {
-		return { workspaceId: '' };
-	}
-	const candidate = request as Record<string, unknown>;
-	const workspaceId =
-		typeof candidate.workspaceId === 'string' ? candidate.workspaceId : '';
-	const normalized: ArchiveWorkspaceRequest = { workspaceId };
-	if (typeof candidate.branchCleanup === 'boolean') {
-		normalized.branchCleanup = candidate.branchCleanup;
-	}
-	if (typeof candidate.reason === 'string') {
-		normalized.reason = candidate.reason;
-	}
-	return normalized;
-}
-
-/** Coerces an IPC payload into a {@link ArchiveRepositoryRequest}. */
-function normalizeArchiveRepositoryRequest(
-	request: unknown,
-): ArchiveRepositoryRequest {
-	if (typeof request !== 'object' || request === null) {
-		return { repositoryId: '' };
-	}
-	const candidate = request as Record<string, unknown>;
-	const repositoryId =
-		typeof candidate.repositoryId === 'string' ? candidate.repositoryId : '';
-	const normalized: ArchiveRepositoryRequest = { repositoryId };
-	if (typeof candidate.branchCleanup === 'boolean') {
-		normalized.branchCleanup = candidate.branchCleanup;
-	}
-	if (typeof candidate.reason === 'string') {
-		normalized.reason = candidate.reason;
-	}
-	return normalized;
-}
-
-/** Coerces an IPC payload into a {@link DeleteWorkspaceRequest}. */
-function normalizeDeleteWorkspaceRequest(
-	request: unknown,
-): DeleteWorkspaceRequest {
-	if (typeof request !== 'object' || request === null) {
-		return { workspaceId: '' };
-	}
-	const candidate = request as Record<string, unknown>;
-	const workspaceId =
-		typeof candidate.workspaceId === 'string' ? candidate.workspaceId : '';
-	return { workspaceId };
-}
-
-/** Coerces an IPC payload into a {@link DeleteRepositoryRequest}. */
-function normalizeDeleteRepositoryRequest(
-	request: unknown,
-): DeleteRepositoryRequest {
-	if (typeof request !== 'object' || request === null) {
-		return { repositoryId: '' };
-	}
-	const candidate = request as Record<string, unknown>;
-	const repositoryId =
-		typeof candidate.repositoryId === 'string' ? candidate.repositoryId : '';
-	return { repositoryId };
-}
-
-/** Coerces an IPC payload into a {@link ListArchivedWorkspacesRequest}. */
-function normalizeListArchivedWorkspacesRequest(
-	request: unknown,
-): ListArchivedWorkspacesRequest {
-	if (typeof request !== 'object' || request === null) {
-		return { repositoryId: '' };
-	}
-	const candidate = request as Record<string, unknown>;
-	const repositoryId =
-		typeof candidate.repositoryId === 'string' ? candidate.repositoryId : '';
-	return { repositoryId };
-}
-
-/** Coerces an IPC payload into a {@link UnarchiveWorkspaceRequest}. */
-function normalizeUnarchiveWorkspaceRequest(
-	request: unknown,
-): UnarchiveWorkspaceRequest {
-	if (typeof request !== 'object' || request === null) {
-		return { workspaceId: '' };
-	}
-	const candidate = request as Record<string, unknown>;
-	const workspaceId =
-		typeof candidate.workspaceId === 'string' ? candidate.workspaceId : '';
-	const normalized: UnarchiveWorkspaceRequest = { workspaceId };
-	if (typeof candidate.reason === 'string') {
-		normalized.reason = candidate.reason;
-	}
-	return normalized;
-}
-
-/** Coerces an IPC payload into a {@link DeleteArchivedWorkspaceRequest}. */
-function normalizeDeleteArchivedWorkspaceRequest(
-	request: unknown,
-): DeleteArchivedWorkspaceRequest {
-	if (typeof request !== 'object' || request === null) {
-		return { workspaceId: '' };
-	}
-	const candidate = request as Record<string, unknown>;
-	const workspaceId =
-		typeof candidate.workspaceId === 'string' ? candidate.workspaceId : '';
-	return { workspaceId };
-}
-
-/** Coerces an IPC payload into a {@link CreateWorkspaceRequest}. */
-function normalizeCreateWorkspaceRequest(
-	request: unknown,
-): CreateWorkspaceRequest {
-	if (typeof request !== 'object' || request === null) {
-		return { repositoryId: '' };
-	}
-	const candidate = request as Record<string, unknown>;
-	return {
-		repositoryId:
-			typeof candidate.repositoryId === 'string' ? candidate.repositoryId : '',
-		...(typeof candidate.name === 'string' && { name: candidate.name }),
-		...(typeof candidate.branchName === 'string' && {
-			branchName: candidate.branchName,
-		}),
-		...(typeof candidate.baseBranch === 'string' && {
-			baseBranch: candidate.baseBranch,
-		}),
-	};
 }

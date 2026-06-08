@@ -1,10 +1,15 @@
 import type { DatabaseSync } from 'node:sqlite';
+import type {
+	PiChatTabWire,
+	PiSessionSnapshotWire,
+} from '../../shared/ipc/contracts/pi-session.ts';
 import type { PiExecutableSnapshot } from '../pi/pi-executable.ts';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import {
 	type ChatTabRow,
 	closeChatTab,
 	listOpenChatTabs,
+	listOpenChatTabsBySession,
 	openChatTab,
 } from '../storage/repositories/chat-tab-repository.ts';
 import {
@@ -16,7 +21,7 @@ import {
 import {
 	createPiSession,
 	createTurn,
-	getPiSessionBranchById,
+	getPiSessionById,
 	listPiSessionBranches,
 	listPiSessionsByWorkspace,
 	type PiSessionBranchRow,
@@ -28,7 +33,6 @@ import {
 import type { PiAgentClient, PiAgentSession } from './pi-agent-client.ts';
 import type {
 	PiAgentEvent,
-	PiAgentSessionMetadata,
 	PiAgentSubscription,
 } from './pi-agent-types.ts';
 
@@ -43,10 +47,18 @@ interface ActiveSession {
 
 export interface PiSessionSnapshot {
 	branchId: string;
+	closedAt: string | null;
+	createdAt: string;
+	cwd: string;
+	id: string;
+	label: string | null;
 	model: string | null;
 	openedTabs: readonly ChatTabRow[];
-	row: PiSessionRow;
+	piSessionId: string | null;
+	status: PiSessionRow['status'];
 	thinkingLevel: string | null;
+	updatedAt: string;
+	workspaceId: string;
 }
 
 export interface OpenPiSessionRequest {
@@ -135,10 +147,18 @@ export function createPiSessionService({
 		const database = requireDatabase();
 		return {
 			branchId,
+			closedAt: row.closedAt,
+			createdAt: row.createdAt,
+			cwd: row.cwd,
+			id: row.id,
+			label: row.label,
 			model: row.model,
 			openedTabs: listOpenChatTabs({ database, workspaceId: row.workspaceId }),
-			row,
+			piSessionId: row.piSessionId,
+			status: row.status,
 			thinkingLevel: row.thinkingLevel,
+			updatedAt: row.updatedAt,
+			workspaceId: row.workspaceId,
 		};
 	};
 
@@ -235,7 +255,10 @@ export function createPiSessionService({
 				thinkingLevel: request.thinkingLevel ?? null,
 			},
 		});
-		active.activeTurnId = turn.id;
+		activeSessions.set(request.sessionId, {
+			...active,
+			activeTurnId: turn.id,
+		});
 		updatePiSession({
 			database,
 			id: request.sessionId,
@@ -308,9 +331,13 @@ export function createPiSessionService({
 		let persistedRow: PiEventRow | null = null;
 		try {
 			persistedRow = appendPiEvent({ database, input });
-		} catch {
+		} catch (error) {
 			// Persistence is best-effort on the live path; the timeline rehydrates
-			// from whatever events did land.
+			// from whatever events did land. Surface for observability.
+			console.warn('[pi-session] failed to persist runtime event', {
+				error,
+				sessionId,
+			});
 		}
 
 		if (persistedRow && eventSink && active) {
@@ -366,11 +393,7 @@ export function createPiSessionService({
 			if (active) {
 				return toSnapshot(active.row, active.branch.id);
 			}
-			const sessions = listPiSessionsByWorkspace({
-				database,
-				workspaceId: '',
-			});
-			const row = sessions.find((s) => s.id === sessionId);
+			const row = getPiSessionById({ database, id: sessionId });
 			if (!row) {
 				return null;
 			}
@@ -421,6 +444,40 @@ export function createPiSessionService({
 	};
 }
 
+/**
+ * Maps a {@link PiSessionSnapshot} to the renderer-facing wire shape. Lives in
+ * the service so adding a wire field surfaces a compile error here rather than
+ * silently dropping data in the IPC layer.
+ */
+export function snapshotToWire(
+	snapshot: PiSessionSnapshot,
+): PiSessionSnapshotWire {
+	const tabs: PiChatTabWire[] = snapshot.openedTabs.map((tab) => ({
+		id: tab.id,
+		kind: tab.kind,
+		openedAt: tab.openedAt,
+		piSessionId: tab.piSessionId,
+		position: tab.position,
+		title: tab.title,
+		workspaceId: tab.workspaceId,
+	}));
+	return {
+		branchId: snapshot.branchId,
+		closedAt: snapshot.closedAt,
+		createdAt: snapshot.createdAt,
+		cwd: snapshot.cwd,
+		id: snapshot.id,
+		label: snapshot.label,
+		model: snapshot.model,
+		openedTabs: tabs,
+		piSessionId: snapshot.piSessionId,
+		status: snapshot.status,
+		thinkingLevel: snapshot.thinkingLevel,
+		updatedAt: snapshot.updatedAt,
+		workspaceId: snapshot.workspaceId,
+	};
+}
+
 function closeOpenChatTabs({
 	database,
 	sessionId,
@@ -428,11 +485,7 @@ function closeOpenChatTabs({
 	database: DatabaseSync;
 	sessionId: string;
 }): void {
-	const tabs = database
-		.prepare(
-			`SELECT id, workspace_id FROM chat_tabs WHERE pi_session_id = ? AND closed_at IS NULL`,
-		)
-		.all(sessionId) as unknown as Array<{ id: string }>;
+	const tabs = listOpenChatTabsBySession({ database, sessionId });
 	for (const tab of tabs) {
 		closeChatTab({ database, id: tab.id });
 	}

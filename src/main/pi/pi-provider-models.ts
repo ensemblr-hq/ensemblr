@@ -1,4 +1,8 @@
 import type {
+	ListPiModelsResult,
+	PiModelOptionWire,
+} from '../../shared/ipc/contracts/pi-session.ts';
+import type {
 	LocalCommandFailureCode,
 	LocalCommandResult,
 	LocalCommandService,
@@ -12,6 +16,44 @@ import type {
 	PiProviderModelFailureCode,
 	PiProviderModelSnapshot,
 } from './pi-readiness';
+
+const DEFAULT_THINKING_LEVELS = ['low', 'medium', 'high'] as const;
+const DEFAULT_THINKING_LEVEL = 'medium';
+
+const EMPTY_PI_MODELS: ListPiModelsResult = {
+	defaultModelId: null,
+	defaultThinkingLevel: null,
+	models: [],
+};
+
+/**
+ * Maps a {@link PiProviderModelSnapshot} to the renderer-facing wire shape used
+ * by `IPC_CHANNELS.listPiModels`. Returns the empty result when the snapshot is
+ * unsuccessful or empty, so callers can pipe it straight through.
+ */
+export function presentPiModels(
+	input: PiProviderModelSnapshot,
+): ListPiModelsResult {
+	if (input.status !== 'success' || input.models.length === 0) {
+		return EMPTY_PI_MODELS;
+	}
+	const models: PiModelOptionWire[] = input.models
+		.filter((row) => row.model && row.provider)
+		.map((row) => ({
+			displayName: `${row.model} (${row.provider})`,
+			id: row.id,
+			provider: row.provider,
+			thinkingLevels: DEFAULT_THINKING_LEVELS,
+		}));
+	if (models.length === 0) {
+		return EMPTY_PI_MODELS;
+	}
+	return {
+		defaultModelId: models[0]?.id ?? null,
+		defaultThinkingLevel: DEFAULT_THINKING_LEVEL,
+		models,
+	};
+}
 
 const DEFAULT_PROVIDER_MODEL_TIMEOUT_MS = 10000;
 const PROVIDER_MODEL_MAX_OUTPUT_BYTES = 128 * 1024;

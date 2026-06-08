@@ -48,6 +48,9 @@ export function useTimelineEvents({
 			);
 		});
 		return unsubscribe;
+		// branchId intentionally omitted: the effect derives the cache key from the
+		// broadcast's own event.branchId, so adding branchId would only cause
+		// pointless re-subscribes when the branch label changes mid-stream.
 	}, [queryClient, sessionId]);
 
 	const events = useMemo<readonly PiSessionEventWire[]>(

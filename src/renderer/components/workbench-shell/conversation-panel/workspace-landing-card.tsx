@@ -9,7 +9,6 @@ import {
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { cn } from '@/renderer/lib/utils';
 import type {
-	ComposerShellState,
 	WorkspaceLandingKind,
 	WorkspaceLandingSummary,
 } from '@/renderer/types/workbench';
@@ -29,12 +28,10 @@ import type {
  * the workspace transitions out of its new state (e.g. first agent turn).
  */
 export function WorkspaceLandingCard({
-	composer: _composer,
 	landingSummary,
 	name,
 	pathLabel,
 }: {
-	composer: ComposerShellState;
 	landingSummary: WorkspaceLandingSummary | null | undefined;
 	name: string;
 	pathLabel: string;

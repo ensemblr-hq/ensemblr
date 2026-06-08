@@ -72,9 +72,9 @@ test('openSession persists a pi_sessions row plus a main branch', async (t) => {
 		workspaceId: fixture.workspaceId,
 	});
 
-	assert.equal(snapshot.row.workspaceId, fixture.workspaceId);
-	assert.equal(snapshot.row.label, 'first chat');
-	assert.equal(snapshot.row.status, 'starting');
+	assert.equal(snapshot.workspaceId, fixture.workspaceId);
+	assert.equal(snapshot.label, 'first chat');
+	assert.equal(snapshot.status, 'starting');
 	assert.equal(snapshot.openedTabs.length, 1);
 });
 
@@ -89,7 +89,7 @@ test('submitPrompt creates a turn and forwards to the runtime session', async (t
 	});
 	const ack = await service.submitPrompt({
 		prompt: 'hello pi',
-		sessionId: snapshot.row.id,
+		sessionId: snapshot.id,
 	});
 
 	assert.ok(ack.turnId);
@@ -113,7 +113,7 @@ test('runtime events are mirrored into pi_session_events', async (t) => {
 	});
 	await service.submitPrompt({
 		prompt: 'do work',
-		sessionId: snapshot.row.id,
+		sessionId: snapshot.id,
 	});
 
 	const runtime = fake.getOpenSessions()[0]!;
@@ -143,9 +143,9 @@ test('stopSession aborts the runtime and marks the turn aborted', async (t) => {
 	});
 	await service.submitPrompt({
 		prompt: 'task',
-		sessionId: snapshot.row.id,
+		sessionId: snapshot.id,
 	});
-	await service.stopSession({ sessionId: snapshot.row.id });
+	await service.stopSession({ sessionId: snapshot.id });
 
 	const runtime = fake.getOpenSessions();
 	assert.equal(runtime.length, 0, 'fake adapter should drop closed sessions');
@@ -162,5 +162,5 @@ test('listSessionsForWorkspace returns active and persisted sessions', async (t)
 	});
 	const sessions = service.listSessionsForWorkspace(fixture.workspaceId);
 	assert.equal(sessions.length, 1);
-	assert.equal(sessions[0]?.row.workspaceId, fixture.workspaceId);
+	assert.equal(sessions[0]?.workspaceId, fixture.workspaceId);
 });

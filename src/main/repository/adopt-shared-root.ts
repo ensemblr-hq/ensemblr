@@ -21,6 +21,7 @@ import {
 import type { EnsembleRootDirectoryService } from '../root';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import { hasArchivedRepositoryMarker } from './archived-marker.ts';
+import { DEFAULT_FALLBACK_BRANCH } from './git-ops.ts';
 import {
 	type GitRepositoryProbe,
 	type GitRepositoryProbeFn,
@@ -30,6 +31,7 @@ import {
 	probeGitWorktreeMetadata,
 } from './git-probe.ts';
 import { parseMetadata } from './metadata.ts';
+import { normalizeRemoteUrl } from './register-repository.ts';
 import { toSlug } from './slug.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';
 
@@ -49,7 +51,6 @@ export interface CreateSharedRootAdoptionServiceOptions {
 }
 
 const ADOPTION_MODE = 'adopted-from-shared-root';
-const DEFAULT_FALLBACK_BRANCH = 'main';
 
 /**
  * Builds the service that scans the configured shared root, adopts valid git
@@ -577,9 +578,10 @@ function adoptRepositoryRow({
 				default_branch,
 				created_at,
 				updated_at,
-				metadata_json
+				metadata_json,
+				remote_url
 			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.run(
 			id,
@@ -590,6 +592,7 @@ function adoptRepositoryRow({
 			timestamp,
 			timestamp,
 			JSON.stringify(metadata),
+			normalizeRemoteUrl(probe.remoteUrl) ?? '',
 		);
 
 	return {
@@ -792,11 +795,15 @@ function detectStaleRecords({
 	const workspacesPathPrefix = ensureTrailingSeparator(rootWorkspacesPath);
 
 	const repoRows = database
-		.prepare('SELECT id, path, metadata_json AS metadataJson FROM repositories')
-		.all();
+		.prepare(
+			"SELECT id, path, metadata_json AS metadataJson FROM repositories WHERE path LIKE ? || '%'",
+		)
+		.all(repositoriesPathPrefix);
 	const wsRows = database
-		.prepare('SELECT id, path, metadata_json AS metadataJson FROM workspaces')
-		.all();
+		.prepare(
+			"SELECT id, path, metadata_json AS metadataJson FROM workspaces WHERE path LIKE ? || '%'",
+		)
+		.all(workspacesPathPrefix);
 
 	const repositories: SharedRootAdoptionStaleRepositoryRecord[] = [];
 	for (const row of repoRows) {
