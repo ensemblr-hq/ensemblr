@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { PiExecutableSnapshot } from '../../src/main/pi/pi-executable.ts';
 import { createFakePiAgentAdapter } from '../../src/main/pi-agent/fake-pi-agent-client.ts';
 import type { PiAgentAdapter } from '../../src/main/pi-agent/pi-agent-adapter.ts';
 import type { PiAgentClient } from '../../src/main/pi-agent/pi-agent-client.ts';
@@ -12,6 +11,7 @@ import type {
 	PiAgentEvent,
 	PiAgentSessionRequest,
 } from '../../src/main/pi-agent/pi-agent-types.ts';
+import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 
 const NOW = new Date('2026-06-08T12:00:00.000Z');
 

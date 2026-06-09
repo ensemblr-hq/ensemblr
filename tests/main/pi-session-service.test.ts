@@ -7,10 +7,10 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { PiExecutableSnapshot } from '../../src/main/pi/pi-executable.ts';
 import { createFakePiAgentAdapter } from '../../src/main/pi-agent/fake-pi-agent-client.ts';
 import { createPiAgentClient } from '../../src/main/pi-agent/pi-agent-client.ts';
 import { createPiSessionService } from '../../src/main/pi-agent/pi-session-service.ts';
+import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
 import {
 	listOpenChatTabs,

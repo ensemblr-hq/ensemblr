@@ -28,7 +28,7 @@ import type {
 	RepositoryConfigSnapshot,
 	SettingsResolutionGroupSnapshot,
 	SettingsResolutionSource,
-} from '../../src/shared/ipc.ts';
+} from '../../src/shared/ipc/index.ts';
 
 let settingCounter = 0;
 

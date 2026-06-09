@@ -32,7 +32,7 @@ import type {
 	SetupCheckId,
 	SetupCheckSnapshot,
 	SetupDiagnosticsSnapshot,
-} from '../../src/shared/ipc.ts';
+} from '../../src/shared/ipc/index.ts';
 
 const NOW = new Date('2026-06-05T00:00:00.000Z');
 const HOME = '/Users/alice';
@@ -170,7 +170,7 @@ function createRootDirectoryService(
 			reconciliation: {
 				diagnostics: [],
 				repositoryDirectoryCount: 0,
-				scannedAt: NOW,
+				scannedAt: NOW.toISOString(),
 				status: 'ok',
 				workspaceDirectoryCount: 0,
 			},
@@ -405,6 +405,10 @@ function createPiReadinessService(
 		providerModels: {
 			command: executable.command,
 			modelCount: 2,
+			models: [
+				{ id: 'openai-codex/gpt-5.5', model: 'gpt-5.5', provider: 'openai-codex' },
+				{ id: 'openai-codex/gpt-5.4', model: 'gpt-5.4', provider: 'openai-codex' },
+			],
 			providerCount: 1,
 			result: createLocalCommandResult(executable.command, ['--list-models'], {
 				stdout:
@@ -835,6 +839,7 @@ test('redacts sensitive Pi provider/model diagnostics', async () => {
 						'Pi listed zero usable provider models. OPENAI_API_KEY=provider-secret',
 				},
 				modelCount: 0,
+				models: [],
 				providerCount: 0,
 				result: createLocalCommandResult(`${HOME}/bin/pi`, ['--list-models'], {
 					stdout: 'provider      model\nOPENAI_API_KEY=provider-secret\n',

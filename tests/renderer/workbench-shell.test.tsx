@@ -119,6 +119,7 @@ function renderWorkbench(
 							activeSession={activeSession}
 							activeWorkspace={activeWorkspace}
 							composer={getComposerState({
+								activePiSessionId: null,
 								activeSession,
 								availableModels: [],
 								availableThinkingLevels: [],

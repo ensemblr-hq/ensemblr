@@ -27,7 +27,7 @@ import {
 	savePiExecutableOverride,
 } from '../../src/main/pi-runtime/pi-executable.ts';
 import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
-import type { SettingsResolutionSnapshot } from '../../src/shared/ipc.ts';
+import type { SettingsResolutionSnapshot } from '../../src/shared/ipc/index.ts';
 
 const NOW = new Date('2026-06-05T00:00:00.000Z');
 

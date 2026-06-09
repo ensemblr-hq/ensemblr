@@ -1,0 +1,12 @@
+{
+	"extends": "./tsconfig.json",
+	"include": [
+		"forge.config.ts",
+		"forge.env.d.ts",
+		"src",
+		"tests",
+		"vite.main.config.mts",
+		"vite.preload.config.mts",
+		"vite.renderer.config.mts"
+	]
+}

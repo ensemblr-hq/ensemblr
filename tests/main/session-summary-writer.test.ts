@@ -230,7 +230,10 @@ test('produces an LLM summary when the ephemeral session emits agent messages', 
 
 	assert.equal(result.usedLlm, true);
 	assert.equal(result.title, 'Refactor auth providers');
-	assert.ok(submittedPrompt?.includes('TRANSCRIPT:'));
+	const promptValue = submittedPrompt as string | null;
+	assert.ok(
+		typeof promptValue === 'string' && promptValue.includes('TRANSCRIPT:'),
+	);
 	const contents = readFileSync(result.path, 'utf8');
 	assert.match(contents, /summaryModel: null/);
 	assert.match(contents, /# Refactor auth providers/);
