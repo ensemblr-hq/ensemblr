@@ -1,3 +1,5 @@
+/// <reference types="bun" />
+
 import { expect, test } from 'bun:test';
 import { QueryClient } from '@tanstack/react-query';
 import { isRedirect } from '@tanstack/react-router';
@@ -243,29 +245,44 @@ test('redirects workspace index routes to the default chat route', async () => {
 
 test('accepts valid typed chat route params without redirecting', async () => {
 	const workspaceData = await loadDefaultWorkspaceRouteData();
-
-	await expect(
-		loadWorkspaceChatRoute({
-			parentMatchPromise: Promise.resolve({ loaderData: workspaceData }),
-			params: {
-				chatId: 'review-shell',
-				projectId: 'ensemble',
-				workspaceId: 'san-antonio',
-			},
-			rawSearch: {
-				dock: 'terminal:default',
-			},
-			search: normalizeWorkbenchSearch({
-				dock: 'terminal:default',
-			}),
+	const result = await loadWorkspaceChatRoute({
+		parentMatchPromise: Promise.resolve({ loaderData: workspaceData }),
+		params: {
+			chatId: 'review-shell',
+			projectId: 'ensemble',
+			workspaceId: 'san-antonio',
+		},
+		rawSearch: {
+			dock: 'terminal:default',
+		},
+		search: normalizeWorkbenchSearch({
+			dock: 'terminal:default',
 		}),
-	).resolves.toBeUndefined();
+	});
+
+	expect(result).toBeUndefined();
 });
 
-test('redirects invalid typed chat route params to the default chat', async () => {
+test('accepts database-backed chat route params outside fixture sessions', async () => {
+	const workspaceData = await loadDefaultWorkspaceRouteData();
+	const result = await loadWorkspaceChatRoute({
+		parentMatchPromise: Promise.resolve({ loaderData: workspaceData }),
+		params: {
+			chatId: 'chat-tab-from-database',
+			projectId: 'ensemble',
+			workspaceId: 'san-antonio',
+		},
+		rawSearch: {},
+		search: normalizeWorkbenchSearch({}),
+	});
+
+	expect(result).toBeUndefined();
+});
+
+test('canonicalizes chat route search without replacing database tab ids', async () => {
 	const redirectOptions = await catchWorkspaceChatRouteRedirect({
 		params: {
-			chatId: 'missing-session',
+			chatId: 'chat-tab-from-database',
 			projectId: 'ensemble',
 			workspaceId: 'san-antonio',
 		},
@@ -276,7 +293,7 @@ test('redirects invalid typed chat route params to the default chat', async () =
 
 	expect(redirectOptions).toMatchObject({
 		params: {
-			chatId: 'review-shell',
+			chatId: 'chat-tab-from-database',
 			projectId: 'ensemble',
 			workspaceId: 'san-antonio',
 		},

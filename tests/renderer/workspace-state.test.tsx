@@ -1,3 +1,5 @@
+/// <reference types="bun" />
+
 import { afterEach, expect, test } from 'bun:test';
 import { createStore } from 'jotai';
 import { getDefaultWorkspace } from '../../src/renderer/fixtures/workbench';
@@ -6,7 +8,6 @@ import {
 	activeDockTabByWorkspaceAtom,
 	activeReviewTabByWorkspaceAtom,
 	changesViewModeAtom,
-	closedSessionIdsByWorkspaceAtom,
 	collapsedProjectIdsAtom,
 	getPreferredChatId,
 	getPreferredDockTab,
@@ -24,8 +25,6 @@ const STORAGE_KEYS = {
 	activeReviewTabByWorkspace:
 		'ensemble_workspace_active_review_tab_by_workspace',
 	changesViewMode: 'ensemble_workspace_changes_view_mode',
-	closedSessionIdsByWorkspace:
-		'ensemble_workspace_closed_session_ids_by_workspace',
 	collapsedProjectIds: 'ensemble_workspace_collapsed_project_ids',
 	lastWorkspaceSelection: 'ensemble_workspace_last_selection',
 	orderedProjectIds: 'ensemble_workspace_ordered_project_ids',
@@ -99,9 +98,6 @@ test('hydrates workspace navigation atoms from localStorage when mounted', () =>
 		[STORAGE_KEYS.activeReviewTabByWorkspace]: JSON.stringify({
 			'workspace-a': 'checks',
 		}),
-		[STORAGE_KEYS.closedSessionIdsByWorkspace]: JSON.stringify({
-			'workspace-a': ['session-a'],
-		}),
 		[STORAGE_KEYS.changesViewMode]: JSON.stringify('folders'),
 		[STORAGE_KEYS.collapsedProjectIds]: JSON.stringify(['project-a']),
 		[STORAGE_KEYS.lastWorkspaceSelection]: JSON.stringify({
@@ -129,7 +125,6 @@ test('hydrates workspace navigation atoms from localStorage when mounted', () =>
 		store.sub(pinnedWorkspaceIdsAtom, () => undefined),
 		store.sub(rightSidebarCollapsedAtom, () => undefined),
 		store.sub(rightSidebarSizePercentAtom, () => undefined),
-		store.sub(closedSessionIdsByWorkspaceAtom, () => undefined),
 	];
 
 	try {
@@ -155,9 +150,6 @@ test('hydrates workspace navigation atoms from localStorage when mounted', () =>
 		expect(store.get(pinnedWorkspaceIdsAtom)).toEqual(['workspace-a']);
 		expect(store.get(rightSidebarCollapsedAtom)).toBe(true);
 		expect(store.get(rightSidebarSizePercentAtom)).toBe(48);
-		expect(store.get(closedSessionIdsByWorkspaceAtom)).toEqual({
-			'workspace-a': ['session-a'],
-		});
 	} finally {
 		for (const unsubscribe of unsubscribes) {
 			unsubscribe();
@@ -182,9 +174,6 @@ test('writes workspace navigation atom changes to localStorage', () => {
 	store.set(pinnedWorkspaceIdsAtom, ['workspace-b']);
 	store.set(rightSidebarCollapsedAtom, true);
 	store.set(rightSidebarSizePercentAtom, 52);
-	store.set(closedSessionIdsByWorkspaceAtom, {
-		'workspace-b': ['session-b'],
-	});
 
 	expect(storage.getItem(STORAGE_KEYS.activeChatTabByWorkspace)).toBe(
 		JSON.stringify({ 'workspace-b': 'session-b' }),
@@ -218,9 +207,6 @@ test('writes workspace navigation atom changes to localStorage', () => {
 	);
 	expect(storage.getItem(STORAGE_KEYS.rightSidebarSizePercent)).toBe(
 		JSON.stringify(52),
-	);
-	expect(storage.getItem(STORAGE_KEYS.closedSessionIdsByWorkspace)).toBe(
-		JSON.stringify({ 'workspace-b': ['session-b'] }),
 	);
 });
 
@@ -285,10 +271,10 @@ test('resolves the remembered chat tab per workspace', () => {
 	).toBe(secondSession.id);
 	expect(
 		getPreferredChatId({
-			chatTabsByWorkspace: { [workspace.id]: 'missing-session' },
+			chatTabsByWorkspace: { [workspace.id]: 'database-tab-id' },
 			workspace,
 		}),
-	).toBe(firstSession.id);
+	).toBe('database-tab-id');
 	expect(
 		getPreferredChatId({
 			chatTabsByWorkspace: { [workspace.id]: secondSession.id },

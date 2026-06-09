@@ -33,6 +33,17 @@ export interface SessionTabState {
 	sessionTabs: SessionTabModel[];
 }
 
+/**
+ * Extended session-tab state surface — adds async open/close handlers used by
+ * the conversation-panel SessionTabs to drive routing on mutation success.
+ */
+export interface SessionTabActions {
+	openSessionTab: () => Promise<{ chatTabId: string } | null>;
+	closeSessionTabAsync: (
+		chatTabId: string,
+	) => Promise<{ replacementChatTabId: string | null }>;
+}
+
 export interface WorkbenchShellProps {
 	activeProject: ProjectShellModel;
 	activeReviewTab: ReviewPanelTab;

@@ -56,6 +56,7 @@ export function WorkspaceWorkbenchContent({
 		composer,
 		onSessionTabChange,
 		onSessionTabClose: sessionNavigation.closeSessionTab,
+		onSessionTabOpen: sessionNavigation.openSessionTab,
 		onSessionTabRestore: sessionNavigation.restoreSessionTab,
 		sessionTabs: sessionNavigation.sessionTabs,
 	};

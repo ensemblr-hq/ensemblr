@@ -3,15 +3,25 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type {
 	ArchivedRepositorySnapshot,
-	ArchiveLifecycleDiagnostic,
 	ArchiveRepositoryDiagnostic,
 	ArchiveRepositoryDiagnosticCode,
 	ArchiveRepositoryRequest,
 	ArchiveRepositoryResult,
 } from '../../shared/ipc';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { withTransaction } from '../storage/tx.ts';
+import {
+	failureResult,
+	pushLifecycleDiagnostics,
+} from './archive-diagnostics.ts';
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
+import { insertArchiveRecord } from './archive-records.ts';
 import type { ArchiveWorkspaceService } from './archive-workspace.ts';
+import {
+	isNullableString,
+	isRecord,
+	isString,
+} from './row-guards.ts';
 
 /** Public surface of the repository lifecycle archive service. */
 export interface ArchiveRepositoryService {
@@ -311,8 +321,7 @@ function stampArchivedAt({
 	recordId: string;
 	source: SourceRepository;
 }): void {
-	database.exec('BEGIN');
-	try {
+	withTransaction(database, () => {
 		database
 			.prepare(
 				`UPDATE repositories
@@ -320,65 +329,34 @@ function stampArchivedAt({
 				WHERE id = ?`,
 			)
 			.run(archivedAt, archivedAt, source.id);
-		database
-			.prepare(
-				`INSERT INTO archive_records (
-					id,
-					record_type,
-					repository_id,
-					workspace_id,
-					repository_slug,
-					workspace_slug,
-					branch_name,
-					base_branch,
-					source_path,
-					archived_context_path,
-					branch_cleanup,
-					archive_reason,
-					archived_at
-				)
-				VALUES (?, 'repository', ?, NULL, ?, NULL, NULL, NULL, ?, NULL, ?, ?, ?)`,
-			)
-			.run(
-				recordId,
-				source.id,
-				source.slug,
-				source.path,
-				branchCleanup ? 1 : 0,
-				reason,
-				archivedAt,
-			);
-		database.exec('COMMIT');
-	} catch (error) {
-		database.exec('ROLLBACK');
-		throw error;
-	}
-}
-
-function pushLifecycleDiagnostics(
-	diagnostics: ArchiveRepositoryDiagnostic[],
-	lifecycle: ArchiveLifecycleDiagnostic[],
-): void {
-	for (const entry of lifecycle) {
-		diagnostics.push({
-			code: 'lifecycle-hook-failed',
-			message: entry.message,
-			path: entry.path,
-			severity: entry.severity,
+		insertArchiveRecord({
+			archivedAt,
+			archivedContextPath: null,
+			baseBranch: null,
+			branchCleanup,
+			branchName: null,
+			database,
+			kind: 'repository',
+			reason,
+			recordId,
+			repositoryId: source.id,
+			repositoryPath: source.path,
+			repositorySlug: source.slug,
+			workspaceId: null,
+			workspacePath: null,
+			workspaceSlug: null,
 		});
-	}
+	});
 }
 
 function failure(
 	diagnostic: ArchiveRepositoryDiagnostic,
 ): ArchiveRepositoryResult {
-	return {
+	return failureResult(diagnostic, {
 		archiveRecordId: null,
-		diagnostics: [diagnostic],
 		repository: null,
-		status: 'failure',
 		workspacesArchived: 0,
-	};
+	});
 }
 
 function isRepositoryRow(row: unknown): row is {
@@ -388,28 +366,26 @@ function isRepositoryRow(row: unknown): row is {
 	path: string;
 	slug: string;
 } {
-	if (typeof row !== 'object' || row === null) {
+	if (!isRecord(row)) {
 		return false;
 	}
-	const candidate = row as Record<string, unknown>;
 	return (
-		typeof candidate.id === 'string' &&
-		typeof candidate.slug === 'string' &&
-		typeof candidate.name === 'string' &&
-		typeof candidate.path === 'string' &&
-		(candidate.archivedAt === null || typeof candidate.archivedAt === 'string')
+		isString(row.id) &&
+		isString(row.slug) &&
+		isString(row.name) &&
+		isString(row.path) &&
+		isNullableString(row.archivedAt)
 	);
 }
 
 function isWorkspaceRow(row: unknown): row is SourceWorkspace {
-	if (typeof row !== 'object' || row === null) {
+	if (!isRecord(row)) {
 		return false;
 	}
-	const candidate = row as Record<string, unknown>;
 	return (
-		typeof candidate.id === 'string' &&
-		typeof candidate.name === 'string' &&
-		(candidate.archivedAt === null || typeof candidate.archivedAt === 'string')
+		isString(row.id) &&
+		isString(row.name) &&
+		isNullableString(row.archivedAt)
 	);
 }
 

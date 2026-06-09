@@ -1,4 +1,4 @@
-import type { PiExecutableSnapshot } from '../pi/pi-executable.ts';
+import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
 
 /** Stable identifier for a Pi agent session within the main process. */
 export type PiAgentSessionId = string;
@@ -106,6 +106,48 @@ export interface PiAgentSubmitAcknowledgement {
 	turnId: string;
 }
 
+/**
+ * Tagged union of normalized message payloads emitted by the adapter. Each
+ * variant maps to a single chat-timeline concept; the renderer mapper consumes
+ * this union directly so it never sniffs Pi's wire shapes.
+ *
+ *   text         — assistant text (or user prompt echo)
+ *   reasoning    — assistant reasoning/thinking content
+ *   tool-call    — tool invocation with id, name, and structured input
+ *   tool-result  — tool execution outcome, with `isError` discriminator
+ *   message      — composite assistant/user message (multi-part content)
+ *   prompt       — synthetic submit-side user echo carrying the original prompt
+ *   unknown      — forward-compatible passthrough for frames we have not modelled
+ */
+export type PiAgentMessagePart =
+	| { kind: 'text'; text: string }
+	| { kind: 'reasoning'; text: string }
+	| { kind: 'tool-call'; input: unknown; name: string; toolCallId: string }
+	| {
+			kind: 'tool-result';
+			isError: boolean;
+			output: unknown;
+			toolCallId: string;
+	  };
+
+export type PiAgentMessagePayload =
+	| { kind: 'text'; text: string }
+	| { kind: 'reasoning'; text: string }
+	| { input: unknown; kind: 'tool-call'; name: string; toolCallId: string }
+	| {
+			isError: boolean;
+			kind: 'tool-result';
+			output: unknown;
+			toolCallId: string;
+	  }
+	| {
+			kind: 'message';
+			parts: readonly PiAgentMessagePart[];
+			role: 'assistant' | 'user';
+	  }
+	| { kind: 'prompt'; prompt: string }
+	| { kind: 'unknown'; frameType: string; raw: unknown };
+
 /** Discriminated event stream emitted by a session. */
 export type PiAgentEvent =
 	| {
@@ -120,7 +162,7 @@ export type PiAgentEvent =
 	  }
 	| {
 			at: string;
-			payload: unknown;
+			payload: PiAgentMessagePayload;
 			role: 'agent' | 'tool' | 'user';
 			turnId: string | null;
 			type: 'message';

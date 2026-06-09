@@ -103,3 +103,18 @@ export interface GithubRepositoryListResult {
 	generatedAt: string;
 	status: GithubRepositoryListStatus;
 }
+
+/** GitHub clone / discovery IPC surface, including the live progress channel. */
+export interface CloneApi {
+	githubRepositoryList: () => Promise<GithubRepositoryListResult>;
+	onCloneGithubRepositoryProgress: (
+		listener: (event: CloneGithubRepositoryProgressEvent) => void,
+	) => () => void;
+	prepareCloneGithubRepository: (
+		request: CloneGithubRepositoryRequest,
+	) => Promise<CloneGithubRepositoryPrepareResult>;
+	selectCloneDestination: () => Promise<CloneDestinationSelectionResult>;
+	startCloneGithubRepository: (
+		request: CloneGithubRepositoryStartRequest,
+	) => Promise<CloneGithubRepositoryStartResult>;
+}

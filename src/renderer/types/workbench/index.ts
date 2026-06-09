@@ -10,20 +10,22 @@ export type {
 	AddProjectActionId,
 	AddProjectActionModel,
 	AddProjectMenuModel,
+	ProjectShellModel,
 	RecentProject,
-} from './add-project';
+	WorkspaceSource,
+	WorkspaceSourceAction,
+	WorkspaceSourceKind,
+	WorkspaceSourceProvider,
+} from './project';
+export type { WorkbenchRouteSearch } from './routing';
 export type {
+	ComposerModelOption,
+	ComposerShellState,
+	ComposerThinkingOption,
 	DockTabId,
 	DockTabModel,
 	DockTabStatus,
 	FixedDockTabId,
-	RunScriptDockTabModel,
-	SetupScriptDockTabModel,
-	TerminalDockTabId,
-	TerminalDockTabModel,
-} from './dock-tabs';
-export type { ProjectShellModel } from './project';
-export type {
 	PullRequestCheckStatus,
 	PullRequestCheckSummary,
 	PullRequestCommentSummary,
@@ -31,21 +33,15 @@ export type {
 	PullRequestPreviewDeploymentSummary,
 	PullRequestShellStatus,
 	PullRequestTodoSummary,
-} from './pull-request';
-export type {
 	ReviewFileSummary,
 	ReviewPanelTab,
-	WorkspaceFileSummary,
-} from './review';
-export type { WorkbenchRouteSearch } from './route-search';
-export type {
-	ComposerModelOption,
-	ComposerShellState,
-	ComposerThinkingOption,
+	RunScriptDockTabModel,
 	SessionTabModel,
-} from './session';
-export type { WorkbenchShellData, WorkspaceShellData } from './shell-data';
-export type {
+	SetupScriptDockTabModel,
+	TerminalDockTabId,
+	TerminalDockTabModel,
+	WorkbenchShellData,
+	WorkspaceFileSummary,
 	WorkspaceLandingBranchSummary,
 	WorkspaceLandingCopyState,
 	WorkspaceLandingCopySummary,
@@ -58,12 +54,7 @@ export type {
 	WorkspaceOpenTarget,
 	WorkspaceOpenTargetKind,
 	WorkspaceScriptSummary,
+	WorkspaceShellData,
 	WorkspaceShellModel,
 	WorkspaceStatus,
 } from './workspace';
-export type {
-	WorkspaceSource,
-	WorkspaceSourceAction,
-	WorkspaceSourceKind,
-	WorkspaceSourceProvider,
-} from './workspace-source';

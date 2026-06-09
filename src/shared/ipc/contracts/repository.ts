@@ -166,3 +166,14 @@ export interface AdoptedRepositorySnapshot {
 	slug: string;
 	updatedAt: string;
 }
+
+/** Repository lifecycle IPC surface (register / hard-delete / selection dialog). */
+export interface RepositoryApi {
+	deleteRepository: (
+		request: DeleteRepositoryRequest,
+	) => Promise<DeleteRepositoryResult>;
+	registerLocalRepository: (
+		request: RegisterLocalRepositoryRequest,
+	) => Promise<RegisterLocalRepositoryResult>;
+	selectLocalRepository: () => Promise<LocalRepositorySelectionResult>;
+}

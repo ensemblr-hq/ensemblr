@@ -1,5 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 
+import { withTransaction } from '../storage/tx.ts';
+
 /**
  * Removes a workspace row in a single transaction. Shared by the archive
  * flow (intentional removal) and the shared-root reconciler (vanished-row
@@ -12,12 +14,7 @@ export function deleteWorkspaceRow({
 	database: DatabaseSync;
 	id: string;
 }): void {
-	database.exec('BEGIN');
-	try {
+	withTransaction(database, () => {
 		database.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
-		database.exec('COMMIT');
-	} catch (error) {
-		database.exec('ROLLBACK');
-		throw error;
-	}
+	});
 }

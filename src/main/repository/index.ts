@@ -1,11 +1,11 @@
 export type {
 	CreateSharedRootAdoptionServiceOptions,
 	SharedRootAdoptionService,
-} from './adopt-shared-root.ts';
+} from './adopt-shared-root/index.ts';
 export {
 	createSharedRootAdoptionService,
 	reconcileSharedRoot,
-} from './adopt-shared-root.ts';
+} from './adopt-shared-root/index.ts';
 export type {
 	ArchiveLifecycleHandler,
 	ArchiveLifecycleService,

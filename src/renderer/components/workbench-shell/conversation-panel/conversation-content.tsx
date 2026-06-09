@@ -1,4 +1,3 @@
-import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import type {
 	ComposerShellState,
 	SessionTabModel,
@@ -9,7 +8,13 @@ import { ComposerPanel } from './composer-panel';
 import { SessionTabs } from './session-tabs';
 import { WorkspaceTimeline } from './workspace-timeline';
 
-/** Conversation surface — session tabs, scrollable timeline, and composer. */
+/**
+ * Conversation surface — session tabs, scrollable timeline, and composer.
+ *
+ * ai-elements' `Conversation` owns its own scroll viewport (sticky-to-bottom),
+ * so the surrounding container is a flex column with overflow hidden — the
+ * timeline child manages its own scrolling.
+ */
 export function WorkspaceConversationContent({
 	activeSession,
 	activeWorkspace,
@@ -17,6 +22,7 @@ export function WorkspaceConversationContent({
 	composer,
 	onSessionTabChange,
 	onSessionTabClose,
+	onSessionTabOpen,
 	onSessionTabRestore,
 	sessionTabs,
 }: {
@@ -26,6 +32,7 @@ export function WorkspaceConversationContent({
 	composer: ComposerShellState;
 	onSessionTabChange: (sessionId: string) => void;
 	onSessionTabClose: (sessionId: string) => void;
+	onSessionTabOpen: () => Promise<{ chatTabId: string } | null>;
 	onSessionTabRestore: (sessionId: string) => void;
 	sessionTabs: SessionTabModel[];
 }) {
@@ -36,16 +43,17 @@ export function WorkspaceConversationContent({
 				closedSessions={closedSessions}
 				onSessionTabClose={onSessionTabClose}
 				onSessionTabChange={onSessionTabChange}
+				onSessionTabOpen={onSessionTabOpen}
 				onSessionTabRestore={onSessionTabRestore}
 				sessions={sessionTabs}
 			/>
-			<ScrollArea className='min-h-0 flex-1'>
+			<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
 				<WorkspaceTimeline
 					activeSession={activeSession}
 					composer={composer}
 					workspace={activeWorkspace}
 				/>
-			</ScrollArea>
+			</div>
 			<ComposerPanel composer={composer} />
 		</section>
 	);

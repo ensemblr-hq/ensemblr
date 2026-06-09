@@ -3,7 +3,6 @@ export {
 	activeDockTabByWorkspaceAtom,
 	activeReviewTabByWorkspaceAtom,
 	changesViewModeAtom,
-	closedSessionIdsByWorkspaceAtom,
 	collapsedProjectIdsAtom,
 	LAST_WORKSPACE_SELECTION_STORAGE_KEY,
 	lastWorkspaceNavigationRenderStateAtom,
@@ -12,6 +11,8 @@ export {
 	pinnedWorkspaceIdsAtom,
 	rightSidebarCollapsedAtom,
 	rightSidebarSizePercentAtom,
+	selectedPiModelByWorkspaceAtom,
+	selectedPiThinkingLevelByWorkspaceAtom,
 } from './atoms';
 export { useProjectNavigationState } from './navigation';
 export {
@@ -21,4 +22,11 @@ export {
 	useWorkspacePanelTabState,
 } from './panel-tabs';
 export { readStoredWorkspaceSelection } from './selection-storage';
-export { useSessionTabState } from './session-tabs';
+export type {
+	CloseSessionTabHandlerResult,
+	OpenSessionTabHandlerResult,
+} from './session-tabs';
+export {
+	formatRelativeClosedAt,
+	useSessionTabState,
+} from './session-tabs';

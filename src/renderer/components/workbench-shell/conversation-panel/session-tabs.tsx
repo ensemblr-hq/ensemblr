@@ -6,7 +6,7 @@ import {
 	RotateCcwIcon,
 	XIcon,
 } from 'lucide-react';
-
+import { useState } from 'react';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -23,6 +23,7 @@ export function SessionTabs({
 	closedSessions,
 	onSessionTabClose,
 	onSessionTabChange,
+	onSessionTabOpen,
 	onSessionTabRestore,
 	sessions,
 }: {
@@ -30,10 +31,26 @@ export function SessionTabs({
 	closedSessions: SessionTabModel[];
 	onSessionTabClose: (sessionId: string) => void;
 	onSessionTabChange: (sessionId: string) => void;
+	onSessionTabOpen: () => Promise<{ chatTabId: string } | null>;
 	onSessionTabRestore: (sessionId: string) => void;
 	sessions: SessionTabModel[];
 }) {
-	const canCloseTabs = sessions.length > 1;
+	const [isOpening, setIsOpening] = useState(false);
+
+	/** Opens a chat tab through the workspace-level controller and selects it. */
+	function handleOpen() {
+		if (isOpening) {
+			return;
+		}
+		setIsOpening(true);
+		void onSessionTabOpen()
+			.then((result) => {
+				if (result) {
+					onSessionTabChange(result.chatTabId);
+				}
+			})
+			.finally(() => setIsOpening(false));
+	}
 
 	return (
 		<div className='flex h-12 shrink-0 items-center justify-between gap-3 border-border border-b bg-background px-3'>
@@ -41,6 +58,7 @@ export function SessionTabs({
 				<div className='no-scrollbar flex min-w-0 gap-1 overflow-x-auto'>
 					{sessions.map((session) => {
 						const isActive = session.id === activeSession.id;
+						const canClose = sessions.length > 1;
 						const SessionIcon =
 							session.status === 'working'
 								? LoaderCircleIcon
@@ -72,36 +90,41 @@ export function SessionTabs({
 									</span>
 									<span className='truncate'>{session.label}</span>
 								</button>
-								{canCloseTabs ? (
-									<>
-										<span
-											aria-hidden='true'
-											className={cn(
-												'pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent opacity-0 transition-opacity group-hover/session-tab:opacity-100',
-												isActive
-													? 'from-muted via-muted/90'
-													: 'from-background via-background/90',
-											)}
-										/>
-										<button
-											aria-label={`Close ${session.label} tab`}
-											className='absolute top-1/2 right-2 grid size-5 -translate-y-1/2 place-items-center rounded-sm opacity-0 transition-all hover:bg-transparent hover:text-foreground focus-visible:opacity-100 group-hover/session-tab:opacity-100'
-											onClick={(event) => {
-												event.stopPropagation();
-												onSessionTabClose(session.id);
-											}}
-											type='button'
-										>
-											<XIcon aria-hidden='true' className='size-3' />
-										</button>
-									</>
+								{canClose ? (
+									<span
+										aria-hidden='true'
+										className={cn(
+											'pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent opacity-0 transition-opacity group-hover/session-tab:opacity-100',
+											isActive
+												? 'from-muted via-muted/90'
+												: 'from-background via-background/90',
+										)}
+									/>
+								) : null}
+								{canClose ? (
+									<button
+										aria-label={`Close ${session.label} tab`}
+										className='absolute top-1/2 right-2 grid size-5 -translate-y-1/2 place-items-center rounded-sm opacity-0 transition-all hover:bg-transparent hover:text-foreground focus-visible:opacity-100 group-hover/session-tab:opacity-100'
+										onClick={(event) => {
+											event.stopPropagation();
+											onSessionTabClose(session.id);
+										}}
+										type='button'
+									>
+										<XIcon aria-hidden='true' className='size-3' />
+									</button>
 								) : null}
 							</div>
 						);
 					})}
 				</div>
 				<div className='flex shrink-0 items-center gap-1'>
-					<Button size='icon-sm' variant='ghost'>
+					<Button
+						disabled={isOpening}
+						onClick={handleOpen}
+						size='icon-sm'
+						variant='ghost'
+					>
 						<PlusIcon />
 						<span className='sr-only'>New chat tab</span>
 					</Button>

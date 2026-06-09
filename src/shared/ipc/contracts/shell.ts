@@ -6,3 +6,8 @@ export interface InitialShellSnapshot {
 	health: HealthSnapshot | null;
 	navigation: RepositoryWorkspaceNavigationSnapshot | null;
 }
+
+/** Window/shell-level IPC surface (resize the BrowserWindow, etc). */
+export interface ShellApi {
+	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
+}

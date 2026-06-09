@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
+import { useAtom } from 'jotai';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
 	ensembleQueryKeys,
@@ -8,7 +9,12 @@ import {
 	piSessionsForWorkspaceQuery,
 	stopPiSession,
 	submitPiPrompt,
+	subscribePiSessionEvents,
 } from '@/renderer/api/ensemble-queries';
+import {
+	selectedPiModelByWorkspaceAtom,
+	selectedPiThinkingLevelByWorkspaceAtom,
+} from '@/renderer/state/workspace';
 import type {
 	ComposerModelOption,
 	ComposerThinkingOption,
@@ -35,16 +41,28 @@ const THINKING_LABELS: Record<string, string> = {
 	off: 'Off',
 };
 
+/** Locally tracks the Pi session opened for one chat tab before refetch lands. */
+interface PendingTabSession {
+	chatTabId: string;
+	sessionId: string;
+}
+
 /**
  * Wires the Pi composer UI to the main-process Pi session service. Owns local
- * state for selected model, thinking level, the active session, and the
- * streaming flag — and exposes async submit/stop callbacks suitable for
- * `ComposerShellState`.
+ * state for selected model, thinking level, and the active session, derives
+ * streaming state from persisted Pi status, and exposes async submit/stop
+ * callbacks suitable for `ComposerShellState`. Per-tab binding: the controller
+ * scopes its active Pi session lookup to `currentPiSessionId`, and binds a
+ * newly-opened Pi session to `chatTabId` on first submit.
  */
 export function usePiComposerController({
+	chatTabId,
+	currentPiSessionId,
 	workspaceCwd,
 	workspaceId,
 }: {
+	chatTabId: string;
+	currentPiSessionId: string | null;
 	workspaceCwd: string;
 	workspaceId: string;
 }): PiComposerControllerState {
@@ -52,13 +70,18 @@ export function usePiComposerController({
 	const modelsQuery = useQuery(piModelsQuery);
 	const sessionsQuery = useQuery(piSessionsForWorkspaceQuery(workspaceId));
 
-	const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-	const [selectedThinkingLevel, setSelectedThinkingLevel] = useState<
-		string | null
-	>(null);
+	const [selectedModelByWorkspace, setSelectedModelByWorkspace] = useAtom(
+		selectedPiModelByWorkspaceAtom,
+	);
+	const [selectedThinkingByWorkspace, setSelectedThinkingByWorkspace] = useAtom(
+		selectedPiThinkingLevelByWorkspaceAtom,
+	);
+	const selectedModelId = selectedModelByWorkspace[workspaceId] ?? null;
+	const selectedThinkingLevel =
+		selectedThinkingByWorkspace[workspaceId] ?? null;
 	const [lastError, setLastError] = useState<string | null>(null);
-	const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
-	const [isStreaming, setIsStreaming] = useState(false);
+	const [pendingSession, setPendingSession] =
+		useState<PendingTabSession | null>(null);
 
 	const models = modelsQuery.data;
 	const availableModels = useMemo<readonly ComposerModelOption[]>(() => {
@@ -91,14 +114,48 @@ export function usePiComposerController({
 	}, [models, modelId]);
 
 	const persistedActiveSession = sessionsQuery.data?.sessions.find(
-		(session) => session.status !== 'closed' && session.status !== 'errored',
+		(session) => session.id === currentPiSessionId,
 	);
-	const activeSessionId =
-		pendingSessionId ?? persistedActiveSession?.id ?? null;
+	const pendingSessionId =
+		pendingSession?.chatTabId === chatTabId ? pendingSession.sessionId : null;
+	const activeSessionId = persistedActiveSession?.id ?? pendingSessionId;
+	const activeSessionStatus = sessionsQuery.data?.sessions.find(
+		(session) => session.id === activeSessionId,
+	)?.status;
+	const isPiSessionStreaming =
+		activeSessionStatus === 'starting' || activeSessionStatus === 'streaming';
+
+	useEffect(() => {
+		const unsubscribe = subscribePiSessionEvents((broadcast) => {
+			if (broadcast.workspaceId !== workspaceId) {
+				return;
+			}
+			if (activeSessionId && broadcast.sessionId !== activeSessionId) {
+				return;
+			}
+			if (broadcast.event.eventType === 'metadata') {
+				if (hasChatTitleMetadata(broadcast.event.payload)) {
+					void queryClient.invalidateQueries({
+						queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+					});
+				}
+				return;
+			}
+			if (broadcast.event.eventType !== 'status') {
+				return;
+			}
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
+			});
+		});
+		return unsubscribe;
+	}, [activeSessionId, queryClient, workspaceId]);
 
 	const openSessionMutation = useMutation({
-		mutationFn: () =>
+		mutationFn: (input: { initialPrompt: string }) =>
 			openPiSession({
+				chatTabId,
+				initialPrompt: input.initialPrompt,
 				model: modelId,
 				thinkingLevel,
 				workspaceCwd,
@@ -106,9 +163,12 @@ export function usePiComposerController({
 			}),
 		onSuccess: (result) => {
 			if (result.session) {
-				setPendingSessionId(result.session.id);
+				setPendingSession({ chatTabId, sessionId: result.session.id });
 				void queryClient.invalidateQueries({
 					queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
+				});
+				void queryClient.invalidateQueries({
+					queryKey: ensembleQueryKeys.chatTabs(workspaceId),
 				});
 			}
 		},
@@ -127,13 +187,14 @@ export function usePiComposerController({
 	const stopMutation = useMutation({
 		mutationFn: (sessionId: string) => stopPiSession({ sessionId }),
 		onSuccess: () => {
-			setPendingSessionId(null);
-			setIsStreaming(false);
+			setPendingSession(null);
 			void queryClient.invalidateQueries({
 				queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
 			});
 		},
 	});
+
+	const isRealChatTabId = !chatTabId.endsWith(':overview');
 
 	const onSubmit = useCallback(
 		async (prompt: string): Promise<void> => {
@@ -141,11 +202,19 @@ export function usePiComposerController({
 			if (!trimmed) {
 				return;
 			}
+			if (!isRealChatTabId) {
+				setLastError(
+					'Workspace chat tab is still initializing. Try again in a moment.',
+				);
+				return;
+			}
 			setLastError(null);
 
 			let sessionId = activeSessionId;
 			if (!sessionId) {
-				const opened = await openSessionMutation.mutateAsync();
+				const opened = await openSessionMutation.mutateAsync({
+					initialPrompt: trimmed,
+				});
 				if (opened.error) {
 					setLastError(opened.error);
 					return;
@@ -157,38 +226,69 @@ export function usePiComposerController({
 				return;
 			}
 
-			setIsStreaming(true);
 			const result = await submitMutation.mutateAsync({
 				prompt: trimmed,
 				sessionId,
 			});
 			if (result.error) {
 				setLastError(result.error);
-				setIsStreaming(false);
 			}
 		},
-		[activeSessionId, openSessionMutation, submitMutation],
+		[activeSessionId, isRealChatTabId, openSessionMutation, submitMutation],
 	);
 
 	const onStop = useCallback(async (): Promise<void> => {
 		if (!activeSessionId) {
-			setIsStreaming(false);
 			return;
 		}
 		await stopMutation.mutateAsync(activeSessionId);
 	}, [activeSessionId, stopMutation]);
 
+	const onModelChange = useCallback(
+		(nextModelId: string) => {
+			setSelectedModelByWorkspace((current) => ({
+				...current,
+				[workspaceId]: nextModelId,
+			}));
+		},
+		[setSelectedModelByWorkspace, workspaceId],
+	);
+
+	const onThinkingChange = useCallback(
+		(nextThinkingLevel: string) => {
+			setSelectedThinkingByWorkspace((current) => ({
+				...current,
+				[workspaceId]: nextThinkingLevel,
+			}));
+		},
+		[setSelectedThinkingByWorkspace, workspaceId],
+	);
+
 	return {
 		activeSessionId,
 		availableModels,
 		availableThinkingLevels,
-		isStreaming: isStreaming || submitMutation.isPending,
+		isStreaming:
+			isPiSessionStreaming ||
+			openSessionMutation.isPending ||
+			submitMutation.isPending ||
+			stopMutation.isPending,
 		lastError,
 		modelId,
-		onModelChange: setSelectedModelId,
+		onModelChange,
 		onStop,
 		onSubmit,
-		onThinkingChange: setSelectedThinkingLevel,
+		onThinkingChange,
 		thinkingLevel,
 	};
+}
+
+/** Detects the metadata event emitted when the main process finishes tab titling. */
+function hasChatTitleMetadata(
+	payload: import('@/shared/ipc').PiPersistedEnvelope | null,
+): boolean {
+	if (!payload || payload.kind !== 'metadata') {
+		return false;
+	}
+	return typeof payload.metadata.chatTitle === 'string';
 }

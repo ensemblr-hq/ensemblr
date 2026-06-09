@@ -10,6 +10,74 @@ export type ChatTabKindWire = 'chat' | 'preview';
 
 export type PiEventStreamWire = 'protocol' | 'stderr';
 
+/** Error shape carried across the wire on persisted error events. */
+export interface PiWireError {
+	code?: string;
+	detail?: string | null;
+	message: string;
+	recoverable?: boolean;
+}
+
+/** Metadata payload carried on persisted metadata events. */
+export interface PiWireMetadata {
+	chatTitle?: string;
+	model?: { displayName?: string; id: string; provider: string } | null;
+	sessionId?: string | null;
+	status?: PiSessionStatusWire;
+}
+
+/** Mirror of {@link PiAgentMessagePart} on the wire. */
+export type PiWireMessagePart =
+	| { kind: 'text'; text: string }
+	| { kind: 'reasoning'; text: string }
+	| { kind: 'tool-call'; input: unknown; name: string; toolCallId: string }
+	| {
+			kind: 'tool-result';
+			isError: boolean;
+			output: unknown;
+			toolCallId: string;
+	  };
+
+/** Mirror of {@link PiAgentMessagePayload} on the wire. */
+export type PiWireMessagePayload =
+	| { kind: 'text'; text: string }
+	| { kind: 'reasoning'; text: string }
+	| { input: unknown; kind: 'tool-call'; name: string; toolCallId: string }
+	| {
+			isError: boolean;
+			kind: 'tool-result';
+			output: unknown;
+			toolCallId: string;
+	  }
+	| {
+			kind: 'message';
+			parts: readonly PiWireMessagePart[];
+			role: 'assistant' | 'user';
+	  }
+	| { kind: 'prompt'; prompt: string }
+	| { kind: 'unknown'; frameType: string; raw: unknown };
+
+/**
+ * Tagged union persisted into `pi_session_events.payload_json` and replayed on
+ * the renderer. Each variant maps 1:1 to a `PiAgentEvent` discriminant; the
+ * envelope shape is stable so the renderer can match on `envelope.kind`
+ * without sniffing raw Pi frames.
+ */
+export type PiPersistedEnvelope =
+	| { kind: 'error'; error: PiWireError }
+	| {
+			kind: 'message';
+			payload: PiWireMessagePayload;
+			role: 'agent' | 'tool' | 'user';
+	  }
+	| { kind: 'metadata'; metadata: PiWireMetadata }
+	| {
+			kind: 'status';
+			previous: PiSessionStatusWire;
+			status: PiSessionStatusWire;
+	  }
+	| { kind: 'shutdown'; reason: string };
+
 /** Renderer-facing chat tab descriptor. */
 export interface PiChatTabWire {
 	id: string;
@@ -45,13 +113,25 @@ export interface PiSessionEventWire {
 	eventType: string;
 	id: string;
 	ordinal: number;
-	payload: unknown;
+	/**
+	 * Tagged envelope. `null` only when the row predates this contract or the
+	 * JSON failed to parse on read; renderers should treat null as a no-op.
+	 */
+	payload: PiPersistedEnvelope | null;
 	stream: PiEventStreamWire;
 	turnId: string | null;
 }
 
 /** Open or attach a Pi session for a workspace. */
 export interface OpenPiSessionRequest {
+	/**
+	 * When supplied, the resulting Pi session is bound to this chat tab via
+	 * the chat-tab repository's `bindPiSession` helper so the renderer can
+	 * resume the same tab on next listing.
+	 */
+	chatTabId?: string | null;
+	/** First user prompt, used only to generate a short tab title. */
+	initialPrompt?: string | null;
 	label?: string;
 	model?: string | null;
 	thinkingLevel?: string | null;
@@ -126,4 +206,31 @@ export interface ListPiModelsResult {
 	defaultModelId: string | null;
 	defaultThinkingLevel: string | null;
 	models: readonly PiModelOptionWire[];
+}
+
+/**
+ * Pi session IPC surface (open / submit / stop / list, plus the live event
+ * subscription). CHAT-FRAGILE — keep these signatures byte-for-byte identical
+ * to the legacy `EnsembleApi` slice; channel handlers key off the method names.
+ */
+export interface PiSessionApi {
+	listPiModels: () => Promise<ListPiModelsResult>;
+	listPiSessionEvents: (
+		request: ListPiSessionEventsRequest,
+	) => Promise<ListPiSessionEventsResult>;
+	listPiSessions: (
+		request: ListPiSessionsRequest,
+	) => Promise<ListPiSessionsResult>;
+	onPiSessionEvent: (
+		listener: (event: PiSessionEventBroadcast) => void,
+	) => () => void;
+	openPiSession: (
+		request: OpenPiSessionRequest,
+	) => Promise<OpenPiSessionResult>;
+	stopPiSession: (
+		request: StopPiSessionRequest,
+	) => Promise<StopPiSessionResult>;
+	submitPiPrompt: (
+		request: SubmitPiPromptRequest,
+	) => Promise<SubmitPiPromptResult>;
 }

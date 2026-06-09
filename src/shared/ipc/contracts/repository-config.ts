@@ -61,3 +61,16 @@ export interface RepositoryConfigMigrationResult
 	applied: boolean;
 	error?: string;
 }
+
+/** Per-repository config-resolution IPC surface (read snapshot + migrate). */
+export interface RepositoryConfigApi {
+	applyRepositoryConfigMigration: (
+		request: RepositoryConfigMigrationRequest,
+	) => Promise<RepositoryConfigMigrationResult>;
+	previewRepositoryConfigMigration: (
+		request: RepositoryConfigMigrationRequest,
+	) => Promise<RepositoryConfigMigrationPreview>;
+	repositoryConfig: (
+		request: RepositoryConfigRequest,
+	) => Promise<RepositoryConfigSnapshot>;
+}

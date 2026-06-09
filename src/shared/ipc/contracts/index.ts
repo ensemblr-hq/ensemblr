@@ -1,5 +1,6 @@
 export type { EnsembleApi } from './api';
 export type {
+	ArchiveApi,
 	ArchiveLifecycleAbort,
 	ArchiveLifecycleContext,
 	ArchiveLifecycleDiagnostic,
@@ -10,6 +11,24 @@ export type {
 	ArchiveLifecycleWorkspaceTarget,
 } from './archive-lifecycle';
 export type {
+	BindPiSessionToTabRequest,
+	BindPiSessionToTabResult,
+	ChatTabApi,
+	ChatTabWire,
+	CloseChatTabRequest,
+	CloseChatTabResult,
+	ClosedChatTabEntryWire,
+	ListChatTabsRequest,
+	ListChatTabsResult,
+	ListClosedChatTabsWithSummaryRequest,
+	ListClosedChatTabsWithSummaryResult,
+	OpenChatTabRequest,
+	OpenChatTabResult,
+	RestoreChatTabRequest,
+	RestoreChatTabResult,
+} from './chat-tab';
+export type {
+	CloneApi,
 	CloneDestinationSelectionResult,
 	CloneGithubRepositoryDiagnostic,
 	CloneGithubRepositoryDiagnosticCode,
@@ -33,6 +52,7 @@ export type {
 	ConfigStatusSnapshot,
 } from './config';
 export type {
+	EnvironmentApi,
 	EnvironmentVariableCatalogEntrySnapshot,
 	EnvironmentVariableCategory,
 	EnvironmentVariableDiagnostic,
@@ -47,9 +67,10 @@ export type {
 export type {
 	DatabaseHealthSnapshot,
 	DatabaseStatus,
+	HealthApi,
 	HealthSnapshot,
 } from './health';
-export type { PiExecutableSelectionResult } from './pi';
+export type { PiApi, PiExecutableSelectionResult } from './pi';
 export type {
 	ChatTabKindWire,
 	ListPiModelsResult,
@@ -62,16 +83,23 @@ export type {
 	PiChatTabWire,
 	PiEventStreamWire,
 	PiModelOptionWire,
+	PiPersistedEnvelope,
+	PiSessionApi,
 	PiSessionEventBroadcast,
 	PiSessionEventWire,
 	PiSessionSnapshotWire,
 	PiSessionStatusWire,
+	PiWireError,
+	PiWireMessagePart,
+	PiWireMessagePayload,
+	PiWireMetadata,
 	StopPiSessionRequest,
 	StopPiSessionResult,
 	SubmitPiPromptRequest,
 	SubmitPiPromptResult,
 } from './pi-session';
 export type {
+	QuickStartApi,
 	QuickStartProjectDiagnostic,
 	QuickStartProjectDiagnosticCode,
 	QuickStartProjectDiagnosticSeverity,
@@ -102,8 +130,10 @@ export type {
 	RegisterLocalRepositoryDiagnosticSeverity,
 	RegisterLocalRepositoryRequest,
 	RegisterLocalRepositoryResult,
+	RepositoryApi,
 } from './repository';
 export type {
+	RepositoryConfigApi,
 	RepositoryConfigMigrationChange,
 	RepositoryConfigMigrationChangeStatus,
 	RepositoryConfigMigrationPreview,
@@ -115,12 +145,14 @@ export type {
 	RepositoryConfigSourceStatus,
 } from './repository-config';
 export type {
+	NavigationApi,
 	RepositoryWorkspaceNavigationMetadata,
 	RepositoryWorkspaceNavigationRepository,
 	RepositoryWorkspaceNavigationSnapshot,
 	RepositoryWorkspaceNavigationWorkspace,
 } from './repository-navigation';
 export type {
+	RootDirectoryApi,
 	RootDirectoryChangeApplyResult,
 	RootDirectoryChangePreview,
 	RootDirectoryChangeRequest,
@@ -139,6 +171,7 @@ export type {
 	RepositorySettingsResolutionRequest,
 	ResolvedSettingSnapshot,
 	SettingResolutionCandidateSnapshot,
+	SettingsApi,
 	SettingsResolutionCandidateStatus,
 	SettingsResolutionDiagnostic,
 	SettingsResolutionGroupSnapshot,
@@ -148,6 +181,7 @@ export type {
 	SettingsResolutionSource,
 } from './settings-resolution';
 export type {
+	SetupApi,
 	SetupCheckGroupId,
 	SetupCheckId,
 	SetupCheckLogSnapshot,
@@ -166,8 +200,9 @@ export type {
 	SharedRootAdoptionStaleRepositoryRecord,
 	SharedRootAdoptionStaleWorkspaceRecord,
 	SharedRootAdoptionStatus,
+	SharedRootApi,
 } from './shared-root-adoption';
-export type { InitialShellSnapshot } from './shell';
+export type { InitialShellSnapshot, ShellApi } from './shell';
 export type {
 	AdoptedWorkspaceSnapshot,
 	ArchivedWorkspaceListEntry,
@@ -220,4 +255,5 @@ export type {
 	UnarchiveWorkspaceRequest,
 	UnarchiveWorkspaceResult,
 	UnarchiveWorkspaceStatus,
+	WorkspaceApi,
 } from './workspace';

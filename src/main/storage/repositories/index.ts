@@ -5,14 +5,21 @@ export type {
 	PiRuntimeStateRow,
 } from './chat-tab-repository';
 export {
+	bindPiSession,
 	closeChatTab,
+	deleteChatTab,
 	getChatTabById,
 	getRuntimeState,
+	listClosedForWorkspace,
 	listOpenChatTabs,
 	listOpenChatTabsBySession,
+	listOpenForWorkspace,
+	markClosed,
 	openChatTab,
 	renameChatTab,
 	reorderChatTabs,
+	restoreChatTab,
+	restoreClosedChatTab,
 	setRuntimeState,
 } from './chat-tab-repository';
 export type {

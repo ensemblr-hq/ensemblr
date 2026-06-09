@@ -65,3 +65,8 @@ export interface SetupDiagnosticsSnapshot {
 	successCount: number;
 	warningCount: number;
 }
+
+/** Setup-diagnostics IPC surface (first-run + recurring readiness checks). */
+export interface SetupApi {
+	setupDiagnostics: () => Promise<SetupDiagnosticsSnapshot>;
+}

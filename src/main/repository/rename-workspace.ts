@@ -9,6 +9,7 @@ import type {
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { withTransaction } from '../storage/tx.ts';
 import { firstLine } from './first-line.ts';
 import { parseMetadata } from './metadata.ts';
 import { toSlug } from './slug.ts';
@@ -344,8 +345,7 @@ function updateWorkspaceRow({
 	name: string;
 	timestamp: string;
 }): void {
-	database.exec('BEGIN');
-	try {
+	withTransaction(database, () => {
 		database
 			.prepare(
 				`UPDATE workspaces
@@ -362,11 +362,7 @@ function updateWorkspaceRow({
 				bumpRenameMetadata(metadataJson, timestamp),
 				id,
 			);
-		database.exec('COMMIT');
-	} catch (error) {
-		database.exec('ROLLBACK');
-		throw error;
-	}
+	});
 }
 
 /** Stamps `metadata.renamedAt` so consumers can see when the rename happened. */

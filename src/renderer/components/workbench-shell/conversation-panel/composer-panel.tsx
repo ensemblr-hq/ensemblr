@@ -1,9 +1,17 @@
-import { FileCodeIcon, SquareIcon } from 'lucide-react';
+import type { ChatStatus } from 'ai';
+import { FileCodeIcon } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 
+import {
+	PromptInput,
+	PromptInputFooter,
+	type PromptInputMessage,
+	PromptInputSubmit,
+	PromptInputTextarea,
+	PromptInputTools,
+} from '@/renderer/components/ai-elements/prompt-input';
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
-import { Textarea } from '@/renderer/components/ui/textarea';
 import {
 	Tooltip,
 	TooltipContent,
@@ -11,24 +19,27 @@ import {
 } from '@/renderer/components/ui/tooltip';
 import type { ComposerShellState } from '@/renderer/types/workbench';
 
-/** Sticky bottom composer with textarea, status badges and send/stop. */
+/**
+ * Sticky bottom composer powered by ai-elements' `PromptInput`. The outer
+ * footer chrome (border, padding, background) matches the surrounding
+ * conversation panel; the inner controls inherit ai-elements affordances
+ * (input group, Cmd+Enter, submit/stop status).
+ */
 export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
-	const [prompt, setPrompt] = useState('');
 	const [pending, setPending] = useState(false);
 
-	const submitDisabled =
-		composer.disabled || pending || prompt.trim().length === 0;
-	const showStop = composer.isStreaming || pending;
-
-	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+	const handleSubmit = async (
+		message: PromptInputMessage,
+		event: FormEvent<HTMLFormElement>,
+	) => {
 		event.preventDefault();
-		if (submitDisabled) {
+		const text = message.text.trim();
+		if (composer.disabled || pending || text.length === 0) {
 			return;
 		}
 		setPending(true);
 		try {
-			await composer.onSubmit(prompt);
-			setPrompt('');
+			await composer.onSubmit(text);
 		} finally {
 			setPending(false);
 		}
@@ -39,59 +50,54 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 		setPending(false);
 	};
 
+	const status: ChatStatus = pending
+		? 'submitted'
+		: composer.isStreaming
+			? 'streaming'
+			: 'ready';
+
+	const showDisabledTooltip =
+		composer.disabled && composer.disabledReason && !composer.isStreaming;
+
 	return (
 		<footer className='shrink-0 border-border border-t bg-background p-3'>
-			<form
-				className='rounded-md border border-border bg-pane p-2'
+			<PromptInput
+				className='rounded-md border border-border bg-pane'
 				onSubmit={handleSubmit}
 			>
-				<Textarea
+				<PromptInputTextarea
 					aria-label='Pi composer'
-					className='min-h-24 resize-none border-0 bg-transparent px-2 shadow-none focus-visible:ring-0'
 					disabled={composer.disabled}
-					onChange={(event) => setPrompt(event.target.value)}
 					placeholder={composer.placeholder}
-					value={prompt}
 				/>
-				<div className='mt-2 flex flex-wrap items-center justify-between gap-2'>
-					<div className='flex flex-wrap items-center gap-1.5'>
+				<PromptInputFooter>
+					<PromptInputTools className='flex-wrap'>
 						<ModelSelect composer={composer} />
 						<ThinkingSelect composer={composer} />
-					</div>
-					<div className='flex items-center gap-1.5'>
 						<Button disabled={composer.disabled} size='sm' variant='outline'>
 							<FileCodeIcon data-icon='inline-start' />
 							Attach
 						</Button>
-						{showStop ? (
-							<Button
-								onClick={handleStop}
-								size='sm'
-								type='button'
-								variant='destructive'
-							>
-								<SquareIcon data-icon='inline-start' />
-								Stop
-							</Button>
-						) : composer.disabled && composer.disabledReason ? (
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<span>
-										<Button disabled size='sm' type='button'>
-											Send
-										</Button>
-									</span>
-								</TooltipTrigger>
-								<TooltipContent>{composer.disabledReason}</TooltipContent>
-							</Tooltip>
-						) : (
-							<Button disabled={submitDisabled} size='sm' type='submit'>
-								Send
-							</Button>
-						)}
-					</div>
-				</div>
-			</form>
+					</PromptInputTools>
+					{showDisabledTooltip ? (
+						<Tooltip>
+							<TooltipTrigger asChild>
+								<span>
+									<PromptInputSubmit disabled size='sm' status='ready' />
+								</span>
+							</TooltipTrigger>
+							<TooltipContent>{composer.disabledReason}</TooltipContent>
+						</Tooltip>
+					) : (
+						<PromptInputSubmit
+							disabled={composer.disabled}
+							onStop={handleStop}
+							size='sm'
+							status={status}
+						/>
+					)}
+				</PromptInputFooter>
+			</PromptInput>
 		</footer>
 	);
 }

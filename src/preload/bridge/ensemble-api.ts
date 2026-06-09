@@ -1,68 +1,69 @@
 import { type IpcRendererEvent, ipcRenderer } from 'electron';
 
 import {
-	type ArchiveRepositoryRequest,
-	type ArchiveRepositoryResult,
-	type ArchiveWorkspaceRequest,
-	type ArchiveWorkspaceResult,
-	type CloneDestinationSelectionResult,
-	type CloneGithubRepositoryPrepareResult,
 	type CloneGithubRepositoryProgressEvent,
-	type CloneGithubRepositoryRequest,
-	type CloneGithubRepositoryStartRequest,
-	type CloneGithubRepositoryStartResult,
-	type CreateWorkspaceRequest,
-	type CreateWorkspaceResult,
-	type DeleteArchivedWorkspaceRequest,
-	type DeleteArchivedWorkspaceResult,
-	type DeleteRepositoryRequest,
-	type DeleteRepositoryResult,
-	type DeleteWorkspaceRequest,
-	type DeleteWorkspaceResult,
 	type EnsembleApi,
-	type EnvironmentVariablesSnapshot,
-	type GithubRepositoryListResult,
-	type HealthSnapshot,
 	IPC_CHANNELS,
-	type ListArchivedWorkspacesRequest,
-	type ListArchivedWorkspacesResult,
-	type ListPiModelsResult,
-	type ListPiSessionEventsRequest,
-	type ListPiSessionEventsResult,
-	type ListPiSessionsRequest,
-	type ListPiSessionsResult,
-	type LocalRepositorySelectionResult,
-	type OpenPiSessionRequest,
-	type OpenPiSessionResult,
-	type PiExecutableSelectionResult,
 	type PiSessionEventBroadcast,
-	type QuickStartProjectRequest,
-	type QuickStartProjectResult,
-	type RegisterLocalRepositoryRequest,
-	type RegisterLocalRepositoryResult,
-	type RenameWorkspaceRequest,
-	type RenameWorkspaceResult,
-	type RepositoryConfigMigrationPreview,
-	type RepositoryConfigMigrationRequest,
-	type RepositoryConfigMigrationResult,
-	type RepositoryConfigRequest,
-	type RepositoryConfigSnapshot,
-	type RepositoryWorkspaceNavigationSnapshot,
-	type RootDirectoryChangeApplyResult,
-	type RootDirectoryChangeRequest,
-	type RootDirectorySelectionResult,
-	type RootDirectorySnapshot,
-	type SettingsResolutionRequest,
-	type SettingsResolutionSnapshot,
-	type SetupDiagnosticsSnapshot,
-	type SharedRootAdoptionSnapshot,
-	type StopPiSessionRequest,
-	type StopPiSessionResult,
-	type SubmitPiPromptRequest,
-	type SubmitPiPromptResult,
-	type UnarchiveWorkspaceRequest,
-	type UnarchiveWorkspaceResult,
 } from '../../shared/ipc';
+
+/**
+ * Keys of {@link EnsembleApi} that represent typed `ipcRenderer.invoke`
+ * round-trips (i.e. every method except the broadcast subscription helpers).
+ */
+type InvokeKey = Exclude<
+	keyof EnsembleApi,
+	'onCloneGithubRepositoryProgress' | 'onPiSessionEvent'
+>;
+
+/**
+ * Mapping of {@link EnsembleApi} method names whose channel identifier diverges
+ * from the method name (most match 1:1 against {@link IPC_CHANNELS}).
+ */
+const CHANNEL_OVERRIDES = {
+	prepareCloneGithubRepository: IPC_CHANNELS.cloneGithubRepositoryPrepare,
+	resolveSettings: IPC_CHANNELS.settingsResolution,
+	startCloneGithubRepository: IPC_CHANNELS.cloneGithubRepositoryStart,
+} as const satisfies Partial<Record<InvokeKey, string>>;
+
+function channelFor(key: InvokeKey): string {
+	if (key in CHANNEL_OVERRIDES) {
+		return CHANNEL_OVERRIDES[key as keyof typeof CHANNEL_OVERRIDES];
+	}
+	// Every remaining invoke method shares its name with the channels registry key.
+	return IPC_CHANNELS[key as keyof typeof IPC_CHANNELS];
+}
+
+/**
+ * Typed wrapper around `ipcRenderer.invoke`. The return type is derived from
+ * `EnsembleApi[K]`, so callers no longer need `as Promise<T>` casts.
+ */
+function invoke<K extends InvokeKey>(
+	key: K,
+	...args: Parameters<EnsembleApi[K]>
+): ReturnType<EnsembleApi[K]> {
+	return ipcRenderer.invoke(channelFor(key), ...args) as ReturnType<
+		EnsembleApi[K]
+	>;
+}
+
+/**
+ * Subscribe to a broadcast IPC channel with a typed payload and return an
+ * unsubscribe function. Wraps the raw `IpcRendererEvent` so consumers only see
+ * the payload.
+ */
+function subscribe<E>(
+	channel: string,
+	listener: (event: E) => void,
+): () => void {
+	const wrapped = (_event: IpcRendererEvent, payload: E) => {
+		listener(payload);
+	};
+	ipcRenderer.on(channel, wrapped);
+	return () => {
+		ipcRenderer.off(channel, wrapped);
+	};
+}
 
 /**
  * Builds the `window.ensemble` bridge object exposed to the renderer, mapping
@@ -71,201 +72,68 @@ import {
  */
 export function createEnsembleApi(): EnsembleApi {
 	return {
-		applyRepositoryConfigMigration: (
-			request: RepositoryConfigMigrationRequest,
-		) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.applyRepositoryConfigMigration,
-				request,
-			) as Promise<RepositoryConfigMigrationResult>,
-		archiveRepository: (request: ArchiveRepositoryRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.archiveRepository,
-				request,
-			) as Promise<ArchiveRepositoryResult>,
-		archiveWorkspace: (request: ArchiveWorkspaceRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.archiveWorkspace,
-				request,
-			) as Promise<ArchiveWorkspaceResult>,
-		confirmRootDirectoryChange: (request: RootDirectoryChangeRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.confirmRootDirectoryChange,
-				request,
-			) as Promise<RootDirectoryChangeApplyResult>,
-		createWorkspace: (request: CreateWorkspaceRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.createWorkspace,
-				request,
-			) as Promise<CreateWorkspaceResult>,
-		deleteArchivedWorkspace: (request: DeleteArchivedWorkspaceRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.deleteArchivedWorkspace,
-				request,
-			) as Promise<DeleteArchivedWorkspaceResult>,
-		deleteRepository: (request: DeleteRepositoryRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.deleteRepository,
-				request,
-			) as Promise<DeleteRepositoryResult>,
-		deleteWorkspace: (request: DeleteWorkspaceRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.deleteWorkspace,
-				request,
-			) as Promise<DeleteWorkspaceResult>,
-		listArchivedWorkspaces: (request: ListArchivedWorkspacesRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.listArchivedWorkspaces,
-				request,
-			) as Promise<ListArchivedWorkspacesResult>,
-		unarchiveWorkspace: (request: UnarchiveWorkspaceRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.unarchiveWorkspace,
-				request,
-			) as Promise<UnarchiveWorkspaceResult>,
-		ensureWindowWidth: (minimumWidth: number) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.ensureWindowWidth,
-				minimumWidth,
-			) as Promise<void>,
-		environmentVariables: () =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.environmentVariables,
-			) as Promise<EnvironmentVariablesSnapshot>,
-		githubRepositoryList: () =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.githubRepositoryList,
-			) as Promise<GithubRepositoryListResult>,
-		health: () =>
-			ipcRenderer.invoke(IPC_CHANNELS.health) as Promise<HealthSnapshot>,
-		listPiModels: () =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.listPiModels,
-			) as Promise<ListPiModelsResult>,
-		listPiSessionEvents: (request: ListPiSessionEventsRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.listPiSessionEvents,
-				request,
-			) as Promise<ListPiSessionEventsResult>,
-		listPiSessions: (request: ListPiSessionsRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.listPiSessions,
-				request,
-			) as Promise<ListPiSessionsResult>,
-		onPiSessionEvent: (listener: (event: PiSessionEventBroadcast) => void) => {
-			const wrapped = (
-				_event: IpcRendererEvent,
-				payload: PiSessionEventBroadcast,
-			) => {
-				listener(payload);
-			};
-			ipcRenderer.on(IPC_CHANNELS.piSessionEvent, wrapped);
-			return () => {
-				ipcRenderer.off(IPC_CHANNELS.piSessionEvent, wrapped);
-			};
-		},
-		openPiSession: (request: OpenPiSessionRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.openPiSession,
-				request,
-			) as Promise<OpenPiSessionResult>,
-		stopPiSession: (request: StopPiSessionRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.stopPiSession,
-				request,
-			) as Promise<StopPiSessionResult>,
-		submitPiPrompt: (request: SubmitPiPromptRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.submitPiPrompt,
-				request,
-			) as Promise<SubmitPiPromptResult>,
-		onCloneGithubRepositoryProgress: (
-			listener: (event: CloneGithubRepositoryProgressEvent) => void,
-		) => {
-			const wrapped = (
-				_event: IpcRendererEvent,
-				payload: CloneGithubRepositoryProgressEvent,
-			) => {
-				listener(payload);
-			};
-			ipcRenderer.on(IPC_CHANNELS.cloneGithubRepositoryProgress, wrapped);
-			return () => {
-				ipcRenderer.off(IPC_CHANNELS.cloneGithubRepositoryProgress, wrapped);
-			};
-		},
-		prepareCloneGithubRepository: (request: CloneGithubRepositoryRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.cloneGithubRepositoryPrepare,
-				request,
-			) as Promise<CloneGithubRepositoryPrepareResult>,
-		registerLocalRepository: (request: RegisterLocalRepositoryRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.registerLocalRepository,
-				request,
-			) as Promise<RegisterLocalRepositoryResult>,
-		renameWorkspace: (request: RenameWorkspaceRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.renameWorkspace,
-				request,
-			) as Promise<RenameWorkspaceResult>,
-		selectCloneDestination: () =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.selectCloneDestination,
-			) as Promise<CloneDestinationSelectionResult>,
-		selectLocalRepository: () =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.selectLocalRepository,
-			) as Promise<LocalRepositorySelectionResult>,
-		startCloneGithubRepository: (request: CloneGithubRepositoryStartRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.cloneGithubRepositoryStart,
-				request,
-			) as Promise<CloneGithubRepositoryStartResult>,
-		previewRepositoryConfigMigration: (
-			request: RepositoryConfigMigrationRequest,
-		) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.previewRepositoryConfigMigration,
-				request,
-			) as Promise<RepositoryConfigMigrationPreview>,
-		quickStartProject: (request: QuickStartProjectRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.quickStartProject,
-				request,
-			) as Promise<QuickStartProjectResult>,
-		repositoryConfig: (request: RepositoryConfigRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.repositoryConfig,
-				request,
-			) as Promise<RepositoryConfigSnapshot>,
-		repositoryWorkspaceNavigation: () =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.repositoryWorkspaceNavigation,
-			) as Promise<RepositoryWorkspaceNavigationSnapshot>,
-		rootDirectory: () =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.rootDirectory,
-			) as Promise<RootDirectorySnapshot>,
-		setupDiagnostics: () =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.setupDiagnostics,
-			) as Promise<SetupDiagnosticsSnapshot>,
-		sharedRootAdoption: () =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.sharedRootAdoption,
-			) as Promise<SharedRootAdoptionSnapshot>,
-		selectPiExecutable: () =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.selectPiExecutable,
-			) as Promise<PiExecutableSelectionResult>,
-		selectRootDirectory: () =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.selectRootDirectory,
-			) as Promise<RootDirectorySelectionResult>,
-		resolveSettings: (request?: SettingsResolutionRequest) =>
-			ipcRenderer.invoke(
-				IPC_CHANNELS.settingsResolution,
-				request,
-			) as Promise<SettingsResolutionSnapshot>,
+		applyRepositoryConfigMigration: (request) =>
+			invoke('applyRepositoryConfigMigration', request),
+		archiveRepository: (request) => invoke('archiveRepository', request),
+		archiveWorkspace: (request) => invoke('archiveWorkspace', request),
+		bindPiSessionToChatTab: (request) =>
+			invoke('bindPiSessionToChatTab', request),
+		closeChatTab: (request) => invoke('closeChatTab', request),
+		confirmRootDirectoryChange: (request) =>
+			invoke('confirmRootDirectoryChange', request),
+		createWorkspace: (request) => invoke('createWorkspace', request),
+		deleteArchivedWorkspace: (request) =>
+			invoke('deleteArchivedWorkspace', request),
+		deleteRepository: (request) => invoke('deleteRepository', request),
+		deleteWorkspace: (request) => invoke('deleteWorkspace', request),
+		ensureWindowWidth: (minimumWidth) =>
+			invoke('ensureWindowWidth', minimumWidth),
+		environmentVariables: () => invoke('environmentVariables'),
+		githubRepositoryList: () => invoke('githubRepositoryList'),
+		health: () => invoke('health'),
+		listArchivedWorkspaces: (request) =>
+			invoke('listArchivedWorkspaces', request),
+		listChatTabs: (request) => invoke('listChatTabs', request),
+		listClosedChatTabsWithSummary: (request) =>
+			invoke('listClosedChatTabsWithSummary', request),
+		listPiModels: () => invoke('listPiModels'),
+		listPiSessionEvents: (request) => invoke('listPiSessionEvents', request),
+		listPiSessions: (request) => invoke('listPiSessions', request),
+		onCloneGithubRepositoryProgress: (listener) =>
+			subscribe<CloneGithubRepositoryProgressEvent>(
+				IPC_CHANNELS.cloneGithubRepositoryProgress,
+				listener,
+			),
+		onPiSessionEvent: (listener) =>
+			subscribe<PiSessionEventBroadcast>(
+				IPC_CHANNELS.piSessionEvent,
+				listener,
+			),
+		openChatTab: (request) => invoke('openChatTab', request),
+		openPiSession: (request) => invoke('openPiSession', request),
+		prepareCloneGithubRepository: (request) =>
+			invoke('prepareCloneGithubRepository', request),
+		previewRepositoryConfigMigration: (request) =>
+			invoke('previewRepositoryConfigMigration', request),
+		quickStartProject: (request) => invoke('quickStartProject', request),
+		registerLocalRepository: (request) =>
+			invoke('registerLocalRepository', request),
+		renameWorkspace: (request) => invoke('renameWorkspace', request),
+		repositoryConfig: (request) => invoke('repositoryConfig', request),
+		repositoryWorkspaceNavigation: () => invoke('repositoryWorkspaceNavigation'),
+		resolveSettings: (request) => invoke('resolveSettings', request),
+		restoreChatTab: (request) => invoke('restoreChatTab', request),
+		rootDirectory: () => invoke('rootDirectory'),
+		selectCloneDestination: () => invoke('selectCloneDestination'),
+		selectLocalRepository: () => invoke('selectLocalRepository'),
+		selectPiExecutable: () => invoke('selectPiExecutable'),
+		selectRootDirectory: () => invoke('selectRootDirectory'),
+		setupDiagnostics: () => invoke('setupDiagnostics'),
+		sharedRootAdoption: () => invoke('sharedRootAdoption'),
+		startCloneGithubRepository: (request) =>
+			invoke('startCloneGithubRepository', request),
+		stopPiSession: (request) => invoke('stopPiSession', request),
+		submitPiPrompt: (request) => invoke('submitPiPrompt', request),
+		unarchiveWorkspace: (request) => invoke('unarchiveWorkspace', request),
 	};
 }

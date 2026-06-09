@@ -1,14 +1,152 @@
-import type { DockTabModel } from './dock-tabs';
 import type {
-	PullRequestCheckSummary,
-	PullRequestCommentSummary,
-	PullRequestGitStatusSummary,
-	PullRequestPreviewDeploymentSummary,
-	PullRequestShellStatus,
-	PullRequestTodoSummary,
-} from './pull-request';
-import type { ReviewFileSummary, WorkspaceFileSummary } from './review';
-import type { SessionTabModel } from './session';
+	HealthSnapshot,
+	RepositoryWorkspaceNavigationSnapshot,
+	SetupDiagnosticsSnapshot,
+} from '@/shared/ipc';
+
+import type { ProjectShellModel } from './project';
+
+// --- Dock tabs --------------------------------------------------------------
+
+export type FixedDockTabId = 'run' | 'setup';
+export type TerminalDockTabId = `terminal:${string}`;
+export type DockTabId = FixedDockTabId | TerminalDockTabId;
+export type DockTabStatus = 'idle' | 'ready' | 'running' | 'warning';
+
+export interface SetupScriptDockTabModel {
+	id: 'setup';
+	kind: 'setup-script';
+	label: string;
+	status: DockTabStatus;
+}
+
+export interface RunScriptDockTabModel {
+	id: 'run';
+	kind: 'run-script';
+	label: string;
+	status: DockTabStatus;
+}
+
+export interface TerminalDockTabModel {
+	id: TerminalDockTabId;
+	isDefault?: boolean;
+	kind: 'terminal';
+	label: string;
+	lines: string[];
+	sessionId: string;
+	status: DockTabStatus;
+}
+
+export type DockTabModel =
+	| RunScriptDockTabModel
+	| SetupScriptDockTabModel
+	| TerminalDockTabModel;
+
+// --- Review -----------------------------------------------------------------
+
+export type ReviewPanelTab = 'changes' | 'checks' | 'files';
+
+export interface ReviewFileSummary {
+	additions: number;
+	deletions: number;
+	id: string;
+	path: string;
+	status: 'added' | 'deleted' | 'modified' | 'renamed' | 'untracked';
+}
+
+export interface WorkspaceFileSummary {
+	id: string;
+	kind: 'directory' | 'file';
+	name: string;
+	path: string;
+}
+
+// --- Pull request -----------------------------------------------------------
+
+export type PullRequestShellStatus =
+	| 'agent-working'
+	| 'blocked'
+	| 'checking'
+	| 'idle'
+	| 'ready-to-merge';
+
+export type PullRequestCheckStatus = 'blocked' | 'pending' | 'ready';
+
+export interface PullRequestCheckSummary {
+	durationLabel?: string;
+	id: string;
+	label: string;
+	provider: 'github' | 'local' | 'vercel';
+	status: PullRequestCheckStatus;
+	url?: string;
+}
+
+export interface PullRequestCommentSummary {
+	detail: string;
+	id: string;
+	provider: 'github-actions' | 'linear';
+}
+
+export interface PullRequestTodoSummary {
+	id: string;
+	label: string;
+}
+
+export interface PullRequestPreviewDeploymentSummary {
+	label: string;
+	provider: 'netlify' | 'unknown' | 'vercel';
+	source: 'check-link' | 'github-deployment' | 'pr-comment';
+	status: PullRequestCheckStatus;
+	url: string;
+}
+
+export interface PullRequestGitStatusSummary {
+	actionLabel?: string;
+	label: string;
+	status: PullRequestCheckStatus | 'open';
+}
+
+// --- Session / composer -----------------------------------------------------
+
+export interface SessionTabModel {
+	id: string;
+	chatTabId: string;
+	piSessionId: string | null;
+	label: string;
+	status: 'blocked' | 'idle' | 'working';
+	summary: string;
+	updatedLabel: string;
+}
+
+export interface ComposerModelOption {
+	displayName: string;
+	id: string;
+}
+
+export interface ComposerThinkingOption {
+	id: string;
+	label: string;
+}
+
+export interface ComposerShellState {
+	activePiSessionId: string | null;
+	availableModels: readonly ComposerModelOption[];
+	availableThinkingLevels: readonly ComposerThinkingOption[];
+	disabled: boolean;
+	disabledReason: string | null;
+	isStreaming: boolean;
+	modelId: string | null;
+	modelLabel: string;
+	onModelChange: (modelId: string) => void;
+	onStop: () => Promise<void> | void;
+	onSubmit: (prompt: string) => Promise<void> | void;
+	onThinkingChange: (thinkingLevel: string) => void;
+	placeholder: string;
+	thinkingLabel: string;
+	thinkingLevel: string | null;
+}
+
+// --- Workspace domain -------------------------------------------------------
 
 export type WorkspaceStatus = 'idle' | 'needs-setup' | 'review' | 'working';
 
@@ -75,7 +213,9 @@ export interface WorkspaceLandingSummary {
 	headline: string;
 	kind: WorkspaceLandingKind;
 	linkedIssue?: WorkspaceLinkedIssueSummary;
+	repositoryName: string;
 	setupGuidance: WorkspaceLandingSetupSummary;
+	workspaceName: string;
 }
 
 export type WorkspaceOpenTargetKind =
@@ -138,4 +278,22 @@ export interface WorkspaceShellModel {
 	sourceSummary: string;
 	status: WorkspaceStatus;
 	workspaceFiles: WorkspaceFileSummary[];
+}
+
+// --- Shell data -------------------------------------------------------------
+
+export interface WorkbenchShellData {
+	hasPreloadBridge: boolean;
+	healthError: string | null;
+	healthSnapshot: HealthSnapshot | null;
+	navigationError: string | null;
+	navigationSnapshot: RepositoryWorkspaceNavigationSnapshot | null;
+	projects: ProjectShellModel[];
+	setupError: string | null;
+	setupSnapshot: SetupDiagnosticsSnapshot | null;
+}
+
+export interface WorkspaceShellData {
+	project: ProjectShellModel;
+	workspace: WorkspaceShellModel;
 }

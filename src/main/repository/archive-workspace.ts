@@ -5,7 +5,6 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type {
 	ArchivedWorkspaceSnapshot,
-	ArchiveLifecycleDiagnostic,
 	ArchiveWorkspaceDiagnostic,
 	ArchiveWorkspaceDiagnosticCode,
 	ArchiveWorkspaceRequest,
@@ -14,8 +13,18 @@ import type {
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { withTransaction } from '../storage/tx.ts';
+import {
+	failureResult,
+	pushLifecycleDiagnostics,
+} from './archive-diagnostics.ts';
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
+import { insertArchiveRecord } from './archive-records.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
+import {
+	hasWorkspaceRepositoryIdentity,
+	isRecord,
+} from './row-guards.ts';
 
 /** Public surface of the workspace lifecycle archive service. */
 export interface ArchiveWorkspaceService {
@@ -431,8 +440,7 @@ function stampArchivedAt({
 	recordId: string;
 	source: SourceWorkspace;
 }): void {
-	database.exec('BEGIN');
-	try {
+	withTransaction(database, () => {
 		database
 			.prepare(
 				`UPDATE workspaces
@@ -440,44 +448,24 @@ function stampArchivedAt({
 				WHERE id = ?`,
 			)
 			.run(archivedAt, archivedAt, source.id);
-		database
-			.prepare(
-				`INSERT INTO archive_records (
-					id,
-					record_type,
-					repository_id,
-					workspace_id,
-					repository_slug,
-					workspace_slug,
-					branch_name,
-					base_branch,
-					source_path,
-					archived_context_path,
-					branch_cleanup,
-					archive_reason,
-					archived_at
-				)
-				VALUES (?, 'workspace', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			)
-			.run(
-				recordId,
-				source.repositoryId,
-				source.id,
-				source.repositorySlug,
-				source.slug,
-				source.branchName,
-				source.baseBranch,
-				source.path,
-				archivedContextPath,
-				branchCleanup ? 1 : 0,
-				reason,
-				archivedAt,
-			);
-		database.exec('COMMIT');
-	} catch (error) {
-		database.exec('ROLLBACK');
-		throw error;
-	}
+		insertArchiveRecord({
+			archivedAt,
+			archivedContextPath,
+			baseBranch: source.baseBranch,
+			branchCleanup,
+			branchName: source.branchName,
+			database,
+			kind: 'workspace',
+			reason,
+			recordId,
+			repositoryId: source.repositoryId,
+			repositoryPath: source.repositoryPath,
+			repositorySlug: source.repositorySlug,
+			workspaceId: source.id,
+			workspacePath: source.path,
+			workspaceSlug: source.slug,
+		});
+	});
 }
 
 function writeArchiveMetadata({
@@ -541,20 +529,6 @@ function writeArchiveMetadata({
 	}
 }
 
-function pushLifecycleDiagnostics(
-	diagnostics: ArchiveWorkspaceDiagnostic[],
-	lifecycle: ArchiveLifecycleDiagnostic[],
-): void {
-	for (const entry of lifecycle) {
-		diagnostics.push({
-			code: 'lifecycle-hook-failed',
-			message: entry.message,
-			path: entry.path,
-			severity: entry.severity,
-		});
-	}
-}
-
 /** Renders an ISO timestamp into a filesystem-safe suffix. */
 function toFilesystemTimestamp(isoTimestamp: string): string {
 	return isoTimestamp.replace(/[:.]/g, '-');
@@ -563,33 +537,19 @@ function toFilesystemTimestamp(isoTimestamp: string): string {
 function failure(
 	diagnostic: ArchiveWorkspaceDiagnostic,
 ): ArchiveWorkspaceResult {
-	return {
+	return failureResult(diagnostic, {
 		archiveRecordId: null,
-		diagnostics: [diagnostic],
-		status: 'failure',
 		workspace: null,
-	};
+	});
 }
 
 function isWorkspaceRow(row: unknown): row is SourceWorkspace {
-	if (typeof row !== 'object' || row === null) {
+	if (!isRecord(row)) {
 		return false;
 	}
-	const candidate = row as Record<string, unknown>;
 	return (
-		typeof candidate.id === 'string' &&
-		typeof candidate.slug === 'string' &&
-		typeof candidate.name === 'string' &&
-		typeof candidate.path === 'string' &&
-		typeof candidate.repositoryId === 'string' &&
-		typeof candidate.repositoryName === 'string' &&
-		typeof candidate.repositoryPath === 'string' &&
-		typeof candidate.repositorySlug === 'string' &&
-		(candidate.branchName === null ||
-			typeof candidate.branchName === 'string') &&
-		(candidate.baseBranch === null ||
-			typeof candidate.baseBranch === 'string') &&
-		(candidate.archivedAt === null || typeof candidate.archivedAt === 'string')
+		hasWorkspaceRepositoryIdentity(row) &&
+		(row.baseBranch === null || typeof row.baseBranch === 'string')
 	);
 }
 

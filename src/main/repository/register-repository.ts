@@ -15,12 +15,14 @@ import {
 	loadRepositoryConfig,
 } from '../config/repository-config.ts';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { withTransaction } from '../storage/tx.ts';
 import { ARCHIVED_REPOSITORY_MARKER } from './archived-marker.ts';
 import {
 	type GitRepositoryProbe,
 	type GitRepositoryProbeFn,
 	probeGitRepository,
 } from './git-probe.ts';
+import { normalizeRemoteUrl } from './github-url.ts';
 import { toSlug } from './slug.ts';
 
 /** Public surface of the local repository registration service. */
@@ -169,14 +171,9 @@ export async function registerLocalRepository({
 	});
 
 	try {
-		database.exec('BEGIN');
-		try {
+		withTransaction(database, () => {
 			insertRepositoryRow({ database, prepared, timestamp });
-			database.exec('COMMIT');
-		} catch (error) {
-			database.exec('ROLLBACK');
-			throw error;
-		}
+		});
 	} catch (error) {
 		return failureResult(diagnostics, {
 			code: 'repository-insert-failed',
@@ -313,27 +310,6 @@ export function isRemoteUrlTracked(
 		.prepare('SELECT id FROM repositories WHERE remote_url = ? LIMIT 1')
 		.get(normalized);
 	return isIdRow(row);
-}
-
-/**
- * Reduces a git remote URL to a canonical `host/owner/repo` key so equivalent
- * `git@github.com:owner/repo`, `ssh://git@github.com/owner/repo.git`, and
- * `https://github.com/owner/repo.git` forms all collide on the same value.
- */
-export function normalizeRemoteUrl(value: string | null): string | null {
-	if (!value) {
-		return null;
-	}
-	let candidate = value.trim().toLowerCase();
-	if (!candidate) {
-		return null;
-	}
-	candidate = candidate.replace(/^(?:https?|ssh|git):\/\//, '');
-	candidate = candidate.replace(/^git@/, '');
-	candidate = candidate.replace(':', '/');
-	candidate = candidate.replace(/\.git$/i, '');
-	candidate = candidate.replace(/\/+$/, '');
-	return candidate || null;
 }
 
 /**

@@ -1,14 +1,21 @@
+/// <reference types="node" />
+
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 import type { PiExecutableSnapshot } from '../../src/main/pi/pi-executable.ts';
 import { createFakePiAgentAdapter } from '../../src/main/pi-agent/fake-pi-agent-client.ts';
 import { createPiAgentClient } from '../../src/main/pi-agent/pi-agent-client.ts';
 import { createPiSessionService } from '../../src/main/pi-agent/pi-session-service.ts';
 import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import {
+	listOpenChatTabs,
+	openChatTab,
+} from '../../src/main/storage/repositories/chat-tab-repository.ts';
 import { listEventsByBranch } from '../../src/main/storage/repositories/pi-event-repository.ts';
 
 function openFixture(t: import('node:test').TestContext): {
@@ -46,10 +53,14 @@ function createReadyExecutable(): PiExecutableSnapshot {
 	};
 }
 
-function createService(database: DatabaseSync) {
+function createService(
+	database: DatabaseSync,
+	options: { chatTitleTimeoutMs?: number } = {},
+) {
 	const fake = createFakePiAgentAdapter();
 	const piAgentClient = createPiAgentClient({ adapter: fake.adapter });
 	const service = createPiSessionService({
+		chatTitleTimeoutMs: options.chatTitleTimeoutMs,
 		databaseService: {
 			close: () => undefined,
 			getConnection: () => ({ database, path: ':memory:', schemaVersion: 5 }),
@@ -59,6 +70,25 @@ function createService(database: DatabaseSync) {
 		piAgentClient,
 	});
 	return { fake, service };
+}
+
+async function waitForTabTitle({
+	database,
+	title,
+	workspaceId,
+}: {
+	database: DatabaseSync;
+	title: string;
+	workspaceId: string;
+}): Promise<void> {
+	for (let attempt = 0; attempt < 40; attempt += 1) {
+		const tabTitle = listOpenChatTabs({ database, workspaceId })[0]?.title;
+		if (tabTitle === title) {
+			return;
+		}
+		await delay(5);
+	}
+	assert.equal(listOpenChatTabs({ database, workspaceId })[0]?.title, title);
 }
 
 test('openSession persists a pi_sessions row plus a main branch', async (t) => {
@@ -76,6 +106,64 @@ test('openSession persists a pi_sessions row plus a main branch', async (t) => {
 	assert.equal(snapshot.label, 'first chat');
 	assert.equal(snapshot.status, 'starting');
 	assert.equal(snapshot.openedTabs.length, 1);
+});
+
+test('openSession binds an existing chat tab without opening a duplicate', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database);
+	const tab = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			piSessionId: null,
+			title: 'Existing tab',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	const snapshot = await service.openSession({
+		chatTabId: tab.id,
+		executable: createReadyExecutable(),
+		label: 'bound chat',
+		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const tabs = listOpenChatTabs({
+		database: fixture.database,
+		workspaceId: fixture.workspaceId,
+	});
+
+	assert.equal(snapshot.openedTabs.length, 1);
+	assert.equal(tabs.length, 1);
+	assert.equal(tabs[0]?.id, tab.id);
+	assert.equal(tabs[0]?.piSessionId, snapshot.id);
+	assert.equal(tabs[0]?.title, 'Existing tab');
+});
+
+test('chat title timeout uses first prompt words as fallback', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database, {
+		chatTitleTimeoutMs: 1,
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		initialPrompt: 'Fix flaky tests in setup diagnostics now',
+		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	await waitForTabTitle({
+		database: fixture.database,
+		title: 'Fix flaky tests in setup',
+		workspaceId: fixture.workspaceId,
+	});
+
+	const events = listEventsByBranch({
+		branchId: snapshot.branchId,
+		database: fixture.database,
+	});
+	assert.ok(events.some((event) => event.eventType === 'metadata'));
 });
 
 test('submitPrompt creates a turn and forwards to the runtime session', async (t) => {
@@ -116,10 +204,11 @@ test('runtime events are mirrored into pi_session_events', async (t) => {
 		sessionId: snapshot.id,
 	});
 
-	const runtime = fake.getOpenSessions()[0]!;
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
 	runtime.emit({
 		at: '2026-06-08T00:00:00.000Z',
-		payload: { text: 'agent reply' },
+		payload: { kind: 'text', text: 'agent reply' },
 		role: 'agent',
 		turnId: 'fake-turn',
 		type: 'message',

@@ -32,3 +32,8 @@ export interface RepositoryWorkspaceNavigationSnapshot {
 	generatedAt: string;
 	repositories: RepositoryWorkspaceNavigationRepository[];
 }
+
+/** Repository / workspace navigation tree IPC surface. */
+export interface NavigationApi {
+	repositoryWorkspaceNavigation: () => Promise<RepositoryWorkspaceNavigationSnapshot>;
+}

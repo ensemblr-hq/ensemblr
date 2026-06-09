@@ -16,11 +16,11 @@ import {
 	type SubmitPiPromptResult,
 } from '../../../shared/ipc';
 import type { LocalCommandService } from '../../commands/local-command';
-import type { PiExecutableService } from '../../pi';
+import type { PiExecutableService } from '../../pi-runtime';
 import {
 	presentPiModels,
 	resolvePiProviderModels,
-} from '../../pi/pi-provider-models.ts';
+} from '../../pi-runtime/pi-provider-models.ts';
 import {
 	type PiSessionService,
 	snapshotToWire,
@@ -65,7 +65,9 @@ export function registerPiSessionHandlers({
 					return { error: 'workspaceCwd is required.' };
 				}
 				const snapshot = await piSessionService.openSession({
+					chatTabId: request.chatTabId ?? null,
 					executable,
+					initialPrompt: request.initialPrompt ?? null,
 					label: request.label,
 					model: request.model ?? null,
 					thinkingLevel: request.thinkingLevel ?? null,
@@ -176,4 +178,3 @@ export function registerPiSessionHandlers({
 		},
 	);
 }
-

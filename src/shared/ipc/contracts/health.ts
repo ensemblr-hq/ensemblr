@@ -22,3 +22,8 @@ export interface HealthSnapshot {
 		node: string;
 	};
 }
+
+/** Process / database health IPC surface. */
+export interface HealthApi {
+	health: () => Promise<HealthSnapshot>;
+}

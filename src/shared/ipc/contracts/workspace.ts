@@ -378,3 +378,16 @@ export interface ArchiveRecordSnapshot {
 	workspaceId: string | null;
 	workspaceSlug: string | null;
 }
+
+/** Workspace lifecycle IPC surface (create / rename / hard-delete). */
+export interface WorkspaceApi {
+	createWorkspace: (
+		request: CreateWorkspaceRequest,
+	) => Promise<CreateWorkspaceResult>;
+	deleteWorkspace: (
+		request: DeleteWorkspaceRequest,
+	) => Promise<DeleteWorkspaceResult>;
+	renameWorkspace: (
+		request: RenameWorkspaceRequest,
+	) => Promise<RenameWorkspaceResult>;
+}

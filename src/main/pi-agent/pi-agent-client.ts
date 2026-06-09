@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { isExecutableReady } from '../pi/pi-executable.ts';
+import { isExecutableReady } from '../pi-runtime/pi-executable.ts';
 import type {
 	PiAgentAdapter,
 	PiAgentAdapterSession,

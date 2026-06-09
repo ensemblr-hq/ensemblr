@@ -13,6 +13,7 @@ import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
  */
 export function getComposerState({
 	activeSession,
+	activePiSessionId,
 	availableModels,
 	availableThinkingLevels,
 	isStreaming,
@@ -25,6 +26,7 @@ export function getComposerState({
 	setupError,
 	thinkingLevel,
 }: {
+	activePiSessionId: string | null;
 	activeSession: SessionTabModel;
 	availableModels: readonly ComposerModelOption[];
 	availableThinkingLevels: readonly ComposerThinkingOption[];
@@ -46,6 +48,7 @@ export function getComposerState({
 			?.label ?? 'Thinking pending';
 
 	const base = {
+		activePiSessionId,
 		availableModels,
 		availableThinkingLevels,
 		isStreaming,

@@ -4,7 +4,7 @@ import {
 	IPC_CHANNELS,
 	type PiExecutableSelectionResult,
 } from '../../../shared/ipc';
-import type { PiExecutableService } from '../../pi';
+import type { PiExecutableService } from '../../pi-runtime';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the Pi executable IPC handlers. */

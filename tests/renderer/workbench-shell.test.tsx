@@ -182,9 +182,9 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('data-workspace-sidebar-state="pr-ready"');
 	expect(markup).toContain('Conductor shell rework');
 	expect(markup).toContain('Review shell');
-	// THE-130: the mock chat fixture is gone; the structured Pi RPC
-	// timeline renderer is what fills the chat surface now.
-	expect(markup).toContain('Pi session timeline');
+	// THE-130: the mock chat fixture is gone. With no active Pi session in
+	// the fixture, the chat surface renders the new-chat empty state.
+	expect(markup).toContain('New chat empty state');
 	expect(markup).not.toContain('Mock agent chat');
 	expect(markup).not.toContain('Chat mock in progress');
 	expect(markup).not.toContain('Renderer tests');
@@ -375,7 +375,7 @@ test('models project owner avatars with repo-icon fallback', () => {
 	});
 });
 
-test('does not show a close control when only one chat tab remains', () => {
+test('hides the close control when only one chat tab is visible', () => {
 	const activeWorkspace = shellFixtureProjects[1].workspaces[0];
 	const markup = renderWorkbench(
 		createSnapshot(
@@ -390,6 +390,8 @@ test('does not show a close control when only one chat tab remains', () => {
 
 	expect(markup).toContain('Checks pass');
 	expect(markup).toContain('lucide-loader-circle');
+	// The min-one-tab invariant is visible in the renderer: no X appears for
+	// the final remaining chat tab.
 	expect(markup).not.toContain('Close Checks pass tab');
 });
 

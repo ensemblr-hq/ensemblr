@@ -3,7 +3,6 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
-	ArchiveLifecycleDiagnostic,
 	UnarchivedWorkspaceSnapshot,
 	UnarchiveWorkspaceDiagnostic,
 	UnarchiveWorkspaceDiagnosticCode,
@@ -12,8 +11,19 @@ import type {
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { withTransaction } from '../storage/tx.ts';
+import {
+	failureResult,
+	pushLifecycleDiagnostics,
+} from './archive-diagnostics.ts';
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
 import { runWorktreeAdd as runWorktreeAddShared } from './git-ops.ts';
+import {
+	hasWorkspaceRepositoryIdentity,
+	isNullableNumber,
+	isNullableString,
+	isRecord,
+} from './row-guards.ts';
 
 /** Public surface of the workspace unarchive service. */
 export interface UnarchiveWorkspaceService {
@@ -432,8 +442,7 @@ function clearArchivedAt({
 	unarchivedAt: string;
 	workspaceId: string;
 }): void {
-	database.exec('BEGIN');
-	try {
+	withTransaction(database, () => {
 		database
 			.prepare(
 				`UPDATE workspaces
@@ -441,35 +450,15 @@ function clearArchivedAt({
 				WHERE id = ?`,
 			)
 			.run(unarchivedAt, workspaceId);
-		database.exec('COMMIT');
-	} catch (error) {
-		database.exec('ROLLBACK');
-		throw error;
-	}
-}
-
-function pushLifecycleDiagnostics(
-	diagnostics: UnarchiveWorkspaceDiagnostic[],
-	lifecycle: ArchiveLifecycleDiagnostic[],
-): void {
-	for (const entry of lifecycle) {
-		diagnostics.push({
-			code: 'lifecycle-hook-failed',
-			message: entry.message,
-			path: entry.path,
-			severity: entry.severity,
-		});
-	}
+	});
 }
 
 function failure(
 	diagnostic: UnarchiveWorkspaceDiagnostic,
 ): UnarchiveWorkspaceResult {
-	return {
-		diagnostics: [diagnostic],
-		status: 'failure',
+	return failureResult(diagnostic, {
 		workspace: null,
-	};
+	});
 }
 
 interface WorkspaceRow {
@@ -490,31 +479,15 @@ interface WorkspaceRow {
 }
 
 function isWorkspaceRow(row: unknown): row is WorkspaceRow {
-	if (typeof row !== 'object' || row === null) {
+	if (!isRecord(row)) {
 		return false;
 	}
-	const candidate = row as Record<string, unknown>;
 	return (
-		typeof candidate.id === 'string' &&
-		typeof candidate.slug === 'string' &&
-		typeof candidate.name === 'string' &&
-		typeof candidate.path === 'string' &&
-		typeof candidate.repositoryId === 'string' &&
-		typeof candidate.repositoryName === 'string' &&
-		typeof candidate.repositoryPath === 'string' &&
-		typeof candidate.repositorySlug === 'string' &&
-		(candidate.branchName === null ||
-			typeof candidate.branchName === 'string') &&
-		(candidate.archivedAt === null ||
-			typeof candidate.archivedAt === 'string') &&
-		(candidate.archiveRecordId === null ||
-			typeof candidate.archiveRecordId === 'string') &&
-		(candidate.archivedContextPath === null ||
-			typeof candidate.archivedContextPath === 'string') &&
-		(candidate.baseBranch === null ||
-			typeof candidate.baseBranch === 'string') &&
-		(candidate.branchCleanupRaw === null ||
-			typeof candidate.branchCleanupRaw === 'number')
+		hasWorkspaceRepositoryIdentity(row) &&
+		isNullableString(row.archiveRecordId) &&
+		isNullableString(row.archivedContextPath) &&
+		isNullableString(row.baseBranch) &&
+		isNullableNumber(row.branchCleanupRaw)
 	);
 }
 

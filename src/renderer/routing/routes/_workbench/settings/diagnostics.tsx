@@ -40,8 +40,8 @@ function DiagnosticsRoute() {
 				<h1 className='font-semibold text-foreground text-lg'>Diagnostics</h1>
 				<p className='text-muted-foreground text-sm'>
 					Setup gate checks for Pi, git, GitHub, Linear, and the Ensemble
-					runtime. Resolve blocked checks here; the workbench will re-enable
-					the composer automatically.
+					runtime. Resolve blocked checks here; the workbench will re-enable the
+					composer automatically.
 				</p>
 			</header>
 			<SetupDiagnosticsPanel

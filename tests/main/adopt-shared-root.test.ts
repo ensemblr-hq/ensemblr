@@ -11,7 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
-import { reconcileSharedRoot } from '../../src/main/repository/adopt-shared-root.ts';
+import { reconcileSharedRoot } from '../../src/main/repository/adopt-shared-root/index.ts';
 import {
 	probeGitRepository,
 	probeGitWorktreeMetadata,

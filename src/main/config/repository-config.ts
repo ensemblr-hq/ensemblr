@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import type { DatabaseSync } from 'node:sqlite';
 
 import type {
 	ConfigDiagnostic,
@@ -19,6 +20,12 @@ import {
 
 export { readJsonFile } from './repository-config-loaders.ts';
 
+/** Inputs for {@link isRepositoryConfigPathAllowed}. */
+export interface RepositoryConfigPathAuthorizationOptions {
+	database: DatabaseSync | null;
+	repositoryPath: string;
+}
+
 /** Options for {@link loadRepositoryConfig}. */
 export interface LoadRepositoryConfigOptions {
 	now?: () => Date;
@@ -34,9 +41,6 @@ export interface LoadedRepositoryConfig {
 	snapshot: RepositoryConfigSnapshot;
 	worktreeincludeConfig?: Record<string, unknown>;
 }
-
-export type { RepositoryConfigPathAuthorizationOptions } from './repository-config-auth.ts';
-export { isRepositoryConfigPathAllowed } from './repository-config-auth.ts';
 
 /** Internal: result of normalising a parsed config file. */
 interface NormalizedConfigSource {
@@ -348,8 +352,6 @@ function normalizeJsonRepositoryConfig({
 		settings.conductorCompatibility ??= true;
 	}
 
-	diagnostics.push(...takeNestedDiagnostics(settings));
-
 	return { diagnostics, settings };
 }
 
@@ -375,10 +377,14 @@ function normalizeRepositoryConfigFields({
 }): void {
 	for (const [key, value] of Object.entries(config)) {
 		if (key === 'scripts') {
-			mergeSettings(
-				settings,
-				normalizeScripts(value, '$.scripts', source, scriptSupportsRunMode),
+			const normalizedScripts = normalizeScripts(
+				value,
+				'$.scripts',
+				source,
+				scriptSupportsRunMode,
 			);
+			mergeSettings(settings, normalizedScripts.settings);
+			diagnostics.push(...normalizedScripts.diagnostics);
 			continue;
 		}
 
@@ -434,8 +440,6 @@ function normalizeTomlRepositoryConfig(
 		settings.conductorCompatibility ??= true;
 	}
 
-	diagnostics.push(...takeNestedDiagnostics(settings));
-
 	return { diagnostics, settings };
 }
 
@@ -446,18 +450,19 @@ function normalizeTomlRepositoryConfig(
  * @param fieldPath - JSONPath used in diagnostic messages.
  * @param source - Source identifier used in diagnostics.
  * @param supportRunMode - Whether to accept the TOML-only `run_mode` key.
- * @returns Partial settings record (may include the special `__diagnostics` key).
+ * @returns Partial settings record plus accumulated diagnostics.
  */
 function normalizeScripts(
 	value: unknown,
 	fieldPath: string,
 	source: SettingsResolutionSource,
 	supportRunMode: boolean,
-): Record<string, unknown> {
+): NormalizedConfigSource {
 	if (!isPlainRecord(value)) {
-		return {};
+		return { diagnostics: [], settings: {} };
 	}
 
+	const diagnostics: ConfigDiagnostic[] = [];
 	const scripts: Record<string, unknown> = {};
 	const settings: Record<string, unknown> = {};
 
@@ -470,8 +475,7 @@ function normalizeScripts(
 			if (typeof scriptValue === 'string') {
 				scripts[normalizedScriptKey] = scriptValue;
 			} else {
-				pushNestedDiagnostic(
-					settings,
+				diagnostics.push(
 					createInvalidFieldDiagnostic(
 						key,
 						source,
@@ -487,8 +491,7 @@ function normalizeScripts(
 			if (typeof scriptValue === 'string') {
 				settings.runScriptMode = scriptValue;
 			} else {
-				pushNestedDiagnostic(
-					settings,
+				diagnostics.push(
 					createInvalidFieldDiagnostic(
 						key,
 						source,
@@ -500,8 +503,7 @@ function normalizeScripts(
 			continue;
 		}
 
-		pushNestedDiagnostic(
-			settings,
+		diagnostics.push(
 			createUnsupportedFieldDiagnostic(key, source, `${fieldPath}.${key}`),
 		);
 	}
@@ -510,7 +512,7 @@ function normalizeScripts(
 		settings.scripts = scripts;
 	}
 
-	return settings;
+	return { diagnostics, settings };
 }
 
 /**
@@ -599,8 +601,8 @@ function normalizeSettingValue({
 }
 
 /**
- * Builds the IPC-safe snapshot describing a single config source, stripping the
- * internal `__diagnostics` carrier and clearing settings when not `loaded`.
+ * Builds the IPC-safe snapshot describing a single config source, clearing
+ * settings when the source did not load.
  * @param input - Source identifier, status, path and settings.
  * @returns A snapshot for transport across IPC.
  */
@@ -617,13 +619,10 @@ function createSourceSnapshot({
 	sourcePath: string;
 	status: RepositoryConfigSourceStatus;
 }): RepositoryConfigSourceSnapshot {
-	const cleanSettings = { ...settings };
-	delete cleanSettings.__diagnostics;
-
 	return {
 		displayPath: formatRepositoryDisplayPath(sourcePath, repositoryPath),
 		path: sourcePath,
-		settings: status === 'loaded' ? cleanSettings : {},
+		settings: status === 'loaded' ? { ...settings } : {},
 		source,
 		status,
 	};
@@ -688,8 +687,7 @@ function getLoadedSettingsForStatus(
 }
 
 /**
- * Merges `source` into `target` in place, preserving and concatenating the
- * internal `__diagnostics` carrier and deep-merging `scripts`.
+ * Merges `source` into `target` in place, deep-merging the `scripts` block.
  * @param target - Settings record to update.
  * @param source - Partial settings to merge in.
  */
@@ -697,16 +695,6 @@ function mergeSettings(
 	target: Record<string, unknown>,
 	source: Record<string, unknown>,
 ): void {
-	const diagnostics = source.__diagnostics;
-
-	if (Array.isArray(diagnostics)) {
-		target.__diagnostics = [
-			...((target.__diagnostics as ConfigDiagnostic[] | undefined) ?? []),
-			...diagnostics,
-		];
-		delete source.__diagnostics;
-	}
-
 	for (const [key, value] of Object.entries(source)) {
 		if (
 			key === 'scripts' &&
@@ -719,36 +707,6 @@ function mergeSettings(
 
 		target[key] = value;
 	}
-}
-
-/**
- * Attaches a diagnostic to a settings record via the internal `__diagnostics`
- * carrier so it can be hoisted later by {@link takeNestedDiagnostics}.
- * @param settings - Settings record being normalised.
- * @param diagnostic - Diagnostic to append.
- */
-function pushNestedDiagnostic(
-	settings: Record<string, unknown>,
-	diagnostic: ConfigDiagnostic,
-): void {
-	settings.__diagnostics = [
-		...((settings.__diagnostics as ConfigDiagnostic[] | undefined) ?? []),
-		diagnostic,
-	];
-}
-
-/**
- * Extracts and removes accumulated nested diagnostics from a settings record.
- * @param settings - Settings record to drain.
- * @returns The previously-collected diagnostics.
- */
-function takeNestedDiagnostics(
-	settings: Record<string, unknown>,
-): ConfigDiagnostic[] {
-	const diagnostics = settings.__diagnostics;
-	delete settings.__diagnostics;
-
-	return Array.isArray(diagnostics) ? diagnostics : [];
 }
 
 /**
@@ -820,5 +778,55 @@ function formatRepositoryDisplayPath(
 function isStringArray(value: unknown): value is string[] {
 	return (
 		Array.isArray(value) && value.every((item) => typeof item === 'string')
+	);
+}
+
+/**
+ * Returns whether the repository path is currently tracked (as either a
+ * repository or a workspace), gating repository-config IPC writes.
+ *
+ * Lives alongside config loading because authorization is the same boundary
+ * concern: gating which repository paths the renderer can read or write.
+ * @param options - Open database and candidate path.
+ * @returns True when the path matches a tracked entry.
+ */
+export function isRepositoryConfigPathAllowed({
+	database,
+	repositoryPath,
+}: RepositoryConfigPathAuthorizationOptions): boolean {
+	if (!database || !repositoryPath.trim()) {
+		return false;
+	}
+
+	const resolvedRepositoryPath = path.resolve(repositoryPath);
+
+	try {
+		const row = database
+			.prepare(
+				`
+SELECT path FROM repositories WHERE path = ?
+UNION
+SELECT path FROM workspaces WHERE path = ?
+LIMIT 1
+`,
+			)
+			.get(resolvedRepositoryPath, resolvedRepositoryPath);
+
+		return isPathRow(row);
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Type guard for the `SELECT path FROM ...` shape returned by
+ * {@link isRepositoryConfigPathAllowed}.
+ */
+function isPathRow(row: unknown): row is { path: string } {
+	return (
+		typeof row === 'object' &&
+		row !== null &&
+		'path' in row &&
+		typeof row.path === 'string'
 	);
 }

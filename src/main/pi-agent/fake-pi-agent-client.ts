@@ -169,7 +169,7 @@ function createSessionEntry({
 			updateMetadata({ status: 'streaming' });
 			emit({
 				at: acknowledgement.acceptedAt,
-				payload: { prompt: request.prompt },
+				payload: { kind: 'prompt', prompt: request.prompt },
 				role: 'user',
 				turnId: acknowledgement.turnId,
 				type: 'message',

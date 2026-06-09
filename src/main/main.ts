@@ -12,12 +12,10 @@ import {
 import { createEnvironmentVariablesService } from './environment';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
-import { createPiExecutableService, createPiReadinessService } from './pi';
-import {
-	createCliRpcPiAgentAdapter,
-	createPiAgentClient,
-} from './pi-agent';
+import { createPiExecutableService, createPiReadinessService } from './pi-runtime';
+import { createCliRpcPiAgentAdapter, createPiAgentClient } from './pi-agent';
 import { createPiSessionService } from './pi-agent/pi-session-service';
+import { createSessionSummaryWriter } from './pi-agent/session-summary-writer';
 import {
 	createArchiveLifecycleService,
 	createArchiveRepositoryService,
@@ -83,6 +81,20 @@ const piReadinessService = createPiReadinessService({
 });
 const piAgentAdapter = createCliRpcPiAgentAdapter();
 const piAgentClient = createPiAgentClient({ adapter: piAgentAdapter });
+const summaryPiAgentAdapter = createCliRpcPiAgentAdapter();
+const summaryPiAgentClient = createPiAgentClient({
+	adapter: summaryPiAgentAdapter,
+});
+const sessionSummaryWriter = createSessionSummaryWriter({
+	piAgentClient: summaryPiAgentClient,
+	resolveExecutable: async () => {
+		const snapshot = await piExecutableService.getSnapshot();
+		if (snapshot.status === 'error' || !snapshot.command) {
+			return null;
+		}
+		return snapshot;
+	},
+});
 const piSessionService = createPiSessionService({
 	databaseService,
 	eventSink: ({ event, sessionId, workspaceId }) => {
@@ -211,6 +223,7 @@ app.whenReady().then(() => {
 		renameWorkspaceService,
 		repositoryConfigService,
 		rootDirectoryService,
+		sessionSummaryWriter,
 		setupDiagnosticsService,
 		settingsResolutionService,
 		sharedRootAdoptionService,

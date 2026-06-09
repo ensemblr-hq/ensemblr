@@ -41,6 +41,7 @@ import type {
 	SharedRootAdoptionService,
 	UnarchiveWorkspaceService,
 } from '../../repository';
+import { withPermissionGate } from '../permission-gate.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the local-repository IPC handlers. */
@@ -110,10 +111,8 @@ export function registerRepositoryHandlers({
 
 	ipcMain.handle(
 		IPC_CHANNELS.createWorkspace,
-		(
-			_event,
-			request: CreateWorkspaceRequest,
-		): Promise<CreateWorkspaceResult> => createWorkspaceService.create(request),
+		(_event, request: CreateWorkspaceRequest): Promise<CreateWorkspaceResult> =>
+			createWorkspaceService.create(request),
 	);
 
 	ipcMain.handle(
@@ -124,10 +123,8 @@ export function registerRepositoryHandlers({
 
 	ipcMain.handle(
 		IPC_CHANNELS.renameWorkspace,
-		(
-			_event,
-			request: RenameWorkspaceRequest,
-		): Promise<RenameWorkspaceResult> => renameWorkspaceService.rename(request),
+		(_event, request: RenameWorkspaceRequest): Promise<RenameWorkspaceResult> =>
+			renameWorkspaceService.rename(request),
 	);
 
 	ipcMain.handle(
@@ -139,8 +136,9 @@ export function registerRepositoryHandlers({
 			archiveWorkspaceService.archive(request),
 	);
 
-	ipcMain.handle(
+	withPermissionGate(
 		IPC_CHANNELS.archiveRepository,
+		'repository-removal',
 		(
 			_event,
 			request: ArchiveRepositoryRequest,
@@ -150,14 +148,13 @@ export function registerRepositoryHandlers({
 
 	ipcMain.handle(
 		IPC_CHANNELS.deleteWorkspace,
-		(
-			_event,
-			request: DeleteWorkspaceRequest,
-		): Promise<DeleteWorkspaceResult> => deleteWorkspaceService.delete(request),
+		(_event, request: DeleteWorkspaceRequest): Promise<DeleteWorkspaceResult> =>
+			deleteWorkspaceService.delete(request),
 	);
 
-	ipcMain.handle(
+	withPermissionGate(
 		IPC_CHANNELS.deleteRepository,
+		'repository-removal',
 		(
 			_event,
 			request: DeleteRepositoryRequest,
@@ -183,8 +180,9 @@ export function registerRepositoryHandlers({
 			unarchiveWorkspaceService.unarchive(request),
 	);
 
-	ipcMain.handle(
+	withPermissionGate(
 		IPC_CHANNELS.deleteArchivedWorkspace,
+		'workspace-archive-delete',
 		(
 			_event,
 			request: DeleteArchivedWorkspaceRequest,

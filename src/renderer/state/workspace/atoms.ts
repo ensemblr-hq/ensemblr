@@ -49,16 +49,6 @@ export const pinnedWorkspaceIdsAtom = atomWithStorage<string[]>(
 	workspaceStorageOptions,
 );
 
-/** Persisted closed session-tab ids, keyed by workspace id. */
-export const closedSessionIdsByWorkspaceAtom = atomWithStorage<
-	Record<string, string[]>
->(
-	'ensemble_workspace_closed_session_ids_by_workspace',
-	{},
-	undefined,
-	workspaceStorageOptions,
-);
-
 /** Persisted display mode for the changes panel (list vs. tree). */
 export const changesViewModeAtom = atomWithStorage<ChangesViewMode>(
 	'ensemble_workspace_changes_view_mode',
@@ -108,6 +98,26 @@ export const activeChatTabByWorkspaceAtom = atomWithStorage<
 	Record<string, string>
 >(
 	'ensemble_workspace_active_chat_tab_by_workspace',
+	{},
+	undefined,
+	workspaceStorageOptions,
+);
+
+/** Persisted Pi model selection keyed by workspace id (survives reloads). */
+export const selectedPiModelByWorkspaceAtom = atomWithStorage<
+	Record<string, string>
+>(
+	'ensemble_workspace_selected_pi_model_by_workspace',
+	{},
+	undefined,
+	workspaceStorageOptions,
+);
+
+/** Persisted Pi thinking-level selection keyed by workspace id. */
+export const selectedPiThinkingLevelByWorkspaceAtom = atomWithStorage<
+	Record<string, string>
+>(
+	'ensemble_workspace_selected_pi_thinking_by_workspace',
 	{},
 	undefined,
 	workspaceStorageOptions,

@@ -10,11 +10,11 @@ import type { EnvironmentVariablesService } from '../../src/main/environment/env
 import type {
 	PiExecutableService,
 	PiExecutableSnapshot,
-} from '../../src/main/pi/pi-executable.ts';
+} from '../../src/main/pi-runtime/pi-executable.ts';
 import type {
 	PiReadinessService,
 	PiReadinessSnapshot,
-} from '../../src/main/pi/pi-readiness.ts';
+} from '../../src/main/pi-runtime/pi-readiness.ts';
 import type { EnsembleRootDirectoryService } from '../../src/main/root/root-directory-service.ts';
 import {
 	createSetupCheckSnapshot,

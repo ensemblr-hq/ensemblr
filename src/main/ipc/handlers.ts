@@ -5,8 +5,9 @@ import type {
 	RepositoryConfigService,
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
-import type { PiExecutableService } from '../pi';
+import type { PiExecutableService } from '../pi-runtime';
 import type { PiSessionService } from '../pi-agent/pi-session-service';
+import type { SessionSummaryWriter } from '../pi-agent/session-summary-writer';
 import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
@@ -26,6 +27,7 @@ import type {
 import type { EnsembleRootDirectoryService } from '../root';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsembleDatabaseService } from '../storage';
+import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCloneHandlers } from './handlers/clone';
 import { registerEnvironmentHandlers } from './handlers/environment';
 import { registerHealthHandlers } from './handlers/health';
@@ -61,6 +63,7 @@ interface RegisterIpcHandlersOptions {
 	renameWorkspaceService: RenameWorkspaceService;
 	repositoryConfigService: RepositoryConfigService;
 	rootDirectoryService: EnsembleRootDirectoryService;
+	sessionSummaryWriter: SessionSummaryWriter;
 	sharedRootAdoptionService: SharedRootAdoptionService;
 	setupDiagnosticsService: SetupDiagnosticsService;
 	settingsResolutionService: EnsembleConfigResolutionService;
@@ -94,6 +97,7 @@ export function registerIpcHandlers({
 	renameWorkspaceService,
 	repositoryConfigService,
 	rootDirectoryService,
+	sessionSummaryWriter,
 	setupDiagnosticsService,
 	settingsResolutionService,
 	sharedRootAdoptionService,
@@ -133,5 +137,6 @@ export function registerIpcHandlers({
 		piExecutableService,
 		piSessionService,
 	});
+	registerChatTabHandlers({ databaseService, sessionSummaryWriter });
 	registerSetupHandlers({ setupDiagnosticsService });
 }

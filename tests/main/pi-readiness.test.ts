@@ -18,14 +18,14 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../../src/main/commands/local-command.ts';
-import type { PiExecutableSnapshot } from '../../src/main/pi/pi-executable.ts';
+import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 import {
 	parsePiListModelsOutput,
 	resolvePiAgentDirectory,
 	resolvePiProviderModels,
 	resolvePiRpcSmoke,
 	runPiRpcSmokeProcess,
-} from '../../src/main/pi/pi-readiness.ts';
+} from '../../src/main/pi-runtime/pi-readiness.ts';
 
 const NOW = new Date('2026-06-05T00:00:00.000Z');
 const RPC_KILL_GRACE_MS = 25;

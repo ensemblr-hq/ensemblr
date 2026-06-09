@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
 	type ChildLike,
 	createCliRpcPiAgentAdapter,
+	normalizePiPayload,
 	type SpawnFn,
 } from '../../src/main/pi-agent/cli-rpc-pi-agent-adapter.ts';
 import type {
@@ -265,7 +266,7 @@ test('abort signals SIGINT then SIGKILL after the grace window', async () => {
 	child.emitExit(null, 'SIGKILL');
 });
 
-test('submit writes a JSONL frame to stdin, emits user message, returns turn id', async () => {
+test('submit writes a JSONL frame to stdin and waits for Pi user echo', async () => {
 	let turnCounter = 0;
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({
@@ -289,12 +290,26 @@ test('submit writes a JSONL frame to stdin, emits user message, returns turn id'
 	assert.match(stdinChunks[0]!, /"message":"do the thing"/);
 	assert.match(stdinChunks[0]!, /\n$/);
 
+	const syntheticUserMessage = events.find(
+		(event): event is Extract<PiAgentEvent, { type: 'message' }> =>
+			event.type === 'message' && event.role === 'user',
+	);
+	assert.equal(syntheticUserMessage, undefined);
+
+	child.emitStdout(
+		'{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"do the thing"}]}}\n',
+	);
 	const userMessage = events.find(
 		(event): event is Extract<PiAgentEvent, { type: 'message' }> =>
 			event.type === 'message' && event.role === 'user',
 	);
 	assert.ok(userMessage);
-	assert.equal(userMessage.turnId, 'turn-1');
+	assert.equal(userMessage.turnId, 'pending');
+	assert.deepEqual(userMessage.payload, {
+		kind: 'message',
+		parts: [{ kind: 'text', text: 'do the thing' }],
+		role: 'user',
+	});
 	await adapter.shutdown();
 });
 
@@ -367,4 +382,81 @@ test('oversize line drops cleanly and reports recoverable error', async () => {
 	const status = events.find((event) => event.type === 'status');
 	assert.ok(status);
 	await adapter.shutdown();
+});
+
+test('normalizePiPayload projects message_end frames into a composite message', () => {
+	const result = normalizePiPayload({
+		message: {
+			content: [
+				{ text: 'Plan', thinking: 'Plan', type: 'thinking' },
+				{ text: 'Answer', type: 'text' },
+				{
+					arguments: { command: 'ls' },
+					id: 'call-1',
+					name: 'bash',
+					type: 'toolCall',
+				},
+			],
+			role: 'assistant',
+		},
+		type: 'message_end',
+	});
+
+	assert.deepEqual(result, {
+		kind: 'message',
+		parts: [
+			{ kind: 'reasoning', text: 'Plan' },
+			{ kind: 'text', text: 'Answer' },
+			{
+				input: { command: 'ls' },
+				kind: 'tool-call',
+				name: 'bash',
+				toolCallId: 'call-1',
+			},
+		],
+		role: 'assistant',
+	});
+});
+
+test('normalizePiPayload maps tool_execution_end to a tool-result variant', () => {
+	const result = normalizePiPayload({
+		isError: false,
+		result: { content: [{ text: 'ok', type: 'text' }] },
+		toolCallId: 'call-99',
+		toolName: 'bash',
+		type: 'tool_execution_end',
+	});
+
+	assert.deepEqual(result, {
+		isError: false,
+		kind: 'tool-result',
+		output: { content: [{ text: 'ok', type: 'text' }] },
+		toolCallId: 'call-99',
+	});
+});
+
+test('normalizePiPayload maps tool_execution_start to a tool-call variant', () => {
+	const result = normalizePiPayload({
+		args: { path: '/tmp' },
+		toolCallId: 'call-1',
+		toolName: 'read',
+		type: 'tool_execution_start',
+	});
+
+	assert.deepEqual(result, {
+		input: { path: '/tmp' },
+		kind: 'tool-call',
+		name: 'read',
+		toolCallId: 'call-1',
+	});
+});
+
+test('normalizePiPayload falls through to an unknown envelope for unrecognized frames', () => {
+	const result = normalizePiPayload({ type: 'mystery-frame', wat: 1 });
+
+	assert.deepEqual(result, {
+		frameType: 'mystery-frame',
+		kind: 'unknown',
+		raw: { type: 'mystery-frame', wat: 1 },
+	});
 });

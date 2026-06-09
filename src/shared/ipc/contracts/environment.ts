@@ -64,3 +64,8 @@ export interface EnvironmentVariablesSnapshot {
 	requiredCount: number;
 	variables: EnvironmentVariableSnapshot[];
 }
+
+/** Environment-variable inspection IPC surface. */
+export interface EnvironmentApi {
+	environmentVariables: () => Promise<EnvironmentVariablesSnapshot>;
+}

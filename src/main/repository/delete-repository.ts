@@ -12,6 +12,7 @@ import type {
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { withTransaction } from '../storage/tx.ts';
 import { ARCHIVED_REPOSITORY_MARKER } from './archived-marker.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
 
@@ -242,17 +243,12 @@ function deleteRepositoryRows({
 	database: DatabaseSync;
 	repositoryId: string;
 }): void {
-	database.exec('BEGIN');
-	try {
+	withTransaction(database, () => {
 		database
 			.prepare('DELETE FROM workspaces WHERE repository_id = ?')
 			.run(repositoryId);
 		database.prepare('DELETE FROM repositories WHERE id = ?').run(repositoryId);
-		database.exec('COMMIT');
-	} catch (error) {
-		database.exec('ROLLBACK');
-		throw error;
-	}
+	});
 }
 
 function writeArchivedMarker({

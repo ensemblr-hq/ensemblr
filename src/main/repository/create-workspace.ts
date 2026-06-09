@@ -19,6 +19,7 @@ import {
 } from '../config/repository-config.ts';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { withTransaction } from '../storage/tx.ts';
 import {
 	createFilesToCopyService,
 	type FilesToCopyService,
@@ -202,9 +203,13 @@ export function createWorkspaceService({
 			});
 
 			const timestamp = now().toISOString();
+			const initialMetadata = buildInitialWorkspaceMetadata({
+				filesToCopySnapshot,
+			});
 			try {
 				insertWorkspaceRow({
 					database,
+					metadataJson: JSON.stringify(initialMetadata),
 					prepared,
 					timestamp,
 				});
@@ -240,7 +245,7 @@ export function createWorkspaceService({
 				branchName: prepared.branchName,
 				createdAt: timestamp,
 				id: prepared.id,
-				metadata: {},
+				metadata: initialMetadata,
 				name: prepared.name,
 				path: prepared.path,
 				repositoryId: repository.id,
@@ -617,18 +622,38 @@ function cleanupDirectory(workspacePath: string): void {
 	}
 }
 
+/**
+ * Builds the initial workspace metadata record stored under `metadata_json`,
+ * capturing the files-to-copy outcome so the renderer landing card can show
+ * the actual copied-file count without recomputing the snapshot.
+ */
+function buildInitialWorkspaceMetadata({
+	filesToCopySnapshot,
+}: {
+	filesToCopySnapshot: FilesToCopySnapshot;
+}): Record<string, unknown> {
+	return {
+		filesToCopy: {
+			copiedCount: filesToCopySnapshot.copied.length,
+			skippedCount: filesToCopySnapshot.skipped.length,
+			source: filesToCopySnapshot.source,
+		},
+	};
+}
+
 /** Inserts a `workspaces` row inside a single transaction. */
 function insertWorkspaceRow({
 	database,
+	metadataJson,
 	prepared,
 	timestamp,
 }: {
 	database: DatabaseSync;
+	metadataJson: string;
 	prepared: PreparedWorkspace;
 	timestamp: string;
 }): void {
-	database.exec('BEGIN');
-	try {
+	withTransaction(database, () => {
 		database
 			.prepare(
 				`INSERT INTO workspaces (
@@ -655,13 +680,9 @@ function insertWorkspaceRow({
 				prepared.baseBranch,
 				timestamp,
 				timestamp,
-				'{}',
+				metadataJson,
 			);
-		database.exec('COMMIT');
-	} catch (error) {
-		database.exec('ROLLBACK');
-		throw error;
-	}
+	});
 }
 
 /** Type guard for repository rows returned by the lookup query. */

@@ -3,8 +3,6 @@ import { ipcMain } from 'electron';
 import {
 	type CloneDestinationSelectionResult,
 	type CloneGithubRepositoryPrepareResult,
-	type CloneGithubRepositoryRequest,
-	type CloneGithubRepositoryStartRequest,
 	type CloneGithubRepositoryStartResult,
 	type GithubRepositoryListResult,
 	IPC_CHANNELS,
@@ -13,6 +11,10 @@ import type {
 	GithubCloneService,
 	GithubRepositoryListService,
 } from '../../repository';
+import {
+	parseCloneGithubRepositoryRequest,
+	parseCloneGithubRepositoryStartRequest,
+} from '../request-schemas.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the GitHub clone IPC handlers. */
@@ -53,7 +55,7 @@ export function registerCloneHandlers({
 		IPC_CHANNELS.cloneGithubRepositoryPrepare,
 		(_event, request: unknown): Promise<CloneGithubRepositoryPrepareResult> => {
 			return githubCloneService.prepare(
-				normalizeCloneGithubRepositoryRequest(request),
+				parseCloneGithubRepositoryRequest(request),
 			);
 		},
 	);
@@ -61,7 +63,7 @@ export function registerCloneHandlers({
 	ipcMain.handle(
 		IPC_CHANNELS.cloneGithubRepositoryStart,
 		(event, request: unknown): Promise<CloneGithubRepositoryStartResult> => {
-			const normalized = normalizeCloneGithubRepositoryStartRequest(request);
+			const normalized = parseCloneGithubRepositoryStartRequest(request);
 			return githubCloneService.start(normalized, {
 				onProgress: (payload) => {
 					if (event.sender.isDestroyed()) {
@@ -75,38 +77,4 @@ export function registerCloneHandlers({
 			});
 		},
 	);
-}
-
-/** Coerces an IPC payload into a {@link CloneGithubRepositoryRequest}. */
-function normalizeCloneGithubRepositoryRequest(
-	request: unknown,
-): CloneGithubRepositoryRequest {
-	if (typeof request !== 'object' || request === null) {
-		return { url: '' };
-	}
-
-	const url =
-		'url' in request && typeof request.url === 'string' ? request.url : '';
-	const destinationPath =
-		'destinationPath' in request && typeof request.destinationPath === 'string'
-			? request.destinationPath
-			: undefined;
-
-	return destinationPath !== undefined ? { destinationPath, url } : { url };
-}
-
-/** Coerces an IPC payload into a {@link CloneGithubRepositoryStartRequest}. */
-function normalizeCloneGithubRepositoryStartRequest(
-	request: unknown,
-): CloneGithubRepositoryStartRequest {
-	if (
-		typeof request !== 'object' ||
-		request === null ||
-		!('jobId' in request) ||
-		typeof request.jobId !== 'string'
-	) {
-		return { jobId: '' };
-	}
-
-	return { jobId: request.jobId };
 }
