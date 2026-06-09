@@ -10,6 +10,7 @@
 		"maxSize": 200000,
 		"includes": [
 			"**",
+			"!.agents/skills/ai-elements/scripts",
 			"!src/components/ui",
 			"!src/hooks/ui",
 			"!src/renderer/routing/routeTree.gen.ts"
