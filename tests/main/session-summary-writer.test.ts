@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 import type {
 	PiAgentClient,
 	PiAgentSession,
@@ -200,6 +201,41 @@ test('falls back deterministically when the ephemeral Pi session throws', async 
 	assert.match(contents, /# Investigate flaky test/);
 });
 
+test('writes the deterministic transcript before waiting on LLM summary', async (t) => {
+	const workspaceCwd = makeWorkspaceDir(t);
+	const writer = createSessionSummaryWriter({
+		piAgentClient: makeHangingAgentClient().client,
+		resolveExecutable: async () => makeFakeExecutable(),
+		timeoutMs: 50,
+	});
+
+	const pending = writer.writeSessionSummary({
+		branchId: 'branch-1',
+		chatTabId: 'tab-live-safe',
+		closedAt: '2026-01-04T00:00:00.000Z',
+		events: [
+			makeUserEvent('Persist the transcript immediately', 't-1'),
+			makeAgentEvent('Transcript is safely written first', 't-1'),
+		],
+		piSessionId: 'pi-session-live',
+		workspaceCwd,
+	});
+
+	const filePath = path.join(
+		workspaceCwd,
+		'.context',
+		'sessions',
+		'tab-live-safe.md',
+	);
+	await delay(5);
+	const liveContents = readFileSync(filePath, 'utf8');
+	assert.match(liveContents, /# Persist the transcript immediately/);
+	assert.match(liveContents, /Transcript is safely written first/);
+
+	const result = await pending;
+	assert.equal(result.usedLlm, false);
+});
+
 test('produces an LLM summary when the ephemeral session emits agent messages', async (t) => {
 	const workspaceCwd = makeWorkspaceDir(t);
 	let submittedPrompt: string | null = null;
@@ -239,6 +275,43 @@ test('produces an LLM summary when the ephemeral session emits agent messages', 
 	assert.match(contents, /# Refactor auth providers/);
 	assert.match(contents, /- Extract `AuthService`/);
 });
+
+function makeHangingAgentClient(): { client: PiAgentClient } {
+	const sessionId = 'session-hanging';
+	const metadata: PiAgentSessionMetadata = {
+		args: ['--mode', 'rpc'],
+		command: '/fake/pi',
+		cwd: '/fake/cwd',
+		env: {},
+		id: sessionId,
+		label: 'ensemble-session-summary',
+		model: null,
+		piAgentDirectoryPreserved: true,
+		sessionId: null,
+		startedAt: '2026-01-04T00:00:00.000Z',
+		status: 'starting',
+		thinking: null,
+		updatedAt: '2026-01-04T00:00:00.000Z',
+	};
+	const session: PiAgentSession = {
+		abort: async () => undefined,
+		close: async () => undefined,
+		getMetadata: () => metadata,
+		id: sessionId,
+		subscribe: (): PiAgentSubscription => ({ unsubscribe: () => undefined }),
+		submit: async () => ({
+			acceptedAt: '2026-01-04T00:00:00.500Z',
+			turnId: 'turn-hanging',
+		}),
+	};
+	return {
+		client: {
+			createSession: async () => session,
+			listSessions: () => [session],
+			shutdown: async () => undefined,
+		},
+	};
+}
 
 interface FakeAgentClientOptions {
 	onSubmit?: (request: PiAgentSubmitRequest) => void;

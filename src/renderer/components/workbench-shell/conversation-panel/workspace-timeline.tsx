@@ -44,13 +44,11 @@ export function WorkspaceTimeline({
 	if (piSessionId) {
 		return (
 			<div className='flex min-h-0 flex-1 flex-col'>
-				<div className='mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-4 pb-5'>
-					<PiSessionTimeline
-						activePiSessionId={composer.activePiSessionId}
-						activeSession={activeSession}
-						workspace={workspace}
-					/>
-				</div>
+				<PiSessionTimeline
+					activePiSessionId={composer.activePiSessionId}
+					activeSession={activeSession}
+					workspace={workspace}
+				/>
 			</div>
 		);
 	}

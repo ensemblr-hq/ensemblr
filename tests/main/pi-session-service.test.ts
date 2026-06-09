@@ -10,13 +10,19 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { createFakePiAgentAdapter } from '../../src/main/pi-agent/fake-pi-agent-client.ts';
 import { createPiAgentClient } from '../../src/main/pi-agent/pi-agent-client.ts';
 import { createPiSessionService } from '../../src/main/pi-agent/pi-session-service.ts';
+import type {
+	SessionSummaryWriter,
+	WriteSessionSummaryInput,
+} from '../../src/main/pi-agent/session-summary-writer.ts';
 import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
 import {
+	getChatTabById,
 	listOpenChatTabs,
 	openChatTab,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
 import { listEventsByBranch } from '../../src/main/storage/repositories/pi-event-repository.ts';
+import { getPiSessionById } from '../../src/main/storage/repositories/pi-session-repository.ts';
 
 function openFixture(t: import('node:test').TestContext): {
 	database: DatabaseSync;
@@ -55,7 +61,10 @@ function createReadyExecutable(): PiExecutableSnapshot {
 
 function createService(
 	database: DatabaseSync,
-	options: { chatTitleTimeoutMs?: number } = {},
+	options: {
+		chatTitleTimeoutMs?: number;
+		sessionSummaryWriter?: SessionSummaryWriter;
+	} = {},
 ) {
 	const fake = createFakePiAgentAdapter();
 	const piAgentClient = createPiAgentClient({ adapter: fake.adapter });
@@ -68,6 +77,7 @@ function createService(
 			open: () => ({ path: ':memory:', schemaVersion: 5, status: 'ok' }),
 		},
 		piAgentClient,
+		sessionSummaryWriter: options.sessionSummaryWriter,
 	});
 	return { fake, service };
 }
@@ -89,6 +99,19 @@ async function waitForTabTitle({
 		await delay(5);
 	}
 	assert.equal(listOpenChatTabs({ database, workspaceId })[0]?.title, title);
+}
+
+async function waitForSummaryCalls(
+	calls: readonly WriteSessionSummaryInput[],
+	count: number,
+): Promise<void> {
+	for (let attempt = 0; attempt < 40; attempt += 1) {
+		if (calls.length >= count) {
+			return;
+		}
+		await delay(5);
+	}
+	assert.equal(calls.length, count);
 }
 
 test('openSession persists a pi_sessions row plus a main branch', async (t) => {
@@ -166,6 +189,60 @@ test('chat title timeout uses first prompt words as fallback', async (t) => {
 	assert.ok(events.some((event) => event.eventType === 'metadata'));
 });
 
+test('openSession persists and launches with a native Pi session id', async (t) => {
+	const fixture = openFixture(t);
+	const { fake, service } = createService(fixture.database);
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	const row = getPiSessionById({
+		database: fixture.database,
+		id: snapshot.id,
+	});
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(row?.piSessionId);
+	assert.equal(snapshot.runtimeOpen, true);
+	assert.equal(runtime?.getMetadata().sessionId, row.piSessionId);
+	assert.deepEqual(runtime?.getMetadata().args.slice(-2), [
+		'--session-id',
+		row.piSessionId,
+	]);
+});
+
+test('openSession resumes a closed persisted session before submit', async (t) => {
+	const fixture = openFixture(t);
+	const { fake, service } = createService(fixture.database);
+
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const nativeSessionId = first.piSessionId;
+	await service.shutdown();
+
+	const resumed = await service.openSession({
+		executable: createReadyExecutable(),
+		resumeSessionId: first.id,
+		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({
+		prompt: 'continue work',
+		sessionId: resumed.id,
+	});
+
+	const runtime = fake.getOpenSessions()[0];
+	assert.equal(resumed.id, first.id);
+	assert.equal(resumed.runtimeOpen, true);
+	assert.equal(runtime?.getMetadata().sessionId, nativeSessionId);
+	assert.equal(runtime?.getRequests()[0]?.prompt, 'continue work');
+});
+
 test('submitPrompt creates a turn and forwards to the runtime session', async (t) => {
 	const fixture = openFixture(t);
 	const { fake, service } = createService(fixture.database);
@@ -219,6 +296,67 @@ test('runtime events are mirrored into pi_session_events', async (t) => {
 		database: fixture.database,
 	});
 	assert.ok(events.some((event) => event.eventType === 'message'));
+});
+
+test('updates the chat summary as soon as an agent response lands', async (t) => {
+	const fixture = openFixture(t);
+	const summaryCalls: WriteSessionSummaryInput[] = [];
+	const sessionSummaryWriter: SessionSummaryWriter = {
+		writeSessionSummary: async (input) => {
+			summaryCalls.push(input);
+			return {
+				path: `${input.workspaceCwd}/.context/sessions/${input.chatTabId}.md`,
+				title: 'Live summary',
+				usedLlm: false,
+			};
+		},
+	};
+	const { fake, service } = createService(fixture.database, {
+		sessionSummaryWriter,
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({
+		prompt: 'summarize after this turn',
+		sessionId: snapshot.id,
+	});
+
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	runtime.emit({
+		at: '2026-06-08T00:00:01.000Z',
+		payload: { kind: 'text', text: 'agent reply' },
+		role: 'agent',
+		turnId: 'fake-turn',
+		type: 'message',
+	});
+	await waitForSummaryCalls(summaryCalls, 1);
+
+	const summaryInput = summaryCalls[0];
+	assert.ok(summaryInput);
+	const tabId = snapshot.openedTabs[0]?.id;
+	assert.equal(summaryInput.chatTabId, tabId);
+	assert.equal(summaryInput.branchId, snapshot.branchId);
+	const summaryMessages = summaryInput.events.filter(
+		(event) => event.payload?.kind === 'message',
+	);
+	assert.equal(summaryMessages.length, 2);
+	assert.deepEqual(
+		summaryMessages.map((event) => event.payload?.kind),
+		['message', 'message'],
+	);
+	const tab = tabId
+		? getChatTabById({ database: fixture.database, id: tabId })
+		: null;
+	assert.deepEqual(tab?.metadata.summary, {
+		path: `/tmp/ensemble/svc/ws/.context/sessions/${tabId}.md`,
+		title: 'Live summary',
+		usedLlm: false,
+	});
 });
 
 test('stopSession aborts the runtime and marks the turn aborted', async (t) => {

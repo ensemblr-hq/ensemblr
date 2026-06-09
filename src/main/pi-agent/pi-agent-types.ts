@@ -1,3 +1,7 @@
+import type {
+	PiWireMessagePart,
+	PiWireMessagePayload,
+} from '../../shared/ipc/contracts/pi-session.ts';
 import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
 
 /** Stable identifier for a Pi agent session within the main process. */
@@ -83,6 +87,8 @@ export interface PiAgentSessionRequest {
 	modelOverride?: string | null;
 	/** Optional human-readable label attached to session metadata for logs. */
 	label?: string;
+	/** Native Pi session id to create or resume with `pi --session-id`. */
+	piSessionId?: string | null;
 }
 
 /** Inline or referenced attachment included with a prompt submission. */
@@ -118,35 +124,14 @@ export interface PiAgentSubmitAcknowledgement {
  *   message      — composite assistant/user message (multi-part content)
  *   prompt       — synthetic submit-side user echo carrying the original prompt
  *   unknown      — forward-compatible passthrough for frames we have not modelled
+ *
+ * The shared `PiWireMessagePart`/`PiWireMessagePayload` aliases are the
+ * canonical boundary types. Main-process and renderer code reference them by
+ * either name with full structural parity guaranteed by the type system.
  */
-export type PiAgentMessagePart =
-	| { kind: 'text'; text: string }
-	| { kind: 'reasoning'; text: string }
-	| { kind: 'tool-call'; input: unknown; name: string; toolCallId: string }
-	| {
-			kind: 'tool-result';
-			isError: boolean;
-			output: unknown;
-			toolCallId: string;
-	  };
+export type PiAgentMessagePart = PiWireMessagePart;
 
-export type PiAgentMessagePayload =
-	| { kind: 'text'; text: string }
-	| { kind: 'reasoning'; text: string }
-	| { input: unknown; kind: 'tool-call'; name: string; toolCallId: string }
-	| {
-			isError: boolean;
-			kind: 'tool-result';
-			output: unknown;
-			toolCallId: string;
-	  }
-	| {
-			kind: 'message';
-			parts: readonly PiAgentMessagePart[];
-			role: 'assistant' | 'user';
-	  }
-	| { kind: 'prompt'; prompt: string }
-	| { kind: 'unknown'; frameType: string; raw: unknown };
+export type PiAgentMessagePayload = PiWireMessagePayload;
 
 /** Discriminated event stream emitted by a session. */
 export type PiAgentEvent =

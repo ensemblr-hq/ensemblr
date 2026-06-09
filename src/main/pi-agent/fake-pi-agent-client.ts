@@ -21,6 +21,7 @@ import type {
  */
 export interface FakePiAgentAdapterSessionController {
 	emit: (event: PiAgentEvent) => void;
+	getMetadata: () => PiAgentSessionMetadata;
 	getRequests: () => readonly PiAgentSubmitRequest[];
 	getStatus: () => PiAgentSessionStatus;
 	id: PiAgentSessionId;
@@ -180,6 +181,7 @@ function createSessionEntry({
 
 	const controller: FakePiAgentAdapterSessionController = {
 		emit: (event) => emit(event),
+		getMetadata: () => metadata,
 		getRequests: () => requests.slice(),
 		getStatus: () => metadata.status,
 		id: session.id,

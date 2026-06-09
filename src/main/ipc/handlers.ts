@@ -6,7 +6,6 @@ import type {
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
 import type { PiSessionService } from '../pi-agent/pi-session-service';
-import type { SessionSummaryWriter } from '../pi-agent/session-summary-writer';
 import type { PiExecutableService } from '../pi-runtime';
 import type {
 	ArchiveRepositoryService,
@@ -63,7 +62,6 @@ interface RegisterIpcHandlersOptions {
 	renameWorkspaceService: RenameWorkspaceService;
 	repositoryConfigService: RepositoryConfigService;
 	rootDirectoryService: EnsembleRootDirectoryService;
-	sessionSummaryWriter: SessionSummaryWriter;
 	sharedRootAdoptionService: SharedRootAdoptionService;
 	setupDiagnosticsService: SetupDiagnosticsService;
 	settingsResolutionService: EnsembleConfigResolutionService;
@@ -97,7 +95,6 @@ export function registerIpcHandlers({
 	renameWorkspaceService,
 	repositoryConfigService,
 	rootDirectoryService,
-	sessionSummaryWriter,
 	setupDiagnosticsService,
 	settingsResolutionService,
 	sharedRootAdoptionService,
@@ -137,6 +134,6 @@ export function registerIpcHandlers({
 		piExecutableService,
 		piSessionService,
 	});
-	registerChatTabHandlers({ databaseService, sessionSummaryWriter });
+	registerChatTabHandlers({ databaseService });
 	registerSetupHandlers({ setupDiagnosticsService });
 }

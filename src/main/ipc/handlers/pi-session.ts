@@ -70,6 +70,7 @@ export function registerPiSessionHandlers({
 					initialPrompt: request.initialPrompt ?? null,
 					label: request.label,
 					model: request.model ?? null,
+					resumeSessionId: request.resumeSessionId ?? null,
 					thinkingLevel: request.thinkingLevel ?? null,
 					workspaceCwd: request.workspaceCwd,
 					workspaceId: request.workspaceId,

@@ -10,6 +10,10 @@ import type {
 type UIRole = UIMessage['role'];
 
 type UIMessagePart = UIMessage['parts'][number];
+type DynamicToolOutputPart = Extract<
+	DynamicToolUIPart,
+	{ state: 'output-available' | 'output-error' }
+>;
 
 /**
  * Converts the persisted Pi RPC event stream into the AI SDK `UIMessage` shape
@@ -19,10 +23,11 @@ type UIMessagePart = UIMessage['parts'][number];
  * normalization happens in the main-process adapter so this mapper just
  * pattern-matches on `payload.kind` and projects each variant to UI parts.
  *
- * Grouping rule: consecutive `message` events that share the same `turnId`
- * and the same UI role collapse into a single `UIMessage`. Errors, stderr,
- * status changes, metadata, and shutdown rows each emit their own message so
- * the timeline stays informative without losing per-event chronology.
+ * Grouping rule: consecutive renderable `message` events that share the same
+ * `turnId` and the same UI role collapse into a single `UIMessage`. Lifecycle,
+ * metadata, status, shutdown, unknown, and no-op rows are skipped so runtime
+ * bookkeeping does not appear as chat content. Actionable errors and stderr
+ * diagnostics remain as compact system messages for the timeline renderer.
  */
 export function eventsToUIMessages(
 	events: readonly PiSessionEventWire[],
@@ -54,18 +59,18 @@ function handleEvent(
 	result: UIMessage[],
 ): PendingGroup | null {
 	if (event.stream === 'stderr') {
+		const stderrMessage = buildStderrMessage(event);
+		if (!stderrMessage) {
+			return pending;
+		}
 		flush(pending, result);
-		result.push(buildStderrMessage(event));
+		result.push(stderrMessage);
 		return null;
 	}
 
 	const envelope = event.payload;
 	if (!envelope) {
-		flush(pending, result);
-		result.push(
-			buildSystemNoticeMessage(event, `Pi event: ${event.eventType}`),
-		);
-		return null;
+		return pending;
 	}
 
 	switch (envelope.kind) {
@@ -76,35 +81,14 @@ function handleEvent(
 			result.push(buildErrorMessage(event, envelope));
 			return null;
 		case 'status':
-			flush(pending, result);
-			result.push(
-				buildSystemNoticeMessage(
-					event,
-					`Status: ${envelope.status}${
-						envelope.previous ? ` (was ${envelope.previous})` : ''
-					}`,
-				),
-			);
-			return null;
 		case 'metadata':
-			flush(pending, result);
-			result.push(buildSystemNoticeMessage(event, describeMetadata(envelope)));
-			return null;
 		case 'shutdown':
-			flush(pending, result);
-			result.push(
-				buildSystemNoticeMessage(event, `Session ended (${envelope.reason})`),
-			);
-			return null;
+			return pending;
 		default: {
 			// Exhaustiveness guard: a future variant should be added above.
 			const exhaustive: never = envelope;
 			void exhaustive;
-			flush(pending, result);
-			result.push(
-				buildSystemNoticeMessage(event, `Pi event: ${event.eventType}`),
-			);
-			return null;
+			return pending;
 		}
 	}
 }
@@ -118,7 +102,10 @@ function handleMessageEnvelope(
 	const uiRole: UIRole = envelope.role === 'user' ? 'user' : 'assistant';
 	const signature = groupSignature(event.turnId, uiRole);
 
-	const incomingParts = projectMessagePayload(event, envelope.payload);
+	const incomingParts = mergeToolParts(
+		[],
+		projectMessagePayload(event, envelope.payload),
+	);
 	if (incomingParts.length === 0) {
 		// Nothing to render (e.g., an unknown frame variant). Skip without
 		// disturbing any pending group so the timeline stays clean.
@@ -135,7 +122,10 @@ function handleMessageEnvelope(
 		};
 	}
 
-	return { ...pending, parts: [...pending.parts, ...incomingParts] };
+	return {
+		...pending,
+		parts: mergeToolParts(pending.parts, incomingParts),
+	};
 }
 
 /**
@@ -265,8 +255,11 @@ function finalizeGroup(group: PendingGroup): UIMessage {
 	};
 }
 
-function buildStderrMessage(event: PiSessionEventWire): UIMessage {
+function buildStderrMessage(event: PiSessionEventWire): UIMessage | null {
 	const detail = readStderrDetail(event.payload);
+	if (!isActionableDiagnostic(detail)) {
+		return null;
+	}
 	return {
 		id: `pi-event:${event.id}`,
 		parts: [{ state: 'done', text: `[stderr] ${detail}`, type: 'text' }],
@@ -289,29 +282,6 @@ function buildErrorMessage(
 	};
 }
 
-function buildSystemNoticeMessage(
-	event: PiSessionEventWire,
-	text: string,
-): UIMessage {
-	return {
-		id: `pi-event:${event.id}`,
-		parts: [{ state: 'done', text, type: 'text' }],
-		role: 'system',
-	};
-}
-
-function describeMetadata(
-	envelope: Extract<PiPersistedEnvelope, { kind: 'metadata' }>,
-): string {
-	if (envelope.metadata.sessionId) {
-		return `Pi runtime session id: ${envelope.metadata.sessionId}`;
-	}
-	if (envelope.metadata.chatTitle) {
-		return `Chat renamed: ${envelope.metadata.chatTitle}`;
-	}
-	return 'Pi runtime metadata received.';
-}
-
 function readStderrDetail(payload: PiPersistedEnvelope | null): string {
 	if (payload?.kind === 'error') {
 		return (
@@ -319,6 +289,60 @@ function readStderrDetail(payload: PiPersistedEnvelope | null): string {
 		);
 	}
 	return '(empty stderr chunk)';
+}
+
+function mergeToolParts(
+	existingParts: readonly UIMessagePart[],
+	incomingParts: readonly UIMessagePart[],
+): UIMessagePart[] {
+	const merged = [...existingParts];
+	for (const incomingPart of incomingParts) {
+		if (!isDynamicToolPart(incomingPart) || !isToolOutputPart(incomingPart)) {
+			merged.push(incomingPart);
+			continue;
+		}
+
+		const matchIndex = merged.findIndex(
+			(part) =>
+				isDynamicToolPart(part) && part.toolCallId === incomingPart.toolCallId,
+		);
+		if (matchIndex === -1) {
+			merged.push(incomingPart);
+			continue;
+		}
+
+		const previousPart = merged[matchIndex];
+		if (previousPart !== undefined && isDynamicToolPart(previousPart)) {
+			merged[matchIndex] = mergeDynamicToolParts(previousPart, incomingPart);
+		}
+	}
+	return merged;
+}
+
+function mergeDynamicToolParts(
+	previousPart: DynamicToolUIPart,
+	incomingPart: DynamicToolOutputPart,
+): DynamicToolOutputPart {
+	return {
+		...incomingPart,
+		input: previousPart.input ?? incomingPart.input,
+		toolName: previousPart.toolName || incomingPart.toolName,
+	};
+}
+
+function isDynamicToolPart(part: UIMessagePart): part is DynamicToolUIPart {
+	return part.type === 'dynamic-tool';
+}
+
+function isToolOutputPart(
+	part: DynamicToolUIPart,
+): part is DynamicToolOutputPart {
+	return part.state === 'output-available' || part.state === 'output-error';
+}
+
+function isActionableDiagnostic(detail: string): boolean {
+	const normalized = detail.trim();
+	return normalized.length > 0 && normalized !== '(empty stderr chunk)';
 }
 
 function normalizeToolOutput(output: unknown): unknown {

@@ -1,3 +1,5 @@
+/// <reference types="bun" />
+
 import { describe, expect, test } from 'bun:test';
 
 import { eventsToUIMessages } from '../../src/renderer/lib/pi/event-to-ui-message';
@@ -24,11 +26,20 @@ function event(
 	};
 }
 
+function messageText(
+	eventMessages: ReturnType<typeof eventsToUIMessages>,
+): string {
+	return eventMessages
+		.flatMap((message) => message.parts)
+		.map((part) => (part.type === 'text' ? part.text : ''))
+		.join('\n');
+}
+
 describe('eventsToUIMessages', () => {
-	test('maps a user prompt envelope to a UIMessage with a text part', () => {
+	test('maps a user prompt event to a single text part with user role', () => {
 		const messages = eventsToUIMessages([
 			event({
-				id: 'evt-1',
+				id: 'evt-user',
 				payload: {
 					kind: 'message',
 					payload: { kind: 'prompt', prompt: 'Hello Pi' },
@@ -40,22 +51,21 @@ describe('eventsToUIMessages', () => {
 
 		expect(messages).toHaveLength(1);
 		expect(messages[0]?.role).toBe('user');
-		expect(messages[0]?.id).toBe('pi-turn:turn-1:user:evt-1');
 		expect(messages[0]?.parts).toEqual([
 			{ state: 'done', text: 'Hello Pi', type: 'text' },
 		]);
 	});
 
-	test('maps an assistant text envelope to an assistant UIMessage', () => {
+	test('maps an assistant text payload to one text part', () => {
 		const messages = eventsToUIMessages([
 			event({
-				id: 'evt-2',
+				id: 'evt-agent-text',
 				payload: {
 					kind: 'message',
 					payload: { kind: 'text', text: 'Hi there' },
 					role: 'agent',
 				},
-				turnId: 'turn-2',
+				turnId: 'turn-text',
 			}),
 		]);
 
@@ -66,45 +76,37 @@ describe('eventsToUIMessages', () => {
 		]);
 	});
 
-	test('maps a composite message payload into reasoning + text parts', () => {
+	test('maps an assistant reasoning payload to one reasoning part', () => {
 		const messages = eventsToUIMessages([
 			event({
-				id: 'evt-3',
+				id: 'evt-agent-reasoning',
 				payload: {
 					kind: 'message',
-					payload: {
-						kind: 'message',
-						parts: [
-							{ kind: 'reasoning', text: 'Let me think' },
-							{ kind: 'text', text: 'Reasoned answer' },
-						],
-						role: 'assistant',
-					},
+					payload: { kind: 'reasoning', text: 'Think first' },
 					role: 'agent',
 				},
-				turnId: 'turn-3',
+				turnId: 'turn-reasoning',
 			}),
 		]);
 
 		expect(messages).toHaveLength(1);
 		expect(messages[0]?.role).toBe('assistant');
 		expect(messages[0]?.parts).toEqual([
-			{ state: 'done', text: 'Let me think', type: 'reasoning' },
-			{ state: 'done', text: 'Reasoned answer', type: 'text' },
+			{ state: 'done', text: 'Think first', type: 'reasoning' },
 		]);
 	});
 
-	test('maps composite message parts including tool-call into UI parts', () => {
+	test('maps a composite assistant message into reasoning + text + tool-call parts', () => {
 		const messages = eventsToUIMessages([
 			event({
-				id: 'evt-content',
+				id: 'evt-agent-composite',
 				payload: {
 					kind: 'message',
 					payload: {
 						kind: 'message',
 						parts: [
-							{ kind: 'reasoning', text: 'Plan first' },
-							{ kind: 'text', text: 'Then answer' },
+							{ kind: 'reasoning', text: 'Think first' },
+							{ kind: 'text', text: 'Hi there' },
 							{
 								input: { command: 'pwd' },
 								kind: 'tool-call',
@@ -116,13 +118,15 @@ describe('eventsToUIMessages', () => {
 					},
 					role: 'agent',
 				},
-				turnId: 'turn-content',
+				turnId: 'turn-composite',
 			}),
 		]);
 
+		expect(messages).toHaveLength(1);
+		expect(messages[0]?.role).toBe('assistant');
 		expect(messages[0]?.parts).toEqual([
-			{ state: 'done', text: 'Plan first', type: 'reasoning' },
-			{ state: 'done', text: 'Then answer', type: 'text' },
+			{ state: 'done', text: 'Think first', type: 'reasoning' },
+			{ state: 'done', text: 'Hi there', type: 'text' },
 			{
 				input: { command: 'pwd' },
 				state: 'input-available',
@@ -133,39 +137,7 @@ describe('eventsToUIMessages', () => {
 		]);
 	});
 
-	test('maps a tool-result envelope to a dynamic-tool output-available part', () => {
-		const messages = eventsToUIMessages([
-			event({
-				id: 'evt-4',
-				payload: {
-					kind: 'message',
-					payload: {
-						isError: false,
-						kind: 'tool-result',
-						output: { content: [{ text: 'README.md', type: 'text' }] },
-						toolCallId: 'call-ls',
-					},
-					role: 'tool',
-				},
-				turnId: 'turn-4',
-			}),
-		]);
-
-		expect(messages).toHaveLength(1);
-		expect(messages[0]?.role).toBe('assistant');
-		expect(messages[0]?.parts).toEqual([
-			{
-				input: {},
-				output: 'README.md',
-				state: 'output-available',
-				toolCallId: 'call-ls',
-				toolName: 'tool',
-				type: 'dynamic-tool',
-			},
-		]);
-	});
-
-	test('maps a tool-call envelope to an input-available dynamic-tool part', () => {
+	test('pairs tool-call and tool-result by toolCallId inside one assistant message', () => {
 		const messages = eventsToUIMessages([
 			event({
 				id: 'evt-tool-call',
@@ -179,14 +151,30 @@ describe('eventsToUIMessages', () => {
 					},
 					role: 'tool',
 				},
-				turnId: 'turn-tool-call',
+				turnId: 'turn-tool',
+			}),
+			event({
+				id: 'evt-tool-result',
+				payload: {
+					kind: 'message',
+					payload: {
+						isError: false,
+						kind: 'tool-result',
+						output: { content: [{ text: 'README.md', type: 'text' }] },
+						toolCallId: 'call-ls',
+					},
+					role: 'tool',
+				},
+				turnId: 'turn-tool',
 			}),
 		]);
 
+		expect(messages).toHaveLength(1);
 		expect(messages[0]?.parts).toEqual([
 			{
 				input: { command: 'ls' },
-				state: 'input-available',
+				output: 'README.md',
+				state: 'output-available',
 				toolCallId: 'call-ls',
 				toolName: 'bash',
 				type: 'dynamic-tool',
@@ -194,11 +182,164 @@ describe('eventsToUIMessages', () => {
 		]);
 	});
 
-	test('emits a system message for error events', () => {
+	test('maps errored tool-result to an output-error tool part', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-tool-error',
+				payload: {
+					kind: 'message',
+					payload: {
+						isError: true,
+						kind: 'tool-result',
+						output: { message: 'Command failed' },
+						toolCallId: 'call-fail',
+					},
+					role: 'tool',
+				},
+				turnId: 'turn-error-tool',
+			}),
+		]);
+
+		expect(messages[0]?.parts).toEqual([
+			{
+				errorText: '{"message":"Command failed"}',
+				input: {},
+				state: 'output-error',
+				toolCallId: 'call-fail',
+				toolName: 'tool',
+				type: 'dynamic-tool',
+			},
+		]);
+	});
+
+	test('filters metadata, status, shutdown, null, unknown, and lifecycle noise', () => {
+		const messages = eventsToUIMessages([
+			event({
+				eventType: 'metadata',
+				id: 'evt-metadata',
+				payload: { kind: 'metadata', metadata: { sessionId: 'pi-sess-123' } },
+			}),
+			event({
+				eventType: 'metadata',
+				id: 'evt-title',
+				payload: { kind: 'metadata', metadata: { chatTitle: 'New name' } },
+			}),
+			event({
+				eventType: 'status',
+				id: 'evt-status-start',
+				payload: { kind: 'status', previous: 'idle', status: 'starting' },
+			}),
+			event({
+				eventType: 'status',
+				id: 'evt-status-streaming',
+				payload: { kind: 'status', previous: 'starting', status: 'streaming' },
+			}),
+			event({
+				eventType: 'status',
+				id: 'evt-status-idle',
+				payload: { kind: 'status', previous: 'streaming', status: 'idle' },
+			}),
+			event({
+				eventType: 'shutdown',
+				id: 'evt-shutdown-completed',
+				payload: { kind: 'shutdown', reason: 'completed' },
+			}),
+			event({
+				eventType: 'shutdown',
+				id: 'evt-shutdown-manual',
+				payload: { kind: 'shutdown', reason: 'manual' },
+			}),
+			event({ eventType: 'message_start', id: 'evt-null', payload: null }),
+			event({
+				eventType: 'agent_start',
+				id: 'evt-unknown',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'unknown', frameType: 'agent_start', raw: {} },
+					role: 'agent',
+				},
+			}),
+		]);
+
+		expect(messages).toHaveLength(0);
+		expect(messageText(messages)).not.toContain(
+			'Pi runtime metadata received.',
+		);
+		expect(messageText(messages)).not.toContain('Pi runtime session id');
+		expect(messageText(messages)).not.toContain('Chat renamed');
+		expect(messageText(messages)).not.toContain('Status: starting');
+		expect(messageText(messages)).not.toContain('Status: streaming');
+		expect(messageText(messages)).not.toContain('Status: idle');
+		expect(messageText(messages)).not.toContain('Session ended');
+	});
+
+	test('groups same-turn renderable events across filtered lifecycle rows', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-before',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: 'Before status' },
+					role: 'agent',
+				},
+				turnId: 'turn-group',
+			}),
+			event({
+				eventType: 'status',
+				id: 'evt-filtered-status',
+				payload: { kind: 'status', previous: 'starting', status: 'streaming' },
+				turnId: 'turn-group',
+			}),
+			event({
+				id: 'evt-after',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: 'After status' },
+					role: 'agent',
+				},
+				turnId: 'turn-group',
+			}),
+		]);
+
+		expect(messages).toHaveLength(1);
+		expect(messages[0]?.parts).toEqual([
+			{ state: 'done', text: 'Before status', type: 'text' },
+			{ state: 'done', text: 'After status', type: 'text' },
+		]);
+	});
+
+	test('splits the group when the role changes mid-turn', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-user-role',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'prompt', prompt: 'Run the linter' },
+					role: 'user',
+				},
+				turnId: 'turn-role',
+			}),
+			event({
+				id: 'evt-agent-role',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: 'Running' },
+					role: 'agent',
+				},
+				turnId: 'turn-role',
+			}),
+		]);
+
+		expect(messages).toHaveLength(2);
+		expect(messages[0]?.role).toBe('user');
+		expect(messages[1]?.role).toBe('assistant');
+	});
+
+	test('surfaces fatal errors and actionable stderr as system diagnostics', () => {
 		const messages = eventsToUIMessages([
 			event({
 				eventType: 'error',
-				id: 'evt-5',
+				id: 'evt-error',
 				payload: {
 					error: {
 						detail: 'stack trace here',
@@ -208,23 +349,8 @@ describe('eventsToUIMessages', () => {
 					kind: 'error',
 				},
 			}),
-		]);
-
-		expect(messages).toHaveLength(1);
-		expect(messages[0]?.role).toBe('system');
-		expect(messages[0]?.id).toBe('pi-event:evt-5');
-		const part = messages[0]?.parts[0];
-		expect(part?.type).toBe('text');
-		if (part?.type === 'text') {
-			expect(part.text).toContain('[fatal] Boom');
-			expect(part.text).toContain('stack trace here');
-		}
-	});
-
-	test('emits a system message for stderr events', () => {
-		const messages = eventsToUIMessages([
 			event({
-				id: 'evt-6',
+				id: 'evt-stderr',
 				payload: {
 					error: { detail: 'ENOENT thing.txt', message: 'Pi RPC stderr' },
 					kind: 'error',
@@ -233,130 +359,13 @@ describe('eventsToUIMessages', () => {
 			}),
 		]);
 
-		expect(messages).toHaveLength(1);
-		expect(messages[0]?.role).toBe('system');
-		const part = messages[0]?.parts[0];
-		expect(part?.type).toBe('text');
-		if (part?.type === 'text') {
-			expect(part.text).toContain('[stderr]');
-			expect(part.text).toContain('ENOENT thing.txt');
-		}
-	});
-
-	test('groups consecutive assistant events sharing a turnId into a single message', () => {
-		const messages = eventsToUIMessages([
-			event({
-				id: 'evt-7a',
-				payload: {
-					kind: 'message',
-					payload: { kind: 'text', text: 'Part one.' },
-					role: 'agent',
-				},
-				turnId: 'turn-7',
-			}),
-			event({
-				id: 'evt-7b',
-				payload: {
-					kind: 'message',
-					payload: { kind: 'text', text: 'Part two.' },
-					role: 'agent',
-				},
-				turnId: 'turn-7',
-			}),
-		]);
-
-		expect(messages).toHaveLength(1);
-		expect(messages[0]?.parts).toEqual([
-			{ state: 'done', text: 'Part one.', type: 'text' },
-			{ state: 'done', text: 'Part two.', type: 'text' },
-		]);
-	});
-
-	test('splits the group when a non-message event interrupts the turn', () => {
-		const messages = eventsToUIMessages([
-			event({
-				id: 'evt-8a',
-				payload: {
-					kind: 'message',
-					payload: { kind: 'text', text: 'Before status' },
-					role: 'agent',
-				},
-				turnId: 'turn-8',
-			}),
-			event({
-				eventType: 'status',
-				id: 'evt-8b',
-				payload: { kind: 'status', previous: 'idle', status: 'streaming' },
-				turnId: 'turn-8',
-			}),
-			event({
-				id: 'evt-8c',
-				payload: {
-					kind: 'message',
-					payload: { kind: 'text', text: 'After status' },
-					role: 'agent',
-				},
-				turnId: 'turn-8',
-			}),
-		]);
-
-		expect(messages).toHaveLength(3);
-		expect(messages[0]?.role).toBe('assistant');
-		expect(messages[1]?.role).toBe('system');
-		expect(messages[2]?.role).toBe('assistant');
-	});
-
-	test('splits the group when the role changes mid-turn', () => {
-		const messages = eventsToUIMessages([
-			event({
-				id: 'evt-9a',
-				payload: {
-					kind: 'message',
-					payload: { kind: 'prompt', prompt: 'Run the linter' },
-					role: 'user',
-				},
-				turnId: 'turn-9',
-			}),
-			event({
-				id: 'evt-9b',
-				payload: {
-					kind: 'message',
-					payload: { kind: 'text', text: 'Running' },
-					role: 'agent',
-				},
-				turnId: 'turn-9',
-			}),
-		]);
-
 		expect(messages).toHaveLength(2);
-		expect(messages[0]?.role).toBe('user');
-		expect(messages[1]?.role).toBe('assistant');
-	});
-
-	test('describes metadata, shutdown, and unknown events as system messages', () => {
-		const messages = eventsToUIMessages([
-			event({
-				eventType: 'metadata',
-				id: 'evt-10a',
-				payload: {
-					kind: 'metadata',
-					metadata: { sessionId: 'pi-sess-123' },
-				},
-			}),
-			event({
-				eventType: 'shutdown',
-				id: 'evt-10b',
-				payload: { kind: 'shutdown', reason: 'manual' },
-			}),
-			event({ eventType: 'weird', id: 'evt-10c', payload: null }),
+		expect(messages.map((message) => message.role)).toEqual([
+			'system',
+			'system',
 		]);
-
-		expect(messages.map((m) => m.role)).toEqual(['system', 'system', 'system']);
-		const texts = messages.map((m) =>
-			m.parts[0]?.type === 'text' ? m.parts[0].text : '',
-		);
-		expect(texts[0]).toContain('pi-sess-123');
-		expect(texts[1]).toContain('Session ended');
-		expect(texts[2]).toContain('weird');
+		expect(messageText(messages)).toContain('[fatal] Boom');
+		expect(messageText(messages)).toContain('stack trace here');
+		expect(messageText(messages)).toContain('[stderr] ENOENT thing.txt');
 	});
 });

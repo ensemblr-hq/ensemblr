@@ -10,13 +10,8 @@ import {
 	type ListChatTabsResult,
 	type ListClosedChatTabsWithSummaryResult,
 	type OpenChatTabResult,
-	type PiSessionEventWire,
 	type RestoreChatTabResult,
 } from '../../../shared/ipc';
-import type {
-	SessionSummaryWriter,
-	WriteSessionSummaryResult,
-} from '../../pi-agent/session-summary-writer.ts';
 import type { EnsembleDatabaseService } from '../../storage/database.ts';
 import {
 	bindPiSession,
@@ -29,11 +24,7 @@ import {
 	openChatTab,
 	restoreClosedChatTab,
 } from '../../storage/repositories/chat-tab-repository.ts';
-import { listEventsByBranch } from '../../storage/repositories/pi-event-repository.ts';
-import {
-	getPiSessionById,
-	listPiSessionBranches,
-} from '../../storage/repositories/pi-session-repository.ts';
+import { getPiSessionById } from '../../storage/repositories/pi-session-repository.ts';
 import {
 	bindPiSessionToChatTabRequestSchema,
 	closeChatTabRequestSchema,
@@ -46,19 +37,17 @@ import {
 /** Service dependencies for the chat-tab IPC handlers. */
 export interface ChatTabHandlersOptions {
 	databaseService: EnsembleDatabaseService;
-	sessionSummaryWriter: SessionSummaryWriter;
 }
 
 const DEFAULT_TAB_TITLE = 'New chat';
 
 /**
- * Registers IPC handlers exposing chat-tab CRUD + session summary writing to
- * the renderer. The summary writer is injected so production can supply an
- * LLM-backed implementation while tests inject a deterministic stub.
+ * Registers IPC handlers exposing chat-tab CRUD and closed-tab history to the
+ * renderer. Live session summaries are written by the Pi session lifecycle as
+ * agent responses complete.
  */
 export function registerChatTabHandlers({
 	databaseService,
-	sessionSummaryWriter,
 }: ChatTabHandlersOptions): void {
 	const requireDatabase = (): DatabaseSync => {
 		const connection = databaseService.getConnection();
@@ -143,12 +132,6 @@ export function registerChatTabHandlers({
 				throw new Error(`Failed to close chat tab ${request.chatTabId}.`);
 			}
 
-			void writeSummaryIfPossible({
-				database,
-				sessionSummaryWriter,
-				tab: closedTab,
-			});
-
 			return { ok: true };
 		},
 	);
@@ -227,116 +210,6 @@ export function registerChatTabHandlers({
 /** True when a tab has no attached Pi session and should not enter history. */
 function isEmptyChatTab(tab: ChatTabRow): boolean {
 	return tab.piSessionId === null;
-}
-
-interface WriteSummaryArgs {
-	database: DatabaseSync;
-	sessionSummaryWriter: SessionSummaryWriter;
-	tab: ChatTabRow;
-}
-
-async function writeSummaryIfPossible({
-	database,
-	sessionSummaryWriter,
-	tab,
-}: WriteSummaryArgs): Promise<void> {
-	const workspaceCwd = lookupWorkspacePath({
-		database,
-		workspaceId: tab.workspaceId,
-	});
-	if (!workspaceCwd) {
-		console.warn(
-			'[chat-tab] Skipping summary write: workspace cwd unresolved.',
-			{ workspaceId: tab.workspaceId },
-		);
-		return;
-	}
-
-	const { branchId, events } = collectEventsForTab({ database, tab });
-	const closedAt = tab.closedAt ?? new Date().toISOString();
-
-	let result: WriteSessionSummaryResult | null = null;
-	try {
-		result = await sessionSummaryWriter.writeSessionSummary({
-			branchId,
-			chatTabId: tab.id,
-			closedAt,
-			events,
-			piSessionId: tab.piSessionId,
-			workspaceCwd,
-		});
-	} catch (cause) {
-		console.warn('[chat-tab] writeSessionSummary failed.', {
-			cause: cause instanceof Error ? cause.message : String(cause),
-			chatTabId: tab.id,
-		});
-		return;
-	}
-
-	if (!result) {
-		return;
-	}
-
-	// Stash the summary metadata in the tab row so later listings can render
-	// titles without re-reading the markdown file.
-	const nextMetadata = {
-		...tab.metadata,
-		summary: {
-			path: result.path,
-			title: result.title,
-			usedLlm: result.usedLlm,
-		},
-	};
-	try {
-		database
-			.prepare(`UPDATE chat_tabs SET metadata_json = ? WHERE id = ?`)
-			.run(JSON.stringify(nextMetadata), tab.id);
-	} catch (cause) {
-		console.warn('[chat-tab] Failed to persist summary metadata.', {
-			cause: cause instanceof Error ? cause.message : String(cause),
-			chatTabId: tab.id,
-		});
-	}
-}
-
-interface CollectEventsArgs {
-	database: DatabaseSync;
-	tab: ChatTabRow;
-}
-
-interface CollectedEvents {
-	branchId: string | null;
-	events: readonly PiSessionEventWire[];
-}
-
-function collectEventsForTab({
-	database,
-	tab,
-}: CollectEventsArgs): CollectedEvents {
-	if (!tab.piSessionId) {
-		return { branchId: null, events: [] };
-	}
-	const branches = listPiSessionBranches({
-		database,
-		piSessionId: tab.piSessionId,
-	});
-	const mainBranch =
-		branches.find((branch) => branch.kind === 'main') ?? branches[0];
-	if (!mainBranch) {
-		return { branchId: null, events: [] };
-	}
-	const rows = listEventsByBranch({ branchId: mainBranch.id, database });
-	const events: PiSessionEventWire[] = rows.map((row) => ({
-		branchId: row.branchId,
-		createdAt: row.createdAt,
-		eventType: row.eventType,
-		id: row.id,
-		ordinal: row.ordinal,
-		payload: row.payload,
-		stream: row.stream,
-		turnId: row.turnId,
-	}));
-	return { branchId: mainBranch.id, events };
 }
 
 function lookupWorkspacePath({

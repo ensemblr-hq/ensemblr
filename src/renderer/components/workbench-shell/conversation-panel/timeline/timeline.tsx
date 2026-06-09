@@ -1,7 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import type { UIMessage } from 'ai';
+import type { ReactNode } from 'react';
 import { useMemo } from 'react';
+import type { BundledLanguage } from 'shiki';
 import { piSessionsForWorkspaceQuery } from '@/renderer/api/ensemble-queries';
+import { CodeBlock } from '@/renderer/components/ai-elements/code-block';
 import {
 	Conversation,
 	ConversationContent,
@@ -18,6 +21,19 @@ import {
 	ReasoningTrigger,
 } from '@/renderer/components/ai-elements/reasoning';
 import {
+	StackTrace,
+	StackTraceActions,
+	StackTraceContent,
+	StackTraceCopyButton,
+	StackTraceError,
+	StackTraceErrorMessage,
+	StackTraceErrorType,
+	StackTraceExpandButton,
+	StackTraceFrames,
+	StackTraceHeader,
+} from '@/renderer/components/ai-elements/stack-trace';
+import { Terminal } from '@/renderer/components/ai-elements/terminal';
+import {
 	Tool,
 	ToolContent,
 	ToolHeader,
@@ -25,6 +41,10 @@ import {
 	ToolOutput,
 } from '@/renderer/components/ai-elements/tool';
 import { eventsToUIMessages } from '@/renderer/lib/pi/event-to-ui-message';
+import {
+	classifyToolOutput,
+	looksLikeStackTrace,
+} from '@/renderer/lib/pi/tool-output-classifier';
 import type {
 	SessionTabModel,
 	WorkspaceShellModel,
@@ -61,6 +81,7 @@ export function PiSessionTimeline({
 				);
 	const branchId = activePiSession?.branchId ?? '';
 	const piSessionId = activePiSession?.id ?? null;
+	const isStreaming = activePiSession?.status === 'streaming';
 
 	const { error, events, isLoading } = useTimelineEvents({
 		branchId,
@@ -103,7 +124,7 @@ export function PiSessionTimeline({
 		);
 	}
 
-	if (events.length === 0) {
+	if (messages.length === 0) {
 		return (
 			<section
 				aria-label='Pi session timeline'
@@ -121,10 +142,15 @@ export function PiSessionTimeline({
 			className='flex min-h-0 flex-1 flex-col'
 			data-timeline-state='ready'
 		>
-			<Conversation className='min-h-0 flex-1'>
-				<ConversationContent className='gap-6 p-0'>
-					{messages.map((message) => (
-						<TimelineMessage key={message.id} message={message} />
+			<Conversation className='min-h-0 w-full flex-1'>
+				<ConversationContent className='mx-auto w-full max-w-3xl gap-6 px-4 pt-5 pb-5'>
+					{messages.map((message, index) => (
+						<TimelineMessage
+							isLastMessage={index === messages.length - 1}
+							isStreaming={isStreaming}
+							key={message.id}
+							message={message}
+						/>
 					))}
 				</ConversationContent>
 				<ConversationScrollButton />
@@ -133,7 +159,20 @@ export function PiSessionTimeline({
 	);
 }
 
-function TimelineMessage({ message }: { message: UIMessage }) {
+/** Renders one mapped Pi message with chat or diagnostic semantics. */
+function TimelineMessage({
+	isLastMessage,
+	isStreaming,
+	message,
+}: {
+	isLastMessage: boolean;
+	isStreaming: boolean;
+	message: UIMessage;
+}) {
+	if (message.role === 'system') {
+		return <RuntimeDiagnostic message={message} />;
+	}
+
 	return (
 		<Message from={message.role}>
 			<MessageContent>
@@ -143,8 +182,16 @@ function TimelineMessage({ message }: { message: UIMessage }) {
 						return <MessageResponse key={key}>{part.text}</MessageResponse>;
 					}
 					if (part.type === 'reasoning') {
+						const isReasoningStreaming =
+							isStreaming &&
+							isLastMessage &&
+							index === lastReasoningPartIndex(message);
 						return (
-							<Reasoning defaultOpen={false} key={key}>
+							<Reasoning
+								defaultOpen={isReasoningStreaming}
+								isStreaming={isReasoningStreaming}
+								key={key}
+							>
 								<ReasoningTrigger />
 								<ReasoningContent>{part.text}</ReasoningContent>
 							</Reasoning>
@@ -152,7 +199,7 @@ function TimelineMessage({ message }: { message: UIMessage }) {
 					}
 					if (part.type === 'dynamic-tool') {
 						return (
-							<Tool defaultOpen={false} key={key}>
+							<Tool defaultOpen={isToolRunning(part.state)} key={key}>
 								<ToolHeader
 									state={part.state}
 									toolName={part.toolName}
@@ -162,14 +209,7 @@ function TimelineMessage({ message }: { message: UIMessage }) {
 									{'input' in part && part.input !== undefined ? (
 										<ToolInput input={part.input} />
 									) : null}
-									{'output' in part || 'errorText' in part ? (
-										<ToolOutput
-											errorText={
-												'errorText' in part ? part.errorText : undefined
-											}
-											output={'output' in part ? part.output : undefined}
-										/>
-									) : null}
+									<ToolOutputForPart part={part} />
 								</ToolContent>
 							</Tool>
 						);
@@ -179,6 +219,156 @@ function TimelineMessage({ message }: { message: UIMessage }) {
 			</MessageContent>
 		</Message>
 	);
+}
+
+/** Renders runtime failures outside the normal user/assistant bubble flow. */
+function RuntimeDiagnostic({ message }: { message: UIMessage }) {
+	const text = textFromMessage(message);
+	const isStackTrace = looksLikeStackTrace(text);
+
+	return (
+		<div className='rounded-md border border-status-warning/30 bg-status-warning/10 p-3 text-xs'>
+			{isStackTrace ? (
+				<StackTraceDiagnostic trace={text} />
+			) : (
+				<MessageResponse className='text-status-warning'>
+					{text}
+				</MessageResponse>
+			)}
+		</div>
+	);
+}
+
+/** Renders one dynamic tool result with the most specific AI Elements view. */
+function ToolOutputForPart({
+	part,
+}: {
+	part: Extract<UIMessage['parts'][number], { type: 'dynamic-tool' }>;
+}) {
+	if ('errorText' in part && part.errorText) {
+		const errorNode = looksLikeStackTrace(part.errorText) ? (
+			<StackTraceDiagnostic trace={part.errorText} />
+		) : (
+			part.errorText
+		);
+		return <ToolOutput errorText={errorNode} output={undefined} />;
+	}
+
+	if (!('output' in part) || part.output === undefined) {
+		return null;
+	}
+
+	return (
+		<ToolOutput
+			errorText={undefined}
+			output={
+				<ToolPayload
+					state={part.state}
+					toolName={part.toolName}
+					value={part.output}
+				/>
+			}
+		/>
+	);
+}
+
+/** Memoised payload renderer — classification runs once per (value, toolName). */
+function ToolPayload({
+	state,
+	toolName,
+	value,
+}: {
+	state: string;
+	toolName: string;
+	value: unknown;
+}): ReactNode {
+	const classification = useMemo(
+		() => classifyToolOutput(toolName, value),
+		[toolName, value],
+	);
+
+	switch (classification.kind) {
+		case 'stack-trace':
+			return <StackTraceDiagnostic trace={classification.text} />;
+		case 'terminal':
+			return (
+				<Terminal
+					isStreaming={isToolRunning(state)}
+					output={classification.text}
+				/>
+			);
+		case 'code':
+			return (
+				<CodeBlock
+					code={classification.text}
+					language={classification.language ?? 'typescript'}
+				/>
+			);
+		case 'path-tree':
+			return (
+				<CodeBlock
+					code={classification.text}
+					language={'text' as BundledLanguage}
+				/>
+			);
+		case 'json':
+			return <CodeBlock code={classification.text} language='json' />;
+		case 'text':
+			return <MessageResponse>{classification.text}</MessageResponse>;
+		default: {
+			const exhaustive: never = classification.kind;
+			void exhaustive;
+			return <MessageResponse>{classification.text}</MessageResponse>;
+		}
+	}
+}
+
+/** Renders a collapsed stack trace diagnostic from generated AI Elements parts. */
+function StackTraceDiagnostic({ trace }: { trace: string }) {
+	return (
+		<StackTrace
+			className='border-status-warning/30'
+			defaultOpen={false}
+			trace={trace}
+		>
+			<StackTraceHeader>
+				<StackTraceError>
+					<StackTraceErrorType />
+					<StackTraceErrorMessage />
+				</StackTraceError>
+				<StackTraceActions>
+					<StackTraceCopyButton />
+					<StackTraceExpandButton />
+				</StackTraceActions>
+			</StackTraceHeader>
+			<StackTraceContent>
+				<StackTraceFrames showInternalFrames={false} />
+			</StackTraceContent>
+		</StackTrace>
+	);
+}
+
+/** Returns the final reasoning part index so streaming state only marks one block. */
+function lastReasoningPartIndex(message: UIMessage): number {
+	for (let index = message.parts.length - 1; index >= 0; index -= 1) {
+		if (message.parts[index]?.type === 'reasoning') {
+			return index;
+		}
+	}
+	return -1;
+}
+
+/** Converts all text parts in a message into one diagnostic string. */
+function textFromMessage(message: UIMessage): string {
+	return message.parts
+		.map((part) => (part.type === 'text' ? part.text : ''))
+		.filter(Boolean)
+		.join('\n');
+}
+
+/** Detects tool states that still represent active work. */
+function isToolRunning(state: string): boolean {
+	return state === 'input-available' || state === 'input-streaming';
 }
 
 export default PiSessionTimeline;

@@ -12,6 +12,7 @@ export interface PiSessionSnapshot {
 	model: string | null;
 	openedTabs: readonly ChatTabRow[];
 	piSessionId: string | null;
+	runtimeOpen: boolean;
 	status: PiSessionRow['status'];
 	thinkingLevel: string | null;
 	updatedAt: string;

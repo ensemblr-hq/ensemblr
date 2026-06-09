@@ -135,6 +135,12 @@ async function waitForMicrotasks(): Promise<void> {
 	await new Promise((resolve) => setImmediate(resolve));
 }
 
+function firstItem<T>(items: readonly T[]): T {
+	const item = items[0];
+	assert.ok(item);
+	return item;
+}
+
 test('spawns the executable with metadata cwd, args, and merged env', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
@@ -143,10 +149,11 @@ test('spawns the executable with metadata cwd, args, and merged env', async () =
 	assert.equal(session.id, 'session-1');
 	const records = recorder.getRecords();
 	assert.equal(records.length, 1);
-	assert.equal(records[0]!.command, '/usr/local/bin/pi');
-	assert.deepEqual(records[0]!.args, ['--mode', 'rpc']);
-	assert.equal(records[0]!.cwd, '/tmp/ensemble/ws');
-	assert.equal(records[0]!.env.LANG, 'en_US.UTF-8');
+	const record = firstItem(records);
+	assert.equal(record.command, '/usr/local/bin/pi');
+	assert.deepEqual(record.args, ['--mode', 'rpc']);
+	assert.equal(record.cwd, '/tmp/ensemble/ws');
+	assert.equal(record.env.LANG, 'en_US.UTF-8');
 	await adapter.shutdown();
 });
 
@@ -157,7 +164,7 @@ test('parses JSONL frames into typed events', async () => {
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitStdout('{"type":"session","sessionId":"pi-runtime-9"}\n');
 	child.emitStdout(
@@ -187,7 +194,7 @@ test('invalid JSON lines surface as recoverable error events', async () => {
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitStdout('not-json-{{{\n');
 
@@ -208,7 +215,7 @@ test('stderr chunks emit recoverable error events tagged "Pi RPC stderr"', async
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitStderr('warning: deprecated flag\n');
 
@@ -229,7 +236,7 @@ test('crash with non-zero exit emits error then shutdown(crashed)', async () => 
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitExit(137, 'SIGKILL');
 
@@ -255,7 +262,7 @@ test('abort signals SIGINT then SIGKILL after the grace window', async () => {
 	});
 	const session = await adapter.createSession({ metadata: buildMetadata() });
 	await session.abort('user clicked stop');
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	await new Promise((resolve) => setTimeout(resolve, 25));
 	const signals = child.getKillSignals();
@@ -277,18 +284,20 @@ test('submit writes a JSONL frame to stdin and waits for Pi user echo', async ()
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	const ack = await session.submit({ prompt: 'do the thing' });
 	assert.equal(ack.turnId, 'turn-1');
 
 	const stdinChunks = child.getStdinChunks();
 	assert.equal(stdinChunks.length, 1);
+	const firstStdinChunk = stdinChunks[0];
+	assert.ok(firstStdinChunk);
 	// Pi RPC protocol (@earendil-works/pi-coding-agent): `prompt` command
 	// with `message` field, one JSONL frame per line.
-	assert.match(stdinChunks[0]!, /"type":"prompt"/);
-	assert.match(stdinChunks[0]!, /"message":"do the thing"/);
-	assert.match(stdinChunks[0]!, /\n$/);
+	assert.match(firstStdinChunk, /"type":"prompt"/);
+	assert.match(firstStdinChunk, /"message":"do the thing"/);
+	assert.match(firstStdinChunk, /\n$/);
 
 	const syntheticUserMessage = events.find(
 		(event): event is Extract<PiAgentEvent, { type: 'message' }> =>
@@ -317,7 +326,7 @@ test('subscribing replays current metadata to late listeners', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
 	const session = await adapter.createSession({ metadata: buildMetadata() });
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitStdout('{"type":"session","sessionId":"replay-99"}\n');
 
@@ -369,7 +378,7 @@ test('oversize line drops cleanly and reports recoverable error', async () => {
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitStdout('x'.repeat(128));
 	child.emitStdout('\n{"type":"status","status":"streaming"}\n');

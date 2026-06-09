@@ -49,9 +49,10 @@ export interface OpenChatTabResult {
 }
 
 /**
- * Close a chat tab. The handler writes a session summary and marks the tab
- * `closed_at`. If this is the workspace's final open tab, the handler is a
- * no-op so the min-one-tab invariant holds without creating a replacement.
+ * Close a chat tab. Summaries are refreshed by the Pi session lifecycle after
+ * agent responses; close only marks `closed_at`. If this is the workspace's
+ * final open tab, the handler is a no-op so the min-one-tab invariant holds
+ * without creating a replacement.
  */
 export interface CloseChatTabRequest {
 	chatTabId: string;

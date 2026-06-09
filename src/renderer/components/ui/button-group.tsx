@@ -24,17 +24,14 @@ function ButtonGroup({
 	className,
 	orientation,
 	...props
-}: React.ComponentProps<'fieldset'> &
-	VariantProps<typeof buttonGroupVariants>) {
+}: React.ComponentProps<'div'> & VariantProps<typeof buttonGroupVariants>) {
 	return (
-		<fieldset
+		// biome-ignore lint/a11y/useSemanticElements: shadcn ButtonGroup ships as a non-form grouping container — switching to <fieldset> would change focus/styling semantics.
+		<div
+			role='group'
 			data-slot='button-group'
 			data-orientation={orientation}
-			className={cn(
-				'm-0 border-0 p-0',
-				buttonGroupVariants({ orientation }),
-				className,
-			)}
+			className={cn(buttonGroupVariants({ orientation }), className)}
 			{...props}
 		/>
 	);

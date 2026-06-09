@@ -30,14 +30,12 @@ import {
 	toSnapshot,
 } from './pi-session-lifecycle.ts';
 import { persistRuntimeEvent } from './pi-session-persistence.ts';
-import {
-	PiSessionServiceError,
-	type PiSessionServiceErrorCode,
-} from './pi-session-service-error.ts';
+import { PiSessionServiceError } from './pi-session-service-error.ts';
 import type {
 	PiSessionEventSink,
 	PiSessionSnapshot,
 } from './pi-session-types.ts';
+import type { SessionSummaryWriter } from './session-summary-writer.ts';
 
 export type {
 	OpenPiSessionRequest,
@@ -59,6 +57,7 @@ export interface PiSessionServiceOptions {
 	databaseService: EnsembleDatabaseService;
 	eventSink?: PiSessionEventSink;
 	piAgentClient: PiAgentClient;
+	sessionSummaryWriter?: SessionSummaryWriter;
 	now?: () => Date;
 }
 
@@ -86,12 +85,14 @@ export interface PiSessionService {
  *   - {@link createPiSessionLifecycle} — open/submit/stop/runtime-event state machine
  *   - {@link persistRuntimeEvent} — discriminant mapping into `pi_session_events`
  *   - {@link queueChatTitleGeneration} — best-effort LLM tab title generation
+ *   - `sessionSummaryWriter` — optional live summary updates after agent turns
  */
 export function createPiSessionService({
 	chatTitleTimeoutMs = CHAT_TITLE_TIMEOUT_MS,
 	databaseService,
 	eventSink,
 	piAgentClient,
+	sessionSummaryWriter,
 	now = () => new Date(),
 }: PiSessionServiceOptions): PiSessionService {
 	const requireDatabase = (): DatabaseSync => {
@@ -113,6 +114,7 @@ export function createPiSessionService({
 		piAgentClient,
 		queueChatTitle: queueChatTitleGeneration,
 		requireDatabase,
+		sessionSummaryWriter,
 	});
 
 	return {
@@ -124,6 +126,7 @@ export function createPiSessionService({
 					branchId: active.branch.id,
 					database,
 					row: active.row,
+					runtimeOpen: true,
 				});
 			}
 			const row = getPiSessionById({ database, id: sessionId });
@@ -138,7 +141,12 @@ export function createPiSessionService({
 			if (!mainBranch) {
 				return null;
 			}
-			return toSnapshot({ branchId: mainBranch.id, database, row });
+			return toSnapshot({
+				branchId: mainBranch.id,
+				database,
+				row,
+				runtimeOpen: false,
+			});
 		},
 		listEvents: (branchId) => {
 			const database = requireDatabase();
@@ -158,7 +166,12 @@ export function createPiSessionService({
 					if (!mainBranch) {
 						return null;
 					}
-					return toSnapshot({ branchId: mainBranch.id, database, row });
+					return toSnapshot({
+						branchId: mainBranch.id,
+						database,
+						row,
+						runtimeOpen: lifecycle.getActiveSession(row.id) !== null,
+					});
 				})
 				.filter((snapshot): snapshot is PiSessionSnapshot => snapshot !== null);
 		},
@@ -199,6 +212,7 @@ export function snapshotToWire(
 		model: snapshot.model,
 		openedTabs: tabs,
 		piSessionId: snapshot.piSessionId,
+		runtimeOpen: snapshot.runtimeOpen,
 		status: snapshot.status,
 		thinkingLevel: snapshot.thinkingLevel,
 		updatedAt: snapshot.updatedAt,

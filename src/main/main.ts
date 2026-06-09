@@ -122,6 +122,7 @@ const piSessionService = createPiSessionService({
 		}
 	},
 	piAgentClient,
+	sessionSummaryWriter,
 });
 const localRepositoryRegistrationService =
 	createLocalRepositoryRegistrationService({
@@ -226,7 +227,6 @@ app.whenReady().then(() => {
 		renameWorkspaceService,
 		repositoryConfigService,
 		rootDirectoryService,
-		sessionSummaryWriter,
 		setupDiagnosticsService,
 		settingsResolutionService,
 		sharedRootAdoptionService,

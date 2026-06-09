@@ -95,6 +95,23 @@ test('seeds metadata from request and defaults to preserving PI_CODING_AGENT_DIR
 	assert.equal(fake.getOpenSessions().length, 1);
 });
 
+test('adds native Pi session id args when supplied', async () => {
+	const { client } = createClient();
+
+	const session = await client.createSession(
+		baseRequest({ piSessionId: 'native-session-1' }),
+	);
+
+	const metadata = session.getMetadata();
+	assert.deepEqual(metadata.args, [
+		'--mode',
+		'rpc',
+		'--session-id',
+		'native-session-1',
+	]);
+	assert.equal(metadata.sessionId, 'native-session-1');
+});
+
 test('allows an explicit PI_CODING_AGENT_DIR when the caller opts out of preservation', async () => {
 	const { client } = createClient();
 

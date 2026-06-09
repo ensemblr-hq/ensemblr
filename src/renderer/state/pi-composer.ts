@@ -119,11 +119,13 @@ export function usePiComposerController({
 	const pendingSessionId =
 		pendingSession?.chatTabId === chatTabId ? pendingSession.sessionId : null;
 	const activeSessionId = persistedActiveSession?.id ?? pendingSessionId;
-	const activeSessionStatus = sessionsQuery.data?.sessions.find(
+	const activeSessionSnapshot = sessionsQuery.data?.sessions.find(
 		(session) => session.id === activeSessionId,
-	)?.status;
+	);
+	const activeSessionStatus = activeSessionSnapshot?.status;
 	const isPiSessionStreaming =
-		activeSessionStatus === 'starting' || activeSessionStatus === 'streaming';
+		activeSessionSnapshot?.runtimeOpen === true &&
+		(activeSessionStatus === 'starting' || activeSessionStatus === 'streaming');
 
 	useEffect(() => {
 		const unsubscribe = subscribePiSessionEvents((broadcast) => {
@@ -152,11 +154,15 @@ export function usePiComposerController({
 	}, [activeSessionId, queryClient, workspaceId]);
 
 	const openSessionMutation = useMutation({
-		mutationFn: (input: { initialPrompt: string }) =>
+		mutationFn: (input: {
+			initialPrompt: string | null;
+			resumeSessionId?: string | null;
+		}) =>
 			openPiSession({
 				chatTabId,
 				initialPrompt: input.initialPrompt,
 				model: modelId,
+				resumeSessionId: input.resumeSessionId ?? null,
 				thinkingLevel,
 				workspaceCwd,
 				workspaceId,
@@ -211,9 +217,13 @@ export function usePiComposerController({
 			setLastError(null);
 
 			let sessionId = activeSessionId;
-			if (!sessionId) {
+			const needsRuntimeResume =
+				persistedActiveSession !== undefined &&
+				!persistedActiveSession.runtimeOpen;
+			if (!sessionId || needsRuntimeResume) {
 				const opened = await openSessionMutation.mutateAsync({
-					initialPrompt: trimmed,
+					initialPrompt: sessionId ? null : trimmed,
+					resumeSessionId: sessionId,
 				});
 				if (opened.error) {
 					setLastError(opened.error);
@@ -234,7 +244,13 @@ export function usePiComposerController({
 				setLastError(result.error);
 			}
 		},
-		[activeSessionId, isRealChatTabId, openSessionMutation, submitMutation],
+		[
+			activeSessionId,
+			isRealChatTabId,
+			openSessionMutation,
+			persistedActiveSession,
+			submitMutation,
+		],
 	);
 
 	const onStop = useCallback(async (): Promise<void> => {
@@ -287,7 +303,7 @@ export function usePiComposerController({
 function hasChatTitleMetadata(
 	payload: import('@/shared/ipc').PiPersistedEnvelope | null,
 ): boolean {
-	if (!payload || payload.kind !== 'metadata') {
+	if (payload?.kind !== 'metadata') {
 		return false;
 	}
 	return typeof payload.metadata.chatTitle === 'string';

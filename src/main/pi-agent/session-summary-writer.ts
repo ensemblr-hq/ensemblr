@@ -10,6 +10,7 @@ import type { PiAgentEvent } from './pi-agent-types.ts';
 export interface WriteSessionSummaryInput {
 	branchId: string | null;
 	chatTabId: string;
+	/** Close timestamp, or the live update time while the tab is still open. */
 	closedAt: string;
 	events: readonly PiSessionEventWire[];
 	piSessionId: string | null;
@@ -139,6 +140,24 @@ async function runWriteSummary({
 	}
 
 	const transcript = renderTranscript(transcriptEvents);
+	const fallbackTitle = extractFirstUserPrompt(transcriptEvents);
+
+	// Write a deterministic transcript first so a crash during LLM summarization
+	// still leaves the latest conversation on disk.
+	const fallbackFrontmatter = renderFrontmatter({
+		branchId: input.branchId,
+		chatTabId: input.chatTabId,
+		closedAt: input.closedAt,
+		messageCount,
+		piSessionId: input.piSessionId,
+		summaryModel: null,
+		turnCount,
+	});
+	const fallbackBody = renderDeterministicBody({
+		title: fallbackTitle,
+		transcript,
+	});
+	await writeFileImpl(filePath, `${fallbackFrontmatter}\n${fallbackBody}`);
 
 	if (piAgentClient && executable) {
 		const llm = await tryLlmSummary({
@@ -163,22 +182,6 @@ async function runWriteSummary({
 		}
 	}
 
-	// Deterministic fallback: title from first user prompt, body = full transcript.
-	const fallbackTitle = extractFirstUserPrompt(transcriptEvents);
-	const fallbackBody = renderDeterministicBody({
-		title: fallbackTitle,
-		transcript,
-	});
-	const frontmatter = renderFrontmatter({
-		branchId: input.branchId,
-		chatTabId: input.chatTabId,
-		closedAt: input.closedAt,
-		messageCount,
-		piSessionId: input.piSessionId,
-		summaryModel: null,
-		turnCount,
-	});
-	await writeFileImpl(filePath, `${frontmatter}\n${fallbackBody}`);
 	return { path: filePath, title: fallbackTitle, usedLlm: false };
 }
 
@@ -264,7 +267,7 @@ function extractRole(
 	event: PiSessionEventWire,
 ): 'agent' | 'tool' | 'user' | null {
 	const payload = event.payload;
-	if (!payload || payload.kind !== 'message') {
+	if (payload?.kind !== 'message') {
 		return null;
 	}
 	return payload.role;
@@ -272,7 +275,7 @@ function extractRole(
 
 function extractText(event: PiSessionEventWire): string {
 	const payload = event.payload;
-	if (!payload || payload.kind !== 'message') {
+	if (payload?.kind !== 'message') {
 		return '';
 	}
 	const inner = payload.payload;

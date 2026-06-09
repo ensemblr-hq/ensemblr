@@ -26,7 +26,12 @@ export interface PiWireMetadata {
 	status?: PiSessionStatusWire;
 }
 
-/** Mirror of {@link PiAgentMessagePart} on the wire. */
+/**
+ * Canonical message-part shape carried across the wire and reused inside the
+ * main-process pi-agent boundary as `PiAgentMessagePart`. Keeping one definition
+ * means a new variant added here is enforced everywhere by the type system —
+ * no silent drift between main and renderer.
+ */
 export type PiWireMessagePart =
 	| { kind: 'text'; text: string }
 	| { kind: 'reasoning'; text: string }
@@ -38,7 +43,11 @@ export type PiWireMessagePart =
 			toolCallId: string;
 	  };
 
-/** Mirror of {@link PiAgentMessagePayload} on the wire. */
+/**
+ * Canonical message-payload union on the wire. Reused inside the main-process
+ * pi-agent boundary as `PiAgentMessagePayload` so exhaustiveness checks fail
+ * on the producer side whenever a new variant is added.
+ */
 export type PiWireMessagePayload =
 	| { kind: 'text'; text: string }
 	| { kind: 'reasoning'; text: string }
@@ -100,6 +109,8 @@ export interface PiSessionSnapshotWire {
 	model: string | null;
 	openedTabs: readonly PiChatTabWire[];
 	piSessionId: string | null;
+	/** True when a Pi RPC child is currently attached for this session. */
+	runtimeOpen: boolean;
 	status: PiSessionStatusWire;
 	thinkingLevel: string | null;
 	updatedAt: string;
@@ -133,6 +144,8 @@ export interface OpenPiSessionRequest {
 	/** First user prompt, used only to generate a short tab title. */
 	initialPrompt?: string | null;
 	label?: string;
+	/** Existing Ensemble Pi session id to reopen with native Pi history. */
+	resumeSessionId?: string | null;
 	model?: string | null;
 	thinkingLevel?: string | null;
 	workspaceCwd: string;
