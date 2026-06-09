@@ -3,7 +3,6 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 import type {
 	PiAgentClient,
 	PiAgentSession,
@@ -15,6 +14,7 @@ import type {
 	PiAgentSubscription,
 } from '../../src/main/pi-agent/pi-agent-types.ts';
 import { createSessionSummaryWriter } from '../../src/main/pi-agent/session-summary-writer.ts';
+import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 import type { PiSessionEventWire } from '../../src/shared/ipc/contracts/pi-session.ts';
 
 function makeFakeExecutable(): PiExecutableSnapshot {

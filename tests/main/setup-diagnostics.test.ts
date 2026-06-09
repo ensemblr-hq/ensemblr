@@ -406,8 +406,16 @@ function createPiReadinessService(
 			command: executable.command,
 			modelCount: 2,
 			models: [
-				{ id: 'openai-codex/gpt-5.5', model: 'gpt-5.5', provider: 'openai-codex' },
-				{ id: 'openai-codex/gpt-5.4', model: 'gpt-5.4', provider: 'openai-codex' },
+				{
+					id: 'openai-codex/gpt-5.5',
+					model: 'gpt-5.5',
+					provider: 'openai-codex',
+				},
+				{
+					id: 'openai-codex/gpt-5.4',
+					model: 'gpt-5.4',
+					provider: 'openai-codex',
+				},
 			],
 			providerCount: 1,
 			result: createLocalCommandResult(executable.command, ['--list-models'], {

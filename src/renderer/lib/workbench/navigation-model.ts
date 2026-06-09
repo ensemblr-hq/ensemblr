@@ -378,15 +378,15 @@ function readFilesToCopyMetadata(
 	if (typeof raw !== 'object' || raw === null) {
 		return {
 			count: 0,
-			detail:
-				'Copied files will be shown here once workspace setup completes.',
+			detail: 'Copied files will be shown here once workspace setup completes.',
 			state: 'unavailable',
 		};
 	}
 
 	const record = raw as Record<string, unknown>;
 	const copiedCount =
-		typeof record.copiedCount === 'number' && Number.isFinite(record.copiedCount)
+		typeof record.copiedCount === 'number' &&
+		Number.isFinite(record.copiedCount)
 			? record.copiedCount
 			: 0;
 	const skippedCount =

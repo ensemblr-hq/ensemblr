@@ -357,8 +357,7 @@ export function getShellProcessCheck({
 			if (result.status !== 'success') {
 				return {
 					detail:
-						result.failure?.message ??
-						'The process launch smoke check failed.',
+						result.failure?.message ?? 'The process launch smoke check failed.',
 					logs,
 					status: 'failure',
 				};

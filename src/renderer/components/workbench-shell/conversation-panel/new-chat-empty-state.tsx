@@ -50,7 +50,10 @@ function TranscriptChip({ entry }: { entry: ClosedChatTabEntryWire }) {
 			title={entry.summaryPath}
 			type='button'
 		>
-			<SparklesIcon aria-hidden='true' className='size-3.5 text-muted-foreground' />
+			<SparklesIcon
+				aria-hidden='true'
+				className='size-3.5 text-muted-foreground'
+			/>
 			<span className='truncate'>{label}</span>
 		</button>
 	);

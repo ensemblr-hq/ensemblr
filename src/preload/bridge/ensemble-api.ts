@@ -105,10 +105,7 @@ export function createEnsembleApi(): EnsembleApi {
 				listener,
 			),
 		onPiSessionEvent: (listener) =>
-			subscribe<PiSessionEventBroadcast>(
-				IPC_CHANNELS.piSessionEvent,
-				listener,
-			),
+			subscribe<PiSessionEventBroadcast>(IPC_CHANNELS.piSessionEvent, listener),
 		openChatTab: (request) => invoke('openChatTab', request),
 		openPiSession: (request) => invoke('openPiSession', request),
 		prepareCloneGithubRepository: (request) =>
@@ -120,7 +117,8 @@ export function createEnsembleApi(): EnsembleApi {
 			invoke('registerLocalRepository', request),
 		renameWorkspace: (request) => invoke('renameWorkspace', request),
 		repositoryConfig: (request) => invoke('repositoryConfig', request),
-		repositoryWorkspaceNavigation: () => invoke('repositoryWorkspaceNavigation'),
+		repositoryWorkspaceNavigation: () =>
+			invoke('repositoryWorkspaceNavigation'),
 		resolveSettings: (request) => invoke('resolveSettings', request),
 		restoreChatTab: (request) => invoke('restoreChatTab', request),
 		rootDirectory: () => invoke('rootDirectory'),

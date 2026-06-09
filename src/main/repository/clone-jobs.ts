@@ -14,10 +14,7 @@ export interface PreparedJobStore {
 	delete: (jobId: string) => void;
 	evictExpired: () => void;
 	get: (jobId: string) => PreparedJob | undefined;
-	set: (
-		jobId: string,
-		preparation: CloneGithubRepositoryPreparation,
-	) => void;
+	set: (jobId: string, preparation: CloneGithubRepositoryPreparation) => void;
 }
 
 /**

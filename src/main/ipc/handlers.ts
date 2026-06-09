@@ -5,9 +5,9 @@ import type {
 	RepositoryConfigService,
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
-import type { PiExecutableService } from '../pi-runtime';
 import type { PiSessionService } from '../pi-agent/pi-session-service';
 import type { SessionSummaryWriter } from '../pi-agent/session-summary-writer';
+import type { PiExecutableService } from '../pi-runtime';
 import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,

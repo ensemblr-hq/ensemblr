@@ -5,8 +5,8 @@ import type {
 } from '../../shared/ipc/contracts/pi-session.ts';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import {
-	type PiEventRow,
 	listEventsByBranch,
+	type PiEventRow,
 } from '../storage/repositories/pi-event-repository.ts';
 import {
 	getPiSessionById,
@@ -16,11 +16,11 @@ import {
 	type PiSessionRow,
 	type PiTurnRow,
 } from '../storage/repositories/pi-session-repository.ts';
+import type { PiAgentClient } from './pi-agent-client.ts';
 import {
 	CHAT_TITLE_TIMEOUT_MS,
 	queueChatTitleGeneration,
 } from './pi-chat-title-service.ts';
-import type { PiAgentClient } from './pi-agent-client.ts';
 import {
 	createPiSessionLifecycle,
 	type OpenPiSessionRequest,

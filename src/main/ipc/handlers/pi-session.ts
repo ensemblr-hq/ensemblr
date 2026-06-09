@@ -16,15 +16,15 @@ import {
 	type SubmitPiPromptResult,
 } from '../../../shared/ipc';
 import type { LocalCommandService } from '../../commands/local-command';
+import {
+	type PiSessionService,
+	snapshotToWire,
+} from '../../pi-agent/pi-session-service.ts';
 import type { PiExecutableService } from '../../pi-runtime';
 import {
 	presentPiModels,
 	resolvePiProviderModels,
 } from '../../pi-runtime/pi-provider-models.ts';
-import {
-	type PiSessionService,
-	snapshotToWire,
-} from '../../pi-agent/pi-session-service.ts';
 
 /** Service dependencies used by the Pi session IPC handlers. */
 export interface PiSessionHandlersOptions {

@@ -21,10 +21,7 @@ export interface ArchiveDiagnosticLike {
  */
 export function pushLifecycleDiagnostics<
 	TDiagnostic extends ArchiveDiagnosticLike,
->(
-	diagnostics: TDiagnostic[],
-	lifecycle: ArchiveLifecycleDiagnostic[],
-): void {
+>(diagnostics: TDiagnostic[], lifecycle: ArchiveLifecycleDiagnostic[]): void {
 	for (const entry of lifecycle) {
 		const folded: ArchiveDiagnosticLike = {
 			code: 'lifecycle-hook-failed',
@@ -44,7 +41,10 @@ export function pushLifecycleDiagnostics<
 export function failureResult<
 	TDiagnostic extends ArchiveDiagnosticLike,
 	TExtras extends Record<string, unknown>,
->(diagnostic: TDiagnostic, extras: TExtras): { diagnostics: TDiagnostic[]; status: 'failure' } & TExtras {
+>(
+	diagnostic: TDiagnostic,
+	extras: TExtras,
+): { diagnostics: TDiagnostic[]; status: 'failure' } & TExtras {
 	return {
 		diagnostics: [diagnostic],
 		status: 'failure',

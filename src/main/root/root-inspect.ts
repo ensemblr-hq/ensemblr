@@ -12,7 +12,6 @@ import type {
 	RootDirectoryManagedPathSnapshot,
 	RootDirectorySnapshot,
 } from '../../shared/ipc';
-import { buildRootDirectorySnapshot } from './root-persist.ts';
 import {
 	createManagedPathSnapshots,
 	createRootDirectorySettingSnapshot,
@@ -20,6 +19,7 @@ import {
 	MANAGED_DIRECTORY_NAMES,
 	normalizeRootPath,
 } from './root-path-normalize.ts';
+import { buildRootDirectorySnapshot } from './root-persist.ts';
 
 /**
  * Validates and inspects a candidate root path value without depending on the

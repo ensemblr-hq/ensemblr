@@ -49,8 +49,7 @@ export function registerRepositoryConfigHandlers({
 	ipcMain.handle(
 		IPC_CHANNELS.previewRepositoryConfigMigration,
 		(_event, request: unknown): RepositoryConfigMigrationPreview => {
-			const normalizedRequest =
-				parseRepositoryConfigMigrationRequest(request);
+			const normalizedRequest = parseRepositoryConfigMigrationRequest(request);
 
 			if (
 				normalizedRequest.repositoryPath &&
@@ -68,8 +67,7 @@ export function registerRepositoryConfigHandlers({
 	ipcMain.handle(
 		IPC_CHANNELS.applyRepositoryConfigMigration,
 		(_event, request: unknown): RepositoryConfigMigrationResult => {
-			const normalizedRequest =
-				parseRepositoryConfigMigrationRequest(request);
+			const normalizedRequest = parseRepositoryConfigMigrationRequest(request);
 
 			if (
 				normalizedRequest.repositoryPath &&

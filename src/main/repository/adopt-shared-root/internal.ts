@@ -7,14 +7,11 @@ import type {
 	SharedRootAdoptionSnapshot,
 	SharedRootAdoptionStatus,
 } from '../../../shared/ipc';
-import {
-	type LoadedRepositoryConfig,
-	type LoadRepositoryConfigOptions,
+import type {
+	LoadedRepositoryConfig,
+	LoadRepositoryConfigOptions,
 } from '../../config/repository-config.ts';
-import {
-	type GitRepositoryProbeFn,
-	type GitWorktreeProbeFn,
-} from '../git-probe.ts';
+import type { GitRepositoryProbeFn, GitWorktreeProbeFn } from '../git-probe.ts';
 import { parseMetadata } from '../metadata.ts';
 
 /** Sentinel string written into adoption metadata to tag discovered rows. */

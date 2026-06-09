@@ -62,7 +62,9 @@ function handleEvent(
 	const envelope = event.payload;
 	if (!envelope) {
 		flush(pending, result);
-		result.push(buildSystemNoticeMessage(event, `Pi event: ${event.eventType}`));
+		result.push(
+			buildSystemNoticeMessage(event, `Pi event: ${event.eventType}`),
+		);
 		return null;
 	}
 
@@ -99,7 +101,9 @@ function handleEvent(
 			const exhaustive: never = envelope;
 			void exhaustive;
 			flush(pending, result);
-			result.push(buildSystemNoticeMessage(event, `Pi event: ${event.eventType}`));
+			result.push(
+				buildSystemNoticeMessage(event, `Pi event: ${event.eventType}`),
+			);
 			return null;
 		}
 	}
@@ -198,7 +202,10 @@ function projectMessagePart(
 }
 
 function buildToolCallPart(
-	source: Extract<PiWireMessagePart | PiWireMessagePayload, { kind: 'tool-call' }>,
+	source: Extract<
+		PiWireMessagePart | PiWireMessagePayload,
+		{ kind: 'tool-call' }
+	>,
 	event: PiSessionEventWire,
 ): DynamicToolUIPart {
 	const input = isPlainObject(source.input) ? source.input : {};
@@ -307,7 +314,9 @@ function describeMetadata(
 
 function readStderrDetail(payload: PiPersistedEnvelope | null): string {
 	if (payload?.kind === 'error') {
-		return payload.error.detail ?? payload.error.message ?? '(empty stderr chunk)';
+		return (
+			payload.error.detail ?? payload.error.message ?? '(empty stderr chunk)'
+		);
 	}
 	return '(empty stderr chunk)';
 }

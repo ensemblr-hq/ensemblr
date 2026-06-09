@@ -20,11 +20,11 @@ import {
 } from '../storage/repositories/pi-session-repository.ts';
 import type { PiAgentClient, PiAgentSession } from './pi-agent-client.ts';
 import type { PiAgentEvent, PiAgentSubscription } from './pi-agent-types.ts';
+import { PiSessionServiceError } from './pi-session-service-error.ts';
 import type {
 	PiSessionEventSink,
 	PiSessionSnapshot,
 } from './pi-session-types.ts';
-import { PiSessionServiceError } from './pi-session-service-error.ts';
 
 /** Live binding between a persisted Pi session row and a runtime PiAgentSession. */
 interface ActiveSession {

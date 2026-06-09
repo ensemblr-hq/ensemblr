@@ -21,10 +21,7 @@ import {
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
 import { insertArchiveRecord } from './archive-records.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
-import {
-	hasWorkspaceRepositoryIdentity,
-	isRecord,
-} from './row-guards.ts';
+import { hasWorkspaceRepositoryIdentity, isRecord } from './row-guards.ts';
 
 /** Public surface of the workspace lifecycle archive service. */
 export interface ArchiveWorkspaceService {

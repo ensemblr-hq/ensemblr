@@ -12,10 +12,13 @@ import {
 import { createEnvironmentVariablesService } from './environment';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
-import { createPiExecutableService, createPiReadinessService } from './pi-runtime';
 import { createCliRpcPiAgentAdapter, createPiAgentClient } from './pi-agent';
 import { createPiSessionService } from './pi-agent/pi-session-service';
 import { createSessionSummaryWriter } from './pi-agent/session-summary-writer';
+import {
+	createPiExecutableService,
+	createPiReadinessService,
+} from './pi-runtime';
 import {
 	createArchiveLifecycleService,
 	createArchiveRepositoryService,

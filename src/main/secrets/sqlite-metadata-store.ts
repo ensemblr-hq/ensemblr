@@ -5,11 +5,11 @@ import {
 	type KeychainReference,
 	type NormalizedLookup,
 	type NormalizedWriteInput,
+	SECRET_SCOPES,
 	type SecretBackend,
 	type SecretMetadata,
 	type SecretMetadataFilter,
 	type SecretScope,
-	SECRET_SCOPES,
 	SecretStoreError,
 } from './secret-store-types.ts';
 

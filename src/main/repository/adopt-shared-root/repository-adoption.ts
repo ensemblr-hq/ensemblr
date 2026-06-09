@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { AdoptedRepositorySnapshot } from '../../../shared/ipc';
-import { type GitRepositoryProbe } from '../git-probe.ts';
+import type { GitRepositoryProbe } from '../git-probe.ts';
 import { normalizeRemoteUrl } from '../github-url.ts';
 import { parseMetadata } from '../metadata.ts';
 import { toSlug } from '../slug.ts';

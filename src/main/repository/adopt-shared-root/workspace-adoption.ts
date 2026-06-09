@@ -3,7 +3,7 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type { AdoptedWorkspaceSnapshot } from '../../../shared/ipc';
 import { DEFAULT_FALLBACK_BRANCH } from '../git-ops.ts';
-import { type GitWorktreeMetadata } from '../git-probe.ts';
+import type { GitWorktreeMetadata } from '../git-probe.ts';
 import { parseMetadata } from '../metadata.ts';
 import { ADOPTION_MODE } from './internal.ts';
 

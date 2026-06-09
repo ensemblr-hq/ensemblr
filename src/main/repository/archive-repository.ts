@@ -17,11 +17,7 @@ import {
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
 import { insertArchiveRecord } from './archive-records.ts';
 import type { ArchiveWorkspaceService } from './archive-workspace.ts';
-import {
-	isNullableString,
-	isRecord,
-	isString,
-} from './row-guards.ts';
+import { isNullableString, isRecord, isString } from './row-guards.ts';
 
 /** Public surface of the repository lifecycle archive service. */
 export interface ArchiveRepositoryService {
@@ -383,9 +379,7 @@ function isWorkspaceRow(row: unknown): row is SourceWorkspace {
 		return false;
 	}
 	return (
-		isString(row.id) &&
-		isString(row.name) &&
-		isNullableString(row.archivedAt)
+		isString(row.id) && isString(row.name) && isNullableString(row.archivedAt)
 	);
 }
 

@@ -676,7 +676,9 @@ function normalizeMessageEnd(
  * into structured {@link PiAgentMessagePart} entries. Blocks we don't know how
  * to interpret are skipped.
  */
-function normalizeContentParts(content: unknown): readonly PiAgentMessagePart[] {
+function normalizeContentParts(
+	content: unknown,
+): readonly PiAgentMessagePart[] {
 	if (typeof content === 'string') {
 		return content.length > 0 ? [{ kind: 'text', text: content }] : [];
 	}
@@ -698,8 +700,7 @@ function contentBlockToPart(block: unknown): PiAgentMessagePart | null {
 		return null;
 	}
 	const record = block as Record<string, unknown>;
-	const blockType =
-		typeof record.type === 'string' ? record.type : '';
+	const blockType = typeof record.type === 'string' ? record.type : '';
 	if (blockType === 'text' && typeof record.text === 'string') {
 		return { kind: 'text', text: record.text };
 	}
@@ -792,8 +793,7 @@ function normalizeLegacyMessageFrame(
 				toolCallId,
 			};
 		}
-		const input =
-			(inner.input as unknown) ?? (inner.args as unknown) ?? {};
+		const input = (inner.input as unknown) ?? (inner.args as unknown) ?? {};
 		return { input, kind: 'tool-call', name, toolCallId };
 	}
 

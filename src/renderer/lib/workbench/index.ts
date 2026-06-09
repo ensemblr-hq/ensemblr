@@ -9,6 +9,7 @@ export {
 } from './constants';
 export { getWorkspaceFileIconName } from './file-icons';
 export { healthTone } from './health-tone';
+export { getEmptyStateCopy } from './navigation-empty-state';
 export {
 	createPlaceholderSession,
 	getRenderableNavigationSnapshot,
@@ -32,10 +33,9 @@ export {
 	getStringRouteParam,
 	getWorkbenchStaticView,
 } from './route-utils';
-export { getEmptyStateCopy } from './navigation-empty-state';
 export { loadWorkbenchShellData } from './shell-data-loader';
-export { getWorkbenchHealth } from './workbench-health';
 export { getWorkbenchStaticRoute } from './static-navigation';
+export { getWorkbenchHealth } from './workbench-health';
 export { getWorkspaceSidebarState } from './workspace-sidebar-state';
 export {
 	filterWorkspaceSourcesByKind,

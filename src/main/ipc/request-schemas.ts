@@ -116,9 +116,9 @@ export function parseCloneGithubRepositoryRequest(
  * Parses a clone-start payload, preserving the legacy fallback of
  * `{ jobId: '' }` when the payload is malformed or `jobId` is non-string.
  */
-export function parseCloneGithubRepositoryStartRequest(
-	raw: unknown,
-): { jobId: string } {
+export function parseCloneGithubRepositoryStartRequest(raw: unknown): {
+	jobId: string;
+} {
 	const parsed = cloneGithubRepositoryStartRequestSchema.safeParse(raw);
 	if (!parsed.success) {
 		return { jobId: '' };
@@ -193,9 +193,10 @@ export function parseRepositoryConfigRequest(raw: unknown): {
  * fallback of `{ repositoryPath: '' }` on malformed input and the strict
  * `overwrite === true` test (any other value collapses to `undefined`).
  */
-export function parseRepositoryConfigMigrationRequest(
-	raw: unknown,
-): { overwrite?: true | undefined; repositoryPath: string } {
+export function parseRepositoryConfigMigrationRequest(raw: unknown): {
+	overwrite?: true | undefined;
+	repositoryPath: string;
+} {
 	const parsed = repositoryConfigMigrationRequestSchema.safeParse(raw);
 	if (!parsed.success) {
 		return { repositoryPath: '' };

@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 
 import { eventsToUIMessages } from '../../src/renderer/lib/pi/event-to-ui-message';
-import type { PiPersistedEnvelope, PiSessionEventWire } from '../../src/shared/ipc';
+import type {
+	PiPersistedEnvelope,
+	PiSessionEventWire,
+} from '../../src/shared/ipc';
 
 function event(
 	overrides: Partial<PiSessionEventWire> & {

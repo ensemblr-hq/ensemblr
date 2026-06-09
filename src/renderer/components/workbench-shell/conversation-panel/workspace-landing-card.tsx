@@ -64,9 +64,7 @@ export function WorkspaceLandingCard({
 						{workspaceName}
 					</span>{' '}
 					and copied{' '}
-					<span className='font-mono text-foreground'>
-						{copiedFiles.count}
-					</span>{' '}
+					<span className='font-mono text-foreground'>{copiedFiles.count}</span>{' '}
 					files
 				</span>
 			</p>
