@@ -126,7 +126,8 @@ function framesToEvents(lines: readonly string[]): PiSessionEventWire[] {
 						payload: {
 							input: frame.args ?? {},
 							kind: 'tool-call',
-							name: typeof frame.toolName === 'string' ? frame.toolName : 'tool',
+							name:
+								typeof frame.toolName === 'string' ? frame.toolName : 'tool',
 							toolCallId:
 								typeof frame.toolCallId === 'string' ? frame.toolCallId : '',
 						},
@@ -177,12 +178,18 @@ for (const message of messages) {
 	console.log(`\n[${message.role}] (${duration})`);
 	for (const part of message.parts) {
 		if (part.type === 'text') {
-			console.log(`  text(${'state' in part ? part.state : '?'}): ${part.text.slice(0, 80).replaceAll('\n', '\\n')}`);
+			console.log(
+				`  text(${'state' in part ? part.state : '?'}): ${part.text.slice(0, 80).replaceAll('\n', '\\n')}`,
+			);
 		} else if (part.type === 'reasoning') {
-			console.log(`  reasoning: ${part.text.slice(0, 60).replaceAll('\n', '\\n')}`);
+			console.log(
+				`  reasoning: ${part.text.slice(0, 60).replaceAll('\n', '\\n')}`,
+			);
 		} else if (part.type === 'dynamic-tool') {
 			const p = part as { state: string; toolName: string; toolCallId: string };
-			console.log(`  tool[${p.toolName}] state=${p.state} id=${p.toolCallId.slice(0, 24)}…`);
+			console.log(
+				`  tool[${p.toolName}] state=${p.state} id=${p.toolCallId.slice(0, 24)}…`,
+			);
 		}
 	}
 }

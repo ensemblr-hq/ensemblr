@@ -22,7 +22,7 @@ export function ChatAttachmentChip({
 	return (
 		<span
 			className={cn(
-				'inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/50 bg-muted/60 px-2 py-0.5 font-medium text-[12px] text-foreground/90 leading-5',
+				'inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/50 bg-muted/60 px-2 py-0.5 font-medium text-foreground/90 text-xs leading-5',
 				className,
 			)}
 			{...rest}

@@ -41,7 +41,10 @@ export function ChatTurnSummary({
 	const headline = segments.join(', ');
 	const trailing = durationMs !== null ? formatTurnDuration(durationMs) : null;
 	return (
-		<div className={cn('flex flex-col gap-2', className)} data-role='turn-summary'>
+		<div
+			className={cn('flex flex-col gap-2', className)}
+			data-role='turn-summary'
+		>
 			<button
 				aria-expanded={open}
 				className='flex w-fit items-center gap-2 rounded-md px-1 text-muted-foreground text-xs leading-5 transition-colors hover:text-foreground'

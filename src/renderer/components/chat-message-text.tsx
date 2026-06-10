@@ -1,8 +1,5 @@
 import type { BundledLanguage } from 'shiki';
-import {
-	classifyToolOutput,
-	looksLikeStructuredDump,
-} from '@/renderer/lib/pi';
+import { classifyToolOutput, looksLikeStructuredDump } from '@/renderer/lib/pi';
 import { cn } from '@/renderer/lib/utils';
 
 import { CodeBlock } from './code-block';

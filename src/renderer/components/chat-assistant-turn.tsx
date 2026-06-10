@@ -5,8 +5,8 @@ import { cn } from '@/renderer/lib/utils';
 
 import { ChatReasoningRow, ChatToolRow } from './chat-activity-row';
 import { ChatMessageText } from './chat-message-text';
-import { ChatTurnTimer, formatTurnDuration } from './chat-turn-timer';
 import { ChatTurnSummary } from './chat-turn-summary';
+import { ChatTurnTimer, formatTurnDuration } from './chat-turn-timer';
 
 export interface ChatAssistantTurnTiming {
 	endMs: number | null;
