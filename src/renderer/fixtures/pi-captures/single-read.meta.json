@@ -1,0 +1,31 @@
+{
+	"scenario": "single-read",
+	"description": "One tool call with small output.",
+	"piArgs": [
+		"--mode",
+		"rpc",
+		"--no-session"
+	],
+	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/single-read",
+	"startedAt": 1781134158741,
+	"endedAt": 1781134166256,
+	"sent": [
+		{
+			"ts": 1781134158742,
+			"command": {
+				"type": "prompt",
+				"message": "Read README.md and summarize it in two sentences."
+			}
+		},
+		{
+			"ts": 1781134166244,
+			"command": {
+				"id": "final-stats",
+				"type": "get_session_stats"
+			}
+		}
+	],
+	"exitCondition": "completed",
+	"exitCode": 143,
+	"notes": []
+}

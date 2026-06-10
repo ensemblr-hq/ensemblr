@@ -1,0 +1,31 @@
+{
+	"scenario": "multi-tool-chain",
+	"description": "Consecutive sequential tool calls.",
+	"piArgs": [
+		"--mode",
+		"rpc",
+		"--no-session"
+	],
+	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/multi-tool-chain",
+	"startedAt": 1781134166257,
+	"endedAt": 1781134180671,
+	"sent": [
+		{
+			"ts": 1781134166257,
+			"command": {
+				"type": "prompt",
+				"message": "Find every .ts file in this project, read each of them, and then describe the project structure."
+			}
+		},
+		{
+			"ts": 1781134180660,
+			"command": {
+				"id": "final-stats",
+				"type": "get_session_stats"
+			}
+		}
+	],
+	"exitCondition": "completed",
+	"exitCode": 143,
+	"notes": []
+}

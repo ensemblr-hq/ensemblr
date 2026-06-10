@@ -1,0 +1,38 @@
+{
+	"scenario": "thinking",
+	"description": "Extended reasoning blocks, if the model emits them.",
+	"piArgs": [
+		"--mode",
+		"rpc",
+		"--no-session"
+	],
+	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/thinking",
+	"startedAt": 1781134219756,
+	"endedAt": 1781134228516,
+	"sent": [
+		{
+			"ts": 1781134219757,
+			"command": {
+				"type": "set_thinking_level",
+				"level": "high"
+			}
+		},
+		{
+			"ts": 1781134224105,
+			"command": {
+				"type": "prompt",
+				"message": "Without using any tools: a farmer must ferry a wolf, a goat, and a cabbage across a river in a boat that fits only one item at a time. Work out a correct sequence, then explain in two sentences why no shorter sequence exists."
+			}
+		},
+		{
+			"ts": 1781134228504,
+			"command": {
+				"id": "final-stats",
+				"type": "get_session_stats"
+			}
+		}
+	],
+	"exitCondition": "completed",
+	"exitCode": 143,
+	"notes": []
+}

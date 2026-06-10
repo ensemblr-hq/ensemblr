@@ -1,0 +1,31 @@
+{
+	"scenario": "markdown-heavy",
+	"description": "Markdown rendering edge cases: headings, table, code.",
+	"piArgs": [
+		"--mode",
+		"rpc",
+		"--no-session"
+	],
+	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/markdown-heavy",
+	"startedAt": 1781134147742,
+	"endedAt": 1781134158740,
+	"sent": [
+		{
+			"ts": 1781134147742,
+			"command": {
+				"type": "prompt",
+				"message": "Explain React Server Components. Use markdown with at least two heading levels, a comparison table (server vs client components), one tsx code block, and one bash code block. Do not use any tools."
+			}
+		},
+		{
+			"ts": 1781134158727,
+			"command": {
+				"id": "final-stats",
+				"type": "get_session_stats"
+			}
+		}
+	],
+	"exitCondition": "completed",
+	"exitCode": 143,
+	"notes": []
+}

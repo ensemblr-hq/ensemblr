@@ -1,0 +1,39 @@
+{
+	"scenario": "abort-mid-turn",
+	"description": "Abort RPC mid-stream; cancellation events, partial content.",
+	"piArgs": [
+		"--mode",
+		"rpc",
+		"--no-session"
+	],
+	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/abort-mid-turn",
+	"startedAt": 1781134228517,
+	"endedAt": 1781134235872,
+	"sent": [
+		{
+			"ts": 1781134228518,
+			"command": {
+				"type": "prompt",
+				"message": "Read every file in this project one at a time, then write a very detailed multi-section analysis of the entire codebase, file by file."
+			}
+		},
+		{
+			"ts": 1781134235821,
+			"command": {
+				"type": "abort"
+			}
+		},
+		{
+			"ts": 1781134235858,
+			"command": {
+				"id": "final-stats",
+				"type": "get_session_stats"
+			}
+		}
+	],
+	"exitCondition": "completed",
+	"exitCode": 143,
+	"notes": [
+		"abort sent 750ms after first tool/text activity"
+	]
+}

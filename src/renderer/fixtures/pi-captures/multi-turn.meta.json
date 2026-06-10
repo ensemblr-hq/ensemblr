@@ -1,0 +1,38 @@
+{
+	"scenario": "multi-turn",
+	"description": "Two sequential prompts in one session.",
+	"piArgs": [
+		"--mode",
+		"rpc",
+		"--no-session"
+	],
+	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/multi-turn",
+	"startedAt": 1781134210341,
+	"endedAt": 1781134219755,
+	"sent": [
+		{
+			"ts": 1781134210342,
+			"command": {
+				"type": "prompt",
+				"message": "Read README.md and tell me what this project does in one sentence."
+			}
+		},
+		{
+			"ts": 1781134217931,
+			"command": {
+				"type": "prompt",
+				"message": "Based on that, suggest one concrete improvement to the README. Do not read any files."
+			}
+		},
+		{
+			"ts": 1781134219744,
+			"command": {
+				"id": "final-stats",
+				"type": "get_session_stats"
+			}
+		}
+	],
+	"exitCondition": "completed",
+	"exitCode": 143,
+	"notes": []
+}

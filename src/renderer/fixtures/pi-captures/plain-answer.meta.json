@@ -1,0 +1,31 @@
+{
+	"scenario": "plain-answer",
+	"description": "Pure streamed assistant text, no tools.",
+	"piArgs": [
+		"--mode",
+		"rpc",
+		"--no-session"
+	],
+	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/plain-answer",
+	"startedAt": 1781134140965,
+	"endedAt": 1781134147741,
+	"sent": [
+		{
+			"ts": 1781134140967,
+			"command": {
+				"type": "prompt",
+				"message": "What is a Git worktree? Answer in one short paragraph of plain prose. Do not use any tools."
+			}
+		},
+		{
+			"ts": 1781134147726,
+			"command": {
+				"id": "final-stats",
+				"type": "get_session_stats"
+			}
+		}
+	],
+	"exitCondition": "completed",
+	"exitCode": 143,
+	"notes": []
+}
