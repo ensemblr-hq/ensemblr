@@ -91,7 +91,7 @@ export function SetupCheckRow({
 							check.status === 'success' && 'text-status-ok',
 							check.status === 'warning' && 'text-status-warning',
 							check.status === 'pending' && 'text-muted-foreground',
-							check.status === 'running' && 'text-accent',
+							check.status === 'running' && 'text-accent-strong',
 						)}
 					/>
 					<div className='min-w-0'>
