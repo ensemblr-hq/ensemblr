@@ -4,7 +4,7 @@ import type { UIMessage } from 'ai';
 import { ArrowDownIcon, DownloadIcon } from 'lucide-react';
 import { ScrollArea as ScrollAreaPrimitive } from 'radix-ui';
 import type { ComponentProps, ReactNode } from 'react';
-import { useCallback } from 'react';
+import { useCallback, useLayoutEffect, useState } from 'react';
 import {
 	StickToBottom,
 	type StickToBottomContext,
@@ -20,7 +20,7 @@ export type ConversationProps = ComponentProps<typeof StickToBottom>;
 export const Conversation = ({ className, ...props }: ConversationProps) => (
 	<StickToBottom
 		className={cn('relative flex-1 overflow-y-hidden', className)}
-		initial='smooth'
+		initial='instant'
 		resize='smooth'
 		role='log'
 		{...props}
@@ -39,6 +39,19 @@ export const ConversationContent = ({
 	...props
 }: ConversationContentProps) => {
 	const context = useStickToBottomContext();
+	const [ready, setReady] = useState(false);
+
+	// Jam scrollTop to the bottom before the first paint and only reveal the
+	// viewport once it lands there. The library's own initial scroll fires in
+	// a useEffect (post-paint), so without this the user briefly sees the top
+	// of long conversations on tab switch.
+	useLayoutEffect(() => {
+		const node = context.scrollRef.current;
+		if (node) {
+			node.scrollTop = node.scrollHeight;
+		}
+		setReady(true);
+	}, [context.scrollRef]);
 
 	return (
 		<ScrollAreaPrimitive.Root
@@ -49,7 +62,10 @@ export const ConversationContent = ({
 				className='size-full rounded-[inherit] outline-none transition-[color,box-shadow] focus-visible:outline-1 focus-visible:ring-3 focus-visible:ring-ring/50'
 				data-slot='conversation-scroll-area-viewport'
 				ref={context.scrollRef}
-				style={{ scrollbarGutter: 'stable both-edges' }}
+				style={{
+					opacity: ready ? 1 : 0,
+					scrollbarGutter: 'stable both-edges',
+				}}
 			>
 				<div
 					className={cn('flex flex-col gap-8 p-4', className)}

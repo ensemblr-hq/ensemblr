@@ -154,7 +154,10 @@ export function PiSessionTimeline({
 			className='flex min-h-0 flex-1 flex-col'
 			data-timeline-state='ready'
 		>
-			<Conversation className='min-h-0 w-full flex-1'>
+			<Conversation
+				className='min-h-0 w-full flex-1'
+				key={activeSession.chatTabId}
+			>
 				<ConversationContent className='mx-auto w-full max-w-3xl gap-6 px-4 pt-5 pb-5'>
 					{messages.map((message, index) => (
 						<TimelineMessage
