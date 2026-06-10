@@ -6,6 +6,7 @@ import {
 	ensembleQueryKeys,
 	openPiSession,
 	piModelsQuery,
+	piSessionEventsQuery,
 	piSessionsForWorkspaceQuery,
 	stopPiSession,
 	submitPiPrompt,
@@ -16,6 +17,7 @@ import {
 	selectedPiThinkingLevelByWorkspaceAtom,
 } from '@/renderer/state/workspace';
 import type {
+	ComposerContextUsage,
 	ComposerModelOption,
 	ComposerThinkingOption,
 } from '@/renderer/types/workbench';
@@ -24,6 +26,7 @@ export interface PiComposerControllerState {
 	activeSessionId: string | null;
 	availableModels: readonly ComposerModelOption[];
 	availableThinkingLevels: readonly ComposerThinkingOption[];
+	contextUsage: ComposerContextUsage | null;
 	isStreaming: boolean;
 	lastError: string | null;
 	modelId: string | null;
@@ -38,8 +41,25 @@ const THINKING_LABELS: Record<string, string> = {
 	high: 'High',
 	low: 'Low',
 	medium: 'Medium',
+	minimal: 'Minimal',
 	off: 'Off',
+	xhigh: 'Extra high',
 };
+
+/**
+ * Canonical pi thinking levels (matches `ThinkingLevel` in
+ * `@earendil-works/pi-agent-core`). Hard-coded so the picker doesn't depend
+ * on `pi --list-models` reporting per-model levels — pi accepts any of these
+ * via `--thinking` and the RPC `set_thinking_level` command.
+ */
+const PI_THINKING_LEVELS = [
+	'off',
+	'minimal',
+	'low',
+	'medium',
+	'high',
+	'xhigh',
+] as const;
 
 /** Locally tracks the Pi session opened for one chat tab before refetch lands. */
 interface PendingTabSession {
@@ -82,6 +102,10 @@ export function usePiComposerController({
 	const [lastError, setLastError] = useState<string | null>(null);
 	const [pendingSession, setPendingSession] =
 		useState<PendingTabSession | null>(null);
+	const [liveContextUsage, setLiveContextUsage] = useState<{
+		sessionId: string;
+		usage: ComposerContextUsage;
+	} | null>(null);
 
 	const models = modelsQuery.data;
 	const availableModels = useMemo<readonly ComposerModelOption[]>(() => {
@@ -91,6 +115,8 @@ export function usePiComposerController({
 		return models.models.map((model) => ({
 			displayName: model.displayName,
 			id: model.id,
+			isDefault: model.id === models.defaultModelId,
+			provider: model.provider,
 		}));
 	}, [models]);
 
@@ -102,11 +128,15 @@ export function usePiComposerController({
 	const availableThinkingLevels = useMemo<
 		readonly ComposerThinkingOption[]
 	>(() => {
-		if (!models || !modelId) {
-			return [];
-		}
-		const selectedModel = models.models.find((model) => model.id === modelId);
-		const levels = selectedModel?.thinkingLevels ?? [];
+		const selectedModel = models?.models.find((model) => model.id === modelId);
+		const supplied = selectedModel?.thinkingLevels ?? [];
+		// Prefer pi's per-model list when it covers the canonical 6 levels; fall
+		// back to the hard-coded canonical list so the picker works even when
+		// `pi --list-models` doesn't enumerate them.
+		const levels =
+			supplied.length >= PI_THINKING_LEVELS.length
+				? supplied
+				: PI_THINKING_LEVELS;
 		return levels.map((level) => ({
 			id: level,
 			label: THINKING_LABELS[level] ?? level,
@@ -123,6 +153,19 @@ export function usePiComposerController({
 		(session) => session.id === activeSessionId,
 	);
 	const activeSessionStatus = activeSessionSnapshot?.status;
+	const activeBranchId = activeSessionSnapshot?.branchId ?? '';
+	const contextEventsQuery = useQuery(piSessionEventsQuery(activeBranchId));
+	const persistedContextUsage = useMemo(
+		() => latestContextUsageFromEvents(contextEventsQuery.data?.events ?? []),
+		[contextEventsQuery.data?.events],
+	);
+	// Live usage is tagged by session id; a stale snapshot from a previous
+	// session is treated as absent so the gauge falls back to persisted state
+	// without needing a reset-on-change effect.
+	const contextUsage =
+		liveContextUsage && liveContextUsage.sessionId === activeSessionId
+			? liveContextUsage.usage
+			: persistedContextUsage;
 	const isPiSessionStreaming =
 		activeSessionSnapshot?.runtimeOpen === true &&
 		(activeSessionStatus === 'starting' || activeSessionStatus === 'streaming');
@@ -133,6 +176,21 @@ export function usePiComposerController({
 				return;
 			}
 			if (activeSessionId && broadcast.sessionId !== activeSessionId) {
+				return;
+			}
+			if (broadcast.event.eventType === 'context-usage') {
+				const payload = broadcast.event.payload;
+				if (payload?.kind === 'context-usage') {
+					setLiveContextUsage({
+						sessionId: broadcast.sessionId,
+						usage: toComposerContextUsage(payload.usage),
+					});
+					void queryClient.invalidateQueries({
+						queryKey: ensembleQueryKeys.piSessionEvents(
+							broadcast.event.branchId,
+						),
+					});
+				}
 				return;
 			}
 			if (broadcast.event.eventType === 'metadata') {
@@ -284,6 +342,7 @@ export function usePiComposerController({
 		activeSessionId,
 		availableModels,
 		availableThinkingLevels,
+		contextUsage,
 		isStreaming:
 			isPiSessionStreaming ||
 			openSessionMutation.isPending ||
@@ -296,6 +355,37 @@ export function usePiComposerController({
 		onSubmit,
 		onThinkingChange,
 		thinkingLevel,
+	};
+}
+
+/** Finds the newest persisted context usage event for the active session. */
+function latestContextUsageFromEvents(
+	events: readonly import('@/shared/ipc').PiSessionEventWire[],
+): ComposerContextUsage | null {
+	for (let index = events.length - 1; index >= 0; index -= 1) {
+		const payload = events[index]?.payload;
+		if (payload?.kind === 'context-usage') {
+			return toComposerContextUsage(payload.usage);
+		}
+	}
+	return null;
+}
+
+/** Converts Pi's usage wire payload into the composer meter model. */
+function toComposerContextUsage(usage: {
+	contextWindow: number;
+	percent: number | null;
+	tokens: number | null;
+}): ComposerContextUsage {
+	const maxTokens = Math.max(0, usage.contextWindow);
+	const usedTokens =
+		usage.tokens ??
+		(usage.percent === null
+			? 0
+			: Math.round(maxTokens * (usage.percent / 100)));
+	return {
+		maxTokens,
+		usedTokens,
 	};
 }
 

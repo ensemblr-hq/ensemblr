@@ -15,6 +15,7 @@ import type { SetupApi } from './setup';
 import type { SharedRootApi } from './shared-root-adoption';
 import type { ShellApi } from './shell';
 import type { WorkspaceApi } from './workspace';
+import type { WorkspaceFilesApi } from './workspace-files';
 
 /**
  * Aggregate IPC surface exposed to the renderer through the preload bridge.
@@ -41,4 +42,5 @@ export interface EnsembleApi
 		QuickStartApi,
 		RepositoryConfigApi,
 		SharedRootApi,
+		WorkspaceFilesApi,
 		PiApi {}

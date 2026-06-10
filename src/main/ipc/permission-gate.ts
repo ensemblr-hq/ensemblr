@@ -1,7 +1,10 @@
 import { ipcMain } from 'electron';
 
+import type { SettingsResolutionSnapshot } from '../../shared/ipc';
 import {
 	classifyPermissionAction,
+	DEFAULT_PERMISSION_MODE,
+	normalizePermissionMode,
 	type PermissionActionKind,
 	type PermissionMode,
 } from '../../shared/permissions';
@@ -9,16 +12,10 @@ import {
 /**
  * Mode the permission gate operates under. `'allow-all'` is a transport-level
  * bypass that short-circuits classification entirely; remaining values delegate
- * to {@link classifyPermissionAction}.
+ * to {@link classifyPermissionAction}. Bypass mode is reserved for the test
+ * harness so handler tests don't have to wire a settings service.
  */
 export type PermissionGateMode = PermissionMode | 'allow-all';
-
-/**
- * Currently-active gate mode. Kept as a module-local constant so the seam exists
- * without yet wiring a renderer-driven mode source; can be swapped for a getter
- * once persisted mode reaches the main process.
- */
-const ACTIVE_PERMISSION_GATE_MODE: PermissionGateMode = 'allow-all';
 
 /**
  * Error raised when the gate denies an invocation. Crosses the IPC boundary as
@@ -50,37 +47,70 @@ export class PermissionGateDeniedError extends Error {
 type IpcHandleListener = Parameters<typeof ipcMain.handle>[1];
 
 /**
- * Wraps an `ipcMain.handle` registration with a permission classification check
- * for the given action. Under `'allow-all'` the wrapper is a pass-through; under
- * any classifying mode a `'blocked'` boundary throws
- * {@link PermissionGateDeniedError} before the inner handler runs.
- *
- * @param channel - Wire channel name to register against.
- * @param action - Permission action kind associated with this channel.
- * @param handler - Inner listener invoked when the gate allows the call.
+ * Function shape returned by {@link createPermissionGate} — wraps an
+ * `ipcMain.handle` registration with a permission classification check.
  */
-export function withPermissionGate(
+export type WithPermissionGate = (
 	channel: string,
 	action: PermissionActionKind,
 	handler: IpcHandleListener,
-): void {
-	const gated: IpcHandleListener = (event, ...args) => {
-		const mode = ACTIVE_PERMISSION_GATE_MODE;
+) => void;
 
-		if (mode !== 'allow-all') {
-			const snapshot = classifyPermissionAction({ action, mode });
+/** Inputs for {@link createPermissionGate}. */
+export interface CreatePermissionGateOptions {
+	/**
+	 * Resolves the currently-active permission mode every time a gated channel
+	 * is invoked. Called per-invocation so the gate picks up settings changes
+	 * without restarting Electron.
+	 */
+	getMode: () => PermissionGateMode;
+}
 
-			if (snapshot.boundary === 'blocked') {
-				throw new PermissionGateDeniedError({
-					action,
-					channel,
-					reason: snapshot.reason,
-				});
+/**
+ * Builds a {@link WithPermissionGate} that uses `getMode` to look up the
+ * active mode on every call. Under `'allow-all'` the wrapper is a pass-through;
+ * under any classifying mode a `'blocked'` boundary throws
+ * {@link PermissionGateDeniedError} before the inner handler runs.
+ */
+export function createPermissionGate({
+	getMode,
+}: CreatePermissionGateOptions): WithPermissionGate {
+	return (channel, action, handler) => {
+		const gated: IpcHandleListener = (event, ...args) => {
+			const mode = getMode();
+
+			if (mode !== 'allow-all') {
+				const snapshot = classifyPermissionAction({ action, mode });
+
+				if (snapshot.boundary === 'blocked') {
+					throw new PermissionGateDeniedError({
+						action,
+						channel,
+						reason: snapshot.reason,
+					});
+				}
 			}
-		}
 
-		return handler(event, ...args);
+			return handler(event, ...args);
+		};
+
+		ipcMain.handle(channel, gated);
 	};
+}
 
-	ipcMain.handle(channel, gated);
+/**
+ * Reads `security.permissionMode` out of a resolved-settings snapshot,
+ * normalising the value back to a valid {@link PermissionMode} and falling
+ * back to {@link DEFAULT_PERMISSION_MODE} when the setting is absent.
+ */
+export function readPermissionModeFromSnapshot(
+	snapshot: SettingsResolutionSnapshot,
+): PermissionMode {
+	const setting = snapshot.app.settings.find(
+		(entry) => entry.key === 'security.permissionMode',
+	);
+	if (!setting) {
+		return DEFAULT_PERMISSION_MODE;
+	}
+	return normalizePermissionMode(setting.value);
 }

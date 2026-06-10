@@ -26,6 +26,7 @@ import type {
 import type { EnsembleRootDirectoryService } from '../root';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsembleDatabaseService } from '../storage';
+import type { ListWorkspaceFilesService } from '../workspace-files';
 import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCloneHandlers } from './handlers/clone';
 import { registerEnvironmentHandlers } from './handlers/environment';
@@ -39,6 +40,11 @@ import { registerRootHandlers } from './handlers/root';
 import { registerSettingsHandlers } from './handlers/settings';
 import { registerSetupHandlers } from './handlers/setup';
 import { registerWindowHandlers } from './handlers/window';
+import { registerWorkspaceFilesHandlers } from './handlers/workspace-files';
+import {
+	createPermissionGate,
+	readPermissionModeFromSnapshot,
+} from './permission-gate';
 
 /** Dependency bundle wired into the renderer-facing IPC handlers. */
 interface RegisterIpcHandlersOptions {
@@ -54,6 +60,7 @@ interface RegisterIpcHandlersOptions {
 	githubCloneService: GithubCloneService;
 	githubRepositoryListService: GithubRepositoryListService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
+	listWorkspaceFilesService: ListWorkspaceFilesService;
 	localCommandService: LocalCommandService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
@@ -87,6 +94,7 @@ export function registerIpcHandlers({
 	githubCloneService,
 	githubRepositoryListService,
 	listArchivedWorkspacesService,
+	listWorkspaceFilesService,
 	localCommandService,
 	localRepositoryRegistrationService,
 	piExecutableService,
@@ -100,12 +108,23 @@ export function registerIpcHandlers({
 	sharedRootAdoptionService,
 	unarchiveWorkspaceService,
 }: RegisterIpcHandlersOptions): void {
+	// Permission gate is wired here so all handler groups share one instance.
+	// `getMode` re-resolves on every gated call so settings changes apply live.
+	const withPermissionGate = createPermissionGate({
+		getMode: () =>
+			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
+	});
+
 	registerWindowHandlers();
 	registerEnvironmentHandlers({ environmentVariablesService });
 	registerHealthHandlers({ configService, databaseService });
 	registerNavigationHandlers({ databaseService });
 	registerSettingsHandlers({ settingsResolutionService });
-	registerRootHandlers({ rootDirectoryService, sharedRootAdoptionService });
+	registerRootHandlers({
+		rootDirectoryService,
+		sharedRootAdoptionService,
+		withPermissionGate,
+	});
 	registerRepositoryConfigHandlers({
 		databaseService,
 		repositoryConfigService,
@@ -123,6 +142,7 @@ export function registerIpcHandlers({
 		renameWorkspaceService,
 		sharedRootAdoptionService,
 		unarchiveWorkspaceService,
+		withPermissionGate,
 	});
 	registerCloneHandlers({
 		githubCloneService,
@@ -136,4 +156,5 @@ export function registerIpcHandlers({
 	});
 	registerChatTabHandlers({ databaseService });
 	registerSetupHandlers({ setupDiagnosticsService });
+	registerWorkspaceFilesHandlers({ listWorkspaceFilesService });
 }

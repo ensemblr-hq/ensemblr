@@ -174,6 +174,21 @@ export function renameChatTab({
 	return getChatTabById({ database, id });
 }
 
+/** Replaces the JSON metadata blob for a chat tab. */
+export function setChatTabMetadata({
+	database,
+	id,
+	metadata,
+}: {
+	database: DatabaseSync;
+	id: string;
+	metadata: Record<string, unknown>;
+}): void {
+	database
+		.prepare(`UPDATE chat_tabs SET metadata_json = ? WHERE id = ?`)
+		.run(JSON.stringify(metadata), id);
+}
+
 /** Permanently removes a chat tab row, used for empty tabs with no history. */
 export function deleteChatTab({
 	database,

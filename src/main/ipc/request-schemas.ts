@@ -75,6 +75,50 @@ export const listClosedChatTabsWithSummaryRequestSchema = z.object({
 });
 
 // -----------------------------------------------------------------------------
+// pi-session — STRICT (throws on bad input, caught by handler try/catch)
+//
+// All renderer-facing Pi session IPC payloads validate here. Handlers already
+// wrap calls in try/catch and surface failures as `{ error }`, so a Zod parse
+// error becomes a controlled error response rather than an unhandled rejection.
+// -----------------------------------------------------------------------------
+
+/** {@link import('../../shared/ipc').OpenPiSessionRequest}. */
+export const openPiSessionRequestSchema = z.object({
+	chatTabId: optionalNullableString,
+	initialPrompt: optionalNullableString,
+	label: z.string().optional(),
+	model: optionalNullableString,
+	resumeSessionId: optionalNullableString,
+	thinkingLevel: optionalNullableString,
+	workspaceCwd: z.string(),
+	workspaceId: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').SubmitPiPromptRequest}. */
+export const submitPiPromptRequestSchema = z.object({
+	model: optionalNullableString,
+	prompt: z.string(),
+	sessionId: z.string().min(1),
+	thinkingLevel: optionalNullableString,
+});
+
+/** {@link import('../../shared/ipc').StopPiSessionRequest}. */
+export const stopPiSessionRequestSchema = z.object({
+	reason: z.string().optional(),
+	sessionId: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').ListPiSessionsRequest}. */
+export const listPiSessionsRequestSchema = z.object({
+	workspaceId: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').ListPiSessionEventsRequest}. */
+export const listPiSessionEventsRequestSchema = z.object({
+	branchId: z.string().min(1),
+});
+
+// -----------------------------------------------------------------------------
 // clone — LENIENT (safeParse + empty fallback)
 // -----------------------------------------------------------------------------
 

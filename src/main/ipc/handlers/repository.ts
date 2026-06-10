@@ -41,7 +41,7 @@ import type {
 	SharedRootAdoptionService,
 	UnarchiveWorkspaceService,
 } from '../../repository';
-import { withPermissionGate } from '../permission-gate.ts';
+import type { WithPermissionGate } from '../permission-gate.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the local-repository IPC handlers. */
@@ -58,6 +58,7 @@ export interface RepositoryHandlersOptions {
 	renameWorkspaceService: RenameWorkspaceService;
 	sharedRootAdoptionService: SharedRootAdoptionService;
 	unarchiveWorkspaceService: UnarchiveWorkspaceService;
+	withPermissionGate: WithPermissionGate;
 }
 
 /**
@@ -78,6 +79,7 @@ export function registerRepositoryHandlers({
 	renameWorkspaceService,
 	sharedRootAdoptionService,
 	unarchiveWorkspaceService,
+	withPermissionGate,
 }: RepositoryHandlersOptions): void {
 	ipcMain.handle(
 		IPC_CHANNELS.selectLocalRepository,

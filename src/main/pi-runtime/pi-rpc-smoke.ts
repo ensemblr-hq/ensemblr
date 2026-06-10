@@ -17,7 +17,7 @@ import type {
 	PiRpcSmokeRunner,
 	PiRpcSmokeRunnerRequest,
 	PiRpcSmokeSnapshot,
-} from './pi-readiness';
+} from './pi-runtime-types.ts';
 
 const DEFAULT_RPC_TIMEOUT_MS = 5000;
 const DEFAULT_RPC_KILL_GRACE_MS = 500;

@@ -19,6 +19,8 @@ export const ensembleQueryKeys = {
 		[...ensembleQueryKeys.all, 'github-repository-list'] as const,
 	health: () => [...ensembleQueryKeys.all, 'health'] as const,
 	piModels: () => [...ensembleQueryKeys.all, 'pi-models'] as const,
+	piSlashCommands: (workspaceCwd: string) =>
+		[...ensembleQueryKeys.all, 'pi-slash-commands', workspaceCwd] as const,
 	piSessionEvents: (branchId: string) =>
 		[...ensembleQueryKeys.all, 'pi-session-events', branchId] as const,
 	piSessionsForWorkspace: (workspaceId: string) =>
@@ -28,6 +30,8 @@ export const ensembleQueryKeys = {
 	rootDirectory: () => [...ensembleQueryKeys.all, 'root-directory'] as const,
 	setupDiagnostics: () =>
 		[...ensembleQueryKeys.all, 'setup-diagnostics'] as const,
+	workspaceFiles: (workspaceCwd: string) =>
+		[...ensembleQueryKeys.all, 'workspace-files', workspaceCwd] as const,
 };
 
 /**

@@ -1,5 +1,7 @@
+import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useCallback, useMemo } from 'react';
+import { workspaceFilesQuery } from '@/renderer/api/ensemble-queries';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
 import type { WorkspaceNavigationSelection } from '@/renderer/lib/workbench';
@@ -72,6 +74,24 @@ export function WorkspaceRouteContent({
 	const activeReviewTab = panelTabs.activeReviewTab;
 	const activeDockTab = panelTabs.activeDockTab;
 	const { state: setupDiagnosticsState } = useSetupDiagnostics();
+	const workspaceFilesQueryState = useQuery(
+		workspaceFilesQuery(activeWorkspace.pathLabel ?? null),
+	);
+	const remoteWorkspaceFiles = useMemo(
+		() => workspaceFilesQueryState.data?.files ?? [],
+		[workspaceFilesQueryState.data?.files],
+	);
+	const mergedWorkspaceFiles = useMemo(() => {
+		if (remoteWorkspaceFiles.length === 0) {
+			return activeWorkspace.workspaceFiles;
+		}
+		return remoteWorkspaceFiles.map((entry) => ({
+			id: `wsfile:${entry.path}`,
+			kind: entry.kind,
+			name: entry.name,
+			path: entry.path,
+		}));
+	}, [remoteWorkspaceFiles, activeWorkspace.workspaceFiles]);
 	const piComposer = usePiComposerController({
 		chatTabId: activeSession.chatTabId,
 		currentPiSessionId: activeSession.piSessionId,
@@ -83,6 +103,7 @@ export function WorkspaceRouteContent({
 		activeSession,
 		availableModels: piComposer.availableModels,
 		availableThinkingLevels: piComposer.availableThinkingLevels,
+		contextUsage: piComposer.contextUsage,
 		isStreaming: piComposer.isStreaming,
 		modelId: piComposer.modelId,
 		onModelChange: piComposer.onModelChange,
@@ -92,6 +113,8 @@ export function WorkspaceRouteContent({
 		setupDiagnostics: setupDiagnosticsState.setupDiagnostics,
 		setupError: setupDiagnosticsState.setupDiagnosticsError,
 		thinkingLevel: piComposer.thinkingLevel,
+		workspaceCwd: activeWorkspace.pathLabel,
+		workspaceFiles: mergedWorkspaceFiles,
 	});
 	const dockActions = useMemo<WorkbenchDockActions>(
 		() => ({

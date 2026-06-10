@@ -121,6 +121,8 @@ export interface SessionTabModel {
 export interface ComposerModelOption {
 	displayName: string;
 	id: string;
+	isDefault?: boolean;
+	provider: string;
 }
 
 export interface ComposerThinkingOption {
@@ -128,10 +130,16 @@ export interface ComposerThinkingOption {
 	label: string;
 }
 
+export interface ComposerContextUsage {
+	maxTokens: number;
+	usedTokens: number;
+}
+
 export interface ComposerShellState {
 	activePiSessionId: string | null;
 	availableModels: readonly ComposerModelOption[];
 	availableThinkingLevels: readonly ComposerThinkingOption[];
+	contextUsage: ComposerContextUsage | null;
 	disabled: boolean;
 	disabledReason: string | null;
 	isStreaming: boolean;
@@ -144,6 +152,8 @@ export interface ComposerShellState {
 	placeholder: string;
 	thinkingLabel: string;
 	thinkingLevel: string | null;
+	workspaceCwd: string;
+	workspaceFiles: readonly WorkspaceFileSummary[];
 }
 
 // --- Workspace domain -------------------------------------------------------

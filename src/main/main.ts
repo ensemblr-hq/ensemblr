@@ -43,6 +43,7 @@ import {
 import { createMacosKeychainSecretStore } from './secrets';
 import { createSetupDiagnosticsService } from './setup';
 import { createEnsembleDatabaseService } from './storage';
+import { createListWorkspaceFilesService } from './workspace-files';
 
 // Quit early on Windows when invoked by the Squirrel installer.
 if (started) {
@@ -187,6 +188,9 @@ const deleteArchivedWorkspaceService = createDeleteArchivedWorkspaceService({
 const listArchivedWorkspacesService = createListArchivedWorkspacesService({
 	databaseService,
 });
+const listWorkspaceFilesService = createListWorkspaceFilesService({
+	localCommandService,
+});
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
 	databaseService,
@@ -219,6 +223,7 @@ app.whenReady().then(() => {
 		githubCloneService,
 		githubRepositoryListService,
 		listArchivedWorkspacesService,
+		listWorkspaceFilesService,
 		localCommandService,
 		localRepositoryRegistrationService,
 		piExecutableService,

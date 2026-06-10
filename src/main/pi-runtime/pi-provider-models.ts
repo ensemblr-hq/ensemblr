@@ -15,9 +15,16 @@ import type {
 	PiModelOption,
 	PiProviderModelFailureCode,
 	PiProviderModelSnapshot,
-} from './pi-readiness';
+} from './pi-runtime-types.ts';
 
-const DEFAULT_THINKING_LEVELS = ['low', 'medium', 'high'] as const;
+const DEFAULT_THINKING_LEVELS = [
+	'off',
+	'minimal',
+	'low',
+	'medium',
+	'high',
+	'xhigh',
+] as const;
 const DEFAULT_THINKING_LEVEL = 'medium';
 
 const EMPTY_PI_MODELS: ListPiModelsResult = {
@@ -40,7 +47,7 @@ export function presentPiModels(
 	const models: PiModelOptionWire[] = input.models
 		.filter((row) => row.model && row.provider)
 		.map((row) => ({
-			displayName: `${row.model} (${row.provider})`,
+			displayName: row.model,
 			id: row.id,
 			provider: row.provider,
 			thinkingLevels: DEFAULT_THINKING_LEVELS,

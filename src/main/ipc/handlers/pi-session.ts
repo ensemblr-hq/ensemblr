@@ -3,16 +3,11 @@ import { ipcMain } from 'electron';
 import {
 	IPC_CHANNELS,
 	type ListPiModelsResult,
-	type ListPiSessionEventsRequest,
 	type ListPiSessionEventsResult,
-	type ListPiSessionsRequest,
 	type ListPiSessionsResult,
-	type OpenPiSessionRequest,
 	type OpenPiSessionResult,
 	type PiSessionEventWire,
-	type StopPiSessionRequest,
 	type StopPiSessionResult,
-	type SubmitPiPromptRequest,
 	type SubmitPiPromptResult,
 } from '../../../shared/ipc';
 import type { LocalCommandService } from '../../commands/local-command';
@@ -25,6 +20,13 @@ import {
 	presentPiModels,
 	resolvePiProviderModels,
 } from '../../pi-runtime/pi-provider-models.ts';
+import {
+	listPiSessionEventsRequestSchema,
+	listPiSessionsRequestSchema,
+	openPiSessionRequestSchema,
+	stopPiSessionRequestSchema,
+	submitPiPromptRequestSchema,
+} from '../request-schemas.ts';
 
 /** Service dependencies used by the Pi session IPC handlers. */
 export interface PiSessionHandlersOptions {
@@ -50,11 +52,9 @@ export function registerPiSessionHandlers({
 }: PiSessionHandlersOptions): void {
 	ipcMain.handle(
 		IPC_CHANNELS.openPiSession,
-		async (
-			_event,
-			request: OpenPiSessionRequest,
-		): Promise<OpenPiSessionResult> => {
+		async (_event, raw: unknown): Promise<OpenPiSessionResult> => {
 			try {
+				const request = openPiSessionRequestSchema.parse(raw);
 				const executable = await piExecutableService.getSnapshot();
 				if (executable.status === 'error' || !executable.command) {
 					return {
@@ -89,11 +89,9 @@ export function registerPiSessionHandlers({
 
 	ipcMain.handle(
 		IPC_CHANNELS.submitPiPrompt,
-		async (
-			_event,
-			request: SubmitPiPromptRequest,
-		): Promise<SubmitPiPromptResult> => {
+		async (_event, raw: unknown): Promise<SubmitPiPromptResult> => {
 			try {
+				const request = submitPiPromptRequestSchema.parse(raw);
 				const acknowledgement = await piSessionService.submitPrompt({
 					model: request.model ?? null,
 					prompt: request.prompt,
@@ -111,11 +109,9 @@ export function registerPiSessionHandlers({
 
 	ipcMain.handle(
 		IPC_CHANNELS.stopPiSession,
-		async (
-			_event,
-			request: StopPiSessionRequest,
-		): Promise<StopPiSessionResult> => {
+		async (_event, raw: unknown): Promise<StopPiSessionResult> => {
 			try {
+				const request = stopPiSessionRequestSchema.parse(raw);
 				await piSessionService.stopSession(request);
 				return { ok: true };
 			} catch (cause) {
@@ -129,10 +125,8 @@ export function registerPiSessionHandlers({
 
 	ipcMain.handle(
 		IPC_CHANNELS.listPiSessions,
-		async (
-			_event,
-			request: ListPiSessionsRequest,
-		): Promise<ListPiSessionsResult> => {
+		async (_event, raw: unknown): Promise<ListPiSessionsResult> => {
+			const request = listPiSessionsRequestSchema.parse(raw);
 			const sessions = piSessionService.listSessionsForWorkspace(
 				request.workspaceId,
 			);
@@ -160,10 +154,8 @@ export function registerPiSessionHandlers({
 
 	ipcMain.handle(
 		IPC_CHANNELS.listPiSessionEvents,
-		(
-			_event,
-			request: ListPiSessionEventsRequest,
-		): Promise<ListPiSessionEventsResult> => {
+		(_event, raw: unknown): Promise<ListPiSessionEventsResult> => {
+			const request = listPiSessionEventsRequestSchema.parse(raw);
 			const rows = piSessionService.listEvents(request.branchId);
 			const events: PiSessionEventWire[] = rows.map((row) => ({
 				branchId: row.branchId,

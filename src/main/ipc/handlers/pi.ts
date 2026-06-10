@@ -2,9 +2,12 @@ import { ipcMain } from 'electron';
 
 import {
 	IPC_CHANNELS,
+	type ListPiSlashCommandsRequest,
+	type ListPiSlashCommandsResult,
 	type PiExecutableSelectionResult,
 } from '../../../shared/ipc';
 import type { PiExecutableService } from '../../pi-runtime';
+import { resolvePiSlashCommands } from '../../pi-runtime/pi-slash-commands.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the Pi executable IPC handlers. */
@@ -13,7 +16,8 @@ export interface PiHandlersOptions {
 }
 
 /**
- * Registers IPC handlers for selecting and saving a Pi executable override.
+ * Registers IPC handlers for selecting and saving a Pi executable override
+ * and for surfacing pi's slash command catalog to the renderer.
  * @param options - Required services.
  */
 export function registerPiHandlers({
@@ -35,6 +39,17 @@ export function registerPiHandlers({
 			}
 
 			return piExecutableService.saveOverride(selection.path);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.listPiSlashCommands,
+		async (
+			_event,
+			request?: ListPiSlashCommandsRequest,
+		): Promise<ListPiSlashCommandsResult> => {
+			const snapshot = await piExecutableService.getSnapshot();
+			return resolvePiSlashCommands(snapshot, request?.cwd);
 		},
 	);
 }

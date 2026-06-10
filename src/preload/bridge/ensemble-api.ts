@@ -99,6 +99,8 @@ export function createEnsembleApi(): EnsembleApi {
 		listPiModels: () => invoke('listPiModels'),
 		listPiSessionEvents: (request) => invoke('listPiSessionEvents', request),
 		listPiSessions: (request) => invoke('listPiSessions', request),
+		listPiSlashCommands: (request) => invoke('listPiSlashCommands', request),
+		listWorkspaceFiles: (request) => invoke('listWorkspaceFiles', request),
 		onCloneGithubRepositoryProgress: (listener) =>
 			subscribe<CloneGithubRepositoryProgressEvent>(
 				IPC_CHANNELS.cloneGithubRepositoryProgress,
@@ -113,6 +115,7 @@ export function createEnsembleApi(): EnsembleApi {
 		previewRepositoryConfigMigration: (request) =>
 			invoke('previewRepositoryConfigMigration', request),
 		quickStartProject: (request) => invoke('quickStartProject', request),
+		readWorkspaceFile: (request) => invoke('readWorkspaceFile', request),
 		registerLocalRepository: (request) =>
 			invoke('registerLocalRepository', request),
 		renameWorkspace: (request) => invoke('renameWorkspace', request),

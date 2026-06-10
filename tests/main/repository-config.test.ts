@@ -15,10 +15,8 @@ import {
 	type EnsembleConfig,
 } from '../../src/main/config/config-loader.ts';
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
-import {
-	isRepositoryConfigPathAllowed,
-	loadRepositoryConfig,
-} from '../../src/main/config/repository-config.ts';
+import { isRepositoryConfigPathAllowed } from '../../src/main/config/index.ts';
+import { loadRepositoryConfig } from '../../src/main/config/repository-config.ts';
 import {
 	applyRepositoryConfigMigration,
 	previewRepositoryConfigMigration,

@@ -16,6 +16,15 @@ import type { PiAgentEvent } from './pi-agent-types.ts';
  */
 export function eventPayload(event: PiAgentEvent): PiPersistedEnvelope {
 	switch (event.type) {
+		case 'context-usage':
+			return {
+				kind: 'context-usage',
+				usage: {
+					contextWindow: event.usage.contextWindow,
+					percent: event.usage.percent,
+					tokens: event.usage.tokens,
+				},
+			};
 		case 'error':
 			return {
 				error: {

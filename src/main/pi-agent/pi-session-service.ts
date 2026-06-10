@@ -4,13 +4,14 @@ import type {
 	PiSessionSnapshotWire,
 } from '../../shared/ipc/contracts/pi-session.ts';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { listOpenChatTabs } from '../storage/repositories/chat-tab-repository.ts';
 import {
 	listEventsByBranch,
 	type PiEventRow,
 } from '../storage/repositories/pi-event-repository.ts';
 import {
+	getMainBranchForSession,
 	getPiSessionById,
-	listPiSessionBranches,
 	listPiSessionsByWorkspace,
 	type PiSessionBranchRow,
 	type PiSessionRow,
@@ -133,11 +134,10 @@ export function createPiSessionService({
 			if (!row) {
 				return null;
 			}
-			const branches = listPiSessionBranches({
+			const mainBranch = getMainBranchForSession({
 				database,
 				piSessionId: row.id,
 			});
-			const mainBranch = branches.find((b) => b.kind === 'main') ?? branches[0];
 			if (!mainBranch) {
 				return null;
 			}
@@ -155,20 +155,20 @@ export function createPiSessionService({
 		listSessionsForWorkspace: (workspaceId) => {
 			const database = requireDatabase();
 			const rows = listPiSessionsByWorkspace({ database, workspaceId });
+			const openedTabs = listOpenChatTabs({ database, workspaceId });
 			return rows
 				.map((row) => {
-					const branches = listPiSessionBranches({
+					const mainBranch = getMainBranchForSession({
 						database,
 						piSessionId: row.id,
 					});
-					const mainBranch =
-						branches.find((b) => b.kind === 'main') ?? branches[0];
 					if (!mainBranch) {
 						return null;
 					}
 					return toSnapshot({
 						branchId: mainBranch.id,
 						database,
+						openedTabs,
 						row,
 						runtimeOpen: lifecycle.getActiveSession(row.id) !== null,
 					});

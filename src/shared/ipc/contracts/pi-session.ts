@@ -1,91 +1,21 @@
-/** Wire-side enums mirrored from the main-process Pi session repository. */
-export type PiSessionStatusWire =
-	| 'idle'
-	| 'starting'
-	| 'streaming'
-	| 'closed'
-	| 'errored';
+import type {
+	PiEventStreamWire,
+	PiPersistedEnvelope,
+	PiSessionStatusWire,
+} from './pi-message-payloads.ts';
+
+export type {
+	PiContextUsageWire,
+	PiEventStreamWire,
+	PiPersistedEnvelope,
+	PiSessionStatusWire,
+	PiWireError,
+	PiWireMessagePart,
+	PiWireMessagePayload,
+	PiWireMetadata,
+} from './pi-message-payloads.ts';
 
 export type ChatTabKindWire = 'chat' | 'preview';
-
-export type PiEventStreamWire = 'protocol' | 'stderr';
-
-/** Error shape carried across the wire on persisted error events. */
-export interface PiWireError {
-	code?: string;
-	detail?: string | null;
-	message: string;
-	recoverable?: boolean;
-}
-
-/** Metadata payload carried on persisted metadata events. */
-export interface PiWireMetadata {
-	chatTitle?: string;
-	model?: { displayName?: string; id: string; provider: string } | null;
-	sessionId?: string | null;
-	status?: PiSessionStatusWire;
-}
-
-/**
- * Canonical message-part shape carried across the wire and reused inside the
- * main-process pi-agent boundary as `PiAgentMessagePart`. Keeping one definition
- * means a new variant added here is enforced everywhere by the type system —
- * no silent drift between main and renderer.
- */
-export type PiWireMessagePart =
-	| { kind: 'text'; text: string }
-	| { kind: 'reasoning'; text: string }
-	| { kind: 'tool-call'; input: unknown; name: string; toolCallId: string }
-	| {
-			kind: 'tool-result';
-			isError: boolean;
-			output: unknown;
-			toolCallId: string;
-	  };
-
-/**
- * Canonical message-payload union on the wire. Reused inside the main-process
- * pi-agent boundary as `PiAgentMessagePayload` so exhaustiveness checks fail
- * on the producer side whenever a new variant is added.
- */
-export type PiWireMessagePayload =
-	| { kind: 'text'; text: string }
-	| { kind: 'reasoning'; text: string }
-	| { input: unknown; kind: 'tool-call'; name: string; toolCallId: string }
-	| {
-			isError: boolean;
-			kind: 'tool-result';
-			output: unknown;
-			toolCallId: string;
-	  }
-	| {
-			kind: 'message';
-			parts: readonly PiWireMessagePart[];
-			role: 'assistant' | 'user';
-	  }
-	| { kind: 'prompt'; prompt: string }
-	| { kind: 'unknown'; frameType: string; raw: unknown };
-
-/**
- * Tagged union persisted into `pi_session_events.payload_json` and replayed on
- * the renderer. Each variant maps 1:1 to a `PiAgentEvent` discriminant; the
- * envelope shape is stable so the renderer can match on `envelope.kind`
- * without sniffing raw Pi frames.
- */
-export type PiPersistedEnvelope =
-	| { kind: 'error'; error: PiWireError }
-	| {
-			kind: 'message';
-			payload: PiWireMessagePayload;
-			role: 'agent' | 'tool' | 'user';
-	  }
-	| { kind: 'metadata'; metadata: PiWireMetadata }
-	| {
-			kind: 'status';
-			previous: PiSessionStatusWire;
-			status: PiSessionStatusWire;
-	  }
-	| { kind: 'shutdown'; reason: string };
 
 /** Renderer-facing chat tab descriptor. */
 export interface PiChatTabWire {

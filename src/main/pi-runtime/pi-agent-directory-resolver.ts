@@ -7,7 +7,7 @@ import type {
 	PiAgentDirectorySnapshot,
 	PiAgentDirectorySource,
 	PiReadinessDiagnostic,
-} from './pi-readiness';
+} from './pi-runtime-types.ts';
 
 const PI_AGENT_DIRECTORY_ENV_KEY = 'PI_CODING_AGENT_DIR';
 

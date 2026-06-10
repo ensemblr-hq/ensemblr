@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type { DatabaseSync } from 'node:sqlite';
 
 import type {
 	ConfigDiagnostic,
@@ -19,12 +18,6 @@ import {
 } from './repository-config-loaders.ts';
 
 export { readJsonFile } from './repository-config-loaders.ts';
-
-/** Inputs for {@link isRepositoryConfigPathAllowed}. */
-export interface RepositoryConfigPathAuthorizationOptions {
-	database: DatabaseSync | null;
-	repositoryPath: string;
-}
 
 /** Options for {@link loadRepositoryConfig}. */
 export interface LoadRepositoryConfigOptions {
@@ -336,45 +329,40 @@ function normalizeJsonRepositoryConfig({
 	kind: 'conductor' | 'ensemble';
 	source: SettingsResolutionSource;
 }): NormalizedConfigSource {
-	const diagnostics: ConfigDiagnostic[] = [];
-	const settings: Record<string, unknown> = {};
-
-	normalizeRepositoryConfigFields({
+	const { diagnostics, settings } = normalizeRepositoryConfigFields({
 		config,
-		diagnostics,
 		fieldMap: JSON_FIELD_MAP,
 		scriptSupportsRunMode: false,
-		settings,
 		source,
 	});
 
-	if (kind === 'conductor' && Object.keys(settings).length > 0) {
-		settings.conductorCompatibility ??= true;
-	}
+	const withCompatFlag =
+		kind === 'conductor' && Object.keys(settings).length > 0
+			? { conductorCompatibility: true, ...settings }
+			: settings;
 
-	return { diagnostics, settings };
+	return { diagnostics, settings: withCompatFlag };
 }
 
 /**
  * Shared per-field normalisation loop used by both JSON and TOML parsers.
  * Handles the special `scripts` key, looks up the field map for the
- * canonical key, and accumulates accepted values + diagnostics in-place.
+ * canonical key, and returns the accumulated settings plus diagnostics.
  */
 function normalizeRepositoryConfigFields({
 	config,
-	diagnostics,
 	fieldMap,
 	scriptSupportsRunMode,
-	settings,
 	source,
 }: {
 	config: Record<string, unknown>;
-	diagnostics: ConfigDiagnostic[];
 	fieldMap: ReadonlyMap<string, string>;
 	scriptSupportsRunMode: boolean;
-	settings: Record<string, unknown>;
 	source: SettingsResolutionSource;
-}): void {
+}): { diagnostics: ConfigDiagnostic[]; settings: Record<string, unknown> } {
+	const diagnostics: ConfigDiagnostic[] = [];
+	let settings: Record<string, unknown> = {};
+
 	for (const [key, value] of Object.entries(config)) {
 		if (key === 'scripts') {
 			const normalizedScripts = normalizeScripts(
@@ -383,7 +371,7 @@ function normalizeRepositoryConfigFields({
 				source,
 				scriptSupportsRunMode,
 			);
-			mergeSettings(settings, normalizedScripts.settings);
+			settings = mergeSettings(settings, normalizedScripts.settings);
 			diagnostics.push(...normalizedScripts.diagnostics);
 			continue;
 		}
@@ -405,12 +393,14 @@ function normalizeRepositoryConfigFields({
 		});
 
 		if (normalizedValue.accepted) {
-			settings[normalizedKey] = normalizedValue.value;
+			settings = { ...settings, [normalizedKey]: normalizedValue.value };
 			continue;
 		}
 
 		diagnostics.push(normalizedValue.diagnostic);
 	}
+
+	return { diagnostics, settings };
 }
 
 /**
@@ -424,23 +414,19 @@ function normalizeTomlRepositoryConfig(
 	config: Record<string, unknown>,
 	source: SettingsResolutionSource,
 ): NormalizedConfigSource {
-	const diagnostics: ConfigDiagnostic[] = [];
-	const settings: Record<string, unknown> = {};
-
-	normalizeRepositoryConfigFields({
+	const { diagnostics, settings } = normalizeRepositoryConfigFields({
 		config,
-		diagnostics,
 		fieldMap: TOML_FIELD_MAP,
 		scriptSupportsRunMode: true,
-		settings,
 		source,
 	});
 
-	if (Object.keys(settings).length > 0) {
-		settings.conductorCompatibility ??= true;
-	}
+	const withCompatFlag =
+		Object.keys(settings).length > 0
+			? { conductorCompatibility: true, ...settings }
+			: settings;
 
-	return { diagnostics, settings };
+	return { diagnostics, settings: withCompatFlag };
 }
 
 /**
@@ -687,26 +673,25 @@ function getLoadedSettingsForStatus(
 }
 
 /**
- * Merges `source` into `target` in place, deep-merging the `scripts` block.
- * @param target - Settings record to update.
- * @param source - Partial settings to merge in.
+ * Returns a new settings record with `source` merged on top of `target`,
+ * deep-merging the `scripts` block when both sides provide one.
  */
 function mergeSettings(
 	target: Record<string, unknown>,
 	source: Record<string, unknown>,
-): void {
-	for (const [key, value] of Object.entries(source)) {
-		if (
-			key === 'scripts' &&
-			isPlainRecord(value) &&
-			isPlainRecord(target.scripts)
-		) {
-			target.scripts = { ...target.scripts, ...value };
-			continue;
-		}
+): Record<string, unknown> {
+	const mergedScripts =
+		isPlainRecord(source.scripts) && isPlainRecord(target.scripts)
+			? { ...target.scripts, ...source.scripts }
+			: undefined;
 
-		target[key] = value;
+	const merged = { ...target, ...source };
+
+	if (mergedScripts !== undefined) {
+		merged.scripts = mergedScripts;
 	}
+
+	return merged;
 }
 
 /**
@@ -778,55 +763,5 @@ function formatRepositoryDisplayPath(
 function isStringArray(value: unknown): value is string[] {
 	return (
 		Array.isArray(value) && value.every((item) => typeof item === 'string')
-	);
-}
-
-/**
- * Returns whether the repository path is currently tracked (as either a
- * repository or a workspace), gating repository-config IPC writes.
- *
- * Lives alongside config loading because authorization is the same boundary
- * concern: gating which repository paths the renderer can read or write.
- * @param options - Open database and candidate path.
- * @returns True when the path matches a tracked entry.
- */
-export function isRepositoryConfigPathAllowed({
-	database,
-	repositoryPath,
-}: RepositoryConfigPathAuthorizationOptions): boolean {
-	if (!database || !repositoryPath.trim()) {
-		return false;
-	}
-
-	const resolvedRepositoryPath = path.resolve(repositoryPath);
-
-	try {
-		const row = database
-			.prepare(
-				`
-SELECT path FROM repositories WHERE path = ?
-UNION
-SELECT path FROM workspaces WHERE path = ?
-LIMIT 1
-`,
-			)
-			.get(resolvedRepositoryPath, resolvedRepositoryPath);
-
-		return isPathRow(row);
-	} catch {
-		return false;
-	}
-}
-
-/**
- * Type guard for the `SELECT path FROM ...` shape returned by
- * {@link isRepositoryConfigPathAllowed}.
- */
-function isPathRow(row: unknown): row is { path: string } {
-	return (
-		typeof row === 'object' &&
-		row !== null &&
-		'path' in row &&
-		typeof row.path === 'string'
 	);
 }

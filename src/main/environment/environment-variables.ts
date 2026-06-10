@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
@@ -20,11 +19,14 @@ import {
 	isReservedEnvironmentVariableKey,
 	isSecretEnvironmentVariableKey,
 	toSecretStoreKey,
-	toSettingKey,
 } from './environment-variable-keys.ts';
 import { resolveEnvironmentVariables } from './environment-variable-resolution.ts';
 import { createVariableSnapshots } from './environment-variable-snapshots.ts';
 import type { NormalizedScope } from './environment-variable-types.ts';
+import {
+	deletePlainSetting,
+	upsertPlainSetting,
+} from './settings-repository.ts';
 
 export { BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG } from './environment-variable-catalog.ts';
 export { isEnvironmentVariableKey } from './environment-variable-keys.ts';
@@ -500,73 +502,6 @@ function normalizeScope({
 		scope,
 		scopeId: normalizedScopeId,
 	};
-}
-
-/**
- * Inserts or updates a plain env var row in the SQLite `settings` table.
- * @param input - Database, key, scope, and string value.
- */
-function upsertPlainSetting({
-	database,
-	key,
-	scope,
-	value,
-}: {
-	database: DatabaseSync;
-	key: string;
-	scope: NormalizedScope;
-	value: string;
-}): void {
-	const timestamp = new Date().toISOString();
-
-	database
-		.prepare(
-			`INSERT INTO settings (
-				id,
-				scope,
-				scope_id,
-				key,
-				value_json,
-				source,
-				locked,
-				updated_at
-			)
-			VALUES (?, ?, ?, ?, ?, 'sqlite', 0, ?)
-			ON CONFLICT(scope, scope_id, key) DO UPDATE SET
-				value_json = excluded.value_json,
-				source = 'sqlite',
-				locked = 0,
-				updated_at = excluded.updated_at`,
-		)
-		.run(
-			`setting-${randomUUID()}`,
-			scope.scope,
-			scope.scopeId,
-			toSettingKey(key),
-			JSON.stringify(value),
-			timestamp,
-		);
-}
-
-/**
- * Removes the plain env var row from the SQLite `settings` table, if any.
- * @param input - Database, key, and scope.
- */
-function deletePlainSetting({
-	database,
-	key,
-	scope,
-}: {
-	database: DatabaseSync;
-	key: string;
-	scope: NormalizedScope;
-}): void {
-	database
-		.prepare(
-			`DELETE FROM settings
-			 WHERE scope = ? AND scope_id = ? AND key = ?`,
-		)
-		.run(scope.scope, scope.scopeId, toSettingKey(key));
 }
 
 /**

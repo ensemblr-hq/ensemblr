@@ -10,6 +10,7 @@ import {
 	listOpenChatTabs,
 	listOpenChatTabsBySession,
 	openChatTab,
+	setChatTabMetadata,
 } from '../storage/repositories/chat-tab-repository.ts';
 import {
 	listEventsByBranch,
@@ -18,8 +19,8 @@ import {
 import {
 	createPiSession,
 	createTurn,
+	getMainBranchForSession,
 	getPiSessionById,
-	listPiSessionBranches,
 	type PiSessionBranchRow,
 	type PiSessionRow,
 	updatePiSession,
@@ -177,12 +178,10 @@ export function createPiSessionLifecycle({
 			});
 		}
 
-		const branches = listPiSessionBranches({
+		const mainBranch = getMainBranchForSession({
 			database,
 			piSessionId: row.id,
 		});
-		const mainBranch =
-			branches.find((branch) => branch.kind === 'main') ?? branches[0];
 		if (!mainBranch) {
 			throw new PiSessionServiceError({
 				code: 'session-not-open',
@@ -685,20 +684,27 @@ function persistSummaryMetadata({
 			usedLlm: result.usedLlm,
 		},
 	};
-	database
-		.prepare(`UPDATE chat_tabs SET metadata_json = ? WHERE id = ?`)
-		.run(JSON.stringify(nextMetadata), tabId);
+	setChatTabMetadata({ database, id: tabId, metadata: nextMetadata });
 }
 
-/** Snapshot projection used by both the lifecycle and the composition root. */
+/**
+ * Snapshot projection used by both the lifecycle and the composition root.
+ *
+ * `openedTabs` may be pre-fetched by the caller to amortize the workspace-tabs
+ * query across a multi-snapshot listing (avoids an N+1 in
+ * `listSessionsForWorkspace`). When omitted, the tabs are fetched from the
+ * database for the snapshot's workspace.
+ */
 export function toSnapshot({
 	branchId,
 	database,
+	openedTabs,
 	row,
 	runtimeOpen = false,
 }: {
 	branchId: string;
 	database: DatabaseSync;
+	openedTabs?: readonly ChatTabRow[];
 	row: PiSessionRow;
 	runtimeOpen?: boolean;
 }): PiSessionSnapshot {
@@ -710,7 +716,9 @@ export function toSnapshot({
 		id: row.id,
 		label: row.label,
 		model: row.model,
-		openedTabs: listOpenChatTabs({ database, workspaceId: row.workspaceId }),
+		openedTabs:
+			openedTabs ??
+			listOpenChatTabs({ database, workspaceId: row.workspaceId }),
 		piSessionId: row.piSessionId,
 		runtimeOpen,
 		status: row.status,

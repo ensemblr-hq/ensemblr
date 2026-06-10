@@ -70,7 +70,15 @@ export type {
 	HealthApi,
 	HealthSnapshot,
 } from './health';
-export type { PiApi, PiExecutableSelectionResult } from './pi';
+export type {
+	ListPiSlashCommandsRequest,
+	ListPiSlashCommandsResult,
+	PiApi,
+	PiExecutableSelectionResult,
+	PiSlashCommandSource,
+	PiSlashCommandSourceScope,
+	PiSlashCommandWire,
+} from './pi';
 export type {
 	ChatTabKindWire,
 	ListPiModelsResult,
@@ -257,3 +265,13 @@ export type {
 	UnarchiveWorkspaceStatus,
 	WorkspaceApi,
 } from './workspace';
+export type {
+	ListWorkspaceFilesFailureCode,
+	ListWorkspaceFilesRequest,
+	ListWorkspaceFilesResult,
+	ReadWorkspaceFileFailureCode,
+	ReadWorkspaceFileRequest,
+	ReadWorkspaceFileResult,
+	WorkspaceFileEntryWire,
+	WorkspaceFilesApi,
+} from './workspace-files';

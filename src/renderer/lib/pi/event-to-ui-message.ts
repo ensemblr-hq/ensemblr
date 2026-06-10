@@ -80,6 +80,7 @@ function handleEvent(
 			flush(pending, result);
 			result.push(buildErrorMessage(event, envelope));
 			return null;
+		case 'context-usage':
 		case 'status':
 		case 'metadata':
 		case 'shutdown':

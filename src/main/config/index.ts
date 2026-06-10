@@ -4,13 +4,22 @@ import type {
 	RepositoryConfigMigrationResult,
 	RepositoryConfigSnapshot,
 } from '../../shared/ipc';
-import { loadRepositoryConfig } from './repository-config';
+import { loadRepositoryConfig } from './repository-config.ts';
 import {
 	applyRepositoryConfigMigration,
 	normalizeRepositoryConfigRequest,
 	previewRepositoryConfigMigration,
-} from './repository-config-migration';
+} from './repository-config-migration.ts';
 
+/**
+ * Backward-compat alias — the implementation moved to the storage repository
+ * layer where the SQL lives. Existing config consumers (IPC handlers, tests)
+ * keep importing the same symbol from `@/main/config`.
+ */
+export {
+	type IsTrackedRepositoryPathOptions as RepositoryConfigPathAuthorizationOptions,
+	isTrackedRepositoryPath as isRepositoryConfigPathAllowed,
+} from '../storage/repositories/repository-path-repository.ts';
 export type {
 	ConfigDiagnostic,
 	ConfigStatusSnapshot,
@@ -18,36 +27,33 @@ export type {
 	EnsembleConfigLoadResult,
 	EnsembleConfigService,
 	LoadEnsembleConfigOptions,
-} from './config-loader';
+} from './config-loader.ts';
 export {
 	createEnsembleConfigService,
 	ENSEMBLE_CONFIG_SCHEMA,
 	ENSEMBLE_CONFIG_SCHEMA_VERSION,
 	loadEnsembleConfig,
 	resolveEnsembleConfigPath,
-} from './config-loader';
+} from './config-loader.ts';
 export type {
 	EnsembleConfigResolutionService,
 	ResolveSettingsOptions,
-} from './config-resolution';
+} from './config-resolution.ts';
 export {
 	createEnsembleConfigResolutionService,
 	normalizeSettingsResolutionRequest,
 	resolveSettings,
-} from './config-resolution';
+} from './config-resolution.ts';
 export type {
 	LoadedRepositoryConfig,
 	LoadRepositoryConfigOptions,
-} from './repository-config';
-export {
-	isRepositoryConfigPathAllowed,
-	loadRepositoryConfig,
-} from './repository-config';
+} from './repository-config.ts';
+export { loadRepositoryConfig } from './repository-config.ts';
 export {
 	applyRepositoryConfigMigration,
 	normalizeRepositoryConfigRequest,
 	previewRepositoryConfigMigration,
-} from './repository-config-migration';
+} from './repository-config-migration.ts';
 
 /** Service exposed to IPC handlers for inspecting and migrating repo config. */
 export interface RepositoryConfigService {

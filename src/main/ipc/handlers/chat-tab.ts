@@ -25,6 +25,7 @@ import {
 	restoreClosedChatTab,
 } from '../../storage/repositories/chat-tab-repository.ts';
 import { getPiSessionById } from '../../storage/repositories/pi-session-repository.ts';
+import { getWorkspacePathById } from '../../storage/repositories/workspace-repository.ts';
 import {
 	bindPiSessionToChatTabRequestSchema,
 	closeChatTabRequestSchema,
@@ -182,7 +183,7 @@ export function registerChatTabHandlers({
 		): Promise<ListClosedChatTabsWithSummaryResult> => {
 			const request = listClosedChatTabsWithSummaryRequestSchema.parse(raw);
 			const database = requireDatabase();
-			const workspaceCwd = lookupWorkspacePath({
+			const workspaceCwd = getWorkspacePathById({
 				database,
 				workspaceId: request.workspaceId,
 			});
@@ -210,19 +211,6 @@ export function registerChatTabHandlers({
 /** True when a tab has no attached Pi session and should not enter history. */
 function isEmptyChatTab(tab: ChatTabRow): boolean {
 	return tab.piSessionId === null;
-}
-
-function lookupWorkspacePath({
-	database,
-	workspaceId,
-}: {
-	database: DatabaseSync;
-	workspaceId: string;
-}): string | null {
-	const row = database
-		.prepare(`SELECT path FROM workspaces WHERE id = ?`)
-		.get(workspaceId) as { path: string } | undefined;
-	return row?.path ?? null;
 }
 
 function buildSummaryPath({

@@ -133,8 +133,19 @@ export type PiAgentMessagePart = PiWireMessagePart;
 
 export type PiAgentMessagePayload = PiWireMessagePayload;
 
+export interface PiAgentContextUsage {
+	contextWindow: number;
+	percent: number | null;
+	tokens: number | null;
+}
+
 /** Discriminated event stream emitted by a session. */
 export type PiAgentEvent =
+	| {
+			at: string;
+			type: 'context-usage';
+			usage: PiAgentContextUsage;
+	  }
 	| {
 			at: string;
 			error: PiAgentError;

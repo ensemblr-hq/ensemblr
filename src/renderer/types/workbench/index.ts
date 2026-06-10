@@ -19,6 +19,7 @@ export type {
 } from './project';
 export type { WorkbenchRouteSearch } from './routing';
 export type {
+	ComposerContextUsage,
 	ComposerModelOption,
 	ComposerShellState,
 	ComposerThinkingOption,
