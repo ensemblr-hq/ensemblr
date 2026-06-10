@@ -4,7 +4,7 @@ import { Grip } from 'lucide-react';
 import { Reorder, useDragControls, useMotionValue } from 'motion/react';
 import React, { useEffect, useMemo, useState } from 'react';
 
-import { useRaisedShadow } from '@/renderer/hooks/ui/useRaisedShadow';
+import { useRaisedShadow } from '@/renderer/hooks/useRaisedShadow';
 import { cn } from '@/renderer/lib/utils';
 
 /** Drag-and-drop reorderable list backed by motion's `Reorder.Group`. */

@@ -1,5 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 
+import { insertArchiveRecordRow } from '../storage/repositories/archive-record-repository.ts';
+
 /**
  * Kind of archive row being recorded. The column shapes below are derived
  * directly from this discriminator so callers do not need to know which
@@ -42,9 +44,10 @@ export interface ArchiveRecordInput {
 }
 
 /**
- * Shared INSERT into `archive_records`. Centralises the column list and the
- * per-kind NULL coercions so the workspace and repository archive services
- * cannot drift apart on row shape.
+ * Shared INSERT into `archive_records`. Centralises the per-kind NULL
+ * coercions so the workspace and repository archive services cannot drift
+ * apart on row shape. The actual SQL lives in the data-access layer
+ * (`storage/repositories/archive-record-repository.ts`).
  */
 export function insertArchiveRecord(input: ArchiveRecordInput): void {
 	const {
@@ -70,41 +73,25 @@ export function insertArchiveRecord(input: ArchiveRecordInput): void {
 	const resolvedWorkspaceSlug = isWorkspace ? workspaceSlug : null;
 	const resolvedBranchName = isWorkspace ? branchName : null;
 	const resolvedBaseBranch = isWorkspace ? baseBranch : null;
-	const resolvedSourcePath = isWorkspace ? workspacePath : repositoryPath;
+	const resolvedSourcePath = isWorkspace
+		? (workspacePath ?? repositoryPath)
+		: repositoryPath;
 	const resolvedArchivedContextPath = isWorkspace ? archivedContextPath : null;
 
-	database
-		.prepare(
-			`INSERT INTO archive_records (
-				id,
-				record_type,
-				repository_id,
-				workspace_id,
-				repository_slug,
-				workspace_slug,
-				branch_name,
-				base_branch,
-				source_path,
-				archived_context_path,
-				branch_cleanup,
-				archive_reason,
-				archived_at
-			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		)
-		.run(
-			recordId,
-			kind,
-			repositoryId,
-			resolvedWorkspaceId,
-			repositorySlug,
-			resolvedWorkspaceSlug,
-			resolvedBranchName,
-			resolvedBaseBranch,
-			resolvedSourcePath,
-			resolvedArchivedContextPath,
-			branchCleanup ? 1 : 0,
-			reason,
-			archivedAt,
-		);
+	insertArchiveRecordRow({
+		archivedAt,
+		archivedContextPath: resolvedArchivedContextPath,
+		baseBranch: resolvedBaseBranch,
+		branchCleanup,
+		branchName: resolvedBranchName,
+		database,
+		kind,
+		reason,
+		recordId,
+		repositoryId,
+		repositorySlug,
+		sourcePath: resolvedSourcePath,
+		workspaceId: resolvedWorkspaceId,
+		workspaceSlug: resolvedWorkspaceSlug,
+	});
 }

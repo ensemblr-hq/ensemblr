@@ -1,7 +1,4 @@
-import type {
-	PiWireMessagePart,
-	PiWireMessagePayload,
-} from '../../shared/ipc/contracts/pi-session.ts';
+import type { PiWireMessagePart, PiWireMessagePayload } from '../../shared/ipc';
 import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
 
 /** Stable identifier for a Pi agent session within the main process. */

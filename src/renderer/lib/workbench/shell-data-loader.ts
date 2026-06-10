@@ -21,26 +21,16 @@ import {
 
 /**
  * Loads every dataset the workbench shell needs (health, navigation, setup),
- * falling back to mocks when the preload bridge is absent.
+ * falling back to {@link loadFixtureShellData} when the preload bridge is
+ * absent (web preview / Storybook).
  * @param queryClient - Shared TanStack Query client.
  * @returns A {@link WorkbenchShellData} for the shell renderer.
  */
 export async function loadWorkbenchShellData(
 	queryClient: QueryClient,
 ): Promise<WorkbenchShellData> {
-	const hasPreloadBridge = isEnsembleApiAvailable();
-
-	if (!hasPreloadBridge) {
-		return {
-			hasPreloadBridge,
-			healthError: null,
-			healthSnapshot: null,
-			navigationError: null,
-			navigationSnapshot: null,
-			projects: shellFixtureProjects,
-			setupError: null,
-			setupSnapshot: null,
-		};
+	if (!isEnsembleApiAvailable()) {
+		return loadFixtureShellData();
 	}
 
 	// Kick off background refreshes but never block the loader: the renderer
@@ -69,7 +59,7 @@ export async function loadWorkbenchShellData(
 	});
 
 	return {
-		hasPreloadBridge,
+		hasPreloadBridge: true,
 		healthError: null,
 		healthSnapshot: cachedHealthSnapshot ?? null,
 		navigationError: null,
@@ -77,5 +67,24 @@ export async function loadWorkbenchShellData(
 		projects: mapRepositoriesToProjects(navigationSnapshot?.repositories),
 		setupError: null,
 		setupSnapshot: cachedSetupSnapshot ?? null,
+	};
+}
+
+/**
+ * Returns a fixture-backed `WorkbenchShellData` for contexts where the Electron
+ * preload bridge is missing — web preview, Storybook, and SSR-style snapshot
+ * runs. Kept separate from {@link loadWorkbenchShellData} so the live path
+ * does not import fixtures into its hot code path.
+ */
+export function loadFixtureShellData(): WorkbenchShellData {
+	return {
+		hasPreloadBridge: false,
+		healthError: null,
+		healthSnapshot: null,
+		navigationError: null,
+		navigationSnapshot: null,
+		projects: shellFixtureProjects,
+		setupError: null,
+		setupSnapshot: null,
 	};
 }

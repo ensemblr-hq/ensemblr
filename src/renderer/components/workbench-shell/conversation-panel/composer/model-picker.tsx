@@ -1,11 +1,5 @@
 import { CheckIcon, SparklesIcon, StarIcon } from 'lucide-react';
-import {
-	type CSSProperties,
-	useCallback,
-	useEffect,
-	useMemo,
-	useState,
-} from 'react';
+import { type CSSProperties, useCallback, useMemo, useState } from 'react';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Popover,
@@ -19,6 +13,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
+import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { cn } from '@/renderer/lib/utils';
 import type { ComposerModelOption } from '@/renderer/types/workbench';
 
@@ -221,26 +216,21 @@ export function ModelPicker({
 	);
 	const selected = options.find((option) => option.id === value) ?? null;
 
-	useEffect(() => {
-		if (!open) {
-			return;
-		}
-		const handler = (event: KeyboardEvent) => {
-			if (!/^[1-9]$/.test(event.key)) {
-				return;
-			}
+	const handleDigitShortcut = useCallback(
+		(event: KeyboardEvent) => {
 			const index = Number.parseInt(event.key, 10) - 1;
 			const target = orderedShortcuts[index];
 			if (!target) {
 				return;
 			}
-			event.preventDefault();
 			onChange(target.id);
 			setOpen(false);
-		};
-		document.addEventListener('keydown', handler);
-		return () => document.removeEventListener('keydown', handler);
-	}, [open, orderedShortcuts, onChange, setOpen]);
+		},
+		[onChange, orderedShortcuts, setOpen],
+	);
+	useHotkey('modelPicker.selectByIndex', handleDigitShortcut, {
+		enabled: open,
+	});
 
 	if (options.length === 0) {
 		return (

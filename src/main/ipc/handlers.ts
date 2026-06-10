@@ -26,6 +26,8 @@ import type {
 import type { EnsembleRootDirectoryService } from '../root';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsembleDatabaseService } from '../storage';
+import { getPiSessionById } from '../storage/repositories/pi-session-repository';
+import { getWorkspacePathById } from '../storage/repositories/workspace-repository';
 import type { ListWorkspaceFilesService } from '../workspace-files';
 import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCloneHandlers } from './handlers/clone';
@@ -154,7 +156,25 @@ export function registerIpcHandlers({
 		piExecutableService,
 		piSessionService,
 	});
-	registerChatTabHandlers({ databaseService });
+	registerChatTabHandlers({
+		databaseService,
+		repositoryLookups: {
+			piSessionExists: ({ piSessionId }) => {
+				const database = databaseService.getConnection()?.database;
+				if (!database) {
+					return false;
+				}
+				return getPiSessionById({ database, id: piSessionId }) !== null;
+			},
+			workspaceCwd: ({ workspaceId }) => {
+				const database = databaseService.getConnection()?.database;
+				if (!database) {
+					return null;
+				}
+				return getWorkspacePathById({ database, workspaceId });
+			},
+		},
+	});
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerWorkspaceFilesHandlers({ listWorkspaceFilesService });
 }

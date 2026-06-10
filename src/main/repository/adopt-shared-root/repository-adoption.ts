@@ -3,6 +3,14 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { AdoptedRepositorySnapshot } from '../../../shared/ipc';
+import {
+	insertRepositoryRow,
+	refreshRepositoryAdoptionRow,
+	selectRepositoryIdBySlug,
+	selectRepositoryLookupByPath,
+	selectRepositoryLookupBySlug,
+	selectRepositoryMetadataJson,
+} from '../../storage/repositories/repository-row-repository.ts';
 import type { GitRepositoryProbe } from '../git-probe.ts';
 import { normalizeRemoteUrl } from '../github-url.ts';
 import { parseMetadata } from '../metadata.ts';
@@ -14,11 +22,7 @@ export function findRepositoryByPath(
 	database: DatabaseSync,
 	repositoryPath: string,
 ): { defaultBranch: string | null; id: string; slug: string } | null {
-	const row = database
-		.prepare(
-			'SELECT id, slug, default_branch AS defaultBranch FROM repositories WHERE path = ?',
-		)
-		.get(repositoryPath);
+	const row = selectRepositoryLookupByPath({ database, repositoryPath });
 
 	if (!isRepositoryLookupRow(row)) {
 		return null;
@@ -36,11 +40,7 @@ export function findRepositoryBySlug(
 	path: string;
 	slug: string;
 } | null {
-	const row = database
-		.prepare(
-			'SELECT id, path, slug, default_branch AS defaultBranch FROM repositories WHERE slug = ?',
-		)
-		.get(slug);
+	const row = selectRepositoryLookupBySlug({ database, slug });
 
 	if (
 		typeof row !== 'object' ||
@@ -83,12 +83,8 @@ export function refreshRepositoryRow({
 	probe: GitRepositoryProbe;
 	timestamp: string;
 }): void {
-	const row = database
-		.prepare(
-			'SELECT metadata_json AS metadataJson FROM repositories WHERE id = ?',
-		)
-		.get(id) as { metadataJson: string } | undefined;
-	const existing = parseMetadata(row?.metadataJson);
+	const metadataJson = selectRepositoryMetadataJson({ database, id });
+	const existing = parseMetadata(metadataJson ?? undefined);
 	const adoption =
 		typeof existing.adoption === 'object' && existing.adoption !== null
 			? (existing.adoption as Record<string, unknown>)
@@ -102,15 +98,13 @@ export function refreshRepositoryRow({
 		remoteUrl: probe.remoteUrl ?? existing.remoteUrl ?? null,
 	};
 
-	database
-		.prepare(
-			`UPDATE repositories
-				SET updated_at = ?,
-					default_branch = COALESCE(?, default_branch),
-					metadata_json = ?
-				WHERE id = ?`,
-		)
-		.run(timestamp, probe.defaultBranch, JSON.stringify(nextMetadata), id);
+	refreshRepositoryAdoptionRow({
+		database,
+		defaultBranch: probe.defaultBranch,
+		id,
+		metadataJson: JSON.stringify(nextMetadata),
+		timestamp,
+	});
 }
 
 /**
@@ -152,32 +146,17 @@ export function adoptRepositoryRow({
 		})),
 	};
 
-	database
-		.prepare(
-			`INSERT INTO repositories (
-				id,
-				slug,
-				name,
-				path,
-				default_branch,
-				created_at,
-				updated_at,
-				metadata_json,
-				remote_url
-			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		)
-		.run(
-			id,
-			slug,
-			baseName,
-			candidatePath,
-			probe.defaultBranch,
-			timestamp,
-			timestamp,
-			JSON.stringify(metadata),
-			normalizeRemoteUrl(probe.remoteUrl) ?? '',
-		);
+	insertRepositoryRow({
+		database,
+		defaultBranch: probe.defaultBranch,
+		id,
+		metadataJson: JSON.stringify(metadata),
+		name: baseName,
+		path: candidatePath,
+		remoteUrl: normalizeRemoteUrl(probe.remoteUrl) ?? '',
+		slug,
+		timestamp,
+	});
 
 	return {
 		adoptedAt: timestamp,
@@ -212,15 +191,7 @@ function allocateRepositorySlug(
 
 /** Tests whether a repository slug is already taken. */
 function repositorySlugExists(database: DatabaseSync, slug: string): boolean {
-	const row = database
-		.prepare('SELECT id FROM repositories WHERE slug = ?')
-		.get(slug);
-
-	return (
-		typeof row === 'object' &&
-		row !== null &&
-		typeof (row as Record<string, unknown>).id === 'string'
-	);
+	return selectRepositoryIdBySlug({ database, slug }) !== null;
 }
 
 /** Type guard for repository lookup rows. */

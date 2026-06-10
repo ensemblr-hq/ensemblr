@@ -1,8 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
-import type {
-	PiChatTabWire,
-	PiSessionSnapshotWire,
-} from '../../shared/ipc/contracts/pi-session.ts';
+import type { PiChatTabWire, PiSessionSnapshotWire } from '../../shared/ipc';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import { listOpenChatTabs } from '../storage/repositories/chat-tab-repository.ts';
 import {

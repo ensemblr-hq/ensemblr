@@ -1,11 +1,5 @@
 import { ArrowUpIcon, SquareIcon } from 'lucide-react';
-import {
-	type ChangeEvent,
-	type KeyboardEvent,
-	useCallback,
-	useRef,
-	useState,
-} from 'react';
+import { useCallback, useState } from 'react';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
 import { Textarea } from '@/renderer/components/ui/textarea';
@@ -16,332 +10,43 @@ import {
 } from '@/renderer/components/ui/tooltip';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { cn } from '@/renderer/lib/utils';
-import { formatMentionAttachmentText } from '@/renderer/lib/workbench/mention-payload';
-import type {
-	ComposerShellState,
-	WorkspaceFileSummary,
-} from '@/renderer/types/workbench';
+import type { ComposerShellState } from '@/renderer/types/workbench';
+import { formatShortcut } from '@/shared/keymap';
 import { AttachmentChip } from './composer/attachment-chip';
 import { AttachmentMenu } from './composer/attachment-menu';
 import { ContextIndicator } from './composer/context-indicator';
 import { ComposerAutocompletePopover } from './composer/mention-popover';
 import { ModelPicker } from './composer/model-picker';
 import { getNextThinkingId, ThinkingPicker } from './composer/thinking-picker';
-import {
-	type AutocompleteState,
-	detectAutocomplete,
-	useFuzzyMatches,
-} from './composer/use-autocomplete';
-import { useMentionMatches } from './composer/use-mention-matches';
-import { useSlashCommands } from './composer/use-slash-commands';
+import { useComposerState } from './composer/use-composer-state';
 
-const FOCUS_SHORTCUT_HINT = '⌘L';
+const FOCUS_SHORTCUT_HINT = formatShortcut('composer.focus');
 
 /**
  * Sticky bottom composer wired to pi's session service. Mirrors reference
  * design — tall textarea, model + thinking chips, paperclip menu, context
  * indicator, send button. Owns inline @ file-mention picker (Portal anchored
- * to textarea wrapper) and / slash-command palette.
+ * to textarea wrapper) and / slash-command palette. Domain state (value,
+ * autocomplete, attachments, keymap) lives in `useComposerState`; this file
+ * stays as a thin wiring/JSX layer.
  */
-export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
-	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-	const anchorRef = useRef<HTMLDivElement | null>(null);
-	const fileInputRef = useRef<HTMLInputElement | null>(null);
-	const [value, setValue] = useState('');
-	const [pending, setPending] = useState(false);
+export function ComposerPanel({
+	chatTabId,
+	composer,
+}: {
+	chatTabId: string;
+	composer: ComposerShellState;
+}) {
+	const state = useComposerState({ chatTabId, composer });
 	const [focused, setFocused] = useState(false);
-	const [autocomplete, setAutocomplete] = useState<AutocompleteState>({
-		kind: null,
-		query: '',
-		tokenStart: 0,
-		tokenEnd: 0,
-	});
-	const [activeIndex, setActiveIndex] = useState(0);
-	const [uploadAttachments, setUploadAttachments] = useState<File[]>([]);
-	const [mentionAttachments, setMentionAttachments] = useState<
-		WorkspaceFileSummary[]
-	>([]);
-	const [attachmentError, setAttachmentError] = useState<string | null>(null);
 	const [modelPickerOpen, setModelPickerOpen] = useState(false);
 
-	const mentionMatches = useMentionMatches(
-		composer.workspaceFiles,
-		autocomplete.kind === 'mention' ? autocomplete.query : '',
-	);
-
-	const slashCommands = useSlashCommands(composer.workspaceCwd);
-	const slashMatches = useFuzzyMatches(
-		slashCommands,
-		autocomplete.kind === 'slash' ? autocomplete.query : '',
-		(entry) => entry.command,
-		80,
-	);
-
-	const mentionOpen = autocomplete.kind === 'mention';
-	const slashOpen = autocomplete.kind === 'slash';
-
 	const focusTextarea = useCallback(() => {
-		textareaRef.current?.focus();
-	}, []);
+		state.textareaRef.current?.focus();
+	}, [state.textareaRef]);
+	useHotkey('composer.focus', focusTextarea);
 
-	useHotkey('l', { meta: true }, focusTextarea);
-	useHotkey('l', { ctrl: true }, focusTextarea);
-
-	const updateAutocomplete = useCallback((nextValue: string, caret: number) => {
-		setAutocomplete(detectAutocomplete(nextValue, caret));
-		setActiveIndex(0);
-	}, []);
-
-	const handleChange = useCallback(
-		(event: ChangeEvent<HTMLTextAreaElement>) => {
-			const nextValue = event.target.value;
-			setValue(nextValue);
-			const caret = event.target.selectionStart ?? nextValue.length;
-			updateAutocomplete(nextValue, caret);
-		},
-		[updateAutocomplete],
-	);
-
-	const handleSelect = useCallback(() => {
-		const textarea = textareaRef.current;
-		if (!textarea) {
-			return;
-		}
-		const caret = textarea.selectionStart ?? textarea.value.length;
-		updateAutocomplete(textarea.value, caret);
-	}, [updateAutocomplete]);
-
-	const dismissAutocomplete = useCallback(() => {
-		setAutocomplete({ kind: null, query: '', tokenStart: 0, tokenEnd: 0 });
-		setActiveIndex(0);
-	}, []);
-
-	const replaceToken = useCallback(
-		(insert: string, keepTrailingSpace = true) => {
-			const { tokenStart, tokenEnd } = autocomplete;
-			const before = value.slice(0, tokenStart);
-			const after = value.slice(tokenEnd);
-			const trailing = keepTrailingSpace ? ' ' : '';
-			const next = `${before}${insert}${trailing}${after}`;
-			setValue(next);
-			dismissAutocomplete();
-			requestAnimationFrame(() => {
-				const textarea = textareaRef.current;
-				if (!textarea) {
-					return;
-				}
-				const newCaret = before.length + insert.length + trailing.length;
-				textarea.focus();
-				textarea.setSelectionRange(newCaret, newCaret);
-			});
-		},
-		[autocomplete, dismissAutocomplete, value],
-	);
-
-	const submitText = useCallback(
-		async (rawText: string, mentions: readonly WorkspaceFileSummary[]) => {
-			const trimmed = rawText.trim();
-			if (
-				composer.disabled ||
-				pending ||
-				(trimmed.length === 0 && mentions.length === 0)
-			) {
-				return;
-			}
-			setPending(true);
-			setAttachmentError(null);
-			try {
-				const attachmentText = await formatMentionAttachmentText({
-					mentions,
-					workspaceCwd: composer.workspaceCwd,
-				});
-				const payload = [attachmentText, trimmed].filter(Boolean).join('\n\n');
-				await composer.onSubmit(payload);
-				setValue('');
-				setUploadAttachments([]);
-				setMentionAttachments([]);
-			} catch (cause) {
-				setAttachmentError(
-					cause instanceof Error
-						? cause.message
-						: 'Failed to attach selected file.',
-				);
-			} finally {
-				setPending(false);
-			}
-		},
-		[composer, pending],
-	);
-
-	const handleSubmit = useCallback(
-		() => submitText(value, mentionAttachments),
-		[submitText, value, mentionAttachments],
-	);
-
-	const onMentionSelect = useCallback(
-		(entry: WorkspaceFileSummary) => {
-			// Drop the @query token from textarea, push file onto chip list
-			setAttachmentError(null);
-			const { tokenStart, tokenEnd } = autocomplete;
-			const before = value.slice(0, tokenStart);
-			const after = value.slice(tokenEnd);
-			const nextValue = `${before.trimEnd()}${before.trimEnd().length > 0 ? ' ' : ''}${after.trimStart()}`;
-			setValue(nextValue);
-			setMentionAttachments((prev) => {
-				if (prev.some((existing) => existing.path === entry.path)) {
-					return prev;
-				}
-				return [...prev, entry];
-			});
-			dismissAutocomplete();
-			requestAnimationFrame(() => {
-				const textarea = textareaRef.current;
-				if (!textarea) {
-					return;
-				}
-				const newCaret = before.trimEnd().length + 1;
-				textarea.focus();
-				textarea.setSelectionRange(newCaret, newCaret);
-			});
-		},
-		[autocomplete, dismissAutocomplete, value],
-	);
-
-	const onSlashSelect = useCallback(
-		(command: string, autoSubmit: boolean) => {
-			const { tokenStart, tokenEnd } = autocomplete;
-			const before = value.slice(0, tokenStart);
-			const after = value.slice(tokenEnd);
-			const slashText = `/${command}`;
-			if (
-				autoSubmit &&
-				before.trim().length === 0 &&
-				after.trim().length === 0
-			) {
-				dismissAutocomplete();
-				setValue('');
-				void submitText(slashText, mentionAttachments);
-				return;
-			}
-			replaceToken(slashText);
-		},
-		[
-			autocomplete,
-			dismissAutocomplete,
-			mentionAttachments,
-			replaceToken,
-			submitText,
-			value,
-		],
-	);
-
-	const handleKeyDown = useCallback(
-		(event: KeyboardEvent<HTMLTextAreaElement>) => {
-			if (mentionOpen || slashOpen) {
-				const kind = mentionOpen ? 'mention' : 'slash';
-				const total =
-					kind === 'mention' ? mentionMatches.length : slashMatches.length;
-				if (total > 0) {
-					if (event.key === 'ArrowDown') {
-						event.preventDefault();
-						setActiveIndex((prev) => (prev + 1) % total);
-						return;
-					}
-					if (event.key === 'ArrowUp') {
-						event.preventDefault();
-						setActiveIndex((prev) => (prev - 1 + total) % total);
-						return;
-					}
-					if (event.key === 'Enter' || event.key === 'Tab') {
-						event.preventDefault();
-						if (kind === 'mention') {
-							const match = mentionMatches[activeIndex];
-							if (match) {
-								onMentionSelect(match);
-							}
-						} else {
-							const match = slashMatches[activeIndex];
-							if (match) {
-								onSlashSelect(match.command, match.autoSubmit);
-							}
-						}
-						return;
-					}
-				}
-				if (event.key === 'Escape') {
-					event.preventDefault();
-					dismissAutocomplete();
-					return;
-				}
-			}
-
-			if (
-				event.key === 'Backspace' &&
-				value.length === 0 &&
-				mentionAttachments.length > 0
-			) {
-				event.preventDefault();
-				setMentionAttachments((prev) => prev.slice(0, -1));
-				return;
-			}
-
-			if (
-				event.key === 'Enter' &&
-				!event.shiftKey &&
-				!event.nativeEvent.isComposing
-			) {
-				event.preventDefault();
-				void handleSubmit();
-			}
-		},
-		[
-			activeIndex,
-			dismissAutocomplete,
-			handleSubmit,
-			mentionAttachments.length,
-			mentionMatches,
-			mentionOpen,
-			onMentionSelect,
-			onSlashSelect,
-			slashMatches,
-			slashOpen,
-			value.length,
-		],
-	);
-
-	const handleAddAttachment = useCallback(() => {
-		fileInputRef.current?.click();
-	}, []);
-
-	const handleFileChange = useCallback(
-		(event: ChangeEvent<HTMLInputElement>) => {
-			const files = event.target.files ? [...event.target.files] : [];
-			if (files.length > 0) {
-				setUploadAttachments((prev) => [...prev, ...files]);
-			}
-			event.target.value = '';
-		},
-		[],
-	);
-
-	const removeUpload = useCallback((index: number) => {
-		setUploadAttachments((prev) => prev.filter((_, idx) => idx !== index));
-	}, []);
-
-	const removeMention = useCallback((path: string) => {
-		setAttachmentError(null);
-		setMentionAttachments((prev) =>
-			prev.filter((entry) => entry.path !== path),
-		);
-	}, []);
-
-	const isStreaming = composer.isStreaming || pending;
-	const canSubmit =
-		!composer.disabled &&
-		!isStreaming &&
-		(value.trim().length > 0 || mentionAttachments.length > 0);
-
-	const pickersDisabled = composer.disabled || isStreaming;
+	const pickersDisabled = composer.disabled || state.isStreaming;
 	const toggleModelPicker = useCallback(() => {
 		setModelPickerOpen((current) => !current);
 	}, []);
@@ -358,18 +63,19 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 		composer.onThinkingChange,
 		composer.thinkingLevel,
 	]);
-	useHotkey('p', { alt: true }, toggleModelPicker, {
+	useHotkey('composer.toggleModelPicker', toggleModelPicker, {
 		enabled: !pickersDisabled && composer.availableModels.length > 0,
 	});
-	useHotkey('t', { alt: true }, cycleThinking, {
+	useHotkey('composer.cycleThinking', cycleThinking, {
 		enabled: !pickersDisabled && composer.availableThinkingLevels.length > 0,
 	});
+
 	const placeholder =
 		composer.placeholder.length > 0
 			? composer.placeholder
 			: 'Ask to make changes, @mention files, run /commands';
 
-	const submitButton = isStreaming ? (
+	const submitButton = state.isStreaming ? (
 		<Button
 			aria-label='Stop'
 			className='rounded-md'
@@ -378,21 +84,21 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 			type='button'
 			variant='outline'
 		>
-			{pending ? <Spinner /> : <SquareIcon />}
+			{state.pending ? <Spinner /> : <SquareIcon />}
 		</Button>
 	) : (
 		<Button
 			aria-label='Send'
 			className={cn(
 				'rounded-md',
-				!canSubmit &&
+				!state.canSubmit &&
 					'bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground',
 			)}
-			disabled={!canSubmit}
-			onClick={() => void handleSubmit()}
+			disabled={!state.canSubmit}
+			onClick={() => void state.handleSubmit()}
 			size='icon-sm'
 			type='button'
-			variant={canSubmit ? 'default' : 'secondary'}
+			variant={state.canSubmit ? 'default' : 'secondary'}
 		>
 			<ArrowUpIcon />
 		</Button>
@@ -410,26 +116,23 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 			submitButton
 		);
 
-	const hasChips =
-		uploadAttachments.length > 0 || mentionAttachments.length > 0;
-
 	const textareaBlock = (
-		<div className='relative' ref={anchorRef}>
+		<div className='relative' ref={state.anchorRef}>
 			<Textarea
 				aria-label='Pi composer'
 				className='max-h-64 min-h-28 resize-none px-0 py-0 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0'
 				disabled={composer.disabled}
 				onBlur={() => setFocused(false)}
-				onChange={handleChange}
+				onChange={state.handleChange}
 				onFocus={() => setFocused(true)}
-				onKeyDown={handleKeyDown}
-				onSelect={handleSelect}
+				onKeyDown={state.handleKeyDown}
+				onSelect={state.handleSelect}
 				placeholder={placeholder}
-				ref={textareaRef}
-				value={value}
+				ref={state.textareaRef}
+				value={state.value}
 				variant='bare'
 			/>
-			{!focused && value.length === 0 && !hasChips ? (
+			{!focused && state.value.length === 0 && !state.hasChips ? (
 				<span
 					aria-hidden='true'
 					className='pointer-events-none absolute top-0 right-0 text-muted-foreground/60 text-xs'
@@ -454,49 +157,49 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 					aria-label='Upload attachment'
 					className='hidden'
 					multiple
-					onChange={handleFileChange}
-					ref={fileInputRef}
+					onChange={state.handleFileChange}
+					ref={state.fileInputRef}
 					tabIndex={-1}
 					type='file'
 				/>
 
-				{hasChips ? (
+				{state.hasChips ? (
 					<div className='flex flex-wrap gap-1.5'>
-						{mentionAttachments.map((entry) => (
+						{state.mentionAttachments.map((entry) => (
 							<AttachmentChip
 								file={entry}
 								key={`mention:${entry.path}`}
-								onRemove={() => removeMention(entry.path)}
+								onRemove={() => state.removeMention(entry.path)}
 							/>
 						))}
-						{uploadAttachments.map((file, index) => (
+						{state.uploadAttachments.map((file, index) => (
 							<AttachmentChip
 								file={{ kind: 'upload', name: file.name }}
 								key={`upload:${file.name}:${file.size}:${index}`}
-								onRemove={() => removeUpload(index)}
+								onRemove={() => state.removeUpload(index)}
 							/>
 						))}
 					</div>
 				) : null}
-				{attachmentError ? (
+				{state.attachmentError ? (
 					<div className='text-destructive text-xs' role='alert'>
-						{attachmentError}
+						{state.attachmentError}
 					</div>
 				) : null}
 
 				<ComposerAutocompletePopover
-					activeIndex={activeIndex}
-					kind={autocomplete.kind}
-					mentionMatches={mentionMatches}
-					onHover={setActiveIndex}
-					onMentionSelect={onMentionSelect}
+					activeIndex={state.activeIndex}
+					kind={state.autocomplete.kind}
+					mentionMatches={state.mentionMatches}
+					onHover={state.setActiveIndex}
+					onMentionSelect={state.onMentionSelect}
 					onOpenChange={(open) => {
 						if (!open) {
-							dismissAutocomplete();
+							state.dismissAutocomplete();
 						}
 					}}
-					onSlashSelect={onSlashSelect}
-					slashMatches={slashMatches}
+					onSlashSelect={state.onSlashSelect}
+					slashMatches={state.slashMatches}
 				>
 					{textareaBlock}
 				</ComposerAutocompletePopover>
@@ -522,7 +225,7 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 						<ContextIndicator usage={composer.contextUsage} />
 						<AttachmentMenu
 							disabled={composer.disabled}
-							onAddAttachment={handleAddAttachment}
+							onAddAttachment={state.handleAddAttachment}
 						/>
 						{submitWithTooltip}
 					</div>

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createJsonlLineStream } from '../../src/main/pi-agent/jsonl-line-stream.ts';
+import { createJsonlLineStream } from '../../src/main/pi-ipc/jsonl-line-stream.ts';
 
 test('emits one line per LF, splits chunked lines correctly', () => {
 	const lines: string[] = [];

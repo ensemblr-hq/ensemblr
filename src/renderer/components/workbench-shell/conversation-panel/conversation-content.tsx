@@ -1,3 +1,4 @@
+import { usePiRawFrameCapture } from '@/renderer/state/pi-raw-frames';
 import type {
 	ComposerShellState,
 	SessionTabModel,
@@ -5,6 +6,7 @@ import type {
 } from '@/renderer/types/workbench';
 
 import { ComposerPanel } from './composer-panel';
+import { PiRawFramePanel } from './pi-raw-frame-panel';
 import { SessionTabs } from './session-tabs';
 import { WorkspaceTimeline } from './workspace-timeline';
 
@@ -36,8 +38,14 @@ export function WorkspaceConversationContent({
 	onSessionTabRestore: (sessionId: string) => void;
 	sessionTabs: SessionTabModel[];
 }) {
+	// Capture every raw Pi RPC frame into the debug ring buffer. The panel may
+	// be closed; capture still runs so the user can open the panel after the
+	// fact and see what already happened.
+	usePiRawFrameCapture();
+	const debugSessionId =
+		activeSession.piSessionId ?? composer.activePiSessionId ?? null;
 	return (
-		<section className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+		<section className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
 			<SessionTabs
 				activeSession={activeSession}
 				closedSessions={closedSessions}
@@ -54,7 +62,8 @@ export function WorkspaceConversationContent({
 					workspace={activeWorkspace}
 				/>
 			</div>
-			<ComposerPanel composer={composer} />
+			<ComposerPanel chatTabId={activeSession.chatTabId} composer={composer} />
+			<PiRawFramePanel sessionId={debugSessionId} />
 		</section>
 	);
 }

@@ -11,8 +11,6 @@ export {
 	pinnedWorkspaceIdsAtom,
 	rightSidebarCollapsedAtom,
 	rightSidebarSizePercentAtom,
-	selectedPiModelByWorkspaceAtom,
-	selectedPiThinkingLevelByWorkspaceAtom,
 } from './atoms';
 export { useProjectNavigationState } from './navigation';
 export {

@@ -24,8 +24,6 @@ import {
 	openChatTab,
 	restoreClosedChatTab,
 } from '../../storage/repositories/chat-tab-repository.ts';
-import { getPiSessionById } from '../../storage/repositories/pi-session-repository.ts';
-import { getWorkspacePathById } from '../../storage/repositories/workspace-repository.ts';
 import {
 	bindPiSessionToChatTabRequestSchema,
 	closeChatTabRequestSchema,
@@ -35,9 +33,22 @@ import {
 	restoreChatTabRequestSchema,
 } from '../request-schemas.ts';
 
+/**
+ * Cross-table lookups the chat-tab IPC layer needs without leaking SQL into
+ * the handler. Default implementation is built in `main.ts` from the storage
+ * data-access layer; tests can pass a stub.
+ */
+export interface ChatTabRepositoryLookups {
+	/** Returns `true` when a Pi session exists for the given id. */
+	piSessionExists: (input: { piSessionId: string }) => boolean;
+	/** Returns the workspace's on-disk cwd, or `null` when absent. */
+	workspaceCwd: (input: { workspaceId: string }) => string | null;
+}
+
 /** Service dependencies for the chat-tab IPC handlers. */
 export interface ChatTabHandlersOptions {
 	databaseService: EnsembleDatabaseService;
+	repositoryLookups: ChatTabRepositoryLookups;
 }
 
 const DEFAULT_TAB_TITLE = 'New chat';
@@ -49,6 +60,7 @@ const DEFAULT_TAB_TITLE = 'New chat';
  */
 export function registerChatTabHandlers({
 	databaseService,
+	repositoryLookups,
 }: ChatTabHandlersOptions): void {
 	const requireDatabase = (): DatabaseSync => {
 		const connection = databaseService.getConnection();
@@ -159,11 +171,11 @@ export function registerChatTabHandlers({
 			if (!existing) {
 				throw new Error(`Chat tab ${request.chatTabId} does not exist.`);
 			}
-			const session = getPiSessionById({
-				database,
-				id: request.piSessionId,
-			});
-			if (!session) {
+			if (
+				!repositoryLookups.piSessionExists({
+					piSessionId: request.piSessionId,
+				})
+			) {
 				throw new Error(`Pi session ${request.piSessionId} does not exist.`);
 			}
 			bindPiSession({
@@ -183,8 +195,7 @@ export function registerChatTabHandlers({
 		): Promise<ListClosedChatTabsWithSummaryResult> => {
 			const request = listClosedChatTabsWithSummaryRequestSchema.parse(raw);
 			const database = requireDatabase();
-			const workspaceCwd = getWorkspacePathById({
-				database,
+			const workspaceCwd = repositoryLookups.workspaceCwd({
 				workspaceId: request.workspaceId,
 			});
 			const closed = listClosedForWorkspace({

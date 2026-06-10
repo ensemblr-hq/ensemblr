@@ -2,6 +2,12 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { AdoptedWorkspaceSnapshot } from '../../../shared/ipc';
+import {
+	insertWorkspaceRow,
+	refreshWorkspaceAdoptionRow,
+	selectWorkspaceIdByPath,
+	selectWorkspaceMetadataJson,
+} from '../../storage/repositories/workspace-repository.ts';
 import { DEFAULT_FALLBACK_BRANCH } from '../git-ops.ts';
 import type { GitWorktreeMetadata } from '../git-probe.ts';
 import { parseMetadata } from '../metadata.ts';
@@ -12,18 +18,8 @@ export function findWorkspaceByPath(
 	database: DatabaseSync,
 	workspacePath: string,
 ): { id: string } | null {
-	const row = database
-		.prepare('SELECT id FROM workspaces WHERE path = ?')
-		.get(workspacePath);
-
-	if (
-		typeof row !== 'object' ||
-		row === null ||
-		typeof (row as Record<string, unknown>).id !== 'string'
-	) {
-		return null;
-	}
-	return row as { id: string };
+	const id = selectWorkspaceIdByPath({ database, workspacePath });
+	return id ? { id } : null;
 }
 
 /**
@@ -42,12 +38,8 @@ export function refreshWorkspaceRow({
 	probe: GitWorktreeMetadata;
 	timestamp: string;
 }): void {
-	const row = database
-		.prepare(
-			'SELECT metadata_json AS metadataJson FROM workspaces WHERE id = ?',
-		)
-		.get(id) as { metadataJson: string } | undefined;
-	const existing = parseMetadata(row?.metadataJson);
+	const metadataJson = selectWorkspaceMetadataJson({ database, id });
+	const existing = parseMetadata(metadataJson ?? undefined);
 	const adoption =
 		typeof existing.adoption === 'object' && existing.adoption !== null
 			? (existing.adoption as Record<string, unknown>)
@@ -60,15 +52,13 @@ export function refreshWorkspaceRow({
 		},
 	};
 
-	database
-		.prepare(
-			`UPDATE workspaces
-				SET updated_at = ?,
-					branch_name = COALESCE(?, branch_name),
-					metadata_json = ?
-				WHERE id = ?`,
-		)
-		.run(timestamp, probe.headBranch, JSON.stringify(nextMetadata), id);
+	refreshWorkspaceAdoptionRow({
+		branchName: probe.headBranch,
+		database,
+		id,
+		metadataJson: JSON.stringify(nextMetadata),
+		timestamp,
+	});
 }
 
 /**
@@ -104,34 +94,18 @@ export function adoptWorkspaceRow({
 		adoptionMode: ADOPTION_MODE,
 	};
 
-	database
-		.prepare(
-			`INSERT INTO workspaces (
-				id,
-				repository_id,
-				slug,
-				name,
-				path,
-				branch_name,
-				base_branch,
-				created_at,
-				updated_at,
-				metadata_json
-			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		)
-		.run(
-			id,
-			repository.id,
-			slug,
-			name,
-			candidatePath,
-			branchName,
-			baseBranch,
-			timestamp,
-			timestamp,
-			JSON.stringify(metadata),
-		);
+	insertWorkspaceRow({
+		baseBranch,
+		branchName,
+		database,
+		id,
+		metadataJson: JSON.stringify(metadata),
+		name,
+		path: candidatePath,
+		repositoryId: repository.id,
+		slug,
+		timestamp,
+	});
 
 	return {
 		adoptedAt: timestamp,

@@ -1,4 +1,4 @@
-import type { DynamicToolUIPart, UIMessage } from 'ai';
+import type { UIMessage } from 'ai';
 
 import type {
 	PiPersistedEnvelope,
@@ -7,13 +7,22 @@ import type {
 	PiWireMessagePayload,
 } from '@/shared/ipc';
 
-type UIRole = UIMessage['role'];
-
-type UIMessagePart = UIMessage['parts'][number];
-type DynamicToolOutputPart = Extract<
-	DynamicToolUIPart,
-	{ state: 'output-available' | 'output-error' }
->;
+import {
+	buildErrorMessage,
+	buildStderrMessage,
+} from './diagnostic-event-mapper';
+import {
+	dropStreamingPartsOfType,
+	isDoneTextPart,
+	isStreamingTextPart,
+	mergeStreamingTextPart,
+} from './text-event-mapper';
+import {
+	buildToolCallPart,
+	buildToolResultPart,
+	mergeToolOutputPart,
+} from './tool-event-mapper';
+import type { PendingGroup, UIMessagePart, UIRole } from './types';
 
 /**
  * Converts the persisted Pi RPC event stream into the AI SDK `UIMessage` shape
@@ -21,7 +30,8 @@ type DynamicToolOutputPart = Extract<
  *
  * The wire payload is a tagged {@link PiPersistedEnvelope} union — the
  * normalization happens in the main-process adapter so this mapper just
- * pattern-matches on `payload.kind` and projects each variant to UI parts.
+ * pattern-matches on `payload.kind` and projects each variant to UI parts via
+ * the concern-specific sub-mappers.
  *
  * Grouping rule: consecutive renderable `message` events that share the same
  * `turnId` and the same UI role collapse into a single `UIMessage`. Lifecycle,
@@ -44,13 +54,6 @@ export function eventsToUIMessages(
 	}
 
 	return result;
-}
-
-interface PendingGroup {
-	id: string;
-	parts: UIMessagePart[];
-	role: UIRole;
-	signature: string;
 }
 
 function handleEvent(
@@ -103,7 +106,7 @@ function handleMessageEnvelope(
 	const uiRole: UIRole = envelope.role === 'user' ? 'user' : 'assistant';
 	const signature = groupSignature(event.turnId, uiRole);
 
-	const incomingParts = mergeToolParts(
+	const incomingParts = mergeParts(
 		[],
 		projectMessagePayload(event, envelope.payload),
 	);
@@ -125,7 +128,7 @@ function handleMessageEnvelope(
 
 	return {
 		...pending,
-		parts: mergeToolParts(pending.parts, incomingParts),
+		parts: mergeParts(pending.parts, incomingParts),
 	};
 }
 
@@ -146,6 +149,14 @@ function projectMessagePayload(
 		case 'reasoning':
 			return payload.text
 				? [{ state: 'done', text: payload.text, type: 'reasoning' }]
+				: [];
+		case 'text-delta':
+			return payload.text
+				? [{ state: 'streaming', text: payload.text, type: 'text' }]
+				: [];
+		case 'reasoning-delta':
+			return payload.text
+				? [{ state: 'streaming', text: payload.text, type: 'reasoning' }]
 				: [];
 		case 'prompt':
 			return payload.prompt
@@ -192,49 +203,33 @@ function projectMessagePart(
 	}
 }
 
-function buildToolCallPart(
-	source: Extract<
-		PiWireMessagePart | PiWireMessagePayload,
-		{ kind: 'tool-call' }
-	>,
-	event: PiSessionEventWire,
-): DynamicToolUIPart {
-	const input = isPlainObject(source.input) ? source.input : {};
-	return {
-		input,
-		state: 'input-available',
-		toolCallId: source.toolCallId || event.id,
-		toolName: source.name || 'tool',
-		type: 'dynamic-tool',
-	};
-}
-
-function buildToolResultPart(
-	source: Extract<
-		PiWireMessagePart | PiWireMessagePayload,
-		{ kind: 'tool-result' }
-	>,
-	event: PiSessionEventWire,
-): DynamicToolUIPart {
-	const normalizedOutput = normalizeToolOutput(source.output);
-	if (source.isError) {
-		return {
-			errorText: normalizeToolError(normalizedOutput),
-			input: {},
-			state: 'output-error',
-			toolCallId: source.toolCallId || event.id,
-			toolName: 'tool',
-			type: 'dynamic-tool',
-		};
+/**
+ * Folds `incomingParts` into `existingParts`, delegating to the concern-
+ * specific mergers for streaming text, finalized text, and tool-output pairing.
+ */
+function mergeParts(
+	existingParts: readonly UIMessagePart[],
+	incomingParts: readonly UIMessagePart[],
+): UIMessagePart[] {
+	let merged: UIMessagePart[] = [...existingParts];
+	for (const incomingPart of incomingParts) {
+		if (isStreamingTextPart(incomingPart)) {
+			merged = mergeStreamingTextPart(merged, incomingPart);
+			continue;
+		}
+		if (isDoneTextPart(incomingPart)) {
+			merged = dropStreamingPartsOfType(merged, incomingPart.type);
+			merged.push(incomingPart);
+			continue;
+		}
+		const toolMerged = mergeToolOutputPart(merged, incomingPart);
+		if (toolMerged !== null) {
+			merged = toolMerged;
+			continue;
+		}
+		merged.push(incomingPart);
 	}
-	return {
-		input: {},
-		output: normalizedOutput,
-		state: 'output-available',
-		toolCallId: source.toolCallId || event.id,
-		toolName: 'tool',
-		type: 'dynamic-tool',
-	};
+	return merged;
 }
 
 function flush(pending: PendingGroup | null, result: UIMessage[]): void {
@@ -254,135 +249,6 @@ function finalizeGroup(group: PendingGroup): UIMessage {
 		parts,
 		role: group.role,
 	};
-}
-
-function buildStderrMessage(event: PiSessionEventWire): UIMessage | null {
-	const detail = readStderrDetail(event.payload);
-	if (!isActionableDiagnostic(detail)) {
-		return null;
-	}
-	return {
-		id: `pi-event:${event.id}`,
-		parts: [{ state: 'done', text: `[stderr] ${detail}`, type: 'text' }],
-		role: 'system',
-	};
-}
-
-function buildErrorMessage(
-	event: PiSessionEventWire,
-	envelope: Extract<PiPersistedEnvelope, { kind: 'error' }>,
-): UIMessage {
-	const error = envelope.error;
-	const tag = error.recoverable === false ? 'fatal' : 'recoverable';
-	const head = error.message || 'Runtime error';
-	const body = error.detail ? `\n${error.detail}` : '';
-	return {
-		id: `pi-event:${event.id}`,
-		parts: [{ state: 'done', text: `[${tag}] ${head}${body}`, type: 'text' }],
-		role: 'system',
-	};
-}
-
-function readStderrDetail(payload: PiPersistedEnvelope | null): string {
-	if (payload?.kind === 'error') {
-		return (
-			payload.error.detail ?? payload.error.message ?? '(empty stderr chunk)'
-		);
-	}
-	return '(empty stderr chunk)';
-}
-
-function mergeToolParts(
-	existingParts: readonly UIMessagePart[],
-	incomingParts: readonly UIMessagePart[],
-): UIMessagePart[] {
-	const merged = [...existingParts];
-	for (const incomingPart of incomingParts) {
-		if (!isDynamicToolPart(incomingPart) || !isToolOutputPart(incomingPart)) {
-			merged.push(incomingPart);
-			continue;
-		}
-
-		const matchIndex = merged.findIndex(
-			(part) =>
-				isDynamicToolPart(part) && part.toolCallId === incomingPart.toolCallId,
-		);
-		if (matchIndex === -1) {
-			merged.push(incomingPart);
-			continue;
-		}
-
-		const previousPart = merged[matchIndex];
-		if (previousPart !== undefined && isDynamicToolPart(previousPart)) {
-			merged[matchIndex] = mergeDynamicToolParts(previousPart, incomingPart);
-		}
-	}
-	return merged;
-}
-
-function mergeDynamicToolParts(
-	previousPart: DynamicToolUIPart,
-	incomingPart: DynamicToolOutputPart,
-): DynamicToolOutputPart {
-	return {
-		...incomingPart,
-		input: previousPart.input ?? incomingPart.input,
-		toolName: previousPart.toolName || incomingPart.toolName,
-	};
-}
-
-function isDynamicToolPart(part: UIMessagePart): part is DynamicToolUIPart {
-	return part.type === 'dynamic-tool';
-}
-
-function isToolOutputPart(
-	part: DynamicToolUIPart,
-): part is DynamicToolOutputPart {
-	return part.state === 'output-available' || part.state === 'output-error';
-}
-
-function isActionableDiagnostic(detail: string): boolean {
-	const normalized = detail.trim();
-	return normalized.length > 0 && normalized !== '(empty stderr chunk)';
-}
-
-function normalizeToolOutput(output: unknown): unknown {
-	if (!output || typeof output !== 'object' || Array.isArray(output)) {
-		return output;
-	}
-	const content = (output as Record<string, unknown>).content;
-	if (!Array.isArray(content)) {
-		return output;
-	}
-	const text = content
-		.map((block) => {
-			if (!block || typeof block !== 'object') {
-				return null;
-			}
-			const value = (block as Record<string, unknown>).text;
-			return typeof value === 'string' ? value : null;
-		})
-		.filter((value): value is string => value !== null)
-		.join('\n');
-	return text.length > 0 ? text : output;
-}
-
-function normalizeToolError(output: unknown): string {
-	if (typeof output === 'string' && output.length > 0) {
-		return output;
-	}
-	if (output !== undefined && output !== null) {
-		try {
-			return JSON.stringify(output);
-		} catch {
-			return 'Tool execution failed.';
-		}
-	}
-	return 'Tool execution failed.';
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-	return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function groupSignature(turnId: string | null, role: UIRole): string {

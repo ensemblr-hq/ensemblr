@@ -4,6 +4,8 @@ import type {
 	SharedRootAdoptionStaleRepositoryRecord,
 	SharedRootAdoptionStaleWorkspaceRecord,
 } from '../../../shared/ipc';
+import { listRepositoryRowsByPathPrefix } from '../../storage/repositories/repository-row-repository.ts';
+import { listWorkspaceRowsByPathPrefix } from '../../storage/repositories/workspace-repository.ts';
 import { deleteWorkspaceRow } from '../workspace-row-ops.ts';
 import {
 	ensureTrailingSeparator,
@@ -43,16 +45,14 @@ export function detectStaleRecords({
 	const repositoriesPathPrefix = ensureTrailingSeparator(rootRepositoriesPath);
 	const workspacesPathPrefix = ensureTrailingSeparator(rootWorkspacesPath);
 
-	const repoRows = database
-		.prepare(
-			"SELECT id, path, metadata_json AS metadataJson FROM repositories WHERE path LIKE ? || '%'",
-		)
-		.all(repositoriesPathPrefix);
-	const wsRows = database
-		.prepare(
-			"SELECT id, path, metadata_json AS metadataJson FROM workspaces WHERE path LIKE ? || '%'",
-		)
-		.all(workspacesPathPrefix);
+	const repoRows = listRepositoryRowsByPathPrefix({
+		database,
+		pathPrefix: repositoriesPathPrefix,
+	});
+	const wsRows = listWorkspaceRowsByPathPrefix({
+		database,
+		pathPrefix: workspacesPathPrefix,
+	});
 
 	const repositories: SharedRootAdoptionStaleRepositoryRecord[] = [];
 	for (const row of repoRows) {

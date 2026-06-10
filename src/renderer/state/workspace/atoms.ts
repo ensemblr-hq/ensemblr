@@ -102,23 +102,3 @@ export const activeChatTabByWorkspaceAtom = atomWithStorage<
 	undefined,
 	workspaceStorageOptions,
 );
-
-/** Persisted Pi model selection keyed by workspace id (survives reloads). */
-export const selectedPiModelByWorkspaceAtom = atomWithStorage<
-	Record<string, string>
->(
-	'ensemble_workspace_selected_pi_model_by_workspace',
-	{},
-	undefined,
-	workspaceStorageOptions,
-);
-
-/** Persisted Pi thinking-level selection keyed by workspace id. */
-export const selectedPiThinkingLevelByWorkspaceAtom = atomWithStorage<
-	Record<string, string>
->(
-	'ensemble_workspace_selected_pi_thinking_by_workspace',
-	{},
-	undefined,
-	workspaceStorageOptions,
-);

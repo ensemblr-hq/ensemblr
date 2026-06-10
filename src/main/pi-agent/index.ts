@@ -3,9 +3,10 @@
 //                   probing, RPC smoke, provider models, agent-directory
 //                   resolver. Answers "is Pi installed and runnable?".
 //   `pi-agent/`   — Pi session/protocol: adapter, client, session service,
-//                   JSONL framing, fakes, summary writer. Drives live Pi
-//                   conversations. JSONL line framing lives here and is
-//                   shared with the runtime smoke check.
+//                   slash command resolver, fakes, summary writer. Drives
+//                   live Pi conversations.
+//   `pi-ipc/`     — Low-level transport plumbing (JSONL framing) shared
+//                   between `pi-runtime/` smoke check and `pi-agent/` adapter.
 
 export type {
 	ChildLike,
@@ -18,11 +19,6 @@ export type {
 	FakePiAgentAdapterSessionController,
 } from './fake-pi-agent-client';
 export { createFakePiAgentAdapter } from './fake-pi-agent-client';
-export type {
-	JsonlLineStream,
-	JsonlLineStreamOptions,
-} from './jsonl-line-stream';
-export { createJsonlLineStream } from './jsonl-line-stream';
 export type {
 	PiAgentAdapter,
 	PiAgentAdapterCreateSessionInput,

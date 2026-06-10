@@ -1,12 +1,13 @@
 import { queryOptions } from '@tanstack/react-query';
 
-import { profileElectronIpcCall } from '@/renderer/lib/instrumentation/route-profiler';
+import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type {
 	ListPiModelsResult,
 	ListPiSessionEventsResult,
 	ListPiSessionsResult,
 	OpenPiSessionRequest,
 	OpenPiSessionResult,
+	PiRawFrameBroadcast,
 	PiSessionEventBroadcast,
 	StopPiSessionRequest,
 	StopPiSessionResult,
@@ -91,6 +92,20 @@ export function subscribePiSessionEvents(
 		return () => undefined;
 	}
 	return api.onPiSessionEvent(listener);
+}
+
+/**
+ * Subscribes to the temporary debug feed of raw Pi JSONL frames. Used by the
+ * debug panel to display unnormalized rx/tx lines. Returns an unsubscribe fn.
+ */
+export function subscribePiRawFrames(
+	listener: (frame: PiRawFrameBroadcast) => void,
+): () => void {
+	const api = getEnsembleApiOrNull();
+	if (!api) {
+		return () => undefined;
+	}
+	return api.onPiRawFrame(listener);
 }
 
 /** Aborts the in-flight turn of an open Pi session. */

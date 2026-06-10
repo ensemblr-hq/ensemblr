@@ -4,6 +4,7 @@ import {
 	type CloneGithubRepositoryProgressEvent,
 	type EnsembleApi,
 	IPC_CHANNELS,
+	type PiRawFrameBroadcast,
 	type PiSessionEventBroadcast,
 } from '../../shared/ipc';
 
@@ -13,7 +14,7 @@ import {
  */
 type InvokeKey = Exclude<
 	keyof EnsembleApi,
-	'onCloneGithubRepositoryProgress' | 'onPiSessionEvent'
+	'onCloneGithubRepositoryProgress' | 'onPiRawFrame' | 'onPiSessionEvent'
 >;
 
 /**
@@ -106,6 +107,8 @@ export function createEnsembleApi(): EnsembleApi {
 				IPC_CHANNELS.cloneGithubRepositoryProgress,
 				listener,
 			),
+		onPiRawFrame: (listener) =>
+			subscribe<PiRawFrameBroadcast>(IPC_CHANNELS.piRawFrame, listener),
 		onPiSessionEvent: (listener) =>
 			subscribe<PiSessionEventBroadcast>(IPC_CHANNELS.piSessionEvent, listener),
 		openChatTab: (request) => invoke('openChatTab', request),

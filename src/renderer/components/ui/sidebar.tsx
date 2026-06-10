@@ -20,15 +20,14 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
-import { useIsMobile } from '@/renderer/hooks/ui/use-mobile';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { useIsMobile } from '@/renderer/hooks/use-mobile';
 import { cn } from '@/renderer/lib/utils';
-import { sidebarOpenAtom } from '@/renderer/state/sidebar/atoms';
+import { sidebarOpenAtom } from '@/renderer/state/sidebar';
 
 const SIDEBAR_WIDTH = '16rem';
 const SIDEBAR_WIDTH_MOBILE = '18rem';
 const SIDEBAR_WIDTH_ICON = '3rem';
-const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
 
 type SidebarContextProps = {
 	state: 'expanded' | 'collapsed';
@@ -88,8 +87,7 @@ function SidebarProvider({
 		return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
 	}, [isMobile, setOpen]);
 
-	useHotkey(SIDEBAR_KEYBOARD_SHORTCUT, { meta: true }, toggleSidebar);
-	useHotkey(SIDEBAR_KEYBOARD_SHORTCUT, { ctrl: true }, toggleSidebar);
+	useHotkey('sidebar.toggle', toggleSidebar);
 
 	// We add a state so that we can do data-state="expanded" or "collapsed".
 	// This makes it easier to style the sidebar with Tailwind classes.

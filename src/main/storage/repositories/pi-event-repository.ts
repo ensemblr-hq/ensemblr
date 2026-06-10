@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { PiPersistedEnvelope } from '../../../shared/ipc/contracts/pi-session.ts';
+import type { PiPersistedEnvelope } from '../../../shared/ipc';
 
 export type PiEventStream = 'protocol' | 'stderr';
 
@@ -174,6 +174,22 @@ export function getEventById({
 		| undefined;
 
 	return row ? mapEventRow(row) : null;
+}
+
+/** Returns the largest ordinal stored for a branch, or -1 when empty. */
+export function getMaxOrdinalForBranch({
+	database,
+	branchId,
+}: {
+	database: DatabaseSync;
+	branchId: string;
+}): number {
+	const row = database
+		.prepare(
+			`SELECT COALESCE(MAX(ordinal), -1) AS max FROM pi_session_events WHERE branch_id = ?`,
+		)
+		.get(branchId) as { max: number } | undefined;
+	return row?.max ?? -1;
 }
 
 /** Returns events for a branch in ordinal order. */

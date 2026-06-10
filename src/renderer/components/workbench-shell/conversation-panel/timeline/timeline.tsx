@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { UIMessage } from 'ai';
 import type { ReactNode } from 'react';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { BundledLanguage } from 'shiki';
 import { piSessionsForWorkspaceQuery } from '@/renderer/api/ensemble-queries';
 import { CodeBlock } from '@/renderer/components/ai-elements/code-block';
@@ -40,11 +40,15 @@ import {
 	ToolInput,
 	ToolOutput,
 } from '@/renderer/components/ai-elements/tool';
-import { eventsToUIMessages } from '@/renderer/lib/pi/event-to-ui-message';
 import {
 	classifyToolOutput,
+	eventsToUIMessages,
 	looksLikeStackTrace,
-} from '@/renderer/lib/pi/tool-output-classifier';
+} from '@/renderer/lib/pi';
+import {
+	type OptimisticPrompt,
+	useOptimisticPrompts,
+} from '@/renderer/state/optimistic-prompts';
 import type {
 	SessionTabModel,
 	WorkspaceShellModel,
@@ -83,33 +87,49 @@ export function PiSessionTimeline({
 	const piSessionId = activePiSession?.id ?? null;
 	const isStreaming = activePiSession?.status === 'streaming';
 
-	const { error, events, isLoading } = useTimelineEvents({
+	const { error, events } = useTimelineEvents({
 		branchId,
 		sessionId: piSessionId,
 	});
 
-	const messages = useMemo<UIMessage[]>(
+	const persistedMessages = useMemo<UIMessage[]>(
 		() => eventsToUIMessages(events),
 		[events],
 	);
 
-	if (!piSessionId) {
-		return null;
-	}
+	const optimistic = useOptimisticPrompts(activeSession.chatTabId);
 
-	if (isLoading && events.length === 0) {
-		return (
-			<section
-				aria-label='Pi session timeline'
-				className='flex flex-col gap-2 text-muted-foreground text-xs'
-				data-timeline-state='loading'
-			>
-				<p>Loading timeline…</p>
-			</section>
+	// Drop an optimistic prompt as soon as a persisted user-message with the
+	// same text shows up in the event stream. The dedup is text-only and
+	// chronologically ordered so back-to-back identical prompts still resolve
+	// in submission order.
+	useEffect(() => {
+		if (optimistic.prompts.length === 0) {
+			return;
+		}
+		const matchedIds = matchOptimisticAgainstMessages(
+			optimistic.prompts,
+			persistedMessages,
 		);
-	}
+		if (matchedIds.length > 0) {
+			optimistic.removeMany(matchedIds);
+		}
+	}, [optimistic, persistedMessages]);
 
-	if (error) {
+	const optimisticUnmatched = useMemo(
+		() => filterUnmatchedOptimistic(optimistic.prompts, persistedMessages),
+		[optimistic.prompts, persistedMessages],
+	);
+
+	const messages = useMemo<UIMessage[]>(
+		() => [
+			...persistedMessages,
+			...optimisticUnmatched.map(optimisticToUIMessage),
+		],
+		[persistedMessages, optimisticUnmatched],
+	);
+
+	if (piSessionId && error) {
 		return (
 			<section
 				aria-label='Pi session timeline'
@@ -125,15 +145,7 @@ export function PiSessionTimeline({
 	}
 
 	if (messages.length === 0) {
-		return (
-			<section
-				aria-label='Pi session timeline'
-				className='flex flex-col items-center gap-2 rounded-md border border-border border-dashed bg-pane/40 p-6 text-center text-muted-foreground text-xs'
-				data-timeline-state='idle'
-			>
-				<p>Pi session is idle. Send a prompt to start the conversation.</p>
-			</section>
-		);
+		return null;
 	}
 
 	return (
@@ -157,6 +169,73 @@ export function PiSessionTimeline({
 			</Conversation>
 		</section>
 	);
+}
+
+function optimisticToUIMessage(entry: OptimisticPrompt): UIMessage {
+	return {
+		id: entry.id,
+		parts: [{ state: 'done', text: entry.prompt, type: 'text' }],
+		role: 'user',
+	};
+}
+
+/**
+ * Returns the optimistic-prompt entries that have not yet been mirrored by a
+ * persisted user message. Match is exact on `prompt` text and consumes one
+ * persisted message per match so duplicates resolve in submission order.
+ */
+function filterUnmatchedOptimistic(
+	optimistic: readonly OptimisticPrompt[],
+	persisted: readonly UIMessage[],
+): readonly OptimisticPrompt[] {
+	if (optimistic.length === 0) {
+		return optimistic;
+	}
+	const persistedTexts = collectPersistedUserTexts(persisted);
+	const unmatched: OptimisticPrompt[] = [];
+	for (const entry of optimistic) {
+		const found = persistedTexts.indexOf(entry.prompt);
+		if (found === -1) {
+			unmatched.push(entry);
+			continue;
+		}
+		persistedTexts.splice(found, 1);
+	}
+	return unmatched;
+}
+
+function matchOptimisticAgainstMessages(
+	optimistic: readonly OptimisticPrompt[],
+	persisted: readonly UIMessage[],
+): string[] {
+	const persistedTexts = collectPersistedUserTexts(persisted);
+	const matched: string[] = [];
+	for (const entry of optimistic) {
+		const found = persistedTexts.indexOf(entry.prompt);
+		if (found === -1) {
+			continue;
+		}
+		persistedTexts.splice(found, 1);
+		matched.push(entry.id);
+	}
+	return matched;
+}
+
+function collectPersistedUserTexts(messages: readonly UIMessage[]): string[] {
+	const texts: string[] = [];
+	for (const message of messages) {
+		if (message.role !== 'user') {
+			continue;
+		}
+		const joined = message.parts
+			.map((part) => (part.type === 'text' ? part.text : ''))
+			.filter(Boolean)
+			.join('\n');
+		if (joined.length > 0) {
+			texts.push(joined);
+		}
+	}
+	return texts;
 }
 
 /** Renders one mapped Pi message with chat or diagnostic semantics. */

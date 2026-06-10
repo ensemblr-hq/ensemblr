@@ -9,7 +9,7 @@ import {
 } from '@/renderer/components/settings/settings-sidebar';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { workbenchRouteApi } from '@/renderer/components/workbench-shell/route-layout/use-workbench-layout-model';
-import { settingsActiveRepoIdAtom } from '@/renderer/state/preferences/atoms';
+import { settingsActiveRepoIdAtom } from '@/renderer/state/preferences';
 
 /** Derive the active scope from the current pathname. */
 function getScopeFromPath(pathname: string): SettingsScope {

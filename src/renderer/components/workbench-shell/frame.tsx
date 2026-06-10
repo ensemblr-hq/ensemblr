@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 import { SidebarProvider } from '@/renderer/components/ui/sidebar';
 import { TooltipProvider } from '@/renderer/components/ui/tooltip';
-import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
+import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import { useProjectNavigationState } from '@/renderer/state/workspace';
 import type {
 	WorkbenchRouteSearch,

@@ -12,10 +12,11 @@ import {
 	submitPiPrompt,
 	subscribePiSessionEvents,
 } from '@/renderer/api/ensemble-queries';
+import { useOptimisticPrompts } from '@/renderer/state/optimistic-prompts';
 import {
-	selectedPiModelByWorkspaceAtom,
-	selectedPiThinkingLevelByWorkspaceAtom,
-} from '@/renderer/state/workspace';
+	lastSelectedPiModelAtom,
+	lastSelectedPiThinkingLevelAtom,
+} from '@/renderer/state/preferences';
 import type {
 	ComposerContextUsage,
 	ComposerModelOption,
@@ -90,15 +91,12 @@ export function usePiComposerController({
 	const modelsQuery = useQuery(piModelsQuery);
 	const sessionsQuery = useQuery(piSessionsForWorkspaceQuery(workspaceId));
 
-	const [selectedModelByWorkspace, setSelectedModelByWorkspace] = useAtom(
-		selectedPiModelByWorkspaceAtom,
+	const [selectedModelId, setSelectedModelId] = useAtom(
+		lastSelectedPiModelAtom,
 	);
-	const [selectedThinkingByWorkspace, setSelectedThinkingByWorkspace] = useAtom(
-		selectedPiThinkingLevelByWorkspaceAtom,
+	const [selectedThinkingLevel, setSelectedThinkingLevel] = useAtom(
+		lastSelectedPiThinkingLevelAtom,
 	);
-	const selectedModelId = selectedModelByWorkspace[workspaceId] ?? null;
-	const selectedThinkingLevel =
-		selectedThinkingByWorkspace[workspaceId] ?? null;
 	const [lastError, setLastError] = useState<string | null>(null);
 	const [pendingSession, setPendingSession] =
 		useState<PendingTabSession | null>(null);
@@ -259,6 +257,7 @@ export function usePiComposerController({
 	});
 
 	const isRealChatTabId = !chatTabId.endsWith(':overview');
+	const optimistic = useOptimisticPrompts(chatTabId);
 
 	const onSubmit = useCallback(
 		async (prompt: string): Promise<void> => {
@@ -274,6 +273,11 @@ export function usePiComposerController({
 			}
 			setLastError(null);
 
+			// Render the user prompt instantly. The Timeline removes this entry as
+			// soon as a matching persisted user-message event lands so we don't
+			// double-render once the runtime echoes the prompt back.
+			const optimisticEntry = optimistic.push(trimmed);
+
 			let sessionId = activeSessionId;
 			const needsRuntimeResume =
 				persistedActiveSession !== undefined &&
@@ -285,12 +289,14 @@ export function usePiComposerController({
 				});
 				if (opened.error) {
 					setLastError(opened.error);
+					optimistic.remove(optimisticEntry.id);
 					return;
 				}
 				sessionId = opened.session?.id ?? null;
 			}
 			if (!sessionId) {
 				setLastError('Unable to open a Pi session.');
+				optimistic.remove(optimisticEntry.id);
 				return;
 			}
 
@@ -300,12 +306,14 @@ export function usePiComposerController({
 			});
 			if (result.error) {
 				setLastError(result.error);
+				optimistic.remove(optimisticEntry.id);
 			}
 		},
 		[
 			activeSessionId,
 			isRealChatTabId,
 			openSessionMutation,
+			optimistic,
 			persistedActiveSession,
 			submitMutation,
 		],
@@ -320,22 +328,16 @@ export function usePiComposerController({
 
 	const onModelChange = useCallback(
 		(nextModelId: string) => {
-			setSelectedModelByWorkspace((current) => ({
-				...current,
-				[workspaceId]: nextModelId,
-			}));
+			setSelectedModelId(nextModelId);
 		},
-		[setSelectedModelByWorkspace, workspaceId],
+		[setSelectedModelId],
 	);
 
 	const onThinkingChange = useCallback(
 		(nextThinkingLevel: string) => {
-			setSelectedThinkingByWorkspace((current) => ({
-				...current,
-				[workspaceId]: nextThinkingLevel,
-			}));
+			setSelectedThinkingLevel(nextThinkingLevel);
 		},
-		[setSelectedThinkingByWorkspace, workspaceId],
+		[setSelectedThinkingLevel],
 	);
 
 	return {

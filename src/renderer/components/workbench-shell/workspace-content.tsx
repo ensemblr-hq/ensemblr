@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 
-import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
+import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import { useSessionTabState } from '@/renderer/state/workspace';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type { WorkbenchShellProps } from '@/renderer/types/workbench-shell';

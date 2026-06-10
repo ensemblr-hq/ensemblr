@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { PiSessionEventWire } from '../../shared/ipc/contracts/pi-session.ts';
+import type { PiSessionEventWire } from '../../shared/ipc';
 import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import type { PiAgentEvent } from './pi-agent-types.ts';
@@ -45,6 +45,16 @@ export interface CreateSessionSummaryWriterOptions {
 const DEFAULT_TIMEOUT_MS = 30_000;
 const SESSIONS_SUBDIR = path.join('.context', 'sessions');
 const STUB_BODY = '_Empty tab — no Pi session was opened._\n';
+/**
+ * Upper bound on the transcript sent to the LLM. Long sessions otherwise eat
+ * full context windows and either time out or are silently truncated by the
+ * runtime. We keep the opening prompt for topic anchoring and the tail for
+ * recent state; the middle is replaced with an explicit `[…]` marker so the
+ * summarizer knows context was elided.
+ */
+const TRANSCRIPT_MAX_CHARS = 18_000;
+const TRANSCRIPT_HEAD_CHARS = 4_000;
+const TRANSCRIPT_TAIL_CHARS = 13_500;
 
 /** Public surface of the summary writer. */
 export interface SessionSummaryWriter {
@@ -281,17 +291,22 @@ function extractText(event: PiSessionEventWire): string {
 	const inner = payload.payload;
 	switch (inner.kind) {
 		case 'text':
-		case 'reasoning':
 			return inner.text;
 		case 'prompt':
 			return inner.prompt;
 		case 'message':
 			return inner.parts
-				.map((part) =>
-					part.kind === 'text' || part.kind === 'reasoning' ? part.text : '',
-				)
+				.map((part) => (part.kind === 'text' ? part.text : ''))
 				.filter((value) => value.length > 0)
 				.join('\n');
+		case 'tool-call':
+			return `(tool call: ${inner.name})`;
+		case 'tool-result':
+			return inner.isError ? '(tool error)' : '';
+		// Reasoning, streaming deltas, tool calls fall through. Reasoning is
+		// excluded so chain-of-thought text doesn't bloat or distort the
+		// summary; deltas are non-canonical and `message_end` carries the
+		// authoritative version.
 		default:
 			return '';
 	}
@@ -334,7 +349,8 @@ interface LlmSummaryResult {
 async function tryLlmSummary(
 	args: TryLlmSummaryArgs,
 ): Promise<LlmSummaryResult | null> {
-	const prompt = buildSummaryPrompt(args.transcript);
+	const cappedTranscript = capTranscript(args.transcript);
+	const prompt = buildSummaryPrompt(cappedTranscript);
 
 	try {
 		const session = await args.piAgentClient.createSession({
@@ -349,18 +365,20 @@ async function tryLlmSummary(
 			resolveAgent = resolve;
 		});
 
+		// Subscribe to agent text only — tool outputs are excluded inside
+		// `extractTextFromAgentEvent` so file dumps and command output never
+		// land inside the summary or get parsed as the title.
 		const subscription = session.subscribe((event) => {
-			if (
-				event.type === 'message' &&
-				(event.role === 'agent' || event.role === 'tool')
-			) {
+			if (event.type === 'message' && event.role === 'agent') {
 				const text = extractTextFromAgentEvent(event);
 				if (text) {
 					collected.push(text);
 				}
+				return;
 			}
 			if (event.type === 'status' && event.status === 'idle') {
 				resolveAgent();
+				return;
 			}
 			if (event.type === 'shutdown') {
 				resolveAgent();
@@ -369,7 +387,16 @@ async function tryLlmSummary(
 
 		try {
 			await session.submit({ prompt });
-			await raceWithTimeout(agentDone, args.timeoutMs);
+			try {
+				await raceWithTimeout(agentDone, args.timeoutMs);
+			} catch (cause) {
+				// On timeout we still attempt to use whatever the model produced.
+				// A partial 100-word summary beats falling all the way back to
+				// the raw transcript dump.
+				if (collected.length === 0) {
+					throw cause;
+				}
+			}
 		} finally {
 			subscription.unsubscribe();
 			await session.close().catch(() => undefined);
@@ -392,9 +419,36 @@ async function tryLlmSummary(
 	}
 }
 
+/**
+ * Caps the transcript at {@link TRANSCRIPT_MAX_CHARS} by keeping the head
+ * (topic anchor) and tail (recent state) and replacing the middle with an
+ * explicit elision marker so the summarizer knows context was dropped.
+ */
+function capTranscript(transcript: string): string {
+	if (transcript.length <= TRANSCRIPT_MAX_CHARS) {
+		return transcript;
+	}
+	const head = transcript.slice(0, TRANSCRIPT_HEAD_CHARS);
+	const tail = transcript.slice(transcript.length - TRANSCRIPT_TAIL_CHARS);
+	const omitted = transcript.length - head.length - tail.length;
+	return `${head}\n\n[… ${omitted.toLocaleString()} characters omitted …]\n\n${tail}`;
+}
+
 function buildSummaryPrompt(transcript: string): string {
 	return [
-		'Summarize the following Conductor workspace conversation in markdown (max 200 words). Lead with a 1-line topic title. Then 3-6 bullet points covering decisions, code touched, and outstanding follow-ups.',
+		'Write a session summary for the conversation below.',
+		'',
+		'Output format (markdown, plain text — no code fences around the response):',
+		'  Line 1: A topic title, 3 to 7 words, no markdown, no quotes, no trailing punctuation.',
+		'  Line 2: blank line.',
+		'  Lines 3+: 3 to 6 bullet points covering decisions made, code or files touched, and outstanding follow-ups.',
+		'',
+		'Strict rules:',
+		'- Hard cap of 200 words across the entire response.',
+		'- No preamble like "Here is the summary" or "Sure".',
+		'- No explanation, no apology, no chain-of-thought.',
+		'- Do not wrap the response in ``` fences.',
+		'- If the transcript was truncated, infer state from what is present; do not mention the truncation in the output.',
 		'',
 		'TRANSCRIPT:',
 		transcript,
@@ -402,23 +456,18 @@ function buildSummaryPrompt(transcript: string): string {
 }
 
 function extractTextFromAgentEvent(event: PiAgentEvent): string {
-	if (event.type !== 'message') {
+	if (event.type !== 'message' || event.role !== 'agent') {
 		return '';
 	}
 	const payload = event.payload;
 	switch (payload.kind) {
 		case 'text':
-		case 'reasoning':
 			return payload.text;
 		case 'message':
 			return payload.parts
-				.map((part) =>
-					part.kind === 'text' || part.kind === 'reasoning' ? part.text : '',
-				)
+				.map((part) => (part.kind === 'text' ? part.text : ''))
 				.filter((value) => value.length > 0)
 				.join('\n');
-		case 'prompt':
-			return payload.prompt;
 		default:
 			return '';
 	}
@@ -444,23 +493,47 @@ async function raceWithTimeout(
 }
 
 function splitTitle(text: string): { body: string; title: string | null } {
-	const trimmed = text.trim();
-	if (trimmed.length === 0) {
+	const stripped = text.replace(/```[a-z]*\s*([\s\S]*?)```/gi, '$1').trim();
+	if (stripped.length === 0) {
 		return { body: '', title: null };
 	}
-	const newlineIndex = trimmed.indexOf('\n');
-	const firstLineRaw =
-		newlineIndex === -1 ? trimmed : trimmed.slice(0, newlineIndex);
-	const remainder =
-		newlineIndex === -1 ? '' : trimmed.slice(newlineIndex + 1).trimStart();
-	const title = stripMarkdownHeading(firstLineRaw).trim();
+	const lines = stripped.split(/\r?\n/);
+	const firstLineIndex = lines.findIndex((line) => line.trim().length > 0);
+	if (firstLineIndex === -1) {
+		return { body: '', title: null };
+	}
+	const firstLineRaw = lines[firstLineIndex] ?? '';
+	const title = sanitizeSummaryTitle(firstLineRaw);
+	const remainder = lines
+		.slice(firstLineIndex + 1)
+		.join('\n')
+		.trimStart();
+	const heading = title ?? 'Session Summary';
 	const body =
 		remainder.length === 0
-			? `# ${title || 'Session Summary'}\n`
-			: `# ${title || 'Session Summary'}\n\n${remainder}\n`;
-	return { body, title: title.length > 0 ? title : null };
+			? `# ${heading}\n`
+			: `# ${heading}\n\n${remainder}\n`;
+	return { body, title };
 }
 
-function stripMarkdownHeading(line: string): string {
-	return line.replace(/^#+\s*/, '').trim();
+/**
+ * Cleans the LLM's first line so a conversational preamble (e.g.
+ * "Here's a summary:") does not become the tab title.
+ */
+function sanitizeSummaryTitle(line: string): string | null {
+	const cleaned = line
+		.replace(/^#+\s*/, '')
+		.replace(/^[-*+]\s*/, '')
+		.replace(/^\d+[.)]\s*/, '')
+		.replace(/^title\s*[:\-—]\s*/i, '')
+		.replace(
+			/^(?:here(?:'s| is)? (?:the |a )?(?:summary|session summary|title)|(?:the |a )?(?:summary|title) is)\s*[:\-—]?\s*/i,
+			'',
+		)
+		.replace(/[*_`~]/g, '')
+		.replace(/^["'“”‘’«»]+|["'“”‘’«»]+$/g, '')
+		.replace(/[.!?,;:]+$/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
+	return cleaned.length > 0 ? cleaned : null;
 }

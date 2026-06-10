@@ -1,7 +1,4 @@
-import type {
-	ListPiModelsResult,
-	PiModelOptionWire,
-} from '../../shared/ipc/contracts/pi-session.ts';
+import type { ListPiModelsResult, PiModelOptionWire } from '../../shared/ipc';
 import type {
 	LocalCommandFailureCode,
 	LocalCommandResult,

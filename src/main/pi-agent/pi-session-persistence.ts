@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { PiPersistedEnvelope } from '../../shared/ipc/contracts/pi-session.ts';
+import type { PiPersistedEnvelope } from '../../shared/ipc';
 import {
 	type AppendPiEventInput,
 	appendPiEvent,

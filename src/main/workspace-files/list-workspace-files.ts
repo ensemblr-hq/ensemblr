@@ -6,7 +6,7 @@ import type {
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
 	WorkspaceFileEntryWire,
-} from '../../shared/ipc/contracts/workspace-files';
+} from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 
 const GIT_ARGS = [

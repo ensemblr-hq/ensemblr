@@ -1,4 +1,3 @@
-import { CircleIcon } from 'lucide-react';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	HoverCard,
@@ -31,6 +30,7 @@ export function ContextIndicator({ maxLabel, usage }: ContextIndicatorProps) {
 	const used = usage?.usedTokens ?? 0;
 	const max = usage?.maxTokens ?? FALLBACK_MAX;
 	const percent = max > 0 ? Math.min(100, (used / max) * 100) : 0;
+	const hasRingProgress = percent > 0;
 	const ringDash = `${percent}, 100`;
 
 	return (
@@ -43,23 +43,23 @@ export function ContextIndicator({ maxLabel, usage }: ContextIndicatorProps) {
 					type='button'
 					variant='subtle'
 				>
-					{usage ? (
-						<svg
-							aria-hidden='true'
-							className='size-4'
-							role='img'
-							viewBox='0 0 36 36'
-						>
-							<title>Context usage gauge</title>
-							<circle
-								cx='18'
-								cy='18'
-								fill='none'
-								r='15.9155'
-								stroke='currentColor'
-								strokeOpacity='0.2'
-								strokeWidth='3'
-							/>
+					<svg
+						aria-hidden='true'
+						className='size-4'
+						role='img'
+						viewBox='0 0 36 36'
+					>
+						<title>Context usage gauge</title>
+						<circle
+							cx='18'
+							cy='18'
+							fill='none'
+							r='15.9155'
+							stroke='currentColor'
+							strokeOpacity='0.2'
+							strokeWidth='3'
+						/>
+						{hasRingProgress ? (
 							<circle
 								cx='18'
 								cy='18'
@@ -73,10 +73,8 @@ export function ContextIndicator({ maxLabel, usage }: ContextIndicatorProps) {
 								strokeWidth='3'
 								transform='rotate(-90 18 18)'
 							/>
-						</svg>
-					) : (
-						<CircleIcon />
-					)}
+						) : null}
+					</svg>
 				</Button>
 			</HoverCardTrigger>
 			<HoverCardContent

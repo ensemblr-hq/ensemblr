@@ -32,6 +32,7 @@ export const IPC_CHANNELS = {
 	listWorkspaceFiles: 'ensemble:list-workspace-files',
 	openChatTab: 'ensemble:open-chat-tab',
 	openPiSession: 'ensemble:open-pi-session',
+	piRawFrame: 'ensemble:pi-raw-frame',
 	piSessionEvent: 'ensemble:pi-session-event',
 	previewRepositoryConfigMigration:
 		'ensemble:preview-repository-config-migration',

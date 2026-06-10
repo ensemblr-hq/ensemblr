@@ -1,4 +1,4 @@
-import { profileElectronIpcCall } from '@/renderer/lib/instrumentation/route-profiler';
+import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type {
 	CloneDestinationSelectionResult,
 	CloneGithubRepositoryPrepareResult,

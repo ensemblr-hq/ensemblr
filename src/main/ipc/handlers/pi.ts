@@ -6,8 +6,8 @@ import {
 	type ListPiSlashCommandsResult,
 	type PiExecutableSelectionResult,
 } from '../../../shared/ipc';
+import { resolvePiSlashCommands } from '../../pi-agent/pi-slash-commands.ts';
 import type { PiExecutableService } from '../../pi-runtime';
-import { resolvePiSlashCommands } from '../../pi-runtime/pi-slash-commands.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the Pi executable IPC handlers. */

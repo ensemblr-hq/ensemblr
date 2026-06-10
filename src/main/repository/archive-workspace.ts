@@ -13,6 +13,10 @@ import type {
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import {
+	selectWorkspaceWithRepositoryById,
+	stampWorkspaceArchived,
+} from '../storage/repositories/workspace-repository.ts';
 import { withTransaction } from '../storage/tx.ts';
 import {
 	failureResult,
@@ -310,26 +314,7 @@ function readWorkspace(
 	database: DatabaseSync,
 	workspaceId: string,
 ): SourceWorkspace | null {
-	const row = database
-		.prepare(
-			`SELECT
-				w.id AS id,
-				w.slug AS slug,
-				w.repository_id AS repositoryId,
-				w.name AS name,
-				w.path AS path,
-				w.branch_name AS branchName,
-				w.base_branch AS baseBranch,
-				w.archived_at AS archivedAt,
-				r.path AS repositoryPath,
-				r.name AS repositoryName,
-				r.slug AS repositorySlug
-			FROM workspaces w
-			INNER JOIN repositories r ON r.id = w.repository_id
-			WHERE w.id = ?`,
-		)
-		.get(workspaceId);
-
+	const row = selectWorkspaceWithRepositoryById({ database, workspaceId });
 	if (!isWorkspaceRow(row)) {
 		return null;
 	}
@@ -438,13 +423,7 @@ function stampArchivedAt({
 	source: SourceWorkspace;
 }): void {
 	withTransaction(database, () => {
-		database
-			.prepare(
-				`UPDATE workspaces
-				SET archived_at = ?, updated_at = ?
-				WHERE id = ?`,
-			)
-			.run(archivedAt, archivedAt, source.id);
+		stampWorkspaceArchived({ archivedAt, database, id: source.id });
 		insertArchiveRecord({
 			archivedAt,
 			archivedContextPath,

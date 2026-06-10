@@ -11,6 +11,10 @@ import type {
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import {
+	clearWorkspaceArchived,
+	selectArchivedWorkspaceJoinById,
+} from '../storage/repositories/workspace-repository.ts';
 import { withTransaction } from '../storage/tx.ts';
 import {
 	failureResult,
@@ -284,37 +288,7 @@ function readArchivedWorkspace(
 	database: DatabaseSync,
 	workspaceId: string,
 ): ArchivedWorkspace | null {
-	const row = database
-		.prepare(
-			`SELECT
-				w.id AS id,
-				w.slug AS slug,
-				w.repository_id AS repositoryId,
-				w.name AS name,
-				w.path AS path,
-				w.branch_name AS branchName,
-				w.archived_at AS archivedAt,
-				r.path AS repositoryPath,
-				r.name AS repositoryName,
-				r.slug AS repositorySlug,
-				a.id AS archiveRecordId,
-				a.base_branch AS baseBranch,
-				a.archived_context_path AS archivedContextPath,
-				a.branch_cleanup AS branchCleanupRaw
-			FROM workspaces w
-			INNER JOIN repositories r ON r.id = w.repository_id
-			LEFT JOIN archive_records a
-				ON a.workspace_id = w.id
-				AND a.record_type = 'workspace'
-				AND a.id = (
-					SELECT id FROM archive_records
-					WHERE workspace_id = w.id AND record_type = 'workspace'
-					ORDER BY archived_at DESC
-					LIMIT 1
-				)
-			WHERE w.id = ?`,
-		)
-		.get(workspaceId);
+	const row = selectArchivedWorkspaceJoinById({ database, workspaceId });
 
 	if (!isWorkspaceRow(row)) {
 		return null;
@@ -443,13 +417,7 @@ function clearArchivedAt({
 	workspaceId: string;
 }): void {
 	withTransaction(database, () => {
-		database
-			.prepare(
-				`UPDATE workspaces
-				SET archived_at = NULL, updated_at = ?
-				WHERE id = ?`,
-			)
-			.run(unarchivedAt, workspaceId);
+		clearWorkspaceArchived({ database, id: workspaceId, unarchivedAt });
 	});
 }
 

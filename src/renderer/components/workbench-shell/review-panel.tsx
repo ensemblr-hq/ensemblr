@@ -62,10 +62,7 @@ export function ReviewPanel({
 	const openFileSearch = useCallback(() => {
 		setIsFileSearchOpen(true);
 	}, []);
-	useHotkey('p', { meta: true }, openFileSearch, {
-		enabled: activeTab === 'files',
-	});
-	useHotkey('p', { ctrl: true }, openFileSearch, {
+	useHotkey('files.search', openFileSearch, {
 		enabled: activeTab === 'files',
 	});
 

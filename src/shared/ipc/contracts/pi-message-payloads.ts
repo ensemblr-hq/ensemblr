@@ -45,10 +45,17 @@ export type PiWireMessagePart =
  * Canonical message-payload union on the wire. Reused inside the main-process
  * pi-agent boundary as `PiAgentMessagePayload` so exhaustiveness checks fail
  * on the producer side whenever a new variant is added.
+ *
+ * `text-delta` / `reasoning-delta` carry incremental chunks emitted by the Pi
+ * runtime's `message_update` frame. They render as streaming-state parts on
+ * the timeline; a subsequent `message` envelope for the same turn replaces
+ * them with the authoritative final text.
  */
 export type PiWireMessagePayload =
 	| { kind: 'text'; text: string }
 	| { kind: 'reasoning'; text: string }
+	| { kind: 'text-delta'; text: string }
+	| { kind: 'reasoning-delta'; text: string }
 	| { input: unknown; kind: 'tool-call'; name: string; toolCallId: string }
 	| {
 			isError: boolean;

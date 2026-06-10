@@ -1,11 +1,18 @@
-import {
-	type ChildProcessByStdio,
-	spawn as nodeSpawn,
-} from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import type { Readable, Writable } from 'node:stream';
 
-import { createJsonlLineStream } from './jsonl-line-stream.ts';
+import { bindChildStreams } from './cli-rpc/child-streams.ts';
+import { createKillTimer } from './cli-rpc/kill-timer.ts';
+import { createPiRpcLineStream } from './cli-rpc/line-stream-handlers.ts';
+import { createListenerFanout } from './cli-rpc/listener-fanout.ts';
+import { createProtocolDispatcher } from './cli-rpc/protocol-dispatch.ts';
+import { createRingBuffer } from './cli-rpc/ring-buffer.ts';
+import {
+	buildSpawnEnv,
+	type ChildLike,
+	defaultSpawn,
+	type SpawnFn,
+} from './cli-rpc/spawn-env.ts';
+import { createSpawnFailureSession } from './cli-rpc/spawn-failure-session.ts';
 import type {
 	PiAgentAdapter,
 	PiAgentAdapterCreateSessionInput,
@@ -14,39 +21,29 @@ import type {
 import type {
 	PiAgentError,
 	PiAgentErrorCode,
-	PiAgentEvent,
 	PiAgentEventListener,
 	PiAgentSessionMetadata,
 	PiAgentSessionStatus,
 	PiAgentShutdownReason,
 	PiAgentSubmitAcknowledgement,
 	PiAgentSubmitRequest,
-	PiAgentSubscription,
 } from './pi-agent-types.ts';
-import {
-	extractMessageId,
-	isMessageRole,
-	normalizeLegacyMessageFrame,
-	normalizeMessageEnd,
-	normalizeToolExecutionFrame,
-} from './pi-wire-normalizer.ts';
 
+export type { ChildLike, SpawnFn } from './cli-rpc/spawn-env.ts';
 export { normalizePiPayload } from './pi-wire-normalizer.ts';
 
 const DEFAULT_MAX_LINE_BYTES = 1024 * 1024;
 const DEFAULT_STDERR_RING_BYTES = 64 * 1024;
 const DEFAULT_KILL_GRACE_MS = 750;
 
-/** Spawned process surface the adapter depends on, abstracted for tests. */
-export type ChildLike = ChildProcessByStdio<Writable, Readable, Readable>;
-
-/** Factory injected by tests; defaults to `node:child_process.spawn`. */
-export type SpawnFn = (input: {
-	args: readonly string[];
-	command: string;
-	cwd: string;
-	env: NodeJS.ProcessEnv;
-}) => ChildLike;
+/** Raw JSONL line crossing the Pi RPC boundary, surfaced for debug only. */
+export interface PiRawFrameSample {
+	at: string;
+	direction: 'rx' | 'tx';
+	label: string;
+	line: string;
+	sessionId: string;
+}
 
 /** Options for {@link createCliRpcPiAgentAdapter}. */
 export interface CreateCliRpcPiAgentAdapterOptions {
@@ -62,6 +59,12 @@ export interface CreateCliRpcPiAgentAdapterOptions {
 	stderrRingBytes?: number;
 	/** SIGTERM → SIGKILL grace window when terminating the child. */
 	killGraceMs?: number;
+	/**
+	 * Debug-only tap into every JSONL line crossing the Pi RPC boundary. Called
+	 * for both stdout reads (`rx`) and stdin writes (`tx`). Skipped when not
+	 * set so production paths pay no overhead.
+	 */
+	onRawFrame?: (frame: PiRawFrameSample) => void;
 }
 
 /**
@@ -88,6 +91,7 @@ export function createCliRpcPiAgentAdapter(
 	const maxLineBytes = options.maxLineBytes ?? DEFAULT_MAX_LINE_BYTES;
 	const stderrRingBytes = options.stderrRingBytes ?? DEFAULT_STDERR_RING_BYTES;
 	const killGraceMs = options.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
+	const onRawFrame = options.onRawFrame;
 
 	const openSessions = new Set<CliRpcSession>();
 
@@ -99,6 +103,7 @@ export function createCliRpcPiAgentAdapter(
 				maxLineBytes,
 				now,
 				onClosed: (s) => openSessions.delete(s),
+				onRawFrame,
 				spawnFn,
 				stderrRingBytes,
 				turnIdFactory,
@@ -130,6 +135,7 @@ function createCliRpcSession({
 	maxLineBytes,
 	now,
 	onClosed,
+	onRawFrame,
 	spawnFn,
 	stderrRingBytes,
 	turnIdFactory,
@@ -139,26 +145,39 @@ function createCliRpcSession({
 	maxLineBytes: number;
 	now: () => Date;
 	onClosed: (session: CliRpcSession) => void;
+	onRawFrame: ((frame: PiRawFrameSample) => void) | undefined;
 	spawnFn: SpawnFn;
 	stderrRingBytes: number;
 	turnIdFactory: () => string;
 }): CliRpcSession {
 	const listeners = new Set<PiAgentEventListener>();
 	const stderrRing = createRingBuffer(stderrRingBytes);
+	const killTimer = createKillTimer();
 	let metadata: PiAgentSessionMetadata = { ...input.metadata };
 	let closed = false;
-	let killTimer: NodeJS.Timeout | null = null;
 	let pendingShutdownReason: PiAgentShutdownReason | null = null;
 
-	const emit = (event: PiAgentEvent): void => {
-		for (const listener of [...listeners]) {
-			try {
-				listener(event);
-			} catch {
-				// Per adapter contract: a throwing listener must not block peers.
-			}
+	const emitRawFrame = (direction: 'rx' | 'tx', line: string): void => {
+		if (!onRawFrame) {
+			return;
+		}
+		try {
+			onRawFrame({
+				at: now().toISOString(),
+				direction,
+				label: input.metadata.label,
+				line,
+				sessionId: input.metadata.id,
+			});
+		} catch {
+			// Debug tap must never break the hot path.
 		}
 	};
+
+	const { emit, attachListener } = createListenerFanout({
+		getMetadata: () => metadata,
+		listeners,
+	});
 
 	const patchMetadata = (
 		patch: Partial<PiAgentSessionMetadata>,
@@ -210,54 +229,21 @@ function createCliRpcSession({
 	} catch (cause) {
 		const detail = cause instanceof Error ? cause.message : String(cause);
 		patchMetadata({ status: 'errored' }, { silent: true });
-		const placeholder: PiAgentAdapterSession = {
-			abort: async () => undefined,
-			close: async () => undefined,
-			getMetadata: () => metadata,
-			id: metadata.id,
-			subscribe: (listener) => {
-				listeners.add(listener);
-				queueMicrotask(() => {
-					if (!listeners.has(listener)) {
-						return;
-					}
-					try {
-						listener({
-							at: now().toISOString(),
-							error: {
-								code: 'spawn-error',
-								detail,
-								message: 'Failed to spawn the Pi RPC process.',
-								recoverable: false,
-							},
-							type: 'error',
-						});
-						listener({
-							at: now().toISOString(),
-							reason: 'crashed',
-							type: 'shutdown',
-						});
-					} catch {
-						// fan-out contract: ignore listener errors
-					}
-				});
-				return {
-					unsubscribe: () => {
-						listeners.delete(listener);
-					},
-				};
-			},
-			submit: async () => {
-				throw new Error('Cannot submit: Pi RPC process failed to spawn.');
-			},
+		return {
+			publicSession: createSpawnFailureSession({
+				detail,
+				listeners,
+				metadata,
+				now,
+			}),
 		};
-		const wrapper: CliRpcSession = { publicSession: placeholder };
-		return wrapper;
 	}
 
 	patchMetadata({ status: 'starting' });
 
 	const pendingStatsIds = new Set<string>();
+	// See `ProtocolDispatchDeps.streamedTurns` for the lifecycle/dedup rules.
+	const streamedTurns = new Set<string>();
 
 	const requestContextUsage = (): void => {
 		if (closed || !child.stdin.writable) {
@@ -269,254 +255,30 @@ function createCliRpcSession({
 		const line = `${JSON.stringify(frame)}\n`;
 		try {
 			child.stdin.write(line, 'utf8');
+			emitRawFrame('tx', line.trimEnd());
 		} catch {
+			// stdin not writable (child gone/EPIPE) — drop the request and
+			// release the pending id so it never leaks.
 			pendingStatsIds.delete(id);
 		}
 	};
 
-	const lineStream = createJsonlLineStream({
+	const handleProtocolFrame = createProtocolDispatcher({
+		emit,
+		emitError,
+		now,
+		patchMetadata,
+		pendingStatsIds,
+		requestContextUsage,
+		setStatus,
+		streamedTurns,
+	});
+
+	const lineStream = createPiRpcLineStream({
+		emitError,
 		maxLineBytes,
-		onLine: (line) => {
-			if (line.length === 0) {
-				return;
-			}
-			let parsed: unknown;
-			try {
-				parsed = JSON.parse(line);
-			} catch {
-				emitError(
-					'adapter-failure',
-					'Invalid JSON line on Pi RPC stdout.',
-					`bytes=${Buffer.byteLength(line, 'utf8')}, preview=${line.slice(0, 80)}`,
-					true,
-				);
-				return;
-			}
-			handleProtocolFrame(parsed);
-		},
-		onOversize: ({ droppedBytes, firstBytes }) => {
-			emitError(
-				'adapter-failure',
-				`Discarded oversize Pi RPC line (${droppedBytes} bytes > ${maxLineBytes} cap).`,
-				firstBytes,
-				true,
-			);
-		},
-	});
-
-	const handleProtocolFrame = (frame: unknown): void => {
-		if (!frame || typeof frame !== 'object') {
-			emitError(
-				'adapter-failure',
-				'Pi RPC frame was not a JSON object.',
-				JSON.stringify(frame).slice(0, 200),
-				true,
-			);
-			return;
-		}
-
-		const typed = frame as Record<string, unknown>;
-		switch (typed.type) {
-			// `session` (legacy/future) — explicit session id frame.
-			case 'session': {
-				const sessionId =
-					typeof typed.sessionId === 'string' ? typed.sessionId : null;
-				if (sessionId) {
-					patchMetadata({ sessionId });
-				}
-				setStatus('streaming');
-				return;
-			}
-			// Pi command ack: `{"type":"response","command":"prompt","success":bool}`.
-			case 'response': {
-				const success = typed.success !== false;
-				const responseId = typeof typed.id === 'string' ? typed.id : null;
-				if (responseId && pendingStatsIds.has(responseId)) {
-					pendingStatsIds.delete(responseId);
-					if (success) {
-						const usage = extractContextUsage(typed.data);
-						if (usage) {
-							emit({
-								at: now().toISOString(),
-								type: 'context-usage',
-								usage,
-							});
-						}
-					}
-					return;
-				}
-				if (!success) {
-					emitError(
-						'adapter-failure',
-						typeof typed.error === 'string'
-							? typed.error
-							: 'Pi RPC command failed.',
-						typeof typed.command === 'string'
-							? `command=${typed.command}`
-							: undefined,
-						true,
-					);
-				}
-				return;
-			}
-			// Pi lifecycle: `agent_start` / `agent_end` / `turn_start` / `turn_end`.
-			case 'agent_start':
-				setStatus('streaming');
-				return;
-			case 'turn_start':
-				return;
-			case 'turn_end':
-			case 'agent_end':
-				setStatus('idle');
-				requestContextUsage();
-				return;
-			// Pi message lifecycle.
-			//   message_start: new assistant message begins — record turnId only.
-			//   message_update: carries `assistantMessageEvent` text/thinking deltas.
-			//     The adapter swallows these today: only the final `message_end`
-			//     is materialized so the persisted timeline holds one row per
-			//     assistant message rather than one row per token.
-			//   message_end: full `message` object with role + content[] blocks.
-			case 'message_start':
-			case 'message_update':
-				return;
-			case 'message_end': {
-				const message = (typed.message ?? {}) as Record<string, unknown>;
-				const wireRole = isMessageRole(message.role) ? message.role : 'agent';
-				const turnId =
-					typeof typed.turnId === 'string'
-						? typed.turnId
-						: (extractMessageId(typed.message) ?? 'pending');
-				const normalized = normalizeMessageEnd(message, wireRole);
-				emit({
-					at: now().toISOString(),
-					payload: normalized,
-					role: wireRole,
-					turnId,
-					type: 'message',
-				});
-				return;
-			}
-			// Tool execution lifecycle from Pi docs.
-			case 'tool_execution_start':
-			case 'tool_execution_update':
-			case 'tool_execution_end': {
-				const turnId =
-					typeof typed.turnId === 'string'
-						? typed.turnId
-						: typeof typed.toolCallId === 'string'
-							? typed.toolCallId
-							: null;
-				const normalized = normalizeToolExecutionFrame(typed);
-				emit({
-					at: now().toISOString(),
-					payload: normalized,
-					role: 'tool',
-					turnId,
-					type: 'message',
-				});
-				return;
-			}
-			// Legacy / fallback shapes.
-			case 'tool_call':
-			case 'tool_result':
-			case 'message': {
-				const role = isMessageRole(typed.role)
-					? typed.role
-					: typed.type === 'tool_result' || typed.type === 'tool_call'
-						? 'tool'
-						: 'agent';
-				const turnId = typeof typed.turnId === 'string' ? typed.turnId : null;
-				const normalized = normalizeLegacyMessageFrame(typed, role);
-				emit({
-					at: now().toISOString(),
-					payload: normalized,
-					role,
-					turnId,
-					type: 'message',
-				});
-				return;
-			}
-			case 'status': {
-				const status = isSessionStatus(typed.status)
-					? typed.status
-					: 'streaming';
-				setStatus(status);
-				return;
-			}
-			case 'error': {
-				emitError(
-					'adapter-failure',
-					typeof typed.message === 'string' ? typed.message : 'Pi RPC error.',
-					typeof typed.detail === 'string' ? typed.detail : undefined,
-					typed.recoverable !== false,
-				);
-				return;
-			}
-			default: {
-				// Unknown frame — surface as agent message so the timeline at least
-				// records it instead of dropping silently. Future versions of Pi may
-				// add frame types we have not modelled yet.
-				const frameType =
-					typeof typed.type === 'string' ? typed.type : 'unknown';
-				emit({
-					at: now().toISOString(),
-					payload: { frameType, kind: 'unknown', raw: typed },
-					role: 'agent',
-					turnId: typeof typed.turnId === 'string' ? typed.turnId : null,
-					type: 'message',
-				});
-				return;
-			}
-		}
-	};
-
-	child.stdout.on('data', (chunk: Buffer) => {
-		lineStream.feed(chunk);
-	});
-	child.stdout.on('end', () => {
-		lineStream.flush();
-	});
-	child.stderr.on('data', (chunk: Buffer) => {
-		stderrRing.write(chunk);
-		emit({
-			at: now().toISOString(),
-			error: {
-				code: 'adapter-failure',
-				detail: chunk.toString('utf8'),
-				message: 'Pi RPC stderr',
-				recoverable: true,
-			},
-			type: 'error',
-		});
-	});
-
-	child.on('error', (cause: Error) => {
-		emitError('spawn-error', 'Pi RPC process emitted an error.', cause.message);
-	});
-
-	child.on('exit', (code, signal) => {
-		clearKillTimer();
-		const reason: PiAgentShutdownReason = pendingShutdownReason
-			? pendingShutdownReason
-			: code === 0
-				? 'completed'
-				: 'crashed';
-		if (reason === 'crashed' && code !== null) {
-			emitError(
-				'adapter-failure',
-				`Pi RPC process exited with code ${code}.`,
-				signal ? `signal=${signal}` : undefined,
-			);
-		}
-		if (reason === 'crashed' && code === null && signal) {
-			emitError(
-				'adapter-failure',
-				`Pi RPC process killed by signal ${signal}.`,
-				stderrRing.snapshot(),
-			);
-		}
-		finalizeShutdown(reason);
+		onFrame: handleProtocolFrame,
+		onRawLine: (line) => emitRawFrame('rx', line),
 	});
 
 	const finalizeShutdown = (reason: PiAgentShutdownReason): void => {
@@ -531,12 +293,17 @@ function createCliRpcSession({
 		onClosed({ publicSession });
 	};
 
-	const clearKillTimer = (): void => {
-		if (killTimer) {
-			clearTimeout(killTimer);
-			killTimer = null;
-		}
-	};
+	bindChildStreams({
+		child,
+		emit,
+		emitError,
+		finalizeShutdown,
+		getPendingShutdownReason: () => pendingShutdownReason,
+		killTimer,
+		lineStream,
+		now,
+		stderrRing,
+	});
 
 	const sendSignal = (signal: NodeJS.Signals): void => {
 		try {
@@ -544,32 +311,6 @@ function createCliRpcSession({
 		} catch {
 			// Already exited.
 		}
-	};
-
-	const attachListener = (
-		listener: PiAgentEventListener,
-	): PiAgentSubscription => {
-		listeners.add(listener);
-		// Replay current status so late subscribers can render the right state.
-		queueMicrotask(() => {
-			if (!listeners.has(listener)) {
-				return;
-			}
-			try {
-				listener({
-					at: metadata.updatedAt,
-					metadata,
-					type: 'metadata',
-				});
-			} catch {
-				// fan-out contract: never let one listener break others
-			}
-		});
-		return {
-			unsubscribe: () => {
-				listeners.delete(listener);
-			},
-		};
 	};
 
 	const submit = async (
@@ -594,6 +335,7 @@ function createCliRpcSession({
 		};
 		const line = `${JSON.stringify(frame)}\n`;
 		const writeResult = child.stdin.write(line, 'utf8');
+		emitRawFrame('tx', line.trimEnd());
 		if (!writeResult) {
 			await new Promise<void>((resolve) => child.stdin.once('drain', resolve));
 		}
@@ -608,9 +350,7 @@ function createCliRpcSession({
 		pendingShutdownReason = 'aborted';
 		emitError('adapter-failure', 'Pi RPC session aborted.', reason, true);
 		sendSignal('SIGINT');
-		killTimer = setTimeout(() => {
-			sendSignal('SIGKILL');
-		}, killGraceMs);
+		killTimer.schedule(killGraceMs, () => sendSignal('SIGKILL'));
 	};
 
 	const close = async (): Promise<void> => {
@@ -621,12 +361,10 @@ function createCliRpcSession({
 		try {
 			child.stdin.end();
 		} catch {
-			// stdin may already be closed.
+			// stdin may already be closed (child exited before close() ran).
 		}
 		sendSignal('SIGTERM');
-		killTimer = setTimeout(() => {
-			sendSignal('SIGKILL');
-		}, killGraceMs);
+		killTimer.schedule(killGraceMs, () => sendSignal('SIGKILL'));
 	};
 
 	const publicSession: PiAgentAdapterSession = {
@@ -638,89 +376,5 @@ function createCliRpcSession({
 		submit,
 	};
 
-	const wrapper: CliRpcSession = { publicSession };
-	return wrapper;
-}
-
-function defaultSpawn({
-	args,
-	command,
-	cwd,
-	env,
-}: {
-	args: readonly string[];
-	command: string;
-	cwd: string;
-	env: NodeJS.ProcessEnv;
-}): ChildLike {
-	return nodeSpawn(command, Array.from(args), {
-		cwd,
-		env,
-		shell: false,
-		stdio: ['pipe', 'pipe', 'pipe'],
-	}) as ChildLike;
-}
-
-function buildSpawnEnv(overlay: Record<string, string>): NodeJS.ProcessEnv {
-	return { ...process.env, ...overlay };
-}
-
-function createRingBuffer(maxBytes: number): {
-	snapshot: () => string;
-	write: (chunk: Buffer) => void;
-} {
-	let stored = Buffer.alloc(0);
-	return {
-		snapshot: () => stored.toString('utf8'),
-		write: (chunk: Buffer) => {
-			if (chunk.length === 0) {
-				return;
-			}
-			const combined = Buffer.concat([stored, chunk]);
-			stored =
-				combined.length > maxBytes
-					? combined.subarray(combined.length - maxBytes)
-					: combined;
-		},
-	};
-}
-
-function isSessionStatus(value: unknown): value is PiAgentSessionStatus {
-	return (
-		value === 'closed' ||
-		value === 'errored' ||
-		value === 'idle' ||
-		value === 'starting' ||
-		value === 'streaming'
-	);
-}
-
-/**
- * Extracts the `contextUsage` block from a pi `get_session_stats` response.
- * Returns null when the response doesn't include usage data (e.g. right after
- * compaction). Tolerates both top-level and nested shapes for forward
- * compatibility.
- */
-function extractContextUsage(data: unknown): {
-	contextWindow: number;
-	percent: number | null;
-	tokens: number | null;
-} | null {
-	if (!data || typeof data !== 'object') {
-		return null;
-	}
-	const root = data as Record<string, unknown>;
-	const candidate =
-		root.contextUsage && typeof root.contextUsage === 'object'
-			? (root.contextUsage as Record<string, unknown>)
-			: root;
-	const contextWindow =
-		typeof candidate.contextWindow === 'number' ? candidate.contextWindow : 0;
-	if (contextWindow <= 0) {
-		return null;
-	}
-	const tokens = typeof candidate.tokens === 'number' ? candidate.tokens : null;
-	const percent =
-		typeof candidate.percent === 'number' ? candidate.percent : null;
-	return { contextWindow, percent, tokens };
+	return { publicSession };
 }

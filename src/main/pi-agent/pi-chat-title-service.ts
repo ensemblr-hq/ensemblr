@@ -7,7 +7,7 @@ import type { PiAgentEvent } from './pi-agent-types.ts';
 import { appendChatTitleMetadataEvent } from './pi-session-persistence.ts';
 import type { PiSessionEventSink } from './pi-session-types.ts';
 
-export const CHAT_TITLE_TIMEOUT_MS = 8000;
+export const CHAT_TITLE_TIMEOUT_MS = 20000;
 const CHAT_TITLE_MAX_LENGTH = 32;
 const CHAT_TITLE_FALLBACK_WORD_COUNT = 5;
 
@@ -52,7 +52,8 @@ export function queueChatTitleGeneration({
 		workspaceCwd,
 	})
 		.then((title) => {
-			if (!title) {
+			const finalTitle = title ?? buildFallbackChatTitle(prompt);
+			if (!finalTitle) {
 				return;
 			}
 			persistChatTitle({
@@ -61,27 +62,25 @@ export function queueChatTitleGeneration({
 				eventSink,
 				sessionId,
 				tabId,
-				title,
+				title: finalTitle,
 				workspaceId,
 			});
 		})
 		.catch((cause: unknown) => {
-			if (cause instanceof ChatTitleTimeoutError) {
-				const title = buildFallbackChatTitle(prompt);
-				if (title) {
-					persistChatTitle({
-						branchId,
-						database,
-						eventSink,
-						sessionId,
-						tabId,
-						title,
-						workspaceId,
-					});
-				}
-				return;
+			// Last-ditch fallback: derive a title from the user's prompt so the
+			// tab never stays stuck on the placeholder label.
+			const fallback = buildFallbackChatTitle(prompt);
+			if (fallback) {
+				persistChatTitle({
+					branchId,
+					database,
+					eventSink,
+					sessionId,
+					tabId,
+					title: fallback,
+					workspaceId,
+				});
 			}
-
 			console.warn('[pi-session] chat title generation failed', {
 				cause: cause instanceof Error ? cause.message : String(cause),
 				tabId,
@@ -138,7 +137,22 @@ function broadcastChatTitle({
 	eventSink?.({ event, sessionId, workspaceId });
 }
 
-/** Asks Pi for a super-short tab title and returns sanitized plain text. */
+/**
+ * Asks Pi for a super-short tab title and returns sanitized plain text.
+ *
+ * Collection rules:
+ *  - Only `kind: 'text'` parts are accumulated; reasoning/thinking chunks are
+ *    skipped so chain-of-thought tokens never leak into the title.
+ *  - Streaming delta payloads are ignored — we use the final `message_end`
+ *    text so the title reflects the model's settled output.
+ *  - Resolution waits for `status === 'idle'` (turn complete) instead of
+ *    resolving on the first chunk. The first chunk is frequently a partial
+ *    sentence or a leading explanation and produces gibberish titles.
+ *
+ * On timeout, any partially-collected text is still sanitized and returned;
+ * the caller falls back to a prompt-derived title only when we collected
+ * nothing.
+ */
 async function generateChatTitle({
 	executable,
 	piAgentClient,
@@ -167,11 +181,12 @@ async function generateChatTitle({
 			const text = extractTitleText(event);
 			if (text) {
 				chunks.push(text);
-				resolveDone();
 			}
+			return;
 		}
 		if (event.type === 'status' && event.status === 'idle') {
 			resolveDone();
+			return;
 		}
 		if (event.type === 'shutdown') {
 			resolveDone();
@@ -180,8 +195,17 @@ async function generateChatTitle({
 
 	try {
 		await session.submit({ prompt: buildChatTitlePrompt(prompt) });
-		await waitForTitle(done, timeoutMs);
-		return sanitizeGeneratedChatTitle(chunks.join('\n'));
+		try {
+			await waitForTitle(done, timeoutMs);
+		} catch (cause) {
+			// On timeout we still want to use whatever the model produced. A
+			// short partial chunk is usually a usable title; only when nothing
+			// was collected do we surface the timeout to the caller.
+			if (cause instanceof ChatTitleTimeoutError && chunks.length === 0) {
+				throw cause;
+			}
+		}
+		return sanitizeGeneratedChatTitle(chunks.join(' '));
 	} finally {
 		subscription.unsubscribe();
 		await session.close().catch(() => undefined);
@@ -191,55 +215,92 @@ async function generateChatTitle({
 /** Builds the LLM instruction for a terse, semantic chat title. */
 function buildChatTitlePrompt(prompt: string): string {
 	return [
-		'Create a super-short chat tab title for this user request.',
-		'Rules: 2-5 words, max 32 characters, noun phrase, no quotes, no punctuation unless needed.',
-		'Return only the title.',
+		'Generate a short tab title for the user request below.',
+		'',
+		'Output rules:',
+		'- 2 to 5 words, no more than 32 characters total.',
+		'- Noun phrase or imperative; no trailing punctuation.',
+		'- No quotes, no markdown, no code fences, no emoji.',
+		'- No prefixes like "Title:", "Tab title:", or "Here is".',
+		'- No reasoning, no explanation, no apology.',
+		'- Reply with the title only on a single line.',
 		'',
 		'USER REQUEST:',
 		prompt,
 	].join('\n');
 }
 
-/** Pulls plain text out of a normalized Pi agent message payload. */
+/**
+ * Pulls plain text out of a normalized Pi agent message payload. Reasoning,
+ * tool calls/results, prompt echoes, and streaming deltas are intentionally
+ * excluded — only finalized `text` parts feed the title.
+ */
 function extractTitleText(
 	event: Extract<PiAgentEvent, { type: 'message' }>,
 ): string {
 	const payload = event.payload;
 	switch (payload.kind) {
 		case 'text':
-		case 'reasoning':
 			return payload.text;
 		case 'message':
 			return payload.parts
-				.map((part) =>
-					part.kind === 'text' || part.kind === 'reasoning' ? part.text : '',
-				)
+				.map((part) => (part.kind === 'text' ? part.text : ''))
+				.filter(Boolean)
 				.join(' ')
 				.trim();
-		case 'prompt':
-			return payload.prompt;
 		default:
 			return '';
 	}
 }
 
-/** Normalizes the generated title to a single short line. */
+/**
+ * Normalizes the generated title to a single short line. Strips code fences,
+ * markdown emphasis, headings, list bullets, conversational prefixes
+ * (`Title:`, `Here's the title:`), and trailing punctuation that LLMs add
+ * when they treat the response as a sentence rather than a label.
+ */
 function sanitizeGeneratedChatTitle(text: string): string | null {
-	const firstLine = text
-		.trim()
-		.split(/\r?\n/)[0]
-		?.replace(/^#+\s*/, '')
-		.replace(/^[-*]\s*/, '')
-		.replace(/^title:\s*/i, '')
-		.replace(/["'“”]/g, '')
-		.trim();
+	if (!text) {
+		return null;
+	}
+	const stripped = text.replace(/```[a-z]*\s*([\s\S]*?)```/gi, '$1').trim();
+
+	const firstLine = stripped
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.find((line) => line.length > 0);
 	if (!firstLine) {
 		return null;
 	}
-	if (firstLine.length <= CHAT_TITLE_MAX_LENGTH) {
-		return firstLine;
+
+	const cleaned = firstLine
+		.replace(/^#+\s*/, '')
+		.replace(/^[-*+]\s*/, '')
+		.replace(/^\d+[.)]\s*/, '')
+		.replace(/^title\s*[:\-—]\s*/i, '')
+		.replace(
+			/^(?:here(?:'s| is)? (?:the |a )?(?:title|tab title)|(?:the |a )?(?:title|tab title) is)\s*[:\-—]?\s*/i,
+			'',
+		)
+		.replace(/[*_`~]/g, '')
+		.replace(/^["'“”‘’«»]+|["'“”‘’«»]+$/g, '')
+		.replace(/[.!?,;:]+$/g, '')
+		.replace(/\s+/g, ' ')
+		.trim();
+
+	if (!cleaned) {
+		return null;
 	}
-	return `${firstLine.slice(0, CHAT_TITLE_MAX_LENGTH - 1).trimEnd()}…`;
+	if (cleaned.length <= CHAT_TITLE_MAX_LENGTH) {
+		return cleaned;
+	}
+	// Truncate at the nearest word boundary inside the cap when possible so
+	// we don't end mid-word right before the ellipsis.
+	const window = cleaned.slice(0, CHAT_TITLE_MAX_LENGTH - 1);
+	const lastSpace = window.lastIndexOf(' ');
+	const truncated =
+		lastSpace > CHAT_TITLE_MAX_LENGTH / 2 ? window.slice(0, lastSpace) : window;
+	return `${truncated.trimEnd()}…`;
 }
 
 /** Builds a short fallback title from the first words of the user's prompt. */

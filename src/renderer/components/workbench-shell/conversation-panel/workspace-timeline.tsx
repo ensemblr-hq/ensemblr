@@ -63,7 +63,9 @@ export function WorkspaceTimeline({
 					<WorkspaceLandingCard landingSummary={workspace.landingSummary} />
 				) : (
 					<NewChatEmptyState
+						activeChatTabId={activeSession.chatTabId}
 						transcripts={transcripts}
+						workspaceCwd={composer.workspaceCwd}
 						workspaceName={workspace.name}
 					/>
 				)}

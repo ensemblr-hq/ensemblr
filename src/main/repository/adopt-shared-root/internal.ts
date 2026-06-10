@@ -11,6 +11,8 @@ import type {
 	LoadedRepositoryConfig,
 	LoadRepositoryConfigOptions,
 } from '../../config/repository-config.ts';
+import { updateRepositoryMetadataJson } from '../../storage/repositories/repository-row-repository.ts';
+import { updateWorkspaceMetadataJson } from '../../storage/repositories/workspace-repository.ts';
 import type { GitRepositoryProbeFn, GitWorktreeProbeFn } from '../git-probe.ts';
 import { parseMetadata } from '../metadata.ts';
 
@@ -96,13 +98,20 @@ export function markRecordMissing({
 		},
 	};
 
-	database
-		.prepare(
-			table === 'repositories'
-				? 'UPDATE repositories SET metadata_json = ? WHERE id = ?'
-				: 'UPDATE workspaces SET metadata_json = ? WHERE id = ?',
-		)
-		.run(JSON.stringify(nextMetadata), id);
+	const nextMetadataJson = JSON.stringify(nextMetadata);
+	if (table === 'repositories') {
+		updateRepositoryMetadataJson({
+			database,
+			id,
+			metadataJson: nextMetadataJson,
+		});
+	} else {
+		updateWorkspaceMetadataJson({
+			database,
+			id,
+			metadataJson: nextMetadataJson,
+		});
+	}
 }
 
 /** Type guard for `SELECT id, path, metadata_json ...` rows. */

@@ -3,8 +3,8 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import type { PiExecutableSnapshot } from './pi-executable.ts';
-import { isExecutableReady } from './pi-executable.ts';
+import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
+import { isExecutableReady } from '../pi-runtime/pi-executable.ts';
 
 /** IPC-safe slash command metadata consumed by renderer autocomplete. */
 export interface PiSlashCommandWire {

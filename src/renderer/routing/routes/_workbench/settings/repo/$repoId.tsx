@@ -3,7 +3,7 @@ import { useSetAtom } from 'jotai';
 import { useEffect } from 'react';
 
 import { workbenchRouteApi } from '@/renderer/components/workbench-shell/route-layout/use-workbench-layout-model';
-import { settingsActiveRepoIdAtom } from '@/renderer/state/preferences/atoms';
+import { settingsActiveRepoIdAtom } from '@/renderer/state/preferences';
 
 export const Route = createFileRoute('/_workbench/settings/repo/$repoId')({
 	component: RepoSettingsLayout,

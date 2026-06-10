@@ -4,7 +4,7 @@ import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
 import type { CommandEnvironmentSnapshot } from '../commands/local-command';
-import { createJsonlLineStream } from '../pi-agent/jsonl-line-stream.ts';
+import { createJsonlLineStream } from '../pi-ipc/index.ts';
 import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
 import {
 	isExecutableReady,

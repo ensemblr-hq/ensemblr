@@ -1,11 +1,5 @@
 import { useEffect } from 'react';
-
-interface HotkeyModifiers {
-	alt?: boolean;
-	ctrl?: boolean;
-	meta?: boolean;
-	shift?: boolean;
-}
+import { matchesShortcut, type ShortcutId } from '@/shared/keymap';
 
 const TYPEABLE_TAGS = new Set(['INPUT', 'TEXTAREA']);
 
@@ -24,9 +18,13 @@ interface HotkeyOptions {
 	enabled?: boolean;
 }
 
+/**
+ * Registers a global window-level keydown listener that fires `handler` when
+ * the shortcut identified by `id` is pressed. Shortcut definitions live in
+ * `src/shared/keymap/shortcuts.ts`.
+ */
 export function useHotkey(
-	key: string,
-	modifiers: HotkeyModifiers,
+	id: ShortcutId,
 	handler: (event: KeyboardEvent) => void,
 	options: HotkeyOptions = {},
 ): void {
@@ -35,21 +33,8 @@ export function useHotkey(
 		if (!enabled) {
 			return;
 		}
-		const targetKey = key.toLowerCase();
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key.toLowerCase() !== targetKey) {
-				return;
-			}
-			if (Boolean(modifiers.alt) !== event.altKey) {
-				return;
-			}
-			if (Boolean(modifiers.ctrl) !== event.ctrlKey) {
-				return;
-			}
-			if (Boolean(modifiers.meta) !== event.metaKey) {
-				return;
-			}
-			if (modifiers.shift !== undefined && modifiers.shift !== event.shiftKey) {
+			if (!matchesShortcut(id, event)) {
 				return;
 			}
 			if (!allowInTypeable && isTypeableTarget(event.target)) {
@@ -60,14 +45,5 @@ export function useHotkey(
 		};
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
-	}, [
-		key,
-		modifiers.alt,
-		modifiers.ctrl,
-		modifiers.meta,
-		modifiers.shift,
-		handler,
-		allowInTypeable,
-		enabled,
-	]);
+	}, [id, handler, allowInTypeable, enabled]);
 }

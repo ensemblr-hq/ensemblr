@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
+import { deleteWorkspaceRowById } from '../storage/repositories/workspace-repository.ts';
 import { withTransaction } from '../storage/tx.ts';
 
 /**
@@ -15,6 +16,6 @@ export function deleteWorkspaceRow({
 	id: string;
 }): void {
 	withTransaction(database, () => {
-		database.prepare('DELETE FROM workspaces WHERE id = ?').run(id);
+		deleteWorkspaceRowById({ database, id });
 	});
 }

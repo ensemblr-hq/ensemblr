@@ -70,6 +70,12 @@ function mergeBroadcast(
 	event: PiSessionEventWire,
 ): ListPiSessionEventsResult {
 	const existing = previous?.events ?? [];
+	const tail = existing[existing.length - 1];
+	// Fast path: deltas stream in monotonic order, so an append-only push avoids
+	// the O(n log n) sort that would otherwise run for every token.
+	if (tail === undefined || event.ordinal > tail.ordinal) {
+		return { events: [...existing, event] };
+	}
 	if (existing.some((row) => row.id === event.id)) {
 		return previous ?? { events: existing };
 	}

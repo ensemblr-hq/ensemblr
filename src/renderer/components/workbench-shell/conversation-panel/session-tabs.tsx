@@ -1,4 +1,5 @@
 import {
+	BugIcon,
 	HistoryIcon,
 	LoaderCircleIcon,
 	MessageSquareIcon,
@@ -15,6 +16,7 @@ import {
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import { cn } from '@/renderer/lib/utils';
+import { useDebugPanelToggle } from '@/renderer/state/pi-raw-frames';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 
 /** Horizontal session-tab bar with close, restore, and new-tab controls. */
@@ -36,6 +38,7 @@ export function SessionTabs({
 	sessions: SessionTabModel[];
 }) {
 	const [isOpening, setIsOpening] = useState(false);
+	const [debugOpen, setDebugOpen] = useDebugPanelToggle();
 
 	/** Opens a chat tab through the workspace-level controller and selects it. */
 	function handleOpen() {
@@ -130,10 +133,23 @@ export function SessionTabs({
 					</Button>
 				</div>
 			</div>
-			<ClosedSessionHistoryMenu
-				closedSessions={closedSessions}
-				onSessionTabRestore={onSessionTabRestore}
-			/>
+			<div className='flex shrink-0 items-center gap-1'>
+				<Button
+					aria-label={debugOpen ? 'Hide Pi debug panel' : 'Show Pi debug panel'}
+					className={cn(debugOpen && 'bg-muted text-foreground')}
+					onClick={() => setDebugOpen(!debugOpen)}
+					size='icon-sm'
+					title='Pi raw frames (debug)'
+					variant='ghost'
+				>
+					<BugIcon />
+					<span className='sr-only'>Toggle Pi debug panel</span>
+				</Button>
+				<ClosedSessionHistoryMenu
+					closedSessions={closedSessions}
+					onSessionTabRestore={onSessionTabRestore}
+				/>
+			</div>
 		</div>
 	);
 }

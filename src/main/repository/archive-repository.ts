@@ -9,6 +9,11 @@ import type {
 	ArchiveRepositoryResult,
 } from '../../shared/ipc';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import {
+	selectRepositoryForArchive,
+	stampRepositoryArchived,
+} from '../storage/repositories/repository-row-repository.ts';
+import { listWorkspaceIdsByRepository } from '../storage/repositories/workspace-repository.ts';
 import { withTransaction } from '../storage/tx.ts';
 import {
 	failureResult,
@@ -263,34 +268,19 @@ function readRepository(
 	database: DatabaseSync,
 	repositoryId: string,
 ): SourceRepository | null {
-	const repositoryRow = database
-		.prepare(
-			`SELECT
-				id AS id,
-				slug AS slug,
-				name AS name,
-				path AS path,
-				archived_at AS archivedAt
-			FROM repositories
-			WHERE id = ?`,
-		)
-		.get(repositoryId);
+	const repositoryRow = selectRepositoryForArchive({
+		database,
+		id: repositoryId,
+	});
 
 	if (!isRepositoryRow(repositoryRow)) {
 		return null;
 	}
 
-	const workspaceRows = database
-		.prepare(
-			`SELECT
-				id AS id,
-				name AS name,
-				archived_at AS archivedAt
-			FROM workspaces
-			WHERE repository_id = ?
-			ORDER BY created_at`,
-		)
-		.all(repositoryId);
+	const workspaceRows = listWorkspaceIdsByRepository({
+		database,
+		repositoryId,
+	});
 
 	const workspaces: SourceWorkspace[] = [];
 	for (const row of workspaceRows) {
@@ -318,13 +308,7 @@ function stampArchivedAt({
 	source: SourceRepository;
 }): void {
 	withTransaction(database, () => {
-		database
-			.prepare(
-				`UPDATE repositories
-				SET archived_at = ?, updated_at = ?
-				WHERE id = ?`,
-			)
-			.run(archivedAt, archivedAt, source.id);
+		stampRepositoryArchived({ archivedAt, database, id: source.id });
 		insertArchiveRecord({
 			archivedAt,
 			archivedContextPath: null,

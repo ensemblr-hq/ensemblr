@@ -1,6 +1,7 @@
 import { SparklesIcon } from 'lucide-react';
 
 import { Button } from '@/renderer/components/ui/button';
+import { useComposerAttachmentDispatcher } from '@/renderer/state/composer-attachments';
 import type { ClosedChatTabEntryWire } from '@/shared/ipc';
 
 /**
@@ -9,10 +10,14 @@ import type { ClosedChatTabEntryWire } from '@/shared/ipc';
  * Lists each transcript as a chip the user can attach to the new chat.
  */
 export function NewChatEmptyState({
+	activeChatTabId,
 	transcripts,
+	workspaceCwd,
 	workspaceName,
 }: {
+	activeChatTabId: string;
 	transcripts: readonly ClosedChatTabEntryWire[];
+	workspaceCwd: string;
 	workspaceName: string;
 }) {
 	return (
@@ -31,7 +36,11 @@ export function NewChatEmptyState({
 					<ul className='flex flex-wrap gap-2'>
 						{transcripts.map((entry) => (
 							<li key={entry.tab.id}>
-								<TranscriptChip entry={entry} />
+								<TranscriptChip
+									activeChatTabId={activeChatTabId}
+									entry={entry}
+									workspaceCwd={workspaceCwd}
+								/>
 							</li>
 						))}
 					</ul>
@@ -41,15 +50,43 @@ export function NewChatEmptyState({
 	);
 }
 
-function TranscriptChip({ entry }: { entry: ClosedChatTabEntryWire }) {
-	const label = entry.summaryTitle ?? entry.tab.title ?? 'Untitled transcript';
+function TranscriptChip({
+	activeChatTabId,
+	entry,
+	workspaceCwd,
+}: {
+	activeChatTabId: string;
+	entry: ClosedChatTabEntryWire;
+	workspaceCwd: string;
+}) {
+	// Mirror the open tab label — the short chat-title set on the tab itself
+	// is the user's anchor. The LLM-derived summary title is verbose and
+	// inconsistent so it is only used as a last-resort fallback.
+	const label = entry.tab.title || entry.summaryTitle || 'Untitled transcript';
+	const dispatch = useComposerAttachmentDispatcher();
+
+	const handleAttach = () => {
+		// The composer's mention payload reader rejects absolute paths, so
+		// strip the workspaceCwd prefix before dispatching. Falls back to the
+		// raw path when the prefix does not match — the read will then error
+		// visibly instead of silently attaching the wrong file.
+		const relativePath = toWorkspaceRelative(workspaceCwd, entry.summaryPath);
+		dispatch(activeChatTabId, {
+			id: `transcript:${entry.tab.id}`,
+			kind: 'file',
+			name: label,
+			path: relativePath,
+		});
+	};
 
 	return (
 		<Button
 			className='h-auto gap-1.5 rounded-md bg-pane px-2.5 py-1 text-xs hover:border-foreground/30 hover:bg-muted/40'
 			data-transcript-id={entry.tab.id}
+			onClick={handleAttach}
 			size='xs'
 			title={entry.summaryPath}
+			type='button'
 			variant='outline'
 		>
 			<SparklesIcon
@@ -59,4 +96,22 @@ function TranscriptChip({ entry }: { entry: ClosedChatTabEntryWire }) {
 			<span className='truncate'>{label}</span>
 		</Button>
 	);
+}
+
+/** Strips the workspace cwd prefix from an absolute path. */
+function toWorkspaceRelative(
+	workspaceCwd: string,
+	absolutePath: string,
+): string {
+	if (workspaceCwd.length === 0) {
+		return absolutePath;
+	}
+	const cwd = workspaceCwd.endsWith('/') ? workspaceCwd : `${workspaceCwd}/`;
+	if (absolutePath.startsWith(cwd)) {
+		return absolutePath.slice(cwd.length);
+	}
+	if (absolutePath === workspaceCwd) {
+		return '';
+	}
+	return absolutePath;
 }

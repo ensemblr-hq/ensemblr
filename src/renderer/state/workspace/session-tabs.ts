@@ -1,9 +1,4 @@
-import {
-	type QueryClient,
-	useMutation,
-	useQuery,
-	useQueryClient,
-} from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo } from 'react';
 import {
 	closeChatTab,
@@ -11,7 +6,11 @@ import {
 	listChatTabsQuery,
 	listClosedChatTabsWithSummaryQuery,
 	openChatTab,
+	piSessionsForWorkspaceQuery,
+	removeOpenChatTabFromCache,
 	restoreChatTab,
+	subscribePiSessionEvents,
+	writeOpenedChatTabToCache,
 } from '@/renderer/api/ensemble-queries';
 import type {
 	SessionTabModel,
@@ -21,7 +20,7 @@ import type { SessionTabState } from '@/renderer/types/workbench-shell';
 import type {
 	ChatTabWire,
 	ClosedChatTabEntryWire,
-	ListChatTabsResult,
+	PiSessionSnapshotWire,
 } from '@/shared/ipc';
 
 /**
@@ -70,9 +69,22 @@ export function useSessionTabState({
 	const closedChatTabsQuery = useQuery(
 		listClosedChatTabsWithSummaryQuery(workspaceId),
 	);
+	const piSessionsQuery = useQuery(piSessionsForWorkspaceQuery(workspaceId));
 
 	const openTabs = chatTabsQuery.data?.open ?? null;
 	const closedEntries = closedChatTabsQuery.data?.entries ?? null;
+	const piSessions = piSessionsQuery.data?.sessions;
+
+	const piStatusByPiSessionId = useMemo(() => {
+		const map = new Map<string, PiSessionSnapshotWire>();
+		if (!piSessions) {
+			return map;
+		}
+		for (const session of piSessions) {
+			map.set(session.id, session);
+		}
+		return map;
+	}, [piSessions]);
 
 	const sessionTabs = useMemo<SessionTabModel[]>(() => {
 		if (!openTabs || openTabs.length === 0) {
@@ -81,8 +93,10 @@ export function useSessionTabState({
 			// server-side; this branch covers first-paint and offline modes.
 			return activeWorkspace.sessions;
 		}
-		return openTabs.map(toSessionTabModel);
-	}, [openTabs, activeWorkspace.sessions]);
+		return openTabs.map((tab) =>
+			toSessionTabModel(tab, piStatusByPiSessionId.get(tab.piSessionId ?? '')),
+		);
+	}, [openTabs, activeWorkspace.sessions, piStatusByPiSessionId]);
 
 	const closedSessions = useMemo<SessionTabModel[]>(() => {
 		if (!closedEntries) {
@@ -103,6 +117,25 @@ export function useSessionTabState({
 		void queryClient.invalidateQueries({
 			queryKey: ensembleQueryKeys.closedChatTabsWithSummary(workspaceId),
 		});
+	}, [queryClient, workspaceId]);
+
+	// Tab-level subscription: refresh the Pi session list on status events
+	// across ALL sessions in this workspace so inactive-tab spinners update.
+	// The composer-bound subscription filters to one session id and would
+	// otherwise miss status changes on background tabs.
+	useEffect(() => {
+		const unsubscribe = subscribePiSessionEvents((broadcast) => {
+			if (broadcast.workspaceId !== workspaceId) {
+				return;
+			}
+			if (broadcast.event.eventType !== 'status') {
+				return;
+			}
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
+			});
+		});
+		return unsubscribe;
 	}, [queryClient, workspaceId]);
 
 	const openMutation = useMutation({
@@ -232,16 +265,32 @@ export function useSessionTabState({
 }
 
 /** Maps an open chat-tab wire row into a renderer-facing `SessionTabModel`. */
-function toSessionTabModel(tab: ChatTabWire): SessionTabModel {
+function toSessionTabModel(
+	tab: ChatTabWire,
+	piSession: PiSessionSnapshotWire | undefined,
+): SessionTabModel {
 	return {
 		chatTabId: tab.id,
 		id: tab.id,
 		label: tab.title,
 		piSessionId: tab.piSessionId,
-		status: 'idle',
+		status: deriveTabStatus(piSession),
 		summary: '',
 		updatedLabel: '',
 	};
+}
+
+/** Maps a Pi session's runtime status to the tab spinner state. */
+function deriveTabStatus(
+	piSession: PiSessionSnapshotWire | undefined,
+): SessionTabModel['status'] {
+	if (!piSession?.runtimeOpen) {
+		return 'idle';
+	}
+	if (piSession.status === 'starting' || piSession.status === 'streaming') {
+		return 'working';
+	}
+	return 'idle';
 }
 
 /** Maps a closed-tab + summary entry into a `SessionTabModel`. */
@@ -251,7 +300,10 @@ function toClosedSessionTabModel(
 	return {
 		chatTabId: entry.tab.id,
 		id: entry.tab.id,
-		label: entry.summaryTitle ?? entry.tab.title,
+		// Prefer the short chat-title that was visible on the open tab. The
+		// LLM-derived summary title is verbose and often diverges from what
+		// the user saw, so it is only used when no tab title exists.
+		label: entry.tab.title || entry.summaryTitle || 'Untitled chat',
 		piSessionId: entry.tab.piSessionId,
 		status: 'idle',
 		summary: entry.summaryPath,
@@ -284,67 +336,4 @@ export function formatRelativeClosedAt(closedAtIso: string): string {
 		return `${Math.floor(elapsed / HOUR_MS)}h ago`;
 	}
 	return `${Math.floor(elapsed / DAY_MS)}d ago`;
-}
-
-/** Writes an opened tab into the query cache before the refetch completes. */
-function writeOpenedChatTabToCache({
-	queryClient,
-	tab,
-	workspaceId,
-}: {
-	queryClient: QueryClient;
-	tab: ChatTabWire;
-	workspaceId: string;
-}) {
-	queryClient.setQueryData<ListChatTabsResult>(
-		ensembleQueryKeys.chatTabs(workspaceId),
-		(current) => {
-			if (!current) {
-				return {
-					closed: [],
-					open: [tab],
-				};
-			}
-
-			return {
-				closed: current.closed.filter((closedTab) => closedTab.id !== tab.id),
-				open: [
-					...current.open.filter((openTab) => openTab.id !== tab.id),
-					tab,
-				].sort(compareChatTabsByPosition),
-			};
-		},
-	);
-}
-
-/** Removes a closed tab from the open-tab cache before IPC/refetch completes. */
-function removeOpenChatTabFromCache({
-	chatTabId,
-	queryClient,
-	workspaceId,
-}: {
-	chatTabId: string;
-	queryClient: QueryClient;
-	workspaceId: string;
-}) {
-	queryClient.setQueryData<ListChatTabsResult>(
-		ensembleQueryKeys.chatTabs(workspaceId),
-		(current) => {
-			if (!current) {
-				return current;
-			}
-			return {
-				...current,
-				open: current.open.filter((tab) => tab.id !== chatTabId),
-			};
-		},
-	);
-}
-
-/** Orders chat tabs by persisted strip position, then creation timestamp. */
-function compareChatTabsByPosition(left: ChatTabWire, right: ChatTabWire) {
-	return (
-		left.position - right.position ||
-		left.openedAt.localeCompare(right.openedAt)
-	);
 }

@@ -1,4 +1,4 @@
-import type { ConfigDiagnostic } from './config';
+import type { ConfigDiagnostic } from './health';
 import type { SettingsResolutionSource } from './settings-resolution';
 
 export type RepositoryConfigSourceStatus =

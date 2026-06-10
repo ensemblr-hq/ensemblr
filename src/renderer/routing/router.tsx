@@ -1,6 +1,6 @@
 import { createHashHistory, createRouter } from '@tanstack/react-router';
 import { queryClient } from '@/renderer/api/query-client';
-import { installRouteNavigationProfiler } from '@/renderer/lib/instrumentation/route-profiler';
+import { installRouteNavigationProfiler } from '@/renderer/lib/instrumentation';
 import { routeTree } from './routeTree.gen';
 
 /**

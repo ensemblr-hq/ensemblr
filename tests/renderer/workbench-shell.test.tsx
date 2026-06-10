@@ -224,27 +224,32 @@ test('renders the Conductor-style workbench shell regions', () => {
 test('does not mark a workspace active on static workbench routes', () => {
 	const activeWorkspace = getDefaultWorkspace();
 	const activeProject = getDefaultProject();
+	const queryClient = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
 	const markup = renderToStaticMarkup(
-		<NavigationProvider
-			value={{ renderStaticLink: undefined, renderWorkspaceLink: undefined }}
-		>
-			<WorkbenchFrame
-				activeProject={activeProject}
-				activeView='dashboard'
-				activeWorkspace={activeWorkspace}
-				health={{
-					detail: 'Renderer query fixture',
-					label: 'IPC online',
-					state: 'online',
-				}}
-				onStaticNavigationSelect={() => undefined}
-				onWorkspaceSelect={() => undefined}
-				projects={shellFixtureProjects}
-				resolveWorkspaceRouteSearch={EMPTY_ROUTE_SEARCH}
+		<QueryClientProvider client={queryClient}>
+			<NavigationProvider
+				value={{ renderStaticLink: undefined, renderWorkspaceLink: undefined }}
 			>
-				<div />
-			</WorkbenchFrame>
-		</NavigationProvider>,
+				<WorkbenchFrame
+					activeProject={activeProject}
+					activeView='dashboard'
+					activeWorkspace={activeWorkspace}
+					health={{
+						detail: 'Renderer query fixture',
+						label: 'IPC online',
+						state: 'online',
+					}}
+					onStaticNavigationSelect={() => undefined}
+					onWorkspaceSelect={() => undefined}
+					projects={shellFixtureProjects}
+					resolveWorkspaceRouteSearch={EMPTY_ROUTE_SEARCH}
+				>
+					<div />
+				</WorkbenchFrame>
+			</NavigationProvider>
+		</QueryClientProvider>,
 	);
 
 	expect(markup).toContain('Dashboard');

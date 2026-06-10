@@ -1,4 +1,9 @@
 export * from './archive';
+export {
+	compareChatTabsByPosition,
+	removeOpenChatTabFromCache,
+	writeOpenedChatTabToCache,
+} from './chat-tab-cache';
 export * from './chat-tabs';
 export * from './clone';
 export * from './health';

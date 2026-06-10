@@ -15,5 +15,5 @@ export type {
 	ShellEnvironmentLoader,
 	ShellEnvironmentLoaderRequest,
 	ShellEnvironmentLoaderResult,
-} from './local-command';
-export { createLocalCommandService } from './local-command';
+} from './local-command.ts';
+export { createLocalCommandService } from './local-command.ts';

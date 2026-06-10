@@ -1,6 +1,6 @@
 import { queryOptions } from '@tanstack/react-query';
 
-import { profileElectronIpcCall } from '@/renderer/lib/instrumentation/route-profiler';
+import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type { ListPiSlashCommandsRequest } from '@/shared/ipc';
 
 import { ensembleQueryKeys, getEnsembleApi } from './query-keys';
