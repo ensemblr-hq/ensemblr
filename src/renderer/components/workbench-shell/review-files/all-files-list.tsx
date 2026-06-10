@@ -1,3 +1,4 @@
+import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 
@@ -11,16 +12,17 @@ export function AllFilesList({ files }: { files: WorkspaceFileSummary[] }) {
 				{files.length ? (
 					files.map((file) => (
 						<li key={file.id}>
-							<button
+							<Button
 								aria-label={getWorkspaceFileActionLabel(file)}
-								className='flex min-h-7 w-full min-w-0 items-center gap-2.5 rounded-md px-2 py-0.5 text-left text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50'
-								type='button'
+								className='h-auto min-h-7 w-full justify-start gap-2.5 rounded-md px-2 py-0.5 text-left font-normal'
+								size='sm'
+								variant='ghost'
 							>
 								<WorkspaceFileIcon file={file} />
 								<span className='min-w-0 truncate font-mono text-xs leading-none'>
 									{file.name}
 								</span>
-							</button>
+							</Button>
 						</li>
 					))
 				) : (

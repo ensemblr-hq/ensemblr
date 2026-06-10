@@ -1,5 +1,6 @@
 import { SparklesIcon } from 'lucide-react';
 
+import { Button } from '@/renderer/components/ui/button';
 import type { ClosedChatTabEntryWire } from '@/shared/ipc';
 
 /**
@@ -44,17 +45,18 @@ function TranscriptChip({ entry }: { entry: ClosedChatTabEntryWire }) {
 	const label = entry.summaryTitle ?? entry.tab.title ?? 'Untitled transcript';
 
 	return (
-		<button
-			className='inline-flex items-center gap-1.5 rounded-md border border-border bg-pane px-2.5 py-1 text-foreground text-xs transition-colors hover:border-foreground/30 hover:bg-muted/40'
+		<Button
+			className='h-auto gap-1.5 rounded-md bg-pane px-2.5 py-1 text-xs hover:border-foreground/30 hover:bg-muted/40'
 			data-transcript-id={entry.tab.id}
+			size='xs'
 			title={entry.summaryPath}
-			type='button'
+			variant='outline'
 		>
 			<SparklesIcon
 				aria-hidden='true'
 				className='size-3.5 text-muted-foreground'
 			/>
 			<span className='truncate'>{label}</span>
-		</button>
+		</Button>
 	);
 }

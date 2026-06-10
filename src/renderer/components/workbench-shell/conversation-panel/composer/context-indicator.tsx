@@ -1,10 +1,10 @@
 import { CircleIcon } from 'lucide-react';
 import { Button } from '@/renderer/components/ui/button';
 import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from '@/renderer/components/ui/popover';
+	HoverCard,
+	HoverCardContent,
+	HoverCardTrigger,
+} from '@/renderer/components/ui/hover-card';
 import { Progress } from '@/renderer/components/ui/progress';
 import type { ComposerContextUsage } from '@/renderer/types/workbench';
 
@@ -26,7 +26,7 @@ function formatTokens(value: number): string {
 	return String(value);
 }
 
-/** Renders the composer context-window gauge and usage popover. */
+/** Renders the composer context-window gauge and hover details. */
 export function ContextIndicator({ maxLabel, usage }: ContextIndicatorProps) {
 	const used = usage?.usedTokens ?? 0;
 	const max = usage?.maxTokens ?? FALLBACK_MAX;
@@ -34,14 +34,14 @@ export function ContextIndicator({ maxLabel, usage }: ContextIndicatorProps) {
 	const ringDash = `${percent}, 100`;
 
 	return (
-		<Popover>
-			<PopoverTrigger asChild>
+		<HoverCard closeDelay={80} openDelay={150}>
+			<HoverCardTrigger asChild>
 				<Button
 					aria-label='Context usage'
-					className='rounded-md text-muted-foreground hover:text-foreground'
+					className='rounded-md'
 					size='icon-sm'
 					type='button'
-					variant='ghost'
+					variant='subtle'
 				>
 					{usage ? (
 						<svg
@@ -78,9 +78,13 @@ export function ContextIndicator({ maxLabel, usage }: ContextIndicatorProps) {
 						<CircleIcon />
 					)}
 				</Button>
-			</PopoverTrigger>
-			<PopoverContent align='end' className='w-72 gap-3 p-3' sideOffset={10}>
-				<div className='flex items-center justify-between'>
+			</HoverCardTrigger>
+			<HoverCardContent
+				align='end'
+				className='flex w-80 flex-col gap-2.5 p-4'
+				sideOffset={4}
+			>
+				<div className='flex items-center justify-between gap-6'>
 					<span className='font-medium text-sm'>Context</span>
 					<span className='text-muted-foreground text-xs tabular-nums'>
 						{formatTokens(used)}/{maxLabel ?? formatTokens(max)}
@@ -89,7 +93,7 @@ export function ContextIndicator({ maxLabel, usage }: ContextIndicatorProps) {
 				{usage ? (
 					<>
 						<Progress className='h-2 bg-muted' value={percent} />
-						<div className='flex items-center justify-between text-muted-foreground text-xs'>
+						<div className='flex items-center justify-between gap-6 text-muted-foreground text-xs'>
 							<span>Window used</span>
 							<span className='tabular-nums'>{percent.toFixed(1)}%</span>
 						</div>
@@ -99,7 +103,7 @@ export function ContextIndicator({ maxLabel, usage }: ContextIndicatorProps) {
 						Context window unavailable for this model.
 					</p>
 				)}
-			</PopoverContent>
-		</Popover>
+			</HoverCardContent>
+		</HoverCard>
 	);
 }

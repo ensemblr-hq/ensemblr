@@ -1,6 +1,11 @@
 import { useCallback } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from '@/renderer/components/ui/tooltip';
 import { cn } from '@/renderer/lib/utils';
 import type { ComposerThinkingOption } from '@/renderer/types/workbench';
 
@@ -11,6 +16,22 @@ interface ThinkingPickerProps {
 	onChange: (level: string) => void;
 	options: readonly ComposerThinkingOption[];
 	value: string | null;
+}
+
+/** Computes the next thinking-level id when cycling through the available options. */
+export function getNextThinkingId(
+	options: readonly ComposerThinkingOption[],
+	value: string | null,
+): string | null {
+	if (options.length === 0) {
+		return null;
+	}
+	const currentIndex = Math.max(
+		0,
+		options.findIndex((option) => option.id === value),
+	);
+	const nextIndex = (currentIndex + 1) % options.length;
+	return options[nextIndex]?.id ?? null;
 }
 
 /**
@@ -25,17 +46,9 @@ export function ThinkingPicker({
 	value,
 }: ThinkingPickerProps) {
 	const handleClick = useCallback(() => {
-		if (options.length === 0) {
-			return;
-		}
-		const currentIndex = Math.max(
-			0,
-			options.findIndex((option) => option.id === value),
-		);
-		const nextIndex = (currentIndex + 1) % options.length;
-		const next = options[nextIndex];
-		if (next) {
-			onChange(next.id);
+		const nextId = getNextThinkingId(options, value);
+		if (nextId) {
+			onChange(nextId);
 		}
 	}, [onChange, options, value]);
 
@@ -53,22 +66,29 @@ export function ThinkingPicker({
 	const strength = getThinkingStrength(selected?.id ?? null);
 	const tintClass =
 		strength > 0
-			? 'bg-status-warning/10 text-status-warning hover:bg-status-warning/15'
-			: 'text-muted-foreground hover:text-foreground';
+			? 'bg-status-warning/10 text-status-warning hover:bg-status-warning/15 hover:text-status-warning'
+			: undefined;
 
 	return (
-		<Button
-			aria-label={`Thinking level: ${selected?.label ?? 'Off'}. Click to cycle.`}
-			className={cn('h-7 rounded-md px-2 font-medium', tintClass)}
-			disabled={disabled}
-			onClick={handleClick}
-			size='sm'
-			title={`Thinking: ${selected?.label ?? 'Off'} — click to cycle`}
-			type='button'
-			variant='ghost'
-		>
-			<ThinkingBarIcon strength={strength} />
-			{strength > 0 ? <span>{selected?.label ?? 'Off'}</span> : null}
-		</Button>
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<Button
+					aria-label={`Thinking level: ${selected?.label ?? 'Off'}. Click to cycle.`}
+					className={cn('h-7 rounded-md px-2 font-medium', tintClass)}
+					disabled={disabled}
+					onClick={handleClick}
+					size='sm'
+					type='button'
+					variant='subtle'
+				>
+					<ThinkingBarIcon strength={strength} />
+					{strength > 0 ? <span>{selected?.label ?? 'Off'}</span> : null}
+				</Button>
+			</TooltipTrigger>
+			<TooltipContent sideOffset={4}>
+				Adjust thinking level
+				<span className='ml-2 text-muted-foreground'>⌥T</span>
+			</TooltipContent>
+		</Tooltip>
 	);
 }

@@ -121,7 +121,7 @@ export function CreateWorkspaceSourceDialog({
 					>
 						{WORKSPACE_SOURCE_KINDS.map((sourceKind) => (
 							<ToggleGroupItem
-								className='h-7 rounded-md px-2.5 font-medium text-muted-foreground text-xs data-[state=on]:bg-muted data-[state=on]:text-foreground'
+								className='h-7 rounded-md px-2.5 text-xs'
 								key={sourceKind}
 								value={sourceKind}
 							>

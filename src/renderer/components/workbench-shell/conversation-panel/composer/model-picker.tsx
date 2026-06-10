@@ -1,5 +1,11 @@
 import { CheckIcon, SparklesIcon, StarIcon } from 'lucide-react';
-import { type CSSProperties, useEffect, useMemo, useState } from 'react';
+import {
+	type CSSProperties,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from 'react';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Popover,
@@ -8,6 +14,11 @@ import {
 } from '@/renderer/components/ui/popover';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { Separator } from '@/renderer/components/ui/separator';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from '@/renderer/components/ui/tooltip';
 import { cn } from '@/renderer/lib/utils';
 import type { ComposerModelOption } from '@/renderer/types/workbench';
 
@@ -32,6 +43,8 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
 interface ModelPickerProps {
 	disabled?: boolean;
 	onChange: (modelId: string) => void;
+	onOpenChange?: (open: boolean) => void;
+	open?: boolean;
 	options: readonly ComposerModelOption[];
 	value: string | null;
 }
@@ -177,10 +190,22 @@ function ModelOptionsList({
 export function ModelPicker({
 	disabled,
 	onChange,
+	onOpenChange,
+	open: controlledOpen,
 	options,
 	value,
 }: ModelPickerProps) {
-	const [open, setOpen] = useState(false);
+	const [internalOpen, setInternalOpen] = useState(false);
+	const open = controlledOpen ?? internalOpen;
+	const setOpen = useCallback(
+		(next: boolean) => {
+			if (controlledOpen === undefined) {
+				setInternalOpen(next);
+			}
+			onOpenChange?.(next);
+		},
+		[controlledOpen, onOpenChange],
+	);
 	const groups = useMemo(() => groupByProvider(options), [options]);
 	const orderedShortcuts = useMemo(
 		() => groups.flatMap((group) => group.models),
@@ -215,7 +240,7 @@ export function ModelPicker({
 		};
 		document.addEventListener('keydown', handler);
 		return () => document.removeEventListener('keydown', handler);
-	}, [open, orderedShortcuts, onChange]);
+	}, [open, orderedShortcuts, onChange, setOpen]);
 
 	if (options.length === 0) {
 		return (
@@ -228,23 +253,31 @@ export function ModelPicker({
 
 	return (
 		<Popover onOpenChange={setOpen} open={open}>
-			<PopoverTrigger asChild>
-				<Button
-					aria-label='Model'
-					className='h-7 rounded-md px-1.5 text-muted-foreground hover:text-foreground'
-					disabled={disabled}
-					size='sm'
-					type='button'
-					variant='ghost'
-				>
-					<SparklesIcon />
-					<span className='font-medium text-foreground'>
-						{selected?.displayName ?? 'Select model'}
-					</span>
-				</Button>
-			</PopoverTrigger>
+			<Tooltip open={open ? false : undefined}>
+				<TooltipTrigger asChild>
+					<PopoverTrigger asChild>
+						<Button
+							aria-label='Model'
+							className='h-7 rounded-md px-1.5'
+							disabled={disabled}
+							size='sm'
+							type='button'
+							variant='subtle'
+						>
+							<SparklesIcon />
+							<span className='font-medium text-foreground'>
+								{selected?.displayName ?? 'Select model'}
+							</span>
+						</Button>
+					</PopoverTrigger>
+				</TooltipTrigger>
+				<TooltipContent sideOffset={4}>
+					Change model
+					<span className='ml-2 text-muted-foreground'>⌥P</span>
+				</TooltipContent>
+			</Tooltip>
 			<PopoverContent align='start' className='w-80 overflow-hidden p-1.5'>
-				<ScrollArea className='pr-2' style={scrollAreaStyle}>
+				<ScrollArea className='pr-3.5' style={scrollAreaStyle}>
 					<ModelOptionsList
 						groups={groups}
 						onSelect={(modelId) => {

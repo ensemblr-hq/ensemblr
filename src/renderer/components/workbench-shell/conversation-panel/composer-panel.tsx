@@ -3,7 +3,6 @@ import {
 	type ChangeEvent,
 	type KeyboardEvent,
 	useCallback,
-	useEffect,
 	useRef,
 	useState,
 } from 'react';
@@ -15,19 +14,19 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
+import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { cn } from '@/renderer/lib/utils';
 import { formatMentionAttachmentText } from '@/renderer/lib/workbench/mention-payload';
 import type {
 	ComposerShellState,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
-
 import { AttachmentChip } from './composer/attachment-chip';
 import { AttachmentMenu } from './composer/attachment-menu';
 import { ContextIndicator } from './composer/context-indicator';
 import { ComposerAutocompletePopover } from './composer/mention-popover';
 import { ModelPicker } from './composer/model-picker';
-import { ThinkingPicker } from './composer/thinking-picker';
+import { getNextThinkingId, ThinkingPicker } from './composer/thinking-picker';
 import {
 	type AutocompleteState,
 	detectAutocomplete,
@@ -63,6 +62,7 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 		WorkspaceFileSummary[]
 	>([]);
 	const [attachmentError, setAttachmentError] = useState<string | null>(null);
+	const [modelPickerOpen, setModelPickerOpen] = useState(false);
 
 	const mentionMatches = useMentionMatches(
 		composer.workspaceFiles,
@@ -84,18 +84,8 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 		textareaRef.current?.focus();
 	}, []);
 
-	useEffect(() => {
-		const handler = (event: globalThis.KeyboardEvent) => {
-			const isMeta = event.metaKey || event.ctrlKey;
-			if (!isMeta || event.key.toLowerCase() !== 'l') {
-				return;
-			}
-			event.preventDefault();
-			focusTextarea();
-		};
-		window.addEventListener('keydown', handler);
-		return () => window.removeEventListener('keydown', handler);
-	}, [focusTextarea]);
+	useHotkey('l', { meta: true }, focusTextarea);
+	useHotkey('l', { ctrl: true }, focusTextarea);
 
 	const updateAutocomplete = useCallback((nextValue: string, caret: number) => {
 		setAutocomplete(detectAutocomplete(nextValue, caret));
@@ -350,6 +340,30 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 		!composer.disabled &&
 		!isStreaming &&
 		(value.trim().length > 0 || mentionAttachments.length > 0);
+
+	const pickersDisabled = composer.disabled || isStreaming;
+	const toggleModelPicker = useCallback(() => {
+		setModelPickerOpen((current) => !current);
+	}, []);
+	const cycleThinking = useCallback(() => {
+		const nextId = getNextThinkingId(
+			composer.availableThinkingLevels,
+			composer.thinkingLevel,
+		);
+		if (nextId) {
+			composer.onThinkingChange(nextId);
+		}
+	}, [
+		composer.availableThinkingLevels,
+		composer.onThinkingChange,
+		composer.thinkingLevel,
+	]);
+	useHotkey('p', { alt: true }, toggleModelPicker, {
+		enabled: !pickersDisabled && composer.availableModels.length > 0,
+	});
+	useHotkey('t', { alt: true }, cycleThinking, {
+		enabled: !pickersDisabled && composer.availableThinkingLevels.length > 0,
+	});
 	const placeholder =
 		composer.placeholder.length > 0
 			? composer.placeholder
@@ -403,10 +417,7 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 		<div className='relative' ref={anchorRef}>
 			<Textarea
 				aria-label='Pi composer'
-				className={cn(
-					'max-h-64 min-h-28 resize-none border-0 bg-transparent px-0 py-0 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground/70',
-					'focus-visible:border-transparent focus-visible:ring-0 disabled:bg-transparent dark:bg-transparent',
-				)}
+				className='max-h-64 min-h-28 resize-none px-0 py-0 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0'
 				disabled={composer.disabled}
 				onBlur={() => setFocused(false)}
 				onChange={handleChange}
@@ -416,6 +427,7 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 				placeholder={placeholder}
 				ref={textareaRef}
 				value={value}
+				variant='bare'
 			/>
 			{!focused && value.length === 0 && !hasChips ? (
 				<span
@@ -492,13 +504,15 @@ export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
 				<div className='flex items-center justify-between gap-2'>
 					<div className='flex min-w-0 items-center gap-1.5'>
 						<ModelPicker
-							disabled={composer.disabled || isStreaming}
+							disabled={pickersDisabled}
 							onChange={composer.onModelChange}
+							onOpenChange={setModelPickerOpen}
+							open={modelPickerOpen}
 							options={composer.availableModels}
 							value={composer.modelId}
 						/>
 						<ThinkingPicker
-							disabled={composer.disabled || isStreaming}
+							disabled={pickersDisabled}
 							onChange={composer.onThinkingChange}
 							options={composer.availableThinkingLevels}
 							value={composer.thinkingLevel}

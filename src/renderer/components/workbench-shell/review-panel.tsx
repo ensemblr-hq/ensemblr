@@ -7,7 +7,7 @@ import {
 	MoreVerticalIcon,
 	SearchIcon,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -19,6 +19,7 @@ import {
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
+import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { cn } from '@/renderer/lib/utils';
 import { changesViewModeAtom } from '@/renderer/state/workspace';
 import type {
@@ -58,29 +59,15 @@ export function ReviewPanel({
 		{ id: 'checks', label: 'Checks' },
 	];
 
-	useEffect(() => {
-		if (activeTab !== 'files') {
-			return;
-		}
-
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (
-				!(event.metaKey || event.ctrlKey) ||
-				event.key.toLowerCase() !== 'p'
-			) {
-				return;
-			}
-
-			event.preventDefault();
-			setIsFileSearchOpen(true);
-		};
-
-		window.addEventListener('keydown', handleKeyDown);
-
-		return () => {
-			window.removeEventListener('keydown', handleKeyDown);
-		};
-	}, [activeTab]);
+	const openFileSearch = useCallback(() => {
+		setIsFileSearchOpen(true);
+	}, []);
+	useHotkey('p', { meta: true }, openFileSearch, {
+		enabled: activeTab === 'files',
+	});
+	useHotkey('p', { ctrl: true }, openFileSearch, {
+		enabled: activeTab === 'files',
+	});
 
 	return (
 		<Tabs
@@ -170,9 +157,6 @@ function ReviewPanelActions({
 					</Button>
 					<Button
 						aria-pressed={changesViewMode === 'folders'}
-						className={cn(
-							changesViewMode === 'folders' && 'bg-muted text-foreground',
-						)}
 						onClick={onChangesViewModeToggle}
 						size='icon-sm'
 						variant='ghost'
@@ -274,16 +258,15 @@ function ReviewTabButton({
 	onSelect: () => void;
 }) {
 	return (
-		<button
+		<Button
 			aria-pressed={isActive}
 			className={cn(
-				'flex h-8 shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-2.5 text-xs transition-colors',
-				isActive
-					? 'bg-muted font-medium text-foreground'
-					: 'text-muted-foreground hover:text-foreground',
+				'h-8 shrink-0 gap-2 rounded-md px-2.5 text-xs',
+				isActive ? 'font-medium' : undefined,
 			)}
 			onClick={onSelect}
-			type='button'
+			size='sm'
+			variant='ghost'
 		>
 			<span>{label}</span>
 			{typeof count === 'number' ? (
@@ -291,6 +274,6 @@ function ReviewTabButton({
 					{count}
 				</span>
 			) : null}
-		</button>
+		</Button>
 	);
 }

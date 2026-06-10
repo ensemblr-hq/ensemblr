@@ -1318,8 +1318,8 @@ export const PromptInputSelectValue = ({
 export type PromptInputHoverCardProps = ComponentProps<typeof HoverCard>;
 
 export const PromptInputHoverCard = ({
-	openDelay = 0,
-	closeDelay = 0,
+	openDelay = 150,
+	closeDelay = 80,
 	...props
 }: PromptInputHoverCardProps) => (
 	<HoverCard closeDelay={closeDelay} openDelay={openDelay} {...props} />
