@@ -20,13 +20,13 @@ import {
 import {
 	buildToolCallPart,
 	buildToolResultPart,
-	mergeToolOutputPart,
+	mergeToolPart,
 } from './tool-event-mapper';
 import type { PendingGroup, UIMessagePart, UIRole } from './types';
 
 /**
  * Converts the persisted Pi RPC event stream into the AI SDK `UIMessage` shape
- * consumed by ai-elements' `Conversation` + `Message` components.
+ * consumed by the `Conversation` + `Message` primitives.
  *
  * The wire payload is a tagged {@link PiPersistedEnvelope} union — the
  * normalization happens in the main-process adapter so this mapper just
@@ -104,7 +104,12 @@ function handleMessageEnvelope(
 	result: UIMessage[],
 ): PendingGroup | null {
 	const uiRole: UIRole = envelope.role === 'user' ? 'user' : 'assistant';
-	const signature = groupSignature(event.turnId, uiRole);
+	// Group by role only. Pi's wire frames carry inconsistent turn ids —
+	// tool_execution_* frames fall back to toolCallId, message frames use
+	// message ids — so keying on turnId fractures one logical assistant turn
+	// into dozens of single-part messages. A run of consecutive
+	// assistant/tool events IS the turn; user messages and errors flush it.
+	const signature = groupSignature(uiRole);
 
 	const incomingParts = mergeParts(
 		[],
@@ -119,7 +124,9 @@ function handleMessageEnvelope(
 	if (!pending || pending.signature !== signature) {
 		flush(pending, result);
 		return {
+			firstEventAt: event.createdAt,
 			id: groupIdFromEvent(event, uiRole),
+			lastEventAt: event.createdAt,
 			parts: incomingParts,
 			role: uiRole,
 			signature,
@@ -128,6 +135,7 @@ function handleMessageEnvelope(
 
 	return {
 		...pending,
+		lastEventAt: event.createdAt,
 		parts: mergeParts(pending.parts, incomingParts),
 	};
 }
@@ -222,7 +230,7 @@ function mergeParts(
 			merged.push(incomingPart);
 			continue;
 		}
-		const toolMerged = mergeToolOutputPart(merged, incomingPart);
+		const toolMerged = mergeToolPart(merged, incomingPart);
 		if (toolMerged !== null) {
 			merged = toolMerged;
 			continue;
@@ -246,19 +254,43 @@ function finalizeGroup(group: PendingGroup): UIMessage {
 			: ([{ state: 'done', text: '', type: 'text' }] satisfies UIMessagePart[]);
 	return {
 		id: group.id,
+		metadata: {
+			firstEventAt: group.firstEventAt,
+			lastEventAt: group.lastEventAt,
+		} satisfies PiTurnMetadata,
 		parts,
 		role: group.role,
 	};
 }
 
-function groupSignature(turnId: string | null, role: UIRole): string {
-	const turnKey = turnId ?? 'no-turn';
-	return `${turnKey}::${role}`;
+/** Turn timing carried on each mapped `UIMessage` for the timer feature. */
+export interface PiTurnMetadata {
+	firstEventAt: string;
+	lastEventAt: string;
+}
+
+/** Reads the timing metadata back off a mapped message, if present. */
+export function turnMetadataOf(message: UIMessage): PiTurnMetadata | null {
+	const metadata = message.metadata;
+	if (
+		metadata &&
+		typeof metadata === 'object' &&
+		'firstEventAt' in metadata &&
+		typeof (metadata as PiTurnMetadata).firstEventAt === 'string' &&
+		'lastEventAt' in metadata &&
+		typeof (metadata as PiTurnMetadata).lastEventAt === 'string'
+	) {
+		return metadata as PiTurnMetadata;
+	}
+	return null;
+}
+
+function groupSignature(role: UIRole): string {
+	return `role::${role}`;
 }
 
 function groupIdFromEvent(event: PiSessionEventWire, role: UIRole): string {
-	// Use the trigger event id so multiple same-role groups within a turn
+	// Use the trigger event id so multiple same-role groups within a session
 	// (e.g. two user prompts before the next assistant reply) stay unique.
-	const turnKey = event.turnId ?? 'no-turn';
-	return `pi-turn:${turnKey}:${role}:${event.id}`;
+	return `pi-group:${role}:${event.id}`;
 }

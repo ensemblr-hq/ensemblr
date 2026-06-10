@@ -25,11 +25,14 @@ export type StreamingTextPart = Extract<
 > & { state: 'streaming' };
 
 /**
- * Buffer for consecutive same-turn, same-role message events while they are
- * being collapsed into a single `UIMessage`.
+ * Buffer for a consecutive same-role run of message events while it is being
+ * collapsed into a single `UIMessage`. Event timestamps bound the turn so the
+ * renderer can derive generation duration without re-walking the stream.
  */
 export interface PendingGroup {
+	firstEventAt: string;
 	id: string;
+	lastEventAt: string;
 	parts: UIMessagePart[];
 	role: UIRole;
 	signature: string;

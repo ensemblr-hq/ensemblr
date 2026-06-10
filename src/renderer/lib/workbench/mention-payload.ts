@@ -1,13 +1,40 @@
 import { readWorkspaceFile } from '@/renderer/api/ensemble-queries';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 
+/**
+ * Upper bound on inlined attachment content sent to Pi. Long `.context`
+ * transcripts otherwise dominate the prompt and Pi tends to parrot the
+ * content verbatim in its reply. Caller-side truncation keeps the prompt
+ * focused while leaving a visible marker so the model knows context was
+ * elided.
+ */
+export const ATTACHED_FILE_MAX_CHARS = 8_000;
+const ATTACHED_FILE_HEAD_CHARS = 2_500;
+const ATTACHED_FILE_TAIL_CHARS = 5_000;
+
 /** Wraps one workspace file's content in an explicit attachment marker. */
 export function formatAttachedFileSection(
 	pathValue: string,
 	content: string,
 ): string {
 	const safePath = pathValue.replaceAll('"', '&quot;');
-	return `<attached_file path="${safePath}">\n${content}\n</attached_file>`;
+	return `<attached_file path="${safePath}">\n${truncateAttachmentContent(content)}\n</attached_file>`;
+}
+
+/**
+ * Keeps the opening for topic anchoring and the tail for the latest state,
+ * replacing the middle with a `[...elided N chars...]` marker. Mirrors the
+ * head/tail strategy the session-summary writer already uses for transcript
+ * elision so the renderer and main process behave consistently.
+ */
+export function truncateAttachmentContent(content: string): string {
+	if (content.length <= ATTACHED_FILE_MAX_CHARS) {
+		return content;
+	}
+	const head = content.slice(0, ATTACHED_FILE_HEAD_CHARS);
+	const tail = content.slice(content.length - ATTACHED_FILE_TAIL_CHARS);
+	const elided = content.length - head.length - tail.length;
+	return `${head}\n\n[...elided ${elided.toLocaleString('en-US')} chars...]\n\n${tail}`;
 }
 
 /**

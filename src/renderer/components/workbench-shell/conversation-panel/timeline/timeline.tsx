@@ -1,25 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
-import type { UIMessage } from 'ai';
+import type { DynamicToolUIPart, UIMessage } from 'ai';
 import type { ReactNode } from 'react';
 import { useEffect, useMemo } from 'react';
 import type { BundledLanguage } from 'shiki';
 import { piSessionsForWorkspaceQuery } from '@/renderer/api/ensemble-queries';
-import { CodeBlock } from '@/renderer/components/ai-elements/code-block';
+import {
+	ChatAssistantTurn,
+	type ChatAssistantTurnTiming,
+} from '@/renderer/components/chat-assistant-turn';
+import { ChatUserPrompt } from '@/renderer/components/chat-user-prompt';
+import { CodeBlock } from '@/renderer/components/code-block';
 import {
 	Conversation,
 	ConversationContent,
 	ConversationScrollButton,
-} from '@/renderer/components/ai-elements/conversation';
-import {
-	Message,
-	MessageContent,
-	MessageResponse,
-} from '@/renderer/components/ai-elements/message';
-import {
-	Reasoning,
-	ReasoningContent,
-	ReasoningTrigger,
-} from '@/renderer/components/ai-elements/reasoning';
+} from '@/renderer/components/conversation';
+import { MessageResponse } from '@/renderer/components/message';
 import {
 	StackTrace,
 	StackTraceActions,
@@ -31,19 +27,13 @@ import {
 	StackTraceExpandButton,
 	StackTraceFrames,
 	StackTraceHeader,
-} from '@/renderer/components/ai-elements/stack-trace';
-import { Terminal } from '@/renderer/components/ai-elements/terminal';
-import {
-	Tool,
-	ToolContent,
-	ToolHeader,
-	ToolInput,
-	ToolOutput,
-} from '@/renderer/components/ai-elements/tool';
+} from '@/renderer/components/stack-trace';
+import { Terminal } from '@/renderer/components/terminal';
 import {
 	classifyToolOutput,
 	eventsToUIMessages,
 	looksLikeStackTrace,
+	turnMetadataOf,
 } from '@/renderer/lib/pi';
 import {
 	type OptimisticPrompt,
@@ -61,10 +51,9 @@ import { useTimelineEvents } from './use-timeline-events';
  * from SQLite and overlays live events broadcast from the main process so
  * the conversation surface stays in sync without a refresh.
  *
- * Events are mapped to AI SDK `UIMessage` shape and rendered with
- * ai-elements' `Conversation` + `Message` components so we share UI
- * affordances (sticky scroll, reasoning collapse, tool cards) with the rest
- * of the chat surface.
+ * Events are mapped to AI SDK `UIMessage` shape and rendered with the
+ * shared `Conversation` + `Message` primitives so we get sticky scroll,
+ * reasoning collapse, and tool cards across the chat surface.
  */
 export function PiSessionTimeline({
 	activePiSessionId,
@@ -255,51 +244,49 @@ function TimelineMessage({
 		return <RuntimeDiagnostic message={message} />;
 	}
 
+	if (message.role === 'user') {
+		return <ChatUserPrompt prompt={textFromMessage(message)} />;
+	}
+
+	const isLiveTurn = isStreaming && isLastMessage;
+	const metadata = turnMetadataOf(message);
+	const startMs = metadata ? Date.parse(metadata.firstEventAt) : Number.NaN;
+	const endMs = metadata ? Date.parse(metadata.lastEventAt) : Number.NaN;
+	const turnTiming: ChatAssistantTurnTiming = {
+		endMs: isLiveTurn || Number.isNaN(endMs) ? null : endMs,
+		startMs: Number.isNaN(startMs) ? Date.now() : startMs,
+	};
+
 	return (
-		<Message from={message.role}>
-			<MessageContent>
-				{message.parts.map((part, index) => {
-					const key = `${message.id}:${index}`;
-					if (part.type === 'text') {
-						return <MessageResponse key={key}>{part.text}</MessageResponse>;
-					}
-					if (part.type === 'reasoning') {
-						const isReasoningStreaming =
-							isStreaming &&
-							isLastMessage &&
-							index === lastReasoningPartIndex(message);
-						return (
-							<Reasoning
-								defaultOpen={isReasoningStreaming}
-								isStreaming={isReasoningStreaming}
-								key={key}
-							>
-								<ReasoningTrigger />
-								<ReasoningContent>{part.text}</ReasoningContent>
-							</Reasoning>
-						);
-					}
-					if (part.type === 'dynamic-tool') {
-						return (
-							<Tool defaultOpen={isToolRunning(part.state)} key={key}>
-								<ToolHeader
-									state={part.state}
-									toolName={part.toolName}
-									type={part.type}
-								/>
-								<ToolContent>
-									{'input' in part && part.input !== undefined ? (
-										<ToolInput input={part.input} />
-									) : null}
-									<ToolOutputForPart part={part} />
-								</ToolContent>
-							</Tool>
-						);
-					}
-					return null;
-				})}
-			</MessageContent>
-		</Message>
+		<ChatAssistantTurn
+			isStreaming={isLiveTurn}
+			message={message}
+			renderToolDetail={(part) => renderToolDetailNode(part)}
+			timing={turnTiming}
+		/>
+	);
+}
+
+function renderToolDetailNode(part: DynamicToolUIPart): ReactNode {
+	if ('errorText' in part && part.errorText) {
+		const errorText = part.errorText;
+		return looksLikeStackTrace(errorText) ? (
+			<StackTraceDiagnostic trace={errorText} />
+		) : (
+			<MessageResponse className='text-status-warning'>
+				{errorText}
+			</MessageResponse>
+		);
+	}
+	if (!('output' in part) || part.output === undefined) {
+		return null;
+	}
+	return (
+		<ToolPayload
+			state={part.state}
+			toolName={part.toolName}
+			value={part.output}
+		/>
 	);
 }
 
@@ -318,39 +305,6 @@ function RuntimeDiagnostic({ message }: { message: UIMessage }) {
 				</MessageResponse>
 			)}
 		</div>
-	);
-}
-
-/** Renders one dynamic tool result with the most specific AI Elements view. */
-function ToolOutputForPart({
-	part,
-}: {
-	part: Extract<UIMessage['parts'][number], { type: 'dynamic-tool' }>;
-}) {
-	if ('errorText' in part && part.errorText) {
-		const errorNode = looksLikeStackTrace(part.errorText) ? (
-			<StackTraceDiagnostic trace={part.errorText} />
-		) : (
-			part.errorText
-		);
-		return <ToolOutput errorText={errorNode} output={undefined} />;
-	}
-
-	if (!('output' in part) || part.output === undefined) {
-		return null;
-	}
-
-	return (
-		<ToolOutput
-			errorText={undefined}
-			output={
-				<ToolPayload
-					state={part.state}
-					toolName={part.toolName}
-					value={part.output}
-				/>
-			}
-		/>
 	);
 }
 
@@ -428,16 +382,6 @@ function StackTraceDiagnostic({ trace }: { trace: string }) {
 			</StackTraceContent>
 		</StackTrace>
 	);
-}
-
-/** Returns the final reasoning part index so streaming state only marks one block. */
-function lastReasoningPartIndex(message: UIMessage): number {
-	for (let index = message.parts.length - 1; index >= 0; index -= 1) {
-		if (message.parts[index]?.type === 'reasoning') {
-			return index;
-		}
-	}
-	return -1;
 }
 
 /** Converts all text parts in a message into one diagnostic string. */

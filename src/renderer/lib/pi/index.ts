@@ -8,8 +8,20 @@
  * exported renderer types belong under `@/renderer/types/`.
  */
 
-export { eventsToUIMessages } from './event-to-ui-message';
+export { eventsToUIMessages, turnMetadataOf } from './event-to-ui-message';
+export type { PiTurnMetadata } from './event-to-ui-message';
+export {
+	chipLabelForPath,
+	parsePromptAttachments,
+} from './prompt-attachment-parser';
+export type {
+	ParsedPrompt,
+	ParsedPromptAttachment,
+} from './prompt-attachment-parser';
 export {
 	classifyToolOutput,
 	looksLikeStackTrace,
+	looksLikeStructuredDump,
 } from './tool-output-classifier';
+export { projectToolRow } from './tool-row-projector';
+export type { ToolRowProjection } from './tool-row-projector';

@@ -13,7 +13,7 @@ import { WorkspaceTimeline } from './workspace-timeline';
 /**
  * Conversation surface — session tabs, scrollable timeline, and composer.
  *
- * ai-elements' `Conversation` owns its own scroll viewport (sticky-to-bottom),
+ * The `Conversation` primitive owns its own scroll viewport (sticky-to-bottom),
  * so the surrounding container is a flex column with overflow hidden — the
  * timeline child manages its own scrolling.
  */

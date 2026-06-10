@@ -66,17 +66,24 @@ export function buildToolResultPart(
 }
 
 /**
- * Merges an incoming tool-output part into the existing parts array, pairing
- * it with the prior `input-available` part that shares the same `toolCallId`.
+ * Merges any incoming `dynamic-tool` part into the existing parts array keyed
+ * by `toolCallId`. The Pi runtime emits each tool call twice — once as a
+ * streaming `tool-call`/`tool-result` event and again inside the final
+ * authoritative `message` envelope — so without this dedup every call renders
+ * as a duplicate row.
  *
- * Returns `null` when the incoming part is not a tool output — the caller is
- * expected to fall back to whatever handling the part type requires.
+ * Merge rules: results win over calls (state precedence output-error >
+ * output-available > input-available), the non-empty `input` survives, and a
+ * concrete tool name beats the generic `'tool'` fallback.
+ *
+ * Returns `null` when the incoming part is not a dynamic-tool part — the
+ * caller falls back to whatever handling the part type requires.
  */
-export function mergeToolOutputPart(
+export function mergeToolPart(
 	existingParts: readonly UIMessagePart[],
 	incomingPart: UIMessagePart,
 ): UIMessagePart[] | null {
-	if (!isDynamicToolPart(incomingPart) || !isToolOutputPart(incomingPart)) {
+	if (!isDynamicToolPart(incomingPart)) {
 		return null;
 	}
 
@@ -111,15 +118,46 @@ export function isToolOutputPart(
 	return part.state === 'output-available' || part.state === 'output-error';
 }
 
+const STATE_RANK: Record<string, number> = {
+	'input-available': 1,
+	'input-streaming': 0,
+	'output-available': 2,
+	'output-error': 3,
+};
+
 function mergeDynamicToolParts(
 	previousPart: DynamicToolUIPart,
-	incomingPart: DynamicToolOutputPart,
-): DynamicToolOutputPart {
+	incomingPart: DynamicToolUIPart,
+): DynamicToolUIPart {
+	const previousRank = STATE_RANK[previousPart.state] ?? 0;
+	const incomingRank = STATE_RANK[incomingPart.state] ?? 0;
+	const winner = incomingRank >= previousRank ? incomingPart : previousPart;
 	return {
-		...incomingPart,
-		input: previousPart.input ?? incomingPart.input,
-		toolName: previousPart.toolName || incomingPart.toolName,
-	};
+		...winner,
+		input: pickRicherInput(previousPart.input, incomingPart.input),
+		toolName: pickToolName(previousPart.toolName, incomingPart.toolName),
+	} as DynamicToolUIPart;
+}
+
+function pickRicherInput(a: unknown, b: unknown): unknown {
+	const aHasKeys =
+		a !== null && typeof a === 'object' && Object.keys(a).length > 0;
+	if (aHasKeys) {
+		return a;
+	}
+	const bHasKeys =
+		b !== null && typeof b === 'object' && Object.keys(b).length > 0;
+	return bHasKeys ? b : (a ?? b);
+}
+
+function pickToolName(a: string, b: string): string {
+	if (a && a !== 'tool') {
+		return a;
+	}
+	if (b && b !== 'tool') {
+		return b;
+	}
+	return a || b;
 }
 
 function normalizeToolOutput(output: unknown): unknown {

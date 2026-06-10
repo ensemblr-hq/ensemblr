@@ -35,6 +35,17 @@ const MIN_CODE_KEYWORD_HITS = 3;
 const INTERFACE_DECLARATION = /\binterface\s+\w+/;
 const JSX_TAG_OPEN = /<[A-Z][\w]*[\s>]/;
 const JSON_OBJECT_START = /^[\s\n]*[{[]/;
+/** `ls -l` style permission column: `drwxr-xr-x@ 25 user staff ...`. */
+const LS_LONG_FORMAT = /(^|\s)[bcdlps-][rwxsStT-]{8,9}[@+]?\s+\d+\s+\S+\s+\S+/;
+/** `total 96` header emitted by `ls -l`. */
+const LS_TOTAL_HEADER = /(^|\n)total\s+\d+(\s|$)/;
+/**
+ * Run of `key: "value"` / `key: 123` / `key: null` pairs — session-state and
+ * frontmatter-like dumps that must never hit the markdown renderer (Streamdown
+ * inflates them into headings/bold soup).
+ */
+const STRUCTURED_KV_PAIR = /\b\w+:\s*(?:"[^"\n]*"|null|true|false|-?\d[\d.]*)/g;
+const MIN_STRUCTURED_KV_HITS = 3;
 
 /** Converts arbitrary tool payloads into readable text without throwing. */
 export function stringifyToolValue(value: unknown): string {
@@ -60,8 +71,20 @@ function looksLikeTerminalOutput(toolName: string, text: string): boolean {
 		normalizedName.includes('shell') ||
 		normalizedName.includes('terminal') ||
 		ANSI_ESCAPE.test(text) ||
-		SHELL_PROMPT_LINE.test(text)
+		SHELL_PROMPT_LINE.test(text) ||
+		LS_LONG_FORMAT.test(text) ||
+		LS_TOTAL_HEADER.test(text)
 	);
+}
+
+/**
+ * True for `key: "value"` session-state dumps (chatTabId/piSessionId/...)
+ * that read as data, not prose. Exported so the message-text segmenter can
+ * fence single-paragraph dumps that would otherwise stay markdown.
+ */
+export function looksLikeStructuredDump(text: string): boolean {
+	const hits = (text.match(STRUCTURED_KV_PAIR) ?? []).length;
+	return hits >= MIN_STRUCTURED_KV_HITS;
 }
 
 function looksLikeCodeOutput(toolName: string, text: string): boolean {
@@ -127,6 +150,9 @@ export function classifyToolOutput(
 	}
 	if (looksLikePathTree(text)) {
 		return { kind: 'path-tree', text };
+	}
+	if (looksLikeStructuredDump(text)) {
+		return { kind: 'json', text };
 	}
 	if (typeof value === 'object' && value !== null) {
 		return { kind: 'json', text };

@@ -160,6 +160,15 @@ export function createProtocolDispatcher(
 			}
 			case 'message_end': {
 				const message = (typed.message ?? {}) as Record<string, unknown>;
+				// Pi mirrors every tool result as a `message_end` with
+				// role "toolResult" whose content is the raw output text. The
+				// `tool_execution_end` frame already carries the same result as a
+				// structured tool-result payload, so persisting this echo would
+				// render the output twice — once in the tool card and again as a
+				// bare text dump in the transcript.
+				if (message.role === 'toolResult') {
+					return;
+				}
 				const wireRole = isMessageRole(message.role) ? message.role : 'agent';
 				const turnId =
 					typeof typed.turnId === 'string'
