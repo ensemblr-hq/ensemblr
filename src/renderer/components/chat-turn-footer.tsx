@@ -56,9 +56,12 @@ export function ChatTurnFooter({
 							<EllipsisIcon aria-hidden='true' className='size-3.5' />
 						</button>
 					</DropdownMenuTrigger>
-					<DropdownMenuContent align='start'>
+					{/* Content width defaults to the trigger width — far too narrow
+					    for the icon-only trigger, so let it size to the items. */}
+					<DropdownMenuContent align='start' className='w-auto'>
 						{onForkToNewTab ? (
 							<DropdownMenuItem
+								className='whitespace-nowrap'
 								disabled={forkDisabled}
 								onSelect={() => onForkToNewTab()}
 							>
@@ -68,6 +71,7 @@ export function ChatTurnFooter({
 						) : null}
 						{onForkToNewWorkspace ? (
 							<DropdownMenuItem
+								className='whitespace-nowrap'
 								disabled={forkDisabled}
 								onSelect={() => onForkToNewWorkspace()}
 							>
