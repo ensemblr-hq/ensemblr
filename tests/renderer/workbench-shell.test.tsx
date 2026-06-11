@@ -24,10 +24,15 @@ import {
 import type {
 	DockTabId,
 	ProjectShellModel,
+	SessionTabModel,
 	WorkbenchRouteSearch,
 	WorkspaceShellModel,
 } from '../../src/renderer/types/workbench';
-import type { WorkbenchDockActions } from '../../src/renderer/types/workbench-shell';
+import type {
+	SessionTabActions,
+	SessionTabState,
+	WorkbenchDockActions,
+} from '../../src/renderer/types/workbench-shell';
 import type {
 	SetupCheckGroupId,
 	SetupCheckId,
@@ -64,6 +69,22 @@ const DOCK_ACTIONS: WorkbenchDockActions = {
 };
 
 const EMPTY_ROUTE_SEARCH = (): WorkbenchRouteSearch => ({});
+
+/** Mirrors the hook's no-data fallback: placeholder sessions, no history. */
+function stubSessionNavigation(
+	activeSession: SessionTabModel,
+	activeWorkspace: WorkspaceShellModel,
+): SessionTabState & SessionTabActions {
+	return {
+		closedSessions: [],
+		closeSessionTab: () => undefined,
+		closeSessionTabAsync: () => Promise.resolve({ replacementChatTabId: null }),
+		effectiveActiveSession: activeSession,
+		openSessionTab: () => Promise.resolve(null),
+		restoreSessionTab: () => undefined,
+		sessionTabs: activeWorkspace.sessions,
+	};
+}
 
 function renderWorkbench(
 	snapshot: SetupDiagnosticsSnapshot | null,
@@ -116,7 +137,6 @@ function renderWorkbench(
 						<WorkspaceWorkbenchContent
 							activeProject={activeProject}
 							activeReviewTab={activeReviewTab}
-							activeSession={activeSession}
 							activeWorkspace={activeWorkspace}
 							composer={getComposerState({
 								activePiSessionId: null,
@@ -138,6 +158,10 @@ function renderWorkbench(
 							onDockTabChange={() => undefined}
 							onReviewTabChange={() => undefined}
 							onSessionTabChange={() => undefined}
+							sessionNavigation={stubSessionNavigation(
+								activeSession,
+								activeWorkspace,
+							)}
 							MainContent={(mainContent) => (
 								<WorkspaceConversationContent {...mainContent} />
 							)}

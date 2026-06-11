@@ -24,9 +24,10 @@ import type {
 } from '@/shared/ipc';
 
 /**
- * Cross-instance lock for the workspace-level bootstrap. Two mounted hook
- * instances (route shell + workspace content) must not both spawn a chat tab
- * on first load — the first to claim the workspace id wins.
+ * Cross-instance lock for the workspace-level bootstrap. The route shell owns
+ * the only long-lived hook instance, but remounts (StrictMode, route
+ * transitions) must not spawn duplicate chat tabs on first load — the first
+ * mount to claim the workspace id wins.
  */
 const bootstrappedWorkspacesGlobal = new Set<string>();
 
@@ -153,8 +154,7 @@ export function useSessionTabState({
 	// Bootstrap a real chat-tab row when the workspace has none. Placeholder
 	// session ids like `<workspaceId>:overview` are not persisted, so the first
 	// prompt would fail to bind without a real row. Cross-instance lock keeps
-	// the multiple hooks mounted in the same workspace from spawning duplicate
-	// tabs on first load.
+	// remounted hooks from spawning duplicate tabs on first load.
 	useEffect(() => {
 		if (!bootstrap) {
 			return;

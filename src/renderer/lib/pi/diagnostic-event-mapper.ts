@@ -58,6 +58,8 @@ function readStderrDetail(payload: PiPersistedEnvelope | null): string {
 /** Strong actionable signals. Anything that matches one of these gets through. */
 const ACTIONABLE_MARKER =
 	/\b(error|warning|fatal|panic|crash|traceback|exception)\b/i;
+/** POSIX/Node errno codes (ENOENT, EACCES, ECONNRESET, ...). */
+const ERRNO_CODE = /\bE[A-Z]{2,}\b/;
 const STACK_FRAME = /\bat\s+\S+:\d+/;
 const SHELL_PROMPT = /^\s*[$#]\s+\S/;
 
@@ -95,6 +97,7 @@ export function filterActionableStderr(detail: string): string | null {
 		}
 		if (
 			ACTIONABLE_MARKER.test(line) ||
+			ERRNO_CODE.test(line) ||
 			STACK_FRAME.test(line) ||
 			SHELL_PROMPT.test(line)
 		) {

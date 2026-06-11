@@ -170,7 +170,6 @@ export function WorkspaceRouteContent({
 		<WorkspaceWorkbenchContent
 			activeProject={activeProject}
 			activeReviewTab={activeReviewTab}
-			activeSession={activeSession}
 			activeWorkspace={activeWorkspace}
 			composer={composer}
 			dockActions={dockActions}
@@ -180,6 +179,7 @@ export function WorkspaceRouteContent({
 			onSessionTabChange={(nextChatId) =>
 				navigateToWorkspaceChat({ nextChatId })
 			}
+			sessionNavigation={sessionNavigation}
 			MainContent={WorkspaceMainContentOutlet}
 		/>
 	);
