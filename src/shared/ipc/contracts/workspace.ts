@@ -1,3 +1,5 @@
+import type { LinearIssueWire } from './linear';
+
 export type CreateWorkspaceDiagnosticCode =
 	| 'context-directory-failed'
 	| 'database-unavailable'
@@ -20,9 +22,18 @@ export interface CreateWorkspaceDiagnostic {
 	severity: CreateWorkspaceDiagnosticSeverity;
 }
 
+/** Linked remote issue persisted on a workspace created from an issue. */
+export interface WorkspaceLinkedIssueInput
+	extends Pick<LinearIssueWire, 'id' | 'identifier' | 'title' | 'url'> {
+	provider: 'linear';
+	teamKey?: string;
+	teamName?: string;
+}
+
 export interface CreateWorkspaceRequest {
 	baseBranch?: string;
 	branchName?: string;
+	linkedIssue?: WorkspaceLinkedIssueInput;
 	name?: string;
 	repositoryId: string;
 }

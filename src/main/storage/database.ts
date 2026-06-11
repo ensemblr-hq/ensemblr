@@ -473,6 +473,67 @@ CREATE INDEX idx_checkpoints_pi_session_id ON checkpoints(pi_session_id);
 CREATE UNIQUE INDEX idx_checkpoints_turn_id ON checkpoints(turn_id) WHERE turn_id IS NOT NULL;
 `,
 	},
+	{
+		id: '009_linear_cache',
+		version: 9,
+		// Refreshable cache of Linear issues and metadata (ADR 0024). Linear stays
+		// the source of truth; rows carry synced_at for staleness display. Tokens
+		// never land here — they live in the Keychain (ADR 0018).
+		sql: `
+CREATE TABLE linear_issues (
+	id TEXT PRIMARY KEY,
+	identifier TEXT NOT NULL,
+	title TEXT NOT NULL,
+	description TEXT,
+	team_id TEXT,
+	project_id TEXT,
+	state_id TEXT,
+	assignee_id TEXT,
+	priority INTEGER,
+	due_date TEXT,
+	url TEXT NOT NULL DEFAULT '',
+	archived_at TEXT,
+	remote_updated_at TEXT,
+	data_json TEXT NOT NULL DEFAULT '{}',
+	synced_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+) STRICT;
+
+CREATE INDEX idx_linear_issues_identifier ON linear_issues(identifier);
+CREATE INDEX idx_linear_issues_team_id ON linear_issues(team_id);
+CREATE INDEX idx_linear_issues_remote_updated_at ON linear_issues(remote_updated_at);
+
+CREATE TABLE linear_resources (
+	id TEXT PRIMARY KEY,
+	kind TEXT NOT NULL CHECK (kind IN ('team', 'project', 'state', 'label', 'cycle', 'user')),
+	team_id TEXT,
+	name TEXT NOT NULL,
+	data_json TEXT NOT NULL DEFAULT '{}',
+	synced_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+) STRICT;
+
+CREATE INDEX idx_linear_resources_kind ON linear_resources(kind, team_id);
+
+CREATE TABLE linear_comments (
+	id TEXT PRIMARY KEY,
+	issue_id TEXT NOT NULL,
+	author_name TEXT,
+	body TEXT NOT NULL DEFAULT '',
+	remote_created_at TEXT,
+	data_json TEXT NOT NULL DEFAULT '{}',
+	synced_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+) STRICT;
+
+CREATE INDEX idx_linear_comments_issue_id ON linear_comments(issue_id);
+
+CREATE TABLE linear_sync_state (
+	scope TEXT PRIMARY KEY,
+	cursor TEXT,
+	status TEXT NOT NULL DEFAULT 'idle' CHECK (status IN ('idle', 'syncing', 'error')),
+	error_code TEXT,
+	synced_at TEXT
+) STRICT;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

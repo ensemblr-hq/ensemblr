@@ -13,7 +13,10 @@ import type {
 	ProjectShellModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type { CreateWorkspaceDiagnostic } from '@/shared/ipc';
+import type {
+	CreateWorkspaceDiagnostic,
+	WorkspaceLinkedIssueInput,
+} from '@/shared/ipc';
 
 /**
  * Returns a callback the browse-archive dialog calls after every successful
@@ -74,8 +77,18 @@ interface CreateWorkspaceActionDeps {
 	disableProjectReorderLayoutAnimation: () => void;
 }
 
+/** Optional provenance seed (e.g. from a Linear issue) for a new workspace. */
+export interface WorkspaceCreationSeed {
+	branchName?: string;
+	linkedIssue?: WorkspaceLinkedIssueInput;
+	name?: string;
+}
+
 interface CreateWorkspaceActionResult {
-	create: (project: ProjectShellModel) => Promise<void>;
+	create: (
+		project: ProjectShellModel,
+		seed?: WorkspaceCreationSeed,
+	) => Promise<void>;
 	error: string | null;
 	isCreating: boolean;
 }
@@ -91,7 +104,7 @@ export function useCreateWorkspaceFromProject({
 	const [error, setError] = useState<string | null>(null);
 
 	const create = useCallback(
-		async (project: ProjectShellModel) => {
+		async (project: ProjectShellModel, seed?: WorkspaceCreationSeed) => {
 			if (!isEnsembleApiAvailable()) {
 				return;
 			}
@@ -107,8 +120,10 @@ export function useCreateWorkspaceFromProject({
 					workspace.name,
 					workspace.branchName,
 				]);
-				const name = pickComposerSurname({ exclude: excluded });
+				const name = seed?.name ?? pickComposerSurname({ exclude: excluded });
 				const result = await createWorkspace({
+					...(seed?.branchName ? { branchName: seed.branchName } : {}),
+					...(seed?.linkedIssue ? { linkedIssue: seed.linkedIssue } : {}),
 					name,
 					repositoryId: project.id,
 				});

@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import started from 'electron-squirrel-startup';
 import {
 	IPC_CHANNELS,
@@ -21,6 +21,11 @@ import {
 	createWorkspaceEnvironmentService,
 } from './environment';
 import { registerIpcHandlers } from './ipc';
+import {
+	createLinearAuthService,
+	createLinearClient,
+	createLinearService,
+} from './linear';
 import { installApplicationMenu } from './menu';
 import { createCliRpcPiAgentAdapter, createPiAgentClient } from './pi-agent';
 import { createPiSessionService } from './pi-agent/pi-session-service';
@@ -289,10 +294,26 @@ const archiveWorkspaceServiceWithScript = withArchiveScriptBeforeArchive({
 	archiveWorkspaceService,
 	scriptLifecycleService,
 });
+const linearAuthService = createLinearAuthService({
+	configService,
+	databaseService,
+	openExternal: (url) => shell.openExternal(url),
+	secretStoreFactory: (database) =>
+		process.platform === 'darwin'
+			? createMacosKeychainSecretStore({ database })
+			: null,
+});
+const linearService = createLinearService({
+	client: createLinearClient({
+		getAccessToken: () => linearAuthService.getAccessToken(),
+	}),
+	databaseService,
+});
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
 	databaseService,
 	environmentVariablesService,
+	linearAuthService,
 	localCommandService,
 	piExecutableService,
 	piReadinessService,
@@ -320,6 +341,8 @@ app.whenReady().then(() => {
 		environmentVariablesService,
 		githubCloneService,
 		githubRepositoryListService,
+		linearAuthService,
+		linearService,
 		listArchivedWorkspacesService,
 		listWorkspaceFilesService,
 		localCommandService,

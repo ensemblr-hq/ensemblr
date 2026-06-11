@@ -6,6 +6,7 @@ import type {
 	RepositoryConfigService,
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
+import type { LinearAuthService, LinearService } from '../linear';
 import type { PiSessionService } from '../pi-agent/pi-session-service';
 import type { PiExecutableService } from '../pi-runtime';
 import type {
@@ -37,6 +38,7 @@ import { registerCheckpointHandlers } from './handlers/checkpoint';
 import { registerCloneHandlers } from './handlers/clone';
 import { registerEnvironmentHandlers } from './handlers/environment';
 import { registerHealthHandlers } from './handlers/health';
+import { registerLinearHandlers } from './handlers/linear';
 import { registerNavigationHandlers } from './handlers/navigation';
 import { registerPiHandlers } from './handlers/pi';
 import { registerPiSessionHandlers } from './handlers/pi-session';
@@ -67,6 +69,8 @@ interface RegisterIpcHandlersOptions {
 	environmentVariablesService: EnvironmentVariablesService;
 	githubCloneService: GithubCloneService;
 	githubRepositoryListService: GithubRepositoryListService;
+	linearAuthService: LinearAuthService;
+	linearService: LinearService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
 	listWorkspaceFilesService: ListWorkspaceFilesService;
 	localCommandService: LocalCommandService;
@@ -103,6 +107,8 @@ export function registerIpcHandlers({
 	environmentVariablesService,
 	githubCloneService,
 	githubRepositoryListService,
+	linearAuthService,
+	linearService,
 	listArchivedWorkspacesService,
 	listWorkspaceFilesService,
 	localCommandService,
@@ -188,6 +194,7 @@ export function registerIpcHandlers({
 		}),
 	});
 	registerCheckpointHandlers({ databaseService });
+	registerLinearHandlers({ linearAuthService, linearService });
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerTerminalHandlers({ terminalService });
 	registerWorkspaceScriptHandlers({ scriptLifecycleService });

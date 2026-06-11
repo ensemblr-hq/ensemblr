@@ -65,6 +65,11 @@ function getWorkbenchPlaceholderCopy({
 				detail: 'Kanban board is not connected yet.',
 				title: 'Dashboard',
 			};
+		case 'linear':
+			return {
+				detail: 'Linear issues are available from the Linear route.',
+				title: 'Linear',
+			};
 		default: {
 			const exhaustive: never = view;
 			return exhaustive;

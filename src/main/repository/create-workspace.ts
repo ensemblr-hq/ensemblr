@@ -10,6 +10,7 @@ import type {
 	CreateWorkspaceRequest,
 	CreateWorkspaceResult,
 	FilesToCopySnapshot,
+	WorkspaceLinkedIssueInput,
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import {
@@ -210,10 +211,12 @@ export function createWorkspaceService({
 			const timestamp = now().toISOString();
 			const initialMetadata = buildInitialWorkspaceMetadata({
 				filesToCopySnapshot,
+				linkedIssue: request.linkedIssue,
 			});
 			try {
 				insertWorkspaceRow({
 					database,
+					linkedIssue: request.linkedIssue,
 					metadataJson: JSON.stringify(initialMetadata),
 					prepared,
 					timestamp,
@@ -627,11 +630,18 @@ function cleanupDirectory(workspacePath: string): void {
  * Builds the initial workspace metadata record stored under `metadata_json`,
  * capturing the files-to-copy outcome so the renderer landing card can show
  * the actual copied-file count without recomputing the snapshot.
+ *
+ * The `linkedIssue` copy here is a denormalized read model for the renderer
+ * (which only sees workspace rows); the `integration_metadata` row written in
+ * the same transaction is the canonical, queryable link. Both are written once
+ * at creation and never updated afterwards.
  */
 function buildInitialWorkspaceMetadata({
 	filesToCopySnapshot,
+	linkedIssue,
 }: {
 	filesToCopySnapshot: FilesToCopySnapshot;
+	linkedIssue?: WorkspaceLinkedIssueInput;
 }): Record<string, unknown> {
 	return {
 		filesToCopy: {
@@ -639,17 +649,23 @@ function buildInitialWorkspaceMetadata({
 			skippedCount: filesToCopySnapshot.skipped.length,
 			source: filesToCopySnapshot.source,
 		},
+		...(linkedIssue ? { linkedIssue } : {}),
 	};
 }
 
-/** Inserts a `workspaces` row inside a single transaction. */
+/**
+ * Inserts the `workspaces` row plus, for issue-seeded workspaces, the
+ * `integration_metadata` link row inside one transaction.
+ */
 function insertWorkspaceRow({
 	database,
+	linkedIssue,
 	metadataJson,
 	prepared,
 	timestamp,
 }: {
 	database: DatabaseSync;
+	linkedIssue?: WorkspaceLinkedIssueInput;
 	metadataJson: string;
 	prepared: PreparedWorkspace;
 	timestamp: string;
@@ -667,6 +683,23 @@ function insertWorkspaceRow({
 			slug: prepared.slug,
 			timestamp,
 		});
+
+		if (linkedIssue) {
+			database
+				.prepare(
+					`INSERT INTO integration_metadata
+						(id, provider, resource_type, resource_id, external_id, synced_at, metadata_json)
+					 VALUES (?, ?, 'workspace-link', ?, ?, ?, ?)`,
+				)
+				.run(
+					randomUUID(),
+					linkedIssue.provider,
+					prepared.id,
+					linkedIssue.id,
+					timestamp,
+					JSON.stringify(linkedIssue),
+				);
+		}
 	});
 }
 

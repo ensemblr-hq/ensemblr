@@ -87,6 +87,35 @@ export type {
 	HealthSnapshot,
 } from './contracts/health';
 export type {
+	CreateLinearCommentRequest,
+	CreateLinearCommentResult,
+	CreateLinearIssueRequest,
+	GetLinearIssueRequest,
+	GetLinearIssueResult,
+	GetLinearMetadataRequest,
+	GetLinearMetadataResult,
+	LinearApi,
+	LinearAuthFailure,
+	LinearAuthFailureCode,
+	LinearCommentWire,
+	LinearConnectionSnapshot,
+	LinearConnectionState,
+	LinearDisconnectResult,
+	LinearIssueFieldsInput,
+	LinearIssueLabelWire,
+	LinearIssueWire,
+	LinearLoginResult,
+	LinearMetadataWire,
+	LinearResourceKindWire,
+	LinearResourceWire,
+	LinearServiceFailure,
+	LinearServiceFailureCode,
+	ListLinearIssuesRequest,
+	ListLinearIssuesResult,
+	MutateLinearIssueResult,
+	UpdateLinearIssueRequest,
+} from './contracts/linear';
+export type {
 	ChatTabKindWire,
 	ListPiModelsResult,
 	ListPiSessionEventsRequest,
@@ -303,6 +332,7 @@ export type {
 	UnarchiveWorkspaceResult,
 	UnarchiveWorkspaceStatus,
 	WorkspaceApi,
+	WorkspaceLinkedIssueInput,
 } from './contracts/workspace';
 export type {
 	ListWorkspaceFilesFailureCode,

@@ -204,6 +204,8 @@ export type WorkspaceLinkedIssueProvider = 'github' | 'linear';
 export interface WorkspaceLinkedIssueSummary {
 	provider: WorkspaceLinkedIssueProvider;
 	reference: string;
+	/** Remote issue id used to resolve live status from the provider cache. */
+	remoteId?: string;
 	subtitle?: string;
 	title: string;
 	url?: string;

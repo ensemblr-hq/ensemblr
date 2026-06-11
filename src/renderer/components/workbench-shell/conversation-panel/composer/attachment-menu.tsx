@@ -25,12 +25,14 @@ import {
 interface AttachmentMenuProps {
 	disabled?: boolean;
 	onAddAttachment: () => void;
+	onLinkIssue?: () => void;
 }
 
 /** Opens the composer attachment/link actions from the plus button. */
 export function AttachmentMenu({
 	disabled,
 	onAddAttachment,
+	onLinkIssue,
 }: AttachmentMenuProps) {
 	const [menuOpen, setMenuOpen] = useState(false);
 	return (
@@ -66,7 +68,13 @@ export function AttachmentMenu({
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						className='gap-3 px-2 py-2 text-sm'
-						onSelect={() => toast.info('Linking issues is coming soon.')}
+						onSelect={() => {
+							if (onLinkIssue) {
+								onLinkIssue();
+							} else {
+								toast.info('Linking issues is coming soon.');
+							}
+						}}
 					>
 						<LinkIcon />
 						<span className='flex-1'>Link issue</span>

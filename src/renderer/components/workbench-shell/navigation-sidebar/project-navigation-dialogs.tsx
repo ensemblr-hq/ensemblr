@@ -1,9 +1,19 @@
-import { useCallback, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo, useState } from 'react';
 
+import { linearIssuesQuery } from '@/renderer/api/ensemble';
+import { defaultWorkspaceSources } from '@/renderer/fixtures/workbench';
+import {
+	buildWorkspaceSeedFromLinearIssue,
+	type LinearWorkspaceSeed,
+	mapLinearIssuesToWorkspaceSources,
+} from '@/renderer/lib/linear';
 import type {
 	ProjectShellModel,
 	WorkspaceShellModel,
+	WorkspaceSource,
 } from '@/renderer/types/workbench';
+import type { LinearIssueWire } from '@/shared/ipc';
 import { ArchiveRepositoryDialog } from '../archive-repository-dialog';
 import { ArchiveWorkspaceDialog } from '../archive-workspace-dialog';
 import { BrowseArchiveDialog } from '../browse-archive-dialog';
@@ -101,6 +111,36 @@ export function useProjectNavigationDialogs(): {
 	};
 }
 
+/**
+ * Builds the create-from picker source list: live cached Linear issues replace
+ * the Linear fixtures, while branch/PR fixtures remain until their providers
+ * land. Only queries Linear while the dialog is open.
+ */
+function useCreateWorkspaceSources(enabled: boolean): {
+	issuesById: Map<string, LinearIssueWire>;
+	sources: WorkspaceSource[];
+} {
+	const linearIssues = useQuery({
+		...linearIssuesQuery({}),
+		enabled,
+	});
+
+	return useMemo(() => {
+		const placeholderSources = defaultWorkspaceSources.filter(
+			(source) => !(source.kind === 'issue' && source.provider === 'linear'),
+		);
+		const issues = linearIssues.data?.issues ?? [];
+
+		return {
+			issuesById: new Map(issues.map((issue) => [issue.id, issue])),
+			sources: [
+				...placeholderSources,
+				...mapLinearIssuesToWorkspaceSources(issues),
+			],
+		};
+	}, [linearIssues.data]);
+}
+
 /** Mounts the sidebar lifecycle dialogs driven by the navigation actions hook. */
 export function ProjectNavigationDialogs({
 	archiveProjectTarget,
@@ -110,6 +150,7 @@ export function ProjectNavigationDialogs({
 	deleteProjectTarget,
 	deleteWorkspaceTarget,
 	onArchiveBrowseChange,
+	onCreateWorkspaceFromIssue,
 	onProjectArchived,
 	onProjectDeleted,
 	onWorkspaceArchived,
@@ -129,6 +170,10 @@ export function ProjectNavigationDialogs({
 	deleteProjectTarget: ProjectShellModel | null;
 	deleteWorkspaceTarget: WorkspaceShellModel | null;
 	onArchiveBrowseChange: (repositoryId: string) => Promise<void>;
+	onCreateWorkspaceFromIssue?: (
+		project: ProjectShellModel,
+		seed: LinearWorkspaceSeed,
+	) => void;
 	onProjectArchived: (archivedProjectId: string) => Promise<void>;
 	onProjectDeleted: (deletedProjectId: string) => Promise<void>;
 	onWorkspaceArchived: (archivedWorkspaceId: string) => Promise<void>;
@@ -141,9 +186,28 @@ export function ProjectNavigationDialogs({
 	setDeleteProjectTarget: (project: ProjectShellModel | null) => void;
 	setDeleteWorkspaceTarget: (workspace: WorkspaceShellModel | null) => void;
 }) {
+	const { issuesById, sources } = useCreateWorkspaceSources(
+		createSourceProject !== null,
+	);
+
 	return (
 		<>
 			<CreateWorkspaceSourceDialog
+				onCreateWorkspace={({ repoId, source }) => {
+					if (source.kind !== 'issue' || source.provider !== 'linear') {
+						return;
+					}
+					const issue = issuesById.get(source.id);
+					const project = orderedProjects.find(
+						(candidate) => candidate.id === repoId,
+					);
+					if (issue && project) {
+						onCreateWorkspaceFromIssue?.(
+							project,
+							buildWorkspaceSeedFromLinearIssue(issue),
+						);
+					}
+				}}
 				onOpenChange={(open) => {
 					if (!open) {
 						setCreateSourceProject(null);
@@ -152,6 +216,7 @@ export function ProjectNavigationDialogs({
 				open={createSourceProject !== null}
 				project={createSourceProject}
 				projects={orderedProjects}
+				sources={sources}
 			/>
 
 			<ArchiveWorkspaceDialog

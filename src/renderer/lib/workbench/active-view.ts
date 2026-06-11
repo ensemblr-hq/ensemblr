@@ -12,6 +12,7 @@ export function isWorkbenchActiveView(
 		view === 'dashboard' ||
 		view === 'help' ||
 		view === 'history' ||
+		view === 'linear' ||
 		view === 'settings' ||
 		view === 'welcome' ||
 		view === 'workspace'
