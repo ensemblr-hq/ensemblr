@@ -175,6 +175,9 @@ export function ProjectNavigationGroups({
 				deleteProjectTarget={state.deleteProjectTarget}
 				deleteWorkspaceTarget={state.deleteWorkspaceTarget}
 				onArchiveBrowseChange={handleArchiveBrowseChange}
+				onCreateWorkspaceFromIssue={(project, seed) => {
+					void handleCreateWorkspace(project, seed);
+				}}
 				onProjectArchived={handleProjectLifecycleAction}
 				onProjectDeleted={handleProjectLifecycleAction}
 				onWorkspaceArchived={handleWorkspaceLifecycleAction}

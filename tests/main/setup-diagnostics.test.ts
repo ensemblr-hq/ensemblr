@@ -7,6 +7,7 @@ import type {
 } from '../../src/main/commands/local-command.ts';
 import type { EnsembleConfigService } from '../../src/main/config/config-loader.ts';
 import type { EnvironmentVariablesService } from '../../src/main/environment/environment-variables.ts';
+import type { LinearAuthService } from '../../src/main/linear/linear-auth-service.ts';
 import type {
 	PiExecutableService,
 	PiExecutableSnapshot,
@@ -475,6 +476,30 @@ function createProvider(
 		});
 }
 
+function createLinearAuthService(): LinearAuthService {
+	const snapshot = {
+		expiresAt: null,
+		organizationName: null,
+		organizationUrlKey: null,
+		scopes: [],
+		state: 'disconnected',
+		updatedAt: null,
+		userEmail: null,
+		userName: null,
+	} as const;
+
+	return {
+		cancelLogin: async () => {},
+		disconnect: async () => ({ snapshot, status: 'disconnected' }),
+		getAccessToken: async () => 'token',
+		getConnectionStatus: async () => snapshot,
+		startLogin: async () => ({
+			failure: { code: 'not-configured', message: 'not configured' },
+			status: 'error',
+		}),
+	};
+}
+
 function createFutureProviders(
 	overrides: Partial<Record<SetupCheckId, SetupCheckProvider>> = {},
 ): Partial<Record<SetupCheckId, SetupCheckProvider>> {
@@ -504,6 +529,7 @@ async function getSnapshot(
 			options.environmentVariablesService ??
 			createEnvironmentVariablesService(),
 		homeDirectory: HOME,
+		linearAuthService: createLinearAuthService(),
 		localCommandService:
 			options.localCommandService ?? createLocalCommandService(),
 		now: () => NOW,

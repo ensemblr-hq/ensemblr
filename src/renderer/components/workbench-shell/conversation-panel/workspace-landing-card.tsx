@@ -1,5 +1,6 @@
 import { FolderIcon, GitBranchIcon } from 'lucide-react';
 
+import { LinkedIssueStatus } from '@/renderer/components/linear/linked-issue-status';
 import type { WorkspaceLandingSummary } from '@/renderer/types/workbench';
 
 /**
@@ -36,6 +37,10 @@ export function WorkspaceLandingCard({
 				<span className='font-mono'>{repositoryName}</span> called{' '}
 				<span className='font-mono'>{workspaceName}</span>
 			</div>
+
+			{landingSummary.linkedIssue ? (
+				<LinkedIssueStatus linkedIssue={landingSummary.linkedIssue} />
+			) : null}
 
 			<p className='flex items-center gap-2 text-muted-foreground text-xs'>
 				<GitBranchIcon aria-hidden='true' className='size-3.5 shrink-0' />

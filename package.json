@@ -37,6 +37,8 @@
 		"test:root": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/root-directory.test.ts",
 		"test:secrets": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/secret-store.test.ts",
 		"test:setup": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/setup-diagnostics.test.ts",
+		"test:linear": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/linear-oauth.test.ts tests/main/linear-oauth-callback-server.test.ts tests/main/linear-auth-service.test.ts tests/main/linear-client.test.ts tests/main/linear-store.test.ts tests/main/linear-service.test.ts tests/main/workspace-create-linked-issue.test.ts",
+		"test:linear-renderer": "bun test tests/renderer/linear-issue-view.test.ts tests/renderer/linear-issue-editor.test.ts tests/renderer/workspace-linked-issue-landing.test.ts",
 		"typecheck": "tsc --noEmit",
 		"build": "electron-forge package",
 		"package": "electron-forge package",

@@ -35,6 +35,8 @@ import { useSlashCommands } from './use-slash-commands';
 interface UseComposerStateArgs {
 	chatTabId: string;
 	composer: ComposerShellState;
+	/** Initial context (e.g. linked-issue summary) applied to an untouched composer. */
+	seedText?: string;
 }
 
 /**
@@ -60,6 +62,7 @@ export interface ComposerStateApi {
 	handleSelect: () => void;
 	handleSubmit: () => Promise<void> | void;
 	hasChips: boolean;
+	insertText: (text: string) => void;
 	isStreaming: boolean;
 	mentionAttachments: readonly WorkspaceFileSummary[];
 	mentionMatches: readonly WorkspaceFileSummary[];
@@ -97,6 +100,7 @@ const EMPTY_AUTOCOMPLETE: AutocompleteState = {
 export function useComposerState({
 	chatTabId,
 	composer,
+	seedText,
 }: UseComposerStateArgs): ComposerStateApi {
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const anchorRef = useRef<HTMLDivElement | null>(null);
@@ -163,6 +167,23 @@ export function useComposerState({
 		},
 		[updateAutocomplete],
 	);
+
+	const insertText = useCallback((text: string) => {
+		setValue((current) =>
+			current.trim().length > 0 ? `${current.trimEnd()}\n\n${text}` : text,
+		);
+		textareaRef.current?.focus();
+	}, []);
+
+	// Seed the composer once per mount for issue-created workspaces. Only an
+	// untouched composer is seeded so user input is never overwritten.
+	const seedAppliedRef = useRef(false);
+	useEffect(() => {
+		if (seedText && !seedAppliedRef.current && value === '') {
+			seedAppliedRef.current = true;
+			setValue(seedText);
+		}
+	}, [seedText, value]);
 
 	const handleSelect = useCallback(() => {
 		const textarea = textareaRef.current;
@@ -459,6 +480,7 @@ export function useComposerState({
 		handleSelect,
 		handleSubmit,
 		hasChips,
+		insertText,
 		isStreaming,
 		mentionAttachments,
 		mentionMatches,

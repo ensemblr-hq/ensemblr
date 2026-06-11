@@ -4,6 +4,7 @@ import type { CheckpointApi } from './checkpoint';
 import type { CloneApi } from './clone';
 import type { EnvironmentApi } from './environment';
 import type { HealthApi } from './health';
+import type { LinearApi } from './linear';
 import type { PiApi, PiSessionApi } from './pi-session';
 import type { QuickStartApi } from './quick-start';
 import type { RepositoryApi } from './repository';
@@ -47,4 +48,5 @@ export interface EnsembleApi
 		CheckpointApi,
 		TerminalApi,
 		WorkspaceScriptsApi,
-		PiApi {}
+		PiApi,
+		LinearApi {}

@@ -8,14 +8,12 @@ import type {
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleConfigService } from '../config/config-loader';
 import type { EnvironmentVariablesService } from '../environment/environment-variables';
+import type { LinearAuthService } from '../linear';
 import type { PiExecutableService } from '../pi-runtime/pi-executable';
 import type { PiReadinessService } from '../pi-runtime/pi-readiness';
 import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
 import type { EnsembleDatabaseService } from '../storage/database';
-import {
-	createSetupCheckSnapshot,
-	type SetupCheckProvider,
-} from './setup-check-context.ts';
+import type { SetupCheckProvider } from './setup-check-context.ts';
 import {
 	getConfigCheck,
 	getDatabaseCheck,
@@ -29,6 +27,7 @@ import {
 	getGitHubAuthCheck,
 	getGitHubCliCheck,
 } from './setup-checks-github.ts';
+import { getLinearConnectionCheck } from './setup-checks-linear.ts';
 import {
 	getPiAgentDirectoryCheck,
 	getPiExecutableCheck,
@@ -48,6 +47,7 @@ interface CreateSetupDiagnosticsServiceOptions {
 	databaseService: EnsembleDatabaseService;
 	environmentVariablesService: EnvironmentVariablesService;
 	homeDirectory?: string;
+	linearAuthService: LinearAuthService;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
 	piExecutableService: PiExecutableService;
@@ -91,6 +91,7 @@ export function createSetupDiagnosticsService({
 	databaseService,
 	environmentVariablesService,
 	homeDirectory = homedir(),
+	linearAuthService,
 	localCommandService,
 	now = () => new Date(),
 	piExecutableService,
@@ -110,28 +111,7 @@ export function createSetupDiagnosticsService({
 		'git-executable': () =>
 			getGitExecutableCheck({ context, localCommandService }),
 		'linear-oauth': () =>
-			createPendingCheck({
-				blocking: false,
-				detail:
-					'Linear OAuth is optional for local and GitHub-only workflows. It will become required only when a Linear workflow is selected.',
-				group: 'linear',
-				id: 'linear-oauth',
-				remediationActions: [
-					{
-						id: 'open-linear-settings',
-						kind: 'open-settings',
-						label: 'Open integration settings',
-						target: 'linear',
-					},
-					{
-						id: 'retry-linear',
-						kind: 'retry',
-						label: 'Retry Linear check',
-					},
-				],
-				title: 'Linear connection',
-				updatedAt: now().toISOString(),
-			}),
+			getLinearConnectionCheck({ context, linearAuthService }),
 		'managed-directories': () =>
 			getManagedDirectoriesCheck({
 				context,
@@ -167,37 +147,6 @@ export function createSetupDiagnosticsService({
 			return createDiagnosticsSnapshot(checks, now().toISOString());
 		},
 	};
-}
-
-/** Builds a `pending` setup check snapshot for not-yet-implemented checks. */
-function createPendingCheck({
-	blocking = true,
-	detail,
-	group,
-	id,
-	remediationActions,
-	title,
-	updatedAt,
-}: Pick<SetupCheckSnapshot, 'detail' | 'group' | 'id' | 'title' | 'updatedAt'> &
-	Partial<Pick<SetupCheckSnapshot, 'blocking' | 'remediationActions'>>) {
-	return createSetupCheckSnapshot({
-		blocking,
-		description:
-			'This setup contract is reserved for the domain implementation ticket.',
-		detail,
-		group,
-		id,
-		remediationActions: remediationActions ?? [
-			{
-				id: `retry-${id}`,
-				kind: 'retry',
-				label: 'Retry check',
-			},
-		],
-		status: 'pending',
-		title,
-		updatedAt,
-	});
 }
 
 /**
