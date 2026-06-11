@@ -147,12 +147,14 @@ function createServiceFixture(
 	t: TestContext,
 	{
 		app = { linear: { clientId: CLIENT_ID } },
+		builtInClientId,
 		callbackTimeoutMs,
 		fetchStub = createFetchStub(),
 		openExternal,
 		secretStore = createMockSecretStore({ now: () => NOW }),
 	}: {
 		app?: Record<string, unknown>;
+		builtInClientId?: string;
 		callbackTimeoutMs?: number;
 		fetchStub?: ReturnType<typeof createFetchStub>;
 		openExternal?: (url: string) => Promise<void>;
@@ -161,7 +163,11 @@ function createServiceFixture(
 ) {
 	const databaseService = createDatabaseServiceFixture(t);
 	const service = createLinearAuthService({
+		...(builtInClientId === undefined ? {} : { builtInClientId }),
 		...(callbackTimeoutMs === undefined ? {} : { callbackTimeoutMs }),
+		// Port 0 keeps tests on random loopback ports so parallel test files
+		// never contend for the fixed production callback ports.
+		callbackPorts: [0],
 		configService: createConfigService(app),
 		databaseService,
 		fetchImpl: fetchStub.fetchImpl,
@@ -255,13 +261,57 @@ test('startLogin: rejects a callback whose state does not match', async (t) => {
 	);
 });
 
-test('startLogin: fails with not-configured when the client id is missing', async (t) => {
-	const { service } = createServiceFixture(t, { app: {} });
+test('startLogin: fails with not-configured when neither config nor built-in id is set', async (t) => {
+	const { service } = createServiceFixture(t, {
+		app: {},
+		builtInClientId: '',
+	});
 
 	const result = await service.startLogin();
 
 	assert.ok(result.status === 'error');
 	assert.strictEqual(result.failure.code, 'not-configured');
+});
+
+test('startLogin: falls back to the built-in client id without config', async (t) => {
+	const fetchStub = createFetchStub();
+	const { service } = createServiceFixture(t, {
+		app: {},
+		builtInClientId: 'built-in-client',
+		fetchStub,
+	});
+
+	const result = await service.startLogin();
+
+	assert.ok(result.status === 'connected');
+	const tokenCall = fetchStub.calls.find((call) =>
+		call.url.includes('/oauth/token'),
+	);
+	assert.ok(tokenCall?.body);
+	assert.strictEqual(
+		new URLSearchParams(tokenCall.body).get('client_id'),
+		'built-in-client',
+	);
+});
+
+test('startLogin: config clientId overrides the built-in client id', async (t) => {
+	const fetchStub = createFetchStub();
+	const { service } = createServiceFixture(t, {
+		builtInClientId: 'built-in-client',
+		fetchStub,
+	});
+
+	const result = await service.startLogin();
+
+	assert.ok(result.status === 'connected');
+	const tokenCall = fetchStub.calls.find((call) =>
+		call.url.includes('/oauth/token'),
+	);
+	assert.ok(tokenCall?.body);
+	assert.strictEqual(
+		new URLSearchParams(tokenCall.body).get('client_id'),
+		CLIENT_ID,
+	);
 });
 
 test('startLogin: times out when no callback ever arrives', async (t) => {
@@ -302,7 +352,10 @@ test('startLogin: surfaces token-exchange failures', async (t) => {
 });
 
 test('getConnectionStatus: reports not-configured, disconnected, and connected', async (t) => {
-	const unconfigured = createServiceFixture(t, { app: {} });
+	const unconfigured = createServiceFixture(t, {
+		app: {},
+		builtInClientId: '',
+	});
 	assert.strictEqual(
 		(await unconfigured.service.getConnectionStatus()).state,
 		'not-configured',
@@ -384,7 +437,16 @@ test('disconnect: revokes, clears secrets, and removes connection metadata', asy
 		await secretStore.read({ key: 'linear-refresh-token', scope: 'app' }),
 		null,
 	);
-	assert.ok(fetchStub.calls.some((call) => call.url.includes('/oauth/revoke')));
+	const revokeCalls = fetchStub.calls.filter((call) =>
+		call.url.includes('/oauth/revoke'),
+	);
+	assert.strictEqual(revokeCalls.length, 2);
+	const refreshRevoke = new URLSearchParams(revokeCalls[0]?.body ?? '');
+	assert.strictEqual(refreshRevoke.get('token'), 'refresh-1');
+	assert.strictEqual(refreshRevoke.get('token_type_hint'), 'refresh_token');
+	const accessRevoke = new URLSearchParams(revokeCalls[1]?.body ?? '');
+	assert.strictEqual(accessRevoke.get('token'), 'access-1');
+	assert.strictEqual(accessRevoke.get('token_type_hint'), 'access_token');
 
 	const database = databaseService.getConnection()?.database;
 	assert.ok(database);

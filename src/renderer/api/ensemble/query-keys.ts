@@ -33,6 +33,8 @@ export const ensembleQueryKeys = {
 			filter.teamId ?? '',
 			filter.query ?? '',
 		] as const,
+	/** Prefix matching every cached issue list regardless of filter. */
+	linearIssuesAll: () => [...ensembleQueryKeys.all, 'linear-issues'] as const,
 	linearMetadata: () => [...ensembleQueryKeys.all, 'linear-metadata'] as const,
 	piModels: () => [...ensembleQueryKeys.all, 'pi-models'] as const,
 	piSlashCommands: (workspaceCwd: string) =>

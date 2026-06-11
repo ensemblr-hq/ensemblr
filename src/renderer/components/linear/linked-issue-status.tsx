@@ -165,41 +165,50 @@ function SetStatusMenu({ issue }: { issue: LinearIssueWire }) {
 		return null;
 	}
 
+	const failureMessage =
+		mutation.data?.status === 'error'
+			? describeLinearFailure(mutation.data.failure)
+			: mutation.error
+				? 'Updating the Linear status failed.'
+				: null;
+
 	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button disabled={mutation.isPending} size='sm' variant='ghost'>
-					{mutation.isPending ? 'Updating…' : 'Set status'}
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align='start' className='w-48 p-1'>
-				<DropdownMenuLabel className='px-2 pt-1.5 pb-1 text-muted-foreground text-xs'>
-					Update Linear status
-				</DropdownMenuLabel>
-				{states.map((state) => (
-					<DropdownMenuItem
-						className='h-8 gap-2 px-2 text-[0.8125rem]'
-						disabled={state.id === issue.stateId}
-						key={state.id}
-						onSelect={() => mutation.mutate(state.id)}
-					>
-						<span
-							aria-hidden='true'
-							className='size-2 shrink-0 rounded-full'
-							style={{
-								backgroundColor: state.color ?? 'var(--muted-foreground)',
-							}}
-						/>
-						<span className='min-w-0 flex-1 truncate'>{state.name}</span>
-					</DropdownMenuItem>
-				))}
-			</DropdownMenuContent>
-			{mutation.data?.status === 'error' ? (
-				<p className='text-status-danger text-xs' role='alert'>
-					{describeLinearFailure(mutation.data.failure)}
-				</p>
+		<>
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button disabled={mutation.isPending} size='sm' variant='ghost'>
+						{mutation.isPending ? 'Updating…' : 'Set status'}
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align='start' className='w-48 p-1'>
+					<DropdownMenuLabel className='px-2 pt-1.5 pb-1 text-muted-foreground text-xs'>
+						Update Linear status
+					</DropdownMenuLabel>
+					{states.map((state) => (
+						<DropdownMenuItem
+							className='h-8 gap-2 px-2 text-[0.8125rem]'
+							disabled={state.id === issue.stateId}
+							key={state.id}
+							onSelect={() => mutation.mutate(state.id)}
+						>
+							<span
+								aria-hidden='true'
+								className='size-2 shrink-0 rounded-full'
+								style={{
+									backgroundColor: state.color ?? 'var(--muted-foreground)',
+								}}
+							/>
+							<span className='min-w-0 flex-1 truncate'>{state.name}</span>
+						</DropdownMenuItem>
+					))}
+				</DropdownMenuContent>
+			</DropdownMenu>
+			{failureMessage ? (
+				<span className='text-status-danger text-xs' role='alert'>
+					{failureMessage}
+				</span>
 			) : null}
-		</DropdownMenu>
+		</>
 	);
 }
 

@@ -630,6 +630,11 @@ function cleanupDirectory(workspacePath: string): void {
  * Builds the initial workspace metadata record stored under `metadata_json`,
  * capturing the files-to-copy outcome so the renderer landing card can show
  * the actual copied-file count without recomputing the snapshot.
+ *
+ * The `linkedIssue` copy here is a denormalized read model for the renderer
+ * (which only sees workspace rows); the `integration_metadata` row written in
+ * the same transaction is the canonical, queryable link. Both are written once
+ * at creation and never updated afterwards.
  */
 function buildInitialWorkspaceMetadata({
 	filesToCopySnapshot,

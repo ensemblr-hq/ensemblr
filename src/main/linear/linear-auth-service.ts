@@ -12,6 +12,7 @@ import type { EnsembleConfigService } from '../config/config-loader';
 import type { SecretStore } from '../secrets';
 import type { EnsembleDatabaseService } from '../storage/database';
 import {
+	BUILT_IN_LINEAR_CLIENT_ID,
 	buildLinearAuthorizeUrl,
 	createOauthState,
 	createPkcePair,
@@ -28,6 +29,10 @@ import {
 const LINEAR_GRAPHQL_URL = 'https://api.linear.app/graphql';
 const ACCESS_TOKEN_KEY = 'linear-access-token';
 const REFRESH_TOKEN_KEY = 'linear-refresh-token';
+/**
+ * User-managed secret for custom confidential OAuth apps. Never written by the
+ * app and deliberately survives disconnect, like `app.linear.clientId`.
+ */
 const CLIENT_SECRET_KEY = 'linear-client-secret';
 const CONNECTION_RESOURCE_TYPE = 'connection';
 const CONNECTION_RESOURCE_ID = 'default';
@@ -70,6 +75,8 @@ export interface LinearAuthService {
 
 /** Options for {@link createLinearAuthService}. */
 export interface CreateLinearAuthServiceOptions {
+	builtInClientId?: string;
+	callbackPorts?: readonly number[];
 	callbackTimeoutMs?: number;
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
@@ -108,6 +115,8 @@ interface PendingLogin {
  * @returns A fresh {@link LinearAuthService}.
  */
 export function createLinearAuthService({
+	builtInClientId = BUILT_IN_LINEAR_CLIENT_ID,
+	callbackPorts,
 	callbackTimeoutMs,
 	configService,
 	databaseService,
@@ -148,15 +157,16 @@ export function createLinearAuthService({
 	function getOauthConfig(): LinearOauthConfig | null {
 		const app = configService.getConfig().app;
 		const linear = app['linear'];
+		const record =
+			typeof linear === 'object' && linear !== null
+				? (linear as Record<string, unknown>)
+				: {};
+		const configuredId =
+			typeof record['clientId'] === 'string' ? record['clientId'].trim() : '';
+		const clientId =
+			configuredId === '' ? builtInClientId.trim() : configuredId;
 
-		if (typeof linear !== 'object' || linear === null) {
-			return null;
-		}
-
-		const record = linear as Record<string, unknown>;
-		const clientId = record['clientId'];
-
-		if (typeof clientId !== 'string' || clientId.trim() === '') {
+		if (clientId === '') {
 			return null;
 		}
 
@@ -166,7 +176,7 @@ export function createLinearAuthService({
 				)
 			: DEFAULT_LINEAR_SCOPES;
 
-		return { clientId: clientId.trim(), scopes };
+		return { clientId, scopes };
 	}
 
 	async function readSecret(key: string): Promise<string | null> {
@@ -413,6 +423,22 @@ export function createLinearAuthService({
 		}
 	}
 
+	async function revokeToken(
+		token: string,
+		hint: 'access_token' | 'refresh_token',
+	): Promise<void> {
+		await fetchImpl(LINEAR_REVOKE_URL, {
+			body: new URLSearchParams({
+				token,
+				token_type_hint: hint,
+			}).toString(),
+			headers: { 'content-type': 'application/x-www-form-urlencoded' },
+			method: 'POST',
+		}).catch(() => {
+			// Best-effort revocation: local disconnect must succeed offline.
+		});
+	}
+
 	async function persistTokens(tokens: TokenResponse): Promise<void> {
 		await writeSecret(ACCESS_TOKEN_KEY, tokens.accessToken);
 
@@ -517,14 +543,17 @@ export function createLinearAuthService({
 				const accessToken = await readSecret(ACCESS_TOKEN_KEY).catch(
 					() => null,
 				);
+				const refreshToken = await readSecret(REFRESH_TOKEN_KEY).catch(
+					() => null,
+				);
+
+				// Refresh token first: revoking it invalidates the whole grant.
+				if (refreshToken) {
+					await revokeToken(refreshToken, 'refresh_token');
+				}
 
 				if (accessToken) {
-					await fetchImpl(LINEAR_REVOKE_URL, {
-						headers: { authorization: `Bearer ${accessToken}` },
-						method: 'POST',
-					}).catch(() => {
-						// Best-effort revocation: local disconnect must succeed offline.
-					});
+					await revokeToken(accessToken, 'access_token');
 				}
 
 				await deleteSecret(ACCESS_TOKEN_KEY);
@@ -622,6 +651,7 @@ export function createLinearAuthService({
 
 			try {
 				server = await startLinearOauthCallbackServer({
+					...(callbackPorts === undefined ? {} : { ports: callbackPorts }),
 					...(callbackTimeoutMs === undefined
 						? {}
 						: { timeoutMs: callbackTimeoutMs }),

@@ -3,6 +3,7 @@ import { useState } from 'react';
 
 import {
 	createLinearIssue,
+	ensembleQueryKeys,
 	linearMetadataQuery,
 	updateLinearIssue,
 } from '@/renderer/api/ensemble';
@@ -83,16 +84,25 @@ export function LinearIssueEditorDialog({
 			}
 			return createLinearIssue(buildCreateIssueRequest(fields));
 		},
+		onError: () => {
+			setError('Saving the issue failed. Check your connection and try again.');
+		},
 		onSuccess: async (result) => {
 			if (result && result.status === 'error') {
 				setError(describeLinearFailure(result.failure));
 				return;
 			}
-			await queryClient.invalidateQueries({
-				predicate: (query) =>
-					query.queryKey.includes('linear-issues') ||
-					query.queryKey.includes('linear-issue'),
-			});
+			// Null result means a no-op edit: nothing changed, nothing to refetch.
+			if (result) {
+				await Promise.all([
+					queryClient.invalidateQueries({
+						queryKey: ensembleQueryKeys.linearIssuesAll(),
+					}),
+					queryClient.invalidateQueries({
+						queryKey: ensembleQueryKeys.linearIssue(result.issue.id),
+					}),
+				]);
+			}
 			onOpenChange(false);
 		},
 	});

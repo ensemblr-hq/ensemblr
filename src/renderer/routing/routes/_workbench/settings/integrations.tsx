@@ -83,7 +83,7 @@ function LinearConnectionRow() {
 				<span className='flex items-center gap-2'>
 					<LinearLogo className='size-4' />
 					Linear
-					<LinearStateBadge snapshot={snapshot} />
+					<LinearConnectionStateBadge snapshot={snapshot} />
 				</span>
 			}
 		>
@@ -156,7 +156,7 @@ function LinearConnectionControls({
 	);
 }
 
-function LinearStateBadge({
+function LinearConnectionStateBadge({
 	snapshot,
 }: {
 	snapshot: LinearConnectionSnapshot | undefined;

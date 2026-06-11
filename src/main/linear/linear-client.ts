@@ -143,7 +143,7 @@ const ISSUE_FIELDS = `
 	state { id name color type }
 	assignee { id name }
 	cycle { id name }
-	labels(first: 10) { nodes { id name color } }
+	labels(first: 50) { nodes { id name color } }
 `;
 
 const PAGE_INFO_FIELDS = 'pageInfo { hasNextPage endCursor }';
@@ -251,6 +251,20 @@ export function createLinearClient({
 			);
 		}
 
+		// Linear reports GraphQL errors (including RATELIMITED) as HTTP 400, so
+		// the body must be parsed before the status code is acted on.
+		const payload = (await response.json().catch(() => null)) as {
+			data?: T;
+			errors?: Array<{
+				extensions?: { code?: string; retryAfter?: number; type?: string };
+				message?: string;
+			}>;
+		} | null;
+
+		if (payload?.errors && payload.errors.length > 0) {
+			throw mapGraphqlErrors(payload.errors);
+		}
+
 		if (!response.ok) {
 			throw new LinearServiceError(
 				'network',
@@ -258,19 +272,7 @@ export function createLinearClient({
 			);
 		}
 
-		const payload = (await response.json()) as {
-			data?: T;
-			errors?: Array<{
-				extensions?: { code?: string; retryAfter?: number; type?: string };
-				message?: string;
-			}>;
-		};
-
-		if (payload.errors && payload.errors.length > 0) {
-			throw mapGraphqlErrors(payload.errors);
-		}
-
-		if (!payload.data) {
+		if (!payload?.data) {
 			throw new LinearServiceError(
 				'network',
 				'The Linear API returned an empty response.',

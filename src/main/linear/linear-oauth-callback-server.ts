@@ -5,6 +5,15 @@ const DEFAULT_CALLBACK_PATH = '/callback';
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const LOOPBACK_HOST = '127.0.0.1';
 
+/**
+ * Fixed loopback ports registered as redirect URIs on the bundled Linear OAuth
+ * application. Linear matches redirect URIs exactly, so a random port would
+ * never match the registered list; the server tries these in order instead.
+ */
+export const LINEAR_CALLBACK_PORTS: readonly number[] = [
+	48752, 48753, 48754, 48755, 48756,
+];
+
 const CALLBACK_RESPONSE_HTML = `<!doctype html>
 <html lang="en">
 	<head>
@@ -53,18 +62,21 @@ export interface LinearOauthCallbackServer {
 /** Options for {@link startLinearOauthCallbackServer}. */
 export interface StartLinearOauthCallbackServerOptions {
 	callbackPath?: string;
+	ports?: readonly number[];
 	timeoutMs?: number;
 }
 
 /**
- * Starts a temporary loopback HTTP server on a random port that resolves the
- * first request hitting the callback path. The server only ever serves one
- * login attempt and must be closed by the caller in every outcome.
- * @param options - Optional callback path and timeout overrides.
+ * Starts a temporary loopback HTTP server on the first free port from `ports`
+ * that resolves the first request hitting the callback path. The server only
+ * ever serves one login attempt and must be closed by the caller in every
+ * outcome.
+ * @param options - Optional callback path, port list, and timeout overrides.
  * @returns A {@link LinearOauthCallbackServer} bound to `127.0.0.1`.
  */
 export async function startLinearOauthCallbackServer({
 	callbackPath = DEFAULT_CALLBACK_PATH,
+	ports = LINEAR_CALLBACK_PORTS,
 	timeoutMs = DEFAULT_TIMEOUT_MS,
 }: StartLinearOauthCallbackServerOptions = {}): Promise<LinearOauthCallbackServer> {
 	let settled = false;
@@ -97,6 +109,17 @@ export async function startLinearOauthCallbackServer({
 		}
 	});
 
+	try {
+		await listenOnFirstFreePort(server, ports);
+	} catch (error) {
+		// The server never reaches the caller on bind failure, so close it here
+		// to avoid leaking the handle.
+		await new Promise<void>((resolve) => {
+			server.close(() => resolve());
+		});
+		throw error;
+	}
+
 	const timeout = setTimeout(() => {
 		if (!settled) {
 			settled = true;
@@ -109,11 +132,6 @@ export async function startLinearOauthCallbackServer({
 		}
 	}, timeoutMs);
 	timeout.unref();
-
-	await new Promise<void>((resolve, reject) => {
-		server.once('error', reject);
-		server.listen(0, LOOPBACK_HOST, resolve);
-	});
 
 	const port = (server.address() as AddressInfo).port;
 
@@ -140,4 +158,42 @@ export async function startLinearOauthCallbackServer({
 		redirectUri: `http://${LOOPBACK_HOST}:${port}${callbackPath}`,
 		waitForCallback: () => callbackPromise,
 	};
+}
+
+async function listenOnFirstFreePort(
+	server: Server,
+	ports: readonly number[],
+): Promise<void> {
+	for (const port of ports) {
+		const bound = await new Promise<boolean>((resolve, reject) => {
+			const handleError = (error: NodeJS.ErrnoException) => {
+				if (error.code === 'EADDRINUSE' || error.code === 'EACCES') {
+					resolve(false);
+					return;
+				}
+
+				reject(
+					new LinearOauthCallbackError(
+						'server-error',
+						`Starting the OAuth callback server failed: ${error.message}`,
+					),
+				);
+			};
+
+			server.once('error', handleError);
+			server.listen(port, LOOPBACK_HOST, () => {
+				server.removeListener('error', handleError);
+				resolve(true);
+			});
+		});
+
+		if (bound) {
+			return;
+		}
+	}
+
+	throw new LinearOauthCallbackError(
+		'server-error',
+		`Every Linear OAuth callback port is busy (${ports.join(', ')}).`,
+	);
 }

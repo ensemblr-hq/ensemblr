@@ -624,6 +624,7 @@ const linearIssueFieldsShape = {
 	description: z.string().optional(),
 	dueDate: z.string().optional(),
 	labelIds: z.array(z.string().min(1)).optional(),
+	// Linear priority scale: 0=none, 1=urgent, 2=high, 3=medium, 4=low.
 	priority: z.number().int().min(0).max(4).optional(),
 	projectId: z.string().min(1).optional(),
 	stateId: z.string().min(1).optional(),
