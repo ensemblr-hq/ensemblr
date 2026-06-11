@@ -5,6 +5,7 @@ import {
 	ListIcon,
 	ListTreeIcon,
 	MoreVerticalIcon,
+	RefreshCwIcon,
 	SearchIcon,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -29,6 +30,7 @@ import type {
 import type { ChangesViewMode } from '@/renderer/types/workbench-shell';
 
 import { ChecksPanel } from './checks-panel/checks-panel';
+import { useReviewActions } from './review-actions/review-actions-context';
 import { AllFilesList } from './review-files/all-files-list';
 import { AllFilesSearchDialog } from './review-files/all-files-search-dialog';
 import { ReviewFileList } from './review-files/review-file-list';
@@ -103,6 +105,7 @@ export function ReviewPanel({
 			</TabsContent>
 			<TabsContent className='min-h-0 overflow-hidden' value='changes'>
 				<ReviewFileList
+					error={workspace.reviewFilesError}
 					files={workspace.reviewFiles}
 					viewMode={changesViewMode}
 				/>
@@ -133,8 +136,10 @@ function ReviewPanelActions({
 	onFileSearchOpen: () => void;
 	workspace: WorkspaceShellModel;
 }) {
+	const reviewActions = useReviewActions();
+
 	if (activeTab === 'checks') {
-		return <div className='w-0 shrink-0' />;
+		return <ChecksRefreshButton />;
 	}
 
 	const ChangesViewIcon =
@@ -146,6 +151,7 @@ function ReviewPanelActions({
 				<>
 					<Button
 						className='text-accent-strong hover:text-foreground'
+						onClick={() => reviewActions?.runAgentAction('review')}
 						size='xs'
 						variant='ghost'
 					>
@@ -178,6 +184,29 @@ function ReviewPanelActions({
 					<span className='sr-only'>Open review menu</span>
 				</Button>
 			)}
+		</div>
+	);
+}
+
+/** Manual gh snapshot refresh for the Checks tab. */
+function ChecksRefreshButton() {
+	const reviewActions = useReviewActions();
+
+	return (
+		<div className='flex shrink-0 items-center gap-0.5'>
+			<Button
+				disabled={reviewActions?.isRefreshingPullRequest}
+				onClick={() => reviewActions?.refreshPullRequest()}
+				size='icon-sm'
+				variant='ghost'
+			>
+				<RefreshCwIcon
+					className={cn(
+						reviewActions?.isRefreshingPullRequest ? 'animate-spin' : undefined,
+					)}
+				/>
+				<span className='sr-only'>Refresh pull request status</span>
+			</Button>
 		</div>
 	);
 }

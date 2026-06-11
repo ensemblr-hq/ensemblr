@@ -17,6 +17,7 @@ import {
 	formatMentionAttachmentText,
 } from '@/renderer/lib/workbench/mention-payload';
 import { useComposerAttachmentInbox } from '@/renderer/state/composer-attachments';
+import { useComposerInsertConsumer } from '@/renderer/state/composer-insert';
 import type {
 	ComposerShellState,
 	WorkspaceFileSummary,
@@ -174,6 +175,9 @@ export function useComposerState({
 		);
 		textareaRef.current?.focus();
 	}, []);
+
+	// Drain review-context insertions queued from the Checks panel / diff views.
+	useComposerInsertConsumer(insertText);
 
 	// Seed the composer once per mount for issue-created workspaces. Only an
 	// untouched composer is seeded so user input is never overwritten.

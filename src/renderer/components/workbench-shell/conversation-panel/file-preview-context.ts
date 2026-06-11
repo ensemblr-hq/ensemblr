@@ -26,3 +26,33 @@ export const TurnDiffOpenerProvider = TurnDiffOpenerContext.Provider;
 export function useTurnDiffOpener(): TurnDiffOpener | null {
 	return useContext(TurnDiffOpenerContext);
 }
+
+/**
+ * Opens (or re-focuses) a working-tree diff tab for a changed file. Provided
+ * at the workbench level so the review panel (right sidebar) can open diffs
+ * in the main conversation surface.
+ */
+export type WorkspaceFileDiffOpener = (filePath: string) => void;
+
+const WorkspaceFileDiffOpenerContext =
+	createContext<WorkspaceFileDiffOpener | null>(null);
+
+export const WorkspaceFileDiffOpenerProvider =
+	WorkspaceFileDiffOpenerContext.Provider;
+
+export function useWorkspaceFileDiffOpener(): WorkspaceFileDiffOpener | null {
+	return useContext(WorkspaceFileDiffOpenerContext);
+}
+
+/** Opens (or re-focuses) a read-only file preview tab from review surfaces. */
+export type ReviewFilePreviewOpener = (filePath: string) => void;
+
+const ReviewFilePreviewOpenerContext =
+	createContext<ReviewFilePreviewOpener | null>(null);
+
+export const ReviewFilePreviewOpenerProvider =
+	ReviewFilePreviewOpenerContext.Provider;
+
+export function useReviewFilePreviewOpener(): ReviewFilePreviewOpener | null {
+	return useContext(ReviewFilePreviewOpenerContext);
+}

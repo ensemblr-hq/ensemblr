@@ -6,6 +6,7 @@ import type {
 	RepositoryConfigService,
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
+import { createGithubService } from '../github';
 import type { LinearAuthService, LinearService } from '../linear';
 import type { PiSessionService } from '../pi-agent/pi-session-service';
 import type { PiExecutableService } from '../pi-runtime';
@@ -25,6 +26,7 @@ import type {
 	SharedRootAdoptionService,
 	UnarchiveWorkspaceService,
 } from '../repository';
+import { createReviewService } from '../review';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { ScriptLifecycleService } from '../scripts';
 import type { SetupDiagnosticsService } from '../setup';
@@ -33,10 +35,12 @@ import { getPiSessionById } from '../storage/repositories/pi-session-repository'
 import { getWorkspacePathById } from '../storage/repositories/workspace-repository';
 import type { TerminalService } from '../terminal';
 import type { ListWorkspaceFilesService } from '../workspace-files';
+import { createWorkspaceGitService } from '../workspace-git';
 import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCheckpointHandlers } from './handlers/checkpoint';
 import { registerCloneHandlers } from './handlers/clone';
 import { registerEnvironmentHandlers } from './handlers/environment';
+import { registerGithubHandlers } from './handlers/github';
 import { registerHealthHandlers } from './handlers/health';
 import { registerLinearHandlers } from './handlers/linear';
 import { registerNavigationHandlers } from './handlers/navigation';
@@ -44,12 +48,14 @@ import { registerPiHandlers } from './handlers/pi';
 import { registerPiSessionHandlers } from './handlers/pi-session';
 import { registerRepositoryHandlers } from './handlers/repository';
 import { registerRepositoryConfigHandlers } from './handlers/repository-config';
+import { registerReviewHandlers } from './handlers/review';
 import { registerRootHandlers } from './handlers/root';
 import { registerSettingsHandlers } from './handlers/settings';
 import { registerSetupHandlers } from './handlers/setup';
 import { registerTerminalHandlers } from './handlers/terminal';
 import { registerWindowHandlers } from './handlers/window';
 import { registerWorkspaceFilesHandlers } from './handlers/workspace-files';
+import { registerWorkspaceGitHandlers } from './handlers/workspace-git';
 import { registerWorkspaceScriptHandlers } from './handlers/workspace-scripts';
 import {
 	createPermissionGate,
@@ -194,9 +200,21 @@ export function registerIpcHandlers({
 		}),
 	});
 	registerCheckpointHandlers({ databaseService });
+	registerReviewHandlers({
+		reviewService: createReviewService({ databaseService }),
+	});
 	registerLinearHandlers({ linearAuthService, linearService });
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerTerminalHandlers({ terminalService });
 	registerWorkspaceScriptHandlers({ scriptLifecycleService });
 	registerWorkspaceFilesHandlers({ listWorkspaceFilesService });
+	registerWorkspaceGitHandlers({
+		workspaceGitService: createWorkspaceGitService({ localCommandService }),
+	});
+	registerGithubHandlers({
+		githubService: createGithubService({
+			databaseService,
+			localCommandService,
+		}),
+	});
 }

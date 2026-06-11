@@ -18,6 +18,7 @@ import { FilePreviewPanel } from './file-preview-panel';
 import { PiRawFramePanel } from './pi-raw-frame-panel';
 import { SessionTabs } from './session-tabs';
 import { TurnDiffPanel } from './turn-diff-panel';
+import { WorkspaceFileDiffPanel } from './workspace-file-diff-panel';
 import { WorkspaceTimeline } from './workspace-timeline';
 
 /**
@@ -123,7 +124,15 @@ export function WorkspaceConversationContent({
 					</TurnDiffOpenerProvider>
 				</FilePreviewOpenerProvider>
 			) : activeSession.kind === 'diff' ? (
-				<TurnDiffPanel turnId={activeSession.turnId ?? null} />
+				activeSession.filePath ? (
+					<WorkspaceFileDiffPanel
+						filePath={activeSession.filePath}
+						workspaceCwd={activeWorkspace.pathLabel ?? null}
+						workspaceId={activeWorkspace.id}
+					/>
+				) : (
+					<TurnDiffPanel turnId={activeSession.turnId ?? null} />
+				)
 			) : (
 				<FilePreviewPanel
 					filePath={activeSession.filePath ?? null}

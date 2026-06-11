@@ -615,6 +615,93 @@ export function parseRepositoryConfigMigrationRequest(raw: unknown): {
 }
 
 // -----------------------------------------------------------------------------
+// review — STRICT (throws on bad input)
+// -----------------------------------------------------------------------------
+
+/** {@link import('../../shared/ipc').ListReviewCommentsRequest} and {@link import('../../shared/ipc').ListReviewTodosRequest}. */
+export const reviewListRequestSchema = z.object({
+	workspaceId: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').DeleteReviewCommentRequest} and {@link import('../../shared/ipc').DeleteReviewTodoRequest}. */
+export const reviewDeleteRequestSchema = z.object({ id: z.string().min(1) });
+
+/** {@link import('../../shared/ipc').SaveReviewCommentRequest}. */
+export const saveReviewCommentRequestSchema = z.object({
+	body: z.string().optional(),
+	filePath: z.string().optional(),
+	id: z.string().optional(),
+	lineNumber: z.number().int().nullable().optional(),
+	status: z.enum(['archived', 'open', 'resolved']).optional(),
+	workspaceId: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').SaveReviewTodoRequest}. */
+export const saveReviewTodoRequestSchema = z.object({
+	id: z.string().optional(),
+	status: z.enum(['canceled', 'done', 'in_progress', 'open']).optional(),
+	title: z.string().optional(),
+	workspaceId: z.string().min(1),
+});
+
+// -----------------------------------------------------------------------------
+// github — STRICT (throws on bad input)
+//
+// These payloads carry renderer-supplied filesystem paths that ultimately
+// reach `git`/`gh` invocations, so they must be validated at the boundary.
+// -----------------------------------------------------------------------------
+
+/** {@link import('../../shared/ipc').CommitWorkspaceChangesRequest}. */
+export const commitWorkspaceChangesRequestSchema = z.object({
+	message: z.string().min(1),
+	paths: z.array(z.string().min(1)).optional(),
+	workspaceCwd: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').PushWorkspaceBranchRequest}. */
+export const pushWorkspaceBranchRequestSchema = z.object({
+	workspaceCwd: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').CreatePullRequestRequest}. */
+export const createPullRequestRequestSchema = z.object({
+	baseBranch: z.string().min(1).optional(),
+	body: z.string(),
+	draft: z.boolean().optional(),
+	title: z.string().min(1),
+	workspaceCwd: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').GetPullRequestSnapshotRequest}. */
+export const getPullRequestSnapshotRequestSchema = z.object({
+	refresh: z.boolean().optional(),
+	workspaceCwd: z.string().min(1),
+	workspaceId: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').MergePullRequestRequest}. */
+export const mergePullRequestRequestSchema = z.object({
+	method: z.enum(['merge', 'rebase', 'squash']).optional(),
+	workspaceCwd: z.string().min(1),
+	workspaceId: z.string().min(1),
+});
+
+// -----------------------------------------------------------------------------
+// workspace-git — STRICT (throws on bad input)
+// -----------------------------------------------------------------------------
+
+/** {@link import('../../shared/ipc').GetWorkspaceGitStatusRequest}. */
+export const getWorkspaceGitStatusRequestSchema = z.object({
+	workspaceCwd: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').GetWorkspaceFileDiffRequest}. */
+export const getWorkspaceFileDiffRequestSchema = z.object({
+	path: z.string().min(1),
+	workspaceCwd: z.string().min(1),
+});
+
+// -----------------------------------------------------------------------------
 // linear — STRICT (throws on bad input)
 // -----------------------------------------------------------------------------
 

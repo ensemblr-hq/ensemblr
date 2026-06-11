@@ -77,6 +77,33 @@ export type {
 	EnvironmentVariableValueKind,
 } from './contracts/environment';
 export type {
+	CommitWorkspaceChangesRequest,
+	CommitWorkspaceChangesResult,
+	CreatePullRequestRequest,
+	CreatePullRequestResult,
+	GetPullRequestSnapshotRequest,
+	GetPullRequestSnapshotResult,
+	GitBranchSyncWire,
+	GithubApi,
+	GithubCheckBucket,
+	GithubCheckWire,
+	GithubCommentKind,
+	GithubCommentWire,
+	GithubDeploymentSource,
+	GithubDeploymentWire,
+	GithubFailure,
+	GithubFailureCode,
+	GithubMergeableState,
+	GithubMergeMethod,
+	GithubPullRequestSnapshotWire,
+	GithubPullRequestState,
+	GithubPullRequestWire,
+	MergePullRequestRequest,
+	MergePullRequestResult,
+	PushWorkspaceBranchRequest,
+	PushWorkspaceBranchResult,
+} from './contracts/github';
+export type {
 	ConfigDiagnostic,
 	ConfigDiagnosticSeverity,
 	ConfigStatus,
@@ -208,6 +235,25 @@ export type {
 	RepositoryWorkspaceNavigationWorkspace,
 	ShellApi,
 } from './contracts/repository-navigation';
+export type {
+	DeleteReviewCommentRequest,
+	DeleteReviewCommentResult,
+	DeleteReviewTodoRequest,
+	DeleteReviewTodoResult,
+	ListReviewCommentsRequest,
+	ListReviewCommentsResult,
+	ListReviewTodosRequest,
+	ListReviewTodosResult,
+	ReviewCommentStatus,
+	ReviewCommentsApi,
+	ReviewCommentWire,
+	ReviewTodoStatus,
+	ReviewTodoWire,
+	SaveReviewCommentRequest,
+	SaveReviewCommentResult,
+	SaveReviewTodoRequest,
+	SaveReviewTodoResult,
+} from './contracts/review-comments';
 export type {
 	RootDirectoryApi,
 	RootDirectoryChangeApplyResult,
@@ -344,6 +390,18 @@ export type {
 	WorkspaceFileEntryWire,
 	WorkspaceFilesApi,
 } from './contracts/workspace-files';
+export type {
+	GetWorkspaceFileDiffRequest,
+	GetWorkspaceFileDiffResult,
+	GetWorkspaceGitStatusRequest,
+	GetWorkspaceGitStatusResult,
+	WorkspaceFileDiffFailureCode,
+	WorkspaceGitApi,
+	WorkspaceGitChangeSummaryWire,
+	WorkspaceGitFailureCode,
+	WorkspaceGitFileStatus,
+	WorkspaceGitFileWire,
+} from './contracts/workspace-git';
 export type {
 	RunWorkspaceScriptRequest,
 	RunWorkspaceScriptResult,

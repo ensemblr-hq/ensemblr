@@ -1,11 +1,14 @@
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { useReviewFilePreviewOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 
 import { WorkspaceFileIcon } from './workspace-file-icon';
 
 /** Flat scrollable list of every workspace file (files tab). */
 export function AllFilesList({ files }: { files: WorkspaceFileSummary[] }) {
+	const openFilePreview = useReviewFilePreviewOpener();
+
 	return (
 		<ScrollArea className='h-full'>
 			<ul className='flex flex-col gap-0.5 p-2.5'>
@@ -15,6 +18,11 @@ export function AllFilesList({ files }: { files: WorkspaceFileSummary[] }) {
 							<Button
 								aria-label={getWorkspaceFileActionLabel(file)}
 								className='h-auto min-h-7 w-full justify-start gap-2.5 rounded-md px-2 py-0.5 text-left font-normal'
+								onClick={
+									file.kind === 'file' && openFilePreview
+										? () => openFilePreview(file.path)
+										: undefined
+								}
 								size='sm'
 								variant='ghost'
 							>
