@@ -107,6 +107,7 @@ function toWire(row: ChatTabRow): ChatTabWire {
 		closedAt: row.closedAt,
 		id: row.id,
 		kind: row.kind,
+		metadata: row.metadata,
 		openedAt: row.openedAt,
 		piSessionId: row.piSessionId,
 		position: row.position,

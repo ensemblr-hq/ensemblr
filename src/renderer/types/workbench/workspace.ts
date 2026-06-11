@@ -108,7 +108,9 @@ export interface PullRequestGitStatusSummary {
 
 // --- Session / composer -----------------------------------------------------
 
-export interface SessionTabModel {
+export type SessionTabKind = 'chat' | 'diff' | 'document' | 'file' | 'preview';
+
+interface SessionTabBase {
 	id: string;
 	chatTabId: string;
 	piSessionId: string | null;
@@ -117,6 +119,22 @@ export interface SessionTabModel {
 	summary: string;
 	updatedLabel: string;
 }
+
+/**
+ * Discriminated on `kind` so file paths only exist on file-like tabs and turn
+ * ids only on diff tabs. `kind` is optional on the chat variant because
+ * placeholder/fixture sessions predate tab kinds and are treated as chat.
+ * Nullable payload fields reflect untyped wire metadata: a persisted row may
+ * legitimately lack them.
+ */
+export type SessionTabModel =
+	| (SessionTabBase & { filePath?: null; kind?: 'chat'; turnId?: null })
+	| (SessionTabBase & { filePath?: null; kind: 'diff'; turnId: string | null })
+	| (SessionTabBase & {
+			filePath: string | null;
+			kind: 'document' | 'file' | 'preview';
+			turnId?: null;
+	  });
 
 export interface ComposerModelOption {
 	displayName: string;

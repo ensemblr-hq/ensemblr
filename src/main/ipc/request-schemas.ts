@@ -48,6 +48,8 @@ export const listChatTabsRequestSchema = z.object({
 
 /** {@link import('../../shared/ipc').OpenChatTabRequest}. */
 export const openChatTabRequestSchema = z.object({
+	kind: z.enum(['chat', 'diff', 'document', 'file', 'preview']).optional(),
+	metadata: z.record(z.string(), z.unknown()).optional(),
 	piSessionId: optionalNullableString,
 	title: optionalStringCoerceNullToUndefined,
 	workspaceId: z.string().min(1),
@@ -125,6 +127,29 @@ export const writeForkSummaryRequestSchema = z.object({
 	sessionId: z.string().min(1),
 	targetWorkspaceCwd: z.string().min(1).optional(),
 	upToOrdinal: z.number().int().nonnegative().optional(),
+});
+
+// -----------------------------------------------------------------------------
+// checkpoint — STRICT (throws on bad input, caught by handler try/catch)
+// -----------------------------------------------------------------------------
+
+/** {@link import('../../shared/ipc').ListTurnCheckpointsRequest}. */
+export const listTurnCheckpointsRequestSchema = z.object({
+	piSessionId: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').ComputeTurnDiffRequest}. */
+export const computeTurnDiffRequestSchema = z.object({
+	turnId: z.string().min(1),
+});
+
+/**
+ * {@link import('../../shared/ipc').RestoreCheckpointRequest}. The literal
+ * `confirm: true` enforces the destructive-action acknowledgment server-side.
+ */
+export const restoreCheckpointRequestSchema = z.object({
+	confirm: z.literal(true),
+	turnId: z.string().min(1),
 });
 
 // -----------------------------------------------------------------------------

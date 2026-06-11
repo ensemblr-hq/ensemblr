@@ -9,6 +9,8 @@ import type { DynamicToolUIPart } from 'ai';
  */
 export interface ToolRowProjection {
 	chipLabel: string | null;
+	/** Full path backing the chip (as given in tool input), for preview opening. */
+	chipPath: string | null;
 	detail: string;
 	label: string;
 }
@@ -44,6 +46,7 @@ function projectRead(part: DynamicToolUIPart): ToolRowProjection {
 	const detail = limit !== null ? `${limit} lines` : 'file';
 	return {
 		chipLabel: path ? basename(path) : null,
+		chipPath: path || null,
 		detail,
 		label: 'Read',
 	};
@@ -54,6 +57,7 @@ function projectBash(part: DynamicToolUIPart): ToolRowProjection {
 	const command = asString(input.command) ?? asString(input.cmd) ?? '';
 	return {
 		chipLabel: null,
+		chipPath: null,
 		detail: command || '(no command)',
 		label: 'Bash',
 	};
@@ -65,6 +69,7 @@ function projectGrep(part: DynamicToolUIPart): ToolRowProjection {
 	const path = asString(input.path) ?? asString(input.glob) ?? '';
 	return {
 		chipLabel: path ? basename(path) : null,
+		chipPath: path || null,
 		detail: pattern || '(empty)',
 		label: 'Grep',
 	};
@@ -75,6 +80,7 @@ function projectGlob(part: DynamicToolUIPart): ToolRowProjection {
 	const pattern = asString(input.pattern) ?? '';
 	return {
 		chipLabel: null,
+		chipPath: null,
 		detail: pattern || '(empty)',
 		label: 'Glob',
 	};
@@ -85,6 +91,7 @@ function projectWrite(part: DynamicToolUIPart): ToolRowProjection {
 	const path = asString(input.path) ?? asString(input.file_path) ?? '';
 	return {
 		chipLabel: path ? basename(path) : null,
+		chipPath: path || null,
 		detail: path || '(no path)',
 		label: 'Write',
 	};
@@ -95,6 +102,7 @@ function projectEdit(part: DynamicToolUIPart): ToolRowProjection {
 	const path = asString(input.path) ?? asString(input.file_path) ?? '';
 	return {
 		chipLabel: path ? basename(path) : null,
+		chipPath: path || null,
 		detail: path || '(no path)',
 		label: 'Edit',
 	};
@@ -112,6 +120,7 @@ function projectGeneric(part: DynamicToolUIPart): ToolRowProjection {
 	const label = humanizeToolName(part.toolName);
 	return {
 		chipLabel: null,
+		chipPath: null,
 		detail,
 		label,
 	};

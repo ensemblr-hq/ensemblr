@@ -1,4 +1,10 @@
-import { EllipsisIcon, SplitIcon, SquarePlusIcon } from 'lucide-react';
+import {
+	EllipsisIcon,
+	FileDiffIcon,
+	HistoryIcon,
+	SplitIcon,
+	SquarePlusIcon,
+} from 'lucide-react';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -22,6 +28,8 @@ export function ChatTurnFooter({
 	forkDisabled = false,
 	onForkToNewTab,
 	onForkToNewWorkspace,
+	onRestoreToCheckpoint,
+	onViewTurnDiff,
 }: {
 	answerText: string;
 	className?: string;
@@ -30,8 +38,17 @@ export function ChatTurnFooter({
 	forkDisabled?: boolean;
 	onForkToNewTab?: () => void;
 	onForkToNewWorkspace?: () => void;
+	/** Restores workspace files to this turn's pre-prompt checkpoint. */
+	onRestoreToCheckpoint?: () => void;
+	/** Opens the diff between this turn's checkpoint and the post-turn state. */
+	onViewTurnDiff?: () => void;
 }) {
-	const hasForkActions = Boolean(onForkToNewTab || onForkToNewWorkspace);
+	const hasForkActions = Boolean(
+		onForkToNewTab ||
+			onForkToNewWorkspace ||
+			onRestoreToCheckpoint ||
+			onViewTurnDiff,
+	);
 	return (
 		<div
 			className={cn(
@@ -77,6 +94,24 @@ export function ChatTurnFooter({
 							>
 								<SplitIcon aria-hidden='true' className='size-4' />
 								Fork to new workspace
+							</DropdownMenuItem>
+						) : null}
+						{onViewTurnDiff ? (
+							<DropdownMenuItem
+								className='whitespace-nowrap'
+								onSelect={() => onViewTurnDiff()}
+							>
+								<FileDiffIcon aria-hidden='true' className='size-4' />
+								View turn diff
+							</DropdownMenuItem>
+						) : null}
+						{onRestoreToCheckpoint ? (
+							<DropdownMenuItem
+								className='whitespace-nowrap'
+								onSelect={() => onRestoreToCheckpoint()}
+							>
+								<HistoryIcon aria-hidden='true' className='size-4' />
+								Restore to before this turn…
 							</DropdownMenuItem>
 						) : null}
 					</DropdownMenuContent>

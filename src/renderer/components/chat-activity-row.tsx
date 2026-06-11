@@ -2,8 +2,8 @@ import type { DynamicToolUIPart } from 'ai';
 import type { ReactNode } from 'react';
 import { chipLabelForPath, projectToolRow } from '@/renderer/lib/pi';
 import { cn } from '@/renderer/lib/utils';
-
 import { ChatAttachmentChip } from './chat-attachment-chip';
+import { useFilePreviewOpener } from './workbench-shell/conversation-panel/file-preview-context';
 
 /**
  * Single-line compact activity row used during streaming. Matches the GIF
@@ -82,12 +82,20 @@ export function ChatToolRow({
 	className?: string;
 	part: DynamicToolUIPart;
 }) {
+	const openFilePreview = useFilePreviewOpener();
 	const projection = projectToolRow(part);
+	const chipPath = projection.chipPath;
 	const chip =
 		projection.chipLabel !== null ? (
 			<ChatAttachmentChip
 				kind='file'
 				label={chipLabelForPath(projection.chipLabel)}
+				onActivate={
+					openFilePreview && chipPath
+						? () => openFilePreview(chipPath)
+						: undefined
+				}
+				title={chipPath ?? undefined}
 			/>
 		) : null;
 	return (

@@ -4,6 +4,7 @@ import type {
 	StopPiSessionRequest as StopPiSessionWireRequest,
 	SubmitPiPromptRequest as SubmitPiPromptWireRequest,
 } from '../../shared/ipc';
+import type { CheckpointCapturePort } from '../checkpoints/checkpoint-service.ts';
 import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
 import {
 	createTurn,
@@ -77,6 +78,8 @@ export type QueueChatTitlePort = (input: {
 }) => void;
 
 export interface PiSessionLifecycleOptions {
+	/** Pre-prompt git checkpoint capture (ADR 0012); absent in tests. */
+	captureCheckpoint?: CheckpointCapturePort;
 	chatTitleTimeoutMs: number;
 	eventSink: PiSessionEventSink | undefined;
 	now: () => Date;
@@ -109,6 +112,7 @@ export interface ActiveSessionView {
  * open/resume flow are delegated to focused helpers under `./session/`.
  */
 export function createPiSessionLifecycle({
+	captureCheckpoint,
 	chatTitleTimeoutMs,
 	eventSink,
 	now,
@@ -174,6 +178,7 @@ export function createPiSessionLifecycle({
 				thinkingLevel: request.thinkingLevel ?? null,
 			},
 		});
+
 		activeSessions.set(request.sessionId, {
 			...active,
 			activeTurnId: turn.id,
@@ -188,6 +193,21 @@ export function createPiSessionLifecycle({
 				thinkingLevel: request.thinkingLevel ?? active.row.thinkingLevel,
 			},
 		});
+
+		// Capture the pre-prompt file state before the runtime can touch files.
+		// Runs after the session map update so a concurrent submit/stop never
+		// observes a turn that exists in SQLite but not in activeSessions.
+		// The port owns the warn-and-continue failure policy (ADR 0012).
+		if (captureCheckpoint) {
+			await captureCheckpoint({
+				cwd: active.row.cwd,
+				database,
+				label: summarizePromptForLabel(request.prompt),
+				piSessionId: request.sessionId,
+				turnId: turn.id,
+				workspaceId: active.row.workspaceId,
+			});
+		}
 
 		const acknowledgement = await active.piRuntimeSession.submit({
 			modelOverride: request.model ?? undefined,
@@ -242,4 +262,15 @@ export function createPiSessionLifecycle({
 		stopSession,
 		submitPrompt,
 	};
+}
+
+/** First line of the prompt, trimmed to a short checkpoint label. */
+function summarizePromptForLabel(prompt: string): string {
+	const firstLine =
+		prompt.split('\n').find((line) => line.trim().length > 0) ?? '';
+	const trimmed = firstLine.trim();
+	if (trimmed.length === 0) {
+		return 'Checkpoint';
+	}
+	return trimmed.length > 80 ? `${trimmed.slice(0, 79)}…` : trimmed;
 }

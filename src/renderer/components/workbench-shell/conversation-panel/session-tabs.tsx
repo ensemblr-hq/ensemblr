@@ -1,5 +1,8 @@
 import {
 	BugIcon,
+	FileDiffIcon,
+	FileIcon,
+	FileTextIcon,
 	HistoryIcon,
 	LoaderCircleIcon,
 	MessageSquareIcon,
@@ -61,11 +64,16 @@ export function SessionTabs({
 				<div className='no-scrollbar flex min-w-0 gap-1 overflow-x-auto'>
 					{sessions.map((session) => {
 						const isActive = session.id === activeSession.id;
-						const canClose = sessions.length > 1;
+						const isChatKind = (session.kind ?? 'chat') === 'chat';
+						// Non-chat tabs are always closable; chat tabs keep min-one.
+						const openChatTabCount = sessions.filter(
+							(candidate) => (candidate.kind ?? 'chat') === 'chat',
+						).length;
+						const canClose = isChatKind ? openChatTabCount > 1 : true;
 						const SessionIcon =
 							session.status === 'working'
 								? LoaderCircleIcon
-								: MessageSquareIcon;
+								: iconForTabKind(session.kind ?? 'chat');
 
 						return (
 							<div
@@ -152,6 +160,21 @@ export function SessionTabs({
 			</div>
 		</div>
 	);
+}
+
+/** Picks the resting icon for a tab's content kind. */
+function iconForTabKind(kind: NonNullable<SessionTabModel['kind']>) {
+	switch (kind) {
+		case 'diff':
+			return FileDiffIcon;
+		case 'document':
+			return FileTextIcon;
+		case 'file':
+		case 'preview':
+			return FileIcon;
+		default:
+			return MessageSquareIcon;
+	}
 }
 
 /** Dropdown listing recently-closed session tabs for restoration. */

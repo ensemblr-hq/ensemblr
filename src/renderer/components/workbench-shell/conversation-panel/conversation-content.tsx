@@ -1,3 +1,6 @@
+import { useCallback } from 'react';
+
+import { toWorkspaceRelativePath } from '@/renderer/lib/pi';
 import { usePiRawFrameCapture } from '@/renderer/state/pi-raw-frames';
 import type {
 	ComposerShellState,
@@ -6,8 +9,14 @@ import type {
 } from '@/renderer/types/workbench';
 
 import { ComposerPanel } from './composer-panel';
+import {
+	FilePreviewOpenerProvider,
+	TurnDiffOpenerProvider,
+} from './file-preview-context';
+import { FilePreviewPanel } from './file-preview-panel';
 import { PiRawFramePanel } from './pi-raw-frame-panel';
 import { SessionTabs } from './session-tabs';
+import { TurnDiffPanel } from './turn-diff-panel';
 import { WorkspaceTimeline } from './workspace-timeline';
 
 /**
@@ -22,16 +31,25 @@ export function WorkspaceConversationContent({
 	activeWorkspace,
 	closedSessions,
 	composer,
+	onFilePreviewOpen,
 	onSessionTabChange,
 	onSessionTabClose,
 	onSessionTabOpen,
 	onSessionTabRestore,
+	onTurnDiffOpen,
 	sessionTabs,
 }: {
 	activeSession: SessionTabModel;
 	activeWorkspace: WorkspaceShellModel;
 	closedSessions: SessionTabModel[];
 	composer: ComposerShellState;
+	onFilePreviewOpen: (input: {
+		filePath: string;
+	}) => Promise<{ chatTabId: string } | null>;
+	onTurnDiffOpen: (input: {
+		label: string;
+		turnId: string;
+	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabChange: (sessionId: string) => void;
 	onSessionTabClose: (sessionId: string) => void;
 	onSessionTabOpen: () => Promise<{ chatTabId: string } | null>;
@@ -44,6 +62,34 @@ export function WorkspaceConversationContent({
 	usePiRawFrameCapture();
 	const debugSessionId =
 		activeSession.piSessionId ?? composer.activePiSessionId ?? null;
+	const isChatTab = (activeSession.kind ?? 'chat') === 'chat';
+
+	/** Opens or re-focuses the preview tab for a chip's file and navigates to it. */
+	const workspaceCwd = activeWorkspace.pathLabel ?? null;
+	const openFilePreview = useCallback(
+		(filePath: string) => {
+			const relativePath = toWorkspaceRelativePath(filePath, workspaceCwd);
+			void onFilePreviewOpen({ filePath: relativePath }).then((result) => {
+				if (result) {
+					onSessionTabChange(result.chatTabId);
+				}
+			});
+		},
+		[onFilePreviewOpen, onSessionTabChange, workspaceCwd],
+	);
+
+	/** Opens or re-focuses the diff tab for a checkpointed turn. */
+	const openTurnDiff = useCallback(
+		({ label, turnId }: { label: string; turnId: string }) => {
+			void onTurnDiffOpen({ label, turnId }).then((result) => {
+				if (result) {
+					onSessionTabChange(result.chatTabId);
+				}
+			});
+		},
+		[onTurnDiffOpen, onSessionTabChange],
+	);
+
 	return (
 		<section className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
 			<SessionTabs
@@ -55,14 +101,30 @@ export function WorkspaceConversationContent({
 				onSessionTabRestore={onSessionTabRestore}
 				sessions={sessionTabs}
 			/>
-			<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-				<WorkspaceTimeline
-					activeSession={activeSession}
-					composer={composer}
-					workspace={activeWorkspace}
+			{isChatTab ? (
+				<FilePreviewOpenerProvider value={openFilePreview}>
+					<TurnDiffOpenerProvider value={openTurnDiff}>
+						<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+							<WorkspaceTimeline
+								activeSession={activeSession}
+								composer={composer}
+								workspace={activeWorkspace}
+							/>
+						</div>
+						<ComposerPanel
+							chatTabId={activeSession.chatTabId}
+							composer={composer}
+						/>
+					</TurnDiffOpenerProvider>
+				</FilePreviewOpenerProvider>
+			) : activeSession.kind === 'diff' ? (
+				<TurnDiffPanel turnId={activeSession.turnId ?? null} />
+			) : (
+				<FilePreviewPanel
+					filePath={activeSession.filePath ?? null}
+					workspaceCwd={activeWorkspace.pathLabel ?? null}
 				/>
-			</div>
-			<ComposerPanel chatTabId={activeSession.chatTabId} composer={composer} />
+			)}
 			<PiRawFramePanel sessionId={debugSessionId} />
 		</section>
 	);

@@ -1,7 +1,7 @@
 import { chipLabelForPath, parsePromptAttachments } from '@/renderer/lib/pi';
 import { cn } from '@/renderer/lib/utils';
-
 import { ChatAttachmentChip } from './chat-attachment-chip';
+import { useFilePreviewOpener } from './workbench-shell/conversation-panel/file-preview-context';
 
 /**
  * Right-aligned compact user prompt card. Pulls leading
@@ -18,6 +18,7 @@ export function ChatUserPrompt({
 	prompt: string;
 }) {
 	const { attachments, text } = parsePromptAttachments(prompt);
+	const openFilePreview = useFilePreviewOpener();
 	if (attachments.length === 0 && text.length === 0) {
 		return null;
 	}
@@ -29,14 +30,22 @@ export function ChatUserPrompt({
 			)}
 			data-role='user-prompt'
 		>
-			{attachments.map((attachment) => (
-				<ChatAttachmentChip
-					key={`${attachment.path}`}
-					kind={attachment.content.length === 0 ? 'folder' : 'file'}
-					label={chipLabelForPath(attachment.path)}
-					title={attachment.path}
-				/>
-			))}
+			{attachments.map((attachment) => {
+				const isFile = attachment.content.length > 0;
+				return (
+					<ChatAttachmentChip
+						key={`${attachment.path}`}
+						kind={isFile ? 'file' : 'folder'}
+						label={chipLabelForPath(attachment.path)}
+						onActivate={
+							isFile && openFilePreview
+								? () => openFilePreview(attachment.path)
+								: undefined
+						}
+						title={attachment.path}
+					/>
+				);
+			})}
 			{text.length > 0 ? (
 				<span className='whitespace-pre-wrap break-words text-foreground/90 leading-5'>
 					{text}

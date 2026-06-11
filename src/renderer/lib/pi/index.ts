@@ -25,3 +25,4 @@ export {
 } from './tool-output-classifier';
 export type { ToolRowProjection } from './tool-row-projector';
 export { projectToolRow } from './tool-row-projector';
+export { toWorkspaceRelativePath } from './workspace-path';

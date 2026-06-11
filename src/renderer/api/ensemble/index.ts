@@ -5,6 +5,7 @@ export {
 	writeOpenedChatTabToCache,
 } from './chat-tab-cache';
 export * from './chat-tabs';
+export * from './checkpoints';
 export * from './clone';
 export * from './health';
 export * from './navigation';

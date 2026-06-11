@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo } from 'react';
+import { toast } from 'sonner';
 import {
 	closeChatTab,
 	ensembleQueryKeys,
@@ -17,10 +18,13 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { SessionTabState } from '@/renderer/types/workbench-shell';
-import type {
-	ChatTabWire,
-	ClosedChatTabEntryWire,
-	PiSessionSnapshotWire,
+import {
+	CHAT_TAB_LIMIT,
+	CHAT_TAB_LIMIT_ERROR_CODE,
+	type ChatTabWire,
+	type ClosedChatTabEntryWire,
+	type OpenChatTabRequest,
+	type PiSessionSnapshotWire,
 } from '@/shared/ipc';
 
 /**
@@ -60,6 +64,13 @@ export function useSessionTabState({
 	onSessionTabChange: (sessionId: string) => void;
 }): SessionTabState & {
 	openSessionTab: () => Promise<OpenSessionTabHandlerResult | null>;
+	openFilePreviewTab: (input: {
+		filePath: string;
+	}) => Promise<OpenSessionTabHandlerResult | null>;
+	openTurnDiffTab: (input: {
+		label: string;
+		turnId: string;
+	}) => Promise<OpenSessionTabHandlerResult | null>;
 	closeSessionTabAsync: (
 		chatTabId: string,
 	) => Promise<CloseSessionTabHandlerResult>;
@@ -139,9 +150,8 @@ export function useSessionTabState({
 		return unsubscribe;
 	}, [queryClient, workspaceId]);
 
-	const openMutation = useMutation({
-		mutationFn: () => openChatTab({ workspaceId }),
-		onSuccess: (result) => {
+	const cacheOpenedTab = useCallback(
+		(result: { tab: ChatTabWire }) => {
 			writeOpenedChatTabToCache({
 				queryClient,
 				tab: result.tab,
@@ -149,6 +159,36 @@ export function useSessionTabState({
 			});
 			invalidateChatTabs();
 		},
+		[invalidateChatTabs, queryClient, workspaceId],
+	);
+
+	// Chat opens are subject to the per-workspace tab limit; the limit toast
+	// only makes sense here, so file/diff opens use a separate mutation below.
+	const openChatTabMutation = useMutation({
+		mutationFn: (request?: Omit<OpenChatTabRequest, 'workspaceId'>) =>
+			openChatTab({ ...request, workspaceId }),
+		onError: (error) => {
+			if (isChatTabLimitError(error)) {
+				toast.warning(`Chat tab limit reached`, {
+					description: `At most ${CHAT_TAB_LIMIT} chat tabs can be open in a workspace. Close one to open a new chat — closed chats stay available in history.`,
+				});
+				return;
+			}
+			invalidateChatTabs();
+		},
+		onSuccess: cacheOpenedTab,
+	});
+
+	const openAuxiliaryTabMutation = useMutation({
+		mutationFn: (request: Omit<OpenChatTabRequest, 'workspaceId'>) =>
+			openChatTab({ ...request, workspaceId }),
+		onError: (error) => {
+			invalidateChatTabs();
+			toast.error('Could not open tab', {
+				description: error instanceof Error ? error.message : undefined,
+			});
+		},
+		onSuccess: cacheOpenedTab,
 	});
 
 	// Bootstrap a real chat-tab row when the workspace has none. Placeholder
@@ -169,7 +209,7 @@ export function useSessionTabState({
 			return;
 		}
 		bootstrappedWorkspacesGlobal.add(workspaceId);
-		openMutation.mutate(undefined, {
+		openChatTabMutation.mutate(undefined, {
 			onError: () => {
 				bootstrappedWorkspacesGlobal.delete(workspaceId);
 			},
@@ -185,7 +225,7 @@ export function useSessionTabState({
 		chatTabsQuery.data,
 		invalidateChatTabs,
 		onSessionTabChange,
-		openMutation,
+		openChatTabMutation,
 		workspaceId,
 	]);
 
@@ -204,12 +244,67 @@ export function useSessionTabState({
 
 	const openSessionTab =
 		useCallback(async (): Promise<OpenSessionTabHandlerResult | null> => {
-			const result = await openMutation.mutateAsync();
-			if (!result.tab) {
+			try {
+				const result = await openChatTabMutation.mutateAsync(undefined);
+				if (!result.tab) {
+					return null;
+				}
+				return { chatTabId: result.tab.id };
+			} catch (error) {
+				// Limit errors are surfaced as a toast by the mutation; treat the
+				// blocked open as a soft no-op so callers do not navigate.
+				if (isChatTabLimitError(error)) {
+					return null;
+				}
+				throw error;
+			}
+		}, [openChatTabMutation]);
+
+	/** Opens (or re-focuses) a file-preview tab for a workspace-relative path. */
+	const openFilePreviewTab = useCallback(
+		async ({
+			filePath,
+		}: {
+			filePath: string;
+		}): Promise<OpenSessionTabHandlerResult | null> => {
+			try {
+				const result = await openAuxiliaryTabMutation.mutateAsync({
+					kind: 'file',
+					metadata: { filePath },
+					title: basenameOf(filePath),
+				});
+				return result.tab ? { chatTabId: result.tab.id } : null;
+			} catch {
+				// Surfaced as a toast by the mutation; callers treat as no-op.
 				return null;
 			}
-			return { chatTabId: result.tab.id };
-		}, [openMutation]);
+		},
+		[openAuxiliaryTabMutation],
+	);
+
+	/** Opens (or re-focuses) a turn-diff tab for a checkpointed turn. */
+	const openTurnDiffTab = useCallback(
+		async ({
+			label,
+			turnId,
+		}: {
+			label: string;
+			turnId: string;
+		}): Promise<OpenSessionTabHandlerResult | null> => {
+			try {
+				const result = await openAuxiliaryTabMutation.mutateAsync({
+					kind: 'diff',
+					metadata: { turnId },
+					title: `Diff: ${label}`,
+				});
+				return result.tab ? { chatTabId: result.tab.id } : null;
+			} catch {
+				// Surfaced as a toast by the mutation; callers treat as no-op.
+				return null;
+			}
+		},
+		[openAuxiliaryTabMutation],
+	);
 
 	const closeSessionTabAsync = useCallback(
 		async (chatTabId: string): Promise<CloseSessionTabHandlerResult> => {
@@ -222,8 +317,16 @@ export function useSessionTabState({
 	/** Fire-and-forget close used by the SessionTabState contract. */
 	const closeSessionTab = useCallback(
 		(chatTabId: string) => {
-			if (sessionTabs.length <= 1) {
-				return;
+			const closing = sessionTabs.find((session) => session.id === chatTabId);
+			const isChatKind = (closing?.kind ?? 'chat') === 'chat';
+			// Min-one applies to chat tabs only; non-chat tabs always close.
+			if (isChatKind) {
+				const openChatTabCount = sessionTabs.filter(
+					(session) => (session.kind ?? 'chat') === 'chat',
+				).length;
+				if (openChatTabCount <= 1) {
+					return;
+				}
 			}
 			const nextSession = sessionTabs.find(
 				(session) => session.id !== chatTabId,
@@ -258,10 +361,24 @@ export function useSessionTabState({
 		closeSessionTab,
 		closeSessionTabAsync,
 		effectiveActiveSession,
+		openFilePreviewTab,
 		openSessionTab,
+		openTurnDiffTab,
 		restoreSessionTab,
 		sessionTabs,
 	};
+}
+
+/** True when an IPC open-tab rejection carries the chat-tab-limit marker. */
+function isChatTabLimitError(error: unknown): boolean {
+	return (
+		error instanceof Error && error.message.includes(CHAT_TAB_LIMIT_ERROR_CODE)
+	);
+}
+
+function basenameOf(path: string): string {
+	const trimmed = path.replace(/\/+$/, '');
+	return trimmed.split('/').at(-1) ?? trimmed;
 }
 
 /** Maps an open chat-tab wire row into a renderer-facing `SessionTabModel`. */
@@ -269,7 +386,7 @@ function toSessionTabModel(
 	tab: ChatTabWire,
 	piSession: PiSessionSnapshotWire | undefined,
 ): SessionTabModel {
-	return {
+	const base = {
 		chatTabId: tab.id,
 		id: tab.id,
 		label: tab.title,
@@ -277,6 +394,23 @@ function toSessionTabModel(
 		status: deriveTabStatus(piSession),
 		summary: '',
 		updatedLabel: '',
+	} as const;
+	if (tab.kind === 'diff') {
+		const turnId = tab.metadata.turnId;
+		return {
+			...base,
+			kind: 'diff',
+			turnId: typeof turnId === 'string' ? turnId : null,
+		};
+	}
+	if (tab.kind === 'chat') {
+		return { ...base, kind: 'chat' };
+	}
+	const filePath = tab.metadata.filePath;
+	return {
+		...base,
+		filePath: typeof filePath === 'string' ? filePath : null,
+		kind: tab.kind,
 	};
 }
 

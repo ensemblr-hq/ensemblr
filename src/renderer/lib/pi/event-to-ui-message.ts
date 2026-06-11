@@ -131,6 +131,7 @@ function handleMessageEnvelope(
 			parts: incomingParts,
 			role: uiRole,
 			signature,
+			turnId: event.turnId,
 		};
 	}
 
@@ -139,6 +140,7 @@ function handleMessageEnvelope(
 		lastEventAt: event.createdAt,
 		lastOrdinal: Math.max(pending.lastOrdinal, event.ordinal),
 		parts: mergeParts(pending.parts, incomingParts),
+		turnId: pending.turnId ?? event.turnId,
 	};
 }
 
@@ -260,6 +262,7 @@ function finalizeGroup(group: PendingGroup): UIMessage {
 			firstEventAt: group.firstEventAt,
 			lastEventAt: group.lastEventAt,
 			lastOrdinal: group.lastOrdinal,
+			turnId: group.turnId,
 		} satisfies PiTurnMetadata,
 		parts,
 		role: group.role,
@@ -272,6 +275,8 @@ export interface PiTurnMetadata {
 	lastEventAt: string;
 	/** Highest persisted-event ordinal in the turn — the fork boundary. */
 	lastOrdinal: number;
+	/** Persisted `pi_turns` id backing this group; keys checkpoint lookups. */
+	turnId: string | null;
 }
 
 /** Reads the timing metadata back off a mapped message, if present. */
