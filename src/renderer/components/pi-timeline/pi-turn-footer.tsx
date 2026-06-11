@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
 	Tooltip,
 	TooltipContent,
+	TooltipProvider,
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 import { cn } from '@/renderer/lib/utils';
@@ -112,7 +113,8 @@ function CopyAnswerButton({ answerText }: { answerText: string }) {
 	};
 	const Icon = copied ? CheckIcon : ClipboardIcon;
 	return (
-		<Tooltip>
+		<TooltipProvider>
+			<Tooltip>
 			<TooltipTrigger asChild>
 				<button
 					aria-label='Copy response'
@@ -126,7 +128,8 @@ function CopyAnswerButton({ answerText }: { answerText: string }) {
 					<Icon aria-hidden='true' className='size-3.5' />
 				</button>
 			</TooltipTrigger>
-			<TooltipContent>Copy response</TooltipContent>
-		</Tooltip>
+				<TooltipContent>Copy response</TooltipContent>
+			</Tooltip>
+		</TooltipProvider>
 	);
 }
