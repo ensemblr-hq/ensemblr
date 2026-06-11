@@ -126,7 +126,7 @@ export interface RenameWorkspaceResult {
 /**
  * Lifecycle archive of a workspace. Preserves the `.context/` directory under
  * `<root>/archived-contexts/`, records an archive snapshot for later script
- * hooks (PID-038) and after-merge cleanup (PID-060), and stamps
+ * hooks (ENS-038) and after-merge cleanup (ENS-060), and stamps
  * `workspaces.archived_at`. The worktree folder stays on disk so a future
  * subscriber (or the user) can still inspect uncommitted handoff files. Branch
  * cleanup is opt-in and surfaces an explicit confirmation diagnostic on the

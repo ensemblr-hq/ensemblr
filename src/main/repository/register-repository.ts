@@ -359,7 +359,7 @@ function prepareRepositoryRecord({
 
 /**
  * Inserts a `repositories` row, with `metadata_json` capturing remote URL,
- * adoption mode, and the settings-source diagnostics surface from PID-015.
+ * adoption mode, and the settings-source diagnostics surface from ENS-015.
  */
 function insertRepositoryRow({
 	database,

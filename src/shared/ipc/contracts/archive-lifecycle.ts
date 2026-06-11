@@ -1,7 +1,7 @@
 /**
  * Shared lifecycle types for archive hook subscribers and downstream archive
  * services. Keep both the renderer (read-only mirror) and main process aligned
- * on the wire shape so a future Pi/archive script subscriber in `PID-038` can
+ * on the wire shape so a future Pi/archive script subscriber in `ENS-038` can
  * be wired without touching the runtime contract.
  */
 import type {

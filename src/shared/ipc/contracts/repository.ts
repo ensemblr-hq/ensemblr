@@ -62,7 +62,7 @@ export interface LocalRepositorySelectionResult {
 /**
  * Lifecycle archive of a repository. Sets `repositories.archived_at`, archives
  * every child workspace through the same hook pipeline as a standalone
- * workspace archive, and records the lifecycle decision so PID-038 / PID-060
+ * workspace archive, and records the lifecycle decision so ENS-038 / ENS-060
  * subscribers can act on it later. Worktree folders and branches are preserved
  * unless the request opts into `branchCleanup` (and each workspace already
  * confirmed that choice upstream).

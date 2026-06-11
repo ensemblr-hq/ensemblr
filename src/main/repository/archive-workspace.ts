@@ -66,7 +66,7 @@ const ARCHIVE_METADATA_FILENAME = 'archive-metadata.json';
  * `workspaces.archived_at`, preserves the workspace `.context/` under
  * `<root>/archived-contexts/<repo-slug>/<workspace-slug>-<timestamp>/`, writes
  * an `archive-metadata.json` snapshot, and inserts a row into `archive_records`
- * so PID-038 / PID-060 subscribers have enough state to act on later. Branch
+ * so ENS-038 / ENS-060 subscribers have enough state to act on later. Branch
  * cleanup runs only when the request opts in.
  */
 export function createArchiveWorkspaceService({
