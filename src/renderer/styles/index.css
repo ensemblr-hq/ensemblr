@@ -2,6 +2,14 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/*
+ * Streamdown ships its UI as Tailwind classes inside dist (including shiki
+ * token colors via text-[var(--sdm-c)] / dark:text-[var(--shiki-dark)]).
+ * Tailwind v4 does not scan node_modules by default, so without this source
+ * registration fenced code blocks render unstyled and unhighlighted.
+ */
+@source "../../../node_modules/streamdown/dist/*.js";
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
