@@ -333,6 +333,9 @@ export const MessageResponse = memo(
 				// Render markers outside and shift the whole list right instead so
 				// wrapped lines stay aligned with their text.
 				'[&_ol]:list-outside [&_ol]:pl-6 [&_ul]:list-outside [&_ul]:pl-5',
+				// Streamdown's inline-code chips use bg-muted, which barely reads
+				// against the chat background — lift them a shade.
+				'[&_:not(pre)>code]:bg-foreground/10 [&_:not(pre)>code]:ring-1 [&_:not(pre)>code]:ring-foreground/10',
 				className,
 			)}
 			plugins={streamdownPlugins}
