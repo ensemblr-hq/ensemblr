@@ -5,6 +5,8 @@ import {
 	type PiRawFrameBroadcast,
 	type PiRawFrameKind,
 	type PiSessionEventBroadcast,
+	type TerminalLifecycleBroadcast,
+	type TerminalOutputBroadcast,
 } from '../shared/ipc';
 
 import { createMainWindow, createMainWindowStateStore } from './app';
@@ -14,7 +16,10 @@ import {
 	createEnsembleConfigService,
 	createRepositoryConfigService,
 } from './config';
-import { createEnvironmentVariablesService } from './environment';
+import {
+	createEnvironmentVariablesService,
+	createWorkspaceEnvironmentService,
+} from './environment';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
 import { createCliRpcPiAgentAdapter, createPiAgentClient } from './pi-agent';
@@ -45,9 +50,15 @@ import {
 	createEnsembleRootDirectoryService,
 	reconcileRootDirectory,
 } from './root';
+import {
+	createScriptLifecycleService,
+	withArchiveScriptBeforeArchive,
+	withSetupScriptOnCreate,
+} from './scripts';
 import { createMacosKeychainSecretStore } from './secrets';
 import { createSetupDiagnosticsService } from './setup';
 import { createEnsembleDatabaseService } from './storage';
+import { createTerminalService } from './terminal';
 import { createListWorkspaceFilesService } from './workspace-files';
 
 // Quit early on Windows when invoked by the Squirrel installer.
@@ -244,6 +255,40 @@ const listArchivedWorkspacesService = createListArchivedWorkspacesService({
 const listWorkspaceFilesService = createListWorkspaceFilesService({
 	localCommandService,
 });
+const workspaceEnvironmentService = createWorkspaceEnvironmentService({
+	databaseService,
+	environmentVariablesService,
+	rootDirectoryService,
+	settingsResolutionService,
+});
+const broadcastToAllWindows = (channel: string, payload: unknown): void => {
+	for (const window of BrowserWindow.getAllWindows()) {
+		if (!window.isDestroyed()) {
+			window.webContents.send(channel, payload);
+		}
+	}
+};
+const terminalService = createTerminalService({
+	databaseService,
+	onLifecycle: (event: TerminalLifecycleBroadcast) =>
+		broadcastToAllWindows(IPC_CHANNELS.terminalLifecycle, event),
+	onOutput: (event: TerminalOutputBroadcast) =>
+		broadcastToAllWindows(IPC_CHANNELS.terminalOutput, event),
+	workspaceEnvironmentService,
+});
+const scriptLifecycleService = createScriptLifecycleService({
+	databaseService,
+	settingsResolutionService,
+	terminalService,
+});
+const createWorkspaceServiceWithSetup = withSetupScriptOnCreate({
+	createWorkspaceService: createWorkspaceServiceInstance,
+	scriptLifecycleService,
+});
+const archiveWorkspaceServiceWithScript = withArchiveScriptBeforeArchive({
+	archiveWorkspaceService,
+	scriptLifecycleService,
+});
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
 	databaseService,
@@ -265,9 +310,9 @@ app.whenReady().then(() => {
 	installApplicationMenu();
 	registerIpcHandlers({
 		archiveRepositoryService,
-		archiveWorkspaceService,
+		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
 		configService,
-		createWorkspaceService: createWorkspaceServiceInstance,
+		createWorkspaceService: createWorkspaceServiceWithSetup,
 		databaseService,
 		deleteArchivedWorkspaceService,
 		deleteRepositoryService,
@@ -285,15 +330,19 @@ app.whenReady().then(() => {
 		renameWorkspaceService,
 		repositoryConfigService,
 		rootDirectoryService,
+		scriptLifecycleService,
 		setupDiagnosticsService,
 		settingsResolutionService,
 		sharedRootAdoptionService,
+		terminalService,
 		unarchiveWorkspaceService,
 	});
+	terminalService.recoverStaleSessions();
 	createMainWindow({ windowStateStore: mainWindowStateStore });
 });
 
 app.on('will-quit', () => {
+	terminalService.disposeAll();
 	databaseService.close();
 });
 

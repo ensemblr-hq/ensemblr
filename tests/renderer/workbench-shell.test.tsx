@@ -66,6 +66,7 @@ const DOCK_ACTIONS: WorkbenchDockActions = {
 	onRunScript: () => undefined,
 	onRunSetupScript: () => undefined,
 	onStopRunScript: () => undefined,
+	onStopSetupScript: () => undefined,
 };
 
 const EMPTY_ROUTE_SEARCH = (): WorkbenchRouteSearch => ({});
@@ -321,7 +322,8 @@ test('models fixed script output tabs separately from interactive terminals', ()
 		isDefault: true,
 		kind: 'terminal',
 		label: 'Terminal',
-		sessionId: 'terminal-default',
+		sessionStatus: null,
+		terminalId: null,
 	});
 });
 
@@ -348,9 +350,9 @@ test('renders additional user terminal tabs as independent interactive sessions'
 				id: 'terminal:logs',
 				kind: 'terminal',
 				label: 'Terminal 2',
-				lines: ['$ tail -f app.log', 'ready'],
-				sessionId: 'terminal-logs',
+				sessionStatus: 'running',
 				status: 'running',
+				terminalId: 'terminal-logs',
 			},
 		],
 	};
@@ -378,11 +380,12 @@ test('renders additional user terminal tabs as independent interactive sessions'
 	expect(markup).toContain('data-dock-tab-kind="run-script"');
 	expect(markup).toContain('data-dock-tab-kind="terminal"');
 	expect(markup).toContain('Terminal 2');
-	expect(markup).toContain('data-terminal-session-id="terminal-logs"');
-	expect(markup).toContain('data-terminal-surface="interactive"');
-	expect(setupMarkup).toContain(
-		'data-terminal-surface="readonly-script-output"',
-	);
+	// Live terminal tabs expose a chat-tab-style close control when more than
+	// one terminal tab exists; setup/run never do.
+	expect(markup).toContain('Close Terminal 2 tab');
+	expect(markup).not.toContain('Close Setup tab');
+	expect(markup).not.toContain('Close Run tab');
+	expect(setupMarkup).toContain('Close Terminal 2 tab');
 });
 
 test('marks setup notes tab as active agent activity', () => {
@@ -733,7 +736,7 @@ test('renders run action when dev server is stopped', () => {
 	);
 
 	expect(markup).toContain('Run');
-	expect(markup).toContain('Run script has not started');
+	expect(markup).toContain('Run script is stopped');
 	expect(markup).not.toContain('Open :');
 	expect(markup).not.toContain('Stop');
 });

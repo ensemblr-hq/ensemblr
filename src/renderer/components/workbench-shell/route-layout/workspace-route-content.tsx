@@ -1,9 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useCallback, useMemo } from 'react';
-import { workspaceFilesQuery } from '@/renderer/api/ensemble-queries';
+import {
+	workspaceFilesQuery,
+	workspaceScriptSettingsQuery,
+} from '@/renderer/api/ensemble-queries';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
+import {
+	buildWorkspaceScriptSummaries,
+	scriptSummaryToDockStatus,
+} from '@/renderer/lib/terminal/script-summaries';
+import { mapTerminalSessionsToDockTabs } from '@/renderer/lib/terminal/terminal-tabs';
 import type { WorkspaceNavigationSelection } from '@/renderer/lib/workbench';
 import {
 	createPlaceholderSession,
@@ -14,12 +22,13 @@ import {
 	useSessionTabState,
 	useWorkspacePanelTabState,
 } from '@/renderer/state/workspace';
+import { useWorkspaceDockActions } from '@/renderer/state/workspace/dock-actions';
+import { useWorkspaceTerminalSessions } from '@/renderer/state/workspace/terminal-sessions';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type {
 	DockTabId,
 	WorkbenchRouteSearch,
 } from '@/renderer/types/workbench';
-import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 
 import { WorkspaceMainContentProvider } from '../shell-contexts';
 
@@ -66,9 +75,45 @@ export function WorkspaceRouteContent({
 		onSessionTabChange: handleSessionTabChange,
 	});
 	const activeSession = sessionNavigation.effectiveActiveSession;
+	const terminalSessions = useWorkspaceTerminalSessions(activeWorkspace.id);
+	const scriptSettingsQueryState = useQuery(
+		workspaceScriptSettingsQuery({
+			repositoryId: activeProject.id,
+			repositoryPath: activeProject.pathLabel,
+		}),
+	);
+	const workspaceWithLiveDockTabs = useMemo<typeof activeWorkspace>(() => {
+		const scripts = buildWorkspaceScriptSummaries({
+			sessions: terminalSessions.sessions,
+			settings: scriptSettingsQueryState.data ?? null,
+		});
+
+		return {
+			...activeWorkspace,
+			dockTabs: [
+				...activeWorkspace.dockTabs
+					.filter((tab) => tab.kind !== 'terminal')
+					.map((tab) =>
+						tab.kind === 'setup-script'
+							? { ...tab, status: scriptSummaryToDockStatus(scripts.setup) }
+							: tab.kind === 'run-script'
+								? { ...tab, status: scriptSummaryToDockStatus(scripts.run) }
+								: tab,
+					),
+				...mapTerminalSessionsToDockTabs(terminalSessions.sessions),
+			],
+			scripts,
+		};
+	}, [
+		activeWorkspace,
+		scriptSettingsQueryState.data,
+		terminalSessions.sessions,
+	]);
+	// Tab preference validation must see the LIVE dock tabs (terminal:<id>),
+	// not the placeholder model, or terminal tab clicks bounce back to setup.
 	const panelTabs = useWorkspacePanelTabState({
 		activeChatId: activeSession.id,
-		activeWorkspace,
+		activeWorkspace: workspaceWithLiveDockTabs,
 		search,
 	});
 	const activeReviewTab = panelTabs.activeReviewTab;
@@ -116,17 +161,14 @@ export function WorkspaceRouteContent({
 		workspaceCwd: activeWorkspace.pathLabel,
 		workspaceFiles: mergedWorkspaceFiles,
 	});
-	const dockActions = useMemo<WorkbenchDockActions>(
-		() => ({
-			onNewTerminal: () => undefined,
-			onOpenRunPort: () => undefined,
-			onOpenSetupScripts: () => undefined,
-			onRunScript: () => undefined,
-			onRunSetupScript: () => undefined,
-			onStopRunScript: () => undefined,
-		}),
-		[],
-	);
+	const dockActions = useWorkspaceDockActions({
+		activeDockTab,
+		closeTerminal: terminalSessions.closeTerminal,
+		createTerminal: terminalSessions.createTerminal,
+		sessions: terminalSessions.sessions,
+		updateSearch,
+		workspaceId: activeWorkspace.id,
+	});
 
 	/** Navigates to the canonical chat route, preserving existing search state. */
 	function navigateToWorkspaceChat({
@@ -170,7 +212,7 @@ export function WorkspaceRouteContent({
 		<WorkspaceWorkbenchContent
 			activeProject={activeProject}
 			activeReviewTab={activeReviewTab}
-			activeWorkspace={activeWorkspace}
+			activeWorkspace={workspaceWithLiveDockTabs}
 			composer={composer}
 			dockActions={dockActions}
 			dockTabId={activeDockTab}

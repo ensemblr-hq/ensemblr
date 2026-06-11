@@ -1,7 +1,7 @@
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 
-import { ReadOnlyCommandOutput } from './read-only-command-output';
 import { ScriptEmptyState } from './script-empty-state';
+import { XtermTerminal } from './xterm-terminal';
 
 /** Renders the Setup script output or the appropriate empty state. */
 export function SetupScriptOutputPanel({
@@ -24,7 +24,7 @@ export function SetupScriptOutputPanel({
 		);
 	}
 
-	if (script.status === 'not-run') {
+	if (script.status === 'not-run' || !script.terminalId) {
 		return (
 			<ScriptEmptyState
 				actionLabel='Run setup script'
@@ -36,9 +36,9 @@ export function SetupScriptOutputPanel({
 	}
 
 	return (
-		<ReadOnlyCommandOutput
-			lines={script.lines}
-			title={script.command ?? 'Setup'}
+		<XtermTerminal
+			sessionStatus={script.sessionStatus ?? null}
+			terminalId={script.terminalId}
 		/>
 	);
 }

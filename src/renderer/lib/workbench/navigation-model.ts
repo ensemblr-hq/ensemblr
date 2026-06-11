@@ -283,12 +283,9 @@ function createPlaceholderDockTabs(): DockTabModel[] {
 			isDefault: true,
 			kind: 'terminal',
 			label: 'Terminal',
-			lines: [
-				'$ zsh',
-				'Terminal session loading is not wired for this workspace yet.',
-			],
-			sessionId: 'terminal-default',
+			sessionStatus: null,
 			status: 'idle',
+			terminalId: null,
 		},
 	];
 }
@@ -297,11 +294,9 @@ function createPlaceholderDockTabs(): DockTabModel[] {
 function createPlaceholderScripts(): WorkspaceShellModel['scripts'] {
 	return {
 		run: {
-			lines: [],
 			status: 'missing',
 		},
 		setup: {
-			lines: [],
 			status: 'missing',
 		},
 	};

@@ -103,11 +103,22 @@ export {
 } from './repository-row-repository';
 export { getRepositoryWorkspaceNavigationSnapshot } from './repository-workspace-navigation-repository';
 export type {
+	FinalizeTerminalSessionRowOptions,
+	InsertTerminalSessionRowOptions,
+	MarkStaleRunningTerminalSessionsOptions,
+} from './terminal-session-repository';
+export {
+	finalizeTerminalSessionRow,
+	insertTerminalSessionRow,
+	markStaleRunningTerminalSessions,
+} from './terminal-session-repository';
+export type {
 	ClearWorkspaceArchivedOptions,
 	DeleteWorkspaceRowByIdOptions,
 	DeleteWorkspaceRowsByRepositoryOptions,
 	GetWorkspacePathByIdOptions,
 	InsertWorkspaceRowOptions,
+	ListActiveWorkspaceMetadataRowsOptions,
 	ListArchivedWorkspaceRowsByRepositoryOptions,
 	ListWorkspaceDeletionRowsByRepositoryOptions,
 	ListWorkspaceIdsByRepositoryOptions,
@@ -116,6 +127,7 @@ export type {
 	SelectArchivedWorkspaceJoinByIdOptions,
 	SelectDeleteArchivedWorkspaceJoinByIdOptions,
 	SelectDeleteWorkspaceWithRepositoryByIdOptions,
+	SelectWorkspaceEnvironmentJoinByIdOptions,
 	SelectWorkspaceIdByPathOptions,
 	SelectWorkspaceMetadataJsonOptions,
 	SelectWorkspaceSlugCollisionOptions,
@@ -131,6 +143,7 @@ export {
 	deleteWorkspaceRowsByRepository,
 	getWorkspacePathById,
 	insertWorkspaceRow,
+	listActiveWorkspaceMetadataRows,
 	listArchivedWorkspaceRowsByRepository,
 	listWorkspaceDeletionRowsByRepository,
 	listWorkspaceIdsByRepository,
@@ -139,6 +152,7 @@ export {
 	selectArchivedWorkspaceJoinById,
 	selectDeleteArchivedWorkspaceJoinById,
 	selectDeleteWorkspaceWithRepositoryById,
+	selectWorkspaceEnvironmentJoinById,
 	selectWorkspaceIdByPath,
 	selectWorkspaceMetadataJson,
 	selectWorkspaceWithRepositoryById,

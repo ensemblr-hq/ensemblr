@@ -13,8 +13,10 @@ import type { RootDirectoryApi } from './root-directory';
 import type { SettingsApi } from './settings-resolution';
 import type { SetupApi } from './setup';
 import type { SharedRootApi } from './shared-root-adoption';
+import type { TerminalApi } from './terminal';
 import type { WorkspaceApi } from './workspace';
 import type { WorkspaceFilesApi } from './workspace-files';
+import type { WorkspaceScriptsApi } from './workspace-scripts';
 
 /**
  * Aggregate IPC surface exposed to the renderer through the preload bridge.
@@ -43,4 +45,6 @@ export interface EnsembleApi
 		SharedRootApi,
 		WorkspaceFilesApi,
 		CheckpointApi,
+		TerminalApi,
+		WorkspaceScriptsApi,
 		PiApi {}
