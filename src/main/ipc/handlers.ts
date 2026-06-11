@@ -31,6 +31,7 @@ import { getPiSessionById } from '../storage/repositories/pi-session-repository'
 import { getWorkspacePathById } from '../storage/repositories/workspace-repository';
 import type { ListWorkspaceFilesService } from '../workspace-files';
 import { registerChatTabHandlers } from './handlers/chat-tab';
+import { registerCheckpointHandlers } from './handlers/checkpoint';
 import { registerCloneHandlers } from './handlers/clone';
 import { registerEnvironmentHandlers } from './handlers/environment';
 import { registerHealthHandlers } from './handlers/health';
@@ -178,6 +179,7 @@ export function registerIpcHandlers({
 			},
 		}),
 	});
+	registerCheckpointHandlers({ databaseService });
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerWorkspaceFilesHandlers({ listWorkspaceFilesService });
 }

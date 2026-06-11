@@ -80,6 +80,7 @@ export function createEnsembleApi(): EnsembleApi {
 		bindPiSessionToChatTab: (request) =>
 			invoke('bindPiSessionToChatTab', request),
 		closeChatTab: (request) => invoke('closeChatTab', request),
+		computeTurnDiff: (request) => invoke('computeTurnDiff', request),
 		confirmRootDirectoryChange: (request) =>
 			invoke('confirmRootDirectoryChange', request),
 		createWorkspace: (request) => invoke('createWorkspace', request),
@@ -101,6 +102,7 @@ export function createEnsembleApi(): EnsembleApi {
 		listPiSessionEvents: (request) => invoke('listPiSessionEvents', request),
 		listPiSessions: (request) => invoke('listPiSessions', request),
 		listPiSlashCommands: (request) => invoke('listPiSlashCommands', request),
+		listTurnCheckpoints: (request) => invoke('listTurnCheckpoints', request),
 		listWorkspaceFiles: (request) => invoke('listWorkspaceFiles', request),
 		onCloneGithubRepositoryProgress: (listener) =>
 			subscribe<CloneGithubRepositoryProgressEvent>(
@@ -127,6 +129,7 @@ export function createEnsembleApi(): EnsembleApi {
 			invoke('repositoryWorkspaceNavigation'),
 		resolveSettings: (request) => invoke('resolveSettings', request),
 		restoreChatTab: (request) => invoke('restoreChatTab', request),
+		restoreCheckpoint: (request) => invoke('restoreCheckpoint', request),
 		rootDirectory: () => invoke('rootDirectory'),
 		selectCloneDestination: () => invoke('selectCloneDestination'),
 		selectLocalRepository: () => invoke('selectLocalRepository'),

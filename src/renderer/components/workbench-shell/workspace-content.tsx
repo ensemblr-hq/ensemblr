@@ -53,10 +53,12 @@ export function WorkspaceWorkbenchContent({
 		activeWorkspace,
 		closedSessions: sessionNavigation.closedSessions,
 		composer,
+		onFilePreviewOpen: sessionNavigation.openFilePreviewTab,
 		onSessionTabChange,
 		onSessionTabClose: sessionNavigation.closeSessionTab,
 		onSessionTabOpen: sessionNavigation.openSessionTab,
 		onSessionTabRestore: sessionNavigation.restoreSessionTab,
+		onTurnDiffOpen: sessionNavigation.openTurnDiffTab,
 		sessionTabs: sessionNavigation.sessionTabs,
 	};
 

@@ -431,6 +431,21 @@ export function createTurn({
 	return row;
 }
 
+/** Replaces a branch's JSON metadata blob. */
+export function setBranchMetadata({
+	database,
+	id,
+	metadata,
+}: {
+	database: DatabaseSync;
+	id: string;
+	metadata: Record<string, unknown>;
+}): void {
+	database
+		.prepare(`UPDATE pi_session_branches SET metadata_json = ? WHERE id = ?`)
+		.run(serializeMetadata(metadata), id);
+}
+
 /** Returns the turn row, or `null` when no row matches. */
 export function getTurnById({
 	database,

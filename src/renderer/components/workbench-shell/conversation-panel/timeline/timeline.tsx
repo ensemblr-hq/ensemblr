@@ -1,9 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import type { DynamicToolUIPart, UIMessage } from 'ai';
 import type { ReactNode } from 'react';
-import { useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { BundledLanguage } from 'shiki';
-import { piSessionsForWorkspaceQuery } from '@/renderer/api/ensemble-queries';
+import {
+	piSessionsForWorkspaceQuery,
+	turnCheckpointsQuery,
+} from '@/renderer/api/ensemble-queries';
 import {
 	ChatAssistantTurn,
 	type ChatAssistantTurnTiming,
@@ -44,7 +47,10 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
+import { useTurnDiffOpener } from '../file-preview-context';
 import { useForkConversation } from '../use-fork-conversation';
+import { RestoreCheckpointDialog } from './restore-checkpoint-dialog';
+import { useCheckpointRestore } from './use-checkpoint-restore';
 import { useTimelineEvents } from './use-timeline-events';
 
 /**
@@ -88,6 +94,34 @@ export function PiSessionTimeline({
 		workspace,
 	});
 	const canFork = branchId.length > 0 && piSessionId !== null;
+
+	const checkpointsQuery = useQuery(turnCheckpointsQuery(piSessionId));
+	const checkpointsByTurnId = useMemo(() => {
+		const map = new Map<string, { label: string }>();
+		for (const checkpoint of checkpointsQuery.data?.checkpoints ?? []) {
+			if (checkpoint.turnId) {
+				map.set(checkpoint.turnId, { label: checkpoint.label });
+			}
+		}
+		return map;
+	}, [checkpointsQuery.data?.checkpoints]);
+	const openTurnDiff = useTurnDiffOpener();
+	const restore = useCheckpointRestore();
+	// Same-workspace multi-session restores are risky: another live session may
+	// have produced later file changes that a restore would clobber.
+	const hasOtherOpenSessions = (sessionsQuery.data?.sessions ?? []).some(
+		(session) => session.id !== piSessionId && session.runtimeOpen,
+	);
+
+	const requestRestore = useCallback(
+		({ label, turnId }: { label: string; turnId: string }) => {
+			if (!piSessionId) {
+				return;
+			}
+			restore.request({ branchId, label, piSessionId, turnId });
+		},
+		[branchId, piSessionId, restore.request],
+	);
 
 	const persistedMessages = useMemo<UIMessage[]>(
 		() => eventsToUIMessages(events),
@@ -158,16 +192,25 @@ export function PiSessionTimeline({
 				<ConversationContent className='mx-auto w-full max-w-3xl gap-6 px-4 pt-5 pb-5'>
 					{messages.map((message, index) => (
 						<TimelineMessage
+							checkpointsByTurnId={checkpointsByTurnId}
 							fork={canFork ? fork : null}
 							isLastMessage={index === messages.length - 1}
 							isStreaming={isStreaming}
 							key={message.id}
 							message={message}
+							onRequestRestore={requestRestore}
+							onViewTurnDiff={openTurnDiff}
 						/>
 					))}
 				</ConversationContent>
 				<ConversationScrollButton />
 			</Conversation>
+			<RestoreCheckpointDialog
+				hasOtherOpenSessions={hasOtherOpenSessions}
+				onCancel={restore.cancel}
+				onConfirm={() => void restore.confirm()}
+				target={restore.target}
+			/>
 		</section>
 	);
 }
@@ -241,15 +284,21 @@ function collectPersistedUserTexts(messages: readonly UIMessage[]): string[] {
 
 /** Renders one mapped Pi message with chat or diagnostic semantics. */
 function TimelineMessage({
+	checkpointsByTurnId,
 	fork,
 	isLastMessage,
 	isStreaming,
 	message,
+	onRequestRestore,
+	onViewTurnDiff,
 }: {
+	checkpointsByTurnId: ReadonlyMap<string, { label: string }>;
 	fork: ReturnType<typeof useForkConversation> | null;
 	isLastMessage: boolean;
 	isStreaming: boolean;
 	message: UIMessage;
+	onRequestRestore: (target: { label: string; turnId: string }) => void;
+	onViewTurnDiff: ((input: { label: string; turnId: string }) => void) | null;
 }) {
 	if (message.role === 'system') {
 		return <RuntimeDiagnostic message={message} />;
@@ -270,6 +319,8 @@ function TimelineMessage({
 	// Fork boundary = the last persisted event of THIS turn, so forking an
 	// earlier turn summarizes only the conversation up to that point.
 	const upToOrdinal = metadata?.lastOrdinal;
+	const turnId = metadata?.turnId ?? null;
+	const checkpoint = turnId ? checkpointsByTurnId.get(turnId) : undefined;
 
 	return (
 		<ChatAssistantTurn
@@ -279,6 +330,16 @@ function TimelineMessage({
 			onForkToNewTab={fork ? () => fork.forkToNewTab(upToOrdinal) : undefined}
 			onForkToNewWorkspace={
 				fork ? () => fork.forkToNewWorkspace(upToOrdinal) : undefined
+			}
+			onRestoreToCheckpoint={
+				turnId && checkpoint
+					? () => onRequestRestore({ label: checkpoint.label, turnId })
+					: undefined
+			}
+			onViewTurnDiff={
+				turnId && checkpoint && onViewTurnDiff
+					? () => onViewTurnDiff({ label: checkpoint.label, turnId })
+					: undefined
 			}
 			renderToolDetail={(part) => renderToolDetailNode(part)}
 			timing={turnTiming}

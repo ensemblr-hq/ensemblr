@@ -15,7 +15,7 @@ export type {
 	PiWireMetadata,
 } from './pi-message-payloads.ts';
 
-export type ChatTabKindWire = 'chat' | 'preview';
+export type ChatTabKindWire = 'chat' | 'diff' | 'document' | 'file' | 'preview';
 
 /** Renderer-facing chat tab descriptor. */
 export interface PiChatTabWire {

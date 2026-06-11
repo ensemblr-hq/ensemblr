@@ -7,6 +7,8 @@ export const ensembleQueryKeys = {
 		[...ensembleQueryKeys.all, 'archived-workspaces', repositoryId] as const,
 	chatTabs: (workspaceId: string) =>
 		[...ensembleQueryKeys.all, 'chat-tabs', workspaceId] as const,
+	checkpointsForSession: (piSessionId: string) =>
+		[...ensembleQueryKeys.all, 'checkpoints', piSessionId] as const,
 	closedChatTabsWithSummary: (workspaceId: string) =>
 		[
 			...ensembleQueryKeys.all,
@@ -15,6 +17,8 @@ export const ensembleQueryKeys = {
 		] as const,
 	environmentVariables: () =>
 		[...ensembleQueryKeys.all, 'environment-variables'] as const,
+	filePreview: (workspaceCwd: string, filePath: string) =>
+		[...ensembleQueryKeys.all, 'file-preview', workspaceCwd, filePath] as const,
 	githubRepositoryList: () =>
 		[...ensembleQueryKeys.all, 'github-repository-list'] as const,
 	health: () => [...ensembleQueryKeys.all, 'health'] as const,
@@ -25,6 +29,8 @@ export const ensembleQueryKeys = {
 		[...ensembleQueryKeys.all, 'pi-session-events', branchId] as const,
 	piSessionsForWorkspace: (workspaceId: string) =>
 		[...ensembleQueryKeys.all, 'pi-sessions', workspaceId] as const,
+	turnDiff: (turnId: string) =>
+		[...ensembleQueryKeys.all, 'turn-diff', turnId] as const,
 	repositoryWorkspaceNavigation: () =>
 		[...ensembleQueryKeys.all, 'repository-workspace-navigation'] as const,
 	rootDirectory: () => [...ensembleQueryKeys.all, 'root-directory'] as const,

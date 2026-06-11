@@ -163,3 +163,43 @@ in `multi-tool-chain` capture.
    stripped by pi.
 4. Truncation behavior for very long tool output (`details.truncation`,
    `fullOutputPath` fields seen in `rpc.md` bash examples).
+
+## Capability discovery (ENS-035 / THE-135)
+
+Probed live on 2026-06-11 against pi `0.79.1`
+(`~/.bun/install/global/node_modules/@earendil-works/pi-coding-agent`), via
+`pi --mode rpc --no-session --offline` with JSONL commands on stdin, plus a
+full read of `dist/modes/rpc/rpc-types.d.ts` (`RpcCommand` union) and
+`pi --help`. Unknown commands fail safely:
+`{"type":"response","command":"<name>","success":false,"error":"Unknown command: <name>"}`.
+
+| Capability | Status | Evidence / mechanism |
+|---|---|---|
+| Model listing | **Supported** | `get_available_models` returned 8 models offline; `set_model`, `cycle_model` in `RpcCommand` |
+| Thinking levels | **Supported** | `set_thinking_level` / `cycle_thinking_level`; levels `off,minimal,low,medium,high,xhigh`; per-model `thinkingLevelMap` visible in `get_state` |
+| Context usage | **Supported** | `get_session_stats` (`contextUsage`) + `usage` on assistant messages |
+| Compaction | **Supported** | `compact` command (`customInstructions?`), `set_auto_compaction`; `compaction_start/end` events |
+| Plan mode | **Unsupported in core** | `{"type":"plan_mode"}` → `Unknown command`. Help text: "Extensions can register additional flags (e.g., `--plan` from plan-mode extension)" — plan mode exists only as an optional extension (not installed here; `pi list` shows none). Would surface via extension slash commands / `get_commands`, not a core RPC toggle |
+| Fast mode | **Unsupported** | No CLI flag, no RPC command (`set_fast_mode` → `Unknown command`). No core concept of a fast/low-latency output mode |
+| Browser control | **Unsupported in core** | No CLI flag, no RPC command, no built-in tool (built-ins are read/bash/edit/write). Only achievable via an extension-provided tool |
+| Separate review model | **Unsupported as a setting** | No review-model concept anywhere in `RpcCommand` or flags. A review pass must be a separate Ensemble-managed session spawned with its own `--model` |
+| Tool allowlist (read-only / approval-required) | **Partially supported** | Spawn-time only: `--tools`, `--exclude-tools`, `--no-tools`, `--no-builtin-tools` all accepted in `--mode rpc` (verified: `--tools read,grep,glob,ls`, `--no-tools`, `--exclude-tools bash,write,edit` start cleanly). There is **no runtime RPC command** to change the allowlist mid-session, and no built-in approval gate — approval-required needs the extension `confirm()` handshake (see "Tool approval / permission handshake") |
+| Steering / follow-up modes | **Supported (bonus)** | `set_steering_mode` / `set_follow_up_mode` (`all` \| `one-at-a-time`) |
+| Auto retry | **Supported (bonus)** | `set_auto_retry`, `abort_retry` |
+| Session ops | **Supported (bonus)** | `switch_session`, `fork`, `clone`, `get_fork_messages`, `get_messages`, `set_session_name`, `export_html`, client-side `bash` |
+
+### Recommendations for Ensemble settings (v1)
+
+- **Enable:** model picker, thinking level, context usage, manual + auto
+  compaction toggles (all already wired or trivially wireable).
+- **Implement Ensemble-side:** read-only / approval-required permission modes
+  as *spawn profiles* — restart the RPC process with the corresponding
+  `--tools` / `--exclude-tools` set. Mid-session permission switching is not
+  possible without a restart; the settings UI must say so.
+- **Defer:** plan mode (revisit if the plan-mode extension becomes a managed
+  dependency; remember RPC mode loads no project extensions without explicit
+  `-e`), browser control (no core support), separate review model (model
+  picker per session covers the need — a "review with different model" flow
+  should open a new session).
+- **Decision Needed:** none of the deferred gaps block v1 — no Conductor-parity
+  feature in scope depends on plan/fast/browser modes.

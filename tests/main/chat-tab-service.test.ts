@@ -242,6 +242,141 @@ test('listClosedWithSummary resolves summary paths under .context/sessions', (t)
 	);
 });
 
+test('openTab blocks the sixth chat tab with the limit marker', (t) => {
+	const fixture = openFixture(t);
+
+	for (let index = 0; index < 5; index += 1) {
+		fixture.service.openTab({
+			title: `Chat ${index + 1}`,
+			workspaceId: fixture.workspaceId,
+		});
+	}
+
+	assert.throws(
+		() => fixture.service.openTab({ workspaceId: fixture.workspaceId }),
+		/CHAT_TAB_LIMIT_REACHED/,
+	);
+
+	const { open } = fixture.service.listTabs({
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(open.length, 5);
+});
+
+test('non-chat tabs do not count against the chat-tab limit', (t) => {
+	const fixture = openFixture(t);
+
+	for (let index = 0; index < 5; index += 1) {
+		fixture.service.openTab({
+			title: `Chat ${index + 1}`,
+			workspaceId: fixture.workspaceId,
+		});
+	}
+
+	const fileTab = fixture.service.openTab({
+		kind: 'file',
+		metadata: { filePath: 'src/index.ts' },
+		title: 'index.ts',
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(fileTab.kind, 'file');
+
+	const { open } = fixture.service.listTabs({
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(open.length, 6);
+});
+
+test('closing a chat tab at the limit allows a replacement to open', (t) => {
+	const fixture = openFixture(t);
+
+	const tabs = Array.from({ length: 5 }, (_, index) =>
+		fixture.service.openTab({
+			piSessionId: index === 0 ? fixture.piSessionId : undefined,
+			title: `Chat ${index + 1}`,
+			workspaceId: fixture.workspaceId,
+		}),
+	);
+
+	fixture.service.closeTab({ chatTabId: tabs[4]?.id ?? '' });
+	assert.doesNotThrow(() =>
+		fixture.service.openTab({ workspaceId: fixture.workspaceId }),
+	);
+});
+
+test('opening the same file path twice re-focuses the existing tab', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const first = fixture.service.openTab({
+		kind: 'file',
+		metadata: { filePath: 'src/app.ts' },
+		title: 'app.ts',
+		workspaceId: fixture.workspaceId,
+	});
+	const second = fixture.service.openTab({
+		kind: 'file',
+		metadata: { filePath: 'src/app.ts' },
+		title: 'app.ts',
+		workspaceId: fixture.workspaceId,
+	});
+
+	assert.equal(second.id, first.id);
+	const { open } = fixture.service.listTabs({
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(open.filter((tab) => tab.kind === 'file').length, 1);
+});
+
+test('closeTab hard-deletes non-chat tabs without entering history', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const fileTab = fixture.service.openTab({
+		kind: 'file',
+		metadata: { filePath: 'README.md' },
+		title: 'README.md',
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.closeTab({ chatTabId: fileTab.id });
+
+	assert.equal(
+		getChatTabById({
+			database: fixture.connection.database,
+			id: fileTab.id,
+		}),
+		null,
+	);
+	assert.equal(
+		fixture.service.listTabs({ workspaceId: fixture.workspaceId }).closed
+			.length,
+		0,
+	);
+});
+
+test('min-one rule counts chat tabs only, not open file tabs', (t) => {
+	const fixture = openFixture(t);
+
+	const chat = fixture.service.openTab({
+		piSessionId: fixture.piSessionId,
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.openTab({
+		kind: 'file',
+		metadata: { filePath: 'src/main.ts' },
+		title: 'main.ts',
+		workspaceId: fixture.workspaceId,
+	});
+
+	fixture.service.closeTab({ chatTabId: chat.id });
+
+	const open = listOpenForWorkspace({
+		database: fixture.connection.database,
+		workspaceId: fixture.workspaceId,
+	});
+	assert.ok(open.some((tab) => tab.id === chat.id));
+});
+
 test('service surfaces a clear error when the database is closed', (t) => {
 	const fixture = openFixture(t);
 
