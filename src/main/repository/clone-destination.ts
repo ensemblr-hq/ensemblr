@@ -1,0 +1,96 @@
+import path from 'node:path';
+
+import type {
+	CloneGithubRepositoryDiagnostic,
+	CloneGithubRepositoryProgressEvent,
+	CloneGithubRepositoryStartResult,
+	RegisteredRepositorySnapshot,
+} from '../../shared/ipc';
+import { allocateUniqueTargetPath } from './target-path.ts';
+
+/** Inputs for {@link resolveDestination}. */
+export interface ResolveDestinationOptions {
+	defaultParentPath: string;
+	destinationPath: string | undefined;
+	repositoryName: string;
+}
+
+/** Result of {@link resolveDestination}. */
+export interface ResolveDestinationResult {
+	diagnostic?: CloneGithubRepositoryDiagnostic;
+	targetPath: string;
+}
+
+/**
+ * Picks the absolute destination directory the clone will be written to,
+ * combining the optional caller override with the managed repos path.
+ */
+export function resolveDestination({
+	defaultParentPath,
+	destinationPath,
+	repositoryName,
+}: ResolveDestinationOptions): ResolveDestinationResult {
+	const overrideRaw =
+		typeof destinationPath === 'string' ? destinationPath.trim() : '';
+
+	if (overrideRaw) {
+		if (!path.isAbsolute(overrideRaw)) {
+			return {
+				diagnostic: {
+					code: 'destination-path-relative',
+					message: 'The destination path must be absolute.',
+					path: overrideRaw,
+					severity: 'error',
+				},
+				targetPath: overrideRaw,
+			};
+		}
+		const resolved = path.resolve(overrideRaw);
+		return {
+			targetPath: allocateUniqueTargetPath(
+				path.dirname(resolved),
+				path.basename(resolved),
+			),
+		};
+	}
+
+	if (!defaultParentPath) {
+		return {
+			diagnostic: {
+				code: 'destination-required',
+				message:
+					'No destination directory was provided and the managed root has no repos path.',
+				severity: 'error',
+			},
+			targetPath: '',
+		};
+	}
+
+	return {
+		targetPath: allocateUniqueTargetPath(defaultParentPath, repositoryName),
+	};
+}
+
+/** Build the standardised failure result used by `GithubCloneService.start`. */
+export function failureResult({
+	diagnostic,
+	jobId,
+	logs,
+	repository,
+	targetPath,
+}: {
+	diagnostic: CloneGithubRepositoryDiagnostic;
+	jobId: string;
+	logs: CloneGithubRepositoryProgressEvent[];
+	repository?: RegisteredRepositorySnapshot | null;
+	targetPath: string;
+}): CloneGithubRepositoryStartResult {
+	return {
+		diagnostics: [diagnostic],
+		jobId,
+		logs,
+		repository: repository ?? null,
+		status: 'failure',
+		targetPath,
+	};
+}

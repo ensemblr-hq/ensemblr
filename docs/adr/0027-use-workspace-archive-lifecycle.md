@@ -25,7 +25,7 @@ concrete requirements:
 The pre-ENS-025 implementation exposed a single `archiveWorkspace` IPC channel
 whose semantics were "permanently delete the worktree folder, drop the local
 branch, and remove the SQLite row." The UI dialog used destructive copy. That
-collapsed the four required intents into one, gave PID-038 and PID-060 nothing
+collapsed the four required intents into one, gave ENS-038 and ENS-060 nothing
 to hook into, and treated archive as a filesystem shortcut rather than a
 lifecycle state.
 

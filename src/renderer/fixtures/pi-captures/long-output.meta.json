@@ -1,0 +1,31 @@
+{
+	"scenario": "long-output",
+	"description": "Very long tool output; surfaces truncation behavior.",
+	"piArgs": [
+		"--mode",
+		"rpc",
+		"--no-session"
+	],
+	"cwd": "/sandbox/long-output",
+	"startedAt": 1781134180672,
+	"endedAt": 1781134188140,
+	"sent": [
+		{
+			"ts": 1781134180673,
+			"command": {
+				"type": "prompt",
+				"message": "Use the bash tool to run exactly this command: seq 1 500. Then tell me the last number printed."
+			}
+		},
+		{
+			"ts": 1781134188123,
+			"command": {
+				"id": "final-stats",
+				"type": "get_session_stats"
+			}
+		}
+	],
+	"exitCondition": "completed",
+	"exitCode": 143,
+	"notes": []
+}

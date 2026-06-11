@@ -7,7 +7,7 @@ import {
 	NavigationProvider,
 	SetupDiagnosticsProvider,
 } from '@/renderer/components/workbench-shell/shell-contexts';
-import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
+import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import {
 	getStringRouteParam,
 	getWorkbenchStaticView,

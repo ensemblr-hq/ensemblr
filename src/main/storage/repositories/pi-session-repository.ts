@@ -1,12 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import type { PiSessionStatusWire } from '../../../shared/ipc/contracts/pi-message-payloads';
 
-export type PiSessionStatus =
-	| 'idle'
-	| 'starting'
-	| 'streaming'
-	| 'closed'
-	| 'errored';
+export type PiSessionStatus = PiSessionStatusWire;
 
 export type PiSessionBranchKind = 'main' | 'retry' | 'fork';
 
@@ -322,6 +318,24 @@ export function listPiSessionBranches({
 		.all(piSessionId) as unknown as BranchRowShape[];
 
 	return rows.map(mapBranchRow);
+}
+
+/**
+ * Returns the canonical `main` branch for a session, falling back to the
+ * first branch in creation order when no explicit `main` exists. Returns
+ * `null` when the session has no branches at all.
+ */
+export function getMainBranchForSession({
+	database,
+	piSessionId,
+}: {
+	database: DatabaseSync;
+	piSessionId: string;
+}): PiSessionBranchRow | null {
+	const branches = listPiSessionBranches({ database, piSessionId });
+	return (
+		branches.find((branch) => branch.kind === 'main') ?? branches[0] ?? null
+	);
 }
 
 /** Creates a retry or fork branch from a parent. */

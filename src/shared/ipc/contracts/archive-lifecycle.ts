@@ -1,9 +1,23 @@
 /**
  * Shared lifecycle types for archive hook subscribers and downstream archive
  * services. Keep both the renderer (read-only mirror) and main process aligned
- * on the wire shape so a future Pi/archive script subscriber in `PID-038` can
+ * on the wire shape so a future Pi/archive script subscriber in `ENS-038` can
  * be wired without touching the runtime contract.
  */
+import type {
+	ArchiveRepositoryRequest,
+	ArchiveRepositoryResult,
+} from './repository';
+import type {
+	ArchiveWorkspaceRequest,
+	ArchiveWorkspaceResult,
+	DeleteArchivedWorkspaceRequest,
+	DeleteArchivedWorkspaceResult,
+	ListArchivedWorkspacesRequest,
+	ListArchivedWorkspacesResult,
+	UnarchiveWorkspaceRequest,
+	UnarchiveWorkspaceResult,
+} from './workspace';
 
 export type ArchiveLifecycleStage =
 	| 'pre-archive-repository'
@@ -57,4 +71,26 @@ export interface ArchiveLifecycleContext {
 	repository: ArchiveLifecycleRepositoryTarget;
 	stage: ArchiveLifecycleStage;
 	workspace: ArchiveLifecycleWorkspaceTarget | null;
+}
+
+/**
+ * Archive lifecycle IPC surface — covers archive/unarchive of workspaces and
+ * repositories plus the browse-archive listing and permanent purge.
+ */
+export interface ArchiveApi {
+	archiveRepository: (
+		request: ArchiveRepositoryRequest,
+	) => Promise<ArchiveRepositoryResult>;
+	archiveWorkspace: (
+		request: ArchiveWorkspaceRequest,
+	) => Promise<ArchiveWorkspaceResult>;
+	deleteArchivedWorkspace: (
+		request: DeleteArchivedWorkspaceRequest,
+	) => Promise<DeleteArchivedWorkspaceResult>;
+	listArchivedWorkspaces: (
+		request: ListArchivedWorkspacesRequest,
+	) => Promise<ListArchivedWorkspacesResult>;
+	unarchiveWorkspace: (
+		request: UnarchiveWorkspaceRequest,
+	) => Promise<UnarchiveWorkspaceResult>;
 }

@@ -1,3 +1,4 @@
+import { createChatTabService } from '../chat-tabs/chat-tab-service';
 import type { LocalCommandService } from '../commands/local-command';
 import type {
 	EnsembleConfigResolutionService,
@@ -5,8 +6,8 @@ import type {
 	RepositoryConfigService,
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
-import type { PiExecutableService } from '../pi';
 import type { PiSessionService } from '../pi-agent/pi-session-service';
+import type { PiExecutableService } from '../pi-runtime';
 import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
@@ -26,6 +27,10 @@ import type {
 import type { EnsembleRootDirectoryService } from '../root';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsembleDatabaseService } from '../storage';
+import { getPiSessionById } from '../storage/repositories/pi-session-repository';
+import { getWorkspacePathById } from '../storage/repositories/workspace-repository';
+import type { ListWorkspaceFilesService } from '../workspace-files';
+import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCloneHandlers } from './handlers/clone';
 import { registerEnvironmentHandlers } from './handlers/environment';
 import { registerHealthHandlers } from './handlers/health';
@@ -38,6 +43,11 @@ import { registerRootHandlers } from './handlers/root';
 import { registerSettingsHandlers } from './handlers/settings';
 import { registerSetupHandlers } from './handlers/setup';
 import { registerWindowHandlers } from './handlers/window';
+import { registerWorkspaceFilesHandlers } from './handlers/workspace-files';
+import {
+	createPermissionGate,
+	readPermissionModeFromSnapshot,
+} from './permission-gate';
 
 /** Dependency bundle wired into the renderer-facing IPC handlers. */
 interface RegisterIpcHandlersOptions {
@@ -53,6 +63,7 @@ interface RegisterIpcHandlersOptions {
 	githubCloneService: GithubCloneService;
 	githubRepositoryListService: GithubRepositoryListService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
+	listWorkspaceFilesService: ListWorkspaceFilesService;
 	localCommandService: LocalCommandService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
@@ -86,6 +97,7 @@ export function registerIpcHandlers({
 	githubCloneService,
 	githubRepositoryListService,
 	listArchivedWorkspacesService,
+	listWorkspaceFilesService,
 	localCommandService,
 	localRepositoryRegistrationService,
 	piExecutableService,
@@ -99,12 +111,23 @@ export function registerIpcHandlers({
 	sharedRootAdoptionService,
 	unarchiveWorkspaceService,
 }: RegisterIpcHandlersOptions): void {
+	// Permission gate is wired here so all handler groups share one instance.
+	// `getMode` re-resolves on every gated call so settings changes apply live.
+	const withPermissionGate = createPermissionGate({
+		getMode: () =>
+			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
+	});
+
 	registerWindowHandlers();
 	registerEnvironmentHandlers({ environmentVariablesService });
 	registerHealthHandlers({ configService, databaseService });
 	registerNavigationHandlers({ databaseService });
 	registerSettingsHandlers({ settingsResolutionService });
-	registerRootHandlers({ rootDirectoryService, sharedRootAdoptionService });
+	registerRootHandlers({
+		rootDirectoryService,
+		sharedRootAdoptionService,
+		withPermissionGate,
+	});
 	registerRepositoryConfigHandlers({
 		databaseService,
 		repositoryConfigService,
@@ -122,6 +145,7 @@ export function registerIpcHandlers({
 		renameWorkspaceService,
 		sharedRootAdoptionService,
 		unarchiveWorkspaceService,
+		withPermissionGate,
 	});
 	registerCloneHandlers({
 		githubCloneService,
@@ -133,5 +157,27 @@ export function registerIpcHandlers({
 		piExecutableService,
 		piSessionService,
 	});
+	registerChatTabHandlers({
+		chatTabService: createChatTabService({
+			databaseService,
+			lookups: {
+				piSessionExists: ({ piSessionId }) => {
+					const database = databaseService.getConnection()?.database;
+					if (!database) {
+						return false;
+					}
+					return getPiSessionById({ database, id: piSessionId }) !== null;
+				},
+				workspaceCwd: ({ workspaceId }) => {
+					const database = databaseService.getConnection()?.database;
+					if (!database) {
+						return null;
+					}
+					return getWorkspacePathById({ database, workspaceId });
+				},
+			},
+		}),
+	});
 	registerSetupHandlers({ setupDiagnosticsService });
+	registerWorkspaceFilesHandlers({ listWorkspaceFilesService });
 }

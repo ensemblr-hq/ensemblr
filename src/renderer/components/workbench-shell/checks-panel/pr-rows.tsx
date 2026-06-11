@@ -27,11 +27,7 @@ export function PullRequestStatusRow({
 				</span>
 			</div>
 			{status.actionLabel && !hideAction ? (
-				<Button
-					className='h-6 px-1.5 text-muted-foreground text-xs hover:text-foreground'
-					size='xs'
-					variant='ghost'
-				>
+				<Button className='h-6 px-1.5 text-xs' size='xs' variant='subtle'>
 					{status.actionLabel}
 				</Button>
 			) : null}
@@ -60,7 +56,7 @@ export function ChecksActionRow({
 			</div>
 			{actionLabel ? (
 				<Button
-					className='h-6 px-1.5 text-muted-foreground text-xs hover:text-foreground'
+					className='h-6 px-1.5 text-xs'
 					onClick={onAction}
 					size='xs'
 					variant='ghost'

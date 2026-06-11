@@ -1,22 +1,25 @@
 import type { ComponentType } from 'react';
 
-import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
-import { useSessionTabState } from '@/renderer/state/workspace';
+import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
-import type { WorkbenchShellProps } from '@/renderer/types/workbench-shell';
+import type {
+	SessionTabActions,
+	SessionTabState,
+	WorkbenchShellProps,
+} from '@/renderer/types/workbench-shell';
 import { WorkbenchPanelLayout } from './panel-layout';
 import { WorkbenchLayoutProvider } from './shell-contexts';
 import { useDockController } from './use-dock-controller';
 import { useRightSidebarController } from './use-right-sidebar-controller';
 
 /**
- * Active-workspace shell content — owns review/dock collapse state, viewport
- * syncing, and session-tab navigation.
+ * Active-workspace shell content — owns review/dock collapse state and
+ * viewport syncing. Session-tab state is owned by the route shell (the single
+ * `useSessionTabState` instance) and passed in via `sessionNavigation`.
  */
 export function WorkspaceWorkbenchContent({
 	activeProject,
 	activeReviewTab,
-	activeSession,
 	activeWorkspace,
 	composer,
 	dockActions,
@@ -24,12 +27,12 @@ export function WorkspaceWorkbenchContent({
 	onDockTabChange,
 	onReviewTabChange,
 	onSessionTabChange,
+	sessionNavigation,
 	MainContent,
 }: Pick<
 	WorkbenchShellProps,
 	| 'activeProject'
 	| 'activeReviewTab'
-	| 'activeSession'
 	| 'activeWorkspace'
 	| 'composer'
 	| 'dockActions'
@@ -39,16 +42,12 @@ export function WorkspaceWorkbenchContent({
 	| 'onSessionTabChange'
 > & {
 	MainContent: ComponentType<WorkspaceMainContentState>;
+	sessionNavigation: SessionTabState & SessionTabActions;
 }) {
 	useRouteProfilerMount('WorkspaceWorkbenchContent');
 
 	const rightSidebar = useRightSidebarController();
 	const dock = useDockController();
-	const sessionNavigation = useSessionTabState({
-		activeSession,
-		activeWorkspace,
-		onSessionTabChange,
-	});
 	const mainContentState: WorkspaceMainContentState = {
 		activeSession: sessionNavigation.effectiveActiveSession,
 		activeWorkspace,
@@ -56,6 +55,7 @@ export function WorkspaceWorkbenchContent({
 		composer,
 		onSessionTabChange,
 		onSessionTabClose: sessionNavigation.closeSessionTab,
+		onSessionTabOpen: sessionNavigation.openSessionTab,
 		onSessionTabRestore: sessionNavigation.restoreSessionTab,
 		sessionTabs: sessionNavigation.sessionTabs,
 	};

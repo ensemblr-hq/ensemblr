@@ -24,10 +24,15 @@ import {
 import type {
 	DockTabId,
 	ProjectShellModel,
+	SessionTabModel,
 	WorkbenchRouteSearch,
 	WorkspaceShellModel,
 } from '../../src/renderer/types/workbench';
-import type { WorkbenchDockActions } from '../../src/renderer/types/workbench-shell';
+import type {
+	SessionTabActions,
+	SessionTabState,
+	WorkbenchDockActions,
+} from '../../src/renderer/types/workbench-shell';
 import type {
 	SetupCheckGroupId,
 	SetupCheckId,
@@ -64,6 +69,22 @@ const DOCK_ACTIONS: WorkbenchDockActions = {
 };
 
 const EMPTY_ROUTE_SEARCH = (): WorkbenchRouteSearch => ({});
+
+/** Mirrors the hook's no-data fallback: placeholder sessions, no history. */
+function stubSessionNavigation(
+	activeSession: SessionTabModel,
+	activeWorkspace: WorkspaceShellModel,
+): SessionTabState & SessionTabActions {
+	return {
+		closedSessions: [],
+		closeSessionTab: () => undefined,
+		closeSessionTabAsync: () => Promise.resolve({ replacementChatTabId: null }),
+		effectiveActiveSession: activeSession,
+		openSessionTab: () => Promise.resolve(null),
+		restoreSessionTab: () => undefined,
+		sessionTabs: activeWorkspace.sessions,
+	};
+}
 
 function renderWorkbench(
 	snapshot: SetupDiagnosticsSnapshot | null,
@@ -116,9 +137,9 @@ function renderWorkbench(
 						<WorkspaceWorkbenchContent
 							activeProject={activeProject}
 							activeReviewTab={activeReviewTab}
-							activeSession={activeSession}
 							activeWorkspace={activeWorkspace}
 							composer={getComposerState({
+								activePiSessionId: null,
 								activeSession,
 								availableModels: [],
 								availableThinkingLevels: [],
@@ -137,6 +158,10 @@ function renderWorkbench(
 							onDockTabChange={() => undefined}
 							onReviewTabChange={() => undefined}
 							onSessionTabChange={() => undefined}
+							sessionNavigation={stubSessionNavigation(
+								activeSession,
+								activeWorkspace,
+							)}
 							MainContent={(mainContent) => (
 								<WorkspaceConversationContent {...mainContent} />
 							)}
@@ -182,9 +207,9 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('data-workspace-sidebar-state="pr-ready"');
 	expect(markup).toContain('Conductor shell rework');
 	expect(markup).toContain('Review shell');
-	// THE-130: the mock chat fixture is gone; the structured Pi RPC
-	// timeline renderer is what fills the chat surface now.
-	expect(markup).toContain('Pi session timeline');
+	// THE-130: the mock chat fixture is gone. With no active Pi session in
+	// the fixture, the chat surface renders the new-chat empty state.
+	expect(markup).toContain('New chat empty state');
 	expect(markup).not.toContain('Mock agent chat');
 	expect(markup).not.toContain('Chat mock in progress');
 	expect(markup).not.toContain('Renderer tests');
@@ -223,27 +248,32 @@ test('renders the Conductor-style workbench shell regions', () => {
 test('does not mark a workspace active on static workbench routes', () => {
 	const activeWorkspace = getDefaultWorkspace();
 	const activeProject = getDefaultProject();
+	const queryClient = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
 	const markup = renderToStaticMarkup(
-		<NavigationProvider
-			value={{ renderStaticLink: undefined, renderWorkspaceLink: undefined }}
-		>
-			<WorkbenchFrame
-				activeProject={activeProject}
-				activeView='dashboard'
-				activeWorkspace={activeWorkspace}
-				health={{
-					detail: 'Renderer query fixture',
-					label: 'IPC online',
-					state: 'online',
-				}}
-				onStaticNavigationSelect={() => undefined}
-				onWorkspaceSelect={() => undefined}
-				projects={shellFixtureProjects}
-				resolveWorkspaceRouteSearch={EMPTY_ROUTE_SEARCH}
+		<QueryClientProvider client={queryClient}>
+			<NavigationProvider
+				value={{ renderStaticLink: undefined, renderWorkspaceLink: undefined }}
 			>
-				<div />
-			</WorkbenchFrame>
-		</NavigationProvider>,
+				<WorkbenchFrame
+					activeProject={activeProject}
+					activeView='dashboard'
+					activeWorkspace={activeWorkspace}
+					health={{
+						detail: 'Renderer query fixture',
+						label: 'IPC online',
+						state: 'online',
+					}}
+					onStaticNavigationSelect={() => undefined}
+					onWorkspaceSelect={() => undefined}
+					projects={shellFixtureProjects}
+					resolveWorkspaceRouteSearch={EMPTY_ROUTE_SEARCH}
+				>
+					<div />
+				</WorkbenchFrame>
+			</NavigationProvider>
+		</QueryClientProvider>,
 	);
 
 	expect(markup).toContain('Dashboard');
@@ -375,7 +405,7 @@ test('models project owner avatars with repo-icon fallback', () => {
 	});
 });
 
-test('does not show a close control when only one chat tab remains', () => {
+test('hides the close control when only one chat tab is visible', () => {
 	const activeWorkspace = shellFixtureProjects[1].workspaces[0];
 	const markup = renderWorkbench(
 		createSnapshot(
@@ -390,6 +420,8 @@ test('does not show a close control when only one chat tab remains', () => {
 
 	expect(markup).toContain('Checks pass');
 	expect(markup).toContain('lucide-loader-circle');
+	// The min-one-tab invariant is visible in the renderer: no X appears for
+	// the final remaining chat tab.
 	expect(markup).not.toContain('Close Checks pass tab');
 });
 

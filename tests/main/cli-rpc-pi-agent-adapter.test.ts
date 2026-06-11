@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
 	type ChildLike,
 	createCliRpcPiAgentAdapter,
+	normalizePiPayload,
 	type SpawnFn,
 } from '../../src/main/pi-agent/cli-rpc-pi-agent-adapter.ts';
 import type {
@@ -134,6 +135,12 @@ async function waitForMicrotasks(): Promise<void> {
 	await new Promise((resolve) => setImmediate(resolve));
 }
 
+function firstItem<T>(items: readonly T[]): T {
+	const item = items[0];
+	assert.ok(item);
+	return item;
+}
+
 test('spawns the executable with metadata cwd, args, and merged env', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
@@ -142,10 +149,11 @@ test('spawns the executable with metadata cwd, args, and merged env', async () =
 	assert.equal(session.id, 'session-1');
 	const records = recorder.getRecords();
 	assert.equal(records.length, 1);
-	assert.equal(records[0]!.command, '/usr/local/bin/pi');
-	assert.deepEqual(records[0]!.args, ['--mode', 'rpc']);
-	assert.equal(records[0]!.cwd, '/tmp/ensemble/ws');
-	assert.equal(records[0]!.env.LANG, 'en_US.UTF-8');
+	const record = firstItem(records);
+	assert.equal(record.command, '/usr/local/bin/pi');
+	assert.deepEqual(record.args, ['--mode', 'rpc']);
+	assert.equal(record.cwd, '/tmp/ensemble/ws');
+	assert.equal(record.env.LANG, 'en_US.UTF-8');
 	await adapter.shutdown();
 });
 
@@ -156,7 +164,7 @@ test('parses JSONL frames into typed events', async () => {
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitStdout('{"type":"session","sessionId":"pi-runtime-9"}\n');
 	child.emitStdout(
@@ -186,7 +194,7 @@ test('invalid JSON lines surface as recoverable error events', async () => {
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitStdout('not-json-{{{\n');
 
@@ -207,7 +215,7 @@ test('stderr chunks emit recoverable error events tagged "Pi RPC stderr"', async
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitStderr('warning: deprecated flag\n');
 
@@ -228,7 +236,7 @@ test('crash with non-zero exit emits error then shutdown(crashed)', async () => 
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitExit(137, 'SIGKILL');
 
@@ -254,7 +262,7 @@ test('abort signals SIGINT then SIGKILL after the grace window', async () => {
 	});
 	const session = await adapter.createSession({ metadata: buildMetadata() });
 	await session.abort('user clicked stop');
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	await new Promise((resolve) => setTimeout(resolve, 25));
 	const signals = child.getKillSignals();
@@ -265,7 +273,7 @@ test('abort signals SIGINT then SIGKILL after the grace window', async () => {
 	child.emitExit(null, 'SIGKILL');
 });
 
-test('submit writes a JSONL frame to stdin, emits user message, returns turn id', async () => {
+test('submit writes a JSONL frame to stdin and waits for Pi user echo', async () => {
 	let turnCounter = 0;
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({
@@ -276,25 +284,41 @@ test('submit writes a JSONL frame to stdin, emits user message, returns turn id'
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	const ack = await session.submit({ prompt: 'do the thing' });
 	assert.equal(ack.turnId, 'turn-1');
 
 	const stdinChunks = child.getStdinChunks();
 	assert.equal(stdinChunks.length, 1);
+	const firstStdinChunk = stdinChunks[0];
+	assert.ok(firstStdinChunk);
 	// Pi RPC protocol (@earendil-works/pi-coding-agent): `prompt` command
 	// with `message` field, one JSONL frame per line.
-	assert.match(stdinChunks[0]!, /"type":"prompt"/);
-	assert.match(stdinChunks[0]!, /"message":"do the thing"/);
-	assert.match(stdinChunks[0]!, /\n$/);
+	assert.match(firstStdinChunk, /"type":"prompt"/);
+	assert.match(firstStdinChunk, /"message":"do the thing"/);
+	assert.match(firstStdinChunk, /\n$/);
 
+	const syntheticUserMessage = events.find(
+		(event): event is Extract<PiAgentEvent, { type: 'message' }> =>
+			event.type === 'message' && event.role === 'user',
+	);
+	assert.equal(syntheticUserMessage, undefined);
+
+	child.emitStdout(
+		'{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"do the thing"}]}}\n',
+	);
 	const userMessage = events.find(
 		(event): event is Extract<PiAgentEvent, { type: 'message' }> =>
 			event.type === 'message' && event.role === 'user',
 	);
 	assert.ok(userMessage);
-	assert.equal(userMessage.turnId, 'turn-1');
+	assert.equal(userMessage.turnId, 'pending');
+	assert.deepEqual(userMessage.payload, {
+		kind: 'message',
+		parts: [{ kind: 'text', text: 'do the thing' }],
+		role: 'user',
+	});
 	await adapter.shutdown();
 });
 
@@ -302,7 +326,7 @@ test('subscribing replays current metadata to late listeners', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
 	const session = await adapter.createSession({ metadata: buildMetadata() });
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitStdout('{"type":"session","sessionId":"replay-99"}\n');
 
@@ -354,7 +378,7 @@ test('oversize line drops cleanly and reports recoverable error', async () => {
 	const { events, listener } = collectEvents();
 	session.subscribe(listener);
 	await waitForMicrotasks();
-	const child = recorder.getChildren()[0]!;
+	const child = firstItem(recorder.getChildren());
 
 	child.emitStdout('x'.repeat(128));
 	child.emitStdout('\n{"type":"status","status":"streaming"}\n');
@@ -367,4 +391,81 @@ test('oversize line drops cleanly and reports recoverable error', async () => {
 	const status = events.find((event) => event.type === 'status');
 	assert.ok(status);
 	await adapter.shutdown();
+});
+
+test('normalizePiPayload projects message_end frames into a composite message', () => {
+	const result = normalizePiPayload({
+		message: {
+			content: [
+				{ text: 'Plan', thinking: 'Plan', type: 'thinking' },
+				{ text: 'Answer', type: 'text' },
+				{
+					arguments: { command: 'ls' },
+					id: 'call-1',
+					name: 'bash',
+					type: 'toolCall',
+				},
+			],
+			role: 'assistant',
+		},
+		type: 'message_end',
+	});
+
+	assert.deepEqual(result, {
+		kind: 'message',
+		parts: [
+			{ kind: 'reasoning', text: 'Plan' },
+			{ kind: 'text', text: 'Answer' },
+			{
+				input: { command: 'ls' },
+				kind: 'tool-call',
+				name: 'bash',
+				toolCallId: 'call-1',
+			},
+		],
+		role: 'assistant',
+	});
+});
+
+test('normalizePiPayload maps tool_execution_end to a tool-result variant', () => {
+	const result = normalizePiPayload({
+		isError: false,
+		result: { content: [{ text: 'ok', type: 'text' }] },
+		toolCallId: 'call-99',
+		toolName: 'bash',
+		type: 'tool_execution_end',
+	});
+
+	assert.deepEqual(result, {
+		isError: false,
+		kind: 'tool-result',
+		output: { content: [{ text: 'ok', type: 'text' }] },
+		toolCallId: 'call-99',
+	});
+});
+
+test('normalizePiPayload maps tool_execution_start to a tool-call variant', () => {
+	const result = normalizePiPayload({
+		args: { path: '/tmp' },
+		toolCallId: 'call-1',
+		toolName: 'read',
+		type: 'tool_execution_start',
+	});
+
+	assert.deepEqual(result, {
+		input: { path: '/tmp' },
+		kind: 'tool-call',
+		name: 'read',
+		toolCallId: 'call-1',
+	});
+});
+
+test('normalizePiPayload falls through to an unknown envelope for unrecognized frames', () => {
+	const result = normalizePiPayload({ type: 'mystery-frame', wat: 1 });
+
+	assert.deepEqual(result, {
+		frameType: 'mystery-frame',
+		kind: 'unknown',
+		raw: { type: 'mystery-frame', wat: 1 },
+	});
 });

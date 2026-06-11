@@ -53,3 +53,8 @@ export interface SharedRootAdoptionSnapshot {
 	};
 	status: SharedRootAdoptionStatus;
 }
+
+/** Shared-root adoption / reconciliation IPC surface. */
+export interface SharedRootApi {
+	sharedRootAdoption: () => Promise<SharedRootAdoptionSnapshot>;
+}

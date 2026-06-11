@@ -6,6 +6,7 @@ import type {
 	ListArchivedWorkspacesResult,
 } from '../../shared/ipc';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { listArchivedWorkspaceRowsByRepository } from '../storage/repositories/workspace-repository.ts';
 
 /** Public surface of the archived workspace browser. */
 export interface ListArchivedWorkspacesService {
@@ -53,34 +54,10 @@ function readEntries(
 	database: DatabaseSync,
 	repositoryId: string,
 ): ArchivedWorkspaceListEntry[] {
-	const rows = database
-		.prepare(
-			`SELECT
-				w.id AS id,
-				w.slug AS slug,
-				w.repository_id AS repositoryId,
-				w.name AS name,
-				w.path AS path,
-				w.branch_name AS branchName,
-				w.archived_at AS archivedAt,
-				a.id AS archiveRecordId,
-				a.base_branch AS baseBranch,
-				a.archived_context_path AS archivedContextPath,
-				a.branch_cleanup AS branchCleanupRaw
-			FROM workspaces w
-			LEFT JOIN archive_records a
-				ON a.workspace_id = w.id
-				AND a.record_type = 'workspace'
-				AND a.id = (
-					SELECT id FROM archive_records
-					WHERE workspace_id = w.id AND record_type = 'workspace'
-					ORDER BY archived_at DESC
-					LIMIT 1
-				)
-			WHERE w.repository_id = ? AND w.archived_at IS NOT NULL
-			ORDER BY w.archived_at DESC`,
-		)
-		.all(repositoryId);
+	const rows = listArchivedWorkspaceRowsByRepository({
+		database,
+		repositoryId,
+	});
 
 	const entries: ArchivedWorkspaceListEntry[] = [];
 	for (const row of rows) {

@@ -35,9 +35,6 @@ export interface LoadedRepositoryConfig {
 	worktreeincludeConfig?: Record<string, unknown>;
 }
 
-export type { RepositoryConfigPathAuthorizationOptions } from './repository-config-auth.ts';
-export { isRepositoryConfigPathAllowed } from './repository-config-auth.ts';
-
 /** Internal: result of normalising a parsed config file. */
 interface NormalizedConfigSource {
 	diagnostics: ConfigDiagnostic[];
@@ -332,53 +329,50 @@ function normalizeJsonRepositoryConfig({
 	kind: 'conductor' | 'ensemble';
 	source: SettingsResolutionSource;
 }): NormalizedConfigSource {
-	const diagnostics: ConfigDiagnostic[] = [];
-	const settings: Record<string, unknown> = {};
-
-	normalizeRepositoryConfigFields({
+	const { diagnostics, settings } = normalizeRepositoryConfigFields({
 		config,
-		diagnostics,
 		fieldMap: JSON_FIELD_MAP,
 		scriptSupportsRunMode: false,
-		settings,
 		source,
 	});
 
-	if (kind === 'conductor' && Object.keys(settings).length > 0) {
-		settings.conductorCompatibility ??= true;
-	}
+	const withCompatFlag =
+		kind === 'conductor' && Object.keys(settings).length > 0
+			? { conductorCompatibility: true, ...settings }
+			: settings;
 
-	diagnostics.push(...takeNestedDiagnostics(settings));
-
-	return { diagnostics, settings };
+	return { diagnostics, settings: withCompatFlag };
 }
 
 /**
  * Shared per-field normalisation loop used by both JSON and TOML parsers.
  * Handles the special `scripts` key, looks up the field map for the
- * canonical key, and accumulates accepted values + diagnostics in-place.
+ * canonical key, and returns the accumulated settings plus diagnostics.
  */
 function normalizeRepositoryConfigFields({
 	config,
-	diagnostics,
 	fieldMap,
 	scriptSupportsRunMode,
-	settings,
 	source,
 }: {
 	config: Record<string, unknown>;
-	diagnostics: ConfigDiagnostic[];
 	fieldMap: ReadonlyMap<string, string>;
 	scriptSupportsRunMode: boolean;
-	settings: Record<string, unknown>;
 	source: SettingsResolutionSource;
-}): void {
+}): { diagnostics: ConfigDiagnostic[]; settings: Record<string, unknown> } {
+	const diagnostics: ConfigDiagnostic[] = [];
+	let settings: Record<string, unknown> = {};
+
 	for (const [key, value] of Object.entries(config)) {
 		if (key === 'scripts') {
-			mergeSettings(
-				settings,
-				normalizeScripts(value, '$.scripts', source, scriptSupportsRunMode),
+			const normalizedScripts = normalizeScripts(
+				value,
+				'$.scripts',
+				source,
+				scriptSupportsRunMode,
 			);
+			settings = mergeSettings(settings, normalizedScripts.settings);
+			diagnostics.push(...normalizedScripts.diagnostics);
 			continue;
 		}
 
@@ -399,12 +393,14 @@ function normalizeRepositoryConfigFields({
 		});
 
 		if (normalizedValue.accepted) {
-			settings[normalizedKey] = normalizedValue.value;
+			settings = { ...settings, [normalizedKey]: normalizedValue.value };
 			continue;
 		}
 
 		diagnostics.push(normalizedValue.diagnostic);
 	}
+
+	return { diagnostics, settings };
 }
 
 /**
@@ -418,25 +414,19 @@ function normalizeTomlRepositoryConfig(
 	config: Record<string, unknown>,
 	source: SettingsResolutionSource,
 ): NormalizedConfigSource {
-	const diagnostics: ConfigDiagnostic[] = [];
-	const settings: Record<string, unknown> = {};
-
-	normalizeRepositoryConfigFields({
+	const { diagnostics, settings } = normalizeRepositoryConfigFields({
 		config,
-		diagnostics,
 		fieldMap: TOML_FIELD_MAP,
 		scriptSupportsRunMode: true,
-		settings,
 		source,
 	});
 
-	if (Object.keys(settings).length > 0) {
-		settings.conductorCompatibility ??= true;
-	}
+	const withCompatFlag =
+		Object.keys(settings).length > 0
+			? { conductorCompatibility: true, ...settings }
+			: settings;
 
-	diagnostics.push(...takeNestedDiagnostics(settings));
-
-	return { diagnostics, settings };
+	return { diagnostics, settings: withCompatFlag };
 }
 
 /**
@@ -446,18 +436,19 @@ function normalizeTomlRepositoryConfig(
  * @param fieldPath - JSONPath used in diagnostic messages.
  * @param source - Source identifier used in diagnostics.
  * @param supportRunMode - Whether to accept the TOML-only `run_mode` key.
- * @returns Partial settings record (may include the special `__diagnostics` key).
+ * @returns Partial settings record plus accumulated diagnostics.
  */
 function normalizeScripts(
 	value: unknown,
 	fieldPath: string,
 	source: SettingsResolutionSource,
 	supportRunMode: boolean,
-): Record<string, unknown> {
+): NormalizedConfigSource {
 	if (!isPlainRecord(value)) {
-		return {};
+		return { diagnostics: [], settings: {} };
 	}
 
+	const diagnostics: ConfigDiagnostic[] = [];
 	const scripts: Record<string, unknown> = {};
 	const settings: Record<string, unknown> = {};
 
@@ -470,8 +461,7 @@ function normalizeScripts(
 			if (typeof scriptValue === 'string') {
 				scripts[normalizedScriptKey] = scriptValue;
 			} else {
-				pushNestedDiagnostic(
-					settings,
+				diagnostics.push(
 					createInvalidFieldDiagnostic(
 						key,
 						source,
@@ -487,8 +477,7 @@ function normalizeScripts(
 			if (typeof scriptValue === 'string') {
 				settings.runScriptMode = scriptValue;
 			} else {
-				pushNestedDiagnostic(
-					settings,
+				diagnostics.push(
 					createInvalidFieldDiagnostic(
 						key,
 						source,
@@ -500,8 +489,7 @@ function normalizeScripts(
 			continue;
 		}
 
-		pushNestedDiagnostic(
-			settings,
+		diagnostics.push(
 			createUnsupportedFieldDiagnostic(key, source, `${fieldPath}.${key}`),
 		);
 	}
@@ -510,7 +498,7 @@ function normalizeScripts(
 		settings.scripts = scripts;
 	}
 
-	return settings;
+	return { diagnostics, settings };
 }
 
 /**
@@ -599,8 +587,8 @@ function normalizeSettingValue({
 }
 
 /**
- * Builds the IPC-safe snapshot describing a single config source, stripping the
- * internal `__diagnostics` carrier and clearing settings when not `loaded`.
+ * Builds the IPC-safe snapshot describing a single config source, clearing
+ * settings when the source did not load.
  * @param input - Source identifier, status, path and settings.
  * @returns A snapshot for transport across IPC.
  */
@@ -617,13 +605,10 @@ function createSourceSnapshot({
 	sourcePath: string;
 	status: RepositoryConfigSourceStatus;
 }): RepositoryConfigSourceSnapshot {
-	const cleanSettings = { ...settings };
-	delete cleanSettings.__diagnostics;
-
 	return {
 		displayPath: formatRepositoryDisplayPath(sourcePath, repositoryPath),
 		path: sourcePath,
-		settings: status === 'loaded' ? cleanSettings : {},
+		settings: status === 'loaded' ? { ...settings } : {},
 		source,
 		status,
 	};
@@ -688,67 +673,25 @@ function getLoadedSettingsForStatus(
 }
 
 /**
- * Merges `source` into `target` in place, preserving and concatenating the
- * internal `__diagnostics` carrier and deep-merging `scripts`.
- * @param target - Settings record to update.
- * @param source - Partial settings to merge in.
+ * Returns a new settings record with `source` merged on top of `target`,
+ * deep-merging the `scripts` block when both sides provide one.
  */
 function mergeSettings(
 	target: Record<string, unknown>,
 	source: Record<string, unknown>,
-): void {
-	const diagnostics = source.__diagnostics;
+): Record<string, unknown> {
+	const mergedScripts =
+		isPlainRecord(source.scripts) && isPlainRecord(target.scripts)
+			? { ...target.scripts, ...source.scripts }
+			: undefined;
 
-	if (Array.isArray(diagnostics)) {
-		target.__diagnostics = [
-			...((target.__diagnostics as ConfigDiagnostic[] | undefined) ?? []),
-			...diagnostics,
-		];
-		delete source.__diagnostics;
+	const merged = { ...target, ...source };
+
+	if (mergedScripts !== undefined) {
+		merged.scripts = mergedScripts;
 	}
 
-	for (const [key, value] of Object.entries(source)) {
-		if (
-			key === 'scripts' &&
-			isPlainRecord(value) &&
-			isPlainRecord(target.scripts)
-		) {
-			target.scripts = { ...target.scripts, ...value };
-			continue;
-		}
-
-		target[key] = value;
-	}
-}
-
-/**
- * Attaches a diagnostic to a settings record via the internal `__diagnostics`
- * carrier so it can be hoisted later by {@link takeNestedDiagnostics}.
- * @param settings - Settings record being normalised.
- * @param diagnostic - Diagnostic to append.
- */
-function pushNestedDiagnostic(
-	settings: Record<string, unknown>,
-	diagnostic: ConfigDiagnostic,
-): void {
-	settings.__diagnostics = [
-		...((settings.__diagnostics as ConfigDiagnostic[] | undefined) ?? []),
-		diagnostic,
-	];
-}
-
-/**
- * Extracts and removes accumulated nested diagnostics from a settings record.
- * @param settings - Settings record to drain.
- * @returns The previously-collected diagnostics.
- */
-function takeNestedDiagnostics(
-	settings: Record<string, unknown>,
-): ConfigDiagnostic[] {
-	const diagnostics = settings.__diagnostics;
-	delete settings.__diagnostics;
-
-	return Array.isArray(diagnostics) ? diagnostics : [];
+	return merged;
 }
 
 /**

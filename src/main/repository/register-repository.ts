@@ -15,12 +15,21 @@ import {
 	loadRepositoryConfig,
 } from '../config/repository-config.ts';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import {
+	insertRepositoryRow as insertRepositoryRowStorage,
+	selectRepositoryIdByPath,
+	selectRepositoryIdByRemoteUrl,
+	selectRepositoryIdBySlug,
+} from '../storage/repositories/repository-row-repository.ts';
+import { selectWorkspaceIdByPath } from '../storage/repositories/workspace-repository.ts';
+import { withTransaction } from '../storage/tx.ts';
 import { ARCHIVED_REPOSITORY_MARKER } from './archived-marker.ts';
 import {
 	type GitRepositoryProbe,
 	type GitRepositoryProbeFn,
 	probeGitRepository,
 } from './git-probe.ts';
+import { normalizeRemoteUrl } from './github-url.ts';
 import { toSlug } from './slug.ts';
 
 /** Public surface of the local repository registration service. */
@@ -169,14 +178,9 @@ export async function registerLocalRepository({
 	});
 
 	try {
-		database.exec('BEGIN');
-		try {
+		withTransaction(database, () => {
 			insertRepositoryRow({ database, prepared, timestamp });
-			database.exec('COMMIT');
-		} catch (error) {
-			database.exec('ROLLBACK');
-			throw error;
-		}
+		});
 	} catch (error) {
 		return failureResult(diagnostics, {
 			code: 'repository-insert-failed',
@@ -256,11 +260,7 @@ function findExistingDuplicate(
 	repositoryPath: string,
 	remoteUrl: string | null,
 ): RegisterLocalRepositoryDiagnostic | null {
-	const repositoryRow = database
-		.prepare('SELECT id FROM repositories WHERE path = ?')
-		.get(repositoryPath);
-
-	if (isIdRow(repositoryRow)) {
+	if (selectRepositoryIdByPath({ database, repositoryPath })) {
 		return {
 			code: 'repository-already-registered',
 			message: 'This repository is already registered with Ensemble.',
@@ -269,11 +269,7 @@ function findExistingDuplicate(
 		};
 	}
 
-	const workspaceRow = database
-		.prepare('SELECT id FROM workspaces WHERE path = ?')
-		.get(repositoryPath);
-
-	if (isIdRow(workspaceRow)) {
+	if (selectWorkspaceIdByPath({ database, workspacePath: repositoryPath })) {
 		return {
 			code: 'repository-path-is-workspace',
 			message:
@@ -309,31 +305,9 @@ export function isRemoteUrlTracked(
 	if (!normalized) {
 		return false;
 	}
-	const row = database
-		.prepare('SELECT id FROM repositories WHERE remote_url = ? LIMIT 1')
-		.get(normalized);
-	return isIdRow(row);
-}
-
-/**
- * Reduces a git remote URL to a canonical `host/owner/repo` key so equivalent
- * `git@github.com:owner/repo`, `ssh://git@github.com/owner/repo.git`, and
- * `https://github.com/owner/repo.git` forms all collide on the same value.
- */
-export function normalizeRemoteUrl(value: string | null): string | null {
-	if (!value) {
-		return null;
-	}
-	let candidate = value.trim().toLowerCase();
-	if (!candidate) {
-		return null;
-	}
-	candidate = candidate.replace(/^(?:https?|ssh|git):\/\//, '');
-	candidate = candidate.replace(/^git@/, '');
-	candidate = candidate.replace(':', '/');
-	candidate = candidate.replace(/\.git$/i, '');
-	candidate = candidate.replace(/\/+$/, '');
-	return candidate || null;
+	return (
+		selectRepositoryIdByRemoteUrl({ database, remoteUrl: normalized }) !== null
+	);
 }
 
 /**
@@ -385,7 +359,7 @@ function prepareRepositoryRecord({
 
 /**
  * Inserts a `repositories` row, with `metadata_json` capturing remote URL,
- * adoption mode, and the settings-source diagnostics surface from PID-015.
+ * adoption mode, and the settings-source diagnostics surface from ENS-015.
  */
 function insertRepositoryRow({
 	database,
@@ -396,32 +370,17 @@ function insertRepositoryRow({
 	prepared: PreparedRepository;
 	timestamp: string;
 }): void {
-	database
-		.prepare(
-			`INSERT INTO repositories (
-				id,
-				slug,
-				name,
-				path,
-				default_branch,
-				created_at,
-				updated_at,
-				metadata_json,
-				remote_url
-			)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		)
-		.run(
-			prepared.id,
-			prepared.slug,
-			prepared.name,
-			prepared.path,
-			prepared.defaultBranch,
-			timestamp,
-			timestamp,
-			JSON.stringify(prepared.metadata),
-			normalizeRemoteUrl(prepared.remoteUrl) ?? '',
-		);
+	insertRepositoryRowStorage({
+		database,
+		defaultBranch: prepared.defaultBranch,
+		id: prepared.id,
+		metadataJson: JSON.stringify(prepared.metadata),
+		name: prepared.name,
+		path: prepared.path,
+		remoteUrl: normalizeRemoteUrl(prepared.remoteUrl) ?? '',
+		slug: prepared.slug,
+		timestamp,
+	});
 }
 
 /**
@@ -443,11 +402,7 @@ function allocateUniqueSlug(database: DatabaseSync, baseName: string): string {
 
 /** Tests whether a slug is already taken by an existing repository row. */
 function slugExists(database: DatabaseSync, slug: string): boolean {
-	const row = database
-		.prepare('SELECT id FROM repositories WHERE slug = ?')
-		.get(slug);
-
-	return isIdRow(row);
+	return selectRepositoryIdBySlug({ database, slug }) !== null;
 }
 
 /** Normalises a candidate name into a URL-safe slug with stable fallback. */
@@ -475,15 +430,5 @@ function isPermissionError(error: unknown): boolean {
 		error !== null &&
 		'code' in error &&
 		(error.code === 'EACCES' || error.code === 'EPERM')
-	);
-}
-
-/** Type guard for `SELECT id FROM ...` rows used by the lookups above. */
-function isIdRow(row: unknown): row is { id: string } {
-	return (
-		typeof row === 'object' &&
-		row !== null &&
-		'id' in row &&
-		typeof (row as { id: unknown }).id === 'string'
 	);
 }

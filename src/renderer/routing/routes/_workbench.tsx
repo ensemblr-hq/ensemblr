@@ -5,7 +5,7 @@ import {
 	WorkbenchRoutePending,
 } from '@/renderer/components/workbench-shell/route-boundaries';
 import { WORKBENCH_ROUTE_STALE_TIME_MS } from '@/renderer/config/routing';
-import { profileRouteLoader } from '@/renderer/lib/instrumentation/route-profiler';
+import { profileRouteLoader } from '@/renderer/lib/instrumentation';
 import { loadWorkbenchRouteData } from '@/renderer/routing/workbench-route-loaders';
 
 export const Route = createFileRoute('/_workbench')({

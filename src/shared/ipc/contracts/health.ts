@@ -1,4 +1,24 @@
-import type { ConfigStatusSnapshot } from './config';
+export type ConfigStatus = 'error' | 'invalid' | 'missing' | 'ok';
+export type ConfigDiagnosticSeverity = 'error' | 'info' | 'warning';
+
+export interface ConfigDiagnostic {
+	code: string;
+	column?: number;
+	fieldPath?: string;
+	line?: number;
+	message: string;
+	severity: ConfigDiagnosticSeverity;
+}
+
+export interface ConfigStatusSnapshot {
+	blocksReadiness: boolean;
+	diagnostics: ConfigDiagnostic[];
+	displayPath: string;
+	loadedAt: string;
+	path: string;
+	schemaVersion: number | null;
+	status: ConfigStatus;
+}
 
 export type DatabaseStatus = 'ok' | 'error';
 
@@ -21,4 +41,9 @@ export interface HealthSnapshot {
 		electron: string;
 		node: string;
 	};
+}
+
+/** Process / database health IPC surface. */
+export interface HealthApi {
+	health: () => Promise<HealthSnapshot>;
 }

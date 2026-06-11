@@ -1,254 +1,203 @@
 import type {
 	SetupCheckLogSnapshot,
-	SetupCheckSnapshot,
 	SetupRemediationAction,
 } from '../../shared/ipc';
 import type {
 	PiExecutableService,
 	PiExecutableSnapshot,
-} from '../pi/pi-executable';
+} from '../pi-runtime/pi-executable';
 import type {
 	PiAgentDirectorySnapshot,
 	PiAgentDirectorySource,
 	PiProviderModelSnapshot,
 	PiReadinessService,
 	PiRpcSmokeSnapshot,
-} from '../pi/pi-readiness';
+} from '../pi-runtime/pi-readiness';
 import {
 	createCommandLogs,
-	createSetupCheckSnapshot,
+	defineCheck,
 	type SetupCheckProviderContext,
 } from './setup-check-context.ts';
 
 /** Builds the snapshot for the Pi agent-directory readiness check. */
-export async function getPiAgentDirectoryCheck({
+export function getPiAgentDirectoryCheck({
 	context,
 	piReadinessService,
 }: {
 	context: SetupCheckProviderContext;
 	piReadinessService: PiReadinessService;
-}): Promise<SetupCheckSnapshot> {
-	try {
-		const readiness = await piReadinessService.getSnapshot();
-		const agentDirectory = readiness.agentDirectory;
-		const status = agentDirectory.status === 'success' ? 'success' : 'failure';
-		const detail =
-			status === 'success'
-				? `Pi agent directory resolves from ${formatPiAgentDirectorySource(
-						agentDirectory.source,
-					)}: ${agentDirectory.path}.`
-				: getPiAgentDirectoryFailureDetail(agentDirectory);
-
-		return createSetupCheckSnapshot({
-			blocking: true,
-			description:
-				'Verifies the normal Pi agent directory without redirecting Pi resource discovery.',
-			detail,
-			group: 'pi',
-			id: 'pi-agent-directory',
-			logs: createPiAgentDirectoryLogs(agentDirectory),
-			remediationActions: [
-				{
-					id: 'retry-pi-agent-directory',
-					kind: 'retry',
-					label: 'Retry Pi agent directory check',
-				},
-			],
-			status,
-			title: 'Pi agent directory',
-			updatedAt: context.now().toISOString(),
-		});
-	} catch (error) {
-		return createSetupCheckSnapshot({
-			blocking: true,
-			description:
-				'Verifies the normal Pi agent directory without redirecting Pi resource discovery.',
+}) {
+	const check = defineCheck<SetupCheckProviderContext>({
+		blocking: true,
+		description:
+			'Verifies the normal Pi agent directory without redirecting Pi resource discovery.',
+		group: 'pi',
+		id: 'pi-agent-directory',
+		onError: (error) => ({
 			detail:
 				error instanceof Error
 					? error.message
 					: 'Unknown Pi agent directory check error.',
-			group: 'pi',
-			id: 'pi-agent-directory',
-			logs: [],
-			status: 'failure',
-			title: 'Pi agent directory',
-			updatedAt: context.now().toISOString(),
-		});
-	}
+		}),
+		run: async () => {
+			const readiness = await piReadinessService.getSnapshot();
+			const agentDirectory = readiness.agentDirectory;
+			const status =
+				agentDirectory.status === 'success' ? 'success' : 'failure';
+			const detail =
+				status === 'success'
+					? `Pi agent directory resolves from ${formatPiAgentDirectorySource(
+							agentDirectory.source,
+						)}: ${agentDirectory.path}.`
+					: getPiAgentDirectoryFailureDetail(agentDirectory);
+
+			return {
+				detail,
+				logs: createPiAgentDirectoryLogs(agentDirectory),
+				remediationActions: [
+					{
+						id: 'retry-pi-agent-directory',
+						kind: 'retry',
+						label: 'Retry Pi agent directory check',
+					},
+				],
+				status,
+			};
+		},
+		title: 'Pi agent directory',
+	});
+
+	return check(context);
 }
 
 /** Builds the snapshot for the Pi RPC startup smoke check. */
-export async function getPiRpcCheck({
+export function getPiRpcCheck({
 	context,
 	piReadinessService,
 }: {
 	context: SetupCheckProviderContext;
 	piReadinessService: PiReadinessService;
-}): Promise<SetupCheckSnapshot> {
-	try {
-		const readiness = await piReadinessService.getSnapshot();
-		const rpc = readiness.rpc;
-		const status = rpc.status === 'success' ? 'success' : 'failure';
-		const detail =
-			status === 'success'
-				? `Pi RPC startup produced a valid ${rpc.firstFrame?.type ?? 'JSONL'} frame from ${rpc.cwd}.`
-				: (rpc.failure?.message ??
-					'Pi RPC startup did not produce valid JSONL.');
-
-		return createSetupCheckSnapshot({
-			blocking: true,
-			description:
-				'Launches the selected Pi executable with --mode rpc from a managed setup smoke workspace.',
-			detail,
-			group: 'pi',
-			id: 'pi-rpc',
-			logs: createPiRpcLogs(rpc),
-			remediationActions: [
-				{
-					id: 'select-pi-executable-for-rpc',
-					kind: 'select-path',
-					label: 'Select Pi executable',
-					target: 'pi.executablePath',
-				},
-				{
-					id: 'retry-pi-rpc',
-					kind: 'retry',
-					label: 'Retry Pi RPC check',
-				},
-			],
-			status,
-			title: 'Pi RPC startup',
-			updatedAt: context.now().toISOString(),
-		});
-	} catch (error) {
-		return createSetupCheckSnapshot({
-			blocking: true,
-			description:
-				'Launches the selected Pi executable with --mode rpc from a managed setup smoke workspace.',
+}) {
+	const check = defineCheck<SetupCheckProviderContext>({
+		blocking: true,
+		description:
+			'Launches the selected Pi executable with --mode rpc from a managed setup smoke workspace.',
+		group: 'pi',
+		id: 'pi-rpc',
+		onError: (error) => ({
 			detail:
 				error instanceof Error ? error.message : 'Unknown Pi RPC check error.',
-			group: 'pi',
-			id: 'pi-rpc',
-			logs: [],
-			status: 'failure',
-			title: 'Pi RPC startup',
-			updatedAt: context.now().toISOString(),
-		});
-	}
+		}),
+		run: async () => {
+			const readiness = await piReadinessService.getSnapshot();
+			const rpc = readiness.rpc;
+			const status = rpc.status === 'success' ? 'success' : 'failure';
+			const detail =
+				status === 'success'
+					? `Pi RPC startup produced a valid ${rpc.firstFrame?.type ?? 'JSONL'} frame from ${rpc.cwd}.`
+					: (rpc.failure?.message ??
+						'Pi RPC startup did not produce valid JSONL.');
+
+			return {
+				detail,
+				logs: createPiRpcLogs(rpc),
+				remediationActions: [
+					{
+						id: 'select-pi-executable-for-rpc',
+						kind: 'select-path',
+						label: 'Select Pi executable',
+						target: 'pi.executablePath',
+					},
+					{
+						id: 'retry-pi-rpc',
+						kind: 'retry',
+						label: 'Retry Pi RPC check',
+					},
+				],
+				status,
+			};
+		},
+		title: 'Pi RPC startup',
+	});
+
+	return check(context);
 }
 
 /** Builds the snapshot for the Pi provider/model readiness check. */
-export async function getPiProviderModelCheck({
+export function getPiProviderModelCheck({
 	context,
 	piReadinessService,
 }: {
 	context: SetupCheckProviderContext;
 	piReadinessService: PiReadinessService;
-}): Promise<SetupCheckSnapshot> {
-	try {
-		const readiness = await piReadinessService.getSnapshot();
-		const providerModels = readiness.providerModels;
-		const status = providerModels.status === 'success' ? 'success' : 'failure';
-		const detail =
-			status === 'success'
-				? `Pi listed ${providerModels.modelCount} models across ${providerModels.providerCount} providers.`
-				: (providerModels.failure?.message ??
-					'Pi provider/model readiness could not be verified.');
-
-		return createSetupCheckSnapshot({
-			blocking: true,
-			description:
-				'Runs pi --list-models through the selected executable to verify provider/model readiness.',
-			detail,
-			group: 'pi',
-			id: 'pi-provider-model',
-			logs: createPiProviderModelLogs(providerModels),
-			remediationActions: [
-				{
-					id: 'open-pi-provider-settings',
-					kind: 'open-settings',
-					label: 'Open Pi provider settings',
-					target: 'pi.providers',
-				},
-				{
-					id: 'retry-pi-provider-model',
-					kind: 'retry',
-					label: 'Retry provider/model check',
-				},
-			],
-			status,
-			title: 'Pi provider and model readiness',
-			updatedAt: context.now().toISOString(),
-		});
-	} catch (error) {
-		return createSetupCheckSnapshot({
-			blocking: true,
-			description:
-				'Runs pi --list-models through the selected executable to verify provider/model readiness.',
+}) {
+	const check = defineCheck<SetupCheckProviderContext>({
+		blocking: true,
+		description:
+			'Runs pi --list-models through the selected executable to verify provider/model readiness.',
+		group: 'pi',
+		id: 'pi-provider-model',
+		onError: (error) => ({
 			detail:
 				error instanceof Error
 					? error.message
 					: 'Unknown Pi provider/model check error.',
-			group: 'pi',
-			id: 'pi-provider-model',
-			logs: [],
-			status: 'failure',
-			title: 'Pi provider and model readiness',
-			updatedAt: context.now().toISOString(),
-		});
-	}
+		}),
+		run: async () => {
+			const readiness = await piReadinessService.getSnapshot();
+			const providerModels = readiness.providerModels;
+			const status =
+				providerModels.status === 'success' ? 'success' : 'failure';
+			const detail =
+				status === 'success'
+					? `Pi listed ${providerModels.modelCount} models across ${providerModels.providerCount} providers.`
+					: (providerModels.failure?.message ??
+						'Pi provider/model readiness could not be verified.');
+
+			return {
+				detail,
+				logs: createPiProviderModelLogs(providerModels),
+				remediationActions: [
+					{
+						id: 'open-pi-provider-settings',
+						kind: 'open-settings',
+						label: 'Open Pi provider settings',
+						target: 'pi.providers',
+					},
+					{
+						id: 'retry-pi-provider-model',
+						kind: 'retry',
+						label: 'Retry provider/model check',
+					},
+				],
+				status,
+			};
+		},
+		title: 'Pi provider and model readiness',
+	});
+
+	return check(context);
 }
 
 /** Builds the snapshot for the Pi executable discovery check. */
-export async function getPiExecutableCheck({
+export function getPiExecutableCheck({
 	context,
 	piExecutableService,
 }: {
 	context: SetupCheckProviderContext;
 	piExecutableService: PiExecutableService;
-}): Promise<SetupCheckSnapshot> {
-	try {
-		const executable = await piExecutableService.getSnapshot();
-		const status =
-			executable.status === 'ok'
-				? 'success'
-				: executable.status === 'warning'
-					? 'warning'
-					: 'failure';
-		const detail =
-			status === 'success'
-				? `Pi executable selected from ${formatSourceLabel(
-						executable.source,
-					)}: ${executable.displayPath}. ${formatProbeDetail(executable)}`
-				: status === 'warning'
-					? `Pi executable is present at ${executable.displayPath}, but version/help probing needs attention.`
-					: getPiExecutableFailureDetail(executable.diagnostics);
-
-		return createSetupCheckSnapshot({
-			blocking: true,
-			description:
-				'Discovers a Pi-compatible executable without changing the normal Pi user environment.',
-			detail,
-			group: 'pi',
-			id: 'pi-executable',
-			logs: createPiExecutableLogs(executable),
-			remediationActions: createPiExecutableRemediationActions(executable),
-			status,
-			title: 'Pi executable',
-			updatedAt: context.now().toISOString(),
-		});
-	} catch (error) {
-		return createSetupCheckSnapshot({
-			blocking: true,
-			description:
-				'Discovers a Pi-compatible executable without changing the normal Pi user environment.',
+}) {
+	const check = defineCheck<SetupCheckProviderContext>({
+		blocking: true,
+		description:
+			'Discovers a Pi-compatible executable without changing the normal Pi user environment.',
+		group: 'pi',
+		id: 'pi-executable',
+		onError: (error) => ({
 			detail:
 				error instanceof Error
 					? error.message
 					: 'Unknown Pi executable check error.',
-			group: 'pi',
-			id: 'pi-executable',
-			logs: [],
 			remediationActions: [
 				{
 					id: 'select-pi-executable',
@@ -262,11 +211,35 @@ export async function getPiExecutableCheck({
 					label: 'Retry Pi executable check',
 				},
 			],
-			status: 'failure',
-			title: 'Pi executable',
-			updatedAt: context.now().toISOString(),
-		});
-	}
+		}),
+		run: async () => {
+			const executable = await piExecutableService.getSnapshot();
+			const status =
+				executable.status === 'ok'
+					? 'success'
+					: executable.status === 'warning'
+						? 'warning'
+						: 'failure';
+			const detail =
+				status === 'success'
+					? `Pi executable selected from ${formatSourceLabel(
+							executable.source,
+						)}: ${executable.displayPath}. ${formatProbeDetail(executable)}`
+					: status === 'warning'
+						? `Pi executable is present at ${executable.displayPath}, but version/help probing needs attention.`
+						: getPiExecutableFailureDetail(executable.diagnostics);
+
+			return {
+				detail,
+				logs: createPiExecutableLogs(executable),
+				remediationActions: createPiExecutableRemediationActions(executable),
+				status,
+			};
+		},
+		title: 'Pi executable',
+	});
+
+	return check(context);
 }
 
 /** Builds the remediation actions surfaced by the Pi executable check. */

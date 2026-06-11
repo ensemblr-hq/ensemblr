@@ -1,7 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
+import type { PiPersistedEnvelope } from '../../../shared/ipc';
+
 export type PiEventStream = 'protocol' | 'stderr';
+
+/**
+ * Persisted payload type. The storage column itself accepts opaque JSON so
+ * older rows or future variants don't fail to load, but Ensemble writers
+ * always insert a {@link PiPersistedEnvelope}; a `null` only surfaces when the
+ * stored JSON failed to parse or predates this contract.
+ */
+export type PiEventPayload = PiPersistedEnvelope | null;
 
 export interface PiEventRow {
 	branchId: string;
@@ -9,7 +19,7 @@ export interface PiEventRow {
 	eventType: string;
 	id: string;
 	ordinal: number;
-	payload: unknown;
+	payload: PiEventPayload;
 	stream: PiEventStream;
 	turnId: string | null;
 }
@@ -17,7 +27,7 @@ export interface PiEventRow {
 export interface AppendPiEventInput {
 	branchId: string;
 	eventType: string;
-	payload?: unknown;
+	payload?: PiEventPayload;
 	stream?: PiEventStream;
 	turnId?: string | null;
 }
@@ -166,6 +176,22 @@ export function getEventById({
 	return row ? mapEventRow(row) : null;
 }
 
+/** Returns the largest ordinal stored for a branch, or -1 when empty. */
+export function getMaxOrdinalForBranch({
+	database,
+	branchId,
+}: {
+	database: DatabaseSync;
+	branchId: string;
+}): number {
+	const row = database
+		.prepare(
+			`SELECT COALESCE(MAX(ordinal), -1) AS max FROM pi_session_events WHERE branch_id = ?`,
+		)
+		.get(branchId) as { max: number } | undefined;
+	return row?.max ?? -1;
+}
+
 /** Returns events for a branch in ordinal order. */
 export function listEventsByBranch({
 	database,
@@ -228,7 +254,7 @@ function mapEventRow(row: EventRowShape): PiEventRow {
 	};
 }
 
-function serializePayload(payload: unknown): string {
+function serializePayload(payload: PiEventPayload | undefined): string {
 	if (payload === undefined) {
 		return '{}';
 	}
@@ -239,9 +265,11 @@ function serializePayload(payload: unknown): string {
 	}
 }
 
-function parsePayload(raw: string): unknown {
+function parsePayload(raw: string): PiEventPayload {
 	try {
-		return JSON.parse(raw);
+		// The store accepts opaque JSON; callers always insert envelopes, so
+		// the parsed shape matches `PiPersistedEnvelope` on the read path.
+		return JSON.parse(raw) as PiEventPayload;
 	} catch {
 		return null;
 	}

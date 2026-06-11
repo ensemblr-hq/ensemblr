@@ -13,9 +13,11 @@ import type {
 
 import { SetupDiagnosticsCompact } from './compact';
 import { LocalExecutionNotice } from './local-execution-notice';
-import { RootDirectoryChangeDialog } from './root-directory-change-dialog';
+import {
+	RootDirectoryChangeDialog,
+	useRootDirectoryChange,
+} from './root-directory';
 import { SetupCheckRow } from './setup-check-row';
-import { useRootDirectoryChange } from './use-root-directory-change';
 
 interface SetupDiagnosticsPanelProps {
 	error?: string | null;

@@ -1,25 +1,29 @@
 import { homedir } from 'node:os';
 
 import type {
-	EnvironmentVariablesSnapshot,
 	SetupCheckId,
-	SetupCheckLogSnapshot,
 	SetupCheckSnapshot,
 	SetupDiagnosticsSnapshot,
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleConfigService } from '../config/config-loader';
 import type { EnvironmentVariablesService } from '../environment/environment-variables';
-import type { PiExecutableService } from '../pi/pi-executable';
-import type { PiReadinessService } from '../pi/pi-readiness';
+import type { PiExecutableService } from '../pi-runtime/pi-executable';
+import type { PiReadinessService } from '../pi-runtime/pi-readiness';
 import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
 import type { EnsembleDatabaseService } from '../storage/database';
 import {
-	appendCommandStreamLogs,
 	createSetupCheckSnapshot,
 	type SetupCheckProvider,
-	type SetupCheckProviderContext,
 } from './setup-check-context.ts';
+import {
+	getConfigCheck,
+	getDatabaseCheck,
+	getEnvironmentVariablesCheck,
+	getManagedDirectoriesCheck,
+	getRootDirectoryCheck,
+	getShellProcessCheck,
+} from './setup-checks-core.ts';
 import {
 	getGitExecutableCheck,
 	getGitHubAuthCheck,
@@ -129,7 +133,11 @@ export function createSetupDiagnosticsService({
 				updatedAt: now().toISOString(),
 			}),
 		'managed-directories': () =>
-			getManagedDirectoriesCheck({ context, rootDirectoryService }),
+			getManagedDirectoriesCheck({
+				context,
+				formatSafeText,
+				rootDirectoryService,
+			}),
 		'pi-agent-directory': () =>
 			getPiAgentDirectoryCheck({ context, piReadinessService }),
 		'pi-executable': () =>
@@ -138,10 +146,11 @@ export function createSetupDiagnosticsService({
 			getPiProviderModelCheck({ context, piReadinessService }),
 		'pi-rpc': () => getPiRpcCheck({ context, piReadinessService }),
 		'root-directory': () =>
-			getRootDirectoryCheck({ context, rootDirectoryService }),
+			getRootDirectoryCheck({ context, formatSafeText, rootDirectoryService }),
 		'shell-process-launch': () =>
 			getShellProcessCheck({ context, localCommandService }),
-		'sqlite-database': () => getDatabaseCheck({ context, databaseService }),
+		'sqlite-database': () =>
+			getDatabaseCheck({ context, databaseService, formatSafeText }),
 	};
 
 	return {
@@ -158,441 +167,6 @@ export function createSetupDiagnosticsService({
 			return createDiagnosticsSnapshot(checks, now().toISOString());
 		},
 	};
-}
-
-/** Builds the snapshot for the declarative-config setup check. */
-function getConfigCheck({
-	configService,
-	context,
-}: {
-	configService: EnsembleConfigService;
-	context: SetupCheckProviderContext;
-}): SetupCheckSnapshot {
-	const config = configService.getSnapshot();
-	const diagnostics = config.diagnostics.map(
-		(diagnostic) => `${diagnostic.code}: ${diagnostic.message}`,
-	);
-	const status = config.blocksReadiness
-		? 'failure'
-		: config.status === 'ok' || config.status === 'missing'
-			? 'success'
-			: 'warning';
-	const detail =
-		diagnostics[0] ??
-		(config.status === 'missing'
-			? 'No declarative config file was found; built-in defaults are active.'
-			: 'Declarative config loaded.');
-
-	return createSetupCheckSnapshot({
-		blocking: true,
-		description:
-			'Loads ~/.config/ensemble/config.json and validates whether config can be trusted before setup continues.',
-		detail,
-		group: 'core',
-		id: 'config',
-		logs: diagnostics.map((diagnostic) => ({
-			label: 'Config diagnostic',
-			text: diagnostic,
-		})),
-		remediationActions: [
-			{
-				id: 'open-config-settings',
-				kind: 'open-settings',
-				label: 'Open config diagnostics',
-				target: 'config',
-			},
-			{
-				id: 'retry-config',
-				kind: 'retry',
-				label: 'Retry config check',
-			},
-		],
-		status,
-		title: 'Declarative config',
-		updatedAt: context.now().toISOString(),
-	});
-}
-
-/** Builds the snapshot for the environment-variables setup check. */
-async function getEnvironmentVariablesCheck({
-	context,
-	environmentVariablesService,
-}: {
-	context: SetupCheckProviderContext;
-	environmentVariablesService: EnvironmentVariablesService;
-}): Promise<SetupCheckSnapshot> {
-	try {
-		const snapshot = await environmentVariablesService.getSnapshot();
-		const errorCount = snapshot.diagnostics.filter(
-			(diagnostic) => diagnostic.severity === 'error',
-		).length;
-		const warningCount = snapshot.diagnostics.filter(
-			(diagnostic) => diagnostic.severity === 'warning',
-		).length;
-		const blocking = snapshot.requiredCount > 0;
-		const status =
-			snapshot.missingRequiredCount > 0
-				? 'failure'
-				: errorCount > 0 || warningCount > 0
-					? 'warning'
-					: 'success';
-		const detail = getEnvironmentVariablesDetail(snapshot);
-
-		return createSetupCheckSnapshot({
-			blocking,
-			description:
-				'Checks the global environment variable catalog and safe secret metadata without printing values.',
-			detail,
-			group: 'core',
-			id: 'environment-variables',
-			logs: createEnvironmentVariablesLogs(snapshot),
-			remediationActions: [
-				{
-					id: 'open-environment-settings',
-					kind: 'open-settings',
-					label: 'Open environment settings',
-					target: 'environment',
-				},
-				{
-					id: 'retry-environment-variables',
-					kind: 'retry',
-					label: 'Retry environment check',
-				},
-			],
-			status,
-			title: 'Environment variables',
-			updatedAt: context.now().toISOString(),
-		});
-	} catch (error) {
-		return createSetupCheckSnapshot({
-			blocking: false,
-			description:
-				'Checks the global environment variable catalog and safe secret metadata without printing values.',
-			detail:
-				error instanceof Error
-					? error.message
-					: 'Unknown environment variable check error.',
-			group: 'core',
-			id: 'environment-variables',
-			logs: [],
-			status: 'warning',
-			title: 'Environment variables',
-			updatedAt: context.now().toISOString(),
-		});
-	}
-}
-
-/** Builds the snapshot for the SQLite database setup check. */
-function getDatabaseCheck({
-	context,
-	databaseService,
-}: {
-	context: SetupCheckProviderContext;
-	databaseService: EnsembleDatabaseService;
-}): SetupCheckSnapshot {
-	const database = databaseService.getHealth();
-	const status = database.status === 'ok' ? 'success' : 'failure';
-	const safePath = formatSafeText(database.path, context.homeDirectory);
-	const detail =
-		database.status === 'ok'
-			? `SQLite opened at ${safePath}; schema version ${database.schemaVersion}.`
-			: (database.error ?? `SQLite failed to open at ${safePath}.`);
-
-	return createSetupCheckSnapshot({
-		blocking: true,
-		description:
-			'Opens the local app-support SQLite database and verifies migrations completed.',
-		detail,
-		group: 'storage',
-		id: 'sqlite-database',
-		logs: [
-			{
-				label: 'Database path',
-				text: safePath,
-			},
-			...(database.error
-				? [
-						{
-							label: 'Database error',
-							text: database.error,
-						},
-					]
-				: []),
-		],
-		remediationActions: [
-			{
-				id: 'retry-database',
-				kind: 'retry',
-				label: 'Retry database check',
-			},
-		],
-		status,
-		title: 'SQLite database',
-		updatedAt: context.now().toISOString(),
-	});
-}
-
-/** Builds the snapshot for the Ensemble root-directory setup check. */
-function getRootDirectoryCheck({
-	context,
-	rootDirectoryService,
-}: {
-	context: SetupCheckProviderContext;
-	rootDirectoryService: EnsembleRootDirectoryService;
-}): SetupCheckSnapshot {
-	const root =
-		rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
-	const status =
-		root.status === 'ok'
-			? 'success'
-			: root.status === 'warning'
-				? 'warning'
-				: 'failure';
-	const safePath = formatSafeText(root.path, context.homeDirectory);
-	const detail =
-		root.diagnostics[0]?.message ?? `Ensemble root is ready at ${safePath}.`;
-
-	return createSetupCheckSnapshot({
-		blocking: true,
-		description:
-			'Validates the configured Ensemble root directory before repositories and workspaces are created.',
-		detail,
-		group: 'storage',
-		id: 'root-directory',
-		logs: [
-			{
-				label: 'Root path',
-				text: safePath,
-			},
-			...root.diagnostics.map((diagnostic) => ({
-				label: diagnostic.code,
-				text: diagnostic.path
-					? `${diagnostic.message} ${formatSafeText(
-							diagnostic.path,
-							context.homeDirectory,
-						)}`
-					: diagnostic.message,
-			})),
-		],
-		remediationActions: [
-			{
-				id: 'choose-root-directory',
-				kind: 'select-path',
-				label: 'Choose another root',
-				target: 'rootDirectory',
-			},
-			{
-				id: 'retry-root-directory',
-				kind: 'retry',
-				label: 'Retry root check',
-			},
-		],
-		status,
-		title: 'Root directory',
-		updatedAt: context.now().toISOString(),
-	});
-}
-
-/** Builds the snapshot for the managed-directories setup check. */
-function getManagedDirectoriesCheck({
-	context,
-	rootDirectoryService,
-}: {
-	context: SetupCheckProviderContext;
-	rootDirectoryService: EnsembleRootDirectoryService;
-}): SetupCheckSnapshot {
-	const root =
-		rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
-	const failingPaths = root.managedPaths.filter(
-		(managedPath) =>
-			managedPath.status === 'invalid' || managedPath.status === 'missing',
-	);
-	const status = failingPaths.length > 0 ? 'failure' : 'success';
-	const detail =
-		failingPaths.length > 0
-			? `Managed directories need attention: ${failingPaths
-					.map((managedPath) => managedPath.key)
-					.join(', ')}.`
-			: 'Managed repos, workspaces, and archived-contexts directories are ready.';
-
-	return createSetupCheckSnapshot({
-		blocking: true,
-		description:
-			'Checks repos, workspaces, and archived-contexts under the selected root.',
-		detail,
-		group: 'storage',
-		id: 'managed-directories',
-		logs: root.managedPaths.map((managedPath) => ({
-			label: managedPath.key,
-			text: `${managedPath.status}: ${formatSafeText(
-				managedPath.path,
-				context.homeDirectory,
-			)}`,
-		})),
-		remediationActions: [
-			{
-				id: 'retry-managed-directories',
-				kind: 'retry',
-				label: 'Retry directory check',
-			},
-		],
-		status,
-		title: 'Managed directories',
-		updatedAt: context.now().toISOString(),
-	});
-}
-
-/** Builds the snapshot for the shell-process-launch setup check. */
-async function getShellProcessCheck({
-	context,
-	localCommandService,
-}: {
-	context: SetupCheckProviderContext;
-	localCommandService: LocalCommandService;
-}): Promise<SetupCheckSnapshot> {
-	try {
-		const environment = await localCommandService.getEnvironment();
-		const result = await localCommandService.run({
-			args: ['-lc', 'printf ensemble-process-ok'],
-			command: environment.shell,
-			maxOutputBytes: 1024,
-			timeoutMs: 1500,
-		});
-		const logs: SetupCheckLogSnapshot[] = environment.diagnostics.map(
-			(diagnostic) => ({
-				label: diagnostic.code,
-				text: diagnostic.message,
-			}),
-		);
-
-		appendCommandStreamLogs(logs, result);
-
-		if (result.status !== 'success') {
-			return createSetupCheckSnapshot({
-				blocking: true,
-				description:
-					'Verifies Electron can launch local commands through the user shell environment.',
-				detail:
-					result.failure?.message ?? 'The process launch smoke check failed.',
-				group: 'core',
-				id: 'shell-process-launch',
-				logs,
-				status: 'failure',
-				title: 'Shell and process launch',
-				updatedAt: context.now().toISOString(),
-			});
-		}
-
-		const status =
-			environment.source === 'fallback' || environment.diagnostics.length > 0
-				? 'warning'
-				: 'success';
-		const detail =
-			status === 'success'
-				? 'Commands launch successfully with the shell-derived environment.'
-				: 'Commands launch successfully, but shell environment resolution used a fallback.';
-
-		return createSetupCheckSnapshot({
-			blocking: true,
-			description:
-				'Verifies Electron can launch local commands through the user shell environment.',
-			detail,
-			group: 'core',
-			id: 'shell-process-launch',
-			logs,
-			status,
-			title: 'Shell and process launch',
-			updatedAt: context.now().toISOString(),
-		});
-	} catch (error) {
-		return createSetupCheckSnapshot({
-			blocking: true,
-			description:
-				'Verifies Electron can launch local commands through the user shell environment.',
-			detail: error instanceof Error ? error.message : 'Unknown process error.',
-			group: 'core',
-			id: 'shell-process-launch',
-			logs: [],
-			status: 'failure',
-			title: 'Shell and process launch',
-			updatedAt: context.now().toISOString(),
-		});
-	}
-}
-
-/** Per-status counts derived from an env-vars snapshot. */
-interface EnvironmentVariableStatusCounts {
-	configured: number;
-	masked: number;
-	reserved: number;
-}
-
-/** Counts how many variables fall into each status bucket. */
-function countEnvironmentVariableStatuses(
-	snapshot: EnvironmentVariablesSnapshot,
-): EnvironmentVariableStatusCounts {
-	let configured = 0;
-	let masked = 0;
-	let reserved = 0;
-	for (const variable of snapshot.variables) {
-		if (variable.status === 'set' || variable.status === 'masked') {
-			configured += 1;
-		}
-		if (variable.status === 'masked') {
-			masked += 1;
-		}
-		if (variable.status === 'reserved') {
-			reserved += 1;
-		}
-	}
-	return { configured, masked, reserved };
-}
-
-/** Renders the headline detail string for the env-vars check. */
-function getEnvironmentVariablesDetail(
-	snapshot: EnvironmentVariablesSnapshot,
-): string {
-	if (snapshot.missingRequiredCount > 0) {
-		return `${snapshot.missingRequiredCount} required environment variables are unset.`;
-	}
-
-	const { configured, masked, reserved } =
-		countEnvironmentVariableStatuses(snapshot);
-
-	return `${configured} configured variables, ${masked} masked secrets, and ${reserved} reserved runtime variables are cataloged.`;
-}
-
-/** Renders the per-variable counts and diagnostics as setup check logs. */
-function createEnvironmentVariablesLogs(
-	snapshot: EnvironmentVariablesSnapshot,
-): SetupCheckLogSnapshot[] {
-	const { configured, masked, reserved } =
-		countEnvironmentVariableStatuses(snapshot);
-
-	return [
-		{
-			label: 'Catalog entries',
-			text: String(snapshot.catalog.length),
-		},
-		{
-			label: 'Configured variables',
-			text: String(configured),
-		},
-		{
-			label: 'Masked secrets',
-			text: String(masked),
-		},
-		{
-			label: 'Reserved runtime variables',
-			text: String(reserved),
-		},
-		...snapshot.diagnostics.map((diagnostic) => ({
-			label: diagnostic.code,
-			text: diagnostic.key
-				? `${diagnostic.key}: ${diagnostic.message}`
-				: diagnostic.message,
-		})),
-	];
 }
 
 /** Builds a `pending` setup check snapshot for not-yet-implemented checks. */

@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { KeyboardEvent } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
 	githubRepositoryListQuery,
@@ -17,6 +16,10 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
+import {
+	type KeymapBinding,
+	useKeymapHandler,
+} from '@/renderer/hooks/use-keymap-handler';
 import type { GithubRepositoryEntry } from '@/shared/ipc';
 
 import { joinDestination } from './clone-destination.ts';
@@ -121,15 +124,18 @@ function CloneGithubDialogForm({
 		);
 	}, [canClone, location, startClone, trimmedUrl]);
 
-	const handleSubmitKey = useCallback(
-		(event: KeyboardEvent<HTMLInputElement>) => {
-			if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-				event.preventDefault();
-				handleClone();
-			}
-		},
+	const submitBindings = useMemo<readonly KeymapBinding<HTMLInputElement>[]>(
+		() => [
+			[
+				'dialog.submit',
+				() => {
+					handleClone();
+				},
+			],
+		],
 		[handleClone],
 	);
+	const handleSubmitKey = useKeymapHandler(submitBindings);
 
 	return (
 		<>

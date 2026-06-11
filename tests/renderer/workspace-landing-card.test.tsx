@@ -2,168 +2,78 @@ import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { WorkspaceLandingCard } from '../../src/renderer/components/workbench-shell/conversation-panel';
-import type {
-	ComposerShellState,
-	WorkspaceLandingSummary,
-} from '../../src/renderer/types/workbench';
+import type { WorkspaceLandingSummary } from '../../src/renderer/types/workbench';
 
-const COMPOSER_DEFAULTS = {
-	availableModels: [],
-	availableThinkingLevels: [],
-	isStreaming: false,
-	modelId: 'gpt-5.5',
-	onModelChange: () => undefined,
-	onStop: () => undefined,
-	onSubmit: () => undefined,
-	onThinkingChange: () => undefined,
-	thinkingLevel: 'high',
-} as const;
-
-const READY_COMPOSER: ComposerShellState = {
-	...COMPOSER_DEFAULTS,
-	disabled: false,
-	disabledReason: null,
-	modelLabel: 'GPT-5.5 via Pi',
-	placeholder: 'Ask Pi to continue review shell',
-	thinkingLabel: 'High',
-};
-
-const BLOCKED_COMPOSER: ComposerShellState = {
-	...COMPOSER_DEFAULTS,
-	disabled: true,
-	disabledReason: '3 required setup checks need attention.',
-	modelLabel: 'Pi model pending',
-	placeholder: 'Fix setup blockers before sending a prompt.',
-	thinkingLabel: 'Thinking pending',
-};
-
-const DEFAULT_NAME = 'New landing fixture';
-const DEFAULT_PATH = '~/Ensemble/workspaces/ensemble/new-landing';
-
-function renderCard(
-	landingSummary: WorkspaceLandingSummary | null,
-	composer: ComposerShellState = READY_COMPOSER,
-) {
+function renderCard(landingSummary: WorkspaceLandingSummary | null) {
 	return renderToStaticMarkup(
-		<WorkspaceLandingCard
-			composer={composer}
-			landingSummary={landingSummary}
-			name={DEFAULT_NAME}
-			pathLabel={DEFAULT_PATH}
-		/>,
+		<WorkspaceLandingCard landingSummary={landingSummary} />,
 	);
 }
 
-test('local-branch landing card surfaces branch source and missing setup script guidance', () => {
+test('local-branch landing card surfaces repo name, branch, and copied count', () => {
 	const markup = renderCard({
 		branchSource: {
-			baseBranch: 'master',
-			branchName: 'philipp/the-123-landing',
+			baseBranch: 'origin/master',
+			branchName: 'psoldunov/stockholm',
 			detail: 'Worktree branched from master.',
 		},
 		copiedFiles: {
-			count: 3,
-			detail: 'Copied .env.local, .npmrc, and .agents config from repository.',
+			count: 665,
+			detail: 'Copied 665 local-only files from repository.',
 			state: 'copied',
 		},
 		headline: 'New workspace ready',
 		kind: 'local-branch',
+		repositoryName: 'ensemble',
 		setupGuidance: {
 			detail: 'No setup script is configured for this repository.',
 			state: 'missing',
 		},
+		workspaceName: 'stockholm',
 	});
 
 	expect(markup).toContain('Workspace landing summary');
 	expect(markup).toContain('data-landing-card-kind="local-branch"');
-	expect(markup).toContain('New workspace ready');
-	expect(markup).toContain('philipp/the-123-landing');
-	expect(markup).toContain('master');
-	expect(markup).toContain('3');
-	expect(markup).toContain('files copied');
-	expect(markup).not.toContain('Linked issue');
-	// Diagnostic surface area is gone — chat tab stays chat-only (THE-130).
+	expect(markup).toContain('ensemble');
+	expect(markup).toContain('stockholm');
+	expect(markup).toContain('psoldunov/stockholm');
+	expect(markup).toContain('origin/master');
+	expect(markup).toContain('665');
+	expect(markup).toContain('Branched');
+	expect(markup).toContain('Created');
+	expect(markup).toContain('copied');
 	expect(markup).not.toContain('Pi composer not ready');
 	expect(markup).not.toContain('Add a setup script');
-	expect(markup).not.toContain('data-landing-composer-state');
+	expect(markup).not.toContain('Linked issue');
 });
 
-test('cloned-repo landing card shows clone-specific copy and run-script command', () => {
+test('cloned-repo landing card omits base-branch suffix when not provided', () => {
 	const markup = renderCard({
 		branchSource: {
-			baseBranch: 'main',
 			branchName: 'main',
 			detail: 'Fresh clone checked out the default branch.',
 		},
 		copiedFiles: {
 			count: 0,
-			detail:
-				'No local-only files were available to copy from the source clone.',
+			detail: 'No local-only files were available to copy from the source.',
 			state: 'skipped',
 		},
 		headline: 'Repository cloned',
 		kind: 'cloned-repo',
+		repositoryName: 'monrovia',
 		setupGuidance: {
-			command: 'bun install',
 			detail: 'Run the configured setup script to bootstrap dependencies.',
 			state: 'configured',
 		},
+		workspaceName: 'main',
 	});
 
 	expect(markup).toContain('data-landing-card-kind="cloned-repo"');
-	expect(markup).toContain('Repository cloned');
-	expect(markup).toContain('Fresh clone checked out the default branch.');
-	expect(markup).toContain('files skipped');
-	// Setup-script badge + command moved out of the chat tab.
-	expect(markup).not.toContain('Configured');
+	expect(markup).toContain('monrovia');
+	expect(markup).toContain('main');
+	expect(markup).toContain('0');
+	expect(markup).not.toContain('from <');
 	expect(markup).not.toContain('bun install');
-	expect(markup).not.toContain('files copied');
-});
-
-test('linear-linked landing card shows linked issue metadata and composer-blocked notice', () => {
-	const markup = renderCard(
-		{
-			branchSource: {
-				baseBranch: 'master',
-				branchName: 'philipp/the-148-from-linear',
-				detail: 'Worktree branched from master.',
-			},
-			copiedFiles: {
-				count: 5,
-				detail: 'Copied editor and CLI dotfiles from repository.',
-				state: 'copied',
-			},
-			headline: 'Workspace seeded from Linear issue',
-			kind: 'linked-issue',
-			linkedIssue: {
-				provider: 'linear',
-				reference: 'THE-148',
-				subtitle: 'Ensemble · Todo',
-				title: 'Workspace creation from Linear issue',
-				url: 'https://linear.app/theswisscheese/issue/THE-148',
-			},
-			setupGuidance: {
-				command: 'bun install',
-				detail: 'Configured setup script has not run yet.',
-				state: 'pending',
-			},
-		},
-		BLOCKED_COMPOSER,
-	);
-
-	expect(markup).toContain('data-landing-card-kind="linked-issue"');
-	expect(markup).toContain('Workspace seeded from Linear issue');
-	expect(markup).toContain('Linked issue');
-	expect(markup).toContain('THE-148');
-	expect(markup).toContain('linear');
-	expect(markup).toContain('Workspace creation from Linear issue');
-	expect(markup).toContain('Ensemble · Todo');
-	// Diagnostic content (setup state, composer-not-ready, blocked counts)
-	// belongs in the sidebar footer + settings → diagnostics now (THE-130).
-	expect(markup).not.toContain('Not run yet');
-	expect(markup).not.toContain('data-landing-composer-state');
-	expect(markup).not.toContain('Pi composer not ready');
-	expect(markup).not.toContain('3 required setup checks need attention.');
 });
 
 test('omits the landing card when no summary is provided', () => {

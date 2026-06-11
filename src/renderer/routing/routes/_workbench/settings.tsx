@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { SettingsShell } from '@/renderer/components/settings/settings-shell';
-import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
+import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 
 export const Route = createFileRoute('/_workbench/settings')({
 	component: SettingsRoute,

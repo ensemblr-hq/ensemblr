@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import type { GithubRepositoryEntry } from '@/shared/ipc';
 
@@ -43,12 +44,13 @@ export function CloneGithubRecentRepos({
 					const isSelected = selectedUrl === expectedUrl;
 					return (
 						<li key={repo.fullName}>
-							<button
+							<Button
 								aria-pressed={isSelected}
-								className='flex w-full items-center gap-2.5 px-2.5 py-2 text-left transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-60 aria-pressed:bg-muted'
+								className='h-auto w-full justify-start gap-2.5 rounded-none px-2.5 py-2 font-normal'
 								disabled={disabled}
 								onClick={() => onSelect(repo)}
-								type='button'
+								size='sm'
+								variant='ghost'
 							>
 								<OwnerAvatar
 									avatarUrl={repo.avatarUrl}
@@ -69,7 +71,7 @@ export function CloneGithubRecentRepos({
 										</span>
 									) : null}
 								</span>
-							</button>
+							</Button>
 						</li>
 					);
 				})}

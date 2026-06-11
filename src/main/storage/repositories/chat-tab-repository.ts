@@ -119,6 +119,45 @@ export function closeChatTab({
 	return getChatTabById({ database, id });
 }
 
+/** Reopens a closed chat tab and moves it to the end of the open-tab ordering. */
+export function restoreChatTab({
+	database,
+	id,
+}: {
+	database: DatabaseSync;
+	id: string;
+}): ChatTabRow | null {
+	const existing = getChatTabById({ database, id });
+	if (!existing) {
+		return null;
+	}
+	if (existing.closedAt === null) {
+		return existing;
+	}
+
+	database.exec('BEGIN IMMEDIATE');
+	try {
+		const next = database
+			.prepare(
+				`SELECT COALESCE(MAX(position), -1) + 1 AS next FROM chat_tabs WHERE workspace_id = ? AND closed_at IS NULL`,
+			)
+			.get(existing.workspaceId) as { next: number };
+
+		database
+			.prepare(
+				`UPDATE chat_tabs SET closed_at = NULL, position = ? WHERE id = ?`,
+			)
+			.run(next.next, id);
+
+		database.exec('COMMIT');
+	} catch (error) {
+		database.exec('ROLLBACK');
+		throw error;
+	}
+
+	return getChatTabById({ database, id });
+}
+
 /** Renames the chat tab title. */
 export function renameChatTab({
 	database,
@@ -133,6 +172,32 @@ export function renameChatTab({
 		.prepare(`UPDATE chat_tabs SET title = ? WHERE id = ?`)
 		.run(title, id);
 	return getChatTabById({ database, id });
+}
+
+/** Replaces the JSON metadata blob for a chat tab. */
+export function setChatTabMetadata({
+	database,
+	id,
+	metadata,
+}: {
+	database: DatabaseSync;
+	id: string;
+	metadata: Record<string, unknown>;
+}): void {
+	database
+		.prepare(`UPDATE chat_tabs SET metadata_json = ? WHERE id = ?`)
+		.run(JSON.stringify(metadata), id);
+}
+
+/** Permanently removes a chat tab row, used for empty tabs with no history. */
+export function deleteChatTab({
+	database,
+	id,
+}: {
+	database: DatabaseSync;
+	id: string;
+}): void {
+	database.prepare(`DELETE FROM chat_tabs WHERE id = ?`).run(id);
 }
 
 /** Returns a tab by id (open or closed), or `null` when no row matches. */
@@ -164,6 +229,78 @@ export function listOpenChatTabs({
 		.all(workspaceId) as unknown as ChatTabRowShape[];
 
 	return rows.map(mapTabRow);
+}
+
+/** Alias for {@link listOpenChatTabs} matching the wire-contract naming. */
+export function listOpenForWorkspace({
+	database,
+	workspaceId,
+}: {
+	database: DatabaseSync;
+	workspaceId: string;
+}): readonly ChatTabRow[] {
+	return listOpenChatTabs({ database, workspaceId });
+}
+
+/**
+ * Returns all closed tabs for a workspace, most-recently closed first. Used to
+ * rehydrate the "previous chats" history surface in the renderer.
+ */
+export function listClosedForWorkspace({
+	database,
+	workspaceId,
+}: {
+	database: DatabaseSync;
+	workspaceId: string;
+}): readonly ChatTabRow[] {
+	const rows = database
+		.prepare(
+			`${SELECT_TAB} WHERE workspace_id = ? AND closed_at IS NOT NULL ORDER BY closed_at DESC, opened_at DESC`,
+		)
+		.all(workspaceId) as unknown as ChatTabRowShape[];
+
+	return rows.map(mapTabRow);
+}
+
+/** Marks a tab as closed. Alias for {@link closeChatTab}. */
+export function markClosed({
+	database,
+	id,
+}: {
+	database: DatabaseSync;
+	id: string;
+}): ChatTabRow | null {
+	return closeChatTab({ database, id });
+}
+
+/** Reopens a closed tab. Alias for {@link restoreChatTab}. */
+export function restoreClosedChatTab({
+	database,
+	id,
+}: {
+	database: DatabaseSync;
+	id: string;
+}): ChatTabRow | null {
+	return restoreChatTab({ database, id });
+}
+
+/**
+ * Attaches an existing Pi session to a chat tab. Returns the updated row, or
+ * `null` when no tab with `id` exists.
+ */
+export function bindPiSession({
+	database,
+	id,
+	piSessionId,
+}: {
+	database: DatabaseSync;
+	id: string;
+	piSessionId: string;
+}): ChatTabRow | null {
+	database
+		.prepare(`UPDATE chat_tabs SET pi_session_id = ? WHERE id = ?`)
+		.run(piSessionId, id);
+	return getChatTabById({ database, id });
 }
 
 /** Returns all open tabs bound to a given Pi session, in position order. */

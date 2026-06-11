@@ -64,7 +64,11 @@ test('appendPiEvent allocates ordinals starting at zero', (t) => {
 		input: {
 			branchId: fixture.branchId,
 			eventType: 'message',
-			payload: { role: 'user', text: 'hi' },
+			payload: {
+				kind: 'message',
+				payload: { kind: 'text', text: 'hi' },
+				role: 'user',
+			},
 			turnId: fixture.turnId,
 		},
 	});
@@ -73,7 +77,11 @@ test('appendPiEvent allocates ordinals starting at zero', (t) => {
 		input: {
 			branchId: fixture.branchId,
 			eventType: 'message',
-			payload: { role: 'agent', text: 'hello' },
+			payload: {
+				kind: 'message',
+				payload: { kind: 'text', text: 'hello' },
+				role: 'agent',
+			},
 			turnId: fixture.turnId,
 		},
 	});
@@ -81,7 +89,11 @@ test('appendPiEvent allocates ordinals starting at zero', (t) => {
 	assert.equal(first.ordinal, 0);
 	assert.equal(second.ordinal, 1);
 	assert.equal(first.stream, 'protocol');
-	assert.deepEqual(first.payload, { role: 'user', text: 'hi' });
+	assert.deepEqual(first.payload, {
+		kind: 'message',
+		payload: { kind: 'text', text: 'hi' },
+		role: 'user',
+	});
 });
 
 test('appendPiEvents batches inserts in a single transaction', (t) => {
@@ -91,15 +103,25 @@ test('appendPiEvents batches inserts in a single transaction', (t) => {
 		branchId: fixture.branchId,
 		database: fixture.database,
 		events: [
-			{ eventType: 'status', payload: { status: 'starting' } },
+			{
+				eventType: 'status',
+				payload: { kind: 'status', previous: 'idle', status: 'starting' },
+			},
 			{
 				eventType: 'message',
-				payload: { role: 'agent', text: 'one' },
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: 'one' },
+					role: 'agent',
+				},
 				turnId: fixture.turnId,
 			},
 			{
 				eventType: 'stderr',
-				payload: { line: 'warning x' },
+				payload: {
+					kind: 'error',
+					error: { message: 'warning x' },
+				},
 				stream: 'stderr',
 			},
 		],
@@ -126,7 +148,11 @@ test('listEventsByBranch supports fromOrdinal and limit', (t) => {
 		database: fixture.database,
 		events: Array.from({ length: 5 }, (_, index) => ({
 			eventType: 'message',
-			payload: { index },
+			payload: {
+				kind: 'message' as const,
+				payload: { kind: 'text' as const, text: `msg-${index}` },
+				role: 'agent' as const,
+			},
 		})),
 	});
 
@@ -150,7 +176,11 @@ test('listEventsByTurn filters by turn id', (t) => {
 		input: {
 			branchId: fixture.branchId,
 			eventType: 'message',
-			payload: { ok: true },
+			payload: {
+				kind: 'message',
+				payload: { kind: 'text', text: 'ok' },
+				role: 'agent',
+			},
 			turnId: fixture.turnId,
 		},
 	});
@@ -159,7 +189,7 @@ test('listEventsByTurn filters by turn id', (t) => {
 		input: {
 			branchId: fixture.branchId,
 			eventType: 'status',
-			payload: { status: 'idle' },
+			payload: { kind: 'status', previous: 'starting', status: 'idle' },
 		},
 	});
 
@@ -179,7 +209,7 @@ test('stderr events are stored on a separate stream and never marked protocol', 
 		input: {
 			branchId: fixture.branchId,
 			eventType: 'stderr-line',
-			payload: { line: 'pi: bad json' },
+			payload: { kind: 'error', error: { message: 'pi: bad json' } },
 			stream: 'stderr',
 		},
 	});

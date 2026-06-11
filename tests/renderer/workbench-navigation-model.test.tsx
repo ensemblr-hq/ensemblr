@@ -1,7 +1,17 @@
 import { expect, test } from 'bun:test';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { WorkbenchEmptyStateShell } from '../../src/renderer/components/workbench-empty-state';
+
+function withQueryClient(node: ReactNode): ReactNode {
+	const client = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	return <QueryClientProvider client={client}>{node}</QueryClientProvider>;
+}
+
 import {
 	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
@@ -309,39 +319,43 @@ test('uses previous navigation projects for route changes during loading gaps', 
 test('renders live navigation records and true empty repository state', () => {
 	const projects = mapNavigationSnapshotToProjects(navigationSnapshot);
 	const populatedMarkup = renderToStaticMarkup(
-		<WorkbenchEmptyStateShell
-			activeView='dashboard'
-			emptyState={{
-				detail: 'Previewing live navigation rows.',
-				title: 'No active workspace',
-			}}
-			health={{
-				detail: 'SQLite navigation fixture',
-				label: 'IPC online',
-				state: 'online',
-			}}
-			onStaticNavigationSelect={() => undefined}
-			onWorkspaceSelect={() => undefined}
-			projects={projects}
-		/>,
+		withQueryClient(
+			<WorkbenchEmptyStateShell
+				activeView='dashboard'
+				emptyState={{
+					detail: 'Previewing live navigation rows.',
+					title: 'No active workspace',
+				}}
+				health={{
+					detail: 'SQLite navigation fixture',
+					label: 'IPC online',
+					state: 'online',
+				}}
+				onStaticNavigationSelect={() => undefined}
+				onWorkspaceSelect={() => undefined}
+				projects={projects}
+			/>,
+		),
 	);
 	const emptyMarkup = renderToStaticMarkup(
-		<WorkbenchEmptyStateShell
-			activeView='dashboard'
-			emptyState={{
-				detail:
-					'Open or create a repository to populate the workspace navigation.',
-				title: 'No repositories yet',
-			}}
-			health={{
-				detail: 'SQLite navigation fixture',
-				label: 'IPC online',
-				state: 'online',
-			}}
-			onStaticNavigationSelect={() => undefined}
-			onWorkspaceSelect={() => undefined}
-			projects={[]}
-		/>,
+		withQueryClient(
+			<WorkbenchEmptyStateShell
+				activeView='dashboard'
+				emptyState={{
+					detail:
+						'Open or create a repository to populate the workspace navigation.',
+					title: 'No repositories yet',
+				}}
+				health={{
+					detail: 'SQLite navigation fixture',
+					label: 'IPC online',
+					state: 'online',
+				}}
+				onStaticNavigationSelect={() => undefined}
+				onWorkspaceSelect={() => undefined}
+				projects={[]}
+			/>,
+		),
 	);
 
 	expect(populatedMarkup).toContain('THE-120 Sidebar nav');

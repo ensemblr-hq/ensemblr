@@ -3,7 +3,6 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
-	ArchiveLifecycleDiagnostic,
 	UnarchivedWorkspaceSnapshot,
 	UnarchiveWorkspaceDiagnostic,
 	UnarchiveWorkspaceDiagnosticCode,
@@ -12,8 +11,23 @@ import type {
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import {
+	clearWorkspaceArchived,
+	selectArchivedWorkspaceJoinById,
+} from '../storage/repositories/workspace-repository.ts';
+import { withTransaction } from '../storage/tx.ts';
+import {
+	failureResult,
+	pushLifecycleDiagnostics,
+} from './archive-diagnostics.ts';
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
 import { runWorktreeAdd as runWorktreeAddShared } from './git-ops.ts';
+import {
+	hasWorkspaceRepositoryIdentity,
+	isNullableNumber,
+	isNullableString,
+	isRecord,
+} from './row-guards.ts';
 
 /** Public surface of the workspace unarchive service. */
 export interface UnarchiveWorkspaceService {
@@ -274,37 +288,7 @@ function readArchivedWorkspace(
 	database: DatabaseSync,
 	workspaceId: string,
 ): ArchivedWorkspace | null {
-	const row = database
-		.prepare(
-			`SELECT
-				w.id AS id,
-				w.slug AS slug,
-				w.repository_id AS repositoryId,
-				w.name AS name,
-				w.path AS path,
-				w.branch_name AS branchName,
-				w.archived_at AS archivedAt,
-				r.path AS repositoryPath,
-				r.name AS repositoryName,
-				r.slug AS repositorySlug,
-				a.id AS archiveRecordId,
-				a.base_branch AS baseBranch,
-				a.archived_context_path AS archivedContextPath,
-				a.branch_cleanup AS branchCleanupRaw
-			FROM workspaces w
-			INNER JOIN repositories r ON r.id = w.repository_id
-			LEFT JOIN archive_records a
-				ON a.workspace_id = w.id
-				AND a.record_type = 'workspace'
-				AND a.id = (
-					SELECT id FROM archive_records
-					WHERE workspace_id = w.id AND record_type = 'workspace'
-					ORDER BY archived_at DESC
-					LIMIT 1
-				)
-			WHERE w.id = ?`,
-		)
-		.get(workspaceId);
+	const row = selectArchivedWorkspaceJoinById({ database, workspaceId });
 
 	if (!isWorkspaceRow(row)) {
 		return null;
@@ -432,44 +416,17 @@ function clearArchivedAt({
 	unarchivedAt: string;
 	workspaceId: string;
 }): void {
-	database.exec('BEGIN');
-	try {
-		database
-			.prepare(
-				`UPDATE workspaces
-				SET archived_at = NULL, updated_at = ?
-				WHERE id = ?`,
-			)
-			.run(unarchivedAt, workspaceId);
-		database.exec('COMMIT');
-	} catch (error) {
-		database.exec('ROLLBACK');
-		throw error;
-	}
-}
-
-function pushLifecycleDiagnostics(
-	diagnostics: UnarchiveWorkspaceDiagnostic[],
-	lifecycle: ArchiveLifecycleDiagnostic[],
-): void {
-	for (const entry of lifecycle) {
-		diagnostics.push({
-			code: 'lifecycle-hook-failed',
-			message: entry.message,
-			path: entry.path,
-			severity: entry.severity,
-		});
-	}
+	withTransaction(database, () => {
+		clearWorkspaceArchived({ database, id: workspaceId, unarchivedAt });
+	});
 }
 
 function failure(
 	diagnostic: UnarchiveWorkspaceDiagnostic,
 ): UnarchiveWorkspaceResult {
-	return {
-		diagnostics: [diagnostic],
-		status: 'failure',
+	return failureResult(diagnostic, {
 		workspace: null,
-	};
+	});
 }
 
 interface WorkspaceRow {
@@ -490,31 +447,15 @@ interface WorkspaceRow {
 }
 
 function isWorkspaceRow(row: unknown): row is WorkspaceRow {
-	if (typeof row !== 'object' || row === null) {
+	if (!isRecord(row)) {
 		return false;
 	}
-	const candidate = row as Record<string, unknown>;
 	return (
-		typeof candidate.id === 'string' &&
-		typeof candidate.slug === 'string' &&
-		typeof candidate.name === 'string' &&
-		typeof candidate.path === 'string' &&
-		typeof candidate.repositoryId === 'string' &&
-		typeof candidate.repositoryName === 'string' &&
-		typeof candidate.repositoryPath === 'string' &&
-		typeof candidate.repositorySlug === 'string' &&
-		(candidate.branchName === null ||
-			typeof candidate.branchName === 'string') &&
-		(candidate.archivedAt === null ||
-			typeof candidate.archivedAt === 'string') &&
-		(candidate.archiveRecordId === null ||
-			typeof candidate.archiveRecordId === 'string') &&
-		(candidate.archivedContextPath === null ||
-			typeof candidate.archivedContextPath === 'string') &&
-		(candidate.baseBranch === null ||
-			typeof candidate.baseBranch === 'string') &&
-		(candidate.branchCleanupRaw === null ||
-			typeof candidate.branchCleanupRaw === 'number')
+		hasWorkspaceRepositoryIdentity(row) &&
+		isNullableString(row.archiveRecordId) &&
+		isNullableString(row.archivedContextPath) &&
+		isNullableString(row.baseBranch) &&
+		isNullableNumber(row.branchCleanupRaw)
 	);
 }
 

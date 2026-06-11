@@ -2,7 +2,7 @@ import { getRouteApi, useChildMatches } from '@tanstack/react-router';
 
 import { WorkbenchEmptyStateContent } from '@/renderer/components/workbench-empty-state';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
-import { useRouteProfilerMount } from '@/renderer/lib/instrumentation/route-profiler';
+import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import {
 	findWorkspaceNavigationSelection,
 	getEmptyStateCopy,

@@ -1,0 +1,31 @@
+{
+	"scenario": "file-edit",
+	"description": "Edit/diff events.",
+	"piArgs": [
+		"--mode",
+		"rpc",
+		"--no-session"
+	],
+	"cwd": "/sandbox/file-edit",
+	"startedAt": 1781134188142,
+	"endedAt": 1781134202173,
+	"sent": [
+		{
+			"ts": 1781134188142,
+			"command": {
+				"type": "prompt",
+				"message": "Fix the type error in src/broken.ts."
+			}
+		},
+		{
+			"ts": 1781134202134,
+			"command": {
+				"id": "final-stats",
+				"type": "get_session_stats"
+			}
+		}
+	],
+	"exitCondition": "completed",
+	"exitCode": 143,
+	"notes": []
+}

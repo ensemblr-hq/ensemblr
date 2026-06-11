@@ -179,10 +179,10 @@ export function getPreferredDockTab({
 }
 
 /**
- * Picks the chat session id to render, preferring URL, then persisted, then
- * the workspace's preferred session.
+ * Picks the chat tab id to route to, preferring URL, then persisted tab id,
+ * then the workspace's preferred fixture session.
  * @param input - Persisted prefs, URL override and workspace.
- * @returns The chosen chat session id.
+ * @returns The chosen chat tab id.
  */
 export function getPreferredChatId({
 	chatTabsByWorkspace,
@@ -198,7 +198,7 @@ export function getPreferredChatId({
 		routeChatId ??
 		(typeof storedChatId === 'string' ? storedChatId : undefined);
 
-	return getPreferredSession(workspace, preferredChatId).id;
+	return preferredChatId ?? getPreferredSession(workspace).id;
 }
 
 /** Type guard checking the workspace exposes the candidate dock tab. */

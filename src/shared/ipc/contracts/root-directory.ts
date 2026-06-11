@@ -77,3 +77,12 @@ export interface RootDirectoryChangeApplyResult {
 	oldRootPreserved: true;
 	reconciliation: RootDirectoryReconciliationSnapshot | null;
 }
+
+/** Root-directory IPC surface (read snapshot, pick a new root, apply change). */
+export interface RootDirectoryApi {
+	confirmRootDirectoryChange: (
+		request: RootDirectoryChangeRequest,
+	) => Promise<RootDirectoryChangeApplyResult>;
+	rootDirectory: () => Promise<RootDirectorySnapshot>;
+	selectRootDirectory: () => Promise<RootDirectorySelectionResult>;
+}

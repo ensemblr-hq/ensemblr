@@ -104,10 +104,10 @@ function OpenWorkspaceMenu({ workspace }: { workspace: WorkspaceShellModel }) {
 		<div className='flex h-7 shrink-0 overflow-hidden rounded-md border border-border bg-background'>
 			<Button
 				aria-label={`Open current workspace in ${primaryTarget.label}`}
-				className='size-7 rounded-none border-0 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+				className='size-7 rounded-none border-0 bg-transparent'
 				size='icon-sm'
 				type='button'
-				variant='ghost'
+				variant='subtle'
 			>
 				<OpenTargetIcon className='size-4' target={primaryTarget} />
 			</Button>
@@ -116,10 +116,10 @@ function OpenWorkspaceMenu({ workspace }: { workspace: WorkspaceShellModel }) {
 				<DropdownMenuTrigger asChild>
 					<Button
 						aria-label='Open current workspace app options'
-						className='size-7 rounded-none border-0 bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground'
+						className='size-7 rounded-none border-0 bg-transparent'
 						size='icon-sm'
 						type='button'
-						variant='ghost'
+						variant='subtle'
 					>
 						<ChevronDownIcon aria-hidden='true' className='size-3.5' />
 					</Button>

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { PiExecutableSnapshot } from '../../src/main/pi/pi-executable.ts';
 import { createFakePiAgentAdapter } from '../../src/main/pi-agent/fake-pi-agent-client.ts';
 import type { PiAgentAdapter } from '../../src/main/pi-agent/pi-agent-adapter.ts';
 import type { PiAgentClient } from '../../src/main/pi-agent/pi-agent-client.ts';
@@ -12,6 +11,7 @@ import type {
 	PiAgentEvent,
 	PiAgentSessionRequest,
 } from '../../src/main/pi-agent/pi-agent-types.ts';
+import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 
 const NOW = new Date('2026-06-08T12:00:00.000Z');
 
@@ -93,6 +93,23 @@ test('seeds metadata from request and defaults to preserving PI_CODING_AGENT_DIR
 	});
 	assert.equal(metadata.status, 'starting');
 	assert.equal(fake.getOpenSessions().length, 1);
+});
+
+test('adds native Pi session id args when supplied', async () => {
+	const { client } = createClient();
+
+	const session = await client.createSession(
+		baseRequest({ piSessionId: 'native-session-1' }),
+	);
+
+	const metadata = session.getMetadata();
+	assert.deepEqual(metadata.args, [
+		'--mode',
+		'rpc',
+		'--session-id',
+		'native-session-1',
+	]);
+	assert.equal(metadata.sessionId, 'native-session-1');
 });
 
 test('allows an explicit PI_CODING_AGENT_DIR when the caller opts out of preservation', async () => {

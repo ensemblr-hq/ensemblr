@@ -3,4 +3,4 @@ export { SetupDiagnosticsPanel } from './panel';
 export {
 	RootDirectoryChangeContent,
 	RootDirectoryChangeDialog,
-} from './root-directory-change-dialog';
+} from './root-directory';

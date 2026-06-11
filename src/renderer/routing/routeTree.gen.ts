@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkbenchRouteImport } from './routes/_workbench'
+import { Route as DebugPiReplayRouteImport } from './routes/debug.pi-replay'
 import { Route as WorkbenchSettingsRouteImport } from './routes/_workbench/settings'
 import { Route as WorkbenchShellRouteImport } from './routes/_workbench/_shell'
 import { Route as WorkbenchSettingsIndexRouteImport } from './routes/_workbench/settings/index'
@@ -41,6 +42,11 @@ import { Route as WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdChatsChatI
 
 const WorkbenchRoute = WorkbenchRouteImport.update({
   id: '/_workbench',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DebugPiReplayRoute = DebugPiReplayRouteImport.update({
+  id: '/debug/pi-replay',
+  path: '/debug/pi-replay',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkbenchSettingsRoute = WorkbenchSettingsRouteImport.update({
@@ -209,6 +215,7 @@ const WorkbenchShellProjectsProjectIdWorkspacesWorkspaceIdChatsChatIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof WorkbenchShellIndexRoute
   '/settings': typeof WorkbenchSettingsRouteWithChildren
+  '/debug/pi-replay': typeof DebugPiReplayRoute
   '/dashboard': typeof WorkbenchShellDashboardRoute
   '/help': typeof WorkbenchShellHelpRoute
   '/history': typeof WorkbenchShellHistoryRoute
@@ -237,6 +244,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof WorkbenchShellIndexRoute
+  '/debug/pi-replay': typeof DebugPiReplayRoute
   '/dashboard': typeof WorkbenchShellDashboardRoute
   '/help': typeof WorkbenchShellHelpRoute
   '/history': typeof WorkbenchShellHistoryRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/_workbench': typeof WorkbenchRouteWithChildren
   '/_workbench/_shell': typeof WorkbenchShellRouteWithChildren
   '/_workbench/settings': typeof WorkbenchSettingsRouteWithChildren
+  '/debug/pi-replay': typeof DebugPiReplayRoute
   '/_workbench/_shell/dashboard': typeof WorkbenchShellDashboardRoute
   '/_workbench/_shell/help': typeof WorkbenchShellHelpRoute
   '/_workbench/_shell/history': typeof WorkbenchShellHistoryRoute
@@ -298,6 +307,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/settings'
+    | '/debug/pi-replay'
     | '/dashboard'
     | '/help'
     | '/history'
@@ -326,6 +336,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/debug/pi-replay'
     | '/dashboard'
     | '/help'
     | '/history'
@@ -354,6 +365,7 @@ export interface FileRouteTypes {
     | '/_workbench'
     | '/_workbench/_shell'
     | '/_workbench/settings'
+    | '/debug/pi-replay'
     | '/_workbench/_shell/dashboard'
     | '/_workbench/_shell/help'
     | '/_workbench/_shell/history'
@@ -384,6 +396,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   WorkbenchRoute: typeof WorkbenchRouteWithChildren
+  DebugPiReplayRoute: typeof DebugPiReplayRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -393,6 +406,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof WorkbenchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/debug/pi-replay': {
+      id: '/debug/pi-replay'
+      path: '/debug/pi-replay'
+      fullPath: '/debug/pi-replay'
+      preLoaderRoute: typeof DebugPiReplayRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_workbench/settings': {
@@ -726,6 +746,7 @@ const WorkbenchRouteWithChildren = WorkbenchRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   WorkbenchRoute: WorkbenchRouteWithChildren,
+  DebugPiReplayRoute: DebugPiReplayRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

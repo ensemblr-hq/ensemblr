@@ -7,12 +7,18 @@ import test from 'node:test';
 
 import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
 import {
+	bindPiSession,
 	closeChatTab,
+	deleteChatTab,
 	getRuntimeState,
+	listClosedForWorkspace,
 	listOpenChatTabs,
+	listOpenForWorkspace,
+	markClosed,
 	openChatTab,
 	renameChatTab,
 	reorderChatTabs,
+	restoreChatTab,
 	setRuntimeState,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
 import { createPiSession } from '../../src/main/storage/repositories/pi-session-repository.ts';
@@ -167,6 +173,179 @@ test('renameChatTab updates title only', (t) => {
 
 	assert.equal(renamed?.title, 'Renamed');
 	assert.equal(renamed?.position, tab.position);
+});
+
+test('listOpenForWorkspace mirrors listOpenChatTabs', (t) => {
+	const fixture = openFixture(t);
+
+	openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			piSessionId: fixture.piSessionId,
+			title: 'Alpha',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			piSessionId: fixture.piSessionId,
+			title: 'Beta',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	const direct = listOpenChatTabs({
+		database: fixture.database,
+		workspaceId: fixture.workspaceId,
+	});
+	const aliased = listOpenForWorkspace({
+		database: fixture.database,
+		workspaceId: fixture.workspaceId,
+	});
+	assert.deepEqual(
+		aliased.map((tab) => tab.id),
+		direct.map((tab) => tab.id),
+	);
+	assert.equal(aliased.length, 2);
+});
+
+test('restoreChatTab reopens a closed tab at the end of open tabs', (t) => {
+	const fixture = openFixture(t);
+
+	const first = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'First',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	const second = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Second',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	closeChatTab({ database: fixture.database, id: first.id });
+
+	const restored = restoreChatTab({ database: fixture.database, id: first.id });
+
+	assert.equal(restored?.closedAt, null);
+	assert.deepEqual(
+		listOpenChatTabs({
+			database: fixture.database,
+			workspaceId: fixture.workspaceId,
+		}).map((tab) => tab.id),
+		[second.id, first.id],
+	);
+});
+
+test('listClosedForWorkspace returns closed tabs in reverse-closed order', (t) => {
+	const fixture = openFixture(t);
+
+	const firstClosed = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'First',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	const secondClosed = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Second',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	closeChatTab({ database: fixture.database, id: firstClosed.id });
+	// Force a different closed_at by sleeping deterministically.
+	const second = markClosed({
+		database: fixture.database,
+		id: secondClosed.id,
+	});
+	assert.ok(second?.closedAt);
+
+	const closed = listClosedForWorkspace({
+		database: fixture.database,
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(closed.length, 2);
+	assert.equal(closed[0]?.id, secondClosed.id);
+	assert.equal(closed[1]?.id, firstClosed.id);
+});
+
+test('markClosed is an alias for closeChatTab', (t) => {
+	const fixture = openFixture(t);
+
+	const tab = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			piSessionId: fixture.piSessionId,
+			title: 'Closing soon',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	const closed = markClosed({ database: fixture.database, id: tab.id });
+	assert.ok(closed?.closedAt);
+});
+
+test('deleteChatTab removes a tab without preserving closed history', (t) => {
+	const fixture = openFixture(t);
+
+	const tab = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Empty draft',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	deleteChatTab({ database: fixture.database, id: tab.id });
+
+	assert.equal(
+		listOpenChatTabs({
+			database: fixture.database,
+			workspaceId: fixture.workspaceId,
+		}).some((candidate) => candidate.id === tab.id),
+		false,
+	);
+	assert.equal(
+		listClosedForWorkspace({
+			database: fixture.database,
+			workspaceId: fixture.workspaceId,
+		}).some((candidate) => candidate.id === tab.id),
+		false,
+	);
+});
+
+test('bindPiSession attaches a pi session to a tab', (t) => {
+	const fixture = openFixture(t);
+
+	const tab = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Unbound',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	assert.equal(tab.piSessionId, null);
+
+	const bound = bindPiSession({
+		database: fixture.database,
+		id: tab.id,
+		piSessionId: fixture.piSessionId,
+	});
+	assert.equal(bound?.piSessionId, fixture.piSessionId);
 });
 
 test('runtime state upserts and is keyed by workspace', (t) => {

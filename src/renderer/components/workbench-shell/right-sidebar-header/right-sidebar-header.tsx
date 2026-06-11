@@ -17,6 +17,15 @@ import {
 	type RightSidebarHeaderState,
 } from './state';
 
+type HeaderTone = RightSidebarHeaderState extends { tone: infer T } ? T : never;
+
+const HEADER_LABEL_TONE_CLASSES: Record<HeaderTone, string> = {
+	blocked: 'text-status-danger',
+	neutral: 'text-muted-foreground',
+	pending: 'text-foreground',
+	ready: 'text-status-ok',
+};
+
 const mergeBoundary = classifyPermissionAction({
 	action: 'pull-request-merge',
 	mode: DEFAULT_PERMISSION_MODE,
@@ -57,10 +66,7 @@ export function RightSidebarHeader({
 					<p
 						className={cn(
 							'min-w-0 truncate font-semibold text-sm leading-none',
-							headerState.tone === 'ready' && 'text-status-ok',
-							headerState.tone === 'pending' && 'text-foreground',
-							headerState.tone === 'blocked' && 'text-status-danger',
-							headerState.tone === 'neutral' && 'text-muted-foreground',
+							HEADER_LABEL_TONE_CLASSES[headerState.tone],
 						)}
 					>
 						{headerState.label}

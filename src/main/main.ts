@@ -1,6 +1,11 @@
 import { app, BrowserWindow } from 'electron';
 import started from 'electron-squirrel-startup';
-import { IPC_CHANNELS, type PiSessionEventBroadcast } from '../shared/ipc';
+import {
+	IPC_CHANNELS,
+	type PiRawFrameBroadcast,
+	type PiRawFrameKind,
+	type PiSessionEventBroadcast,
+} from '../shared/ipc';
 
 import { createMainWindow, createMainWindowStateStore } from './app';
 import { createLocalCommandService } from './commands';
@@ -12,12 +17,13 @@ import {
 import { createEnvironmentVariablesService } from './environment';
 import { registerIpcHandlers } from './ipc';
 import { installApplicationMenu } from './menu';
-import { createPiExecutableService, createPiReadinessService } from './pi';
-import {
-	createCliRpcPiAgentAdapter,
-	createPiAgentClient,
-} from './pi-agent';
+import { createCliRpcPiAgentAdapter, createPiAgentClient } from './pi-agent';
 import { createPiSessionService } from './pi-agent/pi-session-service';
+import { createSessionSummaryWriter } from './pi-agent/session-summary-writer';
+import {
+	createPiExecutableService,
+	createPiReadinessService,
+} from './pi-runtime';
 import {
 	createArchiveLifecycleService,
 	createArchiveRepositoryService,
@@ -42,6 +48,7 @@ import {
 import { createMacosKeychainSecretStore } from './secrets';
 import { createSetupDiagnosticsService } from './setup';
 import { createEnsembleDatabaseService } from './storage';
+import { createListWorkspaceFilesService } from './workspace-files';
 
 // Quit early on Windows when invoked by the Squirrel installer.
 if (started) {
@@ -81,8 +88,70 @@ const piReadinessService = createPiReadinessService({
 	piExecutableService,
 	rootDirectoryService,
 });
-const piAgentAdapter = createCliRpcPiAgentAdapter();
+/**
+ * Debug-only fan-out for raw Pi RPC frames. Pipes every JSONL line that
+ * crosses the boundary (rx + tx) to all renderer windows so the temporary
+ * debug panel can inspect them while iterating on conversation UI. Never
+ * persisted; subscribers may discard frames at will.
+ *
+ * `kind` lets the renderer scope traffic to user-facing chat vs. internal
+ * Ensemble jobs (chat-title generation, session-summary generation). It is
+ * derived from the session label so the same broadcast funnel covers both
+ * the main client and the summary client.
+ */
+const classifyRawFrameKind = (label: string): PiRawFrameKind => {
+	if (label === 'ensemble-chat-title') {
+		return 'title';
+	}
+	if (label === 'ensemble-session-summary') {
+		return 'summary';
+	}
+	if (label === 'pi-agent-session') {
+		return 'chat';
+	}
+	return 'unknown';
+};
+const broadcastRawFrame = (sample: {
+	at: string;
+	direction: 'rx' | 'tx';
+	label: string;
+	line: string;
+	sessionId: string;
+}): void => {
+	const payload: PiRawFrameBroadcast = {
+		at: sample.at,
+		direction: sample.direction,
+		kind: classifyRawFrameKind(sample.label),
+		label: sample.label,
+		line: sample.line,
+		sessionId: sample.sessionId,
+	};
+	for (const window of BrowserWindow.getAllWindows()) {
+		if (!window.isDestroyed()) {
+			window.webContents.send(IPC_CHANNELS.piRawFrame, payload);
+		}
+	}
+};
+const piAgentAdapter = createCliRpcPiAgentAdapter({
+	onRawFrame: broadcastRawFrame,
+});
 const piAgentClient = createPiAgentClient({ adapter: piAgentAdapter });
+const summaryPiAgentAdapter = createCliRpcPiAgentAdapter({
+	onRawFrame: broadcastRawFrame,
+});
+const summaryPiAgentClient = createPiAgentClient({
+	adapter: summaryPiAgentAdapter,
+});
+const sessionSummaryWriter = createSessionSummaryWriter({
+	piAgentClient: summaryPiAgentClient,
+	resolveExecutable: async () => {
+		const snapshot = await piExecutableService.getSnapshot();
+		if (snapshot.status === 'error' || !snapshot.command) {
+			return null;
+		}
+		return snapshot;
+	},
+});
 const piSessionService = createPiSessionService({
 	databaseService,
 	eventSink: ({ event, sessionId, workspaceId }) => {
@@ -107,6 +176,7 @@ const piSessionService = createPiSessionService({
 		}
 	},
 	piAgentClient,
+	sessionSummaryWriter,
 });
 const localRepositoryRegistrationService =
 	createLocalRepositoryRegistrationService({
@@ -171,6 +241,9 @@ const deleteArchivedWorkspaceService = createDeleteArchivedWorkspaceService({
 const listArchivedWorkspacesService = createListArchivedWorkspacesService({
 	databaseService,
 });
+const listWorkspaceFilesService = createListWorkspaceFilesService({
+	localCommandService,
+});
 const setupDiagnosticsService = createSetupDiagnosticsService({
 	configService,
 	databaseService,
@@ -203,6 +276,7 @@ app.whenReady().then(() => {
 		githubCloneService,
 		githubRepositoryListService,
 		listArchivedWorkspacesService,
+		listWorkspaceFilesService,
 		localCommandService,
 		localRepositoryRegistrationService,
 		piExecutableService,

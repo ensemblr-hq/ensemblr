@@ -1,6 +1,10 @@
 import type {
+	SetupCheckGroupId,
+	SetupCheckId,
 	SetupCheckLogSnapshot,
 	SetupCheckSnapshot,
+	SetupCheckStatus,
+	SetupRemediationAction,
 } from '../../shared/ipc';
 import type { LocalCommandResult } from '../commands/local-command';
 
@@ -14,6 +18,88 @@ export interface SetupCheckProviderContext {
 export type SetupCheckProvider = (
 	context: SetupCheckProviderContext,
 ) => Promise<SetupCheckSnapshot> | SetupCheckSnapshot;
+
+/**
+ * Outcome returned by {@link DefineCheckOptions.run}. The helper merges these
+ * fields with the static definition to produce the final {@link SetupCheckSnapshot}.
+ */
+export interface SetupCheckRunResult {
+	blocking?: boolean;
+	detail: string;
+	logs?: SetupCheckLogSnapshot[];
+	remediationActions?: SetupRemediationAction[];
+	status: SetupCheckStatus;
+}
+
+/**
+ * Outcome returned by {@link DefineCheckOptions.onError}. All fields are optional;
+ * unspecified fields fall back to the static definition (and a derived `detail`).
+ */
+export type SetupCheckErrorResult = Partial<SetupCheckRunResult>;
+
+/** Static definition + behaviour for one setup check. */
+export interface DefineCheckOptions<TCtx extends SetupCheckProviderContext> {
+	blocking: boolean;
+	description: string;
+	group: SetupCheckGroupId;
+	id: SetupCheckId;
+	onError?: (error: unknown, context: TCtx) => SetupCheckErrorResult;
+	run: (context: TCtx) => Promise<SetupCheckRunResult> | SetupCheckRunResult;
+	title: string;
+	/** Fallback detail used when `onError` does not supply one. */
+	unknownErrorDetail?: string;
+}
+
+/**
+ * Wraps a check `run` body with shared try/catch handling, snapshot construction
+ * and `updatedAt` timestamping. The returned provider eliminates ~50 lines of
+ * structural boilerplate per check.
+ */
+export function defineCheck<TCtx extends SetupCheckProviderContext>(
+	definition: DefineCheckOptions<TCtx>,
+): (context: TCtx) => Promise<SetupCheckSnapshot> {
+	return async (context: TCtx): Promise<SetupCheckSnapshot> => {
+		try {
+			const result = await definition.run(context);
+
+			return createSetupCheckSnapshot({
+				blocking: result.blocking ?? definition.blocking,
+				description: definition.description,
+				detail: result.detail,
+				group: definition.group,
+				id: definition.id,
+				logs: result.logs ?? [],
+				...(result.remediationActions
+					? { remediationActions: result.remediationActions }
+					: {}),
+				status: result.status,
+				title: definition.title,
+				updatedAt: context.now().toISOString(),
+			});
+		} catch (error) {
+			const fallbackDetail =
+				error instanceof Error
+					? error.message
+					: (definition.unknownErrorDetail ?? 'Unknown check error.');
+			const override = definition.onError?.(error, context) ?? {};
+
+			return createSetupCheckSnapshot({
+				blocking: override.blocking ?? definition.blocking,
+				description: definition.description,
+				detail: override.detail ?? fallbackDetail,
+				group: definition.group,
+				id: definition.id,
+				logs: override.logs ?? [],
+				...(override.remediationActions
+					? { remediationActions: override.remediationActions }
+					: {}),
+				status: override.status ?? 'failure',
+				title: definition.title,
+				updatedAt: context.now().toISOString(),
+			});
+		}
+	};
+}
 
 /**
  * Helper that builds a complete {@link SetupCheckSnapshot} from a partial input,

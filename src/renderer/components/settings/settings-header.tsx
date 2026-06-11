@@ -143,18 +143,16 @@ interface ScopeTabProps {
 
 function ScopeTab({ active, disabled, label, onClick }: ScopeTabProps) {
 	return (
-		<button
+		<Button
 			aria-pressed={active}
 			className={cn(
-				'relative px-2 py-1.5 font-medium text-xs transition-colors',
-				active
-					? 'text-foreground'
-					: 'text-muted-foreground hover:text-foreground',
-				disabled && 'cursor-not-allowed opacity-50 hover:text-muted-foreground',
+				'relative h-auto rounded-none bg-transparent px-2 py-1.5 text-xs hover:bg-transparent aria-pressed:bg-transparent',
+				active ? 'text-foreground' : undefined,
 			)}
 			disabled={disabled}
 			onClick={onClick}
-			type='button'
+			size='sm'
+			variant='ghost'
 		>
 			{label}
 			{active ? (
@@ -163,6 +161,6 @@ function ScopeTab({ active, disabled, label, onClick }: ScopeTabProps) {
 					className='absolute inset-x-1 -bottom-px h-px bg-foreground'
 				/>
 			) : null}
-		</button>
+		</Button>
 	);
 }

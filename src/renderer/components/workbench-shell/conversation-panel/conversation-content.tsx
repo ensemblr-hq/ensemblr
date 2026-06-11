@@ -1,4 +1,4 @@
-import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { usePiRawFrameCapture } from '@/renderer/state/pi-raw-frames';
 import type {
 	ComposerShellState,
 	SessionTabModel,
@@ -6,10 +6,17 @@ import type {
 } from '@/renderer/types/workbench';
 
 import { ComposerPanel } from './composer-panel';
+import { PiRawFramePanel } from './pi-raw-frame-panel';
 import { SessionTabs } from './session-tabs';
 import { WorkspaceTimeline } from './workspace-timeline';
 
-/** Conversation surface — session tabs, scrollable timeline, and composer. */
+/**
+ * Conversation surface — session tabs, scrollable timeline, and composer.
+ *
+ * The `Conversation` primitive owns its own scroll viewport (sticky-to-bottom),
+ * so the surrounding container is a flex column with overflow hidden — the
+ * timeline child manages its own scrolling.
+ */
 export function WorkspaceConversationContent({
 	activeSession,
 	activeWorkspace,
@@ -17,6 +24,7 @@ export function WorkspaceConversationContent({
 	composer,
 	onSessionTabChange,
 	onSessionTabClose,
+	onSessionTabOpen,
 	onSessionTabRestore,
 	sessionTabs,
 }: {
@@ -26,27 +34,36 @@ export function WorkspaceConversationContent({
 	composer: ComposerShellState;
 	onSessionTabChange: (sessionId: string) => void;
 	onSessionTabClose: (sessionId: string) => void;
+	onSessionTabOpen: () => Promise<{ chatTabId: string } | null>;
 	onSessionTabRestore: (sessionId: string) => void;
 	sessionTabs: SessionTabModel[];
 }) {
+	// Capture every raw Pi RPC frame into the debug ring buffer. The panel may
+	// be closed; capture still runs so the user can open the panel after the
+	// fact and see what already happened.
+	usePiRawFrameCapture();
+	const debugSessionId =
+		activeSession.piSessionId ?? composer.activePiSessionId ?? null;
 	return (
-		<section className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+		<section className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
 			<SessionTabs
 				activeSession={activeSession}
 				closedSessions={closedSessions}
 				onSessionTabClose={onSessionTabClose}
 				onSessionTabChange={onSessionTabChange}
+				onSessionTabOpen={onSessionTabOpen}
 				onSessionTabRestore={onSessionTabRestore}
 				sessions={sessionTabs}
 			/>
-			<ScrollArea className='min-h-0 flex-1'>
+			<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
 				<WorkspaceTimeline
 					activeSession={activeSession}
 					composer={composer}
 					workspace={activeWorkspace}
 				/>
-			</ScrollArea>
-			<ComposerPanel composer={composer} />
+			</div>
+			<ComposerPanel chatTabId={activeSession.chatTabId} composer={composer} />
+			<PiRawFramePanel sessionId={debugSessionId} />
 		</section>
 	);
 }

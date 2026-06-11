@@ -26,7 +26,7 @@ interface ArchiveRepositoryDialogProps {
 
 /**
  * Lifecycle archive dialog for a repository. Cascades to each child workspace;
- * branch cleanup is opt-in. Worktree folders are preserved so PID-038/PID-060
+ * branch cleanup is opt-in. Worktree folders are preserved so ENS-038/ENS-060
  * subscribers can still inspect them.
  */
 export function ArchiveRepositoryDialog({

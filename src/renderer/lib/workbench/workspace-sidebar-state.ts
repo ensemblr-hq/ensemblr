@@ -13,7 +13,22 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 /** Derives the icon and tone for a workspace sidebar row from its status. */
 export function getWorkspaceSidebarState(
 	workspace: WorkspaceShellModel,
+	options: { agentBusy?: boolean } = {},
 ): WorkspaceSidebarState {
+	// Live Pi runtime activity takes top priority — the spinner is the most
+	// informative signal when a Pi session is mid-turn, even on workspaces
+	// with an open PR or pending checks. The flag is passed in by the caller
+	// instead of being derived from `workspace.status` so PR-priority
+	// semantics on cached fixtures stay intact.
+	if (options.agentBusy) {
+		return {
+			className: 'text-muted-foreground',
+			icon: LoaderCircleIcon,
+			isSpinning: true,
+			kind: 'workspace-working',
+		};
+	}
+
 	const pullRequestState = getPullRequestSidebarState(workspace);
 
 	if (pullRequestState) {
