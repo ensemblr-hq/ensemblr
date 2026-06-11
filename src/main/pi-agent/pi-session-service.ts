@@ -7,6 +7,12 @@ import type {
 	WriteForkSummaryRequest,
 	WriteForkSummaryResult,
 } from '../../shared/ipc';
+import type { CheckpointCapturePort } from '../checkpoints/checkpoint-service.ts';
+import {
+	createCheckpointCapture,
+	isOrdinalHidden,
+	readHiddenEventRanges,
+} from '../checkpoints/checkpoint-service.ts';
 import {
 	type EnsembleDatabaseService,
 	requireDatabase,
@@ -18,6 +24,7 @@ import {
 } from '../storage/repositories/pi-event-repository.ts';
 import {
 	getMainBranchForSession,
+	getPiSessionBranchById,
 	getPiSessionById,
 	listPiSessionsByWorkspace,
 	type PiSessionBranchRow,
@@ -61,6 +68,8 @@ export type {
 } from './pi-session-types.ts';
 
 export interface PiSessionServiceOptions {
+	/** Override for tests; defaults to the git-backed capture (ADR 0012). */
+	captureCheckpoint?: CheckpointCapturePort;
 	chatTitleTimeoutMs?: number;
 	databaseService: EnsembleDatabaseService;
 	eventSink?: PiSessionEventSink;
@@ -99,6 +108,7 @@ export interface PiSessionService {
  *   - `sessionSummaryWriter` — optional live summary updates after agent turns
  */
 export function createPiSessionService({
+	captureCheckpoint = createCheckpointCapture(),
 	chatTitleTimeoutMs = CHAT_TITLE_TIMEOUT_MS,
 	databaseService,
 	eventSink,
@@ -117,6 +127,7 @@ export function createPiSessionService({
 		);
 
 	const lifecycle = createPiSessionLifecycle({
+		captureCheckpoint,
 		chatTitleTimeoutMs,
 		eventSink,
 		now,
@@ -159,7 +170,16 @@ export function createPiSessionService({
 		},
 		listEvents: (branchId) => {
 			const database = requireSessionDatabase();
-			return listEventsByBranch({ branchId, database });
+			const events = listEventsByBranch({ branchId, database });
+			// Checkpoint restores hide (never delete) the overwritten turns.
+			const branch = getPiSessionBranchById({ database, id: branchId });
+			const hiddenRanges = branch ? readHiddenEventRanges(branch.metadata) : [];
+			if (hiddenRanges.length === 0) {
+				return events;
+			}
+			return events.filter(
+				(event) => !isOrdinalHidden(event.ordinal, hiddenRanges),
+			);
 		},
 		listSessionsForWorkspace: (workspaceId) => {
 			const database = requireSessionDatabase();

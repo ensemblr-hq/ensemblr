@@ -412,6 +412,67 @@ UPDATE repositories SET remote_url = rtrim(remote_url, '/') WHERE remote_url LIK
 CREATE INDEX idx_repositories_remote_url ON repositories(remote_url) WHERE remote_url <> '';
 `,
 	},
+	{
+		id: '007_chat_tab_kinds',
+		version: 7,
+		// Widens the chat_tabs.kind CHECK to the full tab-kind set. SQLite cannot
+		// alter a CHECK in place, so both chat_tabs and its dependent
+		// pi_runtime_state are rebuilt. pi_runtime_state_new temporarily
+		// references chat_tabs_new so the later DROP TABLE chat_tabs cannot fire
+		// ON DELETE SET NULL against the copied rows; the RENAME afterwards
+		// rewrites that reference back to chat_tabs.
+		sql: `
+CREATE TABLE chat_tabs_new (
+	id TEXT PRIMARY KEY,
+	workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+	pi_session_id TEXT REFERENCES pi_sessions(id) ON DELETE SET NULL,
+	kind TEXT NOT NULL CHECK (kind IN ('chat', 'file', 'diff', 'document', 'preview')),
+	title TEXT NOT NULL,
+	position INTEGER NOT NULL DEFAULT 0,
+	opened_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+	closed_at TEXT,
+	metadata_json TEXT NOT NULL DEFAULT '{}'
+) STRICT;
+
+INSERT INTO chat_tabs_new (id, workspace_id, pi_session_id, kind, title, position, opened_at, closed_at, metadata_json)
+SELECT id, workspace_id, pi_session_id, kind, title, position, opened_at, closed_at, metadata_json FROM chat_tabs;
+
+CREATE TABLE pi_runtime_state_new (
+	workspace_id TEXT PRIMARY KEY REFERENCES workspaces(id) ON DELETE CASCADE,
+	active_tab_id TEXT REFERENCES chat_tabs_new(id) ON DELETE SET NULL,
+	last_active_session_id TEXT REFERENCES pi_sessions(id) ON DELETE SET NULL,
+	updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+) STRICT;
+
+INSERT INTO pi_runtime_state_new (workspace_id, active_tab_id, last_active_session_id, updated_at)
+SELECT workspace_id, active_tab_id, last_active_session_id, updated_at FROM pi_runtime_state;
+
+DROP TABLE pi_runtime_state;
+DROP TABLE chat_tabs;
+
+ALTER TABLE chat_tabs_new RENAME TO chat_tabs;
+ALTER TABLE pi_runtime_state_new RENAME TO pi_runtime_state;
+
+CREATE INDEX idx_chat_tabs_workspace_id ON chat_tabs(workspace_id);
+CREATE INDEX idx_chat_tabs_session_id ON chat_tabs(pi_session_id);
+CREATE INDEX idx_chat_tabs_open ON chat_tabs(workspace_id, closed_at);
+`,
+	},
+	{
+		id: '008_checkpoint_pi_linkage',
+		version: 8,
+		// Links checkpoints to Pi sessions/turns (ADR 0012). The legacy
+		// `session_id` column referencing `sessions` is kept untouched.
+		sql: `
+ALTER TABLE checkpoints ADD COLUMN pi_session_id TEXT REFERENCES pi_sessions(id) ON DELETE SET NULL;
+ALTER TABLE checkpoints ADD COLUMN turn_id TEXT REFERENCES pi_turns(id) ON DELETE SET NULL;
+ALTER TABLE checkpoints ADD COLUMN git_hash TEXT;
+
+CREATE INDEX idx_checkpoints_pi_session_id ON checkpoints(pi_session_id);
+-- One checkpoint per turn: the capture path and getCheckpointByTurnId assume it.
+CREATE UNIQUE INDEX idx_checkpoints_turn_id ON checkpoints(turn_id) WHERE turn_id IS NOT NULL;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

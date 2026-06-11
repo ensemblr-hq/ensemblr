@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
-export type ChatTabKind = 'chat' | 'preview';
+export type ChatTabKind = 'chat' | 'diff' | 'document' | 'file' | 'preview';
 
 export interface ChatTabRow {
 	closedAt: string | null;

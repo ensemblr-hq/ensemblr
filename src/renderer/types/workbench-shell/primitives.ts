@@ -21,6 +21,13 @@ export type ChangesViewMode = 'folders' | 'list';
  */
 export interface SessionTabActions {
 	openSessionTab: () => Promise<{ chatTabId: string } | null>;
+	openFilePreviewTab: (input: {
+		filePath: string;
+	}) => Promise<{ chatTabId: string } | null>;
+	openTurnDiffTab: (input: {
+		label: string;
+		turnId: string;
+	}) => Promise<{ chatTabId: string } | null>;
 	closeSessionTabAsync: (
 		chatTabId: string,
 	) => Promise<{ replacementChatTabId: string | null }>;

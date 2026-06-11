@@ -1,5 +1,6 @@
 import type { ArchiveApi } from './archive-lifecycle';
 import type { ChatTabApi } from './chat-tab';
+import type { CheckpointApi } from './checkpoint';
 import type { CloneApi } from './clone';
 import type { EnvironmentApi } from './environment';
 import type { HealthApi } from './health';
@@ -41,4 +42,5 @@ export interface EnsembleApi
 		RepositoryConfigApi,
 		SharedRootApi,
 		WorkspaceFilesApi,
+		CheckpointApi,
 		PiApi {}

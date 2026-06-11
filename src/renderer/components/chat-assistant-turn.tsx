@@ -33,6 +33,8 @@ export function ChatAssistantTurn({
 	message,
 	onForkToNewTab,
 	onForkToNewWorkspace,
+	onRestoreToCheckpoint,
+	onViewTurnDiff,
 	renderToolDetail,
 	timing,
 }: {
@@ -43,6 +45,8 @@ export function ChatAssistantTurn({
 	message: UIMessage;
 	onForkToNewTab?: () => void;
 	onForkToNewWorkspace?: () => void;
+	onRestoreToCheckpoint?: () => void;
+	onViewTurnDiff?: () => void;
 	renderToolDetail?: (part: DynamicToolUIPart) => ReactNode;
 	timing: ChatAssistantTurnTiming;
 }) {
@@ -112,6 +116,8 @@ export function ChatAssistantTurn({
 					forkDisabled={forkDisabled}
 					onForkToNewTab={onForkToNewTab}
 					onForkToNewWorkspace={onForkToNewWorkspace}
+					onRestoreToCheckpoint={onRestoreToCheckpoint}
+					onViewTurnDiff={onViewTurnDiff}
 				/>
 			) : null}
 		</div>
