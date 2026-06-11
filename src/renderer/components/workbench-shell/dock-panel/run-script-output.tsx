@@ -1,7 +1,7 @@
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 
-import { ReadOnlyCommandOutput } from './read-only-command-output';
 import { ScriptEmptyState } from './script-empty-state';
+import { XtermTerminal } from './xterm-terminal';
 
 /** Renders the Run script output or the appropriate empty state. */
 export function RunScriptOutputPanel({
@@ -24,7 +24,7 @@ export function RunScriptOutputPanel({
 		);
 	}
 
-	if (script.lines.length === 0) {
+	if (!script.terminalId) {
 		return (
 			<ScriptEmptyState
 				actionLabel='Run'
@@ -36,9 +36,9 @@ export function RunScriptOutputPanel({
 	}
 
 	return (
-		<ReadOnlyCommandOutput
-			lines={script.lines}
-			title={script.command ?? 'Run'}
+		<XtermTerminal
+			sessionStatus={script.sessionStatus ?? null}
+			terminalId={script.terminalId}
 		/>
 	);
 }

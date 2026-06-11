@@ -17,4 +17,5 @@ export {
 } from './query-keys';
 export * from './setup';
 export * from './workspace-files';
+export * from './workspace-scripts';
 export * from './workspaces';

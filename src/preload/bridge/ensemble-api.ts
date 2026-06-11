@@ -6,6 +6,8 @@ import {
 	IPC_CHANNELS,
 	type PiRawFrameBroadcast,
 	type PiSessionEventBroadcast,
+	type TerminalLifecycleBroadcast,
+	type TerminalOutputBroadcast,
 } from '../../shared/ipc';
 
 /**
@@ -14,7 +16,11 @@ import {
  */
 type InvokeKey = Exclude<
 	keyof EnsembleApi,
-	'onCloneGithubRepositoryProgress' | 'onPiRawFrame' | 'onPiSessionEvent'
+	| 'onCloneGithubRepositoryProgress'
+	| 'onPiRawFrame'
+	| 'onPiSessionEvent'
+	| 'onTerminalLifecycle'
+	| 'onTerminalOutput'
 >;
 
 /**
@@ -83,6 +89,8 @@ export function createEnsembleApi(): EnsembleApi {
 		computeTurnDiff: (request) => invoke('computeTurnDiff', request),
 		confirmRootDirectoryChange: (request) =>
 			invoke('confirmRootDirectoryChange', request),
+		createTerminalSession: (request) =>
+			invoke('createTerminalSession', request),
 		createWorkspace: (request) => invoke('createWorkspace', request),
 		deleteArchivedWorkspace: (request) =>
 			invoke('deleteArchivedWorkspace', request),
@@ -93,6 +101,7 @@ export function createEnsembleApi(): EnsembleApi {
 		environmentVariables: () => invoke('environmentVariables'),
 		githubRepositoryList: () => invoke('githubRepositoryList'),
 		health: () => invoke('health'),
+		killTerminalSession: (request) => invoke('killTerminalSession', request),
 		listArchivedWorkspaces: (request) =>
 			invoke('listArchivedWorkspaces', request),
 		listChatTabs: (request) => invoke('listChatTabs', request),
@@ -103,6 +112,7 @@ export function createEnsembleApi(): EnsembleApi {
 		listPiSessions: (request) => invoke('listPiSessions', request),
 		listPiSlashCommands: (request) => invoke('listPiSlashCommands', request),
 		listTurnCheckpoints: (request) => invoke('listTurnCheckpoints', request),
+		listTerminalSessions: (request) => invoke('listTerminalSessions', request),
 		listWorkspaceFiles: (request) => invoke('listWorkspaceFiles', request),
 		onCloneGithubRepositoryProgress: (listener) =>
 			subscribe<CloneGithubRepositoryProgressEvent>(
@@ -113,6 +123,13 @@ export function createEnsembleApi(): EnsembleApi {
 			subscribe<PiRawFrameBroadcast>(IPC_CHANNELS.piRawFrame, listener),
 		onPiSessionEvent: (listener) =>
 			subscribe<PiSessionEventBroadcast>(IPC_CHANNELS.piSessionEvent, listener),
+		onTerminalLifecycle: (listener) =>
+			subscribe<TerminalLifecycleBroadcast>(
+				IPC_CHANNELS.terminalLifecycle,
+				listener,
+			),
+		onTerminalOutput: (listener) =>
+			subscribe<TerminalOutputBroadcast>(IPC_CHANNELS.terminalOutput, listener),
 		openChatTab: (request) => invoke('openChatTab', request),
 		openPiSession: (request) => invoke('openPiSession', request),
 		prepareCloneGithubRepository: (request) =>
@@ -127,10 +144,13 @@ export function createEnsembleApi(): EnsembleApi {
 		repositoryConfig: (request) => invoke('repositoryConfig', request),
 		repositoryWorkspaceNavigation: () =>
 			invoke('repositoryWorkspaceNavigation'),
+		resizeTerminalSession: (request) =>
+			invoke('resizeTerminalSession', request),
 		resolveSettings: (request) => invoke('resolveSettings', request),
 		restoreChatTab: (request) => invoke('restoreChatTab', request),
 		restoreCheckpoint: (request) => invoke('restoreCheckpoint', request),
 		rootDirectory: () => invoke('rootDirectory'),
+		runWorkspaceScript: (request) => invoke('runWorkspaceScript', request),
 		selectCloneDestination: () => invoke('selectCloneDestination'),
 		selectLocalRepository: () => invoke('selectLocalRepository'),
 		selectPiExecutable: () => invoke('selectPiExecutable'),
@@ -140,8 +160,11 @@ export function createEnsembleApi(): EnsembleApi {
 		startCloneGithubRepository: (request) =>
 			invoke('startCloneGithubRepository', request),
 		stopPiSession: (request) => invoke('stopPiSession', request),
+		stopWorkspaceScript: (request) => invoke('stopWorkspaceScript', request),
 		submitPiPrompt: (request) => invoke('submitPiPrompt', request),
+		terminalSnapshot: (request) => invoke('terminalSnapshot', request),
 		unarchiveWorkspace: (request) => invoke('unarchiveWorkspace', request),
 		writeForkSummary: (request) => invoke('writeForkSummary', request),
+		writeTerminalSession: (request) => invoke('writeTerminalSession', request),
 	};
 }

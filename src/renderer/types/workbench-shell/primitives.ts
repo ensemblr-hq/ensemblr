@@ -5,12 +5,14 @@ export interface WorkbenchHealth {
 }
 
 export interface WorkbenchDockActions {
+	onCloseTerminal: (terminalId: string) => void;
 	onNewTerminal: () => void;
 	onOpenRunPort: (port: number) => void;
 	onOpenSetupScripts: () => void;
 	onRunScript: () => void;
 	onRunSetupScript: () => void;
 	onStopRunScript: () => void;
+	onStopSetupScript: () => void;
 }
 
 export type ChangesViewMode = 'folders' | 'list';

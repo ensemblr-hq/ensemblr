@@ -2,6 +2,7 @@ import type {
 	HealthSnapshot,
 	RepositoryWorkspaceNavigationSnapshot,
 	SetupDiagnosticsSnapshot,
+	TerminalSessionStatus,
 } from '@/shared/ipc';
 
 import type { ProjectShellModel } from './project';
@@ -32,9 +33,11 @@ export interface TerminalDockTabModel {
 	isDefault?: boolean;
 	kind: 'terminal';
 	label: string;
-	lines: string[];
-	sessionId: string;
+	/** Live session status, or `null` for the placeholder default tab. */
+	sessionStatus: TerminalSessionStatus | null;
 	status: DockTabStatus;
+	/** Main-process terminal session id, or `null` before a session exists. */
+	terminalId: string | null;
 }
 
 export type DockTabModel =
@@ -180,9 +183,12 @@ export type WorkspaceStatus = 'idle' | 'needs-setup' | 'review' | 'working';
 
 export interface WorkspaceScriptSummary {
 	command?: string;
-	lines: string[];
 	port?: number;
+	/** Status of the most recent script session, when one exists. */
+	sessionStatus?: TerminalSessionStatus | null;
 	status: 'missing' | 'not-run' | 'running' | 'stopped' | 'succeeded';
+	/** Terminal session id of the most recent script run, when one exists. */
+	terminalId?: string | null;
 }
 
 /** Classifies the provenance used to explain why a workspace was created. */
