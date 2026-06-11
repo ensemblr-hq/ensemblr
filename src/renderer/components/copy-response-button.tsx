@@ -1,4 +1,4 @@
-import { CheckIcon, ClipboardIcon } from 'lucide-react';
+import { CheckIcon, CopyIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import {
 	Tooltip,
@@ -47,7 +47,7 @@ export function CopyResponseButton({
 			// Clipboard access denied — leave the icon unchanged.
 		}
 	};
-	const Icon = copied ? CheckIcon : ClipboardIcon;
+	const Icon = copied ? CheckIcon : CopyIcon;
 	return (
 		<TooltipProvider>
 			<Tooltip>
