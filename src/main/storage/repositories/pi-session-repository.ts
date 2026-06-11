@@ -1,12 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import type { PiSessionStatusWire } from '../../../shared/ipc/contracts/pi-message-payloads';
 
-export type PiSessionStatus =
-	| 'idle'
-	| 'starting'
-	| 'streaming'
-	| 'closed'
-	| 'errored';
+export type PiSessionStatus = PiSessionStatusWire;
 
 export type PiSessionBranchKind = 'main' | 'retry' | 'fork';
 

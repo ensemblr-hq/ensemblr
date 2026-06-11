@@ -6,5 +6,5 @@
 export type {
 	JsonlLineStream,
 	JsonlLineStreamOptions,
-} from './jsonl-line-stream';
-export { createJsonlLineStream } from './jsonl-line-stream';
+} from './jsonl-line-stream.ts';
+export { createJsonlLineStream } from './jsonl-line-stream.ts';

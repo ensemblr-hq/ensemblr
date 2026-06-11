@@ -1,3 +1,4 @@
+import { createChatTabService } from '../chat-tabs/chat-tab-service';
 import type { LocalCommandService } from '../commands/local-command';
 import type {
 	EnsembleConfigResolutionService,
@@ -157,23 +158,25 @@ export function registerIpcHandlers({
 		piSessionService,
 	});
 	registerChatTabHandlers({
-		databaseService,
-		repositoryLookups: {
-			piSessionExists: ({ piSessionId }) => {
-				const database = databaseService.getConnection()?.database;
-				if (!database) {
-					return false;
-				}
-				return getPiSessionById({ database, id: piSessionId }) !== null;
+		chatTabService: createChatTabService({
+			databaseService,
+			lookups: {
+				piSessionExists: ({ piSessionId }) => {
+					const database = databaseService.getConnection()?.database;
+					if (!database) {
+						return false;
+					}
+					return getPiSessionById({ database, id: piSessionId }) !== null;
+				},
+				workspaceCwd: ({ workspaceId }) => {
+					const database = databaseService.getConnection()?.database;
+					if (!database) {
+						return null;
+					}
+					return getWorkspacePathById({ database, workspaceId });
+				},
 			},
-			workspaceCwd: ({ workspaceId }) => {
-				const database = databaseService.getConnection()?.database;
-				if (!database) {
-					return null;
-				}
-				return getWorkspacePathById({ database, workspaceId });
-			},
-		},
+		}),
 	});
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerWorkspaceFilesHandlers({ listWorkspaceFilesService });

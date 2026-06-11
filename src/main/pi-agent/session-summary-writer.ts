@@ -55,6 +55,25 @@ export interface CreateSessionSummaryWriterOptions {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const SESSIONS_SUBDIR = path.join('.context', 'sessions');
+
+/**
+ * Single owner of the session-summary file convention:
+ * `<workspaceCwd>/.context/sessions/<fileBaseName>.md`.
+ */
+export function resolveSessionSummaryPath({
+	fileBaseName,
+	workspaceCwd,
+}: {
+	fileBaseName: string;
+	workspaceCwd: string;
+}): string {
+	// basename() guards against path traversal in caller-supplied stems.
+	return path.join(
+		workspaceCwd,
+		SESSIONS_SUBDIR,
+		`${path.basename(fileBaseName)}.md`,
+	);
+}
 const STUB_BODY = '_Empty tab — no Pi session was opened._\n';
 /**
  * Upper bound on the transcript sent to the LLM. Long sessions otherwise eat
@@ -138,9 +157,10 @@ async function runWriteSummary({
 	writeFileImpl,
 }: RunWriteSummaryArgs): Promise<WriteSessionSummaryResult> {
 	const sessionsDir = path.join(input.workspaceCwd, SESSIONS_SUBDIR);
-	// basename() guards against path traversal in caller-supplied stems.
-	const fileBaseName = path.basename(input.fileBaseName ?? input.chatTabId);
-	const filePath = path.join(sessionsDir, `${fileBaseName}.md`);
+	const filePath = resolveSessionSummaryPath({
+		fileBaseName: input.fileBaseName ?? input.chatTabId,
+		workspaceCwd: input.workspaceCwd,
+	});
 
 	await mkdirImpl(sessionsDir);
 

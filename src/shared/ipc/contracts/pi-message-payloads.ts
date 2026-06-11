@@ -1,4 +1,4 @@
-/** Wire-side enums mirrored from the main-process Pi session repository. */
+/** Canonical session status union; the main-process repository aliases this. */
 export type PiSessionStatusWire =
 	| 'idle'
 	| 'starting'

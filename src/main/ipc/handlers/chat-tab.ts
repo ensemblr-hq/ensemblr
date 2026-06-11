@@ -1,29 +1,17 @@
-import type { DatabaseSync } from 'node:sqlite';
 import { ipcMain } from 'electron';
 
 import {
 	type BindPiSessionToTabResult,
 	type ChatTabWire,
 	type CloseChatTabResult,
-	type ClosedChatTabEntryWire,
 	IPC_CHANNELS,
 	type ListChatTabsResult,
 	type ListClosedChatTabsWithSummaryResult,
 	type OpenChatTabResult,
 	type RestoreChatTabResult,
 } from '../../../shared/ipc';
-import type { EnsembleDatabaseService } from '../../storage/database.ts';
-import {
-	bindPiSession,
-	type ChatTabRow,
-	deleteChatTab,
-	getChatTabById,
-	listClosedForWorkspace,
-	listOpenForWorkspace,
-	markClosed,
-	openChatTab,
-	restoreClosedChatTab,
-} from '../../storage/repositories/chat-tab-repository.ts';
+import type { ChatTabService } from '../../chat-tabs/chat-tab-service.ts';
+import type { ChatTabRow } from '../../storage/repositories/chat-tab-repository.ts';
 import {
 	bindPiSessionToChatTabRequestSchema,
 	closeChatTabRequestSchema,
@@ -33,56 +21,24 @@ import {
 	restoreChatTabRequestSchema,
 } from '../request-schemas.ts';
 
-/**
- * Cross-table lookups the chat-tab IPC layer needs without leaking SQL into
- * the handler. Default implementation is built in `main.ts` from the storage
- * data-access layer; tests can pass a stub.
- */
-export interface ChatTabRepositoryLookups {
-	/** Returns `true` when a Pi session exists for the given id. */
-	piSessionExists: (input: { piSessionId: string }) => boolean;
-	/** Returns the workspace's on-disk cwd, or `null` when absent. */
-	workspaceCwd: (input: { workspaceId: string }) => string | null;
-}
-
 /** Service dependencies for the chat-tab IPC handlers. */
 export interface ChatTabHandlersOptions {
-	databaseService: EnsembleDatabaseService;
-	repositoryLookups: ChatTabRepositoryLookups;
+	chatTabService: ChatTabService;
 }
-
-const DEFAULT_TAB_TITLE = 'New chat';
 
 /**
  * Registers IPC handlers exposing chat-tab CRUD and closed-tab history to the
- * renderer. Live session summaries are written by the Pi session lifecycle as
- * agent responses complete.
+ * renderer. All lifecycle policy lives in {@link ChatTabService}; handlers
+ * only parse requests, delegate, and map rows to wire shapes.
  */
 export function registerChatTabHandlers({
-	databaseService,
-	repositoryLookups,
+	chatTabService,
 }: ChatTabHandlersOptions): void {
-	const requireDatabase = (): DatabaseSync => {
-		const connection = databaseService.getConnection();
-		if (!connection) {
-			throw new Error('Database is not open; cannot manage chat tabs.');
-		}
-		return connection.database;
-	};
-
 	ipcMain.handle(
 		IPC_CHANNELS.listChatTabs,
 		async (_event, raw: unknown): Promise<ListChatTabsResult> => {
 			const request = listChatTabsRequestSchema.parse(raw);
-			const database = requireDatabase();
-			const open = listOpenForWorkspace({
-				database,
-				workspaceId: request.workspaceId,
-			});
-			const closed = listClosedForWorkspace({
-				database,
-				workspaceId: request.workspaceId,
-			});
+			const { closed, open } = chatTabService.listTabs(request);
 			return {
 				closed: closed.map(toWire),
 				open: open.map(toWire),
@@ -94,16 +50,7 @@ export function registerChatTabHandlers({
 		IPC_CHANNELS.openChatTab,
 		async (_event, raw: unknown): Promise<OpenChatTabResult> => {
 			const request = openChatTabRequestSchema.parse(raw);
-			const database = requireDatabase();
-			const tab = openChatTab({
-				database,
-				input: {
-					kind: 'chat',
-					piSessionId: request.piSessionId ?? null,
-					title: request.title?.trim() || DEFAULT_TAB_TITLE,
-					workspaceId: request.workspaceId,
-				},
-			});
+			const tab = chatTabService.openTab(request);
 			return { tab: toWire(tab) };
 		},
 	);
@@ -112,39 +59,7 @@ export function registerChatTabHandlers({
 		IPC_CHANNELS.closeChatTab,
 		async (_event, raw: unknown): Promise<CloseChatTabResult> => {
 			const request = closeChatTabRequestSchema.parse(raw);
-			const database = requireDatabase();
-			const existing = getChatTabById({
-				database,
-				id: request.chatTabId,
-			});
-			if (!existing) {
-				// Idempotent: treat unknown tab as already-closed no-op so a
-				// duplicate close (e.g. after cache invalidation) does not
-				// surface as a renderer error.
-				return { ok: true };
-			}
-			if (existing.closedAt !== null) {
-				return { ok: true };
-			}
-
-			const openTabs = listOpenForWorkspace({
-				database,
-				workspaceId: existing.workspaceId,
-			});
-			if (openTabs.length <= 1) {
-				return { ok: true };
-			}
-
-			if (isEmptyChatTab(existing)) {
-				deleteChatTab({ database, id: request.chatTabId });
-				return { ok: true };
-			}
-
-			const closedTab = markClosed({ database, id: request.chatTabId });
-			if (!closedTab) {
-				throw new Error(`Failed to close chat tab ${request.chatTabId}.`);
-			}
-
+			chatTabService.closeTab(request);
 			return { ok: true };
 		},
 	);
@@ -153,11 +68,7 @@ export function registerChatTabHandlers({
 		IPC_CHANNELS.restoreChatTab,
 		async (_event, raw: unknown): Promise<RestoreChatTabResult> => {
 			const request = restoreChatTabRequestSchema.parse(raw);
-			const database = requireDatabase();
-			const restored = restoreClosedChatTab({
-				database,
-				id: request.chatTabId,
-			});
+			const restored = chatTabService.restoreTab(request);
 			return { tab: restored ? toWire(restored) : null };
 		},
 	);
@@ -166,23 +77,7 @@ export function registerChatTabHandlers({
 		IPC_CHANNELS.bindPiSessionToChatTab,
 		async (_event, raw: unknown): Promise<BindPiSessionToTabResult> => {
 			const request = bindPiSessionToChatTabRequestSchema.parse(raw);
-			const database = requireDatabase();
-			const existing = getChatTabById({ database, id: request.chatTabId });
-			if (!existing) {
-				throw new Error(`Chat tab ${request.chatTabId} does not exist.`);
-			}
-			if (
-				!repositoryLookups.piSessionExists({
-					piSessionId: request.piSessionId,
-				})
-			) {
-				throw new Error(`Pi session ${request.piSessionId} does not exist.`);
-			}
-			bindPiSession({
-				database,
-				id: request.chatTabId,
-				piSessionId: request.piSessionId,
-			});
+			chatTabService.bindPiSession(request);
 			return { ok: true };
 		},
 	);
@@ -194,55 +89,17 @@ export function registerChatTabHandlers({
 			raw: unknown,
 		): Promise<ListClosedChatTabsWithSummaryResult> => {
 			const request = listClosedChatTabsWithSummaryRequestSchema.parse(raw);
-			const database = requireDatabase();
-			const workspaceCwd = repositoryLookups.workspaceCwd({
-				workspaceId: request.workspaceId,
-			});
-			const closed = listClosedForWorkspace({
-				database,
-				workspaceId: request.workspaceId,
-			});
-
-			const entries: ClosedChatTabEntryWire[] = closed
-				.filter((tab) => tab.closedAt !== null)
-				.map((tab) => ({
-					closedAt: tab.closedAt ?? '',
-					summaryPath: workspaceCwd
-						? buildSummaryPath({ tabId: tab.id, workspaceCwd })
-						: '',
-					summaryTitle: readSummaryTitleFromMetadata(tab.metadata),
-					tab: toWire(tab),
-				}));
-
-			return { entries };
+			const entries = chatTabService.listClosedWithSummary(request);
+			return {
+				entries: entries.map((entry) => ({
+					closedAt: entry.closedAt,
+					summaryPath: entry.summaryPath,
+					summaryTitle: entry.summaryTitle,
+					tab: toWire(entry.tab),
+				})),
+			};
 		},
 	);
-}
-
-/** True when a tab has no attached Pi session and should not enter history. */
-function isEmptyChatTab(tab: ChatTabRow): boolean {
-	return tab.piSessionId === null;
-}
-
-function buildSummaryPath({
-	tabId,
-	workspaceCwd,
-}: {
-	tabId: string;
-	workspaceCwd: string;
-}): string {
-	return `${workspaceCwd}/.context/sessions/${tabId}.md`;
-}
-
-function readSummaryTitleFromMetadata(
-	metadata: Record<string, unknown>,
-): string | null {
-	const summary = metadata.summary;
-	if (!summary || typeof summary !== 'object') {
-		return null;
-	}
-	const candidate = (summary as { title?: unknown }).title;
-	return typeof candidate === 'string' ? candidate : null;
 }
 
 function toWire(row: ChatTabRow): ChatTabWire {

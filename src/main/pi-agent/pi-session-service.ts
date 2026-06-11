@@ -7,7 +7,10 @@ import type {
 	WriteForkSummaryRequest,
 	WriteForkSummaryResult,
 } from '../../shared/ipc';
-import type { EnsembleDatabaseService } from '../storage/database.ts';
+import {
+	type EnsembleDatabaseService,
+	requireDatabase,
+} from '../storage/database.ts';
 import { listOpenChatTabs } from '../storage/repositories/chat-tab-repository.ts';
 import {
 	listEventsByBranch,
@@ -103,16 +106,15 @@ export function createPiSessionService({
 	sessionSummaryWriter,
 	now = () => new Date(),
 }: PiSessionServiceOptions): PiSessionService {
-	const requireDatabase = (): DatabaseSync => {
-		const connection = databaseService.getConnection();
-		if (!connection) {
-			throw new PiSessionServiceError({
-				code: 'database-unavailable',
-				message: 'Database is not open; cannot manage Pi sessions.',
-			});
-		}
-		return connection.database;
-	};
+	const requireSessionDatabase = (): DatabaseSync =>
+		requireDatabase(
+			databaseService.getConnection()?.database,
+			() =>
+				new PiSessionServiceError({
+					code: 'database-unavailable',
+					message: 'Database is not open; cannot manage Pi sessions.',
+				}),
+		);
 
 	const lifecycle = createPiSessionLifecycle({
 		chatTitleTimeoutMs,
@@ -121,13 +123,13 @@ export function createPiSessionService({
 		persistRuntimeEvent,
 		piAgentClient,
 		queueChatTitle: queueChatTitleGeneration,
-		requireDatabase,
+		requireDatabase: requireSessionDatabase,
 		sessionSummaryWriter,
 	});
 
 	return {
 		getSession: (sessionId) => {
-			const database = requireDatabase();
+			const database = requireSessionDatabase();
 			const active = lifecycle.getActiveSession(sessionId);
 			if (active) {
 				return toSnapshot({
@@ -156,11 +158,11 @@ export function createPiSessionService({
 			});
 		},
 		listEvents: (branchId) => {
-			const database = requireDatabase();
+			const database = requireSessionDatabase();
 			return listEventsByBranch({ branchId, database });
 		},
 		listSessionsForWorkspace: (workspaceId) => {
-			const database = requireDatabase();
+			const database = requireSessionDatabase();
 			const rows = listPiSessionsByWorkspace({ database, workspaceId });
 			const openedTabs = listOpenChatTabs({ database, workspaceId });
 			return rows
@@ -193,7 +195,7 @@ export function createPiSessionService({
 			if (!sessionSummaryWriter) {
 				return { error: 'Summary writer is not configured.' };
 			}
-			const database = requireDatabase();
+			const database = requireSessionDatabase();
 			const row = getPiSessionById({ database, id: request.sessionId });
 			if (!row) {
 				return { error: `No Pi session found for id ${request.sessionId}.` };

@@ -8,7 +8,10 @@ import type {
 } from '../../shared/ipc';
 import type { EnsembleConfigService } from '../config/config-loader';
 import type { SecretMetadata, SecretStore } from '../secrets/secret-store';
-import type { EnsembleDatabaseService } from '../storage/database';
+import {
+	type EnsembleDatabaseService,
+	requireDatabase,
+} from '../storage/database.ts';
 import {
 	compareCatalogEntries,
 	createCatalogMap,
@@ -310,7 +313,7 @@ export function createEnvironmentVariablesService({
 			);
 		}
 
-		const databaseConnection = requireDatabase(getDatabase());
+		const databaseConnection = requireEnvironmentDatabase(getDatabase());
 		const store = getSecretStore(databaseConnection);
 
 		upsertPlainSetting({
@@ -361,7 +364,7 @@ export function createEnvironmentVariablesService({
 			);
 		}
 
-		const databaseConnection = requireDatabase(getDatabase());
+		const databaseConnection = requireEnvironmentDatabase(getDatabase());
 		const store = requireSecretStore(getSecretStore(databaseConnection));
 
 		const metadataInput = {
@@ -509,15 +512,17 @@ function normalizeScope({
  * @param database - Candidate database handle.
  * @returns The handle.
  */
-function requireDatabase(database: DatabaseSync | null): DatabaseSync {
-	if (!database) {
-		throw new EnvironmentVariablesError(
-			'database-unavailable',
-			'SQLite is unavailable; the environment variable was not saved.',
-		);
-	}
-
-	return database;
+function requireEnvironmentDatabase(
+	database: DatabaseSync | null,
+): DatabaseSync {
+	return requireDatabase(
+		database,
+		() =>
+			new EnvironmentVariablesError(
+				'database-unavailable',
+				'SQLite is unavailable; the environment variable was not saved.',
+			),
+	);
 }
 
 /**
