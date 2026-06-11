@@ -38,6 +38,12 @@ export const ensembleQueryKeys = {
 		[...ensembleQueryKeys.all, 'setup-diagnostics'] as const,
 	workspaceFiles: (workspaceCwd: string) =>
 		[...ensembleQueryKeys.all, 'workspace-files', workspaceCwd] as const,
+	workspaceScriptSettings: (repositoryId: string) =>
+		[
+			...ensembleQueryKeys.all,
+			'workspace-script-settings',
+			repositoryId,
+		] as const,
 };
 
 /**

@@ -25,10 +25,12 @@ import type {
 	UnarchiveWorkspaceService,
 } from '../repository';
 import type { EnsembleRootDirectoryService } from '../root';
+import type { ScriptLifecycleService } from '../scripts';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsembleDatabaseService } from '../storage';
 import { getPiSessionById } from '../storage/repositories/pi-session-repository';
 import { getWorkspacePathById } from '../storage/repositories/workspace-repository';
+import type { TerminalService } from '../terminal';
 import type { ListWorkspaceFilesService } from '../workspace-files';
 import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCheckpointHandlers } from './handlers/checkpoint';
@@ -43,8 +45,10 @@ import { registerRepositoryConfigHandlers } from './handlers/repository-config';
 import { registerRootHandlers } from './handlers/root';
 import { registerSettingsHandlers } from './handlers/settings';
 import { registerSetupHandlers } from './handlers/setup';
+import { registerTerminalHandlers } from './handlers/terminal';
 import { registerWindowHandlers } from './handlers/window';
 import { registerWorkspaceFilesHandlers } from './handlers/workspace-files';
+import { registerWorkspaceScriptHandlers } from './handlers/workspace-scripts';
 import {
 	createPermissionGate,
 	readPermissionModeFromSnapshot,
@@ -73,9 +77,11 @@ interface RegisterIpcHandlersOptions {
 	renameWorkspaceService: RenameWorkspaceService;
 	repositoryConfigService: RepositoryConfigService;
 	rootDirectoryService: EnsembleRootDirectoryService;
+	scriptLifecycleService: ScriptLifecycleService;
 	sharedRootAdoptionService: SharedRootAdoptionService;
 	setupDiagnosticsService: SetupDiagnosticsService;
 	settingsResolutionService: EnsembleConfigResolutionService;
+	terminalService: TerminalService;
 	unarchiveWorkspaceService: UnarchiveWorkspaceService;
 }
 
@@ -107,9 +113,11 @@ export function registerIpcHandlers({
 	renameWorkspaceService,
 	repositoryConfigService,
 	rootDirectoryService,
+	scriptLifecycleService,
 	setupDiagnosticsService,
 	settingsResolutionService,
 	sharedRootAdoptionService,
+	terminalService,
 	unarchiveWorkspaceService,
 }: RegisterIpcHandlersOptions): void {
 	// Permission gate is wired here so all handler groups share one instance.
@@ -181,5 +189,7 @@ export function registerIpcHandlers({
 	});
 	registerCheckpointHandlers({ databaseService });
 	registerSetupHandlers({ setupDiagnosticsService });
+	registerTerminalHandlers({ terminalService });
+	registerWorkspaceScriptHandlers({ scriptLifecycleService });
 	registerWorkspaceFilesHandlers({ listWorkspaceFilesService });
 }

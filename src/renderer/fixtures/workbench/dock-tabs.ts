@@ -35,12 +35,8 @@ function createDefaultTerminalDockTab(): TerminalDockTabModel {
 		isDefault: true,
 		kind: 'terminal',
 		label: 'Terminal',
-		lines: [
-			'$ zsh',
-			'Interactive PTY rendering is intentionally deferred to ENS-037.',
-			'This placeholder preserves the default interactive terminal tab contract.',
-		],
-		sessionId: 'terminal-default',
+		sessionStatus: null,
 		status: 'idle',
+		terminalId: null,
 	};
 }

@@ -98,6 +98,20 @@ import type {
 import type { SetupDiagnosticsSnapshot } from './contracts/setup';
 import type { SharedRootAdoptionSnapshot } from './contracts/shared-root-adoption';
 import type {
+	CreateTerminalSessionRequest,
+	CreateTerminalSessionResult,
+	KillTerminalRequest,
+	KillTerminalResult,
+	ListTerminalSessionsRequest,
+	ListTerminalSessionsResult,
+	ResizeTerminalRequest,
+	TerminalLifecycleBroadcast,
+	TerminalOutputBroadcast,
+	TerminalSnapshotRequest,
+	TerminalSnapshotResult,
+	WriteTerminalRequest,
+} from './contracts/terminal';
+import type {
 	ArchiveWorkspaceRequest,
 	ArchiveWorkspaceResult,
 	CreateWorkspaceRequest,
@@ -119,6 +133,12 @@ import type {
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
 } from './contracts/workspace-files';
+import type {
+	RunWorkspaceScriptRequest,
+	RunWorkspaceScriptResult,
+	StopWorkspaceScriptRequest,
+	StopWorkspaceScriptResult,
+} from './contracts/workspace-scripts';
 
 /** Per-channel { req, res } pair. */
 export interface IpcHandlerEntry<Req, Res> {
@@ -170,6 +190,10 @@ export interface IpcHandlerMap {
 		RootDirectoryChangeRequest,
 		RootDirectoryChangeApplyResult
 	>;
+	[IPC_CHANNELS.createTerminalSession]: IpcHandlerEntry<
+		CreateTerminalSessionRequest,
+		CreateTerminalSessionResult
+	>;
 	[IPC_CHANNELS.createWorkspace]: IpcHandlerEntry<
 		CreateWorkspaceRequest,
 		CreateWorkspaceResult
@@ -200,6 +224,10 @@ export interface IpcHandlerMap {
 		void,
 		InitialShellSnapshot
 	>;
+	[IPC_CHANNELS.killTerminalSession]: IpcHandlerEntry<
+		KillTerminalRequest,
+		KillTerminalResult
+	>;
 	[IPC_CHANNELS.listArchivedWorkspaces]: IpcHandlerEntry<
 		ListArchivedWorkspacesRequest,
 		ListArchivedWorkspacesResult
@@ -224,6 +252,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.listPiSlashCommands]: IpcHandlerEntry<
 		ListPiSlashCommandsRequest | undefined,
 		ListPiSlashCommandsResult
+	>;
+	[IPC_CHANNELS.listTerminalSessions]: IpcHandlerEntry<
+		ListTerminalSessionsRequest,
+		ListTerminalSessionsResult
 	>;
 	[IPC_CHANNELS.listWorkspaceFiles]: IpcHandlerEntry<
 		ListWorkspaceFilesRequest,
@@ -267,11 +299,19 @@ export interface IpcHandlerMap {
 		RepositoryConfigRequest,
 		RepositoryConfigSnapshot
 	>;
+	[IPC_CHANNELS.resizeTerminalSession]: IpcHandlerEntry<
+		ResizeTerminalRequest,
+		void
+	>;
 	[IPC_CHANNELS.repositoryWorkspaceNavigation]: IpcHandlerEntry<
 		void,
 		RepositoryWorkspaceNavigationSnapshot
 	>;
 	[IPC_CHANNELS.rootDirectory]: IpcHandlerEntry<void, RootDirectorySnapshot>;
+	[IPC_CHANNELS.runWorkspaceScript]: IpcHandlerEntry<
+		RunWorkspaceScriptRequest,
+		RunWorkspaceScriptResult
+	>;
 	[IPC_CHANNELS.selectCloneDestination]: IpcHandlerEntry<
 		void,
 		CloneDestinationSelectionResult
@@ -296,6 +336,10 @@ export interface IpcHandlerMap {
 		StopPiSessionRequest,
 		StopPiSessionResult
 	>;
+	[IPC_CHANNELS.stopWorkspaceScript]: IpcHandlerEntry<
+		StopWorkspaceScriptRequest,
+		StopWorkspaceScriptResult
+	>;
 	[IPC_CHANNELS.submitPiPrompt]: IpcHandlerEntry<
 		SubmitPiPromptRequest,
 		SubmitPiPromptResult
@@ -308,6 +352,15 @@ export interface IpcHandlerMap {
 		void,
 		SharedRootAdoptionSnapshot
 	>;
+	[IPC_CHANNELS.terminalLifecycle]: IpcHandlerEntry<
+		void,
+		TerminalLifecycleBroadcast
+	>;
+	[IPC_CHANNELS.terminalOutput]: IpcHandlerEntry<void, TerminalOutputBroadcast>;
+	[IPC_CHANNELS.terminalSnapshot]: IpcHandlerEntry<
+		TerminalSnapshotRequest,
+		TerminalSnapshotResult
+	>;
 	[IPC_CHANNELS.unarchiveWorkspace]: IpcHandlerEntry<
 		UnarchiveWorkspaceRequest,
 		UnarchiveWorkspaceResult
@@ -315,5 +368,9 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.writeForkSummary]: IpcHandlerEntry<
 		WriteForkSummaryRequest,
 		WriteForkSummaryResult
+	>;
+	[IPC_CHANNELS.writeTerminalSession]: IpcHandlerEntry<
+		WriteTerminalRequest,
+		void
 	>;
 }

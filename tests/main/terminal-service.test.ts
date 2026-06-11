@@ -1,0 +1,469 @@
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import type { DatabaseSync } from 'node:sqlite';
+import test, { type TestContext } from 'node:test';
+
+import type { WorkspaceEnvironmentService } from '../../src/main/environment/workspace-environment.ts';
+import type { EnsembleDatabaseService } from '../../src/main/storage/database.ts';
+import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import { insertRepositoryRow } from '../../src/main/storage/repositories/repository-row-repository.ts';
+import { insertWorkspaceRow } from '../../src/main/storage/repositories/workspace-repository.ts';
+import type {
+	PtyBackend,
+	PtyProcess,
+} from '../../src/main/terminal/pty-backend.ts';
+import { createNodePtyBackend } from '../../src/main/terminal/pty-backend.ts';
+import { createScrollbackBuffer } from '../../src/main/terminal/terminal-scrollback.ts';
+import { createTerminalService } from '../../src/main/terminal/terminal-service.ts';
+import { resolveUserShell } from '../../src/main/terminal/user-shell.ts';
+import type {
+	TerminalLifecycleBroadcast,
+	TerminalOutputBroadcast,
+} from '../../src/shared/ipc';
+
+const NOW = new Date('2026-06-11T00:00:00.000Z');
+const WORKSPACE_ID = 'workspace-1';
+
+function createDatabaseFixture(t: TestContext): DatabaseSync {
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-terminal-'));
+	const connection = openEnsembleDatabase({
+		databasePath: path.join(directory, 'ensemble-test.db'),
+	});
+
+	t.after(() => {
+		connection.database.close();
+		rmSync(directory, { force: true, recursive: true });
+	});
+
+	insertRepositoryRow({
+		database: connection.database,
+		defaultBranch: 'main',
+		id: 'repo-1',
+		metadataJson: '{}',
+		name: 'ensemble',
+		path: '/tmp/repo',
+		remoteUrl: '',
+		slug: 'ensemble',
+		timestamp: NOW.toISOString(),
+	});
+	insertWorkspaceRow({
+		baseBranch: 'main',
+		branchName: 'philipp/monterrey',
+		database: connection.database,
+		id: WORKSPACE_ID,
+		metadataJson: '{}',
+		name: 'monterrey',
+		path: '/tmp/workspace',
+		repositoryId: 'repo-1',
+		slug: 'monterrey',
+		timestamp: NOW.toISOString(),
+	});
+
+	return connection.database;
+}
+
+function createDatabaseServiceStub(
+	database: DatabaseSync | null,
+): EnsembleDatabaseService {
+	return {
+		getConnection: () => (database ? { database } : null),
+	} as unknown as EnsembleDatabaseService;
+}
+
+function createWorkspaceEnvironmentStub(
+	cwd = process.cwd(),
+): WorkspaceEnvironmentService {
+	return {
+		assemble: async ({ workspaceId }) => ({
+			conductorCompatibility: false,
+			cwd,
+			diagnostics: [],
+			env: {
+				ENSEMBLE_PORT: '41000',
+				ENSEMBLE_WORKSPACE_NAME: 'monterrey',
+				ENSEMBLE_WORKSPACE_PATH: cwd,
+			},
+			port: 41_000,
+			redactValues: [],
+			workspaceId,
+			workspaceName: 'monterrey',
+			workspacePath: cwd,
+		}),
+	};
+}
+
+/** Controllable fake PTY for unit-style service tests. */
+function createFakePty(): {
+	pty: PtyProcess;
+	emitData: (data: string) => void;
+	emitExit: (exitCode: number) => void;
+	killSignals: string[];
+	writes: string[];
+	resizes: Array<{ cols: number; rows: number }>;
+} {
+	const dataListeners = new Set<(data: string) => void>();
+	const exitListeners = new Set<(event: { exitCode: number }) => void>();
+	const killSignals: string[] = [];
+	const writes: string[] = [];
+	const resizes: Array<{ cols: number; rows: number }> = [];
+
+	return {
+		emitData: (data) => {
+			for (const listener of dataListeners) {
+				listener(data);
+			}
+		},
+		emitExit: (exitCode) => {
+			for (const listener of exitListeners) {
+				listener({ exitCode });
+			}
+		},
+		killSignals,
+		pty: {
+			kill: (signal) => {
+				killSignals.push(signal ?? 'SIGTERM');
+			},
+			onData: (listener) => {
+				dataListeners.add(listener);
+				return { dispose: () => dataListeners.delete(listener) };
+			},
+			onExit: (listener) => {
+				exitListeners.add(listener);
+				return { dispose: () => exitListeners.delete(listener) };
+			},
+			pid: 4242,
+			resize: (cols, rows) => {
+				resizes.push({ cols, rows });
+			},
+			write: (data) => {
+				writes.push(data);
+			},
+		},
+		resizes,
+		writes,
+	};
+}
+
+function createServiceFixture(
+	t: TestContext,
+	{ backend, killGraceMs = 50 }: { backend: PtyBackend; killGraceMs?: number },
+) {
+	const database = createDatabaseFixture(t);
+	const lifecycleEvents: TerminalLifecycleBroadcast[] = [];
+	const outputEvents: TerminalOutputBroadcast[] = [];
+	const service = createTerminalService({
+		backend,
+		databaseService: createDatabaseServiceStub(database),
+		killGraceMs,
+		now: () => NOW,
+		onLifecycle: (event) => lifecycleEvents.push(event),
+		onOutput: (event) => outputEvents.push(event),
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(),
+	});
+
+	return { database, lifecycleEvents, outputEvents, service };
+}
+
+test('create spawns a PTY in the workspace cwd with the assembled env', async (t) => {
+	let spawned: {
+		args: string[];
+		cwd: string;
+		env: Record<string, string>;
+		file: string;
+	} | null = null;
+	const fake = createFakePty();
+	const backend: PtyBackend = {
+		spawn: (options) => {
+			spawned = options;
+			return fake.pty;
+		},
+	};
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+
+	assert.ok(result.session);
+	assert.equal(result.session.status, 'running');
+	assert.equal(result.session.kind, 'terminal');
+	assert.ok(spawned);
+	assert.equal(spawned.cwd, process.cwd());
+	assert.deepEqual(spawned.args, ['-l']);
+	assert.equal(spawned.env.ENSEMBLE_WORKSPACE_NAME, 'monterrey');
+	assert.equal(spawned.env.ENSEMBLE_PORT, '41000');
+});
+
+test('output streams broadcast and accumulate as scrollback', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { outputEvents, service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('hello ');
+	fake.emitData('world');
+
+	assert.equal(outputEvents.length, 2);
+	assert.equal(outputEvents[1]?.data, 'world');
+	assert.equal(service.getSnapshot(terminalId).scrollback, 'hello world');
+});
+
+test('output broadcasts carry monotonic seq mirrored by snapshot lastSeq', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { outputEvents, service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	assert.equal(service.getSnapshot(terminalId).lastSeq, 0);
+
+	fake.emitData('a');
+	fake.emitData('b');
+
+	assert.deepEqual(
+		outputEvents.map((event) => event.seq),
+		[1, 2],
+	);
+	assert.equal(service.getSnapshot(terminalId).lastSeq, 2);
+	assert.equal(service.getSnapshot('missing').lastSeq, 0);
+});
+
+test('waitForExit resolves on session end and false on timeout', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	assert.equal(await service.waitForExit('missing'), true);
+
+	const timedOut = await service.waitForExit(terminalId, 20);
+	assert.equal(timedOut, false);
+
+	const waiting = service.waitForExit(terminalId, 1_000);
+	fake.emitExit(0);
+	assert.equal(await waiting, true);
+
+	// Already-ended sessions resolve immediately.
+	assert.equal(await service.waitForExit(terminalId), true);
+});
+
+test('write and resize forward to the PTY and update the snapshot', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	service.write(terminalId, 'ls\r');
+	service.resize(terminalId, 120, 40);
+
+	assert.deepEqual(fake.writes, ['ls\r']);
+	assert.deepEqual(fake.resizes, [{ cols: 120, rows: 40 }]);
+	assert.equal(service.getSnapshot(terminalId).session?.cols, 120);
+	assert.equal(service.getSnapshot(terminalId).session?.rows, 40);
+});
+
+test('clean exit maps to exited; non-zero exit maps to failed', async (t) => {
+	const fakeClean = createFakePty();
+	const fakeFailed = createFakePty();
+	const ptys = [fakeClean.pty, fakeFailed.pty];
+	const backend: PtyBackend = { spawn: () => ptys.shift() as PtyProcess };
+	const { lifecycleEvents, service } = createServiceFixture(t, { backend });
+
+	const clean = await service.create({ workspaceId: WORKSPACE_ID });
+	const failed = await service.create({ workspaceId: WORKSPACE_ID });
+
+	fakeClean.emitExit(0);
+	fakeFailed.emitExit(1);
+
+	assert.equal(
+		service.getSnapshot(clean.session?.id ?? '').session?.status,
+		'exited',
+	);
+	const failedSnapshot = service.getSnapshot(failed.session?.id ?? '').session;
+	assert.equal(failedSnapshot?.status, 'failed');
+	assert.equal(failedSnapshot?.exitCode, 1);
+	assert.ok(lifecycleEvents.some((event) => event.session.status === 'failed'));
+});
+
+test('kill sends SIGHUP, escalates to SIGKILL, and maps exit to stopped', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend, killGraceMs: 10 });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	service.kill(terminalId);
+	assert.deepEqual(fake.killSignals, ['SIGHUP']);
+
+	// Process ignores SIGHUP; the grace timer escalates.
+	await new Promise((resolve) => setTimeout(resolve, 30));
+	assert.deepEqual(fake.killSignals, ['SIGHUP', 'SIGKILL']);
+
+	fake.emitExit(137);
+	assert.equal(service.getSnapshot(terminalId).session?.status, 'stopped');
+});
+
+test('terminal session metadata is persisted across the lifecycle', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { database, service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	const runningRow = database
+		.prepare('SELECT status FROM terminal_sessions WHERE id = ?')
+		.get(terminalId) as { status: string };
+	assert.equal(runningRow.status, 'running');
+
+	service.kill(terminalId);
+	fake.emitExit(1);
+
+	const endedRow = database
+		.prepare(
+			'SELECT status, ended_at AS endedAt, metadata_json AS metadataJson FROM terminal_sessions WHERE id = ?',
+		)
+		.get(terminalId) as {
+		endedAt: string | null;
+		metadataJson: string;
+		status: string;
+	};
+	assert.equal(endedRow.status, 'exited');
+	assert.ok(endedRow.endedAt);
+	assert.equal(JSON.parse(endedRow.metadataJson).stopped, true);
+});
+
+test('list scopes sessions to the requested workspace', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	await service.create({ workspaceId: WORKSPACE_ID });
+
+	assert.equal(service.list(WORKSPACE_ID).length, 1);
+	assert.equal(service.list('other-workspace').length, 0);
+});
+
+test('interactive sessions use the user shell; script commands use the script shell', async (t) => {
+	const spawnedFiles: string[] = [];
+	const spawnedEnvs: Record<string, string>[] = [];
+	const fakes = [createFakePty(), createFakePty()];
+	const backend: PtyBackend = {
+		spawn: (options) => {
+			spawnedFiles.push(options.file);
+			spawnedEnvs.push(options.env);
+			return (fakes.shift() as ReturnType<typeof createFakePty>).pty;
+		},
+	};
+	const database = createDatabaseFixture(t);
+	const service = createTerminalService({
+		backend,
+		databaseService: createDatabaseServiceStub(database),
+		defaultShell: '/usr/local/bin/fish',
+		onLifecycle: () => undefined,
+		onOutput: () => undefined,
+		scriptShell: '/bin/zsh',
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(),
+	});
+
+	await service.create({ workspaceId: WORKSPACE_ID });
+	await service.create({
+		command: 'bun install',
+		kind: 'setup-script',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.deepEqual(spawnedFiles, ['/usr/local/bin/fish', '/bin/zsh']);
+	assert.equal(spawnedEnvs[0]?.COLORTERM, 'truecolor');
+	assert.equal(spawnedEnvs[0]?.TERM_PROGRAM, 'Ensemble');
+	assert.ok(spawnedEnvs[0]?.LANG);
+});
+
+test('resolveUserShell returns an existing shell binary', () => {
+	const shell = resolveUserShell();
+
+	assert.ok(shell.startsWith('/'));
+	assert.ok(shell.length > 1);
+});
+
+test('scrollback buffer trims from the front past its limit', () => {
+	const buffer = createScrollbackBuffer(8);
+
+	buffer.append('12345');
+	buffer.append('6789');
+
+	assert.equal(buffer.read(), '23456789');
+});
+
+test('integration: real PTY runs a shell command, accepts input, and terminates', async () => {
+	const backend = createNodePtyBackend();
+	const outputs: string[] = [];
+	const exits: TerminalLifecycleBroadcast[] = [];
+	const integrationService = createTerminalService({
+		backend,
+		databaseService: createDatabaseServiceStub(null),
+		killGraceMs: 200,
+		onLifecycle: (event) => exits.push(event),
+		onOutput: (event) => outputs.push(event.data),
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(),
+	});
+
+	const echo = await integrationService.create({
+		command: 'echo "pty-says:$ENSEMBLE_WORKSPACE_NAME"',
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.ok(echo.session);
+
+	await waitFor(
+		() =>
+			integrationService.getSnapshot(echo.session?.id ?? '').session?.status ===
+			'exited',
+	);
+	assert.match(outputs.join(''), /pty-says:monterrey/);
+
+	// Interactive input: `cat` echoes stdin back, then a stop maps to 'stopped'.
+	const interactive = await integrationService.create({
+		command: 'cat',
+		workspaceId: WORKSPACE_ID,
+	});
+	const interactiveId = interactive.session?.id ?? '';
+	integrationService.write(interactiveId, 'ping\r');
+	await waitFor(() =>
+		integrationService.getSnapshot(interactiveId).scrollback.includes('ping'),
+	);
+
+	integrationService.resize(interactiveId, 100, 30);
+	integrationService.kill(interactiveId);
+	await waitFor(
+		() =>
+			integrationService.getSnapshot(interactiveId).session?.status !==
+			'running',
+	);
+	assert.equal(
+		integrationService.getSnapshot(interactiveId).session?.status,
+		'stopped',
+	);
+});
+
+async function waitFor(
+	predicate: () => boolean,
+	timeoutMs = 5_000,
+): Promise<void> {
+	const start = Date.now();
+
+	while (!predicate()) {
+		if (Date.now() - start > timeoutMs) {
+			throw new Error('Timed out waiting for condition.');
+		}
+
+		await new Promise((resolve) => setTimeout(resolve, 25));
+	}
+}

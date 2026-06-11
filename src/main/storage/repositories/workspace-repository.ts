@@ -392,6 +392,65 @@ export function selectWorkspaceWithRepositoryById({
 		.get(workspaceId);
 }
 
+/** Inputs for {@link selectWorkspaceEnvironmentJoinById}. */
+export interface SelectWorkspaceEnvironmentJoinByIdOptions {
+	database: DatabaseSync;
+	workspaceId: string;
+}
+
+/**
+ * Projection of the workspace + repository join used by workspace environment
+ * assembly: identity, paths, branch lineage, the repository default branch,
+ * and metadata (which carries the persisted port).
+ */
+export function selectWorkspaceEnvironmentJoinById({
+	database,
+	workspaceId,
+}: SelectWorkspaceEnvironmentJoinByIdOptions): unknown {
+	return database
+		.prepare(
+			`SELECT
+				w.id AS id,
+				w.slug AS slug,
+				w.repository_id AS repositoryId,
+				w.name AS name,
+				w.path AS path,
+				w.branch_name AS branchName,
+				w.base_branch AS baseBranch,
+				w.archived_at AS archivedAt,
+				w.metadata_json AS metadataJson,
+				r.path AS repositoryPath,
+				r.name AS repositoryName,
+				r.slug AS repositorySlug,
+				r.default_branch AS repositoryDefaultBranch
+			FROM workspaces w
+			INNER JOIN repositories r ON r.id = w.repository_id
+			WHERE w.id = ?`,
+		)
+		.get(workspaceId);
+}
+
+/** Inputs for {@link listActiveWorkspaceMetadataRows}. */
+export interface ListActiveWorkspaceMetadataRowsOptions {
+	database: DatabaseSync;
+}
+
+/**
+ * Returns `id` + `metadata_json` for every non-archived workspace. Used by the
+ * port allocator to compute the set of ports already held by active siblings.
+ */
+export function listActiveWorkspaceMetadataRows({
+	database,
+}: ListActiveWorkspaceMetadataRowsOptions): unknown[] {
+	return database
+		.prepare(
+			`SELECT id AS id, metadata_json AS metadataJson
+			FROM workspaces
+			WHERE archived_at IS NULL`,
+		)
+		.all();
+}
+
 /** Inputs for {@link selectDeleteWorkspaceWithRepositoryById}. */
 export interface SelectDeleteWorkspaceWithRepositoryByIdOptions {
 	database: DatabaseSync;

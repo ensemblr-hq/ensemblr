@@ -39,6 +39,15 @@ export function DockPanelActions({
 		);
 	}
 
+	if (hasSetupScript && setup.status === 'running') {
+		return (
+			<Button onClick={actions.onStopSetupScript} size='xs' variant='outline'>
+				<SquareIcon data-icon='inline-start' />
+				Stop setup script
+			</Button>
+		);
+	}
+
 	if (hasRunScript && run.status === 'running') {
 		return (
 			<>

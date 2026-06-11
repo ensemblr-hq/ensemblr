@@ -231,6 +231,26 @@ export type {
 	SharedRootApi,
 } from './contracts/shared-root-adoption';
 export type {
+	CreateTerminalSessionRequest,
+	CreateTerminalSessionResult,
+	KillTerminalRequest,
+	KillTerminalResult,
+	ListTerminalSessionsRequest,
+	ListTerminalSessionsResult,
+	ResizeTerminalRequest,
+	TerminalApi,
+	TerminalDiagnostic,
+	TerminalDiagnosticSeverity,
+	TerminalLifecycleBroadcast,
+	TerminalOutputBroadcast,
+	TerminalSessionKind,
+	TerminalSessionSnapshot,
+	TerminalSessionStatus,
+	TerminalSnapshotRequest,
+	TerminalSnapshotResult,
+	WriteTerminalRequest,
+} from './contracts/terminal';
+export type {
 	AdoptedWorkspaceSnapshot,
 	ArchivedWorkspaceListEntry,
 	ArchivedWorkspaceSnapshot,
@@ -294,4 +314,12 @@ export type {
 	WorkspaceFileEntryWire,
 	WorkspaceFilesApi,
 } from './contracts/workspace-files';
+export type {
+	RunWorkspaceScriptRequest,
+	RunWorkspaceScriptResult,
+	StopWorkspaceScriptRequest,
+	StopWorkspaceScriptResult,
+	WorkspaceScriptKind,
+	WorkspaceScriptsApi,
+} from './contracts/workspace-scripts';
 export type { IpcHandlerMap } from './handler-map';
