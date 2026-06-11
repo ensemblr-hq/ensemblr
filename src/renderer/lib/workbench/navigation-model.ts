@@ -5,6 +5,7 @@ import type {
 	SessionTabModel,
 	WorkspaceLandingKind,
 	WorkspaceLandingSummary,
+	WorkspaceLinkedIssueSummary,
 	WorkspaceOpenTarget,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
@@ -333,12 +334,18 @@ function createPlaceholderLandingSummary(
 	const baseBranch = workspace.baseBranch ?? repository.defaultBranch ?? null;
 	const branchName =
 		workspace.branchName ?? workspace.slug ?? workspace.name ?? 'workspace';
-	const kind = inferPlaceholderLandingKind({ baseBranch, branchName });
+	const linkedIssue = readLinkedIssueMetadata(workspace.metadata);
+	const kind = linkedIssue
+		? 'linked-issue'
+		: inferPlaceholderLandingKind({ baseBranch, branchName });
 	const branchDetail = baseBranch
 		? `Worktree branched from ${baseBranch}.`
 		: 'Worktree created from repository default branch.';
-	const headline =
-		kind === 'cloned-repo' ? 'Repository cloned' : 'New workspace ready';
+	const headline = linkedIssue
+		? `Workspace created from ${linkedIssue.reference}`
+		: kind === 'cloned-repo'
+			? 'Repository cloned'
+			: 'New workspace ready';
 	const copiedFiles = readFilesToCopyMetadata(workspace.metadata);
 
 	return {
@@ -350,6 +357,7 @@ function createPlaceholderLandingSummary(
 		copiedFiles,
 		headline,
 		kind,
+		...(linkedIssue ? { linkedIssue } : {}),
 		repositoryName: repository.name || repository.slug,
 		setupGuidance: {
 			detail:
@@ -402,6 +410,44 @@ function readFilesToCopyMetadata(
 		count: copiedCount,
 		detail,
 		state,
+	};
+}
+
+/**
+ * Reads the linked-issue summary persisted under `workspace.metadata.linkedIssue`
+ * for workspaces created from a Linear issue.
+ */
+function readLinkedIssueMetadata(
+	metadata: RepositoryWorkspaceNavigationWorkspace['metadata'],
+): WorkspaceLinkedIssueSummary | null {
+	const raw = metadata.linkedIssue;
+
+	if (typeof raw !== 'object' || raw === null) {
+		return null;
+	}
+
+	const record = raw as Record<string, unknown>;
+	const provider = record.provider;
+	const identifier = record.identifier;
+	const title = record.title;
+
+	if (
+		(provider !== 'linear' && provider !== 'github') ||
+		typeof identifier !== 'string' ||
+		typeof title !== 'string'
+	) {
+		return null;
+	}
+
+	return {
+		provider,
+		reference: identifier,
+		...(typeof record.id === 'string' ? { remoteId: record.id } : {}),
+		...(typeof record.teamName === 'string'
+			? { subtitle: record.teamName }
+			: {}),
+		title,
+		...(typeof record.url === 'string' ? { url: record.url } : {}),
 	};
 }
 

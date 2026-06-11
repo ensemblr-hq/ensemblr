@@ -41,6 +41,7 @@ export interface WorkbenchShellProps {
 		| 'dashboard'
 		| 'help'
 		| 'history'
+		| 'linear'
 		| 'settings'
 		| 'welcome'
 		| 'workspace';

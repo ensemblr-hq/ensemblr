@@ -10,6 +10,7 @@ import type {
 	CreateWorkspaceRequest,
 	CreateWorkspaceResult,
 	FilesToCopySnapshot,
+	WorkspaceLinkedIssueInput,
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import {
@@ -210,10 +211,12 @@ export function createWorkspaceService({
 			const timestamp = now().toISOString();
 			const initialMetadata = buildInitialWorkspaceMetadata({
 				filesToCopySnapshot,
+				linkedIssue: request.linkedIssue,
 			});
 			try {
 				insertWorkspaceRow({
 					database,
+					linkedIssue: request.linkedIssue,
 					metadataJson: JSON.stringify(initialMetadata),
 					prepared,
 					timestamp,
@@ -630,8 +633,10 @@ function cleanupDirectory(workspacePath: string): void {
  */
 function buildInitialWorkspaceMetadata({
 	filesToCopySnapshot,
+	linkedIssue,
 }: {
 	filesToCopySnapshot: FilesToCopySnapshot;
+	linkedIssue?: WorkspaceLinkedIssueInput;
 }): Record<string, unknown> {
 	return {
 		filesToCopy: {
@@ -639,17 +644,23 @@ function buildInitialWorkspaceMetadata({
 			skippedCount: filesToCopySnapshot.skipped.length,
 			source: filesToCopySnapshot.source,
 		},
+		...(linkedIssue ? { linkedIssue } : {}),
 	};
 }
 
-/** Inserts a `workspaces` row inside a single transaction. */
+/**
+ * Inserts the `workspaces` row plus, for issue-seeded workspaces, the
+ * `integration_metadata` link row inside one transaction.
+ */
 function insertWorkspaceRow({
 	database,
+	linkedIssue,
 	metadataJson,
 	prepared,
 	timestamp,
 }: {
 	database: DatabaseSync;
+	linkedIssue?: WorkspaceLinkedIssueInput;
 	metadataJson: string;
 	prepared: PreparedWorkspace;
 	timestamp: string;
@@ -667,6 +678,23 @@ function insertWorkspaceRow({
 			slug: prepared.slug,
 			timestamp,
 		});
+
+		if (linkedIssue) {
+			database
+				.prepare(
+					`INSERT INTO integration_metadata
+						(id, provider, resource_type, resource_id, external_id, synced_at, metadata_json)
+					 VALUES (?, ?, 'workspace-link', ?, ?, ?, ?)`,
+				)
+				.run(
+					randomUUID(),
+					linkedIssue.provider,
+					prepared.id,
+					linkedIssue.id,
+					timestamp,
+					JSON.stringify(linkedIssue),
+				);
+		}
 	});
 }
 

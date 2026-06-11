@@ -28,7 +28,9 @@ import { Route as WorkbenchShellHistoryRouteImport } from './routes/_workbench/_
 import { Route as WorkbenchShellHelpRouteImport } from './routes/_workbench/_shell/help'
 import { Route as WorkbenchShellDashboardRouteImport } from './routes/_workbench/_shell/dashboard'
 import { Route as WorkbenchSettingsRepoIndexRouteImport } from './routes/_workbench/settings/repo/index'
+import { Route as WorkbenchShellLinearIndexRouteImport } from './routes/_workbench/_shell/linear/index'
 import { Route as WorkbenchSettingsRepoRepoIdRouteImport } from './routes/_workbench/settings/repo/$repoId'
+import { Route as WorkbenchShellLinearIssueIdRouteImport } from './routes/_workbench/_shell/linear/$issueId'
 import { Route as WorkbenchShellProjectsProjectIdRouteRouteImport } from './routes/_workbench/_shell/projects/$projectId/route'
 import { Route as WorkbenchSettingsRepoRepoIdIndexRouteImport } from './routes/_workbench/settings/repo/$repoId/index'
 import { Route as WorkbenchSettingsRepoRepoIdScriptsRouteImport } from './routes/_workbench/settings/repo/$repoId/scripts'
@@ -141,11 +143,23 @@ const WorkbenchSettingsRepoIndexRoute =
     path: '/repo/',
     getParentRoute: () => WorkbenchSettingsRoute,
   } as any)
+const WorkbenchShellLinearIndexRoute =
+  WorkbenchShellLinearIndexRouteImport.update({
+    id: '/linear/',
+    path: '/linear/',
+    getParentRoute: () => WorkbenchShellRoute,
+  } as any)
 const WorkbenchSettingsRepoRepoIdRoute =
   WorkbenchSettingsRepoRepoIdRouteImport.update({
     id: '/repo/$repoId',
     path: '/repo/$repoId',
     getParentRoute: () => WorkbenchSettingsRoute,
+  } as any)
+const WorkbenchShellLinearIssueIdRoute =
+  WorkbenchShellLinearIssueIdRouteImport.update({
+    id: '/linear/$issueId',
+    path: '/linear/$issueId',
+    getParentRoute: () => WorkbenchShellRoute,
   } as any)
 const WorkbenchShellProjectsProjectIdRouteRoute =
   WorkbenchShellProjectsProjectIdRouteRouteImport.update({
@@ -230,7 +244,9 @@ export interface FileRoutesByFullPath {
   '/settings/models': typeof WorkbenchSettingsModelsRoute
   '/settings/': typeof WorkbenchSettingsIndexRoute
   '/projects/$projectId': typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
+  '/linear/$issueId': typeof WorkbenchShellLinearIssueIdRoute
   '/settings/repo/$repoId': typeof WorkbenchSettingsRepoRepoIdRouteWithChildren
+  '/linear/': typeof WorkbenchShellLinearIndexRoute
   '/settings/repo/': typeof WorkbenchSettingsRepoIndexRoute
   '/settings/repo/$repoId/actions': typeof WorkbenchSettingsRepoRepoIdActionsRoute
   '/settings/repo/$repoId/environment': typeof WorkbenchSettingsRepoRepoIdEnvironmentRoute
@@ -259,6 +275,8 @@ export interface FileRoutesByTo {
   '/settings/models': typeof WorkbenchSettingsModelsRoute
   '/settings': typeof WorkbenchSettingsIndexRoute
   '/projects/$projectId': typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
+  '/linear/$issueId': typeof WorkbenchShellLinearIssueIdRoute
+  '/linear': typeof WorkbenchShellLinearIndexRoute
   '/settings/repo': typeof WorkbenchSettingsRepoIndexRoute
   '/settings/repo/$repoId/actions': typeof WorkbenchSettingsRepoRepoIdActionsRoute
   '/settings/repo/$repoId/environment': typeof WorkbenchSettingsRepoRepoIdEnvironmentRoute
@@ -290,7 +308,9 @@ export interface FileRoutesById {
   '/_workbench/_shell/': typeof WorkbenchShellIndexRoute
   '/_workbench/settings/': typeof WorkbenchSettingsIndexRoute
   '/_workbench/_shell/projects/$projectId': typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
+  '/_workbench/_shell/linear/$issueId': typeof WorkbenchShellLinearIssueIdRoute
   '/_workbench/settings/repo/$repoId': typeof WorkbenchSettingsRepoRepoIdRouteWithChildren
+  '/_workbench/_shell/linear/': typeof WorkbenchShellLinearIndexRoute
   '/_workbench/settings/repo/': typeof WorkbenchSettingsRepoIndexRoute
   '/_workbench/settings/repo/$repoId/actions': typeof WorkbenchSettingsRepoRepoIdActionsRoute
   '/_workbench/settings/repo/$repoId/environment': typeof WorkbenchSettingsRepoRepoIdEnvironmentRoute
@@ -322,7 +342,9 @@ export interface FileRouteTypes {
     | '/settings/models'
     | '/settings/'
     | '/projects/$projectId'
+    | '/linear/$issueId'
     | '/settings/repo/$repoId'
+    | '/linear/'
     | '/settings/repo/'
     | '/settings/repo/$repoId/actions'
     | '/settings/repo/$repoId/environment'
@@ -351,6 +373,8 @@ export interface FileRouteTypes {
     | '/settings/models'
     | '/settings'
     | '/projects/$projectId'
+    | '/linear/$issueId'
+    | '/linear'
     | '/settings/repo'
     | '/settings/repo/$repoId/actions'
     | '/settings/repo/$repoId/environment'
@@ -381,7 +405,9 @@ export interface FileRouteTypes {
     | '/_workbench/_shell/'
     | '/_workbench/settings/'
     | '/_workbench/_shell/projects/$projectId'
+    | '/_workbench/_shell/linear/$issueId'
     | '/_workbench/settings/repo/$repoId'
+    | '/_workbench/_shell/linear/'
     | '/_workbench/settings/repo/'
     | '/_workbench/settings/repo/$repoId/actions'
     | '/_workbench/settings/repo/$repoId/environment'
@@ -534,12 +560,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkbenchSettingsRepoIndexRouteImport
       parentRoute: typeof WorkbenchSettingsRoute
     }
+    '/_workbench/_shell/linear/': {
+      id: '/_workbench/_shell/linear/'
+      path: '/linear'
+      fullPath: '/linear/'
+      preLoaderRoute: typeof WorkbenchShellLinearIndexRouteImport
+      parentRoute: typeof WorkbenchShellRoute
+    }
     '/_workbench/settings/repo/$repoId': {
       id: '/_workbench/settings/repo/$repoId'
       path: '/repo/$repoId'
       fullPath: '/settings/repo/$repoId'
       preLoaderRoute: typeof WorkbenchSettingsRepoRepoIdRouteImport
       parentRoute: typeof WorkbenchSettingsRoute
+    }
+    '/_workbench/_shell/linear/$issueId': {
+      id: '/_workbench/_shell/linear/$issueId'
+      path: '/linear/$issueId'
+      fullPath: '/linear/$issueId'
+      preLoaderRoute: typeof WorkbenchShellLinearIssueIdRouteImport
+      parentRoute: typeof WorkbenchShellRoute
     }
     '/_workbench/_shell/projects/$projectId': {
       id: '/_workbench/_shell/projects/$projectId'
@@ -653,6 +693,8 @@ interface WorkbenchShellRouteChildren {
   WorkbenchShellHistoryRoute: typeof WorkbenchShellHistoryRoute
   WorkbenchShellIndexRoute: typeof WorkbenchShellIndexRoute
   WorkbenchShellProjectsProjectIdRouteRoute: typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
+  WorkbenchShellLinearIssueIdRoute: typeof WorkbenchShellLinearIssueIdRoute
+  WorkbenchShellLinearIndexRoute: typeof WorkbenchShellLinearIndexRoute
 }
 
 const WorkbenchShellRouteChildren: WorkbenchShellRouteChildren = {
@@ -662,6 +704,8 @@ const WorkbenchShellRouteChildren: WorkbenchShellRouteChildren = {
   WorkbenchShellIndexRoute: WorkbenchShellIndexRoute,
   WorkbenchShellProjectsProjectIdRouteRoute:
     WorkbenchShellProjectsProjectIdRouteRouteWithChildren,
+  WorkbenchShellLinearIssueIdRoute: WorkbenchShellLinearIssueIdRoute,
+  WorkbenchShellLinearIndexRoute: WorkbenchShellLinearIndexRoute,
 }
 
 const WorkbenchShellRouteWithChildren = WorkbenchShellRoute._addFileChildren(

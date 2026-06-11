@@ -8,6 +8,7 @@ export * from './chat-tabs';
 export * from './checkpoints';
 export * from './clone';
 export * from './health';
+export * from './linear';
 export * from './navigation';
 export * from './pi-sessions';
 export * from './pi-slash-commands';

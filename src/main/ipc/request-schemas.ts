@@ -294,10 +294,21 @@ export function parseQuickStartProjectRequest(raw: unknown): {
 	return parentPath !== undefined ? { name, parentPath } : { name };
 }
 
+const workspaceLinkedIssueSchema = z.object({
+	id: z.string().min(1),
+	identifier: z.string().min(1),
+	provider: z.literal('linear'),
+	teamKey: z.string().optional(),
+	teamName: z.string().optional(),
+	title: z.string().min(1),
+	url: z.string(),
+});
+
 /** {@link import('../../shared/ipc').CreateWorkspaceRequest}. */
 export const createWorkspaceRequestSchema = z.object({
 	baseBranch: optionalTrimmedString,
 	branchName: optionalTrimmedString,
+	linkedIssue: workspaceLinkedIssueSchema.optional(),
 	name: optionalTrimmedString,
 	repositoryId: z.string(),
 });
@@ -309,6 +320,7 @@ export const createWorkspaceRequestSchema = z.object({
 export function parseCreateWorkspaceRequest(raw: unknown): {
 	baseBranch?: string;
 	branchName?: string;
+	linkedIssue?: z.infer<typeof workspaceLinkedIssueSchema>;
 	name?: string;
 	repositoryId: string;
 } {
@@ -316,10 +328,12 @@ export function parseCreateWorkspaceRequest(raw: unknown): {
 	if (!parsed.success) {
 		return { repositoryId: '' };
 	}
-	const { baseBranch, branchName, name, repositoryId } = parsed.data;
+	const { baseBranch, branchName, linkedIssue, name, repositoryId } =
+		parsed.data;
 	const result: {
 		baseBranch?: string;
 		branchName?: string;
+		linkedIssue?: z.infer<typeof workspaceLinkedIssueSchema>;
 		name?: string;
 		repositoryId: string;
 	} = { repositoryId };
@@ -328,6 +342,9 @@ export function parseCreateWorkspaceRequest(raw: unknown): {
 	}
 	if (branchName !== undefined) {
 		result.branchName = branchName;
+	}
+	if (linkedIssue !== undefined) {
+		result.linkedIssue = linkedIssue;
 	}
 	if (name !== undefined) {
 		result.name = name;
@@ -596,3 +613,65 @@ export function parseRepositoryConfigMigrationRequest(raw: unknown): {
 		repositoryPath: parsed.data.repositoryPath,
 	};
 }
+
+// -----------------------------------------------------------------------------
+// linear — STRICT (throws on bad input)
+// -----------------------------------------------------------------------------
+
+const linearIssueFieldsShape = {
+	assigneeId: z.string().min(1).optional(),
+	cycleId: z.string().min(1).optional(),
+	description: z.string().optional(),
+	dueDate: z.string().optional(),
+	labelIds: z.array(z.string().min(1)).optional(),
+	priority: z.number().int().min(0).max(4).optional(),
+	projectId: z.string().min(1).optional(),
+	stateId: z.string().min(1).optional(),
+};
+
+/** {@link import('../../shared/ipc').ListLinearIssuesRequest}. */
+export const listLinearIssuesRequestSchema = z
+	.object({
+		query: z.string().optional(),
+		refresh: z.boolean().optional(),
+		teamId: z.string().min(1).optional(),
+	})
+	.optional()
+	.transform((value) => value ?? {});
+
+/** {@link import('../../shared/ipc').GetLinearIssueRequest}. */
+export const getLinearIssueRequestSchema = z.object({
+	id: z.string().min(1),
+	refresh: z.boolean().optional(),
+});
+
+/** {@link import('../../shared/ipc').GetLinearMetadataRequest}. */
+export const getLinearMetadataRequestSchema = z
+	.object({
+		refresh: z.boolean().optional(),
+	})
+	.optional()
+	.transform((value) => value ?? {});
+
+/** {@link import('../../shared/ipc').CreateLinearIssueRequest}. */
+export const createLinearIssueRequestSchema = z.object({
+	...linearIssueFieldsShape,
+	teamId: z.string().min(1),
+	title: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').UpdateLinearIssueRequest}. */
+export const updateLinearIssueRequestSchema = z.object({
+	id: z.string().min(1),
+	input: z.object({
+		...linearIssueFieldsShape,
+		teamId: z.string().min(1).optional(),
+		title: z.string().min(1).optional(),
+	}),
+});
+
+/** {@link import('../../shared/ipc').CreateLinearCommentRequest}. */
+export const createLinearCommentRequestSchema = z.object({
+	body: z.string().min(1),
+	issueId: z.string().min(1),
+});

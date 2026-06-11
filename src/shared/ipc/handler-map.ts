@@ -42,6 +42,22 @@ import type {
 import type { EnvironmentVariablesSnapshot } from './contracts/environment';
 import type { HealthSnapshot } from './contracts/health';
 import type {
+	CreateLinearCommentRequest,
+	CreateLinearCommentResult,
+	CreateLinearIssueRequest,
+	GetLinearIssueRequest,
+	GetLinearIssueResult,
+	GetLinearMetadataRequest,
+	GetLinearMetadataResult,
+	LinearConnectionSnapshot,
+	LinearDisconnectResult,
+	LinearLoginResult,
+	ListLinearIssuesRequest,
+	ListLinearIssuesResult,
+	MutateLinearIssueResult,
+	UpdateLinearIssueRequest,
+} from './contracts/linear';
+import type {
 	ListPiModelsResult,
 	ListPiSessionEventsRequest,
 	ListPiSessionEventsResult,
@@ -227,6 +243,40 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.killTerminalSession]: IpcHandlerEntry<
 		KillTerminalRequest,
 		KillTerminalResult
+	>;
+	[IPC_CHANNELS.linearCancelLogin]: IpcHandlerEntry<void, void>;
+	[IPC_CHANNELS.linearConnectionStatus]: IpcHandlerEntry<
+		void,
+		LinearConnectionSnapshot
+	>;
+	[IPC_CHANNELS.linearCreateComment]: IpcHandlerEntry<
+		CreateLinearCommentRequest,
+		CreateLinearCommentResult
+	>;
+	[IPC_CHANNELS.linearCreateIssue]: IpcHandlerEntry<
+		CreateLinearIssueRequest,
+		MutateLinearIssueResult
+	>;
+	[IPC_CHANNELS.linearDisconnect]: IpcHandlerEntry<
+		void,
+		LinearDisconnectResult
+	>;
+	[IPC_CHANNELS.linearGetIssue]: IpcHandlerEntry<
+		GetLinearIssueRequest,
+		GetLinearIssueResult
+	>;
+	[IPC_CHANNELS.linearListIssues]: IpcHandlerEntry<
+		ListLinearIssuesRequest | undefined,
+		ListLinearIssuesResult
+	>;
+	[IPC_CHANNELS.linearMetadata]: IpcHandlerEntry<
+		GetLinearMetadataRequest | undefined,
+		GetLinearMetadataResult
+	>;
+	[IPC_CHANNELS.linearStartLogin]: IpcHandlerEntry<void, LinearLoginResult>;
+	[IPC_CHANNELS.linearUpdateIssue]: IpcHandlerEntry<
+		UpdateLinearIssueRequest,
+		MutateLinearIssueResult
 	>;
 	[IPC_CHANNELS.listArchivedWorkspaces]: IpcHandlerEntry<
 		ListArchivedWorkspacesRequest,

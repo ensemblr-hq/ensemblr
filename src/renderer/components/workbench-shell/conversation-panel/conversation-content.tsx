@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 
+import { formatLinearIssueContext } from '@/renderer/lib/linear';
 import { toWorkspaceRelativePath } from '@/renderer/lib/pi';
 import { usePiRawFrameCapture } from '@/renderer/state/pi-raw-frames';
 import type {
@@ -114,6 +115,10 @@ export function WorkspaceConversationContent({
 						<ComposerPanel
 							chatTabId={activeSession.chatTabId}
 							composer={composer}
+							seedText={getLinkedIssueComposerSeed(
+								activeWorkspace,
+								activeSession,
+							)}
 						/>
 					</TurnDiffOpenerProvider>
 				</FilePreviewOpenerProvider>
@@ -128,4 +133,25 @@ export function WorkspaceConversationContent({
 			<PiRawFramePanel sessionId={debugSessionId} />
 		</section>
 	);
+}
+
+/**
+ * Composer seed for issue-created workspaces: linked-issue context is offered
+ * for the first prompt only (no Pi session yet); the user still presses send.
+ */
+function getLinkedIssueComposerSeed(
+	workspace: WorkspaceShellModel,
+	session: SessionTabModel,
+): string | undefined {
+	const linkedIssue = workspace.landingSummary?.linkedIssue;
+
+	if (linkedIssue?.provider !== 'linear' || session.piSessionId) {
+		return undefined;
+	}
+
+	return formatLinearIssueContext({
+		identifier: linkedIssue.reference,
+		title: linkedIssue.title,
+		url: linkedIssue.url ?? null,
+	});
 }

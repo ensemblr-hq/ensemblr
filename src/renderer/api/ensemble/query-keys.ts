@@ -22,6 +22,18 @@ export const ensembleQueryKeys = {
 	githubRepositoryList: () =>
 		[...ensembleQueryKeys.all, 'github-repository-list'] as const,
 	health: () => [...ensembleQueryKeys.all, 'health'] as const,
+	linearConnection: () =>
+		[...ensembleQueryKeys.all, 'linear-connection'] as const,
+	linearIssue: (issueId: string) =>
+		[...ensembleQueryKeys.all, 'linear-issue', issueId] as const,
+	linearIssues: (filter: { query?: string; teamId?: string }) =>
+		[
+			...ensembleQueryKeys.all,
+			'linear-issues',
+			filter.teamId ?? '',
+			filter.query ?? '',
+		] as const,
+	linearMetadata: () => [...ensembleQueryKeys.all, 'linear-metadata'] as const,
 	piModels: () => [...ensembleQueryKeys.all, 'pi-models'] as const,
 	piSlashCommands: (workspaceCwd: string) =>
 		[...ensembleQueryKeys.all, 'pi-slash-commands', workspaceCwd] as const,

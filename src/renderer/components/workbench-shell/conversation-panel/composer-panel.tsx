@@ -1,5 +1,6 @@
 import { ArrowUpIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
+import { LinearIssuePickerDialog } from '@/renderer/components/linear/linear-issue-picker-dialog';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
 import { Textarea } from '@/renderer/components/ui/textarea';
@@ -9,6 +10,7 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { formatLinearIssueContext } from '@/renderer/lib/linear';
 import { cn } from '@/renderer/lib/utils';
 import type { ComposerShellState } from '@/renderer/types/workbench';
 import { formatShortcut } from '@/shared/keymap';
@@ -33,13 +35,16 @@ const FOCUS_SHORTCUT_HINT = formatShortcut('composer.focus');
 export function ComposerPanel({
 	chatTabId,
 	composer,
+	seedText,
 }: {
 	chatTabId: string;
 	composer: ComposerShellState;
+	seedText?: string;
 }) {
-	const state = useComposerState({ chatTabId, composer });
+	const state = useComposerState({ chatTabId, composer, seedText });
 	const [focused, setFocused] = useState(false);
 	const [modelPickerOpen, setModelPickerOpen] = useState(false);
+	const [issuePickerOpen, setIssuePickerOpen] = useState(false);
 
 	const focusTextarea = useCallback(() => {
 		state.textareaRef.current?.focus();
@@ -226,11 +231,17 @@ export function ComposerPanel({
 						<AttachmentMenu
 							disabled={composer.disabled}
 							onAddAttachment={state.handleAddAttachment}
+							onLinkIssue={() => setIssuePickerOpen(true)}
 						/>
 						{submitWithTooltip}
 					</div>
 				</div>
 			</div>
+			<LinearIssuePickerDialog
+				onOpenChange={setIssuePickerOpen}
+				onSelect={(issue) => state.insertText(formatLinearIssueContext(issue))}
+				open={issuePickerOpen}
+			/>
 		</footer>
 	);
 }

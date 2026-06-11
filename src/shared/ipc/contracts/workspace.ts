@@ -20,9 +20,21 @@ export interface CreateWorkspaceDiagnostic {
 	severity: CreateWorkspaceDiagnosticSeverity;
 }
 
+/** Linked remote issue persisted on a workspace created from an issue. */
+export interface WorkspaceLinkedIssueInput {
+	id: string;
+	identifier: string;
+	provider: 'linear';
+	teamKey?: string;
+	teamName?: string;
+	title: string;
+	url: string;
+}
+
 export interface CreateWorkspaceRequest {
 	baseBranch?: string;
 	branchName?: string;
+	linkedIssue?: WorkspaceLinkedIssueInput;
 	name?: string;
 	repositoryId: string;
 }
