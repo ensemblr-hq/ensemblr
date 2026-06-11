@@ -6,7 +6,7 @@
 		"rpc",
 		"--no-session"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/multi-tool-chain",
+	"cwd": "/sandbox/multi-tool-chain",
 	"startedAt": 1781134166257,
 	"endedAt": 1781134180671,
 	"sent": [

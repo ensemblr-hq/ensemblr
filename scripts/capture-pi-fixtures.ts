@@ -18,12 +18,28 @@
  */
 
 import { appendFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { userInfo } from 'node:os';
 import { join } from 'node:path';
 
 const REPO_ROOT = new URL('..', import.meta.url).pathname;
 const SANDBOX_ROOT = join(REPO_ROOT, '.pi-capture-sandbox');
 const FIXTURE_DIR = join(REPO_ROOT, 'src/renderer/fixtures/pi-captures');
 const DEFAULT_STEP_TIMEOUT_MS = 240_000;
+/** Stable stand-in for the machine-local sandbox root in committed fixtures. */
+const SANDBOX_PLACEHOLDER = '/sandbox';
+/** Stable stand-in for the capturing user (e.g. `ls -la` owner columns). */
+const USERNAME_PLACEHOLDER = 'captures';
+
+/**
+ * Strips machine-local absolute paths and the local username so committed
+ * fixtures (and the snapshots derived from them) are identical regardless of
+ * who captures.
+ */
+function sanitizeCapturedText(text: string): string {
+	return text
+		.replaceAll(SANDBOX_ROOT, SANDBOX_PLACEHOLDER)
+		.replaceAll(userInfo().username, USERNAME_PLACEHOLDER);
+}
 
 interface SentRecord {
 	ts: number;
@@ -483,7 +499,11 @@ async function captureScenario(scenario: Scenario): Promise<void> {
 	const record = (stream: 'stdout' | 'stderr') => (line: string) => {
 		appendFileSync(
 			fixturePath,
-			`${JSON.stringify({ ts: Date.now(), stream, raw: line })}\n`,
+			`${JSON.stringify({
+				ts: Date.now(),
+				stream,
+				raw: sanitizeCapturedText(line),
+			})}\n`,
 		);
 		if (stream !== 'stdout') return;
 		let frame: Record<string, unknown>;
@@ -528,7 +548,10 @@ async function captureScenario(scenario: Scenario): Promise<void> {
 	meta.exitCode = await proc.exited;
 	await Promise.allSettled([stdoutDone, stderrDone]);
 	meta.endedAt = Date.now();
-	writeFileSync(metaPath, `${JSON.stringify(meta, null, '\t')}\n`);
+	writeFileSync(
+		metaPath,
+		`${sanitizeCapturedText(JSON.stringify(meta, null, '\t'))}\n`,
+	);
 	console.log(
 		`  ✔ ${meta.exitCondition} (exit ${meta.exitCode}) → ${fixturePath}`,
 	);

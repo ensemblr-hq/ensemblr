@@ -6,7 +6,7 @@
 		"rpc",
 		"--no-session"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/file-edit",
+	"cwd": "/sandbox/file-edit",
 	"startedAt": 1781134188142,
 	"endedAt": 1781134202173,
 	"sent": [

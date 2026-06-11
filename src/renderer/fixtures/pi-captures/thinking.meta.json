@@ -6,7 +6,7 @@
 		"rpc",
 		"--no-session"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/thinking",
+	"cwd": "/sandbox/thinking",
 	"startedAt": 1781134219756,
 	"endedAt": 1781134228516,
 	"sent": [

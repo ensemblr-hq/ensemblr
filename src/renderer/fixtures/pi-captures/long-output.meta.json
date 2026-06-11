@@ -6,7 +6,7 @@
 		"rpc",
 		"--no-session"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/long-output",
+	"cwd": "/sandbox/long-output",
 	"startedAt": 1781134180672,
 	"endedAt": 1781134188140,
 	"sent": [

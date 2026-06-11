@@ -6,7 +6,7 @@
 		"rpc",
 		"--no-session"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/single-read",
+	"cwd": "/sandbox/single-read",
 	"startedAt": 1781134158741,
 	"endedAt": 1781134166256,
 	"sent": [

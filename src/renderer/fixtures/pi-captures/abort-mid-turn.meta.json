@@ -6,7 +6,7 @@
 		"rpc",
 		"--no-session"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/abort-mid-turn",
+	"cwd": "/sandbox/abort-mid-turn",
 	"startedAt": 1781134228517,
 	"endedAt": 1781134235872,
 	"sent": [

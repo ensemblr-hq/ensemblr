@@ -6,7 +6,7 @@
 		"rpc",
 		"--no-session"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/markdown-heavy",
+	"cwd": "/sandbox/markdown-heavy",
 	"startedAt": 1781134147742,
 	"endedAt": 1781134158740,
 	"sent": [

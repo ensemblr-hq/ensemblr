@@ -6,7 +6,7 @@
 		"rpc",
 		"--no-session"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/multi-turn",
+	"cwd": "/sandbox/multi-turn",
 	"startedAt": 1781134210341,
 	"endedAt": 1781134219755,
 	"sent": [

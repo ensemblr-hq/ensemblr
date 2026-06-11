@@ -9,7 +9,7 @@
 		"-e",
 		".pi/agent/extensions/approval-gate.ts"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/permission-gate",
+	"cwd": "/sandbox/permission-gate",
 	"startedAt": 1781134391708,
 	"endedAt": 1781134402021,
 	"sent": [

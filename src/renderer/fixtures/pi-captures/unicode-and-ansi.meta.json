@@ -6,7 +6,7 @@
 		"rpc",
 		"--no-session"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/unicode-and-ansi",
+	"cwd": "/sandbox/unicode-and-ansi",
 	"startedAt": 1781134245626,
 	"endedAt": 1781134253051,
 	"sent": [

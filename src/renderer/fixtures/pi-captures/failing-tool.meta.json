@@ -6,7 +6,7 @@
 		"rpc",
 		"--no-session"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/failing-tool",
+	"cwd": "/sandbox/failing-tool",
 	"startedAt": 1781134202174,
 	"endedAt": 1781134210340,
 	"sent": [

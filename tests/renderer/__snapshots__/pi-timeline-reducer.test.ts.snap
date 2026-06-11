@@ -35,12 +35,12 @@ exports[`pi timeline reducer abort-mid-turn.jsonl replay snapshot 1`] = `
       "kind": "tool-call",
       "output": 
 "total 24
-drwxr-xr-x@  6 psoldunov  staff  192 Jun 11 02:30 .
-drwxr-xr-x@ 12 psoldunov  staff  384 Jun 11 02:30 ..
--rw-r--r--@  1 psoldunov  staff  339 Jun 11 02:30 README.md
--rw-r--r--@  1 psoldunov  staff   92 Jun 11 02:30 package.json
-drwxr-xr-x@  6 psoldunov  staff  192 Jun 11 02:30 src
--rw-r--r--@  1 psoldunov  staff  167 Jun 11 02:30 tsconfig.json
+drwxr-xr-x@  6 captures  staff  192 Jun 11 02:30 .
+drwxr-xr-x@ 12 captures  staff  384 Jun 11 02:30 ..
+-rw-r--r--@  1 captures  staff  339 Jun 11 02:30 README.md
+-rw-r--r--@  1 captures  staff   92 Jun 11 02:30 package.json
+drwxr-xr-x@  6 captures  staff  192 Jun 11 02:30 src
+-rw-r--r--@  1 captures  staff  167 Jun 11 02:30 tsconfig.json
 "
 ,
       "startedAtMs": 1781134235069,
@@ -252,7 +252,7 @@ I also verified \`src/broken.ts\` has no remaining diagnostics."
       "id": "item-3",
       "kind": "tool-call",
       "output": 
-"/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/file-edit
+"/sandbox/file-edit
 README.md
 package.json
 src
@@ -444,7 +444,7 @@ export const verdict = classify('21');"
       },
       "details": {
         "diagnostics": [],
-        "filePath": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/file-edit/src/broken.ts",
+        "filePath": "/sandbox/file-edit/src/broken.ts",
         "lspHealth": {
           "candidateServerIds": [
             "typescript",

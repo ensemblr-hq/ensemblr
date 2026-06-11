@@ -6,7 +6,7 @@
 		"rpc",
 		"--no-session"
 	],
-	"cwd": "/Users/psoldunov/Projects/Conductor/workspaces/ensemble/hanoi/.pi-capture-sandbox/plain-answer",
+	"cwd": "/sandbox/plain-answer",
 	"startedAt": 1781134140965,
 	"endedAt": 1781134147741,
 	"sent": [
