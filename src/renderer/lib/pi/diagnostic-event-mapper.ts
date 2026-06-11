@@ -56,7 +56,8 @@ function readStderrDetail(payload: PiPersistedEnvelope | null): string {
 }
 
 /** Strong actionable signals. Anything that matches one of these gets through. */
-const ACTIONABLE_MARKER = /\b(error|warning|fatal|panic|crash|traceback|exception)\b/i;
+const ACTIONABLE_MARKER =
+	/\b(error|warning|fatal|panic|crash|traceback|exception)\b/i;
 const STACK_FRAME = /\bat\s+\S+:\d+/;
 const SHELL_PROMPT = /^\s*[$#]\s+\S/;
 

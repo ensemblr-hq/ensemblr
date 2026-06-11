@@ -130,6 +130,32 @@ export interface ListPiSessionEventsResult {
 	events: readonly PiSessionEventWire[];
 }
 
+/**
+ * Write a markdown summary of a conversation branch for forking. The summary
+ * lands under `<targetWorkspaceCwd>/.context/sessions/` so the new chat can
+ * attach it as a file chip.
+ */
+export interface WriteForkSummaryRequest {
+	branchId: string;
+	/** Filename stem for the summary, e.g. the destination chat-tab id. */
+	fileBaseName: string;
+	sessionId: string;
+	/** Absolute workspace root to write into; defaults to the session cwd. */
+	targetWorkspaceCwd?: string;
+	/** Inclusive event-ordinal bound; omit to summarize the whole branch. */
+	upToOrdinal?: number;
+}
+
+export interface WriteForkSummaryResult {
+	error?: string;
+	summary?: {
+		absolutePath: string;
+		/** Path relative to the target workspace root. */
+		relativePath: string;
+		title: string | null;
+	};
+}
+
 /** Live envelope pushed from the main process when an event lands. */
 export interface PiSessionEventBroadcast {
 	event: PiSessionEventWire;
@@ -200,6 +226,9 @@ export interface PiSessionApi {
 	submitPiPrompt: (
 		request: SubmitPiPromptRequest,
 	) => Promise<SubmitPiPromptResult>;
+	writeForkSummary: (
+		request: WriteForkSummaryRequest,
+	) => Promise<WriteForkSummaryResult>;
 }
 
 export interface PiExecutableSelectionResult {

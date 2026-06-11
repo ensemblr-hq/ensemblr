@@ -328,6 +328,11 @@ export const MessageResponse = memo(
 		<Streamdown
 			className={cn(
 				'size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
+				// Streamdown defaults lists to `list-inside`, which hangs markers at
+				// the container edge and wraps continuation lines under the marker.
+				// Render markers outside and shift the whole list right instead so
+				// wrapped lines stay aligned with their text.
+				'[&_ol]:list-outside [&_ol]:pl-6 [&_ul]:list-outside [&_ul]:pl-5',
 				className,
 			)}
 			plugins={streamdownPlugins}

@@ -13,7 +13,18 @@ export interface WriteSessionSummaryInput {
 	/** Close timestamp, or the live update time while the tab is still open. */
 	closedAt: string;
 	events: readonly PiSessionEventWire[];
+	/**
+	 * Filename stem for the summary markdown; defaults to `chatTabId`. Used by
+	 * fork summaries so they never collide with the live per-tab summary file.
+	 */
+	fileBaseName?: string;
 	piSessionId: string | null;
+	/**
+	 * Shapes the LLM prompt: `archive` (default) writes a closed-tab session
+	 * record; `fork` writes a tight handoff brief a fresh session can continue
+	 * from.
+	 */
+	purpose?: 'archive' | 'fork';
 	workspaceCwd: string;
 }
 
@@ -127,7 +138,9 @@ async function runWriteSummary({
 	writeFileImpl,
 }: RunWriteSummaryArgs): Promise<WriteSessionSummaryResult> {
 	const sessionsDir = path.join(input.workspaceCwd, SESSIONS_SUBDIR);
-	const filePath = path.join(sessionsDir, `${input.chatTabId}.md`);
+	// basename() guards against path traversal in caller-supplied stems.
+	const fileBaseName = path.basename(input.fileBaseName ?? input.chatTabId);
+	const filePath = path.join(sessionsDir, `${fileBaseName}.md`);
 
 	await mkdirImpl(sessionsDir);
 
@@ -173,6 +186,7 @@ async function runWriteSummary({
 		const llm = await tryLlmSummary({
 			executable,
 			piAgentClient,
+			purpose: input.purpose ?? 'archive',
 			timeoutMs,
 			transcript,
 			workspaceCwd: input.workspaceCwd,
@@ -335,6 +349,7 @@ function firstLine(text: string): string {
 interface TryLlmSummaryArgs {
 	executable: PiExecutableSnapshot;
 	piAgentClient: PiAgentClient;
+	purpose: 'archive' | 'fork';
 	timeoutMs: number;
 	transcript: string;
 	workspaceCwd: string;
@@ -350,7 +365,10 @@ async function tryLlmSummary(
 	args: TryLlmSummaryArgs,
 ): Promise<LlmSummaryResult | null> {
 	const cappedTranscript = capTranscript(args.transcript);
-	const prompt = buildSummaryPrompt(cappedTranscript);
+	const prompt =
+		args.purpose === 'fork'
+			? buildForkSummaryPrompt(cappedTranscript)
+			: buildSummaryPrompt(cappedTranscript);
 
 	try {
 		const session = await args.piAgentClient.createSession({
@@ -447,6 +465,31 @@ function buildSummaryPrompt(transcript: string): string {
 		'- Hard cap of 200 words across the entire response.',
 		'- No preamble like "Here is the summary" or "Sure".',
 		'- No explanation, no apology, no chain-of-thought.',
+		'- Do not wrap the response in ``` fences.',
+		'- If the transcript was truncated, infer state from what is present; do not mention the truncation in the output.',
+		'',
+		'TRANSCRIPT:',
+		transcript,
+	].join('\n');
+}
+
+/**
+ * Fork variant of the summary prompt: a terse handoff brief a fresh agent
+ * session can act on immediately, rather than an archival record.
+ */
+function buildForkSummaryPrompt(transcript: string): string {
+	return [
+		'Write a fork handoff brief for the conversation below. A new agent session will continue this work in a fresh context with ONLY your output as background.',
+		'',
+		'Output format (markdown, plain text — no code fences around the response):',
+		'  Line 1: A topic title, 3 to 7 words, no markdown, no quotes, no trailing punctuation.',
+		'  Line 2: blank line.',
+		'  Lines 3+: 4 to 8 tight bullet points covering: the goal, key decisions and constraints, exact file paths / branches / commands involved, current state, and the immediate next step.',
+		'',
+		'Strict rules:',
+		'- Hard cap of 250 words across the entire response.',
+		'- Be concrete: prefer file paths, identifiers, and commands over prose.',
+		'- No preamble, no explanation, no chain-of-thought.',
 		'- Do not wrap the response in ``` fences.',
 		'- If the transcript was truncated, infer state from what is present; do not mention the truncation in the output.',
 		'',

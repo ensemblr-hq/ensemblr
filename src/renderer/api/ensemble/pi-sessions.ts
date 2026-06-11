@@ -13,6 +13,8 @@ import type {
 	StopPiSessionResult,
 	SubmitPiPromptRequest,
 	SubmitPiPromptResult,
+	WriteForkSummaryRequest,
+	WriteForkSummaryResult,
 } from '@/shared/ipc';
 
 import {
@@ -106,6 +108,16 @@ export function subscribePiRawFrames(
 		return () => undefined;
 	}
 	return api.onPiRawFrame(listener);
+}
+
+/** Writes a fork summary markdown for a conversation branch. */
+export function writeForkSummary(
+	request: WriteForkSummaryRequest,
+): Promise<WriteForkSummaryResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:write-fork-summary', usesDatabase: true },
+		() => getEnsembleApi().writeForkSummary(request),
+	);
 }
 
 /** Aborts the in-flight turn of an open Pi session. */

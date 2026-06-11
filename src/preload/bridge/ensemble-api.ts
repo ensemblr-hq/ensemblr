@@ -139,5 +139,6 @@ export function createEnsembleApi(): EnsembleApi {
 		stopPiSession: (request) => invoke('stopPiSession', request),
 		submitPiPrompt: (request) => invoke('submitPiPrompt', request),
 		unarchiveWorkspace: (request) => invoke('unarchiveWorkspace', request),
+		writeForkSummary: (request) => invoke('writeForkSummary', request),
 	};
 }

@@ -44,6 +44,7 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
+import { useForkConversation } from '../use-fork-conversation';
 import { useTimelineEvents } from './use-timeline-events';
 
 /**
@@ -80,6 +81,13 @@ export function PiSessionTimeline({
 		branchId,
 		sessionId: piSessionId,
 	});
+
+	const fork = useForkConversation({
+		branchId,
+		sessionId: piSessionId ?? '',
+		workspace,
+	});
+	const canFork = branchId.length > 0 && piSessionId !== null;
 
 	const persistedMessages = useMemo<UIMessage[]>(
 		() => eventsToUIMessages(events),
@@ -150,6 +158,7 @@ export function PiSessionTimeline({
 				<ConversationContent className='mx-auto w-full max-w-3xl gap-6 px-4 pt-5 pb-5'>
 					{messages.map((message, index) => (
 						<TimelineMessage
+							fork={canFork ? fork : null}
 							isLastMessage={index === messages.length - 1}
 							isStreaming={isStreaming}
 							key={message.id}
@@ -232,10 +241,12 @@ function collectPersistedUserTexts(messages: readonly UIMessage[]): string[] {
 
 /** Renders one mapped Pi message with chat or diagnostic semantics. */
 function TimelineMessage({
+	fork,
 	isLastMessage,
 	isStreaming,
 	message,
 }: {
+	fork: ReturnType<typeof useForkConversation> | null;
 	isLastMessage: boolean;
 	isStreaming: boolean;
 	message: UIMessage;
@@ -256,11 +267,19 @@ function TimelineMessage({
 		endMs: isLiveTurn || Number.isNaN(endMs) ? null : endMs,
 		startMs: Number.isNaN(startMs) ? Date.now() : startMs,
 	};
+	// Fork boundary = the last persisted event of THIS turn, so forking an
+	// earlier turn summarizes only the conversation up to that point.
+	const upToOrdinal = metadata?.lastOrdinal;
 
 	return (
 		<ChatAssistantTurn
+			forkDisabled={fork?.isForking ?? false}
 			isStreaming={isLiveTurn}
 			message={message}
+			onForkToNewTab={fork ? () => fork.forkToNewTab(upToOrdinal) : undefined}
+			onForkToNewWorkspace={
+				fork ? () => fork.forkToNewWorkspace(upToOrdinal) : undefined
+			}
 			renderToolDetail={(part) => renderToolDetailNode(part)}
 			timing={turnTiming}
 		/>

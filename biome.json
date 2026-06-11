@@ -11,8 +11,10 @@
 		"includes": [
 			"**",
 			"!.agents/skills/ai-elements/scripts",
+			"!.claude",
 			"!src/components/ui",
 			"!src/hooks/ui",
+			"!src/renderer/fixtures/pi-captures",
 			"!src/renderer/routing/routeTree.gen.ts"
 		]
 	},

@@ -104,6 +104,8 @@ export type {
 	StopPiSessionResult,
 	SubmitPiPromptRequest,
 	SubmitPiPromptResult,
+	WriteForkSummaryRequest,
+	WriteForkSummaryResult,
 } from './contracts/pi-session';
 export type {
 	QuickStartApi,

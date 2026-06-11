@@ -58,6 +58,8 @@ import type {
 	StopPiSessionResult,
 	SubmitPiPromptRequest,
 	SubmitPiPromptResult,
+	WriteForkSummaryRequest,
+	WriteForkSummaryResult,
 } from './contracts/pi-session';
 import type {
 	QuickStartProjectRequest,
@@ -309,5 +311,9 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.unarchiveWorkspace]: IpcHandlerEntry<
 		UnarchiveWorkspaceRequest,
 		UnarchiveWorkspaceResult
+	>;
+	[IPC_CHANNELS.writeForkSummary]: IpcHandlerEntry<
+		WriteForkSummaryRequest,
+		WriteForkSummaryResult
 	>;
 }

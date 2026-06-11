@@ -5,8 +5,9 @@ import { cn } from '@/renderer/lib/utils';
 
 import { ChatReasoningRow, ChatToolRow } from './chat-activity-row';
 import { ChatMessageText } from './chat-message-text';
+import { ChatTurnFooter } from './chat-turn-footer';
 import { ChatTurnSummary } from './chat-turn-summary';
-import { ChatTurnTimer, formatTurnDuration } from './chat-turn-timer';
+import { ChatTurnTimer } from './chat-turn-timer';
 
 export interface ChatAssistantTurnTiming {
 	endMs: number | null;
@@ -27,14 +28,21 @@ export interface ChatAssistantTurnTiming {
  */
 export function ChatAssistantTurn({
 	className,
+	forkDisabled = false,
 	isStreaming,
 	message,
+	onForkToNewTab,
+	onForkToNewWorkspace,
 	renderToolDetail,
 	timing,
 }: {
 	className?: string;
+	/** Disables the footer fork menu while a fork is already running. */
+	forkDisabled?: boolean;
 	isStreaming: boolean;
 	message: UIMessage;
+	onForkToNewTab?: () => void;
+	onForkToNewWorkspace?: () => void;
 	renderToolDetail?: (part: DynamicToolUIPart) => ReactNode;
 	timing: ChatAssistantTurnTiming;
 }) {
@@ -62,6 +70,14 @@ export function ChatAssistantTurn({
 
 	const durationMs =
 		timing.endMs !== null ? timing.endMs - timing.startMs : null;
+	const answerText = useMemo(
+		() =>
+			finalParts
+				.map((part) => (part.type === 'text' ? part.text : ''))
+				.filter(Boolean)
+				.join('\n\n'),
+		[finalParts],
+	);
 
 	return (
 		<div
@@ -71,7 +87,7 @@ export function ChatAssistantTurn({
 			{hasFinal ? (
 				activityRows.length > 0 ? (
 					<ChatTurnSummary
-						durationMs={durationMs}
+						durationMs={null}
 						messageCount={countIntermediateText(activityParts)}
 						toolCount={countByType(activityParts, 'dynamic-tool')}
 					>
@@ -83,17 +99,20 @@ export function ChatAssistantTurn({
 					{activityRows.length > 0 ? (
 						<div className='flex flex-col gap-1.5'>{activityRows}</div>
 					) : null}
-					{isStreaming ? (
-						<ChatTurnTimer startMs={timing.startMs} />
-					) : timing.endMs !== null ? (
-						<span className='text-muted-foreground/80 text-xs'>
-							{formatTurnDuration(Math.max(0, timing.endMs - timing.startMs))}
-						</span>
-					) : null}
+					{isStreaming ? <ChatTurnTimer startMs={timing.startMs} /> : null}
 				</>
 			)}
 			{finalRows.length > 0 ? (
 				<div className='flex flex-col gap-2 text-sm'>{finalRows}</div>
+			) : null}
+			{!isStreaming ? (
+				<ChatTurnFooter
+					answerText={answerText}
+					durationMs={durationMs}
+					forkDisabled={forkDisabled}
+					onForkToNewTab={onForkToNewTab}
+					onForkToNewWorkspace={onForkToNewWorkspace}
+				/>
 			) : null}
 		</div>
 	);

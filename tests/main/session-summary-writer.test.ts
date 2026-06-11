@@ -174,6 +174,34 @@ test('falls back to deterministic transcript when no Pi client is supplied', asy
 	);
 });
 
+test('fileBaseName overrides the summary filename and resists traversal', async (t) => {
+	const workspaceCwd = makeWorkspaceDir(t);
+	const writer = createSessionSummaryWriter();
+
+	const result = await writer.writeSessionSummary({
+		branchId: 'branch-1',
+		chatTabId: 'tab-1',
+		closedAt: '2026-01-02T00:00:00.000Z',
+		events: [
+			makeUserEvent('Continue the refactor', 't-1'),
+			makeAgentEvent('Picking up from the fork point.', 't-1'),
+		],
+		fileBaseName: '../../escape/fork-tab-9',
+		piSessionId: 'pi-session-1',
+		purpose: 'fork',
+		workspaceCwd,
+	});
+
+	// Traversal segments are stripped; only the basename survives.
+	assert.equal(
+		result.path,
+		path.join(workspaceCwd, '.context', 'sessions', 'fork-tab-9.md'),
+	);
+	const contents = readFileSync(result.path, 'utf8');
+	assert.match(contents, /chatTabId: "tab-1"/);
+	assert.match(contents, /\[user\]: Continue the refactor/);
+});
+
 test('falls back deterministically when the ephemeral Pi session throws', async (t) => {
 	const workspaceCwd = makeWorkspaceDir(t);
 	const throwingClient = makeThrowingClient();

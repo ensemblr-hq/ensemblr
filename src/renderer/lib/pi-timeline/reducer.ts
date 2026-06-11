@@ -22,6 +22,7 @@ import type {
 } from '@/shared/pi-rpc';
 import { piSessionStatsSchema } from '@/shared/pi-rpc';
 
+// biome-ignore lint/suspicious/noControlCharactersInRegex: ESC is exactly the character ANSI stripping targets.
 const ANSI_PATTERN = /\u001b\[[0-9;]*[A-Za-z]/g;
 
 /** Returns the empty timeline state a new session starts from. */

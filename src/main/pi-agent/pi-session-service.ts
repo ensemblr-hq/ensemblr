@@ -1,5 +1,12 @@
+import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import type { PiChatTabWire, PiSessionSnapshotWire } from '../../shared/ipc';
+import type {
+	PiChatTabWire,
+	PiSessionEventWire,
+	PiSessionSnapshotWire,
+	WriteForkSummaryRequest,
+	WriteForkSummaryResult,
+} from '../../shared/ipc';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import { listOpenChatTabs } from '../storage/repositories/chat-tab-repository.ts';
 import {
@@ -72,6 +79,9 @@ export interface PiSessionService {
 	submitPrompt: (
 		request: SubmitPiPromptRequest,
 	) => Promise<SubmitPiPromptResult>;
+	writeForkSummary: (
+		request: WriteForkSummaryRequest,
+	) => Promise<WriteForkSummaryResult>;
 }
 
 /**
@@ -179,6 +189,64 @@ export function createPiSessionService({
 		},
 		stopSession: lifecycle.stopSession,
 		submitPrompt: lifecycle.submitPrompt,
+		writeForkSummary: async (request) => {
+			if (!sessionSummaryWriter) {
+				return { error: 'Summary writer is not configured.' };
+			}
+			const database = requireDatabase();
+			const row = getPiSessionById({ database, id: request.sessionId });
+			if (!row) {
+				return { error: `No Pi session found for id ${request.sessionId}.` };
+			}
+			const targetCwd = request.targetWorkspaceCwd ?? row.cwd;
+			const events: PiSessionEventWire[] = listEventsByBranch({
+				branchId: request.branchId,
+				database,
+			})
+				.filter(
+					(event) =>
+						request.upToOrdinal === undefined ||
+						event.ordinal <= request.upToOrdinal,
+				)
+				.map((event) => ({
+					branchId: event.branchId,
+					createdAt: event.createdAt,
+					eventType: event.eventType,
+					id: event.id,
+					ordinal: event.ordinal,
+					payload: event.payload,
+					stream: event.stream,
+					turnId: event.turnId,
+				}));
+			try {
+				const result = await sessionSummaryWriter.writeSessionSummary({
+					branchId: request.branchId,
+					chatTabId: request.fileBaseName,
+					closedAt: now().toISOString(),
+					events,
+					// `fork-` prefix keeps the file clear of the destination tab's
+					// own live summary (`<chatTabId>.md`).
+					fileBaseName: `fork-${request.fileBaseName}`,
+					piSessionId: row.piSessionId,
+					purpose: 'fork',
+					workspaceCwd: targetCwd,
+				});
+				return {
+					summary: {
+						absolutePath: result.path,
+						relativePath: path.relative(targetCwd, result.path),
+						title: result.title,
+					},
+				};
+			} catch (error) {
+				return {
+					error:
+						error instanceof Error
+							? error.message
+							: 'Failed to write fork summary.',
+				};
+			}
+		},
 	};
 }
 

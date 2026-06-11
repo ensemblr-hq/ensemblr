@@ -9,6 +9,7 @@ import {
 	type PiSessionEventWire,
 	type StopPiSessionResult,
 	type SubmitPiPromptResult,
+	type WriteForkSummaryResult,
 } from '../../../shared/ipc';
 import type { LocalCommandService } from '../../commands/local-command';
 import {
@@ -26,6 +27,7 @@ import {
 	openPiSessionRequestSchema,
 	stopPiSessionRequestSchema,
 	submitPiPromptRequestSchema,
+	writeForkSummaryRequestSchema,
 } from '../request-schemas.ts';
 
 /** Service dependencies used by the Pi session IPC handlers. */
@@ -168,6 +170,14 @@ export function registerPiSessionHandlers({
 				turnId: row.turnId,
 			}));
 			return Promise.resolve({ events });
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.writeForkSummary,
+		(_event, raw: unknown): Promise<WriteForkSummaryResult> => {
+			const request = writeForkSummaryRequestSchema.parse(raw);
+			return piSessionService.writeForkSummary(request);
 		},
 	);
 }

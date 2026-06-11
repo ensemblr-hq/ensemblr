@@ -54,4 +54,5 @@ export const IPC_CHANNELS = {
 	settingsResolution: 'ensemble:settings-resolution',
 	sharedRootAdoption: 'ensemble:shared-root-adoption',
 	unarchiveWorkspace: 'ensemble:unarchive-workspace',
+	writeForkSummary: 'ensemble:write-fork-summary',
 } as const;

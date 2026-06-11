@@ -33,6 +33,8 @@ export interface PendingGroup {
 	firstEventAt: string;
 	id: string;
 	lastEventAt: string;
+	/** Highest persisted-event ordinal folded into this group. */
+	lastOrdinal: number;
 	parts: UIMessagePart[];
 	role: UIRole;
 	signature: string;

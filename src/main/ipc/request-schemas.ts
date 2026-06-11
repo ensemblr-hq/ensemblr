@@ -118,6 +118,15 @@ export const listPiSessionEventsRequestSchema = z.object({
 	branchId: z.string().min(1),
 });
 
+/** {@link import('../../shared/ipc').WriteForkSummaryRequest}. */
+export const writeForkSummaryRequestSchema = z.object({
+	branchId: z.string().min(1),
+	fileBaseName: z.string().min(1),
+	sessionId: z.string().min(1),
+	targetWorkspaceCwd: z.string().min(1).optional(),
+	upToOrdinal: z.number().int().nonnegative().optional(),
+});
+
 // -----------------------------------------------------------------------------
 // clone — LENIENT (safeParse + empty fallback)
 // -----------------------------------------------------------------------------
