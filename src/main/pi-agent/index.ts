@@ -1,3 +1,13 @@
+// Module boundary:
+//   `pi-runtime/` — Pi binary surface: executable resolution, readiness
+//                   probing, RPC smoke, provider models, agent-directory
+//                   resolver. Answers "is Pi installed and runnable?".
+//   `pi-agent/`   — Pi session/protocol: adapter, client, session service,
+//                   slash command resolver, fakes, summary writer. Drives
+//                   live Pi conversations.
+//   `pi-ipc/`     — Low-level transport plumbing (JSONL framing) shared
+//                   between `pi-runtime/` smoke check and `pi-agent/` adapter.
+
 export type {
 	ChildLike,
 	CreateCliRpcPiAgentAdapterOptions,
@@ -9,11 +19,6 @@ export type {
 	FakePiAgentAdapterSessionController,
 } from './fake-pi-agent-client';
 export { createFakePiAgentAdapter } from './fake-pi-agent-client';
-export type {
-	JsonlLineStream,
-	JsonlLineStreamOptions,
-} from './jsonl-line-stream';
-export { createJsonlLineStream } from './jsonl-line-stream';
 export type {
 	PiAgentAdapter,
 	PiAgentAdapterCreateSessionInput,
@@ -54,3 +59,13 @@ export {
 	createPiSessionService,
 	PiSessionServiceError,
 } from './pi-session-service';
+export type {
+	CreateSessionSummaryWriterOptions,
+	SessionSummaryWriter,
+	WriteSessionSummaryInput,
+	WriteSessionSummaryResult,
+} from './session-summary-writer';
+export {
+	createSessionSummaryWriter,
+	writeSessionSummary,
+} from './session-summary-writer';

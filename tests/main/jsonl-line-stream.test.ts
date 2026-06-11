@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { createJsonlLineStream } from '../../src/main/pi-agent/jsonl-line-stream.ts';
+import { createJsonlLineStream } from '../../src/main/pi-ipc/jsonl-line-stream.ts';
 
 test('emits one line per LF, splits chunked lines correctly', () => {
 	const lines: string[] = [];
@@ -79,8 +79,10 @@ test('drops a single oversize line and emits onOversize, then resumes', () => {
 
 	assert.deepEqual(lines, ['ok', 'recovered']);
 	assert.equal(oversize.length, 1);
-	assert.ok(oversize[0]!.droppedBytes > 16);
-	assert.ok(oversize[0]!.firstBytes.startsWith('aaaa'));
+	const firstOversize = oversize[0];
+	assert.ok(firstOversize);
+	assert.ok(firstOversize.droppedBytes > 16);
+	assert.ok(firstOversize.firstBytes.startsWith('aaaa'));
 });
 
 test('does NOT trip oversize when LF arrives within cap', () => {

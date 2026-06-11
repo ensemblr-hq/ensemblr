@@ -1,147 +1,236 @@
-import { FileCodeIcon, SquareIcon } from 'lucide-react';
-import { type FormEvent, useState } from 'react';
-
-import { StatusBadge } from '@/renderer/components/status-badge';
+import { ArrowUpIcon, SquareIcon } from 'lucide-react';
+import { useCallback, useState } from 'react';
 import { Button } from '@/renderer/components/ui/button';
+import { Spinner } from '@/renderer/components/ui/spinner';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
+import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { cn } from '@/renderer/lib/utils';
 import type { ComposerShellState } from '@/renderer/types/workbench';
+import { formatShortcut } from '@/shared/keymap';
+import { AttachmentChip } from './composer/attachment-chip';
+import { AttachmentMenu } from './composer/attachment-menu';
+import { ContextIndicator } from './composer/context-indicator';
+import { ComposerAutocompletePopover } from './composer/mention-popover';
+import { ModelPicker } from './composer/model-picker';
+import { getNextThinkingId, ThinkingPicker } from './composer/thinking-picker';
+import { useComposerState } from './composer/use-composer-state';
 
-/** Sticky bottom composer with textarea, status badges and send/stop. */
-export function ComposerPanel({ composer }: { composer: ComposerShellState }) {
-	const [prompt, setPrompt] = useState('');
-	const [pending, setPending] = useState(false);
+const FOCUS_SHORTCUT_HINT = formatShortcut('composer.focus');
 
-	const submitDisabled =
-		composer.disabled || pending || prompt.trim().length === 0;
-	const showStop = composer.isStreaming || pending;
+/**
+ * Sticky bottom composer wired to pi's session service. Mirrors reference
+ * design — tall textarea, model + thinking chips, paperclip menu, context
+ * indicator, send button. Owns inline @ file-mention picker (Portal anchored
+ * to textarea wrapper) and / slash-command palette. Domain state (value,
+ * autocomplete, attachments, keymap) lives in `useComposerState`; this file
+ * stays as a thin wiring/JSX layer.
+ */
+export function ComposerPanel({
+	chatTabId,
+	composer,
+}: {
+	chatTabId: string;
+	composer: ComposerShellState;
+}) {
+	const state = useComposerState({ chatTabId, composer });
+	const [focused, setFocused] = useState(false);
+	const [modelPickerOpen, setModelPickerOpen] = useState(false);
 
-	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-		event.preventDefault();
-		if (submitDisabled) {
-			return;
+	const focusTextarea = useCallback(() => {
+		state.textareaRef.current?.focus();
+	}, [state.textareaRef]);
+	useHotkey('composer.focus', focusTextarea);
+
+	const pickersDisabled = composer.disabled || state.isStreaming;
+	const toggleModelPicker = useCallback(() => {
+		setModelPickerOpen((current) => !current);
+	}, []);
+	const cycleThinking = useCallback(() => {
+		const nextId = getNextThinkingId(
+			composer.availableThinkingLevels,
+			composer.thinkingLevel,
+		);
+		if (nextId) {
+			composer.onThinkingChange(nextId);
 		}
-		setPending(true);
-		try {
-			await composer.onSubmit(prompt);
-			setPrompt('');
-		} finally {
-			setPending(false);
-		}
-	};
+	}, [
+		composer.availableThinkingLevels,
+		composer.onThinkingChange,
+		composer.thinkingLevel,
+	]);
+	useHotkey('composer.toggleModelPicker', toggleModelPicker, {
+		enabled: !pickersDisabled && composer.availableModels.length > 0,
+	});
+	useHotkey('composer.cycleThinking', cycleThinking, {
+		enabled: !pickersDisabled && composer.availableThinkingLevels.length > 0,
+	});
 
-	const handleStop = async () => {
-		await composer.onStop();
-		setPending(false);
-	};
+	const placeholder =
+		composer.placeholder.length > 0
+			? composer.placeholder
+			: 'Ask to make changes, @mention files, run /commands';
+
+	const submitButton = state.isStreaming ? (
+		<Button
+			aria-label='Stop'
+			className='rounded-md'
+			onClick={() => void composer.onStop()}
+			size='icon-sm'
+			type='button'
+			variant='outline'
+		>
+			{state.pending ? <Spinner /> : <SquareIcon />}
+		</Button>
+	) : (
+		<Button
+			aria-label='Send'
+			className={cn(
+				'rounded-md',
+				!state.canSubmit &&
+					'bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground',
+			)}
+			disabled={!state.canSubmit}
+			onClick={() => void state.handleSubmit()}
+			size='icon-sm'
+			type='button'
+			variant={state.canSubmit ? 'default' : 'secondary'}
+		>
+			<ArrowUpIcon />
+		</Button>
+	);
+
+	const submitWithTooltip =
+		composer.disabled && composer.disabledReason ? (
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<span>{submitButton}</span>
+				</TooltipTrigger>
+				<TooltipContent>{composer.disabledReason}</TooltipContent>
+			</Tooltip>
+		) : (
+			submitButton
+		);
+
+	const textareaBlock = (
+		<div className='relative' ref={state.anchorRef}>
+			<Textarea
+				aria-label='Pi composer'
+				className='max-h-64 min-h-28 resize-none px-0 py-0 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0'
+				disabled={composer.disabled}
+				onBlur={() => setFocused(false)}
+				onChange={state.handleChange}
+				onFocus={() => setFocused(true)}
+				onKeyDown={state.handleKeyDown}
+				onSelect={state.handleSelect}
+				placeholder={placeholder}
+				ref={state.textareaRef}
+				value={state.value}
+				variant='bare'
+			/>
+			{!focused && state.value.length === 0 && !state.hasChips ? (
+				<span
+					aria-hidden='true'
+					className='pointer-events-none absolute top-0 right-0 text-muted-foreground/60 text-xs'
+				>
+					<kbd className='font-mono'>{FOCUS_SHORTCUT_HINT}</kbd>
+					<span className='ml-1'>to focus</span>
+				</span>
+			) : null}
+		</div>
+	);
 
 	return (
-		<footer className='shrink-0 border-border border-t bg-background p-3'>
-			<form
-				className='rounded-md border border-border bg-pane p-2'
-				onSubmit={handleSubmit}
+		<footer className='shrink-0 bg-background px-4 pt-2 pb-5'>
+			<div
+				className={cn(
+					'relative mx-auto flex w-full max-w-4xl flex-col gap-2 rounded-xl border border-border bg-pane/80 px-4 pt-3 pb-2.5 shadow-panel transition-shadow',
+					focused && 'ring-1 ring-ring/40',
+				)}
 			>
-				<Textarea
-					aria-label='Pi composer'
-					className='min-h-24 resize-none border-0 bg-transparent px-2 shadow-none focus-visible:ring-0'
-					disabled={composer.disabled}
-					onChange={(event) => setPrompt(event.target.value)}
-					placeholder={composer.placeholder}
-					value={prompt}
+				<input
+					accept='*/*'
+					aria-label='Upload attachment'
+					className='hidden'
+					multiple
+					onChange={state.handleFileChange}
+					ref={state.fileInputRef}
+					tabIndex={-1}
+					type='file'
 				/>
-				<div className='mt-2 flex flex-wrap items-center justify-between gap-2'>
-					<div className='flex flex-wrap items-center gap-1.5'>
-						<ModelSelect composer={composer} />
-						<ThinkingSelect composer={composer} />
+
+				{state.hasChips ? (
+					<div className='flex flex-wrap gap-1.5'>
+						{state.mentionAttachments.map((entry) => (
+							<AttachmentChip
+								file={entry}
+								key={`mention:${entry.path}`}
+								onRemove={() => state.removeMention(entry.path)}
+							/>
+						))}
+						{state.uploadAttachments.map((file, index) => (
+							<AttachmentChip
+								file={{ kind: 'upload', name: file.name }}
+								key={`upload:${file.name}:${file.size}:${index}`}
+								onRemove={() => state.removeUpload(index)}
+							/>
+						))}
 					</div>
-					<div className='flex items-center gap-1.5'>
-						<Button disabled={composer.disabled} size='sm' variant='outline'>
-							<FileCodeIcon data-icon='inline-start' />
-							Attach
-						</Button>
-						{showStop ? (
-							<Button
-								onClick={handleStop}
-								size='sm'
-								type='button'
-								variant='destructive'
-							>
-								<SquareIcon data-icon='inline-start' />
-								Stop
-							</Button>
-						) : composer.disabled && composer.disabledReason ? (
-							<Tooltip>
-								<TooltipTrigger asChild>
-									<span>
-										<Button disabled size='sm' type='button'>
-											Send
-										</Button>
-									</span>
-								</TooltipTrigger>
-								<TooltipContent>{composer.disabledReason}</TooltipContent>
-							</Tooltip>
-						) : (
-							<Button disabled={submitDisabled} size='sm' type='submit'>
-								Send
-							</Button>
-						)}
+				) : null}
+				{state.attachmentError ? (
+					<div className='text-destructive text-xs' role='alert'>
+						{state.attachmentError}
+					</div>
+				) : null}
+
+				<ComposerAutocompletePopover
+					activeIndex={state.activeIndex}
+					kind={state.autocomplete.kind}
+					mentionMatches={state.mentionMatches}
+					onHover={state.setActiveIndex}
+					onMentionSelect={state.onMentionSelect}
+					onOpenChange={(open) => {
+						if (!open) {
+							state.dismissAutocomplete();
+						}
+					}}
+					onSlashSelect={state.onSlashSelect}
+					slashMatches={state.slashMatches}
+				>
+					{textareaBlock}
+				</ComposerAutocompletePopover>
+
+				<div className='flex items-center justify-between gap-2'>
+					<div className='flex min-w-0 items-center gap-1.5'>
+						<ModelPicker
+							disabled={pickersDisabled}
+							onChange={composer.onModelChange}
+							onOpenChange={setModelPickerOpen}
+							open={modelPickerOpen}
+							options={composer.availableModels}
+							value={composer.modelId}
+						/>
+						<ThinkingPicker
+							disabled={pickersDisabled}
+							onChange={composer.onThinkingChange}
+							options={composer.availableThinkingLevels}
+							value={composer.thinkingLevel}
+						/>
+					</div>
+					<div className='flex items-center gap-1'>
+						<ContextIndicator usage={composer.contextUsage} />
+						<AttachmentMenu
+							disabled={composer.disabled}
+							onAddAttachment={state.handleAddAttachment}
+						/>
+						{submitWithTooltip}
 					</div>
 				</div>
-			</form>
+			</div>
 		</footer>
-	);
-}
-
-/** Minimal model picker — native select keeps the bundle lean for THE-129 MVP. */
-function ModelSelect({ composer }: { composer: ComposerShellState }) {
-	if (composer.availableModels.length === 0) {
-		return <StatusBadge tone='muted'>{composer.modelLabel}</StatusBadge>;
-	}
-	return (
-		<label className='flex items-center gap-1 text-muted-foreground text-xs'>
-			<span className='sr-only'>Model</span>
-			<select
-				aria-label='Pi model'
-				className='rounded border border-border bg-background px-1.5 py-0.5 text-xs'
-				disabled={composer.disabled || composer.isStreaming}
-				onChange={(event) => composer.onModelChange(event.target.value)}
-				value={composer.modelId ?? ''}
-			>
-				{composer.availableModels.map((option) => (
-					<option key={option.id} value={option.id}>
-						{option.displayName}
-					</option>
-				))}
-			</select>
-		</label>
-	);
-}
-
-/** Minimal thinking-level picker; renders read-only badge when no options. */
-function ThinkingSelect({ composer }: { composer: ComposerShellState }) {
-	if (composer.availableThinkingLevels.length === 0) {
-		return <StatusBadge tone='muted'>{composer.thinkingLabel}</StatusBadge>;
-	}
-	return (
-		<label className='flex items-center gap-1 text-muted-foreground text-xs'>
-			<span className='sr-only'>Thinking level</span>
-			<select
-				aria-label='Pi thinking level'
-				className='rounded border border-border bg-background px-1.5 py-0.5 text-xs'
-				disabled={composer.disabled || composer.isStreaming}
-				onChange={(event) => composer.onThinkingChange(event.target.value)}
-				value={composer.thinkingLevel ?? ''}
-			>
-				{composer.availableThinkingLevels.map((option) => (
-					<option key={option.id} value={option.id}>
-						{option.label}
-					</option>
-				))}
-			</select>
-		</label>
 	);
 }

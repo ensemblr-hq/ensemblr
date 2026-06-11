@@ -1,3 +1,5 @@
+import type { HealthSnapshot } from './health';
+
 export interface RepositoryWorkspaceNavigationMetadata {
 	[key: string]: unknown;
 }
@@ -31,4 +33,25 @@ export interface RepositoryWorkspaceNavigationRepository {
 export interface RepositoryWorkspaceNavigationSnapshot {
 	generatedAt: string;
 	repositories: RepositoryWorkspaceNavigationRepository[];
+}
+
+/**
+ * Single-shot hydration payload sent to the renderer on app start. Bundles the
+ * health + navigation snapshots so the first paint can render without a second
+ * round-trip.
+ */
+export interface InitialShellSnapshot {
+	capturedAt: string;
+	health: HealthSnapshot | null;
+	navigation: RepositoryWorkspaceNavigationSnapshot | null;
+}
+
+/** Repository / workspace navigation tree IPC surface. */
+export interface NavigationApi {
+	repositoryWorkspaceNavigation: () => Promise<RepositoryWorkspaceNavigationSnapshot>;
+}
+
+/** Window/shell-level IPC surface (resize the BrowserWindow, etc). */
+export interface ShellApi {
+	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
 }

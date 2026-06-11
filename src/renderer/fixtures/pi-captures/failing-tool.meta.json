@@ -1,0 +1,31 @@
+{
+	"scenario": "failing-tool",
+	"description": "Tool error / non-zero exit representation.",
+	"piArgs": [
+		"--mode",
+		"rpc",
+		"--no-session"
+	],
+	"cwd": "/sandbox/failing-tool",
+	"startedAt": 1781134202174,
+	"endedAt": 1781134210340,
+	"sent": [
+		{
+			"ts": 1781134202175,
+			"command": {
+				"type": "prompt",
+				"message": "Use the bash tool to run exactly this command: definitely-not-a-real-command-xyz. Report what happened."
+			}
+		},
+		{
+			"ts": 1781134210330,
+			"command": {
+				"id": "final-stats",
+				"type": "get_session_stats"
+			}
+		}
+	],
+	"exitCondition": "completed",
+	"exitCode": 143,
+	"notes": []
+}

@@ -1,8 +1,10 @@
 import type {
+	ComposerContextUsage,
 	ComposerModelOption,
 	ComposerShellState,
 	ComposerThinkingOption,
 	SessionTabModel,
+	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
 
@@ -13,8 +15,10 @@ import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
  */
 export function getComposerState({
 	activeSession,
+	activePiSessionId,
 	availableModels,
 	availableThinkingLevels,
+	contextUsage,
 	isStreaming,
 	modelId,
 	onModelChange,
@@ -24,10 +28,14 @@ export function getComposerState({
 	setupDiagnostics,
 	setupError,
 	thinkingLevel,
+	workspaceCwd,
+	workspaceFiles,
 }: {
+	activePiSessionId: string | null;
 	activeSession: SessionTabModel;
 	availableModels: readonly ComposerModelOption[];
 	availableThinkingLevels: readonly ComposerThinkingOption[];
+	contextUsage?: ComposerContextUsage | null;
 	isStreaming: boolean;
 	modelId: string | null;
 	onModelChange: (modelId: string) => void;
@@ -37,6 +45,8 @@ export function getComposerState({
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
 	setupError: string | null;
 	thinkingLevel: string | null;
+	workspaceCwd?: string;
+	workspaceFiles?: readonly WorkspaceFileSummary[];
 }): ComposerShellState {
 	const modelLabel =
 		availableModels.find((option) => option.id === modelId)?.displayName ??
@@ -46,8 +56,10 @@ export function getComposerState({
 			?.label ?? 'Thinking pending';
 
 	const base = {
+		activePiSessionId,
 		availableModels,
 		availableThinkingLevels,
+		contextUsage: contextUsage ?? null,
 		isStreaming,
 		modelId,
 		modelLabel,
@@ -55,8 +67,10 @@ export function getComposerState({
 		onStop,
 		onSubmit,
 		onThinkingChange,
+		workspaceCwd: workspaceCwd ?? '',
 		thinkingLabel: thinkingLabelText,
 		thinkingLevel,
+		workspaceFiles: workspaceFiles ?? [],
 	};
 
 	if (setupError) {

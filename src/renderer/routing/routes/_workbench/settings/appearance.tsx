@@ -22,7 +22,7 @@ import {
 	terminalFontAtom,
 	terminalFontSizeAtom,
 	themeAtom,
-} from '@/renderer/state/preferences/atoms';
+} from '@/renderer/state/preferences';
 
 export const Route = createFileRoute('/_workbench/settings/appearance')({
 	component: AppearanceSettings,

@@ -9,6 +9,7 @@ import { SidebarMenuButton } from '@/renderer/components/ui/sidebar';
 import { useNavigation } from '@/renderer/components/workbench-shell/shell-contexts';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
+import { useWorkspacePiBusy } from '@/renderer/state/use-workspace-pi-busy';
 import type {
 	WorkbenchRouteSearch,
 	WorkspaceShellModel,
@@ -53,7 +54,11 @@ export function WorkspaceSidebarItem({
 	workspace: WorkspaceShellModel;
 }) {
 	const { renderWorkspaceLink } = useNavigation();
-	const sidebarState = getWorkspaceSidebarState(workspace);
+	// Live Pi runtime activity flows through `agentBusy` so it takes spinner
+	// priority over PR/check states without disturbing the cached
+	// `workspace.status` semantics elsewhere in the renderer.
+	const agentBusy = useWorkspacePiBusy(workspace.id);
+	const sidebarState = getWorkspaceSidebarState(workspace, { agentBusy });
 	const WorkspaceIcon = sidebarState.icon;
 	const hasDiffStats =
 		workspace.changeSummary.additions > 0 ||

@@ -9,6 +9,12 @@ import type {
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import {
+	selectWorkspaceWithRepositoryById,
+	updateWorkspaceRenameRow,
+	workspaceNameCollisionExists,
+} from '../storage/repositories/workspace-repository.ts';
+import { withTransaction } from '../storage/tx.ts';
 import { firstLine } from './first-line.ts';
 import { parseMetadata } from './metadata.ts';
 import { toSlug } from './slug.ts';
@@ -208,24 +214,7 @@ function readWorkspace(
 	database: DatabaseSync,
 	workspaceId: string,
 ): SourceWorkspace | null {
-	const row = database
-		.prepare(
-			`SELECT
-				w.id AS id,
-				w.repository_id AS repositoryId,
-				w.slug AS slug,
-				w.name AS name,
-				w.path AS path,
-				w.branch_name AS branchName,
-				w.base_branch AS baseBranch,
-				w.created_at AS createdAt,
-				w.metadata_json AS metadataJson,
-				r.path AS repositoryPath
-			FROM workspaces w
-			INNER JOIN repositories r ON r.id = w.repository_id
-			WHERE w.id = ?`,
-		)
-		.get(workspaceId);
+	const row = selectWorkspaceWithRepositoryById({ database, workspaceId });
 
 	if (!isWorkspaceRow(row)) {
 		return null;
@@ -271,16 +260,12 @@ function nameCollidesInRepository(
 	source: SourceWorkspace,
 	name: string,
 ): boolean {
-	const row = database
-		.prepare(
-			'SELECT id FROM workspaces WHERE repository_id = ? AND name = ? AND id != ?',
-		)
-		.get(source.repositoryId, name, source.id);
-	return (
-		typeof row === 'object' &&
-		row !== null &&
-		typeof (row as Record<string, unknown>).id === 'string'
-	);
+	return workspaceNameCollisionExists({
+		database,
+		excludeId: source.id,
+		name,
+		repositoryId: source.repositoryId,
+	});
 }
 
 /**
@@ -344,29 +329,16 @@ function updateWorkspaceRow({
 	name: string;
 	timestamp: string;
 }): void {
-	database.exec('BEGIN');
-	try {
-		database
-			.prepare(
-				`UPDATE workspaces
-					SET name = ?,
-						branch_name = ?,
-						updated_at = ?,
-						metadata_json = ?
-					WHERE id = ?`,
-			)
-			.run(
-				name,
-				branchName,
-				timestamp,
-				bumpRenameMetadata(metadataJson, timestamp),
-				id,
-			);
-		database.exec('COMMIT');
-	} catch (error) {
-		database.exec('ROLLBACK');
-		throw error;
-	}
+	withTransaction(database, () => {
+		updateWorkspaceRenameRow({
+			branchName,
+			database,
+			id,
+			metadataJson: bumpRenameMetadata(metadataJson, timestamp),
+			name,
+			timestamp,
+		});
+	});
 }
 
 /** Stamps `metadata.renamedAt` so consumers can see when the rename happened. */

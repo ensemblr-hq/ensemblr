@@ -1,5 +1,4 @@
-import type { KeyboardEvent } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import { isEnsembleApiAvailable } from '@/renderer/api/ensemble-queries';
 import { Button } from '@/renderer/components/ui/button';
@@ -12,6 +11,10 @@ import {
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
 import { useQuickStartFlow } from '@/renderer/components/welcome/use-quick-start-flow';
+import {
+	type KeymapBinding,
+	useKeymapHandler,
+} from '@/renderer/hooks/use-keymap-handler';
 import type { QuickStartProjectDiagnostic } from '@/shared/ipc';
 
 interface QuickStartDialogProps {
@@ -81,15 +84,18 @@ function QuickStartDialogForm({
 		await startQuickStart({ name: trimmedName });
 	}, [canCreate, startQuickStart, trimmedName]);
 
-	const handleSubmitKey = useCallback(
-		(event: KeyboardEvent<HTMLInputElement>) => {
-			if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-				event.preventDefault();
-				handleCreate();
-			}
-		},
+	const submitBindings = useMemo<readonly KeymapBinding<HTMLInputElement>[]>(
+		() => [
+			[
+				'dialog.submit',
+				() => {
+					handleCreate();
+				},
+			],
+		],
 		[handleCreate],
 	);
+	const handleSubmitKey = useKeymapHandler(submitBindings);
 
 	return (
 		<>

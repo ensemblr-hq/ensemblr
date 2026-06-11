@@ -9,6 +9,7 @@ import type {
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { selectDeleteArchivedWorkspaceJoinById } from '../storage/repositories/workspace-repository.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';
 
@@ -171,31 +172,7 @@ function readArchivedWorkspace(
 	database: DatabaseSync,
 	workspaceId: string,
 ): ArchivedWorkspace | null {
-	const row = database
-		.prepare(
-			`SELECT
-				w.id AS id,
-				w.name AS name,
-				w.path AS path,
-				w.branch_name AS branchName,
-				w.archived_at AS archivedAt,
-				r.path AS repositoryPath,
-				a.archived_context_path AS archivedContextPath,
-				a.branch_cleanup AS branchCleanupRaw
-			FROM workspaces w
-			INNER JOIN repositories r ON r.id = w.repository_id
-			LEFT JOIN archive_records a
-				ON a.workspace_id = w.id
-				AND a.record_type = 'workspace'
-				AND a.id = (
-					SELECT id FROM archive_records
-					WHERE workspace_id = w.id AND record_type = 'workspace'
-					ORDER BY archived_at DESC
-					LIMIT 1
-				)
-			WHERE w.id = ?`,
-		)
-		.get(workspaceId);
+	const row = selectDeleteArchivedWorkspaceJoinById({ database, workspaceId });
 
 	if (typeof row !== 'object' || row === null) {
 		return null;

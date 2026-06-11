@@ -33,7 +33,7 @@ import type {
 	RootDirectoryDiagnostic,
 	RootDirectorySnapshot,
 	SettingsResolutionSnapshot,
-} from '../../src/shared/ipc.ts';
+} from '../../src/shared/ipc/index.ts';
 
 let settingCounter = 0;
 

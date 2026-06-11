@@ -1,4 +1,4 @@
-import type { ConfigDiagnostic } from './config';
+import type { ConfigDiagnostic } from './health';
 import type { SettingsResolutionSource } from './settings-resolution';
 
 export type RepositoryConfigSourceStatus =
@@ -60,4 +60,17 @@ export interface RepositoryConfigMigrationResult
 	extends RepositoryConfigMigrationPreview {
 	applied: boolean;
 	error?: string;
+}
+
+/** Per-repository config-resolution IPC surface (read snapshot + migrate). */
+export interface RepositoryConfigApi {
+	applyRepositoryConfigMigration: (
+		request: RepositoryConfigMigrationRequest,
+	) => Promise<RepositoryConfigMigrationResult>;
+	previewRepositoryConfigMigration: (
+		request: RepositoryConfigMigrationRequest,
+	) => Promise<RepositoryConfigMigrationPreview>;
+	repositoryConfig: (
+		request: RepositoryConfigRequest,
+	) => Promise<RepositoryConfigSnapshot>;
 }

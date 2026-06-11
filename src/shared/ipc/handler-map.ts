@@ -1,0 +1,319 @@
+/**
+ * Compile-time table that maps every IPC channel key to its request and
+ * response wire shapes. The string identifier keyed by each entry is
+ * `(typeof IPC_CHANNELS)[K]` so adding a channel without typing it surfaces as
+ * a `Property '...' is missing in type` error at compile time rather than as a
+ * silent runtime mismatch on the other side of the preload bridge.
+ *
+ * Channels that broadcast events from main to renderer (push, no request) use
+ * `void` for `req` and carry the broadcast envelope in `res`. Channels with
+ * optional payloads (e.g. `listPiSlashCommands`) widen `req` to include
+ * `undefined`.
+ *
+ * Type-only file — no runtime export. Consume by indexing
+ * `IpcHandlerMap['createWorkspace']` to derive the request/response shapes
+ * inline.
+ */
+
+import type { IPC_CHANNELS } from './channels';
+import type {
+	BindPiSessionToTabRequest,
+	BindPiSessionToTabResult,
+	CloseChatTabRequest,
+	CloseChatTabResult,
+	ListChatTabsRequest,
+	ListChatTabsResult,
+	ListClosedChatTabsWithSummaryRequest,
+	ListClosedChatTabsWithSummaryResult,
+	OpenChatTabRequest,
+	OpenChatTabResult,
+	RestoreChatTabRequest,
+	RestoreChatTabResult,
+} from './contracts/chat-tab';
+import type {
+	CloneDestinationSelectionResult,
+	CloneGithubRepositoryPrepareResult,
+	CloneGithubRepositoryProgressEvent,
+	CloneGithubRepositoryRequest,
+	CloneGithubRepositoryStartRequest,
+	CloneGithubRepositoryStartResult,
+	GithubRepositoryListResult,
+} from './contracts/clone';
+import type { EnvironmentVariablesSnapshot } from './contracts/environment';
+import type { HealthSnapshot } from './contracts/health';
+import type {
+	ListPiModelsResult,
+	ListPiSessionEventsRequest,
+	ListPiSessionEventsResult,
+	ListPiSessionsRequest,
+	ListPiSessionsResult,
+	ListPiSlashCommandsRequest,
+	ListPiSlashCommandsResult,
+	OpenPiSessionRequest,
+	OpenPiSessionResult,
+	PiExecutableSelectionResult,
+	PiRawFrameBroadcast,
+	PiSessionEventBroadcast,
+	StopPiSessionRequest,
+	StopPiSessionResult,
+	SubmitPiPromptRequest,
+	SubmitPiPromptResult,
+	WriteForkSummaryRequest,
+	WriteForkSummaryResult,
+} from './contracts/pi-session';
+import type {
+	QuickStartProjectRequest,
+	QuickStartProjectResult,
+} from './contracts/quick-start';
+import type {
+	ArchiveRepositoryRequest,
+	ArchiveRepositoryResult,
+	DeleteRepositoryRequest,
+	DeleteRepositoryResult,
+	LocalRepositorySelectionResult,
+	RegisterLocalRepositoryRequest,
+	RegisterLocalRepositoryResult,
+} from './contracts/repository';
+import type {
+	RepositoryConfigMigrationPreview,
+	RepositoryConfigMigrationRequest,
+	RepositoryConfigMigrationResult,
+	RepositoryConfigRequest,
+	RepositoryConfigSnapshot,
+} from './contracts/repository-config';
+import type {
+	InitialShellSnapshot,
+	RepositoryWorkspaceNavigationSnapshot,
+} from './contracts/repository-navigation';
+import type {
+	RootDirectoryChangeApplyResult,
+	RootDirectoryChangeRequest,
+	RootDirectorySelectionResult,
+	RootDirectorySnapshot,
+} from './contracts/root-directory';
+import type {
+	SettingsResolutionRequest,
+	SettingsResolutionSnapshot,
+} from './contracts/settings-resolution';
+import type { SetupDiagnosticsSnapshot } from './contracts/setup';
+import type { SharedRootAdoptionSnapshot } from './contracts/shared-root-adoption';
+import type {
+	ArchiveWorkspaceRequest,
+	ArchiveWorkspaceResult,
+	CreateWorkspaceRequest,
+	CreateWorkspaceResult,
+	DeleteArchivedWorkspaceRequest,
+	DeleteArchivedWorkspaceResult,
+	DeleteWorkspaceRequest,
+	DeleteWorkspaceResult,
+	ListArchivedWorkspacesRequest,
+	ListArchivedWorkspacesResult,
+	RenameWorkspaceRequest,
+	RenameWorkspaceResult,
+	UnarchiveWorkspaceRequest,
+	UnarchiveWorkspaceResult,
+} from './contracts/workspace';
+import type {
+	ListWorkspaceFilesRequest,
+	ListWorkspaceFilesResult,
+	ReadWorkspaceFileRequest,
+	ReadWorkspaceFileResult,
+} from './contracts/workspace-files';
+
+/** Per-channel { req, res } pair. */
+export interface IpcHandlerEntry<Req, Res> {
+	req: Req;
+	res: Res;
+}
+
+/**
+ * Map every `IPC_CHANNELS` key to its request and response shapes.
+ *
+ * Channels keyed by `void` request mean "no payload" (the renderer calls the
+ * preload method with zero arguments). Broadcast channels (push from main)
+ * also use `void` for `req` and put the wire envelope in `res`.
+ */
+export interface IpcHandlerMap {
+	[IPC_CHANNELS.applyRepositoryConfigMigration]: IpcHandlerEntry<
+		RepositoryConfigMigrationRequest,
+		RepositoryConfigMigrationResult
+	>;
+	[IPC_CHANNELS.archiveRepository]: IpcHandlerEntry<
+		ArchiveRepositoryRequest,
+		ArchiveRepositoryResult
+	>;
+	[IPC_CHANNELS.archiveWorkspace]: IpcHandlerEntry<
+		ArchiveWorkspaceRequest,
+		ArchiveWorkspaceResult
+	>;
+	[IPC_CHANNELS.bindPiSessionToChatTab]: IpcHandlerEntry<
+		BindPiSessionToTabRequest,
+		BindPiSessionToTabResult
+	>;
+	[IPC_CHANNELS.closeChatTab]: IpcHandlerEntry<
+		CloseChatTabRequest,
+		CloseChatTabResult
+	>;
+	[IPC_CHANNELS.cloneGithubRepositoryPrepare]: IpcHandlerEntry<
+		CloneGithubRepositoryRequest,
+		CloneGithubRepositoryPrepareResult
+	>;
+	[IPC_CHANNELS.cloneGithubRepositoryProgress]: IpcHandlerEntry<
+		void,
+		CloneGithubRepositoryProgressEvent
+	>;
+	[IPC_CHANNELS.cloneGithubRepositoryStart]: IpcHandlerEntry<
+		CloneGithubRepositoryStartRequest,
+		CloneGithubRepositoryStartResult
+	>;
+	[IPC_CHANNELS.confirmRootDirectoryChange]: IpcHandlerEntry<
+		RootDirectoryChangeRequest,
+		RootDirectoryChangeApplyResult
+	>;
+	[IPC_CHANNELS.createWorkspace]: IpcHandlerEntry<
+		CreateWorkspaceRequest,
+		CreateWorkspaceResult
+	>;
+	[IPC_CHANNELS.deleteArchivedWorkspace]: IpcHandlerEntry<
+		DeleteArchivedWorkspaceRequest,
+		DeleteArchivedWorkspaceResult
+	>;
+	[IPC_CHANNELS.deleteRepository]: IpcHandlerEntry<
+		DeleteRepositoryRequest,
+		DeleteRepositoryResult
+	>;
+	[IPC_CHANNELS.deleteWorkspace]: IpcHandlerEntry<
+		DeleteWorkspaceRequest,
+		DeleteWorkspaceResult
+	>;
+	[IPC_CHANNELS.ensureWindowWidth]: IpcHandlerEntry<number, void>;
+	[IPC_CHANNELS.environmentVariables]: IpcHandlerEntry<
+		void,
+		EnvironmentVariablesSnapshot
+	>;
+	[IPC_CHANNELS.githubRepositoryList]: IpcHandlerEntry<
+		void,
+		GithubRepositoryListResult
+	>;
+	[IPC_CHANNELS.health]: IpcHandlerEntry<void, HealthSnapshot>;
+	[IPC_CHANNELS.initialShellSnapshot]: IpcHandlerEntry<
+		void,
+		InitialShellSnapshot
+	>;
+	[IPC_CHANNELS.listArchivedWorkspaces]: IpcHandlerEntry<
+		ListArchivedWorkspacesRequest,
+		ListArchivedWorkspacesResult
+	>;
+	[IPC_CHANNELS.listChatTabs]: IpcHandlerEntry<
+		ListChatTabsRequest,
+		ListChatTabsResult
+	>;
+	[IPC_CHANNELS.listClosedChatTabsWithSummary]: IpcHandlerEntry<
+		ListClosedChatTabsWithSummaryRequest,
+		ListClosedChatTabsWithSummaryResult
+	>;
+	[IPC_CHANNELS.listPiModels]: IpcHandlerEntry<void, ListPiModelsResult>;
+	[IPC_CHANNELS.listPiSessionEvents]: IpcHandlerEntry<
+		ListPiSessionEventsRequest,
+		ListPiSessionEventsResult
+	>;
+	[IPC_CHANNELS.listPiSessions]: IpcHandlerEntry<
+		ListPiSessionsRequest,
+		ListPiSessionsResult
+	>;
+	[IPC_CHANNELS.listPiSlashCommands]: IpcHandlerEntry<
+		ListPiSlashCommandsRequest | undefined,
+		ListPiSlashCommandsResult
+	>;
+	[IPC_CHANNELS.listWorkspaceFiles]: IpcHandlerEntry<
+		ListWorkspaceFilesRequest,
+		ListWorkspaceFilesResult
+	>;
+	[IPC_CHANNELS.openChatTab]: IpcHandlerEntry<
+		OpenChatTabRequest,
+		OpenChatTabResult
+	>;
+	[IPC_CHANNELS.openPiSession]: IpcHandlerEntry<
+		OpenPiSessionRequest,
+		OpenPiSessionResult
+	>;
+	[IPC_CHANNELS.piRawFrame]: IpcHandlerEntry<void, PiRawFrameBroadcast>;
+	[IPC_CHANNELS.piSessionEvent]: IpcHandlerEntry<void, PiSessionEventBroadcast>;
+	[IPC_CHANNELS.previewRepositoryConfigMigration]: IpcHandlerEntry<
+		RepositoryConfigMigrationRequest,
+		RepositoryConfigMigrationPreview
+	>;
+	[IPC_CHANNELS.quickStartProject]: IpcHandlerEntry<
+		QuickStartProjectRequest,
+		QuickStartProjectResult
+	>;
+	[IPC_CHANNELS.readWorkspaceFile]: IpcHandlerEntry<
+		ReadWorkspaceFileRequest,
+		ReadWorkspaceFileResult
+	>;
+	[IPC_CHANNELS.registerLocalRepository]: IpcHandlerEntry<
+		RegisterLocalRepositoryRequest,
+		RegisterLocalRepositoryResult
+	>;
+	[IPC_CHANNELS.renameWorkspace]: IpcHandlerEntry<
+		RenameWorkspaceRequest,
+		RenameWorkspaceResult
+	>;
+	[IPC_CHANNELS.restoreChatTab]: IpcHandlerEntry<
+		RestoreChatTabRequest,
+		RestoreChatTabResult
+	>;
+	[IPC_CHANNELS.repositoryConfig]: IpcHandlerEntry<
+		RepositoryConfigRequest,
+		RepositoryConfigSnapshot
+	>;
+	[IPC_CHANNELS.repositoryWorkspaceNavigation]: IpcHandlerEntry<
+		void,
+		RepositoryWorkspaceNavigationSnapshot
+	>;
+	[IPC_CHANNELS.rootDirectory]: IpcHandlerEntry<void, RootDirectorySnapshot>;
+	[IPC_CHANNELS.selectCloneDestination]: IpcHandlerEntry<
+		void,
+		CloneDestinationSelectionResult
+	>;
+	[IPC_CHANNELS.selectLocalRepository]: IpcHandlerEntry<
+		void,
+		LocalRepositorySelectionResult
+	>;
+	[IPC_CHANNELS.selectPiExecutable]: IpcHandlerEntry<
+		void,
+		PiExecutableSelectionResult
+	>;
+	[IPC_CHANNELS.selectRootDirectory]: IpcHandlerEntry<
+		void,
+		RootDirectorySelectionResult
+	>;
+	[IPC_CHANNELS.setupDiagnostics]: IpcHandlerEntry<
+		void,
+		SetupDiagnosticsSnapshot
+	>;
+	[IPC_CHANNELS.stopPiSession]: IpcHandlerEntry<
+		StopPiSessionRequest,
+		StopPiSessionResult
+	>;
+	[IPC_CHANNELS.submitPiPrompt]: IpcHandlerEntry<
+		SubmitPiPromptRequest,
+		SubmitPiPromptResult
+	>;
+	[IPC_CHANNELS.settingsResolution]: IpcHandlerEntry<
+		SettingsResolutionRequest | undefined,
+		SettingsResolutionSnapshot
+	>;
+	[IPC_CHANNELS.sharedRootAdoption]: IpcHandlerEntry<
+		void,
+		SharedRootAdoptionSnapshot
+	>;
+	[IPC_CHANNELS.unarchiveWorkspace]: IpcHandlerEntry<
+		UnarchiveWorkspaceRequest,
+		UnarchiveWorkspaceResult
+	>;
+	[IPC_CHANNELS.writeForkSummary]: IpcHandlerEntry<
+		WriteForkSummaryRequest,
+		WriteForkSummaryResult
+	>;
+}

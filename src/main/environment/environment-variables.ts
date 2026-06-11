@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
@@ -9,7 +8,10 @@ import type {
 } from '../../shared/ipc';
 import type { EnsembleConfigService } from '../config/config-loader';
 import type { SecretMetadata, SecretStore } from '../secrets/secret-store';
-import type { EnsembleDatabaseService } from '../storage/database';
+import {
+	type EnsembleDatabaseService,
+	requireDatabase,
+} from '../storage/database.ts';
 import {
 	compareCatalogEntries,
 	createCatalogMap,
@@ -20,11 +22,14 @@ import {
 	isReservedEnvironmentVariableKey,
 	isSecretEnvironmentVariableKey,
 	toSecretStoreKey,
-	toSettingKey,
 } from './environment-variable-keys.ts';
 import { resolveEnvironmentVariables } from './environment-variable-resolution.ts';
 import { createVariableSnapshots } from './environment-variable-snapshots.ts';
 import type { NormalizedScope } from './environment-variable-types.ts';
+import {
+	deletePlainSetting,
+	upsertPlainSetting,
+} from './settings-repository.ts';
 
 export { BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG } from './environment-variable-catalog.ts';
 export { isEnvironmentVariableKey } from './environment-variable-keys.ts';
@@ -308,7 +313,7 @@ export function createEnvironmentVariablesService({
 			);
 		}
 
-		const databaseConnection = requireDatabase(getDatabase());
+		const databaseConnection = requireEnvironmentDatabase(getDatabase());
 		const store = getSecretStore(databaseConnection);
 
 		upsertPlainSetting({
@@ -359,7 +364,7 @@ export function createEnvironmentVariablesService({
 			);
 		}
 
-		const databaseConnection = requireDatabase(getDatabase());
+		const databaseConnection = requireEnvironmentDatabase(getDatabase());
 		const store = requireSecretStore(getSecretStore(databaseConnection));
 
 		const metadataInput = {
@@ -503,86 +508,21 @@ function normalizeScope({
 }
 
 /**
- * Inserts or updates a plain env var row in the SQLite `settings` table.
- * @param input - Database, key, scope, and string value.
- */
-function upsertPlainSetting({
-	database,
-	key,
-	scope,
-	value,
-}: {
-	database: DatabaseSync;
-	key: string;
-	scope: NormalizedScope;
-	value: string;
-}): void {
-	const timestamp = new Date().toISOString();
-
-	database
-		.prepare(
-			`INSERT INTO settings (
-				id,
-				scope,
-				scope_id,
-				key,
-				value_json,
-				source,
-				locked,
-				updated_at
-			)
-			VALUES (?, ?, ?, ?, ?, 'sqlite', 0, ?)
-			ON CONFLICT(scope, scope_id, key) DO UPDATE SET
-				value_json = excluded.value_json,
-				source = 'sqlite',
-				locked = 0,
-				updated_at = excluded.updated_at`,
-		)
-		.run(
-			`setting-${randomUUID()}`,
-			scope.scope,
-			scope.scopeId,
-			toSettingKey(key),
-			JSON.stringify(value),
-			timestamp,
-		);
-}
-
-/**
- * Removes the plain env var row from the SQLite `settings` table, if any.
- * @param input - Database, key, and scope.
- */
-function deletePlainSetting({
-	database,
-	key,
-	scope,
-}: {
-	database: DatabaseSync;
-	key: string;
-	scope: NormalizedScope;
-}): void {
-	database
-		.prepare(
-			`DELETE FROM settings
-			 WHERE scope = ? AND scope_id = ? AND key = ?`,
-		)
-		.run(scope.scope, scope.scopeId, toSettingKey(key));
-}
-
-/**
  * Asserts a database handle is available, throwing a typed error otherwise.
  * @param database - Candidate database handle.
  * @returns The handle.
  */
-function requireDatabase(database: DatabaseSync | null): DatabaseSync {
-	if (!database) {
-		throw new EnvironmentVariablesError(
-			'database-unavailable',
-			'SQLite is unavailable; the environment variable was not saved.',
-		);
-	}
-
-	return database;
+function requireEnvironmentDatabase(
+	database: DatabaseSync | null,
+): DatabaseSync {
+	return requireDatabase(
+		database,
+		() =>
+			new EnvironmentVariablesError(
+				'database-unavailable',
+				'SQLite is unavailable; the environment variable was not saved.',
+			),
+	);
 }
 
 /**

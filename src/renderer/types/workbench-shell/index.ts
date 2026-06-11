@@ -8,6 +8,7 @@
  */
 export type {
 	ChangesViewMode,
+	SessionTabActions,
 	WorkbenchDockActions,
 	WorkbenchHealth,
 } from './primitives';

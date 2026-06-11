@@ -43,11 +43,7 @@ export function ChecksSectionHeader({
 		<div className='flex min-h-6 min-w-0 items-center justify-between gap-2'>
 			<h3 className='font-semibold text-muted-foreground text-xs'>{label}</h3>
 			{actionLabel ? (
-				<Button
-					className='h-6 px-1.5 text-muted-foreground text-xs hover:text-foreground'
-					size='xs'
-					variant='ghost'
-				>
+				<Button className='h-6 px-1.5 text-xs' size='xs' variant='subtle'>
 					{actionLabel}
 				</Button>
 			) : null}

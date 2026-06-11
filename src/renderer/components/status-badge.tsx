@@ -7,7 +7,7 @@ type StatusTone = 'danger' | 'info' | 'muted' | 'ok' | 'warning';
 
 const toneClasses: Record<StatusTone, string> = {
 	danger: 'border-status-danger/30 bg-status-danger/10 text-status-danger',
-	info: 'border-accent/30 bg-accent/10 text-accent',
+	info: 'border-accent-strong/30 bg-accent-strong/10 text-accent-strong',
 	muted: 'border-border bg-muted text-muted-foreground',
 	ok: 'border-status-ok/25 bg-status-ok/10 text-status-ok',
 	warning: 'border-status-warning/30 bg-status-warning/12 text-status-warning',
@@ -15,7 +15,7 @@ const toneClasses: Record<StatusTone, string> = {
 
 const dotClasses: Record<StatusTone, string> = {
 	danger: 'bg-status-danger',
-	info: 'bg-accent',
+	info: 'bg-accent-strong',
 	muted: 'bg-muted-foreground',
 	ok: 'bg-status-ok',
 	warning: 'bg-status-warning',

@@ -1,0 +1,60 @@
+{
+	"scenario": "permission-gate",
+	"description": "Extension UI confirm handshake: approve once, then deny once.",
+	"piArgs": [
+		"--mode",
+		"rpc",
+		"--no-session",
+		"-a",
+		"-e",
+		".pi/agent/extensions/approval-gate.ts"
+	],
+	"cwd": "/sandbox/permission-gate",
+	"startedAt": 1781134391708,
+	"endedAt": 1781134402021,
+	"sent": [
+		{
+			"ts": 1781134391710,
+			"command": {
+				"type": "prompt",
+				"message": "Use the bash tool to run exactly this command: echo approved-run."
+			}
+		},
+		{
+			"ts": 1781134397479,
+			"command": {
+				"type": "extension_ui_response",
+				"id": "55d9f11e-90f2-4d26-9b00-ccf860f8b64f",
+				"confirmed": true
+			}
+		},
+		{
+			"ts": 1781134398508,
+			"command": {
+				"type": "prompt",
+				"message": "Use the bash tool to run exactly this command: echo denied-run. If the tool is blocked, say so and stop."
+			}
+		},
+		{
+			"ts": 1781134401138,
+			"command": {
+				"type": "extension_ui_response",
+				"id": "5fe229dc-620a-4d62-b0f4-16d27433a6c8",
+				"confirmed": false
+			}
+		},
+		{
+			"ts": 1781134402011,
+			"command": {
+				"id": "final-stats",
+				"type": "get_session_stats"
+			}
+		}
+	],
+	"exitCondition": "completed",
+	"exitCode": 143,
+	"notes": [
+		"responded to confirm \"Approve bash command?\" with confirmed=true",
+		"responded to confirm \"Approve bash command?\" with confirmed=false"
+	]
+}

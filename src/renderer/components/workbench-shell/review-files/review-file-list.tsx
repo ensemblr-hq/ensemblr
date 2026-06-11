@@ -2,6 +2,7 @@ import { Icon } from '@iconify/react';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import { Fragment, useState } from 'react';
 
+import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
@@ -166,15 +167,16 @@ function ReviewFolderRow({
 	});
 
 	return (
-		<button
+		<Button
 			aria-expanded={!isCollapsed}
 			aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${path}`}
 			className={cn(
-				'flex h-7 w-full min-w-0 items-center gap-1.5 rounded-md px-2 text-left text-muted-foreground text-xs transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+				'h-7 w-full justify-start gap-1.5 rounded-md px-2 text-xs',
 				reviewFileIndentClassName(level),
 			)}
 			onClick={onToggle}
-			type='button'
+			size='sm'
+			variant='ghost'
 		>
 			<FolderChevronIcon aria-hidden='true' className='size-3 shrink-0' />
 			<Icon
@@ -192,7 +194,7 @@ function ReviewFolderRow({
 					</Fragment>
 				))}
 			</span>
-		</button>
+		</Button>
 	);
 }
 
@@ -209,13 +211,14 @@ function ReviewFileButton({
 	const fileName = getReviewFileName(file.path);
 
 	return (
-		<button
+		<Button
 			aria-label={`Open ${file.path} diff`}
 			className={cn(
-				'grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+				'grid h-auto w-full grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-md px-2 py-1.5 font-normal',
 				reviewFileIndentClassName(level),
 			)}
-			type='button'
+			size='sm'
+			variant='ghost'
 		>
 			<div className='flex min-w-0 items-center gap-2 text-xs'>
 				<Icon
@@ -230,7 +233,7 @@ function ReviewFileButton({
 				)}
 			</div>
 			<ReviewFileStats file={file} />
-		</button>
+		</Button>
 	);
 }
 

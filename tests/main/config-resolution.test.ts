@@ -13,7 +13,7 @@ import {
 	resolveSettings,
 } from '../../src/main/config/config-resolution.ts';
 import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
-import type { SettingsResolutionGroupSnapshot } from '../../src/shared/ipc.ts';
+import type { SettingsResolutionGroupSnapshot } from '../../src/shared/ipc/index.ts';
 
 let settingCounter = 0;
 const previewUrlTemplate = 'http://localhost:$' + '{ENSEMBLE_PORT}';

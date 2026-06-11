@@ -123,16 +123,20 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				scripts: runningDevScripts,
 				sessions: [
 					{
+						chatTabId: 'review-shell',
 						id: 'review-shell',
 						label: 'Review shell',
+						piSessionId: null,
 						status: 'idle',
 						summary:
 							'Fixture session showing the Conductor-style pane hierarchy before Pi RPC is wired.',
 						updatedLabel: '2m ago',
 					},
 					{
+						chatTabId: 'setup-thread',
 						id: 'setup-thread',
 						label: 'Setup notes',
+						piSessionId: null,
 						status: 'working',
 						summary:
 							'Setup script output remains visible in the dock instead of taking over the route.',
@@ -194,8 +198,10 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				scripts: setupPendingScripts,
 				sessions: [
 					{
+						chatTabId: 'issue-kickoff',
 						id: 'issue-kickoff',
 						label: 'Issue kickoff',
+						piSessionId: null,
 						status: 'idle',
 						summary: 'Future Pi session seeded from Linear metadata.',
 						updatedLabel: '1h ago',
@@ -245,8 +251,10 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				scripts: missingScripts,
 				sessions: [
 					{
+						chatTabId: 'plain-header',
 						id: 'plain-header',
 						label: 'Plain header',
+						piSessionId: null,
 						status: 'working',
 						summary:
 							'Fixture showing the normal right sidebar top heading without PR metadata.',
@@ -305,8 +313,10 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				scripts: stoppedRunScripts,
 				sessions: [
 					{
+						chatTabId: 'changed-header',
 						id: 'changed-header',
 						label: 'Changed header',
+						piSessionId: null,
 						status: 'working',
 						summary:
 							'Fixture showing Create PR in the top header when local changes exist.',
@@ -387,8 +397,10 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				scripts: runningDevScripts,
 				sessions: [
 					{
+						chatTabId: 'checks-pass',
 						id: 'checks-pass',
 						label: 'Checks pass',
+						piSessionId: null,
 						status: 'working',
 						summary: 'Fixture showing a running agent tab.',
 						updatedLabel: 'now',

@@ -10,6 +10,7 @@ import type {
 } from '../../shared/ipc';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { selectDeleteWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';
 
@@ -157,20 +158,10 @@ function readWorkspace(
 	database: DatabaseSync,
 	workspaceId: string,
 ): SourceWorkspace | null {
-	const row = database
-		.prepare(
-			`SELECT
-				w.id AS id,
-				w.repository_id AS repositoryId,
-				w.name AS name,
-				w.path AS path,
-				w.branch_name AS branchName,
-				r.path AS repositoryPath
-			FROM workspaces w
-			INNER JOIN repositories r ON r.id = w.repository_id
-			WHERE w.id = ?`,
-		)
-		.get(workspaceId);
+	const row = selectDeleteWorkspaceWithRepositoryById({
+		database,
+		workspaceId,
+	});
 
 	if (!isWorkspaceRow(row)) {
 		return null;

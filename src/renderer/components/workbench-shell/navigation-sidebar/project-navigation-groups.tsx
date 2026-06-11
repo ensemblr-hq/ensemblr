@@ -1,4 +1,4 @@
-import { ReorderList } from '@/renderer/components/shadix-ui/components/reorder-list';
+import { ReorderList } from '@/renderer/components/ui/reorder-list';
 import {
 	SidebarGroup,
 	SidebarGroupLabel,

@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { app, Menu, type MenuItemConstructorOptions, shell } from 'electron';
+import { getAccelerator } from '../../shared/keymap';
 
 /**
  * Returns the on-disk path to the bundled product roadmap markdown.
@@ -44,7 +45,7 @@ export function installApplicationMenu(): void {
 			label: 'File',
 			submenu: [
 				{
-					accelerator: 'CommandOrControl+N',
+					accelerator: getAccelerator('workspace.new'),
 					enabled: false,
 					label: 'New Workspace',
 				},

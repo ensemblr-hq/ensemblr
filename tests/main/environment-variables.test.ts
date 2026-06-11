@@ -20,7 +20,7 @@ import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
 import type {
 	EnvironmentVariableSnapshot,
 	EnvironmentVariablesSnapshot,
-} from '../../src/shared/ipc.ts';
+} from '../../src/shared/ipc/index.ts';
 
 const NOW = new Date('2026-06-05T00:00:00.000Z');
 

@@ -1,5 +1,4 @@
-import type { KeyboardEvent } from 'react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -17,6 +16,10 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
+import {
+	type KeymapBinding,
+	useKeymapHandler,
+} from '@/renderer/hooks/use-keymap-handler';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { RenameWorkspaceDiagnostic } from '@/shared/ipc';
 
@@ -119,15 +122,18 @@ function RenameWorkspaceDialogForm({
 		workspace.name,
 	]);
 
-	const handleSubmitKey = useCallback(
-		(event: KeyboardEvent<HTMLInputElement>) => {
-			if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-				event.preventDefault();
-				handleRename();
-			}
-		},
+	const submitBindings = useMemo<readonly KeymapBinding<HTMLInputElement>[]>(
+		() => [
+			[
+				'dialog.submit',
+				() => {
+					handleRename();
+				},
+			],
+		],
 		[handleRename],
 	);
+	const handleSubmitKey = useKeymapHandler(submitBindings);
 
 	const handleRetry = useCallback(() => {
 		setStage('idle');

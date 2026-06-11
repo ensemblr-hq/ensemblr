@@ -35,3 +35,10 @@ export interface QuickStartProjectResult {
 	status: QuickStartProjectStatus;
 	targetPath: string;
 }
+
+/** Quick-start project scaffolding IPC surface. */
+export interface QuickStartApi {
+	quickStartProject: (
+		request: QuickStartProjectRequest,
+	) => Promise<QuickStartProjectResult>;
+}

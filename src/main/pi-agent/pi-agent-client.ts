@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { isExecutableReady } from '../pi/pi-executable.ts';
+import { isExecutableReady } from '../pi-runtime/pi-executable.ts';
 import type {
 	PiAgentAdapter,
 	PiAgentAdapterSession,
@@ -106,8 +106,9 @@ export function createPiAgentClient({
 				preservePiAgentDirectory,
 			});
 
+			const nativePiSessionId = normalizePiSessionId(request.piSessionId);
 			const metadata: PiAgentSessionMetadata = {
-				args,
+				args: buildSessionArgs(args, nativePiSessionId),
 				command: request.executable.command,
 				cwd: request.workspaceCwd,
 				env,
@@ -115,7 +116,7 @@ export function createPiAgentClient({
 				label: request.label?.trim() || DEFAULT_SESSION_LABEL,
 				model: buildModelMetadata(request.modelOverride),
 				piAgentDirectoryPreserved: preservePiAgentDirectory,
-				sessionId: null,
+				sessionId: nativePiSessionId,
 				startedAt,
 				status: 'starting',
 				thinking: null,
@@ -161,6 +162,23 @@ export function createPiAgentClient({
 			await adapter.shutdown();
 		},
 	};
+}
+
+/** Appends native Pi session selection flags when a session id is available. */
+function buildSessionArgs(
+	baseArgs: readonly string[],
+	piSessionId: string | null,
+): readonly string[] {
+	if (!piSessionId) {
+		return baseArgs;
+	}
+	return [...baseArgs, '--session-id', piSessionId];
+}
+
+/** Trims blank native Pi session ids to `null` before args are built. */
+function normalizePiSessionId(value: string | null | undefined): string | null {
+	const trimmed = value?.trim();
+	return trimmed ? trimmed : null;
 }
 
 /**

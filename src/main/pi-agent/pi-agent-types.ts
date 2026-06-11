@@ -1,4 +1,5 @@
-import type { PiExecutableSnapshot } from '../pi/pi-executable.ts';
+import type { PiWireMessagePart, PiWireMessagePayload } from '../../shared/ipc';
+import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
 
 /** Stable identifier for a Pi agent session within the main process. */
 export type PiAgentSessionId = string;
@@ -83,6 +84,8 @@ export interface PiAgentSessionRequest {
 	modelOverride?: string | null;
 	/** Optional human-readable label attached to session metadata for logs. */
 	label?: string;
+	/** Native Pi session id to create or resume with `pi --session-id`. */
+	piSessionId?: string | null;
 }
 
 /** Inline or referenced attachment included with a prompt submission. */
@@ -106,8 +109,40 @@ export interface PiAgentSubmitAcknowledgement {
 	turnId: string;
 }
 
+/**
+ * Tagged union of normalized message payloads emitted by the adapter. Each
+ * variant maps to a single chat-timeline concept; the renderer mapper consumes
+ * this union directly so it never sniffs Pi's wire shapes.
+ *
+ *   text         — assistant text (or user prompt echo)
+ *   reasoning    — assistant reasoning/thinking content
+ *   tool-call    — tool invocation with id, name, and structured input
+ *   tool-result  — tool execution outcome, with `isError` discriminator
+ *   message      — composite assistant/user message (multi-part content)
+ *   prompt       — synthetic submit-side user echo carrying the original prompt
+ *   unknown      — forward-compatible passthrough for frames we have not modelled
+ *
+ * The shared `PiWireMessagePart`/`PiWireMessagePayload` aliases are the
+ * canonical boundary types. Main-process and renderer code reference them by
+ * either name with full structural parity guaranteed by the type system.
+ */
+export type PiAgentMessagePart = PiWireMessagePart;
+
+export type PiAgentMessagePayload = PiWireMessagePayload;
+
+export interface PiAgentContextUsage {
+	contextWindow: number;
+	percent: number | null;
+	tokens: number | null;
+}
+
 /** Discriminated event stream emitted by a session. */
 export type PiAgentEvent =
+	| {
+			at: string;
+			type: 'context-usage';
+			usage: PiAgentContextUsage;
+	  }
 	| {
 			at: string;
 			error: PiAgentError;
@@ -120,7 +155,7 @@ export type PiAgentEvent =
 	  }
 	| {
 			at: string;
-			payload: unknown;
+			payload: PiAgentMessagePayload;
 			role: 'agent' | 'tool' | 'user';
 			turnId: string | null;
 			type: 'message';

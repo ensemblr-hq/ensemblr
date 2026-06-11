@@ -19,6 +19,12 @@ import {
 } from '../config/repository-config.ts';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
+import { selectRepositoryWithDefaultsById } from '../storage/repositories/repository-row-repository.ts';
+import {
+	insertWorkspaceRow as insertWorkspaceRowStorage,
+	workspaceSlugExists as workspaceSlugExistsStorage,
+} from '../storage/repositories/workspace-repository.ts';
+import { withTransaction } from '../storage/tx.ts';
 import {
 	createFilesToCopyService,
 	type FilesToCopyService,
@@ -202,9 +208,13 @@ export function createWorkspaceService({
 			});
 
 			const timestamp = now().toISOString();
+			const initialMetadata = buildInitialWorkspaceMetadata({
+				filesToCopySnapshot,
+			});
 			try {
 				insertWorkspaceRow({
 					database,
+					metadataJson: JSON.stringify(initialMetadata),
 					prepared,
 					timestamp,
 				});
@@ -240,7 +250,7 @@ export function createWorkspaceService({
 				branchName: prepared.branchName,
 				createdAt: timestamp,
 				id: prepared.id,
-				metadata: {},
+				metadata: initialMetadata,
 				name: prepared.name,
 				path: prepared.path,
 				repositoryId: repository.id,
@@ -323,11 +333,10 @@ function readRepository(
 	database: DatabaseSync,
 	repositoryId: string,
 ): SourceRepository | null {
-	const row = database
-		.prepare(
-			'SELECT id, slug, path, default_branch FROM repositories WHERE id = ?',
-		)
-		.get(repositoryId);
+	const row = selectRepositoryWithDefaultsById({
+		database,
+		id: repositoryId,
+	});
 	if (!isRepositoryRow(row)) {
 		return null;
 	}
@@ -479,10 +488,7 @@ function workspaceSlugExists(
 	repositoryId: string,
 	slug: string,
 ): boolean {
-	const row = database
-		.prepare('SELECT id FROM workspaces WHERE repository_id = ? AND slug = ?')
-		.get(repositoryId, slug);
-	return isIdRow(row);
+	return workspaceSlugExistsStorage({ database, repositoryId, slug });
 }
 
 /** Normalises a candidate name into a URL-safe slug with stable fallback. */
@@ -617,51 +623,51 @@ function cleanupDirectory(workspacePath: string): void {
 	}
 }
 
+/**
+ * Builds the initial workspace metadata record stored under `metadata_json`,
+ * capturing the files-to-copy outcome so the renderer landing card can show
+ * the actual copied-file count without recomputing the snapshot.
+ */
+function buildInitialWorkspaceMetadata({
+	filesToCopySnapshot,
+}: {
+	filesToCopySnapshot: FilesToCopySnapshot;
+}): Record<string, unknown> {
+	return {
+		filesToCopy: {
+			copiedCount: filesToCopySnapshot.copied.length,
+			skippedCount: filesToCopySnapshot.skipped.length,
+			source: filesToCopySnapshot.source,
+		},
+	};
+}
+
 /** Inserts a `workspaces` row inside a single transaction. */
 function insertWorkspaceRow({
 	database,
+	metadataJson,
 	prepared,
 	timestamp,
 }: {
 	database: DatabaseSync;
+	metadataJson: string;
 	prepared: PreparedWorkspace;
 	timestamp: string;
 }): void {
-	database.exec('BEGIN');
-	try {
-		database
-			.prepare(
-				`INSERT INTO workspaces (
-					id,
-					repository_id,
-					slug,
-					name,
-					path,
-					branch_name,
-					base_branch,
-					created_at,
-					updated_at,
-					metadata_json
-				)
-				VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			)
-			.run(
-				prepared.id,
-				prepared.repository.id,
-				prepared.slug,
-				prepared.name,
-				prepared.path,
-				prepared.branchName,
-				prepared.baseBranch,
-				timestamp,
-				timestamp,
-				'{}',
-			);
-		database.exec('COMMIT');
-	} catch (error) {
-		database.exec('ROLLBACK');
-		throw error;
-	}
+	withTransaction(database, () => {
+		insertWorkspaceRowStorage({
+			baseBranch: prepared.baseBranch,
+			branchName: prepared.branchName,
+			database,
+			id: prepared.id,
+			metadataJson,
+			name: prepared.name,
+			path: prepared.path,
+			repositoryId: prepared.repository.id,
+			slug: prepared.slug,
+			timestamp,
+		});
+	});
 }
 
 /** Type guard for repository rows returned by the lookup query. */
@@ -681,16 +687,6 @@ function isRepositoryRow(row: unknown): row is {
 		typeof candidate.path === 'string' &&
 		(candidate.default_branch === null ||
 			typeof candidate.default_branch === 'string')
-	);
-}
-
-/** Type guard for `SELECT id FROM ...` row shapes. */
-function isIdRow(row: unknown): row is { id: string } {
-	return (
-		typeof row === 'object' &&
-		row !== null &&
-		'id' in row &&
-		typeof (row as { id: unknown }).id === 'string'
 	);
 }
 

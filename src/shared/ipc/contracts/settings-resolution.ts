@@ -56,3 +56,10 @@ export interface SettingsResolutionSnapshot {
 	app: SettingsResolutionGroupSnapshot;
 	repository?: SettingsResolutionGroupSnapshot;
 }
+
+/** Settings resolution IPC surface (resolve effective app/repository settings). */
+export interface SettingsApi {
+	resolveSettings: (
+		request?: SettingsResolutionRequest,
+	) => Promise<SettingsResolutionSnapshot>;
+}

@@ -10,12 +10,12 @@ import type {
 	RootDirectorySnapshot,
 	SettingsResolutionSnapshot,
 } from '../../shared/ipc';
+import { ensureRootDirectory } from './root-directory.ts';
+import { inspectRootPathValue } from './root-inspect.ts';
 import {
-	ensureRootDirectory,
 	findRootDirectorySetting,
-	inspectRootPathValue,
 	ROOT_DIRECTORY_KEY,
-} from './root-directory.ts';
+} from './root-path-normalize.ts';
 
 /** Hook used to scan and reconcile a root directory after a change. */
 export type RootDirectoryReconciler = (options: {

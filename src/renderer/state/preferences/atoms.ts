@@ -123,3 +123,24 @@ export const settingsActiveRepoIdAtom = atomWithStorage<string | null>(
 	KEY('active_repo_id'),
 	null,
 );
+
+// ─── Composer memory ──────────────────────────────────────────────────────────
+
+/**
+ * Persisted last-used Pi model id, shared across every workspace and chat tab.
+ * Picking a model anywhere updates this single value so a fresh chat opens with
+ * the same model the user picked last.
+ */
+export const lastSelectedPiModelAtom = atomWithStorage<string | null>(
+	'ensemble_last_selected_pi_model',
+	null,
+);
+
+/**
+ * Persisted last-used Pi thinking-level, shared across every workspace and
+ * chat tab. Mirrors {@link lastSelectedPiModelAtom} for the thinking control.
+ */
+export const lastSelectedPiThinkingLevelAtom = atomWithStorage<string | null>(
+	'ensemble_last_selected_pi_thinking_level',
+	null,
+);

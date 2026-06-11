@@ -49,16 +49,6 @@ export const pinnedWorkspaceIdsAtom = atomWithStorage<string[]>(
 	workspaceStorageOptions,
 );
 
-/** Persisted closed session-tab ids, keyed by workspace id. */
-export const closedSessionIdsByWorkspaceAtom = atomWithStorage<
-	Record<string, string[]>
->(
-	'ensemble_workspace_closed_session_ids_by_workspace',
-	{},
-	undefined,
-	workspaceStorageOptions,
-);
-
 /** Persisted display mode for the changes panel (list vs. tree). */
 export const changesViewModeAtom = atomWithStorage<ChangesViewMode>(
 	'ensemble_workspace_changes_view_mode',

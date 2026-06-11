@@ -3,18 +3,20 @@ import { ipcMain } from 'electron';
 import {
 	IPC_CHANNELS,
 	type RootDirectoryChangeApplyResult,
-	type RootDirectoryChangeRequest,
 	type RootDirectorySelectionResult,
 	type RootDirectorySnapshot,
 } from '../../../shared/ipc';
 import type { SharedRootAdoptionService } from '../../repository';
 import type { EnsembleRootDirectoryService } from '../../root';
+import type { WithPermissionGate } from '../permission-gate.ts';
+import { parseRootDirectoryChangeRequest } from '../request-schemas.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the root-directory IPC handlers. */
 export interface RootHandlersOptions {
 	rootDirectoryService: EnsembleRootDirectoryService;
 	sharedRootAdoptionService: SharedRootAdoptionService;
+	withPermissionGate: WithPermissionGate;
 }
 
 /**
@@ -25,6 +27,7 @@ export interface RootHandlersOptions {
 export function registerRootHandlers({
 	rootDirectoryService,
 	sharedRootAdoptionService,
+	withPermissionGate,
 }: RootHandlersOptions): void {
 	ipcMain.handle(IPC_CHANNELS.rootDirectory, (): RootDirectorySnapshot => {
 		return rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
@@ -62,10 +65,11 @@ export function registerRootHandlers({
 		},
 	);
 
-	ipcMain.handle(
+	withPermissionGate(
 		IPC_CHANNELS.confirmRootDirectoryChange,
+		'root-directory-change',
 		(_event, request: unknown): RootDirectoryChangeApplyResult => {
-			const normalizedRequest = normalizeRootDirectoryChangeRequest(request);
+			const normalizedRequest = parseRootDirectoryChangeRequest(request);
 
 			if (!normalizedRequest.path) {
 				return {
@@ -87,20 +91,4 @@ export function registerRootHandlers({
 			return result;
 		},
 	);
-}
-
-/** Coerces an IPC payload into a {@link RootDirectoryChangeRequest}. */
-function normalizeRootDirectoryChangeRequest(
-	request: unknown,
-): RootDirectoryChangeRequest {
-	if (
-		typeof request !== 'object' ||
-		request === null ||
-		!('path' in request) ||
-		typeof request.path !== 'string'
-	) {
-		return { path: '' };
-	}
-
-	return { path: request.path.trim() };
 }

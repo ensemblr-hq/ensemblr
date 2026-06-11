@@ -1,0 +1,2376 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`pi timeline reducer abort-mid-turn.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": "",
+    "nextItemId": 5,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": true,
+  },
+  "items": [
+    {
+      "atMs": 1781134232764,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "Read every file in this project one at a time, then write a very detailed multi-section analysis of the entire codebase, file by file.",
+    },
+    {
+      "endedAtMs": 1781134234966,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134234239,
+    },
+    {
+      "approval": null,
+      "args": {
+        "command": "ls -la",
+      },
+      "details": null,
+      "endedAtMs": 1781134235089,
+      "id": "item-3",
+      "kind": "tool-call",
+      "output": 
+"total 24
+drwxr-xr-x@  6 captures  staff  192 Jun 11 02:30 .
+drwxr-xr-x@ 12 captures  staff  384 Jun 11 02:30 ..
+-rw-r--r--@  1 captures  staff  339 Jun 11 02:30 README.md
+-rw-r--r--@  1 captures  staff   92 Jun 11 02:30 package.json
+drwxr-xr-x@  6 captures  staff  192 Jun 11 02:30 src
+-rw-r--r--@  1 captures  staff  167 Jun 11 02:30 tsconfig.json
+"
+,
+      "startedAtMs": 1781134235069,
+      "status": "success",
+      "toolCallId": "call_QU6bPGQrXO2Yo4QmB0bRoD06|fc_09542730afe39126016a29f39b013881919d92958c216bb554",
+      "toolName": "bash",
+    },
+    {
+      "aborted": true,
+      "answerText": "",
+      "durationMs": 3094,
+      "id": "item-4",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 2,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 15.625,
+        "tokens": 20000,
+      },
+      "cost": 0.01655045,
+      "sessionId": "019eb3df-7e43-71df-bcf2-4373e9c5cf24",
+      "tokens": {
+        "cacheRead": 18304,
+        "cacheWrite": 0,
+        "input": 747,
+        "output": 860,
+        "total": 19911,
+      },
+      "toolCalls": 1,
+      "toolResults": 1,
+      "totalMessages": 4,
+      "userMessages": 1,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Inactive",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;
+
+exports[`pi timeline reducer failing-tool.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": 
+"Ran exactly:
+
+\`definitely-not-a-real-command-xyz\`
+
+Result: command not found.
+
+\`/bin/bash\` exited with code **127**."
+,
+    "nextItemId": 7,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": false,
+  },
+  "items": [
+    {
+      "atMs": 1781134206898,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "Use the bash tool to run exactly this command: definitely-not-a-real-command-xyz. Report what happened.",
+    },
+    {
+      "endedAtMs": 1781134208658,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134208655,
+    },
+    {
+      "approval": null,
+      "args": {
+        "command": "definitely-not-a-real-command-xyz",
+      },
+      "details": {},
+      "endedAtMs": 1781134208869,
+      "id": "item-3",
+      "kind": "tool-call",
+      "output": 
+"/bin/bash: definitely-not-a-real-command-xyz: command not found
+
+
+Command exited with code 127"
+,
+      "startedAtMs": 1781134208858,
+      "status": "error",
+      "toolCallId": "call_44ruqpY6PhedHvS5rPHGfREg|fc_033cb6c3cc876047016a29f380b80c8191a64cf04e6e93c2af",
+      "toolName": "bash",
+    },
+    {
+      "endedAtMs": 1781134210117,
+      "id": "item-4",
+      "kind": "thinking",
+      "startedAtMs": 1781134210081,
+    },
+    {
+      "atMs": 1781134210118,
+      "id": "item-5",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": 
+"Ran exactly:
+
+\`definitely-not-a-real-command-xyz\`
+
+Result: command not found.
+
+\`/bin/bash\` exited with code **127**."
+,
+    },
+    {
+      "aborted": false,
+      "answerText": 
+"Ran exactly:
+
+\`definitely-not-a-real-command-xyz\`
+
+Result: command not found.
+
+\`/bin/bash\` exited with code **127**."
+,
+      "durationMs": 3432,
+      "id": "item-6",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 2,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 14.921875000000002,
+        "tokens": 19100,
+      },
+      "cost": 0.0402304,
+      "sessionId": "019eb3df-18a3-726c-b723-916bc7769afb",
+      "tokens": {
+        "cacheRead": 18688,
+        "cacheWrite": 0,
+        "input": 19448,
+        "output": 209,
+        "total": 38345,
+      },
+      "toolCalls": 1,
+      "toolResults": 1,
+      "totalMessages": 4,
+      "userMessages": 1,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Inactive",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;
+
+exports[`pi timeline reducer file-edit.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": 
+"Done.
+
+- Fixed \`src/broken.ts\` by passing a \`number\` to \`classify\`:
+  - \`classify('21')\` → \`classify(21)\`
+
+I also verified \`src/broken.ts\` has no remaining diagnostics."
+,
+    "nextItemId": 19,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": false,
+  },
+  "items": [
+    {
+      "atMs": 1781134192184,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "Fix the type error in src/broken.ts.",
+    },
+    {
+      "endedAtMs": 1781134193718,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134193495,
+    },
+    {
+      "approval": null,
+      "args": {
+        "command": "pwd && ls",
+      },
+      "details": null,
+      "endedAtMs": 1781134193866,
+      "id": "item-3",
+      "kind": "tool-call",
+      "output": 
+"/sandbox/file-edit
+README.md
+package.json
+src
+tsconfig.json
+"
+,
+      "startedAtMs": 1781134193855,
+      "status": "success",
+      "toolCallId": "call_kPoEGu96TJGdwmY7r0wmQWi2|fc_05e778563ade0928016a29f371cbb481919d68c2f3128df750",
+      "toolName": "bash",
+    },
+    {
+      "endedAtMs": 1781134194929,
+      "id": "item-4",
+      "kind": "thinking",
+      "startedAtMs": 1781134194928,
+    },
+    {
+      "approval": null,
+      "args": {
+        "command": "find .. -name AGENTS.md -print",
+      },
+      "details": null,
+      "endedAtMs": 1781134195029,
+      "id": "item-5",
+      "kind": "tool-call",
+      "output": "(no output)",
+      "startedAtMs": 1781134195023,
+      "status": "success",
+      "toolCallId": "call_YEGCa3Zt47s4KjyhRLcAPS7y|fc_05e778563ade0928016a29f372f3e48191b45dcb49ec78e7c9",
+      "toolName": "bash",
+    },
+    {
+      "endedAtMs": 1781134195906,
+      "id": "item-6",
+      "kind": "thinking",
+      "startedAtMs": 1781134195852,
+    },
+    {
+      "approval": null,
+      "args": {
+        "path": "src/broken.ts",
+      },
+      "details": null,
+      "endedAtMs": 1781134195984,
+      "id": "item-7",
+      "kind": "tool-call",
+      "output": 
+"import { classify } from './classify.ts';
+
+// BUG: classify expects a number; this passes a string on purpose.
+export const verdict = classify('21');
+"
+,
+      "startedAtMs": 1781134195977,
+      "status": "success",
+      "toolCallId": "call_D1ncLRqYhmGxHjnCtA4LLXVX|fc_05e778563ade0928016a29f373fe008191ad5eea00c0568bf0",
+      "toolName": "read",
+    },
+    {
+      "endedAtMs": 1781134196719,
+      "id": "item-8",
+      "kind": "thinking",
+      "startedAtMs": 1781134196706,
+    },
+    {
+      "approval": null,
+      "args": {
+        "path": "src/classify.ts",
+      },
+      "details": null,
+      "endedAtMs": 1781134196802,
+      "id": "item-9",
+      "kind": "tool-call",
+      "output": 
+"export type TemperatureBand = 'cold' | 'mild' | 'hot';
+
+/** Buckets a Celsius temperature into a coarse band. */
+export function classify(celsius: number): TemperatureBand {
+	if (celsius < 10) return 'cold';
+	if (celsius < 25) return 'mild';
+	return 'hot';
+}
+"
+,
+      "startedAtMs": 1781134196800,
+      "status": "success",
+      "toolCallId": "call_jCSA7deNrHreSzBR6cbbQqve|fc_05e778563ade0928016a29f374ce288191802f2a70d2a049f4",
+      "toolName": "read",
+    },
+    {
+      "endedAtMs": 1781134197754,
+      "id": "item-10",
+      "kind": "thinking",
+      "startedAtMs": 1781134197619,
+    },
+    {
+      "approval": null,
+      "args": {
+        "edits": [
+          {
+            "newText": 
+"import { classify } from './classify.ts';
+
+// Classify a sample temperature using numeric Celsius input.
+export const verdict = classify(21);"
+,
+            "oldText": 
+"import { classify } from './classify.ts';
+
+// BUG: classify expects a number; this passes a string on purpose.
+export const verdict = classify('21');"
+,
+          },
+        ],
+        "path": "src/broken.ts",
+      },
+      "details": {
+        "diff": 
+" 1 import { classify } from './classify.ts';
+ 2 
+-3 // BUG: classify expects a number; this passes a string on purpose.
+-4 export const verdict = classify('21');
++3 // Classify a sample temperature using numeric Celsius input.
++4 export const verdict = classify(21);"
+,
+        "firstChangedLine": 3,
+        "patch": 
+"--- src/broken.ts
++++ src/broken.ts
+@@ -1,4 +1,4 @@
+ import { classify } from './classify.ts';
+ 
+-// BUG: classify expects a number; this passes a string on purpose.
+-export const verdict = classify('21');
++// Classify a sample temperature using numeric Celsius input.
++export const verdict = classify(21);
+"
+,
+      },
+      "endedAtMs": 1781134197967,
+      "id": "item-11",
+      "kind": "tool-call",
+      "output": "Successfully replaced 1 block(s) in src/broken.ts.",
+      "startedAtMs": 1781134197938,
+      "status": "success",
+      "toolCallId": "call_cMT3nWFuI3fz81gqI6xvG1rX|fc_05e778563ade0928016a29f375d5c88191ad82208542cf88ed",
+      "toolName": "edit",
+    },
+    {
+      "endedAtMs": 1781134198732,
+      "id": "item-12",
+      "kind": "thinking",
+      "startedAtMs": 1781134198715,
+    },
+    {
+      "approval": null,
+      "args": {
+        "path": "package.json",
+      },
+      "details": null,
+      "endedAtMs": 1781134198862,
+      "id": "item-13",
+      "kind": "tool-call",
+      "output": 
+"{
+	"name": "pi-capture-sandbox",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module"
+}
+"
+,
+      "startedAtMs": 1781134198860,
+      "status": "success",
+      "toolCallId": "call_6yPYf2UCX5d5cmj40EpI5flS|fc_05e778563ade0928016a29f376d0988191a84e83a7fc2e4d39",
+      "toolName": "read",
+    },
+    {
+      "endedAtMs": 1781134199669,
+      "id": "item-14",
+      "kind": "thinking",
+      "startedAtMs": 1781134199641,
+    },
+    {
+      "approval": null,
+      "args": {
+        "filePath": "src/broken.ts",
+      },
+      "details": {
+        "diagnostics": [],
+        "filePath": "/sandbox/file-edit/src/broken.ts",
+        "lspHealth": {
+          "candidateServerIds": [
+            "typescript",
+            "deno",
+          ],
+          "checkedAt": "2026-06-10T23:30:00.956Z",
+          "dedupDroppedCount": 0,
+          "failureKind": "ok_empty",
+          "health": "ok_empty",
+          "mergedCount": 0,
+          "serverCountAttempted": 1,
+          "serverCountReady": 1,
+        },
+        "mode": "file",
+        "severity": "all",
+        "totalDiagnostics": 0,
+        "truncated": false,
+      },
+      "endedAtMs": 1781134200958,
+      "id": "item-15",
+      "kind": "tool-call",
+      "output": "No diagnostics found.",
+      "startedAtMs": 1781134199807,
+      "status": "success",
+      "toolCallId": "call_jjCFwVw9HsUZybxHYESIiDLH|fc_05e778563ade0928016a29f377c16081918ea36b4144683d3f",
+      "toolName": "lsp_diagnostics",
+    },
+    {
+      "endedAtMs": 1781134201987,
+      "id": "item-16",
+      "kind": "thinking",
+      "startedAtMs": 1781134201853,
+    },
+    {
+      "atMs": 1781134201987,
+      "id": "item-17",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": 
+"Done.
+
+- Fixed \`src/broken.ts\` by passing a \`number\` to \`classify\`:
+  - \`classify('21')\` → \`classify(21)\`
+
+I also verified \`src/broken.ts\` has no remaining diagnostics."
+,
+    },
+    {
+      "aborted": false,
+      "answerText": 
+"Done.
+
+- Fixed \`src/broken.ts\` by passing a \`number\` to \`classify\`:
+  - \`classify('21')\` → \`classify(21)\`
+
+I also verified \`src/broken.ts\` has no remaining diagnostics."
+,
+      "durationMs": 9949,
+      "id": "item-18",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 8,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 15.68828125,
+        "tokens": 20081,
+      },
+      "cost": 0.0454377,
+      "sessionId": "019eb3de-e084-7fe3-8a95-55449cce938c",
+      "tokens": {
+        "cacheRead": 152704,
+        "cacheWrite": 0,
+        "input": 2718,
+        "output": 997,
+        "total": 156419,
+      },
+      "toolCalls": 7,
+      "toolResults": 7,
+      "totalMessages": 16,
+      "userMessages": 1,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Active (1)",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;
+
+exports[`pi timeline reducer long-output.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": "Done. Last number printed: **500**.",
+    "nextItemId": 7,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": false,
+  },
+  "items": [
+    {
+      "atMs": 1781134184888,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "Use the bash tool to run exactly this command: seq 1 500. Then tell me the last number printed.",
+    },
+    {
+      "endedAtMs": 1781134186598,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134186428,
+    },
+    {
+      "approval": null,
+      "args": {
+        "command": "seq 1 500",
+      },
+      "details": null,
+      "endedAtMs": 1781134186778,
+      "id": "item-3",
+      "kind": "tool-call",
+      "output": 
+"1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+97
+98
+99
+100
+101
+102
+103
+104
+105
+106
+107
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+120
+121
+122
+123
+124
+125
+126
+127
+128
+129
+130
+131
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161
+162
+163
+164
+165
+166
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+177
+178
+179
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189
+190
+191
+192
+193
+194
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206
+207
+208
+209
+210
+211
+212
+213
+214
+215
+216
+217
+218
+219
+220
+221
+222
+223
+224
+225
+226
+227
+228
+229
+230
+231
+232
+233
+234
+235
+236
+237
+238
+239
+240
+241
+242
+243
+244
+245
+246
+247
+248
+249
+250
+251
+252
+253
+254
+255
+256
+257
+258
+259
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+300
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346
+347
+348
+349
+350
+351
+352
+353
+354
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365
+366
+367
+368
+369
+370
+371
+372
+373
+374
+375
+376
+377
+378
+379
+380
+381
+382
+383
+384
+385
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410
+411
+412
+413
+414
+415
+416
+417
+418
+419
+420
+421
+422
+423
+424
+425
+426
+427
+428
+429
+430
+431
+432
+433
+434
+435
+436
+437
+438
+439
+440
+441
+442
+443
+444
+445
+446
+447
+448
+449
+450
+451
+452
+453
+454
+455
+456
+457
+458
+459
+460
+461
+462
+463
+464
+465
+466
+467
+468
+469
+470
+471
+472
+473
+474
+475
+476
+477
+478
+479
+480
+481
+482
+483
+484
+485
+486
+487
+488
+489
+490
+491
+492
+493
+494
+495
+496
+497
+498
+499
+500
+"
+,
+      "startedAtMs": 1781134186762,
+      "status": "success",
+      "toolCallId": "call_ZFW5DPjVE4zAmkFyE2ofJVS8|fc_006ce52f816ce54b016a29f36aae14819194c1a2cd97319f5d",
+      "toolName": "bash",
+    },
+    {
+      "endedAtMs": 1781134187959,
+      "id": "item-4",
+      "kind": "thinking",
+      "startedAtMs": 1781134187865,
+    },
+    {
+      "atMs": 1781134187960,
+      "id": "item-5",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": "Done. Last number printed: **500**.",
+    },
+    {
+      "aborted": false,
+      "answerText": "Done. Last number printed: **500**.",
+      "durationMs": 3234,
+      "id": "item-6",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 2,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 15.80234375,
+        "tokens": 20227,
+      },
+      "cost": 0.02744385,
+      "sessionId": "019eb3de-c370-7680-80f3-6324917abfdd",
+      "tokens": {
+        "cacheRead": 29312,
+        "cacheWrite": 0,
+        "input": 9943,
+        "output": 351,
+        "total": 39606,
+      },
+      "toolCalls": 1,
+      "toolResults": 1,
+      "totalMessages": 4,
+      "userMessages": 1,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Inactive",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;
+
+exports[`pi timeline reducer markdown-heavy.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": 
+"# React Server Components (RSC)
+
+## What they are
+
+**React Server Components (RSC)** are components that run **only on the server** and render into the React tree before HTML is sent to the client.  
+They are mainly used in frameworks like **Next.js (App Router)** and let you keep data fetching + rendering logic off the browser, while sending only what the user can see/need.
+
+They do **not** ship their code to the browser, unlike normal React components that run client-side.
+
+## Why use them
+
+- Move data fetching and heavy rendering work to the server.
+- Reduce client JavaScript bundle size.
+- Let frameworks stream UI in chunks for faster first paint.
+- Still combine with interactive client parts where needed.
+
+## Server vs Client Components
+
+| Concern | Server Component | Client Component |
+|---|---|---|
+| Runs in | Server (Node/edge runtime) | Browser |
+| Can use Hooks (\`useState\`, \`useEffect\`) | No | Yes |
+| Can access DB / secrets | Yes (indirectly via server APIs) | No |
+| Can handle user events (\`onClick\`, form handlers) | No | Yes |
+| Can use browser APIs | No | Yes |
+| Can fetch data directly | Yes (\`await\` + fetch) | Usually via API calls |
+| Included in JS bundle sent to client | No (default) | Yes |
+
+## Example (Next.js App Router)
+
+\`\`\`tsx
+// app/page.tsx (Server Component by default)
+async function getProducts() {
+  const res = await fetch('https://example.com/api/products', { cache: 'no-store' });
+  return res.json() as Promise<{ id: string; name: string }[]>;
+}
+
+import AddToCartButton from './AddToCartButton';
+
+export default async function Page() {
+  const products = await getProducts();
+
+  return (
+    <main>
+      <h1>Products</h1>
+      <ul>
+        {products.map((product) => (
+          <li key={product.id}>{product.name}</li>
+        ))}
+      </ul>
+      <AddToCartButton productCount={products.length} />
+    </main>
+  );
+}
+
+// app/AddToCartButton.tsx
+'use client';
+
+import { useState } from 'react';
+
+export default function AddToCartButton({ productCount }: { productCount: number }) {
+  const [qty, setQty] = useState(1);
+  return <button onClick={() => setQty((q) => q + 1)}>Add {qty} of {productCount} items</button>;
+}
+\`\`\`
+
+## Minimal setup command
+
+\`\`\`bash
+bunx create-next-app@latest my-rsc-app --ts
+cd my-rsc-app
+bun run dev
+\`\`\`
+
+### Important boundaries
+
+- In Next.js App Router, files are server components **unless** they start with \`"use client"\`.
+- Client components can be used inside server components as children.
+- Data and props crossing server→client must be serializable (no functions/classes/functions in props)."
+,
+    "nextItemId": 5,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": false,
+  },
+  "items": [
+    {
+      "atMs": 1781134155491,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "Explain React Server Components. Use markdown with at least two heading levels, a comparison table (server vs client components), one tsx code block, and one bash code block. Do not use any tools.",
+    },
+    {
+      "endedAtMs": 1781134158167,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134156867,
+    },
+    {
+      "atMs": 1781134158168,
+      "id": "item-3",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": 
+"# React Server Components (RSC)
+
+## What they are
+
+**React Server Components (RSC)** are components that run **only on the server** and render into the React tree before HTML is sent to the client.  
+They are mainly used in frameworks like **Next.js (App Router)** and let you keep data fetching + rendering logic off the browser, while sending only what the user can see/need.
+
+They do **not** ship their code to the browser, unlike normal React components that run client-side.
+
+## Why use them
+
+- Move data fetching and heavy rendering work to the server.
+- Reduce client JavaScript bundle size.
+- Let frameworks stream UI in chunks for faster first paint.
+- Still combine with interactive client parts where needed.
+
+## Server vs Client Components
+
+| Concern | Server Component | Client Component |
+|---|---|---|
+| Runs in | Server (Node/edge runtime) | Browser |
+| Can use Hooks (\`useState\`, \`useEffect\`) | No | Yes |
+| Can access DB / secrets | Yes (indirectly via server APIs) | No |
+| Can handle user events (\`onClick\`, form handlers) | No | Yes |
+| Can use browser APIs | No | Yes |
+| Can fetch data directly | Yes (\`await\` + fetch) | Usually via API calls |
+| Included in JS bundle sent to client | No (default) | Yes |
+
+## Example (Next.js App Router)
+
+\`\`\`tsx
+// app/page.tsx (Server Component by default)
+async function getProducts() {
+  const res = await fetch('https://example.com/api/products', { cache: 'no-store' });
+  return res.json() as Promise<{ id: string; name: string }[]>;
+}
+
+import AddToCartButton from './AddToCartButton';
+
+export default async function Page() {
+  const products = await getProducts();
+
+  return (
+    <main>
+      <h1>Products</h1>
+      <ul>
+        {products.map((product) => (
+          <li key={product.id}>{product.name}</li>
+        ))}
+      </ul>
+      <AddToCartButton productCount={products.length} />
+    </main>
+  );
+}
+
+// app/AddToCartButton.tsx
+'use client';
+
+import { useState } from 'react';
+
+export default function AddToCartButton({ productCount }: { productCount: number }) {
+  const [qty, setQty] = useState(1);
+  return <button onClick={() => setQty((q) => q + 1)}>Add {qty} of {productCount} items</button>;
+}
+\`\`\`
+
+## Minimal setup command
+
+\`\`\`bash
+bunx create-next-app@latest my-rsc-app --ts
+cd my-rsc-app
+bun run dev
+\`\`\`
+
+### Important boundaries
+
+- In Next.js App Router, files are server components **unless** they start with \`"use client"\`.
+- Client components can be used inside server components as children.
+- Data and props crossing server→client must be serializable (no functions/classes/functions in props)."
+,
+    },
+    {
+      "aborted": false,
+      "answerText": 
+"# React Server Components (RSC)
+
+## What they are
+
+**React Server Components (RSC)** are components that run **only on the server** and render into the React tree before HTML is sent to the client.  
+They are mainly used in frameworks like **Next.js (App Router)** and let you keep data fetching + rendering logic off the browser, while sending only what the user can see/need.
+
+They do **not** ship their code to the browser, unlike normal React components that run client-side.
+
+## Why use them
+
+- Move data fetching and heavy rendering work to the server.
+- Reduce client JavaScript bundle size.
+- Let frameworks stream UI in chunks for faster first paint.
+- Still combine with interactive client parts where needed.
+
+## Server vs Client Components
+
+| Concern | Server Component | Client Component |
+|---|---|---|
+| Runs in | Server (Node/edge runtime) | Browser |
+| Can use Hooks (\`useState\`, \`useEffect\`) | No | Yes |
+| Can access DB / secrets | Yes (indirectly via server APIs) | No |
+| Can handle user events (\`onClick\`, form handlers) | No | Yes |
+| Can use browser APIs | No | Yes |
+| Can fetch data directly | Yes (\`await\` + fetch) | Usually via API calls |
+| Included in JS bundle sent to client | No (default) | Yes |
+
+## Example (Next.js App Router)
+
+\`\`\`tsx
+// app/page.tsx (Server Component by default)
+async function getProducts() {
+  const res = await fetch('https://example.com/api/products', { cache: 'no-store' });
+  return res.json() as Promise<{ id: string; name: string }[]>;
+}
+
+import AddToCartButton from './AddToCartButton';
+
+export default async function Page() {
+  const products = await getProducts();
+
+  return (
+    <main>
+      <h1>Products</h1>
+      <ul>
+        {products.map((product) => (
+          <li key={product.id}>{product.name}</li>
+        ))}
+      </ul>
+      <AddToCartButton productCount={products.length} />
+    </main>
+  );
+}
+
+// app/AddToCartButton.tsx
+'use client';
+
+import { useState } from 'react';
+
+export default function AddToCartButton({ productCount }: { productCount: number }) {
+  const [qty, setQty] = useState(1);
+  return <button onClick={() => setQty((q) => q + 1)}>Add {qty} of {productCount} items</button>;
+}
+\`\`\`
+
+## Minimal setup command
+
+\`\`\`bash
+bunx create-next-app@latest my-rsc-app --ts
+cd my-rsc-app
+bun run dev
+\`\`\`
+
+### Important boundaries
+
+- In Next.js App Router, files are server components **unless** they start with \`"use client"\`.
+- Client components can be used inside server components as children.
+- Data and props crossing server→client must be serializable (no functions/classes/functions in props)."
+,
+      "durationMs": 3237,
+      "id": "item-4",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 1,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 17.07578125,
+        "tokens": 21857,
+      },
+      "cost": 0.046102699999999996,
+      "sessionId": "019eb3de-431d-7538-a633-65913ff47544",
+      "tokens": {
+        "cacheRead": 10624,
+        "cacheWrite": 0,
+        "input": 9226,
+        "output": 2007,
+        "total": 21857,
+      },
+      "toolCalls": 0,
+      "toolResults": 0,
+      "totalMessages": 3,
+      "userMessages": 1,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Inactive",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;
+
+exports[`pi timeline reducer multi-tool-chain.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": 
+"Done.
+
+Found every \`.ts\` file (excluding typical generated/lock/hidden dirs):
+
+- \`./src/broken.ts\`
+- \`./src/convert.ts\`
+- \`./src/classify.ts\`
+- \`./src/index.ts\`
+
+I read all four files.
+
+**Project structure (by runtime source):**
+- \`src/\` is the only TypeScript source area.
+  - \`convert.ts\`: temperature conversion utilities (\`celsiusToFahrenheit\`, \`fahrenheitToCelsius\`)
+  - \`classify.ts\`: \`TemperatureBand\` type and \`classify(celsius: number)\` function
+  - \`index.ts\`: barrel exports of conversion and classify APIs
+  - \`broken.ts\`: \`verdict\` constant using \`classify('21')\` (string argument, likely intentional error demo)
+
+So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`index.ts\`) and three implementation/helper files."
+,
+    "nextItemId": 13,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": false,
+  },
+  "items": [
+    {
+      "atMs": 1781134170358,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "Find every .ts file in this project, read each of them, and then describe the project structure.",
+    },
+    {
+      "endedAtMs": 1781134172612,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134172098,
+    },
+    {
+      "approval": null,
+      "args": {
+        "command": "find . -type f -name '*.ts' -not -path './.git/*' -not -path './node_modules/*' -not -path './dist/*' -not -path './build/*' -not -path './coverage/*'",
+        "timeout": 100000,
+      },
+      "details": null,
+      "endedAtMs": 1781134172831,
+      "id": "item-3",
+      "kind": "tool-call",
+      "output": 
+"./src/broken.ts
+./src/convert.ts
+./src/classify.ts
+./src/index.ts
+"
+,
+      "startedAtMs": 1781134172801,
+      "status": "success",
+      "toolCallId": "call_HBe4imXSLCHZLa2i1ScPf9SZ|fc_0b0b32100d45e93c016a29f35cad448191942b367abf21415a",
+      "toolName": "bash",
+    },
+    {
+      "endedAtMs": 1781134173858,
+      "id": "item-4",
+      "kind": "thinking",
+      "startedAtMs": 1781134173790,
+    },
+    {
+      "calls": [
+        {
+          "approval": null,
+          "args": {
+            "path": "./src/broken.ts",
+          },
+          "details": null,
+          "endedAtMs": 1781134174036,
+          "id": "item-5",
+          "kind": "tool-call",
+          "output": 
+"import { classify } from './classify.ts';
+
+// BUG: classify expects a number; this passes a string on purpose.
+export const verdict = classify('21');
+"
+,
+          "startedAtMs": 1781134174033,
+          "status": "success",
+          "toolCallId": "call_vA7a87l49Q9wvabzItIyp9tG|fc_0b0b32100d45e93c016a29f35df1448191b86f8f962698828e",
+          "toolName": "read",
+        },
+        {
+          "approval": null,
+          "args": {
+            "path": "./src/convert.ts",
+          },
+          "details": null,
+          "endedAtMs": 1781134176183,
+          "id": "item-6",
+          "kind": "tool-call",
+          "output": 
+"/** Converts degrees Celsius to Fahrenheit. */
+export function celsiusToFahrenheit(celsius: number): number {
+	return celsius * (9 / 5) + 32;
+}
+
+/** Converts degrees Fahrenheit to Celsius. */
+export function fahrenheitToCelsius(fahrenheit: number): number {
+	return (fahrenheit - 32) * (5 / 9);
+}
+"
+,
+          "startedAtMs": 1781134176165,
+          "status": "success",
+          "toolCallId": "call_7f4I7kvGXDlcVBHPkFFJUNe7|fc_0b0b32100d45e93c016a29f36014348191aefd587801c48b9e",
+          "toolName": "read",
+        },
+        {
+          "approval": null,
+          "args": {
+            "path": "./src/classify.ts",
+          },
+          "details": null,
+          "endedAtMs": 1781134177193,
+          "id": "item-8",
+          "kind": "tool-call",
+          "output": 
+"export type TemperatureBand = 'cold' | 'mild' | 'hot';
+
+/** Buckets a Celsius temperature into a coarse band. */
+export function classify(celsius: number): TemperatureBand {
+	if (celsius < 10) return 'cold';
+	if (celsius < 25) return 'mild';
+	return 'hot';
+}
+"
+,
+          "startedAtMs": 1781134177184,
+          "status": "success",
+          "toolCallId": "call_licKWXBRefeI92y4G0CNAc4m|fc_0b0b32100d45e93c016a29f361223c81919097085d2f979979",
+          "toolName": "read",
+        },
+        {
+          "approval": null,
+          "args": {
+            "path": "./src/index.ts",
+          },
+          "details": null,
+          "endedAtMs": 1781134178048,
+          "id": "item-9",
+          "kind": "tool-call",
+          "output": 
+"export { celsiusToFahrenheit, fahrenheitToCelsius } from './convert.ts';
+export { classify } from './classify.ts';
+"
+,
+          "startedAtMs": 1781134178047,
+          "status": "success",
+          "toolCallId": "call_8dhkmL8T3nkwJPUPUZ2YQAH7|fc_0b0b32100d45e93c016a29f361fc948191a711a0b1fce78065",
+          "toolName": "read",
+        },
+      ],
+      "id": "item-7",
+      "kind": "tool-group",
+    },
+    {
+      "endedAtMs": 1781134180371,
+      "id": "item-10",
+      "kind": "thinking",
+      "startedAtMs": 1781134179746,
+    },
+    {
+      "atMs": 1781134180372,
+      "id": "item-11",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": 
+"Done.
+
+Found every \`.ts\` file (excluding typical generated/lock/hidden dirs):
+
+- \`./src/broken.ts\`
+- \`./src/convert.ts\`
+- \`./src/classify.ts\`
+- \`./src/index.ts\`
+
+I read all four files.
+
+**Project structure (by runtime source):**
+- \`src/\` is the only TypeScript source area.
+  - \`convert.ts\`: temperature conversion utilities (\`celsiusToFahrenheit\`, \`fahrenheitToCelsius\`)
+  - \`classify.ts\`: \`TemperatureBand\` type and \`classify(celsius: number)\` function
+  - \`index.ts\`: barrel exports of conversion and classify APIs
+  - \`broken.ts\`: \`verdict\` constant using \`classify('21')\` (string argument, likely intentional error demo)
+
+So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`index.ts\`) and three implementation/helper files."
+,
+    },
+    {
+      "aborted": false,
+      "answerText": 
+"Done.
+
+Found every \`.ts\` file (excluding typical generated/lock/hidden dirs):
+
+- \`./src/broken.ts\`
+- \`./src/convert.ts\`
+- \`./src/classify.ts\`
+- \`./src/index.ts\`
+
+I read all four files.
+
+**Project structure (by runtime source):**
+- \`src/\` is the only TypeScript source area.
+  - \`convert.ts\`: temperature conversion utilities (\`celsiusToFahrenheit\`, \`fahrenheitToCelsius\`)
+  - \`classify.ts\`: \`TemperatureBand\` type and \`classify(celsius: number)\` function
+  - \`index.ts\`: barrel exports of conversion and classify APIs
+  - \`broken.ts\`: \`verdict\` constant using \`classify('21')\` (string argument, likely intentional error demo)
+
+So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`index.ts\`) and three implementation/helper files."
+,
+      "durationMs": 10302,
+      "id": "item-12",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 6,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 16.22890625,
+        "tokens": 20773,
+      },
+      "cost": 0.0767095,
+      "sessionId": "019eb3de-8b07-7a50-acd1-a30bcba77fec",
+      "tokens": {
+        "cacheRead": 97280,
+        "cacheWrite": 0,
+        "input": 21018,
+        "output": 1636,
+        "total": 119934,
+      },
+      "toolCalls": 5,
+      "toolResults": 5,
+      "totalMessages": 12,
+      "userMessages": 1,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Inactive",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;
+
+exports[`pi timeline reducer multi-turn.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": "Add a **“Usage”** section with a tiny code example (input/output), e.g., a convert + classify snippet, so users can copy/paste to understand the library immediately instead of inferring behavior from file names alone.",
+    "nextItemId": 11,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": false,
+  },
+  "items": [
+    {
+      "atMs": 1781134214636,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "Read README.md and tell me what this project does in one sentence.",
+    },
+    {
+      "endedAtMs": 1781134216443,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134216086,
+    },
+    {
+      "approval": null,
+      "args": {
+        "path": "README.md",
+      },
+      "details": null,
+      "endedAtMs": 1781134216638,
+      "id": "item-3",
+      "kind": "tool-call",
+      "output": 
+"# Temperature Toolkit
+
+A tiny demo library for converting and classifying temperatures.
+
+- \`src/index.ts\` exposes the public API.
+- \`src/convert.ts\` converts between Celsius and Fahrenheit.
+- \`src/classify.ts\` buckets a temperature into cold/mild/hot.
+- \`src/broken.ts\` is known to contain a type error.
+
+Run \`tsc --noEmit\` to type-check.
+"
+,
+      "startedAtMs": 1781134216633,
+      "status": "success",
+      "toolCallId": "call_eIm6ddvDdC1naO3uJbWcjFWc|fc_0041a030aa913a94016a29f38886188191bce615c7174177cf",
+      "toolName": "read",
+    },
+    {
+      "endedAtMs": 1781134217777,
+      "id": "item-4",
+      "kind": "thinking",
+      "startedAtMs": 1781134217618,
+    },
+    {
+      "atMs": 1781134217777,
+      "id": "item-5",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": "This project is a tiny TypeScript demo library that converts temperatures between Celsius and Fahrenheit and classifies them into cold/mild/hot buckets.",
+    },
+    {
+      "aborted": false,
+      "answerText": "This project is a tiny TypeScript demo library that converts temperatures between Celsius and Fahrenheit and classifies them into cold/mild/hot buckets.",
+      "durationMs": 3296,
+      "id": "item-6",
+      "kind": "turn-footer",
+    },
+    {
+      "atMs": 1781134217932,
+      "id": "item-7",
+      "kind": "user-message",
+      "text": "Based on that, suggest one concrete improvement to the README. Do not read any files.",
+    },
+    {
+      "endedAtMs": 1781134219547,
+      "id": "item-8",
+      "kind": "thinking",
+      "startedAtMs": 1781134218902,
+    },
+    {
+      "atMs": 1781134219549,
+      "id": "item-9",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": "Add a **“Usage”** section with a tiny code example (input/output), e.g., a convert + classify snippet, so users can copy/paste to understand the library immediately instead of inferring behavior from file names alone.",
+    },
+    {
+      "aborted": false,
+      "answerText": "Add a **“Usage”** section with a tiny code example (input/output), e.g., a convert + classify snippet, so users can copy/paste to understand the library immediately instead of inferring behavior from file names alone.",
+      "durationMs": 1811,
+      "id": "item-10",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 3,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 15.37734375,
+        "tokens": 19683,
+      },
+      "cost": 0.02765175,
+      "sessionId": "019eb3df-373d-73b2-8c0b-35784e07a4ed",
+      "tokens": {
+        "cacheRead": 55680,
+        "cacheWrite": 0,
+        "input": 1537,
+        "output": 1087,
+        "total": 58304,
+      },
+      "toolCalls": 1,
+      "toolResults": 1,
+      "totalMessages": 6,
+      "userMessages": 2,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Inactive",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;
+
+exports[`pi timeline reducer permission-gate.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": "Blocked by user: \`bash\` command \`echo denied-run\` was denied. Stopping.",
+    "nextItemId": 13,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": false,
+  },
+  "items": [
+    {
+      "atMs": 1781134395915,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "Use the bash tool to run exactly this command: echo approved-run.",
+    },
+    {
+      "endedAtMs": 1781134397399,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134397371,
+    },
+    {
+      "approval": {
+        "message": "echo approved-run",
+        "requestedAtMs": 1781134397479,
+        "settledAtMs": 1781134397481,
+        "title": "Approve bash command?",
+      },
+      "args": {
+        "command": "echo approved-run",
+      },
+      "details": null,
+      "endedAtMs": 1781134397488,
+      "id": "item-3",
+      "kind": "tool-call",
+      "output": 
+"approved-run
+"
+,
+      "startedAtMs": 1781134397478,
+      "status": "success",
+      "toolCallId": "call_XNlVJgkJm4UD6NjluifyN18R|fc_01ffaade5a82cd92016a29f43d7bc08191bfc17afe41356668",
+      "toolName": "bash",
+    },
+    {
+      "endedAtMs": 1781134398404,
+      "id": "item-4",
+      "kind": "thinking",
+      "startedAtMs": 1781134398395,
+    },
+    {
+      "atMs": 1781134398404,
+      "id": "item-5",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": "Done: \`approved-run\`",
+    },
+    {
+      "aborted": false,
+      "answerText": "Done: \`approved-run\`",
+      "durationMs": 2594,
+      "id": "item-6",
+      "kind": "turn-footer",
+    },
+    {
+      "atMs": 1781134398509,
+      "id": "item-7",
+      "kind": "user-message",
+      "text": "Use the bash tool to run exactly this command: echo denied-run. If the tool is blocked, say so and stop.",
+    },
+    {
+      "endedAtMs": 1781134400985,
+      "id": "item-8",
+      "kind": "thinking",
+      "startedAtMs": 1781134400942,
+    },
+    {
+      "approval": {
+        "message": "echo denied-run",
+        "requestedAtMs": 1781134401138,
+        "settledAtMs": 1781134401138,
+        "title": "Approve bash command?",
+      },
+      "args": {
+        "command": "echo denied-run",
+      },
+      "details": {},
+      "endedAtMs": 1781134401138,
+      "id": "item-9",
+      "kind": "tool-call",
+      "output": "Denied by user",
+      "startedAtMs": 1781134401137,
+      "status": "error",
+      "toolCallId": "call_kGb9hF3tKw2oHbvmRwdUmVAV|fc_01ffaade5a82cd92016a29f44111c08191b063e81ceef57c2a",
+      "toolName": "bash",
+    },
+    {
+      "endedAtMs": 1781134401982,
+      "id": "item-10",
+      "kind": "thinking",
+      "startedAtMs": 1781134401980,
+    },
+    {
+      "atMs": 1781134401983,
+      "id": "item-11",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": "Blocked by user: \`bash\` command \`echo denied-run\` was denied. Stopping.",
+    },
+    {
+      "aborted": false,
+      "answerText": "Blocked by user: \`bash\` command \`echo denied-run\` was denied. Stopping.",
+      "durationMs": 3502,
+      "id": "item-12",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 4,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 15.31953125,
+        "tokens": 19609,
+      },
+      "cost": 0.03540214999999999,
+      "sessionId": "019eb3e1-fb9d-7d34-8343-2aa162d189c5",
+      "tokens": {
+        "cacheRead": 67968,
+        "cacheWrite": 0,
+        "input": 9777,
+        "output": 457,
+        "total": 78202,
+      },
+      "toolCalls": 2,
+      "toolResults": 2,
+      "totalMessages": 8,
+      "userMessages": 2,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Inactive",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;
+
+exports[`pi timeline reducer plain-answer.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": "A Git worktree is a way to check out multiple branches or commits into separate directories while sharing the same Git repository metadata, so you can work on different code versions at the same time without making full separate clones. It creates additional working directories tied to one \`.git\` repository, letting you switch, build, or test in parallel across branches while keeping each worktree independent in its own files.",
+    "nextItemId": 5,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": false,
+  },
+  "items": [
+    {
+      "atMs": 1781134145667,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "What is a Git worktree? Answer in one short paragraph of plain prose. Do not use any tools.",
+    },
+    {
+      "endedAtMs": 1781134147554,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134147318,
+    },
+    {
+      "atMs": 1781134147555,
+      "id": "item-3",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": "A Git worktree is a way to check out multiple branches or commits into separate directories while sharing the same Git repository metadata, so you can work on different code versions at the same time without making full separate clones. It creates additional working directories tied to one \`.git\` repository, letting you switch, build, or test in parallel across branches while keeping each worktree independent in its own files.",
+    },
+    {
+      "aborted": false,
+      "answerText": "A Git worktree is a way to check out multiple branches or commits into separate directories while sharing the same Git repository metadata, so you can work on different code versions at the same time without making full separate clones. It creates additional working directories tied to one \`.git\` repository, letting you switch, build, or test in parallel across branches while keeping each worktree independent in its own files.",
+      "durationMs": 2061,
+      "id": "item-4",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 1,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 15.126562499999999,
+        "tokens": 19362,
+      },
+      "cost": 0.037534000000000005,
+      "sessionId": "019eb3de-28c2-72e1-b6ee-9945bfe2d592",
+      "tokens": {
+        "cacheRead": 0,
+        "cacheWrite": 0,
+        "input": 19064,
+        "output": 298,
+        "total": 19362,
+      },
+      "toolCalls": 0,
+      "toolResults": 0,
+      "totalMessages": 2,
+      "userMessages": 1,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Inactive",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;
+
+exports[`pi timeline reducer single-read.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": "This repository is a tiny TypeScript demo library for converting temperatures and classifying them as cold/mild/hot, with \`src/index.ts\` as the public API and logic split into \`src/convert.ts\` and \`src/classify.ts\`. It also notes that \`src/broken.ts\` intentionally has a type error, and recommends running \`tsc --noEmit\` to type-check the project.",
+    "nextItemId": 7,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": false,
+  },
+  "items": [
+    {
+      "atMs": 1781134163195,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "Read README.md and summarize it in two sentences.",
+    },
+    {
+      "endedAtMs": 1781134164718,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134164513,
+    },
+    {
+      "approval": null,
+      "args": {
+        "path": "README.md",
+      },
+      "details": null,
+      "endedAtMs": 1781134164826,
+      "id": "item-3",
+      "kind": "tool-call",
+      "output": 
+"# Temperature Toolkit
+
+A tiny demo library for converting and classifying temperatures.
+
+- \`src/index.ts\` exposes the public API.
+- \`src/convert.ts\` converts between Celsius and Fahrenheit.
+- \`src/classify.ts\` buckets a temperature into cold/mild/hot.
+- \`src/broken.ts\` is known to contain a type error.
+
+Run \`tsc --noEmit\` to type-check.
+"
+,
+      "startedAtMs": 1781134164821,
+      "status": "success",
+      "toolCallId": "call_M7e3WhdBHDTmAo5bI5mzzoUh|fc_09e83ec205c63010016a29f354cbb48191b027a5c0ef18857d",
+      "toolName": "read",
+    },
+    {
+      "endedAtMs": 1781134166064,
+      "id": "item-4",
+      "kind": "thinking",
+      "startedAtMs": 1781134165914,
+    },
+    {
+      "atMs": 1781134166066,
+      "id": "item-5",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": "This repository is a tiny TypeScript demo library for converting temperatures and classifying them as cold/mild/hot, with \`src/index.ts\` as the public API and logic split into \`src/convert.ts\` and \`src/classify.ts\`. It also notes that \`src/broken.ts\` intentionally has a type error, and recommends running \`tsc --noEmit\` to type-check the project.",
+    },
+    {
+      "aborted": false,
+      "answerText": "This repository is a tiny TypeScript demo library for converting temperatures and classifying them as cold/mild/hot, with \`src/index.ts\` as the public API and logic split into \`src/convert.ts\` and \`src/classify.ts\`. It also notes that \`src/broken.ts\` intentionally has a type error, and recommends running \`tsc --noEmit\` to type-check the project.",
+      "durationMs": 3050,
+      "id": "item-6",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 2,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 15.1125,
+        "tokens": 19344,
+      },
+      "cost": 0.014640849999999999,
+      "sessionId": "019eb3de-6df5-71e1-8390-b7737c261995",
+      "tokens": {
+        "cacheRead": 36992,
+        "cacheWrite": 0,
+        "input": 1171,
+        "output": 437,
+        "total": 38600,
+      },
+      "toolCalls": 1,
+      "toolResults": 1,
+      "totalMessages": 4,
+      "userMessages": 1,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Inactive",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;
+
+exports[`pi timeline reducer thinking.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": 
+"One valid shortest sequence is:
+
+1. F + Goat → R  
+2. F → L  
+3. F + Wolf → R  
+4. F + Goat → L  
+5. F + Cabbage → R  
+6. F → L  
+7. F + Goat → R  
+
+No shorter sequence exists because the first trip must be the goat (wolf or cabbage first leaves an unsafe pair alone), and after the goat first crosses, the only safe way to move the other two is to bring the goat back in between, which forces exactly three goat crossings and two extra return trips plus two item-carrying trips, totaling 7 moves. Since this lower bound is 7 and the sequence uses 7, it is minimal."
+,
+    "nextItemId": 5,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": false,
+  },
+  "items": [
+    {
+      "atMs": 1781134224109,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "Without using any tools: a farmer must ferry a wolf, a goat, and a cabbage across a river in a boat that fits only one item at a time. Work out a correct sequence, then explain in two sentences why no shorter sequence exists.",
+    },
+    {
+      "endedAtMs": 1781134228321,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134225438,
+    },
+    {
+      "atMs": 1781134228325,
+      "id": "item-3",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": 
+"One valid shortest sequence is:
+
+1. F + Goat → R  
+2. F → L  
+3. F + Wolf → R  
+4. F + Goat → L  
+5. F + Cabbage → R  
+6. F → L  
+7. F + Goat → R  
+
+No shorter sequence exists because the first trip must be the goat (wolf or cabbage first leaves an unsafe pair alone), and after the goat first crosses, the only safe way to move the other two is to bring the goat back in between, which forces exactly three goat crossings and two extra return trips plus two item-carrying trips, totaling 7 moves. Since this lower bound is 7 and the sequence uses 7, it is minimal."
+,
+    },
+    {
+      "aborted": false,
+      "answerText": 
+"One valid shortest sequence is:
+
+1. F + Goat → R  
+2. F → L  
+3. F + Wolf → R  
+4. F + Goat → L  
+5. F + Cabbage → R  
+6. F → L  
+7. F + Goat → R  
+
+No shorter sequence exists because the first trip must be the goat (wolf or cabbage first leaves an unsafe pair alone), and after the goat first crosses, the only safe way to move the other two is to bring the goat back in between, which forces exactly three goat crossings and two extra return trips plus two item-carrying trips, totaling 7 moves. Since this lower bound is 7 and the sequence uses 7, it is minimal."
+,
+      "durationMs": 4396,
+      "id": "item-4",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 1,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 16.954687500000002,
+        "tokens": 21702,
+      },
+      "cost": 0.041391700000000003,
+      "sessionId": "019eb3df-5c1b-7a92-b043-5dba97b772db",
+      "tokens": {
+        "cacheRead": 18304,
+        "cacheWrite": 0,
+        "input": 766,
+        "output": 2632,
+        "total": 21702,
+      },
+      "toolCalls": 0,
+      "toolResults": 0,
+      "totalMessages": 2,
+      "userMessages": 1,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Inactive",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;
+
+exports[`pi timeline reducer unicode-and-ansi.jsonl replay snapshot 1`] = `
+{
+  "cursor": {
+    "lastAnswerText": "RED BOLD GREEN 🎉 ✅ café",
+    "nextItemId": 7,
+    "openAssistantId": null,
+    "openThinkingId": null,
+    "pendingTurnStartMs": null,
+    "runningTools": {},
+    "turnAborted": false,
+  },
+  "items": [
+    {
+      "atMs": 1781134249982,
+      "id": "item-1",
+      "kind": "user-message",
+      "text": "Use the bash tool to run exactly this command: printf '\\033[31mRED\\033[0m \\033[1;32mBOLD GREEN\\033[0m 🎉 ✅ café\\n'. Then repeat the visible text back to me.",
+    },
+    {
+      "endedAtMs": 1781134251457,
+      "id": "item-2",
+      "kind": "thinking",
+      "startedAtMs": 1781134251453,
+    },
+    {
+      "approval": null,
+      "args": {
+        "command": "printf '\\033[31mRED\\033[0m \\033[1;32mBOLD GREEN\\033[0m 🎉 ✅ café\\n'",
+      },
+      "details": null,
+      "endedAtMs": 1781134251637,
+      "id": "item-3",
+      "kind": "tool-call",
+      "output": 
+"\x1B[31mRED\x1B[0m \x1B[1;32mBOLD GREEN\x1B[0m 🎉 ✅ café
+"
+,
+      "startedAtMs": 1781134251618,
+      "status": "success",
+      "toolCallId": "call_kDHcGDUlMDyTNBdTIuk3LUA4|fc_0d53ba29c501b03e016a29f3ab8aa88191868f3a3553c27c12",
+      "toolName": "bash",
+    },
+    {
+      "endedAtMs": 1781134252890,
+      "id": "item-4",
+      "kind": "thinking",
+      "startedAtMs": 1781134252698,
+    },
+    {
+      "atMs": 1781134252891,
+      "id": "item-5",
+      "kind": "assistant-message",
+      "streaming": false,
+      "text": "RED BOLD GREEN 🎉 ✅ café",
+    },
+    {
+      "aborted": false,
+      "answerText": "RED BOLD GREEN 🎉 ✅ café",
+      "durationMs": 3056,
+      "id": "item-6",
+      "kind": "turn-footer",
+    },
+  ],
+  "session": {
+    "model": "gpt-5.3-codex-spark",
+    "stats": {
+      "assistantMessages": 2,
+      "contextUsage": {
+        "contextWindow": 128000,
+        "percent": 14.984375,
+        "tokens": 19180,
+      },
+      "cost": 0.0418544,
+      "sessionId": "019eb3df-c11f-71e4-b621-534dd6786e57",
+      "tokens": {
+        "cacheRead": 18688,
+        "cacheWrite": 0,
+        "input": 19432,
+        "output": 327,
+        "total": 38447,
+      },
+      "toolCalls": 1,
+      "toolResults": 1,
+      "totalMessages": 4,
+      "userMessages": 1,
+    },
+    "statusTexts": {
+      "mcp": "MCP: 0/1 servers",
+      "pi-lens-lsp": "LSP Inactive",
+    },
+    "streaming": false,
+    "turnStartedAtMs": null,
+  },
+}
+`;

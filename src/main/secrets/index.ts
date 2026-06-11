@@ -1,18 +1,21 @@
-export type {
-	MacosKeychainSecretStoreOptions,
-	MockSecretStoreOptions,
-	SecretBackend,
-	SecretLookup,
-	SecretMetadata,
-	SecretMetadataFilter,
-	SecretScope,
-	SecretStore,
-	SecretStoreErrorCode,
-	SecretWriteInput,
-} from './secret-store';
+export { createMacosKeychainSecretStore } from './keychain-backend.ts';
+export { createMockSecretStore } from './mock-backend.ts';
+export { maskSecret } from './normalize.ts';
 export {
-	createMacosKeychainSecretStore,
-	createMockSecretStore,
-	maskSecret,
+	type MacosKeychainSecretStoreOptions,
+	type MockSecretStoreOptions,
+	type SecretBackend,
+	type SecretLookup,
+	type SecretMetadata,
+	type SecretMetadataFilter,
+	type SecretScope,
+	type SecretStore,
 	SecretStoreError,
-} from './secret-store';
+	type SecretStoreErrorCode,
+	type SecretWriteInput,
+} from './secret-store-types.ts';
+export {
+	createSqliteSecretMetadataStore,
+	type MetadataPersistInput,
+	type MetadataStore,
+} from './sqlite-metadata-store.ts';

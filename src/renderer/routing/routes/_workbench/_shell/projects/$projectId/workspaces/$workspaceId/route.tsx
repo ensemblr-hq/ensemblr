@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { WorkspaceWorkbenchLayout } from '@/renderer/components/workbench-shell/route-layout';
 import { WORKSPACE_ROUTE_STALE_TIME_MS } from '@/renderer/config/routing';
-import { profileRouteLoader } from '@/renderer/lib/instrumentation/route-profiler';
+import { profileRouteLoader } from '@/renderer/lib/instrumentation';
 import { normalizeWorkbenchSearch } from '@/renderer/lib/workbench';
 import { loadWorkspaceWorkbenchRoute } from '@/renderer/routing/workbench-route-loaders';
 

@@ -33,6 +33,20 @@ export interface EnsembleDatabaseService {
 	open: () => DatabaseHealthSnapshot;
 }
 
+/**
+ * Asserts an open database handle, throwing the caller's domain error when
+ * absent so each subsystem keeps its typed error surface.
+ */
+export function requireDatabase(
+	database: DatabaseSync | null | undefined,
+	onUnavailable: () => Error = () => new Error('Database is not open.'),
+): DatabaseSync {
+	if (!database) {
+		throw onUnavailable();
+	}
+	return database;
+}
+
 /** Internal: one declarative schema migration. */
 interface Migration {
 	id: string;

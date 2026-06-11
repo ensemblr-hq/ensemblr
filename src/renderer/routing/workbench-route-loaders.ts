@@ -257,8 +257,9 @@ export async function loadWorkspaceIndexRoute({
 }
 
 /**
- * Loader for the workspace chat route. Redirects to the canonical chat id and
- * search shape when the URL drifts from the workspace's preferred session.
+ * Loader for the workspace chat route. Canonicalizes only the workspace search
+ * params; chat-tab ids are database-backed and may not be present in the
+ * fixture-derived workspace session list during routing.
  * @param input - Parent match, URL params, parsed and raw search.
  */
 export async function loadWorkspaceChatRoute({
@@ -279,17 +280,9 @@ export async function loadWorkspaceChatRoute({
 		return;
 	}
 
-	const activeSession = getPreferredSession(
-		workspaceData.workspace,
-		params.chatId,
-	);
-
-	if (
-		params.chatId !== activeSession.id ||
-		shouldRedirectToCanonicalWorkspaceSearch(rawSearch, search)
-	) {
+	if (shouldRedirectToCanonicalWorkspaceSearch(rawSearch, search)) {
 		throw redirectToWorkspaceChat({
-			chatId: activeSession.id,
+			chatId: params.chatId,
 			projectId: params.projectId,
 			search,
 			workspaceId: params.workspaceId,
