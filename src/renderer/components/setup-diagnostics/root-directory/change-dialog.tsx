@@ -9,11 +9,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
-import type {
-	RootDirectoryChangeApplyResult,
-	RootDirectoryChangePreview,
-	RootDirectorySelectionResult,
-} from '@/shared/ipc';
+import type { RootDirectoryChangeApplyResult, RootDirectoryChangePreview, RootDirectorySelectionResult } from '@/shared/ipc/contracts/root-directory';
 
 import { RootDirectoryApplyResult } from './apply-result';
 import { RootDirectoryDiagnostics } from './diagnostics';

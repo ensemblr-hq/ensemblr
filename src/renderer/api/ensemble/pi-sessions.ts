@@ -1,21 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
-import type {
-	ListPiModelsResult,
-	ListPiSessionEventsResult,
-	ListPiSessionsResult,
-	OpenPiSessionRequest,
-	OpenPiSessionResult,
-	PiRawFrameBroadcast,
-	PiSessionEventBroadcast,
-	StopPiSessionRequest,
-	StopPiSessionResult,
-	SubmitPiPromptRequest,
-	SubmitPiPromptResult,
-	WriteForkSummaryRequest,
-	WriteForkSummaryResult,
-} from '@/shared/ipc';
+import type { ListPiModelsResult, ListPiSessionEventsResult, ListPiSessionsResult, OpenPiSessionRequest, OpenPiSessionResult, PiRawFrameBroadcast, PiSessionEventBroadcast, StopPiSessionRequest, StopPiSessionResult, SubmitPiPromptRequest, SubmitPiPromptResult, WriteForkSummaryRequest, WriteForkSummaryResult } from '@/shared/ipc/contracts/pi-session';
 
 import {
 	ensembleQueryKeys,

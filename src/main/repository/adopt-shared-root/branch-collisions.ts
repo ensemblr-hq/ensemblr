@@ -1,4 +1,4 @@
-import type { SharedRootAdoptionDiagnostic } from '../../../shared/ipc';
+import type { SharedRootAdoptionDiagnostic } from '../../../shared/ipc/contracts/shared-root-adoption';
 
 /** Groups workspace ids by branch name to surface collision diagnostics. */
 export function trackBranchCollision({

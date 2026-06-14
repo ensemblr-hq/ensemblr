@@ -3,20 +3,7 @@
  * Owns upsert routing and cross-field validation so the IPC handler stays a
  * thin parse-then-delegate wrapper.
  */
-import type {
-	DeleteReviewCommentRequest,
-	DeleteReviewCommentResult,
-	DeleteReviewTodoRequest,
-	DeleteReviewTodoResult,
-	ListReviewCommentsRequest,
-	ListReviewCommentsResult,
-	ListReviewTodosRequest,
-	ListReviewTodosResult,
-	SaveReviewCommentRequest,
-	SaveReviewCommentResult,
-	SaveReviewTodoRequest,
-	SaveReviewTodoResult,
-} from '../../shared/ipc';
+import type { DeleteReviewCommentRequest, DeleteReviewCommentResult, DeleteReviewTodoRequest, DeleteReviewTodoResult, ListReviewCommentsRequest, ListReviewCommentsResult, ListReviewTodosRequest, ListReviewTodosResult, SaveReviewCommentRequest, SaveReviewCommentResult, SaveReviewTodoRequest, SaveReviewTodoResult } from '../../shared/ipc/contracts/review-comments';
 import {
 	type EnsembleDatabaseService,
 	requireDatabase,

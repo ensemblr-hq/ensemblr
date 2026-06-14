@@ -1,11 +1,4 @@
-import type {
-	SetupCheckGroupId,
-	SetupCheckId,
-	SetupCheckLogSnapshot,
-	SetupCheckSnapshot,
-	SetupCheckStatus,
-	SetupRemediationAction,
-} from '../../shared/ipc';
+import type { SetupCheckGroupId, SetupCheckId, SetupCheckLogSnapshot, SetupCheckSnapshot, SetupCheckStatus, SetupRemediationAction } from '../../shared/ipc/contracts/setup';
 import type { LocalCommandResult } from '../commands/local-command';
 
 /** Shared context passed to every setup check provider. */

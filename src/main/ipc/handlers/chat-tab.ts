@@ -1,15 +1,7 @@
 import { ipcMain } from 'electron';
 
-import {
-	type BindPiSessionToTabResult,
-	type ChatTabWire,
-	type CloseChatTabResult,
-	IPC_CHANNELS,
-	type ListChatTabsResult,
-	type ListClosedChatTabsWithSummaryResult,
-	type OpenChatTabResult,
-	type RestoreChatTabResult,
-} from '../../../shared/ipc';
+import { type BindPiSessionToTabResult, type ChatTabWire, type CloseChatTabResult, type ListChatTabsResult, type ListClosedChatTabsWithSummaryResult, type OpenChatTabResult, type RestoreChatTabResult } from '../../../shared/ipc/contracts/chat-tab';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { ChatTabService } from '../../chat-tabs/chat-tab-service.ts';
 import type { ChatTabRow } from '../../storage/repositories/chat-tab-repository.ts';
 import {

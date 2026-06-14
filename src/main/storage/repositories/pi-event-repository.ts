@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { PiPersistedEnvelope } from '../../../shared/ipc';
+import type { PiPersistedEnvelope } from '../../../shared/ipc/contracts/pi-session';
 
 export type PiEventStream = 'protocol' | 'stderr';
 

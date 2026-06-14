@@ -1,9 +1,7 @@
-import type {
-	HealthSnapshot,
-	RepositoryWorkspaceNavigationSnapshot,
-	SetupDiagnosticsSnapshot,
-	TerminalSessionStatus,
-} from '@/shared/ipc';
+import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
+import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
+import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
+import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 
 import type { ProjectShellModel } from './project';
 

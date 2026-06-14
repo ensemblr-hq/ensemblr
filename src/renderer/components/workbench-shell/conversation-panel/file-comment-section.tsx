@@ -14,7 +14,7 @@ import { Input } from '@/renderer/components/ui/input';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import { formatCommentContext } from '@/renderer/lib/workbench/review-context';
 import { useComposerInsert } from '@/renderer/state/composer-insert';
-import type { ReviewCommentWire } from '@/shared/ipc';
+import type { ReviewCommentWire } from '@/shared/ipc/contracts/review-comments';
 
 function parseDraftLine(draftLine: string): number | null {
 	const parsed = Number.parseInt(draftLine, 10);

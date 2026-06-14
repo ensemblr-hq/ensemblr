@@ -1,10 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	ArchivedWorkspaceListEntry,
-	ListArchivedWorkspacesRequest,
-	ListArchivedWorkspacesResult,
-} from '../../shared/ipc';
+import type { ArchivedWorkspaceListEntry, ListArchivedWorkspacesRequest, ListArchivedWorkspacesResult } from '../../shared/ipc/contracts/workspace';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import { listArchivedWorkspaceRowsByRepository } from '../storage/repositories/workspace-repository.ts';
 

@@ -16,7 +16,7 @@ import {
 } from '@/renderer/components/ui/command';
 import { LinearLogo } from '@/renderer/components/workbench-shell/source-provider-logo';
 import { deriveLinearGateState } from '@/renderer/lib/linear';
-import type { LinearIssueWire } from '@/shared/ipc';
+import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 
 import { LinearStateBadge } from './issue-meta-badges';
 

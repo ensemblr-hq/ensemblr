@@ -1,8 +1,4 @@
-import type {
-	CreateLinearIssueRequest,
-	LinearIssueWire,
-	UpdateLinearIssueRequest,
-} from '@/shared/ipc';
+import type { CreateLinearIssueRequest, LinearIssueWire, UpdateLinearIssueRequest } from '@/shared/ipc/contracts/linear';
 
 /** Local form state for the Linear issue editor dialog. */
 export interface LinearIssueEditorFields {

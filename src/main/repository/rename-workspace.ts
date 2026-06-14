@@ -1,12 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	CreatedWorkspaceSnapshot,
-	RenameWorkspaceDiagnostic,
-	RenameWorkspaceDiagnosticCode,
-	RenameWorkspaceRequest,
-	RenameWorkspaceResult,
-} from '../../shared/ipc';
+import type { CreatedWorkspaceSnapshot, RenameWorkspaceDiagnostic, RenameWorkspaceDiagnosticCode, RenameWorkspaceRequest, RenameWorkspaceResult } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import {

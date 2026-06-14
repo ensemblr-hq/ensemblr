@@ -1,11 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	EnvironmentVariableDiagnostic,
-	EnvironmentVariableScope,
-	EnvironmentVariableSnapshot,
-	EnvironmentVariablesSnapshot,
-} from '../../shared/ipc';
+import type { EnvironmentVariableDiagnostic, EnvironmentVariableScope, EnvironmentVariableSnapshot, EnvironmentVariablesSnapshot } from '../../shared/ipc/contracts/environment';
 import type { EnsembleConfigService } from '../config/config-loader';
 import type { SecretMetadata, SecretStore } from '../secrets/secret-store';
 import {

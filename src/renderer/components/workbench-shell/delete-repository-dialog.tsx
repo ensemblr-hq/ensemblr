@@ -13,7 +13,7 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
-import type { DeleteRepositoryDiagnostic } from '@/shared/ipc';
+import type { DeleteRepositoryDiagnostic } from '@/shared/ipc/contracts/repository';
 
 interface DeleteRepositoryDialogProps {
 	onDeleted: (projectId: string) => Promise<void> | void;

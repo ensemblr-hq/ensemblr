@@ -1,8 +1,5 @@
-import type {
-	LinearConnectionSnapshot,
-	SetupCheckStatus,
-	SetupRemediationAction,
-} from '../../shared/ipc';
+import type { LinearConnectionSnapshot } from '../../shared/ipc/contracts/linear';
+import type { SetupCheckStatus, SetupRemediationAction } from '../../shared/ipc/contracts/setup';
 import type { LinearAuthService } from '../linear';
 import {
 	defineCheck,

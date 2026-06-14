@@ -1,4 +1,4 @@
-import type { EnsembleApi } from '@/shared/ipc';
+import type { EnsembleApi } from '@/shared/ipc/contracts/api';
 
 /** Hierarchical TanStack Query keys for every Ensemble IPC-backed query. */
 export const ensembleQueryKeys = {

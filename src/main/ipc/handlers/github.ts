@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 
-import { IPC_CHANNELS } from '../../../shared/ipc';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { GithubService } from '../../github';
 import type { WithPermissionGate } from '../permission-gate.ts';
 import {

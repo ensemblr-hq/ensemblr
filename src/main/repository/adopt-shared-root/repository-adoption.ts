@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { AdoptedRepositorySnapshot } from '../../../shared/ipc';
+import type { AdoptedRepositorySnapshot } from '../../../shared/ipc/contracts/repository';
 import {
 	insertRepositoryRow,
 	refreshRepositoryAdoptionRow,

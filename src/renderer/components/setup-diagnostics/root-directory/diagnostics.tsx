@@ -1,5 +1,5 @@
 import { StatusBadge } from '@/renderer/components/status-badge';
-import type { RootDirectoryChangePreview } from '@/shared/ipc';
+import type { RootDirectoryChangePreview } from '@/shared/ipc/contracts/root-directory';
 
 /** Renders the list of diagnostics surfaced by the root-directory preview. */
 export function RootDirectoryDiagnostics({

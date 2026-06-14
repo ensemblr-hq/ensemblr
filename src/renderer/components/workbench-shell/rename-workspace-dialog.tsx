@@ -21,7 +21,7 @@ import {
 	useKeymapHandler,
 } from '@/renderer/hooks/use-keymap-handler';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
-import type { RenameWorkspaceDiagnostic } from '@/shared/ipc';
+import type { RenameWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
 interface RenameWorkspaceDialogProps {
 	onOpenChange: (open: boolean) => void;

@@ -1,14 +1,10 @@
 import { type IpcRendererEvent, ipcRenderer } from 'electron';
 
-import {
-	type CloneGithubRepositoryProgressEvent,
-	type EnsembleApi,
-	IPC_CHANNELS,
-	type PiRawFrameBroadcast,
-	type PiSessionEventBroadcast,
-	type TerminalLifecycleBroadcast,
-	type TerminalOutputBroadcast,
-} from '../../shared/ipc';
+import { type CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
+import { type EnsembleApi } from '../../shared/ipc/contracts/api';
+import { IPC_CHANNELS } from '../../shared/ipc/channels';
+import { type PiRawFrameBroadcast, type PiSessionEventBroadcast } from '../../shared/ipc/contracts/pi-session';
+import { type TerminalLifecycleBroadcast, type TerminalOutputBroadcast } from '../../shared/ipc/contracts/terminal';
 
 /**
  * Keys of {@link EnsembleApi} that represent typed `ipcRenderer.invoke`

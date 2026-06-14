@@ -1,13 +1,8 @@
 import { app, BrowserWindow, shell } from 'electron';
 import started from 'electron-squirrel-startup';
-import {
-	IPC_CHANNELS,
-	type PiRawFrameBroadcast,
-	type PiRawFrameKind,
-	type PiSessionEventBroadcast,
-	type TerminalLifecycleBroadcast,
-	type TerminalOutputBroadcast,
-} from '../shared/ipc';
+import { IPC_CHANNELS } from '../shared/ipc/channels';
+import { type PiRawFrameBroadcast, type PiRawFrameKind, type PiSessionEventBroadcast } from '../shared/ipc/contracts/pi-session';
+import { type TerminalLifecycleBroadcast, type TerminalOutputBroadcast } from '../shared/ipc/contracts/terminal';
 
 import { createMainWindow, createMainWindowStateStore } from './app';
 import { createLocalCommandService } from './commands';

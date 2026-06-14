@@ -10,11 +10,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	ResolvedSettingSnapshot,
-	SettingsResolutionSnapshot,
-	SettingsResolutionSource,
-} from '../../shared/ipc';
+import type { ResolvedSettingSnapshot, SettingsResolutionSnapshot, SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
 import type {
 	LocalCommandResult,
 	LocalCommandService,

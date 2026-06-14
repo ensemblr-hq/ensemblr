@@ -13,7 +13,7 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
-import type { DeleteWorkspaceDiagnostic } from '@/shared/ipc';
+import type { DeleteWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
 interface DeleteWorkspaceDialogProps {
 	onDeleted: (workspaceId: string) => Promise<void> | void;

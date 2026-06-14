@@ -1,18 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
-import type {
-	BindPiSessionToTabRequest,
-	BindPiSessionToTabResult,
-	CloseChatTabRequest,
-	CloseChatTabResult,
-	ListChatTabsResult,
-	ListClosedChatTabsWithSummaryResult,
-	OpenChatTabRequest,
-	OpenChatTabResult,
-	RestoreChatTabRequest,
-	RestoreChatTabResult,
-} from '@/shared/ipc';
+import type { BindPiSessionToTabRequest, BindPiSessionToTabResult, CloseChatTabRequest, CloseChatTabResult, ListChatTabsResult, ListClosedChatTabsWithSummaryResult, OpenChatTabRequest, OpenChatTabResult, RestoreChatTabRequest, RestoreChatTabResult } from '@/shared/ipc/contracts/chat-tab';
 
 import { ensembleQueryKeys, getEnsembleApi } from './query-keys';
 

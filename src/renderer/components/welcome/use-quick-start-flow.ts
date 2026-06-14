@@ -10,10 +10,7 @@ import {
 	selectCloneDestination,
 } from '@/renderer/api/ensemble-queries';
 import { seedFirstWorkspace } from '@/renderer/lib/workbench/seed-first-workspace';
-import type {
-	QuickStartProjectDiagnostic,
-	QuickStartProjectResult,
-} from '@/shared/ipc';
+import type { QuickStartProjectDiagnostic, QuickStartProjectResult } from '@/shared/ipc/contracts/quick-start';
 
 /** Top-level UI states the quick-start flow moves through. */
 export type QuickStartStage = 'creating' | 'failure' | 'idle';

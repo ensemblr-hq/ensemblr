@@ -39,7 +39,7 @@ import type {
 	WorkbenchStaticNavigationTarget,
 	WorkbenchWorkspaceNavigationLinkTarget,
 } from '@/renderer/types/workbench-shell';
-import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
+import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 export interface WorkbenchNavigationResult {
 	addProjectMenu: AddProjectMenuModel;

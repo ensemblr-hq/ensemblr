@@ -1,5 +1,5 @@
 import { Badge } from '@/renderer/components/ui/badge';
-import type { SettingsResolutionSource } from '@/shared/ipc';
+import type { SettingsResolutionSource } from '@/shared/ipc/contracts/settings-resolution';
 
 const SOURCE_LABEL: Record<SettingsResolutionSource, string> = {
 	'built-in-default': 'default',

@@ -1,12 +1,8 @@
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	RootDirectorySnapshot,
-	SharedRootAdoptionDiagnostic,
-	SharedRootAdoptionSnapshot,
-	SharedRootAdoptionStatus,
-} from '../../../shared/ipc';
+import type { RootDirectorySnapshot } from '../../../shared/ipc/contracts/root-directory';
+import type { SharedRootAdoptionDiagnostic, SharedRootAdoptionSnapshot, SharedRootAdoptionStatus } from '../../../shared/ipc/contracts/shared-root-adoption';
 import type {
 	LoadedRepositoryConfig,
 	LoadRepositoryConfigOptions,

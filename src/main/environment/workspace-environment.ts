@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { EnvironmentVariableDiagnostic } from '../../shared/ipc';
+import type { EnvironmentVariableDiagnostic } from '../../shared/ipc/contracts/environment';
 import type { EnsembleConfigResolutionService } from '../config/config-resolution';
 import { isRecord, isString } from '../repository/row-guards.ts';
 import type { EnsembleRootDirectoryService } from '../root';

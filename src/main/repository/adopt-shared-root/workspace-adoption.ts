@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { AdoptedWorkspaceSnapshot } from '../../../shared/ipc';
+import type { AdoptedWorkspaceSnapshot } from '../../../shared/ipc/contracts/workspace';
 import {
 	insertWorkspaceRow,
 	refreshWorkspaceAdoptionRow,

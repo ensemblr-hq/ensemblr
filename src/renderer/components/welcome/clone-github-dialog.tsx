@@ -20,7 +20,7 @@ import {
 	type KeymapBinding,
 	useKeymapHandler,
 } from '@/renderer/hooks/use-keymap-handler';
-import type { GithubRepositoryEntry } from '@/shared/ipc';
+import type { GithubRepositoryEntry } from '@/shared/ipc/contracts/clone';
 
 import { joinDestination } from './clone-destination.ts';
 import { CloneGithubDiagnostics } from './clone-github-diagnostics.tsx';

@@ -1,13 +1,9 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
-import type {
-	ConfigDiagnostic,
-	RepositoryConfigSnapshot,
-	RepositoryConfigSourceSnapshot,
-	RepositoryConfigSourceStatus,
-	SettingsResolutionSource,
-} from '../../shared/ipc';
+import type { ConfigDiagnostic } from '../../shared/ipc/contracts/health';
+import type { RepositoryConfigSnapshot, RepositoryConfigSourceSnapshot, RepositoryConfigSourceStatus } from '../../shared/ipc/contracts/repository-config';
+import type { SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
 import { cloneRecord, isPlainRecord } from './json-utils.ts';
 import {
 	formatSourceName,

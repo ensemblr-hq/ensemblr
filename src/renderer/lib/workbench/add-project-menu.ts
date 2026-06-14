@@ -4,7 +4,7 @@ import type {
 	AddProjectMenuModel,
 	RecentProject,
 } from '@/renderer/types/workbench';
-import type { SetupCheckId, SetupDiagnosticsSnapshot } from '@/shared/ipc';
+import type { SetupCheckId, SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 /** One entry in the add-project menu, with its prerequisite setup checks. */
 interface AddProjectActionDefinition {

@@ -22,7 +22,7 @@ import {
 	reviewModelAtom,
 	reviewThinkingLevelAtom,
 } from '@/renderer/state/preferences';
-import type { PiModelOptionWire } from '@/shared/ipc';
+import type { PiModelOptionWire } from '@/shared/ipc/contracts/pi-session';
 
 export const Route = createFileRoute('/_workbench/settings/models')({
 	component: ModelsSettings,

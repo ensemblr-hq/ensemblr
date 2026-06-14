@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import type { ChatTabWire, ListChatTabsResult } from '@/shared/ipc';
+import type { ChatTabWire, ListChatTabsResult } from '@/shared/ipc/contracts/chat-tab';
 
 import { ensembleQueryKeys } from './query-keys';
 

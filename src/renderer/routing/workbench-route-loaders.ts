@@ -19,7 +19,7 @@ import type {
 	ProjectShellModel,
 	WorkbenchRouteSearch,
 } from '@/renderer/types/workbench';
-import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc';
+import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 
 const WORKSPACE_SEARCH_KEYS = new Set(['dock', 'review']);
 const LEGACY_CHAT_SEARCH_KEY = 'chat';

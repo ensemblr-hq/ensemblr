@@ -8,11 +8,7 @@ import {
 	subscribeCloneGithubRepositoryProgress,
 } from '@/renderer/api/ensemble-queries';
 import { seedFirstWorkspace } from '@/renderer/lib/workbench/seed-first-workspace';
-import type {
-	CloneGithubRepositoryDiagnostic,
-	CloneGithubRepositoryProgressEvent,
-	CloneGithubRepositoryStartResult,
-} from '@/shared/ipc';
+import type { CloneGithubRepositoryDiagnostic, CloneGithubRepositoryProgressEvent, CloneGithubRepositoryStartResult } from '@/shared/ipc/contracts/clone';
 
 /** Top-level UI states the clone flow moves through. */
 export type CloneStage =

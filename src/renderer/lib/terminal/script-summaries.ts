@@ -2,10 +2,8 @@ import type {
 	DockTabStatus,
 	WorkspaceScriptSummary,
 } from '@/renderer/types/workbench';
-import type {
-	TerminalSessionSnapshot,
-	WorkspaceScriptKind,
-} from '@/shared/ipc';
+import type { TerminalSessionSnapshot } from '@/shared/ipc/contracts/terminal';
+import type { WorkspaceScriptKind } from '@/shared/ipc/contracts/workspace-scripts';
 import type { WorkspaceScriptSettings } from '@/shared/scripts/script-settings';
 
 /**

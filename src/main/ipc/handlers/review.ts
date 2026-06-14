@@ -1,14 +1,7 @@
 import { ipcMain } from 'electron';
 
-import {
-	type DeleteReviewCommentResult,
-	type DeleteReviewTodoResult,
-	IPC_CHANNELS,
-	type ListReviewCommentsResult,
-	type ListReviewTodosResult,
-	type SaveReviewCommentResult,
-	type SaveReviewTodoResult,
-} from '../../../shared/ipc';
+import { type DeleteReviewCommentResult, type DeleteReviewTodoResult, type ListReviewCommentsResult, type ListReviewTodosResult, type SaveReviewCommentResult, type SaveReviewTodoResult } from '../../../shared/ipc/contracts/review-comments';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { ReviewService } from '../../review';
 import {
 	reviewDeleteRequestSchema,

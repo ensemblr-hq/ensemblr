@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { StatusBadge } from '@/renderer/components/status-badge';
-import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
+import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 /** Compact summary variant for the setup diagnostics, used in dense panels. */
 export function SetupDiagnosticsCompact({

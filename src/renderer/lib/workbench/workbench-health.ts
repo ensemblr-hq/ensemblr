@@ -1,5 +1,6 @@
 import type { WorkbenchHealth } from '@/renderer/types/workbench-shell';
-import type { HealthSnapshot, SetupDiagnosticsSnapshot } from '@/shared/ipc';
+import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
+import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 /**
  * Reduces the loaded shell data into a single {@link WorkbenchHealth} value

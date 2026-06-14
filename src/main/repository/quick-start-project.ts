@@ -8,11 +8,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 
-import type {
-	QuickStartProjectDiagnostic,
-	QuickStartProjectRequest,
-	QuickStartProjectResult,
-} from '../../shared/ipc';
+import type { QuickStartProjectDiagnostic, QuickStartProjectRequest, QuickStartProjectResult } from '../../shared/ipc/contracts/quick-start';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleRootDirectoryService } from '../root';
 import { firstLine } from './first-line.ts';

@@ -1,4 +1,4 @@
-import type { CloneGithubRepositoryDiagnostic } from '@/shared/ipc';
+import type { CloneGithubRepositoryDiagnostic } from '@/shared/ipc/contracts/clone';
 
 interface CloneGithubDiagnosticsProps {
 	diagnostics: CloneGithubRepositoryDiagnostic[];
