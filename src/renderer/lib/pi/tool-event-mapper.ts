@@ -6,7 +6,7 @@ import type {
 	PiWireMessagePayload,
 } from '@/shared/ipc';
 
-import type { DynamicToolOutputPart, UIMessagePart } from './types';
+import type { UIMessagePart } from './types';
 
 /**
  * Builds an `input-available` dynamic tool part from a Pi `tool-call` payload.
@@ -105,17 +105,10 @@ export function mergeToolPart(
 }
 
 /** True when `part` is the `dynamic-tool` variant. */
-export function isDynamicToolPart(
+function isDynamicToolPart(
 	part: UIMessagePart,
 ): part is DynamicToolUIPart {
 	return part.type === 'dynamic-tool';
-}
-
-/** True when a dynamic tool part already carries a tool result. */
-export function isToolOutputPart(
-	part: DynamicToolUIPart,
-): part is DynamicToolOutputPart {
-	return part.state === 'output-available' || part.state === 'output-error';
 }
 
 const STATE_RANK: Record<string, number> = {

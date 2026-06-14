@@ -29,13 +29,12 @@ export function useAgentActionRunner({
 	activeWorkspace: WorkspaceShellModel;
 }): (action: AgentActionKind) => void {
 	const insertIntoComposer = useComposerInsert();
-	const actionTemplatesQueryState = useQuery(
+	const { data: actionTemplates } = useQuery(
 		agentActionTemplatesQuery({
 			repositoryId: activeProject.id,
 			repositoryPath: activeProject.pathLabel,
 		}),
 	);
-	const actionTemplates = actionTemplatesQueryState.data;
 
 	return useCallback(
 		(action: AgentActionKind) => {

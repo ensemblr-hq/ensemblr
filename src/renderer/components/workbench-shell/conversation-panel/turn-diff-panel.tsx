@@ -13,19 +13,19 @@ import type { TurnDiffFileWire } from '@/shared/ipc';
  * (next checkpoint, or the live working tree for the latest turn).
  */
 export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
-	const diffQuery = useQuery(turnDiffQuery(turnId));
+	const { data, isError, isPending } = useQuery(turnDiffQuery(turnId));
 
 	if (!turnId) {
 		return <TurnDiffMessage message='This tab has no turn associated.' />;
 	}
-	if (diffQuery.isPending) {
+	if (isPending) {
 		return <TurnDiffMessage message='Computing turn diff…' />;
 	}
-	if (diffQuery.isError) {
+	if (isError) {
 		return <TurnDiffMessage message='Could not compute diff.' tone='error' />;
 	}
 
-	const result = diffQuery.data;
+	const result = data;
 	if (!result.ok) {
 		return <TurnDiffMessage message={result.error.message} tone='error' />;
 	}

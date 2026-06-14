@@ -41,14 +41,18 @@ export function presentPiModels(
 	if (input.status !== 'success' || input.models.length === 0) {
 		return EMPTY_PI_MODELS;
 	}
-	const models: PiModelOptionWire[] = input.models
-		.filter((row) => row.model && row.provider)
-		.map((row) => ({
-			displayName: row.model,
-			id: row.id,
-			provider: row.provider,
-			thinkingLevels: DEFAULT_THINKING_LEVELS,
-		}));
+	const models: PiModelOptionWire[] = input.models.flatMap((row) =>
+		row.model && row.provider
+			? [
+					{
+						displayName: row.model,
+						id: row.id,
+						provider: row.provider,
+						thinkingLevels: DEFAULT_THINKING_LEVELS,
+					},
+				]
+			: [],
+	);
 	if (models.length === 0) {
 		return EMPTY_PI_MODELS;
 	}

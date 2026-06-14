@@ -104,10 +104,11 @@ function resolveBlockingReason(
 	definition: AddProjectActionDefinition,
 	setupSnapshot: SetupDiagnosticsSnapshot,
 ): string | null {
+	const checksById = new Map(
+		setupSnapshot.checks.map((candidate) => [candidate.id, candidate]),
+	);
 	for (const checkId of definition.requiredCheckIds) {
-		const check = setupSnapshot.checks.find(
-			(candidate) => candidate.id === checkId,
-		);
+		const check = checksById.get(checkId);
 
 		// Only a check we can see AND that has definitively failed blocks the
 		// action. Missing, pending, running, warning, or successful checks leave

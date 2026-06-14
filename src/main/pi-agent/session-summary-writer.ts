@@ -330,8 +330,9 @@ function extractText(event: PiSessionEventWire): string {
 			return inner.prompt;
 		case 'message':
 			return inner.parts
-				.map((part) => (part.kind === 'text' ? part.text : ''))
-				.filter((value) => value.length > 0)
+				.flatMap((part) =>
+					part.kind === 'text' && part.text.length > 0 ? [part.text] : [],
+				)
 				.join('\n');
 		case 'tool-call':
 			return `(tool call: ${inner.name})`;
@@ -528,8 +529,9 @@ function extractTextFromAgentEvent(event: PiAgentEvent): string {
 			return payload.text;
 		case 'message':
 			return payload.parts
-				.map((part) => (part.kind === 'text' ? part.text : ''))
-				.filter((value) => value.length > 0)
+				.flatMap((part) =>
+					part.kind === 'text' && part.text.length > 0 ? [part.text] : [],
+				)
 				.join('\n');
 		default:
 			return '';

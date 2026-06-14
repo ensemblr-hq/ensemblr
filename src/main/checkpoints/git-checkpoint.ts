@@ -162,21 +162,23 @@ export async function diffTrees({
 	fromRev: string;
 	toRev: string;
 }): Promise<GitDiffResult> {
-	const numstat = await runGit({
-		args: ['diff', '--numstat', '-M', fromRev, toRev],
-		cwd,
-		step: 'diff-numstat',
-	});
-	const nameStatus = await runGit({
-		args: ['diff', '--name-status', '-M', fromRev, toRev],
-		cwd,
-		step: 'diff-name-status',
-	});
-	const patch = await runGit({
-		args: ['diff', '-M', fromRev, toRev],
-		cwd,
-		step: 'diff-patch',
-	});
+	const [numstat, nameStatus, patch] = await Promise.all([
+		runGit({
+			args: ['diff', '--numstat', '-M', fromRev, toRev],
+			cwd,
+			step: 'diff-numstat',
+		}),
+		runGit({
+			args: ['diff', '--name-status', '-M', fromRev, toRev],
+			cwd,
+			step: 'diff-name-status',
+		}),
+		runGit({
+			args: ['diff', '-M', fromRev, toRev],
+			cwd,
+			step: 'diff-patch',
+		}),
+	]);
 
 	const statusByPath = new Map<string, GitDiffFile['status']>();
 	for (const line of nameStatus.split('\n')) {

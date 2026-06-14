@@ -12,7 +12,7 @@ export interface ComposerInsertRequest {
  * viewer) enqueue context blocks; the mounted composer drains the queue into
  * its textarea. Nothing auto-submits — the user always presses send (ENS-053).
  */
-export const composerInsertQueueAtom = atom<ComposerInsertRequest[]>([]);
+const composerInsertQueueAtom = atom<ComposerInsertRequest[]>([]);
 
 let insertCounter = 0;
 

@@ -21,7 +21,7 @@ const REPO_NAME_PATTERN =
 	/(?:[/:])([\w.-]+?)(?:\.git)?(?:\/?$)|^([\w.-]+)\/([\w.-]+?)(?:\.git)?$/i;
 
 /** Best-effort extraction of the repository name segment from a GitHub URL. */
-export function extractRepositoryName(url: string): string | null {
+function extractRepositoryName(url: string): string | null {
 	const match = url.trim().match(REPO_NAME_PATTERN);
 	if (!match) {
 		return null;

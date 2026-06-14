@@ -221,6 +221,9 @@ export function createWorkspaceGitService({
 					return { additions: 0, deletions: 0 };
 				}
 				const readBytes = Math.min(stat.size, MAX_UNTRACKED_COUNT_BYTES);
+				if (readBytes === 0) {
+					return { additions: 0, deletions: 0 };
+				}
 				const buffer = Buffer.alloc(readBytes);
 				await handle.read(buffer, 0, readBytes, 0);
 				if (
@@ -229,9 +232,6 @@ export function createWorkspaceGitService({
 						.includes(0)
 				) {
 					return { additions: null, deletions: null };
-				}
-				if (readBytes === 0) {
-					return { additions: 0, deletions: 0 };
 				}
 				let lines = 0;
 				for (const byte of buffer) {

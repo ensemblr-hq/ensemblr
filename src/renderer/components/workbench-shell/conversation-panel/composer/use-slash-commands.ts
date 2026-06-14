@@ -44,13 +44,13 @@ export function sortSlashCommands(
 export function useSlashCommands(
 	workspaceCwd: string,
 ): readonly SlashCommandDescriptor[] {
-	const query = useQuery({
+	const { data } = useQuery({
 		...piSlashCommandsQuery({ cwd: workspaceCwd }),
 		retry: false,
 	});
 
 	return useMemo(() => {
-		const remote = query.data;
+		const remote = data;
 		if (!remote) {
 			return sortSlashCommands(SLASH_COMMANDS);
 		}
@@ -66,5 +66,5 @@ export function useSlashCommands(
 				sourceScope: entry.sourceScope,
 			})),
 		);
-	}, [query.data]);
+	}, [data]);
 }

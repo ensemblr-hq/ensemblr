@@ -120,7 +120,7 @@ function useCreateWorkspaceSources(enabled: boolean): {
 	issuesById: Map<string, LinearIssueWire>;
 	sources: WorkspaceSource[];
 } {
-	const linearIssues = useQuery({
+	const { data: linearIssuesData } = useQuery({
 		...linearIssuesQuery({}),
 		enabled,
 	});
@@ -129,7 +129,7 @@ function useCreateWorkspaceSources(enabled: boolean): {
 		const placeholderSources = defaultWorkspaceSources.filter(
 			(source) => !(source.kind === 'issue' && source.provider === 'linear'),
 		);
-		const issues = linearIssues.data?.issues ?? [];
+		const issues = linearIssuesData?.issues ?? [];
 
 		return {
 			issuesById: new Map(issues.map((issue) => [issue.id, issue])),
@@ -138,7 +138,7 @@ function useCreateWorkspaceSources(enabled: boolean): {
 				...mapLinearIssuesToWorkspaceSources(issues),
 			],
 		};
-	}, [linearIssues.data]);
+	}, [linearIssuesData]);
 }
 
 /** Mounts the sidebar lifecycle dialogs driven by the navigation actions hook. */

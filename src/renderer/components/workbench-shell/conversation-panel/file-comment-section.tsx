@@ -21,6 +21,12 @@ function parseDraftLine(draftLine: string): number | null {
 	return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function notifyCommentUpdateFailed(error: unknown): void {
+	toast.error('Comment update failed', {
+		description: error instanceof Error ? error.message : undefined,
+	});
+}
+
 /** Local review comments scoped to the open file, with add/resolve/delete. */
 export function FileCommentSection({
 	filePath,
@@ -30,7 +36,7 @@ export function FileCommentSection({
 	workspaceId: string;
 }) {
 	const queryClient = useQueryClient();
-	const commentsQueryState = useQuery(reviewCommentsQuery(workspaceId));
+	const { data: commentsData } = useQuery(reviewCommentsQuery(workspaceId));
 	const insertIntoComposer = useComposerInsert();
 	const [draftBody, setDraftBody] = useState('');
 	const [draftLine, setDraftLine] = useState('');
@@ -39,10 +45,7 @@ export function FileCommentSection({
 		queryClient.invalidateQueries({
 			queryKey: ensembleQueryKeys.reviewComments(workspaceId),
 		});
-	const onError = (error: unknown) =>
-		toast.error('Comment update failed', {
-			description: error instanceof Error ? error.message : undefined,
-		});
+	const onError = notifyCommentUpdateFailed;
 
 	const addMutation = useMutation({
 		mutationFn: () =>
@@ -75,7 +78,7 @@ export function FileCommentSection({
 		onSuccess: invalidate,
 	});
 
-	const fileComments = (commentsQueryState.data?.comments ?? []).filter(
+	const fileComments = (commentsData?.comments ?? []).filter(
 		(comment) => comment.filePath === filePath,
 	);
 

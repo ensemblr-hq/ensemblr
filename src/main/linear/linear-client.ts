@@ -590,10 +590,11 @@ function mapGraphqlErrors(
 ): LinearServiceError {
 	const message =
 		errors[0]?.message ?? 'The Linear API returned an unknown error.';
-	const markers = errors
-		.flatMap((error) => [error.extensions?.code, error.extensions?.type])
-		.filter((value): value is string => typeof value === 'string')
-		.map((value) => value.toUpperCase());
+	const markers = errors.flatMap((error) =>
+		[error.extensions?.code, error.extensions?.type].flatMap((value) =>
+			typeof value === 'string' ? [value.toUpperCase()] : [],
+		),
+	);
 
 	if (markers.some((marker) => marker.includes('RATELIMIT'))) {
 		return new LinearServiceError('rate-limited', message, {

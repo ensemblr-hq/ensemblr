@@ -32,7 +32,9 @@ export function useTimelineEvents({
 	isLoading: boolean;
 } {
 	const queryClient = useQueryClient();
-	const query = useQuery(piSessionEventsQuery(branchId));
+	const { data, error, isPending } = useQuery(
+		piSessionEventsQuery(branchId),
+	);
 
 	useEffect(() => {
 		if (!sessionId) {
@@ -54,14 +56,14 @@ export function useTimelineEvents({
 	}, [queryClient, sessionId]);
 
 	const events = useMemo<readonly PiSessionEventWire[]>(
-		() => query.data?.events ?? [],
-		[query.data?.events],
+		() => data?.events ?? [],
+		[data?.events],
 	);
 
 	return {
-		error: query.error,
+		error,
 		events,
-		isLoading: query.isPending,
+		isLoading: isPending,
 	};
 }
 

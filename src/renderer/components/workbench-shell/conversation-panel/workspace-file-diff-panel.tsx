@@ -30,7 +30,7 @@ export function WorkspaceFileDiffPanel({
 	workspaceCwd: string | null;
 	workspaceId: string;
 }) {
-	const diffQuery = useQuery(
+	const { data, isError, isPending } = useQuery(
 		workspaceFileDiffQuery({ filePath, workspaceCwd }),
 	);
 	const insertIntoComposer = useComposerInsert();
@@ -38,14 +38,14 @@ export function WorkspaceFileDiffPanel({
 	if (!filePath) {
 		return <DiffMessage message='This tab has no file associated.' />;
 	}
-	if (diffQuery.isPending) {
+	if (isPending) {
 		return <DiffMessage message='Loading diff…' />;
 	}
-	if (diffQuery.isError) {
+	if (isError) {
 		return <DiffMessage message='Could not load diff.' tone='error' />;
 	}
 
-	const result = diffQuery.data;
+	const result = data;
 	if (result.error) {
 		return <DiffMessage message={result.error.message} tone='error' />;
 	}
