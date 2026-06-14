@@ -244,8 +244,9 @@ function extractTitleText(
 			return payload.text;
 		case 'message':
 			return payload.parts
-				.map((part) => (part.kind === 'text' ? part.text : ''))
-				.filter(Boolean)
+				.flatMap((part) =>
+					part.kind === 'text' && part.text ? [part.text] : [],
+				)
 				.join(' ')
 				.trim();
 		default:

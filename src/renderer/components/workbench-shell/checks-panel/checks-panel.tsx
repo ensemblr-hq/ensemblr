@@ -72,6 +72,12 @@ interface TodoActions {
 	toggleTodo: (input: { id: string; nextDone: boolean }) => void;
 }
 
+function notifyTodoUpdateFailed(error: unknown): void {
+	toast.error('Todo update failed', {
+		description: error instanceof Error ? error.message : undefined,
+	});
+}
+
 /** Mutations for the "Your todos" section, invalidating the todos query. */
 function useTodoActions(workspaceId: string): TodoActions {
 	const queryClient = useQueryClient();
@@ -79,10 +85,7 @@ function useTodoActions(workspaceId: string): TodoActions {
 		queryClient.invalidateQueries({
 			queryKey: ensembleQueryKeys.reviewTodos(workspaceId),
 		});
-	const onError = (error: unknown) =>
-		toast.error('Todo update failed', {
-			description: error instanceof Error ? error.message : undefined,
-		});
+	const onError = notifyTodoUpdateFailed;
 
 	const addMutation = useMutation({
 		mutationFn: (title: string) => saveReviewTodo({ title, workspaceId }),
@@ -238,7 +241,7 @@ function ChecksPullRequestPanel({
 }
 
 /** "Your todos" section with inline add, toggle, and delete. */
-export function TodoSection({
+function TodoSection({
 	onAddToChat,
 	todoActions,
 	todos,

@@ -110,6 +110,3 @@ const WorkspaceMainContentCtx = makeShellContext<WorkspaceMainContentState>(
 );
 export const WorkspaceMainContentProvider = WorkspaceMainContentCtx.Provider;
 export const useWorkspaceMainContent = WorkspaceMainContentCtx.use;
-/** Non-throwing variant for chrome rendered outside the workspace route layout. */
-export const useWorkspaceMainContentOptional =
-	WorkspaceMainContentCtx.useOptional;

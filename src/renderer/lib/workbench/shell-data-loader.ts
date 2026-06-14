@@ -76,7 +76,7 @@ export async function loadWorkbenchShellData(
  * runs. Kept separate from {@link loadWorkbenchShellData} so the live path
  * does not import fixtures into its hot code path.
  */
-export function loadFixtureShellData(): WorkbenchShellData {
+function loadFixtureShellData(): WorkbenchShellData {
 	return {
 		hasPreloadBridge: false,
 		healthError: null,

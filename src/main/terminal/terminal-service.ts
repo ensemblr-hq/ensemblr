@@ -426,9 +426,11 @@ export function createTerminalService({
 		},
 		kill,
 		list: (workspaceId) =>
-			Array.from(sessions.values())
-				.filter((session) => session.snapshot.workspaceId === workspaceId)
-				.map((session) => ({ ...session.snapshot })),
+			Array.from(sessions.values()).flatMap((session) =>
+				session.snapshot.workspaceId === workspaceId
+					? [{ ...session.snapshot }]
+					: [],
+			),
 		recoverStaleSessions: () => {
 			const database = getDatabase();
 

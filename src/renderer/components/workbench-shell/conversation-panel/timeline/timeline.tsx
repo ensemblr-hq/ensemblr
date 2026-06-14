@@ -71,12 +71,14 @@ export function PiSessionTimeline({
 	activeSession: SessionTabModel;
 	workspace: WorkspaceShellModel;
 }) {
-	const sessionsQuery = useQuery(piSessionsForWorkspaceQuery(workspace.id));
+	const { data: sessionsData } = useQuery(
+		piSessionsForWorkspaceQuery(workspace.id),
+	);
 	const tabPiSessionId = activeSession.piSessionId ?? activePiSessionId;
 	const activePiSession =
 		tabPiSessionId === null
 			? undefined
-			: sessionsQuery.data?.sessions.find(
+			: sessionsData?.sessions.find(
 					(session) => session.id === tabPiSessionId,
 				);
 	const branchId = activePiSession?.branchId ?? '';
@@ -95,21 +97,23 @@ export function PiSessionTimeline({
 	});
 	const canFork = branchId.length > 0 && piSessionId !== null;
 
-	const checkpointsQuery = useQuery(turnCheckpointsQuery(piSessionId));
+	const { data: checkpointsData } = useQuery(
+		turnCheckpointsQuery(piSessionId),
+	);
 	const checkpointsByTurnId = useMemo(() => {
 		const map = new Map<string, { label: string }>();
-		for (const checkpoint of checkpointsQuery.data?.checkpoints ?? []) {
+		for (const checkpoint of checkpointsData?.checkpoints ?? []) {
 			if (checkpoint.turnId) {
 				map.set(checkpoint.turnId, { label: checkpoint.label });
 			}
 		}
 		return map;
-	}, [checkpointsQuery.data?.checkpoints]);
+	}, [checkpointsData?.checkpoints]);
 	const openTurnDiff = useTurnDiffOpener();
 	const restore = useCheckpointRestore();
 	// Same-workspace multi-session restores are risky: another live session may
 	// have produced later file changes that a restore would clobber.
-	const hasOtherOpenSessions = (sessionsQuery.data?.sessions ?? []).some(
+	const hasOtherOpenSessions = (sessionsData?.sessions ?? []).some(
 		(session) => session.id !== piSessionId && session.runtimeOpen,
 	);
 

@@ -21,7 +21,7 @@ export function FilePreviewPanel({
 	filePath: string | null;
 	workspaceCwd: string | null;
 }) {
-	const fileQuery = useQuery({
+	const { data, isError, isPending } = useQuery({
 		enabled: Boolean(filePath && workspaceCwd),
 		queryFn: () =>
 			readWorkspaceFile({
@@ -38,11 +38,11 @@ export function FilePreviewPanel({
 		);
 	}
 
-	if (fileQuery.isPending) {
+	if (isPending) {
 		return <FilePreviewMessage message={`Loading ${filePath}…`} />;
 	}
 
-	if (fileQuery.isError) {
+	if (isError) {
 		return (
 			<FilePreviewMessage
 				message={`Could not read ${filePath}.`}
@@ -51,7 +51,7 @@ export function FilePreviewPanel({
 		);
 	}
 
-	const result = fileQuery.data;
+	const result = data;
 	if (result.error) {
 		return (
 			<FilePreviewMessage

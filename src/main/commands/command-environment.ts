@@ -307,10 +307,10 @@ function mergePath(
 	pathValue: string | undefined,
 	commonPathEntries: readonly string[],
 ): string {
-	const entries = (pathValue ?? '')
-		.split(path.delimiter)
-		.map((entry) => entry.trim())
-		.filter(Boolean);
+	const entries = (pathValue ?? '').split(path.delimiter).flatMap((entry) => {
+		const trimmed = entry.trim();
+		return trimmed ? [trimmed] : [];
+	});
 	const seen = new Set(entries);
 
 	for (const entry of commonPathEntries) {
