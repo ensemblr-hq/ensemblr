@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
+import { CommandPalette } from '@/renderer/components/command-palette/command-palette';
 import {
 	WorkbenchRouteError,
 	WorkbenchRouteNotFound,
@@ -35,5 +36,10 @@ export const Route = createFileRoute('/_workbench')({
 
 /** Pathless layout route that fetches workbench data and renders descendants. */
 function WorkbenchDataLayoutRoute() {
-	return <Outlet />;
+	return (
+		<>
+			<Outlet />
+			<CommandPalette />
+		</>
+	);
 }

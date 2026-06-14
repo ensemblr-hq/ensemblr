@@ -58,8 +58,16 @@ export const ensembleQueryKeys = {
 	repositoryWorkspaceNavigation: () =>
 		[...ensembleQueryKeys.all, 'repository-workspace-navigation'] as const,
 	rootDirectory: () => [...ensembleQueryKeys.all, 'root-directory'] as const,
+	repositoryConfig: (repositoryPath: string) =>
+		[...ensembleQueryKeys.all, 'repository-config', repositoryPath] as const,
 	setupDiagnostics: () =>
 		[...ensembleQueryKeys.all, 'setup-diagnostics'] as const,
+	settingsResolution: (repositoryId: string | null) =>
+		[
+			...ensembleQueryKeys.all,
+			'settings-resolution',
+			repositoryId ?? '',
+		] as const,
 	workspaceFileDiff: (workspaceCwd: string, filePath: string) =>
 		[
 			...ensembleQueryKeys.all,

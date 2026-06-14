@@ -26,8 +26,6 @@ Date: 2026-06-05
 
 ## Needs Product Decision
 
-- Whether to support Conductor's remove/soften AI-certainty phrase setting in Ensemble. If supported, decide whether it is Pi output post-processing, a prompt preset, or a settings omission.
-- Which non-deferred experimental settings are v1 scope versus post-core flags, especially sidebar visibility/resource usage. Voice, Graphite, cloud/remote SSH, production React profiler, and the chat-tab limit are already resolved by ADRs.
 - Whether the current workspace-row status context menu should change local workspace lifecycle state, linked Linear issue status, both, or another status model.
 - Whether the current workspace-row Mark as unread action represents local workspace attention, chat unread state, or linked external issue state.
 - Whether the Changes tab Review action opens local diff-comment review mode, starts an agent review workflow, or toggles a review filter/state.
@@ -54,6 +52,8 @@ Date: 2026-06-05
 
 ## Resolved Since Screenshot Review
 
+- AI-certainty phrase soften setting (ENS-069): support as a v1 user-scope toggle implemented via prompt preset injection at chat start, not Pi output post-processing. Reason: hidden post-processing changes agent output without user awareness; a prompt preset is reversible and respects Pi as the source of truth. Toggle lives at `Settings → General → Soften AI certainty` (already wired). Build follow-up: extend the new-chat system prompt builder to append the preset when the toggle is on; ticket to be cut against Milestone 4.
+- Experimental settings v1 scope (ENS-068): Dashboard visibility, Sidebar chats grouping, Auto-run after setup, and In-app browser preview ship as v1 user-scope flags in `Settings → Experimental` (read-only-default, opt-in). Sidebar resource usage ships as a v1 flag with the toggle visible; the actual CPU/memory sampler is post-core (separate follow-up ticket once a sampler service exists). Big-terminal mode is satisfied by the terminal dock and does not need a separate flag. Tab-freak mode, Voice, Graphite, cloud SSH, production React profiler, and chat-tab limit remain resolved by ADR 0020/0021/0022.
 - Root directory changes: switch root and reindex/adopt by default; migration/delete are explicit actions.
 - Secret storage: use macOS Keychain from the start; SQLite stores metadata only.
 - Ensemble account model: defer app account/sign-in for v1; local-first with external auth.

@@ -26,7 +26,7 @@ This inventory comes from the settings screenshots plus accepted ADRs. It separa
 | Desktop notifications | Direct. | Notify when Pi turn/session completes or fails. | SQLite; OS permission external. |
 | Completion sound | Direct. | Same, using Ensemble sound assets. | SQLite with optional config default. |
 | Auto-convert long pasted text | Direct. | Same, producing Ensemble/Pi attachments. | SQLite with optional config default. |
-| Remove/soften AI certainty phrase | Direct as a Conductor-specific toggle. | Decide whether to support as a Pi output-postprocessing preference or omit. | Open; if implemented, SQLite/config. |
+| Remove/soften AI certainty phrase | Direct as a Conductor-specific toggle. | Resolved (ENS-069): ship as a v1 General toggle that injects a prompt preset at chat start. No output post-processing. | SQLite with optional config default. |
 | Always show context usage | Direct. | Show Pi context/token usage when SDK provides it. | SQLite with optional config default. |
 | Caffeinate while agents run | Direct. | Prevent sleep during active Pi sessions/scripts. | SQLite with optional config default. |
 | Show MCP/resource status in chat | Direct. | Show Pi resource/MCP/tool status in composer. | SQLite with optional config default. |
@@ -104,11 +104,11 @@ This inventory comes from the settings screenshots plus accepted ADRs. It separa
 
 | Setting | Conductor mapping | Ensemble adaptation | Storage |
 | --- | --- | --- | --- |
-| Big terminal mode | Direct. | Same, with xterm.js layout. | SQLite/config feature flag. |
-| Many chat/terminal tabs per workspace | Direct. | Allow five open chat tabs per workspace; document/file previews do not count. | SQLite/config if user-adjustable later. |
-| Dashboard/workspace sidebar visibility | Direct. | Same. | SQLite/config. |
+| Big terminal mode | Direct. | Resolved (ENS-068): provided by the terminal dock; no separate flag. | n/a |
+| Many chat/terminal tabs per workspace | Direct. | Resolved by ADR 0022 at five tabs; no toggle. | n/a |
+| Dashboard/workspace sidebar visibility | Direct. | Resolved (ENS-068): v1 user-scope flags `Dashboard`, `Sidebar chats`, `Auto-run after setup`, `In-app browser preview`. | SQLite/config. |
 | Voice mode | Direct. | Deferred until after core completion. | Future feature flag. |
-| Sidebar resource usage | Direct. | Show CPU/memory for workspace processes and Pi sessions. | SQLite/config; sampled metrics in SQLite only if needed. |
+| Sidebar resource usage | Direct. | Resolved (ENS-068): toggle ships in v1 user-scope Experimental settings; the CPU/memory sampler is post-core (follow-up ticket). | SQLite/config; sampler service post-core. |
 | Graphite stack support | Direct. | Deferred until after core completion. | Future integration flag. |
 | React profiler | Direct developer feature. | Development/internal diagnostics only; not a normal v1 production setting. | Internal debug flag. |
 
