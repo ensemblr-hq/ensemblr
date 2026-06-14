@@ -2,7 +2,7 @@ import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
 
 import { subscribePiRawFrames } from '@/renderer/api/ensemble-queries';
-import type { PiRawFrameBroadcast } from '@/shared/ipc';
+import type { PiRawFrameBroadcast } from '@/shared/ipc/contracts/pi-session';
 
 /**
  * Ring-buffered store of raw Pi RPC JSONL frames captured for the debug

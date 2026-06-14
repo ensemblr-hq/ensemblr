@@ -1,10 +1,6 @@
 import type { DynamicToolUIPart } from 'ai';
 
-import type {
-	PiSessionEventWire,
-	PiWireMessagePart,
-	PiWireMessagePayload,
-} from '@/shared/ipc';
+import type { PiSessionEventWire, PiWireMessagePart, PiWireMessagePayload } from '@/shared/ipc/contracts/pi-session';
 
 import type { UIMessagePart } from './types';
 

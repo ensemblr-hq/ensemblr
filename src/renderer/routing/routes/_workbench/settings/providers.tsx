@@ -10,7 +10,7 @@ import { SettingsSection } from '@/renderer/components/settings/settings-section
 import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
-import type { SetupCheckSnapshot, SetupCheckStatus } from '@/shared/ipc';
+import type { SetupCheckSnapshot, SetupCheckStatus } from '@/shared/ipc/contracts/setup';
 
 export const Route = createFileRoute('/_workbench/settings/providers')({
 	component: ProvidersSettings,

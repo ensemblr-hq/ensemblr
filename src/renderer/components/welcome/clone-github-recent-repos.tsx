@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
-import type { GithubRepositoryEntry } from '@/shared/ipc';
+import type { GithubRepositoryEntry } from '@/shared/ipc/contracts/clone';
 
 interface CloneGithubRecentReposProps {
 	disabled: boolean;

@@ -1,4 +1,4 @@
-import type { GithubFailure, GithubFailureCode } from '../../shared/ipc';
+import type { GithubFailure, GithubFailureCode } from '../../shared/ipc/contracts/github';
 import type { LocalCommandResult } from '../commands/local-command';
 
 /**

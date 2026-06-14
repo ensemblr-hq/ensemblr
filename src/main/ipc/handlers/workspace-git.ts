@@ -1,10 +1,7 @@
 import { ipcMain } from 'electron';
 
-import {
-	type GetWorkspaceFileDiffResult,
-	type GetWorkspaceGitStatusResult,
-	IPC_CHANNELS,
-} from '../../../shared/ipc';
+import { type GetWorkspaceFileDiffResult, type GetWorkspaceGitStatusResult } from '../../../shared/ipc/contracts/workspace-git';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { WorkspaceGitService } from '../../workspace-git';
 import {
 	getWorkspaceFileDiffRequestSchema,

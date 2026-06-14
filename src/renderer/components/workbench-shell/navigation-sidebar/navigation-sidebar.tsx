@@ -25,7 +25,7 @@ import type {
 	WorkbenchHealth,
 	WorkbenchStaticNavigationTarget,
 } from '@/renderer/types/workbench-shell';
-import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
+import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import { RenameWorkspaceDialog } from '../rename-workspace-dialog';
 
 import { PinnedWorkspaceGroup } from './pinned-workspace-group';

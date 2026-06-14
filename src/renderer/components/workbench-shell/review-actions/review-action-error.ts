@@ -1,6 +1,6 @@
 import { toast } from 'sonner';
 
-import type { GithubFailure } from '@/shared/ipc';
+import type { GithubFailure } from '@/shared/ipc/contracts/github';
 
 /** Error wrapper preserving the typed gh failure for toast remediation. */
 export class ReviewActionError extends Error {

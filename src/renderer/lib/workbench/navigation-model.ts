@@ -9,11 +9,7 @@ import type {
 	WorkspaceOpenTarget,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type {
-	RepositoryWorkspaceNavigationRepository,
-	RepositoryWorkspaceNavigationSnapshot,
-	RepositoryWorkspaceNavigationWorkspace,
-} from '@/shared/ipc';
+import type { RepositoryWorkspaceNavigationRepository, RepositoryWorkspaceNavigationSnapshot, RepositoryWorkspaceNavigationWorkspace } from '@/shared/ipc/contracts/repository-navigation';
 
 // --- Public mappers ---------------------------------------------------------
 

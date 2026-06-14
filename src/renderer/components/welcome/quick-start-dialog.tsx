@@ -15,7 +15,7 @@ import {
 	type KeymapBinding,
 	useKeymapHandler,
 } from '@/renderer/hooks/use-keymap-handler';
-import type { QuickStartProjectDiagnostic } from '@/shared/ipc';
+import type { QuickStartProjectDiagnostic } from '@/shared/ipc/contracts/quick-start';
 
 interface QuickStartDialogProps {
 	onOpenChange: (open: boolean) => void;

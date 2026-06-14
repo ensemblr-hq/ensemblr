@@ -1,4 +1,4 @@
-import type { EnvironmentVariableCatalogEntrySnapshot } from '../../shared/ipc';
+import type { EnvironmentVariableCatalogEntrySnapshot } from '../../shared/ipc/contracts/environment';
 import type { SecretMetadata } from '../secrets/secret-store';
 import { isSensitiveEnvironmentVariableName } from './environment-variable-catalog.ts';
 

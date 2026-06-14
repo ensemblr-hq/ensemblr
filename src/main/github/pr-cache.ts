@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { GithubPullRequestSnapshotWire } from '../../shared/ipc';
+import type { GithubPullRequestSnapshotWire } from '../../shared/ipc/contracts/github';
 
 const PROVIDER = 'github';
 const RESOURCE_TYPE = 'pull-request';

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import type { CloneGithubRepositoryProgressEvent } from '@/shared/ipc';
+import type { CloneGithubRepositoryProgressEvent } from '@/shared/ipc/contracts/clone';
 
 interface CloneGithubProgressLogProps {
 	logs: CloneGithubRepositoryProgressEvent[];

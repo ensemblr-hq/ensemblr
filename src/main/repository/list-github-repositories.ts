@@ -1,7 +1,4 @@
-import type {
-	GithubRepositoryEntry,
-	GithubRepositoryListResult,
-} from '../../shared/ipc';
+import type { GithubRepositoryEntry, GithubRepositoryListResult } from '../../shared/ipc/contracts/clone';
 import type {
 	LocalCommandResult,
 	LocalCommandService,

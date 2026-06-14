@@ -10,7 +10,7 @@ import {
 import { Switch } from '@/renderer/components/ui/switch';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
-import type { ResolvedSettingSnapshot } from '@/shared/ipc';
+import type { ResolvedSettingSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 
 export const Route = createFileRoute(
 	'/_workbench/settings/repo/$repoId/scripts',

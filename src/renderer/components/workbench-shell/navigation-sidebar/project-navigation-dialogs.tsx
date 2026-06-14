@@ -13,7 +13,7 @@ import type {
 	WorkspaceShellModel,
 	WorkspaceSource,
 } from '@/renderer/types/workbench';
-import type { LinearIssueWire } from '@/shared/ipc';
+import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import { ArchiveRepositoryDialog } from '../archive-repository-dialog';
 import { ArchiveWorkspaceDialog } from '../archive-workspace-dialog';
 import { BrowseArchiveDialog } from '../browse-archive-dialog';

@@ -1,7 +1,4 @@
-import type {
-	SetupCheckLogSnapshot,
-	SetupRemediationAction,
-} from '../../shared/ipc';
+import type { SetupCheckLogSnapshot, SetupRemediationAction } from '../../shared/ipc/contracts/setup';
 import type {
 	PiExecutableService,
 	PiExecutableSnapshot,

@@ -1,9 +1,7 @@
 import { ipcMain } from 'electron';
 
-import {
-	type EnvironmentVariablesSnapshot,
-	IPC_CHANNELS,
-} from '../../../shared/ipc';
+import { type EnvironmentVariablesSnapshot } from '../../../shared/ipc/contracts/environment';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { EnvironmentVariablesService } from '../../environment';
 
 /** Service dependencies used by the environment-variables IPC handler. */

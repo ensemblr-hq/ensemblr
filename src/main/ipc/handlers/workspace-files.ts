@@ -1,12 +1,7 @@
 import { ipcMain } from 'electron';
 
-import {
-	IPC_CHANNELS,
-	type ListWorkspaceFilesRequest,
-	type ListWorkspaceFilesResult,
-	type ReadWorkspaceFileRequest,
-	type ReadWorkspaceFileResult,
-} from '../../../shared/ipc';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
+import { type ListWorkspaceFilesRequest, type ListWorkspaceFilesResult, type ReadWorkspaceFileRequest, type ReadWorkspaceFileResult } from '../../../shared/ipc/contracts/workspace-files';
 import type { ListWorkspaceFilesService } from '../../workspace-files';
 
 export interface WorkspaceFilesHandlersOptions {

@@ -1,6 +1,6 @@
 import { BrowserWindow, ipcMain } from 'electron';
 
-import { IPC_CHANNELS } from '../../../shared/ipc';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 
 const MAX_ENSURED_WINDOW_WIDTH = 2400;
 

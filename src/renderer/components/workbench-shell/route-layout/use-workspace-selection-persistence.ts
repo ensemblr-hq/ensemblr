@@ -12,7 +12,7 @@ import {
 } from '@/renderer/state/workspace';
 import type { WorkbenchShellRouteState } from '@/renderer/types/components';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
-import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc';
+import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 
 export interface WorkspaceSelectionPersistenceResult {
 	currentSelection: WorkspaceNavigationSelection | null;

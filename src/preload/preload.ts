@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
-import { type InitialShellSnapshot, IPC_CHANNELS } from '../shared/ipc';
+import { type InitialShellSnapshot } from '../shared/ipc/contracts/repository-navigation';
+import { IPC_CHANNELS } from '../shared/ipc/channels';
 import { createEnsembleApi } from './bridge';
 
 contextBridge.exposeInMainWorld('ensemble', createEnsembleApi());

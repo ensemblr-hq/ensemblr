@@ -25,7 +25,7 @@ import {
 	isLinearDataStale,
 } from '@/renderer/lib/linear';
 import type { WorkspaceLinkedIssueSummary } from '@/renderer/types/workbench';
-import type { LinearIssueWire } from '@/shared/ipc';
+import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 
 import { LinearStateBadge } from './issue-meta-badges';
 

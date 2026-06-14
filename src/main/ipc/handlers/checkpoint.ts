@@ -1,13 +1,7 @@
 import { ipcMain } from 'electron';
 
-import {
-	type CheckpointFailure,
-	type CheckpointWire,
-	type ComputeTurnDiffResult,
-	IPC_CHANNELS,
-	type ListTurnCheckpointsResult,
-	type RestoreCheckpointResult,
-} from '../../../shared/ipc';
+import { type CheckpointFailure, type CheckpointWire, type ComputeTurnDiffResult, type ListTurnCheckpointsResult, type RestoreCheckpointResult } from '../../../shared/ipc/contracts/checkpoint';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import {
 	CheckpointServiceError,
 	computeTurnDiff,

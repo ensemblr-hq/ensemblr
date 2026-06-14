@@ -1,12 +1,7 @@
 import { ipcMain } from 'electron';
 
-import {
-	IPC_CHANNELS,
-	type RunWorkspaceScriptRequest,
-	type RunWorkspaceScriptResult,
-	type StopWorkspaceScriptRequest,
-	type StopWorkspaceScriptResult,
-} from '../../../shared/ipc';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
+import { type RunWorkspaceScriptRequest, type RunWorkspaceScriptResult, type StopWorkspaceScriptRequest, type StopWorkspaceScriptResult } from '../../../shared/ipc/contracts/workspace-scripts';
 import type { ScriptLifecycleService } from '../../scripts';
 
 /** Service dependencies used by the workspace-script IPC handlers. */

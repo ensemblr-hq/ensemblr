@@ -1,9 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
-import type {
-	OpenPiSessionRequest as OpenPiSessionWireRequest,
-	StopPiSessionRequest as StopPiSessionWireRequest,
-	SubmitPiPromptRequest as SubmitPiPromptWireRequest,
-} from '../../shared/ipc';
+import type { OpenPiSessionRequest as OpenPiSessionWireRequest, StopPiSessionRequest as StopPiSessionWireRequest, SubmitPiPromptRequest as SubmitPiPromptWireRequest } from '../../shared/ipc/contracts/pi-session';
 import type { CheckpointCapturePort } from '../checkpoints/checkpoint-service.ts';
 import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
 import {

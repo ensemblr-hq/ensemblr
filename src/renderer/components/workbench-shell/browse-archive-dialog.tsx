@@ -18,11 +18,7 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
-import type {
-	ArchivedWorkspaceListEntry,
-	DeleteArchivedWorkspaceDiagnostic,
-	UnarchiveWorkspaceDiagnostic,
-} from '@/shared/ipc';
+import type { ArchivedWorkspaceListEntry, DeleteArchivedWorkspaceDiagnostic, UnarchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
 interface BrowseArchiveDialogProps {
 	onChange: (repositoryId: string) => Promise<void> | void;

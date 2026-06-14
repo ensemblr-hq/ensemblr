@@ -6,7 +6,7 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
-import type { SettingsResolutionSnapshot } from '@/shared/ipc';
+import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 
 import { ensembleQueryKeys, getEnsembleApi } from './query-keys';
 

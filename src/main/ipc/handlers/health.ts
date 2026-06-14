@@ -1,11 +1,8 @@
 import { app, ipcMain } from 'electron';
 
-import {
-	type HealthSnapshot,
-	type InitialShellSnapshot,
-	IPC_CHANNELS,
-	type RepositoryWorkspaceNavigationSnapshot,
-} from '../../../shared/ipc';
+import { type HealthSnapshot } from '../../../shared/ipc/contracts/health';
+import { type InitialShellSnapshot, type RepositoryWorkspaceNavigationSnapshot } from '../../../shared/ipc/contracts/repository-navigation';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { EnsembleConfigService } from '../../config';
 import type { EnsembleDatabaseService } from '../../storage';
 import { getRepositoryWorkspaceNavigationSnapshot } from '../repository-workspace-navigation';

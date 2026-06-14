@@ -7,10 +7,7 @@ import {
 } from '@/renderer/api/ensemble/workspace-scripts';
 import type { WorkbenchRouteSearch } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
-import type {
-	CreateTerminalSessionResult,
-	TerminalSessionSnapshot,
-} from '@/shared/ipc';
+import type { CreateTerminalSessionResult, TerminalSessionSnapshot } from '@/shared/ipc/contracts/terminal';
 
 /** Inputs for {@link useWorkspaceDockActions}. */
 export interface UseWorkspaceDockActionsOptions {

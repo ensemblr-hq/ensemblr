@@ -1,4 +1,4 @@
-import type { ArchiveLifecycleDiagnostic } from '../../shared/ipc';
+import type { ArchiveLifecycleDiagnostic } from '../../shared/ipc/contracts/archive-lifecycle';
 
 /**
  * Minimal shape every archive/unarchive diagnostic must satisfy. Each service

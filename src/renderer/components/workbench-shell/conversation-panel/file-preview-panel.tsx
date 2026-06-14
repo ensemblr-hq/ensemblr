@@ -7,7 +7,7 @@ import {
 } from '@/renderer/api/ensemble-queries';
 import { CodeBlockContent } from '@/renderer/components/code-block';
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
-import type { ReadWorkspaceFileFailureCode } from '@/shared/ipc';
+import type { ReadWorkspaceFileFailureCode } from '@/shared/ipc/contracts/workspace-files';
 
 /**
  * Read-only file content surface shown when a `kind: 'file'` tab is active.

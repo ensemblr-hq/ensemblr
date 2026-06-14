@@ -9,11 +9,7 @@ import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
 import { cn } from '@/renderer/lib/utils';
-import type {
-	EnvironmentVariableScope,
-	EnvironmentVariableSnapshot,
-	EnvironmentVariableStatus,
-} from '@/shared/ipc';
+import type { EnvironmentVariableScope, EnvironmentVariableSnapshot, EnvironmentVariableStatus } from '@/shared/ipc/contracts/environment';
 
 interface EnvironmentTableProps {
 	scope: EnvironmentVariableScope;

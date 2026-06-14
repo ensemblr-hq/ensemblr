@@ -15,7 +15,7 @@ import {
 import { Label } from '@/renderer/components/ui/label';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
-import type { ArchiveRepositoryDiagnostic } from '@/shared/ipc';
+import type { ArchiveRepositoryDiagnostic } from '@/shared/ipc/contracts/repository';
 
 interface ArchiveRepositoryDialogProps {
 	onArchived: (projectId: string) => Promise<void> | void;

@@ -1,10 +1,6 @@
 import type { WorkspaceSource } from '@/renderer/types/workbench';
-import type {
-	LinearConnectionSnapshot,
-	LinearIssueWire,
-	LinearServiceFailure,
-	WorkspaceLinkedIssueInput,
-} from '@/shared/ipc';
+import type { LinearConnectionSnapshot, LinearIssueWire, LinearServiceFailure } from '@/shared/ipc/contracts/linear';
+import type { WorkspaceLinkedIssueInput } from '@/shared/ipc/contracts/workspace';
 
 /** Connection-level gate state for every Linear surface. */
 export type LinearGateState =

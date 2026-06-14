@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 
-import type { CloneGithubRepositoryDiagnostic } from '../../shared/ipc';
+import type { CloneGithubRepositoryDiagnostic } from '../../shared/ipc/contracts/clone';
 
 /**
  * Confirms the parent directory of the resolved target will accept new writes.

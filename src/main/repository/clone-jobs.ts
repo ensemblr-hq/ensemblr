@@ -1,4 +1,4 @@
-import type { CloneGithubRepositoryPreparation } from '../../shared/ipc';
+import type { CloneGithubRepositoryPreparation } from '../../shared/ipc/contracts/clone';
 
 /** Lifetime of a prepared-but-not-yet-started clone job. */
 export const PREPARED_JOB_TTL_MS = 5 * 60 * 1000;

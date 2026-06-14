@@ -1,11 +1,7 @@
 import { ipcMain } from 'electron';
 
-import {
-	IPC_CHANNELS,
-	type RootDirectoryChangeApplyResult,
-	type RootDirectorySelectionResult,
-	type RootDirectorySnapshot,
-} from '../../../shared/ipc';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
+import { type RootDirectoryChangeApplyResult, type RootDirectorySelectionResult, type RootDirectorySnapshot } from '../../../shared/ipc/contracts/root-directory';
 import type { SharedRootAdoptionService } from '../../repository';
 import type { EnsembleRootDirectoryService } from '../../root';
 import type { WithPermissionGate } from '../permission-gate.ts';

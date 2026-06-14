@@ -1,11 +1,8 @@
 import { homedir } from 'node:os';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	RootDirectoryDiagnostic,
-	RootDirectorySnapshot,
-	SettingsResolutionSnapshot,
-} from '../../shared/ipc';
+import type { RootDirectoryDiagnostic, RootDirectorySnapshot } from '../../shared/ipc/contracts/root-directory';
+import type { SettingsResolutionSnapshot } from '../../shared/ipc/contracts/settings-resolution';
 import { inspectRootDirectory } from './root-inspect.ts';
 import {
 	createManagedPathSnapshots,

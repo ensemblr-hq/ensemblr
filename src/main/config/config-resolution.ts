@@ -2,17 +2,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	RepositorySettingsResolutionRequest,
-	ResolvedSettingSnapshot,
-	SettingResolutionCandidateSnapshot,
-	SettingsResolutionDiagnostic,
-	SettingsResolutionGroupSnapshot,
-	SettingsResolutionRequest,
-	SettingsResolutionScope,
-	SettingsResolutionSnapshot,
-	SettingsResolutionSource,
-} from '../../shared/ipc';
+import type { RepositorySettingsResolutionRequest, ResolvedSettingSnapshot, SettingResolutionCandidateSnapshot, SettingsResolutionDiagnostic, SettingsResolutionGroupSnapshot, SettingsResolutionRequest, SettingsResolutionScope, SettingsResolutionSnapshot, SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
 import type { EnsembleDatabaseService } from '../storage/database';
 import type { EnsembleConfig, EnsembleConfigService } from './config-loader';
 import { isPlainRecord } from './json-utils.ts';

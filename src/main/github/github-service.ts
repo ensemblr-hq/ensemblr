@@ -1,20 +1,6 @@
 import path from 'node:path';
 
-import type {
-	CommitWorkspaceChangesRequest,
-	CommitWorkspaceChangesResult,
-	CreatePullRequestRequest,
-	CreatePullRequestResult,
-	GetPullRequestSnapshotRequest,
-	GetPullRequestSnapshotResult,
-	GitBranchSyncWire,
-	GithubFailure,
-	GithubPullRequestSnapshotWire,
-	MergePullRequestRequest,
-	MergePullRequestResult,
-	PushWorkspaceBranchRequest,
-	PushWorkspaceBranchResult,
-} from '../../shared/ipc';
+import type { CommitWorkspaceChangesRequest, CommitWorkspaceChangesResult, CreatePullRequestRequest, CreatePullRequestResult, GetPullRequestSnapshotRequest, GetPullRequestSnapshotResult, GitBranchSyncWire, GithubFailure, GithubPullRequestSnapshotWire, MergePullRequestRequest, MergePullRequestResult, PushWorkspaceBranchRequest, PushWorkspaceBranchResult } from '../../shared/ipc/contracts/github';
 import type {
 	LocalCommandResult,
 	LocalCommandService,

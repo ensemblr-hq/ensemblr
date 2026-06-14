@@ -7,15 +7,8 @@ import type {
 	PullRequestTodoSummary,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type {
-	GithubCheckWire,
-	GithubCommentWire,
-	GithubDeploymentWire,
-	GithubPullRequestSnapshotWire,
-	GithubPullRequestWire,
-	ReviewCommentWire,
-	ReviewTodoWire,
-} from '@/shared/ipc';
+import type { GithubCheckWire, GithubCommentWire, GithubDeploymentWire, GithubPullRequestSnapshotWire, GithubPullRequestWire } from '@/shared/ipc/contracts/github';
+import type { ReviewCommentWire, ReviewTodoWire } from '@/shared/ipc/contracts/review-comments';
 
 export interface BuildPullRequestShellModelInput {
 	changeSummary: WorkspaceShellModel['changeSummary'];
