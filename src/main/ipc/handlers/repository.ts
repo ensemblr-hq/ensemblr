@@ -140,8 +140,9 @@ export function registerRepositoryHandlers({
 			archiveRepositoryService.archive(parseArchiveRepositoryRequest(raw)),
 	);
 
-	ipcMain.handle(
+	withPermissionGate(
 		IPC_CHANNELS.deleteWorkspace,
+		'workspace-archive-delete',
 		(_event, raw: unknown): Promise<DeleteWorkspaceResult> =>
 			deleteWorkspaceService.delete(parseDeleteWorkspaceRequest(raw)),
 	);

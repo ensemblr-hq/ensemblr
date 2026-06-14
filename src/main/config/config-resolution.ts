@@ -77,8 +77,16 @@ const VALID_PERMISSION_MODES = [
 ] as const;
 
 const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> = {
+	archiveAfterMerge: false,
 	conductorCompatibility: false,
+	deleteLocalBranchOnArchive: false,
 	filesToCopy: ['.env*'],
+	'piActions.branchNaming': null,
+	'piActions.createPr': null,
+	'piActions.fixCheckErrors': null,
+	'piActions.general': null,
+	'piActions.resolveConflicts': null,
+	'piActions.review': null,
 	previewUrlTemplate: null,
 	runScriptMode: 'concurrent',
 	'security.permissionMode': DEFAULT_PERMISSION_MODE,

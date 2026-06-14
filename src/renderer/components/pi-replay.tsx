@@ -29,7 +29,7 @@ import { piCapturedLineSchema } from '@/shared/pi-rpc';
  * mounts this view is guarded by `import.meta.env.DEV`.
  */
 const FIXTURE_SOURCES = import.meta.glob(
-	'/src/renderer/fixtures/pi-captures/*.jsonl',
+	'/tests/fixtures/pi-captures/*.jsonl',
 	{ eager: true, import: 'default', query: '?raw' },
 ) as Record<string, string>;
 

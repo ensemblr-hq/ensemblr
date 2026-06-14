@@ -1,6 +1,6 @@
 /**
  * Zod schemas for the Pi RPC stdout stream, derived from the raw captures in
- * `src/renderer/fixtures/pi-captures/` (see `docs/pi/event-taxonomy.md`).
+ * `tests/fixtures/pi-captures/` (see `docs/pi/event-taxonomy.md`).
  *
  * Every schema cites the fixture(s) proving its shape. Objects are `loose` on
  * purpose: pi may add fields between versions and unknown fields must never

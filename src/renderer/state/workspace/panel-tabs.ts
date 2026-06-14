@@ -11,11 +11,11 @@ import type {
 	WorkbenchRouteSearch,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
+import { activeChatTabByWorkspaceAtom } from './selection-atoms';
 import {
-	activeChatTabByWorkspaceAtom,
 	activeDockTabByWorkspaceAtom,
 	activeReviewTabByWorkspaceAtom,
-} from './atoms';
+} from './layout-atoms';
 
 type ReviewTabPreferences = Record<string, unknown>;
 type DockTabPreferences = Record<string, unknown>;

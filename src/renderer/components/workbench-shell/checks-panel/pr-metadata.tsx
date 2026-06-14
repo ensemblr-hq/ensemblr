@@ -35,15 +35,22 @@ export function PullRequestMetadata({
 export function ChecksSectionHeader({
 	actionLabel,
 	label,
+	onAction,
 }: {
 	actionLabel?: string;
 	label: string;
+	onAction?: () => void;
 }) {
 	return (
 		<div className='flex min-h-6 min-w-0 items-center justify-between gap-2'>
 			<h3 className='font-semibold text-muted-foreground text-xs'>{label}</h3>
 			{actionLabel ? (
-				<Button className='h-6 px-1.5 text-xs' size='xs' variant='subtle'>
+				<Button
+					className='h-6 px-1.5 text-xs'
+					onClick={onAction}
+					size='xs'
+					variant='subtle'
+				>
 					{actionLabel}
 				</Button>
 			) : null}

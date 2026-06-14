@@ -4,6 +4,7 @@ import { Fragment, useState } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { useWorkspaceFileDiffOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
 import type { ReviewFileSummary } from '@/renderer/types/workbench';
@@ -30,18 +31,27 @@ interface MutableReviewFileTreeNode extends ReviewFileTreeNode {
 
 /** Renders the changes panel as either a flat list or a collapsible folder tree. */
 export function ReviewFileList({
+	error,
 	files,
 	viewMode,
 }: {
+	error?: string;
 	files: ReviewFileSummary[];
 	viewMode: ChangesViewMode;
 }) {
-	const visibleFiles = files.filter((file) => file.additions || file.deletions);
+	// Binary and empty untracked files report 0/0 lines but are still changes.
+	const visibleFiles = files.filter(
+		(file) => file.additions || file.deletions || file.status !== 'modified',
+	);
 
 	return (
 		<ScrollArea className='h-full'>
 			<div className='flex flex-col gap-1 p-3'>
-				{visibleFiles.length ? (
+				{error ? (
+					<div className='rounded-md border border-status-danger/40 bg-pane px-3 py-4 text-status-danger text-xs leading-5'>
+						Could not read workspace changes: {error}
+					</div>
+				) : visibleFiles.length ? (
 					viewMode === 'folders' ? (
 						<ReviewFileTree files={visibleFiles} />
 					) : (
@@ -51,7 +61,8 @@ export function ReviewFileList({
 					)
 				) : (
 					<div className='rounded-md border border-border bg-pane px-3 py-4 text-muted-foreground text-xs leading-5'>
-						File state will appear here when the Git workspace service is wired.
+						No changes in this workspace yet. Edits made by Pi or in your editor
+						will appear here.
 					</div>
 				)}
 			</div>
@@ -209,10 +220,16 @@ function ReviewFileButton({
 	showPath: boolean;
 }) {
 	const fileName = getReviewFileName(file.path);
+	const openWorkspaceFileDiff = useWorkspaceFileDiffOpener();
 
 	return (
 		<Button
 			aria-label={`Open ${file.path} diff`}
+			onClick={
+				openWorkspaceFileDiff
+					? () => openWorkspaceFileDiff(file.path)
+					: undefined
+			}
 			className={cn(
 				'grid h-auto w-full grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-md px-2 py-1.5 font-normal',
 				reviewFileIndentClassName(level),

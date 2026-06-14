@@ -30,6 +30,9 @@ export interface SessionTabActions {
 		label: string;
 		turnId: string;
 	}) => Promise<{ chatTabId: string } | null>;
+	openWorkspaceFileDiffTab: (input: {
+		filePath: string;
+	}) => Promise<{ chatTabId: string } | null>;
 	closeSessionTabAsync: (
 		chatTabId: string,
 	) => Promise<{ replacementChatTabId: string | null }>;

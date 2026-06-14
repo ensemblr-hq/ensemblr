@@ -86,19 +86,29 @@ export function createEnsembleApi(): EnsembleApi {
 		bindPiSessionToChatTab: (request) =>
 			invoke('bindPiSessionToChatTab', request),
 		closeChatTab: (request) => invoke('closeChatTab', request),
+		commitWorkspaceChanges: (request) =>
+			invoke('commitWorkspaceChanges', request),
 		computeTurnDiff: (request) => invoke('computeTurnDiff', request),
 		confirmRootDirectoryChange: (request) =>
 			invoke('confirmRootDirectoryChange', request),
+		createPullRequest: (request) => invoke('createPullRequest', request),
 		createTerminalSession: (request) =>
 			invoke('createTerminalSession', request),
 		createWorkspace: (request) => invoke('createWorkspace', request),
 		deleteArchivedWorkspace: (request) =>
 			invoke('deleteArchivedWorkspace', request),
 		deleteRepository: (request) => invoke('deleteRepository', request),
+		deleteReviewComment: (request) => invoke('deleteReviewComment', request),
+		deleteReviewTodo: (request) => invoke('deleteReviewTodo', request),
 		deleteWorkspace: (request) => invoke('deleteWorkspace', request),
 		ensureWindowWidth: (minimumWidth) =>
 			invoke('ensureWindowWidth', minimumWidth),
 		environmentVariables: () => invoke('environmentVariables'),
+		getPullRequestSnapshot: (request) =>
+			invoke('getPullRequestSnapshot', request),
+		getWorkspaceFileDiff: (request) => invoke('getWorkspaceFileDiff', request),
+		getWorkspaceGitStatus: (request) =>
+			invoke('getWorkspaceGitStatus', request),
 		githubRepositoryList: () => invoke('githubRepositoryList'),
 		health: () => invoke('health'),
 		killTerminalSession: (request) => invoke('killTerminalSession', request),
@@ -123,7 +133,10 @@ export function createEnsembleApi(): EnsembleApi {
 		listPiSlashCommands: (request) => invoke('listPiSlashCommands', request),
 		listTurnCheckpoints: (request) => invoke('listTurnCheckpoints', request),
 		listTerminalSessions: (request) => invoke('listTerminalSessions', request),
+		listReviewComments: (request) => invoke('listReviewComments', request),
+		listReviewTodos: (request) => invoke('listReviewTodos', request),
 		listWorkspaceFiles: (request) => invoke('listWorkspaceFiles', request),
+		mergePullRequest: (request) => invoke('mergePullRequest', request),
 		onCloneGithubRepositoryProgress: (listener) =>
 			subscribe<CloneGithubRepositoryProgressEvent>(
 				IPC_CHANNELS.cloneGithubRepositoryProgress,
@@ -146,6 +159,7 @@ export function createEnsembleApi(): EnsembleApi {
 			invoke('prepareCloneGithubRepository', request),
 		previewRepositoryConfigMigration: (request) =>
 			invoke('previewRepositoryConfigMigration', request),
+		pushWorkspaceBranch: (request) => invoke('pushWorkspaceBranch', request),
 		quickStartProject: (request) => invoke('quickStartProject', request),
 		readWorkspaceFile: (request) => invoke('readWorkspaceFile', request),
 		registerLocalRepository: (request) =>
@@ -161,6 +175,8 @@ export function createEnsembleApi(): EnsembleApi {
 		restoreCheckpoint: (request) => invoke('restoreCheckpoint', request),
 		rootDirectory: () => invoke('rootDirectory'),
 		runWorkspaceScript: (request) => invoke('runWorkspaceScript', request),
+		saveReviewComment: (request) => invoke('saveReviewComment', request),
+		saveReviewTodo: (request) => invoke('saveReviewTodo', request),
 		selectCloneDestination: () => invoke('selectCloneDestination'),
 		selectLocalRepository: () => invoke('selectLocalRepository'),
 		selectPiExecutable: () => invoke('selectPiExecutable'),

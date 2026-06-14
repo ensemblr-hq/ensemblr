@@ -1,6 +1,18 @@
-import { GitMergeIcon, LoaderCircleIcon, MoreVerticalIcon } from 'lucide-react';
+import {
+	ExternalLinkIcon,
+	GitMergeIcon,
+	LoaderCircleIcon,
+	MoreVerticalIcon,
+	RefreshCwIcon,
+} from 'lucide-react';
 
 import { Button } from '@/renderer/components/ui/button';
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from '@/renderer/components/ui/dropdown-menu';
 import { cn } from '@/renderer/lib/utils';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import {
@@ -9,6 +21,7 @@ import {
 	getPermissionBoundaryLabel,
 } from '@/shared/permissions';
 
+import { useReviewActions } from '../review-actions/review-actions-context';
 import { CreatePullRequestMenu } from './create-pull-request-menu';
 import { PreviewDeploymentButton } from './preview-deployment-button';
 import { PullRequestNumberButton } from './pull-request-number-button';
@@ -86,12 +99,15 @@ function RightSidebarHeaderAction({
 }: {
 	headerState: RightSidebarHeaderState;
 }) {
+	const reviewActions = useReviewActions();
+
 	switch (headerState.kind) {
 		case 'pr-ready':
 			return (
 				<Button
 					className='h-7 rounded-md bg-status-ok px-2.5 text-primary-foreground hover:bg-status-ok/90'
 					data-permission-boundary={mergeBoundary.boundary}
+					onClick={reviewActions?.openMergeConfirmation}
 					size='sm'
 				>
 					<GitMergeIcon data-icon='inline-start' />
@@ -117,10 +133,37 @@ function RightSidebarHeaderAction({
 		case 'pr-blocked':
 		case 'pr-open':
 			return (
-				<Button size='icon-sm' variant='ghost'>
-					<MoreVerticalIcon />
-					<span className='sr-only'>Open pull request menu</span>
-				</Button>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button size='icon-sm' variant='ghost'>
+							<MoreVerticalIcon />
+							<span className='sr-only'>Open pull request menu</span>
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align='end'>
+						<DropdownMenuItem
+							disabled={reviewActions?.isRefreshingPullRequest}
+							onSelect={() => reviewActions?.refreshPullRequest()}
+						>
+							<RefreshCwIcon aria-hidden='true' />
+							Refresh PR status
+						</DropdownMenuItem>
+						{headerState.url ? (
+							<DropdownMenuItem asChild>
+								<a href={headerState.url} rel='noreferrer' target='_blank'>
+									<ExternalLinkIcon aria-hidden='true' />
+									Open on GitHub
+								</a>
+							</DropdownMenuItem>
+						) : null}
+						<DropdownMenuItem
+							onSelect={() => reviewActions?.openMergeConfirmation()}
+						>
+							<GitMergeIcon aria-hidden='true' />
+							Merge…
+						</DropdownMenuItem>
+					</DropdownMenuContent>
+				</DropdownMenu>
 			);
 		case 'empty':
 			return null;

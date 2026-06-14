@@ -13,10 +13,11 @@ import {
 	useKeymapHandler,
 } from '@/renderer/hooks/use-keymap-handler';
 import {
-	formatAttachedFileSection,
 	formatMentionAttachmentText,
+	formatUploadAttachmentText,
 } from '@/renderer/lib/workbench/mention-payload';
 import { useComposerAttachmentInbox } from '@/renderer/state/composer-attachments';
+import { useComposerInsertConsumer } from '@/renderer/state/composer-insert';
 import type {
 	ComposerShellState,
 	WorkspaceFileSummary,
@@ -174,6 +175,9 @@ export function useComposerState({
 		);
 		textareaRef.current?.focus();
 	}, []);
+
+	// Drain review-context insertions queued from the Checks panel / diff views.
+	useComposerInsertConsumer(insertText);
 
 	// Seed the composer once per mount for issue-created workspaces. Only an
 	// untouched composer is seeded so user input is never overwritten.
@@ -497,26 +501,3 @@ export function useComposerState({
 	};
 }
 
-/**
- * Reads each uploaded file as text and wraps it in the shared
- * `<attached_file>` envelope so Pi receives uploads alongside @ mentions.
- * Falls back to a `[binary]` placeholder if a file cannot be decoded as text.
- */
-async function formatUploadAttachmentText(
-	uploads: readonly File[],
-): Promise<string> {
-	if (uploads.length === 0) {
-		return '';
-	}
-	const sections: string[] = [];
-	for (const file of uploads) {
-		let content: string;
-		try {
-			content = await file.text();
-		} catch {
-			content = '[binary upload — content could not be decoded as text]';
-		}
-		sections.push(formatAttachedFileSection(file.name, content));
-	}
-	return sections.join('\n\n');
-}

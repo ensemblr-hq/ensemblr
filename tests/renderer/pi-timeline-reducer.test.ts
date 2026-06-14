@@ -19,7 +19,7 @@ import type { PiCapturedLine } from '../../src/shared/pi-rpc';
 import { piCapturedLineSchema } from '../../src/shared/pi-rpc';
 
 const FIXTURE_DIR = new URL(
-	'../../src/renderer/fixtures/pi-captures',
+	'../fixtures/pi-captures',
 	import.meta.url,
 ).pathname;
 

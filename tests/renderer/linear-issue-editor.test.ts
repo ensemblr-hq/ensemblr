@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { createLinearIssueFixture } from '../../src/renderer/fixtures/linear';
+import { createLinearIssueFixture } from '../fixtures/linear';
 import {
 	buildCreateIssueRequest,
 	buildUpdateIssueRequest,

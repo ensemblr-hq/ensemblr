@@ -11,6 +11,7 @@ import type {
 	GithubCloneService,
 	GithubRepositoryListService,
 } from '../../repository';
+import type { WithPermissionGate } from '../permission-gate.ts';
 import {
 	parseCloneGithubRepositoryRequest,
 	parseCloneGithubRepositoryStartRequest,
@@ -21,6 +22,7 @@ import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 export interface CloneHandlersOptions {
 	githubCloneService: GithubCloneService;
 	githubRepositoryListService: GithubRepositoryListService;
+	withPermissionGate: WithPermissionGate;
 }
 
 /**
@@ -31,6 +33,7 @@ export interface CloneHandlersOptions {
 export function registerCloneHandlers({
 	githubCloneService,
 	githubRepositoryListService,
+	withPermissionGate,
 }: CloneHandlersOptions): void {
 	ipcMain.handle(
 		IPC_CHANNELS.githubRepositoryList,
@@ -60,8 +63,9 @@ export function registerCloneHandlers({
 		},
 	);
 
-	ipcMain.handle(
+	withPermissionGate(
 		IPC_CHANNELS.cloneGithubRepositoryStart,
+		'outside-workspace-write',
 		(event, request: unknown): Promise<CloneGithubRepositoryStartResult> => {
 			const normalized = parseCloneGithubRepositoryStartRequest(request);
 			return githubCloneService.start(normalized, {

@@ -9,7 +9,7 @@ import {
 	collapsedProjectIdsAtom,
 	orderedProjectIdsAtom,
 	pinnedWorkspaceIdsAtom,
-} from './atoms';
+} from './structure-atoms';
 
 /**
  * Re-orders a list of `{ id }` items to match the React element key order

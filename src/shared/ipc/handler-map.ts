@@ -40,6 +40,18 @@ import type {
 	GithubRepositoryListResult,
 } from './contracts/clone';
 import type { EnvironmentVariablesSnapshot } from './contracts/environment';
+import type {
+	CommitWorkspaceChangesRequest,
+	CommitWorkspaceChangesResult,
+	CreatePullRequestRequest,
+	CreatePullRequestResult,
+	GetPullRequestSnapshotRequest,
+	GetPullRequestSnapshotResult,
+	MergePullRequestRequest,
+	MergePullRequestResult,
+	PushWorkspaceBranchRequest,
+	PushWorkspaceBranchResult,
+} from './contracts/github';
 import type { HealthSnapshot } from './contracts/health';
 import type {
 	CreateLinearCommentRequest,
@@ -102,6 +114,20 @@ import type {
 	RepositoryWorkspaceNavigationSnapshot,
 } from './contracts/repository-navigation';
 import type {
+	DeleteReviewCommentRequest,
+	DeleteReviewCommentResult,
+	DeleteReviewTodoRequest,
+	DeleteReviewTodoResult,
+	ListReviewCommentsRequest,
+	ListReviewCommentsResult,
+	ListReviewTodosRequest,
+	ListReviewTodosResult,
+	SaveReviewCommentRequest,
+	SaveReviewCommentResult,
+	SaveReviewTodoRequest,
+	SaveReviewTodoResult,
+} from './contracts/review-comments';
+import type {
 	RootDirectoryChangeApplyResult,
 	RootDirectoryChangeRequest,
 	RootDirectorySelectionResult,
@@ -149,6 +175,12 @@ import type {
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
 } from './contracts/workspace-files';
+import type {
+	GetWorkspaceFileDiffRequest,
+	GetWorkspaceFileDiffResult,
+	GetWorkspaceGitStatusRequest,
+	GetWorkspaceGitStatusResult,
+} from './contracts/workspace-git';
 import type {
 	RunWorkspaceScriptRequest,
 	RunWorkspaceScriptResult,
@@ -222,6 +254,14 @@ export interface IpcHandlerMap {
 		DeleteRepositoryRequest,
 		DeleteRepositoryResult
 	>;
+	[IPC_CHANNELS.deleteReviewComment]: IpcHandlerEntry<
+		DeleteReviewCommentRequest,
+		DeleteReviewCommentResult
+	>;
+	[IPC_CHANNELS.deleteReviewTodo]: IpcHandlerEntry<
+		DeleteReviewTodoRequest,
+		DeleteReviewTodoResult
+	>;
 	[IPC_CHANNELS.deleteWorkspace]: IpcHandlerEntry<
 		DeleteWorkspaceRequest,
 		DeleteWorkspaceResult
@@ -230,6 +270,34 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.environmentVariables]: IpcHandlerEntry<
 		void,
 		EnvironmentVariablesSnapshot
+	>;
+	[IPC_CHANNELS.commitWorkspaceChanges]: IpcHandlerEntry<
+		CommitWorkspaceChangesRequest,
+		CommitWorkspaceChangesResult
+	>;
+	[IPC_CHANNELS.createPullRequest]: IpcHandlerEntry<
+		CreatePullRequestRequest,
+		CreatePullRequestResult
+	>;
+	[IPC_CHANNELS.getPullRequestSnapshot]: IpcHandlerEntry<
+		GetPullRequestSnapshotRequest,
+		GetPullRequestSnapshotResult
+	>;
+	[IPC_CHANNELS.mergePullRequest]: IpcHandlerEntry<
+		MergePullRequestRequest,
+		MergePullRequestResult
+	>;
+	[IPC_CHANNELS.pushWorkspaceBranch]: IpcHandlerEntry<
+		PushWorkspaceBranchRequest,
+		PushWorkspaceBranchResult
+	>;
+	[IPC_CHANNELS.getWorkspaceFileDiff]: IpcHandlerEntry<
+		GetWorkspaceFileDiffRequest,
+		GetWorkspaceFileDiffResult
+	>;
+	[IPC_CHANNELS.getWorkspaceGitStatus]: IpcHandlerEntry<
+		GetWorkspaceGitStatusRequest,
+		GetWorkspaceGitStatusResult
 	>;
 	[IPC_CHANNELS.githubRepositoryList]: IpcHandlerEntry<
 		void,
@@ -303,6 +371,14 @@ export interface IpcHandlerMap {
 		ListPiSlashCommandsRequest | undefined,
 		ListPiSlashCommandsResult
 	>;
+	[IPC_CHANNELS.listReviewComments]: IpcHandlerEntry<
+		ListReviewCommentsRequest,
+		ListReviewCommentsResult
+	>;
+	[IPC_CHANNELS.listReviewTodos]: IpcHandlerEntry<
+		ListReviewTodosRequest,
+		ListReviewTodosResult
+	>;
 	[IPC_CHANNELS.listTerminalSessions]: IpcHandlerEntry<
 		ListTerminalSessionsRequest,
 		ListTerminalSessionsResult
@@ -361,6 +437,14 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.runWorkspaceScript]: IpcHandlerEntry<
 		RunWorkspaceScriptRequest,
 		RunWorkspaceScriptResult
+	>;
+	[IPC_CHANNELS.saveReviewComment]: IpcHandlerEntry<
+		SaveReviewCommentRequest,
+		SaveReviewCommentResult
+	>;
+	[IPC_CHANNELS.saveReviewTodo]: IpcHandlerEntry<
+		SaveReviewTodoRequest,
+		SaveReviewTodoResult
 	>;
 	[IPC_CHANNELS.selectCloneDestination]: IpcHandlerEntry<
 		void,
