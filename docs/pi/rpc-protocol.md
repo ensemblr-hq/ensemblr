@@ -3,7 +3,7 @@
 Phase 0 protocol discovery for the conversation timeline UI. Every fact below
 cites the source it was read from. Facts marked `OBSERVED` were not stated in
 docs and must be confirmed against the Phase 1 captures in
-`src/renderer/fixtures/pi-captures/`.
+`tests/fixtures/pi-captures/`.
 
 Sources inspected (pi `0.79.1`, installed at
 `~/.bun/install/global/node_modules/@earendil-works/pi-coding-agent`):

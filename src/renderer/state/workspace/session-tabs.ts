@@ -71,6 +71,9 @@ export function useSessionTabState({
 		label: string;
 		turnId: string;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
+	openWorkspaceFileDiffTab: (input: {
+		filePath: string;
+	}) => Promise<OpenSessionTabHandlerResult | null>;
 	closeSessionTabAsync: (
 		chatTabId: string,
 	) => Promise<CloseSessionTabHandlerResult>;
@@ -306,6 +309,28 @@ export function useSessionTabState({
 		[openAuxiliaryTabMutation],
 	);
 
+	/** Opens (or re-focuses) a working-tree diff tab for a changed file. */
+	const openWorkspaceFileDiffTab = useCallback(
+		async ({
+			filePath,
+		}: {
+			filePath: string;
+		}): Promise<OpenSessionTabHandlerResult | null> => {
+			try {
+				const result = await openAuxiliaryTabMutation.mutateAsync({
+					kind: 'diff',
+					metadata: { filePath },
+					title: `Diff: ${basenameOf(filePath)}`,
+				});
+				return result.tab ? { chatTabId: result.tab.id } : null;
+			} catch {
+				// Surfaced as a toast by the mutation; callers treat as no-op.
+				return null;
+			}
+		},
+		[openAuxiliaryTabMutation],
+	);
+
 	const closeSessionTabAsync = useCallback(
 		async (chatTabId: string): Promise<CloseSessionTabHandlerResult> => {
 			await closeMutation.mutateAsync(chatTabId);
@@ -364,6 +389,7 @@ export function useSessionTabState({
 		openFilePreviewTab,
 		openSessionTab,
 		openTurnDiffTab,
+		openWorkspaceFileDiffTab,
 		restoreSessionTab,
 		sessionTabs,
 	};
@@ -397,8 +423,10 @@ function toSessionTabModel(
 	} as const;
 	if (tab.kind === 'diff') {
 		const turnId = tab.metadata.turnId;
+		const filePath = tab.metadata.filePath;
 		return {
 			...base,
+			filePath: typeof filePath === 'string' ? filePath : null,
 			kind: 'diff',
 			turnId: typeof turnId === 'string' ? turnId : null,
 		};

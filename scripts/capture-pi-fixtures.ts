@@ -4,7 +4,7 @@
  * Spawns `pi --mode rpc` inside a throwaway seeded sandbox project (one per
  * scenario, under `.pi-capture-sandbox/`, gitignored), drives each scenario,
  * and writes every stdout/stderr line verbatim to
- * `src/renderer/fixtures/pi-captures/<scenario>.jsonl` as
+ * `tests/fixtures/pi-captures/<scenario>.jsonl` as
  * `{"ts":<ms>,"stream":"stdout"|"stderr","raw":"<line>"}` plus a
  * `<scenario>.meta.json` sidecar recording the exact commands sent and exit
  * conditions. Raw lines are written before any parsing so fixtures stay
@@ -23,7 +23,7 @@ import { join } from 'node:path';
 
 const REPO_ROOT = new URL('..', import.meta.url).pathname;
 const SANDBOX_ROOT = join(REPO_ROOT, '.pi-capture-sandbox');
-const FIXTURE_DIR = join(REPO_ROOT, 'src/renderer/fixtures/pi-captures');
+const FIXTURE_DIR = join(REPO_ROOT, 'tests/fixtures/pi-captures');
 const DEFAULT_STEP_TIMEOUT_MS = 240_000;
 /** Stable stand-in for the machine-local sandbox root in committed fixtures. */
 const SANDBOX_PLACEHOLDER = '/sandbox';

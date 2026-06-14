@@ -4,7 +4,7 @@ import {
 	createLinearConnectionFixture,
 	createLinearFailureFixture,
 	createLinearIssueFixture,
-} from '../../src/renderer/fixtures/linear';
+} from '../fixtures/linear';
 import {
 	deriveLinearGateState,
 	describeLinearFailure,

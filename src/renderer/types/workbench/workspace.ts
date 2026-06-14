@@ -85,14 +85,19 @@ export interface PullRequestCheckSummary {
 }
 
 export interface PullRequestCommentSummary {
+	author?: string;
 	detail: string;
 	id: string;
-	provider: 'github-actions' | 'linear';
+	/** Resolution state for GitHub review threads; absent when not applicable. */
+	isResolved?: boolean | null;
+	provider: 'github' | 'github-actions' | 'linear' | 'local';
+	url?: string;
 }
 
 export interface PullRequestTodoSummary {
 	id: string;
 	label: string;
+	status?: 'done' | 'open';
 }
 
 export interface PullRequestPreviewDeploymentSummary {
@@ -132,7 +137,11 @@ interface SessionTabBase {
  */
 export type SessionTabModel =
 	| (SessionTabBase & { filePath?: null; kind?: 'chat'; turnId?: null })
-	| (SessionTabBase & { filePath?: null; kind: 'diff'; turnId: string | null })
+	| (SessionTabBase & {
+			filePath: string | null;
+			kind: 'diff';
+			turnId: string | null;
+	  })
 	| (SessionTabBase & {
 			filePath: string | null;
 			kind: 'document' | 'file' | 'preview';
@@ -301,11 +310,17 @@ export interface WorkspaceShellModel {
 		number?: number;
 		previewDeployment?: PullRequestPreviewDeploymentSummary;
 		status: PullRequestShellStatus;
+		/** Last refresh error from the gh metadata service, when one occurred. */
+		syncError?: string;
+		/** ISO timestamp of the last successful gh snapshot refresh. */
+		syncedAt?: string;
 		title: string;
 		todos: PullRequestTodoSummary[];
 		url?: string;
 	};
 	reviewFiles: ReviewFileSummary[];
+	/** Error surfaced when live git status could not be read for the worktree. */
+	reviewFilesError?: string;
 	scripts: {
 		run: WorkspaceScriptSummary;
 		setup: WorkspaceScriptSummary;

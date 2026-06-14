@@ -22,15 +22,19 @@ import {
 	PopoverTrigger,
 } from '@/renderer/components/ui/popover';
 
+import { useReviewActions } from '../review-actions/review-actions-context';
+
 /** Split-button + popover surfacing PR creation actions. */
 export function CreatePullRequestMenu() {
 	const [isOpen, setIsOpen] = useState(false);
 	const closeMenu = () => setIsOpen(false);
+	const reviewActions = useReviewActions();
 
 	return (
 		<div className='flex h-7 shrink-0 items-center overflow-hidden rounded-md border border-border bg-background'>
 			<Button
 				className='h-7 rounded-none border-0 bg-transparent px-2.5'
+				onClick={() => reviewActions?.openCreatePullRequest()}
 				size='sm'
 				variant='ghost'
 			>
@@ -59,7 +63,13 @@ export function CreatePullRequestMenu() {
 						<CommandList>
 							<CommandEmpty>No PR actions found.</CommandEmpty>
 							<CommandGroup heading='Pull request'>
-								<CommandItem onSelect={closeMenu} value='create draft pr'>
+								<CommandItem
+									onSelect={() => {
+										closeMenu();
+										reviewActions?.openCreatePullRequest({ draft: true });
+									}}
+									value='create draft pr'
+								>
 									<GitPullRequestDraftIcon aria-hidden='true' />
 									<span>Create draft PR</span>
 									<CommandShortcut>Draft</CommandShortcut>

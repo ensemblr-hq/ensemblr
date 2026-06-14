@@ -85,3 +85,27 @@ export async function formatMentionAttachmentText({
 
 	return sections.join('\n\n');
 }
+
+/**
+ * Reads each uploaded file as text and wraps it in the shared `<attached_file>`
+ * envelope so Pi receives uploads alongside @ mentions. Falls back to a
+ * `[binary]` placeholder if a file cannot be decoded as text.
+ */
+export async function formatUploadAttachmentText(
+	uploads: readonly File[],
+): Promise<string> {
+	if (uploads.length === 0) {
+		return '';
+	}
+	const sections: string[] = [];
+	for (const file of uploads) {
+		let content: string;
+		try {
+			content = await file.text();
+		} catch {
+			content = '[binary upload — content could not be decoded as text]';
+		}
+		sections.push(formatAttachedFileSection(file.name, content));
+	}
+	return sections.join('\n\n');
+}

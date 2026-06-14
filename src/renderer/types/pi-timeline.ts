@@ -4,7 +4,7 @@
  * into growing items, tool calls carry a lifecycle status, consecutive tool
  * calls group, and noise frames never become items (they only update
  * `PiTimelineSessionMeta`). Derived from the fixture matrix in
- * `src/renderer/fixtures/pi-captures/` — see `docs/pi/event-taxonomy.md`.
+ * `tests/fixtures/pi-captures/` — see `docs/pi/event-taxonomy.md`.
  */
 
 import type { PiSessionStats } from '@/shared/pi-rpc';

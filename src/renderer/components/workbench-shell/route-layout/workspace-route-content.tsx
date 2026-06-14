@@ -1,17 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate } from '@tanstack/react-router';
-import { useCallback, useMemo } from 'react';
-import {
-	workspaceFilesQuery,
-	workspaceScriptSettingsQuery,
-} from '@/renderer/api/ensemble-queries';
+import { useCallback } from 'react';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
-import {
-	buildWorkspaceScriptSummaries,
-	scriptSummaryToDockStatus,
-} from '@/renderer/lib/terminal/script-summaries';
-import { mapTerminalSessionsToDockTabs } from '@/renderer/lib/terminal/terminal-tabs';
 import type { WorkspaceNavigationSelection } from '@/renderer/lib/workbench';
 import {
 	createPlaceholderSession,
@@ -31,6 +21,7 @@ import type {
 } from '@/renderer/types/workbench';
 
 import { WorkspaceMainContentProvider } from '../shell-contexts';
+import { useLiveWorkspaceModel } from './use-live-workspace-model';
 
 /** Workspace shell content — wires panel tabs, composer state, and navigation. */
 export function WorkspaceRouteContent({
@@ -76,39 +67,8 @@ export function WorkspaceRouteContent({
 	});
 	const activeSession = sessionNavigation.effectiveActiveSession;
 	const terminalSessions = useWorkspaceTerminalSessions(activeWorkspace.id);
-	const scriptSettingsQueryState = useQuery(
-		workspaceScriptSettingsQuery({
-			repositoryId: activeProject.id,
-			repositoryPath: activeProject.pathLabel,
-		}),
-	);
-	const workspaceWithLiveDockTabs = useMemo<typeof activeWorkspace>(() => {
-		const scripts = buildWorkspaceScriptSummaries({
-			sessions: terminalSessions.sessions,
-			settings: scriptSettingsQueryState.data ?? null,
-		});
-
-		return {
-			...activeWorkspace,
-			dockTabs: [
-				...activeWorkspace.dockTabs
-					.filter((tab) => tab.kind !== 'terminal')
-					.map((tab) =>
-						tab.kind === 'setup-script'
-							? { ...tab, status: scriptSummaryToDockStatus(scripts.setup) }
-							: tab.kind === 'run-script'
-								? { ...tab, status: scriptSummaryToDockStatus(scripts.run) }
-								: tab,
-					),
-				...mapTerminalSessionsToDockTabs(terminalSessions.sessions),
-			],
-			scripts,
-		};
-	}, [
-		activeWorkspace,
-		scriptSettingsQueryState.data,
-		terminalSessions.sessions,
-	]);
+	const { liveWorkspaceFiles, workspaceWithLiveDockTabs } =
+		useLiveWorkspaceModel({ activeProject, activeWorkspace, terminalSessions });
 	// Tab preference validation must see the LIVE dock tabs (terminal:<id>),
 	// not the placeholder model, or terminal tab clicks bounce back to setup.
 	const panelTabs = useWorkspacePanelTabState({
@@ -119,24 +79,6 @@ export function WorkspaceRouteContent({
 	const activeReviewTab = panelTabs.activeReviewTab;
 	const activeDockTab = panelTabs.activeDockTab;
 	const { state: setupDiagnosticsState } = useSetupDiagnostics();
-	const workspaceFilesQueryState = useQuery(
-		workspaceFilesQuery(activeWorkspace.pathLabel ?? null),
-	);
-	const remoteWorkspaceFiles = useMemo(
-		() => workspaceFilesQueryState.data?.files ?? [],
-		[workspaceFilesQueryState.data?.files],
-	);
-	const mergedWorkspaceFiles = useMemo(() => {
-		if (remoteWorkspaceFiles.length === 0) {
-			return activeWorkspace.workspaceFiles;
-		}
-		return remoteWorkspaceFiles.map((entry) => ({
-			id: `wsfile:${entry.path}`,
-			kind: entry.kind,
-			name: entry.name,
-			path: entry.path,
-		}));
-	}, [remoteWorkspaceFiles, activeWorkspace.workspaceFiles]);
 	const piComposer = usePiComposerController({
 		chatTabId: activeSession.chatTabId,
 		currentPiSessionId: activeSession.piSessionId,
@@ -159,7 +101,7 @@ export function WorkspaceRouteContent({
 		setupError: setupDiagnosticsState.setupDiagnosticsError,
 		thinkingLevel: piComposer.thinkingLevel,
 		workspaceCwd: activeWorkspace.pathLabel,
-		workspaceFiles: mergedWorkspaceFiles,
+		workspaceFiles: liveWorkspaceFiles,
 	});
 	const dockActions = useWorkspaceDockActions({
 		activeDockTab,

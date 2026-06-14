@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import { type ComponentType, useCallback } from 'react';
 
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
@@ -7,7 +7,12 @@ import type {
 	SessionTabState,
 	WorkbenchShellProps,
 } from '@/renderer/types/workbench-shell';
+import {
+	ReviewFilePreviewOpenerProvider,
+	WorkspaceFileDiffOpenerProvider,
+} from './conversation-panel/file-preview-context';
 import { WorkbenchPanelLayout } from './panel-layout';
+import { ReviewActionsProvider } from './review-actions/review-actions-provider';
 import { WorkbenchLayoutProvider } from './shell-contexts';
 import { useDockController } from './use-dock-controller';
 import { useRightSidebarController } from './use-right-sidebar-controller';
@@ -48,6 +53,27 @@ export function WorkspaceWorkbenchContent({
 
 	const rightSidebar = useRightSidebarController();
 	const dock = useDockController();
+	const { openWorkspaceFileDiffTab, openFilePreviewTab } = sessionNavigation;
+	const openWorkspaceFileDiff = useCallback(
+		(filePath: string) => {
+			void openWorkspaceFileDiffTab({ filePath }).then((result) => {
+				if (result) {
+					onSessionTabChange(result.chatTabId);
+				}
+			});
+		},
+		[onSessionTabChange, openWorkspaceFileDiffTab],
+	);
+	const openReviewFilePreview = useCallback(
+		(filePath: string) => {
+			void openFilePreviewTab({ filePath }).then((result) => {
+				if (result) {
+					onSessionTabChange(result.chatTabId);
+				}
+			});
+		},
+		[onSessionTabChange, openFilePreviewTab],
+	);
 	const mainContentState: WorkspaceMainContentState = {
 		activeSession: sessionNavigation.effectiveActiveSession,
 		activeWorkspace,
@@ -83,16 +109,25 @@ export function WorkspaceWorkbenchContent({
 				},
 			}}
 		>
-			<WorkbenchPanelLayout
+			<ReviewActionsProvider
 				activeProject={activeProject}
-				activeReviewTab={activeReviewTab}
 				activeWorkspace={activeWorkspace}
-				dockActions={dockActions}
-				dockTabId={dockTabId}
-				mainContent={<MainContent {...mainContentState} />}
-				onDockTabChange={onDockTabChange}
-				onReviewTabChange={onReviewTabChange}
-			/>
+			>
+				<WorkspaceFileDiffOpenerProvider value={openWorkspaceFileDiff}>
+					<ReviewFilePreviewOpenerProvider value={openReviewFilePreview}>
+						<WorkbenchPanelLayout
+							activeProject={activeProject}
+							activeReviewTab={activeReviewTab}
+							activeWorkspace={activeWorkspace}
+							dockActions={dockActions}
+							dockTabId={dockTabId}
+							mainContent={<MainContent {...mainContentState} />}
+							onDockTabChange={onDockTabChange}
+							onReviewTabChange={onReviewTabChange}
+						/>
+					</ReviewFilePreviewOpenerProvider>
+				</WorkspaceFileDiffOpenerProvider>
+			</ReviewActionsProvider>
 		</WorkbenchLayoutProvider>
 	);
 }

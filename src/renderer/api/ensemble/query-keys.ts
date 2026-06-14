@@ -2,6 +2,8 @@ import type { EnsembleApi } from '@/shared/ipc';
 
 /** Hierarchical TanStack Query keys for every Ensemble IPC-backed query. */
 export const ensembleQueryKeys = {
+	agentActionTemplates: (repositoryId: string) =>
+		[...ensembleQueryKeys.all, 'agent-action-templates', repositoryId] as const,
 	all: ['ensemble'] as const,
 	archivedWorkspaces: (repositoryId: string) =>
 		[...ensembleQueryKeys.all, 'archived-workspaces', repositoryId] as const,
@@ -43,6 +45,14 @@ export const ensembleQueryKeys = {
 		[...ensembleQueryKeys.all, 'pi-session-events', branchId] as const,
 	piSessionsForWorkspace: (workspaceId: string) =>
 		[...ensembleQueryKeys.all, 'pi-sessions', workspaceId] as const,
+	pullRequestSnapshot: (workspaceId: string) =>
+		[...ensembleQueryKeys.all, 'pull-request-snapshot', workspaceId] as const,
+	reviewComments: (workspaceId: string) =>
+		[...ensembleQueryKeys.all, 'review-comments', workspaceId] as const,
+	reviewMergeSettings: (repositoryId: string) =>
+		[...ensembleQueryKeys.all, 'review-merge-settings', repositoryId] as const,
+	reviewTodos: (workspaceId: string) =>
+		[...ensembleQueryKeys.all, 'review-todos', workspaceId] as const,
 	turnDiff: (turnId: string) =>
 		[...ensembleQueryKeys.all, 'turn-diff', turnId] as const,
 	repositoryWorkspaceNavigation: () =>
@@ -50,8 +60,17 @@ export const ensembleQueryKeys = {
 	rootDirectory: () => [...ensembleQueryKeys.all, 'root-directory'] as const,
 	setupDiagnostics: () =>
 		[...ensembleQueryKeys.all, 'setup-diagnostics'] as const,
+	workspaceFileDiff: (workspaceCwd: string, filePath: string) =>
+		[
+			...ensembleQueryKeys.all,
+			'workspace-file-diff',
+			workspaceCwd,
+			filePath,
+		] as const,
 	workspaceFiles: (workspaceCwd: string) =>
 		[...ensembleQueryKeys.all, 'workspace-files', workspaceCwd] as const,
+	workspaceGitStatus: (workspaceCwd: string) =>
+		[...ensembleQueryKeys.all, 'workspace-git-status', workspaceCwd] as const,
 	workspaceScriptSettings: (repositoryId: string) =>
 		[
 			...ensembleQueryKeys.all,
