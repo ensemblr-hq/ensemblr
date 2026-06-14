@@ -21,13 +21,15 @@ export function useComposerAttachmentInbox(chatTabId: string): {
 	clear: () => void;
 } {
 	const [all, setAll] = useAtom(pendingComposerAttachmentsAtom);
-	const pending = useMemo(
-		() =>
-			all
-				.filter((entry) => entry.chatTabId === chatTabId)
-				.map((entry) => entry.file),
-		[all, chatTabId],
-	);
+	const pending = useMemo(() => {
+		const files: WorkspaceFileSummary[] = [];
+		for (const entry of all) {
+			if (entry.chatTabId === chatTabId) {
+				files.push(entry.file);
+			}
+		}
+		return files;
+	}, [all, chatTabId]);
 	const clear = useCallback(() => {
 		setAll((prev) => prev.filter((entry) => entry.chatTabId !== chatTabId));
 	}, [chatTabId, setAll]);

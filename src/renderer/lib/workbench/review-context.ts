@@ -92,8 +92,3 @@ export function formatFileDiffContext({
 		].join('\n'),
 	);
 }
-
-/** Formats a selected file reference for Pi context. */
-export function formatFileReferenceContext(filePath: string): string {
-	return `Please look at \`${filePath}\` in this workspace.`;
-}

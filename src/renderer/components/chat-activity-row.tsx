@@ -14,7 +14,7 @@ import { useFilePreviewOpener } from './workbench-shell/conversation-panel/file-
  * still producing text/tool calls. Once a final response arrives, the parent
  * collapses the whole group into a single summary chip.
  */
-export function ChatActivityRow({
+function ChatActivityRow({
 	chip,
 	className,
 	detail,

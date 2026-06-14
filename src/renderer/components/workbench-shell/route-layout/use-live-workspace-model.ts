@@ -41,31 +41,33 @@ export function useLiveWorkspaceModel({
 	liveWorkspaceFiles: ActiveWorkspace['workspaceFiles'];
 	workspaceWithLiveDockTabs: ActiveWorkspace;
 } {
-	const scriptSettingsQueryState = useQuery(
+	const { data: scriptSettingsData } = useQuery(
 		workspaceScriptSettingsQuery({
 			repositoryId: activeProject.id,
 			repositoryPath: activeProject.pathLabel,
 		}),
 	);
-	const gitStatusQueryState = useQuery(
+	const { data: gitStatusData } = useQuery(
 		workspaceGitStatusQuery(activeWorkspace.pathLabel ?? null),
 	);
-	const allFilesQueryState = useQuery(
+	const { data: allFilesData } = useQuery(
 		workspaceFilesQuery(activeWorkspace.pathLabel ?? null),
 	);
-	const prSnapshotQueryState = useQuery(
+	const { data: prSnapshotData } = useQuery(
 		pullRequestSnapshotQuery({
 			workspaceCwd: activeWorkspace.pathLabel ?? null,
 			workspaceId: activeWorkspace.id,
 		}),
 	);
-	const reviewTodosQueryState = useQuery(reviewTodosQuery(activeWorkspace.id));
-	const reviewCommentsQueryState = useQuery(
+	const { data: reviewTodosData } = useQuery(
+		reviewTodosQuery(activeWorkspace.id),
+	);
+	const { data: reviewCommentsData } = useQuery(
 		reviewCommentsQuery(activeWorkspace.id),
 	);
 
 	const liveWorkspaceFiles = useMemo(() => {
-		const remote = allFilesQueryState.data?.files ?? [];
+		const remote = allFilesData?.files ?? [];
 		if (remote.length === 0) {
 			return activeWorkspace.workspaceFiles;
 		}
@@ -75,14 +77,14 @@ export function useLiveWorkspaceModel({
 			name: entry.name,
 			path: entry.path,
 		}));
-	}, [allFilesQueryState.data?.files, activeWorkspace.workspaceFiles]);
+	}, [allFilesData?.files, activeWorkspace.workspaceFiles]);
 
 	const workspaceWithLiveDockTabs = useMemo<ActiveWorkspace>(() => {
 		const scripts = buildWorkspaceScriptSummaries({
 			sessions: terminalSessions.sessions,
-			settings: scriptSettingsQueryState.data ?? null,
+			settings: scriptSettingsData ?? null,
 		});
-		const gitStatus = gitStatusQueryState.data;
+		const gitStatus = gitStatusData;
 		const liveReview = gitStatus
 			? gitStatus.error
 				? { reviewFilesError: gitStatus.error.message }
@@ -99,14 +101,14 @@ export function useLiveWorkspaceModel({
 			'changeSummary' in liveReview && liveReview.changeSummary
 				? liveReview.changeSummary
 				: activeWorkspace.changeSummary;
-		const prResult = prSnapshotQueryState.data;
+		const prResult = prSnapshotData;
 		const pullRequest = prResult
 			? buildPullRequestShellModel({
 					changeSummary,
-					localComments: reviewCommentsQueryState.data?.comments ?? [],
+					localComments: reviewCommentsData?.comments ?? [],
 					snapshot: prResult.snapshot,
 					...(prResult.error ? { syncError: prResult.error.message } : {}),
-					todos: reviewTodosQueryState.data?.todos ?? [],
+					todos: reviewTodosData?.todos ?? [],
 				})
 			: activeWorkspace.pullRequest;
 
@@ -131,12 +133,12 @@ export function useLiveWorkspaceModel({
 		};
 	}, [
 		activeWorkspace,
-		gitStatusQueryState.data,
+		gitStatusData,
 		liveWorkspaceFiles,
-		prSnapshotQueryState.data,
-		reviewCommentsQueryState.data?.comments,
-		reviewTodosQueryState.data?.todos,
-		scriptSettingsQueryState.data,
+		prSnapshotData,
+		reviewCommentsData?.comments,
+		reviewTodosData?.todos,
+		scriptSettingsData,
 		terminalSessions.sessions,
 	]);
 

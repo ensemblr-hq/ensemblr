@@ -36,10 +36,10 @@ export function WorkspaceTimeline({
 }) {
 	const piSessionId =
 		activeSession.piSessionId ?? composer.activePiSessionId ?? null;
-	const transcriptsQuery = useQuery(
+	const { data: transcriptsData } = useQuery(
 		listClosedChatTabsWithSummaryQuery(workspace.id),
 	);
-	const transcripts = transcriptsQuery.data?.entries ?? [];
+	const transcripts = transcriptsData?.entries ?? [];
 
 	if (piSessionId) {
 		return (

@@ -67,14 +67,18 @@ export async function formatMentionAttachmentText({
 		);
 	}
 
-	for (const mention of mentions) {
-		if (mention.kind !== 'file') {
-			continue;
-		}
-		const result = await readWorkspaceFile({
-			path: mention.path,
-			workspaceCwd,
-		});
+	const fileMentions = mentions.filter((entry) => entry.kind === 'file');
+	// Reads are independent, so issue them in parallel. Results stay in mention
+	// order (Promise.all preserves order), and we re-check errors in order so the
+	// first failing mention deterministically wins — matching sequential reads.
+	const results = await Promise.all(
+		fileMentions.map((mention) =>
+			readWorkspaceFile({ path: mention.path, workspaceCwd }),
+		),
+	);
+	for (let index = 0; index < fileMentions.length; index += 1) {
+		const mention = fileMentions[index];
+		const result = results[index];
 		if (result.error) {
 			throw new Error(
 				`Could not attach ${mention.path}: ${result.error.message}`,
@@ -97,15 +101,18 @@ export async function formatUploadAttachmentText(
 	if (uploads.length === 0) {
 		return '';
 	}
-	const sections: string[] = [];
-	for (const file of uploads) {
-		let content: string;
-		try {
-			content = await file.text();
-		} catch {
-			content = '[binary upload — content could not be decoded as text]';
-		}
-		sections.push(formatAttachedFileSection(file.name, content));
-	}
+	// Decodes are independent; read them in parallel. Promise.all preserves the
+	// upload order so the rendered sections still match the user's selection.
+	const sections = await Promise.all(
+		uploads.map(async (file) => {
+			let content: string;
+			try {
+				content = await file.text();
+			} catch {
+				content = '[binary upload — content could not be decoded as text]';
+			}
+			return formatAttachedFileSection(file.name, content);
+		}),
+	);
 	return sections.join('\n\n');
 }

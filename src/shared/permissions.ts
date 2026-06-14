@@ -1,5 +1,5 @@
 /** Permission modes a workspace can run under, ordered from most to least permissive. */
-export const PERMISSION_MODES = [
+const PERMISSION_MODES = [
 	'workspace-trusted',
 	'approval-required',
 	'read-only',

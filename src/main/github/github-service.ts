@@ -139,12 +139,9 @@ export function createGithubService({
 		| { ok: true; snapshot: GithubPullRequestSnapshotWire }
 		| { error: GithubFailure; noPullRequest: boolean; ok: false }
 	> {
-		const branchSync = await readBranchSync(cwd);
-		const viewResult = await run('gh', cwd, [
-			'pr',
-			'view',
-			'--json',
-			PR_VIEW_JSON_FIELDS,
+		const [branchSync, viewResult] = await Promise.all([
+			readBranchSync(cwd),
+			run('gh', cwd, ['pr', 'view', '--json', PR_VIEW_JSON_FIELDS]),
 		]);
 		if (viewResult.status !== 'success') {
 			const failure = classifyCommandFailure(

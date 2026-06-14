@@ -50,13 +50,13 @@ export function ReviewActionsProvider({
 	const [activeDialog, setActiveDialog] = useState<ActiveReviewDialog>(null);
 	const closeDialog = useCallback(() => setActiveDialog(null), []);
 
-	const mergeSettingsQueryState = useQuery(
+	const { data: mergeSettingsData } = useQuery(
 		reviewMergeSettingsQuery({
 			repositoryId: activeProject.id,
 			repositoryPath: activeProject.pathLabel,
 		}),
 	);
-	const mergeSettings = mergeSettingsQueryState.data ?? DEFAULT_MERGE_SETTINGS;
+	const mergeSettings = mergeSettingsData ?? DEFAULT_MERGE_SETTINGS;
 
 	const runAgentAction = useAgentActionRunner({
 		activeProject,

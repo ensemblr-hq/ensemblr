@@ -81,7 +81,7 @@ const LIFECYCLE_LINE =
  * Warning/crash/stack-frame), drop structured log lines and lifecycle chatter.
  * If at least one line survives, return the joined survivors; otherwise null.
  */
-export function filterActionableStderr(detail: string): string | null {
+function filterActionableStderr(detail: string): string | null {
 	const normalized = detail.trim();
 	if (normalized.length === 0 || normalized === '(empty stderr chunk)') {
 		return null;

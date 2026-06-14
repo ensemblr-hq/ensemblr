@@ -8,7 +8,7 @@
  * pipeline (`/[^a-z0-9]+/g` → `-`) collapses spaces into dashes, so a name
  * like `Gregson Williams` becomes branch `gregson-williams`. No duplicates.
  */
-export const COMPOSER_SURNAMES: readonly string[] = [
+const COMPOSER_SURNAMES: readonly string[] = [
 	// Baroque
 	'Bach',
 	'Handel',
