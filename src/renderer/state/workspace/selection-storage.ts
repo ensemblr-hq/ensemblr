@@ -1,5 +1,5 @@
 import type { StoredWorkspaceSelection } from '@/renderer/lib/workbench';
-import { LAST_WORKSPACE_SELECTION_STORAGE_KEY } from './atoms';
+import { LAST_WORKSPACE_SELECTION_STORAGE_KEY } from './selection-atoms';
 
 /**
  * Reads the persisted last-selected workspace pair from localStorage.

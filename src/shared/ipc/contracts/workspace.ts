@@ -1,4 +1,14 @@
-import type { LinearIssueWire } from './linear';
+/**
+ * Provider-agnostic reference to a remote issue linked to a workspace. Held in
+ * the workspace contract so it does not import provider wire types directly;
+ * each provider maps its richer wire shape onto this ref at the IPC seam.
+ */
+export interface LinkedIssueRef {
+	id: string;
+	identifier: string;
+	title: string;
+	url: string;
+}
 
 export type CreateWorkspaceDiagnosticCode =
 	| 'context-directory-failed'
@@ -23,8 +33,7 @@ export interface CreateWorkspaceDiagnostic {
 }
 
 /** Linked remote issue persisted on a workspace created from an issue. */
-export interface WorkspaceLinkedIssueInput
-	extends Pick<LinearIssueWire, 'id' | 'identifier' | 'title' | 'url'> {
+export interface WorkspaceLinkedIssueInput extends LinkedIssueRef {
 	provider: 'linear';
 	teamKey?: string;
 	teamName?: string;

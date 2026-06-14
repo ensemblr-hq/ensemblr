@@ -362,6 +362,7 @@ export type {
 	FilesToCopyEntry,
 	FilesToCopySnapshot,
 	FilesToCopySource,
+	LinkedIssueRef,
 	ListArchivedWorkspacesRequest,
 	ListArchivedWorkspacesResult,
 	RenameWorkspaceDiagnostic,

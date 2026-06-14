@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc';
 import type { GithubService } from '../../github';
+import type { WithPermissionGate } from '../permission-gate.ts';
 import {
 	commitWorkspaceChangesRequestSchema,
 	createPullRequestRequestSchema,
@@ -12,16 +13,21 @@ import {
 
 export interface GithubHandlersOptions {
 	githubService: GithubService;
+	withPermissionGate: WithPermissionGate;
 }
 
 /** Registers IPC handlers for the gh-backed review flow (ADR 0013). */
 export function registerGithubHandlers({
 	githubService,
+	withPermissionGate,
 }: GithubHandlersOptions): void {
-	ipcMain.handle(IPC_CHANNELS.commitWorkspaceChanges, (_event, raw: unknown) =>
-		githubService.commitWorkspaceChanges(
-			commitWorkspaceChangesRequestSchema.parse(raw),
-		),
+	withPermissionGate(
+		IPC_CHANNELS.commitWorkspaceChanges,
+		'workspace-write',
+		(_event, raw: unknown) =>
+			githubService.commitWorkspaceChanges(
+				commitWorkspaceChangesRequestSchema.parse(raw),
+			),
 	);
 	ipcMain.handle(IPC_CHANNELS.pushWorkspaceBranch, (_event, raw: unknown) =>
 		githubService.pushWorkspaceBranch(
@@ -36,7 +42,10 @@ export function registerGithubHandlers({
 			getPullRequestSnapshotRequestSchema.parse(raw),
 		),
 	);
-	ipcMain.handle(IPC_CHANNELS.mergePullRequest, (_event, raw: unknown) =>
-		githubService.mergePullRequest(mergePullRequestRequestSchema.parse(raw)),
+	withPermissionGate(
+		IPC_CHANNELS.mergePullRequest,
+		'pull-request-merge',
+		(_event, raw: unknown) =>
+			githubService.mergePullRequest(mergePullRequestRequestSchema.parse(raw)),
 	);
 }

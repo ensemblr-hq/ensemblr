@@ -171,12 +171,14 @@ export function registerIpcHandlers({
 	registerCloneHandlers({
 		githubCloneService,
 		githubRepositoryListService,
+		withPermissionGate,
 	});
 	registerPiHandlers({ piExecutableService });
 	registerPiSessionHandlers({
 		localCommandService,
 		piExecutableService,
 		piSessionService,
+		withPermissionGate,
 	});
 	registerChatTabHandlers({
 		chatTabService: createChatTabService({
@@ -216,5 +218,6 @@ export function registerIpcHandlers({
 			databaseService,
 			localCommandService,
 		}),
+		withPermissionGate,
 	});
 }

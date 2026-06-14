@@ -21,6 +21,7 @@ import {
 	presentPiModels,
 	resolvePiProviderModels,
 } from '../../pi-runtime/pi-provider-models.ts';
+import type { WithPermissionGate } from '../permission-gate.ts';
 import {
 	listPiSessionEventsRequestSchema,
 	listPiSessionsRequestSchema,
@@ -35,6 +36,7 @@ export interface PiSessionHandlersOptions {
 	localCommandService: LocalCommandService;
 	piExecutableService: PiExecutableService;
 	piSessionService: PiSessionService;
+	withPermissionGate: WithPermissionGate;
 }
 
 const EMPTY_PI_MODELS: ListPiModelsResult = {
@@ -51,6 +53,7 @@ export function registerPiSessionHandlers({
 	localCommandService,
 	piExecutableService,
 	piSessionService,
+	withPermissionGate,
 }: PiSessionHandlersOptions): void {
 	ipcMain.handle(
 		IPC_CHANNELS.openPiSession,
@@ -173,8 +176,9 @@ export function registerPiSessionHandlers({
 		},
 	);
 
-	ipcMain.handle(
+	withPermissionGate(
 		IPC_CHANNELS.writeForkSummary,
+		'workspace-write',
 		(_event, raw: unknown): Promise<WriteForkSummaryResult> => {
 			const request = writeForkSummaryRequestSchema.parse(raw);
 			return piSessionService.writeForkSummary(request);
