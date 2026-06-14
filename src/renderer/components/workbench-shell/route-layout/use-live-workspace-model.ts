@@ -18,7 +18,7 @@ import type { WorkspaceNavigationSelection } from '@/renderer/lib/workbench';
 import { buildPullRequestShellModel } from '@/renderer/lib/workbench/pull-request-model';
 import type { useWorkspaceTerminalSessions } from '@/renderer/state/workspace/terminal-sessions';
 import type { ReviewFileSummary } from '@/renderer/types/workbench';
-import type { WorkspaceGitFileWire } from '@/shared/ipc';
+import type { WorkspaceGitFileWire } from '@/shared/ipc/contracts/workspace-git';
 
 type ActiveProject = WorkspaceNavigationSelection['project'];
 type ActiveWorkspace = WorkspaceNavigationSelection['workspace'];

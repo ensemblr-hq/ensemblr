@@ -6,10 +6,7 @@ import {
 	piSessionEventsQuery,
 	subscribePiSessionEvents,
 } from '@/renderer/api/ensemble-queries';
-import type {
-	ListPiSessionEventsResult,
-	PiSessionEventWire,
-} from '@/shared/ipc';
+import type { ListPiSessionEventsResult, PiSessionEventWire } from '@/shared/ipc/contracts/pi-session';
 
 /**
  * Subscribes the renderer to a single branch's event stream and returns the

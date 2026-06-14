@@ -19,7 +19,7 @@ import type {
 	ProjectShellModel,
 	WorkbenchShellData,
 } from '@/renderer/types/workbench';
-import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc';
+import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 
 export interface WorkbenchQueriesResult {
 	hasPreloadBridge: boolean;

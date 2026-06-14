@@ -7,7 +7,7 @@ import {
 	type RepoSettingsKey,
 	repoSettingsOverrideAtomFamily,
 } from '@/renderer/state/preferences';
-import type { ResolvedSettingSnapshot } from '@/shared/ipc';
+import type { ResolvedSettingSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 
 /**
  * Bundle for a per-repo settings page: the local-overrides atom, the resolved

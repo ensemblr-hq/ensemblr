@@ -1,12 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
-import type {
-	RunWorkspaceScriptRequest,
-	RunWorkspaceScriptResult,
-	StopWorkspaceScriptRequest,
-	StopWorkspaceScriptResult,
-} from '@/shared/ipc';
+import type { RunWorkspaceScriptRequest, RunWorkspaceScriptResult, StopWorkspaceScriptRequest, StopWorkspaceScriptResult } from '@/shared/ipc/contracts/workspace-scripts';
 import {
 	parseWorkspaceScriptSettings,
 	type WorkspaceScriptSettings,

@@ -1,15 +1,9 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import type {
-	ConfigDiagnostic,
-	RepositoryConfigMigrationChange,
-	RepositoryConfigMigrationPreview,
-	RepositoryConfigMigrationRequest,
-	RepositoryConfigMigrationResult,
-	RepositoryConfigSourceSnapshot,
-	SettingsResolutionSource,
-} from '../../shared/ipc';
+import type { ConfigDiagnostic } from '../../shared/ipc/contracts/health';
+import type { RepositoryConfigMigrationChange, RepositoryConfigMigrationPreview, RepositoryConfigMigrationRequest, RepositoryConfigMigrationResult, RepositoryConfigSourceSnapshot } from '../../shared/ipc/contracts/repository-config';
+import type { SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
 import {
 	areJsonValuesEqual,
 	cloneRecord,
@@ -59,7 +53,8 @@ export function normalizeRepositoryConfigRequest(
 export function previewRepositoryConfigMigration(
 	request: RepositoryConfigMigrationRequest,
 ): RepositoryConfigMigrationPreview {
-	if (!request.repositoryPath.trim()) {
+	const repositoryPath = sanitizeRepositoryPath(request.repositoryPath);
+	if (!repositoryPath) {
 		return createEmptyMigrationPreview({
 			diagnostics: [
 				{
@@ -72,7 +67,6 @@ export function previewRepositoryConfigMigration(
 		});
 	}
 
-	const repositoryPath = path.resolve(request.repositoryPath);
 	const overwrite = request.overwrite === true;
 	const loaded = loadRepositoryConfig({ repositoryPath });
 	const targetPath = path.join(repositoryPath, ENSEMBLE_CONFIG_FILENAME);
@@ -197,6 +191,22 @@ export function applyRepositoryConfigMigration(
 			),
 		};
 	}
+}
+
+/**
+ * Trims caller-supplied repository path and resolves it to an absolute path.
+ * IPC payloads are user-owned in this Electron app, but we still normalize here
+ * so any `..` segments are collapsed before reaching `fs`.
+ */
+function sanitizeRepositoryPath(input: unknown): string {
+	if (typeof input !== 'string') {
+		return '';
+	}
+	const trimmed = input.trim();
+	if (!trimmed) {
+		return '';
+	}
+	return path.resolve(trimmed);
 }
 
 /**

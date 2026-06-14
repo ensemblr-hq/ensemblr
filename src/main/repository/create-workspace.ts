@@ -3,15 +3,7 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	CreatedWorkspaceSnapshot,
-	CreateWorkspaceDiagnostic,
-	CreateWorkspaceDiagnosticCode,
-	CreateWorkspaceRequest,
-	CreateWorkspaceResult,
-	FilesToCopySnapshot,
-	WorkspaceLinkedIssueInput,
-} from '../../shared/ipc';
+import type { CreatedWorkspaceSnapshot, CreateWorkspaceDiagnostic, CreateWorkspaceDiagnosticCode, CreateWorkspaceRequest, CreateWorkspaceResult, FilesToCopySnapshot, WorkspaceLinkedIssueInput } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
 import {
 	type LoadedRepositoryConfig,

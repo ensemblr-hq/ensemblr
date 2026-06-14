@@ -5,7 +5,7 @@ import type { BundledLanguage } from 'shiki';
 
 import { turnDiffQuery } from '@/renderer/api/ensemble-queries';
 import { CodeBlockContent } from '@/renderer/components/code-block';
-import type { TurnDiffFileWire } from '@/shared/ipc';
+import type { TurnDiffFileWire } from '@/shared/ipc/contracts/checkpoint';
 
 /**
  * Read-only diff surface shown when a `kind: 'diff'` tab is active. Shows the

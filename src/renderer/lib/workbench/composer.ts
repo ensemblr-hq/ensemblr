@@ -6,7 +6,7 @@ import type {
 	SessionTabModel,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
-import type { SetupDiagnosticsSnapshot } from '@/shared/ipc';
+import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 /**
  * Computes the composer shell state from setup readiness, the active session,

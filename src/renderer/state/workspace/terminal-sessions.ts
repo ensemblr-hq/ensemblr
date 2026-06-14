@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { upsertTerminalSession } from '@/renderer/lib/terminal/terminal-tabs';
-import type {
-	CreateTerminalSessionResult,
-	TerminalSessionSnapshot,
-} from '@/shared/ipc';
+import type { CreateTerminalSessionResult, TerminalSessionSnapshot } from '@/shared/ipc/contracts/terminal';
 
 /** Live terminal sessions for one workspace plus create/close actions. */
 export interface WorkspaceTerminalSessionsState {

@@ -1,21 +1,10 @@
 import { ipcMain } from 'electron';
 
-import {
-	type ArchiveRepositoryResult,
-	type ArchiveWorkspaceResult,
-	type CreateWorkspaceResult,
-	type DeleteArchivedWorkspaceResult,
-	type DeleteRepositoryResult,
-	type DeleteWorkspaceResult,
-	IPC_CHANNELS,
-	type ListArchivedWorkspacesResult,
-	type LocalRepositorySelectionResult,
-	type QuickStartProjectResult,
-	type RegisterLocalRepositoryResult,
-	type RenameWorkspaceResult,
-	type SharedRootAdoptionSnapshot,
-	type UnarchiveWorkspaceResult,
-} from '../../../shared/ipc';
+import { type ArchiveRepositoryResult, type DeleteRepositoryResult, type LocalRepositorySelectionResult, type RegisterLocalRepositoryResult } from '../../../shared/ipc/contracts/repository';
+import { type ArchiveWorkspaceResult, type CreateWorkspaceResult, type DeleteArchivedWorkspaceResult, type DeleteWorkspaceResult, type ListArchivedWorkspacesResult, type RenameWorkspaceResult, type UnarchiveWorkspaceResult } from '../../../shared/ipc/contracts/workspace';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
+import { type QuickStartProjectResult } from '../../../shared/ipc/contracts/quick-start';
+import { type SharedRootAdoptionSnapshot } from '../../../shared/ipc/contracts/shared-root-adoption';
 import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,

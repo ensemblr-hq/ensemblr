@@ -1,9 +1,4 @@
-import type {
-	SetupCheckLogSnapshot,
-	SetupCheckSnapshot,
-	SetupDiagnosticsSnapshot,
-	SetupRemediationAction,
-} from '@/shared/ipc';
+import type { SetupCheckLogSnapshot, SetupCheckSnapshot, SetupDiagnosticsSnapshot, SetupRemediationAction } from '@/shared/ipc/contracts/setup';
 
 const SECRET_KEY_PATTERN =
 	/(token|secret|password|api[_-]?key|bearer|authorization|cookie)/i;

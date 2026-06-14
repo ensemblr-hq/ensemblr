@@ -1,9 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	EnvironmentVariableCatalogEntrySnapshot,
-	EnvironmentVariableDiagnostic,
-} from '../../shared/ipc';
+import type { EnvironmentVariableCatalogEntrySnapshot, EnvironmentVariableDiagnostic } from '../../shared/ipc/contracts/environment';
 import type { SecretMetadata, SecretStore } from '../secrets/secret-store';
 import { createCustomCatalogEntry } from './environment-variable-catalog.ts';
 import {

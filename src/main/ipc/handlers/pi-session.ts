@@ -1,16 +1,7 @@
 import { ipcMain } from 'electron';
 
-import {
-	IPC_CHANNELS,
-	type ListPiModelsResult,
-	type ListPiSessionEventsResult,
-	type ListPiSessionsResult,
-	type OpenPiSessionResult,
-	type PiSessionEventWire,
-	type StopPiSessionResult,
-	type SubmitPiPromptResult,
-	type WriteForkSummaryResult,
-} from '../../../shared/ipc';
+import { IPC_CHANNELS } from '../../../shared/ipc/channels';
+import { type ListPiModelsResult, type ListPiSessionEventsResult, type ListPiSessionsResult, type OpenPiSessionResult, type PiSessionEventWire, type StopPiSessionResult, type SubmitPiPromptResult, type WriteForkSummaryResult } from '../../../shared/ipc/contracts/pi-session';
 import type { LocalCommandService } from '../../commands/local-command';
 import {
 	type PiSessionService,

@@ -1,12 +1,6 @@
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import type {
-	PiChatTabWire,
-	PiSessionEventWire,
-	PiSessionSnapshotWire,
-	WriteForkSummaryRequest,
-	WriteForkSummaryResult,
-} from '../../shared/ipc';
+import type { PiChatTabWire, PiSessionEventWire, PiSessionSnapshotWire, WriteForkSummaryRequest, WriteForkSummaryResult } from '../../shared/ipc/contracts/pi-session';
 import type { CheckpointCapturePort } from '../checkpoints/checkpoint-service.ts';
 import {
 	createCheckpointCapture,

@@ -1,10 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	RepositoryWorkspaceNavigationMetadata,
-	RepositoryWorkspaceNavigationRepository,
-	RepositoryWorkspaceNavigationSnapshot,
-} from '../../../shared/ipc';
+import type { RepositoryWorkspaceNavigationMetadata, RepositoryWorkspaceNavigationRepository, RepositoryWorkspaceNavigationSnapshot } from '../../../shared/ipc/contracts/repository-navigation';
 
 /** Internal: shape of a repository row read from SQLite. */
 interface RepositoryRow {

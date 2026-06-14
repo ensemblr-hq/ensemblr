@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
-import type { PiSessionEventWire } from '../../../shared/ipc';
+import type { PiSessionEventWire } from '../../../shared/ipc/contracts/pi-session';
 import {
 	type ChatTabRow,
 	getChatTabById,

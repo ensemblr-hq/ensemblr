@@ -2,7 +2,7 @@ import { CalendarIcon, UserIcon } from 'lucide-react';
 
 import { Badge } from '@/renderer/components/ui/badge';
 import { getLinearPriorityLabel } from '@/renderer/lib/linear';
-import type { LinearIssueWire } from '@/shared/ipc';
+import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 
 /** Colored dot + name badge for a Linear workflow state. */
 export function LinearStateBadge({

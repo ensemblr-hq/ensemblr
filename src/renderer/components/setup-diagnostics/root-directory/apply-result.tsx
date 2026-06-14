@@ -1,5 +1,5 @@
 import { StatusBadge } from '@/renderer/components/status-badge';
-import type { RootDirectoryChangeApplyResult } from '@/shared/ipc';
+import type { RootDirectoryChangeApplyResult } from '@/shared/ipc/contracts/root-directory';
 
 import { RootDirectoryDiagnostics } from './diagnostics';
 

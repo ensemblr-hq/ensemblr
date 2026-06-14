@@ -1,15 +1,7 @@
 import { open } from 'node:fs/promises';
 import path from 'node:path';
 
-import type {
-	GetWorkspaceFileDiffRequest,
-	GetWorkspaceFileDiffResult,
-	GetWorkspaceGitStatusRequest,
-	GetWorkspaceGitStatusResult,
-	WorkspaceGitFailureCode,
-	WorkspaceGitFileStatus,
-	WorkspaceGitFileWire,
-} from '../../shared/ipc';
+import type { GetWorkspaceFileDiffRequest, GetWorkspaceFileDiffResult, GetWorkspaceGitStatusRequest, GetWorkspaceGitStatusResult, WorkspaceGitFailureCode, WorkspaceGitFileStatus, WorkspaceGitFileWire } from '../../shared/ipc/contracts/workspace-git';
 import type { LocalCommandService } from '../commands/local-command';
 
 const TIMEOUT_MS = 15_000;

@@ -1,12 +1,6 @@
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type {
-	ListWorkspaceFilesRequest,
-	ListWorkspaceFilesResult,
-	ReadWorkspaceFileRequest,
-	ReadWorkspaceFileResult,
-	WorkspaceFileEntryWire,
-} from '../../shared/ipc';
+import type { ListWorkspaceFilesRequest, ListWorkspaceFilesResult, ReadWorkspaceFileRequest, ReadWorkspaceFileResult, WorkspaceFileEntryWire } from '../../shared/ipc/contracts/workspace-files';
 import type { LocalCommandService } from '../commands/local-command';
 
 const GIT_ARGS = [

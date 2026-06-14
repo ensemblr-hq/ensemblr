@@ -1,9 +1,4 @@
-import type {
-	RepositoryConfigMigrationPreview,
-	RepositoryConfigMigrationRequest,
-	RepositoryConfigMigrationResult,
-	RepositoryConfigSnapshot,
-} from '../../shared/ipc';
+import type { RepositoryConfigMigrationPreview, RepositoryConfigMigrationRequest, RepositoryConfigMigrationResult, RepositoryConfigSnapshot } from '../../shared/ipc/contracts/repository-config';
 import { loadRepositoryConfig } from './repository-config.ts';
 import {
 	applyRepositoryConfigMigration,

@@ -2,13 +2,7 @@ import { cpSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	UnarchivedWorkspaceSnapshot,
-	UnarchiveWorkspaceDiagnostic,
-	UnarchiveWorkspaceDiagnosticCode,
-	UnarchiveWorkspaceRequest,
-	UnarchiveWorkspaceResult,
-} from '../../shared/ipc';
+import type { UnarchivedWorkspaceSnapshot, UnarchiveWorkspaceDiagnostic, UnarchiveWorkspaceDiagnosticCode, UnarchiveWorkspaceRequest, UnarchiveWorkspaceResult } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import {

@@ -18,7 +18,7 @@ import {
 } from '@/renderer/components/ui/select';
 import { Skeleton } from '@/renderer/components/ui/skeleton';
 import { describeLinearFailure } from '@/renderer/lib/linear';
-import type { LinearIssueWire } from '@/shared/ipc';
+import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 
 import { LinearIssueEditorDialog } from './issue-editor-dialog';
 import { LinearIssueMetaBadges } from './issue-meta-badges';

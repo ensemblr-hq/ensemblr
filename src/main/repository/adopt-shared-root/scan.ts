@@ -1,7 +1,7 @@
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-import type { SharedRootAdoptionDiagnostic } from '../../../shared/ipc';
+import type { SharedRootAdoptionDiagnostic } from '../../../shared/ipc/contracts/shared-root-adoption';
 
 /**
  * Lists immediate subdirectory names under `directoryPath`, surfacing

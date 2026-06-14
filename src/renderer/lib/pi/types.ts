@@ -37,7 +37,7 @@ export interface PendingGroup {
 	lastOrdinal: number;
 	parts: UIMessagePart[];
 	role: UIRole;
-	signature: string;
+	groupKey: string;
 	/** First persisted turn id seen in the group, if any. */
 	turnId: string | null;
 }

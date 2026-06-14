@@ -1,4 +1,4 @@
-import type { RootDirectoryChangePreview } from '@/shared/ipc';
+import type { RootDirectoryChangePreview } from '@/shared/ipc/contracts/root-directory';
 
 /** Read-only preview block showing what a root-directory change will do. */
 export function RootPathPreview({

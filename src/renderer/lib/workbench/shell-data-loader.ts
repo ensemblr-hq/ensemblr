@@ -8,11 +8,9 @@ import {
 } from '@/renderer/api/ensemble-queries';
 import { shellFixtureProjects } from '@/renderer/fixtures/workbench';
 import type { WorkbenchShellData } from '@/renderer/types/workbench';
-import type {
-	HealthSnapshot,
-	RepositoryWorkspaceNavigationSnapshot,
-	SetupDiagnosticsSnapshot,
-} from '@/shared/ipc';
+import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
+import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
+import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 import {
 	getRenderableNavigationSnapshot,

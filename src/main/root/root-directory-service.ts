@@ -1,9 +1,4 @@
-import type {
-	RootDirectoryChangeApplyResult,
-	RootDirectoryChangePreview,
-	RootDirectoryChangeRequest,
-	RootDirectorySnapshot,
-} from '../../shared/ipc';
+import type { RootDirectoryChangeApplyResult, RootDirectoryChangePreview, RootDirectoryChangeRequest, RootDirectorySnapshot } from '../../shared/ipc/contracts/root-directory';
 import type { EnsembleConfigResolutionService } from '../config/config-resolution';
 import type { EnsembleDatabaseService } from '../storage/database';
 import { ensureRootDirectory } from './root-directory.ts';

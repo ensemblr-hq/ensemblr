@@ -15,7 +15,7 @@ import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
 import { LinearLogo } from '@/renderer/components/workbench-shell/source-provider-logo';
-import type { LinearConnectionSnapshot } from '@/shared/ipc';
+import type { LinearConnectionSnapshot } from '@/shared/ipc/contracts/linear';
 
 export const Route = createFileRoute('/_workbench/settings/integrations')({
 	component: IntegrationsSettings,

@@ -26,7 +26,7 @@ import {
 	buildWorkspaceSeedFromLinearIssue,
 	describeLinearFailure,
 } from '@/renderer/lib/linear';
-import type { LinearCommentWire, LinearIssueWire } from '@/shared/ipc';
+import type { LinearCommentWire, LinearIssueWire } from '@/shared/ipc/contracts/linear';
 
 import { LinearCommentComposer } from './comment-composer';
 import { LinearIssueEditorDialog } from './issue-editor-dialog';

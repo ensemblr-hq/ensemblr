@@ -1,19 +1,7 @@
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
-import type {
-	CreateWorkspaceRequest,
-	CreateWorkspaceResult,
-	DeleteRepositoryRequest,
-	DeleteRepositoryResult,
-	DeleteWorkspaceRequest,
-	DeleteWorkspaceResult,
-	LocalRepositorySelectionResult,
-	QuickStartProjectRequest,
-	QuickStartProjectResult,
-	RegisterLocalRepositoryRequest,
-	RegisterLocalRepositoryResult,
-	RenameWorkspaceRequest,
-	RenameWorkspaceResult,
-} from '@/shared/ipc';
+import type { CreateWorkspaceRequest, CreateWorkspaceResult, DeleteWorkspaceRequest, DeleteWorkspaceResult, RenameWorkspaceRequest, RenameWorkspaceResult } from '@/shared/ipc/contracts/workspace';
+import type { DeleteRepositoryRequest, DeleteRepositoryResult, LocalRepositorySelectionResult, RegisterLocalRepositoryRequest, RegisterLocalRepositoryResult } from '@/shared/ipc/contracts/repository';
+import type { QuickStartProjectRequest, QuickStartProjectResult } from '@/shared/ipc/contracts/quick-start';
 
 import { getEnsembleApi } from './query-keys';
 

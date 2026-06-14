@@ -9,11 +9,9 @@ import path from 'node:path';
 
 import { load } from 'js-toml';
 
-import type {
-	ConfigDiagnostic,
-	RepositoryConfigSourceStatus,
-	SettingsResolutionSource,
-} from '../../shared/ipc';
+import type { ConfigDiagnostic } from '../../shared/ipc/contracts/health';
+import type { RepositoryConfigSourceStatus } from '../../shared/ipc/contracts/repository-config';
+import type { SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
 import {
 	formatErrorMessage,
 	getJsonErrorLocation,

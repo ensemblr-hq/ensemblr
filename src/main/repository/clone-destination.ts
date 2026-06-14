@@ -1,11 +1,7 @@
 import path from 'node:path';
 
-import type {
-	CloneGithubRepositoryDiagnostic,
-	CloneGithubRepositoryProgressEvent,
-	CloneGithubRepositoryStartResult,
-	RegisteredRepositorySnapshot,
-} from '../../shared/ipc';
+import type { CloneGithubRepositoryDiagnostic, CloneGithubRepositoryProgressEvent, CloneGithubRepositoryStartResult } from '../../shared/ipc/contracts/clone';
+import type { RegisteredRepositorySnapshot } from '../../shared/ipc/contracts/repository';
 import { allocateUniqueTargetPath } from './target-path.ts';
 
 /** Inputs for {@link resolveDestination}. */

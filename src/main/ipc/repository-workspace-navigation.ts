@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { RepositoryWorkspaceNavigationSnapshot } from '../../shared/ipc';
+import type { RepositoryWorkspaceNavigationSnapshot } from '../../shared/ipc/contracts/repository-navigation';
 import { getRepositoryWorkspaceNavigationSnapshot as getSnapshotFromRepository } from '../storage/repositories/repository-workspace-navigation-repository.ts';
 
 /**

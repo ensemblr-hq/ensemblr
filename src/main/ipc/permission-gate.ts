@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 
-import type { SettingsResolutionSnapshot } from '../../shared/ipc';
+import type { SettingsResolutionSnapshot } from '../../shared/ipc/contracts/settings-resolution';
 import {
 	classifyPermissionAction,
 	DEFAULT_PERMISSION_MODE,

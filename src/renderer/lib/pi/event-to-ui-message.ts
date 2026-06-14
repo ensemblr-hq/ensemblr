@@ -2,10 +2,10 @@ import type { UIMessage } from 'ai';
 
 import type {
 	PiPersistedEnvelope,
-	PiSessionEventWire,
+	PiSessionEventWire as PiEventFrame,
 	PiWireMessagePart,
 	PiWireMessagePayload,
-} from '@/shared/ipc';
+} from '@/shared/ipc/contracts/pi-session';
 
 import {
 	buildErrorMessage,
@@ -40,7 +40,7 @@ import type { PendingGroup, UIMessagePart, UIRole } from './types';
  * diagnostics remain as compact system messages for the timeline renderer.
  */
 export function eventsToUIMessages(
-	events: readonly PiSessionEventWire[],
+	events: readonly PiEventFrame[],
 ): UIMessage[] {
 	const result: UIMessage[] = [];
 	let pending: PendingGroup | null = null;
@@ -57,7 +57,7 @@ export function eventsToUIMessages(
 }
 
 function handleEvent(
-	event: PiSessionEventWire,
+	event: PiEventFrame,
 	pending: PendingGroup | null,
 	result: UIMessage[],
 ): PendingGroup | null {
@@ -98,7 +98,7 @@ function handleEvent(
 }
 
 function handleMessageEnvelope(
-	event: PiSessionEventWire,
+	event: PiEventFrame,
 	envelope: Extract<PiPersistedEnvelope, { kind: 'message' }>,
 	pending: PendingGroup | null,
 	result: UIMessage[],
@@ -109,7 +109,7 @@ function handleMessageEnvelope(
 	// message ids — so keying on turnId fractures one logical assistant turn
 	// into dozens of single-part messages. A run of consecutive
 	// assistant/tool events IS the turn; user messages and errors flush it.
-	const signature = groupSignature(uiRole);
+	const groupKey = groupKeyFor(uiRole);
 
 	const incomingParts = mergeParts(
 		[],
@@ -121,7 +121,7 @@ function handleMessageEnvelope(
 		return pending;
 	}
 
-	if (!pending || pending.signature !== signature) {
+	if (!pending || pending.groupKey !== groupKey) {
 		flush(pending, result);
 		return {
 			firstEventAt: event.createdAt,
@@ -130,7 +130,7 @@ function handleMessageEnvelope(
 			lastOrdinal: event.ordinal,
 			parts: incomingParts,
 			role: uiRole,
-			signature,
+			groupKey,
 			turnId: event.turnId,
 		};
 	}
@@ -150,7 +150,7 @@ function handleMessageEnvelope(
  * already normalized them.
  */
 function projectMessagePayload(
-	event: PiSessionEventWire,
+	event: PiEventFrame,
 	payload: PiWireMessagePayload,
 ): UIMessagePart[] {
 	switch (payload.kind) {
@@ -192,7 +192,7 @@ function projectMessagePayload(
 
 function projectMessagePart(
 	part: PiWireMessagePart,
-	event: PiSessionEventWire,
+	event: PiEventFrame,
 ): UIMessagePart[] {
 	switch (part.kind) {
 		case 'text':
@@ -295,12 +295,12 @@ export function turnMetadataOf(message: UIMessage): PiTurnMetadata | null {
 	return null;
 }
 
-function groupSignature(role: UIRole): string {
+function groupKeyFor(role: UIRole): string {
 	return `role::${role}`;
 }
 
-function groupIdFromEvent(event: PiSessionEventWire, role: UIRole): string {
-	// Use the trigger event id so multiple same-role groups within a session
+function groupIdFromEvent(event: PiEventFrame, role: UIRole): string {
+	// Use the trigger event id so multiple same-role groups within a chat
 	// (e.g. two user prompts before the next assistant reply) stay unique.
 	return `pi-group:${role}:${event.id}`;
 }

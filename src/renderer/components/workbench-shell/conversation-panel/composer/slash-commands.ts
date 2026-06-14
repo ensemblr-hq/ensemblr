@@ -1,7 +1,4 @@
-import type {
-	PiSlashCommandSource,
-	PiSlashCommandSourceScope,
-} from '@/shared/ipc';
+import type { PiSlashCommandSource, PiSlashCommandSourceScope } from '@/shared/ipc/contracts/pi-session';
 
 /** Source marker used for static fallback commands from Pi's TUI catalog. */
 const BUILTIN_SLASH_COMMAND_SOURCE = 'builtin' satisfies PiSlashCommandSource;

@@ -15,7 +15,7 @@ import {
 import { Label } from '@/renderer/components/ui/label';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
-import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc';
+import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
 interface ArchiveWorkspaceDialogProps {
 	onArchived: (workspaceId: string) => Promise<void> | void;

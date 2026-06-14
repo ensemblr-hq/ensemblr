@@ -4,7 +4,7 @@ import {
 	createXtermAdapter,
 	type TerminalRendererAdapter,
 } from '@/renderer/lib/terminal/xterm-adapter';
-import type { TerminalSessionStatus } from '@/shared/ipc';
+import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 
 /**
  * One live xterm.js surface bound to a main-process PTY session: replays the

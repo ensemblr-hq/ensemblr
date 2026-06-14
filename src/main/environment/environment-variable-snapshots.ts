@@ -1,8 +1,4 @@
-import type {
-	EnvironmentVariableCatalogEntrySnapshot,
-	EnvironmentVariableSnapshot,
-	EnvironmentVariableValueKind,
-} from '../../shared/ipc';
+import type { EnvironmentVariableCatalogEntrySnapshot, EnvironmentVariableSnapshot, EnvironmentVariableValueKind } from '../../shared/ipc/contracts/environment';
 import type { SecretMetadata } from '../secrets/secret-store';
 import { getCatalogEntryForKey } from './environment-variable-catalog.ts';
 import {
