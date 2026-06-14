@@ -9,6 +9,7 @@ import {
 	GitBranchIcon,
 	HeartPulseIcon,
 	KeyRoundIcon,
+	PlugZapIcon,
 	PuzzleIcon,
 	ScrollIcon,
 	SlidersHorizontalIcon,
@@ -30,7 +31,7 @@ interface UserNavItem {
 
 interface RepoNavItem {
 	kind: 'repo';
-	section: 'environment' | 'git' | 'scripts' | 'actions' | 'misc';
+	section: RepoSectionId;
 	label: string;
 	icon: LucideIcon;
 }
@@ -43,6 +44,12 @@ const USER_NAV: UserNavItem[] = [
 		icon: SlidersHorizontalIcon,
 	},
 	{ kind: 'user', to: '/settings/models', label: 'Models', icon: BoxIcon },
+	{
+		kind: 'user',
+		to: '/settings/providers',
+		label: 'Providers',
+		icon: PlugZapIcon,
+	},
 	{
 		kind: 'user',
 		to: '/settings/environment',
@@ -105,6 +112,9 @@ const REPO_SECTION_TARGETS = {
 	misc: '/settings/repo/$repoId/misc',
 	scripts: '/settings/repo/$repoId/scripts',
 } as const;
+
+/** Section id for the per-repo settings sub-nav. Derived from the route map. */
+type RepoSectionId = keyof typeof REPO_SECTION_TARGETS;
 
 interface SettingsSidebarProps {
 	scope: SettingsScope;
@@ -215,5 +225,5 @@ function navLinkClass(active: boolean): string {
 	);
 }
 
+export type { RepoSectionId };
 export { REPO_SECTION_TARGETS };
-export type RepoSectionId = RepoNavItem['section'];
