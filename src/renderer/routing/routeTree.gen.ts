@@ -15,6 +15,7 @@ import { Route as WorkbenchSettingsRouteImport } from './routes/_workbench/setti
 import { Route as WorkbenchShellRouteImport } from './routes/_workbench/_shell'
 import { Route as WorkbenchSettingsIndexRouteImport } from './routes/_workbench/settings/index'
 import { Route as WorkbenchShellIndexRouteImport } from './routes/_workbench/_shell/index'
+import { Route as WorkbenchSettingsProvidersRouteImport } from './routes/_workbench/settings/providers'
 import { Route as WorkbenchSettingsModelsRouteImport } from './routes/_workbench/settings/models'
 import { Route as WorkbenchSettingsIntegrationsRouteImport } from './routes/_workbench/settings/integrations'
 import { Route as WorkbenchSettingsGitRouteImport } from './routes/_workbench/settings/git'
@@ -70,6 +71,12 @@ const WorkbenchShellIndexRoute = WorkbenchShellIndexRouteImport.update({
   path: '/',
   getParentRoute: () => WorkbenchShellRoute,
 } as any)
+const WorkbenchSettingsProvidersRoute =
+  WorkbenchSettingsProvidersRouteImport.update({
+    id: '/providers',
+    path: '/providers',
+    getParentRoute: () => WorkbenchSettingsRoute,
+  } as any)
 const WorkbenchSettingsModelsRoute = WorkbenchSettingsModelsRouteImport.update({
   id: '/models',
   path: '/models',
@@ -242,6 +249,7 @@ export interface FileRoutesByFullPath {
   '/settings/git': typeof WorkbenchSettingsGitRoute
   '/settings/integrations': typeof WorkbenchSettingsIntegrationsRoute
   '/settings/models': typeof WorkbenchSettingsModelsRoute
+  '/settings/providers': typeof WorkbenchSettingsProvidersRoute
   '/settings/': typeof WorkbenchSettingsIndexRoute
   '/projects/$projectId': typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
   '/linear/$issueId': typeof WorkbenchShellLinearIssueIdRoute
@@ -273,6 +281,7 @@ export interface FileRoutesByTo {
   '/settings/git': typeof WorkbenchSettingsGitRoute
   '/settings/integrations': typeof WorkbenchSettingsIntegrationsRoute
   '/settings/models': typeof WorkbenchSettingsModelsRoute
+  '/settings/providers': typeof WorkbenchSettingsProvidersRoute
   '/settings': typeof WorkbenchSettingsIndexRoute
   '/projects/$projectId': typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
   '/linear/$issueId': typeof WorkbenchShellLinearIssueIdRoute
@@ -305,6 +314,7 @@ export interface FileRoutesById {
   '/_workbench/settings/git': typeof WorkbenchSettingsGitRoute
   '/_workbench/settings/integrations': typeof WorkbenchSettingsIntegrationsRoute
   '/_workbench/settings/models': typeof WorkbenchSettingsModelsRoute
+  '/_workbench/settings/providers': typeof WorkbenchSettingsProvidersRoute
   '/_workbench/_shell/': typeof WorkbenchShellIndexRoute
   '/_workbench/settings/': typeof WorkbenchSettingsIndexRoute
   '/_workbench/_shell/projects/$projectId': typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
@@ -340,6 +350,7 @@ export interface FileRouteTypes {
     | '/settings/git'
     | '/settings/integrations'
     | '/settings/models'
+    | '/settings/providers'
     | '/settings/'
     | '/projects/$projectId'
     | '/linear/$issueId'
@@ -371,6 +382,7 @@ export interface FileRouteTypes {
     | '/settings/git'
     | '/settings/integrations'
     | '/settings/models'
+    | '/settings/providers'
     | '/settings'
     | '/projects/$projectId'
     | '/linear/$issueId'
@@ -402,6 +414,7 @@ export interface FileRouteTypes {
     | '/_workbench/settings/git'
     | '/_workbench/settings/integrations'
     | '/_workbench/settings/models'
+    | '/_workbench/settings/providers'
     | '/_workbench/_shell/'
     | '/_workbench/settings/'
     | '/_workbench/_shell/projects/$projectId'
@@ -468,6 +481,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof WorkbenchShellIndexRouteImport
       parentRoute: typeof WorkbenchShellRoute
+    }
+    '/_workbench/settings/providers': {
+      id: '/_workbench/settings/providers'
+      path: '/providers'
+      fullPath: '/settings/providers'
+      preLoaderRoute: typeof WorkbenchSettingsProvidersRouteImport
+      parentRoute: typeof WorkbenchSettingsRoute
     }
     '/_workbench/settings/models': {
       id: '/_workbench/settings/models'
@@ -750,6 +770,7 @@ interface WorkbenchSettingsRouteChildren {
   WorkbenchSettingsGitRoute: typeof WorkbenchSettingsGitRoute
   WorkbenchSettingsIntegrationsRoute: typeof WorkbenchSettingsIntegrationsRoute
   WorkbenchSettingsModelsRoute: typeof WorkbenchSettingsModelsRoute
+  WorkbenchSettingsProvidersRoute: typeof WorkbenchSettingsProvidersRoute
   WorkbenchSettingsIndexRoute: typeof WorkbenchSettingsIndexRoute
   WorkbenchSettingsRepoRepoIdRoute: typeof WorkbenchSettingsRepoRepoIdRouteWithChildren
   WorkbenchSettingsRepoIndexRoute: typeof WorkbenchSettingsRepoIndexRoute
@@ -765,6 +786,7 @@ const WorkbenchSettingsRouteChildren: WorkbenchSettingsRouteChildren = {
   WorkbenchSettingsGitRoute: WorkbenchSettingsGitRoute,
   WorkbenchSettingsIntegrationsRoute: WorkbenchSettingsIntegrationsRoute,
   WorkbenchSettingsModelsRoute: WorkbenchSettingsModelsRoute,
+  WorkbenchSettingsProvidersRoute: WorkbenchSettingsProvidersRoute,
   WorkbenchSettingsIndexRoute: WorkbenchSettingsIndexRoute,
   WorkbenchSettingsRepoRepoIdRoute:
     WorkbenchSettingsRepoRepoIdRouteWithChildren,

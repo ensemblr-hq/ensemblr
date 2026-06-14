@@ -15,6 +15,8 @@ export * from './pi-sessions';
 export * from './pi-slash-commands';
 export {
 	ensembleQueryKeys,
+	getEnsembleApi,
+	getEnsembleApiOrNull,
 	isEnsembleApiAvailable,
 } from './query-keys';
 export * from './settings';

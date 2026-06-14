@@ -6,8 +6,29 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
+import type { SettingsResolutionSnapshot } from '@/shared/ipc';
 
 import { ensembleQueryKeys, getEnsembleApi } from './query-keys';
+
+/** Resolved settings snapshot for the entire app, optionally scoped to a repository. */
+export function settingsResolutionQuery(
+	repository: { repositoryId: string; repositoryPath: string } | null,
+) {
+	return queryOptions({
+		queryFn: async (): Promise<SettingsResolutionSnapshot> =>
+			profileElectronIpcCall(
+				{ channel: 'ensemble:settings-resolution', usesDatabase: true },
+				() =>
+					getEnsembleApi().resolveSettings({
+						repository: repository ?? undefined,
+					}),
+			),
+		queryKey: ensembleQueryKeys.settingsResolution(
+			repository?.repositoryId ?? null,
+		),
+		staleTime: 15_000,
+	});
+}
 
 export interface ReviewMergeSettings {
 	archiveAfterMerge: boolean;

@@ -42,6 +42,18 @@ export const SHORTCUTS = {
 		scope: 'global',
 		bindings: [{ key: 'b', modifiers: ['mod'] }],
 	},
+	'palette.open': {
+		description: 'Open command palette',
+		scope: 'global',
+		bindings: [{ key: 'k', modifiers: ['mod'] }],
+		accelerator: 'CommandOrControl+K',
+	},
+	'settings.open': {
+		description: 'Open settings',
+		scope: 'global',
+		bindings: [{ key: ',', modifiers: ['mod'] }],
+		accelerator: 'CommandOrControl+,',
+	},
 	'files.search': {
 		description: 'Open file search',
 		scope: 'global',
