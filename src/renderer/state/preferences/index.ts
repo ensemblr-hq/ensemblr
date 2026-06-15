@@ -39,6 +39,7 @@ export {
 	defaultChatThinkingLevelAtom,
 	deleteBranchOnArchiveAtom,
 	desktopNotificationsAtom,
+	favouriteModelsAtom,
 	followUpBehaviorAtom,
 	inAppBrowserPreviewAtom,
 	markdownStyleAtom,

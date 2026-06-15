@@ -1,3 +1,4 @@
+import { useAtom } from 'jotai';
 import { CheckIcon, SparklesIcon, StarIcon } from 'lucide-react';
 import { type CSSProperties, useCallback, useMemo, useState } from 'react';
 import { Button } from '@/renderer/components/ui/button';
@@ -15,6 +16,7 @@ import {
 } from '@/renderer/components/ui/tooltip';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { cn } from '@/renderer/lib/utils';
+import { favouriteModelsAtom } from '@/renderer/state/preferences';
 import type { ComposerModelOption } from '@/renderer/types/workbench';
 
 const MAX_MENU_HEIGHT_REM = 24;
@@ -85,6 +87,40 @@ function groupByProvider(
 	return [...groups.values()];
 }
 
+const FAVOURITES_GROUP_KEY = '__favourites__';
+
+/**
+ * Builds the ordered picker groups: a leading "Favourites" group (favourited
+ * models in starred order) followed by the provider groups with those
+ * favourites removed, so each model appears once. Favourites therefore take the
+ * low `1-9` shortcut slots. The Favourites group is omitted when empty.
+ */
+export function buildModelGroups(
+	options: readonly ComposerModelOption[],
+	favouriteIds: readonly string[],
+): GroupedOptions[] {
+	const favouriteSet = new Set(favouriteIds);
+	const byId = new Map(options.map((option) => [option.id, option]));
+	const favouriteModels = favouriteIds.flatMap((id) => {
+		const option = byId.get(id);
+		return option ? [option] : [];
+	});
+	const providerGroups = groupByProvider(
+		options.filter((option) => !favouriteSet.has(option.id)),
+	);
+	if (favouriteModels.length === 0) {
+		return providerGroups;
+	}
+	return [
+		{
+			models: favouriteModels,
+			provider: FAVOURITES_GROUP_KEY,
+			providerLabel: 'Favourites',
+		},
+		...providerGroups,
+	];
+}
+
 /** Builds keyboard shortcut indices for displayed model rows. */
 function buildShortcutIndexById(
 	models: readonly ComposerModelOption[],
@@ -108,51 +144,85 @@ function getMenuHeight(groups: readonly GroupedOptions[]): string {
 	return `min(${estimatedHeightRem}rem, min(${MAX_MENU_HEIGHT_REM}rem, var(--radix-popover-content-available-height, ${MAX_MENU_HEIGHT_REM}rem)))`;
 }
 
-/** Renders one selectable model row inside the grouped model picker. */
+/** Renders one selectable model row plus its favourite-toggle star. */
 function ModelOptionRow({
+	favourite,
 	model,
 	onSelect,
+	onToggleFavourite,
 	selected,
 	shortcutIndex,
 }: {
+	favourite: boolean;
 	model: ComposerModelOption;
 	onSelect: () => void;
+	onToggleFavourite: () => void;
 	selected: boolean;
 	shortcutIndex: number | undefined;
 }) {
+	// Row is a flex container, not a single button, so the star can be its own
+	// interactive control (a button nested in a button is invalid).
 	return (
-		<Button
+		<div
 			className={cn(
-				'h-9 w-full justify-start rounded-md px-2 text-left font-normal',
-				selected && 'bg-muted text-foreground',
+				'flex items-center gap-0.5 rounded-md',
+				selected && 'bg-muted',
 			)}
-			onClick={onSelect}
-			size='sm'
-			type='button'
-			variant='ghost'
 		>
-			<SparklesIcon className='text-muted-foreground' />
-			<span className='flex-1 truncate'>{model.displayName}</span>
-			{model.isDefault ? <StarIcon className='text-status-warning' /> : null}
-			{selected ? <CheckIcon /> : null}
-			{shortcutIndex && shortcutIndex < 10 ? (
-				<span className='ml-1 text-muted-foreground text-xs tabular-nums'>
-					{shortcutIndex}
-				</span>
-			) : null}
-		</Button>
+			<Button
+				className={cn(
+					'h-9 min-w-0 flex-1 justify-start rounded-md px-2 text-left font-normal hover:bg-transparent',
+					selected && 'text-foreground',
+				)}
+				onClick={onSelect}
+				size='sm'
+				type='button'
+				variant='ghost'
+			>
+				<SparklesIcon className='text-muted-foreground' />
+				<span className='flex-1 truncate'>{model.displayName}</span>
+				{selected ? <CheckIcon /> : null}
+				{shortcutIndex && shortcutIndex < 10 ? (
+					<span className='ml-1 text-muted-foreground text-xs tabular-nums'>
+						{shortcutIndex}
+					</span>
+				) : null}
+			</Button>
+			<button
+				aria-label={favourite ? 'Unfavourite model' : 'Favourite model'}
+				aria-pressed={favourite}
+				className={cn(
+					'mr-1 shrink-0 rounded-md p-1.5 transition-colors hover:bg-secondary/60',
+					favourite
+						? 'text-status-warning'
+						: 'text-muted-foreground/40 hover:text-muted-foreground',
+				)}
+				onClick={(event) => {
+					// Never let the star select the model or close the popover.
+					event.stopPropagation();
+					onToggleFavourite();
+				}}
+				type='button'
+			>
+				<StarIcon className={cn('size-3.5', favourite && 'fill-current')} />
+			</button>
+		</div>
 	);
 }
 
 /** Renders the scrollable provider sections for model choices. */
 function ModelOptionsList({
+	favouriteIds,
 	groups,
 	onSelect,
+	onToggleFavourite,
 	selectedId,
 	shortcutIndexById,
 }: {
+	favouriteIds: ReadonlySet<string>;
 	groups: readonly GroupedOptions[];
 	onSelect: (modelId: string) => void;
+	onToggleFavourite: (modelId: string) => void;
 	selectedId: string | null;
 	shortcutIndexById: ReadonlyMap<string, number>;
 }) {
@@ -165,9 +235,11 @@ function ModelOptionsList({
 					</div>
 					{group.models.map((model) => (
 						<ModelOptionRow
+							favourite={favouriteIds.has(model.id)}
 							key={model.id}
 							model={model}
 							onSelect={() => onSelect(model.id)}
+							onToggleFavourite={() => onToggleFavourite(model.id)}
 							selected={model.id === selectedId}
 							shortcutIndex={shortcutIndexById.get(model.id)}
 						/>
@@ -201,7 +273,22 @@ export function ModelPicker({
 		},
 		[controlledOpen, onOpenChange],
 	);
-	const groups = useMemo(() => groupByProvider(options), [options]);
+	const [favourites, setFavourites] = useAtom(favouriteModelsAtom);
+	const favouriteIds = useMemo(() => new Set(favourites), [favourites]);
+	const toggleFavourite = useCallback(
+		(modelId: string) => {
+			setFavourites((prev) =>
+				prev.includes(modelId)
+					? prev.filter((id) => id !== modelId)
+					: [...prev, modelId],
+			);
+		},
+		[setFavourites],
+	);
+	const groups = useMemo(
+		() => buildModelGroups(options, favourites),
+		[options, favourites],
+	);
 	const orderedShortcuts = useMemo(
 		() => groups.flatMap((group) => group.models),
 		[groups],
@@ -269,11 +356,13 @@ export function ModelPicker({
 			<PopoverContent align='start' className='w-80 overflow-hidden p-1.5'>
 				<ScrollArea className='pr-3.5' style={scrollAreaStyle}>
 					<ModelOptionsList
+						favouriteIds={favouriteIds}
 						groups={groups}
 						onSelect={(modelId) => {
 							onChange(modelId);
 							setOpen(false);
 						}}
+						onToggleFavourite={toggleFavourite}
 						selectedId={selected?.id ?? null}
 						shortcutIndexById={shortcutIndexById}
 					/>
