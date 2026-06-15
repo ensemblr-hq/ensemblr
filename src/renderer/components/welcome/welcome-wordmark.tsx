@@ -127,30 +127,32 @@ export function WelcomeWordmark({ className }: { className?: string }) {
 		let burstTimeoutId: number | undefined;
 		let releaseTimeoutId: number | undefined;
 
+		const runBurst = () => {
+			if (cancelled) {
+				return;
+			}
+			setGlitching(true);
+			const duration =
+				BURST_DURATION_MIN_MS + Math.random() * BURST_DURATION_RANGE_MS;
+			releaseTimeoutId = window.setTimeout(() => {
+				if (cancelled) {
+					return;
+				}
+				setGlitching(false);
+				scheduleNextBurst();
+			}, duration);
+		};
+
 		const scheduleNextBurst = () => {
 			if (cancelled) {
 				return;
 			}
 			const wait =
 				BURST_INTERVAL_MIN_MS + Math.random() * BURST_INTERVAL_RANGE_MS;
-			burstTimeoutId = window.setTimeout(() => {
-				if (cancelled) {
-					return;
-				}
-				setGlitching(true);
-				const duration =
-					BURST_DURATION_MIN_MS + Math.random() * BURST_DURATION_RANGE_MS;
-				releaseTimeoutId = window.setTimeout(() => {
-					if (cancelled) {
-						return;
-					}
-					setGlitching(false);
-					scheduleNextBurst();
-				}, duration);
-			}, wait);
+			burstTimeoutId = window.setTimeout(runBurst, wait);
 		};
 
-		scheduleNextBurst();
+		runBurst();
 
 		return () => {
 			cancelled = true;
