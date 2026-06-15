@@ -1,4 +1,4 @@
-import { ipcMain, shell } from 'electron';
+import { ipcMain } from 'electron';
 
 import {
 	type AppSettings,
@@ -7,6 +7,7 @@ import {
 import { IPC_CHANNELS } from '../../../shared/ipc/channels.ts';
 import type { OpenAppConfigFileResult } from '../../../shared/ipc/contracts/app-settings.ts';
 import type { AppSettingsService } from '../../config';
+import { openInEditor } from '../../config/open-in-editor.ts';
 
 /** Service dependencies for the app-settings IPC handlers. */
 export interface AppSettingsHandlersOptions {
@@ -44,8 +45,7 @@ export function registerAppSettingsHandlers({
 		IPC_CHANNELS.openAppConfigFile,
 		async (): Promise<OpenAppConfigFileResult> => {
 			appSettingsService.ensureExists();
-			const error = await shell.openPath(appSettingsService.getPath());
-			return error ? { error } : {};
+			return openInEditor(appSettingsService.getPath());
 		},
 	);
 }
