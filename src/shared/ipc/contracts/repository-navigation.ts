@@ -37,13 +37,14 @@ export interface RepositoryWorkspaceNavigationSnapshot {
 
 /**
  * Single-shot hydration payload sent to the renderer on app start. Bundles the
- * health + navigation snapshots so the first paint can render without a second
- * round-trip.
+ * health + navigation snapshots + the installed "open in…" target list so the
+ * first paint can render without a second round-trip.
  */
 export interface InitialShellSnapshot {
 	capturedAt: string;
 	health: HealthSnapshot | null;
 	navigation: RepositoryWorkspaceNavigationSnapshot | null;
+	openTargets: import('./open-target').WorkspaceOpenTargetSnapshot[] | null;
 }
 
 /** Repository / workspace navigation tree IPC surface. */

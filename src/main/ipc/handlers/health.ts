@@ -4,6 +4,7 @@ import { type HealthSnapshot } from '../../../shared/ipc/contracts/health';
 import { type InitialShellSnapshot, type RepositoryWorkspaceNavigationSnapshot } from '../../../shared/ipc/contracts/repository-navigation';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { EnsembleConfigService } from '../../config';
+import type { OpenTargetService } from '../../open-target';
 import type { EnsembleDatabaseService } from '../../storage';
 import { getRepositoryWorkspaceNavigationSnapshot } from '../repository-workspace-navigation';
 
@@ -11,6 +12,7 @@ import { getRepositoryWorkspaceNavigationSnapshot } from '../repository-workspac
 export interface HealthHandlersOptions {
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
+	openTargetService: OpenTargetService;
 }
 
 /**
@@ -21,6 +23,7 @@ export interface HealthHandlersOptions {
 export function registerHealthHandlers({
 	configService,
 	databaseService,
+	openTargetService,
 }: HealthHandlersOptions): void {
 	ipcMain.handle(IPC_CHANNELS.health, (): HealthSnapshot => {
 		return buildHealthSnapshot(configService, databaseService);
@@ -31,6 +34,7 @@ export function registerHealthHandlers({
 			capturedAt: new Date().toISOString(),
 			health: safeBuildHealthSnapshot(configService, databaseService),
 			navigation: safeBuildNavigationSnapshot(databaseService),
+			openTargets: openTargetService.getCachedSnapshots(),
 		};
 		event.returnValue = snapshot;
 	});

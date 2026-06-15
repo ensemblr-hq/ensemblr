@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react';
+import { useQuery } from '@tanstack/react-query';
 import {
 	ChevronDownIcon,
 	CopyIcon,
@@ -11,7 +12,13 @@ import {
 	SquareTerminalIcon,
 	WrenchIcon,
 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
+import {
+	getEnsembleApiOrNull,
+	workspaceOpenTargetsQuery,
+} from '@/renderer/api/ensemble';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -88,15 +95,126 @@ export function WorkbenchHeader({
 
 /** Split button + dropdown to open the workspace in installed apps. */
 function OpenWorkspaceMenu({ workspace }: { workspace: WorkspaceShellModel }) {
-	const openTargets = workspace.openTargets.filter(
-		(target) => target.installed || target.kind === 'utility',
-	);
-	const primaryTarget =
-		openTargets.find((target) => target.isPrimary) ??
-		openTargets.find((target) => target.kind !== 'utility') ??
-		openTargets[0];
+	const [isMenuOpen, setMenuOpen] = useState(false);
+	const hasBridge = getEnsembleApiOrNull() !== null;
+	const { data } = useQuery({
+		...workspaceOpenTargetsQuery,
+		enabled: hasBridge,
+	});
 
-	if (!primaryTarget) {
+	const openTargets = useMemo<WorkspaceOpenTarget[] | null>(() => {
+		// Only render the menu once the real list (seeded from the preload
+		// snapshot or fetched via IPC) is available. The workspace model carries
+		// an empty list, never a placeholder, so the menu does not flash.
+		const fromQuery = data?.targets ?? null;
+		if (!fromQuery) {
+			return workspace.openTargets.length > 0 ? workspace.openTargets : null;
+		}
+		return fromQuery.filter(
+			(target) => target.installed || target.kind === 'utility',
+		);
+	}, [data?.targets, workspace.openTargets]);
+
+	const primaryTarget = useMemo(() => {
+		if (!openTargets) {
+			return null;
+		}
+		return (
+			openTargets.find((target) => target.isPrimary) ??
+			openTargets.find((target) => target.kind !== 'utility') ??
+			openTargets[0] ??
+			null
+		);
+	}, [openTargets]);
+
+	const invokeTarget = useCallback(
+		async (target: WorkspaceOpenTarget) => {
+			const ensemble = getEnsembleApiOrNull();
+			if (!ensemble) {
+				toast.error('Open in… is unavailable without the Electron bridge.');
+				return;
+			}
+			const result = await ensemble.openWorkspaceInTarget({
+				targetId: target.id,
+				workspaceId: workspace.id,
+			});
+			if (!result.ok) {
+				toast.error(`Failed to open in ${target.label}: ${result.error}`);
+				return;
+			}
+			if (target.id === 'copy-path') {
+				toast.success('Workspace path copied to clipboard.');
+			}
+		},
+		[workspace.id],
+	);
+
+	useEffect(() => {
+		if (!openTargets || openTargets.length === 0) {
+			return undefined;
+		}
+
+		const handler = (event: KeyboardEvent) => {
+			if (event.defaultPrevented) {
+				return;
+			}
+			if (shouldIgnoreShortcut(event)) {
+				return;
+			}
+
+			const commandKey = event.metaKey || event.ctrlKey;
+
+			if (
+				commandKey &&
+				event.shiftKey &&
+				!event.altKey &&
+				event.key.toLowerCase() === 'c'
+			) {
+				const copyTarget = openTargets.find((target) => target.id === 'copy-path');
+				if (copyTarget) {
+					event.preventDefault();
+					void invokeTarget(copyTarget);
+				}
+				return;
+			}
+
+			if (
+				commandKey &&
+				!event.shiftKey &&
+				!event.altKey &&
+				event.key.toLowerCase() === 'o'
+			) {
+				if (primaryTarget) {
+					event.preventDefault();
+					void invokeTarget(primaryTarget);
+				}
+				return;
+			}
+
+			if (
+				isMenuOpen &&
+				!commandKey &&
+				!event.altKey &&
+				!event.shiftKey &&
+				/^[1-9]$/.test(event.key)
+			) {
+				const index = Number.parseInt(event.key, 10) - 1;
+				const target = openTargets[index];
+				if (target) {
+					event.preventDefault();
+					setMenuOpen(false);
+					void invokeTarget(target);
+				}
+			}
+		};
+
+		window.addEventListener('keydown', handler);
+		return () => {
+			window.removeEventListener('keydown', handler);
+		};
+	}, [invokeTarget, isMenuOpen, openTargets, primaryTarget]);
+
+	if (!openTargets || !primaryTarget) {
 		return null;
 	}
 
@@ -105,6 +223,7 @@ function OpenWorkspaceMenu({ workspace }: { workspace: WorkspaceShellModel }) {
 			<Button
 				aria-label={`Open current workspace in ${primaryTarget.label}`}
 				className='size-7 rounded-none border-0 bg-transparent'
+				onClick={() => void invokeTarget(primaryTarget)}
 				size='icon-sm'
 				type='button'
 				variant='subtle'
@@ -112,7 +231,7 @@ function OpenWorkspaceMenu({ workspace }: { workspace: WorkspaceShellModel }) {
 				<OpenTargetIcon className='size-4' target={primaryTarget} />
 			</Button>
 			<div className='my-1 w-px bg-border' />
-			<DropdownMenu>
+			<DropdownMenu onOpenChange={setMenuOpen} open={isMenuOpen}>
 				<DropdownMenuTrigger asChild>
 					<Button
 						aria-label='Open current workspace app options'
@@ -129,6 +248,11 @@ function OpenWorkspaceMenu({ workspace }: { workspace: WorkspaceShellModel }) {
 						<DropdownMenuItem
 							className='h-8 gap-2.5 px-2 text-[0.8125rem]'
 							key={target.id}
+							onSelect={(event) => {
+								event.preventDefault();
+								setMenuOpen(false);
+								void invokeTarget(target);
+							}}
 						>
 							<OpenTargetIcon className='size-4' target={target} />
 							<span className='min-w-0 flex-1 truncate'>{target.label}</span>
@@ -148,7 +272,28 @@ function OpenWorkspaceMenu({ workspace }: { workspace: WorkspaceShellModel }) {
 	);
 }
 
-/** Renders the appropriate icon for an open-in target (iconify or lucide). */
+/**
+ * Skip the global open-in shortcuts when the user is typing in an editable
+ * surface. ⌘O / ⌘⇧C are claimed for opening editors and copying the workspace
+ * path; firing them inside an input would surprise users.
+ */
+function shouldIgnoreShortcut(event: KeyboardEvent): boolean {
+	const target = event.target;
+	if (!(target instanceof HTMLElement)) {
+		return false;
+	}
+	if (target.isContentEditable) {
+		return true;
+	}
+	const tag = target.tagName;
+	return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
+/**
+ * Renders the icon for an open-in target. Prefers the real macOS app icon
+ * (PNG data URL extracted by the main process); falls back to a named iconify
+ * or lucide glyph for utility entries / detection misses.
+ */
 function OpenTargetIcon({
 	className,
 	target,
@@ -157,6 +302,17 @@ function OpenTargetIcon({
 	target: WorkspaceOpenTarget;
 }) {
 	const iconClassName = cn('shrink-0', className);
+
+	if (target.iconDataUrl) {
+		return (
+			<img
+				alt=''
+				aria-hidden='true'
+				className={cn(iconClassName, 'object-contain')}
+				src={target.iconDataUrl}
+			/>
+		);
+	}
 
 	if (target.iconName.startsWith('vscode-icons:')) {
 		return (

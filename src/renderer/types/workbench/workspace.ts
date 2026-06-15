@@ -1,4 +1,8 @@
 import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
+import type {
+	WorkspaceOpenTargetKind as SharedWorkspaceOpenTargetKind,
+	WorkspaceOpenTargetSnapshot,
+} from '@/shared/ipc/contracts/open-target';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
@@ -261,23 +265,9 @@ export interface WorkspaceLandingSummary {
 	workspaceName: string;
 }
 
-export type WorkspaceOpenTargetKind =
-	| 'editor'
-	| 'file-manager'
-	| 'source-control'
-	| 'terminal'
-	| 'utility';
+export type WorkspaceOpenTargetKind = SharedWorkspaceOpenTargetKind;
 
-export interface WorkspaceOpenTarget {
-	iconName: string;
-	id: string;
-	installed: boolean;
-	isPrimary?: boolean;
-	kind: WorkspaceOpenTargetKind;
-	label: string;
-	numberShortcutLabel: string;
-	shortcutLabel?: string;
-}
+export type WorkspaceOpenTarget = WorkspaceOpenTargetSnapshot;
 
 export interface WorkspaceShellModel {
 	branchName: string;

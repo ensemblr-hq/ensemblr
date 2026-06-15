@@ -8,6 +8,7 @@ import type {
 import type { EnvironmentVariablesService } from '../environment';
 import { createGithubService } from '../github';
 import type { LinearAuthService, LinearService } from '../linear';
+import type { OpenTargetService } from '../open-target';
 import type { PiSessionService } from '../pi-agent/pi-session-service';
 import type { PiExecutableService } from '../pi-runtime';
 import type {
@@ -45,6 +46,7 @@ import { registerGithubHandlers } from './handlers/github';
 import { registerHealthHandlers } from './handlers/health';
 import { registerLinearHandlers } from './handlers/linear';
 import { registerNavigationHandlers } from './handlers/navigation';
+import { registerOpenTargetHandlers } from './handlers/open-target';
 import { registerPiHandlers } from './handlers/pi';
 import { registerPiSessionHandlers } from './handlers/pi-session';
 import { registerRepositoryHandlers } from './handlers/repository';
@@ -83,6 +85,7 @@ interface RegisterIpcHandlersOptions {
 	localCommandService: LocalCommandService;
 	localRepositoryImportService: LocalRepositoryImportService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
+	openTargetService: OpenTargetService;
 	piExecutableService: PiExecutableService;
 	piSessionService: PiSessionService;
 	quickStartProjectService: QuickStartProjectService;
@@ -122,6 +125,7 @@ export function registerIpcHandlers({
 	localCommandService,
 	localRepositoryImportService,
 	localRepositoryRegistrationService,
+	openTargetService,
 	piExecutableService,
 	piSessionService,
 	quickStartProjectService,
@@ -144,7 +148,7 @@ export function registerIpcHandlers({
 
 	registerWindowHandlers();
 	registerEnvironmentHandlers({ environmentVariablesService });
-	registerHealthHandlers({ configService, databaseService });
+	registerHealthHandlers({ configService, databaseService, openTargetService });
 	registerNavigationHandlers({ databaseService });
 	registerSettingsHandlers({ settingsResolutionService });
 	registerRootHandlers({
@@ -210,6 +214,7 @@ export function registerIpcHandlers({
 		reviewService: createReviewService({ databaseService }),
 	});
 	registerLinearHandlers({ linearAuthService, linearService });
+	registerOpenTargetHandlers({ databaseService, openTargetService });
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerTerminalHandlers({ terminalService });
 	registerWorkspaceScriptHandlers({ scriptLifecycleService });
