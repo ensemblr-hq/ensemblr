@@ -140,9 +140,6 @@ export const chatThinkingOverrideAtomFamily = atomFamily((chatTabId: string) =>
 
 // ─── Models (user defaults) ───────────────────────────────────────────────────
 
-export type PiPersonality = 'pragmatic' | 'thorough' | 'concise';
-export type ChatModeDefault = 'none' | 'plan' | 'fast';
-
 /** Default model id for new chats (resolved against Pi readiness at use-site). */
 export const defaultChatModelAtom = atomWithStorage<string | null>(
 	KEY('default_chat_model'),
@@ -159,14 +156,6 @@ export const reviewModelAtom = atomWithStorage<string | null>(
 export const reviewThinkingLevelAtom = atomWithStorage<string | null>(
 	KEY('review_thinking'),
 	null,
-);
-export const piPersonalityAtom = atomWithStorage<PiPersonality>(
-	KEY('pi_personality'),
-	'pragmatic',
-);
-export const defaultChatModeAtom = atomWithStorage<ChatModeDefault>(
-	KEY('default_chat_mode'),
-	'none',
 );
 
 // ─── Git (user defaults) ──────────────────────────────────────────────────────
