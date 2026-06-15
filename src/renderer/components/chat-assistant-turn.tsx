@@ -7,7 +7,7 @@ import { ChatReasoningRow, ChatToolRow } from './chat-activity-row';
 import { ChatMessageText } from './chat-message-text';
 import { ChatTurnFooter } from './chat-turn-footer';
 import { ChatTurnSummary } from './chat-turn-summary';
-import { ChatTurnTimer } from './chat-turn-timer';
+import { ChatWorkingIndicator } from './chat-turn-timer';
 
 export interface ChatAssistantTurnTiming {
 	endMs: number | null;
@@ -104,7 +104,9 @@ export function ChatAssistantTurn({
 					{activityRows.length > 0 ? (
 						<div className='flex flex-col gap-1.5'>{activityRows}</div>
 					) : null}
-					{isStreaming ? <ChatTurnTimer startMs={timing.startMs} /> : null}
+					{isStreaming ? (
+						<ChatWorkingIndicator startMs={timing.startMs} />
+					) : null}
 				</>
 			)}
 			{finalRows.length > 0 ? (

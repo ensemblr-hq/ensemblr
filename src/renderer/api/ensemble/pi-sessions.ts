@@ -17,19 +17,34 @@ import type {
 	WriteForkSummaryResult,
 } from '@/shared/ipc/contracts/pi-session';
 
+import { readCachedPiModels } from './pi-models-cache';
 import {
 	ensembleQueryKeys,
 	getEnsembleApi,
 	getEnsembleApiOrNull,
 } from './query-keys';
 
-/** Query options for the static Pi model catalog. */
+/**
+ * Query options for the Pi model catalog. Seeds from the localStorage cache so
+ * the catalog is available instantly on launch (`initialData`), then refetches
+ * in the background (`initialDataUpdatedAt: 0` marks the seed stale). A
+ * transient empty result (pi not ready) falls back to the cache so the picker
+ * is never blanked mid-session. Fresh results are persisted by the query-cache
+ * subscription in `query-client.ts`.
+ */
 export const piModelsQuery = queryOptions({
-	queryFn: (): Promise<ListPiModelsResult> =>
-		profileElectronIpcCall(
+	initialData: () => readCachedPiModels(),
+	initialDataUpdatedAt: 0,
+	queryFn: async (): Promise<ListPiModelsResult> => {
+		const result = await profileElectronIpcCall(
 			{ channel: 'ensemble:list-pi-models', usesDatabase: false },
 			() => getEnsembleApi().listPiModels(),
-		),
+		);
+		if (result.models.length === 0) {
+			return readCachedPiModels() ?? result;
+		}
+		return result;
+	},
 	queryKey: ensembleQueryKeys.piModels(),
 	staleTime: 60_000,
 });

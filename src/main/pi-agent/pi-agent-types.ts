@@ -1,4 +1,7 @@
-import type { PiWireMessagePart, PiWireMessagePayload } from '../../shared/ipc/contracts/pi-session';
+import type {
+	PiWireMessagePart,
+	PiWireMessagePayload,
+} from '../../shared/ipc/contracts/pi-session';
 import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
 
 /** Stable identifier for a Pi agent session within the main process. */
@@ -80,8 +83,16 @@ export interface PiAgentSessionRequest {
 	 * value flows through untouched. Set to false to allow an explicit override.
 	 */
 	preservePiAgentDirectory?: boolean;
-	/** Optional model override propagated to the Pi runtime when supported. */
+	/**
+	 * Optional model override propagated to the Pi runtime as the `--model`
+	 * spawn flag. Accepts Pi's `provider/id` pattern (e.g. `anthropic/claude…`).
+	 */
 	modelOverride?: string | null;
+	/**
+	 * Optional thinking/reasoning level propagated to the Pi runtime as the
+	 * `--thinking` spawn flag (e.g. `off`, `low`, `medium`, `high`, `xhigh`).
+	 */
+	thinkingLevel?: string | null;
 	/** Optional human-readable label attached to session metadata for logs. */
 	label?: string;
 	/** Native Pi session id to create or resume with `pi --session-id`. */
@@ -99,7 +110,17 @@ export interface PiAgentSubmitAttachment {
 /** Caller-supplied prompt submission. */
 export interface PiAgentSubmitRequest {
 	attachments?: readonly PiAgentSubmitAttachment[];
+	/**
+	 * Model to apply for this turn. When it differs from the model the runtime
+	 * is already on, the adapter emits a `set_model` RPC command before the
+	 * prompt so mid-session switches take effect without a respawn.
+	 */
 	modelOverride?: string;
+	/**
+	 * Thinking level to apply for this turn. Mirrors {@link modelOverride}: a
+	 * change triggers a `set_thinking_level` RPC command before the prompt.
+	 */
+	thinkingLevel?: string;
 	prompt: string;
 }
 

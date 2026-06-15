@@ -61,7 +61,7 @@ export interface ClosedChatTabEntry {
 /** Public surface of the chat-tab service used by IPC handlers. */
 export interface ChatTabService {
 	bindPiSession: (input: { chatTabId: string; piSessionId: string }) => void;
-	closeTab: (input: { chatTabId: string }) => void;
+	closeTab: (input: { chatTabId: string }) => { deleted: boolean };
 	listClosedWithSummary: (input: {
 		workspaceId: string;
 	}) => ClosedChatTabEntry[];
@@ -114,14 +114,14 @@ export function createChatTabService({
 			// duplicate close (e.g. after cache invalidation) does not surface
 			// as a renderer error.
 			if (!existing || existing.closedAt !== null) {
-				return;
+				return { deleted: false };
 			}
 
 			// Non-chat tabs (file/diff/document/preview) carry no session history:
 			// they are exempt from the min-one rule and hard-deleted on close.
 			if (existing.kind !== 'chat') {
 				deleteChatTab({ database, id: chatTabId });
-				return;
+				return { deleted: true };
 			}
 
 			const openChatTabs = listOpenForWorkspace({
@@ -129,18 +129,19 @@ export function createChatTabService({
 				workspaceId: existing.workspaceId,
 			}).filter((tab) => tab.kind === 'chat');
 			if (openChatTabs.length <= 1) {
-				return;
+				return { deleted: false };
 			}
 
 			if (isEmptyChatTab(existing)) {
 				deleteChatTab({ database, id: chatTabId });
-				return;
+				return { deleted: true };
 			}
 
 			const closedTab = markClosed({ database, id: chatTabId });
 			if (!closedTab) {
 				throw new Error(`Failed to close chat tab ${chatTabId}.`);
 			}
+			return { deleted: false };
 		},
 		listClosedWithSummary: ({ workspaceId }) => {
 			const database = requireChatTabDatabase();

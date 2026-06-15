@@ -156,6 +156,19 @@ function createCliRpcSession({
 	let metadata: PiAgentSessionMetadata = { ...input.metadata };
 	let closed = false;
 	let pendingShutdownReason: PiAgentShutdownReason | null = null;
+	// Track the model/thinking already applied to the runtime so a per-turn
+	// submit only emits `set_model`/`set_thinking_level` when the selection
+	// actually changes. Seed both from the spawn-time flags (`--model` /
+	// `--thinking` recorded in metadata.args) — the ground truth the process
+	// started with — so the first prompt re-sets neither. Reading the same
+	// `provider/id` / level strings the submit path compares against keeps the
+	// two sides symmetric.
+	const spawnFlagValue = (flag: string): string | undefined => {
+		const index = input.metadata.args.indexOf(flag);
+		return index >= 0 ? input.metadata.args[index + 1] : undefined;
+	};
+	let appliedModel: string | undefined = spawnFlagValue('--model');
+	let appliedThinking: string | undefined = spawnFlagValue('--thinking');
 
 	const emitRawFrame = (direction: 'rx' | 'tx', line: string): void => {
 		if (!onRawFrame) {
@@ -313,6 +326,52 @@ function createCliRpcSession({
 		}
 	};
 
+	const writeFrame = async (frame: unknown): Promise<void> => {
+		const line = `${JSON.stringify(frame)}\n`;
+		const writeResult = child.stdin.write(line, 'utf8');
+		emitRawFrame('tx', line.trimEnd());
+		if (!writeResult) {
+			await new Promise<void>((resolve) => child.stdin.once('drain', resolve));
+		}
+	};
+
+	const applyModelChange = async (
+		modelOverride: string | undefined,
+	): Promise<void> => {
+		const next = modelOverride?.trim();
+		if (!next || next === appliedModel) {
+			return;
+		}
+		// `set_model` needs provider and id split out. Pi model ids follow the
+		// `provider/id` shape; skip the command when no provider segment exists
+		// rather than send a malformed frame the runtime would reject.
+		const separator = next.indexOf('/');
+		if (separator <= 0 || separator >= next.length - 1) {
+			console.warn(
+				'[pi-rpc] ignoring malformed model override; expected `provider/id`',
+				{ modelOverride: next },
+			);
+			return;
+		}
+		await writeFrame({
+			modelId: next.slice(separator + 1),
+			provider: next.slice(0, separator),
+			type: 'set_model',
+		});
+		appliedModel = next;
+	};
+
+	const applyThinkingChange = async (
+		thinkingLevel: string | undefined,
+	): Promise<void> => {
+		const next = thinkingLevel?.trim();
+		if (!next || next === appliedThinking) {
+			return;
+		}
+		await writeFrame({ level: next, type: 'set_thinking_level' });
+		appliedThinking = next;
+	};
+
 	const submit = async (
 		request: PiAgentSubmitRequest,
 	): Promise<PiAgentSubmitAcknowledgement> => {
@@ -321,6 +380,14 @@ function createCliRpcSession({
 		}
 		const turnId = turnIdFactory();
 		const acceptedAt = now().toISOString();
+		// Apply per-turn model/thinking changes before the prompt. Pi processes
+		// stdin commands in order, so a `set_model`/`set_thinking_level` written
+		// ahead of the prompt is guaranteed to take effect for that turn. The
+		// `prompt` command itself carries no model field (Pi ignores unknown
+		// keys), so model selection must travel through these commands.
+		await applyModelChange(request.modelOverride);
+		await applyThinkingChange(request.thinkingLevel);
+
 		// Pi RPC protocol (@earendil-works/pi-coding-agent >= 0.79):
 		//   {"type":"prompt","message":"<text>"}
 		// `turnId` and attachments are Ensemble-side metadata that the runtime
@@ -329,16 +396,10 @@ function createCliRpcSession({
 		const frame = {
 			attachments: request.attachments ?? [],
 			message: request.prompt,
-			modelOverride: request.modelOverride,
 			turnId,
 			type: 'prompt' as const,
 		};
-		const line = `${JSON.stringify(frame)}\n`;
-		const writeResult = child.stdin.write(line, 'utf8');
-		emitRawFrame('tx', line.trimEnd());
-		if (!writeResult) {
-			await new Promise<void>((resolve) => child.stdin.once('drain', resolve));
-		}
+		await writeFrame(frame);
 		setStatus('streaming');
 		return { acceptedAt, turnId };
 	};
