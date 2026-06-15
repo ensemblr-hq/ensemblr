@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell } from 'electron';
 import started from 'electron-squirrel-startup';
 import { IPC_CHANNELS } from '../shared/ipc/channels';
+import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
 import type {
 	PiRawFrameBroadcast,
 	PiRawFrameKind,
@@ -15,6 +16,7 @@ import { createMainWindow } from './app/main-window';
 import { createMainWindowStateStore } from './app/window-state';
 import { createLocalCommandService } from './commands';
 import {
+	createAppSettingsService,
 	createEnsembleConfigResolutionService,
 	createEnsembleConfigService,
 	createRepositoryConfigService,
@@ -32,6 +34,13 @@ import {
 import { installApplicationMenu } from './menu';
 import { createOpenTargetService } from './open-target';
 import { createCliRpcPiAgentAdapter, createPiAgentClient } from './pi-agent';
+import { createAgentActivityMonitor } from './pi-agent/agent-activity-monitor';
+import {
+	electronIsAppFocused,
+	electronNotify,
+	electronPowerControls,
+} from './pi-agent/electron-activity-bindings';
+import { readMacosBattery } from './pi-agent/macos-battery';
 import { createPiSessionService } from './pi-agent/pi-session-service';
 import { createSessionSummaryWriter } from './pi-agent/session-summary-writer';
 import {
@@ -79,6 +88,16 @@ if (started) {
 app.setName('Ensemble');
 
 const configService = createEnsembleConfigService();
+const appSettingsService = createAppSettingsService();
+// Drives the caffeinate power-blocker + "Pi finished" desktop notifications,
+// gated live by the General settings in config.json.
+const agentActivityMonitor = createAgentActivityMonitor({
+	isAppFocused: electronIsAppFocused,
+	notify: electronNotify,
+	powerControls: electronPowerControls,
+	readBattery: readMacosBattery,
+	readSettings: () => appSettingsService.read(),
+});
 const databaseService = createEnsembleDatabaseService();
 const localCommandService = createLocalCommandService();
 const environmentVariablesService = createEnvironmentVariablesService({
@@ -195,6 +214,7 @@ const piSessionService = createPiSessionService({
 				window.webContents.send(IPC_CHANNELS.piSessionEvent, payload);
 			}
 		}
+		agentActivityMonitor.handle({ event: payload.event, sessionId });
 	},
 	piAgentClient,
 	sessionSummaryWriter,
@@ -342,7 +362,16 @@ app.whenReady().then(() => {
 	rootDirectoryService.ensure();
 	void sharedRootAdoptionService.reconcile();
 	installApplicationMenu();
+	// config.json is the source of truth; live-reload the renderer when it's
+	// edited outside the app (the service suppresses echoes of its own writes).
+	appSettingsService.startWatching((settings) => {
+		broadcastToAllWindows(IPC_CHANNELS.appSettingsChanged, {
+			settings,
+		} satisfies AppSettingsChangedBroadcast);
+		agentActivityMonitor.refresh();
+	});
 	registerIpcHandlers({
+		appSettingsService,
 		archiveRepositoryService,
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
 		configService,
@@ -366,6 +395,7 @@ app.whenReady().then(() => {
 		piSessionService,
 		quickStartProjectService,
 		renameWorkspaceService,
+		onAppSettingsUpdated: () => agentActivityMonitor.refresh(),
 		repositoryConfigService,
 		rootDirectoryService,
 		scriptLifecycleService,
@@ -380,6 +410,8 @@ app.whenReady().then(() => {
 });
 
 app.on('will-quit', () => {
+	appSettingsService.stop();
+	agentActivityMonitor.dispose();
 	terminalService.disposeAll();
 	databaseService.close();
 });

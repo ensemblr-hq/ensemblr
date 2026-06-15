@@ -17,9 +17,6 @@ export type FollowUpBehavior = 'steer' | 'queue' | 'block';
 /** Keyboard shortcut for sending a message. */
 export type SendShortcut = 'enter' | 'mod+enter';
 
-/** Built-in completion sound choices. */
-export type CompletionSound = 'off' | 'chime' | 'chime-2' | 'soft-ding' | 'pop';
-
 /** Tool-call rendering mode in the conversation view. */
 export type ToolCallCollapseMode = 'collapsed' | 'expanded';
 
@@ -39,47 +36,9 @@ export type MarkdownStyle = 'default' | 'compact' | 'prose';
 const KEY = (suffix: string) => `ensemble_pref_${suffix}`;
 
 // ─── General ──────────────────────────────────────────────────────────────────
-
-export const sendShortcutAtom = atomWithStorage<SendShortcut>(
-	KEY('send_shortcut'),
-	'enter',
-);
-export const followUpBehaviorAtom = atomWithStorage<FollowUpBehavior>(
-	KEY('follow_up'),
-	'steer',
-);
-export const desktopNotificationsAtom = atomWithStorage<boolean>(
-	KEY('desktop_notifications'),
-	true,
-);
-export const completionSoundAtom = atomWithStorage<CompletionSound>(
-	KEY('completion_sound'),
-	'chime-2',
-);
-export const autoConvertLongTextAtom = atomWithStorage<boolean>(
-	KEY('auto_convert_long_text'),
-	true,
-);
-export const softenCertaintyAtom = atomWithStorage<boolean>(
-	KEY('soften_certainty'),
-	false,
-);
-export const alwaysShowContextUsageAtom = atomWithStorage<boolean>(
-	KEY('always_show_context'),
-	true,
-);
-export const caffeinateWhileRunningAtom = atomWithStorage<boolean>(
-	KEY('caffeinate'),
-	false,
-);
-export const showMcpStatusInChatAtom = atomWithStorage<boolean>(
-	KEY('show_mcp_status'),
-	true,
-);
-export const toolCallCollapseAtom = atomWithStorage<ToolCallCollapseMode>(
-	KEY('tool_call_collapse'),
-	'collapsed',
-);
+// All General settings now live in config.json (see ./app-settings). "Soften AI
+// certainty" and "Show MCP status in chat" were removed from the UI; they had no
+// functional consumers, so their atoms were dropped entirely.
 
 // ─── Appearance ───────────────────────────────────────────────────────────────
 
@@ -160,24 +119,9 @@ export function forgetChatOverrides(chatTabId: string): void {
 }
 
 // ─── Models (user defaults) ───────────────────────────────────────────────────
-
-/** Default model id for new chats (resolved against Pi readiness at use-site). */
-export const defaultChatModelAtom = atomWithStorage<string | null>(
-	KEY('default_chat_model'),
-	null,
-);
-export const defaultChatThinkingLevelAtom = atomWithStorage<string | null>(
-	KEY('default_chat_thinking'),
-	null,
-);
-export const reviewModelAtom = atomWithStorage<string | null>(
-	KEY('review_model'),
-	null,
-);
-export const reviewThinkingLevelAtom = atomWithStorage<string | null>(
-	KEY('review_thinking'),
-	null,
-);
+// Default/review model + thinking and the hidden-models list now live in
+// config.json (see ./app-settings). Favourites stay here: they're toggled from
+// the composer star, not the Settings page.
 
 /**
  * Favourited model ids, pinned to the top of the model picker. App-wide and

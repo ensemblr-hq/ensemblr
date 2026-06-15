@@ -3,7 +3,6 @@ import { useAtom } from 'jotai';
 
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
-import { Button } from '@/renderer/components/ui/button';
 import {
 	Select,
 	SelectContent,
@@ -16,31 +15,35 @@ import {
 	alwaysShowContextUsageAtom,
 	autoConvertLongTextAtom,
 	caffeinateWhileRunningAtom,
-	completionSoundAtom,
 	desktopNotificationsAtom,
 	followUpBehaviorAtom,
 	sendShortcutAtom,
-	showMcpStatusInChatAtom,
-	softenCertaintyAtom,
 	toolCallCollapseAtom,
 } from '@/renderer/state/preferences';
+import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
+import { formatShortcut } from '@/shared/keymap';
 
 export const Route = createFileRoute('/_workbench/settings/general')({
 	component: GeneralSettings,
 });
 
+/** Factory defaults; a row shows its "modified" accent when its value differs. */
+const DEFAULTS = DEFAULT_APP_SETTINGS.general;
+
+const TOOL_CALL_TOGGLE_HINT = formatShortcut('toolCalls.toggleCollapse');
+const SEND_ENTER_HINT = formatShortcut('composer.submit');
+const SEND_MOD_ENTER_HINT = formatShortcut('composer.submitWithMod');
+const NEWLINE_HINT = formatShortcut('composer.newline');
+
 function GeneralSettings() {
 	const [sendShortcut, setSendShortcut] = useAtom(sendShortcutAtom);
 	const [followUp, setFollowUp] = useAtom(followUpBehaviorAtom);
 	const [notifications, setNotifications] = useAtom(desktopNotificationsAtom);
-	const [completionSound, setCompletionSound] = useAtom(completionSoundAtom);
 	const [autoConvertLong, setAutoConvertLong] = useAtom(
 		autoConvertLongTextAtom,
 	);
-	const [softenCertainty, setSoftenCertainty] = useAtom(softenCertaintyAtom);
 	const [showContext, setShowContext] = useAtom(alwaysShowContextUsageAtom);
 	const [caffeinate, setCaffeinate] = useAtom(caffeinateWhileRunningAtom);
-	const [showMcp, setShowMcp] = useAtom(showMcpStatusInChatAtom);
 	const [toolCalls, setToolCalls] = useAtom(toolCallCollapseAtom);
 
 	return (
@@ -55,13 +58,14 @@ function GeneralSettings() {
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value='enter'>Enter</SelectItem>
-							<SelectItem value='mod+enter'>Cmd + Enter</SelectItem>
+							<SelectItem value='enter'>{SEND_ENTER_HINT}</SelectItem>
+							<SelectItem value='mod+enter'>{SEND_MOD_ENTER_HINT}</SelectItem>
 						</SelectContent>
 					</Select>
 				}
-				description='Use Shift+Enter for new lines.'
+				description={`Use ${NEWLINE_HINT} for new lines.`}
 				label='Send messages with'
+				modified={sendShortcut !== DEFAULTS.sendShortcut}
 			/>
 
 			<SettingRow
@@ -80,8 +84,9 @@ function GeneralSettings() {
 						</SelectContent>
 					</Select>
 				}
-				description='Queue messages to send after the agent finishes, or steer the agent mid-turn. Use Cmd+J to queue.'
+				description='Queue messages to send after the agent finishes, or steer the agent mid-turn. Use ⌘J to queue.'
 				label='Follow-up behavior'
+				modified={followUp !== DEFAULTS.followUpBehavior}
 			/>
 
 			<SettingRow
@@ -90,35 +95,7 @@ function GeneralSettings() {
 				}
 				description='Get notified when Pi finishes working in a chat.'
 				label='Desktop notifications'
-			/>
-
-			<SettingRow
-				control={
-					<div className='flex items-center gap-2'>
-						<Select
-							onValueChange={(v) =>
-								setCompletionSound(v as typeof completionSound)
-							}
-							value={completionSound}
-						>
-							<SelectTrigger className='w-32' size='sm'>
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value='off'>Off</SelectItem>
-								<SelectItem value='chime'>Chime 1</SelectItem>
-								<SelectItem value='chime-2'>Chime 2</SelectItem>
-								<SelectItem value='soft-ding'>Soft ding</SelectItem>
-								<SelectItem value='pop'>Pop</SelectItem>
-							</SelectContent>
-						</Select>
-						<Button size='sm' variant='ghost'>
-							Test
-						</Button>
-					</div>
-				}
-				description='Choose what plays when Pi finishes working in a chat.'
-				label='Completion sound'
+				modified={notifications !== DEFAULTS.desktopNotifications}
 			/>
 
 			<SettingRow
@@ -130,17 +107,7 @@ function GeneralSettings() {
 				}
 				description='Convert pasted text over 5000 characters into text attachments.'
 				label='Auto-convert long text'
-			/>
-
-			<SettingRow
-				control={
-					<Switch
-						checked={softenCertainty}
-						onCheckedChange={setSoftenCertainty}
-					/>
-				}
-				description='Strip overconfident phrases like "You’re absolutely right!" from Pi messages.'
-				label='Soften AI certainty'
+				modified={autoConvertLong !== DEFAULTS.autoConvertLongText}
 			/>
 
 			<SettingRow
@@ -149,6 +116,7 @@ function GeneralSettings() {
 				}
 				description='Always show context usage. By default, only shown when more than 70% is used.'
 				label='Always show context usage'
+				modified={showContext !== DEFAULTS.alwaysShowContextUsage}
 			/>
 
 			<SettingRow
@@ -157,12 +125,7 @@ function GeneralSettings() {
 				}
 				description='Prevent your Mac from sleeping while Pi is actively working. Shuts off below 10% battery.'
 				label='Caffeinate while agents are running'
-			/>
-
-			<SettingRow
-				control={<Switch checked={showMcp} onCheckedChange={setShowMcp} />}
-				description='Show a per-session MCP server status indicator in the composer.'
-				label='Show MCP status in chat'
+				modified={caffeinate !== DEFAULTS.caffeinateWhileRunning}
 			/>
 
 			<SettingRow
@@ -172,8 +135,9 @@ function GeneralSettings() {
 						onCheckedChange={(v) => setToolCalls(v ? 'expanded' : 'collapsed')}
 					/>
 				}
-				description='Show all tool calls expanded by default instead of collapsed. Toggle with ⌃⌃ O.'
+				description={`Show all tool calls expanded by default instead of collapsed. Toggle with ${TOOL_CALL_TOGGLE_HINT}.`}
 				label="Don't collapse tool calls"
+				modified={toolCalls !== DEFAULTS.toolCallCollapse}
 			/>
 		</SettingsSection>
 	);

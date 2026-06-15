@@ -182,7 +182,10 @@ export interface ComposerShellState {
 	modelLabel: string;
 	onModelChange: (modelId: string) => void;
 	onStop: () => Promise<void> | void;
-	onSubmit: (prompt: string) => Promise<void> | void;
+	onSubmit: (
+		prompt: string,
+		options?: { streamingBehavior?: 'steer' | 'followUp' },
+	) => Promise<void> | void;
 	onThinkingChange: (thinkingLevel: string) => void;
 	placeholder: string;
 	thinkingLabel: string;

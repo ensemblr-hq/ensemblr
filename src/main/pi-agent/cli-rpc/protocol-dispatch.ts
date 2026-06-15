@@ -64,6 +64,13 @@ export function createProtocolDispatcher(
 		streamedTurns,
 	} = deps;
 
+	// Pi reports model/provider failures as an assistant `message_end` carrying
+	// `stopReason: "error"` + `errorMessage` (and auto-retries up to 3×, each a
+	// fresh errored message_end). Track whether we've surfaced an error for the
+	// current prompt so the retries collapse into a single diagnostic line. Reset
+	// on each new user message_end.
+	let promptErrorEmitted = false;
+
 	return (frame: unknown): void => {
 		if (!frame || typeof frame !== 'object') {
 			emitError(
@@ -170,6 +177,11 @@ export function createProtocolDispatcher(
 					return;
 				}
 				const wireRole = isMessageRole(message.role) ? message.role : 'agent';
+				// A new user prompt opens a fresh error window — re-arm so its
+				// turn's first failure surfaces (retries within the turn stay muted).
+				if (wireRole === 'user') {
+					promptErrorEmitted = false;
+				}
 				const turnId =
 					typeof typed.turnId === 'string'
 						? typed.turnId
@@ -188,6 +200,24 @@ export function createProtocolDispatcher(
 					turnId,
 					type: 'message',
 				});
+				// Surface a model/provider failure (e.g. local server offline) that
+				// would otherwise be an empty assistant bubble. Pi carries the cause
+				// on the message itself, not in the content blocks.
+				const stopReason =
+					typeof message.stopReason === 'string' ? message.stopReason : null;
+				const errorMessage =
+					typeof message.errorMessage === 'string'
+						? message.errorMessage
+						: null;
+				if (
+					wireRole !== 'user' &&
+					stopReason === 'error' &&
+					errorMessage &&
+					!promptErrorEmitted
+				) {
+					promptErrorEmitted = true;
+					emitError('adapter-failure', errorMessage, undefined, true);
+				}
 				return;
 			}
 			// Tool execution lifecycle from Pi docs.

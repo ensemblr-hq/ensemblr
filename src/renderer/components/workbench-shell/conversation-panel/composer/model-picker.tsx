@@ -1,4 +1,4 @@
-import { useAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { CheckIcon, SparklesIcon, StarIcon } from 'lucide-react';
 import { type CSSProperties, useCallback, useMemo, useState } from 'react';
 import { Button } from '@/renderer/components/ui/button';
@@ -16,9 +16,13 @@ import {
 } from '@/renderer/components/ui/tooltip';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { cn } from '@/renderer/lib/utils';
-import { favouriteModelsAtom } from '@/renderer/state/preferences';
+import {
+	favouriteModelsAtom,
+	hiddenModelsAtom,
+} from '@/renderer/state/preferences';
 import type { ComposerModelOption } from '@/renderer/types/workbench';
 import { buildModelGroups, type GroupedOptions } from './model-picker-groups';
+import { ModelProviderIcon } from './model-provider-icon';
 
 const MAX_MENU_HEIGHT_REM = 24;
 const MODEL_ROW_HEIGHT_REM = 2.25;
@@ -94,7 +98,10 @@ function ModelOptionRow({
 				type='button'
 				variant='ghost'
 			>
-				<SparklesIcon className='text-muted-foreground' />
+				<ModelProviderIcon
+					className='text-muted-foreground'
+					provider={model.provider}
+				/>
 				<span className='flex-1 truncate'>{model.displayName}</span>
 				{selected ? <CheckIcon /> : null}
 				{shortcutIndex && shortcutIndex < 10 ? (
@@ -178,6 +185,7 @@ export function ModelPicker({
 	value,
 }: ModelPickerProps) {
 	const [internalOpen, setInternalOpen] = useState(false);
+	const [tooltipOpen, setTooltipOpen] = useState(false);
 	const open = controlledOpen ?? internalOpen;
 	const setOpen = useCallback(
 		(next: boolean) => {
@@ -189,6 +197,7 @@ export function ModelPicker({
 		[controlledOpen, onOpenChange],
 	);
 	const [favourites, setFavourites] = useAtom(favouriteModelsAtom);
+	const hidden = useAtomValue(hiddenModelsAtom);
 	const favouriteIds = useMemo(() => new Set(favourites), [favourites]);
 	const toggleFavourite = useCallback(
 		(modelId: string) => {
@@ -201,9 +210,13 @@ export function ModelPicker({
 		[setFavourites],
 	);
 	const groups = useMemo(
-		() => buildModelGroups(options, favourites),
-		[options, favourites],
+		() => buildModelGroups(options, favourites, hidden),
+		[options, favourites, hidden],
 	);
+	// Every model is hidden: the catalog isn't empty but the list is. The
+	// `options.length === 0` guard below won't catch this, so the popover renders
+	// a hint instead of a zero-height scroll box.
+	const allHidden = options.length > 0 && groups.length === 0;
 	const orderedShortcuts = useMemo(
 		() => groups.flatMap((group) => group.models),
 		[groups],
@@ -245,7 +258,7 @@ export function ModelPicker({
 
 	return (
 		<Popover onOpenChange={setOpen} open={open}>
-			<Tooltip open={open ? false : undefined}>
+			<Tooltip onOpenChange={setTooltipOpen} open={open ? false : tooltipOpen}>
 				<TooltipTrigger asChild>
 					<PopoverTrigger asChild>
 						<Button
@@ -256,7 +269,7 @@ export function ModelPicker({
 							type='button'
 							variant='subtle'
 						>
-							<SparklesIcon />
+							<ModelProviderIcon provider={selected?.provider ?? ''} />
 							<span className='font-medium text-foreground'>
 								{selected?.displayName ?? 'Select model'}
 							</span>
@@ -269,19 +282,25 @@ export function ModelPicker({
 				</TooltipContent>
 			</Tooltip>
 			<PopoverContent align='start' className='w-80 overflow-hidden p-1.5'>
-				<ScrollArea className='pr-3.5' style={scrollAreaStyle}>
-					<ModelOptionsList
-						favouriteIds={favouriteIds}
-						groups={groups}
-						onSelect={(modelId) => {
-							onChange(modelId);
-							setOpen(false);
-						}}
-						onToggleFavourite={toggleFavourite}
-						selectedId={selected?.id ?? null}
-						shortcutIndexById={shortcutIndexById}
-					/>
-				</ScrollArea>
+				{allHidden ? (
+					<p className='px-2 py-3 text-muted-foreground text-xs'>
+						All models hidden — manage in Settings → Models.
+					</p>
+				) : (
+					<ScrollArea className='pr-3.5' style={scrollAreaStyle}>
+						<ModelOptionsList
+							favouriteIds={favouriteIds}
+							groups={groups}
+							onSelect={(modelId) => {
+								onChange(modelId);
+								setOpen(false);
+							}}
+							onToggleFavourite={toggleFavourite}
+							selectedId={selected?.id ?? null}
+							shortcutIndexById={shortcutIndexById}
+						/>
+					</ScrollArea>
+				)}
 			</PopoverContent>
 		</Popover>
 	);

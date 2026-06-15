@@ -101,6 +101,7 @@ export const submitPiPromptRequestSchema = z.object({
 	model: optionalNullableString,
 	prompt: z.string(),
 	sessionId: z.string().min(1),
+	streamingBehavior: z.enum(['steer', 'followUp']).optional(),
 	thinkingLevel: optionalNullableString,
 });
 

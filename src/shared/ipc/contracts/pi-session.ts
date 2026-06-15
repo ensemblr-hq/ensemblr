@@ -87,11 +87,21 @@ export interface OpenPiSessionResult {
 	session?: PiSessionSnapshotWire;
 }
 
+/**
+ * Mid-turn delivery mode for a prompt submitted while the agent is streaming.
+ * `steer` injects after the current turn's tool calls (Pi `steer` command);
+ * `followUp` is held until the agent fully stops (Pi `follow_up` command).
+ * Omitted for a normal idle submit (plain `prompt`).
+ */
+export type PiStreamingBehavior = 'steer' | 'followUp';
+
 /** Submit a prompt to an open Pi session. */
 export interface SubmitPiPromptRequest {
 	model?: string | null;
 	prompt: string;
 	sessionId: string;
+	/** Mid-turn delivery mode; omit for a normal (idle) submit. */
+	streamingBehavior?: PiStreamingBehavior;
 	thinkingLevel?: string | null;
 }
 

@@ -1,3 +1,4 @@
+export * from './app-settings';
 export * from './archive';
 export {
 	removeOpenChatTabFromCache,

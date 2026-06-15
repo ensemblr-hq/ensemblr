@@ -92,6 +92,7 @@ export function registerPiSessionHandlers({
 					model: request.model ?? null,
 					prompt: request.prompt,
 					sessionId: request.sessionId,
+					streamingBehavior: request.streamingBehavior,
 					thinkingLevel: request.thinkingLevel ?? null,
 				});
 				return acknowledgement;

@@ -170,6 +170,16 @@ export function createPiSessionLifecycle({
 			});
 		}
 
+		// Mid-turn steer/follow-up: don't open a new turn, change status, or
+		// checkpoint — the message is injected into the in-flight (steer) or next
+		// (follow-up) turn. Just forward the native RPC frame.
+		if (request.streamingBehavior) {
+			return active.piRuntimeSession.submit({
+				prompt: request.prompt,
+				streamingBehavior: request.streamingBehavior,
+			});
+		}
+
 		const turn = createTurn({
 			database,
 			input: {
