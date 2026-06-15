@@ -235,21 +235,29 @@ export function createEnvironmentVariablesService({
 			}
 
 			if (state.secretStore) {
-				for (const [key, metadata] of state.secretMetadata) {
-					if (isReservedEnvironmentVariableKey(key, state.catalogByKey)) {
+				const secretStore = state.secretStore;
+				const resolvedSecrets = await Promise.all(
+					Array.from(state.secretMetadata).map(async ([key, metadata]) => {
+						if (isReservedEnvironmentVariableKey(key, state.catalogByKey)) {
+							return null;
+						}
+						const value = await secretStore.read({
+							key: metadata.key,
+							scope: metadata.scope,
+							scopeId: metadata.scopeId || undefined,
+						});
+						return { key, value };
+					}),
+				);
+
+				for (const entry of resolvedSecrets) {
+					if (!entry) {
 						continue;
 					}
-
-					const value = await state.secretStore.read({
-						key: metadata.key,
-						scope: metadata.scope,
-						scopeId: metadata.scopeId || undefined,
-					});
-
-					if (value === null) {
+					if (entry.value === null) {
 						state.diagnostics.push({
 							code: 'secret-value-missing',
-							key,
+							key: entry.key,
 							message:
 								'Secret metadata exists, but the secret value was not found.',
 							severity: 'warning',
@@ -257,8 +265,8 @@ export function createEnvironmentVariablesService({
 						continue;
 					}
 
-					env[key] = value;
-					redactValues.push(value);
+					env[entry.key] = entry.value;
+					redactValues.push(entry.value);
 				}
 			}
 		}

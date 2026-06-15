@@ -238,7 +238,7 @@ export const terminalScrollbackMbAtom = atomWithStorage<number>(
  * callers of `resolved(key)` so a typo fails the type-check instead of silently
  * returning `undefined` and blanking the source badge.
  */
-export const REPO_SETTINGS_KEYS = [
+const REPO_SETTINGS_KEYS = [
 	'branchFrom',
 	'remoteOrigin',
 	'deleteLocalBranchOnArchive',

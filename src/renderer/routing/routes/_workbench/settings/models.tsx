@@ -29,7 +29,11 @@ export const Route = createFileRoute('/_workbench/settings/models')({
 });
 
 function ModelsSettings() {
-	const models = useQuery(piModelsQuery);
+	const {
+		data: modelsData,
+		error: modelsError,
+		isLoading: modelsLoading,
+	} = useQuery(piModelsQuery);
 	const [defaultModel, setDefaultModel] = useAtom(defaultChatModelAtom);
 	const [defaultThinking, setDefaultThinking] = useAtom(
 		defaultChatThinkingLevelAtom,
@@ -39,9 +43,9 @@ function ModelsSettings() {
 	const [personality, setPersonality] = useAtom(piPersonalityAtom);
 	const [chatMode, setChatMode] = useAtom(defaultChatModeAtom);
 
-	const list = models.data?.models ?? [];
-	const resolvedDefault = defaultModel ?? models.data?.defaultModelId ?? null;
-	const resolvedReview = reviewModel ?? models.data?.defaultModelId ?? null;
+	const list = modelsData?.models ?? [];
+	const resolvedDefault = defaultModel ?? modelsData?.defaultModelId ?? null;
+	const resolvedReview = reviewModel ?? modelsData?.defaultModelId ?? null;
 	const defaultLevels = thinkingLevelsFor(list, resolvedDefault);
 	const reviewLevels = thinkingLevelsFor(list, resolvedReview);
 
@@ -50,15 +54,15 @@ function ModelsSettings() {
 			description='Pi models and thinking-level defaults for new chats and reviews. Sourced from Pi CLI capability discovery.'
 			title='Models'
 		>
-			{models.isLoading ? (
+			{modelsLoading ? (
 				<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
 					<Spinner className='size-4' /> Loading Pi models…
 				</div>
 			) : null}
 
-			{models.error ? (
+			{modelsError ? (
 				<div className='py-6 text-sm text-status-danger'>
-					Pi model discovery failed: {String(models.error)}.
+					Pi model discovery failed: {String(modelsError)}.
 				</div>
 			) : null}
 
@@ -69,14 +73,14 @@ function ModelsSettings() {
 							ariaLabel='Default chat model'
 							models={list}
 							onChange={setDefaultModel}
-							placeholder={models.data?.defaultModelId ?? 'No models'}
+							placeholder={modelsData?.defaultModelId ?? 'No models'}
 							value={resolvedDefault}
 						/>
 						<ThinkingLevelSelect
 							ariaLabel='Default thinking level'
 							levels={defaultLevels}
 							onChange={setDefaultThinking}
-							value={defaultThinking ?? models.data?.defaultThinkingLevel}
+							value={defaultThinking ?? modelsData?.defaultThinkingLevel}
 						/>
 					</div>
 				}
@@ -91,14 +95,14 @@ function ModelsSettings() {
 							ariaLabel='Review model'
 							models={list}
 							onChange={setReviewModel}
-							placeholder={models.data?.defaultModelId ?? 'No models'}
+							placeholder={modelsData?.defaultModelId ?? 'No models'}
 							value={resolvedReview}
 						/>
 						<ThinkingLevelSelect
 							ariaLabel='Review thinking level'
 							levels={reviewLevels}
 							onChange={setReviewThinking}
-							value={reviewThinking ?? models.data?.defaultThinkingLevel}
+							value={reviewThinking ?? modelsData?.defaultThinkingLevel}
 						/>
 					</div>
 				}

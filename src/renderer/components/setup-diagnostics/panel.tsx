@@ -13,10 +13,9 @@ import type {
 
 import { SetupDiagnosticsCompact } from './compact';
 import { LocalExecutionNotice } from './local-execution-notice';
-import {
-	RootDirectoryChangeDialog,
-	useRootDirectoryChange,
-} from './root-directory';
+import { useRootDirectoryChange } from '@/renderer/hooks/setup-diagnostics/use-change';
+
+import { RootDirectoryChangeDialog } from './root-directory/change-dialog';
 import { SetupCheckRow } from './setup-check-row';
 
 interface SetupDiagnosticsPanelProps {

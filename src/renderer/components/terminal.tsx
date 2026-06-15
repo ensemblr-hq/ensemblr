@@ -4,7 +4,7 @@ import type { ComponentProps, HTMLAttributes } from 'react';
 import {
 	createContext,
 	useCallback,
-	useContext,
+	use,
 	useEffect,
 	useMemo,
 	useRef,
@@ -28,7 +28,7 @@ const TerminalContext = createContext<TerminalContextType>({
 
 export type TerminalHeaderProps = HTMLAttributes<HTMLDivElement>;
 
-export const TerminalHeader = ({
+const TerminalHeader = ({
 	className,
 	children,
 	...props
@@ -46,7 +46,7 @@ export const TerminalHeader = ({
 
 export type TerminalTitleProps = HTMLAttributes<HTMLDivElement>;
 
-export const TerminalTitle = ({
+const TerminalTitle = ({
 	className,
 	children,
 	...props
@@ -62,12 +62,12 @@ export const TerminalTitle = ({
 
 export type TerminalStatusProps = HTMLAttributes<HTMLDivElement>;
 
-export const TerminalStatus = ({
+const TerminalStatus = ({
 	className,
 	children,
 	...props
 }: TerminalStatusProps) => {
-	const { isStreaming } = useContext(TerminalContext);
+	const { isStreaming } = use(TerminalContext);
 
 	if (!isStreaming) {
 		return null;
@@ -85,7 +85,7 @@ export const TerminalStatus = ({
 
 export type TerminalActionsProps = HTMLAttributes<HTMLDivElement>;
 
-export const TerminalActions = ({
+const TerminalActions = ({
 	className,
 	children,
 	...props
@@ -101,7 +101,7 @@ export type TerminalCopyButtonProps = ComponentProps<typeof Button> & {
 	timeout?: number;
 };
 
-export const TerminalCopyButton = ({
+const TerminalCopyButton = ({
 	onCopy,
 	onError,
 	timeout = 2000,
@@ -111,7 +111,7 @@ export const TerminalCopyButton = ({
 }: TerminalCopyButtonProps) => {
 	const [isCopied, setIsCopied] = useState(false);
 	const timeoutRef = useRef<number>(0);
-	const { output } = useContext(TerminalContext);
+	const { output } = use(TerminalContext);
 
 	const copyToClipboard = useCallback(async () => {
 		if (typeof window === 'undefined' || !navigator?.clipboard?.writeText) {
@@ -156,12 +156,12 @@ export const TerminalCopyButton = ({
 
 export type TerminalClearButtonProps = ComponentProps<typeof Button>;
 
-export const TerminalClearButton = ({
+const TerminalClearButton = ({
 	children,
 	className,
 	...props
 }: TerminalClearButtonProps) => {
-	const { onClear } = useContext(TerminalContext);
+	const { onClear } = use(TerminalContext);
 
 	if (!onClear) {
 		return null;
@@ -185,12 +185,12 @@ export const TerminalClearButton = ({
 
 export type TerminalContentProps = HTMLAttributes<HTMLDivElement>;
 
-export const TerminalContent = ({
+const TerminalContent = ({
 	className,
 	children,
 	...props
 }: TerminalContentProps) => {
-	const { output, isStreaming, autoScroll } = useContext(TerminalContext);
+	const { output, isStreaming, autoScroll } = use(TerminalContext);
 	const containerRef = useRef<HTMLDivElement>(null);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: scroll fires on output change; the body reads scrollHeight rather than output directly.

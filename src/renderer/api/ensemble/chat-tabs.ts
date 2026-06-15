@@ -84,12 +84,3 @@ export function restoreChatTab(
 	);
 }
 
-/** Binds an open Pi session to an existing chat tab. */
-export function bindPiSessionToChatTab(
-	request: BindPiSessionToTabRequest,
-): Promise<BindPiSessionToTabResult> {
-	return profileElectronIpcCall(
-		{ channel: 'ensemble:bind-pi-session-to-chat-tab', usesDatabase: true },
-		() => getEnsembleApi().bindPiSessionToChatTab(request),
-	);
-}

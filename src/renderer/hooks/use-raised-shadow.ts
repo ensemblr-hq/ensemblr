@@ -28,7 +28,9 @@ export function useRaisedShadow(value: MotionValue<number>) {
 				}
 			}
 		});
-		return unsubscribe;
+		return () => {
+			unsubscribe();
+		};
 	}, [value, boxShadow]);
 
 	return boxShadow;

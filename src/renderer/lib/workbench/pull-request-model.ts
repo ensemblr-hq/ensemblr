@@ -134,27 +134,36 @@ function toCommentSummary(
 function buildLocalCommentSummaries(
 	comments: readonly ReviewCommentWire[],
 ): PullRequestCommentSummary[] {
-	return comments
-		.filter((comment) => comment.status === 'open')
-		.map((comment) => ({
-			detail: `${comment.filePath}${
-				comment.lineNumber ? `:${comment.lineNumber}` : ''
-			} — ${firstLine(comment.body)}`,
-			id: `local:${comment.id}`,
-			provider: 'local' as const,
-		}));
+	return comments.flatMap((comment) =>
+		comment.status === 'open'
+			? [
+					{
+						detail: `${comment.filePath}${
+							comment.lineNumber ? `:${comment.lineNumber}` : ''
+						} — ${firstLine(comment.body)}`,
+						id: `local:${comment.id}`,
+						provider: 'local' as const,
+					},
+				]
+			: [],
+	);
 }
 
 function buildTodoSummaries(
 	todos: readonly ReviewTodoWire[],
 ): PullRequestTodoSummary[] {
-	return todos
-		.filter((todo) => todo.status !== 'canceled')
-		.map((todo) => ({
-			id: todo.id,
-			label: todo.title,
-			status: todo.status === 'done' ? ('done' as const) : ('open' as const),
-		}));
+	return todos.flatMap((todo) =>
+		todo.status !== 'canceled'
+			? [
+					{
+						id: todo.id,
+						label: todo.title,
+						status:
+							todo.status === 'done' ? ('done' as const) : ('open' as const),
+					},
+				]
+			: [],
+	);
 }
 
 /** Derives the PR shell status from check buckets + mergeability signals. */

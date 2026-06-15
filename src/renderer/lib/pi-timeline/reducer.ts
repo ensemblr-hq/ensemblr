@@ -119,14 +119,14 @@ function messageText(message: PiAgentMessage): string {
 			return message.content;
 		}
 		return message.content
-			.map((block) => block.text ?? '')
-			.filter(Boolean)
+			.flatMap((block) => (block.text ? [block.text] : []))
 			.join('\n');
 	}
 	if (message.role === 'assistant') {
 		return message.content
-			.map((block) => (block.type === 'text' ? block.text : ''))
-			.filter(Boolean)
+			.flatMap((block) =>
+				block.type === 'text' && block.text ? [block.text] : [],
+			)
 			.join('\n');
 	}
 	return '';

@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, use } from 'react';
 
 import type { AgentActionKind } from '@/renderer/lib/workbench/agent-actions';
 
@@ -22,5 +22,5 @@ const ReviewActionsContext = createContext<ReviewActionsValue | null>(null);
 export const ReviewActionsContextProvider = ReviewActionsContext.Provider;
 
 export function useReviewActions(): ReviewActionsValue | null {
-	return useContext(ReviewActionsContext);
+	return use(ReviewActionsContext);
 }

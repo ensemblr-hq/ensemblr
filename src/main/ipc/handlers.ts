@@ -6,7 +6,7 @@ import type {
 	RepositoryConfigService,
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
-import { createGithubService } from '../github';
+import { createGithubService } from '../github/github-service';
 import type { LinearAuthService, LinearService } from '../linear';
 import type { OpenTargetService } from '../open-target';
 import type { PiSessionService } from '../pi-agent/pi-session-service';

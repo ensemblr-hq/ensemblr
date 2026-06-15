@@ -62,7 +62,7 @@ export function removeOpenChatTabFromCache({
 }
 
 /** Orders chat tabs by persisted strip position, then creation timestamp. */
-export function compareChatTabsByPosition(
+function compareChatTabsByPosition(
 	left: ChatTabWire,
 	right: ChatTabWire,
 ): number {

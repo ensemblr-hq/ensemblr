@@ -48,7 +48,6 @@ export {
 	monoFontAtom,
 	piPersonalityAtom,
 	REPO_ACTION_KEYS,
-	REPO_SETTINGS_KEYS,
 	renameWorkspaceOnBranchAtom,
 	repoSettingsOverrideAtomFamily,
 	reviewModelAtom,

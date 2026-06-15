@@ -49,15 +49,6 @@ export function importLocalRepository(
 	);
 }
 
-/** Registers a previously-selected local repository path with Ensemble. */
-export function registerLocalRepository(
-	request: RegisterLocalRepositoryRequest,
-): Promise<RegisterLocalRepositoryResult> {
-	return profileElectronIpcCall(
-		{ channel: 'ensemble:register-local-repository', usesDatabase: true },
-		() => getEnsembleApi().registerLocalRepository(request),
-	);
-}
 
 /** Creates an isolated git worktree workspace under the managed root. */
 export function createWorkspace(

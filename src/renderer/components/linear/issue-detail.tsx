@@ -37,10 +37,14 @@ import { LinearIssueMetaBadges } from './issue-meta-badges';
 
 /** Linear issue detail: metadata header, description, and comment thread. */
 export function LinearIssueDetail({ issueId }: { issueId: string }) {
-	const detail = useQuery(linearIssueQuery(issueId));
-	const result = detail.data;
+	const {
+		data: result,
+		isFetching,
+		isLoading,
+		refetch,
+	} = useQuery(linearIssueQuery(issueId));
 
-	if (detail.isLoading) {
+	if (isLoading) {
 		return (
 			<div className='flex w-full flex-col gap-3'>
 				<Skeleton className='h-8 w-2/3' />
@@ -65,7 +69,7 @@ export function LinearIssueDetail({ issueId }: { issueId: string }) {
 						</Link>
 					</Button>
 					<Button
-						onClick={() => void detail.refetch()}
+						onClick={() => void refetch()}
 						size='sm'
 						variant='outline'
 					>
@@ -80,8 +84,8 @@ export function LinearIssueDetail({ issueId }: { issueId: string }) {
 		<div className='flex w-full flex-col gap-4'>
 			<IssueDetailHeader
 				issue={result.issue}
-				isRefreshing={detail.isFetching}
-				onRefresh={() => void detail.refetch()}
+				isRefreshing={isFetching}
+				onRefresh={() => void refetch()}
 			/>
 			{result.issue.description ? (
 				<p className='whitespace-pre-wrap text-foreground text-sm leading-relaxed'>

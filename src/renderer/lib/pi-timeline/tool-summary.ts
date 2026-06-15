@@ -35,7 +35,7 @@ function stringArg(
 }
 
 /** Counts added/removed lines in a unified diff body. */
-export function diffStats(diff: string): { added: number; removed: number } {
+function diffStats(diff: string): { added: number; removed: number } {
 	let added = 0;
 	let removed = 0;
 	for (const line of diff.split('\n')) {

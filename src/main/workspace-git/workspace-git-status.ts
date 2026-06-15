@@ -176,11 +176,13 @@ export function createWorkspaceGitService({
 			string,
 			{ additions: number | null; deletions: number | null }
 		>();
-		for (const args of [
-			['diff', '--numstat', '-z', '--cached'],
-			['diff', '--numstat', '-z'],
-		]) {
-			const result = await runGit(cwd, args);
+		const results = await Promise.all(
+			[
+				['diff', '--numstat', '-z', '--cached'],
+				['diff', '--numstat', '-z'],
+			].map((args) => runGit(cwd, args)),
+		);
+		for (const result of results) {
 			if (result.status !== 'success') {
 				continue;
 			}

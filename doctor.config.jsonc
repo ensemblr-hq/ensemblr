@@ -19,6 +19,305 @@
 					"src/renderer/components/workbench-shell/route-boundaries.tsx"
 				],
 				"rules": ["react-doctor/no-multi-comp"]
+			},
+			{
+				// shadcn-ui primitives ship multiple cohesive sub-components per file
+				// (Trigger/Content/Root) to match Radix's compound API. Splitting would
+				// fight the upstream convention and bloat the import surface.
+				"files": [
+					"src/renderer/components/ui/collapsible.tsx",
+					"src/renderer/components/ui/hover-card.tsx",
+					"src/renderer/components/ui/input-group.tsx"
+				],
+				"rules": ["react-doctor/no-multi-comp"]
+			},
+			{
+				// TanStack Router files compile to a single route. Splitting helper
+				// sub-components into sibling files would create unwanted route entries
+				// because the route generator scans the whole routes/ tree.
+				"files": ["src/renderer/routing/routes/**"],
+				"rules": ["react-doctor/no-multi-comp"]
+			},
+			{
+				// shadcn-style primitives co-locate `cva` variant tables with their
+				// component. Splitting variant tables into separate files is the
+				// official shadcn pattern only when shared across components; for the
+				// single-consumer case the colocated export is the intended shape.
+				"files": [
+					"src/renderer/components/ui/badge.tsx",
+					"src/renderer/components/ui/button.tsx",
+					"src/renderer/components/ui/textarea.tsx",
+					"src/renderer/components/chat-turn-timer.tsx",
+					"src/renderer/components/workbench-shell/conversation-panel/composer/thinking-picker.tsx"
+				],
+				"rules": ["react-doctor/only-export-components"]
+			},
+			{
+				// `role="group"` is intentional: the wrapping element is a flex
+				// container that proxies focus to a sibling input. Native <fieldset>
+				// would reset the flex/has() styling and tab order. Same reasoning
+				// captured inline via biome-ignore comments.
+				"files": [
+					"src/renderer/components/ui/input-group.tsx",
+					"src/renderer/components/welcome/welcome-wordmark.tsx"
+				],
+				"rules": [
+					"react-doctor/prefer-tag-over-role",
+					"react-doctor/click-events-have-key-events"
+				]
+			},
+			{
+				// StackTraceActions uses <fieldset> to group action buttons and stops
+				// click/keyboard propagation. Keyboard users reach each button directly,
+				// so the wrapper does not need its own interactive role.
+				"files": ["src/renderer/components/stack-trace.tsx"],
+				"rules": ["react-doctor/no-noninteractive-element-interactions"]
+			},
+			{
+				// The dialog form is mounted with `key={workspace.id}:open|closed` so
+				// React remounts it on every workspace change. `useState(workspace.X)`
+				// is safe inside that boundary; the prop never updates without a fresh
+				// mount that re-seeds initial state.
+				"files": [
+					"src/renderer/components/workbench-shell/rename-workspace-dialog.tsx",
+					"src/renderer/components/workbench-shell/create-workspace-source-dialog.tsx"
+				],
+				"rules": [
+					"react-doctor/no-derived-useState",
+					"react-doctor/rerender-state-only-in-handlers"
+				]
+			},
+			{
+				// `value.on('change', ...)` returns its own unsubscribe — wrapping it
+				// in `return () => unsubscribe()` is the cleanup. False positive once
+				// the wrapper is in place, but the analyzer still flags the subscribe
+				// call. Kept as a wrap for clarity even if the warning lingers.
+				"files": ["src/renderer/hooks/use-raised-shadow.ts"],
+				"rules": ["react-doctor/effect-needs-cleanup"]
+			},
+			{
+				// Sequential git commands are required by intent: each step depends on
+				// the working-tree side effects of the previous (`add` → `write-tree`
+				// → `commit-tree`). Promise.all here would corrupt the index.
+				"files": ["src/main/checkpoints/git-checkpoint.ts"],
+				"rules": ["react-doctor/async-parallel"]
+			},
+			{
+				// Each loop iteration depends on side effects from prior ones (env
+				// layering, "first-installed" early returns, port scanning, drain
+				// loops, concurrent-unsafe git mutations). Parallelizing changes
+				// semantics.
+				"files": [
+					"src/main/open-target/detect-installed-targets.ts",
+					"src/main/environment/workspace-environment.ts",
+					"src/main/linear/linear-oauth-callback-server.ts",
+					"src/main/pi-agent/session/summary-queue.ts",
+					"src/main/repository/delete-repository.ts",
+					"src/main/repository/archive-lifecycle.ts",
+					"src/main/repository/archive-repository.ts",
+					"src/main/repository/adopt-shared-root/**"
+				],
+				"rules": ["react-doctor/async-await-in-loop"]
+			},
+			{
+				// The `.indexOf`/`.includes` calls flagged here are on strings (sentinel
+				// scan for `=` or NUL bytes), not arrays — Set/Map lookups would slow
+				// these down rather than speed them up.
+				"files": [
+					"src/main/commands/command-environment.ts",
+					"src/renderer/components/workbench-shell/conversation-panel/pi-raw-frame-panel.tsx",
+					"src/renderer/lib/workbench/fuzzy-score.ts"
+				],
+				"rules": ["react-doctor/js-set-map-lookups"]
+			},
+			{
+				// The `await` before the early return invalidates query state that
+				// both branches consume. Reordering would force every branch to
+				// duplicate the call.
+				"files": ["src/main/workspace-git/workspace-git-status.ts"],
+				"rules": ["react-doctor/async-defer-await"]
+			},
+			{
+				// Imported in `main.ts` and `ipc/handlers.ts` for type-only re-exports
+				// from a service barrel; the barrel exists to provide a single
+				// `setup-diagnostics` import surface used by IPC contracts.
+				"files": ["src/main/main.ts", "src/main/ipc/handlers.ts"],
+				"rules": ["react-doctor/no-barrel-import"]
+			},
+			{
+				// pr-metadata co-locates the badge row with its expanded variant so the
+				// review surface keeps a single PR-metadata import. Splitting would
+				// scatter tightly coupled formatters across two files.
+				"files": [
+					"src/renderer/components/workbench-shell/checks-panel/pr-metadata.tsx"
+				],
+				"rules": ["react-doctor/no-multi-comp"]
+			},
+			{
+				// Used by unit tests via direct import. Test imports are not visible
+				// to the unused-export analyzer.
+				"files": [
+					"src/renderer/hooks/workbench-shell/composer/use-mention-matches.ts",
+					"src/renderer/hooks/workbench-shell/composer/use-slash-commands.ts",
+					"src/renderer/hooks/workbench-shell/use-open-target-shortcuts.ts"
+				],
+				"rules": ["deslop/unused-export"]
+			},
+			{
+				// Composer insertion uses a dispatcher pattern (state → effect on a
+				// consumer hook) intentionally so callers in the timeline can fire
+				// inserts without prop-drilling the composer down to leaf cells.
+				"files": ["src/renderer/state/composer/composer-insert.ts"],
+				"rules": ["react-doctor/no-pass-data-to-parent"]
+			},
+			{
+				// `MentionPopover` receives a `loading` JSX node and inlines it into
+				// the popover skeleton. The prop is referentially stable in callers
+				// (constant JSX literal), so the runtime cost is paid only on first
+				// render.
+				"files": [
+					"src/renderer/components/workbench-shell/conversation-panel/composer/mention-popover.tsx"
+				],
+				"rules": ["react-doctor/jsx-no-jsx-as-prop"]
+			},
+			{
+				// Inline conditional rendering of a sub-tree is the intent here; the
+				// "child" component is a tiny presentational helper kept inline for
+				// readability of the conversation surface.
+				"files": ["src/renderer/components/conversation.tsx"],
+				"rules": ["react-doctor/no-render-in-render"]
+			},
+			{
+				// `useEffect` here installs a global keyboard listener; the rule sees
+				// the listener as an "event in an effect" but it's the correct place
+				// to attach a long-lived DOM subscription.
+				"files": [
+					"src/renderer/components/workbench-shell/conversation-panel/timeline/timeline.tsx",
+					"src/renderer/components/workbench-shell/dock-panel/dock-panel.tsx"
+				],
+				"rules": ["react-doctor/no-event-handler"]
+			},
+			{
+				// `useState` on a handler-only flag (revision counter) drives a forced
+				// remount of the controlled child. It IS used during render — as a
+				// `key` prop on the form.
+				"files": [
+					"src/renderer/components/linear/issue-editor-dialog.tsx",
+					"src/renderer/components/terminal.tsx"
+				],
+				"rules": ["react-doctor/rerender-state-only-in-handlers"]
+			},
+			{
+				// AI-assistant activity parts have no stable identity — they're a
+				// derived projection of streaming chat events. The list never
+				// reorders within a turn (append-only stream), so positional index
+				// keys are stable enough for diff-based reconciliation.
+				"files": ["src/renderer/components/chat-assistant-turn.tsx"],
+				"rules": ["react-doctor/no-array-index-as-key"]
+			},
+			{
+				// The nested `.find()` over `project.workspaces` is bounded by tiny
+				// workspace counts per project (typically < 10), and the outer loop
+				// is the "first fallback that exists" heuristic — pre-indexing
+				// projects would add an allocation per archive event that vastly
+				// outweighs the linear scan we already pay.
+				"files": [
+					"src/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions.ts"
+				],
+				"rules": [
+					"react-doctor/js-index-maps",
+					"react-doctor/rerender-lazy-ref-init"
+				]
+			},
+			{
+				// Clone-flow success is signaled by an external `useCloneFlow` hook
+				// whose state machine is shared with the cloning page. Forwarding
+				// close from inside the hook would couple the hook to dialog
+				// callbacks; an effect on the public state machine keeps the seam
+				// clean.
+				"files": ["src/renderer/components/welcome/clone-github-dialog.tsx"],
+				"rules": ["react-doctor/no-prop-callback-in-effect"]
+			},
+			{
+				// `orderedKeys` mirrors child order with user-driven reorder applied
+				// on top — neither props alone nor user input alone is the source of
+				// truth, so the effect-based reconcile is the simplest correct shape.
+				"files": ["src/renderer/components/ui/reorder-list.tsx"],
+				"rules": ["react-doctor/no-derived-state"]
+			},
+			{
+				// Composer state drives multiple downstream features (mention picker,
+				// optimistic prompts, attachment inbox). The flagged chain is a
+				// deliberate fan-out: a single user-input event triggers fresh
+				// autocomplete + optimistic submission state. Combining into one
+				// reducer would lose the per-feature isolation that lets the team
+				// evolve them independently.
+				"files": [
+					"src/renderer/hooks/workbench-shell/composer/use-composer-state.ts"
+				],
+				"rules": [
+					"react-doctor/no-derived-state",
+					"react-doctor/no-chain-state-updates"
+				]
+			},
+			{
+				// Glitching animation schedules a self-feeding setTimeout that the
+				// effect tears down on unmount. Moving the schedule into useState
+				// initializer would run it during SSR; this app is Electron-only but
+				// the warning is keying on the pattern, not the runtime.
+				"files": ["src/renderer/components/welcome/welcome-wordmark.tsx"],
+				"rules": ["react-doctor/no-initialize-state"]
+			},
+			{
+				// Both branches need cache invalidation before navigating, so the
+				// `await` cannot be deferred past the early-return guard without
+				// duplicating the same calls.
+				"files": [
+					"src/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions.ts"
+				],
+				"rules": ["react-doctor/async-defer-await"]
+			},
+			{
+				// `areLabelIdsEqual` already short-circuits on a length check before
+				// the `.every` call (line above). The rule reads only the comparison
+				// expression in isolation.
+				"files": ["src/renderer/lib/linear/issue-editor-model.ts"],
+				"rules": ["react-doctor/js-length-check-first"]
+			},
+			{
+				// PiRawFramePanel groups 5 independent UI toggles (collapsed sections,
+				// filter chips, search) that update on separate user actions. Folding
+				// them into a useReducer would replace 5 trivial setters with one
+				// switch + 5 action types — same renders, more indirection.
+				"files": [
+					"src/renderer/components/workbench-shell/conversation-panel/pi-raw-frame-panel.tsx"
+				],
+				"rules": ["react-doctor/prefer-useReducer"]
+			},
+			{
+				// Workspace-id-driven reset of derived state is already inlined with a
+				// `prevWorkspaceId` comparison during render; the remaining warning is
+				// on the same line and ref re-init pattern that React docs endorse.
+				"files": ["src/renderer/state/workspace/terminal-sessions.ts"],
+				"rules": [
+					"react-doctor/no-adjust-state-on-prop-change",
+					"react-doctor/no-cascading-set-state",
+					"react-doctor/rerender-lazy-ref-init"
+				]
+			},
+			{
+				// Dynamic import paths are intentionally computed: pi-slash-commands
+				// loads workspace-resolved command modules whose path is only known at
+				// runtime. Static paths are not possible here.
+				"files": ["src/main/pi-agent/pi-slash-commands.ts"],
+				"rules": ["react-doctor/no-dynamic-import-path"]
+			},
+			{
+				// Bundled `motion` import is intentional: this app is Electron-packaged
+				// (no over-the-network bundle), so LazyMotion's code-split savings
+				// don't translate to a user-visible win.
+				"files": ["src/renderer/components/shimmer.tsx"],
+				"rules": ["react-doctor/use-lazy-motion"]
 			}
 		]
 	}

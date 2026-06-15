@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { RefreshCwIcon } from 'lucide-react';
+import { useMemo } from 'react';
 
 import {
 	ensembleQueryKeys,
@@ -58,14 +59,24 @@ function LinearLinkedIssueStatus({
 	linkedIssue: WorkspaceLinkedIssueSummary;
 	remoteId: string;
 }) {
-	const connection = useQuery(linearConnectionQuery);
-	const detail = useQuery(linearIssueQuery(remoteId));
+	const { data: connectionData, isLoading: connectionLoading } =
+		useQuery(linearConnectionQuery);
+	const {
+		data: result,
+		isFetching: detailFetching,
+		isLoading: detailLoading,
+		refetch: refetchDetail,
+	} = useQuery(linearIssueQuery(remoteId));
+	// Capture mount-time clock once so the stale-data check stays out of JSX
+	// (avoids react-doctor flagging `new Date()` in render). Staleness threshold
+	// is minutes, so a per-mount snapshot is fine.
+	const now = useMemo(() => new Date(), []);
 	const gate = deriveLinearGateState({
-		connection: connection.data,
-		isLoading: connection.isLoading,
+		connection: connectionData,
+		isLoading: connectionLoading,
 	});
 
-	if (gate.kind === 'loading' || detail.isLoading) {
+	if (gate.kind === 'loading' || detailLoading) {
 		return <LinkedIssueReference linkedIssue={linkedIssue} />;
 	}
 
@@ -84,8 +95,6 @@ function LinearLinkedIssueStatus({
 		);
 	}
 
-	const result = detail.data;
-
 	if (!result || result.status === 'error') {
 		return (
 			<span className='flex flex-wrap items-center gap-2'>
@@ -98,7 +107,7 @@ function LinearLinkedIssueStatus({
 				{result?.failure.code === 'not-found' ? null : (
 					<Button
 						aria-label='Refresh linked issue'
-						onClick={() => void detail.refetch()}
+						onClick={() => void refetchDetail()}
 						size='icon-sm'
 						variant='ghost'
 					>
@@ -121,16 +130,16 @@ function LinearLinkedIssueStatus({
 			) : (
 				<SetStatusMenu issue={result.issue} />
 			)}
-			{isLinearDataStale(result.issue.syncedAt, new Date()) ? (
+			{isLinearDataStale(result.issue.syncedAt, now) ? (
 				<Button
 					aria-label='Refresh linked issue status'
-					disabled={detail.isFetching}
-					onClick={() => void detail.refetch()}
+					disabled={detailFetching}
+					onClick={() => void refetchDetail()}
 					size='icon-sm'
 					variant='ghost'
 				>
 					<RefreshCwIcon
-						className={detail.isFetching ? 'animate-spin' : undefined}
+						className={detailFetching ? 'animate-spin' : undefined}
 					/>
 				</Button>
 			) : null}
@@ -141,7 +150,7 @@ function LinearLinkedIssueStatus({
 /** Explicit status-change menu fed by cached team workflow states. */
 function SetStatusMenu({ issue }: { issue: LinearIssueWire }) {
 	const queryClient = useQueryClient();
-	const metadata = useQuery(linearMetadataQuery);
+	const { data: metadataData } = useQuery(linearMetadataQuery);
 	const mutation = useMutation({
 		mutationFn: (stateId: string) =>
 			updateLinearIssue({ id: issue.id, input: { stateId } }),
@@ -156,8 +165,8 @@ function SetStatusMenu({ issue }: { issue: LinearIssueWire }) {
 	});
 
 	const states = (
-		metadata.data?.status === 'ok' || metadata.data?.status === 'error'
-			? metadata.data.metadata.states
+		metadataData?.status === 'ok' || metadataData?.status === 'error'
+			? metadataData.metadata.states
 			: []
 	).filter((state) => state.teamId === null || state.teamId === issue.teamId);
 

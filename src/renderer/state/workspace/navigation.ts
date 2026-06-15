@@ -23,10 +23,14 @@ function getReorderedShellItems<T extends { id: string }>(
 	reorderedElements: ReactElement[],
 ): T[] {
 	const itemsById = new Map(items.map((item) => [item.id, item]));
-	const nextItems = reorderedElements
-		.map((element) => normalizeReorderElementKey(element.key))
-		.map((id) => (id ? itemsById.get(id) : undefined))
-		.filter((item): item is T => Boolean(item));
+	const nextItems = reorderedElements.flatMap((element) => {
+		const id = normalizeReorderElementKey(element.key);
+		if (!id) {
+			return [];
+		}
+		const item = itemsById.get(id);
+		return item ? [item] : [];
+	});
 
 	if (nextItems.length !== items.length) {
 		return items;
@@ -78,9 +82,9 @@ function getReconciledShellItemIds<T extends { id: string }>(
 	const itemIdSet = new Set(items.map((item) => item.id));
 	const orderedExistingIds = orderedIds.filter((id) => itemIdSet.has(id));
 	const orderedExistingIdSet = new Set(orderedExistingIds);
-	const newIds = items
-		.map((item) => item.id)
-		.filter((id) => !orderedExistingIdSet.has(id));
+	const newIds = items.flatMap((item) =>
+		orderedExistingIdSet.has(item.id) ? [] : [item.id],
+	);
 
 	return [...orderedExistingIds, ...newIds];
 }

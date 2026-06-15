@@ -1,6 +1,5 @@
 export * from './archive';
 export {
-	compareChatTabsByPosition,
 	removeOpenChatTabFromCache,
 	writeOpenedChatTabToCache,
 } from './chat-tab-cache';

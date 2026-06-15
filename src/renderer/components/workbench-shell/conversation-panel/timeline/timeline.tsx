@@ -234,15 +234,15 @@ function filterUnmatchedOptimistic(
 	if (optimistic.length === 0) {
 		return optimistic;
 	}
-	const persistedTexts = collectPersistedUserTexts(persisted);
+	const remainingByText = buildPersistedTextCounts(persisted);
 	const unmatched: OptimisticPrompt[] = [];
 	for (const entry of optimistic) {
-		const found = persistedTexts.indexOf(entry.prompt);
-		if (found === -1) {
+		const remaining = remainingByText.get(entry.prompt) ?? 0;
+		if (remaining === 0) {
 			unmatched.push(entry);
 			continue;
 		}
-		persistedTexts.splice(found, 1);
+		remainingByText.set(entry.prompt, remaining - 1);
 	}
 	return unmatched;
 }
@@ -251,17 +251,31 @@ function matchOptimisticAgainstMessages(
 	optimistic: readonly OptimisticPrompt[],
 	persisted: readonly UIMessage[],
 ): string[] {
-	const persistedTexts = collectPersistedUserTexts(persisted);
+	const remainingByText = buildPersistedTextCounts(persisted);
 	const matched: string[] = [];
 	for (const entry of optimistic) {
-		const found = persistedTexts.indexOf(entry.prompt);
-		if (found === -1) {
+		const remaining = remainingByText.get(entry.prompt) ?? 0;
+		if (remaining === 0) {
 			continue;
 		}
-		persistedTexts.splice(found, 1);
+		remainingByText.set(entry.prompt, remaining - 1);
 		matched.push(entry.id);
 	}
 	return matched;
+}
+
+/**
+ * Counts persisted user-message texts so duplicates are consumed in submission
+ * order without repeated linear scans.
+ */
+function buildPersistedTextCounts(
+	messages: readonly UIMessage[],
+): Map<string, number> {
+	const counts = new Map<string, number>();
+	for (const text of collectPersistedUserTexts(messages)) {
+		counts.set(text, (counts.get(text) ?? 0) + 1);
+	}
+	return counts;
 }
 
 function collectPersistedUserTexts(messages: readonly UIMessage[]): string[] {
@@ -271,8 +285,9 @@ function collectPersistedUserTexts(messages: readonly UIMessage[]): string[] {
 			continue;
 		}
 		const joined = message.parts
-			.map((part) => (part.type === 'text' ? part.text : ''))
-			.filter(Boolean)
+			.flatMap((part) =>
+				part.type === 'text' && part.text ? [part.text] : [],
+			)
 			.join('\n');
 		if (joined.length > 0) {
 			texts.push(joined);
@@ -466,8 +481,7 @@ function StackTraceDiagnostic({ trace }: { trace: string }) {
 /** Converts all text parts in a message into one diagnostic string. */
 function textFromMessage(message: UIMessage): string {
 	return message.parts
-		.map((part) => (part.type === 'text' ? part.text : ''))
-		.filter(Boolean)
+		.flatMap((part) => (part.type === 'text' && part.text ? [part.text] : []))
 		.join('\n');
 }
 
@@ -475,5 +489,3 @@ function textFromMessage(message: UIMessage): string {
 function isToolRunning(state: string): boolean {
 	return state === 'input-available' || state === 'input-streaming';
 }
-
-export default PiSessionTimeline;
