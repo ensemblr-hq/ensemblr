@@ -76,6 +76,13 @@ export interface CloseChatTabRequest {
 
 export interface CloseChatTabResult {
 	ok: true;
+	/**
+	 * True when the close hard-deleted the tab (empty chat or non-chat kind);
+	 * false when the tab was archived as restorable or the close was a no-op.
+	 * The renderer drops per-chat preference keys only for deleted tabs, since a
+	 * restorable tab must keep its model/thinking overrides.
+	 */
+	deleted: boolean;
 }
 
 /** Restore a closed chat tab to the end of the workspace's open-tab list. */

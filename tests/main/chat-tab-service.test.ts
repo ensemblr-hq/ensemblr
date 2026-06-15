@@ -106,9 +106,9 @@ test('openTab defaults blank titles and lists the tab as open', (t) => {
 test('closeTab is a no-op for unknown and already-closed tabs', (t) => {
 	const fixture = openFixture(t);
 
-	assert.doesNotThrow(() =>
-		fixture.service.closeTab({ chatTabId: 'missing-tab' }),
-	);
+	assert.deepEqual(fixture.service.closeTab({ chatTabId: 'missing-tab' }), {
+		deleted: false,
+	});
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
 	const second = fixture.service.openTab({
@@ -116,7 +116,10 @@ test('closeTab is a no-op for unknown and already-closed tabs', (t) => {
 		workspaceId: fixture.workspaceId,
 	});
 	fixture.service.closeTab({ chatTabId: second.id });
-	assert.doesNotThrow(() => fixture.service.closeTab({ chatTabId: second.id }));
+	// A duplicate close of an already-closed tab reports no deletion.
+	assert.deepEqual(fixture.service.closeTab({ chatTabId: second.id }), {
+		deleted: false,
+	});
 });
 
 test('closeTab keeps the last open tab in a workspace', (t) => {
@@ -126,7 +129,10 @@ test('closeTab keeps the last open tab in a workspace', (t) => {
 		piSessionId: fixture.piSessionId,
 		workspaceId: fixture.workspaceId,
 	});
-	fixture.service.closeTab({ chatTabId: only.id });
+	// Min-one rule keeps the tab open, so nothing is deleted.
+	assert.deepEqual(fixture.service.closeTab({ chatTabId: only.id }), {
+		deleted: false,
+	});
 
 	const open = listOpenForWorkspace({
 		database: fixture.connection.database,
@@ -148,7 +154,10 @@ test('closeTab deletes empty tabs instead of entering history', (t) => {
 	const empty = fixture.service.openTab({
 		workspaceId: fixture.workspaceId,
 	});
-	fixture.service.closeTab({ chatTabId: empty.id });
+	// Empty tabs are hard-deleted, so the close reports a deletion.
+	assert.deepEqual(fixture.service.closeTab({ chatTabId: empty.id }), {
+		deleted: true,
+	});
 
 	assert.equal(
 		getChatTabById({
@@ -172,7 +181,10 @@ test('closeTab moves session-bound tabs into closed history', (t) => {
 		piSessionId: fixture.piSessionId,
 		workspaceId: fixture.workspaceId,
 	});
-	fixture.service.closeTab({ chatTabId: bound.id });
+	// Session-bound tabs are archived (restorable), not deleted.
+	assert.deepEqual(fixture.service.closeTab({ chatTabId: bound.id }), {
+		deleted: false,
+	});
 
 	const { closed } = fixture.service.listTabs({
 		workspaceId: fixture.workspaceId,
@@ -338,7 +350,10 @@ test('closeTab hard-deletes non-chat tabs without entering history', (t) => {
 		title: 'README.md',
 		workspaceId: fixture.workspaceId,
 	});
-	fixture.service.closeTab({ chatTabId: fileTab.id });
+	// Non-chat tabs are hard-deleted on close.
+	assert.deepEqual(fixture.service.closeTab({ chatTabId: fileTab.id }), {
+		deleted: true,
+	});
 
 	assert.equal(
 		getChatTabById({
