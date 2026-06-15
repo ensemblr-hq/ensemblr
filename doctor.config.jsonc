@@ -4,9 +4,13 @@
 		"overrides": [
 			{
 				// TanStack Router file-based routes must `export const Route` (see
-				// src/renderer/AGENTS.md → Routing). That non-component export is
-				// HMR-safe (TanStack Router supports Fast Refresh), like a Remix
-				// loader/meta export, so only-export-components is a false positive here.
+				// src/renderer/AGENTS.md → Routing). That non-component value export
+				// trips only-export-components and can't be silenced by
+				// `allowConstantExport` (it's a `createFileRoute(...)()` call result,
+				// not a literal constant), so we suppress the rule here. The runtime is
+				// fine: TanStack's bundler plugin handles route HMR (with caveats —
+				// loaders/beforeLoad don't hot-reload), so the lint flag is the false
+				// positive, not the routing pattern.
 				"files": ["src/renderer/routing/routes/**"],
 				"rules": ["react-doctor/only-export-components"]
 			},
@@ -39,10 +43,13 @@
 				"rules": ["react-doctor/no-multi-comp"]
 			},
 			{
-				// shadcn-style primitives co-locate `cva` variant tables with their
-				// component. Splitting variant tables into separate files is the
-				// official shadcn pattern only when shared across components; for the
-				// single-consumer case the colocated export is the intended shape.
+				// shadcn primitives co-locate `cva` variant tables with their
+				// component (e.g. `buttonVariants` in button.tsx) — the canonical
+				// shadcn shape. That colocated non-component export trips
+				// only-export-components; for these single-consumer variant tables the
+				// colocation is intended, so suppress the rule here. (Splitting tables
+				// into a shared module is a reasonable convention when reused across
+				// components, but shadcn docs prescribe no such rule.)
 				"files": [
 					"src/renderer/components/ui/badge.tsx",
 					"src/renderer/components/ui/button.tsx",
@@ -313,9 +320,11 @@
 				"rules": ["react-doctor/no-dynamic-import-path"]
 			},
 			{
-				// Bundled `motion` import is intentional: this app is Electron-packaged
-				// (no over-the-network bundle), so LazyMotion's code-split savings
-				// don't translate to a user-visible win.
+				// Bundled `motion` import is intentional. LazyMotion's main win is
+				// download bundle size (`m` ~4.6kb vs `motion` ~34kb); this app is
+				// Electron-packaged with no over-the-network bundle, so that win is
+				// moot. The smaller parse/exec cost still applies but isn't worth the
+				// LazyMotion indirection here.
 				"files": ["src/renderer/components/shimmer.tsx"],
 				"rules": ["react-doctor/use-lazy-motion"]
 			}
