@@ -3,6 +3,9 @@ import type {
 	WorkspaceOpenTargetKind as SharedWorkspaceOpenTargetKind,
 	WorkspaceOpenTargetSnapshot,
 } from '@/shared/ipc/contracts/open-target';
+// `WorkspaceOpenTarget` is re-exported here for the renderer's query result
+// type (`workspaceOpenTargetsQuery`); it is no longer a property of the
+// workspace shell model — the menu reads it from the React Query cache.
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
@@ -285,7 +288,6 @@ export interface WorkspaceShellModel {
 	id: string;
 	landingSummary?: WorkspaceLandingSummary;
 	name: string;
-	openTargets: WorkspaceOpenTarget[];
 	pathLabel: string;
 	projectId: string;
 	pullRequest: {

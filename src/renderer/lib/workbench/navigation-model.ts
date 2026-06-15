@@ -135,10 +135,6 @@ function mapWorkspaceNavigationSnapshot(
 		id: workspace.id,
 		landingSummary: createPlaceholderLandingSummary(repository, workspace),
 		name: workspace.name || workspace.slug,
-		// Seeded from the preload initial-shell snapshot via React Query; the
-		// model intentionally starts empty so the menu only renders once real
-		// detection results arrive.
-		openTargets: [],
 		pathLabel: workspace.path,
 		projectId: repository.id,
 		pullRequest: {

@@ -1,5 +1,4 @@
 import { Icon } from '@iconify/react';
-import { useQuery } from '@tanstack/react-query';
 import {
 	ChevronDownIcon,
 	CopyIcon,
@@ -10,13 +9,8 @@ import {
 	WrenchIcon,
 } from 'lucide-react';
 import type { ComponentType, ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
+import { useCallback, useState } from 'react';
 
-import {
-	getEnsembleApiOrNull,
-	workspaceOpenTargetsQuery,
-} from '@/renderer/api/ensemble';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -25,15 +19,13 @@ import {
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import { cn } from '@/renderer/lib/utils';
-import {
-	readLastUsedOpenTarget,
-	writeLastUsedOpenTarget,
-} from '@/renderer/state/workspace/open-target-history';
 import type {
 	WorkspaceOpenTarget,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { WorkspaceOpenTargetIconName } from '@/shared/ipc/contracts/open-target';
+import { useOpenTargetShortcuts } from './use-open-target-shortcuts';
+import { useOpenTargets } from './use-open-targets';
 
 /** Split button + dropdown to open the workspace in installed apps. */
 export function OpenWorkspaceMenu({
@@ -42,151 +34,18 @@ export function OpenWorkspaceMenu({
 	workspace: WorkspaceShellModel;
 }) {
 	const [isMenuOpen, setMenuOpen] = useState(false);
-	const hasBridge = getEnsembleApiOrNull() !== null;
-	const { data } = useQuery({
-		...workspaceOpenTargetsQuery,
-		enabled: hasBridge,
+	const closeMenu = useCallback(() => setMenuOpen(false), []);
+	const { invokeTarget, openTargets, primaryTarget } = useOpenTargets({
+		workspaceId: workspace.id,
 	});
-	// Per-workspace memory of the last launch-app target the user picked, so
-	// the split button defaults to it on the next visit. Reads localStorage
-	// lazily on mount, re-syncs when the workspace changes, and updates
-	// in-place after each successful launch.
-	const [lastUsedTargetId, setLastUsedTargetId] = useState<string | null>(() =>
-		readLastUsedOpenTarget(workspace.id),
-	);
-	useEffect(() => {
-		setLastUsedTargetId(readLastUsedOpenTarget(workspace.id));
-	}, [workspace.id]);
 
-	const openTargets = useMemo<WorkspaceOpenTarget[] | null>(() => {
-		// Only render the menu once the real list (seeded from the preload
-		// snapshot or fetched via IPC) is available. The workspace model carries
-		// an empty list, never a placeholder, so the menu does not flash.
-		const fromQuery = data?.targets ?? null;
-		if (!fromQuery) {
-			return workspace.openTargets.length > 0 ? workspace.openTargets : null;
-		}
-		return fromQuery.filter(
-			(target) => target.installed || target.kind === 'utility',
-		);
-	}, [data?.targets, workspace.openTargets]);
-
-	const primaryTarget = useMemo(() => {
-		if (!openTargets) {
-			return null;
-		}
-		// Only launch-app targets are eligible for "quick launch" memory —
-		// copy-path and reveal-in-finder are utilities the user wouldn't expect
-		// to take over the split button.
-		const lastUsed =
-			lastUsedTargetId === null
-				? null
-				: (openTargets.find(
-						(target) =>
-							target.id === lastUsedTargetId &&
-							target.behavior === 'launch-app',
-					) ?? null);
-		return (
-			lastUsed ??
-			openTargets.find((target) => target.isPrimary) ??
-			openTargets.find((target) => target.kind !== 'utility') ??
-			openTargets[0] ??
-			null
-		);
-	}, [lastUsedTargetId, openTargets]);
-
-	const invokeTarget = useCallback(
-		async (target: WorkspaceOpenTarget) => {
-			const ensemble = getEnsembleApiOrNull();
-			if (!ensemble) {
-				toast.error('Open in… is unavailable without the Electron bridge.');
-				return;
-			}
-			const result = await ensemble.openWorkspaceInTarget({
-				targetId: target.id,
-				workspaceId: workspace.id,
-			});
-			if (!result.ok) {
-				toast.error(`Failed to open in ${target.label}: ${result.error}`);
-				return;
-			}
-			if (target.behavior === 'launch-app') {
-				writeLastUsedOpenTarget(workspace.id, target.id);
-				setLastUsedTargetId(target.id);
-			}
-			if (target.behavior === 'copy-path') {
-				toast.success('Workspace path copied to clipboard.');
-			}
-		},
-		[workspace.id],
-	);
-
-	useEffect(() => {
-		if (!openTargets || openTargets.length === 0) {
-			return undefined;
-		}
-
-		const handler = (event: KeyboardEvent) => {
-			if (event.defaultPrevented) {
-				return;
-			}
-			if (shouldIgnoreShortcut(event)) {
-				return;
-			}
-
-			const commandKey = event.metaKey || event.ctrlKey;
-
-			if (
-				commandKey &&
-				event.shiftKey &&
-				!event.altKey &&
-				event.key.toLowerCase() === 'c'
-			) {
-				const copyTarget = openTargets.find(
-					(target) => target.behavior === 'copy-path',
-				);
-				if (copyTarget) {
-					event.preventDefault();
-					void invokeTarget(copyTarget);
-				}
-				return;
-			}
-
-			if (
-				commandKey &&
-				!event.shiftKey &&
-				!event.altKey &&
-				event.key.toLowerCase() === 'o'
-			) {
-				if (primaryTarget) {
-					event.preventDefault();
-					void invokeTarget(primaryTarget);
-				}
-				return;
-			}
-
-			if (
-				isMenuOpen &&
-				!commandKey &&
-				!event.altKey &&
-				!event.shiftKey &&
-				/^[1-9]$/.test(event.key)
-			) {
-				const index = Number.parseInt(event.key, 10) - 1;
-				const target = openTargets[index];
-				if (target) {
-					event.preventDefault();
-					setMenuOpen(false);
-					void invokeTarget(target);
-				}
-			}
-		};
-
-		window.addEventListener('keydown', handler);
-		return () => {
-			window.removeEventListener('keydown', handler);
-		};
-	}, [invokeTarget, isMenuOpen, openTargets, primaryTarget]);
+	useOpenTargetShortcuts({
+		closeMenu,
+		invokeTarget: (target) => void invokeTarget(target),
+		isMenuOpen,
+		openTargets,
+		primaryTarget,
+	});
 
 	if (!openTargets || !primaryTarget) {
 		return null;
@@ -244,23 +103,6 @@ export function OpenWorkspaceMenu({
 			</DropdownMenu>
 		</div>
 	);
-}
-
-/**
- * Skip the global open-in shortcuts when the user is typing in an editable
- * surface. ⌘O / ⌘⇧C are claimed for opening editors and copying the workspace
- * path; firing them inside an input would surprise users.
- */
-function shouldIgnoreShortcut(event: KeyboardEvent): boolean {
-	const target = event.target;
-	if (!(target instanceof HTMLElement)) {
-		return false;
-	}
-	if (target.isContentEditable) {
-		return true;
-	}
-	const tag = target.tagName;
-	return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }
 
 type IconRenderer = ComponentType<{ className?: string }>;
