@@ -69,6 +69,22 @@ Route loaders resolve fallback selection when a project/workspace is missing
 non-canonical search, and redirect the workspace index to the preferred chat.
 Pending, error, and not-found boundaries render shared empty-state shells.
 
+Add-project flows such as Quick Start and Open GitHub Project are a special
+navigation race: they register/create a repository, create its first workspace,
+and then navigate to a project/workspace URL while the `_workbench` parent loader
+may still hold the boot-time repository/workspace snapshot. The fix is two-part:
+
+1. `seedFirstWorkspace` force-refreshes `repositoryWorkspaceNavigationQuery` from
+   IPC (`invalidateQueries` with no automatic refetch, then `fetchQuery` with
+   `staleTime: 0`) before navigating, persists the new project/workspace pair to
+   the last-selection atom/localStorage, and navigates directly to the canonical
+   chat route.
+2. The `/projects/$projectId` loader also receives `queryClient` and checks the
+   fresh navigation cache before redirecting. This is required because the
+   project layout loader runs before the workspace loader; if it only reads stale
+   parent loader data, it redirects to the previous fallback before the workspace
+   loader can resolve the newly-created workspace.
+
 ### State and composition
 
 - Durable per-workspace UI selection (dock tab, review tab, and last chat tab) is

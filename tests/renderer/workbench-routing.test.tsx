@@ -1,11 +1,12 @@
 /// <reference types="bun" />
 
-import { expect, test } from 'bun:test';
+import { afterEach, expect, test } from 'bun:test';
 import { QueryClient } from '@tanstack/react-query';
 import { isRedirect } from '@tanstack/react-router';
 
 import { repositoryWorkspaceNavigationQuery } from '../../src/renderer/api/ensemble-queries';
 import { normalizeWorkbenchSearch } from '../../src/renderer/lib/workbench';
+import { refreshRepositoryWorkspaceNavigationCache } from '../../src/renderer/lib/workbench/seed-first-workspace';
 import {
 	loadProjectWorkbenchRoute,
 	loadShellWorkbenchRoute,
@@ -17,6 +18,49 @@ import {
 import type { WorkspaceRouteLoaderData } from '../../src/renderer/types/routing';
 import type { RepositoryWorkspaceNavigationSnapshot } from '../../src/shared/ipc';
 
+afterEach(() => {
+	Reflect.deleteProperty(globalThis, 'window');
+});
+
+function createNavigationSnapshot({
+	repositoryId,
+	workspaceId,
+}: {
+	repositoryId: string;
+	workspaceId: string;
+}): RepositoryWorkspaceNavigationSnapshot {
+	return {
+		generatedAt: '2026-06-08T00:00:00.000Z',
+		repositories: [
+			{
+				createdAt: '2026-06-08T00:00:00.000Z',
+				defaultBranch: 'main',
+				id: repositoryId,
+				metadata: {},
+				name: repositoryId,
+				path: `/tmp/${repositoryId}`,
+				slug: repositoryId,
+				updatedAt: '2026-06-08T00:00:00.000Z',
+				workspaces: [
+					{
+						archivedAt: null,
+						baseBranch: 'main',
+						branchName: `feature/${workspaceId}`,
+						createdAt: '2026-06-08T00:00:00.000Z',
+						id: workspaceId,
+						metadata: {},
+						name: workspaceId,
+						path: `/tmp/${repositoryId}/${workspaceId}`,
+						repositoryId,
+						slug: workspaceId,
+						updatedAt: '2026-06-08T00:00:00.000Z',
+					},
+				],
+			},
+		],
+	};
+}
+
 async function catchProjectRouteRedirect({
 	params,
 }: {
@@ -25,12 +69,14 @@ async function catchProjectRouteRedirect({
 	};
 }) {
 	Reflect.deleteProperty(globalThis, 'window');
-	const loaderData = await loadWorkbenchRouteData(new QueryClient());
+	const queryClient = new QueryClient();
+	const loaderData = await loadWorkbenchRouteData(queryClient);
 
 	try {
 		await loadProjectWorkbenchRoute({
 			parentMatchPromise: Promise.resolve({ loaderData }),
 			params,
+			queryClient,
 		});
 	} catch (error) {
 		if (isRedirect(error)) {
@@ -305,6 +351,45 @@ test('canonicalizes chat route search without replacing database tab ids', async
 	});
 });
 
+test('project loader reads fresh navigation cache before redirecting new project routes', async () => {
+	Reflect.deleteProperty(globalThis, 'window');
+	const queryClient = new QueryClient();
+	const loaderData = await loadWorkbenchRouteData(queryClient);
+	const freshSnapshot = createNavigationSnapshot({
+		repositoryId: 'new-project',
+		workspaceId: 'new-workspace',
+	});
+
+	queryClient.setQueryData(
+		repositoryWorkspaceNavigationQuery.queryKey,
+		freshSnapshot,
+	);
+
+	const projectData = await loadProjectWorkbenchRoute({
+		parentMatchPromise: Promise.resolve({ loaderData }),
+		params: {
+			projectId: 'new-project',
+		},
+		queryClient,
+	});
+
+	expect(projectData?.projects[0]?.id).toBe('new-project');
+
+	const workspaceData = await loadWorkspaceWorkbenchRoute({
+		parentMatchPromise: Promise.resolve({ loaderData: projectData }),
+		params: {
+			projectId: 'new-project',
+			workspaceId: 'new-workspace',
+		},
+		queryClient,
+		rawSearch: {},
+		search: normalizeWorkbenchSearch({}),
+	});
+
+	expect(workspaceData?.project.id).toBe('new-project');
+	expect(workspaceData?.workspace.id).toBe('new-workspace');
+});
+
 test('reads fresh navigation cache when parent loaderData lacks the workspace', async () => {
 	Reflect.deleteProperty(globalThis, 'window');
 	const queryClient = new QueryClient();
@@ -362,6 +447,46 @@ test('reads fresh navigation cache when parent loaderData lacks the workspace', 
 	expect(workspaceData?.workspace.id).toBe(seededWorkspaceId);
 });
 
+test('refreshes navigation from IPC even when the cache is fresh', async () => {
+	const queryClient = new QueryClient();
+	const staleSnapshot = createNavigationSnapshot({
+		repositoryId: 'repo-old',
+		workspaceId: 'workspace-old',
+	});
+	const freshSnapshot = createNavigationSnapshot({
+		repositoryId: 'repo-new',
+		workspaceId: 'workspace-new',
+	});
+	let calls = 0;
+
+	queryClient.setQueryData(
+		repositoryWorkspaceNavigationQuery.queryKey,
+		staleSnapshot,
+	);
+	Object.defineProperty(globalThis, 'window', {
+		configurable: true,
+		value: {
+			ensemble: {
+				repositoryWorkspaceNavigation: async () => {
+					calls += 1;
+					return freshSnapshot;
+				},
+			},
+		},
+	});
+
+	const snapshot = await refreshRepositoryWorkspaceNavigationCache(queryClient);
+
+	const cachedSnapshot =
+		queryClient.getQueryData<RepositoryWorkspaceNavigationSnapshot>(
+			repositoryWorkspaceNavigationQuery.queryKey,
+		);
+
+	expect(calls).toBe(1);
+	expect(snapshot).toEqual(freshSnapshot);
+	expect(cachedSnapshot).toEqual(freshSnapshot);
+});
+
 test('still redirects when neither parent loaderData nor fresh cache has the workspace', async () => {
 	Reflect.deleteProperty(globalThis, 'window');
 	const queryClient = new QueryClient();
@@ -396,7 +521,8 @@ test('still redirects when neither parent loaderData nor fresh cache has the wor
 
 test('shell pass-through feeds workbench data to descendant loaders', async () => {
 	Reflect.deleteProperty(globalThis, 'window');
-	const loaderData = await loadWorkbenchRouteData(new QueryClient());
+	const queryClient = new QueryClient();
+	const loaderData = await loadWorkbenchRouteData(queryClient);
 	const shellData = await loadShellWorkbenchRoute({
 		parentMatchPromise: Promise.resolve({ loaderData }),
 	});
@@ -409,6 +535,7 @@ test('shell pass-through feeds workbench data to descendant loaders', async () =
 			params: {
 				projectId: 'missing-project',
 			},
+			queryClient,
 		});
 	} catch (error) {
 		if (isRedirect(error)) {

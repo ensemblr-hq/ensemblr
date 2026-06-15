@@ -68,6 +68,11 @@ export type {
 } from './list-archived-workspaces.ts';
 export { createListArchivedWorkspacesService } from './list-archived-workspaces.ts';
 export type {
+	CreateLocalRepositoryImportServiceOptions,
+	LocalRepositoryImportService,
+} from './import-local-repository.ts';
+export { createLocalRepositoryImportService } from './import-local-repository.ts';
+export type {
 	CreateGithubRepositoryListServiceOptions,
 	GithubRepositoryListService,
 } from './list-github-repositories.ts';

@@ -1,4 +1,5 @@
 import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useSetAtom } from 'jotai';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -8,13 +9,19 @@ import {
 	subscribeCloneGithubRepositoryProgress,
 } from '@/renderer/api/ensemble-queries';
 import { seedFirstWorkspace } from '@/renderer/lib/workbench/seed-first-workspace';
-import type { CloneGithubRepositoryDiagnostic, CloneGithubRepositoryProgressEvent, CloneGithubRepositoryStartResult } from '@/shared/ipc/contracts/clone';
+import { lastWorkspaceSelectionAtom } from '@/renderer/state/workspace';
+import type {
+	CloneGithubRepositoryDiagnostic,
+	CloneGithubRepositoryProgressEvent,
+	CloneGithubRepositoryStartResult,
+} from '@/shared/ipc/contracts/clone';
 
 /** Top-level UI states the clone flow moves through. */
 export type CloneStage =
 	| 'idle'
 	| 'preparing'
 	| 'cloning'
+	| 'opening'
 	| 'success'
 	| 'failure';
 
@@ -39,6 +46,7 @@ export interface UseCloneFlowResult {
 export function useCloneFlow(): UseCloneFlowResult {
 	const navigate = useNavigate();
 	const router = useRouter();
+	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
 	const [stage, setStage] = useState<CloneStage>('idle');
 	const [diagnostics, setDiagnostics] = useState<
 		CloneGithubRepositoryDiagnostic[]
@@ -99,16 +107,19 @@ export function useCloneFlow(): UseCloneFlowResult {
 
 			if (result.status === 'success' && result.repository) {
 				const repository = result.repository;
-				setStage('success');
 				setSuccessResult(result);
+				setStage('opening');
 				const seed = await seedFirstWorkspace({
 					navigate,
+					persistSelection: setLastWorkspaceSelection,
 					repositoryId: repository.id,
 					router,
 				});
 				if (seed.status === 'success') {
+					setStage('success');
 					toast.success(`Cloned ${repository.name}.`);
 				} else {
+					setStage('failure');
 					toast.error(
 						seed.error ?? `Cloned ${repository.name}, opening failed.`,
 					);
@@ -119,7 +130,7 @@ export function useCloneFlow(): UseCloneFlowResult {
 			setStage('failure');
 			setDiagnostics(result.diagnostics);
 		},
-		[navigate, router],
+		[navigate, router, setLastWorkspaceSelection],
 	);
 
 	const retry = useCallback(() => {
@@ -129,7 +140,7 @@ export function useCloneFlow(): UseCloneFlowResult {
 
 	return {
 		diagnostics,
-		isBusy: stage === 'preparing' || stage === 'cloning',
+		isBusy: stage === 'preparing' || stage === 'cloning' || stage === 'opening',
 		logs,
 		retry,
 		stage,

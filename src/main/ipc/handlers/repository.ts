@@ -1,10 +1,22 @@
 import { ipcMain } from 'electron';
-
-import { type ArchiveRepositoryResult, type DeleteRepositoryResult, type LocalRepositorySelectionResult, type RegisterLocalRepositoryResult } from '../../../shared/ipc/contracts/repository';
-import { type ArchiveWorkspaceResult, type CreateWorkspaceResult, type DeleteArchivedWorkspaceResult, type DeleteWorkspaceResult, type ListArchivedWorkspacesResult, type RenameWorkspaceResult, type UnarchiveWorkspaceResult } from '../../../shared/ipc/contracts/workspace';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import { type QuickStartProjectResult } from '../../../shared/ipc/contracts/quick-start';
-import { type SharedRootAdoptionSnapshot } from '../../../shared/ipc/contracts/shared-root-adoption';
+import type { QuickStartProjectResult } from '../../../shared/ipc/contracts/quick-start';
+import type {
+	ArchiveRepositoryResult,
+	DeleteRepositoryResult,
+	LocalRepositorySelectionResult,
+	RegisterLocalRepositoryResult,
+} from '../../../shared/ipc/contracts/repository';
+import type { SharedRootAdoptionSnapshot } from '../../../shared/ipc/contracts/shared-root-adoption';
+import type {
+	ArchiveWorkspaceResult,
+	CreateWorkspaceResult,
+	DeleteArchivedWorkspaceResult,
+	DeleteWorkspaceResult,
+	ListArchivedWorkspacesResult,
+	RenameWorkspaceResult,
+	UnarchiveWorkspaceResult,
+} from '../../../shared/ipc/contracts/workspace';
 import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
@@ -13,6 +25,7 @@ import type {
 	DeleteRepositoryService,
 	DeleteWorkspaceService,
 	ListArchivedWorkspacesService,
+	LocalRepositoryImportService,
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
 	RenameWorkspaceService,
@@ -44,6 +57,7 @@ export interface RepositoryHandlersOptions {
 	deleteRepositoryService: DeleteRepositoryService;
 	deleteWorkspaceService: DeleteWorkspaceService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
+	localRepositoryImportService: LocalRepositoryImportService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	quickStartProjectService: QuickStartProjectService;
 	renameWorkspaceService: RenameWorkspaceService;
@@ -53,8 +67,8 @@ export interface RepositoryHandlersOptions {
 }
 
 /**
- * Registers IPC handlers for picking, registering, and quick-starting local
- * repositories.
+ * Registers IPC handlers for picking, importing, registering, and quick-starting
+ * local repositories.
  * @param options - Required services.
  */
 export function registerRepositoryHandlers({
@@ -65,6 +79,7 @@ export function registerRepositoryHandlers({
 	deleteRepositoryService,
 	deleteWorkspaceService,
 	listArchivedWorkspacesService,
+	localRepositoryImportService,
 	localRepositoryRegistrationService,
 	quickStartProjectService,
 	renameWorkspaceService,
@@ -76,12 +91,19 @@ export function registerRepositoryHandlers({
 		IPC_CHANNELS.selectLocalRepository,
 		(event): Promise<LocalRepositorySelectionResult> =>
 			showDirectorySelectionDialog(event, {
-				buttonLabel: 'Register repository',
-				message:
-					'Select an existing local git repository to register with Ensemble.',
+				buttonLabel: 'Open project',
+				message: 'Select an existing local git project to copy into Ensemble.',
 				properties: ['openDirectory'],
-				title: 'Register local repository',
+				title: 'Open local project',
 			}),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.importLocalRepository,
+		(_event, raw: unknown): Promise<RegisterLocalRepositoryResult> =>
+			localRepositoryImportService.importRepository(
+				parseRegisterLocalRepositoryRequest(raw),
+			),
 	);
 
 	ipcMain.handle(

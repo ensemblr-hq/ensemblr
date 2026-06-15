@@ -7,11 +7,16 @@ export type RegisterLocalRepositoryDiagnosticSeverity =
 
 export type RegisterLocalRepositoryDiagnosticCode =
 	| 'database-unavailable'
+	| 'destination-not-writable'
+	| 'managed-repositories-path-missing'
 	| 'path-not-a-git-repository'
 	| 'repository-already-registered'
+	| 'repository-copy-failed'
+	| 'repository-copy-target-inside-source'
 	| 'repository-insert-failed'
 	| 'repository-path-is-workspace'
 	| 'repository-path-missing'
+	| 'repository-path-not-directory'
 	| 'repository-path-relative'
 	| 'repository-path-unreadable'
 	| 'repository-permission-denied'
@@ -167,11 +172,14 @@ export interface AdoptedRepositorySnapshot {
 	updatedAt: string;
 }
 
-/** Repository lifecycle IPC surface (register / hard-delete / selection dialog). */
+/** Repository lifecycle IPC surface (import/register / hard-delete / selection dialog). */
 export interface RepositoryApi {
 	deleteRepository: (
 		request: DeleteRepositoryRequest,
 	) => Promise<DeleteRepositoryResult>;
+	importLocalRepository: (
+		request: RegisterLocalRepositoryRequest,
+	) => Promise<RegisterLocalRepositoryResult>;
 	registerLocalRepository: (
 		request: RegisterLocalRepositoryRequest,
 	) => Promise<RegisterLocalRepositoryResult>;

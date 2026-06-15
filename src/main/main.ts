@@ -1,8 +1,15 @@
 import { app, BrowserWindow, shell } from 'electron';
 import started from 'electron-squirrel-startup';
 import { IPC_CHANNELS } from '../shared/ipc/channels';
-import { type PiRawFrameBroadcast, type PiRawFrameKind, type PiSessionEventBroadcast } from '../shared/ipc/contracts/pi-session';
-import { type TerminalLifecycleBroadcast, type TerminalOutputBroadcast } from '../shared/ipc/contracts/terminal';
+import type {
+	PiRawFrameBroadcast,
+	PiRawFrameKind,
+	PiSessionEventBroadcast,
+} from '../shared/ipc/contracts/pi-session';
+import type {
+	TerminalLifecycleBroadcast,
+	TerminalOutputBroadcast,
+} from '../shared/ipc/contracts/terminal';
 
 import { createMainWindow, createMainWindowStateStore } from './app';
 import { createLocalCommandService } from './commands';
@@ -39,6 +46,7 @@ import {
 	createGithubCloneService,
 	createGithubRepositoryListService,
 	createListArchivedWorkspacesService,
+	createLocalRepositoryImportService,
 	createLocalRepositoryRegistrationService,
 	createQuickStartProjectService,
 	createRenameWorkspaceService,
@@ -193,6 +201,11 @@ const localRepositoryRegistrationService =
 	createLocalRepositoryRegistrationService({
 		databaseService,
 	});
+const localRepositoryImportService = createLocalRepositoryImportService({
+	localCommandService,
+	registrationService: localRepositoryRegistrationService,
+	rootDirectoryService,
+});
 const githubCloneService = createGithubCloneService({
 	databaseService,
 	registrationService: localRepositoryRegistrationService,
@@ -341,6 +354,7 @@ app.whenReady().then(() => {
 		listArchivedWorkspacesService,
 		listWorkspaceFilesService,
 		localCommandService,
+		localRepositoryImportService,
 		localRepositoryRegistrationService,
 		piExecutableService,
 		piSessionService,
