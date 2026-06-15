@@ -10,11 +10,17 @@ No onboarding screenshots were captured under `.context/conductor-screens/01-onb
   `src/renderer/components/welcome.tsx` and mounted from the
   `_workbench/_shell/` index route. It renders the Ensemble wordmark plus three
   cards: Open project, Open GitHub project, and Quick start.
-- The Open GitHub project card opens a UI-only `CloneGithubDialog`
-  (`src/renderer/components/welcome/clone-github-dialog.tsx`) with URL
-  and destination inputs. Clone IPC wiring is future work (`ENS-019`).
-- Open project and Quick start cards are visible but not yet wired to native
-  pickers or the quick-start flow.
+- The Open GitHub project card opens `CloneGithubDialog`
+  (`src/renderer/components/welcome/clone-github-dialog.tsx`) with URL,
+  destination, clone progress, repository registration, first-workspace seeding,
+  and navigation into the new workspace.
+- Open project opens a native folder picker, clones only the selected local git
+  project's tracked repository state into the managed `repos/` directory,
+  registers that managed copy, creates the first workspace, and navigates into
+  it. The original selected folder is not mutated, and a progress dialog stays
+  visible while the import/workspace creation runs.
+- Quick start creates a new git repository under the managed `repos/`
+  directory, registers it, creates the first workspace, and navigates into it.
 - The setup gate (`src/renderer/components/setup-diagnostics/`) and its
   remediation states (git/gh/Pi/root) are running ahead of the welcome view via
   the loader chain; the welcome view assumes diagnostics either pass or surface

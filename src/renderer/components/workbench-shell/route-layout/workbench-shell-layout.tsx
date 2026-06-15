@@ -1,6 +1,7 @@
 import { Outlet, useChildMatches } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
 import { CloneGithubDialog } from '@/renderer/components/welcome/clone-github-dialog';
+import { LocalProjectImportDialog } from '@/renderer/components/welcome/local-project-import-dialog';
 import { QuickStartDialog } from '@/renderer/components/welcome/quick-start-dialog';
 import { WorkbenchFrame } from '@/renderer/components/workbench-shell/frame';
 import {
@@ -15,6 +16,7 @@ import {
 } from '@/renderer/lib/workbench';
 import {
 	cloneDialogOpenAtom,
+	localProjectImportDialogOpenAtom,
 	quickStartDialogOpenAtom,
 } from '@/renderer/state/dialogs';
 import type {
@@ -39,6 +41,7 @@ export function WorkbenchShellLayout() {
 		routeState,
 	});
 	const [cloneOpen, setCloneOpen] = useAtom(cloneDialogOpenAtom);
+	const [localProjectImportOpen] = useAtom(localProjectImportDialogOpenAtom);
 	const [quickStartOpen, setQuickStartOpen] = useAtom(quickStartDialogOpenAtom);
 
 	return (
@@ -61,6 +64,7 @@ export function WorkbenchShellLayout() {
 					</WorkbenchLayoutModelProvider>
 				</WorkbenchFrame>
 				<CloneGithubDialog onOpenChange={setCloneOpen} open={cloneOpen} />
+				<LocalProjectImportDialog open={localProjectImportOpen} />
 				<QuickStartDialog
 					onOpenChange={setQuickStartOpen}
 					open={quickStartOpen}

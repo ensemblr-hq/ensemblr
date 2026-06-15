@@ -32,6 +32,7 @@ export const IPC_CHANNELS = {
 	pushWorkspaceBranch: 'ensemble:push-workspace-branch',
 	githubRepositoryList: 'ensemble:github-repository-list',
 	health: 'ensemble:health',
+	importLocalRepository: 'ensemble:import-local-repository',
 	initialShellSnapshot: 'ensemble:initial-shell-snapshot',
 	killTerminalSession: 'ensemble:kill-terminal-session',
 	linearCancelLogin: 'ensemble:linear-cancel-login',

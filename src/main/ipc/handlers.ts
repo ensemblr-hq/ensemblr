@@ -20,6 +20,7 @@ import type {
 	GithubCloneService,
 	GithubRepositoryListService,
 	ListArchivedWorkspacesService,
+	LocalRepositoryImportService,
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
 	RenameWorkspaceService,
@@ -80,6 +81,7 @@ interface RegisterIpcHandlersOptions {
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
 	listWorkspaceFilesService: ListWorkspaceFilesService;
 	localCommandService: LocalCommandService;
+	localRepositoryImportService: LocalRepositoryImportService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	piExecutableService: PiExecutableService;
 	piSessionService: PiSessionService;
@@ -118,6 +120,7 @@ export function registerIpcHandlers({
 	listArchivedWorkspacesService,
 	listWorkspaceFilesService,
 	localCommandService,
+	localRepositoryImportService,
 	localRepositoryRegistrationService,
 	piExecutableService,
 	piSessionService,
@@ -161,6 +164,7 @@ export function registerIpcHandlers({
 		deleteRepositoryService,
 		deleteWorkspaceService,
 		listArchivedWorkspacesService,
+		localRepositoryImportService,
 		localRepositoryRegistrationService,
 		quickStartProjectService,
 		renameWorkspaceService,

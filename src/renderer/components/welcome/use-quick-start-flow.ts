@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useSetAtom } from 'jotai';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -10,7 +11,11 @@ import {
 	selectCloneDestination,
 } from '@/renderer/api/ensemble-queries';
 import { seedFirstWorkspace } from '@/renderer/lib/workbench/seed-first-workspace';
-import type { QuickStartProjectDiagnostic, QuickStartProjectResult } from '@/shared/ipc/contracts/quick-start';
+import { lastWorkspaceSelectionAtom } from '@/renderer/state/workspace';
+import type {
+	QuickStartProjectDiagnostic,
+	QuickStartProjectResult,
+} from '@/shared/ipc/contracts/quick-start';
 
 /** Top-level UI states the quick-start flow moves through. */
 export type QuickStartStage = 'creating' | 'failure' | 'idle';
@@ -44,6 +49,7 @@ export function useQuickStartFlow({
 } = {}): UseQuickStartFlowResult {
 	const navigate = useNavigate();
 	const router = useRouter();
+	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
 	const { data: rootDirectoryData } = useQuery({
 		...rootDirectoryQuery,
 		enabled: isEnsembleApiAvailable(),
@@ -96,6 +102,7 @@ export function useQuickStartFlow({
 				setSuccessResult(result);
 				const seed = await seedFirstWorkspace({
 					navigate,
+					persistSelection: setLastWorkspaceSelection,
 					repositoryId: repository.id,
 					router,
 				});
@@ -115,7 +122,7 @@ export function useQuickStartFlow({
 			setDiagnostics(result.diagnostics);
 			return result;
 		},
-		[navigate, onSuccess, parentPath, router],
+		[navigate, onSuccess, parentPath, router, setLastWorkspaceSelection],
 	);
 
 	const retry = useCallback(() => {

@@ -45,7 +45,7 @@ export function CloneGithubDialog({
 			}}
 			open={open}
 		>
-			<DialogContent className='gap-3 sm:max-w-lg'>
+			<DialogContent className='flex max-h-[min(85vh,42rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-lg'>
 				<CloneGithubDialogForm
 					key={open ? 'open' : 'closed'}
 					onOpenChange={onOpenChange}
@@ -139,90 +139,94 @@ function CloneGithubDialogForm({
 
 	return (
 		<>
-			<DialogHeader>
+			<DialogHeader className='px-4 pt-4'>
 				<DialogTitle className='font-medium text-[0.9375rem]'>
 					Clone GitHub repo
 				</DialogTitle>
 			</DialogHeader>
 
-			<div className='flex flex-col gap-1.5'>
-				<Label className='text-xs' htmlFor='clone-github-url'>
-					Repository URL
-				</Label>
-				<Input
-					autoFocus
-					className='h-9'
-					disabled={isBusy}
-					id='clone-github-url'
-					onChange={(event) => setUrl(event.target.value)}
-					onKeyDown={handleSubmitKey}
-					placeholder='https://github.com/user/repo.git'
-					value={url}
-				/>
-			</div>
-
-			<div className='flex flex-col gap-1.5'>
-				<Label className='text-xs'>Recent repos</Label>
-				<CloneGithubRecentRepos
-					disabled={isBusy}
-					isLoading={isGithubRepoListLoading}
-					onSelect={(repo) => setUrl(`https://github.com/${repo.fullName}.git`)}
-					repos={displayedEntries}
-					selectedUrl={url}
-				/>
-				{liveError ? (
-					<p className='text-muted-foreground text-xxs'>{liveError}</p>
-				) : null}
-			</div>
-
-			<div className='flex flex-col gap-1.5'>
-				<Label className='text-xs' htmlFor='clone-github-location'>
-					Location
-				</Label>
-				<div className='flex gap-2'>
+			<div className='flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pt-3 pb-3'>
+				<div className='flex flex-col gap-1.5'>
+					<Label className='text-xs' htmlFor='clone-github-url'>
+						Repository URL
+					</Label>
 					<Input
-						className='h-9 flex-1 font-mono text-xs'
-						disabled={isBusy}
-						id='clone-github-location'
-						onChange={(event) => {
-							setLocationOverride(event.target.value);
-						}}
-						onKeyDown={handleSubmitKey}
-						placeholder={locationPlaceholder}
-						value={location}
-					/>
-					<Button
+						autoFocus
 						className='h-9'
-						disabled={isBusy || !isEnsembleApiAvailable()}
-						onClick={handleBrowse}
-						type='button'
-						variant='outline'
-					>
-						Browse
-					</Button>
+						disabled={isBusy}
+						id='clone-github-url'
+						onChange={(event) => setUrl(event.target.value)}
+						onKeyDown={handleSubmitKey}
+						placeholder='https://github.com/user/repo.git'
+						value={url}
+					/>
 				</div>
-				{locationOverride !== null &&
-				defaultParentPath &&
-				location !== defaultParentPath ? (
-					<button
-						className='self-start text-muted-foreground text-xxs underline-offset-2 hover:underline'
-						onClick={() => {
-							setLocationOverride(null);
-						}}
-						type='button'
-					>
-						Reset to managed repos directory
-					</button>
+
+				<div className='flex flex-col gap-1.5'>
+					<Label className='text-xs'>Recent repos</Label>
+					<CloneGithubRecentRepos
+						disabled={isBusy}
+						isLoading={isGithubRepoListLoading}
+						onSelect={(repo) =>
+							setUrl(`https://github.com/${repo.fullName}.git`)
+						}
+						repos={displayedEntries}
+						selectedUrl={url}
+					/>
+					{liveError ? (
+						<p className='text-muted-foreground text-xxs'>{liveError}</p>
+					) : null}
+				</div>
+
+				<div className='flex flex-col gap-1.5'>
+					<Label className='text-xs' htmlFor='clone-github-location'>
+						Location
+					</Label>
+					<div className='flex gap-2'>
+						<Input
+							className='h-9 flex-1 font-mono text-xs'
+							disabled={isBusy}
+							id='clone-github-location'
+							onChange={(event) => {
+								setLocationOverride(event.target.value);
+							}}
+							onKeyDown={handleSubmitKey}
+							placeholder={locationPlaceholder}
+							value={location}
+						/>
+						<Button
+							className='h-9'
+							disabled={isBusy || !isEnsembleApiAvailable()}
+							onClick={handleBrowse}
+							type='button'
+							variant='outline'
+						>
+							Browse
+						</Button>
+					</div>
+					{locationOverride !== null &&
+					defaultParentPath &&
+					location !== defaultParentPath ? (
+						<button
+							className='self-start text-muted-foreground text-xxs underline-offset-2 hover:underline'
+							onClick={() => {
+								setLocationOverride(null);
+							}}
+							type='button'
+						>
+							Reset to managed repos directory
+						</button>
+					) : null}
+				</div>
+
+				{logs.length > 0 ? <CloneGithubProgressLog logs={logs} /> : null}
+
+				{stage === 'failure' && diagnostics.length > 0 ? (
+					<CloneGithubDiagnostics diagnostics={diagnostics} />
 				) : null}
 			</div>
 
-			{logs.length > 0 ? <CloneGithubProgressLog logs={logs} /> : null}
-
-			{stage === 'failure' && diagnostics.length > 0 ? (
-				<CloneGithubDiagnostics diagnostics={diagnostics} />
-			) : null}
-
-			<div className='-mx-4 -mb-4 flex justify-end gap-2 rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
+			<div className='flex shrink-0 justify-end gap-2 rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
 				{stage === 'failure' ? (
 					<Button
 						className='h-8'
@@ -260,6 +264,8 @@ function getCloneButtonLabel(stage: CloneStage): string {
 			return 'Preparing…';
 		case 'cloning':
 			return 'Cloning…';
+		case 'opening':
+			return 'Opening…';
 		case 'failure':
 		case 'idle':
 		case 'success':

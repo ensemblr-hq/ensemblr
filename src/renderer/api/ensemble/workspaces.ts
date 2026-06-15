@@ -1,7 +1,23 @@
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
-import type { CreateWorkspaceRequest, CreateWorkspaceResult, DeleteWorkspaceRequest, DeleteWorkspaceResult, RenameWorkspaceRequest, RenameWorkspaceResult } from '@/shared/ipc/contracts/workspace';
-import type { DeleteRepositoryRequest, DeleteRepositoryResult, LocalRepositorySelectionResult, RegisterLocalRepositoryRequest, RegisterLocalRepositoryResult } from '@/shared/ipc/contracts/repository';
-import type { QuickStartProjectRequest, QuickStartProjectResult } from '@/shared/ipc/contracts/quick-start';
+import type {
+	QuickStartProjectRequest,
+	QuickStartProjectResult,
+} from '@/shared/ipc/contracts/quick-start';
+import type {
+	DeleteRepositoryRequest,
+	DeleteRepositoryResult,
+	LocalRepositorySelectionResult,
+	RegisterLocalRepositoryRequest,
+	RegisterLocalRepositoryResult,
+} from '@/shared/ipc/contracts/repository';
+import type {
+	CreateWorkspaceRequest,
+	CreateWorkspaceResult,
+	DeleteWorkspaceRequest,
+	DeleteWorkspaceResult,
+	RenameWorkspaceRequest,
+	RenameWorkspaceResult,
+} from '@/shared/ipc/contracts/workspace';
 
 import { getEnsembleApi } from './query-keys';
 
@@ -20,6 +36,16 @@ export function quickStartProject(
 	return profileElectronIpcCall(
 		{ channel: 'ensemble:quick-start-project', usesDatabase: true },
 		() => getEnsembleApi().quickStartProject(request),
+	);
+}
+
+/** Copies a selected local repository into managed repos and registers it. */
+export function importLocalRepository(
+	request: RegisterLocalRepositoryRequest,
+): Promise<RegisterLocalRepositoryResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:import-local-repository', usesDatabase: true },
+		() => getEnsembleApi().importLocalRepository(request),
 	);
 }
 
