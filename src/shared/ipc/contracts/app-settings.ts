@@ -7,7 +7,7 @@ export interface AppSettingsChangedBroadcast {
 	settings: AppSettings;
 }
 
-/** Result of requesting the OS to open `config.json` in the default editor. */
+/** Result of requesting `config.json` be opened in the user's editor. */
 export interface OpenAppConfigFileResult {
 	error?: string;
 }

@@ -19,7 +19,7 @@ export function updateAppSettings(
 	return getEnsembleApi().updateAppSettings(patch);
 }
 
-/** Opens `config.json` in the OS default editor (creating it if needed). */
+/** Opens `config.json` in the user's editor (creating it if needed). */
 export function openAppConfigFile(): Promise<OpenAppConfigFileResult> {
 	return getEnsembleApi().openAppConfigFile();
 }
