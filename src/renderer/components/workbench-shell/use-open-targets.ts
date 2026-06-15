@@ -63,16 +63,16 @@ export function useOpenTargets({
 		if (!openTargets) {
 			return null;
 		}
-		// Only launch-app targets are eligible for "quick launch" memory —
-		// copy-path and reveal-in-finder are utilities the user wouldn't expect
-		// to take over the split button.
+		// copy-path is a clipboard action, not an "open" — never let it take
+		// over the split button. Anything that actually opens the workspace
+		// (launch-app, reveal-in-finder) is eligible for quick-launch memory.
 		const lastUsed =
 			lastUsedTargetId === null
 				? null
 				: (openTargets.find(
 						(target) =>
 							target.id === lastUsedTargetId &&
-							target.behavior === 'launch-app',
+							target.behavior !== 'copy-path',
 					) ?? null);
 		return (
 			lastUsed ??
@@ -98,7 +98,7 @@ export function useOpenTargets({
 				toast.error(`Failed to open in ${target.label}: ${result.error}`);
 				return;
 			}
-			if (target.behavior === 'launch-app') {
+			if (target.behavior !== 'copy-path') {
 				writeLastUsedOpenTarget(workspaceId, target.id);
 				setLastUsedTargetId(target.id);
 			}
