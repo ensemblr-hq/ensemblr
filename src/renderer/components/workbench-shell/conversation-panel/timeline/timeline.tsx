@@ -52,6 +52,7 @@ import type {
 } from '@/renderer/types/workbench';
 import { useTurnDiffOpener } from '../file-preview-context';
 import { RestoreCheckpointDialog } from './restore-checkpoint-dialog';
+import { resolveLiveTurnStartMs } from './timeline-timing';
 
 /**
  * Structured renderer for the Pi RPC event stream. Reads persisted events
@@ -239,39 +240,6 @@ function optimisticToUIMessage(entry: OptimisticPrompt): UIMessage {
 		parts: [{ state: 'done', text: entry.prompt, type: 'text' }],
 		role: 'user',
 	};
-}
-
-/**
- * Resolves the submit instant (ms) that anchors the live "Working…" indicator
- * while a turn is in flight but before the first assistant event lands. Prefers
- * the most recent optimistic prompt's `submittedAt` (available immediately on
- * submit); falls back to the trailing persisted user message's `firstEventAt`.
- * Returns null when no usable timestamp exists.
- */
-export function resolveLiveTurnStartMs(
-	messages: readonly UIMessage[],
-	optimisticPrompts: readonly OptimisticPrompt[],
-): number | null {
-	const lastOptimistic = optimisticPrompts.at(-1);
-	if (lastOptimistic) {
-		const ms = Date.parse(lastOptimistic.submittedAt);
-		if (!Number.isNaN(ms)) {
-			return ms;
-		}
-	}
-	for (let index = messages.length - 1; index >= 0; index -= 1) {
-		const message = messages[index];
-		if (message?.role !== 'user') {
-			continue;
-		}
-		const metadata = turnMetadataOf(message);
-		if (metadata) {
-			const ms = Date.parse(metadata.firstEventAt);
-			return Number.isNaN(ms) ? null : ms;
-		}
-		break;
-	}
-	return null;
 }
 
 /**
