@@ -18,14 +18,14 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
+import { useOpenTargetShortcuts } from '@/renderer/hooks/workbench-shell/use-open-target-shortcuts';
+import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
 import { cn } from '@/renderer/lib/utils';
 import type {
 	WorkspaceOpenTarget,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { WorkspaceOpenTargetIconName } from '@/shared/ipc/contracts/open-target';
-import { useOpenTargetShortcuts } from './use-open-target-shortcuts';
-import { useOpenTargets } from './use-open-targets';
 
 /** Split button + dropdown to open the workspace in installed apps. */
 export function OpenWorkspaceMenu({

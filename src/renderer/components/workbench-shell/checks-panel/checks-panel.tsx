@@ -17,7 +17,7 @@ import {
 	formatCommentContext,
 	formatTodoContext,
 } from '@/renderer/lib/workbench/review-context';
-import { useComposerInsert } from '@/renderer/state/composer-insert';
+import { useComposerInsert } from '@/renderer/state/composer';
 import type { ChecksPanelState } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 

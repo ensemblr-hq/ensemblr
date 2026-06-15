@@ -10,7 +10,11 @@ import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
 import { isRemediationActionButton } from '@/renderer/lib/setup-diagnostics';
 import { cn } from '@/renderer/lib/utils';
-import type { SetupCheckSnapshot, SetupCheckStatus, SetupRemediationAction } from '@/shared/ipc/contracts/setup';
+import type {
+	SetupCheckSnapshot,
+	SetupCheckStatus,
+	SetupRemediationAction,
+} from '@/shared/ipc/contracts/setup';
 
 const CHECK_STATUS_LABELS: Record<SetupCheckStatus, string> = {
 	failure: 'Failed',

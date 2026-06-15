@@ -3,7 +3,10 @@ import { useMemo } from 'react';
 
 import { piSlashCommandsQuery } from '@/renderer/api/ensemble-queries';
 
-import { SLASH_COMMANDS, type SlashCommandDescriptor } from './slash-commands';
+import {
+	SLASH_COMMANDS,
+	type SlashCommandDescriptor,
+} from '@/renderer/components/workbench-shell/conversation-panel/composer/slash-commands';
 
 /** Ranks slash commands in the default empty-query menu. */
 function getSlashCommandRank(command: SlashCommandDescriptor): number {

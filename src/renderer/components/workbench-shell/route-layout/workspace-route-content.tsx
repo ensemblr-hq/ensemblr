@@ -2,12 +2,13 @@ import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useCallback } from 'react';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
+import { useLiveWorkspaceModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-workspace-model';
 import type { WorkspaceNavigationSelection } from '@/renderer/lib/workbench';
 import {
 	createPlaceholderSession,
 	getComposerState,
 } from '@/renderer/lib/workbench';
-import { usePiComposerController } from '@/renderer/state/pi-composer';
+import { usePiComposerController } from '@/renderer/state/composer';
 import {
 	useSessionTabState,
 	useWorkspacePanelTabState,
@@ -19,9 +20,7 @@ import type {
 	DockTabId,
 	WorkbenchRouteSearch,
 } from '@/renderer/types/workbench';
-
 import { WorkspaceMainContentProvider } from '../shell-contexts';
-import { useLiveWorkspaceModel } from './use-live-workspace-model';
 
 /** Workspace shell content — wires panel tabs, composer state, and navigation. */
 export function WorkspaceRouteContent({

@@ -8,29 +8,31 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import type { SlashCommandDescriptor } from '@/renderer/components/workbench-shell/conversation-panel/composer/slash-commands';
 import {
 	type KeymapBinding,
 	useKeymapHandler,
 } from '@/renderer/hooks/use-keymap-handler';
 import {
-	formatMentionAttachmentText,
-	formatUploadAttachmentText,
-} from '@/renderer/lib/workbench/mention-payload';
-import { useComposerAttachmentInbox } from '@/renderer/state/composer-attachments';
-import { useComposerInsertConsumer } from '@/renderer/state/composer-insert';
-import type {
-	ComposerShellState,
-	WorkspaceFileSummary,
-} from '@/renderer/types/workbench';
-import type { SlashCommandDescriptor } from './slash-commands';
-import {
 	type AutocompleteKind,
 	type AutocompleteState,
 	detectAutocomplete,
 	useFuzzyMatches,
-} from './use-autocomplete';
-import { useMentionMatches } from './use-mention-matches';
-import { useSlashCommands } from './use-slash-commands';
+} from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
+import { useMentionMatches } from '@/renderer/hooks/workbench-shell/composer/use-mention-matches';
+import { useSlashCommands } from '@/renderer/hooks/workbench-shell/composer/use-slash-commands';
+import {
+	formatMentionAttachmentText,
+	formatUploadAttachmentText,
+} from '@/renderer/lib/workbench/mention-payload';
+import {
+	useComposerAttachmentInbox,
+	useComposerInsertConsumer,
+} from '@/renderer/state/composer';
+import type {
+	ComposerShellState,
+	WorkspaceFileSummary,
+} from '@/renderer/types/workbench';
 
 /** Inputs required by the composer state hook. */
 interface UseComposerStateArgs {

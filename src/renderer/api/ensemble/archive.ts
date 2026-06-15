@@ -1,8 +1,18 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
-import type { ArchiveRepositoryRequest, ArchiveRepositoryResult } from '@/shared/ipc/contracts/repository';
-import type { ArchiveWorkspaceRequest, ArchiveWorkspaceResult, DeleteArchivedWorkspaceRequest, DeleteArchivedWorkspaceResult, UnarchiveWorkspaceRequest, UnarchiveWorkspaceResult } from '@/shared/ipc/contracts/workspace';
+import type {
+	ArchiveRepositoryRequest,
+	ArchiveRepositoryResult,
+} from '@/shared/ipc/contracts/repository';
+import type {
+	ArchiveWorkspaceRequest,
+	ArchiveWorkspaceResult,
+	DeleteArchivedWorkspaceRequest,
+	DeleteArchivedWorkspaceResult,
+	UnarchiveWorkspaceRequest,
+	UnarchiveWorkspaceResult,
+} from '@/shared/ipc/contracts/workspace';
 
 import { ensembleQueryKeys, getEnsembleApi } from './query-keys';
 

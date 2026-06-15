@@ -7,9 +7,9 @@ import {
 } from '@/renderer/components/ui/context-menu';
 import { SidebarMenuButton } from '@/renderer/components/ui/sidebar';
 import { useNavigation } from '@/renderer/components/workbench-shell/shell-contexts';
+import { useWorkspacePiBusy } from '@/renderer/hooks/workspace/use-workspace-pi-busy';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
-import { useWorkspacePiBusy } from '@/renderer/state/use-workspace-pi-busy';
 import type {
 	WorkbenchRouteSearch,
 	WorkspaceShellModel,

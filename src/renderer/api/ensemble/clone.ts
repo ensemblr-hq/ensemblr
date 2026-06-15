@@ -1,5 +1,12 @@
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
-import type { CloneDestinationSelectionResult, CloneGithubRepositoryPrepareResult, CloneGithubRepositoryProgressEvent, CloneGithubRepositoryRequest, CloneGithubRepositoryStartRequest, CloneGithubRepositoryStartResult } from '@/shared/ipc/contracts/clone';
+import type {
+	CloneDestinationSelectionResult,
+	CloneGithubRepositoryPrepareResult,
+	CloneGithubRepositoryProgressEvent,
+	CloneGithubRepositoryRequest,
+	CloneGithubRepositoryStartRequest,
+	CloneGithubRepositoryStartResult,
+} from '@/shared/ipc/contracts/clone';
 
 import { getEnsembleApi, getEnsembleApiOrNull } from './query-keys';
 

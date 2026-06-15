@@ -12,7 +12,7 @@ import {
 	submitPiPrompt,
 	subscribePiSessionEvents,
 } from '@/renderer/api/ensemble-queries';
-import { useOptimisticPrompts } from '@/renderer/state/optimistic-prompts';
+import { useOptimisticPrompts } from '@/renderer/state/composer/optimistic-prompts';
 import {
 	lastSelectedPiModelAtom,
 	lastSelectedPiThinkingLevelAtom,

@@ -35,7 +35,11 @@ import {
 	UNSET_FIELD,
 	validateIssueEditorFields,
 } from '@/renderer/lib/linear';
-import type { LinearIssueWire, LinearResourceWire, MutateLinearIssueResult } from '@/shared/ipc/contracts/linear';
+import type {
+	LinearIssueWire,
+	LinearResourceWire,
+	MutateLinearIssueResult,
+} from '@/shared/ipc/contracts/linear';
 
 const PRIORITY_OPTIONS = [
 	{ label: 'No priority', value: '0' },
