@@ -1,5 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 
+import type { ListPiModelsResult } from '@/shared/ipc/contracts/pi-session';
+import { writeCachedPiModels } from './ensemble/pi-models-cache';
 import { ensembleQueryKeys } from './ensemble-queries';
 
 /** Singleton TanStack Query client for the renderer, with conservative defaults. */
@@ -13,6 +15,7 @@ export const queryClient = new QueryClient({
 });
 
 seedQueryCacheFromInitialSnapshot();
+persistPiModelsOnUpdate();
 
 /**
  * Seeds the query cache with the navigation/health snapshot the preload script
@@ -41,4 +44,24 @@ function seedQueryCacheFromInitialSnapshot(): void {
 			targets: snapshot.openTargets,
 		});
 	}
+}
+
+/**
+ * Persists every successful Pi model catalog fetch (initial + background
+ * refreshes) to localStorage so the next launch hydrates instantly. The cache
+ * writer skips empty results, preserving the last-known-good catalog when `pi`
+ * is momentarily unavailable.
+ */
+function persistPiModelsOnUpdate(): void {
+	const modelsKey = JSON.stringify(ensembleQueryKeys.piModels());
+	queryClient.getQueryCache().subscribe((event) => {
+		if (JSON.stringify(event.query.queryKey) !== modelsKey) {
+			return;
+		}
+		const state = event.query.state;
+		if (state.status !== 'success' || !state.data) {
+			return;
+		}
+		writeCachedPiModels(state.data as ListPiModelsResult);
+	});
 }
