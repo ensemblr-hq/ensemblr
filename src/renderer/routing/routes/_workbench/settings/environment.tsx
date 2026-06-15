@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { EnvironmentTable } from '@/renderer/components/settings/environment-table';
-import { SettingsSection } from '@/renderer/components/settings/settings-section';
+import { EnvironmentVariablesPanel } from '@/renderer/components/settings/environment-variables-panel';
 
 export const Route = createFileRoute('/_workbench/settings/environment')({
 	component: EnvironmentSettings,
@@ -9,11 +8,11 @@ export const Route = createFileRoute('/_workbench/settings/environment')({
 
 function EnvironmentSettings() {
 	return (
-		<SettingsSection
-			description='Environment variables Ensemble forwards to Pi sessions, scripts, and terminals. Values are resolved at session launch; this view is read-only. Manage entries through the macOS Keychain or your shell profile.'
+		<EnvironmentVariablesPanel
+			description='Environment variables used by Ensemble and passed to Pi sessions, scripts, and terminals.'
+			enableEnvFiles
+			scope='app'
 			title='Environment'
-		>
-			<EnvironmentTable scope='app' />
-		</SettingsSection>
+		/>
 	);
 }

@@ -82,34 +82,26 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.55.35@2x.png`
 
 - Flow: `02-root-settings`
-- Screen name: App Settings - Providers
-- User goal: Inspect and manage agent-provider authentication.
-- Entry point: Settings sidebar, Providers tab.
-- Primary actions: Switch provider tab, refresh auth status, choose CLI or API-key auth method, open provider settings in an editor, run provider login command.
-- Secondary actions: View plan/account status and provider metadata.
-- Visible UI regions: settings sidebar, provider tabs, connected status badge, metadata table, auth-method cards, settings-file row.
-- Empty/loading/error states: Connected state visible; no failed auth state captured.
-- Data shown: Provider, plan, organization, and account metadata are visible but treated as sensitive and not transcribed.
-- Settings or configuration implied: Provider auth mode, provider settings path, login command, refresh action.
-- Ensemble parity requirement: Provide a provider readiness screen that explains current auth state and remediation.
-- Pi-specific adaptation: Replace multi-provider Claude/Codex tabs with Pi CLI/RPC auth/model/provider readiness and Pi agent directory/resource discovery.
-- Risks or implementation notes: Ensemble should not expose tokens or account identifiers unnecessarily; secret values should be hidden and stored outside plain JSON.
+- Screen name: App Settings - Providers — **REMOVED**
+- Status: The standalone Providers settings screen was deleted (route, sidebar entry, command-palette entry). Provider/auth setup is owned by Pi itself; Ensemble does not store provider tokens.
+- Where it lives now: Provider readiness checks (Pi runtime, Pi model provider, GitHub CLI) remain in the **Diagnostics** screen, sourced from the setup-diagnostics gate.
+- Pi-specific adaptation: Provider credentials stay in the Pi user environment (ADR 0003); Ensemble surfaces readiness only, not auth management.
+- Risks or implementation notes: Ensemble should not expose tokens or account identifiers; secret values are hidden and stored outside plain JSON.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.55.51@2x.png`
 
 - Flow: `02-root-settings`
-- Screen name: App Settings - Environment Variables
-- User goal: Manage environment variables passed to agents and runtime commands.
-- Entry point: Settings sidebar, Environment tab.
-- Primary actions: Add environment variable, add a documented variable from the catalog, expand documented/hidden variable lists.
-- Secondary actions: Inspect whether a variable is set without revealing its value.
-- Visible UI regions: settings sidebar, add-variable button, scrollable catalog list, per-row secret icon/status/action.
-- Empty/loading/error states: Most catalog entries show an unset state; no error visible.
-- Data shown: Variable names and descriptions for proxy, provider, cloud, OpenAI, and gateway-related configuration. No values are visible.
-- Settings or configuration implied: App-level environment store, secret masking, provider-specific documented variable catalog.
-- Ensemble parity requirement: Support global environment variables, documented variable hints, hidden values, unset/set status, and per-variable edit/add actions.
-- Pi-specific adaptation: Replace Claude/Codex-specific catalog items with Pi-relevant variables and still allow generic variables for scripts, tools, and provider SDKs.
-- Risks or implementation notes: Secret storage should not use repository config or `~/.config/ensemble/config.json`; use macOS Keychain with SQLite metadata.
+- Screen name: App Settings - Environment Variables — **IMPLEMENTED** (editable CRUD + env files)
+- User goal: Manage environment variables passed to Pi sessions, scripts, and terminals.
+- Entry point: Settings sidebar, Environment tab (User scope; per-repository scope for variables).
+- Primary actions: Add a variable (right slide-over: Name + Value), set a documented variable via its `+`, edit (pencil), delete (trash), reveal a value (eye toggle), add/remove env files via the native file picker.
+- Secondary actions: Expand/collapse the "Show documented variables (N)" list; inspect set/secret status.
+- Visible UI regions: settings sidebar, add-variable button, configured-variable list with per-row lock/eye/pencil/trash, collapsible documented catalog, Env files section.
+- Empty/loading/error states: "No variables set" empty card; reading spinner; inline save/validation errors in the slide-over.
+- Data shown: Configured variable keys with masked values (revealable on demand); documented catalog keys + descriptions with a "Not set" badge.
+- Settings or configuration implied: Per-scope environment store; secret auto-classification + masking; Pi-only documented catalog; env-file loading at session launch.
+- Implementation: renderer → IPC → `EnvironmentVariablesService` → SQLite (`settings.environment.variables.*`, `settings.environment.files`) / macOS Keychain; injected via `assembleEnvironment` (app → repository → workspace precedence, env files lowest). Documented catalog is Pi-relevant only (no Claude Code/Codex/Cursor entries).
+- Risks or implementation notes: Secret storage uses macOS Keychain with SQLite metadata only — never repository config or `config.json`. Reserved runtime vars (`ENSEMBLE_*`/`CONDUCTOR_*`) are read-only and excluded from editing. Env files are User-scope only for now (storage is per-scope for later repo support).
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.56.01@2x.png`
 

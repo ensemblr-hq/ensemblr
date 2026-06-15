@@ -1,4 +1,8 @@
-import type { EnvironmentVariableCatalogEntrySnapshot, EnvironmentVariableDiagnostic, EnvironmentVariableScope } from '../../shared/ipc/contracts/environment';
+import type {
+	EnvironmentVariableCatalogEntrySnapshot,
+	EnvironmentVariableDiagnostic,
+	EnvironmentVariableScope,
+} from '../../shared/ipc/contracts/environment';
 import type { SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
 import type { SecretMetadata, SecretStore } from '../secrets/secret-store';
 

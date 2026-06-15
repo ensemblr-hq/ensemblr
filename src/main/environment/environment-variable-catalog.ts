@@ -1,4 +1,9 @@
-import type { EnvironmentVariableCatalogEntrySnapshot, EnvironmentVariableCategory, EnvironmentVariableScope, EnvironmentVariableValueKind } from '../../shared/ipc/contracts/environment';
+import type {
+	EnvironmentVariableCatalogEntrySnapshot,
+	EnvironmentVariableCategory,
+	EnvironmentVariableScope,
+	EnvironmentVariableValueKind,
+} from '../../shared/ipc/contracts/environment';
 import { isSensitiveKeyName } from '../config/json-utils.ts';
 
 /** Built-in catalog of environment variables Ensemble understands out-of-the-box. */

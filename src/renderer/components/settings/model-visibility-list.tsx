@@ -3,6 +3,7 @@ import { useAtom } from 'jotai';
 import { useMemo, useState } from 'react';
 
 import { piModelsQuery } from '@/renderer/api/ensemble';
+import { SettingsEmptyState } from '@/renderer/components/settings/settings-empty-state';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
@@ -43,14 +44,14 @@ function groupByProvider(
  * Curates which Pi models appear in the composer model picker. Toggling a model
  * off records it in {@link hiddenModelsAtom} (inverse storage) — it stays
  * selectable as a default and never changes the active model; it's just dropped
- * from the picker list. Mirrors the self-fetching shape of `EnvironmentTable`.
+ * from the picker list. Mirrors the self-fetching shape of the settings lists.
  */
 export function ModelVisibilityList() {
 	const { data, error, isLoading } = useQuery(piModelsQuery);
 	const [hidden, setHidden] = useAtom(hiddenModelsAtom);
 	const [query, setQuery] = useState('');
 
-	const models = data?.models ?? [];
+	const models = useMemo(() => data?.models ?? [], [data]);
 	const hiddenSet = useMemo(() => new Set(hidden), [hidden]);
 
 	const groups = useMemo(() => {
@@ -148,9 +149,7 @@ export function ModelVisibilityList() {
 			</div>
 
 			{groups.length === 0 ? (
-				<p className='py-6 text-center text-muted-foreground text-sm'>
-					No models match “{query}”.
-				</p>
+				<SettingsEmptyState title={`No models match “${query}”.`} />
 			) : (
 				<ScrollArea className='h-80 rounded-md border bg-card/40'>
 					<ul className='divide-y divide-border'>

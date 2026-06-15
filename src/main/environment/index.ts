@@ -1,5 +1,8 @@
 export type {
 	CreateEnvironmentVariablesServiceOptions,
+	EnvironmentFileInput,
+	EnvironmentFilesScopeInput,
+	EnvironmentVariableReadInput,
 	EnvironmentVariablesAssembly,
 	EnvironmentVariablesAssemblyOptions,
 	EnvironmentVariablesErrorCode,

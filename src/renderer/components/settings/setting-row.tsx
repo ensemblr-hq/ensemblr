@@ -34,44 +34,45 @@ export function SettingRow({
 	const LabelTag = htmlFor ? 'label' : 'div';
 
 	return (
-		<div
-			className={cn(
-				'relative flex flex-col gap-3 py-4',
-				stack
-					? 'items-stretch'
-					: 'sm:flex-row sm:items-start sm:justify-between sm:gap-6',
-				className,
-			)}
-		>
+		<div className={cn('relative flex flex-col gap-3 py-4', className)}>
 			{modified ? (
 				<span
 					aria-hidden='true'
 					className='absolute top-4 bottom-4 -left-4 w-0.5 rounded-full bg-accent-strong'
 				/>
 			) : null}
-			<div className='min-w-0 flex-1 space-y-1'>
-				<LabelTag
-					className='block font-medium text-foreground text-sm'
-					htmlFor={htmlFor}
-				>
-					{label}
-				</LabelTag>
-				{description ? (
-					<p className='text-muted-foreground text-xs leading-relaxed'>
-						{description}
-					</p>
+			<div
+				className={cn(
+					'flex flex-col gap-3',
+					stack
+						? 'items-stretch'
+						: 'sm:flex-row sm:items-start sm:justify-between sm:gap-6',
+				)}
+			>
+				<div className='min-w-0 flex-1 space-y-1'>
+					<LabelTag
+						className='block font-medium text-foreground text-sm'
+						htmlFor={htmlFor}
+					>
+						{label}
+					</LabelTag>
+					{description ? (
+						<p className='text-muted-foreground text-xs leading-relaxed'>
+							{description}
+						</p>
+					) : null}
+				</div>
+				{control ? (
+					<div
+						className={cn(
+							'flex shrink-0 items-center gap-2',
+							stack ? 'self-stretch' : 'sm:justify-end',
+						)}
+					>
+						{control}
+					</div>
 				) : null}
 			</div>
-			{control ? (
-				<div
-					className={cn(
-						'flex shrink-0 items-center gap-2',
-						stack ? 'self-stretch' : 'sm:justify-end',
-					)}
-				>
-					{control}
-				</div>
-			) : null}
 			{children ? <div className='w-full'>{children}</div> : null}
 		</div>
 	);

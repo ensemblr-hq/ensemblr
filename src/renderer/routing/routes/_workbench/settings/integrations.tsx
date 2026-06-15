@@ -31,8 +31,9 @@ function IntegrationsSettings() {
 
 function LinearConnectionRow() {
 	const queryClient = useQueryClient();
-	const { data: snapshot, isLoading: connectionLoading } =
-		useQuery(linearConnectionQuery);
+	const { data: snapshot, isLoading: connectionLoading } = useQuery(
+		linearConnectionQuery,
+	);
 	const [failureMessage, setFailureMessage] = useState<string | null>(null);
 
 	const login = useMutation({
