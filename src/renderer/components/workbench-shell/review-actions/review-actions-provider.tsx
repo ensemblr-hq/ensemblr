@@ -65,13 +65,12 @@ export function ReviewActionsProvider({
 	const { isRefreshingPullRequest, refreshPullRequest } = usePullRequestRefresh(
 		{ workspaceId: activeWorkspace.id },
 	);
-	const { commitMutation, createPrMutation, mergeMutation } = useReviewMutations(
-		{
+	const { commitMutation, createPrMutation, mergeMutation } =
+		useReviewMutations({
 			activeWorkspace,
 			mergeSettings,
 			onSettled: closeDialog,
-		},
-	);
+		});
 
 	const value = useMemo<ReviewActionsValue>(
 		() => ({

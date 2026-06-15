@@ -78,9 +78,7 @@ export function PiSessionTimeline({
 	const activePiSession =
 		tabPiSessionId === null
 			? undefined
-			: sessionsData?.sessions.find(
-					(session) => session.id === tabPiSessionId,
-				);
+			: sessionsData?.sessions.find((session) => session.id === tabPiSessionId);
 	const branchId = activePiSession?.branchId ?? '';
 	const piSessionId = activePiSession?.id ?? null;
 	const isStreaming = activePiSession?.status === 'streaming';
@@ -97,9 +95,7 @@ export function PiSessionTimeline({
 	});
 	const canFork = branchId.length > 0 && piSessionId !== null;
 
-	const { data: checkpointsData } = useQuery(
-		turnCheckpointsQuery(piSessionId),
-	);
+	const { data: checkpointsData } = useQuery(turnCheckpointsQuery(piSessionId));
 	const checkpointsByTurnId = useMemo(() => {
 		const map = new Map<string, { label: string }>();
 		for (const checkpoint of checkpointsData?.checkpoints ?? []) {
