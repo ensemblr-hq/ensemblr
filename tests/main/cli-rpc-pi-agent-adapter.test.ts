@@ -353,7 +353,10 @@ test('submit skips set_model when the request matches the spawned model', async 
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
 	const session = await adapter.createSession({
+		// The spawn `--model` flag is the seed for the applied-model tracking,
+		// mirroring production where buildSessionArgs always pushes it.
 		metadata: buildMetadata({
+			args: ['--mode', 'rpc', '--model', 'anthropic/claude-sonnet-4'],
 			model: { id: 'claude-sonnet-4', provider: 'anthropic' },
 		}),
 	});
@@ -369,6 +372,59 @@ test('submit skips set_model when the request matches the spawned model', async 
 	assert.equal(chunks.length, 1);
 	assert.match(chunks[0] ?? '', /"type":"prompt"/);
 	assert.doesNotMatch(chunks[0] ?? '', /set_model/);
+	await adapter.shutdown();
+});
+
+test('submit skips set_thinking_level when the request matches the spawned level', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({
+		// The spawn `--thinking` flag seeds the applied-thinking tracking, so the
+		// first prompt must not redundantly re-assert the same level.
+		metadata: buildMetadata({
+			args: ['--mode', 'rpc', '--thinking', 'high'],
+		}),
+	});
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({ prompt: 'go', thinkingLevel: 'high' });
+
+	const chunks = child.getStdinChunks();
+	assert.equal(chunks.length, 1);
+	assert.match(chunks[0] ?? '', /"type":"prompt"/);
+	assert.doesNotMatch(chunks[0] ?? '', /set_thinking_level/);
+	await adapter.shutdown();
+});
+
+test('submit ignores a malformed model override and warns instead of sending it', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	const warnings: unknown[][] = [];
+	const originalWarn = console.warn;
+	console.warn = (...args: unknown[]) => {
+		warnings.push(args);
+	};
+	try {
+		await session.submit({
+			modelOverride: 'no-provider-segment',
+			prompt: 'go',
+		});
+	} finally {
+		console.warn = originalWarn;
+	}
+
+	const chunks = child.getStdinChunks();
+	assert.equal(chunks.length, 1);
+	assert.match(chunks[0] ?? '', /"type":"prompt"/);
+	assert.doesNotMatch(chunks[0] ?? '', /set_model/);
+	assert.ok(
+		warnings.some((entry) => /malformed model override/.test(String(entry[0]))),
+	);
 	await adapter.shutdown();
 });
 
