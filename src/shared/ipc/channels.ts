@@ -11,6 +11,7 @@ export const IPC_CHANNELS = {
 	getAppSettings: 'ensemble:get-app-settings',
 	updateAppSettings: 'ensemble:update-app-settings',
 	openAppConfigFile: 'ensemble:open-app-config-file',
+	openExternal: 'ensemble:open-external',
 	bindPiSessionToChatTab: 'ensemble:bind-pi-session-to-chat-tab',
 	closeChatTab: 'ensemble:close-chat-tab',
 	cloneGithubRepositoryPrepare: 'ensemble:clone-github-repository:prepare',

@@ -118,7 +118,7 @@ test('renders success state for ready diagnostics', () => {
 	);
 
 	expect(markup).toContain('Core workflows are ready');
-	expect(markup).toContain('Core workflows ready');
+	expect(markup).toContain('2 passed');
 	expect(markup).toContain('Declarative config');
 	expect(markup).toContain('SQLite database');
 	expect(markup).toContain('Workspace trusted mode is the default');
@@ -228,7 +228,8 @@ test('renders Pi executable and root-directory select-path remediations as actio
 	expect(markup).toContain('Select Pi executable');
 	expect(markup).toContain('Retry Pi executable check');
 	expect(markup).toContain('Choose another root');
-	expect(markup).not.toContain('data-remediation-action="retry-pi-executable"');
+	// Retry actions now render as inline buttons too (previously inert labels).
+	expect(markup).toContain('data-remediation-action="retry-pi-executable"');
 });
 
 test('renders root directory change confirmation copy', () => {
