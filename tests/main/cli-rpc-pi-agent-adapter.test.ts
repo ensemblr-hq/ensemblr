@@ -322,6 +322,133 @@ test('submit writes a JSONL frame to stdin and waits for Pi user echo', async ()
 	await adapter.shutdown();
 });
 
+test('submit emits set_model and set_thinking_level before the prompt when changed', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({
+		modelOverride: 'anthropic/claude-sonnet-4',
+		prompt: 'go',
+		thinkingLevel: 'high',
+	});
+
+	const chunks = child.getStdinChunks();
+	assert.equal(chunks.length, 3);
+	const setModel = JSON.parse(chunks[0] ?? '');
+	assert.deepEqual(setModel, {
+		modelId: 'claude-sonnet-4',
+		provider: 'anthropic',
+		type: 'set_model',
+	});
+	const setThinking = JSON.parse(chunks[1] ?? '');
+	assert.deepEqual(setThinking, { level: 'high', type: 'set_thinking_level' });
+	assert.match(chunks[2] ?? '', /"type":"prompt"/);
+	await adapter.shutdown();
+});
+
+test('submit skips set_model when the request matches the spawned model', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({
+		// The spawn `--model` flag is the seed for the applied-model tracking,
+		// mirroring production where buildSessionArgs always pushes it.
+		metadata: buildMetadata({
+			args: ['--mode', 'rpc', '--model', 'anthropic/claude-sonnet-4'],
+			model: { id: 'claude-sonnet-4', provider: 'anthropic' },
+		}),
+	});
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({
+		modelOverride: 'anthropic/claude-sonnet-4',
+		prompt: 'go',
+	});
+
+	const chunks = child.getStdinChunks();
+	assert.equal(chunks.length, 1);
+	assert.match(chunks[0] ?? '', /"type":"prompt"/);
+	assert.doesNotMatch(chunks[0] ?? '', /set_model/);
+	await adapter.shutdown();
+});
+
+test('submit skips set_thinking_level when the request matches the spawned level', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({
+		// The spawn `--thinking` flag seeds the applied-thinking tracking, so the
+		// first prompt must not redundantly re-assert the same level.
+		metadata: buildMetadata({
+			args: ['--mode', 'rpc', '--thinking', 'high'],
+		}),
+	});
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({ prompt: 'go', thinkingLevel: 'high' });
+
+	const chunks = child.getStdinChunks();
+	assert.equal(chunks.length, 1);
+	assert.match(chunks[0] ?? '', /"type":"prompt"/);
+	assert.doesNotMatch(chunks[0] ?? '', /set_thinking_level/);
+	await adapter.shutdown();
+});
+
+test('submit ignores a malformed model override and warns instead of sending it', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	const warnings: unknown[][] = [];
+	const originalWarn = console.warn;
+	console.warn = (...args: unknown[]) => {
+		warnings.push(args);
+	};
+	try {
+		await session.submit({
+			modelOverride: 'no-provider-segment',
+			prompt: 'go',
+		});
+	} finally {
+		console.warn = originalWarn;
+	}
+
+	const chunks = child.getStdinChunks();
+	assert.equal(chunks.length, 1);
+	assert.match(chunks[0] ?? '', /"type":"prompt"/);
+	assert.doesNotMatch(chunks[0] ?? '', /set_model/);
+	assert.ok(
+		warnings.some((entry) => /malformed model override/.test(String(entry[0]))),
+	);
+	await adapter.shutdown();
+});
+
+test('submit only re-emits set_model when the selection changes again', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({
+		metadata: buildMetadata({
+			model: { id: 'claude-sonnet-4', provider: 'anthropic' },
+		}),
+	});
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({ modelOverride: 'openai/gpt-5', prompt: 'one' });
+	await session.submit({ modelOverride: 'openai/gpt-5', prompt: 'two' });
+
+	const setModelFrames = child
+		.getStdinChunks()
+		.filter((chunk) => /set_model/.test(chunk));
+	assert.equal(setModelFrames.length, 1);
+	await adapter.shutdown();
+});
+
 test('subscribing replays current metadata to late listeners', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });

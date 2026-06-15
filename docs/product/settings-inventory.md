@@ -36,13 +36,13 @@ This inventory comes from the settings screenshots plus accepted ADRs. It separa
 
 | Setting | Conductor mapping | Ensemble adaptation | Storage |
 | --- | --- | --- | --- |
-| Default chat model | Direct concept. | Pi model id for new Pi sessions. | SQLite/config; available models from Pi environment. |
-| Review model | Direct concept. | Separate Pi review model if SDK/workflow supports it. | SQLite/config; open SDK check. |
-| Thinking/reasoning level | Direct concept. | Pi thinking level. | SQLite/config. |
-| Personality/style | Provider-specific. | Pi system/personality setting if supported; otherwise Ensemble prompt preset. | SQLite/config; repo overrides possible. |
-| Default plan mode | Direct concept. | Pi planning mode if available; otherwise Ensemble session mode. | SQLite/config; open SDK check. |
-| Default fast mode | Direct concept. | Pi fast/low-latency mode if available. | SQLite/config; open SDK check. |
-| Browser-control integration | Provider-specific. | Use Pi/browser tooling only if available and safe. | SQLite/config plus integration state. |
+| Default chat model | Direct concept. | Pi model id for new chats; bound to the runtime via the `--model` spawn flag. | `atomWithStorage` (`default_chat_model`). |
+| Default thinking level | Direct concept. | Pi thinking level for new chats; bound via `--thinking`. | `atomWithStorage` (`default_chat_thinking`). |
+| Review model + thinking | Direct concept. | Separate model/thinking for the workspace Review action. | `atomWithStorage` (`review_model`, `review_thinking`). |
+| Favourite models | n/a (Ensemble). | Star models in the composer picker to pin them to a top "Favourites" group with the low 1-9 shortcuts. App-wide, shared across all workspaces. | `atomWithStorage` (`favourite_models`, string[]). |
+| Model catalog cache | n/a (Ensemble). | Last non-empty `pi --list-models` result cached so the picker is populated instantly on launch; refreshed silently in the background. | `localStorage` (`pi_models_snapshot`). |
+
+Removed (Pi has no out-of-the-box support — verified against pi 0.79.1 docs and `/earendil-works/pi`): **Personality/style** (no core concept; was an Ensemble prompt preset only), **Default plan mode** (`--plan` exists only as an optional extension), **Default fast mode** (no such concept), **Browser-control integration** (no core support). The per-chat model/thinking selection resolves as: per-chat override → Settings default → Pi-reported default → first available model.
 
 ### Providers
 
@@ -202,5 +202,5 @@ For app-wide behavior, use:
 
 ## Open Settings Questions
 
-- Which Pi CLI/RPC capabilities expose review-model separation, plan mode, fast mode, and browser control?
+- Resolved (pi 0.79.1): plan mode is extension-only, fast mode and browser control have no core support, personality has no Pi concept — all dropped from the Models settings screen. Review-model separation is supported via a separate spawned session with its own `--model`.
 - Which non-deferred experimental features are v1 parity requirements versus post-core flags?

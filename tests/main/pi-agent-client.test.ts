@@ -78,7 +78,12 @@ test('seeds metadata from request and defaults to preserving PI_CODING_AGENT_DIR
 	assert.equal(metadata.id, 'session-1');
 	assert.equal(metadata.command, '/usr/local/bin/pi');
 	assert.equal(metadata.cwd, '/tmp/workspace');
-	assert.deepEqual(metadata.args, ['--mode', 'rpc']);
+	assert.deepEqual(metadata.args, [
+		'--mode',
+		'rpc',
+		'--model',
+		'openai/gpt-test',
+	]);
 	assert.equal(metadata.label, 'pr-review');
 	assert.equal(metadata.piAgentDirectoryPreserved, true);
 	assert.equal(metadata.env.CUSTOM_KEY, 'value');
@@ -110,6 +115,39 @@ test('adds native Pi session id args when supplied', async () => {
 		'native-session-1',
 	]);
 	assert.equal(metadata.sessionId, 'native-session-1');
+});
+
+test('threads model and thinking selection into the spawn args', async () => {
+	const { client } = createClient();
+
+	const session = await client.createSession(
+		baseRequest({
+			modelOverride: 'anthropic/claude-sonnet-4',
+			piSessionId: 'native-2',
+			thinkingLevel: 'high',
+		}),
+	);
+
+	assert.deepEqual(session.getMetadata().args, [
+		'--mode',
+		'rpc',
+		'--model',
+		'anthropic/claude-sonnet-4',
+		'--thinking',
+		'high',
+		'--session-id',
+		'native-2',
+	]);
+});
+
+test('omits model and thinking flags when the request leaves them unset', async () => {
+	const { client } = createClient();
+
+	const session = await client.createSession(
+		baseRequest({ modelOverride: '   ', thinkingLevel: null }),
+	);
+
+	assert.deepEqual(session.getMetadata().args, ['--mode', 'rpc']);
 });
 
 test('allows an explicit PI_CODING_AGENT_DIR when the caller opts out of preservation', async () => {

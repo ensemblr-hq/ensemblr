@@ -18,6 +18,8 @@ export interface QueueChatTitleGenerationArgs {
 	eventSink: PiSessionEventSink | undefined;
 	executable: PiExecutableSnapshot;
 	initialPrompt: string | null;
+	/** Chat model to mirror in the ephemeral title session; `null` = Pi default. */
+	model: string | null;
 	piAgentClient: PiAgentClient;
 	sessionId: string;
 	tabId: string;
@@ -33,6 +35,7 @@ export function queueChatTitleGeneration({
 	eventSink,
 	executable,
 	initialPrompt,
+	model,
 	piAgentClient,
 	sessionId,
 	tabId,
@@ -46,6 +49,7 @@ export function queueChatTitleGeneration({
 
 	void generateChatTitle({
 		executable,
+		model,
 		piAgentClient,
 		prompt,
 		timeoutMs: chatTitleTimeoutMs,
@@ -155,12 +159,14 @@ function broadcastChatTitle({
  */
 async function generateChatTitle({
 	executable,
+	model,
 	piAgentClient,
 	prompt,
 	timeoutMs,
 	workspaceCwd,
 }: {
 	executable: PiExecutableSnapshot;
+	model: string | null;
 	piAgentClient: PiAgentClient;
 	prompt: string;
 	timeoutMs: number;
@@ -169,6 +175,7 @@ async function generateChatTitle({
 	const session = await piAgentClient.createSession({
 		executable,
 		label: 'ensemble-chat-title',
+		modelOverride: model,
 		workspaceCwd,
 	});
 	const chunks: string[] = [];

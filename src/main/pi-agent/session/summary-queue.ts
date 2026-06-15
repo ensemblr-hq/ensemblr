@@ -115,6 +115,7 @@ export function createSummaryQueue({
 			chatTabId: active.chatTabId,
 			closedAt: row.closedAt ?? now().toISOString(),
 			events,
+			model: row.model,
 			piSessionId: row.piSessionId,
 			workspaceCwd: row.cwd,
 		});

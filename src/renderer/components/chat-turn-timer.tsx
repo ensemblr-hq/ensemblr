@@ -31,6 +31,38 @@ export function ChatTurnTimer({
 }
 
 /**
+ * Live "working" affordance for an in-flight turn: a pulsing dot, a muted
+ * `Working…` label, and the ticking {@link ChatTurnTimer}. Used both for the
+ * pre-first-token placeholder and the streaming assistant turn so the row looks
+ * identical and the elapsed value stays continuous across the handoff. Anchored
+ * at `startMs` (the prompt submit time), bottom-left like the settled footer.
+ */
+export function ChatWorkingIndicator({
+	className,
+	startMs,
+}: {
+	className?: string;
+	startMs: number;
+}) {
+	return (
+		<div
+			className={cn(
+				'flex items-center gap-2 text-muted-foreground/80 text-xs',
+				className,
+			)}
+			data-role='turn-working'
+		>
+			<span
+				aria-hidden='true'
+				className='size-1.5 animate-pulse rounded-full bg-muted-foreground/70'
+			/>
+			<span>Working…</span>
+			<ChatTurnTimer startMs={startMs} />
+		</div>
+	);
+}
+
+/**
  * Compact duration formatter mirroring the reference. Under 10s shows one
  * decimal (`1.8s`), 10s-59s shows integer seconds (`14s`), 60s+ rounds to
  * whole minutes (`1m`).

@@ -69,15 +69,15 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Screen name: App Settings - Models
 - User goal: Choose default models and runtime behavior for new agent sessions and reviews.
 - Entry point: Settings sidebar, Models tab.
-- Primary actions: Select default chat model, review model, reasoning/thinking level, personality/style, plan-mode default, fast-mode default, and browser-control integration.
+- Primary actions: Select default chat model + thinking level, and the review model + thinking level. (Personality, plan-mode, fast-mode, and browser-control rows were removed — pi 0.79.1 has no out-of-the-box support for them.)
 - Secondary actions: Switch settings sections or return to app.
-- Visible UI regions: settings sidebar, centered model preference form, segmented rows with selects and toggles.
-- Empty/loading/error states: No loading or error state visible.
-- Data shown: Current model names, thinking levels, personality/default style, plan and fast mode toggles.
+- Visible UI regions: settings sidebar, centered model preference form, model + thinking selects per row.
+- Empty/loading/error states: Spinner while `pi --list-models` resolves; inline error if discovery fails. Catalog is cached, so it is normally populated instantly.
+- Data shown: Current default model + thinking level, review model + thinking level. Thinking labels: No thinking, Minimal, Low, Medium, High, Extra high.
 - Settings or configuration implied: Separate model defaults for normal chat and code review; per-session behavior defaults.
-- Ensemble parity requirement: Support default model/reasoning/personality-like controls for new chats and review-specific workflows.
-- Pi-specific adaptation: Map to Pi model identifiers, thinking levels, Pi steering/follow-up behavior, and any Pi-supported review model separation.
-- Risks or implementation notes: Exact Pi model capabilities and whether review can use a separate model need SDK discovery.
+- Ensemble parity requirement: Support default model/reasoning controls for new chats and review-specific workflows.
+- Pi-specific adaptation: Map to Pi model identifiers and thinking levels. The composer model picker also supports starring favourites (app-wide, pinned to the top with 1-9 shortcuts). Title/summary generation reuse the chat's current model so they never fall back to a surprise default provider.
+- Risks or implementation notes: Model + thinking bind at spawn (`--model`/`--thinking`) and switch mid-session via the RPC `set_model`/`set_thinking_level` commands. Review runs as a separate spawned session with its own `--model`.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.55.35@2x.png`
 
@@ -325,6 +325,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Ensemble parity requirement: Render structured agent events, tool calls, runtime errors, retry actions, composer controls, and side-panel status without losing workspace context.
 - Current Ensemble shell alignment: The tab strip, timeline location, setup warning, and composer placement are locked. Chat content and prompt behavior remain deferred until Pi integration.
 - Pi-specific adaptation: Replace provider-limit errors with Pi CLI/RPC runtime error cards, Pi session retry/fork behavior, and Pi model/thinking controls.
+- Turn timing: each turn shows elapsed time spanning prompt submit → final answer (reasoning + tool calls included). While in flight a live `● Working… {elapsed}` indicator ticks bottom-left of the assistant slot, appearing immediately on submit (anchored to the prompt time) and continuing seamlessly into the streaming turn; it freezes to the total duration in the settled footer. Reasoning ("Thinking") rows render in full inside the collapsible activity group (no truncation).
 - Risks or implementation notes: Retrying in a new chat must preserve file state and make session branching understandable.
 
 ## 06-terminal-run

@@ -11,6 +11,7 @@ import {
 	ChatAssistantTurn,
 	type ChatAssistantTurnTiming,
 } from '@/renderer/components/chat-assistant-turn';
+import { ChatWorkingIndicator } from '@/renderer/components/chat-turn-timer';
 import { ChatUserPrompt } from '@/renderer/components/chat-user-prompt';
 import { CodeBlock } from '@/renderer/components/code-block';
 import {
@@ -51,6 +52,7 @@ import type {
 } from '@/renderer/types/workbench';
 import { useTurnDiffOpener } from '../file-preview-context';
 import { RestoreCheckpointDialog } from './restore-checkpoint-dialog';
+import { resolveLiveTurnStartMs } from './timeline-timing';
 
 /**
  * Structured renderer for the Pi RPC event stream. Reads persisted events
@@ -159,6 +161,15 @@ export function PiSessionTimeline({
 		[persistedMessages, optimisticUnmatched],
 	);
 
+	// Show a live "Working…" indicator in the pre-first-token gap: the turn is
+	// streaming but no assistant turn exists yet (trailing message is the user
+	// prompt). Anchored at the submit time so it ticks continuously into the
+	// streaming turn's own timer once the first event lands.
+	const pendingStartMs =
+		isStreaming && messages.at(-1)?.role === 'user'
+			? resolveLiveTurnStartMs(messages, optimistic.prompts)
+			: null;
+
 	if (piSessionId && error) {
 		return (
 			<section
@@ -201,6 +212,15 @@ export function PiSessionTimeline({
 							onViewTurnDiff={openTurnDiff}
 						/>
 					))}
+					{pendingStartMs !== null ? (
+						<div
+							className='flex w-full flex-col gap-2.5 text-foreground'
+							data-role='assistant-turn'
+							data-pending='true'
+						>
+							<ChatWorkingIndicator startMs={pendingStartMs} />
+						</div>
+					) : null}
 				</ConversationContent>
 				<ConversationScrollButton />
 			</Conversation>
@@ -285,9 +305,7 @@ function collectPersistedUserTexts(messages: readonly UIMessage[]): string[] {
 			continue;
 		}
 		const joined = message.parts
-			.flatMap((part) =>
-				part.type === 'text' && part.text ? [part.text] : [],
-			)
+			.flatMap((part) => (part.type === 'text' && part.text ? [part.text] : []))
 			.join('\n');
 		if (joined.length > 0) {
 			texts.push(joined);
@@ -324,7 +342,12 @@ function TimelineMessage({
 
 	const isLiveTurn = isStreaming && isLastMessage;
 	const metadata = turnMetadataOf(message);
-	const startMs = metadata ? Date.parse(metadata.firstEventAt) : Number.NaN;
+	// Start at the prompt submit time so the timer covers the whole turn
+	// (reasoning + tool calls + final answer); fall back to the first assistant
+	// event when the prompt time is unknown (e.g. resumed/legacy sessions).
+	const startMs = metadata
+		? Date.parse(metadata.promptAt ?? metadata.firstEventAt)
+		: Number.NaN;
 	const endMs = metadata ? Date.parse(metadata.lastEventAt) : Number.NaN;
 	const turnTiming: ChatAssistantTurnTiming = {
 		endMs: isLiveTurn || Number.isNaN(endMs) ? null : endMs,

@@ -117,31 +117,49 @@ export const terminalFontSizeAtom = atomWithStorage<number>(
 	12,
 );
 
-// ─── Composer memory ──────────────────────────────────────────────────────────
+// ─── Composer memory (per-chat overrides) ──────────────────────────────────────
 
 /**
- * Persisted last-used Pi model id, shared across every workspace and chat tab.
- * Picking a model anywhere updates this single value so a fresh chat opens with
- * the same model the user picked last.
+ * Per-chat model override, keyed by chat-tab id. `null` means "inherit the
+ * Settings → Default model" ({@link defaultChatModelAtom}); a non-null value is
+ * an explicit per-chat pick that survives reloads and is preserved for that
+ * chat only. Picking a model in one chat never changes another chat's model.
  */
-export const lastSelectedPiModelAtom = atomWithStorage<string | null>(
-	KEY('last_selected_pi_model'),
-	null,
+export const chatModelOverrideAtomFamily = atomFamily((chatTabId: string) =>
+	atomWithStorage<string | null>(KEY(`chat_model_${chatTabId}`), null),
 );
 
 /**
- * Persisted last-used Pi thinking-level, shared across every workspace and
- * chat tab. Mirrors {@link lastSelectedPiModelAtom} for the thinking control.
+ * Per-chat thinking-level override, keyed by chat-tab id. Mirrors
+ * {@link chatModelOverrideAtomFamily}; `null` inherits the Settings default
+ * ({@link defaultChatThinkingLevelAtom}).
  */
-export const lastSelectedPiThinkingLevelAtom = atomWithStorage<string | null>(
-	KEY('last_selected_pi_thinking_level'),
-	null,
+export const chatThinkingOverrideAtomFamily = atomFamily((chatTabId: string) =>
+	atomWithStorage<string | null>(KEY(`chat_thinking_${chatTabId}`), null),
 );
+
+/**
+ * Drops a chat's per-chat override atoms and their backing localStorage keys.
+ * Call only when a chat tab is permanently deleted — closed tabs are restorable
+ * and must keep their overrides. `atomFamily.remove` evicts just the in-memory
+ * atom; `atomWithStorage` leaves the stored key behind, so the keys are removed
+ * explicitly to keep storage bounded across the install's lifetime.
+ */
+export function forgetChatOverrides(chatTabId: string): void {
+	chatModelOverrideAtomFamily.remove(chatTabId);
+	chatThinkingOverrideAtomFamily.remove(chatTabId);
+	const storage =
+		typeof globalThis.localStorage === 'undefined'
+			? null
+			: globalThis.localStorage;
+	if (!storage) {
+		return;
+	}
+	storage.removeItem(KEY(`chat_model_${chatTabId}`));
+	storage.removeItem(KEY(`chat_thinking_${chatTabId}`));
+}
 
 // ─── Models (user defaults) ───────────────────────────────────────────────────
-
-export type PiPersonality = 'pragmatic' | 'thorough' | 'concise';
-export type ChatModeDefault = 'none' | 'plan' | 'fast';
 
 /** Default model id for new chats (resolved against Pi readiness at use-site). */
 export const defaultChatModelAtom = atomWithStorage<string | null>(
@@ -160,13 +178,15 @@ export const reviewThinkingLevelAtom = atomWithStorage<string | null>(
 	KEY('review_thinking'),
 	null,
 );
-export const piPersonalityAtom = atomWithStorage<PiPersonality>(
-	KEY('pi_personality'),
-	'pragmatic',
-);
-export const defaultChatModeAtom = atomWithStorage<ChatModeDefault>(
-	KEY('default_chat_mode'),
-	'none',
+
+/**
+ * Favourited model ids, pinned to the top of the model picker. App-wide and
+ * shared across every workspace/chat (single global storage key, no scoping).
+ * Order is the order models were starred.
+ */
+export const favouriteModelsAtom = atomWithStorage<string[]>(
+	KEY('favourite_models'),
+	[],
 );
 
 // ─── Git (user defaults) ──────────────────────────────────────────────────────

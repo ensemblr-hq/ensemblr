@@ -14,8 +14,10 @@ import {
 } from '@/renderer/api/ensemble-queries';
 import { useOptimisticPrompts } from '@/renderer/state/composer/optimistic-prompts';
 import {
-	lastSelectedPiModelAtom,
-	lastSelectedPiThinkingLevelAtom,
+	chatModelOverrideAtomFamily,
+	chatThinkingOverrideAtomFamily,
+	defaultChatModelAtom,
+	defaultChatThinkingLevelAtom,
 } from '@/renderer/state/preferences';
 import type {
 	ComposerContextUsage,
@@ -43,7 +45,7 @@ const THINKING_LABELS: Record<string, string> = {
 	low: 'Low',
 	medium: 'Medium',
 	minimal: 'Minimal',
-	off: 'Off',
+	off: 'No thinking',
 	xhigh: 'Extra high',
 };
 
@@ -93,12 +95,17 @@ export function usePiComposerController({
 		piSessionsForWorkspaceQuery(workspaceId),
 	);
 
-	const [selectedModelId, setSelectedModelId] = useAtom(
-		lastSelectedPiModelAtom,
+	// Per-chat overrides win when set; otherwise a new chat inherits the
+	// Settings → Default model/thinking. Keying the override atoms by chat-tab
+	// id keeps one chat's pick from leaking into another.
+	const [chatModelOverride, setChatModelOverride] = useAtom(
+		chatModelOverrideAtomFamily(chatTabId),
 	);
-	const [selectedThinkingLevel, setSelectedThinkingLevel] = useAtom(
-		lastSelectedPiThinkingLevelAtom,
+	const [chatThinkingOverride, setChatThinkingOverride] = useAtom(
+		chatThinkingOverrideAtomFamily(chatTabId),
 	);
+	const [defaultModelId] = useAtom(defaultChatModelAtom);
+	const [defaultThinkingLevel] = useAtom(defaultChatThinkingLevelAtom);
 	const [lastError, setLastError] = useState<string | null>(null);
 	const [pendingSession, setPendingSession] =
 		useState<PendingTabSession | null>(null);
@@ -119,10 +126,20 @@ export function usePiComposerController({
 		}));
 	}, [models]);
 
+	// Resolution order: explicit per-chat pick → Settings default → Pi-reported
+	// default → first available model. Each rung only fires when the one above
+	// is unset, so a fresh chat lands on the user's configured default.
 	const modelId =
-		selectedModelId ?? models?.defaultModelId ?? availableModels[0]?.id ?? null;
+		chatModelOverride ??
+		defaultModelId ??
+		models?.defaultModelId ??
+		availableModels[0]?.id ??
+		null;
 	const thinkingLevel =
-		selectedThinkingLevel ?? models?.defaultThinkingLevel ?? null;
+		chatThinkingOverride ??
+		defaultThinkingLevel ??
+		models?.defaultThinkingLevel ??
+		null;
 
 	const availableThinkingLevels = useMemo<
 		readonly ComposerThinkingOption[]
@@ -335,16 +352,16 @@ export function usePiComposerController({
 
 	const onModelChange = useCallback(
 		(nextModelId: string) => {
-			setSelectedModelId(nextModelId);
+			setChatModelOverride(nextModelId);
 		},
-		[setSelectedModelId],
+		[setChatModelOverride],
 	);
 
 	const onThinkingChange = useCallback(
 		(nextThinkingLevel: string) => {
-			setSelectedThinkingLevel(nextThinkingLevel);
+			setChatThinkingOverride(nextThinkingLevel);
 		},
-		[setSelectedThinkingLevel],
+		[setChatThinkingOverride],
 	);
 
 	return {

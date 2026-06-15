@@ -13,12 +13,9 @@ import {
 	SelectValue,
 } from '@/renderer/components/ui/select';
 import { Spinner } from '@/renderer/components/ui/spinner';
-import { Switch } from '@/renderer/components/ui/switch';
 import {
-	defaultChatModeAtom,
 	defaultChatModelAtom,
 	defaultChatThinkingLevelAtom,
-	piPersonalityAtom,
 	reviewModelAtom,
 	reviewThinkingLevelAtom,
 } from '@/renderer/state/preferences';
@@ -40,8 +37,6 @@ function ModelsSettings() {
 	);
 	const [reviewModel, setReviewModel] = useAtom(reviewModelAtom);
 	const [reviewThinking, setReviewThinking] = useAtom(reviewThinkingLevelAtom);
-	const [personality, setPersonality] = useAtom(piPersonalityAtom);
-	const [chatMode, setChatMode] = useAtom(defaultChatModeAtom);
 
 	const list = modelsData?.models ?? [];
 	const resolvedDefault = defaultModel ?? modelsData?.defaultModelId ?? null;
@@ -108,48 +103,6 @@ function ModelsSettings() {
 				}
 				description='Model used for the Review action on a workspace.'
 				label='Review model'
-			/>
-
-			<SettingRow
-				control={
-					<Select
-						onValueChange={(v) => setPersonality(v as typeof personality)}
-						value={personality}
-					>
-						<SelectTrigger className='w-44' size='sm'>
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value='pragmatic'>Pragmatic (default)</SelectItem>
-							<SelectItem value='thorough'>Thorough</SelectItem>
-							<SelectItem value='concise'>Concise</SelectItem>
-						</SelectContent>
-					</Select>
-				}
-				description='Style preset injected when a new chat starts. Prompt-side only; does not modify Pi runtime.'
-				label='Pi personality for new chats'
-			/>
-
-			<SettingRow
-				control={
-					<Switch
-						checked={chatMode === 'plan'}
-						onCheckedChange={(v) => setChatMode(v ? 'plan' : 'none')}
-					/>
-				}
-				description='Start new chats in plan mode (Pi proposes a plan before acting).'
-				label='Default to plan mode'
-			/>
-
-			<SettingRow
-				control={
-					<Switch
-						checked={chatMode === 'fast'}
-						onCheckedChange={(v) => setChatMode(v ? 'fast' : 'none')}
-					/>
-				}
-				description='Start new chats in fast mode where supported by the model.'
-				label='Default to fast mode'
 			/>
 		</SettingsSection>
 	);
@@ -232,16 +185,18 @@ function thinkingLevelsFor(
 
 function prettyThinkingLevel(level: string): string {
 	switch (level) {
-		case 'extra-high':
-			return 'Thinking extra high';
-		case 'high':
-			return 'Thinking high';
-		case 'medium':
-			return 'Thinking medium';
-		case 'low':
-			return 'Thinking low';
 		case 'off':
 			return 'No thinking';
+		case 'minimal':
+			return 'Minimal';
+		case 'low':
+			return 'Low';
+		case 'medium':
+			return 'Medium';
+		case 'high':
+			return 'High';
+		case 'xhigh':
+			return 'Extra high';
 		default:
 			return level;
 	}

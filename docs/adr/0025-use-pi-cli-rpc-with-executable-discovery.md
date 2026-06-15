@@ -31,6 +31,12 @@ Runtime behavior:
 - Stream RPC events into Ensemble's structured timeline through a `PiAgentClient` interface.
 - Keep terminal panes separate from Pi RPC; xterm.js is for shells, setup/run scripts, logs, and optional manual terminals.
 
+Model and thinking selection:
+
+- Bind the selected model and thinking level at spawn via `--model <provider/id>` and `--thinking <level>`. The Pi `prompt` command has no model field, so selection cannot ride on the prompt frame.
+- Apply mid-session switches through the RPC `set_model` and `set_thinking_level` commands, written ahead of the next `prompt`. The adapter tracks the last-applied selection (seeded from the spawn flags) and only re-sends a command when the value actually changes.
+- Resolve the selection in the renderer composer in this order: explicit per-chat override → Settings "Default model"/thinking (`defaultChatModelAtom`) → Pi-reported default → first available model. A new chat therefore inherits the configured default, and a per-chat pick (stored per chat-tab id) overrides it for that chat only without leaking to others.
+
 Executable discovery:
 
 1. Use an explicit executable path from Ensemble app settings or `~/.config/ensemble/config.json` when provided.
@@ -69,3 +75,4 @@ Ensemble could install and manage its own Pi runtime. This remains deferred beca
 - Ensemble needs a robust RPC process supervisor: start, stop, abort, restart, stderr capture, JSONL parsing, backpressure, and crash recovery.
 - Ensemble is constrained by the RPC protocol surface; missing capabilities may require future SDK sidecar support.
 - Setup/onboarding must handle missing or invalid Pi executables with clear remediation.
+- Model/thinking must be passed as spawn flags and runtime `set_model`/`set_thinking_level` commands; relying on the `prompt` frame silently drops the selection and lets Pi fall back to its own default provider/model.

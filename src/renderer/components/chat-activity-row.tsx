@@ -44,7 +44,7 @@ function ChatActivityRow({
 	);
 }
 
-/** Italic single-line reasoning row, mirrors the `Thinking <text>` GIF style. */
+/** Italic reasoning row, mirrors the `Thinking <text>` style. */
 export function ChatReasoningRow({
 	className,
 	text,
@@ -52,8 +52,7 @@ export function ChatReasoningRow({
 	className?: string;
 	text: string;
 }) {
-	const firstLine = text.split('\n').find((line) => line.trim().length > 0);
-	const display = firstLine?.trim() ?? '';
+	const display = text.trim();
 	if (display.length === 0) {
 		return null;
 	}
@@ -67,7 +66,7 @@ export function ChatReasoningRow({
 			data-kind='reasoning'
 		>
 			<span className='shrink-0 font-medium text-foreground/85'>Thinking</span>
-			<span className='min-w-0 truncate text-muted-foreground italic'>
+			<span className='min-w-0 whitespace-pre-wrap break-words text-muted-foreground italic'>
 				{display}
 			</span>
 		</div>

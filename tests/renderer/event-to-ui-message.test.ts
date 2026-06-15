@@ -56,6 +56,40 @@ describe('eventsToUIMessages', () => {
 		]);
 	});
 
+	test('stamps the assistant turn with the preceding prompt submit time', () => {
+		const messages = eventsToUIMessages([
+			event({
+				createdAt: '2026-06-08T12:00:00.000Z',
+				id: 'evt-user',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'prompt', prompt: 'Do the thing' },
+					role: 'user',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				createdAt: '2026-06-08T12:00:07.500Z',
+				id: 'evt-agent',
+				ordinal: 1,
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: 'Done' },
+					role: 'agent',
+				},
+				turnId: 'turn-1',
+			}),
+		]);
+
+		const assistant = messages.find((message) => message.role === 'assistant');
+		const metadata = assistant?.metadata as
+			| { promptAt?: string; firstEventAt: string; lastEventAt: string }
+			| undefined;
+		// Start = prompt submit; end = final assistant event → 7.5s span.
+		expect(metadata?.promptAt).toBe('2026-06-08T12:00:00.000Z');
+		expect(metadata?.lastEventAt).toBe('2026-06-08T12:00:07.500Z');
+	});
+
 	test('maps an assistant text payload to one text part', () => {
 		const messages = eventsToUIMessages([
 			event({

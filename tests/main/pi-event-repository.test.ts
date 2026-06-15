@@ -96,6 +96,42 @@ test('appendPiEvent allocates ordinals starting at zero', (t) => {
 	});
 });
 
+test('appendPiEvent persists the supplied createdAt verbatim', (t) => {
+	const fixture = openFixture(t);
+
+	const withTimestamp = appendPiEvent({
+		database: fixture.database,
+		input: {
+			branchId: fixture.branchId,
+			createdAt: '2026-06-08T12:34:56.789Z',
+			eventType: 'message',
+			payload: {
+				kind: 'message',
+				payload: { kind: 'text', text: 'x' },
+				role: 'agent',
+			},
+			turnId: fixture.turnId,
+		},
+	});
+	assert.equal(withTimestamp.createdAt, '2026-06-08T12:34:56.789Z');
+
+	// Omitting createdAt falls back to the DB clock (a non-empty ISO string).
+	const withoutTimestamp = appendPiEvent({
+		database: fixture.database,
+		input: {
+			branchId: fixture.branchId,
+			eventType: 'message',
+			payload: {
+				kind: 'message',
+				payload: { kind: 'text', text: 'y' },
+				role: 'agent',
+			},
+			turnId: fixture.turnId,
+		},
+	});
+	assert.match(withoutTimestamp.createdAt, /^\d{4}-\d{2}-\d{2}T/);
+});
+
 test('appendPiEvents batches inserts in a single transaction', (t) => {
 	const fixture = openFixture(t);
 
