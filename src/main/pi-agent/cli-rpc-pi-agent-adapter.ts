@@ -158,12 +158,17 @@ function createCliRpcSession({
 	let pendingShutdownReason: PiAgentShutdownReason | null = null;
 	// Track the model/thinking already applied to the runtime so a per-turn
 	// submit only emits `set_model`/`set_thinking_level` when the selection
-	// actually changes. Seeded from the spawn-time `--model` flag (recorded in
-	// metadata.model) so the first prompt does not redundantly re-set it.
-	let appliedModel: string | undefined = input.metadata.model
-		? `${input.metadata.model.provider}/${input.metadata.model.id}`
-		: undefined;
-	let appliedThinking: string | undefined;
+	// actually changes. Seed both from the spawn-time flags (`--model` /
+	// `--thinking` recorded in metadata.args) — the ground truth the process
+	// started with — so the first prompt re-sets neither. Reading the same
+	// `provider/id` / level strings the submit path compares against keeps the
+	// two sides symmetric.
+	const spawnFlagValue = (flag: string): string | undefined => {
+		const index = input.metadata.args.indexOf(flag);
+		return index >= 0 ? input.metadata.args[index + 1] : undefined;
+	};
+	let appliedModel: string | undefined = spawnFlagValue('--model');
+	let appliedThinking: string | undefined = spawnFlagValue('--thinking');
 
 	const emitRawFrame = (direction: 'rx' | 'tx', line: string): void => {
 		if (!onRawFrame) {
@@ -342,6 +347,10 @@ function createCliRpcSession({
 		// rather than send a malformed frame the runtime would reject.
 		const separator = next.indexOf('/');
 		if (separator <= 0 || separator >= next.length - 1) {
+			console.warn(
+				'[pi-rpc] ignoring malformed model override; expected `provider/id`',
+				{ modelOverride: next },
+			);
 			return;
 		}
 		await writeFrame({
