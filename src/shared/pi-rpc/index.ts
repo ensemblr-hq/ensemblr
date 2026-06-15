@@ -1,5 +1,5 @@
 export type { PiRpcParseResult } from './parse.ts';
-export { parsePiRpcFrame, parsePiRpcLine } from './parse.ts';
+export { parsePiRpcLine } from './parse.ts';
 export type {
 	PiAgentMessage,
 	PiAssistantBlock,
@@ -19,31 +19,7 @@ export type {
 	PiUserMessage,
 } from './schemas.ts';
 export {
-	piAgentEndSchema,
-	piAgentMessageSchema,
-	piAgentStartSchema,
-	piAssistantBlockSchema,
-	piAssistantDeltaSchema,
-	piAssistantMessageSchema,
 	piCapturedLineSchema,
-	piCustomMessageSchema,
-	piExtensionUiRequestSchema,
-	piMessageEndSchema,
-	piMessageStartSchema,
-	piMessageUpdateSchema,
-	piResponseSchema,
 	piRpcEventSchema,
 	piSessionStatsSchema,
-	piTextBlockSchema,
-	piThinkingBlockSchema,
-	piToolCallBlockSchema,
-	piToolExecutionEndSchema,
-	piToolExecutionStartSchema,
-	piToolExecutionUpdateSchema,
-	piToolPayloadSchema,
-	piToolResultMessageSchema,
-	piTurnEndSchema,
-	piTurnStartSchema,
-	piUsageSchema,
-	piUserMessageSchema,
 } from './schemas.ts';

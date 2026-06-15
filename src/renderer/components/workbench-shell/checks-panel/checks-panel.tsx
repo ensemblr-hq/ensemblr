@@ -81,16 +81,15 @@ function notifyTodoUpdateFailed(error: unknown): void {
 /** Mutations for the "Your todos" section, invalidating the todos query. */
 function useTodoActions(workspaceId: string): TodoActions {
 	const queryClient = useQueryClient();
-	const invalidate = () =>
-		queryClient.invalidateQueries({
-			queryKey: ensembleQueryKeys.reviewTodos(workspaceId),
-		});
 	const onError = notifyTodoUpdateFailed;
 
 	const addMutation = useMutation({
 		mutationFn: (title: string) => saveReviewTodo({ title, workspaceId }),
 		onError,
-		onSuccess: invalidate,
+		onSuccess: () =>
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.reviewTodos(workspaceId),
+			}),
 	});
 	const toggleMutation = useMutation({
 		mutationFn: ({ id, nextDone }: { id: string; nextDone: boolean }) =>
@@ -100,12 +99,18 @@ function useTodoActions(workspaceId: string): TodoActions {
 				workspaceId,
 			}),
 		onError,
-		onSuccess: invalidate,
+		onSuccess: () =>
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.reviewTodos(workspaceId),
+			}),
 	});
 	const removeMutation = useMutation({
 		mutationFn: (id: string) => deleteReviewTodo({ id }),
 		onError,
-		onSuccess: invalidate,
+		onSuccess: () =>
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.reviewTodos(workspaceId),
+			}),
 	});
 
 	return useMemo(

@@ -27,10 +27,15 @@ export function EnvironmentTable({
 	scope,
 	scopeId,
 }: EnvironmentTableProps) {
-	const query = useQuery(environmentVariablesQuery);
+	const {
+		data: queryData,
+		error: queryError,
+		isFetching: queryFetching,
+		isLoading: queryLoading,
+	} = useQuery(environmentVariablesQuery);
 	const queryClient = useQueryClient();
 
-	if (query.isLoading) {
+	if (queryLoading) {
 		return (
 			<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
 				<Spinner className='size-4' /> Reading environment…
@@ -38,15 +43,15 @@ export function EnvironmentTable({
 		);
 	}
 
-	if (query.error) {
+	if (queryError) {
 		return (
 			<div className='py-6 text-sm text-status-danger'>
-				Failed to read environment: {String(query.error)}.
+				Failed to read environment: {String(queryError)}.
 			</div>
 		);
 	}
 
-	const all = query.data?.variables ?? [];
+	const all = queryData?.variables ?? [];
 	const variables = all.filter(
 		(variable) =>
 			variable.scope === scope && (!scopeId || variable.scopeId === scopeId),
@@ -80,7 +85,7 @@ export function EnvironmentTable({
 					{scope}.
 				</span>
 				<Button
-					disabled={query.isFetching}
+					disabled={queryFetching}
 					onClick={() =>
 						queryClient.invalidateQueries({
 							queryKey: ensembleQueryKeys.environmentVariables(),
@@ -89,7 +94,7 @@ export function EnvironmentTable({
 					size='sm'
 					variant='ghost'
 				>
-					{query.isFetching ? 'Refreshing…' : 'Refresh'}
+					{queryFetching ? 'Refreshing…' : 'Refresh'}
 				</Button>
 			</div>
 		</div>

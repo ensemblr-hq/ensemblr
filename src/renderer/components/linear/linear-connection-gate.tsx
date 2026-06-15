@@ -13,10 +13,11 @@ import { deriveLinearGateState } from '@/renderer/lib/linear';
  * connected, otherwise shows sign-in / configuration remediation.
  */
 export function LinearConnectionGate({ children }: { children: ReactNode }) {
-	const connection = useQuery(linearConnectionQuery);
+	const { data: connectionData, isLoading: connectionLoading } =
+		useQuery(linearConnectionQuery);
 	const gate = deriveLinearGateState({
-		connection: connection.data,
-		isLoading: connection.isLoading,
+		connection: connectionData,
+		isLoading: connectionLoading,
 	});
 
 	if (gate.kind === 'ready') {

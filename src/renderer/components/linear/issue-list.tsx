@@ -32,8 +32,13 @@ export function LinearIssueList() {
 	const [teamId, setTeamId] = useState<string>(ALL_TEAMS);
 	const [editorOpen, setEditorOpen] = useState(false);
 
-	const metadata = useQuery(linearMetadataQuery);
-	const issues = useQuery(
+	const { data: metadataData } = useQuery(linearMetadataQuery);
+	const {
+		data: result,
+		isFetching: issuesFetching,
+		isLoading: issuesLoading,
+		refetch: refetchIssues,
+	} = useQuery(
 		linearIssuesQuery({
 			...(query ? { query } : {}),
 			...(teamId !== ALL_TEAMS ? { teamId } : {}),
@@ -41,10 +46,9 @@ export function LinearIssueList() {
 	);
 
 	const teams =
-		metadata.data?.status === 'ok' || metadata.data?.status === 'error'
-			? metadata.data.metadata.teams
+		metadataData?.status === 'ok' || metadataData?.status === 'error'
+			? metadataData.metadata.teams
 			: [];
-	const result = issues.data;
 	const rows = result?.issues ?? [];
 
 	return (
@@ -80,13 +84,13 @@ export function LinearIssueList() {
 				) : null}
 				<Button
 					aria-label='Refresh issues'
-					disabled={issues.isFetching}
-					onClick={() => void issues.refetch()}
+					disabled={issuesFetching}
+					onClick={() => void refetchIssues()}
 					size='icon-sm'
 					variant='ghost'
 				>
 					<RefreshCwIcon
-						className={issues.isFetching ? 'animate-spin' : undefined}
+						className={issuesFetching ? 'animate-spin' : undefined}
 					/>
 				</Button>
 				<Button onClick={() => setEditorOpen(true)} size='sm'>
@@ -101,7 +105,7 @@ export function LinearIssueList() {
 				</p>
 			) : null}
 
-			{issues.isLoading ? (
+			{issuesLoading ? (
 				<div className='flex flex-col gap-2'>
 					<Skeleton className='h-12 w-full' />
 					<Skeleton className='h-12 w-full' />

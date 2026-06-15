@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { app, Menu, type MenuItemConstructorOptions, shell } from 'electron';
-import { getAccelerator } from '../../shared/keymap';
+import { getAccelerator } from '../../shared/keymap/matcher';
 
 /**
  * Returns the on-disk path to the bundled product roadmap markdown.

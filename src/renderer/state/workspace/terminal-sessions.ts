@@ -26,12 +26,22 @@ export function useWorkspaceTerminalSessions(
 	const [sessions, setSessions] = useState<TerminalSessionSnapshot[]>([]);
 	// Tabs the user explicitly closed: their later lifecycle broadcasts (exit
 	// after kill) must not resurrect the tab.
-	const closedTerminalIdsRef = useRef<Set<string>>(new Set());
+	const closedTerminalIdsRef = useRef<Set<string>>(null as unknown as Set<string>);
+	if (closedTerminalIdsRef.current === null) {
+		closedTerminalIdsRef.current = new Set();
+	}
+
+	// Reset session state when the workspace changes; an inline-during-render
+	// comparison avoids an extra render that an effect-based reset would force.
+	const [prevWorkspaceId, setPrevWorkspaceId] = useState(workspaceId);
+	if (prevWorkspaceId !== workspaceId) {
+		setPrevWorkspaceId(workspaceId);
+		setSessions([]);
+		closedTerminalIdsRef.current = new Set();
+	}
 
 	useEffect(() => {
 		let cancelled = false;
-		setSessions([]);
-		closedTerminalIdsRef.current = new Set();
 
 		window.ensemble
 			?.listTerminalSessions({ workspaceId })

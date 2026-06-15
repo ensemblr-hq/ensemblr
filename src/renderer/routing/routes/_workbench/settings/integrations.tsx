@@ -31,13 +31,9 @@ function IntegrationsSettings() {
 
 function LinearConnectionRow() {
 	const queryClient = useQueryClient();
-	const connection = useQuery(linearConnectionQuery);
+	const { data: snapshot, isLoading: connectionLoading } =
+		useQuery(linearConnectionQuery);
 	const [failureMessage, setFailureMessage] = useState<string | null>(null);
-
-	const invalidateConnection = () =>
-		queryClient.invalidateQueries({
-			queryKey: ensembleQueryKeys.linearConnection(),
-		});
 
 	const login = useMutation({
 		mutationFn: startLinearLogin,
@@ -45,8 +41,14 @@ function LinearConnectionRow() {
 			setFailureMessage(
 				result?.status === 'error' ? result.failure.message : null,
 			);
-			await invalidateConnection();
+			await queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.linearConnection(),
+			});
 		},
+		onSuccess: () =>
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.linearConnection(),
+			}),
 	});
 
 	const disconnect = useMutation({
@@ -55,16 +57,27 @@ function LinearConnectionRow() {
 			setFailureMessage(
 				result?.status === 'error' ? result.failure.message : null,
 			);
-			await invalidateConnection();
+			await queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.linearConnection(),
+			});
 		},
+		onSuccess: () =>
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.linearConnection(),
+			}),
 	});
 
 	const cancel = useMutation({
 		mutationFn: cancelLinearLogin,
-		onSettled: () => invalidateConnection(),
+		onSettled: () =>
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.linearConnection(),
+			}),
+		onSuccess: () =>
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.linearConnection(),
+			}),
 	});
-
-	const snapshot = connection.data;
 
 	return (
 		<SettingRow
@@ -78,7 +91,7 @@ function LinearConnectionRow() {
 					snapshot={snapshot}
 				/>
 			}
-			description={describeLinearConnection(snapshot, connection.isLoading)}
+			description={describeLinearConnection(snapshot, connectionLoading)}
 			label={
 				<span className='flex items-center gap-2'>
 					<LinearLogo className='size-4' />

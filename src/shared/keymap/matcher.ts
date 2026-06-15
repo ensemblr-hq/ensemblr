@@ -119,8 +119,9 @@ export function formatShortcut(id: ShortcutId): string {
 	const separator = mac ? '' : '+';
 	const parts: string[] = [];
 	const order: readonly Modifier[] = ['mod', 'alt', 'shift'];
+	const modifierSet = new Set<Modifier>(binding.modifiers ?? []);
 	for (const mod of order) {
-		if (binding.modifiers?.includes(mod)) {
+		if (modifierSet.has(mod)) {
 			parts.push(labels[mod]);
 		}
 	}

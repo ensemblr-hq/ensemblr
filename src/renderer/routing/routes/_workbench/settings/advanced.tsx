@@ -25,7 +25,8 @@ export const Route = createFileRoute('/_workbench/settings/advanced')({
 
 function AdvancedSettings() {
 	const queryClient = useQueryClient();
-	const root = useQuery(rootDirectoryQuery);
+	const { data: rootData, isLoading: rootLoading } =
+		useQuery(rootDirectoryQuery);
 	const [piPath, setPiPath] = useAtom(customPiExecutablePathAtom);
 	const [scrollbackMb, setScrollbackMb] = useAtom(terminalScrollbackMbAtom);
 	const [pickError, setPickError] = useState<string | null>(null);
@@ -68,10 +69,13 @@ function AdvancedSettings() {
 		},
 		onSuccess: (path) => {
 			if (path) setPiPath(path);
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.setupDiagnostics(),
+			});
 		},
 	});
 
-	const rootStatus = root.data?.status ?? 'ok';
+	const rootStatus = rootData?.status ?? 'ok';
 
 	return (
 		<SettingsSection
@@ -104,18 +108,18 @@ function AdvancedSettings() {
 				}
 				stack
 			>
-				{root.isLoading ? (
+				{rootLoading ? (
 					<div className='mt-2 flex items-center gap-2 text-muted-foreground text-xs'>
 						<Spinner className='size-3' /> Reading root…
 					</div>
 				) : (
 					<div className='mt-2 space-y-1'>
 						<code className='block truncate rounded-md bg-muted/40 px-3 py-2 font-mono text-xs'>
-							{root.data?.path ?? 'Not configured'}
+							{rootData?.path ?? 'Not configured'}
 						</code>
-						{root.data?.source ? (
+						{rootData?.source ? (
 							<p className='text-[0.625rem] text-muted-foreground'>
-								source: {root.data.source}
+								source: {rootData.source}
 							</p>
 						) : null}
 					</div>

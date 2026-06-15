@@ -23,7 +23,11 @@ export const Route = createFileRoute('/_workbench/settings/diagnostics')({
  */
 function DiagnosticsRoute() {
 	const queryClient = useQueryClient();
-	const query = useQuery(setupDiagnosticsQuery);
+	const {
+		data: snapshot,
+		error: queryError,
+		isFetching: queryFetching,
+	} = useQuery(setupDiagnosticsQuery);
 	const [copied, setCopied] = useState(false);
 
 	const onRetry = async () => {
@@ -33,10 +37,10 @@ function DiagnosticsRoute() {
 	};
 
 	const onCopyBundle = async () => {
-		if (!query.data) return;
+		if (!snapshot) return;
 		try {
 			await navigator.clipboard.writeText(
-				JSON.stringify(sanitizeDiagnosticsBundle(query.data), null, 2),
+				JSON.stringify(sanitizeDiagnosticsBundle(snapshot), null, 2),
 			);
 			setCopied(true);
 			window.setTimeout(() => setCopied(false), 1800);
@@ -49,7 +53,7 @@ function DiagnosticsRoute() {
 		<SettingsSection
 			action={
 				<Button
-					disabled={!query.data}
+					disabled={!snapshot}
 					onClick={onCopyBundle}
 					size='sm'
 					variant='outline'
@@ -66,10 +70,10 @@ function DiagnosticsRoute() {
 			title='Diagnostics'
 		>
 			<SetupDiagnosticsPanel
-				error={query.error instanceof Error ? query.error.message : null}
-				isRetrying={query.isFetching}
+				error={queryError instanceof Error ? queryError.message : null}
+				isRetrying={queryFetching}
 				onRetry={onRetry}
-				snapshot={query.data ?? null}
+				snapshot={snapshot ?? null}
 			/>
 		</SettingsSection>
 	);

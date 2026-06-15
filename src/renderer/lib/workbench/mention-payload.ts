@@ -8,15 +8,12 @@ import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
  * focused while leaving a visible marker so the model knows context was
  * elided.
  */
-export const ATTACHED_FILE_MAX_CHARS = 8_000;
+const ATTACHED_FILE_MAX_CHARS = 8_000;
 const ATTACHED_FILE_HEAD_CHARS = 2_500;
 const ATTACHED_FILE_TAIL_CHARS = 5_000;
 
 /** Wraps one workspace file's content in an explicit attachment marker. */
-export function formatAttachedFileSection(
-	pathValue: string,
-	content: string,
-): string {
+function formatAttachedFileSection(pathValue: string, content: string): string {
 	const safePath = pathValue.replaceAll('"', '&quot;');
 	return `<attached_file path="${safePath}">\n${truncateAttachmentContent(content)}\n</attached_file>`;
 }
@@ -27,7 +24,7 @@ export function formatAttachedFileSection(
  * head/tail strategy the session-summary writer already uses for transcript
  * elision so the renderer and main process behave consistently.
  */
-export function truncateAttachmentContent(content: string): string {
+function truncateAttachmentContent(content: string): string {
 	if (content.length <= ATTACHED_FILE_MAX_CHARS) {
 		return content;
 	}

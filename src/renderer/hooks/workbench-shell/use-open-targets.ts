@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -41,13 +41,17 @@ export function useOpenTargets({
 	});
 
 	// Per-workspace memory of the last launch-app target the user picked, so
-	// the split button defaults to it on the next visit.
+	// the split button defaults to it on the next visit. An inline-during-render
+	// comparison re-syncs the local copy when `workspaceId` changes without
+	// paying for an extra render that a useEffect-based reset would force.
 	const [lastUsedTargetId, setLastUsedTargetId] = useState<string | null>(() =>
 		readLastUsedOpenTarget(workspaceId),
 	);
-	useEffect(() => {
+	const [prevWorkspaceId, setPrevWorkspaceId] = useState(workspaceId);
+	if (prevWorkspaceId !== workspaceId) {
+		setPrevWorkspaceId(workspaceId);
 		setLastUsedTargetId(readLastUsedOpenTarget(workspaceId));
-	}, [workspaceId]);
+	}
 
 	const openTargets = useMemo<WorkspaceOpenTarget[] | null>(() => {
 		const fromQuery = data?.targets ?? null;

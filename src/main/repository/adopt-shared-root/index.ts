@@ -154,17 +154,28 @@ export async function reconcileSharedRoot({
 		diagnostics,
 		'repository-scan-failed',
 	);
-	for (const child of repositoryChildren) {
-		const candidatePath = path.join(root.repositoriesPath, child);
+	const repositoryProbes = await Promise.all(
+		repositoryChildren.map(async (child) => {
+			const candidatePath = path.join(root.repositoriesPath, child);
+			// Folders the user has explicitly archived carry a sentinel file. Skip
+			// them so a restart never resurrects what the user just removed.
+			if (hasArchivedRepositoryMarker(candidatePath)) {
+				return { candidatePath, archived: true as const };
+			}
+			const probe = await gitProbe(candidatePath);
+			return { candidatePath, archived: false as const, probe };
+		}),
+	);
+
+	for (const entry of repositoryProbes) {
+		const { candidatePath } = entry;
 		scannedRepositoryPaths.add(candidatePath);
 
-		// Folders the user has explicitly archived carry a sentinel file. Skip
-		// them so a restart never resurrects what the user just removed.
-		if (hasArchivedRepositoryMarker(candidatePath)) {
+		if (entry.archived) {
 			continue;
 		}
 
-		const probe = await gitProbe(candidatePath);
+		const probe = entry.probe;
 
 		if (!probe.isGitRepository || probe.topLevel !== candidatePath) {
 			diagnostics.push({
@@ -242,11 +253,17 @@ export async function reconcileSharedRoot({
 			diagnostics,
 			'workspace-scan-failed',
 		);
-		for (const workspaceSlug of workspaceChildren) {
-			const candidatePath = path.join(repoWorkspacesPath, workspaceSlug);
+		const workspaceProbes = await Promise.all(
+			workspaceChildren.map(async (workspaceSlug) => {
+				const candidatePath = path.join(repoWorkspacesPath, workspaceSlug);
+				const probe = await worktreeProbe(candidatePath);
+				return { candidatePath, probe, workspaceSlug };
+			}),
+		);
+
+		for (const { candidatePath, probe, workspaceSlug } of workspaceProbes) {
 			scannedWorkspacePaths.add(candidatePath);
 
-			const probe = await worktreeProbe(candidatePath);
 			if (!probe.isWorktree || probe.topLevel !== candidatePath) {
 				diagnostics.push({
 					code: 'invalid-worktree',

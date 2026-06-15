@@ -82,7 +82,7 @@ function looksLikeTerminalOutput(toolName: string, text: string): boolean {
  * that read as data, not prose. Exported so the message-text segmenter can
  * fence single-paragraph dumps that would otherwise stay markdown.
  */
-export function looksLikeStructuredDump(text: string): boolean {
+function looksLikeStructuredDump(text: string): boolean {
 	const hits = (text.match(STRUCTURED_KV_PAIR) ?? []).length;
 	return hits >= MIN_STRUCTURED_KV_HITS;
 }

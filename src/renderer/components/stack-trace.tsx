@@ -10,7 +10,7 @@ import {
 	createContext,
 	memo,
 	useCallback,
-	useContext,
+	use,
 	useEffect,
 	useMemo,
 	useRef,
@@ -57,7 +57,7 @@ interface StackTraceContextValue {
 const StackTraceContext = createContext<StackTraceContextValue | null>(null);
 
 const useStackTrace = () => {
-	const context = useContext(StackTraceContext);
+	const context = use(StackTraceContext);
 	if (!context) {
 		throw new Error('StackTrace components must be used within StackTrace');
 	}
@@ -141,8 +141,9 @@ const parseStackTrace = (trace: string): ParsedStackTrace => {
 	// Parse stack frames (lines starting with "at")
 	const frames = lines
 		.slice(1)
-		.filter((line) => line.trim().startsWith('at '))
-		.map(parseStackFrame);
+		.flatMap((line) =>
+			line.trim().startsWith('at ') ? [parseStackFrame(line)] : [],
+		);
 
 	return {
 		errorMessage,

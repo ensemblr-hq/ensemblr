@@ -21,7 +21,6 @@ export {
 export {
 	classifyToolOutput,
 	looksLikeStackTrace,
-	looksLikeStructuredDump,
 } from './tool-output-classifier';
 export type { ToolRowProjection } from './tool-row-projector';
 export { projectToolRow } from './tool-row-projector';
