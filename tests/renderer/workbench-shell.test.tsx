@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { ensembleQueryKeys } from '../../src/renderer/api/ensemble';
 import { WorkspaceConversationContent } from '../../src/renderer/components/workbench-shell/conversation-panel';
 import { WorkbenchFrame } from '../../src/renderer/components/workbench-shell/frame';
 import {
@@ -71,6 +72,44 @@ const DOCK_ACTIONS: WorkbenchDockActions = {
 
 const EMPTY_ROUTE_SEARCH = (): WorkbenchRouteSearch => ({});
 
+/**
+ * Minimal open-target snapshot used to seed the React Query cache so the
+ * workbench header's "Open in…" menu renders during static markup tests.
+ * Mirrors the shape produced by the main process detection pipeline.
+ */
+const OPEN_TARGETS_FIXTURE = [
+	{
+		behavior: 'reveal-in-finder',
+		iconName: 'lucide:folder',
+		id: 'finder',
+		installed: true,
+		kind: 'file-manager',
+		label: 'Finder',
+		numberShortcutLabel: '1',
+	},
+	{
+		behavior: 'launch-app',
+		iconName: 'vscode-icons:file-type-vscode',
+		id: 'vscode',
+		installed: true,
+		isPrimary: true,
+		kind: 'editor',
+		label: 'VS Code',
+		numberShortcutLabel: '2',
+		shortcutLabel: '⌘O',
+	},
+	{
+		behavior: 'copy-path',
+		iconName: 'lucide:copy',
+		id: 'copy-path',
+		installed: true,
+		kind: 'utility',
+		label: 'Copy path',
+		numberShortcutLabel: '3',
+		shortcutLabel: '⌘⇧C',
+	},
+] as const;
+
 /** Mirrors the hook's no-data fallback: placeholder sessions, no history. */
 function stubSessionNavigation(
 	activeSession: SessionTabModel,
@@ -105,6 +144,9 @@ function renderWorkbench(
 
 	const queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+	});
+	queryClient.setQueryData(ensembleQueryKeys.workspaceOpenTargets(), {
+		targets: OPEN_TARGETS_FIXTURE,
 	});
 	return renderToStaticMarkup(
 		<QueryClientProvider client={queryClient}>
@@ -280,28 +322,6 @@ test('does not mark a workspace active on static workbench routes', () => {
 	expect(markup).toContain('Dashboard');
 	expect(markup).toContain('Conductor shell rework');
 	expect(markup.match(/data-active="true"/g)).toHaveLength(1);
-});
-
-test('models installed workspace open targets for the header launcher', () => {
-	const workspace = getDefaultWorkspace();
-	const openTargets = workspace.openTargets
-		.filter((target) => target.installed || target.kind === 'utility')
-		.map((target) => target.label);
-
-	expect(openTargets).toEqual([
-		'Finder',
-		'VS Code',
-		'Zed',
-		'Xcode',
-		'Ghostty',
-		'Warp',
-		'Terminal',
-		'GitHub Desktop',
-		'Copy path',
-	]);
-	expect(workspace.openTargets.find((target) => target.isPrimary)?.label).toBe(
-		'VS Code',
-	);
 });
 
 test('models fixed script output tabs separately from interactive terminals', () => {

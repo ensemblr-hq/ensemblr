@@ -1,21 +1,20 @@
 import { app, ipcMain } from 'electron';
 
-import { type HealthSnapshot } from '../../../shared/ipc/contracts/health';
-import { type InitialShellSnapshot, type RepositoryWorkspaceNavigationSnapshot } from '../../../shared/ipc/contracts/repository-navigation';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
+import type { HealthSnapshot } from '../../../shared/ipc/contracts/health';
 import type { EnsembleConfigService } from '../../config';
 import type { EnsembleDatabaseService } from '../../storage';
-import { getRepositoryWorkspaceNavigationSnapshot } from '../repository-workspace-navigation';
 
-/** Service dependencies used by the health-snapshot IPC handlers. */
+/** Service dependencies used by the health-snapshot IPC handler. */
 export interface HealthHandlersOptions {
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
 }
 
 /**
- * Registers IPC handlers for the async health snapshot and the synchronous
- * initial-shell snapshot used by the preload bootstrap.
+ * Registers the async health-snapshot IPC handler. The synchronous
+ * initial-shell snapshot lives in `handlers/shell-snapshot.ts` so this file
+ * stays scoped to health alone.
  * @param options - Required services.
  */
 export function registerHealthHandlers({
@@ -25,19 +24,10 @@ export function registerHealthHandlers({
 	ipcMain.handle(IPC_CHANNELS.health, (): HealthSnapshot => {
 		return buildHealthSnapshot(configService, databaseService);
 	});
-
-	ipcMain.on(IPC_CHANNELS.initialShellSnapshot, (event) => {
-		const snapshot: InitialShellSnapshot = {
-			capturedAt: new Date().toISOString(),
-			health: safeBuildHealthSnapshot(configService, databaseService),
-			navigation: safeBuildNavigationSnapshot(databaseService),
-		};
-		event.returnValue = snapshot;
-	});
 }
 
-/** Single source of truth for the health-snapshot shape returned by both channels. */
-function buildHealthSnapshot(
+/** Single source of truth for the health-snapshot shape. */
+export function buildHealthSnapshot(
 	configService: EnsembleConfigService,
 	databaseService: EnsembleDatabaseService,
 ): HealthSnapshot {
@@ -54,29 +44,4 @@ function buildHealthSnapshot(
 			node: process.versions.node,
 		},
 	};
-}
-
-/** Builds a health snapshot, swallowing failures so the sync channel never throws. */
-function safeBuildHealthSnapshot(
-	configService: EnsembleConfigService,
-	databaseService: EnsembleDatabaseService,
-): HealthSnapshot | null {
-	try {
-		return buildHealthSnapshot(configService, databaseService);
-	} catch {
-		return null;
-	}
-}
-
-/** Builds the navigation snapshot when SQLite is available; null otherwise. */
-function safeBuildNavigationSnapshot(
-	databaseService: EnsembleDatabaseService,
-): RepositoryWorkspaceNavigationSnapshot | null {
-	try {
-		return getRepositoryWorkspaceNavigationSnapshot(
-			databaseService.getConnection()?.database ?? null,
-		);
-	} catch {
-		return null;
-	}
 }

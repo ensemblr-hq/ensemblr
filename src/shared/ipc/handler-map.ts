@@ -109,10 +109,7 @@ import type {
 	RepositoryConfigRequest,
 	RepositoryConfigSnapshot,
 } from './contracts/repository-config';
-import type {
-	InitialShellSnapshot,
-	RepositoryWorkspaceNavigationSnapshot,
-} from './contracts/repository-navigation';
+import type { RepositoryWorkspaceNavigationSnapshot } from './contracts/repository-navigation';
 import type {
 	DeleteReviewCommentRequest,
 	DeleteReviewCommentResult,
@@ -139,6 +136,7 @@ import type {
 } from './contracts/settings-resolution';
 import type { SetupDiagnosticsSnapshot } from './contracts/setup';
 import type { SharedRootAdoptionSnapshot } from './contracts/shared-root-adoption';
+import type { InitialShellSnapshot } from './contracts/shell-snapshot';
 import type {
 	CreateTerminalSessionRequest,
 	CreateTerminalSessionResult,

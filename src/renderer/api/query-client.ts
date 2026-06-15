@@ -36,4 +36,9 @@ function seedQueryCacheFromInitialSnapshot(): void {
 	if (snapshot.health) {
 		queryClient.setQueryData(ensembleQueryKeys.health(), snapshot.health);
 	}
+	if (snapshot.openTargets) {
+		queryClient.setQueryData(ensembleQueryKeys.workspaceOpenTargets(), {
+			targets: snapshot.openTargets,
+		});
+	}
 }

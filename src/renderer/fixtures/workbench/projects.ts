@@ -1,6 +1,5 @@
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import { createDockTabs } from './dock-tabs';
-import { defaultWorkspaceOpenTargets } from './open-targets';
 import {
 	missingScripts,
 	runningDevScripts,
@@ -41,7 +40,6 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				}),
 				id: 'san-antonio',
 				name: 'Conductor shell rework',
-				openTargets: defaultWorkspaceOpenTargets,
 				pathLabel: '~/Ensemble/workspaces/ensemble/san-antonio',
 				projectId: 'ensemble',
 				pullRequest: {
@@ -165,7 +163,6 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				}),
 				id: 'linear-issue-flow',
 				name: 'Linear issue flow',
-				openTargets: defaultWorkspaceOpenTargets,
 				pathLabel: '~/Ensemble/workspaces/ensemble/linear-issue-flow',
 				projectId: 'ensemble',
 				pullRequest: {
@@ -230,7 +227,6 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				}),
 				id: 'normal-right-header',
 				name: 'Normal right header',
-				openTargets: defaultWorkspaceOpenTargets,
 				pathLabel: '~/Ensemble/workspaces/ensemble/normal-right-header',
 				projectId: 'ensemble',
 				pullRequest: {
@@ -284,7 +280,6 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				}),
 				id: 'changed-right-header',
 				name: 'Changed right header',
-				openTargets: defaultWorkspaceOpenTargets,
 				pathLabel: '~/Ensemble/workspaces/ensemble/changed-right-header',
 				projectId: 'ensemble',
 				pullRequest: {
@@ -355,7 +350,6 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				}),
 				id: 'review-checks',
 				name: 'Review checks',
-				openTargets: defaultWorkspaceOpenTargets,
 				pathLabel: '~/Ensemble/workspaces/agent-lab/review-checks',
 				projectId: 'agent-lab',
 				pullRequest: {
