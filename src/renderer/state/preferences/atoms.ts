@@ -1,4 +1,5 @@
-import { atomFamily, atomWithStorage } from 'jotai/utils';
+import { atomWithStorage } from 'jotai/utils';
+import { atomFamily } from 'jotai-family';
 
 /** Visual color scheme. `system` follows OS preference; otherwise overrides. */
 export type ThemeMode = 'system' | 'light' | 'dark';

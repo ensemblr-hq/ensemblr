@@ -80,6 +80,7 @@
 		"cmdk": "^1.1.1",
 		"electron-squirrel-startup": "^1.0.1",
 		"jotai": "^2.20.1",
+		"jotai-family": "^1.0.2",
 		"js-toml": "^1.1.2",
 		"lucide-react": "^1.17.0",
 		"motion": "^12.40.0",
