@@ -78,6 +78,7 @@ export function persistRuntimeEvent({
 }): PiEventRow | null {
 	const input: AppendPiEventInput = {
 		branchId,
+		createdAt: event.at,
 		eventType: event.type,
 		payload: eventPayload(event),
 		stream:

@@ -26,11 +26,20 @@ export interface PiEventRow {
 
 export interface AppendPiEventInput {
 	branchId: string;
+	/**
+	 * Wall-clock timestamp of the event (ISO 8601). Persisted verbatim so turn
+	 * timing reflects when the runtime emitted the event, not when SQLite wrote
+	 * the row. Falls back to the DB clock when omitted.
+	 */
+	createdAt?: string;
 	eventType: string;
 	payload?: PiEventPayload;
 	stream?: PiEventStream;
 	turnId?: string | null;
 }
+
+/** SQLite expression that stamps the DB clock when no `created_at` is supplied. */
+const CREATED_AT_VALUE = `COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
 
 interface EventRowShape {
 	branch_id: string;
@@ -72,8 +81,8 @@ export function appendPiEvent({
 		database
 			.prepare(
 				`INSERT INTO pi_session_events
-					(id, branch_id, turn_id, ordinal, event_type, stream, payload_json)
-					VALUES (?, ?, ?, ?, ?, ?, ?)`,
+					(id, branch_id, turn_id, ordinal, event_type, stream, payload_json, created_at)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ${CREATED_AT_VALUE})`,
 			)
 			.run(
 				id,
@@ -83,6 +92,7 @@ export function appendPiEvent({
 				input.eventType,
 				stream,
 				payload,
+				input.createdAt ?? null,
 			);
 
 		database.exec('COMMIT');
@@ -126,8 +136,8 @@ export function appendPiEvents({
 
 		const insertStatement = database.prepare(
 			`INSERT INTO pi_session_events
-				(id, branch_id, turn_id, ordinal, event_type, stream, payload_json)
-				VALUES (?, ?, ?, ?, ?, ?, ?)`,
+				(id, branch_id, turn_id, ordinal, event_type, stream, payload_json, created_at)
+				VALUES (?, ?, ?, ?, ?, ?, ?, ${CREATED_AT_VALUE})`,
 		);
 
 		events.forEach((event, index) => {
@@ -140,6 +150,7 @@ export function appendPiEvents({
 				event.eventType,
 				event.stream ?? 'protocol',
 				serializePayload(event.payload),
+				event.createdAt ?? null,
 			);
 			insertedIds.push(id);
 		});
