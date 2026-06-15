@@ -45,7 +45,7 @@ const THINKING_LABELS: Record<string, string> = {
 	low: 'Low',
 	medium: 'Medium',
 	minimal: 'Minimal',
-	off: 'Off',
+	off: 'No thinking',
 	xhigh: 'Extra high',
 };
 
