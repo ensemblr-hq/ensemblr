@@ -19,7 +19,7 @@ import {
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import { cn } from '@/renderer/lib/utils';
-import { useDebugPanelToggle } from '@/renderer/state/pi-raw-frames';
+import { useDebugPanelToggle } from '@/renderer/state/pi';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 
 /** Horizontal session-tab bar with close, restore, and new-tab controls. */

@@ -1,7 +1,7 @@
 import { SparklesIcon } from 'lucide-react';
 
 import { Button } from '@/renderer/components/ui/button';
-import { useComposerAttachmentDispatcher } from '@/renderer/state/composer-attachments';
+import { useComposerAttachmentDispatcher } from '@/renderer/state/composer';
 import type { ClosedChatTabEntryWire } from '@/shared/ipc/contracts/chat-tab';
 
 /**

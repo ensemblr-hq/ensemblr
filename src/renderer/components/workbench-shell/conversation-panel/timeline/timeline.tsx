@@ -32,6 +32,9 @@ import {
 	StackTraceHeader,
 } from '@/renderer/components/stack-trace';
 import { Terminal } from '@/renderer/components/terminal';
+import { useForkConversation } from '@/renderer/hooks/workbench-shell/conversation-panel/use-fork-conversation';
+import { useCheckpointRestore } from '@/renderer/hooks/workbench-shell/timeline/use-checkpoint-restore';
+import { useTimelineEvents } from '@/renderer/hooks/workbench-shell/timeline/use-timeline-events';
 import {
 	classifyToolOutput,
 	eventsToUIMessages,
@@ -41,17 +44,13 @@ import {
 import {
 	type OptimisticPrompt,
 	useOptimisticPrompts,
-} from '@/renderer/state/optimistic-prompts';
+} from '@/renderer/state/composer';
 import type {
 	SessionTabModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-
 import { useTurnDiffOpener } from '../file-preview-context';
-import { useForkConversation } from '../use-fork-conversation';
 import { RestoreCheckpointDialog } from './restore-checkpoint-dialog';
-import { useCheckpointRestore } from './use-checkpoint-restore';
-import { useTimelineEvents } from './use-timeline-events';
 
 /**
  * Structured renderer for the Pi RPC event stream. Reads persisted events

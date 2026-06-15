@@ -2,7 +2,10 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 
-import type { ReadWorkspaceFileRequest, ReadWorkspaceFileResult } from '@/shared/ipc/contracts/workspace-files';
+import type {
+	ReadWorkspaceFileRequest,
+	ReadWorkspaceFileResult,
+} from '@/shared/ipc/contracts/workspace-files';
 
 import { ensembleQueryKeys, getEnsembleApi } from './query-keys';
 

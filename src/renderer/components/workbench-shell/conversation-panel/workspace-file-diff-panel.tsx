@@ -11,7 +11,7 @@ import { workspaceFileDiffQuery } from '@/renderer/api/ensemble-queries';
 import { CodeBlockContent } from '@/renderer/components/code-block';
 import { Button } from '@/renderer/components/ui/button';
 import { formatFileDiffContext } from '@/renderer/lib/workbench/review-context';
-import { useComposerInsert } from '@/renderer/state/composer-insert';
+import { useComposerInsert } from '@/renderer/state/composer';
 
 import { FileCommentSection } from './file-comment-section';
 

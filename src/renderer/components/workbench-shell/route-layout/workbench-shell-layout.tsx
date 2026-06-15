@@ -8,6 +8,10 @@ import {
 	NavigationProvider,
 	SetupDiagnosticsProvider,
 } from '@/renderer/components/workbench-shell/shell-contexts';
+import {
+	useWorkbenchLayoutModel,
+	workbenchRouteApi,
+} from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import {
 	getStringRouteParam,
@@ -23,12 +27,7 @@ import type {
 	WorkbenchChildMatch,
 	WorkbenchShellRouteState,
 } from '@/renderer/types/components';
-
 import { WorkbenchLayoutModelProvider } from '../shell-contexts';
-import {
-	useWorkbenchLayoutModel,
-	workbenchRouteApi,
-} from './use-workbench-layout-model';
 
 /** Workbench shell layout — builds the layout model and renders the navigation frame. */
 export function WorkbenchShellLayout() {

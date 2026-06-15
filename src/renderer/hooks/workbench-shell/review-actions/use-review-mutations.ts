@@ -10,13 +10,12 @@ import {
 	mergePullRequest,
 	pushWorkspaceBranch,
 } from '@/renderer/api/ensemble-queries';
-import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
-
 import {
 	ReviewActionError,
 	showReviewActionError,
-} from './review-action-error';
+} from '@/renderer/components/workbench-shell/review-actions/review-action-error';
+import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
+import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 /** Effective merge-settings snapshot — see `reviewMergeSettingsQuery`. */
 export interface ReviewMergeSettings {

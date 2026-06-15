@@ -14,7 +14,7 @@ import {
 	useClearRawFrames,
 	useDebugPanelToggle,
 	useRawFrames,
-} from '@/renderer/state/pi-raw-frames';
+} from '@/renderer/state/pi';
 import type { PiRawFrameKind } from '@/shared/ipc/contracts/pi-session';
 
 /**

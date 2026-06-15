@@ -8,7 +8,7 @@ import {
 	SettingsSidebar,
 } from '@/renderer/components/settings/settings-sidebar';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
-import { workbenchRouteApi } from '@/renderer/components/workbench-shell/route-layout/use-workbench-layout-model';
+import { workbenchRouteApi } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
 import { settingsActiveRepoIdAtom } from '@/renderer/state/settings-ui';
 
 /** Derive the active scope from the current pathname. */

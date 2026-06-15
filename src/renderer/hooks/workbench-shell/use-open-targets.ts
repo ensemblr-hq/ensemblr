@@ -71,8 +71,7 @@ export function useOpenTargets({
 				? null
 				: (openTargets.find(
 						(target) =>
-							target.id === lastUsedTargetId &&
-							target.behavior !== 'copy-path',
+							target.id === lastUsedTargetId && target.behavior !== 'copy-path',
 					) ?? null);
 		return (
 			lastUsed ??

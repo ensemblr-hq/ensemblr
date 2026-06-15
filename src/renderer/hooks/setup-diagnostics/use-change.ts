@@ -4,8 +4,14 @@ import {
 	isPiExecutablePickerAction,
 	isRootDirectoryPickerAction,
 } from '@/renderer/lib/setup-diagnostics';
-import type { RootDirectoryChangeApplyResult, RootDirectorySelectionResult } from '@/shared/ipc/contracts/root-directory';
-import type { SetupCheckSnapshot, SetupRemediationAction } from '@/shared/ipc/contracts/setup';
+import type {
+	RootDirectoryChangeApplyResult,
+	RootDirectorySelectionResult,
+} from '@/shared/ipc/contracts/root-directory';
+import type {
+	SetupCheckSnapshot,
+	SetupRemediationAction,
+} from '@/shared/ipc/contracts/setup';
 
 interface UseRootDirectoryChangeOptions {
 	onRemediationAction?: (

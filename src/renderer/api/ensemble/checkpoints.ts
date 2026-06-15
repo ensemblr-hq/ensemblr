@@ -1,7 +1,12 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
-import type { ComputeTurnDiffResult, ListTurnCheckpointsResult, RestoreCheckpointRequest, RestoreCheckpointResult } from '@/shared/ipc/contracts/checkpoint';
+import type {
+	ComputeTurnDiffResult,
+	ListTurnCheckpointsResult,
+	RestoreCheckpointRequest,
+	RestoreCheckpointResult,
+} from '@/shared/ipc/contracts/checkpoint';
 
 import { ensembleQueryKeys, getEnsembleApi } from './query-keys';
 

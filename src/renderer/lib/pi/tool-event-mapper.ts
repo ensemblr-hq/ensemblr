@@ -1,6 +1,10 @@
 import type { DynamicToolUIPart } from 'ai';
 
-import type { PiSessionEventWire, PiWireMessagePart, PiWireMessagePayload } from '@/shared/ipc/contracts/pi-session';
+import type {
+	PiSessionEventWire,
+	PiWireMessagePart,
+	PiWireMessagePayload,
+} from '@/shared/ipc/contracts/pi-session';
 
 import type { UIMessagePart } from './types';
 
@@ -101,9 +105,7 @@ export function mergeToolPart(
 }
 
 /** True when `part` is the `dynamic-tool` variant. */
-function isDynamicToolPart(
-	part: UIMessagePart,
-): part is DynamicToolUIPart {
+function isDynamicToolPart(part: UIMessagePart): part is DynamicToolUIPart {
 	return part.type === 'dynamic-tool';
 }
 

@@ -1,4 +1,7 @@
-import type { SetupCheckSnapshot, SetupRemediationAction } from '@/shared/ipc/contracts/setup';
+import type {
+	SetupCheckSnapshot,
+	SetupRemediationAction,
+} from '@/shared/ipc/contracts/setup';
 
 /** Type guard for the Pi-executable picker remediation action. */
 export function isPiExecutablePickerAction(

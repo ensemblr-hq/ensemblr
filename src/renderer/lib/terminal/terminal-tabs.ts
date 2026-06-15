@@ -3,7 +3,10 @@ import type {
 	DockTabStatus,
 	TerminalDockTabModel,
 } from '@/renderer/types/workbench';
-import type { TerminalSessionSnapshot, TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
+import type {
+	TerminalSessionSnapshot,
+	TerminalSessionStatus,
+} from '@/shared/ipc/contracts/terminal';
 
 /**
  * Pure helpers that derive dock terminal tabs from live terminal sessions and

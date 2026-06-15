@@ -3,6 +3,12 @@ import {
 	SidebarGroup,
 	SidebarGroupLabel,
 } from '@/renderer/components/ui/sidebar';
+import {
+	useArchiveBrowseChange,
+	useArchiveProjectAction,
+	useArchiveWorkspaceAction,
+	useCreateWorkspaceFromProject,
+} from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import type {
 	AddProjectActionId,
 	AddProjectMenuModel,
@@ -21,12 +27,6 @@ import {
 	useProjectNavigationDialogs,
 } from './project-navigation-dialogs';
 import { ProjectWorkspaceGroup } from './project-workspace-group';
-import {
-	useArchiveBrowseChange,
-	useArchiveProjectAction,
-	useArchiveWorkspaceAction,
-	useCreateWorkspaceFromProject,
-} from './use-project-navigation-actions';
 
 /** Reorderable list of project groups plus the create-workspace dialog mount. */
 export function ProjectNavigationGroups({

@@ -20,7 +20,7 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Textarea } from '@/renderer/components/ui/textarea';
-import { workbenchRouteApi } from '@/renderer/components/workbench-shell/route-layout/use-workbench-layout-model';
+import { workbenchRouteApi } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
 import { repoSettingsOverrideAtomFamily } from '@/renderer/state/preferences';
 
 export const Route = createFileRoute('/_workbench/settings/repo/$repoId/misc')({

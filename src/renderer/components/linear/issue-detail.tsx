@@ -20,13 +20,16 @@ import {
 } from '@/renderer/components/ui/dropdown-menu';
 import { Separator } from '@/renderer/components/ui/separator';
 import { Skeleton } from '@/renderer/components/ui/skeleton';
-import { useCreateWorkspaceFromProject } from '@/renderer/components/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import { useWorkbenchLayoutRouteModel } from '@/renderer/components/workbench-shell/shell-contexts';
+import { useCreateWorkspaceFromProject } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import {
 	buildWorkspaceSeedFromLinearIssue,
 	describeLinearFailure,
 } from '@/renderer/lib/linear';
-import type { LinearCommentWire, LinearIssueWire } from '@/shared/ipc/contracts/linear';
+import type {
+	LinearCommentWire,
+	LinearIssueWire,
+} from '@/shared/ipc/contracts/linear';
 
 import { LinearCommentComposer } from './comment-composer';
 import { LinearIssueEditorDialog } from './issue-editor-dialog';

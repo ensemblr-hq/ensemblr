@@ -13,7 +13,7 @@ import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import { formatCommentContext } from '@/renderer/lib/workbench/review-context';
-import { useComposerInsert } from '@/renderer/state/composer-insert';
+import { useComposerInsert } from '@/renderer/state/composer';
 import type { ReviewCommentWire } from '@/shared/ipc/contracts/review-comments';
 
 function parseDraftLine(draftLine: string): number | null {
