@@ -83,4 +83,3 @@ export function restoreChatTab(
 		() => getEnsembleApi().restoreChatTab(request),
 	);
 }
-

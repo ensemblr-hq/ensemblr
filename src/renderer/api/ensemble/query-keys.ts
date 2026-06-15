@@ -17,6 +17,13 @@ export const ensembleQueryKeys = {
 			'closed-chat-tabs-with-summary',
 			workspaceId,
 		] as const,
+	environmentFiles: (scope: string, scopeId?: string) =>
+		[
+			...ensembleQueryKeys.all,
+			'environment-files',
+			scope,
+			scopeId ?? '',
+		] as const,
 	environmentVariables: () =>
 		[...ensembleQueryKeys.all, 'environment-variables'] as const,
 	filePreview: (workspaceCwd: string, filePath: string) =>

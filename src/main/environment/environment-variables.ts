@@ -1,12 +1,22 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { EnvironmentVariableDiagnostic, EnvironmentVariableScope, EnvironmentVariableSnapshot, EnvironmentVariablesSnapshot } from '../../shared/ipc/contracts/environment';
+import type {
+	EnvironmentVariableDiagnostic,
+	EnvironmentVariableScope,
+	EnvironmentVariableSnapshot,
+	EnvironmentVariablesSnapshot,
+} from '../../shared/ipc/contracts/environment';
 import type { EnsembleConfigService } from '../config/config-loader';
 import type { SecretMetadata, SecretStore } from '../secrets/secret-store';
 import {
 	type EnsembleDatabaseService,
 	requireDatabase,
 } from '../storage/database.ts';
+import {
+	loadScopeEnvFiles,
+	readEnvFilePaths,
+	writeEnvFilePaths,
+} from './env-files-repository.ts';
 import {
 	compareCatalogEntries,
 	createCatalogMap,
@@ -21,8 +31,10 @@ import {
 import { resolveEnvironmentVariables } from './environment-variable-resolution.ts';
 import { createVariableSnapshots } from './environment-variable-snapshots.ts';
 import type { NormalizedScope } from './environment-variable-types.ts';
+import { envFilePathExists } from './parse-env-file.ts';
 import {
 	deletePlainSetting,
+	readPlainSetting,
 	upsertPlainSetting,
 } from './settings-repository.ts';
 
@@ -31,6 +43,7 @@ export { isEnvironmentVariableKey } from './environment-variable-keys.ts';
 
 export type EnvironmentVariablesErrorCode =
 	| 'database-unavailable'
+	| 'env-file-not-found'
 	| 'invalid-key'
 	| 'invalid-scope'
 	| 'reserved-key'
@@ -59,6 +72,26 @@ export interface EnvironmentVariableUnsetInput {
 	scopeId?: string;
 }
 
+/** Input for reading the raw stored value of a single env var. */
+export interface EnvironmentVariableReadInput {
+	key: string;
+	scope?: EnvironmentVariableScope;
+	scopeId?: string;
+}
+
+/** Identifies a scope for env-file list operations. */
+export interface EnvironmentFilesScopeInput {
+	scope?: EnvironmentVariableScope;
+	scopeId?: string;
+}
+
+/** Input for adding or removing a single env-file path. */
+export interface EnvironmentFileInput {
+	path: string;
+	scope?: EnvironmentVariableScope;
+	scopeId?: string;
+}
+
 /** Options for {@link EnvironmentVariablesService.assembleEnvironment}. */
 export interface EnvironmentVariablesAssemblyOptions {
 	includeSecrets?: boolean;
@@ -76,16 +109,27 @@ export interface EnvironmentVariablesAssembly {
 
 /** Public surface of the environment-variables service. */
 export interface EnvironmentVariablesService {
+	addEnvFile: (input: EnvironmentFileInput) => Promise<string[]>;
 	assembleEnvironment: (
 		options?: EnvironmentVariablesAssemblyOptions,
 	) => Promise<EnvironmentVariablesAssembly>;
 	getSnapshot: (
 		options?: EnvironmentVariablesSnapshotOptions,
 	) => Promise<EnvironmentVariablesSnapshot>;
+	listEnvFiles: (input?: EnvironmentFilesScopeInput) => Promise<string[]>;
+	readValue: (input: EnvironmentVariableReadInput) => Promise<string | null>;
+	removeEnvFile: (input: EnvironmentFileInput) => Promise<string[]>;
 	setPlainValue: (
 		input: EnvironmentVariableWriteInput,
 	) => Promise<EnvironmentVariableSnapshot>;
 	setSecretValue: (
+		input: EnvironmentVariableWriteInput,
+	) => Promise<EnvironmentVariableSnapshot>;
+	/**
+	 * Persists a variable, auto-routing to the secret store when the key is
+	 * catalog-classified or name-shaped as a secret, else to SQLite.
+	 */
+	setValue: (
 		input: EnvironmentVariableWriteInput,
 	) => Promise<EnvironmentVariableSnapshot>;
 	unsetValue: (input: EnvironmentVariableUnsetInput) => Promise<void>;
@@ -167,24 +211,37 @@ export function createEnvironmentVariablesService({
 		options: EnvironmentVariablesSnapshotOptions = {},
 	): Promise<EnvironmentVariablesSnapshot> {
 		const databaseConnection = getDatabase();
+		const scope = normalizeScope(options);
 		const state = await resolveEnvironmentVariables({
 			configService,
 			database: databaseConnection,
 			now,
 			requiredKeys: options.requiredKeys,
-			scope: normalizeScope(options),
+			scope,
 			secretStore: getSecretStore(databaseConnection),
 		});
 		const variables = createVariableSnapshots(state);
+
+		// Env files are a distinct source, but they still satisfy required
+		// variables at runtime, so fold their keys into the missing-required
+		// count (and surface unreadable-file warnings) to keep the snapshot
+		// consistent with the assembled environment.
+		const envFiles = databaseConnection
+			? loadScopeEnvFiles({ database: databaseConnection, scope })
+			: { diagnostics: [], values: {} };
+		const envFileKeys = new Set(Object.keys(envFiles.values));
 
 		return {
 			catalog: Array.from(state.catalogByKey.values()).sort(
 				compareCatalogEntries,
 			),
-			diagnostics: state.diagnostics,
+			diagnostics: [...state.diagnostics, ...envFiles.diagnostics],
 			generatedAt: now().toISOString(),
 			missingRequiredCount: variables.filter(
-				(variable) => variable.required && variable.status === 'unset',
+				(variable) =>
+					variable.required &&
+					variable.status === 'unset' &&
+					!envFileKeys.has(variable.key),
 			).length,
 			requiredCount: state.requiredKeys.size,
 			variables,
@@ -211,6 +268,31 @@ export function createEnvironmentVariablesService({
 		});
 		const env: Record<string, string> = {};
 		const redactValues: string[] = [];
+
+		// Env-file values are the lowest precedence within the scope: explicit
+		// plain/secret variables below override them, and reserved runtime keys
+		// are never sourced from files. Secret-shaped file values are still
+		// redacted from command output, matching the secret store's guarantee.
+		if (databaseConnection) {
+			const envFiles = loadScopeEnvFiles({
+				database: databaseConnection,
+				scope: normalizeScope(options),
+			});
+
+			state.diagnostics.push(...envFiles.diagnostics);
+
+			for (const [key, value] of Object.entries(envFiles.values)) {
+				if (isReservedEnvironmentVariableKey(key, state.catalogByKey)) {
+					continue;
+				}
+
+				env[key] = value;
+
+				if (isSecretEnvironmentVariableKey(key, state.catalogByKey)) {
+					redactValues.push(value);
+				}
+			}
+		}
 
 		for (const [key, candidate] of state.plainValues) {
 			if (isReservedEnvironmentVariableKey(key, state.catalogByKey)) {
@@ -448,11 +530,145 @@ export function createEnvironmentVariablesService({
 		}
 	}
 
+	/**
+	 * Persists a variable, routing to the secret store when the key is
+	 * catalog-classified or name-shaped as a secret, else to SQLite.
+	 * @param input - Key, scope, and value.
+	 * @returns The resulting variable snapshot.
+	 */
+	async function setValue(
+		input: EnvironmentVariableWriteInput,
+	): Promise<EnvironmentVariableSnapshot> {
+		const key = normalizeEnvironmentVariableKey(input.key);
+		const catalogByKey = createCatalogMap();
+
+		if (isSecretEnvironmentVariableKey(key, catalogByKey)) {
+			return setSecretValue(input);
+		}
+
+		return setPlainValue(input);
+	}
+
+	/**
+	 * Reads the raw stored value of a single variable: plain values from SQLite,
+	 * secrets from the secret store. Returns `null` when unset or unavailable.
+	 * @param input - Key and scope to read.
+	 * @returns The decoded value, or `null`.
+	 */
+	async function readValue(
+		input: EnvironmentVariableReadInput,
+	): Promise<string | null> {
+		const key = normalizeEnvironmentVariableKey(input.key);
+		const scope = normalizeScope(input);
+		const databaseConnection = getDatabase();
+
+		if (databaseConnection) {
+			const plain = readPlainSetting({
+				database: databaseConnection,
+				key,
+				scope,
+			});
+
+			if (plain !== null) {
+				return plain;
+			}
+		}
+
+		const store = getSecretStore(databaseConnection);
+
+		if (!store) {
+			return null;
+		}
+
+		return store.read({
+			key: toSecretStoreKey(key),
+			scope: scope.scope,
+			scopeId: scope.scopeId || undefined,
+		});
+	}
+
+	/**
+	 * Lists the env-file paths configured for a scope.
+	 * @param input - Optional scope and scope id.
+	 * @returns The ordered list of paths.
+	 */
+	async function listEnvFiles(
+		input: EnvironmentFilesScopeInput = {},
+	): Promise<string[]> {
+		const scope = normalizeScope(input);
+		const databaseConnection = getDatabase();
+
+		if (!databaseConnection) {
+			return [];
+		}
+
+		return readEnvFilePaths(databaseConnection, scope);
+	}
+
+	/**
+	 * Appends an env-file path for a scope (de-duplicated, order preserved).
+	 * @param input - Scope and path to add.
+	 * @returns The updated list of paths.
+	 */
+	async function addEnvFile(input: EnvironmentFileInput): Promise<string[]> {
+		const scope = normalizeScope(input);
+		const filePath = input.path.trim();
+
+		if (!filePath) {
+			throw new EnvironmentVariablesError(
+				'invalid-key',
+				'An env-file path is required.',
+			);
+		}
+
+		if (!envFilePathExists(filePath)) {
+			throw new EnvironmentVariablesError(
+				'env-file-not-found',
+				`Env file not found: ${filePath}`,
+			);
+		}
+
+		const databaseConnection = requireEnvironmentDatabase(getDatabase());
+		const current = readEnvFilePaths(databaseConnection, scope);
+
+		if (current.includes(filePath)) {
+			return current;
+		}
+
+		const next = [...current, filePath];
+		writeEnvFilePaths({ database: databaseConnection, paths: next, scope });
+
+		return next;
+	}
+
+	/**
+	 * Removes an env-file path from a scope.
+	 * @param input - Scope and path to remove.
+	 * @returns The updated list of paths.
+	 */
+	async function removeEnvFile(input: EnvironmentFileInput): Promise<string[]> {
+		const scope = normalizeScope(input);
+		const filePath = input.path.trim();
+		const databaseConnection = requireEnvironmentDatabase(getDatabase());
+		const next = readEnvFilePaths(databaseConnection, scope).filter(
+			(entry) => entry !== filePath,
+		);
+
+		writeEnvFilePaths({ database: databaseConnection, paths: next, scope });
+
+		return next;
+	}
+
 	return {
+		addEnvFile,
 		assembleEnvironment,
 		getSnapshot,
+		listEnvFiles,
+		readValue,
+		removeEnvFile,
 		setPlainValue,
 		setSecretValue,
+		setValue,
 		unsetValue,
 	};
 }
