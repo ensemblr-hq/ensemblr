@@ -9,7 +9,7 @@ import {
 	buildAgentActionPrompt,
 	resolveAgentActionTemplate,
 } from '@/renderer/lib/workbench/agent-actions';
-import { useComposerInsert } from '@/renderer/state/composer-insert';
+import { useComposerInsert } from '@/renderer/state/composer';
 import type {
 	ProjectShellModel,
 	WorkspaceShellModel,

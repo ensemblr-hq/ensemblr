@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 
 import { formatLinearIssueContext } from '@/renderer/lib/linear';
 import { toWorkspaceRelativePath } from '@/renderer/lib/pi';
-import { usePiRawFrameCapture } from '@/renderer/state/pi-raw-frames';
+import { usePiRawFrameCapture } from '@/renderer/state/pi';
 import type {
 	ComposerShellState,
 	SessionTabModel,

@@ -18,8 +18,14 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { SessionTabState } from '@/renderer/types/workbench-shell';
-import { CHAT_TAB_LIMIT, CHAT_TAB_LIMIT_ERROR_CODE, type ChatTabWire, type ClosedChatTabEntryWire, type OpenChatTabRequest } from '@/shared/ipc/contracts/chat-tab';
-import { type PiSessionSnapshotWire } from '@/shared/ipc/contracts/pi-session';
+import {
+	CHAT_TAB_LIMIT,
+	CHAT_TAB_LIMIT_ERROR_CODE,
+	type ChatTabWire,
+	type ClosedChatTabEntryWire,
+	type OpenChatTabRequest,
+} from '@/shared/ipc/contracts/chat-tab';
+import type { PiSessionSnapshotWire } from '@/shared/ipc/contracts/pi-session';
 
 /**
  * Cross-instance lock for the workspace-level bootstrap. The route shell owns

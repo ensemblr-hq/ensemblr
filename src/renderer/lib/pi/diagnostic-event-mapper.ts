@@ -1,6 +1,9 @@
 import type { UIMessage } from 'ai';
 
-import type { PiPersistedEnvelope, PiSessionEventWire } from '@/shared/ipc/contracts/pi-session';
+import type {
+	PiPersistedEnvelope,
+	PiSessionEventWire,
+} from '@/shared/ipc/contracts/pi-session';
 
 /**
  * Projects a `stderr` Pi event into a compact `system`-role `UIMessage`, or

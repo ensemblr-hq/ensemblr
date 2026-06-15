@@ -4,7 +4,12 @@ import { ShellPanel } from '@/renderer/components/shell-panel';
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
-import type { SetupCheckGroupId, SetupCheckSnapshot, SetupDiagnosticsSnapshot, SetupRemediationAction } from '@/shared/ipc/contracts/setup';
+import type {
+	SetupCheckGroupId,
+	SetupCheckSnapshot,
+	SetupDiagnosticsSnapshot,
+	SetupRemediationAction,
+} from '@/shared/ipc/contracts/setup';
 
 import { SetupDiagnosticsCompact } from './compact';
 import { LocalExecutionNotice } from './local-execution-notice';

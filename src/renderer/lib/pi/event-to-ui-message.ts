@@ -1,8 +1,8 @@
 import type { UIMessage } from 'ai';
 
 import type {
-	PiPersistedEnvelope,
 	PiSessionEventWire as PiEventFrame,
+	PiPersistedEnvelope,
 	PiWireMessagePart,
 	PiWireMessagePayload,
 } from '@/shared/ipc/contracts/pi-session';

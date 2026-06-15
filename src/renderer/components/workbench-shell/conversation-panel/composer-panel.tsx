@@ -10,6 +10,7 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { useComposerState } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
 import { formatLinearIssueContext } from '@/renderer/lib/linear';
 import { cn } from '@/renderer/lib/utils';
 import type { ComposerShellState } from '@/renderer/types/workbench';
@@ -20,7 +21,6 @@ import { ContextIndicator } from './composer/context-indicator';
 import { ComposerAutocompletePopover } from './composer/mention-popover';
 import { ModelPicker } from './composer/model-picker';
 import { getNextThinkingId, ThinkingPicker } from './composer/thinking-picker';
-import { useComposerState } from './composer/use-composer-state';
 
 const FOCUS_SHORTCUT_HINT = formatShortcut('composer.focus');
 

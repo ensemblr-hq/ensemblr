@@ -1,5 +1,6 @@
 import { type ComponentType, useCallback } from 'react';
-
+import { useDockController } from '@/renderer/hooks/workbench-shell/use-dock-controller';
+import { useRightSidebarController } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type {
@@ -14,8 +15,6 @@ import {
 import { WorkbenchPanelLayout } from './panel-layout';
 import { ReviewActionsProvider } from './review-actions/review-actions-provider';
 import { WorkbenchLayoutProvider } from './shell-contexts';
-import { useDockController } from './use-dock-controller';
-import { useRightSidebarController } from './use-right-sidebar-controller';
 
 /**
  * Active-workspace shell content — owns review/dock collapse state and

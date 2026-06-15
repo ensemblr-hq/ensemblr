@@ -2,11 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 
 import { reviewMergeSettingsQuery } from '@/renderer/api/ensemble-queries';
+import { useAgentActionRunner } from '@/renderer/hooks/workbench-shell/review-actions/use-agent-action-runner';
+import { usePullRequestRefresh } from '@/renderer/hooks/workbench-shell/review-actions/use-pull-request-refresh';
+import { useReviewMutations } from '@/renderer/hooks/workbench-shell/review-actions/use-review-mutations';
 import type {
 	ProjectShellModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-
 import { CommitPushDialog } from './commit-push-dialog';
 import { CreatePullRequestDialog } from './create-pull-request-dialog';
 import { MergeConfirmationDialog } from './merge-confirmation-dialog';
@@ -14,9 +16,6 @@ import {
 	ReviewActionsContextProvider,
 	type ReviewActionsValue,
 } from './review-actions-context';
-import { useAgentActionRunner } from './use-agent-action-runner';
-import { usePullRequestRefresh } from './use-pull-request-refresh';
-import { useReviewMutations } from './use-review-mutations';
 
 type ActiveReviewDialog =
 	| { draft: boolean; kind: 'create-pr' }

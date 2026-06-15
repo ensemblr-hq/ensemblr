@@ -26,6 +26,8 @@ These instructions apply to everything under `src/renderer/`.
 - Keep composed product components under `components/<concern>.tsx` plus a private sibling folder when one is needed, for example `components/welcome.tsx` and `components/welcome/`. Larger concerns may live entirely inside the folder with named entrypoints, for example `components/workbench-shell/frame.tsx`, `components/workbench-shell/workspace-content.tsx`, and `components/workbench-shell/route-layout/index.ts`.
 - Do not define shared exported renderer types in component folders. Import them from `types/`.
 - Do not keep fixture data inside components. Import it from `fixtures/<concern>/`.
+- Do not keep hooks inside component folders. Every `use-*.ts` belongs in `hooks/<concern>/`, mirroring the component sub-concern (for example `hooks/workbench-shell/composer/use-autocomplete.ts`). Components import them from there.
+- Do not keep runtime utilities inside component folders. Pure helpers belong in `lib/<concern>/`.
 
 ## Routing
 
@@ -41,10 +43,11 @@ These instructions apply to everything under `src/renderer/`.
 ## State
 
 - Use Jotai for shared renderer state.
-- Place durable state under `state/<concern>/`.
+- Place durable state under `state/<concern>/`. Do not leave loose `.ts` files at the `state/` root.
 - Each state concern must expose its public surface through `state/<concern>/index.ts`.
 - Keep atoms in `state/<concern>/atoms.ts`; keep larger state hooks in sibling files such as `navigation.ts` or `session-tabs.ts`.
 - Outside the concern folder, import from `@/renderer/state/<concern>`, not from private state files.
+- State-only — no plain renderer hooks at the `state/` root. Hooks that wrap TanStack Query for live status (and similar utilities) belong in `hooks/<concern>/`.
 
 ## Runtime Helpers And Types
 

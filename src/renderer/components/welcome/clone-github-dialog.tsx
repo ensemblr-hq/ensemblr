@@ -20,13 +20,17 @@ import {
 	type KeymapBinding,
 	useKeymapHandler,
 } from '@/renderer/hooks/use-keymap-handler';
+import {
+	type CloneStage,
+	useCloneFlow,
+} from '@/renderer/hooks/welcome/use-clone-flow';
+
+import { joinDestination } from '@/renderer/lib/welcome/clone-destination';
 import type { GithubRepositoryEntry } from '@/shared/ipc/contracts/clone';
 
-import { joinDestination } from './clone-destination.ts';
 import { CloneGithubDiagnostics } from './clone-github-diagnostics.tsx';
 import { CloneGithubProgressLog } from './clone-github-progress-log.tsx';
 import { CloneGithubRecentRepos } from './clone-github-recent-repos.tsx';
-import { type CloneStage, useCloneFlow } from './use-clone-flow.ts';
 
 interface CloneGithubDialogProps {
 	onOpenChange: (open: boolean) => void;

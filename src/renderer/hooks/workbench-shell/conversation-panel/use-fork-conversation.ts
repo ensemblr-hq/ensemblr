@@ -9,7 +9,7 @@ import {
 	writeForkSummary,
 } from '@/renderer/api/ensemble-queries';
 import { pickComposerSurname } from '@/renderer/lib/workbench/workspace-name-pool';
-import { useComposerAttachmentDispatcher } from '@/renderer/state/composer-attachments';
+import { useComposerAttachmentDispatcher } from '@/renderer/state/composer';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 /** Conversation coordinates a fork operates on. */

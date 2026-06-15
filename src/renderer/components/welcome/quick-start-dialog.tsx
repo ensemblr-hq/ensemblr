@@ -10,11 +10,11 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
-import { useQuickStartFlow } from '@/renderer/components/welcome/use-quick-start-flow';
 import {
 	type KeymapBinding,
 	useKeymapHandler,
 } from '@/renderer/hooks/use-keymap-handler';
+import { useQuickStartFlow } from '@/renderer/hooks/welcome/use-quick-start-flow';
 import type { QuickStartProjectDiagnostic } from '@/shared/ipc/contracts/quick-start';
 
 interface QuickStartDialogProps {

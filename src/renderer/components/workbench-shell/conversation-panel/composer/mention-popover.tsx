@@ -6,10 +6,10 @@ import {
 } from '@/renderer/components/ui/popover';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { WorkspaceFileIcon } from '@/renderer/components/workbench-shell/review-files/workspace-file-icon';
+import type { AutocompleteKind } from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 import { AutocompleteRow } from './autocomplete-list';
 import type { SlashCommandDescriptor } from './slash-commands';
-import type { AutocompleteKind } from './use-autocomplete';
 
 const MAX_AUTOCOMPLETE_HEIGHT_REM = 24;
 const AUTOCOMPLETE_ROW_HEIGHT_REM = 2.25;

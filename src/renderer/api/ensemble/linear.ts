@@ -1,7 +1,19 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
-import type { CreateLinearCommentRequest, CreateLinearCommentResult, CreateLinearIssueRequest, GetLinearIssueResult, GetLinearMetadataResult, LinearDisconnectResult, LinearLoginResult, ListLinearIssuesRequest, ListLinearIssuesResult, MutateLinearIssueResult, UpdateLinearIssueRequest } from '@/shared/ipc/contracts/linear';
+import type {
+	CreateLinearCommentRequest,
+	CreateLinearCommentResult,
+	CreateLinearIssueRequest,
+	GetLinearIssueResult,
+	GetLinearMetadataResult,
+	LinearDisconnectResult,
+	LinearLoginResult,
+	ListLinearIssuesRequest,
+	ListLinearIssuesResult,
+	MutateLinearIssueResult,
+	UpdateLinearIssueRequest,
+} from '@/shared/ipc/contracts/linear';
 
 import { ensembleQueryKeys, getEnsembleApi } from './query-keys';
 
