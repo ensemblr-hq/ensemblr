@@ -304,6 +304,38 @@ test('produces an LLM summary when the ephemeral session emits agent messages', 
 	assert.match(contents, /- Extract `AuthService`/);
 });
 
+test('forwards the chat model to the ephemeral summary session', async (t) => {
+	const workspaceCwd = makeWorkspaceDir(t);
+	let createdWith: string | null | undefined;
+
+	const fakeClient = makeFakeAgentClient({
+		onCreateSession: (request) => {
+			createdWith = request.modelOverride;
+		},
+		response: 'Summary body',
+	});
+
+	const writer = createSessionSummaryWriter({
+		piAgentClient: fakeClient.client,
+		resolveExecutable: async () => makeFakeExecutable(),
+	});
+
+	await writer.writeSessionSummary({
+		branchId: 'branch-1',
+		chatTabId: 'tab-model',
+		closedAt: '2026-01-04T00:00:00.000Z',
+		events: [
+			makeUserEvent('Hi', 't-1'),
+			makeAgentEvent('Working on it', 't-1'),
+		],
+		model: 'anthropic/claude-sonnet-4',
+		piSessionId: 'pi-session-model',
+		workspaceCwd,
+	});
+
+	assert.equal(createdWith, 'anthropic/claude-sonnet-4');
+});
+
 function makeHangingAgentClient(): { client: PiAgentClient } {
 	const sessionId = 'session-hanging';
 	const metadata: PiAgentSessionMetadata = {
@@ -342,6 +374,7 @@ function makeHangingAgentClient(): { client: PiAgentClient } {
 }
 
 interface FakeAgentClientOptions {
+	onCreateSession?: (request: { modelOverride?: string | null }) => void;
 	onSubmit?: (request: PiAgentSubmitRequest) => void;
 	response: string;
 }
@@ -403,7 +436,10 @@ function makeFakeAgentClient(options: FakeAgentClientOptions): {
 	};
 
 	const client: PiAgentClient = {
-		createSession: async () => session,
+		createSession: async (request) => {
+			options.onCreateSession?.(request);
+			return session;
+		},
 		listSessions: () => [session],
 		shutdown: async () => undefined,
 	};
