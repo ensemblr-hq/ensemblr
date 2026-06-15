@@ -18,14 +18,23 @@ Sources inspected (pi `0.79.1`, installed at
 ## Invocation
 
 - RPC mode starts with `pi --mode rpc [options]` (`rpc.md` "Starting RPC
-  Mode"). Ensemble already spawns it with exactly
+  Mode"). Ensemble's base args are
   `DEFAULT_PI_RPC_ARGS = ['--mode', 'rpc']`
-  (`src/main/pi-agent/pi-agent-client.ts:21`).
+  (`src/main/pi-agent/pi-agent-client.ts:21`); `buildSessionArgs` then appends
+  `--model <provider/id>`, `--thinking <level>`, and `--session-id <id>` from
+  the resolved request when present.
 - Useful flags: `--provider <name>`, `--model <pattern>`,
   `--name <session name>`, `--no-session` (disable persistence),
   `--session-dir <path>` (`rpc.md` "Starting RPC Mode"). Captures use
   `--no-session` plus explicit `--provider/--model` so fixtures do not depend
   on local default-model state.
+- **Model/thinking selection (Ensemble).** The picked model and thinking level
+  bind at spawn via `--model`/`--thinking`. The `prompt` command carries **no**
+  model field — Pi ignores unknown keys — so mid-session switches go through
+  the RPC `set_model` (`{type,provider,modelId}`) and `set_thinking_level`
+  (`{type,level}`) commands, which the adapter writes ahead of the next
+  `prompt` only when the selection differs from what the runtime is already on
+  (`src/main/pi-agent/cli-rpc-pi-agent-adapter.ts`).
 
 ## Framing
 

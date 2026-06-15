@@ -108,7 +108,12 @@ export function createPiAgentClient({
 
 			const nativePiSessionId = normalizePiSessionId(request.piSessionId);
 			const metadata: PiAgentSessionMetadata = {
-				args: buildSessionArgs(args, nativePiSessionId),
+				args: buildSessionArgs({
+					baseArgs: args,
+					modelOverride: request.modelOverride,
+					piSessionId: nativePiSessionId,
+					thinkingLevel: request.thinkingLevel,
+				}),
 				command: request.executable.command,
 				cwd: request.workspaceCwd,
 				env,
@@ -164,15 +169,36 @@ export function createPiAgentClient({
 	};
 }
 
-/** Appends native Pi session selection flags when a session id is available. */
-function buildSessionArgs(
-	baseArgs: readonly string[],
-	piSessionId: string | null,
-): readonly string[] {
-	if (!piSessionId) {
-		return baseArgs;
+/**
+ * Appends Pi selection flags to the base RPC args: native session id
+ * (`--session-id`), model (`--model`), and thinking level (`--thinking`).
+ * Model and thinking bind at spawn; mid-session changes are handled by the
+ * adapter via `set_model`/`set_thinking_level` RPC commands.
+ */
+function buildSessionArgs({
+	baseArgs,
+	modelOverride,
+	piSessionId,
+	thinkingLevel,
+}: {
+	baseArgs: readonly string[];
+	modelOverride?: string | null;
+	piSessionId: string | null;
+	thinkingLevel?: string | null;
+}): readonly string[] {
+	const args = [...baseArgs];
+	const model = modelOverride?.trim();
+	if (model) {
+		args.push('--model', model);
 	}
-	return [...baseArgs, '--session-id', piSessionId];
+	const thinking = thinkingLevel?.trim();
+	if (thinking) {
+		args.push('--thinking', thinking);
+	}
+	if (piSessionId) {
+		args.push('--session-id', piSessionId);
+	}
+	return args;
 }
 
 /** Trims blank native Pi session ids to `null` before args are built. */

@@ -1,5 +1,9 @@
 import type { DatabaseSync } from 'node:sqlite';
-import type { OpenPiSessionRequest as OpenPiSessionWireRequest, StopPiSessionRequest as StopPiSessionWireRequest, SubmitPiPromptRequest as SubmitPiPromptWireRequest } from '../../shared/ipc/contracts/pi-session';
+import type {
+	OpenPiSessionRequest as OpenPiSessionWireRequest,
+	StopPiSessionRequest as StopPiSessionWireRequest,
+	SubmitPiPromptRequest as SubmitPiPromptWireRequest,
+} from '../../shared/ipc/contracts/pi-session';
 import type { CheckpointCapturePort } from '../checkpoints/checkpoint-service.ts';
 import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
 import {
@@ -208,6 +212,7 @@ export function createPiSessionLifecycle({
 		const acknowledgement = await active.piRuntimeSession.submit({
 			modelOverride: request.model ?? undefined,
 			prompt: request.prompt,
+			thinkingLevel: request.thinkingLevel ?? undefined,
 		});
 		return acknowledgement;
 	};

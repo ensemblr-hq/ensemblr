@@ -170,6 +170,7 @@ export function createSessionOpener({
 				piSessionId: nativePiSessionId,
 				workspaceCwd: row.cwd || request.workspaceCwd,
 			},
+			thinkingLevel: request.thinkingLevel ?? row.thinkingLevel,
 		});
 
 		const subscription = subscribeToRuntime({
@@ -243,6 +244,7 @@ export function createSessionOpener({
 				piSessionId: nativePiSessionId,
 				workspaceCwd: request.workspaceCwd,
 			},
+			thinkingLevel: request.thinkingLevel ?? null,
 		});
 
 		const startedRow =
@@ -304,6 +306,7 @@ async function createRuntimeSessionOrFail({
 	piAgentClient,
 	rowForErrorPatch,
 	sessionInput,
+	thinkingLevel,
 }: {
 	database: DatabaseSync;
 	modelOverride: string | null;
@@ -316,6 +319,7 @@ async function createRuntimeSessionOrFail({
 		piSessionId: string;
 		workspaceCwd: string;
 	};
+	thinkingLevel: string | null;
 }): Promise<PiAgentSession> {
 	try {
 		return await piAgentClient.createSession({
@@ -323,6 +327,7 @@ async function createRuntimeSessionOrFail({
 			label: sessionInput.label,
 			modelOverride,
 			piSessionId: sessionInput.piSessionId,
+			thinkingLevel,
 			workspaceCwd: sessionInput.workspaceCwd,
 		});
 	} catch (cause) {
