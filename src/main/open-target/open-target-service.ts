@@ -1,4 +1,10 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+	mkdirSync,
+	readFileSync,
+	renameSync,
+	unlinkSync,
+	writeFileSync,
+} from 'node:fs';
 import { dirname } from 'node:path';
 
 import { app, clipboard, nativeImage, shell } from 'electron';
@@ -296,11 +302,18 @@ function readSnapshotsFromDisk(): WorkspaceOpenTargetSnapshot[] | null {
 	}
 }
 
+/**
+ * Writes the snapshot cache atomically: serialize → write to a sibling tmp
+ * file → rename over the real path. A crash mid-write leaves either the old
+ * cache or the new one intact, never a half-written JSON file the next boot
+ * would silently discard.
+ */
 function writeSnapshotsToDisk(snapshots: WorkspaceOpenTargetSnapshot[]): void {
 	const cachePath = getCachePath();
 	if (!cachePath) {
 		return;
 	}
+	const tmpPath = `${cachePath}.${process.pid}.tmp`;
 	try {
 		mkdirSync(dirname(cachePath), { recursive: true });
 		const payload: CachedFileShape = {
@@ -308,9 +321,16 @@ function writeSnapshotsToDisk(snapshots: WorkspaceOpenTargetSnapshot[]): void {
 			updatedAt: new Date().toISOString(),
 			version: 1,
 		};
-		writeFileSync(cachePath, JSON.stringify(payload), 'utf8');
+		writeFileSync(tmpPath, JSON.stringify(payload), 'utf8');
+		renameSync(tmpPath, cachePath);
 	} catch {
-		// Best-effort cache; fail silently.
+		// Best-effort cache; fail silently. Clean up the tmp file so we don't
+		// accumulate stale `.tmp` siblings on repeated failures.
+		try {
+			unlinkSync(tmpPath);
+		} catch {
+			// tmp may not exist if writeFileSync never produced it.
+		}
 	}
 }
 

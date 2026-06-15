@@ -319,23 +319,33 @@ export function isValidBundleId(bundleId: string): boolean {
 	return BUNDLE_ID_PATTERN.test(bundleId);
 }
 
-// Boot-time sanity check. Catches typos in bundle-id literals before they
-// reach `mdfind` and before the renderer sees a malformed predicate error.
-for (const definition of OPEN_TARGET_REGISTRY) {
-	if (definition.detection.kind === 'bundleId') {
-		for (const bundleId of definition.detection.bundleIds) {
-			if (!isValidBundleId(bundleId)) {
-				throw new Error(
-					`Invalid bundle id "${bundleId}" in target "${definition.id}".`,
-				);
+/**
+ * Collects bundle-id validation errors for every entry in the registry.
+ * Returns an empty array when the registry is well-formed. Pulled out so the
+ * test suite can assert it instead of crashing the main process at boot.
+ */
+export function collectRegistryValidationErrors(
+	registry: readonly OpenTargetDefinition[] = OPEN_TARGET_REGISTRY,
+): string[] {
+	const errors: string[] = [];
+	for (const definition of registry) {
+		if (definition.detection.kind === 'bundleId') {
+			for (const bundleId of definition.detection.bundleIds) {
+				if (!isValidBundleId(bundleId)) {
+					errors.push(
+						`Invalid bundle id "${bundleId}" in target "${definition.id}".`,
+					);
+				}
 			}
 		}
-	}
-	if (definition.dispatch.kind === 'open-bundle') {
-		if (!isValidBundleId(definition.dispatch.bundleId)) {
-			throw new Error(
+		if (
+			definition.dispatch.kind === 'open-bundle' &&
+			!isValidBundleId(definition.dispatch.bundleId)
+		) {
+			errors.push(
 				`Invalid dispatch bundle id "${definition.dispatch.bundleId}" in target "${definition.id}".`,
 			);
 		}
 	}
+	return errors;
 }
