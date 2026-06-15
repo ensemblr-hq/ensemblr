@@ -6,10 +6,13 @@ import type {
 	WorkspaceLandingKind,
 	WorkspaceLandingSummary,
 	WorkspaceLinkedIssueSummary,
-	WorkspaceOpenTarget,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type { RepositoryWorkspaceNavigationRepository, RepositoryWorkspaceNavigationSnapshot, RepositoryWorkspaceNavigationWorkspace } from '@/shared/ipc/contracts/repository-navigation';
+import type {
+	RepositoryWorkspaceNavigationRepository,
+	RepositoryWorkspaceNavigationSnapshot,
+	RepositoryWorkspaceNavigationWorkspace,
+} from '@/shared/ipc/contracts/repository-navigation';
 
 // --- Public mappers ---------------------------------------------------------
 
@@ -132,7 +135,6 @@ function mapWorkspaceNavigationSnapshot(
 		id: workspace.id,
 		landingSummary: createPlaceholderLandingSummary(repository, workspace),
 		name: workspace.name || workspace.slug,
-		openTargets: createPlaceholderOpenTargets(),
 		pathLabel: workspace.path,
 		projectId: repository.id,
 		pullRequest: {
@@ -218,47 +220,6 @@ function parseGithubOwnerFromRemoteUrl(
 }
 
 // --- Placeholder builders (private) -----------------------------------------
-
-/** Returns placeholder "open in" targets surfaced before integrations are wired. */
-function createPlaceholderOpenTargets(): WorkspaceOpenTarget[] {
-	return [
-		{
-			iconName: 'lucide:folder',
-			id: 'finder',
-			installed: true,
-			kind: 'file-manager',
-			label: 'Finder',
-			numberShortcutLabel: '1',
-		},
-		{
-			iconName: 'vscode-icons:file-type-vscode',
-			id: 'vscode',
-			installed: true,
-			isPrimary: true,
-			kind: 'editor',
-			label: 'VS Code',
-			numberShortcutLabel: '2',
-			shortcutLabel: '⌘O',
-		},
-		{
-			iconName: 'lucide:square-terminal',
-			id: 'terminal',
-			installed: true,
-			kind: 'terminal',
-			label: 'Terminal',
-			numberShortcutLabel: '3',
-		},
-		{
-			iconName: 'lucide:copy',
-			id: 'copy-path',
-			installed: true,
-			kind: 'utility',
-			label: 'Copy path',
-			numberShortcutLabel: '4',
-			shortcutLabel: '⌘⇧C',
-		},
-	];
-}
 
 /** Returns the placeholder dock tabs (setup/run/default terminal). */
 function createPlaceholderDockTabs(): DockTabModel[] {

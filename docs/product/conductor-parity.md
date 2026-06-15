@@ -154,6 +154,7 @@ if original screenshot evidence is unavailable.
 | Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
 | Command palette | Global command palette. | Same target. |
+| Open in… launcher | Header split button launches the workspace in Finder, an editor, a terminal, a source-control GUI, or copies the path. | Implemented (macOS). Curated bundle-id registry probed via Launch Services (`mdfind`); real `.app` icons via `nativeImage.createThumbnailFromPath`; cached to disk and shipped through the preload initial-shell snapshot so the menu paints with real icons on first frame. Shortcuts: `1`..`9` while open, `⌘O` primary editor, `⌘⇧C` copy. See ADR 0028. |
 | Keyboard shortcuts | Navigation, workspace, chat, review, Git, terminal actions. | Same target with Ensemble-specific labels. |
 | Pane layout | Sidebar, center agent timeline, right files/changes/checks panel, and lower terminal dock remain visible during work. | Same target with Ensemble-specific styling. The current implemented shell locks this pane layout. |
 | Settings | App settings and repository settings. | Same target with sections inventoried in `docs/product/settings-inventory.md`. |

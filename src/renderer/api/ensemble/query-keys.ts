@@ -79,6 +79,8 @@ export const ensembleQueryKeys = {
 		[...ensembleQueryKeys.all, 'workspace-files', workspaceCwd] as const,
 	workspaceGitStatus: (workspaceCwd: string) =>
 		[...ensembleQueryKeys.all, 'workspace-git-status', workspaceCwd] as const,
+	workspaceOpenTargets: () =>
+		[...ensembleQueryKeys.all, 'workspace-open-targets'] as const,
 	workspaceScriptSettings: (repositoryId: string) =>
 		[
 			...ensembleQueryKeys.all,

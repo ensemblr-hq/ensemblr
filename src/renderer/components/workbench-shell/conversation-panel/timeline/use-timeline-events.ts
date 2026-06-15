@@ -6,7 +6,10 @@ import {
 	piSessionEventsQuery,
 	subscribePiSessionEvents,
 } from '@/renderer/api/ensemble-queries';
-import type { ListPiSessionEventsResult, PiSessionEventWire } from '@/shared/ipc/contracts/pi-session';
+import type {
+	ListPiSessionEventsResult,
+	PiSessionEventWire,
+} from '@/shared/ipc/contracts/pi-session';
 
 /**
  * Subscribes the renderer to a single branch's event stream and returns the
@@ -29,9 +32,7 @@ export function useTimelineEvents({
 	isLoading: boolean;
 } {
 	const queryClient = useQueryClient();
-	const { data, error, isPending } = useQuery(
-		piSessionEventsQuery(branchId),
-	);
+	const { data, error, isPending } = useQuery(piSessionEventsQuery(branchId));
 
 	useEffect(() => {
 		if (!sessionId) {

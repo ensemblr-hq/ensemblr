@@ -29,6 +29,7 @@ import {
 	createLinearService,
 } from './linear';
 import { installApplicationMenu } from './menu';
+import { createOpenTargetService } from './open-target';
 import { createCliRpcPiAgentAdapter, createPiAgentClient } from './pi-agent';
 import { createPiSessionService } from './pi-agent/pi-session-service';
 import { createSessionSummaryWriter } from './pi-agent/session-summary-writer';
@@ -327,6 +328,9 @@ const setupDiagnosticsService = createSetupDiagnosticsService({
 	piReadinessService,
 	rootDirectoryService,
 });
+const openTargetService = createOpenTargetService({
+	localCommandService,
+});
 const mainWindowStateStore = createMainWindowStateStore({
 	databaseService,
 });
@@ -356,6 +360,7 @@ app.whenReady().then(() => {
 		localCommandService,
 		localRepositoryImportService,
 		localRepositoryRegistrationService,
+		openTargetService,
 		piExecutableService,
 		piSessionService,
 		quickStartProjectService,

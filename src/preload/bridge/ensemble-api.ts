@@ -139,6 +139,7 @@ export function createEnsembleApi(): EnsembleApi {
 		listReviewComments: (request) => invoke('listReviewComments', request),
 		listReviewTodos: (request) => invoke('listReviewTodos', request),
 		listWorkspaceFiles: (request) => invoke('listWorkspaceFiles', request),
+		listWorkspaceOpenTargets: () => invoke('listWorkspaceOpenTargets'),
 		mergePullRequest: (request) => invoke('mergePullRequest', request),
 		onCloneGithubRepositoryProgress: (listener) =>
 			subscribe<CloneGithubRepositoryProgressEvent>(
@@ -158,6 +159,7 @@ export function createEnsembleApi(): EnsembleApi {
 			subscribe<TerminalOutputBroadcast>(IPC_CHANNELS.terminalOutput, listener),
 		openChatTab: (request) => invoke('openChatTab', request),
 		openPiSession: (request) => invoke('openPiSession', request),
+		openWorkspaceInTarget: (request) => invoke('openWorkspaceInTarget', request),
 		prepareCloneGithubRepository: (request) =>
 			invoke('prepareCloneGithubRepository', request),
 		previewRepositoryConfigMigration: (request) =>

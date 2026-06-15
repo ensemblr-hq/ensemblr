@@ -11,6 +11,7 @@ export * from './github';
 export * from './health';
 export * from './linear';
 export * from './navigation';
+export * from './open-targets';
 export * from './pi-sessions';
 export * from './pi-slash-commands';
 export {

@@ -13,7 +13,10 @@ import type {
 	ProjectShellModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type { CreateWorkspaceDiagnostic, WorkspaceLinkedIssueInput } from '@/shared/ipc/contracts/workspace';
+import type {
+	CreateWorkspaceDiagnostic,
+	WorkspaceLinkedIssueInput,
+} from '@/shared/ipc/contracts/workspace';
 
 /**
  * Returns a callback the browse-archive dialog calls after every successful

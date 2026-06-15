@@ -10,6 +10,7 @@ import {
 	mergePullRequest,
 	pushWorkspaceBranch,
 } from '@/renderer/api/ensemble-queries';
+import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 import {
@@ -62,6 +63,7 @@ export function useReviewMutations({
 				workspaceId,
 			});
 			if (result.status === 'success') {
+				deleteLastUsedOpenTarget(workspaceId);
 				toast.success('Pull request merged and workspace archived.');
 			} else {
 				toast.warning('Merge succeeded, but the workspace was not archived.', {
