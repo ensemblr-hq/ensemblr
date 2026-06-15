@@ -53,7 +53,32 @@ export function eventsToUIMessages(
 		result.push(finalizeGroup(pending));
 	}
 
-	return result;
+	return withPromptTimes(result);
+}
+
+/**
+ * Stamps each assistant turn with the submit time of the user prompt that
+ * preceded it. Walks the finalized messages in order, tracking the latest
+ * user-message timestamp, so the turn timer can span prompt → final answer.
+ */
+function withPromptTimes(messages: readonly UIMessage[]): UIMessage[] {
+	let lastUserAt: string | undefined;
+	return messages.map((message) => {
+		const metadata = turnMetadataOf(message);
+		if (message.role === 'user') {
+			if (metadata) {
+				lastUserAt = metadata.firstEventAt;
+			}
+			return message;
+		}
+		if (message.role === 'assistant' && metadata && lastUserAt) {
+			return {
+				...message,
+				metadata: { ...metadata, promptAt: lastUserAt },
+			};
+		}
+		return message;
+	});
 }
 
 function handleEvent(
@@ -271,6 +296,13 @@ function finalizeGroup(group: PendingGroup): UIMessage {
 
 /** Turn timing carried on each mapped `UIMessage` for the timer feature. */
 export interface PiTurnMetadata {
+	/**
+	 * Submit time of the user prompt that opened this turn, when known. Used as
+	 * the turn-timer start so the elapsed time spans prompt → final answer
+	 * (reasoning + tool calls included), not just the first assistant event.
+	 * Only set on assistant turns.
+	 */
+	promptAt?: string;
 	firstEventAt: string;
 	lastEventAt: string;
 	/** Highest persisted-event ordinal in the turn — the fork boundary. */

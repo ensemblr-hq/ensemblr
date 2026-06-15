@@ -285,9 +285,7 @@ function collectPersistedUserTexts(messages: readonly UIMessage[]): string[] {
 			continue;
 		}
 		const joined = message.parts
-			.flatMap((part) =>
-				part.type === 'text' && part.text ? [part.text] : [],
-			)
+			.flatMap((part) => (part.type === 'text' && part.text ? [part.text] : []))
 			.join('\n');
 		if (joined.length > 0) {
 			texts.push(joined);
@@ -324,7 +322,12 @@ function TimelineMessage({
 
 	const isLiveTurn = isStreaming && isLastMessage;
 	const metadata = turnMetadataOf(message);
-	const startMs = metadata ? Date.parse(metadata.firstEventAt) : Number.NaN;
+	// Start at the prompt submit time so the timer covers the whole turn
+	// (reasoning + tool calls + final answer); fall back to the first assistant
+	// event when the prompt time is unknown (e.g. resumed/legacy sessions).
+	const startMs = metadata
+		? Date.parse(metadata.promptAt ?? metadata.firstEventAt)
+		: Number.NaN;
 	const endMs = metadata ? Date.parse(metadata.lastEventAt) : Number.NaN;
 	const turnTiming: ChatAssistantTurnTiming = {
 		endMs: isLiveTurn || Number.isNaN(endMs) ? null : endMs,
