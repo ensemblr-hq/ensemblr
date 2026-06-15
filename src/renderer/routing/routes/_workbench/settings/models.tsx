@@ -185,16 +185,18 @@ function thinkingLevelsFor(
 
 function prettyThinkingLevel(level: string): string {
 	switch (level) {
-		case 'extra-high':
-			return 'Thinking extra high';
-		case 'high':
-			return 'Thinking high';
-		case 'medium':
-			return 'Thinking medium';
-		case 'low':
-			return 'Thinking low';
 		case 'off':
 			return 'No thinking';
+		case 'minimal':
+			return 'Minimal';
+		case 'low':
+			return 'Low';
+		case 'medium':
+			return 'Medium';
+		case 'high':
+			return 'High';
+		case 'xhigh':
+			return 'Extra high';
 		default:
 			return level;
 	}
