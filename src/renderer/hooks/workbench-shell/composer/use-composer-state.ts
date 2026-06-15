@@ -1,5 +1,7 @@
+import { useAtomValue } from 'jotai';
 import {
 	type ChangeEvent,
+	type ClipboardEvent as ReactClipboardEvent,
 	type KeyboardEvent as ReactKeyboardEvent,
 	type RefObject,
 	useCallback,
@@ -29,6 +31,11 @@ import {
 	useComposerAttachmentInbox,
 	useComposerInsertConsumer,
 } from '@/renderer/state/composer';
+import {
+	autoConvertLongTextAtom,
+	followUpBehaviorAtom,
+	sendShortcutAtom,
+} from '@/renderer/state/preferences';
 import type {
 	ComposerShellState,
 	WorkspaceFileSummary,
@@ -51,6 +58,12 @@ export interface ComposerStateApi {
 	activeIndex: number;
 	anchorRef: RefObject<HTMLDivElement | null>;
 	attachmentError: string | null;
+	/**
+	 * True after a mid-stream submit was dropped because the Follow-up behavior is
+	 * set to "block". Lets the composer explain the no-op instead of swallowing
+	 * the keypress silently. Cleared on the next edit or submit.
+	 */
+	blockedNotice: boolean;
 	autocomplete: AutocompleteState;
 	autocompleteActive: boolean;
 	autocompleteKind: AutocompleteKind;
@@ -62,11 +75,14 @@ export interface ComposerStateApi {
 	handleChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
 	handleFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
 	handleKeyDown: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void;
+	handlePaste: (event: ReactClipboardEvent<HTMLTextAreaElement>) => void;
 	handleSelect: () => void;
 	handleSubmit: () => Promise<void> | void;
 	hasChips: boolean;
 	insertText: (text: string) => void;
 	isStreaming: boolean;
+	/** Send the current draft to Pi as a follow-up (Cmd+J). */
+	queueCurrent: () => void;
 	mentionAttachments: readonly WorkspaceFileSummary[];
 	mentionMatches: readonly WorkspaceFileSummary[];
 	onMentionSelect: (entry: WorkspaceFileSummary) => void;
@@ -88,6 +104,9 @@ const EMPTY_AUTOCOMPLETE: AutocompleteState = {
 	tokenStart: 0,
 	tokenEnd: 0,
 };
+
+/** Pasted text at or above this length is auto-converted into an attachment. */
+const PASTE_ATTACHMENT_THRESHOLD = 5_000;
 
 /**
  * Owns the composer's local state machine: textarea value, mention + slash
@@ -119,6 +138,10 @@ export function useComposerState({
 		WorkspaceFileSummary[]
 	>([]);
 	const [attachmentError, setAttachmentError] = useState<string | null>(null);
+	const [blockedNotice, setBlockedNotice] = useState(false);
+
+	const autoConvertLong = useAtomValue(autoConvertLongTextAtom);
+	const followUp = useAtomValue(followUpBehaviorAtom);
 
 	// Drain externally-pushed attachments (transcript chips, etc.) into the
 	// composer's mention list. Dedup by path so re-clicking the same chip is
@@ -165,6 +188,7 @@ export function useComposerState({
 		(event: ChangeEvent<HTMLTextAreaElement>) => {
 			const nextValue = event.target.value;
 			setValue(nextValue);
+			setBlockedNotice(false);
 			const caret = event.target.selectionStart ?? nextValue.length;
 			updateAutocomplete(nextValue, caret);
 		},
@@ -232,6 +256,7 @@ export function useComposerState({
 			rawText: string,
 			mentions: readonly WorkspaceFileSummary[],
 			uploads: readonly File[],
+			streamingBehavior?: 'steer' | 'followUp',
 		) => {
 			const trimmed = rawText.trim();
 			if (
@@ -252,10 +277,24 @@ export function useComposerState({
 				const payload = [attachmentText, uploadText, trimmed]
 					.filter(Boolean)
 					.join('\n\n');
-				await composer.onSubmit(payload);
+				// Clear the composer before awaiting onSubmit. onSubmit renders an
+				// optimistic prompt synchronously, so leaving the textarea populated
+				// during its async round-trip shows the prompt in two places at once.
 				setValue('');
 				setUploadAttachments([]);
 				setMentionAttachments([]);
+				try {
+					await composer.onSubmit(
+						payload,
+						streamingBehavior ? { streamingBehavior } : undefined,
+					);
+				} catch (cause) {
+					// Restore the unsent text so the user does not lose their input.
+					setValue(rawText);
+					setUploadAttachments([...uploads]);
+					setMentionAttachments([...mentions]);
+					throw cause;
+				}
 			} catch (cause) {
 				setAttachmentError(
 					cause instanceof Error
@@ -269,9 +308,81 @@ export function useComposerState({
 		[composer, pending],
 	);
 
+	// Maps the Follow-up behavior setting onto Pi's native mid-turn delivery:
+	// `steer` → `steer` frame (injected after the current tool calls), `queue` →
+	// `follow_up` frame (delivered when the agent stops), `block` → dropped. When
+	// idle, every mode sends a normal prompt. Pi owns the queue, so there is no
+	// renderer-side hold to flush.
+	const dispatchSubmit = useCallback(
+		(
+			rawText: string,
+			mentions: readonly WorkspaceFileSummary[],
+			uploads: readonly File[],
+		) => {
+			const empty =
+				rawText.trim().length === 0 &&
+				mentions.length === 0 &&
+				uploads.length === 0;
+			if (composer.isStreaming && !empty) {
+				if (followUp === 'block') {
+					// Keep the draft and explain the no-op rather than eating the key.
+					setBlockedNotice(true);
+					return;
+				}
+				setBlockedNotice(false);
+				void submitText(
+					rawText,
+					mentions,
+					uploads,
+					followUp === 'steer' ? 'steer' : 'followUp',
+				);
+				return;
+			}
+			setBlockedNotice(false);
+			void submitText(rawText, mentions, uploads);
+		},
+		[composer.isStreaming, followUp, submitText],
+	);
+
 	const handleSubmit = useCallback(
-		() => submitText(value, mentionAttachments, uploadAttachments),
-		[submitText, value, mentionAttachments, uploadAttachments],
+		() => dispatchSubmit(value, mentionAttachments, uploadAttachments),
+		[dispatchSubmit, value, mentionAttachments, uploadAttachments],
+	);
+
+	// Cmd+J explicitly queues the current draft as a follow-up regardless of the
+	// Follow-up setting; when idle it just sends normally.
+	const queueCurrent = useCallback(() => {
+		void submitText(
+			value,
+			mentionAttachments,
+			uploadAttachments,
+			composer.isStreaming ? 'followUp' : undefined,
+		);
+	}, [
+		composer.isStreaming,
+		submitText,
+		value,
+		mentionAttachments,
+		uploadAttachments,
+	]);
+
+	// Long pastes balloon the textarea and bury the prompt; convert them into a
+	// text attachment instead (gated by the Auto-convert long text setting).
+	const handlePaste = useCallback(
+		(event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+			if (!autoConvertLong) {
+				return;
+			}
+			const text = event.clipboardData.getData('text/plain');
+			if (text.length < PASTE_ATTACHMENT_THRESHOLD) {
+				return;
+			}
+			event.preventDefault();
+			const file = new File([text], 'pasted-text.txt', { type: 'text/plain' });
+			setUploadAttachments((prev) => [...prev, file]);
+			setAttachmentError(null);
+		},
+		[autoConvertLong],
 	);
 
 	const onMentionSelect = useCallback(
@@ -316,7 +427,7 @@ export function useComposerState({
 			) {
 				dismissAutocomplete();
 				setValue('');
-				void submitText(slashText, mentionAttachments, uploadAttachments);
+				dispatchSubmit(slashText, mentionAttachments, uploadAttachments);
 				return;
 			}
 			replaceToken(slashText);
@@ -324,9 +435,9 @@ export function useComposerState({
 		[
 			autocomplete,
 			dismissAutocomplete,
+			dispatchSubmit,
 			mentionAttachments,
 			replaceToken,
-			submitText,
 			uploadAttachments,
 			value,
 		],
@@ -344,6 +455,8 @@ export function useComposerState({
 				? slashMatches.length
 				: 0;
 	const autocompleteActive = autocompleteKind !== null && autocompleteTotal > 0;
+
+	const sendShortcut = useAtomValue(sendShortcutAtom);
 
 	const keymapBindings = useMemo<readonly KeymapBinding<HTMLTextAreaElement>[]>(
 		() => [
@@ -410,7 +523,27 @@ export function useComposerState({
 					if (event.nativeEvent.isComposing) {
 						return false;
 					}
+					// In "Cmd + Enter" mode a bare Enter inserts a newline instead
+					// (fall through to the textarea's native handling).
+					if (sendShortcut === 'mod+enter') {
+						return false;
+					}
 					void handleSubmit();
+				},
+			],
+			[
+				'composer.submitWithMod',
+				(event) => {
+					if (event.nativeEvent.isComposing) {
+						return false;
+					}
+					void handleSubmit();
+				},
+			],
+			[
+				'composer.queue',
+				() => {
+					queueCurrent();
 				},
 			],
 		],
@@ -425,6 +558,8 @@ export function useComposerState({
 			mentionMatches,
 			onMentionSelect,
 			onSlashSelect,
+			queueCurrent,
+			sendShortcut,
 			slashMatches,
 			value.length,
 		],
@@ -472,6 +607,7 @@ export function useComposerState({
 		activeIndex,
 		anchorRef,
 		attachmentError,
+		blockedNotice,
 		autocomplete,
 		autocompleteActive,
 		autocompleteKind,
@@ -483,6 +619,7 @@ export function useComposerState({
 		handleChange,
 		handleFileChange,
 		handleKeyDown,
+		handlePaste,
 		handleSelect,
 		handleSubmit,
 		hasChips,
@@ -493,6 +630,7 @@ export function useComposerState({
 		onMentionSelect,
 		onSlashSelect,
 		pending,
+		queueCurrent,
 		removeMention,
 		removeUpload,
 		setActiveIndex,

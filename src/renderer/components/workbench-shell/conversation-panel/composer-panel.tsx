@@ -1,3 +1,4 @@
+import { useAtomValue } from 'jotai';
 import { ArrowUpIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { LinearIssuePickerDialog } from '@/renderer/components/linear/linear-issue-picker-dialog';
@@ -13,6 +14,10 @@ import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useComposerState } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
 import { formatLinearIssueContext } from '@/renderer/lib/linear';
 import { cn } from '@/renderer/lib/utils';
+import {
+	alwaysShowContextUsageAtom,
+	sendShortcutAtom,
+} from '@/renderer/state/preferences';
 import type { ComposerShellState } from '@/renderer/types/workbench';
 import { formatShortcut } from '@/shared/keymap';
 import { AttachmentChip } from './composer/attachment-chip';
@@ -45,6 +50,19 @@ export function ComposerPanel({
 	const [focused, setFocused] = useState(false);
 	const [modelPickerOpen, setModelPickerOpen] = useState(false);
 	const [issuePickerOpen, setIssuePickerOpen] = useState(false);
+	const sendShortcut = useAtomValue(sendShortcutAtom);
+	const alwaysShowContext = useAtomValue(alwaysShowContextUsageAtom);
+	// Context gauge is noise at low usage, so by default it appears only past
+	// 70% of the window. The setting forces it always-on.
+	const usage = composer.contextUsage;
+	const contextPercent =
+		usage && usage.maxTokens > 0
+			? (usage.usedTokens / usage.maxTokens) * 100
+			: 0;
+	const showContextIndicator = alwaysShowContext || contextPercent > 70;
+	const sendShortcutHint = formatShortcut(
+		sendShortcut === 'mod+enter' ? 'composer.submitWithMod' : 'composer.submit',
+	);
 
 	const focusTextarea = useCallback(() => {
 		state.textareaRef.current?.focus();
@@ -109,16 +127,33 @@ export function ComposerPanel({
 		</Button>
 	);
 
+	const submitTooltip =
+		composer.disabled && composer.disabledReason
+			? composer.disabledReason
+			: state.isStreaming
+				? null
+				: 'send';
 	const submitWithTooltip =
-		composer.disabled && composer.disabledReason ? (
+		submitTooltip === null ? (
+			submitButton
+		) : (
 			<Tooltip>
 				<TooltipTrigger asChild>
 					<span>{submitButton}</span>
 				</TooltipTrigger>
-				<TooltipContent>{composer.disabledReason}</TooltipContent>
+				<TooltipContent>
+					{submitTooltip === 'send' ? (
+						<>
+							Send message
+							<span className='ml-2 text-muted-foreground'>
+								{sendShortcutHint}
+							</span>
+						</>
+					) : (
+						submitTooltip
+					)}
+				</TooltipContent>
 			</Tooltip>
-		) : (
-			submitButton
 		);
 
 	const textareaBlock = (
@@ -131,6 +166,7 @@ export function ComposerPanel({
 				onChange={state.handleChange}
 				onFocus={() => setFocused(true)}
 				onKeyDown={state.handleKeyDown}
+				onPaste={state.handlePaste}
 				onSelect={state.handleSelect}
 				placeholder={placeholder}
 				ref={state.textareaRef}
@@ -142,7 +178,8 @@ export function ComposerPanel({
 					aria-hidden='true'
 					className='pointer-events-none absolute top-0 right-0 text-muted-foreground/60 text-xs'
 				>
-					<kbd className='font-mono'>{FOCUS_SHORTCUT_HINT}</kbd>
+					{/* Sans, not the kbd UA monospace — monospace renders ⌘/⌥ tiny. */}
+					<kbd className='font-sans'>{FOCUS_SHORTCUT_HINT}</kbd>
 					<span className='ml-1'>to focus</span>
 				</span>
 			) : null}
@@ -191,6 +228,12 @@ export function ComposerPanel({
 						{state.attachmentError}
 					</div>
 				) : null}
+				{state.blockedNotice ? (
+					<output className='text-muted-foreground text-xs'>
+						Follow-ups are blocked while Pi is working — stop the turn or wait
+						for it to finish.
+					</output>
+				) : null}
 
 				<ComposerAutocompletePopover
 					activeIndex={state.activeIndex}
@@ -227,7 +270,9 @@ export function ComposerPanel({
 						/>
 					</div>
 					<div className='flex items-center gap-1'>
-						<ContextIndicator usage={composer.contextUsage} />
+						{showContextIndicator ? (
+							<ContextIndicator usage={composer.contextUsage} />
+						) : null}
 						<AttachmentMenu
 							disabled={composer.disabled}
 							onAddAttachment={state.handleAddAttachment}

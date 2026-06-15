@@ -10,18 +10,22 @@ export interface GroupedOptions {
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
 	anthropic: 'Claude Code',
 	'claude-code': 'Claude Code',
-	codex: 'Codex',
+	codex: 'OpenAI Codex',
 	composer: 'Cursor',
+	lmstudio: 'LM Studio',
+	ollama: 'Ollama',
+	'nvidia-nim': 'Nvidia NIM',
 	cursor: 'Cursor',
 	gemini: 'Gemini',
 	google: 'Gemini',
-	openai: 'Codex',
+	openai: 'OpenAI Codex',
+	'openai-codex': 'OpenAI Codex',
 };
 
 export const FAVOURITES_GROUP_KEY = '__favourites__';
 
 /** Maps provider identifiers to the grouped label shown in the model picker. */
-function getProviderDisplayName(provider: string): string {
+export function getProviderDisplayName(provider: string): string {
 	const lowered = provider.toLowerCase();
 	if (PROVIDER_DISPLAY_NAMES[lowered]) {
 		return PROVIDER_DISPLAY_NAMES[lowered];
@@ -59,19 +63,27 @@ function groupByProvider(
  * models in starred order) followed by the provider groups with those
  * favourites removed, so each model appears once. Favourites therefore take the
  * low `1-9` shortcut slots. The Favourites group is omitted when empty.
+ *
+ * `hiddenIds` are dropped from every group (favourites included), so hiding wins
+ * over favouriting. Hidden models are absent from the list only — the picker
+ * trigger still resolves the active model against the full `options` set.
  */
 export function buildModelGroups(
 	options: readonly ComposerModelOption[],
 	favouriteIds: readonly string[],
+	hiddenIds: readonly string[] = [],
 ): GroupedOptions[] {
 	const favouriteSet = new Set(favouriteIds);
+	const hiddenSet = new Set(hiddenIds);
 	const byId = new Map(options.map((option) => [option.id, option]));
 	const favouriteModels = favouriteIds.flatMap((id) => {
 		const option = byId.get(id);
-		return option ? [option] : [];
+		return option && !hiddenSet.has(id) ? [option] : [];
 	});
 	const providerGroups = groupByProvider(
-		options.filter((option) => !favouriteSet.has(option.id)),
+		options.filter(
+			(option) => !favouriteSet.has(option.id) && !hiddenSet.has(option.id),
+		),
 	);
 	if (favouriteModels.length === 0) {
 		return providerGroups;

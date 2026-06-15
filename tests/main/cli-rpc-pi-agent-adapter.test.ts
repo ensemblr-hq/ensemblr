@@ -157,6 +157,43 @@ test('spawns the executable with metadata cwd, args, and merged env', async () =
 	await adapter.shutdown();
 });
 
+test('surfaces a model error once per prompt across auto-retries', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	// User prompt opens the turn, then the model fails — pi auto-retries, each a
+	// fresh errored assistant message_end carrying stopReason/errorMessage.
+	child.emitStdout(
+		'{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"hi"}]}}\n',
+	);
+	const erroredAssistant =
+		'{"type":"message_end","message":{"role":"assistant","content":[],"stopReason":"error","errorMessage":"Connection error."}}\n';
+	child.emitStdout(erroredAssistant);
+	child.emitStdout(erroredAssistant);
+	child.emitStdout(erroredAssistant);
+
+	const errorEvents = events.filter((event) => event.type === 'error');
+	assert.equal(errorEvents.length, 1);
+	assert.equal(
+		(errorEvents[0] as Extract<PiAgentEvent, { type: 'error' }>).error.message,
+		'Connection error.',
+	);
+
+	// A new prompt re-arms the error window.
+	child.emitStdout(
+		'{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"again"}]}}\n',
+	);
+	child.emitStdout(erroredAssistant);
+	assert.equal(events.filter((event) => event.type === 'error').length, 2);
+
+	await adapter.shutdown();
+});
+
 test('parses JSONL frames into typed events', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
@@ -319,6 +356,45 @@ test('submit writes a JSONL frame to stdin and waits for Pi user echo', async ()
 		parts: [{ kind: 'text', text: 'do the thing' }],
 		role: 'user',
 	});
+	await adapter.shutdown();
+});
+
+test('submit with streamingBehavior:steer writes a steer frame, not a prompt', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({ prompt: 'go this way', streamingBehavior: 'steer' });
+
+	const chunks = child.getStdinChunks();
+	assert.equal(chunks.length, 1);
+	assert.match(chunks[0] ?? '', /"type":"steer"/);
+	assert.match(chunks[0] ?? '', /"message":"go this way"/);
+	assert.doesNotMatch(chunks[0] ?? '', /"type":"prompt"/);
+	await adapter.shutdown();
+});
+
+test('submit with streamingBehavior:followUp writes a follow_up frame', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({
+		// A model override must NOT trigger set_model on a mid-turn injection.
+		modelOverride: 'openai/gpt-5',
+		prompt: 'and then this',
+		streamingBehavior: 'followUp',
+	});
+
+	const chunks = child.getStdinChunks();
+	assert.equal(chunks.length, 1);
+	assert.match(chunks[0] ?? '', /"type":"follow_up"/);
+	assert.match(chunks[0] ?? '', /"message":"and then this"/);
+	assert.doesNotMatch(chunks[0] ?? '', /"type":"set_model"/);
 	await adapter.shutdown();
 });
 

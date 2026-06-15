@@ -5,11 +5,29 @@
  *
  * Outside this folder, import from `@/renderer/state/preferences` only.
  */
+
+// Config.json-backed App settings (General + Models sections). The source of
+// truth is `~/.config/ensemble/config.json`; see ./app-settings.
+export {
+	alwaysShowContextUsageAtom,
+	appSettingsAtom,
+	autoConvertLongTextAtom,
+	caffeinateWhileRunningAtom,
+	defaultChatModelAtom,
+	defaultChatThinkingLevelAtom,
+	desktopNotificationsAtom,
+	followUpBehaviorAtom,
+	hiddenModelsAtom,
+	reviewModelAtom,
+	reviewThinkingLevelAtom,
+	sendShortcutAtom,
+	toolCallCollapseAtom,
+	useAppSettingsSync,
+} from './app-settings';
 export type {
 	AccessibleColorVariant,
 	BranchPrefixSource,
 	CodeTheme,
-	CompletionSound,
 	FollowUpBehavior,
 	MarkdownStyle,
 	RepoActionKey,
@@ -21,26 +39,18 @@ export type {
 } from './atoms';
 export {
 	accessibleColorsAtom,
-	alwaysShowContextUsageAtom,
 	archiveOnMergeAtom,
-	autoConvertLongTextAtom,
 	autoRunAfterSetupAtom,
 	branchPrefixCustomAtom,
 	branchPrefixSourceAtom,
-	caffeinateWhileRunningAtom,
 	chatModelOverrideAtomFamily,
 	chatThinkingOverrideAtomFamily,
 	codeLigaturesAtom,
 	codeThemeAtom,
 	coloredSidebarDiffsAtom,
-	completionSoundAtom,
 	customPiExecutablePathAtom,
-	defaultChatModelAtom,
-	defaultChatThinkingLevelAtom,
 	deleteBranchOnArchiveAtom,
-	desktopNotificationsAtom,
 	favouriteModelsAtom,
-	followUpBehaviorAtom,
 	forgetChatOverrides,
 	inAppBrowserPreviewAtom,
 	markdownStyleAtom,
@@ -48,19 +58,13 @@ export {
 	REPO_ACTION_KEYS,
 	renameWorkspaceOnBranchAtom,
 	repoSettingsOverrideAtomFamily,
-	reviewModelAtom,
-	reviewThinkingLevelAtom,
-	sendShortcutAtom,
 	setUpstreamOnPushAtom,
 	showDashboardAtom,
-	showMcpStatusInChatAtom,
 	showSidebarResourceUsageAtom,
 	sidebarChatsModeAtom,
-	softenCertaintyAtom,
 	terminalFontAtom,
 	terminalFontSizeAtom,
 	terminalScrollbackMbAtom,
 	themeAtom,
-	toolCallCollapseAtom,
 } from './atoms';
 export { useThemeEffect } from './use-theme-effect';

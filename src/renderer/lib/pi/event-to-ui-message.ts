@@ -134,7 +134,13 @@ function handleMessageEnvelope(
 	// message ids — so keying on turnId fractures one logical assistant turn
 	// into dozens of single-part messages. A run of consecutive
 	// assistant/tool events IS the turn; user messages and errors flush it.
-	const groupKey = groupKeyFor(uiRole);
+	//
+	// User prompts never merge with each other: each submission is a distinct
+	// input and gets its own bubble. Keying user groups by event id keeps
+	// back-to-back prompts (e.g. while a turn errors and retries) from stacking
+	// into a single bubble. Assistant/tool runs still collapse into one turn.
+	const groupKey =
+		uiRole === 'user' ? `${groupKeyFor(uiRole)}::${event.id}` : groupKeyFor(uiRole);
 
 	const incomingParts = mergeParts(
 		[],

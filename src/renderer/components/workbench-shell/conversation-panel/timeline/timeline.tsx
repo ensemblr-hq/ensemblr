@@ -412,16 +412,18 @@ function RuntimeDiagnostic({ message }: { message: UIMessage }) {
 	const text = textFromMessage(message);
 	const isStackTrace = looksLikeStackTrace(text);
 
-	return (
-		<div className='rounded-md border border-status-warning/30 bg-status-warning/10 p-3 text-xs'>
-			{isStackTrace ? (
+	// Stack traces still need a container to stay legible; plain runtime errors
+	// render as a lean inline line — no box — per the timeline's quiet style.
+	if (isStackTrace) {
+		return (
+			<div className='rounded-md border border-status-warning/30 bg-status-warning/10 p-3 text-xs'>
 				<StackTraceDiagnostic trace={text} />
-			) : (
-				<MessageResponse className='text-status-warning'>
-					{text}
-				</MessageResponse>
-			)}
-		</div>
+			</div>
+		);
+	}
+
+	return (
+		<p className='px-1 text-status-warning text-xs'>{text}</p>
 	);
 }
 
