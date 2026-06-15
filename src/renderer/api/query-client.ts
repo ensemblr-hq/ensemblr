@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { hashKey, QueryClient } from '@tanstack/react-query';
 
 import type { ListPiModelsResult } from '@/shared/ipc/contracts/pi-session';
 import { writeCachedPiModels } from './ensemble/pi-models-cache';
@@ -53,9 +53,13 @@ function seedQueryCacheFromInitialSnapshot(): void {
  * is momentarily unavailable.
  */
 function persistPiModelsOnUpdate(): void {
-	const modelsKey = JSON.stringify(ensembleQueryKeys.piModels());
+	// Compare each event against the models query's precomputed `queryHash`
+	// (TanStack stores it per query) so the cache-wide subscription does no
+	// per-event JSON.stringify. The unsubscribe handle is intentionally dropped:
+	// this client is a process-lifetime singleton.
+	const modelsHash = hashKey(ensembleQueryKeys.piModels());
 	queryClient.getQueryCache().subscribe((event) => {
-		if (JSON.stringify(event.query.queryKey) !== modelsKey) {
+		if (event.type !== 'updated' || event.query.queryHash !== modelsHash) {
 			return;
 		}
 		const state = event.query.state;
