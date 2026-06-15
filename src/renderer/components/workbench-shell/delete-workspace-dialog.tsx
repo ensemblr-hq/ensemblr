@@ -12,6 +12,7 @@ import {
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
+import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { DeleteWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
@@ -77,6 +78,7 @@ function DeleteWorkspaceDialogForm({
 		const result = await deleteWorkspace({ workspaceId: workspace.id });
 
 		if (result.status === 'success') {
+			deleteLastUsedOpenTarget(workspace.id);
 			await onDeleted(workspace.id);
 			onOpenChange(false);
 			return;

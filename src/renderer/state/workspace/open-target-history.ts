@@ -27,10 +27,36 @@ export function writeLastUsedOpenTarget(
 		return;
 	}
 	const next = { ...readMap(), [workspaceId]: targetId };
+	writeMap(next);
+}
+
+/**
+ * Drops the last-used pointer for `workspaceId`. Should be called whenever a
+ * workspace is deleted or archived so the per-workspace map does not grow
+ * unbounded as workspaces accumulate.
+ */
+export function deleteLastUsedOpenTarget(workspaceId: string): void {
+	if (typeof window === 'undefined') {
+		return;
+	}
+	const current = readMap();
+	if (!(workspaceId in current)) {
+		return;
+	}
+	const next: Record<string, string> = {};
+	for (const [key, value] of Object.entries(current)) {
+		if (key !== workspaceId) {
+			next[key] = value;
+		}
+	}
+	writeMap(next);
+}
+
+function writeMap(map: LastUsedMap): void {
 	try {
 		window.localStorage.setItem(
 			LAST_USED_OPEN_TARGET_STORAGE_KEY,
-			JSON.stringify(next),
+			JSON.stringify(map),
 		);
 	} catch {
 		// localStorage write failures (quota, privacy mode) are non-fatal.
