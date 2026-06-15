@@ -227,7 +227,6 @@ export type {
 	RepositoryConfigSourceStatus,
 } from './contracts/repository-config';
 export type {
-	InitialShellSnapshot,
 	NavigationApi,
 	RepositoryWorkspaceNavigationMetadata,
 	RepositoryWorkspaceNavigationRepository,
@@ -305,6 +304,7 @@ export type {
 	SharedRootAdoptionStatus,
 	SharedRootApi,
 } from './contracts/shared-root-adoption';
+export type { InitialShellSnapshot } from './contracts/shell-snapshot';
 export type {
 	CreateTerminalSessionRequest,
 	CreateTerminalSessionResult,

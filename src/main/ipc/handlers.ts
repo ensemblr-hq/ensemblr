@@ -55,6 +55,7 @@ import { registerReviewHandlers } from './handlers/review';
 import { registerRootHandlers } from './handlers/root';
 import { registerSettingsHandlers } from './handlers/settings';
 import { registerSetupHandlers } from './handlers/setup';
+import { registerShellSnapshotHandlers } from './handlers/shell-snapshot';
 import { registerTerminalHandlers } from './handlers/terminal';
 import { registerWindowHandlers } from './handlers/window';
 import { registerWorkspaceFilesHandlers } from './handlers/workspace-files';
@@ -148,7 +149,12 @@ export function registerIpcHandlers({
 
 	registerWindowHandlers();
 	registerEnvironmentHandlers({ environmentVariablesService });
-	registerHealthHandlers({ configService, databaseService, openTargetService });
+	registerHealthHandlers({ configService, databaseService });
+	registerShellSnapshotHandlers({
+		configService,
+		databaseService,
+		openTargetService,
+	});
 	registerNavigationHandlers({ databaseService });
 	registerSettingsHandlers({ settingsResolutionService });
 	registerRootHandlers({
