@@ -6,10 +6,13 @@ import type {
 	WorkspaceLandingKind,
 	WorkspaceLandingSummary,
 	WorkspaceLinkedIssueSummary,
-	WorkspaceOpenTarget,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type { RepositoryWorkspaceNavigationRepository, RepositoryWorkspaceNavigationSnapshot, RepositoryWorkspaceNavigationWorkspace } from '@/shared/ipc/contracts/repository-navigation';
+import type {
+	RepositoryWorkspaceNavigationRepository,
+	RepositoryWorkspaceNavigationSnapshot,
+	RepositoryWorkspaceNavigationWorkspace,
+} from '@/shared/ipc/contracts/repository-navigation';
 
 // --- Public mappers ---------------------------------------------------------
 
@@ -132,7 +135,10 @@ function mapWorkspaceNavigationSnapshot(
 		id: workspace.id,
 		landingSummary: createPlaceholderLandingSummary(repository, workspace),
 		name: workspace.name || workspace.slug,
-		openTargets: createPlaceholderOpenTargets(),
+		// Seeded from the preload initial-shell snapshot via React Query; the
+		// model intentionally starts empty so the menu only renders once real
+		// detection results arrive.
+		openTargets: [],
 		pathLabel: workspace.path,
 		projectId: repository.id,
 		pullRequest: {
@@ -218,15 +224,6 @@ function parseGithubOwnerFromRemoteUrl(
 }
 
 // --- Placeholder builders (private) -----------------------------------------
-
-/**
- * Empty placeholder — the real list is delivered via the initial-shell
- * snapshot (preload) which seeds the React Query cache before first paint,
- * so the menu never renders fallback iconify glyphs.
- */
-function createPlaceholderOpenTargets(): WorkspaceOpenTarget[] {
-	return [];
-}
 
 /** Returns the placeholder dock tabs (setup/run/default terminal). */
 function createPlaceholderDockTabs(): DockTabModel[] {

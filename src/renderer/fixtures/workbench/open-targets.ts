@@ -2,6 +2,7 @@ import type { WorkspaceOpenTarget } from '@/renderer/types/workbench';
 
 export const defaultWorkspaceOpenTargets: WorkspaceOpenTarget[] = [
 	{
+		behavior: 'reveal-in-finder',
 		iconName: 'lucide:folder',
 		id: 'finder',
 		installed: true,
@@ -10,6 +11,7 @@ export const defaultWorkspaceOpenTargets: WorkspaceOpenTarget[] = [
 		numberShortcutLabel: '1',
 	},
 	{
+		behavior: 'launch-app',
 		iconName: 'vscode-icons:file-type-vscode',
 		id: 'vscode',
 		installed: true,
@@ -20,6 +22,7 @@ export const defaultWorkspaceOpenTargets: WorkspaceOpenTarget[] = [
 		shortcutLabel: '⌘O',
 	},
 	{
+		behavior: 'launch-app',
 		iconName: 'lucide:file-code',
 		id: 'zed',
 		installed: true,
@@ -28,6 +31,7 @@ export const defaultWorkspaceOpenTargets: WorkspaceOpenTarget[] = [
 		numberShortcutLabel: '3',
 	},
 	{
+		behavior: 'launch-app',
 		iconName: 'lucide:wrench',
 		id: 'xcode',
 		installed: true,
@@ -36,6 +40,7 @@ export const defaultWorkspaceOpenTargets: WorkspaceOpenTarget[] = [
 		numberShortcutLabel: '4',
 	},
 	{
+		behavior: 'launch-app',
 		iconName: 'lucide:square-terminal',
 		id: 'ghostty',
 		installed: true,
@@ -44,6 +49,7 @@ export const defaultWorkspaceOpenTargets: WorkspaceOpenTarget[] = [
 		numberShortcutLabel: '5',
 	},
 	{
+		behavior: 'launch-app',
 		iconName: 'lucide:square-terminal',
 		id: 'warp',
 		installed: true,
@@ -52,6 +58,7 @@ export const defaultWorkspaceOpenTargets: WorkspaceOpenTarget[] = [
 		numberShortcutLabel: '6',
 	},
 	{
+		behavior: 'launch-app',
 		iconName: 'lucide:square-terminal',
 		id: 'terminal',
 		installed: true,
@@ -60,6 +67,7 @@ export const defaultWorkspaceOpenTargets: WorkspaceOpenTarget[] = [
 		numberShortcutLabel: '7',
 	},
 	{
+		behavior: 'launch-app',
 		iconName: 'vscode-icons:folder-type-github',
 		id: 'github-desktop',
 		installed: true,
@@ -68,6 +76,7 @@ export const defaultWorkspaceOpenTargets: WorkspaceOpenTarget[] = [
 		numberShortcutLabel: '8',
 	},
 	{
+		behavior: 'copy-path',
 		iconName: 'lucide:copy',
 		id: 'copy-path',
 		installed: true,

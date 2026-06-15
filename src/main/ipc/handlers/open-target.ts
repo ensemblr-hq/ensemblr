@@ -52,9 +52,10 @@ export function registerOpenTargetHandlers({
 				workspaceId: request.workspaceId,
 			});
 			if (!workspacePath) {
+				console.warn('[open-target] workspace not found', request.workspaceId);
 				return {
 					ok: false,
-					error: `Workspace not found: ${request.workspaceId}`,
+					error: 'Workspace not found.',
 				};
 			}
 

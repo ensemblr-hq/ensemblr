@@ -1,4 +1,14 @@
-import type { WorkspaceOpenTargetKind } from '@/shared/ipc/contracts/open-target';
+import type {
+	WorkspaceOpenTargetIconName,
+	WorkspaceOpenTargetKind,
+} from '@/shared/ipc/contracts/open-target';
+
+/**
+ * macOS bundle ids are reverse-DNS strings: letters, digits, dot, dash,
+ * underscore. Any deviation means a malformed registry entry — we'd rather
+ * fail loudly than emit a malformed Spotlight predicate.
+ */
+const BUNDLE_ID_PATTERN = /^[A-Za-z0-9._-]+$/;
 
 /**
  * How the service decides whether a target is installed on the host.
@@ -32,7 +42,7 @@ type OpenTargetDispatch =
 export interface OpenTargetDefinition {
 	readonly id: string;
 	readonly label: string;
-	readonly iconName: string;
+	readonly iconName: WorkspaceOpenTargetIconName;
 	readonly kind: WorkspaceOpenTargetKind;
 	readonly detection: OpenTargetDetection;
 	readonly dispatch: OpenTargetDispatch;
@@ -104,7 +114,10 @@ export const OPEN_TARGET_REGISTRY: readonly OpenTargetDefinition[] = [
 		label: 'Windsurf',
 	},
 	{
-		detection: { kind: 'bundleId', bundleIds: ['dev.zed.Zed', 'dev.zed.Zed-Preview'] },
+		detection: {
+			kind: 'bundleId',
+			bundleIds: ['dev.zed.Zed', 'dev.zed.Zed-Preview'],
+		},
 		dispatch: { kind: 'open-bundle', bundleId: 'dev.zed.Zed' },
 		iconName: 'lucide:file-code',
 		id: 'zed',
@@ -264,10 +277,7 @@ export const OPEN_TARGET_REGISTRY: readonly OpenTargetDefinition[] = [
 	{
 		detection: {
 			kind: 'bundleId',
-			bundleIds: [
-				'com.torusknot.SourceTreeNotMAS',
-				'com.atlassian.SourceTree',
-			],
+			bundleIds: ['com.torusknot.SourceTreeNotMAS', 'com.atlassian.SourceTree'],
 		},
 		dispatch: { kind: 'open-app-name', appName: 'Sourcetree' },
 		iconName: 'lucide:github',
@@ -302,4 +312,30 @@ export function findOpenTargetDefinition(
 		OPEN_TARGET_REGISTRY.find((definition) => definition.id === targetId) ??
 		null
 	);
+}
+
+/** Validates a bundle id against the macOS reverse-DNS shape. */
+export function isValidBundleId(bundleId: string): boolean {
+	return BUNDLE_ID_PATTERN.test(bundleId);
+}
+
+// Boot-time sanity check. Catches typos in bundle-id literals before they
+// reach `mdfind` and before the renderer sees a malformed predicate error.
+for (const definition of OPEN_TARGET_REGISTRY) {
+	if (definition.detection.kind === 'bundleId') {
+		for (const bundleId of definition.detection.bundleIds) {
+			if (!isValidBundleId(bundleId)) {
+				throw new Error(
+					`Invalid bundle id "${bundleId}" in target "${definition.id}".`,
+				);
+			}
+		}
+	}
+	if (definition.dispatch.kind === 'open-bundle') {
+		if (!isValidBundleId(definition.dispatch.bundleId)) {
+			throw new Error(
+				`Invalid dispatch bundle id "${definition.dispatch.bundleId}" in target "${definition.id}".`,
+			);
+		}
+	}
 }

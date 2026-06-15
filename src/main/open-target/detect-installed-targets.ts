@@ -1,7 +1,7 @@
 import { access, constants } from 'node:fs/promises';
 
 import type { LocalCommandService } from '../commands';
-import { OPEN_TARGET_REGISTRY } from './open-target-registry';
+import { isValidBundleId, OPEN_TARGET_REGISTRY } from './open-target-registry';
 
 const MDFIND_TIMEOUT_MS = 3000;
 const MDFIND_PATH = '/usr/bin/mdfind';
@@ -128,10 +128,17 @@ async function mdfindPathForBundleId({
 	bundleId: string;
 	localCommandService: LocalCommandService;
 }): Promise<string | null> {
+	// Registry is asserted at module load, but defence in depth: anything that
+	// reaches the Spotlight predicate must already be a strict reverse-DNS id,
+	// so no shell/predicate escaping is required.
+	if (!isValidBundleId(bundleId)) {
+		return null;
+	}
+
 	try {
 		const result = await localCommandService.run(
 			{
-				args: [`kMDItemCFBundleIdentifier == "${escapeBundleId(bundleId)}"`],
+				args: [`kMDItemCFBundleIdentifier == "${bundleId}"`],
 				command: MDFIND_PATH,
 				timeoutMs: MDFIND_TIMEOUT_MS,
 			},
@@ -160,8 +167,4 @@ async function pathExists(path: string): Promise<boolean> {
 	} catch {
 		return false;
 	}
-}
-
-function escapeBundleId(id: string): string {
-	return id.replace(/"/g, '\\"');
 }

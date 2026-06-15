@@ -2,15 +2,15 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { app, clipboard, nativeImage, shell } from 'electron';
-
-import type { LocalCommandService } from '../commands';
 import type {
 	OpenTargetResult,
+	WorkspaceOpenTargetBehavior,
 	WorkspaceOpenTargetSnapshot,
 } from '@/shared/ipc/contracts/open-target';
+import type { LocalCommandService } from '../commands';
 import {
-	detectInstalledTargets,
 	type DetectedTargetsMap,
+	detectInstalledTargets,
 } from './detect-installed-targets';
 import {
 	findOpenTargetDefinition,
@@ -61,6 +61,11 @@ interface ResolvedTargets {
 	iconDataUrls: Readonly<Record<string, string | undefined>>;
 }
 
+const EMPTY_RESOLVED: ResolvedTargets = {
+	detected: {},
+	iconDataUrls: {},
+};
+
 /**
  * Detection runs once at boot, then is cached to disk under userData so the
  * next launch paints the menu instantly. The on-disk cache is the source of
@@ -72,27 +77,48 @@ export function createOpenTargetService({
 }: CreateOpenTargetServiceOptions): OpenTargetService {
 	let inMemorySnapshots: WorkspaceOpenTargetSnapshot[] | null =
 		readSnapshotsFromDisk();
-	let resolvedPromise: Promise<ResolvedTargets> | null = null;
+	// One-deep refresh chain: every resolve is appended to the previous one so
+	// concurrent callers see a consistent in-memory write order and one rejected
+	// run can't pin the service into a permanently-failed state.
+	let resolveChain: Promise<ResolvedTargets> = Promise.resolve(EMPTY_RESOLVED);
+	let primed = false;
 
-	const ensureResolved = (): Promise<ResolvedTargets> => {
-		if (!resolvedPromise) {
-			resolvedPromise = app
-				.whenReady()
-				.then(() => resolveTargets({ localCommandService }))
-				.then((resolved) => {
-					const snapshots = buildSnapshots(resolved);
-					inMemorySnapshots = snapshots;
-					writeSnapshotsToDisk(snapshots);
-					return resolved;
-				});
-		}
-		return resolvedPromise;
+	const runDetection = (): Promise<ResolvedTargets> => {
+		return app
+			.whenReady()
+			.then(() => resolveTargets({ localCommandService }))
+			.then((resolved) => {
+				const snapshots = buildSnapshots(resolved);
+				inMemorySnapshots = snapshots;
+				writeSnapshotsToDisk(snapshots);
+				return resolved;
+			})
+			.catch((error: unknown) => {
+				// Surface for diagnostics but don't crash the main process; the cached
+				// snapshot (if any) remains usable, and the next call can retry.
+				console.error('[open-target] detection failed', error);
+				return EMPTY_RESOLVED;
+			});
 	};
-	// Prime the cache on construction. Safe because we await `whenReady` inside.
-	void ensureResolved();
+
+	const queueResolve = (): Promise<ResolvedTargets> => {
+		resolveChain = resolveChain.then(runDetection, runDetection);
+		return resolveChain;
+	};
+
+	const ensurePrimed = (): Promise<ResolvedTargets> => {
+		if (!primed) {
+			primed = true;
+			return queueResolve();
+		}
+		return resolveChain;
+	};
+	// Prime the cache on construction. Safe because we await `whenReady` inside,
+	// and `queueResolve` swallows errors so no unhandled rejection escapes.
+	void ensurePrimed();
 
 	const listTargets = async (): Promise<WorkspaceOpenTargetSnapshot[]> => {
-		await ensureResolved();
+		await ensurePrimed();
 		return inMemorySnapshots ?? [];
 	};
 
@@ -127,17 +153,8 @@ export function createOpenTargetService({
 	};
 
 	const refresh = async (): Promise<void> => {
-		const next = app
-			.whenReady()
-			.then(() => resolveTargets({ localCommandService }))
-			.then((resolved) => {
-				const snapshots = buildSnapshots(resolved);
-				inMemorySnapshots = snapshots;
-				writeSnapshotsToDisk(snapshots);
-				return resolved;
-			});
-		resolvedPromise = next;
-		await next;
+		primed = true;
+		await queueResolve();
 	};
 
 	return { getCachedSnapshots, listTargets, openTarget, refresh };
@@ -220,6 +237,7 @@ function toSnapshot({
 	visibleIndex: number;
 }): WorkspaceOpenTargetSnapshot {
 	return {
+		behavior: behaviorForDispatch(definition.dispatch.kind),
 		...(iconDataUrl ? { iconDataUrl } : {}),
 		iconName: definition.iconName,
 		id: definition.id,
@@ -232,6 +250,20 @@ function toSnapshot({
 			? { shortcutLabel: definition.shortcutLabel }
 			: {}),
 	};
+}
+
+function behaviorForDispatch(
+	kind: OpenTargetDefinition['dispatch']['kind'],
+): WorkspaceOpenTargetBehavior {
+	switch (kind) {
+		case 'copy-path':
+			return 'copy-path';
+		case 'reveal-in-finder':
+			return 'reveal-in-finder';
+		case 'open-app-name':
+		case 'open-bundle':
+			return 'launch-app';
+	}
 }
 
 /**
@@ -264,9 +296,7 @@ function readSnapshotsFromDisk(): WorkspaceOpenTargetSnapshot[] | null {
 	}
 }
 
-function writeSnapshotsToDisk(
-	snapshots: WorkspaceOpenTargetSnapshot[],
-): void {
+function writeSnapshotsToDisk(snapshots: WorkspaceOpenTargetSnapshot[]): void {
 	const cachePath = getCachePath();
 	if (!cachePath) {
 		return;
