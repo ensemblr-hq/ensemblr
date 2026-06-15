@@ -1,19 +1,31 @@
 import {
 	AlertCircleIcon,
 	CheckCircle2Icon,
+	CheckIcon,
+	ChevronRightIcon,
 	CircleDashedIcon,
+	ClipboardIcon,
+	ExternalLinkIcon,
+	FolderIcon,
 	RefreshCwIcon,
+	SettingsIcon,
 	ShieldAlertIcon,
 } from 'lucide-react';
+import { useState } from 'react';
 
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
-import { isRemediationActionButton } from '@/renderer/lib/setup-diagnostics';
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from '@/renderer/components/ui/collapsible';
 import { cn } from '@/renderer/lib/utils';
 import type {
 	SetupCheckSnapshot,
 	SetupCheckStatus,
 	SetupRemediationAction,
+	SetupRemediationActionKind,
 } from '@/shared/ipc/contracts/setup';
 
 const CHECK_STATUS_LABELS: Record<SetupCheckStatus, string> = {
@@ -43,117 +55,137 @@ const CHECK_STATUS_ICON = {
 	warning: ShieldAlertIcon,
 } satisfies Record<SetupCheckStatus, typeof AlertCircleIcon>;
 
-/** Single setup-check row showing status, detail, logs, and remediation actions. */
+const CHECK_STATUS_ICON_COLOR: Record<SetupCheckStatus, string> = {
+	failure: 'text-status-danger',
+	pending: 'text-muted-foreground',
+	running: 'text-accent-strong',
+	success: 'text-status-ok',
+	warning: 'text-status-warning',
+};
+
+const REMEDIATION_ICON = {
+	'open-external': ExternalLinkIcon,
+	'open-settings': SettingsIcon,
+	'run-command': ClipboardIcon,
+	retry: RefreshCwIcon,
+	'select-path': FolderIcon,
+} satisfies Record<SetupRemediationActionKind, typeof RefreshCwIcon>;
+
+/** Left indent that aligns secondary content under the row title (icon + gap). */
+const CONTENT_INDENT = 'pl-[1.625rem]';
+
+/** Single setup-check row: status icon, title, detail line, logs, remediations. */
 export function SetupCheckRow({
 	check,
 	onRemediationAction,
-	onRetry,
 }: {
 	check: SetupCheckSnapshot;
 	onRemediationAction?: (
 		action: SetupRemediationAction,
 		check: SetupCheckSnapshot,
 	) => void | Promise<void>;
-	onRetry?: () => void;
 }) {
 	const Icon = CHECK_STATUS_ICON[check.status];
-	const handleRemediationAction = async (action: SetupRemediationAction) => {
-		if (onRemediationAction) {
-			await onRemediationAction(action, check);
+	const [copiedActionId, setCopiedActionId] = useState<string | null>(null);
+
+	const runRemediationAction = async (action: SetupRemediationAction) => {
+		// `run-command` is a pure renderer concern: copy the suggested command to
+		// the clipboard (never auto-runs it) and flash a transient confirmation on
+		// the originating button. Gating the flash on a successful write keeps us
+		// from showing a false "Copied" when the clipboard is unavailable.
+		if (action.kind === 'run-command') {
+			if (!action.command) {
+				return;
+			}
+
+			try {
+				await navigator.clipboard.writeText(action.command);
+				setCopiedActionId(action.id);
+				window.setTimeout(() => setCopiedActionId(null), 1800);
+			} catch (error) {
+				console.error('Failed to copy command to clipboard:', error);
+			}
+
 			return;
 		}
 
-		// Standalone fallback: when this row is mounted without a parent
-		// `onRemediationAction` (e.g. the compact panel), drive the Pi
-		// executable picker directly. Kept intentionally as a self-contained
-		// escape hatch so the compact view can ship without a parent
-		// controller. TODO: require onRemediationAction once compact panel
-		// gets its own remediation controller.
-		if (
-			action.kind === 'select-path' &&
-			action.target === 'pi.executablePath' &&
-			check.id === 'pi-executable'
-		) {
-			await window.ensemble?.selectPiExecutable();
-			onRetry?.();
-		}
+		await onRemediationAction?.(action, check);
 	};
 
 	return (
-		<div className='flex flex-col gap-2 px-3 py-2.5'>
+		<div className='flex flex-col gap-2 px-3 py-3.5'>
 			<div className='flex items-start justify-between gap-3'>
-				<div className='flex min-w-0 items-start gap-2'>
+				<div className='flex min-w-0 items-start gap-2.5'>
 					<Icon
 						aria-hidden='true'
 						className={cn(
 							'mt-0.5 size-4 shrink-0',
-							check.status === 'failure' && 'text-status-danger',
-							check.status === 'success' && 'text-status-ok',
-							check.status === 'warning' && 'text-status-warning',
-							check.status === 'pending' && 'text-muted-foreground',
-							check.status === 'running' && 'text-accent-strong',
+							CHECK_STATUS_ICON_COLOR[check.status],
 						)}
 					/>
-					<div className='min-w-0'>
-						<div className='flex flex-wrap items-center gap-1.5'>
-							<h3 className='font-medium text-xs'>{check.title}</h3>
-							{check.blocking ? (
-								<StatusBadge tone='muted'>Required</StatusBadge>
-							) : (
-								<StatusBadge tone='info'>Optional</StatusBadge>
+					<div className='min-w-0 space-y-0.5'>
+						<p className='font-medium text-sm leading-snug'>
+							{check.title}
+							{check.blocking ? null : (
+								<span className='ml-2 font-normal text-muted-foreground text-xs'>
+									Optional
+								</span>
 							)}
-						</div>
-						<p className='mt-1 text-muted-foreground text-xs leading-5'>
-							{check.detail}
 						</p>
-						<p className='mt-1 text-muted-foreground text-xxs leading-4'>
-							{check.description}
+						<p className='text-muted-foreground text-xs leading-5'>
+							{check.detail}
 						</p>
 					</div>
 				</div>
-				<StatusBadge tone={CHECK_STATUS_TONE[check.status]}>
+				<StatusBadge
+					className='mt-0.5 shrink-0'
+					tone={CHECK_STATUS_TONE[check.status]}
+				>
 					{CHECK_STATUS_LABELS[check.status]}
 				</StatusBadge>
 			</div>
 
 			{check.remediationActions.length ? (
-				<div className='flex flex-wrap gap-1.5 pl-6'>
-					{check.remediationActions.map((action) =>
-						isRemediationActionButton(action, check) ? (
+				<div className={cn('flex flex-wrap gap-1.5', CONTENT_INDENT)}>
+					{check.remediationActions.map((action) => {
+						const copied =
+							action.kind === 'run-command' && copiedActionId === action.id;
+						const ActionIcon = copied
+							? CheckIcon
+							: REMEDIATION_ICON[action.kind];
+
+						return (
 							<Button
-								className='h-6 px-2 text-xxs leading-none'
 								data-remediation-action={action.id}
 								key={action.id}
 								onClick={() => {
-									void handleRemediationAction(action);
+									void runRemediationAction(action);
 								}}
 								size='xs'
 								type='button'
 								variant='outline'
 							>
-								{action.label}
+								<ActionIcon aria-hidden='true' data-icon='inline-start' />
+								{copied ? 'Copied' : action.label}
 							</Button>
-						) : (
-							<span
-								className='rounded-sm border border-border bg-muted px-1.5 py-1 text-muted-foreground text-xxs leading-none'
-								key={action.id}
-							>
-								{action.label}
-							</span>
-						),
-					)}
+						);
+					})}
 				</div>
 			) : null}
 
 			{check.logs.length ? (
-				<details className='ml-6 rounded-md border border-border bg-background/60 px-2 py-1.5 text-xs'>
-					<summary className='cursor-default text-muted-foreground'>
+				<Collapsible className={CONTENT_INDENT}>
+					<CollapsibleTrigger className='group inline-flex items-center gap-1 text-muted-foreground text-xs transition-colors hover:text-foreground'>
+						<ChevronRightIcon
+							aria-hidden='true'
+							className='size-3.5 transition-transform group-data-[state=open]:rotate-90'
+						/>
 						Diagnostics log
-					</summary>
-					<div className='mt-1.5 flex flex-col gap-1'>
+					</CollapsibleTrigger>
+					<CollapsibleContent className='mt-1.5 flex flex-col gap-1 rounded-md border border-border bg-muted/40 px-2.5 py-2 text-xs'>
 						{check.logs.slice(0, 4).map((log) => (
 							<p
-								className='break-words text-muted-foreground leading-5'
+								className='wrap-break-word text-muted-foreground leading-5'
 								key={`${log.label}-${log.text}`}
 							>
 								<span className='font-medium text-foreground'>{log.label}</span>
@@ -162,8 +194,8 @@ export function SetupCheckRow({
 								{log.truncated ? ' (truncated)' : null}
 							</p>
 						))}
-					</div>
-				</details>
+					</CollapsibleContent>
+				</Collapsible>
 			) : null}
 		</div>
 	);

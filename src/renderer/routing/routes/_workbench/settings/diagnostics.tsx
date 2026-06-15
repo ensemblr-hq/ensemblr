@@ -56,7 +56,7 @@ function DiagnosticsRoute() {
 					disabled={!snapshot}
 					onClick={onCopyBundle}
 					size='sm'
-					variant='outline'
+					variant='secondary'
 				>
 					{copied ? (
 						<CheckIcon aria-hidden='true' className='size-4' />

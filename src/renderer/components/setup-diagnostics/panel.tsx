@@ -1,9 +1,7 @@
-import { ClockIcon, RefreshCwIcon } from 'lucide-react';
+import { ClockIcon } from 'lucide-react';
 
-import { ShellPanel } from '@/renderer/components/shell-panel';
-import { StatusBadge } from '@/renderer/components/status-badge';
-import { Button } from '@/renderer/components/ui/button';
-import { cn } from '@/renderer/lib/utils';
+import { useRootDirectoryChange } from '@/renderer/hooks/setup-diagnostics/use-change';
+import { useGenericRemediation } from '@/renderer/hooks/setup-diagnostics/use-remediation';
 import type {
 	SetupCheckGroupId,
 	SetupCheckSnapshot,
@@ -11,10 +9,8 @@ import type {
 	SetupRemediationAction,
 } from '@/shared/ipc/contracts/setup';
 
-import { SetupDiagnosticsCompact } from './compact';
+import { SetupDiagnosticsSummary } from './compact';
 import { LocalExecutionNotice } from './local-execution-notice';
-import { useRootDirectoryChange } from '@/renderer/hooks/setup-diagnostics/use-change';
-
 import { RootDirectoryChangeDialog } from './root-directory/change-dialog';
 import { SetupCheckRow } from './setup-check-row';
 
@@ -45,7 +41,7 @@ const GROUP_ORDER: readonly SetupCheckGroupId[] = [
 	'linear',
 ];
 
-/** Full setup-diagnostics panel — groups checks, surfaces remediation actions. */
+/** Flat setup-diagnostics panel — status strip, grouped checks, remediation. */
 export function SetupDiagnosticsPanel({
 	error,
 	isRetrying = false,
@@ -54,6 +50,9 @@ export function SetupDiagnosticsPanel({
 	snapshot,
 }: SetupDiagnosticsPanelProps) {
 	const summary = getSetupSummary(snapshot, error);
+	const { handle: handleGenericRemediation } = useGenericRemediation({
+		onRetry,
+	});
 	const {
 		actionError: rootActionError,
 		applyResult: rootApplyResult,
@@ -62,91 +61,63 @@ export function SetupDiagnosticsPanel({
 		handleRemediationAction,
 		isApplying: isApplyingRootChange,
 		selection: rootSelection,
-	} = useRootDirectoryChange({ onRemediationAction, onRetry });
+	} = useRootDirectoryChange({
+		onRemediationAction: onRemediationAction ?? handleGenericRemediation,
+		onRetry,
+	});
 
 	return (
-		<ShellPanel
-			action={
-				<div className='flex items-center gap-2'>
-					<StatusBadge tone={summary.tone}>{summary.badge}</StatusBadge>
-					<Button
-						disabled={isRetrying}
-						onClick={onRetry}
-						size='sm'
-						type='button'
-						variant='outline'
-					>
-						<RefreshCwIcon
-							className={cn(isRetrying && 'animate-spin')}
-							data-icon='inline-start'
-						/>
-						{isRetrying ? 'Retrying' : 'Retry checks'}
-					</Button>
+		<div className='flex flex-col gap-6 pt-4'>
+			{error ? <DangerNotice>{error}</DangerNotice> : null}
+			{rootActionError ? <DangerNotice>{rootActionError}</DangerNotice> : null}
+
+			<SetupDiagnosticsSummary
+				detail={summary.detail}
+				isRetrying={isRetrying}
+				onRetry={onRetry}
+				snapshot={snapshot}
+				title={summary.title}
+				tone={summary.tone}
+			/>
+
+			{snapshot ? (
+				<div className='flex flex-col gap-6'>
+					{GROUP_ORDER.map((group) => {
+						const checks = snapshot.checks.filter(
+							(check) => check.group === group,
+						);
+
+						if (!checks.length) {
+							return null;
+						}
+
+						return (
+							<section className='flex flex-col gap-1' key={group}>
+								<h2 className='px-3 font-medium text-muted-foreground text-xs uppercase tracking-wide'>
+									{GROUP_LABELS[group]}
+								</h2>
+								<div className='flex flex-col divide-y divide-border'>
+									{checks.map((check) => (
+										<SetupCheckRow
+											check={check}
+											key={check.id}
+											onRemediationAction={handleRemediationAction}
+										/>
+									))}
+								</div>
+							</section>
+						);
+					})}
 				</div>
-			}
-			description={summary.detail}
-			eyebrow='Setup gate'
-			title={summary.title}
-		>
-			<div className='flex flex-col gap-3'>
-				{error ? (
-					<div className='rounded-md border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-status-danger text-xs leading-5'>
-						{error}
-					</div>
-				) : null}
-				{rootActionError ? (
-					<div className='rounded-md border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-status-danger text-xs leading-5'>
-						{rootActionError}
-					</div>
-				) : null}
+			) : (
+				<div className='flex items-center gap-2 px-3 text-muted-foreground text-xs'>
+					<ClockIcon aria-hidden='true' className='size-4 shrink-0' />
+					<span>Loading setup diagnostics</span>
+				</div>
+			)}
 
-				<LocalExecutionNotice />
+			<LocalExecutionNotice />
 
-				{snapshot ? (
-					<>
-						<SetupDiagnosticsCompact snapshot={snapshot} />
-						<div className='flex flex-col gap-3'>
-							{GROUP_ORDER.map((group) => {
-								const checks = snapshot.checks.filter(
-									(check) => check.group === group,
-								);
-
-								if (!checks.length) {
-									return null;
-								}
-
-								return (
-									<section className='flex flex-col gap-2' key={group}>
-										<div className='flex items-center justify-between gap-3'>
-											<h2 className='font-medium text-xs'>
-												{GROUP_LABELS[group]}
-											</h2>
-											<StatusBadge tone='muted'>
-												{checks.length} checks
-											</StatusBadge>
-										</div>
-										<div className='flex flex-col divide-y divide-border rounded-md border border-border bg-pane'>
-											{checks.map((check) => (
-												<SetupCheckRow
-													check={check}
-													key={check.id}
-													onRemediationAction={handleRemediationAction}
-													onRetry={onRetry}
-												/>
-											))}
-										</div>
-									</section>
-								);
-							})}
-						</div>
-					</>
-				) : (
-					<div className='flex items-center gap-2 rounded-md border border-border bg-pane px-3 py-3 text-muted-foreground text-xs'>
-						<ClockIcon aria-hidden='true' className='size-4 shrink-0' />
-						<span>Loading setup diagnostics</span>
-					</div>
-				)}
-			</div>
 			<RootDirectoryChangeDialog
 				applyResult={rootApplyResult}
 				isApplying={isApplyingRootChange}
@@ -160,7 +131,16 @@ export function SetupDiagnosticsPanel({
 				}}
 				selection={rootSelection}
 			/>
-		</ShellPanel>
+		</div>
+	);
+}
+
+/** Inline danger banner for IPC / remediation errors. */
+function DangerNotice({ children }: { children: React.ReactNode }) {
+	return (
+		<div className='rounded-md border border-status-danger/30 bg-status-danger/10 px-3 py-2 text-status-danger text-xs leading-5'>
+			{children}
+		</div>
 	);
 }
 
@@ -169,14 +149,12 @@ function getSetupSummary(
 	snapshot: SetupDiagnosticsSnapshot | null,
 	error?: string | null,
 ): {
-	badge: string;
 	detail: string;
 	title: string;
 	tone: 'danger' | 'muted' | 'ok' | 'warning';
 } {
 	if (error) {
 		return {
-			badge: 'IPC error',
 			detail: 'Setup diagnostics could not be loaded from the main process.',
 			title: 'Setup diagnostics unavailable',
 			tone: 'danger',
@@ -185,7 +163,6 @@ function getSetupSummary(
 
 	if (!snapshot) {
 		return {
-			badge: 'Loading',
 			detail: 'Ensemble is collecting setup diagnostics.',
 			title: 'Checking setup readiness',
 			tone: 'muted',
@@ -194,7 +171,6 @@ function getSetupSummary(
 
 	if (snapshot.status === 'ready') {
 		return {
-			badge: 'Ready',
 			detail: `${snapshot.successCount} checks passed and ${snapshot.warningCount} warnings remain.`,
 			title: 'Core workflows are ready',
 			tone: 'ok',
@@ -203,7 +179,6 @@ function getSetupSummary(
 
 	if (snapshot.status === 'checking') {
 		return {
-			badge: 'Pending',
 			detail: `${snapshot.blockedCount} required checks are still pending.`,
 			title: 'Setup checks are still pending',
 			tone: 'warning',
@@ -211,7 +186,6 @@ function getSetupSummary(
 	}
 
 	return {
-		badge: 'Blocked',
 		detail: `${snapshot.blockedCount} required checks need attention before core workflows open.`,
 		title: 'Core workflows are blocked',
 		tone: 'danger',

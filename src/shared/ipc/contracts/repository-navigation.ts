@@ -41,4 +41,6 @@ export interface NavigationApi {
 /** Window/shell-level IPC surface (resize the BrowserWindow, etc). */
 export interface ShellApi {
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
+	/** Opens an http/https URL in the user's default browser. */
+	openExternal: (url: string) => Promise<void>;
 }
