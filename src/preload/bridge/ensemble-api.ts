@@ -168,6 +168,7 @@ export function createEnsembleApi(): EnsembleApi {
 		onTerminalOutput: (listener) =>
 			subscribe<TerminalOutputBroadcast>(IPC_CHANNELS.terminalOutput, listener),
 		openAppConfigFile: () => invoke('openAppConfigFile'),
+		openExternal: (url) => invoke('openExternal', url),
 		openChatTab: (request) => invoke('openChatTab', request),
 		openPiSession: (request) => invoke('openPiSession', request),
 		openWorkspaceInTarget: (request) =>

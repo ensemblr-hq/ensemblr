@@ -1,73 +1,78 @@
-import type { ReactNode } from 'react';
+import { RefreshCwIcon } from 'lucide-react';
 
-import { StatusBadge } from '@/renderer/components/status-badge';
+import { StatusDot } from '@/renderer/components/status-badge';
+import { Button } from '@/renderer/components/ui/button';
+import { cn } from '@/renderer/lib/utils';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
-/** Compact summary variant for the setup diagnostics, used in dense panels. */
-export function SetupDiagnosticsCompact({
+type StatusTone = 'danger' | 'muted' | 'ok' | 'warning';
+
+interface SetupDiagnosticsSummaryProps {
+	detail: string;
+	isRetrying?: boolean;
+	onRetry?: () => void;
+	snapshot: SetupDiagnosticsSnapshot | null;
+	title: string;
+	tone: StatusTone;
+}
+
+/**
+ * Single-line status strip: a tone dot, the overall state title, plain-text
+ * counts, and the retry action. Replaces the old four-tile metric grid.
+ */
+export function SetupDiagnosticsSummary({
+	detail,
+	isRetrying = false,
+	onRetry,
 	snapshot,
-}: {
-	snapshot: SetupDiagnosticsSnapshot;
-}) {
-	const readyLabel =
-		snapshot.status === 'ready'
-			? 'Core workflows ready'
-			: snapshot.status === 'checking'
-				? 'Setup checks pending'
-				: 'Core workflows blocked';
-
-	return (
-		<div className='grid grid-cols-2 gap-2 md:grid-cols-4'>
-			<CompactMetric label='State' tone={getSnapshotTone(snapshot)}>
-				{readyLabel}
-			</CompactMetric>
-			<CompactMetric label='Required' tone='muted'>
-				{snapshot.requiredCount} checks
-			</CompactMetric>
-			<CompactMetric label='Blocked' tone='danger'>
-				{snapshot.blockedCount}
-			</CompactMetric>
-			<CompactMetric label='Warnings' tone='warning'>
-				{snapshot.warningCount}
-			</CompactMetric>
-		</div>
-	);
-}
-
-/** Single metric tile used by the compact diagnostics variant. */
-function CompactMetric({
-	children,
-	label,
+	title,
 	tone,
-}: {
-	children: ReactNode;
-	label: string;
-	tone: 'danger' | 'info' | 'muted' | 'ok' | 'warning';
-}) {
+}: SetupDiagnosticsSummaryProps) {
 	return (
-		<div className='flex min-h-16 flex-col justify-between rounded-md border border-border bg-pane px-2.5 py-2'>
-			<div className='flex items-center justify-between gap-2'>
-				<span className='text-muted-foreground text-xxs uppercase tracking-wide'>
-					{label}
-				</span>
-				<StatusBadge tone={tone}>{label}</StatusBadge>
+		<div className='flex items-center justify-between gap-4 rounded-lg border bg-card px-5 py-4'>
+			<div className='flex min-w-0 items-center gap-3.5'>
+				<StatusDot className='size-2 shrink-0' tone={tone} />
+				<div className='flex min-w-0 flex-col gap-1'>
+					<span className='truncate font-medium text-sm leading-none'>
+						{title}
+					</span>
+					<span className='truncate text-muted-foreground text-xs'>
+						{snapshot ? <SummaryCounts snapshot={snapshot} /> : detail}
+					</span>
+				</div>
 			</div>
-			<div className='mt-2 font-medium text-xs'>{children}</div>
+			<Button
+				className='shrink-0'
+				disabled={isRetrying}
+				onClick={onRetry}
+				size='sm'
+				type='button'
+				variant='outline'
+			>
+				<RefreshCwIcon
+					aria-hidden='true'
+					className={cn('size-4', isRetrying && 'animate-spin')}
+				/>
+				{isRetrying ? 'Retrying' : 'Retry checks'}
+			</Button>
 		</div>
 	);
 }
 
-/** Maps a setup snapshot to its overall surface tone. */
-function getSnapshotTone(
-	snapshot: SetupDiagnosticsSnapshot,
-): 'danger' | 'ok' | 'warning' {
-	if (snapshot.status === 'ready') {
-		return 'ok';
-	}
+/** Plain-text count run-on for the summary strip. */
+function SummaryCounts({ snapshot }: { snapshot: SetupDiagnosticsSnapshot }) {
+	return (
+		<>
+			{snapshot.successCount} passed
+			<CountSeparator />
+			{snapshot.warningCount} warnings
+			<CountSeparator />
+			{snapshot.blockedCount} blocked
+		</>
+	);
+}
 
-	if (snapshot.status === 'checking') {
-		return 'warning';
-	}
-
-	return 'danger';
+/** Middle-dot separator between inline counts. */
+function CountSeparator() {
+	return <span className='mx-1.5 text-border'>·</span>;
 }

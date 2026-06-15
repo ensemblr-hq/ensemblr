@@ -85,6 +85,24 @@ Ensemble should not drop users into a workspace that cannot run the core workflo
 | Managed subdirectories | Yes | `repos/`, `workspaces/`, `archived-contexts/` exist. | Create directories or choose another root. |
 | Linear OAuth | Required for Linear workflows | Linear connection succeeds and teams/issues can be read. | Sign in to Linear, reconnect, or continue without Linear workflows. |
 
+## Remediation Action Mechanics
+
+Diagnostics renders as a single status strip (tone dot, overall state, pass/warning/blocked
+counts, and a retry action) above grouped check rows. Each failing check exposes its
+remediation steps as actionable buttons (icon + label); there are no inert text labels. The
+action kinds behave as:
+
+- **retry** — re-runs the setup checks.
+- **select-path** — opens a native file picker. The Pi-executable picker selects an
+  executable and retries immediately; the root-directory picker previews the change in a
+  confirmation dialog before applying.
+- **open-settings** — routes to the relevant settings screen, or opens `config.json` in the
+  user's editor for the declarative-config check.
+- **open-external** — opens a vetted docs URL in the default browser. The main process only
+  permits `http`/`https` and ignores anything else.
+- **run-command** — copies the suggested command to the clipboard and flashes a transient
+  confirmation; it never auto-runs the command.
+
 ## Failure and Remediation States
 
 ### Missing Git

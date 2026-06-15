@@ -1,9 +1,6 @@
 import { useState } from 'react';
 
-import {
-	isPiExecutablePickerAction,
-	isRootDirectoryPickerAction,
-} from '@/renderer/lib/setup-diagnostics';
+import { isRootDirectoryPickerAction } from '@/renderer/lib/setup-diagnostics';
 import type {
 	RootDirectoryChangeApplyResult,
 	RootDirectorySelectionResult,
@@ -79,12 +76,6 @@ export function useRootDirectoryChange({
 			}
 
 			setSelection(next);
-			return;
-		}
-
-		if (isPiExecutablePickerAction(action, check)) {
-			await window.ensemble?.selectPiExecutable();
-			onRetry?.();
 			return;
 		}
 
