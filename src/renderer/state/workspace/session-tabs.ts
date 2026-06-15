@@ -13,6 +13,7 @@ import {
 	subscribePiSessionEvents,
 	writeOpenedChatTabToCache,
 } from '@/renderer/api/ensemble-queries';
+import { forgetChatOverrides } from '@/renderer/state/preferences';
 import type {
 	SessionTabModel,
 	WorkspaceShellModel,
@@ -259,7 +260,12 @@ export function useSessionTabState({
 				workspaceId,
 			});
 		},
-		onSuccess: () => {
+		onSuccess: (result, chatTabId) => {
+			// Drop per-chat overrides only for hard-deleted tabs; tabs marked
+			// closed remain restorable and must keep their model/thinking picks.
+			if (result.deleted) {
+				forgetChatOverrides(chatTabId);
+			}
 			void queryClient.invalidateQueries({
 				queryKey: ensembleQueryKeys.chatTabs(workspaceId),
 			});

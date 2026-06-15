@@ -41,6 +41,7 @@ export {
 	desktopNotificationsAtom,
 	favouriteModelsAtom,
 	followUpBehaviorAtom,
+	forgetChatOverrides,
 	inAppBrowserPreviewAtom,
 	markdownStyleAtom,
 	monoFontAtom,

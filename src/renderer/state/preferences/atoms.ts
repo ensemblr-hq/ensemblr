@@ -138,6 +138,27 @@ export const chatThinkingOverrideAtomFamily = atomFamily((chatTabId: string) =>
 	atomWithStorage<string | null>(KEY(`chat_thinking_${chatTabId}`), null),
 );
 
+/**
+ * Drops a chat's per-chat override atoms and their backing localStorage keys.
+ * Call only when a chat tab is permanently deleted — closed tabs are restorable
+ * and must keep their overrides. `atomFamily.remove` evicts just the in-memory
+ * atom; `atomWithStorage` leaves the stored key behind, so the keys are removed
+ * explicitly to keep storage bounded across the install's lifetime.
+ */
+export function forgetChatOverrides(chatTabId: string): void {
+	chatModelOverrideAtomFamily.remove(chatTabId);
+	chatThinkingOverrideAtomFamily.remove(chatTabId);
+	const storage =
+		typeof globalThis.localStorage === 'undefined'
+			? null
+			: globalThis.localStorage;
+	if (!storage) {
+		return;
+	}
+	storage.removeItem(KEY(`chat_model_${chatTabId}`));
+	storage.removeItem(KEY(`chat_thinking_${chatTabId}`));
+}
+
 // ─── Models (user defaults) ───────────────────────────────────────────────────
 
 /** Default model id for new chats (resolved against Pi readiness at use-site). */

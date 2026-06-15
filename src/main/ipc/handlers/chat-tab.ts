@@ -1,7 +1,14 @@
 import { ipcMain } from 'electron';
-
-import { type BindPiSessionToTabResult, type ChatTabWire, type CloseChatTabResult, type ListChatTabsResult, type ListClosedChatTabsWithSummaryResult, type OpenChatTabResult, type RestoreChatTabResult } from '../../../shared/ipc/contracts/chat-tab';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
+import type {
+	BindPiSessionToTabResult,
+	ChatTabWire,
+	CloseChatTabResult,
+	ListChatTabsResult,
+	ListClosedChatTabsWithSummaryResult,
+	OpenChatTabResult,
+	RestoreChatTabResult,
+} from '../../../shared/ipc/contracts/chat-tab';
 import type { ChatTabService } from '../../chat-tabs/chat-tab-service.ts';
 import type { ChatTabRow } from '../../storage/repositories/chat-tab-repository.ts';
 import {
@@ -51,8 +58,8 @@ export function registerChatTabHandlers({
 		IPC_CHANNELS.closeChatTab,
 		async (_event, raw: unknown): Promise<CloseChatTabResult> => {
 			const request = closeChatTabRequestSchema.parse(raw);
-			chatTabService.closeTab(request);
-			return { ok: true };
+			const { deleted } = chatTabService.closeTab(request);
+			return { deleted, ok: true };
 		},
 	);
 
