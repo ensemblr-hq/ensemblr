@@ -25,6 +25,10 @@ import {
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import { cn } from '@/renderer/lib/utils';
+import {
+	readLastUsedOpenTarget,
+	writeLastUsedOpenTarget,
+} from '@/renderer/state/workspace/open-target-history';
 import type {
 	WorkspaceOpenTarget,
 	WorkspaceShellModel,
@@ -43,6 +47,16 @@ export function OpenWorkspaceMenu({
 		...workspaceOpenTargetsQuery,
 		enabled: hasBridge,
 	});
+	// Per-workspace memory of the last launch-app target the user picked, so
+	// the split button defaults to it on the next visit. Reads localStorage
+	// lazily on mount, re-syncs when the workspace changes, and updates
+	// in-place after each successful launch.
+	const [lastUsedTargetId, setLastUsedTargetId] = useState<string | null>(() =>
+		readLastUsedOpenTarget(workspace.id),
+	);
+	useEffect(() => {
+		setLastUsedTargetId(readLastUsedOpenTarget(workspace.id));
+	}, [workspace.id]);
 
 	const openTargets = useMemo<WorkspaceOpenTarget[] | null>(() => {
 		// Only render the menu once the real list (seeded from the preload
@@ -61,13 +75,25 @@ export function OpenWorkspaceMenu({
 		if (!openTargets) {
 			return null;
 		}
+		// Only launch-app targets are eligible for "quick launch" memory —
+		// copy-path and reveal-in-finder are utilities the user wouldn't expect
+		// to take over the split button.
+		const lastUsed =
+			lastUsedTargetId === null
+				? null
+				: (openTargets.find(
+						(target) =>
+							target.id === lastUsedTargetId &&
+							target.behavior === 'launch-app',
+					) ?? null);
 		return (
+			lastUsed ??
 			openTargets.find((target) => target.isPrimary) ??
 			openTargets.find((target) => target.kind !== 'utility') ??
 			openTargets[0] ??
 			null
 		);
-	}, [openTargets]);
+	}, [lastUsedTargetId, openTargets]);
 
 	const invokeTarget = useCallback(
 		async (target: WorkspaceOpenTarget) => {
@@ -83,6 +109,10 @@ export function OpenWorkspaceMenu({
 			if (!result.ok) {
 				toast.error(`Failed to open in ${target.label}: ${result.error}`);
 				return;
+			}
+			if (target.behavior === 'launch-app') {
+				writeLastUsedOpenTarget(workspace.id, target.id);
+				setLastUsedTargetId(target.id);
 			}
 			if (target.behavior === 'copy-path') {
 				toast.success('Workspace path copied to clipboard.');
