@@ -35,6 +35,16 @@ Sources inspected (pi `0.79.1`, installed at
   (`{type,level}`) commands, which the adapter writes ahead of the next
   `prompt` only when the selection differs from what the runtime is already on
   (`src/main/pi-agent/cli-rpc-pi-agent-adapter.ts`).
+- **Ephemeral utility sessions (Ensemble).** Chat-title and session-summary
+  generation spawn their own short-lived RPC sessions; each is launched with
+  `--model` set to the chat's current model (`pi_sessions.model`) so they run on
+  the same provider as the conversation rather than Pi's default
+  (`pi-chat-title-service.ts`, `session-summary-writer.ts`).
+- **Catalog caching (renderer).** `pi --list-models` output is cached in
+  `localStorage` and used as React Query `initialData`, so the model picker is
+  populated instantly on launch and refreshed silently in the background; an
+  empty result never overwrites the last-known-good catalog
+  (`src/renderer/api/ensemble/pi-models-cache.ts`).
 
 ## Framing
 
