@@ -58,7 +58,12 @@ export const ConversationContent = ({
 			data-slot='conversation-scroll-area'
 		>
 			<ScrollAreaPrimitive.Viewport
-				className='size-full rounded-[inherit] outline-none transition-[color,box-shadow] focus-visible:outline-1 focus-visible:ring-3 focus-visible:ring-ring/50'
+				// Radix wraps children in a `display:table; min-width:100%` div that
+				// grows to the widest child's intrinsic width — long unbroken content
+				// (e.g. the reasoning preview) then pushes the whole timeline past the
+				// right edge. Force that wrapper to a block so its width tracks the
+				// viewport and `%`/`max-w` children resolve against the visible area.
+				className='[&>div]:block! size-full rounded-[inherit] outline-none transition-[color,box-shadow] focus-visible:outline-1 focus-visible:ring-3 focus-visible:ring-ring/50 [&>div]:min-w-0!'
 				data-slot='conversation-scroll-area-viewport'
 				ref={context.scrollRef}
 				style={{
