@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -299,4 +299,171 @@ test('rejects invalid, reserved, and secret-classified plain writes', async (t) 
 			error instanceof EnvironmentVariablesError &&
 			error.code === 'secret-value-required',
 	);
+});
+
+test('setValue auto-routes secret-classified and plain keys', async (t) => {
+	const database = createDatabaseFixture(t);
+	const secretStore = createMockSecretStore({
+		idFactory: () => 'secret-route-1',
+		now: () => NOW,
+	});
+	const service = createService({ database, secretStore });
+
+	const secret = await service.setValue({
+		key: 'ANTHROPIC_API_KEY',
+		value: 'sk-secret-route',
+	});
+	const plain = await service.setValue({ key: 'DEBUG', value: 'ensemble:*' });
+
+	assert.equal(secret.status, 'masked');
+	assert.equal(secret.valueKind, 'secret');
+	assert.equal(plain.status, 'set');
+	assert.equal(plain.valueKind, 'plain');
+});
+
+test('readValue returns plain and secret stored values', async (t) => {
+	const database = createDatabaseFixture(t);
+	const secretStore = createMockSecretStore({
+		idFactory: () => 'secret-read-1',
+		now: () => NOW,
+	});
+	const service = createService({ database, secretStore });
+
+	await service.setValue({ key: 'DEBUG', value: 'ensemble:read' });
+	await service.setValue({ key: 'OPENAI_API_KEY', value: 'sk-read-secret' });
+
+	assert.equal(await service.readValue({ key: 'DEBUG' }), 'ensemble:read');
+	assert.equal(
+		await service.readValue({ key: 'OPENAI_API_KEY' }),
+		'sk-read-secret',
+	);
+	assert.equal(await service.readValue({ key: 'UNSET_VARIABLE' }), null);
+});
+
+test('env files round-trip and seed assembled environment below explicit vars', async (t) => {
+	const database = createDatabaseFixture(t);
+	const service = createService({ database });
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-envfile-'));
+	const envFilePath = path.join(directory, '.env');
+
+	writeFileSync(
+		envFilePath,
+		[
+			'# comment',
+			'export FROM_FILE=file-value',
+			'DEBUG=file-debug',
+			'ENSEMBLE_PORT=9999',
+		].join('\n'),
+		'utf8',
+	);
+
+	t.after(() => {
+		rmSync(directory, { force: true, recursive: true });
+	});
+
+	const afterAdd = await service.addEnvFile({ path: envFilePath });
+	assert.deepEqual(afterAdd, [envFilePath]);
+	assert.deepEqual(await service.listEnvFiles(), [envFilePath]);
+
+	// Explicit var wins over the file value; reserved keys are never sourced.
+	await service.setValue({ key: 'DEBUG', value: 'explicit-debug' });
+	const assembly = await service.assembleEnvironment();
+
+	assert.equal(assembly.env.FROM_FILE, 'file-value');
+	assert.equal(assembly.env.DEBUG, 'explicit-debug');
+	assert.equal(assembly.env.ENSEMBLE_PORT, undefined);
+
+	const afterRemove = await service.removeEnvFile({ path: envFilePath });
+	assert.deepEqual(afterRemove, []);
+	assert.equal((await service.assembleEnvironment()).env.FROM_FILE, undefined);
+});
+
+test('addEnvFile rejects a path that does not exist', async (t) => {
+	const database = createDatabaseFixture(t);
+	const service = createService({ database });
+	const missingPath = path.join(tmpdir(), 'ensemble-missing-env-file.env');
+
+	await assert.rejects(
+		() => service.addEnvFile({ path: missingPath }),
+		(error: unknown) =>
+			error instanceof EnvironmentVariablesError &&
+			error.code === 'env-file-not-found',
+	);
+});
+
+test('assembleEnvironment warns when a configured env file disappears', async (t) => {
+	const database = createDatabaseFixture(t);
+	const service = createService({ database });
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-envfile-gone-'));
+	const envFilePath = path.join(directory, '.env');
+
+	writeFileSync(envFilePath, 'A=1\n', 'utf8');
+
+	t.after(() => {
+		rmSync(directory, { force: true, recursive: true });
+	});
+
+	await service.addEnvFile({ path: envFilePath });
+	// The file is removed after it was registered.
+	rmSync(envFilePath, { force: true });
+	const assembly = await service.assembleEnvironment();
+
+	assert.equal(
+		assembly.diagnostics.some(
+			(diagnostic) => diagnostic.code === 'env-file-unreadable',
+		),
+		true,
+	);
+});
+
+test('assembleEnvironment redacts secret-shaped env-file values', async (t) => {
+	const database = createDatabaseFixture(t);
+	const service = createService({ database });
+	const directory = mkdtempSync(
+		path.join(tmpdir(), 'ensemble-envfile-secret-'),
+	);
+	const envFilePath = path.join(directory, '.env');
+
+	writeFileSync(
+		envFilePath,
+		['OPENAI_API_KEY=sk-from-file', 'PLAIN_VAR=plain-value'].join('\n'),
+		'utf8',
+	);
+
+	t.after(() => {
+		rmSync(directory, { force: true, recursive: true });
+	});
+
+	await service.addEnvFile({ path: envFilePath });
+	const assembly = await service.assembleEnvironment();
+
+	assert.equal(assembly.env.OPENAI_API_KEY, 'sk-from-file');
+	assert.equal(assembly.redactValues.includes('sk-from-file'), true);
+	assert.equal(assembly.redactValues.includes('plain-value'), false);
+});
+
+test('getSnapshot counts an env-file value as satisfying a required key', async (t) => {
+	const database = createDatabaseFixture(t);
+	const service = createService({ database });
+	const directory = mkdtempSync(
+		path.join(tmpdir(), 'ensemble-envfile-required-'),
+	);
+	const envFilePath = path.join(directory, '.env');
+
+	writeFileSync(envFilePath, 'REQUIRED_FROM_FILE=present\n', 'utf8');
+
+	t.after(() => {
+		rmSync(directory, { force: true, recursive: true });
+	});
+
+	const before = await service.getSnapshot({
+		requiredKeys: ['REQUIRED_FROM_FILE'],
+	});
+	assert.equal(before.missingRequiredCount, 1);
+
+	await service.addEnvFile({ path: envFilePath });
+	const after = await service.getSnapshot({
+		requiredKeys: ['REQUIRED_FROM_FILE'],
+	});
+	assert.equal(after.missingRequiredCount, 0);
 });

@@ -59,23 +59,28 @@ Removed (Pi has no out-of-the-box support — verified against pi 0.79.1 docs an
 
 ### Providers
 
-| Setting | Conductor mapping | Ensemble adaptation | Storage |
-| --- | --- | --- | --- |
-| Provider readiness | Direct concept. | Pi executable/RPC/provider/model readiness. | SQLite cache; Pi environment source of truth. |
-| Auth method | Direct concept. | Pi auth mechanism; likely inherited from Pi environment. | Pi environment; Ensemble metadata in SQLite. |
-| Provider metadata | Direct concept. | Show account/provider readiness without exposing sensitive details. | SQLite cache only. |
-| Provider settings file | Direct concept. | Open Pi agent/settings resources where appropriate. | Pi environment. |
-| Login/remediation command | Direct concept. | Pi-specific auth/remediation command or instructions. | Built-in docs/action log. |
+**Removed.** The standalone Providers screen (route, sidebar entry, and command-palette
+entry) was deleted. Provider/auth setup is owned by Pi itself — Ensemble does not store
+provider tokens or duplicate Pi's provider configuration. The readiness checks that screen
+surfaced (Pi runtime, Pi model provider, GitHub CLI) still live in **Diagnostics**, sourced
+from the setup-diagnostics gate.
 
 ### Environment
 
+**Status: implemented** — fully editable CRUD on a per-scope environment store, wired end to
+end (renderer → IPC → `EnvironmentVariablesService` → SQLite/Keychain) and injected into Pi
+sessions, scripts, and terminals at session launch via `assembleEnvironment` (app →
+repository → workspace precedence). The earlier "read-only / manage via Keychain or shell
+profile" copy was a hallucination and has been replaced.
+
 | Setting | Conductor mapping | Ensemble adaptation | Storage |
 | --- | --- | --- | --- |
-| Global env variable catalog | Direct. | Pi-relevant documented variables plus generic script/tool variables. | Built-in catalog; user values separate. |
-| Non-secret variable values | Direct. | Passed to Pi sessions, scripts, and terminals. | SQLite; optional config defaults. |
-| Secret variable values | Direct. | Hidden/masked, passed only to processes that need them. | macOS Keychain; SQLite metadata. |
-| Set/unset status | Direct. | Same. | SQLite metadata/cache. |
-| Per-variable add/edit action | Direct. | Same. | SQLite/protected store. |
+| Documented variable catalog | Direct. | Pi-relevant documented variables only (`PI_CODING_AGENT_DIR`, `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`, the 8 provider API keys, `DEBUG`, `CI`). No Claude Code/Codex/Cursor catalog entries. Shown in a collapsible "Show documented variables (N)" list with a `+` to set each. | Built-in catalog; user values separate. |
+| Non-secret variable values | Direct. | Passed to Pi sessions, scripts, and terminals. | SQLite (`settings` table, `environment.variables.*`); optional `config.json` defaults. |
+| Secret variable values | Direct. | Auto-classified: a known secret catalog key or sensitive-named key routes to the secret store; everything else is plain. Masked in the list; the eye toggle reveals the real value on demand (plain from SQLite, secret read back from Keychain). | macOS Keychain; SQLite metadata. |
+| Set/unset status | Direct. | Configured variables (`set`/`masked`) render as editable rows; reserved runtime vars (`ENSEMBLE_*`/`CONDUCTOR_*`) are excluded. | SQLite metadata/cache. |
+| Add / edit / delete variable | Direct. | Right slide-over (Name + Value). Custom adds and edits require a value; documented adds may set an empty string. Name is locked when the key is preset (documented add or edit). | SQLite / secret store. |
+| Env files | Direct (Conductor "Env files"). | Load `KEY=value` files from disk at session launch (lowest precedence within a scope, so explicit vars win; reserved keys skipped). Native file picker. **User (app) scope only for now**; storage is per-scope so repository scope is a later no-op. | Ordered path list in SQLite (`settings` table, `environment.files`); file contents read at assembly time. |
 
 ### Appearance
 

@@ -82,6 +82,7 @@ function subscribe<E>(
  */
 export function createEnsembleApi(): EnsembleApi {
 	return {
+		addEnvFile: (request) => invoke('addEnvFile', request),
 		applyRepositoryConfigMigration: (request) =>
 			invoke('applyRepositoryConfigMigration', request),
 		archiveRepository: (request) => invoke('archiveRepository', request),
@@ -136,6 +137,7 @@ export function createEnsembleApi(): EnsembleApi {
 		listPiModels: () => invoke('listPiModels'),
 		listPiSessionEvents: (request) => invoke('listPiSessionEvents', request),
 		listPiSessions: (request) => invoke('listPiSessions', request),
+		listEnvFiles: (request) => invoke('listEnvFiles', request),
 		listPiSlashCommands: (request) => invoke('listPiSlashCommands', request),
 		listTurnCheckpoints: (request) => invoke('listTurnCheckpoints', request),
 		listTerminalSessions: (request) => invoke('listTerminalSessions', request),
@@ -176,9 +178,12 @@ export function createEnsembleApi(): EnsembleApi {
 			invoke('previewRepositoryConfigMigration', request),
 		pushWorkspaceBranch: (request) => invoke('pushWorkspaceBranch', request),
 		quickStartProject: (request) => invoke('quickStartProject', request),
+		readEnvironmentVariableValue: (request) =>
+			invoke('readEnvironmentVariableValue', request),
 		readWorkspaceFile: (request) => invoke('readWorkspaceFile', request),
 		registerLocalRepository: (request) =>
 			invoke('registerLocalRepository', request),
+		removeEnvFile: (request) => invoke('removeEnvFile', request),
 		renameWorkspace: (request) => invoke('renameWorkspace', request),
 		repositoryConfig: (request) => invoke('repositoryConfig', request),
 		repositoryWorkspaceNavigation: () =>
@@ -193,9 +198,12 @@ export function createEnsembleApi(): EnsembleApi {
 		saveReviewComment: (request) => invoke('saveReviewComment', request),
 		saveReviewTodo: (request) => invoke('saveReviewTodo', request),
 		selectCloneDestination: () => invoke('selectCloneDestination'),
+		selectEnvFile: () => invoke('selectEnvFile'),
 		selectLocalRepository: () => invoke('selectLocalRepository'),
 		selectPiExecutable: () => invoke('selectPiExecutable'),
 		selectRootDirectory: () => invoke('selectRootDirectory'),
+		setEnvironmentVariable: (request) =>
+			invoke('setEnvironmentVariable', request),
 		setupDiagnostics: () => invoke('setupDiagnostics'),
 		sharedRootAdoption: () => invoke('sharedRootAdoption'),
 		startCloneGithubRepository: (request) =>
@@ -205,6 +213,8 @@ export function createEnsembleApi(): EnsembleApi {
 		submitPiPrompt: (request) => invoke('submitPiPrompt', request),
 		terminalSnapshot: (request) => invoke('terminalSnapshot', request),
 		unarchiveWorkspace: (request) => invoke('unarchiveWorkspace', request),
+		unsetEnvironmentVariable: (request) =>
+			invoke('unsetEnvironmentVariable', request),
 		updateAppSettings: (patch) => invoke('updateAppSettings', patch),
 		writeForkSummary: (request) => invoke('writeForkSummary', request),
 		writeTerminalSession: (request) => invoke('writeTerminalSession', request),

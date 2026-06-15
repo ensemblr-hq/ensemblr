@@ -107,12 +107,6 @@ export function CommandPalette() {
 			run: go(() => navigate({ to: '/settings/models' })),
 		},
 		{
-			id: 'settings.providers',
-			label: 'Settings · Providers',
-			icon: PuzzleIcon,
-			run: go(() => navigate({ to: '/settings/providers' })),
-		},
-		{
 			id: 'settings.environment',
 			label: 'Settings · Environment',
 			icon: KeyboardIcon,
