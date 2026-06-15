@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from 'bun:test';
 
-import { buildModelGroups } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/model-picker';
+import { buildModelGroups } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/model-picker-groups';
 import type { ComposerModelOption } from '../../src/renderer/types/workbench';
 
 function model(id: string, provider: string): ComposerModelOption {
