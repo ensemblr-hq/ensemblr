@@ -26,14 +26,3 @@ export function isRootDirectoryPickerAction(
 		(action.target === 'rootDirectory' || action.id === 'choose-root-directory')
 	);
 }
-
-/** Returns true when a remediation action should render as an inline button. */
-export function isRemediationActionButton(
-	action: SetupRemediationAction,
-	check: SetupCheckSnapshot,
-): boolean {
-	return (
-		isPiExecutablePickerAction(action, check) ||
-		isRootDirectoryPickerAction(action, check)
-	);
-}

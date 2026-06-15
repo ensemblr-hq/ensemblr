@@ -21,6 +21,22 @@ const dotClasses: Record<StatusTone, string> = {
 	warning: 'bg-status-warning',
 };
 
+/** Bare colored status dot. Shared by {@link StatusBadge} and status strips. */
+export function StatusDot({
+	className,
+	tone = 'muted',
+}: {
+	className?: string;
+	tone?: StatusTone;
+}) {
+	return (
+		<span
+			aria-hidden='true'
+			className={cn('size-1.5 rounded-full', dotClasses[tone], className)}
+		/>
+	);
+}
+
 /** Compact pill-shaped status indicator with a colored leading dot. */
 export function StatusBadge({
 	children,
@@ -40,10 +56,7 @@ export function StatusBadge({
 			)}
 			variant='outline'
 		>
-			<span
-				aria-hidden='true'
-				className={cn('size-1.5 rounded-full', dotClasses[tone])}
-			/>
+			<StatusDot tone={tone} />
 			{children}
 		</Badge>
 	);

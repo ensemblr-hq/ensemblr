@@ -265,6 +265,7 @@ export interface IpcHandlerMap {
 		DeleteWorkspaceResult
 	>;
 	[IPC_CHANNELS.ensureWindowWidth]: IpcHandlerEntry<number, void>;
+	[IPC_CHANNELS.openExternal]: IpcHandlerEntry<string, void>;
 	[IPC_CHANNELS.environmentVariables]: IpcHandlerEntry<
 		void,
 		EnvironmentVariablesSnapshot
