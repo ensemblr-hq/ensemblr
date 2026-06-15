@@ -1,33 +1,36 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useRouter } from '@tanstack/react-router';
-import { useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { FolderIcon, FolderPlusIcon, GlobeIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
-import { toast } from 'sonner';
+import { useCallback } from 'react';
 
 import {
 	githubRepositoryListQuery,
 	isEnsembleApiAvailable,
-	registerLocalRepository,
-	selectLocalRepository,
 } from '@/renderer/api/ensemble-queries';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
-import { seedFirstWorkspace } from '@/renderer/lib/workbench/seed-first-workspace';
+import { openLocalProjectFlow } from '@/renderer/lib/workbench/open-local-project-flow';
 import {
 	cloneDialogOpenAtom,
+	localProjectImportDialogOpenAtom,
 	quickStartDialogOpenAtom,
 } from '@/renderer/state/dialogs';
+import { lastWorkspaceSelectionAtom } from '@/renderer/state/workspace';
 
 import { WelcomeActionCard } from './welcome/welcome-action-card';
 import { WelcomeWordmark } from './welcome/welcome-wordmark';
 
 /** Default landing view shown when no project/workspace is selected. */
 export function Welcome() {
-	const [isOpeningProject, setIsOpeningProject] = useState(false);
 	const navigate = useNavigate();
 	const router = useRouter();
 	const setCloneOpen = useSetAtom(cloneDialogOpenAtom);
+	const localProjectImportOpen = useAtomValue(localProjectImportDialogOpenAtom);
+	const setLocalProjectImportOpen = useSetAtom(
+		localProjectImportDialogOpenAtom,
+	);
 	const setQuickStartOpen = useSetAtom(quickStartDialogOpenAtom);
+	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
 	// Warm the GitHub repo-list cache so CloneGithubDialog opens with
 	// a populated list instead of an empty spinner. Result is intentionally
 	// discarded; the dialog reads from the React Query cache.
@@ -36,65 +39,14 @@ export function Welcome() {
 		enabled: isEnsembleApiAvailable(),
 	});
 
-	const onOpenLocalProject = useCallback(async () => {
-		if (!isEnsembleApiAvailable()) {
-			toast.error('Preload bridge is unavailable in this context.');
-			return;
-		}
-
-		setIsOpeningProject(true);
-
-		try {
-			const selection = await selectLocalRepository();
-
-			if (selection.canceled) {
-				return;
-			}
-
-			if (selection.error) {
-				toast.error(selection.error);
-				return;
-			}
-
-			if (!selection.path) {
-				return;
-			}
-
-			const result = await registerLocalRepository({ path: selection.path });
-
-			if (!result.registered || !result.repository) {
-				const reason =
-					result.diagnostics.find(
-						(diagnostic) => diagnostic.severity === 'error',
-					)?.message ?? 'The repository could not be registered.';
-				toast.error(reason);
-				return;
-			}
-
-			const repository = result.repository;
-			const seed = await seedFirstWorkspace({
-				navigate,
-				repositoryId: repository.id,
-				router,
-			});
-			if (seed.status === 'success') {
-				toast.success(`Opened ${repository.name}.`);
-			} else {
-				toast.error(
-					seed.error ??
-						`Registered ${repository.name} but couldn't open a workspace.`,
-				);
-			}
-		} catch (error) {
-			toast.error(
-				error instanceof Error
-					? error.message
-					: 'The repository could not be registered.',
-			);
-		} finally {
-			setIsOpeningProject(false);
-		}
-	}, [navigate, router]);
+	const onOpenLocalProject = useCallback(() => {
+		void openLocalProjectFlow({
+			navigate,
+			router,
+			setLastWorkspaceSelection,
+			setLocalProjectImportOpen,
+		});
+	}, [navigate, router, setLastWorkspaceSelection, setLocalProjectImportOpen]);
 
 	return (
 		<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
@@ -103,7 +55,7 @@ export function Welcome() {
 					<WelcomeWordmark className='blur-[0.0625rem]' />
 					<div className='flex flex-wrap items-center justify-center gap-3'>
 						<WelcomeActionCard
-							disabled={isOpeningProject}
+							disabled={localProjectImportOpen}
 							icon={FolderIcon}
 							label='Open project'
 							onClick={onOpenLocalProject}

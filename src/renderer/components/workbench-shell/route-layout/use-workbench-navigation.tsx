@@ -1,21 +1,16 @@
-import { type QueryClient, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate, useRouter } from '@tanstack/react-router';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { type ReactElement, useCallback, useMemo } from 'react';
 
-import {
-	ensembleQueryKeys,
-	isEnsembleApiAvailable,
-	registerLocalRepository,
-	selectLocalRepository,
-} from '@/renderer/api/ensemble-queries';
 import {
 	buildAddProjectMenuModel,
 	findWorkspaceNavigationSelection,
 	getWorkbenchStaticRoute,
 } from '@/renderer/lib/workbench';
+import { openLocalProjectFlow } from '@/renderer/lib/workbench/open-local-project-flow';
 import {
 	cloneDialogOpenAtom,
+	localProjectImportDialogOpenAtom,
 	quickStartDialogOpenAtom,
 } from '@/renderer/state/dialogs';
 import { recentProjectsAtom } from '@/renderer/state/recents';
@@ -26,6 +21,7 @@ import {
 	getPreferredChatId,
 	getPreferredDockTab,
 	getPreferredReviewTab,
+	lastWorkspaceSelectionAtom,
 } from '@/renderer/state/workspace';
 import type { NavigationContextValue } from '@/renderer/types/contexts';
 import type {
@@ -54,8 +50,7 @@ export interface WorkbenchNavigationResult {
 
 /**
  * Owns the workbench navigation callbacks (static + workspace routing), the
- * add-project menu wiring, and the open-local-repository IPC flow with
- * navigation-cache invalidation.
+ * add-project menu wiring, and the local-project import flow.
  */
 export function useWorkbenchNavigation({
 	displayProjects,
@@ -65,7 +60,11 @@ export function useWorkbenchNavigation({
 	setupSnapshot: SetupDiagnosticsSnapshot | null;
 }): WorkbenchNavigationResult {
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
+	const router = useRouter();
+	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
+	const setLocalProjectImportOpen = useSetAtom(
+		localProjectImportDialogOpenAtom,
+	);
 	const recentProjects = useAtomValue(recentProjectsAtom);
 	const reviewTabsByWorkspace = useAtomValue(activeReviewTabByWorkspaceAtom);
 	const dockTabsByWorkspace = useAtomValue(activeDockTabByWorkspaceAtom);
@@ -145,14 +144,26 @@ export function useWorkbenchNavigation({
 				return;
 			}
 			if (id === 'open-local') {
-				void openLocalRepositoryFlow({ queryClient });
+				void openLocalProjectFlow({
+					navigate,
+					router,
+					setLastWorkspaceSelection,
+					setLocalProjectImportOpen,
+				});
 				return;
 			}
 			if (id === 'quick-start') {
 				setQuickStartDialogOpen(true);
 			}
 		},
-		[queryClient, setCloneDialogOpen, setQuickStartDialogOpen],
+		[
+			navigate,
+			router,
+			setCloneDialogOpen,
+			setLastWorkspaceSelection,
+			setLocalProjectImportOpen,
+			setQuickStartDialogOpen,
+		],
 	);
 
 	const navigation: NavigationContextValue = {
@@ -215,30 +226,4 @@ function renderStaticWorkbenchNavigationLink(
 			{children}
 		</Link>
 	);
-}
-
-/**
- * Drives the "Open local project" sidebar action through the native picker and
- * the repository-registration IPC, then refreshes the navigation snapshot so
- * the new repo appears in the sidebar.
- */
-async function openLocalRepositoryFlow({
-	queryClient,
-}: {
-	queryClient: QueryClient;
-}): Promise<void> {
-	if (!isEnsembleApiAvailable()) {
-		return;
-	}
-	const selection = await selectLocalRepository();
-	if (selection.canceled || !selection.path) {
-		return;
-	}
-	const result = await registerLocalRepository({ path: selection.path });
-	if (!result.registered) {
-		return;
-	}
-	await queryClient.invalidateQueries({
-		queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
-	});
 }

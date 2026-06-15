@@ -31,7 +31,7 @@
 		"test:pi-timeline": "bun test tests/renderer/pi-timeline-reducer.test.ts",
 		"test:terminal-tabs": "bun test tests/renderer/terminal-tabs.test.ts",
 		"test:renderer": "bun test tests/renderer/*.test.tsx",
-		"test:repository": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/register-repository.test.ts tests/main/clone-repository.test.ts tests/main/list-github-repositories.test.ts tests/main/quick-start-project.test.ts",
+		"test:repository": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/register-repository.test.ts tests/main/import-local-repository.test.ts tests/main/clone-repository.test.ts tests/main/list-github-repositories.test.ts tests/main/quick-start-project.test.ts",
 		"test:workspace": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/create-workspace.test.ts",
 		"test:workspace-git": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/workspace-git-status.test.ts",
 		"test:github": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/github-service.test.ts tests/main/review-comments.test.ts",

@@ -74,9 +74,11 @@ export async function loadShellWorkbenchRoute({
 export async function loadProjectWorkbenchRoute({
 	parentMatchPromise,
 	params,
+	queryClient,
 }: {
 	parentMatchPromise: Promise<WorkbenchParentRouteMatch>;
 	params: ProjectRouteParams;
+	queryClient: QueryClient;
 }): Promise<WorkbenchRouteLoaderData | undefined> {
 	const parentMatch = await parentMatchPromise;
 	const loaderData = parentMatch.loaderData;
@@ -85,19 +87,23 @@ export async function loadProjectWorkbenchRoute({
 		return undefined;
 	}
 
-	if (loaderData.projects.some((project) => project.id === params.projectId)) {
-		return loaderData;
+	const projects = resolveFreshProjectsForProject({
+		fallbackProjects: loaderData.projects,
+		queryClient,
+		routeProjectId: params.projectId,
+	});
+
+	if (projects.some((project) => project.id === params.projectId)) {
+		return withProjects(loaderData, projects);
 	}
 
-	const fallbackSelection = resolveFallbackWorkspaceSelection(
-		loaderData.projects,
-	);
+	const fallbackSelection = resolveFallbackWorkspaceSelection(projects);
 
 	if (fallbackSelection) {
 		throw redirectToWorkspaceSelection(fallbackSelection);
 	}
 
-	return loaderData;
+	return withProjects(loaderData, projects);
 }
 
 /**
@@ -172,6 +178,48 @@ export async function loadWorkspaceWorkbenchRoute({
 }
 
 /**
+ * Returns loader data with a fresh project list while preserving sibling shell
+ * datasets from the parent route.
+ */
+function withProjects(
+	loaderData: WorkbenchRouteLoaderData,
+	projects: ProjectShellModel[],
+): WorkbenchRouteLoaderData {
+	return projects === loaderData.projects
+		? loaderData
+		: {
+				...loaderData,
+				projects,
+			};
+}
+
+/**
+ * Returns the project list to resolve the URL project against. The project
+ * layout runs before the workspace loader, so it must also consult the fresh
+ * query cache after add-project flows; otherwise it redirects before the child
+ * workspace loader can see the newly-added project.
+ */
+function resolveFreshProjectsForProject({
+	fallbackProjects,
+	queryClient,
+	routeProjectId,
+}: {
+	fallbackProjects: ProjectShellModel[];
+	queryClient: QueryClient;
+	routeProjectId: string;
+}): ProjectShellModel[] {
+	if (fallbackProjects.some((project) => project.id === routeProjectId)) {
+		return fallbackProjects;
+	}
+
+	const freshProjects = readProjectsFromNavigationCache(queryClient);
+
+	return freshProjects?.some((project) => project.id === routeProjectId)
+		? freshProjects
+		: fallbackProjects;
+}
+
+/**
  * Returns the project list to resolve the URL workspace against. Prefers the
  * parent's cached projects, but re-derives from the live TanStack Query cache
  * when the requested workspace is missing — covers the post-create race where
@@ -199,20 +247,27 @@ function resolveFreshProjects({
 		return fallbackProjects;
 	}
 
-	const cached =
-		queryClient.getQueryData<RepositoryWorkspaceNavigationSnapshot>(
-			repositoryWorkspaceNavigationQuery.queryKey,
-		);
+	const freshProjects = readProjectsFromNavigationCache(queryClient);
 
-	if (!cached) {
+	if (!freshProjects) {
 		return fallbackProjects;
 	}
-
-	const freshProjects = mapRepositoriesToProjects(cached.repositories);
 
 	return hasWorkspaceInProjects(freshProjects, routeProjectId, routeWorkspaceId)
 		? freshProjects
 		: fallbackProjects;
+}
+
+/** Reads cached navigation rows as project shell models when available. */
+function readProjectsFromNavigationCache(
+	queryClient: QueryClient | undefined,
+): ProjectShellModel[] | null {
+	const cached =
+		queryClient?.getQueryData<RepositoryWorkspaceNavigationSnapshot>(
+			repositoryWorkspaceNavigationQuery.queryKey,
+		);
+
+	return cached ? mapRepositoriesToProjects(cached.repositories) : null;
 }
 
 /** True when the project list contains the (projectId, workspaceId) pair. */

@@ -3,8 +3,12 @@ import { loadProjectWorkbenchRoute } from '@/renderer/routing/workbench-route-lo
 
 export const Route = createFileRoute('/_workbench/_shell/projects/$projectId')({
 	component: ProjectLayoutRoute,
-	loader: ({ params, parentMatchPromise }) =>
-		loadProjectWorkbenchRoute({ parentMatchPromise, params }),
+	loader: ({ context, params, parentMatchPromise }) =>
+		loadProjectWorkbenchRoute({
+			parentMatchPromise,
+			params,
+			queryClient: context.queryClient,
+		}),
 });
 
 /** Layout route under `/projects/$projectId` — renders workspace descendants. */

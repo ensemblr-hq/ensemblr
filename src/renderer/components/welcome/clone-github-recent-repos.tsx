@@ -56,7 +56,7 @@ export function CloneGithubRecentRepos({
 									avatarUrl={repo.avatarUrl}
 									ownerLogin={repo.ownerLogin}
 								/>
-								<span className='flex min-w-0 flex-col leading-tight'>
+								<span className='flex min-w-0 flex-col text-left leading-tight'>
 									<span className='flex min-w-0 items-center gap-1.5 truncate text-foreground text-xs'>
 										<span className='truncate'>{repo.fullName}</span>
 										{repo.isPrivate ? (

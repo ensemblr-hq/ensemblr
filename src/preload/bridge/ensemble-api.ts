@@ -1,10 +1,15 @@
 import { type IpcRendererEvent, ipcRenderer } from 'electron';
-
-import { type CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
-import { type EnsembleApi } from '../../shared/ipc/contracts/api';
 import { IPC_CHANNELS } from '../../shared/ipc/channels';
-import { type PiRawFrameBroadcast, type PiSessionEventBroadcast } from '../../shared/ipc/contracts/pi-session';
-import { type TerminalLifecycleBroadcast, type TerminalOutputBroadcast } from '../../shared/ipc/contracts/terminal';
+import type { EnsembleApi } from '../../shared/ipc/contracts/api';
+import type { CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
+import type {
+	PiRawFrameBroadcast,
+	PiSessionEventBroadcast,
+} from '../../shared/ipc/contracts/pi-session';
+import type {
+	TerminalLifecycleBroadcast,
+	TerminalOutputBroadcast,
+} from '../../shared/ipc/contracts/terminal';
 
 /**
  * Keys of {@link EnsembleApi} that represent typed `ipcRenderer.invoke`
@@ -107,6 +112,8 @@ export function createEnsembleApi(): EnsembleApi {
 			invoke('getWorkspaceGitStatus', request),
 		githubRepositoryList: () => invoke('githubRepositoryList'),
 		health: () => invoke('health'),
+		importLocalRepository: (request) =>
+			invoke('importLocalRepository', request),
 		killTerminalSession: (request) => invoke('killTerminalSession', request),
 		linearCancelLogin: () => invoke('linearCancelLogin'),
 		linearConnectionStatus: () => invoke('linearConnectionStatus'),
