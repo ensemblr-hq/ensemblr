@@ -1,6 +1,12 @@
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import type { PiChatTabWire, PiSessionEventWire, PiSessionSnapshotWire, WriteForkSummaryRequest, WriteForkSummaryResult } from '../../shared/ipc/contracts/pi-session';
+import type {
+	PiChatTabWire,
+	PiSessionEventWire,
+	PiSessionSnapshotWire,
+	WriteForkSummaryRequest,
+	WriteForkSummaryResult,
+} from '../../shared/ipc/contracts/pi-session';
 import type { CheckpointCapturePort } from '../checkpoints/checkpoint-service.ts';
 import {
 	createCheckpointCapture,
@@ -244,6 +250,7 @@ export function createPiSessionService({
 					// `fork-` prefix keeps the file clear of the destination tab's
 					// own live summary (`<chatTabId>.md`).
 					fileBaseName: `fork-${request.fileBaseName}`,
+					model: row.model,
 					piSessionId: row.piSessionId,
 					purpose: 'fork',
 					workspaceCwd: targetCwd,

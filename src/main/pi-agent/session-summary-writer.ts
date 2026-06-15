@@ -18,6 +18,12 @@ export interface WriteSessionSummaryInput {
 	 * fork summaries so they never collide with the live per-tab summary file.
 	 */
 	fileBaseName?: string;
+	/**
+	 * Model the chat session is on, forwarded to the ephemeral summary session
+	 * so the summary runs on the same provider/model as the conversation — no
+	 * surprise fallback to Pi's default provider. `null` keeps the Pi default.
+	 */
+	model?: string | null;
 	piSessionId: string | null;
 	/**
 	 * Shapes the LLM prompt: `archive` (default) writes a closed-tab session
@@ -205,6 +211,7 @@ async function runWriteSummary({
 	if (piAgentClient && executable) {
 		const llm = await tryLlmSummary({
 			executable,
+			model: input.model ?? null,
 			piAgentClient,
 			purpose: input.purpose ?? 'archive',
 			timeoutMs,
@@ -369,6 +376,8 @@ function firstLine(text: string): string {
 
 interface TryLlmSummaryArgs {
 	executable: PiExecutableSnapshot;
+	/** Chat model to mirror; `null` falls back to the Pi default. */
+	model: string | null;
 	piAgentClient: PiAgentClient;
 	purpose: 'archive' | 'fork';
 	timeoutMs: number;
@@ -395,6 +404,7 @@ async function tryLlmSummary(
 		const session = await args.piAgentClient.createSession({
 			executable: args.executable,
 			label: 'ensemble-session-summary',
+			modelOverride: args.model,
 			workspaceCwd: args.workspaceCwd,
 		});
 

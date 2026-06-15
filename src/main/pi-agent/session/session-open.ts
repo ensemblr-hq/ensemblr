@@ -41,6 +41,7 @@ export interface QueueChatTitleInput {
 	eventSink: PiSessionEventSink | undefined;
 	executable: PiExecutableSnapshot;
 	initialPrompt: string | null;
+	model: string | null;
 	piAgentClient: PiAgentClient;
 	sessionId: string;
 	tabId: string;
@@ -277,6 +278,7 @@ export function createSessionOpener({
 			eventSink,
 			executable: request.executable,
 			initialPrompt: request.initialPrompt ?? null,
+			model: startedRow.model,
 			piAgentClient,
 			sessionId: session.id,
 			tabId: attachedTab.id,

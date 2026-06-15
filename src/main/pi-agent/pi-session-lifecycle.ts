@@ -70,6 +70,7 @@ export type QueueChatTitlePort = (input: {
 	eventSink: PiSessionEventSink | undefined;
 	executable: PiExecutableSnapshot;
 	initialPrompt: string | null;
+	model: string | null;
 	piAgentClient: PiAgentClient;
 	sessionId: string;
 	tabId: string;
