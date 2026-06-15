@@ -11,6 +11,7 @@ import {
 	ChatAssistantTurn,
 	type ChatAssistantTurnTiming,
 } from '@/renderer/components/chat-assistant-turn';
+import { ChatWorkingIndicator } from '@/renderer/components/chat-turn-timer';
 import { ChatUserPrompt } from '@/renderer/components/chat-user-prompt';
 import { CodeBlock } from '@/renderer/components/code-block';
 import {
@@ -159,6 +160,15 @@ export function PiSessionTimeline({
 		[persistedMessages, optimisticUnmatched],
 	);
 
+	// Show a live "Working…" indicator in the pre-first-token gap: the turn is
+	// streaming but no assistant turn exists yet (trailing message is the user
+	// prompt). Anchored at the submit time so it ticks continuously into the
+	// streaming turn's own timer once the first event lands.
+	const pendingStartMs =
+		isStreaming && messages.at(-1)?.role === 'user'
+			? resolveLiveTurnStartMs(messages, optimistic.prompts)
+			: null;
+
 	if (piSessionId && error) {
 		return (
 			<section
@@ -201,6 +211,15 @@ export function PiSessionTimeline({
 							onViewTurnDiff={openTurnDiff}
 						/>
 					))}
+					{pendingStartMs !== null ? (
+						<div
+							className='flex w-full flex-col gap-2.5 text-foreground'
+							data-role='assistant-turn'
+							data-pending='true'
+						>
+							<ChatWorkingIndicator startMs={pendingStartMs} />
+						</div>
+					) : null}
 				</ConversationContent>
 				<ConversationScrollButton />
 			</Conversation>
@@ -220,6 +239,39 @@ function optimisticToUIMessage(entry: OptimisticPrompt): UIMessage {
 		parts: [{ state: 'done', text: entry.prompt, type: 'text' }],
 		role: 'user',
 	};
+}
+
+/**
+ * Resolves the submit instant (ms) that anchors the live "Working…" indicator
+ * while a turn is in flight but before the first assistant event lands. Prefers
+ * the most recent optimistic prompt's `submittedAt` (available immediately on
+ * submit); falls back to the trailing persisted user message's `firstEventAt`.
+ * Returns null when no usable timestamp exists.
+ */
+export function resolveLiveTurnStartMs(
+	messages: readonly UIMessage[],
+	optimisticPrompts: readonly OptimisticPrompt[],
+): number | null {
+	const lastOptimistic = optimisticPrompts.at(-1);
+	if (lastOptimistic) {
+		const ms = Date.parse(lastOptimistic.submittedAt);
+		if (!Number.isNaN(ms)) {
+			return ms;
+		}
+	}
+	for (let index = messages.length - 1; index >= 0; index -= 1) {
+		const message = messages[index];
+		if (message?.role !== 'user') {
+			continue;
+		}
+		const metadata = turnMetadataOf(message);
+		if (metadata) {
+			const ms = Date.parse(metadata.firstEventAt);
+			return Number.isNaN(ms) ? null : ms;
+		}
+		break;
+	}
+	return null;
 }
 
 /**
