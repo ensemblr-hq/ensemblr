@@ -158,6 +158,16 @@ export const reviewThinkingLevelAtom = atomWithStorage<string | null>(
 	null,
 );
 
+/**
+ * Favourited model ids, pinned to the top of the model picker. App-wide and
+ * shared across every workspace/chat (single global storage key, no scoping).
+ * Order is the order models were starred.
+ */
+export const favouriteModelsAtom = atomWithStorage<string[]>(
+	KEY('favourite_models'),
+	[],
+);
+
 // ─── Git (user defaults) ──────────────────────────────────────────────────────
 
 export type BranchPrefixSource = 'github-username' | 'custom' | 'none';
