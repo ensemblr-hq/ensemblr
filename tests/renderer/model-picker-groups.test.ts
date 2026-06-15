@@ -49,4 +49,35 @@ describe('buildModelGroups', () => {
 		expect(groups.some((g) => g.providerLabel === 'Favourites')).toBe(false);
 		expect(groups.flatMap((g) => g.models)).toHaveLength(OPTIONS.length);
 	});
+
+	test('removes hidden ids from provider groups', () => {
+		const groups = buildModelGroups(OPTIONS, [], ['anthropic/haiku']);
+		const ids = groups.flatMap((g) => g.models.map((m) => m.id));
+		expect(ids).toEqual(['anthropic/sonnet', 'google/gemini']);
+	});
+
+	test('hidden wins over favourite', () => {
+		const groups = buildModelGroups(
+			OPTIONS,
+			['anthropic/haiku'],
+			['anthropic/haiku'],
+		);
+		const ids = groups.flatMap((g) => g.models.map((m) => m.id));
+		expect(ids).not.toContain('anthropic/haiku');
+		expect(groups.some((g) => g.providerLabel === 'Favourites')).toBe(false);
+	});
+
+	test('all models hidden yields no groups', () => {
+		const groups = buildModelGroups(
+			OPTIONS,
+			[],
+			OPTIONS.map((m) => m.id),
+		);
+		expect(groups).toHaveLength(0);
+	});
+
+	test('omitting hiddenIds preserves existing behavior', () => {
+		const groups = buildModelGroups(OPTIONS, ['google/gemini']);
+		expect(groups.flatMap((g) => g.models)).toHaveLength(OPTIONS.length);
+	});
 });

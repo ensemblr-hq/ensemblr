@@ -13,6 +13,8 @@ interface SettingRowProps {
 	htmlFor?: string;
 	/** When true, stack the control beneath the label/description instead of trailing it. */
 	stack?: boolean;
+	/** When true, mark the row with a left accent bar (value differs from default). */
+	modified?: boolean;
 	/** Extra content rendered below the description (full-width). */
 	children?: ReactNode;
 	className?: string;
@@ -26,6 +28,7 @@ export function SettingRow({
 	description,
 	htmlFor,
 	label,
+	modified = false,
 	stack = false,
 }: SettingRowProps) {
 	const LabelTag = htmlFor ? 'label' : 'div';
@@ -33,13 +36,19 @@ export function SettingRow({
 	return (
 		<div
 			className={cn(
-				'flex flex-col gap-3 py-4',
+				'relative flex flex-col gap-3 py-4',
 				stack
 					? 'items-stretch'
 					: 'sm:flex-row sm:items-start sm:justify-between sm:gap-6',
 				className,
 			)}
 		>
+			{modified ? (
+				<span
+					aria-hidden='true'
+					className='absolute top-4 bottom-4 -left-4 w-0.5 rounded-full bg-accent-strong'
+				/>
+			) : null}
 			<div className='min-w-0 flex-1 space-y-1'>
 				<LabelTag
 					className='block font-medium text-foreground text-sm'

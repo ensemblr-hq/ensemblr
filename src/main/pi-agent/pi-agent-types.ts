@@ -122,6 +122,12 @@ export interface PiAgentSubmitRequest {
 	 */
 	thinkingLevel?: string;
 	prompt: string;
+	/**
+	 * Mid-turn delivery mode. When set, the adapter emits a `steer` or
+	 * `follow_up` RPC frame instead of a plain `prompt` (which Pi rejects while
+	 * streaming) and skips per-turn model/thinking changes.
+	 */
+	streamingBehavior?: 'steer' | 'followUp';
 }
 
 /** Acknowledgement returned synchronously after a successful submit. */

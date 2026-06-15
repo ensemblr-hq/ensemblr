@@ -1,3 +1,4 @@
+import { useAtomValue } from 'jotai';
 import {
 	BanIcon,
 	CheckIcon,
@@ -18,6 +19,7 @@ import {
 import { Spinner } from '@/renderer/components/ui/spinner';
 import { summarizeToolCall } from '@/renderer/lib/pi-timeline';
 import { cn } from '@/renderer/lib/utils';
+import { toolCallCollapseAtom } from '@/renderer/state/preferences';
 import type {
 	PiToolCallItem,
 	PiToolCallStatus,
@@ -41,8 +43,18 @@ export function PiToolCard({
 	className?: string;
 }) {
 	const failed = call.status === 'error';
-	const [userOpen, setUserOpen] = useState<boolean | null>(null);
-	const open = userOpen ?? failed;
+	// Setting picks the default open state; failures always force-open so their
+	// error tail is visible. An explicit user toggle (`userOpen`) wins over both.
+	const collapseMode = useAtomValue(toolCallCollapseAtom);
+	// A manual toggle is remembered with the global mode it was made against. ⌃O
+	// (and the Settings switch) flips that mode, which invalidates the override so
+	// every card — even one the user previously toggled — obeys the new default.
+	const [override, setOverride] = useState<{
+		mode: typeof collapseMode;
+		open: boolean;
+	} | null>(null);
+	const userOpen = override?.mode === collapseMode ? override.open : null;
+	const open = userOpen ?? (failed || collapseMode === 'expanded');
 	const summary = summarizeToolCall(call);
 	const durationMs =
 		call.endedAtMs !== null ? call.endedAtMs - call.startedAtMs : null;
@@ -56,7 +68,7 @@ export function PiToolCard({
 			data-kind='tool-call'
 			data-role='timeline-item'
 			data-status={call.status}
-			onOpenChange={setUserOpen}
+			onOpenChange={(next) => setOverride({ mode: collapseMode, open: next })}
 			open={open}
 		>
 			<CollapsibleTrigger className='group flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left text-[0.8125rem] leading-5 transition-colors hover:bg-secondary/50'>

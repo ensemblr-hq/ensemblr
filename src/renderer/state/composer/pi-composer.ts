@@ -24,6 +24,7 @@ import type {
 	ComposerModelOption,
 	ComposerThinkingOption,
 } from '@/renderer/types/workbench';
+import type { PiStreamingBehavior } from '@/shared/ipc/contracts/pi-session';
 
 export interface PiComposerControllerState {
 	activeSessionId: string | null;
@@ -35,7 +36,10 @@ export interface PiComposerControllerState {
 	modelId: string | null;
 	onModelChange: (modelId: string) => void;
 	onStop: () => Promise<void>;
-	onSubmit: (prompt: string) => Promise<void>;
+	onSubmit: (
+		prompt: string,
+		options?: { streamingBehavior?: PiStreamingBehavior },
+	) => Promise<void>;
 	onThinkingChange: (thinkingLevel: string) => void;
 	thinkingLevel: string | null;
 }
@@ -257,11 +261,16 @@ export function usePiComposerController({
 	});
 
 	const submitMutation = useMutation({
-		mutationFn: (input: { prompt: string; sessionId: string }) =>
+		mutationFn: (input: {
+			prompt: string;
+			sessionId: string;
+			streamingBehavior?: PiStreamingBehavior;
+		}) =>
 			submitPiPrompt({
 				model: modelId,
 				prompt: input.prompt,
 				sessionId: input.sessionId,
+				streamingBehavior: input.streamingBehavior,
 				thinkingLevel,
 			}),
 		onSuccess: () =>
@@ -284,7 +293,10 @@ export function usePiComposerController({
 	const optimistic = useOptimisticPrompts(chatTabId);
 
 	const onSubmit = useCallback(
-		async (prompt: string): Promise<void> => {
+		async (
+			prompt: string,
+			options?: { streamingBehavior?: PiStreamingBehavior },
+		): Promise<void> => {
 			const trimmed = prompt.trim();
 			if (!trimmed) {
 				return;
@@ -327,6 +339,7 @@ export function usePiComposerController({
 			const result = await submitMutation.mutateAsync({
 				prompt: trimmed,
 				sessionId,
+				streamingBehavior: options?.streamingBehavior,
 			});
 			if (result.error) {
 				setLastError(result.error);

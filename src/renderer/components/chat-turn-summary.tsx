@@ -1,7 +1,9 @@
+import { useAtomValue } from 'jotai';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { cn } from '@/renderer/lib/utils';
+import { toolCallCollapseAtom } from '@/renderer/state/preferences';
 
 import { formatTurnDuration } from './chat-turn-timer';
 
@@ -26,7 +28,19 @@ export function ChatTurnSummary({
 	messageCount: number;
 	toolCount: number;
 }) {
-	const [open, setOpen] = useState(defaultOpen);
+	// ⌃O (and the General settings switch) flips this global mode to expand or
+	// collapse every settled turn at once. A manual click is remembered against
+	// the mode it was made under, so the next flip invalidates it and the turn
+	// obeys the new default again.
+	const collapseMode = useAtomValue(toolCallCollapseAtom);
+	const [override, setOverride] = useState<{
+		mode: typeof collapseMode;
+		open: boolean;
+	} | null>(null);
+	const open =
+		override?.mode === collapseMode
+			? override.open
+			: defaultOpen || collapseMode === 'expanded';
 	const Chevron = open ? ChevronDownIcon : ChevronRightIcon;
 	const segments: string[] = [];
 	if (toolCount > 0) {
@@ -48,7 +62,7 @@ export function ChatTurnSummary({
 			<button
 				aria-expanded={open}
 				className='flex w-fit items-center gap-2 rounded-md px-1 text-muted-foreground text-xs leading-5 transition-colors hover:text-foreground'
-				onClick={() => setOpen((current) => !current)}
+				onClick={() => setOverride({ mode: collapseMode, open: !open })}
 				type='button'
 			>
 				<Chevron aria-hidden='true' className='size-3.5' />

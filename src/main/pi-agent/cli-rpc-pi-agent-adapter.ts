@@ -380,6 +380,17 @@ function createCliRpcSession({
 		}
 		const turnId = turnIdFactory();
 		const acceptedAt = now().toISOString();
+		// Mid-turn injection: Pi rejects a plain `prompt` while streaming, so emit
+		// the dedicated `steer` / `follow_up` frame instead. These carry only a
+		// message — no model/thinking change, no new turn — and the session stays
+		// 'streaming', so we return before the prompt path below.
+		if (request.streamingBehavior) {
+			await writeFrame({
+				message: request.prompt,
+				type: request.streamingBehavior === 'steer' ? 'steer' : 'follow_up',
+			});
+			return { acceptedAt, turnId };
+		}
 		// Apply per-turn model/thinking changes before the prompt. Pi processes
 		// stdin commands in order, so a `set_model`/`set_thinking_level` written
 		// ahead of the prompt is guaranteed to take effect for that turn. The

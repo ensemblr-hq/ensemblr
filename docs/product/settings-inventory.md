@@ -8,8 +8,9 @@ This inventory comes from the settings screenshots plus accepted ADRs. It separa
 
 | Store | Use for |
 | --- | --- |
-| SQLite | Mutable local app state, personal overrides, cached integration status, UI preferences, workspace/repository records. |
-| `~/.config/ensemble/config.json` | Declarative user defaults, managed policy-like settings, keybinding/UI defaults, repository matching rules. |
+| SQLite | Mutable local app state, personal overrides, cached integration status, workspace/repository records. |
+| `~/.config/ensemble/config.json` | **Source of truth for App settings** — General and Models are implemented under `app.general.*` / `app.models.*` (see ADR 0029) — plus declarative user defaults, managed policy-like settings, and repository matching rules. Created on first run; live-watched for external edits. |
+| `localStorage` (`atomWithStorage`) | Non-Settings-page UI state, app preferences not yet migrated to `config.json` (theme, fonts, Git/Experimental/Advanced toggles), composer favourites, and the model-catalog cache. |
 | Repository config | Shared project behavior in `ensemble.json`, with `conductor.json` compatibility. Use for scripts, run mode, files-to-copy, and team-shared repository defaults. |
 | Pi user environment | Pi auth, models, provider settings, skills, extensions, prompts, themes, sessions, and project `.pi` resources. Ensemble should not duplicate this as source of truth. |
 | macOS Keychain | Secret values such as tokens/API keys. SQLite may keep metadata only. |
@@ -18,27 +19,39 @@ This inventory comes from the settings screenshots plus accepted ADRs. It separa
 
 ### General
 
+Source of truth: `~/.config/ensemble/config.json` under `app.general.*`. The
+renderer hydrates from it on launch, writes section-scoped patches back through
+IPC, and live-reloads when the file is edited externally (see ADR 0029).
+
 | Setting | Conductor mapping | Ensemble adaptation | Storage |
 | --- | --- | --- | --- |
 | Sync agent configs | Similar concept, provider-specific. | Inspect/sync Pi resources where supported; avoid mutating `~/.pi/agent` without explicit user action. | Action/log in SQLite; Pi environment remains source of truth. |
-| Send-message shortcut | Direct. | Same behavior for Pi composer. | SQLite with optional config default. |
-| Follow-up behavior | Direct. | Map to Pi steering/queue behavior. | SQLite with optional config default. |
-| Desktop notifications | Direct. | Notify when Pi turn/session completes or fails. | SQLite; OS permission external. |
-| Completion sound | Direct. | Same, using Ensemble sound assets. | SQLite with optional config default. |
-| Auto-convert long pasted text | Direct. | Same, producing Ensemble/Pi attachments. | SQLite with optional config default. |
-| Remove/soften AI certainty phrase | Direct as a Conductor-specific toggle. | Resolved (ENS-069): ship as a v1 General toggle that injects a prompt preset at chat start. No output post-processing. | SQLite with optional config default. |
-| Always show context usage | Direct. | Show Pi context/token usage when SDK provides it. | SQLite with optional config default. |
-| Caffeinate while agents run | Direct. | Prevent sleep during active Pi sessions/scripts. | SQLite with optional config default. |
-| Show MCP/resource status in chat | Direct. | Show Pi resource/MCP/tool status in composer. | SQLite with optional config default. |
-| Expand tool calls by default | Direct. | Same for Pi tool calls. | SQLite with optional config default. |
+| Send-message shortcut | Direct. | Same behavior for Pi composer. | `config.json` (`app.general.sendShortcut`). |
+| Follow-up behavior | Direct. | Map to Pi steering/queue behavior. | `config.json` (`app.general.followUpBehavior`). |
+| Desktop notifications | Direct. | Notify when Pi turn/session completes or fails. | `config.json` (`app.general.desktopNotifications`); OS permission external. |
+| Auto-convert long pasted text | Direct. | Same, producing Ensemble/Pi attachments. | `config.json` (`app.general.autoConvertLongText`). |
+| Always show context usage | Direct. | Show Pi context/token usage when SDK provides it. | `config.json` (`app.general.alwaysShowContextUsage`). |
+| Caffeinate while agents run | Direct. | Prevent sleep during active Pi sessions/scripts. | `config.json` (`app.general.caffeinateWhileRunning`). |
+| Expand tool calls by default | Direct. | Same for Pi tool calls. | `config.json` (`app.general.toolCallCollapse`). |
+
+Removed entirely: **Soften AI certainty** and **Show MCP status in chat**. Both
+were toggles with no functional consumer (planned but never wired), so their
+atoms were dropped; they are not user-configurable and not stored in
+`config.json`.
 
 ### Models
 
+Source of truth: `~/.config/ensemble/config.json` under `app.models.*` (same
+sync/live-reload path as General; see ADR 0029). Favourites and the catalog
+cache stay in `localStorage` — they're set outside the Settings page (composer
+star) or are derived runtime cache, not user settings.
+
 | Setting | Conductor mapping | Ensemble adaptation | Storage |
 | --- | --- | --- | --- |
-| Default chat model | Direct concept. | Pi model id for new chats; bound to the runtime via the `--model` spawn flag. | `atomWithStorage` (`default_chat_model`). |
-| Default thinking level | Direct concept. | Pi thinking level for new chats; bound via `--thinking`. | `atomWithStorage` (`default_chat_thinking`). |
-| Review model + thinking | Direct concept. | Separate model/thinking for the workspace Review action. | `atomWithStorage` (`review_model`, `review_thinking`). |
+| Default chat model | Direct concept. | Pi model id for new chats; bound to the runtime via the `--model` spawn flag. | `config.json` (`app.models.defaultModel`). |
+| Default thinking level | Direct concept. | Pi thinking level for new chats; bound via `--thinking`. | `config.json` (`app.models.defaultThinkingLevel`). |
+| Review model + thinking | Direct concept. | Separate model/thinking for the workspace Review action. | `config.json` (`app.models.reviewModel`, `app.models.reviewThinkingLevel`). |
+| Hidden models | n/a (Ensemble). | Toggle models off in Settings → Models so they drop out of the composer picker. Inverse storage (records hidden ids); hiding never changes the active/default model. | `config.json` (`app.models.hiddenModels`, string[]). |
 | Favourite models | n/a (Ensemble). | Star models in the composer picker to pin them to a top "Favourites" group with the low 1-9 shortcuts. App-wide, shared across all workspaces. | `atomWithStorage` (`favourite_models`, string[]). |
 | Model catalog cache | n/a (Ensemble). | Last non-empty `pi --list-models` result cached so the picker is populated instantly on launch; refreshed silently in the background. | `localStorage` (`pi_models_snapshot`). |
 
@@ -195,10 +208,14 @@ For repository behavior, use the already accepted precedence:
 For app-wide behavior, use:
 
 1. Locked/managed settings from `~/.config/ensemble/config.json`, if supported by schema.
-2. User-selected settings in SQLite.
-3. Declarative defaults from `~/.config/ensemble/config.json`.
-4. Built-in defaults.
-5. Pi user environment for Pi-specific resources and auth.
+2. User-selected settings in `~/.config/ensemble/config.json` (App settings already migrated — General, Models). Sections not yet migrated still read from `localStorage`.
+3. Built-in defaults (the shared Zod schema fills any missing or invalid field).
+4. Pi user environment for Pi-specific resources and auth.
+
+> Migration status: General and Models are the source of truth in `config.json`.
+> Other App sections (Appearance, Git, Experimental, Advanced) still persist to
+> `localStorage` and will move to `config.json` in a later pass. Repo settings
+> are out of scope for this change.
 
 ## Open Settings Questions
 
