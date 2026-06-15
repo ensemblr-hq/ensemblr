@@ -117,25 +117,25 @@ export const terminalFontSizeAtom = atomWithStorage<number>(
 	12,
 );
 
-// ─── Composer memory ──────────────────────────────────────────────────────────
+// ─── Composer memory (per-chat overrides) ──────────────────────────────────────
 
 /**
- * Persisted last-used Pi model id, shared across every workspace and chat tab.
- * Picking a model anywhere updates this single value so a fresh chat opens with
- * the same model the user picked last.
+ * Per-chat model override, keyed by chat-tab id. `null` means "inherit the
+ * Settings → Default model" ({@link defaultChatModelAtom}); a non-null value is
+ * an explicit per-chat pick that survives reloads and is preserved for that
+ * chat only. Picking a model in one chat never changes another chat's model.
  */
-export const lastSelectedPiModelAtom = atomWithStorage<string | null>(
-	KEY('last_selected_pi_model'),
-	null,
+export const chatModelOverrideAtomFamily = atomFamily((chatTabId: string) =>
+	atomWithStorage<string | null>(KEY(`chat_model_${chatTabId}`), null),
 );
 
 /**
- * Persisted last-used Pi thinking-level, shared across every workspace and
- * chat tab. Mirrors {@link lastSelectedPiModelAtom} for the thinking control.
+ * Per-chat thinking-level override, keyed by chat-tab id. Mirrors
+ * {@link chatModelOverrideAtomFamily}; `null` inherits the Settings default
+ * ({@link defaultChatThinkingLevelAtom}).
  */
-export const lastSelectedPiThinkingLevelAtom = atomWithStorage<string | null>(
-	KEY('last_selected_pi_thinking_level'),
-	null,
+export const chatThinkingOverrideAtomFamily = atomFamily((chatTabId: string) =>
+	atomWithStorage<string | null>(KEY(`chat_thinking_${chatTabId}`), null),
 );
 
 // ─── Models (user defaults) ───────────────────────────────────────────────────
