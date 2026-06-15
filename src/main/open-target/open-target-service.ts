@@ -28,6 +28,7 @@ const OPEN_BINARY_PATH = '/usr/bin/open';
 const OPEN_TIMEOUT_MS = 5000;
 const ICON_OUTPUT_SIZE = 64;
 const CACHE_FILE_NAME = 'open-targets-cache.v1.json';
+const MAX_VISIBLE_APPS = 8;
 
 interface CachedFileShape {
 	snapshots: WorkspaceOpenTargetSnapshot[];
@@ -217,11 +218,19 @@ function buildSnapshots(
 ): WorkspaceOpenTargetSnapshot[] {
 	const snapshots: WorkspaceOpenTargetSnapshot[] = [];
 	let visibleIndex = 0;
+	let appsAdded = 0;
 	for (const definition of OPEN_TARGET_REGISTRY) {
 		if (!resolved.detected[definition.id]?.installed) {
 			continue;
 		}
+		const isUtility = definition.kind === 'utility';
+		if (!isUtility && appsAdded >= MAX_VISIBLE_APPS) {
+			continue;
+		}
 		visibleIndex += 1;
+		if (!isUtility) {
+			appsAdded += 1;
+		}
 		snapshots.push(
 			toSnapshot({
 				definition,
