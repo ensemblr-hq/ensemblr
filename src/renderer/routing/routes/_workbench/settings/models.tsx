@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { useAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
+import { useEffect, useMemo } from 'react';
 
 import { piModelsQuery } from '@/renderer/api/ensemble';
+import { ModelVisibilityList } from '@/renderer/components/settings/model-visibility-list';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import {
@@ -16,6 +18,7 @@ import { Spinner } from '@/renderer/components/ui/spinner';
 import {
 	defaultChatModelAtom,
 	defaultChatThinkingLevelAtom,
+	hiddenModelsAtom,
 	reviewModelAtom,
 	reviewThinkingLevelAtom,
 } from '@/renderer/state/preferences';
@@ -38,9 +41,45 @@ function ModelsSettings() {
 	const [reviewModel, setReviewModel] = useAtom(reviewModelAtom);
 	const [reviewThinking, setReviewThinking] = useAtom(reviewThinkingLevelAtom);
 
-	const list = modelsData?.models ?? [];
-	const resolvedDefault = defaultModel ?? modelsData?.defaultModelId ?? null;
-	const resolvedReview = reviewModel ?? modelsData?.defaultModelId ?? null;
+	const hidden = useAtomValue(hiddenModelsAtom);
+	const hiddenSet = useMemo(() => new Set(hidden), [hidden]);
+	const allModels = useMemo(() => modelsData?.models ?? [], [modelsData]);
+	// Hidden models drop out of the default/review selects too, not just the
+	// composer picker.
+	const list = useMemo(
+		() => allModels.filter((model) => !hiddenSet.has(model.id)),
+		[allModels, hiddenSet],
+	);
+	const piDefaultModelId = modelsData?.defaultModelId ?? null;
+
+	// If the model selected for the default or review slot gets hidden, fall back
+	// to the first visible model so the select never points at a hidden id. The
+	// list always has ≥1 entry (the visibility editor blocks hiding the last).
+	useEffect(() => {
+		const firstVisibleId = list[0]?.id;
+		if (!firstVisibleId) {
+			return;
+		}
+		const effectiveDefault = defaultModel ?? piDefaultModelId;
+		if (effectiveDefault && hiddenSet.has(effectiveDefault)) {
+			setDefaultModel(firstVisibleId);
+		}
+		const effectiveReview = reviewModel ?? piDefaultModelId;
+		if (effectiveReview && hiddenSet.has(effectiveReview)) {
+			setReviewModel(firstVisibleId);
+		}
+	}, [
+		list,
+		hiddenSet,
+		defaultModel,
+		reviewModel,
+		piDefaultModelId,
+		setDefaultModel,
+		setReviewModel,
+	]);
+
+	const resolvedDefault = defaultModel ?? piDefaultModelId;
+	const resolvedReview = reviewModel ?? piDefaultModelId;
 	const defaultLevels = thinkingLevelsFor(list, resolvedDefault);
 	const reviewLevels = thinkingLevelsFor(list, resolvedReview);
 
@@ -104,6 +143,14 @@ function ModelsSettings() {
 				description='Model used for the Review action on a workspace.'
 				label='Review model'
 			/>
+
+			<SettingRow
+				description='Hide models you don’t use from the model picker and the default/review selects. Hiding the selected default or review model switches it to the first available.'
+				label='Model visibility'
+				stack
+			>
+				<ModelVisibilityList />
+			</SettingRow>
 		</SettingsSection>
 	);
 }

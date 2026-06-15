@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
+import { formatModelDisplayName } from '@/renderer/lib/pi/model-display-name';
 import type {
 	ListPiModelsResult,
 	ListPiSessionEventsResult,
@@ -46,6 +47,16 @@ export const piModelsQuery = queryOptions({
 		return result;
 	},
 	queryKey: ensembleQueryKeys.piModels(),
+	// Prettify display names by convention (Claude/GPT) for every consumer —
+	// composer picker, default/review selects, visibility list. `id` and
+	// `provider` stay raw so resolution, matching, and search are unaffected.
+	select: (data: ListPiModelsResult): ListPiModelsResult => ({
+		...data,
+		models: data.models.map((model) => ({
+			...model,
+			displayName: formatModelDisplayName(model.displayName),
+		})),
+	}),
 	staleTime: 60_000,
 });
 

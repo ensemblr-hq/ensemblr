@@ -1,6 +1,7 @@
 import { type IpcRendererEvent, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '../../shared/ipc/channels';
 import type { EnsembleApi } from '../../shared/ipc/contracts/api';
+import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app-settings';
 import type { CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
 import type {
 	PiRawFrameBroadcast,
@@ -17,6 +18,7 @@ import type {
  */
 type InvokeKey = Exclude<
 	keyof EnsembleApi,
+	| 'onAppSettingsChanged'
 	| 'onCloneGithubRepositoryProgress'
 	| 'onPiRawFrame'
 	| 'onPiSessionEvent'
@@ -105,6 +107,7 @@ export function createEnsembleApi(): EnsembleApi {
 		ensureWindowWidth: (minimumWidth) =>
 			invoke('ensureWindowWidth', minimumWidth),
 		environmentVariables: () => invoke('environmentVariables'),
+		getAppSettings: () => invoke('getAppSettings'),
 		getPullRequestSnapshot: (request) =>
 			invoke('getPullRequestSnapshot', request),
 		getWorkspaceFileDiff: (request) => invoke('getWorkspaceFileDiff', request),
@@ -141,6 +144,11 @@ export function createEnsembleApi(): EnsembleApi {
 		listWorkspaceFiles: (request) => invoke('listWorkspaceFiles', request),
 		listWorkspaceOpenTargets: () => invoke('listWorkspaceOpenTargets'),
 		mergePullRequest: (request) => invoke('mergePullRequest', request),
+		onAppSettingsChanged: (listener) =>
+			subscribe<AppSettingsChangedBroadcast>(
+				IPC_CHANNELS.appSettingsChanged,
+				listener,
+			),
 		onCloneGithubRepositoryProgress: (listener) =>
 			subscribe<CloneGithubRepositoryProgressEvent>(
 				IPC_CHANNELS.cloneGithubRepositoryProgress,
@@ -157,9 +165,11 @@ export function createEnsembleApi(): EnsembleApi {
 			),
 		onTerminalOutput: (listener) =>
 			subscribe<TerminalOutputBroadcast>(IPC_CHANNELS.terminalOutput, listener),
+		openAppConfigFile: () => invoke('openAppConfigFile'),
 		openChatTab: (request) => invoke('openChatTab', request),
 		openPiSession: (request) => invoke('openPiSession', request),
-		openWorkspaceInTarget: (request) => invoke('openWorkspaceInTarget', request),
+		openWorkspaceInTarget: (request) =>
+			invoke('openWorkspaceInTarget', request),
 		prepareCloneGithubRepository: (request) =>
 			invoke('prepareCloneGithubRepository', request),
 		previewRepositoryConfigMigration: (request) =>
@@ -195,6 +205,7 @@ export function createEnsembleApi(): EnsembleApi {
 		submitPiPrompt: (request) => invoke('submitPiPrompt', request),
 		terminalSnapshot: (request) => invoke('terminalSnapshot', request),
 		unarchiveWorkspace: (request) => invoke('unarchiveWorkspace', request),
+		updateAppSettings: (patch) => invoke('updateAppSettings', patch),
 		writeForkSummary: (request) => invoke('writeForkSummary', request),
 		writeTerminalSession: (request) => invoke('writeTerminalSession', request),
 	};

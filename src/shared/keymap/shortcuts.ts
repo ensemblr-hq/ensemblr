@@ -9,7 +9,12 @@
  * macOS, Ctrl elsewhere.
  */
 
-export type Modifier = 'mod' | 'alt' | 'shift';
+/**
+ * `mod` is the platform command key (⌘ on macOS, Ctrl elsewhere). `ctrl` is
+ * always the physical Control key — distinct from `mod` on macOS, but the same
+ * physical key as `mod` on Windows/Linux.
+ */
+export type Modifier = 'mod' | 'ctrl' | 'alt' | 'shift';
 
 export type Scope =
 	| 'global'
@@ -79,10 +84,20 @@ export const SHORTCUTS = {
 		scope: 'composer',
 		bindings: [{ key: 'Enter' }],
 	},
+	'composer.submitWithMod': {
+		description: 'Send message',
+		scope: 'composer',
+		bindings: [{ key: 'Enter', modifiers: ['mod'] }],
+	},
 	'composer.newline': {
 		description: 'Insert newline in composer',
 		scope: 'composer',
 		bindings: [{ key: 'Enter', modifiers: ['shift'] }],
+	},
+	'composer.queue': {
+		description: 'Queue message as a follow-up',
+		scope: 'composer',
+		bindings: [{ key: 'j', modifiers: ['mod'] }],
 	},
 	'composer.removeLastMention': {
 		description: 'Remove last mention attachment',
@@ -124,6 +139,11 @@ export const SHORTCUTS = {
 		scope: 'menu',
 		bindings: [{ key: 'n', modifiers: ['mod'] }],
 		accelerator: 'CommandOrControl+N',
+	},
+	'toolCalls.toggleCollapse': {
+		description: 'Expand or collapse all tool calls',
+		scope: 'global',
+		bindings: [{ key: 'o', modifiers: ['ctrl'] }],
 	},
 } as const satisfies Record<string, ShortcutDef>;
 

@@ -1,3 +1,4 @@
+import type { AppSettingsApi } from './app-settings';
 import type { ArchiveApi } from './archive-lifecycle';
 import type { ChatTabApi } from './chat-tab';
 import type { CheckpointApi } from './checkpoint';
@@ -32,7 +33,8 @@ import type { WorkspaceScriptsApi } from './workspace-scripts';
  * its contract next to the wire types it depends on.
  */
 export interface EnsembleApi
-	extends WorkspaceApi,
+	extends AppSettingsApi,
+		WorkspaceApi,
 		RepositoryApi,
 		PiSessionApi,
 		ChatTabApi,

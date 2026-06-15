@@ -1,4 +1,9 @@
-import type { RepositoryConfigMigrationPreview, RepositoryConfigMigrationRequest, RepositoryConfigMigrationResult, RepositoryConfigSnapshot } from '../../shared/ipc/contracts/repository-config';
+import type {
+	RepositoryConfigMigrationPreview,
+	RepositoryConfigMigrationRequest,
+	RepositoryConfigMigrationResult,
+	RepositoryConfigSnapshot,
+} from '../../shared/ipc/contracts/repository-config';
 import { loadRepositoryConfig } from './repository-config.ts';
 import {
 	applyRepositoryConfigMigration,
@@ -15,6 +20,11 @@ export {
 	type IsTrackedRepositoryPathOptions as RepositoryConfigPathAuthorizationOptions,
 	isTrackedRepositoryPath as isRepositoryConfigPathAllowed,
 } from '../storage/repositories/repository-path-repository.ts';
+export type {
+	AppSettingsService,
+	CreateAppSettingsServiceOptions,
+} from './app-settings-service.ts';
+export { createAppSettingsService } from './app-settings-service.ts';
 export type {
 	ConfigDiagnostic,
 	ConfigStatusSnapshot,

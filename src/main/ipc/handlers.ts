@@ -1,6 +1,7 @@
 import { createChatTabService } from '../chat-tabs/chat-tab-service';
 import type { LocalCommandService } from '../commands/local-command';
 import type {
+	AppSettingsService,
 	EnsembleConfigResolutionService,
 	EnsembleConfigService,
 	RepositoryConfigService,
@@ -38,6 +39,7 @@ import { getWorkspacePathById } from '../storage/repositories/workspace-reposito
 import type { TerminalService } from '../terminal';
 import type { ListWorkspaceFilesService } from '../workspace-files';
 import { createWorkspaceGitService } from '../workspace-git';
+import { registerAppSettingsHandlers } from './handlers/app-settings';
 import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCheckpointHandlers } from './handlers/checkpoint';
 import { registerCloneHandlers } from './handlers/clone';
@@ -68,6 +70,7 @@ import {
 
 /** Dependency bundle wired into the renderer-facing IPC handlers. */
 interface RegisterIpcHandlersOptions {
+	appSettingsService: AppSettingsService;
 	archiveRepositoryService: ArchiveRepositoryService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
 	configService: EnsembleConfigService;
@@ -86,6 +89,8 @@ interface RegisterIpcHandlersOptions {
 	localCommandService: LocalCommandService;
 	localRepositoryImportService: LocalRepositoryImportService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
+	/** Fired after an in-app App-settings write so side-effects can re-read. */
+	onAppSettingsUpdated?: () => void;
 	openTargetService: OpenTargetService;
 	piExecutableService: PiExecutableService;
 	piSessionService: PiSessionService;
@@ -108,6 +113,7 @@ interface RegisterIpcHandlersOptions {
  * @param options - Service dependencies the handlers delegate to.
  */
 export function registerIpcHandlers({
+	appSettingsService,
 	archiveRepositoryService,
 	archiveWorkspaceService,
 	configService,
@@ -126,6 +132,7 @@ export function registerIpcHandlers({
 	localCommandService,
 	localRepositoryImportService,
 	localRepositoryRegistrationService,
+	onAppSettingsUpdated,
 	openTargetService,
 	piExecutableService,
 	piSessionService,
@@ -148,6 +155,7 @@ export function registerIpcHandlers({
 	});
 
 	registerWindowHandlers();
+	registerAppSettingsHandlers({ appSettingsService, onAppSettingsUpdated });
 	registerEnvironmentHandlers({ environmentVariablesService });
 	registerHealthHandlers({ configService, databaseService });
 	registerShellSnapshotHandlers({

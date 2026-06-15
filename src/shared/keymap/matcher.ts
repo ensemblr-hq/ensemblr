@@ -16,6 +16,12 @@ function defOf(id: ShortcutId): ShortcutDef {
  */
 export interface KeyboardEventLike {
 	readonly key: string;
+	/**
+	 * Physical key code (`KeyP`, `Digit1`, …). Layout-stable, and crucially
+	 * unaffected by macOS composing Option+<letter> into a glyph. Optional so
+	 * synthetic events (tests) can omit it and fall back to `key`.
+	 */
+	readonly code?: string;
 	readonly altKey: boolean;
 	readonly ctrlKey: boolean;
 	readonly metaKey: boolean;
@@ -43,31 +49,86 @@ function isMac(): boolean {
 	return cachedIsMac;
 }
 
-function modifierPressed(mod: Modifier, event: KeyboardEventLike): boolean {
-	switch (mod) {
-		case 'mod':
-			return isMac() ? event.metaKey : event.ctrlKey;
-		case 'alt':
-			return event.altKey;
-		case 'shift':
-			return event.shiftKey;
+/** Physical modifier-key state, the layer bindings ultimately compare against. */
+interface PhysicalModifiers {
+	alt: boolean;
+	ctrl: boolean;
+	meta: boolean;
+	shift: boolean;
+}
+
+/**
+ * Resolves a binding's logical modifiers to physical keys. `mod` maps to ⌘
+ * (meta) on macOS and Ctrl elsewhere; `ctrl` is always the physical Control
+ * key — so on Windows/Linux `mod` and `ctrl` collapse onto the same flag, which
+ * is correct because they are the same physical key there.
+ */
+function requiredPhysicalModifiers(
+	modifiers: readonly Modifier[],
+): PhysicalModifiers {
+	const mac = isMac();
+	const required: PhysicalModifiers = {
+		alt: false,
+		ctrl: false,
+		meta: false,
+		shift: false,
+	};
+	for (const modifier of modifiers) {
+		switch (modifier) {
+			case 'mod':
+				if (mac) {
+					required.meta = true;
+				} else {
+					required.ctrl = true;
+				}
+				break;
+			case 'ctrl':
+				required.ctrl = true;
+				break;
+			case 'alt':
+				required.alt = true;
+				break;
+			case 'shift':
+				required.shift = true;
+				break;
+		}
 	}
+	return required;
+}
+
+/** True for single ASCII letters, the keys macOS mangles under Option. */
+function isAsciiLetter(key: string): boolean {
+	return /^[a-z]$/i.test(key);
+}
+
+/**
+ * Matches the binding's key against the event. For alt+<letter> bindings we
+ * compare the physical `event.code` (`KeyP`) instead of `event.key`, because
+ * macOS composes Option+<letter> into a glyph (⌥P → "π") that would never equal
+ * the bound letter. Falls back to `key` when `code` is absent (synthetic events)
+ * or the binding isn't an alt+letter combo.
+ */
+function keyMatches(binding: Binding, event: KeyboardEventLike): boolean {
+	const requiresAlt = (binding.modifiers ?? []).includes('alt');
+	if (requiresAlt && event.code && isAsciiLetter(binding.key)) {
+		return event.code === `Key${binding.key.toUpperCase()}`;
+	}
+	return event.key.toLowerCase() === binding.key.toLowerCase();
 }
 
 function matchesBinding(binding: Binding, event: KeyboardEventLike): boolean {
-	if (event.key.toLowerCase() !== binding.key.toLowerCase()) {
+	if (!keyMatches(binding, event)) {
 		return false;
 	}
-	const required = new Set<Modifier>(binding.modifiers ?? []);
-	const allMods: readonly Modifier[] = ['mod', 'alt', 'shift'];
-	for (const mod of allMods) {
-		const need = required.has(mod);
-		const have = modifierPressed(mod, event);
-		if (need !== have) {
-			return false;
-		}
-	}
-	return true;
+	// Every modifier the binding requires must be down, and every other physical
+	// modifier must be up — an exact match against the event's physical state.
+	const required = requiredPhysicalModifiers(binding.modifiers ?? []);
+	return (
+		required.meta === event.metaKey &&
+		required.ctrl === event.ctrlKey &&
+		required.alt === event.altKey &&
+		required.shift === event.shiftKey
+	);
 }
 
 export function matchesShortcut(
@@ -88,12 +149,14 @@ export function getAccelerator(id: ShortcutId): string | undefined {
 
 const MODIFIER_LABEL_MAC: Record<Modifier, string> = {
 	mod: '⌘',
+	ctrl: '⌃',
 	alt: '⌥',
 	shift: '⇧',
 };
 
 const MODIFIER_LABEL_OTHER: Record<Modifier, string> = {
 	mod: 'Ctrl',
+	ctrl: 'Ctrl',
 	alt: 'Alt',
 	shift: 'Shift',
 };
@@ -118,7 +181,8 @@ export function formatShortcut(id: ShortcutId): string {
 	const labels = mac ? MODIFIER_LABEL_MAC : MODIFIER_LABEL_OTHER;
 	const separator = mac ? '' : '+';
 	const parts: string[] = [];
-	const order: readonly Modifier[] = ['mod', 'alt', 'shift'];
+	// Mac convention orders ⌃⌥⇧⌘; elsewhere Ctrl comes first.
+	const order: readonly Modifier[] = ['ctrl', 'alt', 'shift', 'mod'];
 	const modifierSet = new Set<Modifier>(binding.modifiers ?? []);
 	for (const mod of order) {
 		if (modifierSet.has(mod)) {
