@@ -7,6 +7,7 @@ export {
 export * from './chat-tabs';
 export * from './checkpoints';
 export * from './clone';
+export * from './environment';
 export * from './github';
 export * from './health';
 export * from './linear';

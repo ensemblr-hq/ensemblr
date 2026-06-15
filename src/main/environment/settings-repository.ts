@@ -1,13 +1,16 @@
-import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
 import { toSettingKey } from './environment-variable-keys.ts';
 import type { NormalizedScope } from './environment-variable-types.ts';
+import {
+	deleteSetting,
+	readSettingJson,
+	upsertSetting,
+} from './settings-table.ts';
 
 /**
  * Inserts or updates a plain env var row in the SQLite `settings` table.
- * The persisted `source` is always `'sqlite'` and `locked` is reset to 0 —
- * scope and key together form the upsert conflict target.
+ * Scope and key together form the upsert conflict target.
  */
 export function upsertPlainSetting({
 	database,
@@ -20,35 +23,44 @@ export function upsertPlainSetting({
 	scope: NormalizedScope;
 	value: string;
 }): void {
-	const timestamp = new Date().toISOString();
+	upsertSetting({
+		database,
+		key: toSettingKey(key),
+		scope,
+		valueJson: JSON.stringify(value),
+	});
+}
 
-	database
-		.prepare(
-			`INSERT INTO settings (
-				id,
-				scope,
-				scope_id,
-				key,
-				value_json,
-				source,
-				locked,
-				updated_at
-			)
-			VALUES (?, ?, ?, ?, ?, 'sqlite', 0, ?)
-			ON CONFLICT(scope, scope_id, key) DO UPDATE SET
-				value_json = excluded.value_json,
-				source = 'sqlite',
-				locked = 0,
-				updated_at = excluded.updated_at`,
-		)
-		.run(
-			`setting-${randomUUID()}`,
-			scope.scope,
-			scope.scopeId,
-			toSettingKey(key),
-			JSON.stringify(value),
-			timestamp,
-		);
+/**
+ * Reads the persisted plain value for an env var, or `null` when absent/invalid.
+ * @returns The decoded string value, or `null`.
+ */
+export function readPlainSetting({
+	database,
+	key,
+	scope,
+}: {
+	database: DatabaseSync;
+	key: string;
+	scope: NormalizedScope;
+}): string | null {
+	const valueJson = readSettingJson({
+		database,
+		key: toSettingKey(key),
+		scope,
+	});
+
+	if (valueJson === null) {
+		return null;
+	}
+
+	try {
+		const parsed: unknown = JSON.parse(valueJson);
+
+		return typeof parsed === 'string' ? parsed : null;
+	} catch {
+		return null;
+	}
 }
 
 /** Removes the plain env var row from the SQLite `settings` table, if any. */
@@ -61,10 +73,5 @@ export function deletePlainSetting({
 	key: string;
 	scope: NormalizedScope;
 }): void {
-	database
-		.prepare(
-			`DELETE FROM settings
-			 WHERE scope = ? AND scope_id = ? AND key = ?`,
-		)
-		.run(scope.scope, scope.scopeId, toSettingKey(key));
+	deleteSetting({ database, key: toSettingKey(key), scope });
 }

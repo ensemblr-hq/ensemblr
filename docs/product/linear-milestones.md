@@ -246,7 +246,7 @@ Included issues:
 
 - `ENS-076` App settings screen UX/UI working session
 - `ENS-061` Settings shell with app and repository sections
-- `ENS-062` App settings sections for general, models, providers, integrations, and security
+- `ENS-062` App settings sections for general, models, environment, integrations, and security
 - `ENS-063` Repository settings source diagnostics
 - `ENS-064` Appearance settings and previews
 - `ENS-065` Command palette and keyboard shortcuts

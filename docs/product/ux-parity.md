@@ -72,7 +72,7 @@ Ensemble equivalent:
 - Settings is a separate full-window settings view with a Back to app action.
 - Settings sidebar has app-wide sections first and local project sections below.
 - Main settings forms are narrow, centered, row-based, and mostly inline-editable.
-- App settings cover General, Models, Providers, Environment, Appearance, Git, Account, Experimental, and Advanced.
+- App settings cover General, Models, Environment, Git, Appearance, Integrations, and (under "More") Diagnostics, Experimental, and Advanced. (The standalone Providers screen was removed — provider/auth setup is owned by Pi; readiness checks live in Diagnostics.)
 - Repository settings are selected from the same sidebar and expose path, branch, remote, preview, copy, script, spotlight, instruction, and removal controls.
 
 Ensemble equivalent:
