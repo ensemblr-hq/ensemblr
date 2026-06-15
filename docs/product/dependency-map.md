@@ -99,7 +99,7 @@ flowchart TD
   subgraph S8__Settings_and_Parity_Polish["8. Settings and Parity Polish"]
     P076["ENS-076 App Settings Screen UX/UI Working Session"]
     P061["ENS-061 Settings Shell with App and Repository Sections"]
-    P062["ENS-062 App Settings Sections for General, Models, Providers, Integrations, and Security"]
+    P062["ENS-062 App Settings Sections for General, Models, Environment, Integrations, and Security"]
     P063["ENS-063 Repository Settings Source Diagnostics"]
     P064["ENS-064 Appearance Settings and Previews"]
     P065["ENS-065 Command Palette and Keyboard Shortcuts"]
@@ -376,7 +376,7 @@ flowchart TD
 - ENS-060 Archive-After-Merge and Branch Cleanup: ENS-025, ENS-058
 - ENS-076 App Settings Screen UX/UI Working Session: ENS-002, ENS-020
 - ENS-061 Settings Shell with App and Repository Sections: ENS-003, ENS-076
-- ENS-062 App Settings Sections for General, Models, Providers, Integrations, and Security: ENS-006, ENS-009, ENS-013, ENS-014, ENS-035, ENS-043, ENS-061
+- ENS-062 App Settings Sections for General, Models, Environment, Integrations, and Security: ENS-006, ENS-009, ENS-013, ENS-014, ENS-035, ENS-043, ENS-061
 - ENS-063 Repository Settings Source Diagnostics: ENS-006, ENS-015, ENS-038, ENS-059, ENS-061
 - ENS-064 Appearance Settings and Previews: ENS-002, ENS-037, ENS-051, ENS-061
 - ENS-065 Command Palette and Keyboard Shortcuts: ENS-020, ENS-023, ENS-037, ENS-057, ENS-061

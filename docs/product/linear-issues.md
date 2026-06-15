@@ -2450,7 +2450,7 @@ Build the full-window settings shell with app-wide sections and local repository
 
 Scope:
 - Build from the current Settings route/sidebar entry toward a full settings route/window with Back to app action.
-- Sidebar sections for General, Models, Providers, Environment, Appearance, Git, Account/Integrations, Experimental, Advanced.
+- Sidebar sections for General, Models, Environment, Appearance, Git, Account/Integrations, and (under "More") Diagnostics, Experimental, Advanced.
 - Repository settings entries below app-wide sections.
 - Narrow centered forms with inline controls and source-diagnostics slots.
 
@@ -2478,7 +2478,7 @@ Source:
 Implementation notes:
 - Do not expose deferred account/cloud features as active v1 settings.
 
-## ENS-062 App Settings Sections for General, Models, Providers, Integrations, and Security
+## ENS-062 App Settings Sections for General, Models, Environment, Integrations, and Security
 
 Milestone: 8. Settings and Parity Polish
 Type: Frontend
@@ -2486,12 +2486,12 @@ Priority: P0
 Dependencies: ENS-006, ENS-009, ENS-013, ENS-014, ENS-035, ENS-043, ENS-061
 
 Summary:
-Implement app-wide settings forms for core behavior, Pi model/provider readiness, environment, GitHub CLI, Linear, privacy, and permission modes.
+Implement app-wide settings forms for core behavior, Pi model/thinking readiness, environment variables, GitHub CLI, Linear, privacy, and permission modes.
 
 Scope:
 - General settings for send shortcut, follow-up behavior, notifications, sound, context/tool-call visibility, and caffeinate behavior where supported.
-- Models/providers settings using Pi capability discovery and readiness state.
-- Environment variable UI using safe secret metadata.
+- Models settings using Pi capability discovery (model selection, thinking levels, model visibility/hiding). Provider readiness checks are sourced from Diagnostics (Pi runtime, model availability, GitHub CLI).
+- Environment variable UI using safe secret metadata and per-scope env file support.
 - Account/integrations surface focused on `gh` CLI status, Linear OAuth status, enterprise data privacy, and permission mode.
 - Advanced settings for root and Pi executable paths.
 
