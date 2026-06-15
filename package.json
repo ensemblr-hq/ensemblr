@@ -83,7 +83,6 @@
 		"js-toml": "^1.1.2",
 		"lucide-react": "^1.17.0",
 		"motion": "^12.40.0",
-		"nanoid": "^5.1.11",
 		"node-pty": "^1.1.0",
 		"radix-ui": "^1.5.0",
 		"react": "^19.2.7",

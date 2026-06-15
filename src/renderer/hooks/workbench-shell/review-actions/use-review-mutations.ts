@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
+
 import { toast } from 'sonner';
 
 import {
@@ -45,15 +46,6 @@ export function useReviewMutations({
 	const workspaceCwd = activeWorkspace.pathLabel;
 	const workspaceId = activeWorkspace.id;
 
-	const invalidateReviewState = useCallback(() => {
-		void queryClient.invalidateQueries({
-			queryKey: ensembleQueryKeys.pullRequestSnapshot(workspaceId),
-		});
-		void queryClient.invalidateQueries({
-			queryKey: ensembleQueryKeys.workspaceGitStatus(workspaceCwd),
-		});
-	}, [queryClient, workspaceCwd, workspaceId]);
-
 	const runArchiveAfterMerge = useCallback(async () => {
 		try {
 			const result = await archiveWorkspace({
@@ -97,7 +89,12 @@ export function useReviewMutations({
 		onSuccess: () => {
 			toast.success('Changes committed and pushed.');
 			onSettled();
-			invalidateReviewState();
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.pullRequestSnapshot(workspaceId),
+			});
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.workspaceGitStatus(workspaceCwd),
+			});
 		},
 	});
 
@@ -152,7 +149,12 @@ export function useReviewMutations({
 					: 'Pull request created.',
 			);
 			onSettled();
-			invalidateReviewState();
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.pullRequestSnapshot(workspaceId),
+			});
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.workspaceGitStatus(workspaceCwd),
+			});
 		},
 	});
 
@@ -166,7 +168,12 @@ export function useReviewMutations({
 		onError: (error) => showReviewActionError('Merge failed', error),
 		onSuccess: () => {
 			onSettled();
-			invalidateReviewState();
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.pullRequestSnapshot(workspaceId),
+			});
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.workspaceGitStatus(workspaceCwd),
+			});
 			if (mergeSettings.archiveAfterMerge) {
 				void runArchiveAfterMerge();
 				return;

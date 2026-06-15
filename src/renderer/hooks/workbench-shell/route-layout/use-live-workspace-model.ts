@@ -115,15 +115,24 @@ export function useLiveWorkspaceModel({
 		return {
 			...activeWorkspace,
 			dockTabs: [
-				...activeWorkspace.dockTabs
-					.filter((tab) => tab.kind !== 'terminal')
-					.map((tab) =>
-						tab.kind === 'setup-script'
-							? { ...tab, status: scriptSummaryToDockStatus(scripts.setup) }
-							: tab.kind === 'run-script'
-								? { ...tab, status: scriptSummaryToDockStatus(scripts.run) }
-								: tab,
-					),
+				...activeWorkspace.dockTabs.flatMap(
+					(tab): typeof activeWorkspace.dockTabs => {
+						if (tab.kind === 'terminal') {
+							return [];
+						}
+						if (tab.kind === 'setup-script') {
+							return [
+								{ ...tab, status: scriptSummaryToDockStatus(scripts.setup) },
+							];
+						}
+						if (tab.kind === 'run-script') {
+							return [
+								{ ...tab, status: scriptSummaryToDockStatus(scripts.run) },
+							];
+						}
+						return [tab];
+					},
+				),
 				...mapTerminalSessionsToDockTabs(terminalSessions.sessions),
 			],
 			...liveReview,

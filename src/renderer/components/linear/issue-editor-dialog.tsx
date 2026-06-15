@@ -61,7 +61,10 @@ export function LinearIssueEditorDialog({
 }) {
 	const mode = issue ? 'edit' : 'create';
 	const queryClient = useQueryClient();
-	const metadata = useQuery({ ...linearMetadataQuery, enabled: open });
+	const { data: metadataData } = useQuery({
+		...linearMetadataQuery,
+		enabled: open,
+	});
 	const [fields, setFields] = useState<LinearIssueEditorFields>(() =>
 		createIssueEditorFields(issue),
 	);
@@ -108,8 +111,8 @@ export function LinearIssueEditorDialog({
 	});
 
 	const metadataWire =
-		metadata.data?.status === 'ok' || metadata.data?.status === 'error'
-			? metadata.data.metadata
+		metadataData?.status === 'ok' || metadataData?.status === 'error'
+			? metadataData.metadata
 			: null;
 	const teamStates = filterByTeam(metadataWire?.states ?? [], fields.teamId);
 	const teamCycles = filterByTeam(metadataWire?.cycles ?? [], fields.teamId);

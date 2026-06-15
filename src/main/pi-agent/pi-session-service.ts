@@ -218,22 +218,23 @@ export function createPiSessionService({
 			const events: PiSessionEventWire[] = listEventsByBranch({
 				branchId: request.branchId,
 				database,
-			})
-				.filter(
-					(event) =>
-						request.upToOrdinal === undefined ||
-						event.ordinal <= request.upToOrdinal,
-				)
-				.map((event) => ({
-					branchId: event.branchId,
-					createdAt: event.createdAt,
-					eventType: event.eventType,
-					id: event.id,
-					ordinal: event.ordinal,
-					payload: event.payload,
-					stream: event.stream,
-					turnId: event.turnId,
-				}));
+			}).flatMap((event) =>
+				request.upToOrdinal === undefined ||
+				event.ordinal <= request.upToOrdinal
+					? [
+							{
+								branchId: event.branchId,
+								createdAt: event.createdAt,
+								eventType: event.eventType,
+								id: event.id,
+								ordinal: event.ordinal,
+								payload: event.payload,
+								stream: event.stream,
+								turnId: event.turnId,
+							},
+						]
+					: [],
+			);
 			try {
 				const result = await sessionSummaryWriter.writeSessionSummary({
 					branchId: request.branchId,

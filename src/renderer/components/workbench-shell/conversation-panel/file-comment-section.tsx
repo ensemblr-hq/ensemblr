@@ -41,10 +41,6 @@ export function FileCommentSection({
 	const [draftBody, setDraftBody] = useState('');
 	const [draftLine, setDraftLine] = useState('');
 
-	const invalidate = () =>
-		queryClient.invalidateQueries({
-			queryKey: ensembleQueryKeys.reviewComments(workspaceId),
-		});
 	const onError = notifyCommentUpdateFailed;
 
 	const addMutation = useMutation({
@@ -59,7 +55,9 @@ export function FileCommentSection({
 		onSuccess: () => {
 			setDraftBody('');
 			setDraftLine('');
-			void invalidate();
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.reviewComments(workspaceId),
+			});
 		},
 	});
 	const resolveMutation = useMutation({
@@ -70,12 +68,18 @@ export function FileCommentSection({
 				workspaceId,
 			}),
 		onError,
-		onSuccess: invalidate,
+		onSuccess: () =>
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.reviewComments(workspaceId),
+			}),
 	});
 	const deleteMutation = useMutation({
 		mutationFn: (id: string) => deleteReviewComment({ id }),
 		onError,
-		onSuccess: invalidate,
+		onSuccess: () =>
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.reviewComments(workspaceId),
+			}),
 	});
 
 	const fileComments = (commentsData?.comments ?? []).filter(

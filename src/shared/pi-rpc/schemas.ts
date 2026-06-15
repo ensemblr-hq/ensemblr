@@ -12,7 +12,7 @@
 import { z } from 'zod';
 
 /** Text content block. Fixture: plain-answer.jsonl (assistant message_end). */
-export const piTextBlockSchema = z.looseObject({
+const piTextBlockSchema = z.looseObject({
 	type: z.literal('text'),
 	text: z.string(),
 });
@@ -21,14 +21,14 @@ export const piTextBlockSchema = z.looseObject({
  * Thinking content block. `thinking` was always empty in captures; only the
  * encrypted `thinkingSignature` is populated. Fixture: thinking.jsonl.
  */
-export const piThinkingBlockSchema = z.looseObject({
+const piThinkingBlockSchema = z.looseObject({
 	type: z.literal('thinking'),
 	thinking: z.string(),
 	thinkingSignature: z.string().optional(),
 });
 
 /** Tool-call content block. Fixture: multi-tool-chain.jsonl (toolcall_end). */
-export const piToolCallBlockSchema = z.looseObject({
+const piToolCallBlockSchema = z.looseObject({
 	type: z.literal('toolCall'),
 	id: z.string(),
 	name: z.string(),
@@ -36,7 +36,7 @@ export const piToolCallBlockSchema = z.looseObject({
 });
 
 /** Assistant message content union. Fixtures: all (message_end:assistant). */
-export const piAssistantBlockSchema = z.discriminatedUnion('type', [
+const piAssistantBlockSchema = z.discriminatedUnion('type', [
 	piTextBlockSchema,
 	piThinkingBlockSchema,
 	piToolCallBlockSchema,
@@ -47,7 +47,7 @@ export const piAssistantBlockSchema = z.discriminatedUnion('type', [
  * `cost` object are undocumented but present in every capture.
  * Fixture: plain-answer.jsonl.
  */
-export const piUsageSchema = z.looseObject({
+const piUsageSchema = z.looseObject({
 	input: z.number().optional(),
 	output: z.number().optional(),
 	cacheRead: z.number().optional(),
@@ -69,7 +69,7 @@ export const piUsageSchema = z.looseObject({
  * the documented bare-string form is kept because docs/rpc.md guarantees it.
  * Fixture: plain-answer.jsonl (message_start:user).
  */
-export const piUserMessageSchema = z.looseObject({
+const piUserMessageSchema = z.looseObject({
 	role: z.literal('user'),
 	content: z.union([
 		z.string(),
@@ -84,7 +84,7 @@ export const piUserMessageSchema = z.looseObject({
  * fail the parse. `responseId` is undocumented but always present.
  * Fixture: plain-answer.jsonl (message_end:assistant).
  */
-export const piAssistantMessageSchema = z.looseObject({
+const piAssistantMessageSchema = z.looseObject({
 	role: z.literal('assistant'),
 	content: z.array(piAssistantBlockSchema),
 	api: z.string().optional(),
@@ -97,7 +97,7 @@ export const piAssistantMessageSchema = z.looseObject({
 });
 
 /** Tool result message. Fixture: single-read.jsonl (message_end:toolResult). */
-export const piToolResultMessageSchema = z.looseObject({
+const piToolResultMessageSchema = z.looseObject({
 	role: z.literal('toolResult'),
 	toolCallId: z.string(),
 	toolName: z.string(),
@@ -113,7 +113,7 @@ export const piToolResultMessageSchema = z.looseObject({
  * Pure context injection — classified as timeline noise.
  * Fixture: markdown-heavy.jsonl (message_start:custom).
  */
-export const piCustomMessageSchema = z.looseObject({
+const piCustomMessageSchema = z.looseObject({
 	role: z.literal('custom'),
 	customType: z.string(),
 	content: z.unknown().optional(),
@@ -121,7 +121,7 @@ export const piCustomMessageSchema = z.looseObject({
 });
 
 /** Any message pi attaches to message/turn/agent events. Fixtures: all. */
-export const piAgentMessageSchema = z.discriminatedUnion('role', [
+const piAgentMessageSchema = z.discriminatedUnion('role', [
 	piUserMessageSchema,
 	piAssistantMessageSchema,
 	piToolResultMessageSchema,
@@ -136,7 +136,7 @@ export const piAgentMessageSchema = z.discriminatedUnion('role', [
  * modelled — items fold deltas instead. Fixtures: plain-answer.jsonl (text),
  * thinking.jsonl (thinking), multi-tool-chain.jsonl (toolcall).
  */
-export const piAssistantDeltaSchema = z.union([
+const piAssistantDeltaSchema = z.union([
 	z.looseObject({ type: z.literal('text_start'), contentIndex: z.number() }),
 	z.looseObject({
 		type: z.literal('text_delta'),
@@ -180,7 +180,7 @@ export const piAssistantDeltaSchema = z.union([
  * firstChangedLine, read → filePath/truncated, lsp_diagnostics →
  * diagnostics/severity. Fixtures: long-output.jsonl, file-edit.jsonl.
  */
-export const piToolPayloadSchema = z.looseObject({
+const piToolPayloadSchema = z.looseObject({
 	content: z.array(
 		z.looseObject({ type: z.string(), text: z.string().optional() }),
 	),
@@ -188,7 +188,7 @@ export const piToolPayloadSchema = z.looseObject({
 });
 
 /** `agent_start` — no payload. Fixtures: all. */
-export const piAgentStartSchema = z.looseObject({
+const piAgentStartSchema = z.looseObject({
 	type: z.literal('agent_start'),
 });
 
@@ -197,45 +197,45 @@ export const piAgentStartSchema = z.looseObject({
  * undocumented but always present. Fires even after an abort. Fixtures: all;
  * abort behavior: abort-mid-turn.jsonl.
  */
-export const piAgentEndSchema = z.looseObject({
+const piAgentEndSchema = z.looseObject({
 	type: z.literal('agent_end'),
 	messages: z.array(piAgentMessageSchema),
 	willRetry: z.boolean().optional(),
 });
 
 /** `turn_start` — inner LLM-call boundary, no payload. Fixtures: all. */
-export const piTurnStartSchema = z.looseObject({
+const piTurnStartSchema = z.looseObject({
 	type: z.literal('turn_start'),
 });
 
 /** `turn_end` — assistant message plus its tool results. Fixtures: all. */
-export const piTurnEndSchema = z.looseObject({
+const piTurnEndSchema = z.looseObject({
 	type: z.literal('turn_end'),
 	message: piAgentMessageSchema,
 	toolResults: z.array(piToolResultMessageSchema),
 });
 
 /** `message_start` — a message began. Fixtures: all. */
-export const piMessageStartSchema = z.looseObject({
+const piMessageStartSchema = z.looseObject({
 	type: z.literal('message_start'),
 	message: piAgentMessageSchema,
 });
 
 /** `message_update` — streaming assistant delta. Fixtures: all. */
-export const piMessageUpdateSchema = z.looseObject({
+const piMessageUpdateSchema = z.looseObject({
 	type: z.literal('message_update'),
 	message: piAgentMessageSchema,
 	assistantMessageEvent: piAssistantDeltaSchema,
 });
 
 /** `message_end` — authoritative completed message. Fixtures: all. */
-export const piMessageEndSchema = z.looseObject({
+const piMessageEndSchema = z.looseObject({
 	type: z.literal('message_end'),
 	message: piAgentMessageSchema,
 });
 
 /** `tool_execution_start`. Fixture: single-read.jsonl. */
-export const piToolExecutionStartSchema = z.looseObject({
+const piToolExecutionStartSchema = z.looseObject({
 	type: z.literal('tool_execution_start'),
 	toolCallId: z.string(),
 	toolName: z.string(),
@@ -246,7 +246,7 @@ export const piToolExecutionStartSchema = z.looseObject({
  * `tool_execution_update` — `partialResult` is the ACCUMULATED output so far,
  * not a delta (verified: long-output.jsonl). Fixture: long-output.jsonl.
  */
-export const piToolExecutionUpdateSchema = z.looseObject({
+const piToolExecutionUpdateSchema = z.looseObject({
 	type: z.literal('tool_execution_update'),
 	toolCallId: z.string(),
 	toolName: z.string(),
@@ -260,7 +260,7 @@ export const piToolExecutionUpdateSchema = z.looseObject({
  * (permission-gate.jsonl, "Denied by user"). Fixtures: single-read.jsonl,
  * failing-tool.jsonl, permission-gate.jsonl.
  */
-export const piToolExecutionEndSchema = z.looseObject({
+const piToolExecutionEndSchema = z.looseObject({
 	type: z.literal('tool_execution_end'),
 	toolCallId: z.string(),
 	toolName: z.string(),
@@ -304,7 +304,7 @@ export const piSessionStatsSchema = z.looseObject({
  * `command === "get_session_stats"`). Fixtures: all (response:prompt),
  * abort-mid-turn.jsonl (response:abort).
  */
-export const piResponseSchema = z.looseObject({
+const piResponseSchema = z.looseObject({
 	type: z.literal('response'),
 	command: z.string(),
 	success: z.boolean(),
@@ -320,7 +320,7 @@ export const piResponseSchema = z.looseObject({
  * all fixtures; `statusText` may embed ANSI codes). Unobserved dialog
  * methods (select/input/editor) intentionally fall into the generic arm.
  */
-export const piExtensionUiRequestSchema = z.union([
+const piExtensionUiRequestSchema = z.union([
 	z.looseObject({
 		type: z.literal('extension_ui_request'),
 		id: z.string(),

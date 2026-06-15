@@ -88,8 +88,10 @@ export function usePiComposerController({
 	workspaceId: string;
 }): PiComposerControllerState {
 	const queryClient = useQueryClient();
-	const modelsQuery = useQuery(piModelsQuery);
-	const sessionsQuery = useQuery(piSessionsForWorkspaceQuery(workspaceId));
+	const { data: models } = useQuery(piModelsQuery);
+	const { data: sessionsData } = useQuery(
+		piSessionsForWorkspaceQuery(workspaceId),
+	);
 
 	const [selectedModelId, setSelectedModelId] = useAtom(
 		lastSelectedPiModelAtom,
@@ -105,7 +107,6 @@ export function usePiComposerController({
 		usage: ComposerContextUsage;
 	} | null>(null);
 
-	const models = modelsQuery.data;
 	const availableModels = useMemo<readonly ComposerModelOption[]>(() => {
 		if (!models) {
 			return [];
@@ -141,21 +142,23 @@ export function usePiComposerController({
 		}));
 	}, [models, modelId]);
 
-	const persistedActiveSession = sessionsQuery.data?.sessions.find(
+	const persistedActiveSession = sessionsData?.sessions.find(
 		(session) => session.id === currentPiSessionId,
 	);
 	const pendingSessionId =
 		pendingSession?.chatTabId === chatTabId ? pendingSession.sessionId : null;
 	const activeSessionId = persistedActiveSession?.id ?? pendingSessionId;
-	const activeSessionSnapshot = sessionsQuery.data?.sessions.find(
+	const activeSessionSnapshot = sessionsData?.sessions.find(
 		(session) => session.id === activeSessionId,
 	);
 	const activeSessionStatus = activeSessionSnapshot?.status;
 	const activeBranchId = activeSessionSnapshot?.branchId ?? '';
-	const contextEventsQuery = useQuery(piSessionEventsQuery(activeBranchId));
+	const { data: contextEventsData } = useQuery(
+		piSessionEventsQuery(activeBranchId),
+	);
 	const persistedContextUsage = useMemo(
-		() => latestContextUsageFromEvents(contextEventsQuery.data?.events ?? []),
-		[contextEventsQuery.data?.events],
+		() => latestContextUsageFromEvents(contextEventsData?.events ?? []),
+		[contextEventsData?.events],
 	);
 	// Live usage is tagged by session id; a stale snapshot from a previous
 	// session is treated as absent so the gauge falls back to persisted state
@@ -243,6 +246,10 @@ export function usePiComposerController({
 				prompt: input.prompt,
 				sessionId: input.sessionId,
 				thinkingLevel,
+			}),
+		onSuccess: () =>
+			queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
 			}),
 	});
 

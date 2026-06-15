@@ -94,10 +94,10 @@ export function parseDeepLink(rawUrl: string): DeepLink {
 
 	// `new URL("ensemble://foo/bar")` puts `foo` in hostname and `/bar` in pathname.
 	const head = url.hostname.toLowerCase();
-	const segments = url.pathname
-		.split('/')
-		.map((s) => decodeURIComponent(s).trim())
-		.filter(Boolean);
+	const segments = url.pathname.split('/').flatMap((s) => {
+		const trimmed = decodeURIComponent(s).trim();
+		return trimmed ? [trimmed] : [];
+	});
 
 	switch (head) {
 		case 'workbench':

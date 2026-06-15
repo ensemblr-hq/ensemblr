@@ -80,15 +80,17 @@ export function useSessionTabState({
 } {
 	const workspaceId = activeWorkspace.id;
 	const queryClient = useQueryClient();
-	const chatTabsQuery = useQuery(listChatTabsQuery(workspaceId));
-	const closedChatTabsQuery = useQuery(
+	const { data: chatTabsData } = useQuery(listChatTabsQuery(workspaceId));
+	const { data: closedChatTabsData } = useQuery(
 		listClosedChatTabsWithSummaryQuery(workspaceId),
 	);
-	const piSessionsQuery = useQuery(piSessionsForWorkspaceQuery(workspaceId));
+	const { data: piSessionsData } = useQuery(
+		piSessionsForWorkspaceQuery(workspaceId),
+	);
 
-	const openTabs = chatTabsQuery.data?.open ?? null;
-	const closedEntries = closedChatTabsQuery.data?.entries ?? null;
-	const piSessions = piSessionsQuery.data?.sessions;
+	const openTabs = chatTabsData?.open ?? null;
+	const closedEntries = closedChatTabsData?.entries ?? null;
+	const piSessions = piSessionsData?.sessions;
 
 	const piStatusByPiSessionId = useMemo(() => {
 		const map = new Map<string, PiSessionSnapshotWire>();
@@ -177,9 +179,19 @@ export function useSessionTabState({
 				});
 				return;
 			}
-			invalidateChatTabs();
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+			});
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.closedChatTabsWithSummary(workspaceId),
+			});
 		},
-		onSuccess: cacheOpenedTab,
+		onSuccess: (result) => {
+			cacheOpenedTab(result);
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+			});
+		},
 	});
 
 	const openAuxiliaryTabMutation = useMutation({
@@ -191,7 +203,12 @@ export function useSessionTabState({
 				description: error instanceof Error ? error.message : undefined,
 			});
 		},
-		onSuccess: cacheOpenedTab,
+		onSuccess: (result) => {
+			cacheOpenedTab(result);
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+			});
+		},
 	});
 
 	// Bootstrap a real chat-tab row when the workspace has none. Placeholder
@@ -202,10 +219,10 @@ export function useSessionTabState({
 		if (!bootstrap) {
 			return;
 		}
-		if (!chatTabsQuery.data) {
+		if (!chatTabsData) {
 			return;
 		}
-		if (chatTabsQuery.data.open.length > 0) {
+		if (chatTabsData.open.length > 0) {
 			return;
 		}
 		if (bootstrappedWorkspacesGlobal.has(workspaceId)) {
@@ -225,7 +242,7 @@ export function useSessionTabState({
 		});
 	}, [
 		bootstrap,
-		chatTabsQuery.data,
+		chatTabsData,
 		invalidateChatTabs,
 		onSessionTabChange,
 		openChatTabMutation,
@@ -242,7 +259,14 @@ export function useSessionTabState({
 				workspaceId,
 			});
 		},
-		onSuccess: invalidateChatTabs,
+		onSuccess: () => {
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+			});
+			void queryClient.invalidateQueries({
+				queryKey: ensembleQueryKeys.closedChatTabsWithSummary(workspaceId),
+			});
+		},
 	});
 
 	const openSessionTab =

@@ -250,10 +250,12 @@ export function createPiSessionLifecycle({
 		shutdownActiveSessions: async () => {
 			const open = [...activeSessions.values()];
 			activeSessions.clear();
-			for (const session of open) {
-				session.subscription.unsubscribe();
-				await session.piRuntimeSession.close().catch(() => undefined);
-			}
+			await Promise.all(
+				open.map(async (session) => {
+					session.subscription.unsubscribe();
+					await session.piRuntimeSession.close().catch(() => undefined);
+				}),
+			);
 		},
 		stopSession,
 		submitPrompt,

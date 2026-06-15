@@ -43,7 +43,7 @@ export function parsePiRpcLine(line: string): PiRpcParseResult {
  * @param frame - One decoded stdout frame.
  * @returns The parsed event or an unknown-frame descriptor.
  */
-export function parsePiRpcFrame(frame: unknown): PiRpcParseResult {
+function parsePiRpcFrame(frame: unknown): PiRpcParseResult {
 	const result = piRpcEventSchema.safeParse(frame);
 	if (result.success) {
 		return { ok: true, event: result.data };

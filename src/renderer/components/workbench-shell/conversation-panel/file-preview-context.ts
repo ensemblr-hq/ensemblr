@@ -1,4 +1,4 @@
-import { createContext, useContext } from 'react';
+import { createContext, use } from 'react';
 
 /**
  * Opens (or re-focuses) a file-preview tab for a workspace-relative path.
@@ -13,7 +13,7 @@ const FilePreviewOpenerContext = createContext<FilePreviewOpener | null>(null);
 export const FilePreviewOpenerProvider = FilePreviewOpenerContext.Provider;
 
 export function useFilePreviewOpener(): FilePreviewOpener | null {
-	return useContext(FilePreviewOpenerContext);
+	return use(FilePreviewOpenerContext);
 }
 
 /** Opens (or re-focuses) a diff tab for a checkpointed turn. */
@@ -24,7 +24,7 @@ const TurnDiffOpenerContext = createContext<TurnDiffOpener | null>(null);
 export const TurnDiffOpenerProvider = TurnDiffOpenerContext.Provider;
 
 export function useTurnDiffOpener(): TurnDiffOpener | null {
-	return useContext(TurnDiffOpenerContext);
+	return use(TurnDiffOpenerContext);
 }
 
 /**
@@ -41,7 +41,7 @@ export const WorkspaceFileDiffOpenerProvider =
 	WorkspaceFileDiffOpenerContext.Provider;
 
 export function useWorkspaceFileDiffOpener(): WorkspaceFileDiffOpener | null {
-	return useContext(WorkspaceFileDiffOpenerContext);
+	return use(WorkspaceFileDiffOpenerContext);
 }
 
 /** Opens (or re-focuses) a read-only file preview tab from review surfaces. */
@@ -54,5 +54,5 @@ export const ReviewFilePreviewOpenerProvider =
 	ReviewFilePreviewOpenerContext.Provider;
 
 export function useReviewFilePreviewOpener(): ReviewFilePreviewOpener | null {
-	return useContext(ReviewFilePreviewOpenerContext);
+	return use(ReviewFilePreviewOpenerContext);
 }

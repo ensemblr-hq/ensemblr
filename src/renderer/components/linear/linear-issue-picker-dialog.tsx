@@ -31,17 +31,20 @@ export function LinearIssuePickerDialog({
 	open: boolean;
 }) {
 	const [query, setQuery] = useState('');
-	const connection = useQuery({ ...linearConnectionQuery, enabled: open });
-	const issues = useQuery({
+	const { data: connectionData, isLoading: connectionLoading } = useQuery({
+		...linearConnectionQuery,
+		enabled: open,
+	});
+	const { data: issuesData, isLoading: issuesLoading } = useQuery({
 		...linearIssuesQuery(query ? { query } : {}),
 		enabled: open,
 	});
 
 	const gate = deriveLinearGateState({
-		connection: connection.data,
-		isLoading: connection.isLoading,
+		connection: connectionData,
+		isLoading: connectionLoading,
 	});
-	const rows = issues.data?.issues ?? [];
+	const rows = issuesData?.issues ?? [];
 
 	return (
 		<CommandDialog
@@ -60,7 +63,7 @@ export function LinearIssuePickerDialog({
 				<CommandList className='max-h-80 border-border border-t'>
 					<CommandEmpty className='py-8 text-muted-foreground text-xs'>
 						{gate.kind === 'ready'
-							? issues.isLoading
+							? issuesLoading
 								? 'Loading issues…'
 								: 'No issues match your search.'
 							: 'Linear is not connected. Sign in from integration settings.'}

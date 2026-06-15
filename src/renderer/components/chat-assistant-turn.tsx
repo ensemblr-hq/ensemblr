@@ -77,8 +77,9 @@ export function ChatAssistantTurn({
 	const answerText = useMemo(
 		() =>
 			finalParts
-				.map((part) => (part.type === 'text' ? part.text : ''))
-				.filter(Boolean)
+				.flatMap((part) =>
+					part.type === 'text' && part.text ? [part.text] : [],
+				)
 				.join('\n\n'),
 		[finalParts],
 	);

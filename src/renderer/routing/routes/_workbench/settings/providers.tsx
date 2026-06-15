@@ -47,9 +47,13 @@ const PROVIDER_GROUPS: ReadonlyArray<{
 
 function ProvidersSettings() {
 	const queryClient = useQueryClient();
-	const diagnostics = useQuery(setupDiagnosticsQuery);
+	const {
+		data: diagnosticsData,
+		isFetching: diagnosticsFetching,
+		isLoading: diagnosticsLoading,
+	} = useQuery(setupDiagnosticsQuery);
 	const checksById = new Map(
-		(diagnostics.data?.checks ?? []).map((check) => [check.id, check]),
+		(diagnosticsData?.checks ?? []).map((check) => [check.id, check]),
 	);
 
 	const refresh = () =>
@@ -61,18 +65,18 @@ function ProvidersSettings() {
 		<SettingsSection
 			action={
 				<Button
-					disabled={diagnostics.isFetching}
+					disabled={diagnosticsFetching}
 					onClick={() => refresh()}
 					size='sm'
 					variant='outline'
 				>
-					{diagnostics.isFetching ? 'Re-checking…' : 'Re-check'}
+					{diagnosticsFetching ? 'Re-checking…' : 'Re-check'}
 				</Button>
 			}
 			description='Pi runtime, model provider, and GitHub readiness sourced from the setup-diagnostics gate. Resolve blocked checks in Diagnostics.'
 			title='Providers'
 		>
-			{diagnostics.isLoading ? (
+			{diagnosticsLoading ? (
 				<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
 					<Spinner className='size-4' /> Reading provider readiness…
 				</div>

@@ -2,8 +2,10 @@ import { ipcMain } from 'electron';
 
 import { type CreateTerminalSessionRequest, type CreateTerminalSessionResult, type KillTerminalRequest, type KillTerminalResult, type ListTerminalSessionsRequest, type ListTerminalSessionsResult, type ResizeTerminalRequest, type TerminalSnapshotRequest, type TerminalSnapshotResult, type WriteTerminalRequest } from '../../../shared/ipc/contracts/terminal';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import type { TerminalService } from '../../terminal';
-import { TerminalServiceError } from '../../terminal';
+import {
+	TerminalServiceError,
+	type TerminalService,
+} from '../../terminal/terminal-service';
 
 /** Service dependencies used by the terminal IPC handlers. */
 export interface TerminalHandlersOptions {

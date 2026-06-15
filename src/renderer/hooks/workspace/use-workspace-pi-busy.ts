@@ -19,7 +19,9 @@ import {
  */
 export function useWorkspacePiBusy(workspaceId: string): boolean {
 	const queryClient = useQueryClient();
-	const sessionsQuery = useQuery(piSessionsForWorkspaceQuery(workspaceId));
+	const { data: sessionsData } = useQuery(
+		piSessionsForWorkspaceQuery(workspaceId),
+	);
 
 	useEffect(() => {
 		if (workspaceId.length === 0) {
@@ -39,7 +41,7 @@ export function useWorkspacePiBusy(workspaceId: string): boolean {
 		return unsubscribe;
 	}, [queryClient, workspaceId]);
 
-	const sessions = sessionsQuery.data?.sessions;
+	const sessions = sessionsData?.sessions;
 	return useMemo(() => {
 		if (!sessions) {
 			return false;

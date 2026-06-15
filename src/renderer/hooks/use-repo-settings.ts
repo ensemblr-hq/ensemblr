@@ -26,7 +26,7 @@ export function useRepoSettings(repoId: string) {
 		repoSettingsOverrideAtomFamily(repoId),
 	);
 
-	const resolution = useQuery(
+	const { data: resolutionData } = useQuery(
 		settingsResolutionQuery(
 			project
 				? { repositoryId: repoId, repositoryPath: project.pathLabel }
@@ -37,7 +37,7 @@ export function useRepoSettings(repoId: string) {
 	const resolved = (
 		key: RepoSettingsKey,
 	): ResolvedSettingSnapshot | undefined =>
-		resolution.data?.repository?.settings.find((s) => s.key === key);
+		resolutionData?.repository?.settings.find((s) => s.key === key);
 
-	return { overrides, setOverrides, resolved, project, resolution };
+	return { overrides, setOverrides, resolved, project };
 }

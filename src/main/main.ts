@@ -11,7 +11,8 @@ import type {
 	TerminalOutputBroadcast,
 } from '../shared/ipc/contracts/terminal';
 
-import { createMainWindow, createMainWindowStateStore } from './app';
+import { createMainWindow } from './app/main-window';
+import { createMainWindowStateStore } from './app/window-state';
 import { createLocalCommandService } from './commands';
 import {
 	createEnsembleConfigResolutionService,
