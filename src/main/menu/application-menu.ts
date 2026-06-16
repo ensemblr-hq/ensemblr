@@ -1,5 +1,12 @@
 import path from 'node:path';
-import { app, Menu, type MenuItemConstructorOptions, shell } from 'electron';
+import {
+	app,
+	BrowserWindow,
+	Menu,
+	type MenuItemConstructorOptions,
+	shell,
+} from 'electron';
+import { IPC_CHANNELS } from '../../shared/ipc/channels';
 import { getAccelerator } from '../../shared/keymap/matcher';
 
 /**
@@ -19,6 +26,20 @@ function getProductRoadmapPath(): string {
  * appearing only on darwin platforms.
  */
 export function installApplicationMenu(): void {
+	// Context-aware close: the renderer decides whether ⌘/Ctrl+W closes the
+	// active tab, navigates back, or closes the window. Replaces the default
+	// `close` role so the keydown reaches the web page logic instead of being
+	// swallowed by the menu accelerator.
+	const closeTabItem: MenuItemConstructorOptions = {
+		accelerator: getAccelerator('tab.close'),
+		click: () => {
+			BrowserWindow.getFocusedWindow()?.webContents.send(
+				IPC_CHANNELS.closeActiveTab,
+			);
+		},
+		label: 'Close Tab',
+	};
+
 	const appMenu: MenuItemConstructorOptions[] =
 		process.platform === 'darwin'
 			? [
@@ -50,7 +71,7 @@ export function installApplicationMenu(): void {
 					label: 'New Workspace',
 				},
 				{ type: 'separator' },
-				{ role: process.platform === 'darwin' ? 'close' : 'quit' },
+				process.platform === 'darwin' ? closeTabItem : { role: 'quit' },
 			],
 		},
 		{
@@ -102,7 +123,7 @@ export function installApplicationMenu(): void {
 							{ type: 'separator' },
 							{ role: 'front' },
 						] as MenuItemConstructorOptions[])
-					: ([{ role: 'close' }] as MenuItemConstructorOptions[])),
+					: ([closeTabItem] as MenuItemConstructorOptions[])),
 			],
 		},
 		{
