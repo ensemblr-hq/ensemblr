@@ -52,6 +52,7 @@ Explicitly deferred until post-core:
 | 3. Repository and Workspace Core | `.vite/` directory gitignored for Vite dev server cache | 6ef81a7 |
 | 8. Settings and Parity Polish | Git settings UI page in Settings → Git | d61d93e |
 | 8. Settings and Parity Polish | Wordmark glitch animation fires immediately on mount | 957a71d |
+| 8. Settings and Parity Polish | Context-aware ⌘/Ctrl+W close action for workspace tabs, Settings shell, and window fallback | 695de4f |
 
 ## Roadmap Sequence
 
