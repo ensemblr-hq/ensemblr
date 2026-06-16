@@ -13,6 +13,7 @@ import type {
 	ArchiveWorkspaceResult,
 	DeleteArchivedWorkspaceRequest,
 	DeleteArchivedWorkspaceResult,
+	ListAllWorkspacesResult,
 	ListArchivedWorkspacesRequest,
 	ListArchivedWorkspacesResult,
 	UnarchiveWorkspaceRequest,
@@ -87,6 +88,8 @@ export interface ArchiveApi {
 	deleteArchivedWorkspace: (
 		request: DeleteArchivedWorkspaceRequest,
 	) => Promise<DeleteArchivedWorkspaceResult>;
+	/** Global History feed: every workspace across all repositories, active or archived. */
+	listAllWorkspaces: () => Promise<ListAllWorkspacesResult>;
 	listArchivedWorkspaces: (
 		request: ListArchivedWorkspacesRequest,
 	) => Promise<ListArchivedWorkspacesResult>;

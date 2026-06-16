@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { WorkbenchPlaceholderPage } from '@/renderer/components/workbench-shell/route-layout';
+import { HistoryPage } from '@/renderer/components/workbench-shell/history';
 
 export const Route = createFileRoute('/_workbench/_shell/history')({
 	component: HistoryRoute,
@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_workbench/_shell/history')({
 	},
 });
 
-/** History workbench view (placeholder pending content). */
+/** History workbench view: all workspaces ever created, grouped by last activity. */
 function HistoryRoute() {
-	return <WorkbenchPlaceholderPage view='history' />;
+	return <HistoryPage />;
 }

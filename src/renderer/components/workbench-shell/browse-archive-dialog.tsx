@@ -6,6 +6,7 @@ import {
 	archivedWorkspacesQuery,
 	deleteArchivedWorkspace,
 	ensembleQueryKeys,
+	invalidateWorkspaceListViews,
 	isEnsembleApiAvailable,
 	unarchiveWorkspace,
 } from '@/renderer/api/ensemble-queries';
@@ -17,6 +18,7 @@ import {
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
+import { canRestoreArchivedWorkspace } from '@/renderer/lib/archive-restore';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type {
 	ArchivedWorkspaceListEntry,
@@ -88,11 +90,9 @@ function BrowseArchiveDialogBody({
 
 	const invalidate = useCallback(async () => {
 		await Promise.all([
+			invalidateWorkspaceListViews(queryClient),
 			queryClient.invalidateQueries({
 				queryKey: ensembleQueryKeys.archivedWorkspaces(project.id),
-			}),
-			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
 			}),
 		]);
 		await onChange(project.id);
@@ -203,11 +203,7 @@ function BrowseArchiveDialogBody({
 									<div className='flex gap-2'>
 										<Button
 											className='h-8'
-											disabled={
-												isBusy ||
-												(entry.branchCleanup &&
-													(!entry.baseBranch || !entry.branchName))
-											}
+											disabled={isBusy || !canRestoreArchivedWorkspace(entry)}
 											onClick={() => {
 												void handleUnarchive(entry);
 											}}

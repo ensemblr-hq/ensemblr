@@ -59,6 +59,7 @@ export const IPC_CHANNELS = {
 	linearMetadata: 'ensemble:linear-metadata',
 	linearStartLogin: 'ensemble:linear-start-login',
 	linearUpdateIssue: 'ensemble:linear-update-issue',
+	listAllWorkspaces: 'ensemble:list-all-workspaces',
 	listArchivedWorkspaces: 'ensemble:list-archived-workspaces',
 	listChatTabs: 'ensemble:list-chat-tabs',
 	listClosedChatTabsWithSummary: 'ensemble:list-closed-chat-tabs-with-summary',

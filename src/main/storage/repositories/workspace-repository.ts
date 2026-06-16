@@ -620,6 +620,55 @@ export function listArchivedWorkspaceRowsByRepository({
 		.all(repositoryId);
 }
 
+/** Inputs for {@link listAllWorkspaceRows}. */
+export interface ListAllWorkspaceRowsOptions {
+	database: DatabaseSync;
+}
+
+/**
+ * Returns every workspace across all repositories — active and archived —
+ * joined with the parent repository (for the display name) and the most recent
+ * matching `archive_records` row (for base branch + branch-cleanup state, used
+ * to gate the Unarchive action). Ordered by last activity (with `id` as a
+ * stable tiebreaker so equal timestamps don't reshuffle between loads) so the
+ * History screen can group newest-first. Mirrors the archive-record join in
+ * {@link listArchivedWorkspaceRowsByRepository} but drops the archived filter
+ * and the repository scope.
+ */
+export function listAllWorkspaceRows({
+	database,
+}: ListAllWorkspaceRowsOptions): unknown[] {
+	return database
+		.prepare(
+			`SELECT
+				w.id AS id,
+				w.slug AS slug,
+				w.repository_id AS repositoryId,
+				w.name AS name,
+				w.path AS path,
+				w.branch_name AS branchName,
+				w.created_at AS createdAt,
+				w.updated_at AS updatedAt,
+				w.archived_at AS archivedAt,
+				r.name AS repositoryName,
+				a.base_branch AS baseBranch,
+				a.branch_cleanup AS branchCleanupRaw
+			FROM workspaces w
+			INNER JOIN repositories r ON r.id = w.repository_id
+			LEFT JOIN archive_records a
+				ON a.workspace_id = w.id
+				AND a.record_type = 'workspace'
+				AND a.id = (
+					SELECT id FROM archive_records
+					WHERE workspace_id = w.id AND record_type = 'workspace'
+					ORDER BY archived_at DESC
+					LIMIT 1
+				)
+			ORDER BY w.updated_at DESC, w.id DESC`,
+		)
+		.all();
+}
+
 /** Inputs for {@link listWorkspaceIdsByRepository}. */
 export interface ListWorkspaceIdsByRepositoryOptions {
 	database: DatabaseSync;

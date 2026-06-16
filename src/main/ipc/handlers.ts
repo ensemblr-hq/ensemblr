@@ -21,6 +21,7 @@ import type {
 	DeleteWorkspaceService,
 	GithubCloneService,
 	GithubRepositoryListService,
+	ListAllWorkspacesService,
 	ListArchivedWorkspacesService,
 	LocalRepositoryImportService,
 	LocalRepositoryRegistrationService,
@@ -87,6 +88,7 @@ interface RegisterIpcHandlersOptions {
 	githubRepositoryListService: GithubRepositoryListService;
 	linearAuthService: LinearAuthService;
 	linearService: LinearService;
+	listAllWorkspacesService: ListAllWorkspacesService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
 	listWorkspaceFilesService: ListWorkspaceFilesService;
 	localCommandService: LocalCommandService;
@@ -131,6 +133,7 @@ export function registerIpcHandlers({
 	githubRepositoryListService,
 	linearAuthService,
 	linearService,
+	listAllWorkspacesService,
 	listArchivedWorkspacesService,
 	listWorkspaceFilesService,
 	localCommandService,
@@ -186,6 +189,7 @@ export function registerIpcHandlers({
 		deleteArchivedWorkspaceService,
 		deleteRepositoryService,
 		deleteWorkspaceService,
+		listAllWorkspacesService,
 		listArchivedWorkspacesService,
 		localRepositoryImportService,
 		localRepositoryRegistrationService,

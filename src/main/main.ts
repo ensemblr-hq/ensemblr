@@ -59,6 +59,7 @@ import {
 	createGithubCloneService,
 	createGithubRepositoryListService,
 	createGithubUsernameResolver,
+	createListAllWorkspacesService,
 	createListArchivedWorkspacesService,
 	createLocalRepositoryImportService,
 	createLocalRepositoryRegistrationService,
@@ -304,6 +305,9 @@ const deleteArchivedWorkspaceService = createDeleteArchivedWorkspaceService({
 	databaseService,
 	localCommandService,
 });
+const listAllWorkspacesService = createListAllWorkspacesService({
+	databaseService,
+});
 const listArchivedWorkspacesService = createListArchivedWorkspacesService({
 	databaseService,
 });
@@ -411,6 +415,7 @@ app.whenReady().then(() => {
 		githubRepositoryListService,
 		linearAuthService,
 		linearService,
+		listAllWorkspacesService,
 		listArchivedWorkspacesService,
 		listWorkspaceFilesService,
 		localCommandService,

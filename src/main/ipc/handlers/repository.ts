@@ -13,6 +13,7 @@ import type {
 	CreateWorkspaceResult,
 	DeleteArchivedWorkspaceResult,
 	DeleteWorkspaceResult,
+	ListAllWorkspacesResult,
 	ListArchivedWorkspacesResult,
 	RenameWorkspaceResult,
 	UnarchiveWorkspaceResult,
@@ -24,6 +25,7 @@ import type {
 	DeleteArchivedWorkspaceService,
 	DeleteRepositoryService,
 	DeleteWorkspaceService,
+	ListAllWorkspacesService,
 	ListArchivedWorkspacesService,
 	LocalRepositoryImportService,
 	LocalRepositoryRegistrationService,
@@ -56,6 +58,7 @@ export interface RepositoryHandlersOptions {
 	deleteArchivedWorkspaceService: DeleteArchivedWorkspaceService;
 	deleteRepositoryService: DeleteRepositoryService;
 	deleteWorkspaceService: DeleteWorkspaceService;
+	listAllWorkspacesService: ListAllWorkspacesService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
 	localRepositoryImportService: LocalRepositoryImportService;
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
@@ -78,6 +81,7 @@ export function registerRepositoryHandlers({
 	deleteArchivedWorkspaceService,
 	deleteRepositoryService,
 	deleteWorkspaceService,
+	listAllWorkspacesService,
 	listArchivedWorkspacesService,
 	localRepositoryImportService,
 	localRepositoryRegistrationService,
@@ -163,6 +167,11 @@ export function registerRepositoryHandlers({
 		'repository-removal',
 		(_event, raw: unknown): Promise<DeleteRepositoryResult> =>
 			deleteRepositoryService.delete(parseDeleteRepositoryRequest(raw)),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.listAllWorkspaces,
+		(): Promise<ListAllWorkspacesResult> => listAllWorkspacesService.list(),
 	);
 
 	ipcMain.handle(

@@ -1,6 +1,10 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { RepositoryWorkspaceNavigationMetadata, RepositoryWorkspaceNavigationRepository, RepositoryWorkspaceNavigationSnapshot } from '../../../shared/ipc/contracts/repository-navigation';
+import type {
+	RepositoryWorkspaceNavigationMetadata,
+	RepositoryWorkspaceNavigationRepository,
+	RepositoryWorkspaceNavigationSnapshot,
+} from '../../../shared/ipc/contracts/repository-navigation';
 
 /** Internal: shape of a repository row read from SQLite. */
 interface RepositoryRow {
@@ -40,6 +44,7 @@ SELECT
 	updated_at AS updatedAt,
 	metadata_json AS metadataJson
 FROM repositories
+WHERE archived_at IS NULL
 ORDER BY lower(name), lower(slug), id
 `;
 
@@ -64,6 +69,9 @@ ORDER BY created_at DESC, id DESC
 /**
  * Builds the repository/workspace navigation snapshot consumed by the renderer
  * sidebar, grouping non-archived workspaces under their parent repository.
+ * Archived repositories are excluded entirely so they leave the sidebar on
+ * archive and stay gone across restarts (the snapshot carries no archived flag
+ * for the renderer to filter on, so the cut has to happen here).
  * @param database - Open SQLite connection or `null`.
  * @returns A navigation snapshot, empty when no database is available.
  */
