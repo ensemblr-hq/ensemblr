@@ -1,6 +1,6 @@
 # Current Shell Inventory
 
-Date: 2026-06-07
+Date: 2026-06-16
 
 This inventory describes the implemented shell. Navigation is file-based
 (TanStack Router): `src/renderer/components/app.tsx` is now only the router
@@ -91,7 +91,7 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 | Composer | Prompt text area, model/thinking badges, setup-disabled reason, attach, and send controls. | Visual placeholder for planned behavior | Setup diagnostics can disable the composer today. Prompt submit, stop, attachments, and model controls are deferred to Pi integration. Do not redesign or finalize this area before Pi work. |
 | Setup diagnostics banner | Setup blockers keep the shell visible while app readiness status stays in the left sidebar footer. | Implemented behavior | App setup diagnostics may disable the composer but must not render in, or force-select, the lower Setup dock. |
 | Review panel tabs | Right panel has All files, Changes, and Checks tabs with route/search state. | Implemented shell behavior | Tab selection is route-backed. Data is fixture-backed until file/git/GitHub services land. |
-| All files tab | Browse and search repository files. | Visual placeholder for planned behavior | File rows and the command-style search dialog are implemented against fixture data. Opening previews is future work. |
+| All files tab | Browse and search repository files. | Implemented behavior | Collapsible folder tree with lazy loading for git-ignored directories (`.context/`, `node_modules/`). File rows and command-style search dialog implemented with live data via `listWorkspaceFiles` IPC. Virtualized rendering via `@tanstack/react-virtual`. Opening previews remains future work. |
 | Changes tab | Changed-file list/tree with folder grouping, collapse, status labels, line counts, review action, and history/filter menu. | Implemented shell behavior | List/tree toggle and folder collapse work against fixture data. Full diff body, search, review mode, comments, and commit filtering are future review work. |
 | Checks tab | PR title/description, git status, checks, comments, todos, no-PR state, and ready-to-merge flow. | Visual placeholder for planned behavior | Sections and state shapes are visible. Live `gh` metadata, polling, comments, todos, context-to-Pi, and merge confirmation are future work. |
 | Dock tabs | Bottom-right fixed Setup and Run script-output tabs plus terminal session tabs stay visible with review/timeline context. | Implemented shell behavior | Dock tab state is route-backed and the dock is collapsible/resizable. Process-backed content is future work. Setup and Run are read-only output tabs for their respective configured commands. |
@@ -99,6 +99,7 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 | Terminal tabs | One default generic manual terminal panel plus a plus button for additional terminal tabs. | Visual placeholder for planned behavior | Terminal content explicitly states interactive PTY rendering is deferred to `ENS-037`. User-spawned terminals are regular IDE-style interactive terminals backed by stable terminal session IDs. |
 | Sidebar health footer | App health, setup readiness, and app diagnostics remain visible in the shell. | Implemented behavior | Health and setup diagnostics use TanStack Query over the typed preload bridge. This footer is the only current-shell place for app diagnostics; do not place app diagnostics in the Setup/Run/Terminal dock. |
 | Settings shell entry | Settings remains part of global navigation. | Implemented shell behavior | Settings opens a separate full-window route (`/settings`) rendered outside the workbench chrome, with a Back to app action. Full settings forms are future work. |
+| Settings → Git | Per-repository git defaults and lifecycle behavior. | Implemented behavior | Branch prefix source (github-username/custom/none), custom prefix, auto-rename workspace on branch, delete local branch on archive, archive after merge, set upstream on push. Stored in `~/.config/ensemble/config.json` under `app.git`, feeds repository resolution as `user-default` source. |
 | Command surfaces | File search dialog and Create PR command popover use command primitives. | Visual placeholder for planned behavior | These establish command UI patterns. A global command palette remains a later settings/polish ticket. |
 
 ## Workspace Sidebar State Contract
@@ -204,3 +205,5 @@ insufficient.
 - `WorkspaceContextMenuContent` status actions: confirm whether these change a local workspace lifecycle state, a linked Linear issue status, both, or another status model.
 - `Mark as unread`: confirm whether this is a local workspace attention marker, chat unread state, or linked external issue state.
 - `Review` button in the Changes tab: confirm whether this opens review mode for local diff comments, starts an agent review workflow, or toggles filtered review state.
+
+**Note:** Workspace lifecycle settings (branch naming, archive/merge behavior) are now configured via Settings → Git. See the "Settings → Git" row above for details.

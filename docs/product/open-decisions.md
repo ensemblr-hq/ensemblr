@@ -1,6 +1,6 @@
 # Open Decisions
 
-Date: 2026-06-05
+Date: 2026-06-16
 
 ## Screenshot Gaps Remaining
 
@@ -66,6 +66,8 @@ Date: 2026-06-05
 - Hosted deployment preview URLs: derive from GitHub data through `gh` for v1, preferring deployment status `environment_url`/`target_url`, then check links, then provider bot PR comments. Do not require Vercel or Netlify login for the right PR header preview link.
 - GitHub integration model: `gh` and `gh api` are the GitHub integration path. Ensemble does not build or store credentials for an app-owned GitHub OAuth/API layer.
 - Renderer routing: file-based TanStack routing with loader-driven data and redirects. Workspace and chat identity are URL path params, `dock`/`review` are search params, and per-workspace dock/review/chat selection is persisted. See `docs/adr/0026-use-file-based-tanstack-routing.md`.
+- Workspace lifecycle settings: branch naming, archive/merge behavior now configured via Settings → Git (`app.git` in `~/.config/ensemble/config.json`), feeding repository resolution as `user-default` source.
+- Wordmark animation: glitch burst now fires immediately on mount (`welcome-wordmark.tsx:155`) with periodic bursts continuing on 9-17s interval.
 
 ## Deferred
 
