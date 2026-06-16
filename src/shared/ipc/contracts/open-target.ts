@@ -60,6 +60,16 @@ export interface ListWorkspaceOpenTargetsResult {
 }
 
 export interface OpenWorkspaceInTargetRequest {
+	/**
+	 * Path within the workspace to open instead of its root. Omit to open the
+	 * workspace root (the original header behavior).
+	 */
+	relativePath?: string;
+	/**
+	 * Whether `relativePath` is a directory or file. Terminal and source-control
+	 * targets open the containing directory of a file rather than the file.
+	 */
+	relativePathKind?: 'directory' | 'file';
 	targetId: string;
 	workspaceId: string;
 }

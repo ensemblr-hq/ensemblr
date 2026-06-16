@@ -22,6 +22,15 @@ export interface ListWorkspaceFilesResult {
 	files: readonly WorkspaceFileEntryWire[];
 }
 
+export interface WatchWorkspaceFilesRequest {
+	workspaceCwd: string;
+}
+
+/** Broadcast announcing that files changed under a watched workspace cwd. */
+export interface WorkspaceFilesChangedBroadcast {
+	workspaceCwd: string;
+}
+
 export interface ReadWorkspaceFileRequest {
 	path: string;
 	workspaceCwd: string;
@@ -50,7 +59,15 @@ export interface WorkspaceFilesApi {
 	listWorkspaceFiles: (
 		request: ListWorkspaceFilesRequest,
 	) => Promise<ListWorkspaceFilesResult>;
+	/** Subscribe to file-change broadcasts; returns an unsubscribe callback. */
+	onWorkspaceFilesChanged: (
+		listener: (event: WorkspaceFilesChangedBroadcast) => void,
+	) => () => void;
 	readWorkspaceFile: (
 		request: ReadWorkspaceFileRequest,
 	) => Promise<ReadWorkspaceFileResult>;
+	/** Stop watching a workspace previously started with `watchWorkspaceFiles`. */
+	unwatchWorkspaceFiles: (request: WatchWorkspaceFilesRequest) => Promise<void>;
+	/** Start watching a workspace so changes emit `onWorkspaceFilesChanged`. */
+	watchWorkspaceFiles: (request: WatchWorkspaceFilesRequest) => Promise<void>;
 }

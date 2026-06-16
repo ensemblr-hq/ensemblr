@@ -1,12 +1,23 @@
 import { Icon } from '@iconify/react';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { Fragment, useMemo } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
-import { useWorkspaceFileDiffOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
+import {
+	useWorkspaceFileDiffOpener,
+	type WorkspaceFileDiffOpener,
+} from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
+import { useFileTreeExpansion } from '@/renderer/hooks/workbench-shell/review-files/use-file-tree-expansion';
 import { cn } from '@/renderer/lib/utils';
-import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
+import {
+	buildFileTree,
+	type FileTreeNode,
+	fileTreeIndentClassName,
+	getCompactFileDirectory,
+	getWorkspaceFileIconName,
+	listDirectoryPaths,
+} from '@/renderer/lib/workbench';
 import type { ReviewFileSummary } from '@/renderer/types/workbench';
 import type { ChangesViewMode } from '@/renderer/types/workbench-shell';
 
@@ -18,17 +29,6 @@ const fileStatusLabel: Record<ReviewFileSummary['status'], string> = {
 	untracked: 'U',
 };
 
-interface ReviewFileTreeNode {
-	directories: ReviewFileTreeNode[];
-	files: ReviewFileSummary[];
-	name: string;
-	path: string;
-}
-
-interface MutableReviewFileTreeNode extends ReviewFileTreeNode {
-	directoryMap: Map<string, MutableReviewFileTreeNode>;
-}
-
 /** Renders the changes panel as either a flat list or a collapsible folder tree. */
 export function ReviewFileList({
 	error,
@@ -39,6 +39,9 @@ export function ReviewFileList({
 	files: ReviewFileSummary[];
 	viewMode: ChangesViewMode;
 }) {
+	// Read the diff opener once here rather than in every file row: a large
+	// change set would otherwise create one context subscription per row.
+	const openWorkspaceFileDiff = useWorkspaceFileDiffOpener();
 	// Binary and empty untracked files report 0/0 lines but are still changes.
 	const visibleFiles = files.filter(
 		(file) => file.additions || file.deletions || file.status !== 'modified',
@@ -53,10 +56,18 @@ export function ReviewFileList({
 					</div>
 				) : visibleFiles.length ? (
 					viewMode === 'folders' ? (
-						<ReviewFileTree files={visibleFiles} />
+						<ReviewFileTree
+							files={visibleFiles}
+							openWorkspaceFileDiff={openWorkspaceFileDiff}
+						/>
 					) : (
 						visibleFiles.map((file) => (
-							<ReviewFileButton file={file} key={file.id} showPath />
+							<ReviewFileButton
+								file={file}
+								key={file.id}
+								openWorkspaceFileDiff={openWorkspaceFileDiff}
+								showPath
+							/>
 						))
 					)
 				) : (
@@ -71,57 +82,63 @@ export function ReviewFileList({
 }
 
 /** Collapsible directory tree of changed files. */
-function ReviewFileTree({ files }: { files: ReviewFileSummary[] }) {
-	const [collapsedDirectoryPaths, setCollapsedDirectoryPaths] = useState<
-		Set<string>
-	>(() => new Set());
-	const tree = buildReviewFileTree(files);
-	const toggleDirectory = (path: string) => {
-		setCollapsedDirectoryPaths((current) => {
-			const next = new Set(current);
-
-			if (next.has(path)) {
-				next.delete(path);
-				return next;
-			}
-
-			next.add(path);
-			return next;
-		});
-	};
+function ReviewFileTree({
+	files,
+	openWorkspaceFileDiff,
+}: {
+	files: ReviewFileSummary[];
+	openWorkspaceFileDiff: WorkspaceFileDiffOpener | null;
+}) {
+	const tree = useMemo(() => buildFileTree(files), [files]);
+	const knownDirectoryPaths = useMemo(() => listDirectoryPaths(tree), [tree]);
+	// Folders start expanded: the changes set is small, and reviewers want to
+	// see every touched file at a glance.
+	const { isExpanded, toggleDirectory } = useFileTreeExpansion(
+		true,
+		knownDirectoryPaths,
+	);
 
 	return (
-		<>
-			{tree.files.map((file) => (
-				<ReviewFileButton file={file} key={file.id} showPath />
-			))}
+		<div className='flex flex-col gap-1' role='tree'>
 			{tree.directories.map((directory) => (
 				<ReviewDirectoryBranch
-					collapsedDirectoryPaths={collapsedDirectoryPaths}
+					isExpanded={isExpanded}
 					key={directory.path}
 					level={0}
 					node={directory}
 					onDirectoryToggle={toggleDirectory}
+					openWorkspaceFileDiff={openWorkspaceFileDiff}
 				/>
 			))}
-		</>
+			{tree.files.map((file) => (
+				<ReviewFileButton
+					ariaLevel={1}
+					file={file}
+					key={file.id}
+					openWorkspaceFileDiff={openWorkspaceFileDiff}
+					showPath
+				/>
+			))}
+		</div>
 	);
 }
 
 /** Single directory branch in the review file tree, with collapsible children. */
 function ReviewDirectoryBranch({
-	collapsedDirectoryPaths,
+	isExpanded,
 	level,
 	node,
 	onDirectoryToggle,
+	openWorkspaceFileDiff,
 }: {
-	collapsedDirectoryPaths: Set<string>;
+	isExpanded: (path: string) => boolean;
 	level: number;
-	node: ReviewFileTreeNode;
+	node: FileTreeNode<ReviewFileSummary>;
 	onDirectoryToggle: (path: string) => void;
+	openWorkspaceFileDiff: WorkspaceFileDiffOpener | null;
 }) {
-	const compactDirectory = getCompactReviewDirectory(node);
-	const isCollapsed = collapsedDirectoryPaths.has(compactDirectory.node.path);
+	const compactDirectory = getCompactFileDirectory(node);
+	const isCollapsed = !isExpanded(compactDirectory.node.path);
 
 	return (
 		<Fragment>
@@ -136,18 +153,21 @@ function ReviewDirectoryBranch({
 				<>
 					{compactDirectory.node.directories.map((directory) => (
 						<ReviewDirectoryBranch
-							collapsedDirectoryPaths={collapsedDirectoryPaths}
+							isExpanded={isExpanded}
 							key={directory.path}
 							level={level + 1}
 							node={directory}
 							onDirectoryToggle={onDirectoryToggle}
+							openWorkspaceFileDiff={openWorkspaceFileDiff}
 						/>
 					))}
 					{compactDirectory.node.files.map((file) => (
 						<ReviewFileButton
+							ariaLevel={level + 2}
 							file={file}
 							key={file.id}
 							level={level + 1}
+							openWorkspaceFileDiff={openWorkspaceFileDiff}
 							showPath={false}
 						/>
 					))}
@@ -172,20 +192,28 @@ function ReviewFolderRow({
 	path: string;
 }) {
 	const FolderChevronIcon = isCollapsed ? ChevronRightIcon : ChevronDownIcon;
-	const folderIconName = getWorkspaceFileIconName({
-		kind: 'directory',
-		name: labelParts[0] ?? path,
-	});
+	// A collapsed row only advertises its own name; the merged `a / b / c` chain
+	// is shown once expanded, when its single-child descendants are revealed.
+	const visibleLabelParts = isCollapsed ? labelParts.slice(0, 1) : labelParts;
+	const folderIconName = getWorkspaceFileIconName(
+		{ kind: 'directory', name: visibleLabelParts.at(-1) ?? path },
+		{ isExpanded: !isCollapsed },
+	);
 
 	return (
 		<Button
 			aria-expanded={!isCollapsed}
 			aria-label={`${isCollapsed ? 'Expand' : 'Collapse'} ${path}`}
+			aria-level={level + 1}
+			// Highlight only on hover: drop the ghost variant's persistent
+			// open-state fill (`aria-expanded:bg-muted`) while keeping the hover
+			// fill for expanded folders.
 			className={cn(
-				'h-7 w-full justify-start gap-1.5 rounded-md px-2 text-xs',
-				reviewFileIndentClassName(level),
+				'h-7 w-full justify-start gap-1.5 rounded-md px-2 text-xs aria-expanded:bg-transparent aria-expanded:hover:bg-muted',
+				fileTreeIndentClassName(level),
 			)}
 			onClick={onToggle}
+			role='treeitem'
 			size='sm'
 			variant='ghost'
 		>
@@ -196,7 +224,7 @@ function ReviewFolderRow({
 				icon={folderIconName}
 			/>
 			<span className='min-w-0 truncate font-mono'>
-				{labelParts.map((label, index) => (
+				{visibleLabelParts.map((label, index) => (
 					<Fragment key={`${label}-${index}`}>
 						{index > 0 ? (
 							<span className='px-1 text-muted-foreground/70'>/</span>
@@ -211,20 +239,25 @@ function ReviewFolderRow({
 
 /** Clickable row representing a single file change. */
 function ReviewFileButton({
+	ariaLevel,
 	file,
 	level = 0,
+	openWorkspaceFileDiff,
 	showPath,
 }: {
+	/** Tree depth (1-based) when rendered inside the folder tree; omit in the flat list. */
+	ariaLevel?: number;
 	file: ReviewFileSummary;
 	level?: number;
+	openWorkspaceFileDiff: WorkspaceFileDiffOpener | null;
 	showPath: boolean;
 }) {
 	const fileName = getReviewFileName(file.path);
-	const openWorkspaceFileDiff = useWorkspaceFileDiffOpener();
 
 	return (
 		<Button
 			aria-label={`Open ${file.path} diff`}
+			aria-level={ariaLevel}
 			onClick={
 				openWorkspaceFileDiff
 					? () => openWorkspaceFileDiff(file.path)
@@ -232,8 +265,9 @@ function ReviewFileButton({
 			}
 			className={cn(
 				'grid h-auto w-full grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-md px-2 py-1.5 font-normal',
-				reviewFileIndentClassName(level),
+				fileTreeIndentClassName(level),
 			)}
+			role={ariaLevel === undefined ? undefined : 'treeitem'}
 			size='sm'
 			variant='ghost'
 		>
@@ -289,85 +323,6 @@ function ReviewFileStats({ file }: { file: ReviewFileSummary }) {
 	);
 }
 
-/**
- * Builds a tree structure from flat review-file rows by their path segments.
- * @param files - Flat list of file changes.
- * @returns The root tree node.
- */
-function buildReviewFileTree(
-	files: ReviewFileSummary[],
-): MutableReviewFileTreeNode {
-	const root = createReviewFileTreeNode('', '');
-
-	for (const file of files) {
-		const pathParts = file.path.split('/').filter(Boolean);
-		const fileName = pathParts.pop();
-
-		if (!fileName) {
-			continue;
-		}
-
-		let currentNode = root;
-
-		for (const directoryName of pathParts) {
-			const directoryPath = currentNode.path
-				? `${currentNode.path}/${directoryName}`
-				: directoryName;
-			let nextNode = currentNode.directoryMap.get(directoryName);
-
-			if (!nextNode) {
-				nextNode = createReviewFileTreeNode(directoryName, directoryPath);
-				currentNode.directoryMap.set(directoryName, nextNode);
-				currentNode.directories.push(nextNode);
-			}
-
-			currentNode = nextNode;
-		}
-
-		currentNode.files.push(file);
-	}
-
-	return root;
-}
-
-/** Constructs an empty mutable tree node for a directory. */
-function createReviewFileTreeNode(
-	name: string,
-	path: string,
-): MutableReviewFileTreeNode {
-	return {
-		directories: [],
-		directoryMap: new Map(),
-		files: [],
-		name,
-		path,
-	};
-}
-
-/**
- * Walks down chains of single-child directories so the tree shows `a/b/c` as
- * one row instead of three.
- * @param node - Starting directory.
- * @returns The compact node plus the label parts that were merged.
- */
-function getCompactReviewDirectory(node: ReviewFileTreeNode): {
-	labelParts: string[];
-	node: ReviewFileTreeNode;
-} {
-	const labelParts = [node.name];
-	let compactNode = node;
-
-	while (
-		compactNode.files.length === 0 &&
-		compactNode.directories.length === 1
-	) {
-		compactNode = compactNode.directories[0];
-		labelParts.push(compactNode.name);
-	}
-
-	return { labelParts, node: compactNode };
-}
-
 /** Returns the parent-directory portion of a file path, or `''` when none. */
 function getReviewFileDirectory(path: string) {
 	const lastSeparatorIndex = path.lastIndexOf('/');
@@ -380,25 +335,4 @@ function getReviewFileName(path: string) {
 	const lastSeparatorIndex = path.lastIndexOf('/');
 
 	return lastSeparatorIndex === -1 ? path : path.slice(lastSeparatorIndex + 1);
-}
-
-/** Maps a tree depth to the matching Tailwind left-padding class. */
-function reviewFileIndentClassName(level: number) {
-	if (level <= 0) {
-		return '';
-	}
-
-	if (level === 1) {
-		return 'pl-6';
-	}
-
-	if (level === 2) {
-		return 'pl-10';
-	}
-
-	if (level === 3) {
-		return 'pl-14';
-	}
-
-	return 'pl-16';
 }

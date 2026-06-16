@@ -1,4 +1,8 @@
 export {
+	resolveOpenTargetPath,
+	sanitizeWorkspaceRelativePath,
+} from './open-target-paths';
+export {
 	collectRegistryValidationErrors,
 	isValidBundleId,
 	OPEN_TARGET_REGISTRY,

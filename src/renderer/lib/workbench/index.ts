@@ -8,6 +8,13 @@ export {
 	DEFAULT_TERMINAL_DOCK_TAB_ID,
 } from './constants';
 export { getWorkspaceFileIconName } from './file-icons';
+export type { FileTreeNode } from './file-tree';
+export {
+	buildFileTree,
+	fileTreeIndentClassName,
+	getCompactFileDirectory,
+	listDirectoryPaths,
+} from './file-tree';
 export { healthTone } from './health-tone';
 export { getEmptyStateCopy } from './navigation-empty-state';
 export {

@@ -18,6 +18,7 @@ import {
 	type DetectedTargetsMap,
 	detectInstalledTargets,
 } from './detect-installed-targets';
+import { resolveOpenTargetPath } from './open-target-paths';
 import {
 	findOpenTargetDefinition,
 	OPEN_TARGET_REGISTRY,
@@ -50,8 +51,11 @@ export interface OpenTargetService {
 	 * Returns null only on the very first launch before detection has ever run.
 	 */
 	getCachedSnapshots: () => WorkspaceOpenTargetSnapshot[] | null;
-	/** Opens the workspace path with the target, or copies the path. */
+	/** Opens the workspace path (or a sub-path) with the target, or copies it. */
 	openTarget: (input: {
+		/** Workspace-relative file/dir to open instead of the root, when set. */
+		relativePath?: string;
+		relativePathKind?: 'directory' | 'file';
 		targetId: string;
 		workspacePath: string;
 	}) => Promise<OpenTargetResult>;
@@ -134,9 +138,13 @@ export function createOpenTargetService({
 	};
 
 	const openTarget = async ({
+		relativePath,
+		relativePathKind,
 		targetId,
 		workspacePath,
 	}: {
+		relativePath?: string;
+		relativePathKind?: 'directory' | 'file';
 		targetId: string;
 		workspacePath: string;
 	}): Promise<OpenTargetResult> => {
@@ -149,7 +157,12 @@ export function createOpenTargetService({
 			await dispatchOpen({
 				definition,
 				localCommandService,
-				workspacePath,
+				targetPath: resolveOpenTargetPath({
+					kind: definition.kind,
+					relativePath,
+					relativePathKind,
+					workspacePath,
+				}),
 			});
 			return { ok: true };
 		} catch (error) {
@@ -346,23 +359,23 @@ function writeSnapshotsToDisk(snapshots: WorkspaceOpenTargetSnapshot[]): void {
 async function dispatchOpen({
 	definition,
 	localCommandService,
-	workspacePath,
+	targetPath,
 }: {
 	definition: OpenTargetDefinition;
 	localCommandService: LocalCommandService;
-	workspacePath: string;
+	targetPath: string;
 }): Promise<void> {
 	switch (definition.dispatch.kind) {
 		case 'reveal-in-finder':
-			shell.showItemInFolder(workspacePath);
+			shell.showItemInFolder(targetPath);
 			return;
 		case 'copy-path':
-			clipboard.writeText(workspacePath);
+			clipboard.writeText(targetPath);
 			return;
 		case 'open-bundle': {
 			const result = await localCommandService.run(
 				{
-					args: ['-b', definition.dispatch.bundleId, workspacePath],
+					args: ['-b', definition.dispatch.bundleId, targetPath],
 					command: OPEN_BINARY_PATH,
 					timeoutMs: OPEN_TIMEOUT_MS,
 				},
@@ -378,7 +391,7 @@ async function dispatchOpen({
 		case 'open-app-name': {
 			const result = await localCommandService.run(
 				{
-					args: ['-a', definition.dispatch.appName, workspacePath],
+					args: ['-a', definition.dispatch.appName, targetPath],
 					command: OPEN_BINARY_PATH,
 					timeoutMs: OPEN_TIMEOUT_MS,
 				},

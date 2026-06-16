@@ -11,6 +11,7 @@ import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
 } from '../shared/ipc/contracts/terminal';
+import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
 
 import { createMainWindow } from './app/main-window';
 import { createMainWindowStateStore } from './app/window-state';
@@ -80,7 +81,10 @@ import { createMacosKeychainSecretStore } from './secrets';
 import { createSetupDiagnosticsService } from './setup';
 import { createEnsembleDatabaseService } from './storage';
 import { createTerminalService } from './terminal';
-import { createListWorkspaceFilesService } from './workspace-files';
+import {
+	createListWorkspaceFilesService,
+	createWorkspaceFilesWatcher,
+} from './workspace-files';
 
 // Quit early on Windows when invoked by the Squirrel installer.
 if (started) {
@@ -319,6 +323,12 @@ const broadcastToAllWindows = (channel: string, payload: unknown): void => {
 		}
 	}
 };
+const workspaceFilesWatcher = createWorkspaceFilesWatcher({
+	onChange: (workspaceCwd) =>
+		broadcastToAllWindows(IPC_CHANNELS.workspaceFilesChanged, {
+			workspaceCwd,
+		} satisfies WorkspaceFilesChangedBroadcast),
+});
 const terminalService = createTerminalService({
 	databaseService,
 	onLifecycle: (event: TerminalLifecycleBroadcast) =>
@@ -420,6 +430,7 @@ app.whenReady().then(() => {
 		sharedRootAdoptionService,
 		terminalService,
 		unarchiveWorkspaceService,
+		workspaceFilesWatcher,
 	});
 	terminalService.recoverStaleSessions();
 	createMainWindow({ windowStateStore: mainWindowStateStore });
@@ -429,6 +440,7 @@ app.on('will-quit', () => {
 	appSettingsService.stop();
 	agentActivityMonitor.dispose();
 	terminalService.disposeAll();
+	workspaceFilesWatcher.stopAll();
 	databaseService.close();
 });
 

@@ -1,16 +1,27 @@
 import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import { type ListWorkspaceFilesRequest, type ListWorkspaceFilesResult, type ReadWorkspaceFileRequest, type ReadWorkspaceFileResult } from '../../../shared/ipc/contracts/workspace-files';
-import type { ListWorkspaceFilesService } from '../../workspace-files';
+import type {
+	ListWorkspaceFilesRequest,
+	ListWorkspaceFilesResult,
+	ReadWorkspaceFileRequest,
+	ReadWorkspaceFileResult,
+	WatchWorkspaceFilesRequest,
+} from '../../../shared/ipc/contracts/workspace-files';
+import type {
+	ListWorkspaceFilesService,
+	WorkspaceFilesWatcher,
+} from '../../workspace-files';
 
 export interface WorkspaceFilesHandlersOptions {
 	listWorkspaceFilesService: ListWorkspaceFilesService;
+	workspaceFilesWatcher: WorkspaceFilesWatcher;
 }
 
-/** Registers the IPC handler that lists repo files for composer @ mentions. */
+/** Registers the IPC handlers that list, read, and watch repo files. */
 export function registerWorkspaceFilesHandlers({
 	listWorkspaceFilesService,
+	workspaceFilesWatcher,
 }: WorkspaceFilesHandlersOptions): void {
 	ipcMain.handle(
 		IPC_CHANNELS.listWorkspaceFiles,
@@ -27,5 +38,17 @@ export function registerWorkspaceFilesHandlers({
 			request: ReadWorkspaceFileRequest,
 		): Promise<ReadWorkspaceFileResult> =>
 			listWorkspaceFilesService.read(request),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.watchWorkspaceFiles,
+		(_event, request: WatchWorkspaceFilesRequest): void => {
+			workspaceFilesWatcher.watch(request.workspaceCwd);
+		},
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.unwatchWorkspaceFiles,
+		(_event, request: WatchWorkspaceFilesRequest): void => {
+			workspaceFilesWatcher.unwatch(request.workspaceCwd);
+		},
 	);
 }

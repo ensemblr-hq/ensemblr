@@ -6,7 +6,10 @@ import type {
 	OpenWorkspaceInTargetRequest,
 } from '@/shared/ipc/contracts/open-target';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import type { OpenTargetService } from '../../open-target';
+import {
+	type OpenTargetService,
+	sanitizeWorkspaceRelativePath,
+} from '../../open-target';
 import type { EnsembleDatabaseService } from '../../storage';
 import { getWorkspacePathById } from '../../storage/repositories/workspace-repository';
 
@@ -59,9 +62,23 @@ export function registerOpenTargetHandlers({
 				};
 			}
 
+			const relativePath = sanitizeWorkspaceRelativePath(request.relativePath);
+			if (relativePath === null) {
+				return { ok: false, error: 'Path must stay inside the workspace.' };
+			}
+
+			// Don't trust the renderer's kind: an unknown value would make terminal
+			// and source-control targets open a file path instead of its parent dir.
+			const relativePathKind =
+				request.relativePathKind === 'file' ||
+				request.relativePathKind === 'directory'
+					? request.relativePathKind
+					: undefined;
+
 			return openTargetService.openTarget({
 				targetId: request.targetId,
 				workspacePath,
+				...(relativePath ? { relativePath, relativePathKind } : {}),
 			});
 		},
 	);
