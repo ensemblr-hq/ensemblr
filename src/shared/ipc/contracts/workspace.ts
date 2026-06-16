@@ -386,6 +386,36 @@ export interface ListArchivedWorkspacesResult {
 	repositoryId: string;
 }
 
+/**
+ * Single row in the global History screen: every workspace ever created,
+ * across all repositories, active or archived. Distinct from
+ * {@link ArchivedWorkspaceListEntry} because `archivedAt` is nullable here
+ * (null === active / still in the sidebar) and the repository display name +
+ * lifecycle timestamps are included so the renderer can group by last activity
+ * and gate the Unarchive action without a second round-trip.
+ */
+export interface WorkspaceHistoryEntry {
+	/** ISO timestamp when archived, or null when the workspace is still active. */
+	archivedAt: string | null;
+	/** Recorded base branch from the latest archive record; needed to gate unarchive when the worktree was destroyed. */
+	baseBranch: string | null;
+	/** True when the original archive removed the worktree + branch. */
+	branchCleanup: boolean;
+	branchName: string | null;
+	createdAt: string;
+	id: string;
+	name: string;
+	path: string;
+	repositoryId: string;
+	repositoryName: string;
+	slug: string;
+	updatedAt: string;
+}
+
+export interface ListAllWorkspacesResult {
+	entries: WorkspaceHistoryEntry[];
+}
+
 /** Persisted archive_records row exposed to the renderer for diagnostics + history. */
 export interface ArchiveRecordSnapshot {
 	archiveReason: string | null;

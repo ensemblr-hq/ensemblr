@@ -62,6 +62,8 @@ export const ensembleQueryKeys = {
 		[...ensembleQueryKeys.all, 'review-todos', workspaceId] as const,
 	turnDiff: (turnId: string) =>
 		[...ensembleQueryKeys.all, 'turn-diff', turnId] as const,
+	workspaceHistory: () =>
+		[...ensembleQueryKeys.all, 'workspace-history'] as const,
 	repositoryWorkspaceNavigation: () =>
 		[...ensembleQueryKeys.all, 'repository-workspace-navigation'] as const,
 	rootDirectory: () => [...ensembleQueryKeys.all, 'root-directory'] as const,

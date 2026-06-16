@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import {
 	createWorkspace,
 	ensembleQueryKeys,
+	invalidateWorkspaceListViews,
 	isEnsembleApiAvailable,
 } from '@/renderer/api/ensemble-queries';
 import { queryClient } from '@/renderer/api/query-client';
@@ -208,11 +209,10 @@ export function useArchiveWorkspaceAction({
 			disableProjectReorderLayoutAnimation();
 
 			// Drop the stale navigation snapshot so the sidebar reflows around
-			// the deleted workspace, then re-run the route loaders so the
-			// workspace match doesn't keep its now-orphaned loaderData.
-			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
-			});
+			// the deleted workspace, refresh the global History feed so a mounted
+			// History screen updates instantly, then re-run the route loaders so
+			// the workspace match doesn't keep its now-orphaned loaderData.
+			await invalidateWorkspaceListViews(queryClient);
 			await router.invalidate();
 
 			if (activeWorkspaceId !== archivedWorkspaceId) {
@@ -268,9 +268,10 @@ export function useArchiveProjectAction({
 		async (archivedProjectId: string) => {
 			disableProjectReorderLayoutAnimation();
 
-			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
-			});
+			// Refresh both the sidebar navigation snapshot and the global History
+			// feed so an archive/delete from the sidebar reflects instantly while
+			// the History screen is mounted (mirrors the unarchive path).
+			await invalidateWorkspaceListViews(queryClient);
 			await router.invalidate();
 
 			if (activeProjectId !== archivedProjectId) {

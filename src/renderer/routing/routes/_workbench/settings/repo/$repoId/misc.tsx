@@ -4,7 +4,10 @@ import { useAtom } from 'jotai';
 import { Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
 
-import { ensembleQueryKeys, getEnsembleApi } from '@/renderer/api/ensemble';
+import {
+	getEnsembleApi,
+	invalidateWorkspaceListViews,
+} from '@/renderer/api/ensemble';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { Button } from '@/renderer/components/ui/button';
@@ -42,9 +45,7 @@ function RepoMiscSettings() {
 		mutationFn: () =>
 			getEnsembleApi().archiveRepository({ repositoryId: repoId }),
 		onSuccess: async () => {
-			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
-			});
+			await invalidateWorkspaceListViews(queryClient);
 			navigate({ to: '/settings/general' });
 		},
 		onError: (error) =>

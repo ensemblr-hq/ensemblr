@@ -73,6 +73,11 @@ export type {
 } from './import-local-repository.ts';
 export { createLocalRepositoryImportService } from './import-local-repository.ts';
 export type {
+	CreateListAllWorkspacesServiceOptions,
+	ListAllWorkspacesService,
+} from './list-all-workspaces.ts';
+export { createListAllWorkspacesService } from './list-all-workspaces.ts';
+export type {
 	CreateListArchivedWorkspacesServiceOptions,
 	ListArchivedWorkspacesService,
 } from './list-archived-workspaces.ts';
