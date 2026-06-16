@@ -21,6 +21,7 @@ type InvokeKey = Exclude<
 	keyof EnsembleApi,
 	| 'onAppSettingsChanged'
 	| 'onCloneGithubRepositoryProgress'
+	| 'onCloseActiveTabRequest'
 	| 'onPiRawFrame'
 	| 'onPiSessionEvent'
 	| 'onTerminalLifecycle'
@@ -92,6 +93,7 @@ export function createEnsembleApi(): EnsembleApi {
 		bindPiSessionToChatTab: (request) =>
 			invoke('bindPiSessionToChatTab', request),
 		closeChatTab: (request) => invoke('closeChatTab', request),
+		closeWindow: () => invoke('closeWindow'),
 		commitWorkspaceChanges: (request) =>
 			invoke('commitWorkspaceChanges', request),
 		computeTurnDiff: (request) => invoke('computeTurnDiff', request),
@@ -158,6 +160,8 @@ export function createEnsembleApi(): EnsembleApi {
 				IPC_CHANNELS.cloneGithubRepositoryProgress,
 				listener,
 			),
+		onCloseActiveTabRequest: (listener) =>
+			subscribe<void>(IPC_CHANNELS.closeActiveTab, listener),
 		onPiRawFrame: (listener) =>
 			subscribe<PiRawFrameBroadcast>(IPC_CHANNELS.piRawFrame, listener),
 		onPiSessionEvent: (listener) =>

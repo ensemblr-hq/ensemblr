@@ -27,6 +27,7 @@ import {
 	type OpenChatTabRequest,
 } from '@/shared/ipc/contracts/chat-tab';
 import type { PiSessionSnapshotWire } from '@/shared/ipc/contracts/pi-session';
+import { decideActiveClose, selectNeighborTab } from './session-tab-close';
 
 /**
  * Cross-instance lock for the workspace-level bootstrap. The route shell owns
@@ -78,6 +79,7 @@ export function useSessionTabState({
 	closeSessionTabAsync: (
 		chatTabId: string,
 	) => Promise<CloseSessionTabHandlerResult>;
+	closeActiveOrReset: () => void;
 } {
 	const workspaceId = activeWorkspace.id;
 	const queryClient = useQueryClient();
@@ -372,7 +374,10 @@ export function useSessionTabState({
 	/** Fire-and-forget close used by the SessionTabState contract. */
 	const closeSessionTab = useCallback(
 		(chatTabId: string) => {
-			const closing = sessionTabs.find((session) => session.id === chatTabId);
+			const closingIndex = sessionTabs.findIndex(
+				(session) => session.id === chatTabId,
+			);
+			const closing = closingIndex >= 0 ? sessionTabs[closingIndex] : undefined;
 			const isChatKind = (closing?.kind ?? 'chat') === 'chat';
 			// Min-one applies to chat tabs only; non-chat tabs always close.
 			if (isChatKind) {
@@ -383,9 +388,7 @@ export function useSessionTabState({
 					return;
 				}
 			}
-			const nextSession = sessionTabs.find(
-				(session) => session.id !== chatTabId,
-			);
+			const nextSession = selectNeighborTab(sessionTabs, closingIndex);
 			if (activeSession.id === chatTabId && nextSession) {
 				onSessionTabChange(nextSession.id);
 			}
@@ -397,6 +400,36 @@ export function useSessionTabState({
 		},
 		[activeSession.id, closeSessionTabAsync, onSessionTabChange, sessionTabs],
 	);
+
+	/**
+	 * ⌘/Ctrl+W policy for the active tab; see `decideActiveClose` for the branch
+	 * rationale. The `reset` branch opens a fresh chat FIRST so the min-one-chat
+	 * invariant never breaks, selects it, then closes the previously-sole chat.
+	 */
+	const closeActiveOrReset = useCallback(() => {
+		const decision = decideActiveClose(sessionTabs, effectiveActiveSession);
+		if (decision.kind === 'noop') {
+			return;
+		}
+		if (decision.kind === 'close') {
+			closeSessionTab(decision.activeId);
+			return;
+		}
+		void openSessionTab().then((opened) => {
+			if (!opened) {
+				return;
+			}
+			onSessionTabChange(opened.chatTabId);
+			void closeSessionTabAsync(decision.activeId);
+		});
+	}, [
+		closeSessionTab,
+		closeSessionTabAsync,
+		effectiveActiveSession,
+		onSessionTabChange,
+		openSessionTab,
+		sessionTabs,
+	]);
 
 	/** Reopens a previously-closed tab and selects it when restoration succeeds. */
 	const restoreSessionTab = useCallback(
@@ -412,6 +445,7 @@ export function useSessionTabState({
 	);
 
 	return {
+		closeActiveOrReset,
 		closedSessions,
 		closeSessionTab,
 		closeSessionTabAsync,

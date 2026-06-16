@@ -1,3 +1,4 @@
+import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
 
 /**
@@ -11,3 +12,12 @@ export const settingsActiveRepoIdAtom = atomWithStorage<string | null>(
 	'ensemble_settings_ui_active_repo_id',
 	null,
 );
+
+/**
+ * In-app href to return to when Settings is closed (← Back or ⌘/Ctrl+W).
+ * Recorded on navigation into `/settings` from a non-settings screen; `null`
+ * means fall back to the workbench root. Deliberately plain in-memory (not
+ * `atomWithStorage`): a return target is navigation-scoped, so a cold start
+ * into Settings must not replay a stale screen from a previous app session.
+ */
+export const settingsReturnToAtom = atom<string | null>(null);
