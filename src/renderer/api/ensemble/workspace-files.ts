@@ -9,7 +9,13 @@ import type {
 
 import { ensembleQueryKeys, getEnsembleApi } from './query-keys';
 
-/** Query options for enumerating workspace files for composer @ mentions. */
+// Coarse fallback poll. A main-process fs watcher invalidates this query within
+// ~250ms of a real change (see useWorkspaceFilesWatch); this interval only
+// covers what the watcher can't — ignored dirs and platforms without recursive
+// watch. React Query pauses it while the window is blurred.
+const WORKSPACE_FILES_REFETCH_INTERVAL_MS = 30_000;
+
+/** Query options for enumerating workspace files for the files tree and @ mentions. */
 export function workspaceFilesQuery(workspaceCwd: string | null) {
 	return queryOptions({
 		enabled: !!workspaceCwd,
@@ -22,7 +28,8 @@ export function workspaceFilesQuery(workspaceCwd: string | null) {
 					}),
 			),
 		queryKey: ensembleQueryKeys.workspaceFiles(workspaceCwd ?? ''),
-		staleTime: 30_000,
+		refetchInterval: WORKSPACE_FILES_REFETCH_INTERVAL_MS,
+		staleTime: 5_000,
 	});
 }
 

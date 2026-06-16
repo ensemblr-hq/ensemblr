@@ -59,17 +59,20 @@ export function EnvironmentVariableSheet({
 	// Only a documented catalog add (preset key, not an edit) gets the hint.
 	const isDocumentedAdd = nameLocked && !isEdit;
 
-	// Reset the form whenever a new target opens; load the existing value on edit.
-	useEffect(() => {
-		if (!target) {
-			return;
-		}
-
-		setName(target.key);
+	// Reset the form synchronously when a new target opens. Doing this during
+	// render (instead of in an effect) avoids a commit that briefly flashes the
+	// previous variable's name and value before the reset lands.
+	const [renderedTarget, setRenderedTarget] = useState(target);
+	if (target !== renderedTarget) {
+		setRenderedTarget(target);
+		setName(target?.key ?? '');
 		setValue('');
 		setError(null);
+	}
 
-		if (!target.isEdit) {
+	// Load the existing value when editing; the async read can't run in render.
+	useEffect(() => {
+		if (!target?.isEdit) {
 			return;
 		}
 

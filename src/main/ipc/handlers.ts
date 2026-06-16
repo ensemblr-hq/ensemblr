@@ -37,7 +37,10 @@ import type { EnsembleDatabaseService } from '../storage';
 import { getPiSessionById } from '../storage/repositories/pi-session-repository';
 import { getWorkspacePathById } from '../storage/repositories/workspace-repository';
 import type { TerminalService } from '../terminal';
-import type { ListWorkspaceFilesService } from '../workspace-files';
+import type {
+	ListWorkspaceFilesService,
+	WorkspaceFilesWatcher,
+} from '../workspace-files';
 import { createWorkspaceGitService } from '../workspace-git';
 import { registerAppSettingsHandlers } from './handlers/app-settings';
 import { registerChatTabHandlers } from './handlers/chat-tab';
@@ -104,6 +107,7 @@ interface RegisterIpcHandlersOptions {
 	settingsResolutionService: EnsembleConfigResolutionService;
 	terminalService: TerminalService;
 	unarchiveWorkspaceService: UnarchiveWorkspaceService;
+	workspaceFilesWatcher: WorkspaceFilesWatcher;
 }
 
 /**
@@ -146,6 +150,7 @@ export function registerIpcHandlers({
 	sharedRootAdoptionService,
 	terminalService,
 	unarchiveWorkspaceService,
+	workspaceFilesWatcher,
 }: RegisterIpcHandlersOptions): void {
 	// Permission gate is wired here so all handler groups share one instance.
 	// `getMode` re-resolves on every gated call so settings changes apply live.
@@ -232,7 +237,10 @@ export function registerIpcHandlers({
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerTerminalHandlers({ terminalService });
 	registerWorkspaceScriptHandlers({ scriptLifecycleService });
-	registerWorkspaceFilesHandlers({ listWorkspaceFilesService });
+	registerWorkspaceFilesHandlers({
+		listWorkspaceFilesService,
+		workspaceFilesWatcher,
+	});
 	registerWorkspaceGitHandlers({
 		workspaceGitService: createWorkspaceGitService({ localCommandService }),
 	});

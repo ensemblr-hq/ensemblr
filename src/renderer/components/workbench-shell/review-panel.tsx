@@ -101,7 +101,10 @@ export function ReviewPanel({
 				/>
 			</div>
 			<TabsContent className='min-h-0 overflow-hidden' value='files'>
-				<AllFilesList files={workspace.workspaceFiles} />
+				<AllFilesList
+					files={workspace.workspaceFiles}
+					workspaceId={workspace.id}
+				/>
 			</TabsContent>
 			<TabsContent className='min-h-0 overflow-hidden' value='changes'>
 				<ReviewFileList

@@ -104,6 +104,9 @@ export const IPC_CHANNELS = {
 	terminalOutput: 'ensemble:terminal-output',
 	terminalSnapshot: 'ensemble:terminal-snapshot',
 	unarchiveWorkspace: 'ensemble:unarchive-workspace',
+	unwatchWorkspaceFiles: 'ensemble:unwatch-workspace-files',
+	watchWorkspaceFiles: 'ensemble:watch-workspace-files',
+	workspaceFilesChanged: 'ensemble:workspace-files-changed',
 	writeForkSummary: 'ensemble:write-fork-summary',
 	writeTerminalSession: 'ensemble:write-terminal-session',
 } as const;

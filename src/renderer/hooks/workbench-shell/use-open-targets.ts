@@ -17,8 +17,17 @@ import type { WorkspaceOpenTarget } from '@/renderer/types/workbench';
  * detection results are still loading so the component can paint nothing
  * (no flash) and `primaryTarget` shares the same null-while-loading shape.
  */
+/** Optional sub-path to open instead of the workspace root. */
+export interface OpenTargetPathOptions {
+	relativePath: string;
+	relativePathKind: 'directory' | 'file';
+}
+
 export interface OpenTargetsState {
-	invokeTarget: (target: WorkspaceOpenTarget) => Promise<void>;
+	invokeTarget: (
+		target: WorkspaceOpenTarget,
+		options?: OpenTargetPathOptions,
+	) => Promise<void>;
 	openTargets: WorkspaceOpenTarget[] | null;
 	primaryTarget: WorkspaceOpenTarget | null;
 }
@@ -87,7 +96,7 @@ export function useOpenTargets({
 	}, [lastUsedTargetId, openTargets]);
 
 	const invokeTarget = useCallback(
-		async (target: WorkspaceOpenTarget) => {
+		async (target: WorkspaceOpenTarget, options?: OpenTargetPathOptions) => {
 			const ensemble = getEnsembleApiOrNull();
 			if (!ensemble) {
 				toast.error('Open in… is unavailable without the Electron bridge.');
@@ -96,17 +105,27 @@ export function useOpenTargets({
 			const result = await ensemble.openWorkspaceInTarget({
 				targetId: target.id,
 				workspaceId,
+				...(options
+					? {
+							relativePath: options.relativePath,
+							relativePathKind: options.relativePathKind,
+						}
+					: {}),
 			});
 			if (!result.ok) {
 				toast.error(`Failed to open in ${target.label}: ${result.error}`);
 				return;
 			}
-			if (target.behavior !== 'copy-path') {
+			// Quick-launch memory is for the header split button (workspace root);
+			// don't let opening an individual file repoint it.
+			if (target.behavior !== 'copy-path' && !options) {
 				writeLastUsedOpenTarget(workspaceId, target.id);
 				setLastUsedTargetId(target.id);
 			}
 			if (target.behavior === 'copy-path') {
-				toast.success('Workspace path copied to clipboard.');
+				toast.success(
+					options ? 'Path copied to clipboard.' : 'Workspace path copied.',
+				);
 			}
 		},
 		[workspaceId],
