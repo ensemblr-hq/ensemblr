@@ -73,6 +73,23 @@ describe('createWorkspaceFilesWatcher', () => {
 		expect(changes).toEqual([]);
 	});
 
+	test('ignores .DS_Store and AppleDouble churn at any depth', async () => {
+		const changes: string[] = [];
+		const { startWatch, watches } = fakeWatchFactory();
+		const watcher = createWorkspaceFilesWatcher({
+			onChange: (cwd) => changes.push(cwd),
+			startWatch,
+		});
+
+		watcher.watch('/abs/workspace');
+		watches[0].changed('.DS_Store');
+		watches[0].changed('src/components/.DS_Store');
+		watches[0].changed('src/._app.ts');
+
+		await sleep(AFTER_DEBOUNCE_MS);
+		expect(changes).toEqual([]);
+	});
+
 	test('rejects a relative cwd without starting a watch', () => {
 		const { startWatch, watches } = fakeWatchFactory();
 		const watcher = createWorkspaceFilesWatcher({

@@ -3,12 +3,14 @@ import { describe, expect, test } from 'bun:test';
 import {
 	buildFileTree,
 	fileTreeIndentClassName,
+	flattenFileTree,
 	getCompactFileDirectory,
 	listDirectoryPaths,
 } from '../../src/renderer/lib/workbench/file-tree';
 
 interface Entry {
 	id: string;
+	isIgnored?: boolean;
 	kind?: 'directory' | 'file';
 	name: string;
 	path: string;
@@ -16,6 +18,16 @@ interface Entry {
 
 function dir(path: string): Entry {
 	return { id: `dir:${path}`, kind: 'directory', name: basename(path), path };
+}
+
+function ignoredDir(path: string): Entry {
+	return {
+		id: `dir:${path}`,
+		isIgnored: true,
+		kind: 'directory',
+		name: basename(path),
+		path,
+	};
 }
 
 function file(path: string): Entry {
@@ -80,6 +92,24 @@ describe('buildFileTree', () => {
 		expect(src.directories[0].files.map((entry) => entry.path)).toEqual([
 			'src/lib/util.ts',
 		]);
+	});
+
+	test('flags ignored directory nodes and leaves synthesized ancestors normal', () => {
+		const tree = buildFileTree([
+			ignoredDir('.context'),
+			file('src/app.ts'),
+			ignoredDir('src/cache'),
+		]);
+
+		const context = tree.directories.find((node) => node.name === '.context');
+		expect(context?.isIgnored).toBe(true);
+
+		const src = tree.directories.find((node) => node.name === 'src');
+		// `src` is synthesized for a tracked file, so it must stay normal...
+		expect(src?.isIgnored).toBeUndefined();
+		// ...while its fully-ignored child carries the flag.
+		const cache = src?.directories.find((node) => node.name === 'cache');
+		expect(cache?.isIgnored).toBe(true);
 	});
 
 	test('ignores empty and root-only paths', () => {
@@ -180,5 +210,93 @@ describe('getCompactFileDirectory', () => {
 
 		expect(compact.labelParts).toEqual(['a']);
 		expect(compact.node.directories).toHaveLength(2);
+	});
+});
+
+describe('flattenFileTree', () => {
+	const closed = () => false;
+	const openOnly = (paths: string[]) => {
+		const set = new Set(paths);
+		return (path: string) => set.has(path);
+	};
+
+	test('emits only top-level rows when nothing is expanded, dirs before files', () => {
+		const tree = buildFileTree([
+			file('src/app.ts'),
+			file('src/lib/util.ts'),
+			file('readme.md'),
+		]);
+
+		const rows = flattenFileTree(tree, closed);
+
+		expect(rows.map((row) => [row.type, row.key, row.level])).toEqual([
+			['directory', 'src', 0],
+			['file', 'readme.md', 0],
+		]);
+		expect(rows[0]).toMatchObject({ isExpanded: false });
+	});
+
+	test('reveals a directory’s children at the next level when expanded', () => {
+		const tree = buildFileTree([
+			file('src/app.ts'),
+			file('src/lib/util.ts'),
+			file('readme.md'),
+		]);
+
+		const rows = flattenFileTree(tree, openOnly(['src']));
+
+		expect(rows.map((row) => [row.type, row.key, row.level])).toEqual([
+			['directory', 'src', 0],
+			['directory', 'src/lib', 1],
+			['file', 'src/app.ts', 1],
+			['file', 'readme.md', 0],
+		]);
+	});
+
+	test('compacts single-child chains into one toggle-able row', () => {
+		const tree = buildFileTree([file('node_modules/.vite/deps/react.js')]);
+
+		const collapsed = flattenFileTree(tree, closed);
+		expect(collapsed).toHaveLength(1);
+		expect(collapsed[0]).toMatchObject({
+			isExpanded: false,
+			key: 'node_modules/.vite/deps',
+			labelParts: ['node_modules', '.vite', 'deps'],
+			level: 0,
+			type: 'directory',
+		});
+
+		// The compacted node's path is the toggle key.
+		const expanded = flattenFileTree(
+			tree,
+			openOnly(['node_modules/.vite/deps']),
+		);
+		expect(expanded.map((row) => [row.type, row.key, row.level])).toEqual([
+			['directory', 'node_modules/.vite/deps', 0],
+			['file', 'node_modules/.vite/deps/react.js', 1],
+		]);
+	});
+
+	test('skips collapsed subtrees even if a descendant is marked expanded', () => {
+		const tree = buildFileTree([file('a/b/x.ts'), file('a/c/y.ts')]);
+
+		// `a` stays closed, so `a/b` must not surface despite being "expanded".
+		const rows = flattenFileTree(tree, openOnly(['a/b']));
+
+		expect(rows.map((row) => [row.type, row.key])).toEqual([
+			['directory', 'a'],
+		]);
+	});
+
+	test('carries the ignored flag from the compacted node', () => {
+		const tree = buildFileTree([ignoredDir('node_modules')]);
+
+		const rows = flattenFileTree(tree, closed);
+
+		expect(rows[0]).toMatchObject({
+			isIgnored: true,
+			key: 'node_modules',
+			type: 'directory',
+		});
 	});
 });

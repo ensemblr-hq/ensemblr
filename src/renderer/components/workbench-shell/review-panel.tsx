@@ -103,6 +103,7 @@ export function ReviewPanel({
 			<TabsContent className='min-h-0 overflow-hidden' value='files'>
 				<AllFilesList
 					files={workspace.workspaceFiles}
+					workspaceCwd={workspace.pathLabel}
 					workspaceId={workspace.id}
 				/>
 			</TabsContent>

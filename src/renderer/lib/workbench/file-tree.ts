@@ -2,6 +2,8 @@
 export interface FileTreeNode<TFile> {
 	directories: FileTreeNode<TFile>[];
 	files: TFile[];
+	/** True when git ignores this directory; the all-files tree dims it. */
+	isIgnored?: boolean;
 	name: string;
 	path: string;
 }
@@ -12,6 +14,7 @@ interface MutableFileTreeNode<TFile> extends FileTreeNode<TFile> {
 
 /** Minimal shape required to place an entry in the tree. */
 interface FileTreeEntry {
+	isIgnored?: boolean;
 	kind?: 'directory' | 'file';
 	path: string;
 }
@@ -40,7 +43,12 @@ export function buildFileTree<TFile extends FileTreeEntry>(
 		}
 
 		if (entry.kind === 'directory') {
-			ensureDirectoryNode(root, parts);
+			const directoryNode = ensureDirectoryNode(root, parts);
+			// Tag the leaf directory ignored; ancestors synthesized for tracked
+			// files stay normal so only the ignored folder itself dims.
+			if (entry.isIgnored) {
+				directoryNode.isIgnored = true;
+			}
 			continue;
 		}
 
@@ -154,6 +162,76 @@ export function getCompactFileDirectory<TFile>(node: FileTreeNode<TFile>): {
 	}
 
 	return { labelParts, node: compactNode };
+}
+
+/** A single visible row of a flattened file tree, ready for windowed render. */
+export type FlatFileTreeRow<TFile> =
+	| {
+			isExpanded: boolean;
+			isIgnored: boolean;
+			/** Stable React key + toggle target: the compacted node's path. */
+			key: string;
+			labelParts: string[];
+			level: number;
+			node: FileTreeNode<TFile>;
+			type: 'directory';
+	  }
+	| {
+			file: TFile;
+			/** Stable React key: the file's (unique) path. */
+			key: string;
+			level: number;
+			type: 'file';
+	  };
+
+/**
+ * Flattens a tree into the ordered list of currently *visible* rows so callers
+ * can virtualize them instead of mounting one component per node.
+ *
+ * Mirrors the recursive render exactly: directories precede files at each level,
+ * single-child chains are compacted (`a/b/c` as one row), and a directory's
+ * descendants are emitted only when `isExpanded` reports its compacted path
+ * open. Collapsed subtrees are skipped, so the walk costs O(visible rows), not
+ * O(tree).
+ * @param root - Root node from {@link buildFileTree}.
+ * @param isExpanded - Reports whether a directory path is currently expanded.
+ * @returns Visible rows in render order.
+ */
+export function flattenFileTree<TFile extends FileTreeEntry>(
+	root: FileTreeNode<TFile>,
+	isExpanded: (path: string) => boolean,
+): FlatFileTreeRow<TFile>[] {
+	const rows: FlatFileTreeRow<TFile>[] = [];
+
+	const walk = (node: FileTreeNode<TFile>, level: number): void => {
+		for (const directory of node.directories) {
+			const { labelParts, node: compactNode } =
+				getCompactFileDirectory(directory);
+			const expanded = isExpanded(compactNode.path);
+
+			rows.push({
+				isExpanded: expanded,
+				isIgnored: compactNode.isIgnored ?? false,
+				key: compactNode.path,
+				labelParts,
+				level,
+				node: compactNode,
+				type: 'directory',
+			});
+
+			if (expanded) {
+				walk(compactNode, level + 1);
+			}
+		}
+
+		for (const file of node.files) {
+			rows.push({ file, key: file.path, level, type: 'file' });
+		}
+	};
+
+	walk(root, 0);
+
+	return rows;
 }
 
 /** Maps a tree depth to the matching Tailwind left-padding class. */

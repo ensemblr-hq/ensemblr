@@ -243,6 +243,7 @@ test('unarchive (no branch cleanup) NULLs archived_at and restores .context/', a
 	const workspace = await seedWorkspace(harness, 'restore-me');
 
 	const handoff = path.join(workspace.path, '.context', 'handoff.md');
+	mkdirSync(path.dirname(handoff), { recursive: true });
 	writeFileSync(handoff, '# pending work\n');
 
 	const { archive, unarchive } = makeArchiveService(harness);
@@ -270,6 +271,7 @@ test('unarchive (branch cleanup) recreates the worktree from the base branch and
 	const workspace = await seedWorkspace(harness, 'restore-cleanup');
 
 	const handoff = path.join(workspace.path, '.context', 'handoff.md');
+	mkdirSync(path.dirname(handoff), { recursive: true });
 	writeFileSync(handoff, 'pushed\n');
 
 	const { archive, unarchive } = makeArchiveService(harness);
