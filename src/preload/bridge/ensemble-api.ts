@@ -133,6 +133,7 @@ export function createEnsembleApi(): EnsembleApi {
 		linearMetadata: (request) => invoke('linearMetadata', request),
 		linearStartLogin: () => invoke('linearStartLogin'),
 		linearUpdateIssue: (request) => invoke('linearUpdateIssue', request),
+		listAllWorkspaces: () => invoke('listAllWorkspaces'),
 		listArchivedWorkspaces: (request) =>
 			invoke('listArchivedWorkspaces', request),
 		listChatTabs: (request) => invoke('listChatTabs', request),

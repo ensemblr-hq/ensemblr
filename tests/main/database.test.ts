@@ -23,6 +23,7 @@ const EXPECTED_MIGRATIONS = [
 	'006_repository_remote_url_index',
 	'007_chat_tab_kinds',
 	'008_checkpoint_pi_linkage',
+	'009_linear_cache',
 ];
 
 function createTestDatabasePath(): {
@@ -85,6 +86,10 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		'checkpoints',
 		'comments',
 		'integration_metadata',
+		'linear_comments',
+		'linear_issues',
+		'linear_resources',
+		'linear_sync_state',
 		'pi_runtime_state',
 		'pi_session_branches',
 		'pi_session_events',
@@ -511,6 +516,41 @@ VALUES
 	assert.equal(
 		snapshot.repositories[1]?.workspaces[0]?.metadata.linearIssue,
 		'THE-120',
+	);
+});
+
+test('repository workspace navigation snapshot excludes archived repositories', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsembleDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	// An archived repository (and its still-on-disk workspace) must never leak
+	// back into the sidebar — otherwise archiving a repo "comes back" on the
+	// next launch. The snapshot carries no archived flag, so the cut happens in
+	// SQL; this regression-tests that filter.
+	connection.database.exec(`
+INSERT INTO repositories (id, slug, name, path, default_branch, metadata_json, archived_at)
+VALUES
+	('repo-active', 'active', 'Active', '/tmp/active/repo', 'main', '{}', NULL),
+	('repo-archived', 'archived', 'Archived', '/tmp/archived/repo', 'main', '{}', '2026-06-01T00:00:00.000Z');
+
+INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch, archived_at, metadata_json)
+VALUES
+	('ws-active', 'repo-active', 'live', 'Live', '/tmp/active/workspaces/live', 'feature', 'main', NULL, '{}'),
+	('ws-archived', 'repo-archived', 'gone', 'Gone', '/tmp/archived/workspaces/gone', 'gone', 'main', '2026-06-01T00:00:00.000Z', '{}');
+`);
+
+	const snapshot = getRepositoryWorkspaceNavigationSnapshot(
+		connection.database,
+	);
+
+	assert.deepEqual(
+		snapshot.repositories.map((repository) => repository.id),
+		['repo-active'],
 	);
 });
 

@@ -10,6 +10,8 @@ export * from './clone';
 export * from './environment';
 export * from './github';
 export * from './health';
+export * from './history';
+export * from './invalidate-workspace-list-views';
 export * from './linear';
 export * from './navigation';
 export * from './open-targets';
