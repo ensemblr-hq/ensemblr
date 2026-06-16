@@ -125,6 +125,9 @@ export function useCreateWorkspaceFromProject({
 					...(seed?.branchName ? { branchName: seed.branchName } : {}),
 					...(seed?.linkedIssue ? { linkedIssue: seed.linkedIssue } : {}),
 					name,
+					// Auto-generated composer name (not user-typed) → eligible for
+					// auto branch-naming rename on the first turn.
+					placeholderName: !seed?.name,
 					repositoryId: project.id,
 				});
 

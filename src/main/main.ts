@@ -41,6 +41,7 @@ import {
 	electronPowerControls,
 } from './pi-agent/electron-activity-bindings';
 import { readMacosBattery } from './pi-agent/macos-battery';
+import { createBranchNameQueue } from './pi-agent/pi-branch-name-service';
 import { createPiSessionService } from './pi-agent/pi-session-service';
 import { createSessionSummaryWriter } from './pi-agent/session-summary-writer';
 import {
@@ -56,6 +57,7 @@ import {
 	createDeleteWorkspaceService,
 	createGithubCloneService,
 	createGithubRepositoryListService,
+	createGithubUsernameResolver,
 	createListArchivedWorkspacesService,
 	createLocalRepositoryImportService,
 	createLocalRepositoryRegistrationService,
@@ -109,6 +111,7 @@ const environmentVariablesService = createEnvironmentVariablesService({
 			: null,
 });
 const settingsResolutionService = createEnsembleConfigResolutionService({
+	appSettingsService,
 	configService,
 	databaseService,
 });
@@ -192,6 +195,17 @@ const sessionSummaryWriter = createSessionSummaryWriter({
 		return snapshot;
 	},
 });
+const renameWorkspaceService = createRenameWorkspaceService({
+	databaseService,
+	localCommandService,
+});
+// Best-effort auto branch-naming after the first turn: renames a placeholder
+// workspace + its branch to an LLM-suggested name. Gated by the
+// `renameWorkspaceOnBranch` user setting and placeholder metadata.
+const branchNameQueue = createBranchNameQueue({
+	appSettingsService,
+	renameWorkspace: renameWorkspaceService.rename,
+});
 const piSessionService = createPiSessionService({
 	databaseService,
 	eventSink: ({ event, sessionId, workspaceId }) => {
@@ -217,6 +231,7 @@ const piSessionService = createPiSessionService({
 		agentActivityMonitor.handle({ event: payload.event, sessionId });
 	},
 	piAgentClient,
+	queueBranchName: branchNameQueue,
 	sessionSummaryWriter,
 });
 const localRepositoryRegistrationService =
@@ -236,6 +251,9 @@ const githubCloneService = createGithubCloneService({
 const githubRepositoryListService = createGithubRepositoryListService({
 	localCommandService,
 });
+const githubUsernameResolver = createGithubUsernameResolver({
+	localCommandService,
+});
 const quickStartProjectService = createQuickStartProjectService({
 	localCommandService,
 	registrationService: localRepositoryRegistrationService,
@@ -243,16 +261,14 @@ const quickStartProjectService = createQuickStartProjectService({
 });
 const createWorkspaceServiceInstance = createWorkspaceService({
 	databaseService,
+	githubUsernameResolver,
 	localCommandService,
+	readGitDefaults: () => appSettingsService.read().git,
 	rootDirectoryService,
 });
 const sharedRootAdoptionService = createSharedRootAdoptionService({
 	databaseService,
 	rootDirectoryService,
-});
-const renameWorkspaceService = createRenameWorkspaceService({
-	databaseService,
-	localCommandService,
 });
 const archiveLifecycleService = createArchiveLifecycleService();
 const archiveWorkspaceService = createArchiveWorkspaceService({

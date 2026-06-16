@@ -32,31 +32,51 @@ export const modelSettingsSchema = z.object({
 	hiddenModels: z.array(z.string()).catch([]),
 });
 
+// Git user-scope defaults. Field names mirror the repository-resolution keys
+// (`deleteLocalBranchOnArchive`, `archiveAfterMerge`, `setUpstreamOnPush`, …) so
+// `resolveSettings` can feed them straight in as the `user-default` source.
+export const gitSettingsSchema = z.object({
+	branchPrefixSource: z
+		.enum(['github-username', 'custom', 'none'])
+		.catch('github-username'),
+	branchPrefixCustom: z.string().catch(''),
+	renameWorkspaceOnBranch: z.boolean().catch(true),
+	deleteLocalBranchOnArchive: z.boolean().catch(false),
+	archiveAfterMerge: z.boolean().catch(false),
+	setUpstreamOnPush: z.boolean().catch(true),
+});
+
 export const appSettingsSchema = z.object({
 	general: generalSettingsSchema,
 	models: modelSettingsSchema,
+	git: gitSettingsSchema,
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;
 export type GeneralSettings = AppSettings['general'];
 export type ModelSettings = AppSettings['models'];
+export type GitSettings = AppSettings['git'];
+export type BranchPrefixSource = GitSettings['branchPrefixSource'];
 
 /** Section-scoped partial patch applied by `updateAppSettings`. */
 export interface AppSettingsPatch {
 	general?: Partial<GeneralSettings>;
 	models?: Partial<ModelSettings>;
+	git?: Partial<GitSettings>;
 }
 
 /** Validates an untrusted patch at the IPC boundary; unknown keys are dropped. */
 export const appSettingsPatchSchema = z.object({
 	general: generalSettingsSchema.partial().optional(),
 	models: modelSettingsSchema.partial().optional(),
+	git: gitSettingsSchema.partial().optional(),
 });
 
 /** Fully-defaulted settings — the baseline before any config file is read. */
 export const DEFAULT_APP_SETTINGS: AppSettings = appSettingsSchema.parse({
 	general: {},
 	models: {},
+	git: {},
 });
 
 /** True for a non-null, non-array plain object. */
@@ -76,6 +96,7 @@ export function parseAppSettings(raw: unknown): AppSettings {
 	const result = appSettingsSchema.safeParse({
 		general: asRecord(record.general),
 		models: asRecord(record.models),
+		git: asRecord(record.git),
 	});
 	return result.success ? result.data : DEFAULT_APP_SETTINGS;
 }
@@ -88,5 +109,6 @@ export function mergeAppSettings(
 	return {
 		general: { ...current.general, ...patch.general },
 		models: { ...current.models, ...patch.models },
+		git: { ...current.git, ...patch.git },
 	};
 }

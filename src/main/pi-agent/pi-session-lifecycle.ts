@@ -86,6 +86,8 @@ export interface PiSessionLifecycleOptions {
 	now: () => Date;
 	persistRuntimeEvent: PersistRuntimeEventPort;
 	piAgentClient: PiAgentClient;
+	/** Optional post-first-turn auto branch-naming; same first-turn payload. */
+	queueBranchName?: QueueChatTitlePort;
 	queueChatTitle: QueueChatTitlePort;
 	requireDatabase: () => DatabaseSync;
 	sessionSummaryWriter?: SessionSummaryWriter;
@@ -119,6 +121,7 @@ export function createPiSessionLifecycle({
 	now,
 	persistRuntimeEvent,
 	piAgentClient,
+	queueBranchName,
 	queueChatTitle,
 	requireDatabase,
 	sessionSummaryWriter,
@@ -145,6 +148,7 @@ export function createPiSessionLifecycle({
 		eventSink,
 		now,
 		piAgentClient,
+		queueBranchName,
 		queueChatTitle,
 		subscribeToRuntime: ({ branchId, database, runtimeSession, sessionId }) =>
 			runtimeSession.subscribe((event) => {

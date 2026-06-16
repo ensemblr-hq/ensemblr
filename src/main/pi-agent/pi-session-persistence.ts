@@ -129,3 +129,30 @@ export function appendChatTitleMetadataEvent({
 		},
 	});
 }
+
+/**
+ * Appends a synthetic metadata event signalling that an auto branch-naming
+ * rename landed, so renderer subscribers refetch the workspace list.
+ */
+export function appendWorkspaceRenamedMetadataEvent({
+	branchId,
+	database,
+}: {
+	branchId: string;
+	database: DatabaseSync;
+}): PiEventRow {
+	const envelope: PiPersistedEnvelope = {
+		kind: 'metadata',
+		metadata: { workspaceRenamed: true },
+	};
+	return appendPiEvent({
+		database,
+		input: {
+			branchId,
+			eventType: 'metadata',
+			payload: envelope,
+			stream: 'protocol',
+			turnId: null,
+		},
+	});
+}

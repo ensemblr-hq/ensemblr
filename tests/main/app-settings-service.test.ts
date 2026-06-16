@@ -66,6 +66,26 @@ describe('createAppSettingsService', () => {
 		expect(readJson(configPath).app.general.sendShortcut).toBe('mod+enter');
 	});
 
+	test('persists git section defaults and updates', () => {
+		const configPath = tmpConfigPath();
+		const service = createAppSettingsService({ configPath });
+
+		expect(service.read().git.setUpstreamOnPush).toBe(true);
+		expect(readJson(configPath).app.git.branchPrefixSource).toBe(
+			'github-username',
+		);
+
+		const next = service.update({
+			git: { archiveAfterMerge: true, branchPrefixSource: 'none' },
+		});
+		expect(next.git.archiveAfterMerge).toBe(true);
+		expect(next.git.branchPrefixSource).toBe('none');
+		expect(next.git.setUpstreamOnPush).toBe(true); // untouched default
+
+		expect(service.read().git.archiveAfterMerge).toBe(true);
+		expect(readJson(configPath).app.git.branchPrefixSource).toBe('none');
+	});
+
 	test('preserves unrelated config keys when writing', () => {
 		const configPath = tmpConfigPath();
 		writeFileSync(

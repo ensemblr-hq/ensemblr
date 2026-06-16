@@ -22,6 +22,7 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 export interface ReviewMergeSettings {
 	archiveAfterMerge: boolean;
 	deleteLocalBranchOnArchive: boolean;
+	setUpstreamOnPush: boolean;
 }
 
 /**
@@ -80,7 +81,10 @@ export function useReviewMutations({
 			if (!commitResult.ok) {
 				throw new ReviewActionError(commitResult.error);
 			}
-			const pushResult = await pushWorkspaceBranch({ workspaceCwd });
+			const pushResult = await pushWorkspaceBranch({
+				setUpstream: mergeSettings.setUpstreamOnPush,
+				workspaceCwd,
+			});
 			if (!pushResult.ok) {
 				throw new ReviewActionError(pushResult.error);
 			}
@@ -122,7 +126,10 @@ export function useReviewMutations({
 					throw new ReviewActionError(commitResult.error);
 				}
 			}
-			const pushResult = await pushWorkspaceBranch({ workspaceCwd });
+			const pushResult = await pushWorkspaceBranch({
+				setUpstream: mergeSettings.setUpstreamOnPush,
+				workspaceCwd,
+			});
 			if (!pushResult.ok) {
 				throw new ReviewActionError(pushResult.error);
 			}

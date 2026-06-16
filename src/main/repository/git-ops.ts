@@ -85,6 +85,99 @@ export async function runWorktreeAdd({
 	}
 }
 
+/**
+ * Resolves the repository's root branch for new workspaces. Prefers the remote's
+ * published default (`origin/HEAD`); when that is not recorded locally, falls
+ * back to a local `main` then `master`. Returns null when none is found so the
+ * caller can fall back to the stored default.
+ *
+ * This is resolved live at workspace creation (not read from the stored
+ * `default_branch` column) so the "+" button always branches from the current
+ * root, even when the repo was registered on a feature branch or its default
+ * has since changed.
+ */
+export async function resolveRootBranch({
+	localCommandService,
+	repositoryPath,
+}: {
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<string | null> {
+	const originHead = await runGitText({
+		args: ['symbolic-ref', '--quiet', '--short', 'refs/remotes/origin/HEAD'],
+		localCommandService,
+		repositoryPath,
+	});
+	if (originHead) {
+		const slashAt = originHead.indexOf('/');
+		const branch = slashAt >= 0 ? originHead.slice(slashAt + 1) : originHead;
+		if (branch) {
+			return branch;
+		}
+	}
+
+	for (const candidate of ['main', 'master']) {
+		const exists = await runGitSucceeds({
+			args: ['show-ref', '--verify', '--quiet', `refs/heads/${candidate}`],
+			localCommandService,
+			repositoryPath,
+		});
+		if (exists) {
+			return candidate;
+		}
+	}
+
+	return null;
+}
+
+/** Runs a read-only git command, returning trimmed stdout (empty on failure). */
+async function runGitText({
+	args,
+	localCommandService,
+	repositoryPath,
+}: {
+	args: string[];
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<string> {
+	try {
+		const result = await localCommandService.run({
+			args,
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 16 * 1024,
+			timeoutMs: GIT_BRANCH_TIMEOUT_MS,
+		});
+		return result.status === 'success' ? result.stdout.trim() : '';
+	} catch {
+		return '';
+	}
+}
+
+/** Runs a git command and reports whether it exited successfully. */
+async function runGitSucceeds({
+	args,
+	localCommandService,
+	repositoryPath,
+}: {
+	args: string[];
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<boolean> {
+	try {
+		const result = await localCommandService.run({
+			args,
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 4 * 1024,
+			timeoutMs: GIT_BRANCH_TIMEOUT_MS,
+		});
+		return result.status === 'success';
+	} catch {
+		return false;
+	}
+}
+
 /** Force-removes a worktree registration so a follow-up branch delete succeeds. */
 export async function runWorktreeRemove({
 	localCommandService,

@@ -3,7 +3,16 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { CreatedWorkspaceSnapshot, CreateWorkspaceDiagnostic, CreateWorkspaceDiagnosticCode, CreateWorkspaceRequest, CreateWorkspaceResult, FilesToCopySnapshot, WorkspaceLinkedIssueInput } from '../../shared/ipc/contracts/workspace';
+import type { GitSettings } from '../../shared/config/app-settings.ts';
+import type {
+	CreatedWorkspaceSnapshot,
+	CreateWorkspaceDiagnostic,
+	CreateWorkspaceDiagnosticCode,
+	CreateWorkspaceRequest,
+	CreateWorkspaceResult,
+	FilesToCopySnapshot,
+	WorkspaceLinkedIssueInput,
+} from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
 import {
 	type LoadedRepositoryConfig,
@@ -22,11 +31,14 @@ import {
 	createFilesToCopyService,
 	type FilesToCopyService,
 } from './files-to-copy.ts';
+import { joinBranchName } from './branch-name.ts';
 import {
 	DEFAULT_FALLBACK_BRANCH,
 	GIT_WORKTREE_TIMEOUT_MS,
+	resolveRootBranch,
 	runWorktreeAdd as runWorktreeAddShared,
 } from './git-ops.ts';
+import type { GithubUsernameResolver } from './github-username.ts';
 import { toSlug } from './slug.ts';
 import { validateWorkspaceName } from './workspace-validation.ts';
 
@@ -39,9 +51,20 @@ export interface CreateWorkspaceService {
 export interface CreateWorkspaceServiceOptions {
 	databaseService: EnsembleDatabaseService;
 	filesToCopyService?: FilesToCopyService;
+	/**
+	 * Resolves the authenticated GitHub login for the `github-username`
+	 * branch-prefix source. Omitted in tests (and when no user defaults are
+	 * wired), in which case that source resolves to no prefix.
+	 */
+	githubUsernameResolver?: GithubUsernameResolver;
 	loadConfig?: (options: LoadRepositoryConfigOptions) => LoadedRepositoryConfig;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
+	/**
+	 * Reads the user-scope git defaults (`app.git`). When omitted, branch-prefix
+	 * resolution falls back to the repository config only (legacy behavior).
+	 */
+	readGitDefaults?: () => GitSettings;
 	rootDirectoryService: EnsembleRootDirectoryService;
 }
 
@@ -78,9 +101,11 @@ const CONTEXT_DIRECTORY = '.context';
 export function createWorkspaceService({
 	databaseService,
 	filesToCopyService,
+	githubUsernameResolver,
 	loadConfig = loadRepositoryConfig,
 	localCommandService,
 	now = () => new Date(),
+	readGitDefaults,
 	rootDirectoryService,
 }: CreateWorkspaceServiceOptions): CreateWorkspaceService {
 	const filesToCopy =
@@ -134,9 +159,23 @@ export function createWorkspaceService({
 			}
 
 			const config = loadConfig({ now, repositoryPath: repository.path });
-			const branchPrefix = readBranchPrefix(config);
+			const branchPrefix = await resolveBranchPrefix({
+				config,
+				githubUsernameResolver,
+				readGitDefaults,
+			});
+			// An explicit base (e.g. forking from another workspace) wins; otherwise
+			// new workspaces always branch from the repository root, resolved live so
+			// a stale/feature `default_branch` can't pin creation to the wrong base.
+			const explicitBase = request.baseBranch?.trim();
+			const baseBranchOverride = explicitBase
+				? explicitBase
+				: ((await resolveRootBranch({
+						localCommandService,
+						repositoryPath: repository.path,
+					})) ?? undefined);
 			const prepared = prepareWorkspace({
-				baseBranchOverride: request.baseBranch,
+				baseBranchOverride,
 				branchNameOverride: request.branchName,
 				branchPrefix,
 				database,
@@ -204,6 +243,7 @@ export function createWorkspaceService({
 			const initialMetadata = buildInitialWorkspaceMetadata({
 				filesToCopySnapshot,
 				linkedIssue: request.linkedIssue,
+				placeholderName: request.placeholderName === true,
 			});
 			try {
 				insertWorkspaceRow({
@@ -402,6 +442,50 @@ function readBranchPrefix(config: LoadedRepositoryConfig): string {
 }
 
 /**
+ * Resolves the branch-name prefix for a new workspace. A repository-scoped
+ * `git.branchPrefix` always wins (it is the team/shared override); otherwise the
+ * user-scope default applies: an empty prefix for `none`, the literal custom
+ * value for `custom`, and the GitHub login for `github-username` (resolved via
+ * gh, empty when unavailable). With no user defaults wired the repo value is
+ * used alone, preserving the legacy behavior. Any trailing slash is normalized
+ * away — {@link joinBranchName} re-inserts a single separator.
+ * @param input - Repo config, the gh resolver, and the user-defaults reader.
+ * @returns The bare prefix (no trailing slash) for {@link joinBranchName}.
+ */
+async function resolveBranchPrefix({
+	config,
+	githubUsernameResolver,
+	readGitDefaults,
+}: {
+	config: LoadedRepositoryConfig;
+	githubUsernameResolver?: GithubUsernameResolver;
+	readGitDefaults?: () => GitSettings;
+}): Promise<string> {
+	const repoPrefix = readBranchPrefix(config);
+	if (repoPrefix) {
+		return repoPrefix;
+	}
+
+	if (!readGitDefaults) {
+		return '';
+	}
+
+	const git = readGitDefaults();
+	switch (git.branchPrefixSource) {
+		case 'none':
+			return '';
+		case 'custom':
+			return git.branchPrefixCustom;
+		case 'github-username': {
+			const login = await githubUsernameResolver?.resolve();
+			return login ?? '';
+		}
+		default:
+			return '';
+	}
+}
+
+/**
  * Resolves the placeholder name, allocates a unique slug for the repository,
  * derives the branch name and base branch, and computes the workspace path.
  */
@@ -437,7 +521,7 @@ function prepareWorkspace({
 	const branchName =
 		typeof branchNameOverride === 'string' && branchNameOverride.trim()
 			? branchNameOverride.trim()
-			: `${branchPrefix}${slug}`;
+			: joinBranchName(branchPrefix, slug);
 	const baseBranch =
 		typeof baseBranchOverride === 'string' && baseBranchOverride.trim()
 			? baseBranchOverride.trim()
@@ -631,9 +715,11 @@ function cleanupDirectory(workspacePath: string): void {
 function buildInitialWorkspaceMetadata({
 	filesToCopySnapshot,
 	linkedIssue,
+	placeholderName,
 }: {
 	filesToCopySnapshot: FilesToCopySnapshot;
 	linkedIssue?: WorkspaceLinkedIssueInput;
+	placeholderName?: boolean;
 }): Record<string, unknown> {
 	return {
 		filesToCopy: {
@@ -642,6 +728,7 @@ function buildInitialWorkspaceMetadata({
 			source: filesToCopySnapshot.source,
 		},
 		...(linkedIssue ? { linkedIssue } : {}),
+		...(placeholderName ? { placeholderName: true } : {}),
 	};
 }
 

@@ -311,6 +311,7 @@ export const createWorkspaceRequestSchema = z.object({
 	branchName: optionalTrimmedString,
 	linkedIssue: workspaceLinkedIssueSchema.optional(),
 	name: optionalTrimmedString,
+	placeholderName: z.boolean().optional(),
 	repositoryId: z.string(),
 });
 
@@ -323,19 +324,27 @@ export function parseCreateWorkspaceRequest(raw: unknown): {
 	branchName?: string;
 	linkedIssue?: z.infer<typeof workspaceLinkedIssueSchema>;
 	name?: string;
+	placeholderName?: boolean;
 	repositoryId: string;
 } {
 	const parsed = createWorkspaceRequestSchema.safeParse(raw);
 	if (!parsed.success) {
 		return { repositoryId: '' };
 	}
-	const { baseBranch, branchName, linkedIssue, name, repositoryId } =
-		parsed.data;
+	const {
+		baseBranch,
+		branchName,
+		linkedIssue,
+		name,
+		placeholderName,
+		repositoryId,
+	} = parsed.data;
 	const result: {
 		baseBranch?: string;
 		branchName?: string;
 		linkedIssue?: z.infer<typeof workspaceLinkedIssueSchema>;
 		name?: string;
+		placeholderName?: boolean;
 		repositoryId: string;
 	} = { repositoryId };
 	if (baseBranch !== undefined) {
@@ -349,6 +358,9 @@ export function parseCreateWorkspaceRequest(raw: unknown): {
 	}
 	if (name !== undefined) {
 		result.name = name;
+	}
+	if (placeholderName !== undefined) {
+		result.placeholderName = placeholderName;
 	}
 	return result;
 }
@@ -661,6 +673,7 @@ export const commitWorkspaceChangesRequestSchema = z.object({
 
 /** {@link import('../../shared/ipc').PushWorkspaceBranchRequest}. */
 export const pushWorkspaceBranchRequestSchema = z.object({
+	setUpstream: z.boolean().optional(),
 	workspaceCwd: z.string().min(1),
 });
 
