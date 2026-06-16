@@ -8,7 +8,9 @@ import {
 	SettingsSidebar,
 } from '@/renderer/components/settings/settings-sidebar';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { useCloseSettings } from '@/renderer/hooks/use-close-settings';
 import { workbenchRouteApi } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
+import { useRegisterCloseAction } from '@/renderer/state/close-action';
 import { settingsActiveRepoIdAtom } from '@/renderer/state/settings-ui';
 
 /** Derive the active scope from the current pathname. */
@@ -20,6 +22,10 @@ function getScopeFromPath(pathname: string): SettingsScope {
 export function SettingsShell() {
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const scope = getScopeFromPath(pathname);
+	// ⌘/Ctrl+W closes settings — return to the screen Settings was opened from
+	// (root fallback), matching the ← Back button. Settings renders outside the
+	// workbench shell, so it registers its own close action while mounted.
+	useRegisterCloseAction(useCloseSettings());
 	const loaderData = workbenchRouteApi.useLoaderData();
 	const projects = loaderData.projects;
 	const lastRepoId = useAtomValue(settingsActiveRepoIdAtom);

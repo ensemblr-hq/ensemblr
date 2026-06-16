@@ -145,6 +145,12 @@ export const SHORTCUTS = {
 		scope: 'global',
 		bindings: [{ key: 'o', modifiers: ['ctrl'] }],
 	},
+	'tab.close': {
+		description: 'Close tab',
+		scope: 'menu',
+		bindings: [{ key: 'w', modifiers: ['mod'] }],
+		accelerator: 'CommandOrControl+W',
+	},
 } as const satisfies Record<string, ShortcutDef>;
 
 export type ShortcutId = keyof typeof SHORTCUTS;

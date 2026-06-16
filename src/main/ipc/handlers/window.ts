@@ -69,4 +69,12 @@ export function registerWindowHandlers(): void {
 			}
 		},
 	);
+
+	ipcMain.handle(IPC_CHANNELS.closeWindow, (event) => {
+		const window = BrowserWindow.fromWebContents(event.sender);
+
+		if (window && !window.isDestroyed()) {
+			window.close();
+		}
+	});
 }

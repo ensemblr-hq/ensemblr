@@ -1,4 +1,4 @@
-import { Link, useNavigate, useRouterState } from '@tanstack/react-router';
+import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileCodeIcon } from 'lucide-react';
 import { openAppConfigFile } from '@/renderer/api/ensemble';
 import {
@@ -15,6 +15,7 @@ import {
 	SelectValue,
 } from '@/renderer/components/ui/select';
 import { ProjectAvatar } from '@/renderer/components/workbench-shell/project-avatar';
+import { useCloseSettings } from '@/renderer/hooks/use-close-settings';
 import { cn } from '@/renderer/lib/utils';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 
@@ -44,6 +45,7 @@ export function SettingsHeader({
 }: SettingsHeaderProps) {
 	const navigate = useNavigate();
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
+	const closeSettings = useCloseSettings();
 
 	const handleScopeChange = (next: SettingsScope) => {
 		if (next === scope) return;
@@ -84,11 +86,9 @@ export function SettingsHeader({
 
 	return (
 		<header className='native-toolbar macos-traffic-light-spacer flex h-11 shrink-0 items-center gap-3 border-b pr-3 pl-[var(--ensemble-traffic-light-safe-inline)]'>
-			<Button asChild size='sm' variant='ghost'>
-				<Link preload='intent' to='/'>
-					<ArrowLeftIcon aria-hidden='true' className='size-4' />
-					<span>Back</span>
-				</Link>
+			<Button onClick={closeSettings} size='sm' variant='ghost'>
+				<ArrowLeftIcon aria-hidden='true' className='size-4' />
+				<span>Back</span>
 			</Button>
 			<div className='ml-2 flex items-center gap-1'>
 				<ScopeTab

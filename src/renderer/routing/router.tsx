@@ -2,6 +2,7 @@ import { createHashHistory, createRouter } from '@tanstack/react-router';
 import { queryClient } from '@/renderer/api/query-client';
 import { installRouteNavigationProfiler } from '@/renderer/lib/instrumentation';
 import { routeTree } from './routeTree.gen';
+import { installSettingsReturnTracker } from './settings-return-tracker';
 
 /**
  * TanStack Router singleton for the renderer, wired with the shared query
@@ -19,6 +20,7 @@ export const router = createRouter({
 });
 
 installRouteNavigationProfiler(router);
+installSettingsReturnTracker(router);
 
 declare module '@tanstack/react-router' {
 	interface Register {

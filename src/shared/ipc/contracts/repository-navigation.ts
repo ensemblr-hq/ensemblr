@@ -40,7 +40,14 @@ export interface NavigationApi {
 
 /** Window/shell-level IPC surface (resize the BrowserWindow, etc). */
 export interface ShellApi {
+	/** Closes the BrowserWindow that issued the request. */
+	closeWindow: () => Promise<void>;
 	ensureWindowWidth: (minimumWidth: number) => Promise<void>;
+	/**
+	 * Subscribes to the application menu's "Close Tab" (⌘/Ctrl+W) request,
+	 * broadcast to the focused window. Returns an unsubscribe function.
+	 */
+	onCloseActiveTabRequest: (listener: () => void) => () => void;
 	/** Opens an http/https URL in the user's default browser. */
 	openExternal: (url: string) => Promise<void>;
 }

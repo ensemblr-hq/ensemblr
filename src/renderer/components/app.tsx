@@ -3,6 +3,7 @@ import { useSetAtom } from 'jotai';
 import { useCallback } from 'react';
 
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { CloseActionProvider } from '@/renderer/state/close-action';
 import {
 	toolCallCollapseAtom,
 	useAppSettingsSync,
@@ -23,5 +24,9 @@ export function App() {
 	}, [setToolCallCollapse]);
 	useHotkey('toolCalls.toggleCollapse', toggleToolCallCollapse);
 
-	return <Outlet />;
+	return (
+		<CloseActionProvider>
+			<Outlet />
+		</CloseActionProvider>
+	);
 }

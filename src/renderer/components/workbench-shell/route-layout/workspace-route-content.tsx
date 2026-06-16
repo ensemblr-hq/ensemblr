@@ -8,6 +8,7 @@ import {
 	createPlaceholderSession,
 	getComposerState,
 } from '@/renderer/lib/workbench';
+import { useRegisterCloseAction } from '@/renderer/state/close-action';
 import { usePiComposerController } from '@/renderer/state/composer';
 import {
 	useSessionTabState,
@@ -65,6 +66,10 @@ export function WorkspaceRouteContent({
 		onSessionTabChange: handleSessionTabChange,
 	});
 	const activeSession = sessionNavigation.effectiveActiveSession;
+	// ⌘/Ctrl+W in the workspace view. The full tab-close policy (close, no-op, or
+	// reset the sole chat) lives in `useSessionTabState` so it stays unit-tested
+	// and reusable; see `decideActiveClose`.
+	useRegisterCloseAction(sessionNavigation.closeActiveOrReset);
 	const terminalSessions = useWorkspaceTerminalSessions(activeWorkspace.id);
 	const { liveWorkspaceFiles, workspaceWithLiveDockTabs } =
 		useLiveWorkspaceModel({ activeProject, activeWorkspace, terminalSessions });
