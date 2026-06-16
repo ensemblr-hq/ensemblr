@@ -22,6 +22,8 @@ export interface PiWireMetadata {
 	model?: { displayName?: string; id: string; provider: string } | null;
 	sessionId?: string | null;
 	status?: PiSessionStatusWire;
+	/** Set when an auto branch-naming rename landed; cues a workspace-list refresh. */
+	workspaceRenamed?: boolean;
 }
 
 /**

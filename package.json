@@ -30,6 +30,8 @@
 		"test:pi-rpc": "bun test tests/shared/pi-rpc-parse.test.ts",
 		"test:keymap": "bun test tests/shared/keymap-matcher.test.ts",
 		"test:app-settings": "bun test tests/shared/app-settings.test.ts tests/main/app-settings-service.test.ts",
+		"test:branch-name": "bun test tests/main/branch-name-slug.test.ts",
+		"test:format-duration": "bun test tests/renderer/format-duration.test.ts",
 		"test:pi-timeline": "bun test tests/renderer/pi-timeline-reducer.test.ts",
 		"test:groups": "bun test tests/renderer/model-picker-groups.test.ts",
 		"test:model-names": "bun test tests/renderer/model-display-name.test.ts",

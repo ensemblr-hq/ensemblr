@@ -124,6 +124,11 @@ export interface CommitWorkspaceChangesResult {
 }
 
 export interface PushWorkspaceBranchRequest {
+	/**
+	 * Whether to pass `--set-upstream` so the pushed branch tracks `origin`.
+	 * Defaults to `true` when omitted; gated by the `setUpstreamOnPush` setting.
+	 */
+	setUpstream?: boolean;
 	workspaceCwd: string;
 }
 

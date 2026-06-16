@@ -221,6 +221,11 @@ export function usePiComposerController({
 						queryKey: ensembleQueryKeys.chatTabs(workspaceId),
 					});
 				}
+				if (hasWorkspaceRenamedMetadata(broadcast.event.payload)) {
+					void queryClient.invalidateQueries({
+						queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+					});
+				}
 				return;
 			}
 			if (broadcast.event.eventType !== 'status') {
@@ -436,4 +441,14 @@ function hasChatTitleMetadata(
 		return false;
 	}
 	return typeof payload.metadata.chatTitle === 'string';
+}
+
+/** Detects the metadata event emitted after an auto branch-naming rename. */
+function hasWorkspaceRenamedMetadata(
+	payload: import('@/shared/ipc').PiPersistedEnvelope | null,
+): boolean {
+	if (payload?.kind !== 'metadata') {
+		return false;
+	}
+	return payload.metadata.workspaceRenamed === true;
 }

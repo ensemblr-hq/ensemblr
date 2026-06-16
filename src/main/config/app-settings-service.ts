@@ -78,7 +78,11 @@ export function createAppSettingsService(
 
 	const settingsFrom = (config: Record<string, unknown>): AppSettings => {
 		const app = asRecord(config.app);
-		return parseAppSettings({ general: app.general, models: app.models });
+		return parseAppSettings({
+			general: app.general,
+			models: app.models,
+			git: app.git,
+		});
 	};
 
 	const ensureExists = (): void => {
@@ -90,6 +94,7 @@ export function createAppSettingsService(
 			app: {
 				general: DEFAULT_APP_SETTINGS.general,
 				models: DEFAULT_APP_SETTINGS.models,
+				git: DEFAULT_APP_SETTINGS.git,
 			},
 		});
 	};
@@ -108,7 +113,12 @@ export function createAppSettingsService(
 			...config,
 			schemaVersion:
 				typeof config.schemaVersion === 'number' ? config.schemaVersion : 1,
-			app: { ...app, general: next.general, models: next.models },
+			app: {
+				...app,
+				general: next.general,
+				models: next.models,
+				git: next.git,
+			},
 		});
 		return next;
 	};

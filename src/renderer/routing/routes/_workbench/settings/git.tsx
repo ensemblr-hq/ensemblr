@@ -17,10 +17,14 @@ import {
 	renameWorkspaceOnBranchAtom,
 	setUpstreamOnPushAtom,
 } from '@/renderer/state/preferences';
+import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
 
 export const Route = createFileRoute('/_workbench/settings/git')({
 	component: GitSettings,
 });
+
+/** Factory defaults; a row shows its "modified" accent when its value differs. */
+const DEFAULTS = DEFAULT_APP_SETTINGS.git;
 
 function GitSettings() {
 	const [prefixSource, setPrefixSource] = useAtom(branchPrefixSourceAtom);
@@ -32,6 +36,10 @@ function GitSettings() {
 	const [archiveOnMerge, setArchiveOnMerge] = useAtom(archiveOnMergeAtom);
 	const [setUpstream, setSetUpstream] = useAtom(setUpstreamOnPushAtom);
 
+	const branchPrefixModified =
+		prefixSource !== DEFAULTS.branchPrefixSource ||
+		(prefixSource === 'custom' && customPrefix !== DEFAULTS.branchPrefixCustom);
+
 	return (
 		<SettingsSection
 			description='Workspace branch defaults and lifecycle behavior. Repository-scope overrides win when set.'
@@ -40,6 +48,7 @@ function GitSettings() {
 			<SettingRow
 				description='Prefix for new workspace branch names.'
 				label='Branch name prefix'
+				modified={branchPrefixModified}
 				stack
 			>
 				<RadioGroup
@@ -83,8 +92,9 @@ function GitSettings() {
 						onCheckedChange={setRenameOnBranch}
 					/>
 				}
-				description='Automatically rename workspaces from their placeholder city name to the branch name generated from the first message.'
+				description='Automatically rename workspaces from their placeholder composer name to the branch name generated from the first message.'
 				label='Rename workspace when branch is named'
+				modified={renameOnBranch !== DEFAULTS.renameWorkspaceOnBranch}
 			/>
 
 			<SettingRow
@@ -93,6 +103,7 @@ function GitSettings() {
 				}
 				description='Delete the local branch when archiving a workspace. To delete the remote branch, configure it on GitHub.'
 				label='Delete branch on archive'
+				modified={deleteBranch !== DEFAULTS.deleteLocalBranchOnArchive}
 			/>
 
 			<SettingRow
@@ -104,6 +115,7 @@ function GitSettings() {
 				}
 				description='Automatically archive a workspace after merging its PR.'
 				label='Archive on merge'
+				modified={archiveOnMerge !== DEFAULTS.archiveAfterMerge}
 			/>
 
 			<SettingRow
@@ -112,6 +124,7 @@ function GitSettings() {
 				}
 				description='Configure new Ensemble workspaces so plain `git push` sets a branch upstream. Turning this off avoids writing Git worktree config, but PR info may be less reliable until branches have an upstream.'
 				label='Set upstream on plain `git push`'
+				modified={setUpstream !== DEFAULTS.setUpstreamOnPush}
 			/>
 		</SettingsSection>
 	);

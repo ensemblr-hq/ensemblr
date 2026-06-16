@@ -26,6 +26,7 @@ type ActiveReviewDialog =
 const DEFAULT_MERGE_SETTINGS = {
 	archiveAfterMerge: false,
 	deleteLocalBranchOnArchive: false,
+	setUpstreamOnPush: true,
 } as const;
 
 /**

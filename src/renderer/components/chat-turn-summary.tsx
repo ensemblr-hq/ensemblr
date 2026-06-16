@@ -2,10 +2,9 @@ import { useAtomValue } from 'jotai';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
+import { formatTurnDuration } from '@/renderer/lib/format-duration';
 import { cn } from '@/renderer/lib/utils';
 import { toolCallCollapseAtom } from '@/renderer/state/preferences';
-
-import { formatTurnDuration } from './chat-turn-timer';
 
 /**
  * Auto-collapsed summary chip rendered once the assistant turn finalizes. Mirrors

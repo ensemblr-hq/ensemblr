@@ -45,7 +45,11 @@ export async function seedFirstWorkspace({
 	router,
 }: SeedFirstWorkspaceOptions): Promise<SeedFirstWorkspaceResult> {
 	const name = pickComposerSurname();
-	const result = await createWorkspace({ name, repositoryId });
+	const result = await createWorkspace({
+		name,
+		placeholderName: true,
+		repositoryId,
+	});
 
 	if (result.status !== 'success' || !result.workspace) {
 		const reason =

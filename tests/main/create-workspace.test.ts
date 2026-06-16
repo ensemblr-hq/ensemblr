@@ -20,9 +20,22 @@ import {
 	type EnsembleDatabaseService,
 	openEnsembleDatabase,
 } from '../../src/main/storage/database.ts';
+import type { GitSettings } from '../../src/shared/config/app-settings.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
+
+function gitDefaults(overrides: Partial<GitSettings> = {}): GitSettings {
+	return {
+		branchPrefixSource: 'github-username',
+		branchPrefixCustom: '',
+		renameWorkspaceOnBranch: true,
+		deleteLocalBranchOnArchive: false,
+		archiveAfterMerge: false,
+		setUpstreamOnPush: true,
+		...overrides,
+	};
+}
 
 interface Harness {
 	databaseService: EnsembleDatabaseService;
@@ -412,4 +425,145 @@ test('create honors caller-supplied branchName and baseBranch', async (t) => {
 		'HEAD',
 	]);
 	assert.equal(headBranch, 'philipp/the-121');
+});
+
+test('create applies the user custom branch prefix', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readGitDefaults: () =>
+			gitDefaults({
+				// No trailing slash — joinBranchName inserts the separator.
+				branchPrefixCustom: 'feat',
+				branchPrefixSource: 'custom',
+			}),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'login',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.slug, 'login'); // slug unaffected by prefix
+	assert.equal(result.workspace?.branchName, 'feat/login');
+});
+
+test('create applies the github username branch prefix', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		githubUsernameResolver: { resolve: async () => 'octocat' },
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readGitDefaults: () =>
+			gitDefaults({ branchPrefixSource: 'github-username' }),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'login',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.branchName, 'octocat/login');
+});
+
+test('create omits the prefix when the github username is unavailable', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		githubUsernameResolver: { resolve: async () => null },
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readGitDefaults: () =>
+			gitDefaults({ branchPrefixSource: 'github-username' }),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'login',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.branchName, 'login');
+});
+
+test('repository git.branchPrefix overrides the user branch prefix', async (t) => {
+	const harness = createHarness(t);
+	writeFileSync(
+		path.join(harness.repositoryPath, 'ensemble.json'),
+		JSON.stringify({ git: { branchPrefix: 'team/' } }),
+	);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		githubUsernameResolver: { resolve: async () => 'octocat' },
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readGitDefaults: () =>
+			gitDefaults({ branchPrefixSource: 'github-username' }),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'login',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.branchName, 'team/login');
+});
+
+test('always branches from the live root, ignoring HEAD and a stale stored default', async (t) => {
+	const harness = createHarness(t);
+	// Source repo is parked on a feature branch...
+	runGit(harness.repositoryPath, ['checkout', '-b', 'feature/x']);
+	// ...and the stored default is stale (points at that feature branch).
+	const database = harness.databaseService.getConnection()
+		?.database as DatabaseSync;
+	database
+		.prepare('UPDATE repositories SET default_branch = ? WHERE id = ?')
+		.run('feature/x', harness.repositoryId);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'login',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	// Live root ('main') wins over the current HEAD and the stale stored default.
+	assert.equal(result.workspace?.baseBranch, 'main');
+});
+
+test('an explicit base branch still overrides the live root', async (t) => {
+	const harness = createHarness(t);
+	runGit(harness.repositoryPath, ['branch', 'develop']);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		baseBranch: 'develop',
+		name: 'login',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.baseBranch, 'develop');
 });

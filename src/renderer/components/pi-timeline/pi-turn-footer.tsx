@@ -1,18 +1,8 @@
 import { useEffect, useState } from 'react';
 import { CopyResponseButton } from '@/renderer/components/copy-response-button';
+import { formatTurnDuration } from '@/renderer/lib/format-duration';
 import { cn } from '@/renderer/lib/utils';
 import type { PiTurnFooterItem } from '@/renderer/types/pi-timeline';
-
-/** Formats a settled turn duration: `12.4s` under a minute, `1m 12s` past. */
-function formatFooterDuration(ms: number): string {
-	const seconds = ms / 1000;
-	if (seconds < 60) {
-		return `${seconds.toFixed(1)}s`;
-	}
-	const minutes = Math.floor(seconds / 60);
-	const rest = Math.round(seconds - minutes * 60);
-	return `${minutes}m ${rest}s`;
-}
 
 /**
  * Footer rendered at the end of a completed assistant turn: the turn duration
@@ -41,7 +31,7 @@ export function PiTurnFooter({
 					Stopped
 				</span>
 			) : null}
-			<span>{formatFooterDuration(item.durationMs)}</span>
+			<span>{formatTurnDuration(item.durationMs)}</span>
 			{item.answerText.length > 0 ? (
 				<CopyResponseButton text={item.answerText} />
 			) : null}
@@ -71,7 +61,7 @@ export function PiLiveTurnFooter({
 			data-kind='turn-footer-live'
 			data-role='timeline-item'
 		>
-			{formatFooterDuration(Math.max(0, nowMs - startedAtMs))}
+			{formatTurnDuration(Math.max(0, nowMs - startedAtMs))}
 		</div>
 	);
 }

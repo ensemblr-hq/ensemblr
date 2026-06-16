@@ -33,6 +33,7 @@ export function settingsResolutionQuery(
 export interface ReviewMergeSettings {
 	archiveAfterMerge: boolean;
 	deleteLocalBranchOnArchive: boolean;
+	setUpstreamOnPush: boolean;
 }
 
 /** Query options for the repository's archive-after-merge policy settings. */
@@ -52,9 +53,14 @@ export function reviewMergeSettingsQuery(
 			const settings = snapshot.repository?.settings ?? [];
 			const readBoolean = (key: string) =>
 				settings.find((setting) => setting.key === key)?.value === true;
+			const readBooleanOr = (key: string, fallback: boolean) => {
+				const found = settings.find((setting) => setting.key === key);
+				return found ? found.value === true : fallback;
+			};
 			return {
 				archiveAfterMerge: readBoolean('archiveAfterMerge'),
 				deleteLocalBranchOnArchive: readBoolean('deleteLocalBranchOnArchive'),
+				setUpstreamOnPush: readBooleanOr('setUpstreamOnPush', true),
 			};
 		},
 		queryKey: ensembleQueryKeys.reviewMergeSettings(

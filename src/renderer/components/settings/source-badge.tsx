@@ -10,6 +10,7 @@ const SOURCE_LABEL: Record<SettingsResolutionSource, string> = {
 	'managed-config': 'managed config',
 	'ensemble-config': 'ensemble.json',
 	sqlite: 'personal (sqlite)',
+	'user-default': 'user defaults',
 	worktreeinclude: 'git worktree include',
 };
 

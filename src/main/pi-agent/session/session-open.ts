@@ -55,6 +55,8 @@ export interface SessionOpenerOptions {
 	eventSink: PiSessionEventSink | undefined;
 	now: () => Date;
 	piAgentClient: PiAgentClient;
+	/** Optional post-first-turn auto branch-naming; runs beside the title queue. */
+	queueBranchName?: (input: QueueChatTitleInput) => void;
 	queueChatTitle: (input: QueueChatTitleInput) => void;
 	subscribeToRuntime: (input: {
 		branchId: string;
@@ -83,6 +85,7 @@ export function createSessionOpener({
 	eventSink,
 	now,
 	piAgentClient,
+	queueBranchName,
 	queueChatTitle,
 	subscribeToRuntime,
 }: SessionOpenerOptions): SessionOpener {
@@ -271,7 +274,7 @@ export function createSessionOpener({
 			subscription,
 		});
 
-		queueChatTitle({
+		const titleInput: QueueChatTitleInput = {
 			branchId: mainBranch.id,
 			chatTitleTimeoutMs,
 			database,
@@ -284,7 +287,11 @@ export function createSessionOpener({
 			tabId: attachedTab.id,
 			workspaceCwd: request.workspaceCwd,
 			workspaceId: request.workspaceId,
-		});
+		};
+		queueChatTitle(titleInput);
+		// Best-effort auto branch-naming shares the title queue's first-turn
+		// context; it self-gates on the setting + placeholder metadata.
+		queueBranchName?.(titleInput);
 
 		return toSnapshot({
 			branchId: mainBranch.id,

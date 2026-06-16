@@ -13,6 +13,7 @@ import {
 	resolveSettings,
 } from '../../src/main/config/config-resolution.ts';
 import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import type { GitSettings } from '../../src/shared/config/app-settings.ts';
 import type { SettingsResolutionGroupSnapshot } from '../../src/shared/ipc/index.ts';
 
 let settingCounter = 0;
@@ -28,6 +29,18 @@ function createConfig(overrides: Partial<EnsembleConfig> = {}): EnsembleConfig {
 		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
+		...overrides,
+	};
+}
+
+function makeUserGit(overrides: Partial<GitSettings> = {}): GitSettings {
+	return {
+		branchPrefixSource: 'github-username',
+		branchPrefixCustom: '',
+		renameWorkspaceOnBranch: true,
+		deleteLocalBranchOnArchive: false,
+		archiveAfterMerge: false,
+		setUpstreamOnPush: true,
 		...overrides,
 	};
 }
@@ -433,6 +446,87 @@ test('invalid repository permission mode falls back by source precedence', () =>
 		},
 		{
 			reason: 'Ignored because conductor-config has higher precedence.',
+			source: 'built-in-default',
+			status: 'ignored',
+		},
+	]);
+});
+
+test('user-default git settings apply when no repo source sets them', () => {
+	const snapshot = resolveSettings({
+		config: createConfig(),
+		repository: { repositoryId: 'repo-1' },
+		userGitDefaults: makeUserGit({
+			archiveAfterMerge: true,
+			deleteLocalBranchOnArchive: true,
+			setUpstreamOnPush: false,
+		}),
+	});
+
+	if (!snapshot.repository) {
+		assert.fail('Expected repository settings resolution');
+	}
+
+	// Wins over the built-in default (false) because user-default ranks higher.
+	assert.deepEqual(
+		{
+			source: getSetting(snapshot.repository, 'deleteLocalBranchOnArchive')
+				.source,
+			value: getSetting(snapshot.repository, 'deleteLocalBranchOnArchive')
+				.value,
+		},
+		{ source: 'user-default', value: true },
+	);
+	assert.deepEqual(
+		{
+			source: getSetting(snapshot.repository, 'archiveAfterMerge').source,
+			value: getSetting(snapshot.repository, 'archiveAfterMerge').value,
+		},
+		{ source: 'user-default', value: true },
+	);
+	// setUpstreamOnPush has no built-in default — user-default is the only source.
+	assert.deepEqual(
+		{
+			source: getSetting(snapshot.repository, 'setUpstreamOnPush').source,
+			value: getSetting(snapshot.repository, 'setUpstreamOnPush').value,
+		},
+		{ source: 'user-default', value: false },
+	);
+});
+
+test('repository sources override user-default git settings', () => {
+	const snapshot = resolveSettings({
+		config: createConfig(),
+		repository: {
+			ensembleConfig: { archiveAfterMerge: false },
+			repositoryId: 'repo-1',
+		},
+		userGitDefaults: makeUserGit({ archiveAfterMerge: true }),
+	});
+
+	if (!snapshot.repository) {
+		assert.fail('Expected repository settings resolution');
+	}
+
+	const archiveAfterMerge = getSetting(
+		snapshot.repository,
+		'archiveAfterMerge',
+	);
+	assert.equal(archiveAfterMerge.source, 'ensemble-config');
+	assert.equal(archiveAfterMerge.value, false);
+	assert.deepEqual(archiveAfterMerge.candidates, [
+		{
+			reason: 'Selected by precedence.',
+			source: 'ensemble-config',
+			status: 'selected',
+		},
+		{
+			reason: 'Ignored because ensemble-config has higher precedence.',
+			source: 'user-default',
+			status: 'ignored',
+		},
+		{
+			reason: 'Ignored because ensemble-config has higher precedence.',
 			source: 'built-in-default',
 			status: 'ignored',
 		},

@@ -63,15 +63,20 @@ export {
 	probeGitWorktreeMetadata,
 } from './git-probe.ts';
 export type {
-	CreateListArchivedWorkspacesServiceOptions,
-	ListArchivedWorkspacesService,
-} from './list-archived-workspaces.ts';
-export { createListArchivedWorkspacesService } from './list-archived-workspaces.ts';
+	CreateGithubUsernameResolverOptions,
+	GithubUsernameResolver,
+} from './github-username.ts';
+export { createGithubUsernameResolver } from './github-username.ts';
 export type {
 	CreateLocalRepositoryImportServiceOptions,
 	LocalRepositoryImportService,
 } from './import-local-repository.ts';
 export { createLocalRepositoryImportService } from './import-local-repository.ts';
+export type {
+	CreateListArchivedWorkspacesServiceOptions,
+	ListArchivedWorkspacesService,
+} from './list-archived-workspaces.ts';
+export { createListArchivedWorkspacesService } from './list-archived-workspaces.ts';
 export type {
 	CreateGithubRepositoryListServiceOptions,
 	GithubRepositoryListService,

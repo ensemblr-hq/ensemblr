@@ -29,6 +29,22 @@ describe('parseAppSettings', () => {
 		expect(parsed.models.hiddenModels).toEqual([]); // default
 	});
 
+	test('parses the git section with resolution-aligned keys', () => {
+		const parsed = parseAppSettings({
+			git: {
+				branchPrefixSource: 'custom',
+				branchPrefixCustom: 'feat/',
+				archiveAfterMerge: 'yes', // invalid → default
+			},
+		});
+		expect(parsed.git.branchPrefixSource).toBe('custom');
+		expect(parsed.git.branchPrefixCustom).toBe('feat/');
+		expect(parsed.git.archiveAfterMerge).toBe(false); // default
+		expect(parsed.git.deleteLocalBranchOnArchive).toBe(false); // default
+		expect(parsed.git.setUpstreamOnPush).toBe(true); // default
+		expect(parsed.git.renameWorkspaceOnBranch).toBe(true); // default
+	});
+
 	test('falls back per-field on invalid values', () => {
 		const parsed = parseAppSettings({
 			general: { sendShortcut: 'bogus', toolCallCollapse: 42 },
@@ -64,6 +80,15 @@ describe('mergeAppSettings', () => {
 		expect(next.models.hiddenModels).toEqual(['x/y']);
 		// original is not mutated
 		expect(DEFAULT_APP_SETTINGS.general.caffeinateWhileRunning).toBe(false);
+	});
+
+	test('merges the git section immutably', () => {
+		const next = mergeAppSettings(DEFAULT_APP_SETTINGS, {
+			git: { deleteLocalBranchOnArchive: true },
+		});
+		expect(next.git.deleteLocalBranchOnArchive).toBe(true);
+		expect(next.git.setUpstreamOnPush).toBe(true); // untouched default
+		expect(DEFAULT_APP_SETTINGS.git.deleteLocalBranchOnArchive).toBe(false);
 	});
 });
 

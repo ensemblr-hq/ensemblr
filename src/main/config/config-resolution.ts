@@ -2,8 +2,20 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { RepositorySettingsResolutionRequest, ResolvedSettingSnapshot, SettingResolutionCandidateSnapshot, SettingsResolutionDiagnostic, SettingsResolutionGroupSnapshot, SettingsResolutionRequest, SettingsResolutionScope, SettingsResolutionSnapshot, SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
+import type { GitSettings } from '../../shared/config/app-settings.ts';
+import type {
+	RepositorySettingsResolutionRequest,
+	ResolvedSettingSnapshot,
+	SettingResolutionCandidateSnapshot,
+	SettingsResolutionDiagnostic,
+	SettingsResolutionGroupSnapshot,
+	SettingsResolutionRequest,
+	SettingsResolutionScope,
+	SettingsResolutionSnapshot,
+	SettingsResolutionSource,
+} from '../../shared/ipc/contracts/settings-resolution';
 import type { EnsembleDatabaseService } from '../storage/database';
+import type { AppSettingsService } from './app-settings-service.ts';
 import type { EnsembleConfig, EnsembleConfigService } from './config-loader';
 import { isPlainRecord } from './json-utils.ts';
 import { loadRepositoryConfig } from './repository-config.ts';
@@ -14,6 +26,12 @@ export interface ResolveSettingsOptions {
 	database?: DatabaseSync | null;
 	homeDirectory?: string;
 	repository?: RepositorySettingsResolutionRequest;
+	/**
+	 * User-scope git defaults from `config.json` (`app.git`). Fed into the
+	 * repository scope as the `user-default` source so personal defaults apply
+	 * to every repo, while any repo-scoped value still wins.
+	 */
+	userGitDefaults?: GitSettings;
 }
 
 /** Service that resolves settings on demand for IPC consumers. */
@@ -23,6 +41,7 @@ export interface EnsembleConfigResolutionService {
 
 /** Options for {@link createEnsembleConfigResolutionService}. */
 interface CreateEnsembleConfigResolutionServiceOptions {
+	appSettingsService: AppSettingsService;
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
 	homeDirectory?: string;
@@ -56,6 +75,7 @@ const REPOSITORY_SOURCE_ORDER: readonly SettingsResolutionSource[] = [
 	'ensemble-config',
 	'conductor-config',
 	'conductor-legacy-config',
+	'user-default',
 	'built-in-default',
 ];
 
@@ -80,6 +100,7 @@ const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> = {
 	previewUrlTemplate: null,
 	runScriptMode: 'concurrent',
 	'security.permissionMode': DEFAULT_PERMISSION_MODE,
+	setUpstreamOnPush: true,
 	'scripts.archive': null,
 	'scripts.run': null,
 	'scripts.setup': null,
@@ -94,6 +115,7 @@ const VALIDATED_SETTING_KEYS = new Set(['security.permissionMode']);
  * @returns A {@link EnsembleConfigResolutionService}.
  */
 export function createEnsembleConfigResolutionService({
+	appSettingsService,
 	configService,
 	databaseService,
 	homeDirectory,
@@ -105,6 +127,7 @@ export function createEnsembleConfigResolutionService({
 				database: databaseService.getConnection()?.database ?? null,
 				homeDirectory,
 				repository: normalizeSettingsResolutionRequest(request).repository,
+				userGitDefaults: appSettingsService.read().git,
 			}),
 	};
 }
@@ -120,6 +143,7 @@ export function resolveSettings({
 	database = null,
 	homeDirectory = homedir(),
 	repository,
+	userGitDefaults,
 }: ResolveSettingsOptions): SettingsResolutionSnapshot {
 	const appConfigDefaults = collectAppConfigDefaults(config);
 	const appLockedKeys = collectManagedLockedKeys(config.managed);
@@ -197,6 +221,11 @@ export function resolveSettings({
 				repositoryFileConfig?.conductorLegacyConfig,
 			),
 			'conductor-legacy-config',
+		);
+		addCandidates(
+			repositoryCandidates,
+			collectUserGitDefaultCandidates(userGitDefaults),
+			'user-default',
 		);
 		addCandidates(
 			repositoryCandidates,
@@ -527,6 +556,31 @@ function collectConductorConfigCandidates(
 	if (conductorConfig && !candidates.has('conductorCompatibility')) {
 		candidates.set('conductorCompatibility', true);
 	}
+
+	return candidates;
+}
+
+/**
+ * Maps user-scope git defaults (`app.git` in config.json) onto repository
+ * resolution keys, contributing them as the `user-default` source. Branch-prefix
+ * and rename-on-branch are intentionally excluded: the former needs async `gh`
+ * resolution performed at workspace creation, the latter is a renderer-only
+ * behavior read straight from app settings.
+ * @param git - User git defaults, when available.
+ * @returns Flat map of repo `key -> value`.
+ */
+function collectUserGitDefaultCandidates(
+	git?: GitSettings,
+): Map<string, unknown> {
+	const candidates = new Map<string, unknown>();
+
+	if (!git) {
+		return candidates;
+	}
+
+	candidates.set('deleteLocalBranchOnArchive', git.deleteLocalBranchOnArchive);
+	candidates.set('archiveAfterMerge', git.archiveAfterMerge);
+	candidates.set('setUpstreamOnPush', git.setUpstreamOnPush);
 
 	return candidates;
 }

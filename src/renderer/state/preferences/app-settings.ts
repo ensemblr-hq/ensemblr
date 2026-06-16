@@ -89,6 +89,22 @@ export const reviewThinkingLevelAtom = settingAtom(
 );
 export const hiddenModelsAtom = settingAtom('models', 'hiddenModels');
 
+// ─── Git (user defaults) ────────────────────────────────────────────────────────
+// Atom names stay friendly; the backing keys mirror the repo-resolution keys so
+// the same values feed `resolveSettings` as the `user-default` source.
+export const branchPrefixSourceAtom = settingAtom('git', 'branchPrefixSource');
+export const branchPrefixCustomAtom = settingAtom('git', 'branchPrefixCustom');
+export const renameWorkspaceOnBranchAtom = settingAtom(
+	'git',
+	'renameWorkspaceOnBranch',
+);
+export const deleteBranchOnArchiveAtom = settingAtom(
+	'git',
+	'deleteLocalBranchOnArchive',
+);
+export const archiveOnMergeAtom = settingAtom('git', 'archiveAfterMerge');
+export const setUpstreamOnPushAtom = settingAtom('git', 'setUpstreamOnPush');
+
 /**
  * Hydrates {@link appSettingsAtom} from `config.json` on mount and live-reloads
  * it when the file is edited outside the app. Mount once at the app root.

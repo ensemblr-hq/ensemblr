@@ -8,6 +8,7 @@ export type SettingsResolutionSource =
 	| 'managed-config'
 	| 'ensemble-config'
 	| 'sqlite'
+	| 'user-default'
 	| 'worktreeinclude';
 export type SettingsResolutionCandidateStatus =
 	| 'ignored'

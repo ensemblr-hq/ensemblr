@@ -39,6 +39,7 @@ import {
 import {
 	createPiSessionLifecycle,
 	type OpenPiSessionRequest,
+	type QueueChatTitlePort,
 	type StopPiSessionRequest,
 	type SubmitPiPromptRequest,
 	type SubmitPiPromptResult,
@@ -74,6 +75,8 @@ export interface PiSessionServiceOptions {
 	databaseService: EnsembleDatabaseService;
 	eventSink?: PiSessionEventSink;
 	piAgentClient: PiAgentClient;
+	/** Optional post-first-turn auto branch-naming queue (best-effort). */
+	queueBranchName?: QueueChatTitlePort;
 	sessionSummaryWriter?: SessionSummaryWriter;
 	now?: () => Date;
 }
@@ -113,6 +116,7 @@ export function createPiSessionService({
 	databaseService,
 	eventSink,
 	piAgentClient,
+	queueBranchName,
 	sessionSummaryWriter,
 	now = () => new Date(),
 }: PiSessionServiceOptions): PiSessionService {
@@ -133,6 +137,7 @@ export function createPiSessionService({
 		now,
 		persistRuntimeEvent,
 		piAgentClient,
+		queueBranchName,
 		queueChatTitle: queueChatTitleGeneration,
 		requireDatabase: requireSessionDatabase,
 		sessionSummaryWriter,
