@@ -11,8 +11,8 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
+import { formatTurnDuration } from '@/renderer/lib/format-duration';
 import { cn } from '@/renderer/lib/utils';
-import { formatTurnDuration } from './chat-turn-timer';
 import { CopyResponseButton } from './copy-response-button';
 
 /**

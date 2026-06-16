@@ -302,6 +302,33 @@ test('pushWorkspaceBranch surfaces auth failures with remediation', async () => 
 	assert.ok(result.error?.remediation);
 });
 
+test('pushWorkspaceBranch sets upstream by default', async () => {
+	const { calls, service } = createService(() => buildResult());
+
+	const result = await service.pushWorkspaceBranch({ workspaceCwd: '/tmp/ws' });
+
+	assert.equal(result.ok, true);
+	const push = calls.find(
+		(call) => call.command === 'git' && call.args[0] === 'push',
+	);
+	assert.deepEqual(push?.args, ['push', '--set-upstream', 'origin', 'HEAD']);
+});
+
+test('pushWorkspaceBranch omits --set-upstream when disabled', async () => {
+	const { calls, service } = createService(() => buildResult());
+
+	const result = await service.pushWorkspaceBranch({
+		setUpstream: false,
+		workspaceCwd: '/tmp/ws',
+	});
+
+	assert.equal(result.ok, true);
+	const push = calls.find(
+		(call) => call.command === 'git' && call.args[0] === 'push',
+	);
+	assert.deepEqual(push?.args, ['push', 'origin', 'HEAD']);
+});
+
 test('createPullRequest parses URL and number from stdout', async () => {
 	const { calls, service } = createService(() =>
 		buildResult({ stdout: 'https://github.com/o/r/pull/42\n' }),

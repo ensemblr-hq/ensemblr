@@ -134,33 +134,9 @@ export const favouriteModelsAtom = atomWithStorage<string[]>(
 );
 
 // ─── Git (user defaults) ──────────────────────────────────────────────────────
-
-export type BranchPrefixSource = 'github-username' | 'custom' | 'none';
-
-export const branchPrefixSourceAtom = atomWithStorage<BranchPrefixSource>(
-	KEY('branch_prefix_source'),
-	'github-username',
-);
-export const branchPrefixCustomAtom = atomWithStorage<string>(
-	KEY('branch_prefix_custom'),
-	'',
-);
-export const renameWorkspaceOnBranchAtom = atomWithStorage<boolean>(
-	KEY('rename_on_branch'),
-	true,
-);
-export const deleteBranchOnArchiveAtom = atomWithStorage<boolean>(
-	KEY('delete_branch_on_archive'),
-	false,
-);
-export const archiveOnMergeAtom = atomWithStorage<boolean>(
-	KEY('archive_on_merge'),
-	false,
-);
-export const setUpstreamOnPushAtom = atomWithStorage<boolean>(
-	KEY('set_upstream_on_push'),
-	true,
-);
+// Moved to config.json (see ./app-settings). The atoms previously here were
+// localStorage-only with no consumers; they now back the `app.git` section and
+// feed the repository settings resolver as the `user-default` source.
 
 // ─── Experimental (user) ──────────────────────────────────────────────────────
 

@@ -44,6 +44,12 @@ export interface CreateWorkspaceRequest {
 	branchName?: string;
 	linkedIssue?: WorkspaceLinkedIssueInput;
 	name?: string;
+	/**
+	 * True when `name` is an auto-generated composer placeholder (not user-typed).
+	 * Recorded in metadata so auto branch-naming only renames placeholders and
+	 * never overrides a name the user chose.
+	 */
+	placeholderName?: boolean;
 	repositoryId: string;
 }
 

@@ -121,6 +121,7 @@ export function useForkConversation({
 					const created = await createWorkspace({
 						baseBranch: workspace.branchName,
 						name: pickComposerSurname(),
+						placeholderName: true,
 						repositoryId: workspace.projectId,
 					});
 					if (created.status !== 'success' || !created.workspace) {

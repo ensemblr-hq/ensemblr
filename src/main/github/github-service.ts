@@ -1,6 +1,20 @@
 import path from 'node:path';
 
-import type { CommitWorkspaceChangesRequest, CommitWorkspaceChangesResult, CreatePullRequestRequest, CreatePullRequestResult, GetPullRequestSnapshotRequest, GetPullRequestSnapshotResult, GitBranchSyncWire, GithubFailure, GithubPullRequestSnapshotWire, MergePullRequestRequest, MergePullRequestResult, PushWorkspaceBranchRequest, PushWorkspaceBranchResult } from '../../shared/ipc/contracts/github';
+import type {
+	CommitWorkspaceChangesRequest,
+	CommitWorkspaceChangesResult,
+	CreatePullRequestRequest,
+	CreatePullRequestResult,
+	GetPullRequestSnapshotRequest,
+	GetPullRequestSnapshotResult,
+	GitBranchSyncWire,
+	GithubFailure,
+	GithubPullRequestSnapshotWire,
+	MergePullRequestRequest,
+	MergePullRequestResult,
+	PushWorkspaceBranchRequest,
+	PushWorkspaceBranchResult,
+} from '../../shared/ipc/contracts/github';
 import type {
 	LocalCommandResult,
 	LocalCommandService,
@@ -340,12 +354,13 @@ export function createGithubService({
 			if (!cwd.ok) {
 				return { error: cwd.error, ok: false };
 			}
-			const pushResult = await run('git', cwd.cwd, [
-				'push',
-				'--set-upstream',
-				'origin',
-				'HEAD',
-			]);
+			// Default to setting upstream (back-compat); skip only when explicitly
+			// disabled via the `setUpstreamOnPush` setting.
+			const pushArgs =
+				request.setUpstream === false
+					? ['push', 'origin', 'HEAD']
+					: ['push', '--set-upstream', 'origin', 'HEAD'];
+			const pushResult = await run('git', cwd.cwd, pushArgs);
 			if (pushResult.status !== 'success') {
 				return {
 					error: classifyCommandFailure(pushResult, 'git push failed.'),
