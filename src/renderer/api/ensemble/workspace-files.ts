@@ -3,6 +3,8 @@ import { queryOptions } from '@tanstack/react-query';
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 
 import type {
+	ReadWorkspaceDirectoryRequest,
+	ReadWorkspaceDirectoryResult,
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
 } from '@/shared/ipc/contracts/workspace-files';
@@ -40,5 +42,15 @@ export function readWorkspaceFile(
 	return profileElectronIpcCall(
 		{ channel: 'ensemble:read-workspace-file', usesDatabase: false },
 		() => getEnsembleApi().readWorkspaceFile(request),
+	);
+}
+
+/** Lists an ignored directory's immediate children for lazy tree expansion. */
+export function readWorkspaceDirectory(
+	request: ReadWorkspaceDirectoryRequest,
+): Promise<ReadWorkspaceDirectoryResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:read-workspace-directory', usesDatabase: false },
+		() => getEnsembleApi().readWorkspaceDirectory(request),
 	);
 }

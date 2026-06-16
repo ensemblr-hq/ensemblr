@@ -4,6 +4,7 @@ import {
 	existsSync,
 	mkdirSync,
 	mkdtempSync,
+	readFileSync,
 	realpathSync,
 	rmSync,
 	writeFileSync,
@@ -141,6 +142,16 @@ function listWorktrees(repositoryPath: string): string[] {
 		.map((line) => line.slice('worktree '.length));
 }
 
+/** Reads the worktree's shared git exclude (`<git-common-dir>/info/exclude`). */
+function readGitExclude(workspacePath: string): string {
+	const commonDir = runGit(workspacePath, ['rev-parse', '--git-common-dir']);
+	const resolved = path.isAbsolute(commonDir)
+		? commonDir
+		: path.resolve(workspacePath, commonDir);
+	const excludePath = path.join(resolved, 'info', 'exclude');
+	return existsSync(excludePath) ? readFileSync(excludePath, 'utf8') : '';
+}
+
 function workspaceRow(
 	databaseService: EnsembleDatabaseService,
 	id: string,
@@ -180,7 +191,11 @@ test('create produces a git worktree on a new branch from the configured base', 
 		path.join(harness.workspacesPath, harness.repositorySlug, 'feature-login'),
 	);
 	assert.equal(existsSync(workspace.path), true);
-	assert.equal(existsSync(path.join(workspace.path, '.context')), true);
+	// `.context/` is no longer created eagerly: the workspace root stays empty
+	// so first-turn scaffolders (e.g. create-next-app) can run against it. It is
+	// instead registered in the worktree's local git exclude.
+	assert.equal(existsSync(path.join(workspace.path, '.context')), false);
+	assert.match(readGitExclude(workspace.path), /^\.context\/$/m);
 
 	const worktrees = listWorktrees(harness.repositoryPath).map((entry) =>
 		realpathSync(entry),
@@ -200,6 +215,38 @@ test('create produces a git worktree on a new branch from the configured base', 
 	assert.equal(row?.slug, 'feature-login');
 	assert.equal(row?.branch_name, 'feature-login');
 	assert.equal(row?.base_branch, 'main');
+});
+
+test('registers .context/ in the git exclude exactly once across workspaces', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const first = await service.create({
+		name: 'alpha',
+		repositoryId: harness.repositoryId,
+	});
+	const second = await service.create({
+		name: 'beta',
+		repositoryId: harness.repositoryId,
+	});
+	assert.equal(first.status, 'success');
+	assert.equal(second.status, 'success');
+	if (!first.workspace || !second.workspace) {
+		throw new Error('workspace missing');
+	}
+
+	// Both worktrees share the repo's common git dir, so the idempotent writer
+	// must leave a single `.context/` rule rather than one per workspace.
+	const exclude = readGitExclude(second.workspace.path);
+	const occurrences = exclude
+		.split('\n')
+		.filter((line) => line.trim() === '.context/').length;
+	assert.equal(occurrences, 1);
 });
 
 test('create defaults the workspace name to a placeholder slug', async (t) => {

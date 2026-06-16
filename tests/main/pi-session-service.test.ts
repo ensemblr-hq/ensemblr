@@ -298,7 +298,7 @@ test('runtime events are mirrored into pi_session_events', async (t) => {
 	assert.ok(events.some((event) => event.eventType === 'message'));
 });
 
-test('updates the chat summary as soon as an agent response lands', async (t) => {
+test('writes the chat summary at the turn boundary, not mid-turn', async (t) => {
 	const fixture = openFixture(t);
 	const summaryCalls: WriteSessionSummaryInput[] = [];
 	const sessionSummaryWriter: SessionSummaryWriter = {
@@ -334,6 +334,14 @@ test('updates the chat summary as soon as an agent response lands', async (t) =>
 		turnId: 'fake-turn',
 		type: 'message',
 	});
+
+	// Deferred: a mid-turn agent message must not trigger a write, or `.context/`
+	// would materialize before a first-turn scaffolder could run.
+	await delay(20);
+	assert.equal(summaryCalls.length, 0, 'summary must wait for the turn to end');
+
+	// The turn boundary (status: idle) is what drains the queue.
+	runtime.setStatus('idle');
 	await waitForSummaryCalls(summaryCalls, 1);
 
 	const summaryInput = summaryCalls[0];
@@ -357,6 +365,49 @@ test('updates the chat summary as soon as an agent response lands', async (t) =>
 		title: 'Live summary',
 		usedLlm: false,
 	});
+});
+
+test('stopSession flushes the owed summary before closing', async (t) => {
+	const fixture = openFixture(t);
+	const summaryCalls: WriteSessionSummaryInput[] = [];
+	const sessionSummaryWriter: SessionSummaryWriter = {
+		writeSessionSummary: async (input) => {
+			summaryCalls.push(input);
+			return {
+				path: `${input.workspaceCwd}/.context/sessions/${input.chatTabId}.md`,
+				title: 'Closed summary',
+				usedLlm: false,
+			};
+		},
+	};
+	const { fake, service } = createService(fixture.database, {
+		sessionSummaryWriter,
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'work', sessionId: snapshot.id });
+
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	// Agent responds but the turn never reaches idle before the user stops it.
+	runtime.emit({
+		at: '2026-06-08T00:00:01.000Z',
+		payload: { kind: 'text', text: 'partial reply' },
+		role: 'agent',
+		turnId: 'fake-turn',
+		type: 'message',
+	});
+	await delay(20);
+	assert.equal(summaryCalls.length, 0, 'no summary before close');
+
+	// Closing must flush the owed summary even though no idle event arrived.
+	await service.stopSession({ sessionId: snapshot.id });
+	await waitForSummaryCalls(summaryCalls, 1);
+	assert.equal(summaryCalls.length, 1, 'exactly one summary flushed on close');
 });
 
 test('stopSession aborts the runtime and marks the turn aborted', async (t) => {

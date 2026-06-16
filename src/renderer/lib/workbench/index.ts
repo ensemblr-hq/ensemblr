@@ -8,10 +8,11 @@ export {
 	DEFAULT_TERMINAL_DOCK_TAB_ID,
 } from './constants';
 export { getWorkspaceFileIconName } from './file-icons';
-export type { FileTreeNode } from './file-tree';
+export type { FileTreeNode, FlatFileTreeRow } from './file-tree';
 export {
 	buildFileTree,
 	fileTreeIndentClassName,
+	flattenFileTree,
 	getCompactFileDirectory,
 	listDirectoryPaths,
 } from './file-tree';

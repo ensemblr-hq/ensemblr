@@ -188,6 +188,8 @@ export function createEnsembleApi(): EnsembleApi {
 		quickStartProject: (request) => invoke('quickStartProject', request),
 		readEnvironmentVariableValue: (request) =>
 			invoke('readEnvironmentVariableValue', request),
+		readWorkspaceDirectory: (request) =>
+			invoke('readWorkspaceDirectory', request),
 		readWorkspaceFile: (request) => invoke('readWorkspaceFile', request),
 		registerLocalRepository: (request) =>
 			invoke('registerLocalRepository', request),

@@ -4,6 +4,8 @@ import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
 	ListWorkspaceFilesRequest,
 	ListWorkspaceFilesResult,
+	ReadWorkspaceDirectoryRequest,
+	ReadWorkspaceDirectoryResult,
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
 	WatchWorkspaceFilesRequest,
@@ -38,6 +40,14 @@ export function registerWorkspaceFilesHandlers({
 			request: ReadWorkspaceFileRequest,
 		): Promise<ReadWorkspaceFileResult> =>
 			listWorkspaceFilesService.read(request),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.readWorkspaceDirectory,
+		(
+			_event,
+			request: ReadWorkspaceDirectoryRequest,
+		): Promise<ReadWorkspaceDirectoryResult> =>
+			listWorkspaceFilesService.readDirectory(request),
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.watchWorkspaceFiles,

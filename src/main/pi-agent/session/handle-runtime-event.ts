@@ -42,6 +42,12 @@ export interface RuntimeEventHandler {
  * → agent-end fan-out (sets `agentResponsePendingSummary`) → status/shutdown
  * patches → summary queue check. Reordering risks race regressions where a
  * summary write fires before the latest message_end is persisted.
+ *
+ * Summary writes are NOT drained on the agent `message` event — only at turn
+ * boundaries (`status: 'idle'`) and on `shutdown`. This keeps `.context/` from
+ * materializing mid-turn, so a first-turn scaffolder (e.g. `create-next-app`)
+ * runs against an empty workspace root. Close paths flush explicitly (see
+ * `shutdownActiveSessions`).
  */
 export function createRuntimeEventHandler({
 	activeSessions,
@@ -129,11 +135,13 @@ export function createRuntimeEventHandler({
 		}
 
 		if (active && event.type === 'message' && event.role === 'agent') {
+			// Mark a summary as pending but defer the actual write to the next
+			// turn boundary (`status: 'idle'`) or shutdown — never mid-turn — so
+			// `.context/` is not created while a scaffolder needs an empty root.
 			activeSessions.set(sessionId, {
 				...active,
 				agentResponsePendingSummary: true,
 			});
-			summaryQueue.queueSummaryAfterAgentResponse({ database, sessionId });
 		}
 
 		if (event.type === 'metadata' && event.metadata.sessionId) {
