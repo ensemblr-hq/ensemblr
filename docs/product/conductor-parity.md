@@ -1,6 +1,6 @@
 # Conductor Parity Matrix
 
-Date: 2026-06-04
+Date: 2026-06-16
 
 Ensemble targets feature parity with Conductor's publicly observable and documented workflows, adapted for Pi. This matrix is a living checklist, not a copied product spec.
 
@@ -157,7 +157,7 @@ if original screenshot evidence is unavailable.
 | Open in… launcher | Header split button launches the workspace in Finder, an editor, a terminal, a source-control GUI, or copies the path. | Implemented (macOS). Curated bundle-id registry probed via Launch Services (`mdfind`); real `.app` icons via `nativeImage.createThumbnailFromPath`; cached to disk and shipped through the preload initial-shell snapshot so the menu paints with real icons on first frame. Shortcuts: `1`..`9` while open, `⌘O` primary editor, `⌘⇧C` copy. See ADR 0028. |
 | Keyboard shortcuts | Navigation, workspace, chat, review, Git, terminal actions. | Same target with Ensemble-specific labels. |
 | Pane layout | Sidebar, center agent timeline, right files/changes/checks panel, and lower terminal dock remain visible during work. | Same target with Ensemble-specific styling. The current implemented shell locks this pane layout. |
-| Settings | App settings and repository settings. | Same target with sections inventoried in `docs/product/settings-inventory.md`. |
+| Settings | App settings and repository settings. | Same target with sections inventoried in `docs/product/settings-inventory.md`. Git settings (branch prefix, lifecycle) implemented in Settings → Git. |
 | Feature flags | Experimental settings expose big terminal, many tabs, dashboard visibility, voice, resource usage, Graphite, and React profiler controls. | Same target where useful; voice, Graphite, cloud SSH, and production React profiler controls are deferred or hidden for v1. |
 | Deep links | App URL scheme that opens/acts on workspace state. | Same target with Ensemble scheme. |
 | Privacy/security | Local execution, permissions controls, privacy settings. | Same target adapted to Pi. |
@@ -168,6 +168,7 @@ if original screenshot evidence is unavailable.
 | --- | --- | --- |
 | App database | Local app-support SQLite database for repositories, workspaces, sessions, messages, terminals, settings, comments, attachments, env vars, and related metadata. | Same storage class using `~/Library/Application Support/com.ensemble.app/ensemble.db`. |
 | Declarative config | Not documented as a primary Conductor feature. | Support `~/.config/ensemble/` for dotfile-managed preferences and policy-like settings. |
+| User git defaults | Configurable per-user git settings. | Implemented via `app.git` in `~/.config/ensemble/config.json`, feeding repository resolution as `user-default` source. Supports branch prefix (github-username/custom/none), auto-rename workspace on branch, delete local branch on archive, archive after merge, set upstream on push. |
 | Secrets | Environment/provider tokens are masked in settings. | Store secret values in macOS Keychain, with SQLite metadata only. |
 | Runtime state | Mutable local app metadata. | Stored in SQLite, not declarative config files. |
 | Pi state | Not applicable to Conductor. | `~/.pi/agent` remains source of truth for Pi auth, models, settings, resources, and Pi sessions. |

@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-Date: 2026-06-05
+Date: 2026-06-16
 
 This roadmap converts the accepted ADRs and product parity docs into a Linear-ready implementation plan. It is an implementation roadmap, not a product-decision source. Accepted ADRs remain the source of truth when there is a conflict.
 
@@ -39,6 +39,19 @@ Explicitly deferred until post-core:
 - Cloud or remote workspace SSH settings.
 - Production React profiler controls.
 - Ensemble account, cloud sync, hosted team features, billing, or app-owned backend services.
+
+## Completed Implementation
+
+| Milestone | Completed Items | Commit |
+|---|---|---|
+| 2. Setup Gate and Configuration | User-scope git defaults (`app.git` in config.json) with branch prefix source, custom prefix, auto-rename, delete branch on archive, archive after merge, set upstream on push | d61d93e |
+| 2. Setup Gate and Configuration | Auto branch-naming from first Pi message via LLM generation | d61d93e |
+| 3. Repository and Workspace Core | File tree view with collapsible folders and folder grouping | d2158d5 |
+| 3. Repository and Workspace Core | Lazy loading for git-ignored directories (`.context/`, `node_modules/`) with 1000-entry cap | 6ef81a7 |
+| 3. Repository and Workspace Core | `.context/` directory gitignored for generator scaffold output | 6ef81a7 |
+| 3. Repository and Workspace Core | `.vite/` directory gitignored for Vite dev server cache | 6ef81a7 |
+| 8. Settings and Parity Polish | Git settings UI page in Settings → Git | d61d93e |
+| 8. Settings and Parity Polish | Wordmark glitch animation fires immediately on mount | 957a71d |
 
 ## Roadmap Sequence
 
