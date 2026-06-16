@@ -194,6 +194,7 @@ test('lifecycle archive preserves .context/, stamps archived_at, leaves worktree
 	const workspace = await seedWorkspace(harness, 'handoff');
 
 	const handoffPath = path.join(workspace.path, '.context', 'handoff.md');
+	mkdirSync(path.dirname(handoffPath), { recursive: true });
 	writeFileSync(handoffPath, '# Handoff\nremember to push\n');
 
 	const { service } = makeArchiveService(harness);
@@ -251,6 +252,7 @@ test('branchCleanup opt-in removes the worktree registration and drops the local
 	const workspace = await seedWorkspace(harness, 'cleanup-branch');
 
 	const handoffPath = path.join(workspace.path, '.context', 'handoff.md');
+	mkdirSync(path.dirname(handoffPath), { recursive: true });
 	writeFileSync(handoffPath, 'pushed work\n');
 
 	const { service } = makeArchiveService(harness);

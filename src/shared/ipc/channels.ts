@@ -78,6 +78,7 @@ export const IPC_CHANNELS = {
 	previewRepositoryConfigMigration:
 		'ensemble:preview-repository-config-migration',
 	quickStartProject: 'ensemble:quick-start-project',
+	readWorkspaceDirectory: 'ensemble:read-workspace-directory',
 	readWorkspaceFile: 'ensemble:read-workspace-file',
 	registerLocalRepository: 'ensemble:register-local-repository',
 	renameWorkspace: 'ensemble:rename-workspace',

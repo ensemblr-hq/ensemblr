@@ -64,6 +64,8 @@ export interface ReviewFileSummary {
 
 export interface WorkspaceFileSummary {
 	id: string;
+	/** True when git ignores this entry; the all-files tree dims it. */
+	isIgnored?: boolean;
 	kind: 'directory' | 'file';
 	name: string;
 	path: string;

@@ -12,6 +12,14 @@ const WATCH_DEBOUNCE_MS = 250;
  */
 const IGNORED_TOP_SEGMENTS = new Set(['.git', 'node_modules']);
 
+/**
+ * Filenames whose churn never changes the listed tree but recurs constantly —
+ * macOS rewrites `.DS_Store` on nearly every Finder interaction. Matched by
+ * basename at any depth, plus AppleDouble `._*` sidecars. These are also hidden
+ * from the listing itself, so a refetch would never surface them anyway.
+ */
+const IGNORED_BASENAMES = new Set(['.DS_Store']);
+
 /** Handle to a single OS watch; `close` releases it. */
 interface WatchHandle {
 	close: () => void;
@@ -184,5 +192,10 @@ function isIgnoredChange(changed: string | null): boolean {
 	}
 
 	const topSegment = changed.split(/[/\\]/, 1)[0];
-	return IGNORED_TOP_SEGMENTS.has(topSegment);
+	if (IGNORED_TOP_SEGMENTS.has(topSegment)) {
+		return true;
+	}
+
+	const basename = changed.split(/[/\\]/).pop() ?? changed;
+	return IGNORED_BASENAMES.has(basename) || basename.startsWith('._');
 }

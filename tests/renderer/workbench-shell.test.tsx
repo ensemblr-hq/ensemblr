@@ -657,7 +657,9 @@ test('renders all files tab with repository file fixtures', () => {
 	expect(markup).toContain('AGENTS.md');
 	expect(markup).toContain('biome.json');
 	expect(markup).toContain('forge.config.ts');
-	expect(markup).toContain('Open .agents directory');
+	// Directories are collapsible toggles ("Expand/Collapse <path>"); files open
+	// a preview. (`.agents` starts collapsed.)
+	expect(markup).toContain('Expand .agents');
 	expect(markup).toContain('Open AGENTS.md preview');
 	expect(markup).toContain('Search files');
 	expect(markup).toContain('type="button"');

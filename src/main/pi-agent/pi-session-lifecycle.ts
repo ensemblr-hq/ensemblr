@@ -238,6 +238,12 @@ export function createPiSessionLifecycle({
 		if (!active) {
 			return;
 		}
+		// Write the owed summary before aborting: the post-abort shutdown event
+		// deletes the session, so the queue could no longer drain it afterward.
+		await summaryQueue.flushSummaryForSession({
+			database,
+			sessionId: request.sessionId,
+		});
 		await active.piRuntimeSession.abort(request.reason);
 		if (active.activeTurnId) {
 			updateTurn({
@@ -268,10 +274,24 @@ export function createPiSessionLifecycle({
 		},
 		openSession,
 		shutdownActiveSessions: async () => {
-			const open = [...activeSessions.values()];
+			const open = [...activeSessions.entries()];
+			// Flush owed summaries while sessions are still registered: once the
+			// map is cleared and the runtime closed, no shutdown event can drain
+			// the queue (the subscription is gone), so a final summary would be
+			// lost. Best-effort — a teardown DB error must not block shutdown.
+			try {
+				const database = requireDatabase();
+				await Promise.all(
+					open.map(([sessionId]) =>
+						summaryQueue.flushSummaryForSession({ database, sessionId }),
+					),
+				);
+			} catch {
+				// Database unavailable during teardown; skip the final flush.
+			}
 			activeSessions.clear();
 			await Promise.all(
-				open.map(async (session) => {
+				open.map(async ([, session]) => {
 					session.subscription.unsubscribe();
 					await session.piRuntimeSession.close().catch(() => undefined);
 				}),

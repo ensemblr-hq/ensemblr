@@ -11,7 +11,6 @@ export interface LinkedIssueRef {
 }
 
 export type CreateWorkspaceDiagnosticCode =
-	| 'context-directory-failed'
 	| 'database-unavailable'
 	| 'destination-exists'
 	| 'destination-not-writable'

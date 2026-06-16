@@ -16,6 +16,15 @@ export interface SummaryQueue {
 		database: DatabaseSync;
 		sessionId: string;
 	}) => void;
+	/**
+	 * Forces any owed summary to disk and resolves once it is written. Close
+	 * paths must call this: after teardown no `idle`/`shutdown` event remains to
+	 * drain the queue, so the final turn's summary would otherwise be lost.
+	 */
+	flushSummaryForSession: (input: {
+		database: DatabaseSync;
+		sessionId: string;
+	}) => Promise<void>;
 }
 
 /**
@@ -28,6 +37,32 @@ export function createSummaryQueue({
 	now,
 	sessionSummaryWriter,
 }: SummaryQueueOptions): SummaryQueue {
+	/** In-flight drain promise per session, so close paths can await it. */
+	const inFlightDrains = new Map<string, Promise<void>>();
+
+	/**
+	 * Starts the drain loop for a session, or returns the already-running one.
+	 * Routing both the live trigger and the close-path flush through here keeps
+	 * writes serialized (no concurrent drains) while making them await-able.
+	 */
+	const startDrain = ({
+		database,
+		sessionId,
+	}: {
+		database: DatabaseSync;
+		sessionId: string;
+	}): Promise<void> => {
+		const existing = inFlightDrains.get(sessionId);
+		if (existing) {
+			return existing;
+		}
+		const drain = drainSummaryQueue({ database, sessionId }).finally(() => {
+			inFlightDrains.delete(sessionId);
+		});
+		inFlightDrains.set(sessionId, drain);
+		return drain;
+	};
+
 	/** Marks the latest agent turn for summary writing once the runtime is idle. */
 	const queueSummaryAfterAgentResponse = ({
 		database,
@@ -46,9 +81,7 @@ export function createSummaryQueue({
 			summaryQueued: true,
 		};
 		activeSessions.set(sessionId, queued);
-		if (!active.summaryWriteInFlight) {
-			void drainSummaryQueue({ database, sessionId });
-		}
+		void startDrain({ database, sessionId });
 	};
 
 	/** Serializes live summary writes so older LLM responses cannot win races. */
@@ -126,5 +159,34 @@ export function createSummaryQueue({
 		});
 	};
 
-	return { queueSummaryAfterAgentResponse };
+	/**
+	 * Forces the latest owed summary to disk and awaits completion. Promotes a
+	 * pending flag to queued so the drain captures the final transcript; an
+	 * already in-flight drain is reused (and re-loops for the newest state).
+	 * No-ops when nothing is owed and no drain is running.
+	 */
+	const flushSummaryForSession = async ({
+		database,
+		sessionId,
+	}: {
+		database: DatabaseSync;
+		sessionId: string;
+	}): Promise<void> => {
+		const active = activeSessions.get(sessionId);
+		if (!active || !sessionSummaryWriter) {
+			return;
+		}
+		if (active.agentResponsePendingSummary || active.summaryQueued) {
+			activeSessions.set(sessionId, {
+				...active,
+				agentResponsePendingSummary: false,
+				summaryQueued: true,
+			});
+		} else if (!inFlightDrains.has(sessionId)) {
+			return;
+		}
+		await startDrain({ database, sessionId });
+	};
+
+	return { flushSummaryForSession, queueSummaryAfterAgentResponse };
 }
