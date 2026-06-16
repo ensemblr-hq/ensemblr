@@ -51,19 +51,35 @@ type WorkspaceFileIconTarget = Pick<WorkspaceFileSummary, 'kind' | 'name'>;
 /**
  * Picks the appropriate VSCode icon name for a workspace file or folder.
  * @param file - File/folder name and kind.
+ * @param options - When `isExpanded` is set, directories resolve to their
+ *   open-folder glyph (falling back to the closed one if no `-opened` variant
+ *   exists in the icon set).
  * @returns A fully-qualified iconify name (e.g. `vscode-icons:file-type-js`).
  */
 export function getWorkspaceFileIconName(
 	file: WorkspaceFileIconTarget,
+	options?: { isExpanded?: boolean },
 ): string {
+	if (file.kind === 'directory') {
+		const baseIcon = folderIconByName[file.name] ?? 'default-folder';
+		const openIcon = `${baseIcon}-opened`;
+		const iconName =
+			options?.isExpanded && folderIconExists(openIcon) ? openIcon : baseIcon;
+
+		return `${iconPrefix}:${iconName}`;
+	}
+
 	const iconName =
-		file.kind === 'directory'
-			? (folderIconByName[file.name] ?? 'default-folder')
-			: (fileIconByName[file.name] ??
-				fileIconByExtension[getFileExtension(file.name)] ??
-				'default-file');
+		fileIconByName[file.name] ??
+		fileIconByExtension[getFileExtension(file.name)] ??
+		'default-file';
 
 	return `${iconPrefix}:${iconName}`;
+}
+
+/** Reports whether a (non-prefixed) folder icon name exists in the VSCode set. */
+function folderIconExists(name: string): boolean {
+	return Boolean(vscodeIcons.icons[name] ?? vscodeIcons.aliases?.[name]);
 }
 
 /**

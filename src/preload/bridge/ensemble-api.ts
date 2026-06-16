@@ -11,6 +11,7 @@ import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
 } from '../../shared/ipc/contracts/terminal';
+import type { WorkspaceFilesChangedBroadcast } from '../../shared/ipc/contracts/workspace-files';
 
 /**
  * Keys of {@link EnsembleApi} that represent typed `ipcRenderer.invoke`
@@ -24,6 +25,7 @@ type InvokeKey = Exclude<
 	| 'onPiSessionEvent'
 	| 'onTerminalLifecycle'
 	| 'onTerminalOutput'
+	| 'onWorkspaceFilesChanged'
 >;
 
 /**
@@ -167,6 +169,11 @@ export function createEnsembleApi(): EnsembleApi {
 			),
 		onTerminalOutput: (listener) =>
 			subscribe<TerminalOutputBroadcast>(IPC_CHANNELS.terminalOutput, listener),
+		onWorkspaceFilesChanged: (listener) =>
+			subscribe<WorkspaceFilesChangedBroadcast>(
+				IPC_CHANNELS.workspaceFilesChanged,
+				listener,
+			),
 		openAppConfigFile: () => invoke('openAppConfigFile'),
 		openExternal: (url) => invoke('openExternal', url),
 		openChatTab: (request) => invoke('openChatTab', request),
@@ -216,7 +223,10 @@ export function createEnsembleApi(): EnsembleApi {
 		unarchiveWorkspace: (request) => invoke('unarchiveWorkspace', request),
 		unsetEnvironmentVariable: (request) =>
 			invoke('unsetEnvironmentVariable', request),
+		unwatchWorkspaceFiles: (request) =>
+			invoke('unwatchWorkspaceFiles', request),
 		updateAppSettings: (patch) => invoke('updateAppSettings', patch),
+		watchWorkspaceFiles: (request) => invoke('watchWorkspaceFiles', request),
 		writeForkSummary: (request) => invoke('writeForkSummary', request),
 		writeTerminalSession: (request) => invoke('writeTerminalSession', request),
 	};

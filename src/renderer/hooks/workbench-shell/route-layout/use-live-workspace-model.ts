@@ -20,6 +20,8 @@ import type { useWorkspaceTerminalSessions } from '@/renderer/state/workspace/te
 import type { ReviewFileSummary } from '@/renderer/types/workbench';
 import type { WorkspaceGitFileWire } from '@/shared/ipc/contracts/workspace-git';
 
+import { useWorkspaceFilesWatch } from './use-workspace-files-watch';
+
 type ActiveProject = WorkspaceNavigationSelection['project'];
 type ActiveWorkspace = WorkspaceNavigationSelection['workspace'];
 type TerminalSessions = ReturnType<typeof useWorkspaceTerminalSessions>;
@@ -41,6 +43,10 @@ export function useLiveWorkspaceModel({
 	liveWorkspaceFiles: ActiveWorkspace['workspaceFiles'];
 	workspaceWithLiveDockTabs: ActiveWorkspace;
 } {
+	// Refresh the files tree the instant an agent or the user changes files on
+	// disk, rather than waiting for the query's polling fallback.
+	useWorkspaceFilesWatch(activeWorkspace.pathLabel ?? null);
+
 	const { data: scriptSettingsData } = useQuery(
 		workspaceScriptSettingsQuery({
 			repositoryId: activeProject.id,

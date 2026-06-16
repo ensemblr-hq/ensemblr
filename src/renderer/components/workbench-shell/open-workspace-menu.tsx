@@ -1,14 +1,4 @@
-import { Icon } from '@iconify/react';
-import {
-	ChevronDownIcon,
-	CopyIcon,
-	FileCodeIcon,
-	FolderIcon,
-	GitBranchIcon,
-	SquareTerminalIcon,
-	WrenchIcon,
-} from 'lucide-react';
-import type { ComponentType, ReactNode } from 'react';
+import { ChevronDownIcon } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
@@ -20,12 +10,9 @@ import {
 } from '@/renderer/components/ui/dropdown-menu';
 import { useOpenTargetShortcuts } from '@/renderer/hooks/workbench-shell/use-open-target-shortcuts';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
-import { cn } from '@/renderer/lib/utils';
-import type {
-	WorkspaceOpenTarget,
-	WorkspaceShellModel,
-} from '@/renderer/types/workbench';
-import type { WorkspaceOpenTargetIconName } from '@/shared/ipc/contracts/open-target';
+import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+
+import { OpenTargetIcon } from './open-target-icon';
 
 /** Split button + dropdown to open the workspace in installed apps. */
 export function OpenWorkspaceMenu({
@@ -103,65 +90,4 @@ export function OpenWorkspaceMenu({
 			</DropdownMenu>
 		</div>
 	);
-}
-
-type IconRenderer = ComponentType<{ className?: string }>;
-
-const lucide = (Component: IconRenderer): IconRenderer =>
-	function LucideGlyph({ className }) {
-		return <Component aria-hidden='true' className={className} />;
-	};
-
-const iconify = (icon: string): IconRenderer =>
-	function IconifyGlyph({ className }) {
-		return <Icon aria-hidden='true' className={className} icon={icon} />;
-	};
-
-/**
- * Exhaustive map from icon-name literal to its concrete React renderer.
- * Adding a new variant to `WorkspaceOpenTargetIconName` without updating this
- * record is a TS error; adding to this record without extending the union is
- * also a TS error.
- */
-const NAMED_ICON_RENDERERS: Record<WorkspaceOpenTargetIconName, IconRenderer> =
-	{
-		'lucide:copy': lucide(CopyIcon),
-		'lucide:file-code': lucide(FileCodeIcon),
-		'lucide:folder': lucide(FolderIcon),
-		'lucide:github': lucide(GitBranchIcon),
-		'lucide:square-terminal': lucide(SquareTerminalIcon),
-		'lucide:wrench': lucide(WrenchIcon),
-		'vscode-icons:file-type-vscode': iconify('vscode-icons:file-type-vscode'),
-		'vscode-icons:folder-type-github': iconify(
-			'vscode-icons:folder-type-github',
-		),
-	};
-
-/**
- * Renders the icon for an open-in target. Prefers the real macOS app icon
- * (PNG data URL extracted by the main process); falls back to the renderer
- * registered for the target's named glyph.
- */
-function OpenTargetIcon({
-	className,
-	target,
-}: {
-	className?: string;
-	target: WorkspaceOpenTarget;
-}): ReactNode {
-	const iconClassName = cn('shrink-0', className);
-
-	if (target.iconDataUrl) {
-		return (
-			<img
-				alt=''
-				aria-hidden='true'
-				className={cn(iconClassName, 'object-contain')}
-				src={target.iconDataUrl}
-			/>
-		);
-	}
-
-	const Renderer = NAMED_ICON_RENDERERS[target.iconName];
-	return <Renderer className={iconClassName} />;
 }
