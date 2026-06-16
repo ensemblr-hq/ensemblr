@@ -47,6 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Wordmark Animation** (`957a71d`): Glitch burst effect now fires immediately on `WelcomeWordmark` component mount (line 155 in `welcome-wordmark.tsx`), eliminating the static "dead" period on welcome screen load. The periodic glitch pattern (9-17s interval) continues thereafter unchanged.
 
+- **Context-Aware Close Action** (`695de4f`): ⌘/Ctrl+W close action is now context-aware:
+  - In workspace view: Closes the active tab with smart behavior (close if multiple tabs, reset sole chat tab to fresh state, no-op for empty sole tab)
+  - In Settings: Returns to the screen Settings was opened from (tracked via `settingsReturnToAtom`)
+  - On other screens: Falls back to closing the BrowserWindow
+  - Centralized via `CloseActionProvider` with a stack-based registration system
+  - New IPC channels: `closeActiveTab` and `closeWindow`
+  - New test: `tests/renderer/session-tab-close.test.ts`
+
 ### Changed
 
 - **Wordmark Mount Behavior** (`957a71d`): Changed from `scheduleNextBurst()` to `runBurst()` on component mount, ensuring immediate visual feedback.
@@ -72,6 +80,7 @@ Ensemble follows a pre-1.0 semantic versioning approach where:
 
 | Commit | Date | Feature |
 |--------|------|---------|
+| `695de4f` | 2026-06-16 | feat(window): context-aware ⌘/Ctrl+W close action (#69) |
 | `6ef81a7` | 2026-06-16 13:47:27 +0300 | feat(workspace): gitignore .context and serve files as lazy live tree |
 | `d2158d5` | 2026-06-16 11:14:09 +0300 | feat(review-files): organize all-files screen as file tree with live watch |
 | `d61d93e` | 2026-06-16 07:17:24 +0300 | feat(git-settings): user-scope git defaults and auto branch-naming |
@@ -87,4 +96,4 @@ The following documentation files were updated to reflect these changes:
 
 - `docs/product/implementation-roadmap.md` - Added "Completed Implementation" section
 - `docs/product/conductor-parity.md` - Updated Settings row, added User git defaults row
-- `docs/product/current-shell-inventory.md` - Updated All Files tab status, added Settings → Git row, updated Current Unknowns
+- `docs/product/current-shell-inventory.md` - Updated All Files tab status, added Settings → Git row, updated Current Unknowns, added context-aware close action details to Chat/session tabs and Settings shell entry rows
