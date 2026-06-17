@@ -318,7 +318,7 @@ function getReviewFileDirectory(path: string) {
 }
 
 /** Returns the basename portion of a file path. */
-export function getReviewFileName(path: string) {
+function getReviewFileName(path: string) {
 	const lastSeparatorIndex = path.lastIndexOf('/');
 
 	return lastSeparatorIndex === -1 ? path : path.slice(lastSeparatorIndex + 1);

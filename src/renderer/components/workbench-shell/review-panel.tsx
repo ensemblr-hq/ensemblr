@@ -120,12 +120,14 @@ export function ReviewPanel({
 	// Source-aware status drives both the tab count and the file list. The
 	// working-tree scope reuses the live model's query (same key), so only the
 	// branch/commit views issue an extra git read — for the active workspace.
-	const sourceStatus = useQuery({
-		...workspaceGitStatusQuery(workspace.pathLabel ?? null, scope),
-		placeholderData: keepPreviousData,
-	});
+	const { data: sourceStatusData, isLoading: isSourceStatusLoading } = useQuery(
+		{
+			...workspaceGitStatusQuery(workspace.pathLabel ?? null, scope),
+			placeholderData: keepPreviousData,
+		},
+	);
 	const statusData =
-		sourceStatus.data && !sourceStatus.data.error ? sourceStatus.data : null;
+		sourceStatusData && !sourceStatusData.error ? sourceStatusData : null;
 	// Until the source query resolves, the "all"/"uncommitted" views borrow the
 	// live model's already-loaded change set so rows don't blink away on every
 	// switch or first paint. A commit view has no model equivalent — it loads.
@@ -275,11 +277,11 @@ export function ReviewPanel({
 					emptyState={emptyState}
 					error={
 						source.kind === 'commit'
-							? sourceStatus.data?.error?.message
+							? sourceStatusData?.error?.message
 							: workspace.reviewFilesError
 					}
 					files={sourceFiles}
-					isLoading={source.kind === 'commit' && sourceStatus.isLoading}
+					isLoading={source.kind === 'commit' && isSourceStatusLoading}
 					onDiscardFile={handleDiscardFile}
 					viewMode={changesViewMode}
 					workspaceId={workspace.id}
