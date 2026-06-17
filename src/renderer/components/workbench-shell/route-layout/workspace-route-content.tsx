@@ -1,5 +1,6 @@
 import { Outlet, useNavigate } from '@tanstack/react-router';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+import { CloseRunningChatDialog } from '@/renderer/components/workbench-shell/conversation-panel/close-running-chat-dialog';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
 import { useLiveWorkspaceModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-workspace-model';
@@ -9,8 +10,13 @@ import {
 	getComposerState,
 } from '@/renderer/lib/workbench';
 import { useRegisterCloseAction } from '@/renderer/state/close-action';
-import { usePiComposerController } from '@/renderer/state/composer';
 import {
+	usePiComposerController,
+	useStopPiSession,
+} from '@/renderer/state/composer';
+import {
+	resolveRunningCloseTarget,
+	useCloseRunningChatGuard,
 	useSessionTabState,
 	useWorkspacePanelTabState,
 } from '@/renderer/state/workspace';
@@ -66,10 +72,6 @@ export function WorkspaceRouteContent({
 		onSessionTabChange: handleSessionTabChange,
 	});
 	const activeSession = sessionNavigation.effectiveActiveSession;
-	// ⌘/Ctrl+W in the workspace view. The full tab-close policy (close, no-op, or
-	// reset the sole chat) lives in `useSessionTabState` so it stays unit-tested
-	// and reusable; see `decideActiveClose`.
-	useRegisterCloseAction(sessionNavigation.closeActiveOrReset);
 	const terminalSessions = useWorkspaceTerminalSessions(activeWorkspace.id);
 	const { liveWorkspaceFiles, workspaceWithLiveDockTabs } =
 		useLiveWorkspaceModel({ activeProject, activeWorkspace, terminalSessions });
@@ -89,6 +91,68 @@ export function WorkspaceRouteContent({
 		workspaceCwd: activeWorkspace.pathLabel,
 		workspaceId: activeWorkspace.id,
 	});
+	// ⌘/Ctrl+W and tab-strip closes both flow through a running-chat guard. The
+	// underlying close policy (close, no-op, or reset the sole chat) still lives
+	// in `useSessionTabState` (see `decideActiveClose`); the guard only adds a
+	// confirm-then-cancel step when the target tab's agent is mid-turn. Wired
+	// here because this is the one place holding both the registered close action
+	// and the composer's live streaming state.
+	const closeGuard = useCloseRunningChatGuard();
+	const stopPiSessionById = useStopPiSession(activeWorkspace.id);
+	const stopFor = useCallback(
+		(targetId: string, piSessionId: string | null) => async () => {
+			// The active tab owns the live composer, so prefer its `onStop` (it also
+			// clears the composer's optimistic pending session). Background tabs have
+			// no live composer; cancel them by session id instead.
+			if (targetId === activeSession.id) {
+				await piComposer.onStop();
+				return;
+			}
+			if (piSessionId) {
+				await stopPiSessionById(piSessionId);
+			}
+		},
+		[activeSession.id, piComposer.onStop, stopPiSessionById],
+	);
+	const requestActiveClose = useCallback(() => {
+		closeGuard.requestClose({
+			isRunning: piComposer.isStreaming,
+			onClose: sessionNavigation.closeActiveOrReset,
+			onStop: piComposer.onStop,
+		});
+	}, [
+		closeGuard,
+		piComposer.isStreaming,
+		piComposer.onStop,
+		sessionNavigation.closeActiveOrReset,
+	]);
+	useRegisterCloseAction(requestActiveClose);
+	const requestTabClose = useCallback(
+		(targetId: string) => {
+			const target = resolveRunningCloseTarget({
+				activeSessionId: activeSession.id,
+				isActiveStreaming: piComposer.isStreaming,
+				tabs: sessionNavigation.sessionTabs,
+				targetId,
+			});
+			closeGuard.requestClose({
+				isRunning: target.isRunning,
+				onClose: () => sessionNavigation.closeSessionTab(targetId),
+				onStop: stopFor(targetId, target.piSessionId),
+			});
+		},
+		[
+			activeSession.id,
+			closeGuard,
+			piComposer.isStreaming,
+			sessionNavigation,
+			stopFor,
+		],
+	);
+	const guardedSessionNavigation = useMemo(
+		() => ({ ...sessionNavigation, closeSessionTab: requestTabClose }),
+		[requestTabClose, sessionNavigation],
+	);
 	const composer = getComposerState({
 		activePiSessionId: piComposer.activeSessionId,
 		activeSession,
@@ -155,21 +219,28 @@ export function WorkspaceRouteContent({
 	}
 
 	return (
-		<WorkspaceWorkbenchContent
-			activeProject={activeProject}
-			activeReviewTab={activeReviewTab}
-			activeWorkspace={workspaceWithLiveDockTabs}
-			composer={composer}
-			dockActions={dockActions}
-			dockTabId={activeDockTab}
-			onDockTabChange={(dock: DockTabId) => updateSearch({ dock })}
-			onReviewTabChange={(review) => updateSearch({ review })}
-			onSessionTabChange={(nextChatId) =>
-				navigateToWorkspaceChat({ nextChatId })
-			}
-			sessionNavigation={sessionNavigation}
-			MainContent={WorkspaceMainContentOutlet}
-		/>
+		<>
+			<WorkspaceWorkbenchContent
+				activeProject={activeProject}
+				activeReviewTab={activeReviewTab}
+				activeWorkspace={workspaceWithLiveDockTabs}
+				composer={composer}
+				dockActions={dockActions}
+				dockTabId={activeDockTab}
+				onDockTabChange={(dock: DockTabId) => updateSearch({ dock })}
+				onReviewTabChange={(review) => updateSearch({ review })}
+				onSessionTabChange={(nextChatId) =>
+					navigateToWorkspaceChat({ nextChatId })
+				}
+				sessionNavigation={guardedSessionNavigation}
+				MainContent={WorkspaceMainContentOutlet}
+			/>
+			<CloseRunningChatDialog
+				onCancel={closeGuard.cancelClose}
+				onConfirm={closeGuard.confirmClose}
+				open={closeGuard.isConfirming}
+			/>
+		</>
 	);
 }
 

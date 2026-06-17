@@ -3,6 +3,7 @@ import { describe, expect, test } from 'bun:test';
 import {
 	type ActiveCloseDecision,
 	decideActiveClose,
+	resolveRunningCloseTarget,
 	selectNeighborTab,
 } from '../../src/renderer/state/workspace/session-tab-close';
 import type { SessionTabModel } from '../../src/renderer/types/workbench';
@@ -63,5 +64,75 @@ describe('decideActiveClose', () => {
 			kind: 'reset',
 			activeId: 'chat-9',
 		});
+	});
+});
+
+describe('resolveRunningCloseTarget', () => {
+	test('uses the live streaming flag for the active tab', () => {
+		const active = createTab({ id: 'chat-1', piSessionId: 'pi-1' });
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'chat-1',
+				isActiveStreaming: true,
+				tabs: [active],
+				targetId: 'chat-1',
+			}),
+		).toEqual({ isRunning: true, piSessionId: 'pi-1' });
+	});
+
+	test('reports the active tab as idle when it is not streaming', () => {
+		// `status` is 'working' but the live composer flag wins for the active tab.
+		const active = createTab({
+			id: 'chat-1',
+			piSessionId: 'pi-1',
+			status: 'working',
+		});
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'chat-1',
+				isActiveStreaming: false,
+				tabs: [active],
+				targetId: 'chat-1',
+			}),
+		).toEqual({ isRunning: false, piSessionId: 'pi-1' });
+	});
+
+	test('falls back to persisted status for a background tab', () => {
+		const background = createTab({
+			id: 'chat-2',
+			piSessionId: 'pi-2',
+			status: 'working',
+		});
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'chat-1',
+				isActiveStreaming: false,
+				tabs: [createTab(), background],
+				targetId: 'chat-2',
+			}),
+		).toEqual({ isRunning: true, piSessionId: 'pi-2' });
+	});
+
+	test('reports an idle background tab as not running', () => {
+		const background = createTab({ id: 'chat-2', piSessionId: 'pi-2' });
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'chat-1',
+				isActiveStreaming: true,
+				tabs: [createTab(), background],
+				targetId: 'chat-2',
+			}),
+		).toEqual({ isRunning: false, piSessionId: 'pi-2' });
+	});
+
+	test('treats an unknown target as not running with no session', () => {
+		expect(
+			resolveRunningCloseTarget({
+				activeSessionId: 'chat-1',
+				isActiveStreaming: true,
+				tabs: [createTab()],
+				targetId: 'missing',
+			}),
+		).toEqual({ isRunning: false, piSessionId: null });
 	});
 });
