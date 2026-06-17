@@ -9,6 +9,7 @@ import type {
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
+import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
 import type { ProjectShellModel } from './project';
 
@@ -59,6 +60,8 @@ export interface ReviewFileSummary {
 	deletions: number;
 	id: string;
 	path: string;
+	/** Previous path when `status` is `renamed`; discarding restores it too. */
+	renamedFrom?: string;
 	status: 'added' | 'deleted' | 'modified' | 'renamed' | 'untracked';
 }
 
@@ -145,6 +148,8 @@ interface SessionTabBase {
 export type SessionTabModel =
 	| (SessionTabBase & { filePath?: null; kind?: 'chat'; turnId?: null })
 	| (SessionTabBase & {
+			/** Which diff to fetch for `filePath`; absent means the working tree. */
+			diffScope?: WorkspaceGitDiffScope | null;
 			filePath: string | null;
 			kind: 'diff';
 			turnId: string | null;

@@ -40,6 +40,8 @@ export const IPC_CHANNELS = {
 	setEnvironmentVariable: 'ensemble:set-environment-variable',
 	unsetEnvironmentVariable: 'ensemble:unset-environment-variable',
 	getPullRequestSnapshot: 'ensemble:get-pull-request-snapshot',
+	discardWorkspaceChanges: 'ensemble:discard-workspace-changes',
+	getWorkspaceCommits: 'ensemble:get-workspace-commits',
 	getWorkspaceFileDiff: 'ensemble:get-workspace-file-diff',
 	getWorkspaceGitStatus: 'ensemble:get-workspace-git-status',
 	mergePullRequest: 'ensemble:merge-pull-request',

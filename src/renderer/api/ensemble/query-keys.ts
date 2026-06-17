@@ -77,17 +77,34 @@ export const ensembleQueryKeys = {
 			'settings-resolution',
 			repositoryId ?? '',
 		] as const,
-	workspaceFileDiff: (workspaceCwd: string, filePath: string) =>
+	workspaceCommits: (workspaceCwd: string, baseRef = '') =>
+		[
+			...ensembleQueryKeys.all,
+			'workspace-commits',
+			workspaceCwd,
+			baseRef,
+		] as const,
+	workspaceFileDiff: (
+		workspaceCwd: string,
+		filePath: string,
+		scopeKey = 'working-tree',
+	) =>
 		[
 			...ensembleQueryKeys.all,
 			'workspace-file-diff',
 			workspaceCwd,
 			filePath,
+			scopeKey,
 		] as const,
 	workspaceFiles: (workspaceCwd: string) =>
 		[...ensembleQueryKeys.all, 'workspace-files', workspaceCwd] as const,
-	workspaceGitStatus: (workspaceCwd: string) =>
-		[...ensembleQueryKeys.all, 'workspace-git-status', workspaceCwd] as const,
+	workspaceGitStatus: (workspaceCwd: string, scopeKey = 'working-tree') =>
+		[
+			...ensembleQueryKeys.all,
+			'workspace-git-status',
+			workspaceCwd,
+			scopeKey,
+		] as const,
 	workspaceOpenTargets: () =>
 		[...ensembleQueryKeys.all, 'workspace-open-targets'] as const,
 	workspaceScriptSettings: (repositoryId: string) =>

@@ -1,6 +1,6 @@
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useAtom } from 'jotai';
 import {
-	CheckIcon,
 	EyeIcon,
 	ListIcon,
 	ListTreeIcon,
@@ -8,32 +8,80 @@ import {
 	RefreshCwIcon,
 	SearchIcon,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
+import { workspaceGitStatusQuery } from '@/renderer/api/ensemble';
 import { Button } from '@/renderer/components/ui/button';
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuShortcut,
-	DropdownMenuTrigger,
-} from '@/renderer/components/ui/dropdown-menu';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { cn } from '@/renderer/lib/utils';
-import { changesViewModeAtom } from '@/renderer/state/workspace';
+import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
+import {
+	changesSourceByWorkspaceAtom,
+	changesViewModeAtom,
+} from '@/renderer/state/workspace';
 import type {
 	ReviewPanelTab,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type { ChangesViewMode } from '@/renderer/types/workbench-shell';
+import type {
+	ChangesSource,
+	ChangesViewMode,
+} from '@/renderer/types/workbench-shell';
+import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
 import { ChecksPanel } from './checks-panel/checks-panel';
 import { useReviewActions } from './review-actions/review-actions-context';
 import { AllFilesList } from './review-files/all-files-list';
 import { AllFilesSearchDialog } from './review-files/all-files-search-dialog';
+import {
+	ChangesOverflowMenu,
+	ChangesSourceBadge,
+} from './review-files/changes-source-menu';
+import {
+	DiscardChangesDialog,
+	type DiscardChangesTarget,
+} from './review-files/discard-changes-dialog';
 import { ReviewFileList } from './review-files/review-file-list';
+
+/** Resolves the active change source to the git diff scope a query needs. */
+function sourceToScope(
+	source: ChangesSource,
+	baseRef: string | null,
+): WorkspaceGitDiffScope {
+	if (source.kind === 'commit') {
+		return { commitHash: source.hash, kind: 'commit' };
+	}
+	// "All changes" means the whole branch — but it can only diff against a base
+	// when one is known; otherwise it degrades to the working-tree change set.
+	if (source.kind === 'all' && baseRef) {
+		return { baseRef, kind: 'branch' };
+	}
+	return { kind: 'working-tree' };
+}
+
+/** Empty-state copy tailored to the active change source. */
+function emptyStateForSource(source: ChangesSource): {
+	message: string;
+	title: string;
+} {
+	if (source.kind === 'uncommitted') {
+		return {
+			message: 'Everything here is committed.',
+			title: 'No uncommitted changes yet',
+		};
+	}
+	if (source.kind === 'commit') {
+		return {
+			message: `${source.shortHash} touched no files.`,
+			title: 'No changes in this commit',
+		};
+	}
+	return {
+		message: 'Changes on this branch appear here.',
+		title: 'No changes yet',
+	};
+}
 
 /** Tabbed review surface for files, changes, and checks. */
 export function ReviewPanel({
@@ -47,6 +95,67 @@ export function ReviewPanel({
 }) {
 	const [changesViewMode, setChangesViewMode] = useAtom(changesViewModeAtom);
 	const [isFileSearchOpen, setIsFileSearchOpen] = useState(false);
+
+	// The Changes tab can show every branch change, only uncommitted edits, or a
+	// single commit — picked per workspace and persisted.
+	const [sourceMap, setSourceMap] = useAtom(changesSourceByWorkspaceAtom);
+	const storedSource = sourceMap[workspace.id];
+	const source = useMemo<ChangesSource>(
+		() => storedSource ?? { kind: 'all' },
+		[storedSource],
+	);
+	const setSource = useCallback(
+		(next: ChangesSource) => {
+			setSourceMap((current) => ({ ...current, [workspace.id]: next }));
+		},
+		[setSourceMap, workspace.id],
+	);
+
+	const baseRef = workspace.landingSummary?.branchSource.baseBranch ?? null;
+	const scope = useMemo(
+		() => sourceToScope(source, baseRef),
+		[source, baseRef],
+	);
+
+	// Source-aware status drives both the tab count and the file list. The
+	// working-tree scope reuses the live model's query (same key), so only the
+	// branch/commit views issue an extra git read — for the active workspace.
+	const { data: sourceStatusData, isLoading: isSourceStatusLoading } = useQuery(
+		{
+			...workspaceGitStatusQuery(workspace.pathLabel ?? null, scope),
+			placeholderData: keepPreviousData,
+		},
+	);
+	const statusData =
+		sourceStatusData && !sourceStatusData.error ? sourceStatusData : null;
+	// Until the source query resolves, the "all"/"uncommitted" views borrow the
+	// live model's already-loaded change set so rows don't blink away on every
+	// switch or first paint. A commit view has no model equivalent — it loads.
+	const useModelChanges = !statusData && source.kind !== 'commit';
+	const sourceFiles = useMemo(
+		() =>
+			statusData
+				? mapGitStatusToReviewFiles(statusData.files)
+				: useModelChanges
+					? workspace.reviewFiles
+					: [],
+		[statusData, useModelChanges, workspace.reviewFiles],
+	);
+	const changesCount = statusData
+		? statusData.summary.files
+		: useModelChanges
+			? workspace.changeSummary.files
+			: 0;
+
+	// Only working-tree (uncommitted) files revert cleanly. The live model's
+	// `reviewFiles` is exactly that set, so cross-reference it to decide which
+	// rows expose a Discard action regardless of the active source.
+	const discardablePaths = useMemo(
+		() => new Set(workspace.reviewFiles.map((file) => file.path)),
+		[workspace.reviewFiles],
+	);
+	const emptyState = useMemo(() => emptyStateForSource(source), [source]);
+
 	const reviewTabs: Array<{
 		count?: number;
 		id: ReviewPanelTab;
@@ -54,7 +163,7 @@ export function ReviewPanel({
 	}> = [
 		{ id: 'files', label: 'All files' },
 		{
-			count: workspace.changeSummary.files,
+			count: changesCount,
 			id: 'changes',
 			label: 'Changes',
 		},
@@ -67,6 +176,57 @@ export function ReviewPanel({
 	useHotkey('files.search', openFileSearch, {
 		enabled: activeTab === 'files',
 	});
+
+	// ⌥⌘U jumps straight to the uncommitted change set, switching tabs if needed.
+	const showUncommitted = useCallback(() => {
+		onTabChange('changes');
+		setSource({ kind: 'uncommitted' });
+	}, [onTabChange, setSource]);
+	useHotkey('changes.uncommitted', showUncommitted);
+
+	const [discardTarget, setDiscardTarget] =
+		useState<DiscardChangesTarget | null>(null);
+
+	// Route every discard through the confirm dialog rather than reverting
+	// inline: the git operation is irreversible, so it stays behind an explicit,
+	// cancelable step. A rename carries both its new path and `renamedFrom` so
+	// the original is restored alongside the new copy's removal.
+	const handleDiscardFile = useCallback(
+		(filePath: string) => {
+			const file = sourceFiles.find((entry) => entry.path === filePath);
+			const paths = file?.renamedFrom
+				? [filePath, file.renamedFrom]
+				: [filePath];
+			setDiscardTarget({ fileCount: 1, paths, title: filePath });
+		},
+		[sourceFiles],
+	);
+
+	// Discard every uncommitted change at once. Only working-tree files revert,
+	// so this always targets the live model's `reviewFiles` regardless of the
+	// active source view; renames contribute both paths.
+	const handleDiscardAll = useCallback(() => {
+		const uncommitted = workspace.reviewFiles;
+		if (uncommitted.length === 0) {
+			return;
+		}
+		const paths = uncommitted.flatMap((file) =>
+			file.renamedFrom ? [file.path, file.renamedFrom] : [file.path],
+		);
+		setDiscardTarget({
+			fileCount: uncommitted.length,
+			paths,
+			title: `all ${uncommitted.length} uncommitted ${
+				uncommitted.length === 1 ? 'change' : 'changes'
+			}`,
+		});
+	}, [workspace.reviewFiles]);
+
+	const handleDiscardDialogChange = useCallback((open: boolean) => {
+		if (!open) {
+			setDiscardTarget(null);
+		}
+	}, []);
 
 	return (
 		<Tabs
@@ -96,7 +256,10 @@ export function ReviewPanel({
 							current === 'list' ? 'folders' : 'list',
 						)
 					}
+					onDiscardAll={handleDiscardAll}
 					onFileSearchOpen={() => setIsFileSearchOpen(true)}
+					onSelectSource={setSource}
+					source={source}
 					workspace={workspace}
 				/>
 			</div>
@@ -109,9 +272,19 @@ export function ReviewPanel({
 			</TabsContent>
 			<TabsContent className='min-h-0 overflow-hidden' value='changes'>
 				<ReviewFileList
-					error={workspace.reviewFilesError}
-					files={workspace.reviewFiles}
+					diffScope={scope}
+					discardablePaths={discardablePaths}
+					emptyState={emptyState}
+					error={
+						source.kind === 'commit'
+							? sourceStatusData?.error?.message
+							: workspace.reviewFilesError
+					}
+					files={sourceFiles}
+					isLoading={source.kind === 'commit' && isSourceStatusLoading}
+					onDiscardFile={handleDiscardFile}
 					viewMode={changesViewMode}
+					workspaceId={workspace.id}
 				/>
 			</TabsContent>
 			<TabsContent className='min-h-0 overflow-hidden' value='checks'>
@@ -122,6 +295,12 @@ export function ReviewPanel({
 				onOpenChange={setIsFileSearchOpen}
 				open={isFileSearchOpen}
 			/>
+			<DiscardChangesDialog
+				onOpenChange={handleDiscardDialogChange}
+				open={discardTarget !== null}
+				target={discardTarget}
+				workspaceCwd={workspace.pathLabel}
+			/>
 		</Tabs>
 	);
 }
@@ -131,17 +310,21 @@ function ReviewPanelActions({
 	activeTab,
 	changesViewMode,
 	onChangesViewModeToggle,
+	onDiscardAll,
 	onFileSearchOpen,
+	onSelectSource,
+	source,
 	workspace,
 }: {
 	activeTab: ReviewPanelTab;
 	changesViewMode: ChangesViewMode;
 	onChangesViewModeToggle: () => void;
+	onDiscardAll: () => void;
 	onFileSearchOpen: () => void;
+	onSelectSource: (source: ChangesSource) => void;
+	source: ChangesSource;
 	workspace: WorkspaceShellModel;
 }) {
-	const reviewActions = useReviewActions();
-
 	if (activeTab === 'checks') {
 		return <ChecksRefreshButton />;
 	}
@@ -153,15 +336,7 @@ function ReviewPanelActions({
 		<div className='flex shrink-0 items-center gap-0.5'>
 			{activeTab === 'changes' ? (
 				<>
-					<Button
-						className='text-accent-strong hover:text-foreground'
-						onClick={() => reviewActions?.runAgentAction('review')}
-						size='xs'
-						variant='ghost'
-					>
-						<EyeIcon data-icon='inline-start' />
-						<span className='review-panel-action-label'>Review</span>
-					</Button>
+					<ReviewActionButton />
 					<Button
 						aria-pressed={changesViewMode === 'folders'}
 						onClick={onChangesViewModeToggle}
@@ -175,13 +350,31 @@ function ReviewPanelActions({
 								: 'Show changes as folders'}
 						</span>
 					</Button>
-					<ChangesOverflowMenu workspace={workspace} />
+					{/* When a non-default source is active its badge owns the slot; the
+					    badge's ✕ is the way back, so the overflow trigger is hidden to
+					    avoid clutter. The menu only appears in the default "All" state. */}
+					{source.kind === 'all' ? (
+						<ChangesOverflowMenu
+							onDiscardAll={onDiscardAll}
+							onSelectSource={onSelectSource}
+							source={source}
+							workspace={workspace}
+						/>
+					) : (
+						<ChangesSourceBadge
+							onClear={() => onSelectSource({ kind: 'all' })}
+							source={source}
+						/>
+					)}
 				</>
 			) : activeTab === 'files' ? (
-				<Button onClick={onFileSearchOpen} size='icon-sm' variant='ghost'>
-					<SearchIcon />
-					<span className='sr-only'>Search files</span>
-				</Button>
+				<>
+					<ReviewActionButton />
+					<Button onClick={onFileSearchOpen} size='icon-sm' variant='ghost'>
+						<SearchIcon />
+						<span className='sr-only'>Search files</span>
+					</Button>
+				</>
 			) : (
 				<Button size='icon-sm' variant='ghost'>
 					<MoreVerticalIcon />
@@ -189,6 +382,23 @@ function ReviewPanelActions({
 				</Button>
 			)}
 		</div>
+	);
+}
+
+/** Kicks off the review agent action; shared by the Changes and All files tabs. */
+function ReviewActionButton() {
+	const reviewActions = useReviewActions();
+
+	return (
+		<Button
+			className='text-accent-strong hover:text-foreground'
+			onClick={() => reviewActions?.runAgentAction('review')}
+			size='xs'
+			variant='ghost'
+		>
+			<EyeIcon data-icon='inline-start' />
+			<span className='review-panel-action-label'>Review</span>
+		</Button>
 	);
 }
 
@@ -212,66 +422,6 @@ function ChecksRefreshButton() {
 				<span className='sr-only'>Refresh pull request status</span>
 			</Button>
 		</div>
-	);
-}
-
-/** Dropdown listing commit ranges and uncommitted-changes options. */
-function ChangesOverflowMenu({
-	workspace,
-}: {
-	workspace: WorkspaceShellModel;
-}) {
-	return (
-		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button size='icon-sm' variant='ghost'>
-					<MoreVerticalIcon />
-					<span className='sr-only'>Open changes menu</span>
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align='end' className='w-80 p-0'>
-				<div className='p-1'>
-					<DropdownMenuItem className='h-9 px-2 text-sm'>
-						<span className='min-w-0 flex-1 truncate'>All changes</span>
-						<CheckIcon aria-hidden='true' className='size-4' />
-					</DropdownMenuItem>
-					<DropdownMenuItem className='items-start px-2 py-2'>
-						<div className='min-w-0 flex-1'>
-							<div className='truncate font-medium text-sm'>
-								Uncommitted changes
-							</div>
-							<div className='text-muted-foreground text-xs'>
-								{workspace.changeSummary.files} files changed
-							</div>
-						</div>
-						<DropdownMenuShortcut>⌥U</DropdownMenuShortcut>
-					</DropdownMenuItem>
-				</div>
-				<DropdownMenuSeparator className='my-0' />
-				<div className='p-1'>
-					<DropdownMenuItem className='items-start px-2 py-2'>
-						<div className='min-w-0'>
-							<div className='truncate font-medium text-sm'>
-								Refine right sidebar PR header states
-							</div>
-							<div className='truncate text-muted-foreground text-xs'>
-								0dc9887 • Philipp Soldunov • 29m ago
-							</div>
-						</div>
-					</DropdownMenuItem>
-					<DropdownMenuItem className='items-start px-2 py-2'>
-						<div className='min-w-0'>
-							<div className='truncate font-medium text-sm'>
-								THE-102 rework workbench shell
-							</div>
-							<div className='truncate text-muted-foreground text-xs'>
-								4339956 • Philipp Soldunov • 1h ago
-							</div>
-						</div>
-					</DropdownMenuItem>
-				</div>
-			</DropdownMenuContent>
-		</DropdownMenu>
 	);
 }
 

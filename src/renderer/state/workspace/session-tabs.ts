@@ -27,6 +27,10 @@ import {
 	type OpenChatTabRequest,
 } from '@/shared/ipc/contracts/chat-tab';
 import type { PiSessionSnapshotWire } from '@/shared/ipc/contracts/pi-session';
+import {
+	parseWorkspaceGitDiffScope,
+	type WorkspaceGitDiffScope,
+} from '@/shared/ipc/contracts/workspace-git';
 import { decideActiveClose, selectNeighborTab } from './session-tab-close';
 
 /**
@@ -341,18 +345,24 @@ export function useSessionTabState({
 		[openAuxiliaryTabMutation],
 	);
 
-	/** Opens (or re-focuses) a working-tree diff tab for a changed file. */
+	/**
+	 * Opens (or re-focuses) a diff tab for a changed file at the given scope. The
+	 * scope is persisted in metadata so the same file viewed at the working tree,
+	 * in a commit, and across the branch each get their own tab.
+	 */
 	const openWorkspaceFileDiffTab = useCallback(
 		async ({
 			filePath,
+			scope,
 		}: {
 			filePath: string;
+			scope?: WorkspaceGitDiffScope;
 		}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
 				const result = await openAuxiliaryTabMutation.mutateAsync({
 					kind: 'diff',
-					metadata: { filePath },
-					title: `Diff: ${basenameOf(filePath)}`,
+					metadata: { filePath, ...(scope ? { diffScope: scope } : {}) },
+					title: diffTabTitle(filePath, scope),
 				});
 				return result.tab ? { chatTabId: result.tab.id } : null;
 			} catch {
@@ -471,6 +481,15 @@ function basenameOf(path: string): string {
 	return trimmed.split('/').at(-1) ?? trimmed;
 }
 
+/** Tab title for a file diff, tagging the short hash when scoped to a commit. */
+function diffTabTitle(filePath: string, scope?: WorkspaceGitDiffScope): string {
+	const name = basenameOf(filePath);
+	if (scope?.kind === 'commit') {
+		return `Diff: ${name} (${scope.commitHash.slice(0, 7)})`;
+	}
+	return `Diff: ${name}`;
+}
+
 /** Maps an open chat-tab wire row into a renderer-facing `SessionTabModel`. */
 function toSessionTabModel(
 	tab: ChatTabWire,
@@ -488,8 +507,10 @@ function toSessionTabModel(
 	if (tab.kind === 'diff') {
 		const turnId = tab.metadata.turnId;
 		const filePath = tab.metadata.filePath;
+		const diffScope = parseWorkspaceGitDiffScope(tab.metadata.diffScope);
 		return {
 			...base,
+			...(diffScope ? { diffScope } : {}),
 			filePath: typeof filePath === 'string' ? filePath : null,
 			kind: 'diff',
 			turnId: typeof turnId === 'string' ? turnId : null,

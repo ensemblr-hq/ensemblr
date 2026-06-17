@@ -109,12 +109,15 @@ export function createEnsembleApi(): EnsembleApi {
 		deleteReviewComment: (request) => invoke('deleteReviewComment', request),
 		deleteReviewTodo: (request) => invoke('deleteReviewTodo', request),
 		deleteWorkspace: (request) => invoke('deleteWorkspace', request),
+		discardWorkspaceChanges: (request) =>
+			invoke('discardWorkspaceChanges', request),
 		ensureWindowWidth: (minimumWidth) =>
 			invoke('ensureWindowWidth', minimumWidth),
 		environmentVariables: () => invoke('environmentVariables'),
 		getAppSettings: () => invoke('getAppSettings'),
 		getPullRequestSnapshot: (request) =>
 			invoke('getPullRequestSnapshot', request),
+		getWorkspaceCommits: (request) => invoke('getWorkspaceCommits', request),
 		getWorkspaceFileDiff: (request) => invoke('getWorkspaceFileDiff', request),
 		getWorkspaceGitStatus: (request) =>
 			invoke('getWorkspaceGitStatus', request),
