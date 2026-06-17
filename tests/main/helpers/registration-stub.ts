@@ -8,6 +8,7 @@ import type {
 
 /** Recorded call from {@link buildRegistrationStub}. */
 export interface RecordedRegistrationCall {
+	name: string;
 	path: string;
 }
 
@@ -44,7 +45,7 @@ export function buildRegistrationStub(
 		calls,
 		service: {
 			register: async (request) => {
-				calls.push({ path: request.path });
+				calls.push({ name: request.name, path: request.path });
 				const result: RegisterLocalRepositoryResult = {
 					diagnostics: [],
 					registered: true,

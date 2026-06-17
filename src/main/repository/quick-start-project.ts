@@ -5,10 +5,15 @@ import {
 	mkdirSync,
 	rmSync,
 	statSync,
+	writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
 
-import type { QuickStartProjectDiagnostic, QuickStartProjectRequest, QuickStartProjectResult } from '../../shared/ipc/contracts/quick-start';
+import type {
+	QuickStartProjectDiagnostic,
+	QuickStartProjectRequest,
+	QuickStartProjectResult,
+} from '../../shared/ipc/contracts/quick-start';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleRootDirectoryService } from '../root';
 import { firstLine } from './first-line.ts';
@@ -31,14 +36,18 @@ export interface CreateQuickStartProjectServiceOptions {
 const PROJECT_NAME_PATTERN = /^[A-Za-z0-9._-]+$/;
 const PROJECT_NAME_MAX_LENGTH = 100;
 const GIT_INIT_TIMEOUT_MS = 5000;
+const GIT_ADD_TIMEOUT_MS = 5000;
 const GIT_COMMIT_TIMEOUT_MS = 5000;
-const DEFAULT_INITIAL_BRANCH = 'main';
+const GH_PUBLISH_TIMEOUT_MS = 45_000;
+const GITKEEP_FILENAME = '.gitkeep';
 
 /**
- * Builds the service that scaffolds a brand-new local project: a directory
- * under the managed repos root, `git init` on top, and a repository row in
- * SQLite. Any failure rolls back the freshly created directory so the user can
- * retry without manual cleanup.
+ * Builds the service that scaffolds a brand-new project: a directory under the
+ * managed repos root, `git init` plus a `.gitkeep` initial commit, a private
+ * GitHub repository published via `gh`, and a repository row in SQLite. Any
+ * setup failure before the publish step rolls back the freshly created
+ * directory so the user can retry without manual cleanup; a failed publish is
+ * surfaced as a non-fatal warning so the local project still survives.
  * @param options - Service dependencies.
  * @returns A {@link QuickStartProjectService}.
  */
@@ -80,6 +89,10 @@ export function createQuickStartProjectService({
 
 		const parentPath = parentResolution.parentPath;
 		const targetPath = allocateUniqueTargetPath(parentPath, name);
+		// The leaf may be suffixed (`my-app-2`) when the original name already
+		// exists on disk. Use it for the GitHub repo and the registered row so
+		// the folder, remote, and repository name all agree.
+		const projectName = path.basename(targetPath);
 
 		const parentReady = ensureParentDirectory(parentPath);
 		if (parentReady.diagnostic) {
@@ -103,9 +116,25 @@ export function createQuickStartProjectService({
 			return failureResult({ diagnostic: gitInitDiagnostic, targetPath });
 		}
 
-		// Empty initial commit so the default branch has a tip ref. Worktrees
-		// created later (`git worktree add -b X path base`) need a real commit
-		// to branch from; without this the very first `New workspace` fails.
+		// Seed a `.gitkeep` and commit it so the default branch has a real tip
+		// ref. Worktrees created later (`git worktree add -b X path base`) need a
+		// real commit to branch from; the committed file also gives the published
+		// GitHub repository non-empty content to push.
+		const seedDiagnostic = seedGitkeep(targetPath);
+		if (seedDiagnostic) {
+			cleanupTargetDirectory(targetPath);
+			return failureResult({ diagnostic: seedDiagnostic, targetPath });
+		}
+
+		const stageDiagnostic = await runStageGitkeep({
+			cwd: targetPath,
+			localCommandService,
+		});
+		if (stageDiagnostic) {
+			cleanupTargetDirectory(targetPath);
+			return failureResult({ diagnostic: stageDiagnostic, targetPath });
+		}
+
 		const initialCommitDiagnostic = await runInitialCommit({
 			cwd: targetPath,
 			localCommandService,
@@ -118,8 +147,24 @@ export function createQuickStartProjectService({
 			});
 		}
 
+		// Publish to GitHub so the project has a real `origin` and the workspace
+		// GitHub panel never reports "no git remotes found". Best-effort: a
+		// failure here (offline, `gh` unauthenticated, name already taken) leaves
+		// a usable local repo, so we keep the project and surface a warning rather
+		// than rolling back. Runs before registration so the registration git
+		// probe records the new `origin` URL automatically.
+		const warnings: QuickStartProjectDiagnostic[] = [];
+		const publishWarning = await runPublishToGithub({
+			cwd: targetPath,
+			localCommandService,
+			name: projectName,
+		});
+		if (publishWarning) {
+			warnings.push(publishWarning);
+		}
+
 		const registration = await registrationService.register({
-			name,
+			name: projectName,
 			path: targetPath,
 		});
 		if (!registration.registered || !registration.repository) {
@@ -140,7 +185,7 @@ export function createQuickStartProjectService({
 		}
 
 		return {
-			diagnostics: [],
+			diagnostics: warnings,
 			repository: registration.repository,
 			status: 'success',
 			targetPath,
@@ -291,7 +336,12 @@ function createTargetDirectory(
 	}
 }
 
-/** Runs `git init -b main` inside the freshly created project directory. */
+/**
+ * Runs `git init` inside the freshly created project directory. The branch is
+ * left unspecified so the user's configured `init.defaultBranch` (or git's
+ * built-in default) is used; `gh repo create --push` then adopts that branch as
+ * the GitHub default.
+ */
 async function runGitInit({
 	cwd,
 	localCommandService,
@@ -300,7 +350,7 @@ async function runGitInit({
 	localCommandService: LocalCommandService;
 }): Promise<QuickStartProjectDiagnostic | null> {
 	const result = await localCommandService.run({
-		args: ['init', '-b', DEFAULT_INITIAL_BRANCH],
+		args: ['init'],
 		command: 'git',
 		cwd,
 		maxOutputBytes: 16 * 1024,
@@ -328,10 +378,10 @@ async function runGitInit({
 }
 
 /**
- * Records an empty initial commit so the default branch points at a real
- * object. `git worktree add -b <branch> <path> <base>` requires `<base>` to
- * resolve to a commit — a bare `git init` repo doesn't, so workspace creation
- * would fail until the user committed something themselves.
+ * Commits the staged `.gitkeep` so the default branch points at a real object.
+ * `git worktree add -b <branch> <path> <base>` requires `<base>` to resolve to
+ * a commit — a bare `git init` repo doesn't, so workspace creation would fail
+ * until the user committed something themselves.
  *
  * `user.name` / `user.email` are passed inline via `-c` so the command works
  * even when the user has no global git identity configured. The values are
@@ -351,7 +401,6 @@ async function runInitialCommit({
 			'-c',
 			'user.email=ensemble@local',
 			'commit',
-			'--allow-empty',
 			'-m',
 			'Initial commit',
 		],
@@ -375,9 +424,123 @@ async function runInitialCommit({
 
 	return {
 		code: 'git-init-failed',
-		message: firstLine(result.stderr) || 'git commit --allow-empty failed.',
+		message: firstLine(result.stderr) || 'git commit failed.',
 		path: cwd,
 		severity: 'error',
+	};
+}
+
+/** Writes an empty `.gitkeep` so the initial commit has real content to track. */
+function seedGitkeep(targetPath: string): QuickStartProjectDiagnostic | null {
+	try {
+		writeFileSync(path.join(targetPath, GITKEEP_FILENAME), '');
+		return null;
+	} catch (error) {
+		return {
+			code: 'git-init-failed',
+			message:
+				error instanceof Error
+					? error.message
+					: `Failed to create ${GITKEEP_FILENAME}.`,
+			path: targetPath,
+			severity: 'error',
+		};
+	}
+}
+
+/** Stages the seeded `.gitkeep` ahead of the initial commit. */
+async function runStageGitkeep({
+	cwd,
+	localCommandService,
+}: {
+	cwd: string;
+	localCommandService: LocalCommandService;
+}): Promise<QuickStartProjectDiagnostic | null> {
+	const result = await localCommandService.run({
+		args: ['add', GITKEEP_FILENAME],
+		command: 'git',
+		cwd,
+		maxOutputBytes: 16 * 1024,
+		timeoutMs: GIT_ADD_TIMEOUT_MS,
+	});
+
+	if (result.status === 'success') {
+		return null;
+	}
+
+	if (result.failure?.code === 'command-not-found') {
+		return {
+			code: 'git-not-installed',
+			message: 'git was not found in PATH. Install git, then retry.',
+			severity: 'error',
+		};
+	}
+
+	return {
+		code: 'git-init-failed',
+		message: firstLine(result.stderr) || 'git add .gitkeep failed.',
+		path: cwd,
+		severity: 'error',
+	};
+}
+
+/**
+ * Publishes the freshly committed repository to GitHub via `gh repo create`,
+ * wiring up an `origin` remote and pushing the initial commit. Best-effort: any
+ * failure is returned as a non-fatal warning so the local project survives.
+ *
+ * `--source` makes `gh` create the remote and push from the local repo;
+ * `--remote origin` fixes the remote name the workspace GitHub panel expects;
+ * `--private` keeps new projects out of public view by default.
+ */
+async function runPublishToGithub({
+	cwd,
+	localCommandService,
+	name,
+}: {
+	cwd: string;
+	localCommandService: LocalCommandService;
+	name: string;
+}): Promise<QuickStartProjectDiagnostic | null> {
+	const result = await localCommandService.run({
+		args: [
+			'repo',
+			'create',
+			name,
+			'--private',
+			'--source',
+			cwd,
+			'--remote',
+			'origin',
+			'--push',
+		],
+		command: 'gh',
+		cwd,
+		maxOutputBytes: 64 * 1024,
+		timeoutMs: GH_PUBLISH_TIMEOUT_MS,
+	});
+
+	if (result.status === 'success') {
+		return null;
+	}
+
+	if (result.failure?.code === 'command-not-found') {
+		return {
+			code: 'publish-failed',
+			message:
+				'GitHub CLI (gh) was not found in PATH; the project was created locally without a GitHub remote.',
+			path: cwd,
+			severity: 'warning',
+		};
+	}
+
+	return {
+		code: 'publish-failed',
+		message:
+			firstLine(result.stderr) ||
+			'Publishing the project to GitHub did not complete. The project was created locally; verify its GitHub remote before pushing.',
+		path: cwd,
+		severity: 'warning',
 	};
 }
 
@@ -404,11 +567,6 @@ function failureResult({
 		status: 'failure',
 		targetPath,
 	};
-}
-
-/** Surfaces the configured initial branch name (so renderer + tests can show it). */
-export function getQuickStartInitialBranch(): string {
-	return DEFAULT_INITIAL_BRANCH;
 }
 
 /** Surfaces the allowed name pattern for renderer-side preview validation. */

@@ -83,7 +83,7 @@ function gitInitSuccess(request: LocalCommandRequest): LocalCommandResult {
 	};
 }
 
-function gitInitFailure(
+function commandFailure(
 	request: LocalCommandRequest,
 	failureCode: 'command-not-found' | 'nonzero-exit',
 	stderr: string,
@@ -158,19 +158,94 @@ test('create scaffolds a folder, runs git init, and registers the repo', async (
 	assert.equal(result.repository?.name, 'my-app');
 	assert.equal(result.targetPath, path.join(repositoriesPath, 'my-app'));
 	assert.equal(existsSync(path.join(repositoriesPath, 'my-app')), true);
-	assert.equal(calls.length, 2);
+	assert.deepEqual(result.diagnostics, []);
+	assert.equal(
+		existsSync(path.join(repositoriesPath, 'my-app', '.gitkeep')),
+		true,
+	);
+	assert.equal(calls.length, 4);
 	assert.equal(calls[0]?.command, 'git');
-	assert.deepEqual(Array.from(calls[0]?.args ?? []), ['init', '-b', 'main']);
+	assert.deepEqual(Array.from(calls[0]?.args ?? []), ['init']);
 	assert.equal(calls[1]?.command, 'git');
-	assert.deepEqual(Array.from(calls[1]?.args ?? []).slice(-3), [
-		'--allow-empty',
+	assert.deepEqual(Array.from(calls[1]?.args ?? []), ['add', '.gitkeep']);
+	assert.equal(calls[2]?.command, 'git');
+	assert.deepEqual(Array.from(calls[2]?.args ?? []).slice(-3), [
+		'commit',
 		'-m',
 		'Initial commit',
+	]);
+	assert.equal(calls[3]?.command, 'gh');
+	assert.deepEqual(Array.from(calls[3]?.args ?? []), [
+		'repo',
+		'create',
+		'my-app',
+		'--private',
+		'--source',
+		path.join(repositoriesPath, 'my-app'),
+		'--remote',
+		'origin',
+		'--push',
 	]);
 	assert.equal(
 		registration.calls[0]?.path,
 		path.join(repositoriesPath, 'my-app'),
 	);
+});
+
+test('create keeps the project and warns when publishing to GitHub fails', async (t) => {
+	const { repositoriesPath } = createWorkspace(t);
+	const calls: LocalCommandRequest[] = [];
+	const registration = registrationStub(path.join(repositoriesPath, 'my-app'));
+	const service = createQuickStartProjectService({
+		localCommandService: commandServiceStub({
+			calls,
+			onRun: (request) =>
+				request.command === 'gh'
+					? commandFailure(
+							request,
+							'nonzero-exit',
+							'GraphQL: Name already exists on this account',
+						)
+					: gitInitSuccess(request),
+		}),
+		registrationService: registration.service,
+		rootDirectoryService: rootDirectoryStub(repositoriesPath),
+	});
+
+	const result = await service.create({ name: 'my-app' });
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.repository?.name, 'my-app');
+	assert.equal(result.diagnostics.length, 1);
+	assert.equal(result.diagnostics[0]?.code, 'publish-failed');
+	assert.equal(result.diagnostics[0]?.severity, 'warning');
+	// Best-effort publish: a usable local repo must survive a GitHub failure.
+	assert.equal(existsSync(path.join(repositoriesPath, 'my-app')), true);
+});
+
+test('create warns but still creates the project when gh is not installed', async (t) => {
+	const { repositoriesPath } = createWorkspace(t);
+	const calls: LocalCommandRequest[] = [];
+	const registration = registrationStub(path.join(repositoriesPath, 'my-app'));
+	const service = createQuickStartProjectService({
+		localCommandService: commandServiceStub({
+			calls,
+			onRun: (request) =>
+				request.command === 'gh'
+					? commandFailure(request, 'command-not-found', 'gh: not found')
+					: gitInitSuccess(request),
+		}),
+		registrationService: registration.service,
+		rootDirectoryService: rootDirectoryStub(repositoriesPath),
+	});
+
+	const result = await service.create({ name: 'my-app' });
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.diagnostics[0]?.code, 'publish-failed');
+	assert.equal(result.diagnostics[0]?.severity, 'warning');
+	assert.match(result.diagnostics[0]?.message ?? '', /GitHub CLI/);
+	assert.equal(existsSync(path.join(repositoriesPath, 'my-app')), true);
 });
 
 test('create rejects invalid project names', async (t) => {
@@ -204,9 +279,10 @@ test('create auto-suffixes the target folder when the original name is already o
 
 	const calls: LocalCommandRequest[] = [];
 	const suffixed = path.join(repositoriesPath, 'my-app-2');
+	const registration = registrationStub(suffixed);
 	const service = createQuickStartProjectService({
 		localCommandService: commandServiceStub({ calls, onRun: gitInitSuccess }),
-		registrationService: registrationStub(suffixed).service,
+		registrationService: registration.service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
 	});
 
@@ -214,6 +290,14 @@ test('create auto-suffixes the target folder when the original name is already o
 	assert.equal(result.status, 'success');
 	assert.equal(result.targetPath, suffixed);
 	assert.equal(existsSync(suffixed), true);
+	// Folder, GitHub repo, and registered name must all agree on the suffix.
+	assert.equal(registration.calls[0]?.name, 'my-app-2');
+	const ghCall = calls.find((call) => call.command === 'gh');
+	assert.deepEqual(Array.from(ghCall?.args ?? []).slice(0, 3), [
+		'repo',
+		'create',
+		'my-app-2',
+	]);
 });
 
 test('create rolls back the directory when git init fails', async (t) => {
@@ -223,7 +307,7 @@ test('create rolls back the directory when git init fails', async (t) => {
 		localCommandService: commandServiceStub({
 			calls,
 			onRun: (request) =>
-				gitInitFailure(request, 'nonzero-exit', 'fatal: boom'),
+				commandFailure(request, 'nonzero-exit', 'fatal: boom'),
 		}),
 		registrationService: registrationStub(path.join(repositoriesPath, 'my-app'))
 			.service,
@@ -244,7 +328,7 @@ test('create reports git-not-installed when git is missing', async (t) => {
 		localCommandService: commandServiceStub({
 			calls,
 			onRun: (request) =>
-				gitInitFailure(request, 'command-not-found', 'no git'),
+				commandFailure(request, 'command-not-found', 'no git'),
 		}),
 		registrationService: registrationStub(path.join(repositoriesPath, 'my-app'))
 			.service,

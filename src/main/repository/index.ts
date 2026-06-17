@@ -93,7 +93,6 @@ export type {
 } from './quick-start-project.ts';
 export {
 	createQuickStartProjectService,
-	getQuickStartInitialBranch,
 	getQuickStartNameRules,
 } from './quick-start-project.ts';
 export type {
