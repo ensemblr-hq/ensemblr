@@ -8,6 +8,7 @@ import type {
 	SessionTabState,
 	WorkbenchShellProps,
 } from '@/renderer/types/workbench-shell';
+import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 import {
 	ReviewFilePreviewOpenerProvider,
 	WorkspaceFileDiffOpenerProvider,
@@ -54,8 +55,8 @@ export function WorkspaceWorkbenchContent({
 	const dock = useDockController();
 	const { openWorkspaceFileDiffTab, openFilePreviewTab } = sessionNavigation;
 	const openWorkspaceFileDiff = useCallback(
-		(filePath: string) => {
-			void openWorkspaceFileDiffTab({ filePath }).then((result) => {
+		(filePath: string, scope?: WorkspaceGitDiffScope) => {
+			void openWorkspaceFileDiffTab({ filePath, scope }).then((result) => {
 				if (result) {
 					onSessionTabChange(result.chatTabId);
 				}

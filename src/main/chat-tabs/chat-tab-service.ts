@@ -4,6 +4,10 @@ import {
 	CHAT_TAB_LIMIT,
 	CHAT_TAB_LIMIT_ERROR_CODE,
 } from '../../shared/ipc/contracts/chat-tab.ts';
+import {
+	parseWorkspaceGitDiffScope,
+	serializeWorkspaceGitDiffScope,
+} from '../../shared/ipc/contracts/workspace-git.ts';
 import { resolveSessionSummaryPath } from '../pi-agent/session-summary-writer.ts';
 import {
 	type EnsembleDatabaseService,
@@ -219,14 +223,24 @@ function isEmptyChatTab(tab: ChatTabRow): boolean {
 	return tab.piSessionId === null;
 }
 
-/** Identity of a non-chat tab's subject: a file path or a turn id. */
+/**
+ * Identity of a non-chat tab's subject. Diff tabs are keyed by their diff scope
+ * *and* file path, so the same file viewed at the working tree, in a specific
+ * commit, and across the whole branch each get their own tab instead of
+ * stealing focus from one another. Turn diffs (no file path) key on the turn id.
+ */
 function readMetadataSubject(
 	metadata: Record<string, unknown> | undefined,
 ): string | null {
-	const candidate = metadata?.filePath ?? metadata?.turnId;
-	return typeof candidate === 'string' && candidate.length > 0
-		? candidate
-		: null;
+	const filePath = metadata?.filePath;
+	if (typeof filePath === 'string' && filePath.length > 0) {
+		const scopeKey = serializeWorkspaceGitDiffScope(
+			parseWorkspaceGitDiffScope(metadata?.diffScope),
+		);
+		return `${scopeKey}::${filePath}`;
+	}
+	const turnId = metadata?.turnId;
+	return typeof turnId === 'string' && turnId.length > 0 ? turnId : null;
 }
 
 function readSummaryTitleFromMetadata(

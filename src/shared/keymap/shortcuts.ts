@@ -151,6 +151,11 @@ export const SHORTCUTS = {
 		bindings: [{ key: 'w', modifiers: ['mod'] }],
 		accelerator: 'CommandOrControl+W',
 	},
+	'changes.uncommitted': {
+		description: 'Show uncommitted changes',
+		scope: 'global',
+		bindings: [{ key: 'u', modifiers: ['mod', 'alt'] }],
+	},
 } as const satisfies Record<string, ShortcutDef>;
 
 export type ShortcutId = keyof typeof SHORTCUTS;

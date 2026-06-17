@@ -1,6 +1,9 @@
 import { atomWithStorage } from 'jotai/utils';
 import type { DockTabId, ReviewPanelTab } from '@/renderer/types/workbench';
-import type { ChangesViewMode } from '@/renderer/types/workbench-shell';
+import type {
+	ChangesSource,
+	ChangesViewMode,
+} from '@/renderer/types/workbench-shell';
 
 const workspaceStorageOptions = { getOnInit: true };
 
@@ -8,6 +11,19 @@ const workspaceStorageOptions = { getOnInit: true };
 export const changesViewModeAtom = atomWithStorage<ChangesViewMode>(
 	'ensemble_workspace_changes_view_mode',
 	'list',
+	undefined,
+	workspaceStorageOptions,
+);
+
+/**
+ * Persisted Changes-tab filter source, keyed by workspace id. Absent entries
+ * default to "all changes" at the call site.
+ */
+export const changesSourceByWorkspaceAtom = atomWithStorage<
+	Record<string, ChangesSource>
+>(
+	'ensemble_workspace_changes_source_by_workspace',
+	{},
 	undefined,
 	workspaceStorageOptions,
 );
