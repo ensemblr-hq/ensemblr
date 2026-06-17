@@ -14,10 +14,11 @@ import type {
 	LocalCommandService,
 } from '../../src/main/commands/local-command';
 import {
-	createWorkspaceGitService,
+	parseNameStatus,
 	parseNumstat,
 	parsePorcelainStatus,
-} from '../../src/main/workspace-git/workspace-git-status.ts';
+} from '../../src/main/workspace-git/workspace-git-parsers.ts';
+import { createWorkspaceGitService } from '../../src/main/workspace-git/workspace-git-status.ts';
 
 const fixedNow = () => new Date('2026-06-11T12:00:00.000Z');
 
@@ -379,4 +380,176 @@ test('getFileDiff rejects escaping paths', async () => {
 
 	assert.equal(result.error?.code, 'invalid-path');
 	assert.equal(calls.length, 0);
+});
+
+test('parseNameStatus classifies entries and reads rename paths', () => {
+	const stdout = `${[
+		'M',
+		'src/app.ts',
+		'A',
+		'src/new.ts',
+		'D',
+		'src/gone.ts',
+		'R100',
+		'src/old.ts',
+		'src/renamed.ts',
+		'T',
+		'src/mode.ts',
+	].join('\0')}\0`;
+	const entries = parseNameStatus(stdout);
+
+	assert.deepEqual(entries, [
+		{ path: 'src/app.ts', status: 'modified' },
+		{ path: 'src/new.ts', status: 'added' },
+		{ path: 'src/gone.ts', status: 'deleted' },
+		{ path: 'src/renamed.ts', renamedFrom: 'src/old.ts', status: 'renamed' },
+		// A type-change (T) is surfaced as a modification.
+		{ path: 'src/mode.ts', status: 'modified' },
+	]);
+});
+
+test("getStatus (real git) returns a single commit's files for commit scope", async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-commit-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
+	await git('init', '-q');
+	await git('config', 'user.email', 'test@example.com');
+	await git('config', 'user.name', 'Test');
+	await writeFile(path.join(dir, 'a.ts'), 'one\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'first');
+	// Second commit modifies a.ts and adds b.ts.
+	await writeFile(path.join(dir, 'a.ts'), 'one\nmore\n');
+	await writeFile(path.join(dir, 'b.ts'), 'two\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'second');
+
+	const headHash = (await git('rev-parse', 'HEAD')).stdout.trim();
+	const firstHash = (await git('rev-parse', 'HEAD~1')).stdout.trim();
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+
+	const head = await service.getStatus({
+		scope: { commitHash: headHash, kind: 'commit' },
+		workspaceCwd: dir,
+	});
+	assert.equal(head.error, undefined);
+	assert.deepEqual(head.files.map((file) => [file.path, file.status]).sort(), [
+		['a.ts', 'modified'],
+		['b.ts', 'added'],
+	]);
+
+	// The root commit diffs against the empty tree, so its file reads as added.
+	const root = await service.getStatus({
+		scope: { commitHash: firstHash, kind: 'commit' },
+		workspaceCwd: dir,
+	});
+	assert.deepEqual(
+		root.files.map((file) => [file.path, file.status]),
+		[['a.ts', 'added']],
+	);
+
+	// A file diff scoped to the commit shows that commit's own hunk.
+	const diff = await service.getFileDiff({
+		path: 'a.ts',
+		scope: { commitHash: headHash, kind: 'commit' },
+		workspaceCwd: dir,
+	});
+	assert.ok(diff.patch?.includes('+more'));
+});
+
+test('getStatus (real git) branch scope spans commits + uncommitted', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-branch-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
+	await git('init', '-q');
+	await git('config', 'user.email', 'test@example.com');
+	await git('config', 'user.name', 'Test');
+	await writeFile(path.join(dir, 'base.ts'), 'base\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'base');
+	const baseBranch = (
+		await git('rev-parse', '--abbrev-ref', 'HEAD')
+	).stdout.trim();
+
+	await git('checkout', '-q', '-b', 'feature');
+	await writeFile(path.join(dir, 'feat.ts'), 'feature\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'feat');
+	// Uncommitted tracked edit + a brand-new untracked file.
+	await writeFile(path.join(dir, 'base.ts'), 'base edited\n');
+	await writeFile(path.join(dir, 'untracked.ts'), 'new\n');
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+
+	const branch = await service.getStatus({
+		scope: { baseRef: baseBranch, kind: 'branch' },
+		workspaceCwd: dir,
+	});
+	assert.equal(branch.error, undefined);
+	assert.deepEqual(
+		branch.files.map((file) => [file.path, file.status]).sort(),
+		[
+			['base.ts', 'modified'],
+			['feat.ts', 'added'],
+			['untracked.ts', 'untracked'],
+		],
+	);
+
+	// An unresolvable base ref degrades to the working-tree (uncommitted) set.
+	const fallback = await service.getStatus({
+		scope: { baseRef: 'no-such-ref', kind: 'branch' },
+		workspaceCwd: dir,
+	});
+	assert.deepEqual(fallback.files.map((file) => file.path).sort(), [
+		'base.ts',
+		'untracked.ts',
+	]);
+});
+
+test('getCommits (real git) scopes to branch commits when given a base ref', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-log-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
+	await git('init', '-q');
+	await git('config', 'user.email', 'test@example.com');
+	await git('config', 'user.name', 'Test');
+	await writeFile(path.join(dir, 'base.ts'), 'base\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'initial');
+	const baseBranch = (
+		await git('rev-parse', '--abbrev-ref', 'HEAD')
+	).stdout.trim();
+
+	await git('checkout', '-q', '-b', 'feature');
+	await writeFile(path.join(dir, 'a.ts'), 'a\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'feat one');
+	await writeFile(path.join(dir, 'b.ts'), 'b\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'feat two');
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+
+	// Scoped to the branch: only the two feature commits, not the base/initial.
+	const scoped = await service.getCommits({
+		baseRef: baseBranch,
+		workspaceCwd: dir,
+	});
+	assert.deepEqual(
+		scoped.commits.map((commit) => commit.subject),
+		['feat two', 'feat one'],
+	);
+
+	// Without a base ref, the whole history (including initial) is returned.
+	const all = await service.getCommits({ workspaceCwd: dir });
+	assert.deepEqual(
+		all.commits.map((commit) => commit.subject),
+		['feat two', 'feat one', 'initial'],
+	);
 });

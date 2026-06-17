@@ -1,6 +1,7 @@
 export {
 	activeDockTabByWorkspaceAtom,
 	activeReviewTabByWorkspaceAtom,
+	changesSourceByWorkspaceAtom,
 	changesViewModeAtom,
 	rightSidebarCollapsedAtom,
 	rightSidebarSizePercentAtom,

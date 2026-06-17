@@ -12,26 +12,30 @@ import { CodeBlockContent } from '@/renderer/components/code-block';
 import { Button } from '@/renderer/components/ui/button';
 import { formatFileDiffContext } from '@/renderer/lib/workbench/review-context';
 import { useComposerInsert } from '@/renderer/state/composer';
+import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
 import { FileCommentSection } from './file-comment-section';
 
 /**
- * Read-only unified diff surface for a single working-tree file, shown when a
- * `kind: 'diff'` tab carries a `filePath` instead of a checkpoint turn. Local
- * review comments (SQLite) attach to the file/line here and are clearly
- * labelled as Ensemble-local, never GitHub state.
+ * Read-only unified diff surface for a single file, shown when a `kind: 'diff'`
+ * tab carries a `filePath` instead of a checkpoint turn. The optional `scope`
+ * selects which diff to show (working tree by default, a commit, or the whole
+ * branch). Local review comments (SQLite) attach to the file/line here and are
+ * clearly labelled as Ensemble-local, never GitHub state.
  */
 export function WorkspaceFileDiffPanel({
 	filePath,
+	scope,
 	workspaceCwd,
 	workspaceId,
 }: {
 	filePath: string | null;
+	scope?: WorkspaceGitDiffScope;
 	workspaceCwd: string | null;
 	workspaceId: string;
 }) {
 	const { data, isError, isPending } = useQuery(
-		workspaceFileDiffQuery({ filePath, workspaceCwd }),
+		workspaceFileDiffQuery({ filePath, scope, workspaceCwd }),
 	);
 	const insertIntoComposer = useComposerInsert();
 

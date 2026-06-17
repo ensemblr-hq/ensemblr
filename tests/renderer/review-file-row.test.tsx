@@ -39,6 +39,7 @@ function makeActions(
 	return {
 		copyTarget: undefined,
 		invokeTarget: async () => {},
+		isDiscardable: () => true,
 		onDiscardFile: () => {},
 		openDiff: () => {},
 		openInTargets: [],
@@ -159,6 +160,18 @@ test('every row exposes a Discard affordance regardless of open targets', () => 
 	const markup = renderRow(modifiedFile, { showPath: true });
 
 	expect(markup).toContain(
+		'Discard changes to src/main/ipc/handlers/workspace-files.ts',
+	);
+});
+
+test('a non-discardable file (commit/branch view) hides the Discard affordance', () => {
+	const markup = renderRow(
+		modifiedFile,
+		{ showPath: true },
+		makeActions({ isDiscardable: () => false }),
+	);
+
+	expect(markup).not.toContain(
 		'Discard changes to src/main/ipc/handlers/workspace-files.ts',
 	);
 });

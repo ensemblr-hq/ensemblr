@@ -17,10 +17,16 @@ export interface ReviewFileActions {
 	copyTarget: WorkspaceOpenTarget | undefined;
 	/** Runs the chosen open-in/copy target against a workspace-relative file path. */
 	invokeTarget: OpenTargetsState['invokeTarget'];
-	/** Opens (or re-focuses) the working-tree diff for a file. `null` outside a conversation. */
+	/** Opens (or re-focuses) the diff for a file at the active source's scope. `null` outside a conversation. */
 	openDiff: WorkspaceFileDiffOpener | null;
 	/** Discards the working-tree changes for a single file. */
 	onDiscardFile: (filePath: string) => void;
+	/**
+	 * Whether a file can be discarded in the current view. Only working-tree
+	 * (uncommitted) files revert cleanly; committed-only files in the branch or
+	 * a specific-commit view are not discardable.
+	 */
+	isDiscardable: (filePath: string) => boolean;
 }
 
 const ReviewFileActionsContext = createContext<ReviewFileActions | null>(null);

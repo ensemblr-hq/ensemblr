@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 
-import { parseWorkspaceCommits } from '../../src/main/workspace-git/workspace-git-status';
+import { parseWorkspaceCommits } from '../../src/main/workspace-git/workspace-git-parsers';
 
 const FIELD = '\x1f';
 const RECORD = '\x1e';

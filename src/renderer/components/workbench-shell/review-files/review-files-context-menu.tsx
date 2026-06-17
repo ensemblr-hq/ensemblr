@@ -31,14 +31,21 @@ export function ReviewFilesContextMenuContent({
 }: {
 	target: ReviewFileMenuTarget | null;
 }) {
-	const { copyTarget, invokeTarget, onDiscardFile, openDiff, openInTargets } =
-		useReviewFileActions();
+	const {
+		copyTarget,
+		invokeTarget,
+		isDiscardable,
+		onDiscardFile,
+		openDiff,
+		openInTargets,
+	} = useReviewFileActions();
 
 	if (!target) {
 		return null;
 	}
 
 	const path = target.path;
+	const canDiscard = isDiscardable(path);
 	const invoke = (targetId: Parameters<typeof invokeTarget>[0]) =>
 		void invokeTarget(targetId, {
 			relativePath: path,
@@ -96,14 +103,18 @@ export function ReviewFilesContextMenuContent({
 					<span className='min-w-0 flex-1'>Copy path</span>
 				</ContextMenuItem>
 			) : null}
-			<ContextMenuSeparator />
-			<ContextMenuItem
-				className='h-8 gap-2 px-2 text-[0.8125rem]'
-				onSelect={() => onDiscardFile(path)}
-			>
-				<Undo2Icon aria-hidden='true' className='text-muted-foreground' />
-				<span className='min-w-0 flex-1'>Discard changes</span>
-			</ContextMenuItem>
+			{canDiscard ? (
+				<>
+					<ContextMenuSeparator />
+					<ContextMenuItem
+						className='h-8 gap-2 px-2 text-[0.8125rem]'
+						onSelect={() => onDiscardFile(path)}
+					>
+						<Undo2Icon aria-hidden='true' className='text-muted-foreground' />
+						<span className='min-w-0 flex-1'>Discard changes</span>
+					</ContextMenuItem>
+				</>
+			) : null}
 		</ContextMenuContent>
 	);
 }

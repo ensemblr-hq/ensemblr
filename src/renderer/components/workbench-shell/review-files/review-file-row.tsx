@@ -57,12 +57,19 @@ export function ReviewFileRow({
 	level?: number;
 	showPath: boolean;
 }) {
-	const { copyTarget, invokeTarget, onDiscardFile, openDiff, openInTargets } =
-		useReviewFileActions();
+	const {
+		copyTarget,
+		invokeTarget,
+		isDiscardable,
+		onDiscardFile,
+		openDiff,
+		openInTargets,
+	} = useReviewFileActions();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
 
 	const fileName = getReviewFileName(file.path);
 	const hasOpenInMenu = openInTargets.length > 0 || Boolean(copyTarget);
+	const canDiscard = isDiscardable(file.path);
 	const openThisDiff = openDiff ? () => openDiff(file.path) : undefined;
 
 	return (
@@ -112,20 +119,22 @@ export function ReviewFileRow({
 					isMenuOpen ? 'flex' : 'hidden group-hover:flex',
 				)}
 			>
-				<Tooltip>
-					<TooltipTrigger asChild>
-						<Button
-							aria-label={`Discard changes to ${file.path}`}
-							className='text-muted-foreground hover:text-foreground'
-							onClick={() => onDiscardFile(file.path)}
-							size='icon-xs'
-							variant='ghost'
-						>
-							<Undo2Icon />
-						</Button>
-					</TooltipTrigger>
-					<TooltipContent>Discard changes</TooltipContent>
-				</Tooltip>
+				{canDiscard ? (
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<Button
+								aria-label={`Discard changes to ${file.path}`}
+								className='text-muted-foreground hover:text-foreground'
+								onClick={() => onDiscardFile(file.path)}
+								size='icon-xs'
+								variant='ghost'
+							>
+								<Undo2Icon />
+							</Button>
+						</TooltipTrigger>
+						<TooltipContent>Discard changes</TooltipContent>
+					</Tooltip>
+				) : null}
 				{hasOpenInMenu ? (
 					<ReviewFileOpenInMenu
 						copyTarget={copyTarget}

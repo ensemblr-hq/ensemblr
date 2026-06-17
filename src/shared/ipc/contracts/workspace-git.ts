@@ -33,7 +33,71 @@ export interface WorkspaceGitChangeSummaryWire {
 	files: number;
 }
 
+/**
+ * What a status/diff request compares against:
+ *
+ *   - `working-tree`: the working tree (staged + unstaged + untracked) vs HEAD —
+ *     the uncommitted change set. This is the default when no scope is sent.
+ *   - `commit`: the changes a single commit introduced (`<hash>^..<hash>`, or the
+ *     empty tree for a root commit).
+ *   - `branch`: every change on this branch — the diff from the fork point
+ *     (`merge-base(baseRef, HEAD)`) to the working tree, so committed-on-branch
+ *     changes and uncommitted edits both appear. Falls back to `working-tree`
+ *     when no merge-base can be resolved.
+ */
+export type WorkspaceGitDiffScope =
+	| { kind: 'working-tree' }
+	| { commitHash: string; kind: 'commit' }
+	| { baseRef: string; kind: 'branch' };
+
+/**
+ * Stable short key for a diff scope. Backs query-cache keys and diff-tab
+ * identity so two scopes of the same file never collide. Keep the output
+ * deterministic — it is compared verbatim across the IPC boundary.
+ */
+export function serializeWorkspaceGitDiffScope(
+	scope: WorkspaceGitDiffScope | undefined,
+): string {
+	if (!scope || scope.kind === 'working-tree') {
+		return 'working-tree';
+	}
+	if (scope.kind === 'commit') {
+		return `commit:${scope.commitHash}`;
+	}
+	return `branch:${scope.baseRef}`;
+}
+
+/**
+ * Reads a diff scope from untyped persisted/wire data (e.g. tab metadata),
+ * returning `undefined` when the shape is not a recognized scope. The narrowed
+ * result drops any extra keys, so a round-tripped scope stays canonical.
+ */
+export function parseWorkspaceGitDiffScope(
+	value: unknown,
+): WorkspaceGitDiffScope | undefined {
+	if (!value || typeof value !== 'object') {
+		return undefined;
+	}
+	const scope = value as {
+		baseRef?: unknown;
+		commitHash?: unknown;
+		kind?: unknown;
+	};
+	if (scope.kind === 'commit' && typeof scope.commitHash === 'string') {
+		return { commitHash: scope.commitHash, kind: 'commit' };
+	}
+	if (scope.kind === 'branch' && typeof scope.baseRef === 'string') {
+		return { baseRef: scope.baseRef, kind: 'branch' };
+	}
+	if (scope.kind === 'working-tree') {
+		return { kind: 'working-tree' };
+	}
+	return undefined;
+}
+
 export interface GetWorkspaceGitStatusRequest {
+	/** Defaults to the working tree (uncommitted changes) when omitted. */
+	scope?: WorkspaceGitDiffScope;
 	workspaceCwd: string;
 }
 
@@ -53,6 +117,8 @@ export interface GetWorkspaceGitStatusResult {
 
 export interface GetWorkspaceFileDiffRequest {
 	path: string;
+	/** Defaults to the working tree (file vs HEAD) when omitted. */
+	scope?: WorkspaceGitDiffScope;
 	workspaceCwd: string;
 }
 
@@ -88,6 +154,12 @@ export interface WorkspaceCommitWire {
 }
 
 export interface GetWorkspaceCommitsRequest {
+	/**
+	 * Base branch to scope the log to this workspace's own commits
+	 * (`merge-base(baseRef, HEAD)..HEAD`). Omitted or unresolvable falls back to
+	 * the full HEAD history.
+	 */
+	baseRef?: string;
 	/** Max commits to return; clamped server-side. Defaults to a small page. */
 	limit?: number;
 	workspaceCwd: string;

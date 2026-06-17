@@ -127,6 +127,7 @@ export function WorkspaceConversationContent({
 				activeSession.filePath ? (
 					<WorkspaceFileDiffPanel
 						filePath={activeSession.filePath}
+						scope={activeSession.diffScope ?? undefined}
 						workspaceCwd={activeWorkspace.pathLabel ?? null}
 						workspaceId={activeWorkspace.id}
 					/>

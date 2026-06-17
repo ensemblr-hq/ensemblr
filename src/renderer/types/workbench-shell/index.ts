@@ -7,6 +7,7 @@
  * review, pull requests — see `types/workbench/`.
  */
 export type {
+	ChangesSource,
 	ChangesViewMode,
 	SessionTabActions,
 	WorkbenchDockActions,
