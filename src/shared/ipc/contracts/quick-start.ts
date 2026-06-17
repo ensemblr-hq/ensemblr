@@ -11,6 +11,7 @@ export type QuickStartProjectDiagnosticCode =
 	| 'name-already-in-use'
 	| 'name-invalid'
 	| 'name-required'
+	| 'publish-failed'
 	| 'register-failed';
 
 export type QuickStartProjectDiagnosticSeverity = 'error' | 'info' | 'warning';

@@ -106,14 +106,22 @@ export function useQuickStartFlow({
 					repositoryId: repository.id,
 					router,
 				});
+				const warnings = result.diagnostics.filter(
+					(diagnostic) => diagnostic.severity === 'warning',
+				);
 				if (seed.status === 'success') {
 					toast.success(`Created project ${repository.name}.`);
-					onSuccess?.();
-					return result;
+				} else {
+					toast.error(
+						seed.error ?? `Created ${repository.name}, opening failed.`,
+					);
 				}
-				toast.error(
-					seed.error ?? `Created ${repository.name}, opening failed.`,
-				);
+				// Surface publish (and any future) warnings regardless of whether
+				// opening the first workspace succeeded — the project may have no
+				// GitHub remote either way.
+				for (const warning of warnings) {
+					toast.warning(warning.message);
+				}
 				onSuccess?.();
 				return result;
 			}
