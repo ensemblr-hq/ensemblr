@@ -47,3 +47,40 @@ export function decideActiveClose(
 	}
 	return { kind: 'close', activeId: active.id };
 }
+
+/** Whether closing a tab needs the running-chat confirmation, and what to cancel. */
+export interface RunningCloseTarget {
+	/** True when the target tab's agent is actively running. */
+	isRunning: boolean;
+	/** Pi session to cancel on confirm, or `null` when the tab has none. */
+	piSessionId: string | null;
+}
+
+/**
+ * Resolves whether closing the tab `targetId` should prompt the running-chat
+ * confirmation, and which Pi session to cancel when it does.
+ *
+ * The active tab uses the composer's live `isActiveStreaming` flag — it flips
+ * on a pending submit/stop mutation before the persisted runtime status catches
+ * up, so it is the truer signal for the tab the user is looking at. Background
+ * tabs have no live composer, so they fall back to their persisted
+ * `status === 'working'` snapshot. An unknown target is treated as not running.
+ */
+export function resolveRunningCloseTarget({
+	activeSessionId,
+	isActiveStreaming,
+	tabs,
+	targetId,
+}: {
+	activeSessionId: string;
+	isActiveStreaming: boolean;
+	tabs: readonly SessionTabModel[];
+	targetId: string;
+}): RunningCloseTarget {
+	const tab = tabs.find((candidate) => candidate.id === targetId);
+	const isRunning =
+		targetId === activeSessionId
+			? isActiveStreaming
+			: tab?.status === 'working';
+	return { isRunning, piSessionId: tab?.piSessionId ?? null };
+}

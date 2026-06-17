@@ -20,6 +20,8 @@ export {
 	lastWorkspaceSelectionAtom,
 } from './selection-atoms';
 export { readStoredWorkspaceSelection } from './selection-storage';
+export type { RunningCloseTarget } from './session-tab-close';
+export { resolveRunningCloseTarget } from './session-tab-close';
 export type {
 	CloseSessionTabHandlerResult,
 	OpenSessionTabHandlerResult,
@@ -33,3 +35,5 @@ export {
 	orderedProjectIdsAtom,
 	pinnedWorkspaceIdsAtom,
 } from './structure-atoms';
+export type { CloseRunningChatGuard } from './use-close-running-chat-guard';
+export { useCloseRunningChatGuard } from './use-close-running-chat-guard';

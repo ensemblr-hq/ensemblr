@@ -37,6 +37,7 @@
 		"test:model-names": "bun test tests/renderer/model-display-name.test.ts",
 		"test:terminal-tabs": "bun test tests/renderer/terminal-tabs.test.ts",
 		"test:session-tab-close": "bun test tests/renderer/session-tab-close.test.ts",
+		"test:close-guard": "bun test tests/renderer/close-running-chat-guard.test.ts",
 		"test:renderer": "bun test tests/renderer/*.test.tsx",
 		"test:repository": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/register-repository.test.ts tests/main/import-local-repository.test.ts tests/main/clone-repository.test.ts tests/main/list-github-repositories.test.ts tests/main/quick-start-project.test.ts",
 		"test:workspace": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/create-workspace.test.ts",
