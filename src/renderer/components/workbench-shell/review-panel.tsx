@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { useAtom } from 'jotai';
 import {
 	CheckIcon,
@@ -7,9 +8,11 @@ import {
 	MoreVerticalIcon,
 	RefreshCwIcon,
 	SearchIcon,
+	Undo2Icon,
 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
+import { workspaceCommitsQuery } from '@/renderer/api/ensemble';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -33,6 +36,10 @@ import { ChecksPanel } from './checks-panel/checks-panel';
 import { useReviewActions } from './review-actions/review-actions-context';
 import { AllFilesList } from './review-files/all-files-list';
 import { AllFilesSearchDialog } from './review-files/all-files-search-dialog';
+import {
+	DiscardChangesDialog,
+	type DiscardChangesTarget,
+} from './review-files/discard-changes-dialog';
 import { ReviewFileList } from './review-files/review-file-list';
 
 /** Tabbed review surface for files, changes, and checks. */
@@ -68,6 +75,39 @@ export function ReviewPanel({
 		enabled: activeTab === 'files',
 	});
 
+	const [discardTarget, setDiscardTarget] =
+		useState<DiscardChangesTarget | null>(null);
+
+	// Route every discard through the confirm dialog rather than reverting
+	// inline: the git operation is irreversible, so it stays behind an explicit,
+	// cancelable step.
+	const handleDiscardFile = useCallback((filePath: string) => {
+		setDiscardTarget({ fileCount: 1, paths: [filePath], title: filePath });
+	}, []);
+
+	const changedPaths = useMemo(
+		() => workspace.reviewFiles.map((file) => file.path),
+		[workspace.reviewFiles],
+	);
+	const handleDiscardAll = useCallback(() => {
+		if (!changedPaths.length) {
+			return;
+		}
+		setDiscardTarget({
+			fileCount: changedPaths.length,
+			paths: changedPaths,
+			title: `all ${changedPaths.length} changed ${
+				changedPaths.length === 1 ? 'file' : 'files'
+			}`,
+		});
+	}, [changedPaths]);
+
+	const handleDiscardDialogChange = useCallback((open: boolean) => {
+		if (!open) {
+			setDiscardTarget(null);
+		}
+	}, []);
+
 	return (
 		<Tabs
 			className='review-panel h-full min-h-0 gap-0 border-border border-b'
@@ -96,6 +136,7 @@ export function ReviewPanel({
 							current === 'list' ? 'folders' : 'list',
 						)
 					}
+					onDiscardAll={handleDiscardAll}
 					onFileSearchOpen={() => setIsFileSearchOpen(true)}
 					workspace={workspace}
 				/>
@@ -111,7 +152,9 @@ export function ReviewPanel({
 				<ReviewFileList
 					error={workspace.reviewFilesError}
 					files={workspace.reviewFiles}
+					onDiscardFile={handleDiscardFile}
 					viewMode={changesViewMode}
+					workspaceId={workspace.id}
 				/>
 			</TabsContent>
 			<TabsContent className='min-h-0 overflow-hidden' value='checks'>
@@ -122,6 +165,12 @@ export function ReviewPanel({
 				onOpenChange={setIsFileSearchOpen}
 				open={isFileSearchOpen}
 			/>
+			<DiscardChangesDialog
+				onOpenChange={handleDiscardDialogChange}
+				open={discardTarget !== null}
+				target={discardTarget}
+				workspaceCwd={workspace.pathLabel}
+			/>
 		</Tabs>
 	);
 }
@@ -131,12 +180,14 @@ function ReviewPanelActions({
 	activeTab,
 	changesViewMode,
 	onChangesViewModeToggle,
+	onDiscardAll,
 	onFileSearchOpen,
 	workspace,
 }: {
 	activeTab: ReviewPanelTab;
 	changesViewMode: ChangesViewMode;
 	onChangesViewModeToggle: () => void;
+	onDiscardAll: () => void;
 	onFileSearchOpen: () => void;
 	workspace: WorkspaceShellModel;
 }) {
@@ -175,7 +226,10 @@ function ReviewPanelActions({
 								: 'Show changes as folders'}
 						</span>
 					</Button>
-					<ChangesOverflowMenu workspace={workspace} />
+					<ChangesOverflowMenu
+						onDiscardAll={onDiscardAll}
+						workspace={workspace}
+					/>
 				</>
 			) : activeTab === 'files' ? (
 				<Button onClick={onFileSearchOpen} size='icon-sm' variant='ghost'>
@@ -215,14 +269,27 @@ function ChecksRefreshButton() {
 	);
 }
 
-/** Dropdown listing commit ranges and uncommitted-changes options. */
+/** Dropdown listing the working-tree change set and recent commits. */
 function ChangesOverflowMenu({
+	onDiscardAll,
 	workspace,
 }: {
+	onDiscardAll: () => void;
 	workspace: WorkspaceShellModel;
 }) {
+	// Defer the `git log` call until the menu actually opens — there's no reason
+	// to read commits for every workspace the user merely glances at.
+	const [open, setOpen] = useState(false);
+	const hasChanges = workspace.changeSummary.files > 0;
+	const { data, isError, isPending } = useQuery({
+		...workspaceCommitsQuery(workspace.pathLabel),
+		enabled: open && Boolean(workspace.pathLabel),
+	});
+	const commits = data?.commits ?? [];
+	const hasCommitFailure = isError || Boolean(data?.error);
+
 	return (
-		<DropdownMenu>
+		<DropdownMenu onOpenChange={setOpen} open={open}>
 			<DropdownMenuTrigger asChild>
 				<Button size='icon-sm' variant='ghost'>
 					<MoreVerticalIcon />
@@ -241,33 +308,55 @@ function ChangesOverflowMenu({
 								Uncommitted changes
 							</div>
 							<div className='text-muted-foreground text-xs'>
-								{workspace.changeSummary.files} files changed
+								{workspace.changeSummary.files > 0
+									? `${workspace.changeSummary.files} files changed`
+									: 'No uncommitted changes'}
 							</div>
 						</div>
-						<DropdownMenuShortcut>⌥U</DropdownMenuShortcut>
+						<DropdownMenuShortcut>⌥⌘U</DropdownMenuShortcut>
 					</DropdownMenuItem>
 				</div>
 				<DropdownMenuSeparator className='my-0' />
+				<div className='max-h-72 overflow-y-auto p-1'>
+					{hasCommitFailure ? (
+						<div className='px-2 py-2 text-muted-foreground text-xs'>
+							Could not load commits.
+						</div>
+					) : isPending ? (
+						<div className='px-2 py-2 text-muted-foreground text-xs'>
+							Loading commits…
+						</div>
+					) : commits.length ? (
+						commits.map((commit) => (
+							<DropdownMenuItem
+								className='items-start px-2 py-2'
+								key={commit.hash}
+							>
+								<div className='min-w-0'>
+									<div className='truncate font-medium text-sm'>
+										{commit.subject}
+									</div>
+									<div className='truncate text-muted-foreground text-xs'>
+										{commit.shortHash} • {commit.author} • {commit.relativeTime}
+									</div>
+								</div>
+							</DropdownMenuItem>
+						))
+					) : (
+						<div className='px-2 py-2 text-muted-foreground text-xs'>
+							No commits yet.
+						</div>
+					)}
+				</div>
+				<DropdownMenuSeparator className='my-0' />
 				<div className='p-1'>
-					<DropdownMenuItem className='items-start px-2 py-2'>
-						<div className='min-w-0'>
-							<div className='truncate font-medium text-sm'>
-								Refine right sidebar PR header states
-							</div>
-							<div className='truncate text-muted-foreground text-xs'>
-								0dc9887 • Philipp Soldunov • 29m ago
-							</div>
-						</div>
-					</DropdownMenuItem>
-					<DropdownMenuItem className='items-start px-2 py-2'>
-						<div className='min-w-0'>
-							<div className='truncate font-medium text-sm'>
-								THE-102 rework workbench shell
-							</div>
-							<div className='truncate text-muted-foreground text-xs'>
-								4339956 • Philipp Soldunov • 1h ago
-							</div>
-						</div>
+					<DropdownMenuItem
+						className='h-9 gap-2 px-2 text-sm text-status-danger focus:text-status-danger'
+						disabled={!hasChanges}
+						onSelect={onDiscardAll}
+					>
+						<Undo2Icon aria-hidden='true' className='size-4' />
+						<span className='min-w-0 flex-1'>Discard all changes</span>
 					</DropdownMenuItem>
 				</div>
 			</DropdownMenuContent>

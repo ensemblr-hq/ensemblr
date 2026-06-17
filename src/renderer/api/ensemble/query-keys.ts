@@ -77,6 +77,8 @@ export const ensembleQueryKeys = {
 			'settings-resolution',
 			repositoryId ?? '',
 		] as const,
+	workspaceCommits: (workspaceCwd: string) =>
+		[...ensembleQueryKeys.all, 'workspace-commits', workspaceCwd] as const,
 	workspaceFileDiff: (workspaceCwd: string, filePath: string) =>
 		[
 			...ensembleQueryKeys.all,

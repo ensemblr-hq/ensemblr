@@ -1,6 +1,7 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
+import type { DiscardWorkspaceChangesRequest } from '@/shared/ipc/contracts/workspace-git';
 
 import { ensembleQueryKeys, getEnsembleApi } from './query-keys';
 
@@ -48,5 +49,36 @@ export function workspaceFileDiffQuery({
 			filePath ?? '',
 		),
 		staleTime: 5_000,
+	});
+}
+
+/**
+ * Discards working-tree changes for the given workspace-relative paths. Tracked
+ * files revert to HEAD; new/untracked files are removed. Irreversible — gate it
+ * behind a confirmation and invalidate the status + files queries on success.
+ */
+export function discardWorkspaceChanges(
+	request: DiscardWorkspaceChangesRequest,
+) {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:discard-workspace-changes', usesDatabase: false },
+		() => getEnsembleApi().discardWorkspaceChanges(request),
+	);
+}
+
+/** Query options for the workspace's recent commits, newest first. */
+export function workspaceCommitsQuery(workspaceCwd: string | null) {
+	return queryOptions({
+		enabled: !!workspaceCwd,
+		queryFn: () =>
+			profileElectronIpcCall(
+				{ channel: 'ensemble:get-workspace-commits', usesDatabase: false },
+				() =>
+					getEnsembleApi().getWorkspaceCommits({
+						workspaceCwd: workspaceCwd ?? '',
+					}),
+			),
+		queryKey: ensembleQueryKeys.workspaceCommits(workspaceCwd ?? ''),
+		staleTime: 10_000,
 	});
 }

@@ -1,7 +1,20 @@
-import { open } from 'node:fs/promises';
+import { open, rm } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { GetWorkspaceFileDiffRequest, GetWorkspaceFileDiffResult, GetWorkspaceGitStatusRequest, GetWorkspaceGitStatusResult, WorkspaceGitFailureCode, WorkspaceGitFileStatus, WorkspaceGitFileWire } from '../../shared/ipc/contracts/workspace-git';
+import type {
+	DiscardWorkspaceChangesRequest,
+	DiscardWorkspaceChangesResult,
+	GetWorkspaceCommitsRequest,
+	GetWorkspaceCommitsResult,
+	GetWorkspaceFileDiffRequest,
+	GetWorkspaceFileDiffResult,
+	GetWorkspaceGitStatusRequest,
+	GetWorkspaceGitStatusResult,
+	WorkspaceCommitWire,
+	WorkspaceGitFailureCode,
+	WorkspaceGitFileStatus,
+	WorkspaceGitFileWire,
+} from '../../shared/ipc/contracts/workspace-git';
 import type { LocalCommandService } from '../commands/local-command';
 
 const TIMEOUT_MS = 15_000;
@@ -9,8 +22,22 @@ const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
 const MAX_DIFF_BYTES = 2 * 1024 * 1024;
 const MAX_UNTRACKED_COUNT_BYTES = 512 * 1024;
 const BINARY_SNIFF_BYTES = 8 * 1024;
+const DEFAULT_COMMIT_LIMIT = 20;
+const MAX_COMMIT_LIMIT = 100;
+/** Unit/record separators keep commit subjects (which may hold anything) safe. */
+const COMMIT_FIELD_SEP = '\x1f';
+const COMMIT_RECORD_SEP = '\x1e';
+const COMMIT_LOG_FORMAT = ['%H', '%h', '%an', '%aI', '%ar', '%s']
+	.join('%x1f')
+	.concat('%x1e');
 
 export interface WorkspaceGitService {
+	discardChanges: (
+		request: DiscardWorkspaceChangesRequest,
+	) => Promise<DiscardWorkspaceChangesResult>;
+	getCommits: (
+		request: GetWorkspaceCommitsRequest,
+	) => Promise<GetWorkspaceCommitsResult>;
 	getFileDiff: (
 		request: GetWorkspaceFileDiffRequest,
 	) => Promise<GetWorkspaceFileDiffResult>;
@@ -46,16 +73,56 @@ export function createWorkspaceGitService({
 	}
 
 	return {
+		async getCommits(request) {
+			const cwd = resolveWorkspaceCwd(request.workspaceCwd);
+			if (!cwd.ok) {
+				return {
+					commits: [],
+					error: { code: 'invalid-cwd', message: cwd.message },
+				};
+			}
+			const limit = clampCommitLimit(request.limit);
+			const result = await runGit(cwd.cwd, [
+				'log',
+				'-n',
+				String(limit),
+				'--no-color',
+				`--pretty=format:${COMMIT_LOG_FORMAT}`,
+			]);
+			if (result.status !== 'success') {
+				// An unborn branch (no commits yet) is an empty list, not an error.
+				if (isNoCommitsYet(result.stderr)) {
+					return { commits: [] };
+				}
+				return {
+					commits: [],
+					error: {
+						code: classifyGitFailure(result.stderr),
+						message:
+							result.failure?.message ??
+							(result.stderr.trim() || 'git log failed in workspace.'),
+					},
+				};
+			}
+			return { commits: parseWorkspaceCommits(result.stdout) };
+		},
+
 		async getStatus(request) {
 			const cwd = resolveWorkspaceCwd(request.workspaceCwd);
 			if (!cwd.ok) {
 				return emptyStatusResult('invalid-cwd', cwd.message);
 			}
 
+			// `--untracked-files=all` is essential: git's default collapses an
+			// untracked directory to a single `dir/` entry, so a brand-new folder
+			// (e.g. an uncommitted `src/`) would show as one un-openable row and the
+			// folder/list view toggle would have nothing to restructure. Expanding to
+			// every individual file makes the change set match the working tree.
 			const statusResult = await runGit(cwd.cwd, [
 				'status',
 				'--porcelain',
 				'-z',
+				'--untracked-files=all',
 			]);
 			if (statusResult.status !== 'success') {
 				return emptyStatusResult(
@@ -93,6 +160,49 @@ export function createWorkspaceGitService({
 				files,
 				summary: { additions, deletions, files: files.length },
 			};
+		},
+
+		async discardChanges(request) {
+			const cwd = resolveWorkspaceCwd(request.workspaceCwd);
+			if (!cwd.ok) {
+				return {
+					discarded: [],
+					error: { code: 'invalid-cwd', message: cwd.message },
+				};
+			}
+
+			// De-dupe up front so a rename's new+old paths (or a repeated request)
+			// each run once, and reject any escaping path before touching the repo.
+			const seen = new Set<string>();
+			const targets: string[] = [];
+			for (const raw of request.paths) {
+				const target = validateRelativePath(raw);
+				if (!target.ok) {
+					return {
+						discarded: [],
+						error: { code: 'invalid-path', message: target.message },
+					};
+				}
+				if (!seen.has(target.path)) {
+					seen.add(target.path);
+					targets.push(target.path);
+				}
+			}
+
+			const discarded: string[] = [];
+			let failure: DiscardWorkspaceChangesResult['error'];
+			for (const relPath of targets) {
+				const outcome = await discardSinglePath(cwd.cwd, relPath);
+				if (outcome.ok) {
+					discarded.push(relPath);
+				} else {
+					// Keep going so one bad path can't strand the rest; surface the
+					// first failure once the batch finishes.
+					failure ??= outcome.error;
+				}
+			}
+
+			return failure ? { discarded, error: failure } : { discarded };
 		},
 
 		async getFileDiff(request) {
@@ -244,6 +354,77 @@ export function createWorkspaceGitService({
 			return { additions: 0, deletions: 0 };
 		}
 	}
+
+	/**
+	 * Reverts one working-tree path. A path present in HEAD is restored to its
+	 * committed content (covers modified, staged-modified, and deleted files); a
+	 * path absent from HEAD (newly added or untracked) is unstaged and its
+	 * working-tree copy is removed. Both git calls are scoped to the single
+	 * pathspec, so nothing outside the requested file is touched.
+	 */
+	async function discardSinglePath(
+		cwd: string,
+		relPath: string,
+	): Promise<
+		| { ok: true }
+		| { error: NonNullable<DiscardWorkspaceChangesResult['error']>; ok: false }
+	> {
+		const inHead = await runGit(cwd, ['cat-file', '-e', `HEAD:${relPath}`]);
+		if (inHead.status === 'success') {
+			const restore = await runGit(cwd, ['checkout', 'HEAD', '--', relPath]);
+			if (restore.status === 'success') {
+				return { ok: true };
+			}
+			return {
+				error: {
+					code: classifyGitFailure(restore.stderr),
+					message:
+						restore.failure?.message ??
+						(restore.stderr.trim() || `Could not restore ${relPath}.`),
+				},
+				ok: false,
+			};
+		}
+
+		// Absent from HEAD: drop it from the index if it was staged
+		// (`--ignore-unmatch` tolerates plain untracked files), then delete the
+		// working-tree copy so the new file is gone entirely.
+		const unstage = await runGit(cwd, [
+			'rm',
+			'--cached',
+			'--force',
+			'--ignore-unmatch',
+			'--',
+			relPath,
+		]);
+		if (unstage.status !== 'success') {
+			return {
+				error: {
+					code: classifyGitFailure(unstage.stderr),
+					message:
+						unstage.failure?.message ??
+						(unstage.stderr.trim() || `Could not unstage ${relPath}.`),
+				},
+				ok: false,
+			};
+		}
+
+		try {
+			await rm(path.join(cwd, relPath), { force: true });
+		} catch (error) {
+			return {
+				error: {
+					code: 'command-failed',
+					message:
+						error instanceof Error
+							? error.message
+							: `Could not delete ${relPath}.`,
+				},
+				ok: false,
+			};
+		}
+		return { ok: true };
+	}
 }
 
 /** Adds two nullable line counts, propagating binary (`null`) markers. */
@@ -252,6 +433,49 @@ function addNullable(a: number | null, b: number | null): number | null {
 		return null;
 	}
 	return a + b;
+}
+
+/** Clamps the requested commit page size into the supported range. */
+function clampCommitLimit(limit: number | undefined): number {
+	if (typeof limit !== 'number' || !Number.isFinite(limit)) {
+		return DEFAULT_COMMIT_LIMIT;
+	}
+	return Math.max(1, Math.min(MAX_COMMIT_LIMIT, Math.trunc(limit)));
+}
+
+/** True when git reports the branch has no commits yet (unborn HEAD). */
+function isNoCommitsYet(stderr: string): boolean {
+	return stderr.toLowerCase().includes('does not have any commits yet');
+}
+
+/**
+ * Parses the unit/record-separated `git log` output into commit rows. Each
+ * record is `hash␟short␟author␟isoDate␟relative␟subject␞`; the trailing record
+ * separator yields one empty chunk that is skipped.
+ */
+export function parseWorkspaceCommits(stdout: string): WorkspaceCommitWire[] {
+	const commits: WorkspaceCommitWire[] = [];
+	for (const record of stdout.split(COMMIT_RECORD_SEP)) {
+		// Records are newline-joined by `--pretty=format`; drop the leading break.
+		const trimmed = record.replace(/^\s+/, '');
+		if (!trimmed) {
+			continue;
+		}
+		const fields = trimmed.split(COMMIT_FIELD_SEP);
+		const [hash, shortHash, author, isoDate, relativeTime, subject] = fields;
+		if (fields.length < 6 || !hash) {
+			continue;
+		}
+		commits.push({
+			author: author ?? '',
+			hash,
+			isoDate: isoDate ?? '',
+			relativeTime: relativeTime ?? '',
+			shortHash: shortHash ?? '',
+			subject: subject ?? '',
+		});
+	}
+	return commits;
 }
 
 /** Builds the failed-status result shape with empty rows. */

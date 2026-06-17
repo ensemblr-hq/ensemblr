@@ -71,8 +71,66 @@ export interface GetWorkspaceFileDiffResult {
 	path: string;
 }
 
+/** One commit reachable from the workspace HEAD, newest first. */
+export interface WorkspaceCommitWire {
+	/** Author display name (`%an`). */
+	author: string;
+	/** Full 40-char commit hash (`%H`). */
+	hash: string;
+	/** Author date in strict ISO-8601 (`%aI`). */
+	isoDate: string;
+	/** Human relative author date from git (`%ar`), e.g. "18 hours ago". */
+	relativeTime: string;
+	/** Abbreviated commit hash (`%h`). */
+	shortHash: string;
+	/** Commit subject line (`%s`). */
+	subject: string;
+}
+
+export interface GetWorkspaceCommitsRequest {
+	/** Max commits to return; clamped server-side. Defaults to a small page. */
+	limit?: number;
+	workspaceCwd: string;
+}
+
+export interface GetWorkspaceCommitsResult {
+	commits: readonly WorkspaceCommitWire[];
+	error?: {
+		code: WorkspaceGitFailureCode;
+		message: string;
+	};
+}
+
+export type WorkspaceDiscardFailureCode =
+	| WorkspaceGitFailureCode
+	| 'invalid-path';
+
+export interface DiscardWorkspaceChangesRequest {
+	/**
+	 * Workspace-relative paths to discard. For a rename, include both the new
+	 * path and its `renamedFrom` so the original is restored too.
+	 */
+	paths: readonly string[];
+	workspaceCwd: string;
+}
+
+export interface DiscardWorkspaceChangesResult {
+	/** Paths that were successfully reverted/removed. */
+	discarded: readonly string[];
+	error?: {
+		code: WorkspaceDiscardFailureCode;
+		message: string;
+	};
+}
+
 /** Workspace git IPC surface — change status rows and unified per-file diffs. */
 export interface WorkspaceGitApi {
+	discardWorkspaceChanges: (
+		request: DiscardWorkspaceChangesRequest,
+	) => Promise<DiscardWorkspaceChangesResult>;
+	getWorkspaceCommits: (
+		request: GetWorkspaceCommitsRequest,
+	) => Promise<GetWorkspaceCommitsResult>;
 	getWorkspaceFileDiff: (
 		request: GetWorkspaceFileDiffRequest,
 	) => Promise<GetWorkspaceFileDiffResult>;

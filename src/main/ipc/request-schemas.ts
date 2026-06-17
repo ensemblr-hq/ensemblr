@@ -715,6 +715,18 @@ export const getWorkspaceFileDiffRequestSchema = z.object({
 	workspaceCwd: z.string().min(1),
 });
 
+/** {@link import('../../shared/ipc').GetWorkspaceCommitsRequest}. */
+export const getWorkspaceCommitsRequestSchema = z.object({
+	limit: z.number().int().positive().max(100).optional(),
+	workspaceCwd: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc').DiscardWorkspaceChangesRequest}. */
+export const discardWorkspaceChangesRequestSchema = z.object({
+	paths: z.array(z.string().min(1)).min(1).max(1000),
+	workspaceCwd: z.string().min(1),
+});
+
 // -----------------------------------------------------------------------------
 // linear — STRICT (throws on bad input)
 // -----------------------------------------------------------------------------
