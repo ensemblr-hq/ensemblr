@@ -19,3 +19,4 @@ export type { OptimisticPrompt } from './optimistic-prompts';
 export { useOptimisticPrompts } from './optimistic-prompts';
 export type { PiComposerControllerState } from './pi-composer';
 export { usePiComposerController } from './pi-composer';
+export { useStopPiSession } from './use-stop-pi-session';
