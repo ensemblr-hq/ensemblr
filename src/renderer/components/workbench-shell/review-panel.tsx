@@ -16,6 +16,7 @@ import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { cn } from '@/renderer/lib/utils';
 import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
+import { hasReviewableChanges } from '@/renderer/lib/workbench/review-presence';
 import {
 	changesSourceByWorkspaceAtom,
 	changesViewModeAtom,
@@ -115,6 +116,25 @@ export function ReviewPanel({
 	const scope = useMemo(
 		() => sourceToScope(source, baseRef),
 		[source, baseRef],
+	);
+
+	// The Review action only makes sense when there's something to review, so gate
+	// it on the *whole* branch diff vs base — committed-on-branch and uncommitted
+	// edits alike — independent of the user's selected source. When source is the
+	// default "all" + a known base, this scope matches `scope` above, so React
+	// Query dedupes it (no extra git read); only the commit/uncommitted views issue
+	// a second read for the active workspace. No base degrades to the working tree.
+	const branchScope = useMemo<WorkspaceGitDiffScope>(
+		() => (baseRef ? { baseRef, kind: 'branch' } : { kind: 'working-tree' }),
+		[baseRef],
+	);
+	const { data: branchStatusData } = useQuery({
+		...workspaceGitStatusQuery(workspace.pathLabel ?? null, branchScope),
+		placeholderData: keepPreviousData,
+	});
+	const canReview = hasReviewableChanges(
+		branchStatusData,
+		workspace.changeSummary.files,
 	);
 
 	// Source-aware status drives both the tab count and the file list. The
@@ -250,6 +270,7 @@ export function ReviewPanel({
 				</div>
 				<ReviewPanelActions
 					activeTab={activeTab}
+					canReview={canReview}
 					changesViewMode={changesViewMode}
 					onChangesViewModeToggle={() =>
 						setChangesViewMode((current) =>
@@ -308,6 +329,7 @@ export function ReviewPanel({
 /** Tab-aware action cluster on the review panel header. */
 function ReviewPanelActions({
 	activeTab,
+	canReview,
 	changesViewMode,
 	onChangesViewModeToggle,
 	onDiscardAll,
@@ -317,6 +339,7 @@ function ReviewPanelActions({
 	workspace,
 }: {
 	activeTab: ReviewPanelTab;
+	canReview: boolean;
 	changesViewMode: ChangesViewMode;
 	onChangesViewModeToggle: () => void;
 	onDiscardAll: () => void;
@@ -336,7 +359,7 @@ function ReviewPanelActions({
 		<div className='flex shrink-0 items-center gap-0.5'>
 			{activeTab === 'changes' ? (
 				<>
-					<ReviewActionButton />
+					<ReviewActionButton canReview={canReview} />
 					<Button
 						aria-pressed={changesViewMode === 'folders'}
 						onClick={onChangesViewModeToggle}
@@ -369,7 +392,7 @@ function ReviewPanelActions({
 				</>
 			) : activeTab === 'files' ? (
 				<>
-					<ReviewActionButton />
+					<ReviewActionButton canReview={canReview} />
 					<Button onClick={onFileSearchOpen} size='icon-sm' variant='ghost'>
 						<SearchIcon />
 						<span className='sr-only'>Search files</span>
@@ -386,8 +409,13 @@ function ReviewPanelActions({
 }
 
 /** Kicks off the review agent action; shared by the Changes and All files tabs. */
-function ReviewActionButton() {
+function ReviewActionButton({ canReview }: { canReview: boolean }) {
 	const reviewActions = useReviewActions();
+
+	// Nothing to review when the branch diff is empty — hide the affordance.
+	if (!canReview) {
+		return null;
+	}
 
 	return (
 		<Button
