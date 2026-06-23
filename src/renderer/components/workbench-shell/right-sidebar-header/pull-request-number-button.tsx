@@ -18,7 +18,7 @@ export function PullRequestNumberButton({
 	const className = cn(
 		'h-6.5 rounded-sm border px-1.75 font-semibold text-xs',
 		tone === 'ready' &&
-			'border-status-ok/35 bg-status-ok/10 text-status-ok hover:bg-status-ok/15',
+			'border-status-ok/35 bg-status-ok/10 text-status-ok hover:bg-transparent dark:border-status-ok/35 dark:hover:bg-transparent',
 		tone === 'pending' &&
 			'border-status-warning/35 bg-status-warning/10 text-foreground hover:bg-status-warning/15',
 		tone === 'blocked' &&
