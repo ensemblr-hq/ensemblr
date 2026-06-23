@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import { type RepositoryWorkspaceNavigationSnapshot } from '../../../shared/ipc/contracts/repository-navigation';
+import type { RepositoryWorkspaceNavigationSnapshot } from '../../../shared/ipc/contracts/repository-navigation';
 import type { EnsembleDatabaseService } from '../../storage';
 import { getRepositoryWorkspaceNavigationSnapshot } from '../repository-workspace-navigation';
 

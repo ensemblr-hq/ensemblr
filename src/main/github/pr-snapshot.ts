@@ -1,4 +1,12 @@
-import type { GithubCheckBucket, GithubCheckWire, GithubCommentWire, GithubDeploymentWire, GithubMergeableState, GithubPullRequestState, GithubPullRequestWire } from '../../shared/ipc/contracts/github';
+import type {
+	GithubCheckBucket,
+	GithubCheckWire,
+	GithubCommentWire,
+	GithubDeploymentWire,
+	GithubMergeableState,
+	GithubPullRequestState,
+	GithubPullRequestWire,
+} from '../../shared/ipc/contracts/github';
 
 /** JSON fields requested from `gh pr view --json`. */
 export const PR_VIEW_JSON_FIELDS = [

@@ -1,7 +1,11 @@
 import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import { type LinearConnectionSnapshot, type LinearDisconnectResult, type LinearLoginResult } from '../../../shared/ipc/contracts/linear';
+import type {
+	LinearConnectionSnapshot,
+	LinearDisconnectResult,
+	LinearLoginResult,
+} from '../../../shared/ipc/contracts/linear';
 import type { LinearAuthService, LinearService } from '../../linear';
 import {
 	createLinearCommentRequestSchema,

@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { accessSync, constants, rmSync } from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import type { RegisteredRepositorySnapshot, RegisterLocalRepositoryDiagnostic, RegisterLocalRepositoryRequest, RegisterLocalRepositoryResult } from '../../shared/ipc/contracts/repository';
+import type {
+	RegisteredRepositorySnapshot,
+	RegisterLocalRepositoryDiagnostic,
+	RegisterLocalRepositoryRequest,
+	RegisterLocalRepositoryResult,
+} from '../../shared/ipc/contracts/repository';
 import type { RepositoryConfigSourceSnapshot } from '../../shared/ipc/contracts/repository-config';
 import {
 	type LoadedRepositoryConfig,

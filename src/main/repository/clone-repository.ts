@@ -1,7 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 
-import type { CloneGithubRepositoryDiagnostic, CloneGithubRepositoryDiagnosticCode, CloneGithubRepositoryPreparation, CloneGithubRepositoryPrepareResult, CloneGithubRepositoryProgressEvent, CloneGithubRepositoryRequest, CloneGithubRepositoryStartRequest, CloneGithubRepositoryStartResult } from '../../shared/ipc/contracts/clone';
+import type {
+	CloneGithubRepositoryDiagnostic,
+	CloneGithubRepositoryDiagnosticCode,
+	CloneGithubRepositoryPreparation,
+	CloneGithubRepositoryPrepareResult,
+	CloneGithubRepositoryProgressEvent,
+	CloneGithubRepositoryRequest,
+	CloneGithubRepositoryStartRequest,
+	CloneGithubRepositoryStartResult,
+} from '../../shared/ipc/contracts/clone';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import { classifyCloneFailure } from './clone-classifier.ts';

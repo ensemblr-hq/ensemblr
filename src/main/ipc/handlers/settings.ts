@@ -1,7 +1,10 @@
 import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import { type SettingsResolutionRequest, type SettingsResolutionSnapshot } from '../../../shared/ipc/contracts/settings-resolution';
+import type {
+	SettingsResolutionRequest,
+	SettingsResolutionSnapshot,
+} from '../../../shared/ipc/contracts/settings-resolution';
 import type { EnsembleConfigResolutionService } from '../../config';
 
 /** Service dependencies used by the settings-resolution IPC handlers. */

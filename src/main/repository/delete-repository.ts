@@ -2,7 +2,13 @@ import { existsSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { DeletedRepositorySnapshot, DeleteRepositoryDiagnostic, DeleteRepositoryDiagnosticCode, DeleteRepositoryRequest, DeleteRepositoryResult } from '../../shared/ipc/contracts/repository';
+import type {
+	DeletedRepositorySnapshot,
+	DeleteRepositoryDiagnostic,
+	DeleteRepositoryDiagnosticCode,
+	DeleteRepositoryRequest,
+	DeleteRepositoryResult,
+} from '../../shared/ipc/contracts/repository';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { EnsembleDatabaseService } from '../storage/database.ts';

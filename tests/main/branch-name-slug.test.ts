@@ -80,7 +80,10 @@ describe('shouldAutoRenameWorkspace', () => {
 	test('skips a non-placeholder workspace', () => {
 		expect(shouldAutoRenameWorkspace({ ...pass, metadata: {} })).toBe(false);
 		expect(
-			shouldAutoRenameWorkspace({ ...pass, metadata: { placeholderName: false } }),
+			shouldAutoRenameWorkspace({
+				...pass,
+				metadata: { placeholderName: false },
+			}),
 		).toBe(false);
 		// Must be a strict boolean true, not a truthy string.
 		expect(

@@ -1,4 +1,8 @@
-import type { CreateTerminalSessionResult, KillTerminalResult, TerminalSessionSnapshot } from '../../shared/ipc/contracts/terminal';
+import type {
+	CreateTerminalSessionResult,
+	KillTerminalResult,
+	TerminalSessionSnapshot,
+} from '../../shared/ipc/contracts/terminal';
 import type { WorkspaceScriptKind } from '../../shared/ipc/contracts/workspace-scripts';
 import {
 	parseWorkspaceScriptSettings,

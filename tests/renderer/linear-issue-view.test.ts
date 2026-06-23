@@ -1,10 +1,4 @@
 import { expect, test } from 'bun:test';
-
-import {
-	createLinearConnectionFixture,
-	createLinearFailureFixture,
-	createLinearIssueFixture,
-} from '../fixtures/linear';
 import {
 	deriveLinearGateState,
 	describeLinearFailure,
@@ -13,6 +7,11 @@ import {
 	isLinearDataStale,
 	mapLinearIssuesToWorkspaceSources,
 } from '../../src/renderer/lib/linear';
+import {
+	createLinearConnectionFixture,
+	createLinearFailureFixture,
+	createLinearIssueFixture,
+} from '../fixtures/linear';
 
 const NOW = new Date('2026-06-11T00:10:00.000Z');
 

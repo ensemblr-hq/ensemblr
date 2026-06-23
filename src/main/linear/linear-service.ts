@@ -437,45 +437,41 @@ function issueDataToWire(
 }
 
 function issueRecordToWire(record: LinearIssueRecord): LinearIssueWire {
-	const assignee = readEntity(record.data['assignee']);
-	const cycle = readEntity(record.data['cycle']);
-	const project = readEntity(record.data['project']);
-	const state = readEntity(record.data['state']);
-	const team = readEntity(record.data['team']);
-	const labels = Array.isArray(record.data['labels'])
-		? record.data['labels']
-		: [];
+	const assignee = readEntity(record.data.assignee);
+	const cycle = readEntity(record.data.cycle);
+	const project = readEntity(record.data.project);
+	const state = readEntity(record.data.state);
+	const team = readEntity(record.data.team);
+	const labels = Array.isArray(record.data.labels) ? record.data.labels : [];
 
 	return {
 		archivedAt: record.archivedAt,
 		assigneeId: record.assigneeId,
-		assigneeName: readString(assignee?.['name']),
-		cycleId: readString(cycle?.['id']),
-		cycleName: readString(cycle?.['name']),
+		assigneeName: readString(assignee?.name),
+		cycleId: readString(cycle?.id),
+		cycleName: readString(cycle?.name),
 		description: record.description,
 		dueDate: record.dueDate,
 		id: record.id,
 		identifier: record.identifier,
 		labels: labels.flatMap((label) => {
 			const entity = readEntity(label);
-			const id = readString(entity?.['id']);
-			const name = readString(entity?.['name']);
+			const id = readString(entity?.id);
+			const name = readString(entity?.name);
 
-			return id && name
-				? [{ color: readString(entity?.['color']), id, name }]
-				: [];
+			return id && name ? [{ color: readString(entity?.color), id, name }] : [];
 		}),
 		priority: record.priority,
 		projectId: record.projectId,
-		projectName: readString(project?.['name']),
-		stateColor: readString(state?.['color']),
+		projectName: readString(project?.name),
+		stateColor: readString(state?.color),
 		stateId: record.stateId,
-		stateName: readString(state?.['name']),
-		stateType: readString(state?.['type']),
+		stateName: readString(state?.name),
+		stateType: readString(state?.type),
 		syncedAt: record.syncedAt,
 		teamId: record.teamId,
-		teamKey: readString(team?.['key']),
-		teamName: readString(team?.['name']),
+		teamKey: readString(team?.key),
+		teamName: readString(team?.name),
 		title: record.title,
 		updatedAt: record.remoteUpdatedAt,
 		url: record.url,
@@ -515,13 +511,13 @@ function resourceRecordToWire(
 	record: LinearResourceRecord,
 ): LinearResourceWire {
 	return {
-		color: readString(record.data['color']),
+		color: readString(record.data.color),
 		id: record.id,
-		key: readString(record.data['key']),
+		key: readString(record.data.key),
 		kind: record.kind,
 		name: record.name,
 		teamId: record.teamId,
-		type: readString(record.data['type']),
+		type: readString(record.data.type),
 	};
 }
 

@@ -1,6 +1,10 @@
 import { spawn as nodeSpawn } from 'node:child_process';
 
-import type { CloneGithubRepositoryPreparation, CloneGithubRepositoryProgressEvent, CloneGithubRepositoryProgressKind } from '../../shared/ipc/contracts/clone';
+import type {
+	CloneGithubRepositoryPreparation,
+	CloneGithubRepositoryProgressEvent,
+	CloneGithubRepositoryProgressKind,
+} from '../../shared/ipc/contracts/clone';
 
 const CLONE_PROGRESS_GIT_ARGS = ['--progress'];
 

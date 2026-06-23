@@ -68,11 +68,7 @@ export function LinearIssueDetail({ issueId }: { issueId: string }) {
 							<ArrowLeftIcon /> Back to issues
 						</Link>
 					</Button>
-					<Button
-						onClick={() => void refetch()}
-						size='sm'
-						variant='outline'
-					>
+					<Button onClick={() => void refetch()} size='sm' variant='outline'>
 						<RefreshCwIcon /> Retry
 					</Button>
 				</div>

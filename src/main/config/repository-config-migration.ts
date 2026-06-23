@@ -2,7 +2,13 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import type { ConfigDiagnostic } from '../../shared/ipc/contracts/health';
-import type { RepositoryConfigMigrationChange, RepositoryConfigMigrationPreview, RepositoryConfigMigrationRequest, RepositoryConfigMigrationResult, RepositoryConfigSourceSnapshot } from '../../shared/ipc/contracts/repository-config';
+import type {
+	RepositoryConfigMigrationChange,
+	RepositoryConfigMigrationPreview,
+	RepositoryConfigMigrationRequest,
+	RepositoryConfigMigrationResult,
+	RepositoryConfigSourceSnapshot,
+} from '../../shared/ipc/contracts/repository-config';
 import type { SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
 import {
 	areJsonValuesEqual,

@@ -9,10 +9,7 @@ export const electronPowerControls: PowerSaveControls = {
 };
 
 /** Shows a desktop notification; clicking it focuses the main window. */
-export function electronNotify(options: {
-	title: string;
-	body: string;
-}): void {
+export function electronNotify(options: { title: string; body: string }): void {
 	if (!Notification.isSupported()) {
 		return;
 	}

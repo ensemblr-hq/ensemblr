@@ -1,6 +1,15 @@
 import { randomUUID } from 'node:crypto';
 
-import type { CreateTerminalSessionResult, TerminalDiagnostic, TerminalLifecycleBroadcast, TerminalOutputBroadcast, TerminalSessionKind, TerminalSessionSnapshot, TerminalSessionStatus, TerminalSnapshotResult } from '../../shared/ipc/contracts/terminal';
+import type {
+	CreateTerminalSessionResult,
+	TerminalDiagnostic,
+	TerminalLifecycleBroadcast,
+	TerminalOutputBroadcast,
+	TerminalSessionKind,
+	TerminalSessionSnapshot,
+	TerminalSessionStatus,
+	TerminalSnapshotResult,
+} from '../../shared/ipc/contracts/terminal';
 import {
 	WorkspaceEnvironmentError,
 	type WorkspaceEnvironmentService,

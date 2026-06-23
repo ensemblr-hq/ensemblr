@@ -1,11 +1,7 @@
 {
 	"scenario": "single-read",
 	"description": "One tool call with small output.",
-	"piArgs": [
-		"--mode",
-		"rpc",
-		"--no-session"
-	],
+	"piArgs": ["--mode", "rpc", "--no-session"],
 	"cwd": "/sandbox/single-read",
 	"startedAt": 1781134158741,
 	"endedAt": 1781134166256,
