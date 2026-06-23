@@ -22,6 +22,7 @@ export function ProjectSidebarHeader({
 	isCollapsed,
 	onArchiveSelect,
 	onBrowseArchiveSelect,
+	onCreateFromSourcePrefetch,
 	onCreateFromSourceSelect,
 	onCreateWorkspaceSelect,
 	onDeleteSelect,
@@ -33,6 +34,8 @@ export function ProjectSidebarHeader({
 	isCollapsed: boolean;
 	onArchiveSelect?: () => void;
 	onBrowseArchiveSelect?: () => void;
+	/** Warms the create-from picker's data before the dialog opens. */
+	onCreateFromSourcePrefetch?: () => void;
 	onCreateFromSourceSelect?: () => void;
 	onCreateWorkspaceSelect?: () => void;
 	onDeleteSelect?: () => void;
@@ -100,7 +103,9 @@ export function ProjectSidebarHeader({
 								className='hidden group-hover/project-toggle:flex'
 								data-action-scope='project'
 								onClick={onCreateFromSourceSelect}
+								onFocus={onCreateFromSourcePrefetch}
 								onPointerDown={(event) => event.stopPropagation()}
+								onPointerEnter={onCreateFromSourcePrefetch}
 							>
 								<Link2Icon aria-hidden='true' />
 							</ProjectHeaderActionButton>

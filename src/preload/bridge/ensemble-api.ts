@@ -147,6 +147,11 @@ export function createEnsembleApi(): EnsembleApi {
 		listPiSessions: (request) => invoke('listPiSessions', request),
 		listEnvFiles: (request) => invoke('listEnvFiles', request),
 		listPiSlashCommands: (request) => invoke('listPiSlashCommands', request),
+		listRepositoryBranches: (request) =>
+			invoke('listRepositoryBranches', request),
+		listRepositoryIssues: (request) => invoke('listRepositoryIssues', request),
+		listRepositoryPullRequests: (request) =>
+			invoke('listRepositoryPullRequests', request),
 		listTurnCheckpoints: (request) => invoke('listTurnCheckpoints', request),
 		listTerminalSessions: (request) => invoke('listTerminalSessions', request),
 		listReviewComments: (request) => invoke('listReviewComments', request),

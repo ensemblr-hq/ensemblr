@@ -10,4 +10,3 @@ export {
 	getDefaultProject,
 	getDefaultWorkspace,
 } from './selectors';
-export { defaultWorkspaceSources } from './workspace-sources';

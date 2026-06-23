@@ -78,8 +78,10 @@ interface CreateWorkspaceActionDeps {
 	disableProjectReorderLayoutAnimation: () => void;
 }
 
-/** Optional provenance seed (e.g. from a Linear issue) for a new workspace. */
+/** Optional provenance seed (e.g. from an issue, branch, or PR) for a workspace. */
 export interface WorkspaceCreationSeed {
+	/** Branch/PR sources fork the new workspace off this ref (e.g. `origin/x`). */
+	baseBranch?: string;
 	branchName?: string;
 	linkedIssue?: WorkspaceLinkedIssueInput;
 	name?: string;
@@ -123,6 +125,7 @@ export function useCreateWorkspaceFromProject({
 				]);
 				const name = seed?.name ?? pickComposerSurname({ exclude: excluded });
 				const result = await createWorkspace({
+					...(seed?.baseBranch ? { baseBranch: seed.baseBranch } : {}),
 					...(seed?.branchName ? { branchName: seed.branchName } : {}),
 					...(seed?.linkedIssue ? { linkedIssue: seed.linkedIssue } : {}),
 					name,

@@ -23,6 +23,7 @@ import type { WorkspaceApi } from './workspace';
 import type { WorkspaceFilesApi } from './workspace-files';
 import type { WorkspaceGitApi } from './workspace-git';
 import type { WorkspaceScriptsApi } from './workspace-scripts';
+import type { RepositorySourcesApi } from './workspace-sources';
 
 /**
  * Aggregate IPC surface exposed to the renderer through the preload bridge.
@@ -57,6 +58,7 @@ export interface EnsembleApi
 		CheckpointApi,
 		TerminalApi,
 		WorkspaceScriptsApi,
+		RepositorySourcesApi,
 		PiApi,
 		LinearApi,
 		OpenTargetApi {}

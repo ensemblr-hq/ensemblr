@@ -136,23 +136,21 @@ export function mapLinearIssuesToWorkspaceSources(
 
 /** Workspace creation seed derived from a Linear issue. */
 export interface LinearWorkspaceSeed {
-	branchName: string;
-	composerSeed: string;
 	linkedIssue: WorkspaceLinkedIssueInput;
-	name: string;
 }
 
 /**
- * Derives the workspace name, branch name, linked-issue record, and composer
- * context for a workspace created from a Linear issue (ADR 0024).
+ * Builds the linked-issue record (including the issue description, which seeds
+ * the first-prompt composer draft) for a workspace created from a Linear issue
+ * (ADR 0024). Workspace name and branch follow the default path — only the
+ * composer is seeded from the issue.
  */
 export function buildWorkspaceSeedFromLinearIssue(
 	issue: LinearIssueWire,
 ): LinearWorkspaceSeed {
 	return {
-		branchName: `feat/${issue.identifier.toLowerCase()}-${slugify(issue.title)}`,
-		composerSeed: formatLinearIssueContext(issue),
 		linkedIssue: {
+			...(issue.description ? { description: issue.description } : {}),
 			id: issue.id,
 			identifier: issue.identifier,
 			provider: 'linear',
@@ -161,19 +159,7 @@ export function buildWorkspaceSeedFromLinearIssue(
 			title: issue.title,
 			url: issue.url,
 		},
-		name: `${issue.identifier} ${issue.title}`,
 	};
-}
-
-function slugify(text: string): string {
-	const slug = text
-		.toLowerCase()
-		.replaceAll(/[^a-z0-9]+/g, '-')
-		.replaceAll(/(^-|-$)/g, '')
-		.slice(0, 40)
-		.replace(/-$/, '');
-
-	return slug || 'issue';
 }
 
 function truncateText(text: string, maxLength: number): string {

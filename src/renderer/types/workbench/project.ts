@@ -38,7 +38,7 @@ export interface AddProjectMenuModel {
 // --- Workspace source -------------------------------------------------------
 
 export type WorkspaceSourceKind = 'branch' | 'issue' | 'pull-request';
-export type WorkspaceSourceProvider = 'github' | 'linear' | 'local-git';
+export type WorkspaceSourceProvider = 'github' | 'linear';
 
 export interface WorkspaceSource {
 	hasWorkspace?: boolean;

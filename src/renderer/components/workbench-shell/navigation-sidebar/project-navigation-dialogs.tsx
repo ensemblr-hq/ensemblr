@@ -1,19 +1,10 @@
-import { useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 
-import { linearIssuesQuery } from '@/renderer/api/ensemble';
-import { defaultWorkspaceSources } from '@/renderer/fixtures/workbench';
-import {
-	buildWorkspaceSeedFromLinearIssue,
-	type LinearWorkspaceSeed,
-	mapLinearIssuesToWorkspaceSources,
-} from '@/renderer/lib/linear';
+import type { WorkspaceCreationSeed } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import type {
 	ProjectShellModel,
 	WorkspaceShellModel,
-	WorkspaceSource,
 } from '@/renderer/types/workbench';
-import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
 import { ArchiveRepositoryDialog } from '../archive-repository-dialog';
 import { ArchiveWorkspaceDialog } from '../archive-workspace-dialog';
 import { BrowseArchiveDialog } from '../browse-archive-dialog';
@@ -111,36 +102,6 @@ export function useProjectNavigationDialogs(): {
 	};
 }
 
-/**
- * Builds the create-from picker source list: live cached Linear issues replace
- * the Linear fixtures, while branch/PR fixtures remain until their providers
- * land. Only queries Linear while the dialog is open.
- */
-function useCreateWorkspaceSources(enabled: boolean): {
-	issuesById: Map<string, LinearIssueWire>;
-	sources: WorkspaceSource[];
-} {
-	const { data: linearIssuesData } = useQuery({
-		...linearIssuesQuery({}),
-		enabled,
-	});
-
-	return useMemo(() => {
-		const placeholderSources = defaultWorkspaceSources.filter(
-			(source) => !(source.kind === 'issue' && source.provider === 'linear'),
-		);
-		const issues = linearIssuesData?.issues ?? [];
-
-		return {
-			issuesById: new Map(issues.map((issue) => [issue.id, issue])),
-			sources: [
-				...placeholderSources,
-				...mapLinearIssuesToWorkspaceSources(issues),
-			],
-		};
-	}, [linearIssuesData]);
-}
-
 /** Mounts the sidebar lifecycle dialogs driven by the navigation actions hook. */
 export function ProjectNavigationDialogs({
 	archiveProjectTarget,
@@ -150,7 +111,8 @@ export function ProjectNavigationDialogs({
 	deleteProjectTarget,
 	deleteWorkspaceTarget,
 	onArchiveBrowseChange,
-	onCreateWorkspaceFromIssue,
+	onCreateWorkspaceFromSource,
+	onOpenWorkspace,
 	onProjectArchived,
 	onProjectDeleted,
 	onWorkspaceArchived,
@@ -170,10 +132,11 @@ export function ProjectNavigationDialogs({
 	deleteProjectTarget: ProjectShellModel | null;
 	deleteWorkspaceTarget: WorkspaceShellModel | null;
 	onArchiveBrowseChange: (repositoryId: string) => Promise<void>;
-	onCreateWorkspaceFromIssue?: (
+	onCreateWorkspaceFromSource?: (
 		project: ProjectShellModel,
-		seed: LinearWorkspaceSeed,
+		seed: WorkspaceCreationSeed,
 	) => void;
+	onOpenWorkspace?: (project: ProjectShellModel, workspaceId: string) => void;
 	onProjectArchived: (archivedProjectId: string) => Promise<void>;
 	onProjectDeleted: (deletedProjectId: string) => Promise<void>;
 	onWorkspaceArchived: (archivedWorkspaceId: string) => Promise<void>;
@@ -186,26 +149,15 @@ export function ProjectNavigationDialogs({
 	setDeleteProjectTarget: (project: ProjectShellModel | null) => void;
 	setDeleteWorkspaceTarget: (workspace: WorkspaceShellModel | null) => void;
 }) {
-	const { issuesById, sources } = useCreateWorkspaceSources(
-		createSourceProject !== null,
-	);
-
 	return (
 		<>
 			<CreateWorkspaceSourceDialog
-				onCreateWorkspace={({ repoId, source }) => {
-					if (source.kind !== 'issue' || source.provider !== 'linear') {
-						return;
-					}
-					const issue = issuesById.get(source.id);
+				onCreateWorkspace={({ repoId, seed }) => {
 					const project = orderedProjects.find(
 						(candidate) => candidate.id === repoId,
 					);
-					if (issue && project) {
-						onCreateWorkspaceFromIssue?.(
-							project,
-							buildWorkspaceSeedFromLinearIssue(issue),
-						);
+					if (project) {
+						onCreateWorkspaceFromSource?.(project, seed);
 					}
 				}}
 				onOpenChange={(open) => {
@@ -213,10 +165,17 @@ export function ProjectNavigationDialogs({
 						setCreateSourceProject(null);
 					}
 				}}
+				onOpenWorkspace={({ repoId, workspaceId }) => {
+					const project = orderedProjects.find(
+						(candidate) => candidate.id === repoId,
+					);
+					if (project) {
+						onOpenWorkspace?.(project, workspaceId);
+					}
+				}}
 				open={createSourceProject !== null}
 				project={createSourceProject}
 				projects={orderedProjects}
-				sources={sources}
 			/>
 
 			<ArchiveWorkspaceDialog

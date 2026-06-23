@@ -26,11 +26,13 @@
 		"src/renderer/components/ui/**"
 	],
 
-	// Sidebar (vendored shadcn) is the sole consumer of these hooks/atoms.
-	// Treat them as dynamically loaded so fallow stops marking them dead.
+	// Vendored shadcn `ui/**` (ignored above) is the sole consumer of these
+	// hooks/atoms, so fallow can't see those import edges. Treat the consumed
+	// files as dynamically loaded so fallow stops marking them dead.
 	"dynamicallyLoaded": [
-		"src/renderer/hooks/ui/use-mobile.ts",
-		"src/renderer/state/sidebar/atoms.ts"
+		"src/renderer/hooks/use-mobile.ts",
+		"src/renderer/hooks/use-raised-shadow.ts",
+		"src/renderer/state/sidebar/index.ts"
 	],
 
 	// Tests import the shared/ipc barrel via the implicit `index` resolution
