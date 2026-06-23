@@ -165,7 +165,6 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 				canCreatePullRequest={canCreatePullRequest}
 				onCommitAndPush={sendCommitAndPush}
 				onCreatePullRequest={sendCreatePullRequest}
-				prForm={prForm}
 				state={panelState}
 				todoSection={
 					<TodoSection
@@ -174,7 +173,9 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 					/>
 				}
 				workspace={workspace}
-			/>
+			>
+				{prForm}
+			</ChecksNoPullRequestState>
 		);
 	}
 
@@ -182,11 +183,12 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 		<ChecksPullRequestPanel
 			onCommitAndPush={sendCommitAndPush}
 			onUpdatePullRequest={sendCreatePullRequest}
-			prForm={prForm}
 			state={panelState}
 			todoActions={todoActions}
 			workspace={workspace}
-		/>
+		>
+			{prForm}
+		</ChecksPullRequestPanel>
 	);
 }
 
@@ -249,16 +251,16 @@ function useTodoActions(workspaceId: string): TodoActions {
 
 /** Body of the checks panel when a pull request exists. */
 function ChecksPullRequestPanel({
+	children,
 	onCommitAndPush,
 	onUpdatePullRequest,
-	prForm,
 	state,
 	todoActions,
 	workspace,
 }: {
+	children: ReactNode;
 	onCommitAndPush: () => void;
 	onUpdatePullRequest: () => void;
-	prForm: ReactNode;
 	state: Extract<ChecksPanelState, { hasPullRequest: true }>;
 	todoActions: TodoActions;
 	workspace: WorkspaceShellModel;
@@ -307,7 +309,7 @@ function ChecksPullRequestPanel({
 						GitHub refresh failed: {pullRequest.syncError}
 					</div>
 				) : null}
-				{prForm}
+				{children}
 
 				{isClosedOrMerged ? null : (
 					<section className='flex min-w-0 flex-col gap-1.5'>

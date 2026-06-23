@@ -13,9 +13,9 @@ export { ChecksEmptyMessage };
 /** Empty-state shown when the workspace has no PR yet. */
 export function ChecksNoPullRequestState({
 	canCreatePullRequest = false,
+	children,
 	onCommitAndPush,
 	onCreatePullRequest,
-	prForm,
 	state,
 	todoSection,
 	workspace,
@@ -26,9 +26,9 @@ export function ChecksNoPullRequestState({
 	 * with commits ahead of base.
 	 */
 	canCreatePullRequest?: boolean;
+	children?: ReactNode;
 	onCommitAndPush?: () => void;
 	onCreatePullRequest?: () => void;
-	prForm?: ReactNode;
 	state: Extract<ChecksPanelState, { hasPullRequest: false }>;
 	todoSection?: ReactNode;
 	workspace: WorkspaceShellModel;
@@ -48,7 +48,7 @@ export function ChecksNoPullRequestState({
 						GitHub refresh failed: {workspace.pullRequest.syncError}
 					</div>
 				) : null}
-				{prForm}
+				{children}
 
 				<section className='flex min-w-0 flex-col gap-1.5'>
 					<ChecksSectionHeader label='Git status' />
