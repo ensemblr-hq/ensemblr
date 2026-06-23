@@ -4,7 +4,6 @@ import {
 	EyeIcon,
 	ListIcon,
 	ListTreeIcon,
-	MoreVerticalIcon,
 	RefreshCwIcon,
 	SearchIcon,
 } from 'lucide-react';
@@ -14,9 +13,9 @@ import { workspaceGitStatusQuery } from '@/renderer/api/ensemble';
 import { Button } from '@/renderer/components/ui/button';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { cn } from '@/renderer/lib/utils';
 import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
-import { hasReviewableChanges } from '@/renderer/lib/workbench/review-presence';
 import {
 	changesSourceByWorkspaceAtom,
 	changesViewModeAtom,
@@ -120,22 +119,11 @@ export function ReviewPanel({
 
 	// The Review action only makes sense when there's something to review, so gate
 	// it on the *whole* branch diff vs base — committed-on-branch and uncommitted
-	// edits alike — independent of the user's selected source. When source is the
-	// default "all" + a known base, this scope matches `scope` above, so React
-	// Query dedupes it (no extra git read); only the commit/uncommitted views issue
-	// a second read for the active workspace. No base degrades to the working tree.
-	const branchScope = useMemo<WorkspaceGitDiffScope>(
-		() => (baseRef ? { baseRef, kind: 'branch' } : { kind: 'working-tree' }),
-		[baseRef],
-	);
-	const { data: branchStatusData } = useQuery({
-		...workspaceGitStatusQuery(workspace.pathLabel ?? null, branchScope),
-		placeholderData: keepPreviousData,
-	});
-	const canReview = hasReviewableChanges(
-		branchStatusData,
-		workspace.changeSummary.files,
-	);
+	// edits alike — independent of the user's selected source. Shares the
+	// branch-scoped query key with the header/Checks Create PR action, so React
+	// Query dedupes it; when source is the default "all" + a known base it also
+	// matches `scope` below, adding no extra git read.
+	const canReview = useReviewableChanges(workspace);
 
 	// Source-aware status drives both the tab count and the file list. The
 	// working-tree scope reuses the live model's query (same key), so only the
@@ -390,7 +378,8 @@ function ReviewPanelActions({
 						/>
 					)}
 				</>
-			) : activeTab === 'files' ? (
+			) : (
+				// Only 'changes' and 'files' remain here ('checks' returns early).
 				<>
 					<ReviewActionButton canReview={canReview} />
 					<Button onClick={onFileSearchOpen} size='icon-sm' variant='ghost'>
@@ -398,11 +387,6 @@ function ReviewPanelActions({
 						<span className='sr-only'>Search files</span>
 					</Button>
 				</>
-			) : (
-				<Button size='icon-sm' variant='ghost'>
-					<MoreVerticalIcon />
-					<span className='sr-only'>Open review menu</span>
-				</Button>
 			)}
 		</div>
 	);

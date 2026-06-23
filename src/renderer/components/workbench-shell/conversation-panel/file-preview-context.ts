@@ -1,5 +1,6 @@
 import { createContext, use } from 'react';
 
+import type { PullRequestCommentSummary } from '@/renderer/types/workbench';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
 /**
@@ -62,4 +63,25 @@ export const ReviewFilePreviewOpenerProvider =
 
 export function useReviewFilePreviewOpener(): ReviewFilePreviewOpener | null {
 	return use(ReviewFilePreviewOpenerContext);
+}
+
+/**
+ * Opens (or re-focuses) a read-only PR-comment preview tab in the main surface.
+ * Provided at the workbench level so the Checks panel (right sidebar) can open
+ * the preview alongside file/diff tabs; `null` outside a workspace.
+ */
+export type CommentPreviewOpener = (input: {
+	comment: PullRequestCommentSummary;
+	prNumber?: number;
+}) => void;
+
+const CommentPreviewOpenerContext = createContext<CommentPreviewOpener | null>(
+	null,
+);
+
+export const CommentPreviewOpenerProvider =
+	CommentPreviewOpenerContext.Provider;
+
+export function useCommentPreviewOpener(): CommentPreviewOpener | null {
+	return use(CommentPreviewOpenerContext);
 }

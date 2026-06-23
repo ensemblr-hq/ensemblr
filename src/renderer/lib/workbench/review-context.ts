@@ -1,5 +1,4 @@
 import type {
-	PullRequestCheckSummary,
 	PullRequestCommentSummary,
 	PullRequestTodoSummary,
 } from '@/renderer/types/workbench';
@@ -17,22 +16,6 @@ export function clampReviewContext(text: string): string {
 		return text;
 	}
 	return `${text.slice(0, REVIEW_CONTEXT_CHAR_LIMIT)}\n…[truncated — full content exceeds the review context limit]`;
-}
-
-/** Formats a failing/pending check row for Pi context. */
-export function formatCheckContext(
-	check: PullRequestCheckSummary,
-	prNumber?: number,
-): string {
-	const lines = [
-		`Failing check on PR${prNumber ? ` #${prNumber}` : ''}: ${check.label}`,
-		`Status: ${check.status}`,
-	];
-	if (check.url) {
-		lines.push(`Details: ${check.url}`);
-	}
-	lines.push('Please investigate the failure and propose a fix.');
-	return clampReviewContext(lines.join('\n'));
 }
 
 /** Formats one PR comment (GitHub or local) for Pi context. */

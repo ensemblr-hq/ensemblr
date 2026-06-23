@@ -9,6 +9,7 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
+import { CommentPreviewPanel } from './comment-preview-panel';
 import { ComposerPanel } from './composer-panel';
 import {
 	FilePreviewOpenerProvider,
@@ -134,6 +135,8 @@ export function WorkspaceConversationContent({
 				) : (
 					<TurnDiffPanel turnId={activeSession.turnId ?? null} />
 				)
+			) : activeSession.kind === 'document' && activeSession.commentPreview ? (
+				<CommentPreviewPanel comment={activeSession.commentPreview} />
 			) : (
 				<FilePreviewPanel
 					filePath={activeSession.filePath ?? null}

@@ -9,19 +9,13 @@ import type {
 	ProjectShellModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import { CommitPushDialog } from './commit-push-dialog';
-import { CreatePullRequestDialog } from './create-pull-request-dialog';
 import { MergeConfirmationDialog } from './merge-confirmation-dialog';
 import {
 	ReviewActionsContextProvider,
 	type ReviewActionsValue,
 } from './review-actions-context';
 
-type ActiveReviewDialog =
-	| { draft: boolean; kind: 'create-pr' }
-	| { kind: 'commit' }
-	| { kind: 'merge' }
-	| null;
+type ActiveReviewDialog = { kind: 'merge' } | null;
 
 const DEFAULT_MERGE_SETTINGS = {
 	archiveAfterMerge: false,
@@ -30,7 +24,7 @@ const DEFAULT_MERGE_SETTINGS = {
 } as const;
 
 /**
- * Wires the review-flow context and renders its three dialogs. All
+ * Wires the review-flow context and renders the merge confirmation dialog. All
  * data-fetching and mutation logic lives in dedicated hooks
  * (`useReviewMutations`, `usePullRequestRefresh`, `useAgentActionRunner`); the
  * provider only owns dialog visibility state and the context value.
@@ -63,21 +57,20 @@ export function ReviewActionsProvider({
 		activeWorkspace,
 	});
 	const { isRefreshingPullRequest, refreshPullRequest } = usePullRequestRefresh(
-		{ workspaceId: activeWorkspace.id },
+		{
+			workspaceCwd: activeWorkspace.pathLabel ?? null,
+			workspaceId: activeWorkspace.id,
+		},
 	);
-	const { commitMutation, createPrMutation, mergeMutation } =
-		useReviewMutations({
-			activeWorkspace,
-			mergeSettings,
-			onSettled: closeDialog,
-		});
+	const { mergeMutation } = useReviewMutations({
+		activeWorkspace,
+		mergeSettings,
+		onSettled: closeDialog,
+	});
 
 	const value = useMemo<ReviewActionsValue>(
 		() => ({
 			isRefreshingPullRequest,
-			openCommitAndPush: () => setActiveDialog({ kind: 'commit' }),
-			openCreatePullRequest: (options) =>
-				setActiveDialog({ draft: options?.draft ?? false, kind: 'create-pr' }),
 			openMergeConfirmation: () => setActiveDialog({ kind: 'merge' }),
 			refreshPullRequest,
 			runAgentAction,
@@ -88,34 +81,6 @@ export function ReviewActionsProvider({
 	return (
 		<ReviewActionsContextProvider value={value}>
 			{children}
-			<CommitPushDialog
-				isSubmitting={commitMutation.isPending}
-				onOpenChange={(open) => {
-					if (!open) {
-						closeDialog();
-					}
-				}}
-				onSubmit={(message) => commitMutation.mutate(message)}
-				open={activeDialog?.kind === 'commit'}
-				workspace={activeWorkspace}
-			/>
-			<CreatePullRequestDialog
-				initialDraft={activeDialog?.kind === 'create-pr' && activeDialog.draft}
-				isSubmitting={createPrMutation.isPending}
-				onOpenChange={(open) => {
-					if (!open) {
-						closeDialog();
-					}
-				}}
-				onSubmit={(input) =>
-					createPrMutation.mutate({
-						...input,
-						commitFirst: activeWorkspace.changeSummary.files > 0,
-					})
-				}
-				open={activeDialog?.kind === 'create-pr'}
-				workspace={activeWorkspace}
-			/>
 			<MergeConfirmationDialog
 				archiveAfterMerge={mergeSettings.archiveAfterMerge}
 				deleteLocalBranchOnArchive={mergeSettings.deleteLocalBranchOnArchive}

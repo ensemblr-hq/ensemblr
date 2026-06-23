@@ -84,6 +84,7 @@ export function buildPullRequestShellModel({
 		label: deriveLabel(pullRequest, status),
 		number: pullRequest.number,
 		...(previewDeployment ? { previewDeployment } : {}),
+		state: pullRequest.state,
 		status,
 		...(syncError ? { syncError } : {}),
 		syncedAt: snapshot.syncedAt,

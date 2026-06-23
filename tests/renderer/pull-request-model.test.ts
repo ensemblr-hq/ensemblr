@@ -4,7 +4,6 @@ import { buildPullRequestShellModel } from '../../src/renderer/lib/workbench/pul
 import {
 	clampReviewContext,
 	formatAllCommentsContext,
-	formatCheckContext,
 	REVIEW_CONTEXT_CHAR_LIMIT,
 } from '../../src/renderer/lib/workbench/review-context';
 import type {
@@ -79,6 +78,7 @@ describe('buildPullRequestShellModel', () => {
 		expect(model.number).toBeUndefined();
 		expect(model.label).toBe('No PR');
 		expect(model.gitStatus.status).toBe('open');
+		expect(model.state).toBeUndefined();
 	});
 
 	test('uncommitted changes produce commit-and-push git status', () => {
@@ -112,6 +112,7 @@ describe('buildPullRequestShellModel', () => {
 		expect(model.status).toBe('ready-to-merge');
 		expect(model.label).toBe('Ready to merge');
 		expect(model.checks).toHaveLength(2);
+		expect(model.state).toBe('open');
 	});
 
 	test('failing check derives blocked status', () => {
@@ -259,27 +260,11 @@ describe('buildPullRequestShellModel', () => {
 
 		expect(model.label).toBe('Merged');
 		expect(model.status).toBe('idle');
+		expect(model.state).toBe('merged');
 	});
 });
 
 describe('review context formatting', () => {
-	test('check context includes label, status, and link', () => {
-		const text = formatCheckContext(
-			{
-				id: 'c1',
-				label: 'build',
-				provider: 'github',
-				status: 'blocked',
-				url: 'https://ci.example/1',
-			},
-			7,
-		);
-
-		expect(text).toContain('build');
-		expect(text).toContain('#7');
-		expect(text).toContain('https://ci.example/1');
-	});
-
 	test('all-comments context numbers each comment', () => {
 		const text = formatAllCommentsContext(
 			[

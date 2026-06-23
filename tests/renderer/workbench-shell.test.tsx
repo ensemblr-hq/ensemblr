@@ -120,7 +120,11 @@ function stubSessionNavigation(
 		closeSessionTab: () => undefined,
 		closeSessionTabAsync: () => Promise.resolve({ replacementChatTabId: null }),
 		effectiveActiveSession: activeSession,
+		openCommentPreviewTab: () => Promise.resolve(null),
+		openFilePreviewTab: () => Promise.resolve(null),
 		openSessionTab: () => Promise.resolve(null),
+		openTurnDiffTab: () => Promise.resolve(null),
+		openWorkspaceFileDiffTab: () => Promise.resolve(null),
 		restoreSessionTab: () => undefined,
 		sessionTabs: activeWorkspace.sessions,
 	};
@@ -277,6 +281,9 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('Pull request activity in progress');
 	expect(markup).toContain('THE-102 Rework workbench shell');
 	expect(markup).toContain('Add all to chat');
+	// Reworked comment rows expose hover actions; "Hide comment" is unique to the
+	// new row, so its presence proves the rebuilt Comments section rendered.
+	expect(markup).toContain('Hide comment');
 	expect(markup).toContain('Open app settings');
 	expect(markup).toContain('Open current workspace in VS Code');
 	expect(markup).toContain('Open current workspace app options');
@@ -507,14 +514,11 @@ test('renders merge-ready pull request state in the right header', () => {
 		'data-workspace-sidebar-state="workspace-blocked"',
 	);
 	expect(markup).toContain('data-checks-panel-state="pr-ready"');
-	expect(markup).toContain('Preview');
-	expect(markup).toContain('Open Vercel preview deployment');
-	expect(markup).toContain('href="https://ensemble-ready.vercel.app"');
-	expect(markup).toContain('Deployments');
-	expect(markup).toContain('Open scan check');
-	expect(markup).toContain(
-		'href="https://github.com/psoldunov/ensemble/actions/runs/102"',
-	);
+	// The Checks and Deployments sections were removed from the Checks panel;
+	// their data no longer renders there (the preview-deploy link lives on in the
+	// right-sidebar PR header, which is out of scope for this rework).
+	expect(markup).not.toContain('Deployments');
+	expect(markup).not.toContain('Open scan check');
 	expect(markup).toContain('All required checks passed.');
 	expect(markup).toContain('Merge');
 	expect(markup).toContain('Requires confirmation');
@@ -571,13 +575,50 @@ test('renders an open idle pull request without working affordances', () => {
 		'data-workspace-sidebar-state="workspace-blocked"',
 	);
 	expect(markup).toContain('data-checks-panel-state="pr-open"');
-	expect(markup).toContain('Pull request is open.');
-	expect(markup).toContain('No checks reported yet');
-	expect(markup).toContain('No description provided');
+	// The status banner is gone; PR title/description are editable inputs that
+	// seed from the open PR (title here, empty description shows its placeholder).
+	expect(markup).toContain('PR title');
+	expect(markup).toContain('PR description');
+	expect(markup).toContain('Open fixture');
 	expect(markup).toContain('Open pull request menu');
 	expect(markup).not.toContain('Working...');
 	expect(markup).not.toContain('Pull request activity in progress');
 	expect(markup).not.toContain('Create PR');
+});
+
+test('hides the git status section on a merged or closed pull request', () => {
+	const snapshot = createSnapshot(
+		[
+			createCheck({ id: 'config', title: 'Declarative config' }),
+			createCheck({ id: 'sqlite-database', title: 'SQLite database' }),
+		],
+		'ready',
+	);
+	const withState = (
+		state?: 'closed' | 'merged' | 'open',
+	): WorkspaceShellModel => {
+		const base = getDefaultWorkspace();
+		return {
+			...base,
+			pullRequest: {
+				...base.pullRequest,
+				gitStatus: { label: 'Up to date with remote', status: 'open' },
+				...(state ? { state } : {}),
+			},
+		};
+	};
+
+	const openMarkup = renderWorkbench(snapshot, withState('open'), 'checks');
+	const mergedMarkup = renderWorkbench(snapshot, withState('merged'), 'checks');
+	const closedMarkup = renderWorkbench(snapshot, withState('closed'), 'checks');
+
+	// Open PRs keep the git status row; merged/closed PRs drop the whole section.
+	expect(openMarkup).toContain('Up to date with remote');
+	expect(mergedMarkup).not.toContain('Up to date with remote');
+	expect(closedMarkup).not.toContain('Up to date with remote');
+	// Comments stay available regardless of merge state.
+	expect(mergedMarkup).toContain('Comments');
+	expect(closedMarkup).toContain('Comments');
 });
 
 test('renders a blocked pull request header with danger state actions', () => {
@@ -800,10 +841,10 @@ test('renders no pull request empty state in the checks tab', () => {
 	);
 
 	expect(markup).toContain('data-checks-panel-state="empty"');
-	expect(markup).toContain('No local changes to review.');
 	expect(markup).toContain('No PR open');
-	expect(markup).not.toContain('PR title');
-	expect(markup).not.toContain('PR description');
+	// PR title/description inputs replace the old status banner in every state.
+	expect(markup).toContain('PR title');
+	expect(markup).toContain('PR description');
 	expect(markup).not.toContain('Create PR');
 	expect(markup).not.toContain('Open create pull request options');
 	expect(markup).not.toContain('Commit and push');
@@ -858,13 +899,13 @@ test('renders uncommitted no pull request state in the checks tab', () => {
 	);
 
 	expect(markup).toContain('data-checks-panel-state="uncommitted"');
-	expect(markup).toContain('1 uncommitted change ready for PR setup.');
+	expect(markup).toContain('1 uncommitted change');
 	expect(markup).toContain('No PR open');
 	expect(markup).toContain('Create PR');
 	expect(markup).toContain('Open create pull request options');
 	expect(markup).toContain('Commit and push');
-	expect(markup).not.toContain('PR title');
-	expect(markup).not.toContain('PR description');
+	expect(markup).toContain('PR title');
+	expect(markup).toContain('PR description');
 });
 
 test('renders plain working header fixture without pull request number', () => {

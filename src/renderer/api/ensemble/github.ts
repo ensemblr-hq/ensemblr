@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query';
+import { type QueryClient, queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type {
@@ -49,6 +49,37 @@ export function pullRequestSnapshotQuery({
 		refetchInterval: PR_SNAPSHOT_REFETCH_INTERVAL_MS,
 		staleTime: 10_000,
 	});
+}
+
+/**
+ * Forces a cache-bypassing PR-snapshot fetch (`refresh: true`) and writes the
+ * result straight into the query cache. Used by the agent-idle auto-refresh,
+ * the manual refresh button, and the create/merge mutations so the panel
+ * reflects new PR state immediately instead of waiting for the 30s poll (and
+ * the main-process snapshot's own 30s TTL, which a plain refetch would hit).
+ */
+export async function refreshPullRequestSnapshot({
+	queryClient,
+	workspaceCwd,
+	workspaceId,
+}: {
+	queryClient: QueryClient;
+	workspaceCwd: string;
+	workspaceId: string;
+}): Promise<void> {
+	const result = await profileElectronIpcCall(
+		{ channel: 'ensemble:get-pull-request-snapshot', usesDatabase: true },
+		() =>
+			getEnsembleApi().getPullRequestSnapshot({
+				refresh: true,
+				workspaceCwd,
+				workspaceId,
+			}),
+	);
+	queryClient.setQueryData(
+		ensembleQueryKeys.pullRequestSnapshot(workspaceId),
+		result,
+	);
 }
 
 /** Query options for Ensemble-local review comments. */
