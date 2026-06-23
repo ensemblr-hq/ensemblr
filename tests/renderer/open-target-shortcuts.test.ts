@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 
-import { shouldIgnoreShortcut } from '../../src/renderer/components/workbench-shell/use-open-target-shortcuts';
+import { shouldIgnoreShortcut } from '../../src/renderer/hooks/workbench-shell/use-open-target-shortcuts';
 
 function makeEvent(target: EventTarget | null): KeyboardEvent {
 	return { target } as unknown as KeyboardEvent;

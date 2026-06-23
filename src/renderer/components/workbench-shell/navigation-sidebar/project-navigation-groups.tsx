@@ -1,3 +1,6 @@
+import { useQueryClient } from '@tanstack/react-query';
+
+import { prefetchWorkspaceSources } from '@/renderer/api/ensemble';
 import { ReorderList } from '@/renderer/components/ui/reorder-list';
 import {
 	SidebarGroup,
@@ -98,6 +101,7 @@ export function ProjectNavigationGroups({
 		disableProjectReorderLayoutAnimation,
 	});
 
+	const queryClient = useQueryClient();
 	const handleArchiveBrowseChange = useArchiveBrowseChange();
 
 	return (
@@ -132,6 +136,9 @@ export function ProjectNavigationGroups({
 							activeWorkspace={activeWorkspace}
 							isCollapsed={isProjectCollapsed}
 							key={project.id}
+							onCreateFromSourcePrefetch={() =>
+								prefetchWorkspaceSources(queryClient, project.id)
+							}
 							onCreateFromSourceSelect={() =>
 								controller.openCreateSource(project)
 							}
@@ -175,8 +182,11 @@ export function ProjectNavigationGroups({
 				deleteProjectTarget={state.deleteProjectTarget}
 				deleteWorkspaceTarget={state.deleteWorkspaceTarget}
 				onArchiveBrowseChange={handleArchiveBrowseChange}
-				onCreateWorkspaceFromIssue={(project, seed) => {
+				onCreateWorkspaceFromSource={(project, seed) => {
 					void handleCreateWorkspace(project, seed);
+				}}
+				onOpenWorkspace={(project, workspaceId) => {
+					onWorkspaceSelect(project.id, workspaceId);
 				}}
 				onProjectArchived={handleProjectLifecycleAction}
 				onProjectDeleted={handleProjectLifecycleAction}

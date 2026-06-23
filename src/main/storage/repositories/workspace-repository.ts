@@ -670,6 +670,31 @@ export function listAllWorkspaceRows({
 }
 
 /** Inputs for {@link listWorkspaceIdsByRepository}. */
+export interface ListActiveWorkspaceBranchRowsByRepositoryOptions {
+	database: DatabaseSync;
+	repositoryId: string;
+}
+
+/**
+ * Returns `{ id, branchName }` for every active (non-archived) workspace in a
+ * repository, so the create-from-source picker can mark branches that already
+ * back a workspace and offer "Open" instead of forking a duplicate.
+ */
+export function listActiveWorkspaceBranchRowsByRepository({
+	database,
+	repositoryId,
+}: ListActiveWorkspaceBranchRowsByRepositoryOptions): unknown[] {
+	return database
+		.prepare(
+			`SELECT
+				id AS id,
+				branch_name AS branchName
+			FROM workspaces
+			WHERE repository_id = ? AND archived_at IS NULL`,
+		)
+		.all(repositoryId);
+}
+
 export interface ListWorkspaceIdsByRepositoryOptions {
 	database: DatabaseSync;
 	repositoryId: string;

@@ -2,14 +2,8 @@ import { type QueryClient, queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type {
-	CommitWorkspaceChangesRequest,
-	CommitWorkspaceChangesResult,
-	CreatePullRequestRequest,
-	CreatePullRequestResult,
 	MergePullRequestRequest,
 	MergePullRequestResult,
-	PushWorkspaceBranchRequest,
-	PushWorkspaceBranchResult,
 } from '@/shared/ipc/contracts/github';
 import type {
 	DeleteReviewCommentRequest,
@@ -117,24 +111,6 @@ export function reviewTodosQuery(workspaceId: string) {
 		queryKey: ensembleQueryKeys.reviewTodos(workspaceId),
 		staleTime: 5_000,
 	});
-}
-
-export function commitWorkspaceChanges(
-	request: CommitWorkspaceChangesRequest,
-): Promise<CommitWorkspaceChangesResult> {
-	return getEnsembleApi().commitWorkspaceChanges(request);
-}
-
-export function pushWorkspaceBranch(
-	request: PushWorkspaceBranchRequest,
-): Promise<PushWorkspaceBranchResult> {
-	return getEnsembleApi().pushWorkspaceBranch(request);
-}
-
-export function createPullRequest(
-	request: CreatePullRequestRequest,
-): Promise<CreatePullRequestResult> {
-	return getEnsembleApi().createPullRequest(request);
 }
 
 export function mergePullRequest(

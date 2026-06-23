@@ -4,9 +4,8 @@ import {
 	FolderGit2Icon,
 	GitBranchIcon,
 	GitPullRequestIcon,
-	GlobeIcon,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -27,12 +26,13 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from '@/renderer/components/ui/toggle-group';
-import { defaultWorkspaceSources } from '@/renderer/fixtures/workbench';
+import type { WorkspaceCreationSeed } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
+import { useWorkspaceSourcePicker } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-source-picker';
 import {
-	filterWorkspaceSourcesByKind,
 	getWorkspaceSourceActions,
 	getWorkspaceSourceKindLabel,
 	WORKSPACE_SOURCE_KINDS,
+	workspaceSeedFromSourceItem,
 } from '@/renderer/lib/workbench';
 import type {
 	ProjectShellModel,
@@ -54,29 +54,29 @@ const searchPlaceholders: Record<WorkspaceSourceKind, string> = {
 export function CreateWorkspaceSourceDialog({
 	onCreateWorkspace,
 	onOpenChange,
+	onOpenWorkspace,
 	open,
 	project,
 	projects,
-	sources = defaultWorkspaceSources,
 }: {
 	onCreateWorkspace?: (input: {
-		action: WorkspaceSourceAction;
 		repoId: string;
-		source: WorkspaceSource;
+		seed: WorkspaceCreationSeed;
 	}) => void;
 	onOpenChange: (open: boolean) => void;
+	onOpenWorkspace?: (input: { repoId: string; workspaceId: string }) => void;
 	open: boolean;
 	project: ProjectShellModel | null;
 	projects: ProjectShellModel[];
-	sources?: WorkspaceSource[];
 }) {
 	const [kind, setKind] = useState<WorkspaceSourceKind>('pull-request');
 	const [repoId, setRepoId] = useState(project?.id ?? projects[0]?.id ?? '');
 
-	const visibleSources = useMemo(
-		() => filterWorkspaceSourcesByKind(sources, kind),
-		[sources, kind],
-	);
+	const { error, isLoading, itemsById, sources } = useWorkspaceSourcePicker({
+		kind,
+		open,
+		repoId,
+	});
 	const selectedRepo =
 		projects.find((candidate) => candidate.id === repoId) ?? project ?? null;
 
@@ -90,12 +90,24 @@ export function CreateWorkspaceSourceDialog({
 		}
 	}
 
-	/** Forwards an action selection to the parent and closes the dialog. */
+	/** Turns a selected source into a create-or-open action, then closes. */
 	const dispatchAction = (
 		source: WorkspaceSource,
 		action: WorkspaceSourceAction,
 	) => {
-		onCreateWorkspace?.({ action, repoId, source });
+		const item = itemsById.get(source.id);
+		if (item) {
+			const openBranch =
+				action.id === 'open' && item.kind === 'branch' ? item.branch : null;
+			if (openBranch?.workspaceId) {
+				onOpenWorkspace?.({ repoId, workspaceId: openBranch.workspaceId });
+			} else {
+				onCreateWorkspace?.({
+					repoId,
+					seed: workspaceSeedFromSourceItem(item),
+				});
+			}
+		}
 		onOpenChange(false);
 	};
 
@@ -136,12 +148,30 @@ export function CreateWorkspaceSourceDialog({
 					/>
 				</div>
 				<CommandList className='max-h-80 border-border border-t'>
-					<CommandEmpty className='py-8 text-muted-foreground text-xs'>
-						No {getWorkspaceSourceKindLabel(kind).toLowerCase()} match your
-						search.
-					</CommandEmpty>
+					{/* Banners only when there is nothing to show yet — once cached rows
+					    exist we render them and let a refetch happen silently, so the
+					    list never flashes a loading state over real data. */}
+					{sources.length === 0 && error ? (
+						<div className='px-3 py-8 text-destructive text-xs'>
+							<p>{error.message}</p>
+							{error.remediation ? (
+								<p className='mt-1 text-muted-foreground'>
+									{error.remediation}
+								</p>
+							) : null}
+						</div>
+					) : sources.length === 0 && isLoading ? (
+						<div className='py-8 text-center text-muted-foreground text-xs'>
+							Loading {getWorkspaceSourceKindLabel(kind).toLowerCase()}…
+						</div>
+					) : (
+						<CommandEmpty className='py-8 text-muted-foreground text-xs'>
+							No {getWorkspaceSourceKindLabel(kind).toLowerCase()} match your
+							search.
+						</CommandEmpty>
+					)}
 					<CommandGroup>
-						{visibleSources.map((source) => {
+						{sources.map((source) => {
 							const actions = getWorkspaceSourceActions(source);
 							const primaryAction = actions[0];
 
@@ -199,8 +229,8 @@ function WorkspaceSourceActions({
 				<Button
 					className={
 						action.variant === 'primary'
-							? 'h-6 gap-1.5 bg-foreground px-2 text-background text-xs hover:bg-foreground/90 hover:text-background'
-							: 'h-6 gap-1.5 border border-border bg-popover px-2 text-foreground text-xs hover:bg-foreground/10 hover:text-foreground'
+							? 'h-6 gap-1.5 bg-foreground px-2 text-background text-xs hover:bg-foreground/80 hover:text-background dark:hover:bg-foreground/80'
+							: 'h-6 gap-1.5 border border-border bg-popover px-2 text-foreground text-xs hover:bg-foreground/10 hover:text-foreground dark:hover:bg-foreground/10'
 					}
 					data-action-id={action.id}
 					key={action.id}
@@ -311,9 +341,5 @@ function WorkspaceSourceIcon({ source }: { source: WorkspaceSource }) {
 		);
 	}
 
-	return source.provider === 'local-git' ? (
-		<GitBranchIcon aria-hidden='true' className={className} />
-	) : (
-		<GlobeIcon aria-hidden='true' className={className} />
-	);
+	return <GitBranchIcon aria-hidden='true' className={className} />;
 }

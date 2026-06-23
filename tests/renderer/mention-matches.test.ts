@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { getMentionMatches } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/use-mention-matches';
+import { getMentionMatches } from '../../src/renderer/hooks/workbench-shell/composer/use-mention-matches';
 import type { WorkspaceFileSummary } from '../../src/renderer/types/workbench';
 
 const FILES: WorkspaceFileSummary[] = [

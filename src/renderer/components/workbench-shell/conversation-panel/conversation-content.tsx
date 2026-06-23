@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
-import { formatLinearIssueContext } from '@/renderer/lib/linear';
 import { toWorkspaceRelativePath } from '@/renderer/lib/pi';
+import { formatLinkedIssueComposerSeed } from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
 import type {
 	ComposerShellState,
@@ -149,8 +149,9 @@ export function WorkspaceConversationContent({
 }
 
 /**
- * Composer seed for issue-created workspaces: linked-issue context is offered
- * for the first prompt only (no Pi session yet); the user still presses send.
+ * Composer seed for issue-created workspaces: the issue contents (heading, body,
+ * link) are offered as the first-prompt draft (no Pi session yet); the user
+ * edits and presses send — nothing is auto-submitted.
  */
 function getLinkedIssueComposerSeed(
 	workspace: WorkspaceShellModel,
@@ -158,13 +159,16 @@ function getLinkedIssueComposerSeed(
 ): string | undefined {
 	const linkedIssue = workspace.landingSummary?.linkedIssue;
 
-	if (linkedIssue?.provider !== 'linear' || session.piSessionId) {
+	if (!linkedIssue || session.piSessionId) {
 		return undefined;
 	}
 
-	return formatLinearIssueContext({
-		identifier: linkedIssue.reference,
+	return formatLinkedIssueComposerSeed({
+		...(linkedIssue.description !== undefined
+			? { description: linkedIssue.description }
+			: {}),
+		reference: linkedIssue.reference,
 		title: linkedIssue.title,
-		url: linkedIssue.url ?? null,
+		...(linkedIssue.url !== undefined ? { url: linkedIssue.url } : {}),
 	});
 }

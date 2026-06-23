@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import type { SlashCommandDescriptor } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/slash-commands';
-import { sortSlashCommands } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/use-slash-commands';
+import { sortSlashCommands } from '../../src/renderer/hooks/workbench-shell/composer/use-slash-commands';
 
 const COMMANDS: SlashCommandDescriptor[] = [
 	{

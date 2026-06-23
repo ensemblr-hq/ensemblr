@@ -296,9 +296,10 @@ export function parseQuickStartProjectRequest(raw: unknown): {
 }
 
 const workspaceLinkedIssueSchema = z.object({
+	description: z.string().optional(),
 	id: z.string().min(1),
 	identifier: z.string().min(1),
-	provider: z.literal('linear'),
+	provider: z.enum(['github', 'linear']),
 	teamKey: z.string().optional(),
 	teamName: z.string().optional(),
 	title: z.string().min(1),
@@ -698,6 +699,14 @@ export const mergePullRequestRequestSchema = z.object({
 	method: z.enum(['merge', 'rebase', 'squash']).optional(),
 	workspaceCwd: z.string().min(1),
 	workspaceId: z.string().min(1),
+});
+
+/**
+ * {@link import('../../shared/ipc/contracts/workspace-sources').ListRepositoryBranchesRequest}
+ * and its PR/issue siblings — all just a repository id.
+ */
+export const listRepositorySourcesRequestSchema = z.object({
+	repositoryId: z.string().min(1),
 });
 
 // -----------------------------------------------------------------------------

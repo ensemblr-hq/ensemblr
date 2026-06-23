@@ -18,13 +18,6 @@ const kindLabels: Record<WorkspaceSourceKind, string> = {
 	'pull-request': 'Pull requests',
 };
 
-const OPEN_ACTION: WorkspaceSourceAction = {
-	id: 'open',
-	label: 'Open',
-	shortcut: '↵',
-	variant: 'primary',
-};
-
 const CREATE_ACTION: WorkspaceSourceAction = {
 	id: 'create',
 	label: 'Create',
@@ -52,7 +45,6 @@ const BRANCH_WORKSPACE_ACTIONS: readonly WorkspaceSourceAction[] = [
 const providerLabels: Record<WorkspaceSourceProvider, string> = {
 	github: 'GitHub',
 	linear: 'Linear',
-	'local-git': 'Local',
 };
 
 /** Tab label for a source kind, e.g. `Pull requests`. */
@@ -72,11 +64,13 @@ export function getWorkspaceSourceActions(
 		case 'issue':
 			return [CREATE_ACTION];
 		case 'branch':
+			// A branch backing an active workspace offers Open + Duplicate;
+			// otherwise it forks a fresh workspace.
 			return source.hasWorkspace
 				? [...BRANCH_WORKSPACE_ACTIONS]
 				: [USE_BRANCH_ACTION];
 		case 'pull-request':
-			return [OPEN_ACTION];
+			return [CREATE_ACTION];
 	}
 }
 
@@ -85,12 +79,4 @@ export function getWorkspaceSourceProviderLabel(
 	provider: WorkspaceSourceProvider,
 ): string {
 	return providerLabels[provider];
-}
-
-/** Sources of a single kind, preserving input order. */
-export function filterWorkspaceSourcesByKind(
-	sources: WorkspaceSource[],
-	kind: WorkspaceSourceKind,
-): WorkspaceSource[] {
-	return sources.filter((source) => source.kind === kind);
 }

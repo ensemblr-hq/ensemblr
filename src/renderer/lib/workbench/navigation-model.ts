@@ -394,6 +394,9 @@ function readLinkedIssueMetadata(
 	}
 
 	return {
+		...(typeof record.description === 'string'
+			? { description: record.description }
+			: {}),
 		provider,
 		reference: identifier,
 		...(typeof record.id === 'string' ? { remoteId: record.id } : {}),
