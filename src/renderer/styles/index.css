@@ -313,6 +313,30 @@
 		display: none;
 	}
 
+	/* Thin, overlay-style scrollbar — subtle thumb, no track or buttons. */
+	.sleek-scrollbar {
+		scrollbar-width: thin;
+		scrollbar-color: var(--border) transparent;
+	}
+
+	.sleek-scrollbar::-webkit-scrollbar {
+		width: 0.375rem;
+		height: 0.375rem;
+	}
+
+	.sleek-scrollbar::-webkit-scrollbar-track {
+		background: transparent;
+	}
+
+	.sleek-scrollbar::-webkit-scrollbar-thumb {
+		border-radius: 9999px;
+		background-color: var(--border);
+	}
+
+	.sleek-scrollbar::-webkit-scrollbar-thumb:hover {
+		background-color: var(--muted-foreground);
+	}
+
 	.review-panel {
 		container-type: inline-size;
 	}
@@ -360,6 +384,10 @@
 	[data-slot="sidebar-menu-button"],
 	[data-slot="tabs-trigger"] {
 		-webkit-app-region: no-drag;
+	}
+
+	button:not(:disabled) {
+		@apply cursor-pointer;
 	}
 
 	.terminal-scanline {

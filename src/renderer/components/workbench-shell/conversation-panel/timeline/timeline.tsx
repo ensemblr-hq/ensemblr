@@ -422,9 +422,7 @@ function RuntimeDiagnostic({ message }: { message: UIMessage }) {
 		);
 	}
 
-	return (
-		<p className='px-1 text-status-warning text-xs'>{text}</p>
-	);
+	return <p className='px-1 text-status-warning text-xs'>{text}</p>;
 }
 
 /** Memoised payload renderer — classification runs once per (value, toolName). */

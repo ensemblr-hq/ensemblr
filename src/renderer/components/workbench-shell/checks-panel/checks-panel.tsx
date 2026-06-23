@@ -1,5 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useAtom, useSetAtom } from 'jotai';
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -10,41 +17,154 @@ import {
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { getChecksPanelState } from '@/renderer/lib/workbench/checks-panel-state';
 import {
+	buildCommitAndPushPrompt,
+	buildCreatePullRequestPrompt,
+} from '@/renderer/lib/workbench/checks-pr-prompts';
+import {
+	prDraftIdentity,
+	seedPrDetails,
+} from '@/renderer/lib/workbench/pr-details-draft';
+import {
 	formatAllCommentsContext,
-	formatCheckContext,
 	formatCommentContext,
 	formatTodoContext,
 } from '@/renderer/lib/workbench/review-context';
-import { useComposerInsert } from '@/renderer/state/composer';
+import {
+	useComposerInsert,
+	useComposerSubmit,
+} from '@/renderer/state/composer';
+import {
+	prDetailsDraftAtomFamily,
+	prDetailsLiveDraftAtomFamily,
+} from '@/renderer/state/preferences';
 import type { ChecksPanelState } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
-import { AgentActionsMenu } from '../review-actions/agent-actions-menu';
-import { useReviewActions } from '../review-actions/review-actions-context';
+import { useCommentPreviewOpener } from '../conversation-panel/file-preview-context';
 import { ChecksEmptyMessage, ChecksNoPullRequestState } from './empty-states';
-import { ChecksSectionHeader, PullRequestMetadata } from './pr-metadata';
+import { PrDetailsForm } from './pr-details-form';
+import { ChecksSectionHeader } from './pr-metadata';
 import {
-	PullRequestCheckRow,
 	PullRequestCommentRow,
-	PullRequestPreviewDeploymentRow,
 	PullRequestStatusRow,
 	PullRequestTodoRow,
 } from './pr-rows';
-import { ChecksPanelSummary } from './summary';
+
+/** Editable PR title/description draft plus its save/discard controls. */
+interface PrDetailsFormState {
+	canSave: boolean;
+	description: string;
+	discard: () => void;
+	isDirty: boolean;
+	save: () => void;
+	setDescription: (value: string) => void;
+	setTitle: (value: string) => void;
+	title: string;
+}
+
+/**
+ * Owns the editable PR title/description. The committed values persist locally
+ * per workspace (Save); until the user saves, the inputs seed from the open PR.
+ * Editing lives in local state so Discard reverts to the saved (or seeded)
+ * baseline, and re-seeds when the workspace or its PR changes — using React's
+ * "adjust state during render" pattern so edits survive background gh refreshes.
+ */
+function usePrDetailsDraft(workspace: WorkspaceShellModel): PrDetailsFormState {
+	const [saved, setSaved] = useAtom(prDetailsDraftAtomFamily(workspace.id));
+	const publishLiveDraft = useSetAtom(
+		prDetailsLiveDraftAtomFamily(workspace.id),
+	);
+	const baseline = saved ?? seedPrDetails(workspace);
+	const identity = prDraftIdentity(workspace);
+
+	const [edit, setEdit] = useState(() => ({ ...baseline, identity }));
+	if (edit.identity !== identity) {
+		setEdit({ ...baseline, identity });
+	}
+
+	// Publish live edits so other surfaces (the sidebar "Create PR" menu) hand the
+	// agent the same title/description shown here, not just the last Saved draft.
+	useEffect(() => {
+		publishLiveDraft({
+			description: edit.description,
+			identity: edit.identity,
+			title: edit.title,
+		});
+	}, [edit, publishLiveDraft]);
+
+	const isDirty =
+		edit.title !== baseline.title || edit.description !== baseline.description;
+
+	return {
+		canSave: isDirty && edit.title.trim().length > 0,
+		description: edit.description,
+		discard: () => setEdit({ ...baseline, identity }),
+		isDirty,
+		save: () => {
+			if (edit.title.trim().length === 0) {
+				return;
+			}
+			setSaved({ description: edit.description, title: edit.title });
+		},
+		setDescription: (description) =>
+			setEdit((current) => ({ ...current, description })),
+		setTitle: (title) => setEdit((current) => ({ ...current, title })),
+		title: edit.title,
+	};
+}
 
 /** Review-panel "Checks" tab — renders PR metadata, statuses, comments and todos. */
 export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 	const panelState = getChecksPanelState(workspace);
-	const reviewActions = useReviewActions();
 	const todoActions = useTodoActions(workspace.id);
+	const submitToComposer = useComposerSubmit();
+	const draft = usePrDetailsDraft(workspace);
+	// "Create PR" stays available whenever the branch differs from base, even with
+	// a clean worktree once edits are committed.
+	const canCreatePullRequest = useReviewableChanges(workspace);
+
+	const sendCommitAndPush = useCallback(() => {
+		submitToComposer(buildCommitAndPushPrompt(workspace));
+		toast.success('Asked the agent to commit and push.');
+	}, [submitToComposer, workspace]);
+
+	const sendCreatePullRequest = useCallback(() => {
+		submitToComposer(
+			buildCreatePullRequestPrompt({
+				description: draft.description,
+				title: draft.title,
+				workspace,
+			}),
+		);
+		toast.success(
+			workspace.pullRequest.number
+				? 'Asked the agent to update the pull request.'
+				: 'Asked the agent to open a pull request.',
+		);
+	}, [draft.description, draft.title, submitToComposer, workspace]);
+
+	const prForm = (
+		<PrDetailsForm
+			canSave={draft.canSave}
+			description={draft.description}
+			isDirty={draft.isDirty}
+			onDescriptionChange={draft.setDescription}
+			onDiscard={draft.discard}
+			onSave={draft.save}
+			onTitleChange={draft.setTitle}
+			title={draft.title}
+		/>
+	);
 
 	if (!panelState.hasPullRequest) {
 		return (
 			<ChecksNoPullRequestState
-				onCommitAndPush={reviewActions?.openCommitAndPush}
-				onCreatePullRequest={() => reviewActions?.openCreatePullRequest()}
+				canCreatePullRequest={canCreatePullRequest}
+				onCommitAndPush={sendCommitAndPush}
+				onCreatePullRequest={sendCreatePullRequest}
 				state={panelState}
 				todoSection={
 					<TodoSection
@@ -53,16 +173,22 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 					/>
 				}
 				workspace={workspace}
-			/>
+			>
+				{prForm}
+			</ChecksNoPullRequestState>
 		);
 	}
 
 	return (
 		<ChecksPullRequestPanel
+			onCommitAndPush={sendCommitAndPush}
+			onUpdatePullRequest={sendCreatePullRequest}
 			state={panelState}
 			todoActions={todoActions}
 			workspace={workspace}
-		/>
+		>
+			{prForm}
+		</ChecksPullRequestPanel>
 	);
 }
 
@@ -125,106 +251,108 @@ function useTodoActions(workspaceId: string): TodoActions {
 
 /** Body of the checks panel when a pull request exists. */
 function ChecksPullRequestPanel({
+	children,
+	onCommitAndPush,
+	onUpdatePullRequest,
 	state,
 	todoActions,
 	workspace,
 }: {
+	children: ReactNode;
+	onCommitAndPush: () => void;
+	onUpdatePullRequest: () => void;
 	state: Extract<ChecksPanelState, { hasPullRequest: true }>;
 	todoActions: TodoActions;
 	workspace: WorkspaceShellModel;
 }) {
 	const { pullRequest } = state;
 	const insertIntoComposer = useComposerInsert();
-	const reviewActions = useReviewActions();
+	const openCommentPreview = useCommentPreviewOpener();
 	const showGitStatusAction = state.kind !== 'pr-ready';
+	// A merged/closed PR has no actionable git status, so the section is hidden.
+	const isClosedOrMerged =
+		pullRequest.state === 'merged' || pullRequest.state === 'closed';
 
-	const addCheckToChat = (check: (typeof pullRequest.checks)[number]) => {
-		insertIntoComposer(formatCheckContext(check, pullRequest.number));
-		toast.success('Check context added to chat.');
-	};
+	// Hiding a comment dismisses it for this session only (it returns on reload).
+	// State is keyed by workspace id so hidden ids never leak across a workspace
+	// switch — the render-time reset mirrors usePrDetailsDraft's identity pattern.
+	const [hidden, setHidden] = useState(() => ({
+		ids: new Set<string>(),
+		workspaceId: workspace.id,
+	}));
+	if (hidden.workspaceId !== workspace.id) {
+		setHidden({ ids: new Set<string>(), workspaceId: workspace.id });
+	}
+	const visibleComments = pullRequest.comments.filter(
+		(comment) => !hidden.ids.has(comment.id),
+	);
+
 	const addCommentToChat = (comment: (typeof pullRequest.comments)[number]) => {
 		insertIntoComposer(formatCommentContext(comment, pullRequest.number));
 		toast.success('Comment added to chat.');
 	};
+	const hideComment = (id: string) => {
+		setHidden((current) => ({
+			ids: new Set(current.ids).add(id),
+			workspaceId: current.workspaceId,
+		}));
+	};
 
 	return (
 		<ScrollArea className='h-full overflow-hidden'>
-			<div className='flex min-w-0 max-w-full flex-col gap-4 overflow-hidden p-3'>
+			<div
+				className='flex min-w-0 max-w-full flex-col gap-4 overflow-hidden p-3'
+				data-checks-panel-state={state.kind}
+			>
 				{pullRequest.syncError ? (
 					<div className='rounded-md border border-status-danger/40 bg-pane px-3 py-2 text-status-danger text-xs leading-5'>
 						GitHub refresh failed: {pullRequest.syncError}
 					</div>
 				) : null}
-				<ChecksPanelSummary state={state} />
-				<div className='flex items-center justify-end'>
-					<AgentActionsMenu />
-				</div>
-				<PullRequestMetadata pullRequest={pullRequest} />
+				{children}
 
-				<section className='flex min-w-0 flex-col gap-1.5'>
-					<ChecksSectionHeader label='Git status' />
-					<PullRequestStatusRow
-						hideAction={!showGitStatusAction}
-						onAction={reviewActions?.openCommitAndPush}
-						status={pullRequest.gitStatus}
-					/>
-				</section>
-
-				<section className='flex min-w-0 flex-col gap-1.5'>
-					<ChecksSectionHeader label='Checks' />
-					{pullRequest.checks.length ? (
-						pullRequest.checks.map((check) => (
-							<PullRequestCheckRow
-								check={check}
-								key={check.id}
-								onAddToChat={
-									check.status === 'blocked'
-										? () => addCheckToChat(check)
-										: undefined
-								}
-							/>
-						))
-					) : (
-						<ChecksEmptyMessage label='No checks reported yet' />
-					)}
-				</section>
-
-				{pullRequest.previewDeployment ? (
+				{isClosedOrMerged ? null : (
 					<section className='flex min-w-0 flex-col gap-1.5'>
-						<ChecksSectionHeader label='Deployments' />
-						<PullRequestPreviewDeploymentRow
-							deployment={pullRequest.previewDeployment}
+						<ChecksSectionHeader
+							actionLabel='Update PR'
+							label='Git status'
+							onAction={onUpdatePullRequest}
 						/>
-					</section>
-				) : (
-					<section className='flex min-w-0 flex-col gap-1.5'>
-						<ChecksSectionHeader label='Deployments' />
-						<ChecksEmptyMessage label='No preview deployments detected' />
+						<PullRequestStatusRow
+							hideAction={!showGitStatusAction}
+							onAction={onCommitAndPush}
+							status={pullRequest.gitStatus}
+						/>
 					</section>
 				)}
 
 				<section className='flex min-w-0 flex-col gap-1.5'>
 					<ChecksSectionHeader
-						actionLabel={
-							pullRequest.comments.length ? 'Add all to chat' : undefined
-						}
+						actionLabel={visibleComments.length ? 'Add all to chat' : undefined}
 						label='Comments'
 						onAction={() => {
 							insertIntoComposer(
-								formatAllCommentsContext(
-									pullRequest.comments,
-									pullRequest.number,
-								),
+								formatAllCommentsContext(visibleComments, pullRequest.number),
 							);
 							toast.success('All comments added to chat.');
 						}}
 					/>
-					{pullRequest.comments.length ? (
-						pullRequest.comments.map((comment) => (
+					{visibleComments.length ? (
+						visibleComments.map((comment) => (
 							<PullRequestCommentRow
 								comment={comment}
 								key={comment.id}
 								onAddToChat={() => addCommentToChat(comment)}
+								onHide={() => hideComment(comment.id)}
+								onOpenPreview={
+									openCommentPreview
+										? () =>
+												openCommentPreview({
+													comment,
+													prNumber: pullRequest.number,
+												})
+										: undefined
+								}
 							/>
 						))
 					) : (

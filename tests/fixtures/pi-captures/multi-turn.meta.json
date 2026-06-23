@@ -1,11 +1,7 @@
 {
 	"scenario": "multi-turn",
 	"description": "Two sequential prompts in one session.",
-	"piArgs": [
-		"--mode",
-		"rpc",
-		"--no-session"
-	],
+	"piArgs": ["--mode", "rpc", "--no-session"],
 	"cwd": "/sandbox/multi-turn",
 	"startedAt": 1781134210341,
 	"endedAt": 1781134219755,

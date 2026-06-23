@@ -1,6 +1,4 @@
 import { expect, test } from 'bun:test';
-
-import { createLinearIssueFixture } from '../fixtures/linear';
 import {
 	buildCreateIssueRequest,
 	buildUpdateIssueRequest,
@@ -8,6 +6,7 @@ import {
 	UNSET_FIELD,
 	validateIssueEditorFields,
 } from '../../src/renderer/lib/linear';
+import { createLinearIssueFixture } from '../fixtures/linear';
 
 test('createIssueEditorFields: empty for creation, seeded for editing', () => {
 	const empty = createIssueEditorFields();

@@ -1,7 +1,11 @@
 import { ipcMain } from 'electron';
-
-import { type CloneDestinationSelectionResult, type CloneGithubRepositoryPrepareResult, type CloneGithubRepositoryStartResult, type GithubRepositoryListResult } from '../../../shared/ipc/contracts/clone';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
+import type {
+	CloneDestinationSelectionResult,
+	CloneGithubRepositoryPrepareResult,
+	CloneGithubRepositoryStartResult,
+	GithubRepositoryListResult,
+} from '../../../shared/ipc/contracts/clone';
 import type {
 	GithubCloneService,
 	GithubRepositoryListService,

@@ -154,9 +154,7 @@ export function EnvFilesSection({ scope, scopeId }: EnvFilesSectionProps) {
 							<XIcon aria-hidden='true' className='size-4' />
 						</Button>
 					</div>
-					{error ? (
-						<p className='text-sm text-status-danger'>{error}</p>
-					) : null}
+					{error ? <p className='text-sm text-status-danger'>{error}</p> : null}
 				</div>
 			) : (
 				<Button onClick={() => setDraft('')} variant='outline'>

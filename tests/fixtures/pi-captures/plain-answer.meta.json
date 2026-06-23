@@ -1,11 +1,7 @@
 {
 	"scenario": "plain-answer",
 	"description": "Pure streamed assistant text, no tools.",
-	"piArgs": [
-		"--mode",
-		"rpc",
-		"--no-session"
-	],
+	"piArgs": ["--mode", "rpc", "--no-session"],
 	"cwd": "/sandbox/plain-answer",
 	"startedAt": 1781134140965,
 	"endedAt": 1781134147741,

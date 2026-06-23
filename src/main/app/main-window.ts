@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { BrowserWindow, screen } from 'electron';
 
+import { routeExternalLinksToBrowser } from './external-links';
 import {
 	DEFAULT_MAIN_WINDOW_HEIGHT,
 	DEFAULT_MAIN_WINDOW_WIDTH,
@@ -56,6 +57,15 @@ export function createMainWindow({
 	if (windowStateStore) {
 		trackMainWindowState({ mainWindow, store: windowStateStore });
 	}
+
+	// Send every external link to the default system browser. In dev the renderer
+	// is served from the Vite origin (treated as internal); in prod it is a file:
+	// bundle, which has no http(s) origin to match.
+	routeExternalLinksToBrowser(mainWindow.webContents, {
+		appOrigin: MAIN_WINDOW_VITE_DEV_SERVER_URL
+			? new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL).origin
+			: null,
+	});
 
 	mainWindow.once('ready-to-show', () => {
 		restoreMainWindowState(mainWindow, restoredState);

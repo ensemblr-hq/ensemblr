@@ -1,8 +1,12 @@
 import path from 'node:path';
 
 import type { AdoptedRepositorySnapshot } from '../../../shared/ipc/contracts/repository';
+import type {
+	SharedRootAdoptionDiagnostic,
+	SharedRootAdoptionSnapshot,
+	SharedRootAdoptionStatus,
+} from '../../../shared/ipc/contracts/shared-root-adoption';
 import type { AdoptedWorkspaceSnapshot } from '../../../shared/ipc/contracts/workspace';
-import type { SharedRootAdoptionDiagnostic, SharedRootAdoptionSnapshot, SharedRootAdoptionStatus } from '../../../shared/ipc/contracts/shared-root-adoption';
 import {
 	type LoadedRepositoryConfig,
 	type LoadRepositoryConfigOptions,

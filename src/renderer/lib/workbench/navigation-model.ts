@@ -1,4 +1,5 @@
 import { DEFAULT_TERMINAL_DOCK_TAB_ID } from '@/renderer/lib/workbench/constants';
+import { parseGithubRepoFromRemoteUrl } from '@/renderer/lib/workbench/github-compare-url';
 import type {
 	DockTabModel,
 	ProjectShellModel,
@@ -102,7 +103,7 @@ function mapRepositoryNavigationSnapshot(
 		},
 		pathLabel: repository.path,
 		workspaces: repository.workspaces.map((workspace) =>
-			mapWorkspaceNavigationSnapshot(repository, workspace),
+			mapWorkspaceNavigationSnapshot(repository, workspace, remoteUrl),
 		),
 	};
 }
@@ -111,6 +112,9 @@ function mapRepositoryNavigationSnapshot(
 function mapWorkspaceNavigationSnapshot(
 	repository: RepositoryWorkspaceNavigationRepository,
 	workspace: RepositoryWorkspaceNavigationWorkspace,
+	// Resolved once at the repository level and threaded down so the key-priority
+	// list lives in a single place.
+	remoteUrl: string | null,
 ): WorkspaceShellModel {
 	const branchName =
 		workspace.branchName ??
@@ -132,6 +136,7 @@ function mapWorkspaceNavigationSnapshot(
 			status: 'pending',
 		},
 		dockTabs: createPlaceholderDockTabs(),
+		githubRepo: parseGithubRepoFromRemoteUrl(remoteUrl),
 		id: workspace.id,
 		landingSummary: createPlaceholderLandingSummary(repository, workspace),
 		name: workspace.name || workspace.slug,
@@ -208,15 +213,7 @@ function getParentDirectoryName(filePath: string): string | null {
 function parseGithubOwnerFromRemoteUrl(
 	remoteUrl: string | null,
 ): string | null {
-	if (!remoteUrl) {
-		return null;
-	}
-
-	const match = remoteUrl
-		.trim()
-		.match(/github\.com[/:]([^/:]+)\/[^/]+?(?:\.git)?\/?$/i);
-
-	return match?.[1] ?? null;
+	return parseGithubRepoFromRemoteUrl(remoteUrl)?.owner ?? null;
 }
 
 // --- Placeholder builders (private) -----------------------------------------

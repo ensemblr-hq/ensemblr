@@ -1,11 +1,7 @@
 {
 	"scenario": "failing-tool",
 	"description": "Tool error / non-zero exit representation.",
-	"piArgs": [
-		"--mode",
-		"rpc",
-		"--no-session"
-	],
+	"piArgs": ["--mode", "rpc", "--no-session"],
 	"cwd": "/sandbox/failing-tool",
 	"startedAt": 1781134202174,
 	"endedAt": 1781134210340,

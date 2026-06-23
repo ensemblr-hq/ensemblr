@@ -1,11 +1,7 @@
 {
 	"scenario": "thinking",
 	"description": "Extended reasoning blocks, if the model emits them.",
-	"piArgs": [
-		"--mode",
-		"rpc",
-		"--no-session"
-	],
+	"piArgs": ["--mode", "rpc", "--no-session"],
 	"cwd": "/sandbox/thinking",
 	"startedAt": 1781134219756,
 	"endedAt": 1781134228516,

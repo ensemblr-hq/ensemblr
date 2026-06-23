@@ -13,6 +13,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
+import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { cn } from '@/renderer/lib/utils';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import {
@@ -51,7 +52,11 @@ export function RightSidebarHeader({
 }: {
 	activeWorkspace: WorkspaceShellModel;
 }) {
-	const headerState = getRightSidebarHeaderState(activeWorkspace);
+	const hasBranchChanges = useReviewableChanges(activeWorkspace);
+	const headerState = getRightSidebarHeaderState(
+		activeWorkspace,
+		hasBranchChanges,
+	);
 	const hasPullRequestNumber = 'number' in headerState;
 	const hasHeaderLabel = 'label' in headerState;
 
@@ -87,7 +92,10 @@ export function RightSidebarHeader({
 				) : null}
 			</div>
 			<div className='ml-auto flex shrink-0 items-center justify-end'>
-				<RightSidebarHeaderAction headerState={headerState} />
+				<RightSidebarHeaderAction
+					activeWorkspace={activeWorkspace}
+					headerState={headerState}
+				/>
 			</div>
 		</header>
 	);
@@ -95,8 +103,10 @@ export function RightSidebarHeader({
 
 /** Dispatches the header's trailing action based on the resolved header state. */
 function RightSidebarHeaderAction({
+	activeWorkspace,
 	headerState,
 }: {
+	activeWorkspace: WorkspaceShellModel;
 	headerState: RightSidebarHeaderState;
 }) {
 	const reviewActions = useReviewActions();
@@ -129,7 +139,7 @@ function RightSidebarHeaderAction({
 				</output>
 			);
 		case 'create-pr':
-			return <CreatePullRequestMenu />;
+			return <CreatePullRequestMenu workspace={activeWorkspace} />;
 		case 'pr-blocked':
 		case 'pr-open':
 			return (

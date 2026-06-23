@@ -2,15 +2,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
-import { ensembleQueryKeys } from '@/renderer/api/ensemble-queries';
+import { refreshPullRequestSnapshot } from '@/renderer/api/ensemble-queries';
 
 /**
  * Manual pull-request-snapshot refresh with toast-on-error and in-flight state
- * for the spinner. Separated so the provider does not own loading UI flags.
+ * for the spinner. Forces a cache-bypassing `gh` fetch (a plain refetch would
+ * return the main process's still-fresh 30s-cached snapshot), so the button
+ * always reflects the live PR state.
  */
 export function usePullRequestRefresh({
+	workspaceCwd,
 	workspaceId,
 }: {
+	workspaceCwd: string | null;
 	workspaceId: string;
 }): {
 	isRefreshingPullRequest: boolean;
@@ -20,10 +24,15 @@ export function usePullRequestRefresh({
 	const [isRefreshingPullRequest, setIsRefreshingPullRequest] = useState(false);
 
 	const refreshPullRequest = useCallback(async () => {
+		if (!workspaceCwd) {
+			return;
+		}
 		setIsRefreshingPullRequest(true);
 		try {
-			await queryClient.refetchQueries({
-				queryKey: ensembleQueryKeys.pullRequestSnapshot(workspaceId),
+			await refreshPullRequestSnapshot({
+				queryClient,
+				workspaceCwd,
+				workspaceId,
 			});
 		} catch (cause) {
 			toast.error('Pull request refresh failed', {
@@ -32,7 +41,7 @@ export function usePullRequestRefresh({
 		} finally {
 			setIsRefreshingPullRequest(false);
 		}
-	}, [queryClient, workspaceId]);
+	}, [queryClient, workspaceCwd, workspaceId]);
 
 	return {
 		isRefreshingPullRequest,

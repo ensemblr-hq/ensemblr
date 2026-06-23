@@ -3,6 +3,7 @@ import { useDockController } from '@/renderer/hooks/workbench-shell/use-dock-con
 import { useRightSidebarController } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
+import type { PullRequestCommentSummary } from '@/renderer/types/workbench';
 import type {
 	SessionTabActions,
 	SessionTabState,
@@ -10,6 +11,7 @@ import type {
 } from '@/renderer/types/workbench-shell';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 import {
+	CommentPreviewOpenerProvider,
 	ReviewFilePreviewOpenerProvider,
 	WorkspaceFileDiffOpenerProvider,
 } from './conversation-panel/file-preview-context';
@@ -53,7 +55,11 @@ export function WorkspaceWorkbenchContent({
 
 	const rightSidebar = useRightSidebarController();
 	const dock = useDockController();
-	const { openWorkspaceFileDiffTab, openFilePreviewTab } = sessionNavigation;
+	const {
+		openWorkspaceFileDiffTab,
+		openFilePreviewTab,
+		openCommentPreviewTab,
+	} = sessionNavigation;
 	const openWorkspaceFileDiff = useCallback(
 		(filePath: string, scope?: WorkspaceGitDiffScope) => {
 			void openWorkspaceFileDiffTab({ filePath, scope }).then((result) => {
@@ -73,6 +79,16 @@ export function WorkspaceWorkbenchContent({
 			});
 		},
 		[onSessionTabChange, openFilePreviewTab],
+	);
+	const openCommentPreview = useCallback(
+		(input: { comment: PullRequestCommentSummary; prNumber?: number }) => {
+			void openCommentPreviewTab(input).then((result) => {
+				if (result) {
+					onSessionTabChange(result.chatTabId);
+				}
+			});
+		},
+		[onSessionTabChange, openCommentPreviewTab],
 	);
 	const mainContentState: WorkspaceMainContentState = {
 		activeSession: sessionNavigation.effectiveActiveSession,
@@ -115,16 +131,18 @@ export function WorkspaceWorkbenchContent({
 			>
 				<WorkspaceFileDiffOpenerProvider value={openWorkspaceFileDiff}>
 					<ReviewFilePreviewOpenerProvider value={openReviewFilePreview}>
-						<WorkbenchPanelLayout
-							activeProject={activeProject}
-							activeReviewTab={activeReviewTab}
-							activeWorkspace={activeWorkspace}
-							dockActions={dockActions}
-							dockTabId={dockTabId}
-							mainContent={<MainContent {...mainContentState} />}
-							onDockTabChange={onDockTabChange}
-							onReviewTabChange={onReviewTabChange}
-						/>
+						<CommentPreviewOpenerProvider value={openCommentPreview}>
+							<WorkbenchPanelLayout
+								activeProject={activeProject}
+								activeReviewTab={activeReviewTab}
+								activeWorkspace={activeWorkspace}
+								dockActions={dockActions}
+								dockTabId={dockTabId}
+								mainContent={<MainContent {...mainContentState} />}
+								onDockTabChange={onDockTabChange}
+								onReviewTabChange={onReviewTabChange}
+							/>
+						</CommentPreviewOpenerProvider>
 					</ReviewFilePreviewOpenerProvider>
 				</WorkspaceFileDiffOpenerProvider>
 			</ReviewActionsProvider>

@@ -1,11 +1,7 @@
 {
 	"scenario": "long-output",
 	"description": "Very long tool output; surfaces truncation behavior.",
-	"piArgs": [
-		"--mode",
-		"rpc",
-		"--no-session"
-	],
+	"piArgs": ["--mode", "rpc", "--no-session"],
 	"cwd": "/sandbox/long-output",
 	"startedAt": 1781134180672,
 	"endedAt": 1781134188140,

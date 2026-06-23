@@ -71,9 +71,7 @@ export function readSettingJson({
 			`SELECT value_json FROM settings
 			 WHERE scope = ? AND scope_id = ? AND key = ?`,
 		)
-		.get(scope.scope, scope.scopeId, key) as
-		| { value_json: string }
-		| undefined;
+		.get(scope.scope, scope.scopeId, key) as { value_json: string } | undefined;
 
 	return row?.value_json ?? null;
 }

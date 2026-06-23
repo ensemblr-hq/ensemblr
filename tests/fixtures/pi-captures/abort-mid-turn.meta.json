@@ -1,11 +1,7 @@
 {
 	"scenario": "abort-mid-turn",
 	"description": "Abort RPC mid-stream; cancellation events, partial content.",
-	"piArgs": [
-		"--mode",
-		"rpc",
-		"--no-session"
-	],
+	"piArgs": ["--mode", "rpc", "--no-session"],
 	"cwd": "/sandbox/abort-mid-turn",
 	"startedAt": 1781134228517,
 	"endedAt": 1781134235872,
@@ -33,7 +29,5 @@
 	],
 	"exitCondition": "completed",
 	"exitCode": 143,
-	"notes": [
-		"abort sent 750ms after first tool/text activity"
-	]
+	"notes": ["abort sent 750ms after first tool/text activity"]
 }

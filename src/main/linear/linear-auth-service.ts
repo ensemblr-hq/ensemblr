@@ -156,13 +156,13 @@ export function createLinearAuthService({
 
 	function getOauthConfig(): LinearOauthConfig | null {
 		const app = configService.getConfig().app;
-		const linear = app['linear'];
+		const linear = app.linear;
 		const record =
 			typeof linear === 'object' && linear !== null
 				? (linear as Record<string, unknown>)
 				: {};
 		const configuredId =
-			typeof record['clientId'] === 'string' ? record['clientId'].trim() : '';
+			typeof record.clientId === 'string' ? record.clientId.trim() : '';
 		const clientId =
 			configuredId === '' ? builtInClientId.trim() : configuredId;
 
@@ -170,8 +170,8 @@ export function createLinearAuthService({
 			return null;
 		}
 
-		const scopes = Array.isArray(record['scopes'])
-			? record['scopes'].filter(
+		const scopes = Array.isArray(record.scopes)
+			? record.scopes.filter(
 					(scope): scope is string => typeof scope === 'string',
 				)
 			: DEFAULT_LINEAR_SCOPES;
@@ -347,7 +347,7 @@ export function createLinearAuthService({
 		if (!response.ok) {
 			const detail = await response.text().catch(() => '');
 			throw new LinearAuthError(
-				body['grant_type'] === 'refresh_token'
+				body.grant_type === 'refresh_token'
 					? 'refresh-failed'
 					: 'exchange-failed',
 				`The Linear token endpoint responded with HTTP ${response.status}${

@@ -15,6 +15,8 @@ import {
 } from '@/renderer/api/ensemble-queries';
 import { forgetChatOverrides } from '@/renderer/state/preferences';
 import type {
+	CommentPreviewPayload,
+	PullRequestCommentSummary,
 	SessionTabModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
@@ -70,6 +72,10 @@ export function useSessionTabState({
 	onSessionTabChange: (sessionId: string) => void;
 }): SessionTabState & {
 	openSessionTab: () => Promise<OpenSessionTabHandlerResult | null>;
+	openCommentPreviewTab: (input: {
+		comment: PullRequestCommentSummary;
+		prNumber?: number;
+	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openFilePreviewTab: (input: {
 		filePath: string;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
@@ -321,6 +327,52 @@ export function useSessionTabState({
 		[openAuxiliaryTabMutation],
 	);
 
+	/**
+	 * Opens (or re-focuses) a read-only preview tab for a PR comment. The comment
+	 * rides in `metadata` as a `document` tab so the body survives reloads without
+	 * a re-fetch (and avoids widening the `chat_tabs.kind` CHECK constraint).
+	 */
+	const openCommentPreviewTab = useCallback(
+		async ({
+			comment,
+			prNumber,
+		}: {
+			comment: PullRequestCommentSummary;
+			prNumber?: number;
+		}): Promise<OpenSessionTabHandlerResult | null> => {
+			try {
+				const author = comment.author?.trim();
+				const result = await openAuxiliaryTabMutation.mutateAsync({
+					kind: 'document',
+					metadata: {
+						// Persist only the fields `parseCommentPreview` reads back, so a
+						// future `PullRequestCommentSummary` field can't leak unintended
+						// (or non-serializable) data into the tab's SQLite metadata.
+						commentPreview: {
+							...(comment.author === undefined
+								? {}
+								: { author: comment.author }),
+							detail: comment.detail,
+							id: comment.id,
+							...(comment.isResolved === undefined
+								? {}
+								: { isResolved: comment.isResolved }),
+							provider: comment.provider,
+							...(comment.url === undefined ? {} : { url: comment.url }),
+							...(typeof prNumber === 'number' ? { prNumber } : {}),
+						},
+					},
+					title: author ? `Comment · ${author}` : 'Comment',
+				});
+				return result.tab ? { chatTabId: result.tab.id } : null;
+			} catch {
+				// Surfaced as a toast by the mutation; callers treat as no-op.
+				return null;
+			}
+		},
+		[openAuxiliaryTabMutation],
+	);
+
 	/** Opens (or re-focuses) a turn-diff tab for a checkpointed turn. */
 	const openTurnDiffTab = useCallback(
 		async ({
@@ -460,6 +512,7 @@ export function useSessionTabState({
 		closeSessionTab,
 		closeSessionTabAsync,
 		effectiveActiveSession,
+		openCommentPreviewTab,
 		openFilePreviewTab,
 		openSessionTab,
 		openTurnDiffTab,
@@ -520,10 +573,62 @@ function toSessionTabModel(
 		return { ...base, kind: 'chat' };
 	}
 	const filePath = tab.metadata.filePath;
+	if (tab.kind === 'document') {
+		const commentPreview = parseCommentPreview(tab.metadata.commentPreview);
+		return {
+			...base,
+			...(commentPreview ? { commentPreview } : {}),
+			filePath: typeof filePath === 'string' ? filePath : null,
+			kind: 'document',
+		};
+	}
 	return {
 		...base,
 		filePath: typeof filePath === 'string' ? filePath : null,
 		kind: tab.kind,
+	};
+}
+
+const COMMENT_PREVIEW_PROVIDERS: ReadonlySet<string> = new Set([
+	'github',
+	'github-actions',
+	'linear',
+	'local',
+]);
+
+/**
+ * Defensively parses the inline comment payload carried on a `document` tab's
+ * metadata (untyped wire `Record<string, unknown>`). Returns `undefined` for
+ * regular document tabs or malformed payloads so hydration degrades gracefully.
+ */
+function parseCommentPreview(
+	value: unknown,
+): CommentPreviewPayload | undefined {
+	if (typeof value !== 'object' || value === null) {
+		return undefined;
+	}
+	const record = value as Record<string, unknown>;
+	const { detail, id, provider } = record;
+	if (
+		typeof id !== 'string' ||
+		typeof detail !== 'string' ||
+		typeof provider !== 'string' ||
+		!COMMENT_PREVIEW_PROVIDERS.has(provider)
+	) {
+		return undefined;
+	}
+	return {
+		...(typeof record.author === 'string' ? { author: record.author } : {}),
+		detail,
+		id,
+		...(typeof record.isResolved === 'boolean'
+			? { isResolved: record.isResolved }
+			: {}),
+		...(typeof record.prNumber === 'number'
+			? { prNumber: record.prNumber }
+			: {}),
+		provider: provider as CommentPreviewPayload['provider'],
+		...(typeof record.url === 'string' ? { url: record.url } : {}),
 	};
 }
 

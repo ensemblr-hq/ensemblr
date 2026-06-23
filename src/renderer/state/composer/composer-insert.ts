@@ -14,15 +14,12 @@ export interface ComposerInsertRequest {
  */
 const composerInsertQueueAtom = atom<ComposerInsertRequest[]>([]);
 
-let insertCounter = 0;
-
 /** Returns a stable callback that queues text for the workspace composer. */
 export function useComposerInsert(): (text: string) => void {
 	const setQueue = useSetAtom(composerInsertQueueAtom);
 	return useCallback(
 		(text: string) => {
-			insertCounter += 1;
-			setQueue((queue) => [...queue, { id: `insert-${insertCounter}`, text }]);
+			setQueue((queue) => [...queue, { id: crypto.randomUUID(), text }]);
 		},
 		[setQueue],
 	);

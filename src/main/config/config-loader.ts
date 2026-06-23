@@ -2,7 +2,11 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
-import type { ConfigDiagnostic, ConfigStatus, ConfigStatusSnapshot } from '../../shared/ipc/contracts/health';
+import type {
+	ConfigDiagnostic,
+	ConfigStatus,
+	ConfigStatusSnapshot,
+} from '../../shared/ipc/contracts/health';
 import {
 	formatErrorMessage,
 	getJsonErrorLocation,

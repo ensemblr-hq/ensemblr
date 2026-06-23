@@ -59,8 +59,9 @@ function LinearLinkedIssueStatus({
 	linkedIssue: WorkspaceLinkedIssueSummary;
 	remoteId: string;
 }) {
-	const { data: connectionData, isLoading: connectionLoading } =
-		useQuery(linearConnectionQuery);
+	const { data: connectionData, isLoading: connectionLoading } = useQuery(
+		linearConnectionQuery,
+	);
 	const {
 		data: result,
 		isFetching: detailFetching,

@@ -124,10 +124,7 @@ test('create with linkedIssue persists issue metadata and the integration link r
 		result.workspace.branchName,
 		'feat/the-143-linear-oauth-pkce-and-token-life',
 	);
-	assert.deepStrictEqual(
-		result.workspace.metadata['linkedIssue'],
-		LINKED_ISSUE,
-	);
+	assert.deepStrictEqual(result.workspace.metadata.linkedIssue, LINKED_ISSUE);
 
 	const database = harness.databaseService.getConnection()?.database;
 	assert.ok(database);
@@ -139,7 +136,7 @@ test('create with linkedIssue persists issue metadata and the integration link r
 		string,
 		unknown
 	>;
-	assert.deepStrictEqual(persistedMetadata['linkedIssue'], LINKED_ISSUE);
+	assert.deepStrictEqual(persistedMetadata.linkedIssue, LINKED_ISSUE);
 
 	const linkRow = database
 		.prepare(
@@ -178,7 +175,7 @@ test('create without linkedIssue writes no integration link row', async (t) => {
 
 	assert.strictEqual(result.status, 'success');
 	assert.ok(result.workspace);
-	assert.strictEqual(result.workspace.metadata['linkedIssue'], undefined);
+	assert.strictEqual(result.workspace.metadata.linkedIssue, undefined);
 
 	const database = harness.databaseService.getConnection()?.database;
 	assert.ok(database);

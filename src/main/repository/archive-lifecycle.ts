@@ -1,4 +1,9 @@
-import type { ArchiveLifecycleContext, ArchiveLifecycleDiagnostic, ArchiveLifecycleOutcome, ArchiveLifecycleStage } from '../../shared/ipc/contracts/archive-lifecycle';
+import type {
+	ArchiveLifecycleContext,
+	ArchiveLifecycleDiagnostic,
+	ArchiveLifecycleOutcome,
+	ArchiveLifecycleStage,
+} from '../../shared/ipc/contracts/archive-lifecycle';
 
 export type ArchiveLifecycleHandler = (
 	context: ArchiveLifecycleContext,

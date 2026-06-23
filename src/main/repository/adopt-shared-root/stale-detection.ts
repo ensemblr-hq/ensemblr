@@ -1,6 +1,9 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { SharedRootAdoptionStaleRepositoryRecord, SharedRootAdoptionStaleWorkspaceRecord } from '../../../shared/ipc/contracts/shared-root-adoption';
+import type {
+	SharedRootAdoptionStaleRepositoryRecord,
+	SharedRootAdoptionStaleWorkspaceRecord,
+} from '../../../shared/ipc/contracts/shared-root-adoption';
 import { listRepositoryRowsByPathPrefix } from '../../storage/repositories/repository-row-repository.ts';
 import { listWorkspaceRowsByPathPrefix } from '../../storage/repositories/workspace-repository.ts';
 import { deleteWorkspaceRow } from '../workspace-row-ops.ts';

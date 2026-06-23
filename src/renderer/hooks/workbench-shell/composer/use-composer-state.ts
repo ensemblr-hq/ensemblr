@@ -30,6 +30,7 @@ import {
 import {
 	useComposerAttachmentInbox,
 	useComposerInsertConsumer,
+	useComposerSubmitConsumer,
 } from '@/renderer/state/composer';
 import {
 	autoConvertLongTextAtom,
@@ -348,6 +349,41 @@ export function useComposerState({
 		() => dispatchSubmit(value, mentionAttachments, uploadAttachments),
 		[dispatchSubmit, value, mentionAttachments, uploadAttachments],
 	);
+
+	// Drain auto-submit prompts queued from the Checks panel (commit & push,
+	// create PR). These bypass the textarea and go straight through the normal
+	// send pipeline so they respect the Follow-up behavior just like a manual
+	// send — the Checks panel hands the chore to the active tab's agent.
+	// Returns whether the prompt was accepted for delivery. The consumer keeps
+	// anything we reject and retries when this callback is recreated (composer
+	// enabled, send finished, streaming ended), so a chore queued while the
+	// composer is busy or mid-turn-blocked is held and sent once it is free
+	// rather than being dropped. Mirrors the drop conditions in `submitText` and
+	// `dispatchSubmit`.
+	const submitFromChannel = useCallback(
+		(text: string): boolean => {
+			if (composer.disabled || pending) {
+				return false;
+			}
+			if (
+				composer.isStreaming &&
+				text.trim().length > 0 &&
+				followUp === 'block'
+			) {
+				return false;
+			}
+			dispatchSubmit(text, [], []);
+			return true;
+		},
+		[
+			composer.disabled,
+			composer.isStreaming,
+			dispatchSubmit,
+			followUp,
+			pending,
+		],
+	);
+	useComposerSubmitConsumer(submitFromChannel);
 
 	// Cmd+J explicitly queues the current draft as a follow-up regardless of the
 	// Follow-up setting; when idle it just sends normally.

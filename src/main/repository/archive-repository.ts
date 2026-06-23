@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { ArchivedRepositorySnapshot, ArchiveRepositoryDiagnostic, ArchiveRepositoryDiagnosticCode, ArchiveRepositoryRequest, ArchiveRepositoryResult } from '../../shared/ipc/contracts/repository';
+import type {
+	ArchivedRepositorySnapshot,
+	ArchiveRepositoryDiagnostic,
+	ArchiveRepositoryDiagnosticCode,
+	ArchiveRepositoryRequest,
+	ArchiveRepositoryResult,
+} from '../../shared/ipc/contracts/repository';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import {
 	selectRepositoryForArchive,

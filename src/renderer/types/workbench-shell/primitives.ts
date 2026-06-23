@@ -1,3 +1,4 @@
+import type { PullRequestCommentSummary } from '@/renderer/types/workbench';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
 export interface WorkbenchHealth {
@@ -39,6 +40,10 @@ export type ChangesSource =
  */
 export interface SessionTabActions {
 	openSessionTab: () => Promise<{ chatTabId: string } | null>;
+	openCommentPreviewTab: (input: {
+		comment: PullRequestCommentSummary;
+		prNumber?: number;
+	}) => Promise<{ chatTabId: string } | null>;
 	openFilePreviewTab: (input: {
 		filePath: string;
 	}) => Promise<{ chatTabId: string } | null>;

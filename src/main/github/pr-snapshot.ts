@@ -1,4 +1,12 @@
-import type { GithubCheckBucket, GithubCheckWire, GithubCommentWire, GithubDeploymentWire, GithubMergeableState, GithubPullRequestState, GithubPullRequestWire } from '../../shared/ipc/contracts/github';
+import type {
+	GithubCheckBucket,
+	GithubCheckWire,
+	GithubCommentWire,
+	GithubDeploymentWire,
+	GithubMergeableState,
+	GithubPullRequestState,
+	GithubPullRequestWire,
+} from '../../shared/ipc/contracts/github';
 
 /** JSON fields requested from `gh pr view --json`. */
 export const PR_VIEW_JSON_FIELDS = [
@@ -8,6 +16,7 @@ export const PR_VIEW_JSON_FIELDS = [
 	'comments',
 	'deletions',
 	'headRefName',
+	'headRefOid',
 	'isDraft',
 	'mergeStateStatus',
 	'mergeable',
@@ -43,6 +52,7 @@ export function parsePullRequestView(stdout: string): GithubPullRequestWire {
 		deletions: typeof raw.deletions === 'number' ? raw.deletions : null,
 		deployments: [],
 		headRefName: readString(raw.headRefName),
+		headRefOid: readString(raw.headRefOid),
 		isDraft: raw.isDraft === true,
 		mergeable: parseMergeable(raw.mergeable),
 		...(typeof raw.mergeStateStatus === 'string'

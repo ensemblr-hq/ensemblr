@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { RootDirectoryChangeApplyResult, RootDirectoryChangePreview, RootDirectoryDiagnostic, RootDirectoryReconciliationSnapshot, RootDirectorySnapshot } from '../../shared/ipc/contracts/root-directory';
+import type {
+	RootDirectoryChangeApplyResult,
+	RootDirectoryChangePreview,
+	RootDirectoryDiagnostic,
+	RootDirectoryReconciliationSnapshot,
+	RootDirectorySnapshot,
+} from '../../shared/ipc/contracts/root-directory';
 import type { SettingsResolutionSnapshot } from '../../shared/ipc/contracts/settings-resolution';
 import { ensureRootDirectory } from './root-directory.ts';
 import { inspectRootPathValue } from './root-inspect.ts';

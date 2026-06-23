@@ -3,7 +3,13 @@ import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { ArchivedWorkspaceSnapshot, ArchiveWorkspaceDiagnostic, ArchiveWorkspaceDiagnosticCode, ArchiveWorkspaceRequest, ArchiveWorkspaceResult } from '../../shared/ipc/contracts/workspace';
+import type {
+	ArchivedWorkspaceSnapshot,
+	ArchiveWorkspaceDiagnostic,
+	ArchiveWorkspaceDiagnosticCode,
+	ArchiveWorkspaceRequest,
+	ArchiveWorkspaceResult,
+} from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { EnsembleDatabaseService } from '../storage/database.ts';

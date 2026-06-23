@@ -1,11 +1,7 @@
 {
 	"scenario": "multi-tool-chain",
 	"description": "Consecutive sequential tool calls.",
-	"piArgs": [
-		"--mode",
-		"rpc",
-		"--no-session"
-	],
+	"piArgs": ["--mode", "rpc", "--no-session"],
 	"cwd": "/sandbox/multi-tool-chain",
 	"startedAt": 1781134166257,
 	"endedAt": 1781134180671,

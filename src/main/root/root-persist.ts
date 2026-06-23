@@ -1,7 +1,13 @@
 import type { DatabaseSync } from 'node:sqlite';
-
-import type { ResolvedSettingSnapshot, SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
-import type { RootDirectoryDiagnostic, RootDirectoryManagedPathSnapshot, RootDirectorySnapshot } from '../../shared/ipc/contracts/root-directory';
+import type {
+	RootDirectoryDiagnostic,
+	RootDirectoryManagedPathSnapshot,
+	RootDirectorySnapshot,
+} from '../../shared/ipc/contracts/root-directory';
+import type {
+	ResolvedSettingSnapshot,
+	SettingsResolutionSource,
+} from '../../shared/ipc/contracts/settings-resolution';
 
 const CURRENT_ROOT_ID = 'current';
 

@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { ReviewCommentStatus, ReviewCommentWire, ReviewTodoStatus, ReviewTodoWire } from '../../../shared/ipc/contracts/review-comments';
+import type {
+	ReviewCommentStatus,
+	ReviewCommentWire,
+	ReviewTodoStatus,
+	ReviewTodoWire,
+} from '../../../shared/ipc/contracts/review-comments';
 
 interface CommentRowShape {
 	body: string;
