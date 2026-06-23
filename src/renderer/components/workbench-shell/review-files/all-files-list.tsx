@@ -401,7 +401,7 @@ const WorkspaceFileRow = memo(function WorkspaceFileRow({
 			aria-label={`Open ${file.path} preview`}
 			aria-level={level + 1}
 			className={cn(
-				'h-7 w-full justify-start gap-2.5 rounded-md px-2 py-0.5 text-left font-normal',
+				'h-7 w-full justify-start gap-1.5 rounded-md px-2 py-0.5 text-left font-normal',
 				fileTreeIndentClassName(level),
 				// Git-ignored entries stay visible but dimmed, VS Code style.
 				file.isIgnored && 'opacity-50',
@@ -413,6 +413,7 @@ const WorkspaceFileRow = memo(function WorkspaceFileRow({
 			size='sm'
 			variant='ghost'
 		>
+			<span aria-hidden='true' className='size-3 shrink-0' />
 			<Icon
 				aria-hidden='true'
 				className='size-3.5 shrink-0'
