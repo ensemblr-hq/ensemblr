@@ -244,6 +244,8 @@ export type WorkspaceLinkedIssueProvider = 'github' | 'linear';
 
 /** Describes the issue that seeded a workspace when one is linked. */
 export interface WorkspaceLinkedIssueSummary {
+	/** Issue body/description, seeded into the first-prompt composer draft. */
+	description?: string;
 	provider: WorkspaceLinkedIssueProvider;
 	reference: string;
 	/** Remote issue id used to resolve live status from the provider cache. */

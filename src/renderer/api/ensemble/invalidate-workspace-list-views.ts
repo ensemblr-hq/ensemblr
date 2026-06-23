@@ -3,11 +3,12 @@ import type { QueryClient } from '@tanstack/react-query';
 import { ensembleQueryKeys } from './query-keys';
 
 /**
- * Invalidates the two cross-cutting workspace list views that every archive,
- * unarchive, or delete mutation must refresh: the sidebar navigation snapshot
- * and the global History feed. Centralised so adding a third list view is a
- * one-line change here instead of a hunt across every mutation site (and so no
- * site forgets one — the bug the History feed already had to fix once).
+ * Invalidates the cross-cutting workspace list views that every archive,
+ * unarchive, or delete mutation must refresh: the sidebar navigation snapshot,
+ * the global History feed, and the create-from-source picker's branch list.
+ * Centralised so adding another list view is a one-line change here instead of
+ * a hunt across every mutation site (and so no site forgets one — the bug the
+ * History feed already had to fix once).
  */
 export function invalidateWorkspaceListViews(
 	queryClient: QueryClient,
@@ -18,6 +19,14 @@ export function invalidateWorkspaceListViews(
 		}),
 		queryClient.invalidateQueries({
 			queryKey: ensembleQueryKeys.workspaceHistory(),
+		}),
+		// The picker's branch list embeds workspace lifecycle state (a branch
+		// backing an active workspace shows Open/Duplicate, else Use branch), so
+		// archiving a workspace must flip its branch row back to "Use branch"
+		// immediately. Costs nothing while the picker is closed — an
+		// observer-less query is just marked stale until the next open.
+		queryClient.invalidateQueries({
+			queryKey: ensembleQueryKeys.repositoryBranchesAll(),
 		}),
 	]);
 }

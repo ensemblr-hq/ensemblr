@@ -23,6 +23,7 @@ export {
 	getEnsembleApiOrNull,
 	isEnsembleApiAvailable,
 } from './query-keys';
+export * from './repository-sources';
 export * from './settings';
 export * from './setup';
 export * from './workspace-files';

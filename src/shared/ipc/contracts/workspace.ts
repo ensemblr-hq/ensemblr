@@ -33,8 +33,12 @@ export interface CreateWorkspaceDiagnostic {
 
 /** Linked remote issue persisted on a workspace created from an issue. */
 export interface WorkspaceLinkedIssueInput extends LinkedIssueRef {
-	provider: 'linear';
+	/** Issue body/description, seeded into the first-prompt composer draft. */
+	description?: string;
+	provider: 'github' | 'linear';
+	/** Linear team key (e.g. `THE`); omitted for GitHub issues. */
 	teamKey?: string;
+	/** Linear team name; omitted for GitHub issues. */
 	teamName?: string;
 }
 

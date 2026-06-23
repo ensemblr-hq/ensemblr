@@ -17,6 +17,10 @@ export {
 	listDirectoryPaths,
 } from './file-tree';
 export { healthTone } from './health-tone';
+export {
+	formatLinkedIssueComposerSeed,
+	type LinkedIssueComposerSeedInput,
+} from './linked-issue-composer-seed';
 export { getEmptyStateCopy } from './navigation-empty-state';
 export {
 	createPlaceholderSession,
@@ -46,7 +50,15 @@ export { getWorkbenchStaticRoute } from './static-navigation';
 export { getWorkbenchHealth } from './workbench-health';
 export { getWorkspaceSidebarState } from './workspace-sidebar-state';
 export {
-	filterWorkspaceSourcesByKind,
+	branchSourceId,
+	githubIssueSourceId,
+	mapPullRequestsToWorkspaceSources,
+	mapRepositoryBranchesToWorkspaceSources,
+	pullRequestSourceId,
+	type WorkspaceSourceItem,
+	workspaceSeedFromSourceItem,
+} from './workspace-source-mappers';
+export {
 	getWorkspaceSourceActions,
 	getWorkspaceSourceKindLabel,
 	getWorkspaceSourceProviderLabel,

@@ -18,6 +18,7 @@ export function ProjectWorkspaceGroup({
 	activeProject,
 	activeWorkspace,
 	isCollapsed,
+	onCreateFromSourcePrefetch,
 	onCreateFromSourceSelect,
 	onCreateWorkspaceSelect,
 	onProjectArchiveSelect,
@@ -38,6 +39,7 @@ export function ProjectWorkspaceGroup({
 	activeProject: ProjectShellModel | null;
 	activeWorkspace: WorkspaceShellModel | null;
 	isCollapsed: boolean;
+	onCreateFromSourcePrefetch?: () => void;
 	onCreateFromSourceSelect: () => void;
 	onCreateWorkspaceSelect: () => void;
 	onProjectArchiveSelect?: () => void;
@@ -66,6 +68,7 @@ export function ProjectWorkspaceGroup({
 				isCollapsed={isCollapsed}
 				onArchiveSelect={onProjectArchiveSelect}
 				onBrowseArchiveSelect={onProjectBrowseArchiveSelect}
+				onCreateFromSourcePrefetch={onCreateFromSourcePrefetch}
 				onCreateFromSourceSelect={onCreateFromSourceSelect}
 				onCreateWorkspaceSelect={onCreateWorkspaceSelect}
 				onDeleteSelect={onProjectDeleteSelect}

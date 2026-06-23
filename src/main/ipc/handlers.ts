@@ -30,6 +30,7 @@ import type {
 	SharedRootAdoptionService,
 	UnarchiveWorkspaceService,
 } from '../repository';
+import { createRepositorySourcesService } from '../repository/repository-sources-service';
 import { createReviewService } from '../review';
 import type { EnsembleRootDirectoryService } from '../root';
 import type { ScriptLifecycleService } from '../scripts';
@@ -57,6 +58,7 @@ import { registerPiHandlers } from './handlers/pi';
 import { registerPiSessionHandlers } from './handlers/pi-session';
 import { registerRepositoryHandlers } from './handlers/repository';
 import { registerRepositoryConfigHandlers } from './handlers/repository-config';
+import { registerRepositorySourcesHandlers } from './handlers/repository-sources';
 import { registerReviewHandlers } from './handlers/review';
 import { registerRootHandlers } from './handlers/root';
 import { registerSettingsHandlers } from './handlers/settings';
@@ -254,5 +256,11 @@ export function registerIpcHandlers({
 			localCommandService,
 		}),
 		withPermissionGate,
+	});
+	registerRepositorySourcesHandlers({
+		repositorySourcesService: createRepositorySourcesService({
+			databaseService,
+			localCommandService,
+		}),
 	});
 }

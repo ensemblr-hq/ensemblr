@@ -96,6 +96,7 @@ interface PreparedWorkspace {
 
 const DEFAULT_WORKSPACE_NAME = 'workspace';
 const CONTEXT_DIRECTORY = '.context';
+const GIT_FETCH_TIMEOUT_MS = 30_000;
 
 /**
  * Builds the service that creates isolated git worktree workspaces under the
@@ -206,6 +207,14 @@ export function createWorkspaceService({
 			if (parentDiagnostic) {
 				return failure(parentDiagnostic);
 			}
+
+			// A workspace created from a PR (or any remote branch not yet fetched)
+			// forks off `origin/<head>`; make sure that ref exists locally first.
+			await ensureBaseRefAvailable({
+				baseBranch: prepared.baseBranch,
+				localCommandService,
+				repositoryPath: repository.path,
+			});
 
 			const worktreeDiagnostic = await runWorktreeAdd({
 				baseBranch: prepared.baseBranch,
@@ -601,6 +610,53 @@ function ensureParentDirectory(
 			path: parentPath,
 			severity: 'error',
 		};
+	}
+}
+
+/**
+ * Ensures the worktree base ref resolves locally before `git worktree add`.
+ * When it does not (e.g. a pull-request head like `origin/feature-x` that was
+ * never fetched), attempts a best-effort `git fetch <remote> <branch>` so the
+ * fork can proceed. Already-present refs (local branches, fetched remotes) skip
+ * the fetch. All failures are swallowed — `git worktree add` surfaces the real,
+ * actionable error if the ref is still missing afterward.
+ */
+export async function ensureBaseRefAvailable({
+	baseBranch,
+	localCommandService,
+	repositoryPath,
+}: {
+	baseBranch: string;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<void> {
+	try {
+		const verify = await localCommandService.run({
+			args: ['rev-parse', '--verify', '--quiet', `${baseBranch}^{commit}`],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 4 * 1024,
+			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+		});
+		if (verify.status === 'success') {
+			return;
+		}
+
+		const separator = baseBranch.indexOf('/');
+		if (separator <= 0) {
+			return;
+		}
+		const remote = baseBranch.slice(0, separator);
+		const branch = baseBranch.slice(separator + 1);
+		await localCommandService.run({
+			args: ['fetch', remote, branch],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 64 * 1024,
+			timeoutMs: GIT_FETCH_TIMEOUT_MS,
+		});
+	} catch {
+		// Best effort: leave it to `git worktree add` to report a missing ref.
 	}
 }
 

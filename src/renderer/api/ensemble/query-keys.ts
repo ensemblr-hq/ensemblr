@@ -54,6 +54,19 @@ export const ensembleQueryKeys = {
 		[...ensembleQueryKeys.all, 'pi-sessions', workspaceId] as const,
 	pullRequestSnapshot: (workspaceId: string) =>
 		[...ensembleQueryKeys.all, 'pull-request-snapshot', workspaceId] as const,
+	repositoryBranches: (repositoryId: string) =>
+		[...ensembleQueryKeys.all, 'repository-branches', repositoryId] as const,
+	/** Prefix matching every repository's cached branch list. */
+	repositoryBranchesAll: () =>
+		[...ensembleQueryKeys.all, 'repository-branches'] as const,
+	repositoryIssues: (repositoryId: string) =>
+		[...ensembleQueryKeys.all, 'repository-issues', repositoryId] as const,
+	repositoryPullRequests: (repositoryId: string) =>
+		[
+			...ensembleQueryKeys.all,
+			'repository-pull-requests',
+			repositoryId,
+		] as const,
 	reviewComments: (workspaceId: string) =>
 		[...ensembleQueryKeys.all, 'review-comments', workspaceId] as const,
 	reviewMergeSettings: (repositoryId: string) =>
