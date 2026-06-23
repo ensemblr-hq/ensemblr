@@ -3,8 +3,8 @@ import { CheckIcon, CopyIcon, TerminalIcon, Trash2Icon } from 'lucide-react';
 import type { ComponentProps, HTMLAttributes } from 'react';
 import {
 	createContext,
-	useCallback,
 	use,
+	useCallback,
 	useEffect,
 	useMemo,
 	useRef,

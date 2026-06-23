@@ -1,7 +1,11 @@
 import { readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-import type { RootDirectoryDiagnostic, RootDirectoryReconciliationSnapshot, RootDirectorySnapshot } from '../../shared/ipc/contracts/root-directory';
+import type {
+	RootDirectoryDiagnostic,
+	RootDirectoryReconciliationSnapshot,
+	RootDirectorySnapshot,
+} from '../../shared/ipc/contracts/root-directory';
 
 /** Options for {@link reconcileRootDirectory}. */
 export interface ReconcileRootDirectoryOptions {

@@ -1,3 +1,4 @@
+import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
 import { atomFamily } from 'jotai-family';
 
@@ -223,4 +224,47 @@ export type RepoActionKey = (typeof REPO_ACTION_KEYS)[number];
 
 export const repoSettingsOverrideAtomFamily = atomFamily((repoId: string) =>
 	atomWithStorage<RepoSettingsOverride>(KEY(`repo_override_${repoId}`), {}),
+);
+
+// ─── Pull request details (per-workspace local draft) ──────────────────────────
+
+/** Locally-saved PR title/description for a workspace's Checks panel. */
+export interface PrDetailsDraft {
+	description: string;
+	title: string;
+}
+
+/**
+ * Per-workspace saved PR title/description, keyed by workspace id. `null` means
+ * "nothing saved" — the Checks panel then seeds its inputs from the open PR (if
+ * any). Saving persists across reloads so a drafted title/description isn't lost
+ * on navigation; "Create PR" reads the live inputs, not this atom.
+ */
+export const prDetailsDraftAtomFamily = atomFamily((workspaceId: string) =>
+	atomWithStorage<PrDetailsDraft | null>(
+		KEY(`pr_details_${workspaceId}`),
+		null,
+	),
+);
+
+/** Live (possibly unsaved) PR draft mirrored from the Checks panel inputs. */
+export interface PrDetailsLiveDraft {
+	description: string;
+	/**
+	 * `${workspaceId}:${prNumber ?? 'none'}` — guards a cross-surface read against
+	 * a draft left over from a different PR identity (e.g. after one is opened).
+	 */
+	identity: string;
+	title: string;
+}
+
+/**
+ * In-memory mirror of the Checks panel's *live* PR title/description, keyed by
+ * workspace id. The Checks form publishes every edit here so other surfaces —
+ * notably the sidebar "Create PR" menu — hand the agent exactly what the user is
+ * currently editing, not just the last Saved draft. Deliberately not persisted:
+ * after a reload, surfaces fall back to {@link prDetailsDraftAtomFamily}.
+ */
+export const prDetailsLiveDraftAtomFamily = atomFamily((_workspaceId: string) =>
+	atom<PrDetailsLiveDraft | null>(null),
 );

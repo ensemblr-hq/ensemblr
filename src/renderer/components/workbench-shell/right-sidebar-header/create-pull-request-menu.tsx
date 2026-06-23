@@ -1,40 +1,82 @@
+import { useAtomValue } from 'jotai';
 import {
 	ChevronDownIcon,
 	ExternalLinkIcon,
 	GitPullRequestCreateIcon,
 	GitPullRequestDraftIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-	CommandShortcut,
-} from '@/renderer/components/ui/command';
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from '@/renderer/components/ui/dropdown-menu';
+import { buildCreatePullRequestPrompt } from '@/renderer/lib/workbench/checks-pr-prompts';
+import { buildGithubCompareUrl } from '@/renderer/lib/workbench/github-compare-url';
+import { resolvePrDetails } from '@/renderer/lib/workbench/pr-details-draft';
+import { useComposerSubmit } from '@/renderer/state/composer';
 import {
-	Popover,
-	PopoverContent,
-	PopoverTrigger,
-} from '@/renderer/components/ui/popover';
+	prDetailsDraftAtomFamily,
+	prDetailsLiveDraftAtomFamily,
+} from '@/renderer/state/preferences';
+import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
-import { useReviewActions } from '../review-actions/review-actions-context';
+/**
+ * Split-button + dropdown surfacing PR creation actions. Like the Checks panel,
+ * the primary action hands the chore to the active chat agent rather than
+ * calling the GitHub API directly; the dropdown adds a draft variant and an
+ * escape hatch that opens GitHub's compare page in the browser.
+ */
+export function CreatePullRequestMenu({
+	workspace,
+}: {
+	workspace: WorkspaceShellModel;
+}) {
+	const submitToComposer = useComposerSubmit();
+	// Hand the agent the live title/description from the Checks tab (including
+	// unsaved edits), falling back to the saved draft and then the open PR.
+	const liveDraft = useAtomValue(prDetailsLiveDraftAtomFamily(workspace.id));
+	const savedDraft = useAtomValue(prDetailsDraftAtomFamily(workspace.id));
+	const { description, title } = resolvePrDetails({
+		live: liveDraft,
+		saved: savedDraft,
+		workspace,
+	});
 
-/** Split-button + popover surfacing PR creation actions. */
-export function CreatePullRequestMenu() {
-	const [isOpen, setIsOpen] = useState(false);
-	const closeMenu = () => setIsOpen(false);
-	const reviewActions = useReviewActions();
+	const compareUrl = workspace.githubRepo
+		? buildGithubCompareUrl({
+				base: workspace.landingSummary?.branchSource.baseBranch,
+				head: workspace.branchName,
+				owner: workspace.githubRepo.owner,
+				repo: workspace.githubRepo.repo,
+			})
+		: null;
+
+	const handoffToAgent = (draft: boolean) => {
+		submitToComposer(
+			buildCreatePullRequestPrompt({ description, draft, title, workspace }),
+		);
+		toast.success(
+			draft
+				? 'Asked the agent to open a draft pull request.'
+				: 'Asked the agent to open a pull request.',
+		);
+	};
+
+	const openManually = () => {
+		if (compareUrl) {
+			void window.ensemble?.openExternal(compareUrl);
+		}
+	};
 
 	return (
 		<div className='flex h-7 shrink-0 items-center overflow-hidden rounded-md border border-border bg-background'>
 			<Button
 				className='h-7 rounded-none border-0 bg-transparent px-2.5'
-				onClick={() => reviewActions?.openCreatePullRequest()}
+				onClick={() => handoffToAgent(false)}
 				size='sm'
 				variant='ghost'
 			>
@@ -42,8 +84,8 @@ export function CreatePullRequestMenu() {
 				Create PR
 			</Button>
 			<span aria-hidden='true' className='h-4 w-px shrink-0 bg-border' />
-			<Popover onOpenChange={setIsOpen} open={isOpen}>
-				<PopoverTrigger asChild>
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
 					<Button
 						aria-label='Open create pull request options'
 						className='size-7 rounded-none border-0 bg-transparent'
@@ -52,38 +94,18 @@ export function CreatePullRequestMenu() {
 					>
 						<ChevronDownIcon aria-hidden='true' />
 					</Button>
-				</PopoverTrigger>
-				<PopoverContent
-					align='end'
-					className='w-64 overflow-hidden p-0'
-					onOpenAutoFocus={(event) => event.preventDefault()}
-				>
-					<Command>
-						<CommandInput placeholder='Create PR action...' />
-						<CommandList>
-							<CommandEmpty>No PR actions found.</CommandEmpty>
-							<CommandGroup heading='Pull request'>
-								<CommandItem
-									onSelect={() => {
-										closeMenu();
-										reviewActions?.openCreatePullRequest({ draft: true });
-									}}
-									value='create draft pr'
-								>
-									<GitPullRequestDraftIcon aria-hidden='true' />
-									<span>Create draft PR</span>
-									<CommandShortcut>Draft</CommandShortcut>
-								</CommandItem>
-								<CommandItem onSelect={closeMenu} value='create pr manually'>
-									<ExternalLinkIcon aria-hidden='true' />
-									<span>Create PR manually</span>
-									<CommandShortcut>Web</CommandShortcut>
-								</CommandItem>
-							</CommandGroup>
-						</CommandList>
-					</Command>
-				</PopoverContent>
-			</Popover>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align='end' className='w-56'>
+					<DropdownMenuItem onSelect={() => handoffToAgent(true)}>
+						<GitPullRequestDraftIcon aria-hidden='true' />
+						Create draft PR
+					</DropdownMenuItem>
+					<DropdownMenuItem disabled={!compareUrl} onSelect={openManually}>
+						<ExternalLinkIcon aria-hidden='true' />
+						Create PR manually
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
 		</div>
 	);
 }

@@ -1,7 +1,13 @@
 import { existsSync, rmSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { DeletedWorkspaceSnapshot, DeleteWorkspaceDiagnostic, DeleteWorkspaceDiagnosticCode, DeleteWorkspaceRequest, DeleteWorkspaceResult } from '../../shared/ipc/contracts/workspace';
+import type {
+	DeletedWorkspaceSnapshot,
+	DeleteWorkspaceDiagnostic,
+	DeleteWorkspaceDiagnosticCode,
+	DeleteWorkspaceRequest,
+	DeleteWorkspaceResult,
+} from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleDatabaseService } from '../storage/database.ts';
 import { selectDeleteWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';

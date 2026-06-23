@@ -26,7 +26,9 @@ export function useWorkspaceTerminalSessions(
 	const [sessions, setSessions] = useState<TerminalSessionSnapshot[]>([]);
 	// Tabs the user explicitly closed: their later lifecycle broadcasts (exit
 	// after kill) must not resurrect the tab.
-	const closedTerminalIdsRef = useRef<Set<string>>(null as unknown as Set<string>);
+	const closedTerminalIdsRef = useRef<Set<string>>(
+		null as unknown as Set<string>,
+	);
 	if (closedTerminalIdsRef.current === null) {
 		closedTerminalIdsRef.current = new Set();
 	}

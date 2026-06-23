@@ -140,7 +140,9 @@ function handleMessageEnvelope(
 	// back-to-back prompts (e.g. while a turn errors and retries) from stacking
 	// into a single bubble. Assistant/tool runs still collapse into one turn.
 	const groupKey =
-		uiRole === 'user' ? `${groupKeyFor(uiRole)}::${event.id}` : groupKeyFor(uiRole);
+		uiRole === 'user'
+			? `${groupKeyFor(uiRole)}::${event.id}`
+			: groupKeyFor(uiRole);
 
 	const incomingParts = mergeParts(
 		[],

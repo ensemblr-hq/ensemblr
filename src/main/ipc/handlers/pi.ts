@@ -1,7 +1,11 @@
 import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import { type ListPiSlashCommandsRequest, type ListPiSlashCommandsResult, type PiExecutableSelectionResult } from '../../../shared/ipc/contracts/pi-session';
+import type {
+	ListPiSlashCommandsRequest,
+	ListPiSlashCommandsResult,
+	PiExecutableSelectionResult,
+} from '../../../shared/ipc/contracts/pi-session';
 import { resolvePiSlashCommands } from '../../pi-agent/pi-slash-commands.ts';
 import type { PiExecutableService } from '../../pi-runtime';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';

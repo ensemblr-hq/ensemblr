@@ -155,15 +155,19 @@ function WorkspaceFileTree({
 			}
 			setLazyChildren((previous) => {
 				const seen = new Set(previous.map((entry) => entry.path));
-				const additions = result.entries
-					.filter((entry) => !seen.has(entry.path))
-					.map((entry) => ({
-						id: `wsfile:${entry.path}`,
-						isIgnored: entry.isIgnored,
-						kind: entry.kind,
-						name: entry.name,
-						path: entry.path,
-					}));
+				const additions = result.entries.flatMap((entry) =>
+					seen.has(entry.path)
+						? []
+						: [
+								{
+									id: `wsfile:${entry.path}`,
+									isIgnored: entry.isIgnored,
+									kind: entry.kind,
+									name: entry.name,
+									path: entry.path,
+								},
+							],
+				);
 				return additions.length > 0 ? [...previous, ...additions] : previous;
 			});
 		},

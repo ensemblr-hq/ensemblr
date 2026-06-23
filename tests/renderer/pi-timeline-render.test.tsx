@@ -17,10 +17,8 @@ import { replayPiTimeline } from '../../src/renderer/lib/pi-timeline';
 import type { PiTimelineState } from '../../src/renderer/types/pi-timeline';
 import { piCapturedLineSchema } from '../../src/shared/pi-rpc';
 
-const FIXTURE_DIR = new URL(
-	'../fixtures/pi-captures',
-	import.meta.url,
-).pathname;
+const FIXTURE_DIR = new URL('../fixtures/pi-captures', import.meta.url)
+	.pathname;
 
 function stateFor(fixtureName: string): PiTimelineState {
 	const content = readFileSync(join(FIXTURE_DIR, fixtureName), 'utf8');

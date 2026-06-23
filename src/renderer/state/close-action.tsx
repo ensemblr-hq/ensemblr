@@ -1,11 +1,5 @@
 import type { ReactNode } from 'react';
-import {
-	createContext,
-	useCallback,
-	useContext,
-	useEffect,
-	useRef,
-} from 'react';
+import { createContext, use, useCallback, useEffect, useRef } from 'react';
 
 type RegisterCloseAction = (handler: () => void) => () => void;
 
@@ -66,7 +60,7 @@ export function CloseActionProvider({ children }: { children: ReactNode }) {
  * when its dependencies change. A no-op outside a {@link CloseActionProvider}.
  */
 export function useRegisterCloseAction(handler: () => void): void {
-	const register = useContext(CloseActionContext);
+	const register = use(CloseActionContext);
 	useEffect(() => {
 		if (!register) {
 			return;

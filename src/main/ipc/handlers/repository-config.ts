@@ -1,7 +1,11 @@
 import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import { type RepositoryConfigMigrationPreview, type RepositoryConfigMigrationResult, type RepositoryConfigSnapshot } from '../../../shared/ipc/contracts/repository-config';
+import type {
+	RepositoryConfigMigrationPreview,
+	RepositoryConfigMigrationResult,
+	RepositoryConfigSnapshot,
+} from '../../../shared/ipc/contracts/repository-config';
 import type { RepositoryConfigService } from '../../config';
 import { isRepositoryConfigPathAllowed } from '../../config';
 import type { EnsembleDatabaseService } from '../../storage';

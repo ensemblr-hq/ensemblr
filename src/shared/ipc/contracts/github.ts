@@ -81,6 +81,8 @@ export interface GithubPullRequestWire {
 	deletions: number | null;
 	deployments: readonly GithubDeploymentWire[];
 	headRefName: string;
+	/** Head-branch tip commit at the PR, used to confirm branch identity. */
+	headRefOid: string;
 	isDraft: boolean;
 	mergeable: GithubMergeableState;
 	/** GraphQL mergeStateStatus (BLOCKED, CLEAN, DIRTY, …) when exposed. */

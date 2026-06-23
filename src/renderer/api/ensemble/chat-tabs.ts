@@ -2,8 +2,6 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type {
-	BindPiSessionToTabRequest,
-	BindPiSessionToTabResult,
 	CloseChatTabRequest,
 	CloseChatTabResult,
 	ListChatTabsResult,

@@ -1,6 +1,10 @@
 import { homedir } from 'node:os';
 
-import type { SetupCheckId, SetupCheckSnapshot, SetupDiagnosticsSnapshot } from '../../shared/ipc/contracts/setup';
+import type {
+	SetupCheckId,
+	SetupCheckSnapshot,
+	SetupDiagnosticsSnapshot,
+} from '../../shared/ipc/contracts/setup';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsembleConfigService } from '../config/config-loader';
 import type { EnvironmentVariablesService } from '../environment/environment-variables';

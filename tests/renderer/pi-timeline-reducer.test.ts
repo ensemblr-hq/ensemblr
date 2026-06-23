@@ -18,10 +18,8 @@ import {
 import type { PiCapturedLine } from '../../src/shared/pi-rpc';
 import { piCapturedLineSchema } from '../../src/shared/pi-rpc';
 
-const FIXTURE_DIR = new URL(
-	'../fixtures/pi-captures',
-	import.meta.url,
-).pathname;
+const FIXTURE_DIR = new URL('../fixtures/pi-captures', import.meta.url)
+	.pathname;
 
 function loadFixture(name: string): readonly PiCapturedLine[] {
 	const content = readFileSync(join(FIXTURE_DIR, name), 'utf8');

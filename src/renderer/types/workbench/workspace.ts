@@ -1,3 +1,4 @@
+import type { GithubRepoRef } from '@/renderer/lib/workbench/github-compare-url';
 import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
 import type {
 	WorkspaceOpenTargetKind as SharedWorkspaceOpenTargetKind,
@@ -104,6 +105,16 @@ export interface PullRequestCommentSummary {
 	url?: string;
 }
 
+/**
+ * Self-contained comment payload carried inline on a `document` session tab so
+ * the comment preview survives reloads without re-fetching — the body is the
+ * `detail`, and `prNumber` lets the preview's "Add to chat" reuse the same
+ * context formatter the Checks panel uses.
+ */
+export interface CommentPreviewPayload extends PullRequestCommentSummary {
+	prNumber?: number;
+}
+
 export interface PullRequestTodoSummary {
 	id: string;
 	label: string;
@@ -155,8 +166,15 @@ export type SessionTabModel =
 			turnId: string | null;
 	  })
 	| (SessionTabBase & {
+			/** Inline PR-comment payload when this document tab previews a comment. */
+			commentPreview?: CommentPreviewPayload;
 			filePath: string | null;
-			kind: 'document' | 'file' | 'preview';
+			kind: 'document';
+			turnId?: null;
+	  })
+	| (SessionTabBase & {
+			filePath: string | null;
+			kind: 'file' | 'preview';
 			turnId?: null;
 	  });
 
@@ -295,6 +313,8 @@ export interface WorkspaceShellModel {
 		status: 'blocked' | 'pending' | 'ready';
 	};
 	dockTabs: DockTabModel[];
+	/** Owner/repo parsed from the repository's GitHub remote, when it has one. */
+	githubRepo?: GithubRepoRef | null;
 	id: string;
 	landingSummary?: WorkspaceLandingSummary;
 	name: string;
@@ -309,6 +329,8 @@ export interface WorkspaceShellModel {
 		label: string;
 		number?: number;
 		previewDeployment?: PullRequestPreviewDeploymentSummary;
+		/** GitHub PR state; absent before a snapshot lands (treated as open). */
+		state?: 'closed' | 'merged' | 'open';
 		status: PullRequestShellStatus;
 		/** Last refresh error from the gh metadata service, when one occurred. */
 		syncError?: string;

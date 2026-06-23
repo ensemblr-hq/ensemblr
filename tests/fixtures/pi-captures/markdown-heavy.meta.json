@@ -1,11 +1,7 @@
 {
 	"scenario": "markdown-heavy",
 	"description": "Markdown rendering edge cases: headings, table, code.",
-	"piArgs": [
-		"--mode",
-		"rpc",
-		"--no-session"
-	],
+	"piArgs": ["--mode", "rpc", "--no-session"],
 	"cwd": "/sandbox/markdown-heavy",
 	"startedAt": 1781134147742,
 	"endedAt": 1781134158740,

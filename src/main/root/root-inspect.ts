@@ -7,7 +7,11 @@ import {
 	statSync,
 } from 'node:fs';
 
-import type { RootDirectoryDiagnostic, RootDirectoryManagedPathSnapshot, RootDirectorySnapshot } from '../../shared/ipc/contracts/root-directory';
+import type {
+	RootDirectoryDiagnostic,
+	RootDirectoryManagedPathSnapshot,
+	RootDirectorySnapshot,
+} from '../../shared/ipc/contracts/root-directory';
 import {
 	createManagedPathSnapshots,
 	createRootDirectorySettingSnapshot,

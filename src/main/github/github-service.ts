@@ -35,8 +35,13 @@ import {
 const GIT_TIMEOUT_MS = 30_000;
 const GH_TIMEOUT_MS = 45_000;
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
-/** Cache freshness window before a non-forced snapshot read re-runs `gh`. */
-const SNAPSHOT_TTL_MS = 30_000;
+/**
+ * Cache freshness window before a non-forced snapshot read re-runs `gh`. Kept
+ * below the renderer's active poll interval so polling actually drives fresh
+ * GitHub-side updates (checks, reviews, merge state) instead of being swallowed
+ * by the cache, while still deduping overlapping reads within the window.
+ */
+const SNAPSHOT_TTL_MS = 5_000;
 
 const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
@@ -132,6 +137,61 @@ export function createGithubService({
 		};
 	}
 
+	/**
+	 * Confirms a resolved PR belongs to the current branch by checking its head
+	 * commit is reachable from HEAD. `gh pr view` matches PRs by head-ref name
+	 * alone, so a reused or recreated branch name can resolve to a stale
+	 * closed/merged PR from an old session whose commit this branch never
+	 * contained. Reachability (`merge-base --is-ancestor` exit 0, reflexive for
+	 * an exact tip match) is the identity signal that the name match is genuine.
+	 *
+	 * The check is HEAD-relative: a merged PR's head also stops being reachable
+	 * once the workspace moves off the feature branch (e.g. a squash/rebase
+	 * merge followed by checking out the base), which intentionally retires the
+	 * stale view.
+	 */
+	async function isPullRequestHeadOnBranch(
+		cwd: string,
+		headRefOid: string,
+	): Promise<boolean> {
+		if (!headRefOid) {
+			// gh did not report the head oid — cannot verify, so do not suppress.
+			return true;
+		}
+		const result = await run('git', cwd, [
+			'merge-base',
+			'--is-ancestor',
+			headRefOid,
+			'HEAD',
+		]);
+		if (typeof result.exitCode !== 'number') {
+			// git never rendered a verdict (timeout / spawn failure). Match the
+			// empty-oid path and keep the PR rather than suppressing it on a
+			// transient hiccup. A real exit code — 1 (not an ancestor) or 128
+			// (head commit absent from this repo) — still means "not on branch".
+			return true;
+		}
+		return result.exitCode === 0;
+	}
+
+	/**
+	 * An "ok, no PR" snapshot for the current branch — used whenever the branch
+	 * has no PR of its own: none found, or a stale name-matched one suppressed.
+	 */
+	function emptySnapshot(branchSync: GitBranchSyncWire | null): {
+		ok: true;
+		snapshot: GithubPullRequestSnapshotWire;
+	} {
+		return {
+			ok: true,
+			snapshot: {
+				branchSync,
+				pullRequest: null,
+				syncedAt: now().toISOString(),
+			},
+		};
+	}
+
 	/** Fetches the live PR snapshot from `gh`, enriching with deployments/threads. */
 	async function fetchSnapshot(
 		cwd: string,
@@ -149,14 +209,7 @@ export function createGithubService({
 				'gh pr view failed in workspace.',
 			);
 			if (failure.code === 'no-pull-request') {
-				return {
-					ok: true,
-					snapshot: {
-						branchSync,
-						pullRequest: null,
-						syncedAt: now().toISOString(),
-					},
-				};
+				return emptySnapshot(branchSync);
 			}
 			return { error: failure, noPullRequest: false, ok: false };
 		}
@@ -176,6 +229,16 @@ export function createGithubService({
 				noPullRequest: false,
 				ok: false,
 			};
+		}
+
+		if (
+			pullRequest.state !== 'open' &&
+			!(await isPullRequestHeadOnBranch(cwd, pullRequest.headRefOid))
+		) {
+			// A closed/merged PR resolved purely by a reused branch name — its
+			// head commit is not part of this branch's history, so it belongs to
+			// an old session. Report no PR instead of attaching a stale one.
+			return emptySnapshot(branchSync);
 		}
 
 		const [deployments, reviewThreads] = await Promise.all([

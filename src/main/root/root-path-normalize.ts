@@ -1,7 +1,13 @@
 import path from 'node:path';
-
-import type { ResolvedSettingSnapshot, SettingsResolutionSnapshot } from '../../shared/ipc/contracts/settings-resolution';
-import type { RootDirectoryDiagnostic, RootDirectoryManagedPathKey, RootDirectoryManagedPathSnapshot } from '../../shared/ipc/contracts/root-directory';
+import type {
+	RootDirectoryDiagnostic,
+	RootDirectoryManagedPathKey,
+	RootDirectoryManagedPathSnapshot,
+} from '../../shared/ipc/contracts/root-directory';
+import type {
+	ResolvedSettingSnapshot,
+	SettingsResolutionSnapshot,
+} from '../../shared/ipc/contracts/settings-resolution';
 
 /** Setting key used to persist the user-selected root directory. */
 export const ROOT_DIRECTORY_KEY = 'rootDirectory';

@@ -12,10 +12,8 @@ import { join } from 'node:path';
 
 import { parsePiRpcLine, piCapturedLineSchema } from '../../src/shared/pi-rpc';
 
-const FIXTURE_DIR = new URL(
-	'../fixtures/pi-captures',
-	import.meta.url,
-).pathname;
+const FIXTURE_DIR = new URL('../fixtures/pi-captures', import.meta.url)
+	.pathname;
 
 const fixtureNames = readdirSync(FIXTURE_DIR)
 	.filter((name) => name.endsWith('.jsonl'))

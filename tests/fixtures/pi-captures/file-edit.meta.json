@@ -1,11 +1,7 @@
 {
 	"scenario": "file-edit",
 	"description": "Edit/diff events.",
-	"piArgs": [
-		"--mode",
-		"rpc",
-		"--no-session"
-	],
+	"piArgs": ["--mode", "rpc", "--no-session"],
 	"cwd": "/sandbox/file-edit",
 	"startedAt": 1781134188142,
 	"endedAt": 1781134202173,

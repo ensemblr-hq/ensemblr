@@ -122,6 +122,7 @@ const PR_VIEW_JSON = JSON.stringify({
 	],
 	deletions: 3,
 	headRefName: 'feature/x',
+	headRefOid: 'feature-tip-oid',
 	isDraft: false,
 	mergeStateStatus: 'CLEAN',
 	mergeable: 'MERGEABLE',
@@ -163,6 +164,7 @@ test('parsePullRequestView maps fields and check buckets', () => {
 
 	assert.equal(pullRequest.number, 7);
 	assert.equal(pullRequest.state, 'open');
+	assert.equal(pullRequest.headRefOid, 'feature-tip-oid');
 	assert.equal(pullRequest.mergeable, 'mergeable');
 	assert.equal(pullRequest.reviewDecision, 'APPROVED');
 	assert.deepEqual(
@@ -490,4 +492,181 @@ test('mergePullRequest uses the requested merge method', async () => {
 	assert.equal(result.merged, true);
 	const mergeCall = calls.find((call) => call.args?.[1] === 'merge');
 	assert.ok(mergeCall?.args?.includes('--rebase'));
+});
+
+test('getPullRequestSnapshot drops a closed PR whose head is not on the branch', async () => {
+	const { calls, service } = createService((request) => {
+		if (request.command === 'git') {
+			if (request.args?.[0] === 'rev-parse') {
+				return buildResult({ stdout: 'feature/x\n' });
+			}
+			if (request.args?.[0] === 'merge-base') {
+				// Stale PR head commit is not reachable from HEAD (reused branch).
+				return buildResult({ exitCode: 1, status: 'failure' });
+			}
+			return buildResult({ stdout: '0\t0\n' });
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+			return buildResult({
+				stdout: JSON.stringify({
+					...JSON.parse(PR_VIEW_JSON),
+					headRefOid: 'stale-oid',
+					state: 'CLOSED',
+				}),
+			});
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.error, undefined);
+	assert.equal(result.snapshot?.pullRequest, null);
+	const ancestorCall = calls.find((call) => call.args?.[0] === 'merge-base');
+	assert.deepEqual(ancestorCall?.args, [
+		'merge-base',
+		'--is-ancestor',
+		'stale-oid',
+		'HEAD',
+	]);
+});
+
+test('getPullRequestSnapshot keeps a merged PR whose head is on the branch', async () => {
+	const { service } = createService((request) => {
+		if (request.command === 'git') {
+			if (request.args?.[0] === 'rev-parse') {
+				return buildResult({ stdout: 'feature/x\n' });
+			}
+			if (request.args?.[0] === 'merge-base') {
+				// Head commit is reachable from HEAD — a genuine merged PR.
+				return buildResult({ exitCode: 0 });
+			}
+			return buildResult({ stdout: '0\t0\n' });
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+			return buildResult({
+				stdout: JSON.stringify({
+					...JSON.parse(PR_VIEW_JSON),
+					headRefOid: 'branch-tip',
+					state: 'MERGED',
+				}),
+			});
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.pullRequest?.number, 7);
+	assert.equal(result.snapshot?.pullRequest?.state, 'merged');
+});
+
+test('getPullRequestSnapshot keeps a closed PR whose head is on the branch', async () => {
+	const { service } = createService((request) => {
+		if (request.command === 'git') {
+			if (request.args?.[0] === 'rev-parse') {
+				return buildResult({ stdout: 'feature/x\n' });
+			}
+			if (request.args?.[0] === 'merge-base') {
+				// Head commit is reachable — a PR closed without merging, not a
+				// stale name match. It must survive.
+				return buildResult({ exitCode: 0 });
+			}
+			return buildResult({ stdout: '0\t0\n' });
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+			return buildResult({
+				stdout: JSON.stringify({
+					...JSON.parse(PR_VIEW_JSON),
+					headRefOid: 'branch-tip',
+					state: 'CLOSED',
+				}),
+			});
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.pullRequest?.number, 7);
+	assert.equal(result.snapshot?.pullRequest?.state, 'closed');
+});
+
+test('getPullRequestSnapshot keeps a closed PR when gh omits the head oid', async () => {
+	const { calls, service } = createService((request) => {
+		if (request.command === 'git') {
+			if (request.args?.[0] === 'rev-parse') {
+				return buildResult({ stdout: 'feature/x\n' });
+			}
+			return buildResult({ stdout: '0\t0\n' });
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+			return buildResult({
+				stdout: JSON.stringify({
+					...JSON.parse(PR_VIEW_JSON),
+					headRefOid: '',
+					state: 'CLOSED',
+				}),
+			});
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	// No oid to verify against — keep the PR and skip the ancestry probe.
+	assert.equal(result.snapshot?.pullRequest?.number, 7);
+	const ancestorCall = calls.find((call) => call.args?.[0] === 'merge-base');
+	assert.equal(ancestorCall, undefined);
+});
+
+test('getPullRequestSnapshot keeps a closed PR when the ancestry check cannot run', async () => {
+	const { service } = createService((request) => {
+		if (request.command === 'git') {
+			if (request.args?.[0] === 'rev-parse') {
+				return buildResult({ stdout: 'feature/x\n' });
+			}
+			if (request.args?.[0] === 'merge-base') {
+				// git produced no exit code (timeout / spawn failure) — cannot
+				// verify, so the PR must not be suppressed on a transient hiccup.
+				return buildResult({ exitCode: null, status: 'failure' });
+			}
+			return buildResult({ stdout: '0\t0\n' });
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+			return buildResult({
+				stdout: JSON.stringify({
+					...JSON.parse(PR_VIEW_JSON),
+					headRefOid: 'unknown-oid',
+					state: 'CLOSED',
+				}),
+			});
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.pullRequest?.number, 7);
+	assert.equal(result.snapshot?.pullRequest?.state, 'closed');
 });

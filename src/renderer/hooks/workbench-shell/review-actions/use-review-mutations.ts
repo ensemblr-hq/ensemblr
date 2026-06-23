@@ -5,11 +5,9 @@ import { toast } from 'sonner';
 
 import {
 	archiveWorkspace,
-	commitWorkspaceChanges,
-	createPullRequest,
 	ensembleQueryKeys,
 	mergePullRequest,
-	pushWorkspaceBranch,
+	refreshPullRequestSnapshot,
 } from '@/renderer/api/ensemble-queries';
 import {
 	ReviewActionError,
@@ -26,10 +24,10 @@ export interface ReviewMergeSettings {
 }
 
 /**
- * Owns the three review-flow mutations (commit & push, create pull request,
- * merge pull request) plus the archive-after-merge follow-up. Callers pass the
- * active workspace and merge-settings snapshot, plus an `onSettled` callback
- * the provider uses to dismiss its active dialog.
+ * Owns the merge-pull-request mutation plus the archive-after-merge follow-up.
+ * (PR creation is handed to the chat agent — see `CreatePullRequestMenu`.)
+ * Callers pass the active workspace and merge-settings snapshot, plus an
+ * `onSettled` callback the provider uses to dismiss its active dialog.
  *
  * Invalidates the pull-request snapshot and workspace git-status queries after
  * every success so the review panel reflects the new state immediately.
@@ -72,99 +70,6 @@ export function useReviewMutations({
 		}
 	}, [mergeSettings.deleteLocalBranchOnArchive, queryClient, workspaceId]);
 
-	const commitMutation = useMutation({
-		mutationFn: async (message: string) => {
-			const commitResult = await commitWorkspaceChanges({
-				message,
-				workspaceCwd,
-			});
-			if (!commitResult.ok) {
-				throw new ReviewActionError(commitResult.error);
-			}
-			const pushResult = await pushWorkspaceBranch({
-				setUpstream: mergeSettings.setUpstreamOnPush,
-				workspaceCwd,
-			});
-			if (!pushResult.ok) {
-				throw new ReviewActionError(pushResult.error);
-			}
-		},
-		onError: (error) => showReviewActionError('Commit and push failed', error),
-		onSuccess: () => {
-			toast.success('Changes committed and pushed.');
-			onSettled();
-			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.pullRequestSnapshot(workspaceId),
-			});
-			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.workspaceGitStatus(workspaceCwd),
-			});
-		},
-	});
-
-	const createPrMutation = useMutation({
-		mutationFn: async ({
-			body,
-			commitFirst,
-			draft,
-			title,
-		}: {
-			body: string;
-			commitFirst: boolean;
-			draft: boolean;
-			title: string;
-		}) => {
-			if (commitFirst) {
-				const commitResult = await commitWorkspaceChanges({
-					message: title,
-					workspaceCwd,
-				});
-				if (
-					!commitResult.ok &&
-					commitResult.error?.code !== 'nothing-to-commit'
-				) {
-					throw new ReviewActionError(commitResult.error);
-				}
-			}
-			const pushResult = await pushWorkspaceBranch({
-				setUpstream: mergeSettings.setUpstreamOnPush,
-				workspaceCwd,
-			});
-			if (!pushResult.ok) {
-				throw new ReviewActionError(pushResult.error);
-			}
-			const baseBranch =
-				activeWorkspace.landingSummary?.branchSource.baseBranch;
-			const createResult = await createPullRequest({
-				...(baseBranch ? { baseBranch } : {}),
-				body,
-				draft,
-				title,
-				workspaceCwd,
-			});
-			if (!createResult.ok) {
-				throw new ReviewActionError(createResult.error);
-			}
-			return createResult;
-		},
-		onError: (error) =>
-			showReviewActionError('Pull request creation failed', error),
-		onSuccess: (result) => {
-			toast.success(
-				result.pullRequestNumber
-					? `Pull request #${result.pullRequestNumber} created.`
-					: 'Pull request created.',
-			);
-			onSettled();
-			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.pullRequestSnapshot(workspaceId),
-			});
-			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.workspaceGitStatus(workspaceCwd),
-			});
-		},
-	});
-
 	const mergeMutation = useMutation({
 		mutationFn: async () => {
 			const result = await mergePullRequest({ workspaceCwd, workspaceId });
@@ -175,8 +80,14 @@ export function useReviewMutations({
 		onError: (error) => showReviewActionError('Merge failed', error),
 		onSuccess: () => {
 			onSettled();
-			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.pullRequestSnapshot(workspaceId),
+			void refreshPullRequestSnapshot({
+				queryClient,
+				workspaceCwd,
+				workspaceId,
+			}).catch((cause) => {
+				// The merge already succeeded; a failed snapshot refresh only leaves
+				// the panel stale until the next poll, so log rather than alarm.
+				console.error('Failed to refresh PR snapshot after merge:', cause);
 			});
 			void queryClient.invalidateQueries({
 				queryKey: ensembleQueryKeys.workspaceGitStatus(workspaceCwd),
@@ -196,8 +107,6 @@ export function useReviewMutations({
 	});
 
 	return {
-		commitMutation,
-		createPrMutation,
 		mergeMutation,
 	};
 }
