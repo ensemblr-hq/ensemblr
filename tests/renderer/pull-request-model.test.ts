@@ -26,6 +26,7 @@ function createPullRequest(
 		deletions: 2,
 		deployments: [],
 		headRefName: 'feature/x',
+		headRefOid: 'abc123',
 		isDraft: false,
 		mergeable: 'mergeable',
 		number: 7,

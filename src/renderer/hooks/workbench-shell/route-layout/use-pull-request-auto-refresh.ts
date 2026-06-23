@@ -11,10 +11,10 @@ import {
  * finishes a turn (a `status` event transitioning streaming/starting → idle).
  *
  * Agents create PRs, push, and merge from their own shell, which the app cannot
- * see; without this the Checks panel and PR header wait up to ~30s for the next
- * poll (and that poll can still hit the main process's 30s snapshot TTL). The
- * turn-end signal is the cheapest reliable hook — a `gh pr create` almost always
- * lands just before the agent goes idle. The 30s poll remains the fallback.
+ * see; without this the Checks panel and PR header wait for the next poll (and
+ * that poll can still hit the main process's snapshot TTL). The turn-end signal
+ * is the cheapest reliable hook — a `gh pr create` almost always lands just
+ * before the agent goes idle. The background poll remains the fallback.
  */
 export function usePullRequestAutoRefresh({
 	workspaceCwd,
