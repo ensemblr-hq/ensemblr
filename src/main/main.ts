@@ -1,5 +1,4 @@
 import { app, BrowserWindow, shell } from 'electron';
-import started from 'electron-squirrel-startup';
 import { IPC_CHANNELS } from '../shared/ipc/channels';
 import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
 import type {
@@ -86,11 +85,6 @@ import {
 	createListWorkspaceFilesService,
 	createWorkspaceFilesWatcher,
 } from './workspace-files';
-
-// Quit early on Windows when invoked by the Squirrel installer.
-if (started) {
-	app.quit();
-}
 
 app.setName('Ensemble');
 
