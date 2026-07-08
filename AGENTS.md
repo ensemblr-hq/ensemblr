@@ -111,6 +111,10 @@ Every function, hook, React component, Jotai atom, and IPC contract in `src/main
 - Excluded by policy: shadcn UI primitives under `src/renderer/components/ui/`, type-only files (`*.d.ts`, anything under `types/`), the generated `routeTree.gen.ts`, mock fixtures under `src/renderer/mocks/`, pure barrel `index.ts` re-export files, and tests. `src/shared/ipc/contracts.ts` is also treated as type-only.
 - When updating existing code, leave correct JSDoc in place and refresh it when behavior changes. Do not introduce new code without the appropriate JSDoc block.
 
+## Code Review Policy
+
+See @.claude/rules/code-review.md — when the `code-review` skill runs, run `react-doctor` and `fallow` as its final step.
+
 ## Linear And Pull Request Workflow
 
 - Linear project lookup defaults: team `The Swiss Cheese`, project `Ensemble`, issue key prefix `THE`.
