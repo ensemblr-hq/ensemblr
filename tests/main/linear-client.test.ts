@@ -185,7 +185,8 @@ test('listIssues: sends bearer auth and the team filter, maps nodes', async () =
 	assert.strictEqual(page.nodes[0]?.identifier, 'THE-1');
 	assert.strictEqual(requests[0]?.headers.authorization, 'Bearer token-1');
 	assert.deepStrictEqual(
-		(requests[0]?.body.variables as Record<string, unknown>).filter,
+		(requests[0]?.body.variables as Record<string, unknown> | undefined)
+			?.filter,
 		{ team: { id: { eq: 'team-1' } } },
 	);
 });
