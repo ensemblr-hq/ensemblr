@@ -104,7 +104,15 @@ export function installApplicationMenu(): void {
 		{
 			label: 'View',
 			submenu: [
-				{ role: 'reload' },
+				// Reload is intentionally accelerator-less: ⌘/Ctrl+R is repurposed as
+				// the workspace Run/Stop shortcut (`run.start`) and handled in the
+				// renderer. Force Reload (⌘⇧R) stays as the keyboard path to a reload.
+				{
+					click: () => {
+						BrowserWindow.getFocusedWindow()?.webContents.reload();
+					},
+					label: 'Reload',
+				},
 				{ role: 'forceReload' },
 				{ role: 'toggleDevTools' },
 				{ type: 'separator' },

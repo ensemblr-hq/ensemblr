@@ -1,5 +1,6 @@
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 
+import { RunStoppedEmptyState } from './run-stopped-empty-state';
 import { ScriptEmptyState } from './script-empty-state';
 import { XtermTerminal } from './xterm-terminal';
 
@@ -25,14 +26,7 @@ export function RunScriptOutputPanel({
 	}
 
 	if (!script.terminalId) {
-		return (
-			<ScriptEmptyState
-				actionLabel='Run'
-				detail='Start the run script to stream dev server output here.'
-				onAction={onRunScript}
-				title='Run script is stopped'
-			/>
-		);
+		return <RunStoppedEmptyState onRunScript={onRunScript} />;
 	}
 
 	return (

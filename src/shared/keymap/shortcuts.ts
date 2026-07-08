@@ -156,6 +156,11 @@ export const SHORTCUTS = {
 		scope: 'global',
 		bindings: [{ key: 'u', modifiers: ['mod', 'alt'] }],
 	},
+	'run.start': {
+		description: 'Start or stop run script',
+		scope: 'global',
+		bindings: [{ key: 'r', modifiers: ['mod'] }],
+	},
 } as const satisfies Record<string, ShortcutDef>;
 
 export type ShortcutId = keyof typeof SHORTCUTS;

@@ -60,6 +60,7 @@ const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
 };
 
 const DOCK_ACTIONS: WorkbenchDockActions = {
+	onAskAgentSetupScript: () => undefined,
 	onNewTerminal: () => undefined,
 	onOpenRunPort: () => undefined,
 	onOpenSetupScripts: () => undefined,
@@ -724,8 +725,8 @@ test('renders setup-not-run dock action and empty state', () => {
 		'setup',
 	);
 
-	expect(markup).toContain('Run setup script');
-	expect(markup).toContain('Setup script has not run');
+	expect(markup).toContain('Run setup');
+	expect(markup).toContain('No setup script output');
 	expect(markup).not.toContain('Rerun');
 });
 
@@ -763,8 +764,9 @@ test('renders missing setup and run script empty states', () => {
 		'run',
 	);
 
-	expect(setupMarkup).toContain('Setup Scripts');
-	expect(setupMarkup).toContain('No setup script configured');
+	expect(setupMarkup).toContain('Add setup script');
+	expect(setupMarkup).toContain('Ask agent');
+	expect(setupMarkup).toContain('Add manually');
 	expect(runMarkup).toContain('Setup Scripts');
 	expect(runMarkup).toContain('No run script configured');
 	expect(runMarkup).not.toContain('Stop');
@@ -793,7 +795,7 @@ test('renders run action when dev server is stopped', () => {
 	);
 
 	expect(markup).toContain('Run');
-	expect(markup).toContain('Run script is stopped');
+	expect(markup).toContain('Start Run');
 	expect(markup).not.toContain('Open :');
 	expect(markup).not.toContain('Stop');
 });
