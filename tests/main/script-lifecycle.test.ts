@@ -68,6 +68,7 @@ function createDatabaseServiceStub(
 
 function createSettingsStub(settings: {
 	archive?: string;
+	autoRunAfterSetup?: boolean;
 	run?: string;
 	runScriptMode?: string;
 	setup?: string;
@@ -81,6 +82,10 @@ function createSettingsStub(settings: {
 	entries.push({
 		key: 'runScriptMode',
 		value: settings.runScriptMode ?? 'concurrent',
+	});
+	entries.push({
+		key: 'autoRunAfterSetup',
+		value: settings.autoRunAfterSetup ?? false,
 	});
 
 	return {
@@ -124,6 +129,7 @@ function createTerminalServiceFake({ killStops = true } = {}): {
 				exitCode: null,
 				id: `session-${counter}`,
 				kind: options.kind ?? 'terminal',
+				previewUrl: null,
 				rows: 24,
 				status: 'running',
 				title: options.title ?? 'Terminal',
@@ -409,4 +415,83 @@ test('unknown workspace yields workspace-not-found', async (t) => {
 
 	assert.equal(result.session, null);
 	assert.equal(result.diagnostics[0]?.code, 'workspace-not-found');
+});
+
+test('runSetupScriptWithAutoRun chains the run script after a clean setup exit', async (t) => {
+	const fixture = createServiceFixture(t, {
+		autoRunAfterSetup: true,
+		run: 'bun run dev',
+		setup: 'bun install',
+	});
+
+	// Setup exits successfully shortly after it starts.
+	setTimeout(() => fixture.endSession('session-1', 'exited'), 20);
+
+	await fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.deepEqual(
+		fixture.createCalls.map((call) => call.kind),
+		['setup-script', 'run-script'],
+	);
+});
+
+test('runSetupScriptWithAutoRun does not run when auto-run is disabled', async (t) => {
+	const fixture = createServiceFixture(t, {
+		autoRunAfterSetup: false,
+		run: 'bun run dev',
+		setup: 'bun install',
+	});
+
+	setTimeout(() => fixture.endSession('session-1', 'exited'), 20);
+
+	await fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.deepEqual(
+		fixture.createCalls.map((call) => call.kind),
+		['setup-script'],
+	);
+});
+
+test('runSetupScriptWithAutoRun skips the run script when setup fails', async (t) => {
+	const fixture = createServiceFixture(t, {
+		autoRunAfterSetup: true,
+		run: 'bun run dev',
+		setup: 'bun install',
+	});
+
+	setTimeout(() => fixture.endSession('session-1', 'failed'), 20);
+
+	await fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.deepEqual(
+		fixture.createCalls.map((call) => call.kind),
+		['setup-script'],
+	);
+});
+
+test('runSetupScriptWithAutoRun skips the run script when setup is stopped mid-flight', async (t) => {
+	const fixture = createServiceFixture(t, {
+		autoRunAfterSetup: true,
+		run: 'bun run dev',
+		setup: 'bun install',
+	});
+
+	// The user manually stops setup before it can exit cleanly.
+	setTimeout(() => fixture.terminalService.kill('session-1'), 20);
+
+	await fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.deepEqual(
+		fixture.createCalls.map((call) => call.kind),
+		['setup-script'],
+	);
+	assert.deepEqual(fixture.killedIds, ['session-1']);
 });

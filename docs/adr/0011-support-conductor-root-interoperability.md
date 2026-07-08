@@ -23,8 +23,8 @@ If the user sets Ensemble's root directory to the same root directory used by Co
 - Use the same root subdirectory shape: `repos/`, `workspaces/`, and `archived-contexts/`.
 - Discover existing repositories and workspaces from the shared root.
 - Adopt existing git worktree workspaces when possible by inspecting git metadata, branch, root path, and repository relationship.
-- Preserve Conductor-compatible repository configuration, including `conductor.json` and `.worktreeinclude`.
-- Preserve script compatibility through `CONDUCTOR_*` environment variables where configured.
+- Read the committed `.ensemble/settings.toml` repository config and the `.worktreeinclude` files-to-copy list (see [0030](0030-use-ensemble-settings-toml-as-sole-repository-config.md)).
+- Expose `ENSEMBLE_*` workspace environment variables to scripts; the `CONDUCTOR_*` mirrors are removed.
 - Leave unknown files, directories, and metadata alone.
 - Store Ensemble-specific app metadata in Ensemble's own SQLite database, not Conductor's database.
 

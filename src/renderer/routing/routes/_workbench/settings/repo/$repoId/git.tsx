@@ -108,8 +108,8 @@ function RepoGitSettings() {
 
 			<p className='py-3 text-muted-foreground text-xs'>
 				Toggle defaults are currently read-only. Edit{' '}
-				<code className='font-mono'>ensemble.json</code> at the repository root
-				to change shared values for the team.
+				<code className='font-mono'>.ensemble/settings.toml</code> to change
+				shared values for the team.
 			</p>
 		</SettingsSection>
 	);

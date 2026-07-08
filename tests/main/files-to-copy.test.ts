@@ -113,7 +113,7 @@ test('tracked files matching patterns are not copied', async (t) => {
 	);
 });
 
-test('`.worktreeinclude` wins over ensemble.json files-to-copy', async (t) => {
+test('`.worktreeinclude` wins over .ensemble/settings.toml files-to-copy', async (t) => {
 	const fixture = createFixture(t);
 	writeFileSync(
 		path.join(fixture.repositoryPath, '.gitignore'),
@@ -124,11 +124,14 @@ test('`.worktreeinclude` wins over ensemble.json files-to-copy', async (t) => {
 	writeFileSync(path.join(fixture.repositoryPath, 'secret.json'), '{}\n');
 	writeFileSync(
 		path.join(fixture.repositoryPath, '.worktreeinclude'),
-		'# Conductor compatible\nconfig.local\n',
+		'# copied files\nconfig.local\n',
 	);
+	mkdirSync(path.join(fixture.repositoryPath, '.ensemble'), {
+		recursive: true,
+	});
 	writeFileSync(
-		path.join(fixture.repositoryPath, 'ensemble.json'),
-		JSON.stringify({ filesToCopy: ['secret.json'] }),
+		path.join(fixture.repositoryPath, '.ensemble', 'settings.toml'),
+		'file_include_globs = ["secret.json"]\n',
 	);
 
 	const service = createFilesToCopyService({
@@ -155,7 +158,7 @@ test('`.worktreeinclude` wins over ensemble.json files-to-copy', async (t) => {
 	);
 });
 
-test('ensemble.json files-to-copy is used when no .worktreeinclude or conductor config', async (t) => {
+test('.ensemble/settings.toml files-to-copy is used when no .worktreeinclude', async (t) => {
 	const fixture = createFixture(t);
 	writeFileSync(
 		path.join(fixture.repositoryPath, '.gitignore'),
@@ -167,9 +170,12 @@ test('ensemble.json files-to-copy is used when no .worktreeinclude or conductor 
 		'KEY=1\n',
 	);
 	writeFileSync(path.join(fixture.repositoryPath, '.env'), 'IGNORED=1\n');
+	mkdirSync(path.join(fixture.repositoryPath, '.ensemble'), {
+		recursive: true,
+	});
 	writeFileSync(
-		path.join(fixture.repositoryPath, 'ensemble.json'),
-		JSON.stringify({ filesToCopy: ['secrets/**'] }),
+		path.join(fixture.repositoryPath, '.ensemble', 'settings.toml'),
+		'file_include_globs = ["secrets/**"]\n',
 	);
 
 	const service = createFilesToCopyService({
@@ -199,7 +205,7 @@ test('ensemble.json files-to-copy is used when no .worktreeinclude or conductor 
 	assert.equal(
 		existsSync(path.join(fixture.workspacePath, '.env')),
 		false,
-		'default .env* should not apply when ensemble.json declared filesToCopy',
+		'default .env* should not apply when .ensemble/settings.toml declared filesToCopy',
 	);
 });
 
@@ -302,9 +308,12 @@ test('invalid filesToCopy (non-string-array) falls through to next source', asyn
 	const fixture = createFixture(t);
 	writeFileSync(path.join(fixture.repositoryPath, '.gitignore'), '.env*\n');
 	writeFileSync(path.join(fixture.repositoryPath, '.env'), 'X=1\n');
+	mkdirSync(path.join(fixture.repositoryPath, '.ensemble'), {
+		recursive: true,
+	});
 	writeFileSync(
-		path.join(fixture.repositoryPath, 'ensemble.json'),
-		JSON.stringify({ filesToCopy: 'not-an-array' }),
+		path.join(fixture.repositoryPath, '.ensemble', 'settings.toml'),
+		'file_include_globs = "not-an-array"\n',
 	);
 
 	const service = createFilesToCopyService({

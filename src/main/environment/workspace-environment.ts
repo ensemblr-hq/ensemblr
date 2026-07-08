@@ -1,7 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { EnvironmentVariableDiagnostic } from '../../shared/ipc/contracts/environment';
-import type { EnsembleConfigResolutionService } from '../config/config-resolution';
 import { isRecord, isString } from '../repository/row-guards.ts';
 import type { EnsembleRootDirectoryService } from '../root';
 import {
@@ -28,16 +27,6 @@ export const ENSEMBLE_RUNTIME_VARIABLE_KEYS = [
 	'ENSEMBLE_DEFAULT_BRANCH',
 	'ENSEMBLE_PORT',
 ] as const;
-
-/** Conductor-compatible mirrors of {@link ENSEMBLE_RUNTIME_VARIABLE_KEYS}. */
-export const CONDUCTOR_COMPATIBILITY_VARIABLE_MAP: ReadonlyMap<string, string> =
-	new Map([
-		['ENSEMBLE_WORKSPACE_NAME', 'CONDUCTOR_WORKSPACE_NAME'],
-		['ENSEMBLE_WORKSPACE_PATH', 'CONDUCTOR_WORKSPACE_PATH'],
-		['ENSEMBLE_ROOT_PATH', 'CONDUCTOR_ROOT_PATH'],
-		['ENSEMBLE_DEFAULT_BRANCH', 'CONDUCTOR_DEFAULT_BRANCH'],
-		['ENSEMBLE_PORT', 'CONDUCTOR_PORT'],
-	]);
 
 export type WorkspaceEnvironmentErrorCode =
 	| 'database-unavailable'
@@ -66,7 +55,6 @@ export interface WorkspaceEnvironmentAssemblyOptions {
 
 /** Assembled workspace environment for process execution. */
 export interface WorkspaceEnvironmentAssembly {
-	conductorCompatibility: boolean;
 	cwd: string;
 	diagnostics: EnvironmentVariableDiagnostic[];
 	/**
@@ -98,7 +86,6 @@ export interface CreateWorkspaceEnvironmentServiceOptions {
 	databaseService: EnsembleDatabaseService;
 	environmentVariablesService: EnvironmentVariablesService;
 	rootDirectoryService: EnsembleRootDirectoryService;
-	settingsResolutionService: EnsembleConfigResolutionService;
 }
 
 /** Internal: row shape returned by the env-join selector. */
@@ -121,8 +108,7 @@ interface WorkspaceEnvironmentRow {
 /**
  * Builds the service that assembles the full per-workspace process environment:
  * configured variables across app/repository/workspace scopes, native
- * `ENSEMBLE_*` runtime variables, optional `CONDUCTOR_*` compatibility mirrors,
- * and the stable allocated workspace port.
+ * `ENSEMBLE_*` runtime variables, and the stable allocated workspace port.
  *
  * The returned overlay is reusable by terminal, script, Pi, and GitHub flows;
  * runtime variables always win over configured values because their catalog
@@ -134,7 +120,6 @@ export function createWorkspaceEnvironmentService({
 	databaseService,
 	environmentVariablesService,
 	rootDirectoryService,
-	settingsResolutionService,
 }: CreateWorkspaceEnvironmentServiceOptions): WorkspaceEnvironmentService {
 	// Ports are stable once persisted; memoizing avoids re-scanning every
 	// active workspace row (and re-writing metadata) on each spawn.
@@ -205,27 +190,7 @@ export function createWorkspaceEnvironmentService({
 			});
 		}
 
-		const conductorCompatibility = resolveConductorCompatibility({
-			repositoryId: workspace.repositoryId,
-			repositoryPath: workspace.repositoryPath,
-			settingsResolutionService,
-		});
-
-		if (conductorCompatibility) {
-			for (const [
-				ensembleKey,
-				conductorKey,
-			] of CONDUCTOR_COMPATIBILITY_VARIABLE_MAP) {
-				const value = env[ensembleKey];
-
-				if (value !== undefined) {
-					env[conductorKey] = value;
-				}
-			}
-		}
-
 		return {
-			conductorCompatibility,
 			cwd: workspace.path,
 			diagnostics,
 			env,
@@ -308,30 +273,6 @@ function collectActiveSiblingPorts({
 	}
 
 	return usedPorts;
-}
-
-/**
- * Resolves the effective `conductorCompatibility` repository setting.
- * @param input - Repository identity plus the settings-resolution service.
- * @returns True when CONDUCTOR_* mirrors should be exposed.
- */
-function resolveConductorCompatibility({
-	repositoryId,
-	repositoryPath,
-	settingsResolutionService,
-}: {
-	repositoryId: string;
-	repositoryPath: string;
-	settingsResolutionService: EnsembleConfigResolutionService;
-}): boolean {
-	const snapshot = settingsResolutionService.resolve({
-		repository: { repositoryId, repositoryPath },
-	});
-	const setting = snapshot.repository?.settings.find(
-		(candidate) => candidate.key === 'conductorCompatibility',
-	);
-
-	return setting?.value === true;
 }
 
 /**

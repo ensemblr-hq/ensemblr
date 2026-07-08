@@ -157,7 +157,7 @@ action kinds behave as:
 6. If the user selected a Linear issue through the Linear workflow, Ensemble links the issue metadata and uses it to seed workspace name, branch, and initial Pi context.
 7. Ensemble creates or registers the repository under the root layout.
 8. Ensemble creates the first git worktree workspace from the configured default branch.
-9. Ensemble copies eligible gitignored files according to `.worktreeinclude`, repository settings, or defaults.
+9. Ensemble copies eligible gitignored files according to `.worktreeinclude`, the committed `.ensemble/settings.toml`, or defaults.
 10. Ensemble runs setup script if configured, or shows optional setup-script guidance if missing.
 11. Ensemble opens the workspace landing state with file tree, checks panel, terminal dock, linked Linear issue context when present, and Pi composer ready.
 12. First prompt creates a Pi session using workspace `cwd` and normal Pi resource discovery.

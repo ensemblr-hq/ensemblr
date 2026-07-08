@@ -18,6 +18,8 @@ export type RunScriptMode = 'concurrent' | 'nonconcurrent';
 
 /** Parsed repository script configuration. */
 export interface WorkspaceScriptSettings {
+	/** When true, the run script auto-starts after the setup script exits 0. */
+	autoRunAfterSetup: boolean;
 	runScriptMode: RunScriptMode;
 	scripts: Partial<Record<WorkspaceScriptKind, string>>;
 }
@@ -25,8 +27,8 @@ export interface WorkspaceScriptSettings {
 const SCRIPT_KINDS = ['archive', 'run', 'setup'] as const;
 
 /**
- * Extracts the configured script commands and run mode from resolved
- * repository settings. Blank or non-string commands are treated as
+ * Extracts the configured script commands, run mode, and auto-run flag from
+ * resolved repository settings. Blank or non-string commands are treated as
  * unconfigured; unknown run modes fall back to `concurrent`.
  * @param settings - Resolved settings entries (repository scope).
  * @returns The parsed {@link WorkspaceScriptSettings}.
@@ -49,8 +51,12 @@ export function parseWorkspaceScriptSettings(
 	const runModeValue = settings.find(
 		(setting) => setting.key === 'runScriptMode',
 	)?.value;
+	const autoRunValue = settings.find(
+		(setting) => setting.key === 'autoRunAfterSetup',
+	)?.value;
 
 	return {
+		autoRunAfterSetup: autoRunValue === true,
 		runScriptMode:
 			runModeValue === 'nonconcurrent' ? 'nonconcurrent' : 'concurrent',
 		scripts,

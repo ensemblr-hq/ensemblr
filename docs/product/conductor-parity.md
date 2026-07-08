@@ -99,22 +99,22 @@ if original screenshot evidence is unavailable.
 
 | Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
-| Shared file | `conductor.json` at repo root. | Support `ensemble.json` first, then `conductor.json` for migration and tool-switching compatibility. |
-| Fields | `scripts.setup`, `scripts.run`, `scripts.archive`, `runScriptMode`, `enterpriseDataPrivacy`. | Same functional fields where applicable; Pi-specific fields belong in `ensemble.json`. |
-| Preview URL | Repository settings can define a preview URL template using workspace environment variables. | Same target with `ENSEMBLE_*` variables and `CONDUCTOR_*` compatibility for Conductor-compatible repos or explicit opt-in. |
+| Shared file | `conductor.json` at repo root. | The committed `.ensemble/settings.toml` is the sole repository config file (see ADR 0030). |
+| Fields | `scripts.setup`, `scripts.run`, `scripts.archive`, `runScriptMode`, `enterpriseDataPrivacy`. | Same functional fields where applicable; Pi-specific fields belong in `.ensemble/settings.toml`. |
+| Preview URL | Repository settings can define a preview URL template using workspace environment variables. | Same target with `ENSEMBLE_*` variables. |
 | Action preferences | Repository settings include per-action agent instructions for review, PR creation, fixing errors, conflict resolution, branch naming, and general chats. | Same target as Pi instruction templates with personal and shared sources. |
-| Precedence | Personal repository settings override shared config. | Same target. |
+| Precedence | Personal repository settings override shared config. | Reversed for Ensemble: the committed `.ensemble/settings.toml` overrides personal SQLite settings per key (see ADR 0030). |
 | Shell | Scripts run from workspace directory with workspace env vars. | Same target. |
 
 ## Environment Variables
 
 | Area | Conductor Behavior | Ensemble Target |
 | --- | --- | --- |
-| Workspace name | `CONDUCTOR_WORKSPACE_NAME`. | Expose `ENSEMBLE_WORKSPACE_NAME`; expose `CONDUCTOR_WORKSPACE_NAME` for compatibility. |
-| Workspace path | `CONDUCTOR_WORKSPACE_PATH`. | Expose `ENSEMBLE_WORKSPACE_PATH`; expose `CONDUCTOR_WORKSPACE_PATH` for compatibility. |
-| Root path | `CONDUCTOR_ROOT_PATH`. | Expose `ENSEMBLE_ROOT_PATH`; expose `CONDUCTOR_ROOT_PATH` for compatibility. |
-| Default branch | `CONDUCTOR_DEFAULT_BRANCH`. | Expose `ENSEMBLE_DEFAULT_BRANCH`; expose `CONDUCTOR_DEFAULT_BRANCH` for compatibility. |
-| Port range | `CONDUCTOR_PORT` plus allocated nearby ports. | Expose `ENSEMBLE_PORT`; expose `CONDUCTOR_PORT` for compatibility. |
+| Workspace name | `CONDUCTOR_WORKSPACE_NAME`. | Expose `ENSEMBLE_WORKSPACE_NAME`. |
+| Workspace path | `CONDUCTOR_WORKSPACE_PATH`. | Expose `ENSEMBLE_WORKSPACE_PATH`. |
+| Root path | `CONDUCTOR_ROOT_PATH`. | Expose `ENSEMBLE_ROOT_PATH`. |
+| Default branch | `CONDUCTOR_DEFAULT_BRANCH`. | Expose `ENSEMBLE_DEFAULT_BRANCH`. |
+| Port range | `CONDUCTOR_PORT` plus allocated nearby ports. | Expose `ENSEMBLE_PORT`. |
 
 ## Review Flow
 
@@ -190,7 +190,7 @@ if original screenshot evidence is unavailable.
 | --- | --- | --- |
 | Shared root | Conductor stores managed repos and workspaces under a configurable root. | Ensemble can point at the same root and use the same `repos/`, `workspaces/`, and `archived-contexts/` layout. |
 | Existing workspaces | Conductor workspaces are git worktrees. | Discover and adopt existing git worktree workspaces from the shared root when possible. |
-| Shared config | `conductor.json` and `.worktreeinclude` configure repo behavior. | Support both files for migration and switching between apps. |
+| Shared config | `conductor.json` and `.worktreeinclude` configure repo behavior. | Read the committed `.ensemble/settings.toml` and `.worktreeinclude`; `conductor.json` is no longer read (see ADR 0030). |
 | Private app DB | Conductor stores private app metadata in its own SQLite DB. | Do not read/write Conductor's private DB as a source of truth. Store Ensemble metadata separately. |
 | Cross-app continuity | Conductor can continue its own sessions. | Guarantee filesystem/git/config continuity where possible; Pi session continuity remains Ensemble-specific. |
 

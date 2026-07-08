@@ -175,6 +175,7 @@ export function WorkspaceRouteContent({
 		activeDockTab,
 		closeTerminal: terminalSessions.closeTerminal,
 		createTerminal: terminalSessions.createTerminal,
+		repositoryId: activeProject.id,
 		sessions: terminalSessions.sessions,
 		updateSearch,
 		workspaceId: activeWorkspace.id,

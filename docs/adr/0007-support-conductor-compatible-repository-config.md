@@ -4,7 +4,9 @@ Date: 2026-06-04
 
 ## Status
 
-Accepted
+Superseded by [0030](0030-use-ensemble-settings-toml-as-sole-repository-config.md).
+
+Ensemble now uses a single committed `.ensemble/settings.toml` with `ENSEMBLE_*`-only environment variables; the Conductor-compatible multi-file model and `CONDUCTOR_*` mirrors described below are no longer implemented.
 
 ## Context
 

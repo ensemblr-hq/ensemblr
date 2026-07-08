@@ -434,25 +434,19 @@ function validateName(name: unknown): CreateWorkspaceDiagnostic | null {
 }
 
 /**
- * Reads `git.branchPrefix` from any loaded repository config source; returns
- * an empty string when no string-valued prefix is configured.
+ * Reads `git.branchPrefix` from the loaded `.ensemble/settings.toml` config;
+ * returns an empty string when no string-valued prefix is configured.
  */
 function readBranchPrefix(config: LoadedRepositoryConfig): string {
-	const candidates: Array<Record<string, unknown> | undefined> = [
-		config.ensembleConfig,
-		config.conductorLocalConfig,
-		config.conductorSharedConfig,
-		config.conductorLegacyConfig,
-	];
-	for (const candidate of candidates) {
-		const git = candidate?.git;
-		if (git && typeof git === 'object' && !Array.isArray(git)) {
-			const prefix = (git as Record<string, unknown>).branchPrefix;
-			if (typeof prefix === 'string' && prefix.length > 0) {
-				return prefix;
-			}
+	const git = config.ensembleConfig?.git;
+
+	if (git && typeof git === 'object' && !Array.isArray(git)) {
+		const prefix = (git as Record<string, unknown>).branchPrefix;
+		if (typeof prefix === 'string' && prefix.length > 0) {
+			return prefix;
 		}
 	}
+
 	return '';
 }
 

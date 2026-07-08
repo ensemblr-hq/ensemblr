@@ -16,7 +16,7 @@ Ensemble is a macOS app, and macOS Keychain is the native protected store for lo
 
 Ensemble will store secret values in macOS Keychain from the start.
 
-SQLite may store secret metadata such as key names, scopes, masked display state, and references to Keychain items. `~/.config/ensemble/config.json`, `ensemble.json`, and `conductor.json` must not store raw secret values by default.
+SQLite may store secret metadata such as key names, scopes, masked display state, and references to Keychain items. `~/.config/ensemble/config.json` and the committed `.ensemble/settings.toml` must not store raw secret values by default.
 
 Secrets include:
 

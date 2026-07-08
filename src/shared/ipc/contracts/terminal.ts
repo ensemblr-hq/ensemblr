@@ -31,6 +31,12 @@ export interface TerminalSessionSnapshot {
 	exitCode: number | null;
 	id: string;
 	kind: TerminalSessionKind;
+	/**
+	 * Local dev-server URL auto-detected from a `run-script` session's output
+	 * (Vite `Local:` etc.), or `null` until one is seen. Powers the dock's Open
+	 * button. Always `null` for non-run-script sessions.
+	 */
+	previewUrl: string | null;
 	rows: number;
 	status: TerminalSessionStatus;
 	title: string;

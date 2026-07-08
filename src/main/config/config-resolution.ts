@@ -70,11 +70,8 @@ const APP_SOURCE_ORDER: readonly SettingsResolutionSource[] = [
 
 const REPOSITORY_SOURCE_ORDER: readonly SettingsResolutionSource[] = [
 	'worktreeinclude',
-	'sqlite',
-	'conductor-local-config',
 	'ensemble-config',
-	'conductor-config',
-	'conductor-legacy-config',
+	'sqlite',
 	'user-default',
 	'built-in-default',
 ];
@@ -88,7 +85,7 @@ const VALID_PERMISSION_MODES = [
 
 const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> = {
 	archiveAfterMerge: false,
-	conductorCompatibility: false,
+	autoRunAfterSetup: false,
 	deleteLocalBranchOnArchive: false,
 	filesToCopy: ['.env*'],
 	'piActions.branchNaming': null,
@@ -190,18 +187,6 @@ export function resolveSettings({
 		}
 		addCandidates(
 			repositoryCandidates,
-			collectSqliteSettings(database, 'repository', repository.repositoryId),
-			'sqlite',
-		);
-		addCandidates(
-			repositoryCandidates,
-			collectConductorConfigCandidates(
-				repositoryFileConfig?.conductorLocalConfig,
-			),
-			'conductor-local-config',
-		);
-		addCandidates(
-			repositoryCandidates,
 			flattenRecord(
 				repository.ensembleConfig ?? repositoryFileConfig?.ensembleConfig ?? {},
 			),
@@ -209,18 +194,8 @@ export function resolveSettings({
 		);
 		addCandidates(
 			repositoryCandidates,
-			collectConductorConfigCandidates(
-				repository.conductorConfig ??
-					repositoryFileConfig?.conductorSharedConfig,
-			),
-			'conductor-config',
-		);
-		addCandidates(
-			repositoryCandidates,
-			collectConductorConfigCandidates(
-				repositoryFileConfig?.conductorLegacyConfig,
-			),
-			'conductor-legacy-config',
+			collectSqliteSettings(database, 'repository', repository.repositoryId),
+			'sqlite',
 		);
 		addCandidates(
 			repositoryCandidates,
@@ -276,9 +251,6 @@ export function normalizeSettingsResolutionRequest(
 
 	return {
 		repository: {
-			conductorConfig: isPlainRecord(request.repository.conductorConfig)
-				? request.repository.conductorConfig
-				: undefined,
 			ensembleConfig: isPlainRecord(request.repository.ensembleConfig)
 				? request.repository.ensembleConfig
 				: undefined,
@@ -540,24 +512,6 @@ function getInvalidPermissionModeReason(value: unknown): string | null {
 		typeof value === 'string' ? `"${value}"` : typeof value;
 
 	return `Invalid permission mode ${formattedValue}. Expected one of: ${VALID_PERMISSION_MODES.join(', ')}.`;
-}
-
-/**
- * Flattens a Conductor config and forces `conductorCompatibility` to true when
- * the source provided any settings at all.
- * @param conductorConfig - Conductor settings, when present.
- * @returns Flat map of `key -> value`.
- */
-function collectConductorConfigCandidates(
-	conductorConfig?: Record<string, unknown>,
-): Map<string, unknown> {
-	const candidates = flattenRecord(conductorConfig ?? {});
-
-	if (conductorConfig && !candidates.has('conductorCompatibility')) {
-		candidates.set('conductorCompatibility', true);
-	}
-
-	return candidates;
 }
 
 /**

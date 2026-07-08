@@ -4,7 +4,6 @@
  * `ipcRenderer.invoke`; keys are the camelCase handles used in the preload bridge.
  */
 export const IPC_CHANNELS = {
-	applyRepositoryConfigMigration: 'ensemble:apply-repository-config-migration',
 	archiveRepository: 'ensemble:archive-repository',
 	archiveWorkspace: 'ensemble:archive-workspace',
 	appSettingsChanged: 'ensemble:app-settings-changed',
@@ -83,8 +82,6 @@ export const IPC_CHANNELS = {
 	openPiSession: 'ensemble:open-pi-session',
 	piRawFrame: 'ensemble:pi-raw-frame',
 	piSessionEvent: 'ensemble:pi-session-event',
-	previewRepositoryConfigMigration:
-		'ensemble:preview-repository-config-migration',
 	quickStartProject: 'ensemble:quick-start-project',
 	readWorkspaceDirectory: 'ensemble:read-workspace-directory',
 	readWorkspaceFile: 'ensemble:read-workspace-file',
@@ -114,6 +111,7 @@ export const IPC_CHANNELS = {
 	terminalSnapshot: 'ensemble:terminal-snapshot',
 	unarchiveWorkspace: 'ensemble:unarchive-workspace',
 	unwatchWorkspaceFiles: 'ensemble:unwatch-workspace-files',
+	updateRepositoryScripts: 'ensemble:update-repository-scripts',
 	watchWorkspaceFiles: 'ensemble:watch-workspace-files',
 	workspaceFilesChanged: 'ensemble:workspace-files-changed',
 	writeForkSummary: 'ensemble:write-fork-summary',

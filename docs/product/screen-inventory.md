@@ -101,7 +101,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: Configured variable keys with masked values (revealable on demand); documented catalog keys + descriptions with a "Not set" badge.
 - Settings or configuration implied: Per-scope environment store; secret auto-classification + masking; Pi-only documented catalog; env-file loading at session launch.
 - Implementation: renderer → IPC → `EnvironmentVariablesService` → SQLite (`settings.environment.variables.*`, `settings.environment.files`) / macOS Keychain; injected via `assembleEnvironment` (app → repository → workspace precedence, env files lowest). Documented catalog is Pi-relevant only (no Claude Code/Codex/Cursor entries).
-- Risks or implementation notes: Secret storage uses macOS Keychain with SQLite metadata only — never repository config or `config.json`. Reserved runtime vars (`ENSEMBLE_*`/`CONDUCTOR_*`) are read-only and excluded from editing. Env files are User-scope only for now (storage is per-scope for later repo support).
+- Risks or implementation notes: Secret storage uses macOS Keychain with SQLite metadata only — never repository config or `config.json`. Reserved runtime vars (`ENSEMBLE_*`) are read-only and excluded from editing. Env files are User-scope only for now (storage is per-scope for later repo support).
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.56.01@2x.png`
 
@@ -196,7 +196,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: Private repository name, paths, and script commands are visible but described generically.
 - Settings or configuration implied: Repository root path, workspace path, default branch, remote origin, preview URL template, files-to-copy patterns, scripts.
 - Ensemble parity requirement: Provide repository-scoped settings that override shared config and expose config/source diagnostics.
-- Pi-specific adaptation: Support both `ensemble.json` and `conductor.json`, expose `ENSEMBLE_*` and compatible `CONDUCTOR_*` variables in preview URLs and scripts.
+- Pi-specific adaptation: Read the committed `.ensemble/settings.toml`, and expose `ENSEMBLE_*` variables in preview URLs and scripts.
 - Risks or implementation notes: Do not move/delete repository or workspace directories from settings; archive or remove through explicit lifecycle actions.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.56.59@2x.png`
@@ -212,7 +212,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: Private script commands are visible but described generically.
 - Settings or configuration implied: Shared config generation, spotlight testing, review/PR/fix/conflict/branch-rename/general instruction overrides.
 - Ensemble parity requirement: Support repository action-specific instruction templates and spotlight testing behavior.
-- Pi-specific adaptation: Store Pi-specific instruction templates in `ensemble.json` or personal settings, while preserving `conductor.json` script compatibility.
+- Pi-specific adaptation: Store Pi-specific instruction templates in the committed `.ensemble/settings.toml` or personal SQLite settings.
 - Risks or implementation notes: Repository removal is destructive/high-impact and must distinguish removing from app records versus deleting files.
 
 ## 03-add-repo
@@ -336,7 +336,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Settings or configuration implied: Setup script command, captured process logs, terminal tab persistence.
 - Ensemble parity requirement: Provide docked read-only setup/run output panes plus default and user-spawned interactive terminal panes with output capture and rerun controls.
 - Current Ensemble shell alignment: The lower-right Setup / Run / Terminal dock, collapse affordance, and script-state action placement are already represented. Future terminal tickets should replace placeholder logs with live process/PTY data in place while keeping Setup/Run separate from user terminal sessions.
-- Pi-specific adaptation: Run scripts are independent of Pi but should include `ENSEMBLE_*` and compatibility environment variables.
+- Pi-specific adaptation: Run scripts are independent of Pi but should include `ENSEMBLE_*` variables.
 - Risks or implementation notes: Large output, interactive prompts, and process cancellation need terminal/process supervision.
 
 ## 07-diff-review

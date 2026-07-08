@@ -59,10 +59,10 @@ export const ensembleWorkspaceFiles: WorkspaceFileSummary[] = [
 		path: 'components.json',
 	},
 	{
-		id: 'file-conductor',
+		id: 'file-ensemble-settings',
 		kind: 'file',
-		name: 'conductor.json',
-		path: 'conductor.json',
+		name: 'settings.toml',
+		path: '.ensemble/settings.toml',
 	},
 	{ id: 'file-context', kind: 'file', name: 'CONTEXT.md', path: 'CONTEXT.md' },
 	{

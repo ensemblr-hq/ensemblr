@@ -45,7 +45,7 @@ Date: 2026-06-16
 - Linear archive/delete schema and permission support. Create/read/update/comment and workspace-from-issue are resolved v1 scope, but field-level SDK/GraphQL mapping, pagination, filtering, labels, cycles, and metadata caching still need implementation discovery.
 - Whether `gh` exposes enough data for add-all-comments-to-chat and review-thread resolution.
 - Conductor checkpoint git refs, if any, and whether they can be safely detected without relying on private app DB.
-- Whether a `.conductor` folder exists in any real repositories and whether it has a documented/public meaning.
+- Whether a `.conductor` folder exists in any real repositories and whether it has a documented/public meaning for workspace adoption (Ensemble no longer reads it for repository config; see ADR 0030).
 - How to detect preview URLs from run/setup output robustly.
 - How to safely implement spotlight testing without overwriting root changes.
 - Which current command/menu placeholders should be keyboard-shortcut/global-command entries before their backing services exist.

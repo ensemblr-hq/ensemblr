@@ -4,6 +4,7 @@ export const runningDevScripts = {
 	run: {
 		command: 'bun run dev',
 		port: 5173,
+		previewUrl: 'http://localhost:5173',
 		status: 'running',
 	},
 	setup: {

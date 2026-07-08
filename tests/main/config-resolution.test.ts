@@ -239,7 +239,7 @@ test('invalid sqlite setting JSON falls back to the next valid source', (t) => {
 	);
 });
 
-test('resolves repository settings from sqlite and provided config snapshots', (t) => {
+test('.ensemble/settings.toml outranks personal SQLite per-key', (t) => {
 	const database = createDatabaseFixture(t);
 	insertSetting({
 		database,
@@ -248,17 +248,18 @@ test('resolves repository settings from sqlite and provided config snapshots', (
 		scopeId: 'repo-1',
 		valueJson: JSON.stringify('bun run sqlite'),
 	});
+	insertSetting({
+		database,
+		key: 'scripts.setup',
+		scope: 'repository',
+		scopeId: 'repo-1',
+		valueJson: JSON.stringify('bun install sqlite'),
+	});
 
 	const snapshot = resolveSettings({
 		config: createConfig(),
 		database,
 		repository: {
-			conductorConfig: {
-				scripts: {
-					run: 'bun run conductor',
-					setup: 'bun install',
-				},
-			},
 			ensembleConfig: {
 				previewUrlTemplate,
 				scripts: { run: 'bun run ensemble' },
@@ -271,12 +272,21 @@ test('resolves repository settings from sqlite and provided config snapshots', (
 		assert.fail('Expected repository settings resolution');
 	}
 
+	// The committed .ensemble/settings.toml wins for the keys it defines.
 	assert.deepEqual(
 		{
 			source: getSetting(snapshot.repository, 'scripts.run').source,
 			value: getSetting(snapshot.repository, 'scripts.run').value,
 		},
-		{ source: 'sqlite', value: 'bun run sqlite' },
+		{ source: 'ensemble-config', value: 'bun run ensemble' },
+	);
+	// A key the committed file omits falls back to the personal SQLite edit.
+	assert.deepEqual(
+		{
+			source: getSetting(snapshot.repository, 'scripts.setup').source,
+			value: getSetting(snapshot.repository, 'scripts.setup').value,
+		},
+		{ source: 'sqlite', value: 'bun install sqlite' },
 	);
 	assert.deepEqual(
 		{
@@ -287,20 +297,6 @@ test('resolves repository settings from sqlite and provided config snapshots', (
 			source: 'ensemble-config',
 			value: previewUrlTemplate,
 		},
-	);
-	assert.deepEqual(
-		{
-			source: getSetting(snapshot.repository, 'scripts.setup').source,
-			value: getSetting(snapshot.repository, 'scripts.setup').value,
-		},
-		{ source: 'conductor-config', value: 'bun install' },
-	);
-	assert.deepEqual(
-		{
-			source: getSetting(snapshot.repository, 'conductorCompatibility').source,
-			value: getSetting(snapshot.repository, 'conductorCompatibility').value,
-		},
-		{ source: 'conductor-config', value: true },
 	);
 	assert.deepEqual(
 		{
@@ -319,48 +315,20 @@ test('resolves repository settings from sqlite and provided config snapshots', (
 	assert.deepEqual(getSetting(snapshot.repository, 'scripts.run').candidates, [
 		{
 			reason: 'Selected by precedence.',
-			source: 'sqlite',
+			source: 'ensemble-config',
 			status: 'selected',
 		},
 		{
-			reason: 'Ignored because sqlite has higher precedence.',
-			source: 'ensemble-config',
+			reason: 'Ignored because ensemble-config has higher precedence.',
+			source: 'sqlite',
 			status: 'ignored',
 		},
 		{
-			reason: 'Ignored because sqlite has higher precedence.',
-			source: 'conductor-config',
-			status: 'ignored',
-		},
-		{
-			reason: 'Ignored because sqlite has higher precedence.',
+			reason: 'Ignored because ensemble-config has higher precedence.',
 			source: 'built-in-default',
 			status: 'ignored',
 		},
 	]);
-});
-
-test('explicit repository sources override inferred conductor compatibility', () => {
-	const snapshot = resolveSettings({
-		config: createConfig(),
-		repository: {
-			conductorConfig: { scripts: { setup: 'bun install' } },
-			ensembleConfig: { conductorCompatibility: false },
-			repositoryId: 'repo-1',
-		},
-	});
-
-	if (!snapshot.repository) {
-		assert.fail('Expected repository settings resolution');
-	}
-
-	assert.deepEqual(
-		{
-			source: getSetting(snapshot.repository, 'conductorCompatibility').source,
-			value: getSetting(snapshot.repository, 'conductorCompatibility').value,
-		},
-		{ source: 'ensemble-config', value: false },
-	);
 });
 
 test('invalid app permission mode falls back to the next valid source', (t) => {
@@ -411,11 +379,20 @@ test('invalid app permission mode falls back to the next valid source', (t) => {
 	);
 });
 
-test('invalid repository permission mode falls back by source precedence', () => {
+test('invalid repository permission mode falls back by source precedence', (t) => {
+	const database = createDatabaseFixture(t);
+	insertSetting({
+		database,
+		key: 'security.permissionMode',
+		scope: 'repository',
+		scopeId: 'repo-1',
+		valueJson: JSON.stringify('approval-required'),
+	});
+
 	const snapshot = resolveSettings({
 		config: createConfig(),
+		database,
 		repository: {
-			conductorConfig: { security: { permissionMode: 'approval-required' } },
 			ensembleConfig: { security: { permissionMode: 'sandboxed' } },
 			repositoryId: 'repo-1',
 		},
@@ -430,7 +407,7 @@ test('invalid repository permission mode falls back by source precedence', () =>
 		'security.permissionMode',
 	);
 
-	assert.equal(permissionMode.source, 'conductor-config');
+	assert.equal(permissionMode.source, 'sqlite');
 	assert.equal(permissionMode.value, 'approval-required');
 	assert.deepEqual(permissionMode.candidates, [
 		{
@@ -441,11 +418,11 @@ test('invalid repository permission mode falls back by source precedence', () =>
 		},
 		{
 			reason: 'Selected by precedence.',
-			source: 'conductor-config',
+			source: 'sqlite',
 			status: 'selected',
 		},
 		{
-			reason: 'Ignored because conductor-config has higher precedence.',
+			reason: 'Ignored because sqlite has higher precedence.',
 			source: 'built-in-default',
 			status: 'ignored',
 		},
@@ -538,14 +515,12 @@ test('normalizes IPC settings resolution requests', () => {
 	assert.deepEqual(
 		normalizeSettingsResolutionRequest({
 			repository: {
-				conductorConfig: [],
 				ensembleConfig: { scripts: { run: 'bun run dev' } },
 				repositoryId: ' repo-1 ',
 			},
 		}),
 		{
 			repository: {
-				conductorConfig: undefined,
 				ensembleConfig: { scripts: { run: 'bun run dev' } },
 				repositoryId: 'repo-1',
 			},

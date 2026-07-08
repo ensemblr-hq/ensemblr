@@ -543,9 +543,12 @@ test('create omits the prefix when the github username is unavailable', async (t
 
 test('repository git.branchPrefix overrides the user branch prefix', async (t) => {
 	const harness = createHarness(t);
+	mkdirSync(path.join(harness.repositoryPath, '.ensemble'), {
+		recursive: true,
+	});
 	writeFileSync(
-		path.join(harness.repositoryPath, 'ensemble.json'),
-		JSON.stringify({ git: { branchPrefix: 'team/' } }),
+		path.join(harness.repositoryPath, '.ensemble', 'settings.toml'),
+		'[git]\nbranchPrefix = "team/"\n',
 	);
 	const service = createWorkspaceService({
 		databaseService: harness.databaseService,

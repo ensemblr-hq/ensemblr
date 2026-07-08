@@ -28,9 +28,9 @@ import type {
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 
 import { DockPanelActions } from './actions';
-import { InteractiveTerminalPanel } from './interactive-terminal';
 import { RunScriptOutputPanel } from './run-script-output';
 import { SetupScriptOutputPanel } from './setup-script-output';
+import { XtermTerminal } from './xterm-terminal';
 
 /**
  * Bottom dock panel hosting fixed Setup/Run output tabs plus user-spawned
@@ -106,13 +106,11 @@ export function DockPanel({
 					>
 						{workspace.dockTabs.map((tab) => {
 							const DockTabIcon = getDockTabIcon(tab);
-							// Setup/Run and the last remaining terminal stay open.
-							const closableTerminalId =
-								isTerminalDockTab(tab) &&
-								tab.terminalId &&
-								terminalTabs.length > 1
-									? tab.terminalId
-									: null;
+							// Setup/Run are fixed; every terminal tab is closable (down to
+							// zero — the dock falls back to Setup and the `+` button remains).
+							const closableTerminalId = isTerminalDockTab(tab)
+								? tab.terminalId
+								: null;
 
 							return (
 								<Fragment key={tab.id}>
@@ -194,10 +192,9 @@ export function DockPanel({
 					key={tab.id}
 					value={tab.id}
 				>
-					<InteractiveTerminalPanel
-						isActive={tab.id === activeDockTab}
-						onNewTerminal={actions.onNewTerminal}
-						tab={tab}
+					<XtermTerminal
+						sessionStatus={tab.sessionStatus}
+						terminalId={tab.terminalId}
 					/>
 				</TabsContent>
 			))}

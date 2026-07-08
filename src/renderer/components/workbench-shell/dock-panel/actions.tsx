@@ -49,16 +49,18 @@ export function DockPanelActions({
 	}
 
 	if (hasRunScript && run.status === 'running') {
+		const previewUrl = run.previewUrl;
+
 		return (
 			<>
-				{typeof run.port === 'number' ? (
+				{previewUrl ? (
 					<Button
-						onClick={() => actions.onOpenRunPort(run.port as number)}
+						onClick={() => actions.onOpenRunPort(previewUrl)}
 						size='xs'
 						variant='outline'
 					>
 						<ExternalLinkIcon data-icon='inline-start' />
-						Open :{run.port}
+						{typeof run.port === 'number' ? `Open :${run.port}` : 'Open'}
 					</Button>
 				) : null}
 				<Button onClick={actions.onStopRunScript} size='xs' variant='outline'>

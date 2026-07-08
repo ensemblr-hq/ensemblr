@@ -18,7 +18,6 @@ import {
 import {
 	DEFAULT_DOCK_TAB,
 	DEFAULT_REVIEW_TAB,
-	DEFAULT_TERMINAL_DOCK_TAB_ID,
 	getComposerState,
 	normalizeWorkbenchSearch,
 } from '../../src/renderer/lib/workbench';
@@ -270,7 +269,7 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('Checks');
 	expect(markup).toContain('Setup');
 	expect(markup).toContain('Run');
-	expect(markup).toContain('Terminal');
+	// No default terminal tab: the dock starts with only Setup/Run + the `+`.
 	expect(markup).toContain('Collapse terminal area');
 	expect(markup).toContain('New terminal');
 	expect(markup).toContain('Open :5173');
@@ -331,34 +330,29 @@ test('does not mark a workspace active on static workbench routes', () => {
 	expect(markup.match(/data-active="true"/g)).toHaveLength(1);
 });
 
-test('models fixed script output tabs separately from interactive terminals', () => {
-	const [setupTab, runTab, terminalTab] = getDefaultWorkspace().dockTabs;
+test('models fixed script output tabs and no default terminal tab', () => {
+	const dockTabs = getDefaultWorkspace().dockTabs;
 
-	expect(setupTab).toMatchObject({
+	expect(dockTabs).toHaveLength(2);
+	expect(dockTabs[0]).toMatchObject({
 		id: 'setup',
 		kind: 'setup-script',
 		label: 'Setup',
 	});
-	expect(runTab).toMatchObject({
+	expect(dockTabs[1]).toMatchObject({
 		id: 'run',
 		kind: 'run-script',
 		label: 'Run',
 	});
-	expect(terminalTab).toMatchObject({
-		id: DEFAULT_TERMINAL_DOCK_TAB_ID,
-		isDefault: true,
-		kind: 'terminal',
-		label: 'Terminal',
-		sessionStatus: null,
-		terminalId: null,
-	});
+	expect(dockTabs.some((tab) => tab.kind === 'terminal')).toBe(false);
 });
 
 test('normalizes dock route state for terminal session tabs', () => {
 	expect(normalizeWorkbenchSearch({}).dock).toBeUndefined();
 	expect(normalizeWorkbenchSearch({}).review).toBeUndefined();
+	// A bare `terminal` value no longer maps to a default tab.
 	expect(normalizeWorkbenchSearch({ dock: 'terminal' }).dock).toBe(
-		DEFAULT_TERMINAL_DOCK_TAB_ID,
+		DEFAULT_DOCK_TAB,
 	);
 	expect(normalizeWorkbenchSearch({ dock: 'terminal:logs' }).dock).toBe(
 		'terminal:logs',

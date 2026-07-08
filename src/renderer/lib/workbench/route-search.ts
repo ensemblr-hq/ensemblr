@@ -1,7 +1,6 @@
 import {
 	DEFAULT_DOCK_TAB,
 	DEFAULT_REVIEW_TAB,
-	DEFAULT_TERMINAL_DOCK_TAB_ID,
 } from '@/renderer/lib/workbench/constants';
 import type {
 	DockTabId,
@@ -37,10 +36,6 @@ function isReviewTab(value: unknown): value is ReviewPanelTab {
 
 /** Coerces a raw `dock` search param to a valid {@link DockTabId}. */
 function normalizeDockTab(value: unknown): DockTabId {
-	if (value === 'terminal') {
-		return DEFAULT_TERMINAL_DOCK_TAB_ID;
-	}
-
 	return isDockTab(value) ? value : DEFAULT_DOCK_TAB;
 }
 

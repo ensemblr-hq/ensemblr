@@ -10,6 +10,7 @@ import type {
 	TerminalSessionStatus,
 	TerminalSnapshotResult,
 } from '../../shared/ipc/contracts/terminal';
+import { detectPreviewUrl } from '../../shared/terminal/detect-preview-url.ts';
 import {
 	WorkspaceEnvironmentError,
 	type WorkspaceEnvironmentService,
@@ -162,6 +163,26 @@ export function createTerminalService({
 			terminalId: session.snapshot.id,
 			workspaceId: session.snapshot.workspaceId,
 		});
+	}
+
+	/**
+	 * Scans a run-script output chunk for a local dev-server URL and, on the
+	 * first hit, stamps it on the session and broadcasts so the dock's Open
+	 * button appears. No-ops for other kinds or once a URL is already known.
+	 */
+	function maybeDetectPreviewUrl(session: TrackedSession, data: string): void {
+		if (session.snapshot.kind !== 'run-script' || session.snapshot.previewUrl) {
+			return;
+		}
+
+		const previewUrl = detectPreviewUrl(data);
+
+		if (!previewUrl) {
+			return;
+		}
+
+		session.snapshot = { ...session.snapshot, previewUrl };
+		broadcastLifecycle(session);
 	}
 
 	function finalizeSession(
@@ -317,6 +338,7 @@ export function createTerminalService({
 				exitCode: null,
 				id,
 				kind,
+				previewUrl: null,
 				rows: normalizedRows,
 				status: 'running',
 				title: title?.trim() || defaultTitle(kind),
@@ -329,6 +351,7 @@ export function createTerminalService({
 			session.outputSeq += 1;
 			session.scrollback.append(data);
 			onOutput({ data, seq: session.outputSeq, terminalId: id, workspaceId });
+			maybeDetectPreviewUrl(session, data);
 		});
 		session.exitSubscription = pty.onExit(({ exitCode }) => {
 			finalizeSession(session, exitCode);

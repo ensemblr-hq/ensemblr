@@ -216,11 +216,6 @@ export type {
 } from './contracts/repository';
 export type {
 	RepositoryConfigApi,
-	RepositoryConfigMigrationChange,
-	RepositoryConfigMigrationChangeStatus,
-	RepositoryConfigMigrationPreview,
-	RepositoryConfigMigrationRequest,
-	RepositoryConfigMigrationResult,
 	RepositoryConfigRequest,
 	RepositoryConfigSnapshot,
 	RepositoryConfigSourceSnapshot,

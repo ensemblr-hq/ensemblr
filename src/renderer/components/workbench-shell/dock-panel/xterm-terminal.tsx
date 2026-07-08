@@ -9,12 +9,15 @@ import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 /**
  * One live xterm.js surface bound to a main-process PTY session: replays the
  * scrollback snapshot, streams output broadcasts, forwards keystrokes, and
- * keeps PTY dimensions in sync with the panel size.
+ * keeps PTY dimensions in sync with the panel size. When `readOnly` is set the
+ * surface streams output but never forwards input (Setup/Run panels).
  */
 export function XtermTerminal({
+	readOnly = false,
 	sessionStatus,
 	terminalId,
 }: {
+	readOnly?: boolean;
 	sessionStatus: TerminalSessionStatus | null;
 	terminalId: string;
 }) {
@@ -30,7 +33,7 @@ export function XtermTerminal({
 		}
 
 		const ensemble = window.ensemble;
-		const adapter = createXtermAdapter();
+		const adapter = createXtermAdapter({ readOnly });
 		adapterRef.current = adapter;
 		adapter.attach(container);
 
@@ -52,9 +55,13 @@ export function XtermTerminal({
 				bufferedChunks.push({ data: event.data, seq: event.seq });
 			}
 		});
-		const unsubscribeInput = adapter.onData((data) => {
-			void ensemble.writeTerminalSession({ data, terminalId });
-		});
+		// Read-only panels (Setup/Run output) stream output but never forward
+		// keystrokes: skip the input subscription entirely.
+		const unsubscribeInput = readOnly
+			? null
+			: adapter.onData((data) => {
+					void ensemble.writeTerminalSession({ data, terminalId });
+				});
 
 		ensemble
 			.terminalSnapshot({ terminalId })
@@ -99,7 +106,11 @@ export function XtermTerminal({
 		};
 
 		syncDimensions();
-		adapter.focus();
+
+		// Read-only panels never grab keyboard focus from the composer.
+		if (!readOnly) {
+			adapter.focus();
+		}
 
 		const resizeObserver = new ResizeObserver(() => syncDimensions());
 		resizeObserver.observe(container);
@@ -108,11 +119,11 @@ export function XtermTerminal({
 			disposed = true;
 			resizeObserver.disconnect();
 			unsubscribeOutput();
-			unsubscribeInput();
+			unsubscribeInput?.();
 			adapter.dispose();
 			adapterRef.current = null;
 		};
-	}, [terminalId]);
+	}, [readOnly, terminalId]);
 
 	return (
 		<div className='relative h-full min-h-0 w-full bg-sidebar'>
