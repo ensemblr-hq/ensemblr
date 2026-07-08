@@ -1,4 +1,3 @@
-import { DEFAULT_TERMINAL_DOCK_TAB_ID } from '@/renderer/lib/workbench/constants';
 import { parseGithubRepoFromRemoteUrl } from '@/renderer/lib/workbench/github-compare-url';
 import type {
 	DockTabModel,
@@ -232,15 +231,6 @@ function createPlaceholderDockTabs(): DockTabModel[] {
 			kind: 'run-script',
 			label: 'Run',
 			status: 'idle',
-		},
-		{
-			id: DEFAULT_TERMINAL_DOCK_TAB_ID,
-			isDefault: true,
-			kind: 'terminal',
-			label: 'Terminal',
-			sessionStatus: null,
-			status: 'idle',
-			terminalId: null,
 		},
 	];
 }

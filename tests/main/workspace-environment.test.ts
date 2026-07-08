@@ -9,7 +9,6 @@ import {
 	type EnsembleConfig,
 	type EnsembleConfigService,
 } from '../../src/main/config/config-loader.ts';
-import type { EnsembleConfigResolutionService } from '../../src/main/config/config-resolution.ts';
 import { createEnvironmentVariablesService } from '../../src/main/environment/environment-variables.ts';
 import {
 	createWorkspaceEnvironmentService,
@@ -112,28 +111,6 @@ function createRootDirectoryServiceStub(): EnsembleRootDirectoryService {
 	} as unknown as EnsembleRootDirectoryService;
 }
 
-function createSettingsResolutionStub(
-	conductorCompatibility: boolean,
-): EnsembleConfigResolutionService {
-	return {
-		resolve: () => ({
-			app: { diagnostics: [], settings: [] },
-			repository: {
-				diagnostics: [],
-				settings: [
-					{
-						candidates: [],
-						key: 'conductorCompatibility',
-						locked: false,
-						source: 'built-in-default',
-						value: conductorCompatibility,
-					},
-				],
-			},
-		}),
-	};
-}
-
 function seedWorkspace({
 	baseBranch = 'main',
 	database,
@@ -193,11 +170,9 @@ function seedWorkspace({
 }
 
 function createService({
-	conductorCompatibility = false,
 	database,
 	secretStore = createMockSecretStore(),
 }: {
-	conductorCompatibility?: boolean;
 	database: DatabaseSync;
 	secretStore?: ReturnType<typeof createMockSecretStore>;
 }) {
@@ -214,9 +189,6 @@ function createService({
 			databaseService: createDatabaseServiceStub(database),
 			environmentVariablesService,
 			rootDirectoryService: createRootDirectoryServiceStub(),
-			settingsResolutionService: createSettingsResolutionStub(
-				conductorCompatibility,
-			),
 		}),
 	};
 }
@@ -237,46 +209,18 @@ test('assemble injects native ENSEMBLE_* runtime variables', async (t) => {
 	assert.ok(isWorkspacePort(assembly.port));
 });
 
-test('assemble omits CONDUCTOR_* mirrors without compatibility opt-in', async (t) => {
+test('assemble does not expose CONDUCTOR_* mirrors', async (t) => {
 	const database = createDatabaseFixture(t);
 	const { workspaceId } = seedWorkspace({ database });
-	const { service } = createService({
-		conductorCompatibility: false,
-		database,
-	});
+	const { service } = createService({ database });
 
 	const assembly = await service.assemble({ workspaceId });
 
-	assert.equal(assembly.conductorCompatibility, false);
 	assert.equal(assembly.env.CONDUCTOR_WORKSPACE_NAME, undefined);
+	assert.equal(assembly.env.CONDUCTOR_WORKSPACE_PATH, undefined);
+	assert.equal(assembly.env.CONDUCTOR_ROOT_PATH, undefined);
+	assert.equal(assembly.env.CONDUCTOR_DEFAULT_BRANCH, undefined);
 	assert.equal(assembly.env.CONDUCTOR_PORT, undefined);
-});
-
-test('assemble mirrors CONDUCTOR_* variables for compatible repositories', async (t) => {
-	const database = createDatabaseFixture(t);
-	const { workspaceId } = seedWorkspace({ database });
-	const { service } = createService({ conductorCompatibility: true, database });
-
-	const assembly = await service.assemble({ workspaceId });
-
-	assert.equal(assembly.conductorCompatibility, true);
-	assert.equal(
-		assembly.env.CONDUCTOR_WORKSPACE_NAME,
-		assembly.env.ENSEMBLE_WORKSPACE_NAME,
-	);
-	assert.equal(
-		assembly.env.CONDUCTOR_WORKSPACE_PATH,
-		assembly.env.ENSEMBLE_WORKSPACE_PATH,
-	);
-	assert.equal(
-		assembly.env.CONDUCTOR_ROOT_PATH,
-		assembly.env.ENSEMBLE_ROOT_PATH,
-	);
-	assert.equal(
-		assembly.env.CONDUCTOR_DEFAULT_BRANCH,
-		assembly.env.ENSEMBLE_DEFAULT_BRANCH,
-	);
-	assert.equal(assembly.env.CONDUCTOR_PORT, assembly.env.ENSEMBLE_PORT);
 });
 
 test('assemble layers configured variables with workspace > repository > app precedence', async (t) => {

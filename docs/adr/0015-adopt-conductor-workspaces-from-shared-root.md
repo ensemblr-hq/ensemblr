@@ -23,7 +23,7 @@ Discovery inputs:
 - `<root>/repos/<repo-slug>` directories.
 - `<root>/workspaces/<repo-slug>/<workspace-slug>` directories.
 - Git metadata from `git rev-parse`, `git status`, and `git worktree list --porcelain`.
-- `conductor.json`, `ensemble.json`, and `.worktreeinclude` at repository roots.
+- The committed `.ensemble/settings.toml` and `.worktreeinclude` at repository roots (see [0030](0030-use-ensemble-settings-toml-as-sole-repository-config.md)).
 - Remote URL, default branch, current branch, and PR state from git/`gh`.
 
 Adoption behavior:

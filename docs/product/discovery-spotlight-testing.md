@@ -12,9 +12,9 @@ changes or breaking workspace isolation?
 
 Spotlight testing points the *root* repository checkout at a *workspace*'s
 changes so a long-running root app (dev server, simulator build) picks them up
-without restarting from the worktree. Conductor's `spotlight_testing` config
-key exists in `.conductor/settings.toml` and is already parsed (but unused) by
-our repository config loader.
+without restarting from the worktree. Conductor exposes a `spotlight_testing` config
+key. In Ensemble's single-file model, any such key would live in the committed
+`.ensemble/settings.toml`; it is unused today.
 
 ## Candidate sync strategies
 

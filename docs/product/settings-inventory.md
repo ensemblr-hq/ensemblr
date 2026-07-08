@@ -11,7 +11,7 @@ This inventory comes from the settings screenshots plus accepted ADRs. It separa
 | SQLite | Mutable local app state, personal overrides, cached integration status, workspace/repository records. |
 | `~/.config/ensemble/config.json` | **Source of truth for App settings** — General and Models are implemented under `app.general.*` / `app.models.*` (see ADR 0029) — plus declarative user defaults, managed policy-like settings, and repository matching rules. Created on first run; live-watched for external edits. |
 | `localStorage` (`atomWithStorage`) | Non-Settings-page UI state, app preferences not yet migrated to `config.json` (theme, fonts, Git/Experimental/Advanced toggles), composer favourites, and the model-catalog cache. |
-| Repository config | Shared project behavior in `ensemble.json`, with `conductor.json` compatibility. Use for scripts, run mode, files-to-copy, and team-shared repository defaults. |
+| Repository config | Shared project behavior in the committed `.ensemble/settings.toml`. Use for scripts, run mode, files-to-copy, and team-shared repository defaults. |
 | Pi user environment | Pi auth, models, provider settings, skills, extensions, prompts, themes, sessions, and project `.pi` resources. Ensemble should not duplicate this as source of truth. |
 | macOS Keychain | Secret values such as tokens/API keys. SQLite may keep metadata only. |
 
@@ -78,7 +78,7 @@ profile" copy was a hallucination and has been replaced.
 | Documented variable catalog | Direct. | Pi-relevant documented variables only (`PI_CODING_AGENT_DIR`, `HTTP_PROXY`/`HTTPS_PROXY`/`ALL_PROXY`/`NO_PROXY`, the 8 provider API keys, `DEBUG`, `CI`). No Claude Code/Codex/Cursor catalog entries. Shown in a collapsible "Show documented variables (N)" list with a `+` to set each. | Built-in catalog; user values separate. |
 | Non-secret variable values | Direct. | Passed to Pi sessions, scripts, and terminals. | SQLite (`settings` table, `environment.variables.*`); optional `config.json` defaults. |
 | Secret variable values | Direct. | Auto-classified: a known secret catalog key or sensitive-named key routes to the secret store; everything else is plain. Masked in the list; the eye toggle reveals the real value on demand (plain from SQLite, secret read back from Keychain). | macOS Keychain; SQLite metadata. |
-| Set/unset status | Direct. | Configured variables (`set`/`masked`) render as editable rows; reserved runtime vars (`ENSEMBLE_*`/`CONDUCTOR_*`) are excluded. | SQLite metadata/cache. |
+| Set/unset status | Direct. | Configured variables (`set`/`masked`) render as editable rows; reserved runtime vars (`ENSEMBLE_*`) are excluded. | SQLite metadata/cache. |
 | Add / edit / delete variable | Direct. | Right slide-over (Name + Value). Custom adds and edits require a value; documented adds may set an empty string. Name is locked when the key is preset (documented add or edit). | SQLite / secret store. |
 | Env files | Direct (Conductor "Env files"). | Load `KEY=value` files from disk at session launch (lowest precedence within a scope, so explicit vars win; reserved keys skipped). Native file picker. **User (app) scope only for now**; storage is per-scope so repository scope is a later no-op. | Ordered path list in SQLite (`settings` table, `environment.files`); file contents read at assembly time. |
 
@@ -163,14 +163,14 @@ profile" copy was a hallucination and has been replaced.
 
 | Setting | Conductor mapping | Ensemble adaptation | Storage |
 | --- | --- | --- | --- |
-| Preview URL template | Direct. | Support `ENSEMBLE_*`; support `CONDUCTOR_*` compatibility variables for Conductor-compatible repos or explicit opt-in. | SQLite personal override; shared default in `ensemble.json` if added. |
+| Preview URL template | Direct. | Support `ENSEMBLE_*` variables. | SQLite personal override; shared default in `.ensemble/settings.toml` if added. |
 | Auto-detect preview from logs | Direct concept from screenshots. | Same if implementation can detect local server URLs. | Runtime cache in SQLite. |
 
 ### Files to Copy
 
 | Setting | Conductor mapping | Ensemble adaptation | Storage |
 | --- | --- | --- | --- |
-| Files-to-copy patterns | Direct. | Same pattern semantics; `.worktreeinclude` support required. | `.worktreeinclude`/repository config for shared; SQLite personal override. |
+| Files-to-copy patterns | Direct. | Same pattern semantics; `.worktreeinclude` support required. | `.worktreeinclude`/`.ensemble/settings.toml` for shared; SQLite personal override. |
 | Matching ignored-file preview | Direct. | Same. | Derived at runtime; not stored except cache if needed. |
 
 ### Scripts
@@ -181,7 +181,7 @@ profile" copy was a hallucination and has been replaced.
 | Run script | Direct. | Same; run button in terminal dock. | Repository config for shared; SQLite personal override. |
 | Archive script | Direct. | Same; runs before archive. | Repository config for shared; SQLite personal override. |
 | Run script mode | Direct from existing docs. | Same concurrent/nonconcurrent behavior. | Repository config for shared; SQLite personal override. |
-| Create shared config file | Direct. | Create `ensemble.json` first; support `conductor.json` for compatibility. | Repository config. |
+| Create shared config file | Direct. | The committed `.ensemble/settings.toml` is hand-authored in the repo; Ensemble reads it and does not generate it. | Repository config. |
 
 ### Spotlight Testing
 
@@ -194,21 +194,22 @@ profile" copy was a hallucination and has been replaced.
 
 | Setting | Conductor mapping | Ensemble adaptation | Storage |
 | --- | --- | --- | --- |
-| Code review preferences | Direct. | Custom Pi instructions for review action. | SQLite personal override; `ensemble.json` shared if safe. |
-| Create PR preferences | Direct. | Custom Pi instructions for PR action. | SQLite personal override; `ensemble.json` shared if safe. |
-| Fix errors preferences | Direct. | Custom Pi instructions for fix-errors action. | SQLite personal override; `ensemble.json` shared if safe. |
-| Resolve conflicts preferences | Direct. | Custom Pi instructions for conflict resolution action. | SQLite personal override; `ensemble.json` shared if safe. |
-| Branch rename preferences | Direct. | Custom Pi instructions for deriving branch/workspace names. | SQLite personal override; `ensemble.json` shared if safe. |
-| General preferences | Direct. | Custom Pi instructions prepended to new chats in this repository. | SQLite personal override; `ensemble.json` shared if safe. |
+| Code review preferences | Direct. | Custom Pi instructions for review action. | SQLite personal override; `.ensemble/settings.toml` shared if safe. |
+| Create PR preferences | Direct. | Custom Pi instructions for PR action. | SQLite personal override; `.ensemble/settings.toml` shared if safe. |
+| Fix errors preferences | Direct. | Custom Pi instructions for fix-errors action. | SQLite personal override; `.ensemble/settings.toml` shared if safe. |
+| Resolve conflicts preferences | Direct. | Custom Pi instructions for conflict resolution action. | SQLite personal override; `.ensemble/settings.toml` shared if safe. |
+| Branch rename preferences | Direct. | Custom Pi instructions for deriving branch/workspace names. | SQLite personal override; `.ensemble/settings.toml` shared if safe. |
+| General preferences | Direct. | Custom Pi instructions prepended to new chats in this repository. | SQLite personal override; `.ensemble/settings.toml` shared if safe. |
 
 ## Configuration Precedence
 
-For repository behavior, use the already accepted precedence:
+For repository behavior, resolve each key with this precedence (highest to lowest; see ADR 0030):
 
-1. Personal repository settings in SQLite.
-2. `ensemble.json` at repository root.
-3. `conductor.json` at repository root.
-4. Built-in defaults.
+1. `.worktreeinclude` for files-to-copy patterns.
+2. The committed `.ensemble/settings.toml` at the repository root.
+3. Personal repository settings in SQLite (edited via the Scripts settings screen).
+4. User defaults from `~/.config/ensemble/config.json`.
+5. Built-in defaults.
 
 For app-wide behavior, use:
 

@@ -78,7 +78,7 @@ Ensemble equivalent:
 Ensemble equivalent:
 
 - Keep app settings and repository settings in one settings shell.
-- Store high-churn mutable settings in SQLite, declarative defaults in `~/.config/ensemble/config.json`, shared repository behavior in `ensemble.json`/`conductor.json`, and secrets outside plain config files.
+- Store high-churn mutable settings in SQLite, declarative defaults in `~/.config/ensemble/config.json`, shared repository behavior in the committed `.ensemble/settings.toml`, and secrets outside plain config files.
 
 ### Workspace Landing
 
@@ -137,7 +137,7 @@ Ensemble equivalent:
 - Keep the implemented lower-right dock placement, tab names, collapse behavior, and script-state action affordances.
 - Use xterm.js behind a terminal adapter.
 - Main process owns PTY/process supervision.
-- Expose `ENSEMBLE_*` variables and compatible `CONDUCTOR_*` variables for Conductor-compatible repositories or explicit opt-in.
+- Expose `ENSEMBLE_*` variables to workspace processes.
 
 ### PR and Merge Flow
 
@@ -164,7 +164,7 @@ Ensemble equivalent:
 | Review/create-PR/fix prompt templates | Pi instruction templates stored per user/repository with source precedence. |
 | Provider environment catalog | Pi-relevant provider/env catalog plus generic environment variables. |
 | Conductor root path labels | Ensemble root directory, with optional Conductor-compatible shared root support. |
-| `CONDUCTOR_*` environment variables | Native `ENSEMBLE_*` plus compatibility `CONDUCTOR_*` for Conductor-compatible repositories or explicit opt-in. |
+| `CONDUCTOR_*` environment variables | Native `ENSEMBLE_*` variables. |
 
 ## Prioritized Implementation Checklist
 

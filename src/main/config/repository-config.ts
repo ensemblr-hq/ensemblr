@@ -12,12 +12,9 @@ import { cloneRecord, isPlainRecord } from './json-utils.ts';
 import {
 	formatSourceName,
 	loadWorktreeincludeSource,
-	readJsonFile,
 	readTomlFile,
 	WORKTREE_INCLUDE_FILENAME,
 } from './repository-config-loaders.ts';
-
-export { readJsonFile } from './repository-config-loaders.ts';
 
 /** Options for {@link loadRepositoryConfig}. */
 export interface LoadRepositoryConfigOptions {
@@ -27,9 +24,6 @@ export interface LoadRepositoryConfigOptions {
 
 /** Aggregated result of loading every supported repository config source. */
 export interface LoadedRepositoryConfig {
-	conductorLegacyConfig?: Record<string, unknown>;
-	conductorLocalConfig?: Record<string, unknown>;
-	conductorSharedConfig?: Record<string, unknown>;
 	ensembleConfig?: Record<string, unknown>;
 	snapshot: RepositoryConfigSnapshot;
 	worktreeincludeConfig?: Record<string, unknown>;
@@ -41,11 +35,10 @@ interface NormalizedConfigSource {
 	settings: Record<string, unknown>;
 }
 
-export const ENSEMBLE_CONFIG_FILENAME = 'ensemble.json';
-const LEGACY_CONDUCTOR_CONFIG_FILENAME = 'conductor.json';
-const CONDUCTOR_DIRECTORY = '.conductor';
-const CONDUCTOR_SHARED_SETTINGS_FILENAME = 'settings.toml';
-const CONDUCTOR_LOCAL_SETTINGS_FILENAME = 'settings.local.toml';
+/** Directory that holds the committed repository config. */
+export const ENSEMBLE_DIRECTORY = '.ensemble';
+/** Filename of the sole on-disk repository config, inside {@link ENSEMBLE_DIRECTORY}. */
+export const ENSEMBLE_SETTINGS_FILENAME = 'settings.toml';
 
 const SCRIPT_FIELD_MAP = new Map([
 	['archive', 'archive'],
@@ -70,23 +63,6 @@ const TOML_FIELD_MAP: ReadonlyMap<string, string> = new Map([
 	['pi_executable_path', 'piExecutablePath'],
 ] as const);
 
-const JSON_FIELD_MAP: ReadonlyMap<string, string> = new Map([
-	['enterpriseDataPrivacy', 'enterpriseDataPrivacy'],
-	['environmentVariables', 'environmentVariables'],
-	['filesToCopy', 'filesToCopy'],
-	['git', 'git'],
-	['prompts', 'prompts'],
-	['runScriptMode', 'runScriptMode'],
-	['spotlightTesting', 'spotlightTesting'],
-	['claudeExecutablePath', 'claudeExecutablePath'],
-	['codexExecutablePath', 'codexExecutablePath'],
-	['geminiExecutablePath', 'geminiExecutablePath'],
-	['opencodeExecutablePath', 'opencodeExecutablePath'],
-	['ampExecutablePath', 'ampExecutablePath'],
-	['copilotExecutablePath', 'copilotExecutablePath'],
-	['piExecutablePath', 'piExecutablePath'],
-] as const);
-
 const OBJECT_SETTING_KEYS = new Set([
 	'environmentVariables',
 	'git',
@@ -106,9 +82,10 @@ const STRING_SETTING_KEYS = new Set([
 ]);
 
 /**
- * Loads every supported repository config source (ensemble.json, conductor
- * shared/local TOML, legacy conductor.json, .worktreeinclude), normalises each,
- * and returns both raw parsed records and an IPC-safe snapshot.
+ * Loads every supported repository config source (`.ensemble/settings.toml` and
+ * `.worktreeinclude`), normalises each, and returns both raw parsed records and
+ * an IPC-safe snapshot. `.ensemble/settings.toml` is the sole committed config;
+ * `.worktreeinclude` remains a separate files-to-copy list.
  * @param options - Repository path and optional clock.
  * @returns The parsed config sources plus a transport snapshot.
  */
@@ -148,84 +125,24 @@ export function loadRepositoryConfig({
 	});
 	diagnostics.push(...worktreeinclude.diagnostics);
 
-	const conductorLocal = loadTomlSource({
-		repositoryPath: resolvedRepositoryPath,
-		source: 'conductor-local-config',
-		sourcePath: path.join(
-			resolvedRepositoryPath,
-			CONDUCTOR_DIRECTORY,
-			CONDUCTOR_LOCAL_SETTINGS_FILENAME,
-		),
-	});
-	sources.push(conductorLocal.snapshot);
-	diagnostics.push(...conductorLocal.diagnostics);
-
-	const ensemble = loadJsonSource({
-		kind: 'ensemble',
+	const ensemble = loadTomlSource({
 		repositoryPath: resolvedRepositoryPath,
 		source: 'ensemble-config',
-		sourcePath: path.join(resolvedRepositoryPath, ENSEMBLE_CONFIG_FILENAME),
+		sourcePath: path.join(
+			resolvedRepositoryPath,
+			ENSEMBLE_DIRECTORY,
+			ENSEMBLE_SETTINGS_FILENAME,
+		),
 	});
 	sources.push(ensemble.snapshot);
 	diagnostics.push(...ensemble.diagnostics);
 
-	const conductorShared = loadTomlSource({
-		repositoryPath: resolvedRepositoryPath,
-		source: 'conductor-config',
-		sourcePath: path.join(
-			resolvedRepositoryPath,
-			CONDUCTOR_DIRECTORY,
-			CONDUCTOR_SHARED_SETTINGS_FILENAME,
-		),
-	});
-	sources.push(conductorShared.snapshot);
-	diagnostics.push(...conductorShared.diagnostics);
-
-	const legacyPath = path.join(
-		resolvedRepositoryPath,
-		LEGACY_CONDUCTOR_CONFIG_FILENAME,
-	);
-	let conductorLegacySettings: Record<string, unknown> | undefined;
-
-	if (
-		conductorShared.snapshot.status === 'loaded' ||
-		conductorShared.snapshot.status === 'invalid'
-	) {
-		const ignoredLegacyStatus = existsSync(legacyPath) ? 'ignored' : 'missing';
-		pushSourceSnapshot({
-			repositoryPath: resolvedRepositoryPath,
-			settings: {},
-			source: 'conductor-legacy-config',
-			sourcePath: legacyPath,
-			sources,
-			status: ignoredLegacyStatus,
-		});
-
-		if (ignoredLegacyStatus === 'ignored') {
-			diagnostics.push({
-				code: 'legacy-conductor-json-ignored',
-				fieldPath: '$',
-				message:
-					'Legacy conductor.json was ignored because .conductor/settings.toml is present.',
-				severity: 'info',
-			});
-		}
-	} else {
-		const conductorLegacy = loadJsonSource({
-			kind: 'conductor',
-			repositoryPath: resolvedRepositoryPath,
-			source: 'conductor-legacy-config',
-			sourcePath: legacyPath,
-		});
-		sources.push(conductorLegacy.snapshot);
-		diagnostics.push(...conductorLegacy.diagnostics);
-		conductorLegacySettings = getLoadedSettings(conductorLegacy.snapshot);
+	const legacyDiagnostic = detectLegacyConfigDiagnostic(resolvedRepositoryPath);
+	if (legacyDiagnostic) {
+		diagnostics.push(legacyDiagnostic);
 	}
 
 	return {
-		conductorLegacyConfig: conductorLegacySettings,
-		conductorLocalConfig: getLoadedSettings(conductorLocal.snapshot),
-		conductorSharedConfig: getLoadedSettings(conductorShared.snapshot),
 		ensembleConfig: getLoadedSettings(ensemble.snapshot),
 		snapshot: {
 			diagnostics,
@@ -241,42 +158,51 @@ export function loadRepositoryConfig({
 }
 
 /**
- * Reads and normalises a JSON repository config file.
- * @param input - Parsing context (kind, source identifier, path).
- * @returns Diagnostics plus the snapshot describing the source.
+ * Coerces an arbitrary IPC payload into a {@link LoadRepositoryConfigOptions},
+ * returning an empty path when the shape is invalid.
+ * @param request - Raw IPC payload.
+ * @returns Safe-to-use options.
  */
-function loadJsonSource({
-	kind,
-	repositoryPath,
-	source,
-	sourcePath,
-}: {
-	kind: 'conductor' | 'ensemble';
-	repositoryPath: string;
-	source: SettingsResolutionSource;
-	sourcePath: string;
-}): {
-	diagnostics: ConfigDiagnostic[];
-	snapshot: RepositoryConfigSourceSnapshot;
-} {
-	const parsed = readJsonFile({ kind, source, sourcePath });
-	const normalized = parsed.record
-		? normalizeJsonRepositoryConfig({
-				config: parsed.record,
-				kind,
-				source,
-			})
-		: { diagnostics: [], settings: {} };
+export function normalizeRepositoryConfigRequest(
+	request: unknown,
+): LoadRepositoryConfigOptions {
+	if (
+		!isPlainRecord(request) ||
+		typeof request.repositoryPath !== 'string' ||
+		!request.repositoryPath.trim()
+	) {
+		return { repositoryPath: '' };
+	}
+
+	return { repositoryPath: request.repositoryPath.trim() };
+}
+
+/**
+ * Detects whether a legacy, no-longer-read repository config file
+ * (`conductor.json`, `.conductor/settings.toml`, or an old-root `ensemble.json`)
+ * still exists at the repository root, using an existence check only. The files
+ * are never read, parsed, or migrated; this exists solely so a team repo on the
+ * old format gets one informational signal instead of silently losing config.
+ * @param repositoryPath - Resolved repository root.
+ * @returns One `info` diagnostic when a legacy file is present, else `undefined`.
+ */
+function detectLegacyConfigDiagnostic(
+	repositoryPath: string,
+): ConfigDiagnostic | undefined {
+	const legacyPaths = [
+		path.join(repositoryPath, 'conductor.json'),
+		path.join(repositoryPath, '.conductor', 'settings.toml'),
+		path.join(repositoryPath, 'ensemble.json'),
+	];
+
+	if (!legacyPaths.some((legacyPath) => existsSync(legacyPath))) {
+		return undefined;
+	}
 
 	return {
-		diagnostics: [...parsed.diagnostics, ...normalized.diagnostics],
-		snapshot: createSourceSnapshot({
-			repositoryPath,
-			settings: normalized.settings,
-			source,
-			sourcePath,
-			status: parsed.status,
-		}),
+		code: 'legacy-config-ignored',
+		message: `A legacy repository config file was found and ignored. Ensemble reads committed settings only from ${ENSEMBLE_DIRECTORY}/${ENSEMBLE_SETTINGS_FILENAME}; move your settings there.`,
+		severity: 'info',
 	};
 }
 
@@ -315,39 +241,28 @@ function loadTomlSource({
 }
 
 /**
- * Maps a parsed JSON config record onto the canonical Ensemble setting keys,
- * collecting per-field diagnostics for unsupported or wrongly-typed values.
- * @param input - Parsed record plus kind and source labels.
+ * Maps a parsed TOML config record onto the canonical Ensemble setting keys,
+ * applying snake-to-camel renames and collecting per-field diagnostics.
+ * @param config - Parsed TOML record.
+ * @param source - Source identifier used in diagnostics.
  * @returns Normalised settings and diagnostics.
  */
-function normalizeJsonRepositoryConfig({
-	config,
-	kind,
-	source,
-}: {
-	config: Record<string, unknown>;
-	kind: 'conductor' | 'ensemble';
-	source: SettingsResolutionSource;
-}): NormalizedConfigSource {
-	const { diagnostics, settings } = normalizeRepositoryConfigFields({
+function normalizeTomlRepositoryConfig(
+	config: Record<string, unknown>,
+	source: SettingsResolutionSource,
+): NormalizedConfigSource {
+	return normalizeRepositoryConfigFields({
 		config,
-		fieldMap: JSON_FIELD_MAP,
-		scriptSupportsRunMode: false,
+		fieldMap: TOML_FIELD_MAP,
+		scriptSupportsRunMode: true,
 		source,
 	});
-
-	const withCompatFlag =
-		kind === 'conductor' && Object.keys(settings).length > 0
-			? { conductorCompatibility: true, ...settings }
-			: settings;
-
-	return { diagnostics, settings: withCompatFlag };
 }
 
 /**
- * Shared per-field normalisation loop used by both JSON and TOML parsers.
- * Handles the special `scripts` key, looks up the field map for the
- * canonical key, and returns the accumulated settings plus diagnostics.
+ * Shared per-field normalisation loop for the TOML parser. Handles the special
+ * `scripts` key, looks up the field map for the canonical key, and returns the
+ * accumulated settings plus diagnostics.
  */
 function normalizeRepositoryConfigFields({
 	config,
@@ -401,32 +316,6 @@ function normalizeRepositoryConfigFields({
 	}
 
 	return { diagnostics, settings };
-}
-
-/**
- * Maps a parsed TOML config record onto the canonical Ensemble setting keys,
- * applying snake-to-camel renames and collecting per-field diagnostics.
- * @param config - Parsed TOML record.
- * @param source - Source identifier used in diagnostics.
- * @returns Normalised settings and diagnostics.
- */
-function normalizeTomlRepositoryConfig(
-	config: Record<string, unknown>,
-	source: SettingsResolutionSource,
-): NormalizedConfigSource {
-	const { diagnostics, settings } = normalizeRepositoryConfigFields({
-		config,
-		fieldMap: TOML_FIELD_MAP,
-		scriptSupportsRunMode: true,
-		source,
-	});
-
-	const withCompatFlag =
-		Object.keys(settings).length > 0
-			? { conductorCompatibility: true, ...settings }
-			: settings;
-
-	return { diagnostics, settings: withCompatFlag };
 }
 
 /**

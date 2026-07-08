@@ -599,21 +599,6 @@ export const repositoryConfigRequestSchema = z.object({
 });
 
 /**
- * {@link import('../../shared/ipc').RepositoryConfigMigrationRequest}.
- *
- * `overwrite` is preserved as the strict legacy boolean: only `true` survives,
- * anything else (including `false`) collapses to `undefined` so the resulting
- * object retains the historical narrow shape.
- */
-export const repositoryConfigMigrationRequestSchema = z.object({
-	overwrite: z
-		.unknown()
-		.optional()
-		.transform((value) => (value === true ? true : undefined)),
-	repositoryPath: z.string().transform((value) => value.trim()),
-});
-
-/**
  * Parses a repository-config request, preserving the legacy fallback of
  * `{ repositoryPath: '' }` on malformed input.
  */
@@ -627,23 +612,30 @@ export function parseRepositoryConfigRequest(raw: unknown): {
 	return parsed.data;
 }
 
+// -----------------------------------------------------------------------------
+// workspace-scripts — LENIENT (safeParse + null fallback)
+// -----------------------------------------------------------------------------
+
+/** {@link import('../../shared/ipc').UpdateRepositoryScriptsRequest}. */
+export const updateRepositoryScriptsRequestSchema = z.object({
+	archive: z.string().nullable(),
+	autoRunAfterSetup: z.boolean(),
+	repositoryId: z.string().min(1),
+	run: z.string().nullable(),
+	runScriptMode: z.enum(['concurrent', 'nonconcurrent']),
+	setup: z.string().nullable(),
+});
+
 /**
- * Parses a repository-config migration request, preserving the legacy
- * fallback of `{ repositoryPath: '' }` on malformed input and the strict
- * `overwrite === true` test (any other value collapses to `undefined`).
+ * Parses a Scripts-settings write request, returning `null` on malformed input
+ * so the handler can report a no-op without touching SQLite.
  */
-export function parseRepositoryConfigMigrationRequest(raw: unknown): {
-	overwrite?: true | undefined;
-	repositoryPath: string;
-} {
-	const parsed = repositoryConfigMigrationRequestSchema.safeParse(raw);
-	if (!parsed.success) {
-		return { repositoryPath: '' };
-	}
-	return {
-		overwrite: parsed.data.overwrite,
-		repositoryPath: parsed.data.repositoryPath,
-	};
+export function parseUpdateRepositoryScriptsRequest(
+	raw: unknown,
+): z.infer<typeof updateRepositoryScriptsRequestSchema> | null {
+	const parsed = updateRepositoryScriptsRequestSchema.safeParse(raw);
+
+	return parsed.success ? parsed.data : null;
 }
 
 // -----------------------------------------------------------------------------

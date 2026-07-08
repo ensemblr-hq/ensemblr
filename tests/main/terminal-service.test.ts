@@ -77,7 +77,6 @@ function createWorkspaceEnvironmentStub(
 ): WorkspaceEnvironmentService {
 	return {
 		assemble: async ({ workspaceId }) => ({
-			conductorCompatibility: false,
 			cwd,
 			diagnostics: [],
 			env: {

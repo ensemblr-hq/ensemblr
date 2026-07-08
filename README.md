@@ -85,7 +85,7 @@ recent changes.
 ### Terminal & scripts
 - xterm.js terminal backed by a `node-pty` PTY, in a collapsible dock.
 - Setup and Run scripts with read-only output panes, plus additional interactive terminal tabs.
-- `ENSEMBLE_*` / `CONDUCTOR_*` environment variables injected into workspace processes.
+- `ENSEMBLE_*` environment variables injected into workspace processes.
 
 ### History & archive
 - Archive a workspace's context (git-backed) and browse it later.
@@ -165,7 +165,7 @@ src/
 └── shared/     Cross-process contracts (Zod config, IPC contracts, keymap, Pi-RPC)
 
 docs/
-├── adr/        Architecture Decision Records (29)
+├── adr/        Architecture Decision Records (30)
 ├── pi/         Pi integration (RPC protocol, event taxonomy)
 ├── product/    Roadmap, parity notes, shell/settings inventories
 └── refactor/   Refactor plans
@@ -198,8 +198,8 @@ Ensemble is organized around four runtime boundaries:
 
 **Data layer.** State persists to a SQLite database at `~/.config/ensemble/ensemble.db` (repositories,
 workspaces, Pi sessions, Pi events, chat tabs, settings) accessed through a repository layer under
-`src/main/storage/`. App settings live in `~/.config/ensemble/config.json`; per-repo config is declarative
-(`ensemble.json` / `conductor.json`). Per-turn checkpoints are git-backed
+`src/main/storage/`. App settings live in `~/.config/ensemble/config.json`; per-repo config is a committed,
+hand-authored `.ensemble/settings.toml`. Per-turn checkpoints are git-backed
 ([ADR&nbsp;0012](./docs/adr/0012-use-git-backed-checkpoints-for-pi-turns.md)), and secrets are stored in
 the macOS Keychain ([ADR&nbsp;0018](./docs/adr/0018-use-keychain-for-secrets.md)). The Ensemble Root
 Directory holds managed repositories, workspaces, and archived context.
@@ -265,7 +265,7 @@ See `package.json` for the full list of `test:*` scripts.
 - [`CONTEXT.md`](./CONTEXT.md) — product definition and ubiquitous language.
 - [`CHANGELOG.md`](./CHANGELOG.md) — notable changes (Keep a Changelog format).
 - [`AGENTS.md`](./AGENTS.md) — contributor policies (package manager, Biome, state, Tailwind, docs).
-- [`docs/adr/`](./docs/adr) — 29 Architecture Decision Records.
+- [`docs/adr/`](./docs/adr) — 30 Architecture Decision Records.
 - [`docs/product/`](./docs/product) — roadmap, Conductor parity, shell/settings inventories.
 - [`docs/pi/`](./docs/pi) — Pi RPC protocol and event taxonomy.
 

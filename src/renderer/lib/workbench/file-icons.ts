@@ -28,7 +28,6 @@ const fileIconByName: Record<string, string> = {
 	'biome.json': 'file-type-biome',
 	'bun.lock': 'file-type-bun',
 	'components.json': 'file-type-json',
-	'conductor.json': 'file-type-config',
 	CONTEXT: 'file-type-markdown',
 	'CONTEXT.md': 'file-type-markdown',
 	'forge.config.ts': 'file-type-config',

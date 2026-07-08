@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router';
 import { useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 
@@ -17,6 +18,8 @@ export interface UseWorkspaceDockActionsOptions {
 	activeDockTab: string;
 	closeTerminal: (terminalId: string) => Promise<void>;
 	createTerminal: () => Promise<CreateTerminalSessionResult>;
+	/** Repository id (`$repoId`) used to open its Scripts settings page. */
+	repositoryId: string;
 	sessions: readonly TerminalSessionSnapshot[];
 	updateSearch: (nextSearch: WorkbenchRouteSearch) => void;
 	workspaceId: string;
@@ -38,10 +41,12 @@ export function useWorkspaceDockActions({
 	activeDockTab,
 	closeTerminal,
 	createTerminal,
+	repositoryId,
 	sessions,
 	updateSearch,
 	workspaceId,
 }: UseWorkspaceDockActionsOptions): WorkbenchDockActions {
+	const navigate = useNavigate();
 	const updateSearchRef = useRef(updateSearch);
 	updateSearchRef.current = updateSearch;
 	const sessionsRef = useRef(sessions);
@@ -56,13 +61,10 @@ export function useWorkspaceDockActions({
 					(session) => session.kind === 'terminal' && session.id !== terminalId,
 				);
 
-				// Last terminal tab is not closable; guard against stale UI clicks.
-				if (remaining.length === 0) {
-					return;
-				}
-
 				void closeTerminal(terminalId);
 
+				// Terminals close down to zero; when the active tab is the one being
+				// closed, fall back to the next terminal or the fixed Setup tab.
 				if (activeDockTabRef.current === `terminal:${terminalId}`) {
 					const nextTerminal = remaining.at(-1);
 					updateSearchRef.current({
@@ -89,8 +91,15 @@ export function useWorkspaceDockActions({
 						toast.error('The terminal could not start.');
 					});
 			},
-			onOpenRunPort: () => undefined,
-			onOpenSetupScripts: () => undefined,
+			onOpenRunPort: (url) => {
+				void window.ensemble?.openExternal(url);
+			},
+			onOpenSetupScripts: () => {
+				void navigate({
+					params: { repoId: repositoryId },
+					to: '/settings/repo/$repoId/scripts',
+				});
+			},
 			onRunScript: () => {
 				void runWorkspaceScript({ kind: 'run', workspaceId })
 					.then((result) => notifyScriptConflict(result.diagnostics))
@@ -114,7 +123,7 @@ export function useWorkspaceDockActions({
 				);
 			},
 		}),
-		[closeTerminal, createTerminal, workspaceId],
+		[closeTerminal, createTerminal, navigate, repositoryId, workspaceId],
 	);
 }
 

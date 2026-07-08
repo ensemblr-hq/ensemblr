@@ -74,10 +74,12 @@ export function SettingsHeader({
 
 	const disableRepoTab = projects.length === 0;
 	const configLabel =
-		scope === 'user' ? 'Edit in config.json' : 'Edit in ensemble.json';
+		scope === 'user'
+			? 'Edit in config.json'
+			: 'Edit in .ensemble/settings.toml';
 
 	// User scope opens ~/.config/ensemble/config.json (created if missing).
-	// Repo-scoped ensemble.json editing is not wired yet.
+	// Repo-scoped .ensemble/settings.toml editing is not wired yet.
 	const handleEditConfig = () => {
 		if (scope === 'user') {
 			void openAppConfigFile();

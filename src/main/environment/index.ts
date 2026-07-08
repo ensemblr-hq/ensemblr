@@ -24,7 +24,6 @@ export type {
 	WorkspaceEnvironmentService,
 } from './workspace-environment';
 export {
-	CONDUCTOR_COMPATIBILITY_VARIABLE_MAP,
 	createWorkspaceEnvironmentService,
 	ENSEMBLE_RUNTIME_VARIABLE_KEYS,
 	WorkspaceEnvironmentError,

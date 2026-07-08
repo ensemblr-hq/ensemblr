@@ -37,6 +37,7 @@ export function SetupScriptOutputPanel({
 
 	return (
 		<XtermTerminal
+			readOnly
 			sessionStatus={script.sessionStatus ?? null}
 			terminalId={script.terminalId}
 		/>

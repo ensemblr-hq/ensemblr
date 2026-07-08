@@ -185,27 +185,22 @@ const REPO_SETTINGS_KEYS = [
 	'remoteOrigin',
 	'deleteLocalBranchOnArchive',
 	'archiveAfterMerge',
-	'setupScript',
-	'runScript',
-	'archiveScript',
-	'runMode',
+	'scripts.setup',
+	'scripts.run',
+	'scripts.archive',
+	'runScriptMode',
+	'autoRunAfterSetup',
 ] as const;
 export type RepoSettingsKey = (typeof REPO_SETTINGS_KEYS)[number];
 
 /**
  * Personal per-repo overrides stored locally. The real source of truth lives
- * in repository config files (ensemble.json / conductor.json) and SQLite —
- * these atoms only hold user-only personal preferences until edited through
- * the shared config writer.
+ * in the committed `.ensemble/settings.toml` and SQLite — these atoms only hold
+ * user-only personal preferences until edited through the shared config writer.
  */
 export interface RepoSettingsOverride {
 	branchFrom?: string;
 	remoteOrigin?: string;
-	setupScript?: string;
-	runScript?: string;
-	archiveScript?: string;
-	runMode?: 'concurrent' | 'non-concurrent';
-	autoRunAfterSetup?: boolean;
 	useSpotlight?: boolean;
 	filesToCopy?: string;
 	previewUrls?: Array<{ name: string; url: string }>;

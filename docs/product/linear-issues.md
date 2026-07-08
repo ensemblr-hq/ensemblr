@@ -228,7 +228,7 @@ Implement source precedence and diagnostics for app-wide and repository settings
 
 Scope:
 - Resolve app settings from managed config, SQLite user settings, config defaults, and built-in defaults.
-- Resolve repository behavior from personal SQLite settings, `ensemble.json`, `conductor.json`, and built-in defaults.
+- Resolve repository behavior from the committed `.ensemble/settings.toml`, personal SQLite settings, and built-in defaults.
 - Track which source won per field.
 - Expose source diagnostics to settings and setup workflows.
 
@@ -247,7 +247,7 @@ Verification:
 - Snapshot or fixture tests for source diagnostics payloads.
 
 Source:
-- `docs/adr/0007-support-conductor-compatible-repository-config.md`
+- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
 - `docs/adr/0008-use-sqlite-with-declarative-user-config.md`
 - `docs/product/settings-inventory.md`
 
@@ -558,7 +558,7 @@ Source:
 Implementation notes:
 - Do not duplicate Pi-owned provider secrets unless explicitly configured as Ensemble-specific secrets.
 
-## ENS-015 Repository Config Parser for ensemble.json, conductor.json, and .worktreeinclude
+## ENS-015 Repository Config Parser for .ensemble/settings.toml and .worktreeinclude
 
 Milestone: 2. Setup Gate and Configuration
 Type: Backend/main-process
@@ -566,35 +566,34 @@ Priority: P0
 Dependencies: ENS-006, ENS-008
 
 Summary:
-Parse repository configuration files and `.worktreeinclude` with Conductor-compatible precedence and diagnostics.
+Parse the committed `.ensemble/settings.toml` and `.worktreeinclude` with the single-file precedence and diagnostics.
 
 Scope:
-- Parse `ensemble.json` and `conductor.json` from repository roots.
+- Parse the committed `.ensemble/settings.toml` (TOML) from the repository root.
 - Support shared script fields: `scripts.setup`, `scripts.run`, `scripts.archive`, and `runScriptMode`.
-- Support `enterpriseDataPrivacy` and other compatible fields where accepted.
+- Support `enterpriseDataPrivacy` and other supported fields where accepted.
 - Parse `.worktreeinclude` gitignore-style patterns.
-- Report ignored/unsupported Conductor-specific fields safely.
+- Report ignored/unsupported fields safely.
 
 Out of scope:
 - Repository settings UI.
 - Executing scripts or copying files.
 
 Acceptance criteria:
-- Personal settings can override `ensemble.json`, then `conductor.json`, then defaults.
+- The committed `.ensemble/settings.toml` overrides personal SQLite settings per key; keys it omits fall back to SQLite, then defaults.
 - `.worktreeinclude` wins over personal files-to-copy settings when present.
 - Unsupported fields do not crash parsing and are visible in diagnostics.
-- `CONDUCTOR_*` compatibility eligibility can be derived.
 
 Verification:
 - Fixture tests for config precedence, invalid JSON, unsupported fields, and `.worktreeinclude` patterns.
 
 Source:
-- `docs/adr/0007-support-conductor-compatible-repository-config.md`
+- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
-- Keep Ensemble-specific fields in `ensemble.json`; do not overload `conductor.json` with Pi-only semantics.
+- Keep all repository fields in the committed `.ensemble/settings.toml`; the app reads it and never writes it.
 
 ## ENS-016 Root Switch Reindex/Adopt Flow
 
@@ -867,12 +866,12 @@ Verification:
 - Fixture tests with tracked files, ignored files, nested patterns, missing files, and `.worktreeinclude` precedence.
 
 Source:
-- `docs/adr/0007-support-conductor-compatible-repository-config.md`
+- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/screen-inventory.md`
 
 Implementation notes:
-- Preserve Conductor-compatible behavior without relying on Conductor private state.
+- Preserve `.worktreeinclude` files-to-copy behavior without relying on Conductor private state.
 
 ## ENS-023 Workspace Landing Summary and First Composer Surface
 
@@ -1536,7 +1535,7 @@ Verification:
 - Manual run setup/rerun/stop in a temporary workspace.
 
 Source:
-- `docs/adr/0007-support-conductor-compatible-repository-config.md`
+- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/screen-inventory.md`
 
@@ -1551,11 +1550,10 @@ Priority: P0
 Dependencies: ENS-006, ENS-014, ENS-021, ENS-038
 
 Summary:
-Inject native and Conductor-compatible workspace environment variables into scripts, terminals, and Pi sessions as appropriate.
+Inject native `ENSEMBLE_*` workspace environment variables into scripts, terminals, and Pi sessions.
 
 Scope:
 - Define `ENSEMBLE_WORKSPACE_NAME`, `ENSEMBLE_WORKSPACE_PATH`, `ENSEMBLE_ROOT_PATH`, `ENSEMBLE_DEFAULT_BRANCH`, `ENSEMBLE_PORT`, and related variables.
-- Expose matching `CONDUCTOR_*` variables for Conductor-compatible repositories or explicit opt-in.
 - Allocate stable workspace port ranges.
 - Include configured environment variables and secrets safely.
 
@@ -1565,16 +1563,15 @@ Out of scope:
 
 Acceptance criteria:
 - Scripts receive native variables in all workspaces.
-- Compatibility variables map to the same values when enabled.
 - Port allocation avoids obvious collisions across active workspaces.
 - Secret values are injected only into intended process environments and never logged by default.
 
 Verification:
-- Unit tests for environment assembly and compatibility mapping.
+- Unit tests for environment assembly.
 - Integration test script prints non-secret expected variables in a fixture workspace.
 
 Source:
-- `docs/adr/0007-support-conductor-compatible-repository-config.md`
+- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/settings-inventory.md`
 
@@ -1612,7 +1609,7 @@ Verification:
 - Manual run/start/stop/restart in a fixture workspace.
 
 Source:
-- `docs/adr/0007-support-conductor-compatible-repository-config.md`
+- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
 - `docs/product/conductor-parity.md`
 
 Implementation notes:
@@ -2358,7 +2355,7 @@ Source:
 - `docs/product/conductor-parity.md`
 
 Implementation notes:
-- Store Pi-specific shared templates in `ensemble.json` when shared config is appropriate.
+- Store Pi-specific shared templates in the committed `.ensemble/settings.toml` when shared config is appropriate.
 
 ## ENS-060 Archive-After-Merge and Branch Cleanup
 
@@ -2532,8 +2529,8 @@ Implement repository settings forms and source diagnostics for paths, branch, re
 Scope:
 - Repository identity/path, branch source, remote origin, branch naming, preview template, files-to-copy, scripts, run mode, create shared config file, spotlight flag, action preferences, archive/remove actions.
 - Show which source won per field.
-- Write personal overrides to SQLite and shared team config to `ensemble.json` where explicitly requested.
-- Preserve `conductor.json` compatibility and diagnostics.
+- Write personal overrides to SQLite; the shared `.ensemble/settings.toml` is committed by hand and read-only to the app.
+- Show source diagnostics, including when the committed `.ensemble/settings.toml` overrides a SQLite value.
 
 Out of scope:
 - Building spotlight behavior before discovery.
@@ -2542,17 +2539,17 @@ Out of scope:
 Acceptance criteria:
 - Users can inspect and edit repository overrides.
 - Source precedence is visible and correct.
-- Creating shared config writes `ensemble.json` first.
+- Personal edits persist to SQLite; the app never writes the committed `.ensemble/settings.toml`.
 - Remove repository distinguishes app record removal from deleting files.
 
 Verification:
 - Component tests with source-diagnostics fixtures.
-- Integration tests for writing personal overrides and `ensemble.json`.
+- Integration tests for writing personal SQLite overrides.
 
 Source:
 - `docs/product/settings-inventory.md`
 - `docs/product/screen-inventory.md`
-- `docs/adr/0007-support-conductor-compatible-repository-config.md`
+- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
 
 Implementation notes:
 - Never move/delete repository or workspace directories from normal settings edits.

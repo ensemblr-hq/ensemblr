@@ -3,12 +3,9 @@ import type { SettingsResolutionSource } from '@/shared/ipc/contracts/settings-r
 
 const SOURCE_LABEL: Record<SettingsResolutionSource, string> = {
 	'built-in-default': 'default',
-	'conductor-config': 'conductor.json',
-	'conductor-legacy-config': 'conductor.local.json',
-	'conductor-local-config': 'conductor.local.json',
 	'config-default': 'config defaults',
 	'managed-config': 'managed config',
-	'ensemble-config': 'ensemble.json',
+	'ensemble-config': '.ensemble/settings.toml',
 	sqlite: 'personal (sqlite)',
 	'user-default': 'user defaults',
 	worktreeinclude: 'git worktree include',

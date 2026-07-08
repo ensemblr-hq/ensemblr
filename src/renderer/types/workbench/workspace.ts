@@ -37,14 +37,13 @@ export interface RunScriptDockTabModel {
 
 export interface TerminalDockTabModel {
 	id: TerminalDockTabId;
-	isDefault?: boolean;
 	kind: 'terminal';
 	label: string;
-	/** Live session status, or `null` for the placeholder default tab. */
-	sessionStatus: TerminalSessionStatus | null;
+	/** Live status of the bound main-process terminal session. */
+	sessionStatus: TerminalSessionStatus;
 	status: DockTabStatus;
-	/** Main-process terminal session id, or `null` before a session exists. */
-	terminalId: string | null;
+	/** Main-process terminal session id backing this tab. */
+	terminalId: string;
 }
 
 export type DockTabModel =
@@ -226,6 +225,8 @@ export type WorkspaceStatus = 'idle' | 'needs-setup' | 'review' | 'working';
 export interface WorkspaceScriptSummary {
 	command?: string;
 	port?: number;
+	/** Auto-detected local dev-server URL for a running run script, when seen. */
+	previewUrl?: string | null;
 	/** Status of the most recent script session, when one exists. */
 	sessionStatus?: TerminalSessionStatus | null;
 	status: 'missing' | 'not-run' | 'running' | 'stopped' | 'succeeded';

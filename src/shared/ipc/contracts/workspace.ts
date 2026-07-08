@@ -73,9 +73,6 @@ export interface CreatedWorkspaceSnapshot {
 export type CreateWorkspaceStatus = 'failure' | 'success';
 
 export type FilesToCopySource =
-	| 'conductor-config'
-	| 'conductor-legacy-config'
-	| 'conductor-local-config'
 	| 'default'
 	| 'ensemble-config'
 	| 'worktreeinclude';

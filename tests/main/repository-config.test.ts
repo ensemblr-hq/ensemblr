@@ -1,11 +1,5 @@
 import assert from 'node:assert/strict';
-import {
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	rmSync,
-	writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -17,10 +11,6 @@ import {
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
 import { isRepositoryConfigPathAllowed } from '../../src/main/config/index.ts';
 import { loadRepositoryConfig } from '../../src/main/config/repository-config.ts';
-import {
-	applyRepositoryConfigMigration,
-	previewRepositoryConfigMigration,
-} from '../../src/main/config/repository-config-migration.ts';
 import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
 import type {
 	RepositoryConfigSnapshot,
@@ -45,7 +35,6 @@ function createConfig(overrides: Partial<EnsembleConfig> = {}): EnsembleConfig {
 }
 
 function createRepositoryFixture(t: TestContext): {
-	readJson: (relativePath: string) => Record<string, unknown>;
 	repositoryPath: string;
 	write: (relativePath: string, source: string) => void;
 } {
@@ -56,10 +45,6 @@ function createRepositoryFixture(t: TestContext): {
 	});
 
 	return {
-		readJson: (relativePath) =>
-			JSON.parse(
-				readFileSync(path.join(repositoryPath, relativePath), 'utf8'),
-			) as Record<string, unknown>,
 		repositoryPath,
 		write: (relativePath, source) => {
 			const targetPath = path.join(repositoryPath, relativePath);
@@ -131,10 +116,10 @@ function getSource(
 	return match;
 }
 
-test('parses Conductor TOML repository settings into Ensemble keys', (t) => {
+test('parses .ensemble/settings.toml repository settings into Ensemble keys', (t) => {
 	const fixture = createRepositoryFixture(t);
 	fixture.write(
-		'.conductor/settings.toml',
+		'.ensemble/settings.toml',
 		`
 enterprise_data_privacy = true
 file_include_globs = [".env.local", "config/*.json"]
@@ -163,12 +148,11 @@ enabled = true
 	const loaded = loadRepositoryConfig({
 		repositoryPath: fixture.repositoryPath,
 	});
-	const source = getSource(loaded.snapshot, 'conductor-config');
+	const source = getSource(loaded.snapshot, 'ensemble-config');
 
 	assert.equal(source.status, 'loaded');
 	assert.deepEqual(source.settings, {
 		claudeExecutablePath: '/opt/homebrew/bin/claude',
-		conductorCompatibility: true,
 		enterpriseDataPrivacy: true,
 		environmentVariables: { DEBUG: 'ensemble:*' },
 		filesToCopy: ['.env.local', 'config/*.json'],
@@ -185,19 +169,23 @@ enabled = true
 	assert.deepEqual(loaded.snapshot.diagnostics, []);
 });
 
-test('Conductor local TOML overrides shared TOML in repository resolution', (t) => {
+test('.ensemble/settings.toml overrides personal SQLite per-key', (t) => {
 	const fixture = createRepositoryFixture(t);
+	const database = createDatabaseFixture(t);
 	fixture.write(
-		'.conductor/settings.toml',
-		'[scripts]\nrun = "bun run shared"\n',
+		'.ensemble/settings.toml',
+		'[scripts]\nrun = "bun run committed"\n',
 	);
-	fixture.write(
-		'.conductor/settings.local.toml',
-		'[scripts]\nrun = "bun run local"\n',
-	);
+	insertSetting({
+		database,
+		key: 'scripts.run',
+		scopeId: 'repo-1',
+		valueJson: JSON.stringify('bun run personal'),
+	});
 
 	const snapshot = resolveSettings({
 		config: createConfig(),
+		database,
 		repository: {
 			repositoryId: 'repo-1',
 			repositoryPath: fixture.repositoryPath,
@@ -210,48 +198,62 @@ test('Conductor local TOML overrides shared TOML in repository resolution', (t) 
 			source: getRepositorySetting(snapshot.repository, 'scripts.run').source,
 			value: getRepositorySetting(snapshot.repository, 'scripts.run').value,
 		},
-		{ source: 'conductor-local-config', value: 'bun run local' },
+		{ source: 'ensemble-config', value: 'bun run committed' },
 	);
 });
 
-test('ensemble.json overrides shared Conductor TOML', (t) => {
+test('personal SQLite fills keys .ensemble/settings.toml omits', (t) => {
+	const fixture = createRepositoryFixture(t);
+	const database = createDatabaseFixture(t);
+	fixture.write(
+		'.ensemble/settings.toml',
+		'[scripts]\nrun = "bun run committed"\n',
+	);
+	insertSetting({
+		database,
+		key: 'scripts.setup',
+		scopeId: 'repo-1',
+		valueJson: JSON.stringify('bun install personal'),
+	});
+
+	const snapshot = resolveSettings({
+		config: createConfig(),
+		database,
+		repository: {
+			repositoryId: 'repo-1',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	assert.deepEqual(
+		{
+			run: getRepositorySetting(snapshot.repository, 'scripts.run').source,
+			setup: getRepositorySetting(snapshot.repository, 'scripts.setup').source,
+			setupValue: getRepositorySetting(snapshot.repository, 'scripts.setup')
+				.value,
+		},
+		{
+			run: 'ensemble-config',
+			setup: 'sqlite',
+			setupValue: 'bun install personal',
+		},
+	);
+});
+
+test('legacy conductor.json / ensemble.json on disk are ignored', (t) => {
 	const fixture = createRepositoryFixture(t);
 	fixture.write(
-		'.conductor/settings.toml',
-		'[scripts]\nrun = "bun run shared"\n',
+		'conductor.json',
+		JSON.stringify({ scripts: { run: 'legacy' } }),
 	);
 	fixture.write(
 		'ensemble.json',
-		JSON.stringify({ scripts: { run: 'bun run ensemble' } }),
+		JSON.stringify({ scripts: { run: 'old-native' } }),
 	);
-
-	const snapshot = resolveSettings({
-		config: createConfig(),
-		repository: {
-			repositoryId: 'repo-1',
-			repositoryPath: fixture.repositoryPath,
-		},
-	});
-
-	assert.ok(snapshot.repository);
-	assert.deepEqual(
-		{
-			source: getRepositorySetting(snapshot.repository, 'scripts.run').source,
-			value: getRepositorySetting(snapshot.repository, 'scripts.run').value,
-		},
-		{ source: 'ensemble-config', value: 'bun run ensemble' },
-	);
-});
-
-test('shared Conductor TOML suppresses legacy conductor.json', (t) => {
-	const fixture = createRepositoryFixture(t);
 	fixture.write(
 		'.conductor/settings.toml',
-		'[scripts]\nrun = "bun run shared"\n',
-	);
-	fixture.write(
-		'conductor.json',
-		JSON.stringify({ scripts: { run: 'bun run legacy' } }),
+		'[scripts]\nrun = "bun run conductor"\n',
 	);
 
 	const loaded = loadRepositoryConfig({
@@ -265,13 +267,19 @@ test('shared Conductor TOML suppresses legacy conductor.json', (t) => {
 		},
 	});
 
-	assert.equal(
-		getSource(loaded.snapshot, 'conductor-legacy-config').status,
-		'ignored',
+	// Only worktreeinclude + ensemble-config sources are inspected; the old
+	// files are never read.
+	assert.deepEqual(
+		loaded.snapshot.sources.map((source) => source.source).sort(),
+		['ensemble-config', 'worktreeinclude'],
 	);
+	// The legacy files are still ignored, but their presence now surfaces one
+	// informational diagnostic instead of failing silently.
 	assert.equal(
 		loaded.snapshot.diagnostics.some(
-			(diagnostic) => diagnostic.code === 'legacy-conductor-json-ignored',
+			(diagnostic) =>
+				diagnostic.code === 'legacy-config-ignored' &&
+				diagnostic.severity === 'info',
 		),
 		true,
 	);
@@ -281,140 +289,8 @@ test('shared Conductor TOML suppresses legacy conductor.json', (t) => {
 			source: getRepositorySetting(snapshot.repository, 'scripts.run').source,
 			value: getRepositorySetting(snapshot.repository, 'scripts.run').value,
 		},
-		{ source: 'conductor-config', value: 'bun run shared' },
+		{ source: 'built-in-default', value: null },
 	);
-});
-
-test('migrates shared Conductor TOML into a new ensemble.json', (t) => {
-	const fixture = createRepositoryFixture(t);
-	fixture.write(
-		'.conductor/settings.toml',
-		`
-enterprise_data_privacy = true
-file_include_globs = [".env.local"]
-
-[scripts]
-setup = "bun install"
-run = "bun run dev"
-`,
-	);
-
-	const preview = previewRepositoryConfigMigration({
-		repositoryPath: fixture.repositoryPath,
-	});
-	const result = applyRepositoryConfigMigration({
-		repositoryPath: fixture.repositoryPath,
-	});
-
-	assert.equal(preview.canApply, true);
-	assert.equal(preview.targetExists, false);
-	assert.deepEqual(
-		preview.changes.map((change) => [change.key, change.status]),
-		[
-			['enterpriseDataPrivacy', 'added'],
-			['filesToCopy', 'added'],
-			['scripts.run', 'added'],
-			['scripts.setup', 'added'],
-		],
-	);
-	assert.equal(result.applied, true);
-	assert.deepEqual(fixture.readJson('ensemble.json'), {
-		enterpriseDataPrivacy: true,
-		filesToCopy: ['.env.local'],
-		scripts: {
-			run: 'bun run dev',
-			setup: 'bun install',
-		},
-	});
-});
-
-test('migration preserves existing ensemble.json values unless overwrite is requested', (t) => {
-	const fixture = createRepositoryFixture(t);
-	fixture.write(
-		'.conductor/settings.toml',
-		'[scripts]\nsetup = "bun install"\nrun = "bun run conductor"\n',
-	);
-	fixture.write(
-		'ensemble.json',
-		JSON.stringify({ scripts: { run: 'bun run ensemble' } }),
-	);
-
-	const preview = previewRepositoryConfigMigration({
-		repositoryPath: fixture.repositoryPath,
-	});
-	const result = applyRepositoryConfigMigration({
-		repositoryPath: fixture.repositoryPath,
-	});
-	const overwriteResult = applyRepositoryConfigMigration({
-		overwrite: true,
-		repositoryPath: fixture.repositoryPath,
-	});
-
-	assert.deepEqual(
-		preview.changes.map((change) => [change.key, change.status]),
-		[
-			['scripts.run', 'conflict'],
-			['scripts.setup', 'added'],
-		],
-	);
-	assert.equal(result.applied, true);
-	assert.deepEqual(result.resultingConfig, {
-		scripts: {
-			run: 'bun run ensemble',
-			setup: 'bun install',
-		},
-	});
-	assert.equal(overwriteResult.applied, true);
-	assert.deepEqual(fixture.readJson('ensemble.json'), {
-		scripts: {
-			run: 'bun run conductor',
-			setup: 'bun install',
-		},
-	});
-});
-
-test('migration treats incompatible target parents as conflicts', (t) => {
-	const fixture = createRepositoryFixture(t);
-	fixture.write(
-		'.conductor/settings.toml',
-		'[scripts]\nrun = "bun run conductor"\n',
-	);
-	fixture.write(
-		'ensemble.json',
-		JSON.stringify({ scripts: 'bun run ensemble' }),
-	);
-
-	const preview = previewRepositoryConfigMigration({
-		repositoryPath: fixture.repositoryPath,
-	});
-	const result = applyRepositoryConfigMigration({
-		repositoryPath: fixture.repositoryPath,
-	});
-
-	assert.deepEqual(
-		preview.changes.map((change) => [
-			change.key,
-			change.status,
-			change.existingValue,
-		]),
-		[['scripts.run', 'conflict', 'bun run ensemble']],
-	);
-	assert.equal(result.applied, false);
-	assert.deepEqual(fixture.readJson('ensemble.json'), {
-		scripts: 'bun run ensemble',
-	});
-
-	const overwriteResult = applyRepositoryConfigMigration({
-		overwrite: true,
-		repositoryPath: fixture.repositoryPath,
-	});
-
-	assert.equal(overwriteResult.applied, true);
-	assert.deepEqual(fixture.readJson('ensemble.json'), {
-		scripts: {
-			run: 'bun run conductor',
-		},
-	});
 });
 
 test('repository config path authorization allows only known repositories and workspaces', (t) => {
@@ -465,12 +341,11 @@ test('repository config path authorization allows only known repositories and wo
 	);
 });
 
-test('invalid repository config and unsupported fields are diagnostic-only', (t) => {
+test('unsupported .ensemble/settings.toml fields are diagnostic-only', (t) => {
 	const fixture = createRepositoryFixture(t);
-	fixture.write('ensemble.json', '{"scripts":');
 	fixture.write(
-		'.conductor/settings.toml',
-		'unsupported_field = true\n[scripts]\nrun = "bun run conductor"\n',
+		'.ensemble/settings.toml',
+		'unsupported_field = true\n[scripts]\nrun = "bun run dev"\n',
 	);
 
 	const loaded = loadRepositoryConfig({
@@ -486,12 +361,6 @@ test('invalid repository config and unsupported fields are diagnostic-only', (t)
 
 	assert.equal(
 		loaded.snapshot.diagnostics.some(
-			(diagnostic) => diagnostic.code === 'invalid-repository-json',
-		),
-		true,
-	);
-	assert.equal(
-		loaded.snapshot.diagnostics.some(
 			(diagnostic) => diagnostic.code === 'unsupported-repository-config-field',
 		),
 		true,
@@ -502,13 +371,13 @@ test('invalid repository config and unsupported fields are diagnostic-only', (t)
 			source: getRepositorySetting(snapshot.repository, 'scripts.run').source,
 			value: getRepositorySetting(snapshot.repository, 'scripts.run').value,
 		},
-		{ source: 'conductor-config', value: 'bun run conductor' },
+		{ source: 'ensemble-config', value: 'bun run dev' },
 	);
 });
 
-test('invalid shared Conductor TOML falls back to built-in defaults', (t) => {
+test('invalid .ensemble/settings.toml falls back to built-in defaults', (t) => {
 	const fixture = createRepositoryFixture(t);
-	fixture.write('.conductor/settings.toml', '[scripts]\nrun = ');
+	fixture.write('.ensemble/settings.toml', '[scripts]\nrun = ');
 
 	const loaded = loadRepositoryConfig({
 		repositoryPath: fixture.repositoryPath,

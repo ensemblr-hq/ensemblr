@@ -16,6 +16,12 @@ import type { TerminalService } from '../terminal';
 
 const RESTART_WAIT_TIMEOUT_MS = 7_000;
 
+/**
+ * Longest the service waits for a setup or archive script to exit before it
+ * gives up. Shared so both bounded waits use one value.
+ */
+const SCRIPT_EXIT_WAIT_TIMEOUT_MS = 60_000;
+
 /** Inputs for {@link ScriptLifecycleService.runScript}. */
 export interface RunScriptOptions {
 	kind: WorkspaceScriptKind;
@@ -40,6 +46,13 @@ export interface ScriptLifecycleService {
 	runScript: (
 		options: RunScriptOptions,
 	) => Promise<CreateTerminalSessionResult>;
+	/**
+	 * Runs the setup script and, when the repository has `autoRunAfterSetup`
+	 * enabled and the setup exits successfully, chains the run script.
+	 */
+	runSetupScriptWithAutoRun: (options: {
+		workspaceId: string;
+	}) => Promise<void>;
 	stopScript: (options: StopScriptOptions) => Promise<KillTerminalResult>;
 }
 
@@ -188,6 +201,67 @@ export function createScriptLifecycleService({
 		});
 	}
 
+	/**
+	 * Runs the setup script for a workspace, then auto-starts the run script when
+	 * the repository opts in via `autoRunAfterSetup` and the setup exits cleanly.
+	 * Waits for the setup session to finish only when auto-run is enabled, so the
+	 * common (opt-out) path stays fire-and-forget. The wait is bounded and the
+	 * settings are re-read afterward, so a hung setup or a mid-setup opt-out both
+	 * skip the chain.
+	 */
+	async function runSetupScriptWithAutoRun({
+		workspaceId,
+	}: {
+		workspaceId: string;
+	}): Promise<void> {
+		const setupResult = await runScript({ kind: 'setup', workspaceId });
+		const setupSessionId = setupResult.session?.id;
+
+		if (!setupSessionId) {
+			return;
+		}
+
+		// Cheap short-circuit: skip the wait entirely when the pre-wait snapshot
+		// already shows auto-run is off or no run command is configured.
+		const preWait = resolveScriptConfig(workspaceId);
+
+		if (
+			preWait.error ||
+			!preWait.settings.autoRunAfterSetup ||
+			!preWait.settings.scripts.run
+		) {
+			return;
+		}
+
+		// Bound the wait so a hung setup script cannot block the chain forever.
+		const exited = await terminalService.waitForExit(
+			setupSessionId,
+			SCRIPT_EXIT_WAIT_TIMEOUT_MS,
+		);
+
+		// Skip the chain when setup timed out or did not finish cleanly (exit 0).
+		if (
+			!exited ||
+			terminalService.getSnapshot(setupSessionId).session?.status !== 'exited'
+		) {
+			return;
+		}
+
+		// Re-read settings after the wait: the user may have toggled auto-run off
+		// or cleared the run command while a long setup script ran.
+		const fresh = resolveScriptConfig(workspaceId);
+
+		if (
+			fresh.error ||
+			!fresh.settings.autoRunAfterSetup ||
+			!fresh.settings.scripts.run
+		) {
+			return;
+		}
+
+		await runScript({ kind: 'run', workspaceId }).catch(() => {});
+	}
+
 	async function stopScript({
 		kind,
 		workspaceId,
@@ -214,7 +288,10 @@ export function createScriptLifecycleService({
 	}
 
 	return {
-		runArchiveScriptAndWait: async ({ timeoutMs = 60_000, workspaceId }) => {
+		runArchiveScriptAndWait: async ({
+			timeoutMs = SCRIPT_EXIT_WAIT_TIMEOUT_MS,
+			workspaceId,
+		}) => {
 			const result = await runScript({ kind: 'archive', workspaceId });
 			const terminalId = result.session?.id;
 
@@ -230,6 +307,7 @@ export function createScriptLifecycleService({
 			}
 		},
 		runScript,
+		runSetupScriptWithAutoRun,
 		stopScript,
 	};
 }
