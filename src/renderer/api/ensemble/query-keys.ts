@@ -120,12 +120,6 @@ export const ensembleQueryKeys = {
 		] as const,
 	workspaceOpenTargets: () =>
 		[...ensembleQueryKeys.all, 'workspace-open-targets'] as const,
-	workspaceScriptSettings: (repositoryId: string) =>
-		[
-			...ensembleQueryKeys.all,
-			'workspace-script-settings',
-			repositoryId,
-		] as const,
 };
 
 /**
