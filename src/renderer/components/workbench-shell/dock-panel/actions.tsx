@@ -21,15 +21,6 @@ export function DockPanelActions({
 	const hasSetupScript = setup.status !== 'missing';
 	const hasRunScript = run.status !== 'missing';
 
-	if (!(hasSetupScript || hasRunScript)) {
-		return (
-			<Button onClick={actions.onOpenSetupScripts} size='xs' variant='outline'>
-				<WrenchIcon data-icon='inline-start' />
-				Setup Scripts
-			</Button>
-		);
-	}
-
 	if (hasSetupScript && setup.status === 'not-run') {
 		return (
 			<Button onClick={actions.onRunSetupScript} size='xs' variant='outline'>
@@ -80,10 +71,8 @@ export function DockPanelActions({
 		);
 	}
 
-	return (
-		<Button onClick={actions.onOpenSetupScripts} size='xs' variant='outline'>
-			<WrenchIcon data-icon='inline-start' />
-			Setup Scripts
-		</Button>
-	);
+	// Nothing runnable in this state: the tab row carries only run/stop and open
+	// actions. The Setup Scripts entry point lives in the Setup dock tab and its
+	// settings page, not the header.
+	return null;
 }

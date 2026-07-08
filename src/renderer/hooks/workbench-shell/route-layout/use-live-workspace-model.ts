@@ -5,9 +5,9 @@ import {
 	pullRequestSnapshotQuery,
 	reviewCommentsQuery,
 	reviewTodosQuery,
+	settingsResolutionQuery,
 	workspaceFilesQuery,
 	workspaceGitStatusQuery,
-	workspaceScriptSettingsQuery,
 } from '@/renderer/api/ensemble-queries';
 import {
 	buildWorkspaceScriptSummaries,
@@ -19,6 +19,8 @@ import { buildPullRequestShellModel } from '@/renderer/lib/workbench/pull-reques
 import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
 import type { useWorkspaceTerminalSessions } from '@/renderer/state/workspace/terminal-sessions';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
+import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
+import { parseWorkspaceScriptSettings } from '@/shared/scripts/script-settings';
 
 import { usePullRequestAutoRefresh } from './use-pull-request-auto-refresh';
 import { useWorkspaceFilesWatch } from './use-workspace-files-watch';
@@ -26,6 +28,16 @@ import { useWorkspaceFilesWatch } from './use-workspace-files-watch';
 type ActiveProject = WorkspaceNavigationSelection['project'];
 type ActiveWorkspace = WorkspaceNavigationSelection['workspace'];
 type TerminalSessions = ReturnType<typeof useWorkspaceTerminalSessions>;
+
+/**
+ * Parses workspace script settings out of a resolved settings snapshot. Hoisted
+ * to module scope so its reference stays stable across renders: an inline
+ * `select` re-runs the parse on every render, whereas a stable function only
+ * re-runs when the underlying snapshot changes.
+ */
+function selectScriptSettings(snapshot: SettingsResolutionSnapshot) {
+	return parseWorkspaceScriptSettings(snapshot.repository?.settings ?? []);
+}
 
 /**
  * Assembles the live workspace shell model: merges git status, workspace
@@ -54,12 +66,17 @@ export function useLiveWorkspaceModel({
 		workspaceId: activeWorkspace.id,
 	});
 
-	const { data: scriptSettingsData } = useQuery(
-		workspaceScriptSettingsQuery({
+	// Derive script settings from the shared settings-resolution cache rather
+	// than a second private query: the Scripts settings screen invalidates that
+	// key on save, so a newly configured setup/run script reaches the dock at
+	// once instead of waiting out a stale-time on a cache nothing invalidates.
+	const { data: scriptSettingsData } = useQuery({
+		...settingsResolutionQuery({
 			repositoryId: activeProject.id,
 			repositoryPath: activeProject.pathLabel,
 		}),
-	);
+		select: selectScriptSettings,
+	});
 	const { data: gitStatusData } = useQuery(
 		workspaceGitStatusQuery(activeWorkspace.pathLabel ?? null),
 	);
