@@ -3,6 +3,7 @@ import { useCallback, useMemo } from 'react';
 import { CloseRunningChatDialog } from '@/renderer/components/workbench-shell/conversation-panel/close-running-chat-dialog';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
+import { useAskAgentSetupScript } from '@/renderer/hooks/workbench-shell/composer/use-ask-agent-setup-script';
 import { useLiveWorkspaceModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-workspace-model';
 import type { WorkspaceNavigationSelection } from '@/renderer/lib/workbench';
 import {
@@ -171,8 +172,14 @@ export function WorkspaceRouteContent({
 		workspaceCwd: activeWorkspace.pathLabel,
 		workspaceFiles: liveWorkspaceFiles,
 	});
+	const askAgentSetupScript = useAskAgentSetupScript({
+		activeChatTabId: activeSession.chatTabId,
+		openSessionTab: sessionNavigation.openSessionTab,
+		selectChat: handleSessionTabChange,
+	});
 	const dockActions = useWorkspaceDockActions({
 		activeDockTab,
+		askAgentSetupScript,
 		closeTerminal: terminalSessions.closeTerminal,
 		createTerminal: terminalSessions.createTerminal,
 		repositoryId: activeProject.id,

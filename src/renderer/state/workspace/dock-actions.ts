@@ -16,6 +16,12 @@ import type {
 /** Inputs for {@link useWorkspaceDockActions}. */
 export interface UseWorkspaceDockActionsOptions {
 	activeDockTab: string;
+	/**
+	 * Opens a fresh chat seeded with the settings.toml setup prompt. Built by the
+	 * route content (it owns chat-tab creation) and surfaced as
+	 * {@link WorkbenchDockActions.onAskAgentSetupScript}.
+	 */
+	askAgentSetupScript: () => void;
 	closeTerminal: (terminalId: string) => Promise<void>;
 	createTerminal: () => Promise<CreateTerminalSessionResult>;
 	/** Repository id (`$repoId`) used to open its Scripts settings page. */
@@ -39,6 +45,7 @@ export interface UseWorkspaceDockActionsOptions {
  */
 export function useWorkspaceDockActions({
 	activeDockTab,
+	askAgentSetupScript,
 	closeTerminal,
 	createTerminal,
 	repositoryId,
@@ -47,6 +54,8 @@ export function useWorkspaceDockActions({
 	workspaceId,
 }: UseWorkspaceDockActionsOptions): WorkbenchDockActions {
 	const navigate = useNavigate();
+	const askAgentSetupScriptRef = useRef(askAgentSetupScript);
+	askAgentSetupScriptRef.current = askAgentSetupScript;
 	const updateSearchRef = useRef(updateSearch);
 	updateSearchRef.current = updateSearch;
 	const sessionsRef = useRef(sessions);
@@ -56,6 +65,7 @@ export function useWorkspaceDockActions({
 
 	return useMemo<WorkbenchDockActions>(
 		() => ({
+			onAskAgentSetupScript: () => askAgentSetupScriptRef.current(),
 			onCloseTerminal: (terminalId) => {
 				const remaining = sessionsRef.current.filter(
 					(session) => session.kind === 'terminal' && session.id !== terminalId,

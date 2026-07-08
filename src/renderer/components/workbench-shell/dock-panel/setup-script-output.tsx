@@ -1,38 +1,32 @@
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 
-import { ScriptEmptyState } from './script-empty-state';
+import { SetupMissingEmptyState } from './setup-missing-empty-state';
+import { SetupNotRunEmptyState } from './setup-not-run-empty-state';
 import { XtermTerminal } from './xterm-terminal';
 
 /** Renders the Setup script output or the appropriate empty state. */
 export function SetupScriptOutputPanel({
+	onAskAgentSetupScript,
 	onOpenSetupScripts,
 	onRunSetupScript,
 	script,
 }: {
+	onAskAgentSetupScript: () => void;
 	onOpenSetupScripts: () => void;
 	onRunSetupScript: () => void;
 	script: WorkspaceScriptSummary;
 }) {
 	if (script.status === 'missing') {
 		return (
-			<ScriptEmptyState
-				actionLabel='Setup Scripts'
-				detail='Add a setup script to install dependencies or prepare each workspace before the first agent turn.'
-				onAction={onOpenSetupScripts}
-				title='No setup script configured'
+			<SetupMissingEmptyState
+				onAddManually={onOpenSetupScripts}
+				onAskAgent={onAskAgentSetupScript}
 			/>
 		);
 	}
 
 	if (script.status === 'not-run' || !script.terminalId) {
-		return (
-			<ScriptEmptyState
-				actionLabel='Run setup script'
-				detail='Run the configured setup script before starting the dev server or relying on generated dependencies.'
-				onAction={onRunSetupScript}
-				title='Setup script has not run'
-			/>
-		);
+		return <SetupNotRunEmptyState onRunSetupScript={onRunSetupScript} />;
 	}
 
 	return (

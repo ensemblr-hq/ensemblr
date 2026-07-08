@@ -8,6 +8,11 @@ export interface WorkbenchHealth {
 }
 
 export interface WorkbenchDockActions {
+	/**
+	 * Seeds the active chat composer with a prompt directing the agent to create
+	 * the repository's `.ensemble/settings.toml` setup script. Never auto-submits.
+	 */
+	onAskAgentSetupScript: () => void;
 	onCloseTerminal: (terminalId: string) => void;
 	onNewTerminal: () => void;
 	/** Opens the detected dev-server preview URL in the system browser. */
