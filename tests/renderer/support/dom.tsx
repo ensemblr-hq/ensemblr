@@ -1,21 +1,11 @@
-// Must be first: registers the DOM before @testing-library/react is evaluated.
-import './register-dom';
+// Vitest render helper for renderer component tests. The DOM environment is
+// provided per file via a `// @vitest-environment happy-dom` docblock; jest-dom
+// matchers are registered globally in ./vitest.setup.ts. @testing-library/react
+// auto-unmounts trees after each test under Vitest's `globals: true`.
 
-import { afterEach, expect } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import * as matchers from '@testing-library/jest-dom/matchers';
-import { cleanup, type RenderResult, render } from '@testing-library/react';
+import { type RenderResult, render } from '@testing-library/react';
 import type { ReactElement } from 'react';
-
-// Import this module FIRST in any component test file. It wires jest-dom matchers
-// and unmounts trees after each test. Scoped per-file on purpose: platform-
-// sensitive pure-logic tests (keymap, etc.) must keep bun's real navigator, so
-// this is never a global bunfig preload.
-expect.extend(matchers);
-
-afterEach(() => {
-	cleanup();
-});
 
 /** A QueryClient tuned for tests: no retries, no background refetch churn. */
 export function createTestQueryClient(): QueryClient {

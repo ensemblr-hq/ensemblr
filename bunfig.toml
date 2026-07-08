@@ -1,7 +1,0 @@
-[test]
-# Coverage settings only take effect under `bun test --coverage`; lcov output
-# feeds scripts/lcov-to-istanbul.mjs for `fallow audit --coverage`. No global
-# preload: DOM setup is scoped per-file via tests/renderer/support/dom.tsx so
-# platform-sensitive pure-logic tests (keymap, etc.) keep bun's real navigator.
-coverageReporter = ["text", "lcov"]
-coverageDir = "coverage"

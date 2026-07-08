@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 
 import { mapRepositoriesToProjects } from '../../src/renderer/lib/workbench/navigation-model';
 import type {

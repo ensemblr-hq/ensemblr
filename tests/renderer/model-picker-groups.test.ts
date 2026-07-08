@@ -1,6 +1,4 @@
-/// <reference types="bun" />
-
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 
 import { buildModelGroups } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/model-picker-groups';
 import type { ComposerModelOption } from '../../src/renderer/types/workbench';

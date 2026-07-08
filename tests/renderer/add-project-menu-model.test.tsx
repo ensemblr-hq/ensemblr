@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { defaultRecentProjects } from '../../src/renderer/fixtures/workbench';
 import { buildAddProjectMenuModel } from '../../src/renderer/lib/workbench';
 import type { RecentProject } from '../../src/renderer/types/workbench';

@@ -4,12 +4,10 @@
  * matrix displays cleanly (no throw, expected items present).
  */
 
-/// <reference types="bun" />
-
-import { describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { describe, expect, test } from 'vitest';
 
 import { PiSessionStatusBar } from '../../src/renderer/components/pi-timeline/pi-session-status-bar';
 import { PiTimeline } from '../../src/renderer/components/pi-timeline/pi-timeline';

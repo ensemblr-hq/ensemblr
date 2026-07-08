@@ -1,6 +1,6 @@
-import { expect, test } from 'bun:test';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { expect, test } from 'vitest';
 
 import { TooltipProvider } from '../../src/renderer/components/ui/tooltip';
 import { ReviewFileList } from '../../src/renderer/components/workbench-shell/review-files/review-file-list';

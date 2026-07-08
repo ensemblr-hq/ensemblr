@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 
 import { buildPullRequestShellModel } from '../../src/renderer/lib/workbench/pull-request-model';
 import {

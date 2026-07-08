@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { expect, test } from 'vitest';
 
 import { CloneGithubRecentRepos } from '../../src/renderer/components/welcome/clone-github-recent-repos';
 import type { GithubRepositoryEntry } from '../../src/shared/ipc/contracts/clone';

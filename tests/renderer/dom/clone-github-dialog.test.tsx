@@ -1,10 +1,10 @@
-// register-dom (via --preload) registers the DOM before the component graph loads.
-
-import { afterEach, beforeEach, expect, mock, test } from 'bun:test';
+// @vitest-environment happy-dom
 
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { ensembleQueryKeys } from '@/renderer/api/ensemble-queries';
+import { CloneGithubDialog } from '@/renderer/components/welcome/clone-github-dialog';
 import type {
 	GithubRepositoryEntry,
 	GithubRepositoryListResult,
@@ -18,16 +18,25 @@ import {
 
 const FIXED_ISO = '2026-01-01T00:00:00.000Z';
 
-/** Mutable clone-flow stand-in; the mocked useCloneFlow returns whatever this holds. */
-let flow = makeFlow();
-
-mock.module('@/renderer/hooks/welcome/use-clone-flow', () => ({
-	useCloneFlow: () => flow,
+// Holder for the mocked useCloneFlow return value. Hoisted so the vi.mock
+// factory (which is lifted above imports) can close over it; the tests reassign
+// `current` before each render.
+const flowHolder = vi.hoisted(() => ({
+	current: null as null | ReturnType<typeof baseFlow>,
 }));
 
-const { CloneGithubDialog } = await import(
-	'@/renderer/components/welcome/clone-github-dialog.tsx'
-);
+vi.mock('@/renderer/hooks/welcome/use-clone-flow', () => ({
+	useCloneFlow: () => flowHolder.current,
+}));
+
+/** Mutable clone-flow stand-in; assertions read the current flow's startClone. */
+let flow = makeFlow();
+
+/** Points both the local handle and the mocked hook at a fresh flow. */
+function setFlow(next: ReturnType<typeof baseFlow>): void {
+	flow = next;
+	flowHolder.current = next;
+}
 
 function makeFlow(
 	overrides: Partial<ReturnType<typeof baseFlow>> = {},
@@ -48,7 +57,7 @@ function baseFlow() {
 			| 'opening'
 			| 'success'
 			| 'failure',
-		startClone: mock(async () => {}),
+		startClone: vi.fn(async (..._args: unknown[]) => {}),
 		successResult: null,
 	};
 }
@@ -93,11 +102,11 @@ function seededClient(options: { recent?: GithubRepositoryListResult } = {}) {
 }
 
 beforeEach(() => {
-	flow = makeFlow();
+	setFlow(makeFlow());
 	installEnsembleApi({
-		githubRepositoryList: mock(async () => listResult([])),
-		rootDirectory: mock(async () => ({ repositoriesPath: '/tmp/repos' })),
-		selectCloneDestination: mock(async () => ({
+		githubRepositoryList: vi.fn(async () => listResult([])),
+		rootDirectory: vi.fn(async () => ({ repositoriesPath: '/tmp/repos' })),
+		selectCloneDestination: vi.fn(async () => ({
 			canceled: false,
 			path: '/picked/dir',
 		})),
@@ -200,7 +209,7 @@ for (const { stage, label } of [
 	{ label: 'Opening…', stage: 'opening' as const },
 ]) {
 	test(`renders the ${stage} button label`, () => {
-		flow = makeFlow({ isBusy: true, stage });
+		setFlow(makeFlow({ isBusy: true, stage }));
 		renderDialog();
 		expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
 	});
