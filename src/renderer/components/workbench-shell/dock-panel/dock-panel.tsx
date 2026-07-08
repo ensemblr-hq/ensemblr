@@ -17,6 +17,7 @@ import {
 	TabsTrigger,
 } from '@/renderer/components/ui/tabs';
 import { useWorkbenchLayout } from '@/renderer/components/workbench-shell/shell-contexts';
+import { useRunScriptHotkey } from '@/renderer/hooks/workbench-shell/dock-panel/use-run-script-hotkey';
 import { cn } from '@/renderer/lib/utils';
 import { DEFAULT_DOCK_TAB } from '@/renderer/lib/workbench';
 import type {
@@ -67,6 +68,8 @@ export function DockPanel({
 			strip.scrollLeft = strip.scrollWidth;
 		}
 	}, [activeDockTab, lastTerminalTabId]);
+
+	useRunScriptHotkey(workspace.scripts.run.status, actions);
 
 	return (
 		<Tabs
@@ -169,6 +172,7 @@ export function DockPanel({
 				value='setup'
 			>
 				<SetupScriptOutputPanel
+					onAskAgentSetupScript={actions.onAskAgentSetupScript}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunSetupScript={actions.onRunSetupScript}
 					script={workspace.scripts.setup}
