@@ -1,7 +1,5 @@
-/// <reference types="bun" />
-
-import { afterEach, expect, test } from 'bun:test';
 import { createStore } from 'jotai';
+import { afterEach, expect, test } from 'vitest';
 import { getDefaultWorkspace } from '../../src/renderer/fixtures/workbench';
 import {
 	activeChatTabByWorkspaceAtom,

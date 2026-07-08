@@ -1,6 +1,9 @@
 import { expect, test } from 'bun:test';
 
-import { parseCreateWorkspaceRequest } from '../../src/main/ipc/request-schemas.ts';
+import {
+	parseCreateWorkspaceRequest,
+	parseGithubRepositoryListRequest,
+} from '../../src/main/ipc/request-schemas.ts';
 
 const GITHUB_LINKED_ISSUE = {
 	id: 'https://github.com/o/r/issues/44',
@@ -54,4 +57,26 @@ test('falls back to an empty repository id when the provider is unknown', () => 
 	});
 
 	expect(parsed.repositoryId).toBe('');
+});
+
+test('github repository list request defaults to recent scope when undefined', () => {
+	expect(parseGithubRepositoryListRequest(undefined).scope).toBe('recent');
+});
+
+test('github repository list request defaults to recent scope for an empty object', () => {
+	expect(parseGithubRepositoryListRequest({}).scope).toBe('recent');
+});
+
+test('github repository list request accepts an explicit full scope', () => {
+	expect(parseGithubRepositoryListRequest({ scope: 'full' }).scope).toBe(
+		'full',
+	);
+});
+
+test('github repository list request falls back to recent scope for garbage input', () => {
+	expect(parseGithubRepositoryListRequest({ scope: 'nonsense' }).scope).toBe(
+		'recent',
+	);
+	expect(parseGithubRepositoryListRequest('garbage').scope).toBe('recent');
+	expect(parseGithubRepositoryListRequest(null).scope).toBe('recent');
 });

@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { getMentionMatches } from '../../src/renderer/hooks/workbench-shell/composer/use-mention-matches';
 import type { WorkspaceFileSummary } from '../../src/renderer/types/workbench';
 

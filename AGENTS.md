@@ -51,6 +51,18 @@ This repository uses Biome instead of ESLint and Prettier.
 - Keep `bun run typecheck` as a separate verification step for TypeScript type errors.
 - Do not add ESLint or Prettier configuration unless the user explicitly asks for it.
 
+## Testing Policy
+
+Vitest is the mandated test runner for renderer and shared tests. Bun remains the package manager only — the runner is Vitest, never `bun test`.
+
+- Renderer tests (`tests/renderer/**`) and shared tests (`tests/shared/**`) run under Vitest. Do not import from `bun:test`. Do not add Jest, Mocha, or any other runner.
+- Bun still manages packages: install test tooling with `bun add -d` and run Vitest with `bunx vitest` (for example `bunx vitest run`, or a focused `bunx vitest run <file>`). Do not use `npm`/`npx`/`pnpm`/`yarn`.
+- Vitest config lives in `vitest.config.mts`. The default `environment` is `node` so platform-sensitive pure-logic tests (keymap, etc.) keep the real `navigator`/`process`. DOM component tests opt into happy-dom per file with a `// @vitest-environment happy-dom` docblock — never register a DOM globally.
+- DOM harness: `tests/renderer/support/dom.tsx` exposes `renderWithProviders` and the `window.ensemble` stub helpers; jest-dom matchers are registered globally in `tests/renderer/support/vitest.setup.ts`. `@testing-library/react` auto-unmounts after each test because `globals: true`.
+- Coverage is native Istanbul: run `bunx vitest run --coverage` (provider `istanbul`) to emit `coverage/coverage-final.json`, which `fallow audit --coverage <file> --coverage_root <repo root>` reads directly. There is no lcov→istanbul bridge; do not reintroduce one.
+- Mocks use Vitest: `vi.fn()` for spies, `vi.spyOn()` for method spies, and `vi.mock()` (hoisted; use `vi.hoisted()` for factory-referenced variables) for module mocks. Do not use `mock()`/`mock.module()`.
+- Main-process tests (`tests/main/**`) stay on their `electron --test` scripts — they need the Electron runtime and are not run by Vitest.
+
 ## State Management Policy
 
 - Use Jotai as the only app-level state management solution.
@@ -110,6 +122,10 @@ Every function, hook, React component, Jotai atom, and IPC contract in `src/main
 - For IPC channel and contract definitions, describe what the channel does, who sends it, and who receives it.
 - Excluded by policy: shadcn UI primitives under `src/renderer/components/ui/`, type-only files (`*.d.ts`, anything under `types/`), the generated `routeTree.gen.ts`, mock fixtures under `src/renderer/mocks/`, pure barrel `index.ts` re-export files, and tests. `src/shared/ipc/contracts.ts` is also treated as type-only.
 - When updating existing code, leave correct JSDoc in place and refresh it when behavior changes. Do not introduce new code without the appropriate JSDoc block.
+
+## Code Review Policy
+
+See @.claude/rules/code-review.md — when the `code-review` skill runs, run `react-doctor` and `fallow` as its final step.
 
 ## Linear And Pull Request Workflow
 

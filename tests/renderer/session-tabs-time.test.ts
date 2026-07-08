@@ -1,11 +1,11 @@
-import { afterEach, beforeEach, expect, spyOn, test } from 'bun:test';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { formatRelativeClosedAt } from '../../src/renderer/state/workspace';
 
 const NOW = new Date('2026-06-08T12:00:00.000Z').getTime();
-let dateSpy: ReturnType<typeof spyOn> | null = null;
+let dateSpy: ReturnType<typeof vi.spyOn> | null = null;
 
 beforeEach(() => {
-	dateSpy = spyOn(Date, 'now').mockImplementation(() => NOW);
+	dateSpy = vi.spyOn(Date, 'now').mockImplementation(() => NOW);
 });
 
 afterEach(() => {

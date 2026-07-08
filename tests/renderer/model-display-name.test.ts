@@ -1,6 +1,4 @@
-/// <reference types="bun" />
-
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 
 import { formatModelDisplayName } from '../../src/renderer/lib/pi/model-display-name';
 

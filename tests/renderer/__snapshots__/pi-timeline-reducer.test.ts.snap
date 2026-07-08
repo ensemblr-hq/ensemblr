@@ -1,6 +1,6 @@
-// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`pi timeline reducer abort-mid-turn.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > abort-mid-turn.jsonl replay snapshot 1`] = `
 {
   "cursor": {
     "lastAnswerText": "",
@@ -33,16 +33,14 @@ exports[`pi timeline reducer abort-mid-turn.jsonl replay snapshot 1`] = `
       "endedAtMs": 1781134235089,
       "id": "item-3",
       "kind": "tool-call",
-      "output": 
-"total 24
+      "output": "total 24
 drwxr-xr-x@  6 captures  staff  192 Jun 11 02:30 .
 drwxr-xr-x@ 12 captures  staff  384 Jun 11 02:30 ..
 -rw-r--r--@  1 captures  staff  339 Jun 11 02:30 README.md
 -rw-r--r--@  1 captures  staff   92 Jun 11 02:30 package.json
 drwxr-xr-x@  6 captures  staff  192 Jun 11 02:30 src
 -rw-r--r--@  1 captures  staff  167 Jun 11 02:30 tsconfig.json
-"
-,
+",
       "startedAtMs": 1781134235069,
       "status": "success",
       "toolCallId": "call_QU6bPGQrXO2Yo4QmB0bRoD06|fc_09542730afe39126016a29f39b013881919d92958c216bb554",
@@ -89,18 +87,16 @@ drwxr-xr-x@  6 captures  staff  192 Jun 11 02:30 src
 }
 `;
 
-exports[`pi timeline reducer failing-tool.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > failing-tool.jsonl replay snapshot 1`] = `
 {
   "cursor": {
-    "lastAnswerText": 
-"Ran exactly:
+    "lastAnswerText": "Ran exactly:
 
 \`definitely-not-a-real-command-xyz\`
 
 Result: command not found.
 
-\`/bin/bash\` exited with code **127**."
-,
+\`/bin/bash\` exited with code **127**.",
     "nextItemId": 7,
     "openAssistantId": null,
     "openThinkingId": null,
@@ -130,12 +126,10 @@ Result: command not found.
       "endedAtMs": 1781134208869,
       "id": "item-3",
       "kind": "tool-call",
-      "output": 
-"/bin/bash: definitely-not-a-real-command-xyz: command not found
+      "output": "/bin/bash: definitely-not-a-real-command-xyz: command not found
 
 
-Command exited with code 127"
-,
+Command exited with code 127",
       "startedAtMs": 1781134208858,
       "status": "error",
       "toolCallId": "call_44ruqpY6PhedHvS5rPHGfREg|fc_033cb6c3cc876047016a29f380b80c8191a64cf04e6e93c2af",
@@ -152,27 +146,23 @@ Command exited with code 127"
       "id": "item-5",
       "kind": "assistant-message",
       "streaming": false,
-      "text": 
-"Ran exactly:
+      "text": "Ran exactly:
 
 \`definitely-not-a-real-command-xyz\`
 
 Result: command not found.
 
-\`/bin/bash\` exited with code **127**."
-,
+\`/bin/bash\` exited with code **127**.",
     },
     {
       "aborted": false,
-      "answerText": 
-"Ran exactly:
+      "answerText": "Ran exactly:
 
 \`definitely-not-a-real-command-xyz\`
 
 Result: command not found.
 
-\`/bin/bash\` exited with code **127**."
-,
+\`/bin/bash\` exited with code **127**.",
       "durationMs": 3432,
       "id": "item-6",
       "kind": "turn-footer",
@@ -211,17 +201,15 @@ Result: command not found.
 }
 `;
 
-exports[`pi timeline reducer file-edit.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > file-edit.jsonl replay snapshot 1`] = `
 {
   "cursor": {
-    "lastAnswerText": 
-"Done.
+    "lastAnswerText": "Done.
 
 - Fixed \`src/broken.ts\` by passing a \`number\` to \`classify\`:
   - \`classify('21')\` → \`classify(21)\`
 
-I also verified \`src/broken.ts\` has no remaining diagnostics."
-,
+I also verified \`src/broken.ts\` has no remaining diagnostics.",
     "nextItemId": 19,
     "openAssistantId": null,
     "openThinkingId": null,
@@ -251,14 +239,12 @@ I also verified \`src/broken.ts\` has no remaining diagnostics."
       "endedAtMs": 1781134193866,
       "id": "item-3",
       "kind": "tool-call",
-      "output": 
-"/sandbox/file-edit
+      "output": "/sandbox/file-edit
 README.md
 package.json
 src
 tsconfig.json
-"
-,
+",
       "startedAtMs": 1781134193855,
       "status": "success",
       "toolCallId": "call_kPoEGu96TJGdwmY7r0wmQWi2|fc_05e778563ade0928016a29f371cbb481919d68c2f3128df750",
@@ -300,13 +286,11 @@ tsconfig.json
       "endedAtMs": 1781134195984,
       "id": "item-7",
       "kind": "tool-call",
-      "output": 
-"import { classify } from './classify.ts';
+      "output": "import { classify } from './classify.ts';
 
 // BUG: classify expects a number; this passes a string on purpose.
 export const verdict = classify('21');
-"
-,
+",
       "startedAtMs": 1781134195977,
       "status": "success",
       "toolCallId": "call_D1ncLRqYhmGxHjnCtA4LLXVX|fc_05e778563ade0928016a29f373fe008191ad5eea00c0568bf0",
@@ -327,8 +311,7 @@ export const verdict = classify('21');
       "endedAtMs": 1781134196802,
       "id": "item-9",
       "kind": "tool-call",
-      "output": 
-"export type TemperatureBand = 'cold' | 'mild' | 'hot';
+      "output": "export type TemperatureBand = 'cold' | 'mild' | 'hot';
 
 /** Buckets a Celsius temperature into a coarse band. */
 export function classify(celsius: number): TemperatureBand {
@@ -336,8 +319,7 @@ export function classify(celsius: number): TemperatureBand {
 	if (celsius < 25) return 'mild';
 	return 'hot';
 }
-"
-,
+",
       "startedAtMs": 1781134196800,
       "status": "success",
       "toolCallId": "call_jCSA7deNrHreSzBR6cbbQqve|fc_05e778563ade0928016a29f374ce288191802f2a70d2a049f4",
@@ -354,34 +336,27 @@ export function classify(celsius: number): TemperatureBand {
       "args": {
         "edits": [
           {
-            "newText": 
-"import { classify } from './classify.ts';
+            "newText": "import { classify } from './classify.ts';
 
 // Classify a sample temperature using numeric Celsius input.
-export const verdict = classify(21);"
-,
-            "oldText": 
-"import { classify } from './classify.ts';
+export const verdict = classify(21);",
+            "oldText": "import { classify } from './classify.ts';
 
 // BUG: classify expects a number; this passes a string on purpose.
-export const verdict = classify('21');"
-,
+export const verdict = classify('21');",
           },
         ],
         "path": "src/broken.ts",
       },
       "details": {
-        "diff": 
-" 1 import { classify } from './classify.ts';
+        "diff": " 1 import { classify } from './classify.ts';
  2 
 -3 // BUG: classify expects a number; this passes a string on purpose.
 -4 export const verdict = classify('21');
 +3 // Classify a sample temperature using numeric Celsius input.
-+4 export const verdict = classify(21);"
-,
++4 export const verdict = classify(21);",
         "firstChangedLine": 3,
-        "patch": 
-"--- src/broken.ts
+        "patch": "--- src/broken.ts
 +++ src/broken.ts
 @@ -1,4 +1,4 @@
  import { classify } from './classify.ts';
@@ -390,8 +365,7 @@ export const verdict = classify('21');"
 -export const verdict = classify('21');
 +// Classify a sample temperature using numeric Celsius input.
 +export const verdict = classify(21);
-"
-,
+",
       },
       "endedAtMs": 1781134197967,
       "id": "item-11",
@@ -417,15 +391,13 @@ export const verdict = classify('21');"
       "endedAtMs": 1781134198862,
       "id": "item-13",
       "kind": "tool-call",
-      "output": 
-"{
+      "output": "{
 	"name": "pi-capture-sandbox",
 	"version": "0.0.0",
 	"private": true,
 	"type": "module"
 }
-"
-,
+",
       "startedAtMs": 1781134198860,
       "status": "success",
       "toolCallId": "call_6yPYf2UCX5d5cmj40EpI5flS|fc_05e778563ade0928016a29f376d0988191a84e83a7fc2e4d39",
@@ -483,25 +455,21 @@ export const verdict = classify('21');"
       "id": "item-17",
       "kind": "assistant-message",
       "streaming": false,
-      "text": 
-"Done.
+      "text": "Done.
 
 - Fixed \`src/broken.ts\` by passing a \`number\` to \`classify\`:
   - \`classify('21')\` → \`classify(21)\`
 
-I also verified \`src/broken.ts\` has no remaining diagnostics."
-,
+I also verified \`src/broken.ts\` has no remaining diagnostics.",
     },
     {
       "aborted": false,
-      "answerText": 
-"Done.
+      "answerText": "Done.
 
 - Fixed \`src/broken.ts\` by passing a \`number\` to \`classify\`:
   - \`classify('21')\` → \`classify(21)\`
 
-I also verified \`src/broken.ts\` has no remaining diagnostics."
-,
+I also verified \`src/broken.ts\` has no remaining diagnostics.",
       "durationMs": 9949,
       "id": "item-18",
       "kind": "turn-footer",
@@ -540,7 +508,7 @@ I also verified \`src/broken.ts\` has no remaining diagnostics."
 }
 `;
 
-exports[`pi timeline reducer long-output.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > long-output.jsonl replay snapshot 1`] = `
 {
   "cursor": {
     "lastAnswerText": "Done. Last number printed: **500**.",
@@ -573,8 +541,7 @@ exports[`pi timeline reducer long-output.jsonl replay snapshot 1`] = `
       "endedAtMs": 1781134186778,
       "id": "item-3",
       "kind": "tool-call",
-      "output": 
-"1
+      "output": "1
 2
 3
 4
@@ -1074,8 +1041,7 @@ exports[`pi timeline reducer long-output.jsonl replay snapshot 1`] = `
 498
 499
 500
-"
-,
+",
       "startedAtMs": 1781134186762,
       "status": "success",
       "toolCallId": "call_ZFW5DPjVE4zAmkFyE2ofJVS8|fc_006ce52f816ce54b016a29f36aae14819194c1a2cd97319f5d",
@@ -1135,11 +1101,10 @@ exports[`pi timeline reducer long-output.jsonl replay snapshot 1`] = `
 }
 `;
 
-exports[`pi timeline reducer markdown-heavy.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > markdown-heavy.jsonl replay snapshot 1`] = `
 {
   "cursor": {
-    "lastAnswerText": 
-"# React Server Components (RSC)
+    "lastAnswerText": "# React Server Components (RSC)
 
 ## What they are
 
@@ -1217,8 +1182,7 @@ bun run dev
 
 - In Next.js App Router, files are server components **unless** they start with \`"use client"\`.
 - Client components can be used inside server components as children.
-- Data and props crossing server→client must be serializable (no functions/classes/functions in props)."
-,
+- Data and props crossing server→client must be serializable (no functions/classes/functions in props).",
     "nextItemId": 5,
     "openAssistantId": null,
     "openThinkingId": null,
@@ -1244,8 +1208,7 @@ bun run dev
       "id": "item-3",
       "kind": "assistant-message",
       "streaming": false,
-      "text": 
-"# React Server Components (RSC)
+      "text": "# React Server Components (RSC)
 
 ## What they are
 
@@ -1323,13 +1286,11 @@ bun run dev
 
 - In Next.js App Router, files are server components **unless** they start with \`"use client"\`.
 - Client components can be used inside server components as children.
-- Data and props crossing server→client must be serializable (no functions/classes/functions in props)."
-,
+- Data and props crossing server→client must be serializable (no functions/classes/functions in props).",
     },
     {
       "aborted": false,
-      "answerText": 
-"# React Server Components (RSC)
+      "answerText": "# React Server Components (RSC)
 
 ## What they are
 
@@ -1407,8 +1368,7 @@ bun run dev
 
 - In Next.js App Router, files are server components **unless** they start with \`"use client"\`.
 - Client components can be used inside server components as children.
-- Data and props crossing server→client must be serializable (no functions/classes/functions in props)."
-,
+- Data and props crossing server→client must be serializable (no functions/classes/functions in props).",
       "durationMs": 3237,
       "id": "item-4",
       "kind": "turn-footer",
@@ -1447,11 +1407,10 @@ bun run dev
 }
 `;
 
-exports[`pi timeline reducer multi-tool-chain.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > multi-tool-chain.jsonl replay snapshot 1`] = `
 {
   "cursor": {
-    "lastAnswerText": 
-"Done.
+    "lastAnswerText": "Done.
 
 Found every \`.ts\` file (excluding typical generated/lock/hidden dirs):
 
@@ -1469,8 +1428,7 @@ I read all four files.
   - \`index.ts\`: barrel exports of conversion and classify APIs
   - \`broken.ts\`: \`verdict\` constant using \`classify('21')\` (string argument, likely intentional error demo)
 
-So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`index.ts\`) and three implementation/helper files."
-,
+So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`index.ts\`) and three implementation/helper files.",
     "nextItemId": 13,
     "openAssistantId": null,
     "openThinkingId": null,
@@ -1501,13 +1459,11 @@ So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`
       "endedAtMs": 1781134172831,
       "id": "item-3",
       "kind": "tool-call",
-      "output": 
-"./src/broken.ts
+      "output": "./src/broken.ts
 ./src/convert.ts
 ./src/classify.ts
 ./src/index.ts
-"
-,
+",
       "startedAtMs": 1781134172801,
       "status": "success",
       "toolCallId": "call_HBe4imXSLCHZLa2i1ScPf9SZ|fc_0b0b32100d45e93c016a29f35cad448191942b367abf21415a",
@@ -1530,13 +1486,11 @@ So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`
           "endedAtMs": 1781134174036,
           "id": "item-5",
           "kind": "tool-call",
-          "output": 
-"import { classify } from './classify.ts';
+          "output": "import { classify } from './classify.ts';
 
 // BUG: classify expects a number; this passes a string on purpose.
 export const verdict = classify('21');
-"
-,
+",
           "startedAtMs": 1781134174033,
           "status": "success",
           "toolCallId": "call_vA7a87l49Q9wvabzItIyp9tG|fc_0b0b32100d45e93c016a29f35df1448191b86f8f962698828e",
@@ -1551,8 +1505,7 @@ export const verdict = classify('21');
           "endedAtMs": 1781134176183,
           "id": "item-6",
           "kind": "tool-call",
-          "output": 
-"/** Converts degrees Celsius to Fahrenheit. */
+          "output": "/** Converts degrees Celsius to Fahrenheit. */
 export function celsiusToFahrenheit(celsius: number): number {
 	return celsius * (9 / 5) + 32;
 }
@@ -1561,8 +1514,7 @@ export function celsiusToFahrenheit(celsius: number): number {
 export function fahrenheitToCelsius(fahrenheit: number): number {
 	return (fahrenheit - 32) * (5 / 9);
 }
-"
-,
+",
           "startedAtMs": 1781134176165,
           "status": "success",
           "toolCallId": "call_7f4I7kvGXDlcVBHPkFFJUNe7|fc_0b0b32100d45e93c016a29f36014348191aefd587801c48b9e",
@@ -1577,8 +1529,7 @@ export function fahrenheitToCelsius(fahrenheit: number): number {
           "endedAtMs": 1781134177193,
           "id": "item-8",
           "kind": "tool-call",
-          "output": 
-"export type TemperatureBand = 'cold' | 'mild' | 'hot';
+          "output": "export type TemperatureBand = 'cold' | 'mild' | 'hot';
 
 /** Buckets a Celsius temperature into a coarse band. */
 export function classify(celsius: number): TemperatureBand {
@@ -1586,8 +1537,7 @@ export function classify(celsius: number): TemperatureBand {
 	if (celsius < 25) return 'mild';
 	return 'hot';
 }
-"
-,
+",
           "startedAtMs": 1781134177184,
           "status": "success",
           "toolCallId": "call_licKWXBRefeI92y4G0CNAc4m|fc_0b0b32100d45e93c016a29f361223c81919097085d2f979979",
@@ -1602,11 +1552,9 @@ export function classify(celsius: number): TemperatureBand {
           "endedAtMs": 1781134178048,
           "id": "item-9",
           "kind": "tool-call",
-          "output": 
-"export { celsiusToFahrenheit, fahrenheitToCelsius } from './convert.ts';
+          "output": "export { celsiusToFahrenheit, fahrenheitToCelsius } from './convert.ts';
 export { classify } from './classify.ts';
-"
-,
+",
           "startedAtMs": 1781134178047,
           "status": "success",
           "toolCallId": "call_8dhkmL8T3nkwJPUPUZ2YQAH7|fc_0b0b32100d45e93c016a29f361fc948191a711a0b1fce78065",
@@ -1627,8 +1575,7 @@ export { classify } from './classify.ts';
       "id": "item-11",
       "kind": "assistant-message",
       "streaming": false,
-      "text": 
-"Done.
+      "text": "Done.
 
 Found every \`.ts\` file (excluding typical generated/lock/hidden dirs):
 
@@ -1646,13 +1593,11 @@ I read all four files.
   - \`index.ts\`: barrel exports of conversion and classify APIs
   - \`broken.ts\`: \`verdict\` constant using \`classify('21')\` (string argument, likely intentional error demo)
 
-So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`index.ts\`) and three implementation/helper files."
-,
+So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`index.ts\`) and three implementation/helper files.",
     },
     {
       "aborted": false,
-      "answerText": 
-"Done.
+      "answerText": "Done.
 
 Found every \`.ts\` file (excluding typical generated/lock/hidden dirs):
 
@@ -1670,8 +1615,7 @@ I read all four files.
   - \`index.ts\`: barrel exports of conversion and classify APIs
   - \`broken.ts\`: \`verdict\` constant using \`classify('21')\` (string argument, likely intentional error demo)
 
-So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`index.ts\`) and three implementation/helper files."
-,
+So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`index.ts\`) and three implementation/helper files.",
       "durationMs": 10302,
       "id": "item-12",
       "kind": "turn-footer",
@@ -1710,7 +1654,7 @@ So structure is a tiny flat \`src/\`-based module with one public entrypoint (\`
 }
 `;
 
-exports[`pi timeline reducer multi-turn.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > multi-turn.jsonl replay snapshot 1`] = `
 {
   "cursor": {
     "lastAnswerText": "Add a **“Usage”** section with a tiny code example (input/output), e.g., a convert + classify snippet, so users can copy/paste to understand the library immediately instead of inferring behavior from file names alone.",
@@ -1743,8 +1687,7 @@ exports[`pi timeline reducer multi-turn.jsonl replay snapshot 1`] = `
       "endedAtMs": 1781134216638,
       "id": "item-3",
       "kind": "tool-call",
-      "output": 
-"# Temperature Toolkit
+      "output": "# Temperature Toolkit
 
 A tiny demo library for converting and classifying temperatures.
 
@@ -1754,8 +1697,7 @@ A tiny demo library for converting and classifying temperatures.
 - \`src/broken.ts\` is known to contain a type error.
 
 Run \`tsc --noEmit\` to type-check.
-"
-,
+",
       "startedAtMs": 1781134216633,
       "status": "success",
       "toolCallId": "call_eIm6ddvDdC1naO3uJbWcjFWc|fc_0041a030aa913a94016a29f38886188191bce615c7174177cf",
@@ -1841,7 +1783,7 @@ Run \`tsc --noEmit\` to type-check.
 }
 `;
 
-exports[`pi timeline reducer permission-gate.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > permission-gate.jsonl replay snapshot 1`] = `
 {
   "cursor": {
     "lastAnswerText": "Blocked by user: \`bash\` command \`echo denied-run\` was denied. Stopping.",
@@ -1879,10 +1821,8 @@ exports[`pi timeline reducer permission-gate.jsonl replay snapshot 1`] = `
       "endedAtMs": 1781134397488,
       "id": "item-3",
       "kind": "tool-call",
-      "output": 
-"approved-run
-"
-,
+      "output": "approved-run
+",
       "startedAtMs": 1781134397478,
       "status": "success",
       "toolCallId": "call_XNlVJgkJm4UD6NjluifyN18R|fc_01ffaade5a82cd92016a29f43d7bc08191bfc17afe41356668",
@@ -1994,7 +1934,7 @@ exports[`pi timeline reducer permission-gate.jsonl replay snapshot 1`] = `
 }
 `;
 
-exports[`pi timeline reducer plain-answer.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > plain-answer.jsonl replay snapshot 1`] = `
 {
   "cursor": {
     "lastAnswerText": "A Git worktree is a way to check out multiple branches or commits into separate directories while sharing the same Git repository metadata, so you can work on different code versions at the same time without making full separate clones. It creates additional working directories tied to one \`.git\` repository, letting you switch, build, or test in parallel across branches while keeping each worktree independent in its own files.",
@@ -2066,7 +2006,7 @@ exports[`pi timeline reducer plain-answer.jsonl replay snapshot 1`] = `
 }
 `;
 
-exports[`pi timeline reducer single-read.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > single-read.jsonl replay snapshot 1`] = `
 {
   "cursor": {
     "lastAnswerText": "This repository is a tiny TypeScript demo library for converting temperatures and classifying them as cold/mild/hot, with \`src/index.ts\` as the public API and logic split into \`src/convert.ts\` and \`src/classify.ts\`. It also notes that \`src/broken.ts\` intentionally has a type error, and recommends running \`tsc --noEmit\` to type-check the project.",
@@ -2099,8 +2039,7 @@ exports[`pi timeline reducer single-read.jsonl replay snapshot 1`] = `
       "endedAtMs": 1781134164826,
       "id": "item-3",
       "kind": "tool-call",
-      "output": 
-"# Temperature Toolkit
+      "output": "# Temperature Toolkit
 
 A tiny demo library for converting and classifying temperatures.
 
@@ -2110,8 +2049,7 @@ A tiny demo library for converting and classifying temperatures.
 - \`src/broken.ts\` is known to contain a type error.
 
 Run \`tsc --noEmit\` to type-check.
-"
-,
+",
       "startedAtMs": 1781134164821,
       "status": "success",
       "toolCallId": "call_M7e3WhdBHDTmAo5bI5mzzoUh|fc_09e83ec205c63010016a29f354cbb48191b027a5c0ef18857d",
@@ -2171,11 +2109,10 @@ Run \`tsc --noEmit\` to type-check.
 }
 `;
 
-exports[`pi timeline reducer thinking.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > thinking.jsonl replay snapshot 1`] = `
 {
   "cursor": {
-    "lastAnswerText": 
-"One valid shortest sequence is:
+    "lastAnswerText": "One valid shortest sequence is:
 
 1. F + Goat → R  
 2. F → L  
@@ -2185,8 +2122,7 @@ exports[`pi timeline reducer thinking.jsonl replay snapshot 1`] = `
 6. F → L  
 7. F + Goat → R  
 
-No shorter sequence exists because the first trip must be the goat (wolf or cabbage first leaves an unsafe pair alone), and after the goat first crosses, the only safe way to move the other two is to bring the goat back in between, which forces exactly three goat crossings and two extra return trips plus two item-carrying trips, totaling 7 moves. Since this lower bound is 7 and the sequence uses 7, it is minimal."
-,
+No shorter sequence exists because the first trip must be the goat (wolf or cabbage first leaves an unsafe pair alone), and after the goat first crosses, the only safe way to move the other two is to bring the goat back in between, which forces exactly three goat crossings and two extra return trips plus two item-carrying trips, totaling 7 moves. Since this lower bound is 7 and the sequence uses 7, it is minimal.",
     "nextItemId": 5,
     "openAssistantId": null,
     "openThinkingId": null,
@@ -2212,8 +2148,7 @@ No shorter sequence exists because the first trip must be the goat (wolf or cabb
       "id": "item-3",
       "kind": "assistant-message",
       "streaming": false,
-      "text": 
-"One valid shortest sequence is:
+      "text": "One valid shortest sequence is:
 
 1. F + Goat → R  
 2. F → L  
@@ -2223,13 +2158,11 @@ No shorter sequence exists because the first trip must be the goat (wolf or cabb
 6. F → L  
 7. F + Goat → R  
 
-No shorter sequence exists because the first trip must be the goat (wolf or cabbage first leaves an unsafe pair alone), and after the goat first crosses, the only safe way to move the other two is to bring the goat back in between, which forces exactly three goat crossings and two extra return trips plus two item-carrying trips, totaling 7 moves. Since this lower bound is 7 and the sequence uses 7, it is minimal."
-,
+No shorter sequence exists because the first trip must be the goat (wolf or cabbage first leaves an unsafe pair alone), and after the goat first crosses, the only safe way to move the other two is to bring the goat back in between, which forces exactly three goat crossings and two extra return trips plus two item-carrying trips, totaling 7 moves. Since this lower bound is 7 and the sequence uses 7, it is minimal.",
     },
     {
       "aborted": false,
-      "answerText": 
-"One valid shortest sequence is:
+      "answerText": "One valid shortest sequence is:
 
 1. F + Goat → R  
 2. F → L  
@@ -2239,8 +2172,7 @@ No shorter sequence exists because the first trip must be the goat (wolf or cabb
 6. F → L  
 7. F + Goat → R  
 
-No shorter sequence exists because the first trip must be the goat (wolf or cabbage first leaves an unsafe pair alone), and after the goat first crosses, the only safe way to move the other two is to bring the goat back in between, which forces exactly three goat crossings and two extra return trips plus two item-carrying trips, totaling 7 moves. Since this lower bound is 7 and the sequence uses 7, it is minimal."
-,
+No shorter sequence exists because the first trip must be the goat (wolf or cabbage first leaves an unsafe pair alone), and after the goat first crosses, the only safe way to move the other two is to bring the goat back in between, which forces exactly three goat crossings and two extra return trips plus two item-carrying trips, totaling 7 moves. Since this lower bound is 7 and the sequence uses 7, it is minimal.",
       "durationMs": 4396,
       "id": "item-4",
       "kind": "turn-footer",
@@ -2279,7 +2211,7 @@ No shorter sequence exists because the first trip must be the goat (wolf or cabb
 }
 `;
 
-exports[`pi timeline reducer unicode-and-ansi.jsonl replay snapshot 1`] = `
+exports[`pi timeline reducer > unicode-and-ansi.jsonl replay snapshot 1`] = `
 {
   "cursor": {
     "lastAnswerText": "RED BOLD GREEN 🎉 ✅ café",
@@ -2312,10 +2244,8 @@ exports[`pi timeline reducer unicode-and-ansi.jsonl replay snapshot 1`] = `
       "endedAtMs": 1781134251637,
       "id": "item-3",
       "kind": "tool-call",
-      "output": 
-"\x1B[31mRED\x1B[0m \x1B[1;32mBOLD GREEN\x1B[0m 🎉 ✅ café
-"
-,
+      "output": "[31mRED[0m [1;32mBOLD GREEN[0m 🎉 ✅ café
+",
       "startedAtMs": 1781134251618,
       "status": "success",
       "toolCallId": "call_kDHcGDUlMDyTNBdTIuk3LUA4|fc_0d53ba29c501b03e016a29f3ab8aa88191868f3a3553c27c12",

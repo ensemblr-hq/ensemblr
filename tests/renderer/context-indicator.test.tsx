@@ -1,7 +1,5 @@
-/// <reference types="bun" />
-
-import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { expect, test } from 'vitest';
 import { ContextIndicator } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/context-indicator';
 
 test('leaves the context ring empty when no tokens are used', () => {

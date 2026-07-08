@@ -1,6 +1,4 @@
-/// <reference types="bun" />
-
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 
 import { eventsToUIMessages } from '../../src/renderer/lib/pi/event-to-ui-message';
 import type {

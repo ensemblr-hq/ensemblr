@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 
 import { getRightSidebarHeaderState } from '../../src/renderer/components/workbench-shell/right-sidebar-header/state';
 import { getDefaultWorkspace } from '../../src/renderer/fixtures/workbench';

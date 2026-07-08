@@ -1,8 +1,5 @@
-/// <reference types="bun" />
-
-import { describe, expect, test } from 'bun:test';
-
 import type { UIMessage } from 'ai';
+import { describe, expect, test } from 'vitest';
 
 import { resolveLiveTurnStartMs } from '../../src/renderer/components/workbench-shell/conversation-panel/timeline/timeline-timing';
 import type { OptimisticPrompt } from '../../src/renderer/state/composer';

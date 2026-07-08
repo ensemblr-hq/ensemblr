@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import type { SlashCommandDescriptor } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/slash-commands';
 import { sortSlashCommands } from '../../src/renderer/hooks/workbench-shell/composer/use-slash-commands';
 

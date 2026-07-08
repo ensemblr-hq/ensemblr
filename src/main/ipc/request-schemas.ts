@@ -205,6 +205,24 @@ export function parseCloneGithubRepositoryStartRequest(raw: unknown): {
 	return parsed.data;
 }
 
+/** {@link import('../../shared/ipc').GithubRepositoryListRequest}. */
+export const githubRepositoryListRequestSchema = z.object({
+	scope: z.enum(['recent', 'full']).optional(),
+});
+
+/**
+ * Parses a github-repository-list payload, defaulting a missing or malformed
+ * `scope` to `'recent'` — the pre-existing default behaviour.
+ */
+export function parseGithubRepositoryListRequest(raw: unknown): {
+	scope: 'full' | 'recent';
+} {
+	const parsed = githubRepositoryListRequestSchema.safeParse(raw ?? {});
+	return {
+		scope: parsed.success ? (parsed.data.scope ?? 'recent') : 'recent',
+	};
+}
+
 // -----------------------------------------------------------------------------
 // root — LENIENT (safeParse + empty fallback, trims path)
 // -----------------------------------------------------------------------------

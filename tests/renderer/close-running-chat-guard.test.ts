@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from 'bun:test';
+import { describe, expect, test, vi } from 'vitest';
 
 import {
 	planClose,
@@ -7,8 +7,8 @@ import {
 
 describe('planClose', () => {
 	test('closes immediately when the target is idle', () => {
-		const onClose = mock(() => {});
-		const onStop = mock(() => {});
+		const onClose = vi.fn(() => {});
+		const onStop = vi.fn(() => {});
 		const plan = planClose({ isRunning: false, onClose, onStop });
 		expect(plan).toEqual({ kind: 'close-now' });
 		// Pure: deciding to close-now must not run the callbacks itself.
@@ -17,8 +17,8 @@ describe('planClose', () => {
 	});
 
 	test('defers a running target, carrying both callbacks', () => {
-		const onClose = mock(() => {});
-		const onStop = mock(() => {});
+		const onClose = vi.fn(() => {});
+		const onStop = vi.fn(() => {});
 		const plan = planClose({ isRunning: true, onClose, onStop });
 		expect(plan.kind).toBe('defer');
 		if (plan.kind === 'defer') {
@@ -62,7 +62,7 @@ describe('runConfirmedClose', () => {
 	});
 
 	test('still closes the tab when the stop rejects', async () => {
-		const onClose = mock(() => {});
+		const onClose = vi.fn(() => {});
 		await runConfirmedClose({
 			onClose,
 			onStop: () => Promise.reject(new Error('stop failed')),
@@ -71,7 +71,7 @@ describe('runConfirmedClose', () => {
 	});
 
 	test('still closes the tab when the stop throws synchronously', async () => {
-		const onClose = mock(() => {});
+		const onClose = vi.fn(() => {});
 		await runConfirmedClose({
 			onClose,
 			onStop: () => {
