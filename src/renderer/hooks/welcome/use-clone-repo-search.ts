@@ -74,15 +74,34 @@ export function useCloneRepoSearch({
 		enabled: enabled && isSearching,
 	});
 
-	const view = deriveRepoSearchView({
-		full: fullData,
-		isFullLoading: isFullListLoading,
-		isRecentLoading: isRecentListLoading,
-		isSearching,
-		query: trimmedUrl,
-		recent: recentData,
-	});
+	// Memoized so `displayedEntries` keeps a stable identity across renders whose
+	// inputs are unchanged; otherwise the fresh filter/sort array on every render
+	// would defeat the `keyBindings` memo below.
+	const view = useMemo(
+		() =>
+			deriveRepoSearchView({
+				full: fullData,
+				isFullLoading: isFullListLoading,
+				isRecentLoading: isRecentListLoading,
+				isSearching,
+				query: trimmedUrl,
+				recent: recentData,
+			}),
+		[
+			fullData,
+			isFullListLoading,
+			isRecentListLoading,
+			isSearching,
+			recentData,
+			trimmedUrl,
+		],
+	);
 	const { displayedEntries } = view;
+
+	// A stale highlight (e.g. the full-scope query resolves and narrows the list)
+	// must never point past the last row; collapse it to "no selection".
+	const highlight =
+		highlightIndex < displayedEntries.length ? highlightIndex : -1;
 
 	const handleUrlChange = useCallback(
 		(value: string) => {
@@ -102,9 +121,10 @@ export function useCloneRepoSearch({
 
 	const moveHighlight = useCallback(
 		(delta: number) => {
-			setHighlightIndex((current) =>
-				nextHighlightIndex(current, delta, displayedEntries.length),
-			);
+			setHighlightIndex((current) => {
+				const base = current < displayedEntries.length ? current : -1;
+				return nextHighlightIndex(base, delta, displayedEntries.length);
+			});
 		},
 		[displayedEntries.length],
 	);
@@ -113,7 +133,7 @@ export function useCloneRepoSearch({
 		() =>
 			buildRepoSearchKeyBindings({
 				entries: displayedEntries,
-				highlightIndex,
+				highlightIndex: highlight,
 				isSearching,
 				onHighlightMove: moveHighlight,
 				onSelect: selectRepo,
@@ -121,7 +141,7 @@ export function useCloneRepoSearch({
 			}),
 		[
 			displayedEntries,
-			highlightIndex,
+			highlight,
 			isSearching,
 			moveHighlight,
 			onSubmit,
@@ -134,7 +154,7 @@ export function useCloneRepoSearch({
 		...view,
 		handleUrlChange,
 		handleUrlKeyDown,
-		highlightIndex,
+		highlightIndex: highlight,
 		isSearching,
 		selectRepo,
 	};
