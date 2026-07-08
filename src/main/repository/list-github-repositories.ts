@@ -1,15 +1,24 @@
 import type {
 	GithubRepositoryEntry,
 	GithubRepositoryListResult,
+	GithubRepositoryListScope,
 } from '../../shared/ipc/contracts/clone';
 import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
 import { firstLine } from './first-line.ts';
+
+/** Options accepted by {@link GithubRepositoryListService.list}. */
+export interface GithubRepositoryListOptions {
+	scope?: GithubRepositoryListScope;
+}
+
 /** Public surface of the gh-backed repository listing service. */
 export interface GithubRepositoryListService {
-	list: () => Promise<GithubRepositoryListResult>;
+	list: (
+		options?: GithubRepositoryListOptions,
+	) => Promise<GithubRepositoryListResult>;
 }
 
 /** Options for {@link createGithubRepositoryListService}. */
@@ -22,6 +31,11 @@ const GH_TIMEOUT_MS = 10_000;
 const GH_MAX_OUTPUT_BYTES = 1024 * 512;
 const GH_REPO_LIST_LIMIT = 8;
 const GH_REPO_LIST_QUERY = `user/repos?sort=updated&per_page=${GH_REPO_LIST_LIMIT}&affiliation=owner,collaborator,organization_member`;
+
+const GH_FULL_PAGE_SIZE = 100;
+const GH_FULL_PAGE_CAP = 5;
+const GH_REPO_FIELDS_JQ =
+	'map({description, full_name, private, updated_at, owner: {avatar_url: .owner.avatar_url, login: .owner.login}})';
 
 /** Shape of the relevant fields from `gh api user/repos` payloads. */
 interface RawGithubRepository {
@@ -44,41 +58,114 @@ export function createGithubRepositoryListService({
 	now = () => new Date(),
 }: CreateGithubRepositoryListServiceOptions): GithubRepositoryListService {
 	return {
-		list: async () => {
-			const generatedAt = now().toISOString();
-
-			const result = await localCommandService.run({
-				args: ['api', '--paginate=false', GH_REPO_LIST_QUERY],
-				command: 'gh',
-				maxOutputBytes: GH_MAX_OUTPUT_BYTES,
-				timeoutMs: GH_TIMEOUT_MS,
-			});
-
-			if (result.status !== 'success') {
-				return {
-					entries: [],
-					error: mapFailure(result),
-					generatedAt,
-					status: 'failure',
-				};
-			}
-
-			const entries = parseGithubRepositories(result.stdout);
-			if (!entries) {
-				return {
-					entries: [],
-					error: 'gh returned an unexpected response shape.',
-					generatedAt,
-					status: 'failure',
-				};
-			}
-
-			return {
-				entries,
-				generatedAt,
-				status: 'success',
-			};
+		list: async (options) => {
+			return options?.scope === 'full'
+				? listFullScope(localCommandService, now)
+				: listRecentScope(localCommandService, now);
 		},
+	};
+}
+
+/** Fetches the 8 most recently updated repos in a single `gh api` call. */
+async function listRecentScope(
+	localCommandService: LocalCommandService,
+	now: () => Date,
+): Promise<GithubRepositoryListResult> {
+	const generatedAt = now().toISOString();
+
+	const result = await localCommandService.run({
+		args: ['api', '--paginate=false', GH_REPO_LIST_QUERY],
+		command: 'gh',
+		maxOutputBytes: GH_MAX_OUTPUT_BYTES,
+		timeoutMs: GH_TIMEOUT_MS,
+	});
+
+	if (result.status !== 'success') {
+		return {
+			entries: [],
+			error: mapFailure(result),
+			generatedAt,
+			status: 'failure',
+		};
+	}
+
+	const entries = parseGithubRepositories(result.stdout);
+	if (!entries) {
+		return {
+			entries: [],
+			error: 'gh returned an unexpected response shape.',
+			generatedAt,
+			status: 'failure',
+		};
+	}
+
+	return {
+		entries,
+		generatedAt,
+		status: 'success',
+	};
+}
+
+/**
+ * Fetches up to {@link GH_FULL_PAGE_CAP} pages (500 repos) of the user's full
+ * accessible repo set, trimming server-side via `--jq` so each page stays well
+ * under the output-byte cap. Stops early once a page returns fewer than
+ * {@link GH_FULL_PAGE_SIZE} rows. Any page failure fails the whole result —
+ * the renderer falls back to the recent list.
+ */
+async function listFullScope(
+	localCommandService: LocalCommandService,
+	now: () => Date,
+): Promise<GithubRepositoryListResult> {
+	const generatedAt = now().toISOString();
+	const byFullName = new Map<string, GithubRepositoryEntry>();
+
+	for (let page = 1; page <= GH_FULL_PAGE_CAP; page += 1) {
+		const result = await localCommandService.run({
+			args: [
+				'api',
+				'--paginate=false',
+				`user/repos?sort=updated&per_page=${GH_FULL_PAGE_SIZE}&page=${page}&affiliation=owner,collaborator,organization_member`,
+				'--jq',
+				GH_REPO_FIELDS_JQ,
+			],
+			command: 'gh',
+			maxOutputBytes: GH_MAX_OUTPUT_BYTES,
+			timeoutMs: GH_TIMEOUT_MS,
+		});
+
+		if (result.status !== 'success') {
+			return {
+				entries: [],
+				error: mapFailure(result),
+				generatedAt,
+				status: 'failure',
+			};
+		}
+
+		const pageEntries = parseGithubRepositories(result.stdout);
+		if (!pageEntries) {
+			return {
+				entries: [],
+				error: 'gh returned an unexpected response shape.',
+				generatedAt,
+				status: 'failure',
+			};
+		}
+
+		for (const entry of pageEntries) {
+			byFullName.set(entry.fullName, entry);
+		}
+
+		if (pageEntries.length < GH_FULL_PAGE_SIZE) {
+			break;
+		}
+	}
+
+	return {
+		entries: [...byFullName.values()],
+		generatedAt,
+		status: 'success',
 	};
 }
 

@@ -37,6 +37,7 @@ import type {
 	CloneGithubRepositoryRequest,
 	CloneGithubRepositoryStartRequest,
 	CloneGithubRepositoryStartResult,
+	GithubRepositoryListRequest,
 	GithubRepositoryListResult,
 } from './contracts/clone';
 import type { EnvironmentVariablesSnapshot } from './contracts/environment';
@@ -299,7 +300,7 @@ export interface IpcHandlerMap {
 		GetWorkspaceGitStatusResult
 	>;
 	[IPC_CHANNELS.githubRepositoryList]: IpcHandlerEntry<
-		void,
+		GithubRepositoryListRequest | undefined,
 		GithubRepositoryListResult
 	>;
 	[IPC_CHANNELS.health]: IpcHandlerEntry<void, HealthSnapshot>;

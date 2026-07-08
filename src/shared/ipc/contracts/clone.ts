@@ -95,6 +95,12 @@ export interface GithubRepositoryEntry {
 	updatedAt: string;
 }
 
+export type GithubRepositoryListScope = 'full' | 'recent';
+
+export interface GithubRepositoryListRequest {
+	scope?: GithubRepositoryListScope;
+}
+
 export type GithubRepositoryListStatus = 'failure' | 'success';
 
 export interface GithubRepositoryListResult {
@@ -106,7 +112,9 @@ export interface GithubRepositoryListResult {
 
 /** GitHub clone / discovery IPC surface, including the live progress channel. */
 export interface CloneApi {
-	githubRepositoryList: () => Promise<GithubRepositoryListResult>;
+	githubRepositoryList: (
+		request?: GithubRepositoryListRequest,
+	) => Promise<GithubRepositoryListResult>;
 	onCloneGithubRepositoryProgress: (
 		listener: (event: CloneGithubRepositoryProgressEvent) => void,
 	) => () => void;
