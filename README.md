@@ -234,16 +234,22 @@ This repository has explicit contributor policies — see [`AGENTS.md`](./AGENTS
 
 ## Testing
 
-Tests run under two runners:
+Tests run under two runners (Bun is the package manager only — never the test runner):
 
-- **`bun test`** — shared and renderer suites.
-- **`electron --test`** (via `ELECTRON_RUN_AS_NODE=1`) — main-process suites that need Electron/Node APIs.
+- **Vitest** (`bunx vitest run`) — shared (`tests/shared/**`) and renderer (`tests/renderer/**`) suites.
+  Config in `vitest.config.mts`; default `environment` is `node`, and DOM component tests opt into
+  happy-dom per file with a `// @vitest-environment happy-dom` docblock.
+- **`electron --test`** (via `ELECTRON_RUN_AS_NODE=1`) — main-process suites (`tests/main/**`) that need Electron/Node APIs.
 
-There is no single aggregate `test` script; suites are run individually. Representative examples:
+Run everything with `bun run test`; add coverage with `bun run test:coverage` (native Istanbul →
+`coverage/coverage-final.json`). Focused examples:
 
 ```bash
-bun run test:renderer     # renderer components (bun test)
-bun run test:pi-rpc       # Pi RPC parsing (bun test)
+bun run test              # full Vitest suite (renderer + shared)
+bun run test:coverage     # Vitest with Istanbul coverage
+bunx vitest run <file>    # a single Vitest file
+bun run test:renderer     # renderer suites (Vitest)
+bun run test:pi-rpc       # Pi RPC parsing (Vitest)
 bun run test:db           # SQLite database (electron --test)
 bun run test:workspace    # workspace creation (electron --test)
 bun run test:github       # GitHub service (electron --test)
