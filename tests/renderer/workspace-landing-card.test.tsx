@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { expect, test } from 'vitest';
 
 import { WorkspaceLandingCard } from '../../src/renderer/components/workbench-shell/conversation-panel';
 import type { WorkspaceLandingSummary } from '../../src/renderer/types/workbench';

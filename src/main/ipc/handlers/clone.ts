@@ -14,6 +14,7 @@ import type { WithPermissionGate } from '../permission-gate.ts';
 import {
 	parseCloneGithubRepositoryRequest,
 	parseCloneGithubRepositoryStartRequest,
+	parseGithubRepositoryListRequest,
 } from '../request-schemas.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
@@ -36,8 +37,10 @@ export function registerCloneHandlers({
 }: CloneHandlersOptions): void {
 	ipcMain.handle(
 		IPC_CHANNELS.githubRepositoryList,
-		(): Promise<GithubRepositoryListResult> => {
-			return githubRepositoryListService.list();
+		(_event, request: unknown): Promise<GithubRepositoryListResult> => {
+			return githubRepositoryListService.list(
+				parseGithubRepositoryListRequest(request),
+			);
 		},
 	);
 

@@ -4,7 +4,7 @@ import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 
 import { ensembleQueryKeys, getEnsembleApi } from './query-keys';
 
-/** Query options for the gh-backed GitHub repository list. */
+/** Query options for the gh-backed GitHub repository list (8 most recent). */
 export const githubRepositoryListQuery = queryOptions({
 	queryFn: () =>
 		profileElectronIpcCall(
@@ -13,6 +13,20 @@ export const githubRepositoryListQuery = queryOptions({
 		),
 	queryKey: ensembleQueryKeys.githubRepositoryList(),
 	staleTime: 60_000,
+});
+
+/**
+ * Query options for the full accessible-repo set, fetched in the background so
+ * the clone dialog's search can cover more than the 8 most recent repos.
+ */
+export const githubRepositoryFullListQuery = queryOptions({
+	queryFn: () =>
+		profileElectronIpcCall(
+			{ channel: 'ensemble:github-repository-list-full', usesDatabase: false },
+			() => getEnsembleApi().githubRepositoryList({ scope: 'full' }),
+		),
+	queryKey: ensembleQueryKeys.githubRepositoryList('full'),
+	staleTime: 300_000,
 });
 
 /** Query options for the renderer-side root directory snapshot. */

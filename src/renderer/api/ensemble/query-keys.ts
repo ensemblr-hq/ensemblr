@@ -28,8 +28,8 @@ export const ensembleQueryKeys = {
 		[...ensembleQueryKeys.all, 'environment-variables'] as const,
 	filePreview: (workspaceCwd: string, filePath: string) =>
 		[...ensembleQueryKeys.all, 'file-preview', workspaceCwd, filePath] as const,
-	githubRepositoryList: () =>
-		[...ensembleQueryKeys.all, 'github-repository-list'] as const,
+	githubRepositoryList: (scope: 'full' | 'recent' = 'recent') =>
+		[...ensembleQueryKeys.all, 'github-repository-list', scope] as const,
 	health: () => [...ensembleQueryKeys.all, 'health'] as const,
 	linearConnection: () =>
 		[...ensembleQueryKeys.all, 'linear-connection'] as const,

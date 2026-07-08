@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 
 import { hasReviewableChanges } from '../../src/renderer/lib/workbench/review-presence';
 import type { GetWorkspaceGitStatusResult } from '../../src/shared/ipc/contracts/workspace-git';

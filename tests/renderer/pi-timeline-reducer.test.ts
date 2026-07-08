@@ -5,11 +5,9 @@
  * frames are no-ops).
  */
 
-/// <reference types="bun" />
-
-import { describe, expect, test } from 'bun:test';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, expect, test } from 'vitest';
 
 import {
 	createPiTimelineState,

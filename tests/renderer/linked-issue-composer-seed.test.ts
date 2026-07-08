@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 
 import { formatLinkedIssueComposerSeed } from '../../src/renderer/lib/workbench/linked-issue-composer-seed.ts';
 

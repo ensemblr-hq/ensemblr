@@ -1,5 +1,5 @@
-import { expect, test } from 'bun:test';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { expect, test } from 'vitest';
 
 import { TooltipProvider } from '../../src/renderer/components/ui/tooltip';
 import {

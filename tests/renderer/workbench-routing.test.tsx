@@ -1,8 +1,6 @@
-/// <reference types="bun" />
-
-import { afterEach, expect, test } from 'bun:test';
 import { QueryClient } from '@tanstack/react-query';
 import { isRedirect } from '@tanstack/react-router';
+import { afterEach, expect, test } from 'vitest';
 
 import { repositoryWorkspaceNavigationQuery } from '../../src/renderer/api/ensemble-queries';
 import { normalizeWorkbenchSearch } from '../../src/renderer/lib/workbench';

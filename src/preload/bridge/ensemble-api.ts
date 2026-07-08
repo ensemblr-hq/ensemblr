@@ -121,7 +121,7 @@ export function createEnsembleApi(): EnsembleApi {
 		getWorkspaceFileDiff: (request) => invoke('getWorkspaceFileDiff', request),
 		getWorkspaceGitStatus: (request) =>
 			invoke('getWorkspaceGitStatus', request),
-		githubRepositoryList: () => invoke('githubRepositoryList'),
+		githubRepositoryList: (request) => invoke('githubRepositoryList', request),
 		health: () => invoke('health'),
 		importLocalRepository: (request) =>
 			invoke('importLocalRepository', request),

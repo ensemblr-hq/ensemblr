@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, expect, test } from 'bun:test';
+import { afterAll, afterEach, beforeEach, expect, test } from 'vitest';
 
 import {
 	deleteLastUsedOpenTarget,

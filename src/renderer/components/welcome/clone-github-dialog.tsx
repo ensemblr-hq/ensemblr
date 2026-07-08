@@ -2,7 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
-	githubRepositoryListQuery,
 	isEnsembleApiAvailable,
 	rootDirectoryQuery,
 	selectCloneDestination,
@@ -24,13 +23,16 @@ import {
 	type CloneStage,
 	useCloneFlow,
 } from '@/renderer/hooks/welcome/use-clone-flow';
+import { useCloneRepoSearch } from '@/renderer/hooks/welcome/use-clone-repo-search';
 
 import { joinDestination } from '@/renderer/lib/welcome/clone-destination';
-import type { GithubRepositoryEntry } from '@/shared/ipc/contracts/clone';
+import { isUrlLikeInput } from '@/renderer/lib/welcome/github-repo-search';
 
 import { CloneGithubDiagnostics } from './clone-github-diagnostics.tsx';
 import { CloneGithubProgressLog } from './clone-github-progress-log.tsx';
 import { CloneGithubRecentRepos } from './clone-github-recent-repos.tsx';
+
+const RESULTS_LISTBOX_ID = 'clone-github-repo-results';
 
 interface CloneGithubDialogProps {
 	onOpenChange: (open: boolean) => void;
@@ -71,18 +73,6 @@ function CloneGithubDialogForm({
 	});
 	const defaultParentPath = rootDirectoryData?.repositoriesPath ?? '';
 
-	const { data: githubRepoListData, isLoading: isGithubRepoListLoading } =
-		useQuery({
-			...githubRepositoryListQuery,
-			enabled: isEnsembleApiAvailable(),
-		});
-	const displayedEntries: GithubRepositoryEntry[] =
-		githubRepoListData?.entries ?? [];
-	const liveError =
-		githubRepoListData?.status === 'failure'
-			? githubRepoListData.error
-			: undefined;
-
 	const [url, setUrl] = useState('');
 	const [locationOverride, setLocationOverride] = useState<string | null>(null);
 
@@ -99,7 +89,13 @@ function CloneGithubDialogForm({
 	// managed default once the query resolves. Avoids a sync effect.
 	const location = locationOverride ?? defaultParentPath;
 	const trimmedUrl = url.trim();
-	const canClone = !isBusy && trimmedUrl.length > 0 && isEnsembleApiAvailable();
+	// Only URL-like input is a clonable target; a bare search term keeps the
+	// primary action disabled so it can't kick off a doomed clone of the query.
+	const canClone =
+		!isBusy &&
+		trimmedUrl.length > 0 &&
+		isUrlLikeInput(trimmedUrl) &&
+		isEnsembleApiAvailable();
 	const locationPlaceholder = defaultParentPath || 'Managed repos directory';
 
 	const handleBrowse = useCallback(async () => {
@@ -128,6 +124,17 @@ function CloneGithubDialogForm({
 		);
 	}, [canClone, location, startClone, trimmedUrl]);
 
+	const search = useCloneRepoSearch({
+		enabled: isEnsembleApiAvailable(),
+		onSubmit: handleClone,
+		setUrl,
+		url,
+	});
+	const activeDescendantId =
+		search.isSearching && search.highlightIndex >= 0
+			? `${RESULTS_LISTBOX_ID}-${search.highlightIndex}`
+			: undefined;
+
 	const submitBindings = useMemo<readonly KeymapBinding<HTMLInputElement>[]>(
 		() => [
 			[
@@ -155,30 +162,37 @@ function CloneGithubDialogForm({
 						Repository URL
 					</Label>
 					<Input
+						aria-activedescendant={activeDescendantId}
+						aria-controls={RESULTS_LISTBOX_ID}
+						aria-expanded={search.isSearching}
 						autoFocus
 						className='h-9'
 						disabled={isBusy}
 						id='clone-github-url'
-						onChange={(event) => setUrl(event.target.value)}
-						onKeyDown={handleSubmitKey}
-						placeholder='https://github.com/user/repo.git'
+						onChange={(event) => search.handleUrlChange(event.target.value)}
+						onKeyDown={search.handleUrlKeyDown}
+						placeholder='Search repos or paste URL'
+						role='combobox'
 						value={url}
 					/>
 				</div>
 
 				<div className='flex flex-col gap-1.5'>
-					<Label className='text-xs'>Recent repos</Label>
+					<Label className='text-xs'>
+						{search.isSearching ? 'Matching repos' : 'Recent repos'}
+					</Label>
 					<CloneGithubRecentRepos
 						disabled={isBusy}
-						isLoading={isGithubRepoListLoading}
-						onSelect={(repo) =>
-							setUrl(`https://github.com/${repo.fullName}.git`)
-						}
-						repos={displayedEntries}
-						selectedUrl={url}
+						emptyMessage={search.emptyMessage}
+						footerHint={search.footerHint}
+						highlightedIndex={search.isSearching ? search.highlightIndex : -1}
+						isLoading={search.isDisplayLoading}
+						listboxId={RESULTS_LISTBOX_ID}
+						onSelect={search.selectRepo}
+						repos={search.displayedEntries}
 					/>
-					{liveError ? (
-						<p className='text-muted-foreground text-xxs'>{liveError}</p>
+					{search.liveError ? (
+						<p className='text-muted-foreground text-xxs'>{search.liveError}</p>
 					) : null}
 				</div>
 

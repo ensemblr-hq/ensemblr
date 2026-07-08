@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, test } from 'bun:test';
+import { afterAll, beforeAll, expect, test } from 'vitest';
 
 import { shouldIgnoreShortcut } from '../../src/renderer/hooks/workbench-shell/use-open-target-shortcuts';
 
