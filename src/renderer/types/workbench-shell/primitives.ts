@@ -10,7 +10,8 @@ export interface WorkbenchHealth {
 export interface WorkbenchDockActions {
 	onCloseTerminal: (terminalId: string) => void;
 	onNewTerminal: () => void;
-	onOpenRunPort: (port: number) => void;
+	/** Opens the detected dev-server preview URL in the system browser. */
+	onOpenRunPort: (url: string) => void;
 	onOpenSetupScripts: () => void;
 	onRunScript: () => void;
 	onRunSetupScript: () => void;

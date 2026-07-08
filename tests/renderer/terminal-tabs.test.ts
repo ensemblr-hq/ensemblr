@@ -36,12 +36,8 @@ describe('terminalSessionToDockStatus', () => {
 });
 
 describe('mapTerminalSessionsToDockTabs', () => {
-	test('returns the placeholder default tab when no interactive sessions exist', () => {
-		const tabs = mapTerminalSessionsToDockTabs([]);
-
-		expect(tabs).toHaveLength(1);
-		expect(tabs[0]?.isDefault).toBe(true);
-		expect(tabs[0]?.terminalId).toBeNull();
+	test('returns no terminal tabs when no interactive sessions exist', () => {
+		expect(mapTerminalSessionsToDockTabs([])).toEqual([]);
 	});
 
 	test('maps interactive sessions to terminal tabs and skips script sessions', () => {

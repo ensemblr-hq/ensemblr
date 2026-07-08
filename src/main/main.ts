@@ -312,7 +312,6 @@ const workspaceEnvironmentService = createWorkspaceEnvironmentService({
 	databaseService,
 	environmentVariablesService,
 	rootDirectoryService,
-	settingsResolutionService,
 });
 const broadcastToAllWindows = (channel: string, payload: unknown): void => {
 	for (const window of BrowserWindow.getAllWindows()) {

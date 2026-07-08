@@ -22,6 +22,11 @@ export interface TerminalRendererAdapter {
 /** Options for {@link createXtermAdapter}. */
 export interface CreateXtermAdapterOptions {
 	fontSize?: number;
+	/**
+	 * When true the surface never accepts keyboard input: stdin is disabled and
+	 * the cursor is hidden. Used by the read-only Setup/Run output panels.
+	 */
+	readOnly?: boolean;
 	scrollback?: number;
 }
 
@@ -31,17 +36,21 @@ const DEFAULT_SCROLLBACK = 10_000;
 /**
  * Builds the xterm.js-backed terminal adapter with fit, clickable links, and
  * the workspace monospace font.
- * @param options - Typography and scrollback overrides.
+ * @param options - Typography, scrollback, and read-only overrides.
  * @returns A fresh {@link TerminalRendererAdapter}.
  */
 export function createXtermAdapter({
 	fontSize = DEFAULT_FONT_SIZE,
+	readOnly = false,
 	scrollback = DEFAULT_SCROLLBACK,
 }: CreateXtermAdapterOptions = {}): TerminalRendererAdapter {
 	const terminal = new Terminal({
 		allowTransparency: true,
 		convertEol: false,
-		cursorBlink: true,
+		cursorBlink: !readOnly,
+		cursorInactiveStyle: readOnly ? 'none' : 'outline',
+		cursorStyle: readOnly ? 'underline' : 'block',
+		disableStdin: readOnly,
 		fontFamily: "'JetBrains Mono Variable', ui-monospace, monospace",
 		fontSize,
 		scrollback,

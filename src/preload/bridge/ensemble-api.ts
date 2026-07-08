@@ -86,8 +86,6 @@ function subscribe<E>(
 export function createEnsembleApi(): EnsembleApi {
 	return {
 		addEnvFile: (request) => invoke('addEnvFile', request),
-		applyRepositoryConfigMigration: (request) =>
-			invoke('applyRepositoryConfigMigration', request),
 		archiveRepository: (request) => invoke('archiveRepository', request),
 		archiveWorkspace: (request) => invoke('archiveWorkspace', request),
 		bindPiSessionToChatTab: (request) =>
@@ -195,8 +193,6 @@ export function createEnsembleApi(): EnsembleApi {
 			invoke('openWorkspaceInTarget', request),
 		prepareCloneGithubRepository: (request) =>
 			invoke('prepareCloneGithubRepository', request),
-		previewRepositoryConfigMigration: (request) =>
-			invoke('previewRepositoryConfigMigration', request),
 		pushWorkspaceBranch: (request) => invoke('pushWorkspaceBranch', request),
 		quickStartProject: (request) => invoke('quickStartProject', request),
 		readEnvironmentVariableValue: (request) =>
@@ -241,6 +237,8 @@ export function createEnsembleApi(): EnsembleApi {
 		unwatchWorkspaceFiles: (request) =>
 			invoke('unwatchWorkspaceFiles', request),
 		updateAppSettings: (patch) => invoke('updateAppSettings', patch),
+		updateRepositoryScripts: (request) =>
+			invoke('updateRepositoryScripts', request),
 		watchWorkspaceFiles: (request) => invoke('watchWorkspaceFiles', request),
 		writeForkSummary: (request) => invoke('writeForkSummary', request),
 		writeTerminalSession: (request) => invoke('writeTerminalSession', request),

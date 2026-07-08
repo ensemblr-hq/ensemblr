@@ -260,7 +260,7 @@ test('redirects legacy workspace chat search params to the chat route', async ()
 		},
 		replace: true,
 		search: {
-			dock: 'terminal:default',
+			dock: 'setup',
 		},
 		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
 	});
@@ -297,10 +297,10 @@ test('accepts valid typed chat route params without redirecting', async () => {
 			workspaceId: 'san-antonio',
 		},
 		rawSearch: {
-			dock: 'terminal:default',
+			dock: 'terminal:logs',
 		},
 		search: normalizeWorkbenchSearch({
-			dock: 'terminal:default',
+			dock: 'terminal:logs',
 		}),
 	});
 
@@ -343,7 +343,7 @@ test('canonicalizes chat route search without replacing database tab ids', async
 		},
 		replace: true,
 		search: {
-			dock: 'terminal:default',
+			dock: 'setup',
 		},
 		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
 	});

@@ -4,7 +4,8 @@ import type { ScriptLifecycleService } from './script-lifecycle-service.ts';
 
 /**
  * Decorates workspace creation so the configured setup script runs
- * automatically after a successful create (ADR 0007 parity). Script failures
+ * automatically after a successful create (ADR 0007 parity), then chains the
+ * run script when the repository enables `autoRunAfterSetup`. Script failures
  * surface in the dock; they never block or fail creation.
  * @param input - Base service plus the script lifecycle service.
  * @returns A {@link CreateWorkspaceService} with the setup-script hook.
@@ -23,7 +24,7 @@ export function withSetupScriptOnCreate({
 
 			if (result.status === 'success' && workspaceId) {
 				void scriptLifecycleService
-					.runScript({ kind: 'setup', workspaceId })
+					.runSetupScriptWithAutoRun({ workspaceId })
 					.catch(() => {});
 			}
 

@@ -23,6 +23,25 @@ export interface StopWorkspaceScriptRequest {
 
 export type StopWorkspaceScriptResult = KillTerminalResult;
 
+/**
+ * Personal (SQLite-persisted) repository script settings edited on the Scripts
+ * settings screen. Blank script commands clear their stored row. The committed
+ * `.ensemble/settings.toml` still overrides any of these keys per-key.
+ */
+export interface UpdateRepositoryScriptsRequest {
+	archive: string | null;
+	autoRunAfterSetup: boolean;
+	repositoryId: string;
+	run: string | null;
+	runScriptMode: 'concurrent' | 'nonconcurrent';
+	setup: string | null;
+}
+
+/** Result of a Scripts-settings write; `ok: false` means validation failed or the SQLite write errored. */
+export interface UpdateRepositoryScriptsResult {
+	ok: boolean;
+}
+
 /** Workspace-script slice of the `window.ensemble` API. */
 export interface WorkspaceScriptsApi {
 	runWorkspaceScript: (
@@ -31,4 +50,7 @@ export interface WorkspaceScriptsApi {
 	stopWorkspaceScript: (
 		request: StopWorkspaceScriptRequest,
 	) => Promise<StopWorkspaceScriptResult>;
+	updateRepositoryScripts: (
+		request: UpdateRepositoryScriptsRequest,
+	) => Promise<UpdateRepositoryScriptsResult>;
 }

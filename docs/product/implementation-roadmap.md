@@ -15,8 +15,8 @@ In scope for v1:
 - macOS Keychain for secret values, with SQLite storing metadata only.
 - Declarative user config at `~/.config/ensemble/config.json` with JSON schema validation.
 - Default Ensemble root at `~/Ensemble`, with configurable root and shared-root interoperability.
-- Repository config precedence: personal SQLite settings, `ensemble.json`, `conductor.json`, built-in defaults.
-- `.worktreeinclude` support and Conductor-compatible script/env behavior.
+- Repository config precedence (highest to lowest): the committed `.ensemble/settings.toml`, personal SQLite settings, user defaults, and built-in defaults; `.worktreeinclude` still governs files-to-copy. See ADR 0030.
+- `.worktreeinclude` support and `ENSEMBLE_*` script/env behavior.
 - Setup gate requiring git, authenticated `gh`, Pi executable/RPC readiness, root, SQLite, and process environment checks.
 - Pi runtime through selected CLI-compatible executable launched as `--mode rpc` from workspace `cwd`.
 - Preservation of the Pi user environment, including `~/.pi/agent`, project `.pi`, context files, sessions, skills, extensions, prompts, themes, tools, and provider/model configuration.

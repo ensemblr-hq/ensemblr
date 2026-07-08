@@ -38,7 +38,7 @@ flowchart TD
     P012["ENS-012 Pi RPC and Provider Readiness Smoke Checks"]
     P013["ENS-013 Workspace Trust and Permission-Mode Baseline"]
     P014["ENS-014 Environment Variable Catalog and Secret Metadata"]
-    P015["ENS-015 Repository Config Parser for ensemble.json, conductor.json, and .worktreeinclude"]
+    P015["ENS-015 Repository Config Parser for .ensemble/settings.toml and .worktreeinclude"]
     P016["ENS-016 Root Switch Reindex/Adopt Flow"]
   end
   subgraph S3__Repository_and_Workspace_Core["3. Repository and Workspace Core"]
@@ -327,7 +327,7 @@ flowchart TD
 - ENS-012 Pi RPC and Provider Readiness Smoke Checks: ENS-008, ENS-009, ENS-011
 - ENS-013 Workspace Trust and Permission-Mode Baseline: ENS-006, ENS-009
 - ENS-014 Environment Variable Catalog and Secret Metadata: ENS-004, ENS-006, ENS-013
-- ENS-015 Repository Config Parser for ensemble.json, conductor.json, and .worktreeinclude: ENS-006, ENS-008
+- ENS-015 Repository Config Parser for .ensemble/settings.toml and .worktreeinclude: ENS-006, ENS-008
 - ENS-016 Root Switch Reindex/Adopt Flow: ENS-007, ENS-009, ENS-013
 - ENS-017 Project Add Menu and Recents: ENS-020
 - ENS-018 Local Repository Registration: ENS-007, ENS-015, ENS-020

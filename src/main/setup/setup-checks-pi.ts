@@ -448,8 +448,6 @@ function formatSourceLabel(
 			return 'user override';
 		case 'built-in-default':
 			return 'built-in default';
-		case 'conductor-config':
-			return 'Conductor config';
 		case 'ensemble-config':
 			return 'Ensemble repository config';
 		default:

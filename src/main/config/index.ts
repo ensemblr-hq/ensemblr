@@ -1,15 +1,8 @@
-import type {
-	RepositoryConfigMigrationPreview,
-	RepositoryConfigMigrationRequest,
-	RepositoryConfigMigrationResult,
-	RepositoryConfigSnapshot,
-} from '../../shared/ipc/contracts/repository-config';
-import { loadRepositoryConfig } from './repository-config.ts';
+import type { RepositoryConfigSnapshot } from '../../shared/ipc/contracts/repository-config';
 import {
-	applyRepositoryConfigMigration,
+	loadRepositoryConfig,
 	normalizeRepositoryConfigRequest,
-	previewRepositoryConfigMigration,
-} from './repository-config-migration.ts';
+} from './repository-config.ts';
 
 /**
  * Backward-compat alias — the implementation moved to the storage repository
@@ -53,33 +46,23 @@ export type {
 	LoadedRepositoryConfig,
 	LoadRepositoryConfigOptions,
 } from './repository-config.ts';
-export { loadRepositoryConfig } from './repository-config.ts';
 export {
-	applyRepositoryConfigMigration,
+	loadRepositoryConfig,
 	normalizeRepositoryConfigRequest,
-	previewRepositoryConfigMigration,
-} from './repository-config-migration.ts';
+} from './repository-config.ts';
 
-/** Service exposed to IPC handlers for inspecting and migrating repo config. */
+/** Service exposed to IPC handlers for inspecting per-repository config. */
 export interface RepositoryConfigService {
-	applyMigration: (
-		request: RepositoryConfigMigrationRequest,
-	) => RepositoryConfigMigrationResult;
 	load: (request: unknown) => RepositoryConfigSnapshot;
-	previewMigration: (
-		request: RepositoryConfigMigrationRequest,
-	) => RepositoryConfigMigrationPreview;
 }
 
 /**
- * Builds the {@link RepositoryConfigService} used by IPC handlers to load and
- * migrate per-repository configuration files.
+ * Builds the {@link RepositoryConfigService} used by IPC handlers to load
+ * per-repository configuration files.
  */
 export function createRepositoryConfigService(): RepositoryConfigService {
 	return {
-		applyMigration: (request) => applyRepositoryConfigMigration(request),
 		load: (request) =>
 			loadRepositoryConfig(normalizeRepositoryConfigRequest(request)).snapshot,
-		previewMigration: (request) => previewRepositoryConfigMigration(request),
 	};
 }

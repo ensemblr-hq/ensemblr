@@ -104,9 +104,6 @@ import type {
 	RegisterLocalRepositoryResult,
 } from './contracts/repository';
 import type {
-	RepositoryConfigMigrationPreview,
-	RepositoryConfigMigrationRequest,
-	RepositoryConfigMigrationResult,
 	RepositoryConfigRequest,
 	RepositoryConfigSnapshot,
 } from './contracts/repository-config';
@@ -185,6 +182,8 @@ import type {
 	RunWorkspaceScriptResult,
 	StopWorkspaceScriptRequest,
 	StopWorkspaceScriptResult,
+	UpdateRepositoryScriptsRequest,
+	UpdateRepositoryScriptsResult,
 } from './contracts/workspace-scripts';
 
 /** Per-channel { req, res } pair. */
@@ -201,10 +200,6 @@ export interface IpcHandlerEntry<Req, Res> {
  * also use `void` for `req` and put the wire envelope in `res`.
  */
 export interface IpcHandlerMap {
-	[IPC_CHANNELS.applyRepositoryConfigMigration]: IpcHandlerEntry<
-		RepositoryConfigMigrationRequest,
-		RepositoryConfigMigrationResult
-	>;
 	[IPC_CHANNELS.archiveRepository]: IpcHandlerEntry<
 		ArchiveRepositoryRequest,
 		ArchiveRepositoryResult
@@ -401,10 +396,6 @@ export interface IpcHandlerMap {
 	>;
 	[IPC_CHANNELS.piRawFrame]: IpcHandlerEntry<void, PiRawFrameBroadcast>;
 	[IPC_CHANNELS.piSessionEvent]: IpcHandlerEntry<void, PiSessionEventBroadcast>;
-	[IPC_CHANNELS.previewRepositoryConfigMigration]: IpcHandlerEntry<
-		RepositoryConfigMigrationRequest,
-		RepositoryConfigMigrationPreview
-	>;
 	[IPC_CHANNELS.quickStartProject]: IpcHandlerEntry<
 		QuickStartProjectRequest,
 		QuickStartProjectResult
@@ -477,6 +468,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.stopWorkspaceScript]: IpcHandlerEntry<
 		StopWorkspaceScriptRequest,
 		StopWorkspaceScriptResult
+	>;
+	[IPC_CHANNELS.updateRepositoryScripts]: IpcHandlerEntry<
+		UpdateRepositoryScriptsRequest,
+		UpdateRepositoryScriptsResult
 	>;
 	[IPC_CHANNELS.submitPiPrompt]: IpcHandlerEntry<
 		SubmitPiPromptRequest,

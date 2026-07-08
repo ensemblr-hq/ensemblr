@@ -104,11 +104,6 @@ export const BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG: readonly EnvironmentVariable
 			'ENSEMBLE_ROOT_PATH',
 			'ENSEMBLE_DEFAULT_BRANCH',
 			'ENSEMBLE_PORT',
-			'CONDUCTOR_WORKSPACE_NAME',
-			'CONDUCTOR_WORKSPACE_PATH',
-			'CONDUCTOR_ROOT_PATH',
-			'CONDUCTOR_DEFAULT_BRANCH',
-			'CONDUCTOR_PORT',
 		].map((key) =>
 			createCatalogEntry({
 				category: 'runtime',

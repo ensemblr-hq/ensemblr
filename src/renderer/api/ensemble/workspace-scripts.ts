@@ -6,6 +6,8 @@ import type {
 	RunWorkspaceScriptResult,
 	StopWorkspaceScriptRequest,
 	StopWorkspaceScriptResult,
+	UpdateRepositoryScriptsRequest,
+	UpdateRepositoryScriptsResult,
 } from '@/shared/ipc/contracts/workspace-scripts';
 import {
 	parseWorkspaceScriptSettings,
@@ -55,5 +57,15 @@ export function stopWorkspaceScript(
 	return profileElectronIpcCall(
 		{ channel: 'ensemble:stop-workspace-script', usesDatabase: false },
 		() => getEnsembleApi().stopWorkspaceScript(request),
+	);
+}
+
+/** Persists the Scripts settings screen edits to repository-scoped SQLite. */
+export function updateRepositoryScripts(
+	request: UpdateRepositoryScriptsRequest,
+): Promise<UpdateRepositoryScriptsResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemble:update-repository-scripts', usesDatabase: true },
+		() => getEnsembleApi().updateRepositoryScripts(request),
 	);
 }

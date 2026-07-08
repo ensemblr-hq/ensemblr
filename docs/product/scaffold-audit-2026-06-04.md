@@ -135,6 +135,14 @@ Reason:
 
 ### Conductor Configuration
 
+> **Historical (2026-06-04):** This dated snapshot predates the single-file
+> repository config model. Ensemble no longer reads `conductor.json` or
+> `CONDUCTOR_*`; the sole on-disk repository config is the committed
+> `.ensemble/settings.toml`, and workspace variables are `ENSEMBLE_*` only. See
+> [ADR 0030](../adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md).
+> The `conductor.json` / `CONDUCTOR_PORT` details below are retained as a record
+> of the original scaffold.
+
 - Added `conductor.json` with:
 
 ```json

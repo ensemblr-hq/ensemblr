@@ -242,7 +242,7 @@ export function registerIpcHandlers({
 	registerOpenTargetHandlers({ databaseService, openTargetService });
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerTerminalHandlers({ terminalService });
-	registerWorkspaceScriptHandlers({ scriptLifecycleService });
+	registerWorkspaceScriptHandlers({ databaseService, scriptLifecycleService });
 	registerWorkspaceFilesHandlers({
 		listWorkspaceFilesService,
 		workspaceFilesWatcher,

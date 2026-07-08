@@ -1,9 +1,7 @@
 export type SettingsResolutionScope = 'app' | 'repository';
+/** Provenance source that supplied a resolved settings value. */
 export type SettingsResolutionSource =
 	| 'built-in-default'
-	| 'conductor-config'
-	| 'conductor-legacy-config'
-	| 'conductor-local-config'
 	| 'config-default'
 	| 'managed-config'
 	| 'ensemble-config'
@@ -42,8 +40,8 @@ export interface SettingsResolutionGroupSnapshot {
 	settings: ResolvedSettingSnapshot[];
 }
 
+/** Request to resolve effective settings for a specific repository. */
 export interface RepositorySettingsResolutionRequest {
-	conductorConfig?: Record<string, unknown>;
 	ensembleConfig?: Record<string, unknown>;
 	repositoryId: string;
 	repositoryPath?: string;

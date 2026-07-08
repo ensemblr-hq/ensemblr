@@ -11,7 +11,7 @@ export type AgentActionKind =
 	| 'resolve-conflicts'
 	| 'review';
 
-/** Settings key for each action template (personal SQLite or ensemble.json). */
+/** Settings key for each action template (personal SQLite or .ensemble/settings.toml). */
 export const AGENT_ACTION_SETTING_KEYS: Record<AgentActionKind, string> = {
 	'branch-naming': 'piActions.branchNaming',
 	'create-pr': 'piActions.createPr',

@@ -297,15 +297,10 @@ test('captures settings-source diagnostics in metadata_json', async (t) => {
 	const directory = createFixtureDirectory(t);
 	const database = createDatabaseFixture(t);
 
-	const conductorDirectory = path.join(directory, '.conductor');
-	mkdirSync(conductorDirectory, { recursive: true });
+	mkdirSync(path.join(directory, '.ensemble'), { recursive: true });
 	writeFileSync(
-		path.join(conductorDirectory, 'settings.toml'),
+		path.join(directory, '.ensemble', 'settings.toml'),
 		'[scripts]\nrun = "bun run dev"\n',
-	);
-	writeFileSync(
-		path.join(directory, 'ensemble.json'),
-		JSON.stringify({ scripts: { run: 'bun run ensemble' } }),
 	);
 
 	const result = await registerLocalRepository({
@@ -324,7 +319,7 @@ test('captures settings-source diagnostics in metadata_json', async (t) => {
 	assert.equal(result.registered, true);
 	const sources = result.settingsSources.map((source) => source.source);
 	assert.equal(sources.includes('ensemble-config'), true);
-	assert.equal(sources.includes('conductor-config'), true);
+	assert.equal(sources.includes('worktreeinclude'), true);
 });
 
 test('createLocalRepositoryRegistrationService wires the database service', async (t) => {

@@ -51,7 +51,7 @@ Included issues:
 - `ENS-012` Pi RPC and provider readiness smoke checks
 - `ENS-013` Workspace trust and permission-mode baseline
 - `ENS-014` Environment variable catalog and secret metadata
-- `ENS-015` Repository config parser for `ensemble.json`, `conductor.json`, and `.worktreeinclude`
+- `ENS-015` Repository config parser for the committed `.ensemble/settings.toml` and `.worktreeinclude`
 - `ENS-016` Root switch reindex/adopt flow
 
 Exit criteria:
@@ -94,7 +94,7 @@ Exit criteria:
 - Project/workspace navigation preserves the current sidebar, pinning, collapse/reorder, context-menu, header, and open-workspace launcher affordances.
 - Users can create a git worktree workspace from the configured branch source.
 - `.context/` exists for workspace handoff files.
-- Eligible gitignored files are copied through `.worktreeinclude`, repository settings, or defaults.
+- Eligible gitignored files are copied through `.worktreeinclude`, the committed `.ensemble/settings.toml`, or defaults.
 - Workspaces under a shared Conductor root can be adopted through filesystem/git metadata only.
 - Archive behavior is explicit, preserves unknown content, and prepares archive-script execution for the scripts milestone.
 
@@ -159,7 +159,7 @@ Exit criteria:
 
 - Setup, run, archive, and named terminal sessions execute from workspace directories.
 - xterm.js replaces the existing dock placeholder in place and can render output, handle resize, copy/paste, scrollback, and process termination states.
-- Scripts receive native `ENSEMBLE_*` variables and compatibility `CONDUCTOR_*` variables when appropriate.
+- Scripts receive native `ENSEMBLE_*` variables.
 - Run script modes support concurrent and nonconcurrent behavior.
 - Preview URL and spotlight testing uncertainties are documented before build work proceeds.
 

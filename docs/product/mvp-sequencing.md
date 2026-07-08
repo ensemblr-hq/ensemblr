@@ -15,7 +15,7 @@ Build every major Conductor workflow, adapted for Pi, in thin vertical slices be
 - SQLite database and migrations.
 - `~/.config/ensemble/config.json` loader and schema stub.
 - Ensemble root directory management.
-- Conductor-compatible config loader for `ensemble.json`, `conductor.json`, and `.worktreeinclude`.
+- Repository config loader for the committed `.ensemble/settings.toml` and `.worktreeinclude`.
 - Setup gate checks.
 - Linear OAuth connection surface and token storage foundation.
 
@@ -49,7 +49,7 @@ Build every major Conductor workflow, adapted for Pi, in thin vertical slices be
 - PTY/process service.
 - Run script button and lifecycle.
 - Setup/archive/run logs.
-- `ENSEMBLE_*` and `CONDUCTOR_*` env vars.
+- `ENSEMBLE_*` env vars.
 - Concurrent/nonconcurrent run script modes.
 
 ## Milestone 4: Review Flow

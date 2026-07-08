@@ -242,13 +242,14 @@ test('resolves per-workspace review and dock tab preferences', () => {
 			workspace,
 		}),
 	).toBe('setup');
+	// A valid route dock tab overrides the stored per-workspace preference.
 	expect(
 		getPreferredDockTab({
 			dockTabsByWorkspace: { [workspace.id]: 'run' },
-			routeDockTab: 'terminal:default',
+			routeDockTab: 'setup',
 			workspace,
 		}),
-	).toBe('terminal:default');
+	).toBe('setup');
 });
 
 test('resolves the remembered chat tab per workspace', () => {

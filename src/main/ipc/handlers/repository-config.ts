@@ -1,18 +1,11 @@
 import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import type {
-	RepositoryConfigMigrationPreview,
-	RepositoryConfigMigrationResult,
-	RepositoryConfigSnapshot,
-} from '../../../shared/ipc/contracts/repository-config';
+import type { RepositoryConfigSnapshot } from '../../../shared/ipc/contracts/repository-config';
 import type { RepositoryConfigService } from '../../config';
 import { isRepositoryConfigPathAllowed } from '../../config';
 import type { EnsembleDatabaseService } from '../../storage';
-import {
-	parseRepositoryConfigMigrationRequest,
-	parseRepositoryConfigRequest,
-} from '../request-schemas.ts';
+import { parseRepositoryConfigRequest } from '../request-schemas.ts';
 
 /** Service dependencies used by the repository-config IPC handlers. */
 export interface RepositoryConfigHandlersOptions {
@@ -21,7 +14,7 @@ export interface RepositoryConfigHandlersOptions {
 }
 
 /**
- * Registers IPC handlers for repository config inspection and migration.
+ * Registers the IPC handler for repository config inspection.
  * @param options - Required services.
  */
 export function registerRepositoryConfigHandlers({
@@ -43,47 +36,6 @@ export function registerRepositoryConfigHandlers({
 			}
 
 			return repositoryConfigService.load(normalizedRequest);
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.previewRepositoryConfigMigration,
-		(_event, request: unknown): RepositoryConfigMigrationPreview => {
-			const normalizedRequest = parseRepositoryConfigMigrationRequest(request);
-
-			if (
-				normalizedRequest.repositoryPath &&
-				!isAllowedRepositoryConfigPath(normalizedRequest.repositoryPath)
-			) {
-				return createDeniedRepositoryConfigMigrationPreview(
-					normalizedRequest.repositoryPath,
-				);
-			}
-
-			return repositoryConfigService.previewMigration(normalizedRequest);
-		},
-	);
-
-	ipcMain.handle(
-		IPC_CHANNELS.applyRepositoryConfigMigration,
-		(_event, request: unknown): RepositoryConfigMigrationResult => {
-			const normalizedRequest = parseRepositoryConfigMigrationRequest(request);
-
-			if (
-				normalizedRequest.repositoryPath &&
-				!isAllowedRepositoryConfigPath(normalizedRequest.repositoryPath)
-			) {
-				return {
-					...createDeniedRepositoryConfigMigrationPreview(
-						normalizedRequest.repositoryPath,
-					),
-					applied: false,
-					error:
-						'Repository config migration can only be applied to a known repository or workspace path.',
-				};
-			}
-
-			return repositoryConfigService.applyMigration(normalizedRequest);
 		},
 	);
 
@@ -112,28 +64,5 @@ function createDeniedRepositoryConfigSnapshot(
 		loadedAt: new Date().toISOString(),
 		repositoryPath,
 		sources: [],
-	};
-}
-
-/** Returns a synthetic migration preview used when a path is not authorised. */
-function createDeniedRepositoryConfigMigrationPreview(
-	repositoryPath: string,
-): RepositoryConfigMigrationPreview {
-	return {
-		canApply: false,
-		changes: [],
-		diagnostics: [
-			{
-				code: 'repository-config-path-not-allowed',
-				message:
-					'Repository config migration can only be applied to a known repository or workspace path.',
-				severity: 'error',
-			},
-		],
-		repositoryPath,
-		resultingConfig: {},
-		sourcePath: null,
-		targetExists: false,
-		targetPath: '',
 	};
 }

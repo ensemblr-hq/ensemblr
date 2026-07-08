@@ -5,6 +5,7 @@ import type {
 import type { TerminalSessionSnapshot } from '@/shared/ipc/contracts/terminal';
 import type { WorkspaceScriptKind } from '@/shared/ipc/contracts/workspace-scripts';
 import type { WorkspaceScriptSettings } from '@/shared/scripts/script-settings';
+import { extractPreviewPort } from '@/shared/terminal/detect-preview-url';
 
 /**
  * Pure helpers that fold resolved repository script settings and live terminal
@@ -62,8 +63,16 @@ function buildScriptSummary({
 		return { status: 'missing' };
 	}
 
+	// The main process auto-detects a dev-server URL from run-script output and
+	// stamps it on the session; carry it (and its port) onto the summary so the
+	// dock can render the Open button.
+	const previewUrl = latestSession?.previewUrl ?? null;
+	const previewPort = previewUrl ? extractPreviewPort(previewUrl) : null;
+
 	const base: WorkspaceScriptSummary = {
 		...(command ? { command } : {}),
+		...(previewUrl ? { previewUrl } : {}),
+		...(previewPort !== null ? { port: previewPort } : {}),
 		sessionStatus: latestSession?.status ?? null,
 		status: 'not-run',
 		terminalId: latestSession?.id ?? null,
