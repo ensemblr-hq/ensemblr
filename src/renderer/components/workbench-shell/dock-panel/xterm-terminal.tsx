@@ -23,7 +23,10 @@ export function XtermTerminal({
 }) {
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const adapterRef = useRef<TerminalRendererAdapter | null>(null);
-	const exitNotice = formatExitNotice(sessionStatus);
+	// The exit banner is for interactive terminals only. Setup/Run script panels
+	// (read-only) surface their lifecycle through the dock tab status dot, so the
+	// footer would be redundant noise there.
+	const exitNotice = readOnly ? null : formatExitNotice(sessionStatus);
 
 	useEffect(() => {
 		const container = containerRef.current;
