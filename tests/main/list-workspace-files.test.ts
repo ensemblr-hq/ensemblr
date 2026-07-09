@@ -1,8 +1,8 @@
-import { afterEach, describe, expect, test } from 'bun:test';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { afterEach, describe, expect, test } from 'vitest';
 
 import { createLocalCommandService } from '../../src/main/commands/local-command';
 import { createListWorkspaceFilesService } from '../../src/main/workspace-files/list-workspace-files';

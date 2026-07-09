@@ -16,9 +16,11 @@ import type {
 interface FakeChildHandle extends ChildLike {
 	emitExit: (code: number | null, signal?: NodeJS.Signals | null) => void;
 	emitStderr: (chunk: Buffer | string) => void;
+	emitStdinError: (cause: Error) => void;
 	emitStdout: (chunk: Buffer | string) => void;
 	getKillSignals: () => readonly NodeJS.Signals[];
 	getStdinChunks: () => readonly string[];
+	setStdinWritable: (value: boolean) => void;
 }
 
 interface SpawnRecord {
@@ -33,9 +35,13 @@ function createFakeChild(): FakeChildHandle {
 	const stderr = new EventEmitter() as NodeJS.ReadableStream;
 	const stdinChunks: string[] = [];
 	const killSignals: NodeJS.Signals[] = [];
-	const stdin = {
+	// Model stdin as an EventEmitter so `on('error', …)` wires up like the real
+	// pipe socket; `writable` is mutable so tests can simulate a dead pipe.
+	const stdinEmitter = new EventEmitter();
+	const stdin = Object.assign(stdinEmitter, {
 		end: () => undefined,
 		once: (_event: string, _handler: () => void) => undefined,
+		writable: true,
 		write: (
 			chunk: string | Buffer,
 			_enc?: BufferEncoding | (() => void),
@@ -49,7 +55,7 @@ function createFakeChild(): FakeChildHandle {
 			}
 			return true;
 		},
-	} as unknown as NodeJS.WritableStream;
+	}) as unknown as NodeJS.WritableStream;
 	const emitter = new EventEmitter();
 	const child = Object.assign(emitter, {
 		emitExit: (code: number | null, signal: NodeJS.Signals | null = null) => {
@@ -60,6 +66,9 @@ function createFakeChild(): FakeChildHandle {
 				'data',
 				typeof chunk === 'string' ? Buffer.from(chunk) : chunk,
 			);
+		},
+		emitStdinError: (cause: Error) => {
+			stdinEmitter.emit('error', cause);
 		},
 		emitStdout: (chunk: Buffer | string) => {
 			stdout.emit(
@@ -75,6 +84,9 @@ function createFakeChild(): FakeChildHandle {
 			return true;
 		},
 		pid: 4242,
+		setStdinWritable: (value: boolean) => {
+			(stdin as unknown as { writable: boolean }).writable = value;
+		},
 		stderr,
 		stdin,
 		stdout,
@@ -153,6 +165,29 @@ test('spawns the executable with metadata cwd, args, and merged env', async () =
 	assert.equal(record.command, '/usr/local/bin/pi');
 	assert.deepEqual(record.args, ['--mode', 'rpc']);
 	assert.equal(record.cwd, '/tmp/ensemble/ws');
+	assert.equal(record.env.LANG, 'en_US.UTF-8');
+	await adapter.shutdown();
+});
+
+test('spawns the Pi child under the resolved base environment', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({
+		// Production wires this to the login-shell env; a Finder-launched packaged
+		// app was instead spawning under process.env's minimal PATH, so pi exited
+		// on startup and the first prompt write hit EPIPE.
+		resolveBaseEnv: () => ({
+			HOME: '/Users/dev',
+			PATH: '/opt/homebrew/bin:/usr/bin:/bin',
+		}),
+		spawn: recorder.spawn,
+	});
+	await adapter.createSession({ metadata: buildMetadata() });
+
+	const record = firstItem(recorder.getRecords());
+	// Base env (shell PATH + HOME) is present, and the per-session overlay layers
+	// on top.
+	assert.equal(record.env.PATH, '/opt/homebrew/bin:/usr/bin:/bin');
+	assert.equal(record.env.HOME, '/Users/dev');
 	assert.equal(record.env.LANG, 'en_US.UTF-8');
 	await adapter.shutdown();
 });
@@ -356,6 +391,49 @@ test('submit writes a JSONL frame to stdin and waits for Pi user echo', async ()
 		parts: [{ kind: 'text', text: 'do the thing' }],
 		role: 'user',
 	});
+	await adapter.shutdown();
+});
+
+test('absorbs an async stdin EPIPE as a recoverable error, never uncaught', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	// The kernel reports EPIPE on the stdin pipe when the Pi child dies mid-turn.
+	// Without the adapter's `stdin.on('error')` listener this would surface as an
+	// uncaught exception and crash the main process (the production regression).
+	child.emitStdinError(new Error('write EPIPE'));
+
+	const errorEvent = events.find(
+		(event): event is Extract<PiAgentEvent, { type: 'error' }> =>
+			event.type === 'error' && event.error.code === 'submit-failed',
+	);
+	assert.ok(errorEvent);
+	assert.equal(errorEvent.error.recoverable, true);
+	assert.match(errorEvent.error.message, /stdin write failed/i);
+	await adapter.shutdown();
+});
+
+test('submit rejects with a typed error when the stdin pipe is dead', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	// Simulate a dead pipe (child exited): stdin is no longer writable.
+	child.setStdinWritable(false);
+
+	await assert.rejects(
+		() => session.submit({ prompt: 'do the thing' }),
+		/not writable/,
+	);
+	// The frame is never handed to the broken pipe.
+	assert.equal(child.getStdinChunks().length, 0);
 	await adapter.shutdown();
 });
 

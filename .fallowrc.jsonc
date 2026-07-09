@@ -11,10 +11,12 @@
 		"vite.main.config.mts",
 		"vite.preload.config.mts",
 		"vite.renderer.config.mts",
-		// Bun runs renderer tests directly; treat each file as an entry so
+		// Vitest runs renderer tests directly; treat each file as an entry so
 		// fallow doesn't flag them as unused.
 		"tests/**/*.test.{ts,tsx}",
-		"scripts/**/*.mjs"
+		// Dev tooling scripts run directly via `node` (.mjs) or `npx tsx` (.ts);
+		// treat each as an entry so fallow doesn't flag them as unused files.
+		"scripts/**/*.{mjs,ts}"
 	],
 
 	"ignorePatterns": [

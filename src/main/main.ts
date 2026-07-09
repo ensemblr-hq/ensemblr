@@ -238,12 +238,23 @@ const broadcastRawFrame = (sample: {
 		}
 	}
 };
+/**
+ * Base environment for every spawned Pi child. Uses the login-shell env (with
+ * the user's PATH) so a packaged app launched from Finder — whose `process.env`
+ * PATH is minimal — still lets pi find its runtime and tools instead of exiting
+ * on startup and surfacing later as an EPIPE on the first prompt write. Memoized
+ * inside `localCommandService`, so repeated opens do not re-spawn a shell.
+ */
+const resolvePiSpawnEnv = async (): Promise<NodeJS.ProcessEnv> =>
+	(await localCommandService.getEnvironment()).env;
 const piAgentAdapter = createCliRpcPiAgentAdapter({
 	onRawFrame: broadcastRawFrame,
+	resolveBaseEnv: resolvePiSpawnEnv,
 });
 const piAgentClient = createPiAgentClient({ adapter: piAgentAdapter });
 const summaryPiAgentAdapter = createCliRpcPiAgentAdapter({
 	onRawFrame: broadcastRawFrame,
+	resolveBaseEnv: resolvePiSpawnEnv,
 });
 const summaryPiAgentClient = createPiAgentClient({
 	adapter: summaryPiAgentAdapter,

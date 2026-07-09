@@ -1,6 +1,3 @@
-/// <reference types="bun" />
-
-import { afterEach, describe, expect, test } from 'bun:test';
 import {
 	existsSync,
 	mkdtempSync,
@@ -10,6 +7,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { afterEach, describe, expect, test } from 'vitest';
 
 import { createAppSettingsService } from '../../src/main/config/app-settings-service';
 

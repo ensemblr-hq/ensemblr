@@ -17,5 +17,5 @@ These instructions apply to everything under `src/preload/`.
 
 ## Verification
 
-- After moving preload files or imports, run `bun run typecheck`.
-- Run `bun run check` before finishing JavaScript or TypeScript changes.
+- After moving preload files or imports, run `npm run typecheck`.
+- Run `npm run check` before finishing JavaScript or TypeScript changes.

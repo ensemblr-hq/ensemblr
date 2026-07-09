@@ -2,7 +2,7 @@
 	"biome.enabled": true,
 	"prettier.enable": false,
 	"editor.tabSize": 2,
-	"npm.packageManager": "bun",
+	"npm.packageManager": "npm",
 	"figma.assetExportDirectory": "export/assets",
 	"editor.defaultFormatter": "biomejs.biome",
 	"[javascript]": {

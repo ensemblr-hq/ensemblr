@@ -1,0 +1,11 @@
+{
+	// Dev tooling scripts run under `node`/`npx tsx`, not the Vite bundler, so they
+	// are excluded from the main `tsconfig.json` include. Typecheck them here (via
+	// `npm run typecheck`) so `.ts` scripts do not ship type errors that tsx — which
+	// strips types without checking — would never catch.
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"types": ["node"]
+	},
+	"include": ["scripts/**/*.ts"]
+}

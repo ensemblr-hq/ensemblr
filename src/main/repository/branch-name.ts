@@ -2,7 +2,7 @@
  * Pure branch-name composition shared by workspace creation (configured prefix)
  * and auto-rename (prefix carried over from the existing branch). Kept free of
  * the sqlite/pi runtime so both call sites compose names identically and the
- * logic unit-tests under bun.
+ * logic unit-tests under Vitest.
  */
 
 /**

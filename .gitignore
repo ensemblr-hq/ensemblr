@@ -3,7 +3,8 @@
 .vite/
 dist/
 node_modules/
-out/
+/out/
+/out.*/
 .playwright-cli/
 .fallow/
 .pi-capture-sandbox/

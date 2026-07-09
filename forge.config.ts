@@ -25,7 +25,7 @@ const config: ForgeConfig = {
 		appBundleId: 'com.ensemble.app',
 		extraResource: ['docs/product/mvp-sequencing.md'],
 		// Packager resolves the platform extension (`icon.icns` on macOS).
-		// Regenerate with `bun run icon:generate`.
+		// Regenerate with `npm run icon:generate`.
 		icon: './assets/icon',
 		name: 'Ensemble',
 		// Keep only the Vite output plus node-pty (see PACKAGE_KEEP_* above);
