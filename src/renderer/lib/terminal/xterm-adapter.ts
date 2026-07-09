@@ -16,11 +16,15 @@ export interface TerminalRendererAdapter {
 	fit: () => { cols: number; rows: number } | null;
 	focus: () => void;
 	onData: (listener: (data: string) => void) => () => void;
+	/** Live-updates the terminal typography; caller re-fits afterwards. */
+	setFont: (options: { fontFamily?: string; fontSize?: number }) => void;
 	write: (data: string) => void;
 }
 
 /** Options for {@link createXtermAdapter}. */
 export interface CreateXtermAdapterOptions {
+	/** CSS font-family stack for the terminal glyphs. */
+	fontFamily?: string;
 	fontSize?: number;
 	/**
 	 * When true the surface never accepts keyboard input: stdin is disabled and
@@ -30,6 +34,9 @@ export interface CreateXtermAdapterOptions {
 	scrollback?: number;
 }
 
+/** Fallback monospace stack used when no user terminal font is set. */
+export const DEFAULT_FONT_FAMILY =
+	'"JetBrains Mono Variable", ui-monospace, monospace';
 const DEFAULT_FONT_SIZE = 12;
 const DEFAULT_SCROLLBACK = 10_000;
 
@@ -40,6 +47,7 @@ const DEFAULT_SCROLLBACK = 10_000;
  * @returns A fresh {@link TerminalRendererAdapter}.
  */
 export function createXtermAdapter({
+	fontFamily = DEFAULT_FONT_FAMILY,
 	fontSize = DEFAULT_FONT_SIZE,
 	readOnly = false,
 	scrollback = DEFAULT_SCROLLBACK,
@@ -51,7 +59,7 @@ export function createXtermAdapter({
 		cursorInactiveStyle: readOnly ? 'none' : 'outline',
 		cursorStyle: readOnly ? 'underline' : 'block',
 		disableStdin: readOnly,
-		fontFamily: "'JetBrains Mono Variable', ui-monospace, monospace",
+		fontFamily,
 		fontSize,
 		scrollback,
 		theme: readThemeFromDocument(),
@@ -86,6 +94,14 @@ export function createXtermAdapter({
 			const subscription = terminal.onData(listener);
 
 			return () => subscription.dispose();
+		},
+		setFont: ({ fontFamily: nextFamily, fontSize: nextSize }) => {
+			if (nextFamily !== undefined) {
+				terminal.options.fontFamily = nextFamily;
+			}
+			if (nextSize !== undefined) {
+				terminal.options.fontSize = nextSize;
+			}
 		},
 		write: (data) => terminal.write(data),
 	};

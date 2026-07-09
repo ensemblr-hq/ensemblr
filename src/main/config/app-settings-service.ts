@@ -22,7 +22,8 @@ import { resolveEnsembleConfigPath } from './config-loader.ts';
 const WATCH_DEBOUNCE_MS = 120;
 
 /**
- * Owns the App-settings slice (`app.general`, `app.models`) of
+ * Owns the App-settings slice (`app.general`, `app.models`, `app.git`,
+ * `app.appearance`) of
  * `~/.config/ensemble/config.json` — the source of truth. Creates the file with
  * defaults on first use, applies section-scoped patches via an atomic
  * temp-write+rename, and watches for external edits (echo-suppressed against its
@@ -82,6 +83,7 @@ export function createAppSettingsService(
 			general: app.general,
 			models: app.models,
 			git: app.git,
+			appearance: app.appearance,
 		});
 	};
 
@@ -95,6 +97,7 @@ export function createAppSettingsService(
 				general: DEFAULT_APP_SETTINGS.general,
 				models: DEFAULT_APP_SETTINGS.models,
 				git: DEFAULT_APP_SETTINGS.git,
+				appearance: DEFAULT_APP_SETTINGS.appearance,
 			},
 		});
 	};
@@ -118,6 +121,7 @@ export function createAppSettingsService(
 				general: next.general,
 				models: next.models,
 				git: next.git,
+				appearance: next.appearance,
 			},
 		});
 		return next;

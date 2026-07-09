@@ -9,8 +9,8 @@ This inventory comes from the settings screenshots plus accepted ADRs. It separa
 | Store | Use for |
 | --- | --- |
 | SQLite | Mutable local app state, personal overrides, cached integration status, workspace/repository records. |
-| `~/.config/ensemble/config.json` | **Source of truth for App settings** — General and Models are implemented under `app.general.*` / `app.models.*` (see ADR 0029) — plus declarative user defaults, managed policy-like settings, and repository matching rules. Created on first run; live-watched for external edits. |
-| `localStorage` (`atomWithStorage`) | Non-Settings-page UI state, app preferences not yet migrated to `config.json` (theme, fonts, Git/Experimental/Advanced toggles), composer favourites, and the model-catalog cache. |
+| `~/.config/ensemble/config.json` | **Source of truth for App settings** — General, Models, Git, and Appearance are implemented under `app.general.*` / `app.models.*` / `app.git.*` / `app.appearance.*` (see ADR 0029) — plus declarative user defaults, managed policy-like settings, and repository matching rules. Created on first run; live-watched for external edits. |
+| `localStorage` (`atomWithStorage`) | Non-Settings-page UI state, app preferences not yet migrated to `config.json` (Experimental/Advanced toggles), composer favourites, and the model-catalog cache. |
 | Repository config | Shared project behavior in the committed `.ensemble/settings.toml`. Use for scripts, run mode, files-to-copy, and team-shared repository defaults. |
 | Pi user environment | Pi auth, models, provider settings, skills, extensions, prompts, themes, sessions, and project `.pi` resources. Ensemble should not duplicate this as source of truth. |
 | macOS Keychain | Secret values such as tokens/API keys. SQLite may keep metadata only. |
@@ -84,17 +84,27 @@ profile" copy was a hallucination and has been replaced.
 
 ### Appearance
 
+Source of truth: `~/.config/ensemble/config.json` under `app.appearance.*` (same
+sync/live-reload path as General; see ADR 0029). Each value applies live — theme
+plus the accessible-color/ligature classes on the document root, the mono font
+via the `--ensemble-font-mono` CSS variable, terminal typography through the
+xterm adapter, and the code theme through the Shiki/Streamdown renderers. Unlike
+General/Models (fresh seed), Appearance runs a **one-time migration** of the old
+`ensemble_pref_*` `localStorage` values into `config.json` on first launch, then
+removes the legacy keys; the renamed `one-dark` code theme is carried over as
+`one-dark-pro`.
+
 | Setting | Conductor mapping | Ensemble adaptation | Storage |
 | --- | --- | --- | --- |
-| Theme | Direct. | Ensemble-specific themes. | SQLite/config. |
-| Colored sidebar diffs | Direct. | Same. | SQLite/config. |
-| Accessible colors | Direct. | Ensemble accessibility palette variants. | SQLite/config. |
-| Code theme | Direct. | Ensemble code/diff highlighting theme. | SQLite/config. |
-| Mono font | Direct. | Font for code, diffs, and inline code. | SQLite/config. |
-| Code ligatures | Direct. | Same. | SQLite/config. |
-| Markdown style | Direct. | Ensemble markdown rendering preset. | SQLite/config. |
-| Terminal font | Direct. | xterm.js font family. | SQLite/config. |
-| Terminal font size | Direct. | xterm.js font size. | SQLite/config. |
+| Theme | Direct. | Ensemble-specific themes. | `config.json` (`app.appearance.theme`). |
+| Colored sidebar diffs | Direct. | Same. | `config.json` (`app.appearance.coloredSidebarDiffs`). |
+| Accessible colors | Direct. | Ensemble accessibility palette variants. | `config.json` (`app.appearance.accessibleColors`). |
+| Code theme | Direct. | Ensemble code/diff highlighting theme. | `config.json` (`app.appearance.codeTheme`). |
+| Mono font | Direct. | Font for code, diffs, and inline code. | `config.json` (`app.appearance.monoFont`). |
+| Code ligatures | Direct. | Same. | `config.json` (`app.appearance.codeLigatures`). |
+| Markdown style | Direct. | Ensemble markdown rendering preset. | `config.json` (`app.appearance.markdownStyle`). |
+| Terminal font | Direct. | xterm.js font family. | `config.json` (`app.appearance.terminalFont`). |
+| Terminal font size | Direct. | xterm.js font size (8–24). | `config.json` (`app.appearance.terminalFontSize`). |
 
 ### Git
 
@@ -214,14 +224,15 @@ For repository behavior, resolve each key with this precedence (highest to lowes
 For app-wide behavior, use:
 
 1. Locked/managed settings from `~/.config/ensemble/config.json`, if supported by schema.
-2. User-selected settings in `~/.config/ensemble/config.json` (App settings already migrated — General, Models). Sections not yet migrated still read from `localStorage`.
+2. User-selected settings in `~/.config/ensemble/config.json` (App settings already migrated — General, Models, Git, Appearance). Sections not yet migrated still read from `localStorage`.
 3. Built-in defaults (the shared Zod schema fills any missing or invalid field).
 4. Pi user environment for Pi-specific resources and auth.
 
-> Migration status: General and Models are the source of truth in `config.json`.
-> Other App sections (Appearance, Git, Experimental, Advanced) still persist to
-> `localStorage` and will move to `config.json` in a later pass. Repo settings
-> are out of scope for this change.
+> Migration status: General, Models, Git, and Appearance are the source of truth
+> in `config.json`. Appearance additionally migrates its legacy `ensemble_pref_*`
+> `localStorage` values on first launch (removing them only after a successful
+> write). The remaining App sections (Experimental, Advanced) still persist to
+> `localStorage` and will move in a later pass. Repo settings are out of scope.
 
 ## Open Settings Questions
 

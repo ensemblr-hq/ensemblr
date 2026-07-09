@@ -105,6 +105,29 @@ export const deleteBranchOnArchiveAtom = settingAtom(
 export const archiveOnMergeAtom = settingAtom('git', 'archiveAfterMerge');
 export const setUpstreamOnPushAtom = settingAtom('git', 'setUpstreamOnPush');
 
+// ─── Appearance ─────────────────────────────────────────────────────────────────
+// Backs the Settings → Appearance page. Consumers apply these live via
+// `useThemeEffect`/`useAppearanceEffect` (DOM classes + CSS vars), the xterm
+// adapter (terminal typography), and the Shiki/Streamdown code renderers.
+export const themeAtom = settingAtom('appearance', 'theme');
+export const coloredSidebarDiffsAtom = settingAtom(
+	'appearance',
+	'coloredSidebarDiffs',
+);
+export const accessibleColorsAtom = settingAtom(
+	'appearance',
+	'accessibleColors',
+);
+export const codeThemeAtom = settingAtom('appearance', 'codeTheme');
+export const monoFontAtom = settingAtom('appearance', 'monoFont');
+export const codeLigaturesAtom = settingAtom('appearance', 'codeLigatures');
+export const markdownStyleAtom = settingAtom('appearance', 'markdownStyle');
+export const terminalFontAtom = settingAtom('appearance', 'terminalFont');
+export const terminalFontSizeAtom = settingAtom(
+	'appearance',
+	'terminalFontSize',
+);
+
 /**
  * Hydrates {@link appSettingsAtom} from `config.json` on mount and live-reloads
  * it when the file is edited outside the app. Mount once at the app root.

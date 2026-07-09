@@ -1,10 +1,22 @@
+import { useAtomValue } from 'jotai';
 import { useEffect, useRef } from 'react';
 
 import {
 	createXtermAdapter,
+	DEFAULT_FONT_FAMILY,
 	type TerminalRendererAdapter,
 } from '@/renderer/lib/terminal/xterm-adapter';
+import {
+	terminalFontAtom,
+	terminalFontSizeAtom,
+} from '@/renderer/state/preferences';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
+
+/** Builds the terminal CSS font stack, prepending the user's chosen font. */
+function buildTerminalFontFamily(font: string): string {
+	const trimmed = font.trim();
+	return trimmed ? `"${trimmed}", ${DEFAULT_FONT_FAMILY}` : DEFAULT_FONT_FAMILY;
+}
 
 /**
  * One live xterm.js surface bound to a main-process PTY session: replays the
@@ -23,6 +35,17 @@ export function XtermTerminal({
 }) {
 	const containerRef = useRef<HTMLDivElement | null>(null);
 	const adapterRef = useRef<TerminalRendererAdapter | null>(null);
+	const terminalFont = useAtomValue(terminalFontAtom);
+	const terminalFontSize = useAtomValue(terminalFontSizeAtom);
+	const fontFamily = buildTerminalFontFamily(terminalFont);
+	// Latest typography, read at construction without re-mounting the surface on
+	// every font/size change (that is handled by the separate effect below).
+	const fontRef = useRef({ fontFamily, fontSize: terminalFontSize });
+	fontRef.current = { fontFamily, fontSize: terminalFontSize };
+	// Typography the live adapter already reflects. Seeded with the construction
+	// values so the live-apply effect skips its redundant first run (and any
+	// remount that rebuilds the adapter with the same font).
+	const appliedFontRef = useRef({ fontFamily, fontSize: terminalFontSize });
 	// The exit banner is for interactive terminals only. Setup/Run script panels
 	// (read-only) surface their lifecycle through the dock tab status dot, so the
 	// footer would be redundant noise there.
@@ -36,7 +59,11 @@ export function XtermTerminal({
 		}
 
 		const ensemble = window.ensemble;
-		const adapter = createXtermAdapter({ readOnly });
+		const adapter = createXtermAdapter({
+			fontFamily: fontRef.current.fontFamily,
+			fontSize: fontRef.current.fontSize,
+			readOnly,
+		});
 		adapterRef.current = adapter;
 		adapter.attach(container);
 
@@ -127,6 +154,45 @@ export function XtermTerminal({
 			adapterRef.current = null;
 		};
 	}, [readOnly, terminalId]);
+
+	// Live-apply terminal font/size changes to the already-mounted surface so the
+	// Appearance settings take effect without recreating the PTY binding. Each
+	// open terminal runs this independently, then re-fits and resizes its session.
+	useEffect(() => {
+		const adapter = adapterRef.current;
+		const container = containerRef.current;
+
+		if (!adapter || !container || !window.ensemble) {
+			return;
+		}
+
+		// The mount effect already built the adapter with the current typography
+		// and fitted it; only re-apply when the font or size actually changed.
+		const applied = appliedFontRef.current;
+		if (
+			applied.fontFamily === fontFamily &&
+			applied.fontSize === terminalFontSize
+		) {
+			return;
+		}
+		appliedFontRef.current = { fontFamily, fontSize: terminalFontSize };
+
+		adapter.setFont({ fontFamily, fontSize: terminalFontSize });
+
+		if (container.clientHeight === 0 || container.clientWidth === 0) {
+			return;
+		}
+
+		const dimensions = adapter.fit();
+
+		if (dimensions) {
+			void window.ensemble.resizeTerminalSession({
+				cols: dimensions.cols,
+				rows: dimensions.rows,
+				terminalId,
+			});
+		}
+	}, [fontFamily, terminalFontSize, terminalId]);
 
 	return (
 		<div className='relative h-full min-h-0 w-full bg-sidebar'>

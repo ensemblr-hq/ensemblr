@@ -6,9 +6,10 @@
  * Outside this folder, import from `@/renderer/state/preferences` only.
  */
 
-// Config.json-backed App settings (General + Models sections). The source of
-// truth is `~/.config/ensemble/config.json`; see ./app-settings.
+// Config.json-backed App settings (General, Models, Git, Appearance sections).
+// The source of truth is `~/.config/ensemble/config.json`; see ./app-settings.
 export {
+	accessibleColorsAtom,
 	alwaysShowContextUsageAtom,
 	appSettingsAtom,
 	archiveOnMergeAtom,
@@ -16,48 +17,46 @@ export {
 	branchPrefixCustomAtom,
 	branchPrefixSourceAtom,
 	caffeinateWhileRunningAtom,
+	codeLigaturesAtom,
+	codeThemeAtom,
+	coloredSidebarDiffsAtom,
 	defaultChatModelAtom,
 	defaultChatThinkingLevelAtom,
 	deleteBranchOnArchiveAtom,
 	desktopNotificationsAtom,
 	followUpBehaviorAtom,
 	hiddenModelsAtom,
+	markdownStyleAtom,
+	monoFontAtom,
 	renameWorkspaceOnBranchAtom,
 	reviewModelAtom,
 	reviewThinkingLevelAtom,
 	sendShortcutAtom,
 	setUpstreamOnPushAtom,
+	terminalFontAtom,
+	terminalFontSizeAtom,
+	themeAtom,
 	toolCallCollapseAtom,
 	useAppSettingsSync,
 } from './app-settings';
 export type {
-	AccessibleColorVariant,
-	CodeTheme,
 	FollowUpBehavior,
-	MarkdownStyle,
 	PrDetailsDraft,
 	PrDetailsLiveDraft,
 	RepoActionKey,
 	RepoSettingsKey,
 	RepoSettingsOverride,
 	SendShortcut,
-	ThemeMode,
 	ToolCallCollapseMode,
 } from './atoms';
 export {
-	accessibleColorsAtom,
 	autoRunAfterSetupAtom,
 	chatModelOverrideAtomFamily,
 	chatThinkingOverrideAtomFamily,
-	codeLigaturesAtom,
-	codeThemeAtom,
-	coloredSidebarDiffsAtom,
 	customPiExecutablePathAtom,
 	favouriteModelsAtom,
 	forgetChatOverrides,
 	inAppBrowserPreviewAtom,
-	markdownStyleAtom,
-	monoFontAtom,
 	prDetailsDraftAtomFamily,
 	prDetailsLiveDraftAtomFamily,
 	REPO_ACTION_KEYS,
@@ -65,9 +64,8 @@ export {
 	showDashboardAtom,
 	showSidebarResourceUsageAtom,
 	sidebarChatsModeAtom,
-	terminalFontAtom,
-	terminalFontSizeAtom,
 	terminalScrollbackMbAtom,
-	themeAtom,
 } from './atoms';
+export { useAppearanceEffect } from './use-appearance-effect';
+export { useAppearanceLegacyMigration } from './use-appearance-migration';
 export { useThemeEffect } from './use-theme-effect';

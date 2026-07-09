@@ -75,3 +75,15 @@ less overhead than polling; debounced and echo-suppressed against our own writes
   still in `localStorage` until a follow-up pass moves them.
 - A bad value typed into the file degrades to that field's default rather than
   breaking the app.
+
+## Update (2026-07-09)
+
+The pattern has since been extended beyond General/Models: **Git** and
+**Appearance** now persist to `config.json` under `app.git.*` / `app.appearance.*`
+and are the source of truth (same schema, service, IPC, and per-setting-atom
+path). Appearance departs from the "fresh seed" rule above in one respect — it
+runs a **one-time migration** of the legacy `ensemble_pref_*` `localStorage`
+values into `config.json` on first launch (via `useAppearanceLegacyMigration`),
+removing each legacy key only after a successful write so a failed write retries
+next launch. The renamed `one-dark` code theme is carried over as `one-dark-pro`.
+The `localStorage`-only App sections are now just Experimental and Advanced.
