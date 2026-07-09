@@ -151,6 +151,25 @@
 }
 
 /*
+ * Dev-build tint. `main.tsx` adds `.env-dev` to <html> only when
+ * `import.meta.env.DEV` is set, so the packaged app never matches. Re-hues the
+ * top bars (`--ensemble-toolbar`) and the accent (`--ensemble-accent`) to amber
+ * (hue 74) so the dogfood dev window is unmistakable. The nav sidebar's
+ * title-bar strip carries no `.native-toolbar`, so it is tinted to match via the
+ * rule below. Light values on `.env-dev`; dark on `.dark.env-dev` (higher
+ * specificity, wins over `.dark`).
+ */
+.env-dev {
+	--ensemble-toolbar: oklch(0.9 0.055 74 / 92%);
+	--ensemble-accent: oklch(0.7 0.14 74);
+}
+
+.dark.env-dev {
+	--ensemble-toolbar: oklch(0.22 0.05 74 / 94%);
+	--ensemble-accent: oklch(0.75 0.13 74);
+}
+
+/*
  * Accessible-color variants (Settings → Appearance). `useAppearanceEffect` adds
  * one `a11y-*` root class; each block re-hues the status + diff semantic tokens
  * to a colorblind-distinguishable palette (Okabe-Ito) while preserving each
@@ -336,6 +355,11 @@
 	.native-toolbar {
 		background: var(--ensemble-toolbar);
 		backdrop-filter: blur(18px) saturate(1.3);
+	}
+
+	/* Dev only: tint the nav sidebar's bare title-bar strip to match the top bars. */
+	.env-dev .macos-traffic-light-spacer {
+		background: var(--ensemble-toolbar);
 	}
 
 	.project-workspace-collapse {
