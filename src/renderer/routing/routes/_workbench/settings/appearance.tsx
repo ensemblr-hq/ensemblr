@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
 
+import { CodeBlock } from '@/renderer/components/code-block';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { Input } from '@/renderer/components/ui/input';
@@ -23,10 +24,13 @@ import {
 	terminalFontSizeAtom,
 	themeAtom,
 } from '@/renderer/state/preferences';
+import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
 
 export const Route = createFileRoute('/_workbench/settings/appearance')({
 	component: AppearanceSettings,
 });
+
+const DEFAULTS = DEFAULT_APP_SETTINGS.appearance;
 
 const CODE_SAMPLE = `// Fetch user data
 async function getUser(id: number): Promise<User> {
@@ -70,6 +74,7 @@ function AppearanceSettings() {
 				}
 				description='Toggle with ⌘⌥T.'
 				label='Theme'
+				modified={theme !== DEFAULTS.theme}
 			/>
 
 			<SettingRow
@@ -78,6 +83,7 @@ function AppearanceSettings() {
 				}
 				description='Always show line change colors in the sidebar, even for unselected workspaces.'
 				label='Colored sidebar diffs'
+				modified={coloredDiffs !== DEFAULTS.coloredSidebarDiffs}
 			/>
 
 			<SettingRow
@@ -101,6 +107,7 @@ function AppearanceSettings() {
 				}
 				description='Theme optimized for color vision differences.'
 				label='Accessible colors'
+				modified={accessibleColors !== DEFAULTS.accessibleColors}
 			/>
 
 			<SettingRow
@@ -117,20 +124,17 @@ function AppearanceSettings() {
 							<SelectItem value='catppuccin-latte'>Catppuccin Latte</SelectItem>
 							<SelectItem value='github-dark'>GitHub Dark</SelectItem>
 							<SelectItem value='github-light'>GitHub Light</SelectItem>
-							<SelectItem value='one-dark'>One Dark</SelectItem>
+							<SelectItem value='one-dark-pro'>One Dark Pro</SelectItem>
 							<SelectItem value='solarized-dark'>Solarized Dark</SelectItem>
 						</SelectContent>
 					</Select>
 				}
 				description='Syntax highlighting for code blocks and editors.'
 				label='Code theme'
+				modified={codeTheme !== DEFAULTS.codeTheme}
 				stack
 			>
-				<pre className='mt-3 overflow-x-auto rounded-md bg-code px-4 py-3 text-code-foreground text-xs leading-relaxed ring-1 ring-code-border'>
-					<code style={{ fontFamily: `"${monoFont}", var(--font-mono)` }}>
-						{CODE_SAMPLE}
-					</code>
-				</pre>
+				<CodeBlock className='mt-3' code={CODE_SAMPLE} language='typescript' />
 			</SettingRow>
 
 			<SettingRow
@@ -145,6 +149,7 @@ function AppearanceSettings() {
 				}
 				description='Font used for code and diffs. Enter the font name exactly as installed on your system.'
 				label='Mono font'
+				modified={monoFont !== DEFAULTS.monoFont}
 				stack
 			>
 				<pre className='mt-3 overflow-x-auto rounded-md bg-code px-4 py-3 text-code-foreground text-xs leading-relaxed ring-1 ring-code-border'>
@@ -158,6 +163,7 @@ function AppearanceSettings() {
 				control={<Switch checked={ligatures} onCheckedChange={setLigatures} />}
 				description='Use font ligatures in file editors and diffs.'
 				label='Code ligatures'
+				modified={ligatures !== DEFAULTS.codeLigatures}
 			/>
 
 			<SettingRow
@@ -178,6 +184,7 @@ function AppearanceSettings() {
 				}
 				description='Rendering style for markdown files.'
 				label='Markdown style'
+				modified={markdownStyle !== DEFAULTS.markdownStyle}
 			/>
 
 			<SettingRow
@@ -192,6 +199,7 @@ function AppearanceSettings() {
 				}
 				description='Enter the font name exactly as installed, e.g. Arial, Papyrus, FiraCode Nerd Font.'
 				label='Terminal font'
+				modified={terminalFont !== DEFAULTS.terminalFont}
 			/>
 
 			<SettingRow
@@ -202,6 +210,7 @@ function AppearanceSettings() {
 				}
 				description='Adjust the size of text in the integrated terminal.'
 				label='Terminal font size'
+				modified={terminalSize !== DEFAULTS.terminalFontSize}
 				stack
 			>
 				<input

@@ -1,7 +1,7 @@
 import { useAtomValue } from 'jotai';
 import { useEffect } from 'react';
 
-import { themeAtom } from './atoms';
+import { themeAtom } from './app-settings';
 
 /** Applies the active theme class to the document root and reacts to OS changes when `system`. */
 export function useThemeEffect(): void {

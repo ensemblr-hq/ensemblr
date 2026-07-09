@@ -46,10 +46,40 @@ export const gitSettingsSchema = z.object({
 	setUpstreamOnPush: z.boolean().catch(true),
 });
 
+// Appearance settings drive live DOM/CSS side-effects (theme class, mono-font
+// CSS var, ligature/accessible-color root classes) plus terminal and code-block
+// typography. Enum unions live here as the single source of truth; the renderer
+// atoms and the settings UI derive their types from this schema.
+export const appearanceSettingsSchema = z.object({
+	theme: z.enum(['system', 'light', 'dark']).catch('system'),
+	coloredSidebarDiffs: z.boolean().catch(false),
+	accessibleColors: z
+		.enum(['default', 'protanopia', 'deuteranopia', 'tritanopia'])
+		.catch('default'),
+	// Values are Shiki `BundledTheme` ids so consumers can pass them straight
+	// through (e.g. `one-dark-pro`, not `one-dark`).
+	codeTheme: z
+		.enum([
+			'catppuccin-mocha',
+			'catppuccin-latte',
+			'github-dark',
+			'github-light',
+			'one-dark-pro',
+			'solarized-dark',
+		])
+		.catch('catppuccin-mocha'),
+	monoFont: z.string().catch('JetBrains Mono'),
+	codeLigatures: z.boolean().catch(true),
+	markdownStyle: z.enum(['default', 'compact', 'prose']).catch('default'),
+	terminalFont: z.string().catch('JetBrains Mono'),
+	terminalFontSize: z.number().int().min(8).max(24).catch(12),
+});
+
 export const appSettingsSchema = z.object({
 	general: generalSettingsSchema,
 	models: modelSettingsSchema,
 	git: gitSettingsSchema,
+	appearance: appearanceSettingsSchema,
 });
 
 export type AppSettings = z.infer<typeof appSettingsSchema>;
@@ -57,12 +87,14 @@ export type GeneralSettings = AppSettings['general'];
 export type ModelSettings = AppSettings['models'];
 export type GitSettings = AppSettings['git'];
 export type BranchPrefixSource = GitSettings['branchPrefixSource'];
+export type AppearanceSettings = AppSettings['appearance'];
 
 /** Section-scoped partial patch applied by `updateAppSettings`. */
 export interface AppSettingsPatch {
 	general?: Partial<GeneralSettings>;
 	models?: Partial<ModelSettings>;
 	git?: Partial<GitSettings>;
+	appearance?: Partial<AppearanceSettings>;
 }
 
 /** Validates an untrusted patch at the IPC boundary; unknown keys are dropped. */
@@ -70,6 +102,7 @@ export const appSettingsPatchSchema = z.object({
 	general: generalSettingsSchema.partial().optional(),
 	models: modelSettingsSchema.partial().optional(),
 	git: gitSettingsSchema.partial().optional(),
+	appearance: appearanceSettingsSchema.partial().optional(),
 });
 
 /** Fully-defaulted settings — the baseline before any config file is read. */
@@ -77,6 +110,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = appSettingsSchema.parse({
 	general: {},
 	models: {},
 	git: {},
+	appearance: {},
 });
 
 /** True for a non-null, non-array plain object. */
@@ -97,6 +131,7 @@ export function parseAppSettings(raw: unknown): AppSettings {
 		general: asRecord(record.general),
 		models: asRecord(record.models),
 		git: asRecord(record.git),
+		appearance: asRecord(record.appearance),
 	});
 	return result.success ? result.data : DEFAULT_APP_SETTINGS;
 }
@@ -110,5 +145,6 @@ export function mergeAppSettings(
 		general: { ...current.general, ...patch.general },
 		models: { ...current.models, ...patch.models },
 		git: { ...current.git, ...patch.git },
+		appearance: { ...current.appearance, ...patch.appearance },
 	};
 }

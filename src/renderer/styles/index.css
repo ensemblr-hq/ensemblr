@@ -2,6 +2,9 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Enables `prose` markdown rendering (Settings → Appearance → Markdown style). */
+@plugin "@tailwindcss/typography";
+
 /*
  * Streamdown ships its UI as Tailwind classes inside dist (including shiki
  * token colors via text-[var(--sdm-c)] / dark:text-[var(--shiki-dark)]).
@@ -18,6 +21,15 @@
 	font-family: var(--font-sans);
 	font-synthesis: none;
 	text-rendering: optimizeLegibility;
+
+	/*
+	 * Runtime-swappable mono stack. `@theme inline` inlines this var's *value*
+	 * into the `font-mono` utility, so `useAppearanceEffect` overriding it here
+	 * re-fonts every code/editor/diff surface live. The user's chosen font is
+	 * prepended at runtime; this literal is the fallback chain.
+	 */
+	--ensemble-font-mono:
+		"JetBrains Mono Variable", "JetBrains Mono", Menlo, Consolas, monospace;
 
 	--ensemble-canvas: oklch(0.965 0.003 265);
 	--ensemble-toolbar: oklch(0.94 0.004 265 / 92%);
@@ -138,13 +150,84 @@
 	--sidebar-accent: oklch(0.235 0.006 35);
 }
 
+/*
+ * Accessible-color variants (Settings → Appearance). `useAppearanceEffect` adds
+ * one `a11y-*` root class; each block re-hues the status + diff semantic tokens
+ * to a colorblind-distinguishable palette (Okabe-Ito) while preserving each
+ * token's existing lightness/chroma so the remap sits correctly in both modes.
+ * Light values live on `.a11y-*`; dark on `.dark.a11y-*` (higher specificity,
+ * so it wins over `.dark`). Protanopia and deuteranopia share the red-green
+ * palette (add/ok → blue 244°, remove/danger → vermillion 47.5°, warning → 76.8°).
+ */
+.a11y-protanopia,
+.a11y-deuteranopia {
+	--ensemble-status-ok: oklch(0.61 0.18 244);
+	--ensemble-status-warning: oklch(0.68 0.15 76.8);
+	--ensemble-status-danger: oklch(0.58 0.19 47.5);
+	--ensemble-diff-addition: oklch(0.94 0.041 244);
+	--ensemble-diff-addition-foreground: oklch(0.37 0.11 244);
+	--ensemble-diff-deletion: oklch(0.94 0.035 47.5);
+	--ensemble-diff-deletion-foreground: oklch(0.43 0.14 47.5);
+	--ensemble-diff-modified: oklch(0.94 0.028 76.8);
+	--ensemble-diff-modified-foreground: oklch(0.43 0.08 76.8);
+}
+
+.dark.a11y-protanopia,
+.dark.a11y-deuteranopia {
+	--ensemble-status-ok: oklch(0.74 0.18 244);
+	--ensemble-status-warning: oklch(0.77 0.13 76.8);
+	--ensemble-status-danger: oklch(0.68 0.15 47.5);
+	--ensemble-diff-addition: oklch(0.22 0.052 244);
+	--ensemble-diff-addition-foreground: oklch(0.78 0.18 244);
+	--ensemble-diff-deletion: oklch(0.22 0.045 47.5);
+	--ensemble-diff-deletion-foreground: oklch(0.74 0.15 47.5);
+	--ensemble-diff-modified: oklch(0.24 0.035 76.8);
+	--ensemble-diff-modified-foreground: oklch(0.78 0.13 76.8);
+}
+
+/* Tritanopia: add/ok → green 165.5°, remove/danger → magenta 346.3°, warning → vermillion 47.5°. */
+.a11y-tritanopia {
+	--ensemble-status-ok: oklch(0.61 0.18 165.5);
+	--ensemble-status-warning: oklch(0.68 0.15 47.5);
+	--ensemble-status-danger: oklch(0.58 0.19 346.3);
+	--ensemble-diff-addition: oklch(0.94 0.041 165.5);
+	--ensemble-diff-addition-foreground: oklch(0.37 0.11 165.5);
+	--ensemble-diff-deletion: oklch(0.94 0.035 346.3);
+	--ensemble-diff-deletion-foreground: oklch(0.43 0.14 346.3);
+	--ensemble-diff-modified: oklch(0.94 0.028 47.5);
+	--ensemble-diff-modified-foreground: oklch(0.43 0.08 47.5);
+}
+
+.dark.a11y-tritanopia {
+	--ensemble-status-ok: oklch(0.74 0.18 165.5);
+	--ensemble-status-warning: oklch(0.77 0.13 47.5);
+	--ensemble-status-danger: oklch(0.68 0.15 346.3);
+	--ensemble-diff-addition: oklch(0.22 0.052 165.5);
+	--ensemble-diff-addition-foreground: oklch(0.78 0.18 165.5);
+	--ensemble-diff-deletion: oklch(0.22 0.045 346.3);
+	--ensemble-diff-deletion-foreground: oklch(0.74 0.15 346.3);
+	--ensemble-diff-modified: oklch(0.24 0.035 47.5);
+	--ensemble-diff-modified-foreground: oklch(0.78 0.13 47.5);
+}
+
+/*
+ * Ligature opt-out (Settings → Appearance → Code ligatures). Scoped to code,
+ * editor, and diff surfaces — matches the field's "editors and diffs" wording.
+ * The xterm terminal renders to canvas and is unaffected.
+ */
+.ligatures-off pre,
+.ligatures-off code,
+.ligatures-off .cm-editor {
+	font-feature-settings: normal;
+	font-variant-ligatures: none;
+}
+
 @theme inline {
 	--font-heading:
 		-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
 	--font-sans:
 		-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-	--font-mono:
-		"JetBrains Mono Variable", "JetBrains Mono", Menlo, Consolas, monospace;
+	--font-mono: var(--ensemble-font-mono);
 	--text-xxs: 0.6875rem;
 	--color-canvas: var(--ensemble-canvas);
 	--color-toolbar: var(--ensemble-toolbar);
