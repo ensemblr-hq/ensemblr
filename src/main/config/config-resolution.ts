@@ -27,6 +27,11 @@ export interface ResolveSettingsOptions {
 	homeDirectory?: string;
 	repository?: RepositorySettingsResolutionRequest;
 	/**
+	 * Overrides the built-in default Ensemble root directory (`~/Ensemble`).
+	 * Used to isolate the dogfood dev build onto its own repo/workspace root.
+	 */
+	rootDirectory?: string;
+	/**
 	 * User-scope git defaults from `config.json` (`app.git`). Fed into the
 	 * repository scope as the `user-default` source so personal defaults apply
 	 * to every repo, while any repo-scoped value still wins.
@@ -45,6 +50,8 @@ interface CreateEnsembleConfigResolutionServiceOptions {
 	configService: EnsembleConfigService;
 	databaseService: EnsembleDatabaseService;
 	homeDirectory?: string;
+	/** Overrides the default Ensemble root directory (dogfood dev build). */
+	rootDirectory?: string;
 }
 
 /** Internal: one candidate value for a setting, before precedence selection. */
@@ -116,6 +123,7 @@ export function createEnsembleConfigResolutionService({
 	configService,
 	databaseService,
 	homeDirectory,
+	rootDirectory,
 }: CreateEnsembleConfigResolutionServiceOptions): EnsembleConfigResolutionService {
 	return {
 		resolve: (request) =>
@@ -124,6 +132,7 @@ export function createEnsembleConfigResolutionService({
 				database: databaseService.getConnection()?.database ?? null,
 				homeDirectory,
 				repository: normalizeSettingsResolutionRequest(request).repository,
+				rootDirectory,
 				userGitDefaults: appSettingsService.read().git,
 			}),
 	};
@@ -140,6 +149,7 @@ export function resolveSettings({
 	database = null,
 	homeDirectory = homedir(),
 	repository,
+	rootDirectory,
 	userGitDefaults,
 }: ResolveSettingsOptions): SettingsResolutionSnapshot {
 	const appConfigDefaults = collectAppConfigDefaults(config);
@@ -159,7 +169,7 @@ export function resolveSettings({
 	addCandidates(appCandidates, appConfigDefaults, 'config-default');
 	addCandidates(
 		appCandidates,
-		collectAppBuiltInDefaults(homeDirectory),
+		collectAppBuiltInDefaults(homeDirectory, rootDirectory),
 		'built-in-default',
 	);
 
@@ -450,13 +460,15 @@ function addCandidates(
  * Built-in fallback defaults for the app scope, including the default Ensemble
  * root directory derived from the user's home.
  * @param homeDirectory - User home directory.
+ * @param rootDirectory - Explicit root-directory override; defaults to `<home>/Ensemble`.
  * @returns Flat map of `key -> value`.
  */
 function collectAppBuiltInDefaults(
 	homeDirectory: string,
+	rootDirectory?: string,
 ): Map<string, unknown> {
 	return new Map([
-		['rootDirectory', path.join(homeDirectory, 'Ensemble')],
+		['rootDirectory', rootDirectory ?? path.join(homeDirectory, 'Ensemble')],
 		['security.permissionMode', DEFAULT_PERMISSION_MODE],
 		['sendShortcut', 'enter'],
 		['ui.theme', 'system'],

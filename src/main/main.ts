@@ -1,3 +1,6 @@
+import os from 'node:os';
+import path from 'node:path';
+import type { DatabaseSync } from 'node:sqlite';
 import { app, BrowserWindow, shell } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc/channels';
 import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
@@ -20,6 +23,7 @@ import {
 	createEnsembleConfigResolutionService,
 	createEnsembleConfigService,
 	createRepositoryConfigService,
+	resolveEnsembleConfigPath,
 } from './config';
 import {
 	createEnvironmentVariablesService,
@@ -79,17 +83,77 @@ import {
 } from './scripts';
 import { createMacosKeychainSecretStore } from './secrets';
 import { createSetupDiagnosticsService } from './setup';
-import { createEnsembleDatabaseService } from './storage';
+import {
+	createEnsembleDatabaseService,
+	resolveDefaultDatabasePath,
+} from './storage';
 import { createTerminalService } from './terminal';
 import {
 	createListWorkspaceFilesService,
 	createWorkspaceFilesWatcher,
 } from './workspace-files';
 
-app.setName('Ensemble');
+// The dev build (`electron-forge start`, unpackaged) runs alongside the
+// installed app while dogfooding. Isolate all of its persistent state so
+// experimenting in dev can never mutate the app the user relies on. The config
+// dir, DB dir, and keychain service derive from fixed path layouts / a
+// reverse-DNS id rather than the app name, so `app.setName` below does not
+// isolate them — each is overridden explicitly.
+//
+// `isDev` (main) and `import.meta.env.DEV` (renderer, drives the amber tint in
+// `main.tsx`) are separate signals that MUST move together: `electron-forge
+// start` is both unpackaged and Vite-dev, a packaged build is neither. A
+// mismatch would isolate state without the warning tint, or tint a window that
+// shares the installed app's state — keep the two in lockstep.
+const isDev = !app.isPackaged;
 
-const configService = createEnsembleConfigService();
-const appSettingsService = createAppSettingsService();
+// Marker for the two dev paths that share their production counterpart's
+// namespace (DB data dir, workspace root). The config dir and keychain service
+// live in different namespaces (dotfile path segment, reverse-DNS service id)
+// and carry their own dev markers below.
+const DEV_SUFFIX = ' (DEV)';
+app.setName(isDev ? `Ensemble${DEV_SUFFIX}` : 'Ensemble');
+
+// Derive each dev path from its production resolver rather than hardcoding the
+// layout, so dev tracks prod cross-platform (the DB resolver branches between
+// macOS Application Support and XDG `.config`) and can never silently drift if
+// the prod path changes. Each keeps its own dev marker in the namespace the
+// prod path uses: the DB data dir is suffixed ` (DEV)`, while the `.config`
+// dotfile dir takes an `ensemble-dev` sibling (spaces/parens don't belong in a
+// dotfile path segment).
+const prodDatabasePath = resolveDefaultDatabasePath();
+const devDatabasePath = path.join(
+	path.dirname(prodDatabasePath) + DEV_SUFFIX,
+	path.basename(prodDatabasePath),
+);
+const prodConfigPath = resolveEnsembleConfigPath();
+const devConfigPath = path.join(
+	`${path.dirname(prodConfigPath)}-dev`,
+	path.basename(prodConfigPath),
+);
+const devRootDirectory = path.join(os.homedir(), `Ensemble${DEV_SUFFIX}`);
+const devKeychainService = 'com.ensemble.app.secret-store.dev';
+
+/**
+ * Builds the macOS Keychain secret store shared by every service, swapping in
+ * the isolated dev keychain service name when running the unpackaged dev build.
+ * @param database - Open SQLite handle the store persists its metadata into.
+ * @returns The secret store, or `null` on non-darwin platforms.
+ */
+const createSecretStore = (database: DatabaseSync) =>
+	process.platform === 'darwin'
+		? createMacosKeychainSecretStore({
+				database,
+				...(isDev ? { serviceName: devKeychainService } : {}),
+			})
+		: null;
+
+const configService = createEnsembleConfigService(
+	isDev ? { configPath: devConfigPath } : {},
+);
+const appSettingsService = createAppSettingsService(
+	isDev ? { configPath: devConfigPath } : {},
+);
 // Drives the caffeinate power-blocker + "Pi finished" desktop notifications,
 // gated live by the General settings in config.json.
 const agentActivityMonitor = createAgentActivityMonitor({
@@ -99,20 +163,20 @@ const agentActivityMonitor = createAgentActivityMonitor({
 	readBattery: readMacosBattery,
 	readSettings: () => appSettingsService.read(),
 });
-const databaseService = createEnsembleDatabaseService();
+const databaseService = createEnsembleDatabaseService(
+	isDev ? { databasePath: devDatabasePath } : {},
+);
 const localCommandService = createLocalCommandService();
 const environmentVariablesService = createEnvironmentVariablesService({
 	configService,
 	databaseService,
-	secretStoreFactory: (database) =>
-		process.platform === 'darwin'
-			? createMacosKeychainSecretStore({ database })
-			: null,
+	secretStoreFactory: createSecretStore,
 });
 const settingsResolutionService = createEnsembleConfigResolutionService({
 	appSettingsService,
 	configService,
 	databaseService,
+	rootDirectory: isDev ? devRootDirectory : undefined,
 });
 const repositoryConfigService = createRepositoryConfigService();
 const rootDirectoryService = createEnsembleRootDirectoryService({
@@ -351,10 +415,7 @@ const linearAuthService = createLinearAuthService({
 	configService,
 	databaseService,
 	openExternal: (url) => shell.openExternal(url),
-	secretStoreFactory: (database) =>
-		process.platform === 'darwin'
-			? createMacosKeychainSecretStore({ database })
-			: null,
+	secretStoreFactory: createSecretStore,
 });
 const linearService = createLinearService({
 	client: createLinearClient({

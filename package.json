@@ -12,6 +12,7 @@
 		"check": "biome check . && bun run check:tailwind",
 		"check:tailwind": "bun scripts/check-tailwind-classes.mjs",
 		"check:fix": "biome check --write .",
+		"icon:generate": "bun scripts/generate-app-icon.mjs",
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:commands": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/local-command.test.ts",
