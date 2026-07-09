@@ -47,6 +47,7 @@
         "@biomejs/biome": "2.5.3",
         "@electron-forge/cli": "^7.11.2",
         "@electron-forge/maker-zip": "^7.11.2",
+        "@electron-forge/plugin-auto-unpack-natives": "^7.11.2",
         "@electron-forge/plugin-fuses": "^7.11.2",
         "@electron-forge/plugin-vite": "^7.11.2",
         "@electron/fuses": "^2.1.3",
@@ -186,6 +187,8 @@
     "@electron-forge/maker-base": ["@electron-forge/maker-base@7.11.2", "", { "dependencies": { "@electron-forge/shared-types": "7.11.2", "fs-extra": "^10.0.0", "which": "^2.0.2" } }, "sha512-9934zYu9WVdgCYQXvtS+eL1oyLagsY8JlWhZmoK8yWTYftSAydH7jb3seVpfy6n85SYmY/yjcAy2lvOTy5dUwA=="],
 
     "@electron-forge/maker-zip": ["@electron-forge/maker-zip@7.11.2", "", { "dependencies": { "@electron-forge/maker-base": "7.11.2", "@electron-forge/shared-types": "7.11.2", "cross-zip": "^4.0.0", "fs-extra": "^10.0.0", "got": "^11.8.5" } }, "sha512-FWnOm2MORX/nt8psnEtID3Vnt8Blby1NkzjU3KjXBPF9kave71C3lI8KbBbCeKKyTQ/S00i2FiglKdRWQ1WNTw=="],
+
+    "@electron-forge/plugin-auto-unpack-natives": ["@electron-forge/plugin-auto-unpack-natives@7.11.2", "", { "dependencies": { "@electron-forge/plugin-base": "7.11.2", "@electron-forge/shared-types": "7.11.2" } }, "sha512-ktMQxO80vGjqVXVSFha+kWJscBmJaWud4Kqu7rKkbrCphr1zqaG+8EDNbkpGzV/+mhKOLuA5qII1hJ69gFNpdA=="],
 
     "@electron-forge/plugin-base": ["@electron-forge/plugin-base@7.11.2", "", { "dependencies": { "@electron-forge/shared-types": "7.11.2" } }, "sha512-tIFzEE2+D9NnCAn/rLwSkh8H59IqN+G973JNl7xmCzquO6qa7/veitZOQFGO79Zmmgkc8R/fmiCbh7LIdLS9Tg=="],
 
