@@ -27,6 +27,41 @@ describe('parseAppSettings', () => {
 		expect(parsed.models.hiddenModels).toEqual([]); // default
 	});
 
+	test('applies appearance defaults', () => {
+		const appearance = parseAppSettings({}).appearance;
+		expect(appearance).toEqual({
+			theme: 'system',
+			coloredSidebarDiffs: false,
+			accessibleColors: 'default',
+			codeTheme: 'catppuccin-mocha',
+			monoFont: 'JetBrains Mono',
+			codeLigatures: true,
+			markdownStyle: 'default',
+			terminalFont: 'JetBrains Mono',
+			terminalFontSize: 12,
+		});
+	});
+
+	test('keeps valid appearance values and defaults invalid ones', () => {
+		const parsed = parseAppSettings({
+			appearance: {
+				theme: 'dark',
+				codeTheme: 'one-dark-pro',
+				monoFont: 'Fira Code',
+				accessibleColors: 'protanopia',
+				markdownStyle: 'not-a-style', // invalid → default
+				terminalFontSize: 99, // out of range → default
+			},
+		}).appearance;
+		expect(parsed.theme).toBe('dark');
+		expect(parsed.codeTheme).toBe('one-dark-pro');
+		expect(parsed.monoFont).toBe('Fira Code');
+		expect(parsed.accessibleColors).toBe('protanopia');
+		expect(parsed.markdownStyle).toBe('default'); // fell back
+		expect(parsed.terminalFontSize).toBe(12); // fell back
+		expect(parsed.codeLigatures).toBe(true); // untouched default
+	});
+
 	test('parses the git section with resolution-aligned keys', () => {
 		const parsed = parseAppSettings({
 			git: {
@@ -87,6 +122,16 @@ describe('mergeAppSettings', () => {
 		expect(next.git.deleteLocalBranchOnArchive).toBe(true);
 		expect(next.git.setUpstreamOnPush).toBe(true); // untouched default
 		expect(DEFAULT_APP_SETTINGS.git.deleteLocalBranchOnArchive).toBe(false);
+	});
+
+	test('merges the appearance section immutably', () => {
+		const next = mergeAppSettings(DEFAULT_APP_SETTINGS, {
+			appearance: { monoFont: 'Fira Code', codeLigatures: false },
+		});
+		expect(next.appearance.monoFont).toBe('Fira Code');
+		expect(next.appearance.codeLigatures).toBe(false);
+		expect(next.appearance.theme).toBe('system'); // untouched default
+		expect(DEFAULT_APP_SETTINGS.appearance.monoFont).toBe('JetBrains Mono');
 	});
 });
 

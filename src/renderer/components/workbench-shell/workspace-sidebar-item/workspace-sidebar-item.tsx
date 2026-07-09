@@ -80,7 +80,9 @@ export function WorkspaceSidebarItem({
 					<span className='truncate font-medium text-[0.8125rem]'>
 						{workspace.name}
 					</span>
-					{hasDiffStats ? <WorkspaceDiffStats workspace={workspace} /> : null}
+					{hasDiffStats ? (
+						<WorkspaceDiffStats isActive={isActive} workspace={workspace} />
+					) : null}
 				</div>
 				<div className='mt-1 flex min-w-0 items-center gap-1.5 text-muted-foreground text-xxs'>
 					<span className='truncate'>{workspace.branchName}</span>

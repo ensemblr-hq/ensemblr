@@ -2,16 +2,6 @@ import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
 import { atomFamily } from 'jotai-family';
 
-/** Visual color scheme. `system` follows OS preference; otherwise overrides. */
-export type ThemeMode = 'system' | 'light' | 'dark';
-
-/** Accessible color palette variant for color-vision differences. */
-export type AccessibleColorVariant =
-	| 'default'
-	| 'protanopia'
-	| 'deuteranopia'
-	| 'tritanopia';
-
 /** Behavior when the user submits a message mid-turn. */
 export type FollowUpBehavior = 'steer' | 'queue' | 'block';
 
@@ -20,18 +10,6 @@ export type SendShortcut = 'enter' | 'mod+enter';
 
 /** Tool-call rendering mode in the conversation view. */
 export type ToolCallCollapseMode = 'collapsed' | 'expanded';
-
-/** Code editor / diff syntax highlight theme. */
-export type CodeTheme =
-	| 'catppuccin-mocha'
-	| 'catppuccin-latte'
-	| 'github-dark'
-	| 'github-light'
-	| 'one-dark'
-	| 'solarized-dark';
-
-/** Markdown renderer preset. */
-export type MarkdownStyle = 'default' | 'compact' | 'prose';
 
 /** Single-source store key prefix to avoid clashes with other Jotai atoms. */
 const KEY = (suffix: string) => `ensemble_pref_${suffix}`;
@@ -42,40 +20,9 @@ const KEY = (suffix: string) => `ensemble_pref_${suffix}`;
 // functional consumers, so their atoms were dropped entirely.
 
 // ─── Appearance ───────────────────────────────────────────────────────────────
-
-export const themeAtom = atomWithStorage<ThemeMode>(KEY('theme'), 'system');
-export const coloredSidebarDiffsAtom = atomWithStorage<boolean>(
-	KEY('colored_sidebar_diffs'),
-	false,
-);
-export const accessibleColorsAtom = atomWithStorage<AccessibleColorVariant>(
-	KEY('accessible_colors'),
-	'default',
-);
-export const codeThemeAtom = atomWithStorage<CodeTheme>(
-	KEY('code_theme'),
-	'catppuccin-mocha',
-);
-export const monoFontAtom = atomWithStorage<string>(
-	KEY('mono_font'),
-	'JetBrains Mono',
-);
-export const codeLigaturesAtom = atomWithStorage<boolean>(
-	KEY('code_ligatures'),
-	true,
-);
-export const markdownStyleAtom = atomWithStorage<MarkdownStyle>(
-	KEY('markdown_style'),
-	'default',
-);
-export const terminalFontAtom = atomWithStorage<string>(
-	KEY('terminal_font'),
-	'JetBrains Mono',
-);
-export const terminalFontSizeAtom = atomWithStorage<number>(
-	KEY('terminal_font_size'),
-	12,
-);
+// All Appearance settings now live in config.json (see ./app-settings). The
+// legacy `ensemble_pref_*` localStorage keys are one-time migrated on first
+// hydrate by `useAppearanceLegacyMigration`, then removed.
 
 // ─── Composer memory (per-chat overrides) ──────────────────────────────────────
 
