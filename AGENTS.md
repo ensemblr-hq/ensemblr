@@ -26,40 +26,40 @@ Scaffold provenance guardrail:
 
 - Do not hand-author generated app structure from memory when an official generator exists.
 - Run the official generator in `.context/` or another disposable directory first, then copy or adapt from that generated output.
-- If the generator conflicts with Bun, hooks, existing files, or other repo policy, stop and explain the conflict before choosing a workaround.
+- If the generator conflicts with npm, hooks, existing files, or other repo policy, stop and explain the conflict before choosing a workaround.
 - Record scaffold provenance in the final response or a tracked audit note: documentation source, exact generator command, generated files used, and every intentional deviation.
 - Treat manually added package names, versions, config keys, templates, or generated-file structure as invalid unless they are directly backed by current official docs, generator output, or an explicit user decision.
 
 ## Package Manager Policy
 
-This repository enforces Bun for JavaScript and TypeScript package management.
+This repository enforces npm for JavaScript and TypeScript package management.
 
-- Use `bun install` instead of `npm install`, `pnpm install`, or `yarn install`.
-- Use `bun run <script>` instead of `npm run <script>`, `pnpm run <script>`, or `yarn run <script>`.
-- Use `bunx <package>` instead of `npx`, `pnpx`, or `yarn dlx`.
-- Use `bun add <package>` and `bun remove <package>` for dependency changes.
-- Do not create `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock`.
-- When creating or updating `package.json`, set `packageManager` to a Bun version and keep `bun.lock` as the lockfile.
-- The local Codex hook in `.codex/hooks.json` blocks direct `npm`, `npx`, `pnpm`, `pnpx`, `yarn`, `yarnpkg`, and matching `corepack` package-manager calls.
+- Use `npm install` instead of `bun install`, `pnpm install`, or `yarn install`.
+- Use `npm run <script>` instead of `bun run <script>`, `pnpm run <script>`, or `yarn run <script>`.
+- Use `npx <package>` instead of `bunx`, `pnpx`, or `yarn dlx`.
+- Use `npm install <package>` and `npm uninstall <package>` for dependency changes.
+- Do not create `bun.lock`, `pnpm-lock.yaml`, or `yarn.lock`.
+- When creating or updating `package.json`, set `packageManager` to an npm version and keep `package-lock.json` as the lockfile.
+- The local Codex hook `.codex/hooks/enforce-npm-package-manager.sh` (plus the Claude hook `.claude/hooks/enforce-npm.sh`) block direct `bun`, `bunx`, `pnpm`, `pnpx`, `yarn`, `yarnpkg`, and matching `corepack` package-manager calls.
 
 ## Biome Policy
 
 This repository uses Biome instead of ESLint and Prettier.
 
-- Run `bun run check` before finishing changes that touch JavaScript, TypeScript, JSX, TSX, CSS, or JSON.
-- Use `bun run check:fix` to apply safe Biome fixes, including formatting and import organization.
-- Keep `bun run typecheck` as a separate verification step for TypeScript type errors.
+- Run `npm run check` before finishing changes that touch JavaScript, TypeScript, JSX, TSX, CSS, or JSON.
+- Use `npm run check:fix` to apply safe Biome fixes, including formatting and import organization.
+- Keep `npm run typecheck` as a separate verification step for TypeScript type errors. It checks two projects — the app (`tsconfig.json`) and dev scripts (`tsconfig.scripts.json`) — so `.ts` files under `scripts/` are type-checked even though `npx tsx`/`node` run them without checking.
 - Do not add ESLint or Prettier configuration unless the user explicitly asks for it.
 
 ## Testing Policy
 
-Vitest is the mandated test runner for renderer and shared tests. Bun remains the package manager only — the runner is Vitest, never `bun test`.
+Vitest is the mandated test runner for renderer and shared tests. npm is the package manager — Bun is no longer used (the enforcement hook blocks it), and the runner is Vitest, never `bun test`.
 
 - Renderer tests (`tests/renderer/**`) and shared tests (`tests/shared/**`) run under Vitest. Do not import from `bun:test`. Do not add Jest, Mocha, or any other runner.
-- Bun still manages packages: install test tooling with `bun add -d` and run Vitest with `bunx vitest` (for example `bunx vitest run`, or a focused `bunx vitest run <file>`). Do not use `npm`/`npx`/`pnpm`/`yarn`.
+- npm manages packages: install test tooling with `npm install -D` and run Vitest with `npx vitest` (for example `npx vitest run`, or a focused `npx vitest run <file>`). Do not use `bun`/`bunx`/`pnpm`/`yarn`.
 - Vitest config lives in `vitest.config.mts`. The default `environment` is `node` so platform-sensitive pure-logic tests (keymap, etc.) keep the real `navigator`/`process`. DOM component tests opt into happy-dom per file with a `// @vitest-environment happy-dom` docblock — never register a DOM globally.
 - DOM harness: `tests/renderer/support/dom.tsx` exposes `renderWithProviders` and the `window.ensemble` stub helpers; jest-dom matchers are registered globally in `tests/renderer/support/vitest.setup.ts`. `@testing-library/react` auto-unmounts after each test because `globals: true`.
-- Coverage is native Istanbul: run `bunx vitest run --coverage` (provider `istanbul`) to emit `coverage/coverage-final.json`, which `fallow audit --coverage <file> --coverage_root <repo root>` reads directly. There is no lcov→istanbul bridge; do not reintroduce one.
+- Coverage is native Istanbul: run `npx vitest run --coverage` (provider `istanbul`) to emit `coverage/coverage-final.json`, which `fallow audit --coverage <file> --coverage_root <repo root>` reads directly. There is no lcov→istanbul bridge; do not reintroduce one.
 - Mocks use Vitest: `vi.fn()` for spies, `vi.spyOn()` for method spies, and `vi.mock()` (hoisted; use `vi.hoisted()` for factory-referenced variables) for module mocks. Do not use `mock()`/`mock.module()`.
 - Main-process tests (`tests/main/**`) stay on their `electron --test` scripts — they need the Electron runtime and are not run by Vitest.
 
@@ -81,7 +81,7 @@ Vitest is the mandated test runner for renderer and shared tests. Bun remains th
 - Use canonical Tailwind classes before arbitrary values. For example, use `text-xs` instead of `text-[0.75rem]`, `rounded-2xl` instead of `rounded-[0.375rem]`, and `rounded-sm` instead of `rounded-[0.125rem]`.
 - If a value is not available as a canonical Tailwind class, use rem-based arbitrary values instead of px-based arbitrary values, especially for typography: use `text-[0.8125rem]` instead of `text-[13px]`.
 - Prefer semantic or existing tokenized utilities over new arbitrary values when the design system already exposes the needed value.
-- `bun run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. Update that script when adding another canonical class equivalence that agents should preserve.
+- `npm run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. Update that script when adding another canonical class equivalence that agents should preserve.
 
 ## Scoped Agent Instructions
 

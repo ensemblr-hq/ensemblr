@@ -23,7 +23,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": ".claude/hooks/enforce-bun.sh"
+						"command": ".claude/hooks/enforce-npm.sh"
 					}
 				]
 			}

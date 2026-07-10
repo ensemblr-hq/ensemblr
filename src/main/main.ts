@@ -112,7 +112,31 @@ const isDev = !app.isPackaged;
 // live in different namespaces (dotfile path segment, reverse-DNS service id)
 // and carry their own dev markers below.
 const DEV_SUFFIX = ' (DEV)';
-app.setName(isDev ? `Ensemble${DEV_SUFFIX}` : 'Ensemble');
+// The unpackaged dev build (`electron-forge start`) gets the explicit (DEV)
+// suffix so it reads its isolated userData below. A *packaged* build keeps the
+// product name forge baked in from its build channel (Ensemble / Ensemble
+// Canary / Ensemble Dev — see forge.config.ts + ADR 0032): that name derives
+// the userData path and thus the single-instance lock, so each channel stays a
+// distinct app. Clobbering to 'Ensemble' here would collapse every packaged
+// channel back onto the release identity — the shared registration that lets
+// macOS relaunch a sibling build and flash a stray Dock tile.
+if (isDev) {
+	app.setName(`Ensemble${DEV_SUFFIX}`);
+}
+
+// A second launch of the packaged app — most often a spawned login shell that
+// re-execs the bundle's binary directly, which bypasses macOS LaunchServices
+// dedup — would otherwise boot a whole second instance (its own Dock icon and
+// window). Hold a single-instance lock so any such relaunch folds into the
+// running instance via the `second-instance` handler below instead. The lock is
+// a file lock under userData, so it catches direct-exec relaunches too, not just
+// `open`-routed ones. Dev is excluded: dev builds share one `Ensemble (DEV)`
+// userData across Conductor workspaces, so a lock there would kill the second
+// dogfooding instance. Acquired after `setName` so it keys on the right userData.
+const hasSingleInstanceLock = isDev || app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+	app.quit();
+}
 
 // Derive each dev path from its production resolver rather than hardcoding the
 // layout, so dev tracks prod cross-platform (the DB resolver branches between
@@ -238,12 +262,23 @@ const broadcastRawFrame = (sample: {
 		}
 	}
 };
+/**
+ * Base environment for every spawned Pi child. Uses the login-shell env (with
+ * the user's PATH) so a packaged app launched from Finder — whose `process.env`
+ * PATH is minimal — still lets pi find its runtime and tools instead of exiting
+ * on startup and surfacing later as an EPIPE on the first prompt write. Memoized
+ * inside `localCommandService`, so repeated opens do not re-spawn a shell.
+ */
+const resolvePiSpawnEnv = async (): Promise<NodeJS.ProcessEnv> =>
+	(await localCommandService.getEnvironment()).env;
 const piAgentAdapter = createCliRpcPiAgentAdapter({
 	onRawFrame: broadcastRawFrame,
+	resolveBaseEnv: resolvePiSpawnEnv,
 });
 const piAgentClient = createPiAgentClient({ adapter: piAgentAdapter });
 const summaryPiAgentAdapter = createCliRpcPiAgentAdapter({
 	onRawFrame: broadcastRawFrame,
+	resolveBaseEnv: resolvePiSpawnEnv,
 });
 const summaryPiAgentClient = createPiAgentClient({
 	adapter: summaryPiAgentAdapter,
@@ -441,6 +476,12 @@ const mainWindowStateStore = createMainWindowStateStore({
 });
 
 app.whenReady().then(() => {
+	// The instance that lost the single-instance lock is already quitting; skip
+	// state loading and window creation so it never touches shared userData.
+	if (!hasSingleInstanceLock) {
+		return;
+	}
+
 	configService.load();
 	databaseService.open();
 	rootDirectoryService.ensure();
@@ -513,4 +554,26 @@ app.on('activate', () => {
 	if (BrowserWindow.getAllWindows().length === 0) {
 		createMainWindow({ windowStateStore: mainWindowStateStore });
 	}
+});
+
+// A blocked second launch (see the single-instance lock above) fires this in the
+// already-running instance. Surface the existing window instead of letting a new
+// instance spawn; recreate only if every window was closed (on macOS the app
+// stays alive with no windows).
+app.on('second-instance', (_event, argv, workingDirectory) => {
+	// Forensics for the Dock-flash bug: record who exec'd the blocked instance
+	// so a surviving relaunch trigger can be identified from Console.app.
+	console.warn('[single-instance] blocked a second launch', {
+		argv,
+		workingDirectory,
+	});
+	const [existing] = BrowserWindow.getAllWindows();
+	if (existing) {
+		if (existing.isMinimized()) {
+			existing.restore();
+		}
+		existing.focus();
+		return;
+	}
+	createMainWindow({ windowStateStore: mainWindowStateStore });
 });

@@ -1,6 +1,4 @@
-/// <reference types="bun" />
-
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, test } from 'vitest';
 import {
 	type AgentActivityMonitorOptions,
 	type BatterySnapshot,

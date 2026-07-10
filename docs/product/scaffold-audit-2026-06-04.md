@@ -43,6 +43,15 @@ The reference scaffold produced these relevant files:
 
 ### Package Management
 
+> **Historical (2026-06-04):** This dated snapshot predates the Bun→npm
+> migration. The repository is now npm-managed: `package.json` sets
+> `packageManager` to an npm version, the root lockfile is `package-lock.json`,
+> and the guardrail hooks block direct `bun`/`bunx`/`pnpm`/`yarn` calls. See the
+> "Package Manager → npm" entry in [`CHANGELOG.md`](../../CHANGELOG.md) and the
+> Package Manager Policy in [`AGENTS.md`](../../AGENTS.md). The Bun details below
+> (and the `bun` commands under Conductor Configuration and Verification) are
+> retained as a record of the original scaffold.
+
 - Root `package.json` sets `packageManager` to Bun and root dependencies were installed with `bun add` / `bun add -d`.
 - Root lockfile is `bun.lock`.
 - The generated reference includes npm-installed state only under `.context`, which is gitignored and not part of the project scaffold.

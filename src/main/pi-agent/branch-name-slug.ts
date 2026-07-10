@@ -1,6 +1,6 @@
 /**
  * Pure helpers for auto branch-naming. Kept free of the pi/sqlite runtime (only
- * a pure sibling helper is imported) so they unit-test under bun.
+ * a pure sibling helper is imported) so they unit-test under Vitest.
  */
 
 import { joinBranchName } from '../repository/branch-name.ts';

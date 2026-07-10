@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 
 import { parseWorkspaceCommits } from '../../src/main/workspace-git/workspace-git-parsers';
 

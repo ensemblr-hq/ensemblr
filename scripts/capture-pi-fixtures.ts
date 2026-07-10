@@ -11,12 +11,13 @@
  * faithful even when a frame is malformed.
  *
  * Usage:
- *   bun scripts/capture-pi-fixtures.ts            # run all scenarios
- *   bun scripts/capture-pi-fixtures.ts file-edit  # run selected scenarios
+ *   npx tsx scripts/capture-pi-fixtures.ts            # run all scenarios
+ *   npx tsx scripts/capture-pi-fixtures.ts file-edit  # run selected scenarios
  *
  * Protocol notes: docs/pi/rpc-protocol.md
  */
 
+import { spawn } from 'node:child_process';
 import { appendFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
@@ -387,13 +388,17 @@ const SCENARIOS: Scenario[] = [
  * (strip one trailing CR; never split on U+2028/U+2029).
  */
 async function readJsonlStream(
-	stream: ReadableStream<Uint8Array>,
+	stream: NodeJS.ReadableStream,
 	onLine: (line: string) => void,
 ): Promise<void> {
 	const decoder = new TextDecoder();
 	let buffer = '';
 	for await (const chunk of stream) {
-		buffer += decoder.decode(chunk, { stream: true });
+		// A Node stream can yield either a Buffer (byte pipe, the pi case) or a
+		// string (if it were ever in string mode); TextDecoder only accepts bytes.
+		const bytes =
+			typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk;
+		buffer += decoder.decode(bytes, { stream: true });
 		let newlineIndex = buffer.indexOf('\n');
 		while (newlineIndex !== -1) {
 			let line = buffer.slice(0, newlineIndex);
@@ -449,12 +454,18 @@ async function captureScenario(scenario: Scenario): Promise<void> {
 	};
 
 	console.log(`▶ ${scenario.name}`);
-	const proc = Bun.spawn(['pi', ...piArgs], {
+	const proc = spawn('pi', piArgs, {
 		cwd,
-		stdin: 'pipe',
-		stdout: 'pipe',
-		stderr: 'pipe',
+		stdio: ['pipe', 'pipe', 'pipe'],
 	});
+	const exited = new Promise<number | null>((resolve) => {
+		proc.on('exit', (code) => resolve(code));
+	});
+	// `stdio: ['pipe','pipe','pipe']` always yields real streams, but Node types
+	// them as nullable; assert so the reads below are type-correct, not `| null`.
+	if (!proc.stdin || !proc.stdout || !proc.stderr) {
+		throw new Error('pi child spawned without piped stdio.');
+	}
 
 	type Waiter = {
 		label: string;
@@ -469,8 +480,7 @@ async function captureScenario(scenario: Scenario): Promise<void> {
 	const session: Session = {
 		send(command) {
 			meta.sent.push({ ts: Date.now(), command });
-			proc.stdin.write(`${JSON.stringify(command)}\n`);
-			proc.stdin.flush();
+			proc.stdin?.write(`${JSON.stringify(command)}\n`);
 		},
 		waitFor(label, pred, timeoutMs = DEFAULT_STEP_TIMEOUT_MS) {
 			return new Promise((resolve, reject) => {
@@ -545,7 +555,7 @@ async function captureScenario(scenario: Scenario): Promise<void> {
 	}
 
 	proc.kill('SIGTERM');
-	meta.exitCode = await proc.exited;
+	meta.exitCode = await exited;
 	await Promise.allSettled([stdoutDone, stderrDone]);
 	meta.endedAt = Date.now();
 	writeFileSync(
@@ -570,7 +580,20 @@ if (requested.length > 0 && selected.length !== requested.length) {
 }
 
 mkdirSync(FIXTURE_DIR, { recursive: true });
-for (const scenario of selected) {
-	await captureScenario(scenario);
+
+/**
+ * Runs each selected scenario sequentially. Wrapped in a function rather than
+ * using top-level await so the script transpiles under tsx's CommonJS output
+ * (the repo has no `"type": "module"`, so `.ts` scripts build as CJS).
+ */
+async function runSelectedScenarios(): Promise<void> {
+	for (const scenario of selected) {
+		await captureScenario(scenario);
+	}
+	console.log('done');
 }
-console.log('done');
+
+runSelectedScenarios().catch((error: unknown) => {
+	console.error(error);
+	process.exit(1);
+});

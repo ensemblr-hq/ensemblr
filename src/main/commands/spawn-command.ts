@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 
+import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import { createSanitizedLogs } from './command-redaction.ts';
 import {
 	createFailure,
@@ -51,7 +52,8 @@ export function runSpawnedCommand({
 	return new Promise((resolve) => {
 		const child = spawn(command, args, {
 			cwd,
-			env,
+			// Final boundary strip: no assembled env may carry launch-context vars.
+			env: stripLaunchContextEnv(env),
 			shell: false,
 			stdio: ['ignore', 'pipe', 'pipe'],
 		});

@@ -11,6 +11,7 @@ import type {
 	TerminalSnapshotResult,
 } from '../../shared/ipc/contracts/terminal';
 import { detectPreviewUrl } from '../../shared/terminal/detect-preview-url.ts';
+import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import {
 	WorkspaceEnvironmentError,
 	type WorkspaceEnvironmentService,
@@ -556,7 +557,12 @@ function mergeProcessEnvironment(
 ): Record<string, string> {
 	const env: Record<string, string> = {};
 
-	for (const [key, value] of Object.entries(process.env)) {
+	// Drop macOS/Electron launch-context vars so a terminal running `open` (or a
+	// tool that shells out to it) can't make macOS relaunch Ensemble as a second
+	// instance.
+	for (const [key, value] of Object.entries(
+		stripLaunchContextEnv(process.env),
+	)) {
 		if (value !== undefined) {
 			env[key] = value;
 		}
@@ -574,5 +580,7 @@ function mergeProcessEnvironment(
 		env.TERM_PROGRAM = 'Ensemble';
 	}
 
-	return { ...env, ...overlay };
+	// Strip again AFTER the overlay merge: launch-context identity must never
+	// reach a pty child, no matter which upstream source assembled the overlay.
+	return stripLaunchContextEnv({ ...env, ...overlay });
 }

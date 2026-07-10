@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * Generates the Ensemble macOS app icon and writes `assets/icon.{icns,png,svg}`.
  *
@@ -14,7 +14,7 @@
  * primitives are both dependency-free and pixel-exact. `iconutil` assembles the
  * final `.icns`.
  *
- * Run: `bun run icon:generate` (or `bun scripts/generate-app-icon.mjs`).
+ * Run: `npm run icon:generate` (or `node scripts/generate-app-icon.mjs`).
  */
 
 import { execFileSync } from 'node:child_process';

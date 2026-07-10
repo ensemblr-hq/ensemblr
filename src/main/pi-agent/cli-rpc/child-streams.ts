@@ -12,6 +12,8 @@ import type { ChildLike } from './spawn-env.ts';
  * Wires the spawned Pi RPC child's stdio + lifecycle events into the adapter:
  *  - stdout → JSONL line stream (decoded by the protocol dispatcher elsewhere)
  *  - stderr → ring buffer (for post-mortem) + recoverable `error` event
+ *  - stdin  → recoverable `error` event (absorbs async EPIPE so a dead pipe
+ *             cannot become an uncaught exception that crashes the main process)
  *  - process `error` → typed `spawn-error`
  *  - process `exit`  → cancel kill timer, classify shutdown reason, finalize
  *
@@ -66,6 +68,20 @@ export function bindChildStreams({
 			},
 			type: 'error',
 		});
+	});
+
+	// The child's stdin is a pipe socket. If the Pi process exits mid-turn the
+	// kernel reports EPIPE asynchronously on this stream; without a listener Node
+	// rethrows it as an uncaught exception and crashes the main process. Absorb it
+	// as a recoverable error so the renderer surfaces it and the `exit` handler
+	// classifies the real shutdown reason.
+	child.stdin.on('error', (cause: Error) => {
+		emitError(
+			'submit-failed',
+			'Pi RPC stdin write failed.',
+			cause.message,
+			true,
+		);
 	});
 
 	child.on('error', (cause: Error) => {
