@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
+import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import type { BatterySnapshot } from './agent-activity-monitor.ts';
 
 const execFileAsync = promisify(execFile);
@@ -39,6 +40,7 @@ export async function readMacosBattery(): Promise<BatterySnapshot | null> {
 	try {
 		const { stdout } = await execFileAsync('pmset', ['-g', 'batt'], {
 			encoding: 'utf8',
+			env: stripLaunchContextEnv(process.env),
 			timeout: 2_000,
 		});
 		return parsePmsetBattery(stdout);

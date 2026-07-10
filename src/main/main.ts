@@ -114,6 +114,20 @@ const isDev = !app.isPackaged;
 const DEV_SUFFIX = ' (DEV)';
 app.setName(isDev ? `Ensemble${DEV_SUFFIX}` : 'Ensemble');
 
+// A second launch of the packaged app — most often a spawned login shell that
+// re-execs the bundle's binary directly, which bypasses macOS LaunchServices
+// dedup — would otherwise boot a whole second instance (its own Dock icon and
+// window). Hold a single-instance lock so any such relaunch folds into the
+// running instance via the `second-instance` handler below instead. The lock is
+// a file lock under userData, so it catches direct-exec relaunches too, not just
+// `open`-routed ones. Dev is excluded: dev builds share one `Ensemble (DEV)`
+// userData across Conductor workspaces, so a lock there would kill the second
+// dogfooding instance. Acquired after `setName` so it keys on the right userData.
+const hasSingleInstanceLock = isDev || app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) {
+	app.quit();
+}
+
 // Derive each dev path from its production resolver rather than hardcoding the
 // layout, so dev tracks prod cross-platform (the DB resolver branches between
 // macOS Application Support and XDG `.config`) and can never silently drift if
@@ -452,6 +466,12 @@ const mainWindowStateStore = createMainWindowStateStore({
 });
 
 app.whenReady().then(() => {
+	// The instance that lost the single-instance lock is already quitting; skip
+	// state loading and window creation so it never touches shared userData.
+	if (!hasSingleInstanceLock) {
+		return;
+	}
+
 	configService.load();
 	databaseService.open();
 	rootDirectoryService.ensure();
@@ -524,4 +544,26 @@ app.on('activate', () => {
 	if (BrowserWindow.getAllWindows().length === 0) {
 		createMainWindow({ windowStateStore: mainWindowStateStore });
 	}
+});
+
+// A blocked second launch (see the single-instance lock above) fires this in the
+// already-running instance. Surface the existing window instead of letting a new
+// instance spawn; recreate only if every window was closed (on macOS the app
+// stays alive with no windows).
+app.on('second-instance', (_event, argv, workingDirectory) => {
+	// Forensics for the Dock-flash bug: record who exec'd the blocked instance
+	// so a surviving relaunch trigger can be identified from Console.app.
+	console.warn('[single-instance] blocked a second launch', {
+		argv,
+		workingDirectory,
+	});
+	const [existing] = BrowserWindow.getAllWindows();
+	if (existing) {
+		if (existing.isMinimized()) {
+			existing.restore();
+		}
+		existing.focus();
+		return;
+	}
+	createMainWindow({ windowStateStore: mainWindowStateStore });
 });

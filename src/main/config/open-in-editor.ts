@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { shell } from 'electron';
 
 import type { OpenAppConfigFileResult } from '../../shared/ipc/contracts/app-settings.ts';
+import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 
 /**
  * Opens a file in the user's preferred editor, in priority order:
@@ -46,6 +47,9 @@ function trySpawn(command: string, args: string[]): Promise<boolean> {
 		try {
 			const child = spawn(command, args, {
 				detached: true,
+				// A GUI editor is a LaunchServices context; drop the launch-context
+				// vars so it can't make macOS relaunch Ensemble as a second instance.
+				env: stripLaunchContextEnv(process.env),
 				stdio: 'ignore',
 			});
 			child.on('error', () => resolve(false));
