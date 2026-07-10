@@ -597,6 +597,131 @@ test('always branches from the live root, ignoring HEAD and a stale stored defau
 	assert.equal(result.workspace?.baseBranch, 'main');
 });
 
+test('syncs the default branch from origin before creating a workspace', async (t) => {
+	const harness = createHarness(t);
+	const remotePath = path.join(harness.rootPath, 'remote.git');
+	const collaboratorPath = path.join(harness.rootPath, 'collaborator');
+	runGit(harness.rootPath, ['init', '--bare', remotePath]);
+	runGit(remotePath, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+	runGit(harness.repositoryPath, ['remote', 'add', 'origin', remotePath]);
+	runGit(harness.repositoryPath, ['push', '-u', 'origin', 'main']);
+	runGit(harness.rootPath, ['clone', remotePath, collaboratorPath]);
+	runGit(collaboratorPath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(collaboratorPath, ['config', 'user.name', 'Ensemblr Test']);
+	writeFileSync(
+		path.join(collaboratorPath, 'README.md'),
+		'# demo\nlatest remote change\n',
+	);
+	runGit(collaboratorPath, ['commit', '-am', 'remote change']);
+	runGit(collaboratorPath, ['push', 'origin', 'main']);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'login',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	if (!result.workspace) {
+		throw new Error('workspace missing');
+	}
+	assert.match(
+		readFileSync(path.join(result.workspace.path, 'README.md'), 'utf8'),
+		/latest remote change/,
+	);
+	assert.equal(
+		runGit(harness.repositoryPath, ['rev-parse', 'main']),
+		runGit(collaboratorPath, ['rev-parse', 'main']),
+	);
+});
+
+test('syncs origin default branch even when local branch has no upstream', async (t) => {
+	const harness = createHarness(t);
+	const remotePath = path.join(harness.rootPath, 'remote.git');
+	const collaboratorPath = path.join(harness.rootPath, 'collaborator');
+	runGit(harness.rootPath, ['init', '--bare', remotePath]);
+	runGit(remotePath, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+	runGit(harness.repositoryPath, ['remote', 'add', 'origin', remotePath]);
+	runGit(harness.repositoryPath, ['push', '-u', 'origin', 'main']);
+	runGit(harness.repositoryPath, ['branch', '--unset-upstream', 'main']);
+	runGit(harness.rootPath, ['clone', remotePath, collaboratorPath]);
+	runGit(collaboratorPath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(collaboratorPath, ['config', 'user.name', 'Ensemblr Test']);
+	writeFileSync(
+		path.join(collaboratorPath, 'README.md'),
+		'# demo\nlatest no-upstream change\n',
+	);
+	runGit(collaboratorPath, ['commit', '-am', 'remote change']);
+	runGit(collaboratorPath, ['push', 'origin', 'main']);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'login-no-upstream',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	if (!result.workspace) {
+		throw new Error('workspace missing');
+	}
+	assert.match(
+		readFileSync(path.join(result.workspace.path, 'README.md'), 'utf8'),
+		/latest no-upstream change/,
+	);
+	assert.equal(
+		runGit(harness.repositoryPath, ['rev-parse', 'main']),
+		runGit(collaboratorPath, ['rev-parse', 'main']),
+	);
+});
+
+test('creates a workspace from the local base when the remote is unreachable', async (t) => {
+	const harness = createHarness(t);
+	const remotePath = path.join(harness.rootPath, 'remote.git');
+	runGit(harness.rootPath, ['init', '--bare', remotePath]);
+	runGit(remotePath, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+	runGit(harness.repositoryPath, ['remote', 'add', 'origin', remotePath]);
+	runGit(harness.repositoryPath, ['push', '-u', 'origin', 'main']);
+	writeFileSync(
+		path.join(harness.repositoryPath, 'README.md'),
+		'# demo\nlocal offline change\n',
+	);
+	runGit(harness.repositoryPath, ['commit', '-am', 'local change']);
+	rmSync(remotePath, { force: true, recursive: true });
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'offline',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	if (!result.workspace) {
+		throw new Error('workspace missing');
+	}
+	assert.match(
+		readFileSync(path.join(result.workspace.path, 'README.md'), 'utf8'),
+		/local offline change/,
+	);
+});
+
 test('an explicit base branch still overrides the live root', async (t) => {
 	const harness = createHarness(t);
 	runGit(harness.repositoryPath, ['branch', 'develop']);

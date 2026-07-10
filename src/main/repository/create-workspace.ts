@@ -43,6 +43,7 @@ import {
 	GIT_WORKTREE_TIMEOUT_MS,
 	resolveRootBranch,
 	runWorktreeAdd as runWorktreeAddShared,
+	syncBaseRef,
 } from './git-ops.ts';
 import type { GithubUsernameResolver } from './github-username.ts';
 import { toSlug } from './slug.ts';
@@ -207,6 +208,16 @@ export function createWorkspaceService({
 			if (parentDiagnostic) {
 				return failure(parentDiagnostic);
 			}
+
+			// Best-effort: pull the latest remote commits into the base branch so
+			// new workspaces fork from an up-to-date root when online. Any failure
+			// (offline, divergence, dirty tree) degrades to the local base rather
+			// than blocking creation, so workspaces can still be created offline.
+			await syncBaseRef({
+				baseBranch: prepared.baseBranch,
+				localCommandService,
+				repositoryPath: repository.path,
+			});
 
 			// A workspace created from a PR (or any remote branch not yet fetched)
 			// forks off `origin/<head>`; make sure that ref exists locally first.
