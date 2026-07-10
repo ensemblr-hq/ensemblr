@@ -2,7 +2,6 @@ import { Icon } from '@iconify/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import {
-	Fragment,
 	type MouseEvent,
 	memo,
 	useCallback,
@@ -38,6 +37,7 @@ import {
 	AllFilesContextMenuContent,
 	type FileTreeMenuTarget,
 } from './all-files-context-menu';
+import { FileTreeLabel } from './file-tree-label';
 
 /** Fixed row height (px). Rows are single-line (truncated), so heights are uniform. */
 const ROW_HEIGHT = 28;
@@ -358,16 +358,7 @@ const WorkspaceFolderRow = memo(
 					className='size-3.5 shrink-0'
 					icon={folderIconName}
 				/>
-				<span className='min-w-0 truncate font-mono'>
-					{visibleLabelParts.map((label, index) => (
-						<Fragment key={`${label}-${index}`}>
-							{index > 0 ? (
-								<span className='px-1 text-muted-foreground/70'>/</span>
-							) : null}
-							<span>{label}</span>
-						</Fragment>
-					))}
-				</span>
+				<FileTreeLabel parts={visibleLabelParts} />
 			</Button>
 		);
 	},

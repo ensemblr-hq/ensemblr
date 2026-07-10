@@ -53,6 +53,13 @@ function RepoMiscSettings() {
 	});
 
 	const previewUrls = overrides.previewUrls ?? [{ name: '', url: '' }];
+	// previewUrls entries carry no persistent id, so track one stable key per
+	// row locally. The add/remove/reset handlers below update rowIds in lockstep,
+	// so removing a middle row can't shift keys and reassociate a controlled
+	// <Input> to the wrong row (which positional index keys would).
+	const [rowIds, setRowIds] = useState<string[]>(() =>
+		previewUrls.map(() => crypto.randomUUID()),
+	);
 
 	return (
 		<SettingsSection
@@ -85,51 +92,60 @@ function RepoMiscSettings() {
 				stack
 			>
 				<div className='mt-2 space-y-2'>
-					{previewUrls.map((entry, idx) => (
-						<div className='flex gap-2' key={`${idx}-${entry.name}`}>
-							<Input
-								aria-label='Preview URL name'
-								className='h-8 w-32 text-xs'
-								onChange={(e) => {
-									const next = [...previewUrls];
-									next[idx] = { ...entry, name: e.target.value };
-									setOverrides((prev) => ({ ...prev, previewUrls: next }));
-								}}
-								placeholder='Name'
-								value={entry.name}
-							/>
-							<Input
-								aria-label='Preview URL template'
-								className='h-8 flex-1 font-mono text-xs'
-								onChange={(e) => {
-									const next = [...previewUrls];
-									next[idx] = { ...entry, url: e.target.value };
-									setOverrides((prev) => ({ ...prev, previewUrls: next }));
-								}}
-								placeholder='https://localhost:$ENSEMBLR_PORT'
-								value={entry.url}
-							/>
-							<Button
-								onClick={() => {
-									const next = previewUrls.filter((_, i) => i !== idx);
-									setOverrides((prev) => ({
-										...prev,
-										previewUrls: next.length === 0 ? undefined : next,
-									}));
-								}}
-								size='icon'
-								variant='ghost'
-							>
-								<Trash2Icon aria-hidden='true' className='size-4' />
-							</Button>
-						</div>
-					))}
+					{previewUrls.map((entry, idx) => {
+						const rowKey = rowIds[idx];
+						return (
+							<div className='flex gap-2' key={rowKey}>
+								<Input
+									aria-label='Preview URL name'
+									className='h-8 w-32 text-xs'
+									onChange={(e) => {
+										const next = [...previewUrls];
+										next[idx] = { ...entry, name: e.target.value };
+										setOverrides((prev) => ({ ...prev, previewUrls: next }));
+									}}
+									placeholder='Name'
+									value={entry.name}
+								/>
+								<Input
+									aria-label='Preview URL template'
+									className='h-8 flex-1 font-mono text-xs'
+									onChange={(e) => {
+										const next = [...previewUrls];
+										next[idx] = { ...entry, url: e.target.value };
+										setOverrides((prev) => ({ ...prev, previewUrls: next }));
+									}}
+									placeholder='https://localhost:$ENSEMBLR_PORT'
+									value={entry.url}
+								/>
+								<Button
+									onClick={() => {
+										const next = previewUrls.filter((_, i) => i !== idx);
+										setOverrides((prev) => ({
+											...prev,
+											previewUrls: next.length === 0 ? undefined : next,
+										}));
+										setRowIds((ids) =>
+											next.length === 0
+												? [crypto.randomUUID()]
+												: ids.filter((_, i) => i !== idx),
+										);
+									}}
+									size='icon'
+									variant='ghost'
+								>
+									<Trash2Icon aria-hidden='true' className='size-4' />
+								</Button>
+							</div>
+						);
+					})}
 					<Button
 						onClick={() => {
 							setOverrides((prev) => ({
 								...prev,
 								previewUrls: [...previewUrls, { name: '', url: '' }],
 							}));
+							setRowIds((ids) => [...ids, crypto.randomUUID()]);
 						}}
 						size='sm'
 						variant='outline'

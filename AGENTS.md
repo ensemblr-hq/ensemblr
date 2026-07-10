@@ -122,6 +122,7 @@ Every function, hook, React component, Jotai atom, and IPC contract in `src/main
 - For IPC channel and contract definitions, describe what the channel does, who sends it, and who receives it.
 - Excluded by policy: shadcn UI primitives under `src/renderer/components/ui/`, type-only files (`*.d.ts`, anything under `types/`), the generated `routeTree.gen.ts`, mock fixtures under `src/renderer/mocks/`, pure barrel `index.ts` re-export files, and tests. `src/shared/ipc/contracts.ts` is also treated as type-only.
 - When updating existing code, leave correct JSDoc in place and refresh it when behavior changes. Do not introduce new code without the appropriate JSDoc block.
+- Function bodies stay comment-free — clear names and small helpers over prose. See @.claude/rules/jsdoc.md for the per-function JSDoc contract and the no-inline-comments rule (the one exception: a short comment explaining a non-obvious *why*).
 
 ## Code Review Policy
 

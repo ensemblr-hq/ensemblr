@@ -22,7 +22,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
 	'openai-codex': 'OpenAI Codex',
 };
 
-export const FAVOURITES_GROUP_KEY = '__favourites__';
+const FAVOURITES_GROUP_KEY = '__favourites__';
 
 /** Maps provider identifiers to the grouped label shown in the model picker. */
 export function getProviderDisplayName(provider: string): string {

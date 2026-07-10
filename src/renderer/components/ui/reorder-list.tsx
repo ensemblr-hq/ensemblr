@@ -46,9 +46,10 @@ const ReorderList: React.FC<ReorderListProps> = ({
 	useEffect(() => {
 		setOrderedKeys((currentKeys) => {
 			const childKeySet = new Set(childKeys);
+			const currentKeySet = new Set(currentKeys);
 			const nextKeys = [
 				...currentKeys.filter((key) => childKeySet.has(key)),
-				...childKeys.filter((key) => !currentKeys.includes(key)),
+				...childKeys.filter((key) => !currentKeySet.has(key)),
 			];
 
 			return areStringArraysEqual(nextKeys, currentKeys)

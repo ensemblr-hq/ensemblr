@@ -18,7 +18,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: millionco/react-doctor@main
+      - uses: millionco/react-doctor@v2
         with:
           diff: master
           github-token: ${{ secrets.GITHUB_TOKEN }}

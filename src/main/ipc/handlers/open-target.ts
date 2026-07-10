@@ -6,10 +6,8 @@ import type {
 	OpenWorkspaceInTargetRequest,
 } from '@/shared/ipc/contracts/open-target';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import {
-	type OpenTargetService,
-	sanitizeWorkspaceRelativePath,
-} from '../../open-target';
+import { sanitizeWorkspaceRelativePath } from '../../open-target/open-target-paths';
+import type { OpenTargetService } from '../../open-target/open-target-service';
 import type { EnsemblrDatabaseService } from '../../storage';
 import { getWorkspacePathById } from '../../storage/repositories/workspace-repository';
 

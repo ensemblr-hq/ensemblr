@@ -24,7 +24,7 @@ export interface ScriptsForm {
 export type RepoProject = ReturnType<typeof useRepoSettings>['project'];
 
 /** Debounce window before a form edit is persisted to SQLite. */
-export const SAVE_DEBOUNCE_MS = 500;
+const SAVE_DEBOUNCE_MS = 500;
 
 /**
  * Owns the Scripts settings form: local edit state seeded once at mount,

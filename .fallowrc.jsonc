@@ -23,9 +23,12 @@
 		// Build / cache output
 		".vite/**",
 		"out/**",
-		".fallow/**",
-		// Vendored shadcn/ui primitives kept for future composition.
-		"src/renderer/components/ui/**"
+		".fallow/**"
+		// NOTE: vendored shadcn `ui/**` is intentionally NOT ignored here. A
+		// primitive that was installed but has no consumers should surface as an
+		// unused file. Per-rule style noise on the used primitives (unused
+		// exports, etc.) is quieted below via `ignoreExports`, not by hiding the
+		// whole tree.
 	],
 
 	// Vendored shadcn `ui/**` (ignored above) is the sole consumer of these

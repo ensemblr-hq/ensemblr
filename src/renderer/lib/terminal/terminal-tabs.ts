@@ -38,16 +38,21 @@ export function terminalSessionToDockStatus(
 export function mapTerminalSessionsToDockTabs(
 	sessions: readonly TerminalSessionSnapshot[],
 ): TerminalDockTabModel[] {
-	return sessions
-		.filter((session) => session.kind === 'terminal')
-		.map((session) => ({
+	const tabs: TerminalDockTabModel[] = [];
+	for (const session of sessions) {
+		if (session.kind !== 'terminal') {
+			continue;
+		}
+		tabs.push({
 			id: `terminal:${session.id}` as const,
 			kind: 'terminal',
 			label: session.title,
 			sessionStatus: session.status,
 			status: terminalSessionToDockStatus(session.status),
 			terminalId: session.id,
-		}));
+		});
+	}
+	return tabs;
 }
 
 /**

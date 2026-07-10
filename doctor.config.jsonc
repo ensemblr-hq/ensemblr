@@ -122,7 +122,11 @@
 					"src/main/repository/delete-repository.ts",
 					"src/main/repository/archive-lifecycle.ts",
 					"src/main/repository/archive-repository.ts",
-					"src/main/repository/adopt-shared-root/**"
+					"src/main/repository/adopt-shared-root/**",
+					// discardChanges reverts each path with sequential `git
+					// checkout`/`git rm` calls; parallelizing would race on
+					// `.git/index.lock` and corrupt the index.
+					"src/main/workspace-git/workspace-git-status.ts"
 				],
 				"rules": ["react-doctor/async-await-in-loop"]
 			},
@@ -215,11 +219,16 @@
 				"rules": ["react-doctor/rerender-state-only-in-handlers"]
 			},
 			{
-				// AI-assistant activity parts have no stable identity — they're a
-				// derived projection of streaming chat events. The list never
-				// reorders within a turn (append-only stream), so positional index
-				// keys are stable enough for diff-based reconciliation.
-				"files": ["src/renderer/components/chat-assistant-turn.tsx"],
+				// Append-only or render-once lists whose items carry no stable
+				// identity: streaming chat-assistant parts, the clone progress log
+				// (lines appended in order, never removed), and archive diagnostics
+				// (rendered once on failure). None reorder or filter, so positional
+				// index keys are stable for reconciliation.
+				"files": [
+					"src/renderer/components/chat-assistant-turn.tsx",
+					"src/renderer/components/welcome/clone-github-progress-log.tsx",
+					"src/renderer/components/workbench-shell/archive-diagnostics-list.tsx"
+				],
 				"rules": ["react-doctor/no-array-index-as-key"]
 			},
 			{

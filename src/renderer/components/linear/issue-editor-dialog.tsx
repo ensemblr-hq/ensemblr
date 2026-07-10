@@ -117,6 +117,7 @@ export function LinearIssueEditorDialog({
 	const teamStates = filterByTeam(metadataWire?.states ?? [], fields.teamId);
 	const teamCycles = filterByTeam(metadataWire?.cycles ?? [], fields.teamId);
 	const teamLabels = filterByTeam(metadataWire?.labels ?? [], fields.teamId);
+	const selectedLabelIds = new Set(fields.labelIds);
 
 	const update = (patch: Partial<LinearIssueEditorFields>) => {
 		setFields((current) => ({ ...current, ...patch }));
@@ -248,7 +249,7 @@ export function LinearIssueEditorDialog({
 					{teamLabels.length > 0 ? (
 						<div className='flex flex-wrap items-center gap-1.5'>
 							{teamLabels.map((label) => {
-								const selected = fields.labelIds.includes(label.id);
+								const selected = selectedLabelIds.has(label.id);
 
 								return (
 									<button
