@@ -63,7 +63,10 @@ export function useLiveWorkspaceModel({
 } {
 	// Refresh the files tree the instant an agent or the user changes files on
 	// disk, rather than waiting for the query's polling fallback.
-	useWorkspaceFilesWatch(activeWorkspace.pathLabel ?? null);
+	useWorkspaceFilesWatch({
+		repositoryId: activeProject.id,
+		workspaceCwd: activeWorkspace.pathLabel ?? null,
+	});
 	// Refresh the PR snapshot the instant the agent finishes a turn, so a PR it
 	// just created/pushed/merged surfaces without waiting for the 30s poll.
 	usePullRequestAutoRefresh({
@@ -78,7 +81,7 @@ export function useLiveWorkspaceModel({
 	const { data: scriptSettingsData } = useQuery({
 		...settingsResolutionQuery({
 			repositoryId: activeProject.id,
-			repositoryPath: activeProject.pathLabel,
+			repositoryPath: activeWorkspace.pathLabel,
 		}),
 		select: selectScriptSettings,
 	});

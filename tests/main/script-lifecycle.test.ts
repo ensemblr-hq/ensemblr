@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,7 +17,10 @@ import type {
 	CreateTerminalSessionOptions,
 	TerminalService,
 } from '../../src/main/terminal';
-import type { TerminalSessionSnapshot } from '../../src/shared/ipc';
+import type {
+	SettingsResolutionRequest,
+	TerminalSessionSnapshot,
+} from '../../src/shared/ipc';
 
 const NOW = '2026-06-11T00:00:00.000Z';
 const WORKSPACE_ID = 'workspace-1';
@@ -66,13 +71,18 @@ function createDatabaseServiceStub(
 	} as unknown as EnsemblrDatabaseService;
 }
 
-function createSettingsStub(settings: {
-	archive?: string;
-	autoRunAfterSetup?: boolean;
-	run?: string;
-	runScriptMode?: string;
-	setup?: string;
-}): EnsemblrConfigResolutionService {
+function createSettingsStub(
+	settings: {
+		archive?: string;
+		autoRunAfterSetup?: boolean;
+		run?: string;
+		runScriptMode?: string;
+		setup?: string;
+	},
+	onResolve?: (
+		request: Parameters<EnsemblrConfigResolutionService['resolve']>[0],
+	) => void,
+): EnsemblrConfigResolutionService {
 	const entries: Array<{ key: string; value: unknown }> = [];
 
 	for (const kind of ['archive', 'run', 'setup'] as const) {
@@ -89,19 +99,23 @@ function createSettingsStub(settings: {
 	});
 
 	return {
-		resolve: () => ({
-			app: { diagnostics: [], settings: [] },
-			repository: {
-				diagnostics: [],
-				settings: entries.map((entry) => ({
-					candidates: [],
-					key: entry.key,
-					locked: false,
-					source: 'built-in-default' as const,
-					value: entry.value,
-				})),
-			},
-		}),
+		resolve: (request) => {
+			onResolve?.(request);
+
+			return {
+				app: { diagnostics: [], settings: [] },
+				repository: {
+					diagnostics: [],
+					settings: entries.map((entry) => ({
+						candidates: [],
+						key: entry.key,
+						locked: false,
+						source: 'built-in-default' as const,
+						value: entry.value,
+					})),
+				},
+			};
+		},
 	};
 }
 
@@ -238,6 +252,31 @@ test('runScript starts the configured setup script in a workspace PTY', async (t
 	assert.equal(result.session.kind, 'setup-script');
 	assert.equal(createCalls[0]?.command, 'bun install');
 	assert.equal(createCalls[0]?.kind, 'setup-script');
+});
+
+test('runScript resolves committed config from the workspace worktree', async (t) => {
+	const database = createDatabaseFixture(t);
+	const fake = createTerminalServiceFake();
+	const requests: unknown[] = [];
+	const service = createScriptLifecycleService({
+		databaseService: createDatabaseServiceStub(database),
+		settingsResolutionService: createSettingsStub(
+			{ setup: 'bun install' },
+			(request) => {
+				requests.push(request);
+			},
+		),
+		terminalService: fake.terminalService,
+	});
+
+	await service.runScript({
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	const request = requests[0] as SettingsResolutionRequest | undefined;
+	assert.equal(request?.repository?.repositoryId, 'repo-1');
+	assert.equal(request?.repository?.repositoryPath, '/tmp/workspace');
 });
 
 test('runScript reports unconfigured scripts without spawning', async (t) => {

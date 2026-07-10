@@ -26,6 +26,7 @@ export function settingsResolutionQuery(
 			),
 		queryKey: ensemblrQueryKeys.settingsResolution(
 			repository?.repositoryId ?? null,
+			repository?.repositoryPath,
 		),
 		staleTime: 15_000,
 	});

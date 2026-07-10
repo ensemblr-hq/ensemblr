@@ -10,13 +10,21 @@ import {
  * Keeps the workspace file list fresh in near-real-time: asks the main process
  * to watch `workspaceCwd` and invalidates the cached file list whenever a
  * change is broadcast. The polling on `workspaceFilesQuery` stays as a coarse
- * fallback for platforms or ignored paths the watcher cannot cover.
+ * fallback for platforms or ignored paths the watcher cannot cover. The same
+ * broadcast also refreshes the workspace-scoped settings snapshot, so a newly
+ * authored `.ensemblr/settings.toml` updates the Setup and Run dock panels.
  *
  * No-ops when no workspace is active or the preload bridge is unavailable
  * (e.g. tests). Re-subscribes when the active workspace changes.
- * @param workspaceCwd - Absolute workspace path, or null when none is active.
+ * @param options - Active repository and workspace identifiers for cache refresh.
  */
-export function useWorkspaceFilesWatch(workspaceCwd: string | null): void {
+export function useWorkspaceFilesWatch({
+	repositoryId,
+	workspaceCwd,
+}: {
+	repositoryId: string | null;
+	workspaceCwd: string | null;
+}): void {
 	const queryClient = useQueryClient();
 
 	useEffect(() => {
@@ -35,11 +43,20 @@ export function useWorkspaceFilesWatch(workspaceCwd: string | null): void {
 			void queryClient.invalidateQueries({
 				queryKey: ensemblrQueryKeys.workspaceFiles(workspaceCwd),
 			});
+
+			if (repositoryId) {
+				void queryClient.invalidateQueries({
+					queryKey: ensemblrQueryKeys.settingsResolution(
+						repositoryId,
+						workspaceCwd,
+					),
+				});
+			}
 		});
 
 		return () => {
 			unsubscribe();
 			void api.unwatchWorkspaceFiles({ workspaceCwd });
 		};
-	}, [queryClient, workspaceCwd]);
+	}, [queryClient, repositoryId, workspaceCwd]);
 }

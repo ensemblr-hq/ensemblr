@@ -115,13 +115,20 @@ export const ensemblrQueryKeys = {
 	/** Query key for the setup-diagnostics snapshot. */
 	setupDiagnostics: () =>
 		[...ensemblrQueryKeys.all, 'setup-diagnostics'] as const,
-	/** Query key for the resolved settings snapshot, optionally scoped to a repository. */
-	settingsResolution: (repositoryId: string | null) =>
-		[
-			...ensemblrQueryKeys.all,
-			'settings-resolution',
-			repositoryId ?? '',
-		] as const,
+	/** Query key for a resolved settings snapshot, optionally scoped by repository path. */
+	settingsResolution: (repositoryId: string | null, repositoryPath?: string) =>
+		repositoryPath
+			? ([
+					...ensemblrQueryKeys.all,
+					'settings-resolution',
+					repositoryId ?? '',
+					repositoryPath,
+				] as const)
+			: ([
+					...ensemblrQueryKeys.all,
+					'settings-resolution',
+					repositoryId ?? '',
+				] as const),
 	/** Query key for a workspace's commits relative to a base ref. */
 	workspaceCommits: (workspaceCwd: string, baseRef = '') =>
 		[

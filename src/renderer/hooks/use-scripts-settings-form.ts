@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-	settingsResolutionQuery,
+	ensemblrQueryKeys,
 	updateRepositoryScripts,
 } from '@/renderer/api/ensemblr';
 import type { RepoProject, ScriptsForm } from '@/renderer/types/settings';
@@ -53,10 +53,7 @@ export function useScriptsSettingsForm(
 				return;
 			}
 			await queryClient.invalidateQueries({
-				queryKey: settingsResolutionQuery({
-					repositoryId: repoId,
-					repositoryPath: project.pathLabel,
-				}).queryKey,
+				queryKey: ensemblrQueryKeys.settingsResolution(repoId),
 			});
 		} catch {
 			toast.error('Could not save script settings.');

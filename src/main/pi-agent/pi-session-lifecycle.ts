@@ -241,12 +241,19 @@ export function createPiSessionLifecycle({
 		if (!active) {
 			return;
 		}
-		// Write the owed summary before aborting: the post-abort shutdown event
-		// deletes the session, so the queue could no longer drain it afterward.
-		await summaryQueue.flushSummaryForSession({
-			database,
-			sessionId: request.sessionId,
-		});
+		// Start the owed summary before aborting so it snapshots the active session,
+		// but never block the user's explicit stop on archival summary work. The
+		// flush reads the transcript synchronously before its first await, so the
+		// snapshot is captured before the abort/delete below. Durability is now
+		// best-effort: if the process exits immediately after this stop, the
+		// backgrounded write may not finish (the session is already removed from
+		// activeSessions, so shutdownActiveSessions cannot re-flush it).
+		void summaryQueue
+			.flushSummaryForSession({
+				database,
+				sessionId: request.sessionId,
+			})
+			.catch(() => undefined);
 		await active.piRuntimeSession.abort(request.reason);
 		if (active.activeTurnId) {
 			updateTurn({
@@ -293,11 +300,13 @@ export function createPiSessionLifecycle({
 				// Database unavailable during teardown; skip the final flush.
 			}
 			activeSessions.clear();
+			for (const [, session] of open) {
+				session.subscription.unsubscribe();
+			}
 			await Promise.all(
-				open.map(async ([, session]) => {
-					session.subscription.unsubscribe();
-					await session.piRuntimeSession.close().catch(() => undefined);
-				}),
+				open.map(([, session]) =>
+					session.piRuntimeSession.close().catch(() => undefined),
+				),
 			);
 		},
 		stopSession,
