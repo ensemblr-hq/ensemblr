@@ -9,6 +9,11 @@ export interface RingBuffer {
 	write: (chunk: Buffer) => void;
 }
 
+/**
+ * Create a fixed-byte ring buffer that retains only the most recent bytes.
+ * @param maxBytes - Maximum number of bytes to retain.
+ * @returns A ring buffer exposing `write` and `snapshot`.
+ */
 export function createRingBuffer(maxBytes: number): RingBuffer {
 	let stored = Buffer.alloc(0);
 	return {

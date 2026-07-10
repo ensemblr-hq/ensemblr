@@ -39,6 +39,12 @@ export function registerShellSnapshotHandlers({
 	});
 }
 
+/**
+ * Build the health snapshot, swallowing errors so the shell snapshot still returns.
+ * @param configService - Config service used to build the snapshot
+ * @param databaseService - Database service used to build the snapshot
+ * @returns The health snapshot, or null when building it throws
+ */
 function safeBuildHealthSnapshot(
 	configService: EnsemblrConfigService,
 	databaseService: EnsemblrDatabaseService,
@@ -50,6 +56,11 @@ function safeBuildHealthSnapshot(
 	}
 }
 
+/**
+ * Build the repository/workspace navigation snapshot, returning null on failure.
+ * @param databaseService - Database service used to read navigation state
+ * @returns The navigation snapshot, or null when building it throws
+ */
 function safeBuildNavigationSnapshot(
 	databaseService: EnsemblrDatabaseService,
 ): RepositoryWorkspaceNavigationSnapshot | null {

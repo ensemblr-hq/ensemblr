@@ -17,6 +17,7 @@ import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/ar
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type { ArchiveRepositoryDiagnostic } from '@/shared/ipc/contracts/repository';
 
+/** Props for the archive-repository dialog. */
 interface ArchiveRepositoryDialogProps {
 	onArchived: (projectId: string) => Promise<void> | void;
 	onOpenChange: (open: boolean) => void;
@@ -51,8 +52,10 @@ export function ArchiveRepositoryDialog({
 	);
 }
 
+/** Progress stage of the repository archive flow. */
 type ArchiveStage = 'archiving' | 'failure' | 'idle';
 
+/** Inner archive form for a repository; owns the archiving state and opt-in branch cleanup. */
 function ArchiveRepositoryDialogForm({
 	onArchived,
 	onOpenChange,

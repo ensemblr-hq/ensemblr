@@ -40,6 +40,7 @@ interface ShellContext<T> {
 function makeShellContext<T>(name: string): ShellContext<T> {
 	const Context = createContext<T | null>(null);
 
+	/** Mounts the context, exposing `value` to descendant consumers. */
 	function Provider({
 		value,
 		children,
@@ -50,6 +51,10 @@ function makeShellContext<T>(name: string): ShellContext<T> {
 		return <Context.Provider value={value}>{children}</Context.Provider>;
 	}
 
+	/**
+	 * Reads the context value, throwing when used outside its provider.
+	 * @returns The current context value
+	 */
 	function useValue(): T {
 		const value = use(Context);
 		if (value === null) {
@@ -58,6 +63,10 @@ function makeShellContext<T>(name: string): ShellContext<T> {
 		return value;
 	}
 
+	/**
+	 * Reads the context value without throwing when no provider is mounted.
+	 * @returns The context value, or `null` outside a provider
+	 */
 	function useOptional(): T | null {
 		return use(Context);
 	}

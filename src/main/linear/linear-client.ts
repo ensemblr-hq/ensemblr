@@ -209,6 +209,13 @@ export function createLinearClient({
 	fetchImpl = fetch,
 	getAccessToken,
 }: CreateLinearClientOptions): LinearClient {
+	/**
+	 * Send a GraphQL operation to Linear, mapping auth, rate-limit, and transport
+	 * failures onto typed {@link LinearServiceError}s.
+	 * @param query - GraphQL query or mutation document.
+	 * @param variables - Variables for the operation.
+	 * @returns The `data` payload from the response.
+	 */
 	async function execute<T>(
 		query: string,
 		variables: Record<string, unknown>,
@@ -282,6 +289,13 @@ export function createLinearClient({
 		return payload.data;
 	}
 
+	/**
+	 * Run an issue-list query and map the named connection into a page of issues.
+	 * @param query - GraphQL query returning an issue connection.
+	 * @param variables - Variables for the query.
+	 * @param connectionKey - Response field holding the connection.
+	 * @returns A page of mapped issue data.
+	 */
 	async function fetchIssuePage(
 		query: string,
 		variables: Record<string, unknown>,
@@ -467,11 +481,13 @@ export function createLinearClient({
 	};
 }
 
+/** Raw Relay-style connection payload (nodes plus page info) from GraphQL. */
 interface ConnectionPayload<T> {
 	nodes: T[];
 	pageInfo: { endCursor?: string | null; hasNextPage: boolean };
 }
 
+/** Raw issue node shape as returned by the Linear GraphQL selections. */
 interface IssueNode {
 	archivedAt?: string | null;
 	assignee?: { id: string; name: string } | null;
@@ -497,6 +513,7 @@ interface IssueNode {
 	url: string;
 }
 
+/** Raw comment node shape as returned by the Linear GraphQL selections. */
 interface CommentNode {
 	body: string;
 	createdAt?: string | null;
@@ -504,6 +521,7 @@ interface CommentNode {
 	user?: { displayName?: string | null; name?: string | null } | null;
 }
 
+/** Raw metadata node (team/project/state/label/cycle/user) from GraphQL. */
 interface MetadataNode {
 	id: string;
 	name?: string | null;
@@ -511,6 +529,11 @@ interface MetadataNode {
 	[key: string]: unknown;
 }
 
+/**
+ * Normalize a raw issue node into the flat {@link LinearIssueData} shape.
+ * @param node - Raw issue node from the GraphQL response.
+ * @returns The flattened issue data.
+ */
 function mapIssueNode(node: IssueNode): LinearIssueData {
 	return {
 		archivedAt: node.archivedAt ?? null,
@@ -542,6 +565,12 @@ function mapIssueNode(node: IssueNode): LinearIssueData {
 	};
 }
 
+/**
+ * Normalize a raw comment node into flat {@link LinearCommentData}, preferring
+ * the author's display name over their username.
+ * @param node - Raw comment node from the GraphQL response.
+ * @returns The flattened comment data.
+ */
 function mapCommentNode(node: CommentNode): LinearCommentData {
 	return {
 		authorName: node.user?.displayName ?? node.user?.name ?? null,
@@ -551,6 +580,12 @@ function mapCommentNode(node: CommentNode): LinearCommentData {
 	};
 }
 
+/**
+ * Normalize a raw metadata node into {@link LinearResourceData}, lifting the
+ * team id out and keeping the remaining fields as opaque data.
+ * @param node - Raw metadata node from the GraphQL response.
+ * @returns The flattened resource data.
+ */
 function mapMetadataNode(node: MetadataNode): LinearResourceData {
 	const { team, ...data } = node;
 
@@ -562,6 +597,12 @@ function mapMetadataNode(node: MetadataNode): LinearResourceData {
 	};
 }
 
+/**
+ * Map a token-resolution error onto a typed {@link LinearServiceError},
+ * distinguishing not-connected from reconnect-required states.
+ * @param error - Error thrown while resolving the access token.
+ * @returns The mapped service error.
+ */
 function mapAuthError(error: unknown): LinearServiceError {
 	if (error instanceof LinearAuthError) {
 		if (error.code === 'not-connected' || error.code === 'not-configured') {
@@ -582,6 +623,12 @@ function mapAuthError(error: unknown): LinearServiceError {
 	);
 }
 
+/**
+ * Map GraphQL error extensions onto a typed {@link LinearServiceError},
+ * detecting rate-limit, authentication, permission, and not-found categories.
+ * @param errors - GraphQL errors from the response body.
+ * @returns The mapped service error.
+ */
 function mapGraphqlErrors(
 	errors: Array<{
 		extensions?: { code?: string; retryAfter?: number; type?: string };
@@ -622,6 +669,11 @@ function mapGraphqlErrors(
 	return new LinearServiceError('invalid-request', message);
 }
 
+/**
+ * Read the `retry-after` header as a number of seconds.
+ * @param response - HTTP response carrying rate-limit headers.
+ * @returns The retry delay in seconds, or null when absent or unparseable.
+ */
 function parseRetryAfter(response: Response): number | null {
 	const header = response.headers.get('retry-after');
 

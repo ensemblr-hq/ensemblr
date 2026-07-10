@@ -13,6 +13,7 @@ import { Button } from '@/renderer/components/ui/button';
 import { ScrollBar } from '@/renderer/components/ui/scroll-area';
 import { cn } from '@/renderer/lib/utils';
 
+/** Props for the Conversation wrapper — the underlying StickToBottom props. */
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
 /** Provides the sticky chat scroll context for conversation timelines. */
@@ -26,6 +27,7 @@ export const Conversation = ({ className, ...props }: ConversationProps) => (
 	/>
 );
 
+/** Props for ConversationContent — the StickToBottom.Content props. */
 export type ConversationContentProps = ComponentProps<
 	typeof StickToBottom.Content
 >;
@@ -96,8 +98,10 @@ const renderConversationContentChildren = (
 	return children;
 };
 
+/** Props for ConversationScrollButton — the underlying Button props. */
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
 
+/** Floating button that scrolls the conversation to the bottom; hidden while already at the bottom. */
 export const ConversationScrollButton = ({
 	className,
 	...props

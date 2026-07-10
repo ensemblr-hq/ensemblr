@@ -8,6 +8,11 @@
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Compute the epoch-millisecond start of the calendar day containing a date.
+ * @param date - The date to truncate to local midnight.
+ * @returns Milliseconds since the epoch at the start of that day.
+ */
 function startOfDay(date: Date): number {
 	return new Date(
 		date.getFullYear(),

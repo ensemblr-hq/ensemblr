@@ -225,6 +225,7 @@ export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
 	);
 }
 
+/** Renders a small toggle button for a raw-frame filter. */
 function FilterButton({
 	active,
 	label,
@@ -282,6 +283,7 @@ function stripSignatures(value: unknown): unknown {
 	return value;
 }
 
+/** Renders a toggle button for showing or hiding a raw-frame kind, struck through when off. */
 function KindToggle({
 	active,
 	label,
@@ -309,6 +311,7 @@ function KindToggle({
 	);
 }
 
+/** Renders a single raw Pi frame with pretty-printed JSON and optional signature stripping. */
 function FrameItem({
 	frame,
 	hideSignatures,

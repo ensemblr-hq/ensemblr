@@ -28,6 +28,7 @@ const BURST_INTERVAL_RANGE_MS = 8000;
 const BURST_DURATION_MIN_MS = 260;
 const BURST_DURATION_RANGE_MS = 200;
 
+/** A single lit pixel in the wordmark grid, with its flicker-animation timing. */
 interface PixelRect {
 	x: number;
 	y: number;
@@ -35,6 +36,10 @@ interface PixelRect {
 	flickerDuration: number;
 }
 
+/**
+ * Build the lit-pixel rectangles for the "ENSEMBLR" wordmark from the glyph bitmaps.
+ * @returns The pixel rectangles, each with randomized flicker timing.
+ */
 function buildPixels(): PixelRect[] {
 	const pixels: PixelRect[] = [];
 	for (let letterIndex = 0; letterIndex < WORD.length; letterIndex += 1) {
@@ -76,12 +81,14 @@ const KEYFRAMES = `
 }
 `;
 
+/** Props for a single offset, tinted ghost layer of the wordmark. */
 interface GhostLayerProps {
 	color: string;
 	offset: number;
 	visible: boolean;
 }
 
+/** Renders one offset, tinted copy of the wordmark used for the chromatic ghost effect. */
 function GhostLayer({ color, offset, visible }: GhostLayerProps) {
 	return (
 		<svg

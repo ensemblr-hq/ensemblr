@@ -24,10 +24,12 @@ import {
 } from '@/renderer/state/preferences';
 import type { PiModelOptionWire } from '@/shared/ipc/contracts/pi-session';
 
+/** Route for the Models settings section; renders the models panel populated from Pi capability discovery. */
 export const Route = createFileRoute('/_workbench/settings/models')({
 	component: ModelsSettings,
 });
 
+/** Models settings panel for choosing default chat and review models, their thinking levels, and which models are visible. */
 function ModelsSettings() {
 	const {
 		data: modelsData,
@@ -155,6 +157,7 @@ function ModelsSettings() {
 	);
 }
 
+/** Select dropdown for choosing a Pi model from the visible list; disabled when no models are available. */
 function ModelSelect({
 	ariaLabel,
 	models,
@@ -189,6 +192,7 @@ function ModelSelect({
 	);
 }
 
+/** Select dropdown for choosing a thinking level; renders nothing when the model exposes no levels. */
 function ThinkingLevelSelect({
 	ariaLabel,
 	levels,
@@ -222,6 +226,12 @@ function ThinkingLevelSelect({
 	);
 }
 
+/**
+ * Resolve the thinking levels a given model supports.
+ * @param list - Available Pi model options
+ * @param modelId - ID of the model to look up, or null
+ * @returns The model's thinking levels, or an empty list when none match
+ */
 function thinkingLevelsFor(
 	list: readonly PiModelOptionWire[],
 	modelId: string | null,
@@ -230,6 +240,11 @@ function thinkingLevelsFor(
 	return list.find((m) => m.id === modelId)?.thinkingLevels ?? [];
 }
 
+/**
+ * Map a thinking-level id to its user-facing label.
+ * @param level - Raw thinking-level identifier
+ * @returns The display label, or the raw level when unrecognized
+ */
 function prettyThinkingLevel(level: string): string {
 	switch (level) {
 		case 'off':

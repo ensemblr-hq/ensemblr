@@ -11,10 +11,12 @@ import { matchesShortcut, type ShortcutId } from '@/shared/keymap';
  */
 export type KeymapHandlerResult = boolean | undefined;
 
+/** Handler run for a matched keymap binding; its result decides whether the event is consumed. */
 export type KeymapHandler<T extends HTMLElement> = (
 	event: ReactKeyboardEvent<T>,
 ) => KeymapHandlerResult;
 
+/** A shortcut id paired with the handler to run when it matches. */
 export type KeymapBinding<T extends HTMLElement> = readonly [
 	ShortcutId,
 	KeymapHandler<T>,

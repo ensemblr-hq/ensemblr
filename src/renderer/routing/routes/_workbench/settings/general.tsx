@@ -23,6 +23,7 @@ import {
 import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
 import { formatShortcut } from '@/shared/keymap';
 
+/** Route for the General settings section; renders the general-settings panel. */
 export const Route = createFileRoute('/_workbench/settings/general')({
 	component: GeneralSettings,
 });
@@ -35,6 +36,7 @@ const SEND_ENTER_HINT = formatShortcut('composer.submit');
 const SEND_MOD_ENTER_HINT = formatShortcut('composer.submitWithMod');
 const NEWLINE_HINT = formatShortcut('composer.newline');
 
+/** General settings panel for the send shortcut, follow-up behavior, notifications, and other core chat preferences. */
 function GeneralSettings() {
 	const [sendShortcut, setSendShortcut] = useAtom(sendShortcutAtom);
 	const [followUp, setFollowUp] = useAtom(followUpBehaviorAtom);

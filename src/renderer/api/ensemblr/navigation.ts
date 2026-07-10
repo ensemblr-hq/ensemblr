@@ -6,6 +6,7 @@ import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
 
 /** Query options for the gh-backed GitHub repository list (8 most recent). */
 export const githubRepositoryListQuery = queryOptions({
+	/** Fetches the recent GitHub repository list over IPC with call profiling. */
 	queryFn: () =>
 		profileElectronIpcCall(
 			{ channel: 'ensemblr:github-repository-list', usesDatabase: false },
@@ -20,6 +21,7 @@ export const githubRepositoryListQuery = queryOptions({
  * the clone dialog's search can cover more than the 8 most recent repos.
  */
 export const githubRepositoryFullListQuery = queryOptions({
+	/** Fetches the full accessible GitHub repository set over IPC with call profiling. */
 	queryFn: () =>
 		profileElectronIpcCall(
 			{ channel: 'ensemblr:github-repository-list-full', usesDatabase: false },
@@ -31,6 +33,7 @@ export const githubRepositoryFullListQuery = queryOptions({
 
 /** Query options for the renderer-side root directory snapshot. */
 export const rootDirectoryQuery = queryOptions({
+	/** Fetches the root directory snapshot over IPC with call profiling. */
 	queryFn: () =>
 		profileElectronIpcCall(
 			{ channel: 'ensemblr:root-directory', usesDatabase: true },
@@ -42,6 +45,7 @@ export const rootDirectoryQuery = queryOptions({
 
 /** Query options for the renderer-side repository/workspace navigation snapshot. */
 export const repositoryWorkspaceNavigationQuery = queryOptions({
+	/** Fetches the repository/workspace navigation snapshot over IPC with call profiling. */
 	queryFn: () =>
 		profileElectronIpcCall(
 			{

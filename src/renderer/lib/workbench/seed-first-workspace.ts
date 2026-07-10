@@ -15,6 +15,7 @@ import {
 } from './navigation-selection';
 import { pickComposerSurname } from './workspace-name-pool';
 
+/** Inputs for seeding a repository's first workspace: navigation, persistence, and the target repo. */
 interface SeedFirstWorkspaceOptions {
 	navigate: ReturnType<typeof useNavigate>;
 	persistSelection: (selection: StoredWorkspaceSelection) => void;
@@ -22,6 +23,7 @@ interface SeedFirstWorkspaceOptions {
 	router?: ReturnType<typeof useRouter>;
 }
 
+/** Outcome of seeding a first workspace: success with the new id, or a failure reason. */
 interface SeedFirstWorkspaceResult {
 	error?: string;
 	status: 'failure' | 'success';

@@ -39,6 +39,11 @@ export interface CheckpointCaptureInput {
 	workspaceId: string;
 }
 
+/**
+ * Function signature for the checkpoint capture port, invoked before a prompt
+ * reaches the runtime; resolves to the recorded checkpoint row, or null when
+ * capture was skipped or failed.
+ */
 export type CheckpointCapturePort = (
 	input: CheckpointCaptureInput,
 ) => Promise<CheckpointRow | null>;
@@ -121,6 +126,7 @@ export function listTurnCheckpoints({
 	return listCheckpointsForPiSession({ database, piSessionId });
 }
 
+/** A turn's git diff paired with the checkpoint it was computed against. */
 export interface TurnDiffResult extends GitDiffResult {
 	checkpoint: CheckpointRow;
 }
@@ -150,6 +156,7 @@ export async function computeTurnDiff({
 	return { ...diff, checkpoint };
 }
 
+/** Result of restoring a turn checkpoint, carrying the checkpoint restored. */
 export interface RestoreTurnCheckpointResult {
 	checkpoint: CheckpointRow;
 }
@@ -222,6 +229,10 @@ export function isOrdinalHidden(
 	);
 }
 
+/**
+ * Look up the checkpoint captured for a turn, throwing when none exists.
+ * @returns The turn's checkpoint row
+ */
 function requireCheckpointForTurn({
 	database,
 	turnId,
@@ -239,6 +250,10 @@ function requireCheckpointForTurn({
 	return checkpoint;
 }
 
+/**
+ * Find the checkpoint captured after the given one in the same Pi session.
+ * @returns The next checkpoint, or null when it is the latest or unlinked
+ */
 function findNextCheckpoint({
 	checkpoint,
 	database,

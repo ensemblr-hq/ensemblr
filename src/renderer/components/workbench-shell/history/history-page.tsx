@@ -13,6 +13,7 @@ import type { WorkspaceHistoryEntry } from '@/shared/ipc/contracts/workspace';
 import { HistoryGroup } from './history-group';
 import { bucketForDate } from './relative-time';
 
+/** A relative-time group of workspace history entries under one bucket label. */
 interface HistoryGroupModel {
 	entries: WorkspaceHistoryEntry[];
 	label: string;
@@ -91,6 +92,7 @@ export function HistoryPage() {
 	);
 }
 
+/** Renders the history list body: status notices while loading, failing, or empty, otherwise the grouped rows. */
 function HistoryBody({
 	apiAvailable,
 	groups,
@@ -138,6 +140,7 @@ function HistoryBody({
 	);
 }
 
+/** Renders a centered muted notice message in the history screen. */
 function HistoryNotice({ message }: { message: string }) {
 	return (
 		<div className='px-2 py-12 text-center text-muted-foreground text-xs'>

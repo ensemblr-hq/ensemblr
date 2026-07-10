@@ -25,6 +25,13 @@ export function classifyCommandFailure(
 	};
 }
 
+/**
+ * Classify a failed `gh` invocation into a coarse failure code from its stderr
+ * text and command result.
+ * @param stderr - Lowercased stderr output from the gh command
+ * @param result - Structured result of the local command run
+ * @returns The matched failure code, defaulting to `command-failed`
+ */
 function classifyStderr(
 	stderr: string,
 	result: LocalCommandResult,
@@ -92,6 +99,11 @@ function classifyStderr(
 	return 'command-failed';
 }
 
+/**
+ * Provide a user-facing remediation hint for a GitHub failure code.
+ * @param code - The classified failure code
+ * @returns A remediation message, or undefined when none applies
+ */
 function remediationFor(code: GithubFailureCode): string | undefined {
 	switch (code) {
 		case 'gh-not-installed':

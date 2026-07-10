@@ -19,10 +19,12 @@ import {
 	terminalScrollbackMbAtom,
 } from '@/renderer/state/preferences';
 
+/** Route for the Advanced settings section; renders the advanced-settings panel. */
 export const Route = createFileRoute('/_workbench/settings/advanced')({
 	component: AdvancedSettings,
 });
 
+/** Advanced settings panel for the Ensemblr root directory, a custom Pi executable override, and the terminal scrollback limit. */
 function AdvancedSettings() {
 	const queryClient = useQueryClient();
 	const { data: rootData, isLoading: rootLoading } =

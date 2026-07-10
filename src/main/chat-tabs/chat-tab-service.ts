@@ -243,6 +243,11 @@ function readMetadataSubject(
 	return typeof turnId === 'string' && turnId.length > 0 ? turnId : null;
 }
 
+/**
+ * Read the summary title stored on a session-event metadata record.
+ * @param metadata - Parsed event metadata record
+ * @returns The summary title, or null when the record has no string title
+ */
 function readSummaryTitleFromMetadata(
 	metadata: Record<string, unknown>,
 ): string | null {

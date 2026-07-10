@@ -19,6 +19,7 @@ import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
 
 /** Query options for the Linear connection status snapshot. */
 export const linearConnectionQuery = queryOptions({
+	/** Fetches the Linear connection status over IPC with call profiling. */
 	queryFn: () =>
 		profileElectronIpcCall(
 			{ channel: 'ensemblr:linear-connection-status', usesDatabase: true },
@@ -71,6 +72,7 @@ export function linearIssueQuery(id: string) {
 
 /** Query options for cached Linear metadata (teams, states, labels, …). */
 export const linearMetadataQuery = queryOptions({
+	/** Fetches cached Linear metadata over IPC with call profiling. */
 	queryFn: (): Promise<GetLinearMetadataResult> =>
 		profileElectronIpcCall(
 			{ channel: 'ensemblr:linear-metadata', usesDatabase: true },

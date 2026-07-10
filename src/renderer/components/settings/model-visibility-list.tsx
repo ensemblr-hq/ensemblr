@@ -13,6 +13,7 @@ import { getProviderDisplayName } from '@/renderer/components/workbench-shell/co
 import { hiddenModelsAtom } from '@/renderer/state/preferences';
 import type { PiModelOptionWire } from '@/shared/ipc/contracts/pi-session';
 
+/** A provider and its catalog models, grouped for the model-visibility list. */
 interface ProviderGroup {
 	provider: string;
 	providerLabel: string;

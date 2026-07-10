@@ -26,6 +26,7 @@ import type {
 	UnarchiveWorkspaceDiagnostic,
 } from '@/shared/ipc/contracts/workspace';
 
+/** Props for the browse-archived-workspaces dialog. */
 interface BrowseArchiveDialogProps {
 	onChange: (repositoryId: string) => Promise<void> | void;
 	onOpenChange: (open: boolean) => void;
@@ -60,10 +61,12 @@ export function BrowseArchiveDialog({
 	);
 }
 
+/** Diagnostic surfaced against a single archived-workspace row from a delete or unarchive attempt. */
 type RowDiagnostic =
 	| DeleteArchivedWorkspaceDiagnostic
 	| UnarchiveWorkspaceDiagnostic;
 
+/** Inner body that lists a repository's archived workspaces with restore and purge actions. */
 function BrowseArchiveDialogBody({
 	onChange,
 	project,
@@ -248,6 +251,7 @@ function BrowseArchiveDialogBody({
 	);
 }
 
+/** Renders a centered muted message when the archive list is empty. */
 function EmptyState({ message }: { message: string }) {
 	return (
 		<div className='px-4 py-8 text-center text-muted-foreground text-xs'>
@@ -256,6 +260,11 @@ function EmptyState({ message }: { message: string }) {
 	);
 }
 
+/**
+ * Format an archived-at ISO timestamp as a locale string, falling back to the raw value.
+ * @param iso - ISO timestamp string
+ * @returns The localized date-time, or the original string when parsing fails.
+ */
 function formatArchivedAt(iso: string): string {
 	try {
 		return new Date(iso).toLocaleString();

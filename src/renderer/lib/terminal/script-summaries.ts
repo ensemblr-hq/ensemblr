@@ -45,6 +45,12 @@ export function scriptSummaryToDockStatus(
 	return 'idle';
 }
 
+/**
+ * Folds a script's resolved command and its latest terminal session into a
+ * single dock summary, carrying any auto-detected preview URL and port.
+ * @param options - The script kind, live terminal sessions, and resolved script settings
+ * @returns The summary describing the script's command, status, and preview
+ */
 function buildScriptSummary({
 	kind,
 	sessions,

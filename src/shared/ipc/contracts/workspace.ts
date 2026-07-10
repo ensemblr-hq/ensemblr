@@ -10,6 +10,7 @@ export interface LinkedIssueRef {
 	url: string;
 }
 
+/** Machine-readable codes for problems raised while creating a workspace. */
 export type CreateWorkspaceDiagnosticCode =
 	| 'database-unavailable'
 	| 'destination-exists'
@@ -22,8 +23,10 @@ export type CreateWorkspaceDiagnosticCode =
 	| 'repository-not-found'
 	| 'workspace-insert-failed';
 
+/** Severity level attached to a create-workspace diagnostic. */
 export type CreateWorkspaceDiagnosticSeverity = 'error' | 'info' | 'warning';
 
+/** A single problem reported during workspace creation. */
 export interface CreateWorkspaceDiagnostic {
 	code: CreateWorkspaceDiagnosticCode;
 	message: string;
@@ -42,6 +45,7 @@ export interface WorkspaceLinkedIssueInput extends LinkedIssueRef {
 	teamName?: string;
 }
 
+/** Request payload for creating a workspace. */
 export interface CreateWorkspaceRequest {
 	baseBranch?: string;
 	branchName?: string;
@@ -56,6 +60,7 @@ export interface CreateWorkspaceRequest {
 	repositoryId: string;
 }
 
+/** Snapshot of a freshly created workspace returned to the renderer. */
 export interface CreatedWorkspaceSnapshot {
 	archivedAt: string | null;
 	baseBranch: string | null;
@@ -70,13 +75,16 @@ export interface CreatedWorkspaceSnapshot {
 	updatedAt: string;
 }
 
+/** Outcome of a create-workspace request. */
 export type CreateWorkspaceStatus = 'failure' | 'success';
 
+/** Origin of the files-to-copy pattern list applied to a new worktree. */
 export type FilesToCopySource =
 	| 'default'
 	| 'ensemblr-config'
 	| 'worktreeinclude';
 
+/** Machine-readable codes for problems copying files into a new worktree. */
 export type FilesToCopyDiagnosticCode =
 	| 'copy-failed'
 	| 'invalid-pattern'
@@ -84,8 +92,10 @@ export type FilesToCopyDiagnosticCode =
 	| 'source-path-missing'
 	| 'tracked-skipped';
 
+/** Severity level attached to a files-to-copy diagnostic. */
 export type FilesToCopyDiagnosticSeverity = 'error' | 'info' | 'warning';
 
+/** A single problem reported while copying files into a new worktree. */
 export interface FilesToCopyDiagnostic {
 	code: FilesToCopyDiagnosticCode;
 	message: string;
@@ -94,12 +104,14 @@ export interface FilesToCopyDiagnostic {
 	severity: FilesToCopyDiagnosticSeverity;
 }
 
+/** One file copied into a new worktree, with its source and destination paths. */
 export interface FilesToCopyEntry {
 	from: string;
 	relativePath: string;
 	to: string;
 }
 
+/** Summary of the files-to-copy step run after a workspace is created. */
 export interface FilesToCopySnapshot {
 	copied: FilesToCopyEntry[];
 	diagnostics: FilesToCopyDiagnostic[];
@@ -108,6 +120,7 @@ export interface FilesToCopySnapshot {
 	source: FilesToCopySource;
 }
 
+/** Result of a create-workspace request. */
 export interface CreateWorkspaceResult {
 	diagnostics: CreateWorkspaceDiagnostic[];
 	filesToCopy: FilesToCopySnapshot | null;
@@ -115,6 +128,7 @@ export interface CreateWorkspaceResult {
 	workspace: CreatedWorkspaceSnapshot | null;
 }
 
+/** Machine-readable codes for problems raised while renaming a workspace. */
 export type RenameWorkspaceDiagnosticCode =
 	| 'branch-already-exists'
 	| 'branch-rename-failed'
@@ -126,8 +140,10 @@ export type RenameWorkspaceDiagnosticCode =
 	| 'worktree-move-failed'
 	| 'workspace-update-failed';
 
+/** Severity level attached to a rename-workspace diagnostic. */
 export type RenameWorkspaceDiagnosticSeverity = 'error' | 'info' | 'warning';
 
+/** A single problem reported during workspace rename. */
 export interface RenameWorkspaceDiagnostic {
 	code: RenameWorkspaceDiagnosticCode;
 	message: string;
@@ -135,14 +151,17 @@ export interface RenameWorkspaceDiagnostic {
 	severity: RenameWorkspaceDiagnosticSeverity;
 }
 
+/** Request payload for renaming a workspace and/or its branch. */
 export interface RenameWorkspaceRequest {
 	branchName?: string;
 	name?: string;
 	workspaceId: string;
 }
 
+/** Outcome of a rename-workspace request. */
 export type RenameWorkspaceStatus = 'failure' | 'success';
 
+/** Result of a rename-workspace request. */
 export interface RenameWorkspaceResult {
 	diagnostics: RenameWorkspaceDiagnostic[];
 	status: RenameWorkspaceStatus;
@@ -171,8 +190,10 @@ export type ArchiveWorkspaceDiagnosticCode =
 	| 'workspace-not-found'
 	| 'workspace-update-failed';
 
+/** Severity level attached to an archive-workspace diagnostic. */
 export type ArchiveWorkspaceDiagnosticSeverity = 'error' | 'info' | 'warning';
 
+/** A single problem reported during workspace archiving. */
 export interface ArchiveWorkspaceDiagnostic {
 	code: ArchiveWorkspaceDiagnosticCode;
 	message: string;
@@ -180,14 +201,17 @@ export interface ArchiveWorkspaceDiagnostic {
 	severity: ArchiveWorkspaceDiagnosticSeverity;
 }
 
+/** Request payload for archiving a workspace, optionally cleaning up its branch. */
 export interface ArchiveWorkspaceRequest {
 	branchCleanup?: boolean;
 	reason?: string;
 	workspaceId: string;
 }
 
+/** Outcome of an archive-workspace request. */
 export type ArchiveWorkspaceStatus = 'aborted' | 'failure' | 'success';
 
+/** Snapshot of a workspace after it has been archived. */
 export interface ArchivedWorkspaceSnapshot {
 	archivedAt: string;
 	archivedContextPath: string | null;
@@ -201,6 +225,7 @@ export interface ArchivedWorkspaceSnapshot {
 	slug: string;
 }
 
+/** Result of an archive-workspace request. */
 export interface ArchiveWorkspaceResult {
 	archiveRecordId: string | null;
 	diagnostics: ArchiveWorkspaceDiagnostic[];
@@ -220,8 +245,10 @@ export type DeleteWorkspaceDiagnosticCode =
 	| 'workspace-id-required'
 	| 'workspace-not-found';
 
+/** Severity level attached to a delete-workspace diagnostic. */
 export type DeleteWorkspaceDiagnosticSeverity = 'error' | 'info' | 'warning';
 
+/** A single problem reported during workspace hard-delete. */
 export interface DeleteWorkspaceDiagnostic {
 	code: DeleteWorkspaceDiagnosticCode;
 	message: string;
@@ -229,12 +256,15 @@ export interface DeleteWorkspaceDiagnostic {
 	severity: DeleteWorkspaceDiagnosticSeverity;
 }
 
+/** Request payload for hard-deleting a workspace. */
 export interface DeleteWorkspaceRequest {
 	workspaceId: string;
 }
 
+/** Outcome of a hard-delete request. */
 export type DeleteWorkspaceStatus = 'failure' | 'success';
 
+/** Snapshot of a workspace as it existed just before hard-delete. */
 export interface DeletedWorkspaceSnapshot {
 	branchName: string | null;
 	id: string;
@@ -243,6 +273,7 @@ export interface DeletedWorkspaceSnapshot {
 	repositoryId: string;
 }
 
+/** Result of a hard-delete request. */
 export interface DeleteWorkspaceResult {
 	branchDeleted: boolean;
 	diagnostics: DeleteWorkspaceDiagnostic[];
@@ -251,6 +282,7 @@ export interface DeleteWorkspaceResult {
 	workspace: DeletedWorkspaceSnapshot | null;
 }
 
+/** Snapshot of a workspace adopted from a pre-existing worktree. */
 export interface AdoptedWorkspaceSnapshot {
 	adoptedAt: string;
 	archivedAt: string | null;
@@ -286,8 +318,10 @@ export type UnarchiveWorkspaceDiagnosticCode =
 	| 'workspace-update-failed'
 	| 'worktree-recreate-failed';
 
+/** Severity level attached to an unarchive-workspace diagnostic. */
 export type UnarchiveWorkspaceDiagnosticSeverity = 'error' | 'info' | 'warning';
 
+/** A single problem reported during workspace unarchiving. */
 export interface UnarchiveWorkspaceDiagnostic {
 	code: UnarchiveWorkspaceDiagnosticCode;
 	message: string;
@@ -295,13 +329,16 @@ export interface UnarchiveWorkspaceDiagnostic {
 	severity: UnarchiveWorkspaceDiagnosticSeverity;
 }
 
+/** Request payload for unarchiving a workspace. */
 export interface UnarchiveWorkspaceRequest {
 	reason?: string;
 	workspaceId: string;
 }
 
+/** Outcome of an unarchive-workspace request. */
 export type UnarchiveWorkspaceStatus = 'aborted' | 'failure' | 'success';
 
+/** Snapshot of a workspace after it has been unarchived. */
 export interface UnarchivedWorkspaceSnapshot {
 	branchName: string | null;
 	branchRecreated: boolean;
@@ -314,6 +351,7 @@ export interface UnarchivedWorkspaceSnapshot {
 	unarchivedAt: string;
 }
 
+/** Result of an unarchive-workspace request. */
 export interface UnarchiveWorkspaceResult {
 	diagnostics: UnarchiveWorkspaceDiagnostic[];
 	status: UnarchiveWorkspaceStatus;
@@ -336,11 +374,13 @@ export type DeleteArchivedWorkspaceDiagnosticCode =
 	| 'workspace-not-found'
 	| 'worktree-cleanup-failed';
 
+/** Severity level attached to a delete-archived-workspace diagnostic. */
 export type DeleteArchivedWorkspaceDiagnosticSeverity =
 	| 'error'
 	| 'info'
 	| 'warning';
 
+/** A single problem reported while permanently deleting an archived workspace. */
 export interface DeleteArchivedWorkspaceDiagnostic {
 	code: DeleteArchivedWorkspaceDiagnosticCode;
 	message: string;
@@ -348,12 +388,15 @@ export interface DeleteArchivedWorkspaceDiagnostic {
 	severity: DeleteArchivedWorkspaceDiagnosticSeverity;
 }
 
+/** Request payload for permanently deleting an archived workspace. */
 export interface DeleteArchivedWorkspaceRequest {
 	workspaceId: string;
 }
 
+/** Outcome of a delete-archived-workspace request. */
 export type DeleteArchivedWorkspaceStatus = 'failure' | 'success';
 
+/** Result of a delete-archived-workspace request. */
 export interface DeleteArchivedWorkspaceResult {
 	branchDeleted: boolean;
 	contextRemoved: boolean;
@@ -378,10 +421,12 @@ export interface ArchivedWorkspaceListEntry {
 	slug: string;
 }
 
+/** Request payload for listing a repository's archived workspaces. */
 export interface ListArchivedWorkspacesRequest {
 	repositoryId: string;
 }
 
+/** Archived workspaces belonging to a repository, returned to the browse-archive UI. */
 export interface ListArchivedWorkspacesResult {
 	entries: ArchivedWorkspaceListEntry[];
 	repositoryId: string;
@@ -413,6 +458,7 @@ export interface WorkspaceHistoryEntry {
 	updatedAt: string;
 }
 
+/** Every workspace across all repositories, backing the global History screen. */
 export interface ListAllWorkspacesResult {
 	entries: WorkspaceHistoryEntry[];
 }

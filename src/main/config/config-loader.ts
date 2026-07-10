@@ -73,6 +73,7 @@ export interface EnsemblrConfigService {
 	load: () => ConfigStatusSnapshot;
 }
 
+/** Name of a top-level section in the on-disk Ensemblr config file. */
 type SectionName =
 	| 'app'
 	| 'environment'

@@ -88,6 +88,7 @@ export function FilePreviewPanel({
 	);
 }
 
+/** Renders a centered muted or error message inside the file-preview panel. */
 function FilePreviewMessage({
 	message,
 	tone = 'muted',
@@ -116,6 +117,12 @@ function FilePreviewMessage({
 	);
 }
 
+/**
+ * Build a human-readable message for a workspace file read failure.
+ * @param code - The read-failure code.
+ * @param filePath - The path that failed to read.
+ * @returns A user-facing explanation of the failure.
+ */
 function describeReadFailure(
 	code: ReadWorkspaceFileFailureCode,
 	filePath: string,
@@ -136,6 +143,11 @@ function describeReadFailure(
 	}
 }
 
+/**
+ * Format a byte count as a B/KB/MB string.
+ * @param sizeBytes - The size in bytes.
+ * @returns The formatted, human-readable size.
+ */
 function formatSizeBytes(sizeBytes: number): string {
 	if (sizeBytes < 1024) {
 		return `${sizeBytes} B`;

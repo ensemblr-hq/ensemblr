@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { cn } from '@/renderer/lib/utils';
 
+/** Props for a top-level settings page section. */
 interface SettingsSectionProps {
 	title: string;
 	description?: ReactNode;

@@ -23,13 +23,18 @@ import type { EnsemblrConfigResolutionService } from '../config/config-resolutio
 import type { EnsemblrDatabaseService } from '../storage/database';
 import { normalizeConfiguredPath } from './internal/normalize-configured-path.ts';
 
+/** Overall outcome of Pi executable discovery. */
 export type PiExecutableStatus = 'error' | 'ok' | 'warning';
+/** Severity level of a Pi executable discovery diagnostic. */
 export type PiExecutableDiagnosticSeverity = 'error' | 'info' | 'warning';
+/** Where a resolved Pi executable path originated. */
 export type PiExecutableSource =
 	| SettingsResolutionSource
 	| 'common-location'
 	| 'path';
+/** Which probe was run against a candidate executable: `--help` or `--version`. */
 export type PiExecutableProbeKind = 'help' | 'version';
+/** Outcome of probing a candidate executable. */
 export type PiExecutableProbeStatus = 'failure' | 'success';
 
 /** One advisory diagnostic emitted during Pi executable discovery. */

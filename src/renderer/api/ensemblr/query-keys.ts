@@ -2,21 +2,27 @@ import type { EnsemblrApi } from '@/shared/ipc/contracts/api';
 
 /** Hierarchical TanStack Query keys for every Ensemblr IPC-backed query. */
 export const ensemblrQueryKeys = {
+	/** Query key for a repository's resolved agent action templates. */
 	agentActionTemplates: (repositoryId: string) =>
 		[...ensemblrQueryKeys.all, 'agent-action-templates', repositoryId] as const,
 	all: ['ensemblr'] as const,
+	/** Query key for a repository's archived workspaces. */
 	archivedWorkspaces: (repositoryId: string) =>
 		[...ensemblrQueryKeys.all, 'archived-workspaces', repositoryId] as const,
+	/** Query key for a workspace's open chat tabs. */
 	chatTabs: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'chat-tabs', workspaceId] as const,
+	/** Query key for a Pi session's checkpoints. */
 	checkpointsForSession: (piSessionId: string) =>
 		[...ensemblrQueryKeys.all, 'checkpoints', piSessionId] as const,
+	/** Query key for a workspace's closed chat tabs with their summaries. */
 	closedChatTabsWithSummary: (workspaceId: string) =>
 		[
 			...ensemblrQueryKeys.all,
 			'closed-chat-tabs-with-summary',
 			workspaceId,
 		] as const,
+	/** Query key for the environment files in a given scope. */
 	environmentFiles: (scope: string, scopeId?: string) =>
 		[
 			...ensemblrQueryKeys.all,
@@ -24,17 +30,24 @@ export const ensemblrQueryKeys = {
 			scope,
 			scopeId ?? '',
 		] as const,
+	/** Query key for the environment variables list. */
 	environmentVariables: () =>
 		[...ensemblrQueryKeys.all, 'environment-variables'] as const,
+	/** Query key for a file's preview within a workspace. */
 	filePreview: (workspaceCwd: string, filePath: string) =>
 		[...ensemblrQueryKeys.all, 'file-preview', workspaceCwd, filePath] as const,
+	/** Query key for the GitHub repository list, scoped to full or recent. */
 	githubRepositoryList: (scope: 'full' | 'recent' = 'recent') =>
 		[...ensemblrQueryKeys.all, 'github-repository-list', scope] as const,
+	/** Query key for the backend health check. */
 	health: () => [...ensemblrQueryKeys.all, 'health'] as const,
+	/** Query key for the Linear connection status. */
 	linearConnection: () =>
 		[...ensemblrQueryKeys.all, 'linear-connection'] as const,
+	/** Query key for a single Linear issue by id. */
 	linearIssue: (issueId: string) =>
 		[...ensemblrQueryKeys.all, 'linear-issue', issueId] as const,
+	/** Query key for a filtered Linear issue list. */
 	linearIssues: (filter: { query?: string; teamId?: string }) =>
 		[
 			...ensemblrQueryKeys.all,
@@ -44,52 +57,72 @@ export const ensemblrQueryKeys = {
 		] as const,
 	/** Prefix matching every cached issue list regardless of filter. */
 	linearIssuesAll: () => [...ensemblrQueryKeys.all, 'linear-issues'] as const,
+	/** Query key for cached Linear workspace metadata. */
 	linearMetadata: () => [...ensemblrQueryKeys.all, 'linear-metadata'] as const,
+	/** Query key for the available Pi models. */
 	piModels: () => [...ensemblrQueryKeys.all, 'pi-models'] as const,
+	/** Query key for a workspace's available Pi slash commands. */
 	piSlashCommands: (workspaceCwd: string) =>
 		[...ensemblrQueryKeys.all, 'pi-slash-commands', workspaceCwd] as const,
+	/** Query key for a branch's Pi session events. */
 	piSessionEvents: (branchId: string) =>
 		[...ensemblrQueryKeys.all, 'pi-session-events', branchId] as const,
+	/** Query key for a workspace's Pi sessions. */
 	piSessionsForWorkspace: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'pi-sessions', workspaceId] as const,
+	/** Query key for a workspace's pull-request snapshot. */
 	pullRequestSnapshot: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'pull-request-snapshot', workspaceId] as const,
+	/** Query key for a repository's branches. */
 	repositoryBranches: (repositoryId: string) =>
 		[...ensemblrQueryKeys.all, 'repository-branches', repositoryId] as const,
 	/** Prefix matching every repository's cached branch list. */
 	repositoryBranchesAll: () =>
 		[...ensemblrQueryKeys.all, 'repository-branches'] as const,
+	/** Query key for a repository's issues. */
 	repositoryIssues: (repositoryId: string) =>
 		[...ensemblrQueryKeys.all, 'repository-issues', repositoryId] as const,
+	/** Query key for a repository's pull requests. */
 	repositoryPullRequests: (repositoryId: string) =>
 		[
 			...ensemblrQueryKeys.all,
 			'repository-pull-requests',
 			repositoryId,
 		] as const,
+	/** Query key for a workspace's review comments. */
 	reviewComments: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'review-comments', workspaceId] as const,
+	/** Query key for a repository's review merge settings. */
 	reviewMergeSettings: (repositoryId: string) =>
 		[...ensemblrQueryKeys.all, 'review-merge-settings', repositoryId] as const,
+	/** Query key for a workspace's review to-dos. */
 	reviewTodos: (workspaceId: string) =>
 		[...ensemblrQueryKeys.all, 'review-todos', workspaceId] as const,
+	/** Query key for a single turn's diff. */
 	turnDiff: (turnId: string) =>
 		[...ensemblrQueryKeys.all, 'turn-diff', turnId] as const,
+	/** Query key for the workspace history list. */
 	workspaceHistory: () =>
 		[...ensemblrQueryKeys.all, 'workspace-history'] as const,
+	/** Query key for the repository and workspace navigation tree. */
 	repositoryWorkspaceNavigation: () =>
 		[...ensemblrQueryKeys.all, 'repository-workspace-navigation'] as const,
+	/** Query key for the configured root directory. */
 	rootDirectory: () => [...ensemblrQueryKeys.all, 'root-directory'] as const,
+	/** Query key for a repository's on-disk configuration. */
 	repositoryConfig: (repositoryPath: string) =>
 		[...ensemblrQueryKeys.all, 'repository-config', repositoryPath] as const,
+	/** Query key for the setup-diagnostics snapshot. */
 	setupDiagnostics: () =>
 		[...ensemblrQueryKeys.all, 'setup-diagnostics'] as const,
+	/** Query key for the resolved settings snapshot, optionally scoped to a repository. */
 	settingsResolution: (repositoryId: string | null) =>
 		[
 			...ensemblrQueryKeys.all,
 			'settings-resolution',
 			repositoryId ?? '',
 		] as const,
+	/** Query key for a workspace's commits relative to a base ref. */
 	workspaceCommits: (workspaceCwd: string, baseRef = '') =>
 		[
 			...ensemblrQueryKeys.all,
@@ -97,6 +130,7 @@ export const ensemblrQueryKeys = {
 			workspaceCwd,
 			baseRef,
 		] as const,
+	/** Query key for a single file's diff within a workspace and scope. */
 	workspaceFileDiff: (
 		workspaceCwd: string,
 		filePath: string,
@@ -109,8 +143,10 @@ export const ensemblrQueryKeys = {
 			filePath,
 			scopeKey,
 		] as const,
+	/** Query key for a workspace's file list. */
 	workspaceFiles: (workspaceCwd: string) =>
 		[...ensemblrQueryKeys.all, 'workspace-files', workspaceCwd] as const,
+	/** Query key for a workspace's git status within a scope. */
 	workspaceGitStatus: (workspaceCwd: string, scopeKey = 'working-tree') =>
 		[
 			...ensemblrQueryKeys.all,
@@ -118,6 +154,7 @@ export const ensemblrQueryKeys = {
 			workspaceCwd,
 			scopeKey,
 		] as const,
+	/** Query key for the available workspace open targets. */
 	workspaceOpenTargets: () =>
 		[...ensemblrQueryKeys.all, 'workspace-open-targets'] as const,
 };

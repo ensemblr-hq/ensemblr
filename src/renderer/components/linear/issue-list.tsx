@@ -137,6 +137,7 @@ export function LinearIssueList() {
 	);
 }
 
+/** One row in the Linear issue list: identifier, title, and meta badges, opening the issue on click. */
 function LinearIssueRow({
 	issue,
 	onOpen,

@@ -20,6 +20,7 @@ export interface ListTurnCheckpointsRequest {
 	piSessionId: string;
 }
 
+/** Result of listing a Pi session's checkpoints. */
 export interface ListTurnCheckpointsResult {
 	checkpoints: readonly CheckpointWire[];
 }
@@ -34,12 +35,14 @@ export interface TurnDiffFileWire {
 	status: 'added' | 'deleted' | 'modified' | 'renamed';
 }
 
+/** Reason a checkpoint diff or restore operation failed. */
 export type CheckpointFailureCode =
 	| 'diff-failed'
 	| 'no-checkpoint'
 	| 'restore-failed'
 	| 'workspace-missing';
 
+/** A failed checkpoint operation, with its code and message. */
 export interface CheckpointFailure {
 	code: CheckpointFailureCode;
 	message: string;
@@ -53,6 +56,7 @@ export interface ComputeTurnDiffRequest {
 	turnId: string;
 }
 
+/** Result of computing a turn diff: the checkpoint, changed files, and patch on success, or a failure. */
 export type ComputeTurnDiffResult =
 	| {
 			checkpoint: CheckpointWire;
@@ -76,6 +80,7 @@ export interface RestoreCheckpointRequest {
 	turnId: string;
 }
 
+/** Result of restoring a workspace to a turn's checkpoint: the restored checkpoint on success, or a failure. */
 export type RestoreCheckpointResult =
 	| { checkpoint: CheckpointWire; ok: true }
 	| { error: CheckpointFailure; ok: false };

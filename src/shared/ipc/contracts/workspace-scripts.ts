@@ -6,6 +6,7 @@ import type {
 /** Repository-configured workspace script kinds (ADR 0007). */
 export type WorkspaceScriptKind = 'archive' | 'run' | 'setup';
 
+/** Request to run a repository-configured workspace script. */
 export interface RunWorkspaceScriptRequest {
 	kind: WorkspaceScriptKind;
 	/** Stop the active session of this kind before starting a new one. */
@@ -16,11 +17,13 @@ export interface RunWorkspaceScriptRequest {
 /** Script sessions are terminal sessions; results share the terminal shapes. */
 export type RunWorkspaceScriptResult = CreateTerminalSessionResult;
 
+/** Request to stop a workspace's running script session of a given kind. */
 export interface StopWorkspaceScriptRequest {
 	kind: WorkspaceScriptKind;
 	workspaceId: string;
 }
 
+/** Result of stopping a workspace script; shares the terminal-kill result shape. */
 export type StopWorkspaceScriptResult = KillTerminalResult;
 
 /**

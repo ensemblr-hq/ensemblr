@@ -30,6 +30,7 @@ export function settingsResolutionQuery(
 	});
 }
 
+/** Repository policy flags controlling what happens after a review is merged. */
 export interface ReviewMergeSettings {
 	archiveAfterMerge: boolean;
 	deleteLocalBranchOnArchive: boolean;
@@ -70,6 +71,7 @@ export function reviewMergeSettingsQuery(
 	});
 }
 
+/** A single resolved per-action Pi instruction template, with its source and raw value. */
 export interface AgentActionTemplateSetting {
 	source?: string;
 	value?: unknown;

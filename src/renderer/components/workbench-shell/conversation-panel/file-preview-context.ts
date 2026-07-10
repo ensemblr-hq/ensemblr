@@ -15,6 +15,10 @@ const FilePreviewOpenerContext = createContext<FilePreviewOpener | null>(null);
 
 export const FilePreviewOpenerProvider = FilePreviewOpenerContext.Provider;
 
+/**
+ * Read the file-preview opener from context.
+ * @returns The opener, or null outside a workspace conversation.
+ */
 export function useFilePreviewOpener(): FilePreviewOpener | null {
 	return use(FilePreviewOpenerContext);
 }
@@ -26,6 +30,10 @@ const TurnDiffOpenerContext = createContext<TurnDiffOpener | null>(null);
 
 export const TurnDiffOpenerProvider = TurnDiffOpenerContext.Provider;
 
+/**
+ * Read the turn-diff opener from context.
+ * @returns The opener, or null when no provider is present.
+ */
 export function useTurnDiffOpener(): TurnDiffOpener | null {
 	return use(TurnDiffOpenerContext);
 }
@@ -48,6 +56,10 @@ const WorkspaceFileDiffOpenerContext =
 export const WorkspaceFileDiffOpenerProvider =
 	WorkspaceFileDiffOpenerContext.Provider;
 
+/**
+ * Read the workspace file-diff opener from context.
+ * @returns The opener, or null when no provider is present.
+ */
 export function useWorkspaceFileDiffOpener(): WorkspaceFileDiffOpener | null {
 	return use(WorkspaceFileDiffOpenerContext);
 }
@@ -61,6 +73,10 @@ const ReviewFilePreviewOpenerContext =
 export const ReviewFilePreviewOpenerProvider =
 	ReviewFilePreviewOpenerContext.Provider;
 
+/**
+ * Read the review file-preview opener from context.
+ * @returns The opener, or null when no provider is present.
+ */
 export function useReviewFilePreviewOpener(): ReviewFilePreviewOpener | null {
 	return use(ReviewFilePreviewOpenerContext);
 }
@@ -82,6 +98,10 @@ const CommentPreviewOpenerContext = createContext<CommentPreviewOpener | null>(
 export const CommentPreviewOpenerProvider =
 	CommentPreviewOpenerContext.Provider;
 
+/**
+ * Read the PR-comment preview opener from context.
+ * @returns The opener, or null outside a workspace.
+ */
 export function useCommentPreviewOpener(): CommentPreviewOpener | null {
 	return use(CommentPreviewOpenerContext);
 }

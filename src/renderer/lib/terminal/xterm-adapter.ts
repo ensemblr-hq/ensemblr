@@ -206,6 +206,11 @@ function resolveCssColor(value: string): string | undefined {
 	return `#${toHexByte(red)}${toHexByte(green)}${toHexByte(blue)}`;
 }
 
+/**
+ * Formats a color-channel byte as a two-digit hex string.
+ * @param channel - The 0–255 channel value
+ * @returns The zero-padded two-character hex representation
+ */
 function toHexByte(channel = 0): string {
 	return channel.toString(16).padStart(2, '0');
 }

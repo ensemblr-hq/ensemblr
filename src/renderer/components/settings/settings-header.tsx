@@ -19,6 +19,7 @@ import { useCloseSettings } from '@/renderer/hooks/use-close-settings';
 import { cn } from '@/renderer/lib/utils';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 
+/** Props for the settings top toolbar. */
 interface SettingsHeaderProps {
 	scope: SettingsScope;
 	projects: ProjectShellModel[];
@@ -30,6 +31,12 @@ const KNOWN_REPO_SECTIONS = Object.keys(
 	REPO_SECTION_TARGETS,
 ) as RepoSectionId[];
 
+/**
+ * Resolve the active repo settings section from a pathname, falling back to the
+ * environment section for unknown paths.
+ * @param pathname - Current router pathname
+ * @returns The matching repo section id
+ */
 function getRepoSectionFromPath(pathname: string): RepoSectionId {
 	const last = pathname.split('/').filter(Boolean).at(-1) ?? '';
 	return (
@@ -141,6 +148,7 @@ export function SettingsHeader({
 	);
 }
 
+/** Props for a settings-header scope tab. */
 interface ScopeTabProps {
 	active: boolean;
 	label: string;
@@ -148,6 +156,7 @@ interface ScopeTabProps {
 	onClick: () => void;
 }
 
+/** Renders a User/Repo scope tab with an active-state underline. */
 function ScopeTab({ active, disabled, label, onClick }: ScopeTabProps) {
 	return (
 		<Button

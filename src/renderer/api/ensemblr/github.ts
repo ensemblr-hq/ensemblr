@@ -113,30 +113,55 @@ export function reviewTodosQuery(workspaceId: string) {
 	});
 }
 
+/**
+ * Merges a pull request through the main-process GitHub service.
+ * @param request - Pull request identity and merge method
+ * @returns Outcome of the merge attempt
+ */
 export function mergePullRequest(
 	request: MergePullRequestRequest,
 ): Promise<MergePullRequestResult> {
 	return getEnsemblrApi().mergePullRequest(request);
 }
 
+/**
+ * Persists a local review comment through the main-process service.
+ * @param request - Comment fields to upsert
+ * @returns The saved comment result
+ */
 export function saveReviewComment(
 	request: SaveReviewCommentRequest,
 ): Promise<SaveReviewCommentResult> {
 	return getEnsemblrApi().saveReviewComment(request);
 }
 
+/**
+ * Deletes a local review comment through the main-process service.
+ * @param request - Identifies the comment to delete
+ * @returns The deletion result
+ */
 export function deleteReviewComment(
 	request: DeleteReviewCommentRequest,
 ): Promise<DeleteReviewCommentResult> {
 	return getEnsemblrApi().deleteReviewComment(request);
 }
 
+/**
+ * Persists a local review todo through the main-process service.
+ * @param request - Todo fields to upsert
+ * @returns The saved todo result
+ */
 export function saveReviewTodo(
 	request: SaveReviewTodoRequest,
 ): Promise<SaveReviewTodoResult> {
 	return getEnsemblrApi().saveReviewTodo(request);
 }
 
+/**
+ * Deletes a local review todo through the main-process service.
+ * @param request - Identifies the todo to delete
+ * @returns The deletion result
+ */
 export function deleteReviewTodo(
 	request: DeleteReviewTodoRequest,
 ): Promise<DeleteReviewTodoResult> {

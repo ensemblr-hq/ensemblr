@@ -136,6 +136,11 @@ export function createScriptLifecycleService({
 		);
 	}
 
+	/**
+	 * Start a workspace's setup/run/archive script session, honoring restart and the resolved concurrency mode.
+	 * @param options - Script kind, target workspace, and whether to restart a running session
+	 * @returns The terminal session create result, or a typed failure diagnostic
+	 */
 	async function runScript({
 		kind,
 		restart = false,
@@ -262,6 +267,11 @@ export function createScriptLifecycleService({
 		await runScript({ kind: 'run', workspaceId }).catch(() => {});
 	}
 
+	/**
+	 * Stop the active script session of a given kind for a workspace.
+	 * @param options - Script kind and target workspace
+	 * @returns The kill result, or an info diagnostic when no session is running
+	 */
 	async function stopScript({
 		kind,
 		workspaceId,

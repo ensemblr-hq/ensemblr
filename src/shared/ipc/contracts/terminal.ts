@@ -13,8 +13,10 @@ export type TerminalSessionKind =
 /** Renderer-facing lifecycle state of a terminal session. */
 export type TerminalSessionStatus = 'exited' | 'failed' | 'running' | 'stopped';
 
+/** Severity of a terminal diagnostic. */
 export type TerminalDiagnosticSeverity = 'error' | 'info' | 'warning';
 
+/** A diagnostic message about a terminal session or spawn attempt. */
 export interface TerminalDiagnostic {
 	code: string;
 	message: string;
@@ -43,6 +45,7 @@ export interface TerminalSessionSnapshot {
 	workspaceId: string;
 }
 
+/** Request to create a terminal session in a workspace. */
 export interface CreateTerminalSessionRequest {
 	cols?: number;
 	/**
@@ -56,39 +59,47 @@ export interface CreateTerminalSessionRequest {
 	workspaceId: string;
 }
 
+/** Result of creating a terminal session: the new session, or diagnostics on failure. */
 export interface CreateTerminalSessionResult {
 	diagnostics: TerminalDiagnostic[];
 	session: TerminalSessionSnapshot | null;
 }
 
+/** Request to write input data to a terminal session. */
 export interface WriteTerminalRequest {
 	data: string;
 	terminalId: string;
 }
 
+/** Request to resize a terminal session's viewport. */
 export interface ResizeTerminalRequest {
 	cols: number;
 	rows: number;
 	terminalId: string;
 }
 
+/** Request to kill a terminal session. */
 export interface KillTerminalRequest {
 	terminalId: string;
 }
 
+/** Result of killing a terminal session, with the final session snapshot when available. */
 export interface KillTerminalResult {
 	diagnostics: TerminalDiagnostic[];
 	session: TerminalSessionSnapshot | null;
 }
 
+/** Request to list a workspace's terminal sessions. */
 export interface ListTerminalSessionsRequest {
 	workspaceId: string;
 }
 
+/** The terminal sessions belonging to a workspace. */
 export interface ListTerminalSessionsResult {
 	sessions: TerminalSessionSnapshot[];
 }
 
+/** Request for a terminal session's replay snapshot. */
 export interface TerminalSnapshotRequest {
 	terminalId: string;
 }

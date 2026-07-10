@@ -59,6 +59,7 @@ export function DiscardChangesDialog({
 	);
 }
 
+/** Inner form that discards a target's working-tree changes and surfaces any failure. */
 function DiscardChangesDialogForm({
 	onOpenChange,
 	target,

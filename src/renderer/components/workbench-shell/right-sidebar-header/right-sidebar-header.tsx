@@ -31,6 +31,7 @@ import {
 	type RightSidebarHeaderState,
 } from './state';
 
+/** Tone values extracted from {@link RightSidebarHeaderState}. */
 type HeaderTone = RightSidebarHeaderState extends { tone: infer T } ? T : never;
 
 const HEADER_LABEL_TONE_CLASSES: Record<HeaderTone, string> = {

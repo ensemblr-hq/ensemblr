@@ -135,6 +135,7 @@ export function MergeConfirmationDialog({
 	);
 }
 
+/** Renders one label/value row in the merge confirmation summary, tinted by tone. */
 function MergeSummaryRow({
 	label,
 	tone,

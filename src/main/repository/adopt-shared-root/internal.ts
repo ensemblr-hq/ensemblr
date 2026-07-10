@@ -37,6 +37,7 @@ export interface ReconcileSharedRootInput {
 	worktreeProbe: GitWorktreeProbeFn;
 }
 
+/** Loads a repository's resolved config for the given options; injectable for tests. */
 export type LoadConfigFn = (
 	options: LoadRepositoryConfigOptions,
 ) => LoadedRepositoryConfig;

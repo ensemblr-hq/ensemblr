@@ -10,6 +10,7 @@ import type {
 	SetupRemediationAction,
 } from '@/shared/ipc/contracts/setup';
 
+/** Callbacks for the root-directory change hook. */
 interface UseRootDirectoryChangeOptions {
 	onRemediationAction?: (
 		action: SetupRemediationAction,
@@ -18,6 +19,7 @@ interface UseRootDirectoryChangeOptions {
 	onRetry?: () => void;
 }
 
+/** State and handlers exposed by the root-directory change hook. */
 interface UseRootDirectoryChangeResult {
 	actionError: string | null;
 	applyResult: RootDirectoryChangeApplyResult | null;

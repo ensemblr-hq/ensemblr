@@ -140,6 +140,11 @@ export function buildUpdateIssueRequest(
 	return Object.keys(input).length > 0 ? { id: original.id, input } : null;
 }
 
+/**
+ * Builds a patch object containing only the optional issue fields the user has set.
+ * @param fields - Current editor field values
+ * @returns An object holding just the non-unset optional fields
+ */
 function buildOptionalFields(fields: LinearIssueEditorFields) {
 	return {
 		...(fields.assigneeId !== UNSET_FIELD
@@ -159,6 +164,12 @@ function buildOptionalFields(fields: LinearIssueEditorFields) {
 	};
 }
 
+/**
+ * Reports whether two label-id lists hold the same ids, ignoring order.
+ * @param a - First label-id list
+ * @param b - Second label-id list
+ * @returns True when both lists contain the same ids
+ */
 function areLabelIdsEqual(a: string[], b: string[]): boolean {
 	if (a.length !== b.length) {
 		return false;

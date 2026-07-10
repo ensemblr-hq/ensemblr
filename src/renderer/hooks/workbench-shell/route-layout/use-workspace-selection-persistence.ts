@@ -14,6 +14,7 @@ import type { WorkbenchShellRouteState } from '@/renderer/types/components';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 
+/** Current and persisted workspace selection returned by {@link useWorkspaceSelectionPersistence}. */
 export interface WorkspaceSelectionPersistenceResult {
 	currentSelection: WorkspaceNavigationSelection | null;
 	displayProjects: ProjectShellModel[];

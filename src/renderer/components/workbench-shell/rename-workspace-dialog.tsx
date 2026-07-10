@@ -23,6 +23,7 @@ import {
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { RenameWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
+/** Props for the rename-workspace dialog. */
 interface RenameWorkspaceDialogProps {
 	onOpenChange: (open: boolean) => void;
 	open: boolean;
@@ -50,6 +51,7 @@ export function RenameWorkspaceDialog({
 	);
 }
 
+/** Progress stage of the workspace rename flow. */
 type RenameWorkspaceStage = 'failure' | 'idle' | 'renaming';
 
 const NAME_PATTERN = /^[A-Za-z0-9 ._-]+$/;

@@ -11,6 +11,7 @@ import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
  * and let consumers `invalidateQueries` after a manual rescan.
  */
 export const workspaceOpenTargetsQuery = queryOptions({
+	/** Fetches the installed "Open in…" app targets over IPC with call profiling. */
 	queryFn: (): Promise<ListWorkspaceOpenTargetsResult> =>
 		profileElectronIpcCall(
 			{

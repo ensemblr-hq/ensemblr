@@ -6,6 +6,7 @@ import type {
 /** Source marker used for static fallback commands from Pi's TUI catalog. */
 const BUILTIN_SLASH_COMMAND_SOURCE = 'builtin' satisfies PiSlashCommandSource;
 
+/** Describes a slash command surfaced in the composer autocomplete. */
 export interface SlashCommandDescriptor {
 	/** Bare command name without the leading slash. */
 	command: string;

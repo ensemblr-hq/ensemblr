@@ -39,6 +39,7 @@ const MAX_READ_BYTES = 512 * 1024;
 // its files are browsable; one that exceeds this bails and stays collapsed.
 const IGNORED_ROOT_MAX_ENTRIES = 1000;
 
+/** Service surface for listing and safely reading files within a workspace. */
 export interface ListWorkspaceFilesService {
 	list: (
 		request: ListWorkspaceFilesRequest,
@@ -50,6 +51,7 @@ export interface ListWorkspaceFilesService {
 	) => Promise<ReadWorkspaceDirectoryResult>;
 }
 
+/** Options for constructing a {@link ListWorkspaceFilesService}. */
 export interface CreateListWorkspaceFilesServiceOptions {
 	/** Per-ignored-directory enumeration cap; overridable in tests. */
 	ignoredRootMaxEntries?: number;

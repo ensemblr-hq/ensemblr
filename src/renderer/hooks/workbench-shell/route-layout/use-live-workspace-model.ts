@@ -25,8 +25,11 @@ import { parseWorkspaceScriptSettings } from '@/shared/scripts/script-settings';
 import { usePullRequestAutoRefresh } from './use-pull-request-auto-refresh';
 import { useWorkspaceFilesWatch } from './use-workspace-files-watch';
 
+/** The project of the current workspace navigation selection. */
 type ActiveProject = WorkspaceNavigationSelection['project'];
+/** The workspace of the current workspace navigation selection. */
 type ActiveWorkspace = WorkspaceNavigationSelection['workspace'];
+/** The terminal-sessions state returned by {@link useWorkspaceTerminalSessions}. */
 type TerminalSessions = ReturnType<typeof useWorkspaceTerminalSessions>;
 
 /**

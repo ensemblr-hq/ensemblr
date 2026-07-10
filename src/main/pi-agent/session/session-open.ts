@@ -34,6 +34,7 @@ export interface OpenRequest {
 	workspaceId: string;
 }
 
+/** Input passed to the chat-title and branch-name generation callbacks for a newly opened session. */
 export interface QueueChatTitleInput {
 	branchId: string;
 	chatTitleTimeoutMs: number;
@@ -49,6 +50,7 @@ export interface QueueChatTitleInput {
 	workspaceId: string;
 }
 
+/** Dependencies for {@link createSessionOpener}. */
 export interface SessionOpenerOptions {
 	activeSessions: ActiveSessionMap;
 	chatTitleTimeoutMs: number;
@@ -66,6 +68,7 @@ export interface SessionOpenerOptions {
 	}) => PiAgentSubscription;
 }
 
+/** Public surface of the session opener: opens or resumes a session and returns its snapshot. */
 export interface SessionOpener {
 	openSession: (input: {
 		database: DatabaseSync;
@@ -353,6 +356,10 @@ async function createRuntimeSessionOrFail({
 	}
 }
 
+/**
+ * Registers a freshly opened session in the active-session map, seeding its
+ * branch, chat tab, runtime session, and event subscription.
+ */
 function insertActiveSession({
 	activeSessions,
 	branch,

@@ -6,6 +6,7 @@ export type PiSessionStatusWire =
 	| 'closed'
 	| 'errored';
 
+/** Which stream a persisted Pi event came from: the structured protocol channel or raw stderr. */
 export type PiEventStreamWire = 'protocol' | 'stderr';
 
 /** Error shape carried across the wire on persisted error events. */

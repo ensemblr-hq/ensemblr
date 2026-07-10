@@ -145,6 +145,7 @@ export async function writeSessionSummary(
 	return writer.writeSessionSummary(input);
 }
 
+/** Internal arguments threaded into {@link runWriteSummary}. */
 interface RunWriteSummaryArgs {
 	executable: PiExecutableSnapshot | null;
 	input: WriteSessionSummaryInput;
@@ -154,6 +155,12 @@ interface RunWriteSummaryArgs {
 	writeFileImpl: (filePath: string, contents: string) => Promise<void>;
 }
 
+/**
+ * Writes the session-summary markdown: emits a deterministic transcript first,
+ * then upgrades it with an LLM summary when a client and executable are present.
+ * @param args - Resolved executable, summary input, fs writers, and timeout
+ * @returns The written path, resolved title, and whether the LLM was used
+ */
 async function runWriteSummary({
 	executable,
 	input,
@@ -236,6 +243,7 @@ async function runWriteSummary({
 	return { path: filePath, title: fallbackTitle, usedLlm: false };
 }
 
+/** Fields rendered into a summary file's YAML frontmatter. */
 interface RenderFrontmatterInput {
 	branchId: string | null;
 	chatTabId: string;
@@ -246,6 +254,11 @@ interface RenderFrontmatterInput {
 	turnCount: number;
 }
 
+/**
+ * Renders the YAML frontmatter block for a summary file.
+ * @param input - Metadata fields to emit
+ * @returns The frontmatter block, terminated with a newline
+ */
 function renderFrontmatter(input: RenderFrontmatterInput): string {
 	const lines = [
 		'---',
@@ -261,14 +274,29 @@ function renderFrontmatter(input: RenderFrontmatterInput): string {
 	return `${lines.join('\n')}\n`;
 }
 
+/**
+ * Encodes a string as a double-quoted YAML scalar.
+ * @param value - Raw string value
+ * @returns The JSON-quoted representation, safe as a YAML scalar
+ */
 function yamlString(value: string): string {
 	return JSON.stringify(value);
 }
 
+/**
+ * Encodes a nullable string as a YAML scalar, emitting `null` when absent.
+ * @param value - String value or null
+ * @returns `null` or the quoted string
+ */
 function yamlNullable(value: string | null): string {
 	return value === null ? 'null' : yamlString(value);
 }
 
+/**
+ * Keeps only protocol `message` events that carry a role, dropping non-transcript frames.
+ * @param events - Full session event stream
+ * @returns The transcript-relevant subset
+ */
 function filterTranscriptEvents(
 	events: readonly PiSessionEventWire[],
 ): readonly PiSessionEventWire[] {
@@ -283,6 +311,11 @@ function filterTranscriptEvents(
 	});
 }
 
+/**
+ * Counts the distinct turns represented in the events.
+ * @param events - Session events to scan
+ * @returns The number of unique turn ids
+ */
 function countTurns(events: readonly PiSessionEventWire[]): number {
 	const turns = new Set<string>();
 	for (const event of events) {
@@ -293,6 +326,11 @@ function countTurns(events: readonly PiSessionEventWire[]): number {
 	return turns.size;
 }
 
+/**
+ * Renders events as newline-separated `[role]: text` lines.
+ * @param events - Transcript events to render
+ * @returns The plain-text transcript
+ */
 function renderTranscript(events: readonly PiSessionEventWire[]): string {
 	return events
 		.map((event) => {
@@ -303,6 +341,12 @@ function renderTranscript(events: readonly PiSessionEventWire[]): string {
 		.join('\n');
 }
 
+/**
+ * Builds the deterministic markdown body from an optional title and transcript.
+ * @param title - Heading title; falls back to a generic heading when null
+ * @param transcript - Rendered transcript body
+ * @returns The markdown body
+ */
 function renderDeterministicBody({
 	title,
 	transcript,
@@ -314,6 +358,11 @@ function renderDeterministicBody({
 	return `${heading}${transcript}\n`;
 }
 
+/**
+ * Extracts the message role from a session event.
+ * @param event - Session event to inspect
+ * @returns The role, or null when the event is not a message payload
+ */
 function extractRole(
 	event: PiSessionEventWire,
 ): 'agent' | 'tool' | 'user' | null {
@@ -324,6 +373,11 @@ function extractRole(
 	return payload.role;
 }
 
+/**
+ * Extracts the human-readable text from a message event for the transcript.
+ * @param event - Session event to inspect
+ * @returns The rendered text, or an empty string when there is none
+ */
 function extractText(event: PiSessionEventWire): string {
 	const payload = event.payload;
 	if (payload?.kind !== 'message') {
@@ -354,6 +408,11 @@ function extractText(event: PiSessionEventWire): string {
 	}
 }
 
+/**
+ * Finds the first user message and returns its first line as a fallback title.
+ * @param events - Transcript events to scan
+ * @returns The first user prompt's first line, or null when none exists
+ */
 function extractFirstUserPrompt(
 	events: readonly PiSessionEventWire[],
 ): string | null {
@@ -368,12 +427,18 @@ function extractFirstUserPrompt(
 	return null;
 }
 
+/**
+ * Returns the first line of the text, trimmed and capped at 120 characters.
+ * @param text - Source text
+ * @returns The truncated first line
+ */
 function firstLine(text: string): string {
 	const lineEnd = text.indexOf('\n');
 	const slice = lineEnd === -1 ? text : text.slice(0, lineEnd);
 	return slice.trim().slice(0, 120);
 }
 
+/** Arguments for {@link tryLlmSummary}. */
 interface TryLlmSummaryArgs {
 	executable: PiExecutableSnapshot;
 	/** Chat model to mirror; `null` falls back to the Pi default. */
@@ -385,12 +450,19 @@ interface TryLlmSummaryArgs {
 	workspaceCwd: string;
 }
 
+/** Successful LLM summary: the markdown body, resolved model, and extracted title. */
 interface LlmSummaryResult {
 	body: string;
 	model: string | null;
 	title: string | null;
 }
 
+/**
+ * Runs an ephemeral Pi session to summarize the transcript, collecting agent
+ * text until the session goes idle or the timeout elapses.
+ * @param args - Executable, client, model, purpose, transcript, and timeout
+ * @returns The parsed summary, or null when the LLM produced nothing or failed
+ */
 async function tryLlmSummary(
 	args: TryLlmSummaryArgs,
 ): Promise<LlmSummaryResult | null> {
@@ -483,6 +555,11 @@ function capTranscript(transcript: string): string {
 	return `${head}\n\n[… ${omitted.toLocaleString()} characters omitted …]\n\n${tail}`;
 }
 
+/**
+ * Builds the archival summary prompt sent to the LLM.
+ * @param transcript - Capped conversation transcript
+ * @returns The full prompt string
+ */
 function buildSummaryPrompt(transcript: string): string {
 	return [
 		'Write a session summary for the conversation below.',
@@ -529,6 +606,11 @@ function buildForkSummaryPrompt(transcript: string): string {
 	].join('\n');
 }
 
+/**
+ * Extracts assistant text from an agent message event, ignoring tool output.
+ * @param event - Agent event to inspect
+ * @returns The concatenated text, or an empty string when there is none
+ */
 function extractTextFromAgentEvent(event: PiAgentEvent): string {
 	if (event.type !== 'message' || event.role !== 'agent') {
 		return '';
@@ -548,6 +630,11 @@ function extractTextFromAgentEvent(event: PiAgentEvent): string {
 	}
 }
 
+/**
+ * Races a promise against a timeout, rejecting when the deadline elapses first.
+ * @param promise - Work to await
+ * @param timeoutMs - Timeout in milliseconds
+ */
 async function raceWithTimeout(
 	promise: Promise<void>,
 	timeoutMs: number,
@@ -567,6 +654,11 @@ async function raceWithTimeout(
 	}
 }
 
+/**
+ * Splits raw LLM output into a sanitized title and a markdown body.
+ * @param text - Raw summary text from the model
+ * @returns The markdown body and the extracted title (null when none)
+ */
 function splitTitle(text: string): { body: string; title: string | null } {
 	const stripped = text.replace(/```[a-z]*\s*([\s\S]*?)```/gi, '$1').trim();
 	if (stripped.length === 0) {

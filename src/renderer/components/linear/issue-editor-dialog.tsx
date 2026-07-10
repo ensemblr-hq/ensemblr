@@ -296,6 +296,7 @@ export function LinearIssueEditorDialog({
 	);
 }
 
+/** Labeled select used for the issue editor's picker fields, with an optional "none" option. */
 function EditorSelect({
 	allowUnset = false,
 	'aria-label': ariaLabel,
@@ -330,6 +331,12 @@ function EditorSelect({
 	);
 }
 
+/**
+ * Narrow Linear resources to those that are global or belong to the selected team.
+ * @param resources - Team-scoped Linear resources such as states, cycles, or labels
+ * @param teamId - Selected team id, or an unset sentinel
+ * @returns The resources visible for the team, or all resources when no team is selected
+ */
 function filterByTeam(
 	resources: LinearResourceWire[],
 	teamId: string,

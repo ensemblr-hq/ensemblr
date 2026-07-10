@@ -16,6 +16,7 @@ import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { DeleteWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
+/** Props for the delete-workspace dialog. */
 interface DeleteWorkspaceDialogProps {
 	onDeleted: (workspaceId: string) => Promise<void> | void;
 	onOpenChange: (open: boolean) => void;
@@ -50,8 +51,10 @@ export function DeleteWorkspaceDialog({
 	);
 }
 
+/** Progress stage of the workspace delete flow. */
 type DeleteStage = 'deleting' | 'failure' | 'idle';
 
+/** Inner delete form for a workspace; owns the deleting state and failure diagnostics. */
 function DeleteWorkspaceDialogForm({
 	onDeleted,
 	onOpenChange,

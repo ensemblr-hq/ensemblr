@@ -21,6 +21,7 @@ export interface CaptureWorkspaceCheckpointInput {
 	ref: string;
 }
 
+/** Identifiers produced by a workspace checkpoint capture: the commit, its tree, and the ref it was written to. */
 export interface CaptureWorkspaceCheckpointResult {
 	commitHash: string;
 	ref: string;
@@ -47,6 +48,15 @@ const GIT_IDENTITY_ENV = {
 	GIT_COMMITTER_NAME: 'Ensemblr',
 };
 
+/**
+ * Capture the full working-tree state of a git workspace into a commit reachable
+ * only from a private ref, using a temporary index so the user's real index,
+ * HEAD, and branches are untouched (ADR 0012).
+ * @param cwd - Workspace directory to capture
+ * @param message - Commit message for the checkpoint commit
+ * @param ref - Fully-qualified private ref to point at the new commit
+ * @returns The captured commit, tree, and ref identifiers
+ */
 export async function captureWorkspaceCheckpoint({
 	cwd,
 	message,
@@ -142,6 +152,7 @@ export async function snapshotWorkingTree(cwd: string): Promise<string> {
 	}
 }
 
+/** A single file's change within a git diff, with per-file line counts and status. */
 export interface GitDiffFile {
 	additions: number | null;
 	deletions: number | null;
@@ -149,6 +160,7 @@ export interface GitDiffFile {
 	status: 'added' | 'deleted' | 'modified' | 'renamed';
 }
 
+/** A parsed git diff: the per-file change summary plus the full unified patch text. */
 export interface GitDiffResult {
 	files: readonly GitDiffFile[];
 	patch: string;
@@ -231,6 +243,11 @@ export async function restoreWorkspaceTo({
 	});
 }
 
+/**
+ * Map a git name-status code letter to a diff file status.
+ * @param code - Name-status code from `git diff --name-status`
+ * @returns The corresponding file status
+ */
 function statusFromCode(code: string): GitDiffFile['status'] {
 	switch (code.charAt(0)) {
 		case 'A':
@@ -257,6 +274,15 @@ async function resolveHeadCommit(cwd: string): Promise<string | null> {
 	}
 }
 
+/**
+ * Run a git command with a launch-context-scrubbed environment, returning
+ * trimmed stdout and throwing a {@link GitCheckpointError} on failure.
+ * @param args - Git arguments to pass
+ * @param cwd - Directory to run git in
+ * @param env - Extra environment overlaid on the scrubbed process env
+ * @param step - Label identifying this step for error reporting
+ * @returns Trimmed stdout of the git command
+ */
 async function runGit({
 	args,
 	cwd,

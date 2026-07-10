@@ -19,6 +19,7 @@ export interface BatterySnapshot {
 	percent: number;
 }
 
+/** Options for {@link createAgentActivityMonitor}. */
 export interface AgentActivityMonitorOptions {
 	/** Reads the live App settings (config.json is the source of truth). */
 	readSettings: () => AppSettings;
@@ -40,6 +41,7 @@ export interface AgentActivityMonitorOptions {
 	now?: () => number;
 }
 
+/** Public surface of the agent activity monitor. */
 export interface AgentActivityMonitor {
 	/** Feed every persisted Pi session event here. */
 	handle: (input: AgentActivityEvent) => void;
@@ -60,10 +62,18 @@ const BATTERY_SAMPLE_TTL_MS = 30_000;
 // under a plain Node/bun runtime. The real Electron-backed controls, notifier,
 // and focus check are injected from `electron-activity-bindings.ts` in main.ts.
 const inertPowerControls: PowerSaveControls = {
+	/** Inert power-blocker start; returns a placeholder id. */
 	start: () => 0,
+	/** Inert power-blocker stop; does nothing. */
 	stop: () => undefined,
 };
 
+/**
+ * Default interval scheduler backed by `setInterval`.
+ * @param callback - Function to run on each tick.
+ * @param ms - Interval delay in milliseconds.
+ * @returns A canceller that clears the interval.
+ */
 function defaultSchedule(callback: () => void, ms: number): () => void {
 	const timer = setInterval(callback, ms);
 	return () => clearInterval(timer);

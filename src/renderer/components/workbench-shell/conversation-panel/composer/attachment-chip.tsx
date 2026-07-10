@@ -4,6 +4,7 @@ import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 
+/** Props for a composer attachment chip. */
 interface AttachmentChipProps {
 	file: WorkspaceFileSummary | { kind: 'upload'; name: string };
 	onRemove: () => void;

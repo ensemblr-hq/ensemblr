@@ -74,6 +74,7 @@ function pickFallbackWorkspace({
 	return null;
 }
 
+/** Dependencies for the create-workspace navigation action hook. */
 interface CreateWorkspaceActionDeps {
 	disableProjectReorderLayoutAnimation: () => void;
 }
@@ -87,6 +88,7 @@ export interface WorkspaceCreationSeed {
 	name?: string;
 }
 
+/** State and `create` handler exposed by the create-workspace action hook. */
 interface CreateWorkspaceActionResult {
 	create: (
 		project: ProjectShellModel,
@@ -187,6 +189,7 @@ export function useCreateWorkspaceFromProject({
 	return { create, error, isCreating };
 }
 
+/** Dependencies for the archive-workspace navigation action hook. */
 interface ArchiveWorkspaceActionDeps {
 	activeProjectId: string | null;
 	activeWorkspaceId: string | null;
@@ -252,6 +255,7 @@ export function useArchiveWorkspaceAction({
 	);
 }
 
+/** Dependencies for the archive-project navigation action hook. */
 interface ArchiveProjectActionDeps {
 	activeProjectId: string | null;
 	disableProjectReorderLayoutAnimation: () => void;

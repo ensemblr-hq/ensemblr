@@ -695,6 +695,7 @@ export function listActiveWorkspaceBranchRowsByRepository({
 		.all(repositoryId);
 }
 
+/** Options for listing a repository's workspace id rows. */
 export interface ListWorkspaceIdsByRepositoryOptions {
 	database: DatabaseSync;
 	repositoryId: string;
@@ -771,6 +772,11 @@ export function listWorkspaceRowsByPathPrefix({
 		.all(pathPrefix);
 }
 
+/**
+ * Type guard narrowing an unknown SQLite row to one exposing a string `id`.
+ * @param row - Value returned from a SQLite query
+ * @returns True when the row has a string `id`
+ */
 function isIdRow(row: unknown): row is { id: string } {
 	return (
 		typeof row === 'object' &&

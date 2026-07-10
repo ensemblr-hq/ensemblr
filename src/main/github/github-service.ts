@@ -58,6 +58,7 @@ const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: In
   }
 }`;
 
+/** Public surface for git review-flow operations and all `gh`-backed GitHub calls. */
 export interface GithubService {
 	commitWorkspaceChanges: (
 		request: CommitWorkspaceChangesRequest,
@@ -76,6 +77,7 @@ export interface GithubService {
 	) => Promise<PushWorkspaceBranchResult>;
 }
 
+/** Dependencies for creating the GitHub service, with an injectable clock for tests. */
 export interface CreateGithubServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
@@ -92,6 +94,14 @@ export function createGithubService({
 	localCommandService,
 	now = () => new Date(),
 }: CreateGithubServiceOptions): GithubService {
+	/**
+	 * Run a `gh` or `git` command through the local command service, applying the
+	 * command-specific timeout and output cap.
+	 * @param command - Which executable to invoke
+	 * @param cwd - Working directory for the command
+	 * @param args - Arguments to pass to the command
+	 * @returns The structured local command result
+	 */
 	async function run(
 		command: 'gh' | 'git',
 		cwd: string,
@@ -547,6 +557,12 @@ export function createGithubService({
 		},
 	};
 
+	/**
+	 * Report whether a cached snapshot is still within its time-to-live.
+	 * @param syncedAt - ISO timestamp when the snapshot was last synced
+	 * @param current - Current time to measure freshness against
+	 * @returns True when the snapshot is younger than the snapshot TTL
+	 */
 	function isFresh(syncedAt: string, current: Date): boolean {
 		const parsed = Date.parse(syncedAt);
 		return (

@@ -28,6 +28,7 @@ export const ENSEMBLR_RUNTIME_VARIABLE_KEYS = [
 	'ENSEMBLR_PORT',
 ] as const;
 
+/** Machine-readable failure codes for the workspace-environment service. */
 export type WorkspaceEnvironmentErrorCode =
 	| 'database-unavailable'
 	| 'workspace-not-found';
@@ -125,6 +126,14 @@ export function createWorkspaceEnvironmentService({
 	// active workspace row (and re-writing metadata) on each spawn.
 	const allocatedPorts = new Map<string, number>();
 
+	/**
+	 * Assemble a workspace's process environment by layering configured
+	 * variables from app, repository, and workspace scope over the native
+	 * runtime variables, collecting diagnostics and redaction values.
+	 * @param includeSecrets - Whether to resolve and include secret values
+	 * @param workspaceId - ID of the workspace to assemble the environment for
+	 * @returns The assembled environment, diagnostics, and redaction set
+	 */
 	async function assemble({
 		includeSecrets = true,
 		workspaceId,

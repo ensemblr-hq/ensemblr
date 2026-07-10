@@ -40,6 +40,11 @@ LIMIT 1
 	}
 }
 
+/**
+ * Type guard narrowing an unknown SQLite row to one exposing a string `path`.
+ * @param row - Value returned from a SQLite query
+ * @returns True when the row has a string `path`
+ */
 function isPathRow(row: unknown): row is { path: string } {
 	return (
 		typeof row === 'object' &&

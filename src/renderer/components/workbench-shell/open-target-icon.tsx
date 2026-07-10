@@ -13,13 +13,24 @@ import { cn } from '@/renderer/lib/utils';
 import type { WorkspaceOpenTarget } from '@/renderer/types/workbench';
 import type { WorkspaceOpenTargetIconName } from '@/shared/ipc/contracts/open-target';
 
+/** A component that renders an icon glyph from an optional className. */
 type IconRenderer = ComponentType<{ className?: string }>;
 
+/**
+ * Wrap a Lucide icon component as an aria-hidden icon renderer.
+ * @param Component - The Lucide icon component to wrap.
+ * @returns An icon renderer that forwards the className.
+ */
 const lucide = (Component: IconRenderer): IconRenderer =>
 	function LucideGlyph({ className }) {
 		return <Component aria-hidden='true' className={className} />;
 	};
 
+/**
+ * Wrap an Iconify icon name as an aria-hidden icon renderer.
+ * @param icon - The Iconify icon name.
+ * @returns An icon renderer that forwards the className.
+ */
 const iconify = (icon: string): IconRenderer =>
 	function IconifyGlyph({ className }) {
 		return <Icon aria-hidden='true' className={className} icon={icon} />;

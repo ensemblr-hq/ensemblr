@@ -83,6 +83,7 @@ export function createFakePiAgentAdapter(
 	};
 }
 
+/** A single open fake-adapter session: its public session handle, test controller, and close callback. */
 interface FakeAdapterSessionEntry {
 	controller: FakePiAgentAdapterSessionController;
 	onClosed: () => void;

@@ -28,6 +28,7 @@ export interface EnvironmentVariableSheetTarget {
 	isEdit: boolean;
 }
 
+/** Props for the environment-variable create/edit slide-over sheet. */
 interface EnvironmentVariableSheetProps {
 	scope: EnvironmentVariableScope;
 	scopeId?: string;

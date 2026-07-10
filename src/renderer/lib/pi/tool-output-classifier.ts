@@ -64,6 +64,13 @@ export function looksLikeStackTrace(text: string): boolean {
 	return STACK_FRAME_LINE.test(text) || ERROR_NAME_PREFIX.test(text);
 }
 
+/**
+ * Detects shell or terminal output by tool name, ANSI escapes, shell prompts,
+ * or `ls -l` listing markers.
+ * @param toolName - Name of the tool that produced the output
+ * @param text - The stringified tool output
+ * @returns True when the output reads as terminal output
+ */
 function looksLikeTerminalOutput(toolName: string, text: string): boolean {
 	const normalizedName = toolName.toLowerCase();
 	return (
@@ -87,6 +94,13 @@ function looksLikeStructuredDump(text: string): boolean {
 	return hits >= MIN_STRUCTURED_KV_HITS;
 }
 
+/**
+ * Detects source code by tool name, code fences, diff headers, or a threshold
+ * of language keyword hits.
+ * @param toolName - Name of the tool that produced the output
+ * @param text - The stringified tool output
+ * @returns True when the output reads as code
+ */
 function looksLikeCodeOutput(toolName: string, text: string): boolean {
 	const normalizedName = toolName.toLowerCase();
 	if (normalizedName.includes('code') || normalizedName.includes('file')) {
@@ -100,6 +114,11 @@ function looksLikeCodeOutput(toolName: string, text: string): boolean {
 	return keywordHits >= MIN_CODE_KEYWORD_HITS;
 }
 
+/**
+ * Detects an indented directory or path-tree listing.
+ * @param text - The stringified tool output
+ * @returns True when the output resembles a path tree
+ */
 function looksLikePathTree(text: string): boolean {
 	return PATH_TREE_LINE.test(text);
 }

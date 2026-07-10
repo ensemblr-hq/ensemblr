@@ -86,6 +86,7 @@ export interface CreateLinearAuthServiceOptions {
 	secretStoreFactory: (database: DatabaseSync) => SecretStore | null;
 }
 
+/** Normalized OAuth token set returned by the Linear token endpoint. */
 interface TokenResponse {
 	accessToken: string;
 	expiresAt: string | null;
@@ -93,6 +94,7 @@ interface TokenResponse {
 	scopes: string[];
 }
 
+/** Non-secret Linear connection metadata persisted in SQLite alongside the stored tokens. */
 interface ConnectionMetadata {
 	expiresAt: string | null;
 	hasRefreshToken: boolean;
@@ -103,6 +105,7 @@ interface ConnectionMetadata {
 	userName: string | null;
 }
 
+/** Handle to an in-flight login, exposing a way to cancel it. */
 interface PendingLogin {
 	cancel: () => Promise<void>;
 }
@@ -128,6 +131,10 @@ export function createLinearAuthService({
 	let pendingLogin: PendingLogin | null = null;
 	let refreshInFlight: Promise<string> | null = null;
 
+	/**
+	 * Return the open database connection, throwing when it is not available.
+	 * @returns The open SQLite database
+	 */
 	function getDatabase(): DatabaseSync {
 		const database = databaseService.getConnection()?.database;
 
@@ -141,6 +148,10 @@ export function createLinearAuthService({
 		return database;
 	}
 
+	/**
+	 * Return the platform secret store, throwing when no backend is available.
+	 * @returns The secret store for app-scoped secrets
+	 */
 	function getSecretStore(): SecretStore {
 		const store = secretStoreFactory(getDatabase());
 
@@ -154,6 +165,11 @@ export function createLinearAuthService({
 		return store;
 	}
 
+	/**
+	 * Resolve the Linear OAuth client config from app settings, falling back to
+	 * the built-in client id and default scopes.
+	 * @returns The resolved OAuth config, or null when no client id is available
+	 */
 	function getOauthConfig(): LinearOauthConfig | null {
 		const app = configService.getConfig().app;
 		const linear = app.linear;
@@ -179,6 +195,11 @@ export function createLinearAuthService({
 		return { clientId, scopes };
 	}
 
+	/**
+	 * Read an app-scoped secret, wrapping backend failures as a Linear auth error.
+	 * @param key - Secret key to read
+	 * @returns The stored secret value, or null when it is not set
+	 */
 	async function readSecret(key: string): Promise<string | null> {
 		try {
 			return await getSecretStore().read({ key, scope: 'app' });
@@ -191,6 +212,11 @@ export function createLinearAuthService({
 		}
 	}
 
+	/**
+	 * Create or update an app-scoped secret, wrapping backend failures as an error.
+	 * @param key - Secret key to persist
+	 * @param value - Secret value to store
+	 */
 	async function writeSecret(key: string, value: string): Promise<void> {
 		const store = getSecretStore();
 		const input = {
@@ -217,6 +243,10 @@ export function createLinearAuthService({
 		}
 	}
 
+	/**
+	 * Best-effort deletion of an app-scoped secret; never throws so disconnect can proceed.
+	 * @param key - Secret key to delete
+	 */
 	async function deleteSecret(key: string): Promise<void> {
 		try {
 			await getSecretStore().delete({ key, scope: 'app' });
@@ -225,6 +255,10 @@ export function createLinearAuthService({
 		}
 	}
 
+	/**
+	 * Read and parse the stored Linear connection metadata row.
+	 * @returns The parsed metadata, or null when absent or malformed
+	 */
 	function readConnectionMetadata(): ConnectionMetadata | null {
 		const row = getDatabase()
 			.prepare(
@@ -258,6 +292,10 @@ export function createLinearAuthService({
 		}
 	}
 
+	/**
+	 * Upsert the Linear connection metadata row, stamping the sync time.
+	 * @param metadata - Connection metadata to persist
+	 */
 	function writeConnectionMetadata(metadata: ConnectionMetadata): void {
 		const timestamp = now().toISOString();
 		getDatabase()
@@ -279,6 +317,7 @@ export function createLinearAuthService({
 			);
 	}
 
+	/** Delete the stored Linear connection metadata row. */
 	function deleteConnectionMetadata(): void {
 		getDatabase()
 			.prepare(
@@ -288,6 +327,10 @@ export function createLinearAuthService({
 			.run(CONNECTION_RESOURCE_TYPE, CONNECTION_RESOURCE_ID);
 	}
 
+	/**
+	 * Read the last-updated timestamp of the connection metadata row.
+	 * @returns The ISO `updated_at` value, or null when no row exists
+	 */
 	function readConnectionUpdatedAt(): string | null {
 		const row = getDatabase()
 			.prepare(
@@ -301,6 +344,12 @@ export function createLinearAuthService({
 		return row?.updated_at ?? null;
 	}
 
+	/**
+	 * Compose a connection snapshot for the renderer from a state and metadata.
+	 * @param state - Connection state to report
+	 * @param metadata - Stored metadata to project, when present
+	 * @returns The connection snapshot
+	 */
 	function buildSnapshot(
 		state: LinearConnectionSnapshot['state'],
 		metadata: ConnectionMetadata | null,
@@ -317,6 +366,11 @@ export function createLinearAuthService({
 		};
 	}
 
+	/**
+	 * Report whether an access token is expired, applying a clock-skew margin.
+	 * @param expiresAt - ISO expiry timestamp, or null when the token never expires
+	 * @returns True when the token is at or past its skew-adjusted expiry
+	 */
 	function isExpired(expiresAt: string | null): boolean {
 		if (!expiresAt) {
 			return false;
@@ -325,6 +379,12 @@ export function createLinearAuthService({
 		return now().getTime() + EXPIRY_SKEW_MS >= Date.parse(expiresAt);
 	}
 
+	/**
+	 * Exchange a form body at the Linear token endpoint and normalize the response,
+	 * throwing typed errors on network or non-OK responses.
+	 * @param body - Form fields for the token request (grant type, code, etc.)
+	 * @returns The normalized token set
+	 */
 	async function requestToken(
 		body: Record<string, string>,
 	): Promise<TokenResponse> {
@@ -383,6 +443,12 @@ export function createLinearAuthService({
 		};
 	}
 
+	/**
+	 * Fetch the authenticated viewer and organization details from Linear's
+	 * GraphQL API, returning all-null values on any failure.
+	 * @param accessToken - Bearer access token for the request
+	 * @returns The viewer and organization fields, each null when unavailable
+	 */
 	async function fetchViewer(accessToken: string): Promise<{
 		organizationName: string | null;
 		organizationUrlKey: string | null;
@@ -423,6 +489,12 @@ export function createLinearAuthService({
 		}
 	}
 
+	/**
+	 * Best-effort revocation of a token at Linear; swallows errors so a local
+	 * disconnect still succeeds offline.
+	 * @param token - Token value to revoke
+	 * @param hint - Whether the token is an access or refresh token
+	 */
 	async function revokeToken(
 		token: string,
 		hint: 'access_token' | 'refresh_token',
@@ -439,6 +511,10 @@ export function createLinearAuthService({
 		});
 	}
 
+	/**
+	 * Persist an access token, plus the refresh token when the response carries one.
+	 * @param tokens - Token set to write to the secret store
+	 */
 	async function persistTokens(tokens: TokenResponse): Promise<void> {
 		await writeSecret(ACCESS_TOKEN_KEY, tokens.accessToken);
 
@@ -447,6 +523,11 @@ export function createLinearAuthService({
 		}
 	}
 
+	/**
+	 * Exchange the stored refresh token for a new access token and update the
+	 * persisted tokens and connection metadata.
+	 * @returns The freshly issued access token
+	 */
 	async function refreshAccessToken(): Promise<string> {
 		const config = getOauthConfig();
 
@@ -492,6 +573,16 @@ export function createLinearAuthService({
 		return tokens.accessToken;
 	}
 
+	/**
+	 * Finish the OAuth login: validate the callback, exchange the code for tokens,
+	 * persist them with viewer metadata, and return the connection snapshot.
+	 * @param searchParams - Query params from the OAuth callback URL
+	 * @param expectedState - State value expected to match the callback
+	 * @param verifier - PKCE code verifier for the token exchange
+	 * @param redirectUri - Redirect URI used in the authorization request
+	 * @param config - Resolved Linear OAuth client config
+	 * @returns The connection snapshot after a successful login
+	 */
 	async function completeLogin(
 		searchParams: URLSearchParams,
 		expectedState: string,
@@ -699,6 +790,10 @@ export function createLinearAuthService({
 	};
 }
 
+/**
+ * Build an all-null viewer/organization record used as a fallback.
+ * @returns A viewer record with every field set to null
+ */
 function nullViewer() {
 	return {
 		organizationName: null,
@@ -708,6 +803,11 @@ function nullViewer() {
 	};
 }
 
+/**
+ * Map a thrown error to a structured Linear auth failure for the renderer.
+ * @param error - The caught error
+ * @returns The corresponding failure with a code and message
+ */
 function toFailure(error: unknown): LinearAuthFailure {
 	if (error instanceof LinearAuthError) {
 		return { code: error.code, message: error.message };
@@ -726,10 +826,21 @@ function toFailure(error: unknown): LinearAuthFailure {
 	return { code: 'callback-failed', message: formatError(error) };
 }
 
+/**
+ * Extract a human-readable message from an unknown error value.
+ * @param error - The value to format
+ * @returns The error message, or the value stringified
+ */
 function formatError(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Truncate text to a maximum length, appending an ellipsis when shortened.
+ * @param text - Text to truncate
+ * @param maxLength - Maximum length before truncation
+ * @returns The original text, or a truncated copy with a trailing ellipsis
+ */
 function truncate(text: string, maxLength: number): string {
 	return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 }

@@ -17,6 +17,7 @@ const FRAME_BUFFER_SIZE = 1000;
  */
 type FrameCategory = 'session-stats-call' | 'session-stats-response' | 'other';
 
+/** A captured raw Pi frame plus a stable id and a precomputed category for panel filtering. */
 interface BufferedFrame extends PiRawFrameBroadcast {
 	id: string;
 	category: FrameCategory;
@@ -65,7 +66,9 @@ function classifyFrame(frame: PiRawFrameBroadcast): FrameCategory {
 	return 'other';
 }
 
+/** Ring-buffered raw Pi RPC frames captured for the debug panel; in-memory only. */
 const rawFramesAtom = atom<readonly BufferedFrame[]>([]);
+/** Whether the raw-frames debug panel is open; in-memory only. */
 const debugPanelOpenAtom = atom<boolean>(false);
 
 /** Reads the debug panel toggle state and exposes the setter. */

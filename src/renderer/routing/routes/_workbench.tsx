@@ -9,10 +9,15 @@ import { WORKBENCH_ROUTE_STALE_TIME_MS } from '@/renderer/config/routing';
 import { profileRouteLoader } from '@/renderer/lib/instrumentation';
 import { loadWorkbenchRouteData } from '@/renderer/routing/workbench-route-loaders';
 
+/**
+ * Pathless layout route that loads the shared workbench data (with navigation
+ * profiling) and renders descendant routes plus the command palette.
+ */
 export const Route = createFileRoute('/_workbench')({
 	component: WorkbenchDataLayoutRoute,
 	errorComponent: WorkbenchRouteError,
 	loader: {
+		/** Runs the workbench data loader wrapped in the route navigation profiler. */
 		handler: ({ cause, context, deps, location, params, preload }) =>
 			profileRouteLoader(
 				{
@@ -28,6 +33,7 @@ export const Route = createFileRoute('/_workbench')({
 			),
 		staleReloadMode: 'background',
 	},
+	/** No loader dependencies; the workbench data load takes no route inputs. */
 	loaderDeps: () => ({}),
 	notFoundComponent: WorkbenchRouteNotFound,
 	pendingComponent: WorkbenchRoutePending,

@@ -234,6 +234,11 @@ export function PiSessionTimeline({
 	);
 }
 
+/**
+ * Convert an optimistic prompt entry into a renderable user UIMessage.
+ * @param entry - The optimistic prompt awaiting persistence.
+ * @returns The equivalent user-role UIMessage.
+ */
 function optimisticToUIMessage(entry: OptimisticPrompt): UIMessage {
 	return {
 		id: entry.id,
@@ -267,6 +272,12 @@ function filterUnmatchedOptimistic(
 	return unmatched;
 }
 
+/**
+ * Find the optimistic prompts that a persisted user message now mirrors.
+ * @param optimistic - The pending optimistic prompts.
+ * @param persisted - The persisted messages to match against.
+ * @returns The ids of optimistic prompts that have a persisted match.
+ */
 function matchOptimisticAgainstMessages(
 	optimistic: readonly OptimisticPrompt[],
 	persisted: readonly UIMessage[],
@@ -298,6 +309,11 @@ function buildPersistedTextCounts(
 	return counts;
 }
 
+/**
+ * Collect the joined text of each persisted user message.
+ * @param messages - The persisted messages to scan.
+ * @returns The non-empty text of every user message, in order.
+ */
 function collectPersistedUserTexts(messages: readonly UIMessage[]): string[] {
 	const texts: string[] = [];
 	for (const message of messages) {
@@ -384,6 +400,11 @@ function TimelineMessage({
 	);
 }
 
+/**
+ * Render the detail node for a tool part: a stack-trace diagnostic, a warning, or its output payload.
+ * @param part - The dynamic tool UI part to render.
+ * @returns The rendered detail node, or null when there is nothing to show.
+ */
 function renderToolDetailNode(part: DynamicToolUIPart): ReactNode {
 	if ('errorText' in part && part.errorText) {
 		const errorText = part.errorText;

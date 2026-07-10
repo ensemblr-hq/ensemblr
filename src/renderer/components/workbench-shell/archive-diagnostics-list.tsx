@@ -10,6 +10,7 @@ interface ArchiveDiagnosticItem {
 	path?: string;
 }
 
+/** Renders the shared archive diagnostics list used by the repository and workspace archive dialogs on failure. */
 export function ArchiveDiagnosticsList<T extends ArchiveDiagnosticItem>({
 	diagnostics,
 	testId,

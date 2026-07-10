@@ -18,7 +18,9 @@ function readLastRepoId(): string | null {
 	}
 }
 
+/** Index route for repository settings; redirects to the last-visited repo's Environment page, or to General settings when none was visited. */
 export const Route = createFileRoute('/_workbench/settings/repo/')({
+	/** Redirects the bare repo-settings path to the last-known repo's Environment page, or to General settings when there is none. */
 	beforeLoad: () => {
 		const lastRepoId = readLastRepoId();
 		if (lastRepoId) {

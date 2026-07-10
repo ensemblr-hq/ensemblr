@@ -39,6 +39,11 @@ export function createListAllWorkspacesService({
 	};
 }
 
+/**
+ * Read every workspace history row and map it to renderer entries, dropping malformed rows.
+ * @param database - Open SQLite connection
+ * @returns The mapped workspace history entries
+ */
 function readEntries(database: DatabaseSync): WorkspaceHistoryEntry[] {
 	const rows = listAllWorkspaceRows({ database });
 
@@ -52,6 +57,11 @@ function readEntries(database: DatabaseSync): WorkspaceHistoryEntry[] {
 	return entries;
 }
 
+/**
+ * Map a raw SQLite row to a workspace history entry, or null when required fields are missing.
+ * @param row - Candidate row returned by the query
+ * @returns The history entry, or null when the row is malformed
+ */
 function toEntry(row: unknown): WorkspaceHistoryEntry | null {
 	if (typeof row !== 'object' || row === null) {
 		return null;

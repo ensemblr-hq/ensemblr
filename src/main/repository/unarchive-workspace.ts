@@ -284,6 +284,12 @@ export function createUnarchiveWorkspaceService({
 	};
 }
 
+/**
+ * Load an archived workspace joined with its repository and archive record.
+ * @param database - Open SQLite connection
+ * @param workspaceId - ID of the archived workspace to load
+ * @returns The archived workspace, or null when it is missing or malformed
+ */
 function readArchivedWorkspace(
 	database: DatabaseSync,
 	workspaceId: string,
@@ -312,6 +318,11 @@ function readArchivedWorkspace(
 	};
 }
 
+/**
+ * Recreate the workspace's git worktree from its base branch during unarchive.
+ * @param options - Command service, repository and workspace paths, and branch names
+ * @returns A diagnostic when the worktree could not be recreated, otherwise null
+ */
 async function runWorktreeAdd({
 	baseBranch,
 	branchName,
@@ -350,6 +361,11 @@ async function runWorktreeAdd({
 	};
 }
 
+/**
+ * Restore the workspace's preserved `.context/` directory from its archive snapshot.
+ * @param options - Diagnostics sink and the archived workspace to restore from
+ * @returns True when the directory was restored, false when skipped or on failure
+ */
 function restoreContextDirectory({
 	diagnostics,
 	source,
@@ -407,6 +423,10 @@ function restoreContextDirectory({
 	}
 }
 
+/**
+ * Clear a workspace's archived marker within a transaction to mark it active again.
+ * @param options - Open database, the unarchive timestamp, and the workspace id
+ */
 function clearArchivedAt({
 	database,
 	unarchivedAt,
@@ -421,6 +441,11 @@ function clearArchivedAt({
 	});
 }
 
+/**
+ * Wrap a single diagnostic into a failed unarchive-workspace result.
+ * @param diagnostic - The diagnostic explaining why the unarchive failed
+ * @returns A failure result carrying the diagnostic
+ */
 function failure(
 	diagnostic: UnarchiveWorkspaceDiagnostic,
 ): UnarchiveWorkspaceResult {
@@ -429,6 +454,7 @@ function failure(
 	});
 }
 
+/** Raw joined workspace, repository, and archive-record row read during unarchive. */
 interface WorkspaceRow {
 	archiveRecordId: string | null;
 	archivedAt: string | null;
@@ -446,6 +472,11 @@ interface WorkspaceRow {
 	slug: string;
 }
 
+/**
+ * Narrow an unknown SQLite row to a {@link WorkspaceRow}.
+ * @param row - Candidate row returned by the join query
+ * @returns True when the row has the required workspace and archive fields
+ */
 function isWorkspaceRow(row: unknown): row is WorkspaceRow {
 	if (!isRecord(row)) {
 		return false;

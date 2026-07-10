@@ -116,6 +116,13 @@ const STATE_RANK: Record<string, number> = {
 	'output-error': 3,
 };
 
+/**
+ * Combines two dynamic-tool parts for the same call, keeping the higher-state
+ * winner while preserving the richer input and the more specific tool name.
+ * @param previousPart - The part already stored for this tool call
+ * @param incomingPart - The newly observed part for the same tool call
+ * @returns The merged dynamic-tool part
+ */
 function mergeDynamicToolParts(
 	previousPart: DynamicToolUIPart,
 	incomingPart: DynamicToolUIPart,
@@ -130,6 +137,12 @@ function mergeDynamicToolParts(
 	} as DynamicToolUIPart;
 }
 
+/**
+ * Chooses whichever tool input carries object keys, preferring the first.
+ * @param a - The previously stored input value
+ * @param b - The incoming input value
+ * @returns The input that has keys, or a fallback when neither does
+ */
 function pickRicherInput(a: unknown, b: unknown): unknown {
 	const aHasKeys =
 		a !== null && typeof a === 'object' && Object.keys(a).length > 0;
@@ -141,6 +154,12 @@ function pickRicherInput(a: unknown, b: unknown): unknown {
 	return bHasKeys ? b : (a ?? b);
 }
 
+/**
+ * Prefers a concrete tool name over the generic `'tool'` fallback.
+ * @param a - The previously stored tool name
+ * @param b - The incoming tool name
+ * @returns The most specific of the two names
+ */
 function pickToolName(a: string, b: string): string {
 	if (a && a !== 'tool') {
 		return a;
@@ -151,6 +170,12 @@ function pickToolName(a: string, b: string): string {
 	return a || b;
 }
 
+/**
+ * Flattens Pi's MCP-style `{ content: [{ text }] }` envelope into plain text,
+ * leaving non-envelope values untouched.
+ * @param output - The raw tool-result output value
+ * @returns The extracted text, or the original value when it is not an envelope
+ */
 function normalizeToolOutput(output: unknown): unknown {
 	if (!output || typeof output !== 'object' || Array.isArray(output)) {
 		return output;
@@ -172,6 +197,12 @@ function normalizeToolOutput(output: unknown): unknown {
 	return text.length > 0 ? text : output;
 }
 
+/**
+ * Coerces a tool error payload into a displayable message, falling back to a
+ * generic failure string.
+ * @param output - The normalized error output value
+ * @returns A non-empty error message string
+ */
 function normalizeToolError(output: unknown): string {
 	if (typeof output === 'string' && output.length > 0) {
 		return output;
@@ -186,6 +217,11 @@ function normalizeToolError(output: unknown): string {
 	return 'Tool execution failed.';
 }
 
+/**
+ * Narrows a value to a non-array object record.
+ * @param value - The value to test
+ * @returns True when `value` is a plain object
+ */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }

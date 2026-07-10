@@ -18,6 +18,7 @@ export type GithubFailureCode =
 	| 'parse-failed'
 	| 'permission-denied';
 
+/** A failed git/gh operation, with its code, message, and optional remediation hint. */
 export interface GithubFailure {
 	code: GithubFailureCode;
 	message: string;
@@ -28,6 +29,7 @@ export interface GithubFailure {
 /** Simplified check bucket derived from check-run status + conclusion. */
 export type GithubCheckBucket = 'failing' | 'passing' | 'pending' | 'skipped';
 
+/** Renderer-facing snapshot of a single PR check run. */
 export interface GithubCheckWire {
 	bucket: GithubCheckBucket;
 	completedAt?: string;
@@ -45,6 +47,7 @@ export type GithubDeploymentSource =
 	| 'github-deployment'
 	| 'pr-comment';
 
+/** Renderer-facing snapshot of a preview/deployment surfaced for a PR. */
 export interface GithubDeploymentWire {
 	environment: string;
 	id: string;
@@ -53,8 +56,10 @@ export interface GithubDeploymentWire {
 	url?: string;
 }
 
+/** Kind of PR comment: an issue comment, a review, or an inline review comment. */
 export type GithubCommentKind = 'issue-comment' | 'review' | 'review-comment';
 
+/** Renderer-facing snapshot of a single PR comment or review note. */
 export interface GithubCommentWire {
 	author: string;
 	body: string;
@@ -68,10 +73,13 @@ export interface GithubCommentWire {
 	url?: string;
 }
 
+/** High-level state of a pull request. */
 export type GithubPullRequestState = 'closed' | 'merged' | 'open';
 
+/** Whether a pull request can be merged cleanly. */
 export type GithubMergeableState = 'conflicting' | 'mergeable' | 'unknown';
 
+/** Renderer-facing snapshot of a pull request with its checks, comments, and deployments. */
 export interface GithubPullRequestWire {
 	additions: number | null;
 	baseRefName: string;
@@ -112,6 +120,7 @@ export interface GithubPullRequestSnapshotWire {
 
 // --- Commit / push / PR create (THE-154) -------------------------------------
 
+/** Request to commit a workspace's changes with a message. */
 export interface CommitWorkspaceChangesRequest {
 	message: string;
 	/** Restrict staging to these workspace-relative paths; defaults to all. */
@@ -119,12 +128,14 @@ export interface CommitWorkspaceChangesRequest {
 	workspaceCwd: string;
 }
 
+/** Result of committing workspace changes: the commit hash on success, or a failure. */
 export interface CommitWorkspaceChangesResult {
 	commitHash?: string;
 	error?: GithubFailure;
 	ok: boolean;
 }
 
+/** Request to push a workspace's branch to its remote. */
 export interface PushWorkspaceBranchRequest {
 	/**
 	 * Whether to pass `--set-upstream` so the pushed branch tracks `origin`.
@@ -134,11 +145,13 @@ export interface PushWorkspaceBranchRequest {
 	workspaceCwd: string;
 }
 
+/** Result of pushing a workspace branch. */
 export interface PushWorkspaceBranchResult {
 	error?: GithubFailure;
 	ok: boolean;
 }
 
+/** Request to open a pull request for a workspace's branch. */
 export interface CreatePullRequestRequest {
 	baseBranch?: string;
 	body: string;
@@ -147,6 +160,7 @@ export interface CreatePullRequestRequest {
 	workspaceCwd: string;
 }
 
+/** Result of creating a pull request: its number and URL on success, or a failure. */
 export interface CreatePullRequestResult {
 	error?: GithubFailure;
 	ok: boolean;
@@ -156,6 +170,7 @@ export interface CreatePullRequestResult {
 
 // --- PR metadata snapshot (THE-155) ------------------------------------------
 
+/** Request for a workspace's PR metadata snapshot, optionally forcing a refresh. */
 export interface GetPullRequestSnapshotRequest {
 	/** Force a `gh` refresh even when a fresh cache row exists. */
 	refresh?: boolean;
@@ -163,6 +178,7 @@ export interface GetPullRequestSnapshotRequest {
 	workspaceId: string;
 }
 
+/** Result of fetching a PR snapshot, noting whether it came from cache. */
 export interface GetPullRequestSnapshotResult {
 	error?: GithubFailure;
 	/** True when the snapshot came from the SQLite cache without a refresh. */
@@ -172,14 +188,17 @@ export interface GetPullRequestSnapshotResult {
 
 // --- Merge (THE-158) ----------------------------------------------------------
 
+/** How to merge a pull request: merge commit, squash, or rebase. */
 export type GithubMergeMethod = 'merge' | 'rebase' | 'squash';
 
+/** Request to merge a workspace's pull request with a given method. */
 export interface MergePullRequestRequest {
 	method?: GithubMergeMethod;
 	workspaceCwd: string;
 	workspaceId: string;
 }
 
+/** Result of merging a pull request. */
 export interface MergePullRequestResult {
 	error?: GithubFailure;
 	merged: boolean;

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { createContext, use, useCallback, useEffect, useRef } from 'react';
 
+/** Registers a ⌘/Ctrl+W close handler and returns a function that unregisters it. */
 type RegisterCloseAction = (handler: () => void) => () => void;
 
 const CloseActionContext = createContext<RegisterCloseAction | null>(null);

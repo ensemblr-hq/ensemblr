@@ -48,8 +48,15 @@ export interface ProtocolDispatchDeps {
 	streamedTurns: Set<string>;
 }
 
+/** Handles a single raw Pi RPC frame. */
 export type ProtocolFrameHandler = (frame: unknown) => void;
 
+/**
+ * Build the frame dispatcher that turns raw Pi RPC frames into session events,
+ * routing by frame type and collapsing retried model errors into one diagnostic.
+ * @param deps - Session callbacks and shared mutable turn-tracking sets.
+ * @returns A handler that processes one raw frame per call.
+ */
 export function createProtocolDispatcher(
 	deps: ProtocolDispatchDeps,
 ): ProtocolFrameHandler {

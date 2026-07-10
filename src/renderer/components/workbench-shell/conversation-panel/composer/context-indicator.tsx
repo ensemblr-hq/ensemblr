@@ -7,6 +7,7 @@ import {
 import { Progress } from '@/renderer/components/ui/progress';
 import type { ComposerContextUsage } from '@/renderer/types/workbench';
 
+/** Props for the composer context-usage indicator. */
 interface ContextIndicatorProps {
 	maxLabel?: string;
 	usage: ComposerContextUsage | null;

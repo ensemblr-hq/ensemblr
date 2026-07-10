@@ -1,7 +1,9 @@
+/** Open-ended metadata bag attached to a repository or workspace in the navigation tree. */
 export interface RepositoryWorkspaceNavigationMetadata {
 	[key: string]: unknown;
 }
 
+/** A workspace entry in the repository/workspace navigation tree. */
 export interface RepositoryWorkspaceNavigationWorkspace {
 	archivedAt: string | null;
 	baseBranch: string | null;
@@ -16,6 +18,7 @@ export interface RepositoryWorkspaceNavigationWorkspace {
 	updatedAt: string;
 }
 
+/** A repository entry, with its child workspaces, in the navigation tree. */
 export interface RepositoryWorkspaceNavigationRepository {
 	createdAt: string;
 	defaultBranch: string | null;
@@ -28,6 +31,7 @@ export interface RepositoryWorkspaceNavigationRepository {
 	workspaces: RepositoryWorkspaceNavigationWorkspace[];
 }
 
+/** Full repository/workspace navigation tree snapshot. */
 export interface RepositoryWorkspaceNavigationSnapshot {
 	generatedAt: string;
 	repositories: RepositoryWorkspaceNavigationRepository[];

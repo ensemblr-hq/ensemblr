@@ -8,6 +8,7 @@ export interface FileTreeNode<TFile> {
 	path: string;
 }
 
+/** File-tree node augmented with a directory lookup map for fast child access while the tree is being built. */
 interface MutableFileTreeNode<TFile> extends FileTreeNode<TFile> {
 	directoryMap: Map<string, MutableFileTreeNode<TFile>>;
 }

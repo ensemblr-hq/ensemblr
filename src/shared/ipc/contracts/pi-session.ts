@@ -15,6 +15,7 @@ export type {
 	PiWireMetadata,
 } from './pi-message-payloads.ts';
 
+/** Kind of chat tab surfaced to the renderer. */
 export type ChatTabKindWire = 'chat' | 'diff' | 'document' | 'file' | 'preview';
 
 /** Renderer-facing chat tab descriptor. */
@@ -82,6 +83,7 @@ export interface OpenPiSessionRequest {
 	workspaceId: string;
 }
 
+/** Result of opening or attaching a Pi session. */
 export interface OpenPiSessionResult {
 	error?: string;
 	session?: PiSessionSnapshotWire;
@@ -105,6 +107,7 @@ export interface SubmitPiPromptRequest {
 	thinkingLevel?: string | null;
 }
 
+/** Result of submitting a prompt to an open Pi session. */
 export interface SubmitPiPromptResult {
 	acceptedAt?: string;
 	error?: string;
@@ -117,6 +120,7 @@ export interface StopPiSessionRequest {
 	sessionId: string;
 }
 
+/** Result of stopping the currently-streaming turn in a Pi session. */
 export interface StopPiSessionResult {
 	error?: string;
 	ok: boolean;
@@ -127,6 +131,7 @@ export interface ListPiSessionsRequest {
 	workspaceId: string;
 }
 
+/** Result of listing Pi sessions persisted for a workspace. */
 export interface ListPiSessionsResult {
 	sessions: readonly PiSessionSnapshotWire[];
 }
@@ -136,6 +141,7 @@ export interface ListPiSessionEventsRequest {
 	branchId: string;
 }
 
+/** Result of reading persisted events for a branch. */
 export interface ListPiSessionEventsResult {
 	events: readonly PiSessionEventWire[];
 }
@@ -156,6 +162,7 @@ export interface WriteForkSummaryRequest {
 	upToOrdinal?: number;
 }
 
+/** Result of writing a fork summary; carries the summary file's paths and title on success. */
 export interface WriteForkSummaryResult {
 	error?: string;
 	summary?: {
@@ -204,6 +211,7 @@ export interface PiModelOptionWire {
 	thinkingLevels: readonly string[];
 }
 
+/** Result of listing available Pi models, plus the default model and thinking level. */
 export interface ListPiModelsResult {
 	defaultModelId: string | null;
 	defaultThinkingLevel: string | null;
@@ -241,6 +249,7 @@ export interface PiSessionApi {
 	) => Promise<WriteForkSummaryResult>;
 }
 
+/** Result of prompting the user to pick a Pi executable path. */
 export interface PiExecutableSelectionResult {
 	canceled: boolean;
 	error?: string;

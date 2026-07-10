@@ -5,11 +5,17 @@ import { profileRouteLoader } from '@/renderer/lib/instrumentation';
 import { normalizeWorkbenchSearch } from '@/renderer/lib/workbench';
 import { loadWorkspaceWorkbenchRoute } from '@/renderer/routing/workbench-route-loaders';
 
+/**
+ * Layout route for a workspace; loads workspace workbench data (with navigation
+ * profiling) for the `projectId`/`workspaceId` params, validates the
+ * `dock`/`review` search params, and renders the workspace chrome around descendants.
+ */
 export const Route = createFileRoute(
 	'/_workbench/_shell/projects/$projectId/workspaces/$workspaceId',
 )({
 	component: WorkspaceWorkbenchLayout,
 	loader: {
+		/** Runs the workspace workbench loader wrapped in the route navigation profiler. */
 		handler: ({
 			cause,
 			context,
@@ -41,6 +47,7 @@ export const Route = createFileRoute(
 			),
 		staleReloadMode: 'background',
 	},
+	/** Narrows the loader dependencies to the `dock` and `review` search params. */
 	loaderDeps: ({ search }) => ({
 		dock: search.dock,
 		review: search.review,

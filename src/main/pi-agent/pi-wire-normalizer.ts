@@ -3,12 +3,22 @@ import type {
 	PiAgentMessagePayload,
 } from './pi-agent-types.ts';
 
+/**
+ * Type guard for a known Pi wire message role.
+ * @param value - Candidate role value from a wire frame
+ * @returns True when `value` is `agent`, `tool`, or `user`
+ */
 export function isMessageRole(
 	value: unknown,
 ): value is 'agent' | 'tool' | 'user' {
 	return value === 'agent' || value === 'tool' || value === 'user';
 }
 
+/**
+ * Reads the string `id` from an unknown Pi message frame.
+ * @param message - Candidate message object from the wire
+ * @returns The message id, or null when absent or not a string
+ */
 export function extractMessageId(message: unknown): string | null {
 	if (!message || typeof message !== 'object') {
 		return null;
@@ -55,6 +65,11 @@ export function normalizeContentParts(
 	return parts;
 }
 
+/**
+ * Converts a single Pi content block into a typed message part.
+ * @param block - One entry from a Pi message `content[]` array
+ * @returns The mapped part, or null for blocks that are not modelled
+ */
 export function contentBlockToPart(block: unknown): PiAgentMessagePart | null {
 	if (!block || typeof block !== 'object') {
 		return null;

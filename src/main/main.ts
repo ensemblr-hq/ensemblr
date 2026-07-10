@@ -185,6 +185,7 @@ const agentActivityMonitor = createAgentActivityMonitor({
 	notify: electronNotify,
 	powerControls: electronPowerControls,
 	readBattery: readMacosBattery,
+	/** Reads the latest app settings so the monitor can gate itself live. */
 	readSettings: () => appSettingsService.read(),
 });
 const databaseService = createEnsemblrDatabaseService(
@@ -241,6 +242,11 @@ const classifyRawFrameKind = (label: string): PiRawFrameKind => {
 	}
 	return 'unknown';
 };
+/**
+ * Fan out a raw Pi RPC frame sample to every live renderer window for the debug
+ * panel.
+ * @param sample - Captured frame with direction, label, and JSONL line.
+ */
 const broadcastRawFrame = (sample: {
 	at: string;
 	direction: 'rx' | 'tx';
@@ -285,6 +291,7 @@ const summaryPiAgentClient = createPiAgentClient({
 });
 const sessionSummaryWriter = createSessionSummaryWriter({
 	piAgentClient: summaryPiAgentClient,
+	/** Resolves the current Pi executable snapshot, or null when unavailable. */
 	resolveExecutable: async () => {
 		const snapshot = await piExecutableService.getSnapshot();
 		if (snapshot.status === 'error' || !snapshot.command) {
@@ -306,6 +313,7 @@ const branchNameQueue = createBranchNameQueue({
 });
 const piSessionService = createPiSessionService({
 	databaseService,
+	/** Forwards a Pi session event to every window and the activity monitor. */
 	eventSink: ({ event, sessionId, workspaceId }) => {
 		const payload: PiSessionEventBroadcast = {
 			event: {
@@ -361,6 +369,7 @@ const createWorkspaceServiceInstance = createWorkspaceService({
 	databaseService,
 	githubUsernameResolver,
 	localCommandService,
+	/** Reads the user's default git settings for new workspaces. */
 	readGitDefaults: () => appSettingsService.read().git,
 	rootDirectoryService,
 });
@@ -412,6 +421,11 @@ const workspaceEnvironmentService = createWorkspaceEnvironmentService({
 	environmentVariablesService,
 	rootDirectoryService,
 });
+/**
+ * Send an IPC payload to every live renderer window.
+ * @param channel - IPC channel to send on.
+ * @param payload - Data to deliver to each window.
+ */
 const broadcastToAllWindows = (channel: string, payload: unknown): void => {
 	for (const window of BrowserWindow.getAllWindows()) {
 		if (!window.isDestroyed()) {
@@ -420,6 +434,7 @@ const broadcastToAllWindows = (channel: string, payload: unknown): void => {
 	}
 };
 const workspaceFilesWatcher = createWorkspaceFilesWatcher({
+	/** Broadcasts a workspace-files-changed event when the watcher fires. */
 	onChange: (workspaceCwd) =>
 		broadcastToAllWindows(IPC_CHANNELS.workspaceFilesChanged, {
 			workspaceCwd,
@@ -427,8 +442,10 @@ const workspaceFilesWatcher = createWorkspaceFilesWatcher({
 });
 const terminalService = createTerminalService({
 	databaseService,
+	/** Broadcasts a terminal lifecycle event to all windows. */
 	onLifecycle: (event: TerminalLifecycleBroadcast) =>
 		broadcastToAllWindows(IPC_CHANNELS.terminalLifecycle, event),
+	/** Broadcasts terminal output to all windows. */
 	onOutput: (event: TerminalOutputBroadcast) =>
 		broadcastToAllWindows(IPC_CHANNELS.terminalOutput, event),
 	workspaceEnvironmentService,
@@ -449,11 +466,13 @@ const archiveWorkspaceServiceWithScript = withArchiveScriptBeforeArchive({
 const linearAuthService = createLinearAuthService({
 	configService,
 	databaseService,
+	/** Opens an external URL in the user's default browser. */
 	openExternal: (url) => shell.openExternal(url),
 	secretStoreFactory: createSecretStore,
 });
 const linearService = createLinearService({
 	client: createLinearClient({
+		/** Resolves the current Linear access token from the auth service. */
 		getAccessToken: () => linearAuthService.getAccessToken(),
 	}),
 	databaseService,

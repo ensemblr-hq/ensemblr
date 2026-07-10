@@ -18,6 +18,7 @@ export interface JsonlLineStreamOptions {
 
 const DEFAULT_MAX_LINE_BYTES = 1024 * 1024;
 
+/** Public surface of a chunked LF-delimited line buffer: feed chunks, flush, or reset. */
 export interface JsonlLineStream {
 	/** Push a chunk. Newlines may straddle chunk boundaries. */
 	feed: (chunk: Buffer | string) => void;
@@ -130,6 +131,11 @@ export function createJsonlLineStream({
 	};
 }
 
+/**
+ * Drops a single trailing carriage return so `\r\n` lines yield the same text as `\n` lines.
+ * @param line - Line text, possibly ending in CR
+ * @returns The line without its trailing CR
+ */
 function stripTrailingCarriageReturn(line: string): string {
 	if (line.length > 0 && line.charCodeAt(line.length - 1) === 0x0d) {
 		return line.slice(0, -1);

@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { LinearIssueDetail } from '@/renderer/components/linear/issue-detail';
 import { LinearConnectionGate } from '@/renderer/components/linear/linear-connection-gate';
 
+/** Linear issue detail route; renders the issue named by the `issueId` route param. */
 export const Route = createFileRoute('/_workbench/_shell/linear/$issueId')({
 	component: LinearIssueDetailRoute,
 	staticData: {

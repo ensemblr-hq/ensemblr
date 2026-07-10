@@ -9,6 +9,7 @@ import { ChatTurnFooter } from './chat-turn-footer';
 import { ChatTurnSummary } from './chat-turn-summary';
 import { ChatWorkingIndicator } from './chat-turn-timer';
 
+/** Start and end timestamps in milliseconds for one assistant turn, used to derive its duration. */
 export interface ChatAssistantTurnTiming {
 	endMs: number | null;
 	startMs: number;
@@ -127,6 +128,7 @@ export function ChatAssistantTurn({
 	);
 }
 
+/** Renders one pre-answer activity part: reasoning, a tool call with optional detail, or muted intermediate commentary. */
 function ActivityPart({
 	part,
 	renderToolDetail,
@@ -192,6 +194,12 @@ function splitTurnParts(
 	};
 }
 
+/**
+ * Count the parts of a given type within an activity-part list.
+ * @param parts - Message parts to scan
+ * @param type - Part type to match
+ * @returns The number of matching parts
+ */
 function countByType(
 	parts: UIMessage['parts'],
 	type: 'reasoning' | 'dynamic-tool',
@@ -205,6 +213,11 @@ function countByType(
 	return count;
 }
 
+/**
+ * Count the intermediate text and reasoning parts that fold into a turn's activity summary.
+ * @param parts - Message parts to scan
+ * @returns The number of text or reasoning parts
+ */
 function countIntermediateText(parts: UIMessage['parts']): number {
 	let count = 0;
 	for (const part of parts) {

@@ -28,6 +28,7 @@ import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { themeAtom } from '@/renderer/state/preferences';
 import { formatShortcut } from '@/shared/keymap';
 
+/** A single command-palette action: its label, icon, optional hint/keywords/shortcut, and run handler. */
 interface ActionEntry {
 	id: string;
 	label: string;
@@ -201,6 +202,7 @@ export function CommandPalette() {
 	);
 }
 
+/** Renders one titled group of command-palette actions, marking the active theme entry. */
 function ActionGroup({
 	actions,
 	currentTheme,

@@ -26,6 +26,7 @@ import type {
 } from '@/renderer/types/workbench';
 import type { PiStreamingBehavior } from '@/shared/ipc/contracts/pi-session';
 
+/** State and callbacks the Pi composer controller exposes to the composer UI. */
 export interface PiComposerControllerState {
 	activeSessionId: string | null;
 	availableModels: readonly ComposerModelOption[];

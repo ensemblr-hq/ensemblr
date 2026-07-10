@@ -51,6 +51,7 @@ export interface OpenPiSessionRequest extends OpenPiSessionWireRequest {
  */
 export type SubmitPiPromptRequest = SubmitPiPromptWireRequest;
 
+/** Result of submitting a prompt to an open Pi session. */
 export interface SubmitPiPromptResult {
 	acceptedAt: string;
 	turnId: string;
@@ -78,6 +79,7 @@ export type QueueChatTitlePort = (input: {
 	workspaceId: string;
 }) => void;
 
+/** Dependencies and configuration for {@link createPiSessionLifecycle}. */
 export interface PiSessionLifecycleOptions {
 	/** Pre-prompt git checkpoint capture (ADR 0012); absent in tests. */
 	captureCheckpoint?: CheckpointCapturePort;
@@ -93,6 +95,7 @@ export interface PiSessionLifecycleOptions {
 	sessionSummaryWriter?: SessionSummaryWriter;
 }
 
+/** Public surface of the Pi session lifecycle: open, submit, stop, and shut down active sessions. */
 export interface PiSessionLifecycle {
 	getActiveSession: (sessionId: string) => ActiveSessionView | null;
 	openSession: (request: OpenPiSessionRequest) => Promise<PiSessionSnapshot>;

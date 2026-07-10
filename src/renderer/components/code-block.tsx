@@ -21,24 +21,46 @@ import { cn } from '@/renderer/lib/utils';
 import { codeThemeAtom } from '@/renderer/state/preferences';
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
+/**
+ * Whether a Shiki token's font-style bitflags include the italic bit.
+ * @param fontStyle - Shiki token font-style bitflags
+ * @returns A truthy value when the italic bit is set
+ */
 // oxlint-disable-next-line eslint(no-bitwise)
 const isItalic = (fontStyle: number | undefined) => fontStyle && fontStyle & 1;
+/**
+ * Whether a Shiki token's font-style bitflags include the bold bit.
+ * @param fontStyle - Shiki token font-style bitflags
+ * @returns A truthy value when the bold bit is set
+ */
 // oxlint-disable-next-line eslint(no-bitwise)
 const isBold = (fontStyle: number | undefined) => fontStyle && fontStyle & 2;
+/**
+ * Whether a Shiki token's font-style bitflags include the underline bit.
+ * @param fontStyle - Shiki token font-style bitflags
+ * @returns A truthy value when the underline bit is set
+ */
 const isUnderline = (fontStyle: number | undefined) =>
 	// oxlint-disable-next-line eslint(no-bitwise)
 	fontStyle && fontStyle & 4;
 
 // Transform tokens to include pre-computed keys to avoid noArrayIndexKey lint
+/** A Shiki token paired with a stable React key for list rendering. */
 interface KeyedToken {
 	token: ThemedToken;
 	key: string;
 }
+/** A source line of keyed Shiki tokens, itself carrying a stable React key. */
 interface KeyedLine {
 	tokens: KeyedToken[];
 	key: string;
 }
 
+/**
+ * Attach stable React keys to every Shiki line and token for list rendering.
+ * @param lines - Tokenized lines produced by Shiki
+ * @returns The lines and tokens wrapped with deterministic keys
+ */
 const addKeysToTokens = (lines: ThemedToken[][]): KeyedLine[] =>
 	lines.map((line, lineIdx) => ({
 		key: `line-${lineIdx}`,
@@ -49,6 +71,7 @@ const addKeysToTokens = (lines: ThemedToken[][]): KeyedLine[] =>
 	}));
 
 // Token rendering component
+/** Renders a single syntax-highlighted token as a styled span. */
 const TokenSpan = ({ token }: { token: ThemedToken }) => (
 	<span
 		className='dark:!bg-[var(--shiki-dark-bg)] dark:!text-[var(--shiki-dark)]'
@@ -82,6 +105,7 @@ const LINE_NUMBER_CLASSES = cn(
 );
 
 // Line rendering component
+/** Renders one code line as a row of token spans, optionally with a CSS-counter line number. */
 const LineSpan = ({
 	keyedLine,
 	showLineNumbers,
@@ -99,18 +123,21 @@ const LineSpan = ({
 );
 
 // Types
+/** Props for the CodeBlock component: source code, its language, and an optional line-number toggle. */
 type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
 	code: string;
 	language: BundledLanguage;
 	showLineNumbers?: boolean;
 };
 
+/** Highlighted code: the themed token grid plus resolved foreground and background colors. */
 interface TokenizedCode {
 	tokens: ThemedToken[][];
 	fg: string;
 	bg: string;
 }
 
+/** Context value exposing the raw source code to CodeBlock subcomponents. */
 interface CodeBlockContextType {
 	code: string;
 }
@@ -132,6 +159,13 @@ const tokensCache = new Map<string, TokenizedCode>();
 // Subscribers for async token updates
 const subscribers = new Map<string, Set<(result: TokenizedCode) => void>>();
 
+/**
+ * Build a cache key for highlighted tokens from the theme, language, and a code fingerprint.
+ * @param code - Source code being highlighted
+ * @param language - Shiki language id
+ * @param theme - Shiki theme id
+ * @returns A cache key that fingerprints the code without hashing all of it
+ */
 const getTokensCacheKey = (
 	code: string,
 	language: BundledLanguage,
@@ -142,6 +176,11 @@ const getTokensCacheKey = (
 	return `${theme}:${language}:${code.length}:${start}:${end}`;
 };
 
+/**
+ * Get or lazily create the cached Shiki highlighter for a language.
+ * @param language - Shiki language to load
+ * @returns A promise resolving to the shared highlighter instance
+ */
 const getHighlighter = (
 	language: BundledLanguage,
 ): Promise<HighlighterGeneric<BundledLanguage, BundledTheme>> => {
@@ -160,6 +199,11 @@ const getHighlighter = (
 };
 
 // Create raw tokens for immediate display while highlighting loads
+/**
+ * Build unstyled tokens so code renders immediately before Shiki finishes highlighting.
+ * @param code - Source code to wrap as raw tokens
+ * @returns Tokenized code with inherited colors and one token per line
+ */
 const createRawTokens = (code: string): TokenizedCode => ({
 	bg: 'transparent',
 	fg: 'inherit',
@@ -176,6 +220,14 @@ const createRawTokens = (code: string): TokenizedCode => ({
 });
 
 // Synchronous highlight with callback for async results
+/**
+ * Return cached highlighted tokens synchronously, otherwise kick off async Shiki highlighting and resolve via callback.
+ * @param code - Source code to highlight
+ * @param language - Shiki language id
+ * @param theme - Shiki theme id
+ * @param callback - Optional subscriber invoked once async highlighting resolves
+ * @returns The cached tokens, or null while highlighting runs in the background
+ */
 const highlightCode = (
 	code: string,
 	language: BundledLanguage,
@@ -248,6 +300,7 @@ const highlightCode = (
 	return null;
 };
 
+/** Renders the highlighted token grid inside a styled pre/code block; memoized against its tokens and options. */
 const CodeBlockBody = memo(
 	({
 		tokenized,
@@ -305,6 +358,7 @@ const CodeBlockBody = memo(
 
 CodeBlockBody.displayName = 'CodeBlockBody';
 
+/** Highlights and renders code for a language, showing raw tokens immediately and swapping in Shiki output once it loads. */
 export const CodeBlockContent = ({
 	code,
 	language,
@@ -363,6 +417,7 @@ export const CodeBlockContent = ({
 	);
 };
 
+/** Outer bordered container for a code block, tagged with its language and tuned for content-visibility. */
 const CodeBlockContainer = ({
 	className,
 	language,
@@ -384,6 +439,7 @@ const CodeBlockContainer = ({
 	/>
 );
 
+/** Public code block that provides code context and composes the container, optional children, and highlighted content. */
 export const CodeBlock = ({
 	code,
 	language,

@@ -5,6 +5,7 @@ import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { cn } from '@/renderer/lib/utils';
 import type { GithubRepositoryEntry } from '@/shared/ipc/contracts/clone';
 
+/** Props for the recent/searched GitHub repositories picker list. */
 interface CloneGithubRecentReposProps {
 	disabled: boolean;
 	emptyMessage: string;

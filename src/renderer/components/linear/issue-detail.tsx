@@ -97,6 +97,7 @@ export function LinearIssueDetail({ issueId }: { issueId: string }) {
 	);
 }
 
+/** Header for the Linear issue detail: identifier, team/project/cycle, and refresh, external-link, edit, and create-workspace actions. */
 function IssueDetailHeader({
 	isRefreshing,
 	issue,
@@ -216,6 +217,7 @@ function CreateWorkspaceFromIssueButton({ issue }: { issue: LinearIssueWire }) {
 	);
 }
 
+/** Renders a Linear issue's comment thread, or an empty-state note when there are none. */
 function IssueComments({ comments }: { comments: LinearCommentWire[] }) {
 	if (comments.length === 0) {
 		return <p className='text-muted-foreground text-xs'>No comments yet.</p>;

@@ -33,6 +33,7 @@ const FIXTURE_SOURCES = import.meta.glob(
 	{ eager: true, import: 'default', query: '?raw' },
 ) as Record<string, string>;
 
+/** Replay playback speed: original timing (1x), compressed (4x), or 'instant' with no delays. */
 type ReplaySpeed = 1 | 4 | 'instant';
 
 /** Parses one bundled fixture into captured lines, skipping bad rows. */

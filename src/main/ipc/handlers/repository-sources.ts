@@ -4,6 +4,7 @@ import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { RepositorySourcesService } from '../../repository/repository-sources-service.ts';
 import { listRepositorySourcesRequestSchema } from '../request-schemas.ts';
 
+/** Dependencies for registering the create-from-source picker IPC handlers. */
 export interface RepositorySourcesHandlersOptions {
 	repositorySourcesService: RepositorySourcesService;
 }

@@ -14,6 +14,7 @@ import {
 	getWorkspaceGitStatusRequestSchema,
 } from '../request-schemas.ts';
 
+/** Dependencies for registering the workspace-git IPC handlers. */
 export interface WorkspaceGitHandlersOptions {
 	workspaceGitService: WorkspaceGitService;
 }

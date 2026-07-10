@@ -39,6 +39,7 @@ export interface CreateArchiveRepositoryServiceOptions {
 	now?: () => Date;
 }
 
+/** Repository row plus its child workspaces, read as the source for an archive operation. */
 interface SourceRepository {
 	archivedAt: string | null;
 	id: string;
@@ -48,6 +49,7 @@ interface SourceRepository {
 	workspaces: SourceWorkspace[];
 }
 
+/** Minimal workspace row read as a child of an archiving repository. */
 interface SourceWorkspace {
 	archivedAt: string | null;
 	id: string;
@@ -264,6 +266,12 @@ export function createArchiveRepositoryService({
 	};
 }
 
+/**
+ * Reads a repository and its workspace children to seed an archive operation.
+ * @param database - Open database handle
+ * @param repositoryId - Repository to read
+ * @returns The source repository with its workspaces, or null when not found
+ */
 function readRepository(
 	database: DatabaseSync,
 	repositoryId: string,
@@ -292,6 +300,10 @@ function readRepository(
 	return { ...repositoryRow, workspaces };
 }
 
+/**
+ * Stamps `archived_at` on the repository and inserts a repository-level archive
+ * record within a single transaction.
+ */
 function stampArchivedAt({
 	archivedAt,
 	branchCleanup,
@@ -329,6 +341,11 @@ function stampArchivedAt({
 	});
 }
 
+/**
+ * Wraps an archive diagnostic in a failed {@link ArchiveRepositoryResult}.
+ * @param diagnostic - Diagnostic describing the failure
+ * @returns The failure result
+ */
 function failure(
 	diagnostic: ArchiveRepositoryDiagnostic,
 ): ArchiveRepositoryResult {
@@ -339,6 +356,11 @@ function failure(
 	});
 }
 
+/**
+ * Type guard for a raw repository row selected for archiving.
+ * @param row - Candidate database row
+ * @returns True when the row has the expected repository fields
+ */
 function isRepositoryRow(row: unknown): row is {
 	archivedAt: string | null;
 	id: string;
@@ -358,6 +380,11 @@ function isRepositoryRow(row: unknown): row is {
 	);
 }
 
+/**
+ * Type guard for a raw workspace row belonging to an archiving repository.
+ * @param row - Candidate database row
+ * @returns True when the row matches {@link SourceWorkspace}
+ */
 function isWorkspaceRow(row: unknown): row is SourceWorkspace {
 	if (!isRecord(row)) {
 		return false;

@@ -23,6 +23,7 @@ export interface OpenTargetPathOptions {
 	relativePathKind: 'directory' | 'file';
 }
 
+/** Open-in menu snapshot: the invoke action plus detected and primary targets (`null` while loading). */
 export interface OpenTargetsState {
 	invokeTarget: (
 		target: WorkspaceOpenTarget,

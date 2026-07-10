@@ -41,6 +41,7 @@ const DEFAULT_KILL_GRACE_MS = 5_000;
 // Defense-in-depth against a compromised renderer flooding the PTY buffer.
 const MAX_WRITE_BYTES = 65_536;
 
+/** Machine-readable failure categories raised by the terminal service. */
 export type TerminalServiceErrorCode = 'session-not-found';
 
 /** Domain-specific error thrown by the terminal service. */
@@ -141,10 +142,19 @@ export function createTerminalService({
 }: CreateTerminalServiceOptions): TerminalService {
 	const sessions = new Map<string, TrackedSession>();
 
+	/**
+	 * Returns the active SQLite connection, or null when no database is open.
+	 * @returns The database handle, or null
+	 */
 	function getDatabase() {
 		return databaseService.getConnection()?.database ?? null;
 	}
 
+	/**
+	 * Looks up a tracked session by id, throwing when it is not registered.
+	 * @param terminalId - Id of the terminal session to fetch
+	 * @returns The tracked session
+	 */
 	function requireSession(terminalId: string): TrackedSession {
 		const session = sessions.get(terminalId);
 
@@ -158,6 +168,10 @@ export function createTerminalService({
 		return session;
 	}
 
+	/**
+	 * Emits a lifecycle event carrying the session's current snapshot.
+	 * @param session - Tracked session whose state to broadcast
+	 */
 	function broadcastLifecycle(session: TrackedSession): void {
 		onLifecycle({
 			session: { ...session.snapshot },
@@ -186,6 +200,13 @@ export function createTerminalService({
 		broadcastLifecycle(session);
 	}
 
+	/**
+	 * Tears down a session's PTY subscriptions, records its terminal status and
+	 * exit code, persists the outcome when a database is available, and wakes any
+	 * exit waiters and lifecycle listeners.
+	 * @param session - Tracked session that has exited
+	 * @param exitCode - Process exit code, or null when unknown
+	 */
 	function finalizeSession(
 		session: TrackedSession,
 		exitCode: number | null,
@@ -244,6 +265,12 @@ export function createTerminalService({
 		broadcastLifecycle(session);
 	}
 
+	/**
+	 * Assembles the workspace environment and spawns a PTY-backed terminal
+	 * session, returning setup diagnostics with the live session snapshot — or
+	 * diagnostics and a null session when the environment cannot be assembled.
+	 * @returns Setup diagnostics and the created session, or a null session on failure
+	 */
 	async function create({
 		cols = DEFAULT_COLS,
 		command,
@@ -393,6 +420,12 @@ export function createTerminalService({
 		};
 	}
 
+	/**
+	 * Requests graceful termination of a running session via SIGHUP, escalating
+	 * to SIGKILL after a grace window when the process ignores the signal.
+	 * @param terminalId - Id of the terminal session to stop
+	 * @returns The session's current snapshot
+	 */
 	function kill(terminalId: string): TerminalSessionSnapshot | null {
 		const session = requireSession(terminalId);
 

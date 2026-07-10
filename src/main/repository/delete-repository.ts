@@ -36,6 +36,7 @@ export interface CreateDeleteRepositoryServiceOptions {
 	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
+/** In-memory shape of a repository and its workspaces loaded for deletion. */
 interface SourceRepository {
 	id: string;
 	name: string;
@@ -44,6 +45,7 @@ interface SourceRepository {
 	workspaces: SourceWorkspace[];
 }
 
+/** In-memory shape of a workspace row loaded for repository deletion. */
 interface SourceWorkspace {
 	branchName: string | null;
 	id: string;
@@ -175,6 +177,12 @@ export function createDeleteRepositoryService({
 	};
 }
 
+/**
+ * Load a repository and its workspaces from SQLite as the deletion source.
+ * @param database - Open SQLite connection
+ * @param repositoryId - ID of the repository to load
+ * @returns The repository with its workspaces, or null when it is not registered
+ */
 function readRepository(
 	database: DatabaseSync,
 	repositoryId: string,
@@ -209,6 +217,10 @@ function readRepository(
 	};
 }
 
+/**
+ * Remove a workspace's worktree directory, recording a warning diagnostic when it cannot be deleted.
+ * @param options - Diagnostics sink and the workspace whose directory is removed
+ */
 function removeWorkspaceDirectory({
 	diagnostics,
 	workspace,
@@ -234,6 +246,10 @@ function removeWorkspaceDirectory({
 	}
 }
 
+/**
+ * Delete a repository's workspace rows and its own row within one transaction.
+ * @param options - Open database and the repository id whose rows are removed
+ */
 function deleteRepositoryRows({
 	database,
 	repositoryId,
@@ -247,6 +263,10 @@ function deleteRepositoryRows({
 	});
 }
 
+/**
+ * Write the archived-repository sentinel into the repo folder so the shared-root reconciler does not re-adopt it.
+ * @param options - Diagnostics sink and the repository path to mark
+ */
 function writeArchivedMarker({
 	diagnostics,
 	repositoryPath,
@@ -275,6 +295,11 @@ function writeArchivedMarker({
 	}
 }
 
+/**
+ * Wrap a single diagnostic into a failed delete-repository result.
+ * @param diagnostic - The diagnostic explaining why the delete failed
+ * @returns A failure result carrying the diagnostic
+ */
 function failure(
 	diagnostic: DeleteRepositoryDiagnostic,
 ): DeleteRepositoryResult {
@@ -286,6 +311,11 @@ function failure(
 	};
 }
 
+/**
+ * Narrow an unknown SQLite row to the repository fields required for deletion.
+ * @param row - Candidate row returned by the query
+ * @returns True when the row carries string id, name, path, and slug
+ */
 function isRepositoryRow(row: unknown): row is {
 	id: string;
 	name: string;
@@ -345,6 +375,11 @@ function removeArchivedContextsForRepository({
 	}
 }
 
+/**
+ * Narrow an unknown SQLite row to a deletable {@link SourceWorkspace}.
+ * @param row - Candidate row returned by the query
+ * @returns True when the row has the required workspace fields
+ */
 function isWorkspaceRow(row: unknown): row is SourceWorkspace {
 	if (typeof row !== 'object' || row === null) {
 		return false;

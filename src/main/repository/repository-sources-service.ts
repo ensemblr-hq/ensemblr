@@ -58,6 +58,7 @@ export interface RepositorySourcesService {
 	) => Promise<ListRepositoryPullRequestsResult>;
 }
 
+/** Options for {@link createRepositorySourcesService}. */
 export interface CreateRepositorySourcesServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
@@ -88,6 +89,12 @@ export function createRepositorySourcesService({
 			return readRepositoryPath(database, repositoryId);
 		});
 
+	/**
+	 * Build a branch-name to workspace-id map for a repository's active workspaces.
+	 * @param repositoryId - ID of the repository whose workspace rows are read
+	 * @param select - Query that returns the workspace rows for the repository
+	 * @returns Map from branch name to the owning workspace id
+	 */
 	function readWorkspaceBranchMap(
 		repositoryId: string,
 		select: (input: {
@@ -116,6 +123,12 @@ export function createRepositorySourcesService({
 		return byBranch;
 	}
 
+	/**
+	 * Run the `gh` CLI inside a repository path, returning stdout or a typed failure.
+	 * @param cwd - Repository directory to run `gh` in
+	 * @param args - Arguments passed to `gh`
+	 * @returns The command stdout on success, or a GitHub failure on error
+	 */
 	async function runGh(
 		cwd: string,
 		args: readonly string[],

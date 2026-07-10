@@ -9,6 +9,7 @@ import {
 
 import { seedFirstWorkspace } from './seed-first-workspace';
 
+/** Dependencies for the Open Local Project flow: navigation, router, and UI setters. */
 interface OpenLocalProjectFlowOptions {
 	navigate: ReturnType<typeof useNavigate>;
 	router: ReturnType<typeof useRouter>;

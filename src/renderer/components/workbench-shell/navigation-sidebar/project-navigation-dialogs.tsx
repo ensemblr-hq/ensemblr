@@ -12,6 +12,7 @@ import { CreateWorkspaceSourceDialog } from '../create-workspace-source-dialog';
 import { DeleteRepositoryDialog } from '../delete-repository-dialog';
 import { DeleteWorkspaceDialog } from '../delete-workspace-dialog';
 
+/** Openers for each sidebar lifecycle dialog (archive, delete, browse-archive, create-source). */
 export interface ProjectNavigationDialogsController {
 	openArchiveProject: (project: ProjectShellModel) => void;
 	openArchiveWorkspace: (workspace: WorkspaceShellModel) => void;
@@ -21,6 +22,7 @@ export interface ProjectNavigationDialogsController {
 	openDeleteWorkspace: (workspace: WorkspaceShellModel) => void;
 }
 
+/** Current target project or workspace for each sidebar lifecycle dialog. */
 interface ProjectNavigationDialogsState {
 	archiveProjectTarget: ProjectShellModel | null;
 	archiveWorkspaceTarget: WorkspaceShellModel | null;

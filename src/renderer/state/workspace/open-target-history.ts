@@ -2,6 +2,7 @@
 const LAST_USED_OPEN_TARGET_STORAGE_KEY =
 	'ensemblr_workspace_open_target_last_used_v1';
 
+/** Immutable map of workspace id to the target id last used to open that workspace. */
 type LastUsedMap = Readonly<Record<string, string>>;
 
 /**
@@ -52,6 +53,10 @@ export function deleteLastUsedOpenTarget(workspaceId: string): void {
 	writeMap(next);
 }
 
+/**
+ * Persists the last-used open-target map to localStorage, ignoring write failures.
+ * @param map - The full workspace-to-target map to store
+ */
 function writeMap(map: LastUsedMap): void {
 	try {
 		window.localStorage.setItem(
@@ -63,6 +68,10 @@ function writeMap(map: LastUsedMap): void {
 	}
 }
 
+/**
+ * Reads the last-used open-target map from localStorage.
+ * @returns The parsed map, or an empty map when storage is unavailable or the payload is malformed
+ */
 function readMap(): LastUsedMap {
 	if (typeof window === 'undefined') {
 		return {};
@@ -82,6 +91,11 @@ function readMap(): LastUsedMap {
 	}
 }
 
+/**
+ * Type guard verifying a value is an object whose every value is a string.
+ * @param value - The parsed JSON value to check
+ * @returns True when the value is a string-valued record
+ */
 function isStringRecord(value: unknown): value is Record<string, string> {
 	if (typeof value !== 'object' || value === null) {
 		return false;

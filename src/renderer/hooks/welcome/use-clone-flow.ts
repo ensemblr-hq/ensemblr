@@ -25,6 +25,7 @@ export type CloneStage =
 	| 'success'
 	| 'failure';
 
+/** State and handlers exposed by {@link useCloneFlow}. */
 export interface UseCloneFlowResult {
 	diagnostics: CloneGithubRepositoryDiagnostic[];
 	isBusy: boolean;

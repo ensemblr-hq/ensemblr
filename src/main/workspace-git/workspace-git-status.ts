@@ -37,6 +37,7 @@ const COMMIT_LOG_FORMAT = ['%H', '%h', '%an', '%aI', '%ar', '%s']
 	.join('%x1f')
 	.concat('%x1e');
 
+/** Read-only git service exposing status, diff, commit log, and change-discard operations for a workspace. */
 export interface WorkspaceGitService {
 	discardChanges: (
 		request: DiscardWorkspaceChangesRequest,
@@ -52,6 +53,7 @@ export interface WorkspaceGitService {
 	) => Promise<GetWorkspaceGitStatusResult>;
 }
 
+/** Options for constructing a {@link WorkspaceGitService}. */
 export interface CreateWorkspaceGitServiceOptions {
 	localCommandService: LocalCommandService;
 }
@@ -64,6 +66,13 @@ export interface CreateWorkspaceGitServiceOptions {
 export function createWorkspaceGitService({
 	localCommandService,
 }: CreateWorkspaceGitServiceOptions): WorkspaceGitService {
+	/**
+	 * Runs a git subcommand in a workspace via the local command service.
+	 * @param cwd - Absolute working directory to run git in
+	 * @param args - Git arguments, excluding the `git` executable itself
+	 * @param maxOutputBytes - Cap on captured stdout; defaults to the service limit
+	 * @returns The command execution result
+	 */
 	async function runGit(
 		cwd: string,
 		args: readonly string[],

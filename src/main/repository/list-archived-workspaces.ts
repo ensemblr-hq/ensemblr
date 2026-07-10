@@ -50,6 +50,12 @@ export function createListArchivedWorkspacesService({
 	};
 }
 
+/**
+ * Read a repository's archived workspace rows and map them to list entries, dropping malformed rows.
+ * @param database - Open SQLite connection
+ * @param repositoryId - ID of the repository whose archived workspaces are listed
+ * @returns The mapped archived workspace entries
+ */
 function readEntries(
 	database: DatabaseSync,
 	repositoryId: string,
@@ -69,6 +75,11 @@ function readEntries(
 	return entries;
 }
 
+/**
+ * Map a raw SQLite row to an archived workspace list entry, or null when required fields are missing.
+ * @param row - Candidate row returned by the query
+ * @returns The list entry, or null when the row is malformed
+ */
 function toListEntry(row: unknown): ArchivedWorkspaceListEntry | null {
 	if (typeof row !== 'object' || row === null) {
 		return null;

@@ -132,10 +132,22 @@ function messageText(message: PiAgentMessage): string {
 	return '';
 }
 
+/**
+ * Allocates the next timeline item id and the incremented id counter.
+ * @param state - Current timeline state
+ * @returns A tuple of the new item id and the next counter value
+ */
 function nextId(state: PiTimelineState): [string, number] {
 	return [`item-${state.cursor.nextItemId}`, state.cursor.nextItemId + 1];
 }
 
+/**
+ * Returns a new items array with the item matching `id` transformed by `update`.
+ * @param items - Current timeline items
+ * @param id - Id of the item to replace
+ * @param update - Transform applied to the matched item
+ * @returns The items array with the matched item replaced
+ */
 function replaceItem(
 	items: readonly PiTimelineItem[],
 	id: string,
@@ -144,6 +156,13 @@ function replaceItem(
 	return items.map((item) => (item.id === id ? update(item) : item));
 }
 
+/**
+ * Folds an RPC `response` event into state, recording a pending turn start or updated session stats.
+ * @param state - Current timeline state
+ * @param event - The RPC response event
+ * @param atMs - Event timestamp in milliseconds
+ * @returns The updated timeline state
+ */
 function reduceResponse(
 	state: PiTimelineState,
 	event: Extract<PiRpcEvent, { type: 'response' }>,
@@ -167,6 +186,12 @@ function reduceResponse(
 	return state;
 }
 
+/**
+ * Marks the session as streaming at the start of an agent turn and resets the turn cursors.
+ * @param state - Current timeline state
+ * @param atMs - Turn-start timestamp in milliseconds
+ * @returns The updated timeline state
+ */
 function reduceAgentStart(
 	state: PiTimelineState,
 	atMs: number,
@@ -261,6 +286,13 @@ function reduceAgentEnd(
 	};
 }
 
+/**
+ * Appends a user-message item when a user message starts; other roles produce no item.
+ * @param state - Current timeline state
+ * @param message - The starting agent message
+ * @param atMs - Message-start timestamp in milliseconds
+ * @returns The updated timeline state
+ */
 function reduceMessageStart(
 	state: PiTimelineState,
 	message: PiAgentMessage,
@@ -285,6 +317,13 @@ function reduceMessageStart(
 	};
 }
 
+/**
+ * Seals an open assistant message when its message ends, flagging the turn as aborted when applicable.
+ * @param state - Current timeline state
+ * @param message - The ending agent message
+ * @param atMs - Message-end timestamp in milliseconds
+ * @returns The updated timeline state
+ */
 function reduceMessageEnd(
 	state: PiTimelineState,
 	message: PiAgentMessage,
@@ -345,11 +384,22 @@ function reduceMessageEnd(
 	};
 }
 
+/**
+ * Builds a predicate matching an open, streaming assistant item with the given text.
+ * @param text - Assistant text to match
+ * @returns A predicate over timeline items
+ */
 function isOpenStreamFor(text: string) {
 	return (item: PiTimelineItem) =>
 		item.kind === 'assistant-message' && item.streaming && item.text === text;
 }
 
+/**
+ * Reports whether a sealed (non-streaming) assistant item with the given text exists in the current turn.
+ * @param items - Current timeline items
+ * @param text - Assistant text to look for
+ * @returns True when a matching sealed item is found before the last turn footer
+ */
 function hasSealedText(
 	items: readonly PiTimelineItem[],
 	text: string,
@@ -370,6 +420,13 @@ function hasSealedText(
 	return false;
 }
 
+/**
+ * Folds a streaming assistant-message delta (thinking and text start/append/end) into state.
+ * @param state - Current timeline state
+ * @param delta - The assistant message streaming event
+ * @param atMs - Delta timestamp in milliseconds
+ * @returns The updated timeline state
+ */
 function reduceDelta(
 	state: PiTimelineState,
 	delta: Extract<
@@ -582,6 +639,13 @@ function updateToolCall(
 	return { ...state, items };
 }
 
+/**
+ * Records a tool-execution end — output, status, and timing — and clears it from running tools.
+ * @param state - Current timeline state
+ * @param event - The tool execution end event
+ * @param atMs - Completion timestamp in milliseconds
+ * @returns The updated timeline state
+ */
 function finishToolCall(
 	state: PiTimelineState,
 	event: Extract<PiRpcEvent, { type: 'tool_execution_end' }>,
@@ -602,6 +666,13 @@ function finishToolCall(
 	return { ...next, cursor: { ...next.cursor, runningTools } };
 }
 
+/**
+ * Folds an extension UI request (such as `setStatus`) into session state.
+ * @param state - Current timeline state
+ * @param event - The extension UI request event
+ * @param atMs - Event timestamp in milliseconds
+ * @returns The updated timeline state
+ */
 function reduceUiRequest(
 	state: PiTimelineState,
 	event: Extract<PiRpcEvent, { type: 'extension_ui_request' }>,

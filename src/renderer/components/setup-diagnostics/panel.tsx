@@ -14,6 +14,7 @@ import { LocalExecutionNotice } from './local-execution-notice';
 import { RootDirectoryChangeDialog } from './root-directory/change-dialog';
 import { SetupCheckRow } from './setup-check-row';
 
+/** Props for the setup-diagnostics panel. */
 interface SetupDiagnosticsPanelProps {
 	error?: string | null;
 	isRetrying?: boolean;

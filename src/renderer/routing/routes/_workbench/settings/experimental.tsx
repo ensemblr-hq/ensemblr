@@ -13,10 +13,12 @@ import {
 	sidebarChatsModeAtom,
 } from '@/renderer/state/preferences';
 
+/** Route for the Experimental settings section; renders the experimental-features panel. */
 export const Route = createFileRoute('/_workbench/settings/experimental')({
 	component: ExperimentalSettings,
 });
 
+/** Experimental features panel toggling in-development options such as the dashboard, sidebar chats, and auto-run after setup. */
 function ExperimentalSettings() {
 	const [showDashboard, setShowDashboard] = useAtom(showDashboardAtom);
 	const [sidebarChats, setSidebarChats] = useAtom(sidebarChatsModeAtom);
@@ -93,6 +95,7 @@ function ExperimentalSettings() {
 	);
 }
 
+/** Settings row for a feature deferred out of v1: shows a "Deferred" badge, a disabled switch, and an explanatory note. */
 function DeferredRow({
 	description,
 	label,

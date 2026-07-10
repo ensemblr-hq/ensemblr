@@ -13,6 +13,7 @@ const GIT_VERSION_TIMEOUT_MS = 3000;
 const GITHUB_CLI_TIMEOUT_MS = 3000;
 const GITHUB_AUTH_TIMEOUT_MS = 5000;
 
+/** Dependencies shared by the GitHub setup checks. */
 interface GitHubCheckDeps {
 	context: SetupCheckProviderContext;
 	localCommandService: LocalCommandService;

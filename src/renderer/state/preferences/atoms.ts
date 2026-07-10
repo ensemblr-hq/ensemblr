@@ -87,22 +87,27 @@ export const favouriteModelsAtom = atomWithStorage<string[]>(
 
 // ─── Experimental (user) ──────────────────────────────────────────────────────
 
+/** Whether the workspace sidebar footer shows CPU and memory usage meters; persisted to localStorage. */
 export const showSidebarResourceUsageAtom = atomWithStorage<boolean>(
 	KEY('exp_sidebar_resource_usage'),
 	false,
 );
+/** Whether the workspace dashboard is shown between the sidebar and the workbench; persisted to localStorage. */
 export const showDashboardAtom = atomWithStorage<boolean>(
 	KEY('exp_show_dashboard'),
 	true,
 );
+/** Whether the workspace sidebar exposes a Chats grouping mode; persisted to localStorage. */
 export const sidebarChatsModeAtom = atomWithStorage<boolean>(
 	KEY('exp_sidebar_chats_mode'),
 	false,
 );
+/** Whether a repository's run script starts automatically after a new local workspace finishes setup; persisted to localStorage. */
 export const autoRunAfterSetupAtom = atomWithStorage<boolean>(
 	KEY('exp_auto_run_after_setup'),
 	false,
 );
+/** Whether preview URLs open in an in-app browser tab instead of the external browser; persisted to localStorage. */
 export const inAppBrowserPreviewAtom = atomWithStorage<boolean>(
 	KEY('exp_in_app_browser_preview'),
 	false,
@@ -110,10 +115,12 @@ export const inAppBrowserPreviewAtom = atomWithStorage<boolean>(
 
 // ─── Advanced (user) ──────────────────────────────────────────────────────────
 
+/** Path to a custom Pi executable overriding the bundled one; empty means use the discovered system Pi. Persisted to localStorage. */
 export const customPiExecutablePathAtom = atomWithStorage<string>(
 	KEY('pi_executable_override'),
 	'',
 );
+/** Maximum size in megabytes of each terminal pane's scrollback buffer; persisted to localStorage. */
 export const terminalScrollbackMbAtom = atomWithStorage<number>(
 	KEY('terminal_scrollback_mb'),
 	10,
@@ -137,6 +144,7 @@ const REPO_SETTINGS_KEYS = [
 	'runScriptMode',
 	'autoRunAfterSetup',
 ] as const;
+/** One of the known repo-scope setting keys resolvable from the settings snapshot. */
 export type RepoSettingsKey = (typeof REPO_SETTINGS_KEYS)[number];
 
 /**
@@ -161,8 +169,10 @@ export const REPO_ACTION_KEYS = [
 	'branchRename',
 	'general',
 ] as const;
+/** One of the per-repo action keys that can carry custom agent instructions. */
 export type RepoActionKey = (typeof REPO_ACTION_KEYS)[number];
 
+/** Personal per-repository setting overrides, keyed by repo id and persisted to localStorage. */
 export const repoSettingsOverrideAtomFamily = atomFamily((repoId: string) =>
 	atomWithStorage<RepoSettingsOverride>(KEY(`repo_override_${repoId}`), {}),
 );

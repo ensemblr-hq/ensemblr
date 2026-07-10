@@ -95,17 +95,20 @@ export function parseWorkspaceGitDiffScope(
 	return undefined;
 }
 
+/** Request for a workspace's git change status, optionally scoped to a commit or branch. */
 export interface GetWorkspaceGitStatusRequest {
 	/** Defaults to the working tree (uncommitted changes) when omitted. */
 	scope?: WorkspaceGitDiffScope;
 	workspaceCwd: string;
 }
 
+/** Failure reason for a workspace git status or commits request. */
 export type WorkspaceGitFailureCode =
 	| 'command-failed'
 	| 'invalid-cwd'
 	| 'not-a-git-repo';
 
+/** Changed-file rows and their aggregate summary, or a typed error on failure. */
 export interface GetWorkspaceGitStatusResult {
 	error?: {
 		code: WorkspaceGitFailureCode;
@@ -115,6 +118,7 @@ export interface GetWorkspaceGitStatusResult {
 	summary: WorkspaceGitChangeSummaryWire;
 }
 
+/** Request for a single file's unified diff within a workspace. */
 export interface GetWorkspaceFileDiffRequest {
 	path: string;
 	/** Defaults to the working tree (file vs HEAD) when omitted. */
@@ -122,10 +126,12 @@ export interface GetWorkspaceFileDiffRequest {
 	workspaceCwd: string;
 }
 
+/** Failure reason for a workspace file-diff request. */
 export type WorkspaceFileDiffFailureCode =
 	| WorkspaceGitFailureCode
 	| 'invalid-path';
 
+/** The unified diff patch for a file, or a typed error on failure. */
 export interface GetWorkspaceFileDiffResult {
 	error?: {
 		code: WorkspaceFileDiffFailureCode;
@@ -153,6 +159,7 @@ export interface WorkspaceCommitWire {
 	subject: string;
 }
 
+/** Request for a workspace's commit log, optionally scoped to its own branch commits. */
 export interface GetWorkspaceCommitsRequest {
 	/**
 	 * Base branch to scope the log to this workspace's own commits
@@ -165,6 +172,7 @@ export interface GetWorkspaceCommitsRequest {
 	workspaceCwd: string;
 }
 
+/** Commit rows for a workspace, or a typed error on failure. */
 export interface GetWorkspaceCommitsResult {
 	commits: readonly WorkspaceCommitWire[];
 	error?: {
@@ -173,10 +181,12 @@ export interface GetWorkspaceCommitsResult {
 	};
 }
 
+/** Failure reason for a discard-workspace-changes request. */
 export type WorkspaceDiscardFailureCode =
 	| WorkspaceGitFailureCode
 	| 'invalid-path';
 
+/** Request to discard working-tree changes for specific workspace paths. */
 export interface DiscardWorkspaceChangesRequest {
 	/**
 	 * Workspace-relative paths to discard. For a rename, include both the new
@@ -186,6 +196,7 @@ export interface DiscardWorkspaceChangesRequest {
 	workspaceCwd: string;
 }
 
+/** Paths that were successfully discarded, or a typed error on failure. */
 export interface DiscardWorkspaceChangesResult {
 	/** Paths that were successfully reverted/removed. */
 	discarded: readonly string[];

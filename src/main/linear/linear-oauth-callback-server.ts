@@ -160,6 +160,12 @@ export async function startLinearOauthCallbackServer({
 	};
 }
 
+/**
+ * Bind the server to the first free port in the list, skipping busy ports and
+ * throwing when none can be bound.
+ * @param server - HTTP server to bind.
+ * @param ports - Candidate ports to try in order.
+ */
 async function listenOnFirstFreePort(
 	server: Server,
 	ports: readonly number[],

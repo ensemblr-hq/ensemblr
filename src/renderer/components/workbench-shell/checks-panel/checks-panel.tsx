@@ -192,12 +192,17 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 	);
 }
 
+/** Callbacks for adding, removing, and toggling review todos. */
 interface TodoActions {
 	addTodo: (title: string) => void;
 	removeTodo: (id: string) => void;
 	toggleTodo: (input: { id: string; nextDone: boolean }) => void;
 }
 
+/**
+ * Show an error toast when a todo mutation fails.
+ * @param error - The thrown error, if any.
+ */
 function notifyTodoUpdateFailed(error: unknown): void {
 	toast.error('Todo update failed', {
 		description: error instanceof Error ? error.message : undefined,

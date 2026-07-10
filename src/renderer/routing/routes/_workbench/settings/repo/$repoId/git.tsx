@@ -7,10 +7,12 @@ import { Input } from '@/renderer/components/ui/input';
 import { Switch } from '@/renderer/components/ui/switch';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
 
+/** Route for a repository's Git settings; renders the repo-scoped git-defaults panel keyed by the `repoId` path param. */
 export const Route = createFileRoute('/_workbench/settings/repo/$repoId/git')({
 	component: RepoGitSettings,
 });
 
+/** Repository-scoped Git settings panel for branch-from, remote origin, and archive defaults that override user-scope git settings. */
 function RepoGitSettings() {
 	const { repoId } = Route.useParams();
 	const { overrides, setOverrides, resolved } = useRepoSettings(repoId);

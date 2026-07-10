@@ -45,6 +45,7 @@ const fileIconByExtension: Record<string, string> = {
 	tsx: 'file-type-reactts',
 };
 
+/** Minimal file or folder shape needed to choose an icon: its name and kind. */
 type WorkspaceFileIconTarget = Pick<WorkspaceFileSummary, 'kind' | 'name'>;
 
 /**

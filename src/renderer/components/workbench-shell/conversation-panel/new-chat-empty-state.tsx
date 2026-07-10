@@ -50,6 +50,7 @@ export function NewChatEmptyState({
 	);
 }
 
+/** Renders a closed-chat transcript as a chip that can be attached to the composer. */
 function TranscriptChip({
 	activeChatTabId,
 	entry,

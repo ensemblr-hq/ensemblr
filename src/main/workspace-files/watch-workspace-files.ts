@@ -39,12 +39,14 @@ export type StartWatch = (
 	onError: () => void,
 ) => WatchHandle;
 
+/** Internal per-directory watch state: OS handle, debounce timer, and reference count. */
 interface WatchEntry {
 	debounce: ReturnType<typeof setTimeout> | null;
 	handle: WatchHandle;
 	refCount: number;
 }
 
+/** Reference-counted watcher surface for workspace directory file changes. */
 export interface WorkspaceFilesWatcher {
 	/** Begin (or ref-count) watching a workspace directory for file changes. */
 	watch: (workspaceCwd: string) => void;
@@ -54,6 +56,7 @@ export interface WorkspaceFilesWatcher {
 	stopAll: () => void;
 }
 
+/** Options for constructing a {@link WorkspaceFilesWatcher}. */
 export interface CreateWorkspaceFilesWatcherOptions {
 	/** Notified (debounced, per cwd) when a non-ignored file change is seen. */
 	onChange: (workspaceCwd: string) => void;

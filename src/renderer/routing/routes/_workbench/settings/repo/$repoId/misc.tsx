@@ -26,10 +26,12 @@ import { Textarea } from '@/renderer/components/ui/textarea';
 import { workbenchRouteApi } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
 import { repoSettingsOverrideAtomFamily } from '@/renderer/state/preferences';
 
+/** Route for a repository's Misc settings; renders the repo-scoped paths, preview URLs, and lifecycle panel keyed by the `repoId` path param. */
 export const Route = createFileRoute('/_workbench/settings/repo/$repoId/misc')({
 	component: RepoMiscSettings,
 });
 
+/** Repository-scoped Misc settings panel for root/workspace paths, preview URLs, files-to-copy globs, and repository removal. */
 function RepoMiscSettings() {
 	const { repoId } = Route.useParams();
 	const loaderData = workbenchRouteApi.useLoaderData();

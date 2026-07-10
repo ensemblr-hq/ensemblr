@@ -16,6 +16,7 @@
  */
 export type Modifier = 'mod' | 'ctrl' | 'alt' | 'shift';
 
+/** UI context a shortcut is active within, used to route key events to the right layer. */
 export type Scope =
 	| 'global'
 	| 'composer'
@@ -24,11 +25,13 @@ export type Scope =
 	| 'modelPicker'
 	| 'menu';
 
+/** A single key plus the modifiers that must be held for it. */
 export interface Binding {
 	readonly key: string;
 	readonly modifiers?: readonly Modifier[];
 }
 
+/** Definition of a shortcut: its description, scope, key bindings, and optional Electron accelerator. */
 export interface ShortcutDef {
 	readonly description: string;
 	readonly scope: Scope;
@@ -163,4 +166,5 @@ export const SHORTCUTS = {
 	},
 } as const satisfies Record<string, ShortcutDef>;
 
+/** Union of every registered shortcut id (the keys of `SHORTCUTS`). */
 export type ShortcutId = keyof typeof SHORTCUTS;

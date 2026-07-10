@@ -11,6 +11,7 @@ import type { ComposerThinkingOption } from '@/renderer/types/workbench';
 
 import { getThinkingStrength, ThinkingBarIcon } from './thinking-bar-icon';
 
+/** Props for the composer thinking-level picker. */
 interface ThinkingPickerProps {
 	disabled?: boolean;
 	onChange: (level: string) => void;

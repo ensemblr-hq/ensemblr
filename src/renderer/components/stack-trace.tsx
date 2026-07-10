@@ -30,6 +30,7 @@ const STACK_FRAME_WITHOUT_FN_REGEX = /^at\s+(.+):(\d+):(\d+)$/;
 const ERROR_TYPE_REGEX = /^(\w+Error|Error):\s*(.*)$/;
 const AT_PREFIX_REGEX = /^at\s+/;
 
+/** One parsed stack-trace frame: function, file location, and internal-source flag. */
 interface StackFrame {
 	raw: string;
 	functionName: string | null;
@@ -39,6 +40,7 @@ interface StackFrame {
 	isInternal: boolean;
 }
 
+/** A parsed stack trace: error type/message plus its individual frames. */
 interface ParsedStackTrace {
 	errorType: string | null;
 	errorMessage: string;
@@ -46,6 +48,7 @@ interface ParsedStackTrace {
 	raw: string;
 }
 
+/** Context shared by the {@link StackTrace} compound components. */
 interface StackTraceContextValue {
 	trace: ParsedStackTrace;
 	raw: string;
@@ -56,6 +59,10 @@ interface StackTraceContextValue {
 
 const StackTraceContext = createContext<StackTraceContextValue | null>(null);
 
+/**
+ * Read the stack-trace context, throwing when used outside a {@link StackTrace}.
+ * @returns The active stack-trace context value
+ */
 const useStackTrace = () => {
 	const context = use(StackTraceContext);
 	if (!context) {
@@ -64,6 +71,12 @@ const useStackTrace = () => {
 	return context;
 };
 
+/**
+ * Parse a single stack-trace line into structured frame data, flagging internal
+ * (node/node_modules) frames.
+ * @param line - One raw stack-trace line
+ * @returns The parsed frame; location fields are null when the line is unparseable
+ */
 const parseStackFrame = (line: string): StackFrame => {
 	const trimmed = line.trim();
 
@@ -114,6 +127,11 @@ const parseStackFrame = (line: string): StackFrame => {
 	};
 };
 
+/**
+ * Parse raw stack-trace text into its error type, message, and frames.
+ * @param trace - Full stack-trace string
+ * @returns The parsed stack trace
+ */
 const parseStackTrace = (trace: string): ParsedStackTrace => {
 	const lines = trace.split('\n').filter((line) => line.trim());
 
@@ -153,6 +171,7 @@ const parseStackTrace = (trace: string): ParsedStackTrace => {
 	};
 };
 
+/** Props for the {@link StackTrace} root: the raw trace text plus open-state controls and a file-path click handler. */
 export type StackTraceProps = ComponentProps<'div'> & {
 	trace: string;
 	open?: boolean;
@@ -161,6 +180,7 @@ export type StackTraceProps = ComponentProps<'div'> & {
 	onFilePathClick?: (filePath: string, line?: number, column?: number) => void;
 };
 
+/** Root of the stack-trace compound component: parses the trace and provides collapsible context to its parts. */
 export const StackTrace = memo(
 	({
 		trace,
@@ -209,8 +229,10 @@ export const StackTrace = memo(
 	},
 );
 
+/** Props for the stack-trace header, mirroring the collapsible trigger. */
 export type StackTraceHeaderProps = ComponentProps<typeof CollapsibleTrigger>;
 
+/** Clickable header row that toggles the stack-trace's collapsible content. */
 export const StackTraceHeader = memo(
 	({ className, children, ...props }: StackTraceHeaderProps) => (
 		<CollapsibleTrigger asChild {...props}>
@@ -226,8 +248,10 @@ export const StackTraceHeader = memo(
 	),
 );
 
+/** Props for the stack-trace error summary row. */
 export type StackTraceErrorProps = ComponentProps<'div'>;
 
+/** Error summary row with a warning icon, holding the error type and message. */
 export const StackTraceError = memo(
 	({ className, children, ...props }: StackTraceErrorProps) => (
 		<div
@@ -243,8 +267,10 @@ export const StackTraceError = memo(
 	),
 );
 
+/** Props for the stack-trace error-type label. */
 export type StackTraceErrorTypeProps = ComponentProps<'span'>;
 
+/** Renders the parsed error type, defaulting to the trace's own type. */
 export const StackTraceErrorType = memo(
 	({ className, children, ...props }: StackTraceErrorTypeProps) => {
 		const { trace } = useStackTrace();
@@ -260,8 +286,10 @@ export const StackTraceErrorType = memo(
 	},
 );
 
+/** Props for the stack-trace error-message label. */
 export type StackTraceErrorMessageProps = ComponentProps<'span'>;
 
+/** Renders the parsed error message, defaulting to the trace's own message. */
 export const StackTraceErrorMessage = memo(
 	({ className, children, ...props }: StackTraceErrorMessageProps) => {
 		const { trace } = useStackTrace();
@@ -274,15 +302,25 @@ export const StackTraceErrorMessage = memo(
 	},
 );
 
+/** Props for the stack-trace actions toolbar. */
 export type StackTraceActionsProps = ComponentProps<'fieldset'>;
 
+/**
+ * Stop a click from bubbling to the collapsible header so action buttons don't toggle it.
+ * @param e - The originating mouse event
+ */
 const handleActionsClick = (e: React.MouseEvent) => e.stopPropagation();
+/**
+ * Stop Enter/Space key activations from bubbling to the collapsible header.
+ * @param e - The originating keyboard event
+ */
 const handleActionsKeyDown = (e: React.KeyboardEvent) => {
 	if (e.key === 'Enter' || e.key === ' ') {
 		e.stopPropagation();
 	}
 };
 
+/** Action toolbar that keeps its buttons from toggling the collapsible header. */
 export const StackTraceActions = memo(
 	({ className, children, ...props }: StackTraceActionsProps) => (
 		<fieldset
@@ -299,12 +337,14 @@ export const StackTraceActions = memo(
 	),
 );
 
+/** Props for the stack-trace copy button, including copy/error callbacks and the copied-state timeout. */
 export type StackTraceCopyButtonProps = ComponentProps<typeof Button> & {
 	onCopy?: () => void;
 	onError?: (error: Error) => void;
 	timeout?: number;
 };
 
+/** Button that copies the raw stack trace to the clipboard, briefly showing a check icon. */
 export const StackTraceCopyButton = memo(
 	({
 		onCopy,
@@ -360,8 +400,10 @@ export const StackTraceCopyButton = memo(
 	},
 );
 
+/** Props for the stack-trace expand chevron. */
 export type StackTraceExpandButtonProps = ComponentProps<'div'>;
 
+/** Chevron affordance that rotates to reflect the open/closed state. */
 export const StackTraceExpandButton = memo(
 	({ className, ...props }: StackTraceExpandButtonProps) => {
 		const { isOpen } = useStackTrace();
@@ -382,12 +424,14 @@ export const StackTraceExpandButton = memo(
 	},
 );
 
+/** Props for the collapsible stack-trace content, including an optional max height. */
 export type StackTraceContentProps = ComponentProps<
 	typeof CollapsibleContent
 > & {
 	maxHeight?: number;
 };
 
+/** Scrollable collapsible body revealed when the stack trace is expanded. */
 export const StackTraceContent = memo(
 	({
 		className,
@@ -409,10 +453,12 @@ export const StackTraceContent = memo(
 	),
 );
 
+/** Props for the stack-trace frames list, including whether to show internal frames. */
 export type StackTraceFramesProps = ComponentProps<'div'> & {
 	showInternalFrames?: boolean;
 };
 
+/** Props for the clickable file-path button in a stack frame. */
 interface FilePathButtonProps {
 	frame: StackFrame;
 	onFilePathClick?: (
@@ -422,6 +468,7 @@ interface FilePathButtonProps {
 	) => void;
 }
 
+/** Clickable file path that opens the frame's source location when clicked. */
 const FilePathButton = memo(
 	({ frame, onFilePathClick }: FilePathButtonProps) => {
 		const handleClick = useCallback(() => {
@@ -454,6 +501,7 @@ const FilePathButton = memo(
 
 FilePathButton.displayName = 'FilePathButton';
 
+/** Renders the parsed stack frames, optionally hiding internal ones and linking file paths. */
 export const StackTraceFrames = memo(
 	({
 		className,

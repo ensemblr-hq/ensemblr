@@ -7,6 +7,7 @@ import type {
 	SetupRemediationAction,
 } from '@/shared/ipc/contracts/setup';
 
+/** Callbacks for the generic setup-remediation hook. */
 interface UseGenericRemediationOptions {
 	onRetry?: () => void;
 }

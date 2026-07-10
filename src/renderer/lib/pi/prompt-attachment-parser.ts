@@ -14,6 +14,7 @@ export interface ParsedPromptAttachment {
 	path: string;
 }
 
+/** A parsed user prompt split into its leading file attachments and typed text. */
 export interface ParsedPrompt {
 	attachments: readonly ParsedPromptAttachment[];
 	text: string;
@@ -25,6 +26,12 @@ const ATTACHED_FILE_PATTERN =
 const REFERENCED_FOLDERS_PATTERN =
 	/^Referenced workspace folders:\n((?:@[^\n]+\n?)+)\s*/;
 
+/**
+ * Splits a persisted prompt into its leading attachment blocks (referenced
+ * workspace folders and `<attached_file>` markers) and the trailing typed text.
+ * @param prompt - The raw persisted prompt text
+ * @returns The extracted attachments and the remaining trimmed message text
+ */
 export function parsePromptAttachments(prompt: string): ParsedPrompt {
 	let remaining = prompt;
 	const attachments: ParsedPromptAttachment[] = [];

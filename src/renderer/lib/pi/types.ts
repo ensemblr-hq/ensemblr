@@ -10,6 +10,7 @@ import type { DynamicToolUIPart, UIMessage } from 'ai';
 
 export type UIRole = UIMessage['role'];
 
+/** A single part of a mapped `UIMessage` (text, reasoning, or dynamic-tool). */
 export type UIMessagePart = UIMessage['parts'][number];
 
 /** Tool part variant that carries a result (success or error). */

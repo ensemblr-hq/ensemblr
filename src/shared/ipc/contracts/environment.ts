@@ -1,13 +1,17 @@
 import type { SettingsResolutionSource } from './settings-resolution';
 
+/** Scope an environment variable belongs to: app-wide, per-repository, or per-workspace. */
 export type EnvironmentVariableScope = 'app' | 'repository' | 'workspace';
+/** How an environment variable's value is treated: plain text, runtime-resolved, or a secret. */
 export type EnvironmentVariableValueKind = 'plain' | 'runtime' | 'secret';
+/** Resolution status of an environment variable (set, unset, masked, reserved, or invalid). */
 export type EnvironmentVariableStatus =
 	| 'invalid'
 	| 'masked'
 	| 'reserved'
 	| 'set'
 	| 'unset';
+/** Grouping used to organize environment variables in the settings UI. */
 export type EnvironmentVariableCategory =
 	| 'custom'
 	| 'generic'
@@ -15,15 +19,18 @@ export type EnvironmentVariableCategory =
 	| 'provider'
 	| 'proxy'
 	| 'runtime';
+/** Severity level for an environment-variable diagnostic. */
 export type EnvironmentVariableDiagnosticSeverity =
 	| 'error'
 	| 'info'
 	| 'warning';
+/** Where an environment variable's resolved value came from. */
 export type EnvironmentVariableSource =
 	| SettingsResolutionSource
 	| 'runtime'
 	| 'secret-metadata';
 
+/** Catalog metadata describing a known environment variable (title, scope, requirements). */
 export interface EnvironmentVariableCatalogEntrySnapshot {
 	category: EnvironmentVariableCategory;
 	description: string;
@@ -35,6 +42,7 @@ export interface EnvironmentVariableCatalogEntrySnapshot {
 	valueKind: EnvironmentVariableValueKind;
 }
 
+/** A diagnostic about an environment variable's configuration. */
 export interface EnvironmentVariableDiagnostic {
 	code: string;
 	key?: string;
@@ -42,6 +50,7 @@ export interface EnvironmentVariableDiagnostic {
 	severity: EnvironmentVariableDiagnosticSeverity;
 }
 
+/** Resolved state of a single environment variable, including its catalog entry and display value. */
 export interface EnvironmentVariableSnapshot {
 	catalog: EnvironmentVariableCatalogEntrySnapshot;
 	characterCount?: number;
@@ -56,6 +65,7 @@ export interface EnvironmentVariableSnapshot {
 	valueKind: EnvironmentVariableValueKind;
 }
 
+/** Full snapshot of resolved environment variables, plus catalog, diagnostics, and required-count summary. */
 export interface EnvironmentVariablesSnapshot {
 	catalog: EnvironmentVariableCatalogEntrySnapshot[];
 	diagnostics: EnvironmentVariableDiagnostic[];

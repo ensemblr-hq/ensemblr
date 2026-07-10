@@ -79,6 +79,12 @@ export function ChatTurnSummary({
 	);
 }
 
+/**
+ * Pluralize a word by appending `s` unless the count is exactly one.
+ * @param word - Singular word to pluralize
+ * @param count - Count that selects singular or plural
+ * @returns The singular or pluralized word
+ */
 function pluralize(word: string, count: number): string {
 	return count === 1 ? word : `${word}s`;
 }

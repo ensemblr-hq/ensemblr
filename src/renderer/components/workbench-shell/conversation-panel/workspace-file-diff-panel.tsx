@@ -104,6 +104,7 @@ export function WorkspaceFileDiffPanel({
 	);
 }
 
+/** Renders a centered muted or error message inside the workspace file-diff panel. */
 function DiffMessage({
 	message,
 	tone = 'muted',

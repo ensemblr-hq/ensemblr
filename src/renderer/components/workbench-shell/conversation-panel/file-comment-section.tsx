@@ -16,11 +16,20 @@ import { formatCommentContext } from '@/renderer/lib/workbench/review-context';
 import { useComposerInsert } from '@/renderer/state/composer';
 import type { ReviewCommentWire } from '@/shared/ipc/contracts/review-comments';
 
+/**
+ * Parse a draft line-number input into a positive integer.
+ * @param draftLine - The raw draft line-number text.
+ * @returns The parsed line number, or null when it is not a positive integer.
+ */
 function parseDraftLine(draftLine: string): number | null {
 	const parsed = Number.parseInt(draftLine, 10);
 	return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+/**
+ * Show an error toast when a review-comment mutation fails.
+ * @param error - The thrown error, if any.
+ */
 function notifyCommentUpdateFailed(error: unknown): void {
 	toast.error('Comment update failed', {
 		description: error instanceof Error ? error.message : undefined,
@@ -153,6 +162,7 @@ export function FileCommentSection({
 	);
 }
 
+/** Renders one local review comment with resolve, add-to-chat, and delete actions. */
 function FileCommentRow({
 	comment,
 	onAddToChat,

@@ -9,6 +9,7 @@ export class PiSessionServiceError extends Error {
 	}
 }
 
+/** Error codes raised by the Pi session service, translated to IPC error responses. */
 export type PiSessionServiceErrorCode =
 	| 'database-unavailable'
 	| 'session-not-open';
