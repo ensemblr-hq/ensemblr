@@ -14,7 +14,7 @@ import type {
 import {
 	EnvironmentVariablesError,
 	type EnvironmentVariablesService,
-} from '../../environment';
+} from '../../environment/environment-variables';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the environment-variables IPC handler. */

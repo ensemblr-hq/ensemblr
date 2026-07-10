@@ -14,7 +14,7 @@
 export function cloneRecord(
 	record: Record<string, unknown>,
 ): Record<string, unknown> {
-	return JSON.parse(JSON.stringify(record)) as Record<string, unknown>;
+	return structuredClone(record);
 }
 
 /**

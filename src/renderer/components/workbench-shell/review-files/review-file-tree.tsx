@@ -15,6 +15,7 @@ import {
 } from '@/renderer/lib/workbench';
 import type { ReviewFileSummary } from '@/renderer/types/workbench';
 
+import { FileTreeLabel } from './file-tree-label';
 import { ReviewFileRow } from './review-file-row';
 
 /** Collapsible directory tree of changed files. */
@@ -142,16 +143,7 @@ function ReviewFolderRow({
 				className='size-3.5 shrink-0'
 				icon={folderIconName}
 			/>
-			<span className='min-w-0 truncate font-mono'>
-				{visibleLabelParts.map((label, index) => (
-					<Fragment key={`${label}-${index}`}>
-						{index > 0 ? (
-							<span className='px-1 text-muted-foreground/70'>/</span>
-						) : null}
-						<span>{label}</span>
-					</Fragment>
-				))}
-			</span>
+			<FileTreeLabel parts={visibleLabelParts} />
 		</Button>
 	);
 }

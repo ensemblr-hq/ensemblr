@@ -217,7 +217,7 @@ export function ComposerPanel({
 						{state.uploadAttachments.map((file, index) => (
 							<AttachmentChip
 								file={{ kind: 'upload', name: file.name }}
-								key={`upload:${file.name}:${file.size}:${index}`}
+								key={`upload:${file.name}:${file.size}:${file.lastModified}`}
 								onRemove={() => state.removeUpload(index)}
 							/>
 						))}

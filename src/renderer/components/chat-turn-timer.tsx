@@ -9,7 +9,7 @@ import { cn } from '@/renderer/lib/utils';
  * the live component and renders the frozen `formatTurnDuration(endMs - startMs)`
  * inside the collapsed summary chip instead.
  */
-export function ChatTurnTimer({
+function ChatTurnTimer({
 	className,
 	startMs,
 }: {
