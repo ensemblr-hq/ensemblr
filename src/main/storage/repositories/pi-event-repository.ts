@@ -3,6 +3,7 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type { PiPersistedEnvelope } from '../../../shared/ipc/contracts/pi-session';
 
+/** Source stream a persisted Pi event came from: the protocol channel or stderr. */
 export type PiEventStream = 'protocol' | 'stderr';
 
 /**
@@ -13,6 +14,7 @@ export type PiEventStream = 'protocol' | 'stderr';
  */
 export type PiEventPayload = PiPersistedEnvelope | null;
 
+/** Domain shape of a persisted Pi session event returned by the repository. */
 export interface PiEventRow {
 	branchId: string;
 	createdAt: string;
@@ -24,6 +26,7 @@ export interface PiEventRow {
 	turnId: string | null;
 }
 
+/** Input for appending a Pi session event to the event log. */
 export interface AppendPiEventInput {
 	branchId: string;
 	/**
@@ -41,6 +44,7 @@ export interface AppendPiEventInput {
 /** SQLite expression that stamps the DB clock when no `created_at` is supplied. */
 const CREATED_AT_VALUE = `COALESCE(?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`;
 
+/** Raw Pi event row shape with snake_case columns as stored in SQLite. */
 interface EventRowShape {
 	branch_id: string;
 	created_at: string;
@@ -252,6 +256,11 @@ export function listEventsByTurn({
 	return rows.map(mapEventRow);
 }
 
+/**
+ * Map a raw Pi event row to the domain {@link PiEventRow}, parsing its payload JSON.
+ * @param row - Raw SQLite row
+ * @returns The domain Pi event
+ */
 function mapEventRow(row: EventRowShape): PiEventRow {
 	return {
 		branchId: row.branch_id,
@@ -265,6 +274,11 @@ function mapEventRow(row: EventRowShape): PiEventRow {
 	};
 }
 
+/**
+ * Serialize a Pi event payload to a JSON string, falling back to `{}` on missing or unserializable input.
+ * @param payload - Event payload to serialize
+ * @returns The JSON string, or `'{}'` when absent or serialization fails
+ */
 function serializePayload(payload: PiEventPayload | undefined): string {
 	if (payload === undefined) {
 		return '{}';
@@ -276,6 +290,11 @@ function serializePayload(payload: PiEventPayload | undefined): string {
 	}
 }
 
+/**
+ * Parse a stored payload JSON string into a Pi event payload, returning null when parsing fails.
+ * @param raw - JSON string to parse
+ * @returns The parsed payload, or null when the JSON is invalid
+ */
 function parsePayload(raw: string): PiEventPayload {
 	try {
 		// The store accepts opaque JSON; callers always insert envelopes, so

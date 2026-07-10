@@ -94,7 +94,9 @@ export function logNavigationProfile(
  * @param router - Router to patch.
  */
 export function patchPreloadRoute(router: AnyRouter): void {
+	/** Options accepted by the router's `preloadRoute`. */
 	type PreloadRouteOptions = Parameters<AnyRouter['preloadRoute']>[0];
+	/** Result returned by the router's `preloadRoute`. */
 	type PreloadRouteResult = ReturnType<AnyRouter['preloadRoute']>;
 
 	const originalPreloadRoute = router.preloadRoute.bind(router) as (

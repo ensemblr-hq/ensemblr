@@ -17,6 +17,7 @@ import {
 import { useQuickStartFlow } from '@/renderer/hooks/welcome/use-quick-start-flow';
 import type { QuickStartProjectDiagnostic } from '@/shared/ipc/contracts/quick-start';
 
+/** Props for the quick-start new-local-project dialog. */
 interface QuickStartDialogProps {
 	onOpenChange: (open: boolean) => void;
 	open: boolean;

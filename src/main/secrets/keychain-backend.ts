@@ -63,6 +63,7 @@ export function createMacosKeychainSecretStore({
 	});
 }
 
+/** Injected dependencies for {@link buildKeychainSecretStore}. */
 interface KeychainBackendDependencies {
 	commandPath: string;
 	idFactory: () => string;

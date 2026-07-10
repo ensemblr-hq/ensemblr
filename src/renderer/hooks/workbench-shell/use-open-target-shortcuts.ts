@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 
 import type { WorkspaceOpenTarget } from '@/renderer/types/workbench';
 
+/** Menu state and target callbacks for the open-in shortcut hook. */
 interface UseOpenTargetShortcutsOptions {
 	closeMenu: () => void;
 	invokeTarget: (target: WorkspaceOpenTarget) => void;

@@ -14,6 +14,7 @@ export interface OptimisticPrompt {
 	submittedAt: string;
 }
 
+/** In-memory list of optimistically rendered prompts awaiting their matching persisted Pi events. */
 const optimisticPromptsAtom = atom<readonly OptimisticPrompt[]>([]);
 
 /**

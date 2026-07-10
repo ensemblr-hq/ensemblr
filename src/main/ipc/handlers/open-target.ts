@@ -11,6 +11,7 @@ import type { OpenTargetService } from '../../open-target/open-target-service';
 import type { EnsemblrDatabaseService } from '../../storage';
 import { getWorkspacePathById } from '../../storage/repositories/workspace-repository';
 
+/** Dependencies for registering the "Open in…" IPC handlers. */
 interface RegisterOpenTargetHandlersOptions {
 	databaseService: EnsemblrDatabaseService;
 	openTargetService: OpenTargetService;

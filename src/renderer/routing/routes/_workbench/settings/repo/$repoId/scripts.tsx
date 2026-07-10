@@ -18,6 +18,7 @@ import {
 } from '@/renderer/hooks/use-scripts-settings-form';
 import type { ResolvedSettingSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 
+/** Route for a repository's Scripts settings; renders the setup/run/archive script editor keyed by the `repoId` path param. */
 export const Route = createFileRoute(
 	'/_workbench/settings/repo/$repoId/scripts',
 )({

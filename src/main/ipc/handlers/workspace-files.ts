@@ -15,6 +15,7 @@ import type {
 	WorkspaceFilesWatcher,
 } from '../../workspace-files';
 
+/** Dependencies for registering the workspace-files IPC handlers. */
 export interface WorkspaceFilesHandlersOptions {
 	listWorkspaceFilesService: ListWorkspaceFilesService;
 	workspaceFilesWatcher: WorkspaceFilesWatcher;

@@ -16,6 +16,7 @@ import {
 	repoSettingsOverrideAtomFamily,
 } from '@/renderer/state/preferences';
 
+/** Route for a repository's Actions settings; renders the per-repo action-preferences panel keyed by the `repoId` path param. */
 export const Route = createFileRoute(
 	'/_workbench/settings/repo/$repoId/actions',
 )({
@@ -58,6 +59,7 @@ const ACTION_META: Record<
 	},
 };
 
+/** Repository-scoped Actions settings panel for spotlight testing and per-action agent instruction overrides. */
 function RepoActionsSettings() {
 	const { repoId } = Route.useParams();
 	const [overrides, setOverrides] = useAtom(

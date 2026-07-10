@@ -49,6 +49,11 @@ export function buildErrorMessage(
 	};
 }
 
+/**
+ * Extracts a stderr detail message from an error envelope, or a placeholder when absent.
+ * @param payload - Persisted event envelope, if any
+ * @returns The stderr detail text
+ */
 function readStderrDetail(payload: PiPersistedEnvelope | null): string {
 	if (payload?.kind === 'error') {
 		return (

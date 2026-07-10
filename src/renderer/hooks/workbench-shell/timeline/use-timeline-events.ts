@@ -65,6 +65,12 @@ export function useTimelineEvents({
 	};
 }
 
+/**
+ * Merges a broadcast event into the cached event list, keeping it ordered by ordinal and de-duplicated by id.
+ * @param previous - Previously cached events result, if any
+ * @param event - Newly received event to merge in
+ * @returns The updated event list result
+ */
 function mergeBroadcast(
 	previous: ListPiSessionEventsResult | undefined,
 	event: PiSessionEventWire,

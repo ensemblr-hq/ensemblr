@@ -1,5 +1,6 @@
 import type { CloneGithubRepositoryDiagnostic } from '@/shared/ipc/contracts/clone';
 
+/** Props for the clone GitHub diagnostics list. */
 interface CloneGithubDiagnosticsProps {
 	diagnostics: CloneGithubRepositoryDiagnostic[];
 }

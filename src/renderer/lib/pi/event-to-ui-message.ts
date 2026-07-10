@@ -81,6 +81,14 @@ function withPromptTimes(messages: readonly UIMessage[]): UIMessage[] {
 	});
 }
 
+/**
+ * Routes one persisted Pi event to the appropriate handler, flushing the
+ * pending group before emitting standalone stderr or error messages.
+ * @param event - The persisted Pi event frame being processed
+ * @param pending - The group currently being accumulated, or null when none is open
+ * @param result - Accumulator of finalized UI messages, appended in place
+ * @returns The still-open pending group, or null when the event closed it
+ */
 function handleEvent(
 	event: PiEventFrame,
 	pending: PendingGroup | null,
@@ -122,6 +130,16 @@ function handleEvent(
 	}
 }
 
+/**
+ * Folds a renderable `message` envelope into the pending group, opening a new
+ * group when the role changes; user prompts also key on event id so
+ * back-to-back submissions stay in separate bubbles.
+ * @param event - The persisted Pi event frame carrying the message
+ * @param envelope - The `message` variant of the persisted envelope
+ * @param pending - The group currently being accumulated, or null when none is open
+ * @param result - Accumulator of finalized UI messages, appended in place
+ * @returns The pending group after folding in the message, unchanged when nothing rendered
+ */
 function handleMessageEnvelope(
 	event: PiEventFrame,
 	envelope: Extract<PiPersistedEnvelope, { kind: 'message' }>,
@@ -223,6 +241,13 @@ function projectMessagePayload(
 	}
 }
 
+/**
+ * Projects one part of a composite `message` payload into UI parts, covering
+ * text, reasoning, and tool call/result variants.
+ * @param part - A single wire message part
+ * @param event - The persisted Pi event frame the part belongs to
+ * @returns The UI parts for this part, or an empty array when it has no content
+ */
 function projectMessagePart(
 	part: PiWireMessagePart,
 	event: PiEventFrame,
@@ -277,6 +302,11 @@ function mergeParts(
 	return merged;
 }
 
+/**
+ * Finalizes the pending group when one is open and appends it to the result.
+ * @param pending - The group currently being accumulated, or null when none is open
+ * @param result - Accumulator of finalized UI messages, appended in place
+ */
 function flush(pending: PendingGroup | null, result: UIMessage[]): void {
 	if (!pending) {
 		return;
@@ -284,6 +314,12 @@ function flush(pending: PendingGroup | null, result: UIMessage[]): void {
 	result.push(finalizeGroup(pending));
 }
 
+/**
+ * Converts an accumulated pending group into a finalized `UIMessage`,
+ * substituting an empty text part when the group produced none.
+ * @param group - The accumulated pending group to finalize
+ * @returns The finalized UI message carrying turn timing metadata
+ */
 function finalizeGroup(group: PendingGroup): UIMessage {
 	const parts =
 		group.parts.length > 0
@@ -335,10 +371,22 @@ export function turnMetadataOf(message: UIMessage): PiTurnMetadata | null {
 	return null;
 }
 
+/**
+ * Builds the grouping key that collapses consecutive same-role events.
+ * @param role - The UI role of the events being grouped
+ * @returns The role-scoped group key
+ */
 function groupKeyFor(role: UIRole): string {
 	return `role::${role}`;
 }
 
+/**
+ * Derives a stable, unique id for a message group from its trigger event so
+ * multiple same-role groups within one chat stay distinct.
+ * @param event - The event that opened the group
+ * @param role - The UI role of the group
+ * @returns A unique group id keyed by role and event id
+ */
 function groupIdFromEvent(event: PiEventFrame, role: UIRole): string {
 	// Use the trigger event id so multiple same-role groups within a chat
 	// (e.g. two user prompts before the next assistant reply) stay unique.

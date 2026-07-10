@@ -25,6 +25,11 @@ export type SpawnFn = (input: {
 	env: NodeJS.ProcessEnv;
 }) => ChildLike;
 
+/**
+ * Default child spawner backed by `node:child_process.spawn` with no shell.
+ * @param options - Command, args, working directory, and environment.
+ * @returns The spawned child process.
+ */
 export function defaultSpawn({
 	args,
 	command,

@@ -7,6 +7,7 @@ import { PiReplayView } from '@/renderer/components/pi-replay';
  * 404s outside development builds.
  */
 export const Route = createFileRoute('/debug/pi-replay')({
+	/** Blocks the debug replay route outside development builds by throwing a 404. */
 	beforeLoad: () => {
 		if (!import.meta.env.DEV) {
 			throw notFound();

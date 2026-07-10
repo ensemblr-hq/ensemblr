@@ -1,8 +1,11 @@
 import type { DatabaseSync } from 'node:sqlite';
 
+/** Scope a secret is bound to: the whole app, a repository, or a workspace. */
 export type SecretScope = 'app' | 'repository' | 'workspace';
+/** Storage backend a secret lives in: the macOS Keychain or the in-memory mock. */
 export type SecretBackend = 'macos-keychain' | 'mock';
 
+/** Machine-readable failure categories for secret-store operations. */
 export type SecretStoreErrorCode =
 	| 'already-exists'
 	| 'invalid-input'

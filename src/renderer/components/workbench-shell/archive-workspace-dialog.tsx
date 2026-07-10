@@ -18,6 +18,7 @@ import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
+/** Props for the archive-workspace dialog. */
 interface ArchiveWorkspaceDialogProps {
 	onArchived: (workspaceId: string) => Promise<void> | void;
 	onOpenChange: (open: boolean) => void;
@@ -52,8 +53,10 @@ export function ArchiveWorkspaceDialog({
 	);
 }
 
+/** Progress stage of the workspace archive flow. */
 type ArchiveStage = 'archiving' | 'failure' | 'idle';
 
+/** Inner archive form for a workspace; owns the archiving state and opt-in branch cleanup. */
 function ArchiveWorkspaceDialogForm({
 	onArchived,
 	onOpenChange,

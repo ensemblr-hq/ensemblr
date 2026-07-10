@@ -12,6 +12,7 @@ import {
 	useKeymapHandler,
 } from '@/renderer/hooks/use-keymap-handler';
 
+/** Props for the close-running-chat confirmation dialog. */
 interface CloseRunningChatDialogProps {
 	/** Dismisses the dialog and keeps the chat open. */
 	onCancel: () => void;

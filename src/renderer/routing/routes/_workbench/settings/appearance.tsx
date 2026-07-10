@@ -26,6 +26,7 @@ import {
 } from '@/renderer/state/preferences';
 import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
 
+/** Route for the Appearance settings section; renders the appearance-settings panel. */
 export const Route = createFileRoute('/_workbench/settings/appearance')({
 	component: AppearanceSettings,
 });
@@ -43,6 +44,7 @@ const MONO_PREVIEW = `// Preview
 const greeting = 'Hello, World!';
 function sum(a, b) { return a + b; }`;
 
+/** Appearance settings panel for theme, code and markdown styling, and terminal font choices. */
 function AppearanceSettings() {
 	const [theme, setTheme] = useAtom(themeAtom);
 	const [coloredDiffs, setColoredDiffs] = useAtom(coloredSidebarDiffsAtom);

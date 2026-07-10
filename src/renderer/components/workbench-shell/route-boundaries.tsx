@@ -9,6 +9,7 @@ import type {
 	WorkbenchStaticNavigationTarget,
 } from '@/renderer/types/workbench-shell';
 
+/** Title and detail text for a route-boundary empty state. */
 interface BoundaryCopy {
 	detail: string;
 	title: string;
@@ -19,6 +20,12 @@ const BOUNDARY_NAVIGATION: NavigationContextValue = {
 	renderWorkspaceLink: undefined,
 };
 
+/**
+ * Renders the shared empty-state shell used by every workbench route boundary.
+ * @param emptyState - Title and detail copy shown to the user
+ * @param health - Health banner describing the boundary condition
+ * @returns The rendered empty-state shell element
+ */
 function renderBoundary(emptyState: BoundaryCopy, health: WorkbenchHealth) {
 	return (
 		<WorkbenchEmptyStateShell
@@ -91,4 +98,5 @@ function renderStaticLink(
 	);
 }
 
+/** No-op selection handler for boundary states that offer no navigation. */
 const noop = () => undefined;

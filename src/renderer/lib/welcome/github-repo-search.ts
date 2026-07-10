@@ -210,6 +210,11 @@ function repositoryName(entry: GithubRepositoryEntry): string {
 	return segments[segments.length - 1] ?? entry.fullName;
 }
 
+/**
+ * Collects the lowercased repository fields a search query is matched against.
+ * @param entry - The repository entry to read
+ * @returns Full name, short name, owner login, and description, all lowercased
+ */
 function searchableFields(entry: GithubRepositoryEntry): string[] {
 	return [
 		entry.fullName.toLowerCase(),

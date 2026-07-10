@@ -171,6 +171,11 @@ function SidebarHealthFooter({
 	);
 }
 
+/**
+ * Derive the sidebar footer status line from a setup-diagnostics snapshot.
+ * @param snapshot - The latest setup-diagnostics snapshot, or null when none.
+ * @returns The status line, or null when setup is ready and nothing needs surfacing.
+ */
 function describeSetupLine(
 	snapshot: SetupDiagnosticsSnapshot | null,
 ): string | null {

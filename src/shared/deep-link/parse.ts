@@ -37,6 +37,7 @@ export type DeepLink =
 	| { kind: 'review'; workspaceId: string }
 	| { kind: 'invalid'; reason: string };
 
+/** Identifier for a section of the app-level (global) settings surface. */
 export type AppSettingsSection =
 	| 'general'
 	| 'models'
@@ -49,6 +50,7 @@ export type AppSettingsSection =
 	| 'experimental'
 	| 'advanced';
 
+/** Identifier for a section of a repository's settings surface. */
 export type RepoSettingsSection =
 	| 'environment'
 	| 'git'
@@ -119,6 +121,11 @@ export function parseDeepLink(rawUrl: string): DeepLink {
 	}
 }
 
+/**
+ * Parse `repo/...` segments into a repo or repo-settings deep link, validating the repository id and optional settings section.
+ * @param segments - Path segments following the `repo` host
+ * @returns The parsed repo deep link, or an invalid result when validation fails
+ */
 function parseRepo(segments: string[]): DeepLink {
 	const [repositoryId, settingsLiteral, section] = segments;
 	if (!repositoryId || !SAFE_ID_PATTERN.test(repositoryId)) {
@@ -140,6 +147,11 @@ function parseRepo(segments: string[]): DeepLink {
 	};
 }
 
+/**
+ * Parse `workspace/...` segments into a workspace or workspace-chat deep link, validating the repository, workspace, and optional chat ids.
+ * @param segments - Path segments following the `workspace` host
+ * @returns The parsed workspace deep link, or an invalid result when validation fails
+ */
 function parseWorkspace(segments: string[]): DeepLink {
 	const [repositoryId, workspaceId, chatLiteral, chatId] = segments;
 	if (
@@ -164,6 +176,11 @@ function parseWorkspace(segments: string[]): DeepLink {
 	};
 }
 
+/**
+ * Parse `linear/<issueId>` segments into a Linear-issue deep link, requiring a `TEAM-123`-shaped id.
+ * @param segments - Path segments following the `linear` host
+ * @returns The parsed linear-issue deep link, or an invalid result when the id is malformed
+ */
 function parseLinear(segments: string[]): DeepLink {
 	const [issueId] = segments;
 	if (!issueId || !/^[A-Za-z]+-\d+$/.test(issueId)) {
@@ -172,6 +189,11 @@ function parseLinear(segments: string[]): DeepLink {
 	return { kind: 'linear-issue', issueId };
 }
 
+/**
+ * Parse `settings/<section>` segments into an app-settings deep link, defaulting to the `general` section when none is given.
+ * @param segments - Path segments following the `settings` host
+ * @returns The parsed settings deep link, or an invalid result for an unknown section
+ */
 function parseSettings(segments: string[]): DeepLink {
 	const [section] = segments;
 	if (!section) {
@@ -183,6 +205,11 @@ function parseSettings(segments: string[]): DeepLink {
 	return { kind: 'settings', section: section as AppSettingsSection };
 }
 
+/**
+ * Parse `review/<workspaceId>` segments into a review deep link, validating the workspace id.
+ * @param segments - Path segments following the `review` host
+ * @returns The parsed review deep link, or an invalid result when the id is malformed
+ */
 function parseReview(segments: string[]): DeepLink {
 	const [workspaceId] = segments;
 	if (!workspaceId || !SAFE_ID_PATTERN.test(workspaceId)) {
@@ -204,6 +231,11 @@ const ALLOWED_EXTERNAL_HOSTS = [
 	'api.github.com',
 ];
 
+/**
+ * Whether a raw URL is safe for the renderer to open externally: http(s) only, plus localhost or a whitelisted host.
+ * @param rawUrl - The URL string to validate
+ * @returns True when the URL is permitted to open externally
+ */
 export function isAllowedExternalUrl(rawUrl: string): boolean {
 	try {
 		const url = new URL(rawUrl);

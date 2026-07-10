@@ -13,6 +13,7 @@ interface PendingEntry {
 	file: WorkspaceFileSummary;
 }
 
+/** In-memory queue of files awaiting insertion into a chat tab's composer mention list. */
 const pendingComposerAttachmentsAtom = atom<readonly PendingEntry[]>([]);
 
 /** Inbox view for the composer — reads + drains entries for a chat tab. */

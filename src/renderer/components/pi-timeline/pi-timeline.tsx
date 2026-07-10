@@ -75,6 +75,13 @@ function PiTimelineItemView({
 	);
 }
 
+/**
+ * Pick the top-margin class for a timeline item, giving generous gaps at turn
+ * boundaries and tight gaps between activity rows within a turn.
+ * @param item - Timeline item being spaced
+ * @param isFirst - Whether this is the first item in the timeline
+ * @returns A Tailwind margin-top class (empty for the first user message)
+ */
 function itemSpacing(item: PiTimelineItem, isFirst: boolean): string {
 	if (item.kind === 'user-message') {
 		return isFirst ? '' : 'mt-8';
@@ -88,6 +95,7 @@ function itemSpacing(item: PiTimelineItem, isFirst: boolean): string {
 	return 'mt-1.5';
 }
 
+/** Renders a single timeline item's body, dispatching on its kind to the matching row component. */
 function PiTimelineItemBody({ item }: { item: PiTimelineItem }) {
 	switch (item.kind) {
 		case 'user-message':

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
 
+/** Props for a single composer autocomplete row. */
 export interface AutocompleteRowProps {
 	active: boolean;
 	icon?: React.ReactNode;

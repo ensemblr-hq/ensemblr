@@ -173,10 +173,17 @@ function awaitStdinDrain(stdin: NodeJS.WritableStream): Promise<void> {
 	});
 }
 
+/** Internal handle wrapping one CLI RPC session's public surface. */
 interface CliRpcSession {
 	publicSession: PiAgentAdapterSession;
 }
 
+/**
+ * Spawn a Pi CLI child and wire it into a session that emits agent events and
+ * enforces kill-escalation on shutdown.
+ * @param options - Spawn inputs, timing, callbacks, and per-session config.
+ * @returns The internal session handle.
+ */
 function createCliRpcSession({
 	baseEnv,
 	input,

@@ -12,6 +12,11 @@ export class ReviewActionError extends Error {
 	}
 }
 
+/**
+ * Show an error toast for a failed review action, including gh remediation when present.
+ * @param title - The toast title.
+ * @param error - The thrown error, possibly a ReviewActionError carrying a typed gh failure.
+ */
 export function showReviewActionError(title: string, error: unknown): void {
 	const failure =
 		error instanceof ReviewActionError ? error.failure : undefined;

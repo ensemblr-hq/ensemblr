@@ -9,14 +9,29 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
 }
 
+/**
+ * Narrow an unknown value to a string.
+ * @param value - Value to test
+ * @returns True when the value is a string
+ */
 export function isString(value: unknown): value is string {
 	return typeof value === 'string';
 }
 
+/**
+ * Narrow an unknown value to a string or null.
+ * @param value - Value to test
+ * @returns True when the value is a string or null
+ */
 export function isNullableString(value: unknown): value is string | null {
 	return value === null || typeof value === 'string';
 }
 
+/**
+ * Narrow an unknown value to a number or null.
+ * @param value - Value to test
+ * @returns True when the value is a number or null
+ */
 export function isNullableNumber(value: unknown): value is number | null {
 	return value === null || typeof value === 'number';
 }

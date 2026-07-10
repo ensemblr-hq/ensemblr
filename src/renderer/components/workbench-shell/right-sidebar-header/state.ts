@@ -2,6 +2,7 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 import type { PullRequestHeaderTone } from './pull-request-number-button';
 
+/** Discriminated header state for the right review sidebar, derived from a workspace's pull-request status. */
 export type RightSidebarHeaderState =
 	| {
 			kind: 'create-pr' | 'empty';

@@ -23,6 +23,7 @@ export interface EnsemblrRootDirectoryService {
 	previewChange: (nextRootPath: string) => RootDirectoryChangePreview;
 }
 
+/** Options for {@link createEnsemblrRootDirectoryService}. */
 interface CreateEnsemblrRootDirectoryServiceOptions {
 	allowCreate?: boolean;
 	databaseService: EnsemblrDatabaseService;
@@ -46,6 +47,10 @@ export function createEnsemblrRootDirectoryService({
 }: CreateEnsemblrRootDirectoryServiceOptions): EnsemblrRootDirectoryService {
 	let snapshot: RootDirectorySnapshot | null = null;
 
+	/**
+	 * Ensure the Ensemblr root directory exists and cache the resulting snapshot.
+	 * @returns The current root-directory snapshot
+	 */
 	function ensure(): RootDirectorySnapshot {
 		snapshot = ensureRootDirectory({
 			allowCreate,

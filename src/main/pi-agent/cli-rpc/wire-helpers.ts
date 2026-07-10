@@ -1,6 +1,11 @@
 import type { PiAgentSessionStatus } from '../pi-agent-types.ts';
 import { extractMessageId } from '../pi-wire-normalizer.ts';
 
+/**
+ * Type guard for a valid Pi agent session status string.
+ * @param value - Value to test.
+ * @returns True when the value is a known session status.
+ */
 export function isSessionStatus(value: unknown): value is PiAgentSessionStatus {
 	return (
 		value === 'closed' ||

@@ -8,9 +8,13 @@ import type {
 	PiExecutableSnapshot,
 } from './pi-executable';
 
+/** Overall outcome of a Pi readiness assessment. */
 export type PiReadinessStatus = 'failure' | 'success';
+/** Severity level of a Pi readiness diagnostic. */
 export type PiReadinessDiagnosticSeverity = 'error' | 'info' | 'warning';
+/** Where the Pi agent directory path was resolved from. */
 export type PiAgentDirectorySource = 'default' | 'environment';
+/** Failure codes for the Pi RPC smoke test. */
 export type PiRpcSmokeFailureCode =
 	| 'command-not-found'
 	| 'executable-not-ready'
@@ -21,6 +25,7 @@ export type PiRpcSmokeFailureCode =
 	| 'smoke-workspace-unavailable'
 	| 'spawn-error'
 	| 'timeout';
+/** Failure codes for listing a provider's available Pi models. */
 export type PiProviderModelFailureCode =
 	| 'command-not-found'
 	| 'executable-not-ready'

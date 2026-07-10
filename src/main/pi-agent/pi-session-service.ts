@@ -68,6 +68,7 @@ export type {
 	PiSessionSnapshot,
 } from './pi-session-types.ts';
 
+/** Dependencies and configuration for constructing the Pi session service. */
 export interface PiSessionServiceOptions {
 	/** Override for tests; defaults to the git-backed capture (ADR 0012). */
 	captureCheckpoint?: CheckpointCapturePort;

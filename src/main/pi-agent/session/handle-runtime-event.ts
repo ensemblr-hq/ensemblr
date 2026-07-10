@@ -18,6 +18,7 @@ export type PersistRuntimeEventPort = (input: {
 	turnId: string | null;
 }) => PiEventRow | null;
 
+/** Dependencies for {@link createRuntimeEventHandler}. */
 export interface RuntimeEventHandlerOptions {
 	activeSessions: ActiveSessionMap;
 	eventSink: PiSessionEventSink | undefined;
@@ -26,6 +27,7 @@ export interface RuntimeEventHandlerOptions {
 	summaryQueue: SummaryQueue;
 }
 
+/** Handler that persists a normalized runtime event and schedules summary refreshes. */
 export interface RuntimeEventHandler {
 	handle: (input: {
 		branchId: string;

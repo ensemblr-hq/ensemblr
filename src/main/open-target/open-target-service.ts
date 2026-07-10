@@ -31,6 +31,7 @@ const ICON_OUTPUT_SIZE = 64;
 const CACHE_FILE_NAME = 'open-targets-cache.v1.json';
 const MAX_VISIBLE_APPS = 8;
 
+/** On-disk shape of the persisted open-target snapshot cache. */
 interface CachedFileShape {
 	snapshots: WorkspaceOpenTargetSnapshot[];
 	updatedAt: string;
@@ -63,10 +64,12 @@ export interface OpenTargetService {
 	refresh: () => Promise<void>;
 }
 
+/** Options for {@link createOpenTargetService}. */
 interface CreateOpenTargetServiceOptions {
 	localCommandService: LocalCommandService;
 }
 
+/** Detection results paired with resolved per-target icon data URLs. */
 interface ResolvedTargets {
 	detected: DetectedTargetsMap;
 	iconDataUrls: Readonly<Record<string, string | undefined>>;
@@ -180,6 +183,11 @@ export function createOpenTargetService({
 	return { getCachedSnapshots, listTargets, openTarget, refresh };
 }
 
+/**
+ * Detect installed targets and load their icons in one pass.
+ * @param options - The command runner used for detection.
+ * @returns The detected targets with their icon data URLs.
+ */
 async function resolveTargets({
 	localCommandService,
 }: {
@@ -211,6 +219,11 @@ async function loadIconDataUrls(
 	return Object.fromEntries(entries);
 }
 
+/**
+ * Render a small thumbnail for an app bundle as a data URL via QuickLook.
+ * @param appPath - Absolute path to the `.app` bundle.
+ * @returns The icon data URL, or null when it cannot be rendered.
+ */
 async function loadIconDataUrlForApp(appPath: string): Promise<string | null> {
 	try {
 		const image = await nativeImage.createThumbnailFromPath(appPath, {
@@ -226,6 +239,12 @@ async function loadIconDataUrlForApp(appPath: string): Promise<string | null> {
 	}
 }
 
+/**
+ * Build the ordered snapshot list from detection results, assigning numeric
+ * shortcuts and capping the number of visible apps.
+ * @param resolved - Detected targets and their icon data URLs.
+ * @returns The renderer-facing snapshot list.
+ */
 function buildSnapshots(
 	resolved: ResolvedTargets,
 ): WorkspaceOpenTargetSnapshot[] {
@@ -255,6 +274,11 @@ function buildSnapshots(
 	return snapshots;
 }
 
+/**
+ * Map a target definition into a renderer snapshot with icon and shortcut info.
+ * @param options - The definition, its icon data URL, and its visible index.
+ * @returns The renderer-facing snapshot.
+ */
 function toSnapshot({
 	definition,
 	iconDataUrl,
@@ -280,6 +304,11 @@ function toSnapshot({
 	};
 }
 
+/**
+ * Map a dispatch kind onto the renderer behavior it triggers.
+ * @param kind - Dispatch kind from a target definition.
+ * @returns The workspace open-target behavior.
+ */
 function behaviorForDispatch(
 	kind: OpenTargetDefinition['dispatch']['kind'],
 ): WorkspaceOpenTargetBehavior {
@@ -307,6 +336,10 @@ function getCachePath(): string | null {
 	}
 }
 
+/**
+ * Read the persisted snapshot cache from disk, validating its version.
+ * @returns The cached snapshots, or null when absent or invalid.
+ */
 function readSnapshotsFromDisk(): WorkspaceOpenTargetSnapshot[] | null {
 	const cachePath = getCachePath();
 	if (!cachePath) {
@@ -356,6 +389,10 @@ function writeSnapshotsToDisk(snapshots: WorkspaceOpenTargetSnapshot[]): void {
 	}
 }
 
+/**
+ * Carry out a target's dispatch action: reveal, copy, or launch the app.
+ * @param options - The definition, command runner, and resolved target path.
+ */
 async function dispatchOpen({
 	definition,
 	localCommandService,

@@ -1,3 +1,4 @@
+/** Icon name for a tool entry in mock workbench chat fixtures. */
 export type WorkbenchMockChatToolIcon =
 	| 'check'
 	| 'circle-dashed'
@@ -6,6 +7,7 @@ export type WorkbenchMockChatToolIcon =
 	| 'search'
 	| 'terminal';
 
+/** A tool invocation shown within a mock workbench chat message. */
 export interface WorkbenchMockChatTool {
 	detail: string;
 	icon: WorkbenchMockChatToolIcon;
@@ -13,6 +15,7 @@ export interface WorkbenchMockChatTool {
 	status: 'done' | 'pending' | 'running';
 }
 
+/** A single message in a mock workbench chat thread fixture. */
 export interface WorkbenchMockChatMessage {
 	author: string;
 	body: string[];

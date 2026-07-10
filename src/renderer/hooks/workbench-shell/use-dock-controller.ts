@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import type { PanelImperativeHandle } from 'react-resizable-panels';
 
+/** Dock collapse state and handlers returned by {@link useDockController}. */
 export interface DockController {
 	dockPanelRef: React.RefObject<PanelImperativeHandle | null>;
 	handleDockResize: (collapsed: boolean) => void;

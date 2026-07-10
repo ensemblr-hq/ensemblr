@@ -15,6 +15,7 @@ import {
 	type ReviewActionsValue,
 } from './review-actions-context';
 
+/** Which review dialog is currently open, or null when none is. */
 type ActiveReviewDialog = { kind: 'merge' } | null;
 
 const DEFAULT_MERGE_SETTINGS = {

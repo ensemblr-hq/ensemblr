@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 
 import { cn } from '@/renderer/lib/utils';
 
+/** Props for a welcome-screen action tile. */
 interface WelcomeActionCardProps {
 	className?: string;
 	disabled?: boolean;

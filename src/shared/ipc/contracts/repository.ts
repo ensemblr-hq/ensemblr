@@ -1,10 +1,12 @@
 import type { RepositoryConfigSourceSnapshot } from './repository-config';
 
+/** Severity level of a local-repository registration diagnostic. */
 export type RegisterLocalRepositoryDiagnosticSeverity =
 	| 'error'
 	| 'info'
 	| 'warning';
 
+/** Machine-readable codes for failures and warnings raised while registering a local repository. */
 export type RegisterLocalRepositoryDiagnosticCode =
 	| 'database-unavailable'
 	| 'destination-not-writable'
@@ -22,6 +24,7 @@ export type RegisterLocalRepositoryDiagnosticCode =
 	| 'repository-permission-denied'
 	| 'repository-remote-already-registered';
 
+/** A single diagnostic emitted while registering a local repository. */
 export interface RegisterLocalRepositoryDiagnostic {
 	code: RegisterLocalRepositoryDiagnosticCode;
 	message: string;
@@ -29,6 +32,7 @@ export interface RegisterLocalRepositoryDiagnostic {
 	severity: RegisterLocalRepositoryDiagnosticSeverity;
 }
 
+/** Wire snapshot of a registered repository row. */
 export interface RegisteredRepositorySnapshot {
 	createdAt: string;
 	defaultBranch: string | null;
@@ -41,6 +45,7 @@ export interface RegisteredRepositorySnapshot {
 	updatedAt: string;
 }
 
+/** Request to register or import a local git repository. */
 export interface RegisterLocalRepositoryRequest {
 	/**
 	 * Optional logical name for the repository row. When omitted, the basename
@@ -51,6 +56,7 @@ export interface RegisterLocalRepositoryRequest {
 	path: string;
 }
 
+/** Result of registering a local repository, with diagnostics and resolved settings sources. */
 export interface RegisterLocalRepositoryResult {
 	diagnostics: RegisterLocalRepositoryDiagnostic[];
 	registered: boolean;
@@ -58,6 +64,7 @@ export interface RegisterLocalRepositoryResult {
 	settingsSources: RepositoryConfigSourceSnapshot[];
 }
 
+/** Result of prompting the user to pick a local repository folder. */
 export interface LocalRepositorySelectionResult {
 	canceled: boolean;
 	error?: string;
@@ -82,8 +89,10 @@ export type ArchiveRepositoryDiagnosticCode =
 	| 'repository-update-failed'
 	| 'workspace-archive-failed';
 
+/** Severity level of a repository-archive diagnostic. */
 export type ArchiveRepositoryDiagnosticSeverity = 'error' | 'info' | 'warning';
 
+/** A single diagnostic emitted while archiving a repository. */
 export interface ArchiveRepositoryDiagnostic {
 	code: ArchiveRepositoryDiagnosticCode;
 	message: string;
@@ -92,14 +101,17 @@ export interface ArchiveRepositoryDiagnostic {
 	workspaceId?: string;
 }
 
+/** Request to archive a repository and its workspaces. */
 export interface ArchiveRepositoryRequest {
 	branchCleanup?: boolean;
 	reason?: string;
 	repositoryId: string;
 }
 
+/** Outcome status of a repository-archive attempt. */
 export type ArchiveRepositoryStatus = 'aborted' | 'failure' | 'success';
 
+/** Wire snapshot of a repository after it has been archived. */
 export interface ArchivedRepositorySnapshot {
 	archivedAt: string;
 	archivedWorkspaceIds: string[];
@@ -109,6 +121,7 @@ export interface ArchivedRepositorySnapshot {
 	slug: string;
 }
 
+/** Result of archiving a repository, with diagnostics and the count of archived workspaces. */
 export interface ArchiveRepositoryResult {
 	archiveRecordId: string | null;
 	diagnostics: ArchiveRepositoryDiagnostic[];
@@ -129,8 +142,10 @@ export type DeleteRepositoryDiagnosticCode =
 	| 'repository-not-found'
 	| 'workspace-cleanup-failed';
 
+/** Severity level of a repository-delete diagnostic. */
 export type DeleteRepositoryDiagnosticSeverity = 'error' | 'info' | 'warning';
 
+/** A single diagnostic emitted while deleting a repository. */
 export interface DeleteRepositoryDiagnostic {
 	code: DeleteRepositoryDiagnosticCode;
 	message: string;
@@ -139,12 +154,15 @@ export interface DeleteRepositoryDiagnostic {
 	workspaceId?: string;
 }
 
+/** Request to permanently delete a repository and its workspaces. */
 export interface DeleteRepositoryRequest {
 	repositoryId: string;
 }
 
+/** Outcome status of a repository-delete attempt. */
 export type DeleteRepositoryStatus = 'failure' | 'success';
 
+/** Wire snapshot of a repository after it has been deleted. */
 export interface DeletedRepositorySnapshot {
 	deletedWorkspaceIds: string[];
 	id: string;
@@ -152,6 +170,7 @@ export interface DeletedRepositorySnapshot {
 	path: string;
 }
 
+/** Result of deleting a repository, with diagnostics and the count of deleted workspaces. */
 export interface DeleteRepositoryResult {
 	diagnostics: DeleteRepositoryDiagnostic[];
 	repository: DeletedRepositorySnapshot | null;
@@ -159,6 +178,7 @@ export interface DeleteRepositoryResult {
 	workspacesDeleted: number;
 }
 
+/** Wire snapshot of a repository adopted into the database from an existing on-disk folder. */
 export interface AdoptedRepositorySnapshot {
 	adoptedAt: string;
 	createdAt: string;

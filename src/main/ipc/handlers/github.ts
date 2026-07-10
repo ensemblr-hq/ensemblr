@@ -11,6 +11,7 @@ import {
 	pushWorkspaceBranchRequestSchema,
 } from '../request-schemas.ts';
 
+/** Dependencies for registering the gh-backed review-flow IPC handlers. */
 export interface GithubHandlersOptions {
 	githubService: GithubService;
 	withPermissionGate: WithPermissionGate;

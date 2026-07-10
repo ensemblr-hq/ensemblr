@@ -11,8 +11,10 @@ import { Streamdown } from 'streamdown';
 import { cn } from '@/renderer/lib/utils';
 import { codeThemeAtom, markdownStyleAtom } from '@/renderer/state/preferences';
 
+/** Props for {@link MessageResponse}; mirrors Streamdown's own props. */
 type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
+/** Renders assistant markdown through Streamdown, honoring the user's chosen code theme and markdown style. */
 export const MessageResponse = memo(
 	({ className, ...props }: MessageResponseProps) => {
 		const codeTheme = useAtomValue(codeThemeAtom);

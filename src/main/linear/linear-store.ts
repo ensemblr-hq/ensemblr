@@ -109,6 +109,10 @@ export function createLinearStore({
 	database,
 	now = () => new Date(),
 }: CreateLinearStoreOptions): LinearStore {
+	/**
+	 * Current time as an ISO-8601 string for stamping synced rows.
+	 * @returns The current timestamp in ISO format.
+	 */
 	function timestamp(): string {
 		return now().toISOString();
 	}
@@ -341,6 +345,7 @@ export function createLinearStore({
 	};
 }
 
+/** Raw `linear_issues` table row (snake_case columns). */
 interface IssueRow {
 	archived_at: string | null;
 	assignee_id: string | null;
@@ -359,6 +364,7 @@ interface IssueRow {
 	url: string;
 }
 
+/** Raw `linear_resources` table row (snake_case columns). */
 interface ResourceRow {
 	data_json: string;
 	id: string;
@@ -368,6 +374,7 @@ interface ResourceRow {
 	team_id: string | null;
 }
 
+/** Raw `linear_comments` table row (snake_case columns). */
 interface CommentRow {
 	author_name: string | null;
 	body: string;
@@ -378,6 +385,7 @@ interface CommentRow {
 	synced_at: string;
 }
 
+/** Raw `linear_sync_state` table row (snake_case columns). */
 interface SyncStateRow {
 	cursor: string | null;
 	error_code: string | null;
@@ -386,6 +394,11 @@ interface SyncStateRow {
 	synced_at: string | null;
 }
 
+/**
+ * Map a raw issue row into a {@link LinearIssueRecord}, decoding its JSON blob.
+ * @param row - Raw `linear_issues` row.
+ * @returns The cached issue record.
+ */
 function mapIssueRow(row: IssueRow): LinearIssueRecord {
 	return {
 		archivedAt: row.archived_at,
@@ -406,6 +419,11 @@ function mapIssueRow(row: IssueRow): LinearIssueRecord {
 	};
 }
 
+/**
+ * Map a raw resource row into a {@link LinearResourceRecord}, decoding its JSON blob.
+ * @param row - Raw `linear_resources` row.
+ * @returns The cached resource record.
+ */
 function mapResourceRow(row: ResourceRow): LinearResourceRecord {
 	return {
 		data: parseJsonRecord(row.data_json),
@@ -417,6 +435,11 @@ function mapResourceRow(row: ResourceRow): LinearResourceRecord {
 	};
 }
 
+/**
+ * Map a raw comment row into a {@link LinearCommentRecord}, decoding its JSON blob.
+ * @param row - Raw `linear_comments` row.
+ * @returns The cached comment record.
+ */
 function mapCommentRow(row: CommentRow): LinearCommentRecord {
 	return {
 		authorName: row.author_name,
@@ -429,6 +452,12 @@ function mapCommentRow(row: CommentRow): LinearCommentRecord {
 	};
 }
 
+/**
+ * Parse a stored JSON column into a record, falling back to an empty object on
+ * malformed or non-object data.
+ * @param json - Serialized JSON from a `data_json` column.
+ * @returns The parsed record, or an empty object.
+ */
 function parseJsonRecord(json: string): Record<string, unknown> {
 	try {
 		const parsed = JSON.parse(json) as unknown;
@@ -441,6 +470,11 @@ function parseJsonRecord(json: string): Record<string, unknown> {
 	}
 }
 
+/**
+ * Escape SQL `LIKE` wildcards (`%` and `_`) so user queries match literally.
+ * @param input - Raw search text.
+ * @returns The input with wildcards backslash-escaped.
+ */
 function escapeLikePattern(input: string): string {
 	return input.replaceAll(/[%_]/g, (match) => `\\${match}`);
 }

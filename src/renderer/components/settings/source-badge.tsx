@@ -11,6 +11,7 @@ const SOURCE_LABEL: Record<SettingsResolutionSource, string> = {
 	worktreeinclude: 'git worktree include',
 };
 
+/** Props for the settings source badge. */
 interface SourceBadgeProps {
 	source: SettingsResolutionSource | null | undefined;
 	locked?: boolean;

@@ -1,13 +1,17 @@
 import type { AnyRouter, ParsedLocation } from '@tanstack/react-router';
 
+/** Why a route loader ran: fresh navigation, intent preload, or staying on the route. */
 export type LoaderCause = 'enter' | 'preload' | 'stay';
+/** How a stale-data loader reload runs: in the background or blocking navigation. */
 export type LoaderStaleReloadMode = 'background' | 'blocking';
 
+/** Snapshot of a route loader's inputs (deps and params) used to detect changes. */
 export interface RouteInputSnapshot {
 	deps: unknown;
 	params?: Record<string, unknown>;
 }
 
+/** Metadata describing a single route loader invocation. */
 export interface LoaderProfileMetadata {
 	cause: LoaderCause;
 	deps: unknown;
@@ -18,6 +22,7 @@ export interface LoaderProfileMetadata {
 	staleReloadMode: LoaderStaleReloadMode;
 }
 
+/** A completed loader invocation with its timing and change detection. */
 export interface LoaderProfileRecord extends LoaderProfileMetadata {
 	depsChange: string;
 	durationMs: number;
@@ -25,22 +30,26 @@ export interface LoaderProfileRecord extends LoaderProfileMetadata {
 	startedAt: number;
 }
 
+/** Metadata describing a single IPC call captured during navigation. */
 export interface IpcProfileMetadata {
 	channel: string;
 	usesDatabase: boolean;
 }
 
+/** A completed IPC call with its timing. */
 export interface IpcProfileRecord extends IpcProfileMetadata {
 	durationMs: number;
 	startedAt: number;
 }
 
+/** A layout component mount or unmount event captured during navigation. */
 export interface LayoutProfileRecord {
 	component: string;
 	event: 'mount' | 'unmount';
 	startedAt: number;
 }
 
+/** A route preload attempt with its status and optional duration. */
 export interface PreloadProfileRecord {
 	durationMs?: number;
 	href: string;
@@ -48,6 +57,7 @@ export interface PreloadProfileRecord {
 	status: 'failed' | 'resolved' | 'started';
 }
 
+/** Aggregated profile of one navigation, collecting its loader, IPC, layout, and preload records. */
 export interface NavigationProfile {
 	fromHref: string;
 	hadIntentPreload: boolean;

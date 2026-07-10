@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
+/** Kind of content a chat tab hosts: a chat, diff, document, file, or preview. */
 export type ChatTabKind = 'chat' | 'diff' | 'document' | 'file' | 'preview';
 
+/** Domain shape of a chat tab row returned by the repository. */
 export interface ChatTabRow {
 	closedAt: string | null;
 	id: string;
@@ -15,6 +17,7 @@ export interface ChatTabRow {
 	workspaceId: string;
 }
 
+/** Input for opening a new chat tab in a workspace. */
 export interface OpenChatTabInput {
 	kind: ChatTabKind;
 	metadata?: Record<string, unknown>;
@@ -23,6 +26,7 @@ export interface OpenChatTabInput {
 	workspaceId: string;
 }
 
+/** Per-workspace runtime state tracking the active tab and last active Pi session. */
 export interface PiRuntimeStateRow {
 	activeTabId: string | null;
 	lastActiveSessionId: string | null;
@@ -30,6 +34,7 @@ export interface PiRuntimeStateRow {
 	workspaceId: string;
 }
 
+/** Raw `chat_tabs` row shape with snake_case columns as stored in SQLite. */
 interface ChatTabRowShape {
 	closed_at: string | null;
 	id: string;
@@ -42,6 +47,7 @@ interface ChatTabRowShape {
 	workspace_id: string;
 }
 
+/** Raw `pi_runtime_state` row shape with snake_case columns as stored in SQLite. */
 interface RuntimeStateRowShape {
 	active_tab_id: string | null;
 	last_active_session_id: string | null;
@@ -397,6 +403,11 @@ export function setRuntimeState({
 	return getRuntimeState({ database, workspaceId });
 }
 
+/**
+ * Map a raw `chat_tabs` row to the domain {@link ChatTabRow}, parsing its metadata JSON.
+ * @param row - Raw SQLite row
+ * @returns The domain chat tab
+ */
 function mapTabRow(row: ChatTabRowShape): ChatTabRow {
 	return {
 		closedAt: row.closed_at,
@@ -411,6 +422,11 @@ function mapTabRow(row: ChatTabRowShape): ChatTabRow {
 	};
 }
 
+/**
+ * Map a raw `pi_runtime_state` row to the domain {@link PiRuntimeStateRow}.
+ * @param row - Raw SQLite row
+ * @returns The domain runtime state
+ */
 function mapRuntimeRow(row: RuntimeStateRowShape): PiRuntimeStateRow {
 	return {
 		activeTabId: row.active_tab_id,
@@ -420,6 +436,11 @@ function mapRuntimeRow(row: RuntimeStateRowShape): PiRuntimeStateRow {
 	};
 }
 
+/**
+ * Serialize tab metadata to a JSON string, falling back to `{}` on missing or unserializable input.
+ * @param metadata - Metadata record to serialize
+ * @returns The JSON string, or `'{}'` when absent or serialization fails
+ */
 function serializeMetadata(metadata?: Record<string, unknown>): string {
 	if (!metadata) {
 		return '{}';
@@ -431,6 +452,11 @@ function serializeMetadata(metadata?: Record<string, unknown>): string {
 	}
 }
 
+/**
+ * Parse a metadata JSON string into a record, returning `{}` on invalid or non-object input.
+ * @param raw - JSON string to parse
+ * @returns The parsed record, or an empty record when parsing fails
+ */
 function parseMetadata(raw: string): Record<string, unknown> {
 	try {
 		const parsed = JSON.parse(raw);

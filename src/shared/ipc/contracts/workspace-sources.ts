@@ -59,22 +59,27 @@ export interface RepositoryIssueWire {
 	url: string;
 }
 
+/** Request to list a repository's remote branches. */
 export interface ListRepositoryBranchesRequest {
 	repositoryId: string;
 }
 
+/** Request to list a repository's open pull requests. */
 export interface ListRepositoryPullRequestsRequest {
 	repositoryId: string;
 }
 
+/** Request to list a repository's issues. */
 export interface ListRepositoryIssuesRequest {
 	repositoryId: string;
 }
 
+/** The repository's branches, or an empty list with a typed error when `gh` fails. */
 export type ListRepositoryBranchesResult =
 	| { branches: RepositoryBranchWire[]; status: 'ok' }
 	| { branches: RepositoryBranchWire[]; error: GithubFailure; status: 'error' };
 
+/** The repository's open pull requests, or an empty list with a typed error when `gh` fails. */
 export type ListRepositoryPullRequestsResult =
 	| { pullRequests: RepositoryPullRequestWire[]; status: 'ok' }
 	| {
@@ -83,6 +88,7 @@ export type ListRepositoryPullRequestsResult =
 			status: 'error';
 	  };
 
+/** The repository's issues, or an empty list with a typed error when `gh` fails. */
 export type ListRepositoryIssuesResult =
 	| { issues: RepositoryIssueWire[]; status: 'ok' }
 	| { error: GithubFailure; issues: RepositoryIssueWire[]; status: 'error' };

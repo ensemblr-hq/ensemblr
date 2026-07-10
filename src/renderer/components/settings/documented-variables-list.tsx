@@ -10,6 +10,7 @@ import {
 } from '@/renderer/components/ui/collapsible';
 import type { EnvironmentVariableSnapshot } from '@/shared/ipc/contracts/environment';
 
+/** Props for the collapsible list of settable, currently-unset catalog variables. */
 interface DocumentedVariablesListProps {
 	variables: EnvironmentVariableSnapshot[];
 	onAdd: (key: string) => void;

@@ -28,6 +28,7 @@ import {
 	restoreCheckpointRequestSchema,
 } from '../request-schemas.ts';
 
+/** Dependencies for registering the checkpoint IPC handlers. */
 export interface CheckpointHandlersOptions {
 	databaseService: EnsemblrDatabaseService;
 }
@@ -103,6 +104,13 @@ export function registerCheckpointHandlers({
 	);
 }
 
+/**
+ * Resolve the workspace directory for a turn from its checkpoint row, so the
+ * renderer never supplies filesystem paths.
+ * @param database - Open database connection
+ * @param turnId - Turn whose workspace path to resolve
+ * @returns The absolute workspace directory for the turn's checkpoint
+ */
 function resolveCwdForTurn({
 	database,
 	turnId,
@@ -130,6 +138,12 @@ function resolveCwdForTurn({
 	return cwd;
 }
 
+/**
+ * Convert a thrown error into a structured checkpoint failure for the renderer.
+ * @param error - The caught error
+ * @param fallback - Failure code to use when the error is not a service error
+ * @returns The structured checkpoint failure
+ */
 function describeFailure(
 	error: unknown,
 	fallback: 'diff-failed' | 'restore-failed',
@@ -143,6 +157,11 @@ function describeFailure(
 	};
 }
 
+/**
+ * Map a checkpoint database row to its renderer-facing wire shape.
+ * @param row - The stored checkpoint row
+ * @returns The checkpoint in wire form
+ */
 function toWire(row: CheckpointRow): CheckpointWire {
 	return {
 		createdAt: row.createdAt,

@@ -377,19 +377,35 @@ export const piCapturedLineSchema = z.object({
 	raw: z.string(),
 });
 
+/** Text content block within an assistant message. */
 export type PiTextBlock = z.infer<typeof piTextBlockSchema>;
+/** Thinking content block within an assistant message. */
 export type PiThinkingBlock = z.infer<typeof piThinkingBlockSchema>;
+/** Tool-call content block within an assistant message. */
 export type PiToolCallBlock = z.infer<typeof piToolCallBlockSchema>;
+/** One content block of an assistant message: text, thinking, or tool call. */
 export type PiAssistantBlock = z.infer<typeof piAssistantBlockSchema>;
+/** A user message in the Pi RPC stream. */
 export type PiUserMessage = z.infer<typeof piUserMessageSchema>;
+/** An assistant message with its content blocks, model, and token usage. */
 export type PiAssistantMessage = z.infer<typeof piAssistantMessageSchema>;
+/** A tool-result message carrying a tool call's output. */
 export type PiToolResultMessage = z.infer<typeof piToolResultMessageSchema>;
+/** An extension-injected custom context message. */
 export type PiCustomMessage = z.infer<typeof piCustomMessageSchema>;
+/** Any Pi message (user, assistant, tool result, or custom) carried on an event. */
 export type PiAgentMessage = z.infer<typeof piAgentMessageSchema>;
+/** A streaming assistant delta emitted inside a `message_update` frame. */
 export type PiAssistantDelta = z.infer<typeof piAssistantDeltaSchema>;
+/** Accumulated tool output payload shared by tool-execution update and end frames. */
 export type PiToolPayload = z.infer<typeof piToolPayloadSchema>;
+/** Session statistics (tokens, cost, context usage) answering `get_session_stats`. */
 export type PiSessionStats = z.infer<typeof piSessionStatsSchema>;
+/** Command acknowledgment frame responding to a request. */
 export type PiResponseFrame = z.infer<typeof piResponseSchema>;
+/** An extension UI request frame (confirm, notify, or setStatus). */
 export type PiExtensionUiRequest = z.infer<typeof piExtensionUiRequestSchema>;
+/** Any stdout frame observed in the Pi RPC stream. */
 export type PiRpcEvent = z.infer<typeof piRpcEventSchema>;
+/** One captured Pi RPC fixture line: timestamp, source stream, and raw text. */
 export type PiCapturedLine = z.infer<typeof piCapturedLineSchema>;

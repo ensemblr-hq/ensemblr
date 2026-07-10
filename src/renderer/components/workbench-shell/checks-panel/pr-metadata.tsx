@@ -1,5 +1,6 @@
 import { Button } from '@/renderer/components/ui/button';
 
+/** Renders a muted placeholder message for an empty checks section. */
 export function ChecksEmptyMessage({ label }: { label: string }) {
 	return <p className='text-muted-foreground text-xs'>{label}</p>;
 }

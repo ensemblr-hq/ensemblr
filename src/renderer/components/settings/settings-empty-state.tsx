@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { cn } from '@/renderer/lib/utils';
 
+/** Props for the shared settings empty-state block. */
 interface SettingsEmptyStateProps {
 	title: ReactNode;
 	description?: ReactNode;

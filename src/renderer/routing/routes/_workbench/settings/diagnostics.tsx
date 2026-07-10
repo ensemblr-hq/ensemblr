@@ -12,6 +12,7 @@ import { SetupDiagnosticsPanel } from '@/renderer/components/setup-diagnostics';
 import { Button } from '@/renderer/components/ui/button';
 import { sanitizeDiagnosticsBundle } from '@/renderer/lib/diagnostics-bundle';
 
+/** Route for the Diagnostics settings section; renders the setup-diagnostics panel with a copy-bundle action. */
 export const Route = createFileRoute('/_workbench/settings/diagnostics')({
 	component: DiagnosticsRoute,
 });

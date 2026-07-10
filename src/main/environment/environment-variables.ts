@@ -41,6 +41,7 @@ import {
 export { BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG } from './environment-variable-catalog.ts';
 export { isEnvironmentVariableKey } from './environment-variable-keys.ts';
 
+/** Machine-readable failure codes surfaced by the environment-variables service. */
 export type EnvironmentVariablesErrorCode =
 	| 'database-unavailable'
 	| 'env-file-not-found'

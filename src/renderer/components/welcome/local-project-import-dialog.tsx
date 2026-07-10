@@ -15,6 +15,7 @@ const INITIAL_DESCRIPTION =
 const STILL_WORKING_DESCRIPTION =
 	'Still working — large repositories with deep history can take a minute or two. The window will switch as soon as the workspace is ready.';
 
+/** Dialog body that reports import progress and escalates to a "still working" note after a delay. */
 function ImportDialogBody() {
 	const [stillWorking, setStillWorking] = useState(false);
 

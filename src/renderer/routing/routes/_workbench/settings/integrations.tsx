@@ -17,10 +17,12 @@ import { Spinner } from '@/renderer/components/ui/spinner';
 import { LinearLogo } from '@/renderer/components/workbench-shell/source-provider-logo';
 import type { LinearConnectionSnapshot } from '@/shared/ipc/contracts/linear';
 
+/** Route for the Integrations settings section; renders the integrations panel. */
 export const Route = createFileRoute('/_workbench/settings/integrations')({
 	component: IntegrationsSettings,
 });
 
+/** Integrations settings panel; currently exposes the Linear connection row. */
 function IntegrationsSettings() {
 	return (
 		<SettingsSection title='Integrations'>
@@ -29,6 +31,7 @@ function IntegrationsSettings() {
 	);
 }
 
+/** Settings row that connects, disconnects, or reconnects the Linear integration and surfaces login failures. */
 function LinearConnectionRow() {
 	const queryClient = useQueryClient();
 	const { data: snapshot, isLoading: connectionLoading } = useQuery(
@@ -108,6 +111,7 @@ function LinearConnectionRow() {
 	);
 }
 
+/** Connect, disconnect, and cancel controls whose buttons reflect the current Linear connection state. */
 function LinearConnectionControls({
 	isDisconnecting,
 	isLoggingIn,
@@ -170,6 +174,7 @@ function LinearConnectionControls({
 	);
 }
 
+/** Badge showing the Linear connection state, or nothing while the snapshot is loading. */
 function LinearConnectionStateBadge({
 	snapshot,
 }: {
@@ -191,6 +196,12 @@ function LinearConnectionStateBadge({
 	}
 }
 
+/**
+ * Build the human-readable description of the current Linear connection for the settings row.
+ * @param snapshot - Latest Linear connection snapshot, or undefined while loading
+ * @param isLoading - Whether the connection query is still in flight
+ * @returns A sentence describing the connection state and next action
+ */
 function describeLinearConnection(
 	snapshot: LinearConnectionSnapshot | undefined,
 	isLoading: boolean,

@@ -19,6 +19,7 @@ import type {
 	ReviewTodoWire,
 } from '@/shared/ipc/contracts/review-comments';
 
+/** Inputs for building the workspace shell PR model: local changes, review rows, and the gh snapshot. */
 export interface BuildPullRequestShellModelInput {
 	changeSummary: WorkspaceShellModel['changeSummary'];
 	localComments: readonly ReviewCommentWire[];
@@ -116,6 +117,12 @@ function toCheckSummary(check: GithubCheckWire): PullRequestCheckSummary {
 	};
 }
 
+/**
+ * Maps a GitHub PR comment into the shell comment summary, folding its path and
+ * line into the detail line.
+ * @param comment - The GitHub comment wire record
+ * @returns The PR comment summary for the sidebar
+ */
 function toCommentSummary(
 	comment: GithubCommentWire,
 ): PullRequestCommentSummary {
@@ -132,6 +139,12 @@ function toCommentSummary(
 	};
 }
 
+/**
+ * Projects open local review comments into shell comment summaries, dropping
+ * resolved ones.
+ * @param comments - Local review comment wire records
+ * @returns Summaries for the still-open local comments
+ */
 function buildLocalCommentSummaries(
 	comments: readonly ReviewCommentWire[],
 ): PullRequestCommentSummary[] {
@@ -150,6 +163,11 @@ function buildLocalCommentSummaries(
 	);
 }
 
+/**
+ * Projects review todos into shell todo summaries, dropping canceled ones.
+ * @param todos - Review todo wire records
+ * @returns Summaries for the non-canceled todos
+ */
 function buildTodoSummaries(
 	todos: readonly ReviewTodoWire[],
 ): PullRequestTodoSummary[] {
@@ -201,6 +219,12 @@ function derivePullRequestStatus(
 	return 'idle';
 }
 
+/**
+ * Derives the PR header label from the pull request state and shell status.
+ * @param pullRequest - The GitHub pull request wire record
+ * @param status - The derived PR shell status
+ * @returns The header label to display
+ */
 function deriveLabel(
 	pullRequest: GithubPullRequestWire,
 	status: PullRequestShellStatus,
@@ -226,6 +250,11 @@ function deriveLabel(
 	}
 }
 
+/**
+ * Derives the PR detail line, preferring a sync-error message when one is present.
+ * @param options - The pull request, its shell status, and any sync error
+ * @returns The detail line to display
+ */
 function deriveDetail({
 	pullRequest,
 	status,
@@ -299,6 +328,11 @@ function derivePreviewDeployment(
 	return undefined;
 }
 
+/**
+ * Infers the preview deployment provider from a deployment URL.
+ * @param url - The deployment URL
+ * @returns The detected provider, or `'unknown'` when none matches
+ */
 function inferDeploymentProvider(
 	url: string,
 ): PullRequestPreviewDeploymentSummary['provider'] {
@@ -348,6 +382,12 @@ function buildGitStatus(
 	};
 }
 
+/**
+ * Formats the elapsed time between two ISO timestamps as `Xs` or `Xm Ys`.
+ * @param startedAt - ISO start timestamp
+ * @param completedAt - ISO completion timestamp
+ * @returns The formatted duration, or undefined when a bound is missing or invalid
+ */
 function formatDuration(
 	startedAt?: string,
 	completedAt?: string,
@@ -367,6 +407,11 @@ function formatDuration(
 	return `${minutes}m ${seconds % 60}s`;
 }
 
+/**
+ * Returns the first line of a multi-line string.
+ * @param text - The text to read
+ * @returns The text up to the first newline
+ */
 function firstLine(text: string): string {
 	return text.split('\n', 1)[0] ?? '';
 }

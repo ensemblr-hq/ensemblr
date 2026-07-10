@@ -89,6 +89,11 @@ export function createLinearService({
 	now = () => new Date(),
 	staleAfterMs = DEFAULT_STALE_AFTER_MS,
 }: CreateLinearServiceOptions): LinearService {
+	/**
+	 * Open a Linear store bound to the current database connection, throwing when
+	 * the Ensemblr database is not open.
+	 * @returns A store for the open database.
+	 */
 	function getStore(): LinearStore {
 		const database: DatabaseSync | undefined =
 			databaseService.getConnection()?.database;
@@ -103,6 +108,11 @@ export function createLinearService({
 		return createLinearStore({ database, now });
 	}
 
+	/**
+	 * Decide whether a cached timestamp has aged past the staleness window.
+	 * @param syncedAt - ISO timestamp of the last sync, if any.
+	 * @returns True when the value is missing or older than the stale threshold.
+	 */
 	function isStale(syncedAt: string | null | undefined): boolean {
 		if (!syncedAt) {
 			return true;
@@ -111,6 +121,12 @@ export function createLinearService({
 		return now().getTime() - Date.parse(syncedAt) > staleAfterMs;
 	}
 
+	/**
+	 * Sync up to `maxSyncPages` of issues from Linear into the store, recording
+	 * sync-state transitions and re-throwing on failure.
+	 * @param store - Store to upsert issues and sync state into.
+	 * @param teamId - Optional team to scope the sync to.
+	 */
 	async function syncIssues(
 		store: LinearStore,
 		teamId?: string,
@@ -159,6 +175,11 @@ export function createLinearService({
 		}
 	}
 
+	/**
+	 * Sync all metadata kinds (teams, projects, states, labels, cycles, users)
+	 * from Linear into the store, recording sync-state transitions.
+	 * @param store - Store to upsert resources and sync state into.
+	 */
 	async function syncMetadata(store: LinearStore): Promise<void> {
 		store.setSyncState({
 			cursor: null,
@@ -210,6 +231,11 @@ export function createLinearService({
 		}
 	}
 
+	/**
+	 * Read all cached metadata resources into the wire shape.
+	 * @param store - Store to read cached resources from.
+	 * @returns The cached metadata plus its last-synced timestamp.
+	 */
 	function readMetadata(store: LinearStore): LinearMetadataWire {
 		return {
 			cycles: store.listResources('cycle').map(resourceRecordToWire),
@@ -374,6 +400,11 @@ export function createLinearService({
 	};
 }
 
+/**
+ * Convert client issue data into the store's upsert shape.
+ * @param issue - Issue data returned by the Linear client.
+ * @returns The issue upsert record for the store.
+ */
 function issueDataToUpsert(issue: LinearIssueData): LinearIssueUpsert {
 	return {
 		archivedAt: issue.archivedAt,
@@ -400,6 +431,12 @@ function issueDataToUpsert(issue: LinearIssueData): LinearIssueUpsert {
 	};
 }
 
+/**
+ * Convert client issue data into the renderer wire shape.
+ * @param issue - Issue data returned by the Linear client.
+ * @param syncedAt - Timestamp to stamp the wire record with.
+ * @returns The wire issue for IPC.
+ */
 function issueDataToWire(
 	issue: LinearIssueData,
 	syncedAt: string | null,
@@ -436,6 +473,12 @@ function issueDataToWire(
 	};
 }
 
+/**
+ * Convert a cached issue record into the renderer wire shape, decoding its
+ * stored JSON relations.
+ * @param record - Cached issue record from the store.
+ * @returns The wire issue for IPC.
+ */
 function issueRecordToWire(record: LinearIssueRecord): LinearIssueWire {
 	const assignee = readEntity(record.data.assignee);
 	const cycle = readEntity(record.data.cycle);
@@ -478,6 +521,12 @@ function issueRecordToWire(record: LinearIssueRecord): LinearIssueWire {
 	};
 }
 
+/**
+ * Convert client comment data into the store's upsert shape.
+ * @param issueId - ID of the issue the comment belongs to.
+ * @param comment - Comment data returned by the Linear client.
+ * @returns The comment upsert record for the store.
+ */
 function commentDataToUpsert(issueId: string, comment: LinearCommentData) {
 	return {
 		authorName: comment.authorName,
@@ -489,6 +538,11 @@ function commentDataToUpsert(issueId: string, comment: LinearCommentData) {
 	};
 }
 
+/**
+ * Convert client comment data into the renderer wire shape.
+ * @param comment - Comment data returned by the Linear client.
+ * @returns The wire comment for IPC.
+ */
 function commentDataToWire(comment: LinearCommentData): LinearCommentWire {
 	return {
 		authorName: comment.authorName,
@@ -498,6 +552,11 @@ function commentDataToWire(comment: LinearCommentData): LinearCommentWire {
 	};
 }
 
+/**
+ * Convert a cached comment record into the renderer wire shape.
+ * @param record - Cached comment record from the store.
+ * @returns The wire comment for IPC.
+ */
 function commentRecordToWire(record: LinearCommentRecord): LinearCommentWire {
 	return {
 		authorName: record.authorName,
@@ -507,6 +566,11 @@ function commentRecordToWire(record: LinearCommentRecord): LinearCommentWire {
 	};
 }
 
+/**
+ * Convert a cached resource record into the renderer wire shape.
+ * @param record - Cached resource record from the store.
+ * @returns The wire resource for IPC.
+ */
 function resourceRecordToWire(
 	record: LinearResourceRecord,
 ): LinearResourceWire {
@@ -521,6 +585,10 @@ function resourceRecordToWire(
 	};
 }
 
+/**
+ * Build an empty metadata wire payload for error fallbacks.
+ * @returns Metadata with empty collections and no sync timestamp.
+ */
 function emptyMetadata(): LinearMetadataWire {
 	return {
 		cycles: [],
@@ -533,16 +601,31 @@ function emptyMetadata(): LinearMetadataWire {
 	};
 }
 
+/**
+ * Narrow an unknown value to a plain object, or null when it is not one.
+ * @param value - Value decoded from stored JSON.
+ * @returns The value as a record, or null.
+ */
 function readEntity(value: unknown): Record<string, unknown> | null {
 	return typeof value === 'object' && value !== null
 		? (value as Record<string, unknown>)
 		: null;
 }
 
+/**
+ * Narrow an unknown value to a string, or null when it is not one.
+ * @param value - Value decoded from stored JSON.
+ * @returns The value as a string, or null.
+ */
 function readString(value: unknown): string | null {
 	return typeof value === 'string' ? value : null;
 }
 
+/**
+ * Map any thrown error onto a serializable {@link LinearServiceFailure}.
+ * @param error - Error thrown by the client or store.
+ * @returns The wire failure descriptor.
+ */
 function toFailure(error: unknown): LinearServiceFailure {
 	if (error instanceof LinearServiceError) {
 		return {

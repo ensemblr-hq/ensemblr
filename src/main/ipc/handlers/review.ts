@@ -16,6 +16,7 @@ import {
 	saveReviewTodoRequestSchema,
 } from '../request-schemas.ts';
 
+/** Dependencies for registering the review-comments and todos IPC handlers. */
 export interface ReviewHandlersOptions {
 	reviewService: ReviewService;
 }

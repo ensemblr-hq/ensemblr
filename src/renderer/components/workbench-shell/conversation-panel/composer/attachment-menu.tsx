@@ -22,6 +22,7 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 
+/** Props for the composer attachment/link menu. */
 interface AttachmentMenuProps {
 	disabled?: boolean;
 	onAddAttachment: () => void;

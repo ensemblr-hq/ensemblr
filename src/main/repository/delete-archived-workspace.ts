@@ -26,6 +26,7 @@ export interface CreateDeleteArchivedWorkspaceServiceOptions {
 	localCommandService: LocalCommandService;
 }
 
+/** Archived-workspace row joined with its archive record, used to drive a permanent delete. */
 interface ArchivedWorkspace {
 	archivedContextPath: string | null;
 	archivedAt: string | null;
@@ -168,6 +169,12 @@ export function createDeleteArchivedWorkspaceService({
 	};
 }
 
+/**
+ * Reads and validates the archived-workspace/archive-record join row.
+ * @param database - Open database handle
+ * @param workspaceId - Archived workspace to read
+ * @returns The archived workspace, or null when missing or malformed
+ */
 function readArchivedWorkspace(
 	database: DatabaseSync,
 	workspaceId: string,
@@ -203,6 +210,12 @@ function readArchivedWorkspace(
 	};
 }
 
+/**
+ * Removes the workspace worktree directory, recording a diagnostic on failure.
+ * @param diagnostics - Diagnostics sink appended to on failure
+ * @param workspacePath - Absolute path of the worktree directory
+ * @returns True when the directory no longer exists afterwards
+ */
 function removeWorkspaceDirectory({
 	diagnostics,
 	workspacePath,
@@ -227,6 +240,13 @@ function removeWorkspaceDirectory({
 	return !existsSync(workspacePath);
 }
 
+/**
+ * Removes the preserved archived-contexts directory when present, recording a
+ * diagnostic on failure.
+ * @param diagnostics - Diagnostics sink appended to on failure
+ * @param preservedPath - Path of the preserved directory, or null when none was kept
+ * @returns True when the directory is absent afterwards
+ */
 function removeArchivedContextDirectory({
 	diagnostics,
 	preservedPath,
@@ -257,6 +277,12 @@ function removeArchivedContextDirectory({
 	}
 }
 
+/**
+ * Builds a failed {@link DeleteArchivedWorkspaceResult} for a workspace.
+ * @param workspaceId - Workspace the delete was attempted on
+ * @param diagnostic - Diagnostic describing the failure
+ * @returns The failure result
+ */
 function failure(
 	workspaceId: string,
 	diagnostic: DeleteArchivedWorkspaceDiagnostic,

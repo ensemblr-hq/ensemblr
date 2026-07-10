@@ -1,5 +1,6 @@
 import type { RegisteredRepositorySnapshot } from './repository';
 
+/** Stable diagnostic code for GitHub clone preparation and execution failures. */
 export type CloneGithubRepositoryDiagnosticCode =
 	| 'auth'
 	| 'destination-exists'
@@ -19,11 +20,13 @@ export type CloneGithubRepositoryDiagnosticCode =
 	| 'url-invalid'
 	| 'url-required';
 
+/** Severity level for a GitHub clone diagnostic. */
 export type CloneGithubRepositoryDiagnosticSeverity =
 	| 'error'
 	| 'info'
 	| 'warning';
 
+/** A diagnostic surfaced while preparing or running a GitHub clone. */
 export interface CloneGithubRepositoryDiagnostic {
 	code: CloneGithubRepositoryDiagnosticCode;
 	message: string;
@@ -31,11 +34,13 @@ export interface CloneGithubRepositoryDiagnostic {
 	severity: CloneGithubRepositoryDiagnosticSeverity;
 }
 
+/** Request to prepare a GitHub repository clone from a URL. */
 export interface CloneGithubRepositoryRequest {
 	destinationPath?: string;
 	url: string;
 }
 
+/** Validated clone plan produced by the prepare step, resolved before the clone runs. */
 export interface CloneGithubRepositoryPreparation {
 	defaultParentPath: string;
 	jobId: string;
@@ -45,6 +50,7 @@ export interface CloneGithubRepositoryPreparation {
 	validatedUrl: string;
 }
 
+/** Result of preparing a clone: the validated preparation on success, or diagnostics on failure. */
 export type CloneGithubRepositoryPrepareResult =
 	| {
 			diagnostics: CloneGithubRepositoryDiagnostic[];
@@ -56,12 +62,15 @@ export type CloneGithubRepositoryPrepareResult =
 			preparation: CloneGithubRepositoryPreparation;
 	  };
 
+/** Request to start a prepared clone job, keyed by its job id. */
 export interface CloneGithubRepositoryStartRequest {
 	jobId: string;
 }
 
+/** Channel a clone progress line came from: stdout, stderr, or a status update. */
 export type CloneGithubRepositoryProgressKind = 'stderr' | 'status' | 'stdout';
 
+/** A single progress line emitted while a clone job runs. */
 export interface CloneGithubRepositoryProgressEvent {
 	jobId: string;
 	kind: CloneGithubRepositoryProgressKind;
@@ -69,8 +78,10 @@ export interface CloneGithubRepositoryProgressEvent {
 	timestamp: string;
 }
 
+/** Terminal status of a clone job. */
 export type CloneGithubRepositoryStartStatus = 'failure' | 'success';
 
+/** Result of running a clone job: the registered repository plus logs and diagnostics. */
 export interface CloneGithubRepositoryStartResult {
 	diagnostics: CloneGithubRepositoryDiagnostic[];
 	jobId: string;
@@ -80,12 +91,14 @@ export interface CloneGithubRepositoryStartResult {
 	targetPath: string;
 }
 
+/** Result of the native folder picker for choosing a clone destination. */
 export interface CloneDestinationSelectionResult {
 	canceled: boolean;
 	error?: string;
 	path?: string;
 }
 
+/** A GitHub repository listed in the clone picker. */
 export interface GithubRepositoryEntry {
 	avatarUrl: string | null;
 	description: string | null;
@@ -95,14 +108,18 @@ export interface GithubRepositoryEntry {
 	updatedAt: string;
 }
 
+/** How much of the repository list to fetch: recently updated or the full set. */
 export type GithubRepositoryListScope = 'full' | 'recent';
 
+/** Request to list the authenticated user's GitHub repositories. */
 export interface GithubRepositoryListRequest {
 	scope?: GithubRepositoryListScope;
 }
 
+/** Outcome status of a GitHub repository listing. */
 export type GithubRepositoryListStatus = 'failure' | 'success';
 
+/** Result of listing GitHub repositories, with entries and a generation timestamp. */
 export interface GithubRepositoryListResult {
 	entries: GithubRepositoryEntry[];
 	error?: string;

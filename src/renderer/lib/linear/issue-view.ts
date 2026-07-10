@@ -162,6 +162,12 @@ export function buildWorkspaceSeedFromLinearIssue(
 	};
 }
 
+/**
+ * Truncates text to a maximum length, appending an ellipsis when shortened.
+ * @param text - Text to truncate
+ * @param maxLength - Maximum length before truncation
+ * @returns The original text, or an ellipsis-truncated copy
+ */
 function truncateText(text: string, maxLength: number): string {
 	return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 }

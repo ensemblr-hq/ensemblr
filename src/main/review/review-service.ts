@@ -32,6 +32,7 @@ import {
 	updateReviewTodo,
 } from '../storage/repositories/review-repository.ts';
 
+/** Public surface of the Ensemblr-local review comments and todos service. */
 export interface ReviewService {
 	deleteComment: (
 		request: DeleteReviewCommentRequest,
@@ -45,10 +46,16 @@ export interface ReviewService {
 	saveTodo: (request: SaveReviewTodoRequest) => SaveReviewTodoResult;
 }
 
+/** Options for {@link createReviewService}. */
 export interface ReviewServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 }
 
+/**
+ * Build the review service that persists and lists Ensemblr-local review comments and todos.
+ * @param options - Database service used to resolve the SQLite connection
+ * @returns The review service surface
+ */
 export function createReviewService({
 	databaseService,
 }: ReviewServiceOptions): ReviewService {

@@ -1,7 +1,11 @@
+/** Where a resolved command environment came from: the user's shell or a built-in fallback. */
 export type CommandEnvironmentSource = 'fallback' | 'shell';
+/** Severity of a diagnostic emitted while resolving the command environment. */
 export type CommandDiagnosticSeverity = 'info' | 'warning';
+/** Terminal status of a local command run. */
 export type LocalCommandStatus = 'failure' | 'success';
 
+/** Reason code describing why a local command failed. */
 export type LocalCommandFailureCode =
 	| 'canceled'
 	| 'command-not-found'

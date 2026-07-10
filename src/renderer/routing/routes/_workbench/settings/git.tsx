@@ -19,6 +19,7 @@ import {
 } from '@/renderer/state/preferences';
 import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
 
+/** Route for the Git settings section; renders the git-settings panel. */
 export const Route = createFileRoute('/_workbench/settings/git')({
 	component: GitSettings,
 });
@@ -26,6 +27,7 @@ export const Route = createFileRoute('/_workbench/settings/git')({
 /** Factory defaults; a row shows its "modified" accent when its value differs. */
 const DEFAULTS = DEFAULT_APP_SETTINGS.git;
 
+/** Git settings panel for workspace branch-name prefix defaults and merge/archive lifecycle behavior. */
 function GitSettings() {
 	const [prefixSource, setPrefixSource] = useAtom(branchPrefixSourceAtom);
 	const [customPrefix, setCustomPrefix] = useAtom(branchPrefixCustomAtom);

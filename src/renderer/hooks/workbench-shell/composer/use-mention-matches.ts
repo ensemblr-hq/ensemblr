@@ -5,6 +5,7 @@ import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 const DEFAULT_MENTION_LIMIT = 80;
 const MIN_DRILLDOWN_QUERY_LENGTH = 2;
 
+/** A workspace file entry paired with its fuzzy-match score. */
 interface ScoredWorkspaceFile {
 	entry: WorkspaceFileSummary;
 	score: number;

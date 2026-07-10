@@ -15,6 +15,11 @@ export interface KillTimer {
 	clear: () => void;
 }
 
+/**
+ * Create a single-shot kill-escalation timer where scheduling a new timer
+ * supersedes any pending one.
+ * @returns A timer exposing `schedule` and `clear` controls.
+ */
 export function createKillTimer(): KillTimer {
 	let handle: NodeJS.Timeout | null = null;
 

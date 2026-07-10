@@ -15,6 +15,7 @@ import type { WorkbenchShellData } from '@/renderer/types/workbench';
 
 export const workbenchRouteApi = getRouteApi('/_workbench');
 
+/** Layout model plus the navigation and setup-diagnostics context values it feeds. */
 export interface WorkbenchLayoutModelBundle {
 	model: WorkbenchLayoutModel;
 	navigation: NavigationContextValue;

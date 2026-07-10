@@ -35,6 +35,7 @@ const DEFAULT_TEMPLATES: Record<AgentActionKind, string> = {
 		'Review the current workspace changes like a thorough code reviewer. Flag bugs, risky patterns, and missing tests. Be specific with file and line references.',
 };
 
+/** An agent-action prompt template together with where it was resolved from. */
 export interface ResolvedAgentTemplate {
 	/** Where the template came from, for source diagnostics in the UI. */
 	source: string;

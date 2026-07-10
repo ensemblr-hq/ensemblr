@@ -14,6 +14,7 @@ export interface ChatAttachmentChipProps extends ComponentProps<'span'> {
 	onActivate?: () => void;
 }
 
+/** Compact attachment pill showing a file or folder icon and the path basename; acts as a button that opens the file preview when given an activation handler. */
 export function ChatAttachmentChip({
 	className,
 	kind = 'file',

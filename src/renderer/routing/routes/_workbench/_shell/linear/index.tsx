@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { LinearIssueList } from '@/renderer/components/linear/issue-list';
 import { LinearConnectionGate } from '@/renderer/components/linear/linear-connection-gate';
 
+/** Linear issue browse route (list, search, and filters). */
 export const Route = createFileRoute('/_workbench/_shell/linear/')({
 	component: LinearBrowseRoute,
 	staticData: {

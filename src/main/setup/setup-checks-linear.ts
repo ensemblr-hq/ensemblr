@@ -9,6 +9,7 @@ import {
 	type SetupCheckProviderContext,
 } from './setup-check-context.ts';
 
+/** Dependencies for the Linear setup check. */
 interface LinearCheckDeps {
 	context: SetupCheckProviderContext;
 	linearAuthService: LinearAuthService;
@@ -57,12 +58,22 @@ export function getLinearConnectionCheck(deps: LinearCheckDeps) {
 	return check(deps.context);
 }
 
+/**
+ * Map a Linear connection snapshot to a setup-check status.
+ * @param snapshot - Current Linear connection state
+ * @returns `'success'` when connected, otherwise `'warning'`
+ */
 function statusForConnection(
 	snapshot: LinearConnectionSnapshot,
 ): SetupCheckStatus {
 	return snapshot.state === 'connected' ? 'success' : 'warning';
 }
 
+/**
+ * Build the user-facing detail message describing the Linear connection state.
+ * @param snapshot - Current Linear connection state
+ * @returns A human-readable description of the connection
+ */
 function describeConnection(snapshot: LinearConnectionSnapshot): string {
 	switch (snapshot.state) {
 		case 'connected': {

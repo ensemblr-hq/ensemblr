@@ -55,10 +55,12 @@ export interface WorkspaceOpenTargetSnapshot {
 	shortcutLabel?: string;
 }
 
+/** Result of listing the "Open in" targets installed for a workspace. */
 export interface ListWorkspaceOpenTargetsResult {
 	targets: WorkspaceOpenTargetSnapshot[];
 }
 
+/** Request to open a workspace, or a path within it, in a chosen target app. */
 export interface OpenWorkspaceInTargetRequest {
 	/**
 	 * Path within the workspace to open instead of its root. Omit to open the
@@ -74,6 +76,7 @@ export interface OpenWorkspaceInTargetRequest {
 	workspaceId: string;
 }
 
+/** Result of an open-in-target action: success, or a failure with an error message. */
 export type OpenTargetResult = { ok: true } | { error: string; ok: false };
 
 /** IPC surface for the open-in menu. */

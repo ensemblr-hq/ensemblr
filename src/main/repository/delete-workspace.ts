@@ -25,6 +25,7 @@ export interface CreateDeleteWorkspaceServiceOptions {
 	localCommandService: LocalCommandService;
 }
 
+/** In-memory shape of a workspace row and its repository path loaded for deletion. */
 interface SourceWorkspace {
 	branchName: string | null;
 	id: string;
@@ -154,6 +155,12 @@ export function createDeleteWorkspaceService({
 	};
 }
 
+/**
+ * Load a workspace and its repository path from SQLite as the deletion source.
+ * @param database - Open SQLite connection
+ * @param workspaceId - ID of the workspace to load
+ * @returns The workspace row, or null when it is not registered
+ */
 function readWorkspace(
 	database: DatabaseSync,
 	workspaceId: string,
@@ -169,6 +176,11 @@ function readWorkspace(
 	return row;
 }
 
+/**
+ * Remove a workspace's worktree directory, recording a warning diagnostic on failure.
+ * @param options - Diagnostics sink and the workspace path to remove
+ * @returns True when the directory no longer exists afterward
+ */
 function removeWorkspaceDirectory({
 	diagnostics,
 	workspacePath,
@@ -194,6 +206,11 @@ function removeWorkspaceDirectory({
 	return !existsSync(workspacePath);
 }
 
+/**
+ * Wrap a single diagnostic into a failed delete-workspace result.
+ * @param diagnostic - The diagnostic explaining why the delete failed
+ * @returns A failure result carrying the diagnostic
+ */
 function failure(diagnostic: DeleteWorkspaceDiagnostic): DeleteWorkspaceResult {
 	return {
 		branchDeleted: false,
@@ -204,6 +221,11 @@ function failure(diagnostic: DeleteWorkspaceDiagnostic): DeleteWorkspaceResult {
 	};
 }
 
+/**
+ * Narrow an unknown SQLite row to the workspace fields required for deletion.
+ * @param row - Candidate row returned by the query
+ * @returns True when the row has the required workspace and repository fields
+ */
 function isWorkspaceRow(row: unknown): row is {
 	branchName: string | null;
 	id: string;

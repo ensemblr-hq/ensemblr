@@ -1,5 +1,8 @@
+/** Overall readiness of the setup diagnostics run. */
 export type SetupDiagnosticsStatus = 'blocked' | 'checking' | 'ready';
+/** Category a setup check belongs to. */
 export type SetupCheckGroupId = 'core' | 'github' | 'linear' | 'pi' | 'storage';
+/** Identifier for an individual setup diagnostic check. */
 export type SetupCheckId =
 	| 'config'
 	| 'environment-variables'
@@ -15,12 +18,14 @@ export type SetupCheckId =
 	| 'root-directory'
 	| 'shell-process-launch'
 	| 'sqlite-database';
+/** Status of a single setup check. */
 export type SetupCheckStatus =
 	| 'failure'
 	| 'pending'
 	| 'running'
 	| 'success'
 	| 'warning';
+/** Kind of remediation action offered for a failing setup check. */
 export type SetupRemediationActionKind =
 	| 'open-external'
 	| 'open-settings'
@@ -28,6 +33,7 @@ export type SetupRemediationActionKind =
 	| 'run-command'
 	| 'select-path';
 
+/** A user-facing action that can fix a failing setup check. */
 export interface SetupRemediationAction {
 	command?: string;
 	id: string;
@@ -36,12 +42,14 @@ export interface SetupRemediationAction {
 	target?: string;
 }
 
+/** Captured log output attached to a setup check. */
 export interface SetupCheckLogSnapshot {
 	label: string;
 	text: string;
 	truncated?: boolean;
 }
 
+/** IPC-safe snapshot of a single setup diagnostic check and its result. */
 export interface SetupCheckSnapshot {
 	blocking: boolean;
 	description: string;
@@ -55,6 +63,7 @@ export interface SetupCheckSnapshot {
 	updatedAt: string;
 }
 
+/** Aggregate snapshot of all setup checks with rollup counts and overall status. */
 export interface SetupDiagnosticsSnapshot {
 	blockedCount: number;
 	checks: SetupCheckSnapshot[];

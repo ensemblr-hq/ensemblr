@@ -5,8 +5,10 @@ import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
+/** Semantic tone for the setup-diagnostics status indicator. */
 type StatusTone = 'danger' | 'muted' | 'ok' | 'warning';
 
+/** Props for the setup-diagnostics summary strip. */
 interface SetupDiagnosticsSummaryProps {
 	detail: string;
 	isRetrying?: boolean;

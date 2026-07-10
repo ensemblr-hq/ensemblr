@@ -194,6 +194,11 @@ export function parseReviewThreads(value: unknown): GithubCommentWire[] {
 	});
 }
 
+/**
+ * Parse GraphQL issue-comment nodes into wire comments, dropping ones without a body.
+ * @param value - Raw issue-comment nodes from the gh GraphQL response
+ * @returns The parsed issue comments in wire form
+ */
 function parseIssueComments(value: unknown): GithubCommentWire[] {
 	if (!Array.isArray(value)) {
 		return [];
@@ -223,6 +228,11 @@ function parseIssueComments(value: unknown): GithubCommentWire[] {
 	});
 }
 
+/**
+ * Parse GraphQL review nodes into wire comments, dropping reviews without a body.
+ * @param value - Raw review nodes from the gh GraphQL response
+ * @returns The parsed reviews in wire comment form
+ */
 function parseReviews(value: unknown): GithubCommentWire[] {
 	if (!Array.isArray(value)) {
 		return [];
@@ -252,6 +262,12 @@ function parseReviews(value: unknown): GithubCommentWire[] {
 	});
 }
 
+/**
+ * Reduce a check run's status and conclusion to a single check bucket.
+ * @param status - Check run status (e.g. `COMPLETED`)
+ * @param conclusion - Check run conclusion (e.g. `SUCCESS`)
+ * @returns The bucket the check run belongs to
+ */
 function bucketFromCheckRun(
 	status: string,
 	conclusion: string,
@@ -271,6 +287,11 @@ function bucketFromCheckRun(
 	}
 }
 
+/**
+ * Reduce a legacy commit-status context state to a check bucket.
+ * @param state - Commit-status state (e.g. `SUCCESS`, `PENDING`)
+ * @returns The bucket the status context belongs to
+ */
 function bucketFromStatusContext(state: string): GithubCheckBucket {
 	switch (state.toUpperCase()) {
 		case 'SUCCESS':
@@ -283,6 +304,11 @@ function bucketFromStatusContext(state: string): GithubCheckBucket {
 	}
 }
 
+/**
+ * Normalize a raw deployment state string into the wire deployment state.
+ * @param state - Raw deployment state from GitHub
+ * @returns The corresponding wire deployment state
+ */
 function parseDeploymentState(state: string): GithubDeploymentWire['state'] {
 	switch (state.toLowerCase()) {
 		case 'success':
@@ -301,6 +327,11 @@ function parseDeploymentState(state: string): GithubDeploymentWire['state'] {
 	}
 }
 
+/**
+ * Normalize a raw mergeable value into the mergeable state, defaulting to unknown.
+ * @param value - Raw mergeable value from GitHub
+ * @returns The parsed mergeable state
+ */
 function parseMergeable(value: unknown): GithubMergeableState {
 	switch (typeof value === 'string' ? value.toUpperCase() : '') {
 		case 'MERGEABLE':
@@ -312,6 +343,11 @@ function parseMergeable(value: unknown): GithubMergeableState {
 	}
 }
 
+/**
+ * Normalize a raw pull-request state value into the wire PR state, defaulting to open.
+ * @param value - Raw PR state value from GitHub
+ * @returns The parsed pull-request state
+ */
 function parseState(value: unknown): GithubPullRequestState {
 	switch (typeof value === 'string' ? value.toUpperCase() : '') {
 		case 'MERGED':
@@ -323,6 +359,12 @@ function parseState(value: unknown): GithubPullRequestState {
 	}
 }
 
+/**
+ * Coerce an unknown value to a non-empty string, otherwise return the fallback.
+ * @param value - Value to read as a string
+ * @param fallback - Value returned when `value` is not a non-empty string
+ * @returns The string value or the fallback
+ */
 function readString(value: unknown, fallback = ''): string {
 	return typeof value === 'string' && value ? value : fallback;
 }

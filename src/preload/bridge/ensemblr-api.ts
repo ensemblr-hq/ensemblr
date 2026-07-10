@@ -39,6 +39,12 @@ const CHANNEL_OVERRIDES = {
 	startCloneGithubRepository: IPC_CHANNELS.cloneGithubRepositoryStart,
 } as const satisfies Partial<Record<InvokeKey, string>>;
 
+/**
+ * Resolves the IPC channel identifier for an invoke method, honoring the
+ * override map and otherwise matching the method name against the channels registry 1:1.
+ * @param key - Invoke method name
+ * @returns The IPC channel string to invoke
+ */
 function channelFor(key: InvokeKey): string {
 	if (key in CHANNEL_OVERRIDES) {
 		return CHANNEL_OVERRIDES[key as keyof typeof CHANNEL_OVERRIDES];

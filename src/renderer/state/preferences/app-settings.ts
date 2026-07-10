@@ -29,9 +29,11 @@ function settingAtom<
 	Section extends keyof AppSettings,
 	Key extends keyof AppSettings[Section],
 >(section: Section, key: Key) {
+	/** Value type of the targeted `config.json` setting. */
 	type Value = AppSettings[Section][Key];
 	// Accept a direct value or an updater fn, matching the `atomWithStorage`
 	// setter API these atoms replaced so existing call sites keep working.
+	/** Either a replacement value or an updater function for a setting. */
 	type Update = Value | ((prev: Value) => Value);
 	return atom(
 		(get) => get(appSettingsAtom)[section][key],

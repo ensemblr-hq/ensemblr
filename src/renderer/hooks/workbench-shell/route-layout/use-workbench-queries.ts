@@ -21,6 +21,7 @@ import type {
 } from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 
+/** Live query data and loading flags returned by {@link useWorkbenchQueries}. */
 export interface WorkbenchQueriesResult {
 	hasPreloadBridge: boolean;
 	healthData: ReturnType<typeof useQuery<typeof healthQuery>>['data'];

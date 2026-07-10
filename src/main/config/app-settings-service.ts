@@ -39,17 +39,29 @@ export interface AppSettingsService {
 	stop(): void;
 }
 
+/** Options for creating the app-settings service. */
 export interface CreateAppSettingsServiceOptions {
 	/** Override the config path (tests). Defaults to the real `~/.config` path. */
 	configPath?: string;
 }
 
+/**
+ * Coerce an unknown value into a plain record, treating non-objects and arrays as empty.
+ * @param value - Value to coerce
+ * @returns The value as a record, or an empty record when it is not a plain object
+ */
 function asRecord(value: unknown): Record<string, unknown> {
 	return value && typeof value === 'object' && !Array.isArray(value)
 		? (value as Record<string, unknown>)
 		: {};
 }
 
+/**
+ * Create the service that reads, writes, and watches the app settings section
+ * of the on-disk config, ignoring the filesystem events from its own writes.
+ * @param options - Optional overrides such as the config path
+ * @returns The app-settings service
+ */
 export function createAppSettingsService(
 	options: CreateAppSettingsServiceOptions = {},
 ): AppSettingsService {
@@ -179,6 +191,11 @@ export function createAppSettingsService(
 	};
 }
 
+/**
+ * Parse JSON text, returning an empty object rather than throwing on malformed input.
+ * @param text - JSON text to parse
+ * @returns The parsed value, or an empty object when parsing fails
+ */
 function safeParse(text: string): unknown {
 	try {
 		return JSON.parse(text);

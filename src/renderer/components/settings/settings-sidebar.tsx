@@ -20,6 +20,7 @@ import { cn } from '@/renderer/lib/utils';
 /** Settings scope toggle: User-wide preferences vs. per-repository overrides. */
 export type SettingsScope = 'user' | 'repo';
 
+/** A user-scope settings nav entry. */
 interface UserNavItem {
 	kind: 'user';
 	to: string;
@@ -28,6 +29,7 @@ interface UserNavItem {
 	group?: 'main' | 'more';
 }
 
+/** A repo-scope settings nav entry. */
 interface RepoNavItem {
 	kind: 'repo';
 	section: RepoSectionId;
@@ -109,6 +111,7 @@ const REPO_SECTION_TARGETS = {
 /** Section id for the per-repo settings sub-nav. Derived from the route map. */
 type RepoSectionId = keyof typeof REPO_SECTION_TARGETS;
 
+/** Props for the settings sidebar. */
 interface SettingsSidebarProps {
 	scope: SettingsScope;
 	activeRepoId: string | null;
@@ -126,6 +129,7 @@ export function SettingsSidebar({ activeRepoId, scope }: SettingsSidebarProps) {
 	);
 }
 
+/** Renders the user-scope settings nav, split into a main group and a "More" group. */
 function UserNav() {
 	const main = USER_NAV.filter((item) => item.group !== 'more');
 	const more = USER_NAV.filter((item) => item.group === 'more');
@@ -150,6 +154,7 @@ function UserNav() {
 	);
 }
 
+/** Renders the repo-scope settings nav, or a placeholder when no repository is selected. */
 function RepoNav({ activeRepoId }: { activeRepoId: string | null }) {
 	if (!activeRepoId) {
 		return (
@@ -169,6 +174,7 @@ function RepoNav({ activeRepoId }: { activeRepoId: string | null }) {
 	);
 }
 
+/** Renders a small uppercase label heading a settings nav group. */
 function NavGroupLabel({ children }: { children: string }) {
 	return (
 		<div className='px-2 pt-1 font-medium text-[0.6875rem] text-muted-foreground uppercase tracking-wide'>
@@ -177,6 +183,7 @@ function NavGroupLabel({ children }: { children: string }) {
 	);
 }
 
+/** Renders a user-scope settings nav link, highlighted when its route is active. */
 function UserNavLink({ item }: { item: UserNavItem }) {
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const isActive = pathname === item.to;
@@ -190,6 +197,7 @@ function UserNavLink({ item }: { item: UserNavItem }) {
 	);
 }
 
+/** Renders a repo-scope settings nav link, highlighted when its section is active. */
 function RepoNavLink({ item, repoId }: { item: RepoNavItem; repoId: string }) {
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const target = REPO_SECTION_TARGETS[item.section];
@@ -209,6 +217,11 @@ function RepoNavLink({ item, repoId }: { item: RepoNavItem; repoId: string }) {
 	);
 }
 
+/**
+ * Build the class string for a settings nav link.
+ * @param active - Whether the link points at the current route
+ * @returns The composed Tailwind class string
+ */
 function navLinkClass(active: boolean): string {
 	return cn(
 		'flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors',

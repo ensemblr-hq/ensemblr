@@ -27,6 +27,7 @@ export interface DetectedTarget {
 /** Map of registry id → detection result. */
 export type DetectedTargetsMap = Readonly<Record<string, DetectedTarget>>;
 
+/** Options for {@link detectInstalledTargets}. */
 interface DetectInstalledTargetsOptions {
 	localCommandService: LocalCommandService;
 }
@@ -88,6 +89,11 @@ export async function detectInstalledTargets({
 	return detected;
 }
 
+/**
+ * Resolve a builtin macOS app to the first of its known paths that exists.
+ * @param id - Registry id of the builtin target.
+ * @returns The existing `.app` path, or null when none is present.
+ */
 async function resolveBuiltinAppPath(id: string): Promise<string | null> {
 	const candidates = BUILTIN_APP_PATHS[id] ?? [];
 	for (const candidate of candidates) {
@@ -98,11 +104,17 @@ async function resolveBuiltinAppPath(id: string): Promise<string | null> {
 	return null;
 }
 
+/** Options for {@link findFirstInstalledAppPath}. */
 interface FindFirstInstalledOptions {
 	bundleIds: readonly string[];
 	localCommandService: LocalCommandService;
 }
 
+/**
+ * Return the path of the first installed app among the candidate bundle ids.
+ * @param options - Candidate bundle ids and the command runner.
+ * @returns The first matching `.app` path, or null when none is installed.
+ */
 async function findFirstInstalledAppPath({
 	bundleIds,
 	localCommandService,
@@ -160,6 +172,11 @@ async function mdfindPathForBundleId({
 	}
 }
 
+/**
+ * Check whether a filesystem path exists.
+ * @param path - Absolute path to test.
+ * @returns True when the path is accessible.
+ */
 async function pathExists(path: string): Promise<boolean> {
 	try {
 		await access(path, constants.F_OK);

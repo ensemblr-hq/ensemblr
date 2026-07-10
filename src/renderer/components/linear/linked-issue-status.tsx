@@ -52,6 +52,7 @@ export function LinkedIssueStatus({
 	);
 }
 
+/** Resolves and renders a workspace's linked Linear issue: connection gate, live status badge, staleness refresh, and set-status action. */
 function LinearLinkedIssueStatus({
 	linkedIssue,
 	remoteId,
@@ -222,6 +223,7 @@ function SetStatusMenu({ issue }: { issue: LinearIssueWire }) {
 	);
 }
 
+/** Renders a linked issue's Linear logo, reference, and title, linking out when a URL is present. */
 function LinkedIssueReference({
 	linkedIssue,
 }: {
@@ -255,6 +257,11 @@ function LinkedIssueReference({
 	);
 }
 
+/**
+ * Map a Linear failure code to a short status badge label.
+ * @param code - Linear failure code
+ * @returns A concise human-readable status label
+ */
 function shortFailureLabel(code: string): string {
 	switch (code) {
 		case 'not-found':

@@ -34,8 +34,10 @@ import {
  * subscription in `query-client.ts`.
  */
 export const piModelsQuery = queryOptions({
+	/** Seeds the catalog from the localStorage cache for an instant first paint. */
 	initialData: () => readCachedPiModels(),
 	initialDataUpdatedAt: 0,
+	/** Fetches the live Pi model catalog over IPC, falling back to the cache on an empty result. */
 	queryFn: async (): Promise<ListPiModelsResult> => {
 		const result = await profileElectronIpcCall(
 			{ channel: 'ensemblr:list-pi-models', usesDatabase: false },
@@ -50,6 +52,7 @@ export const piModelsQuery = queryOptions({
 	// Prettify display names by convention (Claude/GPT) for every consumer —
 	// composer picker, default/review selects, visibility list. `id` and
 	// `provider` stay raw so resolution, matching, and search are unaffected.
+	/** Prettifies model display names for every consumer while leaving `id` and `provider` raw. */
 	select: (data: ListPiModelsResult): ListPiModelsResult => ({
 		...data,
 		models: data.models.map((model) => ({

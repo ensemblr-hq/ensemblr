@@ -15,6 +15,7 @@ import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/ar
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type { DeleteRepositoryDiagnostic } from '@/shared/ipc/contracts/repository';
 
+/** Props for the delete-repository dialog. */
 interface DeleteRepositoryDialogProps {
 	onDeleted: (projectId: string) => Promise<void> | void;
 	onOpenChange: (open: boolean) => void;
@@ -50,8 +51,10 @@ export function DeleteRepositoryDialog({
 	);
 }
 
+/** Progress stage of the repository delete flow. */
 type DeleteStage = 'deleting' | 'failure' | 'idle';
 
+/** Inner delete form for a repository; owns the deleting state and failure diagnostics. */
 function DeleteRepositoryDialogForm({
 	onDeleted,
 	onOpenChange,

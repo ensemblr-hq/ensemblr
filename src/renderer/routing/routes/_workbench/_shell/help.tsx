@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { WorkbenchPlaceholderPage } from '@/renderer/components/workbench-shell/route-layout';
 
+/** Registers the `/help` workbench view (placeholder pending content). */
 export const Route = createFileRoute('/_workbench/_shell/help')({
 	component: HelpRoute,
 	staticData: {

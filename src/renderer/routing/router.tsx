@@ -23,6 +23,7 @@ installRouteNavigationProfiler(router);
 installSettingsReturnTracker(router);
 
 declare module '@tanstack/react-router' {
+	/** Registers the app router type with TanStack Router so route paths and params are fully inferred. */
 	interface Register {
 		router: typeof router;
 	}

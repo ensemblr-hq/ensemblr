@@ -8,6 +8,7 @@ import type {
 	ReviewTodoWire,
 } from '../../../shared/ipc/contracts/review-comments';
 
+/** Raw snake_case column shape of a `comments` row as read from SQLite. */
 interface CommentRowShape {
 	body: string;
 	created_at: string;
@@ -19,6 +20,7 @@ interface CommentRowShape {
 	workspace_id: string;
 }
 
+/** Raw snake_case column shape of a `todos` row as read from SQLite. */
 interface TodoRowShape {
 	created_at: string;
 	id: string;
@@ -178,6 +180,11 @@ export function deleteReviewTodo({
 	database.prepare(`DELETE FROM todos WHERE id = ?`).run(id);
 }
 
+/**
+ * Maps a raw SQLite comment row to its camelCase IPC wire shape.
+ * @param row - Raw `comments` row
+ * @returns The wire-shaped review comment
+ */
 function toCommentWire(row: CommentRowShape): ReviewCommentWire {
 	return {
 		body: row.body,
@@ -191,6 +198,11 @@ function toCommentWire(row: CommentRowShape): ReviewCommentWire {
 	};
 }
 
+/**
+ * Maps a raw SQLite todo row to its camelCase IPC wire shape.
+ * @param row - Raw `todos` row
+ * @returns The wire-shaped review todo
+ */
 function toTodoWire(row: TodoRowShape): ReviewTodoWire {
 	return {
 		createdAt: row.created_at,

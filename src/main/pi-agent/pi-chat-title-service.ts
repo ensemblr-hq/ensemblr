@@ -11,6 +11,7 @@ export const CHAT_TITLE_TIMEOUT_MS = 20000;
 const CHAT_TITLE_MAX_LENGTH = 32;
 const CHAT_TITLE_FALLBACK_WORD_COUNT = 5;
 
+/** Inputs for queuing best-effort chat-title generation for a session. */
 export interface QueueChatTitleGenerationArgs {
 	branchId: string;
 	chatTitleTimeoutMs: number;

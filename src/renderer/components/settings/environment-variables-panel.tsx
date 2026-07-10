@@ -19,6 +19,7 @@ import type {
 	EnvironmentVariableSnapshot,
 } from '@/shared/ipc/contracts/environment';
 
+/** Props for the environment-variables settings panel. */
 interface EnvironmentVariablesPanelProps {
 	scope: EnvironmentVariableScope;
 	scopeId?: string;

@@ -17,8 +17,11 @@ import {
 } from './layout-atoms';
 import { activeChatTabByWorkspaceAtom } from './selection-atoms';
 
+/** Per-workspace review-panel tab preferences, keyed by workspace id. */
 type ReviewTabPreferences = Record<string, unknown>;
+/** Per-workspace dock tab preferences, keyed by workspace id. */
 type DockTabPreferences = Record<string, unknown>;
+/** Per-workspace chat tab preferences, keyed by workspace id. */
 type ChatTabPreferences = Record<string, unknown>;
 
 /**

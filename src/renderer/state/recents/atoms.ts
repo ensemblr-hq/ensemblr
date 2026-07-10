@@ -23,12 +23,14 @@ const EMPTY_ENVELOPE: RecentProjectsStorageEnvelope = {
 // gracefully degrades to a no-op when `localStorage` is missing (tests, SSR).
 const envelopeStorage = createJSONStorage<RecentProjectsStorageEnvelope>();
 
+/** Versioned recent-projects envelope persisted to localStorage; resets when the stored schema version mismatches. */
 const recentProjectsEnvelopeAtom =
 	atomWithStorage<RecentProjectsStorageEnvelope>(
 		RECENT_PROJECTS_STORAGE_KEY,
 		EMPTY_ENVELOPE,
 		{
 			...envelopeStorage,
+			/** Reads the stored envelope, falling back to empty when it is missing or its schema version mismatches. */
 			getItem: (key, initialValue) => {
 				const stored = envelopeStorage.getItem(key, initialValue);
 				// Reset on missing or mismatched version so a schema change can't

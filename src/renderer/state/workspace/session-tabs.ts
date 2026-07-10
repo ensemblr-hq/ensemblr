@@ -529,6 +529,11 @@ function isChatTabLimitError(error: unknown): boolean {
 	);
 }
 
+/**
+ * Extracts the final path segment from a slash-separated path.
+ * @param path - The path to reduce, with any trailing slashes ignored
+ * @returns The last segment, or the trimmed path when it has no separator
+ */
 function basenameOf(path: string): string {
 	const trimmed = path.replace(/\/+$/, '');
 	return trimmed.split('/').at(-1) ?? trimmed;

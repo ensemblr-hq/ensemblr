@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 
 import { cn } from '@/renderer/lib/utils';
 
+/** Props for a settings section row. */
 interface SettingRowProps {
 	/** Primary row label, shown bold. */
 	label: ReactNode;

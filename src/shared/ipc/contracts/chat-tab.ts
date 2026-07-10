@@ -42,6 +42,7 @@ export interface ListChatTabsRequest {
 	workspaceId: string;
 }
 
+/** Result of listing a workspace's chat tabs: its open and closed tabs. */
 export interface ListChatTabsResult {
 	closed: readonly ChatTabWire[];
 	open: readonly ChatTabWire[];
@@ -60,6 +61,7 @@ export interface OpenChatTabRequest {
 	workspaceId: string;
 }
 
+/** Result of opening a chat tab: the newly created tab row. */
 export interface OpenChatTabResult {
 	tab: ChatTabWire;
 }
@@ -74,6 +76,7 @@ export interface CloseChatTabRequest {
 	chatTabId: string;
 }
 
+/** Result of closing a chat tab. */
 export interface CloseChatTabResult {
 	ok: true;
 	/**
@@ -90,6 +93,7 @@ export interface RestoreChatTabRequest {
 	chatTabId: string;
 }
 
+/** Result of restoring a closed chat tab: the restored tab, or null when nothing was restored. */
 export interface RestoreChatTabResult {
 	tab: ChatTabWire | null;
 }
@@ -100,6 +104,7 @@ export interface BindPiSessionToTabRequest {
 	piSessionId: string;
 }
 
+/** Result of binding a Pi session to an open chat tab. */
 export interface BindPiSessionToTabResult {
 	ok: true;
 }
@@ -109,6 +114,7 @@ export interface ListClosedChatTabsWithSummaryRequest {
 	workspaceId: string;
 }
 
+/** Result of listing a workspace's closed chat tabs with their persisted session summaries. */
 export interface ListClosedChatTabsWithSummaryResult {
 	entries: readonly ClosedChatTabEntryWire[];
 }

@@ -294,6 +294,7 @@ const reviewFileStatusMark: Record<
 	},
 };
 
+/** Renders the colored icon marking a review file's git change status. */
 function ReviewFileStatusMark({
 	status,
 }: {

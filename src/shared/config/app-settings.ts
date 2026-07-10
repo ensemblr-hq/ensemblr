@@ -82,11 +82,17 @@ export const appSettingsSchema = z.object({
 	appearance: appearanceSettingsSchema,
 });
 
+/** Validated shape of the user-facing App settings persisted under the config `app` key. */
 export type AppSettings = z.infer<typeof appSettingsSchema>;
+/** The `general` section of App settings. */
 export type GeneralSettings = AppSettings['general'];
+/** The `models` section of App settings. */
 export type ModelSettings = AppSettings['models'];
+/** The `git` user-scope defaults section of App settings. */
 export type GitSettings = AppSettings['git'];
+/** Source of the workspace branch-name prefix: GitHub username, a custom string, or none. */
 export type BranchPrefixSource = GitSettings['branchPrefixSource'];
+/** The `appearance` section of App settings. */
 export type AppearanceSettings = AppSettings['appearance'];
 
 /** Section-scoped partial patch applied by `updateAppSettings`. */

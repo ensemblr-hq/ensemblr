@@ -1,3 +1,4 @@
+/** Scope a setting is resolved at: app-wide or a specific repository. */
 export type SettingsResolutionScope = 'app' | 'repository';
 /** Provenance source that supplied a resolved settings value. */
 export type SettingsResolutionSource =
@@ -8,17 +9,20 @@ export type SettingsResolutionSource =
 	| 'sqlite'
 	| 'user-default'
 	| 'worktreeinclude';
+/** Outcome of a candidate value considered during settings resolution. */
 export type SettingsResolutionCandidateStatus =
 	| 'ignored'
 	| 'invalid'
 	| 'selected';
 
+/** One candidate value considered when resolving a setting, with its source and status. */
 export interface SettingResolutionCandidateSnapshot {
 	reason: string;
 	source: SettingsResolutionSource;
 	status: SettingsResolutionCandidateStatus;
 }
 
+/** A resolved setting's final value alongside the candidates that were considered. */
 export interface ResolvedSettingSnapshot {
 	candidates: SettingResolutionCandidateSnapshot[];
 	key: string;
@@ -27,6 +31,7 @@ export interface ResolvedSettingSnapshot {
 	value: unknown;
 }
 
+/** Diagnostic recorded while resolving a setting, such as an ignored or invalid candidate. */
 export interface SettingsResolutionDiagnostic {
 	key: string;
 	message: string;
@@ -35,6 +40,7 @@ export interface SettingsResolutionDiagnostic {
 	status: SettingsResolutionCandidateStatus;
 }
 
+/** Resolved settings plus diagnostics for one scope (app or repository). */
 export interface SettingsResolutionGroupSnapshot {
 	diagnostics: SettingsResolutionDiagnostic[];
 	settings: ResolvedSettingSnapshot[];
@@ -47,10 +53,12 @@ export interface RepositorySettingsResolutionRequest {
 	repositoryPath?: string;
 }
 
+/** Request to resolve effective settings, optionally including a repository scope. */
 export interface SettingsResolutionRequest {
 	repository?: RepositorySettingsResolutionRequest;
 }
 
+/** Resolved app settings and, when requested, repository settings. */
 export interface SettingsResolutionSnapshot {
 	app: SettingsResolutionGroupSnapshot;
 	repository?: SettingsResolutionGroupSnapshot;

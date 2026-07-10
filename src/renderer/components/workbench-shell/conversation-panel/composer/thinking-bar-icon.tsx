@@ -1,5 +1,6 @@
 import { cn } from '@/renderer/lib/utils';
 
+/** Discrete thinking-effort strength from 0 (off) to 5 (extra-high). */
 export type ThinkingBarStrength = 0 | 1 | 2 | 3 | 4 | 5;
 
 /** Five progressive bars (off=0, minimal=1, low=2, medium=3, high=4, xhigh=5). */
@@ -13,6 +14,7 @@ const ICON_WIDTH =
 	BAR_HEIGHTS.length * BAR_WIDTH +
 	(BAR_HEIGHTS.length - 1) * BAR_GAP;
 
+/** Renders five progressive bars illustrating the selected thinking strength. */
 export function ThinkingBarIcon({
 	className,
 	strength,
@@ -66,6 +68,11 @@ const STRENGTH_BY_LEVEL: Record<string, ThinkingBarStrength> = {
 	xhigh: 5,
 };
 
+/**
+ * Map a thinking-level label to its bar strength, defaulting to medium (3) for unknown levels.
+ * @param level - The thinking-level id, or null when none is set.
+ * @returns The matching bar strength (0 when no level is set).
+ */
 export function getThinkingStrength(level: string | null): ThinkingBarStrength {
 	if (!level) {
 		return 0;

@@ -10,15 +10,18 @@ export interface WorkspaceFileEntryWire {
 	path: string;
 }
 
+/** Request to list files under a workspace working directory. */
 export interface ListWorkspaceFilesRequest {
 	workspaceCwd: string;
 }
 
+/** Failure reason for a list-workspace-files request. */
 export type ListWorkspaceFilesFailureCode =
 	| 'command-failed'
 	| 'invalid-cwd'
 	| 'not-a-git-repo';
 
+/** The workspace file entries, or a typed error on failure. */
 export interface ListWorkspaceFilesResult {
 	error?: {
 		code: ListWorkspaceFilesFailureCode;
@@ -27,6 +30,7 @@ export interface ListWorkspaceFilesResult {
 	files: readonly WorkspaceFileEntryWire[];
 }
 
+/** Request identifying the workspace cwd to start or stop watching for file changes. */
 export interface WatchWorkspaceFilesRequest {
 	workspaceCwd: string;
 }
@@ -36,11 +40,13 @@ export interface WorkspaceFilesChangedBroadcast {
 	workspaceCwd: string;
 }
 
+/** Request to read a single workspace file's contents. */
 export interface ReadWorkspaceFileRequest {
 	path: string;
 	workspaceCwd: string;
 }
 
+/** Failure reason for a read-workspace-file request. */
 export type ReadWorkspaceFileFailureCode =
 	| 'invalid-cwd'
 	| 'invalid-path'
@@ -49,6 +55,7 @@ export type ReadWorkspaceFileFailureCode =
 	| 'read-failed'
 	| 'too-large';
 
+/** The file's contents and size, or a typed error on failure. */
 export interface ReadWorkspaceFileResult {
 	content?: string;
 	error?: {
@@ -59,18 +66,21 @@ export interface ReadWorkspaceFileResult {
 	sizeBytes?: number;
 }
 
+/** Request to enumerate a workspace directory's immediate children. */
 export interface ReadWorkspaceDirectoryRequest {
 	/** Repo-relative directory path to enumerate. */
 	path: string;
 	workspaceCwd: string;
 }
 
+/** Failure reason for a read-workspace-directory request. */
 export type ReadWorkspaceDirectoryFailureCode =
 	| 'invalid-cwd'
 	| 'invalid-path'
 	| 'not-directory'
 	| 'read-failed';
 
+/** The directory's immediate child entries, or a typed error on failure. */
 export interface ReadWorkspaceDirectoryResult {
 	/**
 	 * Immediate children of the directory. Used to lazily expand git-ignored

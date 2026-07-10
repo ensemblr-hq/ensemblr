@@ -6,6 +6,7 @@ import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
 
 /** Query options for the renderer-side health snapshot. */
 export const healthQuery = queryOptions({
+	/** Fetches the health snapshot over IPC with call profiling. */
 	queryFn: () =>
 		profileElectronIpcCall(
 			{ channel: 'ensemblr:health', usesDatabase: true },
@@ -17,6 +18,7 @@ export const healthQuery = queryOptions({
 
 /** Query options for the renderer-side environment-variables snapshot. */
 export const environmentVariablesQuery = queryOptions({
+	/** Fetches the environment-variables snapshot over IPC with call profiling. */
 	queryFn: () =>
 		profileElectronIpcCall(
 			{ channel: 'ensemblr:environment-variables', usesDatabase: false },

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Badge } from '@/renderer/components/ui/badge';
 import { cn } from '@/renderer/lib/utils';
 
+/** Semantic status tone shared by {@link StatusBadge} and {@link StatusDot}. */
 type StatusTone = 'danger' | 'info' | 'muted' | 'ok' | 'warning';
 
 const toneClasses: Record<StatusTone, string> = {

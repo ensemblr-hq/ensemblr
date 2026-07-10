@@ -4,7 +4,9 @@ import type { PowerSaveControls } from './agent-activity-monitor.ts';
 
 /** Electron `powerSaveBlocker` adapter for the activity monitor. */
 export const electronPowerControls: PowerSaveControls = {
+	/** Starts an Electron power-save blocker of the given type. */
 	start: (type) => powerSaveBlocker.start(type),
+	/** Stops the Electron power-save blocker with the given id. */
 	stop: (id) => powerSaveBlocker.stop(id),
 };
 

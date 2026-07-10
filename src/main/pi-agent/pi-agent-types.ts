@@ -155,8 +155,10 @@ export interface PiAgentSubmitAcknowledgement {
  */
 export type PiAgentMessagePart = PiWireMessagePart;
 
+/** Normalized message payload emitted by the adapter; alias of the shared {@link PiWireMessagePayload} boundary type. */
 export type PiAgentMessagePayload = PiWireMessagePayload;
 
+/** Context-window usage reported by a session: total window size and current token consumption. */
 export interface PiAgentContextUsage {
 	contextWindow: number;
 	percent: number | null;

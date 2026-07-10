@@ -15,6 +15,7 @@ export interface CheckpointRow {
 	workspaceId: string;
 }
 
+/** Input for inserting a new checkpoint row. */
 export interface InsertCheckpointInput {
 	gitHash: string;
 	gitRef: string;
@@ -26,6 +27,7 @@ export interface InsertCheckpointInput {
 	workspaceId: string;
 }
 
+/** Raw `checkpoints` row shape with snake_case columns as stored in SQLite. */
 interface CheckpointRowShape {
 	created_at: string;
 	git_hash: string | null;
@@ -160,6 +162,11 @@ export function listCheckpointsForWorkspace({
 	return rows.map(mapRow);
 }
 
+/**
+ * Map a raw `checkpoints` row to the domain {@link CheckpointRow}, parsing its metadata JSON.
+ * @param row - Raw SQLite row
+ * @returns The domain checkpoint
+ */
 function mapRow(row: CheckpointRowShape): CheckpointRow {
 	return {
 		createdAt: row.created_at,
@@ -175,6 +182,11 @@ function mapRow(row: CheckpointRowShape): CheckpointRow {
 	};
 }
 
+/**
+ * Parse a checkpoint metadata JSON string into a record, returning `{}` on invalid or non-object input.
+ * @param raw - JSON string to parse
+ * @returns The parsed record, or an empty record when parsing fails
+ */
 function parseMetadata(raw: string): Record<string, unknown> {
 	try {
 		const parsed = JSON.parse(raw);

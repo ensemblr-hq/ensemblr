@@ -13,6 +13,7 @@ import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import type { EnvironmentVariableScope } from '@/shared/ipc/contracts/environment';
 
+/** Props for the env-files management section, scoped to a settings scope. */
 interface EnvFilesSectionProps {
 	scope: EnvironmentVariableScope;
 	scopeId?: string;

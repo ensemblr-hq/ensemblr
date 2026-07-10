@@ -2,10 +2,13 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import type { PiSessionStatusWire } from '../../../shared/ipc/contracts/pi-message-payloads';
 
+/** Lifecycle status of a persisted Pi session, mirrored from the IPC wire type. */
 export type PiSessionStatus = PiSessionStatusWire;
 
+/** Kind of a Pi session branch: the primary line, a retry, or a fork. */
 export type PiSessionBranchKind = 'main' | 'retry' | 'fork';
 
+/** Lifecycle status of a single prompt turn within a Pi session. */
 export type PiTurnStatus =
 	| 'submitted'
 	| 'streaming'
@@ -13,6 +16,7 @@ export type PiTurnStatus =
 	| 'aborted'
 	| 'errored';
 
+/** Domain-shaped Pi session record returned by the repository. */
 export interface PiSessionRow {
 	closedAt: string | null;
 	createdAt: string;
@@ -31,6 +35,7 @@ export interface PiSessionRow {
 	workspaceId: string;
 }
 
+/** Domain-shaped Pi session branch record returned by the repository. */
 export interface PiSessionBranchRow {
 	createdAt: string;
 	forkedFromTurnId: string | null;
@@ -42,6 +47,7 @@ export interface PiSessionBranchRow {
 	piSessionId: string;
 }
 
+/** Domain-shaped Pi turn record returned by the repository. */
 export interface PiTurnRow {
 	branchId: string;
 	completedAt: string | null;
@@ -55,6 +61,7 @@ export interface PiTurnRow {
 	turnMetadata: Record<string, unknown>;
 }
 
+/** Fields required to create a new Pi session and its main branch. */
 export interface CreatePiSessionInput {
 	cwd: string;
 	executableId?: string | null;
@@ -67,11 +74,13 @@ export interface CreatePiSessionInput {
 	workspaceId: string;
 }
 
+/** Result of creating a Pi session: the session row and its main branch. */
 export interface CreatePiSessionResult {
 	mainBranch: PiSessionBranchRow;
 	session: PiSessionRow;
 }
 
+/** Partial fields to update on an existing Pi session. */
 export interface UpdatePiSessionPatch {
 	closedAt?: string | null;
 	lastError?: string | null;
@@ -81,6 +90,7 @@ export interface UpdatePiSessionPatch {
 	thinkingLevel?: string | null;
 }
 
+/** Fields required to append a new prompt turn to a branch. */
 export interface CreatePiTurnInput {
 	branchId: string;
 	model?: string | null;
@@ -89,12 +99,14 @@ export interface CreatePiTurnInput {
 	turnMetadata?: Record<string, unknown>;
 }
 
+/** Partial fields to update on an existing Pi turn. */
 export interface UpdatePiTurnPatch {
 	completedAt?: string | null;
 	status?: PiTurnStatus;
 	turnMetadata?: Record<string, unknown>;
 }
 
+/** Raw snake_case column shape of a `pi_sessions` row as read from SQLite. */
 interface SessionRowShape {
 	closed_at: string | null;
 	created_at: string;
@@ -113,6 +125,7 @@ interface SessionRowShape {
 	workspace_id: string;
 }
 
+/** Raw snake_case column shape of a `pi_session_branches` row as read from SQLite. */
 interface BranchRowShape {
 	created_at: string;
 	forked_from_turn_id: string | null;
@@ -124,6 +137,7 @@ interface BranchRowShape {
 	pi_session_id: string;
 }
 
+/** Raw snake_case column shape of a `pi_turns` row as read from SQLite. */
 interface TurnRowShape {
 	branch_id: string;
 	completed_at: string | null;
@@ -513,6 +527,11 @@ export function updateTurn({
 	return getTurnById({ database, id });
 }
 
+/**
+ * Maps a raw SQLite session row to its domain shape, parsing the metadata JSON.
+ * @param row - Raw `pi_sessions` row
+ * @returns The domain-shaped session record
+ */
 function mapSessionRow(row: SessionRowShape): PiSessionRow {
 	return {
 		closedAt: row.closed_at,
@@ -533,6 +552,11 @@ function mapSessionRow(row: SessionRowShape): PiSessionRow {
 	};
 }
 
+/**
+ * Maps a raw SQLite branch row to its domain shape, parsing the metadata JSON.
+ * @param row - Raw `pi_session_branches` row
+ * @returns The domain-shaped branch record
+ */
 function mapBranchRow(row: BranchRowShape): PiSessionBranchRow {
 	return {
 		createdAt: row.created_at,
@@ -546,6 +570,11 @@ function mapBranchRow(row: BranchRowShape): PiSessionBranchRow {
 	};
 }
 
+/**
+ * Maps a raw SQLite turn row to its domain shape, parsing the metadata JSON.
+ * @param row - Raw `pi_turns` row
+ * @returns The domain-shaped turn record
+ */
 function mapTurnRow(row: TurnRowShape): PiTurnRow {
 	return {
 		branchId: row.branch_id,
@@ -561,6 +590,12 @@ function mapTurnRow(row: TurnRowShape): PiTurnRow {
 	};
 }
 
+/**
+ * Serializes a metadata record to JSON for storage, falling back to `'{}'` when
+ * it is absent or not serializable.
+ * @param metadata - Metadata record to serialize
+ * @returns The JSON string, or `'{}'` on missing or invalid input
+ */
 function serializeMetadata(metadata?: Record<string, unknown>): string {
 	if (!metadata) {
 		return '{}';
@@ -572,6 +607,12 @@ function serializeMetadata(metadata?: Record<string, unknown>): string {
 	}
 }
 
+/**
+ * Parses a stored metadata JSON string back into a record, returning `{}` for
+ * missing, corrupt, or non-object values.
+ * @param raw - Stored JSON string
+ * @returns The parsed record, or an empty object on failure
+ */
 function parseMetadata(raw: string): Record<string, unknown> {
 	try {
 		const parsed = JSON.parse(raw);

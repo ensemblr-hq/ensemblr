@@ -310,6 +310,12 @@ export function createArchiveWorkspaceService({
 	};
 }
 
+/**
+ * Reads a workspace together with its repository to seed an archive operation.
+ * @param database - Open database handle
+ * @param workspaceId - Workspace to read
+ * @returns The source workspace, or null when not found
+ */
 function readWorkspace(
 	database: DatabaseSync,
 	workspaceId: string,
@@ -405,6 +411,10 @@ function preserveContextDirectory({
 	return { archivedContextPath };
 }
 
+/**
+ * Stamps `archived_at` on the workspace and inserts a workspace-level archive
+ * record within a single transaction.
+ */
 function stampArchivedAt({
 	archivedAt,
 	archivedContextPath,
@@ -444,6 +454,10 @@ function stampArchivedAt({
 	});
 }
 
+/**
+ * Writes an `archive-record/v1` metadata JSON into the preserved `.context`
+ * directory, recording a diagnostic when the write fails.
+ */
 function writeArchiveMetadata({
 	archiveRecordId,
 	archivedAt,
@@ -510,6 +524,11 @@ function toFilesystemTimestamp(isoTimestamp: string): string {
 	return isoTimestamp.replace(/[:.]/g, '-');
 }
 
+/**
+ * Wraps an archive diagnostic in a failed {@link ArchiveWorkspaceResult}.
+ * @param diagnostic - Diagnostic describing the failure
+ * @returns The failure result
+ */
 function failure(
 	diagnostic: ArchiveWorkspaceDiagnostic,
 ): ArchiveWorkspaceResult {
@@ -519,6 +538,11 @@ function failure(
 	});
 }
 
+/**
+ * Type guard for a raw workspace row joined with its repository identity.
+ * @param row - Candidate database row
+ * @returns True when the row matches {@link SourceWorkspace}
+ */
 function isWorkspaceRow(row: unknown): row is SourceWorkspace {
 	if (!isRecord(row)) {
 		return false;

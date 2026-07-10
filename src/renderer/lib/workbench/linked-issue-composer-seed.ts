@@ -33,6 +33,12 @@ export function formatLinkedIssueComposerSeed(
 	return `${header}${body}${link}`;
 }
 
+/**
+ * Truncates text to a maximum length, appending an ellipsis when it is clipped.
+ * @param text - The text to truncate
+ * @param maxLength - Maximum length before truncation
+ * @returns The original text, or a clipped version ending in an ellipsis
+ */
 function truncateBody(text: string, maxLength: number): string {
 	return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
 }

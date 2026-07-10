@@ -10,6 +10,12 @@ import type { ListPiModelsResult } from '@/shared/ipc/contracts/pi-session';
  */
 const CACHE_KEY = 'ensemblr_pref_pi_models_snapshot';
 
+/**
+ * Resolves the Storage to use, defaulting to `globalThis.localStorage` when
+ * available and returning null in non-browser contexts.
+ * @param storage - Explicit storage to use, e.g. in tests
+ * @returns The storage instance, or null when none is available
+ */
 function resolveStorage(storage?: Storage): Storage | null {
 	if (storage) {
 		return storage;

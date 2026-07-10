@@ -3,6 +3,11 @@ import { matchesShortcut, type ShortcutId } from '@/shared/keymap';
 
 const TYPEABLE_TAGS = new Set(['INPUT', 'TEXTAREA']);
 
+/**
+ * Reports whether an event target is a text-editable element (input, textarea, or contenteditable).
+ * @param target - Event target to test
+ * @returns True when the target accepts typed text
+ */
 function isTypeableTarget(target: EventTarget | null): boolean {
 	if (!(target instanceof HTMLElement)) {
 		return false;
@@ -13,6 +18,7 @@ function isTypeableTarget(target: EventTarget | null): boolean {
 	return TYPEABLE_TAGS.has(target.tagName);
 }
 
+/** Options for {@link useHotkey}. */
 interface HotkeyOptions {
 	allowInTypeable?: boolean;
 	enabled?: boolean;

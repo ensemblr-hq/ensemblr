@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { workbenchRouteApi } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
 import { settingsActiveRepoIdAtom } from '@/renderer/state/settings-ui';
 
+/** Layout route for repository-scoped settings; nests the child settings pages under the `repoId` path param. */
 export const Route = createFileRoute('/_workbench/settings/repo/$repoId')({
 	component: RepoSettingsLayout,
 });

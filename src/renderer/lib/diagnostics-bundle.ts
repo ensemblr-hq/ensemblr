@@ -38,6 +38,11 @@ export function sanitizeDiagnosticsBundle(
 	};
 }
 
+/**
+ * Returns a copy of a setup check snapshot with its text, logs, and remediation actions sanitized.
+ * @param check - Setup check snapshot to sanitize
+ * @returns The sanitized check snapshot
+ */
 function sanitizeCheck(check: SetupCheckSnapshot): SetupCheckSnapshot {
 	return {
 		blocking: check.blocking,
@@ -53,6 +58,11 @@ function sanitizeCheck(check: SetupCheckSnapshot): SetupCheckSnapshot {
 	};
 }
 
+/**
+ * Returns a copy of a setup check log snapshot with its label and text sanitized.
+ * @param log - Log snapshot to sanitize
+ * @returns The sanitized log snapshot
+ */
 function sanitizeLog(log: SetupCheckLogSnapshot): SetupCheckLogSnapshot {
 	return {
 		label: sanitizeText(log.label),
@@ -61,6 +71,11 @@ function sanitizeLog(log: SetupCheckLogSnapshot): SetupCheckLogSnapshot {
 	};
 }
 
+/**
+ * Returns a copy of a remediation action with its command, label, and target sanitized.
+ * @param action - Remediation action to sanitize
+ * @returns The sanitized remediation action
+ */
 function sanitizeRemediation(
 	action: SetupRemediationAction,
 ): SetupRemediationAction {
@@ -73,6 +88,11 @@ function sanitizeRemediation(
 	};
 }
 
+/**
+ * Redacts secrets and PII (JWTs, hex tokens, emails, home paths, and key/value secrets) from a string.
+ * @param input - Text to sanitize
+ * @returns The sanitized text
+ */
 function sanitizeText(input: string): string {
 	if (!input) return input;
 	let next = input;

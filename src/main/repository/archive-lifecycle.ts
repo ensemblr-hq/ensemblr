@@ -5,10 +5,12 @@ import type {
 	ArchiveLifecycleStage,
 } from '../../shared/ipc/contracts/archive-lifecycle';
 
+/** Hook invoked at an archive lifecycle stage, returning its outcome synchronously or asynchronously. */
 export type ArchiveLifecycleHandler = (
 	context: ArchiveLifecycleContext,
 ) => Promise<ArchiveLifecycleOutcome> | ArchiveLifecycleOutcome;
 
+/** Registry entry pairing a lifecycle handler with its priority and registration order for deterministic sequencing. */
 interface RegisteredHandler {
 	handler: ArchiveLifecycleHandler;
 	priority: number;

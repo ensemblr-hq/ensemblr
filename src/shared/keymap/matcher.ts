@@ -6,6 +6,11 @@ import {
 	type ShortcutId,
 } from './shortcuts';
 
+/**
+ * Look up the shortcut definition registered under an id.
+ * @param id - Identifier of the shortcut to resolve
+ * @returns The shortcut definition for the id
+ */
 function defOf(id: ShortcutId): ShortcutDef {
 	return SHORTCUTS[id];
 }
@@ -28,6 +33,11 @@ export interface KeyboardEventLike {
 	readonly shiftKey: boolean;
 }
 
+/**
+ * Detect whether the current platform is macOS, preferring the browser
+ * `navigator.platform` and falling back to `process.platform`.
+ * @returns True when running on macOS
+ */
 function detectIsMac(): boolean {
 	if (
 		typeof navigator !== 'undefined' &&
@@ -42,6 +52,10 @@ function detectIsMac(): boolean {
 }
 
 let cachedIsMac: boolean | null = null;
+/**
+ * Memoized macOS check that caches the first `detectIsMac` result.
+ * @returns True when running on macOS
+ */
 function isMac(): boolean {
 	if (cachedIsMac === null) {
 		cachedIsMac = detectIsMac();
@@ -116,6 +130,13 @@ function keyMatches(binding: Binding, event: KeyboardEventLike): boolean {
 	return event.key.toLowerCase() === binding.key.toLowerCase();
 }
 
+/**
+ * Whether a keyboard event exactly matches a binding's key and physical
+ * modifier state.
+ * @param binding - The key binding to test
+ * @param event - The keyboard event to compare against
+ * @returns True when the event satisfies the binding exactly
+ */
 function matchesBinding(binding: Binding, event: KeyboardEventLike): boolean {
 	if (!keyMatches(binding, event)) {
 		return false;
@@ -131,6 +152,12 @@ function matchesBinding(binding: Binding, event: KeyboardEventLike): boolean {
 	);
 }
 
+/**
+ * Whether a keyboard event matches any binding registered for a shortcut.
+ * @param id - Identifier of the shortcut to test
+ * @param event - The keyboard event to compare against
+ * @returns True when any of the shortcut's bindings match
+ */
 export function matchesShortcut(
 	id: ShortcutId,
 	event: KeyboardEventLike,
@@ -143,6 +170,12 @@ export function matchesShortcut(
 	return false;
 }
 
+/**
+ * Electron accelerator string registered for a shortcut, consumed by
+ * main-process menu code.
+ * @param id - Identifier of the shortcut to resolve
+ * @returns The accelerator string, or undefined when the shortcut has none
+ */
 export function getAccelerator(id: ShortcutId): string | undefined {
 	return defOf(id).accelerator;
 }
@@ -161,6 +194,12 @@ const MODIFIER_LABEL_OTHER: Record<Modifier, string> = {
 	shift: 'Shift',
 };
 
+/**
+ * Normalize a binding key for display, upper-casing single characters and
+ * leaving named keys (`Enter`, `ArrowUp`) untouched.
+ * @param key - The binding key to format
+ * @returns The display-ready key label
+ */
 function formatKey(key: string): string {
 	if (key.length === 1) {
 		return key.toUpperCase();

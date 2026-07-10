@@ -20,6 +20,7 @@ import type {
 	EnvironmentVariableSnapshot,
 } from '@/shared/ipc/contracts/environment';
 
+/** Props for a single configured-variable row. */
 interface EnvironmentVariableRowProps {
 	variable: EnvironmentVariableSnapshot;
 	scope: EnvironmentVariableScope;

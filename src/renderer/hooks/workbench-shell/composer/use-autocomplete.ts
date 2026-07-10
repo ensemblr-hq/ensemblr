@@ -1,8 +1,10 @@
 import { useMemo } from 'react';
 import { fuzzyScore } from '@/renderer/lib/workbench/fuzzy-score';
 
+/** Kind of composer autocomplete token under the caret, or `null` when none. */
 export type AutocompleteKind = 'mention' | 'slash' | null;
 
+/** Detected autocomplete token: its kind, query, and span within the composer text. */
 export interface AutocompleteState {
 	kind: AutocompleteKind;
 	query: string;
@@ -55,11 +57,20 @@ export function detectAutocomplete(
 	return { kind: null, query: '', tokenStart: caret, tokenEnd: caret };
 }
 
+/** An item paired with its fuzzy-match score. */
 export interface FuzzyScored<T> {
 	item: T;
 	score: number;
 }
 
+/**
+ * Memoizes the highest-scoring fuzzy matches for a query over a list of items.
+ * @param items - Candidate items to score
+ * @param query - Fuzzy query string
+ * @param getKey - Extracts the string each item is scored against
+ * @param limit - Maximum number of matches to return
+ * @returns The best-scoring items, ordered best first
+ */
 export function useFuzzyMatches<T>(
 	items: readonly T[],
 	query: string,

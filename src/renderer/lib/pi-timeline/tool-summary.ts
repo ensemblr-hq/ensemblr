@@ -14,6 +14,11 @@ function shortPath(value: string): string {
 	return segments.slice(-2).join('/') || value;
 }
 
+/**
+ * Returns the first line of a string, truncated to the summary length cap.
+ * @param value - Text to read the first line from
+ * @returns The first line, ellipsis-truncated when too long
+ */
 function firstLine(value: string): string {
 	const line = value.split('\n', 1)[0] ?? '';
 	return line.length > SUMMARY_MAX_LENGTH
@@ -21,6 +26,12 @@ function firstLine(value: string): string {
 		: line;
 }
 
+/**
+ * Returns the first non-empty string value found among the given arg keys.
+ * @param args - Tool-call argument record
+ * @param keys - Keys to check, in order
+ * @returns The first non-empty string value, or null when none match
+ */
 function stringArg(
 	args: Readonly<Record<string, unknown>>,
 	...keys: string[]

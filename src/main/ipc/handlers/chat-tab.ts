@@ -101,6 +101,11 @@ export function registerChatTabHandlers({
 	);
 }
 
+/**
+ * Map a chat-tab database row to its renderer-facing wire shape.
+ * @param row - The stored chat-tab row
+ * @returns The chat tab in wire form
+ */
 function toWire(row: ChatTabRow): ChatTabWire {
 	return {
 		closedAt: row.closedAt,

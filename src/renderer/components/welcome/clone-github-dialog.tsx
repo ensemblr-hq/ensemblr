@@ -34,6 +34,7 @@ import { CloneGithubRecentRepos } from './clone-github-recent-repos.tsx';
 
 const RESULTS_LISTBOX_ID = 'clone-github-repo-results';
 
+/** Props for the clone-GitHub-repository dialog. */
 interface CloneGithubDialogProps {
 	onOpenChange: (open: boolean) => void;
 	open: boolean;

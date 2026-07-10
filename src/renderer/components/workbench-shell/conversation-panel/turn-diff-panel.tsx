@@ -80,6 +80,11 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 	);
 }
 
+/**
+ * Map a turn-diff file status to its single-letter glyph.
+ * @param status - The changed-file status.
+ * @returns The status glyph (A/D/R/M).
+ */
 function statusGlyph(status: TurnDiffFileWire['status']): string {
 	switch (status) {
 		case 'added':
@@ -93,6 +98,7 @@ function statusGlyph(status: TurnDiffFileWire['status']): string {
 	}
 }
 
+/** Renders a centered muted or error message inside the turn-diff panel. */
 function TurnDiffMessage({
 	message,
 	tone = 'muted',
