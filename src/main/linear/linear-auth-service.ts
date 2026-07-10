@@ -8,9 +8,9 @@ import type {
 	LinearDisconnectResult,
 	LinearLoginResult,
 } from '../../shared/ipc/contracts/linear';
-import type { EnsemblrConfigService } from '../config/config-loader';
+import type { EnsemblrConfigService } from '../config';
 import type { SecretStore } from '../secrets';
-import type { EnsemblrDatabaseService } from '../storage/database';
+import type { EnsemblrDatabaseService } from '../storage';
 import {
 	BUILT_IN_LINEAR_CLIENT_ID,
 	buildLinearAuthorizeUrl,

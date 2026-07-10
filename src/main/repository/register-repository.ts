@@ -9,12 +9,12 @@ import type {
 	RegisterLocalRepositoryResult,
 } from '../../shared/ipc/contracts/repository';
 import type { RepositoryConfigSourceSnapshot } from '../../shared/ipc/contracts/repository-config';
-import {
-	type LoadedRepositoryConfig,
-	type LoadRepositoryConfigOptions,
-	loadRepositoryConfig,
-} from '../config/repository-config.ts';
-import type { EnsemblrDatabaseService } from '../storage/database.ts';
+import type {
+	LoadedRepositoryConfig,
+	LoadRepositoryConfigOptions,
+} from '../config';
+import { loadRepositoryConfig } from '../config/repository-config.ts';
+import type { EnsemblrDatabaseService } from '../storage';
 import {
 	insertRepositoryRow as insertRepositoryRowStorage,
 	selectRepositoryIdByPath,

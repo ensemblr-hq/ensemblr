@@ -18,10 +18,10 @@ import type {
 } from '@/shared/ipc/contracts/quick-start';
 
 /** Top-level UI states the quick-start flow moves through. */
-export type QuickStartStage = 'creating' | 'failure' | 'idle';
+type QuickStartStage = 'creating' | 'failure' | 'idle';
 
 /** State and handlers exposed by {@link useQuickStartFlow}. */
-export interface UseQuickStartFlowResult {
+interface UseQuickStartFlowResult {
 	defaultParentPath: string;
 	diagnostics: QuickStartProjectDiagnostic[];
 	isBusy: boolean;

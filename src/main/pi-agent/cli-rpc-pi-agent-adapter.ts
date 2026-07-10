@@ -38,7 +38,7 @@ const DEFAULT_STDERR_RING_BYTES = 64 * 1024;
 const DEFAULT_KILL_GRACE_MS = 750;
 
 /** Raw JSONL line crossing the Pi RPC boundary, surfaced for debug only. */
-export interface PiRawFrameSample {
+interface PiRawFrameSample {
 	at: string;
 	direction: 'rx' | 'tx';
 	label: string;

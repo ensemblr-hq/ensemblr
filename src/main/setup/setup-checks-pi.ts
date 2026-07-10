@@ -2,10 +2,7 @@ import type {
 	SetupCheckLogSnapshot,
 	SetupRemediationAction,
 } from '../../shared/ipc/contracts/setup';
-import type {
-	PiExecutableService,
-	PiExecutableSnapshot,
-} from '../pi-runtime/pi-executable';
+import type { PiExecutableService, PiExecutableSnapshot } from '../pi-runtime';
 import type {
 	PiAgentDirectorySnapshot,
 	PiAgentDirectorySource,

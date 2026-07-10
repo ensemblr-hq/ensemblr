@@ -1,7 +1,7 @@
 import type {
 	PiSessionBranchRow,
 	PiSessionRow,
-} from '../../storage/repositories/pi-session-repository.ts';
+} from '../../storage/repositories';
 import type { PiAgentSession } from '../pi-agent-client.ts';
 import type { PiAgentSubscription } from '../pi-agent-types.ts';
 

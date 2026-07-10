@@ -6,7 +6,7 @@ import {
 } from 'electron';
 
 /** Canonical canceled/selected discriminated union shared by every directory-picker IPC handler. */
-export type DirectorySelectionResult =
+type DirectorySelectionResult =
 	| { canceled: true; path?: undefined }
 	| { canceled: false; path: string };
 

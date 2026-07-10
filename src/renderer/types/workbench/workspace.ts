@@ -1,4 +1,3 @@
-import type { GithubRepoRef } from '@/renderer/lib/workbench/github-compare-url';
 import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
 import type {
 	WorkspaceOpenTargetKind as SharedWorkspaceOpenTargetKind,
@@ -11,6 +10,7 @@ import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contrac
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
+import type { GithubRepoRef } from './github';
 
 import type { ProjectShellModel } from './project';
 

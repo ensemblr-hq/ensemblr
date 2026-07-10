@@ -9,7 +9,7 @@ import {
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-
+import type { PiExecutableSelectionResult } from '../../shared/ipc/contracts/pi-session';
 import type {
 	ResolvedSettingSnapshot,
 	SettingsResolutionSnapshot,
@@ -19,8 +19,8 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
-import type { EnsemblrConfigResolutionService } from '../config/config-resolution';
-import type { EnsemblrDatabaseService } from '../storage/database';
+import type { EnsemblrConfigResolutionService } from '../config';
+import type { EnsemblrDatabaseService } from '../storage';
 import { normalizeConfiguredPath } from './internal/normalize-configured-path.ts';
 
 /** Overall outcome of Pi executable discovery. */
@@ -70,13 +70,6 @@ export interface PiExecutableSnapshot {
 /** True when the Pi executable snapshot is good enough to run readiness checks. */
 export function isExecutableReady(executable: PiExecutableSnapshot): boolean {
 	return Boolean(executable.command) && executable.status !== 'error';
-}
-
-/** Result of {@link PiExecutableService.saveOverride}. */
-export interface PiExecutableSelectionResult {
-	canceled: boolean;
-	error?: string;
-	selectedPath?: string;
 }
 
 /** Public surface of the Pi executable service. */

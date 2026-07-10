@@ -7,19 +7,8 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
-import {
-	type KeymapBinding,
-	useKeymapHandler,
-} from '@/renderer/hooks/use-keymap-handler';
-
-/** Props for the close-running-chat confirmation dialog. */
-interface CloseRunningChatDialogProps {
-	/** Dismisses the dialog and keeps the chat open. */
-	onCancel: () => void;
-	/** Cancels the agent and closes the chat. */
-	onConfirm: () => void;
-	open: boolean;
-}
+import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
+import type { KeymapBinding } from '@/renderer/types/keymap';
 
 /**
  * Confirmation shown before closing a tab whose agent is still running. Closing
@@ -33,7 +22,13 @@ export function CloseRunningChatDialog({
 	onCancel,
 	onConfirm,
 	open,
-}: CloseRunningChatDialogProps) {
+}: {
+	/** Dismisses the dialog and keeps the chat open. */
+	onCancel: () => void;
+	/** Cancels the agent and closes the chat. */
+	onConfirm: () => void;
+	open: boolean;
+}) {
 	const submitBindings = useMemo<readonly KeymapBinding<HTMLDivElement>[]>(
 		() => [
 			[

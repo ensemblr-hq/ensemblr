@@ -14,7 +14,7 @@ import type {
 	SettingsResolutionSnapshot,
 	SettingsResolutionSource,
 } from '../../shared/ipc/contracts/settings-resolution';
-import type { EnsemblrDatabaseService } from '../storage/database';
+import type { EnsemblrDatabaseService } from '../storage';
 import type { AppSettingsService } from './app-settings-service.ts';
 import type { EnsemblrConfig, EnsemblrConfigService } from './config-loader';
 import { isPlainRecord } from './json-utils.ts';

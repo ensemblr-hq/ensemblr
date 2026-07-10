@@ -7,13 +7,11 @@ import { usePullRequestRefresh } from '@/renderer/hooks/workbench-shell/review-a
 import { useReviewMutations } from '@/renderer/hooks/workbench-shell/review-actions/use-review-mutations';
 import type {
 	ProjectShellModel,
+	ReviewActionsValue,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import { MergeConfirmationDialog } from './merge-confirmation-dialog';
-import {
-	ReviewActionsContextProvider,
-	type ReviewActionsValue,
-} from './review-actions-context';
+import { ReviewActionsContextProvider } from './review-actions-context';
 
 /** Which review dialog is currently open, or null when none is. */
 type ActiveReviewDialog = { kind: 'merge' } | null;

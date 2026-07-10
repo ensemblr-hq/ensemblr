@@ -4,25 +4,10 @@ import { Terminal } from '@xterm/xterm';
 
 import '@xterm/xterm/css/xterm.css';
 
-/**
- * Renderer-side terminal boundary. Components talk to this interface only so
- * the underlying renderer (xterm.js today) can be swapped without touching
- * dock UI or session wiring.
- */
-export interface TerminalRendererAdapter {
-	attach: (element: HTMLElement) => void;
-	clear: () => void;
-	dispose: () => void;
-	fit: () => { cols: number; rows: number } | null;
-	focus: () => void;
-	onData: (listener: (data: string) => void) => () => void;
-	/** Live-updates the terminal typography; caller re-fits afterwards. */
-	setFont: (options: { fontFamily?: string; fontSize?: number }) => void;
-	write: (data: string) => void;
-}
+import type { TerminalRendererAdapter } from '@/renderer/types/terminal';
 
 /** Options for {@link createXtermAdapter}. */
-export interface CreateXtermAdapterOptions {
+interface CreateXtermAdapterOptions {
 	/** CSS font-family stack for the terminal glyphs. */
 	fontFamily?: string;
 	fontSize?: number;

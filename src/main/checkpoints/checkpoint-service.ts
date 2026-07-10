@@ -6,7 +6,7 @@ import {
 	getNextCheckpointInPiSession,
 	insertCheckpoint,
 	listCheckpointsForPiSession,
-} from '../storage/repositories/checkpoint-repository.ts';
+} from '../storage/repositories/index.ts';
 import {
 	getPiSessionBranchById,
 	getTurnById,
@@ -30,7 +30,7 @@ import {
  * prompting on a degraded git state (or a non-git scratch workspace) is worse
  * than losing one turn's snapshot, and the failure is logged loudly.
  */
-export interface CheckpointCaptureInput {
+interface CheckpointCaptureInput {
 	cwd: string;
 	database: DatabaseSync;
 	label: string;
@@ -127,7 +127,7 @@ export function listTurnCheckpoints({
 }
 
 /** A turn's git diff paired with the checkpoint it was computed against. */
-export interface TurnDiffResult extends GitDiffResult {
+interface TurnDiffResult extends GitDiffResult {
 	checkpoint: CheckpointRow;
 }
 
@@ -157,7 +157,7 @@ export async function computeTurnDiff({
 }
 
 /** Result of restoring a turn checkpoint, carrying the checkpoint restored. */
-export interface RestoreTurnCheckpointResult {
+interface RestoreTurnCheckpointResult {
 	checkpoint: CheckpointRow;
 }
 
@@ -191,7 +191,7 @@ export async function restoreTurnCheckpoint({
 }
 
 /** Hidden ordinal range persisted on branch metadata after a restore. */
-export interface HiddenEventRange {
+interface HiddenEventRange {
 	/** Events with `ordinal > afterOrdinal` ... */
 	afterOrdinal: number;
 	/** ... and `ordinal <= throughOrdinal` are hidden. */

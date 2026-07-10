@@ -59,13 +59,6 @@ export interface LinearOauthCallbackServer {
 	waitForCallback: () => Promise<URLSearchParams>;
 }
 
-/** Options for {@link startLinearOauthCallbackServer}. */
-export interface StartLinearOauthCallbackServerOptions {
-	callbackPath?: string;
-	ports?: readonly number[];
-	timeoutMs?: number;
-}
-
 /**
  * Starts a temporary loopback HTTP server on the first free port from `ports`
  * that resolves the first request hitting the callback path. The server only
@@ -78,7 +71,11 @@ export async function startLinearOauthCallbackServer({
 	callbackPath = DEFAULT_CALLBACK_PATH,
 	ports = LINEAR_CALLBACK_PORTS,
 	timeoutMs = DEFAULT_TIMEOUT_MS,
-}: StartLinearOauthCallbackServerOptions = {}): Promise<LinearOauthCallbackServer> {
+}: {
+	callbackPath?: string;
+	ports?: readonly number[];
+	timeoutMs?: number;
+} = {}): Promise<LinearOauthCallbackServer> {
 	let settled = false;
 	let resolveCallback: (params: URLSearchParams) => void = () => {};
 	let rejectCallback: (error: LinearOauthCallbackError) => void = () => {};

@@ -1,12 +1,5 @@
 import type { CloneGithubRepositoryDiagnostic } from '../../shared/ipc/contracts/clone';
 
-/** Inputs for {@link classifyCloneFailure}. */
-export interface ClassifyCloneFailureOptions {
-	exitCode: number | null;
-	stderr: string;
-	targetPath: string;
-}
-
 /**
  * Maps the captured stderr from a failed clone into a categorised diagnostic.
  * Pattern matching is intentionally substring-based so we cover both `gh` and
@@ -16,7 +9,11 @@ export function classifyCloneFailure({
 	exitCode,
 	stderr,
 	targetPath,
-}: ClassifyCloneFailureOptions): CloneGithubRepositoryDiagnostic {
+}: {
+	exitCode: number | null;
+	stderr: string;
+	targetPath: string;
+}): CloneGithubRepositoryDiagnostic {
 	const lower = stderr.toLowerCase();
 
 	if (

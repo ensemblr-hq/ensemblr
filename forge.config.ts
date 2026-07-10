@@ -54,7 +54,15 @@ const PACKAGE_KEEP_PREFIXES = [
 
 const config: ForgeConfig = {
 	packagerConfig: {
-		asar: true,
+		// node-pty's native addon execs a sibling `spawn-helper` binary (macOS) via
+		// posix_spawn, resolving it under `app.asar.unpacked`. AutoUnpackNativesPlugin
+		// only unpacks `*.node`, so without this glob spawn-helper stays trapped in
+		// app.asar, the unpacked path points at a missing file, and every terminal
+		// spawn dies with "posix_spawnp failed." The plugin merges this `unpack` glob
+		// with its own `*.node` pattern (its existingUnpack handling).
+		asar: {
+			unpack: '**/node_modules/node-pty/build/Release/spawn-helper',
+		},
 		// Per-channel bundle id so dogfood builds never share the release's
 		// LaunchServices registration (the Dock-flash root cause). See ADR 0032.
 		appBundleId: APP_BUNDLE_IDS[buildChannel],

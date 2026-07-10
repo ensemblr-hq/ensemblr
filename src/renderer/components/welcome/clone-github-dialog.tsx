@@ -15,18 +15,13 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
-import {
-	type KeymapBinding,
-	useKeymapHandler,
-} from '@/renderer/hooks/use-keymap-handler';
-import {
-	type CloneStage,
-	useCloneFlow,
-} from '@/renderer/hooks/welcome/use-clone-flow';
+import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
+import { useCloneFlow } from '@/renderer/hooks/welcome/use-clone-flow';
 import { useCloneRepoSearch } from '@/renderer/hooks/welcome/use-clone-repo-search';
-
 import { joinDestination } from '@/renderer/lib/welcome/clone-destination';
 import { isUrlLikeInput } from '@/renderer/lib/welcome/github-repo-search';
+import type { KeymapBinding } from '@/renderer/types/keymap';
+import type { CloneStage } from '@/renderer/types/welcome';
 
 import { CloneGithubDiagnostics } from './clone-github-diagnostics.tsx';
 import { CloneGithubProgressLog } from './clone-github-progress-log.tsx';
@@ -34,17 +29,14 @@ import { CloneGithubRecentRepos } from './clone-github-recent-repos.tsx';
 
 const RESULTS_LISTBOX_ID = 'clone-github-repo-results';
 
-/** Props for the clone-GitHub-repository dialog. */
-interface CloneGithubDialogProps {
-	onOpenChange: (open: boolean) => void;
-	open: boolean;
-}
-
 /** Modal for cloning a GitHub repository into the managed root. */
 export function CloneGithubDialog({
 	onOpenChange,
 	open,
-}: CloneGithubDialogProps) {
+}: {
+	onOpenChange: (open: boolean) => void;
+	open: boolean;
+}) {
 	return (
 		<Dialog
 			onOpenChange={(next) => {

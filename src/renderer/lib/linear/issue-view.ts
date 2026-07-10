@@ -1,18 +1,13 @@
+import type {
+	LinearGateState,
+	LinearWorkspaceSeed,
+} from '@/renderer/types/linear';
 import type { WorkspaceSource } from '@/renderer/types/workbench';
 import type {
 	LinearConnectionSnapshot,
 	LinearIssueWire,
 	LinearServiceFailure,
 } from '@/shared/ipc/contracts/linear';
-import type { WorkspaceLinkedIssueInput } from '@/shared/ipc/contracts/workspace';
-
-/** Connection-level gate state for every Linear surface. */
-export type LinearGateState =
-	| { kind: 'loading' }
-	| { kind: 'not-configured' }
-	| { kind: 'disconnected' }
-	| { kind: 'reconnect-required' }
-	| { kind: 'ready' };
 
 const PRIORITY_LABELS: Record<number, string> = {
 	0: 'No priority',
@@ -132,11 +127,6 @@ export function mapLinearIssuesToWorkspaceSources(
 		subtitle: issue.stateName ?? undefined,
 		title: issue.title,
 	}));
-}
-
-/** Workspace creation seed derived from a Linear issue. */
-export interface LinearWorkspaceSeed {
-	linkedIssue: WorkspaceLinkedIssueInput;
 }
 
 /**

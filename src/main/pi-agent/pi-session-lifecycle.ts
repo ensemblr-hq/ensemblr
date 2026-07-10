@@ -4,15 +4,15 @@ import type {
 	StopPiSessionRequest as StopPiSessionWireRequest,
 	SubmitPiPromptRequest as SubmitPiPromptWireRequest,
 } from '../../shared/ipc/contracts/pi-session';
-import type { CheckpointCapturePort } from '../checkpoints/checkpoint-service.ts';
-import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
+import type { CheckpointCapturePort } from '../checkpoints';
+import type { PiExecutableSnapshot } from '../pi-runtime';
 import {
 	createTurn,
 	type PiSessionBranchRow,
 	type PiSessionRow,
 	updatePiSession,
 	updateTurn,
-} from '../storage/repositories/pi-session-repository.ts';
+} from '../storage/repositories/index.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import { PiSessionServiceError } from './pi-session-service-error.ts';
 import type {
@@ -80,7 +80,7 @@ export type QueueChatTitlePort = (input: {
 }) => void;
 
 /** Dependencies and configuration for {@link createPiSessionLifecycle}. */
-export interface PiSessionLifecycleOptions {
+interface PiSessionLifecycleOptions {
 	/** Pre-prompt git checkpoint capture (ADR 0012); absent in tests. */
 	captureCheckpoint?: CheckpointCapturePort;
 	chatTitleTimeoutMs: number;
@@ -96,7 +96,7 @@ export interface PiSessionLifecycleOptions {
 }
 
 /** Public surface of the Pi session lifecycle: open, submit, stop, and shut down active sessions. */
-export interface PiSessionLifecycle {
+interface PiSessionLifecycle {
 	getActiveSession: (sessionId: string) => ActiveSessionView | null;
 	openSession: (request: OpenPiSessionRequest) => Promise<PiSessionSnapshot>;
 	shutdownActiveSessions: () => Promise<void>;
@@ -107,7 +107,7 @@ export interface PiSessionLifecycle {
 }
 
 /** Read-only view of an active session for the composition root. */
-export interface ActiveSessionView {
+interface ActiveSessionView {
 	branch: PiSessionBranchRow;
 	row: PiSessionRow;
 }

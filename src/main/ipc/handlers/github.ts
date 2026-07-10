@@ -11,17 +11,14 @@ import {
 	pushWorkspaceBranchRequestSchema,
 } from '../request-schemas.ts';
 
-/** Dependencies for registering the gh-backed review-flow IPC handlers. */
-export interface GithubHandlersOptions {
-	githubService: GithubService;
-	withPermissionGate: WithPermissionGate;
-}
-
 /** Registers IPC handlers for the gh-backed review flow (ADR 0013). */
 export function registerGithubHandlers({
 	githubService,
 	withPermissionGate,
-}: GithubHandlersOptions): void {
+}: {
+	githubService: GithubService;
+	withPermissionGate: WithPermissionGate;
+}): void {
 	withPermissionGate(
 		IPC_CHANNELS.commitWorkspaceChanges,
 		'workspace-write',

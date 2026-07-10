@@ -5,12 +5,12 @@ import { toast } from 'sonner';
 import { agentActionTemplatesQuery } from '@/renderer/api/ensemblr-queries';
 import {
 	AGENT_ACTION_SETTING_KEYS,
-	type AgentActionKind,
 	buildAgentActionPrompt,
 	resolveAgentActionTemplate,
 } from '@/renderer/lib/workbench/agent-actions';
 import { useComposerInsert } from '@/renderer/state/composer';
 import type {
+	AgentActionKind,
 	ProjectShellModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';

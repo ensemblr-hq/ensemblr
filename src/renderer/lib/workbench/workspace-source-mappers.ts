@@ -1,14 +1,15 @@
-import type { WorkspaceCreationSeed } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import {
 	buildWorkspaceSeedFromGithubIssue,
 	githubIssueSourceId,
 } from '@/renderer/lib/github';
 import { buildWorkspaceSeedFromLinearIssue } from '@/renderer/lib/linear';
-import type { WorkspaceSource } from '@/renderer/types/workbench';
-import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
+import type {
+	WorkspaceCreationSeed,
+	WorkspaceSource,
+	WorkspaceSourceItem,
+} from '@/renderer/types/workbench';
 import type {
 	RepositoryBranchWire,
-	RepositoryIssueWire,
 	RepositoryPullRequestWire,
 } from '@/shared/ipc/contracts/workspace-sources';
 
@@ -50,17 +51,6 @@ export function mapPullRequestsToWorkspaceSources(
 		title: pullRequest.title,
 	}));
 }
-
-/**
- * The raw row behind a picker source, retained so a selection can become a
- * workspace creation seed (or, for a branch that already has a workspace, an
- * open-existing navigation).
- */
-export type WorkspaceSourceItem =
-	| { branch: RepositoryBranchWire; kind: 'branch' }
-	| { issue: LinearIssueWire; kind: 'linear-issue' }
-	| { issue: RepositoryIssueWire; kind: 'github-issue' }
-	| { kind: 'pull-request'; pullRequest: RepositoryPullRequestWire };
 
 /**
  * Builds the workspace creation seed for a selected picker item. Branch/PR

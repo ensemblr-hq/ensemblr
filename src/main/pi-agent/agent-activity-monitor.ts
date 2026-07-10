@@ -2,7 +2,7 @@ import type { AppSettings } from '../../shared/config/app-settings.ts';
 import type { PiSessionEventWire } from '../../shared/ipc/contracts/pi-session.ts';
 
 /** One persisted Pi event plus the session it belongs to. */
-export interface AgentActivityEvent {
+interface AgentActivityEvent {
 	event: PiSessionEventWire;
 	sessionId: string;
 }
@@ -42,7 +42,7 @@ export interface AgentActivityMonitorOptions {
 }
 
 /** Public surface of the agent activity monitor. */
-export interface AgentActivityMonitor {
+interface AgentActivityMonitor {
 	/** Feed every persisted Pi session event here. */
 	handle: (input: AgentActivityEvent) => void;
 	/** Re-evaluate the power blocker (e.g. after a settings change). */

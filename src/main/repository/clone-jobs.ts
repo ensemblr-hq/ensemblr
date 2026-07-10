@@ -4,13 +4,13 @@ import type { CloneGithubRepositoryPreparation } from '../../shared/ipc/contract
 export const PREPARED_JOB_TTL_MS = 5 * 60 * 1000;
 
 /** Internal: a prepared-but-not-yet-started clone job. */
-export interface PreparedJob {
+interface PreparedJob {
 	createdAtMs: number;
 	preparation: CloneGithubRepositoryPreparation;
 }
 
 /** A bounded store of prepared clone jobs keyed by their `jobId`. */
-export interface PreparedJobStore {
+interface PreparedJobStore {
 	delete: (jobId: string) => void;
 	evictExpired: () => void;
 	get: (jobId: string) => PreparedJob | undefined;

@@ -10,13 +10,6 @@ import type { EnsemblrDatabaseService } from '../../storage';
 import { getRepositoryWorkspaceNavigationSnapshot } from '../repository-workspace-navigation';
 import { buildHealthSnapshot } from './health';
 
-/** Service dependencies used by the synchronous initial-shell snapshot. */
-export interface ShellSnapshotHandlersOptions {
-	configService: EnsemblrConfigService;
-	databaseService: EnsemblrDatabaseService;
-	openTargetService: OpenTargetService;
-}
-
 /**
  * Registers the synchronous `initial-shell-snapshot` IPC channel consumed by
  * the preload bootstrap. Each underlying snapshot is built defensively so the
@@ -27,7 +20,11 @@ export function registerShellSnapshotHandlers({
 	configService,
 	databaseService,
 	openTargetService,
-}: ShellSnapshotHandlersOptions): void {
+}: {
+	configService: EnsemblrConfigService;
+	databaseService: EnsemblrDatabaseService;
+	openTargetService: OpenTargetService;
+}): void {
 	ipcMain.on(IPC_CHANNELS.initialShellSnapshot, (event) => {
 		const snapshot: InitialShellSnapshot = {
 			capturedAt: new Date().toISOString(),

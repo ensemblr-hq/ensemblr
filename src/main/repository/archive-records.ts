@@ -14,7 +14,7 @@ export type ArchiveRecordKind = 'repository' | 'workspace';
  * exactly: every column is named, defaults are explicit, and `kind` selects
  * which columns are written vs. forced to NULL.
  */
-export interface ArchiveRecordInput {
+interface ArchiveRecordInput {
 	archivedAt: string;
 	/**
 	 * Filesystem path the preserved `.context/` directory was copied to. NULL

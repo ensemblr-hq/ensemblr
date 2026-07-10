@@ -31,10 +31,10 @@ import {
 	buildUpdateIssueRequest,
 	createIssueEditorFields,
 	describeLinearFailure,
-	type LinearIssueEditorFields,
 	UNSET_FIELD,
 	validateIssueEditorFields,
 } from '@/renderer/lib/linear';
+import type { LinearIssueEditorFields } from '@/renderer/types/linear';
 import type {
 	LinearIssueWire,
 	LinearResourceWire,

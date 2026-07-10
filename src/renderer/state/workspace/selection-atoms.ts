@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
-import type { WorkspaceNavigationRenderState } from '@/renderer/lib/workbench';
+import type { WorkspaceNavigationRenderState } from '@/renderer/types/workbench';
 
 const workspaceStorageOptions = { getOnInit: true };
 

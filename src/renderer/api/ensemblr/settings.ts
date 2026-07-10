@@ -6,6 +6,7 @@
 import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
+import type { ReviewMergeSettings } from '@/renderer/types/settings';
 import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 
 import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
@@ -28,13 +29,6 @@ export function settingsResolutionQuery(
 		),
 		staleTime: 15_000,
 	});
-}
-
-/** Repository policy flags controlling what happens after a review is merged. */
-export interface ReviewMergeSettings {
-	archiveAfterMerge: boolean;
-	deleteLocalBranchOnArchive: boolean;
-	setUpstreamOnPush: boolean;
 }
 
 /** Query options for the repository's archive-after-merge policy settings. */
@@ -72,7 +66,7 @@ export function reviewMergeSettingsQuery(
 }
 
 /** A single resolved per-action Pi instruction template, with its source and raw value. */
-export interface AgentActionTemplateSetting {
+interface AgentActionTemplateSetting {
 	source?: string;
 	value?: unknown;
 }

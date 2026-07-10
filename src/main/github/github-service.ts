@@ -77,13 +77,6 @@ export interface GithubService {
 	) => Promise<PushWorkspaceBranchResult>;
 }
 
-/** Dependencies for creating the GitHub service, with an injectable clock for tests. */
-export interface CreateGithubServiceOptions {
-	databaseService: EnsemblrDatabaseService;
-	localCommandService: LocalCommandService;
-	now?: () => Date;
-}
-
 /**
  * Single command boundary for git review-flow operations and all `gh`/`gh api`
  * calls (ADR 0013). Never adds an app-owned GitHub OAuth client; everything
@@ -93,7 +86,11 @@ export function createGithubService({
 	databaseService,
 	localCommandService,
 	now = () => new Date(),
-}: CreateGithubServiceOptions): GithubService {
+}: {
+	databaseService: EnsemblrDatabaseService;
+	localCommandService: LocalCommandService;
+	now?: () => Date;
+}): GithubService {
 	/**
 	 * Run a `gh` or `git` command through the local command service, applying the
 	 * command-specific timeout and output cap.

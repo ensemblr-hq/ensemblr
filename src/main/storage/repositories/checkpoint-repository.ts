@@ -16,7 +16,7 @@ export interface CheckpointRow {
 }
 
 /** Input for inserting a new checkpoint row. */
-export interface InsertCheckpointInput {
+interface InsertCheckpointInput {
 	gitHash: string;
 	gitRef: string;
 	label: string;

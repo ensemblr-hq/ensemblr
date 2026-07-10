@@ -14,7 +14,7 @@ const COMMIT_FIELD_SEP = '\x1f';
 const COMMIT_RECORD_SEP = '\x1e';
 
 /** One parsed `git status --porcelain` entry: path, status, and optional rename source. */
-export interface PorcelainEntry {
+interface PorcelainEntry {
 	path: string;
 	renamedFrom?: string;
 	status: WorkspaceGitFileStatus;

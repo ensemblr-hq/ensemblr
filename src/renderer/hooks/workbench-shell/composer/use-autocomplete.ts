@@ -1,16 +1,6 @@
 import { useMemo } from 'react';
 import { fuzzyScore } from '@/renderer/lib/workbench/fuzzy-score';
-
-/** Kind of composer autocomplete token under the caret, or `null` when none. */
-export type AutocompleteKind = 'mention' | 'slash' | null;
-
-/** Detected autocomplete token: its kind, query, and span within the composer text. */
-export interface AutocompleteState {
-	kind: AutocompleteKind;
-	query: string;
-	tokenStart: number;
-	tokenEnd: number;
-}
+import type { AutocompleteState } from '@/renderer/types/workbench';
 
 const SLASH_RE = /(?:^|\s)\/([\w:-]*)$/;
 const MENTION_RE = /(?:^|\s)@([\w\-/.]*)$/;
@@ -58,7 +48,7 @@ export function detectAutocomplete(
 }
 
 /** An item paired with its fuzzy-match score. */
-export interface FuzzyScored<T> {
+interface FuzzyScored<T> {
 	item: T;
 	score: number;
 }

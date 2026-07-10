@@ -18,13 +18,6 @@ import {
 } from '../request-schemas.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
-/** Service dependencies used by the GitHub clone IPC handlers. */
-export interface CloneHandlersOptions {
-	githubCloneService: GithubCloneService;
-	githubRepositoryListService: GithubRepositoryListService;
-	withPermissionGate: WithPermissionGate;
-}
-
 /**
  * Registers IPC handlers for listing, picking a destination for, and cloning
  * GitHub repositories.
@@ -34,7 +27,11 @@ export function registerCloneHandlers({
 	githubCloneService,
 	githubRepositoryListService,
 	withPermissionGate,
-}: CloneHandlersOptions): void {
+}: {
+	githubCloneService: GithubCloneService;
+	githubRepositoryListService: GithubRepositoryListService;
+	withPermissionGate: WithPermissionGate;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.githubRepositoryList,
 		(_event, request: unknown): Promise<GithubRepositoryListResult> => {

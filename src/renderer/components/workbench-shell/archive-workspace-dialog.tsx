@@ -18,14 +18,6 @@ import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
-/** Props for the archive-workspace dialog. */
-interface ArchiveWorkspaceDialogProps {
-	onArchived: (workspaceId: string) => Promise<void> | void;
-	onOpenChange: (open: boolean) => void;
-	open: boolean;
-	workspace: WorkspaceShellModel | null;
-}
-
 /**
  * Lifecycle archive dialog: preserves the workspace `.context/` folder and
  * archives the workspace as a state. Branch cleanup is opt-in and gated by a
@@ -36,7 +28,12 @@ export function ArchiveWorkspaceDialog({
 	onOpenChange,
 	open,
 	workspace,
-}: ArchiveWorkspaceDialogProps) {
+}: {
+	onArchived: (workspaceId: string) => Promise<void> | void;
+	onOpenChange: (open: boolean) => void;
+	open: boolean;
+	workspace: WorkspaceShellModel | null;
+}) {
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
 			<DialogContent className='gap-4 sm:max-w-md'>

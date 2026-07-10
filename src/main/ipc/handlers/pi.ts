@@ -10,11 +10,6 @@ import { resolvePiSlashCommands } from '../../pi-agent/pi-slash-commands.ts';
 import type { PiExecutableService } from '../../pi-runtime';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
-/** Service dependencies used by the Pi executable IPC handlers. */
-export interface PiHandlersOptions {
-	piExecutableService: PiExecutableService;
-}
-
 /**
  * Registers IPC handlers for selecting and saving a Pi executable override
  * and for surfacing pi's slash command catalog to the renderer.
@@ -22,7 +17,9 @@ export interface PiHandlersOptions {
  */
 export function registerPiHandlers({
 	piExecutableService,
-}: PiHandlersOptions): void {
+}: {
+	piExecutableService: PiExecutableService;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.selectPiExecutable,
 		async (event): Promise<PiExecutableSelectionResult> => {

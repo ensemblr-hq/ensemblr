@@ -2,13 +2,11 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 
 import { TooltipProvider } from '../../src/renderer/components/ui/tooltip';
-import {
-	type ReviewFileActions,
-	ReviewFileActionsProvider,
-} from '../../src/renderer/components/workbench-shell/review-files/review-file-actions-context';
+import { ReviewFileActionsProvider } from '../../src/renderer/components/workbench-shell/review-files/review-file-actions-context';
 import { ReviewFileEmptyState } from '../../src/renderer/components/workbench-shell/review-files/review-file-empty-state';
 import { ReviewFileRow } from '../../src/renderer/components/workbench-shell/review-files/review-file-row';
 import type {
+	ReviewFileActions,
 	ReviewFileSummary,
 	WorkspaceOpenTarget,
 } from '../../src/renderer/types/workbench';

@@ -21,6 +21,7 @@ import {
 	changesViewModeAtom,
 } from '@/renderer/state/workspace';
 import type {
+	DiscardChangesTarget,
 	ReviewPanelTab,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
@@ -29,7 +30,6 @@ import type {
 	ChangesViewMode,
 } from '@/renderer/types/workbench-shell';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
-
 import { ChecksPanel } from './checks-panel/checks-panel';
 import { useReviewActions } from './review-actions/review-actions-context';
 import { AllFilesList } from './review-files/all-files-list';
@@ -38,10 +38,7 @@ import {
 	ChangesOverflowMenu,
 	ChangesSourceBadge,
 } from './review-files/changes-source-menu';
-import {
-	DiscardChangesDialog,
-	type DiscardChangesTarget,
-} from './review-files/discard-changes-dialog';
+import { DiscardChangesDialog } from './review-files/discard-changes-dialog';
 import { ReviewFileList } from './review-files/review-file-list';
 
 /** Resolves the active change source to the git diff scope a query needs. */

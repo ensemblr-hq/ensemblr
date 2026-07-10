@@ -28,7 +28,7 @@ const TerminalContext = createContext<TerminalContextType>({
 });
 
 /** Props for the terminal header row. */
-export type TerminalHeaderProps = HTMLAttributes<HTMLDivElement>;
+type TerminalHeaderProps = HTMLAttributes<HTMLDivElement>;
 
 /** Header row for the terminal, holding the title, status, and actions. */
 const TerminalHeader = ({
@@ -48,7 +48,7 @@ const TerminalHeader = ({
 );
 
 /** Props for the terminal title. */
-export type TerminalTitleProps = HTMLAttributes<HTMLDivElement>;
+type TerminalTitleProps = HTMLAttributes<HTMLDivElement>;
 
 /** Terminal title with a leading terminal icon, defaulting to "Terminal". */
 const TerminalTitle = ({
@@ -66,7 +66,7 @@ const TerminalTitle = ({
 );
 
 /** Props for the terminal status indicator. */
-export type TerminalStatusProps = HTMLAttributes<HTMLDivElement>;
+type TerminalStatusProps = HTMLAttributes<HTMLDivElement>;
 
 /** Status area shown only while the terminal is streaming output. */
 const TerminalStatus = ({
@@ -91,7 +91,7 @@ const TerminalStatus = ({
 };
 
 /** Props for the terminal actions cluster. */
-export type TerminalActionsProps = HTMLAttributes<HTMLDivElement>;
+type TerminalActionsProps = HTMLAttributes<HTMLDivElement>;
 
 /** Container for the terminal's trailing action buttons. */
 const TerminalActions = ({
@@ -105,7 +105,7 @@ const TerminalActions = ({
 );
 
 /** Props for the terminal copy button, including copy/error callbacks and the copied-state timeout. */
-export type TerminalCopyButtonProps = ComponentProps<typeof Button> & {
+type TerminalCopyButtonProps = ComponentProps<typeof Button> & {
 	onCopy?: () => void;
 	onError?: (error: Error) => void;
 	timeout?: number;
@@ -166,7 +166,7 @@ const TerminalCopyButton = ({
 };
 
 /** Props for the terminal clear button. */
-export type TerminalClearButtonProps = ComponentProps<typeof Button>;
+type TerminalClearButtonProps = ComponentProps<typeof Button>;
 
 /** Button that clears the terminal; hidden when no clear handler is provided. */
 const TerminalClearButton = ({
@@ -197,7 +197,7 @@ const TerminalClearButton = ({
 };
 
 /** Props for the terminal content area. */
-export type TerminalContentProps = HTMLAttributes<HTMLDivElement>;
+type TerminalContentProps = HTMLAttributes<HTMLDivElement>;
 
 /** Scrollable output area that renders ANSI text and auto-scrolls to the newest line while streaming. */
 const TerminalContent = ({
@@ -237,7 +237,7 @@ const TerminalContent = ({
 };
 
 /** Props for the Terminal root, including the output text and streaming/auto-scroll flags. */
-export type TerminalProps = HTMLAttributes<HTMLDivElement> & {
+type TerminalProps = HTMLAttributes<HTMLDivElement> & {
 	output: string;
 	isStreaming?: boolean;
 	autoScroll?: boolean;

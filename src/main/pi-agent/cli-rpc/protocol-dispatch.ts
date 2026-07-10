@@ -49,7 +49,7 @@ export interface ProtocolDispatchDeps {
 }
 
 /** Handles a single raw Pi RPC frame. */
-export type ProtocolFrameHandler = (frame: unknown) => void;
+type ProtocolFrameHandler = (frame: unknown) => void;
 
 /**
  * Build the frame dispatcher that turns raw Pi RPC frames into session events,

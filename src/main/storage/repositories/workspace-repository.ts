@@ -620,11 +620,6 @@ export function listArchivedWorkspaceRowsByRepository({
 		.all(repositoryId);
 }
 
-/** Inputs for {@link listAllWorkspaceRows}. */
-export interface ListAllWorkspaceRowsOptions {
-	database: DatabaseSync;
-}
-
 /**
  * Returns every workspace across all repositories — active and archived —
  * joined with the parent repository (for the display name) and the most recent
@@ -637,7 +632,9 @@ export interface ListAllWorkspaceRowsOptions {
  */
 export function listAllWorkspaceRows({
 	database,
-}: ListAllWorkspaceRowsOptions): unknown[] {
+}: {
+	database: DatabaseSync;
+}): unknown[] {
 	return database
 		.prepare(
 			`SELECT
@@ -669,12 +666,6 @@ export function listAllWorkspaceRows({
 		.all();
 }
 
-/** Inputs for {@link listWorkspaceIdsByRepository}. */
-export interface ListActiveWorkspaceBranchRowsByRepositoryOptions {
-	database: DatabaseSync;
-	repositoryId: string;
-}
-
 /**
  * Returns `{ id, branchName }` for every active (non-archived) workspace in a
  * repository, so the create-from-source picker can mark branches that already
@@ -683,7 +674,10 @@ export interface ListActiveWorkspaceBranchRowsByRepositoryOptions {
 export function listActiveWorkspaceBranchRowsByRepository({
 	database,
 	repositoryId,
-}: ListActiveWorkspaceBranchRowsByRepositoryOptions): unknown[] {
+}: {
+	database: DatabaseSync;
+	repositoryId: string;
+}): unknown[] {
 	return database
 		.prepare(
 			`SELECT

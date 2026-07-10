@@ -13,7 +13,7 @@ import { useComposerAttachmentDispatcher } from '@/renderer/state/composer';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 /** Conversation coordinates a fork operates on. */
-export interface ForkConversationSource {
+interface ForkConversationSource {
 	branchId: string;
 	sessionId: string;
 	workspace: WorkspaceShellModel;

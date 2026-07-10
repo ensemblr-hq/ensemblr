@@ -12,26 +12,19 @@ import {
 	computeTurnDiff,
 	listTurnCheckpoints,
 	restoreTurnCheckpoint,
-} from '../../checkpoints/checkpoint-service.ts';
-import {
-	type EnsemblrDatabaseService,
-	requireDatabase,
-} from '../../storage/database.ts';
+} from '../../checkpoints/index.ts';
+import type { EnsemblrDatabaseService } from '../../storage';
+import { requireDatabase } from '../../storage/database.ts';
 import {
 	type CheckpointRow,
 	getCheckpointByTurnId,
-} from '../../storage/repositories/checkpoint-repository.ts';
+} from '../../storage/repositories/index.ts';
 import { getWorkspacePathById } from '../../storage/repositories/workspace-repository.ts';
 import {
 	computeTurnDiffRequestSchema,
 	listTurnCheckpointsRequestSchema,
 	restoreCheckpointRequestSchema,
 } from '../request-schemas.ts';
-
-/** Dependencies for registering the checkpoint IPC handlers. */
-export interface CheckpointHandlersOptions {
-	databaseService: EnsemblrDatabaseService;
-}
 
 /**
  * Registers IPC handlers for checkpoint listing, turn diff, and restore
@@ -40,7 +33,9 @@ export interface CheckpointHandlersOptions {
  */
 export function registerCheckpointHandlers({
 	databaseService,
-}: CheckpointHandlersOptions): void {
+}: {
+	databaseService: EnsemblrDatabaseService;
+}): void {
 	const requireCheckpointDatabase = () =>
 		requireDatabase(
 			databaseService.getConnection()?.database,

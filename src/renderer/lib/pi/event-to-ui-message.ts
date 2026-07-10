@@ -1,12 +1,16 @@
 import type { UIMessage } from 'ai';
-
+import type {
+	PendingGroup,
+	PiTurnMetadata,
+	UIMessagePart,
+	UIRole,
+} from '@/renderer/types/pi-timeline';
 import type {
 	PiSessionEventWire as PiEventFrame,
 	PiPersistedEnvelope,
 	PiWireMessagePart,
 	PiWireMessagePayload,
 } from '@/shared/ipc/contracts/pi-session';
-
 import {
 	buildErrorMessage,
 	buildStderrMessage,
@@ -22,7 +26,6 @@ import {
 	buildToolResultPart,
 	mergeToolPart,
 } from './tool-event-mapper';
-import type { PendingGroup, UIMessagePart, UIRole } from './types';
 
 /**
  * Converts the persisted Pi RPC event stream into the AI SDK `UIMessage` shape
@@ -336,23 +339,6 @@ function finalizeGroup(group: PendingGroup): UIMessage {
 		parts,
 		role: group.role,
 	};
-}
-
-/** Turn timing carried on each mapped `UIMessage` for the timer feature. */
-export interface PiTurnMetadata {
-	/**
-	 * Submit time of the user prompt that opened this turn, when known. Used as
-	 * the turn-timer start so the elapsed time spans prompt → final answer
-	 * (reasoning + tool calls included), not just the first assistant event.
-	 * Only set on assistant turns.
-	 */
-	promptAt?: string;
-	firstEventAt: string;
-	lastEventAt: string;
-	/** Highest persisted-event ordinal in the turn — the fork boundary. */
-	lastOrdinal: number;
-	/** Persisted `pi_turns` id backing this group; keys checkpoint lookups. */
-	turnId: string | null;
 }
 
 /** Reads the timing metadata back off a mapped message, if present. */

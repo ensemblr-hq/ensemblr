@@ -1,4 +1,4 @@
-import type { StoredWorkspaceSelection } from '@/renderer/lib/workbench';
+import type { StoredWorkspaceSelection } from '@/renderer/types/workbench';
 import { LAST_WORKSPACE_SELECTION_STORAGE_KEY } from './selection-atoms';
 
 /**

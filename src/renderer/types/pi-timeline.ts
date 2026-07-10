@@ -7,6 +7,8 @@
  * `tests/fixtures/pi-captures/` — see `docs/pi/event-taxonomy.md`.
  */
 
+import type { UIMessage } from 'ai';
+
 import type { PiSessionStats } from '@/shared/pi-rpc';
 
 /** Lifecycle of one tool call rendered as a card. */
@@ -18,7 +20,7 @@ export type PiToolCallStatus =
 	| 'cancelled';
 
 /** One user prompt echoed back by pi. */
-export interface PiUserMessageItem {
+interface PiUserMessageItem {
 	id: string;
 	kind: 'user-message';
 	text: string;
@@ -46,7 +48,7 @@ export interface PiThinkingItem {
 }
 
 /** Extension confirm-dialog handshake attached to a gated tool call. */
-export interface PiToolApproval {
+interface PiToolApproval {
 	title: string;
 	message: string | null;
 	requestedAtMs: number;
@@ -123,7 +125,7 @@ export interface PiTimelineState {
 }
 
 /** Reducer-internal bookkeeping between events. */
-export interface PiTimelineCursor {
+interface PiTimelineCursor {
 	nextItemId: number;
 	openAssistantId: string | null;
 	openThinkingId: string | null;
@@ -141,4 +143,78 @@ export interface PiTimelineCursor {
 export interface PiTimelineInput {
 	atMs: number;
 	event: import('@/shared/pi-rpc').PiRpcEvent;
+}
+
+/** UI-message role of a mapped Pi turn: user, assistant, or system. */
+export type UIRole = UIMessage['role'];
+
+/** A single part of a mapped `UIMessage` (text, reasoning, or dynamic-tool). */
+export type UIMessagePart = UIMessage['parts'][number];
+
+/** Text or reasoning part that is still streaming deltas. */
+export type StreamingTextPart = Extract<
+	UIMessagePart,
+	{ type: 'text' | 'reasoning' }
+> & { state: 'streaming' };
+
+/**
+ * Buffer for a consecutive same-role run of message events while it is being
+ * collapsed into a single `UIMessage`. Event timestamps bound the turn so the
+ * renderer can derive generation duration without re-walking the stream.
+ */
+export interface PendingGroup {
+	firstEventAt: string;
+	id: string;
+	lastEventAt: string;
+	/** Highest persisted-event ordinal folded into this group. */
+	lastOrdinal: number;
+	parts: UIMessagePart[];
+	role: UIRole;
+	groupKey: string;
+	/** First persisted turn id seen in the group, if any. */
+	turnId: string | null;
+}
+
+/** Turn timing carried on each mapped `UIMessage` for the timer feature. */
+export interface PiTurnMetadata {
+	/**
+	 * Submit time of the user prompt that opened this turn, when known. Used as
+	 * the turn-timer start so the elapsed time spans prompt → final answer
+	 * (reasoning + tool calls included), not just the first assistant event.
+	 * Only set on assistant turns.
+	 */
+	promptAt?: string;
+	firstEventAt: string;
+	lastEventAt: string;
+	/** Highest persisted-event ordinal in the turn — the fork boundary. */
+	lastOrdinal: number;
+	/** Persisted `pi_turns` id backing this group; keys checkpoint lookups. */
+	turnId: string | null;
+}
+
+/** One file attachment parsed from a persisted user prompt (path + inlined content). */
+export interface ParsedPromptAttachment {
+	content: string;
+	path: string;
+}
+
+/** A parsed user prompt split into its leading file attachments and typed text. */
+export interface ParsedPrompt {
+	attachments: readonly ParsedPromptAttachment[];
+	text: string;
+}
+
+/**
+ * Compact one-line projection of a tool call for the activity-row renderer.
+ * Mirrors the GIF reference: `[label]  [detail]  [optional chip]`.
+ *
+ * Unknown tools fall through to a generic projection — the tool name as label,
+ * the first scalar input value as detail. Keeps the surface uniform.
+ */
+export interface ToolRowProjection {
+	chipLabel: string | null;
+	/** Full path backing the chip (as given in tool input), for preview opening. */
+	chipPath: string | null;
+	detail: string;
+	label: string;
 }

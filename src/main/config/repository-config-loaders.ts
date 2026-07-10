@@ -18,7 +18,7 @@ import { formatErrorMessage } from './json-utils.ts';
 export const WORKTREE_INCLUDE_FILENAME = '.worktreeinclude';
 
 /** Result of reading a single config file from disk. */
-export interface ParsedConfigSource {
+interface ParsedConfigSource {
 	diagnostics: ConfigDiagnostic[];
 	path: string;
 	record: Record<string, unknown> | null;

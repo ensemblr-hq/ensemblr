@@ -16,12 +16,6 @@ import {
 	updateLinearIssueRequestSchema,
 } from '../request-schemas.ts';
 
-/** Service dependencies used by the Linear integration IPC handlers. */
-export interface LinearHandlersOptions {
-	linearAuthService: LinearAuthService;
-	linearService: LinearService;
-}
-
 /**
  * Registers IPC handlers for the Linear OAuth lifecycle and issue data.
  * @param options - Required services.
@@ -29,7 +23,10 @@ export interface LinearHandlersOptions {
 export function registerLinearHandlers({
 	linearAuthService,
 	linearService,
-}: LinearHandlersOptions): void {
+}: {
+	linearAuthService: LinearAuthService;
+	linearService: LinearService;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.linearConnectionStatus,
 		(): Promise<LinearConnectionSnapshot> => {

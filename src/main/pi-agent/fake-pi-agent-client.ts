@@ -37,12 +37,6 @@ export interface FakePiAgentAdapterController {
 	getShutdownCount: () => number;
 }
 
-/** Options for `createFakePiAgentAdapter`. */
-export interface CreateFakePiAgentAdapterOptions {
-	now?: () => Date;
-	turnIdFactory?: () => string;
-}
-
 /**
  * Builds an in-memory `PiAgentAdapter` for unit tests. Returns both the
  * adapter and a controller that lets tests assert and drive session state.
@@ -50,7 +44,7 @@ export interface CreateFakePiAgentAdapterOptions {
  * @returns A {@link FakePiAgentAdapterController}.
  */
 export function createFakePiAgentAdapter(
-	options: CreateFakePiAgentAdapterOptions = {},
+	options: { now?: () => Date; turnIdFactory?: () => string } = {},
 ): FakePiAgentAdapterController {
 	const now = options.now ?? (() => new Date());
 	let turnCounter = 0;

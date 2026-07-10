@@ -7,11 +7,6 @@ import type {
 } from '../../../shared/ipc/contracts/settings-resolution';
 import type { EnsemblrConfigResolutionService } from '../../config';
 
-/** Service dependencies used by the settings-resolution IPC handlers. */
-export interface SettingsHandlersOptions {
-	settingsResolutionService: EnsemblrConfigResolutionService;
-}
-
 /**
  * Registers the IPC handler that resolves the layered Ensemblr settings tree
  * (app-wide + optional repository scope) for the renderer.
@@ -19,7 +14,9 @@ export interface SettingsHandlersOptions {
  */
 export function registerSettingsHandlers({
 	settingsResolutionService,
-}: SettingsHandlersOptions): void {
+}: {
+	settingsResolutionService: EnsemblrConfigResolutionService;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.settingsResolution,
 		(

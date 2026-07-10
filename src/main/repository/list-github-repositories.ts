@@ -9,16 +9,11 @@ import type {
 } from '../commands/local-command';
 import { firstLine } from './first-line.ts';
 
-/** Options accepted by {@link GithubRepositoryListService.list}. */
-export interface GithubRepositoryListOptions {
-	scope?: GithubRepositoryListScope;
-}
-
 /** Public surface of the gh-backed repository listing service. */
 export interface GithubRepositoryListService {
-	list: (
-		options?: GithubRepositoryListOptions,
-	) => Promise<GithubRepositoryListResult>;
+	list: (options?: {
+		scope?: GithubRepositoryListScope;
+	}) => Promise<GithubRepositoryListResult>;
 }
 
 /** Options for {@link createGithubRepositoryListService}. */

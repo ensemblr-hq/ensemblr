@@ -10,12 +10,9 @@ import {
 } from '@/renderer/components/ui/context-menu';
 import { OpenTargetIcon } from '@/renderer/components/workbench-shell/open-target-icon';
 
-import { useReviewFileActions } from './review-file-actions-context';
+import type { ReviewFileMenuTarget } from '@/renderer/types/workbench';
 
-/** The changed file a right-click opened the shared menu against. */
-export interface ReviewFileMenuTarget {
-	path: string;
-}
+import { useReviewFileActions } from './review-file-actions-context';
 
 /**
  * Single shared right-click menu for the changes panel: View (open diff), "Open

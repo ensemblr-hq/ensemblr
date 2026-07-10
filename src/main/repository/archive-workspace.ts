@@ -12,7 +12,7 @@ import type {
 } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrRootDirectoryService } from '../root';
-import type { EnsemblrDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
 import {
 	selectWorkspaceWithRepositoryById,
 	stampWorkspaceArchived,

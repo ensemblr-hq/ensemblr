@@ -12,12 +12,10 @@ import { queryClient } from '@/renderer/api/query-client';
 import { pickComposerSurname } from '@/renderer/lib/workbench/workspace-name-pool';
 import type {
 	ProjectShellModel,
+	WorkspaceCreationSeed,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type {
-	CreateWorkspaceDiagnostic,
-	WorkspaceLinkedIssueInput,
-} from '@/shared/ipc/contracts/workspace';
+import type { CreateWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
 /**
  * Returns a callback the browse-archive dialog calls after every successful
@@ -77,15 +75,6 @@ function pickFallbackWorkspace({
 /** Dependencies for the create-workspace navigation action hook. */
 interface CreateWorkspaceActionDeps {
 	disableProjectReorderLayoutAnimation: () => void;
-}
-
-/** Optional provenance seed (e.g. from an issue, branch, or PR) for a workspace. */
-export interface WorkspaceCreationSeed {
-	/** Branch/PR sources fork the new workspace off this ref (e.g. `origin/x`). */
-	baseBranch?: string;
-	branchName?: string;
-	linkedIssue?: WorkspaceLinkedIssueInput;
-	name?: string;
 }
 
 /** State and `create` handler exposed by the create-workspace action hook. */

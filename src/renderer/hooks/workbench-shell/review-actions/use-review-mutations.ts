@@ -14,14 +14,8 @@ import {
 	showReviewActionError,
 } from '@/renderer/components/workbench-shell/review-actions/review-action-error';
 import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
+import type { ReviewMergeSettings } from '@/renderer/types/settings';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
-
-/** Effective merge-settings snapshot — see `reviewMergeSettingsQuery`. */
-export interface ReviewMergeSettings {
-	archiveAfterMerge: boolean;
-	deleteLocalBranchOnArchive: boolean;
-	setUpstreamOnPush: boolean;
-}
 
 /**
  * Owns the merge-pull-request mutation plus the archive-after-merge follow-up.

@@ -11,16 +11,9 @@ import type {
 	ReadEnvironmentVariableValueResult,
 	SelectEnvFileResult,
 } from '../../../shared/ipc/contracts/environment';
-import {
-	EnvironmentVariablesError,
-	type EnvironmentVariablesService,
-} from '../../environment/environment-variables';
+import type { EnvironmentVariablesService } from '../../environment';
+import { EnvironmentVariablesError } from '../../environment/environment-variables';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
-
-/** Service dependencies used by the environment-variables IPC handler. */
-export interface EnvironmentHandlersOptions {
-	environmentVariablesService: EnvironmentVariablesService;
-}
 
 const scopeSchema = z.enum(['app', 'repository', 'workspace']);
 
@@ -80,7 +73,9 @@ function toFriendlyError(error: unknown): string {
  */
 export function registerEnvironmentHandlers({
 	environmentVariablesService,
-}: EnvironmentHandlersOptions): void {
+}: {
+	environmentVariablesService: EnvironmentVariablesService;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.environmentVariables,
 		(): Promise<EnvironmentVariablesSnapshot> =>

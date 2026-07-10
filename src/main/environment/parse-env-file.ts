@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { isEnvironmentVariableKey } from './environment-variable-keys.ts';
 
 /** Result of loading an env file from disk. */
-export interface LoadEnvFileResult {
+interface LoadEnvFileResult {
 	/** Parsed `KEY=value` pairs (empty when the file is missing or unreadable). */
 	values: Record<string, string>;
 	/** Set when the file could not be read; absent on success. */

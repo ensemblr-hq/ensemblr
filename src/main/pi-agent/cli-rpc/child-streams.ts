@@ -1,4 +1,4 @@
-import type { JsonlLineStream } from '../../pi-ipc/jsonl-line-stream.ts';
+import type { JsonlLineStream } from '../../pi-ipc';
 import type {
 	PiAgentErrorCode,
 	PiAgentEvent,

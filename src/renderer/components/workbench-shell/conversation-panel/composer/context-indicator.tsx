@@ -7,12 +7,6 @@ import {
 import { Progress } from '@/renderer/components/ui/progress';
 import type { ComposerContextUsage } from '@/renderer/types/workbench';
 
-/** Props for the composer context-usage indicator. */
-interface ContextIndicatorProps {
-	maxLabel?: string;
-	usage: ComposerContextUsage | null;
-}
-
 const FALLBACK_MAX = 258_400;
 
 /** Formats token counts into compact model-picker-friendly labels. */
@@ -27,7 +21,13 @@ function formatTokens(value: number): string {
 }
 
 /** Renders the composer context-window gauge and hover details. */
-export function ContextIndicator({ maxLabel, usage }: ContextIndicatorProps) {
+export function ContextIndicator({
+	maxLabel,
+	usage,
+}: {
+	maxLabel?: string;
+	usage: ComposerContextUsage | null;
+}) {
 	const used = usage?.usedTokens ?? 0;
 	const max = usage?.maxTokens ?? FALLBACK_MAX;
 	const percent = max > 0 ? Math.min(100, (used / max) * 100) : 0;

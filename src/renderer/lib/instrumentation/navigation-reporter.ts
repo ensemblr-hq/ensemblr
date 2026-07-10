@@ -1,12 +1,9 @@
 import type { AnyRouteMatch, AnyRouter } from '@tanstack/react-router';
-import {
-	type LoaderProfileRecord,
-	type NavigationProfile,
-	now,
-	preloadsByHref,
-	roundMs,
-	stableJson,
-} from './profiler-store';
+import type {
+	LoaderProfileRecord,
+	NavigationProfile,
+} from '@/renderer/types/instrumentation';
+import { now, preloadsByHref, roundMs, stableJson } from './profiler-store';
 
 /**
  * Emits the dev-console summary for one completed navigation, including loader

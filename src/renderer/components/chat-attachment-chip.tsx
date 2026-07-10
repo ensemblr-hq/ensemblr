@@ -2,18 +2,6 @@ import { FileIcon, FolderIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { cn } from '@/renderer/lib/utils';
 
-/**
- * Compact pill that mirrors the composer attachment chip used inside the chat
- * transcript. Shows a leading file/folder icon and the basename of the path.
- * Visually matches the reference design — small, muted background, single line.
- * With `onActivate` set, renders as a button that opens the file preview.
- */
-export interface ChatAttachmentChipProps extends ComponentProps<'span'> {
-	kind?: 'file' | 'folder';
-	label: string;
-	onActivate?: () => void;
-}
-
 /** Compact attachment pill showing a file or folder icon and the path basename; acts as a button that opens the file preview when given an activation handler. */
 export function ChatAttachmentChip({
 	className,
@@ -21,7 +9,11 @@ export function ChatAttachmentChip({
 	label,
 	onActivate,
 	...rest
-}: ChatAttachmentChipProps) {
+}: ComponentProps<'span'> & {
+	kind?: 'file' | 'folder';
+	label: string;
+	onActivate?: () => void;
+}) {
 	const Icon = kind === 'folder' ? FolderIcon : FileIcon;
 	const chipClassName = cn(
 		'inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/50 bg-muted/60 px-2 py-0.5 font-medium text-foreground/90 text-xs leading-5',

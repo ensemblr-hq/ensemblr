@@ -51,7 +51,7 @@ import {
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the local-repository IPC handlers. */
-export interface RepositoryHandlersOptions {
+interface RepositoryHandlersOptions {
 	archiveRepositoryService: ArchiveRepositoryService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
 	createWorkspaceService: CreateWorkspaceService;

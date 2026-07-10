@@ -26,7 +26,6 @@ import {
 	ToggleGroup,
 	ToggleGroupItem,
 } from '@/renderer/components/ui/toggle-group';
-import type { WorkspaceCreationSeed } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import { useWorkspaceSourcePicker } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-workspace-source-picker';
 import {
 	getWorkspaceSourceActions,
@@ -36,6 +35,7 @@ import {
 } from '@/renderer/lib/workbench';
 import type {
 	ProjectShellModel,
+	WorkspaceCreationSeed,
 	WorkspaceSource,
 	WorkspaceSourceAction,
 	WorkspaceSourceKind,

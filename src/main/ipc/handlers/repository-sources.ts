@@ -1,13 +1,8 @@
 import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
-import type { RepositorySourcesService } from '../../repository/repository-sources-service.ts';
+import type { RepositorySourcesService } from '../../repository';
 import { listRepositorySourcesRequestSchema } from '../request-schemas.ts';
-
-/** Dependencies for registering the create-from-source picker IPC handlers. */
-export interface RepositorySourcesHandlersOptions {
-	repositorySourcesService: RepositorySourcesService;
-}
 
 /**
  * Registers read-only IPC handlers for the create-from-source picker (branches,
@@ -16,7 +11,9 @@ export interface RepositorySourcesHandlersOptions {
  */
 export function registerRepositorySourcesHandlers({
 	repositorySourcesService,
-}: RepositorySourcesHandlersOptions): void {
+}: {
+	repositorySourcesService: RepositorySourcesService;
+}): void {
 	ipcMain.handle(IPC_CHANNELS.listRepositoryBranches, (_event, raw: unknown) =>
 		repositorySourcesService.listBranches(
 			listRepositorySourcesRequestSchema.parse(raw),

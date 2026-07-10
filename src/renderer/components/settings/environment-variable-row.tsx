@@ -20,14 +20,6 @@ import type {
 	EnvironmentVariableSnapshot,
 } from '@/shared/ipc/contracts/environment';
 
-/** Props for a single configured-variable row. */
-interface EnvironmentVariableRowProps {
-	variable: EnvironmentVariableSnapshot;
-	scope: EnvironmentVariableScope;
-	scopeId?: string;
-	onEdit: (key: string) => void;
-}
-
 const MASK = '••••••••';
 
 /** One configured variable: lock/key on the left, value + actions on the right. */
@@ -36,7 +28,12 @@ export function EnvironmentVariableRow({
 	scope,
 	scopeId,
 	variable,
-}: EnvironmentVariableRowProps) {
+}: {
+	variable: EnvironmentVariableSnapshot;
+	scope: EnvironmentVariableScope;
+	scopeId?: string;
+	onEdit: (key: string) => void;
+}) {
 	const queryClient = useQueryClient();
 	const [revealed, setRevealed] = useState(false);
 	const [revealedValue, setRevealedValue] = useState<string | null>(null);

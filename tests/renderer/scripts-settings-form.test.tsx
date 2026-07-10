@@ -6,10 +6,8 @@ import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
-import {
-	type ScriptsForm,
-	useScriptsSettingsForm,
-} from '@/renderer/hooks/use-scripts-settings-form';
+import { useScriptsSettingsForm } from '@/renderer/hooks/use-scripts-settings-form';
+import type { ScriptsForm } from '@/renderer/types/settings';
 
 const { updateRepositoryScriptsMock } = vi.hoisted(() => ({
 	updateRepositoryScriptsMock: vi.fn(),

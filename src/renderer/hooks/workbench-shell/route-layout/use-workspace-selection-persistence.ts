@@ -4,18 +4,20 @@ import { useEffect, useMemo } from 'react';
 import {
 	resolveWorkspaceNavigationRenderState,
 	resolveWorkspaceNavigationSelection,
-	type WorkspaceNavigationSelection,
 } from '@/renderer/lib/workbench';
 import {
 	lastWorkspaceNavigationRenderStateAtom,
 	lastWorkspaceSelectionAtom,
 } from '@/renderer/state/workspace';
 import type { WorkbenchShellRouteState } from '@/renderer/types/components';
-import type { ProjectShellModel } from '@/renderer/types/workbench';
+import type {
+	ProjectShellModel,
+	WorkspaceNavigationSelection,
+} from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 
 /** Current and persisted workspace selection returned by {@link useWorkspaceSelectionPersistence}. */
-export interface WorkspaceSelectionPersistenceResult {
+interface WorkspaceSelectionPersistenceResult {
 	currentSelection: WorkspaceNavigationSelection | null;
 	displayProjects: ProjectShellModel[];
 	displaySelection: WorkspaceNavigationSelection | null;

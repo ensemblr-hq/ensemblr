@@ -13,12 +13,6 @@ import type { ScriptLifecycleService } from '../../scripts';
 import type { EnsemblrDatabaseService } from '../../storage';
 import { parseUpdateRepositoryScriptsRequest } from '../request-schemas.ts';
 
-/** Service dependencies used by the workspace-script IPC handlers. */
-export interface WorkspaceScriptHandlersOptions {
-	databaseService: EnsemblrDatabaseService;
-	scriptLifecycleService: ScriptLifecycleService;
-}
-
 /**
  * Registers the IPC handlers that run and stop repository setup/run/archive
  * scripts inside workspace terminal sessions, plus the Scripts-settings writer
@@ -28,7 +22,10 @@ export interface WorkspaceScriptHandlersOptions {
 export function registerWorkspaceScriptHandlers({
 	databaseService,
 	scriptLifecycleService,
-}: WorkspaceScriptHandlersOptions): void {
+}: {
+	databaseService: EnsemblrDatabaseService;
+	scriptLifecycleService: ScriptLifecycleService;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.runWorkspaceScript,
 		(

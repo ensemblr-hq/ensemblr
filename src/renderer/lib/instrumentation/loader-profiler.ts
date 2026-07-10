@@ -1,4 +1,8 @@
 import type { AnyRouter } from '@tanstack/react-router';
+import type {
+	LoaderProfileMetadata,
+	LoaderProfileRecord,
+} from '@/renderer/types/instrumentation';
 import { logNavigationProfile, patchPreloadRoute } from './navigation-reporter';
 import {
 	consumeNextNavigationId,
@@ -6,8 +10,6 @@ import {
 	getActiveNavigation,
 	getLocationHref,
 	installedRouters,
-	type LoaderProfileMetadata,
-	type LoaderProfileRecord,
 	lastInputsByRouteId,
 	now,
 	preloadsByHref,

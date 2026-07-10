@@ -12,7 +12,7 @@ export type PiEventStream = 'protocol' | 'stderr';
  * always insert a {@link PiPersistedEnvelope}; a `null` only surfaces when the
  * stored JSON failed to parse or predates this contract.
  */
-export type PiEventPayload = PiPersistedEnvelope | null;
+type PiEventPayload = PiPersistedEnvelope | null;
 
 /** Domain shape of a persisted Pi session event returned by the repository. */
 export interface PiEventRow {

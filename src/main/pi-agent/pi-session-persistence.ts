@@ -5,7 +5,7 @@ import {
 	type AppendPiEventInput,
 	appendPiEvent,
 	type PiEventRow,
-} from '../storage/repositories/pi-event-repository.ts';
+} from '../storage/repositories/index.ts';
 import type { PiAgentEvent } from './pi-agent-types.ts';
 
 /**

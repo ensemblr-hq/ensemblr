@@ -1,7 +1,5 @@
-import {
-	createJsonlLineStream,
-	type JsonlLineStream,
-} from '../../pi-ipc/jsonl-line-stream.ts';
+import type { JsonlLineStream } from '../../pi-ipc';
+import { createJsonlLineStream } from '../../pi-ipc/jsonl-line-stream.ts';
 import type { PiAgentErrorCode } from '../pi-agent-types.ts';
 
 /**

@@ -172,7 +172,7 @@ const parseStackTrace = (trace: string): ParsedStackTrace => {
 };
 
 /** Props for the {@link StackTrace} root: the raw trace text plus open-state controls and a file-path click handler. */
-export type StackTraceProps = ComponentProps<'div'> & {
+type StackTraceProps = ComponentProps<'div'> & {
 	trace: string;
 	open?: boolean;
 	defaultOpen?: boolean;
@@ -230,7 +230,7 @@ export const StackTrace = memo(
 );
 
 /** Props for the stack-trace header, mirroring the collapsible trigger. */
-export type StackTraceHeaderProps = ComponentProps<typeof CollapsibleTrigger>;
+type StackTraceHeaderProps = ComponentProps<typeof CollapsibleTrigger>;
 
 /** Clickable header row that toggles the stack-trace's collapsible content. */
 export const StackTraceHeader = memo(
@@ -249,7 +249,7 @@ export const StackTraceHeader = memo(
 );
 
 /** Props for the stack-trace error summary row. */
-export type StackTraceErrorProps = ComponentProps<'div'>;
+type StackTraceErrorProps = ComponentProps<'div'>;
 
 /** Error summary row with a warning icon, holding the error type and message. */
 export const StackTraceError = memo(
@@ -268,7 +268,7 @@ export const StackTraceError = memo(
 );
 
 /** Props for the stack-trace error-type label. */
-export type StackTraceErrorTypeProps = ComponentProps<'span'>;
+type StackTraceErrorTypeProps = ComponentProps<'span'>;
 
 /** Renders the parsed error type, defaulting to the trace's own type. */
 export const StackTraceErrorType = memo(
@@ -287,7 +287,7 @@ export const StackTraceErrorType = memo(
 );
 
 /** Props for the stack-trace error-message label. */
-export type StackTraceErrorMessageProps = ComponentProps<'span'>;
+type StackTraceErrorMessageProps = ComponentProps<'span'>;
 
 /** Renders the parsed error message, defaulting to the trace's own message. */
 export const StackTraceErrorMessage = memo(
@@ -303,7 +303,7 @@ export const StackTraceErrorMessage = memo(
 );
 
 /** Props for the stack-trace actions toolbar. */
-export type StackTraceActionsProps = ComponentProps<'fieldset'>;
+type StackTraceActionsProps = ComponentProps<'fieldset'>;
 
 /**
  * Stop a click from bubbling to the collapsible header so action buttons don't toggle it.
@@ -338,7 +338,7 @@ export const StackTraceActions = memo(
 );
 
 /** Props for the stack-trace copy button, including copy/error callbacks and the copied-state timeout. */
-export type StackTraceCopyButtonProps = ComponentProps<typeof Button> & {
+type StackTraceCopyButtonProps = ComponentProps<typeof Button> & {
 	onCopy?: () => void;
 	onError?: (error: Error) => void;
 	timeout?: number;
@@ -401,7 +401,7 @@ export const StackTraceCopyButton = memo(
 );
 
 /** Props for the stack-trace expand chevron. */
-export type StackTraceExpandButtonProps = ComponentProps<'div'>;
+type StackTraceExpandButtonProps = ComponentProps<'div'>;
 
 /** Chevron affordance that rotates to reflect the open/closed state. */
 export const StackTraceExpandButton = memo(
@@ -425,9 +425,7 @@ export const StackTraceExpandButton = memo(
 );
 
 /** Props for the collapsible stack-trace content, including an optional max height. */
-export type StackTraceContentProps = ComponentProps<
-	typeof CollapsibleContent
-> & {
+type StackTraceContentProps = ComponentProps<typeof CollapsibleContent> & {
 	maxHeight?: number;
 };
 
@@ -454,7 +452,7 @@ export const StackTraceContent = memo(
 );
 
 /** Props for the stack-trace frames list, including whether to show internal frames. */
-export type StackTraceFramesProps = ComponentProps<'div'> & {
+type StackTraceFramesProps = ComponentProps<'div'> & {
 	showInternalFrames?: boolean;
 };
 

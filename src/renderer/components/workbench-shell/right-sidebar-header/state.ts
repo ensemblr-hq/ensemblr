@@ -1,26 +1,7 @@
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
-
-import type { PullRequestHeaderTone } from './pull-request-number-button';
-
-/** Discriminated header state for the right review sidebar, derived from a workspace's pull-request status. */
-export type RightSidebarHeaderState =
-	| {
-			kind: 'create-pr' | 'empty';
-			tone: PullRequestHeaderTone;
-	  }
-	| {
-			kind:
-				| 'pr-blocked'
-				| 'pr-checking'
-				| 'pr-open'
-				| 'pr-ready'
-				| 'pr-working';
-			label: string;
-			number: number;
-			previewDeployment?: WorkspaceShellModel['pullRequest']['previewDeployment'];
-			tone: PullRequestHeaderTone;
-			url?: string;
-	  };
+import type {
+	RightSidebarHeaderState,
+	WorkspaceShellModel,
+} from '@/renderer/types/workbench';
 
 /**
  * Derives the right-sidebar header state (kind, label, tone, URL) from the

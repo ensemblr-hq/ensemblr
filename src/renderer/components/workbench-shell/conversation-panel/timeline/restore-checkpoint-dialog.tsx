@@ -8,7 +8,7 @@ import {
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
 
-import type { CheckpointRestoreTarget } from '@/renderer/hooks/workbench-shell/timeline/use-checkpoint-restore';
+import type { CheckpointRestoreTarget } from '@/renderer/types/workbench';
 
 /** Destructive-action confirmation for restoring a turn checkpoint. */
 export function RestoreCheckpointDialog({

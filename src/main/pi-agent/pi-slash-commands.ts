@@ -2,21 +2,12 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-
-import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
+import type { PiSlashCommandWire } from '../../shared/ipc/contracts/pi-session';
+import type { PiExecutableSnapshot } from '../pi-runtime';
 import { isExecutableReady } from '../pi-runtime/pi-executable.ts';
 
-/** IPC-safe slash command metadata consumed by renderer autocomplete. */
-export interface PiSlashCommandWire {
-	autoSubmit: boolean;
-	command: string;
-	description: string;
-	source: 'builtin' | 'extension' | 'prompt' | 'skill';
-	sourceScope?: 'project' | 'temporary' | 'user';
-}
-
 /** Result of resolving live SDK commands or static fallback commands. */
-export interface ResolvePiSlashCommandsResult {
+interface ResolvePiSlashCommandsResult {
 	commands: readonly PiSlashCommandWire[];
 	error: string | null;
 	source: 'sdk' | 'static';

@@ -5,26 +5,22 @@ import {
 	ContextMenuTrigger,
 } from '@/renderer/components/ui/context-menu';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
-import {
-	useWorkspaceFileDiffOpener,
-	type WorkspaceFileDiffOpener,
-} from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
+import { useWorkspaceFileDiffOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
-import type { ReviewFileSummary } from '@/renderer/types/workbench';
+import type {
+	ReviewFileActions,
+	ReviewFileMenuTarget,
+	ReviewFileSummary,
+	WorkspaceFileDiffOpener,
+} from '@/renderer/types/workbench';
 import type { ChangesViewMode } from '@/renderer/types/workbench-shell';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
-import {
-	type ReviewFileActions,
-	ReviewFileActionsProvider,
-} from './review-file-actions-context';
+import { ReviewFileActionsProvider } from './review-file-actions-context';
 import { ReviewFileEmptyState } from './review-file-empty-state';
 import { ReviewFileRow } from './review-file-row';
 import { ReviewFileTree } from './review-file-tree';
-import {
-	type ReviewFileMenuTarget,
-	ReviewFilesContextMenuContent,
-} from './review-files-context-menu';
+import { ReviewFilesContextMenuContent } from './review-files-context-menu';
 
 /** Renders the changes panel as either a flat list or a collapsible folder tree. */
 export function ReviewFileList({

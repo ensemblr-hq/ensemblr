@@ -2,13 +2,12 @@ import { useEffect, useRef } from 'react';
 
 import type { CloneGithubRepositoryProgressEvent } from '@/shared/ipc/contracts/clone';
 
-/** Props for the live clone progress log. */
-interface CloneGithubProgressLogProps {
-	logs: CloneGithubRepositoryProgressEvent[];
-}
-
 /** Live, scrollable progress log used while the clone runs. */
-export function CloneGithubProgressLog({ logs }: CloneGithubProgressLogProps) {
+export function CloneGithubProgressLog({
+	logs,
+}: {
+	logs: CloneGithubRepositoryProgressEvent[];
+}) {
 	const logRef = useRef<HTMLOListElement | null>(null);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: logs.length triggers the auto-scroll when new lines arrive.

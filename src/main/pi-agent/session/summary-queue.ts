@@ -5,13 +5,6 @@ import type { SessionSummaryWriter } from '../session-summary-writer.ts';
 import type { ActiveSession, ActiveSessionMap } from './active-session.ts';
 import { persistSummaryMetadata, toEventWire } from './session-snapshot.ts';
 
-/** Dependencies for {@link createSummaryQueue}. */
-export interface SummaryQueueOptions {
-	activeSessions: ActiveSessionMap;
-	now: () => Date;
-	sessionSummaryWriter: SessionSummaryWriter | undefined;
-}
-
 /** Public surface of the summary queue: schedule per-turn summaries and flush any owed summary on close. */
 export interface SummaryQueue {
 	queueSummaryAfterAgentResponse: (input: {
@@ -38,7 +31,11 @@ export function createSummaryQueue({
 	activeSessions,
 	now,
 	sessionSummaryWriter,
-}: SummaryQueueOptions): SummaryQueue {
+}: {
+	activeSessions: ActiveSessionMap;
+	now: () => Date;
+	sessionSummaryWriter: SessionSummaryWriter | undefined;
+}): SummaryQueue {
 	/** In-flight drain promise per session, so close paths can await it. */
 	const inFlightDrains = new Map<string, Promise<void>>();
 

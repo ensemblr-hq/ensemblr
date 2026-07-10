@@ -1,8 +1,7 @@
 import { useCallback, useState } from 'react';
-
-import type { WorkspaceCreationSeed } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
 import type {
 	ProjectShellModel,
+	WorkspaceCreationSeed,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import { ArchiveRepositoryDialog } from '../archive-repository-dialog';
@@ -13,7 +12,7 @@ import { DeleteRepositoryDialog } from '../delete-repository-dialog';
 import { DeleteWorkspaceDialog } from '../delete-workspace-dialog';
 
 /** Openers for each sidebar lifecycle dialog (archive, delete, browse-archive, create-source). */
-export interface ProjectNavigationDialogsController {
+interface ProjectNavigationDialogsController {
 	openArchiveProject: (project: ProjectShellModel) => void;
 	openArchiveWorkspace: (workspace: WorkspaceShellModel) => void;
 	openBrowseArchive: (project: ProjectShellModel) => void;

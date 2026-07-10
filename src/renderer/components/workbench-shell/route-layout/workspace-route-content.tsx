@@ -5,7 +5,6 @@ import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
 import { useAskAgentSetupScript } from '@/renderer/hooks/workbench-shell/composer/use-ask-agent-setup-script';
 import { useLiveWorkspaceModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-workspace-model';
-import type { WorkspaceNavigationSelection } from '@/renderer/lib/workbench';
 import {
 	createPlaceholderSession,
 	getComposerState,
@@ -27,6 +26,7 @@ import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type {
 	DockTabId,
 	WorkbenchRouteSearch,
+	WorkspaceNavigationSelection,
 } from '@/renderer/types/workbench';
 import { WorkspaceMainContentProvider } from '../shell-contexts';
 

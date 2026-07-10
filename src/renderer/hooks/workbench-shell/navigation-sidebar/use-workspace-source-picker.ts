@@ -17,16 +17,16 @@ import {
 	mapPullRequestsToWorkspaceSources,
 	mapRepositoryBranchesToWorkspaceSources,
 	pullRequestSourceId,
-	type WorkspaceSourceItem,
 } from '@/renderer/lib/workbench';
 import type {
 	WorkspaceSource,
+	WorkspaceSourceItem,
 	WorkspaceSourceKind,
 } from '@/renderer/types/workbench';
 import type { GithubFailure } from '@/shared/ipc/contracts/github';
 
 /** Result of the create-from picker's per-repository, per-tab data fetch. */
-export interface WorkspaceSourcePickerState {
+interface WorkspaceSourcePickerState {
 	error: GithubFailure | null;
 	isLoading: boolean;
 	itemsById: Map<string, WorkspaceSourceItem>;

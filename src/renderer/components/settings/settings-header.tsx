@@ -4,7 +4,6 @@ import { openAppConfigFile } from '@/renderer/api/ensemblr';
 import {
 	REPO_SECTION_TARGETS,
 	type RepoSectionId,
-	type SettingsScope,
 } from '@/renderer/components/settings/settings-sidebar';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -17,14 +16,8 @@ import {
 import { ProjectAvatar } from '@/renderer/components/workbench-shell/project-avatar';
 import { useCloseSettings } from '@/renderer/hooks/use-close-settings';
 import { cn } from '@/renderer/lib/utils';
+import type { SettingsScope } from '@/renderer/types/settings';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
-
-/** Props for the settings top toolbar. */
-interface SettingsHeaderProps {
-	scope: SettingsScope;
-	projects: ProjectShellModel[];
-	activeRepoId: string | null;
-}
 
 const USER_DEFAULT = '/settings/general';
 const KNOWN_REPO_SECTIONS = Object.keys(
@@ -49,7 +42,11 @@ export function SettingsHeader({
 	activeRepoId,
 	projects,
 	scope,
-}: SettingsHeaderProps) {
+}: {
+	scope: SettingsScope;
+	projects: ProjectShellModel[];
+	activeRepoId: string | null;
+}) {
 	const navigate = useNavigate();
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 	const closeSettings = useCloseSettings();
@@ -148,16 +145,18 @@ export function SettingsHeader({
 	);
 }
 
-/** Props for a settings-header scope tab. */
-interface ScopeTabProps {
+/** Renders a User/Repo scope tab with an active-state underline. */
+function ScopeTab({
+	active,
+	disabled,
+	label,
+	onClick,
+}: {
 	active: boolean;
 	label: string;
 	disabled?: boolean;
 	onClick: () => void;
-}
-
-/** Renders a User/Repo scope tab with an active-state underline. */
-function ScopeTab({ active, disabled, label, onClick }: ScopeTabProps) {
+}) {
 	return (
 		<Button
 			aria-pressed={active}

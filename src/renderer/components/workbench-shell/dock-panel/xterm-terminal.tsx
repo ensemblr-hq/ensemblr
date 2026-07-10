@@ -4,12 +4,12 @@ import { useEffect, useRef } from 'react';
 import {
 	createXtermAdapter,
 	DEFAULT_FONT_FAMILY,
-	type TerminalRendererAdapter,
 } from '@/renderer/lib/terminal/xterm-adapter';
 import {
 	terminalFontAtom,
 	terminalFontSizeAtom,
 } from '@/renderer/state/preferences';
+import type { TerminalRendererAdapter } from '@/renderer/types/terminal';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 
 /** Builds the terminal CSS font stack, prepending the user's chosen font. */

@@ -1,9 +1,5 @@
-import {
-	enabled,
-	getActiveNavigation,
-	type IpcProfileMetadata,
-	now,
-} from './profiler-store';
+import type { IpcProfileMetadata } from '@/renderer/types/instrumentation';
+import { enabled, getActiveNavigation, now } from './profiler-store';
 
 /**
  * Wraps an IPC invoke call, recording its duration on the active navigation

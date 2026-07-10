@@ -26,12 +26,12 @@ export interface WorkbenchLayoutContextValue {
 	};
 }
 
-export type RenderStaticLink = (
+type RenderStaticLink = (
 	target: WorkbenchStaticNavigationTarget,
 	content: ReactElement,
 ) => ReactElement;
 
-export type RenderWorkspaceLink = (
+type RenderWorkspaceLink = (
 	target: WorkbenchWorkspaceNavigationLinkTarget,
 	content: ReactElement,
 ) => ReactElement;

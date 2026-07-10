@@ -10,7 +10,7 @@ import type {
 import type {
 	LoadedRepositoryConfig,
 	LoadRepositoryConfigOptions,
-} from '../../config/repository-config.ts';
+} from '../../config';
 import { updateRepositoryMetadataJson } from '../../storage/repositories/repository-row-repository.ts';
 import { updateWorkspaceMetadataJson } from '../../storage/repositories/workspace-repository.ts';
 import type { GitRepositoryProbeFn, GitWorktreeProbeFn } from '../git-probe.ts';

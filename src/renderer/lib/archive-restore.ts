@@ -1,5 +1,5 @@
 /** Minimal shape needed to decide whether an archived workspace can be restored. */
-export interface RestorableArchiveFields {
+interface RestorableArchiveFields {
 	baseBranch: string | null;
 	branchCleanup: boolean;
 	branchName: string | null;

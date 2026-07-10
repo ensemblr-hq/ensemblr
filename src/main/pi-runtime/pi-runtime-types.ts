@@ -2,7 +2,7 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
-import type { EnsemblrRootDirectoryService } from '../root/root-directory-service';
+import type { EnsemblrRootDirectoryService } from '../root';
 import type {
 	PiExecutableService,
 	PiExecutableSnapshot,

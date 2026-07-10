@@ -23,7 +23,7 @@ export interface PkcePair {
 }
 
 /** Options for {@link buildLinearAuthorizeUrl}. */
-export interface BuildAuthorizeUrlOptions {
+interface BuildAuthorizeUrlOptions {
 	challenge: string;
 	clientId: string;
 	redirectUri: string;

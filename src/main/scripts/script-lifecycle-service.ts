@@ -8,9 +8,9 @@ import {
 	parseWorkspaceScriptSettings,
 	type WorkspaceScriptSettings,
 } from '../../shared/scripts/script-settings.ts';
-import type { EnsemblrConfigResolutionService } from '../config/config-resolution';
+import type { EnsemblrConfigResolutionService } from '../config';
 import { isRecord, isString } from '../repository/row-guards.ts';
-import type { EnsemblrDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
 import { selectWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
 import type { TerminalService } from '../terminal';
 

@@ -14,7 +14,7 @@ const execFileAsync = promisify(execFile);
  * private ref. Uses a temporary index file so the user's real index, HEAD, and
  * branches are never touched (ADR 0012).
  */
-export interface CaptureWorkspaceCheckpointInput {
+interface CaptureWorkspaceCheckpointInput {
 	cwd: string;
 	message: string;
 	/** Fully-qualified private ref, e.g. `refs/ensemblr/checkpoints/<ws>/<turn>`. */
@@ -22,7 +22,7 @@ export interface CaptureWorkspaceCheckpointInput {
 }
 
 /** Identifiers produced by a workspace checkpoint capture: the commit, its tree, and the ref it was written to. */
-export interface CaptureWorkspaceCheckpointResult {
+interface CaptureWorkspaceCheckpointResult {
 	commitHash: string;
 	ref: string;
 	treeHash: string;
@@ -153,7 +153,7 @@ export async function snapshotWorkingTree(cwd: string): Promise<string> {
 }
 
 /** A single file's change within a git diff, with per-file line counts and status. */
-export interface GitDiffFile {
+interface GitDiffFile {
 	additions: number | null;
 	deletions: number | null;
 	path: string;

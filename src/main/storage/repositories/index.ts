@@ -1,14 +1,14 @@
 export type {
 	ArchiveRecordKind,
 	InsertArchiveRecordRowOptions,
-} from './archive-record-repository';
-export { insertArchiveRecordRow } from './archive-record-repository';
+} from './archive-record-repository.ts';
+export { insertArchiveRecordRow } from './archive-record-repository.ts';
 export type {
 	ChatTabKind,
 	ChatTabRow,
 	OpenChatTabInput,
 	PiRuntimeStateRow,
-} from './chat-tab-repository';
+} from './chat-tab-repository.ts';
 export {
 	bindPiSession,
 	closeChatTab,
@@ -26,12 +26,19 @@ export {
 	restoreChatTab,
 	restoreClosedChatTab,
 	setRuntimeState,
-} from './chat-tab-repository';
+} from './chat-tab-repository.ts';
+export type { CheckpointRow } from './checkpoint-repository.ts';
+export {
+	getCheckpointByTurnId,
+	getNextCheckpointInPiSession,
+	insertCheckpoint,
+	listCheckpointsForPiSession,
+} from './checkpoint-repository.ts';
 export type {
 	AppendPiEventInput,
 	PiEventRow,
 	PiEventStream,
-} from './pi-event-repository';
+} from './pi-event-repository.ts';
 export {
 	appendPiEvent,
 	appendPiEvents,
@@ -39,7 +46,7 @@ export {
 	getMaxOrdinalForBranch,
 	listEventsByBranch,
 	listEventsByTurn,
-} from './pi-event-repository';
+} from './pi-event-repository.ts';
 export type {
 	CreatePiSessionInput,
 	CreatePiSessionResult,
@@ -52,7 +59,7 @@ export type {
 	PiTurnStatus,
 	UpdatePiSessionPatch,
 	UpdatePiTurnPatch,
-} from './pi-session-repository';
+} from './pi-session-repository.ts';
 export {
 	createBranch,
 	createPiSession,
@@ -65,7 +72,7 @@ export {
 	listTurns,
 	updatePiSession,
 	updateTurn,
-} from './pi-session-repository';
+} from './pi-session-repository.ts';
 export type {
 	DeleteRepositoryRowByIdOptions,
 	InsertRepositoryRowOptions,
@@ -83,7 +90,7 @@ export type {
 	SelectRepositoryWithDefaultsByIdOptions,
 	StampRepositoryArchivedOptions,
 	UpdateRepositoryMetadataJsonOptions,
-} from './repository-row-repository';
+} from './repository-row-repository.ts';
 export {
 	deleteRepositoryRowById,
 	insertRepositoryRow,
@@ -100,18 +107,18 @@ export {
 	selectRepositoryWithDefaultsById,
 	stampRepositoryArchived,
 	updateRepositoryMetadataJson,
-} from './repository-row-repository';
-export { getRepositoryWorkspaceNavigationSnapshot } from './repository-workspace-navigation-repository';
+} from './repository-row-repository.ts';
+export { getRepositoryWorkspaceNavigationSnapshot } from './repository-workspace-navigation-repository.ts';
 export type {
 	FinalizeTerminalSessionRowOptions,
 	InsertTerminalSessionRowOptions,
 	MarkStaleRunningTerminalSessionsOptions,
-} from './terminal-session-repository';
+} from './terminal-session-repository.ts';
 export {
 	finalizeTerminalSessionRow,
 	insertTerminalSessionRow,
 	markStaleRunningTerminalSessions,
-} from './terminal-session-repository';
+} from './terminal-session-repository.ts';
 export type {
 	ClearWorkspaceArchivedOptions,
 	DeleteWorkspaceRowByIdOptions,
@@ -136,7 +143,7 @@ export type {
 	UpdateWorkspaceMetadataJsonOptions,
 	UpdateWorkspaceRenameRowOptions,
 	WorkspaceNameCollisionOptions,
-} from './workspace-repository';
+} from './workspace-repository.ts';
 export {
 	clearWorkspaceArchived,
 	deleteWorkspaceRowById,
@@ -161,4 +168,4 @@ export {
 	updateWorkspaceRenameRow,
 	workspaceNameCollisionExists,
 	workspaceSlugExists,
-} from './workspace-repository';
+} from './workspace-repository.ts';

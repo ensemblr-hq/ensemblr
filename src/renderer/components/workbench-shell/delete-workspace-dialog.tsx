@@ -16,14 +16,6 @@ import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { DeleteWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
-/** Props for the delete-workspace dialog. */
-interface DeleteWorkspaceDialogProps {
-	onDeleted: (workspaceId: string) => Promise<void> | void;
-	onOpenChange: (open: boolean) => void;
-	open: boolean;
-	workspace: WorkspaceShellModel | null;
-}
-
 /**
  * Destructive confirmation dialog. Removes the worktree folder, drops the
  * local branch, and deletes the SQLite row — no `.context/` preservation. Use
@@ -34,7 +26,12 @@ export function DeleteWorkspaceDialog({
 	onOpenChange,
 	open,
 	workspace,
-}: DeleteWorkspaceDialogProps) {
+}: {
+	onDeleted: (workspaceId: string) => Promise<void> | void;
+	onOpenChange: (open: boolean) => void;
+	open: boolean;
+	workspace: WorkspaceShellModel | null;
+}) {
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
 			<DialogContent className='gap-4 sm:max-w-md'>

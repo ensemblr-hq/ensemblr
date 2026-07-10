@@ -17,7 +17,7 @@
  * smuggling, embedded protocols) return `{ kind: 'invalid', reason }`.
  */
 
-export type DeepLink =
+type DeepLink =
 	| { kind: 'workbench' }
 	| { kind: 'repo'; repositoryId: string }
 	| {
@@ -38,7 +38,7 @@ export type DeepLink =
 	| { kind: 'invalid'; reason: string };
 
 /** Identifier for a section of the app-level (global) settings surface. */
-export type AppSettingsSection =
+type AppSettingsSection =
 	| 'general'
 	| 'models'
 	| 'providers'
@@ -51,7 +51,7 @@ export type AppSettingsSection =
 	| 'advanced';
 
 /** Identifier for a section of a repository's settings surface. */
-export type RepoSettingsSection =
+type RepoSettingsSection =
 	| 'environment'
 	| 'git'
 	| 'scripts'

@@ -1,15 +1,9 @@
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import type {
+	AgentActionKind,
+	WorkspaceShellModel,
+} from '@/renderer/types/workbench';
 
 import { clampReviewContext } from './review-context';
-
-/** Agent-assisted review actions resolved from settings templates (ENS-059). */
-export type AgentActionKind =
-	| 'branch-naming'
-	| 'create-pr'
-	| 'fix-check-errors'
-	| 'general'
-	| 'resolve-conflicts'
-	| 'review';
 
 /** Settings key for each action template (personal SQLite or .ensemblr/settings.toml). */
 export const AGENT_ACTION_SETTING_KEYS: Record<AgentActionKind, string> = {
@@ -36,7 +30,7 @@ const DEFAULT_TEMPLATES: Record<AgentActionKind, string> = {
 };
 
 /** An agent-action prompt template together with where it was resolved from. */
-export interface ResolvedAgentTemplate {
+interface ResolvedAgentTemplate {
 	/** Where the template came from, for source diagnostics in the UI. */
 	source: string;
 	template: string;

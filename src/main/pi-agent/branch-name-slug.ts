@@ -68,13 +68,13 @@ export function sanitizeBranchSlug(text: string): string | null {
 }
 
 /** Workspace metadata fields consulted by the auto-rename gate. */
-export interface AutoRenameMetadata {
+interface AutoRenameMetadata {
 	placeholderName?: unknown;
 	renamedAt?: unknown;
 }
 
 /** Inputs to {@link shouldAutoRenameWorkspace}. */
-export interface AutoRenameGate {
+interface AutoRenameGate {
 	/** The first-turn prompt (pre-trim); empty/whitespace blocks the rename. */
 	prompt: string | undefined;
 	/** The `git.renameWorkspaceOnBranch` user setting. */

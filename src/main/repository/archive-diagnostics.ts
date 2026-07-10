@@ -5,7 +5,7 @@ import type { ArchiveLifecycleDiagnostic } from '../../shared/ipc/contracts/arch
  * narrows this with its own code / severity union; the shared helpers below
  * stay structural so they work with all of them.
  */
-export interface ArchiveDiagnosticLike {
+interface ArchiveDiagnosticLike {
 	code: string;
 	message: string;
 	path?: string;

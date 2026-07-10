@@ -17,7 +17,7 @@ import {
 export const ENVIRONMENT_FILES_SETTING_KEY = 'environment.files';
 
 /** Merged env-file values for a scope plus diagnostics for unreadable files. */
-export interface ScopeEnvFiles {
+interface ScopeEnvFiles {
 	/** Diagnostics for files that could not be read. */
 	diagnostics: EnvironmentVariableDiagnostic[];
 	/** Merged `KEY=value` pairs (later files override earlier ones). */

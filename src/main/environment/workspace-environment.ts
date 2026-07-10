@@ -3,10 +3,8 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { EnvironmentVariableDiagnostic } from '../../shared/ipc/contracts/environment';
 import { isRecord, isString } from '../repository/row-guards.ts';
 import type { EnsemblrRootDirectoryService } from '../root';
-import {
-	type EnsemblrDatabaseService,
-	requireDatabase,
-} from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
+import { requireDatabase } from '../storage/database.ts';
 import {
 	listActiveWorkspaceMetadataRows,
 	selectWorkspaceEnvironmentJoinById,

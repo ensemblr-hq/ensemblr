@@ -17,7 +17,7 @@ import type {
 	FilesToCopySource,
 } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
-import type { LoadedRepositoryConfig } from '../config/repository-config.ts';
+import type { LoadedRepositoryConfig } from '../config';
 
 /** Public surface of the files-to-copy service. */
 export interface FilesToCopyService {
@@ -25,15 +25,10 @@ export interface FilesToCopyService {
 }
 
 /** Input for a single files-to-copy run. */
-export interface CopyFilesToWorkspaceInput {
+interface CopyFilesToWorkspaceInput {
 	config: LoadedRepositoryConfig;
 	repositoryPath: string;
 	workspacePath: string;
-}
-
-/** Options for {@link createFilesToCopyService}. */
-export interface CreateFilesToCopyServiceOptions {
-	localCommandService: LocalCommandService;
 }
 
 const DEFAULT_PATTERNS: readonly string[] = ['.env*'];
@@ -49,7 +44,9 @@ const LS_FILES_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
  */
 export function createFilesToCopyService({
 	localCommandService,
-}: CreateFilesToCopyServiceOptions): FilesToCopyService {
+}: {
+	localCommandService: LocalCommandService;
+}): FilesToCopyService {
 	return {
 		copy: async (input) => {
 			const resolved = resolvePatterns(input.config);

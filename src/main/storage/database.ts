@@ -3,16 +3,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
-/** Health state of the database connection. */
-export type DatabaseStatus = 'ok' | 'error';
-
-/** IPC-safe snapshot of the database connection's health. */
-export interface DatabaseHealthSnapshot {
-	error?: string;
-	path: string;
-	schemaVersion: number;
-	status: DatabaseStatus;
-}
+import type { DatabaseHealthSnapshot } from '../../shared/ipc/contracts/health';
 
 /** Options for {@link openEnsemblrDatabase} / {@link createEnsemblrDatabaseService}. */
 export interface OpenDatabaseOptions {

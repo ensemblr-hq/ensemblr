@@ -1,7 +1,7 @@
 import type { WorkbenchStaticNavigationTarget } from '@/renderer/types/workbench-shell';
 
 /** The set of static TanStack Router `to` paths reachable from the workbench chrome. */
-export type WorkbenchStaticRouteTo =
+type WorkbenchStaticRouteTo =
 	| '/dashboard'
 	| '/help'
 	| '/history'
@@ -9,7 +9,7 @@ export type WorkbenchStaticRouteTo =
 	| '/settings/repo/$repoId/environment';
 
 /** A resolved static route: a `to` path plus optional route params. */
-export interface WorkbenchStaticRouteSpec {
+interface WorkbenchStaticRouteSpec {
 	to: WorkbenchStaticRouteTo;
 	params?: Record<string, string>;
 }

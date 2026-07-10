@@ -41,7 +41,7 @@ export interface CloneCommandRunResult {
 }
 
 /** Signature of the emitter returned by {@link createEmitter}. */
-export type CloneEmitter = (
+type CloneEmitter = (
 	kind: CloneGithubRepositoryProgressKind,
 	text: string,
 ) => void;
@@ -111,7 +111,7 @@ export async function runAttempt({
 }
 
 /** Outcome of {@link runCloneWithFallback}. */
-export type CloneFallbackOutcome =
+type CloneFallbackOutcome =
 	| {
 			kind: 'ok';
 			result: CloneCommandRunResult & { stderrText: string };

@@ -12,15 +12,8 @@ import type {
 	TerminalSnapshotResult,
 	WriteTerminalRequest,
 } from '../../../shared/ipc/contracts/terminal';
-import {
-	type TerminalService,
-	TerminalServiceError,
-} from '../../terminal/terminal-service';
-
-/** Service dependencies used by the terminal IPC handlers. */
-export interface TerminalHandlersOptions {
-	terminalService: TerminalService;
-}
+import type { TerminalService } from '../../terminal';
+import { TerminalServiceError } from '../../terminal/terminal-service';
 
 /**
  * Registers the IPC handlers for PTY-backed terminal sessions: create, input,
@@ -29,7 +22,9 @@ export interface TerminalHandlersOptions {
  */
 export function registerTerminalHandlers({
 	terminalService,
-}: TerminalHandlersOptions): void {
+}: {
+	terminalService: TerminalService;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.createTerminalSession,
 		(

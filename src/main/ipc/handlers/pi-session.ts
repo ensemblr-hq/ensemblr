@@ -12,10 +12,8 @@ import type {
 	WriteForkSummaryResult,
 } from '../../../shared/ipc/contracts/pi-session';
 import type { LocalCommandService } from '../../commands/local-command';
-import {
-	type PiSessionService,
-	snapshotToWire,
-} from '../../pi-agent/pi-session-service.ts';
+import type { PiSessionService } from '../../pi-agent';
+import { snapshotToWire } from '../../pi-agent/pi-session-service.ts';
 import type { PiExecutableService } from '../../pi-runtime';
 import {
 	presentPiModels,
@@ -30,14 +28,6 @@ import {
 	submitPiPromptRequestSchema,
 	writeForkSummaryRequestSchema,
 } from '../request-schemas.ts';
-
-/** Service dependencies used by the Pi session IPC handlers. */
-export interface PiSessionHandlersOptions {
-	localCommandService: LocalCommandService;
-	piExecutableService: PiExecutableService;
-	piSessionService: PiSessionService;
-	withPermissionGate: WithPermissionGate;
-}
 
 const EMPTY_PI_MODELS: ListPiModelsResult = {
 	defaultModelId: null,
@@ -54,7 +44,12 @@ export function registerPiSessionHandlers({
 	piExecutableService,
 	piSessionService,
 	withPermissionGate,
-}: PiSessionHandlersOptions): void {
+}: {
+	localCommandService: LocalCommandService;
+	piExecutableService: PiExecutableService;
+	piSessionService: PiSessionService;
+	withPermissionGate: WithPermissionGate;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.openPiSession,
 		async (_event, raw: unknown): Promise<OpenPiSessionResult> => {

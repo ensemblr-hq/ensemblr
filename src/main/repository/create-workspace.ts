@@ -20,13 +20,13 @@ import type {
 	WorkspaceLinkedIssueInput,
 } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
-import {
-	type LoadedRepositoryConfig,
-	type LoadRepositoryConfigOptions,
-	loadRepositoryConfig,
-} from '../config/repository-config.ts';
+import type {
+	LoadedRepositoryConfig,
+	LoadRepositoryConfigOptions,
+} from '../config';
+import { loadRepositoryConfig } from '../config/repository-config.ts';
 import type { EnsemblrRootDirectoryService } from '../root';
-import type { EnsemblrDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
 import { selectRepositoryWithDefaultsById } from '../storage/repositories/repository-row-repository.ts';
 import {
 	insertWorkspaceRow as insertWorkspaceRowStorage,

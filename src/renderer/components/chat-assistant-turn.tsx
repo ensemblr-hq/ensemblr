@@ -2,18 +2,13 @@ import type { DynamicToolUIPart, UIMessage } from 'ai';
 import type { ReactNode } from 'react';
 import { useMemo } from 'react';
 import { cn } from '@/renderer/lib/utils';
+import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
 
 import { ChatReasoningRow, ChatToolRow } from './chat-activity-row';
 import { ChatMessageText } from './chat-message-text';
 import { ChatTurnFooter } from './chat-turn-footer';
 import { ChatTurnSummary } from './chat-turn-summary';
 import { ChatWorkingIndicator } from './chat-turn-timer';
-
-/** Start and end timestamps in milliseconds for one assistant turn, used to derive its duration. */
-export interface ChatAssistantTurnTiming {
-	endMs: number | null;
-	startMs: number;
-}
 
 /**
  * One assistant turn in the new chat surface. Splits the message parts into:

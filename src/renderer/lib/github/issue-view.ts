@@ -1,5 +1,5 @@
+import type { GithubIssueWorkspaceSeed } from '@/renderer/types/github';
 import type { WorkspaceSource } from '@/renderer/types/workbench';
-import type { WorkspaceLinkedIssueInput } from '@/shared/ipc/contracts/workspace';
 import type { RepositoryIssueWire } from '@/shared/ipc/contracts/workspace-sources';
 
 /** Stable picker-row id for a GitHub issue source. */
@@ -19,11 +19,6 @@ export function mapGithubIssuesToWorkspaceSources(
 		subtitle: issue.state ? issue.state.toLowerCase() : undefined,
 		title: issue.title,
 	}));
-}
-
-/** Workspace creation seed derived from a GitHub issue. */
-export interface GithubIssueWorkspaceSeed {
-	linkedIssue: WorkspaceLinkedIssueInput;
 }
 
 /**

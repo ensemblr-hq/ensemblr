@@ -22,13 +22,10 @@ export type PermissionActionKind =
 	| 'workspace-write';
 
 /** Resolution applied to a single action under a given permission mode. */
-export type PermissionBoundary =
-	| 'allowed'
-	| 'blocked'
-	| 'confirmation-required';
+type PermissionBoundary = 'allowed' | 'blocked' | 'confirmation-required';
 
 /** Permission boundary decision for one action, with explanatory reason. */
-export interface PermissionBoundarySnapshot {
+interface PermissionBoundarySnapshot {
 	action: PermissionActionKind;
 	boundary: PermissionBoundary;
 	mode: PermissionMode;

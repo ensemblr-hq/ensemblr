@@ -2,7 +2,7 @@ import type { LocalCommandService } from '../commands/local-command';
 import { firstLine } from './first-line.ts';
 
 /** Outcome of a git operation that the caller maps to its own diagnostic code. */
-export type GitOpOutcome =
+type GitOpOutcome =
 	| { status: 'success' }
 	| { status: 'no-branch' }
 	| { status: 'failure'; message: string };
@@ -12,7 +12,7 @@ export type GitOpOutcome =
  * code. `git-missing` is split from generic failure so callers can surface a
  * tailored install hint.
  */
-export type GitWorktreeAddOutcome =
+type GitWorktreeAddOutcome =
 	| { status: 'success' }
 	| { status: 'git-missing'; message: string }
 	| { status: 'failure'; message: string };

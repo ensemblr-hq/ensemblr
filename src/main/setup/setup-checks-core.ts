@@ -1,10 +1,10 @@
 import type { EnvironmentVariablesSnapshot } from '../../shared/ipc/contracts/environment';
 import type { SetupCheckLogSnapshot } from '../../shared/ipc/contracts/setup';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsemblrConfigService } from '../config/config-loader';
-import type { EnvironmentVariablesService } from '../environment/environment-variables';
-import type { EnsemblrRootDirectoryService } from '../root/root-directory-service';
-import type { EnsemblrDatabaseService } from '../storage/database';
+import type { EnsemblrConfigService } from '../config';
+import type { EnvironmentVariablesService } from '../environment';
+import type { EnsemblrRootDirectoryService } from '../root';
+import type { EnsemblrDatabaseService } from '../storage';
 import {
 	appendCommandStreamLogs,
 	defineCheck,
