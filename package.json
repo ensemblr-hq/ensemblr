@@ -17,6 +17,7 @@
 		"check:tailwind": "node scripts/check-tailwind-classes.mjs",
 		"check:fix": "biome check --write .",
 		"icon:generate": "node scripts/generate-app-icon.mjs",
+		"avatar:generate": "node scripts/generate-avatar.mjs",
 		"format": "biome format --write .",
 		"lint": "biome lint .",
 		"test:commands": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/local-command.test.ts",
