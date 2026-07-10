@@ -7,14 +7,14 @@ import type {
 	RootDirectorySnapshot,
 } from '../../../shared/ipc/contracts/root-directory';
 import type { SharedRootAdoptionService } from '../../repository';
-import type { EnsembleRootDirectoryService } from '../../root';
+import type { EnsemblrRootDirectoryService } from '../../root';
 import type { WithPermissionGate } from '../permission-gate.ts';
 import { parseRootDirectoryChangeRequest } from '../request-schemas.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /** Service dependencies used by the root-directory IPC handlers. */
 export interface RootHandlersOptions {
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 	sharedRootAdoptionService: SharedRootAdoptionService;
 	withPermissionGate: WithPermissionGate;
 }
@@ -39,9 +39,9 @@ export function registerRootHandlers({
 			const selection = await showDirectorySelectionDialog(event, {
 				buttonLabel: 'Preview root',
 				message:
-					'Select the Ensemble root directory to switch to. Existing contents are only inspected before confirmation.',
+					'Select the Ensemblr root directory to switch to. Existing contents are only inspected before confirmation.',
 				properties: ['openDirectory', 'createDirectory'],
-				title: 'Select Ensemble root directory',
+				title: 'Select Ensemblr root directory',
 			});
 
 			if (selection.canceled) {

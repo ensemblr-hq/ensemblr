@@ -3,16 +3,16 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
-import { ensembleQueryKeys } from '@/renderer/api/ensemble-queries';
+import { ensemblrQueryKeys } from '@/renderer/api/ensemblr-queries';
 import { CloneGithubDialog } from '@/renderer/components/welcome/clone-github-dialog';
 import type {
 	GithubRepositoryEntry,
 	GithubRepositoryListResult,
 } from '@/shared/ipc/contracts/clone';
 import {
-	clearEnsembleApi,
+	clearEnsemblrApi,
 	createTestQueryClient,
-	installEnsembleApi,
+	installEnsemblrApi,
 	renderWithProviders,
 } from '../support/dom';
 
@@ -84,18 +84,18 @@ function listResult(
 function seededClient(options: { recent?: GithubRepositoryListResult } = {}) {
 	const client = createTestQueryClient();
 	client.setQueryData(
-		ensembleQueryKeys.githubRepositoryList('recent'),
+		ensemblrQueryKeys.githubRepositoryList('recent'),
 		options.recent ?? listResult([repo('octo/alpha'), repo('octo/beta')]),
 	);
 	client.setQueryData(
-		ensembleQueryKeys.githubRepositoryList('full'),
+		ensemblrQueryKeys.githubRepositoryList('full'),
 		listResult([
 			repo('octo/alpha'),
 			repo('octo/beta'),
 			repo('octo/widgets-deep'),
 		]),
 	);
-	client.setQueryData(ensembleQueryKeys.rootDirectory(), {
+	client.setQueryData(ensemblrQueryKeys.rootDirectory(), {
 		repositoriesPath: '/tmp/repos',
 	});
 	return client;
@@ -103,7 +103,7 @@ function seededClient(options: { recent?: GithubRepositoryListResult } = {}) {
 
 beforeEach(() => {
 	setFlow(makeFlow());
-	installEnsembleApi({
+	installEnsemblrApi({
 		githubRepositoryList: vi.fn(async () => listResult([])),
 		rootDirectory: vi.fn(async () => ({ repositoriesPath: '/tmp/repos' })),
 		selectCloneDestination: vi.fn(async () => ({
@@ -114,7 +114,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	clearEnsembleApi();
+	clearEnsemblrApi();
 });
 
 function renderDialog(client = seededClient()) {

@@ -10,7 +10,7 @@ import {
 	type LinearIssueUpsert,
 	type LinearStore,
 } from '../../src/main/linear/linear-store.ts';
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 
 const NOW = new Date('2026-06-11T00:00:00.000Z');
 
@@ -18,8 +18,8 @@ function createFixture(t: TestContext): {
 	database: DatabaseSync;
 	store: LinearStore;
 } {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-linear-store-'));
-	const connection = openEnsembleDatabase({
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-linear-store-'));
+	const connection = openEnsemblrDatabase({
 		databasePath: path.join(directory, 'linear-store-test.db'),
 	});
 

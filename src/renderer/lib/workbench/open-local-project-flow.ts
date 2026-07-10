@@ -3,9 +3,9 @@ import { toast } from 'sonner';
 
 import {
 	importLocalRepository,
-	isEnsembleApiAvailable,
+	isEnsemblrApiAvailable,
 	selectLocalRepository,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 
 import { seedFirstWorkspace } from './seed-first-workspace';
 
@@ -29,7 +29,7 @@ export async function openLocalProjectFlow({
 	setLastWorkspaceSelection,
 	setLocalProjectImportOpen,
 }: OpenLocalProjectFlowOptions): Promise<void> {
-	if (!isEnsembleApiAvailable()) {
+	if (!isEnsemblrApiAvailable()) {
 		toast.error('Preload bridge is unavailable in this context.');
 		return;
 	}

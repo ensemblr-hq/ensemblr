@@ -51,7 +51,7 @@ const DEFAULT_KILL_GRACE_MS = 500;
 
 /**
  * Builds a service that runs local commands with sanitized logs and a
- * lazily-resolved shell environment, protecting Ensemble from PATH/secret leaks.
+ * lazily-resolved shell environment, protecting Ensemblr from PATH/secret leaks.
  * @param options - Optional dependency overrides and tuning knobs.
  * @returns A {@link LocalCommandService} instance.
  */
@@ -60,7 +60,7 @@ export function createLocalCommandService(
 ): LocalCommandService {
 	// Strip macOS/Electron launch-context vars before they seed the shell
 	// environment captured for pi, local commands, and readiness — otherwise a
-	// spawned process running `open`/LaunchServices makes macOS relaunch Ensemble.
+	// spawned process running `open`/LaunchServices makes macOS relaunch Ensemblr.
 	const baseEnv = normalizeEnvironment(
 		stripLaunchContextEnv(options.baseEnv ?? process.env),
 	);

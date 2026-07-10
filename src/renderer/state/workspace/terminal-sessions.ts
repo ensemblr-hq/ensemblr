@@ -45,7 +45,7 @@ export function useWorkspaceTerminalSessions(
 	useEffect(() => {
 		let cancelled = false;
 
-		window.ensemble
+		window.ensemblr
 			?.listTerminalSessions({ workspaceId })
 			.then((result) => {
 				if (!cancelled) {
@@ -56,7 +56,7 @@ export function useWorkspaceTerminalSessions(
 				// Listing is best-effort; lifecycle broadcasts still hydrate state.
 			});
 
-		const unsubscribe = window.ensemble?.onTerminalLifecycle((event) => {
+		const unsubscribe = window.ensemblr?.onTerminalLifecycle((event) => {
 			if (
 				event.workspaceId !== workspaceId ||
 				closedTerminalIdsRef.current.has(event.terminalId)
@@ -75,7 +75,7 @@ export function useWorkspaceTerminalSessions(
 
 	const createTerminal =
 		useCallback(async (): Promise<CreateTerminalSessionResult> => {
-			const result = (await window.ensemble?.createTerminalSession({
+			const result = (await window.ensemblr?.createTerminalSession({
 				workspaceId,
 			})) ?? {
 				diagnostics: [
@@ -103,7 +103,7 @@ export function useWorkspaceTerminalSessions(
 		);
 
 		try {
-			await window.ensemble?.killTerminalSession({ terminalId });
+			await window.ensemblr?.killTerminalSession({ terminalId });
 		} catch {
 			// The tab is gone either way; main-process cleanup is best-effort.
 		}

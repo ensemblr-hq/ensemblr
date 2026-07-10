@@ -12,7 +12,7 @@ export type SendShortcut = 'enter' | 'mod+enter';
 export type ToolCallCollapseMode = 'collapsed' | 'expanded';
 
 /** Single-source store key prefix to avoid clashes with other Jotai atoms. */
-const KEY = (suffix: string) => `ensemble_pref_${suffix}`;
+const KEY = (suffix: string) => `ensemblr_pref_${suffix}`;
 
 // ─── General ──────────────────────────────────────────────────────────────────
 // All General settings now live in config.json (see ./app-settings). "Soften AI
@@ -20,9 +20,8 @@ const KEY = (suffix: string) => `ensemble_pref_${suffix}`;
 // functional consumers, so their atoms were dropped entirely.
 
 // ─── Appearance ───────────────────────────────────────────────────────────────
-// All Appearance settings now live in config.json (see ./app-settings). The
-// legacy `ensemble_pref_*` localStorage keys are one-time migrated on first
-// hydrate by `useAppearanceLegacyMigration`, then removed.
+// All Appearance settings now live in config.json (see ./app-settings); there
+// are no Appearance atoms here.
 
 // ─── Composer memory (per-chat overrides) ──────────────────────────────────────
 
@@ -142,7 +141,7 @@ export type RepoSettingsKey = (typeof REPO_SETTINGS_KEYS)[number];
 
 /**
  * Personal per-repo overrides stored locally. The real source of truth lives
- * in the committed `.ensemble/settings.toml` and SQLite — these atoms only hold
+ * in the committed `.ensemblr/settings.toml` and SQLite — these atoms only hold
  * user-only personal preferences until edited through the shared config writer.
  */
 export interface RepoSettingsOverride {

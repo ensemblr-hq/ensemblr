@@ -45,7 +45,7 @@ describe('externalNavigationTarget', () => {
 	test('keeps the production file: bundle in-app', () => {
 		expect(
 			externalNavigationTarget(
-				'file:///Applications/Ensemble.app/index.html',
+				'file:///Applications/Ensemblr.app/index.html',
 				null,
 			),
 		).toBeNull();

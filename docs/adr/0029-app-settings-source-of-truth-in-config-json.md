@@ -11,8 +11,8 @@ Accepted
 App (user-scope) settings were persisted in the renderer via Jotai
 `atomWithStorage`, i.e. browser `localStorage` inside the Electron renderer.
 That made the settings opaque to inspection, impossible to hand-edit, and
-invisible to the declarative `~/.config/ensemble/config.json` that ADR 0009
-established as Ensemble's user configuration format.
+invisible to the declarative `~/.config/ensemblr/config.json` that ADR 0009
+established as Ensemblr's user configuration format.
 
 We want `config.json` to be the source of truth for App settings so users (and
 managed/policy tooling) can read and edit them directly, and so the "Edit in
@@ -24,7 +24,7 @@ settings are out of scope.
 ## Decision
 
 App settings for General and Models are persisted in
-`~/.config/ensemble/config.json` under `app.general.*` and `app.models.*`, and
+`~/.config/ensemblr/config.json` under `app.general.*` and `app.models.*`, and
 that file is the source of truth.
 
 - A shared Zod schema (`src/shared/config/app-settings.ts`) defines the settings,
@@ -82,7 +82,7 @@ The pattern has since been extended beyond General/Models: **Git** and
 **Appearance** now persist to `config.json` under `app.git.*` / `app.appearance.*`
 and are the source of truth (same schema, service, IPC, and per-setting-atom
 path). Appearance departs from the "fresh seed" rule above in one respect — it
-runs a **one-time migration** of the legacy `ensemble_pref_*` `localStorage`
+runs a **one-time migration** of the legacy `ensemblr_pref_*` `localStorage`
 values into `config.json` on first launch (via `useAppearanceLegacyMigration`),
 removing each legacy key only after a successful write so a failed write retries
 next launch. The renamed `one-dark` code theme is carried over as `one-dark-pro`.

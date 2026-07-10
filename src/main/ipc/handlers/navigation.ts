@@ -2,12 +2,12 @@ import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { RepositoryWorkspaceNavigationSnapshot } from '../../../shared/ipc/contracts/repository-navigation';
-import type { EnsembleDatabaseService } from '../../storage';
+import type { EnsemblrDatabaseService } from '../../storage';
 import { getRepositoryWorkspaceNavigationSnapshot } from '../repository-workspace-navigation';
 
 /** Service dependencies used by the navigation-snapshot IPC handlers. */
 export interface NavigationHandlersOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 }
 
 /**

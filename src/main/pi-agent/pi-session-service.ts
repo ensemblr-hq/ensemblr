@@ -14,7 +14,7 @@ import {
 	readHiddenEventRanges,
 } from '../checkpoints/checkpoint-service.ts';
 import {
-	type EnsembleDatabaseService,
+	type EnsemblrDatabaseService,
 	requireDatabase,
 } from '../storage/database.ts';
 import { listOpenChatTabs } from '../storage/repositories/chat-tab-repository.ts';
@@ -72,7 +72,7 @@ export interface PiSessionServiceOptions {
 	/** Override for tests; defaults to the git-backed capture (ADR 0012). */
 	captureCheckpoint?: CheckpointCapturePort;
 	chatTitleTimeoutMs?: number;
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	eventSink?: PiSessionEventSink;
 	piAgentClient: PiAgentClient;
 	/** Optional post-first-turn auto branch-naming queue (best-effort). */

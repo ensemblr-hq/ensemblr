@@ -159,7 +159,7 @@ export function createAgentActivityMonitor(
 		if (!settings.general.desktopNotifications || isAppFocused()) {
 			return;
 		}
-		notify({ title: 'Ensemble', body: 'Pi finished working in a chat.' });
+		notify({ title: 'Ensemblr', body: 'Pi finished working in a chat.' });
 	};
 
 	const handle = ({ event, sessionId }: AgentActivityEvent): void => {

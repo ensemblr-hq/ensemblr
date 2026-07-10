@@ -14,7 +14,7 @@ import type {
 } from '../../shared/ipc/contracts/workspace-sources';
 import type { LocalCommandService } from '../commands/local-command';
 import { classifyCommandFailure } from '../github/gh-failures.ts';
-import type { EnsembleDatabaseService } from '../storage';
+import type { EnsemblrDatabaseService } from '../storage';
 import { selectRepositoryWithDefaultsById } from '../storage/repositories/repository-row-repository.ts';
 import { listActiveWorkspaceBranchRowsByRepository } from '../storage/repositories/workspace-repository.ts';
 
@@ -59,7 +59,7 @@ export interface RepositorySourcesService {
 }
 
 export interface CreateRepositorySourcesServiceOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
 	/** Test seam: resolves a repository id to its on-disk path. */
 	resolveRepositoryPath?: (repositoryId: string) => string | null;

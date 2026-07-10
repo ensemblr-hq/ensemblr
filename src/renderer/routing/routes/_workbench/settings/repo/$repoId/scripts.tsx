@@ -32,7 +32,7 @@ const SCRIPTS_DESCRIPTION =
 
 /**
  * Per-repository Scripts settings. Reads the resolved values (which prefer the
- * committed `.ensemble/settings.toml` over personal SQLite) to seed the editor
+ * committed `.ensemblr/settings.toml` over personal SQLite) to seed the editor
  * and render source badges. The editor is remounted per repo via `key` once the
  * snapshot has loaded, so its initial values seed from render state instead of a
  * derive-into-state effect.
@@ -191,7 +191,7 @@ function ScriptRow({
 	source,
 	value,
 }: ScriptRowProps) {
-	const overriddenByToml = source === 'ensemble-config';
+	const overriddenByToml = source === 'ensemblr-config';
 
 	return (
 		<SettingRow
@@ -213,7 +213,7 @@ function ScriptRow({
 			/>
 			{overriddenByToml ? (
 				<p className='mt-1 text-muted-foreground text-xs'>
-					Overridden by the committed .ensemble/settings.toml; your edit is
+					Overridden by the committed .ensemblr/settings.toml; your edit is
 					saved but shadowed until that key is removed.
 				</p>
 			) : null}

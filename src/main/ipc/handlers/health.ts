@@ -2,13 +2,13 @@ import { app, ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { HealthSnapshot } from '../../../shared/ipc/contracts/health';
-import type { EnsembleConfigService } from '../../config';
-import type { EnsembleDatabaseService } from '../../storage';
+import type { EnsemblrConfigService } from '../../config';
+import type { EnsemblrDatabaseService } from '../../storage';
 
 /** Service dependencies used by the health-snapshot IPC handler. */
 export interface HealthHandlersOptions {
-	configService: EnsembleConfigService;
-	databaseService: EnsembleDatabaseService;
+	configService: EnsemblrConfigService;
+	databaseService: EnsemblrDatabaseService;
 }
 
 /**
@@ -28,8 +28,8 @@ export function registerHealthHandlers({
 
 /** Single source of truth for the health-snapshot shape. */
 export function buildHealthSnapshot(
-	configService: EnsembleConfigService,
-	databaseService: EnsembleDatabaseService,
+	configService: EnsemblrConfigService,
+	databaseService: EnsemblrDatabaseService,
 ): HealthSnapshot {
 	return {
 		appName: app.getName(),

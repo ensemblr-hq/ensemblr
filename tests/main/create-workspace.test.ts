@@ -17,9 +17,9 @@ import test, { type TestContext } from 'node:test';
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
 import {
-	type EnsembleDatabaseConnection,
-	type EnsembleDatabaseService,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseConnection,
+	type EnsemblrDatabaseService,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import type { GitSettings } from '../../src/shared/config/app-settings.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
@@ -39,7 +39,7 @@ function gitDefaults(overrides: Partial<GitSettings> = {}): GitSettings {
 }
 
 interface Harness {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	repositoryId: string;
 	repositoryPath: string;
 	repositorySlug: string;
@@ -52,7 +52,7 @@ interface Harness {
  * commit on `main`, an in-memory SQLite seeded with that repository row.
  */
 function createHarness(t: TestContext): Harness {
-	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemble-workspace-'));
+	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-workspace-'));
 	const repositoriesPath = path.join(rootPath, 'repos');
 	const workspacesPath = path.join(rootPath, 'workspaces');
 	mkdirSync(repositoriesPath, { recursive: true });
@@ -61,13 +61,13 @@ function createHarness(t: TestContext): Harness {
 	const repositoryPath = path.join(repositoriesPath, 'demo');
 	mkdirSync(repositoryPath);
 	runGit(repositoryPath, ['init', '-b', 'main']);
-	runGit(repositoryPath, ['config', 'user.email', 'test@ensemble.dev']);
-	runGit(repositoryPath, ['config', 'user.name', 'Ensemble Test']);
+	runGit(repositoryPath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(repositoryPath, ['config', 'user.name', 'Ensemblr Test']);
 	writeFileSync(path.join(repositoryPath, 'README.md'), '# demo\n');
 	runGit(repositoryPath, ['add', '.']);
 	runGit(repositoryPath, ['commit', '-m', 'init']);
 
-	const connection = openEnsembleDatabase({ databasePath: ':memory:' });
+	const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
 	const repositoryId = 'repository-demo';
 	const repositorySlug = 'demo';
 	const timestamp = fixedNow().toISOString();
@@ -105,8 +105,8 @@ function createHarness(t: TestContext): Harness {
 }
 
 function wrapConnection(
-	connection: EnsembleDatabaseConnection,
-): EnsembleDatabaseService {
+	connection: EnsemblrDatabaseConnection,
+): EnsemblrDatabaseService {
 	return {
 		close: () => connection.database.close(),
 		getConnection: () => connection,
@@ -153,7 +153,7 @@ function readGitExclude(workspacePath: string): string {
 }
 
 function workspaceRow(
-	databaseService: EnsembleDatabaseService,
+	databaseService: EnsemblrDatabaseService,
 	id: string,
 ): Record<string, unknown> | null {
 	const database = databaseService.getConnection()?.database as DatabaseSync;
@@ -543,11 +543,11 @@ test('create omits the prefix when the github username is unavailable', async (t
 
 test('repository git.branchPrefix overrides the user branch prefix', async (t) => {
 	const harness = createHarness(t);
-	mkdirSync(path.join(harness.repositoryPath, '.ensemble'), {
+	mkdirSync(path.join(harness.repositoryPath, '.ensemblr'), {
 		recursive: true,
 	});
 	writeFileSync(
-		path.join(harness.repositoryPath, '.ensemble', 'settings.toml'),
+		path.join(harness.repositoryPath, '.ensemblr', 'settings.toml'),
 		'[git]\nbranchPrefix = "team/"\n',
 	);
 	const service = createWorkspaceService({

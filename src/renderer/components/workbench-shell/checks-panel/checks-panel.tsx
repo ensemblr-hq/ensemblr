@@ -11,9 +11,9 @@ import { toast } from 'sonner';
 
 import {
 	deleteReviewTodo,
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	saveReviewTodo,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
@@ -214,7 +214,7 @@ function useTodoActions(workspaceId: string): TodoActions {
 		onError,
 		onSuccess: () =>
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.reviewTodos(workspaceId),
+				queryKey: ensemblrQueryKeys.reviewTodos(workspaceId),
 			}),
 	});
 	const toggleMutation = useMutation({
@@ -227,7 +227,7 @@ function useTodoActions(workspaceId: string): TodoActions {
 		onError,
 		onSuccess: () =>
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.reviewTodos(workspaceId),
+				queryKey: ensemblrQueryKeys.reviewTodos(workspaceId),
 			}),
 	});
 	const removeMutation = useMutation({
@@ -235,7 +235,7 @@ function useTodoActions(workspaceId: string): TodoActions {
 		onError,
 		onSuccess: () =>
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.reviewTodos(workspaceId),
+				queryKey: ensemblrQueryKeys.reviewTodos(workspaceId),
 			}),
 	});
 

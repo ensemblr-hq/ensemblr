@@ -7,10 +7,10 @@ import { useMemo } from 'react';
 
 import {
 	healthQuery,
-	isEnsembleApiAvailable,
+	isEnsemblrApiAvailable,
 	repositoryWorkspaceNavigationQuery,
 	setupDiagnosticsQuery,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import {
 	getRenderableNavigationSnapshot,
 	mapRepositoriesToProjects,
@@ -49,7 +49,7 @@ export function useWorkbenchQueries({
 	loaderData: WorkbenchShellData;
 }) {
 	const queryClient = useQueryClient();
-	const hasPreloadBridge = isEnsembleApiAvailable();
+	const hasPreloadBridge = isEnsemblrApiAvailable();
 	const { data: healthData, error: healthErrorResult } = useQuery({
 		...healthQuery,
 		enabled: hasPreloadBridge,

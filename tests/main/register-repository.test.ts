@@ -24,12 +24,12 @@ import {
 	registerLocalRepository,
 } from '../../src/main/repository/register-repository.ts';
 import {
-	createEnsembleDatabaseService,
-	openEnsembleDatabase,
+	createEnsemblrDatabaseService,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 
 function createFixtureDirectory(t: TestContext): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-repo-fixture-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-repo-fixture-'));
 
 	t.after(() => {
 		try {
@@ -44,9 +44,9 @@ function createFixtureDirectory(t: TestContext): string {
 }
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-repo-db-'));
-	const connection = openEnsembleDatabase({
-		databasePath: path.join(directory, 'ensemble-test.db'),
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-repo-db-'));
+	const connection = openEnsemblrDatabase({
+		databasePath: path.join(directory, 'ensemblr-test.db'),
 	});
 
 	t.after(() => {
@@ -81,7 +81,7 @@ test('registers a valid git repository and writes an absolute path', async (t) =
 		gitProbe: gitProbeStub({
 			defaultBranch: 'master',
 			isGitRepository: true,
-			remoteUrl: 'git@github.com:psoldunov/ensemble.git',
+			remoteUrl: 'git@github.com:psoldunov/ensemblr.git',
 			topLevel: directory,
 		}),
 		loadConfig: loadRepositoryConfig,
@@ -96,7 +96,7 @@ test('registers a valid git repository and writes an absolute path', async (t) =
 	assert.equal(result.repository?.defaultBranch, 'master');
 	assert.equal(
 		result.repository?.remoteUrl,
-		'git@github.com:psoldunov/ensemble.git',
+		'git@github.com:psoldunov/ensemblr.git',
 	);
 	assert.equal(result.repository?.name, path.basename(directory));
 	assert.equal(result.repository?.createdAt, '2026-06-07T12:00:00.000Z');
@@ -126,7 +126,7 @@ test('registers a valid git repository and writes an absolute path', async (t) =
 		unknown
 	>;
 	assert.equal(metadata.adoptionMode, 'adopt-in-place');
-	assert.equal(metadata.remoteUrl, 'git@github.com:psoldunov/ensemble.git');
+	assert.equal(metadata.remoteUrl, 'git@github.com:psoldunov/ensemblr.git');
 	assert.equal(metadata.registeredAt, '2026-06-07T12:00:00.000Z');
 	assert.ok(Array.isArray(metadata.settingsSources));
 });
@@ -190,7 +190,7 @@ test('rejects empty, relative, and non-existent paths', async (t) => {
 		loadConfig: loadRepositoryConfig,
 		now: fixedNow,
 		request: {
-			path: path.join(tmpdir(), 'ensemble-missing-fixture-does-not-exist'),
+			path: path.join(tmpdir(), 'ensemblr-missing-fixture-does-not-exist'),
 		},
 	});
 	assert.equal(missing.registered, false);
@@ -228,7 +228,7 @@ test('rejects a duplicate registration with a clear diagnostic', async (t) => {
 
 test('honours an explicit name override so folder suffixes do not leak into the row', async (t) => {
 	const directory = mkdtempSync(
-		path.join(tmpdir(), 'ensemble-repo-fixture-suffix-'),
+		path.join(tmpdir(), 'ensemblr-repo-fixture-suffix-'),
 	);
 	t.after(() => {
 		rmSync(directory, { force: true, recursive: true });
@@ -297,9 +297,9 @@ test('captures settings-source diagnostics in metadata_json', async (t) => {
 	const directory = createFixtureDirectory(t);
 	const database = createDatabaseFixture(t);
 
-	mkdirSync(path.join(directory, '.ensemble'), { recursive: true });
+	mkdirSync(path.join(directory, '.ensemblr'), { recursive: true });
 	writeFileSync(
-		path.join(directory, '.ensemble', 'settings.toml'),
+		path.join(directory, '.ensemblr', 'settings.toml'),
 		'[scripts]\nrun = "bun run dev"\n',
 	);
 
@@ -318,22 +318,22 @@ test('captures settings-source diagnostics in metadata_json', async (t) => {
 
 	assert.equal(result.registered, true);
 	const sources = result.settingsSources.map((source) => source.source);
-	assert.equal(sources.includes('ensemble-config'), true);
+	assert.equal(sources.includes('ensemblr-config'), true);
 	assert.equal(sources.includes('worktreeinclude'), true);
 });
 
 test('createLocalRepositoryRegistrationService wires the database service', async (t) => {
 	const directory = createFixtureDirectory(t);
 	const databaseDirectory = mkdtempSync(
-		path.join(tmpdir(), 'ensemble-repo-svc-'),
+		path.join(tmpdir(), 'ensemblr-repo-svc-'),
 	);
 
 	t.after(() => {
 		rmSync(databaseDirectory, { force: true, recursive: true });
 	});
 
-	const databaseService = createEnsembleDatabaseService({
-		databasePath: path.join(databaseDirectory, 'ensemble-test.db'),
+	const databaseService = createEnsemblrDatabaseService({
+		databasePath: path.join(databaseDirectory, 'ensemblr-test.db'),
 	});
 	t.after(databaseService.close);
 	databaseService.open();

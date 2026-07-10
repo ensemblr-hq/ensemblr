@@ -32,14 +32,14 @@ function renderWithAppearance(appearance: Partial<AppearanceSettings>) {
 
 afterEach(() => {
 	document.documentElement.className = '';
-	document.documentElement.style.removeProperty('--ensemble-font-mono');
+	document.documentElement.style.removeProperty('--ensemblr-font-mono');
 });
 
 describe('useAppearanceEffect', () => {
 	test('prepends the chosen mono font to the CSS var', () => {
 		renderWithAppearance({ monoFont: 'Fira Code' });
 		const value = document.documentElement.style.getPropertyValue(
-			'--ensemble-font-mono',
+			'--ensemblr-font-mono',
 		);
 		expect(value).toContain('"Fira Code"');
 		expect(value).toContain('monospace');
@@ -48,7 +48,7 @@ describe('useAppearanceEffect', () => {
 	test('falls back to the base stack when the font is blank', () => {
 		renderWithAppearance({ monoFont: '   ' });
 		const value = document.documentElement.style.getPropertyValue(
-			'--ensemble-font-mono',
+			'--ensemblr-font-mono',
 		);
 		expect(value.startsWith('"JetBrains Mono Variable"')).toBe(true);
 	});

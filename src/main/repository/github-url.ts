@@ -21,7 +21,7 @@ const SSH_URL_PATTERN = /^git@github\.com:([\w.-]+)\/([\w.-]+?)(?:\.git)?$/i;
 const SHORTHAND_URL_PATTERN = /^(?:gh:)?([\w.-]+)\/([\w.-]+?)(?:\.git)?$/i;
 
 /**
- * Recognises the GitHub URL forms Ensemble accepts and returns the canonical
+ * Recognises the GitHub URL forms Ensemblr accepts and returns the canonical
  * `https://github.com/owner/repo.git` form plus the bare `owner/repo` slug
  * passed to `gh repo clone`. Returns `null` for any other input.
  */

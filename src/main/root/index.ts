@@ -4,7 +4,7 @@ export {
 	applyRootDirectoryChange,
 	previewRootDirectoryChange,
 } from './root-directory-change';
-export type { EnsembleRootDirectoryService } from './root-directory-service';
-export { createEnsembleRootDirectoryService } from './root-directory-service';
+export type { EnsemblrRootDirectoryService } from './root-directory-service';
+export { createEnsemblrRootDirectoryService } from './root-directory-service';
 export type { ReconcileRootDirectoryOptions } from './root-reconciliation';
 export { reconcileRootDirectory } from './root-reconciliation';

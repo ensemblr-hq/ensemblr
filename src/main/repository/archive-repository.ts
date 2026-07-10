@@ -8,7 +8,7 @@ import type {
 	ArchiveRepositoryRequest,
 	ArchiveRepositoryResult,
 } from '../../shared/ipc/contracts/repository';
-import type { EnsembleDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage/database.ts';
 import {
 	selectRepositoryForArchive,
 	stampRepositoryArchived,
@@ -35,7 +35,7 @@ export interface ArchiveRepositoryService {
 export interface CreateArchiveRepositoryServiceOptions {
 	archiveLifecycleService: ArchiveLifecycleService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	now?: () => Date;
 }
 

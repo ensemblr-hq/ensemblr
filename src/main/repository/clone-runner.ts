@@ -202,7 +202,7 @@ export function runCloneCommand(
 		const child = nodeSpawn(command, args, {
 			cwd,
 			// Strip launch-context vars so gh/git (and their credential helpers)
-			// can't be attributed to Ensemble by LaunchServices.
+			// can't be attributed to Ensemblr by LaunchServices.
 			env: stripLaunchContextEnv(process.env),
 			shell: false,
 			stdio: ['ignore', 'pipe', 'pipe'],

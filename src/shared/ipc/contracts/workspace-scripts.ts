@@ -26,7 +26,7 @@ export type StopWorkspaceScriptResult = KillTerminalResult;
 /**
  * Personal (SQLite-persisted) repository script settings edited on the Scripts
  * settings screen. Blank script commands clear their stored row. The committed
- * `.ensemble/settings.toml` still overrides any of these keys per-key.
+ * `.ensemblr/settings.toml` still overrides any of these keys per-key.
  */
 export interface UpdateRepositoryScriptsRequest {
 	archive: string | null;
@@ -42,7 +42,7 @@ export interface UpdateRepositoryScriptsResult {
 	ok: boolean;
 }
 
-/** Workspace-script slice of the `window.ensemble` API. */
+/** Workspace-script slice of the `window.ensemblr` API. */
 export interface WorkspaceScriptsApi {
 	runWorkspaceScript: (
 		request: RunWorkspaceScriptRequest,

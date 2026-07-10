@@ -12,7 +12,7 @@ import './styles/index.css';
 const rootElement = document.getElementById('root');
 
 if (!rootElement) {
-	throw new Error('Ensemble renderer root element was not found.');
+	throw new Error('Ensemblr renderer root element was not found.');
 }
 
 // Tag the dev build (`bun run dev`) so `.env-dev` in index.css tints the top

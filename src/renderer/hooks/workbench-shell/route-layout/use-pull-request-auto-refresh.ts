@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import {
 	refreshPullRequestSnapshot,
 	subscribePiSessionEvents,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 
 /**
  * Forces a cache-bypassing PR-snapshot refresh the instant the workspace's agent

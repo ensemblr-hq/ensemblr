@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import type { ReactNode } from 'react';
 
-import { linearConnectionQuery } from '@/renderer/api/ensemble';
+import { linearConnectionQuery } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
 import { LinearLogo } from '@/renderer/components/workbench-shell/source-provider-logo';
@@ -45,8 +45,8 @@ export function LinearConnectionGate({ children }: { children: ReactNode }) {
 			</p>
 			<p className='max-w-sm text-muted-foreground text-xs leading-relaxed'>
 				{gate.kind === 'not-configured'
-					? 'Add app.linear.clientId to ~/.config/ensemble/config.json, then connect from integration settings.'
-					: 'Connect Linear from integration settings to browse issues, manage them from Ensemble, and create workspaces from issues.'}
+					? 'Add app.linear.clientId to ~/.config/ensemblr/config.json, then connect from integration settings.'
+					: 'Connect Linear from integration settings to browse issues, manage them from Ensemblr, and create workspaces from issues.'}
 			</p>
 			<Button asChild size='sm' variant='outline'>
 				<Link to='/settings/integrations'>Open integration settings</Link>

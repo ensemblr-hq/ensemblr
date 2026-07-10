@@ -1,6 +1,6 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { redirect } from '@tanstack/react-router';
-import { repositoryWorkspaceNavigationQuery } from '@/renderer/api/ensemble-queries';
+import { repositoryWorkspaceNavigationQuery } from '@/renderer/api/ensemblr-queries';
 import {
 	getPreferredSession,
 	loadWorkbenchShellData,

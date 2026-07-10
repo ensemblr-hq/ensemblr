@@ -9,7 +9,7 @@ import { atomWithStorage } from 'jotai/utils';
  * validate against the live project list before navigating.
  */
 export const settingsActiveRepoIdAtom = atomWithStorage<string | null>(
-	'ensemble_settings_ui_active_repo_id',
+	'ensemblr_settings_ui_active_repo_id',
 	null,
 );
 

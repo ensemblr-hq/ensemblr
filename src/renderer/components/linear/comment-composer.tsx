@@ -3,8 +3,8 @@ import { useState } from 'react';
 
 import {
 	createLinearComment,
-	ensembleQueryKeys,
-} from '@/renderer/api/ensemble';
+	ensemblrQueryKeys,
+} from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import { describeLinearFailure } from '@/renderer/lib/linear';
@@ -25,7 +25,7 @@ export function LinearCommentComposer({ issueId }: { issueId: string }) {
 			setBody('');
 			setError(null);
 			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.linearIssue(issueId),
+				queryKey: ensemblrQueryKeys.linearIssue(issueId),
 			});
 		},
 	});

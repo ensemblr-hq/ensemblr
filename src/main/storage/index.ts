@@ -1,15 +1,15 @@
 export type {
 	DatabaseHealthSnapshot,
 	DatabaseStatus,
-	EnsembleDatabaseConnection,
-	EnsembleDatabaseService,
+	EnsemblrDatabaseConnection,
+	EnsemblrDatabaseService,
 	OpenDatabaseOptions,
 } from './database';
 export {
-	createEnsembleDatabaseService,
+	createEnsemblrDatabaseService,
 	getCurrentSchemaVersion,
 	LATEST_SCHEMA_VERSION,
 	listAppliedMigrationIds,
-	openEnsembleDatabase,
+	openEnsemblrDatabase,
 	resolveDefaultDatabasePath,
 } from './database';

@@ -16,11 +16,11 @@ import {
 
 export type { ConfigDiagnostic, ConfigStatusSnapshot };
 
-/** Schema version embedded in `~/.config/ensemble/config.json`. */
-export const ENSEMBLE_CONFIG_SCHEMA_VERSION = 1;
+/** Schema version embedded in `~/.config/ensemblr/config.json`. */
+export const ENSEMBLR_CONFIG_SCHEMA_VERSION = 1;
 
-/** JSON Schema describing the supported top-level shape of the Ensemble config. */
-export const ENSEMBLE_CONFIG_SCHEMA = {
+/** JSON Schema describing the supported top-level shape of the Ensemblr config. */
+export const ENSEMBLR_CONFIG_SCHEMA = {
 	$schema: 'https://json-schema.org/draft/2020-12/schema',
 	additionalProperties: false,
 	properties: {
@@ -32,28 +32,28 @@ export const ENSEMBLE_CONFIG_SCHEMA = {
 			items: { type: 'object' },
 			type: 'array',
 		},
-		schemaVersion: { const: ENSEMBLE_CONFIG_SCHEMA_VERSION },
+		schemaVersion: { const: ENSEMBLR_CONFIG_SCHEMA_VERSION },
 		security: { type: 'object' },
 		ui: { type: 'object' },
 	},
-	title: 'Ensemble Config',
+	title: 'Ensemblr Config',
 	type: 'object',
 } as const;
 
-/** Validated declarative config loaded from `~/.config/ensemble/config.json`. */
-export interface EnsembleConfig {
+/** Validated declarative config loaded from `~/.config/ensemblr/config.json`. */
+export interface EnsemblrConfig {
 	app: Record<string, unknown>;
 	environment: Record<string, unknown>;
 	managed: Record<string, unknown>;
 	repositoryDefaults: Record<string, unknown>;
 	repositoryRules: Record<string, unknown>[];
-	schemaVersion: typeof ENSEMBLE_CONFIG_SCHEMA_VERSION;
+	schemaVersion: typeof ENSEMBLR_CONFIG_SCHEMA_VERSION;
 	security: Record<string, unknown>;
 	ui: Record<string, unknown>;
 }
 
-/** Options for {@link loadEnsembleConfig}. */
-export interface LoadEnsembleConfigOptions {
+/** Options for {@link loadEnsemblrConfig}. */
+export interface LoadEnsemblrConfigOptions {
 	configPath?: string;
 	homeDirectory?: string;
 	now?: () => Date;
@@ -61,14 +61,14 @@ export interface LoadEnsembleConfigOptions {
 }
 
 /** Combined result of validating the on-disk config file. */
-export interface EnsembleConfigLoadResult {
-	config: EnsembleConfig;
+export interface EnsemblrConfigLoadResult {
+	config: EnsemblrConfig;
 	snapshot: ConfigStatusSnapshot;
 }
 
 /** Public surface of the cached config service. */
-export interface EnsembleConfigService {
-	getConfig: () => EnsembleConfig;
+export interface EnsemblrConfigService {
+	getConfig: () => EnsemblrConfig;
 	getSnapshot: () => ConfigStatusSnapshot;
 	load: () => ConfigStatusSnapshot;
 }
@@ -81,7 +81,7 @@ type SectionName =
 	| 'security'
 	| 'ui';
 
-const CONFIG_DIRECTORY = '.config/ensemble';
+const CONFIG_DIRECTORY = '.config/ensemblr';
 const CONFIG_FILENAME = 'config.json';
 const ALLOWED_TOP_LEVEL_KEYS = new Set([
 	'app',
@@ -102,26 +102,26 @@ const OBJECT_SECTIONS: readonly SectionName[] = [
 	'ui',
 ];
 /**
- * Computes the absolute path to the Ensemble config file inside a home directory.
+ * Computes the absolute path to the Ensemblr config file inside a home directory.
  * @param homeDirectory - Home directory to resolve against; defaults to `os.homedir()`.
  * @returns Absolute path to `config.json`.
  */
-export function resolveEnsembleConfigPath(homeDirectory = homedir()): string {
+export function resolveEnsemblrConfigPath(homeDirectory = homedir()): string {
 	return path.join(homeDirectory, CONFIG_DIRECTORY, CONFIG_FILENAME);
 }
 
 /**
- * Reads and validates the Ensemble config file, returning the validated config
+ * Reads and validates the Ensemblr config file, returning the validated config
  * and a diagnostic snapshot suitable for IPC.
  * @param options - Optional path and clock overrides.
  * @returns The validated config and snapshot.
  */
-export function loadEnsembleConfig(
-	options: LoadEnsembleConfigOptions = {},
-): EnsembleConfigLoadResult {
+export function loadEnsemblrConfig(
+	options: LoadEnsemblrConfigOptions = {},
+): EnsemblrConfigLoadResult {
 	const configPath =
 		options.configPath ??
-		resolveEnsembleConfigPath(options.homeDirectory ?? homedir());
+		resolveEnsemblrConfigPath(options.homeDirectory ?? homedir());
 	const displayPath = formatDisplayPath(
 		configPath,
 		options.homeDirectory ?? homedir(),
@@ -144,7 +144,7 @@ export function loadEnsembleConfig(
 			],
 			displayPath,
 			loadedAt,
-			schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+			schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 			status: 'missing',
 		});
 	}
@@ -215,7 +215,7 @@ export function loadEnsembleConfig(
 		});
 	}
 
-	const validation = validateEnsembleConfig(parsed);
+	const validation = validateEnsemblrConfig(parsed);
 	const schemaVersion = getSchemaVersion(parsed);
 	const blocksReadiness =
 		requireTrustedManagedConfig ||
@@ -238,17 +238,17 @@ export function loadEnsembleConfig(
 
 /**
  * Builds the cached config service used by every consumer in the main process.
- * @param options - Forwarded to {@link loadEnsembleConfig} on first access.
+ * @param options - Forwarded to {@link loadEnsemblrConfig} on first access.
  * @returns A service that lazily loads and caches the config on first call.
  */
-export function createEnsembleConfigService(
-	options: LoadEnsembleConfigOptions = {},
-): EnsembleConfigService {
-	let cachedResult: EnsembleConfigLoadResult | null = null;
+export function createEnsemblrConfigService(
+	options: LoadEnsemblrConfigOptions = {},
+): EnsemblrConfigService {
+	let cachedResult: EnsemblrConfigLoadResult | null = null;
 
 	/** Loads the config on first call and caches the result. */
-	function ensureLoaded(): EnsembleConfigLoadResult {
-		cachedResult ??= loadEnsembleConfig(options);
+	function ensureLoaded(): EnsemblrConfigLoadResult {
+		cachedResult ??= loadEnsemblrConfig(options);
 		return cachedResult;
 	}
 
@@ -261,22 +261,22 @@ export function createEnsembleConfigService(
 
 /**
  * Type-checks a parsed config record against the supported schema, collecting
- * diagnostics and returning a sanitised {@link EnsembleConfig}.
+ * diagnostics and returning a sanitised {@link EnsemblrConfig}.
  * @param config - Parsed JSON record.
  * @returns The validated config and accumulated diagnostics.
  */
-function validateEnsembleConfig(config: Record<string, unknown>): {
-	config: EnsembleConfig;
+function validateEnsemblrConfig(config: Record<string, unknown>): {
+	config: EnsemblrConfig;
 	diagnostics: ConfigDiagnostic[];
 } {
 	const diagnostics: ConfigDiagnostic[] = [];
 	const schemaVersion = getSchemaVersion(config);
 
-	if (schemaVersion !== ENSEMBLE_CONFIG_SCHEMA_VERSION) {
+	if (schemaVersion !== ENSEMBLR_CONFIG_SCHEMA_VERSION) {
 		diagnostics.push({
 			code: 'unsupported-schema-version',
 			fieldPath: '$.schemaVersion',
-			message: `Unsupported config schema version ${String(schemaVersion)}. Expected ${ENSEMBLE_CONFIG_SCHEMA_VERSION}.`,
+			message: `Unsupported config schema version ${String(schemaVersion)}. Expected ${ENSEMBLR_CONFIG_SCHEMA_VERSION}.`,
 			severity: 'error',
 		});
 	}
@@ -351,17 +351,17 @@ function validateEnsembleConfig(config: Record<string, unknown>): {
 }
 
 /**
- * Builds an {@link EnsembleConfig} populated with safe defaults.
+ * Builds an {@link EnsemblrConfig} populated with safe defaults.
  * @returns A defaulted config record.
  */
-function createEmptyConfig(): EnsembleConfig {
+function createEmptyConfig(): EnsemblrConfig {
 	return {
 		app: {},
 		environment: {},
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 	};
@@ -388,7 +388,7 @@ function createResult({
 	loadedAt: string;
 	schemaVersion: number | null;
 	status: ConfigStatus;
-}): EnsembleConfigLoadResult {
+}): EnsemblrConfigLoadResult {
 	return {
 		config: createEmptyConfig(),
 		snapshot: {
@@ -412,7 +412,7 @@ function getSchemaVersion(config: Record<string, unknown>): number | null {
 	const value = config.schemaVersion;
 
 	if (value === undefined) {
-		return ENSEMBLE_CONFIG_SCHEMA_VERSION;
+		return ENSEMBLR_CONFIG_SCHEMA_VERSION;
 	}
 
 	return typeof value === 'number' && Number.isInteger(value) ? value : null;

@@ -6,7 +6,7 @@ import type { BundledLanguage } from 'shiki';
 import {
 	piSessionsForWorkspaceQuery,
 	turnCheckpointsQuery,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import {
 	ChatAssistantTurn,
 	type ChatAssistantTurnTiming,

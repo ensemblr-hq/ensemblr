@@ -20,7 +20,7 @@ function createWorkspace(t: TestContext): {
 	parentPath: string;
 	repositoriesPath: string;
 } {
-	const root = mkdtempSync(path.join(tmpdir(), 'ensemble-quickstart-'));
+	const root = mkdtempSync(path.join(tmpdir(), 'ensemblr-quickstart-'));
 	const repositoriesPath = path.join(root, 'repos');
 	mkdirSync(repositoriesPath, { recursive: true });
 

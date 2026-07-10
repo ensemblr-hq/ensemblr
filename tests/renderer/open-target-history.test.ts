@@ -6,7 +6,7 @@ import {
 	writeLastUsedOpenTarget,
 } from '../../src/renderer/state/workspace/open-target-history';
 
-const STORAGE_KEY = 'ensemble_workspace_open_target_last_used_v1';
+const STORAGE_KEY = 'ensemblr_workspace_open_target_last_used_v1';
 
 const globalScope = globalThis as unknown as {
 	localStorage?: Storage;

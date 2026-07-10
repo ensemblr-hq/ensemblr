@@ -22,7 +22,7 @@ export interface UpsertRepositoryScriptSettingsInput {
  * (`scripts.setup`/`scripts.run`/`scripts.archive`/`runScriptMode`/
  * `autoRunAfterSetup`) — the keys are NOT run through `toSettingKey` because the
  * resolver matches them verbatim. A blank script command deletes its row so the
- * value falls back to `.ensemble/settings.toml` / built-in defaults. All rows
+ * value falls back to `.ensemblr/settings.toml` / built-in defaults. All rows
  * are written in a single SQLite transaction so a mid-sequence failure rolls
  * back cleanly instead of leaving the settings half-written.
  * @param input - Database handle, repository id, and the edited fields.

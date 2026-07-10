@@ -20,10 +20,10 @@ import { createMainWindowStateStore } from './app/window-state';
 import { createLocalCommandService } from './commands';
 import {
 	createAppSettingsService,
-	createEnsembleConfigResolutionService,
-	createEnsembleConfigService,
+	createEnsemblrConfigResolutionService,
+	createEnsemblrConfigService,
 	createRepositoryConfigService,
-	resolveEnsembleConfigPath,
+	resolveEnsemblrConfigPath,
 } from './config';
 import {
 	createEnvironmentVariablesService,
@@ -73,7 +73,7 @@ import {
 	createWorkspaceService,
 } from './repository';
 import {
-	createEnsembleRootDirectoryService,
+	createEnsemblrRootDirectoryService,
 	reconcileRootDirectory,
 } from './root';
 import {
@@ -84,7 +84,7 @@ import {
 import { createMacosKeychainSecretStore } from './secrets';
 import { createSetupDiagnosticsService } from './setup';
 import {
-	createEnsembleDatabaseService,
+	createEnsemblrDatabaseService,
 	resolveDefaultDatabasePath,
 } from './storage';
 import { createTerminalService } from './terminal';
@@ -114,14 +114,14 @@ const isDev = !app.isPackaged;
 const DEV_SUFFIX = ' (DEV)';
 // The unpackaged dev build (`electron-forge start`) gets the explicit (DEV)
 // suffix so it reads its isolated userData below. A *packaged* build keeps the
-// product name forge baked in from its build channel (Ensemble / Ensemble
-// Canary / Ensemble Dev — see forge.config.ts + ADR 0032): that name derives
+// product name forge baked in from its build channel (Ensemblr / Ensemblr
+// Canary / Ensemblr Dev — see forge.config.ts + ADR 0032): that name derives
 // the userData path and thus the single-instance lock, so each channel stays a
-// distinct app. Clobbering to 'Ensemble' here would collapse every packaged
+// distinct app. Clobbering to 'Ensemblr' here would collapse every packaged
 // channel back onto the release identity — the shared registration that lets
 // macOS relaunch a sibling build and flash a stray Dock tile.
 if (isDev) {
-	app.setName(`Ensemble${DEV_SUFFIX}`);
+	app.setName(`Ensemblr${DEV_SUFFIX}`);
 }
 
 // A second launch of the packaged app — most often a spawned login shell that
@@ -130,7 +130,7 @@ if (isDev) {
 // window). Hold a single-instance lock so any such relaunch folds into the
 // running instance via the `second-instance` handler below instead. The lock is
 // a file lock under userData, so it catches direct-exec relaunches too, not just
-// `open`-routed ones. Dev is excluded: dev builds share one `Ensemble (DEV)`
+// `open`-routed ones. Dev is excluded: dev builds share one `Ensemblr (DEV)`
 // userData across Conductor workspaces, so a lock there would kill the second
 // dogfooding instance. Acquired after `setName` so it keys on the right userData.
 const hasSingleInstanceLock = isDev || app.requestSingleInstanceLock();
@@ -143,20 +143,20 @@ if (!hasSingleInstanceLock) {
 // macOS Application Support and XDG `.config`) and can never silently drift if
 // the prod path changes. Each keeps its own dev marker in the namespace the
 // prod path uses: the DB data dir is suffixed ` (DEV)`, while the `.config`
-// dotfile dir takes an `ensemble-dev` sibling (spaces/parens don't belong in a
+// dotfile dir takes an `ensemblr-dev` sibling (spaces/parens don't belong in a
 // dotfile path segment).
 const prodDatabasePath = resolveDefaultDatabasePath();
 const devDatabasePath = path.join(
 	path.dirname(prodDatabasePath) + DEV_SUFFIX,
 	path.basename(prodDatabasePath),
 );
-const prodConfigPath = resolveEnsembleConfigPath();
+const prodConfigPath = resolveEnsemblrConfigPath();
 const devConfigPath = path.join(
 	`${path.dirname(prodConfigPath)}-dev`,
 	path.basename(prodConfigPath),
 );
-const devRootDirectory = path.join(os.homedir(), `Ensemble${DEV_SUFFIX}`);
-const devKeychainService = 'com.ensemble.app.secret-store.dev';
+const devRootDirectory = path.join(os.homedir(), `Ensemblr${DEV_SUFFIX}`);
+const devKeychainService = 'dev.ensemblr.app.secret-store.dev';
 
 /**
  * Builds the macOS Keychain secret store shared by every service, swapping in
@@ -172,7 +172,7 @@ const createSecretStore = (database: DatabaseSync) =>
 			})
 		: null;
 
-const configService = createEnsembleConfigService(
+const configService = createEnsemblrConfigService(
 	isDev ? { configPath: devConfigPath } : {},
 );
 const appSettingsService = createAppSettingsService(
@@ -187,7 +187,7 @@ const agentActivityMonitor = createAgentActivityMonitor({
 	readBattery: readMacosBattery,
 	readSettings: () => appSettingsService.read(),
 });
-const databaseService = createEnsembleDatabaseService(
+const databaseService = createEnsemblrDatabaseService(
 	isDev ? { databasePath: devDatabasePath } : {},
 );
 const localCommandService = createLocalCommandService();
@@ -196,14 +196,14 @@ const environmentVariablesService = createEnvironmentVariablesService({
 	databaseService,
 	secretStoreFactory: createSecretStore,
 });
-const settingsResolutionService = createEnsembleConfigResolutionService({
+const settingsResolutionService = createEnsemblrConfigResolutionService({
 	appSettingsService,
 	configService,
 	databaseService,
 	rootDirectory: isDev ? devRootDirectory : undefined,
 });
 const repositoryConfigService = createRepositoryConfigService();
-const rootDirectoryService = createEnsembleRootDirectoryService({
+const rootDirectoryService = createEnsemblrRootDirectoryService({
 	databaseService,
 	reconcileRootDirectory,
 	settingsResolutionService,
@@ -225,15 +225,15 @@ const piReadinessService = createPiReadinessService({
  * persisted; subscribers may discard frames at will.
  *
  * `kind` lets the renderer scope traffic to user-facing chat vs. internal
- * Ensemble jobs (chat-title generation, session-summary generation). It is
+ * Ensemblr jobs (chat-title generation, session-summary generation). It is
  * derived from the session label so the same broadcast funnel covers both
  * the main client and the summary client.
  */
 const classifyRawFrameKind = (label: string): PiRawFrameKind => {
-	if (label === 'ensemble-chat-title') {
+	if (label === 'ensemblr-chat-title') {
 		return 'title';
 	}
-	if (label === 'ensemble-session-summary') {
+	if (label === 'ensemblr-session-summary') {
 		return 'summary';
 	}
 	if (label === 'pi-agent-session') {

@@ -22,7 +22,7 @@ function getProductRoadmapPath(): string {
 }
 
 /**
- * Builds and installs the Ensemble application menu, with the macOS app menu
+ * Builds and installs the Ensemblr application menu, with the macOS app menu
  * appearing only on darwin platforms.
  */
 export function installApplicationMenu(): void {

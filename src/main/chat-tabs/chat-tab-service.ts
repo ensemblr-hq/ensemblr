@@ -10,7 +10,7 @@ import {
 } from '../../shared/ipc/contracts/workspace-git.ts';
 import { resolveSessionSummaryPath } from '../pi-agent/session-summary-writer.ts';
 import {
-	type EnsembleDatabaseService,
+	type EnsemblrDatabaseService,
 	requireDatabase,
 } from '../storage/database.ts';
 import {
@@ -50,7 +50,7 @@ export interface ChatTabLookups {
 
 /** Dependencies for {@link createChatTabService}. */
 export interface ChatTabServiceOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	lookups: ChatTabLookups;
 }
 

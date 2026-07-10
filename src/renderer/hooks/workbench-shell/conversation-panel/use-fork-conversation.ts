@@ -4,10 +4,10 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 import {
 	createWorkspace,
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	openChatTab,
 	writeForkSummary,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { pickComposerSurname } from '@/renderer/lib/workbench/workspace-name-pool';
 import { useComposerAttachmentDispatcher } from '@/renderer/state/composer';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
@@ -89,7 +89,7 @@ export function useForkConversation({
 					});
 					await attachSummary({ chatTabId: opened.tab.id, upToOrdinal });
 					await queryClient.invalidateQueries({
-						queryKey: ensembleQueryKeys.chatTabs(workspace.id),
+						queryKey: ensemblrQueryKeys.chatTabs(workspace.id),
 					});
 					await navigate({
 						params: {
@@ -142,7 +142,7 @@ export function useForkConversation({
 						upToOrdinal,
 					});
 					await queryClient.invalidateQueries({
-						queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+						queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
 					});
 					await router.invalidate();
 					await navigate({

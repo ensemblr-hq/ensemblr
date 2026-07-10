@@ -8,10 +8,11 @@ const GLYPHS: Record<string, readonly string[]> = {
 	L: ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
 	M: ['10001', '11011', '10101', '10001', '10001', '10001', '10001'],
 	N: ['10001', '11001', '10101', '10011', '10001', '10001', '10001'],
+	R: ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
 	S: ['01111', '10000', '10000', '01110', '00001', '00001', '11110'],
 };
 
-const WORD = 'ENSEMBLE';
+const WORD = 'ENSEMBLR';
 const GLYPH_WIDTH = 5;
 const GLYPH_HEIGHT = 7;
 const LETTER_GAP = 1;
@@ -63,7 +64,7 @@ function buildPixels(): PixelRect[] {
 const PIXELS = buildPixels();
 
 const KEYFRAMES = `
-@keyframes ensemble-wordmark-flicker {
+@keyframes ensemblr-wordmark-flicker {
   0%, 100% { opacity: 1; }
   48% { opacity: 1; }
   49% { opacity: 0.15; }
@@ -167,7 +168,7 @@ export function WelcomeWordmark({ className }: { className?: string }) {
 
 	return (
 		<span
-			aria-label='Ensemble'
+			aria-label='Ensemblr'
 			className={cn(
 				'relative inline-flex h-16 text-foreground sm:h-20',
 				className,
@@ -189,14 +190,14 @@ export function WelcomeWordmark({ className }: { className?: string }) {
 				viewBox={`0 0 ${TOTAL_WIDTH} ${GLYPH_HEIGHT}`}
 				xmlns='http://www.w3.org/2000/svg'
 			>
-				<title>Ensemble</title>
+				<title>Ensemblr</title>
 				{PIXELS.map((pixel) => (
 					<rect
 						fill='currentColor'
 						height={PIXEL_SIZE}
 						key={`${pixel.x}-${pixel.y}`}
 						style={{
-							animation: `ensemble-wordmark-flicker ${pixel.flickerDuration}s linear ${pixel.flickerDelay}s infinite`,
+							animation: `ensemblr-wordmark-flicker ${pixel.flickerDuration}s linear ${pixel.flickerDelay}s infinite`,
 						}}
 						width={PIXEL_SIZE}
 						x={pixel.x + PIXEL_INSET}

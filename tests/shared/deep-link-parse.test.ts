@@ -4,20 +4,20 @@ import { isAllowedExternalUrl, parseDeepLink } from '@/shared/deep-link/parse';
 
 describe('parseDeepLink', () => {
 	test('parses workbench root', () => {
-		expect(parseDeepLink('ensemble://workbench')).toEqual({
+		expect(parseDeepLink('ensemblr://workbench')).toEqual({
 			kind: 'workbench',
 		});
 	});
 
 	test('parses repo', () => {
-		expect(parseDeepLink('ensemble://repo/abc123')).toEqual({
+		expect(parseDeepLink('ensemblr://repo/abc123')).toEqual({
 			kind: 'repo',
 			repositoryId: 'abc123',
 		});
 	});
 
 	test('parses repo settings section', () => {
-		expect(parseDeepLink('ensemble://repo/r1/settings/scripts')).toEqual({
+		expect(parseDeepLink('ensemblr://repo/r1/settings/scripts')).toEqual({
 			kind: 'repo-settings',
 			repositoryId: 'r1',
 			section: 'scripts',
@@ -25,12 +25,12 @@ describe('parseDeepLink', () => {
 	});
 
 	test('rejects unknown repo section', () => {
-		const result = parseDeepLink('ensemble://repo/r1/settings/explode');
+		const result = parseDeepLink('ensemblr://repo/r1/settings/explode');
 		expect(result.kind).toBe('invalid');
 	});
 
 	test('parses workspace + chat', () => {
-		expect(parseDeepLink('ensemble://workspace/repo1/ws1/chat/c1')).toEqual({
+		expect(parseDeepLink('ensemblr://workspace/repo1/ws1/chat/c1')).toEqual({
 			chatId: 'c1',
 			kind: 'workspace-chat',
 			repositoryId: 'repo1',
@@ -39,14 +39,14 @@ describe('parseDeepLink', () => {
 	});
 
 	test('parses linear issue', () => {
-		expect(parseDeepLink('ensemble://linear/THE-161')).toEqual({
+		expect(parseDeepLink('ensemblr://linear/THE-161')).toEqual({
 			kind: 'linear-issue',
 			issueId: 'THE-161',
 		});
 	});
 
 	test('rejects path traversal', () => {
-		const result = parseDeepLink('ensemble://repo/..%2F..%2Fetc%2Fpasswd');
+		const result = parseDeepLink('ensemblr://repo/..%2F..%2Fetc%2Fpasswd');
 		expect(result.kind).toBe('invalid');
 	});
 

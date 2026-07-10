@@ -46,7 +46,7 @@ export function RootDirectoryChangeDialog({
 						<DialogHeader>
 							<DialogTitle>Change root directory</DialogTitle>
 							<DialogDescription>
-								Switch Ensemble to the selected root and reindex/adopt from that
+								Switch Ensemblr to the selected root and reindex/adopt from that
 								filesystem layout after confirmation.
 							</DialogDescription>
 						</DialogHeader>
@@ -90,7 +90,7 @@ export function RootDirectoryChangeContent({
 						Change root directory
 					</h2>
 					<p className='text-muted-foreground text-sm'>
-						Switch Ensemble to the selected root and reindex/adopt from that
+						Switch Ensemblr to the selected root and reindex/adopt from that
 						filesystem layout after confirmation.
 					</p>
 				</div>
@@ -104,7 +104,7 @@ export function RootDirectoryChangeContent({
 							Old root contents are preserved.
 						</p>
 						<p className='mt-1 text-muted-foreground'>
-							Switching changes where Ensemble looks for repos, workspaces, and
+							Switching changes where Ensemblr looks for repos, workspaces, and
 							archived contexts. Reindex/adopt is the default behavior.
 							Migration is a separate action. Delete or cleanup is a separate
 							destructive action.

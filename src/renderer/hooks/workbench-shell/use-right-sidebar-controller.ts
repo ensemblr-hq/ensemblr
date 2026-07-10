@@ -21,7 +21,7 @@ async function ensureWindowCanShowRightSidebar() {
 		return;
 	}
 
-	await window.ensemble?.ensureWindowWidth(RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH);
+	await window.ensemblr?.ensureWindowWidth(RIGHT_SIDEBAR_MIN_VIEWPORT_WIDTH);
 }
 
 /** Clamps a sidebar size percentage to the supported range, defaulting on NaN. */

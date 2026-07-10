@@ -10,25 +10,25 @@ Accepted
 
 Conductor's documented security model is local execution: agents run on the user's Mac with access to files, terminals, and tools available to the user's account. Some actions may ask for approval before continuing. macOS may also prompt when protected locations are accessed. Enterprise data privacy disables features requiring external AI providers.
 
-Ensemble targets Conductor parity and launches a selected Pi-compatible CLI executable in RPC mode for v1. Pi can run tools, load packages/extensions/skills/prompts/themes from the user's Pi environment, and supports restricting tool availability through allowed/excluded tools. The desired default UX is that once the user creates or opens a workspace, the agent can work freely inside that workspace without constant approval prompts.
+Ensemblr targets Conductor parity and launches a selected Pi-compatible CLI executable in RPC mode for v1. Pi can run tools, load packages/extensions/skills/prompts/themes from the user's Pi environment, and supports restricting tool availability through allowed/excluded tools. The desired default UX is that once the user creates or opens a workspace, the agent can work freely inside that workspace without constant approval prompts.
 
 ## Decision
 
-Ensemble will use a workspace-trusted local execution model by default.
+Ensemblr will use a workspace-trusted local execution model by default.
 
 Default behavior:
 
 - A workspace is treated as the user's explicit trust boundary for a task.
 - Pi agents may read, write, edit, search, and run commands from inside the workspace without per-action approval by default.
 - Setup scripts, run scripts, terminals, and Pi tool execution run with the user's local account permissions.
-- Ensemble should avoid interrupting normal in-workspace coding with approval prompts.
+- Ensemblr should avoid interrupting normal in-workspace coding with approval prompts.
 
 Approval or warning boundaries:
 
 - Writes or destructive operations targeting paths outside the workspace.
 - Root directory changes, workspace archive/delete, repository removal, or shared-root migration.
 - PR merge actions and other externally visible irreversible actions.
-- Actions that modify Ensemble app settings, `~/.config/ensemble`, or Ensemble's app database.
+- Actions that modify Ensemblr app settings, `~/.config/ensemblr`, or Ensemblr's app database.
 - Actions that modify Pi global configuration under `~/.pi/agent`, unless initiated through an explicit settings/config flow.
 - Optional stricter modes selected by the user or repository policy.
 
@@ -40,9 +40,9 @@ Permission modes:
 
 Security principles:
 
-- Ensemble must clearly communicate that agents run locally with the user's account permissions.
+- Ensemblr must clearly communicate that agents run locally with the user's account permissions.
 - macOS permission prompts may still appear when protected locations are accessed.
-- Ensemble must preserve Pi environment compatibility by default, including user skills/extensions/plugins/configuration from `~/.pi`.
+- Ensemblr must preserve Pi environment compatibility by default, including user skills/extensions/plugins/configuration from `~/.pi`.
 - Enterprise data privacy must be supported at user and repository levels, following Conductor-compatible semantics where possible.
 
 Implementation guardrails:
@@ -64,11 +64,11 @@ A strict sandbox would reduce risk but would likely break Pi compatibility, loca
 
 ### Disable Pi extensions by default
 
-This would improve isolation but violate the requirement that `~/.pi` skills/extensions/plugins/configuration work inside Ensemble as they do in Pi.
+This would improve isolation but violate the requirement that `~/.pi` skills/extensions/plugins/configuration work inside Ensemblr as they do in Pi.
 
 ## Consequences
 
-- Ensemble matches the expected Conductor-like ergonomics: agents can work freely in a workspace.
+- Ensemblr matches the expected Conductor-like ergonomics: agents can work freely in a workspace.
 - The workspace boundary becomes security-critical and must be explained clearly.
-- CLI RPC v1 improves process isolation versus embedded SDK, but Ensemble still runs local commands and tools with the user's account permissions.
+- CLI RPC v1 improves process isolation versus embedded SDK, but Ensemblr still runs local commands and tools with the user's account permissions.
 - Stricter permission modes remain available for sensitive repositories or review-only workflows.

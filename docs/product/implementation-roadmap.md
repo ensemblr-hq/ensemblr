@@ -10,19 +10,19 @@ V1 builds a Pi-focused Electron desktop app with Conductor-style local workspace
 
 In scope for v1:
 
-- Electron main process, React/TypeScript renderer, TanStack Router, TanStack Query, shadcn/ui, Tailwind, and Ensemble-owned design tokens.
+- Electron main process, React/TypeScript renderer, TanStack Router, TanStack Query, shadcn/ui, Tailwind, and Ensemblr-owned design tokens.
 - Local SQLite database for mutable app metadata and UI/review state.
 - macOS Keychain for secret values, with SQLite storing metadata only.
-- Declarative user config at `~/.config/ensemble/config.json` with JSON schema validation.
-- Default Ensemble root at `~/Ensemble`, with configurable root and shared-root interoperability.
-- Repository config precedence (highest to lowest): the committed `.ensemble/settings.toml`, personal SQLite settings, user defaults, and built-in defaults; `.worktreeinclude` still governs files-to-copy. See ADR 0030.
-- `.worktreeinclude` support and `ENSEMBLE_*` script/env behavior.
+- Declarative user config at `~/.config/ensemblr/config.json` with JSON schema validation.
+- Default Ensemblr root at `~/Ensemblr`, with configurable root and shared-root interoperability.
+- Repository config precedence (highest to lowest): the committed `.ensemblr/settings.toml`, personal SQLite settings, user defaults, and built-in defaults; `.worktreeinclude` still governs files-to-copy. See ADR 0030.
+- `.worktreeinclude` support and `ENSEMBLR_*` script/env behavior.
 - Setup gate requiring git, authenticated `gh`, Pi executable/RPC readiness, root, SQLite, and process environment checks.
 - Pi runtime through selected CLI-compatible executable launched as `--mode rpc` from workspace `cwd`.
 - Preservation of the Pi user environment, including `~/.pi/agent`, project `.pi`, context files, sessions, skills, extensions, prompts, themes, tools, and provider/model configuration.
 - Git worktree workspace creation, workspace adoption from shared Conductor roots, `.context` folder support, and archive lifecycle.
 - xterm.js terminal dock backed by main-process PTY/process supervision.
-- Git-backed checkpoints under `refs/ensemble/checkpoints/<workspace-id>/<turn-id>`.
+- Git-backed checkpoints under `refs/ensemblr/checkpoints/<workspace-id>/<turn-id>`.
 - First-class Linear OAuth integration with issue create/read/update/comment and workspace creation from issues.
 - GitHub PR/check/comment/merge workflows through authenticated `gh` CLI and `gh api`.
 - Settings shell, repository settings, keyboard shortcuts, command palette, deep links, diagnostics, and non-deferred polish.
@@ -38,7 +38,7 @@ Explicitly deferred until post-core:
 - Graphite stack support.
 - Cloud or remote workspace SSH settings.
 - Production React profiler controls.
-- Ensemble account, cloud sync, hosted team features, billing, or app-owned backend services.
+- Ensemblr account, cloud sync, hosted team features, billing, or app-owned backend services.
 
 ## Completed Implementation
 
@@ -122,7 +122,7 @@ These tickets require an interactive session with the user before downstream bui
 
 These are product decisions, not implementation guesses:
 
-- `ENS-069` - Decide whether to support Conductor's remove/soften AI-certainty phrase setting in Ensemble. If supported, decide whether it is Pi output post-processing, a prompt preset, or a settings omission.
+- `ENS-069` - Decide whether to support Conductor's remove/soften AI-certainty phrase setting in Ensemblr. If supported, decide whether it is Pi output post-processing, a prompt preset, or a settings omission.
 - `ENS-068` - Decide which non-deferred experimental settings are v1 scope versus post-core flags, especially workspace/sidebar visibility and sidebar resource usage. Voice, Graphite, cloud/remote SSH, production React profiler, and the five-chat-tab limit are already resolved by ADRs.
 
 If another ticket encounters ambiguity that would alter behavior, create a new Decision Needed item instead of guessing.

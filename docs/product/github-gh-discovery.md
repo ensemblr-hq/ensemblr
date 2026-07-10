@@ -55,8 +55,8 @@ annotations can be added later through
 
 ## Gaps / intentionally unsupported in v1
 
-- Resolving or replying to GitHub review threads from Ensemble (mutation UI
-  deferred; local comments are the Ensemble-native annotation channel).
+- Resolving or replying to GitHub review threads from Ensemblr (mutation UI
+  deferred; local comments are the Ensemblr-native annotation channel).
 - Check-run log excerpts and annotations (extra `gh api` calls; deferred).
 - Reactions, suggested-change application, and multi-account switching.
 
@@ -65,7 +65,7 @@ annotations can be added later through
 - Show GitHub issue comments, review bodies, and review-thread comments
   read-only, clearly labelled with author + source, with resolution state
   badges on threads.
-- Local Ensemble comments/todos (ENS-052) render in distinct sections and are
+- Local Ensemblr comments/todos (ENS-052) render in distinct sections and are
   the only mutable items.
 - Every GitHub item links out via its `url`.
 - Add-to-Pi-context actions accept any comment row (ENS-053).

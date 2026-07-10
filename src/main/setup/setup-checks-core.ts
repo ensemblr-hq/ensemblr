@@ -1,10 +1,10 @@
 import type { EnvironmentVariablesSnapshot } from '../../shared/ipc/contracts/environment';
 import type { SetupCheckLogSnapshot } from '../../shared/ipc/contracts/setup';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsembleConfigService } from '../config/config-loader';
+import type { EnsemblrConfigService } from '../config/config-loader';
 import type { EnvironmentVariablesService } from '../environment/environment-variables';
-import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
-import type { EnsembleDatabaseService } from '../storage/database';
+import type { EnsemblrRootDirectoryService } from '../root/root-directory-service';
+import type { EnsemblrDatabaseService } from '../storage/database';
 import {
 	appendCommandStreamLogs,
 	defineCheck,
@@ -19,13 +19,13 @@ export function getConfigCheck({
 	configService,
 	context,
 }: {
-	configService: EnsembleConfigService;
+	configService: EnsemblrConfigService;
 	context: SetupCheckProviderContext;
 }) {
 	const check = defineCheck<SetupCheckProviderContext>({
 		blocking: true,
 		description:
-			'Loads ~/.config/ensemble/config.json and validates whether config can be trusted before setup continues.',
+			'Loads ~/.config/ensemblr/config.json and validates whether config can be trusted before setup continues.',
 		group: 'core',
 		id: 'config',
 		run: () => {
@@ -143,7 +143,7 @@ export function getDatabaseCheck({
 	formatSafeText,
 }: {
 	context: SetupCheckProviderContext;
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	formatSafeText: SafeTextFormatter;
 }) {
 	const check = defineCheck<SetupCheckProviderContext>({
@@ -193,7 +193,7 @@ export function getDatabaseCheck({
 	return check(context);
 }
 
-/** Builds the snapshot for the Ensemble root-directory setup check. */
+/** Builds the snapshot for the Ensemblr root-directory setup check. */
 export function getRootDirectoryCheck({
 	context,
 	formatSafeText,
@@ -201,12 +201,12 @@ export function getRootDirectoryCheck({
 }: {
 	context: SetupCheckProviderContext;
 	formatSafeText: SafeTextFormatter;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 }) {
 	const check = defineCheck<SetupCheckProviderContext>({
 		blocking: true,
 		description:
-			'Validates the configured Ensemble root directory before repositories and workspaces are created.',
+			'Validates the configured Ensemblr root directory before repositories and workspaces are created.',
 		group: 'storage',
 		id: 'root-directory',
 		run: (ctx) => {
@@ -221,7 +221,7 @@ export function getRootDirectoryCheck({
 			const safePath = formatSafeText(root.path, ctx.homeDirectory);
 			const detail =
 				root.diagnostics[0]?.message ??
-				`Ensemble root is ready at ${safePath}.`;
+				`Ensemblr root is ready at ${safePath}.`;
 
 			return {
 				detail,
@@ -270,7 +270,7 @@ export function getManagedDirectoriesCheck({
 }: {
 	context: SetupCheckProviderContext;
 	formatSafeText: SafeTextFormatter;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 }) {
 	const check = defineCheck<SetupCheckProviderContext>({
 		blocking: true,
@@ -338,7 +338,7 @@ export function getShellProcessCheck({
 		run: async () => {
 			const environment = await localCommandService.getEnvironment();
 			const result = await localCommandService.run({
-				args: ['-lc', 'printf ensemble-process-ok'],
+				args: ['-lc', 'printf ensemblr-process-ok'],
 				command: environment.shell,
 				maxOutputBytes: 1024,
 				timeoutMs: 1500,

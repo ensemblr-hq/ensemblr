@@ -120,7 +120,7 @@ function buildMetadata(
 	const base: PiAgentSessionMetadata = {
 		args: ['--mode', 'rpc'] as const,
 		command: '/usr/local/bin/pi',
-		cwd: '/tmp/ensemble/ws',
+		cwd: '/tmp/ensemblr/ws',
 		env: { LANG: 'en_US.UTF-8' },
 		id: 'session-1',
 		label: 'test session',
@@ -164,7 +164,7 @@ test('spawns the executable with metadata cwd, args, and merged env', async () =
 	const record = firstItem(records);
 	assert.equal(record.command, '/usr/local/bin/pi');
 	assert.deepEqual(record.args, ['--mode', 'rpc']);
-	assert.equal(record.cwd, '/tmp/ensemble/ws');
+	assert.equal(record.cwd, '/tmp/ensemblr/ws');
 	assert.equal(record.env.LANG, 'en_US.UTF-8');
 	await adapter.shutdown();
 });

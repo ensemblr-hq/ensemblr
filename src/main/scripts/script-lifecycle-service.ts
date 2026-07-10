@@ -8,9 +8,9 @@ import {
 	parseWorkspaceScriptSettings,
 	type WorkspaceScriptSettings,
 } from '../../shared/scripts/script-settings.ts';
-import type { EnsembleConfigResolutionService } from '../config/config-resolution';
+import type { EnsemblrConfigResolutionService } from '../config/config-resolution';
 import { isRecord, isString } from '../repository/row-guards.ts';
-import type { EnsembleDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage/database.ts';
 import { selectWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
 import type { TerminalService } from '../terminal';
 
@@ -58,8 +58,8 @@ export interface ScriptLifecycleService {
 
 /** Options for {@link createScriptLifecycleService}. */
 export interface CreateScriptLifecycleServiceOptions {
-	databaseService: EnsembleDatabaseService;
-	settingsResolutionService: EnsembleConfigResolutionService;
+	databaseService: EnsemblrDatabaseService;
+	settingsResolutionService: EnsemblrConfigResolutionService;
 	terminalService: TerminalService;
 }
 

@@ -6,7 +6,7 @@ import { useState } from 'react';
 import {
 	linearIssuesQuery,
 	linearMetadataQuery,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import {

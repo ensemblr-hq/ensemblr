@@ -56,7 +56,7 @@ Implementation notes:
 - Keep native capabilities in Electron main, not the renderer.
 - Leave clear service boundaries for storage, config, root, Pi, terminal, GitHub, and Linear.
 
-## ENS-002 Ensemble Design System Foundation
+## ENS-002 Ensemblr Design System Foundation
 
 Milestone: 1. Foundation
 Type: Frontend
@@ -64,7 +64,7 @@ Priority: P0
 Dependencies: ENS-001
 
 Summary:
-Define the initial Ensemble-owned visual system using shadcn/ui source, Tailwind, and product-specific tokens.
+Define the initial Ensemblr-owned visual system using shadcn/ui source, Tailwind, and product-specific tokens.
 
 Scope:
 - Add shadcn/ui component foundation as owned source.
@@ -79,7 +79,7 @@ Out of scope:
 - Final appearance settings UI.
 
 Acceptance criteria:
-- Core shell components render from Ensemble-owned tokens.
+- Core shell components render from Ensemblr-owned tokens.
 - The style direction is distinct from Conductor and not stock shadcn defaults.
 - Setup-blocked state disables the composer while keeping the workbench visible and surfacing app diagnostics in the left sidebar footer/status area.
 - The lower Setup dock remains reserved for workspace/project setup command output, such as dependency install logs.
@@ -108,7 +108,7 @@ Priority: P0
 Dependencies: ENS-001
 
 Summary:
-Add the local SQLite persistence layer for mutable Ensemble app metadata.
+Add the local SQLite persistence layer for mutable Ensemblr app metadata.
 
 Scope:
 - Create database open/close service under the macOS app-support path.
@@ -121,7 +121,7 @@ Out of scope:
 - Secret value storage.
 
 Acceptance criteria:
-- Database opens at `~/Library/Application Support/com.ensemble.app/ensemble.db` in normal mode.
+- Database opens at `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` in normal mode.
 - Migrations run idempotently.
 - Tests can use an isolated temporary database.
 - Raw secrets are not represented as persistent values in SQLite.
@@ -136,7 +136,7 @@ Source:
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
-- SQLite stores mutable Ensemble metadata and cache only.
+- SQLite stores mutable Ensemblr metadata and cache only.
 - Git, Linear, GitHub, and Pi remain their respective sources of truth.
 
 ## ENS-004 Keychain Secret Store
@@ -185,10 +185,10 @@ Priority: P0
 Dependencies: ENS-001
 
 Summary:
-Load and validate declarative user configuration from `~/.config/ensemble/config.json`.
+Load and validate declarative user configuration from `~/.config/ensemblr/config.json`.
 
 Scope:
-- Add config path resolution for `~/.config/ensemble/config.json`.
+- Add config path resolution for `~/.config/ensemblr/config.json`.
 - Parse strict JSON and report validation errors with file location context where practical.
 - Add a versioned schema stub for app preferences, repository defaults, repository matching rules, environment policy, security preferences, and UI defaults.
 - Expose config status to the renderer.
@@ -228,7 +228,7 @@ Implement source precedence and diagnostics for app-wide and repository settings
 
 Scope:
 - Resolve app settings from managed config, SQLite user settings, config defaults, and built-in defaults.
-- Resolve repository behavior from the committed `.ensemble/settings.toml`, personal SQLite settings, and built-in defaults.
+- Resolve repository behavior from the committed `.ensemblr/settings.toml`, personal SQLite settings, and built-in defaults.
 - Track which source won per field.
 - Expose source diagnostics to settings and setup workflows.
 
@@ -247,7 +247,7 @@ Verification:
 - Snapshot or fixture tests for source diagnostics payloads.
 
 Source:
-- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
+- `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
 - `docs/adr/0008-use-sqlite-with-declarative-user-config.md`
 - `docs/product/settings-inventory.md`
 
@@ -262,10 +262,10 @@ Priority: P0
 Dependencies: ENS-003, ENS-006
 
 Summary:
-Create the Ensemble root-directory service and managed subdirectory layout.
+Create the Ensemblr root-directory service and managed subdirectory layout.
 
 Scope:
-- Default root to `~/Ensemble` unless config/settings override it.
+- Default root to `~/Ensemblr` unless config/settings override it.
 - Create and validate `repos/`, `workspaces/`, and `archived-contexts/`.
 - Persist current root metadata in SQLite and expose absolute paths.
 - Detect missing, unwritable, non-empty, or shared-looking roots.
@@ -337,7 +337,7 @@ Priority: P0
 Dependencies: ENS-003, ENS-007, ENS-008
 
 Summary:
-Build the Conductor-style setup gate model and UI for required Ensemble readiness checks.
+Build the Conductor-style setup gate model and UI for required Ensemblr readiness checks.
 
 Scope:
 - Define stable check IDs, statuses, remediation actions, log references, and retry behavior.
@@ -416,7 +416,7 @@ Summary:
 Discover the Pi-compatible executable and support explicit user overrides.
 
 Scope:
-- Resolve explicit executable path from app settings or `~/.config/ensemble/config.json`.
+- Resolve explicit executable path from app settings or `~/.config/ensemblr/config.json`.
 - Discover `pi` from shell environment and PATH.
 - Check common local binary locations when shell discovery fails.
 - Allow manual selection of executable or wrapper script.
@@ -491,7 +491,7 @@ Priority: P0
 Dependencies: ENS-006, ENS-009
 
 Summary:
-Model Ensemble's local execution trust posture and permission modes.
+Model Ensemblr's local execution trust posture and permission modes.
 
 Scope:
 - Add permission modes: `workspace-trusted`, `approval-required`, and `read-only`.
@@ -556,9 +556,9 @@ Source:
 - `docs/product/screen-inventory.md`
 
 Implementation notes:
-- Do not duplicate Pi-owned provider secrets unless explicitly configured as Ensemble-specific secrets.
+- Do not duplicate Pi-owned provider secrets unless explicitly configured as Ensemblr-specific secrets.
 
-## ENS-015 Repository Config Parser for .ensemble/settings.toml and .worktreeinclude
+## ENS-015 Repository Config Parser for .ensemblr/settings.toml and .worktreeinclude
 
 Milestone: 2. Setup Gate and Configuration
 Type: Backend/main-process
@@ -566,10 +566,10 @@ Priority: P0
 Dependencies: ENS-006, ENS-008
 
 Summary:
-Parse the committed `.ensemble/settings.toml` and `.worktreeinclude` with the single-file precedence and diagnostics.
+Parse the committed `.ensemblr/settings.toml` and `.worktreeinclude` with the single-file precedence and diagnostics.
 
 Scope:
-- Parse the committed `.ensemble/settings.toml` (TOML) from the repository root.
+- Parse the committed `.ensemblr/settings.toml` (TOML) from the repository root.
 - Support shared script fields: `scripts.setup`, `scripts.run`, `scripts.archive`, and `runScriptMode`.
 - Support `enterpriseDataPrivacy` and other supported fields where accepted.
 - Parse `.worktreeinclude` gitignore-style patterns.
@@ -580,7 +580,7 @@ Out of scope:
 - Executing scripts or copying files.
 
 Acceptance criteria:
-- The committed `.ensemble/settings.toml` overrides personal SQLite settings per key; keys it omits fall back to SQLite, then defaults.
+- The committed `.ensemblr/settings.toml` overrides personal SQLite settings per key; keys it omits fall back to SQLite, then defaults.
 - `.worktreeinclude` wins over personal files-to-copy settings when present.
 - Unsupported fields do not crash parsing and are visible in diagnostics.
 
@@ -588,12 +588,12 @@ Verification:
 - Fixture tests for config precedence, invalid JSON, unsupported fields, and `.worktreeinclude` patterns.
 
 Source:
-- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
+- `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
-- Keep all repository fields in the committed `.ensemble/settings.toml`; the app reads it and never writes it.
+- Keep all repository fields in the committed `.ensemblr/settings.toml`; the app reads it and never writes it.
 
 ## ENS-016 Root Switch Reindex/Adopt Flow
 
@@ -682,7 +682,7 @@ Priority: P0
 Dependencies: ENS-007, ENS-015, ENS-020
 
 Summary:
-Register an existing local git repository as an Ensemble project.
+Register an existing local git repository as an Ensemblr project.
 
 Scope:
 - Validate selected local path is a git repository.
@@ -794,7 +794,7 @@ Source:
 - `docs/product/conductor-parity.md`
 
 Implementation notes:
-- Keep Ensemble labels and identity distinct while preserving Conductor-like information architecture.
+- Keep Ensemblr labels and identity distinct while preserving Conductor-like information architecture.
 
 ## ENS-021 Git Worktree Workspace Creation
 
@@ -866,7 +866,7 @@ Verification:
 - Fixture tests with tracked files, ignored files, nested patterns, missing files, and `.worktreeinclude` precedence.
 
 Source:
-- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
+- `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/screen-inventory.md`
 
@@ -927,7 +927,7 @@ Discover and adopt repositories/workspaces from a shared Conductor-style root us
 Scope:
 - Scan `<root>/repos/<repo-slug>` and `<root>/workspaces/<repo-slug>/<workspace-slug>`.
 - Inspect git metadata, worktree relationship, branch, remote, default branch, and PR state where available.
-- Create missing Ensemble SQLite records for valid discovered items.
+- Create missing Ensemblr SQLite records for valid discovered items.
 - Mark adopted workspaces and explain origin in UI.
 - Detect possible active workspace collisions.
 
@@ -936,7 +936,7 @@ Out of scope:
 - Importing Claude/Codex sessions, Conductor local comments, or private terminal state.
 
 Acceptance criteria:
-- Valid Conductor-created worktrees can appear in Ensemble.
+- Valid Conductor-created worktrees can appear in Ensemblr.
 - Unknown files/directories are left untouched.
 - Adoption is idempotent and repairs stale SQLite records where safe.
 - The UI can distinguish created vs adopted workspaces.
@@ -1078,7 +1078,7 @@ Priority: P0
 Dependencies: ENS-003, ENS-026, ENS-027
 
 Summary:
-Persist Ensemble mappings between workspaces, Pi sessions, local tabs, turns, events, and runtime state.
+Persist Ensemblr mappings between workspaces, Pi sessions, local tabs, turns, events, and runtime state.
 
 Scope:
 - Add/update tables for Pi sessions, session branches, events, turns, tab state, runtime state, and workspace links.
@@ -1091,7 +1091,7 @@ Out of scope:
 - Full retry/fork semantics, covered by discovery.
 
 Acceptance criteria:
-- Ensemble can reopen known workspace sessions from local metadata.
+- Ensemblr can reopen known workspace sessions from local metadata.
 - Adopted workspaces can exist without imported Pi sessions.
 - Event history is queryable by workspace and session.
 - Schema supports checkpoint mapping by turn.
@@ -1263,7 +1263,7 @@ Source:
 - `docs/product/ux-parity.md`
 
 Implementation notes:
-- Ensemble-visible continuation can diverge from underlying Pi session history in v1 if clearly explained.
+- Ensemblr-visible continuation can diverge from underlying Pi session history in v1 if clearly explained.
 
 ## ENS-032 Git-Backed Checkpoint Capture
 
@@ -1276,7 +1276,7 @@ Summary:
 Capture private git checkpoints before each Pi user prompt executes.
 
 Scope:
-- Create private refs under `refs/ensemble/checkpoints/<workspace-id>/<turn-id>`.
+- Create private refs under `refs/ensemblr/checkpoints/<workspace-id>/<turn-id>`.
 - Associate checkpoint metadata with workspace, Pi session, turn, and git ref in SQLite.
 - Capture file state before prompt execution.
 - Handle dirty workspaces, untracked files policy, and checkpoint errors safely.
@@ -1293,7 +1293,7 @@ Acceptance criteria:
 
 Verification:
 - Fixture repo tests for clean, dirty, and untracked states.
-- Manual inspect `git show-ref refs/ensemble/checkpoints/...` in a temporary workspace.
+- Manual inspect `git show-ref refs/ensemblr/checkpoints/...` in a temporary workspace.
 
 Source:
 - `docs/adr/0012-use-git-backed-checkpoints-for-pi-turns.md`
@@ -1315,7 +1315,7 @@ Implement checkpoint turn diff and restore behavior for workspace file state.
 Scope:
 - Show diff between checkpoint ref and post-turn workspace state.
 - Restore workspace files to selected checkpoint state.
-- Hide or invalidate later Ensemble-visible messages/events after restore.
+- Hide or invalidate later Ensemblr-visible messages/events after restore.
 - Warn when same-workspace multi-session state may conflict.
 - Do not destructively edit Pi session files.
 
@@ -1325,7 +1325,7 @@ Out of scope:
 
 Acceptance criteria:
 - Users can inspect code changes by turn.
-- Restore affects workspace files and Ensemble-visible continuation state only.
+- Restore affects workspace files and Ensemblr-visible continuation state only.
 - Restore requires confirmation and explains Pi session-history implications.
 - Restore does not delete unrelated user changes outside selected scope.
 
@@ -1535,7 +1535,7 @@ Verification:
 - Manual run setup/rerun/stop in a temporary workspace.
 
 Source:
-- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
+- `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/screen-inventory.md`
 
@@ -1550,15 +1550,15 @@ Priority: P0
 Dependencies: ENS-006, ENS-014, ENS-021, ENS-038
 
 Summary:
-Inject native `ENSEMBLE_*` workspace environment variables into scripts, terminals, and Pi sessions.
+Inject native `ENSEMBLR_*` workspace environment variables into scripts, terminals, and Pi sessions.
 
 Scope:
-- Define `ENSEMBLE_WORKSPACE_NAME`, `ENSEMBLE_WORKSPACE_PATH`, `ENSEMBLE_ROOT_PATH`, `ENSEMBLE_DEFAULT_BRANCH`, `ENSEMBLE_PORT`, and related variables.
+- Define `ENSEMBLR_WORKSPACE_NAME`, `ENSEMBLR_WORKSPACE_PATH`, `ENSEMBLR_ROOT_PATH`, `ENSEMBLR_DEFAULT_BRANCH`, `ENSEMBLR_PORT`, and related variables.
 - Allocate stable workspace port ranges.
 - Include configured environment variables and secrets safely.
 
 Out of scope:
-- Provider-specific Pi secrets not owned by Ensemble.
+- Provider-specific Pi secrets not owned by Ensemblr.
 - Preview URL detection.
 
 Acceptance criteria:
@@ -1571,7 +1571,7 @@ Verification:
 - Integration test script prints non-secret expected variables in a fixture workspace.
 
 Source:
-- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
+- `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
 - `docs/product/conductor-parity.md`
 - `docs/product/settings-inventory.md`
 
@@ -1609,7 +1609,7 @@ Verification:
 - Manual run/start/stop/restart in a fixture workspace.
 
 Source:
-- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
+- `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
 - `docs/product/conductor-parity.md`
 
 Implementation notes:
@@ -1627,7 +1627,7 @@ Discover safe preview URL detection from setup/run output and repository preview
 
 Scope:
 - Evaluate log parsing patterns for localhost/server URLs.
-- Determine how preview templates should expand `ENSEMBLE_*` and compatibility variables.
+- Determine how preview templates should expand `ENSEMBLR_*` and compatibility variables.
 - Identify false positive and privacy risks.
 - Recommend build scope for automatic detection versus explicit template configuration.
 
@@ -1885,7 +1885,7 @@ Priority: P0
 Dependencies: ENS-021, ENS-023, ENS-045, ENS-046
 
 Summary:
-Create an Ensemble workspace from a selected Linear issue and seed workspace context from issue metadata.
+Create an Ensemblr workspace from a selected Linear issue and seed workspace context from issue metadata.
 
 Scope:
 - Add create-workspace action on Linear issue detail/list.
@@ -2072,7 +2072,7 @@ Source:
 - `docs/adr/0008-use-sqlite-with-declarative-user-config.md`
 
 Implementation notes:
-- Prefer GitHub-visible state for cross-app continuity when available; local comments are Ensemble-specific.
+- Prefer GitHub-visible state for cross-app continuity when available; local comments are Ensemblr-specific.
 
 ## ENS-053 Send Review/Check Context to Pi
 
@@ -2355,7 +2355,7 @@ Source:
 - `docs/product/conductor-parity.md`
 
 Implementation notes:
-- Store Pi-specific shared templates in the committed `.ensemble/settings.toml` when shared config is appropriate.
+- Store Pi-specific shared templates in the committed `.ensemblr/settings.toml` when shared config is appropriate.
 
 ## ENS-060 Archive-After-Merge and Branch Cleanup
 
@@ -2453,7 +2453,7 @@ Scope:
 
 Out of scope:
 - Implementing every settings form field.
-- Ensemble account/sign-in.
+- Ensemblr account/sign-in.
 
 Acceptance criteria:
 - Settings shell can switch app and repository sections.
@@ -2493,7 +2493,7 @@ Scope:
 - Advanced settings for root and Pi executable paths.
 
 Out of scope:
-- Ensemble account sign-in.
+- Ensemblr account sign-in.
 - GitHub token field; GitHub auth remains owned by `gh`.
 - Voice, Graphite, cloud SSH, and production React profiler controls.
 
@@ -2510,7 +2510,7 @@ Verification:
 Source:
 - `docs/product/settings-inventory.md`
 - `docs/product/screen-inventory.md`
-- `docs/adr/0019-defer-ensemble-account-for-v1.md`
+- `docs/adr/0019-defer-ensemblr-account-for-v1.md`
 - `docs/adr/0024-use-linear-oauth-for-v1-issue-integration.md`
 
 Implementation notes:
@@ -2529,8 +2529,8 @@ Implement repository settings forms and source diagnostics for paths, branch, re
 Scope:
 - Repository identity/path, branch source, remote origin, branch naming, preview template, files-to-copy, scripts, run mode, create shared config file, spotlight flag, action preferences, archive/remove actions.
 - Show which source won per field.
-- Write personal overrides to SQLite; the shared `.ensemble/settings.toml` is committed by hand and read-only to the app.
-- Show source diagnostics, including when the committed `.ensemble/settings.toml` overrides a SQLite value.
+- Write personal overrides to SQLite; the shared `.ensemblr/settings.toml` is committed by hand and read-only to the app.
+- Show source diagnostics, including when the committed `.ensemblr/settings.toml` overrides a SQLite value.
 
 Out of scope:
 - Building spotlight behavior before discovery.
@@ -2539,7 +2539,7 @@ Out of scope:
 Acceptance criteria:
 - Users can inspect and edit repository overrides.
 - Source precedence is visible and correct.
-- Personal edits persist to SQLite; the app never writes the committed `.ensemble/settings.toml`.
+- Personal edits persist to SQLite; the app never writes the committed `.ensemblr/settings.toml`.
 - Remove repository distinguishes app record removal from deleting files.
 
 Verification:
@@ -2549,7 +2549,7 @@ Verification:
 Source:
 - `docs/product/settings-inventory.md`
 - `docs/product/screen-inventory.md`
-- `docs/adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md`
+- `docs/adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md`
 
 Implementation notes:
 - Never move/delete repository or workspace directories from normal settings edits.
@@ -2576,7 +2576,7 @@ Out of scope:
 Acceptance criteria:
 - Preferences update previews immediately.
 - Settings persist and apply to relevant surfaces.
-- Defaults use Ensemble visual identity and tokens.
+- Defaults use Ensemblr visual identity and tokens.
 - Accessibility variants maintain readable contrast.
 
 Verification:
@@ -2599,7 +2599,7 @@ Priority: P1
 Dependencies: ENS-020, ENS-023, ENS-037, ENS-057, ENS-061
 
 Summary:
-Implement global command palette and keyboard shortcuts for core Ensemble workflows.
+Implement global command palette and keyboard shortcuts for core Ensemblr workflows.
 
 Scope:
 - Command palette with project, workspace, chat, review, Git, terminal, settings, and navigation actions.
@@ -2630,7 +2630,7 @@ Source:
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
-- Use Ensemble-specific labels while preserving workflow semantics.
+- Use Ensemblr-specific labels while preserving workflow semantics.
 
 ## ENS-066 Deep Links and External-Open Actions
 
@@ -2640,10 +2640,10 @@ Priority: P1
 Dependencies: ENS-020, ENS-021, ENS-046, ENS-057
 
 Summary:
-Implement Ensemble URL scheme/deep links and external-open actions for workspaces, repositories, files, PRs, Linear issues, and local folders.
+Implement Ensemblr URL scheme/deep links and external-open actions for workspaces, repositories, files, PRs, Linear issues, and local folders.
 
 Scope:
-- Register and handle Ensemble deep-link scheme in development/runtime where supported.
+- Register and handle Ensemblr deep-link scheme in development/runtime where supported.
 - Open app to repository, workspace, Linear issue link, PR/checks state, or file selection.
 - External-open actions for GitHub PR, Linear issue, preview URL, workspace folder, repository folder, and the current open-workspace launcher targets.
 - Validate inputs and avoid unsafe path traversal.
@@ -2707,7 +2707,7 @@ Source:
 - `docs/product/docs-consistency-audit.md`
 
 Implementation notes:
-- Ensemble can ask users to use Help/Feedback later, but logs should be locally useful first.
+- Ensemblr can ask users to use Help/Feedback later, but logs should be locally useful first.
 
 ## ENS-068 Resource Usage, Sidebar, and Experimental Flag Discovery
 
@@ -2756,12 +2756,12 @@ Priority: P2
 Dependencies: ENS-030, ENS-062
 
 Summary:
-Decide whether Ensemble should support Conductor's remove/soften AI-certainty phrase setting.
+Decide whether Ensemblr should support Conductor's remove/soften AI-certainty phrase setting.
 
 Scope:
 - Evaluate whether the setting makes sense for Pi output.
 - If supported, choose between Pi output post-processing, prompt preset, repository/user instruction, or another mechanism.
-- If omitted, document why it is not part of Ensemble v1.
+- If omitted, document why it is not part of Ensemblr v1.
 - Update settings inventory/open decisions after decision.
 
 Out of scope:
@@ -2835,7 +2835,7 @@ Scope:
 Out of scope:
 - Replacing required `gh` in v1.
 - Building an app-owned GitHub OAuth/API client.
-- Storing GitHub tokens in Ensemble.
+- Storing GitHub tokens in Ensemblr.
 
 Acceptance criteria:
 - Deferred status is explicit.

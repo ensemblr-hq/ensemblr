@@ -2,10 +2,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 
 import {
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	piSessionsForWorkspaceQuery,
 	subscribePiSessionEvents,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 
 /**
  * Reports whether any Pi session attached to `workspaceId` is currently
@@ -35,7 +35,7 @@ export function useWorkspacePiBusy(workspaceId: string): boolean {
 				return;
 			}
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
+				queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
 			});
 		});
 		return unsubscribe;

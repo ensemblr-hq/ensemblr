@@ -120,7 +120,7 @@ export interface TerminalLifecycleBroadcast {
 	workspaceId: string;
 }
 
-/** Terminal slice of the `window.ensemble` API. */
+/** Terminal slice of the `window.ensemblr` API. */
 export interface TerminalApi {
 	createTerminalSession: (
 		request: CreateTerminalSessionRequest,

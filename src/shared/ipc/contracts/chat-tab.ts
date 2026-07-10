@@ -116,7 +116,7 @@ export interface ListClosedChatTabsWithSummaryResult {
 /**
  * Chat-tab IPC surface (open / close / restore / bind to Pi session, plus list
  * queries). CHAT-FRAGILE — keep these signatures byte-for-byte identical to
- * the legacy `EnsembleApi` slice; renderer state-machines depend on them.
+ * the legacy `EnsemblrApi` slice; renderer state-machines depend on them.
  */
 export interface ChatTabApi {
 	bindPiSessionToChatTab: (

@@ -124,8 +124,8 @@ The generated lifecycle is preserved, while `ENS-001` requires native lifecycle/
 
 ### Preload and IPC
 
-- Replaced the generated placeholder preload with `contextBridge.exposeInMainWorld('ensemble', api)`.
-- Added `window.ensemble.health()` backed by `ipcMain.handle`.
+- Replaced the generated placeholder preload with `contextBridge.exposeInMainWorld('ensemblr', api)`.
+- Added `window.ensemblr.health()` backed by `ipcMain.handle`.
 
 Reason:
 `ENS-001` acceptance criteria require the renderer to call a typed no-op IPC health endpoint.
@@ -140,15 +140,15 @@ Reason:
 - Added Tailwind v4 CSS tokens and placeholder UI styling.
 
 Reason:
-`ENS-001` requires basic routing between app shell, setup gate placeholder, workspace shell placeholder, and settings placeholder. ADR 0001 requires React, Tailwind, and a compact Ensemble-owned UI direction.
+`ENS-001` requires basic routing between app shell, setup gate placeholder, workspace shell placeholder, and settings placeholder. ADR 0001 requires React, Tailwind, and a compact Ensemblr-owned UI direction.
 
 ### Conductor Configuration
 
 > **Historical (2026-06-04):** This dated snapshot predates the single-file
-> repository config model. Ensemble no longer reads `conductor.json` or
+> repository config model. Ensemblr no longer reads `conductor.json` or
 > `CONDUCTOR_*`; the sole on-disk repository config is the committed
-> `.ensemble/settings.toml`, and workspace variables are `ENSEMBLE_*` only. See
-> [ADR 0030](../adr/0030-use-ensemble-settings-toml-as-sole-repository-config.md).
+> `.ensemblr/settings.toml`, and workspace variables are `ENSEMBLR_*` only. See
+> [ADR 0030](../adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md).
 > The `conductor.json` / `CONDUCTOR_PORT` details below are retained as a record
 > of the original scaffold.
 

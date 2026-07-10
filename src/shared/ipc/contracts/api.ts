@@ -28,12 +28,12 @@ import type { RepositorySourcesApi } from './workspace-sources';
 /**
  * Aggregate IPC surface exposed to the renderer through the preload bridge.
  *
- * Each per-domain sub-API owns its slice of `window.ensemble` (workspaces, Pi
+ * Each per-domain sub-API owns its slice of `window.ensemblr` (workspaces, Pi
  * sessions, clone progress, etc.). Composing them here keeps the channel
  * registry's 1:1 method-name mapping intact while letting each domain evolve
  * its contract next to the wire types it depends on.
  */
-export interface EnsembleApi
+export interface EnsemblrApi
 	extends AppSettingsApi,
 		WorkspaceApi,
 		RepositoryApi,

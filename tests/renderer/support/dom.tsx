@@ -28,12 +28,12 @@ export function renderWithProviders(
 	return { ...result, client };
 }
 
-/** Installs a stub `window.ensemble` bridge so isEnsembleApiAvailable() is true. */
-export function installEnsembleApi(api: Record<string, unknown>): void {
-	(window as unknown as { ensemble: unknown }).ensemble = api;
+/** Installs a stub `window.ensemblr` bridge so isEnsemblrApiAvailable() is true. */
+export function installEnsemblrApi(api: Record<string, unknown>): void {
+	(window as unknown as { ensemblr: unknown }).ensemblr = api;
 }
 
 /** Removes the stub bridge so a later test starts without one. */
-export function clearEnsembleApi(): void {
-	(window as unknown as { ensemble?: unknown }).ensemble = undefined;
+export function clearEnsemblrApi(): void {
+	(window as unknown as { ensemblr?: unknown }).ensemblr = undefined;
 }

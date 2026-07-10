@@ -4,7 +4,7 @@ export type SettingsResolutionSource =
 	| 'built-in-default'
 	| 'config-default'
 	| 'managed-config'
-	| 'ensemble-config'
+	| 'ensemblr-config'
 	| 'sqlite'
 	| 'user-default'
 	| 'worktreeinclude';
@@ -42,7 +42,7 @@ export interface SettingsResolutionGroupSnapshot {
 
 /** Request to resolve effective settings for a specific repository. */
 export interface RepositorySettingsResolutionRequest {
-	ensembleConfig?: Record<string, unknown>;
+	ensemblrConfig?: Record<string, unknown>;
 	repositoryId: string;
 	repositoryPath?: string;
 }

@@ -2,9 +2,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
 import {
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	stopPiSession,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 
 /**
  * Returns a stop-by-id callback that aborts an arbitrary Pi session's in-flight
@@ -23,7 +23,7 @@ export function useStopPiSession(
 		mutationFn: (sessionId: string) => stopPiSession({ sessionId }),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
+				queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
 			});
 		},
 	});

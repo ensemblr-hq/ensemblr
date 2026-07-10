@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 
-import { reviewMergeSettingsQuery } from '@/renderer/api/ensemble-queries';
+import { reviewMergeSettingsQuery } from '@/renderer/api/ensemblr-queries';
 import { useAgentActionRunner } from '@/renderer/hooks/workbench-shell/review-actions/use-agent-action-runner';
 import { usePullRequestRefresh } from '@/renderer/hooks/workbench-shell/review-actions/use-pull-request-refresh';
 import { useReviewMutations } from '@/renderer/hooks/workbench-shell/review-actions/use-review-mutations';

@@ -6,13 +6,13 @@ import type {
 	SetupDiagnosticsSnapshot,
 } from '../../shared/ipc/contracts/setup';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsembleConfigService } from '../config/config-loader';
+import type { EnsemblrConfigService } from '../config/config-loader';
 import type { EnvironmentVariablesService } from '../environment/environment-variables';
 import type { LinearAuthService } from '../linear';
 import type { PiExecutableService } from '../pi-runtime/pi-executable';
 import type { PiReadinessService } from '../pi-runtime/pi-readiness';
-import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
-import type { EnsembleDatabaseService } from '../storage/database';
+import type { EnsemblrRootDirectoryService } from '../root/root-directory-service';
+import type { EnsemblrDatabaseService } from '../storage/database';
 import type { SetupCheckProvider } from './setup-check-context.ts';
 import {
 	getConfigCheck,
@@ -43,8 +43,8 @@ export interface SetupDiagnosticsService {
 /** Options for {@link createSetupDiagnosticsService}. */
 interface CreateSetupDiagnosticsServiceOptions {
 	checkProviders?: Partial<Record<SetupCheckId, SetupCheckProvider>>;
-	configService: EnsembleConfigService;
-	databaseService: EnsembleDatabaseService;
+	configService: EnsemblrConfigService;
+	databaseService: EnsemblrDatabaseService;
 	environmentVariablesService: EnvironmentVariablesService;
 	homeDirectory?: string;
 	linearAuthService: LinearAuthService;
@@ -52,7 +52,7 @@ interface CreateSetupDiagnosticsServiceOptions {
 	now?: () => Date;
 	piExecutableService: PiExecutableService;
 	piReadinessService: PiReadinessService;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
 const SETUP_CHECK_ORDER: readonly SetupCheckId[] = [

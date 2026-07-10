@@ -15,7 +15,7 @@ import type {
 	WriteSessionSummaryInput,
 } from '../../src/main/pi-agent/session-summary-writer.ts';
 import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import {
 	getChatTabById,
 	listOpenChatTabs,
@@ -28,8 +28,8 @@ function openFixture(t: import('node:test').TestContext): {
 	database: DatabaseSync;
 	workspaceId: string;
 } {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-pi-svc-'));
-	const connection = openEnsembleDatabase({
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-pi-svc-'));
+	const connection = openEnsemblrDatabase({
 		databasePath: path.join(directory, 'pi-svc-test.db'),
 	});
 	t.after(() => {
@@ -38,9 +38,9 @@ function openFixture(t: import('node:test').TestContext): {
 	});
 	connection.database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-svc', 'svc', 'Svc', '/tmp/ensemble/svc', 'main');
+VALUES ('repo-svc', 'svc', 'Svc', '/tmp/ensemblr/svc', 'main');
 INSERT INTO workspaces (id, repository_id, slug, name, path)
-VALUES ('ws-svc', 'repo-svc', 'svc', 'Svc', '/tmp/ensemble/svc/ws');
+VALUES ('ws-svc', 'repo-svc', 'svc', 'Svc', '/tmp/ensemblr/svc/ws');
 `);
 	return { database: connection.database, workspaceId: 'ws-svc' };
 }
@@ -121,7 +121,7 @@ test('openSession persists a pi_sessions row plus a main branch', async (t) => {
 	const snapshot = await service.openSession({
 		executable: createReadyExecutable(),
 		label: 'first chat',
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 
@@ -148,7 +148,7 @@ test('openSession binds an existing chat tab without opening a duplicate', async
 		chatTabId: tab.id,
 		executable: createReadyExecutable(),
 		label: 'bound chat',
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 	const tabs = listOpenChatTabs({
@@ -172,7 +172,7 @@ test('chat title timeout uses first prompt words as fallback', async (t) => {
 	const snapshot = await service.openSession({
 		executable: createReadyExecutable(),
 		initialPrompt: 'Fix flaky tests in setup diagnostics now',
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 
@@ -195,7 +195,7 @@ test('openSession persists and launches with a native Pi session id', async (t) 
 
 	const snapshot = await service.openSession({
 		executable: createReadyExecutable(),
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 
@@ -219,7 +219,7 @@ test('openSession resumes a closed persisted session before submit', async (t) =
 
 	const first = await service.openSession({
 		executable: createReadyExecutable(),
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 	const nativeSessionId = first.piSessionId;
@@ -228,7 +228,7 @@ test('openSession resumes a closed persisted session before submit', async (t) =
 	const resumed = await service.openSession({
 		executable: createReadyExecutable(),
 		resumeSessionId: first.id,
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 	await service.submitPrompt({
@@ -249,7 +249,7 @@ test('submitPrompt creates a turn and forwards to the runtime session', async (t
 
 	const snapshot = await service.openSession({
 		executable: createReadyExecutable(),
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 	const ack = await service.submitPrompt({
@@ -273,7 +273,7 @@ test('runtime events are mirrored into pi_session_events', async (t) => {
 
 	const snapshot = await service.openSession({
 		executable: createReadyExecutable(),
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 	await service.submitPrompt({
@@ -317,7 +317,7 @@ test('writes the chat summary at the turn boundary, not mid-turn', async (t) => 
 
 	const snapshot = await service.openSession({
 		executable: createReadyExecutable(),
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 	await service.submitPrompt({
@@ -361,7 +361,7 @@ test('writes the chat summary at the turn boundary, not mid-turn', async (t) => 
 		? getChatTabById({ database: fixture.database, id: tabId })
 		: null;
 	assert.deepEqual(tab?.metadata.summary, {
-		path: `/tmp/ensemble/svc/ws/.context/sessions/${tabId}.md`,
+		path: `/tmp/ensemblr/svc/ws/.context/sessions/${tabId}.md`,
 		title: 'Live summary',
 		usedLlm: false,
 	});
@@ -386,7 +386,7 @@ test('stopSession flushes the owed summary before closing', async (t) => {
 
 	const snapshot = await service.openSession({
 		executable: createReadyExecutable(),
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 	await service.submitPrompt({ prompt: 'work', sessionId: snapshot.id });
@@ -416,7 +416,7 @@ test('stopSession aborts the runtime and marks the turn aborted', async (t) => {
 
 	const snapshot = await service.openSession({
 		executable: createReadyExecutable(),
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 	await service.submitPrompt({
@@ -435,7 +435,7 @@ test('listSessionsForWorkspace returns active and persisted sessions', async (t)
 
 	await service.openSession({
 		executable: createReadyExecutable(),
-		workspaceCwd: '/tmp/ensemble/svc/ws',
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
 		workspaceId: fixture.workspaceId,
 	});
 	const sessions = service.listSessionsForWorkspace(fixture.workspaceId);

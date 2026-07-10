@@ -9,9 +9,9 @@ export const LINEAR_REVOKE_URL = 'https://api.linear.app/oauth/revoke';
 /** Default OAuth scopes requested when the config does not override them. */
 export const DEFAULT_LINEAR_SCOPES: readonly string[] = ['read', 'write'];
 /**
- * Client id of the Linear OAuth application bundled with Ensemble so users can
+ * Client id of the Linear OAuth application bundled with Ensemblr so users can
  * connect without registering their own app. PKCE-only public client — no
- * client secret ships with the build. `app.linear.clientId` in the Ensemble
+ * client secret ships with the build. `app.linear.clientId` in the Ensemblr
  * config always overrides it; empty until the shared app is registered.
  */
 export const BUILT_IN_LINEAR_CLIENT_ID = '0206138b2824f086f7e5ec80288a7501';

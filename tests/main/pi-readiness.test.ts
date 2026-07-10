@@ -41,7 +41,7 @@ interface FakeCommandOutcome {
 }
 
 function createDirectoryFixture(t: TestContext): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-pi-ready-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-pi-ready-'));
 
 	t.after(() => {
 		try {
@@ -238,7 +238,7 @@ test('reports inaccessible Pi agent directory permissions', (t) => {
 	}
 
 	const homeDirectory = mkdtempSync(
-		path.join(tmpdir(), 'ensemble-pi-ready-permissions-'),
+		path.join(tmpdir(), 'ensemblr-pi-ready-permissions-'),
 	);
 	const agentDirectoryPath = path.join(homeDirectory, '.pi', 'agent');
 	t.after(() => {
@@ -420,7 +420,7 @@ test('does not run Pi RPC smoke when executable discovery failed', async () => {
 			status: 'error',
 		}),
 		now: () => NOW,
-		smokeWorkspace: { path: '/tmp/ensemble-smoke' },
+		smokeWorkspace: { path: '/tmp/ensemblr-smoke' },
 	});
 
 	assert.equal(snapshot.status, 'failure');

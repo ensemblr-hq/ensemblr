@@ -2,10 +2,10 @@ import type { QueryClient } from '@tanstack/react-query';
 
 import {
 	healthQuery,
-	isEnsembleApiAvailable,
+	isEnsemblrApiAvailable,
 	repositoryWorkspaceNavigationQuery,
 	setupDiagnosticsQuery,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { shellFixtureProjects } from '@/renderer/fixtures/workbench';
 import type { WorkbenchShellData } from '@/renderer/types/workbench';
 import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
@@ -27,7 +27,7 @@ import {
 export async function loadWorkbenchShellData(
 	queryClient: QueryClient,
 ): Promise<WorkbenchShellData> {
-	if (!isEnsembleApiAvailable()) {
+	if (!isEnsemblrApiAvailable()) {
 		return loadFixtureShellData();
 	}
 

@@ -11,7 +11,7 @@ import {
 	useState,
 } from 'react';
 
-import { readWorkspaceDirectory } from '@/renderer/api/ensemble-queries';
+import { readWorkspaceDirectory } from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	ContextMenu,

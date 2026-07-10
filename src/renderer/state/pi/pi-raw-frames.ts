@@ -1,7 +1,7 @@
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
 
-import { subscribePiRawFrames } from '@/renderer/api/ensemble-queries';
+import { subscribePiRawFrames } from '@/renderer/api/ensemblr-queries';
 import type { PiRawFrameBroadcast } from '@/shared/ipc/contracts/pi-session';
 
 /**

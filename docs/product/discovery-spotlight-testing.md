@@ -4,7 +4,7 @@ Status: discovery complete — recommendation: defer to post-core. 2026-06-11.
 
 ## Question
 
-Can Ensemble offer Conductor-style "spotlight testing" — running a workspace's
+Can Ensemblr offer Conductor-style "spotlight testing" — running a workspace's
 changes inside the root checkout's app process — without overwriting root
 changes or breaking workspace isolation?
 
@@ -13,8 +13,8 @@ changes or breaking workspace isolation?
 Spotlight testing points the *root* repository checkout at a *workspace*'s
 changes so a long-running root app (dev server, simulator build) picks them up
 without restarting from the worktree. Conductor exposes a `spotlight_testing` config
-key. In Ensemble's single-file model, any such key would live in the committed
-`.ensemble/settings.toml`; it is unused today.
+key. In Ensemblr's single-file model, any such key would live in the committed
+`.ensemblr/settings.toml`; it is unused today.
 
 ## Candidate sync strategies
 
@@ -23,7 +23,7 @@ key. In Ensemble's single-file model, any such key would live in the committed
      uncommitted changes. Worst blast radius.
 2. **Working-tree overlay: copy changed files workspace → root.**
    - `git -C <workspace> diff --name-only <base>` drives a file copy set.
-   - Reversible only if Ensemble snapshots the overwritten root files first.
+   - Reversible only if Ensemblr snapshots the overwritten root files first.
    - Conflicts: root-dirty files in the copy set must hard-stop the operation.
 3. **Patch application: `git diff` in workspace, `git apply` in root.**
    - Atomic-ish (apply fails as a unit on conflict), easy to invert with

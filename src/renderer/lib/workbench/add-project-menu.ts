@@ -34,7 +34,7 @@ const ADD_PROJECT_ACTION_DEFINITIONS: readonly AddProjectActionDefinition[] = [
 		label: 'Open local project',
 		requiredCheckIds: ['root-directory'],
 		unavailableReason:
-			'Set a writable Ensemble root directory before opening local projects.',
+			'Set a writable Ensemblr root directory before opening local projects.',
 	},
 	{
 		id: 'open-github',
@@ -48,7 +48,7 @@ const ADD_PROJECT_ACTION_DEFINITIONS: readonly AddProjectActionDefinition[] = [
 		label: 'Quick start',
 		requiredCheckIds: ['root-directory'],
 		unavailableReason:
-			'Set a writable Ensemble root directory before starting a new project.',
+			'Set a writable Ensemblr root directory before starting a new project.',
 	},
 ];
 

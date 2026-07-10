@@ -5,10 +5,10 @@ import { useState } from 'react';
 import {
 	cancelLinearLogin,
 	disconnectLinear,
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	linearConnectionQuery,
 	startLinearLogin,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { Badge } from '@/renderer/components/ui/badge';
@@ -43,12 +43,12 @@ function LinearConnectionRow() {
 				result?.status === 'error' ? result.failure.message : null,
 			);
 			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.linearConnection(),
+				queryKey: ensemblrQueryKeys.linearConnection(),
 			});
 		},
 		onSuccess: () =>
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.linearConnection(),
+				queryKey: ensemblrQueryKeys.linearConnection(),
 			}),
 	});
 
@@ -59,12 +59,12 @@ function LinearConnectionRow() {
 				result?.status === 'error' ? result.failure.message : null,
 			);
 			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.linearConnection(),
+				queryKey: ensemblrQueryKeys.linearConnection(),
 			});
 		},
 		onSuccess: () =>
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.linearConnection(),
+				queryKey: ensemblrQueryKeys.linearConnection(),
 			}),
 	});
 
@@ -72,11 +72,11 @@ function LinearConnectionRow() {
 		mutationFn: cancelLinearLogin,
 		onSettled: () =>
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.linearConnection(),
+				queryKey: ensemblrQueryKeys.linearConnection(),
 			}),
 		onSuccess: () =>
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.linearConnection(),
+				queryKey: ensemblrQueryKeys.linearConnection(),
 			}),
 	});
 
@@ -211,10 +211,10 @@ function describeLinearConnection(
 			return identity ? `Connected as ${identity}.` : 'Connected to Linear.';
 		}
 		case 'not-configured':
-			return 'Add app.linear.clientId to ~/.config/ensemble/config.json to enable Linear sign-in. Linear is optional for local and GitHub-only workflows.';
+			return 'Add app.linear.clientId to ~/.config/ensemblr/config.json to enable Linear sign-in. Linear is optional for local and GitHub-only workflows.';
 		case 'reconnect-required':
 			return 'The stored Linear token expired and cannot be refreshed automatically. Reconnect to continue using Linear workflows.';
 		default:
-			return 'Connect Linear to browse issues, manage them from Ensemble, and create workspaces from issues.';
+			return 'Connect Linear to browse issues, manage them from Ensemblr, and create workspaces from issues.';
 	}
 }

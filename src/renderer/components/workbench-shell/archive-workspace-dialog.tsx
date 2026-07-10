@@ -2,8 +2,8 @@ import { useCallback, useState } from 'react';
 
 import {
 	archiveWorkspace,
-	isEnsembleApiAvailable,
-} from '@/renderer/api/ensemble-queries';
+	isEnsemblrApiAvailable,
+} from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import { Checkbox } from '@/renderer/components/ui/checkbox';
 import {
@@ -69,7 +69,7 @@ function ArchiveWorkspaceDialogForm({
 		[],
 	);
 
-	const canArchive = stage !== 'archiving' && isEnsembleApiAvailable();
+	const canArchive = stage !== 'archiving' && isEnsemblrApiAvailable();
 	const hasBranch = Boolean(workspace.branchName);
 
 	const handleArchive = useCallback(async () => {

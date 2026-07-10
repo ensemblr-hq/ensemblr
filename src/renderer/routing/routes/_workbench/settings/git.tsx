@@ -122,7 +122,7 @@ function GitSettings() {
 				control={
 					<Switch checked={setUpstream} onCheckedChange={setSetUpstream} />
 				}
-				description='Configure new Ensemble workspaces so plain `git push` sets a branch upstream. Turning this off avoids writing Git worktree config, but PR info may be less reliable until branches have an upstream.'
+				description='Configure new Ensemblr workspaces so plain `git push` sets a branch upstream. Turning this off avoids writing Git worktree config, but PR info may be less reliable until branches have an upstream.'
 				label='Set upstream on plain `git push`'
 				modified={setUpstream !== DEFAULTS.setUpstreamOnPush}
 			/>

@@ -4,12 +4,12 @@ import { RefreshCwIcon } from 'lucide-react';
 import { useMemo } from 'react';
 
 import {
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	linearConnectionQuery,
 	linearIssueQuery,
 	linearMetadataQuery,
 	updateLinearIssue,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -160,7 +160,7 @@ function SetStatusMenu({ issue }: { issue: LinearIssueWire }) {
 				return;
 			}
 			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.linearIssue(issue.id),
+				queryKey: ensemblrQueryKeys.linearIssue(issue.id),
 			});
 		},
 	});

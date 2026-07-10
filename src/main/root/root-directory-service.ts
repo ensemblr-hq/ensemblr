@@ -4,8 +4,8 @@ import type {
 	RootDirectoryChangeRequest,
 	RootDirectorySnapshot,
 } from '../../shared/ipc/contracts/root-directory';
-import type { EnsembleConfigResolutionService } from '../config/config-resolution';
-import type { EnsembleDatabaseService } from '../storage/database';
+import type { EnsemblrConfigResolutionService } from '../config/config-resolution';
+import type { EnsemblrDatabaseService } from '../storage/database';
 import { ensureRootDirectory } from './root-directory.ts';
 import {
 	applyRootDirectoryChange,
@@ -13,8 +13,8 @@ import {
 	type RootDirectoryReconciler,
 } from './root-directory-change.ts';
 
-/** Public surface of the Ensemble root-directory service. */
-export interface EnsembleRootDirectoryService {
+/** Public surface of the Ensemblr root-directory service. */
+export interface EnsemblrRootDirectoryService {
 	applyChange: (
 		request: RootDirectoryChangeRequest,
 	) => RootDirectoryChangeApplyResult;
@@ -23,27 +23,27 @@ export interface EnsembleRootDirectoryService {
 	previewChange: (nextRootPath: string) => RootDirectoryChangePreview;
 }
 
-interface CreateEnsembleRootDirectoryServiceOptions {
+interface CreateEnsemblrRootDirectoryServiceOptions {
 	allowCreate?: boolean;
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	homeDirectory?: string;
 	now?: () => Date;
 	reconcileRootDirectory?: RootDirectoryReconciler;
-	settingsResolutionService: EnsembleConfigResolutionService;
+	settingsResolutionService: EnsemblrConfigResolutionService;
 }
 
 /**
- * Builds the root-directory service that ensures the Ensemble root exists,
+ * Builds the root-directory service that ensures the Ensemblr root exists,
  * exposes change preview/apply, and caches the last snapshot for callers.
  */
-export function createEnsembleRootDirectoryService({
+export function createEnsemblrRootDirectoryService({
 	allowCreate = true,
 	databaseService,
 	homeDirectory,
 	now,
 	reconcileRootDirectory,
 	settingsResolutionService,
-}: CreateEnsembleRootDirectoryServiceOptions): EnsembleRootDirectoryService {
+}: CreateEnsemblrRootDirectoryServiceOptions): EnsemblrRootDirectoryService {
 	let snapshot: RootDirectorySnapshot | null = null;
 
 	function ensure(): RootDirectorySnapshot {

@@ -2,10 +2,10 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-	ensembleQueryKeys,
-	isEnsembleApiAvailable,
+	ensemblrQueryKeys,
+	isEnsemblrApiAvailable,
 	renameWorkspace,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { queryClient } from '@/renderer/api/query-client';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -82,7 +82,7 @@ function RenameWorkspaceDialogForm({
 		trimmedName.length > 0 &&
 		localValidation === null &&
 		!isUnchanged &&
-		isEnsembleApiAvailable();
+		isEnsemblrApiAvailable();
 
 	const handleRename = useCallback(async () => {
 		if (!canRename) {
@@ -101,7 +101,7 @@ function RenameWorkspaceDialogForm({
 
 		if (result.status === 'success' && result.workspace) {
 			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+				queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
 			});
 			toast.success(
 				`Renamed to ${result.workspace.name} on branch ${result.workspace.branchName}.`,

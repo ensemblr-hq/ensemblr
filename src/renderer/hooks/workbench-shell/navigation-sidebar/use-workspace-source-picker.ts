@@ -6,7 +6,7 @@ import {
 	repositoryBranchesQuery,
 	repositoryIssuesQuery,
 	repositoryPullRequestsQuery,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import {
 	githubIssueSourceId,
 	mapGithubIssuesToWorkspaceSources,

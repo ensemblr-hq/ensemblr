@@ -1,21 +1,21 @@
-# Ensemble
+# Ensemblr
 
 **A Pi-native macOS workbench for isolated coding-agent workflows.**
 
-Ensemble is a native macOS desktop app (Electron) for running coding-agent work in isolated project
+Ensemblr is a native macOS desktop app (Electron) for running coding-agent work in isolated project
 workspaces. It borrows the workspace-and-review operating model from [Conductor](https://conductor.build)
 while using **Pi** as the agent runtime.
 
 - **Version:** `0.1.0` (pre-1.0, polish stage)
 - **Platform:** macOS
 - **License:** MIT
-- **Bundle ID:** `com.ensemble.app`
+- **Bundle ID:** `dev.ensemblr.app`
 
 ---
 
-## What is Ensemble?
+## What is Ensemblr?
 
-Ensemble gives each stream of work its own isolated copy of a project — a **workspace** — with its own
+Ensemblr gives each stream of work its own isolated copy of a project — a **workspace** — with its own
 git branch, working tree, agent sessions, and review path. You start work from a branch, a GitHub PR, or a
 Linear issue; drive it with Pi agent sessions; review the resulting changes; then open a pull request,
 merge, or archive.
@@ -24,13 +24,13 @@ The core vocabulary (see [`CONTEXT.md`](./CONTEXT.md)):
 
 | Term | Meaning |
 | --- | --- |
-| **Project** | A tracked codebase Ensemble can open, configure, and use as the source for workspaces. |
+| **Project** | A tracked codebase Ensemblr can open, configure, and use as the source for workspaces. |
 | **Workspace** | An isolated project copy for one stream of work — its own branch, working tree, agent sessions, run state, and review path. |
 | **Workspace Task** | The unit of work assigned to a workspace: a feature, bug fix, experiment, PR, GitHub issue, or Linear issue. |
 | **Pi Session** | A saved Pi coding-agent conversation associated with a project or workspace. |
 | **Session Branch** | A branch within Pi's tree-structured session history, to continue from an earlier point without losing the rest. |
 | **Review Flow** | Inspect changes, run checks, create a PR, merge accepted work, or archive rejected work. |
-| **Ensemble Root Directory** | The user-visible directory where Ensemble stores managed repositories, workspaces, and archived workspace context. |
+| **Ensemblr Root Directory** | The user-visible directory where Ensemblr stores managed repositories, workspaces, and archived workspace context. |
 
 A guiding goal is **Conductor parity** — matching Conductor's publicly observable workflows and
 capabilities, except where Pi-specific behavior requires a different implementation.
@@ -39,7 +39,7 @@ capabilities, except where Pi-specific behavior requires a different implementat
 
 ## Status
 
-Ensemble is **pre-1.0 (v0.1.0), in the polish stage**. The core workflows — isolated workspaces, Pi agent
+Ensemblr is **pre-1.0 (v0.1.0), in the polish stage**. The core workflows — isolated workspaces, Pi agent
 sessions, the review + PR flow, and the GitHub / Linear / git integrations — are implemented and wired to
 real services. Active work is refinement toward a v1 release. See [`CHANGELOG.md`](./CHANGELOG.md) for
 recent changes.
@@ -54,7 +54,7 @@ recent changes.
 - Each workspace is an isolated git worktree with its own branch and working tree.
 - Auto-generated branch names derived from the first Pi turn (kebab-case, optional username/custom prefix).
 - Copy configured files into new workspaces on creation.
-- Quick-start: create a brand-new project and publish it to GitHub directly from Ensemble.
+- Quick-start: create a brand-new project and publish it to GitHub directly from Ensemblr.
 
 ### Pi agent runtime
 - Runs the Pi CLI in RPC mode (JSONL over stdio) with executable discovery and readiness checks.
@@ -76,7 +76,7 @@ recent changes.
 - Merge confirmation flow.
 
 ### Integrations
-- **GitHub** via the `gh` CLI — using your own credentials; Ensemble stores no GitHub tokens.
+- **GitHub** via the `gh` CLI — using your own credentials; Ensemblr stores no GitHub tokens.
 - **Linear** via OAuth, with the token stored in the macOS Keychain.
 - **git** via the native binary (worktrees, branches, commits, push, log/diff inspection).
 - **macOS Launch Services** — open a workspace in Finder, editors, terminals, or source-control apps (only
@@ -85,14 +85,14 @@ recent changes.
 ### Terminal & scripts
 - xterm.js terminal backed by a `node-pty` PTY, in a collapsible dock.
 - Setup and Run scripts with read-only output panes, plus additional interactive terminal tabs.
-- `ENSEMBLE_*` environment variables injected into workspace processes.
+- `ENSEMBLR_*` environment variables injected into workspace processes.
 
 ### History & archive
 - Archive a workspace's context (git-backed) and browse it later.
 - Global History screen to restore or permanently delete archived workspaces.
 
 ### Settings
-- Layered configuration (user / repository / workspace) stored in `~/.config/ensemble/config.json`.
+- Layered configuration (user / repository / workspace) stored in `~/.config/ensemblr/config.json`.
 - Git defaults: branch-prefix source, auto-rename workspace on branch, delete local branch on archive,
   archive after merge, set upstream on push.
 - Setup diagnostics with per-check remediation actions.
@@ -111,7 +111,7 @@ recent changes.
 | State | Jotai |
 | Terminal | xterm.js + `node-pty` |
 | Validation | Zod |
-| Storage | SQLite (`~/.config/ensemble/ensemble.db`) |
+| Storage | SQLite (`~/.config/ensemblr/ensemblr.db`) |
 | Build | Vite 8 |
 | Lint / format | Biome 2.4 |
 | Package manager | npm |
@@ -122,9 +122,9 @@ recent changes.
 
 - **macOS**
 - **[npm](https://www.npmjs.com)** — the enforced package manager, bundled with Node.js (see [`AGENTS.md`](./AGENTS.md)).
-- **Pi CLI** — the agent runtime; Ensemble spawns it in RPC mode
+- **Pi CLI** — the agent runtime; Ensemblr spawns it in RPC mode
   (see [`docs/pi/rpc-protocol.md`](./docs/pi/rpc-protocol.md)).
-- **GitHub CLI (`gh`)** — authenticate once with `gh auth login`. Ensemble reads PR/check data through
+- **GitHub CLI (`gh`)** — authenticate once with `gh auth login`. Ensemblr reads PR/check data through
   `gh` and does not store GitHub tokens (see [ADR&nbsp;0013](./docs/adr/0013-use-gh-cli-for-v1-github-integration.md)).
 - **A Linear account** — for OAuth-based issue integration
   (see [ADR&nbsp;0024](./docs/adr/0024-use-linear-oauth-for-v1-issue-integration.md)).
@@ -180,7 +180,7 @@ Each `src` subtree has its own scoped `AGENTS.md` with rules specific to that ru
 
 ## Architecture
 
-Ensemble is organized around four runtime boundaries:
+Ensemblr is organized around four runtime boundaries:
 
 - **`src/main`** — the Electron main process (Node). Entry: `src/main/main.ts`. Hosts services for
   repository/git operations, the Pi agent (RPC), GitHub (`gh`), Linear, the terminal (PTY), storage
@@ -196,12 +196,12 @@ Ensemble is organized around four runtime boundaries:
 - **`src/shared`** — cross-process contracts: the Zod config schema, ~30 typed IPC contract modules
   (`src/shared/ipc/contracts/`), keymap definitions, and Pi-RPC parsing.
 
-**Data layer.** State persists to a SQLite database at `~/.config/ensemble/ensemble.db` (repositories,
+**Data layer.** State persists to a SQLite database at `~/.config/ensemblr/ensemblr.db` (repositories,
 workspaces, Pi sessions, Pi events, chat tabs, settings) accessed through a repository layer under
-`src/main/storage/`. App settings live in `~/.config/ensemble/config.json`; per-repo config is a committed,
-hand-authored `.ensemble/settings.toml`. Per-turn checkpoints are git-backed
+`src/main/storage/`. App settings live in `~/.config/ensemblr/config.json`; per-repo config is a committed,
+hand-authored `.ensemblr/settings.toml`. Per-turn checkpoints are git-backed
 ([ADR&nbsp;0012](./docs/adr/0012-use-git-backed-checkpoints-for-pi-turns.md)), and secrets are stored in
-the macOS Keychain ([ADR&nbsp;0018](./docs/adr/0018-use-keychain-for-secrets.md)). The Ensemble Root
+the macOS Keychain ([ADR&nbsp;0018](./docs/adr/0018-use-keychain-for-secrets.md)). The Ensemblr Root
 Directory holds managed repositories, workspaces, and archived context.
 
 ---

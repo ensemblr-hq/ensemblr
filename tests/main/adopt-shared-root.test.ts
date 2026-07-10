@@ -17,22 +17,22 @@ import {
 	probeGitWorktreeMetadata,
 } from '../../src/main/repository/git-probe.ts';
 import {
-	type EnsembleDatabaseConnection,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseConnection,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import type { RootDirectorySnapshot } from '../../src/shared/ipc';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 
 interface Harness {
-	connection: EnsembleDatabaseConnection;
+	connection: EnsemblrDatabaseConnection;
 	rootPath: string;
 	rootSnapshot: RootDirectorySnapshot;
 }
 
 function createHarness(t: TestContext): Harness {
 	const rootPath = realpathSync(
-		mkdtempSync(path.join(tmpdir(), 'ensemble-adopt-')),
+		mkdtempSync(path.join(tmpdir(), 'ensemblr-adopt-')),
 	);
 	const repositoriesPath = path.join(rootPath, 'repos');
 	const workspacesPath = path.join(rootPath, 'workspaces');
@@ -41,7 +41,7 @@ function createHarness(t: TestContext): Harness {
 	mkdirSync(workspacesPath, { recursive: true });
 	mkdirSync(archivedContextsPath, { recursive: true });
 
-	const connection = openEnsembleDatabase({ databasePath: ':memory:' });
+	const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
 
 	t.after(() => {
 		connection.database.close();
@@ -71,8 +71,8 @@ function runGit(cwd: string, args: string[]): string {
 function createGitRepository(repositoryPath: string): void {
 	mkdirSync(repositoryPath, { recursive: true });
 	runGit(repositoryPath, ['init', '-b', 'main']);
-	runGit(repositoryPath, ['config', 'user.email', 'test@ensemble.dev']);
-	runGit(repositoryPath, ['config', 'user.name', 'Ensemble Test']);
+	runGit(repositoryPath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(repositoryPath, ['config', 'user.name', 'Ensemblr Test']);
 	writeFileSync(path.join(repositoryPath, 'README.md'), '# demo\n');
 	runGit(repositoryPath, ['add', '.']);
 	runGit(repositoryPath, ['commit', '-m', 'init']);
@@ -346,7 +346,7 @@ test('flags two workspaces sharing the same branch as a collision', async (t) =>
 	assert.ok(codes.includes('workspace-branch-collision'));
 });
 
-test('skips repository folders carrying the .ensemble-archived marker', async (t) => {
+test('skips repository folders carrying the .ensemblr-archived marker', async (t) => {
 	const harness = createHarness(t);
 	const repositoryPath = path.join(
 		harness.rootSnapshot.repositoriesPath,
@@ -354,8 +354,8 @@ test('skips repository folders carrying the .ensemble-archived marker', async (t
 	);
 	createGitRepository(repositoryPath);
 	writeFileSync(
-		path.join(repositoryPath, '.ensemble-archived'),
-		'Archived by Ensemble.\n',
+		path.join(repositoryPath, '.ensemblr-archived'),
+		'Archived by Ensemblr.\n',
 	);
 
 	const snapshot = await runReconcile(harness);

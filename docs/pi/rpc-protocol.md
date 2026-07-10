@@ -12,13 +12,13 @@ Sources inspected (pi `0.79.1`, installed at
 - `dist/modes/rpc/rpc-mode.js` — RPC mode implementation
 - `dist/modes/rpc/rpc-types.d.ts` — command/response/extension-UI types
 - `dist/modes/rpc/rpc-client.js` — reference subprocess client
-- Ensemble's existing adapter: `src/main/pi-agent/pi-agent-client.ts`,
+- Ensemblr's existing adapter: `src/main/pi-agent/pi-agent-client.ts`,
   `src/main/pi-agent/cli-rpc/*`
 
 ## Invocation
 
 - RPC mode starts with `pi --mode rpc [options]` (`rpc.md` "Starting RPC
-  Mode"). Ensemble's base args are
+  Mode"). Ensemblr's base args are
   `DEFAULT_PI_RPC_ARGS = ['--mode', 'rpc']`
   (`src/main/pi-agent/pi-agent-client.ts:21`); `buildSessionArgs` then appends
   `--model <provider/id>`, `--thinking <level>`, and `--session-id <id>` from
@@ -28,14 +28,14 @@ Sources inspected (pi `0.79.1`, installed at
   `--session-dir <path>` (`rpc.md` "Starting RPC Mode"). Captures use
   `--no-session` plus explicit `--provider/--model` so fixtures do not depend
   on local default-model state.
-- **Model/thinking selection (Ensemble).** The picked model and thinking level
+- **Model/thinking selection (Ensemblr).** The picked model and thinking level
   bind at spawn via `--model`/`--thinking`. The `prompt` command carries **no**
   model field — Pi ignores unknown keys — so mid-session switches go through
   the RPC `set_model` (`{type,provider,modelId}`) and `set_thinking_level`
   (`{type,level}`) commands, which the adapter writes ahead of the next
   `prompt` only when the selection differs from what the runtime is already on
   (`src/main/pi-agent/cli-rpc-pi-agent-adapter.ts`).
-- **Ephemeral utility sessions (Ensemble).** Chat-title and session-summary
+- **Ephemeral utility sessions (Ensemblr).** Chat-title and session-summary
   generation spawn their own short-lived RPC sessions; each is launched with
   `--model` set to the chat's current model (`pi_sessions.model`) so they run on
   the same provider as the conversation rather than Pi's default
@@ -44,7 +44,7 @@ Sources inspected (pi `0.79.1`, installed at
   `localStorage` and used as React Query `initialData`, so the model picker is
   populated instantly on launch and refreshed silently in the background; an
   empty result never overwrites the last-known-good catalog
-  (`src/renderer/api/ensemble/pi-models-cache.ts`).
+  (`src/renderer/api/ensemblr/pi-models-cache.ts`).
 
 ## Framing
 
@@ -170,7 +170,7 @@ in `multi-tool-chain` capture.
   `contextUsage`) (`rpc.md` "get_session_stats").
 - The `bash` RPC command's `BashExecutionMessage` emits **no event** and only
   enters LLM context on the next prompt (`rpc.md` "bash") — irrelevant to the
-  timeline unless Ensemble later exposes user-run shell commands.
+  timeline unless Ensemblr later exposes user-run shell commands.
 
 ## Known deviations to verify in Phase 1
 
@@ -201,17 +201,17 @@ full read of `dist/modes/rpc/rpc-types.d.ts` (`RpcCommand` union) and
 | Plan mode | **Unsupported in core** | `{"type":"plan_mode"}` → `Unknown command`. Help text: "Extensions can register additional flags (e.g., `--plan` from plan-mode extension)" — plan mode exists only as an optional extension (not installed here; `pi list` shows none). Would surface via extension slash commands / `get_commands`, not a core RPC toggle |
 | Fast mode | **Unsupported** | No CLI flag, no RPC command (`set_fast_mode` → `Unknown command`). No core concept of a fast/low-latency output mode |
 | Browser control | **Unsupported in core** | No CLI flag, no RPC command, no built-in tool (built-ins are read/bash/edit/write). Only achievable via an extension-provided tool |
-| Separate review model | **Unsupported as a setting** | No review-model concept anywhere in `RpcCommand` or flags. A review pass must be a separate Ensemble-managed session spawned with its own `--model` |
+| Separate review model | **Unsupported as a setting** | No review-model concept anywhere in `RpcCommand` or flags. A review pass must be a separate Ensemblr-managed session spawned with its own `--model` |
 | Tool allowlist (read-only / approval-required) | **Partially supported** | Spawn-time only: `--tools`, `--exclude-tools`, `--no-tools`, `--no-builtin-tools` all accepted in `--mode rpc` (verified: `--tools read,grep,glob,ls`, `--no-tools`, `--exclude-tools bash,write,edit` start cleanly). There is **no runtime RPC command** to change the allowlist mid-session, and no built-in approval gate — approval-required needs the extension `confirm()` handshake (see "Tool approval / permission handshake") |
 | Steering / follow-up modes | **Supported (bonus)** | `set_steering_mode` / `set_follow_up_mode` (`all` \| `one-at-a-time`) |
 | Auto retry | **Supported (bonus)** | `set_auto_retry`, `abort_retry` |
 | Session ops | **Supported (bonus)** | `switch_session`, `fork`, `clone`, `get_fork_messages`, `get_messages`, `set_session_name`, `export_html`, client-side `bash` |
 
-### Recommendations for Ensemble settings (v1)
+### Recommendations for Ensemblr settings (v1)
 
 - **Enable:** model picker, thinking level, context usage, manual + auto
   compaction toggles (all already wired or trivially wireable).
-- **Implement Ensemble-side:** read-only / approval-required permission modes
+- **Implement Ensemblr-side:** read-only / approval-required permission modes
   as *spawn profiles* — restart the RPC process with the corresponding
   `--tools` / `--exclude-tools` set. Mid-session permission switching is not
   possible without a restart; the settings UI must say so.

@@ -60,7 +60,7 @@ test('opens a fresh chat and defers the seed until it is active', async () => {
 	});
 
 	expect(inserted).toHaveLength(1);
-	expect(inserted[0]).toContain('.ensemble/settings.toml');
+	expect(inserted[0]).toContain('.ensemblr/settings.toml');
 	expect(inserted[0]).toContain('[scripts]');
 	expect(toast.success).toHaveBeenCalledTimes(1);
 });

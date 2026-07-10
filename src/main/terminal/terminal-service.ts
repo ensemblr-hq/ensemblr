@@ -16,7 +16,7 @@ import {
 	WorkspaceEnvironmentError,
 	type WorkspaceEnvironmentService,
 } from '../environment/workspace-environment.ts';
-import type { EnsembleDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage/database.ts';
 import {
 	finalizeTerminalSessionRow,
 	insertTerminalSessionRow,
@@ -91,7 +91,7 @@ export interface TerminalService {
 /** Options for {@link createTerminalService}. */
 export interface CreateTerminalServiceOptions {
 	backend?: PtyBackend;
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	/** Shell for interactive terminals; defaults to the user's login shell. */
 	defaultShell?: string;
 	killGraceMs?: number;
@@ -558,7 +558,7 @@ function mergeProcessEnvironment(
 	const env: Record<string, string> = {};
 
 	// Drop macOS/Electron launch-context vars so a terminal running `open` (or a
-	// tool that shells out to it) can't make macOS relaunch Ensemble as a second
+	// tool that shells out to it) can't make macOS relaunch Ensemblr as a second
 	// instance.
 	for (const [key, value] of Object.entries(
 		stripLaunchContextEnv(process.env),
@@ -577,7 +577,7 @@ function mergeProcessEnvironment(
 	}
 
 	if (kind === 'terminal') {
-		env.TERM_PROGRAM = 'Ensemble';
+		env.TERM_PROGRAM = 'Ensemblr';
 	}
 
 	// Strip again AFTER the overlay merge: launch-context identity must never

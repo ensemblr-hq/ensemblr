@@ -59,7 +59,7 @@ export function createFilesToCopyService({
 			}
 
 			const tmpDirectory = mkdtempSync(
-				path.join(tmpdir(), 'ensemble-files-to-copy-'),
+				path.join(tmpdir(), 'ensemblr-files-to-copy-'),
 			);
 			const patternsPath = path.join(tmpDirectory, 'patterns');
 
@@ -183,7 +183,7 @@ function resolvePatterns(config: LoadedRepositoryConfig): {
 		source: FilesToCopySource;
 	}> = [
 		{ record: config.worktreeincludeConfig, source: 'worktreeinclude' },
-		{ record: config.ensembleConfig, source: 'ensemble-config' },
+		{ record: config.ensemblrConfig, source: 'ensemblr-config' },
 	];
 
 	for (const candidate of candidates) {

@@ -2,9 +2,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
 import {
-	ensembleQueryKeys,
-	getEnsembleApiOrNull,
-} from '@/renderer/api/ensemble/query-keys';
+	ensemblrQueryKeys,
+	getEnsemblrApiOrNull,
+} from '@/renderer/api/ensemblr/query-keys';
 
 /**
  * Keeps the workspace file list fresh in near-real-time: asks the main process
@@ -20,7 +20,7 @@ export function useWorkspaceFilesWatch(workspaceCwd: string | null): void {
 	const queryClient = useQueryClient();
 
 	useEffect(() => {
-		const api = getEnsembleApiOrNull();
+		const api = getEnsemblrApiOrNull();
 
 		if (!api || !workspaceCwd) {
 			return;
@@ -33,7 +33,7 @@ export function useWorkspaceFilesWatch(workspaceCwd: string | null): void {
 			}
 
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.workspaceFiles(workspaceCwd),
+				queryKey: ensemblrQueryKeys.workspaceFiles(workspaceCwd),
 			});
 		});
 

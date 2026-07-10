@@ -8,18 +8,18 @@ import type { ForgeConfig } from '@electron-forge/shared-types';
 // Build channel drives the app's LaunchServices identity (bundle id + product
 // name). Every packaged build that shares one bundle id becomes an
 // interchangeable registration for that id: when macOS resolves
-// `com.ensemble.app` — e.g. while a spawned child touches LaunchServices during
+// `dev.ensemblr.app` — e.g. while a spawned child touches LaunchServices during
 // workspace creation — it can relaunch a *different* registered copy, which
 // then hits the running instance's single-instance lock and quits, flashing a
 // stray Dock tile. Only the shipped release may claim the canonical id; every
 // dogfood build gets its own so it can never masquerade as (or collide with)
 // another channel. Release is the default so `npm run make`/`package` keep
-// producing the store build; dogfood builds opt in via `ENSEMBLE_BUILD_CHANNEL`
+// producing the store build; dogfood builds opt in via `ENSEMBLR_BUILD_CHANNEL`
 // (see the `make:canary` / `make:dev` scripts). See docs/adr/0032.
 const KNOWN_CHANNELS = ['release', 'canary', 'dev'] as const;
 type BuildChannel = (typeof KNOWN_CHANNELS)[number];
 const requestedChannel = (
-	process.env.ENSEMBLE_BUILD_CHANNEL ?? 'release'
+	process.env.ENSEMBLR_BUILD_CHANNEL ?? 'release'
 ).toLowerCase();
 const buildChannel: BuildChannel = (
 	KNOWN_CHANNELS as readonly string[]
@@ -28,14 +28,14 @@ const buildChannel: BuildChannel = (
 	: 'release';
 
 const APP_BUNDLE_IDS: Record<BuildChannel, string> = {
-	release: 'com.ensemble.app',
-	canary: 'com.ensemble.app.canary',
-	dev: 'com.ensemble.app.dev',
+	release: 'dev.ensemblr.app',
+	canary: 'dev.ensemblr.app.canary',
+	dev: 'dev.ensemblr.app.dev',
 };
 const APP_NAMES: Record<BuildChannel, string> = {
-	release: 'Ensemble',
-	canary: 'Ensemble Canary',
-	dev: 'Ensemble Dev',
+	release: 'Ensemblr',
+	canary: 'Ensemblr Canary',
+	dev: 'Ensemblr Dev',
 };
 
 // Files kept in the packaged app. The Vite plugin's default `ignore` excludes

@@ -2,8 +2,8 @@ import { useCallback, useState } from 'react';
 
 import {
 	deleteRepository,
-	isEnsembleApiAvailable,
-} from '@/renderer/api/ensemble-queries';
+	isEnsemblrApiAvailable,
+} from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -24,7 +24,7 @@ interface DeleteRepositoryDialogProps {
 
 /**
  * Destructive confirmation dialog for a repository. Wipes every workspace, the
- * repository row, and writes the `.ensemble-archived` sentinel so the shared-
+ * repository row, and writes the `.ensemblr-archived` sentinel so the shared-
  * root reconciler skips the folder on next launch. Use the archive dialog for
  * the reversible lifecycle path.
  */
@@ -66,7 +66,7 @@ function DeleteRepositoryDialogForm({
 		[],
 	);
 
-	const canDelete = stage !== 'deleting' && isEnsembleApiAvailable();
+	const canDelete = stage !== 'deleting' && isEnsemblrApiAvailable();
 	const workspaceCount = project.workspaces.length;
 
 	const handleDelete = useCallback(async () => {
@@ -102,7 +102,7 @@ function DeleteRepositoryDialogForm({
 				</DialogTitle>
 				<p className='text-muted-foreground text-xs'>
 					Permanently removes the repository and {workspaceCount}{' '}
-					{workspaceCount === 1 ? 'workspace' : 'workspaces'} from Ensemble.
+					{workspaceCount === 1 ? 'workspace' : 'workspaces'} from Ensemblr.
 					Each workspace's worktree folder is deleted and its local branch is
 					dropped. The repository folder stays on disk so you can re-register it
 					later. This cannot be undone.

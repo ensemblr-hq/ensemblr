@@ -26,7 +26,7 @@ const macosChromeOptions =
 		: {};
 
 /**
- * Creates the Ensemble main BrowserWindow, restoring persisted bounds and
+ * Creates the Ensemblr main BrowserWindow, restoring persisted bounds and
  * wiring the Vite-served renderer (dev URL or built bundle).
  * @param options - Optional dependencies including the persisted window-state store.
  * @returns The created {@link BrowserWindow}.
@@ -42,7 +42,7 @@ export function createMainWindow({
 		minHeight: MAIN_WINDOW_MIN_HEIGHT,
 		minWidth: MAIN_WINDOW_MIN_WIDTH,
 		show: false,
-		title: 'Ensemble',
+		title: 'Ensemblr',
 		width: restoredState?.bounds.width ?? DEFAULT_MAIN_WINDOW_WIDTH,
 		...(restoredState
 			? { x: restoredState.bounds.x, y: restoredState.bounds.y }

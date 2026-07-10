@@ -2,9 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { FileIcon, TriangleAlertIcon } from 'lucide-react';
 
 import {
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	readWorkspaceFile,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { CodeBlockContent } from '@/renderer/components/code-block';
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
 import type { ReadWorkspaceFileFailureCode } from '@/shared/ipc/contracts/workspace-files';
@@ -28,7 +28,7 @@ export function FilePreviewPanel({
 				path: filePath ?? '',
 				workspaceCwd: workspaceCwd ?? '',
 			}),
-		queryKey: ensembleQueryKeys.filePreview(workspaceCwd ?? '', filePath ?? ''),
+		queryKey: ensemblrQueryKeys.filePreview(workspaceCwd ?? '', filePath ?? ''),
 		staleTime: 10_000,
 	});
 

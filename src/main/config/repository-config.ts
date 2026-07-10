@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import path from 'node:path';
 
 import type { ConfigDiagnostic } from '../../shared/ipc/contracts/health';
@@ -24,7 +23,7 @@ export interface LoadRepositoryConfigOptions {
 
 /** Aggregated result of loading every supported repository config source. */
 export interface LoadedRepositoryConfig {
-	ensembleConfig?: Record<string, unknown>;
+	ensemblrConfig?: Record<string, unknown>;
 	snapshot: RepositoryConfigSnapshot;
 	worktreeincludeConfig?: Record<string, unknown>;
 }
@@ -36,9 +35,9 @@ interface NormalizedConfigSource {
 }
 
 /** Directory that holds the committed repository config. */
-export const ENSEMBLE_DIRECTORY = '.ensemble';
-/** Filename of the sole on-disk repository config, inside {@link ENSEMBLE_DIRECTORY}. */
-export const ENSEMBLE_SETTINGS_FILENAME = 'settings.toml';
+export const ENSEMBLR_DIRECTORY = '.ensemblr';
+/** Filename of the sole on-disk repository config, inside {@link ENSEMBLR_DIRECTORY}. */
+export const ENSEMBLR_SETTINGS_FILENAME = 'settings.toml';
 
 const SCRIPT_FIELD_MAP = new Map([
 	['archive', 'archive'],
@@ -82,9 +81,9 @@ const STRING_SETTING_KEYS = new Set([
 ]);
 
 /**
- * Loads every supported repository config source (`.ensemble/settings.toml` and
+ * Loads every supported repository config source (`.ensemblr/settings.toml` and
  * `.worktreeinclude`), normalises each, and returns both raw parsed records and
- * an IPC-safe snapshot. `.ensemble/settings.toml` is the sole committed config;
+ * an IPC-safe snapshot. `.ensemblr/settings.toml` is the sole committed config;
  * `.worktreeinclude` remains a separate files-to-copy list.
  * @param options - Repository path and optional clock.
  * @returns The parsed config sources plus a transport snapshot.
@@ -125,25 +124,20 @@ export function loadRepositoryConfig({
 	});
 	diagnostics.push(...worktreeinclude.diagnostics);
 
-	const ensemble = loadTomlSource({
+	const ensemblr = loadTomlSource({
 		repositoryPath: resolvedRepositoryPath,
-		source: 'ensemble-config',
+		source: 'ensemblr-config',
 		sourcePath: path.join(
 			resolvedRepositoryPath,
-			ENSEMBLE_DIRECTORY,
-			ENSEMBLE_SETTINGS_FILENAME,
+			ENSEMBLR_DIRECTORY,
+			ENSEMBLR_SETTINGS_FILENAME,
 		),
 	});
-	sources.push(ensemble.snapshot);
-	diagnostics.push(...ensemble.diagnostics);
-
-	const legacyDiagnostic = detectLegacyConfigDiagnostic(resolvedRepositoryPath);
-	if (legacyDiagnostic) {
-		diagnostics.push(legacyDiagnostic);
-	}
+	sources.push(ensemblr.snapshot);
+	diagnostics.push(...ensemblr.diagnostics);
 
 	return {
-		ensembleConfig: getLoadedSettings(ensemble.snapshot),
+		ensemblrConfig: getLoadedSettings(ensemblr.snapshot),
 		snapshot: {
 			diagnostics,
 			loadedAt: now().toISOString(),
@@ -175,35 +169,6 @@ export function normalizeRepositoryConfigRequest(
 	}
 
 	return { repositoryPath: request.repositoryPath.trim() };
-}
-
-/**
- * Detects whether a legacy, no-longer-read repository config file
- * (`conductor.json`, `.conductor/settings.toml`, or an old-root `ensemble.json`)
- * still exists at the repository root, using an existence check only. The files
- * are never read, parsed, or migrated; this exists solely so a team repo on the
- * old format gets one informational signal instead of silently losing config.
- * @param repositoryPath - Resolved repository root.
- * @returns One `info` diagnostic when a legacy file is present, else `undefined`.
- */
-function detectLegacyConfigDiagnostic(
-	repositoryPath: string,
-): ConfigDiagnostic | undefined {
-	const legacyPaths = [
-		path.join(repositoryPath, 'conductor.json'),
-		path.join(repositoryPath, '.conductor', 'settings.toml'),
-		path.join(repositoryPath, 'ensemble.json'),
-	];
-
-	if (!legacyPaths.some((legacyPath) => existsSync(legacyPath))) {
-		return undefined;
-	}
-
-	return {
-		code: 'legacy-config-ignored',
-		message: `A legacy repository config file was found and ignored. Ensemble reads committed settings only from ${ENSEMBLE_DIRECTORY}/${ENSEMBLE_SETTINGS_FILENAME}; move your settings there.`,
-		severity: 'info',
-	};
 }
 
 /**
@@ -241,7 +206,7 @@ function loadTomlSource({
 }
 
 /**
- * Maps a parsed TOML config record onto the canonical Ensemble setting keys,
+ * Maps a parsed TOML config record onto the canonical Ensemblr setting keys,
  * applying snake-to-camel renames and collecting per-field diagnostics.
  * @param config - Parsed TOML record.
  * @param source - Source identifier used in diagnostics.

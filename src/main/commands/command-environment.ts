@@ -9,8 +9,8 @@ import type {
 	ShellEnvironmentLoaderResult,
 } from './command-types.ts';
 
-const SHELL_ENVIRONMENT_BEGIN_SENTINEL = '__ENSEMBLE_SHELL_ENV_BEGIN__';
-const SHELL_ENVIRONMENT_END_SENTINEL = '__ENSEMBLE_SHELL_ENV_END__';
+const SHELL_ENVIRONMENT_BEGIN_SENTINEL = '__ENSEMBLR_SHELL_ENV_BEGIN__';
+const SHELL_ENVIRONMENT_END_SENTINEL = '__ENSEMBLR_SHELL_ENV_END__';
 
 /**
  * Resolves the command environment by invoking the configured shell loader,

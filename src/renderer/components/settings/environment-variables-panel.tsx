@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { PlusIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
-import { environmentVariablesQuery } from '@/renderer/api/ensemble';
+import { environmentVariablesQuery } from '@/renderer/api/ensemblr';
 import { DocumentedVariablesList } from '@/renderer/components/settings/documented-variables-list';
 import { EnvFilesSection } from '@/renderer/components/settings/env-files-section';
 import { EnvironmentVariableRow } from '@/renderer/components/settings/environment-variable-row';

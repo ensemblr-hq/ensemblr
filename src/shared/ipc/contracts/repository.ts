@@ -119,7 +119,7 @@ export interface ArchiveRepositoryResult {
 
 /**
  * Destructive removal of a repository and all its workspaces. Wipes worktrees,
- * drops branches, deletes rows, and writes the `.ensemble-archived` sentinel
+ * drops branches, deletes rows, and writes the `.ensemblr-archived` sentinel
  * so the shared-root reconciler skips the still-on-disk folder on next launch.
  */
 export type DeleteRepositoryDiagnosticCode =

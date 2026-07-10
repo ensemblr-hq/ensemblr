@@ -13,22 +13,22 @@ export interface DatabaseHealthSnapshot {
 	status: DatabaseStatus;
 }
 
-/** Options for {@link openEnsembleDatabase} / {@link createEnsembleDatabaseService}. */
+/** Options for {@link openEnsemblrDatabase} / {@link createEnsemblrDatabaseService}. */
 export interface OpenDatabaseOptions {
 	databasePath?: string;
 }
 
 /** A live SQLite connection plus its file path and applied schema version. */
-export interface EnsembleDatabaseConnection {
+export interface EnsemblrDatabaseConnection {
 	database: DatabaseSync;
 	path: string;
 	schemaVersion: number;
 }
 
 /** Public surface of the database service held by the main process. */
-export interface EnsembleDatabaseService {
+export interface EnsemblrDatabaseService {
 	close: () => void;
-	getConnection: () => EnsembleDatabaseConnection | null;
+	getConnection: () => EnsemblrDatabaseConnection | null;
 	getHealth: () => DatabaseHealthSnapshot;
 	open: () => DatabaseHealthSnapshot;
 }
@@ -54,7 +54,7 @@ interface Migration {
 	version: number;
 }
 
-const DATABASE_FILENAME = 'ensemble.db';
+const DATABASE_FILENAME = 'ensemblr.db';
 const SQLITE_MEMORY_PATH = ':memory:';
 const MIGRATIONS: readonly Migration[] = [
 	{
@@ -250,7 +250,7 @@ CREATE INDEX idx_secret_metadata_scope ON secret_metadata(scope, scope_id);
 CREATE TABLE root_directories (
 	id TEXT PRIMARY KEY,
 	path TEXT NOT NULL UNIQUE,
-	source TEXT NOT NULL CHECK (source IN ('built-in-default', 'conductor-config', 'config-default', 'managed-config', 'ensemble-config', 'sqlite')),
+	source TEXT NOT NULL CHECK (source IN ('built-in-default', 'conductor-config', 'config-default', 'managed-config', 'ensemblr-config', 'sqlite')),
 	status TEXT NOT NULL CHECK (status IN ('ok', 'warning', 'error')),
 	repositories_path TEXT NOT NULL,
 	workspaces_path TEXT NOT NULL,
@@ -551,23 +551,23 @@ export function resolveDefaultDatabasePath(homeDirectory = homedir()): string {
 			homeDirectory,
 			'Library',
 			'Application Support',
-			'com.ensemble.app',
+			'dev.ensemblr.app',
 			DATABASE_FILENAME,
 		);
 	}
 
-	return path.join(homeDirectory, '.config', 'ensemble', DATABASE_FILENAME);
+	return path.join(homeDirectory, '.config', 'ensemblr', DATABASE_FILENAME);
 }
 
 /**
  * Opens the SQLite database, ensures its parent directory exists, configures
  * pragmas, and applies any pending migrations.
  * @param options - Optional path override; `:memory:` is honored for tests.
- * @returns An open {@link EnsembleDatabaseConnection}.
+ * @returns An open {@link EnsemblrDatabaseConnection}.
  */
-export function openEnsembleDatabase(
+export function openEnsemblrDatabase(
 	options: OpenDatabaseOptions = {},
-): EnsembleDatabaseConnection {
+): EnsemblrDatabaseConnection {
 	const databasePath = options.databasePath ?? resolveDefaultDatabasePath();
 
 	if (databasePath !== SQLITE_MEMORY_PATH) {
@@ -599,13 +599,13 @@ export function openEnsembleDatabase(
 /**
  * Builds a lazily-opening database service whose lifecycle is owned by the
  * Electron main process.
- * @param options - Forwarded to {@link openEnsembleDatabase} on first open.
- * @returns A {@link EnsembleDatabaseService}.
+ * @param options - Forwarded to {@link openEnsemblrDatabase} on first open.
+ * @returns A {@link EnsemblrDatabaseService}.
  */
-export function createEnsembleDatabaseService(
+export function createEnsemblrDatabaseService(
 	options: OpenDatabaseOptions = {},
-): EnsembleDatabaseService {
-	let connection: EnsembleDatabaseConnection | null = null;
+): EnsemblrDatabaseService {
+	let connection: EnsemblrDatabaseConnection | null = null;
 	let health: DatabaseHealthSnapshot = {
 		path: options.databasePath ?? resolveDefaultDatabasePath(),
 		schemaVersion: 0,
@@ -619,7 +619,7 @@ export function createEnsembleDatabaseService(
 		}
 
 		try {
-			connection = openEnsembleDatabase(options);
+			connection = openEnsemblrDatabase(options);
 			health = {
 				path: connection.path,
 				schemaVersion: connection.schemaVersion,

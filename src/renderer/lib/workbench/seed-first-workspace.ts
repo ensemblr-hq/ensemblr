@@ -4,7 +4,7 @@ import type { useNavigate, useRouter } from '@tanstack/react-router';
 import {
 	createWorkspace,
 	repositoryWorkspaceNavigationQuery,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { queryClient } from '@/renderer/api/query-client';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 

@@ -17,7 +17,7 @@ export function getEmptyStateCopy({
 }) {
 	if (isLoading) {
 		return {
-			detail: 'Ensemble is reading repositories and workspaces from SQLite.',
+			detail: 'Ensemblr is reading repositories and workspaces from SQLite.',
 			title: 'Loading repositories',
 		};
 	}

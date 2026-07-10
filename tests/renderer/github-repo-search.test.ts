@@ -58,75 +58,75 @@ test('filterGithubRepositories returns an empty array for a blank query', () => 
 });
 
 test('filterGithubRepositories ranks a fullName-prefix match above a name-prefix match', () => {
-	const fullNameMatch = repo({ fullName: 'ensemble/core' });
-	const namePrefixMatch = repo({ fullName: 'octo/ensemble-extras' });
+	const fullNameMatch = repo({ fullName: 'ensemblr/core' });
+	const namePrefixMatch = repo({ fullName: 'octo/ensemblr-extras' });
 	const results = filterGithubRepositories(
 		[namePrefixMatch, fullNameMatch],
-		'ensemble',
+		'ensemblr',
 	);
 	expect(results.map((entry) => entry.fullName)).toEqual([
-		'ensemble/core',
-		'octo/ensemble-extras',
+		'ensemblr/core',
+		'octo/ensemblr-extras',
 	]);
 });
 
 test('filterGithubRepositories ranks a name-prefix match above a name-substring match', () => {
-	const namePrefixMatch = repo({ fullName: 'octo/ensemble-extras' });
-	const nameSubstringMatch = repo({ fullName: 'octo/the-ensemble' });
+	const namePrefixMatch = repo({ fullName: 'octo/ensemblr-extras' });
+	const nameSubstringMatch = repo({ fullName: 'octo/the-ensemblr' });
 	const results = filterGithubRepositories(
 		[nameSubstringMatch, namePrefixMatch],
-		'ensemble',
+		'ensemblr',
 	);
 	expect(results.map((entry) => entry.fullName)).toEqual([
-		'octo/ensemble-extras',
-		'octo/the-ensemble',
+		'octo/ensemblr-extras',
+		'octo/the-ensemblr',
 	]);
 });
 
 test('filterGithubRepositories ranks a name-substring match above an owner-only match', () => {
-	const nameSubstringMatch = repo({ fullName: 'octo/the-ensemble' });
+	const nameSubstringMatch = repo({ fullName: 'octo/the-ensemblr' });
 	const ownerMatch = repo({
-		fullName: 'the-ensemble-inc/widgets',
-		ownerLogin: 'the-ensemble-inc',
+		fullName: 'the-ensemblr-inc/widgets',
+		ownerLogin: 'the-ensemblr-inc',
 	});
 	const results = filterGithubRepositories(
 		[ownerMatch, nameSubstringMatch],
-		'ensemble',
+		'ensemblr',
 	);
 	expect(results.map((entry) => entry.fullName)).toEqual([
-		'octo/the-ensemble',
-		'the-ensemble-inc/widgets',
+		'octo/the-ensemblr',
+		'the-ensemblr-inc/widgets',
 	]);
 });
 
 test('filterGithubRepositories ranks an owner-only match above a description-only match', () => {
 	const ownerMatch = repo({
-		fullName: 'the-ensemble-inc/widgets',
-		ownerLogin: 'the-ensemble-inc',
+		fullName: 'the-ensemblr-inc/widgets',
+		ownerLogin: 'the-ensemblr-inc',
 	});
 	const descriptionMatch = repo({
-		description: 'Built for the ensemble team',
+		description: 'Built for the ensemblr team',
 		fullName: 'octo/widgets',
 	});
 	const results = filterGithubRepositories(
 		[descriptionMatch, ownerMatch],
-		'ensemble',
+		'ensemblr',
 	);
 	expect(results.map((entry) => entry.fullName)).toEqual([
-		'the-ensemble-inc/widgets',
+		'the-ensemblr-inc/widgets',
 		'octo/widgets',
 	]);
 });
 
 test('filterGithubRepositories AND-matches multiple whitespace-separated tokens', () => {
-	const match = repo({ fullName: 'psoldunov/ensemble' });
+	const match = repo({ fullName: 'psoldunov/ensemblr' });
 	const missingToken = repo({ fullName: 'psoldunov/other' });
 	const results = filterGithubRepositories(
 		[match, missingToken],
-		'psoldunov ensemble',
+		'psoldunov ensemblr',
 	);
 	expect(results.map((entry) => entry.fullName)).toEqual([
-		'psoldunov/ensemble',
+		'psoldunov/ensemblr',
 	]);
 });
 

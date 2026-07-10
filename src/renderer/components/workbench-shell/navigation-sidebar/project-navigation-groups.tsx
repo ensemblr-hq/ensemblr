@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 
-import { prefetchWorkspaceSources } from '@/renderer/api/ensemble';
+import { prefetchWorkspaceSources } from '@/renderer/api/ensemblr';
 import { ReorderList } from '@/renderer/components/ui/reorder-list';
 import {
 	SidebarGroup,

@@ -5,28 +5,28 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 import {
-	ENSEMBLE_CONFIG_SCHEMA_VERSION,
-	type EnsembleConfig,
+	ENSEMBLR_CONFIG_SCHEMA_VERSION,
+	type EnsemblrConfig,
 } from '../../src/main/config/config-loader.ts';
 import {
 	normalizeSettingsResolutionRequest,
 	resolveSettings,
 } from '../../src/main/config/config-resolution.ts';
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import type { GitSettings } from '../../src/shared/config/app-settings.ts';
 import type { SettingsResolutionGroupSnapshot } from '../../src/shared/ipc/index.ts';
 
 let settingCounter = 0;
-const previewUrlTemplate = 'http://localhost:$' + '{ENSEMBLE_PORT}';
+const previewUrlTemplate = 'http://localhost:$' + '{ENSEMBLR_PORT}';
 
-function createConfig(overrides: Partial<EnsembleConfig> = {}): EnsembleConfig {
+function createConfig(overrides: Partial<EnsemblrConfig> = {}): EnsemblrConfig {
 	return {
 		app: {},
 		environment: {},
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 		...overrides,
@@ -46,9 +46,9 @@ function makeUserGit(overrides: Partial<GitSettings> = {}): GitSettings {
 }
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-resolution-'));
-	const connection = openEnsembleDatabase({
-		databasePath: path.join(directory, 'ensemble-test.db'),
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-resolution-'));
+	const connection = openEnsemblrDatabase({
+		databasePath: path.join(directory, 'ensemblr-test.db'),
 	});
 
 	t.after(() => {
@@ -130,7 +130,7 @@ test('resolves app settings from sqlite, config defaults, and built-in defaults'
 		},
 		{
 			source: 'built-in-default',
-			value: '/Users/example/Ensemble',
+			value: '/Users/example/Ensemblr',
 		},
 	);
 	assert.deepEqual(
@@ -239,7 +239,7 @@ test('invalid sqlite setting JSON falls back to the next valid source', (t) => {
 	);
 });
 
-test('.ensemble/settings.toml outranks personal SQLite per-key', (t) => {
+test('.ensemblr/settings.toml outranks personal SQLite per-key', (t) => {
 	const database = createDatabaseFixture(t);
 	insertSetting({
 		database,
@@ -260,9 +260,9 @@ test('.ensemble/settings.toml outranks personal SQLite per-key', (t) => {
 		config: createConfig(),
 		database,
 		repository: {
-			ensembleConfig: {
+			ensemblrConfig: {
 				previewUrlTemplate,
-				scripts: { run: 'bun run ensemble' },
+				scripts: { run: 'bun run ensemblr' },
 			},
 			repositoryId: 'repo-1',
 		},
@@ -272,13 +272,13 @@ test('.ensemble/settings.toml outranks personal SQLite per-key', (t) => {
 		assert.fail('Expected repository settings resolution');
 	}
 
-	// The committed .ensemble/settings.toml wins for the keys it defines.
+	// The committed .ensemblr/settings.toml wins for the keys it defines.
 	assert.deepEqual(
 		{
 			source: getSetting(snapshot.repository, 'scripts.run').source,
 			value: getSetting(snapshot.repository, 'scripts.run').value,
 		},
-		{ source: 'ensemble-config', value: 'bun run ensemble' },
+		{ source: 'ensemblr-config', value: 'bun run ensemblr' },
 	);
 	// A key the committed file omits falls back to the personal SQLite edit.
 	assert.deepEqual(
@@ -294,7 +294,7 @@ test('.ensemble/settings.toml outranks personal SQLite per-key', (t) => {
 			value: getSetting(snapshot.repository, 'previewUrlTemplate').value,
 		},
 		{
-			source: 'ensemble-config',
+			source: 'ensemblr-config',
 			value: previewUrlTemplate,
 		},
 	);
@@ -315,16 +315,16 @@ test('.ensemble/settings.toml outranks personal SQLite per-key', (t) => {
 	assert.deepEqual(getSetting(snapshot.repository, 'scripts.run').candidates, [
 		{
 			reason: 'Selected by precedence.',
-			source: 'ensemble-config',
+			source: 'ensemblr-config',
 			status: 'selected',
 		},
 		{
-			reason: 'Ignored because ensemble-config has higher precedence.',
+			reason: 'Ignored because ensemblr-config has higher precedence.',
 			source: 'sqlite',
 			status: 'ignored',
 		},
 		{
-			reason: 'Ignored because ensemble-config has higher precedence.',
+			reason: 'Ignored because ensemblr-config has higher precedence.',
 			source: 'built-in-default',
 			status: 'ignored',
 		},
@@ -393,7 +393,7 @@ test('invalid repository permission mode falls back by source precedence', (t) =
 		config: createConfig(),
 		database,
 		repository: {
-			ensembleConfig: { security: { permissionMode: 'sandboxed' } },
+			ensemblrConfig: { security: { permissionMode: 'sandboxed' } },
 			repositoryId: 'repo-1',
 		},
 	});
@@ -413,7 +413,7 @@ test('invalid repository permission mode falls back by source precedence', (t) =
 		{
 			reason:
 				'Invalid permission mode "sandboxed". Expected one of: workspace-trusted, approval-required, read-only.',
-			source: 'ensemble-config',
+			source: 'ensemblr-config',
 			status: 'invalid',
 		},
 		{
@@ -475,7 +475,7 @@ test('repository sources override user-default git settings', () => {
 	const snapshot = resolveSettings({
 		config: createConfig(),
 		repository: {
-			ensembleConfig: { archiveAfterMerge: false },
+			ensemblrConfig: { archiveAfterMerge: false },
 			repositoryId: 'repo-1',
 		},
 		userGitDefaults: makeUserGit({ archiveAfterMerge: true }),
@@ -489,21 +489,21 @@ test('repository sources override user-default git settings', () => {
 		snapshot.repository,
 		'archiveAfterMerge',
 	);
-	assert.equal(archiveAfterMerge.source, 'ensemble-config');
+	assert.equal(archiveAfterMerge.source, 'ensemblr-config');
 	assert.equal(archiveAfterMerge.value, false);
 	assert.deepEqual(archiveAfterMerge.candidates, [
 		{
 			reason: 'Selected by precedence.',
-			source: 'ensemble-config',
+			source: 'ensemblr-config',
 			status: 'selected',
 		},
 		{
-			reason: 'Ignored because ensemble-config has higher precedence.',
+			reason: 'Ignored because ensemblr-config has higher precedence.',
 			source: 'user-default',
 			status: 'ignored',
 		},
 		{
-			reason: 'Ignored because ensemble-config has higher precedence.',
+			reason: 'Ignored because ensemblr-config has higher precedence.',
 			source: 'built-in-default',
 			status: 'ignored',
 		},
@@ -515,13 +515,13 @@ test('normalizes IPC settings resolution requests', () => {
 	assert.deepEqual(
 		normalizeSettingsResolutionRequest({
 			repository: {
-				ensembleConfig: { scripts: { run: 'bun run dev' } },
+				ensemblrConfig: { scripts: { run: 'bun run dev' } },
 				repositoryId: ' repo-1 ',
 			},
 		}),
 		{
 			repository: {
-				ensembleConfig: { scripts: { run: 'bun run dev' } },
+				ensemblrConfig: { scripts: { run: 'bun run dev' } },
 				repositoryId: 'repo-1',
 			},
 		},

@@ -46,7 +46,7 @@ test('ignores invalid keys and lines without a separator', () => {
 });
 
 test('loadEnvFile reads a file and reports a missing path', (t: TestContext) => {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-parse-env-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-parse-env-'));
 	const filePath = path.join(directory, '.env');
 	writeFileSync(filePath, 'A=1\nB=2\n', 'utf8');
 

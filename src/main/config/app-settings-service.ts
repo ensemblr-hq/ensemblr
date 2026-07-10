@@ -16,7 +16,7 @@ import {
 	mergeAppSettings,
 	parseAppSettings,
 } from '../../shared/config/app-settings.ts';
-import { resolveEnsembleConfigPath } from './config-loader.ts';
+import { resolveEnsemblrConfigPath } from './config-loader.ts';
 
 /** Coalesces the burst of fs events an editor emits for a single save. */
 const WATCH_DEBOUNCE_MS = 120;
@@ -24,7 +24,7 @@ const WATCH_DEBOUNCE_MS = 120;
 /**
  * Owns the App-settings slice (`app.general`, `app.models`, `app.git`,
  * `app.appearance`) of
- * `~/.config/ensemble/config.json` — the source of truth. Creates the file with
+ * `~/.config/ensemblr/config.json` — the source of truth. Creates the file with
  * defaults on first use, applies section-scoped patches via an atomic
  * temp-write+rename, and watches for external edits (echo-suppressed against its
  * own writes). Other config keys are preserved untouched.
@@ -53,7 +53,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 export function createAppSettingsService(
 	options: CreateAppSettingsServiceOptions = {},
 ): AppSettingsService {
-	const configPath = options.configPath ?? resolveEnsembleConfigPath();
+	const configPath = options.configPath ?? resolveEnsemblrConfigPath();
 	// Exact bytes of our last write — the watcher compares against this to ignore
 	// the fs event our own atomic write triggers.
 	let lastWritten: string | null = null;

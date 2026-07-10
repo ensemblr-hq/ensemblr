@@ -3,9 +3,9 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	restoreCheckpoint,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 
 /**
  * Pending restore request. Branch/session ids are captured at request time so
@@ -48,17 +48,17 @@ export function useCheckpointRestore(): {
 			description: `Files reverted to before “${target.label}”.`,
 		});
 		void queryClient.invalidateQueries({
-			queryKey: ensembleQueryKeys.piSessionEvents(target.branchId),
+			queryKey: ensemblrQueryKeys.piSessionEvents(target.branchId),
 		});
 		void queryClient.invalidateQueries({
-			queryKey: ensembleQueryKeys.checkpointsForSession(target.piSessionId),
+			queryKey: ensemblrQueryKeys.checkpointsForSession(target.piSessionId),
 		});
 		// Restore rewrites workspace files, so every cached diff/preview is stale.
 		void queryClient.invalidateQueries({
-			queryKey: [...ensembleQueryKeys.all, 'turn-diff'],
+			queryKey: [...ensemblrQueryKeys.all, 'turn-diff'],
 		});
 		void queryClient.invalidateQueries({
-			queryKey: [...ensembleQueryKeys.all, 'file-preview'],
+			queryKey: [...ensemblrQueryKeys.all, 'file-preview'],
 		});
 	}, [queryClient, target]);
 

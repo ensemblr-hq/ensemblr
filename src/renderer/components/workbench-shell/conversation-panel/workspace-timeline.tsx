@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { listClosedChatTabsWithSummaryQuery } from '@/renderer/api/ensemble-queries';
+import { listClosedChatTabsWithSummaryQuery } from '@/renderer/api/ensemblr-queries';
 import type {
 	ComposerShellState,
 	SessionTabModel,

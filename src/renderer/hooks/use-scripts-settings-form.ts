@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import {
 	settingsResolutionQuery,
 	updateRepositoryScripts,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import type { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
 
 /** Run-script concurrency mode (values match the resolver's `runScriptMode`). */

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
-import { linearIssueQuery } from '@/renderer/api/ensemble';
+import { linearIssueQuery } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,

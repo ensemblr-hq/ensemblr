@@ -18,17 +18,17 @@ Forensics traced it to two independent mechanisms, both rooted in how macOS
 Launch Services attributes processes:
 
 - **Inherited launch-context environment.** When macOS launches a GUI app it
-  injects `__CFBundleIdentifier` (the launching bundle id, `com.ensemble.app`)
+  injects `__CFBundleIdentifier` (the launching bundle id, `dev.ensemblr.app`)
   and `XPC_SERVICE_NAME` (the launchd application-instance identity,
-  `application.com.ensemble.app.<asn>`), with `XPC_FLAGS` and `LaunchInstanceID`
-  travelling in the same launchd context. Every child Ensemble spawns —
+  `application.dev.ensemblr.app.<asn>`), with `XPC_FLAGS` and `LaunchInstanceID`
+  travelling in the same launchd context. Every child Ensemblr spawns —
   a terminal PTY, a git/`gh` subprocess and its credential/askpass helper, a
   keychain `security` call, a GUI editor launch, the Pi agent and transitively
   its extension children, the login-shell environment probe — inherits those
   variables through `process.env`. The moment such a child touches Launch
   Services (a terminal running `open`, an editor registering itself, a tool
   shelling out) macOS treats it as *that bundle id* and attributes it to, or
-  relaunches, Ensemble. Electron's own `ELECTRON_RUN_AS_NODE`,
+  relaunches, Ensemblr. Electron's own `ELECTRON_RUN_AS_NODE`,
   `ELECTRON_NO_ATTACH_CONSOLE`, and `ELECTRON_NO_ASAR` markers similarly steer a
   child Electron/Node process into behavior meant only for this process.
 
@@ -38,13 +38,13 @@ Launch Services attributes processes:
   boots.
 
 A separate root cause — a dev bundle-id collision where an Electrobun
-`Ensemble-dev.app` shared `com.ensemble.app` under `electrobun dev --watch` — was
+`Ensemblr-dev.app` shared `dev.ensemblr.app` under `electrobun dev --watch` — was
 fixed on its own by giving each channel a distinct bundle id. That stops the
 primary trigger, but any child that inherits the launch-context markers can
 still re-arm the flash, so the mitigation below is the durable, defense-in-depth
 cure rather than a point fix.
 
-Ensemble must not strip the *user's* environment: ADR 0003 commits us to handing
+Ensemblr must not strip the *user's* environment: ADR 0003 commits us to handing
 Pi the full login-shell environment (PATH, SHELL, tool config). The fix must
 remove only the macOS/Electron launch markers, never user variables.
 
@@ -92,7 +92,7 @@ working directory to Console.app as forensics for any surviving relaunch
 trigger.
 
 **Dev is deliberately excluded from the lock.** Dev builds share one
-`Ensemble (DEV)` userData across Conductor workspaces, so a lock there would kill
+`Ensemblr (DEV)` userData across Conductor workspaces, so a lock there would kill
 the second dogfooding instance. The lock is gated behind `!isDev` and acquired
 after `app.setName` so it keys on the correct userData.
 
@@ -102,7 +102,7 @@ after `app.setName` so it keys on the correct userData.
 
 Giving each channel a distinct bundle id (done separately) removes the primary
 trigger but not the mechanism: any child inheriting the launch-context markers
-can still be attributed to Ensemble. Rejected as incomplete.
+can still be attributed to Ensemblr. Rejected as incomplete.
 
 ### Rely on the single-instance lock alone
 
@@ -121,7 +121,7 @@ intentional and cheap (a shallow object copy).
 
 ## Consequences
 
-- No child process can be mistaken for, or relaunch, Ensemble via inherited
+- No child process can be mistaken for, or relaunch, Ensemblr via inherited
   launch-context env, and a direct-exec relaunch of the packaged app folds into
   the running instance instead of booting a second one.
 - The user environment is untouched, so Pi and terminals keep the full

@@ -4,11 +4,11 @@ import { useState } from 'react';
 
 import {
 	addEnvFile,
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	envFilesQuery,
 	removeEnvFile,
 	selectEnvFile,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import type { EnvironmentVariableScope } from '@/shared/ipc/contracts/environment';
@@ -30,10 +30,10 @@ export function EnvFilesSection({ scope, scopeId }: EnvFilesSectionProps) {
 	const invalidate = async () => {
 		await Promise.all([
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.environmentFiles(scope, scopeId),
+				queryKey: ensemblrQueryKeys.environmentFiles(scope, scopeId),
 			}),
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.environmentVariables(),
+				queryKey: ensemblrQueryKeys.environmentVariables(),
 			}),
 		]);
 	};

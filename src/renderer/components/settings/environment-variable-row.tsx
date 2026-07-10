@@ -9,10 +9,10 @@ import {
 import { useState } from 'react';
 
 import {
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	readEnvironmentVariableValue,
 	unsetEnvironmentVariable,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
 import type {
@@ -71,7 +71,7 @@ export function EnvironmentVariableRow({
 			unsetEnvironmentVariable({ key: variable.key, scope, scopeId }),
 		onSuccess: async () => {
 			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.environmentVariables(),
+				queryKey: ensemblrQueryKeys.environmentVariables(),
 			});
 		},
 	});

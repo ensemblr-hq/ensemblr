@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { CheckIcon, MoreVerticalIcon, Undo2Icon, XIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import { workspaceCommitsQuery } from '@/renderer/api/ensemble';
+import { workspaceCommitsQuery } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,

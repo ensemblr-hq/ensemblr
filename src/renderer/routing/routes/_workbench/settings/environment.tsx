@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_workbench/settings/environment')({
 function EnvironmentSettings() {
 	return (
 		<EnvironmentVariablesPanel
-			description='Environment variables used by Ensemble and passed to Pi sessions, scripts, and terminals.'
+			description='Environment variables used by Ensemblr and passed to Pi sessions, scripts, and terminals.'
 			enableEnvFiles
 			scope='app'
 			title='Environment'

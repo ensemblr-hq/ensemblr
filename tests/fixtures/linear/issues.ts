@@ -21,7 +21,7 @@ export function createLinearIssueFixture(
 		labels: [{ color: '#eb5757', id: 'label-1', name: 'bug' }],
 		priority: 2,
 		projectId: 'project-1',
-		projectName: 'Ensemble',
+		projectName: 'Ensemblr',
 		stateColor: '#e2e2e2',
 		stateId: 'state-1',
 		stateName: 'Todo',

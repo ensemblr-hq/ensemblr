@@ -9,9 +9,9 @@ import {
 	createChatTabService,
 } from '../../src/main/chat-tabs/chat-tab-service.ts';
 import {
-	type EnsembleDatabaseConnection,
-	type EnsembleDatabaseService,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseConnection,
+	type EnsemblrDatabaseService,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import {
 	getChatTabById,
@@ -20,19 +20,19 @@ import {
 import { createPiSession } from '../../src/main/storage/repositories/pi-session-repository.ts';
 
 interface Fixture {
-	connection: EnsembleDatabaseConnection;
+	connection: EnsemblrDatabaseConnection;
 	piSessionId: string;
 	service: ChatTabService;
 	workspaceId: string;
 }
 
-const WORKSPACE_CWD = '/tmp/ensemble/tab-service/ws';
+const WORKSPACE_CWD = '/tmp/ensemblr/tab-service/ws';
 
 function openFixture(t: import('node:test').TestContext): Fixture {
 	const directory = mkdtempSync(
-		path.join(tmpdir(), 'ensemble-chat-tab-service-'),
+		path.join(tmpdir(), 'ensemblr-chat-tab-service-'),
 	);
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: path.join(directory, 'chat-tab-service-test.db'),
 	});
 	t.after(() => {
@@ -42,7 +42,7 @@ function openFixture(t: import('node:test').TestContext): Fixture {
 
 	connection.database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-tab-svc', 'tab-svc', 'TabSvc', '/tmp/ensemble/tab-service', 'main');
+VALUES ('repo-tab-svc', 'tab-svc', 'TabSvc', '/tmp/ensemblr/tab-service', 'main');
 INSERT INTO workspaces (id, repository_id, slug, name, path)
 VALUES ('ws-tab-svc', 'repo-tab-svc', 'tab-svc', 'TabSvc', '${WORKSPACE_CWD}');
 `);
@@ -52,7 +52,7 @@ VALUES ('ws-tab-svc', 'repo-tab-svc', 'tab-svc', 'TabSvc', '${WORKSPACE_CWD}');
 		input: { cwd: WORKSPACE_CWD, workspaceId: 'ws-tab-svc' },
 	});
 
-	const databaseService: EnsembleDatabaseService = {
+	const databaseService: EnsemblrDatabaseService = {
 		close: () => undefined,
 		getConnection: () => connection,
 		getHealth: () => ({

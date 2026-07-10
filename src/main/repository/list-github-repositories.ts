@@ -235,7 +235,7 @@ function mapFailure(result: LocalCommandResult): string {
 		case 'timeout':
 			return 'gh api timed out before returning the repository list.';
 		case 'output-truncated':
-			return 'gh returned more data than Ensemble can buffer; narrow the affiliation filter.';
+			return 'gh returned more data than Ensemblr can buffer; narrow the affiliation filter.';
 		case 'nonzero-exit':
 			if (
 				result.stderr.toLowerCase().includes('authentication') ||

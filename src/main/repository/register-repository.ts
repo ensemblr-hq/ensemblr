@@ -14,7 +14,7 @@ import {
 	type LoadRepositoryConfigOptions,
 	loadRepositoryConfig,
 } from '../config/repository-config.ts';
-import type { EnsembleDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage/database.ts';
 import {
 	insertRepositoryRow as insertRepositoryRowStorage,
 	selectRepositoryIdByPath,
@@ -41,7 +41,7 @@ export interface LocalRepositoryRegistrationService {
 
 /** Options for {@link createLocalRepositoryRegistrationService}. */
 export interface CreateLocalRepositoryRegistrationServiceOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	gitProbe?: GitRepositoryProbeFn;
 	loadConfig?: (options: LoadRepositoryConfigOptions) => LoadedRepositoryConfig;
 	now?: () => Date;
@@ -263,7 +263,7 @@ function findExistingDuplicate(
 	if (selectRepositoryIdByPath({ database, repositoryPath })) {
 		return {
 			code: 'repository-already-registered',
-			message: 'This repository is already registered with Ensemble.',
+			message: 'This repository is already registered with Ensemblr.',
 			path: repositoryPath,
 			severity: 'error',
 		};

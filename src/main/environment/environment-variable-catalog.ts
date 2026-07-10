@@ -6,7 +6,7 @@ import type {
 } from '../../shared/ipc/contracts/environment';
 import { isSensitiveKeyName } from '../config/json-utils.ts';
 
-/** Built-in catalog of environment variables Ensemble understands out-of-the-box. */
+/** Built-in catalog of environment variables Ensemblr understands out-of-the-box. */
 export const BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG: readonly EnvironmentVariableCatalogEntrySnapshot[] =
 	[
 		{
@@ -76,7 +76,7 @@ export const BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG: readonly EnvironmentVariable
 			createCatalogEntry({
 				category: 'provider',
 				description:
-					'Optional Ensemble-owned provider credential. Pi-owned provider credentials should stay in the Pi user environment unless explicitly overridden here.',
+					'Optional Ensemblr-owned provider credential. Pi-owned provider credentials should stay in the Pi user environment unless explicitly overridden here.',
 				key,
 				title: formatEnvironmentVariableTitle(key),
 				valueKind: 'secret',
@@ -99,11 +99,11 @@ export const BUILT_IN_ENVIRONMENT_VARIABLE_CATALOG: readonly EnvironmentVariable
 			valueKind: 'plain',
 		}),
 		...[
-			'ENSEMBLE_WORKSPACE_NAME',
-			'ENSEMBLE_WORKSPACE_PATH',
-			'ENSEMBLE_ROOT_PATH',
-			'ENSEMBLE_DEFAULT_BRANCH',
-			'ENSEMBLE_PORT',
+			'ENSEMBLR_WORKSPACE_NAME',
+			'ENSEMBLR_WORKSPACE_PATH',
+			'ENSEMBLR_ROOT_PATH',
+			'ENSEMBLR_DEFAULT_BRANCH',
+			'ENSEMBLR_PORT',
 		].map((key) =>
 			createCatalogEntry({
 				category: 'runtime',

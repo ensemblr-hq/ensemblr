@@ -15,7 +15,7 @@ import type {
 	QuickStartProjectResult,
 } from '../../shared/ipc/contracts/quick-start';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsembleRootDirectoryService } from '../root';
+import type { EnsemblrRootDirectoryService } from '../root';
 import { firstLine } from './first-line.ts';
 import type { LocalRepositoryRegistrationService } from './register-repository.ts';
 import { allocateUniqueTargetPath } from './target-path.ts';
@@ -30,7 +30,7 @@ export interface QuickStartProjectService {
 export interface CreateQuickStartProjectServiceOptions {
 	localCommandService: LocalCommandService;
 	registrationService: LocalRepositoryRegistrationService;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
 const PROJECT_NAME_PATTERN = /^[A-Za-z0-9._-]+$/;
@@ -308,7 +308,7 @@ function ensureParentDirectory(parentPath: string): {
 				message:
 					error instanceof Error
 						? error.message
-						: `Ensemble cannot write into ${parentPath}.`,
+						: `Ensemblr cannot write into ${parentPath}.`,
 				path: parentPath,
 				severity: 'error',
 			},
@@ -397,9 +397,9 @@ async function runInitialCommit({
 	const result = await localCommandService.run({
 		args: [
 			'-c',
-			'user.name=Ensemble',
+			'user.name=Ensemblr',
 			'-c',
-			'user.email=ensemble@local',
+			'user.email=ensemblr@local',
 			'commit',
 			'-m',
 			'Initial commit',

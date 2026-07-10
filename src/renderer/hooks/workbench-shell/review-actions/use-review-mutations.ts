@@ -5,10 +5,10 @@ import { toast } from 'sonner';
 
 import {
 	archiveWorkspace,
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	mergePullRequest,
 	refreshPullRequestSnapshot,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import {
 	ReviewActionError,
 	showReviewActionError,
@@ -61,7 +61,7 @@ export function useReviewMutations({
 				});
 			}
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+				queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
 			});
 		} catch (cause) {
 			toast.warning('Merge succeeded, but archiving the workspace failed.', {
@@ -90,7 +90,7 @@ export function useReviewMutations({
 				console.error('Failed to refresh PR snapshot after merge:', cause);
 			});
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.workspaceGitStatus(workspaceCwd),
+				queryKey: ensemblrQueryKeys.workspaceGitStatus(workspaceCwd),
 			});
 			if (mergeSettings.archiveAfterMerge) {
 				void runArchiveAfterMerge();

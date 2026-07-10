@@ -24,7 +24,7 @@ test('local-branch landing card surfaces repo name, branch, and copied count', (
 		},
 		headline: 'New workspace ready',
 		kind: 'local-branch',
-		repositoryName: 'ensemble',
+		repositoryName: 'ensemblr',
 		setupGuidance: {
 			detail: 'No setup script is configured for this repository.',
 			state: 'missing',
@@ -34,7 +34,7 @@ test('local-branch landing card surfaces repo name, branch, and copied count', (
 
 	expect(markup).toContain('Workspace landing summary');
 	expect(markup).toContain('data-landing-card-kind="local-branch"');
-	expect(markup).toContain('ensemble');
+	expect(markup).toContain('ensemblr');
 	expect(markup).toContain('stockholm');
 	expect(markup).toContain('psoldunov/stockholm');
 	expect(markup).toContain('origin/master');

@@ -3,10 +3,10 @@ import { describe, expect, test } from 'vitest';
 import {
 	readCachedPiModels,
 	writeCachedPiModels,
-} from '../../src/renderer/api/ensemble/pi-models-cache';
+} from '../../src/renderer/api/ensemblr/pi-models-cache';
 import type { ListPiModelsResult } from '../../src/shared/ipc/contracts/pi-session';
 
-const KEY = 'ensemble_pref_pi_models_snapshot';
+const KEY = 'ensemblr_pref_pi_models_snapshot';
 
 /** Minimal Map-backed Storage for deterministic, DOM-free tests. */
 function fakeStorage(initial: Record<string, string> = {}): Storage {

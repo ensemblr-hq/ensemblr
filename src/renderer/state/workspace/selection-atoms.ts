@@ -10,7 +10,7 @@ export const lastWorkspaceNavigationRenderStateAtom =
 
 /** localStorage key for the persisted last-selected workspace pair. */
 export const LAST_WORKSPACE_SELECTION_STORAGE_KEY =
-	'ensemble_workspace_last_selection';
+	'ensemblr_workspace_last_selection';
 
 /** Persisted last-selected (projectId, workspaceId) pair, used as a fallback. */
 export const lastWorkspaceSelectionAtom = atomWithStorage<{
@@ -27,7 +27,7 @@ export const lastWorkspaceSelectionAtom = atomWithStorage<{
 export const activeChatTabByWorkspaceAtom = atomWithStorage<
 	Record<string, string>
 >(
-	'ensemble_workspace_active_chat_tab_by_workspace',
+	'ensemblr_workspace_active_chat_tab_by_workspace',
 	{},
 	undefined,
 	workspaceStorageOptions,

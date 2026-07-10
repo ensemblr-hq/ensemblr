@@ -20,7 +20,7 @@ export interface ReviewHandlersOptions {
 	reviewService: ReviewService;
 }
 
-/** Registers IPC handlers for Ensemble-local review comments and todos. */
+/** Registers IPC handlers for Ensemblr-local review comments and todos. */
 export function registerReviewHandlers({
 	reviewService,
 }: ReviewHandlersOptions): void {

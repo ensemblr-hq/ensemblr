@@ -19,7 +19,7 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
-import type { EnsembleDatabaseService } from '../storage';
+import type { EnsemblrDatabaseService } from '../storage';
 import { classifyCommandFailure } from './gh-failures.ts';
 import {
 	readCachedPullRequestSnapshot,
@@ -77,7 +77,7 @@ export interface GithubService {
 }
 
 export interface CreateGithubServiceOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
 }

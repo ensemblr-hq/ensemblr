@@ -55,7 +55,7 @@ export function useRootDirectoryChange({
 			setActionError(null);
 			setApplyResult(null);
 
-			const next = await window.ensemble?.selectRootDirectory();
+			const next = await window.ensemblr?.selectRootDirectory();
 
 			if (!next) {
 				setActionError(
@@ -94,7 +94,7 @@ export function useRootDirectoryChange({
 		setActionError(null);
 
 		try {
-			const result = await window.ensemble?.confirmRootDirectoryChange({
+			const result = await window.ensemblr?.confirmRootDirectoryChange({
 				path,
 			});
 

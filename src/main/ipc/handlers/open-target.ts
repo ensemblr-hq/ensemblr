@@ -10,11 +10,11 @@ import {
 	type OpenTargetService,
 	sanitizeWorkspaceRelativePath,
 } from '../../open-target';
-import type { EnsembleDatabaseService } from '../../storage';
+import type { EnsemblrDatabaseService } from '../../storage';
 import { getWorkspacePathById } from '../../storage/repositories/workspace-repository';
 
 interface RegisterOpenTargetHandlersOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	openTargetService: OpenTargetService;
 }
 

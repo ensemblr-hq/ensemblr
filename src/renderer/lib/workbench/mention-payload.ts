@@ -1,4 +1,4 @@
-import { readWorkspaceFile } from '@/renderer/api/ensemble-queries';
+import { readWorkspaceFile } from '@/renderer/api/ensemblr-queries';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 
 /**

@@ -13,15 +13,15 @@ import {
 } from '../../src/main/linear/linear-client.ts';
 import { createLinearService } from '../../src/main/linear/linear-service.ts';
 import {
-	type EnsembleDatabaseService,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseService,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 
 const NOW = new Date('2026-06-11T00:00:00.000Z');
 
-function createDatabaseServiceFixture(t: TestContext): EnsembleDatabaseService {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-linear-svc-'));
-	const connection = openEnsembleDatabase({
+function createDatabaseServiceFixture(t: TestContext): EnsemblrDatabaseService {
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-linear-svc-'));
+	const connection = openEnsemblrDatabase({
 		databasePath: path.join(directory, 'linear-svc-test.db'),
 	});
 
@@ -59,7 +59,7 @@ function createIssueData(
 		id: 'issue-1',
 		identifier: 'THE-143',
 		priority: 1,
-		project: { id: 'project-1', name: 'Ensemble' },
+		project: { id: 'project-1', name: 'Ensemblr' },
 		state: { color: '#888', id: 'state-1', name: 'Todo', type: 'unstarted' },
 		team: { id: 'team-1', key: 'THE', name: 'Theseus' },
 		title: 'Linear OAuth',

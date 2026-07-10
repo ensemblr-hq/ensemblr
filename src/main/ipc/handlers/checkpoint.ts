@@ -14,7 +14,7 @@ import {
 	restoreTurnCheckpoint,
 } from '../../checkpoints/checkpoint-service.ts';
 import {
-	type EnsembleDatabaseService,
+	type EnsemblrDatabaseService,
 	requireDatabase,
 } from '../../storage/database.ts';
 import {
@@ -29,7 +29,7 @@ import {
 } from '../request-schemas.ts';
 
 export interface CheckpointHandlersOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 }
 
 /**

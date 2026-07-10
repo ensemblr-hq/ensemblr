@@ -8,7 +8,7 @@ import {
 	settingsResolutionQuery,
 	workspaceFilesQuery,
 	workspaceGitStatusQuery,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import {
 	buildWorkspaceScriptSummaries,
 	scriptSummaryToDockStatus,

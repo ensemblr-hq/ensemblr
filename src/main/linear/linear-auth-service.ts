@@ -8,9 +8,9 @@ import type {
 	LinearDisconnectResult,
 	LinearLoginResult,
 } from '../../shared/ipc/contracts/linear';
-import type { EnsembleConfigService } from '../config/config-loader';
+import type { EnsemblrConfigService } from '../config/config-loader';
 import type { SecretStore } from '../secrets';
-import type { EnsembleDatabaseService } from '../storage/database';
+import type { EnsemblrDatabaseService } from '../storage/database';
 import {
 	BUILT_IN_LINEAR_CLIENT_ID,
 	buildLinearAuthorizeUrl,
@@ -58,7 +58,7 @@ export class LinearAuthError extends Error {
 	}
 }
 
-/** Linear OAuth client settings declared in `~/.config/ensemble/config.json`. */
+/** Linear OAuth client settings declared in `~/.config/ensemblr/config.json`. */
 export interface LinearOauthConfig {
 	clientId: string;
 	scopes: readonly string[];
@@ -78,8 +78,8 @@ export interface CreateLinearAuthServiceOptions {
 	builtInClientId?: string;
 	callbackPorts?: readonly number[];
 	callbackTimeoutMs?: number;
-	configService: EnsembleConfigService;
-	databaseService: EnsembleDatabaseService;
+	configService: EnsemblrConfigService;
+	databaseService: EnsemblrDatabaseService;
 	fetchImpl?: typeof fetch;
 	now?: () => Date;
 	openExternal: (url: string) => Promise<void>;
@@ -134,7 +134,7 @@ export function createLinearAuthService({
 		if (!database) {
 			throw new LinearAuthError(
 				'database-error',
-				'The Ensemble database is not open.',
+				'The Ensemblr database is not open.',
 			);
 		}
 
@@ -453,7 +453,7 @@ export function createLinearAuthService({
 		if (!config) {
 			throw new LinearAuthError(
 				'not-configured',
-				'Linear OAuth is not configured. Set app.linear.clientId in the Ensemble config.',
+				'Linear OAuth is not configured. Set app.linear.clientId in the Ensemblr config.',
 			);
 		}
 
@@ -628,7 +628,7 @@ export function createLinearAuthService({
 					failure: {
 						code: 'not-configured',
 						message:
-							'Linear OAuth is not configured. Set app.linear.clientId in ~/.config/ensemble/config.json.',
+							'Linear OAuth is not configured. Set app.linear.clientId in ~/.config/ensemblr/config.json.',
 					},
 					status: 'error',
 				};

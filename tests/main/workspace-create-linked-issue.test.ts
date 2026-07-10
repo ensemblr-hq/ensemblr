@@ -8,9 +8,9 @@ import test, { type TestContext } from 'node:test';
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
 import {
-	type EnsembleDatabaseConnection,
-	type EnsembleDatabaseService,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseConnection,
+	type EnsemblrDatabaseService,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import type { WorkspaceLinkedIssueInput } from '../../src/shared/ipc/index.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
@@ -28,7 +28,7 @@ const LINKED_ISSUE: WorkspaceLinkedIssueInput = {
 };
 
 function createHarness(t: TestContext) {
-	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemble-linked-issue-'));
+	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-linked-issue-'));
 	const repositoriesPath = path.join(rootPath, 'repos');
 	const workspacesPath = path.join(rootPath, 'workspaces');
 	mkdirSync(repositoriesPath, { recursive: true });
@@ -37,13 +37,13 @@ function createHarness(t: TestContext) {
 	const repositoryPath = path.join(repositoriesPath, 'demo');
 	mkdirSync(repositoryPath);
 	runGit(repositoryPath, ['init', '-b', 'main']);
-	runGit(repositoryPath, ['config', 'user.email', 'test@ensemble.dev']);
-	runGit(repositoryPath, ['config', 'user.name', 'Ensemble Test']);
+	runGit(repositoryPath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(repositoryPath, ['config', 'user.name', 'Ensemblr Test']);
 	writeFileSync(path.join(repositoryPath, 'README.md'), '# demo\n');
 	runGit(repositoryPath, ['add', '.']);
 	runGit(repositoryPath, ['commit', '-m', 'init']);
 
-	const connection = openEnsembleDatabase({ databasePath: ':memory:' });
+	const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
 	const timestamp = fixedNow().toISOString();
 	connection.database
 		.prepare(
@@ -77,8 +77,8 @@ function createHarness(t: TestContext) {
 }
 
 function wrapConnection(
-	connection: EnsembleDatabaseConnection,
-): EnsembleDatabaseService {
+	connection: EnsemblrDatabaseConnection,
+): EnsemblrDatabaseService {
 	return {
 		close: () => connection.database.close(),
 		getConnection: () => connection,

@@ -2,7 +2,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { isRedirect } from '@tanstack/react-router';
 import { afterEach, expect, test } from 'vitest';
 
-import { repositoryWorkspaceNavigationQuery } from '../../src/renderer/api/ensemble-queries';
+import { repositoryWorkspaceNavigationQuery } from '../../src/renderer/api/ensemblr-queries';
 import { normalizeWorkbenchSearch } from '../../src/renderer/lib/workbench';
 import { refreshRepositoryWorkspaceNavigationCache } from '../../src/renderer/lib/workbench/seed-first-workspace';
 import {
@@ -126,7 +126,7 @@ async function loadDefaultWorkspaceRouteData(): Promise<WorkspaceRouteLoaderData
 	const workspaceData = await loadWorkspaceWorkbenchRoute({
 		parentMatchPromise: Promise.resolve({ loaderData }),
 		params: {
-			projectId: 'ensemble',
+			projectId: 'ensemblr',
 			workspaceId: 'san-antonio',
 		},
 		rawSearch: {},
@@ -153,7 +153,7 @@ async function catchWorkspaceIndexRouteRedirect({
 		await loadWorkspaceIndexRoute({
 			parentMatchPromise: Promise.resolve({ loaderData: workspaceData }),
 			params: {
-				projectId: 'ensemble',
+				projectId: 'ensemblr',
 				workspaceId: 'san-antonio',
 			},
 			search,
@@ -212,7 +212,7 @@ test('redirects invalid project routes to the default workspace URL', async () =
 	expect(redirectOptions).toMatchObject({
 		params: {
 			chatId: 'review-shell',
-			projectId: 'ensemble',
+			projectId: 'ensemblr',
 			workspaceId: 'san-antonio',
 		},
 		replace: true,
@@ -231,7 +231,7 @@ test('redirects invalid workspace routes to the default workspace URL', async ()
 	expect(redirectOptions).toMatchObject({
 		params: {
 			chatId: 'review-shell',
-			projectId: 'ensemble',
+			projectId: 'ensemblr',
 			workspaceId: 'san-antonio',
 		},
 		replace: true,
@@ -242,7 +242,7 @@ test('redirects invalid workspace routes to the default workspace URL', async ()
 test('redirects legacy workspace chat search params to the chat route', async () => {
 	const redirectOptions = await catchWorkspaceRouteRedirect({
 		params: {
-			projectId: 'ensemble',
+			projectId: 'ensemblr',
 			workspaceId: 'san-antonio',
 		},
 		rawSearch: {
@@ -255,7 +255,7 @@ test('redirects legacy workspace chat search params to the chat route', async ()
 	expect(redirectOptions).toMatchObject({
 		params: {
 			chatId: 'review-shell',
-			projectId: 'ensemble',
+			projectId: 'ensemblr',
 			workspaceId: 'san-antonio',
 		},
 		replace: true,
@@ -276,7 +276,7 @@ test('redirects workspace index routes to the default chat route', async () => {
 	expect(redirectOptions).toMatchObject({
 		params: {
 			chatId: 'review-shell',
-			projectId: 'ensemble',
+			projectId: 'ensemblr',
 			workspaceId: 'san-antonio',
 		},
 		replace: true,
@@ -293,7 +293,7 @@ test('accepts valid typed chat route params without redirecting', async () => {
 		parentMatchPromise: Promise.resolve({ loaderData: workspaceData }),
 		params: {
 			chatId: 'review-shell',
-			projectId: 'ensemble',
+			projectId: 'ensemblr',
 			workspaceId: 'san-antonio',
 		},
 		rawSearch: {
@@ -313,7 +313,7 @@ test('accepts database-backed chat route params outside fixture sessions', async
 		parentMatchPromise: Promise.resolve({ loaderData: workspaceData }),
 		params: {
 			chatId: 'chat-tab-from-database',
-			projectId: 'ensemble',
+			projectId: 'ensemblr',
 			workspaceId: 'san-antonio',
 		},
 		rawSearch: {},
@@ -327,7 +327,7 @@ test('canonicalizes chat route search without replacing database tab ids', async
 	const redirectOptions = await catchWorkspaceChatRouteRedirect({
 		params: {
 			chatId: 'chat-tab-from-database',
-			projectId: 'ensemble',
+			projectId: 'ensemblr',
 			workspaceId: 'san-antonio',
 		},
 		rawSearch: {
@@ -338,7 +338,7 @@ test('canonicalizes chat route search without replacing database tab ids', async
 	expect(redirectOptions).toMatchObject({
 		params: {
 			chatId: 'chat-tab-from-database',
-			projectId: 'ensemble',
+			projectId: 'ensemblr',
 			workspaceId: 'san-antonio',
 		},
 		replace: true,
@@ -400,11 +400,11 @@ test('reads fresh navigation cache when parent loaderData lacks the workspace', 
 			{
 				createdAt: '2026-06-08T00:00:00.000Z',
 				defaultBranch: 'main',
-				id: 'ensemble',
+				id: 'ensemblr',
 				metadata: {},
-				name: 'ensemble',
-				path: '/tmp/ensemble',
-				slug: 'ensemble',
+				name: 'ensemblr',
+				path: '/tmp/ensemblr',
+				slug: 'ensemblr',
 				updatedAt: '2026-06-08T00:00:00.000Z',
 				workspaces: [
 					{
@@ -415,8 +415,8 @@ test('reads fresh navigation cache when parent loaderData lacks the workspace', 
 						id: seededWorkspaceId,
 						metadata: {},
 						name: 'Test Fresh',
-						path: '/tmp/ensemble/test-fresh',
-						repositoryId: 'ensemble',
+						path: '/tmp/ensemblr/test-fresh',
+						repositoryId: 'ensemblr',
 						slug: 'test-fresh',
 						updatedAt: '2026-06-08T00:00:00.000Z',
 					},
@@ -432,7 +432,7 @@ test('reads fresh navigation cache when parent loaderData lacks the workspace', 
 	const workspaceData = await loadWorkspaceWorkbenchRoute({
 		parentMatchPromise: Promise.resolve({ loaderData }),
 		params: {
-			projectId: 'ensemble',
+			projectId: 'ensemblr',
 			workspaceId: seededWorkspaceId,
 		},
 		queryClient,
@@ -441,7 +441,7 @@ test('reads fresh navigation cache when parent loaderData lacks the workspace', 
 	});
 
 	expect(workspaceData).toBeDefined();
-	expect(workspaceData?.project.id).toBe('ensemble');
+	expect(workspaceData?.project.id).toBe('ensemblr');
 	expect(workspaceData?.workspace.id).toBe(seededWorkspaceId);
 });
 
@@ -464,7 +464,7 @@ test('refreshes navigation from IPC even when the cache is fresh', async () => {
 	Object.defineProperty(globalThis, 'window', {
 		configurable: true,
 		value: {
-			ensemble: {
+			ensemblr: {
 				repositoryWorkspaceNavigation: async () => {
 					calls += 1;
 					return freshSnapshot;

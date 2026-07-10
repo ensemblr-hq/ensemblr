@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAtom } from 'jotai';
 import { useMemo, useState } from 'react';
 
-import { piModelsQuery } from '@/renderer/api/ensemble';
+import { piModelsQuery } from '@/renderer/api/ensemblr';
 import { SettingsEmptyState } from '@/renderer/components/settings/settings-empty-state';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';

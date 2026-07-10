@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 /**
  * Schema + defaults for the user-facing **App settings** persisted in
- * `~/.config/ensemble/config.json` under the `app` key (`app.general`,
+ * `~/.config/ensemblr/config.json` under the `app` key (`app.general`,
  * `app.models`). This is the single source of truth shared by the main process
  * (read/validate/write) and the renderer (defaults + types).
  *

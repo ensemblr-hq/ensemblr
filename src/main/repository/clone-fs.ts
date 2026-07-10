@@ -27,7 +27,7 @@ export function assertTargetWritable(
 		}
 		return {
 			code: 'destination-not-writable',
-			message: `Ensemble cannot write into ${parent}. Pick a writable location.`,
+			message: `Ensemblr cannot write into ${parent}. Pick a writable location.`,
 			path: parent,
 			severity: 'error',
 		};

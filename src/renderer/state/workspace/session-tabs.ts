@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import {
 	closeChatTab,
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	listChatTabsQuery,
 	listClosedChatTabsWithSummaryQuery,
 	openChatTab,
@@ -12,7 +12,7 @@ import {
 	restoreChatTab,
 	subscribePiSessionEvents,
 	writeOpenedChatTabToCache,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { forgetChatOverrides } from '@/renderer/state/preferences';
 import type {
 	CommentPreviewPayload,
@@ -142,10 +142,10 @@ export function useSessionTabState({
 
 	const invalidateChatTabs = useCallback(() => {
 		void queryClient.invalidateQueries({
-			queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+			queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 		});
 		void queryClient.invalidateQueries({
-			queryKey: ensembleQueryKeys.closedChatTabsWithSummary(workspaceId),
+			queryKey: ensemblrQueryKeys.closedChatTabsWithSummary(workspaceId),
 		});
 	}, [queryClient, workspaceId]);
 
@@ -162,7 +162,7 @@ export function useSessionTabState({
 				return;
 			}
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
+				queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
 			});
 		});
 		return unsubscribe;
@@ -193,16 +193,16 @@ export function useSessionTabState({
 				return;
 			}
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+				queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 			});
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.closedChatTabsWithSummary(workspaceId),
+				queryKey: ensemblrQueryKeys.closedChatTabsWithSummary(workspaceId),
 			});
 		},
 		onSuccess: (result) => {
 			cacheOpenedTab(result);
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+				queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 			});
 		},
 	});
@@ -219,7 +219,7 @@ export function useSessionTabState({
 		onSuccess: (result) => {
 			cacheOpenedTab(result);
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+				queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 			});
 		},
 	});
@@ -279,10 +279,10 @@ export function useSessionTabState({
 				forgetChatOverrides(chatTabId);
 			}
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+				queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 			});
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.closedChatTabsWithSummary(workspaceId),
+				queryKey: ensemblrQueryKeys.closedChatTabsWithSummary(workspaceId),
 			});
 		},
 	});

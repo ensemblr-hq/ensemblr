@@ -2,10 +2,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 
 import {
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	piSessionEventsQuery,
 	subscribePiSessionEvents,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import type {
 	ListPiSessionEventsResult,
 	PiSessionEventWire,
@@ -16,7 +16,7 @@ import type {
  * persisted-then-live merged list in ordinal order.
  *
  * Persisted events arrive once via TanStack Query against
- * `ensemble:list-pi-session-events`. Live events arrive through the preload
+ * `ensemblr:list-pi-session-events`. Live events arrive through the preload
  * broadcast channel and are appended to the same query cache so the UI does
  * not need a second source of truth.
  */
@@ -43,7 +43,7 @@ export function useTimelineEvents({
 				return;
 			}
 			queryClient.setQueryData<ListPiSessionEventsResult | undefined>(
-				ensembleQueryKeys.piSessionEvents(broadcast.event.branchId),
+				ensemblrQueryKeys.piSessionEvents(broadcast.event.branchId),
 				(prev) => mergeBroadcast(prev, broadcast.event),
 			);
 		});

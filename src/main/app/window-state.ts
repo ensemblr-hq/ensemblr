@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import type { BrowserWindow, Rectangle } from 'electron';
 
-import type { EnsembleDatabaseService } from '../storage';
+import type { EnsemblrDatabaseService } from '../storage';
 
 /** Snapshot of the main window's geometry and state flags. */
 export interface MainWindowState {
@@ -24,7 +24,7 @@ export interface MainWindowDisplay {
 
 /** Options for {@link createMainWindowStateStore}. */
 interface CreateMainWindowStateStoreOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	now?: () => Date;
 }
 

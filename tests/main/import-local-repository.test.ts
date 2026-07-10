@@ -14,7 +14,7 @@ import test, { type TestContext } from 'node:test';
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
 import { createLocalRepositoryImportService } from '../../src/main/repository/import-local-repository.ts';
 import type { LocalRepositoryRegistrationService } from '../../src/main/repository/register-repository.ts';
-import type { EnsembleRootDirectoryService } from '../../src/main/root';
+import type { EnsemblrRootDirectoryService } from '../../src/main/root';
 import type { RegisteredRepositorySnapshot } from '../../src/shared/ipc/contracts/repository.ts';
 import type { RootDirectorySnapshot } from '../../src/shared/ipc/contracts/root-directory.ts';
 
@@ -45,7 +45,7 @@ function createRootSnapshot(rootPath: string): RootDirectorySnapshot {
 
 function rootDirectoryStub(
 	snapshot: RootDirectorySnapshot,
-): EnsembleRootDirectoryService {
+): EnsemblrRootDirectoryService {
 	return {
 		applyChange: () => ({
 			applied: false,
@@ -76,8 +76,8 @@ function runGit(cwd: string, args: string[]): string {
 
 function createGitRepository(cwd: string): void {
 	runGit(cwd, ['init', '-b', 'main']);
-	runGit(cwd, ['config', 'user.email', 'test@ensemble.dev']);
-	runGit(cwd, ['config', 'user.name', 'Ensemble Test']);
+	runGit(cwd, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(cwd, ['config', 'user.name', 'Ensemblr Test']);
 }
 
 function createRepositorySnapshot({
@@ -101,8 +101,8 @@ function createRepositorySnapshot({
 }
 
 test('importLocalRepository copies the selected project into managed repos before registering it', async (t) => {
-	const sourcePath = createFixtureDirectory(t, 'ensemble-import-source-');
-	const rootPath = createFixtureDirectory(t, 'ensemble-import-root-');
+	const sourcePath = createFixtureDirectory(t, 'ensemblr-import-source-');
+	const rootPath = createFixtureDirectory(t, 'ensemblr-import-root-');
 	const nestedPath = path.join(sourcePath, 'src');
 	const untrackedPath = path.join(sourcePath, 'node_modules');
 	mkdirSync(nestedPath);
@@ -149,8 +149,8 @@ test('importLocalRepository copies the selected project into managed repos befor
 });
 
 test('importLocalRepository rolls back the managed copy when registration fails', async (t) => {
-	const sourcePath = createFixtureDirectory(t, 'ensemble-import-source-');
-	const rootPath = createFixtureDirectory(t, 'ensemble-import-root-');
+	const sourcePath = createFixtureDirectory(t, 'ensemblr-import-source-');
+	const rootPath = createFixtureDirectory(t, 'ensemblr-import-root-');
 	createGitRepository(sourcePath);
 	writeFileSync(path.join(sourcePath, 'README.md'), '# rollback\n');
 	runGit(sourcePath, ['add', 'README.md']);
@@ -189,8 +189,8 @@ test('importLocalRepository rolls back the managed copy when registration fails'
 });
 
 test('importLocalRepository rejects destinations inside the selected source', async (t) => {
-	const sourcePath = createFixtureDirectory(t, 'ensemble-import-source-');
-	const rootPath = path.join(sourcePath, 'Ensemble');
+	const sourcePath = createFixtureDirectory(t, 'ensemblr-import-source-');
+	const rootPath = path.join(sourcePath, 'Ensemblr');
 	createGitRepository(sourcePath);
 	writeFileSync(path.join(sourcePath, 'README.md'), '# nested\n');
 	runGit(sourcePath, ['add', 'README.md']);
@@ -216,8 +216,8 @@ test('importLocalRepository rejects destinations inside the selected source', as
 });
 
 test('importLocalRepository rejects sources that are not git repositories', async (t) => {
-	const sourcePath = createFixtureDirectory(t, 'ensemble-import-source-');
-	const rootPath = createFixtureDirectory(t, 'ensemble-import-root-');
+	const sourcePath = createFixtureDirectory(t, 'ensemblr-import-source-');
+	const rootPath = createFixtureDirectory(t, 'ensemblr-import-root-');
 	writeFileSync(path.join(sourcePath, 'README.md'), '# no git here\n');
 	const registrationService: LocalRepositoryRegistrationService = {
 		register: async () => {

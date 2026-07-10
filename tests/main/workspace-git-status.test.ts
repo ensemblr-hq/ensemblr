@@ -154,7 +154,7 @@ test('parseNumstat parses counts, binary markers, and renames', () => {
 });
 
 test('getStatus merges porcelain entries with numstat counts', async (t) => {
-	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-'));
+	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-'));
 	t.after(() => rm(workspaceDir, { force: true, recursive: true }));
 	await writeFile(path.join(workspaceDir, 'notes.md'), 'one\ntwo\n');
 
@@ -177,7 +177,7 @@ test('getStatus merges porcelain entries with numstat counts', async (t) => {
 });
 
 test('getStatus expands untracked directories with --untracked-files=all', async (t) => {
-	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-'));
+	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-'));
 	t.after(() => rm(workspaceDir, { force: true, recursive: true }));
 	const { calls, service } = stubCommandService((request) => {
 		if (request.args?.[0] === 'status') {
@@ -206,7 +206,7 @@ test('getStatus expands untracked directories with --untracked-files=all', async
 });
 
 test('discardChanges reverts a tracked file to HEAD', async (t) => {
-	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-'));
+	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-'));
 	t.after(() => rm(workspaceDir, { force: true, recursive: true }));
 	// All git calls succeed: `cat-file -e HEAD:path` success means the file is in
 	// HEAD, so the tracked-revert branch runs `git checkout`.
@@ -225,7 +225,7 @@ test('discardChanges reverts a tracked file to HEAD', async (t) => {
 });
 
 test('discardChanges deletes a new/untracked file from disk', async (t) => {
-	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-'));
+	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-'));
 	t.after(() => rm(workspaceDir, { force: true, recursive: true }));
 	const filePath = path.join(workspaceDir, 'fresh.ts');
 	await writeFile(filePath, 'export const x = 1;\n');
@@ -257,7 +257,7 @@ test('discardChanges deletes a new/untracked file from disk', async (t) => {
 });
 
 test('discardChanges (real git) reverts a tracked edit and deletes a new file', async (t) => {
-	const dir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-real-'));
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-real-'));
 	t.after(() => rm(dir, { force: true, recursive: true }));
 	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
 	await git('init', '-q');
@@ -290,7 +290,7 @@ test('discardChanges (real git) reverts a tracked edit and deletes a new file', 
 });
 
 test('discardChanges rejects paths escaping the workspace', async (t) => {
-	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-'));
+	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-'));
 	t.after(() => rm(workspaceDir, { force: true, recursive: true }));
 	const { calls, service } = stubCommandService(() => buildResult());
 	const git = createWorkspaceGitService({ localCommandService: service });
@@ -409,7 +409,7 @@ test('parseNameStatus classifies entries and reads rename paths', () => {
 });
 
 test("getStatus (real git) returns a single commit's files for commit scope", async (t) => {
-	const dir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-commit-'));
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-commit-'));
 	t.after(() => rm(dir, { force: true, recursive: true }));
 	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
 	await git('init', '-q');
@@ -460,7 +460,7 @@ test("getStatus (real git) returns a single commit's files for commit scope", as
 });
 
 test('getStatus (real git) branch scope spans commits + uncommitted', async (t) => {
-	const dir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-branch-'));
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-branch-'));
 	t.after(() => rm(dir, { force: true, recursive: true }));
 	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
 	await git('init', '-q');
@@ -511,7 +511,7 @@ test('getStatus (real git) branch scope spans commits + uncommitted', async (t) 
 });
 
 test('getCommits (real git) scopes to branch commits when given a base ref', async (t) => {
-	const dir = await mkdtemp(path.join(tmpdir(), 'ensemble-git-log-'));
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-log-'));
 	t.after(() => rm(dir, { force: true, recursive: true }));
 	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
 	await git('init', '-q');

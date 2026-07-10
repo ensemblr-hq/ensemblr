@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { piSlashCommandsQuery } from '@/renderer/api/ensemble-queries';
+import { piSlashCommandsQuery } from '@/renderer/api/ensemblr-queries';
 
 import {
 	SLASH_COMMANDS,

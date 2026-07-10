@@ -28,7 +28,7 @@ import {
 export function createMockSecretStore({
 	idFactory = randomUUID,
 	now = () => new Date(),
-	serviceName = 'mock.ensemble.secret-store',
+	serviceName = 'mock.ensemblr.secret-store',
 }: MockSecretStoreOptions = {}): SecretStore {
 	const records = new Map<
 		string,

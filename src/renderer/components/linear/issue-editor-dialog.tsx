@@ -3,10 +3,10 @@ import { useState } from 'react';
 
 import {
 	createLinearIssue,
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	linearMetadataQuery,
 	updateLinearIssue,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -99,10 +99,10 @@ export function LinearIssueEditorDialog({
 			if (result) {
 				await Promise.all([
 					queryClient.invalidateQueries({
-						queryKey: ensembleQueryKeys.linearIssuesAll(),
+						queryKey: ensemblrQueryKeys.linearIssuesAll(),
 					}),
 					queryClient.invalidateQueries({
-						queryKey: ensembleQueryKeys.linearIssue(result.issue.id),
+						queryKey: ensemblrQueryKeys.linearIssue(result.issue.id),
 					}),
 				]);
 			}

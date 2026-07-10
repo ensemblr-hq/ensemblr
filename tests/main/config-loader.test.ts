@@ -5,10 +5,10 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
-	createEnsembleConfigService,
-	ENSEMBLE_CONFIG_SCHEMA_VERSION,
-	loadEnsembleConfig,
-	resolveEnsembleConfigPath,
+	createEnsemblrConfigService,
+	ENSEMBLR_CONFIG_SCHEMA_VERSION,
+	loadEnsemblrConfig,
+	resolveEnsemblrConfigPath,
 } from '../../src/main/config/config-loader.ts';
 
 function createConfigFixture(): {
@@ -17,8 +17,8 @@ function createConfigFixture(): {
 	homeDirectory: string;
 	writeConfig: (source: string) => void;
 } {
-	const homeDirectory = mkdtempSync(path.join(tmpdir(), 'ensemble-config-'));
-	const configPath = resolveEnsembleConfigPath(homeDirectory);
+	const homeDirectory = mkdtempSync(path.join(tmpdir(), 'ensemblr-config-'));
+	const configPath = resolveEnsemblrConfigPath(homeDirectory);
 
 	return {
 		cleanup: () => rmSync(homeDirectory, { force: true, recursive: true }),
@@ -35,10 +35,10 @@ function fixedClock() {
 	return new Date('2026-06-04T12:00:00.000Z');
 }
 
-test('resolves the declarative config path under ~/.config/ensemble', () => {
+test('resolves the declarative config path under ~/.config/ensemblr', () => {
 	assert.equal(
-		resolveEnsembleConfigPath('/Users/example'),
-		'/Users/example/.config/ensemble/config.json',
+		resolveEnsemblrConfigPath('/Users/example'),
+		'/Users/example/.config/ensemblr/config.json',
 	);
 });
 
@@ -46,7 +46,7 @@ test('treats a missing config file as empty non-blocking config', (t) => {
 	const fixture = createConfigFixture();
 	t.after(fixture.cleanup);
 
-	const result = loadEnsembleConfig({
+	const result = loadEnsemblrConfig({
 		homeDirectory: fixture.homeDirectory,
 		now: fixedClock,
 	});
@@ -57,16 +57,16 @@ test('treats a missing config file as empty non-blocking config', (t) => {
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 	});
 	assert.equal(result.snapshot.path, fixture.configPath);
-	assert.equal(result.snapshot.displayPath, '~/.config/ensemble/config.json');
+	assert.equal(result.snapshot.displayPath, '~/.config/ensemblr/config.json');
 	assert.equal(result.snapshot.loadedAt, '2026-06-04T12:00:00.000Z');
 	assert.equal(result.snapshot.status, 'missing');
 	assert.equal(result.snapshot.blocksReadiness, false);
-	assert.equal(result.snapshot.schemaVersion, ENSEMBLE_CONFIG_SCHEMA_VERSION);
+	assert.equal(result.snapshot.schemaVersion, ENSEMBLR_CONFIG_SCHEMA_VERSION);
 	assert.equal(result.snapshot.diagnostics[0]?.code, 'config-missing');
 });
 
@@ -77,14 +77,14 @@ test('loads a valid minimal v1 config without diagnostics', (t) => {
 		JSON.stringify({
 			app: { sendShortcut: 'enter' },
 			managed: { locked: { rootDirectory: true } },
-			repositoryDefaults: { branchPrefix: 'ensemble/' },
+			repositoryDefaults: { branchPrefix: 'ensemblr/' },
 			repositoryRules: [{ match: 'github.com/example/*' }],
 			schemaVersion: 1,
 			ui: { theme: 'system' },
 		}),
 	);
 
-	const result = loadEnsembleConfig({
+	const result = loadEnsemblrConfig({
 		homeDirectory: fixture.homeDirectory,
 		now: fixedClock,
 	});
@@ -104,7 +104,7 @@ test('reports invalid JSON with line and column diagnostics', (t) => {
 	t.after(fixture.cleanup);
 	fixture.writeConfig('{\n  "schemaVersion": 1,\n}');
 
-	const result = loadEnsembleConfig({
+	const result = loadEnsemblrConfig({
 		homeDirectory: fixture.homeDirectory,
 		now: fixedClock,
 	});
@@ -123,7 +123,7 @@ test('blocks readiness for invalid JSON when trusted managed config is required'
 	t.after(fixture.cleanup);
 	fixture.writeConfig('{"schemaVersion": 1,');
 
-	const result = loadEnsembleConfig({
+	const result = loadEnsemblrConfig({
 		homeDirectory: fixture.homeDirectory,
 		now: fixedClock,
 		requireTrustedManagedConfig: true,
@@ -138,7 +138,7 @@ test('surfaces unsupported schema versions without blocking non-managed readines
 	t.after(fixture.cleanup);
 	fixture.writeConfig(JSON.stringify({ schemaVersion: 999, ui: {} }));
 
-	const result = loadEnsembleConfig({
+	const result = loadEnsemblrConfig({
 		homeDirectory: fixture.homeDirectory,
 		now: fixedClock,
 	});
@@ -159,7 +159,7 @@ test('blocks readiness when parseable managed config is invalid', (t) => {
 	t.after(fixture.cleanup);
 	fixture.writeConfig(JSON.stringify({ managed: [], schemaVersion: 1 }));
 
-	const result = loadEnsembleConfig({
+	const result = loadEnsemblrConfig({
 		homeDirectory: fixture.homeDirectory,
 		now: fixedClock,
 	});
@@ -188,7 +188,7 @@ test('rejects raw secret-like string values in config', (t) => {
 		}),
 	);
 
-	const result = loadEnsembleConfig({
+	const result = loadEnsemblrConfig({
 		homeDirectory: fixture.homeDirectory,
 		now: fixedClock,
 	});
@@ -218,7 +218,7 @@ test('config service caches the startup load result', (t) => {
 		JSON.stringify({ schemaVersion: 1, ui: { theme: 'dark' } }),
 	);
 
-	const service = createEnsembleConfigService({
+	const service = createEnsemblrConfigService({
 		homeDirectory: fixture.homeDirectory,
 		now: fixedClock,
 	});

@@ -2,8 +2,8 @@ import { createChatTabService } from '../chat-tabs/chat-tab-service';
 import type { LocalCommandService } from '../commands/local-command';
 import type {
 	AppSettingsService,
-	EnsembleConfigResolutionService,
-	EnsembleConfigService,
+	EnsemblrConfigResolutionService,
+	EnsemblrConfigService,
 	RepositoryConfigService,
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
@@ -32,10 +32,10 @@ import type {
 } from '../repository';
 import { createRepositorySourcesService } from '../repository/repository-sources-service';
 import { createReviewService } from '../review';
-import type { EnsembleRootDirectoryService } from '../root';
+import type { EnsemblrRootDirectoryService } from '../root';
 import type { ScriptLifecycleService } from '../scripts';
 import type { SetupDiagnosticsService } from '../setup';
-import type { EnsembleDatabaseService } from '../storage';
+import type { EnsemblrDatabaseService } from '../storage';
 import { getPiSessionById } from '../storage/repositories/pi-session-repository';
 import { getWorkspacePathById } from '../storage/repositories/workspace-repository';
 import type { TerminalService } from '../terminal';
@@ -79,9 +79,9 @@ interface RegisterIpcHandlersOptions {
 	appSettingsService: AppSettingsService;
 	archiveRepositoryService: ArchiveRepositoryService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
-	configService: EnsembleConfigService;
+	configService: EnsemblrConfigService;
 	createWorkspaceService: CreateWorkspaceService;
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	deleteArchivedWorkspaceService: DeleteArchivedWorkspaceService;
 	deleteRepositoryService: DeleteRepositoryService;
 	deleteWorkspaceService: DeleteWorkspaceService;
@@ -104,11 +104,11 @@ interface RegisterIpcHandlersOptions {
 	quickStartProjectService: QuickStartProjectService;
 	renameWorkspaceService: RenameWorkspaceService;
 	repositoryConfigService: RepositoryConfigService;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 	scriptLifecycleService: ScriptLifecycleService;
 	sharedRootAdoptionService: SharedRootAdoptionService;
 	setupDiagnosticsService: SetupDiagnosticsService;
-	settingsResolutionService: EnsembleConfigResolutionService;
+	settingsResolutionService: EnsemblrConfigResolutionService;
 	terminalService: TerminalService;
 	unarchiveWorkspaceService: UnarchiveWorkspaceService;
 	workspaceFilesWatcher: WorkspaceFilesWatcher;

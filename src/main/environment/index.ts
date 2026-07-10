@@ -25,7 +25,7 @@ export type {
 } from './workspace-environment';
 export {
 	createWorkspaceEnvironmentService,
-	ENSEMBLE_RUNTIME_VARIABLE_KEYS,
+	ENSEMBLR_RUNTIME_VARIABLE_KEYS,
 	WorkspaceEnvironmentError,
 } from './workspace-environment';
 export {

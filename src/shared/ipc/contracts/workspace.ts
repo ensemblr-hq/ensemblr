@@ -74,7 +74,7 @@ export type CreateWorkspaceStatus = 'failure' | 'success';
 
 export type FilesToCopySource =
 	| 'default'
-	| 'ensemble-config'
+	| 'ensemblr-config'
 	| 'worktreeinclude';
 
 export type FilesToCopyDiagnosticCode =

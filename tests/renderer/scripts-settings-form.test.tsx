@@ -15,7 +15,7 @@ const { updateRepositoryScriptsMock } = vi.hoisted(() => ({
 	updateRepositoryScriptsMock: vi.fn(),
 }));
 
-vi.mock('@/renderer/api/ensemble', () => ({
+vi.mock('@/renderer/api/ensemblr', () => ({
 	settingsResolutionQuery: vi.fn(() => ({ queryKey: ['settings-resolution'] })),
 	updateRepositoryScripts: updateRepositoryScriptsMock,
 }));

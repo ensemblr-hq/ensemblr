@@ -18,17 +18,17 @@ import {
 } from '../../src/renderer/state/workspace';
 
 const STORAGE_KEYS = {
-	activeChatTabByWorkspace: 'ensemble_workspace_active_chat_tab_by_workspace',
-	activeDockTabByWorkspace: 'ensemble_workspace_active_dock_tab_by_workspace',
+	activeChatTabByWorkspace: 'ensemblr_workspace_active_chat_tab_by_workspace',
+	activeDockTabByWorkspace: 'ensemblr_workspace_active_dock_tab_by_workspace',
 	activeReviewTabByWorkspace:
-		'ensemble_workspace_active_review_tab_by_workspace',
-	changesViewMode: 'ensemble_workspace_changes_view_mode',
-	collapsedProjectIds: 'ensemble_workspace_collapsed_project_ids',
-	lastWorkspaceSelection: 'ensemble_workspace_last_selection',
-	orderedProjectIds: 'ensemble_workspace_ordered_project_ids',
-	pinnedWorkspaceIds: 'ensemble_workspace_pinned_workspace_ids',
-	rightSidebarCollapsed: 'ensemble_workspace_right_sidebar_collapsed',
-	rightSidebarSizePercent: 'ensemble_workspace_right_sidebar_size_percent',
+		'ensemblr_workspace_active_review_tab_by_workspace',
+	changesViewMode: 'ensemblr_workspace_changes_view_mode',
+	collapsedProjectIds: 'ensemblr_workspace_collapsed_project_ids',
+	lastWorkspaceSelection: 'ensemblr_workspace_last_selection',
+	orderedProjectIds: 'ensemblr_workspace_ordered_project_ids',
+	pinnedWorkspaceIds: 'ensemblr_workspace_pinned_workspace_ids',
+	rightSidebarCollapsed: 'ensemblr_workspace_right_sidebar_collapsed',
+	rightSidebarSizePercent: 'ensemblr_workspace_right_sidebar_size_percent',
 };
 
 class MemoryStorage implements Storage {

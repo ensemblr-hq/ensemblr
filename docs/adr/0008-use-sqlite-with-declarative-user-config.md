@@ -8,30 +8,30 @@ Accepted
 
 ## Context
 
-Ensemble targets Conductor feature parity. Conductor stores local app metadata in an app-support SQLite database with tables for repositories, workspaces, sessions, session messages, terminal sessions, settings, environment variables, attachments, diff comments, port forwards, and cleanup state.
+Ensemblr targets Conductor feature parity. Conductor stores local app metadata in an app-support SQLite database with tables for repositories, workspaces, sessions, session messages, terminal sessions, settings, environment variables, attachments, diff comments, port forwards, and cleanup state.
 
-Ensemble needs the same class of durable local metadata: projects, workspaces, Pi sessions, session events, terminal panes, repository settings overrides, UI state, comments, checks, PR metadata, checkpoints, port allocation, and process state.
+Ensemblr needs the same class of durable local metadata: projects, workspaces, Pi sessions, session events, terminal panes, repository settings overrides, UI state, comments, checks, PR metadata, checkpoints, port allocation, and process state.
 
-At the same time, Ensemble should support declarative user-managed settings so users can configure the app with dotfiles or managed machine configuration.
+At the same time, Ensemblr should support declarative user-managed settings so users can configure the app with dotfiles or managed machine configuration.
 
 ## Decision
 
-Ensemble will use a local SQLite database as the primary store for mutable app metadata, matching Conductor's storage shape.
+Ensemblr will use a local SQLite database as the primary store for mutable app metadata, matching Conductor's storage shape.
 
-Ensemble will also support declarative user configuration under `~/.config/ensemble/`.
+Ensemblr will also support declarative user configuration under `~/.config/ensemblr/`.
 
 Initial paths:
 
-- SQLite app database: `~/Library/Application Support/com.ensemble.app/ensemble.db` on macOS.
-- Declarative user config directory: `~/.config/ensemble/`.
-- Primary declarative config file: `~/.config/ensemble/config.json`.
+- SQLite app database: `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` on macOS.
+- Declarative user config directory: `~/.config/ensemblr/`.
+- Primary declarative config file: `~/.config/ensemblr/config.json`.
 
 Responsibility split:
 
 - Git/worktrees are the source of truth for repository files, branches, and diffs.
 - `~/.pi/agent` is the source of truth for Pi auth, models, settings, packages, extensions, skills, prompts, themes, and Pi sessions.
-- Ensemble SQLite is the source of truth for mutable Ensemble app metadata and UI/review state.
-- `~/.config/ensemble` is the source of truth for declarative user preferences and policy-like settings.
+- Ensemblr SQLite is the source of truth for mutable Ensemblr app metadata and UI/review state.
+- `~/.config/ensemblr` is the source of truth for declarative user preferences and policy-like settings.
 
 Declarative config may define:
 
@@ -54,7 +54,7 @@ Using only SQLite would match Conductor closely and simplify implementation, but
 
 ### Declarative config only
 
-Using only files under `~/.config/ensemble` would be attractive for inspectability, but it is a poor fit for high-churn mutable state such as session events, terminal records, comments, and workspace lifecycle metadata.
+Using only files under `~/.config/ensemblr` would be attractive for inspectability, but it is a poor fit for high-churn mutable state such as session events, terminal records, comments, and workspace lifecycle metadata.
 
 ### Store everything in project files
 
@@ -62,7 +62,7 @@ Keeping all state inside repositories would make state portable, but it would po
 
 ## Consequences
 
-- Ensemble can match Conductor's local metadata model while supporting dotfile-managed configuration.
+- Ensemblr can match Conductor's local metadata model while supporting dotfile-managed configuration.
 - The implementation needs a configuration resolution layer that merges declarative config, personal SQLite settings, repository files, and defaults.
 - The app must show which config source won for debuggability.
 - The declarative config schema should be versioned and validated.

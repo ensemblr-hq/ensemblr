@@ -1,17 +1,17 @@
 /**
- * Pure parser for `ensemble://` deep links. Production URL-scheme registration
+ * Pure parser for `ensemblr://` deep links. Production URL-scheme registration
  * happens at packaging time (per Linear ENS-066); the handler logic here is
  * exercised by unit tests and used at runtime once an external open arrives.
  *
  * Supported shapes:
- *   ensemble://workbench
- *   ensemble://repo/<repositoryId>
- *   ensemble://repo/<repositoryId>/settings/<section>
- *   ensemble://workspace/<repositoryId>/<workspaceId>
- *   ensemble://workspace/<repositoryId>/<workspaceId>/chat/<chatId>
- *   ensemble://linear/<issueId>
- *   ensemble://settings/<section>
- *   ensemble://review/<workspaceId>
+ *   ensemblr://workbench
+ *   ensemblr://repo/<repositoryId>
+ *   ensemblr://repo/<repositoryId>/settings/<section>
+ *   ensemblr://workspace/<repositoryId>/<workspaceId>
+ *   ensemblr://workspace/<repositoryId>/<workspaceId>/chat/<chatId>
+ *   ensemblr://linear/<issueId>
+ *   ensemblr://settings/<section>
+ *   ensemblr://review/<workspaceId>
  *
  * Inputs are aggressively validated; unsafe segments (path traversal, query
  * smuggling, embedded protocols) return `{ kind: 'invalid', reason }`.
@@ -79,7 +79,7 @@ const REPO_SECTIONS = new Set<RepoSettingsSection>([
 
 const SAFE_ID_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 
-/** Parse an ensemble:// URL into a typed deep link. */
+/** Parse an ensemblr:// URL into a typed deep link. */
 export function parseDeepLink(rawUrl: string): DeepLink {
 	let url: URL;
 	try {
@@ -88,11 +88,11 @@ export function parseDeepLink(rawUrl: string): DeepLink {
 		return { kind: 'invalid', reason: 'malformed-url' };
 	}
 
-	if (url.protocol !== 'ensemble:') {
+	if (url.protocol !== 'ensemblr:') {
 		return { kind: 'invalid', reason: 'unsupported-protocol' };
 	}
 
-	// `new URL("ensemble://foo/bar")` puts `foo` in hostname and `/bar` in pathname.
+	// `new URL("ensemblr://foo/bar")` puts `foo` in hostname and `/bar` in pathname.
 	const head = url.hostname.toLowerCase();
 	const segments = url.pathname.split('/').flatMap((s) => {
 		const trimmed = decodeURIComponent(s).trim();

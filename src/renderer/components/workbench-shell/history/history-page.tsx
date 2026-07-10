@@ -4,8 +4,8 @@ import { useCallback, useMemo, useState } from 'react';
 
 import {
 	allWorkspacesHistoryQuery,
-	isEnsembleApiAvailable,
-} from '@/renderer/api/ensemble';
+	isEnsemblrApiAvailable,
+} from '@/renderer/api/ensemblr';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { useWorkbenchLayoutRouteModel } from '@/renderer/components/workbench-shell/shell-contexts';
 import type { WorkspaceHistoryEntry } from '@/shared/ipc/contracts/workspace';
@@ -26,7 +26,7 @@ interface HistoryGroupModel {
  * and buckets appear newest-first.
  */
 export function HistoryPage() {
-	const apiAvailable = isEnsembleApiAvailable();
+	const apiAvailable = isEnsemblrApiAvailable();
 	const { navigateToWorkspace } = useWorkbenchLayoutRouteModel();
 	const { data, isError, isLoading } = useQuery({
 		...allWorkspacesHistoryQuery(),

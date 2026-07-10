@@ -6,9 +6,9 @@ import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 
 import {
-	ENSEMBLE_CONFIG_SCHEMA_VERSION,
-	type EnsembleConfig,
-	type EnsembleConfigService,
+	ENSEMBLR_CONFIG_SCHEMA_VERSION,
+	type EnsemblrConfig,
+	type EnsemblrConfigService,
 } from '../../src/main/config/config-loader.ts';
 import {
 	createEnvironmentVariablesService,
@@ -16,7 +16,7 @@ import {
 	isEnvironmentVariableKey,
 } from '../../src/main/environment/environment-variables.ts';
 import { createMockSecretStore } from '../../src/main/secrets/secret-store.ts';
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import type {
 	EnvironmentVariableSnapshot,
 	EnvironmentVariablesSnapshot,
@@ -26,14 +26,14 @@ const NOW = new Date('2026-06-05T00:00:00.000Z');
 
 function createConfigService(
 	environment: Record<string, unknown> = {},
-): EnsembleConfigService {
-	const config: EnsembleConfig = {
+): EnsemblrConfigService {
+	const config: EnsemblrConfig = {
 		app: {},
 		environment,
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 	};
@@ -43,28 +43,28 @@ function createConfigService(
 		getSnapshot: () => ({
 			blocksReadiness: false,
 			diagnostics: [],
-			displayPath: '~/.config/ensemble/config.json',
+			displayPath: '~/.config/ensemblr/config.json',
 			loadedAt: NOW.toISOString(),
-			path: '/Users/alice/.config/ensemble/config.json',
-			schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+			path: '/Users/alice/.config/ensemblr/config.json',
+			schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 			status: 'ok',
 		}),
 		load: () => ({
 			blocksReadiness: false,
 			diagnostics: [],
-			displayPath: '~/.config/ensemble/config.json',
+			displayPath: '~/.config/ensemblr/config.json',
 			loadedAt: NOW.toISOString(),
-			path: '/Users/alice/.config/ensemble/config.json',
-			schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+			path: '/Users/alice/.config/ensemblr/config.json',
+			schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 			status: 'ok',
 		}),
 	};
 }
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-env-'));
-	const connection = openEnsembleDatabase({
-		databasePath: path.join(directory, 'ensemble-test.db'),
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-env-'));
+	const connection = openEnsemblrDatabase({
+		databasePath: path.join(directory, 'ensemblr-test.db'),
 	});
 
 	t.after(() => {
@@ -125,9 +125,9 @@ test('catalog snapshot includes unset, secret, and reserved variables', async ()
 	assert.equal(getVariable(snapshot, 'OPENAI_API_KEY').status, 'unset');
 	assert.deepEqual(
 		{
-			source: getVariable(snapshot, 'ENSEMBLE_PORT').source,
-			status: getVariable(snapshot, 'ENSEMBLE_PORT').status,
-			valueKind: getVariable(snapshot, 'ENSEMBLE_PORT').valueKind,
+			source: getVariable(snapshot, 'ENSEMBLR_PORT').source,
+			status: getVariable(snapshot, 'ENSEMBLR_PORT').status,
+			valueKind: getVariable(snapshot, 'ENSEMBLR_PORT').valueKind,
 		},
 		{
 			source: 'runtime',
@@ -140,7 +140,7 @@ test('catalog snapshot includes unset, secret, and reserved variables', async ()
 test('uses non-secret config defaults and rejects secret config values', async () => {
 	const snapshot = await createService({
 		environment: {
-			DEBUG: 'ensemble:*',
+			DEBUG: 'ensemblr:*',
 			OPENAI_API_KEY: 'sk-raw-config-secret',
 		},
 	}).getSnapshot();
@@ -152,7 +152,7 @@ test('uses non-secret config defaults and rejects secret config values', async (
 			status: getVariable(snapshot, 'DEBUG').status,
 		},
 		{
-			displayValue: 'ensemble:*',
+			displayValue: 'ensemblr:*',
 			source: 'config-default',
 			status: 'set',
 		},
@@ -174,7 +174,7 @@ test('stores and assembles non-secret sqlite values', async (t) => {
 
 	const stored = await service.setPlainValue({
 		key: 'DEBUG',
-		value: 'ensemble:setup',
+		value: 'ensemblr:setup',
 	});
 	const snapshot = await service.getSnapshot();
 	const assembly = await service.assembleEnvironment();
@@ -182,10 +182,10 @@ test('stores and assembles non-secret sqlite values', async (t) => {
 
 	assert.equal(stored.status, 'set');
 	assert.equal(getVariable(snapshot, 'DEBUG').source, 'sqlite');
-	assert.equal(getVariable(snapshot, 'DEBUG').displayValue, 'ensemble:setup');
-	assert.deepEqual(assembly.env, { DEBUG: 'ensemble:setup' });
+	assert.equal(getVariable(snapshot, 'DEBUG').displayValue, 'ensemblr:setup');
+	assert.deepEqual(assembly.env, { DEBUG: 'ensemblr:setup' });
 	assert.deepEqual(assembly.redactValues, []);
-	assert.equal(JSON.stringify(rows).includes('ensemble:setup'), true);
+	assert.equal(JSON.stringify(rows).includes('ensemblr:setup'), true);
 });
 
 test('stores secret values through secret metadata without exposing raw values in snapshots or sqlite', async (t) => {
@@ -228,15 +228,15 @@ test('keeps plain and secret storage mutually exclusive when value kind changes'
 
 	await service.setPlainValue({
 		key: 'DEBUG',
-		value: 'ensemble:plain',
+		value: 'ensemblr:plain',
 	});
 	await service.setSecretValue({
 		key: 'DEBUG',
-		value: 'ensemble-secret',
+		value: 'ensemblr-secret',
 	});
 
 	assert.deepEqual((await service.assembleEnvironment()).env, {
-		DEBUG: 'ensemble-secret',
+		DEBUG: 'ensemblr-secret',
 	});
 	assert.deepEqual(
 		(await service.assembleEnvironment({ includeSecrets: false })).env,
@@ -245,13 +245,13 @@ test('keeps plain and secret storage mutually exclusive when value kind changes'
 
 	await service.setPlainValue({
 		key: 'DEBUG',
-		value: 'ensemble:plain-again',
+		value: 'ensemblr:plain-again',
 	});
 
 	const snapshot = await service.getSnapshot();
 
 	assert.deepEqual((await service.assembleEnvironment()).env, {
-		DEBUG: 'ensemble:plain-again',
+		DEBUG: 'ensemblr:plain-again',
 	});
 	assert.equal(getVariable(snapshot, 'DEBUG').status, 'set');
 	assert.equal(getVariable(snapshot, 'DEBUG').source, 'sqlite');
@@ -259,9 +259,9 @@ test('keeps plain and secret storage mutually exclusive when value kind changes'
 
 test('reports missing required variables without printing values', async () => {
 	const snapshot = await createService().getSnapshot({
-		requiredKeys: ['ENSEMBLE_REQUIRED_TOKEN'],
+		requiredKeys: ['ENSEMBLR_REQUIRED_TOKEN'],
 	});
-	const variable = getVariable(snapshot, 'ENSEMBLE_REQUIRED_TOKEN');
+	const variable = getVariable(snapshot, 'ENSEMBLR_REQUIRED_TOKEN');
 
 	assert.equal(snapshot.requiredCount, 1);
 	assert.equal(snapshot.missingRequiredCount, 1);
@@ -271,7 +271,7 @@ test('reports missing required variables without printing values', async () => {
 		snapshot.diagnostics.some(
 			(diagnostic) =>
 				diagnostic.code === 'required-variable-missing' &&
-				diagnostic.key === 'ENSEMBLE_REQUIRED_TOKEN',
+				diagnostic.key === 'ENSEMBLR_REQUIRED_TOKEN',
 		),
 		true,
 	);
@@ -288,7 +288,7 @@ test('rejects invalid, reserved, and secret-classified plain writes', async (t) 
 			error.code === 'invalid-key',
 	);
 	await assert.rejects(
-		service.setPlainValue({ key: 'ENSEMBLE_PORT', value: '5173' }),
+		service.setPlainValue({ key: 'ENSEMBLR_PORT', value: '5173' }),
 		(error) =>
 			error instanceof EnvironmentVariablesError &&
 			error.code === 'reserved-key',
@@ -313,7 +313,7 @@ test('setValue auto-routes secret-classified and plain keys', async (t) => {
 		key: 'ANTHROPIC_API_KEY',
 		value: 'sk-secret-route',
 	});
-	const plain = await service.setValue({ key: 'DEBUG', value: 'ensemble:*' });
+	const plain = await service.setValue({ key: 'DEBUG', value: 'ensemblr:*' });
 
 	assert.equal(secret.status, 'masked');
 	assert.equal(secret.valueKind, 'secret');
@@ -329,10 +329,10 @@ test('readValue returns plain and secret stored values', async (t) => {
 	});
 	const service = createService({ database, secretStore });
 
-	await service.setValue({ key: 'DEBUG', value: 'ensemble:read' });
+	await service.setValue({ key: 'DEBUG', value: 'ensemblr:read' });
 	await service.setValue({ key: 'OPENAI_API_KEY', value: 'sk-read-secret' });
 
-	assert.equal(await service.readValue({ key: 'DEBUG' }), 'ensemble:read');
+	assert.equal(await service.readValue({ key: 'DEBUG' }), 'ensemblr:read');
 	assert.equal(
 		await service.readValue({ key: 'OPENAI_API_KEY' }),
 		'sk-read-secret',
@@ -343,7 +343,7 @@ test('readValue returns plain and secret stored values', async (t) => {
 test('env files round-trip and seed assembled environment below explicit vars', async (t) => {
 	const database = createDatabaseFixture(t);
 	const service = createService({ database });
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-envfile-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-envfile-'));
 	const envFilePath = path.join(directory, '.env');
 
 	writeFileSync(
@@ -352,7 +352,7 @@ test('env files round-trip and seed assembled environment below explicit vars', 
 			'# comment',
 			'export FROM_FILE=file-value',
 			'DEBUG=file-debug',
-			'ENSEMBLE_PORT=9999',
+			'ENSEMBLR_PORT=9999',
 		].join('\n'),
 		'utf8',
 	);
@@ -371,7 +371,7 @@ test('env files round-trip and seed assembled environment below explicit vars', 
 
 	assert.equal(assembly.env.FROM_FILE, 'file-value');
 	assert.equal(assembly.env.DEBUG, 'explicit-debug');
-	assert.equal(assembly.env.ENSEMBLE_PORT, undefined);
+	assert.equal(assembly.env.ENSEMBLR_PORT, undefined);
 
 	const afterRemove = await service.removeEnvFile({ path: envFilePath });
 	assert.deepEqual(afterRemove, []);
@@ -381,7 +381,7 @@ test('env files round-trip and seed assembled environment below explicit vars', 
 test('addEnvFile rejects a path that does not exist', async (t) => {
 	const database = createDatabaseFixture(t);
 	const service = createService({ database });
-	const missingPath = path.join(tmpdir(), 'ensemble-missing-env-file.env');
+	const missingPath = path.join(tmpdir(), 'ensemblr-missing-env-file.env');
 
 	await assert.rejects(
 		() => service.addEnvFile({ path: missingPath }),
@@ -394,7 +394,7 @@ test('addEnvFile rejects a path that does not exist', async (t) => {
 test('assembleEnvironment warns when a configured env file disappears', async (t) => {
 	const database = createDatabaseFixture(t);
 	const service = createService({ database });
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-envfile-gone-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-envfile-gone-'));
 	const envFilePath = path.join(directory, '.env');
 
 	writeFileSync(envFilePath, 'A=1\n', 'utf8');
@@ -420,7 +420,7 @@ test('assembleEnvironment redacts secret-shaped env-file values', async (t) => {
 	const database = createDatabaseFixture(t);
 	const service = createService({ database });
 	const directory = mkdtempSync(
-		path.join(tmpdir(), 'ensemble-envfile-secret-'),
+		path.join(tmpdir(), 'ensemblr-envfile-secret-'),
 	);
 	const envFilePath = path.join(directory, '.env');
 
@@ -446,7 +446,7 @@ test('getSnapshot counts an env-file value as satisfying a required key', async 
 	const database = createDatabaseFixture(t);
 	const service = createService({ database });
 	const directory = mkdtempSync(
-		path.join(tmpdir(), 'ensemble-envfile-required-'),
+		path.join(tmpdir(), 'ensemblr-envfile-required-'),
 	);
 	const envFilePath = path.join(directory, '.env');
 

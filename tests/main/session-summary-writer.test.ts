@@ -51,7 +51,7 @@ function makeThrowingClient(): ThrowingClientHandle {
 }
 
 function makeWorkspaceDir(t: import('node:test').TestContext): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-summary-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-summary-'));
 	t.after(() => rmSync(directory, { force: true, recursive: true }));
 	return directory;
 }
@@ -344,7 +344,7 @@ function makeHangingAgentClient(): { client: PiAgentClient } {
 		cwd: '/fake/cwd',
 		env: {},
 		id: sessionId,
-		label: 'ensemble-session-summary',
+		label: 'ensemblr-session-summary',
 		model: null,
 		piAgentDirectoryPreserved: true,
 		sessionId: null,
@@ -389,7 +389,7 @@ function makeFakeAgentClient(options: FakeAgentClientOptions): {
 		cwd: '/fake/cwd',
 		env: {},
 		id: sessionId,
-		label: 'ensemble-session-summary',
+		label: 'ensemblr-session-summary',
 		model: null,
 		piAgentDirectoryPreserved: true,
 		sessionId: null,

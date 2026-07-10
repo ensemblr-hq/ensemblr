@@ -5,9 +5,9 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 import {
-	ENSEMBLE_CONFIG_SCHEMA_VERSION,
-	type EnsembleConfig,
-	type EnsembleConfigService,
+	ENSEMBLR_CONFIG_SCHEMA_VERSION,
+	type EnsemblrConfig,
+	type EnsemblrConfigService,
 } from '../../src/main/config/config-loader.ts';
 import { createEnvironmentVariablesService } from '../../src/main/environment/environment-variables.ts';
 import {
@@ -22,10 +22,10 @@ import {
 	WORKSPACE_PORT_RANGE_SIZE,
 	WORKSPACE_PORT_RANGE_START,
 } from '../../src/main/environment/workspace-ports.ts';
-import type { EnsembleRootDirectoryService } from '../../src/main/root';
+import type { EnsemblrRootDirectoryService } from '../../src/main/root';
 import { createMockSecretStore } from '../../src/main/secrets/secret-store.ts';
-import type { EnsembleDatabaseService } from '../../src/main/storage/database.ts';
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import type { EnsemblrDatabaseService } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import { insertRepositoryRow } from '../../src/main/storage/repositories/repository-row-repository.ts';
 import {
 	insertWorkspaceRow,
@@ -33,26 +33,26 @@ import {
 } from '../../src/main/storage/repositories/workspace-repository.ts';
 
 const NOW = new Date('2026-06-11T00:00:00.000Z');
-const ROOT_PATH = '/Users/alice/Ensemble';
+const ROOT_PATH = '/Users/alice/Ensemblr';
 
-function createConfigService(): EnsembleConfigService {
-	const config: EnsembleConfig = {
+function createConfigService(): EnsemblrConfigService {
+	const config: EnsemblrConfig = {
 		app: {},
 		environment: {},
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 	};
 	const snapshot = {
 		blocksReadiness: false,
 		diagnostics: [],
-		displayPath: '~/.config/ensemble/config.json',
+		displayPath: '~/.config/ensemblr/config.json',
 		loadedAt: NOW.toISOString(),
-		path: '/Users/alice/.config/ensemble/config.json',
-		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+		path: '/Users/alice/.config/ensemblr/config.json',
+		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		status: 'ok' as const,
 	};
 
@@ -64,9 +64,9 @@ function createConfigService(): EnsembleConfigService {
 }
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-ws-env-'));
-	const connection = openEnsembleDatabase({
-		databasePath: path.join(directory, 'ensemble-test.db'),
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-ws-env-'));
+	const connection = openEnsemblrDatabase({
+		databasePath: path.join(directory, 'ensemblr-test.db'),
 	});
 
 	t.after(() => {
@@ -79,13 +79,13 @@ function createDatabaseFixture(t: TestContext): DatabaseSync {
 
 function createDatabaseServiceStub(
 	database: DatabaseSync,
-): EnsembleDatabaseService {
+): EnsemblrDatabaseService {
 	return {
 		getConnection: () => ({ database }),
-	} as unknown as EnsembleDatabaseService;
+	} as unknown as EnsemblrDatabaseService;
 }
 
-function createRootDirectoryServiceStub(): EnsembleRootDirectoryService {
+function createRootDirectoryServiceStub(): EnsemblrRootDirectoryService {
 	const snapshot = {
 		archivedContextsPath: path.join(ROOT_PATH, 'archived-contexts'),
 		createdPaths: [],
@@ -108,7 +108,7 @@ function createRootDirectoryServiceStub(): EnsembleRootDirectoryService {
 		previewChange: () => {
 			throw new Error('not implemented');
 		},
-	} as unknown as EnsembleRootDirectoryService;
+	} as unknown as EnsemblrRootDirectoryService;
 }
 
 function seedWorkspace({
@@ -128,11 +128,11 @@ function seedWorkspace({
 	workspaceId?: string;
 	workspaceName?: string;
 }): { repositoryId: string; workspaceId: string; workspacePath: string } {
-	const repositoryPath = path.join(ROOT_PATH, 'repos', 'ensemble');
+	const repositoryPath = path.join(ROOT_PATH, 'repos', 'ensemblr');
 	const workspacePath = path.join(
 		ROOT_PATH,
 		'workspaces',
-		'ensemble',
+		'ensemblr',
 		workspaceName,
 	);
 	const existingRepository = database
@@ -145,10 +145,10 @@ function seedWorkspace({
 			defaultBranch,
 			id: repositoryId,
 			metadataJson: '{}',
-			name: 'ensemble',
+			name: 'ensemblr',
 			path: repositoryPath,
 			remoteUrl: '',
-			slug: 'ensemble',
+			slug: 'ensemblr',
 			timestamp: NOW.toISOString(),
 		});
 	}
@@ -193,18 +193,18 @@ function createService({
 	};
 }
 
-test('assemble injects native ENSEMBLE_* runtime variables', async (t) => {
+test('assemble injects native ENSEMBLR_* runtime variables', async (t) => {
 	const database = createDatabaseFixture(t);
 	const { workspaceId, workspacePath } = seedWorkspace({ database });
 	const { service } = createService({ database });
 
 	const assembly = await service.assemble({ workspaceId });
 
-	assert.equal(assembly.env.ENSEMBLE_WORKSPACE_NAME, 'monterrey');
-	assert.equal(assembly.env.ENSEMBLE_WORKSPACE_PATH, workspacePath);
-	assert.equal(assembly.env.ENSEMBLE_ROOT_PATH, ROOT_PATH);
-	assert.equal(assembly.env.ENSEMBLE_DEFAULT_BRANCH, 'main');
-	assert.equal(assembly.env.ENSEMBLE_PORT, String(assembly.port));
+	assert.equal(assembly.env.ENSEMBLR_WORKSPACE_NAME, 'monterrey');
+	assert.equal(assembly.env.ENSEMBLR_WORKSPACE_PATH, workspacePath);
+	assert.equal(assembly.env.ENSEMBLR_ROOT_PATH, ROOT_PATH);
+	assert.equal(assembly.env.ENSEMBLR_DEFAULT_BRANCH, 'main');
+	assert.equal(assembly.env.ENSEMBLR_PORT, String(assembly.port));
 	assert.equal(assembly.cwd, workspacePath);
 	assert.ok(isWorkspacePort(assembly.port));
 });
@@ -337,7 +337,7 @@ test('assemble warns instead of setting an unknown default branch', async (t) =>
 
 	const assembly = await service.assemble({ workspaceId });
 
-	assert.equal(assembly.env.ENSEMBLE_DEFAULT_BRANCH, undefined);
+	assert.equal(assembly.env.ENSEMBLR_DEFAULT_BRANCH, undefined);
 	assert.ok(
 		assembly.diagnostics.some(
 			(diagnostic) => diagnostic.code === 'default-branch-unknown',
