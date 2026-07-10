@@ -1,5 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	mkdirSync,
+	mkdtempSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -80,6 +86,12 @@ function readDir(cwd: string, dirPath: string) {
 	return service.readDirectory({ path: dirPath, workspaceCwd: cwd });
 }
 
+function workspaceFilesService() {
+	return createListWorkspaceFilesService({
+		localCommandService: createLocalCommandService(),
+	});
+}
+
 describe('createListWorkspaceFilesService.list', () => {
 	test('enumerates ignored directory contents so they are browsable', async () => {
 		const result = await listFiles(seedRepo());
@@ -155,6 +167,203 @@ describe('createListWorkspaceFilesService.list', () => {
 		expect(paths).not.toContain('._resource');
 		// A real file in the same folder as junk still lists.
 		expect(paths).toContain('src/app.ts');
+	});
+});
+
+describe('createListWorkspaceFilesService.writeImageAttachment', () => {
+	test('writes pasted images into .context/images as ignored workspace files', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
+		const result = await workspaceFilesService().writeImageAttachment({
+			contentBase64: bytes.toString('base64'),
+			mimeType: 'image/png',
+			name: 'Screenshot 1.png',
+			workspaceCwd: cwd,
+		});
+
+		expect(result.error).toBeUndefined();
+		expect(result.file).toBeDefined();
+		const file = result.file;
+		if (!file) {
+			throw new Error('Expected pasted image file entry.');
+		}
+		expect(file).toMatchObject({
+			isIgnored: true,
+			kind: 'file',
+		});
+		expect(file.path).toMatch(
+			/^\.context\/images\/screenshot-1-\d+-[0-9a-f]{8}\.png$/,
+		);
+		expect(readFileSync(path.join(cwd, file.path))).toEqual(bytes);
+	});
+
+	test('rejects non-image clipboard payloads', async () => {
+		const result = await workspaceFilesService().writeImageAttachment({
+			contentBase64: Buffer.from('not an image').toString('base64'),
+			mimeType: 'text/plain',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.error?.code).toBe('invalid-image');
+		expect(result.file).toBeUndefined();
+	});
+
+	test('rejects bytes whose signature does not match the declared image type', async () => {
+		const result = await workspaceFilesService().writeImageAttachment({
+			contentBase64: Buffer.from('definitely not a png').toString('base64'),
+			mimeType: 'image/png',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.error?.code).toBe('invalid-image');
+		expect(result.file).toBeUndefined();
+	});
+
+	test('accepts a WEBP payload carrying the WEBP fourcc', async () => {
+		const bytes = Buffer.concat([
+			Buffer.from('RIFF'),
+			Buffer.from([0x24, 0x00, 0x00, 0x00]),
+			Buffer.from('WEBP'),
+			Buffer.from('VP8 '),
+		]);
+		const result = await workspaceFilesService().writeImageAttachment({
+			contentBase64: bytes.toString('base64'),
+			mimeType: 'image/webp',
+			name: 'shot.webp',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.error).toBeUndefined();
+		expect(result.file?.path).toMatch(
+			/^\.context\/images\/shot-\d+-[0-9a-f]{8}\.webp$/,
+		);
+	});
+
+	test('rejects a RIFF payload that is not WEBP (e.g. a WAV mislabeled as webp)', async () => {
+		const wavBytes = Buffer.concat([
+			Buffer.from('RIFF'),
+			Buffer.from([0x24, 0x00, 0x00, 0x00]),
+			Buffer.from('WAVE'),
+		]);
+		const result = await workspaceFilesService().writeImageAttachment({
+			contentBase64: wavBytes.toString('base64'),
+			mimeType: 'image/webp',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.error?.code).toBe('invalid-image');
+		expect(result.file).toBeUndefined();
+	});
+
+	test('rejects images larger than the attachment size limit', async () => {
+		const oversized = Buffer.concat([
+			Buffer.from([0x89, 0x50, 0x4e, 0x47]),
+			Buffer.alloc(10 * 1024 * 1024, 0x61),
+		]);
+		const result = await workspaceFilesService().writeImageAttachment({
+			contentBase64: oversized.toString('base64'),
+			mimeType: 'image/png',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.error?.code).toBe('invalid-image');
+		expect(result.sizeBytes).toBe(oversized.length);
+		expect(result.file).toBeUndefined();
+	});
+
+	test('rejects a non-absolute workspace cwd', async () => {
+		const result = await workspaceFilesService().writeImageAttachment({
+			contentBase64: Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString('base64'),
+			mimeType: 'image/png',
+			workspaceCwd: 'relative/workspace',
+		});
+
+		expect(result.error?.code).toBe('invalid-cwd');
+		expect(result.file).toBeUndefined();
+	});
+});
+
+describe('createListWorkspaceFilesService.writeFileAttachment', () => {
+	test('writes pasted files into .context/attachments as ignored workspace files', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from('%PDF-1.7 fake pdf body');
+		const result = await workspaceFilesService().writeFileAttachment({
+			contentBase64: bytes.toString('base64'),
+			name: 'Quarterly Report.pdf',
+			workspaceCwd: cwd,
+		});
+
+		expect(result.error).toBeUndefined();
+		const file = result.file;
+		if (!file) {
+			throw new Error('Expected pasted attachment file entry.');
+		}
+		expect(file).toMatchObject({ isIgnored: true, kind: 'file' });
+		expect(file.path).toMatch(
+			/^\.context\/attachments\/quarterly-report-\d+-[0-9a-f]{8}\.pdf$/,
+		);
+		expect(readFileSync(path.join(cwd, file.path))).toEqual(bytes);
+	});
+
+	test('sniffs extensionless text payloads and saves them as .txt', async () => {
+		const result = await workspaceFilesService().writeFileAttachment({
+			contentBase64: Buffer.from('#!/bin/sh\necho hi\n').toString('base64'),
+			name: 'Makefile',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.file?.path).toMatch(
+			/^\.context\/attachments\/makefile-\d+-[0-9a-f]{8}\.txt$/,
+		);
+	});
+
+	test('falls back to a bin extension for extensionless binary payloads', async () => {
+		const result = await workspaceFilesService().writeFileAttachment({
+			contentBase64: Buffer.from([0x00, 0x01, 0x02, 0x00, 0xff]).toString(
+				'base64',
+			),
+			name: 'blob',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.file?.path).toMatch(
+			/^\.context\/attachments\/blob-\d+-[0-9a-f]{8}\.bin$/,
+		);
+	});
+
+	test('rejects an undecodable base64 payload', async () => {
+		const result = await workspaceFilesService().writeFileAttachment({
+			contentBase64: '@@not base64@@',
+			name: 'note.txt',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.error?.code).toBe('invalid-attachment');
+		expect(result.file).toBeUndefined();
+	});
+
+	test('rejects attachments larger than the hard ceiling', async () => {
+		const oversized = Buffer.alloc(50 * 1024 * 1024 + 1, 0x61);
+		const result = await workspaceFilesService().writeFileAttachment({
+			contentBase64: oversized.toString('base64'),
+			name: 'huge.bin',
+			workspaceCwd: seedRepo(),
+		});
+
+		expect(result.error?.code).toBe('too-large');
+		expect(result.sizeBytes).toBe(oversized.length);
+		expect(result.file).toBeUndefined();
+	});
+
+	test('rejects a non-absolute workspace cwd', async () => {
+		const result = await workspaceFilesService().writeFileAttachment({
+			contentBase64: Buffer.from('data').toString('base64'),
+			name: 'note.txt',
+			workspaceCwd: 'relative/workspace',
+		});
+
+		expect(result.error?.code).toBe('invalid-cwd');
+		expect(result.file).toBeUndefined();
 	});
 });
 

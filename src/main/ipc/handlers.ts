@@ -246,6 +246,7 @@ export function registerIpcHandlers({
 	registerWorkspaceFilesHandlers({
 		listWorkspaceFilesService,
 		workspaceFilesWatcher,
+		withPermissionGate,
 	});
 	registerWorkspaceGitHandlers({
 		workspaceGitService: createWorkspaceGitService({ localCommandService }),

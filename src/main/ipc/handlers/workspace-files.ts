@@ -9,19 +9,28 @@ import type {
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
 	WatchWorkspaceFilesRequest,
+	WriteWorkspaceFileAttachmentResult,
+	WriteWorkspaceImageAttachmentResult,
 } from '../../../shared/ipc/contracts/workspace-files';
 import type {
 	ListWorkspaceFilesService,
 	WorkspaceFilesWatcher,
 } from '../../workspace-files';
+import type { WithPermissionGate } from '../permission-gate';
+import {
+	writeWorkspaceFileAttachmentRequestSchema,
+	writeWorkspaceImageAttachmentRequestSchema,
+} from '../request-schemas';
 
-/** Registers the IPC handlers that list, read, and watch repo files. */
+/** Registers the IPC handlers that list, read, write attachments, and watch repo files. */
 export function registerWorkspaceFilesHandlers({
 	listWorkspaceFilesService,
 	workspaceFilesWatcher,
+	withPermissionGate,
 }: {
 	listWorkspaceFilesService: ListWorkspaceFilesService;
 	workspaceFilesWatcher: WorkspaceFilesWatcher;
+	withPermissionGate: WithPermissionGate;
 }): void {
 	ipcMain.handle(
 		IPC_CHANNELS.listWorkspaceFiles,
@@ -46,6 +55,52 @@ export function registerWorkspaceFilesHandlers({
 			request: ReadWorkspaceDirectoryRequest,
 		): Promise<ReadWorkspaceDirectoryResult> =>
 			listWorkspaceFilesService.readDirectory(request),
+	);
+	withPermissionGate(
+		IPC_CHANNELS.writeWorkspaceImageAttachment,
+		'workspace-write',
+		async (
+			_event,
+			raw: unknown,
+		): Promise<WriteWorkspaceImageAttachmentResult> => {
+			try {
+				const request = writeWorkspaceImageAttachmentRequestSchema.parse(raw);
+				return listWorkspaceFilesService.writeImageAttachment(request);
+			} catch (cause) {
+				return {
+					error: {
+						code: 'invalid-image',
+						message:
+							cause instanceof Error
+								? cause.message
+								: 'Invalid pasted image payload.',
+					},
+				};
+			}
+		},
+	);
+	withPermissionGate(
+		IPC_CHANNELS.writeWorkspaceFileAttachment,
+		'workspace-write',
+		async (
+			_event,
+			raw: unknown,
+		): Promise<WriteWorkspaceFileAttachmentResult> => {
+			try {
+				const request = writeWorkspaceFileAttachmentRequestSchema.parse(raw);
+				return listWorkspaceFilesService.writeFileAttachment(request);
+			} catch (cause) {
+				return {
+					error: {
+						code: 'invalid-attachment',
+						message:
+							cause instanceof Error
+								? cause.message
+								: 'Invalid pasted attachment payload.',
+					},
+				};
+			}
+		},
 	);
 	ipcMain.handle(
 		IPC_CHANNELS.watchWorkspaceFiles,

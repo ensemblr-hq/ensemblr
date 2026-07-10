@@ -131,6 +131,37 @@ export const writeForkSummaryRequestSchema = z.object({
 });
 
 // -----------------------------------------------------------------------------
+// workspace-files — STRICT (throws on bad input, caught by handler try/catch)
+// -----------------------------------------------------------------------------
+
+/**
+ * {@link import('../../shared/ipc').WriteWorkspaceImageAttachmentRequest}.
+ *
+ * `contentBase64` is capped so an oversized paste is rejected before the handler
+ * allocates the decoded buffer; ~20MB of base64 holds the 10MB decoded limit
+ * (4/3 expansion) with margin for whitespace.
+ */
+export const writeWorkspaceImageAttachmentRequestSchema = z.object({
+	contentBase64: z.string().min(1).max(20_000_000),
+	mimeType: z.string().min(1).max(100),
+	name: z.string().max(255).optional(),
+	workspaceCwd: z.string().min(1),
+});
+
+/**
+ * {@link import('../../shared/ipc').WriteWorkspaceFileAttachmentRequest}.
+ *
+ * `contentBase64` is capped so an oversized paste is rejected before the handler
+ * allocates the decoded buffer; ~70MB of base64 holds the 50MB decoded ceiling
+ * (`HARD_MAX_ATTACHMENT_BYTES`, 4/3 expansion) with margin for whitespace.
+ */
+export const writeWorkspaceFileAttachmentRequestSchema = z.object({
+	contentBase64: z.string().min(1).max(70_000_000),
+	name: z.string().max(255).optional(),
+	workspaceCwd: z.string().min(1),
+});
+
+// -----------------------------------------------------------------------------
 // checkpoint — STRICT (throws on bad input, caught by handler try/catch)
 // -----------------------------------------------------------------------------
 

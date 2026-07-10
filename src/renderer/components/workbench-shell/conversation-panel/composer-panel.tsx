@@ -188,11 +188,14 @@ export function ComposerPanel({
 
 	return (
 		<footer className='shrink-0 bg-background px-4 pt-2 pb-5'>
+			{/* biome-ignore lint/a11y/noStaticElementInteractions: drop zone is a passive file target, not a keyboard/pointer control */}
 			<div
 				className={cn(
 					'relative mx-auto flex w-full max-w-4xl flex-col gap-2 rounded-xl border border-border bg-pane/80 px-4 pt-3 pb-2.5 shadow-panel transition-shadow',
 					focused && 'ring-1 ring-ring/40',
 				)}
+				onDragOver={state.handleDragOver}
+				onDrop={state.handleDrop}
 			>
 				<input
 					accept='*/*'
@@ -219,6 +222,13 @@ export function ComposerPanel({
 								file={{ kind: 'upload', name: file.name }}
 								key={`upload:${file.name}:${file.size}:${file.lastModified}`}
 								onRemove={() => state.removeUpload(index)}
+							/>
+						))}
+						{state.externalAttachments.map((external) => (
+							<AttachmentChip
+								file={{ kind: 'external', name: external.name }}
+								key={`external:${external.absolutePath}`}
+								onRemove={() => state.removeExternal(external.absolutePath)}
 							/>
 						))}
 					</div>

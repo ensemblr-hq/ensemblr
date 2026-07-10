@@ -85,6 +85,8 @@ export const IPC_CHANNELS = {
 	quickStartProject: 'ensemblr:quick-start-project',
 	readWorkspaceDirectory: 'ensemblr:read-workspace-directory',
 	readWorkspaceFile: 'ensemblr:read-workspace-file',
+	writeWorkspaceImageAttachment: 'ensemblr:write-workspace-image-attachment',
+	writeWorkspaceFileAttachment: 'ensemblr:write-workspace-file-attachment',
 	registerLocalRepository: 'ensemblr:register-local-repository',
 	renameWorkspace: 'ensemblr:rename-workspace',
 	restoreChatTab: 'ensemblr:restore-chat-tab',

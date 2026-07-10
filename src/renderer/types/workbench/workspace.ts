@@ -74,6 +74,17 @@ export interface WorkspaceFileSummary {
 	path: string;
 }
 
+/**
+ * A large pasted/dropped file referenced by absolute filesystem path instead of
+ * being copied into the workspace. Distinct from {@link WorkspaceFileSummary},
+ * whose path is workspace-relative and read back through the file IPC.
+ */
+export interface ExternalAttachment {
+	absolutePath: string;
+	name: string;
+	sizeBytes: number;
+}
+
 // --- Pull request -----------------------------------------------------------
 
 export type PullRequestShellStatus =

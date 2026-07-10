@@ -46,6 +46,21 @@ export interface ReadWorkspaceFileRequest {
 	workspaceCwd: string;
 }
 
+/** Request to persist a pasted image under the workspace `.context/` folder. */
+export interface WriteWorkspaceImageAttachmentRequest {
+	contentBase64: string;
+	mimeType: string;
+	name?: string;
+	workspaceCwd: string;
+}
+
+/** Request to persist a pasted non-image file under the workspace `.context/attachments/` folder. */
+export interface WriteWorkspaceFileAttachmentRequest {
+	contentBase64: string;
+	name?: string;
+	workspaceCwd: string;
+}
+
 /** Failure reason for a read-workspace-file request. */
 export type ReadWorkspaceFileFailureCode =
 	| 'invalid-cwd'
@@ -63,6 +78,41 @@ export interface ReadWorkspaceFileResult {
 		message: string;
 	};
 	path: string;
+	sizeBytes?: number;
+}
+
+/** Failure reason for a pasted-image write request. */
+export type WriteWorkspaceImageAttachmentFailureCode =
+	| 'invalid-cwd'
+	| 'invalid-image'
+	| 'invalid-path'
+	| 'write-failed';
+
+/** Result of persisting a pasted image as a workspace file attachment. */
+export interface WriteWorkspaceImageAttachmentResult {
+	error?: {
+		code: WriteWorkspaceImageAttachmentFailureCode;
+		message: string;
+	};
+	file?: WorkspaceFileEntryWire;
+	sizeBytes?: number;
+}
+
+/** Failure reason for a pasted-file attachment write request. */
+export type WriteWorkspaceFileAttachmentFailureCode =
+	| 'invalid-attachment'
+	| 'invalid-cwd'
+	| 'invalid-path'
+	| 'too-large'
+	| 'write-failed';
+
+/** Result of persisting a pasted non-image file as a workspace file attachment. */
+export interface WriteWorkspaceFileAttachmentResult {
+	error?: {
+		code: WriteWorkspaceFileAttachmentFailureCode;
+		message: string;
+	};
+	file?: WorkspaceFileEntryWire;
 	sizeBytes?: number;
 }
 
@@ -95,8 +145,15 @@ export interface ReadWorkspaceDirectoryResult {
 	path: string;
 }
 
-/** Workspace files IPC surface — fast file enumeration and safe reads for composer @ mentions. */
+/** Workspace files IPC surface — fast file enumeration, safe reads, and pasted-attachment writes. */
 export interface WorkspaceFilesApi {
+	/**
+	 * Resolves the absolute filesystem path of a dragged or pasted `File`, or an
+	 * empty string when it has none (e.g. an in-memory clipboard blob). Backed by
+	 * Electron `webUtils.getPathForFile` in the preload; not an IPC round-trip, so
+	 * the live `File` never crosses to the main process.
+	 */
+	getPathForFile: (file: File) => string;
 	listWorkspaceFiles: (
 		request: ListWorkspaceFilesRequest,
 	) => Promise<ListWorkspaceFilesResult>;
@@ -111,6 +168,14 @@ export interface WorkspaceFilesApi {
 	readWorkspaceFile: (
 		request: ReadWorkspaceFileRequest,
 	) => Promise<ReadWorkspaceFileResult>;
+	/** Persist a pasted composer image under `.context/images/`. */
+	writeWorkspaceImageAttachment: (
+		request: WriteWorkspaceImageAttachmentRequest,
+	) => Promise<WriteWorkspaceImageAttachmentResult>;
+	/** Persist a pasted composer non-image file under `.context/attachments/`. */
+	writeWorkspaceFileAttachment: (
+		request: WriteWorkspaceFileAttachmentRequest,
+	) => Promise<WriteWorkspaceFileAttachmentResult>;
 	/** Stop watching a workspace previously started with `watchWorkspaceFiles`. */
 	unwatchWorkspaceFiles: (request: WatchWorkspaceFilesRequest) => Promise<void>;
 	/** Start watching a workspace so changes emit `onWorkspaceFilesChanged`. */

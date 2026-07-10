@@ -1,5 +1,8 @@
 import { readWorkspaceFile } from '@/renderer/api/ensemblr-queries';
-import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
+import type {
+	ExternalAttachment,
+	WorkspaceFileSummary,
+} from '@/renderer/types/workbench';
 
 /**
  * Upper bound on inlined attachment content sent to Pi. Long `.context`
@@ -11,6 +14,57 @@ import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 const ATTACHED_FILE_MAX_CHARS = 8_000;
 const ATTACHED_FILE_HEAD_CHARS = 2_500;
 const ATTACHED_FILE_TAIL_CHARS = 5_000;
+/**
+ * Extensions whose content is inlined verbatim in the prompt. Everything else
+ * (images, pdf, office docs, archives, unknown binaries) is announced by path
+ * with a placeholder so Pi inspects the saved file directly instead of the
+ * prompt being flooded with — or corrupted by — binary bytes.
+ */
+const TEXT_INLINE_EXTENSIONS = new Set([
+	'c',
+	'cfg',
+	'conf',
+	'cjs',
+	'cpp',
+	'cs',
+	'css',
+	'csv',
+	'go',
+	'h',
+	'htm',
+	'html',
+	'ini',
+	'java',
+	'js',
+	'json',
+	'jsonc',
+	'jsx',
+	'kt',
+	'log',
+	'lua',
+	'md',
+	'markdown',
+	'mjs',
+	'php',
+	'py',
+	'rb',
+	'rs',
+	'scss',
+	'sh',
+	'sql',
+	'svg',
+	'swift',
+	'toml',
+	'ts',
+	'tsx',
+	'tsv',
+	'txt',
+	'xml',
+	'yaml',
+	'yml',
+]);
+const ATTACHMENT_PLACEHOLDER =
+	'[attachment saved in the workspace — inspect this file directly if needed]';
 
 /** Wraps one workspace file's content in an explicit attachment marker. */
 function formatAttachedFileSection(pathValue: string, content: string): string {
@@ -38,9 +92,11 @@ function truncateAttachmentContent(content: string): string {
  * Formats the selected @ mentions (workspace files + directories) into the
  * text payload that gets appended to the user's prompt when sent to Pi.
  *
- * Reads each file mention via IPC and inlines its content in a fenced
- * `<attached_file>` block. Directories are surfaced as a separate header so
- * Pi knows the user referenced them without expecting inline content.
+ * Reads text file mentions via IPC and inlines their content in a fenced
+ * `<attached_file>` block. Image mentions use a placeholder so Pi sees the
+ * saved workspace path without flooding the prompt with binary bytes.
+ * Directories are surfaced as a separate header so Pi knows the user referenced
+ * them without expecting inline content.
  *
  * Throws when a file read fails, so the caller can surface the error to the
  * user before clearing the composer.
@@ -65,17 +121,31 @@ export async function formatMentionAttachmentText({
 	}
 
 	const fileMentions = mentions.filter((entry) => entry.kind === 'file');
-	// Reads are independent, so issue them in parallel. Results stay in mention
-	// order (Promise.all preserves order), and we re-check errors in order so the
-	// first failing mention deterministically wins — matching sequential reads.
-	const results = await Promise.all(
-		fileMentions.map((mention) =>
+	const textFileMentions = fileMentions.filter((entry) =>
+		shouldInlineAsText(entry.path),
+	);
+	// Text reads are independent, so issue them in parallel (Promise.all preserves
+	// order). Results key back to their mention so the emitted sections stay in the
+	// user's original mention order, interleaving image placeholders with text.
+	const textResults = await Promise.all(
+		textFileMentions.map((mention) =>
 			readWorkspaceFile({ path: mention.path, workspaceCwd }),
 		),
 	);
-	for (let index = 0; index < fileMentions.length; index += 1) {
-		const mention = fileMentions[index];
-		const result = results[index];
+	const resultByMention = new Map(
+		textFileMentions.map((mention, index) => [mention, textResults[index]]),
+	);
+	for (const mention of fileMentions) {
+		if (!shouldInlineAsText(mention.path)) {
+			sections.push(
+				formatAttachedFileSection(mention.path, ATTACHMENT_PLACEHOLDER),
+			);
+			continue;
+		}
+		const result = resultByMention.get(mention);
+		if (!result) {
+			continue;
+		}
 		if (result.error) {
 			throw new Error(
 				`Could not attach ${mention.path}: ${result.error.message}`,
@@ -85,6 +155,33 @@ export async function formatMentionAttachmentText({
 	}
 
 	return sections.join('\n\n');
+}
+
+/** Returns true when a file's content should be inlined as text rather than referenced by path. */
+function shouldInlineAsText(pathValue: string): boolean {
+	const extension = pathValue.split('.').pop()?.toLowerCase();
+	return extension ? TEXT_INLINE_EXTENSIONS.has(extension) : false;
+}
+
+/**
+ * Formats large files referenced by absolute path (not copied into the
+ * workspace) as a path-only section, so Pi opens each file directly rather than
+ * receiving its bytes.
+ */
+export function formatExternalAttachmentText(
+	externals: readonly ExternalAttachment[],
+): string {
+	if (externals.length === 0) {
+		return '';
+	}
+	return externals
+		.map((external) =>
+			formatAttachedFileSection(
+				external.absolutePath,
+				'[external file — inspect this path directly]',
+			),
+		)
+		.join('\n\n');
 }
 
 /**
