@@ -64,6 +64,6 @@ These instructions apply to everything under `src/renderer/`.
 
 ## Verification
 
-- For changes touching renderer JavaScript, TypeScript, JSX, TSX, CSS, or JSON, run `bun run check`.
-- Run `bun run typecheck` after moving renderer files or changing imports.
-- Run `bun run test:renderer` after changing renderer behavior, component structure, state, routing, or fixtures.
+- For changes touching renderer JavaScript, TypeScript, JSX, TSX, CSS, or JSON, run `npm run check`.
+- Run `npm run typecheck` after moving renderer files or changing imports.
+- Run `npm run test:renderer` after changing renderer behavior, component structure, state, routing, or fixtures.

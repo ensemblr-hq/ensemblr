@@ -87,12 +87,12 @@ while IFS= read -r segment; do
   invoked="$(first_invoked_command "$segment")"
 
   case "$invoked" in
-    npm|npx|pnpm|pnpx|yarn|yarnpkg)
+    bun|bunx|pnpm|pnpx|yarn|yarnpkg)
       blocked_command="$invoked"
       break
       ;;
     corepack)
-      if [[ "$segment" =~ (^|[[:space:]])(npm|npx|pnpm|pnpx|yarn|yarnpkg)(@[^[:space:]]*)?([[:space:]]|$) ]]; then
+      if [[ "$segment" =~ (^|[[:space:]])(bun|bunx|pnpm|pnpx|yarn|yarnpkg)(@[^[:space:]]*)?([[:space:]]|$) ]]; then
         blocked_command="corepack ${BASH_REMATCH[2]}"
         break
       fi
@@ -105,7 +105,7 @@ if [[ -n "$blocked_command" ]]; then
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
-      permissionDecisionReason: ("BLOCK: this repo enforces Bun. Do not call " + $blocked + ". Use Bun equivalents: bun install, bun add <pkg>, bun remove <pkg>, bun run <script>, or bunx <pkg>.")
+      permissionDecisionReason: ("BLOCK: this repo enforces npm. Do not call " + $blocked + ". Use npm equivalents: npm install, npm i <pkg>, npm uninstall <pkg>, npm run <script>, or npx <pkg>.")
     }
   }'
 fi

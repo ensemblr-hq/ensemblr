@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 
+import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import {
 	createKeychainReference,
 	formatLookup,
@@ -243,6 +244,9 @@ function runSecurityCommand(
 ): Promise<SecurityCommandResult> {
 	return new Promise((resolve, reject) => {
 		const child = spawn(commandPath, args, {
+			// Strip launch-context vars so a keychain read can't be attributed to
+			// (or relaunch) Ensemble by LaunchServices.
+			env: stripLaunchContextEnv(process.env),
 			stdio: ['pipe', 'pipe', 'pipe'],
 		});
 		const stderrChunks: string[] = [];

@@ -3,6 +3,8 @@ import { existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
+import { stripLaunchContextEnv } from '../environment/launch-env.ts';
+
 /** Outcome of inspecting a candidate path with git. */
 export interface GitRepositoryProbe {
 	defaultBranch: string | null;
@@ -292,6 +294,7 @@ async function runGitCommand(
 		['-C', repositoryPath, ...args],
 		{
 			encoding: 'utf8',
+			env: stripLaunchContextEnv(process.env),
 			timeout: GIT_COMMAND_TIMEOUT_MS,
 		},
 	);

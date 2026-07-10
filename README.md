@@ -114,14 +114,14 @@ recent changes.
 | Storage | SQLite (`~/.config/ensemble/ensemble.db`) |
 | Build | Vite 8 |
 | Lint / format | Biome 2.4 |
-| Package manager | Bun 1.3.14 |
+| Package manager | npm |
 
 ---
 
 ## Prerequisites
 
 - **macOS**
-- **[Bun](https://bun.sh) 1.3.14** — the enforced package manager (see [`AGENTS.md`](./AGENTS.md)).
+- **[npm](https://www.npmjs.com)** — the enforced package manager, bundled with Node.js (see [`AGENTS.md`](./AGENTS.md)).
 - **Pi CLI** — the agent runtime; Ensemble spawns it in RPC mode
   (see [`docs/pi/rpc-protocol.md`](./docs/pi/rpc-protocol.md)).
 - **GitHub CLI (`gh`)** — authenticate once with `gh auth login`. Ensemble reads PR/check data through
@@ -136,20 +136,20 @@ recent changes.
 
 ```bash
 # Install dependencies (postinstall fixes node-pty native-module permissions)
-bun install
+npm install
 
 # Launch the app in development
-bun run dev
+npm run dev
 ```
 
 Build outputs:
 
 ```bash
 # Package the app bundle
-bun run package
+npm run package
 
 # Produce a macOS distributable (.zip)
-bun run make
+npm run make
 ```
 
 ---
@@ -210,19 +210,19 @@ Directory holds managed repositories, workspaces, and archived context.
 
 This repository has explicit contributor policies — see [`AGENTS.md`](./AGENTS.md). In brief:
 
-- **Bun only.** Use `bun install`, `bun run <script>`, and `bunx`. Do not create `package-lock.json`,
+- **npm only.** Use `npm install`, `npm run <script>`, and `npx`. Do not create `bun.lock`,
   `pnpm-lock.yaml`, or `yarn.lock`.
 - **Biome** for lint + format (no ESLint/Prettier):
 
   ```bash
-  bun run check       # biome check + Tailwind class check
-  bun run check:fix   # apply safe fixes (format + import organization)
-  bun run format      # format only
-  bun run lint        # lint only
-  bun run typecheck   # tsc --noEmit
+  npm run check       # biome check + Tailwind class check
+  npm run check:fix   # apply safe fixes (format + import organization)
+  npm run format      # format only
+  npm run lint        # lint only
+  npm run typecheck   # tsc --noEmit for the app + scripts/ (tsconfig.scripts.json)
   ```
 
-- **Tailwind scale.** No px-based arbitrary utilities (e.g. `w-[13px]`); `bun run check` enforces this via
+- **Tailwind scale.** No px-based arbitrary utilities (e.g. `w-[13px]`); `npm run check` enforces this via
   `scripts/check-tailwind-classes.mjs`.
 - **State.** Jotai is the only app-level state solution.
 - **Docs.** JSDoc is expected on functions, hooks, components, atoms, and IPC contracts.
@@ -234,26 +234,26 @@ This repository has explicit contributor policies — see [`AGENTS.md`](./AGENTS
 
 ## Testing
 
-Tests run under two runners (Bun is the package manager only — never the test runner):
+Tests run under two runners (npm is the package manager, not a test runner):
 
-- **Vitest** (`bunx vitest run`) — shared (`tests/shared/**`) and renderer (`tests/renderer/**`) suites.
+- **Vitest** (`npx vitest run`) — shared (`tests/shared/**`) and renderer (`tests/renderer/**`) suites.
   Config in `vitest.config.mts`; default `environment` is `node`, and DOM component tests opt into
   happy-dom per file with a `// @vitest-environment happy-dom` docblock.
 - **`electron --test`** (via `ELECTRON_RUN_AS_NODE=1`) — main-process suites (`tests/main/**`) that need Electron/Node APIs.
 
-Run everything with `bun run test`; add coverage with `bun run test:coverage` (native Istanbul →
+Run everything with `npm run test`; add coverage with `npm run test:coverage` (native Istanbul →
 `coverage/coverage-final.json`). Focused examples:
 
 ```bash
-bun run test              # full Vitest suite (renderer + shared)
-bun run test:coverage     # Vitest with Istanbul coverage
-bunx vitest run <file>    # a single Vitest file
-bun run test:renderer     # renderer suites (Vitest)
-bun run test:pi-rpc       # Pi RPC parsing (Vitest)
-bun run test:db           # SQLite database (electron --test)
-bun run test:workspace    # workspace creation (electron --test)
-bun run test:github       # GitHub service (electron --test)
-bun run test:linear       # Linear OAuth/API (electron --test)
+npm run test              # full Vitest suite (renderer + shared)
+npm run test:coverage     # Vitest with Istanbul coverage
+npx vitest run <file>    # a single Vitest file
+npm run test:renderer     # renderer suites (Vitest)
+npm run test:pi-rpc       # Pi RPC parsing (Vitest)
+npm run test:db           # SQLite database (electron --test)
+npm run test:workspace    # workspace creation (electron --test)
+npm run test:github       # GitHub service (electron --test)
+npm run test:linear       # Linear OAuth/API (electron --test)
 ```
 
 See `package.json` for the full list of `test:*` scripts.

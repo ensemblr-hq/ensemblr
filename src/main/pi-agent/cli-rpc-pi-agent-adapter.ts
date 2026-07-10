@@ -10,6 +10,7 @@ import {
 	buildSpawnEnv,
 	type ChildLike,
 	defaultSpawn,
+	type ResolveBaseEnv,
 	type SpawnFn,
 } from './cli-rpc/spawn-env.ts';
 import { createSpawnFailureSession } from './cli-rpc/spawn-failure-session.ts';
@@ -60,6 +61,14 @@ export interface CreateCliRpcPiAgentAdapterOptions {
 	/** SIGTERM → SIGKILL grace window when terminating the child. */
 	killGraceMs?: number;
 	/**
+	 * Resolves the base environment the Pi child spawns under. Defaults to the
+	 * Electron `process.env`; production wires this to the login-shell env so a
+	 * packaged app launched from Finder inherits the user's PATH. Without it pi
+	 * resolves by absolute path but its own tool lookups fail and it exits,
+	 * surfacing later as an EPIPE on the first prompt write.
+	 */
+	resolveBaseEnv?: ResolveBaseEnv;
+	/**
 	 * Debug-only tap into every JSONL line crossing the Pi RPC boundary. Called
 	 * for both stdout reads (`rx`) and stdin writes (`tx`). Skipped when not
 	 * set so production paths pay no overhead.
@@ -92,12 +101,17 @@ export function createCliRpcPiAgentAdapter(
 	const stderrRingBytes = options.stderrRingBytes ?? DEFAULT_STDERR_RING_BYTES;
 	const killGraceMs = options.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
 	const onRawFrame = options.onRawFrame;
+	const resolveBaseEnv = options.resolveBaseEnv ?? (() => process.env);
 
 	const openSessions = new Set<CliRpcSession>();
 
 	const adapter: PiAgentAdapter = {
 		createSession: async (input) => {
+			// Resolve the login-shell env before spawning so the child inherits the
+			// user's PATH even when the app was launched from Finder (minimal PATH).
+			const baseEnv = await resolveBaseEnv();
 			const session = createCliRpcSession({
+				baseEnv,
 				input,
 				killGraceMs,
 				maxLineBytes,
@@ -125,11 +139,46 @@ export function createCliRpcPiAgentAdapter(
 	return adapter;
 }
 
+/**
+ * Awaits a `drain` after a backpressured stdin write, but loses the race to a
+ * dying pipe: without the `close`/`error` guards a write that backpressures
+ * exactly as the Pi child exits would await a `drain` that never fires and hang
+ * the turn forever. A large prompt frame can exceed the pipe buffer and trigger
+ * the backpressure path, so this is reachable, not just theoretical.
+ * @param stdin - The child's stdin pipe to wait on.
+ * @returns Resolves on `drain`; rejects if the pipe closes or errors first.
+ */
+function awaitStdinDrain(stdin: NodeJS.WritableStream): Promise<void> {
+	return new Promise<void>((resolve, reject) => {
+		const cleanup = () => {
+			stdin.off('drain', onDrain);
+			stdin.off('close', onClose);
+			stdin.off('error', onError);
+		};
+		const onDrain = () => {
+			cleanup();
+			resolve();
+		};
+		const onClose = () => {
+			cleanup();
+			reject(new Error('Pi RPC stdin closed before the write drained.'));
+		};
+		const onError = (cause: Error) => {
+			cleanup();
+			reject(new Error(`Pi RPC stdin write failed: ${cause.message}`));
+		};
+		stdin.once('drain', onDrain);
+		stdin.once('close', onClose);
+		stdin.once('error', onError);
+	});
+}
+
 interface CliRpcSession {
 	publicSession: PiAgentAdapterSession;
 }
 
 function createCliRpcSession({
+	baseEnv,
 	input,
 	killGraceMs,
 	maxLineBytes,
@@ -140,6 +189,7 @@ function createCliRpcSession({
 	stderrRingBytes,
 	turnIdFactory,
 }: {
+	baseEnv: NodeJS.ProcessEnv;
 	input: PiAgentAdapterCreateSessionInput;
 	killGraceMs: number;
 	maxLineBytes: number;
@@ -237,7 +287,7 @@ function createCliRpcSession({
 			args: metadata.args,
 			command: metadata.command,
 			cwd: metadata.cwd,
-			env: buildSpawnEnv(metadata.env),
+			env: buildSpawnEnv(baseEnv, metadata.env),
 		});
 	} catch (cause) {
 		const detail = cause instanceof Error ? cause.message : String(cause);
@@ -328,10 +378,23 @@ function createCliRpcSession({
 
 	const writeFrame = async (frame: unknown): Promise<void> => {
 		const line = `${JSON.stringify(frame)}\n`;
-		const writeResult = child.stdin.write(line, 'utf8');
+		// Once the Pi child exits its stdin pipe is no longer writable and a write
+		// would throw (or asynchronously emit) EPIPE. Fail fast with a typed error
+		// the IPC layer turns into a clean `{ error }` result instead of crashing.
+		if (closed || !child.stdin.writable) {
+			throw new Error('Pi RPC session is not writable.');
+		}
+		let writeResult: boolean;
+		try {
+			writeResult = child.stdin.write(line, 'utf8');
+		} catch (cause) {
+			throw new Error(
+				`Pi RPC stdin write failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+			);
+		}
 		emitRawFrame('tx', line.trimEnd());
 		if (!writeResult) {
-			await new Promise<void>((resolve) => child.stdin.once('drain', resolve));
+			await awaitStdinDrain(child.stdin);
 		}
 	};
 

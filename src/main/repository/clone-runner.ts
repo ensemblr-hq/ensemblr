@@ -1,10 +1,10 @@
 import { spawn as nodeSpawn } from 'node:child_process';
-
 import type {
 	CloneGithubRepositoryPreparation,
 	CloneGithubRepositoryProgressEvent,
 	CloneGithubRepositoryProgressKind,
 } from '../../shared/ipc/contracts/clone';
+import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 
 const CLONE_PROGRESS_GIT_ARGS = ['--progress'];
 
@@ -201,6 +201,9 @@ export function runCloneCommand(
 	return new Promise((resolve) => {
 		const child = nodeSpawn(command, args, {
 			cwd,
+			// Strip launch-context vars so gh/git (and their credential helpers)
+			// can't be attributed to Ensemble by LaunchServices.
+			env: stripLaunchContextEnv(process.env),
 			shell: false,
 			stdio: ['ignore', 'pipe', 'pipe'],
 		});

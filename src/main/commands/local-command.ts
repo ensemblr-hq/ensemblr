@@ -1,5 +1,6 @@
 import { performance } from 'node:perf_hooks';
 
+import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import {
 	cloneEnvironmentSnapshot,
 	getDefaultCommonPathEntries,
@@ -57,7 +58,12 @@ const DEFAULT_KILL_GRACE_MS = 500;
 export function createLocalCommandService(
 	options: CreateLocalCommandServiceOptions = {},
 ): LocalCommandService {
-	const baseEnv = normalizeEnvironment(options.baseEnv ?? process.env);
+	// Strip macOS/Electron launch-context vars before they seed the shell
+	// environment captured for pi, local commands, and readiness — otherwise a
+	// spawned process running `open`/LaunchServices makes macOS relaunch Ensemble.
+	const baseEnv = normalizeEnvironment(
+		stripLaunchContextEnv(options.baseEnv ?? process.env),
+	);
 	const commonPathEntries =
 		options.commonPathEntries ?? getDefaultCommonPathEntries();
 	const environmentTimeoutMs =

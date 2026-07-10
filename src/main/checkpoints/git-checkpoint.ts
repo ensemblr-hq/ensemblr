@@ -4,6 +4,8 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 
+import { stripLaunchContextEnv } from '../environment/launch-env.ts';
+
 const execFileAsync = promisify(execFile);
 
 /**
@@ -269,7 +271,9 @@ async function runGit({
 	try {
 		const { stdout } = await execFileAsync('git', [...args], {
 			cwd,
-			env: env ? { ...process.env, ...env } : process.env,
+			// Strip launch-context vars AFTER the caller overlay so a git subprocess
+			// (askpass/credential helper) can't make macOS relaunch Ensemble.
+			env: stripLaunchContextEnv({ ...process.env, ...env }),
 			maxBuffer: 16 * 1024 * 1024,
 		});
 		return stdout.trim();

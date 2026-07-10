@@ -3,9 +3,10 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
-import type { CommandEnvironmentSnapshot } from '../commands/local-command';
-import { createJsonlLineStream } from '../pi-ipc/jsonl-line-stream';
-import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
+import type { CommandEnvironmentSnapshot } from '../commands/local-command.ts';
+import { stripLaunchContextEnv } from '../environment/launch-env.ts';
+import { createJsonlLineStream } from '../pi-ipc/jsonl-line-stream.ts';
+import type { EnsembleRootDirectoryService } from '../root/root-directory-service.ts';
 import {
 	isExecutableReady,
 	type PiExecutableSnapshot,
@@ -110,7 +111,10 @@ export function runPiRpcSmokeProcess({
 		const child = spawn(command, Array.from(args), {
 			cwd,
 			detached: shouldDetachChild,
-			env,
+			// Final boundary strip, mirroring buildSpawnEnv for the real pi spawn:
+			// the smoke child (and any extension it spawns) must never inherit this
+			// app's macOS/Electron launch identity either.
+			env: stripLaunchContextEnv(env),
 			shell: false,
 			// Open stdin as a pipe — Pi's RPC mode reads commands from stdin
 			// and exits silently on EOF. We send one probe frame below to

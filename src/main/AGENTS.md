@@ -37,6 +37,6 @@ These instructions apply to everything under `src/main/`.
 
 ## Verification
 
-- After moving main-process files or imports, run `bun run typecheck`.
-- Run the narrow `bun run test:<concern>` script for any changed behavior under a main concern.
-- Run `bun run check` before finishing JavaScript, TypeScript, CSS, or JSON changes.
+- After moving main-process files or imports, run `npm run typecheck`.
+- Run the narrow `npm run test:<concern>` script for any changed behavior under a main concern.
+- Run `npm run check` before finishing JavaScript, TypeScript, CSS, or JSON changes.

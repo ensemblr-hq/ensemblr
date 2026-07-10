@@ -2,7 +2,7 @@
  * Replays raw Pi RPC frame captures (JSONL) through the renderer's
  * event-to-ui-message pipeline and prints the resulting UIMessage structure.
  *
- * Usage: bun scripts/replay-pi-capture.ts /tmp/pi-capture/02-tools.jsonl
+ * Usage: npx tsx scripts/replay-pi-capture.ts /tmp/pi-capture/02-tools.jsonl
  *
  * The mapping below mirrors `protocol-dispatch.ts` + the persistence adapter
  * closely enough to validate grouping, dedup, and the activity/final split
@@ -160,7 +160,7 @@ function framesToEvents(lines: readonly string[]): PiSessionEventWire[] {
 
 const file = process.argv[2];
 if (!file) {
-	console.error('usage: bun scripts/replay-pi-capture.ts <capture.jsonl>');
+	console.error('usage: npx tsx scripts/replay-pi-capture.ts <capture.jsonl>');
 	process.exit(1);
 }
 

@@ -17,6 +17,6 @@ These instructions apply to everything under `src/shared/`.
 
 ## Verification
 
-- After moving shared files or imports, run `bun run typecheck`.
+- After moving shared files or imports, run `npm run typecheck`.
 - Run the relevant main or renderer tests for any shared contract changed by behavior, not just by location.
-- Run `bun run check` before finishing JavaScript, TypeScript, CSS, or JSON changes.
+- Run `npm run check` before finishing JavaScript, TypeScript, CSS, or JSON changes.

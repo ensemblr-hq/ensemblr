@@ -1,7 +1,4 @@
-/// <reference types="bun" />
-
-import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
-import { EventEmitter } from 'node:events';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 interface SpawnCall {
 	command: string;
@@ -11,24 +8,37 @@ interface SpawnCall {
 type SpawnOutcome = 'spawn' | 'error';
 
 // Per-test control over how the mocked spawn resolves and what openPath returns.
-const calls: SpawnCall[] = [];
-let outcomeFor: (command: string) => SpawnOutcome = () => 'spawn';
-let openPathResult = '';
+// These live inside vi.hoisted() so the hoisted vi.mock factories below can
+// reference them without tripping Vitest's "no outer-scope variables" rule.
+const { calls, openPath, state } = vi.hoisted(() => {
+	const spawnState: {
+		openPathResult: string;
+		outcomeFor: (command: string) => SpawnOutcome;
+	} = { openPathResult: '', outcomeFor: () => 'spawn' };
+	const spawnCalls: SpawnCall[] = [];
+	const openPathSpy = vi.fn((_path: string) =>
+		Promise.resolve(spawnState.openPathResult),
+	);
+	return { calls: spawnCalls, openPath: openPathSpy, state: spawnState };
+});
 
-const openPath = mock((_path: string) => Promise.resolve(openPathResult));
+vi.mock('electron', () => ({ shell: { openPath } }));
 
-mock.module('electron', () => ({ shell: { openPath } }));
-
-mock.module('node:child_process', () => ({
-	spawn: (command: string, args: string[]) => {
-		calls.push({ command, args });
-		const child = new EventEmitter() as EventEmitter & { unref: () => void };
-		child.unref = () => undefined;
-		// Emit asynchronously so listeners attach first, mirroring real spawn.
-		queueMicrotask(() => child.emit(outcomeFor(command)));
-		return child;
-	},
-}));
+vi.mock('node:child_process', async () => {
+	const { EventEmitter } = await import('node:events');
+	return {
+		spawn: (command: string, args: string[]) => {
+			calls.push({ command, args });
+			const child = new EventEmitter() as InstanceType<typeof EventEmitter> & {
+				unref: () => void;
+			};
+			child.unref = () => undefined;
+			// Emit asynchronously so listeners attach first, mirroring real spawn.
+			queueMicrotask(() => child.emit(state.outcomeFor(command)));
+			return child;
+		},
+	};
+});
 
 const { openInEditor } = await import(
 	'../../src/main/config/open-in-editor.ts'
@@ -43,8 +53,8 @@ function setPlatform(platform: NodeJS.Platform): void {
 
 beforeEach(() => {
 	calls.length = 0;
-	outcomeFor = () => 'spawn';
-	openPathResult = '';
+	state.outcomeFor = () => 'spawn';
+	state.openPathResult = '';
 	openPath.mockClear();
 	delete process.env.VISUAL;
 	delete process.env.EDITOR;
@@ -81,7 +91,7 @@ describe('openInEditor', () => {
 	test('falls back to TextEdit on macOS when the editor binary is missing', async () => {
 		setPlatform('darwin');
 		process.env.EDITOR = 'missing-editor';
-		outcomeFor = (command) =>
+		state.outcomeFor = (command) =>
 			command === 'missing-editor' ? 'error' : 'spawn';
 
 		const result = await openInEditor('/cfg/config.json');
@@ -108,8 +118,8 @@ describe('openInEditor', () => {
 
 	test('surfaces a shell.openPath error as the last resort', async () => {
 		setPlatform('darwin');
-		outcomeFor = () => 'error';
-		openPathResult = 'no app available';
+		state.outcomeFor = () => 'error';
+		state.openPathResult = 'no app available';
 
 		const result = await openInEditor('/cfg/config.json');
 
