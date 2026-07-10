@@ -1,4 +1,4 @@
-import { type IpcRendererEvent, ipcRenderer } from 'electron';
+import { type IpcRendererEvent, ipcRenderer, webUtils } from 'electron';
 import { IPC_CHANNELS } from '../../shared/ipc/channels';
 import type { EnsemblrApi } from '../../shared/ipc/contracts/api';
 import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app-settings';
@@ -19,6 +19,7 @@ import type { WorkspaceFilesChangedBroadcast } from '../../shared/ipc/contracts/
  */
 type InvokeKey = Exclude<
 	keyof EnsemblrApi,
+	| 'getPathForFile'
 	| 'onAppSettingsChanged'
 	| 'onCloneGithubRepositoryProgress'
 	| 'onCloseActiveTabRequest'
@@ -119,6 +120,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('ensureWindowWidth', minimumWidth),
 		environmentVariables: () => invoke('environmentVariables'),
 		getAppSettings: () => invoke('getAppSettings'),
+		getPathForFile: (file) => webUtils.getPathForFile(file),
 		getPullRequestSnapshot: (request) =>
 			invoke('getPullRequestSnapshot', request),
 		getWorkspaceCommits: (request) => invoke('getWorkspaceCommits', request),
@@ -206,6 +208,10 @@ export function createEnsemblrApi(): EnsemblrApi {
 		readWorkspaceDirectory: (request) =>
 			invoke('readWorkspaceDirectory', request),
 		readWorkspaceFile: (request) => invoke('readWorkspaceFile', request),
+		writeWorkspaceImageAttachment: (request) =>
+			invoke('writeWorkspaceImageAttachment', request),
+		writeWorkspaceFileAttachment: (request) =>
+			invoke('writeWorkspaceFileAttachment', request),
 		registerLocalRepository: (request) =>
 			invoke('registerLocalRepository', request),
 		removeEnvFile: (request) => invoke('removeEnvFile', request),

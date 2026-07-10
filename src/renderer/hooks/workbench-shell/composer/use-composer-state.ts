@@ -2,6 +2,7 @@ import { useAtomValue } from 'jotai';
 import {
 	type ChangeEvent,
 	type ClipboardEvent as ReactClipboardEvent,
+	type DragEvent as ReactDragEvent,
 	type KeyboardEvent as ReactKeyboardEvent,
 	type RefObject,
 	useCallback,
@@ -18,6 +19,11 @@ import {
 import { useMentionMatches } from '@/renderer/hooks/workbench-shell/composer/use-mention-matches';
 import { useSlashCommands } from '@/renderer/hooks/workbench-shell/composer/use-slash-commands';
 import {
+	attachPastedFiles,
+	getTransferFiles,
+} from '@/renderer/lib/workbench/composer-attachments';
+import {
+	formatExternalAttachmentText,
 	formatMentionAttachmentText,
 	formatUploadAttachmentText,
 } from '@/renderer/lib/workbench/mention-payload';
@@ -36,6 +42,7 @@ import type {
 	AutocompleteKind,
 	AutocompleteState,
 	ComposerShellState,
+	ExternalAttachment,
 	SlashCommandDescriptor,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
@@ -69,9 +76,12 @@ interface ComposerStateApi {
 	autocompleteTotal: number;
 	canSubmit: boolean;
 	dismissAutocomplete: () => void;
+	externalAttachments: readonly ExternalAttachment[];
 	fileInputRef: RefObject<HTMLInputElement | null>;
 	handleAddAttachment: () => void;
 	handleChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
+	handleDragOver: (event: ReactDragEvent<HTMLElement>) => void;
+	handleDrop: (event: ReactDragEvent<HTMLElement>) => void;
 	handleFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
 	handleKeyDown: (event: ReactKeyboardEvent<HTMLTextAreaElement>) => void;
 	handlePaste: (event: ReactClipboardEvent<HTMLTextAreaElement>) => void;
@@ -87,6 +97,7 @@ interface ComposerStateApi {
 	onMentionSelect: (entry: WorkspaceFileSummary) => void;
 	onSlashSelect: (command: string, autoSubmit: boolean) => void;
 	pending: boolean;
+	removeExternal: (absolutePath: string) => void;
 	removeMention: (path: string) => void;
 	removeUpload: (index: number) => void;
 	setActiveIndex: (index: number) => void;
@@ -135,6 +146,9 @@ export function useComposerState({
 	const [uploadAttachments, setUploadAttachments] = useState<File[]>([]);
 	const [mentionAttachments, setMentionAttachments] = useState<
 		WorkspaceFileSummary[]
+	>([]);
+	const [externalAttachments, setExternalAttachments] = useState<
+		ExternalAttachment[]
 	>([]);
 	const [attachmentError, setAttachmentError] = useState<string | null>(null);
 	const [blockedNotice, setBlockedNotice] = useState(false);
@@ -255,13 +269,17 @@ export function useComposerState({
 			rawText: string,
 			mentions: readonly WorkspaceFileSummary[],
 			uploads: readonly File[],
+			externals: readonly ExternalAttachment[],
 			streamingBehavior?: 'steer' | 'followUp',
 		) => {
 			const trimmed = rawText.trim();
 			if (
 				composer.disabled ||
 				pending ||
-				(trimmed.length === 0 && mentions.length === 0 && uploads.length === 0)
+				(trimmed.length === 0 &&
+					mentions.length === 0 &&
+					uploads.length === 0 &&
+					externals.length === 0)
 			) {
 				return;
 			}
@@ -273,7 +291,8 @@ export function useComposerState({
 					workspaceCwd: composer.workspaceCwd,
 				});
 				const uploadText = await formatUploadAttachmentText(uploads);
-				const payload = [attachmentText, uploadText, trimmed]
+				const externalText = formatExternalAttachmentText(externals);
+				const payload = [attachmentText, uploadText, externalText, trimmed]
 					.filter(Boolean)
 					.join('\n\n');
 				// Clear the composer before awaiting onSubmit. onSubmit renders an
@@ -282,6 +301,7 @@ export function useComposerState({
 				setValue('');
 				setUploadAttachments([]);
 				setMentionAttachments([]);
+				setExternalAttachments([]);
 				try {
 					await composer.onSubmit(
 						payload,
@@ -292,6 +312,7 @@ export function useComposerState({
 					setValue(rawText);
 					setUploadAttachments([...uploads]);
 					setMentionAttachments([...mentions]);
+					setExternalAttachments([...externals]);
 					throw cause;
 				}
 			} catch (cause) {
@@ -317,11 +338,13 @@ export function useComposerState({
 			rawText: string,
 			mentions: readonly WorkspaceFileSummary[],
 			uploads: readonly File[],
+			externals: readonly ExternalAttachment[],
 		) => {
 			const empty =
 				rawText.trim().length === 0 &&
 				mentions.length === 0 &&
-				uploads.length === 0;
+				uploads.length === 0 &&
+				externals.length === 0;
 			if (composer.isStreaming && !empty) {
 				if (followUp === 'block') {
 					// Keep the draft and explain the no-op rather than eating the key.
@@ -333,19 +356,32 @@ export function useComposerState({
 					rawText,
 					mentions,
 					uploads,
+					externals,
 					followUp === 'steer' ? 'steer' : 'followUp',
 				);
 				return;
 			}
 			setBlockedNotice(false);
-			void submitText(rawText, mentions, uploads);
+			void submitText(rawText, mentions, uploads, externals);
 		},
 		[composer.isStreaming, followUp, submitText],
 	);
 
 	const handleSubmit = useCallback(
-		() => dispatchSubmit(value, mentionAttachments, uploadAttachments),
-		[dispatchSubmit, value, mentionAttachments, uploadAttachments],
+		() =>
+			dispatchSubmit(
+				value,
+				mentionAttachments,
+				uploadAttachments,
+				externalAttachments,
+			),
+		[
+			dispatchSubmit,
+			value,
+			mentionAttachments,
+			uploadAttachments,
+			externalAttachments,
+		],
 	);
 
 	// Drain auto-submit prompts queued from the Checks panel (commit & push,
@@ -370,7 +406,7 @@ export function useComposerState({
 			) {
 				return false;
 			}
-			dispatchSubmit(text, [], []);
+			dispatchSubmit(text, [], [], []);
 			return true;
 		},
 		[
@@ -390,6 +426,7 @@ export function useComposerState({
 			value,
 			mentionAttachments,
 			uploadAttachments,
+			externalAttachments,
 			composer.isStreaming ? 'followUp' : undefined,
 		);
 	}, [
@@ -398,12 +435,63 @@ export function useComposerState({
 		value,
 		mentionAttachments,
 		uploadAttachments,
+		externalAttachments,
 	]);
 
-	// Long pastes balloon the textarea and bury the prompt; convert them into a
-	// text attachment instead (gated by the Auto-convert long text setting).
+	/**
+	 * Persists pasted/dropped files via {@link attachPastedFiles}, then merges the
+	 * copied files onto the mention chips and the path-referenced ones onto the
+	 * external chips, de-duplicating by path so a repeated paste is a no-op.
+	 */
+	const handlePastedFiles = useCallback(
+		async (files: readonly File[]) => {
+			setAttachmentError(null);
+			const { error, savedExternals, savedFiles } = await attachPastedFiles(
+				files,
+				composer.workspaceCwd,
+			);
+			if (error) {
+				setAttachmentError(error);
+			}
+			if (savedFiles.length > 0) {
+				setMentionAttachments((prev) => {
+					const next = [...prev];
+					for (const file of savedFiles) {
+						if (!next.some((existing) => existing.path === file.path)) {
+							next.push(file);
+						}
+					}
+					return next;
+				});
+			}
+			if (savedExternals.length > 0) {
+				setExternalAttachments((prev) => {
+					const next = [...prev];
+					for (const external of savedExternals) {
+						if (
+							!next.some(
+								(existing) => existing.absolutePath === external.absolutePath,
+							)
+						) {
+							next.push(external);
+						}
+					}
+					return next;
+				});
+			}
+		},
+		[composer.workspaceCwd],
+	);
+
+	/** Handles file pastes and long-text paste conversion for the textarea. */
 	const handlePaste = useCallback(
 		(event: ReactClipboardEvent<HTMLTextAreaElement>) => {
+			const files = getTransferFiles(event.clipboardData);
+			if (files.length > 0) {
+				event.preventDefault();
+				void handlePastedFiles(files);
+				return;
+			}
 			if (!autoConvertLong) {
 				return;
 			}
@@ -416,8 +504,28 @@ export function useComposerState({
 			setUploadAttachments((prev) => [...prev, file]);
 			setAttachmentError(null);
 		},
-		[autoConvertLong],
+		[autoConvertLong, handlePastedFiles],
 	);
+
+	/** Accepts files dropped onto the composer, saving them like a paste. */
+	const handleDrop = useCallback(
+		(event: ReactDragEvent<HTMLElement>) => {
+			const files = getTransferFiles(event.dataTransfer);
+			if (files.length === 0) {
+				return;
+			}
+			event.preventDefault();
+			void handlePastedFiles(files);
+		},
+		[handlePastedFiles],
+	);
+
+	/** Signals the composer as a valid drop target so `handleDrop` can fire. */
+	const handleDragOver = useCallback((event: ReactDragEvent<HTMLElement>) => {
+		if (Array.from(event.dataTransfer.types).includes('Files')) {
+			event.preventDefault();
+		}
+	}, []);
 
 	const onMentionSelect = useCallback(
 		(entry: WorkspaceFileSummary) => {
@@ -461,7 +569,12 @@ export function useComposerState({
 			) {
 				dismissAutocomplete();
 				setValue('');
-				dispatchSubmit(slashText, mentionAttachments, uploadAttachments);
+				dispatchSubmit(
+					slashText,
+					mentionAttachments,
+					uploadAttachments,
+					externalAttachments,
+				);
 				return;
 			}
 			replaceToken(slashText);
@@ -470,6 +583,7 @@ export function useComposerState({
 			autocomplete,
 			dismissAutocomplete,
 			dispatchSubmit,
+			externalAttachments,
 			mentionAttachments,
 			replaceToken,
 			uploadAttachments,
@@ -627,15 +741,25 @@ export function useComposerState({
 		);
 	}, []);
 
+	const removeExternal = useCallback((absolutePath: string) => {
+		setAttachmentError(null);
+		setExternalAttachments((prev) =>
+			prev.filter((entry) => entry.absolutePath !== absolutePath),
+		);
+	}, []);
+
 	const isStreaming = composer.isStreaming || pending;
 	const canSubmit =
 		!composer.disabled &&
 		!isStreaming &&
 		(value.trim().length > 0 ||
 			mentionAttachments.length > 0 ||
-			uploadAttachments.length > 0);
+			uploadAttachments.length > 0 ||
+			externalAttachments.length > 0);
 	const hasChips =
-		uploadAttachments.length > 0 || mentionAttachments.length > 0;
+		uploadAttachments.length > 0 ||
+		mentionAttachments.length > 0 ||
+		externalAttachments.length > 0;
 
 	return {
 		activeIndex,
@@ -648,9 +772,12 @@ export function useComposerState({
 		autocompleteTotal,
 		canSubmit,
 		dismissAutocomplete,
+		externalAttachments,
 		fileInputRef,
 		handleAddAttachment,
 		handleChange,
+		handleDragOver,
+		handleDrop,
 		handleFileChange,
 		handleKeyDown,
 		handlePaste,
@@ -665,6 +792,7 @@ export function useComposerState({
 		onSlashSelect,
 		pending,
 		queueCurrent,
+		removeExternal,
 		removeMention,
 		removeUpload,
 		setActiveIndex,

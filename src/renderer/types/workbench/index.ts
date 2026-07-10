@@ -59,6 +59,7 @@ export type {
 	DockTabId,
 	DockTabModel,
 	DockTabStatus,
+	ExternalAttachment,
 	FixedDockTabId,
 	PullRequestCheckStatus,
 	PullRequestCheckSummary,

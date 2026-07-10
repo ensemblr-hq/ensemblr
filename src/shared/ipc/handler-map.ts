@@ -168,8 +168,14 @@ import type {
 import type {
 	ListWorkspaceFilesRequest,
 	ListWorkspaceFilesResult,
+	ReadWorkspaceDirectoryRequest,
+	ReadWorkspaceDirectoryResult,
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
+	WriteWorkspaceFileAttachmentRequest,
+	WriteWorkspaceFileAttachmentResult,
+	WriteWorkspaceImageAttachmentRequest,
+	WriteWorkspaceImageAttachmentResult,
 } from './contracts/workspace-files';
 import type {
 	GetWorkspaceFileDiffRequest,
@@ -400,9 +406,21 @@ export interface IpcHandlerMap {
 		QuickStartProjectRequest,
 		QuickStartProjectResult
 	>;
+	[IPC_CHANNELS.readWorkspaceDirectory]: IpcHandlerEntry<
+		ReadWorkspaceDirectoryRequest,
+		ReadWorkspaceDirectoryResult
+	>;
 	[IPC_CHANNELS.readWorkspaceFile]: IpcHandlerEntry<
 		ReadWorkspaceFileRequest,
 		ReadWorkspaceFileResult
+	>;
+	[IPC_CHANNELS.writeWorkspaceImageAttachment]: IpcHandlerEntry<
+		WriteWorkspaceImageAttachmentRequest,
+		WriteWorkspaceImageAttachmentResult
+	>;
+	[IPC_CHANNELS.writeWorkspaceFileAttachment]: IpcHandlerEntry<
+		WriteWorkspaceFileAttachmentRequest,
+		WriteWorkspaceFileAttachmentResult
 	>;
 	[IPC_CHANNELS.registerLocalRepository]: IpcHandlerEntry<
 		RegisterLocalRepositoryRequest,

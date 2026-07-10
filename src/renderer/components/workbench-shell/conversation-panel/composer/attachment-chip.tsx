@@ -5,22 +5,26 @@ import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 
 /**
- * Compact chip rendered above the textarea for repo-file mentions and local
- * uploads. Mirrors the reference design: VSCode-style icon + monospace label
- * inside a rounded outlined pill.
+ * Compact chip rendered above the textarea for repo-file mentions, local
+ * uploads, and large files referenced by absolute path. Mirrors the reference
+ * design: VSCode-style icon + monospace label inside a rounded outlined pill.
  */
 export function AttachmentChip({
 	file,
 	onRemove,
 }: {
-	file: WorkspaceFileSummary | { kind: 'upload'; name: string };
+	file:
+		| WorkspaceFileSummary
+		| { kind: 'external'; name: string }
+		| { kind: 'upload'; name: string };
 	onRemove: () => void;
 }) {
-	const isWorkspaceFile = 'kind' in file && file.kind !== 'upload';
 	const label = file.name;
-	const iconName = isWorkspaceFile
-		? getWorkspaceFileIconName(file as WorkspaceFileSummary)
-		: 'vscode-icons:default-file';
+	const isDirectory = file.kind === 'directory';
+	const iconName = getWorkspaceFileIconName({
+		kind: isDirectory ? 'directory' : 'file',
+		name: file.name,
+	});
 
 	return (
 		<span
