@@ -25,7 +25,7 @@ Ensemblr still wants one committed, team-shareable place to declare repository b
 
 Ensemblr uses a single on-disk repository configuration file: `.ensemblr/settings.toml`.
 
-- **One file, TOML.** `.ensemblr/settings.toml` at the repository root is the only repository config file Ensemblr reads. It is authored by hand, committed to the repository, and read-only to the app — Ensemblr never writes it.
+- **One file, TOML.** `.ensemblr/settings.toml` at the repository root is the only repository config file Ensemblr reads. It is authored by hand, committed to the repository, and read-only to the app — Ensemblr never writes it. Because each workspace is a git worktree, the file is read from the **active workspace worktree** root rather than the primary clone, so a branch-local edit to `.ensemblr/settings.toml` takes effect for the workspace on that branch.
 - **Files removed.** `conductor.json`, `.conductor/settings.toml`, `.conductor/settings.local.toml`, and `ensemblr.json` are no longer read. Any left on disk are silently ignored.
 - **No migration.** The `conductor.json`→`ensemblr.json` migration feature is removed. Old files are not converted; they are ignored.
 - **`ENSEMBLR_*` only.** Workspace scripts, terminals, and Pi sessions receive `ENSEMBLR_WORKSPACE_NAME`, `ENSEMBLR_WORKSPACE_PATH`, `ENSEMBLR_ROOT_PATH`, `ENSEMBLR_DEFAULT_BRANCH`, and `ENSEMBLR_PORT`. All `CONDUCTOR_*` compatibility variables and the `conductorCompatibility` setting are removed.
@@ -60,4 +60,5 @@ Leaving SQLite as the top repository authority (the ADR 0007 order) would let ea
 - Removing `CONDUCTOR_*` is a breaking change for any script that relied on those variables; such scripts must switch to the `ENSEMBLR_*` names.
 - Repositories that only ever had `conductor.json` or `ensemblr.json` (and no `.ensemblr/settings.toml` and no personal SQLite edits) resolve to built-in defaults; `.worktreeinclude` still copies files.
 - The Scripts settings screen edits personal SQLite values; users cannot edit the committed file from the app, and a SQLite edit is shadowed whenever the committed file defines the same key.
+- Config resolves from the active workspace worktree, so committing an edited `.ensemblr/settings.toml` on a branch changes the Setup/Run/Archive scripts for that workspace once the file watcher refreshes the settings snapshot.
 - Docs, ADRs, and planning issues that described the old multi-file model or `CONDUCTOR_*` env must point to this decision.

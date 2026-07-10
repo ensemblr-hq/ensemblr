@@ -76,7 +76,7 @@ export function createScriptLifecycleService({
 	settingsResolutionService,
 	terminalService,
 }: CreateScriptLifecycleServiceOptions): ScriptLifecycleService {
-	/** Resolves the configured command and run mode for a workspace's repository. */
+	/** Resolves the configured command and run mode from the workspace worktree. */
 	function resolveScriptConfig(
 		workspaceId: string,
 	):
@@ -109,7 +109,7 @@ export function createScriptLifecycleService({
 		const snapshot = settingsResolutionService.resolve({
 			repository: {
 				repositoryId: row.repositoryId,
-				repositoryPath: row.repositoryPath,
+				repositoryPath: row.path,
 			},
 		});
 
@@ -348,10 +348,8 @@ function defaultScriptTitle(kind: WorkspaceScriptKind): string {
 
 /** Type guard for the workspace + repository join row. */
 function isWorkspaceJoinRow(row: unknown): row is {
+	path: string;
 	repositoryId: string;
-	repositoryPath: string;
 } {
-	return (
-		isRecord(row) && isString(row.repositoryId) && isString(row.repositoryPath)
-	);
+	return isRecord(row) && isString(row.path) && isString(row.repositoryId);
 }
