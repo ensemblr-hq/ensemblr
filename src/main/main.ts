@@ -112,7 +112,17 @@ const isDev = !app.isPackaged;
 // live in different namespaces (dotfile path segment, reverse-DNS service id)
 // and carry their own dev markers below.
 const DEV_SUFFIX = ' (DEV)';
-app.setName(isDev ? `Ensemble${DEV_SUFFIX}` : 'Ensemble');
+// The unpackaged dev build (`electron-forge start`) gets the explicit (DEV)
+// suffix so it reads its isolated userData below. A *packaged* build keeps the
+// product name forge baked in from its build channel (Ensemble / Ensemble
+// Canary / Ensemble Dev — see forge.config.ts + ADR 0032): that name derives
+// the userData path and thus the single-instance lock, so each channel stays a
+// distinct app. Clobbering to 'Ensemble' here would collapse every packaged
+// channel back onto the release identity — the shared registration that lets
+// macOS relaunch a sibling build and flash a stray Dock tile.
+if (isDev) {
+	app.setName(`Ensemble${DEV_SUFFIX}`);
+}
 
 // A second launch of the packaged app — most often a spawned login shell that
 // re-execs the bundle's binary directly, which bypasses macOS LaunchServices

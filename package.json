@@ -69,6 +69,10 @@
 		"build": "node scripts/require-node-version.mjs && electron-forge package",
 		"package": "node scripts/require-node-version.mjs && electron-forge package",
 		"make": "node scripts/require-node-version.mjs && electron-forge make",
+		"make:canary": "ENSEMBLE_BUILD_CHANNEL=canary npm run make",
+		"make:dev": "ENSEMBLE_BUILD_CHANNEL=dev npm run make",
+		"package:dev": "ENSEMBLE_BUILD_CHANNEL=dev npm run package",
+		"diagnose:dock-flash": "node scripts/diagnose-dock-flash.mjs",
 		"doctor": "npx react-doctor@latest",
 		"postinstall": "node scripts/fix-node-pty-permissions.mjs"
 	},
