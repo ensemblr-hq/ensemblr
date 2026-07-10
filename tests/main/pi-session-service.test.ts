@@ -429,6 +429,43 @@ test('stopSession aborts the runtime and marks the turn aborted', async (t) => {
 	assert.equal(runtime.length, 0, 'fake adapter should drop closed sessions');
 });
 
+test('stopSession aborts without waiting for slow summary flushing', async (t) => {
+	const fixture = openFixture(t);
+	const sessionSummaryWriter: SessionSummaryWriter = {
+		writeSessionSummary: () => new Promise(() => undefined),
+	};
+	const { fake, service } = createService(fixture.database, {
+		sessionSummaryWriter,
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'task', sessionId: snapshot.id });
+
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	runtime.emit({
+		at: '2026-06-08T00:00:01.000Z',
+		payload: { kind: 'text', text: 'partial reply' },
+		role: 'agent',
+		turnId: 'fake-turn',
+		type: 'message',
+	});
+
+	const outcome = await Promise.race([
+		service
+			.stopSession({ sessionId: snapshot.id })
+			.then(() => 'stopped' as const),
+		delay(25).then(() => 'timed-out' as const),
+	]);
+
+	assert.equal(outcome, 'stopped');
+	assert.equal(fake.getOpenSessions().length, 0);
+});
+
 test('listSessionsForWorkspace returns active and persisted sessions', async (t) => {
 	const fixture = openFixture(t);
 	const { service } = createService(fixture.database);

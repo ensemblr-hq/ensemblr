@@ -31,7 +31,7 @@ describe('planClose', () => {
 });
 
 describe('runConfirmedClose', () => {
-	test('stops the agent before closing the tab', async () => {
+	test('starts the agent stop before closing the tab', async () => {
 		const order: string[] = [];
 		await runConfirmedClose({
 			onClose: () => {
@@ -44,21 +44,27 @@ describe('runConfirmedClose', () => {
 		expect(order).toEqual(['stop', 'close']);
 	});
 
-	test('awaits an async stop before closing', async () => {
+	test('closes immediately without waiting for an async stop', async () => {
 		const order: string[] = [];
+		let resolveStop: () => void = () => undefined;
+		const stop = new Promise<void>((resolve) => {
+			resolveStop = () => {
+				order.push('stop');
+				resolve();
+			};
+		});
+
 		await runConfirmedClose({
 			onClose: () => {
 				order.push('close');
 			},
-			onStop: () =>
-				new Promise<void>((resolve) => {
-					setTimeout(() => {
-						order.push('stop');
-						resolve();
-					}, 5);
-				}),
+			onStop: () => stop,
 		});
-		expect(order).toEqual(['stop', 'close']);
+		expect(order).toEqual(['close']);
+
+		resolveStop();
+		await stop;
+		expect(order).toEqual(['close', 'stop']);
 	});
 
 	test('still closes the tab when the stop rejects', async () => {

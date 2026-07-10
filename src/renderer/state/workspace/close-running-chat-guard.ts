@@ -41,18 +41,17 @@ export function planClose(request: CloseRunningChatRequest): CloseRequestPlan {
 }
 
 /**
- * Runs a confirmed close: cancel the agent, then close the tab. The stop is
- * best-effort — a failed cancel must not strand the user with a tab they asked
- * to close, so the close always proceeds (the dialog's "closing it will stop the
- * current Pi session" promise is upheld on success; on failure we still honor
- * the close the user explicitly requested).
+ * Runs a confirmed close: request an agent stop, then close the tab immediately.
+ * The stop is best-effort and intentionally non-blocking so a hung cancel cannot
+ * strand the user with a tab they explicitly chose to force-close.
  */
-export async function runConfirmedClose(pending: PendingClose): Promise<void> {
+export function runConfirmedClose(pending: PendingClose): Promise<void> {
 	try {
-		await pending.onStop();
+		void Promise.resolve(pending.onStop()).catch(() => undefined);
 	} catch {
-		// Swallowed: see contract above — close proceeds regardless.
-	} finally {
-		pending.onClose();
+		// onStop threw synchronously — the stop is best-effort, so the close
+		// the user explicitly requested still proceeds below.
 	}
+	pending.onClose();
+	return Promise.resolve();
 }
