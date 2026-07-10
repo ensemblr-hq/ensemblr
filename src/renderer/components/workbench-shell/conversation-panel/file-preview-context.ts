@@ -18,12 +18,32 @@ const FilePreviewOpenerContext = createContext<FilePreviewOpener | null>(null);
 
 export const FilePreviewOpenerProvider = FilePreviewOpenerContext.Provider;
 
+/** File-system kind for a workspace-relative path. */
+type WorkspacePathKind = 'directory' | 'file';
+
+/** Resolves a path to its current workspace file kind when the tree knows it. */
+type WorkspacePathKindResolver = (path: string) => WorkspacePathKind | null;
+
+const WorkspacePathKindResolverContext =
+	createContext<WorkspacePathKindResolver | null>(null);
+
+export const WorkspacePathKindResolverProvider =
+	WorkspacePathKindResolverContext.Provider;
+
 /**
  * Read the file-preview opener from context.
  * @returns The opener, or null outside a workspace conversation.
  */
 export function useFilePreviewOpener(): FilePreviewOpener | null {
 	return use(FilePreviewOpenerContext);
+}
+
+/**
+ * Read the workspace path-kind resolver from context.
+ * @returns The resolver, or null outside a workspace conversation.
+ */
+export function useWorkspacePathKindResolver(): WorkspacePathKindResolver | null {
+	return use(WorkspacePathKindResolverContext);
 }
 
 /** Opens (or re-focuses) a diff tab for a checkpointed turn. */

@@ -38,7 +38,7 @@ export function ChatUserPrompt({
 						kind={isFile ? 'file' : 'folder'}
 						label={chipLabelForPath(attachment.path)}
 						onActivate={
-							isFile && openFilePreview
+							openFilePreview
 								? () => openFilePreview(attachment.path)
 								: undefined
 						}

@@ -1,6 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
-import { toWorkspaceRelativePath } from '@/renderer/lib/pi';
+import { toWorkspaceLookupPath } from '@/renderer/lib/pi';
 import { formatLinkedIssueComposerSeed } from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
 import type {
@@ -14,6 +14,7 @@ import { ComposerPanel } from './composer-panel';
 import {
 	FilePreviewOpenerProvider,
 	TurnDiffOpenerProvider,
+	WorkspacePathKindResolverProvider,
 } from './file-preview-context';
 import { FilePreviewPanel } from './file-preview-panel';
 import { PiRawFramePanel } from './pi-raw-frame-panel';
@@ -34,6 +35,7 @@ export function WorkspaceConversationContent({
 	activeWorkspace,
 	closedSessions,
 	composer,
+	onDirectoryReveal,
 	onFilePreviewOpen,
 	onSessionTabChange,
 	onSessionTabClose,
@@ -46,6 +48,7 @@ export function WorkspaceConversationContent({
 	activeWorkspace: WorkspaceShellModel;
 	closedSessions: SessionTabModel[];
 	composer: ComposerShellState;
+	onDirectoryReveal: (directoryPath: string) => void;
 	onFilePreviewOpen: (input: {
 		filePath: string;
 	}) => Promise<{ chatTabId: string } | null>;
@@ -69,16 +72,40 @@ export function WorkspaceConversationContent({
 
 	/** Opens or re-focuses the preview tab for a chip's file and navigates to it. */
 	const workspaceCwd = activeWorkspace.pathLabel ?? null;
+	const workspacePathKindByPath = useMemo(
+		() =>
+			new Map(
+				activeWorkspace.workspaceFiles.map((file) => [file.path, file.kind]),
+			),
+		[activeWorkspace.workspaceFiles],
+	);
+	const resolveWorkspacePathKind = useCallback(
+		(filePath: string) => {
+			const relativePath = toWorkspaceLookupPath(filePath, workspaceCwd);
+			return workspacePathKindByPath.get(relativePath) ?? null;
+		},
+		[workspaceCwd, workspacePathKindByPath],
+	);
 	const openFilePreview = useCallback(
 		(filePath: string) => {
-			const relativePath = toWorkspaceRelativePath(filePath, workspaceCwd);
+			const relativePath = toWorkspaceLookupPath(filePath, workspaceCwd);
+			if (workspacePathKindByPath.get(relativePath) === 'directory') {
+				onDirectoryReveal(relativePath);
+				return;
+			}
 			void onFilePreviewOpen({ filePath: relativePath }).then((result) => {
 				if (result) {
 					onSessionTabChange(result.chatTabId);
 				}
 			});
 		},
-		[onFilePreviewOpen, onSessionTabChange, workspaceCwd],
+		[
+			onDirectoryReveal,
+			onFilePreviewOpen,
+			onSessionTabChange,
+			workspaceCwd,
+			workspacePathKindByPath,
+		],
 	);
 
 	/** Opens or re-focuses the diff tab for a checkpointed turn. */
@@ -105,25 +132,27 @@ export function WorkspaceConversationContent({
 				sessions={sessionTabs}
 			/>
 			{isChatTab ? (
-				<FilePreviewOpenerProvider value={openFilePreview}>
-					<TurnDiffOpenerProvider value={openTurnDiff}>
-						<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-							<WorkspaceTimeline
-								activeSession={activeSession}
+				<WorkspacePathKindResolverProvider value={resolveWorkspacePathKind}>
+					<FilePreviewOpenerProvider value={openFilePreview}>
+						<TurnDiffOpenerProvider value={openTurnDiff}>
+							<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+								<WorkspaceTimeline
+									activeSession={activeSession}
+									composer={composer}
+									workspace={activeWorkspace}
+								/>
+							</div>
+							<ComposerPanel
+								chatTabId={activeSession.chatTabId}
 								composer={composer}
-								workspace={activeWorkspace}
+								seedText={getLinkedIssueComposerSeed(
+									activeWorkspace,
+									activeSession,
+								)}
 							/>
-						</div>
-						<ComposerPanel
-							chatTabId={activeSession.chatTabId}
-							composer={composer}
-							seedText={getLinkedIssueComposerSeed(
-								activeWorkspace,
-								activeSession,
-							)}
-						/>
-					</TurnDiffOpenerProvider>
-				</FilePreviewOpenerProvider>
+						</TurnDiffOpenerProvider>
+					</FilePreviewOpenerProvider>
+				</WorkspacePathKindResolverProvider>
 			) : activeSession.kind === 'diff' ? (
 				activeSession.filePath ? (
 					<WorkspaceFileDiffPanel

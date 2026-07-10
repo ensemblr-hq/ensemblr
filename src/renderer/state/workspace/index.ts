@@ -5,6 +5,7 @@ export {
 	changesViewModeAtom,
 	rightSidebarCollapsedAtom,
 	rightSidebarSizePercentAtom,
+	workspaceDirectoryRevealRequestAtom,
 } from './layout-atoms';
 export { useProjectNavigationState } from './navigation';
 export {

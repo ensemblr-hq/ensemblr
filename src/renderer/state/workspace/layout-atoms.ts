@@ -1,3 +1,4 @@
+import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
 import type { DockTabId, ReviewPanelTab } from '@/renderer/types/workbench';
 import type {
@@ -6,6 +7,17 @@ import type {
 } from '@/renderer/types/workbench-shell';
 
 const workspaceStorageOptions = { getOnInit: true };
+
+/** One-shot request to reveal a directory in the All files tree. */
+interface WorkspaceDirectoryRevealRequest {
+	id: number;
+	path: string;
+	workspaceId: string;
+}
+
+/** Latest transient request to switch to All files and expand a directory. */
+export const workspaceDirectoryRevealRequestAtom =
+	atom<WorkspaceDirectoryRevealRequest | null>(null);
 
 /** Persisted display mode for the changes panel (list vs. tree). */
 export const changesViewModeAtom = atomWithStorage<ChangesViewMode>(

@@ -1,10 +1,12 @@
 import { Icon } from '@iconify/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { useAtomValue } from 'jotai';
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import {
 	type MouseEvent,
 	memo,
 	useCallback,
+	useEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -19,6 +21,7 @@ import {
 import { useReviewFilePreviewOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import { useFileTreeExpansion } from '@/renderer/hooks/workbench-shell/review-files/use-file-tree-expansion';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
+import { toWorkspaceLookupPath } from '@/renderer/lib/pi';
 import { cn } from '@/renderer/lib/utils';
 import {
 	buildFileTree,
@@ -27,6 +30,7 @@ import {
 	getWorkspaceFileIconName,
 	listDirectoryPaths,
 } from '@/renderer/lib/workbench';
+import { workspaceDirectoryRevealRequestAtom } from '@/renderer/state/workspace';
 import type {
 	FileTreeMenuTarget,
 	FileTreeNode,
@@ -122,19 +126,17 @@ function WorkspaceFileTree({
 	}, [files, lazyChildren]);
 	const tree = useMemo(() => buildFileTree(allFiles), [allFiles]);
 	const knownDirectoryPaths = useMemo(() => listDirectoryPaths(tree), [tree]);
+	const knownDirectoryPathSet = useMemo(
+		() => new Set(knownDirectoryPaths),
+		[knownDirectoryPaths],
+	);
 	// Folders start collapsed: the full repo tree would be overwhelming if every
 	// directory rendered open.
-	const { isExpanded, toggleDirectory } = useFileTreeExpansion(
-		false,
-		knownDirectoryPaths,
-	);
-
-	// Only the currently visible rows; collapsed subtrees are skipped, so this
-	// recomputes cheaply on every toggle and feeds the virtualizer directly.
-	const rows = useMemo(
-		() => flattenFileTree(tree, isExpanded),
-		[tree, isExpanded],
-	);
+	const { expandDirectories, isExpanded, toggleDirectory } =
+		useFileTreeExpansion(false, knownDirectoryPaths);
+	const revealRequest = useAtomValue(workspaceDirectoryRevealRequestAtom);
+	const handledRevealRequestIdRef = useRef<number | null>(null);
+	const pendingRevealPathRef = useRef<string | null>(null);
 
 	const loadIgnoredDirectory = useCallback(
 		async (directoryPath: string) => {
@@ -170,6 +172,53 @@ function WorkspaceFileTree({
 			});
 		},
 		[workspaceCwd],
+	);
+
+	useEffect(() => {
+		if (
+			!revealRequest ||
+			revealRequest.workspaceId !== workspaceId ||
+			handledRevealRequestIdRef.current === revealRequest.id
+		) {
+			return;
+		}
+		const directoryPath = toWorkspaceLookupPath(
+			revealRequest.path,
+			workspaceCwd,
+		);
+		if (!knownDirectoryPathSet.has(directoryPath)) {
+			return;
+		}
+		handledRevealRequestIdRef.current = revealRequest.id;
+		expandDirectories(
+			directoryPathAndAncestors(directoryPath).filter((path) =>
+				knownDirectoryPathSet.has(path),
+			),
+		);
+		pendingRevealPathRef.current = directoryPath;
+		const directoryNode = findDirectoryNode(tree, directoryPath);
+		if (
+			directoryNode?.isIgnored &&
+			directoryNode.directories.length === 0 &&
+			directoryNode.files.length === 0
+		) {
+			void loadIgnoredDirectory(directoryPath);
+		}
+	}, [
+		expandDirectories,
+		knownDirectoryPathSet,
+		loadIgnoredDirectory,
+		revealRequest,
+		tree,
+		workspaceCwd,
+		workspaceId,
+	]);
+
+	// Only the currently visible rows; collapsed subtrees are skipped, so this
+	// recomputes cheaply on every toggle and feeds the virtualizer directly.
+	const rows = useMemo(
+		() => flattenFileTree(tree, isExpanded),
+		[tree, isExpanded],
 	);
 
 	// `willExpand` comes from the row (which already knows its open state) so this
@@ -238,6 +287,21 @@ function WorkspaceFileTree({
 		overscan: ROW_OVERSCAN,
 	});
 
+	useEffect(() => {
+		const pendingPath = pendingRevealPathRef.current;
+		if (!pendingPath) {
+			return;
+		}
+		const rowIndex = rows.findIndex(
+			(row) => row.type === 'directory' && row.node.path === pendingPath,
+		);
+		if (rowIndex < 0) {
+			return;
+		}
+		pendingRevealPathRef.current = null;
+		virtualizer.scrollToIndex(rowIndex, { align: 'center' });
+	}, [rows, virtualizer]);
+
 	const listBody = (
 		<div
 			className='h-full overflow-y-auto p-2.5'
@@ -297,6 +361,38 @@ function WorkspaceFileTree({
 			) : null}
 		</ContextMenu>
 	);
+}
+
+/**
+ * Lists a directory path plus its parents, outermost first.
+ * @param path - Workspace-relative directory path.
+ * @returns Ancestor paths ending with the requested directory.
+ */
+function directoryPathAndAncestors(path: string): string[] {
+	const parts = path.split('/').filter(Boolean);
+	return parts.map((_, index) => parts.slice(0, index + 1).join('/'));
+}
+
+/**
+ * Finds a directory node in the tree by workspace-relative path.
+ * @param node - Tree node to search from.
+ * @param path - Directory path to find.
+ * @returns The matching node, if present.
+ */
+function findDirectoryNode(
+	node: FileTreeNode<WorkspaceFileSummary>,
+	path: string,
+): FileTreeNode<WorkspaceFileSummary> | null {
+	if (node.path === path) {
+		return node;
+	}
+	for (const directory of node.directories) {
+		const match = findDirectoryNode(directory, path);
+		if (match) {
+			return match;
+		}
+	}
+	return null;
 }
 
 /** Folder row with a collapse chevron, folder icon, and compacted label. */

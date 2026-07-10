@@ -9,6 +9,7 @@
  */
 
 export { eventsToUIMessages, turnMetadataOf } from './event-to-ui-message';
+export { attachmentPathFromInlineCode } from './inline-attachment';
 export {
 	chipLabelForPath,
 	parsePromptAttachments,
@@ -18,4 +19,4 @@ export {
 	looksLikeStackTrace,
 } from './tool-output-classifier';
 export { projectToolRow } from './tool-row-projector';
-export { toWorkspaceRelativePath } from './workspace-path';
+export { toWorkspaceLookupPath } from './workspace-path';
