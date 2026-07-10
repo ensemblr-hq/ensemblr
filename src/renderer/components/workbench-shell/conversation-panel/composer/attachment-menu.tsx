@@ -22,19 +22,16 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 
-/** Props for the composer attachment/link menu. */
-interface AttachmentMenuProps {
-	disabled?: boolean;
-	onAddAttachment: () => void;
-	onLinkIssue?: () => void;
-}
-
 /** Opens the composer attachment/link actions from the plus button. */
 export function AttachmentMenu({
 	disabled,
 	onAddAttachment,
 	onLinkIssue,
-}: AttachmentMenuProps) {
+}: {
+	disabled?: boolean;
+	onAddAttachment: () => void;
+	onLinkIssue?: () => void;
+}) {
 	const [menuOpen, setMenuOpen] = useState(false);
 	return (
 		<DropdownMenu onOpenChange={setMenuOpen} open={menuOpen}>

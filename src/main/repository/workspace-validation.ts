@@ -4,7 +4,7 @@
  * The function works on an already-trimmed string. Callers decide how to map
  * empty/missing input (some treat it as "use default", others as an error).
  */
-export type WorkspaceNameValidation =
+type WorkspaceNameValidation =
 	| { valid: true }
 	| {
 			code: 'name-required' | 'name-invalid';

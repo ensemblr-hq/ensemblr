@@ -18,23 +18,8 @@ import {
 	SheetTitle,
 } from '@/renderer/components/ui/sheet';
 import { Textarea } from '@/renderer/components/ui/textarea';
+import type { EnvironmentVariableSheetTarget } from '@/renderer/types/settings';
 import type { EnvironmentVariableScope } from '@/shared/ipc/contracts/environment';
-
-/** The variable a sheet opens for: a brand-new entry or an existing key. */
-export interface EnvironmentVariableSheetTarget {
-	/** Pre-filled key (documented add or edit); empty for a blank add. */
-	key: string;
-	/** True when editing an existing variable (loads the current value). */
-	isEdit: boolean;
-}
-
-/** Props for the environment-variable create/edit slide-over sheet. */
-interface EnvironmentVariableSheetProps {
-	scope: EnvironmentVariableScope;
-	scopeId?: string;
-	target: EnvironmentVariableSheetTarget | null;
-	onClose: () => void;
-}
 
 const KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -44,7 +29,12 @@ export function EnvironmentVariableSheet({
 	scope,
 	scopeId,
 	target,
-}: EnvironmentVariableSheetProps) {
+}: {
+	scope: EnvironmentVariableScope;
+	scopeId?: string;
+	target: EnvironmentVariableSheetTarget | null;
+	onClose: () => void;
+}) {
 	const queryClient = useQueryClient();
 	const nameId = useId();
 	const valueId = useId();

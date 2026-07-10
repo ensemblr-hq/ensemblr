@@ -18,12 +18,6 @@ function isTypeableTarget(target: EventTarget | null): boolean {
 	return TYPEABLE_TAGS.has(target.tagName);
 }
 
-/** Options for {@link useHotkey}. */
-interface HotkeyOptions {
-	allowInTypeable?: boolean;
-	enabled?: boolean;
-}
-
 /**
  * Registers a global window-level keydown listener that fires `handler` when
  * the shortcut identified by `id` is pressed. Shortcut definitions live in
@@ -32,7 +26,7 @@ interface HotkeyOptions {
 export function useHotkey(
 	id: ShortcutId,
 	handler: (event: KeyboardEvent) => void,
-	options: HotkeyOptions = {},
+	options: { allowInTypeable?: boolean; enabled?: boolean } = {},
 ): void {
 	const { allowInTypeable = true, enabled = true } = options;
 	useEffect(() => {

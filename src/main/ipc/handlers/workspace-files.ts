@@ -15,17 +15,14 @@ import type {
 	WorkspaceFilesWatcher,
 } from '../../workspace-files';
 
-/** Dependencies for registering the workspace-files IPC handlers. */
-export interface WorkspaceFilesHandlersOptions {
-	listWorkspaceFilesService: ListWorkspaceFilesService;
-	workspaceFilesWatcher: WorkspaceFilesWatcher;
-}
-
 /** Registers the IPC handlers that list, read, and watch repo files. */
 export function registerWorkspaceFilesHandlers({
 	listWorkspaceFilesService,
 	workspaceFilesWatcher,
-}: WorkspaceFilesHandlersOptions): void {
+}: {
+	listWorkspaceFilesService: ListWorkspaceFilesService;
+	workspaceFilesWatcher: WorkspaceFilesWatcher;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.listWorkspaceFiles,
 		(

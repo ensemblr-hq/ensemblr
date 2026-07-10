@@ -1,12 +1,10 @@
 import type { DynamicToolUIPart } from 'ai';
-
+import type { UIMessagePart } from '@/renderer/types/pi-timeline';
 import type {
 	PiSessionEventWire,
 	PiWireMessagePart,
 	PiWireMessagePayload,
 } from '@/shared/ipc/contracts/pi-session';
-
-import type { UIMessagePart } from './types';
 
 /**
  * Builds an `input-available` dynamic tool part from a Pi `tool-call` payload.

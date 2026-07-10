@@ -38,7 +38,7 @@ import type {
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 /** Navigation callbacks and add-project menu wiring returned by {@link useWorkbenchNavigation}. */
-export interface WorkbenchNavigationResult {
+interface WorkbenchNavigationResult {
 	addProjectMenu: AddProjectMenuModel;
 	navigateToStaticRoute: (target: WorkbenchStaticNavigationTarget) => void;
 	navigateToWorkspace: (projectId: string, workspaceId: string) => void;

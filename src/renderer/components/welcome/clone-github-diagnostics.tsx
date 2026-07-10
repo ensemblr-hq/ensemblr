@@ -1,14 +1,11 @@
 import type { CloneGithubRepositoryDiagnostic } from '@/shared/ipc/contracts/clone';
 
-/** Props for the clone GitHub diagnostics list. */
-interface CloneGithubDiagnosticsProps {
-	diagnostics: CloneGithubRepositoryDiagnostic[];
-}
-
 /** Failure detail card listing each diagnostic in execution order. */
 export function CloneGithubDiagnostics({
 	diagnostics,
-}: CloneGithubDiagnosticsProps) {
+}: {
+	diagnostics: CloneGithubRepositoryDiagnostic[];
+}) {
 	return (
 		<ul
 			className='rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive text-xs'

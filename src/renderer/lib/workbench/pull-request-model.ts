@@ -20,7 +20,7 @@ import type {
 } from '@/shared/ipc/contracts/review-comments';
 
 /** Inputs for building the workspace shell PR model: local changes, review rows, and the gh snapshot. */
-export interface BuildPullRequestShellModelInput {
+interface BuildPullRequestShellModelInput {
 	changeSummary: WorkspaceShellModel['changeSummary'];
 	localComments: readonly ReviewCommentWire[];
 	snapshot: GithubPullRequestSnapshotWire | null;

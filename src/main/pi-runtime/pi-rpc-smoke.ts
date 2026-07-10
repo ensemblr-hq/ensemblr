@@ -6,7 +6,7 @@ import { performance } from 'node:perf_hooks';
 import type { CommandEnvironmentSnapshot } from '../commands/local-command.ts';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import { createJsonlLineStream } from '../pi-ipc/jsonl-line-stream.ts';
-import type { EnsemblrRootDirectoryService } from '../root/root-directory-service.ts';
+import type { EnsemblrRootDirectoryService } from '../root';
 import {
 	isExecutableReady,
 	type PiExecutableSnapshot,

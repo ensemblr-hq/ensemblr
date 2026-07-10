@@ -2,9 +2,7 @@ import { ArrowUpRightIcon } from 'lucide-react';
 
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
-
-/** Visual tone of the PR header pill, keyed to review and merge status. */
-export type PullRequestHeaderTone = 'blocked' | 'neutral' | 'pending' | 'ready';
+import type { PullRequestHeaderTone } from '@/renderer/types/workbench';
 
 /** Pill-shaped PR number button, opening the URL when provided. */
 export function PullRequestNumberButton({

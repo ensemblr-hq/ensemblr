@@ -6,6 +6,7 @@
  * For domain model types — projects, workspaces, sessions, dock tabs,
  * review, pull requests — see `types/workbench/`.
  */
+export type { WorkbenchLayoutModel } from './layout';
 export type {
 	ChangesSource,
 	ChangesViewMode,

@@ -108,6 +108,7 @@ export type {
 	RenameWorkspaceService,
 } from './rename-workspace.ts';
 export { createRenameWorkspaceService } from './rename-workspace.ts';
+export type { RepositorySourcesService } from './repository-sources-service.ts';
 export type {
 	CreateUnarchiveWorkspaceServiceOptions,
 	UnarchiveWorkspaceService,

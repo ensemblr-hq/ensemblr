@@ -5,24 +5,13 @@
  */
 import { createContext, type ReactElement, type ReactNode, use } from 'react';
 
-import type { WorkspaceNavigationSelection } from '@/renderer/lib/workbench';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type {
 	NavigationContextValue,
 	SetupDiagnosticsContextValue,
 	WorkbenchLayoutContextValue,
 } from '@/renderer/types/contexts';
-import type {
-	AddProjectActionId,
-	AddProjectMenuModel,
-	ProjectShellModel,
-	WorkbenchRouteSearch,
-	WorkspaceShellModel,
-} from '@/renderer/types/workbench';
-import type {
-	WorkbenchHealth,
-	WorkbenchStaticNavigationTarget,
-} from '@/renderer/types/workbench-shell';
+import type { WorkbenchLayoutModel } from '@/renderer/types/workbench-shell';
 
 /** Result shape of {@link makeShellContext}. */
 interface ShellContext<T> {
@@ -91,22 +80,6 @@ export const SetupDiagnosticsProvider = SetupDiagnosticsContext.Provider;
 export const useSetupDiagnostics = SetupDiagnosticsContext.use;
 /** Non-throwing variant for shell chrome that may render in isolation. */
 export const useSetupDiagnosticsOptional = SetupDiagnosticsContext.useOptional;
-
-/** Layout model exposed below the `_shell` route. */
-export interface WorkbenchLayoutModel {
-	activeProject: ProjectShellModel | null;
-	activeWorkspace: WorkspaceShellModel | null;
-	addProjectMenu: AddProjectMenuModel;
-	displayProjects: ProjectShellModel[];
-	displaySelection: WorkspaceNavigationSelection | null;
-	health: WorkbenchHealth;
-	navigateToStaticRoute: (target: WorkbenchStaticNavigationTarget) => void;
-	navigateToWorkspace: (projectId: string, workspaceId: string) => void;
-	onAddProject: (id: AddProjectActionId) => void;
-	resolveWorkspaceRouteSearch: (
-		workspace: WorkspaceShellModel,
-	) => WorkbenchRouteSearch;
-}
 
 const LayoutModelContext = makeShellContext<WorkbenchLayoutModel>(
 	'useWorkbenchLayoutRouteModel',

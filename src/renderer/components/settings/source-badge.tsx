@@ -11,14 +11,14 @@ const SOURCE_LABEL: Record<SettingsResolutionSource, string> = {
 	worktreeinclude: 'git worktree include',
 };
 
-/** Props for the settings source badge. */
-interface SourceBadgeProps {
+/** "Source won" label showing which file/store provided the resolved value. */
+export function SourceBadge({
+	locked,
+	source,
+}: {
 	source: SettingsResolutionSource | null | undefined;
 	locked?: boolean;
-}
-
-/** "Source won" label showing which file/store provided the resolved value. */
-export function SourceBadge({ locked, source }: SourceBadgeProps) {
+}) {
 	if (!source) {
 		return (
 			<Badge className='text-[0.625rem]' variant='outline'>

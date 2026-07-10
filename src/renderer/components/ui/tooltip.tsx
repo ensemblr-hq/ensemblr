@@ -30,18 +30,15 @@ function TooltipTrigger({
 	return <TooltipPrimitive.Trigger data-slot='tooltip-trigger' {...props} />;
 }
 
-interface TooltipContentProps
-	extends React.ComponentProps<typeof TooltipPrimitive.Content> {
-	arrow?: boolean;
-}
-
 function TooltipContent({
 	arrow = false,
 	className,
 	sideOffset = 0,
 	children,
 	...props
-}: TooltipContentProps) {
+}: React.ComponentProps<typeof TooltipPrimitive.Content> & {
+	arrow?: boolean;
+}) {
 	return (
 		<TooltipPrimitive.Portal>
 			<TooltipPrimitive.Content

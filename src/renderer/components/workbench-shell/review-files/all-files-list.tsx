@@ -16,27 +16,25 @@ import {
 	ContextMenu,
 	ContextMenuTrigger,
 } from '@/renderer/components/ui/context-menu';
-import {
-	type ReviewFilePreviewOpener,
-	useReviewFilePreviewOpener,
-} from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
+import { useReviewFilePreviewOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import { useFileTreeExpansion } from '@/renderer/hooks/workbench-shell/review-files/use-file-tree-expansion';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
 import { cn } from '@/renderer/lib/utils';
 import {
 	buildFileTree,
-	type FileTreeNode,
 	fileTreeIndentClassName,
 	flattenFileTree,
 	getWorkspaceFileIconName,
 	listDirectoryPaths,
 } from '@/renderer/lib/workbench';
-import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
+import type {
+	FileTreeMenuTarget,
+	FileTreeNode,
+	ReviewFilePreviewOpener,
+	WorkspaceFileSummary,
+} from '@/renderer/types/workbench';
 
-import {
-	AllFilesContextMenuContent,
-	type FileTreeMenuTarget,
-} from './all-files-context-menu';
+import { AllFilesContextMenuContent } from './all-files-context-menu';
 import { FileTreeLabel } from './file-tree-label';
 
 /** Fixed row height (px). Rows are single-line (truncated), so heights are uniform. */

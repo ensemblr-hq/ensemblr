@@ -16,15 +16,12 @@ import {
 	saveReviewTodoRequestSchema,
 } from '../request-schemas.ts';
 
-/** Dependencies for registering the review-comments and todos IPC handlers. */
-export interface ReviewHandlersOptions {
-	reviewService: ReviewService;
-}
-
 /** Registers IPC handlers for Ensemblr-local review comments and todos. */
 export function registerReviewHandlers({
 	reviewService,
-}: ReviewHandlersOptions): void {
+}: {
+	reviewService: ReviewService;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.listReviewComments,
 		async (_event, raw: unknown): Promise<ListReviewCommentsResult> =>

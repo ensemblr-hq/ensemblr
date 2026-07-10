@@ -15,7 +15,7 @@ import {
  * to {@link classifyPermissionAction}. Bypass mode is reserved for the test
  * harness so handler tests don't have to wire a settings service.
  */
-export type PermissionGateMode = PermissionMode | 'allow-all';
+type PermissionGateMode = PermissionMode | 'allow-all';
 
 /**
  * Error raised when the gate denies an invocation. Crosses the IPC boundary as
@@ -57,7 +57,7 @@ export type WithPermissionGate = (
 ) => void;
 
 /** Inputs for {@link createPermissionGate}. */
-export interface CreatePermissionGateOptions {
+interface CreatePermissionGateOptions {
 	/**
 	 * Resolves the currently-active permission mode every time a gated channel
 	 * is invoked. Called per-invocation so the gate picks up settings changes

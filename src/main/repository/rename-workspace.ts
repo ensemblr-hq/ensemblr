@@ -8,7 +8,7 @@ import type {
 	RenameWorkspaceResult,
 } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsemblrDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
 import {
 	selectWorkspaceWithRepositoryById,
 	updateWorkspaceRenameRow,

@@ -1,4 +1,4 @@
-import { createChatTabService } from '../chat-tabs/chat-tab-service';
+import { createChatTabService } from '../chat-tabs/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import type {
 	AppSettingsService,
@@ -10,7 +10,7 @@ import type { EnvironmentVariablesService } from '../environment';
 import { createGithubService } from '../github/github-service';
 import type { LinearAuthService, LinearService } from '../linear';
 import type { OpenTargetService } from '../open-target';
-import type { PiSessionService } from '../pi-agent/pi-session-service';
+import type { PiSessionService } from '../pi-agent';
 import type { PiExecutableService } from '../pi-runtime';
 import type {
 	ArchiveRepositoryService,

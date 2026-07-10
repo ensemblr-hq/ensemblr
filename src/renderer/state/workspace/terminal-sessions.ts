@@ -7,7 +7,7 @@ import type {
 } from '@/shared/ipc/contracts/terminal';
 
 /** Live terminal sessions for one workspace plus create/close actions. */
-export interface WorkspaceTerminalSessionsState {
+interface WorkspaceTerminalSessionsState {
 	/** Kills the session and removes its tab from the dock. */
 	closeTerminal: (terminalId: string) => Promise<void>;
 	createTerminal: () => Promise<CreateTerminalSessionResult>;

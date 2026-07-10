@@ -8,7 +8,7 @@ import type {
 	ArchiveRepositoryRequest,
 	ArchiveRepositoryResult,
 } from '../../shared/ipc/contracts/repository';
-import type { EnsemblrDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
 import {
 	selectRepositoryForArchive,
 	stampRepositoryArchived,

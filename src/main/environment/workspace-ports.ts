@@ -18,13 +18,6 @@ export const WORKSPACE_PORT_RANGE_SIZE = 1_000;
 /** Metadata key under which the allocated port is persisted. */
 export const WORKSPACE_PORT_METADATA_KEY = 'ensemblrPort';
 
-/** Inputs for {@link pickWorkspacePort}. */
-export interface PickWorkspacePortOptions {
-	preferredPort?: number | null;
-	usedPorts: ReadonlySet<number>;
-	workspaceId: string;
-}
-
 /**
  * Returns true when `value` is a port inside the Ensemblr workspace range.
  * @param value - Candidate value (usually read from persisted metadata).
@@ -70,7 +63,11 @@ export function pickWorkspacePort({
 	preferredPort,
 	usedPorts,
 	workspaceId,
-}: PickWorkspacePortOptions): number {
+}: {
+	preferredPort?: number | null;
+	usedPorts: ReadonlySet<number>;
+	workspaceId: string;
+}): number {
 	if (isWorkspacePort(preferredPort) && !usedPorts.has(preferredPort)) {
 		return preferredPort;
 	}

@@ -12,7 +12,7 @@ import type {
 	CloneGithubRepositoryStartResult,
 } from '../../shared/ipc/contracts/clone';
 import type { EnsemblrRootDirectoryService } from '../root';
-import type { EnsemblrDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
 import { classifyCloneFailure } from './clone-classifier.ts';
 import { failureResult, resolveDestination } from './clone-destination.ts';
 import { assertTargetWritable, ensureParentDirectory } from './clone-fs.ts';

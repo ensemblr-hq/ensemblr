@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
-import type { PiEventRow } from '../../storage/repositories/pi-event-repository.ts';
+import type { PiEventRow } from '../../storage/repositories';
 import {
 	updatePiSession,
 	updateTurn,
@@ -19,7 +19,7 @@ export type PersistRuntimeEventPort = (input: {
 }) => PiEventRow | null;
 
 /** Dependencies for {@link createRuntimeEventHandler}. */
-export interface RuntimeEventHandlerOptions {
+interface RuntimeEventHandlerOptions {
 	activeSessions: ActiveSessionMap;
 	eventSink: PiSessionEventSink | undefined;
 	now: () => Date;
@@ -28,7 +28,7 @@ export interface RuntimeEventHandlerOptions {
 }
 
 /** Handler that persists a normalized runtime event and schedules summary refreshes. */
-export interface RuntimeEventHandler {
+interface RuntimeEventHandler {
 	handle: (input: {
 		branchId: string;
 		database: DatabaseSync;

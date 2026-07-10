@@ -64,11 +64,6 @@ export interface OpenTargetService {
 	refresh: () => Promise<void>;
 }
 
-/** Options for {@link createOpenTargetService}. */
-interface CreateOpenTargetServiceOptions {
-	localCommandService: LocalCommandService;
-}
-
 /** Detection results paired with resolved per-target icon data URLs. */
 interface ResolvedTargets {
 	detected: DetectedTargetsMap;
@@ -88,7 +83,9 @@ const EMPTY_RESOLVED: ResolvedTargets = {
  */
 export function createOpenTargetService({
 	localCommandService,
-}: CreateOpenTargetServiceOptions): OpenTargetService {
+}: {
+	localCommandService: LocalCommandService;
+}): OpenTargetService {
 	let inMemorySnapshots: WorkspaceOpenTargetSnapshot[] | null =
 		readSnapshotsFromDisk();
 	// One-deep refresh chain: every resolve is appended to the previous one so

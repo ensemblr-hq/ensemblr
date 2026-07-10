@@ -6,13 +6,13 @@ import type {
 	SetupDiagnosticsSnapshot,
 } from '../../shared/ipc/contracts/setup';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsemblrConfigService } from '../config/config-loader';
-import type { EnvironmentVariablesService } from '../environment/environment-variables';
+import type { EnsemblrConfigService } from '../config';
+import type { EnvironmentVariablesService } from '../environment';
 import type { LinearAuthService } from '../linear';
-import type { PiExecutableService } from '../pi-runtime/pi-executable';
+import type { PiExecutableService } from '../pi-runtime';
 import type { PiReadinessService } from '../pi-runtime/pi-readiness';
-import type { EnsemblrRootDirectoryService } from '../root/root-directory-service';
-import type { EnsemblrDatabaseService } from '../storage/database';
+import type { EnsemblrRootDirectoryService } from '../root';
+import type { EnsemblrDatabaseService } from '../storage';
 import type { SetupCheckProvider } from './setup-check-context.ts';
 import {
 	getConfigCheck,

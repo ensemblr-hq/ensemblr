@@ -1,11 +1,7 @@
-import type { ComposerModelOption } from '@/renderer/types/workbench';
-
-/** One provider group inside the model selector menu. */
-export interface GroupedOptions {
-	provider: string;
-	providerLabel: string;
-	models: ComposerModelOption[];
-}
+import type {
+	ComposerModelOption,
+	GroupedOptions,
+} from '@/renderer/types/workbench';
 
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
 	anthropic: 'Claude Code',

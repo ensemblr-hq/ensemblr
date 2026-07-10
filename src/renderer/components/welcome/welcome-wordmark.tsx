@@ -81,15 +81,16 @@ const KEYFRAMES = `
 }
 `;
 
-/** Props for a single offset, tinted ghost layer of the wordmark. */
-interface GhostLayerProps {
+/** Renders one offset, tinted copy of the wordmark used for the chromatic ghost effect. */
+function GhostLayer({
+	color,
+	offset,
+	visible,
+}: {
 	color: string;
 	offset: number;
 	visible: boolean;
-}
-
-/** Renders one offset, tinted copy of the wordmark used for the chromatic ghost effect. */
-function GhostLayer({ color, offset, visible }: GhostLayerProps) {
+}) {
 	return (
 		<svg
 			aria-hidden='true'

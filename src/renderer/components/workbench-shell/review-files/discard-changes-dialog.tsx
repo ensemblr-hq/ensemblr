@@ -13,19 +13,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
-
-/** What a confirmed discard will revert. */
-export interface DiscardChangesTarget {
-	/** Number of distinct changed files (drives single vs bulk copy). */
-	fileCount: number;
-	/**
-	 * Workspace-relative paths to discard. For a rename this carries both the new
-	 * path and its `renamedFrom` so the original is restored alongside.
-	 */
-	paths: string[];
-	/** Human label: a file name, or e.g. "all 8 changes". */
-	title: string;
-}
+import type { DiscardChangesTarget } from '@/renderer/types/workbench';
 
 /**
  * Destructive confirmation for discarding working-tree changes. Tracked files

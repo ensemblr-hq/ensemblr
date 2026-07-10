@@ -12,13 +12,6 @@ import type { WithPermissionGate } from '../permission-gate.ts';
 import { parseRootDirectoryChangeRequest } from '../request-schemas.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
-/** Service dependencies used by the root-directory IPC handlers. */
-export interface RootHandlersOptions {
-	rootDirectoryService: EnsemblrRootDirectoryService;
-	sharedRootAdoptionService: SharedRootAdoptionService;
-	withPermissionGate: WithPermissionGate;
-}
-
 /**
  * Registers IPC handlers for inspecting, picking, and applying root
  * directory changes.
@@ -28,7 +21,11 @@ export function registerRootHandlers({
 	rootDirectoryService,
 	sharedRootAdoptionService,
 	withPermissionGate,
-}: RootHandlersOptions): void {
+}: {
+	rootDirectoryService: EnsemblrRootDirectoryService;
+	sharedRootAdoptionService: SharedRootAdoptionService;
+	withPermissionGate: WithPermissionGate;
+}): void {
 	ipcMain.handle(IPC_CHANNELS.rootDirectory, (): RootDirectorySnapshot => {
 		return rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
 	});

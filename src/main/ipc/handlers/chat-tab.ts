@@ -9,8 +9,8 @@ import type {
 	OpenChatTabResult,
 	RestoreChatTabResult,
 } from '../../../shared/ipc/contracts/chat-tab';
-import type { ChatTabService } from '../../chat-tabs/chat-tab-service.ts';
-import type { ChatTabRow } from '../../storage/repositories/chat-tab-repository.ts';
+import type { ChatTabService } from '../../chat-tabs';
+import type { ChatTabRow } from '../../storage/repositories';
 import {
 	bindPiSessionToChatTabRequestSchema,
 	closeChatTabRequestSchema,
@@ -20,11 +20,6 @@ import {
 	restoreChatTabRequestSchema,
 } from '../request-schemas.ts';
 
-/** Service dependencies for the chat-tab IPC handlers. */
-export interface ChatTabHandlersOptions {
-	chatTabService: ChatTabService;
-}
-
 /**
  * Registers IPC handlers exposing chat-tab CRUD and closed-tab history to the
  * renderer. All lifecycle policy lives in {@link ChatTabService}; handlers
@@ -32,7 +27,9 @@ export interface ChatTabHandlersOptions {
  */
 export function registerChatTabHandlers({
 	chatTabService,
-}: ChatTabHandlersOptions): void {
+}: {
+	chatTabService: ChatTabService;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.listChatTabs,
 		async (_event, raw: unknown): Promise<ListChatTabsResult> => {

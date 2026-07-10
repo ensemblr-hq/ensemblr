@@ -1,10 +1,10 @@
+export type { PiExecutableSelectionResult } from '../../shared/ipc/contracts/pi-session';
 export type {
 	PiExecutableDiagnostic,
 	PiExecutableDiagnosticSeverity,
 	PiExecutableProbeKind,
 	PiExecutableProbeSnapshot,
 	PiExecutableProbeStatus,
-	PiExecutableSelectionResult,
 	PiExecutableService,
 	PiExecutableSnapshot,
 	PiExecutableSource,

@@ -61,12 +61,12 @@ export interface LinearSyncStateRecord {
 /** Upsert payload for {@link LinearStore.upsertIssues}. */
 export type LinearIssueUpsert = Omit<LinearIssueRecord, 'syncedAt'>;
 /** Upsert payload for {@link LinearStore.upsertResources}. */
-export type LinearResourceUpsert = Omit<LinearResourceRecord, 'syncedAt'>;
+type LinearResourceUpsert = Omit<LinearResourceRecord, 'syncedAt'>;
 /** Upsert payload for {@link LinearStore.upsertComments}. */
-export type LinearCommentUpsert = Omit<LinearCommentRecord, 'syncedAt'>;
+type LinearCommentUpsert = Omit<LinearCommentRecord, 'syncedAt'>;
 
 /** Filter for {@link LinearStore.listIssues}. */
-export interface LinearIssueListFilter {
+interface LinearIssueListFilter {
 	includeArchived?: boolean;
 	limit?: number;
 	query?: string;

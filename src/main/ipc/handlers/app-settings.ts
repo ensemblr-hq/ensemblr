@@ -10,7 +10,7 @@ import type { AppSettingsService } from '../../config';
 import { openInEditor } from '../../config/open-in-editor.ts';
 
 /** Service dependencies for the app-settings IPC handlers. */
-export interface AppSettingsHandlersOptions {
+interface AppSettingsHandlersOptions {
 	appSettingsService: AppSettingsService;
 	/** Invoked after a successful write so main-process side-effects re-read. */
 	onAppSettingsUpdated?: () => void;

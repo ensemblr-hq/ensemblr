@@ -2,7 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { PiSessionEventWire } from '../../shared/ipc/contracts/pi-session';
-import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
+import type { PiExecutableSnapshot } from '../pi-runtime';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import type { PiAgentEvent } from './pi-agent-types.ts';
 

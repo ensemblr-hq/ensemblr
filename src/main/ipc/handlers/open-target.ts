@@ -6,16 +6,10 @@ import type {
 	OpenWorkspaceInTargetRequest,
 } from '@/shared/ipc/contracts/open-target';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
+import type { OpenTargetService } from '../../open-target';
 import { sanitizeWorkspaceRelativePath } from '../../open-target/open-target-paths';
-import type { OpenTargetService } from '../../open-target/open-target-service';
 import type { EnsemblrDatabaseService } from '../../storage';
 import { getWorkspacePathById } from '../../storage/repositories/workspace-repository';
-
-/** Dependencies for registering the "Open in…" IPC handlers. */
-interface RegisterOpenTargetHandlersOptions {
-	databaseService: EnsemblrDatabaseService;
-	openTargetService: OpenTargetService;
-}
 
 /**
  * IPC handlers for the workbench "Open in…" menu. The list channel exposes
@@ -25,7 +19,10 @@ interface RegisterOpenTargetHandlersOptions {
 export function registerOpenTargetHandlers({
 	databaseService,
 	openTargetService,
-}: RegisterOpenTargetHandlersOptions): void {
+}: {
+	databaseService: EnsemblrDatabaseService;
+	openTargetService: OpenTargetService;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.listWorkspaceOpenTargets,
 		async (): Promise<ListWorkspaceOpenTargetsResult> => {

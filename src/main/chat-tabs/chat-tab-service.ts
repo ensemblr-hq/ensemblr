@@ -9,10 +9,8 @@ import {
 	serializeWorkspaceGitDiffScope,
 } from '../../shared/ipc/contracts/workspace-git.ts';
 import { resolveSessionSummaryPath } from '../pi-agent/session-summary-writer.ts';
-import {
-	type EnsemblrDatabaseService,
-	requireDatabase,
-} from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
+import { requireDatabase } from '../storage/database.ts';
 import {
 	bindPiSession,
 	type ChatTabKind,
@@ -24,7 +22,7 @@ import {
 	markClosed,
 	openChatTab,
 	restoreClosedChatTab,
-} from '../storage/repositories/chat-tab-repository.ts';
+} from '../storage/repositories/index.ts';
 
 /** Thrown when opening a sixth chat tab; carries a renderer-detectable marker. */
 export class ChatTabLimitError extends Error {
@@ -41,21 +39,15 @@ export class ChatTabLimitError extends Error {
  * domains. Default implementation is built in `main.ts` from the storage
  * data-access layer; tests can pass a stub.
  */
-export interface ChatTabLookups {
+interface ChatTabLookups {
 	/** Returns `true` when a Pi session exists for the given id. */
 	piSessionExists: (input: { piSessionId: string }) => boolean;
 	/** Returns the workspace's on-disk cwd, or `null` when absent. */
 	workspaceCwd: (input: { workspaceId: string }) => string | null;
 }
 
-/** Dependencies for {@link createChatTabService}. */
-export interface ChatTabServiceOptions {
-	databaseService: EnsemblrDatabaseService;
-	lookups: ChatTabLookups;
-}
-
 /** A closed tab joined with its session-summary location and title. */
-export interface ClosedChatTabEntry {
+interface ClosedChatTabEntry {
 	closedAt: string;
 	summaryPath: string;
 	summaryTitle: string | null;
@@ -92,7 +84,10 @@ const DEFAULT_TAB_TITLE = 'New chat';
 export function createChatTabService({
 	databaseService,
 	lookups,
-}: ChatTabServiceOptions): ChatTabService {
+}: {
+	databaseService: EnsemblrDatabaseService;
+	lookups: ChatTabLookups;
+}): ChatTabService {
 	const requireChatTabDatabase = (): DatabaseSync =>
 		requireDatabase(
 			databaseService.getConnection()?.database,

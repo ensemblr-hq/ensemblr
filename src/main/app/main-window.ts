@@ -12,11 +12,6 @@ import {
 	trackMainWindowState,
 } from './window-state';
 
-/** Options for {@link createMainWindow}. */
-interface CreateMainWindowOptions {
-	windowStateStore?: MainWindowStateStore;
-}
-
 const macosChromeOptions =
 	process.platform === 'darwin'
 		? {
@@ -33,7 +28,9 @@ const macosChromeOptions =
  */
 export function createMainWindow({
 	windowStateStore,
-}: CreateMainWindowOptions = {}): BrowserWindow {
+}: {
+	windowStateStore?: MainWindowStateStore;
+} = {}): BrowserWindow {
 	const restoredState = windowStateStore?.load(screen.getAllDisplays()) ?? null;
 	const mainWindow = new BrowserWindow({
 		...macosChromeOptions,

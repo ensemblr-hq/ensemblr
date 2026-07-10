@@ -20,8 +20,11 @@ import {
 	favouriteModelsAtom,
 	hiddenModelsAtom,
 } from '@/renderer/state/preferences';
-import type { ComposerModelOption } from '@/renderer/types/workbench';
-import { buildModelGroups, type GroupedOptions } from './model-picker-groups';
+import type {
+	ComposerModelOption,
+	GroupedOptions,
+} from '@/renderer/types/workbench';
+import { buildModelGroups } from './model-picker-groups';
 import { ModelProviderIcon } from './model-provider-icon';
 
 const MAX_MENU_HEIGHT_REM = 24;

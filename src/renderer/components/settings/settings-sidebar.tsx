@@ -16,9 +16,7 @@ import {
 } from 'lucide-react';
 
 import { cn } from '@/renderer/lib/utils';
-
-/** Settings scope toggle: User-wide preferences vs. per-repository overrides. */
-export type SettingsScope = 'user' | 'repo';
+import type { SettingsScope } from '@/renderer/types/settings';
 
 /** A user-scope settings nav entry. */
 interface UserNavItem {
@@ -111,14 +109,14 @@ const REPO_SECTION_TARGETS = {
 /** Section id for the per-repo settings sub-nav. Derived from the route map. */
 type RepoSectionId = keyof typeof REPO_SECTION_TARGETS;
 
-/** Props for the settings sidebar. */
-interface SettingsSidebarProps {
+/** Left-rail navigation for settings sections, scoped to User or Repo. */
+export function SettingsSidebar({
+	activeRepoId,
+	scope,
+}: {
 	scope: SettingsScope;
 	activeRepoId: string | null;
-}
-
-/** Left-rail navigation for settings sections, scoped to User or Repo. */
-export function SettingsSidebar({ activeRepoId, scope }: SettingsSidebarProps) {
+}) {
 	return (
 		<nav
 			aria-label='Settings sections'

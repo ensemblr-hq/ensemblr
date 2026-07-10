@@ -17,10 +17,8 @@ import type {
 	SaveReviewTodoRequest,
 	SaveReviewTodoResult,
 } from '../../shared/ipc/contracts/review-comments';
-import {
-	type EnsemblrDatabaseService,
-	requireDatabase,
-} from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
+import { requireDatabase } from '../storage/database.ts';
 import {
 	deleteReviewComment,
 	deleteReviewTodo,

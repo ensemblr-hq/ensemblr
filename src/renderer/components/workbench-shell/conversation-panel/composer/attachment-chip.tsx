@@ -4,18 +4,18 @@ import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 
-/** Props for a composer attachment chip. */
-interface AttachmentChipProps {
-	file: WorkspaceFileSummary | { kind: 'upload'; name: string };
-	onRemove: () => void;
-}
-
 /**
  * Compact chip rendered above the textarea for repo-file mentions and local
  * uploads. Mirrors the reference design: VSCode-style icon + monospace label
  * inside a rounded outlined pill.
  */
-export function AttachmentChip({ file, onRemove }: AttachmentChipProps) {
+export function AttachmentChip({
+	file,
+	onRemove,
+}: {
+	file: WorkspaceFileSummary | { kind: 'upload'; name: string };
+	onRemove: () => void;
+}) {
 	const isWorkspaceFile = 'kind' in file && file.kind !== 'upload';
 	const label = file.name;
 	const iconName = isWorkspaceFile

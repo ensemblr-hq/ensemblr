@@ -4,8 +4,8 @@ import type {
 	RootDirectoryChangeRequest,
 	RootDirectorySnapshot,
 } from '../../shared/ipc/contracts/root-directory';
-import type { EnsemblrConfigResolutionService } from '../config/config-resolution';
-import type { EnsemblrDatabaseService } from '../storage/database';
+import type { EnsemblrConfigResolutionService } from '../config';
+import type { EnsemblrDatabaseService } from '../storage';
 import { ensureRootDirectory } from './root-directory.ts';
 import {
 	applyRootDirectoryChange,

@@ -9,7 +9,7 @@ import type {
 	DeleteWorkspaceResult,
 } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsemblrDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
 import { selectDeleteWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';

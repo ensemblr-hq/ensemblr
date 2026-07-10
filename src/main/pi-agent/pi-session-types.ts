@@ -1,6 +1,8 @@
-import type { ChatTabRow } from '../storage/repositories/chat-tab-repository.ts';
-import type { PiEventRow } from '../storage/repositories/pi-event-repository.ts';
-import type { PiSessionRow } from '../storage/repositories/pi-session-repository.ts';
+import type {
+	ChatTabRow,
+	PiEventRow,
+	PiSessionRow,
+} from '../storage/repositories';
 
 /** Snapshot of a persisted Pi session's state, including its open chat tabs and runtime status. */
 export interface PiSessionSnapshot {

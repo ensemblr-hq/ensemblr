@@ -1,6 +1,5 @@
 import { getRouteApi } from '@tanstack/react-router';
 import { useCallback, useMemo } from 'react';
-import type { WorkbenchLayoutModel } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useWorkbenchNavigation } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-navigation';
 import { useWorkbenchQueries } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-queries';
 import { useWorkspaceSelectionPersistence } from '@/renderer/hooks/workbench-shell/route-layout/use-workspace-selection-persistence';
@@ -12,11 +11,12 @@ import type {
 	SetupDiagnosticsContextValue,
 } from '@/renderer/types/contexts';
 import type { WorkbenchShellData } from '@/renderer/types/workbench';
+import type { WorkbenchLayoutModel } from '@/renderer/types/workbench-shell';
 
 export const workbenchRouteApi = getRouteApi('/_workbench');
 
 /** Layout model plus the navigation and setup-diagnostics context values it feeds. */
-export interface WorkbenchLayoutModelBundle {
+interface WorkbenchLayoutModelBundle {
 	model: WorkbenchLayoutModel;
 	navigation: NavigationContextValue;
 	setupDiagnostics: SetupDiagnosticsContextValue;

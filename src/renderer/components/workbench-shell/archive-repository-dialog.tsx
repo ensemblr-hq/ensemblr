@@ -17,14 +17,6 @@ import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/ar
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type { ArchiveRepositoryDiagnostic } from '@/shared/ipc/contracts/repository';
 
-/** Props for the archive-repository dialog. */
-interface ArchiveRepositoryDialogProps {
-	onArchived: (projectId: string) => Promise<void> | void;
-	onOpenChange: (open: boolean) => void;
-	open: boolean;
-	project: ProjectShellModel | null;
-}
-
 /**
  * Lifecycle archive dialog for a repository. Cascades to each child workspace;
  * branch cleanup is opt-in. Worktree folders are preserved so ENS-038/ENS-060
@@ -35,7 +27,12 @@ export function ArchiveRepositoryDialog({
 	onOpenChange,
 	open,
 	project,
-}: ArchiveRepositoryDialogProps) {
+}: {
+	onArchived: (projectId: string) => Promise<void> | void;
+	onOpenChange: (open: boolean) => void;
+	open: boolean;
+	project: ProjectShellModel | null;
+}) {
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
 			<DialogContent className='gap-4 sm:max-w-md'>

@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { EnvironmentVariableDiagnostic } from '../../shared/ipc/contracts/environment';
-import type { EnsemblrConfigService } from '../config/config-loader';
+import type { EnsemblrConfigService } from '../config';
 import type { SecretStore } from '../secrets/secret-store';
 import {
 	createCatalogMap,
@@ -20,7 +20,7 @@ import type {
 } from './environment-variable-types.ts';
 
 /** Inputs for {@link resolveEnvironmentVariables}. */
-export interface ResolveEnvironmentVariablesOptions {
+interface ResolveEnvironmentVariablesOptions {
 	configService: EnsemblrConfigService;
 	database: DatabaseSync | null;
 	now: () => Date;

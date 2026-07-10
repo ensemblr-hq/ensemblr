@@ -2,7 +2,7 @@ import type {
 	PiWireMessagePart,
 	PiWireMessagePayload,
 } from '../../shared/ipc/contracts/pi-session';
-import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
+import type { PiExecutableSnapshot } from '../pi-runtime';
 
 /** Stable identifier for a Pi agent session within the main process. */
 export type PiAgentSessionId = string;
@@ -159,7 +159,7 @@ export type PiAgentMessagePart = PiWireMessagePart;
 export type PiAgentMessagePayload = PiWireMessagePayload;
 
 /** Context-window usage reported by a session: total window size and current token consumption. */
-export interface PiAgentContextUsage {
+interface PiAgentContextUsage {
 	contextWindow: number;
 	percent: number | null;
 	tokens: number | null;

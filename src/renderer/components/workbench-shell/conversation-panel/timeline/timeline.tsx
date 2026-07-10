@@ -7,10 +7,7 @@ import {
 	piSessionsForWorkspaceQuery,
 	turnCheckpointsQuery,
 } from '@/renderer/api/ensemblr-queries';
-import {
-	ChatAssistantTurn,
-	type ChatAssistantTurnTiming,
-} from '@/renderer/components/chat-assistant-turn';
+import { ChatAssistantTurn } from '@/renderer/components/chat-assistant-turn';
 import { ChatWorkingIndicator } from '@/renderer/components/chat-turn-timer';
 import { ChatUserPrompt } from '@/renderer/components/chat-user-prompt';
 import { CodeBlock } from '@/renderer/components/code-block';
@@ -46,6 +43,7 @@ import {
 	type OptimisticPrompt,
 	useOptimisticPrompts,
 } from '@/renderer/state/composer';
+import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
 import type {
 	SessionTabModel,
 	WorkspaceShellModel,

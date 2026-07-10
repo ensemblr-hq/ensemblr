@@ -5,12 +5,6 @@ import type { HealthSnapshot } from '../../../shared/ipc/contracts/health';
 import type { EnsemblrConfigService } from '../../config';
 import type { EnsemblrDatabaseService } from '../../storage';
 
-/** Service dependencies used by the health-snapshot IPC handler. */
-export interface HealthHandlersOptions {
-	configService: EnsemblrConfigService;
-	databaseService: EnsemblrDatabaseService;
-}
-
 /**
  * Registers the async health-snapshot IPC handler. The synchronous
  * initial-shell snapshot lives in `handlers/shell-snapshot.ts` so this file
@@ -20,7 +14,10 @@ export interface HealthHandlersOptions {
 export function registerHealthHandlers({
 	configService,
 	databaseService,
-}: HealthHandlersOptions): void {
+}: {
+	configService: EnsemblrConfigService;
+	databaseService: EnsemblrDatabaseService;
+}): void {
 	ipcMain.handle(IPC_CHANNELS.health, (): HealthSnapshot => {
 		return buildHealthSnapshot(configService, databaseService);
 	});

@@ -11,14 +11,6 @@ import type { ComposerThinkingOption } from '@/renderer/types/workbench';
 
 import { getThinkingStrength, ThinkingBarIcon } from './thinking-bar-icon';
 
-/** Props for the composer thinking-level picker. */
-interface ThinkingPickerProps {
-	disabled?: boolean;
-	onChange: (level: string) => void;
-	options: readonly ComposerThinkingOption[];
-	value: string | null;
-}
-
 /** Computes the next thinking-level id when cycling through the available options. */
 export function getNextThinkingId(
 	options: readonly ComposerThinkingOption[],
@@ -45,7 +37,12 @@ export function ThinkingPicker({
 	onChange,
 	options,
 	value,
-}: ThinkingPickerProps) {
+}: {
+	disabled?: boolean;
+	onChange: (level: string) => void;
+	options: readonly ComposerThinkingOption[];
+	value: string | null;
+}) {
 	const handleClick = useCallback(() => {
 		const nextId = getNextThinkingId(options, value);
 		if (nextId) {

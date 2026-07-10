@@ -15,14 +15,6 @@ import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/ar
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type { DeleteRepositoryDiagnostic } from '@/shared/ipc/contracts/repository';
 
-/** Props for the delete-repository dialog. */
-interface DeleteRepositoryDialogProps {
-	onDeleted: (projectId: string) => Promise<void> | void;
-	onOpenChange: (open: boolean) => void;
-	open: boolean;
-	project: ProjectShellModel | null;
-}
-
 /**
  * Destructive confirmation dialog for a repository. Wipes every workspace, the
  * repository row, and writes the `.ensemblr-archived` sentinel so the shared-
@@ -34,7 +26,12 @@ export function DeleteRepositoryDialog({
 	onOpenChange,
 	open,
 	project,
-}: DeleteRepositoryDialogProps) {
+}: {
+	onDeleted: (projectId: string) => Promise<void> | void;
+	onOpenChange: (open: boolean) => void;
+	open: boolean;
+	project: ProjectShellModel | null;
+}) {
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
 			<DialogContent className='gap-4 sm:max-w-md'>

@@ -1,10 +1,12 @@
 export type {
 	DatabaseHealthSnapshot,
 	DatabaseStatus,
+} from '../../shared/ipc/contracts/health.ts';
+export type {
 	EnsemblrDatabaseConnection,
 	EnsemblrDatabaseService,
 	OpenDatabaseOptions,
-} from './database';
+} from './database.ts';
 export {
 	createEnsemblrDatabaseService,
 	getCurrentSchemaVersion,
@@ -12,4 +14,4 @@ export {
 	listAppliedMigrationIds,
 	openEnsemblrDatabase,
 	resolveDefaultDatabasePath,
-} from './database';
+} from './database.ts';

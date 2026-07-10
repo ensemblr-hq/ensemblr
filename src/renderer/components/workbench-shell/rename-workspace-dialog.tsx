@@ -16,26 +16,21 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
-import {
-	type KeymapBinding,
-	useKeymapHandler,
-} from '@/renderer/hooks/use-keymap-handler';
+import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
+import type { KeymapBinding } from '@/renderer/types/keymap';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { RenameWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
-
-/** Props for the rename-workspace dialog. */
-interface RenameWorkspaceDialogProps {
-	onOpenChange: (open: boolean) => void;
-	open: boolean;
-	workspace: WorkspaceShellModel | null;
-}
 
 /** Modal that renames the selected workspace, optionally renaming its branch. */
 export function RenameWorkspaceDialog({
 	onOpenChange,
 	open,
 	workspace,
-}: RenameWorkspaceDialogProps) {
+}: {
+	onOpenChange: (open: boolean) => void;
+	open: boolean;
+	workspace: WorkspaceShellModel | null;
+}) {
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
 			<DialogContent className='gap-4 sm:max-w-lg'>

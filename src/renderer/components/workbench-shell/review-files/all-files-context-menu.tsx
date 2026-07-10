@@ -8,14 +8,11 @@ import {
 	ContextMenuSubTrigger,
 } from '@/renderer/components/ui/context-menu';
 import { OpenTargetIcon } from '@/renderer/components/workbench-shell/open-target-icon';
-import type { OpenTargetsState } from '@/renderer/hooks/workbench-shell/use-open-targets';
-import type { WorkspaceOpenTarget } from '@/renderer/types/workbench';
-
-/** The file/folder a right-click opened the shared tree menu against. */
-export interface FileTreeMenuTarget {
-	relativePath: string;
-	relativePathKind: 'directory' | 'file';
-}
+import type {
+	FileTreeMenuTarget,
+	OpenTargetsState,
+	WorkspaceOpenTarget,
+} from '@/renderer/types/workbench';
 
 /**
  * Renders the single shared right-click menu for the all-files tree: "Open in

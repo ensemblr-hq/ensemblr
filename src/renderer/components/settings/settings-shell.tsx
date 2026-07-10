@@ -3,15 +3,13 @@ import { useAtomValue } from 'jotai';
 import { useMemo } from 'react';
 
 import { SettingsHeader } from '@/renderer/components/settings/settings-header';
-import {
-	type SettingsScope,
-	SettingsSidebar,
-} from '@/renderer/components/settings/settings-sidebar';
+import { SettingsSidebar } from '@/renderer/components/settings/settings-sidebar';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { useCloseSettings } from '@/renderer/hooks/use-close-settings';
 import { workbenchRouteApi } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
 import { useRegisterCloseAction } from '@/renderer/state/close-action';
 import { settingsActiveRepoIdAtom } from '@/renderer/state/settings-ui';
+import type { SettingsScope } from '@/renderer/types/settings';
 
 /** Derive the active scope from the current pathname. */
 function getScopeFromPath(pathname: string): SettingsScope {

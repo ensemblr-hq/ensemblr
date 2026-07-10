@@ -18,7 +18,7 @@ import type {
 	MutateLinearIssueResult,
 	UpdateLinearIssueRequest,
 } from '../../shared/ipc/contracts/linear';
-import type { EnsemblrDatabaseService } from '../storage/database';
+import type { EnsemblrDatabaseService } from '../storage';
 import {
 	type LinearClient,
 	type LinearCommentData,

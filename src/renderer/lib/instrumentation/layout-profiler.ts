@@ -1,10 +1,6 @@
 import { useEffect, useLayoutEffect } from 'react';
-import {
-	enabled,
-	getActiveNavigation,
-	type LayoutProfileRecord,
-	now,
-} from './profiler-store';
+import type { LayoutProfileRecord } from '@/renderer/types/instrumentation';
+import { enabled, getActiveNavigation, now } from './profiler-store';
 
 /**
  * React effect hook that records mount/unmount events for layout components

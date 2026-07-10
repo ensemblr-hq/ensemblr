@@ -13,14 +13,14 @@ import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import type { EnvironmentVariableScope } from '@/shared/ipc/contracts/environment';
 
-/** Props for the env-files management section, scoped to a settings scope. */
-interface EnvFilesSectionProps {
+/** Manages the list of env files loaded into a scope's session environment. */
+export function EnvFilesSection({
+	scope,
+	scopeId,
+}: {
 	scope: EnvironmentVariableScope;
 	scopeId?: string;
-}
-
-/** Manages the list of env files loaded into a scope's session environment. */
-export function EnvFilesSection({ scope, scopeId }: EnvFilesSectionProps) {
+}) {
 	const queryClient = useQueryClient();
 	const { data } = useQuery(envFilesQuery({ scope, scopeId }));
 	const [draft, setDraft] = useState<string | null>(null);

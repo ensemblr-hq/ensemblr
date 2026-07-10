@@ -54,7 +54,7 @@ export {
 } from '../../shared/sensitive-key.ts';
 
 /** A line/column pair extracted from a JSON parser error. */
-export interface JsonErrorLocation {
+interface JsonErrorLocation {
 	column?: number;
 	line?: number;
 }

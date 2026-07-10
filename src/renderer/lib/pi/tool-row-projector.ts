@@ -1,19 +1,6 @@
 import type { DynamicToolUIPart } from 'ai';
 
-/**
- * Compact one-line projection of a tool call for the activity-row renderer.
- * Mirrors the GIF reference: `[label]  [detail]  [optional chip]`.
- *
- * Unknown tools fall through to a generic projection — the tool name as label,
- * the first scalar input value as detail. Keeps the surface uniform.
- */
-export interface ToolRowProjection {
-	chipLabel: string | null;
-	/** Full path backing the chip (as given in tool input), for preview opening. */
-	chipPath: string | null;
-	detail: string;
-	label: string;
-}
+import type { ToolRowProjection } from '@/renderer/types/pi-timeline';
 
 /** Loosely-typed bag of tool input fields keyed by name. */
 interface ToolInputBag {

@@ -11,12 +11,10 @@ import type {
 	TerminalSnapshotResult,
 } from '../../shared/ipc/contracts/terminal';
 import { detectPreviewUrl } from '../../shared/terminal/detect-preview-url.ts';
+import type { WorkspaceEnvironmentService } from '../environment';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
-import {
-	WorkspaceEnvironmentError,
-	type WorkspaceEnvironmentService,
-} from '../environment/workspace-environment.ts';
-import type { EnsemblrDatabaseService } from '../storage/database.ts';
+import { WorkspaceEnvironmentError } from '../environment/workspace-environment.ts';
+import type { EnsemblrDatabaseService } from '../storage';
 import {
 	finalizeTerminalSessionRow,
 	insertTerminalSessionRow,

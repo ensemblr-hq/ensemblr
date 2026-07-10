@@ -7,29 +7,29 @@ import type {
 	WriteForkSummaryRequest,
 	WriteForkSummaryResult,
 } from '../../shared/ipc/contracts/pi-session';
-import type { CheckpointCapturePort } from '../checkpoints/checkpoint-service.ts';
+import type { CheckpointCapturePort } from '../checkpoints';
 import {
 	createCheckpointCapture,
 	isOrdinalHidden,
 	readHiddenEventRanges,
-} from '../checkpoints/checkpoint-service.ts';
-import {
-	type EnsemblrDatabaseService,
-	requireDatabase,
-} from '../storage/database.ts';
+} from '../checkpoints/index.ts';
+import type { EnsemblrDatabaseService } from '../storage';
+import { requireDatabase } from '../storage/database.ts';
+import type {
+	PiSessionBranchRow,
+	PiSessionRow,
+	PiTurnRow,
+} from '../storage/repositories';
 import { listOpenChatTabs } from '../storage/repositories/chat-tab-repository.ts';
 import {
 	listEventsByBranch,
 	type PiEventRow,
-} from '../storage/repositories/pi-event-repository.ts';
+} from '../storage/repositories/index.ts';
 import {
 	getMainBranchForSession,
 	getPiSessionBranchById,
 	getPiSessionById,
 	listPiSessionsByWorkspace,
-	type PiSessionBranchRow,
-	type PiSessionRow,
-	type PiTurnRow,
 } from '../storage/repositories/pi-session-repository.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import {
@@ -69,7 +69,7 @@ export type {
 } from './pi-session-types.ts';
 
 /** Dependencies and configuration for constructing the Pi session service. */
-export interface PiSessionServiceOptions {
+interface PiSessionServiceOptions {
 	/** Override for tests; defaults to the git-backed capture (ADR 0012). */
 	captureCheckpoint?: CheckpointCapturePort;
 	chatTitleTimeoutMs?: number;

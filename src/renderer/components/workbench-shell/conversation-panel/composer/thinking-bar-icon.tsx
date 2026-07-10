@@ -1,7 +1,7 @@
 import { cn } from '@/renderer/lib/utils';
 
 /** Discrete thinking-effort strength from 0 (off) to 5 (extra-high). */
-export type ThinkingBarStrength = 0 | 1 | 2 | 3 | 4 | 5;
+type ThinkingBarStrength = 0 | 1 | 2 | 3 | 4 | 5;
 
 /** Five progressive bars (off=0, minimal=1, low=2, medium=3, high=4, xhigh=5). */
 const BAR_WIDTH = 2.2;

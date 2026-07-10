@@ -7,11 +7,6 @@ import type {
 	SetupRemediationAction,
 } from '@/shared/ipc/contracts/setup';
 
-/** Callbacks for the generic setup-remediation hook. */
-interface UseGenericRemediationOptions {
-	onRetry?: () => void;
-}
-
 /**
  * Handles the stateless setup remediation actions — everything except the
  * root-directory picker, whose preview/confirm dialog state lives in
@@ -28,7 +23,9 @@ interface UseGenericRemediationOptions {
  */
 export function useGenericRemediation({
 	onRetry,
-}: UseGenericRemediationOptions = {}) {
+}: {
+	onRetry?: () => void;
+} = {}) {
 	const navigate = useNavigate();
 
 	const handle = async (

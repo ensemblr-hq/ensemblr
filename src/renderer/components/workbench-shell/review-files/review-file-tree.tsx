@@ -7,13 +7,15 @@ import { useFileTreeExpansion } from '@/renderer/hooks/workbench-shell/review-fi
 import { cn } from '@/renderer/lib/utils';
 import {
 	buildFileTree,
-	type FileTreeNode,
 	fileTreeIndentClassName,
 	getCompactFileDirectory,
 	getWorkspaceFileIconName,
 	listDirectoryPaths,
 } from '@/renderer/lib/workbench';
-import type { ReviewFileSummary } from '@/renderer/types/workbench';
+import type {
+	FileTreeNode,
+	ReviewFileSummary,
+} from '@/renderer/types/workbench';
 
 import { FileTreeLabel } from './file-tree-label';
 import { ReviewFileRow } from './review-file-row';

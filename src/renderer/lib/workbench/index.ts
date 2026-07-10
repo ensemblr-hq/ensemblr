@@ -4,7 +4,6 @@ export { getChecksPanelState } from './checks-panel-state';
 export { getComposerState } from './composer';
 export { DEFAULT_DOCK_TAB, DEFAULT_REVIEW_TAB } from './constants';
 export { getWorkspaceFileIconName } from './file-icons';
-export type { FileTreeNode, FlatFileTreeRow } from './file-tree';
 export {
 	buildFileTree,
 	fileTreeIndentClassName,
@@ -13,10 +12,7 @@ export {
 	listDirectoryPaths,
 } from './file-tree';
 export { healthTone } from './health-tone';
-export {
-	formatLinkedIssueComposerSeed,
-	type LinkedIssueComposerSeedInput,
-} from './linked-issue-composer-seed';
+export { formatLinkedIssueComposerSeed } from './linked-issue-composer-seed';
 export { getEmptyStateCopy } from './navigation-empty-state';
 export {
 	createPlaceholderSession,
@@ -24,11 +20,6 @@ export {
 	mapNavigationSnapshotToProjects,
 	mapRepositoriesToProjects,
 } from './navigation-model';
-export type {
-	StoredWorkspaceSelection,
-	WorkspaceNavigationRenderState,
-	WorkspaceNavigationSelection,
-} from './navigation-selection';
 export {
 	findWorkspaceNavigationSelection,
 	getPreferredSession,
@@ -51,7 +42,6 @@ export {
 	mapPullRequestsToWorkspaceSources,
 	mapRepositoryBranchesToWorkspaceSources,
 	pullRequestSourceId,
-	type WorkspaceSourceItem,
 	workspaceSeedFromSourceItem,
 } from './workspace-source-mappers';
 export {

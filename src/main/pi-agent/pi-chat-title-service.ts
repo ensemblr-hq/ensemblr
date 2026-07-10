@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
+import type { PiExecutableSnapshot } from '../pi-runtime';
 import { renameChatTab } from '../storage/repositories/chat-tab-repository.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import type { PiAgentEvent } from './pi-agent-types.ts';
@@ -12,7 +12,7 @@ const CHAT_TITLE_MAX_LENGTH = 32;
 const CHAT_TITLE_FALLBACK_WORD_COUNT = 5;
 
 /** Inputs for queuing best-effort chat-title generation for a session. */
-export interface QueueChatTitleGenerationArgs {
+interface QueueChatTitleGenerationArgs {
 	branchId: string;
 	chatTitleTimeoutMs: number;
 	database: DatabaseSync;

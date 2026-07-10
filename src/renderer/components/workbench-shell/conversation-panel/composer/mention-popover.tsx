@@ -6,10 +6,12 @@ import {
 } from '@/renderer/components/ui/popover';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { WorkspaceFileIcon } from '@/renderer/components/workbench-shell/review-files/workspace-file-icon';
-import type { AutocompleteKind } from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
-import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
+import type {
+	AutocompleteKind,
+	SlashCommandDescriptor,
+	WorkspaceFileSummary,
+} from '@/renderer/types/workbench';
 import { AutocompleteRow } from './autocomplete-list';
-import type { SlashCommandDescriptor } from './slash-commands';
 
 const MAX_AUTOCOMPLETE_HEIGHT_REM = 24;
 const AUTOCOMPLETE_ROW_HEIGHT_REM = 2.25;
@@ -26,12 +28,6 @@ interface ComposerAutocompletePopoverProps {
 	onOpenChange: (open: boolean) => void;
 	onSlashSelect: (command: string, autoSubmit: boolean) => void;
 	slashMatches: readonly SlashCommandDescriptor[];
-}
-
-/** Props for rendering a scrollable autocomplete body. */
-interface AutocompleteScrollAreaProps {
-	children: ReactNode;
-	rowCount: number;
 }
 
 /** Formats slash command description text without redundant source prefixes. */
@@ -56,7 +52,10 @@ function getAutocompleteHeight(rowCount: number): string {
 function AutocompleteScrollArea({
 	children,
 	rowCount,
-}: AutocompleteScrollAreaProps): ReactNode {
+}: {
+	children: ReactNode;
+	rowCount: number;
+}): ReactNode {
 	const style: CSSProperties = { height: getAutocompleteHeight(rowCount) };
 
 	return (

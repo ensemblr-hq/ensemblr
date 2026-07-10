@@ -26,14 +26,6 @@ import type {
 	UnarchiveWorkspaceDiagnostic,
 } from '@/shared/ipc/contracts/workspace';
 
-/** Props for the browse-archived-workspaces dialog. */
-interface BrowseArchiveDialogProps {
-	onChange: (repositoryId: string) => Promise<void> | void;
-	onOpenChange: (open: boolean) => void;
-	open: boolean;
-	project: ProjectShellModel | null;
-}
-
 /**
  * Repository-scoped browser for archived workspaces. Lets users unarchive
  * (restore worktree + .context/) or permanently purge each entry. Backed by
@@ -45,7 +37,12 @@ export function BrowseArchiveDialog({
 	onOpenChange,
 	open,
 	project,
-}: BrowseArchiveDialogProps) {
+}: {
+	onChange: (repositoryId: string) => Promise<void> | void;
+	onOpenChange: (open: boolean) => void;
+	open: boolean;
+	project: ProjectShellModel | null;
+}) {
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
 			<DialogContent className='gap-4 sm:max-w-xl'>

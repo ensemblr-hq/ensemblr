@@ -46,7 +46,7 @@ function canPersistRightSidebarResize() {
 }
 
 /** Right-sidebar collapse/expand state and handlers returned by {@link useRightSidebarController}. */
-export interface RightSidebarController {
+interface RightSidebarController {
 	collapseRightSidebar: () => void;
 	expandRightSidebar: () => Promise<void>;
 	handleRightSidebarResize: (size: PanelSize) => void;

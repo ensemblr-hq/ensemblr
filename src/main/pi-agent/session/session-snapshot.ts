@@ -1,13 +1,15 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { PiSessionEventWire } from '../../../shared/ipc/contracts/pi-session';
+import type {
+	ChatTabRow,
+	PiEventRow,
+	PiSessionRow,
+} from '../../storage/repositories';
 import {
-	type ChatTabRow,
 	getChatTabById,
 	listOpenChatTabs,
 	setChatTabMetadata,
 } from '../../storage/repositories/chat-tab-repository.ts';
-import type { PiEventRow } from '../../storage/repositories/pi-event-repository.ts';
-import type { PiSessionRow } from '../../storage/repositories/pi-session-repository.ts';
 import type { PiSessionSnapshot } from '../pi-session-types.ts';
 import type { WriteSessionSummaryResult } from '../session-summary-writer.ts';
 

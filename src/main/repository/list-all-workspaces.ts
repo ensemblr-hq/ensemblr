@@ -4,7 +4,7 @@ import type {
 	ListAllWorkspacesResult,
 	WorkspaceHistoryEntry,
 } from '../../shared/ipc/contracts/workspace';
-import type { EnsemblrDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
 import { listAllWorkspaceRows } from '../storage/repositories/workspace-repository.ts';
 
 /** Public surface of the global workspace History feed. */

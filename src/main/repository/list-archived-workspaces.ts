@@ -5,7 +5,7 @@ import type {
 	ListArchivedWorkspacesRequest,
 	ListArchivedWorkspacesResult,
 } from '../../shared/ipc/contracts/workspace';
-import type { EnsemblrDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
 import { listArchivedWorkspaceRowsByRepository } from '../storage/repositories/workspace-repository.ts';
 
 /** Public surface of the archived workspace browser. */

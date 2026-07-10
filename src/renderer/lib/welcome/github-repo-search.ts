@@ -1,4 +1,4 @@
-import type { KeymapBinding } from '@/renderer/hooks/use-keymap-handler';
+import type { KeymapBinding } from '@/renderer/types/keymap';
 import type {
 	GithubRepositoryEntry,
 	GithubRepositoryListResult,
@@ -53,7 +53,7 @@ export function filterGithubRepositories(
 }
 
 /** Derived view-state for the clone dialog's repo list, per {@link deriveRepoSearchView}. */
-export interface RepoSearchView {
+interface RepoSearchView {
 	displayedEntries: GithubRepositoryEntry[];
 	emptyMessage: string;
 	footerHint: string | undefined;

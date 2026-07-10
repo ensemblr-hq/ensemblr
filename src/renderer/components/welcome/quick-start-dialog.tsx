@@ -10,24 +10,19 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
-import {
-	type KeymapBinding,
-	useKeymapHandler,
-} from '@/renderer/hooks/use-keymap-handler';
+import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
 import { useQuickStartFlow } from '@/renderer/hooks/welcome/use-quick-start-flow';
+import type { KeymapBinding } from '@/renderer/types/keymap';
 import type { QuickStartProjectDiagnostic } from '@/shared/ipc/contracts/quick-start';
-
-/** Props for the quick-start new-local-project dialog. */
-interface QuickStartDialogProps {
-	onOpenChange: (open: boolean) => void;
-	open: boolean;
-}
 
 /** Modal for creating a brand-new local project (folder + git init + register). */
 export function QuickStartDialog({
 	onOpenChange,
 	open,
-}: QuickStartDialogProps) {
+}: {
+	onOpenChange: (open: boolean) => void;
+	open: boolean;
+}) {
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
 			<DialogContent className='gap-4 sm:max-w-lg'>

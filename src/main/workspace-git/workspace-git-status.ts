@@ -53,11 +53,6 @@ export interface WorkspaceGitService {
 	) => Promise<GetWorkspaceGitStatusResult>;
 }
 
-/** Options for constructing a {@link WorkspaceGitService}. */
-export interface CreateWorkspaceGitServiceOptions {
-	localCommandService: LocalCommandService;
-}
-
 /**
  * Reads working-tree change state straight from git so the review surfaces
  * never cache stale file status. Status rows compare the working tree
@@ -65,7 +60,9 @@ export interface CreateWorkspaceGitServiceOptions {
  */
 export function createWorkspaceGitService({
 	localCommandService,
-}: CreateWorkspaceGitServiceOptions): WorkspaceGitService {
+}: {
+	localCommandService: LocalCommandService;
+}): WorkspaceGitService {
 	/**
 	 * Runs a git subcommand in a workspace via the local command service.
 	 * @param cwd - Absolute working directory to run git in

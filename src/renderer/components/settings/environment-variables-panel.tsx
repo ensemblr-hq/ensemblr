@@ -6,14 +6,12 @@ import { environmentVariablesQuery } from '@/renderer/api/ensemblr';
 import { DocumentedVariablesList } from '@/renderer/components/settings/documented-variables-list';
 import { EnvFilesSection } from '@/renderer/components/settings/env-files-section';
 import { EnvironmentVariableRow } from '@/renderer/components/settings/environment-variable-row';
-import {
-	EnvironmentVariableSheet,
-	type EnvironmentVariableSheetTarget,
-} from '@/renderer/components/settings/environment-variable-sheet';
+import { EnvironmentVariableSheet } from '@/renderer/components/settings/environment-variable-sheet';
 import { SettingsEmptyState } from '@/renderer/components/settings/settings-empty-state';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { Button } from '@/renderer/components/ui/button';
 import { Spinner } from '@/renderer/components/ui/spinner';
+import type { EnvironmentVariableSheetTarget } from '@/renderer/types/settings';
 import type {
 	EnvironmentVariableScope,
 	EnvironmentVariableSnapshot,

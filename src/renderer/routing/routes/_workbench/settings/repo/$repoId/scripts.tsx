@@ -10,12 +10,12 @@ import {
 import { Switch } from '@/renderer/components/ui/switch';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
-import {
-	type RepoProject,
-	type RunMode,
-	type ScriptsForm,
-	useScriptsSettingsForm,
-} from '@/renderer/hooks/use-scripts-settings-form';
+import { useScriptsSettingsForm } from '@/renderer/hooks/use-scripts-settings-form';
+import type {
+	RepoProject,
+	RunMode,
+	ScriptsForm,
+} from '@/renderer/types/settings';
 import type { ResolvedSettingSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 
 /** Route for a repository's Scripts settings; renders the setup/run/archive script editor keyed by the `repoId` path param. */

@@ -1,7 +1,7 @@
-import type { AppSettingsService } from '../config/app-settings-service.ts';
-import type { PiExecutableSnapshot } from '../pi-runtime/pi-executable.ts';
+import type { AppSettingsService } from '../config';
+import type { PiExecutableSnapshot } from '../pi-runtime';
+import type { RenameWorkspaceService } from '../repository';
 import { parseMetadata } from '../repository/metadata.ts';
-import type { RenameWorkspaceService } from '../repository/rename-workspace.ts';
 import { selectWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
 import {
 	composeRenamedBranch,
@@ -16,7 +16,7 @@ import type { QueueChatTitleInput } from './session/session-open.ts';
 export const BRANCH_NAME_TIMEOUT_MS = 20000;
 
 /** Dependencies for {@link createBranchNameQueue}. */
-export interface BranchNameQueueDeps {
+interface BranchNameQueueDeps {
 	appSettingsService: AppSettingsService;
 	renameWorkspace: RenameWorkspaceService['rename'];
 }

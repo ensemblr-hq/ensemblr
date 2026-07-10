@@ -9,7 +9,7 @@
  */
 
 /** Parsed components of an accepted GitHub URL. */
-export interface ParsedGithubUrl {
+interface ParsedGithubUrl {
 	repositoryName: string;
 	sanitizedUrl: string;
 	validatedUrl: string;

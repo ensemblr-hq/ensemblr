@@ -6,12 +6,10 @@ import type {
 	EnvironmentVariableSnapshot,
 	EnvironmentVariablesSnapshot,
 } from '../../shared/ipc/contracts/environment';
-import type { EnsemblrConfigService } from '../config/config-loader';
+import type { EnsemblrConfigService } from '../config';
 import type { SecretMetadata, SecretStore } from '../secrets/secret-store';
-import {
-	type EnsemblrDatabaseService,
-	requireDatabase,
-} from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage';
+import { requireDatabase } from '../storage/database.ts';
 import {
 	loadScopeEnvFiles,
 	readEnvFilePaths,

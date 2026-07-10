@@ -10,14 +10,8 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import type { SlashCommandDescriptor } from '@/renderer/components/workbench-shell/conversation-panel/composer/slash-commands';
+import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
 import {
-	type KeymapBinding,
-	useKeymapHandler,
-} from '@/renderer/hooks/use-keymap-handler';
-import {
-	type AutocompleteKind,
-	type AutocompleteState,
 	detectAutocomplete,
 	useFuzzyMatches,
 } from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
@@ -37,8 +31,12 @@ import {
 	followUpBehaviorAtom,
 	sendShortcutAtom,
 } from '@/renderer/state/preferences';
+import type { KeymapBinding } from '@/renderer/types/keymap';
 import type {
+	AutocompleteKind,
+	AutocompleteState,
 	ComposerShellState,
+	SlashCommandDescriptor,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
 
@@ -55,7 +53,7 @@ interface UseComposerStateArgs {
  * designed so the JSX layer only wires refs, derived booleans, and event
  * handlers — it owns no domain logic.
  */
-export interface ComposerStateApi {
+interface ComposerStateApi {
 	activeIndex: number;
 	anchorRef: RefObject<HTMLDivElement | null>;
 	attachmentError: string | null;

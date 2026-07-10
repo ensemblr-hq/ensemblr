@@ -182,9 +182,7 @@ export interface GetWorkspaceCommitsResult {
 }
 
 /** Failure reason for a discard-workspace-changes request. */
-export type WorkspaceDiscardFailureCode =
-	| WorkspaceGitFailureCode
-	| 'invalid-path';
+type WorkspaceDiscardFailureCode = WorkspaceGitFailureCode | 'invalid-path';
 
 /** Request to discard working-tree changes for specific workspace paths. */
 export interface DiscardWorkspaceChangesRequest {

@@ -1,22 +1,12 @@
 import type {
+	IssueEditorValidation,
+	LinearIssueEditorFields,
+} from '@/renderer/types/linear';
+import type {
 	CreateLinearIssueRequest,
 	LinearIssueWire,
 	UpdateLinearIssueRequest,
 } from '@/shared/ipc/contracts/linear';
-
-/** Local form state for the Linear issue editor dialog. */
-export interface LinearIssueEditorFields {
-	assigneeId: string;
-	cycleId: string;
-	description: string;
-	dueDate: string;
-	labelIds: string[];
-	priority: string;
-	projectId: string;
-	stateId: string;
-	teamId: string;
-	title: string;
-}
 
 /** Sentinel option value meaning "leave unset / clear". */
 export const UNSET_FIELD = '__unset__';
@@ -44,9 +34,6 @@ export function createIssueEditorFields(
 		title: issue?.title ?? '',
 	};
 }
-
-/** Validation outcome for the editor form. */
-export type IssueEditorValidation = { error: string; ok: false } | { ok: true };
 
 /** Validates the form fields for the given editor mode. */
 export function validateIssueEditorFields(

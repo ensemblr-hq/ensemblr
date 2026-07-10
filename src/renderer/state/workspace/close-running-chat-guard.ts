@@ -21,7 +21,7 @@ export interface CloseRunningChatRequest {
 }
 
 /** What a close request resolves to: close right away, or defer behind the dialog. */
-export type CloseRequestPlan =
+type CloseRequestPlan =
 	| { kind: 'close-now' }
 	| { kind: 'defer'; pending: PendingClose };
 

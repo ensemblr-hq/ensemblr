@@ -10,28 +10,18 @@ import {
 	githubRepositoryFullListQuery,
 	githubRepositoryListQuery,
 } from '@/renderer/api/ensemblr-queries';
-import {
-	type KeymapBinding,
-	useKeymapHandler,
-} from '@/renderer/hooks/use-keymap-handler';
+import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
 import {
 	buildRepoSearchKeyBindings,
 	deriveRepoSearchView,
 	isUrlLikeInput,
 	nextHighlightIndex,
 } from '@/renderer/lib/welcome/github-repo-search';
+import type { KeymapBinding } from '@/renderer/types/keymap';
 import type { GithubRepositoryEntry } from '@/shared/ipc/contracts/clone';
 
-/** Inputs the clone dialog wires into {@link useCloneRepoSearch}. */
-export interface UseCloneRepoSearchOptions {
-	enabled: boolean;
-	onSubmit: () => void;
-	setUrl: (value: string) => void;
-	url: string;
-}
-
 /** Search view-state and input handlers returned by {@link useCloneRepoSearch}. */
-export interface UseCloneRepoSearchResult {
+interface UseCloneRepoSearchResult {
 	displayedEntries: GithubRepositoryEntry[];
 	emptyMessage: string;
 	footerHint: string | undefined;
@@ -59,7 +49,12 @@ export function useCloneRepoSearch({
 	onSubmit,
 	setUrl,
 	url,
-}: UseCloneRepoSearchOptions): UseCloneRepoSearchResult {
+}: {
+	enabled: boolean;
+	onSubmit: () => void;
+	setUrl: (value: string) => void;
+	url: string;
+}): UseCloneRepoSearchResult {
 	const [highlightIndex, setHighlightIndex] = useState(-1);
 
 	const trimmedUrl = url.trim();

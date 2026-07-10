@@ -1,5 +1,7 @@
-import type { ArchiveWorkspaceService } from '../repository/archive-workspace.ts';
-import type { CreateWorkspaceService } from '../repository/create-workspace.ts';
+import type {
+	ArchiveWorkspaceService,
+	CreateWorkspaceService,
+} from '../repository';
 import type { ScriptLifecycleService } from './script-lifecycle-service.ts';
 
 /**

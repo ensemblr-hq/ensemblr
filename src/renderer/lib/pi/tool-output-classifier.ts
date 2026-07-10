@@ -5,7 +5,7 @@ import type { BundledLanguage } from 'shiki';
  * a dedicated AI Elements view so classification logic lives outside the
  * render path and is testable in isolation.
  */
-export type ToolOutputKind =
+type ToolOutputKind =
 	| 'stack-trace'
 	| 'terminal'
 	| 'code'
@@ -14,7 +14,7 @@ export type ToolOutputKind =
 	| 'text';
 
 /** Classification result for one tool output value. */
-export interface ToolOutputClassification {
+interface ToolOutputClassification {
 	kind: ToolOutputKind;
 	/** Pre-stringified payload so callers do not repeat the work. */
 	text: string;

@@ -90,12 +90,6 @@ export interface LinearIssueCreateInput {
 /** Input for `issueUpdate` (all fields optional). */
 export type LinearIssueUpdateInput = Partial<LinearIssueCreateInput>;
 
-/** Filter for {@link LinearClient.listIssues}. */
-export interface LinearIssueListOptions {
-	after?: string | null;
-	teamId?: string;
-}
-
 /** Boundary over the Linear GraphQL API with typed error mapping. */
 export interface LinearClient {
 	createComment: (input: {
@@ -111,9 +105,10 @@ export interface LinearClient {
 		kind: 'cycle' | 'label' | 'project' | 'state' | 'team' | 'user',
 		after?: string | null,
 	) => Promise<LinearPage<LinearResourceData>>;
-	listIssues: (
-		options?: LinearIssueListOptions,
-	) => Promise<LinearPage<LinearIssueData>>;
+	listIssues: (options?: {
+		after?: string | null;
+		teamId?: string;
+	}) => Promise<LinearPage<LinearIssueData>>;
 	searchIssues: (term: string) => Promise<LinearPage<LinearIssueData>>;
 	updateIssue: (
 		id: string,

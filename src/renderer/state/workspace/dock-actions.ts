@@ -14,7 +14,7 @@ import type {
 } from '@/shared/ipc/contracts/terminal';
 
 /** Inputs for {@link useWorkspaceDockActions}. */
-export interface UseWorkspaceDockActionsOptions {
+interface UseWorkspaceDockActionsOptions {
 	activeDockTab: string;
 	/**
 	 * Opens a fresh chat seeded with the settings.toml setup prompt. Built by the

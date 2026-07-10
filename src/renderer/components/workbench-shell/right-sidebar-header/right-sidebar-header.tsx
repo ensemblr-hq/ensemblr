@@ -15,21 +15,20 @@ import {
 } from '@/renderer/components/ui/dropdown-menu';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { cn } from '@/renderer/lib/utils';
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import type {
+	RightSidebarHeaderState,
+	WorkspaceShellModel,
+} from '@/renderer/types/workbench';
 import {
 	classifyPermissionAction,
 	DEFAULT_PERMISSION_MODE,
 	getPermissionBoundaryLabel,
 } from '@/shared/permissions';
-
 import { useReviewActions } from '../review-actions/review-actions-context';
 import { CreatePullRequestMenu } from './create-pull-request-menu';
 import { PreviewDeploymentButton } from './preview-deployment-button';
 import { PullRequestNumberButton } from './pull-request-number-button';
-import {
-	getRightSidebarHeaderState,
-	type RightSidebarHeaderState,
-} from './state';
+import { getRightSidebarHeaderState } from './state';
 
 /** Tone values extracted from {@link RightSidebarHeaderState}. */
 type HeaderTone = RightSidebarHeaderState extends { tone: infer T } ? T : never;

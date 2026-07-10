@@ -6,13 +6,11 @@ import {
 	repositoryWorkspaceNavigationQuery,
 } from '@/renderer/api/ensemblr-queries';
 import { queryClient } from '@/renderer/api/query-client';
+import type { StoredWorkspaceSelection } from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
-
 import { mapRepositoriesToProjects } from './navigation-model';
-import {
-	resolveWorkspaceRouteParams,
-	type StoredWorkspaceSelection,
-} from './navigation-selection';
+
+import { resolveWorkspaceRouteParams } from './navigation-selection';
 import { pickComposerSurname } from './workspace-name-pool';
 
 /** Inputs for seeding a repository's first workspace: navigation, persistence, and the target repo. */

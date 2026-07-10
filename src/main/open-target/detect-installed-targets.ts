@@ -19,18 +19,13 @@ const BUILTIN_APP_PATHS: Readonly<Record<string, readonly string[]>> = {
  * Per-target detection result: installed flag plus, when found, the absolute
  * `.app` path so callers can fetch a real icon for it.
  */
-export interface DetectedTarget {
+interface DetectedTarget {
 	appPath: string | null;
 	installed: boolean;
 }
 
 /** Map of registry id → detection result. */
 export type DetectedTargetsMap = Readonly<Record<string, DetectedTarget>>;
-
-/** Options for {@link detectInstalledTargets}. */
-interface DetectInstalledTargetsOptions {
-	localCommandService: LocalCommandService;
-}
 
 /**
  * Probes which registered targets exist on this host. macOS-only — on other
@@ -42,7 +37,9 @@ interface DetectInstalledTargetsOptions {
  */
 export async function detectInstalledTargets({
 	localCommandService,
-}: DetectInstalledTargetsOptions): Promise<DetectedTargetsMap> {
+}: {
+	localCommandService: LocalCommandService;
+}): Promise<DetectedTargetsMap> {
 	const detected: Record<string, DetectedTarget> = {};
 
 	for (const definition of OPEN_TARGET_REGISTRY) {
@@ -104,12 +101,6 @@ async function resolveBuiltinAppPath(id: string): Promise<string | null> {
 	return null;
 }
 
-/** Options for {@link findFirstInstalledAppPath}. */
-interface FindFirstInstalledOptions {
-	bundleIds: readonly string[];
-	localCommandService: LocalCommandService;
-}
-
 /**
  * Return the path of the first installed app among the candidate bundle ids.
  * @param options - Candidate bundle ids and the command runner.
@@ -118,7 +109,10 @@ interface FindFirstInstalledOptions {
 async function findFirstInstalledAppPath({
 	bundleIds,
 	localCommandService,
-}: FindFirstInstalledOptions): Promise<string | null> {
+}: {
+	bundleIds: readonly string[];
+	localCommandService: LocalCommandService;
+}): Promise<string | null> {
 	for (const bundleId of bundleIds) {
 		const path = await mdfindPathForBundleId({ bundleId, localCommandService });
 		if (path) {

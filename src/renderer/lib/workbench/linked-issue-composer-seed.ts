@@ -9,16 +9,10 @@
  * flooding the composer.
  */
 
+import type { LinkedIssueComposerSeedInput } from '@/renderer/types/workbench';
+
 /** Upper bound on the pasted issue body; longer bodies are truncated with `…`. */
 const COMPOSER_BODY_MAX = 8000;
-
-/** Minimal linked-issue shape needed to seed the composer draft. */
-export interface LinkedIssueComposerSeedInput {
-	description?: string;
-	reference: string;
-	title: string;
-	url?: string;
-}
 
 /** Formats a linked issue's contents into the first-prompt composer draft. */
 export function formatLinkedIssueComposerSeed(

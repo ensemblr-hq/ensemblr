@@ -23,7 +23,7 @@ export type SetupCheckProvider = (
  * Outcome returned by {@link DefineCheckOptions.run}. The helper merges these
  * fields with the static definition to produce the final {@link SetupCheckSnapshot}.
  */
-export interface SetupCheckRunResult {
+interface SetupCheckRunResult {
 	blocking?: boolean;
 	detail: string;
 	logs?: SetupCheckLogSnapshot[];
@@ -35,10 +35,10 @@ export interface SetupCheckRunResult {
  * Outcome returned by {@link DefineCheckOptions.onError}. All fields are optional;
  * unspecified fields fall back to the static definition (and a derived `detail`).
  */
-export type SetupCheckErrorResult = Partial<SetupCheckRunResult>;
+type SetupCheckErrorResult = Partial<SetupCheckRunResult>;
 
 /** Static definition + behaviour for one setup check. */
-export interface DefineCheckOptions<TCtx extends SetupCheckProviderContext> {
+interface DefineCheckOptions<TCtx extends SetupCheckProviderContext> {
 	blocking: boolean;
 	description: string;
 	group: SetupCheckGroupId;

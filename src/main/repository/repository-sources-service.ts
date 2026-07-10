@@ -59,7 +59,7 @@ export interface RepositorySourcesService {
 }
 
 /** Options for {@link createRepositorySourcesService}. */
-export interface CreateRepositorySourcesServiceOptions {
+interface CreateRepositorySourcesServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
 	/** Test seam: resolves a repository id to its on-disk path. */

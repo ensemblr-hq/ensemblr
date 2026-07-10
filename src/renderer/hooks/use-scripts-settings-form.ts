@@ -6,22 +6,7 @@ import {
 	settingsResolutionQuery,
 	updateRepositoryScripts,
 } from '@/renderer/api/ensemblr';
-import type { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
-
-/** Run-script concurrency mode (values match the resolver's `runScriptMode`). */
-export type RunMode = 'concurrent' | 'nonconcurrent';
-
-/** Editable Scripts-screen form state, mirrored to a ref for debounced saves. */
-export interface ScriptsForm {
-	archive: string;
-	autoRun: boolean;
-	run: string;
-	runMode: RunMode;
-	setup: string;
-}
-
-/** Repo project descriptor (or `undefined` for an unknown repo route param). */
-export type RepoProject = ReturnType<typeof useRepoSettings>['project'];
+import type { RepoProject, ScriptsForm } from '@/renderer/types/settings';
 
 /** Debounce window before a form edit is persisted to SQLite. */
 const SAVE_DEBOUNCE_MS = 500;

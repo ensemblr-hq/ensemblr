@@ -14,15 +14,12 @@ import {
 	getWorkspaceGitStatusRequestSchema,
 } from '../request-schemas.ts';
 
-/** Dependencies for registering the workspace-git IPC handlers. */
-export interface WorkspaceGitHandlersOptions {
-	workspaceGitService: WorkspaceGitService;
-}
-
 /** Registers IPC handlers for workspace git status and per-file diffs. */
 export function registerWorkspaceGitHandlers({
 	workspaceGitService,
-}: WorkspaceGitHandlersOptions): void {
+}: {
+	workspaceGitService: WorkspaceGitService;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.getWorkspaceGitStatus,
 		(_event, raw: unknown): Promise<GetWorkspaceGitStatusResult> =>

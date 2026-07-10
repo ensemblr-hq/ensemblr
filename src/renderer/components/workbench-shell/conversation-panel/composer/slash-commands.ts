@@ -1,23 +1,8 @@
-import type {
-	PiSlashCommandSource,
-	PiSlashCommandSourceScope,
-} from '@/shared/ipc/contracts/pi-session';
+import type { SlashCommandDescriptor } from '@/renderer/types/workbench';
+import type { PiSlashCommandSource } from '@/shared/ipc/contracts/pi-session';
 
 /** Source marker used for static fallback commands from Pi's TUI catalog. */
 const BUILTIN_SLASH_COMMAND_SOURCE = 'builtin' satisfies PiSlashCommandSource;
-
-/** Describes a slash command surfaced in the composer autocomplete. */
-export interface SlashCommandDescriptor {
-	/** Bare command name without the leading slash. */
-	command: string;
-	description: string;
-	/** Source category used to label project/user Pi resources in autocomplete. */
-	source: PiSlashCommandSource;
-	/** Scope used to rank project skills before global skills in autocomplete. */
-	sourceScope?: PiSlashCommandSourceScope;
-	/** When true, command runs immediately on pick (no args expected). */
-	autoSubmit: boolean;
-}
 
 /**
  * Pi's built-in slash commands. Vendored from

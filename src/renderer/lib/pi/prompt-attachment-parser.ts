@@ -9,16 +9,10 @@
  * blocks here and surface them as chips.
  */
 
-export interface ParsedPromptAttachment {
-	content: string;
-	path: string;
-}
-
-/** A parsed user prompt split into its leading file attachments and typed text. */
-export interface ParsedPrompt {
-	attachments: readonly ParsedPromptAttachment[];
-	text: string;
-}
+import type {
+	ParsedPrompt,
+	ParsedPromptAttachment,
+} from '@/renderer/types/pi-timeline';
 
 const ATTACHED_FILE_PATTERN =
 	/^<attached_file path="([^"]*)">\n([\s\S]*?)\n<\/attached_file>\s*/;

@@ -6,7 +6,7 @@ import type { NormalizedScope } from './environment-variable-types.ts';
 import { deleteSetting, upsertSetting } from './settings-table.ts';
 
 /** Persisted fields for a repository's Scripts settings screen. */
-export interface UpsertRepositoryScriptSettingsInput {
+interface UpsertRepositoryScriptSettingsInput {
 	archive: string | null;
 	autoRunAfterSetup: boolean;
 	database: DatabaseSync;

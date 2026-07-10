@@ -1,4 +1,7 @@
-import type { StreamingTextPart, UIMessagePart } from './types';
+import type {
+	StreamingTextPart,
+	UIMessagePart,
+} from '@/renderer/types/pi-timeline';
 
 /**
  * Folds an incoming streaming text or reasoning part into the parts array,

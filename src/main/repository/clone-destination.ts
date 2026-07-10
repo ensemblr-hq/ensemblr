@@ -8,15 +8,8 @@ import type {
 import type { RegisteredRepositorySnapshot } from '../../shared/ipc/contracts/repository';
 import { allocateUniqueTargetPath } from './target-path.ts';
 
-/** Inputs for {@link resolveDestination}. */
-export interface ResolveDestinationOptions {
-	defaultParentPath: string;
-	destinationPath: string | undefined;
-	repositoryName: string;
-}
-
 /** Result of {@link resolveDestination}. */
-export interface ResolveDestinationResult {
+interface ResolveDestinationResult {
 	diagnostic?: CloneGithubRepositoryDiagnostic;
 	targetPath: string;
 }
@@ -29,7 +22,11 @@ export function resolveDestination({
 	defaultParentPath,
 	destinationPath,
 	repositoryName,
-}: ResolveDestinationOptions): ResolveDestinationResult {
+}: {
+	defaultParentPath: string;
+	destinationPath: string | undefined;
+	repositoryName: string;
+}): ResolveDestinationResult {
 	const overrideRaw =
 		typeof destinationPath === 'string' ? destinationPath.trim() : '';
 

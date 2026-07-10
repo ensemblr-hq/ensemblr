@@ -18,14 +18,8 @@ export interface MainWindowStateStore {
 }
 
 /** Minimal display descriptor needed to clamp window bounds. */
-export interface MainWindowDisplay {
+interface MainWindowDisplay {
 	workArea: Rectangle;
-}
-
-/** Options for {@link createMainWindowStateStore}. */
-interface CreateMainWindowStateStoreOptions {
-	databaseService: EnsemblrDatabaseService;
-	now?: () => Date;
 }
 
 const MAIN_WINDOW_STATE_KEY = 'mainWindow.state';
@@ -44,7 +38,10 @@ export const MAIN_WINDOW_MIN_WIDTH = 960;
 export function createMainWindowStateStore({
 	databaseService,
 	now = () => new Date(),
-}: CreateMainWindowStateStoreOptions): MainWindowStateStore {
+}: {
+	databaseService: EnsemblrDatabaseService;
+	now?: () => Date;
+}): MainWindowStateStore {
 	return {
 		load(displays) {
 			const database = databaseService.getConnection()?.database ?? null;

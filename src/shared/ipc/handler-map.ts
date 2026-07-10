@@ -187,7 +187,7 @@ import type {
 } from './contracts/workspace-scripts';
 
 /** Per-channel { req, res } pair. */
-export interface IpcHandlerEntry<Req, Res> {
+interface IpcHandlerEntry<Req, Res> {
 	req: Req;
 	res: Res;
 }

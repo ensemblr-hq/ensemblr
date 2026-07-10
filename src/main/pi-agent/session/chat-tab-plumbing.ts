@@ -5,7 +5,7 @@ import {
 	closeChatTab,
 	listOpenChatTabsBySession,
 	openChatTab,
-} from '../../storage/repositories/chat-tab-repository.ts';
+} from '../../storage/repositories/index.ts';
 
 /** Binds a new Pi session to an existing chat tab, or creates a tab fallback. */
 export function attachSessionToChatTab({

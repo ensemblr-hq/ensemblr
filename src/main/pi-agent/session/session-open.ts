@@ -1,13 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
-import type { PiExecutableSnapshot } from '../../pi-runtime/pi-executable.ts';
+import type { PiExecutableSnapshot } from '../../pi-runtime';
+import type {
+	PiSessionBranchRow,
+	PiSessionRow,
+} from '../../storage/repositories';
 import { getMaxOrdinalForBranch } from '../../storage/repositories/pi-event-repository.ts';
 import {
 	createPiSession,
 	getMainBranchForSession,
 	getPiSessionById,
-	type PiSessionBranchRow,
-	type PiSessionRow,
 	updatePiSession,
 } from '../../storage/repositories/pi-session-repository.ts';
 import type { PiAgentClient, PiAgentSession } from '../pi-agent-client.ts';
@@ -22,7 +24,7 @@ import { attachSessionToChatTab } from './chat-tab-plumbing.ts';
 import { toSnapshot } from './session-snapshot.ts';
 
 /** Lifecycle-side open request, identical shape to the public lifecycle alias. */
-export interface OpenRequest {
+interface OpenRequest {
 	chatTabId?: string | null;
 	executable: PiExecutableSnapshot;
 	initialPrompt?: string | null;
@@ -51,7 +53,7 @@ export interface QueueChatTitleInput {
 }
 
 /** Dependencies for {@link createSessionOpener}. */
-export interface SessionOpenerOptions {
+interface SessionOpenerOptions {
 	activeSessions: ActiveSessionMap;
 	chatTitleTimeoutMs: number;
 	eventSink: PiSessionEventSink | undefined;
@@ -69,7 +71,7 @@ export interface SessionOpenerOptions {
 }
 
 /** Public surface of the session opener: opens or resumes a session and returns its snapshot. */
-export interface SessionOpener {
+interface SessionOpener {
 	openSession: (input: {
 		database: DatabaseSync;
 		request: OpenRequest;

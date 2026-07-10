@@ -7,12 +7,6 @@ import { isRepositoryConfigPathAllowed } from '../../config';
 import type { EnsemblrDatabaseService } from '../../storage';
 import { parseRepositoryConfigRequest } from '../request-schemas.ts';
 
-/** Service dependencies used by the repository-config IPC handlers. */
-export interface RepositoryConfigHandlersOptions {
-	databaseService: EnsemblrDatabaseService;
-	repositoryConfigService: RepositoryConfigService;
-}
-
 /**
  * Registers the IPC handler for repository config inspection.
  * @param options - Required services.
@@ -20,7 +14,10 @@ export interface RepositoryConfigHandlersOptions {
 export function registerRepositoryConfigHandlers({
 	databaseService,
 	repositoryConfigService,
-}: RepositoryConfigHandlersOptions): void {
+}: {
+	databaseService: EnsemblrDatabaseService;
+	repositoryConfigService: RepositoryConfigService;
+}): void {
 	ipcMain.handle(
 		IPC_CHANNELS.repositoryConfig,
 		(_event, request: unknown): RepositoryConfigSnapshot => {
