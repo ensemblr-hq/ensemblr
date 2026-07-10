@@ -131,6 +131,10 @@ for primary navigation identity.
 - The `_shell` pass-through loader is load-bearing. Removing it silently breaks
   descendant loader redirects (invalid workspace URLs, legacy `?chat=` migration,
   canonical search). It is documented in code and guarded by a routing test.
+- A workspace URL whose workspace no longer resolves (archived or deleted)
+  redirects to Welcome (`/`), not to a sibling workspace, so an archived
+  workspace never renders a shell. The archive and archive-after-merge flows
+  navigate to Welcome proactively; the loader redirect is the safety net.
 - Deep linking, restore-on-launch, and per-workspace dock/review/chat memory all
   work through the URL plus persisted atoms.
 - A development-only route/IPC navigation profiler

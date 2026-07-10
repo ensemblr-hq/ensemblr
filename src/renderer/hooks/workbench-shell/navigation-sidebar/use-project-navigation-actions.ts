@@ -13,7 +13,6 @@ import { pickComposerSurname } from '@/renderer/lib/workbench/workspace-name-poo
 import type {
 	ProjectShellModel,
 	WorkspaceCreationSeed,
-	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { CreateWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
@@ -33,43 +32,6 @@ export function useArchiveBrowseChange() {
 		},
 		[router],
 	);
-}
-
-/**
- * Picks the workspace to surface after archiving, preferring another workspace
- * in the same project before falling back to the first available elsewhere.
- */
-function pickFallbackWorkspace({
-	archivedWorkspaceId,
-	orderedProjects,
-	preferredProjectId,
-}: {
-	archivedWorkspaceId: string;
-	orderedProjects: ProjectShellModel[];
-	preferredProjectId: string | null;
-}): { project: ProjectShellModel; workspace: WorkspaceShellModel } | null {
-	if (preferredProjectId) {
-		const sameProject = orderedProjects.find(
-			(project) => project.id === preferredProjectId,
-		);
-		const sibling = sameProject?.workspaces.find(
-			(workspace) => workspace.id !== archivedWorkspaceId,
-		);
-		if (sameProject && sibling) {
-			return { project: sameProject, workspace: sibling };
-		}
-	}
-
-	for (const project of orderedProjects) {
-		const candidate = project.workspaces.find(
-			(workspace) => workspace.id !== archivedWorkspaceId,
-		);
-		if (candidate) {
-			return { project, workspace: candidate };
-		}
-	}
-
-	return null;
 }
 
 /** Dependencies for the create-workspace navigation action hook. */
@@ -180,18 +142,14 @@ export function useCreateWorkspaceFromProject({
 
 /** Dependencies for the archive-workspace navigation action hook. */
 interface ArchiveWorkspaceActionDeps {
-	activeProjectId: string | null;
 	activeWorkspaceId: string | null;
 	disableProjectReorderLayoutAnimation: () => void;
-	orderedProjects: ProjectShellModel[];
 }
 
-/** Handles cache invalidation and fallback navigation after a workspace archive. */
+/** Handles cache invalidation and Welcome navigation after a workspace archive. */
 export function useArchiveWorkspaceAction({
-	activeProjectId,
 	activeWorkspaceId,
 	disableProjectReorderLayoutAnimation,
-	orderedProjects,
 }: ArchiveWorkspaceActionDeps) {
 	const navigate = useNavigate();
 	const router = useRouter();
@@ -203,44 +161,18 @@ export function useArchiveWorkspaceAction({
 			// project rows up as the archived workspace's height collapses.
 			disableProjectReorderLayoutAnimation();
 
+			if (activeWorkspaceId === archivedWorkspaceId) {
+				await navigate({ replace: true, to: '/' });
+			}
+
 			// Drop the stale navigation snapshot so the sidebar reflows around
 			// the deleted workspace, refresh the global History feed so a mounted
-			// History screen updates instantly, then re-run the route loaders so
-			// the workspace match doesn't keep its now-orphaned loaderData.
+			// History screen updates instantly, then re-run route loaders against
+			// the non-workspace route so archived workspaces never render a shell.
 			await invalidateWorkspaceListViews(queryClient);
 			await router.invalidate();
-
-			if (activeWorkspaceId !== archivedWorkspaceId) {
-				return;
-			}
-
-			const fallback = pickFallbackWorkspace({
-				archivedWorkspaceId,
-				orderedProjects,
-				preferredProjectId: activeProjectId,
-			});
-
-			if (fallback) {
-				await navigate({
-					params: {
-						projectId: fallback.project.id,
-						workspaceId: fallback.workspace.id,
-					},
-					to: '/projects/$projectId/workspaces/$workspaceId',
-				});
-				return;
-			}
-
-			await navigate({ to: '/' });
 		},
-		[
-			activeProjectId,
-			activeWorkspaceId,
-			disableProjectReorderLayoutAnimation,
-			navigate,
-			orderedProjects,
-			router,
-		],
+		[activeWorkspaceId, disableProjectReorderLayoutAnimation, navigate, router],
 	);
 }
 

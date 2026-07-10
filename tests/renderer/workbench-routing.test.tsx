@@ -220,22 +220,17 @@ test('redirects invalid project routes to the default workspace URL', async () =
 	});
 });
 
-test('redirects invalid workspace routes to the default workspace URL', async () => {
+test('redirects missing workspace routes to the welcome screen', async () => {
 	const redirectOptions = await catchWorkspaceRouteRedirect({
 		params: {
-			projectId: 'missing-project',
+			projectId: 'ensemblr',
 			workspaceId: 'missing-workspace',
 		},
 	});
 
 	expect(redirectOptions).toMatchObject({
-		params: {
-			chatId: 'review-shell',
-			projectId: 'ensemblr',
-			workspaceId: 'san-antonio',
-		},
 		replace: true,
-		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
+		to: '/',
 	});
 });
 
@@ -485,7 +480,7 @@ test('refreshes navigation from IPC even when the cache is fresh', async () => {
 	expect(cachedSnapshot).toEqual(freshSnapshot);
 });
 
-test('still redirects when neither parent loaderData nor fresh cache has the workspace', async () => {
+test('redirects to welcome when neither parent loaderData nor fresh cache has the workspace', async () => {
 	Reflect.deleteProperty(globalThis, 'window');
 	const queryClient = new QueryClient();
 	const loaderData = await loadWorkbenchRouteData(queryClient);
@@ -505,7 +500,7 @@ test('still redirects when neither parent loaderData nor fresh cache has the wor
 		if (isRedirect(error)) {
 			expect(error.options).toMatchObject({
 				replace: true,
-				to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
+				to: '/',
 			});
 
 			return;

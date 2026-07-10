@@ -85,10 +85,8 @@ export function ProjectNavigationGroups({
 	// callback only sees the workspace/project id that disappeared from the
 	// active surface.
 	const handleWorkspaceLifecycleAction = useArchiveWorkspaceAction({
-		activeProjectId: activeProject?.id ?? null,
 		activeWorkspaceId: activeWorkspace?.id ?? null,
 		disableProjectReorderLayoutAnimation,
-		orderedProjects,
 	});
 
 	const handleProjectLifecycleAction = useArchiveProjectAction({
