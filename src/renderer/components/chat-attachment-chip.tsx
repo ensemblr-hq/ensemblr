@@ -1,6 +1,7 @@
-import { FileIcon, FolderIcon } from 'lucide-react';
+import { Icon } from '@iconify/react';
 import type { ComponentProps } from 'react';
 import { cn } from '@/renderer/lib/utils';
+import { getWorkspaceFileIconName } from '@/renderer/lib/workbench';
 
 /** Compact attachment pill showing a file or folder icon and the path basename; acts as a button that opens the file preview when given an activation handler. */
 export function ChatAttachmentChip({
@@ -14,7 +15,10 @@ export function ChatAttachmentChip({
 	label: string;
 	onActivate?: () => void;
 }) {
-	const Icon = kind === 'folder' ? FolderIcon : FileIcon;
+	const iconName = getWorkspaceFileIconName({
+		kind: kind === 'folder' ? 'directory' : 'file',
+		name: label,
+	});
 	const chipClassName = cn(
 		'inline-flex max-w-full items-center gap-1.5 rounded-md border border-border/50 bg-muted/60 px-2 py-0.5 font-medium text-foreground/90 text-xs leading-5',
 		onActivate &&
@@ -23,10 +27,7 @@ export function ChatAttachmentChip({
 	);
 	const content = (
 		<>
-			<Icon
-				aria-hidden='true'
-				className='size-3.5 shrink-0 text-muted-foreground'
-			/>
+			<Icon aria-hidden='true' className='size-3.5 shrink-0' icon={iconName} />
 			<span className='truncate'>{label}</span>
 		</>
 	);

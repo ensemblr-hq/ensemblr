@@ -54,12 +54,16 @@ recent changes.
 - Each workspace is an isolated git worktree with its own branch and working tree.
 - Auto-generated branch names derived from the first Pi turn (kebab-case, optional username/custom prefix).
 - Copy configured files into new workspaces on creation.
+- Base branch is fetched and fast-forwarded before a workspace is created, so new work starts from the
+  latest `master`/`main` when online (best-effort — offline creation still works).
 - Quick-start: create a brand-new project and publish it to GitHub directly from Ensemblr.
 
 ### Pi agent runtime
 - Runs the Pi CLI in RPC mode (JSONL over stdio) with executable discovery and readiness checks.
 - Per-workspace Pi sessions persisted to SQLite, with tree-structured session branching.
 - Streaming conversation timeline with model and extended-thinking controls.
+- Composer accepts pasted image attachments and `@`-mention file payloads, resolved through the
+  workspace-files service and rendered as attachment chips.
 - Git-backed checkpoints capture per-turn state so you can restore an earlier point.
 - Activity monitoring drives macOS notifications and power-state handling while the agent works.
 
@@ -165,13 +169,15 @@ src/
 └── shared/     Cross-process contracts (Zod config, IPC contracts, keymap, Pi-RPC)
 
 docs/
-├── adr/        Architecture Decision Records (30)
-├── pi/         Pi integration (RPC protocol, event taxonomy)
-├── product/    Roadmap, parity notes, shell/settings inventories
-└── refactor/   Refactor plans
+├── adr/            Architecture Decision Records (33)
+├── considerations/ Exploratory design notes (e.g. Deno desktop migration)
+├── pi/             Pi integration (RPC protocol, event taxonomy)
+├── product/        Roadmap, parity notes, shell/settings inventories
+└── refactor/       Refactor plans
 
 tests/          main/ · renderer/ · shared/ · fixtures/
-scripts/        Build & maintenance scripts (Tailwind check, Pi fixture tooling, node-pty fix)
+scripts/        Build & maintenance scripts (Tailwind check, Pi fixture tooling, node-pty fix,
+                app icon + social avatar generation, Dock-flash diagnostics)
 ```
 
 Each `src` subtree has its own scoped `AGENTS.md` with rules specific to that runtime boundary.
@@ -265,7 +271,7 @@ See `package.json` for the full list of `test:*` scripts.
 - [`CONTEXT.md`](./CONTEXT.md) — product definition and ubiquitous language.
 - [`CHANGELOG.md`](./CHANGELOG.md) — notable changes (Keep a Changelog format).
 - [`AGENTS.md`](./AGENTS.md) — contributor policies (package manager, Biome, state, Tailwind, docs).
-- [`docs/adr/`](./docs/adr) — 30 Architecture Decision Records.
+- [`docs/adr/`](./docs/adr) — 33 Architecture Decision Records.
 - [`docs/product/`](./docs/product) — roadmap, Conductor parity, shell/settings inventories.
 - [`docs/pi/`](./docs/pi) — Pi RPC protocol and event taxonomy.
 

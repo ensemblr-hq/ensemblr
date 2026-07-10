@@ -14,12 +14,13 @@ import { useCallback, useEffect, useState } from 'react';
  * @param defaultExpanded - Whether folders are open before any interaction.
  * @param knownDirectoryPaths - Every directory path currently in the tree.
  *   Pass a memoized array so the prune effect only runs when the tree changes.
- * @returns `isExpanded(path)` and `toggleDirectory(path)` for the tree rows.
+ * @returns Expansion readers and writers for the tree rows.
  */
 export function useFileTreeExpansion(
 	defaultExpanded: boolean,
 	knownDirectoryPaths: readonly string[],
 ): {
+	expandDirectories: (paths: readonly string[]) => void;
 	isExpanded: (path: string) => boolean;
 	toggleDirectory: (path: string) => void;
 } {
@@ -53,11 +54,32 @@ export function useFileTreeExpansion(
 		});
 	}, []);
 
+	const expandDirectories = useCallback(
+		(paths: readonly string[]) => {
+			setToggledPaths((current) => {
+				const next = new Set(current);
+				let changed = false;
+
+				for (const path of paths) {
+					if (defaultExpanded) {
+						changed = next.delete(path) || changed;
+					} else if (!next.has(path)) {
+						next.add(path);
+						changed = true;
+					}
+				}
+
+				return changed ? next : current;
+			});
+		},
+		[defaultExpanded],
+	);
+
 	const isExpanded = useCallback(
 		(path: string) =>
 			defaultExpanded ? !toggledPaths.has(path) : toggledPaths.has(path),
 		[defaultExpanded, toggledPaths],
 	);
 
-	return { isExpanded, toggleDirectory };
+	return { expandDirectories, isExpanded, toggleDirectory };
 }

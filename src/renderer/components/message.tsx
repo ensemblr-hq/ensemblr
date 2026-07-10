@@ -5,18 +5,30 @@ import { createCodePlugin } from '@streamdown/code';
 import { math } from '@streamdown/math';
 import { mermaid } from '@streamdown/mermaid';
 import { useAtomValue } from 'jotai';
-import type { ComponentProps } from 'react';
-import { memo, useMemo } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
+import { Children, memo, useMemo } from 'react';
 import { Streamdown } from 'streamdown';
+import {
+	attachmentPathFromInlineCode,
+	chipLabelForPath,
+} from '@/renderer/lib/pi';
 import { cn } from '@/renderer/lib/utils';
 import { codeThemeAtom, markdownStyleAtom } from '@/renderer/state/preferences';
+import { ChatAttachmentChip } from './chat-attachment-chip';
+import {
+	useFilePreviewOpener,
+	useWorkspacePathKindResolver,
+} from './workbench-shell/conversation-panel/file-preview-context';
 
 /** Props for {@link MessageResponse}; mirrors Streamdown's own props. */
 type MessageResponseProps = ComponentProps<typeof Streamdown>;
 
+/** Props received by Streamdown's custom inline-code renderer. */
+type InlineCodeProps = ComponentProps<'code'> & { node?: unknown };
+
 /** Renders assistant markdown through Streamdown, honoring the user's chosen code theme and markdown style. */
 export const MessageResponse = memo(
-	({ className, ...props }: MessageResponseProps) => {
+	({ className, components, ...props }: MessageResponseProps) => {
 		const codeTheme = useAtomValue(codeThemeAtom);
 		const markdownStyle = useAtomValue(markdownStyleAtom);
 		// Rebuild the code plugin when the picked theme changes so fenced blocks
@@ -29,6 +41,13 @@ export const MessageResponse = memo(
 				mermaid,
 			}),
 			[codeTheme],
+		);
+		const componentsWithAttachmentChips = useMemo(
+			() => ({
+				...components,
+				inlineCode: MessageInlineCode,
+			}),
+			[components],
 		);
 		return (
 			<Streamdown
@@ -50,6 +69,7 @@ export const MessageResponse = memo(
 						'prose prose-sm dark:prose-invert prose-pre:m-0 max-w-none prose-pre:bg-transparent prose-pre:p-0 prose-code:before:content-none prose-code:after:content-none',
 					className,
 				)}
+				components={componentsWithAttachmentChips}
 				plugins={plugins}
 				{...props}
 			/>
@@ -61,3 +81,49 @@ export const MessageResponse = memo(
 );
 
 MessageResponse.displayName = 'MessageResponse';
+
+/** Renders file-like inline code as attachment chips while preserving ordinary code snippets. */
+function MessageInlineCode({
+	children,
+	className,
+	node: _node,
+	...props
+}: InlineCodeProps) {
+	const openFilePreview = useFilePreviewOpener();
+	const resolveWorkspacePathKind = useWorkspacePathKindResolver();
+	const inlineText = textFromInlineCodeChildren(children);
+	const attachmentPath = attachmentPathFromInlineCode(inlineText);
+	if (attachmentPath) {
+		const kind =
+			resolveWorkspacePathKind?.(attachmentPath) === 'directory'
+				? 'folder'
+				: 'file';
+		return (
+			<ChatAttachmentChip
+				className='align-baseline'
+				kind={kind}
+				label={chipLabelForPath(attachmentPath)}
+				onActivate={
+					openFilePreview ? () => openFilePreview(attachmentPath) : undefined
+				}
+				title={attachmentPath}
+			/>
+		);
+	}
+	return (
+		<code className={className} {...props}>
+			{children}
+		</code>
+	);
+}
+
+/** Extracts plain text from Streamdown's inline-code children. */
+function textFromInlineCodeChildren(children: ReactNode): string {
+	return Children.toArray(children)
+		.map((child) =>
+			typeof child === 'string' || typeof child === 'number'
+				? String(child)
+				: '',
+		)
+		.join('');
+}

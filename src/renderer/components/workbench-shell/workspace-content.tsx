@@ -1,7 +1,9 @@
-import { type ComponentType, useCallback } from 'react';
+import { useSetAtom } from 'jotai';
+import { type ComponentType, useCallback, useRef } from 'react';
 import { useDockController } from '@/renderer/hooks/workbench-shell/use-dock-controller';
 import { useRightSidebarController } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
+import { workspaceDirectoryRevealRequestAtom } from '@/renderer/state/workspace';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type { PullRequestCommentSummary } from '@/renderer/types/workbench';
 import type {
@@ -55,6 +57,10 @@ export function WorkspaceWorkbenchContent({
 
 	const rightSidebar = useRightSidebarController();
 	const dock = useDockController();
+	const setDirectoryRevealRequest = useSetAtom(
+		workspaceDirectoryRevealRequestAtom,
+	);
+	const directoryRevealRequestIdRef = useRef(0);
 	const {
 		openWorkspaceFileDiffTab,
 		openFilePreviewTab,
@@ -90,11 +96,30 @@ export function WorkspaceWorkbenchContent({
 		},
 		[onSessionTabChange, openCommentPreviewTab],
 	);
-	const mainContentState: WorkspaceMainContentState = {
+	const revealWorkspaceDirectory = useCallback(
+		(directoryPath: string) => {
+			directoryRevealRequestIdRef.current += 1;
+			setDirectoryRevealRequest({
+				id: directoryRevealRequestIdRef.current,
+				path: directoryPath,
+				workspaceId: activeWorkspace.id,
+			});
+			onReviewTabChange('files');
+			void rightSidebar.expandRightSidebar();
+		},
+		[
+			activeWorkspace.id,
+			onReviewTabChange,
+			rightSidebar.expandRightSidebar,
+			setDirectoryRevealRequest,
+		],
+	);
+	const mainContentState = {
 		activeSession: sessionNavigation.effectiveActiveSession,
 		activeWorkspace,
 		closedSessions: sessionNavigation.closedSessions,
 		composer,
+		onDirectoryReveal: revealWorkspaceDirectory,
 		onFilePreviewOpen: sessionNavigation.openFilePreviewTab,
 		onSessionTabChange,
 		onSessionTabClose: sessionNavigation.closeSessionTab,
