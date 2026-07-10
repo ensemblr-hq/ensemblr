@@ -109,7 +109,7 @@ export async function loadProjectWorkbenchRoute({
 /**
  * Loader for workspace routes. Resolves the (project, workspace) selection,
  * migrates the legacy `?chat=` query into the canonical `/chats/:chatId` route,
- * and redirects to a fallback when the URL workspace is missing.
+ * and redirects to Welcome when the URL workspace is missing.
  *
  * Reads the live navigation snapshot from `queryClient` as a fallback when the
  * cached parent loaderData does not yet contain the requested workspace —
@@ -150,14 +150,9 @@ export async function loadWorkspaceWorkbenchRoute({
 		routeProjectId: params.projectId,
 		routeWorkspaceId: params.workspaceId,
 	});
-	const fallbackSelection = resolveFallbackWorkspaceSelection(projects);
-
-	if (!currentSelection && fallbackSelection) {
-		throw redirectToWorkspaceSelection(fallbackSelection);
-	}
 
 	if (!currentSelection) {
-		return undefined;
+		throw redirectToWorkbenchWelcome();
 	}
 
 	const legacyChatId = getStringSearchValue(rawSearch, LEGACY_CHAT_SEARCH_KEY);
@@ -368,6 +363,11 @@ function redirectToWorkspaceSelection(
 		replace: true,
 		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
 	});
+}
+
+/** Builds a TanStack Router redirect to the workbench Welcome route. */
+function redirectToWorkbenchWelcome() {
+	return redirect({ replace: true, to: '/' });
 }
 
 /** Builds a TanStack Router redirect into a canonical chat route. */

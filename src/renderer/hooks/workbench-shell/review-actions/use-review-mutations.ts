@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useCallback } from 'react';
-
 import { toast } from 'sonner';
 
 import {
 	archiveWorkspace,
 	ensemblrQueryKeys,
+	invalidateWorkspaceListViews,
 	mergePullRequest,
 	refreshPullRequestSnapshot,
 } from '@/renderer/api/ensemblr-queries';
@@ -24,7 +25,9 @@ import type { WorkspaceShellModel } from '@/renderer/types/workbench';
  * `onSettled` callback the provider uses to dismiss its active dialog.
  *
  * Invalidates the pull-request snapshot and workspace git-status queries after
- * every success so the review panel reflects the new state immediately.
+ * every success so the review panel reflects the new state immediately. When the
+ * archive-after-merge follow-up succeeds it redirects to Welcome, since the just
+ * archived workspace can no longer render a shell.
  */
 export function useReviewMutations({
 	activeWorkspace,
@@ -35,10 +38,18 @@ export function useReviewMutations({
 	mergeSettings: ReviewMergeSettings;
 	onSettled: () => void;
 }) {
+	const navigate = useNavigate();
 	const queryClient = useQueryClient();
+	const router = useRouter();
 	const workspaceCwd = activeWorkspace.pathLabel;
 	const workspaceId = activeWorkspace.id;
 
+	/**
+	 * Archives the merged workspace, then redirects to Welcome and refreshes the
+	 * workspace list views on success. When the merge landed but the archive did
+	 * not (skipped or thrown), it stays on the workspace and only refreshes the
+	 * list views the merged branch state feeds.
+	 */
 	const runArchiveAfterMerge = useCallback(async () => {
 		try {
 			const result = await archiveWorkspace({
@@ -48,21 +59,30 @@ export function useReviewMutations({
 			});
 			if (result.status === 'success') {
 				deleteLastUsedOpenTarget(workspaceId);
+				await navigate({ replace: true, to: '/' });
+				await invalidateWorkspaceListViews(queryClient);
+				await router.invalidate();
 				toast.success('Pull request merged and workspace archived.');
-			} else {
-				toast.warning('Merge succeeded, but the workspace was not archived.', {
-					description: result.diagnostics?.[0]?.message,
-				});
+				return;
 			}
-			void queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
+			toast.warning('Merge succeeded, but the workspace was not archived.', {
+				description: result.diagnostics?.[0]?.message,
 			});
 		} catch (cause) {
 			toast.warning('Merge succeeded, but archiving the workspace failed.', {
 				description: cause instanceof Error ? cause.message : undefined,
 			});
 		}
-	}, [mergeSettings.deleteLocalBranchOnArchive, queryClient, workspaceId]);
+		// The merge landed even when the archive didn't, so refresh the list
+		// views the merged branch state feeds while the workspace stays put.
+		await invalidateWorkspaceListViews(queryClient);
+	}, [
+		mergeSettings.deleteLocalBranchOnArchive,
+		navigate,
+		queryClient,
+		router,
+		workspaceId,
+	]);
 
 	const mergeMutation = useMutation({
 		mutationFn: async () => {
