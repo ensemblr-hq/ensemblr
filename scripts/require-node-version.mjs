@@ -10,6 +10,16 @@ const nvmrc = fileURLToPath(new URL('../.nvmrc', import.meta.url));
 const required = Number.parseInt(readFileSync(nvmrc, 'utf8').trim(), 10);
 const current = Number.parseInt(process.versions.node.split('.')[0], 10);
 
+// Guard a malformed .nvmrc (e.g. `v24`, `lts/*`, empty): without this, `required`
+// is NaN, `current !== required` is always true, and the build fails with a
+// confusing "Node NaN required" message instead of naming the real problem.
+if (Number.isNaN(required)) {
+	console.error(
+		'✖ Could not read a major Node version from .nvmrc. Expected a bare number like "24".',
+	);
+	process.exit(1);
+}
+
 if (current !== required) {
 	console.error(
 		[

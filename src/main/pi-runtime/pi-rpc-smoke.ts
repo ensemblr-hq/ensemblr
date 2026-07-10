@@ -3,10 +3,10 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
-import type { CommandEnvironmentSnapshot } from '../commands/local-command';
+import type { CommandEnvironmentSnapshot } from '../commands/local-command.ts';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import { createJsonlLineStream } from '../pi-ipc/jsonl-line-stream.ts';
-import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
+import type { EnsembleRootDirectoryService } from '../root/root-directory-service.ts';
 import {
 	isExecutableReady,
 	type PiExecutableSnapshot,
