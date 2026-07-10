@@ -11,8 +11,8 @@ import {
 } from '../../src/main/checkpoints/checkpoint-service.ts';
 import { captureWorkspaceCheckpoint } from '../../src/main/checkpoints/git-checkpoint.ts';
 import {
-	type EnsembleDatabaseConnection,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseConnection,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import { getCheckpointByTurnId } from '../../src/main/storage/repositories/checkpoint-repository.ts';
 import {
@@ -21,7 +21,7 @@ import {
 } from '../../src/main/storage/repositories/pi-session-repository.ts';
 
 interface Fixture {
-	connection: EnsembleDatabaseConnection;
+	connection: EnsemblrDatabaseConnection;
 	piSessionId: string;
 	repoDirectory: string;
 	turnId: string;
@@ -34,21 +34,21 @@ function git(cwd: string, ...args: string[]): string {
 
 function initGitRepo(directory: string): void {
 	git(directory, 'init', '--initial-branch=main');
-	git(directory, 'config', 'user.email', 'test@ensemble.local');
-	git(directory, 'config', 'user.name', 'Ensemble Test');
+	git(directory, 'config', 'user.email', 'test@ensemblr.local');
+	git(directory, 'config', 'user.name', 'Ensemblr Test');
 	writeFileSync(path.join(directory, 'tracked.txt'), 'initial\n');
 	git(directory, 'add', '-A');
 	git(directory, 'commit', '-m', 'initial');
 }
 
 function openFixture(t: import('node:test').TestContext): Fixture {
-	const root = mkdtempSync(path.join(tmpdir(), 'ensemble-checkpoint-test-'));
+	const root = mkdtempSync(path.join(tmpdir(), 'ensemblr-checkpoint-test-'));
 	const repoDirectory = path.join(root, 'repo');
 	const databasePath = path.join(root, 'test.db');
 	execFileSync('mkdir', ['-p', repoDirectory]);
 	initGitRepo(repoDirectory);
 
-	const connection = openEnsembleDatabase({ databasePath });
+	const connection = openEnsemblrDatabase({ databasePath });
 	t.after(() => {
 		connection.database.close();
 		rmSync(root, { force: true, recursive: true });
@@ -136,7 +136,7 @@ test('capture leaves branches, HEAD, and the real index untouched', async (t) =>
 
 	await captureWorkspaceCheckpoint({
 		cwd: fixture.repoDirectory,
-		message: 'ensemble checkpoint: test',
+		message: 'ensemblr checkpoint: test',
 		ref: checkpointRefFor({
 			turnId: fixture.turnId,
 			workspaceId: fixture.workspaceId,
@@ -155,7 +155,7 @@ test('capture on a clean workspace records the HEAD tree state', async (t) => {
 
 	const result = await captureWorkspaceCheckpoint({
 		cwd: fixture.repoDirectory,
-		message: 'ensemble checkpoint: clean',
+		message: 'ensemblr checkpoint: clean',
 		ref: checkpointRefFor({
 			turnId: fixture.turnId,
 			workspaceId: fixture.workspaceId,
@@ -170,7 +170,7 @@ test('capture on a clean workspace records the HEAD tree state', async (t) => {
 	);
 });
 
-test('refuses refs outside the ensemble checkpoint namespace', async () => {
+test('refuses refs outside the ensemblr checkpoint namespace', async () => {
 	await assert.rejects(
 		captureWorkspaceCheckpoint({
 			cwd: tmpdir(),
@@ -184,7 +184,7 @@ test('refuses refs outside the ensemble checkpoint namespace', async () => {
 test('capture failure warns and returns null without blocking', async (t) => {
 	const fixture = openFixture(t);
 	const nonGitDirectory = mkdtempSync(
-		path.join(tmpdir(), 'ensemble-checkpoint-nongit-'),
+		path.join(tmpdir(), 'ensemblr-checkpoint-nongit-'),
 	);
 	t.after(() => rmSync(nonGitDirectory, { force: true, recursive: true }));
 

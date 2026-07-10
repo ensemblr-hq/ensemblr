@@ -7,7 +7,7 @@ import {
 import type { BundledLanguage } from 'shiki';
 import { toast } from 'sonner';
 
-import { workspaceFileDiffQuery } from '@/renderer/api/ensemble-queries';
+import { workspaceFileDiffQuery } from '@/renderer/api/ensemblr-queries';
 import { CodeBlockContent } from '@/renderer/components/code-block';
 import { Button } from '@/renderer/components/ui/button';
 import { formatFileDiffContext } from '@/renderer/lib/workbench/review-context';
@@ -21,7 +21,7 @@ import { FileCommentSection } from './file-comment-section';
  * tab carries a `filePath` instead of a checkpoint turn. The optional `scope`
  * selects which diff to show (working tree by default, a commit, or the whole
  * branch). Local review comments (SQLite) attach to the file/line here and are
- * clearly labelled as Ensemble-local, never GitHub state.
+ * clearly labelled as Ensemblr-local, never GitHub state.
  */
 export function WorkspaceFileDiffPanel({
 	filePath,

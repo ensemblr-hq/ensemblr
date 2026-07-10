@@ -11,7 +11,7 @@ import { Spinner } from '@/renderer/components/ui/spinner';
 
 const STILL_WORKING_DELAY_MS = 10_000;
 const INITIAL_DESCRIPTION =
-	'Ensemble is cloning the tracked git files into your managed repos folder, then creating the first workspace.';
+	'Ensemblr is cloning the tracked git files into your managed repos folder, then creating the first workspace.';
 const STILL_WORKING_DESCRIPTION =
 	'Still working — large repositories with deep history can take a minute or two. The window will switch as soon as the workspace is ready.';
 
@@ -39,7 +39,7 @@ function ImportDialogBody() {
 	);
 }
 
-/** Modal progress indicator shown while Ensemble imports a local project. */
+/** Modal progress indicator shown while Ensemblr imports a local project. */
 export function LocalProjectImportDialog({ open }: { open: boolean }) {
 	return (
 		<Dialog open={open}>

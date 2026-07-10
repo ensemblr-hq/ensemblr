@@ -4,10 +4,10 @@ import { useAtom } from 'jotai';
 import { useState } from 'react';
 
 import {
-	ensembleQueryKeys,
-	getEnsembleApi,
+	ensemblrQueryKeys,
+	getEnsemblrApi,
 	rootDirectoryQuery,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { Badge } from '@/renderer/components/ui/badge';
@@ -33,7 +33,7 @@ function AdvancedSettings() {
 
 	const pickRoot = useMutation({
 		mutationFn: async () => {
-			const api = getEnsembleApi();
+			const api = getEnsemblrApi();
 			const result = await api.selectRootDirectory();
 			if (result.canceled) return { applied: false as const };
 			if (result.error) throw new Error(result.error);
@@ -54,7 +54,7 @@ function AdvancedSettings() {
 			setPickError(null);
 			if (result.applied) {
 				await queryClient.invalidateQueries({
-					queryKey: ensembleQueryKeys.rootDirectory(),
+					queryKey: ensemblrQueryKeys.rootDirectory(),
 				});
 			}
 		},
@@ -62,7 +62,7 @@ function AdvancedSettings() {
 
 	const pickPi = useMutation({
 		mutationFn: async () => {
-			const result = await getEnsembleApi().selectPiExecutable();
+			const result = await getEnsemblrApi().selectPiExecutable();
 			if (result.canceled) return null;
 			if (result.error) throw new Error(result.error);
 			return result.selectedPath ?? null;
@@ -70,7 +70,7 @@ function AdvancedSettings() {
 		onSuccess: (path) => {
 			if (path) setPiPath(path);
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.setupDiagnostics(),
+				queryKey: ensemblrQueryKeys.setupDiagnostics(),
 			});
 		},
 	});
@@ -93,10 +93,10 @@ function AdvancedSettings() {
 						{pickRoot.isPending ? 'Picking…' : 'Browse'}
 					</Button>
 				}
-				description='Where Ensemble stores repositories and workspaces. This should be an empty directory you do not modify directly. Changing this will reconcile your repository list against the new root.'
+				description='Where Ensemblr stores repositories and workspaces. This should be an empty directory you do not modify directly. Changing this will reconcile your repository list against the new root.'
 				label={
 					<span className='flex items-center gap-2'>
-						Ensemble root directory
+						Ensemblr root directory
 						{rootStatus !== 'ok' ? (
 							<Badge
 								variant={rootStatus === 'error' ? 'destructive' : 'outline'}

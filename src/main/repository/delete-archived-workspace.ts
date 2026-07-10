@@ -8,7 +8,7 @@ import type {
 	DeleteArchivedWorkspaceResult,
 } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsembleDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage/database.ts';
 import { selectDeleteArchivedWorkspaceJoinById } from '../storage/repositories/workspace-repository.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
 import { deleteWorkspaceRow } from './workspace-row-ops.ts';
@@ -22,7 +22,7 @@ export interface DeleteArchivedWorkspaceService {
 
 /** Options for {@link createDeleteArchivedWorkspaceService}. */
 export interface CreateDeleteArchivedWorkspaceServiceOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
 }
 

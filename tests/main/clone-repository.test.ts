@@ -8,7 +8,7 @@ import {
 	createGithubCloneService,
 } from '../../src/main/repository/clone-repository.ts';
 import type { LocalRepositoryRegistrationService } from '../../src/main/repository/register-repository.ts';
-import type { EnsembleDatabaseService } from '../../src/main/storage/database.ts';
+import type { EnsemblrDatabaseService } from '../../src/main/storage/database.ts';
 import { buildRegistrationStub } from './helpers/registration-stub.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
@@ -16,7 +16,7 @@ function createWorkspace(t: TestContext): {
 	parentPath: string;
 	repositoriesPath: string;
 } {
-	const root = mkdtempSync(path.join(tmpdir(), 'ensemble-clone-fixture-'));
+	const root = mkdtempSync(path.join(tmpdir(), 'ensemblr-clone-fixture-'));
 	const repositoriesPath = path.join(root, 'repos');
 	mkdirSync(repositoriesPath, { recursive: true });
 
@@ -53,7 +53,7 @@ function failingRegistrationStub(): LocalRepositoryRegistrationService {
 const fixedNow = () => new Date('2026-06-07T12:00:00.000Z');
 
 /** Stub that reports no SQLite connection — clone tests do not need the dup check. */
-function databaseServiceStub(): EnsembleDatabaseService {
+function databaseServiceStub(): EnsemblrDatabaseService {
 	const snapshot = {
 		path: ':memory:',
 		schemaVersion: 0,
@@ -74,28 +74,28 @@ test('prepare validates an https GitHub URL and resolves the default target', as
 		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
-			path.join(repositoriesPath, 'ensemble'),
+			path.join(repositoriesPath, 'ensemblr'),
 		).service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
 	});
 
 	const result = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemble.git',
+		url: 'https://github.com/psoldunov/ensemblr.git',
 	});
 
 	assert.equal(result.ok, true);
 	if (!result.ok) {
 		throw new Error('expected ok preparation');
 	}
-	assert.equal(result.preparation.repositoryName, 'ensemble');
+	assert.equal(result.preparation.repositoryName, 'ensemblr');
 	assert.equal(
 		result.preparation.sanitizedUrl,
-		'https://github.com/psoldunov/ensemble.git',
+		'https://github.com/psoldunov/ensemblr.git',
 	);
-	assert.equal(result.preparation.validatedUrl, 'psoldunov/ensemble');
+	assert.equal(result.preparation.validatedUrl, 'psoldunov/ensemblr');
 	assert.equal(
 		result.preparation.targetPath,
-		path.join(repositoriesPath, 'ensemble'),
+		path.join(repositoriesPath, 'ensemblr'),
 	);
 });
 
@@ -106,23 +106,23 @@ test('prepare accepts ssh and shorthand URL forms', async (t) => {
 		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
-			path.join(repositoriesPath, 'ensemble'),
+			path.join(repositoriesPath, 'ensemblr'),
 		).service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
 	});
 
 	const ssh = await service.prepare({
-		url: 'git@github.com:psoldunov/ensemble.git',
+		url: 'git@github.com:psoldunov/ensemblr.git',
 	});
 	assert.equal(ssh.ok, true);
 	if (ssh.ok) {
-		assert.equal(ssh.preparation.validatedUrl, 'psoldunov/ensemble');
+		assert.equal(ssh.preparation.validatedUrl, 'psoldunov/ensemblr');
 	}
 
-	const shorthand = await service.prepare({ url: 'psoldunov/ensemble' });
+	const shorthand = await service.prepare({ url: 'psoldunov/ensemblr' });
 	assert.equal(shorthand.ok, true);
 	if (shorthand.ok) {
-		assert.equal(shorthand.preparation.repositoryName, 'ensemble');
+		assert.equal(shorthand.preparation.repositoryName, 'ensemblr');
 	}
 });
 
@@ -133,7 +133,7 @@ test('prepare rejects empty, malformed, and non-GitHub URLs', async (t) => {
 		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
-			path.join(repositoriesPath, 'ensemble'),
+			path.join(repositoriesPath, 'ensemblr'),
 		).service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
 	});
@@ -160,14 +160,14 @@ test('prepare rejects a relative destination override', async (t) => {
 		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
-			path.join(repositoriesPath, 'ensemble'),
+			path.join(repositoriesPath, 'ensemblr'),
 		).service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
 	});
 
 	const result = await service.prepare({
 		destinationPath: 'relative/path',
-		url: 'https://github.com/psoldunov/ensemble.git',
+		url: 'https://github.com/psoldunov/ensemblr.git',
 	});
 
 	assert.equal(result.ok, false);
@@ -176,7 +176,7 @@ test('prepare rejects a relative destination override', async (t) => {
 
 test('prepare auto-suffixes the target when the default path is already on disk', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
-	const existing = path.join(repositoriesPath, 'ensemble');
+	const existing = path.join(repositoriesPath, 'ensemblr');
 	mkdirSync(existing, { recursive: true });
 
 	const service = createGithubCloneService({
@@ -188,23 +188,23 @@ test('prepare auto-suffixes the target when the default path is already on disk'
 	});
 
 	const result = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemble.git',
+		url: 'https://github.com/psoldunov/ensemblr.git',
 	});
 
 	assert.equal(result.ok, true);
 	assert.equal(
 		result.preparation?.targetPath,
-		path.join(repositoriesPath, 'ensemble-2'),
+		path.join(repositoriesPath, 'ensemblr-2'),
 	);
 });
 
 test('prepare rejects the clone when another repository already tracks the remote', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
 	// Real in-memory DB with one pre-existing repo whose remote matches.
-	const { openEnsembleDatabase } = await import(
+	const { openEnsemblrDatabase } = await import(
 		'../../src/main/storage/database.ts'
 	);
-	const connection = openEnsembleDatabase({ databasePath: ':memory:' });
+	const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
 	t.after(() => connection.database.close());
 	connection.database
 		.prepare(
@@ -213,19 +213,19 @@ test('prepare rejects the clone when another repository already tracks the remot
 		)
 		.run(
 			'repository-existing',
-			'ensemble',
-			'ensemble',
-			path.join(repositoriesPath, 'ensemble'),
+			'ensemblr',
+			'ensemblr',
+			path.join(repositoriesPath, 'ensemblr'),
 			'main',
 			fixedNow().toISOString(),
 			fixedNow().toISOString(),
 			JSON.stringify({
-				remoteUrl: 'git@github.com:psoldunov/ensemble.git',
+				remoteUrl: 'git@github.com:psoldunov/ensemblr.git',
 			}),
-			'github.com/psoldunov/ensemble',
+			'github.com/psoldunov/ensemblr',
 		);
 
-	const databaseService: EnsembleDatabaseService = {
+	const databaseService: EnsemblrDatabaseService = {
 		close: () => connection.database.close(),
 		getConnection: () => connection,
 		getHealth: () => ({
@@ -245,14 +245,14 @@ test('prepare rejects the clone when another repository already tracks the remot
 		databaseService,
 		now: fixedNow,
 		registrationService: registrationStub(
-			path.join(repositoriesPath, 'ensemble'),
+			path.join(repositoriesPath, 'ensemblr'),
 		).service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
 	});
 
 	const result = await service.prepare({
 		// HTTPS form of the existing SSH remote — pre-flight should still match.
-		url: 'https://github.com/psoldunov/ensemble.git',
+		url: 'https://github.com/psoldunov/ensemblr.git',
 	});
 
 	assert.equal(result.ok, false);
@@ -266,7 +266,7 @@ test('start refuses an unknown jobId', async (t) => {
 		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
-			path.join(repositoriesPath, 'ensemble'),
+			path.join(repositoriesPath, 'ensemblr'),
 		).service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
 	});
@@ -278,14 +278,14 @@ test('start refuses an unknown jobId', async (t) => {
 
 test('start spawns gh, streams progress, and registers on success', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
-	const target = path.join(repositoriesPath, 'ensemble');
+	const target = path.join(repositoriesPath, 'ensemblr');
 	const registration = registrationStub(target);
 	const events: string[] = [];
 
 	const runner: CloneCommandRunner = async ({ command }, { onStderr }) => {
 		assert.equal(command, 'gh');
 		onStderr(
-			"Cloning into 'ensemble'...\nReceiving objects: 100% (50/50), done.\n",
+			"Cloning into 'ensemblr'...\nReceiving objects: 100% (50/50), done.\n",
 		);
 		// Materialise the cloned directory so the registration stub sees it.
 		mkdirSync(target, { recursive: true });
@@ -302,7 +302,7 @@ test('start spawns gh, streams progress, and registers on success', async (t) =>
 	});
 
 	const preparation = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemble.git',
+		url: 'https://github.com/psoldunov/ensemblr.git',
 	});
 	assert.equal(preparation.ok, true);
 	if (!preparation.ok) {
@@ -341,7 +341,7 @@ test('start classifies an authentication failure', async (t) => {
 		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
-			path.join(repositoriesPath, 'ensemble'),
+			path.join(repositoriesPath, 'ensemblr'),
 		).service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
 	});
@@ -364,7 +364,7 @@ test('start classifies an authentication failure', async (t) => {
 
 test('start falls back to git when gh is not installed', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
-	const target = path.join(repositoriesPath, 'ensemble');
+	const target = path.join(repositoriesPath, 'ensemblr');
 	const registration = registrationStub(target);
 	const observed: string[] = [];
 
@@ -391,7 +391,7 @@ test('start falls back to git when gh is not installed', async (t) => {
 	});
 
 	const preparation = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemble.git',
+		url: 'https://github.com/psoldunov/ensemblr.git',
 	});
 	assert.equal(preparation.ok, true);
 	if (!preparation.ok) {
@@ -420,13 +420,13 @@ test('start reports git-not-installed when both binaries are missing', async (t)
 		databaseService: databaseServiceStub(),
 		now: fixedNow,
 		registrationService: registrationStub(
-			path.join(repositoriesPath, 'ensemble'),
+			path.join(repositoriesPath, 'ensemblr'),
 		).service,
 		rootDirectoryService: rootDirectoryStub(repositoriesPath),
 	});
 
 	const preparation = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemble.git',
+		url: 'https://github.com/psoldunov/ensemblr.git',
 	});
 	assert.equal(preparation.ok, true);
 	if (!preparation.ok) {
@@ -443,7 +443,7 @@ test('start reports git-not-installed when both binaries are missing', async (t)
 
 test('start surfaces register-failed when registration rejects the cloned repo', async (t) => {
 	const { repositoriesPath } = createWorkspace(t);
-	const target = path.join(repositoriesPath, 'ensemble');
+	const target = path.join(repositoriesPath, 'ensemblr');
 
 	const runner: CloneCommandRunner = async () => {
 		mkdirSync(target, { recursive: true });
@@ -459,7 +459,7 @@ test('start surfaces register-failed when registration rejects the cloned repo',
 	});
 
 	const preparation = await service.prepare({
-		url: 'https://github.com/psoldunov/ensemble.git',
+		url: 'https://github.com/psoldunov/ensemblr.git',
 	});
 	assert.equal(preparation.ok, true);
 	if (!preparation.ok) {

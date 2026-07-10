@@ -9,9 +9,9 @@ import { type ReactNode, useCallback, useRef, useState } from 'react';
 
 import {
 	invalidateWorkspaceListViews,
-	isEnsembleApiAvailable,
+	isEnsemblrApiAvailable,
 	unarchiveWorkspace,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import { canRestoreArchivedWorkspace } from '@/renderer/lib/archive-restore';
 import { cn } from '@/renderer/lib/utils';
@@ -48,7 +48,7 @@ export function HistoryRow({
 	onOpen: (entry: WorkspaceHistoryEntry) => void;
 }) {
 	const queryClient = useQueryClient();
-	const apiAvailable = isEnsembleApiAvailable();
+	const apiAvailable = isEnsemblrApiAvailable();
 	const [pending, setPending] = useState(false);
 	// Ref latch (not the `pending` state) guards re-entry: state updates are
 	// async, so a fast double-click could pass a stale `pending === false` check

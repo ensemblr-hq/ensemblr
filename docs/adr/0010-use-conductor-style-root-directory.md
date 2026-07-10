@@ -10,22 +10,22 @@ Accepted
 
 Conductor exposes a configurable root directory where it stores managed repositories and workspaces. The attached screenshot shows Conductor's setting as a user-visible root directory and describes it as the place where Conductor stores repositories and workspaces. On this machine, the configured Conductor root is `/Users/psoldunov/Projects/Conductor`, with managed subdirectories including `repos/`, `workspaces/`, and `archived-contexts/`.
 
-Ensemble targets Conductor feature parity and should make repository/workspace files easy for users to inspect and open without digging into macOS app support directories.
+Ensemblr targets Conductor feature parity and should make repository/workspace files easy for users to inspect and open without digging into macOS app support directories.
 
 ## Decision
 
-Ensemble will use a Conductor-style root directory.
+Ensemblr will use a Conductor-style root directory.
 
 Default root directory:
 
 ```text
-~/Ensemble
+~/Ensemblr
 ```
 
 Managed directory shape:
 
 ```text
-~/Ensemble/
+~/Ensemblr/
   repos/
     <repo-slug>/
   workspaces/
@@ -36,26 +36,26 @@ Managed directory shape:
 
 The root directory is user-configurable through settings and declarative config. The app should treat it as a managed directory and warn users not to edit its internal structure manually.
 
-Changing the root directory is a high-impact setting. Ensemble should require confirmation and clearly explain what happens to existing managed repositories and workspaces before applying the change.
+Changing the root directory is a high-impact setting. Ensemblr should require confirmation and clearly explain what happens to existing managed repositories and workspaces before applying the change.
 
 ## Alternatives Considered
 
 ### App support directory
 
-Storing worktrees under `~/Library/Application Support/com.ensemble.app/` would be tidy from an app-internals perspective, but it would make workspaces harder to inspect and less aligned with Conductor's visible root-directory model.
+Storing worktrees under `~/Library/Application Support/dev.ensemblr.app/` would be tidy from an app-internals perspective, but it would make workspaces harder to inspect and less aligned with Conductor's visible root-directory model.
 
-### `~/Projects/Ensemble`
+### `~/Projects/Ensemblr`
 
-This matches the current configured Conductor root on this machine if product-renamed, but it may not match Conductor's default. `~/Ensemble` is simpler and closer to the suspected Conductor default pattern.
+This matches the current configured Conductor root on this machine if product-renamed, but it may not match Conductor's default. `~/Ensemblr` is simpler and closer to the suspected Conductor default pattern.
 
 ### Repository-adjacent workspaces
 
-Creating workspaces next to each original repository would make paths local to the project, but it would fragment Ensemble-managed state and make cross-repository workspace management harder.
+Creating workspaces next to each original repository would make paths local to the project, but it would fragment Ensemblr-managed state and make cross-repository workspace management harder.
 
 ## Consequences
 
-- Users can find Ensemble-managed repos and workspaces in a predictable visible directory.
-- Ensemble remains close to Conductor's root-directory model while using its own product name.
-- The app must persist the configured root directory in SQLite and allow declarative override from `~/.config/ensemble/config.json`.
+- Users can find Ensemblr-managed repos and workspaces in a predictable visible directory.
+- Ensemblr remains close to Conductor's root-directory model while using its own product name.
+- The app must persist the configured root directory in SQLite and allow declarative override from `~/.config/ensemblr/config.json`.
 - Workspace records in SQLite must store absolute paths so root changes and migrations can be handled explicitly.
 - Root-directory changes require careful UX and migration behavior.

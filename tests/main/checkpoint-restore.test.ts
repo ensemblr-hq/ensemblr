@@ -13,8 +13,8 @@ import {
 	restoreTurnCheckpoint,
 } from '../../src/main/checkpoints/checkpoint-service.ts';
 import {
-	type EnsembleDatabaseConnection,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseConnection,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import { appendPiEvent } from '../../src/main/storage/repositories/pi-event-repository.ts';
 import {
@@ -26,7 +26,7 @@ import {
 
 interface Fixture {
 	branchId: string;
-	connection: EnsembleDatabaseConnection;
+	connection: EnsemblrDatabaseConnection;
 	piSessionId: string;
 	repoDirectory: string;
 	workspaceId: string;
@@ -37,17 +37,17 @@ function git(cwd: string, ...args: string[]): string {
 }
 
 function openFixture(t: import('node:test').TestContext): Fixture {
-	const root = mkdtempSync(path.join(tmpdir(), 'ensemble-restore-test-'));
+	const root = mkdtempSync(path.join(tmpdir(), 'ensemblr-restore-test-'));
 	const repoDirectory = path.join(root, 'repo');
 	execFileSync('mkdir', ['-p', repoDirectory]);
 	git(repoDirectory, 'init', '--initial-branch=main');
-	git(repoDirectory, 'config', 'user.email', 'test@ensemble.local');
-	git(repoDirectory, 'config', 'user.name', 'Ensemble Test');
+	git(repoDirectory, 'config', 'user.email', 'test@ensemblr.local');
+	git(repoDirectory, 'config', 'user.name', 'Ensemblr Test');
 	writeFileSync(path.join(repoDirectory, 'app.txt'), 'v1\n');
 	git(repoDirectory, 'add', '-A');
 	git(repoDirectory, 'commit', '-m', 'initial');
 
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: path.join(root, 'test.db'),
 	});
 	t.after(() => {

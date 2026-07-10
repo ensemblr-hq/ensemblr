@@ -11,8 +11,8 @@ import type {
 	ArchiveWorkspaceResult,
 } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsembleRootDirectoryService } from '../root';
-import type { EnsembleDatabaseService } from '../storage/database.ts';
+import type { EnsemblrRootDirectoryService } from '../root';
+import type { EnsemblrDatabaseService } from '../storage/database.ts';
 import {
 	selectWorkspaceWithRepositoryById,
 	stampWorkspaceArchived,
@@ -37,10 +37,10 @@ export interface ArchiveWorkspaceService {
 /** Options for {@link createArchiveWorkspaceService}. */
 export interface CreateArchiveWorkspaceServiceOptions {
 	archiveLifecycleService: ArchiveLifecycleService;
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
 /** Workspace + repository fields the lifecycle archive needs in one read. */
@@ -468,7 +468,7 @@ function writeArchiveMetadata({
 		archivedAt,
 		branchCleanup,
 		branchDeleted,
-		ensembleSchema: 'archive-record/v1',
+		ensemblrSchema: 'archive-record/v1',
 		reason,
 		repository: {
 			id: source.repositoryId,

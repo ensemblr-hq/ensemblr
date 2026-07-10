@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
-import { ensembleQueryKeys } from '../../src/renderer/api/ensemble';
+import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr';
 import { WorkspaceConversationContent } from '../../src/renderer/components/workbench-shell/conversation-panel';
 import { WorkbenchFrame } from '../../src/renderer/components/workbench-shell/frame';
 import {
@@ -149,7 +149,7 @@ function renderWorkbench(
 	const queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false, staleTime: Infinity } },
 	});
-	queryClient.setQueryData(ensembleQueryKeys.workspaceOpenTargets(), {
+	queryClient.setQueryData(ensemblrQueryKeys.workspaceOpenTargets(), {
 		targets: OPEN_TARGETS_FIXTURE,
 	});
 	return renderToStaticMarkup(
@@ -238,9 +238,9 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('Help');
 	expect(markup).toContain('Repositories');
 	expect(markup).toContain('Open repository creation menu');
-	expect(markup).toContain('Collapse repository ensemble');
+	expect(markup).toContain('Collapse repository ensemblr');
 	expect(markup).toContain('data-slot="context-menu-trigger"');
-	expect(markup).toContain('Reorder repository ensemble');
+	expect(markup).toContain('Reorder repository ensemblr');
 	expect(markup).toContain('2 repos');
 	expect(markup).toContain('5 workspaces');
 	expect(markup).toContain('Open workspace Conductor shell rework');
@@ -419,9 +419,9 @@ test('marks setup notes tab as active agent activity', () => {
 });
 
 test('models project owner avatars with repo-icon fallback', () => {
-	const [ensembleProject, agentLabProject] = shellFixtureProjects;
+	const [ensemblrProject, agentLabProject] = shellFixtureProjects;
 
-	expect(ensembleProject.owner).toEqual({
+	expect(ensemblrProject.owner).toEqual({
 		avatarUrl: 'https://github.com/psoldunov.png',
 		name: 'psoldunov',
 	});
@@ -474,11 +474,11 @@ test('renders merge-ready pull request state in the right header', () => {
 				provider: 'vercel',
 				source: 'github-deployment',
 				status: 'ready',
-				url: 'https://ensemble-ready.vercel.app',
+				url: 'https://ensemblr-ready.vercel.app',
 			},
 			status: 'ready-to-merge',
 			title: 'Ready fixture',
-			url: 'https://github.com/psoldunov/ensemble/pull/29',
+			url: 'https://github.com/psoldunov/ensemblr/pull/29',
 		},
 	};
 	const activeProject: ProjectShellModel = {
@@ -501,7 +501,7 @@ test('renders merge-ready pull request state in the right header', () => {
 
 	expect(markup).toContain('#29');
 	expect(markup).toContain(
-		'href="https://github.com/psoldunov/ensemble/pull/29"',
+		'href="https://github.com/psoldunov/ensemblr/pull/29"',
 	);
 	expect(markup).toContain('Ready to merge');
 	expect(markup).toContain('data-workspace-sidebar-state="pr-ready"');

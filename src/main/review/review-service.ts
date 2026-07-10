@@ -1,5 +1,5 @@
 /**
- * Business logic for Ensemble-local review comments and todos (THE-152).
+ * Business logic for Ensemblr-local review comments and todos (THE-152).
  * Owns upsert routing and cross-field validation so the IPC handler stays a
  * thin parse-then-delegate wrapper.
  */
@@ -18,7 +18,7 @@ import type {
 	SaveReviewTodoResult,
 } from '../../shared/ipc/contracts/review-comments';
 import {
-	type EnsembleDatabaseService,
+	type EnsemblrDatabaseService,
 	requireDatabase,
 } from '../storage/database.ts';
 import {
@@ -46,7 +46,7 @@ export interface ReviewService {
 }
 
 export interface ReviewServiceOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 }
 
 export function createReviewService({

@@ -6,23 +6,23 @@ import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 
 import {
-	ENSEMBLE_CONFIG_SCHEMA_VERSION,
-	type EnsembleConfig,
+	ENSEMBLR_CONFIG_SCHEMA_VERSION,
+	type EnsemblrConfig,
 } from '../../src/main/config/config-loader.ts';
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
 import { upsertRepositoryScriptSettings } from '../../src/main/environment/repository-script-settings.ts';
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 
 const REPO_ID = 'repo-1';
 
-function createConfig(): EnsembleConfig {
+function createConfig(): EnsemblrConfig {
 	return {
 		app: {},
 		environment: {},
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 	};
@@ -30,10 +30,10 @@ function createConfig(): EnsembleConfig {
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
 	const directory = mkdtempSync(
-		path.join(tmpdir(), 'ensemble-script-settings-'),
+		path.join(tmpdir(), 'ensemblr-script-settings-'),
 	);
-	const connection = openEnsembleDatabase({
-		databasePath: path.join(directory, 'ensemble-test.db'),
+	const connection = openEnsemblrDatabase({
+		databasePath: path.join(directory, 'ensemblr-test.db'),
 	});
 
 	t.after(() => {

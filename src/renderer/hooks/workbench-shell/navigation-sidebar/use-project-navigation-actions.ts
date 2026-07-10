@@ -4,10 +4,10 @@ import { toast } from 'sonner';
 
 import {
 	createWorkspace,
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	invalidateWorkspaceListViews,
-	isEnsembleApiAvailable,
-} from '@/renderer/api/ensemble-queries';
+	isEnsemblrApiAvailable,
+} from '@/renderer/api/ensemblr-queries';
 import { queryClient } from '@/renderer/api/query-client';
 import { pickComposerSurname } from '@/renderer/lib/workbench/workspace-name-pool';
 import type {
@@ -29,7 +29,7 @@ export function useArchiveBrowseChange() {
 	return useCallback(
 		async (_repositoryId: string) => {
 			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+				queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
 			});
 			await router.invalidate();
 		},
@@ -108,7 +108,7 @@ export function useCreateWorkspaceFromProject({
 
 	const create = useCallback(
 		async (project: ProjectShellModel, seed?: WorkspaceCreationSeed) => {
-			if (!isEnsembleApiAvailable()) {
+			if (!isEnsemblrApiAvailable()) {
 				return;
 			}
 			if (pendingProjectIds.current.has(project.id)) {
@@ -156,10 +156,10 @@ export function useCreateWorkspaceFromProject({
 				// Force the navigation snapshot to refetch from SQLite so the new row
 				// is authoritative in the cache before any route loader reads it.
 				await queryClient.invalidateQueries({
-					queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+					queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
 				});
 				await queryClient.refetchQueries({
-					queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+					queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
 				});
 
 				// Re-run every active route loader against the fresh cache so the

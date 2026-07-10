@@ -4,7 +4,7 @@ These instructions apply to this repository.
 
 ## Project Naming
 
-- This project was previously called `piductor`. If agents find references to `piductor` in code, documentation, branches, commits, issues, or planning notes, interpret them as references to `Ensemble` unless the local context clearly says otherwise.
+- This project was previously called `piductor`, then `Ensemble`. If agents find references to `piductor` or `Ensemble` in code, documentation, branches, commits, issues, or planning notes, interpret them as references to `Ensemblr` unless the local context clearly says otherwise. The current product name is `Ensemblr` (domain `ensemblr.dev`); the Linear project of record is still named `Ensemble`.
 
 ## App Scaffolding Requires Current Official Docs
 
@@ -58,7 +58,7 @@ Vitest is the mandated test runner for renderer and shared tests. npm is the pac
 - Renderer tests (`tests/renderer/**`) and shared tests (`tests/shared/**`) run under Vitest. Do not import from `bun:test`. Do not add Jest, Mocha, or any other runner.
 - npm manages packages: install test tooling with `npm install -D` and run Vitest with `npx vitest` (for example `npx vitest run`, or a focused `npx vitest run <file>`). Do not use `bun`/`bunx`/`pnpm`/`yarn`.
 - Vitest config lives in `vitest.config.mts`. The default `environment` is `node` so platform-sensitive pure-logic tests (keymap, etc.) keep the real `navigator`/`process`. DOM component tests opt into happy-dom per file with a `// @vitest-environment happy-dom` docblock — never register a DOM globally.
-- DOM harness: `tests/renderer/support/dom.tsx` exposes `renderWithProviders` and the `window.ensemble` stub helpers; jest-dom matchers are registered globally in `tests/renderer/support/vitest.setup.ts`. `@testing-library/react` auto-unmounts after each test because `globals: true`.
+- DOM harness: `tests/renderer/support/dom.tsx` exposes `renderWithProviders` and the `window.ensemblr` stub helpers; jest-dom matchers are registered globally in `tests/renderer/support/vitest.setup.ts`. `@testing-library/react` auto-unmounts after each test because `globals: true`.
 - Coverage is native Istanbul: run `npx vitest run --coverage` (provider `istanbul`) to emit `coverage/coverage-final.json`, which `fallow audit --coverage <file> --coverage_root <repo root>` reads directly. There is no lcov→istanbul bridge; do not reintroduce one.
 - Mocks use Vitest: `vi.fn()` for spies, `vi.spyOn()` for method spies, and `vi.mock()` (hoisted; use `vi.hoisted()` for factory-referenced variables) for module mocks. Do not use `mock()`/`mock.module()`.
 - Main-process tests (`tests/main/**`) stay on their `electron --test` scripts — they need the Electron runtime and are not run by Vitest.

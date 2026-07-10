@@ -6,8 +6,8 @@ import { useCallback } from 'react';
 
 import {
 	githubRepositoryListQuery,
-	isEnsembleApiAvailable,
-} from '@/renderer/api/ensemble-queries';
+	isEnsemblrApiAvailable,
+} from '@/renderer/api/ensemblr-queries';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
 import { openLocalProjectFlow } from '@/renderer/lib/workbench/open-local-project-flow';
 import {
@@ -36,7 +36,7 @@ export function Welcome() {
 	// discarded; the dialog reads from the React Query cache.
 	useQuery({
 		...githubRepositoryListQuery,
-		enabled: isEnsembleApiAvailable(),
+		enabled: isEnsemblrApiAvailable(),
 	});
 
 	const onOpenLocalProject = useCallback(() => {
@@ -50,6 +50,13 @@ export function Welcome() {
 
 	return (
 		<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
+			{/* Frameless welcome screen has no toolbar; this invisible top strip
+			    gives the window a draggable edge. Interactive children opt out of
+			    dragging via the global no-drag rule in styles/index.css. */}
+			<div
+				aria-hidden='true'
+				className='window-drag-region absolute inset-x-0 top-0 z-10 h-12'
+			/>
 			<main className='flex min-h-0 flex-1 items-center justify-center px-8 py-10'>
 				<section className='flex flex-col items-center gap-12'>
 					<WelcomeWordmark className='blur-[0.046875rem]' />

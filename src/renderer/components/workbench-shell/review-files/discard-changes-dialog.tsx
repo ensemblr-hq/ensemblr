@@ -3,9 +3,9 @@ import { useCallback, useState } from 'react';
 
 import {
 	discardWorkspaceChanges,
-	ensembleQueryKeys,
-} from '@/renderer/api/ensemble';
-import { isEnsembleApiAvailable } from '@/renderer/api/ensemble-queries';
+	ensemblrQueryKeys,
+} from '@/renderer/api/ensemblr';
+import { isEnsemblrApiAvailable } from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -82,10 +82,10 @@ function DiscardChangesDialogForm({
 			// Some files may have been discarded even on partial failure, so refresh
 			// both the change set and the lazy file tree regardless of outcome.
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.workspaceGitStatus(workspaceCwd),
+				queryKey: ensemblrQueryKeys.workspaceGitStatus(workspaceCwd),
 			});
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.workspaceFiles(workspaceCwd),
+				queryKey: ensemblrQueryKeys.workspaceFiles(workspaceCwd),
 			});
 		},
 		onSuccess: (result) => {
@@ -97,7 +97,7 @@ function DiscardChangesDialogForm({
 		},
 	});
 
-	const canDiscard = !mutation.isPending && isEnsembleApiAvailable();
+	const canDiscard = !mutation.isPending && isEnsemblrApiAvailable();
 	const isBulk = target.fileCount > 1;
 
 	const handleClose = useCallback(() => {

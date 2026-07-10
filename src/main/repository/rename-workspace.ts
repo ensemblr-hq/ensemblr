@@ -8,7 +8,7 @@ import type {
 	RenameWorkspaceResult,
 } from '../../shared/ipc/contracts/workspace';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsembleDatabaseService } from '../storage/database.ts';
+import type { EnsemblrDatabaseService } from '../storage/database.ts';
 import {
 	selectWorkspaceWithRepositoryById,
 	updateWorkspaceRenameRow,
@@ -26,7 +26,7 @@ export interface RenameWorkspaceService {
 
 /** Options for {@link createRenameWorkspaceService}. */
 export interface CreateRenameWorkspaceServiceOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
 }

@@ -5,9 +5,9 @@ import { Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
 
 import {
-	getEnsembleApi,
+	getEnsemblrApi,
 	invalidateWorkspaceListViews,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { Button } from '@/renderer/components/ui/button';
@@ -43,7 +43,7 @@ function RepoMiscSettings() {
 
 	const remove = useMutation({
 		mutationFn: () =>
-			getEnsembleApi().archiveRepository({ repositoryId: repoId }),
+			getEnsemblrApi().archiveRepository({ repositoryId: repoId }),
 		onSuccess: async () => {
 			await invalidateWorkspaceListViews(queryClient);
 			navigate({ to: '/settings/general' });
@@ -60,7 +60,7 @@ function RepoMiscSettings() {
 			title='Misc'
 		>
 			<SettingRow
-				description='Do not move or delete this directory. Instead, remove the repository in Ensemble.'
+				description='Do not move or delete this directory. Instead, remove the repository in Ensemblr.'
 				label='Root path'
 				stack
 			>
@@ -70,7 +70,7 @@ function RepoMiscSettings() {
 			</SettingRow>
 
 			<SettingRow
-				description='Do not move or delete the workspace subdirectories. Instead, archive workspaces in Ensemble.'
+				description='Do not move or delete the workspace subdirectories. Instead, archive workspaces in Ensemblr.'
 				label='Workspaces path'
 				stack
 			>
@@ -80,7 +80,7 @@ function RepoMiscSettings() {
 			</SettingRow>
 
 			<SettingRow
-				description='Overrides the terminal panel’s Open button URL. Add more than one to switch between them from the Open button dropdown; the first is opened by default and the rest appear in the dropdown in order. Supports `$ENSEMBLE_WORKSPACE_NAME` and `$ENSEMBLE_PORT`. Leave blank to auto-detect from output logs.'
+				description='Overrides the terminal panel’s Open button URL. Add more than one to switch between them from the Open button dropdown; the first is opened by default and the rest appear in the dropdown in order. Supports `$ENSEMBLR_WORKSPACE_NAME` and `$ENSEMBLR_PORT`. Leave blank to auto-detect from output logs.'
 				label='Preview URLs'
 				stack
 			>
@@ -106,7 +106,7 @@ function RepoMiscSettings() {
 									next[idx] = { ...entry, url: e.target.value };
 									setOverrides((prev) => ({ ...prev, previewUrls: next }));
 								}}
-								placeholder='https://localhost:$ENSEMBLE_PORT'
+								placeholder='https://localhost:$ENSEMBLR_PORT'
 								value={entry.url}
 							/>
 							<Button
@@ -140,7 +140,7 @@ function RepoMiscSettings() {
 			</SettingRow>
 
 			<SettingRow
-				description='Ensemble will automatically copy these file paths into each new workspace. Supports gitignore-style globs.'
+				description='Ensemblr will automatically copy these file paths into each new workspace. Supports gitignore-style globs.'
 				label='Files to copy'
 				stack
 			>
@@ -167,7 +167,7 @@ function RepoMiscSettings() {
 						<DialogHeader>
 							<DialogTitle>Remove this repository?</DialogTitle>
 							<DialogDescription>
-								Removes the repository from Ensemble. The on-disk directory at
+								Removes the repository from Ensemblr. The on-disk directory at
 								<code className='mx-1 font-mono text-xs'>
 									{project?.pathLabel}
 								</code>

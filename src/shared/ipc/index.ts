@@ -1,5 +1,5 @@
 export { IPC_CHANNELS } from './channels';
-export type { EnsembleApi } from './contracts/api';
+export type { EnsemblrApi } from './contracts/api';
 export type {
 	ArchiveApi,
 	ArchiveLifecycleAbort,

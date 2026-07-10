@@ -2,9 +2,9 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type { EnvironmentVariableDiagnostic } from '../../shared/ipc/contracts/environment';
 import { isRecord, isString } from '../repository/row-guards.ts';
-import type { EnsembleRootDirectoryService } from '../root';
+import type { EnsemblrRootDirectoryService } from '../root';
 import {
-	type EnsembleDatabaseService,
+	type EnsemblrDatabaseService,
 	requireDatabase,
 } from '../storage/database.ts';
 import {
@@ -20,12 +20,12 @@ import {
 } from './workspace-ports.ts';
 
 /** Native runtime variables injected into every workspace process. */
-export const ENSEMBLE_RUNTIME_VARIABLE_KEYS = [
-	'ENSEMBLE_WORKSPACE_NAME',
-	'ENSEMBLE_WORKSPACE_PATH',
-	'ENSEMBLE_ROOT_PATH',
-	'ENSEMBLE_DEFAULT_BRANCH',
-	'ENSEMBLE_PORT',
+export const ENSEMBLR_RUNTIME_VARIABLE_KEYS = [
+	'ENSEMBLR_WORKSPACE_NAME',
+	'ENSEMBLR_WORKSPACE_PATH',
+	'ENSEMBLR_ROOT_PATH',
+	'ENSEMBLR_DEFAULT_BRANCH',
+	'ENSEMBLR_PORT',
 ] as const;
 
 export type WorkspaceEnvironmentErrorCode =
@@ -83,9 +83,9 @@ export interface WorkspaceEnvironmentService {
 
 /** Options for {@link createWorkspaceEnvironmentService}. */
 export interface CreateWorkspaceEnvironmentServiceOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	environmentVariablesService: EnvironmentVariablesService;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
 /** Internal: row shape returned by the env-join selector. */
@@ -108,7 +108,7 @@ interface WorkspaceEnvironmentRow {
 /**
  * Builds the service that assembles the full per-workspace process environment:
  * configured variables across app/repository/workspace scopes, native
- * `ENSEMBLE_*` runtime variables, and the stable allocated workspace port.
+ * `ENSEMBLR_*` runtime variables, and the stable allocated workspace port.
  *
  * The returned overlay is reusable by terminal, script, Pi, and GitHub flows;
  * runtime variables always win over configured values because their catalog
@@ -173,19 +173,19 @@ export function createWorkspaceEnvironmentService({
 		const defaultBranch =
 			workspace.baseBranch ?? workspace.repositoryDefaultBranch;
 
-		env.ENSEMBLE_WORKSPACE_NAME = workspace.name;
-		env.ENSEMBLE_WORKSPACE_PATH = workspace.path;
-		env.ENSEMBLE_ROOT_PATH = rootSnapshot.path;
-		env.ENSEMBLE_PORT = String(port);
+		env.ENSEMBLR_WORKSPACE_NAME = workspace.name;
+		env.ENSEMBLR_WORKSPACE_PATH = workspace.path;
+		env.ENSEMBLR_ROOT_PATH = rootSnapshot.path;
+		env.ENSEMBLR_PORT = String(port);
 
 		if (defaultBranch) {
-			env.ENSEMBLE_DEFAULT_BRANCH = defaultBranch;
+			env.ENSEMBLR_DEFAULT_BRANCH = defaultBranch;
 		} else {
 			diagnostics.push({
 				code: 'default-branch-unknown',
-				key: 'ENSEMBLE_DEFAULT_BRANCH',
+				key: 'ENSEMBLR_DEFAULT_BRANCH',
 				message:
-					'No base branch or repository default branch is recorded; ENSEMBLE_DEFAULT_BRANCH was not set.',
+					'No base branch or repository default branch is recorded; ENSEMBLR_DEFAULT_BRANCH was not set.',
 				severity: 'warning',
 			});
 		}

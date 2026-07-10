@@ -16,7 +16,7 @@ import {
 	parseReviewThreads,
 	parseStatusCheckRollup,
 } from '../../src/main/github/pr-snapshot.ts';
-import type { EnsembleDatabaseService } from '../../src/main/storage';
+import type { EnsemblrDatabaseService } from '../../src/main/storage';
 
 const fixedNow = () => new Date('2026-06-11T12:00:00.000Z');
 
@@ -83,7 +83,7 @@ function createTestDatabase(): DatabaseSync {
 	return database;
 }
 
-function stubDatabaseService(database: DatabaseSync): EnsembleDatabaseService {
+function stubDatabaseService(database: DatabaseSync): EnsemblrDatabaseService {
 	return {
 		close: () => undefined,
 		getConnection: () => ({ database }) as never,

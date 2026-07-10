@@ -19,8 +19,8 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
-import type { EnsembleConfigResolutionService } from '../config/config-resolution';
-import type { EnsembleDatabaseService } from '../storage/database';
+import type { EnsemblrConfigResolutionService } from '../config/config-resolution';
+import type { EnsemblrDatabaseService } from '../storage/database';
 import { normalizeConfiguredPath } from './internal/normalize-configured-path.ts';
 
 export type PiExecutableStatus = 'error' | 'ok' | 'warning';
@@ -93,12 +93,12 @@ export interface ResolvePiExecutableOptions {
 /** Options for {@link createPiExecutableService}. */
 interface CreatePiExecutableServiceOptions {
 	commonCandidatePaths?: readonly string[];
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	homeDirectory?: string;
 	localCommandService: LocalCommandService;
 	now?: () => Date;
 	probeTimeoutMs?: number;
-	settingsResolutionService: EnsembleConfigResolutionService;
+	settingsResolutionService: EnsemblrConfigResolutionService;
 }
 
 /** Internal: candidate executable path plus the source that produced it. */

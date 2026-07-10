@@ -77,10 +77,10 @@ The list-with-icons is cached two ways:
 
 The preload bootstrap (`src/preload/preload.ts`) already issues a synchronous
 `initial-shell-snapshot` IPC and exposes the result as
-`window.ensembleInitialShellSnapshot`. The snapshot now carries
+`window.ensemblrInitialShellSnapshot`. The snapshot now carries
 `openTargets` alongside `health` and `navigation`; the renderer's
 `queryClient` seeder writes it into the
-`ensembleQueryKeys.workspaceOpenTargets()` cache key before React mounts. On
+`ensemblrQueryKeys.workspaceOpenTargets()` cache key before React mounts. On
 subsequent launches the menu paints with real icons on the first frame
 because React Query already has the data.
 
@@ -94,10 +94,10 @@ uninstalls.
 ### Renderer wiring
 
 `OpenWorkspaceMenu` reads `workspaceOpenTargetsQuery`. The TanStack Query
-cache key is hierarchical (`ensemble/workspace-open-targets`) and the query
+cache key is hierarchical (`ensemblr/workspace-open-targets`) and the query
 has `staleTime: Infinity` because detection only changes when apps install or
 uninstall. Click handlers and a `keydown` listener (with input-focus guard)
-call `window.ensemble.openWorkspaceInTarget({ workspaceId, targetId })`. The
+call `window.ensemblr.openWorkspaceInTarget({ workspaceId, targetId })`. The
 main-side handler resolves the workspace's filesystem path through
 `getWorkspacePathById` and hands the path to the service. Copy-path triggers
 a `sonner` toast.
@@ -135,7 +135,7 @@ The single source of truth for an installed target list is the
   `openTargets`.
 - `src/preload/preload.ts` — synchronous snapshot exposure.
 - `src/renderer/api/query-client.ts` — query cache seeding.
-- `src/renderer/api/ensemble/open-targets.ts` — TanStack Query definition.
+- `src/renderer/api/ensemblr/open-targets.ts` — TanStack Query definition.
 - `src/renderer/components/workbench-shell/workbench-header.tsx` —
   `OpenWorkspaceMenu` component, click handlers, keyboard bindings.
 - `src/shared/ipc/contracts/open-target.ts` — contract types.

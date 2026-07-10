@@ -7,7 +7,7 @@
  */
 
 // Config.json-backed App settings (General, Models, Git, Appearance sections).
-// The source of truth is `~/.config/ensemble/config.json`; see ./app-settings.
+// The source of truth is `~/.config/ensemblr/config.json`; see ./app-settings.
 export {
 	accessibleColorsAtom,
 	alwaysShowContextUsageAtom,
@@ -67,5 +67,4 @@ export {
 	terminalScrollbackMbAtom,
 } from './atoms';
 export { useAppearanceEffect } from './use-appearance-effect';
-export { useAppearanceLegacyMigration } from './use-appearance-migration';
 export { useThemeEffect } from './use-theme-effect';

@@ -4,16 +4,16 @@ import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { HealthSnapshot } from '../../../shared/ipc/contracts/health';
 import type { RepositoryWorkspaceNavigationSnapshot } from '../../../shared/ipc/contracts/repository-navigation';
 import type { InitialShellSnapshot } from '../../../shared/ipc/contracts/shell-snapshot';
-import type { EnsembleConfigService } from '../../config';
+import type { EnsemblrConfigService } from '../../config';
 import type { OpenTargetService } from '../../open-target';
-import type { EnsembleDatabaseService } from '../../storage';
+import type { EnsemblrDatabaseService } from '../../storage';
 import { getRepositoryWorkspaceNavigationSnapshot } from '../repository-workspace-navigation';
 import { buildHealthSnapshot } from './health';
 
 /** Service dependencies used by the synchronous initial-shell snapshot. */
 export interface ShellSnapshotHandlersOptions {
-	configService: EnsembleConfigService;
-	databaseService: EnsembleDatabaseService;
+	configService: EnsemblrConfigService;
+	databaseService: EnsemblrDatabaseService;
 	openTargetService: OpenTargetService;
 }
 
@@ -40,8 +40,8 @@ export function registerShellSnapshotHandlers({
 }
 
 function safeBuildHealthSnapshot(
-	configService: EnsembleConfigService,
-	databaseService: EnsembleDatabaseService,
+	configService: EnsemblrConfigService,
+	databaseService: EnsemblrDatabaseService,
 ): HealthSnapshot | null {
 	try {
 		return buildHealthSnapshot(configService, databaseService);
@@ -51,7 +51,7 @@ function safeBuildHealthSnapshot(
 }
 
 function safeBuildNavigationSnapshot(
-	databaseService: EnsembleDatabaseService,
+	databaseService: EnsemblrDatabaseService,
 ): RepositoryWorkspaceNavigationSnapshot | null {
 	try {
 		return getRepositoryWorkspaceNavigationSnapshot(

@@ -4,12 +4,12 @@ import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type { RepositoryConfigSnapshot } from '../../../shared/ipc/contracts/repository-config';
 import type { RepositoryConfigService } from '../../config';
 import { isRepositoryConfigPathAllowed } from '../../config';
-import type { EnsembleDatabaseService } from '../../storage';
+import type { EnsemblrDatabaseService } from '../../storage';
 import { parseRepositoryConfigRequest } from '../request-schemas.ts';
 
 /** Service dependencies used by the repository-config IPC handlers. */
 export interface RepositoryConfigHandlersOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	repositoryConfigService: RepositoryConfigService;
 }
 

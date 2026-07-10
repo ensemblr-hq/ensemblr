@@ -48,7 +48,7 @@ function trySpawn(command: string, args: string[]): Promise<boolean> {
 			const child = spawn(command, args, {
 				detached: true,
 				// A GUI editor is a LaunchServices context; drop the launch-context
-				// vars so it can't make macOS relaunch Ensemble as a second instance.
+				// vars so it can't make macOS relaunch Ensemblr as a second instance.
 				env: stripLaunchContextEnv(process.env),
 				stdio: 'ignore',
 			});

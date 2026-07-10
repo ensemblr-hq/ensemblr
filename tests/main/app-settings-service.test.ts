@@ -14,7 +14,7 @@ import { createAppSettingsService } from '../../src/main/config/app-settings-ser
 const created: string[] = [];
 
 function tmpConfigPath(): string {
-	const dir = mkdtempSync(path.join(tmpdir(), 'ensemble-cfg-'));
+	const dir = mkdtempSync(path.join(tmpdir(), 'ensemblr-cfg-'));
 	created.push(dir);
 	return path.join(dir, 'config.json');
 }

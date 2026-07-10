@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Generates the Ensemble macOS app icon and writes `assets/icon.{icns,png,svg}`.
+ * Generates the Ensemblr macOS app icon and writes `assets/icon.{icns,png,svg}`.
  *
  * The icon is a dark "app canvas" squircle carrying the dot-matrix "E" from the
  * in-app wordmark (`src/renderer/components/welcome/welcome-wordmark.tsx`), with
@@ -67,9 +67,9 @@ function oklchToHex(l, c, hDeg) {
 
 // Colors derived from src/renderer/styles/index.css (`.dark` block), plus the
 // wordmark's literal glitch channels.
-const COLOR_CANVAS = oklchToHex(0.135, 0.006, 35); // --ensemble-canvas
-const COLOR_INK = oklchToHex(0.91, 0.006, 75); // --ensemble-ink
-const COLOR_RIM = oklchToHex(0.31, 0.006, 35); // --ensemble-border
+const COLOR_CANVAS = oklchToHex(0.135, 0.006, 35); // --ensemblr-canvas
+const COLOR_INK = oklchToHex(0.91, 0.006, 75); // --ensemblr-ink
+const COLOR_RIM = oklchToHex(0.31, 0.006, 35); // --ensemblr-border
 const COLOR_GHOST_CYAN = '#22d3ee'; // GhostLayer color
 const COLOR_GHOST_RED = '#ff2e63'; // GhostLayer color
 
@@ -215,8 +215,8 @@ ${rects(RED_PIXELS, COLOR_GHOST_RED, GHOST_OPACITY)}
     <g>
 ${rects(INK_PIXELS, COLOR_INK, 1)}
     </g>`;
-	return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}" role="img" aria-label="Ensemble">
-  <title>Ensemble</title>
+	return `<svg xmlns="http://www.w3.org/2000/svg" width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}" role="img" aria-label="Ensemblr">
+  <title>Ensemblr</title>
   <defs>
     <clipPath id="squircle"><polygon points="${SQUIRCLE_POLYGON}"/></clipPath>
     <filter id="bloom" x="-20%" y="-20%" width="140%" height="140%">
@@ -266,7 +266,7 @@ function run(file, cliArgs) {
 }
 
 mkdirSync(ASSETS_DIR, { recursive: true });
-const work = mkdtempSync(join(tmpdir(), 'ensemble-icon-'));
+const work = mkdtempSync(join(tmpdir(), 'ensemblr-icon-'));
 try {
 	const body = join(work, 'body.png');
 	const mask = join(work, 'mask.png');
@@ -328,7 +328,7 @@ try {
 		`PNG32:${master}`,
 	]);
 
-	const iconset = join(work, 'Ensemble.iconset');
+	const iconset = join(work, 'Ensemblr.iconset');
 	mkdirSync(iconset);
 	for (const [size, name] of ICONSET_MEMBERS) {
 		run('magick', [

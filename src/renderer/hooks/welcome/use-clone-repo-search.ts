@@ -9,7 +9,7 @@ import {
 import {
 	githubRepositoryFullListQuery,
 	githubRepositoryListQuery,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import {
 	type KeymapBinding,
 	useKeymapHandler,

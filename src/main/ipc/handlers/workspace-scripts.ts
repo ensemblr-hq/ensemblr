@@ -10,12 +10,12 @@ import type {
 } from '../../../shared/ipc/contracts/workspace-scripts';
 import { upsertRepositoryScriptSettings } from '../../environment/repository-script-settings.ts';
 import type { ScriptLifecycleService } from '../../scripts';
-import type { EnsembleDatabaseService } from '../../storage';
+import type { EnsemblrDatabaseService } from '../../storage';
 import { parseUpdateRepositoryScriptsRequest } from '../request-schemas.ts';
 
 /** Service dependencies used by the workspace-script IPC handlers. */
 export interface WorkspaceScriptHandlersOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	scriptLifecycleService: ScriptLifecycleService;
 }
 

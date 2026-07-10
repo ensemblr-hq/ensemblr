@@ -5,9 +5,9 @@ import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 
 import {
-	ENSEMBLE_CONFIG_SCHEMA_VERSION,
-	type EnsembleConfig,
-	type EnsembleConfigService,
+	ENSEMBLR_CONFIG_SCHEMA_VERSION,
+	type EnsemblrConfig,
+	type EnsemblrConfigService,
 } from '../../src/main/config/config-loader.ts';
 import {
 	createLinearAuthService,
@@ -16,8 +16,8 @@ import {
 import { createMockSecretStore } from '../../src/main/secrets/mock-backend.ts';
 import type { SecretStore } from '../../src/main/secrets/secret-store-types.ts';
 import {
-	type EnsembleDatabaseService,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseService,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 
 const NOW = new Date('2026-06-11T00:00:00.000Z');
@@ -25,24 +25,24 @@ const CLIENT_ID = 'linear-client-1';
 
 function createConfigService(
 	app: Record<string, unknown>,
-): EnsembleConfigService {
-	const config: EnsembleConfig = {
+): EnsemblrConfigService {
+	const config: EnsemblrConfig = {
 		app,
 		environment: {},
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 	};
 	const snapshot = {
 		blocksReadiness: false,
 		diagnostics: [],
-		displayPath: '~/.config/ensemble/config.json',
+		displayPath: '~/.config/ensemblr/config.json',
 		loadedAt: NOW.toISOString(),
-		path: '/Users/alice/.config/ensemble/config.json',
-		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+		path: '/Users/alice/.config/ensemblr/config.json',
+		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		status: 'ok',
 	} as const;
 
@@ -53,9 +53,9 @@ function createConfigService(
 	};
 }
 
-function createDatabaseServiceFixture(t: TestContext): EnsembleDatabaseService {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-linear-auth-'));
-	const connection = openEnsembleDatabase({
+function createDatabaseServiceFixture(t: TestContext): EnsemblrDatabaseService {
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-linear-auth-'));
+	const connection = openEnsemblrDatabase({
 		databasePath: path.join(directory, 'linear-auth-test.db'),
 	});
 

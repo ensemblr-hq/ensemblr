@@ -5,7 +5,7 @@ import { stripLaunchContextEnv } from '../../src/main/environment/launch-env';
 describe('stripLaunchContextEnv', () => {
 	test('removes the macOS bundle-identifier launch marker', () => {
 		const result = stripLaunchContextEnv({
-			__CFBundleIdentifier: 'com.ensemble.app',
+			__CFBundleIdentifier: 'dev.ensemblr.app',
 			PATH: '/usr/bin',
 		});
 
@@ -17,7 +17,7 @@ describe('stripLaunchContextEnv', () => {
 		const result = stripLaunchContextEnv({
 			LaunchInstanceID: 'A1B2C3D4-0000-4000-8000-000000000000',
 			XPC_FLAGS: '1',
-			XPC_SERVICE_NAME: 'application.com.ensemble.app.21354441.21356688',
+			XPC_SERVICE_NAME: 'application.dev.ensemblr.app.21354441.21356688',
 			PATH: '/usr/bin',
 		});
 
@@ -49,12 +49,12 @@ describe('stripLaunchContextEnv', () => {
 
 	test('does not mutate the input environment', () => {
 		const source = {
-			__CFBundleIdentifier: 'com.ensemble.app',
+			__CFBundleIdentifier: 'dev.ensemblr.app',
 			PATH: '/usr/bin',
 		};
 
 		stripLaunchContextEnv(source);
 
-		expect(source.__CFBundleIdentifier).toBe('com.ensemble.app');
+		expect(source.__CFBundleIdentifier).toBe('dev.ensemblr.app');
 	});
 });

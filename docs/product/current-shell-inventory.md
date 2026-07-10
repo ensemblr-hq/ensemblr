@@ -73,8 +73,8 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 
 | Surface | Product capability implied | Status | Implementation notes |
 | --- | --- | --- | --- |
-| Electron workbench frame | A compact macOS desktop workbench with native-window spacing, persistent side navigation, and resizable panes. | Locked product direction | Renderer layout uses `SidebarProvider`, horizontal and vertical `ResizablePanelGroup`s, and Ensemble-owned design tokens. |
-| Welcome landing view | First-run / no-project state shows the Ensemble wordmark and the three add-project actions inline on the main canvas. | Implemented shell behavior | `Welcome` renders Open project, Open GitHub project (mounts `CloneGithubDialog` UI-only stub), and Quick start cards from `mocks/workbench`. Clone/open IPC wiring is future work. Mounted at the `_workbench/_shell/` index route. |
+| Electron workbench frame | A compact macOS desktop workbench with native-window spacing, persistent side navigation, and resizable panes. | Locked product direction | Renderer layout uses `SidebarProvider`, horizontal and vertical `ResizablePanelGroup`s, and Ensemblr-owned design tokens. |
+| Welcome landing view | First-run / no-project state shows the Ensemblr wordmark and the three add-project actions inline on the main canvas. | Implemented shell behavior | `Welcome` renders Open project, Open GitHub project (mounts `CloneGithubDialog` UI-only stub), and Quick start cards from `mocks/workbench`. Clone/open IPC wiring is future work. Mounted at the `_workbench/_shell/` index route. |
 | Left primary navigation | Dashboard, History, Help, and Settings are visible from the primary sidebar. | Implemented behavior | `Dashboard` routes to a `WorkbenchPlaceholderPage` reserved for the future kanban board. `History` and `Help` navigate to route-backed shell placeholders. `Settings` opens the separate full-window settings route with a Back to app action. |
 | Sidebar project groups | Repositories/projects contain workspace rows, can collapse, and can be reordered. | Implemented behavior | Project collapse and renderer-local reorder state are live. Persistence and SQLite-backed records are future work. |
 | Pinned workspace group | Users can pin workspaces above their project groups for fast access. | Implemented behavior | Pin/unpin is renderer-local and removes pinned rows from the normal project group. Persistence is future work. |
@@ -95,11 +95,11 @@ not behaviorally finalized. They remain deferred until Pi integration work.
 | Changes tab | Changed-file list/tree with folder grouping, collapse, status labels, line counts, review action, and history/filter menu. | Implemented shell behavior | List/tree toggle and folder collapse work against fixture data. Full diff body, search, review mode, comments, and commit filtering are future review work. |
 | Checks tab | PR title/description, git status, checks, comments, todos, no-PR state, and ready-to-merge flow. | Visual placeholder for planned behavior | Sections and state shapes are visible. Live `gh` metadata, polling, comments, todos, context-to-Pi, and merge confirmation are future work. |
 | Dock tabs | Bottom-right fixed Setup and Run script-output tabs plus terminal session tabs stay visible with review/timeline context. | Implemented shell behavior | Dock tab state is route-backed and the dock is collapsible/resizable. Process-backed content is future work. Setup and Run are read-only output tabs for their respective configured commands. |
-| Dock script actions | Script-state-aware actions: Ask agent / Add manually (setup missing), Run setup script, Run, Open :PORT, and Stop, plus a ⌘/Ctrl+R run/stop toggle. | Locked product direction | Actions render from fixture script status. The setup-missing empty state offers "Ask agent" (opens a fresh chat seeded with a `.ensemble/settings.toml` prompt, never auto-submitted) and "Add manually" (Scripts settings). ⌘/Ctrl+R (`run.start`, via `useRunScriptHotkey`) toggles the run script from anywhere in the workbench; the View → Reload menu item is accelerator-less so the key reaches the renderer. Process execution and PTY lifecycle are future terminal/script work. Script actions must target the fixed Setup/Run panes, not user-spawned terminals. |
+| Dock script actions | Script-state-aware actions: Ask agent / Add manually (setup missing), Run setup script, Run, Open :PORT, and Stop, plus a ⌘/Ctrl+R run/stop toggle. | Locked product direction | Actions render from fixture script status. The setup-missing empty state offers "Ask agent" (opens a fresh chat seeded with a `.ensemblr/settings.toml` prompt, never auto-submitted) and "Add manually" (Scripts settings). ⌘/Ctrl+R (`run.start`, via `useRunScriptHotkey`) toggles the run script from anywhere in the workbench; the View → Reload menu item is accelerator-less so the key reaches the renderer. Process execution and PTY lifecycle are future terminal/script work. Script actions must target the fixed Setup/Run panes, not user-spawned terminals. |
 | Terminal tabs | One default generic manual terminal panel plus a plus button for additional terminal tabs. | Visual placeholder for planned behavior | Terminal content explicitly states interactive PTY rendering is deferred to `ENS-037`. User-spawned terminals are regular IDE-style interactive terminals backed by stable terminal session IDs. |
 | Sidebar health footer | App health, setup readiness, and app diagnostics remain visible in the shell. | Implemented behavior | Health and setup diagnostics use TanStack Query over the typed preload bridge. This footer is the only current-shell place for app diagnostics; do not place app diagnostics in the Setup/Run/Terminal dock. |
 | Settings shell entry | Settings remains part of global navigation. | Implemented shell behavior | Settings opens a separate full-window route (`/settings`) rendered outside the workbench chrome, with a Back to app action. The Back button and ⌘/Ctrl+W close action both return to the screen Settings was opened from (tracked via `settingsReturnToAtom`), falling back to the workbench root if no prior screen was recorded. Full settings forms are future work. |
-| Settings → Git | Per-repository git defaults and lifecycle behavior. | Implemented behavior | Branch prefix source (github-username/custom/none), custom prefix, auto-rename workspace on branch, delete local branch on archive, archive after merge, set upstream on push. Stored in `~/.config/ensemble/config.json` under `app.git`, feeds repository resolution as `user-default` source. |
+| Settings → Git | Per-repository git defaults and lifecycle behavior. | Implemented behavior | Branch prefix source (github-username/custom/none), custom prefix, auto-rename workspace on branch, delete local branch on archive, archive after merge, set upstream on push. Stored in `~/.config/ensemblr/config.json` under `app.git`, feeds repository resolution as `user-default` source. |
 | Command surfaces | File search dialog and Create PR command popover use command primitives. | Visual placeholder for planned behavior | These establish command UI patterns. A global command palette remains a later settings/polish ticket. |
 
 ## Workspace Sidebar State Contract
@@ -179,8 +179,8 @@ Deployments section as well as beside the PR number in the header.
 
 V1 PR/check data must come through the authenticated GitHub CLI, including
 `gh api` for REST/GraphQL endpoints. This keeps v1 aligned with the setup gate:
-users authenticate once with `gh auth login`, Ensemble verifies with
-`gh auth status`, and Ensemble does not store GitHub tokens itself.
+users authenticate once with `gh auth login`, Ensemblr verifies with
+`gh auth status`, and Ensemblr does not store GitHub tokens itself.
 
 | `pullRequest` surface | Primary source | Notes |
 | --- | --- | --- |
@@ -191,7 +191,7 @@ users authenticate once with `gh auth login`, Ensemble verifies with
 | Review comments | `gh api repos/{owner}/{repo}/pulls/{number}/comments --paginate` | Use for file/path/line-level review context. |
 | Review threads and resolved state | `gh api graphql` using the authenticated CLI token | Required when thread resolution state is needed; first-class `gh pr` commands are not enough. |
 | Local changed/uncommitted state | `git status --porcelain=v1`, diff stats, and local branch metadata | Local git remains the source for no-PR and uncommitted panel states. |
-| Local todos | Ensemble SQLite | Todos are app-owned review context, not GitHub-owned state. |
+| Local todos | Ensemblr SQLite | Todos are app-owned review context, not GitHub-owned state. |
 
 When adding query parameters to a GET request with `gh api`, pass `-X GET`
 explicitly because `-f` and `-F` fields otherwise switch the request to POST.

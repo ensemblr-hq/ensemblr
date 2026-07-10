@@ -96,7 +96,7 @@ export function registerRepositoryHandlers({
 		(event): Promise<LocalRepositorySelectionResult> =>
 			showDirectorySelectionDialog(event, {
 				buttonLabel: 'Open project',
-				message: 'Select an existing local git project to copy into Ensemble.',
+				message: 'Select an existing local git project to copy into Ensemblr.',
 				properties: ['openDirectory'],
 				title: 'Open local project',
 			}),

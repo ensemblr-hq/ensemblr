@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 
-import { openAppConfigFile } from '@/renderer/api/ensemble';
+import { openAppConfigFile } from '@/renderer/api/ensemblr';
 import { isPiExecutablePickerAction } from '@/renderer/lib/setup-diagnostics';
 import type {
 	SetupCheckSnapshot,
@@ -44,7 +44,7 @@ export function useGenericRemediation({
 			case 'open-external':
 				if (action.target) {
 					try {
-						await window.ensemble?.openExternal(action.target);
+						await window.ensemblr?.openExternal(action.target);
 					} catch (error) {
 						console.error('Failed to open external URL:', error);
 					}
@@ -52,7 +52,7 @@ export function useGenericRemediation({
 				return;
 			case 'select-path':
 				if (isPiExecutablePickerAction(action, check)) {
-					await window.ensemble?.selectPiExecutable();
+					await window.ensemblr?.selectPiExecutable();
 					onRetry?.();
 				}
 				return;

@@ -3,7 +3,7 @@ import { FileDiffIcon, TriangleAlertIcon } from 'lucide-react';
 
 import type { BundledLanguage } from 'shiki';
 
-import { turnDiffQuery } from '@/renderer/api/ensemble-queries';
+import { turnDiffQuery } from '@/renderer/api/ensemblr-queries';
 import { CodeBlockContent } from '@/renderer/components/code-block';
 import type { TurnDiffFileWire } from '@/shared/ipc/contracts/checkpoint';
 

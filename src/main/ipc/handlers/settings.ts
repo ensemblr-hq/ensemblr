@@ -5,15 +5,15 @@ import type {
 	SettingsResolutionRequest,
 	SettingsResolutionSnapshot,
 } from '../../../shared/ipc/contracts/settings-resolution';
-import type { EnsembleConfigResolutionService } from '../../config';
+import type { EnsemblrConfigResolutionService } from '../../config';
 
 /** Service dependencies used by the settings-resolution IPC handlers. */
 export interface SettingsHandlersOptions {
-	settingsResolutionService: EnsembleConfigResolutionService;
+	settingsResolutionService: EnsemblrConfigResolutionService;
 }
 
 /**
- * Registers the IPC handler that resolves the layered Ensemble settings tree
+ * Registers the IPC handler that resolves the layered Ensemblr settings tree
  * (app-wide + optional repository scope) for the renderer.
  * @param options - Required services.
  */

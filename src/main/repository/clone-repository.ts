@@ -11,8 +11,8 @@ import type {
 	CloneGithubRepositoryStartRequest,
 	CloneGithubRepositoryStartResult,
 } from '../../shared/ipc/contracts/clone';
-import type { EnsembleRootDirectoryService } from '../root';
-import type { EnsembleDatabaseService } from '../storage/database.ts';
+import type { EnsemblrRootDirectoryService } from '../root';
+import type { EnsemblrDatabaseService } from '../storage/database.ts';
 import { classifyCloneFailure } from './clone-classifier.ts';
 import { failureResult, resolveDestination } from './clone-destination.ts';
 import { assertTargetWritable, ensureParentDirectory } from './clone-fs.ts';
@@ -57,10 +57,10 @@ export interface GithubCloneService {
 /** Construction options for {@link createGithubCloneService}. */
 export interface CreateGithubCloneServiceOptions {
 	commandRunner?: CloneCommandRunner;
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	now?: () => Date;
 	registrationService: LocalRepositoryRegistrationService;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
 /**
@@ -118,7 +118,7 @@ export function createGithubCloneService({
 			diagnostics.push({
 				code: 'remote-already-registered',
 				message:
-					'This repository is already registered with Ensemble. Remove it first or open the existing project.',
+					'This repository is already registered with Ensemblr. Remove it first or open the existing project.',
 				severity: 'error',
 			});
 			return { diagnostics, ok: false };

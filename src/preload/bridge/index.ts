@@ -1,1 +1,1 @@
-export { createEnsembleApi } from './ensemble-api';
+export { createEnsemblrApi } from './ensemblr-api';

@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
-import { refreshPullRequestSnapshot } from '@/renderer/api/ensemble-queries';
+import { refreshPullRequestSnapshot } from '@/renderer/api/ensemblr-queries';
 
 /**
  * Manual pull-request-snapshot refresh with toast-on-error and in-flight state

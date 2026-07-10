@@ -18,7 +18,7 @@ const CALLBACK_RESPONSE_HTML = `<!doctype html>
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<title>Ensemble</title>
+		<title>Ensemblr</title>
 		<style>
 			body { align-items: center; background: #101012; color: #e4e4e7; display: flex; font-family: -apple-system, system-ui, sans-serif; height: 100vh; justify-content: center; margin: 0; }
 			main { text-align: center; }
@@ -28,7 +28,7 @@ const CALLBACK_RESPONSE_HTML = `<!doctype html>
 	<body>
 		<main>
 			<h1>Linear connected</h1>
-			<p>You can close this tab and return to Ensemble.</p>
+			<p>You can close this tab and return to Ensemblr.</p>
 		</main>
 	</body>
 </html>`;

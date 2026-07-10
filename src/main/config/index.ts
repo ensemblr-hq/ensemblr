@@ -21,24 +21,24 @@ export { createAppSettingsService } from './app-settings-service.ts';
 export type {
 	ConfigDiagnostic,
 	ConfigStatusSnapshot,
-	EnsembleConfig,
-	EnsembleConfigLoadResult,
-	EnsembleConfigService,
-	LoadEnsembleConfigOptions,
+	EnsemblrConfig,
+	EnsemblrConfigLoadResult,
+	EnsemblrConfigService,
+	LoadEnsemblrConfigOptions,
 } from './config-loader.ts';
 export {
-	createEnsembleConfigService,
-	ENSEMBLE_CONFIG_SCHEMA,
-	ENSEMBLE_CONFIG_SCHEMA_VERSION,
-	loadEnsembleConfig,
-	resolveEnsembleConfigPath,
+	createEnsemblrConfigService,
+	ENSEMBLR_CONFIG_SCHEMA,
+	ENSEMBLR_CONFIG_SCHEMA_VERSION,
+	loadEnsemblrConfig,
+	resolveEnsemblrConfigPath,
 } from './config-loader.ts';
 export type {
-	EnsembleConfigResolutionService,
+	EnsemblrConfigResolutionService,
 	ResolveSettingsOptions,
 } from './config-resolution.ts';
 export {
-	createEnsembleConfigResolutionService,
+	createEnsemblrConfigResolutionService,
 	normalizeSettingsResolutionRequest,
 	resolveSettings,
 } from './config-resolution.ts';

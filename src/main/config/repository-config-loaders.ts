@@ -1,6 +1,6 @@
 /**
  * Pure file-loading primitives shared by `repository-config.ts`. Reads
- * `.ensemble/settings.toml` and `.worktreeinclude` files and surfaces parse/IO
+ * `.ensemblr/settings.toml` and `.worktreeinclude` files and surfaces parse/IO
  * errors as diagnostics. Normalization, snapshot wrapping, and orchestration
  * live in `repository-config.ts`.
  */
@@ -29,8 +29,8 @@ export interface ParsedConfigSource {
  * Maps a settings source identifier to its on-disk filename for diagnostics.
  */
 export function formatSourceName(source: SettingsResolutionSource): string {
-	if (source === 'ensemble-config') {
-		return '.ensemble/settings.toml';
+	if (source === 'ensemblr-config') {
+		return '.ensemblr/settings.toml';
 	}
 
 	if (source === 'worktreeinclude') {
@@ -113,7 +113,7 @@ export function readTomlFile({
 					code: 'invalid-repository-toml',
 					message: formatErrorMessage(
 						error,
-						'.ensemble/settings.toml is not valid TOML.',
+						'.ensemblr/settings.toml is not valid TOML.',
 					),
 					severity: 'error',
 				},

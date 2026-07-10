@@ -5,11 +5,11 @@ import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-	isEnsembleApiAvailable,
+	isEnsemblrApiAvailable,
 	quickStartProject,
 	rootDirectoryQuery,
 	selectCloneDestination,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { seedFirstWorkspace } from '@/renderer/lib/workbench/seed-first-workspace';
 import { lastWorkspaceSelectionAtom } from '@/renderer/state/workspace';
 import type {
@@ -52,7 +52,7 @@ export function useQuickStartFlow({
 	const setLastWorkspaceSelection = useSetAtom(lastWorkspaceSelectionAtom);
 	const { data: rootDirectoryData } = useQuery({
 		...rootDirectoryQuery,
-		enabled: isEnsembleApiAvailable(),
+		enabled: isEnsemblrApiAvailable(),
 	});
 	const defaultParentPath = rootDirectoryData?.repositoriesPath ?? '';
 
@@ -71,7 +71,7 @@ export function useQuickStartFlow({
 	const parentPath = parentPathOverride ?? defaultParentPath;
 
 	const pickParentPath = useCallback(async () => {
-		if (!isEnsembleApiAvailable()) {
+		if (!isEnsemblrApiAvailable()) {
 			return;
 		}
 		const selection = await selectCloneDestination();

@@ -68,7 +68,7 @@ export function CreatePullRequestMenu({
 
 	const openManually = () => {
 		if (compareUrl) {
-			void window.ensemble?.openExternal(compareUrl);
+			void window.ensemblr?.openExternal(compareUrl);
 		}
 	};
 

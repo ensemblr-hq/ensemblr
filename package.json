@@ -1,8 +1,9 @@
 {
-	"name": "ensemble",
-	"productName": "Ensemble",
+	"name": "ensemblr",
+	"productName": "Ensemblr",
 	"version": "0.1.0",
 	"description": "A Pi-native macOS workbench for isolated coding-agent workflows.",
+	"homepage": "https://ensemblr.dev",
 	"main": ".vite/build/main.js",
 	"private": true,
 	"packageManager": "npm@11.17.0",
@@ -69,16 +70,16 @@
 		"build": "node scripts/require-node-version.mjs && electron-forge package",
 		"package": "node scripts/require-node-version.mjs && electron-forge package",
 		"make": "node scripts/require-node-version.mjs && electron-forge make",
-		"make:canary": "ENSEMBLE_BUILD_CHANNEL=canary npm run make",
-		"make:dev": "ENSEMBLE_BUILD_CHANNEL=dev npm run make",
-		"package:dev": "ENSEMBLE_BUILD_CHANNEL=dev npm run package",
+		"make:canary": "ENSEMBLR_BUILD_CHANNEL=canary npm run make",
+		"make:dev": "ENSEMBLR_BUILD_CHANNEL=dev npm run make",
+		"package:dev": "ENSEMBLR_BUILD_CHANNEL=dev npm run package",
 		"diagnose:dock-flash": "node scripts/diagnose-dock-flash.mjs",
 		"doctor": "npx react-doctor@latest",
 		"postinstall": "node scripts/fix-node-pty-permissions.mjs"
 	},
 	"keywords": [
 		"electron",
-		"ensemble",
+		"ensemblr",
 		"pi"
 	],
 	"author": {

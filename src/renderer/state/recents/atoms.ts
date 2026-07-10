@@ -4,7 +4,7 @@ import { atomWithStorage, createJSONStorage } from 'jotai/utils';
 import type { RecentProject } from '@/renderer/types/workbench';
 
 /** localStorage key holding the persisted recent-projects envelope. */
-export const RECENT_PROJECTS_STORAGE_KEY = 'ensemble_recent_projects';
+export const RECENT_PROJECTS_STORAGE_KEY = 'ensemblr_recent_projects';
 /** Schema version embedded in the persisted recent-projects envelope. */
 export const RECENT_PROJECTS_STORAGE_VERSION = 1;
 

@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useAtom, useAtomValue } from 'jotai';
 import { useEffect, useMemo } from 'react';
 
-import { piModelsQuery } from '@/renderer/api/ensemble';
+import { piModelsQuery } from '@/renderer/api/ensemblr';
 import { ModelVisibilityList } from '@/renderer/components/settings/model-visibility-list';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';

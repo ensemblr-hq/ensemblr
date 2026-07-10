@@ -4,9 +4,9 @@ import { CheckIcon, ClipboardCheckIcon } from 'lucide-react';
 import { useState } from 'react';
 
 import {
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	setupDiagnosticsQuery,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { SetupDiagnosticsPanel } from '@/renderer/components/setup-diagnostics';
 import { Button } from '@/renderer/components/ui/button';
@@ -32,7 +32,7 @@ function DiagnosticsRoute() {
 
 	const onRetry = async () => {
 		await queryClient.refetchQueries({
-			queryKey: ensembleQueryKeys.setupDiagnostics(),
+			queryKey: ensemblrQueryKeys.setupDiagnostics(),
 		});
 	};
 
@@ -66,7 +66,7 @@ function DiagnosticsRoute() {
 					{copied ? 'Copied' : 'Copy diagnostics bundle'}
 				</Button>
 			}
-			description='Setup gate checks for Pi, git, GitHub, Linear, and the Ensemble runtime. The diagnostics bundle redacts secrets, account ids, and full paths before going to the clipboard.'
+			description='Setup gate checks for Pi, git, GitHub, Linear, and the Ensemblr runtime. The diagnostics bundle redacts secrets, account ids, and full paths before going to the clipboard.'
 			title='Diagnostics'
 		>
 			<SetupDiagnosticsPanel

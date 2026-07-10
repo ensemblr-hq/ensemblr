@@ -3,11 +3,11 @@
  * must be dropped before spawning any child process.
  *
  * `__CFBundleIdentifier` and `XPC_SERVICE_NAME` are the dangerous ones: macOS
- * sets them to the launching app's bundle id (`com.ensemble.app`) and launchd
- * application-instance identity (`application.com.ensemble.app.<asn>`). A child
+ * sets them to the launching app's bundle id (`dev.ensemblr.app`) and launchd
+ * application-instance identity (`application.dev.ensemblr.app.<asn>`). A child
  * that inherits either and later touches LaunchServices — a terminal running
  * `open`, an agent opening a file, a dev Electron run, a tool shelling out — is
- * treated as *that* bundle, so macOS attributes it to (or relaunches) Ensemble
+ * treated as *that* bundle, so macOS attributes it to (or relaunches) Ensemblr
  * and a stray second Dock instance flashes in. `XPC_FLAGS` and
  * `LaunchInstanceID` travel with the same launchd context. The `ELECTRON_*`
  * markers steer a child Electron/Node process into behavior meant only for

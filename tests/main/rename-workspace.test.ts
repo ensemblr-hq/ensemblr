@@ -15,28 +15,28 @@ import test, { type TestContext } from 'node:test';
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
 import { createRenameWorkspaceService } from '../../src/main/repository/rename-workspace.ts';
-import type { EnsembleRootDirectoryService } from '../../src/main/root';
+import type { EnsemblrRootDirectoryService } from '../../src/main/root';
 import {
-	type EnsembleDatabaseConnection,
-	type EnsembleDatabaseService,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseConnection,
+	type EnsemblrDatabaseService,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import type { RootDirectorySnapshot } from '../../src/shared/ipc';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 
 interface Harness {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	repositoryId: string;
 	repositoryPath: string;
 	rootPath: string;
-	rootService: EnsembleRootDirectoryService;
+	rootService: EnsemblrRootDirectoryService;
 	workspacesPath: string;
 }
 
 function createHarness(t: TestContext): Harness {
 	const rootPath = realpathSync(
-		mkdtempSync(path.join(tmpdir(), 'ensemble-rename-')),
+		mkdtempSync(path.join(tmpdir(), 'ensemblr-rename-')),
 	);
 	const repositoriesPath = path.join(rootPath, 'repos');
 	const workspacesPath = path.join(rootPath, 'workspaces');
@@ -46,13 +46,13 @@ function createHarness(t: TestContext): Harness {
 	const repositoryPath = path.join(repositoriesPath, 'demo');
 	mkdirSync(repositoryPath);
 	runGit(repositoryPath, ['init', '-b', 'main']);
-	runGit(repositoryPath, ['config', 'user.email', 'test@ensemble.dev']);
-	runGit(repositoryPath, ['config', 'user.name', 'Ensemble Test']);
+	runGit(repositoryPath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(repositoryPath, ['config', 'user.name', 'Ensemblr Test']);
 	writeFileSync(path.join(repositoryPath, 'README.md'), '# demo\n');
 	runGit(repositoryPath, ['add', '.']);
 	runGit(repositoryPath, ['commit', '-m', 'init']);
 
-	const connection = openEnsembleDatabase({ databasePath: ':memory:' });
+	const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
 	const repositoryId = 'repository-demo';
 	const repositorySlug = 'demo';
 	const timestamp = fixedNow().toISOString();
@@ -90,8 +90,8 @@ function createHarness(t: TestContext): Harness {
 }
 
 function wrapConnection(
-	connection: EnsembleDatabaseConnection,
-): EnsembleDatabaseService {
+	connection: EnsemblrDatabaseConnection,
+): EnsemblrDatabaseService {
 	return {
 		close: () => connection.database.close(),
 		getConnection: () => connection,
@@ -114,7 +114,7 @@ function rootDirectoryStub({
 }: {
 	rootPath: string;
 	workspacesPath: string;
-}): EnsembleRootDirectoryService {
+}): EnsemblrRootDirectoryService {
 	const snapshot: RootDirectorySnapshot = {
 		archivedContextsPath: path.join(rootPath, 'archived-contexts'),
 		createdPaths: [],

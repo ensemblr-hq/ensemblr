@@ -6,11 +6,11 @@ import test from 'node:test';
 
 import { getRepositoryWorkspaceNavigationSnapshot } from '../../src/main/ipc/repository-workspace-navigation.ts';
 import {
-	createEnsembleDatabaseService,
+	createEnsemblrDatabaseService,
 	getCurrentSchemaVersion,
 	LATEST_SCHEMA_VERSION,
 	listAppliedMigrationIds,
-	openEnsembleDatabase,
+	openEnsemblrDatabase,
 	resolveDefaultDatabasePath,
 } from '../../src/main/storage/database.ts';
 
@@ -30,11 +30,11 @@ function createTestDatabasePath(): {
 	cleanup: () => void;
 	databasePath: string;
 } {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-db-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-db-'));
 
 	return {
 		cleanup: () => rmSync(directory, { force: true, recursive: true }),
-		databasePath: path.join(directory, 'ensemble-test.db'),
+		databasePath: path.join(directory, 'ensemblr-test.db'),
 	};
 }
 
@@ -44,19 +44,19 @@ test('resolves the macOS app-support database path', () => {
 	if (process.platform === 'darwin') {
 		assert.equal(
 			databasePath,
-			'/Users/example/Library/Application Support/com.ensemble.app/ensemble.db',
+			'/Users/example/Library/Application Support/dev.ensemblr.app/ensemblr.db',
 		);
 		return;
 	}
 
-	assert.equal(databasePath, '/Users/example/.config/ensemble/ensemble.db');
+	assert.equal(databasePath, '/Users/example/.config/ensemblr/ensemblr.db');
 });
 
 test('opens an isolated database and applies foundation migrations', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -112,12 +112,12 @@ test('runs migrations idempotently on reopen', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const firstConnection = openEnsembleDatabase({
+	const firstConnection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	firstConnection.database.close();
 
-	const secondConnection = openEnsembleDatabase({
+	const secondConnection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => secondConnection.database.close());
@@ -141,7 +141,7 @@ test('enforces foreign keys', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -160,7 +160,7 @@ test('supports basic CRUD fixtures for foundational tables', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -168,10 +168,10 @@ test('supports basic CRUD fixtures for foundational tables', (t) => {
 
 	database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-1', 'ensemble', 'Ensemble', '/tmp/ensemble/repo', 'master');
+VALUES ('repo-1', 'ensemblr', 'Ensemblr', '/tmp/ensemblr/repo', 'master');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch)
-VALUES ('workspace-1', 'repo-1', 'the-103', 'THE-103', '/tmp/ensemble/workspaces/the-103', 'philipp/the-103', 'master');
+VALUES ('workspace-1', 'repo-1', 'the-103', 'THE-103', '/tmp/ensemblr/workspaces/the-103', 'philipp/the-103', 'master');
 
 INSERT INTO settings (id, scope, scope_id, key, value_json)
 VALUES ('setting-1', 'repository', 'repo-1', 'setup.autoRun', 'false');
@@ -180,10 +180,10 @@ INSERT INTO sessions (id, workspace_id, title, status)
 VALUES ('session-1', 'workspace-1', 'SQLite implementation', 'running');
 
 INSERT INTO terminal_sessions (id, workspace_id, session_id, title, shell, cwd, status)
-VALUES ('terminal-1', 'workspace-1', 'session-1', 'Setup', '/bin/zsh', '/tmp/ensemble/repo', 'running');
+VALUES ('terminal-1', 'workspace-1', 'session-1', 'Setup', '/bin/zsh', '/tmp/ensemblr/repo', 'running');
 
 INSERT INTO checkpoints (id, workspace_id, session_id, git_ref, label)
-VALUES ('checkpoint-1', 'workspace-1', 'session-1', 'refs/ensemble/checkpoints/1', 'Before turn');
+VALUES ('checkpoint-1', 'workspace-1', 'session-1', 'refs/ensemblr/checkpoints/1', 'Before turn');
 
 INSERT INTO comments (id, workspace_id, session_id, checkpoint_id, file_path, line_number, body)
 VALUES ('comment-1', 'workspace-1', 'session-1', 'checkpoint-1', 'src/main/storage/database.ts', 42, 'Review note');
@@ -235,7 +235,7 @@ test('migration 005 supports Pi session metadata round-trip', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -243,13 +243,13 @@ test('migration 005 supports Pi session metadata round-trip', (t) => {
 
 	database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-pi-1', 'pi-runtime', 'Pi Runtime', '/tmp/ensemble/pi-runtime', 'main');
+VALUES ('repo-pi-1', 'pi-runtime', 'Pi Runtime', '/tmp/ensemblr/pi-runtime', 'main');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path, branch_name, base_branch)
-VALUES ('ws-pi-1', 'repo-pi-1', 'the-128', 'THE-128', '/tmp/ensemble/workspaces/the-128', 'philipp/the-128', 'main');
+VALUES ('ws-pi-1', 'repo-pi-1', 'the-128', 'THE-128', '/tmp/ensemblr/workspaces/the-128', 'philipp/the-128', 'main');
 
 INSERT INTO pi_sessions (id, workspace_id, pi_session_id, executable_id, model, status, cwd)
-VALUES ('pi-session-1', 'ws-pi-1', 'pi-runtime-session-7', 'pi-default', 'gpt-5.5', 'streaming', '/tmp/ensemble/workspaces/the-128');
+VALUES ('pi-session-1', 'ws-pi-1', 'pi-runtime-session-7', 'pi-default', 'gpt-5.5', 'streaming', '/tmp/ensemblr/workspaces/the-128');
 
 INSERT INTO pi_session_branches (id, pi_session_id, kind)
 VALUES ('branch-main', 'pi-session-1', 'main');
@@ -317,7 +317,7 @@ test('migration 005 cascades pi session deletes on workspace removal', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -325,13 +325,13 @@ test('migration 005 cascades pi session deletes on workspace removal', (t) => {
 
 	database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-pi-2', 'pi-runtime-2', 'Pi Runtime 2', '/tmp/ensemble/pi-runtime-2', 'main');
+VALUES ('repo-pi-2', 'pi-runtime-2', 'Pi Runtime 2', '/tmp/ensemblr/pi-runtime-2', 'main');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path)
-VALUES ('ws-pi-2', 'repo-pi-2', 'the-129', 'THE-129', '/tmp/ensemble/workspaces/the-129');
+VALUES ('ws-pi-2', 'repo-pi-2', 'the-129', 'THE-129', '/tmp/ensemblr/workspaces/the-129');
 
 INSERT INTO pi_sessions (id, workspace_id, status, cwd)
-VALUES ('pi-session-2', 'ws-pi-2', 'idle', '/tmp/ensemble/workspaces/the-129');
+VALUES ('pi-session-2', 'ws-pi-2', 'idle', '/tmp/ensemblr/workspaces/the-129');
 
 INSERT INTO pi_session_branches (id, pi_session_id, kind)
 VALUES ('branch-cascade', 'pi-session-2', 'main');
@@ -370,12 +370,12 @@ test('stores only secret metadata and keychain references in SQLite', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
 
-	const rawSecretValue = 'ensemble-raw-secret-value-not-persisted';
+	const rawSecretValue = 'ensemblr-raw-secret-value-not-persisted';
 	const maskedDisplay = '****sted';
 
 	connection.database
@@ -399,11 +399,11 @@ test('stores only secret metadata and keychain references in SQLite', (t) => {
 			'secret-1',
 			'app',
 			'',
-			'ENSEMBLE_TEST_SECRET',
+			'ENSEMBLR_TEST_SECRET',
 			'macos-keychain',
-			'com.ensemble.app.secret-store',
-			'v1:app::ENSEMBLE_TEST_SECRET',
-			'Ensemble test secret',
+			'dev.ensemblr.app.secret-store',
+			'v1:app::ENSEMBLR_TEST_SECRET',
+			'Ensemblr test secret',
 			maskedDisplay,
 			rawSecretValue.length,
 			'{"source":"test"}',
@@ -424,7 +424,7 @@ test('schema does not define raw secret value columns', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -449,7 +449,7 @@ test('database service reports health without throwing on open', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const service = createEnsembleDatabaseService({
+	const service = createEnsemblrDatabaseService({
 		databasePath: fixture.databasePath,
 	});
 	t.after(service.close);
@@ -467,7 +467,7 @@ test('repository workspace navigation snapshot nests active workspaces', (t) => 
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -475,7 +475,7 @@ test('repository workspace navigation snapshot nests active workspaces', (t) => 
 	connection.database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch, metadata_json)
 VALUES
-	('repo-1', 'ensemble', 'Ensemble', '/tmp/ensemble/repo', 'master', '{"owner":"alice","avatarUrl":"https://example.com/avatar.png"}'),
+	('repo-1', 'ensemblr', 'Ensemblr', '/tmp/ensemblr/repo', 'master', '{"owner":"alice","avatarUrl":"https://example.com/avatar.png"}'),
 	('repo-2', 'agent-lab', 'Agent Lab', '/tmp/agent-lab/repo', 'main', '{invalid');
 
 INSERT INTO workspaces (
@@ -490,8 +490,8 @@ INSERT INTO workspaces (
 	metadata_json
 )
 VALUES
-	('workspace-1', 'repo-1', 'the-120', 'THE-120', '/tmp/ensemble/workspaces/the-120', 'philipp/the-120', 'master', NULL, '{"linearIssue":"THE-120"}'),
-	('workspace-archived', 'repo-1', 'archived', 'Archived', '/tmp/ensemble/workspaces/archived', 'archived', 'master', '2026-06-01T00:00:00.000Z', '{}'),
+	('workspace-1', 'repo-1', 'the-120', 'THE-120', '/tmp/ensemblr/workspaces/the-120', 'philipp/the-120', 'master', NULL, '{"linearIssue":"THE-120"}'),
+	('workspace-archived', 'repo-1', 'archived', 'Archived', '/tmp/ensemblr/workspaces/archived', 'archived', 'master', '2026-06-01T00:00:00.000Z', '{}'),
 	('workspace-2', 'repo-2', 'draft', 'Draft', '/tmp/agent-lab/workspaces/draft', NULL, NULL, NULL, '{bad');
 `);
 
@@ -523,7 +523,7 @@ test('repository workspace navigation snapshot excludes archived repositories', 
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());
@@ -558,7 +558,7 @@ test('repository workspace navigation snapshot handles empty database', (t) => {
 	const fixture = createTestDatabasePath();
 	t.after(fixture.cleanup);
 
-	const connection = openEnsembleDatabase({
+	const connection = openEnsemblrDatabase({
 		databasePath: fixture.databasePath,
 	});
 	t.after(() => connection.database.close());

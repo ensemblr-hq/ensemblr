@@ -59,7 +59,7 @@ export function MergeConfirmationDialog({
 						Merges <span className='font-mono'>{workspace.branchName}</span>{' '}
 						through <span className='font-mono'>gh pr merge</span>. This action
 						is visible to everyone on the repository and cannot be undone from
-						Ensemble.
+						Ensemblr.
 					</DialogDescription>
 				</DialogHeader>
 				<ul className='flex flex-col gap-1.5 text-xs'>

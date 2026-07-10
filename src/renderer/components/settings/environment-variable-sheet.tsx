@@ -2,10 +2,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useState } from 'react';
 
 import {
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	readEnvironmentVariableValue,
 	setEnvironmentVariable,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
@@ -106,7 +106,7 @@ export function EnvironmentVariableSheet({
 			}
 
 			await queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.environmentVariables(),
+				queryKey: ensemblrQueryKeys.environmentVariables(),
 			});
 			onClose();
 		},

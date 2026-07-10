@@ -15,7 +15,7 @@ import type {
 	RegisterLocalRepositoryResult,
 } from '../../shared/ipc/contracts/repository';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsembleRootDirectoryService } from '../root';
+import type { EnsemblrRootDirectoryService } from '../root';
 import { firstLine } from './first-line.ts';
 import type { LocalRepositoryRegistrationService } from './register-repository.ts';
 import { allocateUniqueTargetPath } from './target-path.ts';
@@ -31,7 +31,7 @@ export interface LocalRepositoryImportService {
 export interface CreateLocalRepositoryImportServiceOptions {
 	localCommandService: LocalCommandService;
 	registrationService: LocalRepositoryRegistrationService;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
 const EMPTY_SETTINGS_SOURCES = Object.freeze(
@@ -41,7 +41,7 @@ const EMPTY_SETTINGS_SOURCES = Object.freeze(
 /**
  * Builds the service behind the Open Local Project flow. The selected source
  * folder is copied into the managed `repos/` directory first, then the copy is
- * registered so Ensemble never mutates the user's original checkout.
+ * registered so Ensemblr never mutates the user's original checkout.
  * @param options - Service dependencies and test seams.
  * @returns A local repository import service.
  */
@@ -86,7 +86,7 @@ export function createLocalRepositoryImportService({
 				return failureResult({
 					code: 'repository-copy-target-inside-source',
 					message:
-						'Choose a project outside the Ensemble managed root; the import destination would be inside the selected folder.',
+						'Choose a project outside the Ensemblr managed root; the import destination would be inside the selected folder.',
 					path: parentPath,
 					severity: 'error',
 				});
@@ -242,7 +242,7 @@ function ensureWritableDirectory(
 			message:
 				error instanceof Error
 					? error.message
-					: `Ensemble cannot write into ${directoryPath}.`,
+					: `Ensemblr cannot write into ${directoryPath}.`,
 			path: directoryPath,
 			severity: 'error',
 		};

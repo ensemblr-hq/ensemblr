@@ -12,8 +12,8 @@ import {
 	type LoadRepositoryConfigOptions,
 	loadRepositoryConfig,
 } from '../../config/repository-config.ts';
-import type { EnsembleRootDirectoryService } from '../../root';
-import type { EnsembleDatabaseService } from '../../storage/database.ts';
+import type { EnsemblrRootDirectoryService } from '../../root';
+import type { EnsemblrDatabaseService } from '../../storage/database.ts';
 import { hasArchivedRepositoryMarker } from '../archived-marker.ts';
 import {
 	type GitRepositoryProbeFn,
@@ -47,11 +47,11 @@ export interface SharedRootAdoptionService {
 
 /** Options for {@link createSharedRootAdoptionService}. */
 export interface CreateSharedRootAdoptionServiceOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	gitProbe?: GitRepositoryProbeFn;
 	loadConfig?: (options: LoadRepositoryConfigOptions) => LoadedRepositoryConfig;
 	now?: () => Date;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 	worktreeProbe?: GitWorktreeProbeFn;
 }
 

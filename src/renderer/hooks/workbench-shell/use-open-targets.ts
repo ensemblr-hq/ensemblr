@@ -3,9 +3,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
-	getEnsembleApiOrNull,
+	getEnsemblrApiOrNull,
 	workspaceOpenTargetsQuery,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import {
 	readLastUsedOpenTarget,
 	writeLastUsedOpenTarget,
@@ -43,7 +43,7 @@ export function useOpenTargets({
 }: {
 	workspaceId: string;
 }): OpenTargetsState {
-	const hasBridge = getEnsembleApiOrNull() !== null;
+	const hasBridge = getEnsemblrApiOrNull() !== null;
 	const { data } = useQuery({
 		...workspaceOpenTargetsQuery,
 		enabled: hasBridge,
@@ -97,12 +97,12 @@ export function useOpenTargets({
 
 	const invokeTarget = useCallback(
 		async (target: WorkspaceOpenTarget, options?: OpenTargetPathOptions) => {
-			const ensemble = getEnsembleApiOrNull();
-			if (!ensemble) {
+			const ensemblr = getEnsemblrApiOrNull();
+			if (!ensemblr) {
 				toast.error('Open in… is unavailable without the Electron bridge.');
 				return;
 			}
-			const result = await ensemble.openWorkspaceInTarget({
+			const result = await ensemblr.openWorkspaceInTarget({
 				targetId: target.id,
 				workspaceId,
 				...(options

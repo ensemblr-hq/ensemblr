@@ -2,7 +2,7 @@
 
 Date: 2026-06-07
 
-Ensemble should match Conductor's observable workflows and information architecture where practical, while using distinct Ensemble visual design, copy, branding, icons, and Pi-specific runtime behavior.
+Ensemblr should match Conductor's observable workflows and information architecture where practical, while using distinct Ensemblr visual design, copy, branding, icons, and Pi-specific runtime behavior.
 
 ## Current Shell Contract
 
@@ -53,7 +53,7 @@ runtime event rendering, and session tree behavior to Pi runtime tickets.
 - Lower-right dock switches between Setup, Run, and terminal tabs. The Setup
   tab is for workspace/project setup command output only, not app diagnostics.
 
-Ensemble equivalent:
+Ensemblr equivalent:
 
 - Use Electron native menu APIs for macOS menus.
 - Use file-based TanStack Router for durable app navigation. The selected workspace and chat tab are URL path params (`/projects/$projectId/workspaces/$workspaceId/chats/$chatId`); review and dock tabs are validated search params. Per-workspace dock, review, and last-chat selections are persisted so switching workspaces restores them.
@@ -61,7 +61,7 @@ Ensemble equivalent:
 - Use Jotai atoms in `src/renderer/state/` for durable renderer-only UI state
   that crosses shell modules, such as pinned workspace IDs, collapsed project
   IDs, project order, and closed session tab IDs.
-- Use an Ensemble-specific React/shadcn visual language, not Conductor's visual identity.
+- Use an Ensemblr-specific React/shadcn visual language, not Conductor's visual identity.
 - Preserve the same pane hierarchy so Conductor users can transfer workflows.
 - Keep app diagnostics in the left sidebar footer/status area. Do not render app
   setup diagnostics in the lower Setup dock.
@@ -75,10 +75,10 @@ Ensemble equivalent:
 - App settings cover General, Models, Environment, Git, Appearance, Integrations, and (under "More") Diagnostics, Experimental, and Advanced. (The standalone Providers screen was removed — provider/auth setup is owned by Pi; readiness checks live in Diagnostics.)
 - Repository settings are selected from the same sidebar and expose path, branch, remote, preview, copy, script, spotlight, instruction, and removal controls.
 
-Ensemble equivalent:
+Ensemblr equivalent:
 
 - Keep app settings and repository settings in one settings shell.
-- Store high-churn mutable settings in SQLite, declarative defaults in `~/.config/ensemble/config.json`, shared repository behavior in the committed `.ensemble/settings.toml`, and secrets outside plain config files.
+- Store high-churn mutable settings in SQLite, declarative defaults in `~/.config/ensemblr/config.json`, shared repository behavior in the committed `.ensemblr/settings.toml`, and secrets outside plain config files.
 
 ### Workspace Landing
 
@@ -86,10 +86,10 @@ Ensemble equivalent:
 - The summary shows that a new isolated copy was created, the branch source, copied-file count, and optional setup-script guidance.
 - Composer, file tree, checks, and run controls are immediately available.
 
-Ensemble equivalent:
+Ensemblr equivalent:
 
 - Create a git worktree workspace, show branch/copy/setup status, and open the Pi composer immediately.
-- Auto-generated placeholder names are acceptable, but Ensemble should not copy Conductor's naming style if it is distinctive.
+- Auto-generated placeholder names are acceptable, but Ensemblr should not copy Conductor's naming style if it is distinctive.
 
 ### Agent Timeline
 
@@ -98,7 +98,7 @@ Ensemble equivalent:
 - Composer supports text prompt, file/PR references, slash/run commands, attachments, voice input when enabled, model selection, reasoning/thinking level, and submit/stop controls.
 - Runtime errors are inline cards with retry actions.
 
-Ensemble equivalent:
+Ensemblr equivalent:
 
 - Keep the implemented chat tab strip, center timeline location, and bottom composer location as the app-shell contract.
 - Keep chat and prompt input behavior deferred until Pi integration. The current mock transcript, attach button, send button, and model/thinking badges should not be treated as final behavior.
@@ -113,7 +113,7 @@ Ensemble equivalent:
 - Checks tab shows PR metadata, git status, checks, deployments, comments/review threads, todos, and merge readiness.
 - The panel remains visible while the agent works or terminals run.
 
-Ensemble equivalent:
+Ensemblr equivalent:
 
 - Keep the implemented All files / Changes / Checks tab order and right-sidebar location.
 - Treat file/diff/checks state as workspace metadata synchronized from git and GitHub/`gh`.
@@ -132,12 +132,12 @@ Ensemble equivalent:
 - Pi RPC transcripts, app setup diagnostics, app health logs, and workspace setup/run script output must not be merged into user-spawned terminal sessions.
 - Experimental settings can enable a bigger terminal-centric layout and more tabs.
 
-Ensemble equivalent:
+Ensemblr equivalent:
 
 - Keep the implemented lower-right dock placement, tab names, collapse behavior, and script-state action affordances.
 - Use xterm.js behind a terminal adapter.
 - Main process owns PTY/process supervision.
-- Expose `ENSEMBLE_*` variables to workspace processes.
+- Expose `ENSEMBLR_*` variables to workspace processes.
 
 ### PR and Merge Flow
 
@@ -146,7 +146,7 @@ Ensemble equivalent:
 - Ready state uses a prominent status banner, external PR/preview links, passed deployments/checks, comments, todos, and merge action.
 - Failing or pending states show blockers and may expose a warning merge path.
 
-Ensemble equivalent:
+Ensemblr equivalent:
 
 - Use `gh` CLI for v1 PR creation, metadata, checks, comments where possible, and merge.
 - Cache PR/check/comment data in SQLite but treat GitHub as source of truth.
@@ -154,17 +154,17 @@ Ensemble equivalent:
 
 ## Pi-Specific Changes
 
-| Conductor concept | Ensemble equivalent |
+| Conductor concept | Ensemblr equivalent |
 | --- | --- |
 | Claude Code and Codex providers | Selected Pi CLI RPC runtime and Pi provider/model readiness. |
 | Claude/Codex model defaults | Pi model defaults and thinking-level controls. |
 | Claude/Codex config sync | Pi resource/config discovery from `~/.pi/agent`, project `.pi`, skills, prompts, themes, and context files. |
-| Claude tool approvals | Ensemble permission modes mapped to Pi tool restrictions where available. |
+| Claude tool approvals | Ensemblr permission modes mapped to Pi tool restrictions where available. |
 | Retry in new chat | Pi session tree fork/continuation behavior plus file checkpoint policy. |
 | Review/create-PR/fix prompt templates | Pi instruction templates stored per user/repository with source precedence. |
 | Provider environment catalog | Pi-relevant provider/env catalog plus generic environment variables. |
-| Conductor root path labels | Ensemble root directory, with optional Conductor-compatible shared root support. |
-| `CONDUCTOR_*` environment variables | Native `ENSEMBLE_*` variables. |
+| Conductor root path labels | Ensemblr root directory, with optional Conductor-compatible shared root support. |
+| `CONDUCTOR_*` environment variables | Native `ENSEMBLR_*` variables. |
 
 ## Prioritized Implementation Checklist
 

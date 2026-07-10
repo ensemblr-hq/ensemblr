@@ -13,8 +13,8 @@ import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 
 import {
-	ENSEMBLE_CONFIG_SCHEMA_VERSION,
-	type EnsembleConfig,
+	ENSEMBLR_CONFIG_SCHEMA_VERSION,
+	type EnsemblrConfig,
 } from '../../src/main/config/config-loader.ts';
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
 import { ensureRootDirectory } from '../../src/main/root/root-directory.ts';
@@ -22,12 +22,12 @@ import {
 	applyRootDirectoryChange,
 	previewRootDirectoryChange,
 } from '../../src/main/root/root-directory-change.ts';
-import { createEnsembleRootDirectoryService } from '../../src/main/root/root-directory-service.ts';
+import { createEnsemblrRootDirectoryService } from '../../src/main/root/root-directory-service.ts';
 import { reconcileRootDirectory } from '../../src/main/root/root-reconciliation.ts';
 import {
-	type EnsembleDatabaseConnection,
-	type EnsembleDatabaseService,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseConnection,
+	type EnsemblrDatabaseService,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import type {
 	RootDirectoryDiagnostic,
@@ -37,14 +37,14 @@ import type {
 
 let settingCounter = 0;
 
-function createConfig(overrides: Partial<EnsembleConfig> = {}): EnsembleConfig {
+function createConfig(overrides: Partial<EnsemblrConfig> = {}): EnsemblrConfig {
 	return {
 		app: {},
 		environment: {},
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 		...overrides,
@@ -52,7 +52,7 @@ function createConfig(overrides: Partial<EnsembleConfig> = {}): EnsembleConfig {
 }
 
 function createDirectoryFixture(t: TestContext): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-root-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-root-'));
 
 	t.after(() => {
 		rmSync(directory, { force: true, recursive: true });
@@ -63,8 +63,8 @@ function createDirectoryFixture(t: TestContext): string {
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
 	const directory = createDirectoryFixture(t);
-	const connection = openEnsembleDatabase({
-		databasePath: path.join(directory, 'ensemble-test.db'),
+	const connection = openEnsemblrDatabase({
+		databasePath: path.join(directory, 'ensemblr-test.db'),
 	});
 
 	t.after(() => {
@@ -79,7 +79,7 @@ function createSettingsSnapshot({
 	database = null,
 	homeDirectory,
 }: {
-	config?: EnsembleConfig;
+	config?: EnsemblrConfig;
 	database?: DatabaseSync | null;
 	homeDirectory: string;
 }): SettingsResolutionSnapshot {
@@ -129,7 +129,7 @@ test('creates the default temp-home root and managed directories', (t) => {
 		homeDirectory,
 		settingsSnapshot: createSettingsSnapshot({ homeDirectory }),
 	});
-	const expectedRoot = path.join(homeDirectory, 'Ensemble');
+	const expectedRoot = path.join(homeDirectory, 'Ensemblr');
 
 	assert.equal(snapshot.status, 'ok');
 	assert.equal(snapshot.path, expectedRoot);
@@ -297,7 +297,7 @@ test('warns about existing managed content as a shared-looking root', (t) => {
 	mkdirSync(reposPath);
 	mkdirSync(workspacesPath);
 	mkdirSync(archivedContextsPath);
-	writeFileSync(path.join(reposPath, 'ensemble-marker'), 'repo content');
+	writeFileSync(path.join(reposPath, 'ensemblr-marker'), 'repo content');
 	writeFileSync(
 		path.join(workspacesPath, 'workspace-marker'),
 		'workspace content',
@@ -594,9 +594,9 @@ test('service does not cache snapshot when applyChange fails (managed-locked)', 
 	const database = createDatabaseFixture(t);
 
 	let lockedManagedRoot: string | null = null;
-	const databaseService: EnsembleDatabaseService = {
+	const databaseService: EnsemblrDatabaseService = {
 		close: () => {},
-		getConnection: (): EnsembleDatabaseConnection => ({
+		getConnection: (): EnsemblrDatabaseConnection => ({
 			database,
 			path: ':memory:',
 			schemaVersion: 1,
@@ -620,7 +620,7 @@ test('service does not cache snapshot when applyChange fails (managed-locked)', 
 			}),
 	};
 
-	const service = createEnsembleRootDirectoryService({
+	const service = createEnsemblrRootDirectoryService({
 		databaseService,
 		homeDirectory,
 		reconcileRootDirectory,
@@ -652,11 +652,11 @@ test('reconciles shared-looking root contents after applying a switch', (t) => {
 		settingsSnapshot: createSettingsSnapshot({ database, homeDirectory }),
 	});
 	const sharedRoot = path.join(homeDirectory, 'SharedRoot');
-	const sharedRepoPath = path.join(sharedRoot, 'repos', 'ensemble');
+	const sharedRepoPath = path.join(sharedRoot, 'repos', 'ensemblr');
 	const sharedWorkspacePath = path.join(
 		sharedRoot,
 		'workspaces',
-		'ensemble',
+		'ensemblr',
 		'nagoya',
 	);
 

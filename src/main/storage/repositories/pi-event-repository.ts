@@ -7,7 +7,7 @@ export type PiEventStream = 'protocol' | 'stderr';
 
 /**
  * Persisted payload type. The storage column itself accepts opaque JSON so
- * older rows or future variants don't fail to load, but Ensemble writers
+ * older rows or future variants don't fail to load, but Ensemblr writers
  * always insert a {@link PiPersistedEnvelope}; a `null` only surfaces when the
  * stored JSON failed to parse or predates this contract.
  */

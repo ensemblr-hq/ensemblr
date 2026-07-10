@@ -21,7 +21,7 @@ const A11Y_CLASSES = [
 /**
  * Applies the non-theme appearance prefs to the document root as CSS custom
  * properties and root classes, so global surfaces react live without prop
- * threading: the mono font drives `--ensemble-font-mono` (consumed by every
+ * threading: the mono font drives `--ensemblr-font-mono` (consumed by every
  * `font-mono` utility), ligatures toggle the `ligatures-off` class, and the
  * accessible-color variant swaps an `a11y-*` class that remaps status/diff
  * tokens. Mount once at the app root beside {@link useThemeEffect}.
@@ -36,7 +36,7 @@ export function useAppearanceEffect(): void {
 		const value = font
 			? `"${font}", ${MONO_FALLBACK_STACK}`
 			: MONO_FALLBACK_STACK;
-		document.documentElement.style.setProperty('--ensemble-font-mono', value);
+		document.documentElement.style.setProperty('--ensemblr-font-mono', value);
 	}, [monoFont]);
 
 	useEffect(() => {

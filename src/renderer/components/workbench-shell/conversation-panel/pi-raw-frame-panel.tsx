@@ -19,7 +19,7 @@ import type { PiRawFrameKind } from '@/shared/ipc/contracts/pi-session';
 
 /**
  * Temporary debug overlay that streams the raw JSONL frames Pi sends to/from
- * Ensemble. Used while iterating on conversation UI so the surface can be
+ * Ensemblr. Used while iterating on conversation UI so the surface can be
  * compared against the underlying protocol without spelunking through logs.
  */
 export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
@@ -28,7 +28,7 @@ export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
 	const clear = useClearRawFrames();
 	const [filter, setFilter] = useState<'all' | 'rx' | 'tx'>('all');
 	// Default off: raw frames carry the adapter-internal session id, which
-	// does not match the renderer-side Ensemble session id. Until that
+	// does not match the renderer-side Ensemblr session id. Until that
 	// mapping is plumbed, scoping silently hides everything.
 	const [sessionScope, setSessionScope] = useState<boolean>(false);
 	// Per-kind visibility — main chat traffic is the default surface; the

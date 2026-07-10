@@ -5,12 +5,12 @@ import { useComposerInsert } from '@/renderer/state/composer';
 
 /**
  * Composer seed for the setup-tab "Ask agent" affordance: directs the agent to
- * author the repository's `.ensemble/settings.toml` `[scripts]` block after
+ * author the repository's `.ensemblr/settings.toml` `[scripts]` block after
  * inspecting the project's tooling. Seeded for review, never auto-submitted.
  */
-const ASK_AGENT_SETUP_PROMPT = `Set up this repository's Ensemble config so a fresh workspace can install its dependencies automatically.
+const ASK_AGENT_SETUP_PROMPT = `Set up this repository's Ensemblr config so a fresh workspace can install its dependencies automatically.
 
-Inspect the project first (package manager, language toolchain, lockfiles), then create or update \`.ensemble/settings.toml\` with a \`[scripts]\` table:
+Inspect the project first (package manager, language toolchain, lockfiles), then create or update \`.ensemblr/settings.toml\` with a \`[scripts]\` table:
 
 - \`setup\`: the command that installs dependencies / prepares a new workspace.
 - \`run\`: the command that starts the dev server or main local process (only if the repo has one).
@@ -54,7 +54,7 @@ export function useAskAgentSetupScript({
 		insertIntoComposer(ASK_AGENT_SETUP_PROMPT);
 		toast.success('New chat ready for setup.', {
 			description:
-				'Send the prompt to have the agent create .ensemble/settings.toml — edit it first if needed.',
+				'Send the prompt to have the agent create .ensemblr/settings.toml — edit it first if needed.',
 		});
 	}, [activeChatTabId, insertIntoComposer]);
 

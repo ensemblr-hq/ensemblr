@@ -5,7 +5,7 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import {
 	appendPiEvent,
 	appendPiEvents,
@@ -24,8 +24,8 @@ interface Fixture {
 }
 
 function openFixture(t: import('node:test').TestContext): Fixture {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-pi-event-'));
-	const connection = openEnsembleDatabase({
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-pi-event-'));
+	const connection = openEnsemblrDatabase({
 		databasePath: path.join(directory, 'pi-event-test.db'),
 	});
 	t.after(() => {
@@ -35,14 +35,14 @@ function openFixture(t: import('node:test').TestContext): Fixture {
 
 	connection.database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-evt', 'evt', 'Evt', '/tmp/ensemble/evt', 'main');
+VALUES ('repo-evt', 'evt', 'Evt', '/tmp/ensemblr/evt', 'main');
 INSERT INTO workspaces (id, repository_id, slug, name, path)
-VALUES ('ws-evt', 'repo-evt', 'evt', 'Evt', '/tmp/ensemble/evt/ws');
+VALUES ('ws-evt', 'repo-evt', 'evt', 'Evt', '/tmp/ensemblr/evt/ws');
 `);
 
 	const { mainBranch } = createPiSession({
 		database: connection.database,
-		input: { cwd: '/tmp/ensemble/evt/ws', workspaceId: 'ws-evt' },
+		input: { cwd: '/tmp/ensemblr/evt/ws', workspaceId: 'ws-evt' },
 	});
 	const turn = createTurn({
 		database: connection.database,

@@ -7,7 +7,7 @@ import {
 	prepareCloneGithubRepository,
 	startCloneGithubRepository,
 	subscribeCloneGithubRepositoryProgress,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { seedFirstWorkspace } from '@/renderer/lib/workbench/seed-first-workspace';
 import { lastWorkspaceSelectionAtom } from '@/renderer/state/workspace';
 import type {

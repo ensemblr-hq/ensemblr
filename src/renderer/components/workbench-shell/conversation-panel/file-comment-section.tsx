@@ -5,10 +5,10 @@ import { toast } from 'sonner';
 
 import {
 	deleteReviewComment,
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	reviewCommentsQuery,
 	saveReviewComment,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { Textarea } from '@/renderer/components/ui/textarea';
@@ -56,7 +56,7 @@ export function FileCommentSection({
 			setDraftBody('');
 			setDraftLine('');
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.reviewComments(workspaceId),
+				queryKey: ensemblrQueryKeys.reviewComments(workspaceId),
 			});
 		},
 	});
@@ -70,7 +70,7 @@ export function FileCommentSection({
 		onError,
 		onSuccess: () =>
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.reviewComments(workspaceId),
+				queryKey: ensemblrQueryKeys.reviewComments(workspaceId),
 			}),
 	});
 	const deleteMutation = useMutation({
@@ -78,7 +78,7 @@ export function FileCommentSection({
 		onError,
 		onSuccess: () =>
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.reviewComments(workspaceId),
+				queryKey: ensemblrQueryKeys.reviewComments(workspaceId),
 			}),
 	});
 
@@ -146,7 +146,7 @@ export function FileCommentSection({
 					</Button>
 				</div>
 				<p className='text-muted-foreground text-xxs'>
-					Local comments stay in Ensemble — they are never posted to GitHub.
+					Local comments stay in Ensemblr — they are never posted to GitHub.
 				</p>
 			</div>
 		</section>

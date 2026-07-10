@@ -18,7 +18,7 @@ import type {
 	MutateLinearIssueResult,
 	UpdateLinearIssueRequest,
 } from '../../shared/ipc/contracts/linear';
-import type { EnsembleDatabaseService } from '../storage/database';
+import type { EnsemblrDatabaseService } from '../storage/database';
 import {
 	type LinearClient,
 	type LinearCommentData,
@@ -69,7 +69,7 @@ export interface LinearService {
 /** Options for {@link createLinearService}. */
 export interface CreateLinearServiceOptions {
 	client: LinearClient;
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	maxSyncPages?: number;
 	now?: () => Date;
 	staleAfterMs?: number;
@@ -96,7 +96,7 @@ export function createLinearService({
 		if (!database) {
 			throw new LinearServiceError(
 				'network',
-				'The Ensemble database is not open.',
+				'The Ensemblr database is not open.',
 			);
 		}
 

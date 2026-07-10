@@ -17,7 +17,7 @@ const execFileAsync = promisify(execFile);
 export interface CaptureWorkspaceCheckpointInput {
 	cwd: string;
 	message: string;
-	/** Fully-qualified private ref, e.g. `refs/ensemble/checkpoints/<ws>/<turn>`. */
+	/** Fully-qualified private ref, e.g. `refs/ensemblr/checkpoints/<ws>/<turn>`. */
 	ref: string;
 }
 
@@ -37,14 +37,14 @@ export class GitCheckpointError extends Error {
 	}
 }
 
-const REF_PATTERN = /^refs\/ensemble\/checkpoints\/[\w./-]+$/;
+const REF_PATTERN = /^refs\/ensemblr\/checkpoints\/[\w./-]+$/;
 
 /** Fixed identity so capture never depends on the user's git config. */
 const GIT_IDENTITY_ENV = {
-	GIT_AUTHOR_EMAIL: 'checkpoints@ensemble.local',
-	GIT_AUTHOR_NAME: 'Ensemble',
-	GIT_COMMITTER_EMAIL: 'checkpoints@ensemble.local',
-	GIT_COMMITTER_NAME: 'Ensemble',
+	GIT_AUTHOR_EMAIL: 'checkpoints@ensemblr.local',
+	GIT_AUTHOR_NAME: 'Ensemblr',
+	GIT_COMMITTER_EMAIL: 'checkpoints@ensemblr.local',
+	GIT_COMMITTER_NAME: 'Ensemblr',
 };
 
 export async function captureWorkspaceCheckpoint({
@@ -54,7 +54,7 @@ export async function captureWorkspaceCheckpoint({
 }: CaptureWorkspaceCheckpointInput): Promise<CaptureWorkspaceCheckpointResult> {
 	if (!REF_PATTERN.test(ref)) {
 		throw new GitCheckpointError({
-			message: `Refusing to write outside the ensemble checkpoint namespace: ${ref}`,
+			message: `Refusing to write outside the ensemblr checkpoint namespace: ${ref}`,
 			step: 'validate-ref',
 		});
 	}
@@ -62,7 +62,7 @@ export async function captureWorkspaceCheckpoint({
 	await runGit({ args: ['rev-parse', '--git-dir'], cwd, step: 'verify-repo' });
 
 	const indexDirectory = await mkdtemp(
-		path.join(tmpdir(), 'ensemble-checkpoint-'),
+		path.join(tmpdir(), 'ensemblr-checkpoint-'),
 	);
 	const indexEnv = {
 		...GIT_IDENTITY_ENV,
@@ -118,7 +118,7 @@ export async function captureWorkspaceCheckpoint({
  */
 export async function snapshotWorkingTree(cwd: string): Promise<string> {
 	const indexDirectory = await mkdtemp(
-		path.join(tmpdir(), 'ensemble-checkpoint-'),
+		path.join(tmpdir(), 'ensemblr-checkpoint-'),
 	);
 	const indexEnv = {
 		...GIT_IDENTITY_ENV,
@@ -272,7 +272,7 @@ async function runGit({
 		const { stdout } = await execFileAsync('git', [...args], {
 			cwd,
 			// Strip launch-context vars AFTER the caller overlay so a git subprocess
-			// (askpass/credential helper) can't make macOS relaunch Ensemble.
+			// (askpass/credential helper) can't make macOS relaunch Ensemblr.
 			env: stripLaunchContextEnv({ ...process.env, ...env }),
 			maxBuffer: 16 * 1024 * 1024,
 		});

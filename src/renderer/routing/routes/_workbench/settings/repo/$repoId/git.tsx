@@ -63,7 +63,7 @@ function RepoGitSettings() {
 						value={overrides.remoteOrigin ?? ''}
 					/>
 				}
-				description='Where Ensemble pushes, pulls, and opens PRs.'
+				description='Where Ensemblr pushes, pulls, and opens PRs.'
 				label={
 					<span className='flex items-center gap-2'>
 						Remote origin
@@ -108,7 +108,7 @@ function RepoGitSettings() {
 
 			<p className='py-3 text-muted-foreground text-xs'>
 				Toggle defaults are currently read-only. Edit{' '}
-				<code className='font-mono'>.ensemble/settings.toml</code> to change
+				<code className='font-mono'>.ensemblr/settings.toml</code> to change
 				shared values for the team.
 			</p>
 		</SettingsSection>

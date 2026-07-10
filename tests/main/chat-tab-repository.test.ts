@@ -5,7 +5,7 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import {
 	bindPiSession,
 	closeChatTab,
@@ -30,8 +30,8 @@ interface Fixture {
 }
 
 function openFixture(t: import('node:test').TestContext): Fixture {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-chat-tab-'));
-	const connection = openEnsembleDatabase({
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-chat-tab-'));
+	const connection = openEnsemblrDatabase({
 		databasePath: path.join(directory, 'chat-tab-test.db'),
 	});
 	t.after(() => {
@@ -41,14 +41,14 @@ function openFixture(t: import('node:test').TestContext): Fixture {
 
 	connection.database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-tab', 'tab', 'Tab', '/tmp/ensemble/tab', 'main');
+VALUES ('repo-tab', 'tab', 'Tab', '/tmp/ensemblr/tab', 'main');
 INSERT INTO workspaces (id, repository_id, slug, name, path)
-VALUES ('ws-tab', 'repo-tab', 'tab', 'Tab', '/tmp/ensemble/tab/ws');
+VALUES ('ws-tab', 'repo-tab', 'tab', 'Tab', '/tmp/ensemblr/tab/ws');
 `);
 
 	const { session } = createPiSession({
 		database: connection.database,
-		input: { cwd: '/tmp/ensemble/tab/ws', workspaceId: 'ws-tab' },
+		input: { cwd: '/tmp/ensemblr/tab/ws', workspaceId: 'ws-tab' },
 	});
 
 	return {

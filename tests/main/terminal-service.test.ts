@@ -6,8 +6,8 @@ import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 
 import type { WorkspaceEnvironmentService } from '../../src/main/environment/workspace-environment.ts';
-import type { EnsembleDatabaseService } from '../../src/main/storage/database.ts';
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import type { EnsemblrDatabaseService } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import { insertRepositoryRow } from '../../src/main/storage/repositories/repository-row-repository.ts';
 import { insertWorkspaceRow } from '../../src/main/storage/repositories/workspace-repository.ts';
 import type {
@@ -27,9 +27,9 @@ const NOW = new Date('2026-06-11T00:00:00.000Z');
 const WORKSPACE_ID = 'workspace-1';
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-terminal-'));
-	const connection = openEnsembleDatabase({
-		databasePath: path.join(directory, 'ensemble-test.db'),
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-terminal-'));
+	const connection = openEnsemblrDatabase({
+		databasePath: path.join(directory, 'ensemblr-test.db'),
 	});
 
 	t.after(() => {
@@ -42,10 +42,10 @@ function createDatabaseFixture(t: TestContext): DatabaseSync {
 		defaultBranch: 'main',
 		id: 'repo-1',
 		metadataJson: '{}',
-		name: 'ensemble',
+		name: 'ensemblr',
 		path: '/tmp/repo',
 		remoteUrl: '',
-		slug: 'ensemble',
+		slug: 'ensemblr',
 		timestamp: NOW.toISOString(),
 	});
 	insertWorkspaceRow({
@@ -66,10 +66,10 @@ function createDatabaseFixture(t: TestContext): DatabaseSync {
 
 function createDatabaseServiceStub(
 	database: DatabaseSync | null,
-): EnsembleDatabaseService {
+): EnsemblrDatabaseService {
 	return {
 		getConnection: () => (database ? { database } : null),
-	} as unknown as EnsembleDatabaseService;
+	} as unknown as EnsemblrDatabaseService;
 }
 
 function createWorkspaceEnvironmentStub(
@@ -80,9 +80,9 @@ function createWorkspaceEnvironmentStub(
 			cwd,
 			diagnostics: [],
 			env: {
-				ENSEMBLE_PORT: '41000',
-				ENSEMBLE_WORKSPACE_NAME: 'monterrey',
-				ENSEMBLE_WORKSPACE_PATH: cwd,
+				ENSEMBLR_PORT: '41000',
+				ENSEMBLR_WORKSPACE_NAME: 'monterrey',
+				ENSEMBLR_WORKSPACE_PATH: cwd,
 			},
 			port: 41_000,
 			redactValues: [],
@@ -189,8 +189,8 @@ test('create spawns a PTY in the workspace cwd with the assembled env', async (t
 	assert.ok(spawned);
 	assert.equal(spawned.cwd, process.cwd());
 	assert.deepEqual(spawned.args, ['-l']);
-	assert.equal(spawned.env.ENSEMBLE_WORKSPACE_NAME, 'monterrey');
-	assert.equal(spawned.env.ENSEMBLE_PORT, '41000');
+	assert.equal(spawned.env.ENSEMBLR_WORKSPACE_NAME, 'monterrey');
+	assert.equal(spawned.env.ENSEMBLR_PORT, '41000');
 });
 
 test('output streams broadcast and accumulate as scrollback', async (t) => {
@@ -382,7 +382,7 @@ test('interactive sessions use the user shell; script commands use the script sh
 
 	assert.deepEqual(spawnedFiles, ['/usr/local/bin/fish', '/bin/zsh']);
 	assert.equal(spawnedEnvs[0]?.COLORTERM, 'truecolor');
-	assert.equal(spawnedEnvs[0]?.TERM_PROGRAM, 'Ensemble');
+	assert.equal(spawnedEnvs[0]?.TERM_PROGRAM, 'Ensemblr');
 	assert.ok(spawnedEnvs[0]?.LANG);
 });
 
@@ -416,7 +416,7 @@ test('integration: real PTY runs a shell command, accepts input, and terminates'
 	});
 
 	const echo = await integrationService.create({
-		command: 'echo "pty-says:$ENSEMBLE_WORKSPACE_NAME"',
+		command: 'echo "pty-says:$ENSEMBLR_WORKSPACE_NAME"',
 		workspaceId: WORKSPACE_ID,
 	});
 	assert.ok(echo.session);

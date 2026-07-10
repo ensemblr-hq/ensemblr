@@ -5,10 +5,10 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test, { type TestContext } from 'node:test';
 
-import type { EnsembleConfigResolutionService } from '../../src/main/config/config-resolution.ts';
+import type { EnsemblrConfigResolutionService } from '../../src/main/config/config-resolution.ts';
 import { createScriptLifecycleService } from '../../src/main/scripts/script-lifecycle-service.ts';
-import type { EnsembleDatabaseService } from '../../src/main/storage/database.ts';
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import type { EnsemblrDatabaseService } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import { insertRepositoryRow } from '../../src/main/storage/repositories/repository-row-repository.ts';
 import { insertWorkspaceRow } from '../../src/main/storage/repositories/workspace-repository.ts';
 import type {
@@ -21,9 +21,9 @@ const NOW = '2026-06-11T00:00:00.000Z';
 const WORKSPACE_ID = 'workspace-1';
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-scripts-'));
-	const connection = openEnsembleDatabase({
-		databasePath: path.join(directory, 'ensemble-test.db'),
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-scripts-'));
+	const connection = openEnsemblrDatabase({
+		databasePath: path.join(directory, 'ensemblr-test.db'),
 	});
 
 	t.after(() => {
@@ -36,10 +36,10 @@ function createDatabaseFixture(t: TestContext): DatabaseSync {
 		defaultBranch: 'main',
 		id: 'repo-1',
 		metadataJson: '{}',
-		name: 'ensemble',
+		name: 'ensemblr',
 		path: '/tmp/repo',
 		remoteUrl: '',
-		slug: 'ensemble',
+		slug: 'ensemblr',
 		timestamp: NOW,
 	});
 	insertWorkspaceRow({
@@ -60,10 +60,10 @@ function createDatabaseFixture(t: TestContext): DatabaseSync {
 
 function createDatabaseServiceStub(
 	database: DatabaseSync,
-): EnsembleDatabaseService {
+): EnsemblrDatabaseService {
 	return {
 		getConnection: () => ({ database }),
-	} as unknown as EnsembleDatabaseService;
+	} as unknown as EnsemblrDatabaseService;
 }
 
 function createSettingsStub(settings: {
@@ -72,7 +72,7 @@ function createSettingsStub(settings: {
 	run?: string;
 	runScriptMode?: string;
 	setup?: string;
-}): EnsembleConfigResolutionService {
+}): EnsemblrConfigResolutionService {
 	const entries: Array<{ key: string; value: unknown }> = [];
 
 	for (const kind of ['archive', 'run', 'setup'] as const) {

@@ -2,21 +2,21 @@
  * Stable per-workspace port allocation.
  *
  * Every workspace gets one port from a dedicated range so setup/run scripts,
- * terminals, and preview templates can rely on `ENSEMBLE_PORT` without
+ * terminals, and preview templates can rely on `ENSEMBLR_PORT` without
  * colliding with sibling workspaces. Allocation is deterministic-first (a hash
  * of the workspace id picks the starting slot) with linear probing past ports
  * already held by other active workspaces, and the chosen port is persisted in
  * workspace metadata so it stays stable across app restarts.
  */
 
-/** First port of the Ensemble workspace range. */
+/** First port of the Ensemblr workspace range. */
 export const WORKSPACE_PORT_RANGE_START = 41_000;
 
-/** Number of ports in the Ensemble workspace range. */
+/** Number of ports in the Ensemblr workspace range. */
 export const WORKSPACE_PORT_RANGE_SIZE = 1_000;
 
 /** Metadata key under which the allocated port is persisted. */
-export const WORKSPACE_PORT_METADATA_KEY = 'ensemblePort';
+export const WORKSPACE_PORT_METADATA_KEY = 'ensemblrPort';
 
 /** Inputs for {@link pickWorkspacePort}. */
 export interface PickWorkspacePortOptions {
@@ -26,7 +26,7 @@ export interface PickWorkspacePortOptions {
 }
 
 /**
- * Returns true when `value` is a port inside the Ensemble workspace range.
+ * Returns true when `value` is a port inside the Ensemblr workspace range.
  * @param value - Candidate value (usually read from persisted metadata).
  */
 export function isWorkspacePort(value: unknown): value is number {

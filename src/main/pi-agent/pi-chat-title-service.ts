@@ -174,7 +174,7 @@ async function generateChatTitle({
 }): Promise<string | null> {
 	const session = await piAgentClient.createSession({
 		executable,
-		label: 'ensemble-chat-title',
+		label: 'ensemblr-chat-title',
 		modelOverride: model,
 		workspaceCwd,
 	});

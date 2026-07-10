@@ -5,7 +5,7 @@ Tested against: `@linear/sdk` (latest at time of writing) over the Linear GraphQ
 (`https://api.linear.app/graphql`). Record the exact SDK version in `package.json`
 when ENS-045 lands.
 
-This note maps every v1 Linear operation Ensemble needs to an implementation
+This note maps every v1 Linear operation Ensemblr needs to an implementation
 path (`@linear/sdk` vs raw GraphQL), and documents pagination, rate-limit,
 permission, and cache requirements consumed by `ENS-045`..`ENS-049`.
 
@@ -16,12 +16,12 @@ permission, and cache requirements consumed by `ENS-045`..`ENS-049`.
   `https://api.linear.app/oauth/revoke`.
 - PKCE (`code_challenge`/`code_verifier`, S256) is sent on every login.
   Linear's token endpoint has historically required `client_secret` even for
-  PKCE flows (confidential client model). Ensemble supports both: the exchange
+  PKCE flows (confidential client model). Ensemblr supports both: the exchange
   includes a Keychain-stored `linear-client-secret` when present and omits it
   otherwise. Verify against the real OAuth app during manual testing and
   update this note with the outcome.
 - Scopes: `read,write` requested by default; configurable via
-  `app.linear.scopes` in the Ensemble config.
+  `app.linear.scopes` in the Ensemblr config.
 - Tokens live in the macOS Keychain only. SQLite holds non-secret connection
   metadata (`integration_metadata`, provider `linear`).
 

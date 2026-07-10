@@ -1,6 +1,6 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileCodeIcon } from 'lucide-react';
-import { openAppConfigFile } from '@/renderer/api/ensemble';
+import { openAppConfigFile } from '@/renderer/api/ensemblr';
 import {
 	REPO_SECTION_TARGETS,
 	type RepoSectionId,
@@ -76,10 +76,10 @@ export function SettingsHeader({
 	const configLabel =
 		scope === 'user'
 			? 'Edit in config.json'
-			: 'Edit in .ensemble/settings.toml';
+			: 'Edit in .ensemblr/settings.toml';
 
-	// User scope opens ~/.config/ensemble/config.json (created if missing).
-	// Repo-scoped .ensemble/settings.toml editing is not wired yet.
+	// User scope opens ~/.config/ensemblr/config.json (created if missing).
+	// Repo-scoped .ensemblr/settings.toml editing is not wired yet.
 	const handleEditConfig = () => {
 		if (scope === 'user') {
 			void openAppConfigFile();
@@ -87,7 +87,7 @@ export function SettingsHeader({
 	};
 
 	return (
-		<header className='native-toolbar macos-traffic-light-spacer flex h-11 shrink-0 items-center gap-3 border-b pr-3 pl-[var(--ensemble-traffic-light-safe-inline)]'>
+		<header className='native-toolbar macos-traffic-light-spacer flex h-11 shrink-0 items-center gap-3 border-b pr-3 pl-[var(--ensemblr-traffic-light-safe-inline)]'>
 			<Button onClick={closeSettings} size='sm' variant='ghost'>
 				<ArrowLeftIcon aria-hidden='true' className='size-4' />
 				<span>Back</span>

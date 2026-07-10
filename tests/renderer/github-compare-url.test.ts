@@ -8,28 +8,28 @@ import {
 describe('parseGithubRepoFromRemoteUrl', () => {
 	test('parses HTTPS remotes with and without .git', () => {
 		expect(
-			parseGithubRepoFromRemoteUrl('https://github.com/psoldunov/ensemble.git'),
-		).toEqual({ owner: 'psoldunov', repo: 'ensemble' });
+			parseGithubRepoFromRemoteUrl('https://github.com/psoldunov/ensemblr.git'),
+		).toEqual({ owner: 'psoldunov', repo: 'ensemblr' });
 		expect(
-			parseGithubRepoFromRemoteUrl('https://github.com/psoldunov/ensemble'),
-		).toEqual({ owner: 'psoldunov', repo: 'ensemble' });
+			parseGithubRepoFromRemoteUrl('https://github.com/psoldunov/ensemblr'),
+		).toEqual({ owner: 'psoldunov', repo: 'ensemblr' });
 	});
 
 	test('parses a trailing slash', () => {
 		expect(
-			parseGithubRepoFromRemoteUrl('https://github.com/psoldunov/ensemble/'),
-		).toEqual({ owner: 'psoldunov', repo: 'ensemble' });
+			parseGithubRepoFromRemoteUrl('https://github.com/psoldunov/ensemblr/'),
+		).toEqual({ owner: 'psoldunov', repo: 'ensemblr' });
 	});
 
 	test('parses git@ and ssh:// remotes', () => {
 		expect(
-			parseGithubRepoFromRemoteUrl('git@github.com:psoldunov/ensemble.git'),
-		).toEqual({ owner: 'psoldunov', repo: 'ensemble' });
+			parseGithubRepoFromRemoteUrl('git@github.com:psoldunov/ensemblr.git'),
+		).toEqual({ owner: 'psoldunov', repo: 'ensemblr' });
 		expect(
 			parseGithubRepoFromRemoteUrl(
-				'ssh://git@github.com/psoldunov/ensemble.git',
+				'ssh://git@github.com/psoldunov/ensemblr.git',
 			),
-		).toEqual({ owner: 'psoldunov', repo: 'ensemble' });
+		).toEqual({ owner: 'psoldunov', repo: 'ensemblr' });
 	});
 
 	test('keeps dots inside the repo name', () => {
@@ -40,7 +40,7 @@ describe('parseGithubRepoFromRemoteUrl', () => {
 
 	test('returns null for non-github hosts and empty input', () => {
 		expect(
-			parseGithubRepoFromRemoteUrl('https://gitlab.com/psoldunov/ensemble.git'),
+			parseGithubRepoFromRemoteUrl('https://gitlab.com/psoldunov/ensemblr.git'),
 		).toBeNull();
 		expect(parseGithubRepoFromRemoteUrl(null)).toBeNull();
 		expect(parseGithubRepoFromRemoteUrl(undefined)).toBeNull();
@@ -55,10 +55,10 @@ describe('buildGithubCompareUrl', () => {
 				base: 'master',
 				head: 'psoldunov/checks-panel-pr-inputs',
 				owner: 'psoldunov',
-				repo: 'ensemble',
+				repo: 'ensemblr',
 			}),
 		).toBe(
-			'https://github.com/psoldunov/ensemble/compare/master...psoldunov%2Fchecks-panel-pr-inputs?body=&expand=1',
+			'https://github.com/psoldunov/ensemblr/compare/master...psoldunov%2Fchecks-panel-pr-inputs?body=&expand=1',
 		);
 	});
 
@@ -67,10 +67,10 @@ describe('buildGithubCompareUrl', () => {
 			buildGithubCompareUrl({
 				head: 'feature/x',
 				owner: 'psoldunov',
-				repo: 'ensemble',
+				repo: 'ensemblr',
 			}),
 		).toBe(
-			'https://github.com/psoldunov/ensemble/compare/feature%2Fx?body=&expand=1',
+			'https://github.com/psoldunov/ensemblr/compare/feature%2Fx?body=&expand=1',
 		);
 	});
 });

@@ -54,11 +54,11 @@ export function XtermTerminal({
 	useEffect(() => {
 		const container = containerRef.current;
 
-		if (!container || !window.ensemble) {
+		if (!container || !window.ensemblr) {
 			return;
 		}
 
-		const ensemble = window.ensemble;
+		const ensemblr = window.ensemblr;
 		const adapter = createXtermAdapter({
 			fontFamily: fontRef.current.fontFamily,
 			fontSize: fontRef.current.fontSize,
@@ -74,7 +74,7 @@ export function XtermTerminal({
 		// scrollback are dropped instead of replayed twice.
 		const bufferedChunks: Array<{ data: string; seq: number }> = [];
 
-		const unsubscribeOutput = ensemble.onTerminalOutput((event) => {
+		const unsubscribeOutput = ensemblr.onTerminalOutput((event) => {
 			if (event.terminalId !== terminalId) {
 				return;
 			}
@@ -90,10 +90,10 @@ export function XtermTerminal({
 		const unsubscribeInput = readOnly
 			? null
 			: adapter.onData((data) => {
-					void ensemble.writeTerminalSession({ data, terminalId });
+					void ensemblr.writeTerminalSession({ data, terminalId });
 				});
 
-		ensemble
+		ensemblr
 			.terminalSnapshot({ terminalId })
 			.then((snapshot) => {
 				if (disposed) {
@@ -127,7 +127,7 @@ export function XtermTerminal({
 			const dimensions = adapter.fit();
 
 			if (dimensions) {
-				void ensemble.resizeTerminalSession({
+				void ensemblr.resizeTerminalSession({
 					cols: dimensions.cols,
 					rows: dimensions.rows,
 					terminalId,
@@ -162,7 +162,7 @@ export function XtermTerminal({
 		const adapter = adapterRef.current;
 		const container = containerRef.current;
 
-		if (!adapter || !container || !window.ensemble) {
+		if (!adapter || !container || !window.ensemblr) {
 			return;
 		}
 
@@ -186,7 +186,7 @@ export function XtermTerminal({
 		const dimensions = adapter.fit();
 
 		if (dimensions) {
-			void window.ensemble.resizeTerminalSession({
+			void window.ensemblr.resizeTerminalSession({
 				cols: dimensions.cols,
 				rows: dimensions.rows,
 				terminalId,

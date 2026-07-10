@@ -5,7 +5,7 @@ const SOURCE_LABEL: Record<SettingsResolutionSource, string> = {
 	'built-in-default': 'default',
 	'config-default': 'config defaults',
 	'managed-config': 'managed config',
-	'ensemble-config': '.ensemble/settings.toml',
+	'ensemblr-config': '.ensemblr/settings.toml',
 	sqlite: 'personal (sqlite)',
 	'user-default': 'user defaults',
 	worktreeinclude: 'git worktree include',

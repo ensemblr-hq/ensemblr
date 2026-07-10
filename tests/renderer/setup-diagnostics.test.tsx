@@ -257,7 +257,7 @@ test('renders root directory change confirmation copy', () => {
 	expect(markup).toContain(
 		'Shared Conductor root continuity covers filesystem, git, and config only',
 	);
-	expect(markup).toContain('/Users/alice/Ensemble');
+	expect(markup).toContain('/Users/alice/Ensemblr');
 	expect(markup).toContain('/Users/alice/Conductor');
 	expect(markup).toContain('Switch root');
 });
@@ -352,32 +352,32 @@ function createRootDirectoryPreview(): RootDirectoryChangePreview {
 			workspacesPath: '/Users/alice/Conductor/workspaces',
 		},
 		oldRoot: {
-			archivedContextsPath: '/Users/alice/Ensemble/archived-contexts',
+			archivedContextsPath: '/Users/alice/Ensemblr/archived-contexts',
 			createdPaths: [],
 			diagnostics: [],
 			managedPaths: [
 				{
 					key: 'repos',
-					path: '/Users/alice/Ensemble/repos',
+					path: '/Users/alice/Ensemblr/repos',
 					status: 'present',
 				},
 				{
 					key: 'workspaces',
-					path: '/Users/alice/Ensemble/workspaces',
+					path: '/Users/alice/Ensemblr/workspaces',
 					status: 'present',
 				},
 				{
 					key: 'archived-contexts',
-					path: '/Users/alice/Ensemble/archived-contexts',
+					path: '/Users/alice/Ensemblr/archived-contexts',
 					status: 'present',
 				},
 			],
-			path: '/Users/alice/Ensemble',
-			repositoriesPath: '/Users/alice/Ensemble/repos',
+			path: '/Users/alice/Ensemblr',
+			repositoriesPath: '/Users/alice/Ensemblr/repos',
 			setting: null,
 			source: 'built-in-default',
 			status: 'ok',
-			workspacesPath: '/Users/alice/Ensemble/workspaces',
+			workspacesPath: '/Users/alice/Ensemblr/workspaces',
 		},
 		oldRootPreserved: true,
 	};

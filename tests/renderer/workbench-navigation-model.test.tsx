@@ -33,9 +33,9 @@ const navigationSnapshot: RepositoryWorkspaceNavigationSnapshot = {
 				avatarUrl: 'https://example.com/alice.png',
 				owner: 'alice',
 			},
-			name: 'Ensemble',
-			path: '/Users/alice/Ensemble/repos/ensemble',
-			slug: 'ensemble',
+			name: 'Ensemblr',
+			path: '/Users/alice/Ensemblr/repos/ensemblr',
+			slug: 'ensemblr',
 			updatedAt: '2026-06-06T00:00:00.000Z',
 			workspaces: [
 				{
@@ -48,7 +48,7 @@ const navigationSnapshot: RepositoryWorkspaceNavigationSnapshot = {
 						linearIssue: 'THE-120',
 					},
 					name: 'THE-120 Sidebar nav',
-					path: '/Users/alice/Ensemble/workspaces/ensemble/the-120',
+					path: '/Users/alice/Ensemblr/workspaces/ensemblr/the-120',
 					repositoryId: 'repo-1',
 					slug: 'the-120',
 					updatedAt: '2026-06-06T00:00:00.000Z',
@@ -61,7 +61,7 @@ const navigationSnapshot: RepositoryWorkspaceNavigationSnapshot = {
 			id: 'repo-2',
 			metadata: {},
 			name: 'Agent Lab',
-			path: '/Users/alice/Ensemble/repos/agent-lab',
+			path: '/Users/alice/Ensemblr/repos/agent-lab',
 			slug: 'agent-lab',
 			updatedAt: '2026-06-06T00:00:00.000Z',
 			workspaces: [
@@ -73,7 +73,7 @@ const navigationSnapshot: RepositoryWorkspaceNavigationSnapshot = {
 					id: 'workspace-2',
 					metadata: {},
 					name: 'Draft workspace',
-					path: '/Users/alice/Ensemble/workspaces/agent-lab/draft',
+					path: '/Users/alice/Ensemblr/workspaces/agent-lab/draft',
 					repositoryId: 'repo-2',
 					slug: 'draft',
 					updatedAt: '2026-06-06T00:00:00.000Z',
@@ -89,7 +89,7 @@ test('maps SQLite navigation snapshot into workbench shell projects', () => {
 	expect(projects).toHaveLength(2);
 	expect(projects[0]).toMatchObject({
 		id: 'repo-1',
-		name: 'Ensemble',
+		name: 'Ensemblr',
 		owner: {
 			avatarUrl: 'https://example.com/alice.png',
 			name: 'alice',

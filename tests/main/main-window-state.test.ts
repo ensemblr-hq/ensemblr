@@ -7,8 +7,8 @@ import {
 	normalizeMainWindowState,
 } from '../../src/main/app/window-state.ts';
 import {
-	type EnsembleDatabaseService,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseService,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 
 const primaryDisplay = {
@@ -20,8 +20,8 @@ const primaryDisplay = {
 	},
 };
 
-function createDatabaseService(t: TestContext): EnsembleDatabaseService {
-	const connection = openEnsembleDatabase({ databasePath: ':memory:' });
+function createDatabaseService(t: TestContext): EnsemblrDatabaseService {
+	const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
 	const health = {
 		path: connection.path,
 		schemaVersion: connection.schemaVersion,

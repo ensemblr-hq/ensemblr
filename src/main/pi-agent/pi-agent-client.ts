@@ -328,7 +328,7 @@ function validateRequest(request: PiAgentSessionRequest): void {
 /**
  * Normalizes the caller env overlay: drops null/undefined entries, and (when
  * `preservePiAgentDirectory` is true) strips any caller-supplied
- * `PI_CODING_AGENT_DIR` so Ensemble never silently overrides Pi's default
+ * `PI_CODING_AGENT_DIR` so Ensemblr never silently overrides Pi's default
  * agent-directory lookup (see ADR 0003).
  */
 function buildEnv({

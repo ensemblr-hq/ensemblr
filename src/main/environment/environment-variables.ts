@@ -6,10 +6,10 @@ import type {
 	EnvironmentVariableSnapshot,
 	EnvironmentVariablesSnapshot,
 } from '../../shared/ipc/contracts/environment';
-import type { EnsembleConfigService } from '../config/config-loader';
+import type { EnsemblrConfigService } from '../config/config-loader';
 import type { SecretMetadata, SecretStore } from '../secrets/secret-store';
 import {
-	type EnsembleDatabaseService,
+	type EnsemblrDatabaseService,
 	requireDatabase,
 } from '../storage/database.ts';
 import {
@@ -137,9 +137,9 @@ export interface EnvironmentVariablesService {
 
 /** Options for {@link createEnvironmentVariablesService}. */
 export interface CreateEnvironmentVariablesServiceOptions {
-	configService: EnsembleConfigService;
+	configService: EnsemblrConfigService;
 	database?: DatabaseSync | null;
-	databaseService?: EnsembleDatabaseService;
+	databaseService?: EnsemblrDatabaseService;
 	now?: () => Date;
 	secretStore?: SecretStore;
 	secretStoreFactory?: (database: DatabaseSync) => SecretStore | null;

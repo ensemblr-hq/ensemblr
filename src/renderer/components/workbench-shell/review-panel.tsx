@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
-import { workspaceGitStatusQuery } from '@/renderer/api/ensemble';
+import { workspaceGitStatusQuery } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';

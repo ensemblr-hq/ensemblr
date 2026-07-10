@@ -403,7 +403,7 @@ async function tryLlmSummary(
 	try {
 		const session = await args.piAgentClient.createSession({
 			executable: args.executable,
-			label: 'ensemble-session-summary',
+			label: 'ensemblr-session-summary',
 			modelOverride: args.model,
 			workspaceCwd: args.workspaceCwd,
 		});

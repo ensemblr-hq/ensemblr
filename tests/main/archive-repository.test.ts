@@ -18,9 +18,9 @@ import { createArchiveRepositoryService } from '../../src/main/repository/archiv
 import { createArchiveWorkspaceService } from '../../src/main/repository/archive-workspace.ts';
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
 import {
-	type EnsembleDatabaseConnection,
-	type EnsembleDatabaseService,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseConnection,
+	type EnsemblrDatabaseService,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
@@ -28,7 +28,7 @@ const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 
 interface Harness {
 	archivedContextsPath: string;
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	repositoryId: string;
 	repositoryPath: string;
 	rootPath: string;
@@ -37,7 +37,7 @@ interface Harness {
 
 function createHarness(t: TestContext): Harness {
 	const rootPath = mkdtempSync(
-		path.join(tmpdir(), 'ensemble-archive-repo-lifecycle-'),
+		path.join(tmpdir(), 'ensemblr-archive-repo-lifecycle-'),
 	);
 	const repositoriesPath = path.join(rootPath, 'repos');
 	const workspacesPath = path.join(rootPath, 'workspaces');
@@ -49,13 +49,13 @@ function createHarness(t: TestContext): Harness {
 	const repositoryPath = path.join(repositoriesPath, 'demo');
 	mkdirSync(repositoryPath);
 	runGit(repositoryPath, ['init', '-b', 'main']);
-	runGit(repositoryPath, ['config', 'user.email', 'test@ensemble.dev']);
-	runGit(repositoryPath, ['config', 'user.name', 'Ensemble Test']);
+	runGit(repositoryPath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(repositoryPath, ['config', 'user.name', 'Ensemblr Test']);
 	writeFileSync(path.join(repositoryPath, 'README.md'), '# demo\n');
 	runGit(repositoryPath, ['add', '.']);
 	runGit(repositoryPath, ['commit', '-m', 'init']);
 
-	const connection = openEnsembleDatabase({ databasePath: ':memory:' });
+	const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
 	const repositoryId = 'repository-demo';
 	const timestamp = fixedNow().toISOString();
 	connection.database
@@ -92,8 +92,8 @@ function createHarness(t: TestContext): Harness {
 }
 
 function wrapConnection(
-	connection: EnsembleDatabaseConnection,
-): EnsembleDatabaseService {
+	connection: EnsemblrDatabaseConnection,
+): EnsemblrDatabaseService {
 	return {
 		close: () => connection.database.close(),
 		getConnection: () => connection,
@@ -122,7 +122,7 @@ function runGit(cwd: string, args: string[]): string {
 }
 
 function repositoryRow(
-	databaseService: EnsembleDatabaseService,
+	databaseService: EnsemblrDatabaseService,
 	id: string,
 ): Record<string, unknown> | undefined {
 	const database = databaseService.getConnection()?.database as DatabaseSync;
@@ -133,7 +133,7 @@ function repositoryRow(
 }
 
 function workspaceRow(
-	databaseService: EnsembleDatabaseService,
+	databaseService: EnsemblrDatabaseService,
 	id: string,
 ): Record<string, unknown> | undefined {
 	const database = databaseService.getConnection()?.database as DatabaseSync;
@@ -142,7 +142,7 @@ function workspaceRow(
 }
 
 function archiveRecords(
-	databaseService: EnsembleDatabaseService,
+	databaseService: EnsemblrDatabaseService,
 	repositoryId: string,
 ): Record<string, unknown>[] {
 	const database = databaseService.getConnection()?.database as DatabaseSync;

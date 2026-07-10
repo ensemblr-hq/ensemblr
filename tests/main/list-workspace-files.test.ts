@@ -28,11 +28,11 @@ function git(cwd: string, args: string[]): void {
  * (`node_modules/`), and an individually-ignored file (`debug.log`).
  */
 function seedRepo(): string {
-	const dir = mkdtempSync(path.join(tmpdir(), 'ensemble-list-files-'));
+	const dir = mkdtempSync(path.join(tmpdir(), 'ensemblr-list-files-'));
 	tempDirs.push(dir);
 	git(dir, ['init', '-b', 'main']);
-	git(dir, ['config', 'user.email', 'test@ensemble.dev']);
-	git(dir, ['config', 'user.name', 'Ensemble Test']);
+	git(dir, ['config', 'user.email', 'test@ensemblr.dev']);
+	git(dir, ['config', 'user.name', 'Ensemblr Test']);
 	writeFileSync(
 		path.join(dir, '.gitignore'),
 		'.context/\nnode_modules/\n*.log\n',

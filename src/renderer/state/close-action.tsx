@@ -36,13 +36,13 @@ export function CloseActionProvider({ children }: { children: ReactNode }) {
 
 	useEffect(
 		() =>
-			window.ensemble?.onCloseActiveTabRequest(() => {
+			window.ensemblr?.onCloseActiveTabRequest(() => {
 				const active = handlersRef.current.at(-1);
 				if (active) {
 					active();
 					return;
 				}
-				void window.ensemble?.closeWindow();
+				void window.ensemblr?.closeWindow();
 			}),
 		[],
 	);

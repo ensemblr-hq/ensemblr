@@ -12,9 +12,9 @@ import { createArchiveWorkspaceService } from '../../src/main/repository/archive
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
 import { createListAllWorkspacesService } from '../../src/main/repository/list-all-workspaces.ts';
 import {
-	type EnsembleDatabaseConnection,
-	type EnsembleDatabaseService,
-	openEnsembleDatabase,
+	type EnsemblrDatabaseConnection,
+	type EnsemblrDatabaseService,
+	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
@@ -29,7 +29,7 @@ interface RepoFixture {
 
 interface Harness {
 	archivedContextsPath: string;
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	repositoriesPath: string;
 	rootPath: string;
 	workspacesPath: string;
@@ -40,8 +40,8 @@ function runGit(cwd: string, args: string[]): string {
 }
 
 function wrapConnection(
-	connection: EnsembleDatabaseConnection,
-): EnsembleDatabaseService {
+	connection: EnsemblrDatabaseConnection,
+): EnsemblrDatabaseService {
 	return {
 		close: () => connection.database.close(),
 		getConnection: () => connection,
@@ -59,7 +59,7 @@ function wrapConnection(
 }
 
 function addRepository(
-	connection: EnsembleDatabaseConnection,
+	connection: EnsemblrDatabaseConnection,
 	repositoriesPath: string,
 	slug: string,
 	name: string,
@@ -67,8 +67,8 @@ function addRepository(
 	const repositoryPath = path.join(repositoriesPath, slug);
 	mkdirSync(repositoryPath);
 	runGit(repositoryPath, ['init', '-b', 'main']);
-	runGit(repositoryPath, ['config', 'user.email', 'test@ensemble.dev']);
-	runGit(repositoryPath, ['config', 'user.name', 'Ensemble Test']);
+	runGit(repositoryPath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(repositoryPath, ['config', 'user.name', 'Ensemblr Test']);
 	writeFileSync(path.join(repositoryPath, 'README.md'), `# ${slug}\n`);
 	runGit(repositoryPath, ['add', '.']);
 	runGit(repositoryPath, ['commit', '-m', 'init']);
@@ -86,7 +86,7 @@ function addRepository(
 }
 
 function createHarness(t: TestContext): Harness {
-	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemble-history-'));
+	const rootPath = mkdtempSync(path.join(tmpdir(), 'ensemblr-history-'));
 	const repositoriesPath = path.join(rootPath, 'repos');
 	const workspacesPath = path.join(rootPath, 'workspaces');
 	const archivedContextsPath = path.join(rootPath, 'archived-contexts');
@@ -94,7 +94,7 @@ function createHarness(t: TestContext): Harness {
 	mkdirSync(workspacesPath, { recursive: true });
 	mkdirSync(archivedContextsPath, { recursive: true });
 
-	const connection = openEnsembleDatabase({ databasePath: ':memory:' });
+	const connection = openEnsemblrDatabase({ databasePath: ':memory:' });
 	const databaseService = wrapConnection(connection);
 
 	t.after(() => {
@@ -233,7 +233,7 @@ test('listAllWorkspaces returns an empty list when the database is unavailable',
 			getConnection: () => undefined,
 			getHealth: () => ({ path: null, schemaVersion: 0, status: 'closed' }),
 			open: () => ({ path: null, schemaVersion: 0, status: 'closed' }),
-		} as unknown as EnsembleDatabaseService,
+		} as unknown as EnsemblrDatabaseService,
 	});
 
 	const result = await service.list();

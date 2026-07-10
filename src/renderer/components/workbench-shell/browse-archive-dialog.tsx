@@ -5,11 +5,11 @@ import { useCallback, useMemo, useState } from 'react';
 import {
 	archivedWorkspacesQuery,
 	deleteArchivedWorkspace,
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	invalidateWorkspaceListViews,
-	isEnsembleApiAvailable,
+	isEnsemblrApiAvailable,
 	unarchiveWorkspace,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -72,7 +72,7 @@ function BrowseArchiveDialogBody({
 	project: ProjectShellModel;
 }) {
 	const queryClient = useQueryClient();
-	const apiAvailable = isEnsembleApiAvailable();
+	const apiAvailable = isEnsemblrApiAvailable();
 	const { data, isLoading, isError } = useQuery({
 		...archivedWorkspacesQuery(project.id),
 		enabled: apiAvailable,
@@ -92,7 +92,7 @@ function BrowseArchiveDialogBody({
 		await Promise.all([
 			invalidateWorkspaceListViews(queryClient),
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.archivedWorkspaces(project.id),
+				queryKey: ensemblrQueryKeys.archivedWorkspaces(project.id),
 			}),
 		]);
 		await onChange(project.id);

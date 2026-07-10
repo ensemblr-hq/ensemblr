@@ -89,7 +89,7 @@ export function getComposerState({
 		return {
 			...base,
 			disabled: true,
-			disabledReason: 'Ensemble is still checking setup readiness.',
+			disabledReason: 'Ensemblr is still checking setup readiness.',
 			placeholder: 'Setup checks are still loading.',
 		};
 	}

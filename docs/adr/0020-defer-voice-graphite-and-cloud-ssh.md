@@ -12,7 +12,7 @@ Screenshot inventory surfaced Conductor settings or affordances related to voice
 
 ## Decision
 
-Ensemble will defer voice mode, Graphite stack support, and cloud/remote workspace SSH settings until after the core product is complete.
+Ensemblr will defer voice mode, Graphite stack support, and cloud/remote workspace SSH settings until after the core product is complete.
 
 These features may appear later behind explicit integration or experimental flags, but they are not v1 implementation requirements.
 

@@ -45,7 +45,7 @@ Date: 2026-06-16
 - Linear archive/delete schema and permission support. Create/read/update/comment and workspace-from-issue are resolved v1 scope, but field-level SDK/GraphQL mapping, pagination, filtering, labels, cycles, and metadata caching still need implementation discovery.
 - Whether `gh` exposes enough data for add-all-comments-to-chat and review-thread resolution.
 - Conductor checkpoint git refs, if any, and whether they can be safely detected without relying on private app DB.
-- Whether a `.conductor` folder exists in any real repositories and whether it has a documented/public meaning for workspace adoption (Ensemble no longer reads it for repository config; see ADR 0030).
+- Whether a `.conductor` folder exists in any real repositories and whether it has a documented/public meaning for workspace adoption (Ensemblr no longer reads it for repository config; see ADR 0030).
 - How to detect preview URLs from run/setup output robustly.
 - How to safely implement spotlight testing without overwriting root changes.
 - Which current command/menu placeholders should be keyboard-shortcut/global-command entries before their backing services exist.
@@ -56,7 +56,7 @@ Date: 2026-06-16
 - Experimental settings v1 scope (ENS-068): Dashboard visibility, Sidebar chats grouping, Auto-run after setup, and In-app browser preview ship as v1 user-scope flags in `Settings → Experimental` (read-only-default, opt-in). Sidebar resource usage ships as a v1 flag with the toggle visible; the actual CPU/memory sampler is post-core (separate follow-up ticket once a sampler service exists). Big-terminal mode is satisfied by the terminal dock and does not need a separate flag. Tab-freak mode, Voice, Graphite, cloud SSH, production React profiler, and chat-tab limit remain resolved by ADR 0020/0021/0022.
 - Root directory changes: switch root and reindex/adopt by default; migration/delete are explicit actions.
 - Secret storage: use macOS Keychain from the start; SQLite stores metadata only.
-- Ensemble account model: defer app account/sign-in for v1; local-first with external auth.
+- Ensemblr account model: defer app account/sign-in for v1; local-first with external auth.
 - Pi runtime: use selected Pi-compatible CLI executable with `--mode rpc` for v1; keep SDK sidecar as fallback if RPC lacks needed capabilities.
 - Linear integration: first-class v1 OAuth login, issue CRUD, and workspace creation from issues.
 - Voice mode, Graphite support, and cloud/remote SSH settings: defer until after core completion.
@@ -64,9 +64,9 @@ Date: 2026-06-16
 - Many-tab mode: allow five open chat tabs per workspace; document/file previews do not count.
 - Merge confirmation: prominent ready action when checks pass, then explicit confirmation/final merge/archive flow.
 - Hosted deployment preview URLs: derive from GitHub data through `gh` for v1, preferring deployment status `environment_url`/`target_url`, then check links, then provider bot PR comments. Do not require Vercel or Netlify login for the right PR header preview link.
-- GitHub integration model: `gh` and `gh api` are the GitHub integration path. Ensemble does not build or store credentials for an app-owned GitHub OAuth/API layer.
+- GitHub integration model: `gh` and `gh api` are the GitHub integration path. Ensemblr does not build or store credentials for an app-owned GitHub OAuth/API layer.
 - Renderer routing: file-based TanStack routing with loader-driven data and redirects. Workspace and chat identity are URL path params, `dock`/`review` are search params, and per-workspace dock/review/chat selection is persisted. See `docs/adr/0026-use-file-based-tanstack-routing.md`.
-- Workspace lifecycle settings: branch naming, archive/merge behavior now configured via Settings → Git (`app.git` in `~/.config/ensemble/config.json`), feeding repository resolution as `user-default` source.
+- Workspace lifecycle settings: branch naming, archive/merge behavior now configured via Settings → Git (`app.git` in `~/.config/ensemblr/config.json`), feeding repository resolution as `user-default` source.
 - Wordmark animation: glitch burst now fires immediately on mount (`welcome-wordmark.tsx:155`) with periodic bursts continuing on 9-17s interval.
 
 ## Deferred

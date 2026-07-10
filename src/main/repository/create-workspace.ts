@@ -25,8 +25,8 @@ import {
 	type LoadRepositoryConfigOptions,
 	loadRepositoryConfig,
 } from '../config/repository-config.ts';
-import type { EnsembleRootDirectoryService } from '../root';
-import type { EnsembleDatabaseService } from '../storage/database.ts';
+import type { EnsemblrRootDirectoryService } from '../root';
+import type { EnsemblrDatabaseService } from '../storage/database.ts';
 import { selectRepositoryWithDefaultsById } from '../storage/repositories/repository-row-repository.ts';
 import {
 	insertWorkspaceRow as insertWorkspaceRowStorage,
@@ -55,7 +55,7 @@ export interface CreateWorkspaceService {
 
 /** Options for {@link createWorkspaceService}. */
 export interface CreateWorkspaceServiceOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	filesToCopyService?: FilesToCopyService;
 	/**
 	 * Resolves the authenticated GitHub login for the `github-username`
@@ -71,7 +71,7 @@ export interface CreateWorkspaceServiceOptions {
 	 * resolution falls back to the repository config only (legacy behavior).
 	 */
 	readGitDefaults?: () => GitSettings;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
 /** Internal: source repository row loaded from SQLite. */
@@ -434,11 +434,11 @@ function validateName(name: unknown): CreateWorkspaceDiagnostic | null {
 }
 
 /**
- * Reads `git.branchPrefix` from the loaded `.ensemble/settings.toml` config;
+ * Reads `git.branchPrefix` from the loaded `.ensemblr/settings.toml` config;
  * returns an empty string when no string-valued prefix is configured.
  */
 function readBranchPrefix(config: LoadedRepositoryConfig): string {
-	const git = config.ensembleConfig?.git;
+	const git = config.ensemblrConfig?.git;
 
 	if (git && typeof git === 'object' && !Array.isArray(git)) {
 		const prefix = (git as Record<string, unknown>).branchPrefix;

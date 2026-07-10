@@ -2,8 +2,8 @@ import { useCallback, useState } from 'react';
 
 import {
 	deleteWorkspace,
-	isEnsembleApiAvailable,
-} from '@/renderer/api/ensemble-queries';
+	isEnsemblrApiAvailable,
+} from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -66,7 +66,7 @@ function DeleteWorkspaceDialogForm({
 		[],
 	);
 
-	const canDelete = stage !== 'deleting' && isEnsembleApiAvailable();
+	const canDelete = stage !== 'deleting' && isEnsemblrApiAvailable();
 
 	const handleDelete = useCallback(async () => {
 		if (!canDelete) {
@@ -102,7 +102,7 @@ function DeleteWorkspaceDialogForm({
 				</DialogTitle>
 				<p className='text-muted-foreground text-xs'>
 					Permanently removes the worktree folder, drops the local branch, and
-					deletes the workspace from Ensemble. Anything not pushed to the remote
+					deletes the workspace from Ensemblr. Anything not pushed to the remote
 					is lost. This cannot be undone.
 				</p>
 			</DialogHeader>

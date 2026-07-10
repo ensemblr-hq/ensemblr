@@ -7,7 +7,6 @@ import { CloseActionProvider } from '@/renderer/state/close-action';
 import {
 	toolCallCollapseAtom,
 	useAppearanceEffect,
-	useAppearanceLegacyMigration,
 	useAppSettingsSync,
 	useThemeEffect,
 } from '@/renderer/state/preferences';
@@ -17,7 +16,6 @@ export function App() {
 	useThemeEffect();
 	useAppearanceEffect();
 	useAppSettingsSync();
-	useAppearanceLegacyMigration();
 
 	// App-wide toggle for the tool-call expand/collapse default (⌃O / Ctrl+O).
 	const setToolCallCollapse = useSetAtom(toolCallCollapseAtom);

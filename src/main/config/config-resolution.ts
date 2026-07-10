@@ -14,20 +14,20 @@ import type {
 	SettingsResolutionSnapshot,
 	SettingsResolutionSource,
 } from '../../shared/ipc/contracts/settings-resolution';
-import type { EnsembleDatabaseService } from '../storage/database';
+import type { EnsemblrDatabaseService } from '../storage/database';
 import type { AppSettingsService } from './app-settings-service.ts';
-import type { EnsembleConfig, EnsembleConfigService } from './config-loader';
+import type { EnsemblrConfig, EnsemblrConfigService } from './config-loader';
 import { isPlainRecord } from './json-utils.ts';
 import { loadRepositoryConfig } from './repository-config.ts';
 
 /** Inputs for the pure {@link resolveSettings} function. */
 export interface ResolveSettingsOptions {
-	config: EnsembleConfig;
+	config: EnsemblrConfig;
 	database?: DatabaseSync | null;
 	homeDirectory?: string;
 	repository?: RepositorySettingsResolutionRequest;
 	/**
-	 * Overrides the built-in default Ensemble root directory (`~/Ensemble`).
+	 * Overrides the built-in default Ensemblr root directory (`~/Ensemblr`).
 	 * Used to isolate the dogfood dev build onto its own repo/workspace root.
 	 */
 	rootDirectory?: string;
@@ -40,17 +40,17 @@ export interface ResolveSettingsOptions {
 }
 
 /** Service that resolves settings on demand for IPC consumers. */
-export interface EnsembleConfigResolutionService {
+export interface EnsemblrConfigResolutionService {
 	resolve: (request?: unknown) => SettingsResolutionSnapshot;
 }
 
-/** Options for {@link createEnsembleConfigResolutionService}. */
-interface CreateEnsembleConfigResolutionServiceOptions {
+/** Options for {@link createEnsemblrConfigResolutionService}. */
+interface CreateEnsemblrConfigResolutionServiceOptions {
 	appSettingsService: AppSettingsService;
-	configService: EnsembleConfigService;
-	databaseService: EnsembleDatabaseService;
+	configService: EnsemblrConfigService;
+	databaseService: EnsemblrDatabaseService;
 	homeDirectory?: string;
-	/** Overrides the default Ensemble root directory (dogfood dev build). */
+	/** Overrides the default Ensemblr root directory (dogfood dev build). */
 	rootDirectory?: string;
 }
 
@@ -77,7 +77,7 @@ const APP_SOURCE_ORDER: readonly SettingsResolutionSource[] = [
 
 const REPOSITORY_SOURCE_ORDER: readonly SettingsResolutionSource[] = [
 	'worktreeinclude',
-	'ensemble-config',
+	'ensemblr-config',
 	'sqlite',
 	'user-default',
 	'built-in-default',
@@ -116,15 +116,15 @@ const VALIDATED_SETTING_KEYS = new Set(['security.permissionMode']);
  * Builds the settings-resolution service consumed by IPC handlers, wiring the
  * config and database services together.
  * @param options - Service dependencies and home-directory override.
- * @returns A {@link EnsembleConfigResolutionService}.
+ * @returns A {@link EnsemblrConfigResolutionService}.
  */
-export function createEnsembleConfigResolutionService({
+export function createEnsemblrConfigResolutionService({
 	appSettingsService,
 	configService,
 	databaseService,
 	homeDirectory,
 	rootDirectory,
-}: CreateEnsembleConfigResolutionServiceOptions): EnsembleConfigResolutionService {
+}: CreateEnsemblrConfigResolutionServiceOptions): EnsemblrConfigResolutionService {
 	return {
 		resolve: (request) =>
 			resolveSettings({
@@ -198,9 +198,9 @@ export function resolveSettings({
 		addCandidates(
 			repositoryCandidates,
 			flattenRecord(
-				repository.ensembleConfig ?? repositoryFileConfig?.ensembleConfig ?? {},
+				repository.ensemblrConfig ?? repositoryFileConfig?.ensemblrConfig ?? {},
 			),
-			'ensemble-config',
+			'ensemblr-config',
 		);
 		addCandidates(
 			repositoryCandidates,
@@ -261,8 +261,8 @@ export function normalizeSettingsResolutionRequest(
 
 	return {
 		repository: {
-			ensembleConfig: isPlainRecord(request.repository.ensembleConfig)
-				? request.repository.ensembleConfig
+			ensemblrConfig: isPlainRecord(request.repository.ensemblrConfig)
+				? request.repository.ensemblrConfig
 				: undefined,
 			repositoryId: repositoryId || repositoryPath,
 			...(repositoryPath ? { repositoryPath } : {}),
@@ -457,10 +457,10 @@ function addCandidates(
 }
 
 /**
- * Built-in fallback defaults for the app scope, including the default Ensemble
+ * Built-in fallback defaults for the app scope, including the default Ensemblr
  * root directory derived from the user's home.
  * @param homeDirectory - User home directory.
- * @param rootDirectory - Explicit root-directory override; defaults to `<home>/Ensemble`.
+ * @param rootDirectory - Explicit root-directory override; defaults to `<home>/Ensemblr`.
  * @returns Flat map of `key -> value`.
  */
 function collectAppBuiltInDefaults(
@@ -468,7 +468,7 @@ function collectAppBuiltInDefaults(
 	rootDirectory?: string,
 ): Map<string, unknown> {
 	return new Map([
-		['rootDirectory', rootDirectory ?? path.join(homeDirectory, 'Ensemble')],
+		['rootDirectory', rootDirectory ?? path.join(homeDirectory, 'Ensemblr')],
 		['security.permissionMode', DEFAULT_PERMISSION_MODE],
 		['sendShortcut', 'enter'],
 		['ui.theme', 'system'],
@@ -558,7 +558,7 @@ function collectUserGitDefaultCandidates(
  * @returns Flat map of `key -> value`.
  */
 function collectAppConfigDefaults(
-	config: EnsembleConfig,
+	config: EnsemblrConfig,
 ): Map<string, unknown> {
 	const defaults = new Map<string, unknown>();
 
@@ -593,7 +593,7 @@ function collectAppConfigDefaults(
  * @returns Flat map of `key -> value`.
  */
 function collectManagedAppCandidates(
-	config: EnsembleConfig,
+	config: EnsemblrConfig,
 	appConfigDefaults: Map<string, unknown>,
 	lockedKeys: Set<string>,
 ): Map<string, unknown> {

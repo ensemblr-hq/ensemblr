@@ -28,94 +28,94 @@
 	 * re-fonts every code/editor/diff surface live. The user's chosen font is
 	 * prepended at runtime; this literal is the fallback chain.
 	 */
-	--ensemble-font-mono:
+	--ensemblr-font-mono:
 		"JetBrains Mono Variable", "JetBrains Mono", Menlo, Consolas, monospace;
 
-	--ensemble-canvas: oklch(0.965 0.003 265);
-	--ensemble-toolbar: oklch(0.94 0.004 265 / 92%);
-	--ensemble-surface: oklch(0.995 0 0);
-	--ensemble-pane: oklch(0.94 0.004 265);
-	--ensemble-pane-strong: oklch(0.89 0.006 265);
-	--ensemble-ink: oklch(0.21 0.004 265);
-	--ensemble-muted-ink: oklch(0.52 0.006 265);
-	--ensemble-accent: oklch(0.609 0.111 222);
-	--ensemble-accent-foreground: oklch(0.99 0 0);
-	--ensemble-border: oklch(0.82 0.006 265);
-	--ensemble-ring: oklch(0.609 0.111 222);
-	--ensemble-status-ok: oklch(0.61 0.18 151);
-	--ensemble-status-warning: oklch(0.68 0.15 73);
-	--ensemble-status-danger: oklch(0.58 0.19 28);
-	--ensemble-code: oklch(0.18 0.004 265);
-	--ensemble-code-foreground: oklch(0.93 0.004 265);
-	--ensemble-code-border: oklch(0.3 0.004 265);
-	--ensemble-terminal: oklch(0.155 0.006 35);
-	--ensemble-terminal-foreground: oklch(0.88 0.006 75);
-	--ensemble-terminal-muted: oklch(0.63 0.006 75);
-	--ensemble-terminal-border: oklch(0.31 0.006 35);
-	--ensemble-diff-addition: oklch(0.94 0.041 151);
-	--ensemble-diff-addition-foreground: oklch(0.37 0.11 151);
-	--ensemble-diff-deletion: oklch(0.94 0.035 28);
-	--ensemble-diff-deletion-foreground: oklch(0.43 0.14 28);
-	--ensemble-diff-modified: oklch(0.94 0.028 73);
-	--ensemble-diff-modified-foreground: oklch(0.43 0.08 73);
-	--ensemble-traffic-light-safe-inline: 5.75rem;
+	--ensemblr-canvas: oklch(0.965 0.003 265);
+	--ensemblr-toolbar: oklch(0.94 0.004 265 / 92%);
+	--ensemblr-surface: oklch(0.995 0 0);
+	--ensemblr-pane: oklch(0.94 0.004 265);
+	--ensemblr-pane-strong: oklch(0.89 0.006 265);
+	--ensemblr-ink: oklch(0.21 0.004 265);
+	--ensemblr-muted-ink: oklch(0.52 0.006 265);
+	--ensemblr-accent: oklch(0.609 0.111 222);
+	--ensemblr-accent-foreground: oklch(0.99 0 0);
+	--ensemblr-border: oklch(0.82 0.006 265);
+	--ensemblr-ring: oklch(0.609 0.111 222);
+	--ensemblr-status-ok: oklch(0.61 0.18 151);
+	--ensemblr-status-warning: oklch(0.68 0.15 73);
+	--ensemblr-status-danger: oklch(0.58 0.19 28);
+	--ensemblr-code: oklch(0.18 0.004 265);
+	--ensemblr-code-foreground: oklch(0.93 0.004 265);
+	--ensemblr-code-border: oklch(0.3 0.004 265);
+	--ensemblr-terminal: oklch(0.155 0.006 35);
+	--ensemblr-terminal-foreground: oklch(0.88 0.006 75);
+	--ensemblr-terminal-muted: oklch(0.63 0.006 75);
+	--ensemblr-terminal-border: oklch(0.31 0.006 35);
+	--ensemblr-diff-addition: oklch(0.94 0.041 151);
+	--ensemblr-diff-addition-foreground: oklch(0.37 0.11 151);
+	--ensemblr-diff-deletion: oklch(0.94 0.035 28);
+	--ensemblr-diff-deletion-foreground: oklch(0.43 0.14 28);
+	--ensemblr-diff-modified: oklch(0.94 0.028 73);
+	--ensemblr-diff-modified-foreground: oklch(0.43 0.08 73);
+	--ensemblr-traffic-light-safe-inline: 5.75rem;
 
-	--background: var(--ensemble-canvas);
-	--foreground: var(--ensemble-ink);
-	--card: var(--ensemble-surface);
-	--card-foreground: var(--ensemble-ink);
-	--popover: var(--ensemble-surface);
-	--popover-foreground: var(--ensemble-ink);
+	--background: var(--ensemblr-canvas);
+	--foreground: var(--ensemblr-ink);
+	--card: var(--ensemblr-surface);
+	--card-foreground: var(--ensemblr-ink);
+	--popover: var(--ensemblr-surface);
+	--popover-foreground: var(--ensemblr-ink);
 	--primary: oklch(0.24 0.006 265);
 	--primary-foreground: oklch(0.99 0 0);
-	--secondary: var(--ensemble-pane);
-	--secondary-foreground: var(--ensemble-ink);
-	--muted: var(--ensemble-pane);
-	--muted-foreground: var(--ensemble-muted-ink);
-	--accent: var(--ensemble-pane-strong);
-	--accent-foreground: var(--ensemble-ink);
-	--destructive: var(--ensemble-status-danger);
-	--border: var(--ensemble-border);
-	--input: var(--ensemble-border);
-	--ring: var(--ensemble-ring);
-	--chart-1: var(--ensemble-accent);
-	--chart-2: var(--ensemble-status-ok);
-	--chart-3: var(--ensemble-status-warning);
+	--secondary: var(--ensemblr-pane);
+	--secondary-foreground: var(--ensemblr-ink);
+	--muted: var(--ensemblr-pane);
+	--muted-foreground: var(--ensemblr-muted-ink);
+	--accent: var(--ensemblr-pane-strong);
+	--accent-foreground: var(--ensemblr-ink);
+	--destructive: var(--ensemblr-status-danger);
+	--border: var(--ensemblr-border);
+	--input: var(--ensemblr-border);
+	--ring: var(--ensemblr-ring);
+	--chart-1: var(--ensemblr-accent);
+	--chart-2: var(--ensemblr-status-ok);
+	--chart-3: var(--ensemblr-status-warning);
 	--chart-4: oklch(0.537 0.098 222);
 	--chart-5: oklch(0.675 0.123 221);
 	--radius: 0.55rem;
 	--sidebar: oklch(0.925 0.004 265 / 96%);
-	--sidebar-foreground: var(--ensemble-ink);
+	--sidebar-foreground: var(--ensemblr-ink);
 	--sidebar-primary: var(--primary);
 	--sidebar-primary-foreground: var(--primary-foreground);
 	--sidebar-accent: oklch(0.89 0.006 265);
-	--sidebar-accent-foreground: var(--ensemble-ink);
-	--sidebar-border: var(--ensemble-border);
-	--sidebar-ring: var(--ensemble-ring);
+	--sidebar-accent-foreground: var(--ensemblr-ink);
+	--sidebar-border: var(--ensemblr-border);
+	--sidebar-ring: var(--ensemblr-ring);
 }
 
 @media (prefers-color-scheme: dark) {
 	:root:not(.light) {
-		--ensemble-canvas: oklch(0.135 0.006 35);
-		--ensemble-toolbar: oklch(0.18 0.006 35 / 94%);
-		--ensemble-surface: oklch(0.16 0.006 35);
-		--ensemble-pane: oklch(0.205 0.006 35);
-		--ensemble-pane-strong: oklch(0.26 0.006 35);
-		--ensemble-ink: oklch(0.91 0.006 75);
-		--ensemble-muted-ink: oklch(0.67 0.006 75);
-		--ensemble-accent: oklch(0.675 0.123 221);
-		--ensemble-accent-foreground: oklch(0.14 0.006 35);
-		--ensemble-border: oklch(0.31 0.006 35);
-		--ensemble-ring: oklch(0.675 0.123 221);
-		--ensemble-status-ok: oklch(0.74 0.18 151);
-		--ensemble-status-warning: oklch(0.77 0.13 73);
-		--ensemble-status-danger: oklch(0.68 0.15 28);
-		--ensemble-diff-addition: oklch(0.22 0.052 151);
-		--ensemble-diff-addition-foreground: oklch(0.78 0.18 151);
-		--ensemble-diff-deletion: oklch(0.22 0.045 28);
-		--ensemble-diff-deletion-foreground: oklch(0.74 0.15 28);
-		--ensemble-diff-modified: oklch(0.24 0.035 73);
-		--ensemble-diff-modified-foreground: oklch(0.78 0.13 73);
+		--ensemblr-canvas: oklch(0.135 0.006 35);
+		--ensemblr-toolbar: oklch(0.18 0.006 35 / 94%);
+		--ensemblr-surface: oklch(0.16 0.006 35);
+		--ensemblr-pane: oklch(0.205 0.006 35);
+		--ensemblr-pane-strong: oklch(0.26 0.006 35);
+		--ensemblr-ink: oklch(0.91 0.006 75);
+		--ensemblr-muted-ink: oklch(0.67 0.006 75);
+		--ensemblr-accent: oklch(0.675 0.123 221);
+		--ensemblr-accent-foreground: oklch(0.14 0.006 35);
+		--ensemblr-border: oklch(0.31 0.006 35);
+		--ensemblr-ring: oklch(0.675 0.123 221);
+		--ensemblr-status-ok: oklch(0.74 0.18 151);
+		--ensemblr-status-warning: oklch(0.77 0.13 73);
+		--ensemblr-status-danger: oklch(0.68 0.15 28);
+		--ensemblr-diff-addition: oklch(0.22 0.052 151);
+		--ensemblr-diff-addition-foreground: oklch(0.78 0.18 151);
+		--ensemblr-diff-deletion: oklch(0.22 0.045 28);
+		--ensemblr-diff-deletion-foreground: oklch(0.74 0.15 28);
+		--ensemblr-diff-modified: oklch(0.24 0.035 73);
+		--ensemblr-diff-modified-foreground: oklch(0.78 0.13 73);
 		--primary: oklch(0.84 0.007 75);
 		--primary-foreground: oklch(0.14 0.006 35);
 		--sidebar: oklch(0.17 0.006 35 / 97%);
@@ -124,26 +124,26 @@
 }
 
 .dark {
-	--ensemble-canvas: oklch(0.135 0.006 35);
-	--ensemble-toolbar: oklch(0.18 0.006 35 / 94%);
-	--ensemble-surface: oklch(0.16 0.006 35);
-	--ensemble-pane: oklch(0.205 0.006 35);
-	--ensemble-pane-strong: oklch(0.26 0.006 35);
-	--ensemble-ink: oklch(0.91 0.006 75);
-	--ensemble-muted-ink: oklch(0.67 0.006 75);
-	--ensemble-accent: oklch(0.675 0.123 221);
-	--ensemble-accent-foreground: oklch(0.14 0.006 35);
-	--ensemble-border: oklch(0.31 0.006 35);
-	--ensemble-ring: oklch(0.675 0.123 221);
-	--ensemble-status-ok: oklch(0.74 0.18 151);
-	--ensemble-status-warning: oklch(0.77 0.13 73);
-	--ensemble-status-danger: oklch(0.68 0.15 28);
-	--ensemble-diff-addition: oklch(0.22 0.052 151);
-	--ensemble-diff-addition-foreground: oklch(0.78 0.18 151);
-	--ensemble-diff-deletion: oklch(0.22 0.045 28);
-	--ensemble-diff-deletion-foreground: oklch(0.74 0.15 28);
-	--ensemble-diff-modified: oklch(0.24 0.035 73);
-	--ensemble-diff-modified-foreground: oklch(0.78 0.13 73);
+	--ensemblr-canvas: oklch(0.135 0.006 35);
+	--ensemblr-toolbar: oklch(0.18 0.006 35 / 94%);
+	--ensemblr-surface: oklch(0.16 0.006 35);
+	--ensemblr-pane: oklch(0.205 0.006 35);
+	--ensemblr-pane-strong: oklch(0.26 0.006 35);
+	--ensemblr-ink: oklch(0.91 0.006 75);
+	--ensemblr-muted-ink: oklch(0.67 0.006 75);
+	--ensemblr-accent: oklch(0.675 0.123 221);
+	--ensemblr-accent-foreground: oklch(0.14 0.006 35);
+	--ensemblr-border: oklch(0.31 0.006 35);
+	--ensemblr-ring: oklch(0.675 0.123 221);
+	--ensemblr-status-ok: oklch(0.74 0.18 151);
+	--ensemblr-status-warning: oklch(0.77 0.13 73);
+	--ensemblr-status-danger: oklch(0.68 0.15 28);
+	--ensemblr-diff-addition: oklch(0.22 0.052 151);
+	--ensemblr-diff-addition-foreground: oklch(0.78 0.18 151);
+	--ensemblr-diff-deletion: oklch(0.22 0.045 28);
+	--ensemblr-diff-deletion-foreground: oklch(0.74 0.15 28);
+	--ensemblr-diff-modified: oklch(0.24 0.035 73);
+	--ensemblr-diff-modified-foreground: oklch(0.78 0.13 73);
 	--primary: oklch(0.84 0.007 75);
 	--primary-foreground: oklch(0.14 0.006 35);
 	--sidebar: oklch(0.17 0.006 35 / 97%);
@@ -153,20 +153,20 @@
 /*
  * Dev-build tint. `main.tsx` adds `.env-dev` to <html> only when
  * `import.meta.env.DEV` is set, so the packaged app never matches. Re-hues the
- * top bars (`--ensemble-toolbar`) and the accent (`--ensemble-accent`) to amber
+ * top bars (`--ensemblr-toolbar`) and the accent (`--ensemblr-accent`) to amber
  * (hue 74) so the dogfood dev window is unmistakable. The nav sidebar's
  * title-bar strip carries no `.native-toolbar`, so it is tinted to match via the
  * rule below. Light values on `.env-dev`; dark on `.dark.env-dev` (higher
  * specificity, wins over `.dark`).
  */
 .env-dev {
-	--ensemble-toolbar: oklch(0.9 0.055 74 / 92%);
-	--ensemble-accent: oklch(0.7 0.14 74);
+	--ensemblr-toolbar: oklch(0.9 0.055 74 / 92%);
+	--ensemblr-accent: oklch(0.7 0.14 74);
 }
 
 .dark.env-dev {
-	--ensemble-toolbar: oklch(0.22 0.05 74 / 94%);
-	--ensemble-accent: oklch(0.75 0.13 74);
+	--ensemblr-toolbar: oklch(0.22 0.05 74 / 94%);
+	--ensemblr-accent: oklch(0.75 0.13 74);
 }
 
 /*
@@ -180,53 +180,53 @@
  */
 .a11y-protanopia,
 .a11y-deuteranopia {
-	--ensemble-status-ok: oklch(0.61 0.18 244);
-	--ensemble-status-warning: oklch(0.68 0.15 76.8);
-	--ensemble-status-danger: oklch(0.58 0.19 47.5);
-	--ensemble-diff-addition: oklch(0.94 0.041 244);
-	--ensemble-diff-addition-foreground: oklch(0.37 0.11 244);
-	--ensemble-diff-deletion: oklch(0.94 0.035 47.5);
-	--ensemble-diff-deletion-foreground: oklch(0.43 0.14 47.5);
-	--ensemble-diff-modified: oklch(0.94 0.028 76.8);
-	--ensemble-diff-modified-foreground: oklch(0.43 0.08 76.8);
+	--ensemblr-status-ok: oklch(0.61 0.18 244);
+	--ensemblr-status-warning: oklch(0.68 0.15 76.8);
+	--ensemblr-status-danger: oklch(0.58 0.19 47.5);
+	--ensemblr-diff-addition: oklch(0.94 0.041 244);
+	--ensemblr-diff-addition-foreground: oklch(0.37 0.11 244);
+	--ensemblr-diff-deletion: oklch(0.94 0.035 47.5);
+	--ensemblr-diff-deletion-foreground: oklch(0.43 0.14 47.5);
+	--ensemblr-diff-modified: oklch(0.94 0.028 76.8);
+	--ensemblr-diff-modified-foreground: oklch(0.43 0.08 76.8);
 }
 
 .dark.a11y-protanopia,
 .dark.a11y-deuteranopia {
-	--ensemble-status-ok: oklch(0.74 0.18 244);
-	--ensemble-status-warning: oklch(0.77 0.13 76.8);
-	--ensemble-status-danger: oklch(0.68 0.15 47.5);
-	--ensemble-diff-addition: oklch(0.22 0.052 244);
-	--ensemble-diff-addition-foreground: oklch(0.78 0.18 244);
-	--ensemble-diff-deletion: oklch(0.22 0.045 47.5);
-	--ensemble-diff-deletion-foreground: oklch(0.74 0.15 47.5);
-	--ensemble-diff-modified: oklch(0.24 0.035 76.8);
-	--ensemble-diff-modified-foreground: oklch(0.78 0.13 76.8);
+	--ensemblr-status-ok: oklch(0.74 0.18 244);
+	--ensemblr-status-warning: oklch(0.77 0.13 76.8);
+	--ensemblr-status-danger: oklch(0.68 0.15 47.5);
+	--ensemblr-diff-addition: oklch(0.22 0.052 244);
+	--ensemblr-diff-addition-foreground: oklch(0.78 0.18 244);
+	--ensemblr-diff-deletion: oklch(0.22 0.045 47.5);
+	--ensemblr-diff-deletion-foreground: oklch(0.74 0.15 47.5);
+	--ensemblr-diff-modified: oklch(0.24 0.035 76.8);
+	--ensemblr-diff-modified-foreground: oklch(0.78 0.13 76.8);
 }
 
 /* Tritanopia: add/ok → green 165.5°, remove/danger → magenta 346.3°, warning → vermillion 47.5°. */
 .a11y-tritanopia {
-	--ensemble-status-ok: oklch(0.61 0.18 165.5);
-	--ensemble-status-warning: oklch(0.68 0.15 47.5);
-	--ensemble-status-danger: oklch(0.58 0.19 346.3);
-	--ensemble-diff-addition: oklch(0.94 0.041 165.5);
-	--ensemble-diff-addition-foreground: oklch(0.37 0.11 165.5);
-	--ensemble-diff-deletion: oklch(0.94 0.035 346.3);
-	--ensemble-diff-deletion-foreground: oklch(0.43 0.14 346.3);
-	--ensemble-diff-modified: oklch(0.94 0.028 47.5);
-	--ensemble-diff-modified-foreground: oklch(0.43 0.08 47.5);
+	--ensemblr-status-ok: oklch(0.61 0.18 165.5);
+	--ensemblr-status-warning: oklch(0.68 0.15 47.5);
+	--ensemblr-status-danger: oklch(0.58 0.19 346.3);
+	--ensemblr-diff-addition: oklch(0.94 0.041 165.5);
+	--ensemblr-diff-addition-foreground: oklch(0.37 0.11 165.5);
+	--ensemblr-diff-deletion: oklch(0.94 0.035 346.3);
+	--ensemblr-diff-deletion-foreground: oklch(0.43 0.14 346.3);
+	--ensemblr-diff-modified: oklch(0.94 0.028 47.5);
+	--ensemblr-diff-modified-foreground: oklch(0.43 0.08 47.5);
 }
 
 .dark.a11y-tritanopia {
-	--ensemble-status-ok: oklch(0.74 0.18 165.5);
-	--ensemble-status-warning: oklch(0.77 0.13 47.5);
-	--ensemble-status-danger: oklch(0.68 0.15 346.3);
-	--ensemble-diff-addition: oklch(0.22 0.052 165.5);
-	--ensemble-diff-addition-foreground: oklch(0.78 0.18 165.5);
-	--ensemble-diff-deletion: oklch(0.22 0.045 346.3);
-	--ensemble-diff-deletion-foreground: oklch(0.74 0.15 346.3);
-	--ensemble-diff-modified: oklch(0.24 0.035 47.5);
-	--ensemble-diff-modified-foreground: oklch(0.78 0.13 47.5);
+	--ensemblr-status-ok: oklch(0.74 0.18 165.5);
+	--ensemblr-status-warning: oklch(0.77 0.13 47.5);
+	--ensemblr-status-danger: oklch(0.68 0.15 346.3);
+	--ensemblr-diff-addition: oklch(0.22 0.052 165.5);
+	--ensemblr-diff-addition-foreground: oklch(0.78 0.18 165.5);
+	--ensemblr-diff-deletion: oklch(0.22 0.045 346.3);
+	--ensemblr-diff-deletion-foreground: oklch(0.74 0.15 346.3);
+	--ensemblr-diff-modified: oklch(0.24 0.035 47.5);
+	--ensemblr-diff-modified-foreground: oklch(0.78 0.13 47.5);
 }
 
 /*
@@ -246,31 +246,31 @@
 		-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
 	--font-sans:
 		-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-	--font-mono: var(--ensemble-font-mono);
+	--font-mono: var(--ensemblr-font-mono);
 	--text-xxs: 0.6875rem;
-	--color-canvas: var(--ensemble-canvas);
-	--color-toolbar: var(--ensemble-toolbar);
-	--color-surface: var(--ensemble-surface);
-	--color-pane: var(--ensemble-pane);
-	--color-pane-strong: var(--ensemble-pane-strong);
-	--color-ink: var(--ensemble-ink);
-	--color-accent-strong: var(--ensemble-accent);
-	--color-status-ok: var(--ensemble-status-ok);
-	--color-status-warning: var(--ensemble-status-warning);
-	--color-status-danger: var(--ensemble-status-danger);
-	--color-code: var(--ensemble-code);
-	--color-code-foreground: var(--ensemble-code-foreground);
-	--color-code-border: var(--ensemble-code-border);
-	--color-terminal: var(--ensemble-terminal);
-	--color-terminal-foreground: var(--ensemble-terminal-foreground);
-	--color-terminal-muted: var(--ensemble-terminal-muted);
-	--color-terminal-border: var(--ensemble-terminal-border);
-	--color-diff-addition: var(--ensemble-diff-addition);
-	--color-diff-addition-foreground: var(--ensemble-diff-addition-foreground);
-	--color-diff-deletion: var(--ensemble-diff-deletion);
-	--color-diff-deletion-foreground: var(--ensemble-diff-deletion-foreground);
-	--color-diff-modified: var(--ensemble-diff-modified);
-	--color-diff-modified-foreground: var(--ensemble-diff-modified-foreground);
+	--color-canvas: var(--ensemblr-canvas);
+	--color-toolbar: var(--ensemblr-toolbar);
+	--color-surface: var(--ensemblr-surface);
+	--color-pane: var(--ensemblr-pane);
+	--color-pane-strong: var(--ensemblr-pane-strong);
+	--color-ink: var(--ensemblr-ink);
+	--color-accent-strong: var(--ensemblr-accent);
+	--color-status-ok: var(--ensemblr-status-ok);
+	--color-status-warning: var(--ensemblr-status-warning);
+	--color-status-danger: var(--ensemblr-status-danger);
+	--color-code: var(--ensemblr-code);
+	--color-code-foreground: var(--ensemblr-code-foreground);
+	--color-code-border: var(--ensemblr-code-border);
+	--color-terminal: var(--ensemblr-terminal);
+	--color-terminal-foreground: var(--ensemblr-terminal-foreground);
+	--color-terminal-muted: var(--ensemblr-terminal-muted);
+	--color-terminal-border: var(--ensemblr-terminal-border);
+	--color-diff-addition: var(--ensemblr-diff-addition);
+	--color-diff-addition-foreground: var(--ensemblr-diff-addition-foreground);
+	--color-diff-deletion: var(--ensemblr-diff-deletion);
+	--color-diff-deletion-foreground: var(--ensemblr-diff-deletion-foreground);
+	--color-diff-modified: var(--ensemblr-diff-modified);
+	--color-diff-modified-foreground: var(--ensemblr-diff-modified-foreground);
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -342,24 +342,25 @@
 	}
 
 	::selection {
-		background: color-mix(in oklch, var(--ensemble-accent), transparent 65%);
+		background: color-mix(in oklch, var(--ensemblr-accent), transparent 65%);
 	}
 }
 
 @layer utilities {
 	.macos-traffic-light-spacer,
-	.native-toolbar {
+	.native-toolbar,
+	.window-drag-region {
 		-webkit-app-region: drag;
 	}
 
 	.native-toolbar {
-		background: var(--ensemble-toolbar);
+		background: var(--ensemblr-toolbar);
 		backdrop-filter: blur(18px) saturate(1.3);
 	}
 
 	/* Dev only: tint the nav sidebar's bare title-bar strip to match the top bars. */
 	.env-dev .macos-traffic-light-spacer {
-		background: var(--ensemble-toolbar);
+		background: var(--ensemblr-toolbar);
 	}
 
 	.project-workspace-collapse {
@@ -389,13 +390,13 @@
 	}
 
 	.right-sidebar-header[data-pr-tone="ready"] {
-		background: color-mix(in oklch, var(--ensemble-status-ok), transparent 84%);
+		background: color-mix(in oklch, var(--ensemblr-status-ok), transparent 84%);
 	}
 
 	.right-sidebar-header[data-pr-tone="pending"] {
 		background: color-mix(
 			in oklch,
-			var(--ensemble-status-warning),
+			var(--ensemblr-status-warning),
 			transparent 88%
 		);
 	}
@@ -403,7 +404,7 @@
 	.right-sidebar-header[data-pr-tone="blocked"] {
 		background: color-mix(
 			in oklch,
-			var(--ensemble-status-danger),
+			var(--ensemblr-status-danger),
 			transparent 88%
 		);
 	}
@@ -461,7 +462,7 @@
 	[data-slot="sidebar"][data-collapsible="offcanvas"]
 		~ [data-slot="sidebar-inset"]
 		.native-toolbar {
-		padding-inline-start: var(--ensemble-traffic-light-safe-inline);
+		padding-inline-start: var(--ensemblr-traffic-light-safe-inline);
 	}
 
 	[data-slot="sidebar"][data-state="collapsed"]
@@ -472,7 +473,7 @@
 
 	@media (width < 48rem) {
 		.native-toolbar {
-			padding-inline-start: var(--ensemble-traffic-light-safe-inline);
+			padding-inline-start: var(--ensemblr-traffic-light-safe-inline);
 		}
 
 		.sidebar-collapsed-trigger {

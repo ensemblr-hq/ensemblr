@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { isEnsembleApiAvailable } from '@/renderer/api/ensemble-queries';
+import { isEnsemblrApiAvailable } from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -74,7 +74,7 @@ function QuickStartDialogForm({
 		!isBusy &&
 		trimmedName.length > 0 &&
 		localValidation === null &&
-		isEnsembleApiAvailable();
+		isEnsemblrApiAvailable();
 	const parentPlaceholder = defaultParentPath || 'Managed repos directory';
 
 	const handleCreate = useCallback(async () => {
@@ -153,7 +153,7 @@ function QuickStartDialogForm({
 					/>
 					<Button
 						className='h-9'
-						disabled={isBusy || !isEnsembleApiAvailable()}
+						disabled={isBusy || !isEnsemblrApiAvailable()}
 						onClick={pickParentPath}
 						type='button'
 						variant='outline'

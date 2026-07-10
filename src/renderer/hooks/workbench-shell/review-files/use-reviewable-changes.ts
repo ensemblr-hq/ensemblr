@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 
-import { workspaceGitStatusQuery } from '@/renderer/api/ensemble';
+import { workspaceGitStatusQuery } from '@/renderer/api/ensemblr';
 import { hasReviewableChanges } from '@/renderer/lib/workbench/review-presence';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';

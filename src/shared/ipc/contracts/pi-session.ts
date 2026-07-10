@@ -74,7 +74,7 @@ export interface OpenPiSessionRequest {
 	/** First user prompt, used only to generate a short tab title. */
 	initialPrompt?: string | null;
 	label?: string;
-	/** Existing Ensemble Pi session id to reopen with native Pi history. */
+	/** Existing Ensemblr Pi session id to reopen with native Pi history. */
 	resumeSessionId?: string | null;
 	model?: string | null;
 	thinkingLevel?: string | null;
@@ -175,14 +175,14 @@ export interface PiSessionEventBroadcast {
 
 /**
  * Coarse kind tag attached to every raw Pi frame so the debug panel can
- * scope traffic to user-facing chat vs. internal Ensemble jobs (chat-title
+ * scope traffic to user-facing chat vs. internal Ensemblr jobs (chat-title
  * generation, session-summary generation). Derived from the session label
  * supplied at adapter create time.
  */
 export type PiRawFrameKind = 'chat' | 'title' | 'summary' | 'unknown';
 
 /**
- * Raw JSONL line as exchanged between Ensemble and a Pi RPC subprocess.
+ * Raw JSONL line as exchanged between Ensemblr and a Pi RPC subprocess.
  * Surfaced to the renderer only for the temporary debug panel — never
  * persisted to SQLite. `direction` indicates whether the line was written
  * TO Pi's stdin (`tx`) or received FROM its stdout (`rx`).
@@ -213,7 +213,7 @@ export interface ListPiModelsResult {
 /**
  * Pi session IPC surface (open / submit / stop / list, plus the live event
  * subscription). CHAT-FRAGILE — keep these signatures byte-for-byte identical
- * to the legacy `EnsembleApi` slice; channel handlers key off the method names.
+ * to the legacy `EnsemblrApi` slice; channel handlers key off the method names.
  */
 export interface PiSessionApi {
 	listPiModels: () => Promise<ListPiModelsResult>;

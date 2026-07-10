@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import {
 	runWorkspaceScript,
 	stopWorkspaceScript,
-} from '@/renderer/api/ensemble/workspace-scripts';
+} from '@/renderer/api/ensemblr/workspace-scripts';
 import type { WorkbenchRouteSearch } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 import type {
@@ -102,7 +102,7 @@ export function useWorkspaceDockActions({
 					});
 			},
 			onOpenRunPort: (url) => {
-				void window.ensemble?.openExternal(url);
+				void window.ensemblr?.openExternal(url);
 			},
 			onOpenSetupScripts: () => {
 				void navigate({

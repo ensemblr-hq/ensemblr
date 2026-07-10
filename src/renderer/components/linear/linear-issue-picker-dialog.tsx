@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
 	linearConnectionQuery,
 	linearIssuesQuery,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import {
 	Command,
 	CommandDialog,

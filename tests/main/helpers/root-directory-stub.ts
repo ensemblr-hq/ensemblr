@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import type { EnsembleRootDirectoryService } from '../../../src/main/root';
+import type { EnsemblrRootDirectoryService } from '../../../src/main/root';
 import type { RootDirectorySnapshot } from '../../../src/shared/ipc';
 
 /**
@@ -16,19 +16,19 @@ export interface RootDirectoryStubOptions {
 }
 
 /**
- * Builds an `EnsembleRootDirectoryService` test double that returns a fixed
+ * Builds an `EnsemblrRootDirectoryService` test double that returns a fixed
  * `ok` snapshot from `ensure()` / `getSnapshot()` and rejects all
  * `applyChange` / `previewChange` calls. The single source of truth for the
  * stub shape across tests/main/*.
  */
 export function buildRootDirectoryStub(
 	options: RootDirectoryStubOptions,
-): EnsembleRootDirectoryService {
+): EnsemblrRootDirectoryService {
 	const rootPath =
 		options.rootPath ??
 		(options.repositoriesPath
 			? path.dirname(options.repositoriesPath)
-			: '/tmp/ensemble-test-root');
+			: '/tmp/ensemblr-test-root');
 	const repositoriesPath =
 		options.repositoriesPath ?? path.join(rootPath, 'repos');
 	const workspacesPath =

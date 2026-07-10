@@ -1,5 +1,5 @@
 /**
- * Wire contracts for Ensemble-local review comments and todos (THE-152).
+ * Wire contracts for Ensemblr-local review comments and todos (THE-152).
  * Rows live in SQLite (`comments` / `todos` tables, ADR 0008) and are always
  * labelled as local so they never read as GitHub review state.
  */

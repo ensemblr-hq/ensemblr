@@ -30,7 +30,7 @@ interface WorkspaceRenameTarget {
 /**
  * Builds the post-first-turn auto branch-naming step. Mirrors the chat-title
  * service: on the first prompt of a fresh session it runs a throwaway pi session
- * (label `ensemble-branch-name`) to suggest a kebab-case branch name, then
+ * (label `ensemblr-branch-name`) to suggest a kebab-case branch name, then
  * renames the workspace + its git branch via {@link RenameWorkspaceService} —
  * but only when `renameWorkspaceOnBranch` is enabled and the workspace still
  * carries its auto-generated composer placeholder name. Entirely best-effort:
@@ -154,7 +154,7 @@ async function generateBranchSlug({
 }): Promise<string | null> {
 	const session = await piAgentClient.createSession({
 		executable,
-		label: 'ensemble-branch-name',
+		label: 'ensemblr-branch-name',
 		modelOverride: model,
 		workspaceCwd,
 	});

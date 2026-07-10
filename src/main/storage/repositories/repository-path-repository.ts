@@ -10,7 +10,7 @@ export interface IsTrackedRepositoryPathOptions {
 /**
  * Returns whether the on-disk path matches a currently-tracked repository or
  * workspace row. Used to gate repository-config IPC writes — the renderer can
- * only mutate config for paths Ensemble already knows about.
+ * only mutate config for paths Ensemblr already knows about.
  */
 export function isTrackedRepositoryPath({
 	database,

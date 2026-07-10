@@ -448,8 +448,8 @@ function formatSourceLabel(
 			return 'user override';
 		case 'built-in-default':
 			return 'built-in default';
-		case 'ensemble-config':
-			return 'Ensemble repository config';
+		case 'ensemblr-config':
+			return 'Ensemblr repository config';
 		default:
 			return 'unknown source';
 	}

@@ -64,7 +64,7 @@ export type ComputeTurnDiffResult =
 
 /**
  * Restore workspace files to a turn's pre-prompt checkpoint. Non-destructive
- * to Pi session files; later Ensemble-visible events are hidden, not deleted.
+ * to Pi session files; later Ensemblr-visible events are hidden, not deleted.
  */
 export interface RestoreCheckpointRequest {
 	/**

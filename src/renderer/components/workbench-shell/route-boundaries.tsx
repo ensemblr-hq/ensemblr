@@ -37,7 +37,7 @@ function renderBoundary(emptyState: BoundaryCopy, health: WorkbenchHealth) {
 export function WorkbenchRoutePending() {
 	return renderBoundary(
 		{
-			detail: 'Ensemble is reading repositories and workspaces from SQLite.',
+			detail: 'Ensemblr is reading repositories and workspaces from SQLite.',
 			title: 'Loading repositories',
 		},
 		{

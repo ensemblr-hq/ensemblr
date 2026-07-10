@@ -28,7 +28,7 @@ interface SecurityCommandResult {
 	stdout: string;
 }
 
-const DEFAULT_KEYCHAIN_SERVICE_NAME = 'com.ensemble.app.secret-store';
+const DEFAULT_KEYCHAIN_SERVICE_NAME = 'dev.ensemblr.app.secret-store';
 const SECURITY_COMMAND_PATH = '/usr/bin/security';
 
 /**
@@ -103,7 +103,7 @@ function buildKeychainSecretStore({
 			'-l',
 			input.displayName,
 			'-j',
-			`Ensemble ${input.scope} secret metadata entry`,
+			`Ensemblr ${input.scope} secret metadata entry`,
 			'-U',
 			'-X',
 			encodedValue,
@@ -245,7 +245,7 @@ function runSecurityCommand(
 	return new Promise((resolve, reject) => {
 		const child = spawn(commandPath, args, {
 			// Strip launch-context vars so a keychain read can't be attributed to
-			// (or relaunch) Ensemble by LaunchServices.
+			// (or relaunch) Ensemblr by LaunchServices.
 			env: stripLaunchContextEnv(process.env),
 			stdio: ['pipe', 'pipe', 'pipe'],
 		});

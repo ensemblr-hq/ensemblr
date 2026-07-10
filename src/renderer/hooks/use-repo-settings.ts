@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useAtom } from 'jotai';
 
-import { settingsResolutionQuery } from '@/renderer/api/ensemble';
+import { settingsResolutionQuery } from '@/renderer/api/ensemblr';
 import { workbenchRouteApi } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
 import {
 	type RepoSettingsKey,

@@ -2,10 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
-	isEnsembleApiAvailable,
+	isEnsemblrApiAvailable,
 	rootDirectoryQuery,
 	selectCloneDestination,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -69,7 +69,7 @@ function CloneGithubDialogForm({
 }) {
 	const { data: rootDirectoryData } = useQuery({
 		...rootDirectoryQuery,
-		enabled: isEnsembleApiAvailable(),
+		enabled: isEnsemblrApiAvailable(),
 	});
 	const defaultParentPath = rootDirectoryData?.repositoriesPath ?? '';
 
@@ -95,11 +95,11 @@ function CloneGithubDialogForm({
 		!isBusy &&
 		trimmedUrl.length > 0 &&
 		isUrlLikeInput(trimmedUrl) &&
-		isEnsembleApiAvailable();
+		isEnsemblrApiAvailable();
 	const locationPlaceholder = defaultParentPath || 'Managed repos directory';
 
 	const handleBrowse = useCallback(async () => {
-		if (!isEnsembleApiAvailable()) {
+		if (!isEnsemblrApiAvailable()) {
 			return;
 		}
 		const selection = await selectCloneDestination();
@@ -125,7 +125,7 @@ function CloneGithubDialogForm({
 	}, [canClone, location, startClone, trimmedUrl]);
 
 	const search = useCloneRepoSearch({
-		enabled: isEnsembleApiAvailable(),
+		enabled: isEnsemblrApiAvailable(),
 		onSubmit: handleClone,
 		setUrl,
 		url,
@@ -214,7 +214,7 @@ function CloneGithubDialogForm({
 						/>
 						<Button
 							className='h-9'
-							disabled={isBusy || !isEnsembleApiAvailable()}
+							disabled={isBusy || !isEnsemblrApiAvailable()}
 							onClick={handleBrowse}
 							type='button'
 							variant='outline'

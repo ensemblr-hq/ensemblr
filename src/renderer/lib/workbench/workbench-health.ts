@@ -58,7 +58,7 @@ export function getWorkbenchHealth({
 
 		if (!setupSnapshot) {
 			return {
-				detail: 'Ensemble is collecting setup readiness checks.',
+				detail: 'Ensemblr is collecting setup readiness checks.',
 				label: 'Checking setup',
 				state: 'pending',
 			};

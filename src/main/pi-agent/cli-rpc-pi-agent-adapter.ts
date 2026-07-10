@@ -464,7 +464,7 @@ function createCliRpcSession({
 
 		// Pi RPC protocol (@earendil-works/pi-coding-agent >= 0.79):
 		//   {"type":"prompt","message":"<text>"}
-		// `turnId` and attachments are Ensemble-side metadata that the runtime
+		// `turnId` and attachments are Ensemblr-side metadata that the runtime
 		// ignores today; we keep them on the frame so a future Pi build that
 		// accepts them needs no client change.
 		const frame = {

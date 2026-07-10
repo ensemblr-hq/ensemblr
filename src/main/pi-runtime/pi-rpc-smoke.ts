@@ -6,7 +6,7 @@ import { performance } from 'node:perf_hooks';
 import type { CommandEnvironmentSnapshot } from '../commands/local-command.ts';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import { createJsonlLineStream } from '../pi-ipc/jsonl-line-stream.ts';
-import type { EnsembleRootDirectoryService } from '../root/root-directory-service.ts';
+import type { EnsemblrRootDirectoryService } from '../root/root-directory-service.ts';
 import {
 	isExecutableReady,
 	type PiExecutableSnapshot,
@@ -373,7 +373,7 @@ export function runPiRpcSmokeProcess({
  * @returns The workspace path plus any error encountered.
  */
 export function ensureSetupSmokeWorkspace(
-	rootDirectoryService: EnsembleRootDirectoryService,
+	rootDirectoryService: EnsemblrRootDirectoryService,
 ): { error?: string; path: string } {
 	const rootSnapshot =
 		rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
@@ -385,14 +385,14 @@ export function ensureSetupSmokeWorkspace(
 		return {
 			error:
 				rootSnapshot.diagnostics[0]?.message ??
-				'Ensemble root is not ready enough to create a Pi RPC smoke workspace.',
+				'Ensemblr root is not ready enough to create a Pi RPC smoke workspace.',
 			path: smokeWorkspacePath,
 		};
 	}
 
 	if (!smokeWorkspacePath) {
 		return {
-			error: 'Ensemble workspaces path is unavailable for Pi RPC smoke checks.',
+			error: 'Ensemblr workspaces path is unavailable for Pi RPC smoke checks.',
 			path: smokeWorkspacePath,
 		};
 	}

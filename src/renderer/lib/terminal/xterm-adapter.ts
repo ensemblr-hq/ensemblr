@@ -135,7 +135,7 @@ function observeDocumentTheme(
 
 /**
  * Derives the xterm theme from the app's CSS design tokens so the terminal
- * follows the active Ensemble theme: the dock terminal surface shares the
+ * follows the active Ensemblr theme: the dock terminal surface shares the
  * sidebar background. Falls back to a transparent background with inherited
  * colors when tokens are unavailable (tests).
  */

@@ -1,6 +1,6 @@
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 
-export const ensembleWorkspaceFiles: WorkspaceFileSummary[] = [
+export const ensemblrWorkspaceFiles: WorkspaceFileSummary[] = [
 	{ id: 'dir-agents', kind: 'directory', name: '.agents', path: '.agents' },
 	{ id: 'dir-claude', kind: 'directory', name: '.claude', path: '.claude' },
 	{ id: 'dir-codex', kind: 'directory', name: '.codex', path: '.codex' },
@@ -59,10 +59,10 @@ export const ensembleWorkspaceFiles: WorkspaceFileSummary[] = [
 		path: 'components.json',
 	},
 	{
-		id: 'file-ensemble-settings',
+		id: 'file-ensemblr-settings',
 		kind: 'file',
 		name: 'settings.toml',
-		path: '.ensemble/settings.toml',
+		path: '.ensemblr/settings.toml',
 	},
 	{ id: 'file-context', kind: 'file', name: 'CONTEXT.md', path: 'CONTEXT.md' },
 	{

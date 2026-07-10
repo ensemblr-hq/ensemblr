@@ -5,7 +5,7 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../../src/main/commands/local-command.ts';
-import type { EnsembleConfigService } from '../../src/main/config/config-loader.ts';
+import type { EnsemblrConfigService } from '../../src/main/config/config-loader.ts';
 import type { EnvironmentVariablesService } from '../../src/main/environment/environment-variables.ts';
 import type { LinearAuthService } from '../../src/main/linear/linear-auth-service.ts';
 import type {
@@ -16,7 +16,7 @@ import type {
 	PiReadinessService,
 	PiReadinessSnapshot,
 } from '../../src/main/pi-runtime/pi-readiness.ts';
-import type { EnsembleRootDirectoryService } from '../../src/main/root/root-directory-service.ts';
+import type { EnsemblrRootDirectoryService } from '../../src/main/root/root-directory-service.ts';
 import {
 	createSetupCheckSnapshot,
 	type SetupCheckProvider,
@@ -24,7 +24,7 @@ import {
 import { createSetupDiagnosticsService } from '../../src/main/setup/setup-diagnostics.ts';
 import type {
 	DatabaseHealthSnapshot,
-	EnsembleDatabaseService,
+	EnsemblrDatabaseService,
 } from '../../src/main/storage/database.ts';
 import type {
 	ConfigStatusSnapshot,
@@ -83,13 +83,13 @@ interface FakeCommandOutcome {
 
 function createConfigService(
 	snapshot: Partial<ConfigStatusSnapshot> = {},
-): EnsembleConfigService {
+): EnsemblrConfigService {
 	const configSnapshot: ConfigStatusSnapshot = {
 		blocksReadiness: false,
 		diagnostics: [],
-		displayPath: '~/.config/ensemble/config.json',
+		displayPath: '~/.config/ensemblr/config.json',
 		loadedAt: NOW.toISOString(),
-		path: `${HOME}/.config/ensemble/config.json`,
+		path: `${HOME}/.config/ensemblr/config.json`,
 		schemaVersion: 1,
 		status: 'ok',
 		...snapshot,
@@ -113,9 +113,9 @@ function createConfigService(
 
 function createDatabaseService(
 	health: Partial<DatabaseHealthSnapshot> = {},
-): EnsembleDatabaseService {
+): EnsemblrDatabaseService {
 	const snapshot: DatabaseHealthSnapshot = {
-		path: `${HOME}/Library/Application Support/com.ensemble.app/ensemble.db`,
+		path: `${HOME}/Library/Application Support/dev.ensemblr.app/ensemblr.db`,
 		schemaVersion: 3,
 		status: 'ok',
 		...health,
@@ -131,34 +131,34 @@ function createDatabaseService(
 
 function createRootDirectoryService(
 	snapshot: Partial<RootDirectorySnapshot> = {},
-): EnsembleRootDirectoryService {
+): EnsemblrRootDirectoryService {
 	const rootSnapshot: RootDirectorySnapshot = {
-		archivedContextsPath: `${HOME}/Ensemble/archived-contexts`,
+		archivedContextsPath: `${HOME}/Ensemblr/archived-contexts`,
 		createdPaths: [],
 		diagnostics: [],
 		managedPaths: [
 			{
 				key: 'repos',
-				path: `${HOME}/Ensemble/repos`,
+				path: `${HOME}/Ensemblr/repos`,
 				status: 'present',
 			},
 			{
 				key: 'workspaces',
-				path: `${HOME}/Ensemble/workspaces`,
+				path: `${HOME}/Ensemblr/workspaces`,
 				status: 'present',
 			},
 			{
 				key: 'archived-contexts',
-				path: `${HOME}/Ensemble/archived-contexts`,
+				path: `${HOME}/Ensemblr/archived-contexts`,
 				status: 'present',
 			},
 		],
-		path: `${HOME}/Ensemble`,
-		repositoriesPath: `${HOME}/Ensemble/repos`,
+		path: `${HOME}/Ensemblr`,
+		repositoriesPath: `${HOME}/Ensemblr/repos`,
 		setting: null,
 		source: 'built-in-default',
 		status: 'ok',
-		workspacesPath: `${HOME}/Ensemble/workspaces`,
+		workspacesPath: `${HOME}/Ensemblr/workspaces`,
 		...snapshot,
 	};
 
@@ -250,13 +250,13 @@ function createEnvironmentVariablesService(): EnvironmentVariablesService {
 function createDefaultCommandOutcome(
 	command: string,
 	args: string[],
-	shellStdout = 'ensemble-process-ok',
+	shellStdout = 'ensemblr-process-ok',
 ): FakeCommandOutcome {
 	const argsKey = args.join('\u0000');
 
 	if (
 		command === '/bin/sh' &&
-		argsKey === '-lc\u0000printf ensemble-process-ok'
+		argsKey === '-lc\u0000printf ensemblr-process-ok'
 	) {
 		return {
 			stdout: shellStdout,
@@ -428,7 +428,7 @@ function createPiReadinessService(
 		rpc: {
 			args: ['--mode', 'rpc'],
 			command: executable.command,
-			cwd: `${HOME}/Ensemble/workspaces/.setup-smoke`,
+			cwd: `${HOME}/Ensemblr/workspaces/.setup-smoke`,
 			durationMs: 2,
 			endedAt: NOW.toISOString(),
 			firstFrame: {
@@ -436,7 +436,7 @@ function createPiReadinessService(
 			},
 			logs: {
 				command: `${executable.command} --mode rpc`,
-				cwd: `${HOME}/Ensemble/workspaces/.setup-smoke`,
+				cwd: `${HOME}/Ensemblr/workspaces/.setup-smoke`,
 				stderr: '',
 				stdout: '{"type":"extension_ui_request"}\n',
 			},
@@ -512,13 +512,13 @@ function createFutureProviders(
 async function getSnapshot(
 	options: {
 		checkProviders?: Partial<Record<SetupCheckId, SetupCheckProvider>>;
-		configService?: EnsembleConfigService;
-		databaseService?: EnsembleDatabaseService;
+		configService?: EnsemblrConfigService;
+		databaseService?: EnsemblrDatabaseService;
 		environmentVariablesService?: EnvironmentVariablesService;
 		localCommandService?: LocalCommandService;
 		piExecutableService?: PiExecutableService;
 		piReadinessService?: PiReadinessService;
-		rootDirectoryService?: EnsembleRootDirectoryService;
+		rootDirectoryService?: EnsemblrRootDirectoryService;
 	} = {},
 ) {
 	const service = createSetupDiagnosticsService({
@@ -842,7 +842,7 @@ test('redacts token-like diagnostics from GitHub auth logs', async () => {
 test('redacts sensitive log assignments and collapses home paths', async () => {
 	const snapshot = await getSnapshot({
 		localCommandService: createLocalCommandService({
-			stdout: `API_TOKEN=abc123 ${HOME}/Ensemble/workspaces/demo`,
+			stdout: `API_TOKEN=abc123 ${HOME}/Ensemblr/workspaces/demo`,
 		}),
 	});
 	const shellCheck = snapshot.checks.find(
@@ -856,7 +856,7 @@ test('redacts sensitive log assignments and collapses home paths', async () => {
 	);
 	assert.equal(
 		shellCheck.logs.some((log) =>
-			log.text.includes('API_TOKEN=[REDACTED] ~/Ensemble/workspaces/demo'),
+			log.text.includes('API_TOKEN=[REDACTED] ~/Ensemblr/workspaces/demo'),
 		),
 		true,
 	);

@@ -4,7 +4,7 @@ Status: discovery complete — recommendation below. 2026-06-11.
 
 ## Question
 
-How should Ensemble surface a clickable preview URL for a workspace's running
+How should Ensemblr surface a clickable preview URL for a workspace's running
 dev server: by parsing setup/run script output, by expanding an explicit
 repository preview URL template, or both?
 
@@ -12,7 +12,7 @@ repository preview URL template, or both?
 
 - Run/setup scripts now execute in PTY sessions (ENS-036/038) and their output
   streams through the terminal dock.
-- Every workspace gets a stable `ENSEMBLE_PORT`
+- Every workspace gets a stable `ENSEMBLR_PORT`
   from workspace environment injection (ENS-039), so well-behaved repository
   run scripts can bind a predictable port.
 - The repository settings resolution already carries a `previewUrlTemplate`
@@ -56,21 +56,21 @@ persisted.
 
 ## Option B — explicit preview URL template (repository config)
 
-`previewUrlTemplate` in the committed `.ensemble/settings.toml` (e.g. `http://localhost:${ENSEMBLE_PORT}`),
+`previewUrlTemplate` in the committed `.ensemblr/settings.toml` (e.g. `http://localhost:${ENSEMBLR_PORT}`),
 expanded with the same workspace environment used for scripts. Expansion is a
 pure string substitution against the injected variable set — no log access at
 all.
 
 Properties: deterministic, zero false positives, works before the server
 prints anything, respects workspace isolation. Cost: requires one line of
-repository config and a run script that honors `ENSEMBLE_PORT`.
+repository config and a run script that honors `ENSEMBLR_PORT`.
 
 ## Recommendation
 
 1. **v1 build scope: template-first.** Implement `previewUrlTemplate`
-   expansion with `ENSEMBLE_*` substitution and wire it to the
+   expansion with `ENSEMBLR_*` substitution and wire it to the
    dock "Open :port" affordance. Default template when unset:
-   `http://localhost:${ENSEMBLE_PORT}` shown only while a run session is
+   `http://localhost:${ENSEMBLR_PORT}` shown only while a run session is
    active.
 2. **Defer automatic log parsing.** If accepted later, restrict to loopback
    hosts, strip ANSI, parse whole lines, never persist matched URLs, and offer

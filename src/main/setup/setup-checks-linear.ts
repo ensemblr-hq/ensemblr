@@ -78,7 +78,7 @@ function describeConnection(snapshot: LinearConnectionSnapshot): string {
 				: 'Linear is connected.';
 		}
 		case 'not-configured':
-			return 'Linear OAuth is not configured. Add app.linear.clientId to the Ensemble config to enable Linear workflows. Linear is optional for local and GitHub-only workflows.';
+			return 'Linear OAuth is not configured. Add app.linear.clientId to the Ensemblr config to enable Linear workflows. Linear is optional for local and GitHub-only workflows.';
 		case 'reconnect-required':
 			return 'The stored Linear token expired and cannot be refreshed. Reconnect Linear from integration settings.';
 		default:

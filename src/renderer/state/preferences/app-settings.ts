@@ -5,7 +5,7 @@ import {
 	getAppSettings,
 	subscribeAppSettingsChanged,
 	updateAppSettings,
-} from '@/renderer/api/ensemble';
+} from '@/renderer/api/ensemblr';
 import {
 	type AppSettings,
 	type AppSettingsPatch,

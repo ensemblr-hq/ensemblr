@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import {
 	createBranch,
 	createPiSession,
@@ -20,8 +20,8 @@ import {
 function openTestDatabase(t: import('node:test').TestContext): {
 	database: DatabaseSync;
 } {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-pi-session-'));
-	const connection = openEnsembleDatabase({
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-pi-session-'));
+	const connection = openEnsemblrDatabase({
 		databasePath: path.join(directory, 'pi-session-test.db'),
 	});
 
@@ -32,12 +32,12 @@ function openTestDatabase(t: import('node:test').TestContext): {
 
 	connection.database.exec(`
 INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-fixture', 'fixture', 'Fixture', '/tmp/ensemble/fixture', 'main');
+VALUES ('repo-fixture', 'fixture', 'Fixture', '/tmp/ensemblr/fixture', 'main');
 
 INSERT INTO workspaces (id, repository_id, slug, name, path)
 VALUES
-	('ws-real', 'repo-fixture', 'real', 'Real Workspace', '/tmp/ensemble/fixture/real'),
-	('ws-adopted', 'repo-fixture', 'adopted', 'Adopted Workspace', '/tmp/ensemble/fixture/adopted');
+	('ws-real', 'repo-fixture', 'real', 'Real Workspace', '/tmp/ensemblr/fixture/real'),
+	('ws-adopted', 'repo-fixture', 'adopted', 'Adopted Workspace', '/tmp/ensemblr/fixture/adopted');
 `);
 
 	return { database: connection.database };
@@ -49,7 +49,7 @@ test('createPiSession inserts a row and a main branch atomically', (t) => {
 	const { mainBranch, session } = createPiSession({
 		database,
 		input: {
-			cwd: '/tmp/ensemble/fixture/real',
+			cwd: '/tmp/ensemblr/fixture/real',
 			executableId: 'pi-default',
 			executablePath: '/usr/local/bin/pi',
 			label: 'Initial chat',
@@ -83,7 +83,7 @@ test('adopted workspaces can persist a session without a Pi session id', (t) => 
 	const { session } = createPiSession({
 		database,
 		input: {
-			cwd: '/tmp/ensemble/fixture/adopted',
+			cwd: '/tmp/ensemblr/fixture/adopted',
 			workspaceId: 'ws-adopted',
 		},
 	});

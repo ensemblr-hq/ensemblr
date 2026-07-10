@@ -51,7 +51,7 @@ export function checkpointRefFor({
 	turnId: string;
 	workspaceId: string;
 }): string {
-	return `refs/ensemble/checkpoints/${sanitizeRefSegment(workspaceId)}/${sanitizeRefSegment(turnId)}`;
+	return `refs/ensemblr/checkpoints/${sanitizeRefSegment(workspaceId)}/${sanitizeRefSegment(turnId)}`;
 }
 
 /** Creates the production capture port (git + SQLite). */
@@ -61,7 +61,7 @@ export function createCheckpointCapture(): CheckpointCapturePort {
 		try {
 			const captured = await captureWorkspaceCheckpoint({
 				cwd,
-				message: `ensemble checkpoint: ${label}`,
+				message: `ensemblr checkpoint: ${label}`,
 				ref,
 			});
 			return insertCheckpoint({
@@ -156,7 +156,7 @@ export interface RestoreTurnCheckpointResult {
 
 /**
  * Restores workspace files to a turn's pre-prompt checkpoint and hides the
- * Ensemble-visible events from that turn onward (ADR 0012). Pi's own session
+ * Ensemblr-visible events from that turn onward (ADR 0012). Pi's own session
  * files are never touched; the hidden range is recorded on the branch metadata
  * so reloads keep the truncated view while newer (post-restore) events with
  * higher ordinals remain visible.

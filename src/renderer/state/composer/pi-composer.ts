@@ -3,7 +3,7 @@ import { useAtom } from 'jotai';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
-	ensembleQueryKeys,
+	ensemblrQueryKeys,
 	openPiSession,
 	piModelsQuery,
 	piSessionEventsQuery,
@@ -11,7 +11,7 @@ import {
 	stopPiSession,
 	submitPiPrompt,
 	subscribePiSessionEvents,
-} from '@/renderer/api/ensemble-queries';
+} from '@/renderer/api/ensemblr-queries';
 import { useOptimisticPrompts } from '@/renderer/state/composer/optimistic-prompts';
 import {
 	chatModelOverrideAtomFamily,
@@ -208,7 +208,7 @@ export function usePiComposerController({
 						usage: toComposerContextUsage(payload.usage),
 					});
 					void queryClient.invalidateQueries({
-						queryKey: ensembleQueryKeys.piSessionEvents(
+						queryKey: ensemblrQueryKeys.piSessionEvents(
 							broadcast.event.branchId,
 						),
 					});
@@ -218,12 +218,12 @@ export function usePiComposerController({
 			if (broadcast.event.eventType === 'metadata') {
 				if (hasChatTitleMetadata(broadcast.event.payload)) {
 					void queryClient.invalidateQueries({
-						queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+						queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 					});
 				}
 				if (hasWorkspaceRenamedMetadata(broadcast.event.payload)) {
 					void queryClient.invalidateQueries({
-						queryKey: ensembleQueryKeys.repositoryWorkspaceNavigation(),
+						queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
 					});
 				}
 				return;
@@ -232,7 +232,7 @@ export function usePiComposerController({
 				return;
 			}
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
+				queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
 			});
 		});
 		return unsubscribe;
@@ -256,10 +256,10 @@ export function usePiComposerController({
 			if (result.session) {
 				setPendingSession({ chatTabId, sessionId: result.session.id });
 				void queryClient.invalidateQueries({
-					queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
+					queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
 				});
 				void queryClient.invalidateQueries({
-					queryKey: ensembleQueryKeys.chatTabs(workspaceId),
+					queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 				});
 			}
 		},
@@ -280,7 +280,7 @@ export function usePiComposerController({
 			}),
 		onSuccess: () =>
 			queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
+				queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
 			}),
 	});
 
@@ -289,7 +289,7 @@ export function usePiComposerController({
 		onSuccess: () => {
 			setPendingSession(null);
 			void queryClient.invalidateQueries({
-				queryKey: ensembleQueryKeys.piSessionsForWorkspace(workspaceId),
+				queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
 			});
 		},
 	});

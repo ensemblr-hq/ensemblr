@@ -13,7 +13,7 @@ export interface OpenAppConfigFileResult {
 }
 
 /**
- * App-settings IPC surface. `config.json` (`~/.config/ensemble/config.json`) is
+ * App-settings IPC surface. `config.json` (`~/.config/ensemblr/config.json`) is
  * the source of truth; the renderer reads on launch, writes section-scoped
  * patches, and live-reloads via {@link AppSettingsApi.onAppSettingsChanged}.
  */

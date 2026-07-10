@@ -18,15 +18,15 @@ import type {
 	LocalCommandService,
 } from '../../src/main/commands/local-command.ts';
 import {
-	ENSEMBLE_CONFIG_SCHEMA_VERSION,
-	type EnsembleConfig,
+	ENSEMBLR_CONFIG_SCHEMA_VERSION,
+	type EnsemblrConfig,
 } from '../../src/main/config/config-loader.ts';
 import { resolveSettings } from '../../src/main/config/config-resolution.ts';
 import {
 	resolvePiExecutable,
 	savePiExecutableOverride,
 } from '../../src/main/pi-runtime/pi-executable.ts';
-import { openEnsembleDatabase } from '../../src/main/storage/database.ts';
+import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import type { SettingsResolutionSnapshot } from '../../src/shared/ipc/index.ts';
 
 const NOW = new Date('2026-06-05T00:00:00.000Z');
@@ -42,14 +42,14 @@ interface FakeCommandOutcome {
 	stdout?: string;
 }
 
-function createConfig(overrides: Partial<EnsembleConfig> = {}): EnsembleConfig {
+function createConfig(overrides: Partial<EnsemblrConfig> = {}): EnsemblrConfig {
 	return {
 		app: {},
 		environment: {},
 		managed: {},
 		repositoryDefaults: {},
 		repositoryRules: [],
-		schemaVersion: ENSEMBLE_CONFIG_SCHEMA_VERSION,
+		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		security: {},
 		ui: {},
 		...overrides,
@@ -57,7 +57,7 @@ function createConfig(overrides: Partial<EnsembleConfig> = {}): EnsembleConfig {
 }
 
 function createDirectoryFixture(t: TestContext): string {
-	const directory = mkdtempSync(path.join(tmpdir(), 'ensemble-pi-'));
+	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-pi-'));
 
 	t.after(() => {
 		rmSync(directory, { force: true, recursive: true });
@@ -68,8 +68,8 @@ function createDirectoryFixture(t: TestContext): string {
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
 	const directory = createDirectoryFixture(t);
-	const connection = openEnsembleDatabase({
-		databasePath: path.join(directory, 'ensemble-test.db'),
+	const connection = openEnsemblrDatabase({
+		databasePath: path.join(directory, 'ensemblr-test.db'),
 	});
 
 	t.after(() => {
@@ -92,7 +92,7 @@ function createSettingsSnapshot({
 	database = null,
 	homeDirectory,
 }: {
-	config?: EnsembleConfig;
+	config?: EnsemblrConfig;
 	database?: DatabaseSync | null;
 	homeDirectory: string;
 }): SettingsResolutionSnapshot {

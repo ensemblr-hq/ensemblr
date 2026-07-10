@@ -10,8 +10,8 @@ import type {
 	DeleteRepositoryResult,
 } from '../../shared/ipc/contracts/repository';
 import type { LocalCommandService } from '../commands/local-command';
-import type { EnsembleRootDirectoryService } from '../root';
-import type { EnsembleDatabaseService } from '../storage/database.ts';
+import type { EnsemblrRootDirectoryService } from '../root';
+import type { EnsemblrDatabaseService } from '../storage/database.ts';
 import {
 	deleteRepositoryRowById,
 	selectRepositoryForDelete,
@@ -31,9 +31,9 @@ export interface DeleteRepositoryService {
 
 /** Options for {@link createDeleteRepositoryService}. */
 export interface CreateDeleteRepositoryServiceOptions {
-	databaseService: EnsembleDatabaseService;
+	databaseService: EnsemblrDatabaseService;
 	localCommandService: LocalCommandService;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
 interface SourceRepository {
@@ -53,7 +53,7 @@ interface SourceWorkspace {
 
 /**
  * Builds the service that destructively removes a repository and every child
- * workspace from Ensemble. Worktrees are wiped, branches are dropped, and the
+ * workspace from Ensemblr. Worktrees are wiped, branches are dropped, and the
  * SQLite rows are deleted. The repository folder itself is left in place and
  * tagged with a sentinel so the shared-root reconciler does not resurrect it.
  */
@@ -260,7 +260,7 @@ function writeArchivedMarker({
 	try {
 		writeFileSync(
 			path.join(repositoryPath, ARCHIVED_REPOSITORY_MARKER),
-			`Removed by Ensemble.\nDelete this file to allow the repository to be re-adopted automatically.\n`,
+			`Removed by Ensemblr.\nDelete this file to allow the repository to be re-adopted automatically.\n`,
 		);
 	} catch (error) {
 		diagnostics.push({
@@ -317,7 +317,7 @@ function removeArchivedContextsForRepository({
 }: {
 	diagnostics: DeleteRepositoryDiagnostic[];
 	repositorySlug: string;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 }): void {
 	const snapshot = rootDirectoryService.getSnapshot();
 	if (!snapshot?.archivedContextsPath) {

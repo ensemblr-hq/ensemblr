@@ -12,7 +12,7 @@ import {
 	parseIssues,
 	parsePullRequests,
 } from '../../src/main/repository/repository-sources-service.ts';
-import type { EnsembleDatabaseService } from '../../src/main/storage';
+import type { EnsemblrDatabaseService } from '../../src/main/storage';
 
 const fixedNow = () => new Date('2026-06-07T12:00:00.000Z');
 
@@ -65,7 +65,7 @@ function stubCommandService(
 /** Fake database returning the active workspace-branch rows for the picker. */
 function fakeDatabaseService(
 	activeRows: Array<{ branchName: string; id: string }>,
-): EnsembleDatabaseService {
+): EnsemblrDatabaseService {
 	const database = {
 		prepare: () => ({
 			all: () => activeRows,
@@ -74,7 +74,7 @@ function fakeDatabaseService(
 	};
 	return {
 		getConnection: () => ({ database }),
-	} as unknown as EnsembleDatabaseService;
+	} as unknown as EnsemblrDatabaseService;
 }
 
 test('parseBranches reads the default branch and sorts names newest-commit-first', () => {

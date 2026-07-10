@@ -1,6 +1,6 @@
 /** localStorage key for the per-workspace last-used "Open in…" target. */
 const LAST_USED_OPEN_TARGET_STORAGE_KEY =
-	'ensemble_workspace_open_target_last_used_v1';
+	'ensemblr_workspace_open_target_last_used_v1';
 
 type LastUsedMap = Readonly<Record<string, string>>;
 

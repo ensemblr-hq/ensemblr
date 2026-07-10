@@ -163,7 +163,7 @@ function getSetupSummary(
 
 	if (!snapshot) {
 		return {
-			detail: 'Ensemble is collecting setup diagnostics.',
+			detail: 'Ensemblr is collecting setup diagnostics.',
 			title: 'Checking setup readiness',
 			tone: 'muted',
 		};

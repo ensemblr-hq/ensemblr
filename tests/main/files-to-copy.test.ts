@@ -28,15 +28,15 @@ function runGit(cwd: string, args: string[]): void {
 }
 
 function createFixture(t: TestContext): FilesToCopyFixture {
-	const root = mkdtempSync(path.join(tmpdir(), 'ensemble-files-to-copy-'));
+	const root = mkdtempSync(path.join(tmpdir(), 'ensemblr-files-to-copy-'));
 	const repositoryPath = path.join(root, 'repo');
 	const workspacePath = path.join(root, 'workspace');
 	mkdirSync(repositoryPath, { recursive: true });
 	mkdirSync(workspacePath, { recursive: true });
 
 	runGit(repositoryPath, ['init', '-b', 'main']);
-	runGit(repositoryPath, ['config', 'user.email', 'test@ensemble.dev']);
-	runGit(repositoryPath, ['config', 'user.name', 'Ensemble Test']);
+	runGit(repositoryPath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(repositoryPath, ['config', 'user.name', 'Ensemblr Test']);
 
 	writeFileSync(path.join(repositoryPath, '.gitignore'), '*.env\n.env*\n');
 	writeFileSync(path.join(repositoryPath, 'README.md'), '# demo\n');
@@ -113,7 +113,7 @@ test('tracked files matching patterns are not copied', async (t) => {
 	);
 });
 
-test('`.worktreeinclude` wins over .ensemble/settings.toml files-to-copy', async (t) => {
+test('`.worktreeinclude` wins over .ensemblr/settings.toml files-to-copy', async (t) => {
 	const fixture = createFixture(t);
 	writeFileSync(
 		path.join(fixture.repositoryPath, '.gitignore'),
@@ -126,11 +126,11 @@ test('`.worktreeinclude` wins over .ensemble/settings.toml files-to-copy', async
 		path.join(fixture.repositoryPath, '.worktreeinclude'),
 		'# copied files\nconfig.local\n',
 	);
-	mkdirSync(path.join(fixture.repositoryPath, '.ensemble'), {
+	mkdirSync(path.join(fixture.repositoryPath, '.ensemblr'), {
 		recursive: true,
 	});
 	writeFileSync(
-		path.join(fixture.repositoryPath, '.ensemble', 'settings.toml'),
+		path.join(fixture.repositoryPath, '.ensemblr', 'settings.toml'),
 		'file_include_globs = ["secret.json"]\n',
 	);
 
@@ -158,7 +158,7 @@ test('`.worktreeinclude` wins over .ensemble/settings.toml files-to-copy', async
 	);
 });
 
-test('.ensemble/settings.toml files-to-copy is used when no .worktreeinclude', async (t) => {
+test('.ensemblr/settings.toml files-to-copy is used when no .worktreeinclude', async (t) => {
 	const fixture = createFixture(t);
 	writeFileSync(
 		path.join(fixture.repositoryPath, '.gitignore'),
@@ -170,11 +170,11 @@ test('.ensemble/settings.toml files-to-copy is used when no .worktreeinclude', a
 		'KEY=1\n',
 	);
 	writeFileSync(path.join(fixture.repositoryPath, '.env'), 'IGNORED=1\n');
-	mkdirSync(path.join(fixture.repositoryPath, '.ensemble'), {
+	mkdirSync(path.join(fixture.repositoryPath, '.ensemblr'), {
 		recursive: true,
 	});
 	writeFileSync(
-		path.join(fixture.repositoryPath, '.ensemble', 'settings.toml'),
+		path.join(fixture.repositoryPath, '.ensemblr', 'settings.toml'),
 		'file_include_globs = ["secrets/**"]\n',
 	);
 
@@ -191,7 +191,7 @@ test('.ensemble/settings.toml files-to-copy is used when no .worktreeinclude', a
 		workspacePath: fixture.workspacePath,
 	});
 
-	assert.equal(result.source, 'ensemble-config');
+	assert.equal(result.source, 'ensemblr-config');
 	assert.deepEqual(result.patterns, ['secrets/**']);
 	assert.equal(result.copied.length, 1);
 	assert.equal(result.copied[0]?.relativePath, 'secrets/api.key');
@@ -205,7 +205,7 @@ test('.ensemble/settings.toml files-to-copy is used when no .worktreeinclude', a
 	assert.equal(
 		existsSync(path.join(fixture.workspacePath, '.env')),
 		false,
-		'default .env* should not apply when .ensemble/settings.toml declared filesToCopy',
+		'default .env* should not apply when .ensemblr/settings.toml declared filesToCopy',
 	);
 });
 
@@ -308,11 +308,11 @@ test('invalid filesToCopy (non-string-array) falls through to next source', asyn
 	const fixture = createFixture(t);
 	writeFileSync(path.join(fixture.repositoryPath, '.gitignore'), '.env*\n');
 	writeFileSync(path.join(fixture.repositoryPath, '.env'), 'X=1\n');
-	mkdirSync(path.join(fixture.repositoryPath, '.ensemble'), {
+	mkdirSync(path.join(fixture.repositoryPath, '.ensemblr'), {
 		recursive: true,
 	});
 	writeFileSync(
-		path.join(fixture.repositoryPath, '.ensemble', 'settings.toml'),
+		path.join(fixture.repositoryPath, '.ensemblr', 'settings.toml'),
 		'file_include_globs = "not-an-array"\n',
 	);
 

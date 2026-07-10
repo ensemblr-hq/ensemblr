@@ -72,7 +72,7 @@ They:
 `src/main/repository/delete-workspace.ts` and
 `src/main/repository/delete-repository.ts` keep the prior destructive flow
 under explicit names. They drop worktrees, drop branches, delete rows, and
-write the `.ensemble-archived` sentinel so the shared-root reconciler does not
+write the `.ensemblr-archived` sentinel so the shared-root reconciler does not
 resurrect the folder. They do not run lifecycle hooks; callers reach them only
 through the dedicated "Delete…" confirmation dialogs.
 
@@ -89,9 +89,9 @@ contract changes.
 
 ### IPC surface
 
-Channel name semantics are kept stable: `ensemble:archive-workspace` and
-`ensemble:archive-repository` now invoke the lifecycle services. The new
-`ensemble:delete-workspace` and `ensemble:delete-repository` channels invoke
+Channel name semantics are kept stable: `ensemblr:archive-workspace` and
+`ensemblr:archive-repository` now invoke the lifecycle services. The new
+`ensemblr:delete-workspace` and `ensemblr:delete-repository` channels invoke
 the destructive services. `ArchiveWorkspaceRequest` and
 `ArchiveRepositoryRequest` accept an opt-in `branchCleanup` flag and an
 optional free-text `reason` recorded in `archive_records`. Diagnostic codes
@@ -100,21 +100,21 @@ optional free-text `reason` recorded in `archive_records`. Diagnostic codes
 
 Reverse + browse channels round out the surface:
 
-- `ensemble:list-archived-workspaces` returns every archived workspace for a
+- `ensemblr:list-archived-workspaces` returns every archived workspace for a
   repository joined with the most recent `archive_records` row. The renderer
   uses it to back the Browse archive dialog.
-- `ensemble:unarchive-workspace` NULLs `workspaces.archived_at` and restores
+- `ensemblr:unarchive-workspace` NULLs `workspaces.archived_at` and restores
   the preserved `.context/` snapshot into the worktree. When the original
   archive ran with `branch_cleanup = 1`, the service recreates the worktree
   via `git worktree add -b <branch_name> <path> <base_branch>` from the
   recorded base branch before copying context back. `pre-/post-unarchive-
   workspace` hook stages frame the operation.
-- `ensemble:delete-archived-workspace` permanently purges an archive entry:
+- `ensemblr:delete-archived-workspace` permanently purges an archive entry:
   removes the preserved `archived-contexts/.../` directory, cleans up the
   worktree + branch if still present, deletes the workspace's
   `archive_records` rows, and drops the workspace row.
 
-The destructive `ensemble:delete-repository` flow cascades into the archive
+The destructive `ensemblr:delete-repository` flow cascades into the archive
 tree. After the repository + child workspace rows are gone, the service
 removes `<root>/archived-contexts/<repo-slug>/` recursively so no orphaned
 `.context/` snapshots survive a destructive delete. `archive_records` rows
@@ -179,7 +179,7 @@ of scope here.
 - The hook registry is in-process and unsubscribed handlers do not survive
   app restart. `ENS-038` will register its subscriber from `main.ts`
   alongside the existing service composition.
-- Destructive delete keeps writing the `.ensemble-archived` sentinel; the
+- Destructive delete keeps writing the `.ensemblr-archived` sentinel; the
   shared-root reconciler logic from ADR 0015 still applies unchanged.
 - Destructive repository delete also removes the repository's slice of
   `<root>/archived-contexts/<repo-slug>/`. Archive history disappears with

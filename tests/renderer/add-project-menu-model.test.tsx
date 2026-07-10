@@ -179,7 +179,7 @@ test('disables local and quick start when the root directory is not writable', (
 				createCheck({ id: 'gh-cli' }),
 				createCheck({ id: 'gh-auth' }),
 				createCheck({
-					detail: 'Choose a writable Ensemble root directory.',
+					detail: 'Choose a writable Ensemblr root directory.',
 					id: 'root-directory',
 					status: 'failure',
 				}),
@@ -190,7 +190,7 @@ test('disables local and quick start when the root directory is not writable', (
 
 	expect(findAction(model, 'open-local').enabled).toBe(false);
 	expect(findAction(model, 'open-local').unavailableReason).toBe(
-		'Choose a writable Ensemble root directory.',
+		'Choose a writable Ensemblr root directory.',
 	);
 	expect(findAction(model, 'quick-start').enabled).toBe(false);
 	expect(findAction(model, 'open-github').enabled).toBe(true);

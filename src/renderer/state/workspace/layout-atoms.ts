@@ -9,7 +9,7 @@ const workspaceStorageOptions = { getOnInit: true };
 
 /** Persisted display mode for the changes panel (list vs. tree). */
 export const changesViewModeAtom = atomWithStorage<ChangesViewMode>(
-	'ensemble_workspace_changes_view_mode',
+	'ensemblr_workspace_changes_view_mode',
 	'list',
 	undefined,
 	workspaceStorageOptions,
@@ -22,7 +22,7 @@ export const changesViewModeAtom = atomWithStorage<ChangesViewMode>(
 export const changesSourceByWorkspaceAtom = atomWithStorage<
 	Record<string, ChangesSource>
 >(
-	'ensemble_workspace_changes_source_by_workspace',
+	'ensemblr_workspace_changes_source_by_workspace',
 	{},
 	undefined,
 	workspaceStorageOptions,
@@ -30,7 +30,7 @@ export const changesSourceByWorkspaceAtom = atomWithStorage<
 
 /** Persisted collapsed state of the workbench right-hand sidebar. */
 export const rightSidebarCollapsedAtom = atomWithStorage<boolean>(
-	'ensemble_workspace_right_sidebar_collapsed',
+	'ensemblr_workspace_right_sidebar_collapsed',
 	false,
 	undefined,
 	workspaceStorageOptions,
@@ -38,7 +38,7 @@ export const rightSidebarCollapsedAtom = atomWithStorage<boolean>(
 
 /** Persisted width of the right-hand sidebar, expressed as a 0-100 percentage. */
 export const rightSidebarSizePercentAtom = atomWithStorage<number>(
-	'ensemble_workspace_right_sidebar_size_percent',
+	'ensemblr_workspace_right_sidebar_size_percent',
 	34,
 	undefined,
 	workspaceStorageOptions,
@@ -48,7 +48,7 @@ export const rightSidebarSizePercentAtom = atomWithStorage<number>(
 export const activeReviewTabByWorkspaceAtom = atomWithStorage<
 	Record<string, ReviewPanelTab>
 >(
-	'ensemble_workspace_active_review_tab_by_workspace',
+	'ensemblr_workspace_active_review_tab_by_workspace',
 	{},
 	undefined,
 	workspaceStorageOptions,
@@ -58,7 +58,7 @@ export const activeReviewTabByWorkspaceAtom = atomWithStorage<
 export const activeDockTabByWorkspaceAtom = atomWithStorage<
 	Record<string, DockTabId>
 >(
-	'ensemble_workspace_active_dock_tab_by_workspace',
+	'ensemblr_workspace_active_dock_tab_by_workspace',
 	{},
 	undefined,
 	workspaceStorageOptions,

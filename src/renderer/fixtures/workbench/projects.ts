@@ -8,18 +8,18 @@ import {
 } from './scripts';
 import {
 	agentLabWorkspaceFiles,
-	ensembleWorkspaceFiles,
+	ensemblrWorkspaceFiles,
 } from './workspace-files';
 
 export const shellFixtureProjects: ProjectShellModel[] = [
 	{
-		id: 'ensemble',
-		name: 'ensemble',
+		id: 'ensemblr',
+		name: 'ensemblr',
 		owner: {
 			avatarUrl: 'https://github.com/psoldunov.png',
 			name: 'psoldunov',
 		},
-		pathLabel: '~/Ensemble/repos/ensemble',
+		pathLabel: '~/Ensemblr/repos/ensemblr',
 		workspaces: [
 			{
 				branchName: 'san-antonio',
@@ -40,8 +40,8 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				}),
 				id: 'san-antonio',
 				name: 'Conductor shell rework',
-				pathLabel: '~/Ensemble/workspaces/ensemble/san-antonio',
-				projectId: 'ensemble',
+				pathLabel: '~/Ensemblr/workspaces/ensemblr/san-antonio',
+				projectId: 'ensemblr',
 				pullRequest: {
 					checks: [
 						{
@@ -50,7 +50,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 							label: 'scan',
 							provider: 'github',
 							status: 'ready',
-							url: 'https://github.com/psoldunov/ensemble/actions/runs/102',
+							url: 'https://github.com/psoldunov/ensemblr/actions/runs/102',
 						},
 					],
 					comments: [
@@ -143,7 +143,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'branched from master with copied local context',
 				status: 'needs-setup',
-				workspaceFiles: ensembleWorkspaceFiles,
+				workspaceFiles: ensemblrWorkspaceFiles,
 			},
 			{
 				branchName: 'linear-issue-flow',
@@ -163,8 +163,8 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				}),
 				id: 'linear-issue-flow',
 				name: 'Linear issue flow',
-				pathLabel: '~/Ensemble/workspaces/ensemble/linear-issue-flow',
-				projectId: 'ensemble',
+				pathLabel: '~/Ensemblr/workspaces/ensemblr/linear-issue-flow',
+				projectId: 'ensemblr',
 				pullRequest: {
 					checks: [
 						{
@@ -173,7 +173,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 							label: 'build',
 							provider: 'github',
 							status: 'pending',
-							url: 'https://github.com/psoldunov/ensemble/actions/runs/118',
+							url: 'https://github.com/psoldunov/ensemblr/actions/runs/118',
 						},
 					],
 					comments: [],
@@ -206,7 +206,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'fixture workspace from future issue picker',
 				status: 'idle',
-				workspaceFiles: ensembleWorkspaceFiles,
+				workspaceFiles: ensemblrWorkspaceFiles,
 			},
 			{
 				branchName: 'normal-right-header',
@@ -227,8 +227,8 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				}),
 				id: 'normal-right-header',
 				name: 'Normal right header',
-				pathLabel: '~/Ensemble/workspaces/ensemble/normal-right-header',
-				projectId: 'ensemble',
+				pathLabel: '~/Ensemblr/workspaces/ensemblr/normal-right-header',
+				projectId: 'ensemblr',
 				pullRequest: {
 					checks: [],
 					comments: [],
@@ -259,7 +259,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'fixture branch for the normal right sidebar header',
 				status: 'working',
-				workspaceFiles: ensembleWorkspaceFiles,
+				workspaceFiles: ensemblrWorkspaceFiles,
 			},
 			{
 				branchName: 'changed-right-header',
@@ -280,8 +280,8 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				}),
 				id: 'changed-right-header',
 				name: 'Changed right header',
-				pathLabel: '~/Ensemble/workspaces/ensemble/changed-right-header',
-				projectId: 'ensemble',
+				pathLabel: '~/Ensemblr/workspaces/ensemblr/changed-right-header',
+				projectId: 'ensemblr',
 				pullRequest: {
 					checks: [],
 					comments: [],
@@ -320,7 +320,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				],
 				sourceSummary: 'fixture branch for the changed right sidebar header',
 				status: 'working',
-				workspaceFiles: ensembleWorkspaceFiles,
+				workspaceFiles: ensemblrWorkspaceFiles,
 			},
 		],
 	},
@@ -330,7 +330,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 		owner: {
 			name: 'agent-lab',
 		},
-		pathLabel: '~/Ensemble/repos/agent-lab',
+		pathLabel: '~/Ensemblr/repos/agent-lab',
 		workspaces: [
 			{
 				branchName: 'review-checks',
@@ -350,7 +350,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				}),
 				id: 'review-checks',
 				name: 'Review checks',
-				pathLabel: '~/Ensemble/workspaces/agent-lab/review-checks',
+				pathLabel: '~/Ensemblr/workspaces/agent-lab/review-checks',
 				projectId: 'agent-lab',
 				pullRequest: {
 					checks: [
@@ -360,7 +360,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 							label: 'scan',
 							provider: 'github',
 							status: 'ready',
-							url: 'https://github.com/psoldunov/ensemble/actions/runs/129',
+							url: 'https://github.com/psoldunov/ensemblr/actions/runs/129',
 						},
 					],
 					comments: [],
@@ -380,12 +380,12 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 						provider: 'vercel',
 						source: 'github-deployment',
 						status: 'ready',
-						url: 'https://ensemble-review-checks.vercel.app',
+						url: 'https://ensemblr-review-checks.vercel.app',
 					},
 					status: 'ready-to-merge',
 					title: 'feat(payouts): monthly agency payout ledger',
 					todos: [],
-					url: 'https://github.com/psoldunov/ensemble/pull/29',
+					url: 'https://github.com/psoldunov/ensemblr/pull/29',
 				},
 				reviewFiles: [],
 				scripts: runningDevScripts,

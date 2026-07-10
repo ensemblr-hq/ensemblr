@@ -2,8 +2,8 @@ import { useCallback, useState } from 'react';
 
 import {
 	archiveRepository,
-	isEnsembleApiAvailable,
-} from '@/renderer/api/ensemble-queries';
+	isEnsemblrApiAvailable,
+} from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import { Checkbox } from '@/renderer/components/ui/checkbox';
 import {
@@ -68,7 +68,7 @@ function ArchiveRepositoryDialogForm({
 		[],
 	);
 
-	const canArchive = stage !== 'archiving' && isEnsembleApiAvailable();
+	const canArchive = stage !== 'archiving' && isEnsemblrApiAvailable();
 	const workspaceCount = project.workspaces.length;
 	const hasWorkspaces = workspaceCount > 0;
 	const checkboxId = `archive-repository-branch-cleanup-${project.id}`;

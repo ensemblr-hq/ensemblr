@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
-const LAST_REPO_STORAGE_KEY = 'ensemble_pref_active_repo_id';
+const LAST_REPO_STORAGE_KEY = 'ensemblr_pref_active_repo_id';
 
 /**
  * Bare `/settings/repo` redirects to the last-known repo's environment section,

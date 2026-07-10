@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 
-import { agentActionTemplatesQuery } from '@/renderer/api/ensemble-queries';
+import { agentActionTemplatesQuery } from '@/renderer/api/ensemblr-queries';
 import {
 	AGENT_ACTION_SETTING_KEYS,
 	type AgentActionKind,

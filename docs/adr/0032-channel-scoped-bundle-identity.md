@@ -13,7 +13,7 @@ bundle-id collision open.
 
 ## Context
 
-After 0031 shipped, the packaged app still flashed a stray Ensemble Dock tile
+After 0031 shipped, the packaged app still flashed a stray Ensemblr Dock tile
 during new-workspace creation: a second process appeared and immediately quit.
 0031 verified every child spawn strips the launch-context env, so no child
 relaunches the app through an inherited `__CFBundleIdentifier`. The residual
@@ -22,24 +22,24 @@ flash has a different, ambient cause.
 Every packaged build shared one bundle id, hardcoded in `forge.config.ts`:
 
 ```
-appBundleId: 'com.ensemble.app'
+appBundleId: 'dev.ensemblr.app'
 ```
 
 On this dogfooding machine, `lsregister -dump` showed **four** packaged bundles
 registered under that single id — the release-style build in one workspace's
-`out/`, an `Ensemble-canary.app` and an `Ensemble-dev.app` from another, and a
+`out/`, an `Ensemblr-canary.app` and an `Ensemblr-dev.app` from another, and a
 **dangling** registration whose bundle had already been deleted:
 
 ```
-com.ensemble.app  ⚠︎ COLLISION (>1 live bundle)
-    [DANGLING] .../san-juan/out/.../Ensemble.app
-    [on-disk ] .../accra-v1/build/canary-macos-arm64/Ensemble-canary.app
-    [on-disk ] .../zurich/out/.../Ensemble.app
-    [on-disk ] .../accra-v1/build/dev-macos-arm64/Ensemble-dev.app
+dev.ensemblr.app  ⚠︎ COLLISION (>1 live bundle)
+    [DANGLING] .../san-juan/out/.../Ensemblr.app
+    [on-disk ] .../accra-v1/build/canary-macos-arm64/Ensemblr-canary.app
+    [on-disk ] .../zurich/out/.../Ensemblr.app
+    [on-disk ] .../accra-v1/build/dev-macos-arm64/Ensemblr-dev.app
 ```
 
 To macOS Launch Services these are interchangeable registrations of one app.
-When something resolves `com.ensemble.app` — a child touching Launch Services
+When something resolves `dev.ensemblr.app` — a child touching Launch Services
 while `git worktree add` runs, a re-open/activate event, or Launch Services
 reconciling a stale entry — macOS can launch a *different* registered copy than
 the one already running. That second process boots, hits the running instance's
@@ -54,17 +54,17 @@ poisoning the release identity.
 
 Scope the bundle identity to a **build channel** using Electron Forge's own
 `buildIdentifier` + `fromBuildIdentifier` mechanism (the documented way to vary
-`appBundleId` per build). `forge.config.ts` reads `ENSEMBLE_BUILD_CHANNEL`
+`appBundleId` per build). `forge.config.ts` reads `ENSEMBLR_BUILD_CHANNEL`
 (default `release`) and resolves both the bundle id and product name per
 channel:
 
 | channel   | bundle id                    | product name     |
 | --------- | ---------------------------- | ---------------- |
-| `release` | `com.ensemble.app`           | `Ensemble`       |
-| `canary`  | `com.ensemble.app.canary`    | `Ensemble Canary`|
-| `dev`     | `com.ensemble.app.dev`       | `Ensemble Dev`   |
+| `release` | `dev.ensemblr.app`           | `Ensemblr`       |
+| `canary`  | `dev.ensemblr.app.canary`    | `Ensemblr Canary`|
+| `dev`     | `dev.ensemblr.app.dev`       | `Ensemblr Dev`   |
 
-- **Only the shipped release claims `com.ensemble.app`.** `npm run make` /
+- **Only the shipped release claims `dev.ensemblr.app`.** `npm run make` /
   `package` still default to `release`, so the store build is unchanged.
 - **Dogfood builds get their own id**: `npm run make:dev` / `make:canary` set the
   env var. They can never masquerade as, or collide with, the release.
@@ -74,7 +74,7 @@ channel:
   thus the single-instance lock — from that name, so each channel is a distinct
   app at runtime.
 - **A diagnostic/remediation script** (`npm run diagnose:dock-flash`) lists every
-  `com.ensemble.app*` registration, flags collisions and dangling entries, and
+  `dev.ensemblr.app*` registration, flags collisions and dangling entries, and
   (`--fix`) unregisters dangling ones. It does not touch live sibling builds in
   other workspaces — removing those is a deliberate choice.
 
@@ -86,16 +86,16 @@ a non-release identity — and legitimately carries no amber tint.
 ## Consequences
 
 - Dogfood builds packaged with `make:dev` / `make:canary` register under a
-  distinct id, so resolving `com.ensemble.app` can only ever find the release —
+  distinct id, so resolving `dev.ensemblr.app` can only ever find the release —
   eliminating the sibling-relaunch flash for the release build.
 - Existing poisoning is cleared operationally with `diagnose:dock-flash --fix`
   (dangling) plus, for live siblings, rebuilding them on their channel or
   unregistering the stale `out/` bundle.
-- `resolveDefaultDatabasePath()` still hardcodes the `com.ensemble.app` path
+- `resolveDefaultDatabasePath()` still hardcodes the `dev.ensemblr.app` path
   segment, so a packaged `dev`/`canary` build isolates its `userData`/lock (name
   derived) but not yet its SQLite DB or config dir. That is a latent data-sharing
   issue for packaged dogfood channels, not a Dock-flash cause; isolating those
   paths per channel is deferred follow-up.
 - The Electrobun builds on `accra-v1` have their own `electrobun.config.ts` and
-  still emit `com.ensemble.app` for canary/dev; they need the same per-channel id
+  still emit `dev.ensemblr.app` for canary/dev; they need the same per-channel id
   treatment on that branch to stop poisoning from that source.

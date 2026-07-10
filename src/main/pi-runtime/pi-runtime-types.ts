@@ -2,7 +2,7 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../commands/local-command';
-import type { EnsembleRootDirectoryService } from '../root/root-directory-service';
+import type { EnsemblrRootDirectoryService } from '../root/root-directory-service';
 import type {
 	PiExecutableService,
 	PiExecutableSnapshot,
@@ -137,7 +137,7 @@ export interface CreatePiReadinessServiceOptions {
 	now?: () => Date;
 	piExecutableService: PiExecutableService;
 	providerModelTimeoutMs?: number;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 	rpcKillGraceMs?: number;
 	rpcMaxOutputBytes?: number;
 	rpcRunner?: PiRpcSmokeRunner;
@@ -151,7 +151,7 @@ export interface ResolvePiReadinessOptions {
 	now?: () => Date;
 	piExecutableService: PiExecutableService;
 	providerModelTimeoutMs?: number;
-	rootDirectoryService: EnsembleRootDirectoryService;
+	rootDirectoryService: EnsemblrRootDirectoryService;
 	rpcKillGraceMs?: number;
 	rpcMaxOutputBytes?: number;
 	rpcRunner?: PiRpcSmokeRunner;
