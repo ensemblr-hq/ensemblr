@@ -9,12 +9,22 @@ import {
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
 import { queryClient } from '@/renderer/api/query-client';
+import {
+	addPendingWorkspaceToNavigationSnapshot,
+	removePendingWorkspaceFromNavigationSnapshot,
+	replacePendingWorkspaceInNavigationSnapshot,
+} from '@/renderer/lib/workbench/optimistic-workspace';
 import { pickComposerSurname } from '@/renderer/lib/workbench/workspace-name-pool';
 import type {
 	ProjectShellModel,
 	WorkspaceCreationSeed,
 } from '@/renderer/types/workbench';
-import type { CreateWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
+import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
+import type {
+	CreateWorkspaceDiagnostic,
+	CreateWorkspaceRequest,
+	CreateWorkspaceResult,
+} from '@/shared/ipc/contracts/workspace';
 
 /**
  * Returns a callback the browse-archive dialog calls after every successful
@@ -45,18 +55,163 @@ interface CreateWorkspaceActionResult {
 		project: ProjectShellModel,
 		seed?: WorkspaceCreationSeed,
 	) => Promise<void>;
+	creatingProjectIds: ReadonlySet<string>;
 	error: string | null;
 	isCreating: boolean;
 }
 
-/** Creates a workspace, invalidates navigation cache, and routes to it. */
+/** Input needed to write a pending workspace row into the navigation cache. */
+interface PendingWorkspaceCacheInput {
+	id: string;
+	name: string;
+	projectId: string;
+	seed?: WorkspaceCreationSeed;
+	timestamp: string;
+}
+
+/** Chooses the workspace display name from a seed or the composer-name pool. */
+function resolveWorkspaceName(
+	project: ProjectShellModel,
+	seed?: WorkspaceCreationSeed,
+): string {
+	const excluded = project.workspaces.flatMap((workspace) => [
+		workspace.name,
+		workspace.branchName,
+	]);
+
+	return seed?.name ?? pickComposerSurname({ exclude: excluded });
+}
+
+/** Builds the IPC request for creating a workspace from a project and seed. */
+function buildCreateWorkspaceRequest({
+	name,
+	projectId,
+	seed,
+}: {
+	name: string;
+	projectId: string;
+	seed?: WorkspaceCreationSeed;
+}): CreateWorkspaceRequest {
+	return {
+		...(seed?.baseBranch ? { baseBranch: seed.baseBranch } : {}),
+		...(seed?.branchName ? { branchName: seed.branchName } : {}),
+		...(seed?.linkedIssue ? { linkedIssue: seed.linkedIssue } : {}),
+		name,
+		placeholderName: !seed?.name,
+		repositoryId: projectId,
+	};
+}
+
+/** Adds the pending workspace row that makes the sidebar respond immediately. */
+function addPendingWorkspaceToCache({
+	id,
+	name,
+	projectId,
+	seed,
+	timestamp,
+}: PendingWorkspaceCacheInput): void {
+	queryClient.setQueryData<RepositoryWorkspaceNavigationSnapshot>(
+		ensemblrQueryKeys.repositoryWorkspaceNavigation(),
+		(current) =>
+			current
+				? addPendingWorkspaceToNavigationSnapshot(current, {
+						...(seed?.baseBranch ? { baseBranch: seed.baseBranch } : {}),
+						...(seed?.branchName ? { branchName: seed.branchName } : {}),
+						id,
+						name,
+						repositoryId: projectId,
+						timestamp,
+					})
+				: current,
+	);
+}
+
+/** Removes a failed pending workspace from the navigation cache. */
+function removePendingWorkspaceFromCache(pendingWorkspaceId: string): void {
+	queryClient.setQueryData<RepositoryWorkspaceNavigationSnapshot>(
+		ensemblrQueryKeys.repositoryWorkspaceNavigation(),
+		(current) =>
+			current
+				? removePendingWorkspaceFromNavigationSnapshot(
+						current,
+						pendingWorkspaceId,
+					)
+				: current,
+	);
+}
+
+/** Replaces the pending row with the authoritative workspace snapshot. */
+function replacePendingWorkspaceInCache(
+	pendingWorkspaceId: string,
+	result: CreateWorkspaceResult,
+): void {
+	const workspace = result.workspace;
+
+	if (!workspace) {
+		return;
+	}
+
+	queryClient.setQueryData<RepositoryWorkspaceNavigationSnapshot>(
+		ensemblrQueryKeys.repositoryWorkspaceNavigation(),
+		(current) =>
+			current
+				? replacePendingWorkspaceInNavigationSnapshot(
+						current,
+						pendingWorkspaceId,
+						workspace,
+					)
+				: current,
+	);
+}
+
+/** Returns the first user-facing create-workspace error from an IPC result. */
+function getCreateWorkspaceFailureMessage(
+	result: CreateWorkspaceResult,
+): string {
+	const firstError = result.diagnostics.find(
+		(diagnostic: CreateWorkspaceDiagnostic) => diagnostic.severity === 'error',
+	);
+
+	return firstError?.message ?? 'Failed to create workspace.';
+}
+
+/** Returns a user-facing message for unexpected create-workspace exceptions. */
+function getCreateWorkspaceExceptionMessage(cause: unknown): string {
+	return cause instanceof Error ? cause.message : 'Failed to create workspace.';
+}
+
+/** Returns a project-id set with the provided project marked as creating. */
+function addCreatingProjectId(
+	current: ReadonlySet<string>,
+	projectId: string,
+): ReadonlySet<string> {
+	return new Set(current).add(projectId);
+}
+
+/** Returns a project-id set with the provided project no longer marked creating. */
+function removeCreatingProjectId(
+	current: ReadonlySet<string>,
+	projectId: string,
+): ReadonlySet<string> {
+	const next = new Set(current);
+	next.delete(projectId);
+	return next;
+}
+
+/** Creates a workspace with an optimistic sidebar row, then routes to the real workspace. */
 export function useCreateWorkspaceFromProject({
 	disableProjectReorderLayoutAnimation,
 }: CreateWorkspaceActionDeps): CreateWorkspaceActionResult {
 	const navigate = useNavigate();
 	const router = useRouter();
+	// Synchronous re-entrancy guard: blocks a double-submit within the same tick
+	// before `creatingProjectIds` state has flushed to the render that disables
+	// the button. The state mirror below drives the UI; this ref guards the call.
 	const pendingProjectIds = useRef<Set<string>>(new Set());
-	const [isCreating, setIsCreating] = useState(false);
+	const pendingWorkspaceIdSequence = useRef(0);
+	const [creatingProjectIds, setCreatingProjectIds] = useState<
+		ReadonlySet<string>
+	>(() => new Set());
 	const [error, setError] = useState<string | null>(null);
 
 	const create = useCallback(
@@ -67,77 +222,82 @@ export function useCreateWorkspaceFromProject({
 			if (pendingProjectIds.current.has(project.id)) {
 				return;
 			}
+
+			const name = resolveWorkspaceName(project, seed);
+			pendingWorkspaceIdSequence.current += 1;
+			const pendingWorkspaceId = `pending-workspace-${project.id}-${pendingWorkspaceIdSequence.current}`;
+			const timestamp = new Date().toISOString();
+
 			pendingProjectIds.current.add(project.id);
-			setIsCreating(true);
+			setCreatingProjectIds((current) =>
+				addCreatingProjectId(current, project.id),
+			);
 			setError(null);
+			disableProjectReorderLayoutAnimation();
+			addPendingWorkspaceToCache({
+				id: pendingWorkspaceId,
+				name,
+				projectId: project.id,
+				seed,
+				timestamp,
+			});
 
 			try {
-				const excluded = project.workspaces.flatMap((workspace) => [
-					workspace.name,
-					workspace.branchName,
-				]);
-				const name = seed?.name ?? pickComposerSurname({ exclude: excluded });
-				const result = await createWorkspace({
-					...(seed?.baseBranch ? { baseBranch: seed.baseBranch } : {}),
-					...(seed?.branchName ? { branchName: seed.branchName } : {}),
-					...(seed?.linkedIssue ? { linkedIssue: seed.linkedIssue } : {}),
-					name,
-					// Auto-generated composer name (not user-typed) → eligible for
-					// auto branch-naming rename on the first turn.
-					placeholderName: !seed?.name,
-					repositoryId: project.id,
-				});
+				const result = await createWorkspace(
+					buildCreateWorkspaceRequest({
+						name,
+						projectId: project.id,
+						seed,
+					}),
+				);
 
 				if (result.status !== 'success' || !result.workspace) {
-					const firstError = result.diagnostics.find(
-						(diagnostic: CreateWorkspaceDiagnostic) =>
-							diagnostic.severity === 'error',
-					);
-					const message = firstError?.message ?? 'Failed to create workspace.';
+					removePendingWorkspaceFromCache(pendingWorkspaceId);
+					const message = getCreateWorkspaceFailureMessage(result);
 					setError(message);
 					toast.error(message);
 					return;
 				}
 
 				const created = result.workspace;
+				replacePendingWorkspaceInCache(pendingWorkspaceId, result);
+				void invalidateWorkspaceListViews(queryClient).catch(() => undefined);
 
-				// Suppress the parent project's reorder layout animation while the new
-				// workspace inflates — otherwise the project height jump triggers a
-				// motion artifact across sibling project rows.
-				disableProjectReorderLayoutAnimation();
-
-				// Force the navigation snapshot to refetch from SQLite so the new row
-				// is authoritative in the cache before any route loader reads it.
-				await queryClient.invalidateQueries({
-					queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
-				});
-				await queryClient.refetchQueries({
-					queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
-				});
-
-				// Re-run every active route loader against the fresh cache so the
-				// parent `_workbench` match holds projects that include the new
-				// workspace before we navigate to it.
-				await router.invalidate();
-
-				// Navigate directly to the workspace index route — the workspace
-				// loader resolves through the freshly-loaded parent match.
-				await navigate({
-					params: {
-						projectId: project.id,
-						workspaceId: created.id,
-					},
-					to: '/projects/$projectId/workspaces/$workspaceId',
-				});
+				try {
+					await navigate({
+						params: {
+							projectId: project.id,
+							workspaceId: created.id,
+						},
+						to: '/projects/$projectId/workspaces/$workspaceId',
+					});
+					void router.invalidate().catch(() => undefined);
+				} catch {
+					// The workspace is already created and in the cache; only the
+					// post-create route hop failed. The router resolves it on the next
+					// navigation, so this must not surface as a create failure.
+				}
+			} catch (cause) {
+				removePendingWorkspaceFromCache(pendingWorkspaceId);
+				const message = getCreateWorkspaceExceptionMessage(cause);
+				setError(message);
+				toast.error(message);
 			} finally {
 				pendingProjectIds.current.delete(project.id);
-				setIsCreating(false);
+				setCreatingProjectIds((current) =>
+					removeCreatingProjectId(current, project.id),
+				);
 			}
 		},
 		[disableProjectReorderLayoutAnimation, navigate, router],
 	);
 
-	return { create, error, isCreating };
+	return {
+		create,
+		creatingProjectIds,
+		error,
+		isCreating: creatingProjectIds.size > 0,
+	};
 }
 
 /** Dependencies for the archive-workspace navigation action hook. */

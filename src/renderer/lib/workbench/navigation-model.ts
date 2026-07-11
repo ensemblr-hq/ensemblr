@@ -1,4 +1,5 @@
 import { parseGithubRepoFromRemoteUrl } from '@/renderer/lib/workbench/github-compare-url';
+import { PENDING_WORKSPACE_CREATION_METADATA_KEY } from '@/renderer/lib/workbench/optimistic-workspace';
 import type {
 	DockTabModel,
 	ProjectShellModel,
@@ -120,6 +121,8 @@ function mapWorkspaceNavigationSnapshot(
 		workspace.baseBranch ??
 		repository.defaultBranch ??
 		workspace.slug;
+	const isPendingCreation =
+		workspace.metadata[PENDING_WORKSPACE_CREATION_METADATA_KEY] === true;
 
 	return {
 		branchName,
@@ -128,15 +131,22 @@ function mapWorkspaceNavigationSnapshot(
 			deletions: 0,
 			files: 0,
 		},
-		checks: {
-			detail:
-				'Live workspace navigation is loaded from SQLite. Checks are not wired yet.',
-			label: 'No checks',
-			status: 'pending',
-		},
+		checks: isPendingCreation
+			? {
+					detail: 'The workspace is still being created.',
+					label: 'Creating',
+					status: 'pending',
+				}
+			: {
+					detail:
+						'Live workspace navigation is loaded from SQLite. Checks are not wired yet.',
+					label: 'No checks',
+					status: 'pending',
+				},
 		dockTabs: createPlaceholderDockTabs(),
 		githubRepo: parseGithubRepoFromRemoteUrl(remoteUrl),
 		id: workspace.id,
+		...(isPendingCreation ? { isPendingCreation } : {}),
 		landingSummary: createPlaceholderLandingSummary(repository, workspace),
 		name: workspace.name || workspace.slug,
 		pathLabel: workspace.path,
@@ -158,8 +168,10 @@ function mapWorkspaceNavigationSnapshot(
 		reviewFiles: [],
 		scripts: createPlaceholderScripts(),
 		sessions: [createPlaceholderSessionFromSnapshot(workspace)],
-		sourceSummary: getWorkspaceSourceSummary(repository, workspace),
-		status: 'idle',
+		sourceSummary: isPendingCreation
+			? 'creating workspace'
+			: getWorkspaceSourceSummary(repository, workspace),
+		status: isPendingCreation ? 'working' : 'idle',
 		workspaceFiles: [],
 	};
 }

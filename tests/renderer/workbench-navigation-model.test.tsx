@@ -4,6 +4,12 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 
 import { WorkbenchEmptyStateShell } from '../../src/renderer/components/workbench-empty-state';
+import {
+	addPendingWorkspaceToNavigationSnapshot,
+	PENDING_WORKSPACE_CREATION_METADATA_KEY,
+	removePendingWorkspaceFromNavigationSnapshot,
+	replacePendingWorkspaceInNavigationSnapshot,
+} from '../../src/renderer/lib/workbench/optimistic-workspace';
 
 function withQueryClient(node: ReactNode): ReactNode {
 	const client = new QueryClient({
@@ -20,7 +26,11 @@ import {
 	resolveWorkspaceNavigationSelection,
 	resolveWorkspaceRouteParams,
 } from '../../src/renderer/lib/workbench';
-import type { RepositoryWorkspaceNavigationSnapshot } from '../../src/shared/ipc';
+import type { WorkspaceShellModel } from '../../src/renderer/types/workbench';
+import type {
+	RepositoryWorkspaceNavigationSnapshot,
+	RepositoryWorkspaceNavigationWorkspace,
+} from '../../src/shared/ipc';
 
 const navigationSnapshot: RepositoryWorkspaceNavigationSnapshot = {
 	generatedAt: '2026-06-06T00:00:00.000Z',
@@ -131,6 +141,94 @@ test('resolves workspace route params for live targets and rejects missing ones'
 	expect(
 		resolveWorkspaceRouteParams(projects, 'missing', 'workspace-1'),
 	).toBeNull();
+});
+
+test('maps pending workspace rows as disabled creation placeholders', () => {
+	const pendingSnapshot = addPendingWorkspaceToNavigationSnapshot(
+		navigationSnapshot,
+		{
+			id: 'pending-workspace-repo-2-1',
+			name: 'Instant Workspace',
+			repositoryId: 'repo-2',
+			timestamp: '2026-06-06T00:00:02.000Z',
+		},
+	);
+	const projects = mapNavigationSnapshotToProjects(pendingSnapshot);
+	const pendingWorkspace = projects[1]?.workspaces.find(
+		(workspace: WorkspaceShellModel) =>
+			workspace.id === 'pending-workspace-repo-2-1',
+	);
+
+	expect(
+		pendingSnapshot.repositories[1]?.workspaces.map(
+			(workspace: RepositoryWorkspaceNavigationWorkspace) => workspace.id,
+		),
+	).toEqual(['pending-workspace-repo-2-1', 'workspace-2']);
+	expect(
+		pendingSnapshot.repositories[1]?.workspaces.find(
+			(workspace: RepositoryWorkspaceNavigationWorkspace) =>
+				workspace.id === 'pending-workspace-repo-2-1',
+		)?.metadata[PENDING_WORKSPACE_CREATION_METADATA_KEY],
+	).toBe(true);
+	expect(pendingWorkspace).toMatchObject({
+		isPendingCreation: true,
+		name: 'Instant Workspace',
+		sourceSummary: 'creating workspace',
+		status: 'working',
+	});
+	expect(
+		resolveWorkspaceRouteParams(
+			projects,
+			'repo-2',
+			'pending-workspace-repo-2-1',
+		),
+	).toBeNull();
+});
+
+test('replaces and removes pending workspace rows in navigation snapshots', () => {
+	const pendingSnapshot = addPendingWorkspaceToNavigationSnapshot(
+		navigationSnapshot,
+		{
+			id: 'pending-workspace-repo-2-1',
+			name: 'Instant Workspace',
+			repositoryId: 'repo-2',
+			timestamp: '2026-06-06T00:00:02.000Z',
+		},
+	);
+	const createdWorkspace: RepositoryWorkspaceNavigationWorkspace = {
+		archivedAt: null,
+		baseBranch: 'main',
+		branchName: 'instant-workspace',
+		createdAt: '2026-06-06T00:00:03.000Z',
+		id: 'workspace-3',
+		metadata: {},
+		name: 'Instant Workspace',
+		path: '/Users/alice/Ensemblr/workspaces/agent-lab/instant-workspace',
+		repositoryId: 'repo-2',
+		slug: 'instant-workspace',
+		updatedAt: '2026-06-06T00:00:03.000Z',
+	};
+
+	const replacedSnapshot = replacePendingWorkspaceInNavigationSnapshot(
+		pendingSnapshot,
+		'pending-workspace-repo-2-1',
+		createdWorkspace,
+	);
+	const removedSnapshot = removePendingWorkspaceFromNavigationSnapshot(
+		pendingSnapshot,
+		'pending-workspace-repo-2-1',
+	);
+
+	expect(
+		replacedSnapshot.repositories[1]?.workspaces.map(
+			(workspace: RepositoryWorkspaceNavigationWorkspace) => workspace.id,
+		),
+	).toEqual(['workspace-3', 'workspace-2']);
+	expect(
+		removedSnapshot.repositories[1]?.workspaces.map(
+			(workspace: RepositoryWorkspaceNavigationWorkspace) => workspace.id,
+		),
+	).toEqual(['workspace-2']);
 });
 
 test('keeps cached navigation snapshot renderable while live query is pending', () => {

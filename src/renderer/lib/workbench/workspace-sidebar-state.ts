@@ -15,6 +15,15 @@ export function getWorkspaceSidebarState(
 	workspace: WorkspaceShellModel,
 	options: { agentBusy?: boolean } = {},
 ): WorkspaceSidebarState {
+	if (workspace.isPendingCreation) {
+		return {
+			className: 'text-muted-foreground',
+			icon: LoaderCircleIcon,
+			isSpinning: true,
+			kind: 'workspace-working',
+		};
+	}
+
 	// Live Pi runtime activity takes top priority — the spinner is the most
 	// informative signal when a Pi session is mid-turn, even on workspaces
 	// with an open PR or pending checks. The flag is passed in by the caller

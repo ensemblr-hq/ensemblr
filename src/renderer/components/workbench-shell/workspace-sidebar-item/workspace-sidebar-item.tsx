@@ -54,6 +54,7 @@ export function WorkspaceSidebarItem({
 	workspace: WorkspaceShellModel;
 }) {
 	const { renderWorkspaceLink } = useNavigation();
+	const isPendingCreation = workspace.isPendingCreation === true;
 	// Live Pi runtime activity flows through `agentBusy` so it takes spinner
 	// priority over PR/check states without disturbing the cached
 	// `workspace.status` semantics elsewhere in the renderer.
@@ -85,11 +86,31 @@ export function WorkspaceSidebarItem({
 					) : null}
 				</div>
 				<div className='mt-1 flex min-w-0 items-center gap-1.5 text-muted-foreground text-xxs'>
-					<span className='truncate'>{workspace.branchName}</span>
+					<span className='truncate'>
+						{isPendingCreation ? 'Creating workspace…' : workspace.branchName}
+					</span>
 				</div>
 			</div>
 		</>
 	);
+
+	if (isPendingCreation) {
+		return (
+			<div className='group/workspace-sidebar-item relative min-w-0 opacity-80'>
+				<SidebarMenuButton
+					aria-disabled='true'
+					aria-label={`Workspace ${workspace.name} is being created`}
+					className='h-auto min-h-12 cursor-not-allowed items-start gap-2 py-2'
+					data-workspace-sidebar-state={sidebarState.kind}
+					disabled
+					isActive={false}
+					tooltip={`${workspace.name} is being created`}
+				>
+					{buttonContent}
+				</SidebarMenuButton>
+			</div>
+		);
+	}
 
 	return (
 		<ContextMenu>

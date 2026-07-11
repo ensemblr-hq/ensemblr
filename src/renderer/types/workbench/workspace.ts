@@ -330,6 +330,8 @@ export interface WorkspaceShellModel {
 	/** Owner/repo parsed from the repository's GitHub remote, when it has one. */
 	githubRepo?: GithubRepoRef | null;
 	id: string;
+	/** True for optimistic rows shown while the main process creates the workspace. */
+	isPendingCreation?: boolean;
 	landingSummary?: WorkspaceLandingSummary;
 	name: string;
 	pathLabel: string;
