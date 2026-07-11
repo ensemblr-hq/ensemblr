@@ -1,10 +1,14 @@
+import { useAtom } from 'jotai';
 import {
+	ArchiveIcon,
 	ExternalLinkIcon,
+	FastForwardIcon,
 	GitMergeIcon,
 	LoaderCircleIcon,
 	MoreVerticalIcon,
 	RefreshCwIcon,
 } from 'lucide-react';
+import { useCallback } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -15,6 +19,7 @@ import {
 } from '@/renderer/components/ui/dropdown-menu';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { cn } from '@/renderer/lib/utils';
+import { continuedMergedPullRequestByWorkspaceAtom } from '@/renderer/state/workspace';
 import type {
 	RightSidebarHeaderState,
 	WorkspaceShellModel,
@@ -37,9 +42,14 @@ const HEADER_LABEL_TONE_CLASSES: Record<HeaderTone, string> = {
 	blocked: 'text-status-danger',
 	neutral: 'text-muted-foreground',
 	pending: 'text-foreground',
+	merged: 'text-[color:var(--right-sidebar-header-merged)]',
 	ready: 'text-status-ok',
 };
 
+const archiveBoundary = classifyPermissionAction({
+	action: 'workspace-archive-delete',
+	mode: DEFAULT_PERMISSION_MODE,
+});
 const mergeBoundary = classifyPermissionAction({
 	action: 'pull-request-merge',
 	mode: DEFAULT_PERMISSION_MODE,
@@ -53,12 +63,32 @@ export function RightSidebarHeader({
 	activeWorkspace: WorkspaceShellModel;
 }) {
 	const hasBranchChanges = useReviewableChanges(activeWorkspace);
+	const [continuedMergedPullRequests, setContinuedMergedPullRequests] = useAtom(
+		continuedMergedPullRequestByWorkspaceAtom,
+	);
+	const continuedPullRequestNumber =
+		continuedMergedPullRequests[activeWorkspace.id];
 	const headerState = getRightSidebarHeaderState(
 		activeWorkspace,
 		hasBranchChanges,
+		{ continuedPullRequestNumber },
 	);
 	const hasPullRequestNumber = 'number' in headerState;
 	const hasHeaderLabel = 'label' in headerState;
+	const continueMergedWorkspace = useCallback(() => {
+		const pullRequestNumber = activeWorkspace.pullRequest.number;
+		if (pullRequestNumber === undefined) {
+			return;
+		}
+		setContinuedMergedPullRequests((current) => ({
+			...current,
+			[activeWorkspace.id]: pullRequestNumber,
+		}));
+	}, [
+		activeWorkspace.id,
+		activeWorkspace.pullRequest.number,
+		setContinuedMergedPullRequests,
+	]);
 
 	return (
 		<header
@@ -95,6 +125,7 @@ export function RightSidebarHeader({
 				<RightSidebarHeaderAction
 					activeWorkspace={activeWorkspace}
 					headerState={headerState}
+					onContinueMergedWorkspace={continueMergedWorkspace}
 				/>
 			</div>
 		</header>
@@ -105,9 +136,11 @@ export function RightSidebarHeader({
 function RightSidebarHeaderAction({
 	activeWorkspace,
 	headerState,
+	onContinueMergedWorkspace,
 }: {
 	activeWorkspace: WorkspaceShellModel;
 	headerState: RightSidebarHeaderState;
+	onContinueMergedWorkspace: () => void;
 }) {
 	const reviewActions = useReviewActions();
 
@@ -124,6 +157,41 @@ function RightSidebarHeaderAction({
 					Merge
 					<span className='sr-only'>{mergeBoundaryLabel}</span>
 				</Button>
+			);
+		case 'pr-merged':
+			return (
+				<div className='flex items-center gap-1.5'>
+					<Button
+						className='h-8 rounded-lg border-[color:var(--right-sidebar-header-merged-border)] border-dashed bg-transparent px-2.5 text-[color:var(--right-sidebar-header-merged)] text-sm hover:bg-[var(--right-sidebar-header-merged-soft)] hover:text-[color:var(--right-sidebar-header-merged)]'
+						disabled={reviewActions?.isArchivingMergedWorkspace}
+						onClick={onContinueMergedWorkspace}
+						size='sm'
+						variant='outline'
+					>
+						<FastForwardIcon aria-hidden='true' data-icon='inline-start' />
+						Continue
+					</Button>
+					<Button
+						className='h-8 rounded-lg bg-[var(--right-sidebar-header-merged)] px-2.5 text-[color:var(--right-sidebar-header-merged-foreground)] text-sm hover:bg-[var(--right-sidebar-header-merged-hover)]'
+						data-permission-boundary={archiveBoundary.boundary}
+						disabled={
+							reviewActions === null || reviewActions.isArchivingMergedWorkspace
+						}
+						onClick={reviewActions?.archiveMergedWorkspace}
+						size='sm'
+					>
+						{reviewActions?.isArchivingMergedWorkspace ? (
+							<LoaderCircleIcon
+								aria-hidden='true'
+								className='animate-spin'
+								data-icon='inline-start'
+							/>
+						) : (
+							<ArchiveIcon aria-hidden='true' data-icon='inline-start' />
+						)}
+						Archive
+					</Button>
+				</div>
 			);
 		case 'pr-working':
 		case 'pr-checking':

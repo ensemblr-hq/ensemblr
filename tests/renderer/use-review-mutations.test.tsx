@@ -44,6 +44,8 @@ vi.mock('@/renderer/state/workspace/open-target-history', () => ({
 	deleteLastUsedOpenTarget: vi.fn(),
 }));
 
+import { toast } from 'sonner';
+
 import { useReviewMutations } from '@/renderer/hooks/workbench-shell/review-actions/use-review-mutations';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
@@ -81,6 +83,14 @@ function renderReviewMutations(archiveAfterMerge: boolean) {
 beforeEach(() => {
 	vi.clearAllMocks();
 	mergePullRequest.mockResolvedValue({ merged: true });
+});
+
+test('does not show a merge-completed toast when archive-on-merge is disabled', async () => {
+	const { result } = renderReviewMutations(false);
+
+	await result.current.mergeMutation.mutateAsync();
+
+	expect(toast.success).not.toHaveBeenCalled();
 });
 
 test('redirects to Welcome and refreshes list views after archive-on-merge', async () => {

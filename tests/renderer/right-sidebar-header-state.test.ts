@@ -37,8 +37,50 @@ test('an open PR ignores the branch-changes signal', () => {
 	const base = getDefaultWorkspace();
 	const withPr: WorkspaceShellModel = {
 		...base,
-		pullRequest: { ...base.pullRequest, number: 42, status: 'open' },
+		pullRequest: { ...base.pullRequest, number: 42, status: 'idle' },
 	};
 	expect(getRightSidebarHeaderState(withPr, false).kind).not.toBe('empty');
 	expect(getRightSidebarHeaderState(withPr, false).kind).not.toBe('create-pr');
+});
+
+test('a merged PR uses the post-merge header actions', () => {
+	const base = getDefaultWorkspace();
+	const withMergedPr: WorkspaceShellModel = {
+		...base,
+		pullRequest: {
+			...base.pullRequest,
+			label: 'Merged',
+			number: 42,
+			state: 'merged',
+			status: 'idle',
+		},
+	};
+	const state = getRightSidebarHeaderState(withMergedPr, false);
+
+	expect(state.kind).toBe('pr-merged');
+	expect(state.tone).toBe('merged');
+});
+
+test('a continued merged PR behaves like a brand-new workspace header', () => {
+	const base = getDefaultWorkspace();
+	const withMergedPr: WorkspaceShellModel = {
+		...base,
+		pullRequest: {
+			...base.pullRequest,
+			number: 42,
+			state: 'merged',
+			status: 'idle',
+		},
+	};
+
+	expect(
+		getRightSidebarHeaderState(withMergedPr, true, {
+			continuedPullRequestNumber: 42,
+		}).kind,
+	).toBe('create-pr');
+	expect(
+		getRightSidebarHeaderState(withMergedPr, false, {
+			continuedPullRequestNumber: 42,
+		}).kind,
+	).toBe('empty');
 });

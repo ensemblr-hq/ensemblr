@@ -56,6 +56,16 @@ export const rightSidebarSizePercentAtom = atomWithStorage<number>(
 	workspaceStorageOptions,
 );
 
+/** Persisted merged PR number that the user continued past, keyed by workspace id. */
+export const continuedMergedPullRequestByWorkspaceAtom = atomWithStorage<
+	Record<string, number>
+>(
+	'ensemblr_workspace_continued_merged_pull_request_by_workspace',
+	{},
+	undefined,
+	workspaceStorageOptions,
+);
+
 /** Persisted active review-panel tab, keyed by workspace id. */
 export const activeReviewTabByWorkspaceAtom = atomWithStorage<
 	Record<string, ReviewPanelTab>

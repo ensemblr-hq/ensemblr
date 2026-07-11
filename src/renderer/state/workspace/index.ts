@@ -3,6 +3,7 @@ export {
 	activeReviewTabByWorkspaceAtom,
 	changesSourceByWorkspaceAtom,
 	changesViewModeAtom,
+	continuedMergedPullRequestByWorkspaceAtom,
 	rightSidebarCollapsedAtom,
 	rightSidebarSizePercentAtom,
 	workspaceDirectoryRevealRequestAtom,
