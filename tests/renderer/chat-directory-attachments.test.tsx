@@ -27,6 +27,16 @@ function readDirectoryPart(path: string): DynamicToolUIPart {
 	};
 }
 
+function editFilePart(path: string): DynamicToolUIPart {
+	return {
+		input: { path },
+		state: 'input-available',
+		toolCallId: `edit-${path}`,
+		toolName: 'edit',
+		type: 'dynamic-tool',
+	};
+}
+
 describe('directory attachment chips', () => {
 	test('renders read tool chips for known directories with a folder icon', () => {
 		const openPreview = vi.fn();
@@ -43,6 +53,16 @@ describe('directory attachment chips', () => {
 		expect(container.innerHTML).toContain('default-folder');
 		fireEvent.click(screen.getByRole('button', { name: 'renderer' }));
 		expect(openPreview).toHaveBeenCalledWith('src/renderer');
+	});
+
+	test('omits redundant edit path when a file chip is present', () => {
+		renderWithProviders(
+			<ChatToolRow part={editFilePart('src/app/page.tsx')} />,
+		);
+
+		expect(screen.getByText('Edit')).toBeTruthy();
+		expect(screen.getByText('page.tsx')).toBeTruthy();
+		expect(screen.queryByText('src/app/page.tsx')).toBeNull();
 	});
 
 	test('activates referenced folder prompt chips', () => {

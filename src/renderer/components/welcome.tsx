@@ -8,7 +8,7 @@ import {
 	githubRepositoryListQuery,
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
-import { SidebarInset } from '@/renderer/components/ui/sidebar';
+import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
 import { openLocalProjectFlow } from '@/renderer/lib/workbench/open-local-project-flow';
 import {
 	cloneDialogOpenAtom,
@@ -57,6 +57,7 @@ export function Welcome() {
 				aria-hidden='true'
 				className='window-drag-region absolute inset-x-0 top-0 z-10 h-12'
 			/>
+			<SidebarTrigger className='sidebar-collapsed-trigger absolute top-2.5 left-[var(--ensemblr-traffic-light-safe-inline)] z-20' />
 			<main className='flex min-h-0 flex-1 items-center justify-center px-8 py-10'>
 				<section className='flex flex-col items-center gap-12'>
 					<WelcomeWordmark className='blur-[0.046875rem]' />

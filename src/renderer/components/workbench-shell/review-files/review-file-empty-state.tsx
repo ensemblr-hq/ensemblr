@@ -16,7 +16,7 @@ export function ReviewFileEmptyState({
 		<div className='flex h-full flex-col items-center justify-center px-8 text-center'>
 			<GitPullRequestArrowIcon
 				aria-hidden='true'
-				className='size-9 text-muted-foreground/50'
+				className='size-9 text-muted-foreground opacity-50'
 				strokeWidth={1.25}
 			/>
 			<p className='mt-4 font-medium text-foreground text-sm'>{title}</p>
