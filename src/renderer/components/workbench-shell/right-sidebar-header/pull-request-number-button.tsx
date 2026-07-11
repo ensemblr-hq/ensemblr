@@ -22,6 +22,8 @@ export function PullRequestNumberButton({
 			'border-status-warning/35 bg-status-warning/10 text-foreground hover:bg-status-warning/15',
 		tone === 'blocked' &&
 			'border-status-danger/35 bg-status-danger/10 text-status-danger hover:bg-status-danger/15',
+		tone === 'merged' &&
+			'border-[color:var(--right-sidebar-header-merged-border)] bg-[var(--right-sidebar-header-merged-soft)] text-[color:var(--right-sidebar-header-merged)] hover:bg-[var(--right-sidebar-header-merged-soft)]',
 		tone === 'neutral' &&
 			'border-border bg-transparent text-muted-foreground hover:bg-muted/70',
 	);

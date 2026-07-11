@@ -389,6 +389,31 @@
 		}
 	}
 
+	.right-sidebar-header[data-pr-tone="merged"] {
+		--right-sidebar-header-merged: oklch(0.72 0.21 304);
+		--right-sidebar-header-merged-border: color-mix(
+			in oklch,
+			var(--right-sidebar-header-merged),
+			transparent 54%
+		);
+		--right-sidebar-header-merged-foreground: oklch(0.99 0 0);
+		--right-sidebar-header-merged-hover: color-mix(
+			in oklch,
+			var(--right-sidebar-header-merged),
+			black 10%
+		);
+		--right-sidebar-header-merged-soft: color-mix(
+			in oklch,
+			var(--right-sidebar-header-merged),
+			transparent 86%
+		);
+		background: color-mix(
+			in oklch,
+			var(--right-sidebar-header-merged),
+			var(--ensemblr-toolbar) 82%
+		);
+	}
+
 	.right-sidebar-header[data-pr-tone="ready"] {
 		background: color-mix(in oklch, var(--ensemblr-status-ok), transparent 84%);
 	}

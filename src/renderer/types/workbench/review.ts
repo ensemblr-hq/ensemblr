@@ -11,6 +11,10 @@ import type { WorkspaceOpenTarget } from './workspace';
  * `CreatePullRequestMenu`), so it is no longer a context action.
  */
 export interface ReviewActionsValue {
+	/** Archives the merged workspace from the post-merge header action. */
+	archiveMergedWorkspace: () => void;
+	/** Whether the merged workspace archive action is currently running. */
+	isArchivingMergedWorkspace: boolean;
 	isRefreshingPullRequest: boolean;
 	openMergeConfirmation: () => void;
 	refreshPullRequest: () => void;
