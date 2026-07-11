@@ -24,6 +24,7 @@ import type {
 import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 import { parseWorkspaceScriptSettings } from '@/shared/scripts/script-settings';
 
+import { useEnsureWorkspaceSetup } from './use-ensure-workspace-setup';
 import { usePullRequestAutoRefresh } from './use-pull-request-auto-refresh';
 import { useWorkspaceFilesWatch } from './use-workspace-files-watch';
 
@@ -61,6 +62,9 @@ export function useLiveWorkspaceModel({
 	liveWorkspaceFiles: ActiveWorkspace['workspaceFiles'];
 	workspaceWithLiveDockTabs: ActiveWorkspace;
 } {
+	// Run the setup script on open only when the dependency fingerprint is
+	// missing or stale, so restarting into a workspace never needlessly reinstalls.
+	useEnsureWorkspaceSetup(activeWorkspace.id);
 	// Refresh the files tree the instant an agent or the user changes files on
 	// disk, rather than waiting for the query's polling fallback.
 	useWorkspaceFilesWatch({

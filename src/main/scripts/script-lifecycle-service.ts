@@ -8,11 +8,20 @@ import {
 	parseWorkspaceScriptSettings,
 	type WorkspaceScriptSettings,
 } from '../../shared/scripts/script-settings.ts';
+import {
+	readSetupState,
+	withSetupState,
+} from '../../shared/scripts/setup-state.ts';
 import type { EnsemblrConfigResolutionService } from '../config';
+import { parseMetadata } from '../repository/metadata.ts';
 import { isRecord, isString } from '../repository/row-guards.ts';
 import type { EnsemblrDatabaseService } from '../storage';
-import { selectWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
+import {
+	selectWorkspaceWithRepositoryById,
+	updateWorkspaceMetadataJson,
+} from '../storage/repositories/workspace-repository.ts';
 import type { TerminalService } from '../terminal';
+import { computeSetupFingerprint } from './setup-fingerprint.ts';
 
 const RESTART_WAIT_TIMEOUT_MS = 7_000;
 
@@ -47,8 +56,18 @@ export interface ScriptLifecycleService {
 		options: RunScriptOptions,
 	) => Promise<CreateTerminalSessionResult>;
 	/**
+	 * Runs the setup script only when the workspace's current dependency
+	 * fingerprint differs from the last successful run. A matching fingerprint
+	 * resolves to an info diagnostic without starting a session, so reopening a
+	 * workspace never re-runs setup when nothing that affects it changed.
+	 */
+	runSetupScriptIfNeeded: (options: {
+		workspaceId: string;
+	}) => Promise<CreateTerminalSessionResult>;
+	/**
 	 * Runs the setup script and, when the repository has `autoRunAfterSetup`
-	 * enabled and the setup exits successfully, chains the run script.
+	 * enabled and the setup exits successfully, chains the run script. Records
+	 * the setup fingerprint on a clean exit so later opens can skip it.
 	 */
 	runSetupScriptWithAutoRun: (options: {
 		workspaceId: string;
@@ -96,7 +115,7 @@ export function createScriptLifecycleService({
 
 		const row = selectWorkspaceWithRepositoryById({ database, workspaceId });
 
-		if (!isWorkspaceJoinRow(row)) {
+		if (!isWorkspaceRow(row)) {
 			return {
 				error: failure(
 					'workspace-not-found',
@@ -207,53 +226,36 @@ export function createScriptLifecycleService({
 	}
 
 	/**
-	 * Runs the setup script for a workspace, then auto-starts the run script when
-	 * the repository opts in via `autoRunAfterSetup` and the setup exits cleanly.
-	 * Waits for the setup session to finish only when auto-run is enabled, so the
-	 * common (opt-out) path stays fire-and-forget. The wait is bounded and the
-	 * settings are re-read afterward, so a hung setup or a mid-setup opt-out both
-	 * skip the chain.
+	 * Waits for a setup session to finish and, when it exits cleanly, records the
+	 * dependency fingerprint so later opens can skip setup, then chains the run
+	 * script if the repository enables `autoRunAfterSetup`. The wait is bounded;
+	 * setup failures, hangs, and mid-flight stops skip both the record and the
+	 * chain. Settings are re-read after the wait so a mid-setup opt-out is honored.
+	 * @param options - The setup command, its session id, and the target workspace.
 	 */
-	async function runSetupScriptWithAutoRun({
+	async function finalizeSetup({
+		command,
+		sessionId,
 		workspaceId,
 	}: {
+		command: string;
+		sessionId: string;
 		workspaceId: string;
 	}): Promise<void> {
-		const setupResult = await runScript({ kind: 'setup', workspaceId });
-		const setupSessionId = setupResult.session?.id;
-
-		if (!setupSessionId) {
-			return;
-		}
-
-		// Cheap short-circuit: skip the wait entirely when the pre-wait snapshot
-		// already shows auto-run is off or no run command is configured.
-		const preWait = resolveScriptConfig(workspaceId);
-
-		if (
-			preWait.error ||
-			!preWait.settings.autoRunAfterSetup ||
-			!preWait.settings.scripts.run
-		) {
-			return;
-		}
-
-		// Bound the wait so a hung setup script cannot block the chain forever.
 		const exited = await terminalService.waitForExit(
-			setupSessionId,
+			sessionId,
 			SCRIPT_EXIT_WAIT_TIMEOUT_MS,
 		);
 
-		// Skip the chain when setup timed out or did not finish cleanly (exit 0).
 		if (
 			!exited ||
-			terminalService.getSnapshot(setupSessionId).session?.status !== 'exited'
+			terminalService.getSnapshot(sessionId).session?.status !== 'exited'
 		) {
 			return;
 		}
 
-		// Re-read settings after the wait: the user may have toggled auto-run off
-		// or cleared the run command while a long setup script ran.
+		recordSetupCompletion({ command, workspaceId });
+
 		const fresh = resolveScriptConfig(workspaceId);
 
 		if (
@@ -265,6 +267,169 @@ export function createScriptLifecycleService({
 		}
 
 		await runScript({ kind: 'run', workspaceId }).catch(() => {});
+	}
+
+	/**
+	 * Persists the current setup fingerprint into the workspace metadata,
+	 * preserving every sibling key. Best-effort: silently no-ops when SQLite or
+	 * the workspace row is unavailable, since a missed record only costs one
+	 * redundant setup run on the next open. The row is re-read immediately before
+	 * the write to keep the read-modify-write window small; a losing race with a
+	 * concurrent metadata write likewise only costs a redundant setup run.
+	 * @param options - The setup command that completed and the target workspace.
+	 */
+	function recordSetupCompletion({
+		command,
+		workspaceId,
+	}: {
+		command: string;
+		workspaceId: string;
+	}): void {
+		const database = databaseService.getConnection()?.database ?? null;
+
+		if (!database) {
+			return;
+		}
+
+		const row = selectWorkspaceWithRepositoryById({ database, workspaceId });
+
+		if (!isWorkspaceRow(row)) {
+			return;
+		}
+
+		const metadata = withSetupState(parseMetadata(row.metadataJson), {
+			command,
+			completedAt: new Date().toISOString(),
+			fingerprint: computeSetupFingerprint({
+				command,
+				worktreePath: row.path,
+			}),
+		});
+
+		updateWorkspaceMetadataJson({
+			database,
+			id: workspaceId,
+			metadataJson: JSON.stringify(metadata),
+		});
+	}
+
+	/**
+	 * Reports whether a prior clean setup run still covers the current inputs, so
+	 * setup can be skipped. Matches on both the command and the worktree
+	 * fingerprint; the fingerprint (which reads lockfiles) is only computed when
+	 * the recorded command matches.
+	 * @param row - Workspace join row carrying `metadataJson` and worktree `path`.
+	 * @param command - The resolved setup command to compare against the record.
+	 * @returns True when the recorded fingerprint matches the current inputs.
+	 */
+	function setupIsCurrent(
+		row: { metadataJson: string; path: string },
+		command: string,
+	): boolean {
+		const persisted = readSetupState(parseMetadata(row.metadataJson));
+
+		if (!persisted || persisted.command !== command) {
+			return false;
+		}
+
+		return (
+			persisted.fingerprint ===
+			computeSetupFingerprint({ command, worktreePath: row.path })
+		);
+	}
+
+	/**
+	 * Runs the setup script, then records its fingerprint and chains the run
+	 * script per `autoRunAfterSetup` once it exits cleanly. Awaits the full tail
+	 * so callers know setup (and any chained run) has settled.
+	 */
+	async function runSetupScriptWithAutoRun({
+		workspaceId,
+	}: {
+		workspaceId: string;
+	}): Promise<void> {
+		const resolved = resolveScriptConfig(workspaceId);
+		const command = resolved.error ? null : resolved.settings.scripts.setup;
+		const setupResult = await runScript({ kind: 'setup', workspaceId });
+		const setupSessionId = setupResult.session?.id;
+
+		if (!command || !setupSessionId) {
+			return;
+		}
+
+		await finalizeSetup({ command, sessionId: setupSessionId, workspaceId });
+	}
+
+	/**
+	 * Runs the setup script only when the workspace's current dependency
+	 * fingerprint differs from the last recorded successful run. A match returns
+	 * an info diagnostic without starting a session; otherwise setup starts and
+	 * its fingerprint is recorded in the background once it exits cleanly.
+	 * @param options - The target workspace.
+	 * @returns The launched setup session result, an info diagnostic when setup
+	 *   is already current, or a typed failure.
+	 */
+	async function runSetupScriptIfNeeded({
+		workspaceId,
+	}: {
+		workspaceId: string;
+	}): Promise<CreateTerminalSessionResult> {
+		const database = databaseService.getConnection()?.database ?? null;
+
+		if (!database) {
+			return failure(
+				'database-unavailable',
+				'SQLite is unavailable; the setup script cannot be resolved.',
+			);
+		}
+
+		const resolved = resolveScriptConfig(workspaceId);
+
+		if (resolved.error) {
+			return resolved.error;
+		}
+
+		const command = resolved.settings.scripts.setup;
+
+		if (!command) {
+			return failure(
+				'script-not-configured',
+				'No setup script is configured for this repository.',
+				'info',
+			);
+		}
+
+		const row = selectWorkspaceWithRepositoryById({ database, workspaceId });
+
+		if (!isWorkspaceRow(row)) {
+			return failure(
+				'workspace-not-found',
+				`No workspace is registered with id ${workspaceId}.`,
+			);
+		}
+
+		if (setupIsCurrent(row, command)) {
+			return {
+				diagnostics: [
+					{
+						code: 'setup-already-current',
+						message:
+							'Setup already ran for the current dependencies; skipping.',
+						severity: 'info',
+					},
+				],
+				session: null,
+			};
+		}
+
+		const result = await runScript({ kind: 'setup', workspaceId });
+		const sessionId = result.session?.id;
+
+		if (sessionId) {
+			void finalizeSetup({ command, sessionId, workspaceId });
+		}
+
+		return result;
 	}
 
 	/**
@@ -317,6 +482,7 @@ export function createScriptLifecycleService({
 			}
 		},
 		runScript,
+		runSetupScriptIfNeeded,
 		runSetupScriptWithAutoRun,
 		stopScript,
 	};
@@ -346,10 +512,16 @@ function defaultScriptTitle(kind: WorkspaceScriptKind): string {
 	}
 }
 
-/** Type guard for the workspace + repository join row. */
-function isWorkspaceJoinRow(row: unknown): row is {
+/** Type guard for the workspace join-row fields this service reads. */
+function isWorkspaceRow(row: unknown): row is {
+	metadataJson: string;
 	path: string;
 	repositoryId: string;
 } {
-	return isRecord(row) && isString(row.path) && isString(row.repositoryId);
+	return (
+		isRecord(row) &&
+		isString(row.path) &&
+		isString(row.repositoryId) &&
+		isString(row.metadataJson)
+	);
 }
