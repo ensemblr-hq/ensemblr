@@ -1,5 +1,9 @@
 import path from 'node:path';
 
+import {
+	extractPullRequestNumber,
+	extractPullRequestUrl,
+} from '../../shared/github';
 import type {
 	CommitWorkspaceChangesRequest,
 	CommitWorkspaceChangesResult,
@@ -583,17 +587,4 @@ function validateCwd(
 		};
 	}
 	return { cwd, ok: true };
-}
-
-/** Finds the created PR URL in `gh pr create` stdout. */
-export function extractPullRequestUrl(stdout: string): string | undefined {
-	const match = stdout.match(/https:\/\/[^\s]+\/pull\/\d+/);
-	return match?.[0];
-}
-
-/** Extracts the PR number from a GitHub PR URL. */
-export function extractPullRequestNumber(url: string): number | undefined {
-	const match = url.match(/\/pull\/(\d+)/);
-	const parsed = match ? Number.parseInt(match[1], 10) : Number.NaN;
-	return Number.isFinite(parsed) ? parsed : undefined;
 }
