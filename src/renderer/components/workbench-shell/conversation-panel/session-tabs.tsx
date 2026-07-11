@@ -1,3 +1,4 @@
+import { Icon } from '@iconify/react';
 import {
 	BugIcon,
 	FileDiffIcon,
@@ -19,6 +20,7 @@ import {
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import { cn } from '@/renderer/lib/utils';
+import { getWorkspaceFileIconNameForPath } from '@/renderer/lib/workbench';
 import { useDebugPanelToggle } from '@/renderer/state/pi';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 
@@ -70,15 +72,11 @@ export function SessionTabs({
 							(candidate) => (candidate.kind ?? 'chat') === 'chat',
 						).length;
 						const canClose = isChatKind ? openChatTabCount > 1 : true;
-						const SessionIcon =
-							session.status === 'working'
-								? LoaderCircleIcon
-								: iconForTabKind(session.kind ?? 'chat');
 
 						return (
 							<div
 								className={cn(
-									'group/session-tab relative flex h-12 min-w-30 flex-none items-center overflow-hidden border-transparent border-b-2 text-xs transition-colors',
+									'group/session-tab relative flex h-12 min-w-30 max-w-52 flex-none items-center overflow-hidden border-transparent border-b-2 text-xs transition-colors',
 									isActive
 										? 'border-primary bg-muted/50 text-foreground'
 										: 'text-muted-foreground hover:text-foreground',
@@ -91,13 +89,7 @@ export function SessionTabs({
 									type='button'
 								>
 									<span className='grid size-3.5 shrink-0 place-items-center'>
-										<SessionIcon
-											aria-hidden='true'
-											className={cn(
-												'size-3.5',
-												session.status === 'working' && 'animate-spin',
-											)}
-										/>
+										<SessionTabIcon session={session} />
 									</span>
 									<span className='truncate'>{session.label}</span>
 								</button>
@@ -162,7 +154,38 @@ export function SessionTabs({
 	);
 }
 
-/** Picks the resting icon for a tab's content kind. */
+/** Renders the icon for a chat, diff, document, or file preview tab. */
+function SessionTabIcon({ session }: { session: SessionTabModel }) {
+	if (session.status === 'working') {
+		return (
+			<LoaderCircleIcon aria-hidden='true' className='size-3.5 animate-spin' />
+		);
+	}
+
+	const fileIconName = iconNameForFilePreviewTab(session);
+	if (fileIconName) {
+		return <Icon aria-hidden='true' className='size-3.5' icon={fileIconName} />;
+	}
+
+	const TabIcon = iconForTabKind(session.kind ?? 'chat');
+	return <TabIcon aria-hidden='true' className='size-3.5' />;
+}
+
+/** Returns a VSCode icon name for file-backed tabs that have a file path. */
+function iconNameForFilePreviewTab(session: SessionTabModel): string | null {
+	if (
+		(session.kind === 'document' ||
+			session.kind === 'file' ||
+			session.kind === 'preview') &&
+		session.filePath
+	) {
+		return getWorkspaceFileIconNameForPath(session.filePath);
+	}
+
+	return null;
+}
+
+/** Returns the generic icon component for non-file-backed tab kinds. */
 function iconForTabKind(kind: NonNullable<SessionTabModel['kind']>) {
 	switch (kind) {
 		case 'diff':

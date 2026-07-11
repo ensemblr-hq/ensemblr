@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { execFileSync } from 'node:child_process';
 import {
 	mkdirSync,
@@ -92,6 +94,10 @@ function workspaceFilesService() {
 	});
 }
 
+function readWorkspaceFile(cwd: string, filePath: string) {
+	return workspaceFilesService().read({ path: filePath, workspaceCwd: cwd });
+}
+
 describe('createListWorkspaceFilesService.list', () => {
 	test('enumerates ignored directory contents so they are browsable', async () => {
 		const result = await listFiles(seedRepo());
@@ -167,6 +173,43 @@ describe('createListWorkspaceFilesService.list', () => {
 		expect(paths).not.toContain('._resource');
 		// A real file in the same folder as junk still lists.
 		expect(paths).toContain('src/app.ts');
+	});
+});
+
+describe('createListWorkspaceFilesService.read', () => {
+	test('reads text files as utf8 preview content', async () => {
+		const result = await readWorkspaceFile(seedRepo(), 'README.md');
+
+		expect(result.error).toBeUndefined();
+		expect(result.content).toBe('# demo\n');
+		expect(result.contentEncoding).toBe('utf8');
+		expect(result.mimeType).toBeUndefined();
+	});
+
+	test('reads image files as base64 preview content with a browser MIME type', async () => {
+		const cwd = seedRepo();
+		const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a]);
+		writeFileSync(path.join(cwd, 'diagram.png'), bytes);
+
+		const result = await readWorkspaceFile(cwd, 'diagram.png');
+
+		expect(result.error).toBeUndefined();
+		expect(result.content).toBe(bytes.toString('base64'));
+		expect(result.contentEncoding).toBe('base64');
+		expect(result.mimeType).toBe('image/png');
+		expect(result.sizeBytes).toBe(bytes.length);
+	});
+
+	test('falls back to utf8 source when image bytes do not match the extension', async () => {
+		const cwd = seedRepo();
+		writeFileSync(path.join(cwd, 'not-really.png'), 'plain text, not a png\n');
+
+		const result = await readWorkspaceFile(cwd, 'not-really.png');
+
+		expect(result.error).toBeUndefined();
+		expect(result.content).toBe('plain text, not a png\n');
+		expect(result.contentEncoding).toBe('utf8');
+		expect(result.mimeType).toBeUndefined();
 	});
 });
 
