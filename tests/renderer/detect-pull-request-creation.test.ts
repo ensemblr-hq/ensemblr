@@ -3,7 +3,10 @@ import {
 	classifyPullRequestRefreshAction,
 	isPullRequestCreationEvent,
 } from '../../src/renderer/hooks/workbench-shell/route-layout/detect-pull-request-creation';
-import type { PiPersistedEnvelope } from '../../src/shared/ipc/contracts/pi-message-payloads';
+import type {
+	PiPersistedEnvelope,
+	PiWireMessagePart,
+} from '../../src/shared/ipc/contracts/pi-message-payloads';
 
 /** Wraps a tool-call payload in the persisted message envelope shape. */
 function toolCall(input: unknown): PiPersistedEnvelope {
@@ -20,6 +23,17 @@ function toolResult(output: unknown): PiPersistedEnvelope {
 		kind: 'message',
 		payload: { isError: false, kind: 'tool-result', output, toolCallId: 'c1' },
 		role: 'tool',
+	};
+}
+
+/** Wraps finalized assistant message parts in the persisted envelope shape. */
+function assistantMessage(
+	parts: readonly PiWireMessagePart[],
+): PiPersistedEnvelope {
+	return {
+		kind: 'message',
+		payload: { kind: 'message', parts, role: 'assistant' },
+		role: 'agent',
 	};
 }
 
@@ -42,6 +56,21 @@ describe('isPullRequestCreationEvent', () => {
 		expect(
 			isPullRequestCreationEvent(
 				toolResult({ stdout: 'https://github.com/acme/app/pull/12' }),
+			),
+		).toBe(true);
+	});
+
+	test('detects a PR URL in a finalized assistant tool-result part', () => {
+		expect(
+			isPullRequestCreationEvent(
+				assistantMessage([
+					{
+						isError: false,
+						kind: 'tool-result',
+						output: 'https://github.com/acme/app/pull/12',
+						toolCallId: 'c1',
+					},
+				]),
 			),
 		).toBe(true);
 	});
@@ -90,6 +119,15 @@ describe('classifyPullRequestRefreshAction', () => {
 				false,
 			),
 		).toEqual({ kind: 'mark-created' });
+	});
+
+	test('requests an immediate retry when a PR URL appears', () => {
+		expect(
+			classifyPullRequestRefreshAction(
+				toolResult('https://github.com/acme/app/pull/12'),
+				false,
+			),
+		).toEqual({ createdPr: true, kind: 'refresh' });
 	});
 
 	test('resets arming when a turn starts', () => {
