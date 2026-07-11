@@ -13,6 +13,7 @@ import {
 	subscribePiSessionEvents,
 	writeOpenedChatTabToCache,
 } from '@/renderer/api/ensemblr-queries';
+import { forgetComposerDraft } from '@/renderer/state/composer';
 import { forgetChatOverrides } from '@/renderer/state/preferences';
 import type {
 	CommentPreviewPayload,
@@ -273,10 +274,12 @@ export function useSessionTabState({
 			});
 		},
 		onSuccess: (result, chatTabId) => {
-			// Drop per-chat overrides only for hard-deleted tabs; tabs marked
-			// closed remain restorable and must keep their model/thinking picks.
+			// Drop per-chat overrides and the composer draft only for hard-deleted
+			// tabs; tabs marked closed remain restorable and must keep their
+			// model/thinking picks and unsent draft.
 			if (result.deleted) {
 				forgetChatOverrides(chatTabId);
+				forgetComposerDraft(chatTabId);
 			}
 			void queryClient.invalidateQueries({
 				queryKey: ensemblrQueryKeys.chatTabs(workspaceId),

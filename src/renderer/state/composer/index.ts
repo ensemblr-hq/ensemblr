@@ -11,6 +11,13 @@ export {
 	useComposerAttachmentDispatcher,
 	useComposerAttachmentInbox,
 } from './composer-attachments';
+export {
+	composerExternalsAtomFamily,
+	composerMentionsAtomFamily,
+	composerUploadsAtomFamily,
+	composerValueAtomFamily,
+	forgetComposerDraft,
+} from './composer-drafts';
 export type { ComposerInsertRequest } from './composer-insert';
 export {
 	useComposerInsert,

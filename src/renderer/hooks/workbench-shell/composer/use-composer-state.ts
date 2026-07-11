@@ -1,4 +1,4 @@
-import { useAtomValue } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import {
 	type ChangeEvent,
 	type ClipboardEvent as ReactClipboardEvent,
@@ -28,6 +28,10 @@ import {
 	formatUploadAttachmentText,
 } from '@/renderer/lib/workbench/mention-payload';
 import {
+	composerExternalsAtomFamily,
+	composerMentionsAtomFamily,
+	composerUploadsAtomFamily,
+	composerValueAtomFamily,
 	useComposerAttachmentInbox,
 	useComposerInsertConsumer,
 	useComposerSubmitConsumer,
@@ -138,18 +142,20 @@ export function useComposerState({
 	const anchorRef = useRef<HTMLDivElement | null>(null);
 	const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-	const [value, setValue] = useState('');
+	const [value, setValue] = useAtom(composerValueAtomFamily(chatTabId));
 	const [pending, setPending] = useState(false);
 	const [autocomplete, setAutocomplete] =
 		useState<AutocompleteState>(EMPTY_AUTOCOMPLETE);
 	const [activeIndex, setActiveIndex] = useState(0);
-	const [uploadAttachments, setUploadAttachments] = useState<File[]>([]);
-	const [mentionAttachments, setMentionAttachments] = useState<
-		WorkspaceFileSummary[]
-	>([]);
-	const [externalAttachments, setExternalAttachments] = useState<
-		ExternalAttachment[]
-	>([]);
+	const [uploadAttachments, setUploadAttachments] = useAtom(
+		composerUploadsAtomFamily(chatTabId),
+	);
+	const [mentionAttachments, setMentionAttachments] = useAtom(
+		composerMentionsAtomFamily(chatTabId),
+	);
+	const [externalAttachments, setExternalAttachments] = useAtom(
+		composerExternalsAtomFamily(chatTabId),
+	);
 	const [attachmentError, setAttachmentError] = useState<string | null>(null);
 	const [blockedNotice, setBlockedNotice] = useState(false);
 
@@ -174,7 +180,7 @@ export function useComposerState({
 			return next;
 		});
 		attachmentInbox.clear();
-	}, [attachmentInbox]);
+	}, [attachmentInbox, setMentionAttachments]);
 
 	const mentionMatches = useMentionMatches(
 		composer.workspaceFiles,
@@ -205,15 +211,18 @@ export function useComposerState({
 			const caret = event.target.selectionStart ?? nextValue.length;
 			updateAutocomplete(nextValue, caret);
 		},
-		[updateAutocomplete],
+		[updateAutocomplete, setValue],
 	);
 
-	const insertText = useCallback((text: string) => {
-		setValue((current) =>
-			current.trim().length > 0 ? `${current.trimEnd()}\n\n${text}` : text,
-		);
-		textareaRef.current?.focus();
-	}, []);
+	const insertText = useCallback(
+		(text: string) => {
+			setValue((current) =>
+				current.trim().length > 0 ? `${current.trimEnd()}\n\n${text}` : text,
+			);
+			textareaRef.current?.focus();
+		},
+		[setValue],
+	);
 
 	// Drain review-context insertions queued from the Checks panel / diff views.
 	useComposerInsertConsumer(insertText);
@@ -226,7 +235,7 @@ export function useComposerState({
 			seedAppliedRef.current = true;
 			setValue(seedText);
 		}
-	}, [seedText, value]);
+	}, [seedText, value, setValue]);
 
 	const handleSelect = useCallback(() => {
 		const textarea = textareaRef.current;
@@ -261,7 +270,7 @@ export function useComposerState({
 				textarea.setSelectionRange(newCaret, newCaret);
 			});
 		},
-		[autocomplete, dismissAutocomplete, value],
+		[autocomplete, dismissAutocomplete, value, setValue],
 	);
 
 	const submitText = useCallback(
@@ -325,7 +334,14 @@ export function useComposerState({
 				setPending(false);
 			}
 		},
-		[composer, pending],
+		[
+			composer,
+			pending,
+			setValue,
+			setExternalAttachments,
+			setUploadAttachments,
+			setMentionAttachments,
+		],
 	);
 
 	// Maps the Follow-up behavior setting onto Pi's native mid-turn delivery:
@@ -480,7 +496,7 @@ export function useComposerState({
 				});
 			}
 		},
-		[composer.workspaceCwd],
+		[composer.workspaceCwd, setMentionAttachments, setExternalAttachments],
 	);
 
 	/** Handles file pastes and long-text paste conversion for the textarea. */
@@ -504,7 +520,7 @@ export function useComposerState({
 			setUploadAttachments((prev) => [...prev, file]);
 			setAttachmentError(null);
 		},
-		[autoConvertLong, handlePastedFiles],
+		[autoConvertLong, handlePastedFiles, setUploadAttachments],
 	);
 
 	/** Accepts files dropped onto the composer, saving them like a paste. */
@@ -553,7 +569,7 @@ export function useComposerState({
 				textarea.setSelectionRange(newCaret, newCaret);
 			});
 		},
-		[autocomplete, dismissAutocomplete, value],
+		[autocomplete, dismissAutocomplete, value, setValue, setMentionAttachments],
 	);
 
 	const onSlashSelect = useCallback(
@@ -588,6 +604,7 @@ export function useComposerState({
 			replaceToken,
 			uploadAttachments,
 			value,
+			setValue,
 		],
 	);
 
@@ -710,6 +727,7 @@ export function useComposerState({
 			sendShortcut,
 			slashMatches,
 			value.length,
+			setMentionAttachments,
 		],
 	);
 
@@ -727,26 +745,35 @@ export function useComposerState({
 			}
 			event.target.value = '';
 		},
-		[],
+		[setUploadAttachments],
 	);
 
-	const removeUpload = useCallback((index: number) => {
-		setUploadAttachments((prev) => prev.filter((_, idx) => idx !== index));
-	}, []);
+	const removeUpload = useCallback(
+		(index: number) => {
+			setUploadAttachments((prev) => prev.filter((_, idx) => idx !== index));
+		},
+		[setUploadAttachments],
+	);
 
-	const removeMention = useCallback((path: string) => {
-		setAttachmentError(null);
-		setMentionAttachments((prev) =>
-			prev.filter((entry) => entry.path !== path),
-		);
-	}, []);
+	const removeMention = useCallback(
+		(path: string) => {
+			setAttachmentError(null);
+			setMentionAttachments((prev) =>
+				prev.filter((entry) => entry.path !== path),
+			);
+		},
+		[setMentionAttachments],
+	);
 
-	const removeExternal = useCallback((absolutePath: string) => {
-		setAttachmentError(null);
-		setExternalAttachments((prev) =>
-			prev.filter((entry) => entry.absolutePath !== absolutePath),
-		);
-	}, []);
+	const removeExternal = useCallback(
+		(absolutePath: string) => {
+			setAttachmentError(null);
+			setExternalAttachments((prev) =>
+				prev.filter((entry) => entry.absolutePath !== absolutePath),
+			);
+		},
+		[setExternalAttachments],
+	);
 
 	const isStreaming = composer.isStreaming || pending;
 	const canSubmit =
