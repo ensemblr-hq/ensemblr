@@ -12,7 +12,8 @@ import { createPlaceholderSession } from './navigation-model';
 
 /**
  * Picks the active workspace selection, preferring the URL route, then the
- * stored selection, then the first available workspace.
+ * stored workspace, then the first workspace in the stored project, then the
+ * first available workspace anywhere.
  */
 export function resolveWorkspaceNavigationSelection({
 	projects,
@@ -43,7 +44,15 @@ export function resolveWorkspaceNavigationSelection({
 			)
 		: null;
 
-	return storedWorkspaceSelection ?? getFirstWorkspaceSelection(projects);
+	const storedProjectSelection = storedSelection
+		? getFirstWorkspaceSelectionInProject(projects, storedSelection.projectId)
+		: null;
+
+	return (
+		storedWorkspaceSelection ??
+		storedProjectSelection ??
+		getFirstWorkspaceSelection(projects)
+	);
 }
 
 /**
@@ -167,6 +176,27 @@ export function resolveWorkspaceRouteParams(
 		projectId: selection.project.id,
 		workspaceId: selection.workspace.id,
 	};
+}
+
+/**
+ * Returns the first available workspace within a specific project, used to keep
+ * launch routing inside the last-active project when its stored workspace is
+ * gone before falling back to the first project globally.
+ */
+function getFirstWorkspaceSelectionInProject(
+	projects: ProjectShellModel[],
+	projectId: string,
+): WorkspaceNavigationSelection | null {
+	const project = projects.find((candidate) => candidate.id === projectId);
+	const workspace = project?.workspaces[0];
+
+	return project && workspace
+		? {
+				project,
+				source: 'first',
+				workspace,
+			}
+		: null;
 }
 
 /** Returns the first available (project, workspace) pair as a selection. */

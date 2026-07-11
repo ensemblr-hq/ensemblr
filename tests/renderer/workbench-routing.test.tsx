@@ -8,6 +8,7 @@ import { refreshRepositoryWorkspaceNavigationCache } from '../../src/renderer/li
 import {
 	loadProjectWorkbenchRoute,
 	loadShellWorkbenchRoute,
+	loadWorkbenchIndexRoute,
 	loadWorkbenchRouteData,
 	loadWorkspaceChatRoute,
 	loadWorkspaceIndexRoute,
@@ -120,6 +121,29 @@ async function catchWorkspaceRouteRedirect({
 	throw new Error('Expected workspace route loader to redirect.');
 }
 
+async function catchWorkbenchIndexRouteRedirect({
+	queryClient = new QueryClient(),
+}: {
+	queryClient?: QueryClient;
+} = {}) {
+	const loaderData = await loadWorkbenchRouteData(queryClient);
+
+	try {
+		await loadWorkbenchIndexRoute({
+			parentMatchPromise: Promise.resolve({ loaderData }),
+			queryClient,
+		});
+	} catch (error) {
+		if (isRedirect(error)) {
+			return error.options;
+		}
+
+		throw error;
+	}
+
+	throw new Error('Expected workbench index route loader to redirect.');
+}
+
 async function loadDefaultWorkspaceRouteData(): Promise<WorkspaceRouteLoaderData> {
 	Reflect.deleteProperty(globalThis, 'window');
 	const loaderData = await loadWorkbenchRouteData(new QueryClient());
@@ -214,6 +238,125 @@ test('redirects invalid project routes to the default workspace URL', async () =
 			chatId: 'review-shell',
 			projectId: 'ensemblr',
 			workspaceId: 'san-antonio',
+		},
+		replace: true,
+		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
+	});
+});
+
+test('redirects workbench launch to the persisted workspace when available', async () => {
+	Object.defineProperty(globalThis, 'window', {
+		configurable: true,
+		value: {
+			localStorage: {
+				getItem: () =>
+					JSON.stringify({
+						projectId: 'ensemblr',
+						workspaceId: 'linear-issue-flow',
+					}),
+			},
+		},
+	});
+
+	const redirectOptions = await catchWorkbenchIndexRouteRedirect();
+
+	expect(redirectOptions).toMatchObject({
+		params: {
+			chatId: 'issue-kickoff',
+			projectId: 'ensemblr',
+			workspaceId: 'linear-issue-flow',
+		},
+		replace: true,
+		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
+	});
+});
+
+test('fetches live navigation before redirecting workbench launch', async () => {
+	const queryClient = new QueryClient();
+	const snapshot = createNavigationSnapshot({
+		repositoryId: 'repo-live',
+		workspaceId: 'workspace-live',
+	});
+	let calls = 0;
+
+	Object.defineProperty(globalThis, 'window', {
+		configurable: true,
+		value: {
+			ensemblr: {
+				repositoryWorkspaceNavigation: async () => {
+					calls += 1;
+					return snapshot;
+				},
+			},
+			localStorage: {
+				getItem: () => null,
+			},
+		},
+	});
+
+	const redirectOptions = await catchWorkbenchIndexRouteRedirect({
+		queryClient,
+	});
+
+	expect(calls).toBe(1);
+	expect(redirectOptions).toMatchObject({
+		params: {
+			chatId: 'workspace-live:overview',
+			projectId: 'repo-live',
+			workspaceId: 'workspace-live',
+		},
+		replace: true,
+		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
+	});
+});
+
+test('leaves workbench launch on welcome when no workspace exists', async () => {
+	const queryClient = new QueryClient();
+
+	Object.defineProperty(globalThis, 'window', {
+		configurable: true,
+		value: {
+			ensemblr: {
+				repositoryWorkspaceNavigation: async () => ({
+					generatedAt: '2026-06-08T00:00:00.000Z',
+					repositories: [],
+				}),
+			},
+			localStorage: {
+				getItem: () => null,
+			},
+		},
+	});
+	const loaderData = await loadWorkbenchRouteData(queryClient);
+	const result = await loadWorkbenchIndexRoute({
+		parentMatchPromise: Promise.resolve({ loaderData }),
+		queryClient,
+	});
+
+	expect(result).toBeUndefined();
+});
+
+test('falls back to the stored project when its workspace is gone', async () => {
+	Object.defineProperty(globalThis, 'window', {
+		configurable: true,
+		value: {
+			localStorage: {
+				getItem: () =>
+					JSON.stringify({
+						projectId: 'agent-lab',
+						workspaceId: 'archived-workspace',
+					}),
+			},
+		},
+	});
+
+	const redirectOptions = await catchWorkbenchIndexRouteRedirect();
+
+	expect(redirectOptions).toMatchObject({
+		params: {
+			chatId: 'checks-pass',
+			projectId: 'agent-lab',
+			workspaceId: 'review-checks',
 		},
 		replace: true,
 		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
