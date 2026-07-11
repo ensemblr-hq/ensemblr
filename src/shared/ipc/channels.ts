@@ -89,6 +89,7 @@ export const IPC_CHANNELS = {
 	writeWorkspaceFileAttachment: 'ensemblr:write-workspace-file-attachment',
 	registerLocalRepository: 'ensemblr:register-local-repository',
 	renameWorkspace: 'ensemblr:rename-workspace',
+	reorderChatTabs: 'ensemblr:reorder-chat-tabs',
 	restoreChatTab: 'ensemblr:restore-chat-tab',
 	restoreCheckpoint: 'ensemblr:restore-checkpoint',
 	repositoryConfig: 'ensemblr:repository-config',

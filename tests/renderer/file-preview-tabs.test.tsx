@@ -61,6 +61,9 @@ describe('file preview tabs', () => {
 		expect(
 			container.querySelector('[data-icon="vscode-icons:file-type-image"]'),
 		).toBeTruthy();
+		expect(
+			container.querySelector('[data-session-tab-reorderable="false"]'),
+		).toBeTruthy();
 	});
 
 	test('renders base64 image previews instead of source code blocks', () => {

@@ -98,6 +98,17 @@ export interface RestoreChatTabResult {
 	tab: ChatTabWire | null;
 }
 
+/** Persist the left-to-right order of every open tab in a workspace. */
+export interface ReorderChatTabsRequest {
+	orderedIds: readonly string[];
+	workspaceId: string;
+}
+
+/** Result of reordering a workspace's open tabs in their new persisted order. */
+export interface ReorderChatTabsResult {
+	open: readonly ChatTabWire[];
+}
+
 /** Attach a Pi session to an already-open tab. */
 export interface BindPiSessionToTabRequest {
 	chatTabId: string;
@@ -134,6 +145,9 @@ export interface ChatTabApi {
 		request: ListClosedChatTabsWithSummaryRequest,
 	) => Promise<ListClosedChatTabsWithSummaryResult>;
 	openChatTab: (request: OpenChatTabRequest) => Promise<OpenChatTabResult>;
+	reorderChatTabs: (
+		request: ReorderChatTabsRequest,
+	) => Promise<ReorderChatTabsResult>;
 	restoreChatTab: (
 		request: RestoreChatTabRequest,
 	) => Promise<RestoreChatTabResult>;

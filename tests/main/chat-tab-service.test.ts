@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -297,6 +299,41 @@ test('non-chat tabs do not count against the chat-tab limit', (t) => {
 		workspaceId: fixture.workspaceId,
 	});
 	assert.equal(open.length, 6);
+});
+
+test('reorderTabs persists a reconciled open-tab sequence', (t) => {
+	const fixture = openFixture(t);
+
+	const chat = fixture.service.openTab({
+		title: 'Chat',
+		workspaceId: fixture.workspaceId,
+	});
+	const file = fixture.service.openTab({
+		kind: 'file',
+		metadata: { filePath: 'src/index.ts' },
+		title: 'index.ts',
+		workspaceId: fixture.workspaceId,
+	});
+	const diff = fixture.service.openTab({
+		kind: 'diff',
+		metadata: { filePath: 'src/index.ts' },
+		title: 'Diff: index.ts',
+		workspaceId: fixture.workspaceId,
+	});
+
+	const reordered = fixture.service.reorderTabs({
+		orderedIds: [diff.id, 'missing-tab', chat.id, diff.id],
+		workspaceId: fixture.workspaceId,
+	});
+
+	assert.deepEqual(
+		reordered.map((tab) => tab.id),
+		[diff.id, chat.id, file.id],
+	);
+	assert.deepEqual(
+		reordered.map((tab) => tab.position),
+		[0, 1, 2],
+	);
 });
 
 test('closing a chat tab at the limit allows a replacement to open', (t) => {

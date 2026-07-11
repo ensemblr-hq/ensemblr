@@ -3,6 +3,7 @@ export * from './archive';
 export {
 	removeOpenChatTabFromCache,
 	writeOpenedChatTabToCache,
+	writeReorderedChatTabsToCache,
 } from './chat-tab-cache';
 export * from './chat-tabs';
 export * from './checkpoints';

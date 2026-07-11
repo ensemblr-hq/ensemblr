@@ -61,6 +61,7 @@ const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
 
 const DOCK_ACTIONS: WorkbenchDockActions = {
 	onAskAgentSetupScript: () => undefined,
+	onCloseTerminal: () => undefined,
 	onNewTerminal: () => undefined,
 	onOpenRunPort: () => undefined,
 	onOpenSetupScripts: () => undefined,
@@ -125,6 +126,7 @@ function stubSessionNavigation(
 		openSessionTab: () => Promise.resolve(null),
 		openTurnDiffTab: () => Promise.resolve(null),
 		openWorkspaceFileDiffTab: () => Promise.resolve(null),
+		reorderSessionTabs: () => undefined,
 		restoreSessionTab: () => undefined,
 		sessionTabs: activeWorkspace.sessions,
 	};
@@ -141,7 +143,7 @@ function renderWorkbench(
 	const activeProject =
 		projectsOverride.find((project) =>
 			project.workspaces.some(
-				(workspace) => workspace.id === activeWorkspace.id,
+				(workspace: WorkspaceShellModel) => workspace.id === activeWorkspace.id,
 			),
 		) ?? getDefaultProject();
 	const activeSession = findSession(activeWorkspace);
@@ -171,11 +173,14 @@ function renderWorkbench(
 						activeProject={activeProject}
 						activeView='workspace'
 						activeWorkspace={activeWorkspace}
+						addProjectMenu={{ actions: [], recents: [] }}
 						health={{
 							detail: 'Renderer query fixture',
 							label: 'IPC online',
 							state: 'online',
 						}}
+						onAddProject={() => undefined}
+						onOpenRecentProject={() => undefined}
 						onStaticNavigationSelect={() => undefined}
 						onWorkspaceSelect={() => undefined}
 						projects={projectsOverride}
@@ -310,11 +315,14 @@ test('does not mark a workspace active on static workbench routes', () => {
 					activeProject={activeProject}
 					activeView='dashboard'
 					activeWorkspace={activeWorkspace}
+					addProjectMenu={{ actions: [], recents: [] }}
 					health={{
 						detail: 'Renderer query fixture',
 						label: 'IPC online',
 						state: 'online',
 					}}
+					onAddProject={() => undefined}
+					onOpenRecentProject={() => undefined}
 					onStaticNavigationSelect={() => undefined}
 					onWorkspaceSelect={() => undefined}
 					projects={shellFixtureProjects}
@@ -345,7 +353,11 @@ test('models fixed script output tabs and no default terminal tab', () => {
 		kind: 'run-script',
 		label: 'Run',
 	});
-	expect(dockTabs.some((tab) => tab.kind === 'terminal')).toBe(false);
+	expect(
+		dockTabs.some(
+			(tab: WorkspaceShellModel['dockTabs'][number]) => tab.kind === 'terminal',
+		),
+	).toBe(false);
 });
 
 test('normalizes dock route state for terminal session tabs', () => {
@@ -412,7 +424,7 @@ test('renders additional user terminal tabs as independent interactive sessions'
 
 test('marks setup notes tab as active agent activity', () => {
 	const setupNotesSession = getDefaultWorkspace().sessions.find(
-		(session) => session.id === 'setup-thread',
+		(session: SessionTabModel) => session.id === 'setup-thread',
 	);
 
 	expect(setupNotesSession?.status).toBe('working');
@@ -705,7 +717,7 @@ test('renders all files tab with repository file fixtures', () => {
 
 test('renders setup-not-run dock action and empty state', () => {
 	const activeWorkspace = shellFixtureProjects[0].workspaces.find(
-		(workspace) => workspace.id === 'linear-issue-flow',
+		(workspace: WorkspaceShellModel) => workspace.id === 'linear-issue-flow',
 	);
 
 	if (!activeWorkspace) {
@@ -732,7 +744,7 @@ test('renders setup-not-run dock action and empty state', () => {
 
 test('renders missing setup and run script empty states', () => {
 	const activeWorkspace = shellFixtureProjects[0].workspaces.find(
-		(workspace) => workspace.id === 'normal-right-header',
+		(workspace: WorkspaceShellModel) => workspace.id === 'normal-right-header',
 	);
 
 	if (!activeWorkspace) {
@@ -774,7 +786,7 @@ test('renders missing setup and run script empty states', () => {
 
 test('renders run action when dev server is stopped', () => {
 	const activeWorkspace = shellFixtureProjects[0].workspaces.find(
-		(workspace) => workspace.id === 'changed-right-header',
+		(workspace: WorkspaceShellModel) => workspace.id === 'changed-right-header',
 	);
 
 	if (!activeWorkspace) {
@@ -848,7 +860,7 @@ test('renders no pull request empty state in the checks tab', () => {
 
 test('renders create pull request action when changed workspace has no pull request', () => {
 	const activeWorkspace = shellFixtureProjects[0].workspaces.find(
-		(workspace) => workspace.id === 'changed-right-header',
+		(workspace: WorkspaceShellModel) => workspace.id === 'changed-right-header',
 	);
 
 	if (!activeWorkspace) {
@@ -875,7 +887,7 @@ test('renders create pull request action when changed workspace has no pull requ
 
 test('renders uncommitted no pull request state in the checks tab', () => {
 	const activeWorkspace = shellFixtureProjects[0].workspaces.find(
-		(workspace) => workspace.id === 'changed-right-header',
+		(workspace: WorkspaceShellModel) => workspace.id === 'changed-right-header',
 	);
 
 	if (!activeWorkspace) {
@@ -906,7 +918,7 @@ test('renders uncommitted no pull request state in the checks tab', () => {
 
 test('renders plain working header fixture without pull request number', () => {
 	const activeWorkspace = shellFixtureProjects[0].workspaces.find(
-		(workspace) => workspace.id === 'normal-right-header',
+		(workspace: WorkspaceShellModel) => workspace.id === 'normal-right-header',
 	);
 
 	if (!activeWorkspace) {

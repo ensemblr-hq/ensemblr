@@ -125,6 +125,7 @@ export function WorkspaceWorkbenchContent({
 		onSessionTabClose: sessionNavigation.closeSessionTab,
 		onSessionTabOpen: sessionNavigation.openSessionTab,
 		onSessionTabRestore: sessionNavigation.restoreSessionTab,
+		onSessionTabsReorder: sessionNavigation.reorderSessionTabs,
 		onTurnDiffOpen: sessionNavigation.openTurnDiffTab,
 		sessionTabs: sessionNavigation.sessionTabs,
 	};

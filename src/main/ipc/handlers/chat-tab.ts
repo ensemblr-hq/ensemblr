@@ -7,6 +7,7 @@ import type {
 	ListChatTabsResult,
 	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabResult,
+	ReorderChatTabsResult,
 	RestoreChatTabResult,
 } from '../../../shared/ipc/contracts/chat-tab';
 import type { ChatTabService } from '../../chat-tabs';
@@ -17,6 +18,7 @@ import {
 	listChatTabsRequestSchema,
 	listClosedChatTabsWithSummaryRequestSchema,
 	openChatTabRequestSchema,
+	reorderChatTabsRequestSchema,
 	restoreChatTabRequestSchema,
 } from '../request-schemas.ts';
 
@@ -57,6 +59,15 @@ export function registerChatTabHandlers({
 			const request = closeChatTabRequestSchema.parse(raw);
 			const { deleted } = chatTabService.closeTab(request);
 			return { deleted, ok: true };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.reorderChatTabs,
+		async (_event, raw: unknown): Promise<ReorderChatTabsResult> => {
+			const request = reorderChatTabsRequestSchema.parse(raw);
+			const open = chatTabService.reorderTabs(request);
+			return { open: open.map(toWire) };
 		},
 	);
 

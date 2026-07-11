@@ -8,6 +8,8 @@ import type {
 	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabRequest,
 	OpenChatTabResult,
+	ReorderChatTabsRequest,
+	ReorderChatTabsResult,
 	RestoreChatTabRequest,
 	RestoreChatTabResult,
 } from '@/shared/ipc/contracts/chat-tab';
@@ -69,6 +71,16 @@ export function closeChatTab(
 	return profileElectronIpcCall(
 		{ channel: 'ensemblr:close-chat-tab', usesDatabase: true },
 		() => getEnsemblrApi().closeChatTab(request),
+	);
+}
+
+/** Persists the left-to-right order of the workspace tab strip. */
+export function reorderChatTabs(
+	request: ReorderChatTabsRequest,
+): Promise<ReorderChatTabsResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemblr:reorder-chat-tabs', usesDatabase: true },
+		() => getEnsemblrApi().reorderChatTabs(request),
 	);
 }
 
