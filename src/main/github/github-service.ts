@@ -308,7 +308,7 @@ export function createGithubService({
 					(deployment as Record<string, unknown> | null)?.id ?? '',
 				);
 				if (!id) {
-					return;
+					return undefined;
 				}
 				const statusResult = await run('gh', cwd, [
 					'api',
@@ -319,7 +319,7 @@ export function createGithubService({
 					'per_page=1',
 				]);
 				if (statusResult.status !== 'success') {
-					return;
+					return undefined;
 				}
 				try {
 					const parsed = JSON.parse(statusResult.stdout) as unknown[];
@@ -329,6 +329,7 @@ export function createGithubService({
 				} catch {
 					// Status row stays absent; deployment renders without a URL.
 				}
+				return undefined;
 			}),
 		);
 		return parseDeployments(deployments, statuses);

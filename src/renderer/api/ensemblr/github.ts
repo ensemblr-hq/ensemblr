@@ -145,26 +145,66 @@ export async function refreshPullRequestSnapshotUntilPresent({
 	workspaceCwd: string;
 	workspaceId: string;
 }): Promise<GetPullRequestSnapshotResult> {
-	let result = await refreshPullRequestSnapshot({
+	const result = await refreshPullRequestSnapshot({
 		queryClient,
 		workspaceCwd,
 		workspaceId,
 	});
-	for (const wait of delaysMs) {
-		if (result.snapshot?.pullRequest || signal?.aborted) {
-			return result;
-		}
-		await delay(wait, signal);
-		if (signal?.aborted) {
-			return result;
-		}
-		result = await refreshPullRequestSnapshot({
-			queryClient,
-			workspaceCwd,
-			workspaceId,
-		});
+	return retryPullRequestSnapshotUntilPresent({
+		delaysMs,
+		queryClient,
+		result,
+		signal,
+		workspaceCwd,
+		workspaceId,
+	});
+}
+
+/**
+ * Recurses through the bounded PR snapshot backoff until a PR appears or retries
+ * are exhausted.
+ * @returns The first non-empty snapshot, or the last attempted result.
+ */
+async function retryPullRequestSnapshotUntilPresent({
+	delaysMs,
+	queryClient,
+	result,
+	signal,
+	workspaceCwd,
+	workspaceId,
+}: {
+	delaysMs: readonly number[];
+	queryClient: QueryClient;
+	result: GetPullRequestSnapshotResult;
+	signal?: AbortSignal;
+	workspaceCwd: string;
+	workspaceId: string;
+}): Promise<GetPullRequestSnapshotResult> {
+	if (
+		result.snapshot?.pullRequest ||
+		signal?.aborted ||
+		delaysMs.length === 0
+	) {
+		return result;
 	}
-	return result;
+	const [wait, ...remainingDelays] = delaysMs;
+	await delay(wait, signal);
+	if (signal?.aborted) {
+		return result;
+	}
+	const nextResult = await refreshPullRequestSnapshot({
+		queryClient,
+		workspaceCwd,
+		workspaceId,
+	});
+	return retryPullRequestSnapshotUntilPresent({
+		delaysMs: remainingDelays,
+		queryClient,
+		result: nextResult,
+		signal,
+		workspaceCwd,
+		workspaceId,
+	});
 }
 
 /** Query options for Ensemblr-local review comments. */
