@@ -62,6 +62,15 @@ const IMAGE_EXTENSION_BY_MIME_TYPE: Readonly<Record<string, string>> = {
 	'image/tiff': 'tiff',
 	'image/webp': 'webp',
 };
+const PREVIEW_IMAGE_MIME_TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
+	avif: 'image/avif',
+	bmp: 'image/bmp',
+	gif: 'image/gif',
+	jpeg: 'image/jpeg',
+	jpg: 'image/jpeg',
+	png: 'image/png',
+	webp: 'image/webp',
+};
 const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 // Per-ignored-directory enumeration cap. A small ignored dir expands fully so
 // its files are browsable; one that exceeds this bails and stays collapsed.
@@ -186,44 +195,21 @@ export function createListWorkspaceFilesService({
 			}
 
 			try {
-				const fileStat = await stat(target.absolutePath);
-				if (!fileStat.isFile()) {
-					return {
-						error: {
-							code: 'not-file',
-							message: 'Selected path is not a file.',
-						},
-						path: request.path,
-						sizeBytes: fileStat.size,
-					};
+				const readable = await resolveReadablePreviewFile({
+					absolutePath: target.absolutePath,
+					relativePath: target.relativePath,
+					requestPath: request.path,
+					workspaceCwd: cwdResult.cwd,
+				});
+				if (!readable.ok) {
+					return readable.result;
 				}
-				if (fileStat.size > MAX_READ_BYTES) {
-					return {
-						error: {
-							code: 'too-large',
-							message: 'Selected file is too large to attach.',
-						},
-						path: request.path,
-						sizeBytes: fileStat.size,
-					};
-				}
-				if (
-					!(await isWithinWorkspaceReal(cwdResult.cwd, target.absolutePath))
-				) {
-					return {
-						error: {
-							code: 'invalid-path',
-							message: 'Workspace file path must stay inside the workspace.',
-						},
-						path: request.path,
-						sizeBytes: fileStat.size,
-					};
-				}
-				return {
-					content: await readFile(target.absolutePath, 'utf8'),
-					path: target.relativePath,
-					sizeBytes: fileStat.size,
-				};
+				return buildFilePreviewResult({
+					buffer: await readFile(target.absolutePath),
+					previewImageMimeType: readable.previewImageMimeType,
+					relativePath: target.relativePath,
+					sizeBytes: readable.sizeBytes,
+				});
 			} catch (cause) {
 				const errorCode = hasErrorCode(cause, 'ENOENT')
 					? 'not-found'
@@ -703,6 +689,142 @@ async function isWithinWorkspaceReal(
 /** Resolves a safe file extension for a pasted image MIME type. */
 function extensionForImageMimeType(mimeType: string): string | null {
 	return IMAGE_EXTENSION_BY_MIME_TYPE[mimeType.toLowerCase()] ?? null;
+}
+
+/**
+ * Returns a browser-previewable image MIME type for a workspace file path.
+ * @param filePath - Workspace-relative file path.
+ * @returns The image MIME type, or null when the extension is not previewable.
+ */
+function previewImageMimeTypeForPath(filePath: string): string | null {
+	const extension = path.extname(filePath).slice(1).toLowerCase();
+	return PREVIEW_IMAGE_MIME_TYPE_BY_EXTENSION[extension] ?? null;
+}
+
+/**
+ * Validates that a resolved workspace path is a readable, in-workspace file
+ * within the preview size cap, returning its preview MIME type on success or a
+ * typed failure result. The stat, size, and symlink-containment checks run in
+ * the order the security model requires (size cap before the real-path check).
+ * @param params - Absolute and workspace-relative paths, the original request
+ *   path for error echoing, and the workspace root for containment checks.
+ * @returns The preview MIME type and size on success, or a failure result.
+ */
+async function resolveReadablePreviewFile(params: {
+	absolutePath: string;
+	relativePath: string;
+	requestPath: string;
+	workspaceCwd: string;
+}): Promise<
+	| { ok: true; previewImageMimeType: string | null; sizeBytes: number }
+	| { ok: false; result: ReadWorkspaceFileResult }
+> {
+	const { absolutePath, relativePath, requestPath, workspaceCwd } = params;
+	const fileStat = await stat(absolutePath);
+	if (!fileStat.isFile()) {
+		return {
+			ok: false,
+			result: {
+				error: { code: 'not-file', message: 'Selected path is not a file.' },
+				path: requestPath,
+				sizeBytes: fileStat.size,
+			},
+		};
+	}
+	const previewImageMimeType = previewImageMimeTypeForPath(relativePath);
+	const maxPreviewBytes = previewImageMimeType
+		? MAX_CONTEXT_IMAGE_BYTES
+		: MAX_READ_BYTES;
+	if (fileStat.size > maxPreviewBytes) {
+		return {
+			ok: false,
+			result: {
+				error: {
+					code: 'too-large',
+					message: 'Selected file is too large to preview.',
+				},
+				path: requestPath,
+				sizeBytes: fileStat.size,
+			},
+		};
+	}
+	if (!(await isWithinWorkspaceReal(workspaceCwd, absolutePath))) {
+		return {
+			ok: false,
+			result: {
+				error: {
+					code: 'invalid-path',
+					message: 'Workspace file path must stay inside the workspace.',
+				},
+				path: requestPath,
+				sizeBytes: fileStat.size,
+			},
+		};
+	}
+	return { ok: true, previewImageMimeType, sizeBytes: fileStat.size };
+}
+
+/**
+ * Builds the preview payload for a validated, in-workspace file: a base64 image
+ * result when the bytes match a browser-previewable type, otherwise utf8 source.
+ * @param params - Decoded file buffer, its declared preview MIME type (or null),
+ *   the workspace-relative path, and the on-disk size in bytes.
+ * @returns A base64 image or utf8 source preview result.
+ */
+function buildFilePreviewResult(params: {
+	buffer: Buffer;
+	previewImageMimeType: string | null;
+	relativePath: string;
+	sizeBytes: number;
+}): ReadWorkspaceFileResult {
+	const { buffer, previewImageMimeType, relativePath, sizeBytes } = params;
+	if (
+		previewImageMimeType &&
+		previewImageBytesLookValid(buffer, relativePath)
+	) {
+		return {
+			content: buffer.toString('base64'),
+			contentEncoding: 'base64',
+			mimeType: previewImageMimeType,
+			path: relativePath,
+			sizeBytes,
+		};
+	}
+	return {
+		content: buffer.toString('utf8'),
+		contentEncoding: 'utf8',
+		path: relativePath,
+		sizeBytes,
+	};
+}
+
+/**
+ * Confirms a preview file's leading bytes match its declared image type, so a
+ * mislabeled text or binary file falls back to the source view instead of a
+ * broken `<img>`. Extensions without a known prefix signature (e.g. the AVIF
+ * container) are allowed through unvalidated.
+ * @param buffer - Decoded file contents.
+ * @param filePath - Workspace-relative file path whose extension declares the type.
+ * @returns True when the bytes are consistent with the declared image type.
+ */
+function previewImageBytesLookValid(buffer: Buffer, filePath: string): boolean {
+	const extension = signatureExtensionForPreview(filePath);
+	if (!extension) {
+		return true;
+	}
+	return imageSignatureMatches(buffer, extension);
+}
+
+/**
+ * Maps a preview file path to its magic-byte signature key, or null when no
+ * prefix signature covers the extension.
+ * @param filePath - Workspace-relative file path.
+ * @returns A key into the image signature table, or null when unvalidated.
+ */
+function signatureExtensionForPreview(filePath: string): string | null {
+	const extension = path.extname(filePath).slice(1).toLowerCase();
+	const normalized = extension === 'jpeg' ? 'jpg' : extension;
+	return normalized in IMAGE_SIGNATURES_BY_EXTENSION ? normalized : null;
 }
 
 /** Leading-byte magic signatures expected for each supported image extension. */

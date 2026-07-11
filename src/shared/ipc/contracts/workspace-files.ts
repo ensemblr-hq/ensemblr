@@ -70,13 +70,18 @@ export type ReadWorkspaceFileFailureCode =
 	| 'read-failed'
 	| 'too-large';
 
+/** Encoding used for the read-workspace-file content payload. */
+export type ReadWorkspaceFileContentEncoding = 'base64' | 'utf8';
+
 /** The file's contents and size, or a typed error on failure. */
 export interface ReadWorkspaceFileResult {
 	content?: string;
+	contentEncoding?: ReadWorkspaceFileContentEncoding;
 	error?: {
 		code: ReadWorkspaceFileFailureCode;
 		message: string;
 	};
+	mimeType?: string;
 	path: string;
 	sizeBytes?: number;
 }

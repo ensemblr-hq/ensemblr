@@ -1,5 +1,6 @@
+import { Icon } from '@iconify/react';
 import { useQuery } from '@tanstack/react-query';
-import { FileIcon, TriangleAlertIcon } from 'lucide-react';
+import { TriangleAlertIcon } from 'lucide-react';
 
 import {
 	ensemblrQueryKeys,
@@ -7,12 +8,16 @@ import {
 } from '@/renderer/api/ensemblr-queries';
 import { CodeBlockContent } from '@/renderer/components/code-block';
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
-import type { ReadWorkspaceFileFailureCode } from '@/shared/ipc/contracts/workspace-files';
+import { getWorkspaceFileIconNameForPath } from '@/renderer/lib/workbench';
+import type {
+	ReadWorkspaceFileFailureCode,
+	ReadWorkspaceFileResult,
+} from '@/shared/ipc/contracts/workspace-files';
 
 /**
  * Read-only file content surface shown when a `kind: 'file'` tab is active.
- * Loads the workspace-relative path through the safe `readWorkspaceFile` IPC
- * (which rejects paths escaping the workspace and oversized files).
+ * Loads the workspace-relative path through the safe `readWorkspaceFile` IPC,
+ * rendering source as code and browser-supported images as image previews.
  */
 export function FilePreviewPanel({
 	filePath,
@@ -61,12 +66,15 @@ export function FilePreviewPanel({
 		);
 	}
 
+	const imageSource = imageSourceForPreview(result);
+
 	return (
 		<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
 			<div className='flex h-9 shrink-0 items-center gap-2 border-border border-b bg-muted/30 px-4'>
-				<FileIcon
+				<Icon
 					aria-hidden='true'
 					className='size-3.5 shrink-0 text-muted-foreground'
+					icon={getWorkspaceFileIconNameForPath(filePath)}
 				/>
 				<span className='truncate font-mono text-muted-foreground text-xs'>
 					{filePath}
@@ -77,15 +85,42 @@ export function FilePreviewPanel({
 					</span>
 				) : null}
 			</div>
-			<div className='min-h-0 flex-1 overflow-auto'>
-				<CodeBlockContent
-					code={result.content ?? ''}
-					language={languageForFilePath(filePath)}
-					showLineNumbers
-				/>
-			</div>
+			{imageSource ? (
+				<div className='flex min-h-0 flex-1 items-center justify-center overflow-auto bg-muted/10 p-4'>
+					<img
+						alt={`Preview of ${filePath}`}
+						className='max-h-full max-w-full rounded-md object-contain shadow-sm'
+						src={imageSource}
+					/>
+				</div>
+			) : (
+				<div className='min-h-0 flex-1 overflow-auto'>
+					<CodeBlockContent
+						code={result.content ?? ''}
+						language={languageForFilePath(filePath)}
+						showLineNumbers
+					/>
+				</div>
+			)}
 		</div>
 	);
+}
+
+/**
+ * Builds an embeddable data URL for image payloads returned by file preview.
+ * @param result - File-read result from the workspace preview IPC.
+ * @returns An image data URL, or null when the result contains text content.
+ */
+function imageSourceForPreview(result: ReadWorkspaceFileResult): string | null {
+	if (
+		result.contentEncoding !== 'base64' ||
+		!result.mimeType?.startsWith('image/') ||
+		!result.content
+	) {
+		return null;
+	}
+
+	return `data:${result.mimeType};base64,${result.content}`;
 }
 
 /** Renders a centered muted or error message inside the file-preview panel. */

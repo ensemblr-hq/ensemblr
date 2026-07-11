@@ -23,6 +23,8 @@ const fileIconByName: Record<string, string> = {
 	'.git': 'file-type-git',
 	'.gitignore': 'file-type-git',
 	'.gitkeep': 'file-type-git',
+	'.npmrc': 'file-type-npm',
+	'.nvmrc': 'file-type-node',
 	AGENTS: 'file-type-agents',
 	'AGENTS.md': 'file-type-agents',
 	'biome.json': 'file-type-biome',
@@ -35,6 +37,7 @@ const fileIconByName: Record<string, string> = {
 };
 
 const fileIconByExtension: Record<string, string> = {
+	avif: 'file-type-image',
 	bmp: 'file-type-image',
 	cjs: 'file-type-js',
 	css: 'file-type-css',
@@ -55,6 +58,7 @@ const fileIconByExtension: Record<string, string> = {
 	md: 'file-type-markdown',
 	markdown: 'file-type-markdown',
 	mjs: 'file-type-js',
+	mts: 'file-type-typescript',
 	odt: 'file-type-word',
 	pdf: 'file-type-pdf2',
 	png: 'file-type-image',
@@ -112,9 +116,32 @@ export function getWorkspaceFileIconName(
 	return `${iconPrefix}:${iconName}`;
 }
 
+/**
+ * Picks the appropriate VSCode icon name for a workspace-relative file path.
+ * @param filePath - Workspace-relative file path.
+ * @returns A fully-qualified iconify name (e.g. `vscode-icons:file-type-js`).
+ */
+export function getWorkspaceFileIconNameForPath(filePath: string): string {
+	return getWorkspaceFileIconName({
+		kind: 'file',
+		name: getFileName(filePath),
+	});
+}
+
 /** Reports whether a (non-prefixed) folder icon name exists in the VSCode set. */
 function folderIconExists(name: string): boolean {
 	return Boolean(vscodeIcons.icons[name] ?? vscodeIcons.aliases?.[name]);
+}
+
+/**
+ * Returns the final path segment for a workspace-relative file path.
+ * @param filePath - Workspace-relative file path.
+ * @returns The file name segment, or the original path when no segment exists.
+ */
+function getFileName(filePath: string): string {
+	const normalizedPath = filePath.replaceAll('\\', '/');
+	const segments = normalizedPath.split('/').filter(Boolean);
+	return segments[segments.length - 1] ?? filePath;
 }
 
 /**

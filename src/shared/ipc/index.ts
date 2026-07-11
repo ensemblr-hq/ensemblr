@@ -382,6 +382,7 @@ export type {
 	ListWorkspaceFilesResult,
 	ReadWorkspaceDirectoryRequest,
 	ReadWorkspaceDirectoryResult,
+	ReadWorkspaceFileContentEncoding,
 	ReadWorkspaceFileFailureCode,
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
