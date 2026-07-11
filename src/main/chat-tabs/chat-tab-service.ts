@@ -21,6 +21,7 @@ import {
 	listOpenForWorkspace,
 	markClosed,
 	openChatTab,
+	reorderChatTabs,
 	restoreClosedChatTab,
 } from '../storage/repositories/index.ts';
 
@@ -72,6 +73,10 @@ export interface ChatTabService {
 		title?: string;
 		workspaceId: string;
 	}) => ChatTabRow;
+	reorderTabs: (input: {
+		orderedIds: readonly string[];
+		workspaceId: string;
+	}) => readonly ChatTabRow[];
 	restoreTab: (input: { chatTabId: string }) => ChatTabRow | null;
 }
 
@@ -206,11 +211,44 @@ export function createChatTabService({
 				},
 			});
 		},
+		reorderTabs: ({ orderedIds, workspaceId }) => {
+			const database = requireChatTabDatabase();
+			const openTabs = listOpenForWorkspace({ database, workspaceId });
+			return reorderChatTabs({
+				database,
+				orderedIds: reconcileOpenTabOrder({ openTabs, orderedIds }),
+				workspaceId,
+			});
+		},
 		restoreTab: ({ chatTabId }) => {
 			const database = requireChatTabDatabase();
 			return restoreClosedChatTab({ database, id: chatTabId });
 		},
 	};
+}
+
+/** Reconciles a drag payload with the current open tab rows before persisting. */
+function reconcileOpenTabOrder({
+	openTabs,
+	orderedIds,
+}: {
+	openTabs: readonly ChatTabRow[];
+	orderedIds: readonly string[];
+}): string[] {
+	const openTabIds = new Set(openTabs.map((tab) => tab.id));
+	const seenOrderedIds = new Set<string>();
+	const knownOrderedIds = orderedIds.filter((id) => {
+		if (!openTabIds.has(id) || seenOrderedIds.has(id)) {
+			return false;
+		}
+		seenOrderedIds.add(id);
+		return true;
+	});
+
+	return [
+		...knownOrderedIds,
+		...openTabs.map((tab) => tab.id).filter((id) => !seenOrderedIds.has(id)),
+	];
 }
 
 /** True when a tab has no attached Pi session and should not enter history. */

@@ -9,10 +9,13 @@ import {
 	openChatTab,
 	piSessionsForWorkspaceQuery,
 	removeOpenChatTabFromCache,
+	reorderChatTabs,
 	restoreChatTab,
 	subscribePiSessionEvents,
 	writeOpenedChatTabToCache,
+	writeReorderedChatTabsToCache,
 } from '@/renderer/api/ensemblr-queries';
+import { areStringArraysEqual } from '@/renderer/lib/ordered-ids';
 import { forgetComposerDraft } from '@/renderer/state/composer';
 import { forgetChatOverrides } from '@/renderer/state/preferences';
 import type {
@@ -27,6 +30,7 @@ import {
 	CHAT_TAB_LIMIT_ERROR_CODE,
 	type ChatTabWire,
 	type ClosedChatTabEntryWire,
+	type ListChatTabsResult,
 	type OpenChatTabRequest,
 } from '@/shared/ipc/contracts/chat-tab';
 import type { PiSessionSnapshotWire } from '@/shared/ipc/contracts/pi-session';
@@ -290,6 +294,33 @@ export function useSessionTabState({
 		},
 	});
 
+	const reorderChatTabsMutation = useMutation({
+		mutationFn: (orderedIds: readonly string[]) =>
+			reorderChatTabs({ orderedIds, workspaceId }),
+		onError: (error) => {
+			invalidateChatTabs();
+			toast.error('Could not reorder tabs', {
+				description: error instanceof Error ? error.message : undefined,
+			});
+		},
+		onMutate: (orderedIds: readonly string[]) => {
+			writeReorderedChatTabsToCache({
+				orderedIds,
+				queryClient,
+				workspaceId,
+			});
+		},
+		onSuccess: (result) => {
+			queryClient.setQueryData<ListChatTabsResult>(
+				ensemblrQueryKeys.chatTabs(workspaceId),
+				(current) => ({
+					closed: current?.closed ?? [],
+					open: result.open,
+				}),
+			);
+		},
+	});
+
 	const openSessionTab =
 		useCallback(async (): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
@@ -466,6 +497,27 @@ export function useSessionTabState({
 		[activeSession.id, closeSessionTabAsync, onSessionTabChange, sessionTabs],
 	);
 
+	/** Persists a drag-and-drop tab order when it differs from the current model. */
+	const reorderSessionTabs = useCallback(
+		(sessionIds: string[]) => {
+			const currentIds = sessionTabs.map((session) => session.id);
+			const currentIdSet = new Set(currentIds);
+			const nextIds = sessionIds.filter((sessionId) =>
+				currentIdSet.has(sessionId),
+			);
+
+			if (
+				nextIds.length !== currentIds.length ||
+				areStringArraysEqual(nextIds, currentIds)
+			) {
+				return;
+			}
+
+			reorderChatTabsMutation.mutate(nextIds);
+		},
+		[reorderChatTabsMutation, sessionTabs],
+	);
+
 	/**
 	 * ⌘/Ctrl+W policy for the active tab; see `decideActiveClose` for the branch
 	 * rationale. The `reset` branch opens a fresh chat FIRST so the min-one-chat
@@ -520,6 +572,7 @@ export function useSessionTabState({
 		openSessionTab,
 		openTurnDiffTab,
 		openWorkspaceFileDiffTab,
+		reorderSessionTabs,
 		restoreSessionTab,
 		sessionTabs,
 	};

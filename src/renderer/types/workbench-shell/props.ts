@@ -29,6 +29,8 @@ export interface SessionTabState {
 	closedSessions: SessionTabModel[];
 	closeSessionTab: (sessionId: string) => void;
 	effectiveActiveSession: SessionTabModel;
+	/** Persists the current left-to-right order of open session tabs. */
+	reorderSessionTabs: (sessionIds: string[]) => void;
 	restoreSessionTab: (sessionId: string) => void;
 	sessionTabs: SessionTabModel[];
 }

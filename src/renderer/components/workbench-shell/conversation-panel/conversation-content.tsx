@@ -41,6 +41,7 @@ export function WorkspaceConversationContent({
 	onSessionTabClose,
 	onSessionTabOpen,
 	onSessionTabRestore,
+	onSessionTabsReorder,
 	onTurnDiffOpen,
 	sessionTabs,
 }: {
@@ -60,6 +61,7 @@ export function WorkspaceConversationContent({
 	onSessionTabClose: (sessionId: string) => void;
 	onSessionTabOpen: () => Promise<{ chatTabId: string } | null>;
 	onSessionTabRestore: (sessionId: string) => void;
+	onSessionTabsReorder: (sessionIds: string[]) => void;
 	sessionTabs: SessionTabModel[];
 }) {
 	// Capture every raw Pi RPC frame into the debug ring buffer. The panel may
@@ -129,6 +131,7 @@ export function WorkspaceConversationContent({
 				onSessionTabChange={onSessionTabChange}
 				onSessionTabOpen={onSessionTabOpen}
 				onSessionTabRestore={onSessionTabRestore}
+				onSessionTabsReorder={onSessionTabsReorder}
 				sessions={sessionTabs}
 			/>
 			{isChatTab ? (

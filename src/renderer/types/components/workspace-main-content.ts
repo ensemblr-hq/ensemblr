@@ -13,6 +13,8 @@ export type WorkspaceMainContentState = Pick<
 		filePath: string;
 	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabClose: (sessionId: string) => void;
+	/** Persists the tab strip order after drag-and-drop reordering. */
+	onSessionTabsReorder: (sessionIds: string[]) => void;
 	onTurnDiffOpen: (input: {
 		label: string;
 		turnId: string;

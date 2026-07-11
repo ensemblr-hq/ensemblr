@@ -27,6 +27,8 @@ import type {
 	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabRequest,
 	OpenChatTabResult,
+	ReorderChatTabsRequest,
+	ReorderChatTabsResult,
 	RestoreChatTabRequest,
 	RestoreChatTabResult,
 } from './contracts/chat-tab';
@@ -429,6 +431,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.renameWorkspace]: IpcHandlerEntry<
 		RenameWorkspaceRequest,
 		RenameWorkspaceResult
+	>;
+	[IPC_CHANNELS.reorderChatTabs]: IpcHandlerEntry<
+		ReorderChatTabsRequest,
+		ReorderChatTabsResult
 	>;
 	[IPC_CHANNELS.restoreChatTab]: IpcHandlerEntry<
 		RestoreChatTabRequest,

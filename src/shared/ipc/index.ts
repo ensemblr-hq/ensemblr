@@ -25,6 +25,8 @@ export type {
 	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabRequest,
 	OpenChatTabResult,
+	ReorderChatTabsRequest,
+	ReorderChatTabsResult,
 	RestoreChatTabRequest,
 	RestoreChatTabResult,
 } from './contracts/chat-tab';
