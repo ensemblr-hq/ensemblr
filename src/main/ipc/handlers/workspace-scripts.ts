@@ -2,6 +2,8 @@ import { ipcMain } from 'electron';
 
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
+	EnsureWorkspaceSetupRequest,
+	EnsureWorkspaceSetupResult,
 	RunWorkspaceScriptRequest,
 	RunWorkspaceScriptResult,
 	StopWorkspaceScriptRequest,
@@ -26,6 +28,17 @@ export function registerWorkspaceScriptHandlers({
 	databaseService: EnsemblrDatabaseService;
 	scriptLifecycleService: ScriptLifecycleService;
 }): void {
+	ipcMain.handle(
+		IPC_CHANNELS.ensureWorkspaceSetup,
+		(
+			_event,
+			request: EnsureWorkspaceSetupRequest,
+		): Promise<EnsureWorkspaceSetupResult> =>
+			scriptLifecycleService.runSetupScriptIfNeeded({
+				workspaceId: request.workspaceId,
+			}),
+	);
+
 	ipcMain.handle(
 		IPC_CHANNELS.runWorkspaceScript,
 		(

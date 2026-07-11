@@ -1,5 +1,7 @@
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type {
+	EnsureWorkspaceSetupRequest,
+	EnsureWorkspaceSetupResult,
 	RunWorkspaceScriptRequest,
 	RunWorkspaceScriptResult,
 	StopWorkspaceScriptRequest,
@@ -9,6 +11,20 @@ import type {
 } from '@/shared/ipc/contracts/workspace-scripts';
 
 import { getEnsemblrApi } from './query-keys';
+
+/**
+ * Asks the main process to run the workspace setup script only when its
+ * dependency fingerprint is missing or stale. Fired once per workspace open so
+ * unchanged dependencies skip setup and a changed lockfile re-runs it.
+ */
+export function ensureWorkspaceSetup(
+	request: EnsureWorkspaceSetupRequest,
+): Promise<EnsureWorkspaceSetupResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemblr:ensure-workspace-setup', usesDatabase: true },
+		() => getEnsemblrApi().ensureWorkspaceSetup(request),
+	);
+}
 
 /** Runs a configured workspace script in a dock terminal session. */
 export function runWorkspaceScript(

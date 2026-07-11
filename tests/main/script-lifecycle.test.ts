@@ -1,7 +1,7 @@
 /// <reference types="node" />
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -9,6 +9,7 @@ import test, { type TestContext } from 'node:test';
 
 import type { EnsemblrConfigResolutionService } from '../../src/main/config/config-resolution.ts';
 import { createScriptLifecycleService } from '../../src/main/scripts/script-lifecycle-service.ts';
+import { computeSetupFingerprint } from '../../src/main/scripts/setup-fingerprint.ts';
 import type { EnsemblrDatabaseService } from '../../src/main/storage/database.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import { insertRepositoryRow } from '../../src/main/storage/repositories/repository-row-repository.ts';
@@ -533,4 +534,172 @@ test('runSetupScriptWithAutoRun skips the run script when setup is stopped mid-f
 		['setup-script'],
 	);
 	assert.deepEqual(fixture.killedIds, ['session-1']);
+});
+
+test('runSetupScriptIfNeeded runs setup when nothing is recorded yet', async (t) => {
+	const { createCalls, service } = createServiceFixture(t, {
+		setup: 'npm install',
+	});
+
+	const result = await service.runSetupScriptIfNeeded({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(result.session);
+	assert.equal(result.session.kind, 'setup-script');
+	assert.equal(createCalls.length, 1);
+});
+
+test('runSetupScriptIfNeeded skips a second run once setup is recorded', async (t) => {
+	const fixture = createServiceFixture(t, { setup: 'npm install' });
+
+	setTimeout(() => fixture.endSession('session-1', 'exited'), 20);
+	await fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.equal(fixture.createCalls.length, 1);
+
+	const result = await fixture.service.runSetupScriptIfNeeded({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(result.session, null);
+	assert.equal(result.diagnostics[0]?.code, 'setup-already-current');
+	assert.equal(fixture.createCalls.length, 1);
+});
+
+test('runSetupScriptIfNeeded re-runs setup when the command changes', async (t) => {
+	const database = createDatabaseFixture(t);
+	const first = createTerminalServiceFake();
+	const serviceA = createScriptLifecycleService({
+		databaseService: createDatabaseServiceStub(database),
+		settingsResolutionService: createSettingsStub({ setup: 'npm install' }),
+		terminalService: first.terminalService,
+	});
+
+	setTimeout(() => first.endSession('session-1', 'exited'), 20);
+	await serviceA.runSetupScriptWithAutoRun({ workspaceId: WORKSPACE_ID });
+
+	const second = createTerminalServiceFake();
+	const serviceB = createScriptLifecycleService({
+		databaseService: createDatabaseServiceStub(database),
+		settingsResolutionService: createSettingsStub({ setup: 'npm ci' }),
+		terminalService: second.terminalService,
+	});
+
+	const result = await serviceB.runSetupScriptIfNeeded({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(result.session);
+	assert.equal(second.createCalls.length, 1);
+});
+
+test('computeSetupFingerprint changes when the lockfile changes', (t) => {
+	const worktreePath = mkdtempSync(path.join(tmpdir(), 'ensemblr-fp-'));
+	t.after(() => rmSync(worktreePath, { force: true, recursive: true }));
+
+	const command = 'npm install';
+	const noLockfile = computeSetupFingerprint({ command, worktreePath });
+
+	writeFileSync(
+		path.join(worktreePath, 'package-lock.json'),
+		'{"lockfileVersion":3,"packages":{}}',
+	);
+	const withLockfile = computeSetupFingerprint({ command, worktreePath });
+
+	writeFileSync(
+		path.join(worktreePath, 'package-lock.json'),
+		'{"lockfileVersion":3,"packages":{"node_modules/left-pad":{}}}',
+	);
+	const changedLockfile = computeSetupFingerprint({ command, worktreePath });
+
+	assert.notEqual(noLockfile, withLockfile);
+	assert.notEqual(withLockfile, changedLockfile);
+});
+
+test('computeSetupFingerprint covers non-npm lockfiles', (t) => {
+	const worktreePath = mkdtempSync(path.join(tmpdir(), 'ensemblr-fp-'));
+	t.after(() => rmSync(worktreePath, { force: true, recursive: true }));
+
+	const command = 'cargo build';
+	const before = computeSetupFingerprint({ command, worktreePath });
+
+	writeFileSync(
+		path.join(worktreePath, 'Cargo.lock'),
+		'[[package]]\nname = "serde"\nversion = "1.0.0"\n',
+	);
+	const withCargo = computeSetupFingerprint({ command, worktreePath });
+
+	writeFileSync(
+		path.join(worktreePath, 'Cargo.lock'),
+		'[[package]]\nname = "serde"\nversion = "1.0.1"\n',
+	);
+	const changedCargo = computeSetupFingerprint({ command, worktreePath });
+
+	assert.notEqual(before, withCargo);
+	assert.notEqual(withCargo, changedCargo);
+});
+
+test('computeSetupFingerprint reflects every present lockfile', (t) => {
+	const worktreePath = mkdtempSync(path.join(tmpdir(), 'ensemblr-fp-'));
+	t.after(() => rmSync(worktreePath, { force: true, recursive: true }));
+
+	const command = 'npm install';
+	writeFileSync(path.join(worktreePath, 'package-lock.json'), '{"v":1}');
+	const npmOnly = computeSetupFingerprint({ command, worktreePath });
+
+	writeFileSync(
+		path.join(worktreePath, 'go.sum'),
+		'example.com/mod v1.0.0 h1:x=\n',
+	);
+	const npmPlusGo = computeSetupFingerprint({ command, worktreePath });
+
+	assert.notEqual(npmOnly, npmPlusGo);
+});
+
+test('runSetupScriptIfNeeded reports database-unavailable without a connection', async () => {
+	const fake = createTerminalServiceFake();
+	const service = createScriptLifecycleService({
+		databaseService: {
+			getConnection: () => null,
+		} as unknown as EnsemblrDatabaseService,
+		settingsResolutionService: createSettingsStub({ setup: 'npm install' }),
+		terminalService: fake.terminalService,
+	});
+
+	const result = await service.runSetupScriptIfNeeded({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(result.session, null);
+	assert.equal(result.diagnostics[0]?.code, 'database-unavailable');
+	assert.equal(fake.createCalls.length, 0);
+});
+
+test('runSetupScriptIfNeeded reports info when no setup script is configured', async (t) => {
+	const { createCalls, service } = createServiceFixture(t, {});
+
+	const result = await service.runSetupScriptIfNeeded({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(result.session, null);
+	assert.equal(result.diagnostics[0]?.code, 'script-not-configured');
+	assert.equal(result.diagnostics[0]?.severity, 'info');
+	assert.equal(createCalls.length, 0);
+});
+
+test('runSetupScriptIfNeeded reports workspace-not-found for an unknown id', async (t) => {
+	const { createCalls, service } = createServiceFixture(t, {
+		setup: 'npm install',
+	});
+
+	const result = await service.runSetupScriptIfNeeded({
+		workspaceId: 'missing',
+	});
+
+	assert.equal(result.session, null);
+	assert.equal(result.diagnostics[0]?.code, 'workspace-not-found');
+	assert.equal(createCalls.length, 0);
 });

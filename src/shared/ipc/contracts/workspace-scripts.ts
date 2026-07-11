@@ -17,6 +17,22 @@ export interface RunWorkspaceScriptRequest {
 /** Script sessions are terminal sessions; results share the terminal shapes. */
 export type RunWorkspaceScriptResult = CreateTerminalSessionResult;
 
+/**
+ * Request to run a workspace's setup script only when its dependency
+ * fingerprint is missing or stale. Sent by the renderer when a workspace opens.
+ */
+export interface EnsureWorkspaceSetupRequest {
+	workspaceId: string;
+}
+
+/**
+ * Result of an ensure-setup request. Shares the run-script result shape: a
+ * started session when setup ran, or `session: null` with an info diagnostic
+ * (`setup-already-current`) when setup was already current for the workspace's
+ * dependencies.
+ */
+export type EnsureWorkspaceSetupResult = CreateTerminalSessionResult;
+
 /** Request to stop a workspace's running script session of a given kind. */
 export interface StopWorkspaceScriptRequest {
 	kind: WorkspaceScriptKind;
@@ -47,6 +63,9 @@ export interface UpdateRepositoryScriptsResult {
 
 /** Workspace-script slice of the `window.ensemblr` API. */
 export interface WorkspaceScriptsApi {
+	ensureWorkspaceSetup: (
+		request: EnsureWorkspaceSetupRequest,
+	) => Promise<EnsureWorkspaceSetupResult>;
 	runWorkspaceScript: (
 		request: RunWorkspaceScriptRequest,
 	) => Promise<RunWorkspaceScriptResult>;

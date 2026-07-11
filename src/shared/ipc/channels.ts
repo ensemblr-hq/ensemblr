@@ -95,6 +95,7 @@ export const IPC_CHANNELS = {
 	resizeTerminalSession: 'ensemblr:resize-terminal-session',
 	repositoryWorkspaceNavigation: 'ensemblr:repository-workspace-navigation',
 	rootDirectory: 'ensemblr:root-directory',
+	ensureWorkspaceSetup: 'ensemblr:ensure-workspace-setup',
 	runWorkspaceScript: 'ensemblr:run-workspace-script',
 	saveReviewComment: 'ensemblr:save-review-comment',
 	saveReviewTodo: 'ensemblr:save-review-todo',
