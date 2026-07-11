@@ -66,6 +66,36 @@ export async function loadShellWorkbenchRoute({
 }
 
 /**
+ * Loader for the workbench index route. Redirects to the last-selected active
+ * workspace, or the first available workspace, and leaves Welcome visible when
+ * no non-archived workspace exists.
+ * @param input - Parent match and query client used to refresh navigation.
+ */
+export async function loadWorkbenchIndexRoute({
+	parentMatchPromise,
+	queryClient,
+}: {
+	parentMatchPromise: Promise<WorkbenchParentRouteMatch>;
+	queryClient: QueryClient;
+}): Promise<void> {
+	const parentMatch = await parentMatchPromise;
+	const loaderData = parentMatch.loaderData;
+
+	if (!loaderData) {
+		return;
+	}
+
+	const projects = await resolveLaunchProjects({ loaderData, queryClient });
+	const fallbackSelection = resolveFallbackWorkspaceSelection(projects);
+
+	if (!fallbackSelection) {
+		return;
+	}
+
+	throw redirectToWorkspaceSelection(fallbackSelection);
+}
+
+/**
  * Loader for project routes. Redirects to the stored/fallback workspace when
  * the URL project id is not present in the loaded data.
  * @param input - Parent match plus URL params.
@@ -276,6 +306,35 @@ function hasWorkspaceInProjects(
 	return Boolean(
 		project?.workspaces.some((workspace) => workspace.id === workspaceId),
 	);
+}
+
+/**
+ * Returns the active/non-archived project list to use for app-launch routing.
+ */
+async function resolveLaunchProjects({
+	loaderData,
+	queryClient,
+}: {
+	loaderData: WorkbenchRouteLoaderData;
+	queryClient: QueryClient;
+}): Promise<ProjectShellModel[]> {
+	if (!loaderData.hasPreloadBridge) {
+		return loaderData.projects;
+	}
+
+	try {
+		// Index route is the launch entry point, so the navigation cache may be
+		// cold here; fetch live rather than reading a possibly-empty cache.
+		const snapshot = await queryClient.fetchQuery(
+			repositoryWorkspaceNavigationQuery,
+		);
+
+		return mapRepositoriesToProjects(snapshot.repositories);
+	} catch (error) {
+		console.error('Failed to fetch live navigation for launch routing:', error);
+
+		return loaderData.projects;
+	}
 }
 
 /**
