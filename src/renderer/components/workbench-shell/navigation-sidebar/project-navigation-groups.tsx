@@ -95,9 +95,10 @@ export function ProjectNavigationGroups({
 		orderedProjects,
 	});
 
-	const { create: handleCreateWorkspace } = useCreateWorkspaceFromProject({
-		disableProjectReorderLayoutAnimation,
-	});
+	const { create: handleCreateWorkspace, creatingProjectIds } =
+		useCreateWorkspaceFromProject({
+			disableProjectReorderLayoutAnimation,
+		});
 
 	const queryClient = useQueryClient();
 	const handleArchiveBrowseChange = useArchiveBrowseChange();
@@ -133,6 +134,7 @@ export function ProjectNavigationGroups({
 							activeProject={activeProject}
 							activeWorkspace={activeWorkspace}
 							isCollapsed={isProjectCollapsed}
+							isCreatingWorkspace={creatingProjectIds.has(project.id)}
 							key={project.id}
 							onCreateFromSourcePrefetch={() =>
 								prefetchWorkspaceSources(queryClient, project.id)

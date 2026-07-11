@@ -125,7 +125,7 @@ export function findWorkspaceNavigationSelection(
 ): WorkspaceNavigationSelection | null {
 	const project = projects.find((candidate) => candidate.id === projectId);
 	const workspace = project?.workspaces.find(
-		(candidate) => candidate.id === workspaceId,
+		(candidate) => candidate.id === workspaceId && !candidate.isPendingCreation,
 	);
 
 	return project && workspace
@@ -188,7 +188,9 @@ function getFirstWorkspaceSelectionInProject(
 	projectId: string,
 ): WorkspaceNavigationSelection | null {
 	const project = projects.find((candidate) => candidate.id === projectId);
-	const workspace = project?.workspaces[0];
+	const workspace = project?.workspaces.find(
+		(candidate) => !candidate.isPendingCreation,
+	);
 
 	return project && workspace
 		? {
@@ -204,7 +206,9 @@ function getFirstWorkspaceSelection(
 	projects: ProjectShellModel[],
 ): WorkspaceNavigationSelection | null {
 	for (const project of projects) {
-		const workspace = project.workspaces[0];
+		const workspace = project.workspaces.find(
+			(candidate) => !candidate.isPendingCreation,
+		);
 
 		if (workspace) {
 			return {

@@ -1,6 +1,7 @@
 import {
 	ChevronDownIcon,
 	Link2Icon,
+	LoaderCircleIcon,
 	PlusIcon,
 	SettingsIcon,
 } from 'lucide-react';
@@ -30,8 +31,10 @@ export function ProjectSidebarHeader({
 	onToggle,
 	project,
 	workspaceCount,
+	isCreatingWorkspace = false,
 }: {
 	isCollapsed: boolean;
+	isCreatingWorkspace?: boolean;
 	onArchiveSelect?: () => void;
 	onBrowseArchiveSelect?: () => void;
 	/** Warms the create-from picker's data before the dialog opens. */
@@ -111,15 +114,25 @@ export function ProjectSidebarHeader({
 							</ProjectHeaderActionButton>
 						) : null}
 						<ProjectHeaderActionButton
-							aria-label={`Create workspace in ${project.name}`}
+							aria-label={
+								isCreatingWorkspace
+									? `Creating workspace in ${project.name}`
+									: `Create workspace in ${project.name}`
+							}
 							data-action-scope='workspace'
-							disabled={!createWorkspaceWired}
+							disabled={!createWorkspaceWired || isCreatingWorkspace}
 							onClick={
-								createWorkspaceWired ? onCreateWorkspaceSelect : undefined
+								createWorkspaceWired && !isCreatingWorkspace
+									? onCreateWorkspaceSelect
+									: undefined
 							}
 							onPointerDown={(event) => event.stopPropagation()}
 						>
-							<PlusIcon aria-hidden='true' />
+							{isCreatingWorkspace ? (
+								<LoaderCircleIcon aria-hidden='true' className='animate-spin' />
+							) : (
+								<PlusIcon aria-hidden='true' />
+							)}
 						</ProjectHeaderActionButton>
 					</div>
 				</SidebarGroupLabel>
@@ -144,7 +157,7 @@ function ProjectHeaderActionButton({
 	return (
 		<button
 			className={cn(
-				'flex aspect-square size-6 items-center justify-center rounded-md bg-transparent text-sidebar-foreground opacity-70 outline-hidden ring-sidebar-ring transition-[color,opacity] hover:text-sidebar-foreground hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0',
+				'flex aspect-square size-6 items-center justify-center rounded-md bg-transparent text-sidebar-foreground opacity-70 outline-hidden ring-sidebar-ring transition-[color,opacity] hover:text-sidebar-foreground hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-40 [&>svg]:size-4 [&>svg]:shrink-0',
 				className,
 			)}
 			type='button'
