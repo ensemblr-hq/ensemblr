@@ -117,10 +117,10 @@ function ModelOptionRow({
 				aria-label={favourite ? 'Unfavourite model' : 'Favourite model'}
 				aria-pressed={favourite}
 				className={cn(
-					'mr-1 shrink-0 rounded-md p-1.5 transition-colors hover:bg-secondary/60',
+					'mr-1 shrink-0 rounded-md p-1.5 transition-[color,background-color,opacity] hover:bg-secondary/60',
 					favourite
-						? 'text-status-warning'
-						: 'text-muted-foreground/40 hover:text-muted-foreground',
+						? 'text-status-warning opacity-100'
+						: 'text-muted-foreground opacity-40 hover:opacity-100',
 				)}
 				onClick={(event) => {
 					// Never let the star select the model or close the popover.

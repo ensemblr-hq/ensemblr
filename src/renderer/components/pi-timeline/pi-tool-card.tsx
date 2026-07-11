@@ -74,7 +74,7 @@ export function PiToolCard({
 			<CollapsibleTrigger className='group flex w-full min-w-0 items-center gap-2 rounded-md px-1 py-0.5 text-left text-[0.8125rem] leading-5 transition-colors hover:bg-secondary/50'>
 				<Chevron
 					aria-hidden='true'
-					className='size-3.5 shrink-0 text-muted-foreground/60'
+					className='size-3.5 shrink-0 text-muted-foreground opacity-60'
 				/>
 				<ToolStatusIcon status={call.status} />
 				<span className='shrink-0 font-medium text-foreground/85'>
@@ -140,7 +140,7 @@ function ToolStatusIcon({ status }: { status: PiToolCallStatus }) {
 			return (
 				<BanIcon
 					aria-hidden='true'
-					className='size-3.5 shrink-0 text-muted-foreground/70'
+					className='size-3.5 shrink-0 text-muted-foreground opacity-70'
 				/>
 			);
 		default:

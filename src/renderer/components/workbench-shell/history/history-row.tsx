@@ -168,7 +168,7 @@ function RowLabel({
 			</span>
 			<ChevronRightIcon
 				aria-hidden='true'
-				className='size-3 shrink-0 text-muted-foreground/40'
+				className='size-3 shrink-0 text-muted-foreground opacity-40'
 			/>
 			<span
 				className={cn(

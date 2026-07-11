@@ -144,7 +144,7 @@ function ProjectHeaderActionButton({
 	return (
 		<button
 			className={cn(
-				'flex aspect-square size-6 items-center justify-center rounded-md bg-transparent text-sidebar-foreground/70 outline-hidden ring-sidebar-ring transition-colors hover:text-sidebar-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0',
+				'flex aspect-square size-6 items-center justify-center rounded-md bg-transparent text-sidebar-foreground opacity-70 outline-hidden ring-sidebar-ring transition-[color,opacity] hover:text-sidebar-foreground hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0',
 				className,
 			)}
 			type='button'

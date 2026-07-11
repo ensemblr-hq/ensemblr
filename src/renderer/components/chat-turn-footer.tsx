@@ -66,7 +66,7 @@ export function ChatTurnFooter({
 					<DropdownMenuTrigger asChild>
 						<button
 							aria-label='Turn actions'
-							className='rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-secondary/60 hover:text-foreground data-[state=open]:bg-secondary/60 data-[state=open]:text-foreground'
+							className='rounded-md p-1 text-muted-foreground opacity-70 transition-[color,background-color,opacity] hover:bg-secondary/60 hover:text-foreground hover:opacity-100 data-[state=open]:bg-secondary/60 data-[state=open]:text-foreground data-[state=open]:opacity-100'
 							disabled={forkDisabled}
 							type='button'
 						>

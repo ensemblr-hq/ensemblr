@@ -55,8 +55,8 @@ export function CopyResponseButton({
 					<button
 						aria-label='Copy response'
 						className={cn(
-							'rounded-md p-1 text-muted-foreground/70 transition-colors hover:bg-secondary/60 hover:text-foreground',
-							copied && 'text-status-ok',
+							'rounded-md p-1 text-muted-foreground opacity-70 transition-[color,background-color,opacity] hover:bg-secondary/60 hover:text-foreground hover:opacity-100',
+							copied && 'text-status-ok opacity-100',
 							className,
 						)}
 						onClick={copy}

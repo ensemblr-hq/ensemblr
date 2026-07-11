@@ -54,7 +54,7 @@ export function PiToolGroupCard({
 			<CollapsibleTrigger className='group flex w-full items-center gap-2 rounded-md px-1 py-0.5 text-left text-[0.8125rem] leading-5 transition-colors hover:bg-secondary/50'>
 				<Chevron
 					aria-hidden='true'
-					className='size-3.5 shrink-0 text-muted-foreground/60'
+					className='size-3.5 shrink-0 text-muted-foreground opacity-60'
 				/>
 				{running ? (
 					<Spinner className='size-3.5 shrink-0 text-muted-foreground' />
@@ -66,7 +66,7 @@ export function PiToolGroupCard({
 				) : (
 					<WrenchIcon
 						aria-hidden='true'
-						className='size-3.5 shrink-0 text-muted-foreground/70'
+						className='size-3.5 shrink-0 text-muted-foreground opacity-70'
 					/>
 				)}
 				<span className='font-medium text-foreground/85'>
