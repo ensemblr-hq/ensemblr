@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 
 import {
@@ -7,7 +7,76 @@ import {
 	subscribePiSessionEvents,
 } from '@/renderer/api/ensemblr-queries';
 
-import { classifyPullRequestRefreshAction } from './detect-pull-request-creation';
+import {
+	classifyPullRequestRefreshAction,
+	type PullRequestRefreshAction,
+} from './detect-pull-request-creation';
+
+/** A refresh action that should trigger a gh-backed PR snapshot fetch. */
+type RefreshAction = Extract<PullRequestRefreshAction, { kind: 'refresh' }>;
+
+/** Mutable in-flight flags for plain and created-PR refresh lanes. */
+interface RefreshInFlightRefs {
+	created: { current: boolean };
+	plain: { current: boolean };
+}
+
+/**
+ * Starts a PR snapshot refresh when the matching refresh lane is available.
+ * @param action - The refresh action classified from a Pi session event.
+ * @param inFlight - Mutable in-flight flags for coalescing duplicate refreshes.
+ * @param queryClient - Query cache to update with the fetched snapshot.
+ * @param signal - Abort signal tied to the hook lifetime.
+ * @param workspaceCwd - Workspace directory for gh commands.
+ * @param workspaceId - Workspace identifier backing the query key.
+ * @returns True when a refresh started, otherwise false.
+ */
+function startRefreshAction({
+	action,
+	inFlight,
+	queryClient,
+	signal,
+	workspaceCwd,
+	workspaceId,
+}: {
+	action: RefreshAction;
+	inFlight: RefreshInFlightRefs;
+	queryClient: QueryClient;
+	signal: AbortSignal;
+	workspaceCwd: string;
+	workspaceId: string;
+}): boolean {
+	const hasRefreshInFlight = inFlight.plain.current || inFlight.created.current;
+	if (!action.createdPr && hasRefreshInFlight) {
+		return false;
+	}
+	if (action.createdPr && inFlight.created.current) {
+		return false;
+	}
+	const activeFlag = action.createdPr ? inFlight.created : inFlight.plain;
+	activeFlag.current = true;
+	const refresh = action.createdPr
+		? refreshPullRequestSnapshotUntilPresent({
+				queryClient,
+				signal,
+				workspaceCwd,
+				workspaceId,
+			})
+		: refreshPullRequestSnapshot({
+				queryClient,
+				workspaceCwd,
+				workspaceId,
+			});
+	void refresh
+		.catch((cause) => {
+			// Best-effort background refresh; the 30s poll is the fallback.
+			console.error('Failed to auto-refresh PR snapshot:', cause);
+		})
+		.finally(() => {
+			activeFlag.current = false;
+		});
+	return true;
+}
 
 /**
  * Forces a cache-bypassing PR-snapshot refresh the instant the workspace's agent
@@ -19,10 +88,11 @@ import { classifyPullRequestRefreshAction } from './detect-pull-request-creation
  * is the cheapest reliable hook — a `gh pr create` almost always lands just
  * before the agent goes idle. The background poll remains the fallback.
  *
- * When the finished turn actually created a PR (detected from its tool events),
- * the refresh retries until the PR surfaces, absorbing GitHub's read-after-write
- * race where `gh pr view` momentarily reports no PR. Other turns keep the single
- * cheap refresh so no-PR editing turns do not spawn extra `gh` calls.
+ * When the agent emits the created PR URL, the retry starts immediately; when
+ * only the `gh pr create` command was observed, the finished turn runs the same
+ * retry. Both paths absorb GitHub's read-after-write race where `gh pr view`
+ * momentarily reports no PR. Other turns keep the single cheap refresh so no-PR
+ * editing turns do not spawn extra `gh` calls.
  */
 export function usePullRequestAutoRefresh({
 	workspaceCwd,
@@ -32,9 +102,10 @@ export function usePullRequestAutoRefresh({
 	workspaceId: string;
 }): void {
 	const queryClient = useQueryClient();
-	// Coalesces overlapping turn-end refreshes (e.g. two sessions finishing at
-	// once) so we never fire a second forced `gh` fetch while one is in flight.
-	const inFlightRef = useRef(false);
+	// Coalesces overlapping plain turn-end refreshes while still allowing a
+	// stronger created-PR retry to overtake a plain refresh already in flight.
+	const plainRefreshInFlightRef = useRef(false);
+	const createdRefreshInFlightRef = useRef(false);
 	// Set when the current turn produced a `gh pr create` / PR-URL tool event;
 	// gates the retry-until-present refresh and resets at each turn boundary.
 	const prCreatedThisTurnRef = useRef(false);
@@ -64,31 +135,23 @@ export function usePullRequestAutoRefresh({
 				prCreatedThisTurnRef.current = false;
 				return;
 			}
-			if (action.kind === 'none' || inFlightRef.current) {
+			if (action.kind === 'none') {
 				return;
 			}
-			prCreatedThisTurnRef.current = false;
-			inFlightRef.current = true;
-			const refresh = action.createdPr
-				? refreshPullRequestSnapshotUntilPresent({
-						queryClient,
-						signal: controller.signal,
-						workspaceCwd,
-						workspaceId,
-					})
-				: refreshPullRequestSnapshot({
-						queryClient,
-						workspaceCwd,
-						workspaceId,
-					});
-			void refresh
-				.catch((cause) => {
-					// Best-effort background refresh; the 30s poll is the fallback.
-					console.error('Failed to auto-refresh PR snapshot:', cause);
-				})
-				.finally(() => {
-					inFlightRef.current = false;
-				});
+			const started = startRefreshAction({
+				action,
+				inFlight: {
+					created: createdRefreshInFlightRef,
+					plain: plainRefreshInFlightRef,
+				},
+				queryClient,
+				signal: controller.signal,
+				workspaceCwd,
+				workspaceId,
+			});
+			if (action.createdPr || started) {
+				prCreatedThisTurnRef.current = false;
+			}
 		});
 		return () => {
 			controller.abort();

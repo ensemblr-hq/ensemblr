@@ -62,6 +62,18 @@ const PR_CREATE_CALL: PiPersistedEnvelope = {
 	role: 'tool',
 };
 
+/** A tool-result envelope carrying the created PR URL. */
+const PR_URL_RESULT: PiPersistedEnvelope = {
+	kind: 'message',
+	payload: {
+		isError: false,
+		kind: 'tool-result',
+		output: 'https://github.com/acme/app/pull/42',
+		toolCallId: 'c1',
+	},
+	role: 'tool',
+};
+
 /** A status envelope for a streaming→idle turn end. */
 const TURN_END: PiPersistedEnvelope = {
 	kind: 'status',
@@ -128,6 +140,18 @@ test('retries until present when the turn created a PR', async () => {
 	expect(mocks.refreshPullRequestSnapshot).not.toHaveBeenCalled();
 });
 
+test('retries immediately when the tool result carries the PR URL', async () => {
+	renderAutoRefresh();
+	await waitFor(() => expect(mocks.listener).not.toBeNull());
+
+	act(() => {
+		mocks.listener?.(broadcast(PR_URL_RESULT));
+	});
+
+	expect(mocks.refreshPullRequestSnapshotUntilPresent).toHaveBeenCalledTimes(1);
+	expect(mocks.refreshPullRequestSnapshot).not.toHaveBeenCalled();
+});
+
 test('a turn start clears a prior PR-created signal', async () => {
 	renderAutoRefresh();
 	await waitFor(() => expect(mocks.listener).not.toBeNull());
@@ -176,6 +200,30 @@ test('coalesces overlapping turn ends while a refresh is in flight', async () =>
 	await waitFor(() =>
 		expect(mocks.refreshPullRequestSnapshot).toHaveBeenCalledTimes(1),
 	);
+});
+
+test('does not drop a created-PR refresh while a plain refresh is in flight', async () => {
+	let resolveRefresh: (() => void) | null = null;
+	mocks.refreshPullRequestSnapshot.mockImplementationOnce(
+		() =>
+			new Promise<void>((resolve) => {
+				resolveRefresh = resolve;
+			}),
+	);
+	renderAutoRefresh();
+	await waitFor(() => expect(mocks.listener).not.toBeNull());
+
+	act(() => {
+		mocks.listener?.(broadcast(TURN_END));
+		mocks.listener?.(broadcast(PR_URL_RESULT));
+	});
+
+	expect(mocks.refreshPullRequestSnapshot).toHaveBeenCalledTimes(1);
+	expect(mocks.refreshPullRequestSnapshotUntilPresent).toHaveBeenCalledTimes(1);
+
+	act(() => {
+		resolveRefresh?.();
+	});
 });
 
 test('unsubscribes on unmount', async () => {
