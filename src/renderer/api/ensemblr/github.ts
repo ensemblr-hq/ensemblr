@@ -2,6 +2,7 @@ import { type QueryClient, queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type {
+	GetPullRequestSnapshotResult,
 	MergePullRequestRequest,
 	MergePullRequestResult,
 } from '@/shared/ipc/contracts/github';
@@ -55,11 +56,20 @@ export function pullRequestSnapshotQuery({
 }
 
 /**
+ * Backoff delays (ms) between retries when a just-created PR has not yet
+ * surfaced through `gh pr view`. GitHub's read-after-write consistency can make
+ * the first post-creation snapshot come back empty; each entry is one extra
+ * attempt, stopping as soon as the PR appears.
+ */
+const PR_PRESENCE_RETRY_DELAYS_MS = [2_000, 4_000, 8_000] as const;
+
+/**
  * Forces a cache-bypassing PR-snapshot fetch (`refresh: true`) and writes the
  * result straight into the query cache. Used by the agent-idle auto-refresh,
  * the manual refresh button, and the create/merge mutations so the panel
  * reflects new PR state immediately instead of waiting for the next poll (and
  * the main-process snapshot TTL, which a plain refetch would hit).
+ * @returns The freshly fetched snapshot result written into the cache.
  */
 export async function refreshPullRequestSnapshot({
 	queryClient,
@@ -69,7 +79,7 @@ export async function refreshPullRequestSnapshot({
 	queryClient: QueryClient;
 	workspaceCwd: string;
 	workspaceId: string;
-}): Promise<void> {
+}): Promise<GetPullRequestSnapshotResult> {
 	const result = await profileElectronIpcCall(
 		{ channel: 'ensemblr:get-pull-request-snapshot', usesDatabase: true },
 		() =>
@@ -83,6 +93,118 @@ export async function refreshPullRequestSnapshot({
 		ensemblrQueryKeys.pullRequestSnapshot(workspaceId),
 		result,
 	);
+	return result;
+}
+
+/**
+ * Resolves after the given delay, or early when the signal aborts, so the retry
+ * loop stops promptly if the caller unmounts mid-backoff.
+ * @param ms - Milliseconds to wait.
+ * @param signal - Optional abort signal that resolves the wait early.
+ */
+function delay(ms: number, signal?: AbortSignal): Promise<void> {
+	return new Promise((resolve) => {
+		if (signal?.aborted) {
+			resolve();
+			return;
+		}
+		const onAbort = () => {
+			clearTimeout(timer);
+			resolve();
+		};
+		const timer = setTimeout(() => {
+			signal?.removeEventListener('abort', onAbort);
+			resolve();
+		}, ms);
+		signal?.addEventListener('abort', onAbort, { once: true });
+	});
+}
+
+/**
+ * Forces a PR-snapshot refresh and, when the snapshot still reports no PR,
+ * retries with bounded backoff until one appears. Absorbs the read-after-create
+ * race where `gh pr view` momentarily returns "no pull requests found" right
+ * after an agent runs `gh pr create` — a plain single refresh would cache that
+ * false empty and leave the panel blank until the next poll. Each successful
+ * attempt re-asserts the snapshot via `setQueryData`, which also heals a
+ * concurrent poll that clobbered a good result with a raced empty one. Stops
+ * early when the signal aborts (e.g. the caller unmounts), leaving no dangling
+ * timer or trailing `gh` fetch.
+ * @returns The final snapshot result (the first non-empty one, or the last).
+ */
+export async function refreshPullRequestSnapshotUntilPresent({
+	delaysMs = PR_PRESENCE_RETRY_DELAYS_MS,
+	queryClient,
+	signal,
+	workspaceCwd,
+	workspaceId,
+}: {
+	delaysMs?: readonly number[];
+	queryClient: QueryClient;
+	signal?: AbortSignal;
+	workspaceCwd: string;
+	workspaceId: string;
+}): Promise<GetPullRequestSnapshotResult> {
+	const result = await refreshPullRequestSnapshot({
+		queryClient,
+		workspaceCwd,
+		workspaceId,
+	});
+	return retryPullRequestSnapshotUntilPresent({
+		delaysMs,
+		queryClient,
+		result,
+		signal,
+		workspaceCwd,
+		workspaceId,
+	});
+}
+
+/**
+ * Recurses through the bounded PR snapshot backoff until a PR appears or retries
+ * are exhausted.
+ * @returns The first non-empty snapshot, or the last attempted result.
+ */
+async function retryPullRequestSnapshotUntilPresent({
+	delaysMs,
+	queryClient,
+	result,
+	signal,
+	workspaceCwd,
+	workspaceId,
+}: {
+	delaysMs: readonly number[];
+	queryClient: QueryClient;
+	result: GetPullRequestSnapshotResult;
+	signal?: AbortSignal;
+	workspaceCwd: string;
+	workspaceId: string;
+}): Promise<GetPullRequestSnapshotResult> {
+	if (
+		result.snapshot?.pullRequest ||
+		signal?.aborted ||
+		delaysMs.length === 0
+	) {
+		return result;
+	}
+	const [wait, ...remainingDelays] = delaysMs;
+	await delay(wait, signal);
+	if (signal?.aborted) {
+		return result;
+	}
+	const nextResult = await refreshPullRequestSnapshot({
+		queryClient,
+		workspaceCwd,
+		workspaceId,
+	});
+	return retryPullRequestSnapshotUntilPresent({
+		delaysMs: remainingDelays,
+		queryClient,
+		result: nextResult,
+		signal,
+		workspaceCwd,
+		workspaceId,
+	});
 }
 
 /** Query options for Ensemblr-local review comments. */
