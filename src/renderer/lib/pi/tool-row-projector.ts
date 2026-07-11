@@ -127,7 +127,7 @@ function projectWrite(part: DynamicToolUIPart): ToolRowProjection {
 	return {
 		chipLabel: path ? basename(path) : null,
 		chipPath: path || null,
-		detail: path || '(no path)',
+		detail: path ? '' : '(no path)',
 		label: 'Write',
 	};
 }
@@ -143,7 +143,7 @@ function projectEdit(part: DynamicToolUIPart): ToolRowProjection {
 	return {
 		chipLabel: path ? basename(path) : null,
 		chipPath: path || null,
-		detail: path || '(no path)',
+		detail: path ? '' : '(no path)',
 		label: 'Edit',
 	};
 }
