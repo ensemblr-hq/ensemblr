@@ -46,8 +46,8 @@ vi.mock('@/renderer/state/workspace/open-target-history', () => ({
 
 import { toast } from 'sonner';
 
-import { useReviewMutations } from '@/renderer/hooks/workbench-shell/review-actions/use-review-mutations';
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import { useReviewMutations } from '../../src/renderer/hooks/workbench-shell/review-actions/use-review-mutations';
+import type { WorkspaceShellModel } from '../../src/renderer/types/workbench';
 
 const activeWorkspace = {
 	id: 'san-antonio',
