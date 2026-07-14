@@ -458,13 +458,13 @@ test('renders live navigation records and true empty repository state', () => {
 
 	expect(populatedMarkup).toContain('THE-120 Sidebar nav');
 	expect(populatedMarkup).toContain('Draft workspace');
-	expect(populatedMarkup).toContain('2 repos');
-	expect(populatedMarkup).toContain('2 workspaces');
+	expect(populatedMarkup).not.toContain('2 repos');
+	expect(populatedMarkup).not.toContain('2 workspaces');
 	expect(populatedMarkup).not.toContain('Conductor shell rework');
 	expect(emptyMarkup).toContain('No repositories yet');
 	expect(emptyMarkup).toContain('Dashboard');
 	expect(emptyMarkup).toContain('Help');
 	expect(emptyMarkup).toContain('Repositories');
-	expect(emptyMarkup).toContain('0 repos');
-	expect(emptyMarkup).toContain('0 workspaces');
+	expect(emptyMarkup).not.toContain('0 repos');
+	expect(emptyMarkup).not.toContain('0 workspaces');
 });

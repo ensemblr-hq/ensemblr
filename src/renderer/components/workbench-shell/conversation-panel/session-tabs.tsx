@@ -1,4 +1,5 @@
 import { Icon } from '@iconify/react';
+import { useAtomValue } from 'jotai';
 import {
 	BugIcon,
 	FileDiffIcon,
@@ -27,6 +28,7 @@ import {
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceFileIconNameForPath } from '@/renderer/lib/workbench';
 import { useDebugPanelToggle } from '@/renderer/state/pi';
+import { developerModeAtom } from '@/renderer/state/preferences';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 
 /** Horizontal session-tab bar with close, restore, new-tab, and drag-order controls. */
@@ -51,6 +53,7 @@ export function SessionTabs({
 }) {
 	const [isOpening, setIsOpening] = useState(false);
 	const [debugOpen, setDebugOpen] = useDebugPanelToggle();
+	const developerMode = useAtomValue(developerModeAtom);
 	const sessionIds = useMemo(
 		() => sessions.map((session) => session.id),
 		[sessions],
@@ -78,6 +81,12 @@ export function SessionTabs({
 			return areStringArraysEqual(nextIds, currentIds) ? currentIds : nextIds;
 		});
 	}, [sessionIds]);
+
+	useEffect(() => {
+		if (!developerMode && debugOpen) {
+			setDebugOpen(false);
+		}
+	}, [debugOpen, developerMode, setDebugOpen]);
 
 	/** Opens a chat tab through the workspace-level controller and selects it. */
 	function handleOpen() {
@@ -218,17 +227,21 @@ export function SessionTabs({
 				</div>
 			</div>
 			<div className='flex shrink-0 items-center gap-1'>
-				<Button
-					aria-label={debugOpen ? 'Hide Pi debug panel' : 'Show Pi debug panel'}
-					className={cn(debugOpen && 'bg-muted text-foreground')}
-					onClick={() => setDebugOpen(!debugOpen)}
-					size='icon-sm'
-					title='Pi raw frames (debug)'
-					variant='ghost'
-				>
-					<BugIcon />
-					<span className='sr-only'>Toggle Pi debug panel</span>
-				</Button>
+				{developerMode ? (
+					<Button
+						aria-label={
+							debugOpen ? 'Hide Pi debug panel' : 'Show Pi debug panel'
+						}
+						className={cn(debugOpen && 'bg-muted text-foreground')}
+						onClick={() => setDebugOpen(!debugOpen)}
+						size='icon-sm'
+						title='Pi raw frames (debug)'
+						variant='ghost'
+					>
+						<BugIcon />
+						<span className='sr-only'>Toggle Pi debug panel</span>
+					</Button>
+				) : null}
 				<ClosedSessionHistoryMenu
 					closedSessions={closedSessions}
 					onSessionTabRestore={onSessionTabRestore}

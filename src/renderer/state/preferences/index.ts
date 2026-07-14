@@ -6,7 +6,8 @@
  * Outside this folder, import from `@/renderer/state/preferences` only.
  */
 
-// Config.json-backed App settings (General, Models, Git, Appearance sections).
+// Config.json-backed App settings (General, Models, Git, Appearance,
+// Experimental sections).
 // The source of truth is `~/.config/ensemblr/config.json`; see ./app-settings.
 export {
 	accessibleColorsAtom,
@@ -14,6 +15,7 @@ export {
 	appSettingsAtom,
 	archiveOnMergeAtom,
 	autoConvertLongTextAtom,
+	autoRunAfterSetupAtom,
 	branchPrefixCustomAtom,
 	branchPrefixSourceAtom,
 	caffeinateWhileRunningAtom,
@@ -50,20 +52,16 @@ export type {
 	ToolCallCollapseMode,
 } from './atoms';
 export {
-	autoRunAfterSetupAtom,
 	chatModelOverrideAtomFamily,
 	chatThinkingOverrideAtomFamily,
 	customPiExecutablePathAtom,
+	developerModeAtom,
 	favouriteModelsAtom,
 	forgetChatOverrides,
-	inAppBrowserPreviewAtom,
 	prDetailsDraftAtomFamily,
 	prDetailsLiveDraftAtomFamily,
 	REPO_ACTION_KEYS,
 	repoSettingsOverrideAtomFamily,
-	showDashboardAtom,
-	showSidebarResourceUsageAtom,
-	sidebarChatsModeAtom,
 	terminalScrollbackMbAtom,
 } from './atoms';
 export { useAppearanceEffect } from './use-appearance-effect';

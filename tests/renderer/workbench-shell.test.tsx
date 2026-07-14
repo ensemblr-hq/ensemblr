@@ -246,8 +246,8 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('Collapse repository ensemblr');
 	expect(markup).toContain('data-slot="context-menu-trigger"');
 	expect(markup).toContain('Reorder repository ensemblr');
-	expect(markup).toContain('2 repos');
-	expect(markup).toContain('5 workspaces');
+	expect(markup).not.toContain('2 repos');
+	expect(markup).not.toContain('5 workspaces');
 	expect(markup).toContain('Open workspace Conductor shell rework');
 	expect(markup).toContain('Archive workspace Conductor shell rework');
 	expect(markup).toContain('data-permission-boundary="confirmation-required"');
@@ -966,9 +966,9 @@ test('keeps blocked setup inside the workbench and disables the composer', () =>
 	expect(markup).not.toContain('SetupDiagnosticsPanel');
 	expect(markup).toContain('Fix setup blockers before sending a prompt.');
 	expect(markup).toContain('disabled');
-	// Sidebar footer carries the brief setup-status line.
-	expect(markup).toContain('data-sidebar-setup-status="blocked"');
-	expect(markup).toContain('#/settings/diagnostics');
+	// Developer Mode hides the sidebar diagnostics footer by default.
+	expect(markup).not.toContain('data-sidebar-setup-status="blocked"');
+	expect(markup).not.toContain('#/settings/diagnostics');
 	// Workbench scaffolding still renders.
 	expect(markup).toContain('Open :5173');
 });

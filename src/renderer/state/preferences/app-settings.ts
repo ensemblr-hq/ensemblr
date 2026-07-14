@@ -107,6 +107,16 @@ export const deleteBranchOnArchiveAtom = settingAtom(
 export const archiveOnMergeAtom = settingAtom('git', 'archiveAfterMerge');
 export const setUpstreamOnPushAtom = settingAtom('git', 'setUpstreamOnPush');
 
+// ─── Experimental ────────────────────────────────────────────────────────────────
+/**
+ * Whether a repository's run script auto-starts after setup when no repository
+ * override exists.
+ */
+export const autoRunAfterSetupAtom = settingAtom(
+	'experimental',
+	'autoRunAfterSetup',
+);
+
 // ─── Appearance ─────────────────────────────────────────────────────────────────
 // Backs the Settings → Appearance page. Consumers apply these live via
 // `useThemeEffect`/`useAppearanceEffect` (DOM classes + CSS vars), the xterm

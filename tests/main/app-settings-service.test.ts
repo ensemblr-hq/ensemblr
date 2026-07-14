@@ -44,6 +44,7 @@ describe('createAppSettingsService', () => {
 		expect(onDisk.schemaVersion).toBe(1);
 		expect(onDisk.app.general.sendShortcut).toBe('enter');
 		expect(onDisk.app.models.hiddenModels).toEqual([]);
+		expect(onDisk.app.experimental.autoRunAfterSetup).toBe(false);
 	});
 
 	test('update merges a section patch and persists it', () => {
@@ -51,17 +52,20 @@ describe('createAppSettingsService', () => {
 		const service = createAppSettingsService({ configPath });
 
 		const next = service.update({
+			experimental: { autoRunAfterSetup: true },
 			general: { sendShortcut: 'mod+enter' },
 			models: { hiddenModels: ['lmstudio/x'] },
 		});
 		expect(next.general.sendShortcut).toBe('mod+enter');
 		expect(next.models.hiddenModels).toEqual(['lmstudio/x']);
+		expect(next.experimental.autoRunAfterSetup).toBe(true);
 		// other fields keep defaults
 		expect(next.general.followUpBehavior).toBe('steer');
 
 		// persisted + reflected on re-read
 		expect(service.read().general.sendShortcut).toBe('mod+enter');
 		expect(readJson(configPath).app.general.sendShortcut).toBe('mod+enter');
+		expect(readJson(configPath).app.experimental.autoRunAfterSetup).toBe(true);
 	});
 
 	test('persists git section defaults and updates', () => {

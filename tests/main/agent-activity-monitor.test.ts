@@ -17,8 +17,8 @@ function flush(): Promise<void> {
 
 function settings(general: Partial<AppSettings['general']>): AppSettings {
 	return {
+		...DEFAULT_APP_SETTINGS,
 		general: { ...DEFAULT_APP_SETTINGS.general, ...general },
-		models: DEFAULT_APP_SETTINGS.models,
 	};
 }
 
