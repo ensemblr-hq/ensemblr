@@ -13,7 +13,10 @@ import {
 	resolveSettings,
 } from '../../src/main/config/config-resolution.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
-import type { GitSettings } from '../../src/shared/config/app-settings.ts';
+import type {
+	ExperimentalSettings,
+	GitSettings,
+} from '../../src/shared/config/app-settings.ts';
 import type { SettingsResolutionGroupSnapshot } from '../../src/shared/ipc/index.ts';
 
 let settingCounter = 0;
@@ -41,6 +44,15 @@ function makeUserGit(overrides: Partial<GitSettings> = {}): GitSettings {
 		deleteLocalBranchOnArchive: false,
 		archiveAfterMerge: false,
 		setUpstreamOnPush: true,
+		...overrides,
+	};
+}
+
+function makeUserExperimental(
+	overrides: Partial<ExperimentalSettings> = {},
+): ExperimentalSettings {
+	return {
+		autoRunAfterSetup: false,
 		...overrides,
 	};
 }
@@ -429,10 +441,13 @@ test('invalid repository permission mode falls back by source precedence', (t) =
 	]);
 });
 
-test('user-default git settings apply when no repo source sets them', () => {
+test('user-default settings apply when no repo source sets them', () => {
 	const snapshot = resolveSettings({
 		config: createConfig(),
 		repository: { repositoryId: 'repo-1' },
+		userExperimentalDefaults: makeUserExperimental({
+			autoRunAfterSetup: true,
+		}),
 		userGitDefaults: makeUserGit({
 			archiveAfterMerge: true,
 			deleteLocalBranchOnArchive: true,
@@ -461,6 +476,13 @@ test('user-default git settings apply when no repo source sets them', () => {
 		},
 		{ source: 'user-default', value: true },
 	);
+	assert.deepEqual(
+		{
+			source: getSetting(snapshot.repository, 'autoRunAfterSetup').source,
+			value: getSetting(snapshot.repository, 'autoRunAfterSetup').value,
+		},
+		{ source: 'user-default', value: true },
+	);
 	// setUpstreamOnPush has no built-in default — user-default is the only source.
 	assert.deepEqual(
 		{
@@ -471,13 +493,19 @@ test('user-default git settings apply when no repo source sets them', () => {
 	);
 });
 
-test('repository sources override user-default git settings', () => {
+test('repository sources override user-default settings', () => {
 	const snapshot = resolveSettings({
 		config: createConfig(),
 		repository: {
-			ensemblrConfig: { archiveAfterMerge: false },
+			ensemblrConfig: {
+				archiveAfterMerge: false,
+				autoRunAfterSetup: false,
+			},
 			repositoryId: 'repo-1',
 		},
+		userExperimentalDefaults: makeUserExperimental({
+			autoRunAfterSetup: true,
+		}),
 		userGitDefaults: makeUserGit({ archiveAfterMerge: true }),
 	});
 
@@ -508,6 +536,13 @@ test('repository sources override user-default git settings', () => {
 			status: 'ignored',
 		},
 	]);
+
+	const autoRunAfterSetup = getSetting(
+		snapshot.repository,
+		'autoRunAfterSetup',
+	);
+	assert.equal(autoRunAfterSetup.source, 'ensemblr-config');
+	assert.equal(autoRunAfterSetup.value, false);
 });
 
 test('normalizes IPC settings resolution requests', () => {

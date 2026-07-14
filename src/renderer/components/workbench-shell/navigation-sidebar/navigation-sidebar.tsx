@@ -1,3 +1,4 @@
+import { useAtomValue } from 'jotai';
 import { useState } from 'react';
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
@@ -11,6 +12,7 @@ import {
 } from '@/renderer/components/ui/sidebar';
 import { useSetupDiagnosticsOptional } from '@/renderer/components/workbench-shell/shell-contexts';
 import { healthTone } from '@/renderer/lib/workbench';
+import { developerModeAtom } from '@/renderer/state/preferences';
 import type {
 	AddProjectActionId,
 	AddProjectMenuModel,
@@ -68,6 +70,7 @@ export function WorkspaceNavigationSidebar({
 		activeView === 'workspace' ? activeWorkspace : null;
 	const [renameWorkspaceTarget, setRenameWorkspaceTarget] =
 		useState<WorkspaceShellModel | null>(null);
+	const developerMode = useAtomValue(developerModeAtom);
 
 	return (
 		<Sidebar className='border-sidebar-border' collapsible='offcanvas'>
@@ -106,7 +109,9 @@ export function WorkspaceNavigationSidebar({
 				</ScrollArea>
 			</SidebarContent>
 
-			<SidebarHealthFooter health={health} projects={projects} />
+			{developerMode ? (
+				<SidebarHealthFooter health={health} projects={projects} />
+			) : null}
 			<SidebarRail />
 			<RenameWorkspaceDialog
 				onOpenChange={(open) => {
@@ -123,9 +128,9 @@ export function WorkspaceNavigationSidebar({
 
 /**
  * Bottom-of-sidebar footer: app health badge plus a single-line setup status
- * with a deep link to /settings/diagnostics. This is the ONLY place in the
- * shell where setup/blocked counts surface outside the diagnostics screen —
- * the chat tab stays free of any diagnostic UI.
+ * with a deep link to /settings/diagnostics. Rendered only in developer mode —
+ * general users get a chat surface free of diagnostic UI, matching Conductor,
+ * and rely on the composer's blocked-setup message instead.
  */
 function SidebarHealthFooter({
 	health,

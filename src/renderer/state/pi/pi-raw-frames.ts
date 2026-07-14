@@ -90,12 +90,15 @@ export function useClearRawFrames(): () => void {
 
 /**
  * Mount-once subscription that pipes incoming raw frames into the buffer.
- * Capture continues even while the debug panel is closed so the user can
- * open it after-the-fact and see what already happened.
+ * @param enabled - Whether developer diagnostics should subscribe to raw frames.
  */
-export function usePiRawFrameCapture(): void {
+export function usePiRawFrameCapture(enabled: boolean): void {
 	const setAll = useSetAtom(rawFramesAtom);
 	useEffect(() => {
+		if (!enabled) {
+			setAll([]);
+			return undefined;
+		}
 		let counter = 0;
 		const unsubscribe = subscribePiRawFrames((frame) => {
 			const buffered: BufferedFrame = {
@@ -112,7 +115,7 @@ export function usePiRawFrameCapture(): void {
 			});
 		});
 		return unsubscribe;
-	}, [setAll]);
+	}, [enabled, setAll]);
 }
 
 export type { FrameCategory };

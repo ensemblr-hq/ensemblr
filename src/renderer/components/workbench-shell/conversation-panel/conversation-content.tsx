@@ -1,8 +1,10 @@
+import { useAtomValue } from 'jotai';
 import { useCallback, useMemo } from 'react';
 
 import { toWorkspaceLookupPath } from '@/renderer/lib/pi';
 import { formatLinkedIssueComposerSeed } from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
+import { developerModeAtom } from '@/renderer/state/preferences';
 import type {
 	ComposerShellState,
 	SessionTabModel,
@@ -64,10 +66,8 @@ export function WorkspaceConversationContent({
 	onSessionTabsReorder: (sessionIds: string[]) => void;
 	sessionTabs: SessionTabModel[];
 }) {
-	// Capture every raw Pi RPC frame into the debug ring buffer. The panel may
-	// be closed; capture still runs so the user can open the panel after the
-	// fact and see what already happened.
-	usePiRawFrameCapture();
+	const developerMode = useAtomValue(developerModeAtom);
+	usePiRawFrameCapture(developerMode);
 	const debugSessionId =
 		activeSession.piSessionId ?? composer.activePiSessionId ?? null;
 	const isChatTab = (activeSession.kind ?? 'chat') === 'chat';
@@ -175,7 +175,7 @@ export function WorkspaceConversationContent({
 					workspaceCwd={activeWorkspace.pathLabel ?? null}
 				/>
 			)}
-			<PiRawFramePanel sessionId={debugSessionId} />
+			{developerMode ? <PiRawFramePanel sessionId={debugSessionId} /> : null}
 		</section>
 	);
 }

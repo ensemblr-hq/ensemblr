@@ -3,8 +3,9 @@ import { z } from 'zod';
 /**
  * Schema + defaults for the user-facing **App settings** persisted in
  * `~/.config/ensemblr/config.json` under the `app` key (`app.general`,
- * `app.models`). This is the single source of truth shared by the main process
- * (read/validate/write) and the renderer (defaults + types).
+ * `app.models`, `app.git`, `app.appearance`, `app.experimental`). This is the
+ * single source of truth shared by the main process (read/validate/write) and
+ * the renderer (defaults + types).
  *
  * Per-field `.catch(default)` keeps a hand-edited config resilient: an invalid
  * or missing field falls back to its default instead of rejecting the whole
@@ -46,6 +47,11 @@ export const gitSettingsSchema = z.object({
 	setUpstreamOnPush: z.boolean().catch(true),
 });
 
+/** Experimental user defaults that can feed repository behavior. */
+export const experimentalSettingsSchema = z.object({
+	autoRunAfterSetup: z.boolean().catch(false),
+});
+
 // Appearance settings drive live DOM/CSS side-effects (theme class, mono-font
 // CSS var, ligature/accessible-color root classes) plus terminal and code-block
 // typography. Enum unions live here as the single source of truth; the renderer
@@ -80,6 +86,7 @@ export const appSettingsSchema = z.object({
 	models: modelSettingsSchema,
 	git: gitSettingsSchema,
 	appearance: appearanceSettingsSchema,
+	experimental: experimentalSettingsSchema,
 });
 
 /** Validated shape of the user-facing App settings persisted under the config `app` key. */
@@ -94,6 +101,8 @@ export type GitSettings = AppSettings['git'];
 export type BranchPrefixSource = GitSettings['branchPrefixSource'];
 /** The `appearance` section of App settings. */
 export type AppearanceSettings = AppSettings['appearance'];
+/** The `experimental` section of App settings. */
+export type ExperimentalSettings = AppSettings['experimental'];
 
 /** Section-scoped partial patch applied by `updateAppSettings`. */
 export interface AppSettingsPatch {
@@ -101,6 +110,7 @@ export interface AppSettingsPatch {
 	models?: Partial<ModelSettings>;
 	git?: Partial<GitSettings>;
 	appearance?: Partial<AppearanceSettings>;
+	experimental?: Partial<ExperimentalSettings>;
 }
 
 /** Validates an untrusted patch at the IPC boundary; unknown keys are dropped. */
@@ -109,6 +119,7 @@ export const appSettingsPatchSchema = z.object({
 	models: modelSettingsSchema.partial().optional(),
 	git: gitSettingsSchema.partial().optional(),
 	appearance: appearanceSettingsSchema.partial().optional(),
+	experimental: experimentalSettingsSchema.partial().optional(),
 });
 
 /** Fully-defaulted settings — the baseline before any config file is read. */
@@ -117,6 +128,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = appSettingsSchema.parse({
 	models: {},
 	git: {},
 	appearance: {},
+	experimental: {},
 });
 
 /** True for a non-null, non-array plain object. */
@@ -138,6 +150,7 @@ export function parseAppSettings(raw: unknown): AppSettings {
 		models: asRecord(record.models),
 		git: asRecord(record.git),
 		appearance: asRecord(record.appearance),
+		experimental: asRecord(record.experimental),
 	});
 	return result.success ? result.data : DEFAULT_APP_SETTINGS;
 }
@@ -152,5 +165,6 @@ export function mergeAppSettings(
 		models: { ...current.models, ...patch.models },
 		git: { ...current.git, ...patch.git },
 		appearance: { ...current.appearance, ...patch.appearance },
+		experimental: { ...current.experimental, ...patch.experimental },
 	};
 }

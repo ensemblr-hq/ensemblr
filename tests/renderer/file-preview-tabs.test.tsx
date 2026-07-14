@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { screen } from '@testing-library/react';
+import { createStore, Provider } from 'jotai';
 import { describe, expect, test, vi } from 'vitest';
 
 vi.mock('@iconify/react', () => ({
@@ -12,6 +13,7 @@ import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr-queries';
 import { FilePreviewPanel } from '../../src/renderer/components/workbench-shell/conversation-panel/file-preview-panel';
 import { SessionTabs } from '../../src/renderer/components/workbench-shell/conversation-panel/session-tabs';
 import { getWorkspaceFileIconNameForPath } from '../../src/renderer/lib/workbench';
+import { developerModeAtom } from '../../src/renderer/state/preferences';
 import type { SessionTabModel } from '../../src/renderer/types/workbench';
 import { createTestQueryClient, renderWithProviders } from './support/dom';
 
@@ -54,6 +56,7 @@ describe('file preview tabs', () => {
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}
 				onSessionTabRestore={() => undefined}
+				onSessionTabsReorder={() => undefined}
 				sessions={[previewSession]}
 			/>,
 		);
@@ -63,6 +66,33 @@ describe('file preview tabs', () => {
 		).toBeTruthy();
 		expect(
 			container.querySelector('[data-session-tab-reorderable="false"]'),
+		).toBeTruthy();
+		expect(
+			screen.queryByRole('button', { name: 'Show Pi debug panel' }),
+		).toBeNull();
+	});
+
+	test('exposes the Pi debug button when developer mode is enabled', () => {
+		const store = createStore();
+		store.set(developerModeAtom, true);
+
+		renderWithProviders(
+			<Provider store={store}>
+				<SessionTabs
+					activeSession={previewSession}
+					closedSessions={[]}
+					onSessionTabChange={() => undefined}
+					onSessionTabClose={() => undefined}
+					onSessionTabOpen={async () => null}
+					onSessionTabRestore={() => undefined}
+					onSessionTabsReorder={() => undefined}
+					sessions={[previewSession]}
+				/>
+			</Provider>,
+		);
+
+		expect(
+			screen.queryByRole('button', { name: 'Show Pi debug panel' }),
 		).toBeTruthy();
 	});
 

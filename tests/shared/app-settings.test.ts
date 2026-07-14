@@ -78,6 +78,17 @@ describe('parseAppSettings', () => {
 		expect(parsed.git.renameWorkspaceOnBranch).toBe(true); // default
 	});
 
+	test('parses the experimental auto-run default', () => {
+		const parsed = parseAppSettings({
+			experimental: { autoRunAfterSetup: true },
+		});
+		expect(parsed.experimental.autoRunAfterSetup).toBe(true);
+		expect(
+			parseAppSettings({ experimental: { autoRunAfterSetup: 'yes' } })
+				.experimental.autoRunAfterSetup,
+		).toBe(false);
+	});
+
 	test('falls back per-field on invalid values', () => {
 		const parsed = parseAppSettings({
 			general: { sendShortcut: 'bogus', toolCallCollapse: 42 },
@@ -133,15 +144,25 @@ describe('mergeAppSettings', () => {
 		expect(next.appearance.theme).toBe('system'); // untouched default
 		expect(DEFAULT_APP_SETTINGS.appearance.monoFont).toBe('JetBrains Mono');
 	});
+
+	test('merges the experimental section immutably', () => {
+		const next = mergeAppSettings(DEFAULT_APP_SETTINGS, {
+			experimental: { autoRunAfterSetup: true },
+		});
+		expect(next.experimental.autoRunAfterSetup).toBe(true);
+		expect(DEFAULT_APP_SETTINGS.experimental.autoRunAfterSetup).toBe(false);
+	});
 });
 
 describe('appSettingsPatchSchema', () => {
 	test('accepts a partial patch and strips unknown keys', () => {
 		const parsed = appSettingsPatchSchema.parse({
+			experimental: { autoRunAfterSetup: true },
 			general: { sendShortcut: 'mod+enter', bogus: 1 },
 		});
 		expect(parsed.general?.sendShortcut).toBe('mod+enter');
 		expect(parsed.general && 'bogus' in parsed.general).toBe(false);
+		expect(parsed.experimental?.autoRunAfterSetup).toBe(true);
 		expect(parsed.models).toBeUndefined();
 	});
 });

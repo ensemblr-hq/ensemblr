@@ -23,7 +23,7 @@ const WATCH_DEBOUNCE_MS = 120;
 
 /**
  * Owns the App-settings slice (`app.general`, `app.models`, `app.git`,
- * `app.appearance`) of
+ * `app.appearance`, `app.experimental`) of
  * `~/.config/ensemblr/config.json` — the source of truth. Creates the file with
  * defaults on first use, applies section-scoped patches via an atomic
  * temp-write+rename, and watches for external edits (echo-suppressed against its
@@ -96,6 +96,7 @@ export function createAppSettingsService(
 			models: app.models,
 			git: app.git,
 			appearance: app.appearance,
+			experimental: app.experimental,
 		});
 	};
 
@@ -110,6 +111,7 @@ export function createAppSettingsService(
 				models: DEFAULT_APP_SETTINGS.models,
 				git: DEFAULT_APP_SETTINGS.git,
 				appearance: DEFAULT_APP_SETTINGS.appearance,
+				experimental: DEFAULT_APP_SETTINGS.experimental,
 			},
 		});
 	};
@@ -134,6 +136,7 @@ export function createAppSettingsService(
 				models: next.models,
 				git: next.git,
 				appearance: next.appearance,
+				experimental: next.experimental,
 			},
 		});
 		return next;

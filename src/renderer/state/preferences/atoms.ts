@@ -87,29 +87,9 @@ export const favouriteModelsAtom = atomWithStorage<string[]>(
 
 // ─── Experimental (user) ──────────────────────────────────────────────────────
 
-/** Whether the workspace sidebar footer shows CPU and memory usage meters; persisted to localStorage. */
-export const showSidebarResourceUsageAtom = atomWithStorage<boolean>(
-	KEY('exp_sidebar_resource_usage'),
-	false,
-);
-/** Whether the workspace dashboard is shown between the sidebar and the workbench; persisted to localStorage. */
-export const showDashboardAtom = atomWithStorage<boolean>(
-	KEY('exp_show_dashboard'),
-	true,
-);
-/** Whether the workspace sidebar exposes a Chats grouping mode; persisted to localStorage. */
-export const sidebarChatsModeAtom = atomWithStorage<boolean>(
-	KEY('exp_sidebar_chats_mode'),
-	false,
-);
-/** Whether a repository's run script starts automatically after a new local workspace finishes setup; persisted to localStorage. */
-export const autoRunAfterSetupAtom = atomWithStorage<boolean>(
-	KEY('exp_auto_run_after_setup'),
-	false,
-);
-/** Whether preview URLs open in an in-app browser tab instead of the external browser; persisted to localStorage. */
-export const inAppBrowserPreviewAtom = atomWithStorage<boolean>(
-	KEY('exp_in_app_browser_preview'),
+/** Whether developer-only diagnostics and debug controls are visible; persisted to localStorage. */
+export const developerModeAtom = atomWithStorage<boolean>(
+	KEY('exp_developer_mode'),
 	false,
 );
 

@@ -2,7 +2,10 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { GitSettings } from '../../shared/config/app-settings.ts';
+import type {
+	ExperimentalSettings,
+	GitSettings,
+} from '../../shared/config/app-settings.ts';
 import type {
 	RepositorySettingsResolutionRequest,
 	ResolvedSettingSnapshot,
@@ -31,6 +34,11 @@ export interface ResolveSettingsOptions {
 	 * Used to isolate the dogfood dev build onto its own repo/workspace root.
 	 */
 	rootDirectory?: string;
+	/**
+	 * User-scope experimental defaults from `config.json` (`app.experimental`).
+	 * Fed into the repository scope as `user-default` candidates.
+	 */
+	userExperimentalDefaults?: ExperimentalSettings;
 	/**
 	 * User-scope git defaults from `config.json` (`app.git`). Fed into the
 	 * repository scope as the `user-default` source so personal defaults apply
@@ -126,15 +134,18 @@ export function createEnsemblrConfigResolutionService({
 	rootDirectory,
 }: CreateEnsemblrConfigResolutionServiceOptions): EnsemblrConfigResolutionService {
 	return {
-		resolve: (request) =>
-			resolveSettings({
+		resolve: (request) => {
+			const appSettings = appSettingsService.read();
+			return resolveSettings({
 				config: configService.getConfig(),
 				database: databaseService.getConnection()?.database ?? null,
 				homeDirectory,
 				repository: normalizeSettingsResolutionRequest(request).repository,
 				rootDirectory,
-				userGitDefaults: appSettingsService.read().git,
-			}),
+				userExperimentalDefaults: appSettings.experimental,
+				userGitDefaults: appSettings.git,
+			});
+		},
 	};
 }
 
@@ -150,6 +161,7 @@ export function resolveSettings({
 	homeDirectory = homedir(),
 	repository,
 	rootDirectory,
+	userExperimentalDefaults,
 	userGitDefaults,
 }: ResolveSettingsOptions): SettingsResolutionSnapshot {
 	const appConfigDefaults = collectAppConfigDefaults(config);
@@ -210,6 +222,11 @@ export function resolveSettings({
 		addCandidates(
 			repositoryCandidates,
 			collectUserGitDefaultCandidates(userGitDefaults),
+			'user-default',
+		);
+		addCandidates(
+			repositoryCandidates,
+			collectUserExperimentalDefaultCandidates(userExperimentalDefaults),
 			'user-default',
 		);
 		addCandidates(
@@ -547,6 +564,26 @@ function collectUserGitDefaultCandidates(
 	candidates.set('deleteLocalBranchOnArchive', git.deleteLocalBranchOnArchive);
 	candidates.set('archiveAfterMerge', git.archiveAfterMerge);
 	candidates.set('setUpstreamOnPush', git.setUpstreamOnPush);
+
+	return candidates;
+}
+
+/**
+ * Maps user-scope experimental defaults (`app.experimental` in config.json)
+ * onto repository resolution keys, contributing them as `user-default` values.
+ * @param experimental - User experimental defaults, when available.
+ * @returns Flat map of repo `key -> value`.
+ */
+function collectUserExperimentalDefaultCandidates(
+	experimental?: ExperimentalSettings,
+): Map<string, unknown> {
+	const candidates = new Map<string, unknown>();
+
+	if (!experimental) {
+		return candidates;
+	}
+
+	candidates.set('autoRunAfterSetup', experimental.autoRunAfterSetup);
 
 	return candidates;
 }
