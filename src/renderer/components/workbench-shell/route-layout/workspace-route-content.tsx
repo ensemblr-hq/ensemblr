@@ -17,6 +17,7 @@ import {
 import {
 	resolveRunningCloseTarget,
 	useCloseRunningChatGuard,
+	usePublishWorkspaceDockActivity,
 	useSessionTabState,
 	useWorkspacePanelTabState,
 } from '@/renderer/state/workspace';
@@ -76,6 +77,10 @@ export function WorkspaceRouteContent({
 	const terminalSessions = useWorkspaceTerminalSessions(activeWorkspace.id);
 	const { liveWorkspaceFiles, workspaceWithLiveDockTabs } =
 		useLiveWorkspaceModel({ activeProject, activeWorkspace, terminalSessions });
+	usePublishWorkspaceDockActivity({
+		dockTabs: workspaceWithLiveDockTabs.dockTabs,
+		workspaceId: activeWorkspace.id,
+	});
 	// Tab preference validation must see the LIVE dock tabs (terminal:<id>),
 	// not the placeholder model, or terminal tab clicks bounce back to setup.
 	const panelTabs = useWorkspacePanelTabState({

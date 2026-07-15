@@ -1,4 +1,7 @@
+import { useAtomValue } from 'jotai';
+import { selectAtom } from 'jotai/utils';
 import { ArchiveIcon } from 'lucide-react';
+import { useMemo } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -11,6 +14,10 @@ import { useLivePullRequestModel } from '@/renderer/hooks/workbench-shell/route-
 import { useWorkspacePiBusy } from '@/renderer/hooks/workspace/use-workspace-pi-busy';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
+import {
+	hasRunningDockTab,
+	workspaceDockActivityByWorkspaceAtom,
+} from '@/renderer/state/workspace';
 import type {
 	WorkbenchRouteSearch,
 	WorkspaceShellModel,
@@ -77,9 +84,25 @@ export function WorkspaceSidebarItem({
 			: { ...workspace, pullRequest: livePullRequest };
 	const sidebarState = getWorkspaceSidebarState(liveWorkspace, { agentBusy });
 	const WorkspaceIcon = sidebarState.icon;
+	const liveDockActivityAtom = useMemo(
+		() =>
+			selectAtom(
+				workspaceDockActivityByWorkspaceAtom,
+				(activity) => activity[workspace.id] === true,
+			),
+		[workspace.id],
+	);
+	const hasLiveDockActivity = useAtomValue(liveDockActivityAtom);
 	const hasDiffStats =
 		workspace.changeSummary.additions > 0 ||
 		workspace.changeSummary.deletions > 0;
+	// Live for the active row via the atom; other rows fall back to their (possibly
+	// staler) navigation snapshot, so the dot's freshness is not uniform across rows.
+	const hasRunningDockActivity =
+		hasRunningDockTab(workspace.dockTabs) || hasLiveDockActivity;
+	const workspaceButtonLabel = `Open workspace ${workspace.name}${
+		hasRunningDockActivity ? '; dock activity running' : ''
+	}`;
 	const buttonContent = (
 		<>
 			<div className='mt-0.5 grid size-5 shrink-0 place-items-center'>
@@ -97,9 +120,19 @@ export function WorkspaceSidebarItem({
 					<span className='truncate font-medium text-[0.8125rem]'>
 						{workspace.name}
 					</span>
-					{hasDiffStats ? (
-						<WorkspaceDiffStats isActive={isActive} workspace={workspace} />
-					) : null}
+					<div className='flex shrink-0 items-center gap-1.5'>
+						{hasDiffStats ? (
+							<WorkspaceDiffStats isActive={isActive} workspace={workspace} />
+						) : null}
+						{hasRunningDockActivity ? (
+							<span
+								aria-hidden='true'
+								className='size-2 rounded-full bg-status-ok ring-2 ring-sidebar'
+								data-workspace-dock-activity='running'
+								title='Dock activity running'
+							/>
+						) : null}
+					</div>
 				</div>
 				<div className='mt-1 flex min-w-0 items-center gap-1.5 text-muted-foreground text-xxs'>
 					<span className='truncate'>
@@ -133,7 +166,7 @@ export function WorkspaceSidebarItem({
 			<ContextMenuTrigger asChild>
 				<div className='group/workspace-sidebar-item relative min-w-0'>
 					<SidebarMenuButton
-						aria-label={`Open workspace ${workspace.name}`}
+						aria-label={workspaceButtonLabel}
 						asChild={Boolean(renderWorkspaceLink)}
 						className='h-auto min-h-12 items-start gap-2 py-2'
 						data-workspace-sidebar-state={sidebarState.kind}

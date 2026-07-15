@@ -1,4 +1,8 @@
 export {
+	hasRunningDockTab,
+	usePublishWorkspaceDockActivity,
+} from './dock-activity';
+export {
 	activeDockTabByWorkspaceAtom,
 	activeReviewTabByWorkspaceAtom,
 	changesSourceByWorkspaceAtom,
@@ -7,6 +11,7 @@ export {
 	rightSidebarCollapsedAtom,
 	rightSidebarSizePercentAtom,
 	workspaceDirectoryRevealRequestAtom,
+	workspaceDockActivityByWorkspaceAtom,
 } from './layout-atoms';
 export { useProjectNavigationState } from './navigation';
 export {
