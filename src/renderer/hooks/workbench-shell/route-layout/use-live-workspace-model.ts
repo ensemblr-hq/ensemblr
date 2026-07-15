@@ -193,7 +193,10 @@ export function useLiveWorkspaceModel({
 						return [tab];
 					},
 				),
-				...mapTerminalSessionsToDockTabs(terminalSessions.sessions),
+				...mapTerminalSessionsToDockTabs({
+					activeTerminalIds: terminalSessions.activeTerminalIds,
+					sessions: terminalSessions.sessions,
+				}),
 			],
 			...liveReview,
 			pullRequest,
@@ -208,6 +211,7 @@ export function useLiveWorkspaceModel({
 		reviewCommentsData?.comments,
 		reviewTodosData?.todos,
 		scriptSettingsData,
+		terminalSessions.activeTerminalIds,
 		terminalSessions.sessions,
 	]);
 

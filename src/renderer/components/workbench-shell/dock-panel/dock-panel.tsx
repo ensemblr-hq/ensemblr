@@ -1,6 +1,7 @@
 import {
 	ChevronDownIcon,
 	ChevronUpIcon,
+	Loader2Icon,
 	PlayIcon,
 	PlusIcon,
 	SquareTerminalIcon,
@@ -108,7 +109,6 @@ export function DockPanel({
 						variant='line'
 					>
 						{workspace.dockTabs.map((tab) => {
-							const DockTabIcon = getDockTabIcon(tab);
 							// Setup/Run are fixed; every terminal tab is closable (down to
 							// zero — the dock falls back to Setup and the `+` button remains).
 							const closableTerminalId = isTerminalDockTab(tab)
@@ -117,7 +117,7 @@ export function DockPanel({
 
 							return (
 								<Fragment key={tab.id}>
-									<div className='group/dock-tab relative flex h-full flex-none items-center'>
+									<div className='group/dock-tab relative flex h-full flex-none items-center overflow-hidden'>
 										<TabsTrigger
 											className={cn(
 												// Chat-tab-style active indicator: full row height so the
@@ -125,15 +125,14 @@ export function DockPanel({
 												// (the default line-variant indicator renders below the list
 												// and gets clipped here).
 												'h-full flex-none rounded-none px-2 text-xs after:bg-primary group-data-horizontal/tabs:after:bottom-0 [&_svg]:size-3.5',
-												closableTerminalId && 'pr-6',
 											)}
 											data-dock-tab-kind={tab.kind}
 											value={tab.id}
 										>
-											<DockTabIcon aria-hidden='true' />
+											<DockTabGlyph tab={tab} />
 											{tab.label}
-											<DockTabStatusDot status={tab.status} />
 										</TabsTrigger>
+										{closableTerminalId ? <DockTabCloseOverlay /> : null}
 										{closableTerminalId ? (
 											<DockTabCloseButton
 												label={tab.label}
@@ -206,6 +205,16 @@ export function DockPanel({
 	);
 }
 
+/** Gradient veil that lets the close button overlay terminal tab text on hover. */
+function DockTabCloseOverlay() {
+	return (
+		<span
+			aria-hidden='true'
+			className='pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-card via-card/90 to-transparent opacity-0 transition-opacity group-focus-within/dock-tab:opacity-100 group-hover/dock-tab:opacity-100'
+		/>
+	);
+}
+
 /** Hover-revealed close affordance for closable terminal tabs. */
 function DockTabCloseButton({
 	label,
@@ -224,6 +233,7 @@ function DockTabCloseButton({
 				event.stopPropagation();
 				onCloseTerminal(terminalId);
 			}}
+			onPointerDown={(event) => event.stopPropagation()}
 			type='button'
 		>
 			<XIcon aria-hidden='true' className='size-3' />
@@ -231,26 +241,15 @@ function DockTabCloseButton({
 	);
 }
 
-/** Small status dot rendered next to the tab label for live sessions. */
-function DockTabStatusDot({ status }: { status: DockTabModel['status'] }) {
-	if (status === 'idle') {
-		return null;
+/** Renders the dock tab icon, swapping to a spinner while work is running. */
+function DockTabGlyph({ tab }: { tab: DockTabModel }) {
+	if (tab.status === 'running') {
+		return <Loader2Icon aria-hidden='true' className='size-3.5 animate-spin' />;
 	}
 
-	const toneClass =
-		status === 'warning'
-			? 'bg-destructive'
-			: status === 'running'
-				? 'bg-emerald-500'
-				: 'bg-muted-foreground';
+	const DockTabIcon = getDockTabIcon(tab);
 
-	return (
-		<span
-			aria-hidden='true'
-			className={`size-1.5 shrink-0 rounded-full ${toneClass}`}
-			data-dock-tab-status={status}
-		/>
-	);
+	return <DockTabIcon aria-hidden='true' />;
 }
 
 /** Maps a dock tab kind to its lucide icon component. */
