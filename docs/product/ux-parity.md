@@ -1,6 +1,6 @@
 # UX Parity
 
-Date: 2026-06-07
+Date: 2026-07-15
 
 Ensemblr should match Conductor's observable workflows and information architecture where practical, while using distinct Ensemblr visual design, copy, branding, icons, and Pi-specific runtime behavior.
 
@@ -34,10 +34,11 @@ The current shell is the intended closest match to Conductor's own shell. Lost
 or unavailable screenshot evidence should not cause agents to reopen settled
 shell layout decisions.
 
-The visible chat transcript and prompt composer are a Pi-integration contract,
-not finalized chat behavior. Preserve their current placement and setup-gated
-behavior, but defer prompt submission, stop, attachments, model controls,
-runtime event rendering, and session tree behavior to Pi runtime tickets.
+The visible chat transcript and prompt composer are now backed by the live Pi
+runtime. Prompt submission, stop, attachments, model/thinking controls, and
+runtime event rendering have landed; preserve their current placement and
+setup-gated behavior. Remaining polish, such as the full session-tree fork UX,
+is ongoing.
 
 ## Major Screen Patterns
 
@@ -101,7 +102,7 @@ Ensemblr equivalent:
 Ensemblr equivalent:
 
 - Keep the implemented chat tab strip, center timeline location, and bottom composer location as the app-shell contract.
-- Keep chat and prompt input behavior deferred until Pi integration. The current mock transcript, attach button, send button, and model/thinking badges should not be treated as final behavior.
+- Chat and prompt input behavior are wired to the Pi runtime. The transcript, attach button, send/stop button, and model/thinking badges are implemented, not placeholders.
 - Render structured Pi RPC events as timeline items.
 - Map model/reasoning controls to Pi concepts.
 - Preserve Pi session tree/fork behavior when retrying or continuing in a new chat.
@@ -135,9 +136,9 @@ Ensemblr equivalent:
 Ensemblr equivalent:
 
 - Keep the implemented lower-right dock placement, tab names, collapse behavior, and script-state action affordances.
-- Use xterm.js behind a terminal adapter.
-- Main process owns PTY/process supervision.
-- Expose `ENSEMBLR_*` variables to workspace processes.
+- User-spawned interactive terminals are implemented on xterm.js behind a terminal adapter, backed by live node-pty sessions.
+- The main process owns PTY/process supervision.
+- `ENSEMBLR_*` variables are exposed to workspace processes.
 
 ### PR and Merge Flow
 
@@ -173,8 +174,8 @@ Ensemblr equivalent:
 3. Implement setup gate: git, `gh`, Pi executable/RPC/provider, root directory, SQLite, and process environment checks.
 4. Implement repository add/open/clone: add menu, clone modal, clone progress log, post-clone workspace landing.
 5. Implement workspace core: worktree creation, default branch/remote, copied files, setup script, placeholder naming, context folder.
-6. Implement Pi timeline: session creation, event rendering, tool calls, runtime errors, retry/fork actions, composer controls.
-7. Wire terminal dock: replace dock placeholder logs with setup/run output, named terminals, rerun/stop/run controls, PTY lifecycle.
+6. **Complete.** Implement Pi timeline: session creation, event rendering, tool calls, runtime errors, retry/fork actions, composer controls.
+7. **Complete.** Wire terminal dock: replace dock placeholder logs with setup/run output, named terminals, rerun/stop/run controls, PTY lifecycle.
 8. Wire file/diff panel: replace fixture rows with all-files tree, changes tree, diff body, search, review mode, local comments.
 9. Wire PR/checks panel: replace fixture checks with no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state.
 10. Implement repository action preferences: review, create PR, fix errors, resolve conflicts, branch rename, and general Pi instructions.

@@ -1,15 +1,17 @@
 # Onboarding Flow
 
-Date: 2026-06-07
+Date: 2026-07-15
 
 No onboarding screenshots were captured under `.context/conductor-screens/01-onboarding/`. This flow is inferred from ADR 0014 and from the setup, provider, root, repository, clone, and workspace screens in the screenshot inventory.
 
-## Implementation Status (2026-06-07)
+## Implementation Status (2026-07-15)
 
 - Welcome landing UI is implemented in
   `src/renderer/components/welcome.tsx` and mounted from the
   `_workbench/_shell/` index route. It renders the Ensemblr wordmark plus three
-  cards: Open project, Open GitHub project, and Quick start.
+  cards: Open project, Open GitHub project, and Quick start. `welcome.tsx` also
+  renders a `SidebarTrigger` so the sidebar can be reopened from the frameless
+  welcome screen.
 - The Open GitHub project card opens `CloneGithubDialog`
   (`src/renderer/components/welcome/clone-github-dialog.tsx`) with URL,
   destination, clone progress, repository registration, first-workspace seeding,
@@ -28,6 +30,21 @@ No onboarding screenshots were captured under `.context/conductor-screens/01-onb
 - The project add menu in the sidebar (`workbench-shell/project-sidebar/project-creation-menu.tsx`)
   mirrors the welcome cards (Open project, Open GitHub project, Quick start)
   for users who already have at least one project added.
+- Launch and archive redirects are handled by the index-route loader
+  (`workbench-route-loaders.ts`): on launch it redirects to the stored or
+  last-active workspace (order: stored → first-in-project → first-anywhere), and
+  navigating to an archived workspace redirects back to Welcome
+  (`loadWorkspaceWorkbenchRoute` → `redirect({ to: '/' })`, with archived rows
+  excluded at the SQL level). Welcome therefore only renders when no selectable
+  workspace exists.
+- First-workspace creation is optimistic: an optimistic pending "Creating" row
+  is shown before the IPC resolves
+  (`use-project-navigation-actions.ts`, `lib/workbench/optimistic-workspace.ts`).
+  See ADR 0037.
+- The workspace landing summary shows the real copied-file count with
+  singular/plural wording plus an `unavailable` branch; the copy-state enum is
+  now `'copied' | 'unavailable'`
+  (`types/workbench/workspace.ts`, `workspace-landing-card.tsx`).
 
 ## Setup Gate Sequence
 
@@ -149,6 +166,11 @@ action kinds behave as:
 
 ## First Successful Path Into First Workspace
 
+This full first-run path applies only when the user has no selectable workspace.
+Once at least one non-archived workspace exists, the index-route loader redirects
+launch straight into the stored or last-active workspace, and Welcome is not
+shown.
+
 1. User launches Ensemblr.
 2. Setup gate runs and shows required checks.
 3. User confirms root directory or chooses a new one.
@@ -158,8 +180,8 @@ action kinds behave as:
 7. Ensemblr creates or registers the repository under the root layout.
 8. Ensemblr creates the first git worktree workspace from the configured default branch.
 9. Ensemblr copies eligible gitignored files according to `.worktreeinclude`, the committed `.ensemblr/settings.toml`, or defaults.
-10. Ensemblr runs setup script if configured, or shows optional setup-script guidance if missing.
-11. Ensemblr opens the workspace landing state with file tree, checks panel, terminal dock, linked Linear issue context when present, and Pi composer ready.
+10. Ensemblr runs setup script if configured, or shows optional setup-script guidance if missing. Setup is auto-skipped when the dependency fingerprint matches the last clean run (`main/scripts/script-lifecycle-service.ts`, code `setup-already-current`; see ADR 0034). There is no user "skip in-progress" control — only Stop, which kills the running script.
+11. Ensemblr opens the workspace landing state with file tree, checks panel, terminal dock, linked Linear issue context when present, and Pi composer ready. The landing summary reports the real copied-file count (singular/plural, with an `unavailable` branch).
 12. First prompt creates a Pi session using workspace `cwd` and normal Pi resource discovery.
 
 ## Ensemblr-Specific Copy and UI Guidance

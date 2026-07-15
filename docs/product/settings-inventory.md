@@ -1,16 +1,23 @@
 # Settings Inventory
 
-Date: 2026-06-04
+Date: 2026-07-15
 
-This inventory comes from the settings screenshots plus accepted ADRs. It separates app-wide settings from repository settings and assigns each setting to the right persistence layer.
+This inventory reflects the settings screens as implemented in code. It separates
+app-wide settings from repository settings and assigns each setting to the right
+persistence layer.
+
+App-scope sections (`settings-sidebar.tsx`): **General, Models, Environment, Git,
+Appearance, Integrations** in the main group, and **Diagnostics, Experimental,
+Advanced** under "More". Repo-scope sections: **Environment, Git, Scripts,
+Actions, Misc**. There is no Providers screen (removed).
 
 ## Storage Legend
 
 | Store | Use for |
 | --- | --- |
 | SQLite | Mutable local app state, personal overrides, cached integration status, workspace/repository records. |
-| `~/.config/ensemblr/config.json` | **Source of truth for App settings** — General, Models, Git, and Appearance are implemented under `app.general.*` / `app.models.*` / `app.git.*` / `app.appearance.*` (see ADR 0029) — plus declarative user defaults, managed policy-like settings, and repository matching rules. Created on first run; live-watched for external edits. |
-| `localStorage` (`atomWithStorage`) | Non-Settings-page UI state, app preferences not yet migrated to `config.json` (Experimental/Advanced toggles), composer favourites, and the model-catalog cache. |
+| `~/.config/ensemblr/config.json` | **Source of truth for App settings** — General, Models, Git, Appearance, and Experimental (partial: `autoRunAfterSetup`) are implemented under `app.general.*` / `app.models.*` / `app.git.*` / `app.appearance.*` / `app.experimental.*` (see ADR 0029) — plus declarative user defaults, managed policy-like settings, and repository matching rules. Created on first run; live-watched for external edits. |
+| `localStorage` (`atomWithStorage`) | Non-Settings-page UI state, the App toggles not backed by `config.json` (Experimental Developer Mode; Advanced Pi executable path and terminal scrollback limit), repo personal overrides, composer favourites, and the model-catalog cache. |
 | Repository config | Shared project behavior in the committed `.ensemblr/settings.toml`. Use for scripts, run mode, files-to-copy, and team-shared repository defaults. |
 | Pi user environment | Pi auth, models, provider settings, skills, extensions, prompts, themes, sessions, and project `.pi` resources. Ensemblr should not duplicate this as source of truth. |
 | macOS Keychain | Secret values such as tokens/API keys. SQLite may keep metadata only. |
@@ -25,14 +32,13 @@ IPC, and live-reloads when the file is edited externally (see ADR 0029).
 
 | Setting | Conductor mapping | Ensemblr adaptation | Storage |
 | --- | --- | --- | --- |
-| Sync agent configs | Similar concept, provider-specific. | Inspect/sync Pi resources where supported; avoid mutating `~/.pi/agent` without explicit user action. | Action/log in SQLite; Pi environment remains source of truth. |
 | Send-message shortcut | Direct. | Same behavior for Pi composer. | `config.json` (`app.general.sendShortcut`). |
 | Follow-up behavior | Direct. | Map to Pi steering/queue behavior. | `config.json` (`app.general.followUpBehavior`). |
 | Desktop notifications | Direct. | Notify when Pi turn/session completes or fails. | `config.json` (`app.general.desktopNotifications`); OS permission external. |
 | Auto-convert long pasted text | Direct. | Same, producing Ensemblr/Pi attachments. | `config.json` (`app.general.autoConvertLongText`). |
 | Always show context usage | Direct. | Show Pi context/token usage when SDK provides it. | `config.json` (`app.general.alwaysShowContextUsage`). |
 | Caffeinate while agents run | Direct. | Prevent sleep during active Pi sessions/scripts. | `config.json` (`app.general.caffeinateWhileRunning`). |
-| Expand tool calls by default | Direct. | Same for Pi tool calls. | `config.json` (`app.general.toolCallCollapse`). |
+| Don't collapse tool calls | Direct. | Render Pi tool calls expanded instead of collapsed (`toolCallCollapse` enum `collapsed`/`expanded`). | `config.json` (`app.general.toolCallCollapse`). |
 
 Removed entirely: **Soften AI certainty** and **Show MCP status in chat**. Both
 were toggles with no functional consumer (planned but never wired), so their
@@ -51,7 +57,7 @@ star) or are derived runtime cache, not user settings.
 | Default chat model | Direct concept. | Pi model id for new chats; bound to the runtime via the `--model` spawn flag. | `config.json` (`app.models.defaultModel`). |
 | Default thinking level | Direct concept. | Pi thinking level for new chats; bound via `--thinking`. | `config.json` (`app.models.defaultThinkingLevel`). |
 | Review model + thinking | Direct concept. | Separate model/thinking for the workspace Review action. | `config.json` (`app.models.reviewModel`, `app.models.reviewThinkingLevel`). |
-| Hidden models | n/a (Ensemblr). | Toggle models off in Settings → Models so they drop out of the composer picker. Inverse storage (records hidden ids); hiding never changes the active/default model. | `config.json` (`app.models.hiddenModels`, string[]). |
+| Model visibility | n/a (Ensemblr). | Toggle models off in Settings → Models so they drop out of the composer picker. Inverse storage (records hidden ids); hiding never changes the active/default model. | `config.json` (`app.models.hiddenModels`, string[]). |
 | Favourite models | n/a (Ensemblr). | Star models in the composer picker to pin them to a top "Favourites" group with the low 1-9 shortcuts. App-wide, shared across all workspaces. | `atomWithStorage` (`favourite_models`, string[]). |
 | Model catalog cache | n/a (Ensemblr). | Last non-empty `pi --list-models` result cached so the picker is populated instantly on launch; refreshed silently in the background. | `localStorage` (`pi_models_snapshot`). |
 
@@ -64,6 +70,14 @@ entry) was deleted. Provider/auth setup is owned by Pi itself — Ensemblr does 
 provider tokens or duplicate Pi's provider configuration. The readiness checks that screen
 surfaced (Pi runtime, Pi model provider, GitHub CLI) still live in **Diagnostics**, sourced
 from the setup-diagnostics gate.
+
+### Diagnostics
+
+First-class user-scope section (`diagnostics.tsx`). Renders the full setup gate —
+Pi runtime/readiness, git, GitHub CLI (`gh auth status`), Linear, and the Ensemblr
+runtime — plus a **Copy diagnostics bundle** action that copies a secret-redacting
+summary for support. This is where GitHub readiness surfaces; it is not on the
+Integrations page.
 
 ### Environment
 
@@ -108,108 +122,112 @@ removes the legacy keys; the renamed `one-dark` code theme is carried over as
 
 ### Git
 
-| Setting | Conductor mapping | Ensemblr adaptation | Storage |
-| --- | --- | --- | --- |
-| Branch name prefix | Direct. | Prefix new workspace branches; support detected GitHub username, custom, or none. | SQLite/config. |
-| Rename workspace when branch is named | Direct. | Same for placeholder workspace names. | SQLite/config. |
-| Delete local branch on archive | Direct. | Same with explicit confirmation where needed. | SQLite/config. |
-| Archive on merge | Direct. | Same after successful `gh pr merge`. | SQLite/config. |
-| Automerge affordance | Direct. | Show automerge action when GitHub/repo supports it. | SQLite/config; GitHub state cache. |
-
-### Account and Integrations
+Source of truth: `~/.config/ensemblr/config.json` under `app.git.*`
+(`app-settings.ts`), not SQLite.
 
 | Setting | Conductor mapping | Ensemblr adaptation | Storage |
 | --- | --- | --- | --- |
-| App account identity | Direct in Conductor. | Deferred for v1; Ensemblr is local-first. | Not applicable in v1. |
-| Linear integration | Direct. | First-class v1 integration with OAuth login, issue CRUD, and workspace creation from issues. | Tokens in Keychain; connection/cache metadata in SQLite. |
-| GitHub CLI integration | Direct. | Required `gh auth status` for v1. | SQLite cache; `gh` config external source. |
-| GitHub token field | Direct. | Do not implement in Ensemblr; GitHub access uses authenticated `gh`, including `gh api`. | Not applicable. |
-| Enterprise data privacy | Direct. | Same concept, adapted to Pi and external-provider features. | SQLite/config; repo override in repository config. |
-| Tool approvals | Direct concept. | Ensemblr permission mode mapped to Pi CLI/RPC tool allow/exclude controls where available. | SQLite/config; repo policy override possible. |
-| Sign out | Direct if cloud account exists. | Deferred unless a future Ensemblr account exists. | Not applicable in v1. |
+| Branch name prefix | Direct. | Prefix new workspace branches; source is detected GitHub username, custom string, or none. | `config.json` (`app.git.*`). |
+| Rename workspace when branch is named | Direct. | Same for placeholder workspace names. | `config.json` (`app.git.*`). |
+| Delete local branch on archive | Direct. | Same with explicit confirmation where needed. | `config.json` (`app.git.*`). |
+| Archive on merge | Direct. | Same after a successful merge. | `config.json` (`app.git.*`). |
+| Set upstream on plain `git push` | Direct. | Add `--set-upstream` on a plain push when the branch has no upstream. | `config.json` (`app.git.setUpstreamOnPush`). |
+
+### Integrations
+
+Sole control on this page is the **Linear** connection row
+(`integrations.tsx`). GitHub readiness is on the **Diagnostics** page, not here;
+GitHub access uses authenticated `gh` (including `gh api`) and stores no token
+field. App account identity and sign-out are deferred (Ensemblr is local-first).
+
+| Setting | Conductor mapping | Ensemblr adaptation | Storage |
+| --- | --- | --- | --- |
+| Linear integration | Direct. | First-class v1 integration: connect/disconnect/reconnect via OAuth, issue CRUD, and workspace creation from issues. | Tokens in Keychain; connection/cache metadata in SQLite. |
 
 ### Experimental
 
-| Setting | Conductor mapping | Ensemblr adaptation | Storage |
-| --- | --- | --- | --- |
-| Big terminal mode | Direct. | Resolved (ENS-068): provided by the terminal dock; no separate flag. | n/a |
-| Many chat/terminal tabs per workspace | Direct. | Resolved by ADR 0022 at five tabs; no toggle. | n/a |
-| Dashboard/workspace sidebar visibility | Direct. | Resolved (ENS-068): v1 user-scope flags `Dashboard`, `Sidebar chats`, `Auto-run after setup`, `In-app browser preview`. | SQLite/config. |
-| Voice mode | Direct. | Deferred until after core completion. | Future feature flag. |
-| Sidebar resource usage | Direct. | Resolved (ENS-068): toggle ships in v1 user-scope Experimental settings; the CPU/memory sampler is post-core (follow-up ticket). | SQLite/config; sampler service post-core. |
-| Graphite stack support | Direct. | Deferred until after core completion. | Future integration flag. |
-| React profiler | Direct developer feature. | Development/internal diagnostics only; not a normal v1 production setting. | Internal debug flag. |
+Exactly two toggles (`experimental.tsx`). The earlier speculative flag list —
+Big terminal mode, many-tabs, Dashboard/Sidebar visibility, In-app browser
+preview, Voice mode, Sidebar resource usage, Graphite stack support, and React
+profiler — is not present in code (removed in the #113 experimental-toggle
+refinement).
+
+| Setting | Ensemblr adaptation | Storage |
+| --- | --- | --- |
+| Developer Mode | Show developer-only diagnostics and Pi debug controls. | `localStorage` (`ensemblr_pref_exp_developer_mode`). |
+| Auto-run after setup | Start a repo's run script automatically after setup when no repo override exists. | `config.json` (`app.experimental.autoRunAfterSetup`). |
 
 ### Advanced
 
-| Setting | Conductor mapping | Ensemblr adaptation | Storage |
-| --- | --- | --- | --- |
-| Root directory | Direct. | Ensemblr root with optional Conductor shared-root interoperability. | SQLite current value; config override/default. |
-| Agent executable paths | Direct concept. | Auto-discovered Pi-compatible executable with explicit override for `pi`, wrapper scripts, or alternate launchers such as `oh-my-pi`. | SQLite/config. |
-| SSH private key path | Direct concept for cloud/remote access. | Deferred with cloud/remote workspace support. | Not applicable in v1. |
-| Set upstream on plain git push | Direct. | Same git convenience setting. | SQLite/config. |
+| Setting | Ensemblr adaptation | Storage |
+| --- | --- | --- |
+| Ensemblr root directory | Browse to the Ensemblr root; changing it reconciles the repo list. Optional Conductor shared-root interoperability. | SQLite current value / root resolver. |
+| Pi executable path | Override the bundled Pi with `pi`, a wrapper script, or an alternate launcher; empty falls back to the discovered system Pi. | `localStorage` (`ensemblr_pref_pi_executable_override`). |
+| Terminal scrollback limit | xterm scrollback buffer, 1–200 MB (default 10). | `localStorage` (`ensemblr_pref_terminal_scrollback_mb`). |
+| SSH private key path | Deferred with cloud/remote workspace support (ADR 0020). | Not applicable in v1. |
+
+Note: "Set upstream on plain `git push`" lives on the **Git** page
+(`app.git.setUpstreamOnPush`), not here.
 
 ## Repository Settings Sections
 
-### Repository Identity and Paths
+The repo scope has five pages (`settings-sidebar.tsx` `REPO_NAV`): **Environment,
+Git, Scripts, Actions, Misc**. Personal repo overrides live in `localStorage`
+(`repoSettingsOverrideAtomFamily`, key `ensemblr_pref_repo_override_<repoId>`);
+resolved values come from the committed `.ensemblr/settings.toml` and SQLite
+through `useRepoSettings`. Each script/toggle row shows a `SourceBadge` and, where
+the committed toml wins, an "Overridden by the committed `.ensemblr/settings.toml`"
+hint.
 
-| Setting | Conductor mapping | Ensemblr adaptation | Storage |
-| --- | --- | --- | --- |
-| Repository record/name/icon | Direct. | Same, with Ensemblr icon choices. | SQLite. |
-| Root path | Direct. | Path to managed or adopted repository. | SQLite only. |
-| Workspaces path | Direct. | Path to workspaces under Ensemblr/shared root. | SQLite only. |
-| Archive repository | Direct. | Lifecycle state with preserved `.context/` under `archived-contexts/`; reversible. | SQLite (`repositories.archived_at` + `archive_records`); filesystem snapshot under managed root. |
-| Remove repository | Direct. | Remove from app records; deleting files, if supported, must be explicit. | SQLite lifecycle; filesystem action explicit. |
+### Environment (repo)
 
-### Branch and Remote
+Repo-scoped environment-variable CRUD (`repo/$repoId/environment.tsx`), same
+panel as the user-scope Environment page but keyed to the repository scope.
 
-| Setting | Conductor mapping | Ensemblr adaptation | Storage |
-| --- | --- | --- | --- |
-| Branch new workspaces from | Direct. | Same. | Personal override in SQLite; shared default in repository config where appropriate. |
-| Remote origin for push/pull/PR | Direct. | Same. | SQLite personal override; can infer from git. |
-| Branch naming preferences | Direct. | Use global defaults plus repo overrides. | SQLite; config defaults/rules. |
+### Git (repo)
 
-### Preview URL
-
-| Setting | Conductor mapping | Ensemblr adaptation | Storage |
-| --- | --- | --- | --- |
-| Preview URL template | Direct. | Support `ENSEMBLR_*` variables. | SQLite personal override; shared default in `.ensemblr/settings.toml` if added. |
-| Auto-detect preview from logs | Direct concept from screenshots. | Same if implementation can detect local server URLs. | Runtime cache in SQLite. |
-
-### Files to Copy
-
-| Setting | Conductor mapping | Ensemblr adaptation | Storage |
-| --- | --- | --- | --- |
-| Files-to-copy patterns | Direct. | Same pattern semantics; `.worktreeinclude` support required. | `.worktreeinclude`/`.ensemblr/settings.toml` for shared; SQLite personal override. |
-| Matching ignored-file preview | Direct. | Same. | Derived at runtime; not stored except cache if needed. |
+| Setting | Ensemblr adaptation | Storage |
+| --- | --- | --- |
+| Branch new workspaces from | Base ref for new workspace branches (`branchFrom`). | localStorage personal override; shared default in `.ensemblr/settings.toml`. |
+| Remote origin | Remote used for push/pull/PR (`remoteOrigin`). | localStorage personal override; inferred from git. |
+| Delete branch on archive | Read-only here; resolved from app/repo config. | Resolved value (edit in `.ensemblr/settings.toml`). |
+| Archive on merge | Read-only here; resolved from app/repo config. | Resolved value (edit in `.ensemblr/settings.toml`). |
 
 ### Scripts
 
-| Setting | Conductor mapping | Ensemblr adaptation | Storage |
-| --- | --- | --- | --- |
-| Setup script | Direct. | Same; runs when workspace is created or manually rerun. | Repository config for shared; SQLite personal override. |
-| Run script | Direct. | Same; run button in terminal dock. | Repository config for shared; SQLite personal override. |
-| Archive script | Direct. | Same; runs before archive. | Repository config for shared; SQLite personal override. |
-| Run script mode | Direct from existing docs. | Same concurrent/nonconcurrent behavior. | Repository config for shared; SQLite personal override. |
-| Create shared config file | Direct. | The committed `.ensemblr/settings.toml` is hand-authored in the repo; Ensemblr reads it and does not generate it. | Repository config. |
+| Setting | Ensemblr adaptation | Storage |
+| --- | --- | --- |
+| Setup script | Runs when a workspace is created or manually rerun; auto-skipped when the dependency fingerprint is unchanged (ADR 0034). | `.ensemblr/settings.toml` shared; localStorage personal override. |
+| Run script | Run button in the terminal dock. | `.ensemblr/settings.toml` shared; localStorage personal override. |
+| Run mode | Concurrent / nonconcurrent run behavior. | `.ensemblr/settings.toml` shared; localStorage personal override. |
+| Auto-run after setup | Start the run script automatically once setup completes. | `.ensemblr/settings.toml` shared; localStorage personal override. |
+| Archive script | Runs before archive. | `.ensemblr/settings.toml` shared; localStorage personal override. |
 
-### Spotlight Testing
+The committed `.ensemblr/settings.toml` is hand-authored in the repo; Ensemblr
+reads it and does not generate it (there is no "create shared config" button).
 
-| Setting | Conductor mapping | Ensemblr adaptation | Storage |
-| --- | --- | --- | --- |
-| Use spotlight testing | Direct. | Replace running app from root while testing workspace changes. | Repository config if shared; SQLite personal override. |
-| Spotlight sync state | Direct concept. | Runtime state of root/workspace synchronization. | SQLite. |
+### Actions
 
-### Agent Action Preferences
+Spotlight testing plus per-action agent-preference text (`repo/$repoId/actions.tsx`,
+`REPO_ACTION_KEYS`).
 
-| Setting | Conductor mapping | Ensemblr adaptation | Storage |
-| --- | --- | --- | --- |
-| Code review preferences | Direct. | Custom Pi instructions for review action. | SQLite personal override; `.ensemblr/settings.toml` shared if safe. |
-| Create PR preferences | Direct. | Custom Pi instructions for PR action. | SQLite personal override; `.ensemblr/settings.toml` shared if safe. |
-| Fix errors preferences | Direct. | Custom Pi instructions for fix-errors action. | SQLite personal override; `.ensemblr/settings.toml` shared if safe. |
-| Resolve conflicts preferences | Direct. | Custom Pi instructions for conflict resolution action. | SQLite personal override; `.ensemblr/settings.toml` shared if safe. |
-| Branch rename preferences | Direct. | Custom Pi instructions for deriving branch/workspace names. | SQLite personal override; `.ensemblr/settings.toml` shared if safe. |
-| General preferences | Direct. | Custom Pi instructions prepended to new chats in this repository. | SQLite personal override; `.ensemblr/settings.toml` shared if safe. |
+| Setting | Ensemblr adaptation | Storage |
+| --- | --- | --- |
+| Use spotlight testing | Replace the running app from root while testing workspace changes. | `.ensemblr/settings.toml` shared; localStorage personal override. |
+| Code review / Create PR / Fix errors / Resolve conflicts / Branch rename / General preferences | Custom Pi instructions for each workspace action (accordion of six textareas). | `.ensemblr/settings.toml` shared if safe; localStorage personal override. |
+
+### Misc
+
+Identity/paths, preview URLs, files-to-copy, and repository removal
+(`repo/$repoId/misc.tsx`).
+
+| Setting | Ensemblr adaptation | Storage |
+| --- | --- | --- |
+| Root path | Path to the managed or adopted repository (read-only). | SQLite only. |
+| Workspaces path | Path to workspaces under the Ensemblr/shared root (read-only). | SQLite only. |
+| Preview URLs | Multi-row templates; support `$ENSEMBLR_WORKSPACE_NAME` and `$ENSEMBLR_PORT`. | localStorage personal override; shared default in `.ensemblr/settings.toml`. |
+| Files to copy | gitignore-style globs (textarea) copied into new worktrees. | `.ensemblr/settings.toml` shared; localStorage personal override. |
+| Remove repository | Remove from app records via a confirm dialog; the handler runs `archiveRepository` under the hood. | SQLite lifecycle. |
 
 ## Configuration Precedence
 
@@ -224,15 +242,18 @@ For repository behavior, resolve each key with this precedence (highest to lowes
 For app-wide behavior, use:
 
 1. Locked/managed settings from `~/.config/ensemblr/config.json`, if supported by schema.
-2. User-selected settings in `~/.config/ensemblr/config.json` (App settings already migrated — General, Models, Git, Appearance). Sections not yet migrated still read from `localStorage`.
+2. User-selected settings in `~/.config/ensemblr/config.json` (General, Models, Git, Appearance, and `app.experimental.autoRunAfterSetup`). The few remaining toggles read from `localStorage` (see migration status).
 3. Built-in defaults (the shared Zod schema fills any missing or invalid field).
 4. Pi user environment for Pi-specific resources and auth.
 
-> Migration status: General, Models, Git, and Appearance are the source of truth
-> in `config.json`. Appearance additionally migrates its legacy `ensemblr_pref_*`
-> `localStorage` values on first launch (removing them only after a successful
-> write). The remaining App sections (Experimental, Advanced) still persist to
-> `localStorage` and will move in a later pass. Repo settings are out of scope.
+> Migration status: General, Models, Git, Appearance, and Experimental's
+> `autoRunAfterSetup` are the source of truth in `config.json`. Appearance
+> additionally migrates its legacy `ensemblr_pref_*` `localStorage` values on first
+> launch (removing them only after a successful write). Only three App toggles
+> still persist to `localStorage`: Experimental **Developer Mode**, and Advanced
+> **Pi executable path** and **Terminal scrollback limit**. Repo personal
+> overrides also live in `localStorage`; the committed `.ensemblr/settings.toml`
+> holds shared repo defaults.
 
 ## Open Settings Questions
 

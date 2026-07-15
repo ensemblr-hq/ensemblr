@@ -1,8 +1,10 @@
 # Conductor Parity Matrix
 
-Date: 2026-06-16
+Date: 2026-07-15
 
 Ensemblr targets feature parity with Conductor's publicly observable and documented workflows, adapted for Pi. This matrix is a living checklist, not a copied product spec.
+
+> **Status (2026-07-15):** The Pi runtime, live `gh`-backed PR/checks, live node-pty/xterm terminals, drag-order session tabs, optimistic workspace creation, and the archive lifecycle have all shipped since this doc's parity targets were written. Rows framed below as future or aspirational are largely implemented; treat the "Ensemblr Target" wording as the intended contract and read the inline "Implemented" annotations for current state.
 
 Sources checked:
 
@@ -34,7 +36,9 @@ right PR-state header, and lower Setup / Run / Terminal dock.
 Future parity work should replace fixture/local renderer data with live
 services through TanStack Query, typed IPC, and app services. It should not
 recreate the same shell surfaces from scratch. Chat transcript content and
-prompt-composer behavior remain deferred until Pi runtime integration.
+prompt-composer behavior have since landed via the Pi runtime: the structured
+RPC event timeline, composer submit/stop, model/thinking-level controls, and
+attachments are implemented.
 The current shell is the intended closest match to Conductor's own shell, even
 if original screenshot evidence is unavailable.
 
@@ -67,12 +71,12 @@ if original screenshot evidence is unavailable.
 | Area | Conductor Behavior | Ensemblr Target |
 | --- | --- | --- |
 | Agent types | Claude Code and Codex. | Pi only for v1. |
-| Session controls | Plan mode, fast mode, reasoning, personality, checkpoints. | Adapt to Pi capabilities: model, thinking level, session tree, compaction, steering/follow-up, checkpoints. |
+| Session controls | Plan mode, fast mode, reasoning, personality, checkpoints. | **Implemented.** Adapt to Pi capabilities: model, thinking level, session tree, compaction, steering/follow-up, checkpoints. |
 | Instructions | Repository instructions, instruction files, skills. | Preserve Pi user environment and Pi resource loading from `~/.pi/agent`, project `.pi`, and context files. |
-| Timeline | Show agent messages, tool calls, output, status, and review context. | Structured Pi RPC event timeline. |
+| Timeline | Show agent messages, tool calls, output, status, and review context. | **Implemented.** Structured Pi RPC event timeline. |
 | Runtime errors | Inline provider/runtime error cards with retry and retry-in-new-chat actions. | Pi CLI/RPC runtime error cards with retry, fork, or continuation behavior mapped to Pi session history. |
-| Composer | Prompt box supports model/reasoning controls, file/PR references, slash/run commands, attachments, optional voice input, and stop/submit controls. | Pi composer with Pi model/thinking controls, Pi attachments/context, and stop/submit controls. Voice input is deferred until after core completion. |
-| Terminal mode | Big terminal mode and terminal panels. | xterm.js terminal panes for shells/scripts/logs. The primary Pi agent runtime is CLI RPC, not terminal scraping; optional raw interactive Pi terminals can be separate manual terminals. |
+| Composer | Prompt box supports model/reasoning controls, file/PR references, slash/run commands, attachments, optional voice input, and stop/submit controls. | **Implemented** (except voice). Pi composer with Pi model/thinking controls, Pi attachments/context, and stop/submit controls. Voice input is deferred until after core completion. |
+| Terminal mode | Big terminal mode and terminal panels. | **Implemented.** Live node-pty/xterm.js terminal panes for shells/scripts/logs. The primary Pi agent runtime is CLI RPC, not terminal scraping; optional raw interactive Pi terminals can be separate manual terminals. |
 
 ## Scripts And Local Runtime
 
@@ -82,7 +86,7 @@ if original screenshot evidence is unavailable.
 | Run script | Runs from Run button inside workspace. | Same target. |
 | Archive script | Runs before workspace archive. | Same target via the lifecycle hook registry from ADR 0027; `ENS-038` registers a `pre-archive-workspace` subscriber that runs the configured archive script and can veto archive on failure. |
 | Run script mode | `concurrent` or `nonconcurrent`. | Same target. |
-| Terminal dock | Fixed read-only Setup and Run output tabs plus default and user-spawned terminal tabs stay visible beside chat/files/checks. | Same target with xterm.js and Electron process supervision; user terminals are independent IDE-style terminal sessions. |
+| Terminal dock | Fixed read-only Setup and Run output tabs plus default and user-spawned terminal tabs stay visible beside chat/files/checks. | **Implemented.** Same target with live node-pty/xterm.js and Electron process supervision; user terminals are independent IDE-style terminal sessions. |
 | Spotlight testing | Syncs workspace changes back to repo root for root-only projects. | Same target after core workspace flow. |
 | Process shutdown | Stop sends SIGHUP, then SIGKILL if still running. | Match behavior where practical. |
 
@@ -126,8 +130,8 @@ if original screenshot evidence is unavailable.
 | Comments to chat | GitHub/check comments can be added to the agent context. | Same target, adding selected comments to Pi chat context. |
 | PR actions | Create PR, respond to feedback, fix checks, merge. | Same target. |
 | Checks tab | Git status, PR metadata, CI/status checks, deployments, comments/review threads, todos. | Same target. |
-| PR readiness states | No-PR, uncommitted, pending/failing checks, and ready-to-merge states have distinct UI. | Same target with `gh`/git state cached in SQLite. |
-| Deployments | Deployment/preview status appears with external links. | Same target, deriving preview URLs from GitHub deployment/status, check, or bot-comment data through `gh` for v1 without Vercel/Netlify login; direct provider APIs are deferred unless GitHub data proves insufficient. |
+| PR readiness states | No-PR, uncommitted, pending/failing checks, and ready-to-merge states have distinct UI. | **Implemented.** Same target with live `gh`/git state cached in SQLite. |
+| Deployments | Deployment/preview status appears with external links. | **Implemented.** Same target, deriving preview URLs from GitHub deployment/status, check, or bot-comment data through `gh` for v1 without Vercel/Netlify login; direct provider APIs are deferred unless GitHub data proves insufficient. |
 | Todos | Users can add local review todos in checks/review context. | Same target, stored in SQLite and optionally sent to Pi. |
 | Blockers | Discourage/block merge when unresolved work exists. | Same target. |
 
