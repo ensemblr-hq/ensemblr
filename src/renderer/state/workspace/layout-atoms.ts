@@ -19,6 +19,15 @@ interface WorkspaceDirectoryRevealRequest {
 export const workspaceDirectoryRevealRequestAtom =
 	atom<WorkspaceDirectoryRevealRequest | null>(null);
 
+/**
+ * Transient live dock activity keyed by workspace id for navigation badges.
+ * Only the active workspace publishes, so the map holds at most one entry today;
+ * the map shape keeps it correct if multiple workspace routes ever mount at once.
+ */
+export const workspaceDockActivityByWorkspaceAtom = atom<
+	Record<string, boolean>
+>({});
+
 /** Persisted display mode for the changes panel (list vs. tree). */
 export const changesViewModeAtom = atomWithStorage<ChangesViewMode>(
 	'ensemblr_workspace_changes_view_mode',

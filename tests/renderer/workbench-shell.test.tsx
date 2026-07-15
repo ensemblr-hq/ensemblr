@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { createStore, Provider } from 'jotai';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr';
@@ -21,6 +22,7 @@ import {
 	getComposerState,
 	normalizeWorkbenchSearch,
 } from '../../src/renderer/lib/workbench';
+import { workspaceDockActivityByWorkspaceAtom } from '../../src/renderer/state/workspace';
 import type {
 	DockTabId,
 	ProjectShellModel,
@@ -138,6 +140,7 @@ function renderWorkbench(
 	activeReviewTab = DEFAULT_REVIEW_TAB,
 	activeDockTab: DockTabId = DEFAULT_DOCK_TAB,
 	projectsOverride: ProjectShellModel[] = shellFixtureProjects,
+	store?: ReturnType<typeof createStore>,
 ) {
 	const activeWorkspace = workspaceOverride ?? getDefaultWorkspace();
 	const activeProject =
@@ -154,7 +157,7 @@ function renderWorkbench(
 	queryClient.setQueryData(ensemblrQueryKeys.workspaceOpenTargets(), {
 		targets: OPEN_TARGETS_FIXTURE,
 	});
-	return renderToStaticMarkup(
+	const tree = (
 		<QueryClientProvider client={queryClient}>
 			<NavigationProvider
 				value={{ renderStaticLink: undefined, renderWorkspaceLink: undefined }}
@@ -221,7 +224,11 @@ function renderWorkbench(
 					</WorkbenchFrame>
 				</SetupDiagnosticsProvider>
 			</NavigationProvider>
-		</QueryClientProvider>,
+		</QueryClientProvider>
+	);
+
+	return renderToStaticMarkup(
+		store ? <Provider store={store}>{tree}</Provider> : tree,
 	);
 }
 
@@ -420,6 +427,27 @@ test('renders additional user terminal tabs as independent interactive sessions'
 	expect(markup).not.toContain('Close Setup tab');
 	expect(markup).not.toContain('Close Run tab');
 	expect(setupMarkup).toContain('Close Terminal 2 tab');
+});
+
+test('marks workspace rows with running dock activity', () => {
+	const activeWorkspace = getDefaultWorkspace();
+	const store = createStore();
+	store.set(workspaceDockActivityByWorkspaceAtom, {
+		[activeWorkspace.id]: true,
+	});
+	const markup = renderWorkbench(
+		null,
+		activeWorkspace,
+		DEFAULT_REVIEW_TAB,
+		DEFAULT_DOCK_TAB,
+		shellFixtureProjects,
+		store,
+	);
+
+	expect(markup).toContain('data-workspace-dock-activity="running"');
+	expect(markup).toContain(
+		'Open workspace Conductor shell rework; dock activity running',
+	);
 });
 
 test('marks setup notes tab as active agent activity', () => {
