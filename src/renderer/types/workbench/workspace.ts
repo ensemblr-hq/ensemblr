@@ -275,7 +275,7 @@ export interface WorkspaceLandingBranchSummary {
 }
 
 /** Describes whether local-only files were copied into the workspace. */
-export type WorkspaceLandingCopyState = 'copied' | 'skipped' | 'unavailable';
+export type WorkspaceLandingCopyState = 'copied' | 'unavailable';
 
 /** Summarizes files-to-copy results for a newly created workspace. */
 export interface WorkspaceLandingCopySummary {

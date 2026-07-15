@@ -98,6 +98,8 @@ interface PreparedWorkspace {
 const DEFAULT_WORKSPACE_NAME = 'workspace';
 const CONTEXT_DIRECTORY = '.context';
 const GIT_FETCH_TIMEOUT_MS = 30_000;
+const GIT_LS_FILES_TIMEOUT_MS = 15_000;
+const GIT_LS_FILES_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 
 /**
  * Builds the service that creates isolated git worktree workspaces under the
@@ -264,12 +266,18 @@ export function createWorkspaceService({
 				repositoryPath: repository.path,
 				workspacePath: prepared.path,
 			});
+			const workspaceFileCount = await countWorkspaceFiles({
+				filesToCopySnapshot,
+				localCommandService,
+				workspacePath: prepared.path,
+			});
 
 			const timestamp = now().toISOString();
 			const initialMetadata = buildInitialWorkspaceMetadata({
 				filesToCopySnapshot,
 				linkedIssue: request.linkedIssue,
 				placeholderName: request.placeholderName === true,
+				workspaceFileCount,
 			});
 			try {
 				insertWorkspaceRow({
@@ -370,6 +378,46 @@ async function runFilesToCopy({
 			source: 'default',
 		};
 	}
+}
+
+/**
+ * Counts tracked worktree files plus local-only files copied after checkout.
+ * @param input - Command service, workspace path, and local copy snapshot.
+ * @returns The total workspace file count, or `null` when git cannot enumerate.
+ */
+async function countWorkspaceFiles({
+	filesToCopySnapshot,
+	localCommandService,
+	workspacePath,
+}: {
+	filesToCopySnapshot: FilesToCopySnapshot;
+	localCommandService: LocalCommandService;
+	workspacePath: string;
+}): Promise<number | null> {
+	const result = await localCommandService.run({
+		args: ['ls-files', '-z'],
+		command: 'git',
+		cwd: workspacePath,
+		maxOutputBytes: GIT_LS_FILES_MAX_OUTPUT_BYTES,
+		timeoutMs: GIT_LS_FILES_TIMEOUT_MS,
+	});
+
+	if (result.status !== 'success' || result.stdoutTruncated) {
+		return null;
+	}
+
+	return (
+		parseNullSeparated(result.stdout).length + filesToCopySnapshot.copied.length
+	);
+}
+
+/**
+ * Splits a NUL-separated git output stream into non-empty path entries.
+ * @param value - Raw stdout from `git ls-files -z`.
+ * @returns The list of paths.
+ */
+function parseNullSeparated(value: string): string[] {
+	return value.split('\0').filter((entry) => entry.length > 0);
 }
 
 /**
@@ -814,8 +862,10 @@ function cleanupDirectory(workspacePath: string): void {
 
 /**
  * Builds the initial workspace metadata record stored under `metadata_json`,
- * capturing the files-to-copy outcome so the renderer landing card can show
- * the actual copied-file count without recomputing the snapshot.
+ * capturing the files-to-copy outcome plus the total workspace file count so
+ * the renderer landing card can show the count without recomputing it. The
+ * count lives at the top level because it describes the whole worktree, not the
+ * files-to-copy step, whose per-step stats stay nested under `filesToCopy`.
  *
  * The `linkedIssue` copy here is a denormalized read model for the renderer
  * (which only sees workspace rows); the `integration_metadata` row written in
@@ -826,10 +876,12 @@ function buildInitialWorkspaceMetadata({
 	filesToCopySnapshot,
 	linkedIssue,
 	placeholderName,
+	workspaceFileCount,
 }: {
 	filesToCopySnapshot: FilesToCopySnapshot;
 	linkedIssue?: WorkspaceLinkedIssueInput;
 	placeholderName?: boolean;
+	workspaceFileCount: number | null;
 }): Record<string, unknown> {
 	return {
 		filesToCopy: {
@@ -837,6 +889,7 @@ function buildInitialWorkspaceMetadata({
 			skippedCount: filesToCopySnapshot.skipped.length,
 			source: filesToCopySnapshot.source,
 		},
+		...(workspaceFileCount !== null ? { workspaceFileCount } : {}),
 		...(linkedIssue ? { linkedIssue } : {}),
 		...(placeholderName ? { placeholderName: true } : {}),
 	};
