@@ -26,7 +26,7 @@ export function buildWorkspaceScriptSummaries({
 	};
 }
 
-/** Maps a script summary to the dock tab status badge. */
+/** Maps a script summary to the dock tab activity state. */
 export function scriptSummaryToDockStatus(
 	summary: WorkspaceScriptSummary,
 ): DockTabStatus {

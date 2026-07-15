@@ -1,6 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { useEffect, useRef } from 'react';
-
+import { emitTerminalInput } from '@/renderer/lib/terminal/terminal-tabs';
 import {
 	createXtermAdapter,
 	DEFAULT_FONT_FAMILY,
@@ -47,8 +47,8 @@ export function XtermTerminal({
 	// remount that rebuilds the adapter with the same font).
 	const appliedFontRef = useRef({ fontFamily, fontSize: terminalFontSize });
 	// The exit banner is for interactive terminals only. Setup/Run script panels
-	// (read-only) surface their lifecycle through the dock tab status dot, so the
-	// footer would be redundant noise there.
+	// (read-only) surface lifecycle controls and status in their panel chrome, so
+	// the footer would be redundant noise there.
 	const exitNotice = readOnly ? null : formatExitNotice(sessionStatus);
 
 	useEffect(() => {
@@ -90,6 +90,7 @@ export function XtermTerminal({
 		const unsubscribeInput = readOnly
 			? null
 			: adapter.onData((data) => {
+					emitTerminalInput({ data, terminalId });
 					void ensemblr.writeTerminalSession({ data, terminalId });
 				});
 
