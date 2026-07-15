@@ -302,7 +302,7 @@ function createPlaceholderLandingSummary(
 		: kind === 'cloned-repo'
 			? 'Repository cloned'
 			: 'New workspace ready';
-	const copiedFiles = readFilesToCopyMetadata(workspace.metadata);
+	const copiedFiles = readWorkspaceFileCount(workspace.metadata);
 
 	return {
 		branchSource: {
@@ -325,47 +325,31 @@ function createPlaceholderLandingSummary(
 }
 
 /**
- * Reads files-to-copy stats persisted under `workspace.metadata.filesToCopy`
- * during workspace creation. Returns the `unavailable` shape when the metadata
- * is missing (older workspace rows pre-dating the wiring).
+ * Reads the total workspace file count persisted under
+ * `workspace.metadata.workspaceFileCount` during workspace creation. The count
+ * is written once at creation and never backfilled, so a missing value yields
+ * the `unavailable` shape — older workspace rows pre-dating the wiring, or rows
+ * whose count could not be enumerated at creation.
  */
-function readFilesToCopyMetadata(
+function readWorkspaceFileCount(
 	metadata: RepositoryWorkspaceNavigationWorkspace['metadata'],
 ): WorkspaceLandingSummary['copiedFiles'] {
-	const raw = metadata.filesToCopy;
+	const raw = metadata.workspaceFileCount;
+	const workspaceFileCount =
+		typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
 
-	if (typeof raw !== 'object' || raw === null) {
+	if (workspaceFileCount === null) {
 		return {
 			count: 0,
-			detail: 'Copied files will be shown here once workspace setup completes.',
+			detail: 'Workspace file count is unavailable.',
 			state: 'unavailable',
 		};
 	}
 
-	const record = raw as Record<string, unknown>;
-	const copiedCount =
-		typeof record.copiedCount === 'number' &&
-		Number.isFinite(record.copiedCount)
-			? record.copiedCount
-			: 0;
-	const skippedCount =
-		typeof record.skippedCount === 'number' &&
-		Number.isFinite(record.skippedCount)
-			? record.skippedCount
-			: 0;
-	const state: WorkspaceLandingSummary['copiedFiles']['state'] =
-		copiedCount > 0 ? 'copied' : skippedCount > 0 ? 'skipped' : 'unavailable';
-	const detail =
-		state === 'copied'
-			? `Copied ${copiedCount} local-only file${copiedCount === 1 ? '' : 's'} from repository.`
-			: state === 'skipped'
-				? 'No local-only files were available to copy from the source.'
-				: 'Copied files will be shown here once workspace setup completes.';
-
 	return {
-		count: copiedCount,
-		detail,
-		state,
+		count: workspaceFileCount,
+		detail: `Copied ${workspaceFileCount} file${workspaceFileCount === 1 ? '' : 's'} into workspace.`,
+		state: 'copied',
 	};
 }
 

@@ -19,7 +19,7 @@ test('local-branch landing card surfaces repo name, branch, and copied count', (
 		},
 		copiedFiles: {
 			count: 665,
-			detail: 'Copied 665 local-only files from repository.',
+			detail: 'Copied 665 files into workspace.',
 			state: 'copied',
 		},
 		headline: 'New workspace ready',
@@ -54,9 +54,9 @@ test('cloned-repo landing card omits base-branch suffix when not provided', () =
 			detail: 'Fresh clone checked out the default branch.',
 		},
 		copiedFiles: {
-			count: 0,
-			detail: 'No local-only files were available to copy from the source.',
-			state: 'skipped',
+			count: 1080,
+			detail: 'Copied 1080 files into workspace.',
+			state: 'copied',
 		},
 		headline: 'Repository cloned',
 		kind: 'cloned-repo',
@@ -71,7 +71,10 @@ test('cloned-repo landing card omits base-branch suffix when not provided', () =
 	expect(markup).toContain('data-landing-card-kind="cloned-repo"');
 	expect(markup).toContain('monrovia');
 	expect(markup).toContain('main');
-	expect(markup).toContain('0');
+	expect(markup).toContain('1080');
+	expect(markup).toContain('copied');
+	expect(markup).toContain('files');
+	expect(markup).not.toContain('local-only');
 	expect(markup).not.toContain('from <');
 	expect(markup).not.toContain('bun install');
 });

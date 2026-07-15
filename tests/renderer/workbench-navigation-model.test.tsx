@@ -127,6 +127,79 @@ test('maps repositories array identically to snapshot mapping', () => {
 	expect(mapRepositoriesToProjects(null)).toEqual([]);
 });
 
+test('maps workspace file-count metadata as copied files', () => {
+	const repository = navigationSnapshot.repositories[0];
+	const workspace = repository?.workspaces[0];
+
+	expect(repository).toBeDefined();
+	expect(workspace).toBeDefined();
+
+	const snapshot: RepositoryWorkspaceNavigationSnapshot = {
+		...navigationSnapshot,
+		repositories: [
+			{
+				...repository,
+				workspaces: [
+					{
+						...workspace,
+						metadata: {
+							filesToCopy: {
+								copiedCount: 0,
+								skippedCount: 0,
+								source: 'default',
+							},
+							workspaceFileCount: 1080,
+						},
+					},
+				],
+			},
+		],
+	};
+	const projects = mapNavigationSnapshotToProjects(snapshot);
+
+	expect(projects[0]?.workspaces[0]?.landingSummary?.copiedFiles).toEqual({
+		count: 1080,
+		detail: 'Copied 1080 files into workspace.',
+		state: 'copied',
+	});
+});
+
+test('maps missing workspace file count as an unavailable copy summary', () => {
+	const repository = navigationSnapshot.repositories[0];
+	const workspace = repository?.workspaces[0];
+
+	expect(repository).toBeDefined();
+	expect(workspace).toBeDefined();
+
+	const snapshot: RepositoryWorkspaceNavigationSnapshot = {
+		...navigationSnapshot,
+		repositories: [
+			{
+				...repository,
+				workspaces: [
+					{
+						...workspace,
+						metadata: {
+							filesToCopy: {
+								copiedCount: 0,
+								skippedCount: 0,
+								source: 'default',
+							},
+						},
+					},
+				],
+			},
+		],
+	};
+	const projects = mapNavigationSnapshotToProjects(snapshot);
+
+	expect(projects[0]?.workspaces[0]?.landingSummary?.copiedFiles).toEqual({
+		count: 0,
+		detail: 'Workspace file count is unavailable.',
+		state: 'unavailable',
+	});
+});
+
 test('resolves workspace route params for live targets and rejects missing ones', () => {
 	const projects = mapNavigationSnapshotToProjects(navigationSnapshot);
 

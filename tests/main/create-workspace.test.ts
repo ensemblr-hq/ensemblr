@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import {
@@ -391,6 +393,13 @@ test('create rolls back the directory and skips the SQLite row when git fails', 
 test('create records files-to-copy snapshot in the success result', async (t) => {
 	const harness = createHarness(t);
 	writeFileSync(path.join(harness.repositoryPath, '.gitignore'), '.env*\n');
+	mkdirSync(path.join(harness.repositoryPath, 'src'), { recursive: true });
+	writeFileSync(
+		path.join(harness.repositoryPath, 'src', 'index.ts'),
+		'export {};\n',
+	);
+	runGit(harness.repositoryPath, ['add', 'src/index.ts']);
+	runGit(harness.repositoryPath, ['commit', '-m', 'add source file']);
 	writeFileSync(
 		path.join(harness.repositoryPath, '.env.local'),
 		'API_KEY=secret\n',
@@ -421,6 +430,11 @@ test('create records files-to-copy snapshot in the success result', async (t) =>
 		existsSync(path.join(result.workspace.path, '.env.local')),
 		true,
 	);
+
+	const filesToCopyMetadata = result.workspace.metadata.filesToCopy;
+	assert.equal(typeof filesToCopyMetadata, 'object');
+	assert.notEqual(filesToCopyMetadata, null);
+	assert.equal(result.workspace.metadata.workspaceFileCount, 3);
 });
 
 test('create returns null filesToCopy snapshot when it fails before copying', async (t) => {

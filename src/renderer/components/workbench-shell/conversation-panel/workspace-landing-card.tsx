@@ -8,7 +8,7 @@ import type { WorkspaceLandingSummary } from '@/renderer/types/workbench';
  * has no chat history yet. Three lines:
  *  1. Pill — `You're in a new copy of {repo} called {workspace}`.
  *  2. Branch source — `Branched {branch} from {baseBranch}`.
- *  3. File copy result — `Created {workspace} and copied {n} files`.
+ *  3. File copy result — `Created {workspace}` plus workspace file count.
  *
  * Diagnostic state (setup readiness, composer not-ready reasons, setup-script
  * status) lives in the sidebar footer and the settings → diagnostics screen.
@@ -67,10 +67,19 @@ export function WorkspaceLandingCard({
 					Created{' '}
 					<span className='rounded-sm border border-border bg-muted/40 px-1.5 py-0.5 font-mono text-foreground'>
 						{workspaceName}
-					</span>{' '}
-					and copied{' '}
-					<span className='font-mono text-foreground'>{copiedFiles.count}</span>{' '}
-					files
+					</span>
+					{copiedFiles.state === 'copied' ? (
+						<>
+							{' '}
+							and copied{' '}
+							<span className='font-mono text-foreground'>
+								{copiedFiles.count}
+							</span>{' '}
+							file{copiedFiles.count === 1 ? '' : 's'}
+						</>
+					) : (
+						<>. {copiedFiles.detail}</>
+					)}
 				</span>
 			</p>
 		</section>
