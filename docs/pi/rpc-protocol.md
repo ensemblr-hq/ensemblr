@@ -5,8 +5,10 @@ cites the source it was read from. Facts marked `OBSERVED` were not stated in
 docs and must be confirmed against the Phase 1 captures in
 `tests/fixtures/pi-captures/`.
 
-Sources inspected (pi `0.79.1`, installed at
-`~/.bun/install/global/node_modules/@earendil-works/pi-coding-agent`):
+Sources inspected (pi `0.79.1`, from the `@earendil-works/pi-coding-agent`
+npm-global install; the original capture predates the Bun→npm migration in
+ADR 0038, so the historical `~/.bun/...` path below is stale — read the current
+install from `npm ls -g @earendil-works/pi-coding-agent`):
 
 - `docs/rpc.md` — primary RPC mode documentation (cited below as `rpc.md`)
 - `dist/modes/rpc/rpc-mode.js` — RPC mode implementation
@@ -64,16 +66,19 @@ Full union in `rpc-types.d.ts` (`RpcCommand`). All commands accept an
 optional `id` echoed back on the matching response (`rpc.md` "Protocol
 Overview"). The ones the timeline client needs:
 
+The complete set of frames Ensemblr actually writes to Pi stdin is
+`prompt`, `steer`, `follow_up`, `set_model`, `set_thinking_level`, and
+`get_session_stats` (`cli-rpc-pi-agent-adapter.ts`). Abort is an OS signal, not a
+frame (see "Aborting"). The rest of the table is Pi capability, not app usage.
+
 | Command | Shape | Notes |
 |---|---|---|
-| prompt | `{"type":"prompt","message":string,"images?":ImageContent[],"streamingBehavior?":"steer"\|"followUp"}` | Rejected with `success:false` if agent is streaming and no `streamingBehavior` given (`rpc.md` "prompt") |
+| prompt | Pi contract: `{"type":"prompt","message":string}`. **Ensemblr sends** `{"type":"prompt","message":string,"turnId":string,"attachments":[]}` (`cli-rpc-pi-agent-adapter.ts`). | `turnId`/`attachments` are client metadata Pi ignores today; `attachments` is always empty. No `images` field is sent — image/file attachments are serialized *into* `message` as text (see "Attachments"). `streamingBehavior` is **not** a prompt field: when set, the adapter emits a separate `steer`/`follow_up` frame instead (`"steer"\|"followUp"`). Pi rejects a `prompt` with `success:false` if it is already streaming (`rpc.md` "prompt"). |
 | steer | `{"type":"steer","message":string}` | Queued; delivered after current assistant turn's tool calls (`rpc.md` "steer") |
 | follow_up | `{"type":"follow_up","message":string}` | Delivered when agent fully stops (`rpc.md` "follow_up") |
-| abort | `{"type":"abort"}` | Aborts current operation (`rpc.md` "abort") |
-| new_session | `{"type":"new_session"}` | Fresh session (`rpc.md` "new_session") |
-| get_state | `{"type":"get_state"}` | Model, thinking level, `isStreaming`, session file/id/name, message counts (`rpc.md` "get_state") |
-| get_session_stats | `{"type":"get_session_stats"}` | Token usage, cost, `contextUsage` — feeds the status bar (`rpc.md` "get_session_stats") |
-| set_model / set_thinking_level | see `rpc.md` | Thinking levels: `off,minimal,low,medium,high,xhigh` |
+| get_session_stats | `{"type":"get_session_stats"}` | Token usage, cost, `contextUsage` — feeds the status bar. The app refreshes it on every `turn_end`/`agent_end` (`rpc.md` "get_session_stats"). |
+| set_model / set_thinking_level | `{"type":"set_model","provider","modelId"}` / `{"type":"set_thinking_level","level"}` | Written ahead of the next `prompt` only when the selection differs from what the runtime is already on. Thinking levels: `off,minimal,low,medium,high,xhigh` |
+| abort / get_state / new_session | Pi capabilities, **not used by Ensemblr** | Abort is done by signal, not this frame. Session status is derived from the `agent_start`/`turn_start`/`agent_end` lifecycle, so `get_state` is never sent. |
 
 Response frames: `{"id?":string,"type":"response","command":string,
 "success":boolean,"data?":...,"error?":string}` (`rpc.md` "Commands",
@@ -100,6 +105,12 @@ Documented event types (`rpc.md` "Events"):
 | `compaction_start` / `compaction_end` | `reason: "manual"\|"threshold"\|"overflow"`, result/abort/error fields |
 | `auto_retry_start` / `auto_retry_end` | attempt counters, delay, error text |
 | `extension_error` | `extensionPath`, `event`, `error` |
+
+> Ensemblr models **none** of `queue_update`, `compaction_*`, `auto_retry_*`, or
+> `extension_error` — they are Pi-runtime-provided but fall through the
+> unknown-frame fallback (`protocol-dispatch.ts`, `parse.ts`) and never appear in
+> the fixtures. Keep them documented as Pi-provided/unconsumed; do not treat them
+> as app behavior. The modeled event set is enumerated in `event-taxonomy.md`.
 
 `message_update.assistantMessageEvent` delta types (`rpc.md`
 "message_update"): `start`, `text_start`, `text_delta`, `text_end`,
@@ -139,11 +150,25 @@ in `multi-tool-chain` capture.
 
 ## Aborting
 
-- `{"type":"abort"}` on stdin; current operation stops; the in-flight
-  assistant message ends with `assistantMessageEvent.type:"error"`,
-  `reason:"aborted"`, and/or `stopReason:"aborted"` (`rpc.md` "abort",
-  "AssistantMessage"). `OBSERVED`: exact terminal event sequence after abort
-  (does `agent_end` still fire?) — verify in `abort-mid-turn` capture.
+- **Ensemblr aborts by signal, not by RPC frame.** `abort()` sends `SIGINT`, then
+  `SIGKILL` after `killGraceMs` (`cli-rpc-pi-agent-adapter.ts`). The
+  `{"type":"abort"}` command is a real Pi capability the app does not use.
+- The in-flight assistant message still ends with
+  `assistantMessageEvent.type:"error"`, `reason:"aborted"`, and/or
+  `stopReason:"aborted"`, and `agent_end` still fires (confirmed in the
+  `abort-mid-turn` capture; sealed with `stopReason:"aborted"` in `reducer.ts`).
+
+## Attachments
+
+- Image/file/@-mention attachments are serialized **into the prompt `message`
+  text**, not sent as a structured field. Files and images become
+  `<attached_file path="…">…</attached_file>` blocks and referenced directories
+  become a `Referenced workspace folders:\n@<path>` header
+  (`src/renderer/lib/workbench/mention-payload.ts`), round-tripped by
+  `src/renderer/lib/pi/prompt-attachment-parser.ts`.
+- Raster images are saved to the workspace `.context/images/` and referenced by
+  path only — no image bytes cross the RPC wire (ADR 0036,
+  `composer-attachments.ts`).
 
 ## Tool approval / permission handshake
 
@@ -185,8 +210,8 @@ in `multi-tool-chain` capture.
 
 ## Capability discovery (ENS-035 / THE-135)
 
-Probed live on 2026-06-11 against pi `0.79.1`
-(`~/.bun/install/global/node_modules/@earendil-works/pi-coding-agent`), via
+Probed live on 2026-06-11 against pi `0.79.1` (then a Bun-global install; the
+project has since moved to npm — ADR 0038), via
 `pi --mode rpc --no-session --offline` with JSONL commands on stdin, plus a
 full read of `dist/modes/rpc/rpc-types.d.ts` (`RpcCommand` union) and
 `pi --help`. Unknown commands fail safely:
@@ -205,7 +230,7 @@ full read of `dist/modes/rpc/rpc-types.d.ts` (`RpcCommand` union) and
 | Tool allowlist (read-only / approval-required) | **Partially supported** | Spawn-time only: `--tools`, `--exclude-tools`, `--no-tools`, `--no-builtin-tools` all accepted in `--mode rpc` (verified: `--tools read,grep,glob,ls`, `--no-tools`, `--exclude-tools bash,write,edit` start cleanly). There is **no runtime RPC command** to change the allowlist mid-session, and no built-in approval gate — approval-required needs the extension `confirm()` handshake (see "Tool approval / permission handshake") |
 | Steering / follow-up modes | **Supported (bonus)** | `set_steering_mode` / `set_follow_up_mode` (`all` \| `one-at-a-time`) |
 | Auto retry | **Supported (bonus)** | `set_auto_retry`, `abort_retry` |
-| Session ops | **Supported (bonus)** | `switch_session`, `fork`, `clone`, `get_fork_messages`, `get_messages`, `set_session_name`, `export_html`, client-side `bash` |
+| Session ops | **Supported by Pi, unused by Ensemblr** | `switch_session`, `fork`, `clone`, `get_fork_messages`, `get_messages`, `set_session_name`, `export_html`, client-side `bash`. Ensemblr uses **none** of these over RPC — conversation "forking" is an app-side markdown summary plus a SQLite branch kind (`'main'\|'retry'\|'fork'`, `pi-session-service.ts`), and per-turn "checkpoints" are git snapshots on a private ref namespace `refs/ensemblr/checkpoints/…` (ADR 0012, `src/main/checkpoints/git-checkpoint.ts`), captured before each user turn. |
 
 ### Recommendations for Ensemblr settings (v1)
 

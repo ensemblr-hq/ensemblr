@@ -2,6 +2,8 @@
 
 Date: 2026-06-04
 
+> **Banner (post-capture):** Since these screenshots were captured, the Pi runtime, live `gh`-backed PR/checks metadata, and live PTY terminals have landed. The "deferred/future" notes in the per-screen sections below are historical parity evidence, not current state.
+
 This inventory summarizes Conductor screenshots as UX evidence for Ensemblr implementation. It intentionally avoids copying Conductor branding, visual identity, private repository names, account data, tokens, issue text, PR text, and chat content. Exact file paths are included only for the screenshot evidence files.
 
 The original screenshot files may be unavailable in later workspaces. This
@@ -315,7 +317,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: Private chat content and file details are visible but not transcribed; visible status includes no PR, uncommitted changes, and no todos.
 - Settings or configuration implied: Retry behavior, model and reasoning controls, setup/run lifecycle, PR/check/todo state.
 - Ensemblr parity requirement: Render structured agent events, tool calls, runtime errors, retry actions, composer controls, and side-panel status without losing workspace context.
-- Current Ensemblr shell alignment: The tab strip, timeline location, setup warning, and composer placement are locked. Chat content and prompt behavior remain deferred until Pi integration.
+- Current Ensemblr shell alignment: The tab strip, timeline location, setup warning, and composer placement are locked. Chat content and prompt behavior have since shipped on the Pi runtime (see the banner at the top of this doc); the "deferred until Pi integration" note is historical.
 - Pi-specific adaptation: Replace provider-limit errors with Pi CLI/RPC runtime error cards, Pi session retry/fork behavior, and Pi model/thinking controls.
 - Turn timing: each turn shows elapsed time spanning prompt submit → final answer (reasoning + tool calls included). While in flight a live `● Working… {elapsed}` indicator ticks bottom-left of the assistant slot, appearing immediately on submit (anchored to the prompt time) and continuing seamlessly into the streaming turn; it freezes to the total duration in the settled footer. Reasoning ("Thinking") rows render in full inside the collapsible activity group (no truncation).
 - Risks or implementation notes: Retrying in a new chat must preserve file state and make session branching understandable.
@@ -335,7 +337,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: Private command output is visible but generalized.
 - Settings or configuration implied: Setup script command, captured process logs, terminal tab persistence.
 - Ensemblr parity requirement: Provide docked read-only setup/run output panes plus default and user-spawned interactive terminal panes with output capture and rerun controls.
-- Current Ensemblr shell alignment: The lower-right Setup / Run / Terminal dock, collapse affordance, and script-state action placement are already represented. Future terminal tickets should replace placeholder logs with live process/PTY data in place while keeping Setup/Run separate from user terminal sessions.
+- Current Ensemblr shell alignment: The lower-right Setup / Run / Terminal dock, collapse affordance, and script-state action placement are represented, and terminals now run on live process/PTY data (see the banner at the top of this doc), keeping Setup/Run separate from user terminal sessions.
 - Pi-specific adaptation: Run scripts are independent of Pi but should include `ENSEMBLR_*` variables.
 - Risks or implementation notes: Large output, interactive prompts, and process cancellation need terminal/process supervision.
 
@@ -354,7 +356,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: Private file names and change counts are visible but generalized.
 - Settings or configuration implied: File status calculation, diff color policy, review-mode preference.
 - Ensemblr parity requirement: Provide a structured changes tree with file statuses, additions/deletions, grouping, search, and review controls.
-- Current Ensemblr shell alignment: All files / Changes / Checks tab placement, changes list/tree toggle, folder grouping, and command-style file search are represented in the current shell. Future work should wire git/diff data into these surfaces.
+- Current Ensemblr shell alignment: All files / Changes / Checks tab placement, changes list/tree toggle, folder grouping, and command-style file search are represented in the current shell. The Changes-tab diff is now live git data via `workspaceFileDiffQuery` (see the banner at the top of this doc).
 - Pi-specific adaptation: Diff/review data is runtime-agnostic; selected diff/comment context should be sendable to Pi.
 - Risks or implementation notes: Full diff body and line-comment UI are not captured in this screenshot set.
 
@@ -389,7 +391,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: PR title/description, check provider names, comment identifiers, and private content are visible but generalized.
 - Settings or configuration implied: PR metadata cache, CI/check status polling, comment ingestion, merge policy, todo storage.
 - Ensemblr parity requirement: Show PR metadata, check states, comments, todos, external links, and merge blockers in one checks panel.
-- Current Ensemblr shell alignment: The right PR header and Checks panel already represent the no-PR, create-PR, working, checking, blocked, open, and ready state shape. Future work should wire `gh`/GitHub metadata and merge confirmation into the existing surfaces without making idle/open PRs look like active agent work.
+- Current Ensemblr shell alignment: The right PR header and Checks panel represent the no-PR, create-PR, working, checking, blocked, open, and ready state shape, and live `gh`/GitHub metadata now feeds these surfaces (see the banner at the top of this doc), without making idle/open PRs look like active agent work.
 - Pi-specific adaptation: Add comments/review context to Pi chat rather than Claude/Codex chat.
 - Risks or implementation notes: first-class `gh` commands may not expose all comment/review-thread detail needed; authenticated `gh api` is the REST/GraphQL path.
 
