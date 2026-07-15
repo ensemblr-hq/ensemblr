@@ -3,6 +3,7 @@ import { PENDING_WORKSPACE_CREATION_METADATA_KEY } from '@/renderer/lib/workbenc
 import type {
 	DockTabModel,
 	ProjectShellModel,
+	PullRequestShellStatus,
 	SessionTabModel,
 	WorkspaceLandingKind,
 	WorkspaceLandingSummary,
@@ -13,6 +14,7 @@ import type {
 	RepositoryWorkspaceNavigationRepository,
 	RepositoryWorkspaceNavigationSnapshot,
 	RepositoryWorkspaceNavigationWorkspace,
+	WorkspacePrPresentation,
 } from '@/shared/ipc/contracts/repository-navigation';
 
 // --- Public mappers ---------------------------------------------------------
@@ -123,6 +125,7 @@ function mapWorkspaceNavigationSnapshot(
 		workspace.slug;
 	const isPendingCreation =
 		workspace.metadata[PENDING_WORKSPACE_CREATION_METADATA_KEY] === true;
+	const presentation = workspace.pullRequest ?? null;
 
 	return {
 		branchName,
@@ -137,12 +140,7 @@ function mapWorkspaceNavigationSnapshot(
 					label: 'Creating',
 					status: 'pending',
 				}
-			: {
-					detail:
-						'Live workspace navigation is loaded from SQLite. Checks are not wired yet.',
-					label: 'No checks',
-					status: 'pending',
-				},
+			: mapPresentationChecks(presentation),
 		dockTabs: createPlaceholderDockTabs(),
 		githubRepo: parseGithubRepoFromRemoteUrl(remoteUrl),
 		id: workspace.id,
@@ -151,20 +149,7 @@ function mapWorkspaceNavigationSnapshot(
 		name: workspace.name || workspace.slug,
 		pathLabel: workspace.path,
 		projectId: repository.id,
-		pullRequest: {
-			checks: [],
-			comments: [],
-			description: [],
-			detail: 'Pull request data is not wired for this workspace yet.',
-			gitStatus: {
-				label: 'No PR open',
-				status: 'open',
-			},
-			label: 'No PR',
-			status: 'idle',
-			title: '',
-			todos: [],
-		},
+		pullRequest: mapPresentationPullRequest(presentation),
 		reviewFiles: [],
 		scripts: createPlaceholderScripts(),
 		sessions: [createPlaceholderSessionFromSnapshot(workspace)],
@@ -174,6 +159,100 @@ function mapWorkspaceNavigationSnapshot(
 		status: isPendingCreation ? 'working' : 'idle',
 		workspaceFiles: [],
 	};
+}
+
+/** Maps a compact PR presentation onto the sidebar row's checks summary. */
+function mapPresentationChecks(
+	presentation: WorkspacePrPresentation | null,
+): WorkspaceShellModel['checks'] {
+	switch (presentation?.status) {
+		case 'blocked':
+			return {
+				detail: 'Checks are failing.',
+				label: 'Checks failed',
+				status: 'blocked',
+			};
+		case 'checking':
+			return {
+				detail: 'Checks are running.',
+				label: 'Checks running',
+				status: 'pending',
+			};
+		case 'merged':
+			return {
+				detail: 'Pull request merged.',
+				label: 'Merged',
+				status: 'ready',
+			};
+		case 'closed':
+			return {
+				detail: 'Pull request closed.',
+				label: 'Closed',
+				status: 'ready',
+			};
+		default:
+			return {
+				detail: 'No checks reported.',
+				label: 'No checks',
+				status: 'ready',
+			};
+	}
+}
+
+/**
+ * Maps a compact PR presentation onto the sidebar row's placeholder PR model.
+ * Only the fields the sidebar icon reads (number, status, state) are populated;
+ * the heavier panel model is still built from the live snapshot elsewhere.
+ */
+function mapPresentationPullRequest(
+	presentation: WorkspacePrPresentation | null,
+): WorkspaceShellModel['pullRequest'] {
+	const base = {
+		checks: [],
+		comments: [],
+		description: [],
+		gitStatus: { label: 'No PR open', status: 'open' as const },
+		title: '',
+		todos: [],
+	};
+	if (!presentation) {
+		return {
+			...base,
+			detail: 'No pull request for this branch yet.',
+			label: 'No PR',
+			status: 'idle',
+		};
+	}
+	const { state, status } = mapPresentationStatus(presentation.status);
+	return {
+		...base,
+		detail: 'Pull request status from the last GitHub sync.',
+		label: 'PR',
+		number: presentation.number,
+		state,
+		status,
+	};
+}
+
+/** Translates a compact presentation status into the shell PR status + state. */
+function mapPresentationStatus(status: WorkspacePrPresentation['status']): {
+	state: 'closed' | 'merged' | 'open';
+	status: PullRequestShellStatus;
+} {
+	switch (status) {
+		case 'merged':
+			return { state: 'merged', status: 'idle' };
+		case 'closed':
+			return { state: 'closed', status: 'idle' };
+		case 'blocked':
+			return { state: 'open', status: 'blocked' };
+		case 'checking':
+			return { state: 'open', status: 'checking' };
+		case 'ready':
+			return { state: 'open', status: 'ready-to-merge' };
+		default:
+			return { state: 'open', status: 'idle' };
+	}
 }
 
 /** Renders a short summary of the workspace's source branch. */

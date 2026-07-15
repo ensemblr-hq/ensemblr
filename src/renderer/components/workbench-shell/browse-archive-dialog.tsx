@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArchiveRestoreIcon, Trash2Icon } from 'lucide-react';
+import { ArchiveIcon, ArchiveRestoreIcon, Trash2Icon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import {
@@ -184,7 +184,11 @@ function BrowseArchiveDialogBody({
 									key={entry.id}
 								>
 									<div className='flex flex-col gap-0.5'>
-										<span className='font-medium text-[0.8125rem]'>
+										<span className='flex items-center gap-1.5 font-medium text-[0.8125rem]'>
+											<ArchiveIcon
+												aria-hidden='true'
+												className='size-3.5 text-muted-foreground'
+											/>
 											{entry.name}
 										</span>
 										<span className='font-mono text-[0.6875rem] text-muted-foreground'>

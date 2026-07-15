@@ -258,6 +258,7 @@
 	--color-status-ok: var(--ensemblr-status-ok);
 	--color-status-warning: var(--ensemblr-status-warning);
 	--color-status-danger: var(--ensemblr-status-danger);
+	--color-status-merged: oklch(0.72 0.21 304);
 	--color-code: var(--ensemblr-code);
 	--color-code-foreground: var(--ensemblr-code-foreground);
 	--color-code-border: var(--ensemblr-code-border);

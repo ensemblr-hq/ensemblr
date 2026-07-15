@@ -40,6 +40,7 @@ export default defineConfig({
 			'tests/main/workspace-commits.test.ts',
 			'tests/main/list-workspace-files.test.ts',
 			'tests/main/open-target-paths.test.ts',
+			'tests/main/workspace-pr-sweeper.test.ts',
 		],
 		coverage: {
 			provider: 'istanbul',

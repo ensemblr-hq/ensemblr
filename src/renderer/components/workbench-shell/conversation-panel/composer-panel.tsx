@@ -98,7 +98,11 @@ export function ComposerPanel({
 			? composer.placeholder
 			: 'Ask to make changes, @mention files, run /commands';
 
-	const submitButton = state.isStreaming ? (
+	// Stop only when Pi is working AND there is nothing to send. The moment the
+	// user drafts a follow-up the control becomes Send (steer / follow-up), so a
+	// live turn no longer hides the ability to send.
+	const showStop = state.isStreaming && !state.hasContent;
+	const submitButton = showStop ? (
 		<Button
 			aria-label='Stop'
 			className='rounded-md'
@@ -114,14 +118,14 @@ export function ComposerPanel({
 			aria-label='Send'
 			className={cn(
 				'rounded-md',
-				!state.canSubmit &&
+				!state.canSend &&
 					'bg-muted text-muted-foreground hover:bg-muted hover:text-muted-foreground',
 			)}
-			disabled={!state.canSubmit}
+			disabled={!state.canSend}
 			onClick={() => void state.handleSubmit()}
 			size='icon-sm'
 			type='button'
-			variant={state.canSubmit ? 'default' : 'secondary'}
+			variant={state.canSend ? 'default' : 'secondary'}
 		>
 			<ArrowUpIcon />
 		</Button>
@@ -130,7 +134,7 @@ export function ComposerPanel({
 	const submitTooltip =
 		composer.disabled && composer.disabledReason
 			? composer.disabledReason
-			: state.isStreaming
+			: showStop
 				? null
 				: 'send';
 	const submitWithTooltip =

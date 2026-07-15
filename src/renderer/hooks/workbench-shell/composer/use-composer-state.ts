@@ -79,6 +79,8 @@ interface ComposerStateApi {
 	autocompleteKind: AutocompleteKind;
 	autocompleteTotal: number;
 	canSubmit: boolean;
+	/** True when a send is allowed even while Pi is working (steer / follow-up). */
+	canSend: boolean;
 	dismissAutocomplete: () => void;
 	externalAttachments: readonly ExternalAttachment[];
 	fileInputRef: RefObject<HTMLInputElement | null>;
@@ -92,6 +94,8 @@ interface ComposerStateApi {
 	handleSelect: () => void;
 	handleSubmit: () => Promise<void> | void;
 	hasChips: boolean;
+	/** True when the composer holds any draft text or attachment. */
+	hasContent: boolean;
 	insertText: (text: string) => void;
 	isStreaming: boolean;
 	/** Send the current draft to Pi as a follow-up (Cmd+J). */
@@ -776,13 +780,24 @@ export function useComposerState({
 	);
 
 	const isStreaming = composer.isStreaming || pending;
-	const canSubmit =
+	const hasContent =
+		value.trim().length > 0 ||
+		mentionAttachments.length > 0 ||
+		uploadAttachments.length > 0 ||
+		externalAttachments.length > 0;
+	// A normal (idle) send: enabled only when nothing is streaming.
+	const canSubmit = !composer.disabled && !isStreaming && hasContent;
+	// A send that is valid even mid-turn (steer / follow-up). Lets the composer
+	// keep showing an enabled Send button while Pi works so a drafted follow-up
+	// is deliverable instead of being hidden behind the Stop button. Under the
+	// `block` follow-up mode a mid-turn send would only surface the blocked
+	// notice, so the button stays disabled rather than presenting an enabled
+	// control that no-ops.
+	const canSend =
 		!composer.disabled &&
-		!isStreaming &&
-		(value.trim().length > 0 ||
-			mentionAttachments.length > 0 ||
-			uploadAttachments.length > 0 ||
-			externalAttachments.length > 0);
+		!pending &&
+		hasContent &&
+		!(composer.isStreaming && followUp === 'block');
 	const hasChips =
 		uploadAttachments.length > 0 ||
 		mentionAttachments.length > 0 ||
@@ -798,6 +813,7 @@ export function useComposerState({
 		autocompleteKind,
 		autocompleteTotal,
 		canSubmit,
+		canSend,
 		dismissAutocomplete,
 		externalAttachments,
 		fileInputRef,
@@ -811,6 +827,7 @@ export function useComposerState({
 		handleSelect,
 		handleSubmit,
 		hasChips,
+		hasContent,
 		insertText,
 		isStreaming,
 		mentionAttachments,

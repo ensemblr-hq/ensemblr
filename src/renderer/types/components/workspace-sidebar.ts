@@ -4,6 +4,7 @@ export type WorkspaceSidebarStateKind =
 	| 'branch'
 	| 'pr-blocked'
 	| 'pr-checking'
+	| 'pr-merged'
 	| 'pr-open'
 	| 'pr-ready'
 	| 'pr-working'

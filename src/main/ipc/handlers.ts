@@ -8,6 +8,7 @@ import type {
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
 import { createGithubService } from '../github/github-service';
+import { createWorkspacePrStatusSweeper } from '../github/workspace-pr-sweeper';
 import type { LinearAuthService, LinearService } from '../linear';
 import type { OpenTargetService } from '../open-target';
 import type { PiSessionService } from '../pi-agent';
@@ -37,7 +38,10 @@ import type { ScriptLifecycleService } from '../scripts';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsemblrDatabaseService } from '../storage';
 import { getPiSessionById } from '../storage/repositories/pi-session-repository';
-import { getWorkspacePathById } from '../storage/repositories/workspace-repository';
+import {
+	getWorkspacePathById,
+	listActiveWorkspacePathRows,
+} from '../storage/repositories/workspace-repository';
 import type { TerminalService } from '../terminal';
 import type {
 	ListWorkspaceFilesService,
@@ -114,11 +118,18 @@ interface RegisterIpcHandlersOptions {
 	workspaceFilesWatcher: WorkspaceFilesWatcher;
 }
 
+/** Teardown handle for the lifecycle-owning work `registerIpcHandlers` starts. */
+export interface IpcHandlersHandle {
+	/** Stops background workers (e.g. the PR-status sweeper) on app quit. */
+	dispose: () => void;
+}
+
 /**
  * Composition root for every renderer-facing `ipcMain` handler. Each domain
  * group lives in its own `handlers/<domain>.ts` file and receives only the
  * services it needs.
  * @param options - Service dependencies the handlers delegate to.
+ * @returns A handle that tears down background workers on app quit.
  */
 export function registerIpcHandlers({
 	appSettingsService,
@@ -156,7 +167,7 @@ export function registerIpcHandlers({
 	terminalService,
 	unarchiveWorkspaceService,
 	workspaceFilesWatcher,
-}: RegisterIpcHandlersOptions): void {
+}: RegisterIpcHandlersOptions): IpcHandlersHandle {
 	// Permission gate is wired here so all handler groups share one instance.
 	// `getMode` re-resolves on every gated call so settings changes apply live.
 	const withPermissionGate = createPermissionGate({
@@ -251,17 +262,27 @@ export function registerIpcHandlers({
 	registerWorkspaceGitHandlers({
 		workspaceGitService: createWorkspaceGitService({ localCommandService }),
 	});
-	registerGithubHandlers({
-		githubService: createGithubService({
-			databaseService,
-			localCommandService,
-		}),
-		withPermissionGate,
+	const githubService = createGithubService({
+		databaseService,
+		localCommandService,
 	});
+	registerGithubHandlers({ githubService, withPermissionGate });
+	const prStatusSweeper = createWorkspacePrStatusSweeper({
+		listActiveWorkspaces: () => {
+			const database = databaseService.getConnection()?.database ?? null;
+			return database ? listActiveWorkspacePathRows({ database }) : [];
+		},
+		refreshSnapshot: async ({ workspaceCwd, workspaceId }) => {
+			await githubService.getPullRequestSnapshot({ workspaceCwd, workspaceId });
+		},
+	});
+	prStatusSweeper.start();
 	registerRepositorySourcesHandlers({
 		repositorySourcesService: createRepositorySourcesService({
 			databaseService,
 			localCommandService,
 		}),
 	});
+
+	return { dispose: () => prStatusSweeper.dispose() };
 }
