@@ -55,5 +55,10 @@ export const repositoryWorkspaceNavigationQuery = queryOptions({
 			() => getEnsemblrApi().repositoryWorkspaceNavigation(),
 		),
 	queryKey: ensemblrQueryKeys.repositoryWorkspaceNavigation(),
+	// Re-read the SQLite-backed nav tree so PR/checks/merge status written by the
+	// active-tab poll and the ~120s main-process sweeper reaches sidebar rows
+	// without a dedicated broadcast channel. This poll only surfaces what those
+	// writers have already persisted; it does not itself refresh gh.
+	refetchInterval: 15000,
 	staleTime: 2000,
 });

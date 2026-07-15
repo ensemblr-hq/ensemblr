@@ -133,13 +133,21 @@ export function createProtocolDispatcher(
 				}
 				return;
 			}
-			// Pi lifecycle: `agent_start` / `agent_end` / `turn_start` / `turn_end`.
+			// Pi lifecycle: a single `agent_start` … `agent_end` wraps the whole
+			// prompt, and inside it Pi emits one `turn_start`/`turn_end` pair per
+			// LLM call (one per tool-loop iteration — see the multi-tool captures).
+			// The session is BUSY for the entire agent run, so only `agent_end`
+			// returns to idle. A per-turn `turn_end` must NOT, or the busy state
+			// collapses after the first tool round and takes the composer Stop
+			// button and the live turn timer down with it. Refresh the context
+			// meter on every turn boundary so the token gauge tracks each call.
 			case 'agent_start':
+			case 'turn_start':
 				setStatus('streaming');
 				return;
-			case 'turn_start':
-				return;
 			case 'turn_end':
+				requestContextUsage();
+				return;
 			case 'agent_end':
 				setStatus('idle');
 				requestContextUsage();

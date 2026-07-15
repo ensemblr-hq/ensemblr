@@ -3,6 +3,25 @@ export interface RepositoryWorkspaceNavigationMetadata {
 	[key: string]: unknown;
 }
 
+/**
+ * Compact pull-request status a workspace sidebar row can render without the
+ * full PR snapshot. `merged`/`closed` mirror the PR's GitHub state; the
+ * remaining values collapse an OPEN PR's checks + mergeability into one signal.
+ */
+export type WorkspacePrPresentationStatus =
+	| 'blocked'
+	| 'checking'
+	| 'closed'
+	| 'merged'
+	| 'open'
+	| 'ready';
+
+/** The compact PR presentation attached to a navigation workspace row. */
+export interface WorkspacePrPresentation {
+	number: number;
+	status: WorkspacePrPresentationStatus;
+}
+
 /** A workspace entry in the repository/workspace navigation tree. */
 export interface RepositoryWorkspaceNavigationWorkspace {
 	archivedAt: string | null;
@@ -13,6 +32,13 @@ export interface RepositoryWorkspaceNavigationWorkspace {
 	metadata: RepositoryWorkspaceNavigationMetadata;
 	name: string;
 	path: string;
+	/**
+	 * Compact PR status derived from the workspace's cached GitHub snapshot.
+	 * Absent/null when no PR is cached (never fetched, or the branch has none).
+	 * Lets the sidebar icon reflect real merge/checks state without the full
+	 * snapshot.
+	 */
+	pullRequest?: WorkspacePrPresentation | null;
 	repositoryId: string;
 	slug: string;
 	updatedAt: string;

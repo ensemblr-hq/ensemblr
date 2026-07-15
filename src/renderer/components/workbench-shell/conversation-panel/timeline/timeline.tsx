@@ -80,7 +80,12 @@ export function PiSessionTimeline({
 			: sessionsData?.sessions.find((session) => session.id === tabPiSessionId);
 	const branchId = activePiSession?.branchId ?? '';
 	const piSessionId = activePiSession?.id ?? null;
-	const isStreaming = activePiSession?.status === 'streaming';
+	// Match the composer's busy definition (`starting || streaming`) so the live
+	// working indicator + turn timer appear during the pre-first-token gap and
+	// stay mounted for the whole agent run rather than flickering per tool round.
+	const isStreaming =
+		activePiSession?.status === 'streaming' ||
+		activePiSession?.status === 'starting';
 
 	const { error, events } = useTimelineEvents({
 		branchId,

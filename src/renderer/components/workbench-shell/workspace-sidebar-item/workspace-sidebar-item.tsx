@@ -7,6 +7,7 @@ import {
 } from '@/renderer/components/ui/context-menu';
 import { SidebarMenuButton } from '@/renderer/components/ui/sidebar';
 import { useNavigation } from '@/renderer/components/workbench-shell/shell-contexts';
+import { useLivePullRequestModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-pull-request-model';
 import { useWorkspacePiBusy } from '@/renderer/hooks/workspace/use-workspace-pi-busy';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
@@ -59,7 +60,22 @@ export function WorkspaceSidebarItem({
 	// priority over PR/check states without disturbing the cached
 	// `workspace.status` semantics elsewhere in the renderer.
 	const agentBusy = useWorkspacePiBusy(workspace.id);
-	const sidebarState = getWorkspaceSidebarState(workspace, { agentBusy });
+	// The active row shares the header's live PR snapshot (same query key), so its
+	// icon flips to ready-to-merge in the same render as the header — not one
+	// slower navigation poll later. Inactive rows keep the navigation snapshot's
+	// PR state (returned unchanged, so no extra subscriptions or re-renders).
+	const livePullRequest = useLivePullRequestModel({
+		changeSummary: workspace.changeSummary,
+		enabled: isActive,
+		fallback: workspace.pullRequest,
+		workspaceCwd: workspace.pathLabel,
+		workspaceId: workspace.id,
+	});
+	const liveWorkspace =
+		livePullRequest === workspace.pullRequest
+			? workspace
+			: { ...workspace, pullRequest: livePullRequest };
+	const sidebarState = getWorkspaceSidebarState(liveWorkspace, { agentBusy });
 	const WorkspaceIcon = sidebarState.icon;
 	const hasDiffStats =
 		workspace.changeSummary.additions > 0 ||

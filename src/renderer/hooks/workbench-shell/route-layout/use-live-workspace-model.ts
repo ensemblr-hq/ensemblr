@@ -2,9 +2,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo, useRef } from 'react';
 
 import {
-	pullRequestSnapshotQuery,
-	reviewCommentsQuery,
-	reviewTodosQuery,
 	settingsResolutionQuery,
 	workspaceFilesQuery,
 	workspaceGitStatusQuery,
@@ -14,7 +11,6 @@ import {
 	scriptSummaryToDockStatus,
 } from '@/renderer/lib/terminal/script-summaries';
 import { mapTerminalSessionsToDockTabs } from '@/renderer/lib/terminal/terminal-tabs';
-import { buildPullRequestShellModel } from '@/renderer/lib/workbench/pull-request-model';
 import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
 import type { useWorkspaceTerminalSessions } from '@/renderer/state/workspace/terminal-sessions';
 import type {
@@ -25,6 +21,7 @@ import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings
 import { parseWorkspaceScriptSettings } from '@/shared/scripts/script-settings';
 
 import { useEnsureWorkspaceSetup } from './use-ensure-workspace-setup';
+import { useLivePullRequestModel } from './use-live-pull-request-model';
 import { usePullRequestAutoRefresh } from './use-pull-request-auto-refresh';
 import { useWorkspaceFilesWatch } from './use-workspace-files-watch';
 
@@ -95,18 +92,6 @@ export function useLiveWorkspaceModel({
 	const { data: allFilesData } = useQuery(
 		workspaceFilesQuery(activeWorkspace.pathLabel ?? null),
 	);
-	const { data: prSnapshotData } = useQuery(
-		pullRequestSnapshotQuery({
-			workspaceCwd: activeWorkspace.pathLabel ?? null,
-			workspaceId: activeWorkspace.id,
-		}),
-	);
-	const { data: reviewTodosData } = useQuery(
-		reviewTodosQuery(activeWorkspace.id),
-	);
-	const { data: reviewCommentsData } = useQuery(
-		reviewCommentsQuery(activeWorkspace.id),
-	);
 
 	// Refetches (the 30s poll + the fs watcher) hand back a fresh `files` array
 	// even when the file set is unchanged. Key the remap on a content signature
@@ -139,38 +124,42 @@ export function useLiveWorkspaceModel({
 		return value;
 	}, [allFilesData?.files, activeWorkspace.workspaceFiles]);
 
+	const liveReview = useMemo(() => {
+		if (!gitStatusData) {
+			return {};
+		}
+		if (gitStatusData.error) {
+			return { reviewFilesError: gitStatusData.error.message };
+		}
+		return {
+			changeSummary: {
+				additions: gitStatusData.summary.additions,
+				deletions: gitStatusData.summary.deletions,
+				files: gitStatusData.summary.files,
+			},
+			reviewFiles: mapGitStatusToReviewFiles(gitStatusData.files),
+		};
+	}, [gitStatusData]);
+	const changeSummary =
+		'changeSummary' in liveReview && liveReview.changeSummary
+			? liveReview.changeSummary
+			: activeWorkspace.changeSummary;
+
+	// The active sidebar row derives its icon from this same hook (keyed by the
+	// same workspace id), so header state and workspace icon move together the
+	// instant a PR flips to ready-to-merge — no lag behind the navigation poll.
+	const pullRequest = useLivePullRequestModel({
+		changeSummary,
+		fallback: activeWorkspace.pullRequest,
+		workspaceCwd: activeWorkspace.pathLabel ?? null,
+		workspaceId: activeWorkspace.id,
+	});
+
 	const workspaceWithLiveDockTabs = useMemo<ActiveWorkspace>(() => {
 		const scripts = buildWorkspaceScriptSummaries({
 			sessions: terminalSessions.sessions,
 			settings: scriptSettingsData ?? null,
 		});
-		const gitStatus = gitStatusData;
-		const liveReview = gitStatus
-			? gitStatus.error
-				? { reviewFilesError: gitStatus.error.message }
-				: {
-						changeSummary: {
-							additions: gitStatus.summary.additions,
-							deletions: gitStatus.summary.deletions,
-							files: gitStatus.summary.files,
-						},
-						reviewFiles: mapGitStatusToReviewFiles(gitStatus.files),
-					}
-			: {};
-		const changeSummary =
-			'changeSummary' in liveReview && liveReview.changeSummary
-				? liveReview.changeSummary
-				: activeWorkspace.changeSummary;
-		const prResult = prSnapshotData;
-		const pullRequest = prResult
-			? buildPullRequestShellModel({
-					changeSummary,
-					localComments: reviewCommentsData?.comments ?? [],
-					snapshot: prResult.snapshot,
-					...(prResult.error ? { syncError: prResult.error.message } : {}),
-					todos: reviewTodosData?.todos ?? [],
-				})
-			: activeWorkspace.pullRequest;
 
 		return {
 			...activeWorkspace,
@@ -205,11 +194,9 @@ export function useLiveWorkspaceModel({
 		};
 	}, [
 		activeWorkspace,
-		gitStatusData,
+		liveReview,
 		liveWorkspaceFiles,
-		prSnapshotData,
-		reviewCommentsData?.comments,
-		reviewTodosData?.todos,
+		pullRequest,
 		scriptSettingsData,
 		terminalSessions.activeTerminalIds,
 		terminalSessions.sessions,

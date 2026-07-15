@@ -29,7 +29,7 @@ import {
 	createEnvironmentVariablesService,
 	createWorkspaceEnvironmentService,
 } from './environment';
-import { registerIpcHandlers } from './ipc';
+import { type IpcHandlersHandle, registerIpcHandlers } from './ipc';
 import {
 	createLinearAuthService,
 	createLinearClient,
@@ -433,6 +433,7 @@ const broadcastToAllWindows = (channel: string, payload: unknown): void => {
 		}
 	}
 };
+let ipcHandlersHandle: IpcHandlersHandle | null = null;
 const workspaceFilesWatcher = createWorkspaceFilesWatcher({
 	/** Broadcasts a workspace-files-changed event when the watcher fires. */
 	onChange: (workspaceCwd) =>
@@ -514,7 +515,7 @@ app.whenReady().then(() => {
 		} satisfies AppSettingsChangedBroadcast);
 		agentActivityMonitor.refresh();
 	});
-	registerIpcHandlers({
+	ipcHandlersHandle = registerIpcHandlers({
 		appSettingsService,
 		archiveRepositoryService,
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
@@ -559,6 +560,7 @@ app.on('will-quit', () => {
 	appSettingsService.stop();
 	agentActivityMonitor.dispose();
 	terminalService.disposeAll();
+	ipcHandlersHandle?.dispose();
 	workspaceFilesWatcher.stopAll();
 	databaseService.close();
 });

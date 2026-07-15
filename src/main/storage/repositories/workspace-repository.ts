@@ -430,6 +430,32 @@ export function selectWorkspaceEnvironmentJoinById({
 		.get(workspaceId);
 }
 
+/** `id` + worktree `path` for one non-archived workspace. */
+export interface ActiveWorkspacePathRow {
+	id: string;
+	path: string;
+}
+
+/**
+ * Returns `id` + worktree `path` for every non-archived workspace. Used by the
+ * PR-status sweeper to refresh each workspace's cached GitHub snapshot.
+ * @param options - The open database connection.
+ * @returns One row per active workspace.
+ */
+export function listActiveWorkspacePathRows({
+	database,
+}: {
+	database: DatabaseSync;
+}): ActiveWorkspacePathRow[] {
+	return database
+		.prepare(
+			`SELECT id AS id, path AS path
+			FROM workspaces
+			WHERE archived_at IS NULL`,
+		)
+		.all() as unknown as ActiveWorkspacePathRow[];
+}
+
 /** Inputs for {@link listActiveWorkspaceMetadataRows}. */
 export interface ListActiveWorkspaceMetadataRowsOptions {
 	database: DatabaseSync;

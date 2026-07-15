@@ -1,9 +1,11 @@
 import type { DatabaseSync } from 'node:sqlite';
-
+import { deriveWorkspacePrPresentation } from '../../../shared/github-pr-presentation.ts';
+import type { GithubPullRequestSnapshotWire } from '../../../shared/ipc/contracts/github';
 import type {
 	RepositoryWorkspaceNavigationMetadata,
 	RepositoryWorkspaceNavigationRepository,
 	RepositoryWorkspaceNavigationSnapshot,
+	WorkspacePrPresentation,
 } from '../../../shared/ipc/contracts/repository-navigation';
 
 /** Internal: shape of a repository row read from SQLite. */
@@ -28,6 +30,8 @@ interface WorkspaceRow {
 	metadataJson: string;
 	name: string;
 	path: string;
+	/** Cached GitHub PR snapshot JSON joined from `integration_metadata`, if any. */
+	pullRequestSnapshotJson: string | null;
 	repositoryId: string;
 	slug: string;
 	updatedAt: string;
@@ -50,20 +54,26 @@ ORDER BY lower(name), lower(slug), id
 
 const SELECT_WORKSPACES = `
 SELECT
-	id,
-	repository_id AS repositoryId,
-	slug,
-	name,
-	path,
-	branch_name AS branchName,
-	base_branch AS baseBranch,
-	created_at AS createdAt,
-	updated_at AS updatedAt,
-	archived_at AS archivedAt,
-	metadata_json AS metadataJson
-FROM workspaces
-WHERE archived_at IS NULL
-ORDER BY created_at DESC, id DESC
+	w.id AS id,
+	w.repository_id AS repositoryId,
+	w.slug AS slug,
+	w.name AS name,
+	w.path AS path,
+	w.branch_name AS branchName,
+	w.base_branch AS baseBranch,
+	w.created_at AS createdAt,
+	w.updated_at AS updatedAt,
+	w.archived_at AS archivedAt,
+	w.metadata_json AS metadataJson,
+	im.metadata_json AS pullRequestSnapshotJson
+FROM workspaces w
+LEFT JOIN integration_metadata im
+	ON im.provider = 'github'
+	AND im.resource_type = 'pull-request'
+	AND im.resource_id = w.id
+	AND im.external_id = ''
+WHERE w.archived_at IS NULL
+ORDER BY w.created_at DESC, w.id DESC
 `;
 
 /**
@@ -130,6 +140,7 @@ export function getRepositoryWorkspaceNavigationSnapshot({
 			metadata: parseMetadataJson(row.metadataJson),
 			name: row.name,
 			path: row.path,
+			pullRequest: parsePullRequestPresentation(row.pullRequestSnapshotJson),
 			repositoryId: row.repositoryId,
 			slug: row.slug,
 			updatedAt: row.updatedAt,
@@ -140,6 +151,26 @@ export function getRepositoryWorkspaceNavigationSnapshot({
 		generatedAt,
 		repositories: Array.from(repositoriesById.values()),
 	};
+}
+
+/**
+ * Parses a joined PR-snapshot JSON column into the compact presentation the
+ * sidebar row renders, tolerating a missing join or malformed cache row.
+ * @param snapshotJson - Raw `integration_metadata.metadata_json`, or null.
+ * @returns The compact PR presentation, or null when absent/unparseable.
+ */
+function parsePullRequestPresentation(
+	snapshotJson: string | null,
+): WorkspacePrPresentation | null {
+	if (!snapshotJson) {
+		return null;
+	}
+	try {
+		const parsed = JSON.parse(snapshotJson) as GithubPullRequestSnapshotWire;
+		return deriveWorkspacePrPresentation(parsed);
+	} catch {
+		return null;
+	}
 }
 
 /**

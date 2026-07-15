@@ -2,6 +2,7 @@ import {
 	CircleEllipsisIcon,
 	GitBranchIcon,
 	GitMergeConflictIcon,
+	GitMergeIcon,
 	GitPullRequestArrowIcon,
 	GitPullRequestIcon,
 	LoaderCircleIcon,
@@ -82,6 +83,16 @@ function getPullRequestSidebarState(
 ): WorkspaceSidebarState | null {
 	if (typeof workspace.pullRequest.number !== 'number') {
 		return null;
+	}
+
+	// A merged PR is the terminal state — it beats any stale check/mergeability
+	// status still hanging off the snapshot.
+	if (workspace.pullRequest.state === 'merged') {
+		return {
+			className: 'text-status-merged',
+			icon: GitMergeIcon,
+			kind: 'pr-merged',
+		};
 	}
 
 	if (workspace.pullRequest.status === 'ready-to-merge') {

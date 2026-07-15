@@ -7,6 +7,7 @@ import type {
 	PullRequestTodoSummary,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
+import { deriveOpenPullRequestStatus } from '@/shared/github-pr-presentation';
 import type {
 	GithubCheckWire,
 	GithubCommentWire,
@@ -65,7 +66,7 @@ export function buildPullRequestShellModel({
 	}
 
 	const checks = pullRequest.checks.map(toCheckSummary);
-	const status = derivePullRequestStatus(pullRequest, checks);
+	const status = derivePullRequestStatus(pullRequest);
 	const previewDeployment = derivePreviewDeployment(
 		pullRequest.deployments,
 		checks,
@@ -185,38 +186,30 @@ function buildTodoSummaries(
 	);
 }
 
-/** Derives the PR shell status from check buckets + mergeability signals. */
+/**
+ * Derives the PR shell status by delegating to the shared open-PR derivation,
+ * so this header model and the cached sidebar rows stay in lockstep. Only the
+ * shell-status mapping (`ready` → `ready-to-merge`, draft/open → `idle`) lives
+ * here; the underlying policy lives once in `deriveOpenPullRequestStatus`.
+ * @param pullRequest - The pull request wire record.
+ * @returns The shell status for the PR header.
+ */
 function derivePullRequestStatus(
 	pullRequest: GithubPullRequestWire,
-	checks: readonly PullRequestCheckSummary[],
 ): PullRequestShellStatus {
 	if (pullRequest.state !== 'open') {
 		return 'idle';
 	}
-	const hasFailing = checks.some((check) => check.status === 'blocked');
-	const hasPending = checks.some((check) => check.status === 'pending');
-	const isBlockedByPolicy =
-		pullRequest.mergeable === 'conflicting' ||
-		pullRequest.reviewDecision === 'CHANGES_REQUESTED' ||
-		pullRequest.mergeStateStatus === 'BLOCKED' ||
-		pullRequest.mergeStateStatus === 'DIRTY';
-
-	if (hasFailing || isBlockedByPolicy) {
-		return 'blocked';
+	switch (deriveOpenPullRequestStatus(pullRequest)) {
+		case 'blocked':
+			return 'blocked';
+		case 'checking':
+			return 'checking';
+		case 'ready':
+			return 'ready-to-merge';
+		default:
+			return 'idle';
 	}
-	if (hasPending) {
-		return 'checking';
-	}
-	if (pullRequest.isDraft) {
-		return 'idle';
-	}
-	if (
-		pullRequest.mergeable === 'mergeable' &&
-		pullRequest.reviewDecision !== 'REVIEW_REQUIRED'
-	) {
-		return 'ready-to-merge';
-	}
-	return 'idle';
 }
 
 /**
