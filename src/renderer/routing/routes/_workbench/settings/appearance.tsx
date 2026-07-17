@@ -145,11 +145,11 @@ function AppearanceSettings() {
 						aria-label='Mono font name'
 						className='h-8 w-56'
 						onChange={(e) => setMonoFont(e.target.value)}
-						placeholder='JetBrains Mono'
+						placeholder='JetBrainsMono Nerd Font Mono'
 						value={monoFont}
 					/>
 				}
-				description='Font used for code and diffs. Enter the font name exactly as installed on your system.'
+				description='Font used for code and diffs. The bundled Nerd Font is the default; custom fonts must be installed on your system.'
 				label='Mono font'
 				modified={monoFont !== DEFAULTS.monoFont}
 				stack
@@ -195,11 +195,11 @@ function AppearanceSettings() {
 						aria-label='Terminal font name'
 						className='h-8 w-56'
 						onChange={(e) => setTerminalFont(e.target.value)}
-						placeholder='JetBrains Mono'
+						placeholder='JetBrainsMono Nerd Font Mono'
 						value={terminalFont}
 					/>
 				}
-				description='Enter the font name exactly as installed, e.g. Arial, Papyrus, FiraCode Nerd Font.'
+				description='The bundled Nerd Font is the default; enter another font name exactly as installed to override it.'
 				label='Terminal font'
 				modified={terminalFont !== DEFAULTS.terminalFont}
 			/>

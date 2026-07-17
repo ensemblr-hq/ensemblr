@@ -15,6 +15,39 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@font-face {
+	font-display: swap;
+	font-family: "JetBrainsMono Nerd Font Mono";
+	font-style: normal;
+	font-weight: 400;
+	src: url("./fonts/JetBrainsMonoNerdFontMono-Regular.ttf") format("truetype");
+}
+
+@font-face {
+	font-display: swap;
+	font-family: "JetBrainsMono Nerd Font Mono";
+	font-style: italic;
+	font-weight: 400;
+	src: url("./fonts/JetBrainsMonoNerdFontMono-Italic.ttf") format("truetype");
+}
+
+@font-face {
+	font-display: swap;
+	font-family: "JetBrainsMono Nerd Font Mono";
+	font-style: normal;
+	font-weight: 700;
+	src: url("./fonts/JetBrainsMonoNerdFontMono-Bold.ttf") format("truetype");
+}
+
+@font-face {
+	font-display: swap;
+	font-family: "JetBrainsMono Nerd Font Mono";
+	font-style: italic;
+	font-weight: 700;
+	src: url("./fonts/JetBrainsMonoNerdFontMono-BoldItalic.ttf")
+		format("truetype");
+}
+
 :root {
 	color-scheme: light dark;
 	color: var(--foreground);
@@ -29,7 +62,8 @@
 	 * prepended at runtime; this literal is the fallback chain.
 	 */
 	--ensemblr-font-mono:
-		"JetBrains Mono Variable", "JetBrains Mono", Menlo, Consolas, monospace;
+		"JetBrainsMono Nerd Font Mono", "JetBrains Mono Variable", "JetBrains Mono",
+		Menlo, Consolas, monospace;
 
 	--ensemblr-canvas: oklch(0.965 0.003 265);
 	--ensemblr-toolbar: oklch(0.94 0.004 265 / 92%);

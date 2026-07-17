@@ -74,10 +74,10 @@ export const appearanceSettingsSchema = z.object({
 			'solarized-dark',
 		])
 		.catch('catppuccin-mocha'),
-	monoFont: z.string().catch('JetBrains Mono'),
+	monoFont: z.string().catch('JetBrainsMono Nerd Font Mono'),
 	codeLigatures: z.boolean().catch(true),
 	markdownStyle: z.enum(['default', 'compact', 'prose']).catch('default'),
-	terminalFont: z.string().catch('JetBrains Mono'),
+	terminalFont: z.string().catch('JetBrainsMono Nerd Font Mono'),
 	terminalFontSize: z.number().int().min(8).max(24).catch(12),
 });
 

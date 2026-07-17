@@ -21,7 +21,7 @@ interface CreateXtermAdapterOptions {
 
 /** Fallback monospace stack used when no user terminal font is set. */
 export const DEFAULT_FONT_FAMILY =
-	'"JetBrains Mono Variable", ui-monospace, monospace';
+	'"JetBrainsMono Nerd Font Mono", "JetBrains Mono Variable", ui-monospace, monospace';
 const DEFAULT_FONT_SIZE = 12;
 const DEFAULT_SCROLLBACK = 10_000;
 

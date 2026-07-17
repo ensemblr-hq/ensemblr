@@ -6,6 +6,9 @@ import type {
 	ChangesViewMode,
 } from '@/renderer/types/workbench-shell';
 
+/** Transient dock activity state used by workspace sidebar badges. */
+export type WorkspaceDockActivityState = 'running' | 'setup-running';
+
 const workspaceStorageOptions = { getOnInit: true };
 
 /** One-shot request to reveal a directory in the All files tree. */
@@ -25,7 +28,7 @@ export const workspaceDirectoryRevealRequestAtom =
  * the map shape keeps it correct if multiple workspace routes ever mount at once.
  */
 export const workspaceDockActivityByWorkspaceAtom = atom<
-	Record<string, boolean>
+	Record<string, WorkspaceDockActivityState>
 >({});
 
 /** Persisted display mode for the changes panel (list vs. tree). */

@@ -15,7 +15,9 @@ import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 /** Builds the terminal CSS font stack, prepending the user's chosen font. */
 function buildTerminalFontFamily(font: string): string {
 	const trimmed = font.trim();
-	return trimmed ? `"${trimmed}", ${DEFAULT_FONT_FAMILY}` : DEFAULT_FONT_FAMILY;
+	return trimmed && trimmed !== 'JetBrainsMono Nerd Font Mono'
+		? `"${trimmed}", ${DEFAULT_FONT_FAMILY}`
+		: DEFAULT_FONT_FAMILY;
 }
 
 /**
@@ -137,6 +139,12 @@ export function XtermTerminal({
 		};
 
 		syncDimensions();
+
+		void document.fonts?.ready.then(() => {
+			if (!disposed) {
+				syncDimensions();
+			}
+		});
 
 		// Read-only panels never grab keyboard focus from the composer.
 		if (!readOnly) {

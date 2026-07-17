@@ -89,7 +89,6 @@
 	},
 	"license": "MIT",
 	"dependencies": {
-		"@fontsource-variable/jetbrains-mono": "^5.2.8",
 		"@iconify-json/vscode-icons": "^1.2.65",
 		"@iconify/react": "^6.0.2",
 		"@radix-ui/react-use-controllable-state": "^1.2.3",
