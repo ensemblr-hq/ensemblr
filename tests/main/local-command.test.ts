@@ -106,6 +106,39 @@ test('resolves shell environment with shell PATH precedence and common path appe
 	assert.deepEqual(secondSnapshot.env, firstSnapshot.env);
 });
 
+test('resolves and memoizes the shell environment per directory', async () => {
+	const requestedCwds: Array<string | undefined> = [];
+	const service = createTestService(
+		{},
+		{
+			shellEnvironmentLoader: async ({ cwd }) => {
+				requestedCwds.push(cwd);
+
+				return {
+					exitCode: 0,
+					signal: null,
+					stderr: '',
+					stdout: createShellEnvironmentFixtureOutput({
+						PATH: cwd ? `${cwd}/bin:/bin` : '/default/bin:/bin',
+						SHELL: TEST_SHELL,
+					}),
+				};
+			},
+		},
+	);
+
+	const workspaceFirst = await service.getEnvironment('/workspace/a');
+	const workspaceSecond = await service.getEnvironment('/workspace/a');
+	const other = await service.getEnvironment('/workspace/b');
+	const fallbackDefault = await service.getEnvironment();
+
+	assert.equal(workspaceFirst.path, '/workspace/a/bin:/bin');
+	assert.equal(workspaceSecond.path, '/workspace/a/bin:/bin');
+	assert.equal(other.path, '/workspace/b/bin:/bin');
+	assert.equal(fallbackDefault.path, '/default/bin:/bin');
+	assert.deepEqual(requestedCwds, ['/workspace/a', '/workspace/b', undefined]);
+});
+
 test('falls back to process environment with diagnostics when shell resolution fails', async () => {
 	const service = createTestService(
 		{},
@@ -128,6 +161,42 @@ test('falls back to process environment with diagnostics when shell resolution f
 		snapshot.diagnostics.map((diagnostic) => diagnostic.code),
 		['shell-env-exit', 'shell-env-fallback'],
 	);
+});
+
+test('does not memoize a fallback resolution and retries the shell', async () => {
+	let attempt = 0;
+	const service = createTestService(
+		{},
+		{
+			shellEnvironmentLoader: async () => {
+				attempt += 1;
+
+				if (attempt === 1) {
+					return { exitCode: 2, signal: null, stderr: 'transient', stdout: '' };
+				}
+
+				return {
+					exitCode: 0,
+					signal: null,
+					stderr: '',
+					stdout: createShellEnvironmentFixtureOutput({
+						PATH: '/recovered/bin',
+						SHELL: TEST_SHELL,
+					}),
+				};
+			},
+		},
+	);
+
+	const first = await service.getEnvironment();
+	const second = await service.getEnvironment();
+	const third = await service.getEnvironment();
+
+	assert.equal(first.source, 'fallback');
+	assert.equal(second.source, 'shell');
+	assert.equal(second.path, '/recovered/bin');
+	assert.equal(third.source, 'shell');
+	assert.equal(attempt, 2);
 });
 
 test('runs a command and captures stdout, stderr, exit code, and duration', async () => {

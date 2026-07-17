@@ -22,6 +22,7 @@ const SHELL_ENVIRONMENT_END_SENTINEL = '__ENSEMBLR_SHELL_ENV_END__';
 export async function resolveCommandEnvironment({
 	baseEnv,
 	commonPathEntries,
+	cwd,
 	environmentTimeoutMs,
 	now,
 	shell,
@@ -29,6 +30,7 @@ export async function resolveCommandEnvironment({
 }: {
 	baseEnv: Record<string, string>;
 	commonPathEntries: readonly string[];
+	cwd?: string;
 	environmentTimeoutMs: number;
 	now: () => Date;
 	shell: string;
@@ -39,6 +41,7 @@ export async function resolveCommandEnvironment({
 	try {
 		const result = await shellEnvironmentLoader({
 			baseEnv,
+			cwd,
 			shell,
 			timeoutMs: environmentTimeoutMs,
 		});
@@ -119,6 +122,7 @@ export async function resolveCommandEnvironment({
  */
 export function loadShellEnvironment({
 	baseEnv,
+	cwd,
 	shell,
 	timeoutMs,
 }: ShellEnvironmentLoaderRequest): Promise<ShellEnvironmentLoaderResult> {
@@ -130,6 +134,7 @@ export function loadShellEnvironment({
 				`printf '%s\\0' '${SHELL_ENVIRONMENT_BEGIN_SENTINEL}'; /usr/bin/env -0; printf '%s\\0' '${SHELL_ENVIRONMENT_END_SENTINEL}'`,
 			],
 			{
+				cwd,
 				env: baseEnv,
 				shell: false,
 				stdio: ['ignore', 'pipe', 'pipe'],

@@ -73,24 +73,52 @@ export function createLocalCommandService(
 	const shell = options.shell ?? resolveDefaultShell(baseEnv);
 	const shellEnvironmentLoader =
 		options.shellEnvironmentLoader ?? loadShellEnvironment;
-	let environmentPromise: Promise<CommandEnvironmentSnapshot> | null = null;
+	// Keyed by resolution cwd ('' for the process-default env) so directory-aware
+	// version managers can be resolved per workspace without re-spawning a shell
+	// on every lookup. Only successful ('shell') snapshots are memoized so a
+	// transient timeout does not pin a directory to the fallback env for the
+	// whole session.
+	const environmentPromises = new Map<
+		string,
+		Promise<CommandEnvironmentSnapshot>
+	>();
 
 	/**
-	 * Resolves the shell environment on first call and returns a defensive clone
-	 * on every subsequent call.
+	 * Resolves the shell environment for a directory on first call and returns a
+	 * defensive clone on every subsequent call for the same directory. A fallback
+	 * resolution is not cached, so a later call retries the shell.
+	 * @param cwd - Directory to resolve the login-shell environment in; omitted
+	 * resolves the Electron process's default environment.
 	 * @returns A cloned environment snapshot.
 	 */
-	async function getEnvironment(): Promise<CommandEnvironmentSnapshot> {
-		environmentPromise ??= resolveCommandEnvironment({
+	async function getEnvironment(
+		cwd?: string,
+	): Promise<CommandEnvironmentSnapshot> {
+		const key = cwd ?? '';
+		const cached = environmentPromises.get(key);
+
+		if (cached) {
+			return cloneEnvironmentSnapshot(await cached);
+		}
+
+		const environmentPromise = resolveCommandEnvironment({
 			baseEnv,
 			commonPathEntries,
+			cwd,
 			environmentTimeoutMs,
 			now,
 			shell,
 			shellEnvironmentLoader,
 		});
+		environmentPromises.set(key, environmentPromise);
 
-		return cloneEnvironmentSnapshot(await environmentPromise);
+		const snapshot = await environmentPromise;
+
+		if (snapshot.source !== 'shell') {
+			environmentPromises.delete(key);
+		}
+
+		return cloneEnvironmentSnapshot(snapshot);
 	}
 
 	/**

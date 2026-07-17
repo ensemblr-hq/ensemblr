@@ -27,6 +27,7 @@ import {
 } from './config';
 import {
 	createEnvironmentVariablesService,
+	createToolchainPathResolver,
 	createWorkspaceEnvironmentService,
 } from './environment';
 import { type IpcHandlersHandle, registerIpcHandlers } from './ipc';
@@ -419,6 +420,7 @@ const listWorkspaceFilesService = createListWorkspaceFilesService({
 const workspaceEnvironmentService = createWorkspaceEnvironmentService({
 	databaseService,
 	environmentVariablesService,
+	resolveToolchainPath: createToolchainPathResolver(localCommandService),
 	rootDirectoryService,
 });
 /**
