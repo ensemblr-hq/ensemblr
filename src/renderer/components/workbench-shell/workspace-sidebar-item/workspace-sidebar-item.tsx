@@ -15,7 +15,8 @@ import { useWorkspacePiBusy } from '@/renderer/hooks/workspace/use-workspace-pi-
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import {
-	hasRunningDockTab,
+	getRunningDockActivityState,
+	type WorkspaceDockActivityState,
 	workspaceDockActivityByWorkspaceAtom,
 } from '@/renderer/state/workspace';
 import type {
@@ -30,6 +31,7 @@ import {
 
 import { WorkspaceContextMenuContent } from './context-menu';
 import { WorkspaceDiffStats } from './diff-stats';
+import { DockActivityDot } from './dock-activity-dot';
 
 const archiveBoundary = classifyPermissionAction({
 	action: 'workspace-archive-delete',
@@ -88,18 +90,20 @@ export function WorkspaceSidebarItem({
 		() =>
 			selectAtom(
 				workspaceDockActivityByWorkspaceAtom,
-				(activity) => activity[workspace.id] === true,
+				(activity: Record<string, WorkspaceDockActivityState>) =>
+					activity[workspace.id] ?? null,
 			),
 		[workspace.id],
 	);
-	const hasLiveDockActivity = useAtomValue(liveDockActivityAtom);
+	const liveDockActivityState = useAtomValue(liveDockActivityAtom);
 	const hasDiffStats =
 		workspace.changeSummary.additions > 0 ||
 		workspace.changeSummary.deletions > 0;
 	// Live for the active row via the atom; other rows fall back to their (possibly
 	// staler) navigation snapshot, so the dot's freshness is not uniform across rows.
-	const hasRunningDockActivity =
-		hasRunningDockTab(workspace.dockTabs) || hasLiveDockActivity;
+	const dockActivityState =
+		liveDockActivityState ?? getRunningDockActivityState(workspace.dockTabs);
+	const hasRunningDockActivity = dockActivityState !== null;
 	const workspaceButtonLabel = `Open workspace ${workspace.name}${
 		hasRunningDockActivity ? '; dock activity running' : ''
 	}`;
@@ -124,13 +128,8 @@ export function WorkspaceSidebarItem({
 						{hasDiffStats ? (
 							<WorkspaceDiffStats isActive={isActive} workspace={workspace} />
 						) : null}
-						{hasRunningDockActivity ? (
-							<span
-								aria-hidden='true'
-								className='size-2 rounded-full bg-status-ok ring-2 ring-sidebar'
-								data-workspace-dock-activity='running'
-								title='Dock activity running'
-							/>
+						{dockActivityState ? (
+							<DockActivityDot state={dockActivityState} />
 						) : null}
 					</div>
 				</div>

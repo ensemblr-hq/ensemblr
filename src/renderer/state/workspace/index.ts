@@ -1,7 +1,8 @@
 export {
-	hasRunningDockTab,
+	getRunningDockActivityState,
 	usePublishWorkspaceDockActivity,
 } from './dock-activity';
+export type { WorkspaceDockActivityState } from './layout-atoms';
 export {
 	activeDockTabByWorkspaceAtom,
 	activeReviewTabByWorkspaceAtom,
