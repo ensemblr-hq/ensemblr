@@ -87,6 +87,14 @@ export interface TerminalService {
 	write: (terminalId: string, data: string) => void;
 }
 
+/** Environment map used as the base for PTY children. */
+export type TerminalBaseEnv = NodeJS.ProcessEnv;
+
+/** Resolves the inherited environment used as the base for PTY children. */
+export type TerminalBaseEnvResolver = () =>
+	| Promise<TerminalBaseEnv>
+	| TerminalBaseEnv;
+
 /** Options for {@link createTerminalService}. */
 export interface CreateTerminalServiceOptions {
 	backend?: PtyBackend;
@@ -97,6 +105,11 @@ export interface CreateTerminalServiceOptions {
 	now?: () => Date;
 	onLifecycle: (event: TerminalLifecycleBroadcast) => void;
 	onOutput: (event: TerminalOutputBroadcast) => void;
+	/**
+	 * Resolves the user's shell-derived environment so setup/run scripts inherit
+	 * the same PATH and toolchain shims as diagnostics and Pi sessions.
+	 */
+	resolveBaseEnv?: TerminalBaseEnvResolver;
 	/**
 	 * Shell for script commands. Stays a POSIX-compatible shell on purpose:
 	 * repository scripts routinely use `VAR=x cmd` and other constructs that
@@ -135,6 +148,7 @@ export function createTerminalService({
 	now = () => new Date(),
 	onLifecycle,
 	onOutput,
+	resolveBaseEnv = () => process.env,
 	scriptShell = resolveScriptShell(),
 	workspaceEnvironmentService,
 }: CreateTerminalServiceOptions): TerminalService {
@@ -314,11 +328,16 @@ export function createTerminalService({
 		const normalizedRows = clampDimension(rows, DEFAULT_ROWS);
 		const normalizedCommand = command?.trim() || null;
 		const shell = normalizedCommand ? scriptShell : defaultShell;
-		const args = normalizedCommand ? ['-l', '-c', normalizedCommand] : ['-l'];
+		const args = buildShellArgs(normalizedCommand);
 		const commandLabel = normalizedCommand ?? shell;
 		const id = randomUUID();
 		const createdAt = now().toISOString();
-		const env = mergeProcessEnvironment(environment.env, kind);
+		const baseEnv = await resolveTerminalBaseEnv(resolveBaseEnv, diagnostics);
+		const env = mergeProcessEnvironment({
+			baseEnv,
+			kind,
+			overlay: environment.env,
+		});
 
 		let pty: PtyProcess;
 
@@ -573,27 +592,65 @@ function defaultTitle(kind: TerminalSessionKind): string {
 }
 
 /**
+ * Builds shell arguments for interactive login shells and non-interactive
+ * scripts. Scripts intentionally avoid login startup files so the already
+ * resolved shell environment remains authoritative.
+ * @param command - Optional script command to run.
+ * @returns Arguments passed to the selected shell.
+ */
+function buildShellArgs(command: string | null): string[] {
+	return command ? ['-c', command] : ['-l'];
+}
+
+/**
+ * Resolves the base PTY environment, falling back to the Electron process
+ * environment when the configured resolver fails unexpectedly.
+ * @param resolveBaseEnv - Base environment resolver.
+ * @param diagnostics - Diagnostics collection to append fallback warnings to.
+ * @returns Environment used as the base for terminal process spawning.
+ */
+async function resolveTerminalBaseEnv(
+	resolveBaseEnv: TerminalBaseEnvResolver,
+	diagnostics: TerminalDiagnostic[],
+): Promise<TerminalBaseEnv> {
+	try {
+		return await resolveBaseEnv();
+	} catch {
+		diagnostics.push({
+			code: 'base-env-unavailable',
+			message:
+				'The shell-derived terminal environment could not be resolved; using the app process environment instead.',
+			severity: 'warning',
+		});
+		return process.env;
+	}
+}
+
+/**
  * Merges the workspace overlay onto the inherited process environment,
  * dropping undefined values so the result is a clean string record. Fills in
  * the terminal-capability variables (truecolor, UTF-8 locale) that prompt
  * tooling like starship and fish's own highlighting rely on — GUI-launched
  * Electron processes often lack them.
- * @param overlay - Workspace overlay variables.
- * @param kind - Session kind; only interactive terminals brand TERM_PROGRAM.
+ * @param input - Base environment, workspace overlay, and terminal kind.
  * @returns The merged environment.
  */
-function mergeProcessEnvironment(
-	overlay: Record<string, string>,
-	kind: TerminalSessionKind,
-): Record<string, string> {
+function mergeProcessEnvironment({
+	baseEnv,
+	kind,
+	overlay,
+}: {
+	baseEnv: TerminalBaseEnv;
+	kind: TerminalSessionKind;
+	overlay: Record<string, string>;
+}): Record<string, string> {
 	const env: Record<string, string> = {};
 
-	// Drop macOS/Electron launch-context vars so a terminal running `open` (or a
+	// Strip macOS/Electron launch-context vars so a terminal running `open` (or a
 	// tool that shells out to it) can't make macOS relaunch Ensemblr as a second
-	// instance.
-	for (const [key, value] of Object.entries(
-		stripLaunchContextEnv(process.env),
-	)) {
+	// instance. The default resolver returns raw process.env, so this strip is
+	// load-bearing even when an upstream resolver already sanitized its output.
+	for (const [key, value] of Object.entries(stripLaunchContextEnv(baseEnv))) {
 		if (value !== undefined) {
 			env[key] = value;
 		}

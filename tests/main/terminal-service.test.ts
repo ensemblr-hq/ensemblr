@@ -352,11 +352,13 @@ test('list scopes sessions to the requested workspace', async (t) => {
 });
 
 test('interactive sessions use the user shell; script commands use the script shell', async (t) => {
+	const spawnedArgs: string[][] = [];
 	const spawnedFiles: string[] = [];
 	const spawnedEnvs: Record<string, string>[] = [];
 	const fakes = [createFakePty(), createFakePty()];
 	const backend: PtyBackend = {
 		spawn: (options) => {
+			spawnedArgs.push(options.args);
 			spawnedFiles.push(options.file);
 			spawnedEnvs.push(options.env);
 			return (fakes.shift() as ReturnType<typeof createFakePty>).pty;
@@ -381,9 +383,49 @@ test('interactive sessions use the user shell; script commands use the script sh
 	});
 
 	assert.deepEqual(spawnedFiles, ['/usr/local/bin/fish', '/bin/zsh']);
+	assert.deepEqual(spawnedArgs, [['-l'], ['-c', 'bun install']]);
 	assert.equal(spawnedEnvs[0]?.COLORTERM, 'truecolor');
 	assert.equal(spawnedEnvs[0]?.TERM_PROGRAM, 'Ensemblr');
 	assert.ok(spawnedEnvs[0]?.LANG);
+});
+
+/** Verifies script PTYs inherit the same shell-derived PATH as diagnostics. */
+test('script sessions merge the resolved base environment before workspace vars', async (t) => {
+	let spawnedEnv: Record<string, string> | null = null;
+	const fake = createFakePty();
+	const backend: PtyBackend = {
+		spawn: (options) => {
+			spawnedEnv = options.env;
+			return fake.pty;
+		},
+	};
+	const database = createDatabaseFixture(t);
+	const service = createTerminalService({
+		backend,
+		databaseService: createDatabaseServiceStub(database),
+		onLifecycle: () => undefined,
+		onOutput: () => undefined,
+		resolveBaseEnv: async () => ({
+			__CFBundleIdentifier: 'dev.ensemblr.app',
+			PATH: '/mise/shims:/opt/homebrew/bin:/usr/bin',
+			SHELL_MARKER: 'from-login-shell',
+		}),
+		scriptShell: '/bin/zsh',
+		workspaceEnvironmentService:
+			createWorkspaceEnvironmentStub('/tmp/workspace'),
+	});
+
+	await service.create({
+		command: 'npm ci',
+		kind: 'setup-script',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(spawnedEnv);
+	assert.equal(spawnedEnv.PATH, '/mise/shims:/opt/homebrew/bin:/usr/bin');
+	assert.equal(spawnedEnv.SHELL_MARKER, 'from-login-shell');
+	assert.equal(spawnedEnv.ENSEMBLR_WORKSPACE_PATH, '/tmp/workspace');
+	assert.equal(spawnedEnv.__CFBundleIdentifier, undefined);
 });
 
 test('resolveUserShell returns an existing shell binary', () => {
