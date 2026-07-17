@@ -449,6 +449,8 @@ const terminalService = createTerminalService({
 	/** Broadcasts terminal output to all windows. */
 	onOutput: (event: TerminalOutputBroadcast) =>
 		broadcastToAllWindows(IPC_CHANNELS.terminalOutput, event),
+	/** Resolves the shell-derived base environment for terminal and script PTYs. */
+	resolveBaseEnv: async () => (await localCommandService.getEnvironment()).env,
 	workspaceEnvironmentService,
 });
 const scriptLifecycleService = createScriptLifecycleService({
