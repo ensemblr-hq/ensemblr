@@ -16,6 +16,7 @@ export {
 	createEnvironmentVariablesService,
 	EnvironmentVariablesError,
 } from './environment-variables';
+export { createToolchainPathResolver } from './toolchain-path';
 export type {
 	CreateWorkspaceEnvironmentServiceOptions,
 	WorkspaceEnvironmentAssembly,

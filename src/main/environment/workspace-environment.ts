@@ -84,6 +84,14 @@ export interface WorkspaceEnvironmentService {
 export interface CreateWorkspaceEnvironmentServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 	environmentVariablesService: EnvironmentVariablesService;
+	/**
+	 * Resolves the version-manager-aware `PATH` for a workspace directory, or
+	 * null when it cannot be resolved. Injected so setup/run scripts — spawned
+	 * through a non-interactive POSIX shell that never activates mise/fnm/asdf —
+	 * still inherit the workspace-pinned toolchain instead of the app's global
+	 * one.
+	 */
+	resolveToolchainPath?: (cwd: string) => Promise<string | null>;
 	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
@@ -107,7 +115,8 @@ interface WorkspaceEnvironmentRow {
 /**
  * Builds the service that assembles the full per-workspace process environment:
  * configured variables across app/repository/workspace scopes, native
- * `ENSEMBLR_*` runtime variables, and the stable allocated workspace port.
+ * `ENSEMBLR_*` runtime variables, the stable allocated workspace port, and the
+ * workspace directory's version-manager-aware `PATH` when a resolver is wired.
  *
  * The returned overlay is reusable by terminal, script, Pi, and GitHub flows;
  * runtime variables always win over configured values because their catalog
@@ -118,6 +127,7 @@ interface WorkspaceEnvironmentRow {
 export function createWorkspaceEnvironmentService({
 	databaseService,
 	environmentVariablesService,
+	resolveToolchainPath,
 	rootDirectoryService,
 }: CreateWorkspaceEnvironmentServiceOptions): WorkspaceEnvironmentService {
 	// Ports are stable once persisted; memoizing avoids re-scanning every
@@ -195,6 +205,27 @@ export function createWorkspaceEnvironmentService({
 					'No base branch or repository default branch is recorded; ENSEMBLR_DEFAULT_BRANCH was not set.',
 				severity: 'warning',
 			});
+		}
+
+		// A configured PATH is an explicit user override and wins, even when set to
+		// an empty string, so the presence of the key — not its truthiness — gates
+		// the override. Otherwise, when a resolver is wired, adopt the workspace
+		// directory's version-manager PATH so non-interactive script shells use the
+		// workspace-pinned toolchain.
+		if (resolveToolchainPath && !('PATH' in env)) {
+			const toolchainPath = await resolveToolchainPath(workspace.path);
+
+			if (toolchainPath) {
+				env.PATH = toolchainPath;
+			} else {
+				diagnostics.push({
+					code: 'toolchain-path-unresolved',
+					key: 'PATH',
+					message:
+						"The workspace login-shell PATH could not be resolved; setup and run scripts fall back to the app's inherited PATH and may miss the workspace-pinned toolchain.",
+					severity: 'warning',
+				});
+			}
 		}
 
 		return {

@@ -88,7 +88,7 @@ export interface LocalCommandRunOptions {
 
 /** Public surface of the local command service. */
 export interface LocalCommandService {
-	getEnvironment: () => Promise<CommandEnvironmentSnapshot>;
+	getEnvironment: (cwd?: string) => Promise<CommandEnvironmentSnapshot>;
 	run: (
 		request: LocalCommandRequest,
 		options?: LocalCommandRunOptions,
@@ -98,6 +98,12 @@ export interface LocalCommandService {
 /** Input passed to a {@link ShellEnvironmentLoader}. */
 export interface ShellEnvironmentLoaderRequest {
 	baseEnv: Record<string, string>;
+	/**
+	 * Directory to run the login shell in. Lets directory-aware version managers
+	 * (mise, fnm, asdf, volta) resolve the toolchain pinned for that directory.
+	 * Omitted resolves in the Electron process's working directory.
+	 */
+	cwd?: string;
 	shell: string;
 	timeoutMs: number;
 }

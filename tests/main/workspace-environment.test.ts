@@ -171,9 +171,11 @@ function seedWorkspace({
 
 function createService({
 	database,
+	resolveToolchainPath,
 	secretStore = createMockSecretStore(),
 }: {
 	database: DatabaseSync;
+	resolveToolchainPath?: (cwd: string) => Promise<string | null>;
 	secretStore?: ReturnType<typeof createMockSecretStore>;
 }) {
 	const environmentVariablesService = createEnvironmentVariablesService({
@@ -188,6 +190,7 @@ function createService({
 		service: createWorkspaceEnvironmentService({
 			databaseService: createDatabaseServiceStub(database),
 			environmentVariablesService,
+			resolveToolchainPath,
 			rootDirectoryService: createRootDirectoryServiceStub(),
 		}),
 	};
@@ -255,6 +258,91 @@ test('assemble layers configured variables with workspace > repository > app pre
 
 	assert.equal(assembly.env.APP_ONLY, 'from-app');
 	assert.equal(assembly.env.LAYERED, 'from-workspace');
+});
+
+test('assemble injects the resolved toolchain PATH for the workspace directory', async (t) => {
+	const database = createDatabaseFixture(t);
+	const { workspaceId, workspacePath } = seedWorkspace({ database });
+	const resolvedCwds: string[] = [];
+	const { service } = createService({
+		database,
+		resolveToolchainPath: async (cwd) => {
+			resolvedCwds.push(cwd);
+			return `${cwd}/.mise/node/bin:/usr/bin:/bin`;
+		},
+	});
+
+	const assembly = await service.assemble({ workspaceId });
+
+	assert.deepEqual(resolvedCwds, [workspacePath]);
+	assert.equal(
+		assembly.env.PATH,
+		`${workspacePath}/.mise/node/bin:/usr/bin:/bin`,
+	);
+});
+
+test('assemble leaves PATH unset when the toolchain resolver returns null', async (t) => {
+	const database = createDatabaseFixture(t);
+	const { workspaceId } = seedWorkspace({ database });
+	const { service } = createService({
+		database,
+		resolveToolchainPath: async () => null,
+	});
+
+	const assembly = await service.assemble({ workspaceId });
+
+	assert.equal(assembly.env.PATH, undefined);
+	assert.ok(
+		assembly.diagnostics.some(
+			(diagnostic) => diagnostic.code === 'toolchain-path-unresolved',
+		),
+		'expected a diagnostic when the toolchain PATH could not be resolved',
+	);
+});
+
+test('assemble keeps a configured empty PATH override over the resolved toolchain PATH', async (t) => {
+	const database = createDatabaseFixture(t);
+	const { workspaceId } = seedWorkspace({ database });
+	let resolverCalls = 0;
+	const { environmentVariablesService, service } = createService({
+		database,
+		resolveToolchainPath: async () => {
+			resolverCalls += 1;
+			return '/resolved/bin:/usr/bin';
+		},
+	});
+
+	await environmentVariablesService.setPlainValue({
+		key: 'PATH',
+		scope: 'workspace',
+		scopeId: workspaceId,
+		value: '',
+	});
+
+	const assembly = await service.assemble({ workspaceId });
+
+	assert.equal(assembly.env.PATH, '');
+	assert.equal(resolverCalls, 0);
+});
+
+test('assemble keeps a configured PATH override over the resolved toolchain PATH', async (t) => {
+	const database = createDatabaseFixture(t);
+	const { workspaceId } = seedWorkspace({ database });
+	const { environmentVariablesService, service } = createService({
+		database,
+		resolveToolchainPath: async () => '/resolved/bin:/usr/bin',
+	});
+
+	await environmentVariablesService.setPlainValue({
+		key: 'PATH',
+		scope: 'workspace',
+		scopeId: workspaceId,
+		value: '/user/override/bin',
+	});
+
+	const assembly = await service.assemble({ workspaceId });
+
+	assert.equal(assembly.env.PATH, '/user/override/bin');
 });
 
 test('assemble includes secret values and marks them for redaction', async (t) => {
