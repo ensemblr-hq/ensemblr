@@ -50,7 +50,7 @@ describe('useAppearanceEffect', () => {
 		const value = document.documentElement.style.getPropertyValue(
 			'--ensemblr-font-mono',
 		);
-		expect(value.startsWith('"JetBrains Mono Variable"')).toBe(true);
+		expect(value.startsWith('"JetBrainsMono Nerd Font Mono"')).toBe(true);
 	});
 
 	test('adds ligatures-off only when ligatures are disabled', () => {

@@ -34,10 +34,10 @@ describe('parseAppSettings', () => {
 			coloredSidebarDiffs: false,
 			accessibleColors: 'default',
 			codeTheme: 'catppuccin-mocha',
-			monoFont: 'JetBrains Mono',
+			monoFont: 'JetBrainsMono Nerd Font Mono',
 			codeLigatures: true,
 			markdownStyle: 'default',
-			terminalFont: 'JetBrains Mono',
+			terminalFont: 'JetBrainsMono Nerd Font Mono',
 			terminalFontSize: 12,
 		});
 	});
@@ -142,7 +142,9 @@ describe('mergeAppSettings', () => {
 		expect(next.appearance.monoFont).toBe('Fira Code');
 		expect(next.appearance.codeLigatures).toBe(false);
 		expect(next.appearance.theme).toBe('system'); // untouched default
-		expect(DEFAULT_APP_SETTINGS.appearance.monoFont).toBe('JetBrains Mono');
+		expect(DEFAULT_APP_SETTINGS.appearance.monoFont).toBe(
+			'JetBrainsMono Nerd Font Mono',
+		);
 	});
 
 	test('merges the experimental section immutably', () => {

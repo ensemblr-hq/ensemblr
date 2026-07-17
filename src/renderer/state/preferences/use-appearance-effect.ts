@@ -7,9 +7,11 @@ import {
 	monoFontAtom,
 } from './app-settings';
 
+/** Bundled monospace family used by code, diffs, and terminal defaults. */
+const BUNDLED_MONO_FONT = 'JetBrainsMono Nerd Font Mono';
+
 /** Fallback monospace stack appended after the user's chosen font. */
-const MONO_FALLBACK_STACK =
-	'"JetBrains Mono Variable", "JetBrains Mono", Menlo, Consolas, monospace';
+const MONO_FALLBACK_STACK = `"${BUNDLED_MONO_FONT}", "JetBrains Mono Variable", "JetBrains Mono", Menlo, Consolas, monospace`;
 
 /** Root classes for each non-default accessible-color variant. */
 const A11Y_CLASSES = [
@@ -33,9 +35,10 @@ export function useAppearanceEffect(): void {
 
 	useEffect(() => {
 		const font = monoFont.trim();
-		const value = font
-			? `"${font}", ${MONO_FALLBACK_STACK}`
-			: MONO_FALLBACK_STACK;
+		const value =
+			font && font !== BUNDLED_MONO_FONT
+				? `"${font}", ${MONO_FALLBACK_STACK}`
+				: MONO_FALLBACK_STACK;
 		document.documentElement.style.setProperty('--ensemblr-font-mono', value);
 	}, [monoFont]);
 
