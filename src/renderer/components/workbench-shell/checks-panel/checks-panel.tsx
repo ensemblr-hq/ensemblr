@@ -19,10 +19,7 @@ import { Input } from '@/renderer/components/ui/input';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { getChecksPanelState } from '@/renderer/lib/workbench/checks-panel-state';
-import {
-	buildCommitAndPushPrompt,
-	buildCreatePullRequestPrompt,
-} from '@/renderer/lib/workbench/checks-pr-prompts';
+import { buildCommitAndPushPrompt } from '@/renderer/lib/workbench/checks-pr-prompts';
 import {
 	prDraftIdentity,
 	seedPrDetails,
@@ -44,6 +41,7 @@ import type { ChecksPanelState } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 import { useCommentPreviewOpener } from '../conversation-panel/file-preview-context';
+import { useReviewActions } from '../review-actions/review-actions-context';
 import { ChecksEmptyMessage, ChecksNoPullRequestState } from './empty-states';
 import { PrDetailsForm } from './pr-details-form';
 import { ChecksSectionHeader } from './pr-metadata';
@@ -122,6 +120,7 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 	const panelState = getChecksPanelState(workspace);
 	const todoActions = useTodoActions(workspace.id);
 	const submitToComposer = useComposerSubmit();
+	const reviewActions = useReviewActions();
 	const draft = usePrDetailsDraft(workspace);
 	// "Create PR" stays available whenever the branch differs from base, even with
 	// a clean worktree once edits are committed.
@@ -133,19 +132,13 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 	}, [submitToComposer, workspace]);
 
 	const sendCreatePullRequest = useCallback(() => {
-		submitToComposer(
-			buildCreatePullRequestPrompt({
-				description: draft.description,
-				title: draft.title,
-				workspace,
-			}),
-		);
+		reviewActions?.runAgentAction('create-pr');
 		toast.success(
 			workspace.pullRequest.number
 				? 'Asked the agent to update the pull request.'
 				: 'Asked the agent to open a pull request.',
 		);
-	}, [draft.description, draft.title, submitToComposer, workspace]);
+	}, [reviewActions, workspace.pullRequest.number]);
 
 	const prForm = (
 		<PrDetailsForm

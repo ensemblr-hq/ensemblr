@@ -2,9 +2,6 @@ import type { EnsemblrApi } from '@/shared/ipc/contracts/api';
 
 /** Hierarchical TanStack Query keys for every Ensemblr IPC-backed query. */
 export const ensemblrQueryKeys = {
-	/** Query key for a repository's resolved agent action templates. */
-	agentActionTemplates: (repositoryId: string) =>
-		[...ensemblrQueryKeys.all, 'agent-action-templates', repositoryId] as const,
 	all: ['ensemblr'] as const,
 	/** Query key for a repository's archived workspaces. */
 	archivedWorkspaces: (repositoryId: string) =>

@@ -174,6 +174,8 @@ import type {
 	ReadWorkspaceDirectoryResult,
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
+	WriteWorkspaceActionPromptRequest,
+	WriteWorkspaceActionPromptResult,
 	WriteWorkspaceFileAttachmentRequest,
 	WriteWorkspaceFileAttachmentResult,
 	WriteWorkspaceImageAttachmentRequest,
@@ -423,6 +425,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.writeWorkspaceFileAttachment]: IpcHandlerEntry<
 		WriteWorkspaceFileAttachmentRequest,
 		WriteWorkspaceFileAttachmentResult
+	>;
+	[IPC_CHANNELS.writeWorkspaceActionPrompt]: IpcHandlerEntry<
+		WriteWorkspaceActionPromptRequest,
+		WriteWorkspaceActionPromptResult
 	>;
 	[IPC_CHANNELS.registerLocalRepository]: IpcHandlerEntry<
 		RegisterLocalRepositoryRequest,

@@ -30,6 +30,8 @@ const OPEN_TIMEOUT_MS = 5000;
 const ICON_OUTPUT_SIZE = 64;
 const CACHE_FILE_NAME = 'open-targets-cache.v1.json';
 const MAX_VISIBLE_APPS = 8;
+const MAX_DEGRADED_RETRIES = 3;
+const DEGRADED_RETRY_DELAY_MS = 2000;
 
 /** On-disk shape of the persisted open-target snapshot cache. */
 interface CachedFileShape {
@@ -66,11 +68,13 @@ export interface OpenTargetService {
 
 /** Detection results paired with resolved per-target icon data URLs. */
 interface ResolvedTargets {
+	degraded: boolean;
 	detected: DetectedTargetsMap;
 	iconDataUrls: Readonly<Record<string, string | undefined>>;
 }
 
 const EMPTY_RESOLVED: ResolvedTargets = {
+	degraded: false,
 	detected: {},
 	iconDataUrls: {},
 };
@@ -93,15 +97,26 @@ export function createOpenTargetService({
 	// run can't pin the service into a permanently-failed state.
 	let resolveChain: Promise<ResolvedTargets> = Promise.resolve(EMPTY_RESOLVED);
 	let primed = false;
+	let degradedRetries = 0;
+
+	const scheduleDegradedRetry = (): void => {
+		if (degradedRetries >= MAX_DEGRADED_RETRIES) {
+			return;
+		}
+		degradedRetries += 1;
+		const timer = setTimeout(() => {
+			void queueResolve();
+		}, DEGRADED_RETRY_DELAY_MS);
+		// Never let a background rescan keep the process alive on quit.
+		timer.unref?.();
+	};
 
 	const runDetection = (): Promise<ResolvedTargets> => {
 		return app
 			.whenReady()
 			.then(() => resolveTargets({ localCommandService }))
 			.then((resolved) => {
-				const snapshots = buildSnapshots(resolved);
-				inMemorySnapshots = snapshots;
-				writeSnapshotsToDisk(snapshots);
+				commitDetection(resolved);
 				return resolved;
 			})
 			.catch((error: unknown) => {
@@ -111,6 +126,35 @@ export function createOpenTargetService({
 				return EMPTY_RESOLVED;
 			});
 	};
+
+	/**
+	 * Publishes a detection result, but refuses to let a transient failure erase
+	 * a healthy cache: a `degraded` run that lost the mdfind-detected apps keeps
+	 * the previous snapshot and schedules a background retry instead of caching a
+	 * broken (apps-missing) list that every later boot would then serve.
+	 * @param resolved - The freshly resolved detection result.
+	 */
+	function commitDetection(resolved: ResolvedTargets): void {
+		const snapshots = buildSnapshots(resolved);
+		const newHasApps = hasDetectedApps(snapshots);
+		const prevHasApps = inMemorySnapshots
+			? hasDetectedApps(inMemorySnapshots)
+			: false;
+
+		if (resolved.degraded && !newHasApps && prevHasApps) {
+			scheduleDegradedRetry();
+			return;
+		}
+
+		inMemorySnapshots = snapshots;
+		writeSnapshotsToDisk(snapshots);
+
+		if (resolved.degraded && !newHasApps) {
+			scheduleDegradedRetry();
+			return;
+		}
+		degradedRetries = 0;
+	}
 
 	const queueResolve = (): Promise<ResolvedTargets> => {
 		resolveChain = resolveChain.then(runDetection, runDetection);
@@ -174,6 +218,7 @@ export function createOpenTargetService({
 
 	const refresh = async (): Promise<void> => {
 		primed = true;
+		degradedRetries = 0;
 		await queueResolve();
 	};
 
@@ -190,9 +235,28 @@ async function resolveTargets({
 }: {
 	localCommandService: LocalCommandService;
 }): Promise<ResolvedTargets> {
-	const detected = await detectInstalledTargets({ localCommandService });
+	const { degraded, detected } = await detectInstalledTargets({
+		localCommandService,
+	});
 	const iconDataUrls = await loadIconDataUrls(detected);
-	return { detected, iconDataUrls };
+	return { degraded, detected, iconDataUrls };
+}
+
+/**
+ * Reports whether a snapshot list contains any Spotlight-detected app (an entry
+ * whose registry definition resolves via bundle id). Builtins like Finder and
+ * utilities like Copy-path are always present, so their presence alone does not
+ * mean detection succeeded — only a bundle-id hit proves the mdfind probes ran.
+ * @param snapshots - The snapshot list to inspect.
+ * @returns True when at least one bundle-id-detected app is present.
+ */
+function hasDetectedApps(
+	snapshots: readonly WorkspaceOpenTargetSnapshot[],
+): boolean {
+	return snapshots.some(
+		(snapshot) =>
+			findOpenTargetDefinition(snapshot.id)?.detection.kind === 'bundleId',
+	);
 }
 
 /**

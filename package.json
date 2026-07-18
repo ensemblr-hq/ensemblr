@@ -28,6 +28,7 @@
 		"test:environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/environment-variables.test.ts",
 		"test:workspace-environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/workspace-environment.test.ts",
 		"test:terminal": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/terminal-service.test.ts",
+		"test:open-targets": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/open-target-registry.test.ts tests/main/detect-installed-targets.test.ts",
 		"test:scripts": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/script-lifecycle.test.ts",
 		"test:app": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/main-window-state.test.ts",
 		"test:pi": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-executable.test.ts tests/main/pi-readiness.test.ts",

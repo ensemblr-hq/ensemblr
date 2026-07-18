@@ -4,10 +4,9 @@ import { ChatAttachmentChip } from './chat-attachment-chip';
 import { useFilePreviewOpener } from './workbench-shell/conversation-panel/file-preview-context';
 
 /**
- * Right-aligned compact user prompt card. Pulls leading
- * `<attached_file>` markers (and the `Referenced workspace folders` header)
- * out of the persisted prompt text and shows them as inline chips followed by
- * the typed message. Matches the reference design where the user message reads
+ * Right-aligned compact user prompt card. Pulls `<attached_file>` markers (and
+ * the `Referenced workspace folders` header) out of the persisted prompt text
+ * and shows the typed message first, followed by inline attachment chips. Reads
  * as a single horizontal strip rather than a tall bubble.
  */
 export function ChatUserPrompt({
@@ -30,6 +29,11 @@ export function ChatUserPrompt({
 			)}
 			data-role='user-prompt'
 		>
+			{text.length > 0 ? (
+				<span className='whitespace-pre-wrap break-words text-foreground/90 leading-5'>
+					{text}
+				</span>
+			) : null}
 			{attachments.map((attachment) => {
 				const isFile = attachment.content.length > 0;
 				return (
@@ -46,11 +50,6 @@ export function ChatUserPrompt({
 					/>
 				);
 			})}
-			{text.length > 0 ? (
-				<span className='whitespace-pre-wrap break-words text-foreground/90 leading-5'>
-					{text}
-				</span>
-			) : null}
 		</div>
 	);
 }

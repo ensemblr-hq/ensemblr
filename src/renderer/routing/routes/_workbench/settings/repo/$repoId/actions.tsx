@@ -55,7 +55,7 @@ const ACTION_META: Record<
 	general: {
 		title: 'General preferences',
 		description:
-			'Instructions sent to the agent at the start of every new chat.',
+			'A master prompt prepended as context to the first message of every new chat in this repository.',
 	},
 };
 

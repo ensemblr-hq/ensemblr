@@ -12,6 +12,7 @@ import {
 	submitPiPrompt,
 	subscribePiSessionEvents,
 } from '@/renderer/api/ensemblr-queries';
+import { wrapWithMasterPrompt } from '@/renderer/lib/workbench/action-prompts';
 import { useOptimisticPrompts } from '@/renderer/state/composer/optimistic-prompts';
 import {
 	chatModelOverrideAtomFamily,
@@ -86,11 +87,14 @@ interface PendingTabSession {
 export function usePiComposerController({
 	chatTabId,
 	currentPiSessionId,
+	masterPrompt = '',
 	workspaceCwd,
 	workspaceId,
 }: {
 	chatTabId: string;
 	currentPiSessionId: string | null;
+	/** Repository `general` preferences prepended to the first message of a new chat. */
+	masterPrompt?: string;
 	workspaceCwd: string;
 	workspaceId: string;
 }): PiComposerControllerState {
@@ -315,10 +319,21 @@ export function usePiComposerController({
 			}
 			setLastError(null);
 
-			// Render the user prompt instantly. The Timeline removes this entry as
-			// soon as a matching persisted user-message event lands so we don't
-			// double-render once the runtime echoes the prompt back.
-			const optimisticEntry = optimistic.push(trimmed);
+			// Prepend the repository's `general` master prompt to the very first
+			// message of a fresh chat only. It is agent-only context: the timeline
+			// strips the `<user_preferences>` block from what it renders (see
+			// `parsePromptAttachments`), so it never shows on the FE. The session's
+			// initialPrompt (used for title/branch naming) stays clean.
+			const isFirstMessage = !activeSessionId;
+			const promptToSend = isFirstMessage
+				? wrapWithMasterPrompt(masterPrompt, trimmed)
+				: trimmed;
+
+			// Render the submitted prompt instantly. The Timeline removes this entry
+			// once the matching persisted user-message lands, so it must be the exact
+			// text sent (master prompt included) or optimistic and persisted entries
+			// won't match and both render.
+			const optimisticEntry = optimistic.push(promptToSend);
 
 			let sessionId = activeSessionId;
 			const needsRuntimeResume =
@@ -343,7 +358,7 @@ export function usePiComposerController({
 			}
 
 			const result = await submitMutation.mutateAsync({
-				prompt: trimmed,
+				prompt: promptToSend,
 				sessionId,
 				streamingBehavior: options?.streamingBehavior,
 			});
@@ -355,6 +370,7 @@ export function usePiComposerController({
 		[
 			activeSessionId,
 			isRealChatTabId,
+			masterPrompt,
 			openSessionMutation,
 			optimistic,
 			persistedActiveSession,
