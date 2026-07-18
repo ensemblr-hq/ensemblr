@@ -140,6 +140,22 @@ export function isPullRequestCreationEvent(
 }
 
 /**
+ * Detect whether a persisted session event marks the end of an agent turn — a
+ * `status` event transitioning from streaming/starting to idle. This is the
+ * canonical "agent finished producing a result" signal, reused by the PR
+ * auto-refresh and the unread auto-mark behavior.
+ * @param envelope - The persisted session-event envelope from the broadcast.
+ * @returns True when the event ends an agent turn.
+ */
+export function isFinishedTurnEvent(envelope: PiPersistedEnvelope): boolean {
+	return (
+		envelope.kind === 'status' &&
+		envelope.status === 'idle' &&
+		(envelope.previous === 'starting' || envelope.previous === 'streaming')
+	);
+}
+
+/**
  * The next mutation the auto-refresh hook should apply for a session event,
  * given whether the current turn has already produced a PR-creation signal.
  * Modeling the branching as a pure value keeps the hook's subscriber callback
@@ -177,10 +193,7 @@ export function classifyPullRequestRefreshAction(
 	if (envelope.status === 'streaming' || envelope.status === 'starting') {
 		return { kind: 'reset' };
 	}
-	const finishedTurn =
-		envelope.status === 'idle' &&
-		(envelope.previous === 'starting' || envelope.previous === 'streaming');
-	if (!finishedTurn) {
+	if (!isFinishedTurnEvent(envelope)) {
 		return { kind: 'none' };
 	}
 	return { createdPr: prCreatedThisTurn, kind: 'refresh' };

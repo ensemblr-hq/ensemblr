@@ -1,10 +1,6 @@
 import {
 	ArchiveIcon,
-	CheckCircle2Icon,
 	CheckIcon,
-	CircleDashedIcon,
-	CircleIcon,
-	CircleSlashIcon,
 	type LucideIcon,
 	MailIcon,
 	PencilIcon,
@@ -22,6 +18,13 @@ import {
 	ContextMenuSubTrigger,
 } from '@/renderer/components/ui/context-menu';
 import { SidebarContextMenuItem } from '@/renderer/components/workbench-shell/sidebar-context-menu-item';
+import { BOARD_STATUS_PRESENTATION } from '@/renderer/components/workbench-shell/workspace-status/board-status-presentation';
+import {
+	BOARD_STATUS_ORDER,
+	useWorkspaceBoardActions,
+	useWorkspaceBoardStatus,
+	useWorkspaceUnread,
+} from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import {
 	classifyPermissionAction,
@@ -33,7 +36,7 @@ const archiveBoundary = classifyPermissionAction({
 	mode: DEFAULT_PERMISSION_MODE,
 });
 
-/** Right-click context menu for a workspace row (pin, status, archive, delete). */
+/** Right-click context menu for a workspace row (unread, pin, status, archive, delete). */
 export function WorkspaceContextMenuContent({
 	isPinned,
 	onArchiveSelect,
@@ -49,15 +52,26 @@ export function WorkspaceContextMenuContent({
 	onRenameSelect?: () => void;
 	workspace: WorkspaceShellModel;
 }) {
+	const currentStatus = useWorkspaceBoardStatus(workspace.id);
+	const isUnread = useWorkspaceUnread(workspace.id);
+	const { setWorkspaceBoardStatus, toggleWorkspaceUnread } =
+		useWorkspaceBoardActions();
+	const currentStatusPresentation = BOARD_STATUS_PRESENTATION[currentStatus];
+	const CurrentStatusIcon = currentStatusPresentation.icon;
+
 	return (
 		<ContextMenuContent
 			aria-label={`${workspace.name} workspace actions`}
 			className='w-56 bg-muted p-1'
 		>
 			<ContextMenuGroup>
-				<SidebarContextMenuItem>
+				<SidebarContextMenuItem
+					onSelect={() => toggleWorkspaceUnread(workspace.id)}
+				>
 					<MailIcon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>Mark as unread</span>
+					<span className='min-w-0 flex-1'>
+						{isUnread ? 'Mark as read' : 'Mark as unread'}
+					</span>
 					<ContextMenuShortcut>R</ContextMenuShortcut>
 				</SidebarContextMenuItem>
 				<SidebarContextMenuItem onSelect={onPinToggle}>
@@ -67,40 +81,29 @@ export function WorkspaceContextMenuContent({
 				</SidebarContextMenuItem>
 				<ContextMenuSub>
 					<ContextMenuSubTrigger className='h-8 gap-2 px-2 text-[0.8125rem]'>
-						<CircleDashedIcon
+						<CurrentStatusIcon
 							aria-hidden='true'
-							className='text-muted-foreground'
+							className={currentStatusPresentation.iconClassName}
 						/>
 						<span className='min-w-0 flex-1'>Set status</span>
 					</ContextMenuSubTrigger>
 					<ContextMenuSubContent className='w-48 bg-muted p-1'>
 						<ContextMenuGroup>
-							<WorkspaceStatusMenuItem
-								icon={CircleDashedIcon}
-								iconClassName='text-muted-foreground'
-								label='Backlog'
-							/>
-							<WorkspaceStatusMenuItem
-								icon={CircleIcon}
-								iconClassName='text-status-warning'
-								label='In progress'
-							/>
-							<WorkspaceStatusMenuItem
-								icon={CheckCircle2Icon}
-								iconClassName='text-status-ok'
-								isSelected
-								label='In review'
-							/>
-							<WorkspaceStatusMenuItem
-								icon={CheckCircle2Icon}
-								iconClassName='text-muted-foreground'
-								label='Done'
-							/>
-							<WorkspaceStatusMenuItem
-								icon={CircleSlashIcon}
-								iconClassName='text-muted-foreground'
-								label='Canceled'
-							/>
+							{BOARD_STATUS_ORDER.map((status) => {
+								const presentation = BOARD_STATUS_PRESENTATION[status];
+								return (
+									<WorkspaceStatusMenuItem
+										icon={presentation.icon}
+										iconClassName={presentation.iconClassName}
+										isSelected={currentStatus === status}
+										key={status}
+										label={presentation.label}
+										onSelect={() =>
+											setWorkspaceBoardStatus(workspace.id, status)
+										}
+									/>
+								);
+							})}
 						</ContextMenuGroup>
 					</ContextMenuSubContent>
 				</ContextMenuSub>
@@ -140,16 +143,18 @@ export function WorkspaceContextMenuContent({
 function WorkspaceStatusMenuItem({
 	icon: StatusIcon,
 	iconClassName,
-	isSelected = false,
+	isSelected,
 	label,
+	onSelect,
 }: {
 	icon: LucideIcon;
 	iconClassName: string;
-	isSelected?: boolean;
+	isSelected: boolean;
 	label: string;
+	onSelect: () => void;
 }) {
 	return (
-		<SidebarContextMenuItem>
+		<SidebarContextMenuItem onSelect={onSelect}>
 			<StatusIcon aria-hidden='true' className={iconClassName} />
 			<span className='min-w-0 flex-1'>{label}</span>
 			{isSelected ? (
