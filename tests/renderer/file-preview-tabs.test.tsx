@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
 import { describe, expect, test, vi } from 'vitest';
 
@@ -9,11 +9,12 @@ vi.mock('@iconify/react', () => ({
 	Icon: ({ icon }: { icon: string }) => <span data-icon={icon} />,
 }));
 
+// @ts-expect-error Vitest resolves the app alias for the component-under-test atom identity.
+import { developerModeAtom } from '@/renderer/state/preferences';
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr-queries';
 import { FilePreviewPanel } from '../../src/renderer/components/workbench-shell/conversation-panel/file-preview-panel';
 import { SessionTabs } from '../../src/renderer/components/workbench-shell/conversation-panel/session-tabs';
 import { getWorkspaceFileIconNameForPath } from '../../src/renderer/lib/workbench';
-import { developerModeAtom } from '../../src/renderer/state/preferences';
 import type { SessionTabModel } from '../../src/renderer/types/workbench';
 import { createTestQueryClient, renderWithProviders } from './support/dom';
 
@@ -74,7 +75,6 @@ describe('file preview tabs', () => {
 
 	test('exposes the Pi debug button when developer mode is enabled', () => {
 		const store = createStore();
-		store.set(developerModeAtom, true);
 
 		renderWithProviders(
 			<Provider store={store}>
@@ -90,6 +90,10 @@ describe('file preview tabs', () => {
 				/>
 			</Provider>,
 		);
+
+		act(() => {
+			store.set(developerModeAtom, true);
+		});
 
 		expect(
 			screen.queryByRole('button', { name: 'Show Pi debug panel' }),
@@ -126,6 +130,96 @@ describe('file preview tabs', () => {
 		);
 		expect(
 			container.querySelector('[data-icon="vscode-icons:file-type-image"]'),
+		).toBeTruthy();
+	});
+});
+
+const chatA: SessionTabModel = {
+	chatTabId: 'chat-a',
+	id: 'chat-a',
+	kind: 'chat',
+	label: 'Chat A',
+	piSessionId: null,
+	status: 'idle',
+	summary: '',
+	turnId: null,
+	updatedLabel: '',
+};
+const chatB: SessionTabModel = {
+	...chatA,
+	chatTabId: 'chat-b',
+	id: 'chat-b',
+	label: 'Chat B',
+};
+
+describe('session tab close controls', () => {
+	test('marks the active tab and closes a tab on close-button click', () => {
+		const onSessionTabClose = vi.fn();
+
+		renderWithProviders(
+			<SessionTabs
+				activeSession={chatA}
+				closedSessions={[]}
+				onSessionTabChange={() => undefined}
+				onSessionTabClose={onSessionTabClose}
+				onSessionTabOpen={async () => null}
+				onSessionTabRestore={() => undefined}
+				onSessionTabsReorder={() => undefined}
+				sessions={[chatA, chatB]}
+			/>,
+		);
+
+		expect(
+			screen
+				.getByText('Chat A')
+				.closest('button')
+				?.getAttribute('aria-current'),
+		).toBe('page');
+		expect(
+			screen
+				.getByText('Chat B')
+				.closest('button')
+				?.getAttribute('aria-current'),
+		).toBeNull();
+
+		fireEvent.click(screen.getByRole('button', { name: 'Close Chat B tab' }));
+
+		expect(onSessionTabClose).toHaveBeenCalledWith('chat-b');
+	});
+
+	test('hides the close control for a lone chat tab', () => {
+		renderWithProviders(
+			<SessionTabs
+				activeSession={chatA}
+				closedSessions={[]}
+				onSessionTabChange={() => undefined}
+				onSessionTabClose={() => undefined}
+				onSessionTabOpen={async () => null}
+				onSessionTabRestore={() => undefined}
+				onSessionTabsReorder={() => undefined}
+				sessions={[chatA]}
+			/>,
+		);
+
+		expect(screen.queryByRole('button', { name: /Close .* tab/ })).toBeNull();
+	});
+
+	test('keeps the close control for a lone non-chat tab', () => {
+		renderWithProviders(
+			<SessionTabs
+				activeSession={previewSession}
+				closedSessions={[]}
+				onSessionTabChange={() => undefined}
+				onSessionTabClose={() => undefined}
+				onSessionTabOpen={async () => null}
+				onSessionTabRestore={() => undefined}
+				onSessionTabsReorder={() => undefined}
+				sessions={[previewSession]}
+			/>,
+		);
+
+		expect(
+			screen.getByRole('button', { name: `Close ${previewSession.label} tab` }),
 		).toBeTruthy();
 	});
 });
