@@ -1,6 +1,10 @@
-import { SidebarInset } from '@/renderer/components/ui/sidebar';
+import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
 import { WorkbenchFrame } from '@/renderer/components/workbench-shell/frame';
 import { NavigationProvider } from '@/renderer/components/workbench-shell/shell-contexts';
+import {
+	SHELL_FLOATING_TRIGGER_CLASS,
+	SHELL_INSET_CLASS,
+} from '@/renderer/components/workbench-shell/shell-inset';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import type { NavigationContextValue } from '@/renderer/types/contexts';
 import type {
@@ -71,7 +75,8 @@ export function WorkbenchEmptyStateContent({
 	useRouteProfilerMount('WorkbenchEmptyStateContent');
 
 	return (
-		<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
+		<SidebarInset className={SHELL_INSET_CLASS}>
+			<SidebarTrigger className={SHELL_FLOATING_TRIGGER_CLASS} />
 			<main className='flex min-h-0 flex-1 items-center justify-center px-8 py-10'>
 				<section className='max-w-md text-center'>
 					<h1 className='font-semibold text-2xl text-foreground tracking-normal'>

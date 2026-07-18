@@ -9,6 +9,10 @@ import {
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
 import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
+import {
+	SHELL_FLOATING_TRIGGER_CLASS,
+	SHELL_INSET_CLASS,
+} from '@/renderer/components/workbench-shell/shell-inset';
 import { openLocalProjectFlow } from '@/renderer/lib/workbench/open-local-project-flow';
 import {
 	cloneDialogOpenAtom,
@@ -49,7 +53,7 @@ export function Welcome() {
 	}, [navigate, router, setLastWorkspaceSelection, setLocalProjectImportOpen]);
 
 	return (
-		<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
+		<SidebarInset className={SHELL_INSET_CLASS}>
 			{/* Frameless welcome screen has no toolbar; this invisible top strip
 			    gives the window a draggable edge. Interactive children opt out of
 			    dragging via the global no-drag rule in styles/index.css. */}
@@ -57,9 +61,10 @@ export function Welcome() {
 				aria-hidden='true'
 				className='window-drag-region absolute inset-x-0 top-0 z-10 h-12'
 			/>
-			<SidebarTrigger className='sidebar-collapsed-trigger absolute top-2.5 left-[var(--ensemblr-traffic-light-safe-inline)] z-20' />
+			<SidebarTrigger className={SHELL_FLOATING_TRIGGER_CLASS} />
 			<main className='flex min-h-0 flex-1 items-center justify-center px-8 py-10'>
 				<section className='flex flex-col items-center gap-12'>
+					{/* fallow-ignore-next-line css-token-drift -- intentional sub-pixel blur softens the wordmark; no design token exists for it */}
 					<WelcomeWordmark className='blur-[0.046875rem]' />
 					<div className='flex flex-wrap items-center justify-center gap-3'>
 						<WelcomeActionCard
