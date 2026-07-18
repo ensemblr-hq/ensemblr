@@ -118,7 +118,7 @@ export function DashboardBoard() {
 		useBoardWorkspaceMenu();
 
 	const setupStatus = setupDiagnosticsState.setupDiagnostics?.status;
-	if (setupStatus !== 'ready') {
+	if (setupStatus === 'blocked') {
 		return <WorkbenchPlaceholderPage view='dashboard' />;
 	}
 	if (cards.length === 0) {
@@ -138,15 +138,17 @@ export function DashboardBoard() {
 				Dashboard
 			</header>
 			<BoardWorkspaceMenuProvider controller={workspaceMenu}>
-				<div className='flex min-h-0 flex-1 gap-3 overflow-x-auto p-4'>
-					{BOARD_STATUS_ORDER.map((status) => (
-						<BoardColumn
-							cards={grouped[status]}
-							key={status}
-							onOpenWorkspace={model.navigateToWorkspace}
-							status={status}
-						/>
-					))}
+				<div className='min-h-0 flex-1 overflow-x-auto p-4'>
+					<div className='mx-auto flex h-full w-max gap-3'>
+						{BOARD_STATUS_ORDER.map((status) => (
+							<BoardColumn
+								cards={grouped[status]}
+								key={status}
+								onOpenWorkspace={model.navigateToWorkspace}
+								status={status}
+							/>
+						))}
+					</div>
 				</div>
 			</BoardWorkspaceMenuProvider>
 			{workspaceMenuDialogs}
