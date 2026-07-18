@@ -48,6 +48,7 @@ import type {
 	WorkspaceFilesWatcher,
 } from '../workspace-files';
 import { createWorkspaceGitService } from '../workspace-git';
+import { createWorkspaceRuntimeService } from '../workspace-runtime';
 import { registerAppSettingsHandlers } from './handlers/app-settings';
 import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCheckpointHandlers } from './handlers/checkpoint';
@@ -72,6 +73,7 @@ import { registerTerminalHandlers } from './handlers/terminal';
 import { registerWindowHandlers } from './handlers/window';
 import { registerWorkspaceFilesHandlers } from './handlers/workspace-files';
 import { registerWorkspaceGitHandlers } from './handlers/workspace-git';
+import { registerWorkspaceRuntimeHandlers } from './handlers/workspace-runtime';
 import { registerWorkspaceScriptHandlers } from './handlers/workspace-scripts';
 import {
 	createPermissionGate,
@@ -261,6 +263,13 @@ export function registerIpcHandlers({
 	});
 	registerWorkspaceGitHandlers({
 		workspaceGitService: createWorkspaceGitService({ localCommandService }),
+	});
+	registerWorkspaceRuntimeHandlers({
+		workspaceRuntimeService: createWorkspaceRuntimeService({
+			databaseService,
+			localCommandService,
+			settingsResolutionService,
+		}),
 	});
 	const githubService = createGithubService({
 		databaseService,

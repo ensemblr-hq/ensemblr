@@ -1,4 +1,4 @@
-import { RefreshCwIcon } from 'lucide-react';
+import { RefreshCwIcon, SquareIcon } from 'lucide-react';
 
 import { Button } from '@/renderer/components/ui/button';
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
@@ -7,18 +7,23 @@ import { SetupMissingEmptyState } from './setup-missing-empty-state';
 import { SetupNotRunEmptyState } from './setup-not-run-empty-state';
 import { XtermTerminal } from './xterm-terminal';
 
+/** Props for {@link SetupScriptOutputPanel}. */
+interface SetupScriptOutputPanelProps {
+	onAskAgentSetupScript: () => void;
+	onOpenSetupScripts: () => void;
+	onRunSetupScript: () => void;
+	onStopSetupScript: () => void;
+	script: WorkspaceScriptSummary;
+}
+
 /** Renders the Setup script output or the appropriate empty state. */
 export function SetupScriptOutputPanel({
 	onAskAgentSetupScript,
 	onOpenSetupScripts,
 	onRunSetupScript,
+	onStopSetupScript,
 	script,
-}: {
-	onAskAgentSetupScript: () => void;
-	onOpenSetupScripts: () => void;
-	onRunSetupScript: () => void;
-	script: WorkspaceScriptSummary;
-}) {
+}: SetupScriptOutputPanelProps) {
 	if (script.status === 'missing') {
 		return (
 			<SetupMissingEmptyState
@@ -39,28 +44,42 @@ export function SetupScriptOutputPanel({
 				sessionStatus={script.sessionStatus ?? null}
 				terminalId={script.terminalId}
 			/>
-			{script.status === 'running' ? null : (
-				<SetupRerunButton onRerun={onRunSetupScript} />
-			)}
+			<SetupActionButton
+				onRerun={onRunSetupScript}
+				onStop={onStopSetupScript}
+				running={script.status === 'running'}
+			/>
 		</div>
 	);
 }
 
 /**
- * Floating bottom-right control over a finished Setup run that reruns the setup
- * script. Hidden while the script is running — the dock header owns the stop
- * control in that state, so surfacing it here too would duplicate that action.
+ * Floating bottom-right control over the Setup run. While setup is running it
+ * stops the script; once the run has finished it reruns setup. Both setup
+ * actions live here because the dock header is reserved for run-script controls.
  */
-function SetupRerunButton({ onRerun }: { onRerun: () => void }) {
+function SetupActionButton({
+	onRerun,
+	onStop,
+	running,
+}: {
+	onRerun: () => void;
+	onStop: () => void;
+	running: boolean;
+}) {
 	return (
 		<Button
 			className='absolute right-3 bottom-3 z-10 pr-2 shadow-sm'
-			onClick={onRerun}
+			onClick={running ? onStop : onRerun}
 			size='sm'
 			variant='outline'
 		>
-			<RefreshCwIcon data-icon='inline-start' />
-			Rerun setup
+			{running ? (
+				<SquareIcon data-icon='inline-start' />
+			) : (
+				<RefreshCwIcon data-icon='inline-start' />
+			)}
+			{running ? 'Stop setup' : 'Rerun setup'}
 		</Button>
 	);
 }

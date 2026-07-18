@@ -1,8 +1,8 @@
 /**
  * Persisted record that a workspace's setup script completed for a given
- * dependency fingerprint. Stored under the `setup` key of a workspace's
- * `metadata_json` so an app restart can skip re-running setup when nothing that
- * affects it (the command or any dependency lockfile) has changed.
+ * dependency fingerprint. Written to `.ensemblr/setup.local.json` inside the
+ * worktree so reopening a workspace can skip re-running setup when neither the
+ * command nor any dependency lockfile has changed.
  */
 export interface WorkspaceSetupState {
 	/** The exact setup command that ran (e.g. `npm install`). */
@@ -13,19 +13,13 @@ export interface WorkspaceSetupState {
 	fingerprint: string;
 }
 
-/** Metadata key under which {@link WorkspaceSetupState} is persisted. */
-const SETUP_METADATA_KEY = 'setup';
-
 /**
- * Reads the persisted setup state from a parsed workspace metadata record.
- * @param metadata - Parsed workspace `metadata_json` object.
- * @returns The stored setup state, or null when absent or malformed.
+ * Validates an unknown value (typically the result of `JSON.parse`) as a
+ * {@link WorkspaceSetupState}.
+ * @param value - Candidate value to validate.
+ * @returns The validated setup state, or null when absent or malformed.
  */
-export function readSetupState(
-	metadata: Record<string, unknown>,
-): WorkspaceSetupState | null {
-	const value = metadata[SETUP_METADATA_KEY];
-
+export function parseSetupState(value: unknown): WorkspaceSetupState | null {
 	if (typeof value !== 'object' || value === null || Array.isArray(value)) {
 		return null;
 	}
@@ -45,18 +39,4 @@ export function readSetupState(
 		completedAt: record.completedAt,
 		fingerprint: record.fingerprint,
 	};
-}
-
-/**
- * Returns a new metadata record with the setup state merged in, leaving every
- * sibling key untouched.
- * @param metadata - Existing parsed workspace metadata record.
- * @param state - Setup state to persist.
- * @returns A new metadata record carrying the setup state.
- */
-export function withSetupState(
-	metadata: Record<string, unknown>,
-	state: WorkspaceSetupState,
-): Record<string, unknown> {
-	return { ...metadata, [SETUP_METADATA_KEY]: state };
 }

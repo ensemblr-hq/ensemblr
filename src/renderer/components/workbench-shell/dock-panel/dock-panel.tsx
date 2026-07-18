@@ -174,6 +174,7 @@ export function DockPanel({
 					onAskAgentSetupScript={actions.onAskAgentSetupScript}
 					onOpenSetupScripts={actions.onOpenSetupScripts}
 					onRunSetupScript={actions.onRunSetupScript}
+					onStopSetupScript={actions.onStopSetupScript}
 					script={workspace.scripts.setup}
 				/>
 			</TabsContent>

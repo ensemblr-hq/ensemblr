@@ -1,15 +1,18 @@
 import {
 	ExternalLinkIcon,
 	PlayIcon,
+	RocketIcon,
 	SquareIcon,
-	WrenchIcon,
 } from 'lucide-react';
 
 import { Button } from '@/renderer/components/ui/button';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 
-/** Renders the appropriate setup/run/stop button cluster on the dock header. */
+/**
+ * Renders the run-script button cluster on the dock header. Setup controls live
+ * in the Setup dock tab, not here — the tab row is reserved for run actions.
+ */
 export function DockPanelActions({
 	actions,
 	workspace,
@@ -17,27 +20,9 @@ export function DockPanelActions({
 	actions: WorkbenchDockActions;
 	workspace: WorkspaceShellModel;
 }) {
-	const { run, setup } = workspace.scripts;
-	const hasSetupScript = setup.status !== 'missing';
+	const { run } = workspace.scripts;
 	const hasRunScript = run.status !== 'missing';
-
-	if (hasSetupScript && setup.status === 'not-run') {
-		return (
-			<Button onClick={actions.onRunSetupScript} size='xs' variant='outline'>
-				<WrenchIcon data-icon='inline-start' />
-				Run setup script
-			</Button>
-		);
-	}
-
-	if (hasSetupScript && setup.status === 'running') {
-		return (
-			<Button onClick={actions.onStopSetupScript} size='xs' variant='outline'>
-				<SquareIcon data-icon='inline-start' />
-				Stop setup script
-			</Button>
-		);
-	}
+	const desktopRuntime = workspace.desktopRuntime ?? null;
 
 	if (hasRunScript && run.status === 'running') {
 		const previewUrl = run.previewUrl;
@@ -53,6 +38,11 @@ export function DockPanelActions({
 						<ExternalLinkIcon data-icon='inline-start' />
 						{typeof run.port === 'number' ? `Open :${run.port}` : 'Open'}
 					</Button>
+				) : null}
+				{/* Launch only appears while running — there's no window to focus
+				    until the run script has started the desktop app. */}
+				{desktopRuntime ? (
+					<LaunchDesktopButton onLaunch={actions.onLaunchDesktopApp} />
 				) : null}
 				<Button onClick={actions.onStopRunScript} size='xs' variant='outline'>
 					<SquareIcon data-icon='inline-start' />
@@ -75,4 +65,14 @@ export function DockPanelActions({
 	// actions. The Setup Scripts entry point lives in the Setup dock tab and its
 	// settings page, not the header.
 	return null;
+}
+
+/** Focuses (or reopens) the workspace's detected desktop app window. */
+function LaunchDesktopButton({ onLaunch }: { onLaunch: () => void }) {
+	return (
+		<Button onClick={onLaunch} size='xs' variant='outline'>
+			<RocketIcon data-icon='inline-start' />
+			Launch
+		</Button>
+	);
 }

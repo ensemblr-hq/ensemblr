@@ -64,6 +64,7 @@ const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
 const DOCK_ACTIONS: WorkbenchDockActions = {
 	onAskAgentSetupScript: () => undefined,
 	onCloseTerminal: () => undefined,
+	onLaunchDesktopApp: () => undefined,
 	onNewTerminal: () => undefined,
 	onOpenRunPort: () => undefined,
 	onOpenSetupScripts: () => undefined,
@@ -433,7 +434,7 @@ test('marks workspace rows with running dock activity', () => {
 	const activeWorkspace = getDefaultWorkspace();
 	const store = createStore();
 	store.set(workspaceDockActivityByWorkspaceAtom, {
-		[activeWorkspace.id]: true,
+		[activeWorkspace.id]: 'running',
 	});
 	const markup = renderWorkbench(
 		null,

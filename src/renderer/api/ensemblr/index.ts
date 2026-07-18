@@ -29,5 +29,6 @@ export * from './settings';
 export * from './setup';
 export * from './workspace-files';
 export * from './workspace-git';
+export * from './workspace-runtime';
 export * from './workspace-scripts';
 export * from './workspaces';

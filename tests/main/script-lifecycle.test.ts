@@ -1,7 +1,7 @@
 /// <reference types="node" />
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
@@ -28,6 +28,8 @@ const WORKSPACE_ID = 'workspace-1';
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
 	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-scripts-'));
+	const worktreePath = path.join(directory, 'worktree');
+	mkdirSync(worktreePath, { recursive: true });
 	const connection = openEnsemblrDatabase({
 		databasePath: path.join(directory, 'ensemblr-test.db'),
 	});
@@ -55,7 +57,7 @@ function createDatabaseFixture(t: TestContext): DatabaseSync {
 		id: WORKSPACE_ID,
 		metadataJson: '{}',
 		name: 'monterrey',
-		path: '/tmp/workspace',
+		path: worktreePath,
 		repositoryId: 'repo-1',
 		slug: 'monterrey',
 		timestamp: NOW,
@@ -277,7 +279,7 @@ test('runScript resolves committed config from the workspace worktree', async (t
 
 	const request = requests[0] as SettingsResolutionRequest | undefined;
 	assert.equal(request?.repository?.repositoryId, 'repo-1');
-	assert.equal(request?.repository?.repositoryPath, '/tmp/workspace');
+	assert.match(request?.repository?.repositoryPath ?? '', /worktree$/);
 });
 
 test('runScript reports unconfigured scripts without spawning', async (t) => {
