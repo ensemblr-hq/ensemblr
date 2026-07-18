@@ -23,6 +23,7 @@ import {
 	prDetailsLiveDraftAtomFamily,
 } from '@/renderer/state/preferences';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import { useReviewActions } from '../review-actions/review-actions-context';
 
 /**
  * Split-button + dropdown surfacing PR creation actions. Like the Checks panel,
@@ -36,8 +37,11 @@ export function CreatePullRequestMenu({
 	workspace: WorkspaceShellModel;
 }) {
 	const submitToComposer = useComposerSubmit();
+	const reviewActions = useReviewActions();
 	// Hand the agent the live title/description from the Checks tab (including
-	// unsaved edits), falling back to the saved draft and then the open PR.
+	// unsaved edits), falling back to the saved draft and then the open PR. Only
+	// the draft variant still builds the prompt here; the primary action defers to
+	// the shared agent-action runner so it attaches the composed PR prompt file.
 	const liveDraft = useAtomValue(prDetailsLiveDraftAtomFamily(workspace.id));
 	const savedDraft = useAtomValue(prDetailsDraftAtomFamily(workspace.id));
 	const { description, title } = resolvePrDetails({
@@ -55,15 +59,21 @@ export function CreatePullRequestMenu({
 			})
 		: null;
 
-	const handoffToAgent = (draft: boolean) => {
+	const createPullRequest = () => {
+		reviewActions?.runAgentAction('create-pr');
+		toast.success('Asked the agent to open a pull request.');
+	};
+
+	const createDraftPullRequest = () => {
 		submitToComposer(
-			buildCreatePullRequestPrompt({ description, draft, title, workspace }),
+			buildCreatePullRequestPrompt({
+				description,
+				draft: true,
+				title,
+				workspace,
+			}),
 		);
-		toast.success(
-			draft
-				? 'Asked the agent to open a draft pull request.'
-				: 'Asked the agent to open a pull request.',
-		);
+		toast.success('Asked the agent to open a draft pull request.');
 	};
 
 	const openManually = () => {
@@ -76,7 +86,7 @@ export function CreatePullRequestMenu({
 		<div className='flex h-7 shrink-0 items-center overflow-hidden rounded-md border border-border bg-background'>
 			<Button
 				className='h-7 rounded-none border-0 bg-transparent px-2.5'
-				onClick={() => handoffToAgent(false)}
+				onClick={createPullRequest}
 				size='sm'
 				variant='ghost'
 			>
@@ -96,7 +106,7 @@ export function CreatePullRequestMenu({
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align='end' className='w-56'>
-					<DropdownMenuItem onSelect={() => handoffToAgent(true)}>
+					<DropdownMenuItem onSelect={createDraftPullRequest}>
 						<GitPullRequestDraftIcon aria-hidden='true' />
 						Create draft PR
 					</DropdownMenuItem>

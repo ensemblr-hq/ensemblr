@@ -16,6 +16,8 @@ import type {
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
 	WorkspaceFileEntryWire,
+	WriteWorkspaceActionPromptRequest,
+	WriteWorkspaceActionPromptResult,
 	WriteWorkspaceFileAttachmentRequest,
 	WriteWorkspaceFileAttachmentResult,
 	WriteWorkspaceImageAttachmentRequest,
@@ -90,6 +92,10 @@ export interface ListWorkspaceFilesService {
 	writeFileAttachment: (
 		request: WriteWorkspaceFileAttachmentRequest,
 	) => Promise<WriteWorkspaceFileAttachmentResult>;
+	/** Persists a composed action prompt at a stable per-action `.context/attachments/` path, overwriting any prior run. */
+	writeActionPrompt: (
+		request: WriteWorkspaceActionPromptRequest,
+	) => Promise<WriteWorkspaceActionPromptResult>;
 	/** Enumerates one directory level for lazy expansion of ignored folders. */
 	readDirectory: (
 		request: ReadWorkspaceDirectoryRequest,
@@ -291,6 +297,28 @@ export function createListWorkspaceFilesService({
 				workspaceCwd: cwdResult.cwd,
 				writeFailedMessage: 'Failed to write pasted attachment.',
 			});
+		},
+		/** Persists a composed action prompt at a stable per-action path, overwriting any prior run. */
+		async writeActionPrompt(request) {
+			const cwdResult = resolveWorkspaceCwd(request.workspaceCwd);
+			if (!cwdResult.ok) {
+				return {
+					error: { code: 'invalid-cwd', message: cwdResult.message },
+				};
+			}
+			const stem = sanitizeAttachmentStem(request.action, 'action');
+			const result = await persistContextAttachment({
+				buffer: Buffer.from(request.content, 'utf8'),
+				overwrite: true,
+				relativePath: `${CONTEXT_ATTACHMENTS_DIR}/ensemblr-${stem}.md`,
+				subdir: 'attachments',
+				workspaceCwd: cwdResult.cwd,
+				writeFailedMessage: 'Failed to write action prompt.',
+			});
+			if ('error' in result) {
+				return { error: result.error };
+			}
+			return { file: result.file };
 		},
 		async readDirectory(request) {
 			const cwdResult = resolveWorkspaceCwd(request.workspaceCwd);
@@ -978,12 +1006,15 @@ async function prepareContextSubdir(
  */
 async function persistContextAttachment({
 	buffer,
+	overwrite = false,
 	relativePath,
 	subdir,
 	workspaceCwd,
 	writeFailedMessage,
 }: {
 	buffer: Buffer;
+	/** When true, replace an existing file at `relativePath` instead of failing. */
+	overwrite?: boolean;
 	relativePath: string;
 	subdir: string;
 	workspaceCwd: string;
@@ -1009,7 +1040,9 @@ async function persistContextAttachment({
 		if (!target.ok) {
 			return { error: { code: 'invalid-path', message: target.message } };
 		}
-		await writeFile(target.absolutePath, buffer, { flag: 'wx' });
+		await writeFile(target.absolutePath, buffer, {
+			flag: overwrite ? 'w' : 'wx',
+		});
 		const fileStat = await stat(target.absolutePath);
 		return {
 			file: ignoredEntry(target.relativePath, 'file'),

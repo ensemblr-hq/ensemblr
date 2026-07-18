@@ -61,6 +61,17 @@ export interface WriteWorkspaceFileAttachmentRequest {
 	workspaceCwd: string;
 }
 
+/**
+ * Request to persist a composed action prompt under the workspace
+ * `.context/attachments/` folder at a stable, per-action path that is
+ * overwritten on each run (unlike pasted attachments, which get unique names).
+ */
+export interface WriteWorkspaceActionPromptRequest {
+	action: string;
+	content: string;
+	workspaceCwd: string;
+}
+
 /** Failure reason for a read-workspace-file request. */
 export type ReadWorkspaceFileFailureCode =
 	| 'invalid-cwd'
@@ -119,6 +130,15 @@ export interface WriteWorkspaceFileAttachmentResult {
 	};
 	file?: WorkspaceFileEntryWire;
 	sizeBytes?: number;
+}
+
+/** Result of persisting a composed action prompt as a workspace file. */
+export interface WriteWorkspaceActionPromptResult {
+	error?: {
+		code: WriteWorkspaceFileAttachmentFailureCode;
+		message: string;
+	};
+	file?: WorkspaceFileEntryWire;
 }
 
 /** Request to enumerate a workspace directory's immediate children. */
@@ -181,6 +201,10 @@ export interface WorkspaceFilesApi {
 	writeWorkspaceFileAttachment: (
 		request: WriteWorkspaceFileAttachmentRequest,
 	) => Promise<WriteWorkspaceFileAttachmentResult>;
+	/** Persist a composed action prompt at a stable per-action `.context/attachments/` path (overwritten each run). */
+	writeWorkspaceActionPrompt: (
+		request: WriteWorkspaceActionPromptRequest,
+	) => Promise<WriteWorkspaceActionPromptResult>;
 	/** Stop watching a workspace previously started with `watchWorkspaceFiles`. */
 	unwatchWorkspaceFiles: (request: WatchWorkspaceFilesRequest) => Promise<void>;
 	/** Start watching a workspace so changes emit `onWorkspaceFilesChanged`. */

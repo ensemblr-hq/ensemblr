@@ -9,6 +9,7 @@ import type {
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
 	WatchWorkspaceFilesRequest,
+	WriteWorkspaceActionPromptResult,
 	WriteWorkspaceFileAttachmentResult,
 	WriteWorkspaceImageAttachmentResult,
 } from '../../../shared/ipc/contracts/workspace-files';
@@ -18,6 +19,7 @@ import type {
 } from '../../workspace-files';
 import type { WithPermissionGate } from '../permission-gate';
 import {
+	writeWorkspaceActionPromptRequestSchema,
 	writeWorkspaceFileAttachmentRequestSchema,
 	writeWorkspaceImageAttachmentRequestSchema,
 } from '../request-schemas';
@@ -97,6 +99,26 @@ export function registerWorkspaceFilesHandlers({
 							cause instanceof Error
 								? cause.message
 								: 'Invalid pasted attachment payload.',
+					},
+				};
+			}
+		},
+	);
+	withPermissionGate(
+		IPC_CHANNELS.writeWorkspaceActionPrompt,
+		'workspace-write',
+		async (_event, raw: unknown): Promise<WriteWorkspaceActionPromptResult> => {
+			try {
+				const request = writeWorkspaceActionPromptRequestSchema.parse(raw);
+				return listWorkspaceFilesService.writeActionPrompt(request);
+			} catch (cause) {
+				return {
+					error: {
+						code: 'invalid-attachment',
+						message:
+							cause instanceof Error
+								? cause.message
+								: 'Invalid action prompt payload.',
 					},
 				};
 			}

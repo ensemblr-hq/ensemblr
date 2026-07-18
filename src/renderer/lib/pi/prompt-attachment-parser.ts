@@ -1,12 +1,15 @@
 /**
- * Splits a persisted user prompt text into the leading `<attached_file>`
- * markers and the trailing user-typed message.
+ * Splits a persisted user prompt text into its `<attached_file>` markers and the
+ * user-typed message.
  *
  * The composer serializes mention/upload attachments as
- * `<attached_file path="...">content</attached_file>` blocks prepended to the
- * user's typed text (see `formatAttachedFileSection`). The renderer round-trips
- * the same shape from the persisted event stream, so we extract the leading
- * blocks here and surface them as chips.
+ * `<attached_file path="...">content</attached_file>` blocks alongside the
+ * user's typed text (see `formatAttachedFileSection`), and agent actions inline
+ * a composed prompt the same way. The `general` master prompt is injected as a
+ * `<user_preferences>` block. The renderer round-trips the same shape from the
+ * persisted event stream. `<attached_file>` blocks are surfaced as chips wherever
+ * they appear; the `<user_preferences>` block is stripped from the visible
+ * message entirely (the agent still receives it in the raw prompt).
  */
 
 import type {
@@ -15,14 +18,18 @@ import type {
 } from '@/renderer/types/pi-timeline';
 
 const ATTACHED_FILE_PATTERN =
-	/^<attached_file path="([^"]*)">\n([\s\S]*?)\n<\/attached_file>\s*/;
+	/<attached_file path="([^"]*)">\n([\s\S]*?)\n<\/attached_file>/g;
+
+const USER_PREFERENCES_PATTERN =
+	/<user_preferences>\n([\s\S]*?)\n<\/user_preferences>/g;
 
 const REFERENCED_FOLDERS_PATTERN =
 	/^Referenced workspace folders:\n((?:@[^\n]+\n?)+)\s*/;
 
 /**
- * Splits a persisted prompt into its leading attachment blocks (referenced
- * workspace folders and `<attached_file>` markers) and the trailing typed text.
+ * Splits a persisted prompt into its attachment blocks (referenced workspace
+ * folders and `<attached_file>` markers, in order of appearance) and the
+ * remaining typed text.
  * @param prompt - The raw persisted prompt text
  * @returns The extracted attachments and the remaining trimmed message text
  */
@@ -44,20 +51,22 @@ export function parsePromptAttachments(prompt: string): ParsedPrompt {
 		remaining = remaining.slice(folderMatch[0].length);
 	}
 
-	while (true) {
-		const match = ATTACHED_FILE_PATTERN.exec(remaining);
-		if (!match) {
-			break;
-		}
-		const decodedPath = (match[1] ?? '').replaceAll('&quot;', '"');
-		attachments.push({
-			content: match[2] ?? '',
-			path: decodedPath,
-		});
-		remaining = remaining.slice(match[0].length);
-	}
+	remaining = remaining.replace(
+		ATTACHED_FILE_PATTERN,
+		(_match, rawPath: string, content: string) => {
+			attachments.push({
+				content: content ?? '',
+				path: (rawPath ?? '').replaceAll('&quot;', '"'),
+			});
+			return '';
+		},
+	);
 
-	return { attachments, text: remaining.trim() };
+	// User preferences are context for the agent, not something to show back to
+	// the user — strip the block from the visible message without a chip.
+	remaining = remaining.replace(USER_PREFERENCES_PATTERN, '');
+
+	return { attachments, text: remaining.replace(/\n{3,}/g, '\n\n').trim() };
 }
 
 /** Convenience: just the chip-displayable path basename. */

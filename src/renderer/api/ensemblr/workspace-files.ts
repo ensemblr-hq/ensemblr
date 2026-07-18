@@ -7,6 +7,8 @@ import type {
 	ReadWorkspaceDirectoryResult,
 	ReadWorkspaceFileRequest,
 	ReadWorkspaceFileResult,
+	WriteWorkspaceActionPromptRequest,
+	WriteWorkspaceActionPromptResult,
 	WriteWorkspaceFileAttachmentRequest,
 	WriteWorkspaceFileAttachmentResult,
 	WriteWorkspaceImageAttachmentRequest,
@@ -91,5 +93,18 @@ export function writeWorkspaceFileAttachment(
 			usesDatabase: false,
 		},
 		() => getEnsemblrApi().writeWorkspaceFileAttachment(request),
+	);
+}
+
+/** Persists a composed action prompt at a stable per-action `.context/attachments/` path. */
+export function writeWorkspaceActionPrompt(
+	request: WriteWorkspaceActionPromptRequest,
+): Promise<WriteWorkspaceActionPromptResult> {
+	return profileElectronIpcCall(
+		{
+			channel: 'ensemblr:write-workspace-action-prompt',
+			usesDatabase: false,
+		},
+		() => getEnsemblrApi().writeWorkspaceActionPrompt(request),
 	);
 }

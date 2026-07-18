@@ -167,6 +167,17 @@ export const writeWorkspaceFileAttachmentRequestSchema = z.object({
 	workspaceCwd: z.string().min(1),
 });
 
+/**
+ * {@link import('../../shared/ipc').WriteWorkspaceActionPromptRequest}. The
+ * composed prompt is bounded well under the renderer's 24k review-context cap;
+ * 200k characters leaves generous headroom without risking an unbounded write.
+ */
+export const writeWorkspaceActionPromptRequestSchema = z.object({
+	action: z.string().min(1).max(64),
+	content: z.string().min(1).max(200_000),
+	workspaceCwd: z.string().min(1),
+});
+
 // -----------------------------------------------------------------------------
 // checkpoint — STRICT (throws on bad input, caught by handler try/catch)
 // -----------------------------------------------------------------------------

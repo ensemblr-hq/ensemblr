@@ -1,5 +1,6 @@
 import { useSetAtom } from 'jotai';
 import { type ComponentType, useCallback, useRef } from 'react';
+import { useAgentActionRunner } from '@/renderer/hooks/workbench-shell/review-actions/use-agent-action-runner';
 import { useDockController } from '@/renderer/hooks/workbench-shell/use-dock-controller';
 import { useRightSidebarController } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
@@ -114,6 +115,14 @@ export function WorkspaceWorkbenchContent({
 			setDirectoryRevealRequest,
 		],
 	);
+	const runAgentAction = useAgentActionRunner({
+		activeProject,
+		activeSession: sessionNavigation.effectiveActiveSession,
+		activeWorkspace,
+		openSessionTab: sessionNavigation.openSessionTab,
+		selectChat: onSessionTabChange,
+		sessionTabs: sessionNavigation.sessionTabs,
+	});
 	const mainContentState = {
 		activeSession: sessionNavigation.effectiveActiveSession,
 		activeWorkspace,
@@ -154,6 +163,7 @@ export function WorkspaceWorkbenchContent({
 			<ReviewActionsProvider
 				activeProject={activeProject}
 				activeWorkspace={activeWorkspace}
+				runAgentAction={runAgentAction}
 			>
 				<WorkspaceFileDiffOpenerProvider value={openWorkspaceFileDiff}>
 					<ReviewFilePreviewOpenerProvider value={openReviewFilePreview}>

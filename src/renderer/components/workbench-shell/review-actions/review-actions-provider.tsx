@@ -2,10 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 
 import { reviewMergeSettingsQuery } from '@/renderer/api/ensemblr-queries';
-import { useAgentActionRunner } from '@/renderer/hooks/workbench-shell/review-actions/use-agent-action-runner';
 import { usePullRequestRefresh } from '@/renderer/hooks/workbench-shell/review-actions/use-pull-request-refresh';
 import { useReviewMutations } from '@/renderer/hooks/workbench-shell/review-actions/use-review-mutations';
 import type {
+	AgentActionKind,
 	ProjectShellModel,
 	ReviewActionsValue,
 	WorkspaceShellModel,
@@ -35,10 +35,12 @@ export function ReviewActionsProvider({
 	activeProject,
 	activeWorkspace,
 	children,
+	runAgentAction,
 }: {
 	activeProject: ProjectShellModel;
 	activeWorkspace: WorkspaceShellModel;
 	children: ReactNode;
+	runAgentAction: (action: AgentActionKind) => void;
 }) {
 	const [activeDialog, setActiveDialog] = useState<ActiveReviewDialog>(null);
 	const closeDialog = useCallback(() => setActiveDialog(null), []);
@@ -51,10 +53,6 @@ export function ReviewActionsProvider({
 	);
 	const mergeSettings = mergeSettingsData ?? DEFAULT_MERGE_SETTINGS;
 
-	const runAgentAction = useAgentActionRunner({
-		activeProject,
-		activeWorkspace,
-	});
 	const { isRefreshingPullRequest, refreshPullRequest } = usePullRequestRefresh(
 		{
 			workspaceCwd: activeWorkspace.pathLabel ?? null,

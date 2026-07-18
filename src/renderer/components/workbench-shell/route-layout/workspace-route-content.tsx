@@ -1,4 +1,5 @@
 import { Outlet, useNavigate } from '@tanstack/react-router';
+import { useAtomValue } from 'jotai';
 import { useCallback, useMemo } from 'react';
 import { CloseRunningChatDialog } from '@/renderer/components/workbench-shell/conversation-panel/close-running-chat-dialog';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
@@ -14,6 +15,7 @@ import {
 	usePiComposerController,
 	useStopPiSession,
 } from '@/renderer/state/composer';
+import { repoSettingsOverrideAtomFamily } from '@/renderer/state/preferences';
 import {
 	resolveRunningCloseTarget,
 	useCloseRunningChatGuard,
@@ -91,9 +93,13 @@ export function WorkspaceRouteContent({
 	const activeReviewTab = panelTabs.activeReviewTab;
 	const activeDockTab = panelTabs.activeDockTab;
 	const { state: setupDiagnosticsState } = useSetupDiagnostics();
+	const repoOverrides = useAtomValue(
+		repoSettingsOverrideAtomFamily(activeProject.id),
+	);
 	const piComposer = usePiComposerController({
 		chatTabId: activeSession.chatTabId,
 		currentPiSessionId: activeSession.piSessionId,
+		masterPrompt: repoOverrides.actionPreferences?.general ?? '',
 		workspaceCwd: activeWorkspace.pathLabel,
 		workspaceId: activeWorkspace.id,
 	});

@@ -217,6 +217,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('writeWorkspaceImageAttachment', request),
 		writeWorkspaceFileAttachment: (request) =>
 			invoke('writeWorkspaceFileAttachment', request),
+		writeWorkspaceActionPrompt: (request) =>
+			invoke('writeWorkspaceActionPrompt', request),
 		registerLocalRepository: (request) =>
 			invoke('registerLocalRepository', request),
 		removeEnvFile: (request) => invoke('removeEnvFile', request),

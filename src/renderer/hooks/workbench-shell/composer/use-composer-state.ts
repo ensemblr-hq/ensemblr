@@ -18,6 +18,7 @@ import {
 } from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
 import { useMentionMatches } from '@/renderer/hooks/workbench-shell/composer/use-mention-matches';
 import { useSlashCommands } from '@/renderer/hooks/workbench-shell/composer/use-slash-commands';
+import { buildActionAttachmentBlock } from '@/renderer/lib/workbench/action-prompts';
 import {
 	attachPastedFiles,
 	getTransferFiles,
@@ -32,6 +33,7 @@ import {
 	composerMentionsAtomFamily,
 	composerUploadsAtomFamily,
 	composerValueAtomFamily,
+	primedActionAtomFamily,
 	useComposerAttachmentInbox,
 	useComposerInsertConsumer,
 	useComposerSubmitConsumer,
@@ -162,6 +164,9 @@ export function useComposerState({
 	);
 	const [attachmentError, setAttachmentError] = useState<string | null>(null);
 	const [blockedNotice, setBlockedNotice] = useState(false);
+	const [primedAction, setPrimedAction] = useAtom(
+		primedActionAtomFamily(chatTabId),
+	);
 
 	const autoConvertLong = useAtomValue(autoConvertLongTextAtom);
 	const followUp = useAtomValue(followUpBehaviorAtom);
@@ -347,6 +352,45 @@ export function useComposerState({
 			setMentionAttachments,
 		],
 	);
+
+	// Drains an agent action primed for this tab (Review, Create PR…): builds the
+	// outgoing message from the trigger line plus the inlined prompt attachment
+	// and auto-submits it. Held until the composer is ready to send so a primed
+	// action queued during tab initialization is delivered once, not dropped.
+	useEffect(() => {
+		if (!primedAction || composer.disabled || pending) {
+			return;
+		}
+		// Trigger message leads, prompt attachment trails. The timeline parser
+		// extracts `<attached_file>` blocks from any position, so the message renders
+		// as text with the prompt collapsed into a chip.
+		const payload = `${primedAction.message}\n\n${buildActionAttachmentBlock(
+			primedAction.attachmentPath,
+			primedAction.attachmentContent,
+		)}`;
+		// submitText clears the composer, so auto-submitting over a draft the user
+		// typed in this tab would silently discard it. When a draft exists, seed the
+		// payload after it and let the user send instead of auto-submitting.
+		const hasDraft = value.trim().length > 0;
+		setPrimedAction(null);
+		if (primedAction.autoSubmit && !hasDraft) {
+			void submitText(payload, [], [], []);
+		} else {
+			setValue((current) =>
+				current.trim().length > 0
+					? `${current.trimEnd()}\n\n${payload}`
+					: payload,
+			);
+		}
+	}, [
+		primedAction,
+		composer.disabled,
+		pending,
+		submitText,
+		setPrimedAction,
+		setValue,
+		value,
+	]);
 
 	// Maps the Follow-up behavior setting onto Pi's native mid-turn delivery:
 	// `steer` → `steer` frame (injected after the current tool calls), `queue` →
