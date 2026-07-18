@@ -1,9 +1,8 @@
 import { describe, expect, test } from 'vitest';
 
 import {
-	readSetupState,
+	parseSetupState,
 	type WorkspaceSetupState,
-	withSetupState,
 } from '../../../src/shared/scripts/setup-state';
 
 const STATE: WorkspaceSetupState = {
@@ -12,46 +11,29 @@ const STATE: WorkspaceSetupState = {
 	fingerprint: 'abc123',
 };
 
-describe('readSetupState', () => {
-	test('reads a well-formed setup record', () => {
-		expect(readSetupState({ setup: STATE })).toEqual(STATE);
+describe('parseSetupState', () => {
+	test('parses a well-formed setup record', () => {
+		expect(parseSetupState({ ...STATE })).toEqual(STATE);
 	});
 
-	test('returns null when no setup key is present', () => {
-		expect(readSetupState({})).toBeNull();
-		expect(readSetupState({ other: 1 })).toBeNull();
+	test('returns null for non-object values', () => {
+		expect(parseSetupState(null)).toBeNull();
+		expect(parseSetupState('npm install')).toBeNull();
+		expect(parseSetupState(['npm install'])).toBeNull();
 	});
 
 	test('returns null for malformed or partial records', () => {
-		expect(readSetupState({ setup: null })).toBeNull();
-		expect(readSetupState({ setup: 'npm install' })).toBeNull();
-		expect(readSetupState({ setup: ['npm install'] })).toBeNull();
-		expect(readSetupState({ setup: { command: 'npm install' } })).toBeNull();
+		expect(parseSetupState({ command: 'npm install' })).toBeNull();
 		expect(
-			readSetupState({
-				setup: { command: 'npm install', completedAt: 5, fingerprint: 'x' },
+			parseSetupState({
+				command: 'npm install',
+				completedAt: 5,
+				fingerprint: 'x',
 			}),
 		).toBeNull();
 	});
-});
 
-describe('withSetupState', () => {
-	test('merges the setup slice without mutating the input', () => {
-		const metadata = { linkedIssue: { id: 'THE-1' }, port: 3000 };
-		const next = withSetupState(metadata, STATE);
-
-		expect(next).toEqual({
-			linkedIssue: { id: 'THE-1' },
-			port: 3000,
-			setup: STATE,
-		});
-		expect(metadata).not.toHaveProperty('setup');
-	});
-
-	test('replaces an existing setup slice', () => {
-		const older = { ...STATE, fingerprint: 'old' };
-		const next = withSetupState({ setup: older }, STATE);
-
-		expect(readSetupState(next)).toEqual(STATE);
+	test('ignores extra keys', () => {
+		expect(parseSetupState({ ...STATE, extra: true })).toEqual(STATE);
 	});
 });

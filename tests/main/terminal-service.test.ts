@@ -13,6 +13,7 @@ import { insertWorkspaceRow } from '../../src/main/storage/repositories/workspac
 import type {
 	PtyBackend,
 	PtyProcess,
+	PtySpawnOptions,
 } from '../../src/main/terminal/pty-backend.ts';
 import { createNodePtyBackend } from '../../src/main/terminal/pty-backend.ts';
 import { createScrollbackBuffer } from '../../src/main/terminal/terminal-scrollback.ts';
@@ -145,6 +146,20 @@ function createFakePty(): {
 	};
 }
 
+function requireSpawnOptions(options: PtySpawnOptions | null): PtySpawnOptions {
+	assert.ok(options);
+
+	return options;
+}
+
+function requireSpawnEnv(
+	env: Record<string, string> | null,
+): Record<string, string> {
+	assert.ok(env);
+
+	return env;
+}
+
 function createServiceFixture(
 	t: TestContext,
 	{ backend, killGraceMs = 50 }: { backend: PtyBackend; killGraceMs?: number },
@@ -186,11 +201,11 @@ test('create spawns a PTY in the workspace cwd with the assembled env', async (t
 	assert.ok(result.session);
 	assert.equal(result.session.status, 'running');
 	assert.equal(result.session.kind, 'terminal');
-	assert.ok(spawned);
-	assert.equal(spawned.cwd, process.cwd());
-	assert.deepEqual(spawned.args, ['-l']);
-	assert.equal(spawned.env.ENSEMBLR_WORKSPACE_NAME, 'monterrey');
-	assert.equal(spawned.env.ENSEMBLR_PORT, '41000');
+	const spawnOptions = requireSpawnOptions(spawned);
+	assert.equal(spawnOptions.cwd, process.cwd());
+	assert.deepEqual(spawnOptions.args, ['-l']);
+	assert.equal(spawnOptions.env.ENSEMBLR_WORKSPACE_NAME, 'monterrey');
+	assert.equal(spawnOptions.env.ENSEMBLR_PORT, '41000');
 });
 
 test('output streams broadcast and accumulate as scrollback', async (t) => {
@@ -207,6 +222,44 @@ test('output streams broadcast and accumulate as scrollback', async (t) => {
 	assert.equal(outputEvents.length, 2);
 	assert.equal(outputEvents[1]?.data, 'world');
 	assert.equal(service.getSnapshot(terminalId).scrollback, 'hello world');
+});
+
+test('detects a run-script preview URL split across two output chunks', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { lifecycleEvents, service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		kind: 'run-script',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('  ➜  Local:   http://localh');
+	fake.emitData('ost:5173/\r\n');
+
+	assert.equal(
+		service.getSnapshot(terminalId).session?.previewUrl,
+		'http://localhost:5173/',
+	);
+	assert.ok(
+		lifecycleEvents.some(
+			(event) => event.session.previewUrl === 'http://localhost:5173/',
+		),
+	);
+});
+
+test('does not detect a preview URL for interactive terminal sessions', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('http://localhost:5173/\r\n');
+
+	assert.equal(service.getSnapshot(terminalId).session?.previewUrl, null);
 });
 
 test('output broadcasts carry monotonic seq mirrored by snapshot lastSeq', async (t) => {
@@ -421,11 +474,11 @@ test('script sessions merge the resolved base environment before workspace vars'
 		workspaceId: WORKSPACE_ID,
 	});
 
-	assert.ok(spawnedEnv);
-	assert.equal(spawnedEnv.PATH, '/mise/shims:/opt/homebrew/bin:/usr/bin');
-	assert.equal(spawnedEnv.SHELL_MARKER, 'from-login-shell');
-	assert.equal(spawnedEnv.ENSEMBLR_WORKSPACE_PATH, '/tmp/workspace');
-	assert.equal(spawnedEnv.__CFBundleIdentifier, undefined);
+	const env = requireSpawnEnv(spawnedEnv);
+	assert.equal(env.PATH, '/mise/shims:/opt/homebrew/bin:/usr/bin');
+	assert.equal(env.SHELL_MARKER, 'from-login-shell');
+	assert.equal(env.ENSEMBLR_WORKSPACE_PATH, '/tmp/workspace');
+	assert.equal(env.__CFBundleIdentifier, undefined);
 });
 
 test('resolveUserShell returns an existing shell binary', () => {

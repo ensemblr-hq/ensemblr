@@ -126,11 +126,25 @@ interface TrackedSession {
 	exitWaiters: Array<() => void>;
 	killTimer: NodeJS.Timeout | null;
 	outputSeq: number;
+	/**
+	 * Rolling tail of recent run-script output kept only until a preview URL is
+	 * found. PTY output arrives in arbitrary fragments, so a dev-server URL can
+	 * straddle two chunks; matching against this window instead of a lone chunk
+	 * stops a split banner from hiding the dock's Open button.
+	 */
+	previewScanBuffer: string;
 	pty: PtyProcess | null;
 	scrollback: ScrollbackBuffer;
 	snapshot: TerminalSessionSnapshot;
 	stopRequested: boolean;
 }
+
+/**
+ * How many trailing characters of run-script output to keep while hunting for a
+ * preview URL. Comfortably longer than any dev-server banner line, so a URL
+ * split across chunks still lands whole inside the window.
+ */
+const PREVIEW_SCAN_WINDOW = 8192;
 
 /**
  * Builds the main-process PTY supervisor used by terminal dock tabs and script
@@ -202,12 +216,17 @@ export function createTerminalService({
 			return;
 		}
 
-		const previewUrl = detectPreviewUrl(data);
+		session.previewScanBuffer = (session.previewScanBuffer + data).slice(
+			-PREVIEW_SCAN_WINDOW,
+		);
+
+		const previewUrl = detectPreviewUrl(session.previewScanBuffer);
 
 		if (!previewUrl) {
 			return;
 		}
 
+		session.previewScanBuffer = '';
 		session.snapshot = { ...session.snapshot, previewUrl };
 		broadcastLifecycle(session);
 	}
@@ -373,6 +392,7 @@ export function createTerminalService({
 			exitWaiters: [],
 			killTimer: null,
 			outputSeq: 0,
+			previewScanBuffer: '',
 			pty,
 			scrollback: createScrollbackBuffer(),
 			snapshot: {

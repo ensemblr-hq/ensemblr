@@ -24,6 +24,8 @@ export const IPC_CHANNELS = {
 	createPullRequest: 'ensemblr:create-pull-request',
 	createTerminalSession: 'ensemblr:create-terminal-session',
 	createWorkspace: 'ensemblr:create-workspace',
+	detectWorkspaceDesktopRuntime: 'ensemblr:detect-workspace-desktop-runtime',
+	activateWorkspaceDesktopApp: 'ensemblr:activate-workspace-desktop-app',
 	deleteArchivedWorkspace: 'ensemblr:delete-archived-workspace',
 	deleteRepository: 'ensemblr:delete-repository',
 	deleteReviewComment: 'ensemblr:delete-review-comment',

@@ -8,20 +8,13 @@ import {
 	parseWorkspaceScriptSettings,
 	type WorkspaceScriptSettings,
 } from '../../shared/scripts/script-settings.ts';
-import {
-	readSetupState,
-	withSetupState,
-} from '../../shared/scripts/setup-state.ts';
 import type { EnsemblrConfigResolutionService } from '../config';
-import { parseMetadata } from '../repository/metadata.ts';
 import { isRecord, isString } from '../repository/row-guards.ts';
 import type { EnsemblrDatabaseService } from '../storage';
-import {
-	selectWorkspaceWithRepositoryById,
-	updateWorkspaceMetadataJson,
-} from '../storage/repositories/workspace-repository.ts';
+import { selectWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
 import type { TerminalService } from '../terminal';
 import { computeSetupFingerprint } from './setup-fingerprint.ts';
+import { readSetupStateFile, writeSetupStateFile } from './setup-state-file.ts';
 
 const RESTART_WAIT_TIMEOUT_MS = 7_000;
 
@@ -270,12 +263,10 @@ export function createScriptLifecycleService({
 	}
 
 	/**
-	 * Persists the current setup fingerprint into the workspace metadata,
-	 * preserving every sibling key. Best-effort: silently no-ops when SQLite or
-	 * the workspace row is unavailable, since a missed record only costs one
-	 * redundant setup run on the next open. The row is re-read immediately before
-	 * the write to keep the read-modify-write window small; a losing race with a
-	 * concurrent metadata write likewise only costs a redundant setup run.
+	 * Persists the current setup fingerprint to the worktree's
+	 * `.ensemblr/setup.local.json` marker. Best-effort: silently no-ops when
+	 * SQLite or the workspace row is unavailable and swallows write errors, since
+	 * a missed record only costs one redundant setup run on the next open.
 	 * @param options - The setup command that completed and the target workspace.
 	 */
 	function recordSetupCompletion({
@@ -297,19 +288,13 @@ export function createScriptLifecycleService({
 			return;
 		}
 
-		const metadata = withSetupState(parseMetadata(row.metadataJson), {
+		writeSetupStateFile(row.path, {
 			command,
 			completedAt: new Date().toISOString(),
 			fingerprint: computeSetupFingerprint({
 				command,
 				worktreePath: row.path,
 			}),
-		});
-
-		updateWorkspaceMetadataJson({
-			database,
-			id: workspaceId,
-			metadataJson: JSON.stringify(metadata),
 		});
 	}
 
@@ -318,15 +303,12 @@ export function createScriptLifecycleService({
 	 * setup can be skipped. Matches on both the command and the worktree
 	 * fingerprint; the fingerprint (which reads lockfiles) is only computed when
 	 * the recorded command matches.
-	 * @param row - Workspace join row carrying `metadataJson` and worktree `path`.
+	 * @param row - Workspace join row carrying the worktree `path`.
 	 * @param command - The resolved setup command to compare against the record.
 	 * @returns True when the recorded fingerprint matches the current inputs.
 	 */
-	function setupIsCurrent(
-		row: { metadataJson: string; path: string },
-		command: string,
-	): boolean {
-		const persisted = readSetupState(parseMetadata(row.metadataJson));
+	function setupIsCurrent(row: { path: string }, command: string): boolean {
+		const persisted = readSetupStateFile(row.path);
 
 		if (!persisted || persisted.command !== command) {
 			return false;
