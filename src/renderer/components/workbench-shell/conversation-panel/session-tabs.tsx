@@ -13,7 +13,7 @@ import {
 	XIcon,
 } from 'lucide-react';
 import { Reorder } from 'motion/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -29,6 +29,7 @@ import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceFileIconNameForPath } from '@/renderer/lib/workbench';
 import { useDebugPanelToggle } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
+import { shouldSelectOnTabClick } from '@/renderer/state/workspace';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 
 /** Horizontal session-tab bar with close, restore, new-tab, and drag-order controls. */
@@ -230,6 +231,22 @@ function SessionTab({
 	const isChatKind = (session.kind ?? 'chat') === 'chat';
 	const canClose = isChatKind ? openChatTabCount > 1 : true;
 	const showCloseControls = canClose && !isDraggingTab;
+	const didDragRef = useRef(false);
+
+	/** Marks this tab as dragged so the synthesized click does not select it. */
+	function handleDragStart() {
+		didDragRef.current = true;
+		onDragStart();
+	}
+
+	/** Selects the tab, unless the click was synthesized at the end of a drag. */
+	function handleSelect(event: MouseEvent<HTMLButtonElement>) {
+		const select = shouldSelectOnTabClick(didDragRef.current, event.detail);
+		didDragRef.current = false;
+		if (select) {
+			onSelect(session.id);
+		}
+	}
 
 	return (
 		<Reorder.Item
@@ -245,7 +262,7 @@ function SessionTab({
 			dragListener={canReorderTabs}
 			layout='position'
 			onDragEnd={onDragEnd}
-			onDragStart={onDragStart}
+			onDragStart={handleDragStart}
 			transition={isDraggingTab ? undefined : { layout: { duration: 0 } }}
 			value={session.id}
 			whileDrag={canReorderTabs ? { scale: 1.02, zIndex: 20 } : undefined}
@@ -253,7 +270,10 @@ function SessionTab({
 			<button
 				aria-current={isActive ? 'page' : undefined}
 				className='flex h-full min-w-0 flex-1 cursor-inherit items-center gap-2 px-3 text-left'
-				onClick={() => onSelect(session.id)}
+				onClick={handleSelect}
+				onPointerDown={() => {
+					didDragRef.current = false;
+				}}
 				type='button'
 			>
 				<span className='grid size-3.5 shrink-0 place-items-center'>
