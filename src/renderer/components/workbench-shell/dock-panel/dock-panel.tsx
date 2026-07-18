@@ -211,7 +211,7 @@ function DockTabCloseOverlay() {
 	return (
 		<span
 			aria-hidden='true'
-			className='pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-card via-card/90 to-transparent opacity-0 transition-opacity group-focus-within/dock-tab:opacity-100 group-hover/dock-tab:opacity-100'
+			className='pointer-events-none absolute top-0 right-0 bottom-0.5 w-10 bg-linear-to-l from-card via-card/90 to-transparent opacity-0 transition-opacity group-focus-within/dock-tab:opacity-100 group-hover/dock-tab:opacity-100'
 		/>
 	);
 }
