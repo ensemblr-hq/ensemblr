@@ -1,11 +1,13 @@
 import { Navigate } from '@tanstack/react-router';
 import { useCallback, useMemo } from 'react';
 
+import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
 import { WorkbenchPlaceholderPage } from '@/renderer/components/workbench-shell/route-layout';
 import {
 	useSetupDiagnostics,
 	useWorkbenchLayoutRouteModel,
 } from '@/renderer/components/workbench-shell/shell-contexts';
+import { SHELL_INSET_CLASS } from '@/renderer/components/workbench-shell/shell-inset';
 import {
 	BOARD_STATUS_ORDER,
 	orderColumnWorkspaceIds,
@@ -122,25 +124,28 @@ export function DashboardBoard() {
 	}
 
 	return (
-		<main className='flex min-w-0 flex-1 flex-col overflow-hidden'>
-			<header className='native-toolbar flex h-12 shrink-0 items-center border-border border-b px-4 font-medium text-sm'>
-				Dashboard
-			</header>
-			<BoardWorkspaceMenuProvider controller={workspaceMenu}>
-				<div className='min-h-0 flex-1 overflow-x-auto p-4'>
-					<div className='mx-auto flex h-full w-max gap-3'>
-						{BOARD_STATUS_ORDER.map((status) => (
-							<BoardColumn
-								cards={grouped[status]}
-								key={status}
-								onOpenWorkspace={model.navigateToWorkspace}
-								status={status}
-							/>
-						))}
+		<SidebarInset className={SHELL_INSET_CLASS}>
+			<main className='flex min-w-0 flex-1 flex-col overflow-hidden'>
+				<header className='native-toolbar flex h-12 shrink-0 items-center gap-2.5 border-border border-b px-4 font-medium text-sm'>
+					<SidebarTrigger className='sidebar-collapsed-trigger' />
+					<span>Dashboard</span>
+				</header>
+				<BoardWorkspaceMenuProvider controller={workspaceMenu}>
+					<div className='min-h-0 flex-1 overflow-x-auto p-4'>
+						<div className='mx-auto flex h-full w-max gap-3'>
+							{BOARD_STATUS_ORDER.map((status) => (
+								<BoardColumn
+									cards={grouped[status]}
+									key={status}
+									onOpenWorkspace={model.navigateToWorkspace}
+									status={status}
+								/>
+							))}
+						</div>
 					</div>
-				</div>
-			</BoardWorkspaceMenuProvider>
-			{workspaceMenuDialogs}
-		</main>
+				</BoardWorkspaceMenuProvider>
+				{workspaceMenuDialogs}
+			</main>
+		</SidebarInset>
 	);
 }

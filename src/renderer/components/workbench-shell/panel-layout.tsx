@@ -17,6 +17,7 @@ import { DockPanel } from './dock-panel/dock-panel';
 import { ReviewPanel } from './review-panel';
 import { RightSidebarHeader } from './right-sidebar-header/right-sidebar-header';
 import { useWorkbenchLayout } from './shell-contexts';
+import { SHELL_INSET_CLASS } from './shell-inset';
 import { WorkbenchHeader } from './workbench-header';
 
 /** Top-level resizable layout housing the main workspace and the review dock. */
@@ -40,7 +41,7 @@ export function WorkbenchPanelLayout({
 	onReviewTabChange: (tab: ReviewPanelTab) => void;
 }) {
 	return (
-		<SidebarInset className='flex h-svh min-h-svh overflow-hidden bg-background text-foreground'>
+		<SidebarInset className={SHELL_INSET_CLASS}>
 			<ResizablePanelGroup className='min-h-0 flex-1' orientation='horizontal'>
 				<MainWorkspacePanel
 					activeProject={activeProject}
