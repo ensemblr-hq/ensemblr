@@ -50,11 +50,19 @@
 	// cva / cmdk / radix-ui are imported only from the vendored shadcn/ui
 	// surface in src/renderer/components/ui (ignored above), so fallow
 	// can't see those edges; allowlist them explicitly.
+	// tailwindcss / @tailwindcss/typography are pulled in via CSS build
+	// directives (`@import "tailwindcss"`, `@plugin "@tailwindcss/typography"`)
+	// in src/renderer/styles/index.css. Fallow reads those as production
+	// imports and wants them moved to `dependencies`, but they are build-time
+	// only — Vite/PostCSS compiles the CSS at build, so devDependencies is
+	// correct and the renderer bundle needs neither at runtime.
 	"ignoreDependencies": [
 		"@electron-forge/shared-types",
+		"@tailwindcss/typography",
 		"class-variance-authority",
 		"cmdk",
-		"radix-ui"
+		"radix-ui",
+		"tailwindcss"
 	],
 
 	// shadcn/ui registry components are vendored verbatim; the unused
