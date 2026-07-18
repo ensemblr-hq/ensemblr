@@ -1,6 +1,6 @@
 # Open Decisions
 
-Date: 2026-06-16
+Date: 2026-07-18
 
 ## Screenshot Gaps Remaining
 
@@ -26,20 +26,18 @@ Date: 2026-06-16
 
 ## Needs Product Decision
 
-- Whether the current workspace-row status context menu should change local workspace lifecycle state, linked Linear issue status, both, or another status model.
-- Whether the current workspace-row Mark as unread action represents local workspace attention, chat unread state, or linked external issue state.
-- Whether the Changes tab Review action opens local diff-comment review mode, starts an agent review workflow, or toggles a review filter/state.
+- None blocking from the current shell refresh. Workspace-row **Set status** is a local dashboard board status, **Mark unread/read** is a local workspace-attention marker, and the Changes tab **Review** button starts the repository `review` agent action.
 
 ## Needs Product Working Session
 
-- `ENS-075` Agent chat pane UX/UI working session after basic Pi composer/timeline integration and capability discovery.
-- `ENS-076` App settings screen UX/UI working session before the full settings shell and forms are built.
+- `ENS-075` Agent chat pane polish session, now that the basic Pi composer/timeline integration is implemented.
+- `ENS-076` App settings polish session, now that the main settings sections and persistence model are implemented.
 
 ## Needs Implementation Discovery
 
 - Pi CLI/RPC hooks available for permission brokering.
-- Pi CLI/RPC APIs for session tree navigation/forking, retry-in-new-chat behavior, and compaction UI.
-- Pi CLI/RPC APIs for model listing, review-model separation, plan mode, fast mode, browser control, and context usage display.
+- Pi CLI/RPC APIs for session tree navigation/forking beyond the current chat-tab model, retry-in-new-chat behavior, and compaction UI.
+- Pi CLI/RPC APIs for permission brokering, browser control, and context usage display. Model listing and model/thinking selection are already wired.
 - How to represent Pi sessions when a workspace is adopted from Conductor.
 - Exact review-thread/comment mutation coverage through first-class `gh` and authenticated `gh api`; any gaps should be documented as unsupported or limited rather than solved with an app-owned GitHub auth layer.
 - Linear archive/delete schema and permission support. Create/read/update/comment and workspace-from-issue are resolved v1 scope, but field-level SDK/GraphQL mapping, pagination, filtering, labels, cycles, and metadata caching still need implementation discovery.
@@ -52,8 +50,8 @@ Date: 2026-06-16
 
 ## Resolved Since Screenshot Review
 
-- AI-certainty phrase soften setting (ENS-069): support as a v1 user-scope toggle implemented via prompt preset injection at chat start, not Pi output post-processing. Reason: hidden post-processing changes agent output without user awareness; a prompt preset is reversible and respects Pi as the source of truth. Toggle lives at `Settings → General → Soften AI certainty` (already wired). Build follow-up: extend the new-chat system prompt builder to append the preset when the toggle is on; ticket to be cut against Milestone 4.
-- Experimental settings v1 scope (ENS-068): Dashboard visibility, Sidebar chats grouping, Auto-run after setup, and In-app browser preview ship as v1 user-scope flags in `Settings → Experimental` (read-only-default, opt-in). Sidebar resource usage ships as a v1 flag with the toggle visible; the actual CPU/memory sampler is post-core (separate follow-up ticket once a sampler service exists). Big-terminal mode is satisfied by the terminal dock and does not need a separate flag. Tab-freak mode, Voice, Graphite, cloud SSH, production React profiler, and chat-tab limit remain resolved by ADR 0020/0021/0022.
+- AI-certainty phrase soften setting (ENS-069): removed from v1. It had no functional consumer, so Ensemblr does not expose or persist this as a user setting; Pi output should not be silently post-processed.
+- Experimental settings v1 scope (ENS-068): the implemented Experimental page has exactly Developer Mode (`localStorage`) and Auto-run after setup (`config.json`, `app.experimental.autoRunAfterSetup`). The earlier dashboard/sidebar/browser/resource flags are not present in code. Big-terminal mode is satisfied by the terminal dock. Tab-freak mode, Voice, Graphite, cloud SSH, production React profiler, and chat-tab limit remain resolved by ADR 0020/0021/0022.
 - Root directory changes: switch root and reindex/adopt by default; migration/delete are explicit actions.
 - Secret storage: use macOS Keychain from the start; SQLite stores metadata only.
 - Ensemblr account model: defer app account/sign-in for v1; local-first with external auth.
@@ -68,6 +66,9 @@ Date: 2026-06-16
 - Renderer routing: file-based TanStack routing with loader-driven data and redirects. Workspace and chat identity are URL path params, `dock`/`review` are search params, and per-workspace dock/review/chat selection is persisted. See `docs/adr/0026-use-file-based-tanstack-routing.md`.
 - Workspace lifecycle settings: branch naming, archive/merge behavior now configured via Settings → Git (`app.git` in `~/.config/ensemblr/config.json`), feeding repository resolution as `user-default` source.
 - Wordmark animation: glitch burst now fires immediately on mount (`welcome-wordmark.tsx:155`) with periodic bursts continuing on 9-17s interval.
+- Dashboard board: shipped as local board state with Backlog, In progress, In review, Done, and Canceled columns; workspace status/unread context-menu ambiguity is resolved as local app state.
+- Review action: the Changes/All files Review affordance starts the repository `review` agent action; inline line comments remain future review polish.
+- Setup/run/terminal environment: workspace processes now inherit sanitized shell-derived environment, workspace toolchain `PATH`, workspace overlays, and `ENSEMBLR_*` variables.
 
 ## Deferred
 

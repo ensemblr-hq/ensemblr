@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Dashboard Workspace Board** (`c73ced6`, #125; `eee3e6f`, #128; `2f4aeb7`, #130): The Dashboard route now shows a draggable workspace board with Backlog, In progress, In review, Done, and Canceled columns, persisted local board status/order, workspace card action menus, and fixed drop targets. The board stays reachable when setup is blocked, the sidebar is collapsed, or no workspaces remain.
+
+- **Bundled Terminal Font** (`d2220aa`, #122): JetBrains Mono Nerd Font assets are bundled under `src/renderer/styles/fonts/` and wired into terminal/code typography so first launch has stable monospace rendering before user font customization.
+
 - **Clickable File & Directory References in Assistant Messages** (in progress, branch `psoldunov/check-master-sync`): Inline-code in assistant markdown that resolves to a workspace path now renders as an attachment chip instead of a plain `code` span. File chips open a file-preview tab; directory chips switch to the All files tab and expand/reveal that folder in the tree:
   - Path classification is isolated in `src/renderer/lib/pi/inline-attachment.ts` — an extension/filename allowlist gated by a safe-path pattern, excluding library display names (`node.js`, `next.js`, …) so prose does not render dead chips
   - `MessageInlineCode` (in `message.tsx`) wires the classifier into Streamdown's inline-code renderer; chips use per-extension icons via `@iconify/react` (`getWorkspaceFileIconName`) instead of generic file/folder glyphs
@@ -24,11 +28,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Social Avatar Generator** (`e502d2c`, #92): `npm run avatar:generate` (`scripts/generate-avatar.mjs`) renders a borderless 512×512 avatar (gitignored `assets/avatar.png`). The dot-matrix "E" glyph shrank 20% (CELL 88 → 70.4) with a proportional chromatic-split offset, and shared icon geometry/colors/rasterization were extracted into `scripts/icon-art.mjs` and `scripts/icon-colors.mjs` so the app icon and avatar share one `renderMaster` source.
 
-- **Appearance Settings Wired to `config.json`**: The Settings → Appearance page is now fully functional and persisted in `~/.config/ensemblr/config.json` under `app.appearance` (source of truth; see ADR 0029). All nine prefs apply live:
+- **Appearance Settings Wired to `config.json`**: The Settings → Appearance page is now fully functional and persisted in `~/.config/ensemblr/config.json` under `app.appearance` (source of truth; see ADR 0029). All eight prefs apply live:
   - Theme, accessible-color variants (Okabe-Ito palettes for protanopia/deuteranopia/tritanopia), and code ligatures toggle document-root classes; the mono font drives the `--ensemblr-font-mono` CSS variable so every `font-mono` surface re-fonts instantly (`src/renderer/state/preferences/use-appearance-effect.ts`)
   - Code theme now flows through the Shiki (`code-block.tsx`) and Streamdown (`message.tsx`) renderers — previously hardcoded to GitHub themes; the picked theme loads on demand and feeds both light/dark slots
   - Terminal font and size live-apply to open xterm surfaces without re-mounting the PTY (`xterm-terminal.tsx` + adapter `setFont`); the shared fallback stack is exported once as `DEFAULT_FONT_FAMILY`
-  - Markdown style adds a `prose` preset via `@tailwindcss/typography`; colored sidebar diffs gained an active-row-aware mode (`diff-stats.tsx`)
+  - Markdown style adds a `prose` preset via `@tailwindcss/typography`; sidebar diff stats render with active-row-aware tokens (`diff-stats.tsx`)
   - One-time migration of the legacy `ensemblr_pref_*` `localStorage` values into `config.json` on first launch (legacy `one-dark` → `one-dark-pro`), removing legacy keys only after a successful write (`use-appearance-migration.ts`)
   - New tests: `tests/renderer/use-appearance-effect.test.tsx`, `tests/renderer/use-appearance-migration.test.tsx`, `tests/renderer/workspace-diff-stats.test.tsx`
 
@@ -97,6 +101,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Workspace Process Environment** (`4695229`, #120; `b9bdd09`, #121): Setup/run scripts and terminal sessions now inherit the user's shell-derived environment and workspace toolchain `PATH`, then merge workspace environment overlays and `ENSEMBLR_*` variables while keeping macOS launch-context variables stripped.
+
 - **Setup Scripts Resolved from Workspace Settings** (`1de8f4f`, #97): Setup and Run scripts now resolve from the workspace's own resolved settings rather than repository-only config, so per-workspace `.ensemblr/settings.toml` `[scripts]` overrides take effect (`src/main/scripts/script-lifecycle-service.ts`, `src/renderer/hooks/use-scripts-settings-form.ts`). Live-workspace file watching and query keys were reworked to key off the workspace model.
 
 - **Package Manager → npm**: Migrated JavaScript/TypeScript package management from Bun to npm. `npm install` now manages dependencies against a `package-lock.json` lockfile (Bun and `bun.lock` are retired). Details:
@@ -124,6 +130,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Session Tab Interaction Polish** (`4a8801b`, #123; `ae163fe`, #124): Close controls are easier to hit, drag overlays no longer interfere with tab controls, and active session selection stays stable after drag reorder.
+
+- **Workspace Dashboard Edge Cases** (`48e6b2f`, #131; `7da4597`, #132; `ed1461f`, #133): Placeholder workspace names avoid reuse collisions, collapsed sidebar triggers render again, and the Dashboard remains accessible when the last workspace is archived/deleted.
+
 - **Base Branch Synced Before Workspace Creation** (`67cf369`, #98): Remote-backed base branches are fetched and fast-forwarded before a workspace is created, so new workspaces start from the latest `master`/`main` when online. The sync is best-effort, so offline workspace creation still works (`src/main/repository/create-workspace.ts`, `src/main/repository/git-ops.ts`; new `tests/main/create-workspace.test.ts`).
 
 - **Chat Close No Longer Blocked by a Running Session** (`1de8f4f`, #97): Closing a chat tab now stops its running Pi session without blocking the close (`src/main/pi-agent/pi-session-lifecycle.ts`, `src/renderer/state/workspace/close-running-chat-guard.ts`; new `tests/main/pi-session-service.test.ts`).
@@ -148,6 +158,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Versioning Note
 
 Ensemblr follows a pre-1.0 semantic versioning approach where:
+
 - `MAJOR` version (currently 0) remains 0 until stable v1 release
 - `MINOR` version increments with significant feature additions
 - `PATCH` version increments with bug fixes and small improvements
@@ -157,7 +168,17 @@ Ensemblr follows a pre-1.0 semantic versioning approach where:
 ## Commit References
 
 | Commit | Date | Feature |
-|--------|------|---------|
+| -------- | ------ | --------- |
+| `ed1461f` | 2026-07-18 | Keep dashboard accessible when no workspaces remain (#133) |
+| `7da4597` | 2026-07-18 | fix: restore collapsed sidebar triggers (#132) |
+| `48e6b2f` | 2026-07-18 | fix(workspace): avoid reused placeholder names (#131) |
+| `eee3e6f` | 2026-07-18 | Add dashboard workspace card action menus (#128) |
+| `c73ced6` | 2026-07-18 | feat(workspace): add draggable dashboard board (#125) |
+| `ae163fe` | 2026-07-18 | Fix session tab selection after drag reorder (#124) |
+| `4a8801b` | 2026-07-18 | fix(session-tabs): improve tab close controls (#123) |
+| `d2220aa` | 2026-07-17 | Show setup status and bundle terminal font (#122) |
+| `b9bdd09` | 2026-07-17 | fix(environment): use workspace toolchain PATH (#121) |
+| `4695229` | 2026-07-17 | fix(terminal): inherit shell-derived env for setup and run scripts (#120) |
 | `1cbf07c` | 2026-07-10 | feat(composer): support pasted image attachments (#99) |
 | `67cf369` | 2026-07-10 | fix(repository): sync base before workspace creation (#98) |
 | `1de8f4f` | 2026-07-10 | Use workspace settings for setup scripts and unblock chat closes (#97) |
@@ -178,8 +199,10 @@ Ensemblr follows a pre-1.0 semantic versioning approach where:
 
 The following documentation files were updated to reflect these changes:
 
-- `docs/product/implementation-roadmap.md` - Added "Completed Implementation" section
-- `docs/product/conductor-parity.md` - Updated Settings row, added User git defaults row
-- `docs/product/current-shell-inventory.md` - Updated All Files tab status, added Settings → Git row, updated Current Unknowns, added context-aware close action details to Chat/session tabs and Settings shell entry rows
-- `docs/adr/0031-strip-launch-context-env-and-single-instance-lock.md` - New ADR documenting the launch-context env strip and the packaged-app single-instance lock (Dock-flash fix)
-- `docs/adr/0032-channel-scoped-bundle-identity.md` - New ADR documenting per-channel bundle ids (release/canary/dev) that stop dogfood builds from sharing the release's LaunchServices registration (Dock-flash root cause)
+- `README.md` - Updated the current feature list, tool versions, macOS SQLite path, and ADR count.
+- `docs/product/current-shell-inventory.md` - Updated dashboard, shell-provider, Changes tab, setup/run script, terminal environment, settings, and resolved-unknowns guidance.
+- `docs/product/implementation-roadmap.md` - Added current implementation deltas since `de46de5` and removed stale settings decisions.
+- `docs/product/conductor-parity.md` - Updated dashboard, setup/run, environment, settings, and feature-flag parity rows.
+- `docs/product/open-decisions.md` - Removed stale AI-certainty/experimental-flag decisions and marked board status/unread/review semantics resolved.
+- `docs/product/settings-inventory.md` - Reflected the actual Appearance schema and bundled default terminal font.
+- `docs/product/docs-consistency-audit.md` - Recorded the 2026-07-18 docs refresh audit.

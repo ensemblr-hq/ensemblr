@@ -1,6 +1,6 @@
 # Settings Inventory
 
-Date: 2026-07-15
+Date: 2026-07-18
 
 This inventory reflects the settings screens as implemented in code. It separates
 app-wide settings from repository settings and assigns each setting to the right
@@ -102,7 +102,9 @@ Source of truth: `~/.config/ensemblr/config.json` under `app.appearance.*` (same
 sync/live-reload path as General; see ADR 0029). Each value applies live — theme
 plus the accessible-color/ligature classes on the document root, the mono font
 via the `--ensemblr-font-mono` CSS variable, terminal typography through the
-xterm adapter, and the code theme through the Shiki/Streamdown renderers. Unlike
+xterm adapter, and the code theme through the Shiki/Streamdown renderers. The
+default mono/terminal family is bundled JetBrains Mono Nerd Font so code and
+terminal surfaces render consistently before user font customization. Unlike
 General/Models (fresh seed), Appearance runs a **one-time migration** of the old
 `ensemblr_pref_*` `localStorage` values into `config.json` on first launch, then
 removes the legacy keys; the renamed `one-dark` code theme is carried over as
@@ -111,7 +113,6 @@ removes the legacy keys; the renamed `one-dark` code theme is carried over as
 | Setting | Conductor mapping | Ensemblr adaptation | Storage |
 | --- | --- | --- | --- |
 | Theme | Direct. | Ensemblr-specific themes. | `config.json` (`app.appearance.theme`). |
-| Colored sidebar diffs | Direct. | Same. | `config.json` (`app.appearance.coloredSidebarDiffs`). |
 | Accessible colors | Direct. | Ensemblr accessibility palette variants. | `config.json` (`app.appearance.accessibleColors`). |
 | Code theme | Direct. | Ensemblr code/diff highlighting theme. | `config.json` (`app.appearance.codeTheme`). |
 | Mono font | Direct. | Font for code, diffs, and inline code. | `config.json` (`app.appearance.monoFont`). |
@@ -258,4 +259,4 @@ For app-wide behavior, use:
 ## Open Settings Questions
 
 - Resolved (pi 0.79.1): plan mode is extension-only, fast mode and browser control have no core support, personality has no Pi concept — all dropped from the Models settings screen. Review-model separation is supported via a separate spawned session with its own `--model`.
-- Which non-deferred experimental features are v1 parity requirements versus post-core flags?
+- No active settings product question remains from the 2026-07-18 refresh. New settings work should update this inventory when a value moves between `config.json`, SQLite, localStorage, repository config, or Keychain.

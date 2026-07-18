@@ -1,27 +1,27 @@
 # Conductor Parity Matrix
 
-Date: 2026-07-15
+Date: 2026-07-18
 
 Ensemblr targets feature parity with Conductor's publicly observable and documented workflows, adapted for Pi. This matrix is a living checklist, not a copied product spec.
 
-> **Status (2026-07-15):** The Pi runtime, live `gh`-backed PR/checks, live node-pty/xterm terminals, drag-order session tabs, optimistic workspace creation, and the archive lifecycle have all shipped since this doc's parity targets were written. Rows framed below as future or aspirational are largely implemented; treat the "Ensemblr Target" wording as the intended contract and read the inline "Implemented" annotations for current state.
+> **Status (2026-07-18):** The Pi runtime, live `gh`-backed PR/checks, live node-pty/xterm terminals, setup/run script execution, drag-order session tabs, optimistic workspace creation, the dashboard board, and the archive lifecycle have all shipped since this doc's parity targets were written. Rows framed below as future or aspirational are largely implemented; treat the "Ensemblr Target" wording as the intended contract and read the inline "Implemented" annotations for current state.
 
 Sources checked:
 
-- Conductor Docs: https://www.conductor.build/docs
-- Isolated workspaces: https://www.conductor.build/docs/concepts/workspaces-and-branches
-- Workflow: https://www.conductor.build/docs/concepts/workflow
-- Parallel agents: https://www.conductor.build/docs/concepts/parallel-agents
-- Agent behavior: https://www.conductor.build/docs/reference/agent-behavior
-- Scripts: https://www.conductor.build/docs/reference/scripts
-- conductor.json: https://www.conductor.build/docs/reference/conductor-json
-- Files to copy: https://www.conductor.build/docs/reference/files-to-copy
-- Environment variables: https://www.conductor.build/docs/reference/environment-variables
-- Diff viewer: https://www.conductor.build/docs/reference/diff-viewer
-- Checks: https://www.conductor.build/docs/reference/checks
-- Checkpoints: https://www.conductor.build/docs/reference/checkpoints
-- MCP: https://www.conductor.build/docs/reference/mcp
-- Keyboard shortcuts: https://www.conductor.build/docs/reference/keyboard-shortcuts
+- Conductor Docs: <https://www.conductor.build/docs>
+- Isolated workspaces: <https://www.conductor.build/docs/concepts/workspaces-and-branches>
+- Workflow: <https://www.conductor.build/docs/concepts/workflow>
+- Parallel agents: <https://www.conductor.build/docs/concepts/parallel-agents>
+- Agent behavior: <https://www.conductor.build/docs/reference/agent-behavior>
+- Scripts: <https://www.conductor.build/docs/reference/scripts>
+- conductor.json: <https://www.conductor.build/docs/reference/conductor-json>
+- Files to copy: <https://www.conductor.build/docs/reference/files-to-copy>
+- Environment variables: <https://www.conductor.build/docs/reference/environment-variables>
+- Diff viewer: <https://www.conductor.build/docs/reference/diff-viewer>
+- Checks: <https://www.conductor.build/docs/reference/checks>
+- Checkpoints: <https://www.conductor.build/docs/reference/checkpoints>
+- MCP: <https://www.conductor.build/docs/reference/mcp>
+- Keyboard shortcuts: <https://www.conductor.build/docs/reference/keyboard-shortcuts>
 - User-provided screenshot inventory: `.context/conductor-screens/`, summarized in `docs/product/screen-inventory.md`
 - Implemented Ensemblr shell inventory: `docs/product/current-shell-inventory.md`
 
@@ -29,16 +29,17 @@ Sources checked:
 
 The current React workbench shell is now a product contract, not a disposable
 mockup. It establishes the sidebar/project/workspace hierarchy, active
-workspace header, open-workspace launcher, chat/session tab strip, center
-timeline and composer placement, right All files / Changes / Checks panel,
-right PR-state header, and lower Setup / Run / Terminal dock.
+workspace header, dashboard board, open-workspace launcher, chat/session tab
+strip, center timeline and composer placement, right All files / Changes /
+Checks panel, right PR-state header, and lower Setup / Run / Terminal dock.
 
 Future parity work should replace fixture/local renderer data with live
 services through TanStack Query, typed IPC, and app services. It should not
 recreate the same shell surfaces from scratch. Chat transcript content and
 prompt-composer behavior have since landed via the Pi runtime: the structured
 RPC event timeline, composer submit/stop, model/thinking-level controls, and
-attachments are implemented.
+attachments are implemented. Setup/run scripts and terminal sessions now share
+the sanitized shell-derived environment plus workspace toolchain `PATH`.
 The current shell is the intended closest match to Conductor's own shell, even
 if original screenshot evidence is unavailable.
 
@@ -82,8 +83,8 @@ if original screenshot evidence is unavailable.
 
 | Area | Conductor Behavior | Ensemblr Target |
 | --- | --- | --- |
-| Setup script | Runs when workspace is created. | Same target. |
-| Run script | Runs from Run button inside workspace. | Same target. |
+| Setup script | Runs when workspace is created or manually rerun. | **Implemented.** Runs in the fixed Setup dock pane through the terminal service, with visible status/output, stop control, shell-derived env, workspace toolchain `PATH`, and `ENSEMBLR_*` vars. |
+| Run script | Runs from Run button inside workspace. | **Implemented.** Runs in the fixed Run dock pane with run/stop, ⌘/Ctrl+R toggle, preview-url open action when detected, shell-derived env, workspace toolchain `PATH`, and `ENSEMBLR_*` vars. |
 | Archive script | Runs before workspace archive. | Same target via the lifecycle hook registry from ADR 0027; `ENS-038` registers a `pre-archive-workspace` subscriber that runs the configured archive script and can veto archive on failure. |
 | Run script mode | `concurrent` or `nonconcurrent`. | Same target. |
 | Terminal dock | Fixed read-only Setup and Run output tabs plus default and user-spawned terminal tabs stay visible beside chat/files/checks. | **Implemented.** Same target with live node-pty/xterm.js and Electron process supervision; user terminals are independent IDE-style terminal sessions. |
@@ -108,7 +109,7 @@ if original screenshot evidence is unavailable.
 | Preview URL | Repository settings can define a preview URL template using workspace environment variables. | Same target with `ENSEMBLR_*` variables. |
 | Action preferences | Repository settings include per-action agent instructions for review, PR creation, fixing errors, conflict resolution, branch naming, and general chats. | Same target as Pi instruction templates with personal and shared sources. |
 | Precedence | Personal repository settings override shared config. | Reversed for Ensemblr: the committed `.ensemblr/settings.toml` overrides personal SQLite settings per key (see ADR 0030). |
-| Shell | Scripts run from workspace directory with workspace env vars. | Same target. |
+| Shell | Scripts run from workspace directory with workspace env vars. | **Implemented.** Script/terminal processes run from the workspace directory, strip macOS launch-context env, inherit the user's shell-derived environment and workspace toolchain `PATH`, then merge workspace env overlays and `ENSEMBLR_*` vars. |
 
 ## Environment Variables
 
@@ -158,11 +159,12 @@ if original screenshot evidence is unavailable.
 | Area | Conductor Behavior | Ensemblr Target |
 | --- | --- | --- |
 | Command palette | Global command palette. | Same target. |
+| Dashboard board | Workspace overview / task triage surface. | **Implemented.** Dashboard shows Backlog, In progress, In review, Done, and Canceled columns, supports drag/drop ordering, local persisted board status, unread markers, and workspace card action menus. |
 | Open in… launcher | Header split button launches the workspace in Finder, an editor, a terminal, a source-control GUI, or copies the path. | Implemented (macOS). Curated bundle-id registry probed via Launch Services (`mdfind`); real `.app` icons via `nativeImage.createThumbnailFromPath`; cached to disk and shipped through the preload initial-shell snapshot so the menu paints with real icons on first frame. Shortcuts: `1`..`9` while open, `⌘O` primary editor, `⌘⇧C` copy. See ADR 0028. |
 | Keyboard shortcuts | Navigation, workspace, chat, review, Git, terminal actions. | Same target with Ensemblr-specific labels. |
 | Pane layout | Sidebar, center agent timeline, right files/changes/checks panel, and lower terminal dock remain visible during work. | Same target with Ensemblr-specific styling. The current implemented shell locks this pane layout. |
-| Settings | App settings and repository settings. | Same target with sections inventoried in `docs/product/settings-inventory.md`. Git settings (branch prefix, lifecycle) implemented in Settings → Git. |
-| Feature flags | Experimental settings expose big terminal, many tabs, dashboard visibility, voice, resource usage, Graphite, and React profiler controls. | Same target where useful; voice, Graphite, cloud SSH, and production React profiler controls are deferred or hidden for v1. |
+| Settings | App settings and repository settings. | Same target with sections inventoried in `docs/product/settings-inventory.md`. General, Models, Git, Appearance, Diagnostics, Environment, Integrations, Experimental, Advanced, and repository settings have implemented storage boundaries; Git settings and Appearance persist through `config.json`. |
+| Feature flags | Experimental settings expose big terminal, many tabs, dashboard visibility, voice, resource usage, Graphite, and React profiler controls. | Ensemblr currently exposes Developer Mode and Auto-run after setup only. Big-terminal behavior is satisfied by the dock; dashboard/sidebar/browser/resource toggles are not present in code; voice, Graphite, cloud SSH, and production React profiler controls are deferred or hidden for v1. |
 | Deep links | App URL scheme that opens/acts on workspace state. | Same target with Ensemblr scheme. |
 | Privacy/security | Local execution, permissions controls, privacy settings. | Same target adapted to Pi. |
 
@@ -186,7 +188,6 @@ if original screenshot evidence is unavailable.
 | Workspace storage | Managed under the Conductor root. | Store under `<ensemblr-root>/workspaces/<repo-slug>/<workspace-slug>`. |
 | Archived context | Local archived context under the Conductor root. | Store under `<ensemblr-root>/archived-contexts/`. |
 | Root override | Configurable from app settings. | Configurable from app settings and `~/.config/ensemblr/config.json`; may point at the same root as Conductor for filesystem/worktree/config interoperability. |
-
 
 ## Conductor Interoperability
 
@@ -230,7 +231,6 @@ if original screenshot evidence is unavailable.
 | Read-only mode | Permission controls can restrict behavior. | Support read-only Pi sessions using Pi tool restrictions where available. |
 | Enterprise privacy | User/repo-level privacy control. | Support equivalent user/repo-level `enterpriseDataPrivacy`. |
 
-
 ## MVP Sequencing
 
 | Area | Conductor Behavior | Ensemblr Target |
@@ -238,7 +238,6 @@ if original screenshot evidence is unavailable.
 | Product scope | Full app workflows across setup, workspaces, agents, review, checks, settings. | Build every major Conductor workflow adapted for Pi; sequence as thin vertical slices rather than reducing final scope. |
 | Packaging | Native macOS app distribution. | Deferred until after core product completion. |
 | Screenshots | Not applicable. | Use user-provided Conductor screenshots as UX inventory, not pixel-copy source. |
-
 
 ## Remaining Product Decisions Resolved
 
@@ -248,7 +247,6 @@ if original screenshot evidence is unavailable.
 | Merge flow | Ready-to-merge action when checks pass, followed by final merge/archive flow. | Require merge confirmation; default block merge with failing required checks; archive after merge according to setting. |
 | React profiler | Developer/diagnostic setting observed. | Development/internal diagnostics only for v1, not a normal production setting. |
 | Deferred integrations | Voice, Graphite, and cloud/remote SSH settings appear in screenshots. | Defer these until after core completion. |
-
 
 ## Linear Integration Implementation
 

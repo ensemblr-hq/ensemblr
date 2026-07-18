@@ -1,20 +1,20 @@
 # Dependency Map
 
-Date: 2026-06-05
+Date: 2026-07-18
 
-This map is generated from the local planning IDs in `docs/product/linear-issues.md`. Replace `ENS-*` IDs with Linear issue keys after import.
+This map was generated from the local planning IDs in `docs/product/linear-issues.md`. The Mermaid graph remains useful as historical planning structure; use `docs/product/current-shell-inventory.md` and `docs/product/implementation-roadmap.md` for shipped-state details. Replace `ENS-*` IDs with Linear issue keys after import.
 
 ## Critical Path
 
-- Foundation services (`ENS-001` through `ENS-008`) unblock setup, repositories, storage, config, secrets, root, command execution, and establish the structural workbench shell contract.
-- Foundation UI creates fixture-backed sidebar, workspace header, chat tab, review panel, PR-state header, and dock regions. Later workspace, Pi, terminal, Linear, GitHub, and review tickets wire live TanStack Query/IPC data into those regions instead of rebuilding them. Navigation across these regions is file-based TanStack routing with loader-driven data and redirects (see `docs/adr/0026-use-file-based-tanstack-routing.md`).
+- Foundation services (`ENS-001` through `ENS-008`) established setup, repositories, storage, config, secrets, root, command execution, and the structural workbench shell contract.
+- The current shell has moved beyond fixture-only UI: repository/workspace navigation, Pi timeline/composer, terminal/script panes, All files, Changes/diff, GitHub PR/check metadata, Linear integration, settings, and the dashboard board now wire live TanStack Query/IPC data into the established regions. Navigation remains file-based TanStack routing with loader-driven data and redirects (see `docs/adr/0026-use-file-based-tanstack-routing.md`).
 - Setup/config (`ENS-009` through `ENS-016`) unblocks ready-state gating, Pi executable/RPC checks, `gh`, env/secrets, repository config, and safe root changes.
 - Workspace core (`ENS-017` through `ENS-025`) replaces fixture shell data with live repository/workspace records and unblocks Pi sessions, terminal/scripts, Linear workspace creation, and GitHub review flows while preserving current navigation, pinning, context-menu, header, and open-target affordances.
 - Pi runtime (`ENS-026` through `ENS-035`, plus `ENS-075`) unblocks agent timeline, checkpoints, context-to-Pi, and agent-assisted review/PR work.
-- Terminal/scripts (`ENS-036` through `ENS-042`) replaces the existing dock log placeholders in place with setup/run/archive execution, env injection, and process UI.
+- Terminal/scripts (`ENS-036` through `ENS-042`) now has live setup/run execution in fixed dock panes, terminal sessions, process status, sanitized shell-derived env, workspace toolchain `PATH`, and `ENSEMBLR_*` injection. Archive-script and spotlight-testing edges remain separate lifecycle/discovery work.
 - Linear (`ENS-043` through `ENS-049`) depends on Keychain/SQLite/setup surfaces and workspace core for workspace-from-issue.
-- GitHub/review (`ENS-050` through `ENS-060`) wires the existing All files/Changes/Checks regions and right PR header, and depends on workspace core, `gh`, git status, Pi composer, and checks metadata.
-- Settings/polish (`ENS-061` through `ENS-069`, plus `ENS-076`) depends on underlying services so settings show real state and source diagnostics.
+- GitHub/review (`ENS-050` through `ENS-060`) now wires live All files, Changes/diff, Checks, PR status, comments, todos, and merge confirmation across the existing right-panel/header regions; inline line comments and richer add-review-context-to-Pi flows remain polish.
+- Settings/polish (`ENS-061` through `ENS-069`, plus `ENS-076`) has implemented app/repo settings boundaries for General, Models, Git, Appearance, Environment, Integrations, Diagnostics, Experimental, Advanced, and repository pages; remaining work should refine source diagnostics and command/deep-link polish.
 - Deferred issues (`ENS-070` through `ENS-074`) should not block core milestones.
 
 ## Mermaid Graph
