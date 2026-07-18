@@ -20,6 +20,7 @@ import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
 import type { KeymapBinding } from '@/renderer/types/keymap';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { RenameWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
+import { toSlug } from '@/shared/slug';
 
 /** Modal that renames the selected workspace, optionally renaming its branch. */
 export function RenameWorkspaceDialog({
@@ -165,7 +166,7 @@ function RenameWorkspaceDialogForm({
 						const next = event.target.value;
 						setName(next);
 						if (!branchTouchedRef.current) {
-							setBranchName(toBranchSlug(next));
+							setBranchName(toSlug(next, 'workspace'));
 						}
 					}}
 					onKeyDown={handleSubmitKey}
@@ -253,15 +254,6 @@ function RenameWorkspaceDiagnosticsList({
 			))}
 		</ul>
 	);
-}
-
-/** Mirrors the backend `toSlug` so the branch preview matches what ships. */
-function toBranchSlug(value: string): string {
-	const slug = value
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-+|-+$/g, '');
-	return slug || 'workspace';
 }
 
 /**

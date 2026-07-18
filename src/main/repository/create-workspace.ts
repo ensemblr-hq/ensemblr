@@ -19,6 +19,7 @@ import type {
 	FilesToCopySnapshot,
 	WorkspaceLinkedIssueInput,
 } from '../../shared/ipc/contracts/workspace';
+import { pickComposerSurname } from '../../shared/workspace-name-pool.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import type {
 	LoadedRepositoryConfig,
@@ -30,6 +31,7 @@ import type { EnsemblrDatabaseService } from '../storage';
 import { selectRepositoryWithDefaultsById } from '../storage/repositories/repository-row-repository.ts';
 import {
 	insertWorkspaceRow as insertWorkspaceRowStorage,
+	listWorkspaceNameSlugRowsByRepository,
 	workspaceSlugExists as workspaceSlugExistsStorage,
 } from '../storage/repositories/workspace-repository.ts';
 import { withTransaction } from '../storage/tx.ts';
@@ -193,6 +195,7 @@ export function createWorkspaceService({
 				branchPrefix,
 				database,
 				nameInput: request.name,
+				placeholderName: request.placeholderName === true,
 				repository,
 				workspacesPath: rootSnapshot.workspacesPath,
 			});
@@ -563,6 +566,7 @@ function prepareWorkspace({
 	branchPrefix,
 	database,
 	nameInput,
+	placeholderName,
 	repository,
 	workspacesPath,
 }: {
@@ -571,6 +575,7 @@ function prepareWorkspace({
 	branchPrefix: string;
 	database: DatabaseSync;
 	nameInput: string | undefined;
+	placeholderName: boolean;
 	repository: SourceRepository;
 	workspacesPath: string;
 }): PreparedWorkspace {
@@ -578,7 +583,14 @@ function prepareWorkspace({
 		typeof nameInput === 'string' && nameInput.trim()
 			? nameInput.trim()
 			: DEFAULT_WORKSPACE_NAME;
-	const baseSlug = toWorkspaceSlug(trimmedName);
+	const resolvedName = placeholderName
+		? resolvePlaceholderName({
+				database,
+				repositoryId: repository.id,
+				requestedName: trimmedName,
+			})
+		: trimmedName;
+	const baseSlug = toWorkspaceSlug(resolvedName);
 	const slug = allocateUniqueWorkspaceSlug({
 		baseSlug,
 		database,
@@ -599,12 +611,72 @@ function prepareWorkspace({
 		baseBranch,
 		branchName,
 		id: `workspace-${randomUUID()}`,
-		name: trimmedName,
+		name: resolvedName,
 		parentDirectory,
 		path: workspacePath,
 		repository,
 		slug,
 	};
+}
+
+/**
+ * Chooses a placeholder workspace name that no active or archived workspace in
+ * the repository already uses, and that none used prior to a rename. Keeps the
+ * caller's suggested composer surname when it is free (the common case, so the
+ * optimistic sidebar row does not flicker); otherwise repicks another surname
+ * that avoids every taken name, slug, and branch. Falls back to the suggested
+ * name when the pool is exhausted, leaving slug allocation to disambiguate.
+ * @param options.database - Open SQLite connection.
+ * @param options.repositoryId - Repository whose workspaces constrain the name.
+ * @param options.requestedName - Surname the renderer optimistically picked.
+ * @returns A workspace display name unused across the repository's history.
+ */
+function resolvePlaceholderName({
+	database,
+	repositoryId,
+	requestedName,
+}: {
+	database: DatabaseSync;
+	repositoryId: string;
+	requestedName: string;
+}): string {
+	const taken = collectTakenWorkspaceNames({ database, repositoryId });
+	const requestedTokens = [
+		requestedName.toLowerCase(),
+		toWorkspaceSlug(requestedName),
+	];
+	if (requestedTokens.every((token) => !taken.has(token))) {
+		return requestedName;
+	}
+	return pickComposerSurname({ exclude: [...taken] });
+}
+
+/**
+ * Builds the lowercased set of every name and slug already used by a workspace
+ * in the repository, active or archived. Slugs are included because a renamed
+ * workspace keeps its original slug, so it reveals the name used before the
+ * rename.
+ */
+function collectTakenWorkspaceNames({
+	database,
+	repositoryId,
+}: {
+	database: DatabaseSync;
+	repositoryId: string;
+}): Set<string> {
+	const rows = listWorkspaceNameSlugRowsByRepository({
+		database,
+		repositoryId,
+	});
+	const taken = new Set<string>();
+	for (const { name, slug } of rows) {
+		for (const value of [name, slug]) {
+			if (typeof value === 'string' && value.trim()) {
+				taken.add(value.toLowerCase());
+			}
+		}
+	}
+	return taken;
 }
 
 /**

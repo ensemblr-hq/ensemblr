@@ -8,9 +8,9 @@ import {
 	openChatTab,
 	writeForkSummary,
 } from '@/renderer/api/ensemblr-queries';
-import { pickComposerSurname } from '@/renderer/lib/workbench/workspace-name-pool';
 import { useComposerAttachmentDispatcher } from '@/renderer/state/composer';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import { pickComposerSurname } from '@/shared/workspace-name-pool';
 
 /** Conversation coordinates a fork operates on. */
 interface ForkConversationSource {
