@@ -1,5 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
+import { sep } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import {
 	parseSetupState,
@@ -19,14 +20,30 @@ const ENSEMBLR_GITIGNORE_FILENAME = '.gitignore';
 /** Pattern that ignores every `*.local.*` marker the app writes. */
 const LOCAL_MARKER_IGNORE = '*.local.*';
 
+/** Converts a filesystem directory path into a file URL with a trailing slash. */
+function directoryUrl(directoryPath: string): URL {
+	const directory = directoryPath.endsWith(sep)
+		? directoryPath
+		: `${directoryPath}${sep}`;
+
+	return pathToFileURL(directory);
+}
+
 /** Absolute path to a worktree's `.ensemblr` directory. */
 function setupStateDirectory(worktreePath: string): string {
-	return path.resolve(worktreePath, ENSEMBLR_DIRECTORY);
+	return fileURLToPath(
+		new URL(`${ENSEMBLR_DIRECTORY}/`, directoryUrl(worktreePath)),
+	);
 }
 
 /** Absolute path to a worktree's setup marker file. */
 function setupStatePath(worktreePath: string): string {
-	return path.resolve(setupStateDirectory(worktreePath), SETUP_STATE_FILENAME);
+	return fileURLToPath(
+		new URL(
+			SETUP_STATE_FILENAME,
+			directoryUrl(setupStateDirectory(worktreePath)),
+		),
+	);
 }
 
 /**
@@ -63,7 +80,7 @@ export function writeSetupStateFile(
 		mkdirSync(directory, { recursive: true });
 		ensureLocalMarkerIgnored(directory);
 		writeFileSync(
-			path.resolve(directory, SETUP_STATE_FILENAME),
+			fileURLToPath(new URL(SETUP_STATE_FILENAME, directoryUrl(directory))),
 			`${JSON.stringify(state, null, 2)}\n`,
 		);
 	} catch {}
@@ -75,7 +92,9 @@ export function writeSetupStateFile(
  * @param directory - Absolute path to the worktree's `.ensemblr` directory.
  */
 function ensureLocalMarkerIgnored(directory: string): void {
-	const gitignorePath = path.resolve(directory, ENSEMBLR_GITIGNORE_FILENAME);
+	const gitignorePath = fileURLToPath(
+		new URL(ENSEMBLR_GITIGNORE_FILENAME, directoryUrl(directory)),
+	);
 	const existing = readGitignore(gitignorePath);
 
 	if (existing?.split(/\r?\n/).includes(LOCAL_MARKER_IGNORE)) {
