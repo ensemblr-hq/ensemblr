@@ -148,69 +148,19 @@ export function SessionTabs({
 							return null;
 						}
 
-						const isActive = session.id === activeSession.id;
-						const isChatKind = (session.kind ?? 'chat') === 'chat';
-						const canClose = isChatKind ? openChatTabCount > 1 : true;
-						const showCloseControls = canClose && !isDraggingTab;
-
 						return (
-							<Reorder.Item
-								className={cn(
-									'group/session-tab relative m-0 flex h-12 min-w-30 max-w-52 flex-none items-center overflow-hidden border-transparent border-b-2 bg-clip-padding p-0 text-xs transition-colors',
-									canReorderTabs && 'cursor-grab active:cursor-grabbing',
-									isActive
-										? 'border-primary bg-muted text-foreground'
-										: 'bg-background text-muted-foreground hover:text-foreground',
-								)}
-								data-session-tab-reorderable={canReorderTabs}
-								dragElastic={canReorderTabs ? 0.08 : 0}
-								dragListener={canReorderTabs}
+							<SessionTab
+								canReorderTabs={canReorderTabs}
+								isActive={session.id === activeSession.id}
+								isDraggingTab={isDraggingTab}
 								key={session.id}
-								layout='position'
+								onClose={onSessionTabClose}
 								onDragEnd={handleReorderEnd}
 								onDragStart={handleReorderStart}
-								value={session.id}
-								whileDrag={
-									canReorderTabs ? { scale: 1.02, zIndex: 20 } : undefined
-								}
-							>
-								<button
-									aria-current={isActive ? 'page' : undefined}
-									className='flex h-full min-w-0 flex-1 cursor-inherit items-center gap-2 px-3 text-left'
-									onClick={() => onSessionTabChange(session.id)}
-									type='button'
-								>
-									<span className='grid size-3.5 shrink-0 place-items-center'>
-										<SessionTabIcon session={session} />
-									</span>
-									<span className='truncate'>{session.label}</span>
-								</button>
-								{showCloseControls ? (
-									<span
-										aria-hidden='true'
-										className={cn(
-											'pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent opacity-0 transition-opacity group-hover/session-tab:opacity-100',
-											isActive
-												? 'from-muted via-muted/90'
-												: 'from-background via-background/90',
-										)}
-									/>
-								) : null}
-								{showCloseControls ? (
-									<button
-										aria-label={`Close ${session.label} tab`}
-										className='absolute top-1/2 right-2 grid size-5 -translate-y-1/2 place-items-center rounded-sm opacity-0 transition-all hover:bg-transparent hover:text-foreground focus-visible:opacity-100 group-hover/session-tab:opacity-100'
-										onClick={(event) => {
-											event.stopPropagation();
-											onSessionTabClose(session.id);
-										}}
-										onPointerDown={(event) => event.stopPropagation()}
-										type='button'
-									>
-										<XIcon aria-hidden='true' className='size-3' />
-									</button>
-								) : null}
-							</Reorder.Item>
+								onSelect={onSessionTabChange}
+								openChatTabCount={openChatTabCount}
+								session={session}
+							/>
 						);
 					})}
 				</Reorder.Group>
@@ -248,6 +198,95 @@ export function SessionTabs({
 				/>
 			</div>
 		</div>
+	);
+}
+
+/** Props for a single reorderable session tab. */
+interface SessionTabProps {
+	session: SessionTabModel;
+	isActive: boolean;
+	canReorderTabs: boolean;
+	isDraggingTab: boolean;
+	/** Count of open chat tabs; a chat tab hides its close control when it is the last one. */
+	openChatTabCount: number;
+	onSelect: (sessionId: string) => void;
+	onClose: (sessionId: string) => void;
+	onDragStart: () => void;
+	onDragEnd: () => void;
+}
+
+/** A single draggable session tab with select and hover-only close controls. */
+function SessionTab({
+	session,
+	isActive,
+	canReorderTabs,
+	isDraggingTab,
+	openChatTabCount,
+	onSelect,
+	onClose,
+	onDragStart,
+	onDragEnd,
+}: SessionTabProps) {
+	const isChatKind = (session.kind ?? 'chat') === 'chat';
+	const canClose = isChatKind ? openChatTabCount > 1 : true;
+	const showCloseControls = canClose && !isDraggingTab;
+
+	return (
+		<Reorder.Item
+			className={cn(
+				'group/session-tab relative m-0 flex h-12 min-w-30 max-w-52 flex-none items-center overflow-hidden border-transparent border-b-2 bg-clip-padding p-0 text-xs transition-colors',
+				canReorderTabs && 'cursor-grab active:cursor-grabbing',
+				isActive
+					? 'border-primary bg-muted text-foreground'
+					: 'border-background bg-background text-muted-foreground hover:text-foreground',
+			)}
+			data-session-tab-reorderable={canReorderTabs}
+			dragElastic={canReorderTabs ? 0.08 : 0}
+			dragListener={canReorderTabs}
+			layout='position'
+			onDragEnd={onDragEnd}
+			onDragStart={onDragStart}
+			transition={isDraggingTab ? undefined : { layout: { duration: 0 } }}
+			value={session.id}
+			whileDrag={canReorderTabs ? { scale: 1.02, zIndex: 20 } : undefined}
+		>
+			<button
+				aria-current={isActive ? 'page' : undefined}
+				className='flex h-full min-w-0 flex-1 cursor-inherit items-center gap-2 px-3 text-left'
+				onClick={() => onSelect(session.id)}
+				type='button'
+			>
+				<span className='grid size-3.5 shrink-0 place-items-center'>
+					<SessionTabIcon session={session} />
+				</span>
+				<span className='truncate'>{session.label}</span>
+			</button>
+			{showCloseControls ? (
+				<span
+					aria-hidden='true'
+					className={cn(
+						'pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent opacity-0 transition-opacity group-hover/session-tab:opacity-100',
+						isActive
+							? 'from-muted via-muted/90'
+							: 'from-background via-background/90',
+					)}
+				/>
+			) : null}
+			{showCloseControls ? (
+				<button
+					aria-label={`Close ${session.label} tab`}
+					className='absolute top-1/2 right-2 grid size-5 -translate-y-1/2 place-items-center rounded-sm opacity-0 transition-all hover:bg-transparent hover:text-foreground focus-visible:opacity-100 group-hover/session-tab:opacity-100'
+					onClick={(event) => {
+						event.stopPropagation();
+						onClose(session.id);
+					}}
+					onPointerDown={(event) => event.stopPropagation()}
+					type='button'
+				>
+					<XIcon aria-hidden='true' className='size-3' />
+				</button>
+			) : null}
+		</Reorder.Item>
 	);
 }
 
