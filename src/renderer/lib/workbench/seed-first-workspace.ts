@@ -8,10 +8,9 @@ import {
 import { queryClient } from '@/renderer/api/query-client';
 import type { StoredWorkspaceSelection } from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
+import { pickComposerSurname } from '@/shared/workspace-name-pool';
 import { mapRepositoriesToProjects } from './navigation-model';
-
 import { resolveWorkspaceRouteParams } from './navigation-selection';
-import { pickComposerSurname } from './workspace-name-pool';
 
 /** Inputs for seeding a repository's first workspace: navigation, persistence, and the target repo. */
 interface SeedFirstWorkspaceOptions {

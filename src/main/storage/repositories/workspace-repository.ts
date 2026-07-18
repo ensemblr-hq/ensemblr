@@ -715,6 +715,38 @@ export function listActiveWorkspaceBranchRowsByRepository({
 		.all(repositoryId);
 }
 
+/** A workspace's display name paired with its immutable slug. */
+export interface WorkspaceNameSlugRow {
+	name: string;
+	slug: string;
+}
+
+/**
+ * Returns `{ name, slug }` for every workspace in a repository, active or
+ * archived. The placeholder-name picker uses this to skip composer surnames
+ * already taken by a live or archived workspace. Because `slug` is fixed at
+ * creation and never rewritten on rename, a workspace originally seeded "Bach"
+ * then renamed still exposes `slug: "bach"`, so matching against slugs also
+ * excludes names used prior to a rename.
+ */
+export function listWorkspaceNameSlugRowsByRepository({
+	database,
+	repositoryId,
+}: {
+	database: DatabaseSync;
+	repositoryId: string;
+}): WorkspaceNameSlugRow[] {
+	return database
+		.prepare(
+			`SELECT
+				name AS name,
+				slug AS slug
+			FROM workspaces
+			WHERE repository_id = ?`,
+		)
+		.all(repositoryId) as unknown as WorkspaceNameSlugRow[];
+}
+
 /** Options for listing a repository's workspace id rows. */
 export interface ListWorkspaceIdsByRepositoryOptions {
 	database: DatabaseSync;

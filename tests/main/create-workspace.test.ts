@@ -270,6 +270,126 @@ test('create defaults the workspace name to a placeholder slug', async (t) => {
 	assert.notEqual(first.workspace?.path, second.workspace?.path);
 });
 
+test('create keeps a placeholder name that no workspace uses', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'Bach',
+		placeholderName: true,
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.name, 'Bach');
+	assert.equal(result.workspace?.slug, 'bach');
+});
+
+test('create repicks a placeholder name an active workspace already uses', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const first = await service.create({
+		name: 'Bach',
+		placeholderName: true,
+		repositoryId: harness.repositoryId,
+	});
+	const second = await service.create({
+		name: 'Bach',
+		placeholderName: true,
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(first.workspace?.name, 'Bach');
+	assert.equal(second.status, 'success');
+	assert.notEqual(second.workspace?.name, 'Bach');
+	assert.notEqual(second.workspace?.slug, 'bach');
+});
+
+test('create repicks a placeholder name a workspace used before a rename', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const first = await service.create({
+		name: 'Bach',
+		placeholderName: true,
+		repositoryId: harness.repositoryId,
+	});
+	if (!first.workspace) {
+		throw new Error('first workspace missing');
+	}
+	// Rename keeps the original slug ("bach") while the display name changes, so
+	// the slug is the only trace of the pre-rename name. Mimic that here.
+	const database = harness.databaseService.getConnection()
+		?.database as DatabaseSync;
+	database
+		.prepare('UPDATE workspaces SET name = ? WHERE id = ?')
+		.run('Feature login', first.workspace.id);
+
+	const second = await service.create({
+		name: 'Bach',
+		placeholderName: true,
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(second.status, 'success');
+	assert.notEqual(second.workspace?.name, 'Bach');
+	assert.notEqual(second.workspace?.slug, 'bach');
+});
+
+test('create repicks a multi-word placeholder name whose slug is taken', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const first = await service.create({
+		name: 'Saint Saens',
+		placeholderName: true,
+		repositoryId: harness.repositoryId,
+	});
+	if (!first.workspace) {
+		throw new Error('first workspace missing');
+	}
+	assert.equal(first.workspace.slug, 'saint-saens');
+	// Rename away from the spaced name so only the dashed slug ("saint-saens")
+	// remains. The repick must match the candidate's slug form, not just its
+	// lowercased spaced form, or it would re-offer "Saint Saens".
+	const database = harness.databaseService.getConnection()
+		?.database as DatabaseSync;
+	database
+		.prepare('UPDATE workspaces SET name = ? WHERE id = ?')
+		.run('Feature login', first.workspace.id);
+
+	const second = await service.create({
+		name: 'Saint Saens',
+		placeholderName: true,
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(second.status, 'success');
+	assert.notEqual(second.workspace?.name, 'Saint Saens');
+	assert.notEqual(second.workspace?.slug, 'saint-saens');
+});
+
 test('create rejects an unknown repository id', async (t) => {
 	const harness = createHarness(t);
 	const service = createWorkspaceService({

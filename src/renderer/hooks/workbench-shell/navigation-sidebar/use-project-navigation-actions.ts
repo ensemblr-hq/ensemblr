@@ -14,7 +14,6 @@ import {
 	removePendingWorkspaceFromNavigationSnapshot,
 	replacePendingWorkspaceInNavigationSnapshot,
 } from '@/renderer/lib/workbench/optimistic-workspace';
-import { pickComposerSurname } from '@/renderer/lib/workbench/workspace-name-pool';
 import type {
 	ProjectShellModel,
 	WorkspaceCreationSeed,
@@ -25,6 +24,7 @@ import type {
 	CreateWorkspaceRequest,
 	CreateWorkspaceResult,
 } from '@/shared/ipc/contracts/workspace';
+import { pickComposerSurname } from '@/shared/workspace-name-pool';
 
 /**
  * Returns a callback the browse-archive dialog calls after every successful

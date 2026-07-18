@@ -1,3 +1,5 @@
+import { toSlug } from './slug.ts';
+
 /**
  * Surnames of well-known composers spanning classical, romantic, modernist,
  * contemporary, film, and game-music eras. Used to seed a workspace name when
@@ -187,8 +189,10 @@ const COMPOSER_SURNAMES: readonly string[] = [
 
 /**
  * Picks a composer surname at random, optionally avoiding names already in
- * use. Falls back to the random choice when every entry is taken so the
- * backend can append `-2` style suffixes.
+ * use. A surname is skipped when either its lowercased form or its slug form
+ * appears in `exclude`, so slug-only entries still exclude the source name.
+ * Falls back to the random choice when every entry is taken so the backend can
+ * append `-2` style suffixes.
  * @param options.exclude - Lowercased existing names/slugs to skip when possible.
  * @returns A composer surname suitable as a workspace name.
  */
@@ -200,7 +204,7 @@ export function pickComposerSurname({
 	const taken = new Set(exclude.map((value) => value.toLowerCase()));
 	const fallback = COMPOSER_SURNAMES[0] ?? 'workspace';
 	const available = COMPOSER_SURNAMES.filter(
-		(name) => !taken.has(name.toLowerCase()),
+		(name) => !taken.has(name.toLowerCase()) && !taken.has(toSlug(name)),
 	);
 	const pool = available.length > 0 ? available : COMPOSER_SURNAMES;
 	const index = Math.floor(Math.random() * pool.length);
