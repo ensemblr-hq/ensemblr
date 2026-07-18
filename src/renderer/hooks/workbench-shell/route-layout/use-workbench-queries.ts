@@ -1,5 +1,6 @@
 import {
 	keepPreviousData,
+	useQueries,
 	useQuery,
 	useQueryClient,
 } from '@tanstack/react-query';
@@ -10,8 +11,12 @@ import {
 	isEnsemblrApiAvailable,
 	repositoryWorkspaceNavigationQuery,
 	setupDiagnosticsQuery,
+	workspaceGitStatusQuery,
 } from '@/renderer/api/ensemblr-queries';
 import {
+	applyWorkspaceChangeSummaries,
+	collectWorkspaceChangeSummaryUpdates,
+	getNavigationWorkspaceChangeSummaryTargets,
 	getRenderableNavigationSnapshot,
 	mapRepositoriesToProjects,
 } from '@/renderer/lib/workbench';
@@ -20,6 +25,11 @@ import type {
 	WorkbenchShellData,
 } from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
+
+// The sidebar/board diff stats are a glanceable overview, not the active
+// workspace's live detail (which keeps the 10s poll in workspaceGitStatusQuery).
+// A slower fan-out interval keeps N per-workspace git-status calls cheap.
+const OVERVIEW_GIT_STATUS_REFETCH_INTERVAL_MS = 30_000;
 
 /** Live query data and loading flags returned by {@link useWorkbenchQueries}. */
 export interface WorkbenchQueriesResult {
@@ -87,11 +97,30 @@ export function useWorkbenchQueries({
 			undefined,
 	});
 	const navigationRepositories = navigationSnapshot?.repositories;
-	const projects = useMemo(
+	const baseProjects = useMemo(
 		() =>
 			hasPreloadBridge ? mapRepositoriesToProjects(navigationRepositories) : [],
 		[hasPreloadBridge, navigationRepositories],
 	);
+	const workspaceChangeSummaryTargets = useMemo(
+		() => getNavigationWorkspaceChangeSummaryTargets(navigationRepositories),
+		[navigationRepositories],
+	);
+	const projects = useQueries({
+		combine: (results) =>
+			applyWorkspaceChangeSummaries(
+				baseProjects,
+				collectWorkspaceChangeSummaryUpdates(
+					results,
+					workspaceChangeSummaryTargets,
+				),
+			),
+		queries: workspaceChangeSummaryTargets.map((target) => ({
+			...workspaceGitStatusQuery(target.workspaceCwd, target.scope),
+			enabled: hasPreloadBridge && target.workspaceCwd.length > 0,
+			refetchInterval: OVERVIEW_GIT_STATUS_REFETCH_INTERVAL_MS,
+		})),
+	});
 
 	return {
 		hasPreloadBridge,

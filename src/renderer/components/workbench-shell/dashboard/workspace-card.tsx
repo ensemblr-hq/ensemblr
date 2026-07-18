@@ -84,6 +84,9 @@ export function WorkspaceCard({
 }) {
 	const menu = useBoardWorkspaceMenuController();
 	const isUnread = useWorkspaceUnread(workspace.id);
+	const hasDiffStats =
+		workspace.changeSummary.additions > 0 ||
+		workspace.changeSummary.deletions > 0;
 	const { closestEdge, isDragging, ref } = useCardDnd(workspace.id);
 
 	return (
@@ -104,14 +107,19 @@ export function WorkspaceCard({
 							onClick={onOpen}
 							type='button'
 						>
-							<span
-								className={cn(
-									'truncate text-[0.8125rem]',
-									isUnread ? 'font-semibold' : 'font-medium',
-								)}
-							>
-								{workspace.name}
-							</span>
+							<div className='flex min-w-0 items-center justify-between gap-2'>
+								<span
+									className={cn(
+										'min-w-0 flex-1 truncate text-[0.8125rem]',
+										isUnread ? 'font-semibold' : 'font-medium',
+									)}
+								>
+									{workspace.name}
+								</span>
+								{hasDiffStats ? (
+									<WorkspaceDiffStats workspace={workspace} />
+								) : null}
+							</div>
 							<span className='truncate text-muted-foreground text-xxs'>
 								{projectName}
 							</span>
@@ -150,19 +158,16 @@ function BoardDropIndicator({ edge }: { edge: Edge | null }) {
 	);
 }
 
-/** PR-status + diff-stats footer for a board card; collapses when empty. */
+/** PR-status footer for a board card; collapses when empty. */
 function WorkspaceCardFooter({
 	workspace,
 }: {
 	workspace: WorkspaceShellModel;
 }) {
-	const { additions, deletions } = workspace.changeSummary;
 	const hasPr = workspace.pullRequest.number !== undefined;
-	const hasDiff = additions + deletions > 0;
 	return (
 		<div className='flex flex-wrap items-center gap-1.5 empty:hidden'>
 			{hasPr ? <WorkspacePrBadge workspace={workspace} /> : null}
-			{hasDiff ? <WorkspaceDiffStats isActive workspace={workspace} /> : null}
 		</div>
 	);
 }

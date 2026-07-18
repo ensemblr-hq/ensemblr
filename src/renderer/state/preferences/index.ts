@@ -21,7 +21,6 @@ export {
 	caffeinateWhileRunningAtom,
 	codeLigaturesAtom,
 	codeThemeAtom,
-	coloredSidebarDiffsAtom,
 	defaultChatModelAtom,
 	defaultChatThinkingLevelAtom,
 	deleteBranchOnArchiveAtom,

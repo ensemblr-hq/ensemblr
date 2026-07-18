@@ -58,7 +58,6 @@ export const experimentalSettingsSchema = z.object({
 // atoms and the settings UI derive their types from this schema.
 export const appearanceSettingsSchema = z.object({
 	theme: z.enum(['system', 'light', 'dark']).catch('system'),
-	coloredSidebarDiffs: z.boolean().catch(false),
 	accessibleColors: z
 		.enum(['default', 'protanopia', 'deuteranopia', 'tritanopia'])
 		.catch('default'),

@@ -19,6 +19,9 @@ function withQueryClient(node: ReactNode): ReactNode {
 }
 
 import {
+	applyWorkspaceChangeSummaries,
+	collectWorkspaceChangeSummaryUpdates,
+	getNavigationWorkspaceChangeSummaryTargets,
 	getRenderableNavigationSnapshot,
 	mapNavigationSnapshotToProjects,
 	mapRepositoriesToProjects,
@@ -125,6 +128,77 @@ test('maps repositories array identically to snapshot mapping', () => {
 	);
 	expect(mapRepositoriesToProjects(undefined)).toEqual([]);
 	expect(mapRepositoriesToProjects(null)).toEqual([]);
+});
+
+test('builds branch-scoped change summary targets from navigation rows', () => {
+	expect(
+		getNavigationWorkspaceChangeSummaryTargets(navigationSnapshot.repositories),
+	).toEqual([
+		{
+			scope: { baseRef: 'master', kind: 'branch' },
+			workspaceCwd: '/Users/alice/Ensemblr/workspaces/ensemblr/the-120',
+			workspaceId: 'workspace-1',
+		},
+		{
+			scope: { baseRef: 'main', kind: 'branch' },
+			workspaceCwd: '/Users/alice/Ensemblr/workspaces/agent-lab/draft',
+			workspaceId: 'workspace-2',
+		},
+	]);
+});
+
+test('omits change summary targets when no branch scope resolves', () => {
+	const repositories = [
+		{
+			...navigationSnapshot.repositories[0],
+			defaultBranch: null,
+			workspaces: [
+				{
+					...navigationSnapshot.repositories[0].workspaces[0],
+					baseBranch: null,
+				},
+			],
+		},
+	] as RepositoryWorkspaceNavigationSnapshot['repositories'];
+
+	expect(getNavigationWorkspaceChangeSummaryTargets(repositories)).toEqual([]);
+});
+
+test('collects change summary updates by target index, skipping errors', () => {
+	const targets = getNavigationWorkspaceChangeSummaryTargets(
+		navigationSnapshot.repositories,
+	);
+	const updates = collectWorkspaceChangeSummaryUpdates(
+		[
+			{ data: { summary: { additions: 5, deletions: 1, files: 2 } } },
+			{ data: { error: { message: 'boom' }, summary: {} } },
+		] as Parameters<typeof collectWorkspaceChangeSummaryUpdates>[0],
+		targets,
+	);
+
+	expect(updates).toEqual([
+		{
+			changeSummary: { additions: 5, deletions: 1, files: 2 },
+			workspaceId: 'workspace-1',
+		},
+	]);
+});
+
+test('applies live change summaries to matching workspace models', () => {
+	const projects = mapNavigationSnapshotToProjects(navigationSnapshot);
+	const updated = applyWorkspaceChangeSummaries(projects, [
+		{
+			changeSummary: { additions: 12, deletions: 4, files: 3 },
+			workspaceId: 'workspace-1',
+		},
+	]);
+
+	expect(updated[0]?.workspaces[0]?.changeSummary).toEqual({
+		additions: 12,
+		deletions: 4,
+		files: 3,
+	});
+	expect(updated[1]).toBe(projects[1]);
 });
 
 test('maps workspace file-count metadata as copied files', () => {

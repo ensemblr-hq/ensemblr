@@ -38,6 +38,11 @@ export {
 export { loadWorkbenchShellData } from './shell-data-loader';
 export { getWorkbenchStaticRoute } from './static-navigation';
 export { getWorkbenchHealth } from './workbench-health';
+export {
+	applyWorkspaceChangeSummaries,
+	collectWorkspaceChangeSummaryUpdates,
+	getNavigationWorkspaceChangeSummaryTargets,
+} from './workspace-change-summaries';
 export { getWorkspaceSidebarState } from './workspace-sidebar-state';
 export {
 	branchSourceId,

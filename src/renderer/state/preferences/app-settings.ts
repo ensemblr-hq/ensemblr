@@ -122,10 +122,6 @@ export const autoRunAfterSetupAtom = settingAtom(
 // `useThemeEffect`/`useAppearanceEffect` (DOM classes + CSS vars), the xterm
 // adapter (terminal typography), and the Shiki/Streamdown code renderers.
 export const themeAtom = settingAtom('appearance', 'theme');
-export const coloredSidebarDiffsAtom = settingAtom(
-	'appearance',
-	'coloredSidebarDiffs',
-);
 export const accessibleColorsAtom = settingAtom(
 	'appearance',
 	'accessibleColors',
