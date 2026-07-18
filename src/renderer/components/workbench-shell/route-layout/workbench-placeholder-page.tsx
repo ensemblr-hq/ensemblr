@@ -35,7 +35,7 @@ function getWorkbenchPlaceholderCopy({
 	setupStatus?: string;
 	view: Exclude<WorkbenchActiveView, 'welcome' | 'workspace'>;
 }) {
-	if (setupStatus !== 'ready') {
+	if (setupStatus === 'blocked') {
 		return getEmptyStateCopy({
 			isLoading: false,
 			navigationError: null,

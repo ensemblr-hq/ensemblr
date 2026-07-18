@@ -29,7 +29,7 @@ export function getEmptyStateCopy({
 		};
 	}
 
-	if (setupStatus !== 'ready') {
+	if (setupStatus === 'blocked') {
 		return {
 			detail: 'Complete setup checks before creating or opening workspaces.',
 			title: 'Setup required',
