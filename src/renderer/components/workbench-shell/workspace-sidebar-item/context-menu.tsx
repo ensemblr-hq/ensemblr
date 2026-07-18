@@ -36,19 +36,24 @@ const archiveBoundary = classifyPermissionAction({
 	mode: DEFAULT_PERMISSION_MODE,
 });
 
-/** Right-click context menu for a workspace row (unread, pin, status, archive, delete). */
+/**
+ * Right-click context menu for a workspace (unread, pin, status, archive,
+ * delete). Shared by the sidebar row and the dashboard board card; the Pin row
+ * only renders when an `onPinToggle` handler is supplied, so board cards omit
+ * the sidebar-specific pin action.
+ */
 export function WorkspaceContextMenuContent({
-	isPinned,
+	isPinned = false,
 	onArchiveSelect,
 	onDeleteSelect,
 	onPinToggle,
 	onRenameSelect,
 	workspace,
 }: {
-	isPinned: boolean;
+	isPinned?: boolean;
 	onArchiveSelect?: () => void;
 	onDeleteSelect?: () => void;
-	onPinToggle: () => void;
+	onPinToggle?: () => void;
 	onRenameSelect?: () => void;
 	workspace: WorkspaceShellModel;
 }) {
@@ -74,11 +79,13 @@ export function WorkspaceContextMenuContent({
 					</span>
 					<ContextMenuShortcut>R</ContextMenuShortcut>
 				</SidebarContextMenuItem>
-				<SidebarContextMenuItem onSelect={onPinToggle}>
-					<PinIcon aria-hidden='true' />
-					<span className='min-w-0 flex-1'>{isPinned ? 'Unpin' : 'Pin'}</span>
-					<ContextMenuShortcut>P</ContextMenuShortcut>
-				</SidebarContextMenuItem>
+				{onPinToggle ? (
+					<SidebarContextMenuItem onSelect={onPinToggle}>
+						<PinIcon aria-hidden='true' />
+						<span className='min-w-0 flex-1'>{isPinned ? 'Unpin' : 'Pin'}</span>
+						<ContextMenuShortcut>P</ContextMenuShortcut>
+					</SidebarContextMenuItem>
+				) : null}
 				<ContextMenuSub>
 					<ContextMenuSubTrigger className='h-8 gap-2 px-2 text-[0.8125rem]'>
 						<CurrentStatusIcon
