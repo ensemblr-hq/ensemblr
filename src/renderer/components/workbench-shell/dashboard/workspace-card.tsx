@@ -13,12 +13,19 @@ import { useEffect, useRef, useState } from 'react';
 
 import { Badge } from '@/renderer/components/ui/badge';
 import { Card } from '@/renderer/components/ui/card';
+import {
+	ContextMenu,
+	ContextMenuTrigger,
+} from '@/renderer/components/ui/context-menu';
+import { WorkspaceContextMenuContent } from '@/renderer/components/workbench-shell/workspace-sidebar-item/context-menu';
 import { WorkspaceDiffStats } from '@/renderer/components/workbench-shell/workspace-sidebar-item/diff-stats';
 import { useWorkspacePiBusy } from '@/renderer/hooks/workspace/use-workspace-pi-busy';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import { useWorkspaceUnread } from '@/renderer/state/workspace';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+
+import { useBoardWorkspaceMenuController } from './board-workspace-menu';
 
 /** Wires a card element as both a drag source and an edge-aware drop target. */
 function useCardDnd(workspaceId: string) {
@@ -62,8 +69,9 @@ function useCardDnd(workspaceId: string) {
 /**
  * Draggable board card for a single workspace. Dragging it to another column
  * changes the workspace's board status; dragging within a column reorders it;
- * clicking opens the workspace. The label renders bold while the workspace is
- * unread, mirroring the sidebar.
+ * clicking opens the workspace; right-clicking opens the same workspace context
+ * menu the sidebar uses (minus the sidebar-only pin action). The label renders
+ * bold while the workspace is unread, mirroring the sidebar.
  */
 export function WorkspaceCard({
 	onOpen,
@@ -74,44 +82,55 @@ export function WorkspaceCard({
 	projectName: string;
 	workspace: WorkspaceShellModel;
 }) {
+	const menu = useBoardWorkspaceMenuController();
 	const isUnread = useWorkspaceUnread(workspace.id);
 	const { closestEdge, isDragging, ref } = useCardDnd(workspace.id);
 
 	return (
-		<div
-			className={cn(
-				'relative cursor-grab transition-opacity',
-				isDragging && 'opacity-50',
-			)}
-			ref={ref}
-		>
-			<BoardDropIndicator edge={closestEdge} />
-			<Card className='gap-0 border border-foreground/10 py-0 ring-0 hover:border-foreground/20'>
-				<button
-					aria-label={`Open workspace ${workspace.name}`}
-					className='flex w-full flex-col gap-2 px-3 py-2.5 text-left'
-					onClick={onOpen}
-					type='button'
+		<ContextMenu>
+			<ContextMenuTrigger asChild>
+				<div
+					className={cn(
+						'relative cursor-grab transition-opacity',
+						isDragging && 'opacity-50',
+					)}
+					ref={ref}
 				>
-					<span
-						className={cn(
-							'truncate text-[0.8125rem]',
-							isUnread ? 'font-semibold' : 'font-medium',
-						)}
-					>
-						{workspace.name}
-					</span>
-					<span className='truncate text-muted-foreground text-xxs'>
-						{projectName}
-					</span>
-					<div className='flex min-w-0 items-center gap-1.5 text-muted-foreground text-xxs'>
-						<GitBranchIcon aria-hidden='true' className='size-3 shrink-0' />
-						<span className='truncate'>{workspace.branchName}</span>
-					</div>
-					<WorkspaceCardFooter workspace={workspace} />
-				</button>
-			</Card>
-		</div>
+					<BoardDropIndicator edge={closestEdge} />
+					<Card className='gap-0 border border-foreground/10 py-0 ring-0 hover:border-foreground/20'>
+						<button
+							aria-label={`Open workspace ${workspace.name}`}
+							className='flex w-full flex-col gap-2 px-3 py-2.5 text-left'
+							onClick={onOpen}
+							type='button'
+						>
+							<span
+								className={cn(
+									'truncate text-[0.8125rem]',
+									isUnread ? 'font-semibold' : 'font-medium',
+								)}
+							>
+								{workspace.name}
+							</span>
+							<span className='truncate text-muted-foreground text-xxs'>
+								{projectName}
+							</span>
+							<div className='flex min-w-0 items-center gap-1.5 text-muted-foreground text-xxs'>
+								<GitBranchIcon aria-hidden='true' className='size-3 shrink-0' />
+								<span className='truncate'>{workspace.branchName}</span>
+							</div>
+							<WorkspaceCardFooter workspace={workspace} />
+						</button>
+					</Card>
+				</div>
+			</ContextMenuTrigger>
+			<WorkspaceContextMenuContent
+				onArchiveSelect={() => menu.openArchive(workspace)}
+				onDeleteSelect={() => menu.openDelete(workspace)}
+				onRenameSelect={() => menu.openRename(workspace)}
+				workspace={workspace}
+			/>
+		</ContextMenu>
 	);
 }
 

@@ -16,8 +16,11 @@ import {
 	type WorkspaceBoardStatus,
 } from '@/renderer/state/workspace';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
-
 import { type BoardCard, BoardColumn } from './board-column';
+import {
+	BoardWorkspaceMenuProvider,
+	useBoardWorkspaceMenu,
+} from './board-workspace-menu';
 import { type BoardDrop, useBoardDragMonitor } from './use-board-drag';
 
 /** Flattens the display projects into board cards, skipping optimistic rows. */
@@ -111,6 +114,8 @@ export function DashboardBoard() {
 		() => groupCardsByStatus(cards, statusByWorkspaceId, order),
 		[cards, statusByWorkspaceId, order],
 	);
+	const { controller: workspaceMenu, dialogs: workspaceMenuDialogs } =
+		useBoardWorkspaceMenu();
 
 	const setupStatus = setupDiagnosticsState.setupDiagnostics?.status;
 	if (setupStatus !== 'ready') {
@@ -132,16 +137,19 @@ export function DashboardBoard() {
 			<header className='native-toolbar flex h-12 shrink-0 items-center border-border border-b px-4 font-medium text-sm'>
 				Dashboard
 			</header>
-			<div className='flex min-h-0 flex-1 gap-3 overflow-x-auto p-4'>
-				{BOARD_STATUS_ORDER.map((status) => (
-					<BoardColumn
-						cards={grouped[status]}
-						key={status}
-						onOpenWorkspace={model.navigateToWorkspace}
-						status={status}
-					/>
-				))}
-			</div>
+			<BoardWorkspaceMenuProvider controller={workspaceMenu}>
+				<div className='flex min-h-0 flex-1 gap-3 overflow-x-auto p-4'>
+					{BOARD_STATUS_ORDER.map((status) => (
+						<BoardColumn
+							cards={grouped[status]}
+							key={status}
+							onOpenWorkspace={model.navigateToWorkspace}
+							status={status}
+						/>
+					))}
+				</div>
+			</BoardWorkspaceMenuProvider>
+			{workspaceMenuDialogs}
 		</main>
 	);
 }
