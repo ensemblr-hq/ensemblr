@@ -48,6 +48,7 @@ import { ChecksEmptyMessage, ChecksNoPullRequestState } from './empty-states';
 import { PrDetailsForm } from './pr-details-form';
 import { ChecksSectionHeader } from './pr-metadata';
 import {
+	PullRequestCheckRow,
 	PullRequestCommentRow,
 	PullRequestStatusRow,
 	PullRequestTodoRow,
@@ -330,6 +331,17 @@ function ChecksPullRequestPanel({
 						/>
 					</section>
 				)}
+
+				<section className='flex min-w-0 flex-col gap-1.5'>
+					<ChecksSectionHeader label='Checks' />
+					{pullRequest.checks.length ? (
+						pullRequest.checks.map((check) => (
+							<PullRequestCheckRow check={check} key={check.id} />
+						))
+					) : (
+						<ChecksEmptyMessage label='No checks reported' />
+					)}
+				</section>
 
 				<section className='flex min-w-0 flex-col gap-1.5'>
 					<ChecksSectionHeader

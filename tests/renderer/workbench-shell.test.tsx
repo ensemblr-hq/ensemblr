@@ -550,11 +550,14 @@ test('renders merge-ready pull request state in the right header', () => {
 		'data-workspace-sidebar-state="workspace-blocked"',
 	);
 	expect(markup).toContain('data-checks-panel-state="pr-ready"');
-	// The Checks and Deployments sections were removed from the Checks panel;
-	// their data no longer renders there (the preview-deploy link lives on in the
-	// right-sidebar PR header, which is out of scope for this rework).
+	// GitHub's status-check rollup renders as a live list; deployments remain in
+	// the right-sidebar PR header rather than a duplicate panel section.
+	expect(markup).toContain('>Checks</h3>');
+	expect(markup).toContain('data-check-status="ready"');
+	expect(markup).toContain(
+		'href="https://github.com/psoldunov/ensemblr/actions/runs/102"',
+	);
 	expect(markup).not.toContain('Deployments');
-	expect(markup).not.toContain('Open scan check');
 	expect(markup).toContain('All required checks passed.');
 	expect(markup).toContain('Merge');
 	expect(markup).toContain('Requires confirmation');
