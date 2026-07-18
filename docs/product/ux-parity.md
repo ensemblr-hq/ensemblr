@@ -1,12 +1,12 @@
 # UX Parity
 
-Date: 2026-07-15
+Date: 2026-07-18
 
 Ensemblr should match Conductor's observable workflows and information architecture where practical, while using distinct Ensemblr visual design, copy, branding, icons, and Pi-specific runtime behavior.
 
 ## Current Shell Contract
 
-As of 2026-06-07, the implemented workbench shell is the product source of
+As of 2026-07-18, the implemented workbench shell is the product source of
 truth for layout and visible affordances. See
 `docs/product/current-shell-inventory.md`.
 
@@ -19,16 +19,18 @@ chrome in `src/renderer/components/workbench-shell/frame.tsx`,
 `src/renderer/components/workbench-shell/workspace-content.tsx`, the
 no-project shell in `src/renderer/components/workbench-empty-state.tsx`, the
 welcome landing in `src/renderer/components/welcome.tsx` plus
-`src/renderer/components/welcome/`, private feature modules under
-`src/renderer/components/workbench-shell/<feature>/`, cross-cutting shell
-contexts in `src/renderer/components/workbench-shell/contexts/`, shared Jotai
-atoms in `src/renderer/state/workspace`, and shared exported shell types in
-`src/renderer/types/workbench-shell/`.
+`src/renderer/components/welcome/`, the dashboard board in
+`src/renderer/components/workbench-shell/dashboard/`, private feature modules
+under `src/renderer/components/workbench-shell/<feature>/`, cross-cutting shell
+contexts in `src/renderer/components/workbench-shell/shell-contexts.tsx`, shared
+Jotai atoms in `src/renderer/state/workspace`, and shared exported shell types
+in `src/renderer/types/workbench-shell/`.
 
-Future work should wire live repository, workspace, Pi, terminal, file, diff,
-GitHub, Linear, settings, and diagnostics services into the existing shell
-regions. Do not redesign the shell or move major surfaces unless a later product
-decision explicitly supersedes the implemented direction.
+Live repository, workspace, Pi, terminal, file, diff, GitHub, Linear, settings,
+and diagnostics services are now wired into the existing shell regions. Future
+work should deepen those services rather than redesigning the shell or moving
+major surfaces unless a later product decision explicitly supersedes the
+implemented direction.
 
 The current shell is the intended closest match to Conductor's own shell. Lost
 or unavailable screenshot evidence should not cause agents to reopen settled
@@ -46,6 +48,7 @@ is ongoing.
 
 - Persistent macOS desktop window with native menu bar support.
 - Left sidebar with visible Dashboard, History, Settings, and Help entries.
+- Dashboard board for workspace triage across Backlog, In progress, In review, Done, and Canceled.
 - Projects grouped in the sidebar, each containing one or more workspaces.
 - Workspace rows show the current task/branch plus compact change statistics.
 - Sidebar footer exposes app health/readiness status and app diagnostics.
@@ -61,12 +64,13 @@ Ensemblr equivalent:
 - Use TanStack Query for backend/preload snapshots such as health, setup diagnostics, repository/workspace records, file status, terminal metadata, and PR/check state.
 - Use Jotai atoms in `src/renderer/state/` for durable renderer-only UI state
   that crosses shell modules, such as pinned workspace IDs, collapsed project
-  IDs, project order, and closed session tab IDs.
+  IDs, project order, dashboard board status/order, unread workspace IDs, and
+  closed session tab IDs.
 - Use an Ensemblr-specific React/shadcn visual language, not Conductor's visual identity.
 - Preserve the same pane hierarchy so Conductor users can transfer workflows.
 - Keep app diagnostics in the left sidebar footer/status area. Do not render app
   setup diagnostics in the lower Setup dock.
-- Treat the current shell as locked product direction. Later service tickets should replace fixture data inside the existing sidebar, timeline, review panel, and dock regions instead of creating new regions.
+- Treat the current shell as locked product direction. Later service tickets should deepen live services inside the existing sidebar, dashboard, timeline, review panel, and dock regions instead of creating new regions.
 
 ### Settings Shell
 
@@ -131,7 +135,7 @@ Ensemblr equivalent:
 - Dock actions are script-state aware: show Setup Scripts when no scripts are configured, Run setup script before setup has run, Run when the dev server is stopped, and Open :PORT plus Stop when the dev server is running.
 - The new-terminal action creates another terminal session. It never creates additional Setup or Run tabs.
 - Pi RPC transcripts, app setup diagnostics, app health logs, and workspace setup/run script output must not be merged into user-spawned terminal sessions.
-- Experimental settings can enable a bigger terminal-centric layout and more tabs.
+- No separate big-terminal or many-tabs setting is implemented; the terminal dock and five-chat-tab ADR cover v1 behavior.
 
 Ensemblr equivalent:
 
@@ -139,6 +143,7 @@ Ensemblr equivalent:
 - User-spawned interactive terminals are implemented on xterm.js behind a terminal adapter, backed by live node-pty sessions.
 - The main process owns PTY/process supervision.
 - `ENSEMBLR_*` variables are exposed to workspace processes.
+- Scripts and terminal sessions inherit the sanitized shell-derived environment and workspace toolchain `PATH`.
 
 ### PR and Merge Flow
 
@@ -176,8 +181,8 @@ Ensemblr equivalent:
 5. Implement workspace core: worktree creation, default branch/remote, copied files, setup script, placeholder naming, context folder.
 6. **Complete.** Implement Pi timeline: session creation, event rendering, tool calls, runtime errors, retry/fork actions, composer controls.
 7. **Complete.** Wire terminal dock: replace dock placeholder logs with setup/run output, named terminals, rerun/stop/run controls, PTY lifecycle.
-8. Wire file/diff panel: replace fixture rows with all-files tree, changes tree, diff body, search, review mode, local comments.
-9. Wire PR/checks panel: replace fixture checks with no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state.
+8. **Mostly complete.** Wire file/diff panel: all-files tree, changes tree, diff body, source filtering, discard controls, and search are live; inline local line comments remain polish.
+9. **Mostly complete.** Wire PR/checks panel: no-PR state, uncommitted state, PR metadata, CI/deployments, comments, todos, ready-to-merge state, and merge confirmation are live; add-review-context-to-Pi remains polish.
 10. Implement repository action preferences: review, create PR, fix errors, resolve conflicts, branch rename, and general Pi instructions.
-11. Add polish/settings parity: appearance previews, keyboard shortcuts, command palette, non-deferred feature flags, resource usage, and big terminal mode. Voice remains post-core deferred.
+11. Add polish/settings parity: appearance previews, keyboard shortcuts, command palette, diagnostics, and source-status polish. Voice remains post-core deferred.
 12. Revisit advanced integrations: Graphite stack support and cloud/remote workspace SSH behavior. Linear issue workflows are v1 scope, and GitHub workflows stay on `gh`/`gh api`.

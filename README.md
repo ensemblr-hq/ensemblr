@@ -49,6 +49,7 @@ recent changes.
 ## Features
 
 ### Workspaces
+
 - Create workspaces from an existing branch, a GitHub PR, or a Linear issue, with live source data in the
   create dialog.
 - Each workspace is an isolated git worktree with its own branch and working tree.
@@ -57,8 +58,10 @@ recent changes.
 - Base branch is fetched and fast-forwarded before a workspace is created, so new work starts from the
   latest `master`/`main` when online (best-effort — offline creation still works).
 - Quick-start: create a brand-new project and publish it to GitHub directly from Ensemblr.
+- Dashboard board groups workspaces into Backlog, In progress, In review, Done, and Canceled columns, with drag-and-drop ordering and workspace card action menus.
 
 ### Pi agent runtime
+
 - Runs the Pi CLI in RPC mode (JSONL over stdio) with executable discovery and readiness checks.
 - Per-workspace Pi sessions persisted to SQLite, with tree-structured session branching.
 - Streaming conversation timeline with model and extended-thinking controls.
@@ -68,18 +71,21 @@ recent changes.
 - Activity monitoring drives macOS notifications and power-state handling while the agent works.
 
 ### Review flow
+
 - Changed-files panel with add/delete/modify/rename/untracked status and line counts.
 - Source-scoped diffs (uncommitted vs. a commit vs. a branch) and per-file discard.
 - Collapsible file tree with live filesystem watch and lazy-loaded ignored directories.
 - Local review comments and todos tied to files and lines.
 
 ### Pull requests
+
 - Inline PR title/description editor persisted per workspace.
 - Commit and push, with first-push upstream setup.
 - PR status, checks, and comments sourced through the GitHub CLI.
 - Merge confirmation flow.
 
 ### Integrations
+
 - **GitHub** via the `gh` CLI — using your own credentials; Ensemblr stores no GitHub tokens.
 - **Linear** via OAuth, with the token stored in the macOS Keychain.
 - **git** via the native binary (worktrees, branches, commits, push, log/diff inspection).
@@ -87,19 +93,24 @@ recent changes.
   installed apps appear).
 
 ### Terminal & scripts
+
 - xterm.js terminal backed by a `node-pty` PTY, in a collapsible dock.
 - Setup and Run scripts with read-only output panes, plus additional interactive terminal tabs.
-- `ENSEMBLR_*` environment variables injected into workspace processes.
+- Workspace processes inherit the user's shell-derived environment, workspace toolchain `PATH`, and `ENSEMBLR_*` variables.
+- Bundled JetBrains Mono Nerd Font keeps terminal/code typography stable on first launch.
 
 ### History & archive
+
 - Archive a workspace's context (git-backed) and browse it later.
 - Global History screen to restore or permanently delete archived workspaces.
 
 ### Settings
+
 - Layered configuration (user / repository / workspace) stored in `~/.config/ensemblr/config.json`.
 - Git defaults: branch-prefix source, auto-rename workspace on branch, delete local branch on archive,
   archive after merge, set upstream on push.
 - Setup diagnostics with per-check remediation actions.
+- Appearance settings for theme, accessible colors, code theme, markdown style, mono/terminal fonts, and terminal font size.
 
 ---
 
@@ -107,7 +118,7 @@ recent changes.
 
 | Area | Choice |
 | --- | --- |
-| Desktop shell | Electron 42, Electron Forge 7 (Vite plugin, Fuses hardening) |
+| Desktop shell | Electron 43, Electron Forge 7 (Vite plugin, Fuses hardening) |
 | UI | React 19, TypeScript 6 (strict) |
 | Styling | Tailwind CSS 4, shadcn/ui (`radix-nova`) + Radix UI, Lucide icons |
 | Routing | TanStack Router (file-based) |
@@ -115,9 +126,9 @@ recent changes.
 | State | Jotai |
 | Terminal | xterm.js + `node-pty` |
 | Validation | Zod |
-| Storage | SQLite (`~/.config/ensemblr/ensemblr.db`) |
+| Storage | SQLite (`~/Library/Application Support/dev.ensemblr.app/ensemblr.db` on macOS) |
 | Build | Vite 8 |
-| Lint / format | Biome 2.4 |
+| Lint / format | Biome 2.5 |
 | Package manager | npm |
 
 ---
@@ -169,7 +180,7 @@ src/
 └── shared/     Cross-process contracts (Zod config, IPC contracts, keymap, Pi-RPC)
 
 docs/
-├── adr/            Architecture Decision Records (33)
+├── adr/            Architecture Decision Records (38)
 ├── considerations/ Exploratory design notes (e.g. Deno desktop migration)
 ├── pi/             Pi integration (RPC protocol, event taxonomy)
 ├── product/        Roadmap, parity notes, shell/settings inventories
@@ -202,7 +213,7 @@ Ensemblr is organized around four runtime boundaries:
 - **`src/shared`** — cross-process contracts: the Zod config schema, ~30 typed IPC contract modules
   (`src/shared/ipc/contracts/`), keymap definitions, and Pi-RPC parsing.
 
-**Data layer.** State persists to a SQLite database at `~/.config/ensemblr/ensemblr.db` (repositories,
+**Data layer.** State persists to a SQLite database at `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` on macOS (repositories,
 workspaces, Pi sessions, Pi events, chat tabs, settings) accessed through a repository layer under
 `src/main/storage/`. App settings live in `~/.config/ensemblr/config.json`; per-repo config is a committed,
 hand-authored `.ensemblr/settings.toml`. Per-turn checkpoints are git-backed
@@ -271,7 +282,7 @@ See `package.json` for the full list of `test:*` scripts.
 - [`CONTEXT.md`](./CONTEXT.md) — product definition and ubiquitous language.
 - [`CHANGELOG.md`](./CHANGELOG.md) — notable changes (Keep a Changelog format).
 - [`AGENTS.md`](./AGENTS.md) — contributor policies (package manager, Biome, state, Tailwind, docs).
-- [`docs/adr/`](./docs/adr) — 33 Architecture Decision Records.
+- [`docs/adr/`](./docs/adr) — 38 Architecture Decision Records.
 - [`docs/product/`](./docs/product) — roadmap, Conductor parity, shell/settings inventories.
 - [`docs/pi/`](./docs/pi) — Pi RPC protocol and event taxonomy.
 

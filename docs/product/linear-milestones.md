@@ -1,8 +1,8 @@
 # Linear Milestones
 
-Date: 2026-06-05
+Date: 2026-07-18
 
-These milestones are intended to be copied into Linear as project milestones. Issue IDs refer to the local planning IDs in `docs/product/linear-issues.md`.
+These milestones were intended to be copied into Linear as project milestones. Issue IDs refer to the local planning IDs in `docs/product/linear-issues.md`; several exit criteria are now shipped and preserved here as planning history. Use `docs/product/implementation-roadmap.md` for current completion status.
 
 ## 1. Foundation
 
@@ -24,8 +24,8 @@ Exit criteria:
 
 - Electron main and React renderer can start in development.
 - Renderer uses TanStack Router for durable navigation/search state and TanStack Query for preload/backend snapshots.
-- The Conductor-style shell contract exists with fixture project/workspace rows, chat tabs, right review panel tabs, PR-state header, and setup/run/terminal dock regions.
-- Fixture data is clearly separated from the locked shell layout so later tickets wire live services in place.
+- The Conductor-style shell contract exists with live project/workspace rows, chat tabs, dashboard board, right review panel tabs, PR-state header, and setup/run/terminal dock regions.
+- Live services are wired into the locked shell layout through TanStack Query, typed IPC, and app services rather than by rebuilding shell regions.
 - Main-process services expose typed IPC boundaries for storage, config, root, secrets, and local commands.
 - SQLite migrations run against a local app-support database and test database.
 - Secrets can be stored through a Keychain abstraction and mocked in tests.
@@ -258,12 +258,12 @@ Included issues:
 Exit criteria:
 
 - Settings contain app-wide and repository-specific sections in one shell, starting from the current visible Settings entry and shell route.
-- App settings screen UX/UI decisions are recorded before the settings shell and forms are locked in.
+- App settings screen UX/UI decisions are recorded as polish follow-up now that the main settings shell and forms are implemented.
 - Source precedence is visible for app and repository configuration.
 - Security, permissions, Linear, `gh`, Pi readiness, and enterprise privacy are inspectable.
 - Appearance controls affect code, markdown, and terminal previews.
 - Command palette, shortcuts, deep links, and external-open actions cover core workflows.
-- Remaining non-deferred settings decisions are recorded explicitly.
+- Remaining non-deferred settings decisions are recorded explicitly; the 2026-07-18 refresh leaves no active settings product question.
 
 Primary source:
 

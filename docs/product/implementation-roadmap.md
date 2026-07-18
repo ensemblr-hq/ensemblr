@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-Date: 2026-06-16
+Date: 2026-07-18
 
 This roadmap converts the accepted ADRs and product parity docs into a Linear-ready implementation plan. It is an implementation roadmap, not a product-decision source. Accepted ADRs remain the source of truth when there is a conflict.
 
@@ -26,7 +26,7 @@ In scope for v1:
 - First-class Linear OAuth integration with issue create/read/update/comment and workspace creation from issues.
 - GitHub PR/check/comment/merge workflows through authenticated `gh` CLI and `gh api`.
 - Settings shell, repository settings, keyboard shortcuts, command palette, deep links, diagnostics, and non-deferred polish.
-- Implemented Conductor-style workbench shell contract for the sidebar, workspace chat tabs, right review panel, PR-state header, and setup/run/terminal dock. The shell composes `WorkbenchFrame` (`src/renderer/components/workbench-shell/frame.tsx`) and `WorkspaceWorkbenchContent` (`src/renderer/components/workbench-shell/workspace-content.tsx`) under file-based TanStack routes, with private feature folders under `src/renderer/components/workbench-shell/<feature>/`, cross-cutting shell contexts under `src/renderer/components/workbench-shell/contexts/`, the no-project shell in `src/renderer/components/workbench-empty-state.tsx`, the welcome landing in `src/renderer/components/welcome.tsx`, Jotai atoms in `src/renderer/state/workspace`, and shared shell types in `src/renderer/types/workbench-shell/`. Live repository/workspace, terminal, file, diff, checks, Linear, GitHub, and Pi services remain in their milestone tickets and should wire into those regions.
+- Implemented Conductor-style workbench shell contract for the sidebar, dashboard board, workspace chat tabs, right review panel, PR-state header, and setup/run/terminal dock. The shell composes `WorkbenchFrame` (`src/renderer/components/workbench-shell/frame.tsx`) and `WorkspaceWorkbenchContent` (`src/renderer/components/workbench-shell/workspace-content.tsx`) under file-based TanStack routes, with private feature folders under `src/renderer/components/workbench-shell/<feature>/`, shell providers in `src/renderer/components/workbench-shell/shell-contexts.tsx`, the no-project shell in `src/renderer/components/workbench-empty-state.tsx`, the welcome landing in `src/renderer/components/welcome.tsx`, Jotai atoms in `src/renderer/state/workspace`, and shared shell types in `src/renderer/types/workbench-shell/`. Live repository/workspace, terminal, file, diff, checks, Linear, GitHub, and Pi services are now wired across the main workflows; remaining work should deepen those services instead of rebuilding the shell.
 
 Explicitly deferred until post-core:
 
@@ -43,7 +43,13 @@ Explicitly deferred until post-core:
 ## Completed Implementation
 
 | Milestone | Completed Items | Commit |
-|---|---|---|
+| --- | --- | --- |
+| 3. Repository and Workspace Core | Dashboard board with Backlog/In progress/In review/Done/Canceled columns, drag-and-drop ordering, persisted local board statuses, and workspace card action menus | c73ced6 / eee3e6f / 2f4aeb7 |
+| 3. Repository and Workspace Core | Dashboard and collapsed-sidebar empty states stay accessible when setup is blocked or no workspaces remain | a9ce1b9 / 7da4597 / ed1461f |
+| 3. Repository and Workspace Core | Placeholder workspace names avoid reuse collisions through shared slug/name pooling | 48e6b2f |
+| 4. Pi CLI RPC Runtime and Agent Timeline | Session-tab close controls and drag-reorder selection stay stable | 4a8801b / ae163fe |
+| 5. Terminal, Scripts, and Processes | Setup/run scripts and terminals inherit the shell-derived environment plus workspace toolchain `PATH` | 4695229 / b9bdd09 |
+| 5. Terminal, Scripts, and Processes | Setup status is visible in the shell and terminal typography uses bundled JetBrains Mono Nerd Font assets | d2220aa |
 | 2. Setup Gate and Configuration | User-scope git defaults (`app.git` in config.json) with branch prefix source, custom prefix, auto-rename, delete branch on archive, archive after merge, set upstream on push | d61d93e |
 | 2. Setup Gate and Configuration | Auto branch-naming from first Pi message via LLM generation | d61d93e |
 | 3. Repository and Workspace Core | File tree view with collapsible folders and folder grouping | d2158d5 |
@@ -77,7 +83,7 @@ Explicitly deferred until post-core:
 - Treat the current workbench shell as the structural UI contract. Later tickets should replace fixture/local renderer data through TanStack Query and IPC-backed services rather than rebuilding navigation, review, PR header, chat tab, composer placement, or dock regions.
 - Keep durable renderer-only UI state in concern-owned Jotai atom modules under `src/renderer/state/`, and keep shared exported renderer types under `src/renderer/types/`.
 - Treat the current shell as the closest intended Conductor-shell match. Lost or unavailable screenshots are not a reason to restart shell parity design.
-- Preserve the explicit Pi deferral: chat transcript content and prompt/composer behavior are not final until Pi runtime work wires structured sessions, model/thinking controls, attachments, stop/submit, and retry/fork behavior.
+- Preserve the implemented Pi runtime boundary: structured sessions, model/thinking controls, attachments, stop/submit, and checkpoint-aware timeline behavior now exist and should be extended through `PiAgentClient` and the Pi-session services rather than replaced.
 - Prefer boundaries that keep implementations testable: `PiAgentClient`, `GitHubService`, `LinearService`, `ConfigService`, `SecretStore`, `TerminalService`, and `WorkspaceService`. `GitHubService` is a `gh`/`gh api` command boundary, not an app-owned GitHub auth client.
 - Do not read or write Conductor's private SQLite database.
 - Do not pass Pi disabling flags by default.
@@ -107,23 +113,23 @@ Discovery tickets are intentionally separate from build tickets:
 - `ENS-044` - Linear schema and permission discovery, including archive/delete support, pagination, filtering, labels, cycles, and cache metadata.
 - `ENS-056` - GitHub comments, review threads, deployments, and add-all-comments coverage through `gh` and `gh api`.
 - `ENS-068` - Non-deferred experimental feature discovery for sidebar visibility and resource usage.
-- Current shell uncertainty to resolve before implementing related behavior: workspace-row status actions, mark-unread semantics, and the Changes tab Review action. See `docs/product/current-shell-inventory.md`.
+- Remaining shell polish to resolve before extending review behavior: inline line-comment UX and any add-review-context-to-Pi flow that goes beyond the current repository `review` agent action. See `docs/product/current-shell-inventory.md`.
 
 Discovery outputs should be short design notes committed with the ticket, or appended to the source product docs if they change planning guidance.
 
 ## Product Working Sessions
 
-These tickets require an interactive session with the user before downstream build tickets lock in UI details:
+These tickets are now polish sessions, not blockers for shipped core layout:
 
-- `ENS-075` - Agent chat pane UX/UI working session, after basic Pi composer/timeline integration and capability discovery.
-- `ENS-076` - App settings screen UX/UI working session, before the full settings shell and forms are built.
+- `ENS-075` - Agent chat pane UX/UI polish session, now that the basic Pi composer/timeline integration is implemented.
+- `ENS-076` - App settings screen UX/UI polish session, now that the main settings sections and persistence model are implemented.
 
 ## Decision Needed
 
 These are product decisions, not implementation guesses:
 
-- `ENS-069` - Decide whether to support Conductor's remove/soften AI-certainty phrase setting in Ensemblr. If supported, decide whether it is Pi output post-processing, a prompt preset, or a settings omission.
-- `ENS-068` - Decide which non-deferred experimental settings are v1 scope versus post-core flags, especially workspace/sidebar visibility and sidebar resource usage. Voice, Graphite, cloud/remote SSH, production React profiler, and the five-chat-tab limit are already resolved by ADRs.
+- No active settings decision remains from the 2026-07-18 refresh. The AI-certainty phrase toggle was removed from v1, and Experimental currently contains only Developer Mode plus Auto-run after setup.
+- Review polish still needs product judgment before new behavior is added: inline line-comment UX and add-review-context-to-Pi flows beyond the current repository `review` agent action.
 
 If another ticket encounters ambiguity that would alter behavior, create a new Decision Needed item instead of guessing.
 

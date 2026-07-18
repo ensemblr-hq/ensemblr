@@ -1,6 +1,6 @@
 # Docs Consistency Audit
 
-Date: 2026-06-04
+Date: 2026-07-18
 
 ## Summary
 
@@ -142,3 +142,47 @@ shipped structure.
   shell paths.
 - The connected Linear workspace mismatch noted in the 2026-06-07 routing
   alignment is still unresolved; live `THE-*` tickets were not synced.
+
+## 2026-07-18 Current Docs Refresh
+
+The last substantive product-doc update before this refresh was `de46de5`
+(`docs: record shipped parity and runtime ADRs`, 2026-07-15). `README.md` and
+`CHANGELOG.md` were last touched by `c94b502` on 2026-07-10; roadmap and open-
+decision docs were last substantively aligned before the Ensemblr rename pass
+(`078b38e`, 2026-07-10).
+
+### Changes reviewed since `de46de5`
+
+- `4695229` and `b9bdd09`: setup/run scripts and terminal sessions now inherit
+  the shell-derived environment and workspace toolchain `PATH`.
+- `d2220aa`: setup status is visible in the shell, and JetBrains Mono Nerd Font
+  assets are bundled for terminal/code typography.
+- `4a8801b` and `ae163fe`: chat/session tab close controls and drag-reorder
+  selection behavior were tightened.
+- `c73ced6`, `eee3e6f`, and `2f4aeb7`: the Dashboard route is now a draggable
+  workspace board with board-status columns and workspace card action menus.
+- `a9ce1b9`, `7da4597`, and `ed1461f`: dashboard/collapsed-sidebar empty states
+  stay reachable when setup is blocked or no workspaces remain.
+- `48e6b2f`: placeholder workspace names avoid reuse collisions.
+
+### Fixes applied
+
+- Updated `README.md` for the dashboard board, bundled terminal font, current
+  tool versions, macOS SQLite path, and current ADR count.
+- Updated `docs/product/current-shell-inventory.md` for the live dashboard board,
+  shell-provider path, Git-backed Changes tab, setup/run script execution,
+  terminal env inheritance, settings state, and resolved context-menu semantics.
+- Updated `docs/product/conductor-parity.md` and
+  `docs/product/implementation-roadmap.md` with the shipped board/script/env
+  work and current implementation deltas.
+- Updated `docs/product/open-decisions.md` to remove stale AI-certainty and
+  experimental-flag decisions, and to mark workspace board status, unread/read,
+  and Review action semantics as resolved.
+- Updated `docs/product/settings-inventory.md` to reflect the actual Appearance
+  schema and bundled default terminal font.
+
+### Remaining ambiguities
+
+- Inline line-comment UX and add-review-context-to-Pi flows remain future review
+  polish.
+- Live Linear `THE-*` ticket syncing was not attempted in this refresh.
