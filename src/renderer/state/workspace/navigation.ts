@@ -1,4 +1,4 @@
-import { useAtom } from 'jotai';
+import { useAtom, useSetAtom } from 'jotai';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type {
@@ -9,6 +9,9 @@ import {
 	collapsedProjectIdsAtom,
 	orderedProjectIdsAtom,
 	pinnedWorkspaceIdsAtom,
+	unreadWorkspaceIdsAtom,
+	workspaceBoardOrderAtom,
+	workspaceBoardStatusAtom,
 } from './structure-atoms';
 
 /**
@@ -113,6 +116,9 @@ export function useProjectNavigationState(
 	const [pinnedWorkspaceIds, setPinnedWorkspaceIds] = useAtom(
 		pinnedWorkspaceIdsAtom,
 	);
+	const setWorkspaceBoardStatus = useSetAtom(workspaceBoardStatusAtom);
+	const setWorkspaceBoardOrder = useSetAtom(workspaceBoardOrderAtom);
+	const setUnreadWorkspaceIds = useSetAtom(unreadWorkspaceIdsAtom);
 	const [
 		isProjectReorderPositionOnlyLayout,
 		setIsProjectReorderPositionOnlyLayout,
@@ -149,12 +155,12 @@ export function useProjectNavigationState(
 				? currentProjectIds
 				: nextProjectIds;
 		});
+		const workspaceIds = new Set(
+			projects.flatMap((project) =>
+				project.workspaces.map((workspace) => workspace.id),
+			),
+		);
 		setPinnedWorkspaceIds((currentWorkspaceIds) => {
-			const workspaceIds = new Set(
-				projects.flatMap((project) =>
-					project.workspaces.map((workspace) => workspace.id),
-				),
-			);
 			const nextWorkspaceIds = currentWorkspaceIds.filter((workspaceId) =>
 				workspaceIds.has(workspaceId),
 			);
@@ -163,11 +169,39 @@ export function useProjectNavigationState(
 				? currentWorkspaceIds
 				: nextWorkspaceIds;
 		});
+		setUnreadWorkspaceIds((currentWorkspaceIds) => {
+			const nextWorkspaceIds = currentWorkspaceIds.filter((workspaceId) =>
+				workspaceIds.has(workspaceId),
+			);
+
+			return nextWorkspaceIds.length === currentWorkspaceIds.length
+				? currentWorkspaceIds
+				: nextWorkspaceIds;
+		});
+		setWorkspaceBoardStatus((currentStatusByWorkspaceId) => {
+			const nextEntries = Object.entries(currentStatusByWorkspaceId).filter(
+				([workspaceId]) => workspaceIds.has(workspaceId),
+			);
+
+			return nextEntries.length ===
+				Object.keys(currentStatusByWorkspaceId).length
+				? currentStatusByWorkspaceId
+				: Object.fromEntries(nextEntries);
+		});
+		setWorkspaceBoardOrder((currentOrder) =>
+			getReconciledShellItemIds(
+				projects.flatMap((project) => project.workspaces),
+				currentOrder,
+			),
+		);
 	}, [
 		projects,
 		setCollapsedProjectIds,
 		setOrderedProjectIds,
 		setPinnedWorkspaceIds,
+		setUnreadWorkspaceIds,
+		setWorkspaceBoardOrder,
+		setWorkspaceBoardStatus,
 	]);
 	useEffect(
 		() => () => {

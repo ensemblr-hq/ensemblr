@@ -12,6 +12,7 @@ import {
 	useWorkbenchLayoutModel,
 	workbenchRouteApi,
 } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-layout-model';
+import { useAutoMarkUnread } from '@/renderer/hooks/workspace/use-auto-mark-unread';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import {
 	getStringRouteParam,
@@ -43,6 +44,7 @@ export function WorkbenchShellLayout() {
 		loaderData,
 		routeState,
 	});
+	useAutoMarkUnread(model.activeWorkspace?.id ?? null);
 	const [cloneOpen, setCloneOpen] = useAtom(cloneDialogOpenAtom);
 	const [localProjectImportOpen] = useAtom(localProjectImportDialogOpenAtom);
 	const [quickStartOpen, setQuickStartOpen] = useAtom(quickStartDialogOpenAtom);

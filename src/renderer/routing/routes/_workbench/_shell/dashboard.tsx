@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { WorkbenchPlaceholderPage } from '@/renderer/components/workbench-shell/route-layout';
+import { DashboardBoard } from '@/renderer/components/workbench-shell/dashboard/dashboard-board';
 
-/** Registers the `/dashboard` workbench view (placeholder for the future kanban board). */
+/** Registers the `/dashboard` workbench view (the workspace Kanban board). */
 export const Route = createFileRoute('/_workbench/_shell/dashboard')({
 	component: DashboardRoute,
 	staticData: {
@@ -10,7 +10,7 @@ export const Route = createFileRoute('/_workbench/_shell/dashboard')({
 	},
 });
 
-/** Dashboard workbench view (placeholder for the future kanban board). */
+/** Dashboard workbench view — the workspace Kanban board. */
 function DashboardRoute() {
-	return <WorkbenchPlaceholderPage view='dashboard' />;
+	return <DashboardBoard />;
 }

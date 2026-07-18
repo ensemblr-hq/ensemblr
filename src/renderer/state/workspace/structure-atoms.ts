@@ -1,5 +1,7 @@
 import { atomWithStorage } from 'jotai/utils';
 
+import type { WorkspaceBoardStatus } from './board-status';
+
 const workspaceStorageOptions = { getOnInit: true };
 
 /** Persisted user-defined ordering of project ids in the workspace sidebar. */
@@ -21,6 +23,27 @@ export const collapsedProjectIdsAtom = atomWithStorage<string[]>(
 /** Persisted set of pinned workspace ids surfaced at the top of the sidebar. */
 export const pinnedWorkspaceIdsAtom = atomWithStorage<string[]>(
 	'ensemblr_workspace_pinned_workspace_ids',
+	[],
+	undefined,
+	workspaceStorageOptions,
+);
+
+/** Persisted board status per workspace, backing the dashboard Kanban columns. */
+export const workspaceBoardStatusAtom = atomWithStorage<
+	Record<string, WorkspaceBoardStatus>
+>('ensemblr_workspace_board_status', {}, undefined, workspaceStorageOptions);
+
+/** Persisted set of workspace ids marked unread (manually or on turn finish). */
+export const unreadWorkspaceIdsAtom = atomWithStorage<string[]>(
+	'ensemblr_workspace_unread_ids',
+	[],
+	undefined,
+	workspaceStorageOptions,
+);
+
+/** Persisted global order of workspace ids on the dashboard board. */
+export const workspaceBoardOrderAtom = atomWithStorage<string[]>(
+	'ensemblr_workspace_board_order',
 	[],
 	undefined,
 	workspaceStorageOptions,

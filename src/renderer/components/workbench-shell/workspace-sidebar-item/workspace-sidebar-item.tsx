@@ -16,6 +16,7 @@ import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import {
 	getRunningDockActivityState,
+	useWorkspaceUnread,
 	type WorkspaceDockActivityState,
 	workspaceDockActivityByWorkspaceAtom,
 } from '@/renderer/state/workspace';
@@ -64,6 +65,7 @@ export function WorkspaceSidebarItem({
 	workspace: WorkspaceShellModel;
 }) {
 	const { renderWorkspaceLink } = useNavigation();
+	const isUnread = useWorkspaceUnread(workspace.id);
 	const isPendingCreation = workspace.isPendingCreation === true;
 	// Live Pi runtime activity flows through `agentBusy` so it takes spinner
 	// priority over PR/check states without disturbing the cached
@@ -121,7 +123,12 @@ export function WorkspaceSidebarItem({
 			</div>
 			<div className='min-w-0 flex-1'>
 				<div className='flex min-w-0 items-start justify-between gap-2'>
-					<span className='truncate font-medium text-[0.8125rem]'>
+					<span
+						className={cn(
+							'truncate text-[0.8125rem]',
+							isUnread ? 'font-semibold' : 'font-medium',
+						)}
+					>
 						{workspace.name}
 					</span>
 					<div className='flex shrink-0 items-center gap-1.5'>
