@@ -1,9 +1,15 @@
 import { access, constants } from 'node:fs/promises';
 
-import type { LocalCommandService } from '../commands';
-import { isValidBundleId, OPEN_TARGET_REGISTRY } from './open-target-registry';
+import type { LocalCommandService } from '../commands/index.ts';
+import {
+	isValidBundleId,
+	OPEN_TARGET_REGISTRY,
+} from './open-target-registry.ts';
 
-const MDFIND_TIMEOUT_MS = 3000;
+// Cold-boot Spotlight under ~18 concurrent probes routinely blows past 3s, and a
+// timed-out probe is indistinguishable from "app absent" — so a stingy timeout
+// silently drops installed editors. Give each probe generous headroom.
+const MDFIND_TIMEOUT_MS = 8000;
 const MDFIND_PATH = '/usr/bin/mdfind';
 
 /** Known absolute paths for macOS system apps that mdfind sometimes hides. */
@@ -28,18 +34,44 @@ interface DetectedTarget {
 export type DetectedTargetsMap = Readonly<Record<string, DetectedTarget>>;
 
 /**
+ * Outcome of a full detection pass. `degraded` is set when at least one
+ * bundle-id target could not be resolved because its `mdfind` probe failed
+ * (timeout, spawn error) rather than genuinely returning "not installed" — a
+ * signal to callers that the result may be hiding installed apps and should not
+ * be trusted as the authoritative installed set.
+ */
+export interface DetectionResult {
+	degraded: boolean;
+	detected: DetectedTargetsMap;
+}
+
+/**
+ * Outcome of probing a single bundle id via Spotlight. `error` marks a transient
+ * command failure (timeout, spawn error) that must never be conflated with a
+ * genuine `not-found`, since doing so caches a temporarily-unreachable app as
+ * uninstalled.
+ */
+type BundleProbeResult =
+	| { status: 'found'; appPath: string }
+	| { status: 'not-found' }
+	| { status: 'error' };
+
+/**
  * Probes which registered targets exist on this host. macOS-only — on other
  * platforms only utilities are returned as installed.
  *
  * One `mdfind` call per bundle id, parallelised. Builtins fall back to a small
  * list of known system paths since mdfind can omit Apple-shipped apps when the
  * Spotlight index has not been built for those system volumes.
+ * @param options - The command runner used to invoke `mdfind`.
+ * @returns The per-target detection map plus a `degraded` flag when any probe
+ * failed transiently.
  */
 export async function detectInstalledTargets({
 	localCommandService,
 }: {
 	localCommandService: LocalCommandService;
-}): Promise<DetectedTargetsMap> {
+}): Promise<DetectionResult> {
 	const detected: Record<string, DetectedTarget> = {};
 
 	for (const definition of OPEN_TARGET_REGISTRY) {
@@ -52,8 +84,10 @@ export async function detectInstalledTargets({
 				detected[definition.id] = { appPath: null, installed: true };
 			}
 		}
-		return detected;
+		return { degraded: false, detected };
 	}
+
+	let degraded = false;
 
 	await Promise.all(
 		OPEN_TARGET_REGISTRY.map(async (definition) => {
@@ -70,20 +104,23 @@ export async function detectInstalledTargets({
 					return;
 				}
 				case 'bundleId': {
-					const path = await findFirstInstalledAppPath({
+					const resolution = await findFirstInstalledAppPath({
 						bundleIds: definition.detection.bundleIds,
 						localCommandService,
 					});
 					detected[definition.id] = {
-						appPath: path,
-						installed: path !== null,
+						appPath: resolution.appPath,
+						installed: resolution.appPath !== null,
 					};
+					if (resolution.appPath === null && resolution.errored) {
+						degraded = true;
+					}
 				}
 			}
 		}),
 	);
 
-	return detected;
+	return { degraded, detected };
 }
 
 /**
@@ -103,8 +140,12 @@ async function resolveBuiltinAppPath(id: string): Promise<string | null> {
 
 /**
  * Return the path of the first installed app among the candidate bundle ids.
+ * A candidate that is `found` wins immediately; otherwise `errored` reports
+ * whether any probe failed transiently, so the caller can tell "genuinely
+ * absent" apart from "temporarily unreachable".
  * @param options - Candidate bundle ids and the command runner.
- * @returns The first matching `.app` path, or null when none is installed.
+ * @returns The first matching `.app` path (or null) plus an `errored` flag set
+ * when no candidate was found and at least one probe failed transiently.
  */
 async function findFirstInstalledAppPath({
 	bundleIds,
@@ -112,20 +153,30 @@ async function findFirstInstalledAppPath({
 }: {
 	bundleIds: readonly string[];
 	localCommandService: LocalCommandService;
-}): Promise<string | null> {
+}): Promise<{ appPath: string | null; errored: boolean }> {
+	let errored = false;
 	for (const bundleId of bundleIds) {
-		const path = await mdfindPathForBundleId({ bundleId, localCommandService });
-		if (path) {
-			return path;
+		const probe = await mdfindPathForBundleId({
+			bundleId,
+			localCommandService,
+		});
+		if (probe.status === 'found') {
+			return { appPath: probe.appPath, errored: false };
+		}
+		if (probe.status === 'error') {
+			errored = true;
 		}
 	}
-	return null;
+	return { appPath: null, errored };
 }
 
 /**
  * Electron exposes `app.getApplicationInfoForProtocol` and similar APIs but no
  * direct "find by bundle id". `mdfind` is the canonical Launch Services hook;
- * this thin wrapper returns the first matching `.app` path or null.
+ * this thin wrapper reports whether the bundle was found, genuinely absent, or
+ * unreachable because the probe itself failed.
+ * @param options - The bundle id to probe and the command runner.
+ * @returns A discriminated probe result.
  */
 async function mdfindPathForBundleId({
 	bundleId,
@@ -133,12 +184,12 @@ async function mdfindPathForBundleId({
 }: {
 	bundleId: string;
 	localCommandService: LocalCommandService;
-}): Promise<string | null> {
+}): Promise<BundleProbeResult> {
 	// Registry is asserted at module load, but defence in depth: anything that
 	// reaches the Spotlight predicate must already be a strict reverse-DNS id,
 	// so no shell/predicate escaping is required.
 	if (!isValidBundleId(bundleId)) {
-		return null;
+		return { status: 'not-found' };
 	}
 
 	try {
@@ -152,7 +203,7 @@ async function mdfindPathForBundleId({
 		);
 
 		if (result.status !== 'success') {
-			return null;
+			return { status: 'error' };
 		}
 
 		const firstLine = result.stdout
@@ -160,9 +211,11 @@ async function mdfindPathForBundleId({
 			.map((line) => line.trim())
 			.find((line) => line.length > 0);
 
-		return firstLine ?? null;
+		return firstLine
+			? { status: 'found', appPath: firstLine }
+			: { status: 'not-found' };
 	} catch {
-		return null;
+		return { status: 'error' };
 	}
 }
 
