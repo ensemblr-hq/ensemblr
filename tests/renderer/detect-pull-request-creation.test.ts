@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
 	classifyPullRequestRefreshAction,
-	isFinishedTurnEvent,
 	isPullRequestCreationEvent,
 } from '../../src/renderer/hooks/workbench-shell/route-layout/detect-pull-request-creation';
 import type {
@@ -162,27 +161,5 @@ describe('classifyPullRequestRefreshAction', () => {
 		expect(
 			classifyPullRequestRefreshAction(toolResult('all tests passed'), false),
 		).toEqual({ kind: 'none' });
-	});
-});
-
-describe('isFinishedTurnEvent', () => {
-	test('is true when a turn transitions from streaming to idle', () => {
-		expect(isFinishedTurnEvent(status('idle', 'streaming'))).toBe(true);
-	});
-
-	test('is true when a turn transitions from starting to idle', () => {
-		expect(isFinishedTurnEvent(status('idle', 'starting'))).toBe(true);
-	});
-
-	test('is false for a turn start', () => {
-		expect(isFinishedTurnEvent(status('streaming', 'starting'))).toBe(false);
-	});
-
-	test('is false for an idle event that did not follow a turn', () => {
-		expect(isFinishedTurnEvent(status('idle', 'idle'))).toBe(false);
-	});
-
-	test('is false for non-status envelopes', () => {
-		expect(isFinishedTurnEvent(toolResult('done'))).toBe(false);
 	});
 });

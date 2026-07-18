@@ -1,18 +1,3 @@
-export { orderColumnWorkspaceIds } from './board-order';
-export {
-	useWorkspaceBoardActions,
-	useWorkspaceBoardOrder,
-	useWorkspaceBoardStatus,
-	useWorkspaceBoardStatuses,
-	useWorkspaceUnread,
-} from './board-state';
-export {
-	BOARD_STATUS_LABELS,
-	BOARD_STATUS_ORDER,
-	DEFAULT_BOARD_STATUS,
-	resolveBoardStatus,
-	type WorkspaceBoardStatus,
-} from './board-status';
 export {
 	getRunningDockActivityState,
 	usePublishWorkspaceDockActivity,
@@ -42,8 +27,13 @@ export {
 	lastWorkspaceSelectionAtom,
 } from './selection-atoms';
 export { readStoredWorkspaceSelection } from './selection-storage';
+export type { RunningCloseTarget } from './session-tab-close';
 export { resolveRunningCloseTarget } from './session-tab-close';
 export { shouldSelectOnTabClick } from './session-tab-select';
+export type {
+	CloseSessionTabHandlerResult,
+	OpenSessionTabHandlerResult,
+} from './session-tabs';
 export {
 	formatRelativeClosedAt,
 	useSessionTabState,
@@ -53,4 +43,5 @@ export {
 	orderedProjectIdsAtom,
 	pinnedWorkspaceIdsAtom,
 } from './structure-atoms';
+export type { CloseRunningChatGuard } from './use-close-running-chat-guard';
 export { useCloseRunningChatGuard } from './use-close-running-chat-guard';
