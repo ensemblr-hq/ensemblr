@@ -23,13 +23,13 @@ export {
 } from './panel-tabs';
 export {
 	activeChatTabByWorkspaceAtom,
-	LAST_WORKSPACE_SELECTION_STORAGE_KEY,
 	lastWorkspaceNavigationRenderStateAtom,
 	lastWorkspaceSelectionAtom,
 } from './selection-atoms';
 export { readStoredWorkspaceSelection } from './selection-storage';
 export type { RunningCloseTarget } from './session-tab-close';
 export { resolveRunningCloseTarget } from './session-tab-close';
+export { shouldSelectOnTabClick } from './session-tab-select';
 export type {
 	CloseSessionTabHandlerResult,
 	OpenSessionTabHandlerResult,
