@@ -1,6 +1,6 @@
+import { Navigate } from '@tanstack/react-router';
 import { useCallback, useMemo } from 'react';
 
-import { WorkbenchEmptyStateContent } from '@/renderer/components/workbench-empty-state';
 import { WorkbenchPlaceholderPage } from '@/renderer/components/workbench-shell/route-layout';
 import {
 	useSetupDiagnostics,
@@ -21,6 +21,7 @@ import {
 	BoardWorkspaceMenuProvider,
 	useBoardWorkspaceMenu,
 } from './board-workspace-menu';
+import { planBoardDrop } from './plan-board-drop';
 import { type BoardDrop, useBoardDragMonitor } from './use-board-drag';
 
 /** Flattens the display projects into board cards, skipping optimistic rows. */
@@ -35,6 +36,11 @@ function toBoardCards(projects: ProjectShellModel[]): BoardCard[] {
 		}
 	}
 	return cards;
+}
+
+/** True when no project holds any workspace, optimistic rows included. */
+function hasNoWorkspaces(projects: ProjectShellModel[]): boolean {
+	return projects.every((project) => project.workspaces.length === 0);
 }
 
 /** Buckets board cards into one list per status, ordered by the board order. */
@@ -67,8 +73,8 @@ function groupCardsByStatus(
 /**
  * Dashboard Kanban board: every workspace across all projects as a card in its
  * board-status column, with drag-to-reassign and in-column reordering both
- * persisted. Falls back to the setup/empty placeholder when there is nothing to
- * show.
+ * persisted. Shows the setup placeholder while setup is blocked, and redirects
+ * to the welcome screen once no workspaces remain.
  */
 export function DashboardBoard() {
 	const model = useWorkbenchLayoutRouteModel();
@@ -79,27 +85,17 @@ export function DashboardBoard() {
 
 	const handleDrop = useCallback(
 		(drop: BoardDrop) => {
-			const targetStatus = drop.targetCardId
-				? resolveBoardStatus(statusByWorkspaceId, drop.targetCardId)
-				: drop.targetColumnStatus;
-			if (!targetStatus) {
+			const plan = planBoardDrop(drop, statusByWorkspaceId);
+			if (!plan) {
 				return;
 			}
-			const droppedOnColumnWhitespace = !drop.targetCardId;
-			const sourceStatus = resolveBoardStatus(
-				statusByWorkspaceId,
-				drop.sourceId,
-			);
-			if (droppedOnColumnWhitespace && sourceStatus === targetStatus) {
-				return;
-			}
-			setWorkspaceBoardStatus(drop.sourceId, targetStatus);
+			setWorkspaceBoardStatus(plan.sourceId, plan.targetStatus);
 			reorderBoard({
-				placeAfter: drop.edge === 'bottom',
-				sourceId: drop.sourceId,
+				placeAfter: plan.placeAfter,
+				sourceId: plan.sourceId,
 				statusByWorkspaceId,
-				targetCardId: drop.targetCardId,
-				targetStatus,
+				targetCardId: plan.targetCardId,
+				targetStatus: plan.targetStatus,
 			});
 		},
 		[reorderBoard, setWorkspaceBoardStatus, statusByWorkspaceId],
@@ -121,15 +117,8 @@ export function DashboardBoard() {
 	if (setupStatus === 'blocked') {
 		return <WorkbenchPlaceholderPage view='dashboard' />;
 	}
-	if (cards.length === 0) {
-		return (
-			<WorkbenchEmptyStateContent
-				emptyState={{
-					detail: 'Create a workspace to see it on the board.',
-					title: 'Dashboard',
-				}}
-			/>
-		);
+	if (hasNoWorkspaces(model.displayProjects)) {
+		return <Navigate replace to='/' />;
 	}
 
 	return (
