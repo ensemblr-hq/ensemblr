@@ -22,11 +22,16 @@ import { type BoardDrop, useBoardDragMonitor } from './use-board-drag';
 
 /** Flattens the display projects into board cards, skipping optimistic rows. */
 function toBoardCards(projects: ProjectShellModel[]): BoardCard[] {
-	return projects.flatMap((project) =>
-		project.workspaces
-			.filter((workspace) => workspace.isPendingCreation !== true)
-			.map((workspace) => ({ project, workspace })),
-	);
+	const cards: BoardCard[] = [];
+	for (const project of projects) {
+		for (const workspace of project.workspaces) {
+			if (workspace.isPendingCreation === true) {
+				continue;
+			}
+			cards.push({ project, workspace });
+		}
+	}
+	return cards;
 }
 
 /** Buckets board cards into one list per status, ordered by the board order. */

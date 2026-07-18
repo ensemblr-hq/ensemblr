@@ -18,7 +18,10 @@ import { useWorkspaceBoardActions } from '@/renderer/state/workspace';
 export function useAutoMarkUnread(activeWorkspaceId: string | null): void {
 	const { markWorkspaceRead, markWorkspaceUnread } = useWorkspaceBoardActions();
 	const activeWorkspaceIdRef = useRef(activeWorkspaceId);
-	activeWorkspaceIdRef.current = activeWorkspaceId;
+
+	useEffect(() => {
+		activeWorkspaceIdRef.current = activeWorkspaceId;
+	}, [activeWorkspaceId]);
 
 	useEffect(() => {
 		const unsubscribe = subscribePiSessionEvents((broadcast) => {
