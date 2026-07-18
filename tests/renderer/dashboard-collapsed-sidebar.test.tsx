@@ -13,7 +13,12 @@ import {
 	WorkbenchLayoutModelProvider,
 } from '../../src/renderer/components/workbench-shell/shell-contexts';
 import { shellFixtureProjects } from '../../src/renderer/fixtures/workbench/projects';
+import {
+	BOARD_STATUS_LABELS,
+	BOARD_STATUS_ORDER,
+} from '../../src/renderer/state/workspace';
 import type { SetupDiagnosticsContextValue } from '../../src/renderer/types/contexts';
+import type { ProjectShellModel } from '../../src/renderer/types/workbench';
 import type { WorkbenchLayoutModel } from '../../src/renderer/types/workbench-shell';
 import type { SetupDiagnosticsSnapshot } from '../../src/shared/ipc/contracts/setup';
 import { renderWithProviders } from './support/dom';
@@ -58,6 +63,7 @@ const BLOCKED_SNAPSHOT: SetupDiagnosticsSnapshot = {
 /** Renders the dashboard with a collapsed sidebar and the given setup snapshot. */
 function renderCollapsedDashboard(options: {
 	onOpenChange?: (open: boolean) => void;
+	projects?: ProjectShellModel[];
 	setupDiagnostics?: SetupDiagnosticsSnapshot;
 }) {
 	const setupDiagnostics: SetupDiagnosticsContextValue = {
@@ -69,9 +75,14 @@ function renderCollapsedDashboard(options: {
 		},
 	};
 
+	const routeModel: WorkbenchLayoutModel = {
+		...model,
+		displayProjects: options.projects ?? model.displayProjects,
+	};
+
 	return renderWithProviders(
 		<SetupDiagnosticsProvider value={setupDiagnostics}>
-			<WorkbenchLayoutModelProvider value={model}>
+			<WorkbenchLayoutModelProvider value={routeModel}>
 				<SidebarProvider
 					onOpenChange={options.onOpenChange ?? noop}
 					open={false}
@@ -102,6 +113,29 @@ test('clicking the collapsed trigger requests the sidebar to expand', () => {
 	fireEvent.click(trigger as Element);
 
 	expect(onOpenChange).toHaveBeenCalledWith(true);
+});
+
+test('keeps the dashboard board accessible when no workspace exists', () => {
+	renderCollapsedDashboard({
+		projects: [
+			{
+				id: 'empty-repo',
+				name: 'Empty repo',
+				owner: { name: 'alice' },
+				pathLabel: '/tmp/empty-repo',
+				workspaces: [],
+			},
+		],
+	});
+
+	expect(screen.getByText('Dashboard')).toBeTruthy();
+	for (const status of BOARD_STATUS_ORDER) {
+		expect(
+			screen.getByRole('region', {
+				name: `${BOARD_STATUS_LABELS[status]} column, 0 workspaces`,
+			}),
+		).toBeTruthy();
+	}
 });
 
 test('keeps an expand trigger on the setup-blocked dashboard placeholder', () => {

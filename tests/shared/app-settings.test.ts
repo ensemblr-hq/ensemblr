@@ -31,7 +31,6 @@ describe('parseAppSettings', () => {
 		const appearance = parseAppSettings({}).appearance;
 		expect(appearance).toEqual({
 			theme: 'system',
-			coloredSidebarDiffs: false,
 			accessibleColors: 'default',
 			codeTheme: 'catppuccin-mocha',
 			monoFont: 'JetBrainsMono Nerd Font Mono',

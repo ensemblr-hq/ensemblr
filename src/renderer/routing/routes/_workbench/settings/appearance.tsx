@@ -17,7 +17,6 @@ import {
 	accessibleColorsAtom,
 	codeLigaturesAtom,
 	codeThemeAtom,
-	coloredSidebarDiffsAtom,
 	markdownStyleAtom,
 	monoFontAtom,
 	terminalFontAtom,
@@ -47,7 +46,6 @@ function sum(a, b) { return a + b; }`;
 /** Appearance settings panel for theme, code and markdown styling, and terminal font choices. */
 function AppearanceSettings() {
 	const [theme, setTheme] = useAtom(themeAtom);
-	const [coloredDiffs, setColoredDiffs] = useAtom(coloredSidebarDiffsAtom);
 	const [accessibleColors, setAccessibleColors] = useAtom(accessibleColorsAtom);
 	const [codeTheme, setCodeTheme] = useAtom(codeThemeAtom);
 	const [monoFont, setMonoFont] = useAtom(monoFontAtom);
@@ -77,15 +75,6 @@ function AppearanceSettings() {
 				description='Toggle with ⌘⌥T.'
 				label='Theme'
 				modified={theme !== DEFAULTS.theme}
-			/>
-
-			<SettingRow
-				control={
-					<Switch checked={coloredDiffs} onCheckedChange={setColoredDiffs} />
-				}
-				description='Always show line change colors in the sidebar, even for unselected workspaces.'
-				label='Colored sidebar diffs'
-				modified={coloredDiffs !== DEFAULTS.coloredSidebarDiffs}
 			/>
 
 			<SettingRow

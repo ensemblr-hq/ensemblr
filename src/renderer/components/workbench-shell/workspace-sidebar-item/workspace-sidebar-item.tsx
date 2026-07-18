@@ -122,19 +122,17 @@ export function WorkspaceSidebarItem({
 				/>
 			</div>
 			<div className='min-w-0 flex-1'>
-				<div className='flex min-w-0 items-start justify-between gap-2'>
+				<div className='flex min-w-0 items-center justify-between gap-2'>
 					<span
 						className={cn(
-							'truncate text-[0.8125rem]',
+							'min-w-0 flex-1 truncate text-[0.8125rem]',
 							isUnread ? 'font-semibold' : 'font-medium',
 						)}
 					>
 						{workspace.name}
 					</span>
 					<div className='flex shrink-0 items-center gap-1.5'>
-						{hasDiffStats ? (
-							<WorkspaceDiffStats isActive={isActive} workspace={workspace} />
-						) : null}
+						{hasDiffStats ? <WorkspaceDiffStats workspace={workspace} /> : null}
 						{dockActivityState ? (
 							<DockActivityDot state={dockActivityState} />
 						) : null}

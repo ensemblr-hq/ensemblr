@@ -1,4 +1,3 @@
-import { Navigate } from '@tanstack/react-router';
 import { useCallback, useMemo } from 'react';
 
 import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
@@ -40,11 +39,6 @@ function toBoardCards(projects: ProjectShellModel[]): BoardCard[] {
 	return cards;
 }
 
-/** True when no project holds any workspace, optimistic rows included. */
-function hasNoWorkspaces(projects: ProjectShellModel[]): boolean {
-	return projects.every((project) => project.workspaces.length === 0);
-}
-
 /** Buckets board cards into one list per status, ordered by the board order. */
 function groupCardsByStatus(
 	cards: BoardCard[],
@@ -75,8 +69,8 @@ function groupCardsByStatus(
 /**
  * Dashboard Kanban board: every workspace across all projects as a card in its
  * board-status column, with drag-to-reassign and in-column reordering both
- * persisted. Shows the setup placeholder while setup is blocked, and redirects
- * to the welcome screen once no workspaces remain.
+ * persisted. Shows the setup placeholder while setup is blocked and keeps empty
+ * columns visible when no workspaces remain.
  */
 export function DashboardBoard() {
 	const model = useWorkbenchLayoutRouteModel();
@@ -119,10 +113,6 @@ export function DashboardBoard() {
 	if (setupStatus === 'blocked') {
 		return <WorkbenchPlaceholderPage view='dashboard' />;
 	}
-	if (hasNoWorkspaces(model.displayProjects)) {
-		return <Navigate replace to='/' />;
-	}
-
 	return (
 		<SidebarInset className={SHELL_INSET_CLASS}>
 			<main className='flex min-w-0 flex-1 flex-col overflow-hidden'>
