@@ -1,14 +1,20 @@
 import {
 	CheckCircle2Icon,
+	CheckIcon,
 	CircleIcon,
+	ExternalLinkIcon,
 	EyeOffIcon,
+	LoaderCircleIcon,
 	MessageSquarePlusIcon,
 	XIcon,
 } from 'lucide-react';
 
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import type {
+	PullRequestCheckStatus,
+	WorkspaceShellModel,
+} from '@/renderer/types/workbench';
 
 import { getProviderLabel } from './provider-label';
 import { ProviderMark } from './provider-mark';
@@ -44,6 +50,102 @@ export function PullRequestStatusRow({
 					{status.actionLabel}
 				</Button>
 			) : null}
+		</div>
+	);
+}
+
+/** Renders the semantic icon for a GitHub check's current state. */
+function CheckStatusIcon({ status }: { status: PullRequestCheckStatus }) {
+	if (status === 'pending') {
+		return (
+			<span
+				aria-label='Running'
+				className='grid size-3.5 shrink-0 place-items-center text-status-warning'
+				role='img'
+			>
+				<LoaderCircleIcon
+					aria-hidden='true'
+					className='size-3 motion-safe:animate-spin'
+				/>
+			</span>
+		);
+	}
+
+	if (status === 'ready') {
+		return (
+			<span
+				aria-label='Passed'
+				className='grid size-3.5 shrink-0 place-items-center text-status-ok'
+				role='img'
+			>
+				<CheckIcon aria-hidden='true' className='size-3.5' />
+			</span>
+		);
+	}
+
+	return (
+		<span
+			aria-label='Failed'
+			className='grid size-3.5 shrink-0 place-items-center text-status-danger'
+			role='img'
+		>
+			<XIcon aria-hidden='true' className='size-3.5' />
+		</span>
+	);
+}
+
+/** Renders one live GitHub check with status, provider, duration, and details link. */
+export function PullRequestCheckRow({
+	check,
+}: {
+	check: WorkspaceShellModel['pullRequest']['checks'][number];
+}) {
+	const baseClassName =
+		'flex min-h-7 min-w-0 items-center justify-between gap-2 rounded-sm px-1 text-xs';
+	const contents = (
+		<>
+			<div className='flex min-w-0 flex-1 items-center gap-2 overflow-hidden'>
+				<CheckStatusIcon status={check.status} />
+				<ProviderMark provider={check.provider} />
+				<span className='min-w-0 truncate font-medium text-xs'>
+					{check.label}
+				</span>
+				{check.durationLabel ? (
+					<span className='shrink-0 text-muted-foreground'>
+						{check.durationLabel}
+					</span>
+				) : null}
+			</div>
+			{check.url ? (
+				<ExternalLinkIcon
+					aria-hidden='true'
+					className='size-3.5 shrink-0 text-muted-foreground'
+				/>
+			) : null}
+		</>
+	);
+
+	if (check.url) {
+		return (
+			<a
+				aria-label={`${check.label} check details (opens in new tab)`}
+				className={cn(
+					baseClassName,
+					'outline-none transition-colors hover:bg-foreground/5 focus-visible:ring-1 focus-visible:ring-ring',
+				)}
+				data-check-status={check.status}
+				href={check.url}
+				rel='noreferrer'
+				target='_blank'
+			>
+				{contents}
+			</a>
+		);
+	}
+
+	return (
+		<div className={baseClassName} data-check-status={check.status}>
+			{contents}
 		</div>
 	);
 }
