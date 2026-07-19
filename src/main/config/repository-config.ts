@@ -434,7 +434,7 @@ function normalizeGitBlock(
 	fieldPath: string,
 	source: SettingsResolutionSource,
 ): NormalizedConfigSource {
-	return normalizeMappedBlock(value, fieldPath, source, (key, entry) => {
+	return normalizeMappedBlock('git', value, fieldPath, source, (key, entry) => {
 		const mapped = GIT_FIELD_MAP.get(key);
 		if (!mapped) {
 			return { kind: 'unsupported' };
@@ -460,20 +460,26 @@ function normalizePromptsBlock(
 	fieldPath: string,
 	source: SettingsResolutionSource,
 ): NormalizedConfigSource {
-	return normalizeMappedBlock(value, fieldPath, source, (key, entry) => {
-		const mapped = PROMPT_FIELD_MAP.get(key);
-		if (!mapped) {
-			return { kind: 'unsupported' };
-		}
-		if (typeof entry !== 'string') {
-			return { expected: 'string', kind: 'invalid' };
-		}
-		return {
-			canonicalKey: `actionPreferences.${mapped}`,
-			kind: 'accepted',
-			value: entry,
-		};
-	});
+	return normalizeMappedBlock(
+		'prompts',
+		value,
+		fieldPath,
+		source,
+		(key, entry) => {
+			const mapped = PROMPT_FIELD_MAP.get(key);
+			if (!mapped) {
+				return { kind: 'unsupported' };
+			}
+			if (typeof entry !== 'string') {
+				return { expected: 'string', kind: 'invalid' };
+			}
+			return {
+				canonicalKey: `actionPreferences.${mapped}`,
+				kind: 'accepted',
+				value: entry,
+			};
+		},
+	);
 }
 
 /** Outcome of resolving one sub-key of a mapped config block. */
@@ -486,7 +492,10 @@ type MappedFieldOutcome =
  * Shared normalisation loop for object config blocks (`[git]`, `[prompts]`)
  * whose sub-keys map onto canonical top-level keys. Delegates per-key mapping
  * and validation to `resolveField`, emitting unsupported/invalid diagnostics
- * consistently so each block only declares its own field map.
+ * consistently so each block only declares its own field map. A non-object block
+ * value (e.g. a scalar `git = "main"`) yields an expected-object diagnostic
+ * instead of being silently dropped.
+ * @param blockKey - Name of the block key, used in the expected-object diagnostic.
  * @param value - Raw block value to normalise.
  * @param fieldPath - JSONPath used in diagnostic messages.
  * @param source - Source identifier used in diagnostics.
@@ -494,13 +503,19 @@ type MappedFieldOutcome =
  * @returns Canonical settings plus accumulated diagnostics.
  */
 function normalizeMappedBlock(
+	blockKey: string,
 	value: unknown,
 	fieldPath: string,
 	source: SettingsResolutionSource,
 	resolveField: (key: string, entry: unknown) => MappedFieldOutcome,
 ): NormalizedConfigSource {
 	if (!isPlainRecord(value)) {
-		return { diagnostics: [], settings: {} };
+		return {
+			diagnostics: [
+				createInvalidFieldDiagnostic(blockKey, source, fieldPath, 'an object'),
+			],
+			settings: {},
+		};
 	}
 
 	const diagnostics: ConfigDiagnostic[] = [];

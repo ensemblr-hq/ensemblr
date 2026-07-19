@@ -98,28 +98,29 @@ const VALID_PERMISSION_MODES = [
 	'read-only',
 ] as const;
 
-const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> = {
-	archiveAfterMerge: false,
-	autoRunAfterSetup: false,
-	branchFrom: null,
-	deleteLocalBranchOnArchive: false,
-	filesToCopy: ['.env*'],
-	'actionPreferences.branchRename': null,
-	'actionPreferences.codeReview': null,
-	'actionPreferences.createPr': null,
-	'actionPreferences.fixErrors': null,
-	'actionPreferences.general': null,
-	'actionPreferences.resolveConflicts': null,
-	previewUrls: [],
-	previewUrlTemplate: null,
-	remoteOrigin: null,
-	runScriptMode: 'concurrent',
-	'security.permissionMode': DEFAULT_PERMISSION_MODE,
-	setUpstreamOnPush: true,
-	'scripts.archive': null,
-	'scripts.run': null,
-	'scripts.setup': null,
-};
+const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> =
+	Object.freeze({
+		archiveAfterMerge: false,
+		autoRunAfterSetup: false,
+		branchFrom: null,
+		deleteLocalBranchOnArchive: false,
+		filesToCopy: Object.freeze(['.env*']),
+		'actionPreferences.branchRename': null,
+		'actionPreferences.codeReview': null,
+		'actionPreferences.createPr': null,
+		'actionPreferences.fixErrors': null,
+		'actionPreferences.general': null,
+		'actionPreferences.resolveConflicts': null,
+		previewUrls: Object.freeze([]),
+		previewUrlTemplate: null,
+		remoteOrigin: null,
+		runScriptMode: 'concurrent',
+		'security.permissionMode': DEFAULT_PERMISSION_MODE,
+		setUpstreamOnPush: true,
+		'scripts.archive': null,
+		'scripts.run': null,
+		'scripts.setup': null,
+	});
 
 const VALIDATED_SETTING_KEYS = new Set(['security.permissionMode']);
 
@@ -225,9 +226,13 @@ export function resolveSettings({
 		// Rules are more specific than flat defaults, so add them first (same-source
 		// resolution is first-added-wins). Both sit above the app.git/experimental
 		// user defaults.
+		const ruleCandidates = collectRepositoryRuleCandidates(
+			config,
+			repository.repositoryPath,
+		);
 		addCandidates(
 			repositoryCandidates,
-			collectRepositoryRuleCandidates(config, repository.repositoryPath),
+			ruleCandidates.candidates,
 			'user-default',
 		);
 		addCandidates(
@@ -251,12 +256,19 @@ export function resolveSettings({
 			'built-in-default',
 		);
 
-		snapshot.repository = resolveCandidateGroup({
+		const resolvedRepository = resolveCandidateGroup({
 			candidatesByKey: repositoryCandidates,
 			lockedKeys: new Set(),
 			scope: 'repository',
 			sourceOrder: REPOSITORY_SOURCE_ORDER,
 		});
+		snapshot.repository = {
+			...resolvedRepository,
+			diagnostics: [
+				...ruleCandidates.diagnostics,
+				...resolvedRepository.diagnostics,
+			],
+		};
 	}
 
 	return snapshot;
@@ -592,16 +604,24 @@ function collectRepositoryDefaultCandidates(
 function collectRepositoryRuleCandidates(
 	config: EnsemblrConfig,
 	repositoryPath?: string,
-): Map<string, unknown> {
+): {
+	candidates: Map<string, unknown>;
+	diagnostics: SettingsResolutionDiagnostic[];
+} {
 	const merged = new Map<string, unknown>();
+	const diagnostics: SettingsResolutionDiagnostic[] = [];
 
 	for (const rule of config.repositoryRules ?? []) {
-		if (repositoryRuleMatches(rule, repositoryPath)) {
+		const outcome = repositoryRuleMatches(rule, repositoryPath);
+		if (outcome.diagnostic) {
+			diagnostics.push(outcome.diagnostic);
+		}
+		if (outcome.matches) {
 			applyRuleSettings(merged, rule);
 		}
 	}
 
-	return merged;
+	return { candidates: merged, diagnostics };
 }
 
 /**
@@ -623,25 +643,109 @@ function applyRuleSettings(
 /**
  * Decides whether a `repositoryRules` entry applies to a repository. A rule with
  * no `match` (or an empty one) applies to all repositories; otherwise its `path`
- * must be a case-insensitive substring of the repository path.
+ * must align to the repository path on segment boundaries (an exact segment
+ * sequence or a boundary-terminated prefix), so `api` matches `/repos/api` but
+ * not `/repos/legacy-api`. A non-empty `match` without a usable string `path`
+ * matches nothing and yields a diagnostic instead of failing silently.
  * @param rule - A repository rule record.
  * @param repositoryPath - Absolute repository path, when known.
- * @returns True when the rule applies.
+ * @returns Whether the rule applies, with a diagnostic for a malformed match.
  */
 function repositoryRuleMatches(
 	rule: Record<string, unknown>,
 	repositoryPath?: string,
-): boolean {
+): { matches: boolean; diagnostic?: SettingsResolutionDiagnostic } {
 	const match = rule.match;
 
 	if (!isPlainRecord(match) || isEmptyRecord(match)) {
+		return { matches: true };
+	}
+
+	const rulePath = typeof match.path === 'string' ? match.path.trim() : '';
+
+	if (rulePath === '') {
+		return { matches: false, diagnostic: createRuleMatchPathDiagnostic() };
+	}
+
+	return { matches: repositoryPathMatchesRule(repositoryPath, rulePath) };
+}
+
+/**
+ * Builds the diagnostic emitted when a rule's `match` record lacks a usable
+ * string `path`, so the misconfiguration surfaces instead of silently matching
+ * nothing.
+ * @returns An `invalid` repository-scope diagnostic for the rule's match path.
+ */
+function createRuleMatchPathDiagnostic(): SettingsResolutionDiagnostic {
+	return {
+		key: 'repositoryRules.match.path',
+		message:
+			'A repositoryRules entry has a "match" without a non-empty string "path"; the rule was ignored.',
+		scope: 'repository',
+		source: 'user-default',
+		status: 'invalid',
+	};
+}
+
+/**
+ * Tests whether a rule path aligns to the repository path on segment boundaries.
+ * Both sides are lowercased and split on `/` or `\`; the rule matches when its
+ * segments appear as a contiguous run within the repository path's segments.
+ * @param repositoryPath - Absolute repository path, when known.
+ * @param rulePath - The rule's trimmed, non-empty `match.path`.
+ * @returns True when the rule path aligns on segment boundaries.
+ */
+function repositoryPathMatchesRule(
+	repositoryPath: string | undefined,
+	rulePath: string,
+): boolean {
+	const needle = toPathSegments(rulePath);
+	const haystack = toPathSegments(repositoryPath ?? '');
+
+	if (needle.length === 0) {
 		return true;
 	}
 
-	const needle = typeof match.path === 'string' ? match.path.trim() : '';
-	const haystack = (repositoryPath ?? '').toLowerCase();
+	return containsSegmentSequence(haystack, needle);
+}
 
-	return needle !== '' && haystack.includes(needle.toLowerCase());
+/**
+ * Splits a filesystem path into lowercased, non-empty segments, tolerating both
+ * POSIX and Windows separators.
+ * @param path - A path to segment.
+ * @returns The path's lowercased segments in order.
+ */
+function toPathSegments(path: string): string[] {
+	return path
+		.toLowerCase()
+		.split(/[\\/]+/)
+		.filter((segment) => segment.length > 0);
+}
+
+/**
+ * Reports whether `needle` appears as a contiguous run of segments in `haystack`.
+ * @param haystack - The repository path's segments.
+ * @param needle - The rule path's segments.
+ * @returns True when the needle segments align contiguously within the haystack.
+ */
+function containsSegmentSequence(
+	haystack: string[],
+	needle: string[],
+): boolean {
+	if (needle.length > haystack.length) {
+		return false;
+	}
+
+	const lastStart = haystack.length - needle.length;
+	for (let start = 0; start <= lastStart; start++) {
+		if (
+			needle.every((segment, offset) => haystack[start + offset] === segment)
+		) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 /** True when a record has no own enumerable keys. */

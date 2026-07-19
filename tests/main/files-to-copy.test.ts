@@ -135,6 +135,69 @@ test('committed .ensemblr config wins over personal SQLite patterns', async (t) 
 	assert.deepEqual(result.patterns, ['*.committed']);
 });
 
+test('empty personal patterns disable copying and skip the default', async (t) => {
+	const fixture = createFixture(t);
+	writeFileSync(path.join(fixture.repositoryPath, '.env'), 'X=1\n');
+
+	const service = createFilesToCopyService({
+		localCommandService: createLocalCommandService(),
+	});
+
+	const result = await service.copy({
+		config: loadRepositoryConfig({
+			now: fixedNow,
+			repositoryPath: fixture.repositoryPath,
+		}),
+		personalPatterns: [],
+		repositoryPath: fixture.repositoryPath,
+		workspacePath: fixture.workspacePath,
+	});
+
+	// An empty personal override behaves like an empty `.worktreeinclude`: it
+	// explicitly disables copying rather than falling through to `.env*`.
+	assert.equal(result.source, 'personal');
+	assert.deepEqual(result.patterns, []);
+	assert.equal(result.copied.length, 0);
+	assert.equal(existsSync(path.join(fixture.workspacePath, '.env')), false);
+});
+
+test('`.worktreeinclude` wins over personal SQLite patterns', async (t) => {
+	const fixture = createFixture(t);
+	writeFileSync(
+		path.join(fixture.repositoryPath, '.gitignore'),
+		'config.local\n*.secret\n',
+	);
+	writeFileSync(path.join(fixture.repositoryPath, 'config.local'), 'C=1\n');
+	writeFileSync(path.join(fixture.repositoryPath, 'app.secret'), 'S=1\n');
+	writeFileSync(
+		path.join(fixture.repositoryPath, '.worktreeinclude'),
+		'config.local\n',
+	);
+
+	const service = createFilesToCopyService({
+		localCommandService: createLocalCommandService(),
+	});
+
+	const result = await service.copy({
+		config: loadRepositoryConfig({
+			now: fixedNow,
+			repositoryPath: fixture.repositoryPath,
+		}),
+		personalPatterns: ['*.secret'],
+		repositoryPath: fixture.repositoryPath,
+		workspacePath: fixture.workspacePath,
+	});
+
+	assert.equal(result.source, 'worktreeinclude');
+	assert.deepEqual(result.patterns, ['config.local']);
+	assert.equal(result.copied.length, 1);
+	assert.equal(result.copied[0]?.relativePath, 'config.local');
+	assert.equal(
+		existsSync(path.join(fixture.workspacePath, 'app.secret')),
+		false,
+	);
+});
+
 test('tracked files matching patterns are not copied', async (t) => {
 	const fixture = createFixture(t);
 	writeFileSync(

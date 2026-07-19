@@ -6,13 +6,13 @@ import type {
 	ListPiSlashCommandsResult,
 	PiExecutablePathSnapshot,
 	PiExecutableSelectionResult,
-	SetPiExecutablePathRequest,
 } from '../../../shared/ipc/contracts/pi-session';
 import { resolvePiSlashCommands } from '../../pi-agent/pi-slash-commands.ts';
 import type {
 	PiExecutableService,
 	PiExecutableSnapshot,
 } from '../../pi-runtime';
+import { parseSetPiExecutablePathRequest } from '../request-schemas.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 
 /**
@@ -76,11 +76,17 @@ export function registerPiHandlers({
 
 	ipcMain.handle(
 		IPC_CHANNELS.setPiExecutablePath,
-		(
-			_event,
-			request: SetPiExecutablePathRequest,
-		): PiExecutableSelectionResult =>
-			piExecutableService.saveOverride(request.path),
+		(_event, request: unknown): PiExecutableSelectionResult => {
+			const parsed = parseSetPiExecutablePathRequest(request);
+			if (!parsed) {
+				return {
+					canceled: false,
+					error: 'A Pi executable path is required.',
+				};
+			}
+
+			return piExecutableService.saveOverride(parsed.path);
+		},
 	);
 
 	ipcMain.handle(

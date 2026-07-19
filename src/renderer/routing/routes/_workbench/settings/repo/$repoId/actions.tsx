@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
+import { Undo2Icon } from 'lucide-react';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import {
@@ -11,6 +12,11 @@ import {
 import { Badge } from '@/renderer/components/ui/badge';
 import { Switch } from '@/renderer/components/ui/switch';
 import { Textarea } from '@/renderer/components/ui/textarea';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from '@/renderer/components/ui/tooltip';
 import {
 	REPO_ACTION_KEYS,
 	type RepoActionKey,
@@ -67,6 +73,12 @@ function RepoActionsSettings() {
 		repoSettingsOverrideAtomFamily(repoId),
 	);
 
+	const clearPref = (key: RepoActionKey) =>
+		setOverrides((prev) => {
+			const { [key]: _removed, ...rest } = prev.actionPreferences ?? {};
+			return { ...prev, actionPreferences: rest };
+		});
+
 	return (
 		<SettingsSection
 			description='Configure action-specific behavior and instructions for this repository.'
@@ -83,20 +95,51 @@ function RepoActionsSettings() {
 				}
 			/>
 
-			<Accordion className='mt-2' collapsible type='single'>
+			<Accordion collapsible type='single'>
 				{REPO_ACTION_KEYS.map((key) => {
 					const meta = ACTION_META[key];
+					const hasValue = Boolean(overrides.actionPreferences?.[key]?.trim());
 					return (
-						<AccordionItem key={key} value={key}>
-							<AccordionTrigger className='py-3'>
+						<AccordionItem
+							className='group/pref relative'
+							key={key}
+							value={key}
+						>
+							{hasValue ? (
+								<span
+									aria-hidden='true'
+									className='absolute top-4 bottom-4 -left-4 w-0.5 rounded-full bg-accent-strong'
+								/>
+							) : null}
+							{hasValue ? (
+								<Tooltip>
+									<TooltipTrigger asChild>
+										<button
+											aria-label={`Remove ${meta.title}`}
+											className='absolute top-4 right-10 z-10 inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover/pref:opacity-100'
+											onClick={(e) => {
+												e.stopPropagation();
+												clearPref(key);
+											}}
+											type='button'
+										>
+											<Undo2Icon aria-hidden='true' className='size-3.5' />
+										</button>
+									</TooltipTrigger>
+									<TooltipContent>Remove</TooltipContent>
+								</Tooltip>
+							) : null}
+							<AccordionTrigger className='py-4 hover:no-underline'>
 								<div className='flex flex-col items-start gap-0.5 text-left'>
-									<span className='font-medium text-sm'>{meta.title}</span>
+									<span className='flex items-center gap-1.5 font-medium text-sm'>
+										{meta.title}
+									</span>
 									<span className='text-muted-foreground text-xs'>
 										{meta.description}
 									</span>
 								</div>
 							</AccordionTrigger>
-							<AccordionContent>
+							<AccordionContent className='px-1 pt-0.5'>
 								<Textarea
 									aria-label={meta.title}
 									className='min-h-22 font-mono text-xs'

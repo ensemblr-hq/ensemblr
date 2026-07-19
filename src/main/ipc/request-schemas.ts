@@ -136,6 +136,26 @@ export const writeForkSummaryRequestSchema = z.object({
 	upToOrdinal: z.number().int().nonnegative().optional(),
 });
 
+/** {@link import('../../shared/ipc').SetPiExecutablePathRequest}. */
+export const setPiExecutablePathRequestSchema = z.object({
+	path: z.string().min(1),
+});
+
+/**
+ * Parses a set-Pi-executable-path payload, returning `null` on malformed input
+ * so the handler can surface a clean selection error instead of throwing a
+ * `TypeError` when the renderer sends `undefined` or a non-string `path`.
+ * @param raw - Raw IPC payload.
+ * @returns The validated request, or `null` when the payload is malformed.
+ */
+export function parseSetPiExecutablePathRequest(
+	raw: unknown,
+): z.infer<typeof setPiExecutablePathRequestSchema> | null {
+	const parsed = setPiExecutablePathRequestSchema.safeParse(raw);
+
+	return parsed.success ? parsed.data : null;
+}
+
 // -----------------------------------------------------------------------------
 // workspace-files — STRICT (throws on bad input, caught by handler try/catch)
 // -----------------------------------------------------------------------------

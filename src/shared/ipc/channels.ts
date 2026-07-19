@@ -81,6 +81,7 @@ export const IPC_CHANNELS = {
 	listWorkspaceFiles: 'ensemblr:list-workspace-files',
 	listWorkspaceOpenTargets: 'ensemblr:list-workspace-open-targets',
 	openChatTab: 'ensemblr:open-chat-tab',
+	openSettingsFileInTarget: 'ensemblr:open-settings-file-in-target',
 	openWorkspaceInTarget: 'ensemblr:open-workspace-in-target',
 	openPiSession: 'ensemblr:open-pi-session',
 	piRawFrame: 'ensemblr:pi-raw-frame',

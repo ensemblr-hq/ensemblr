@@ -43,12 +43,11 @@ export function XtermTerminal({
 	const terminalFontSize = useAtomValue(terminalFontSizeAtom);
 	const terminalScrollbackMb = useAtomValue(terminalScrollbackMbAtom);
 	const fontFamily = buildTerminalFontFamily(terminalFont);
-	// Read the scrollback line count at construction; the adapter is rebuilt (not
-	// live-patched) when the setting changes, matching the typography handling.
-	const scrollbackRef = useRef(scrollbackMbToLines(terminalScrollbackMb));
-	useEffect(() => {
-		scrollbackRef.current = scrollbackMbToLines(terminalScrollbackMb);
-	});
+	const scrollbackLines = scrollbackMbToLines(terminalScrollbackMb);
+	// Scrollback line count captured at construction; later changes are live-applied
+	// by the effect below (never remounting the surface), mirroring typography.
+	const scrollbackRef = useRef(scrollbackLines);
+	const appliedScrollbackRef = useRef(scrollbackLines);
 	// Latest typography, read at construction without re-mounting the surface on
 	// every font/size change (that is handled by the separate effect below).
 	const fontRef = useRef({ fontFamily, fontSize: terminalFontSize });
@@ -214,6 +213,15 @@ export function XtermTerminal({
 			});
 		}
 	}, [fontFamily, terminalFontSize, terminalId]);
+
+	useEffect(() => {
+		const adapter = adapterRef.current;
+		if (!adapter || appliedScrollbackRef.current === scrollbackLines) {
+			return;
+		}
+		appliedScrollbackRef.current = scrollbackLines;
+		adapter.setScrollback(scrollbackLines);
+	}, [scrollbackLines]);
 
 	return (
 		<div className='relative h-full min-h-0 w-full bg-sidebar'>

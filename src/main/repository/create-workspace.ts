@@ -128,6 +128,78 @@ function resolveConfiguredBranchFrom(
 }
 
 /**
+ * Chooses the base branch override for a new workspace. An explicit request base
+ * (e.g. forking from another workspace) wins untouched; a configured personal
+ * `branchFrom` is honored only while it still resolves in the repository, so a
+ * base that was deleted or renamed never blocks every workspace creation with
+ * `git-worktree-failed`. When there is no explicit base and the configured one
+ * is unset or missing, creation falls back to the live repository root branch.
+ * @param options - Explicit/configured bases plus git command dependencies.
+ * @returns The resolved base override, or `undefined` to defer to the stored
+ * repository default.
+ */
+async function resolveBaseBranchOverride({
+	configuredBase,
+	explicitBase,
+	localCommandService,
+	repositoryPath,
+}: {
+	configuredBase: string | undefined;
+	explicitBase: string | undefined;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<string | undefined> {
+	if (explicitBase) {
+		return explicitBase;
+	}
+
+	if (
+		configuredBase &&
+		(await branchRefResolves({
+			baseBranch: configuredBase,
+			localCommandService,
+			repositoryPath,
+		}))
+	) {
+		return configuredBase;
+	}
+
+	return (
+		(await resolveRootBranch({ localCommandService, repositoryPath })) ??
+		undefined
+	);
+}
+
+/**
+ * Verifies that a ref resolves to a commit inside the repository, so a stale
+ * configured base is caught before it reaches `git worktree add`.
+ * @param options - Candidate base ref plus git command dependencies.
+ * @returns True when `git rev-parse` resolves the ref.
+ */
+async function branchRefResolves({
+	baseBranch,
+	localCommandService,
+	repositoryPath,
+}: {
+	baseBranch: string;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<boolean> {
+	try {
+		const result = await localCommandService.run({
+			args: ['rev-parse', '--verify', '--quiet', `${baseBranch}^{commit}`],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 4 * 1024,
+			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+		});
+		return result.status === 'success';
+	} catch {
+		return false;
+	}
+}
+
+/**
  * Reads the repo's personal (SQLite) `filesToCopy` patterns from resolved
  * settings so they can layer under committed config. Only the personal `sqlite`
  * source is returned; committed sources are already applied by the files-to-copy
@@ -241,19 +313,16 @@ export function createWorkspaceService({
 				},
 			});
 			// An explicit base (e.g. forking from another workspace) wins; then the
-			// repo's configured `branchFrom`; otherwise new workspaces branch from
-			// the repository root, resolved live so a stale/feature `default_branch`
-			// can't pin creation to the wrong base.
-			const explicitBase = request.baseBranch?.trim();
-			const configuredBase = resolveConfiguredBranchFrom(resolvedSettings);
-			const baseBranchOverride = explicitBase
-				? explicitBase
-				: (configuredBase ??
-					(await resolveRootBranch({
-						localCommandService,
-						repositoryPath: repository.path,
-					})) ??
-					undefined);
+			// repo's configured `branchFrom`, but only when it still resolves in the
+			// repo; otherwise new workspaces branch from the repository root, resolved
+			// live so a stale/feature `default_branch` — or a deleted or renamed
+			// configured base — can't pin creation to the wrong base.
+			const baseBranchOverride = await resolveBaseBranchOverride({
+				configuredBase: resolveConfiguredBranchFrom(resolvedSettings),
+				explicitBase: request.baseBranch?.trim(),
+				localCommandService,
+				repositoryPath: repository.path,
+			});
 			const prepared = prepareWorkspace({
 				baseBranchOverride,
 				branchNameOverride: request.branchName,

@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Trash2Icon } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
 	getEnsemblrApi,
@@ -22,6 +22,7 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Textarea } from '@/renderer/components/ui/textarea';
+import { useDebouncedSettingField } from '@/renderer/hooks/use-debounced-setting-field';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
 import { useRepoSettingsWriter } from '@/renderer/hooks/use-repo-settings-writer';
 import type { RepositoryPreviewUrl } from '@/shared/ipc/contracts/repository-settings';
@@ -53,6 +54,32 @@ function personalFilesToCopy(
 	}
 
 	return resolved.value.filter((entry) => typeof entry === 'string').join('\n');
+}
+
+/** A preview-URL row paired with a stable local key for React reconciliation. */
+type PreviewUrlRow = { id: string; name: string; url: string };
+
+/** Builds a non-empty, lockstep row/key list from a persisted preview-URL seed, falling back to one blank row so the editor always has an input to render. */
+function toPreviewRows(seed: RepositoryPreviewUrl[]): PreviewUrlRow[] {
+	const source = seed.length > 0 ? seed : [{ name: '', url: '' }];
+	return source.map((entry) => ({
+		id: crypto.randomUUID(),
+		name: entry.name,
+		url: entry.url,
+	}));
+}
+
+/** Structural equality on the persisted fields of two preview-URL lists, ignoring local row keys. */
+function previewUrlsEqual(
+	a: RepositoryPreviewUrl[],
+	b: RepositoryPreviewUrl[],
+): boolean {
+	return (
+		a.length === b.length &&
+		a.every(
+			(entry, idx) => entry.name === b[idx]?.name && entry.url === b[idx]?.url,
+		)
+	);
 }
 
 /** Route for a repository's Misc settings; renders the repo-scoped paths, preview URLs, and lifecycle panel keyed by the `repoId` path param. */
@@ -109,13 +136,13 @@ function RepoMiscSettings() {
 			</SettingRow>
 
 			<PreviewUrlsSetting
-				key={JSON.stringify(seededPreviewUrls)}
+				modified={resolved('previewUrls')?.source === 'sqlite'}
 				onSave={(urls) => save({ previewUrls: urls })}
 				seed={seededPreviewUrls}
 			/>
 
 			<FilesToCopySetting
-				key={seededFilesToCopy}
+				modified={resolved('filesToCopy')?.source === 'sqlite'}
 				onSave={(patterns) => save({ filesToCopy: patterns })}
 				seed={seededFilesToCopy}
 			/>
@@ -167,92 +194,99 @@ function RepoMiscSettings() {
  * to auto-detected preview URLs.
  */
 function PreviewUrlsSetting({
+	modified,
 	onSave,
 	seed,
 }: {
+	modified: boolean;
 	onSave: (urls: RepositoryPreviewUrl[] | null) => void;
 	seed: RepositoryPreviewUrl[];
 }) {
-	const [rows, setRows] = useState<RepositoryPreviewUrl[]>(seed);
+	const [rows, setRows] = useState<PreviewUrlRow[]>(() => toPreviewRows(seed));
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	// previewUrls entries carry no persistent id, so track one stable key per row
-	// locally so removing a middle row can't reassociate a controlled <Input>.
-	// The parent remounts this component (via `key`) when the resolved seed
-	// changes, so state is initialised from `seed` once per resolved value.
-	const [rowIds, setRowIds] = useState<string[]>(() =>
-		seed.map(() => crypto.randomUUID()),
-	);
+	const lastSavedRef = useRef<RepositoryPreviewUrl[]>(seed);
 
-	const persist = (next: RepositoryPreviewUrl[]) => {
+	useEffect(() => {
+		if (previewUrlsEqual(seed, lastSavedRef.current)) {
+			return;
+		}
+		lastSavedRef.current = seed;
+		setRows(toPreviewRows(seed));
+	}, [seed]);
+
+	useEffect(() => {
+		return () => {
+			if (timerRef.current) {
+				clearTimeout(timerRef.current);
+			}
+		};
+	}, []);
+
+	const persist = (next: PreviewUrlRow[]) => {
 		if (timerRef.current) {
 			clearTimeout(timerRef.current);
 		}
 		timerRef.current = setTimeout(() => {
 			timerRef.current = null;
-			const cleaned = next.filter((entry) => entry.url.trim());
+			const cleaned = next.reduce<RepositoryPreviewUrl[]>((acc, entry) => {
+				if (entry.url.trim()) {
+					acc.push({ name: entry.name, url: entry.url });
+				}
+				return acc;
+			}, []);
+			lastSavedRef.current = cleaned;
 			onSave(cleaned.length === 0 ? null : cleaned);
 		}, SAVE_DEBOUNCE_MS);
 	};
 
-	const displayRows = rows.length === 0 ? [{ name: '', url: '' }] : rows;
+	const editRow = (idx: number, patch: Partial<RepositoryPreviewUrl>) => {
+		const next = rows.map((row, i) => (i === idx ? { ...row, ...patch } : row));
+		setRows(next);
+		persist(next);
+	};
+
+	const deleteRow = (idx: number) => {
+		const remaining = rows.filter((_, i) => i !== idx);
+		const next = remaining.length > 0 ? remaining : toPreviewRows([]);
+		setRows(next);
+		persist(next);
+	};
+
+	const addRow = () => {
+		setRows([...rows, { id: crypto.randomUUID(), name: '', url: '' }]);
+	};
 
 	return (
 		<SettingRow
 			description='Overrides the terminal panel’s Open button URL. Add more than one to switch between them from the Open button dropdown; the first is opened by default and the rest appear in the dropdown in order. Supports `$ENSEMBLR_WORKSPACE_NAME` and `$ENSEMBLR_PORT`. Leave blank to auto-detect from output logs.'
 			label='Preview URLs'
+			modified={modified}
+			onReset={() => onSave(null)}
 			stack
 		>
 			<div className='mt-2 space-y-2'>
-				{displayRows.map((entry, idx) => (
-					<div className='flex gap-2' key={rowIds[idx] ?? 'seed'}>
+				{rows.map((entry, idx) => (
+					<div className='flex gap-2' key={entry.id}>
 						<Input
 							aria-label='Preview URL name'
 							className='h-8 w-32 text-xs'
-							onChange={(e) => {
-								const next = displayRows.map((row, i) =>
-									i === idx ? { ...row, name: e.target.value } : row,
-								);
-								setRows(next);
-								persist(next);
-							}}
+							onChange={(e) => editRow(idx, { name: e.target.value })}
 							placeholder='Name'
 							value={entry.name}
 						/>
 						<Input
 							aria-label='Preview URL template'
 							className='h-8 flex-1 font-mono text-xs'
-							onChange={(e) => {
-								const next = displayRows.map((row, i) =>
-									i === idx ? { ...row, url: e.target.value } : row,
-								);
-								setRows(next);
-								persist(next);
-							}}
+							onChange={(e) => editRow(idx, { url: e.target.value })}
 							placeholder='https://localhost:$ENSEMBLR_PORT'
 							value={entry.url}
 						/>
-						<Button
-							onClick={() => {
-								const next = displayRows.filter((_, i) => i !== idx);
-								setRows(next);
-								setRowIds((ids) => ids.filter((_, i) => i !== idx));
-								persist(next);
-							}}
-							size='icon'
-							variant='ghost'
-						>
+						<Button onClick={() => deleteRow(idx)} size='icon' variant='ghost'>
 							<Trash2Icon aria-hidden='true' className='size-4' />
 						</Button>
 					</div>
 				))}
-				<Button
-					onClick={() => {
-						setRows([...displayRows, { name: '', url: '' }]);
-						setRowIds((ids) => [...ids, crypto.randomUUID()]);
-					}}
-					size='sm'
-					variant='outline'
-				>
+				<Button onClick={addRow} size='sm' variant='outline'>
 					+ Add preview URL
 				</Button>
 			</div>
@@ -265,43 +299,41 @@ function PreviewUrlsSetting({
  * personal override so the built-in `.env*` default applies.
  */
 function FilesToCopySetting({
+	modified,
 	onSave,
 	seed,
 }: {
+	modified: boolean;
 	onSave: (patterns: string[] | null) => void;
 	seed: string;
 }) {
-	// Uncontrolled: seeds from `seed` via defaultValue and persists on a debounce.
-	// The parent remounts this component (via `key`) when the resolved value
-	// changes, so defaultValue re-seeds without mirroring state.
-	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	const onChange = (next: string) => {
-		if (timerRef.current) {
-			clearTimeout(timerRef.current);
-		}
-		timerRef.current = setTimeout(() => {
-			timerRef.current = null;
+	const { onChange, value } = useDebouncedSettingField(
+		seed,
+		(next) => {
 			const patterns = next
 				.split('\n')
 				.map((line) => line.trim())
 				.filter((line) => line.length > 0);
 			onSave(patterns.length === 0 ? null : patterns);
-		}, SAVE_DEBOUNCE_MS);
-	};
+			return patterns.join('\n');
+		},
+		SAVE_DEBOUNCE_MS,
+	);
 
 	return (
 		<SettingRow
 			description='Ensemblr will automatically copy these file paths into each new workspace. Supports gitignore-style globs.'
 			label='Files to copy'
+			modified={modified}
+			onReset={() => onSave(null)}
 			stack
 		>
 			<Textarea
 				aria-label='Files to copy'
 				className='mt-2 min-h-18 font-mono text-xs'
-				defaultValue={seed}
 				onChange={(e) => onChange(e.target.value)}
 				placeholder='.env*'
+				value={value}
 			/>
 		</SettingRow>
 	);

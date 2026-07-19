@@ -1,21 +1,24 @@
 /**
- * Compile-time table that maps every IPC channel key to its request and
- * response wire shapes. The string identifier keyed by each entry is
- * `(typeof IPC_CHANNELS)[K]` so adding a channel without typing it surfaces as
- * a `Property '...' is missing in type` error at compile time rather than as a
- * silent runtime mismatch on the other side of the preload bridge.
+ * Compile-time table that maps IPC channel identifiers to their request and
+ * response wire shapes. Each entry is keyed by `(typeof IPC_CHANNELS)[K]` so
+ * consumers can index `IpcHandlerMap[IPC_CHANNELS.createWorkspace]` to derive a
+ * channel's request/response types without duplicating them at the call site.
+ *
+ * This is a plain interface, not a mapped type over `IPC_CHANNELS`, so it does
+ * NOT enforce that every channel appears here — a channel with no entry simply
+ * has no typed wire shape rather than raising a compile error. Add an entry when
+ * a channel's payloads need to be shared across the preload bridge.
  *
  * Channels that broadcast events from main to renderer (push, no request) use
  * `void` for `req` and carry the broadcast envelope in `res`. Channels with
  * optional payloads (e.g. `listPiSlashCommands`) widen `req` to include
  * `undefined`.
  *
- * Type-only file — no runtime export. Consume by indexing
- * `IpcHandlerMap['createWorkspace']` to derive the request/response shapes
- * inline.
+ * Type-only file — no runtime export.
  */
 
 import type { IPC_CHANNELS } from './channels';
+import type { AppSettingsChangedBroadcast } from './contracts/app-settings';
 import type {
 	BindPiSessionToTabRequest,
 	BindPiSessionToTabResult,
@@ -55,7 +58,10 @@ import type {
 	PushWorkspaceBranchRequest,
 	PushWorkspaceBranchResult,
 } from './contracts/github';
-import type { HealthSnapshot } from './contracts/health';
+import type {
+	ConfigChangedBroadcast,
+	HealthSnapshot,
+} from './contracts/health';
 import type {
 	CreateLinearCommentRequest,
 	CreateLinearCommentResult,
@@ -72,6 +78,12 @@ import type {
 	MutateLinearIssueResult,
 	UpdateLinearIssueRequest,
 } from './contracts/linear';
+import type {
+	ListWorkspaceOpenTargetsResult,
+	OpenSettingsFileInTargetRequest,
+	OpenTargetResult,
+	OpenWorkspaceInTargetRequest,
+} from './contracts/open-target';
 import type {
 	ListPiModelsResult,
 	ListPiSessionEventsRequest,
@@ -403,6 +415,23 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.listWorkspaceFiles]: IpcHandlerEntry<
 		ListWorkspaceFilesRequest,
 		ListWorkspaceFilesResult
+	>;
+	[IPC_CHANNELS.appSettingsChanged]: IpcHandlerEntry<
+		void,
+		AppSettingsChangedBroadcast
+	>;
+	[IPC_CHANNELS.configChanged]: IpcHandlerEntry<void, ConfigChangedBroadcast>;
+	[IPC_CHANNELS.listWorkspaceOpenTargets]: IpcHandlerEntry<
+		void,
+		ListWorkspaceOpenTargetsResult
+	>;
+	[IPC_CHANNELS.openSettingsFileInTarget]: IpcHandlerEntry<
+		OpenSettingsFileInTargetRequest,
+		OpenTargetResult
+	>;
+	[IPC_CHANNELS.openWorkspaceInTarget]: IpcHandlerEntry<
+		OpenWorkspaceInTargetRequest,
+		OpenTargetResult
 	>;
 	[IPC_CHANNELS.openChatTab]: IpcHandlerEntry<
 		OpenChatTabRequest,

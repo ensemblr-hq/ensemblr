@@ -51,6 +51,10 @@ function GitSettings() {
 				description='Prefix for new workspace branch names.'
 				label='Branch name prefix'
 				modified={branchPrefixModified}
+				onReset={() => {
+					setPrefixSource(DEFAULTS.branchPrefixSource);
+					setCustomPrefix(DEFAULTS.branchPrefixCustom);
+				}}
 				stack
 			>
 				<RadioGroup
@@ -97,6 +101,7 @@ function GitSettings() {
 				description='Automatically rename workspaces from their placeholder composer name to the branch name generated from the first message.'
 				label='Rename workspace when branch is named'
 				modified={renameOnBranch !== DEFAULTS.renameWorkspaceOnBranch}
+				onReset={() => setRenameOnBranch(DEFAULTS.renameWorkspaceOnBranch)}
 			/>
 
 			<SettingRow
@@ -106,6 +111,7 @@ function GitSettings() {
 				description='Delete the local branch when archiving a workspace. To delete the remote branch, configure it on GitHub.'
 				label='Delete branch on archive'
 				modified={deleteBranch !== DEFAULTS.deleteLocalBranchOnArchive}
+				onReset={() => setDeleteBranch(DEFAULTS.deleteLocalBranchOnArchive)}
 			/>
 
 			<SettingRow
@@ -118,6 +124,7 @@ function GitSettings() {
 				description='Automatically archive a workspace after merging its PR.'
 				label='Archive on merge'
 				modified={archiveOnMerge !== DEFAULTS.archiveAfterMerge}
+				onReset={() => setArchiveOnMerge(DEFAULTS.archiveAfterMerge)}
 			/>
 
 			<SettingRow
@@ -127,6 +134,7 @@ function GitSettings() {
 				description='Configure new Ensemblr workspaces so plain `git push` sets a branch upstream. Turning this off avoids writing Git worktree config, but PR info may be less reliable until branches have an upstream.'
 				label='Set upstream on plain `git push`'
 				modified={setUpstream !== DEFAULTS.setUpstreamOnPush}
+				onReset={() => setSetUpstream(DEFAULTS.setUpstreamOnPush)}
 			/>
 		</SettingsSection>
 	);

@@ -95,10 +95,12 @@ export function WorkspaceRouteContent({
 	// Resolve the repo's configured preview URLs here (where the settings query
 	// lives) and attach them to the model so the leaf dock components stay free
 	// of data hooks and remain statically renderable.
-	const previewUrls = configuredPreviewUrls(settingsResolution);
 	const workspaceWithLiveDockTabs = useMemo(
-		() => ({ ...liveWorkspace, configuredPreviewUrls: previewUrls }),
-		[liveWorkspace, previewUrls],
+		() => ({
+			...liveWorkspace,
+			configuredPreviewUrls: configuredPreviewUrls(settingsResolution),
+		}),
+		[liveWorkspace, settingsResolution],
 	);
 	usePublishWorkspaceDockActivity({
 		dockTabs: workspaceWithLiveDockTabs.dockTabs,

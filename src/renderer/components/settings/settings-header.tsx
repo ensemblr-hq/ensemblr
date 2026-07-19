@@ -1,10 +1,6 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileCodeIcon } from 'lucide-react';
-import { toast } from 'sonner';
-import {
-	openAppConfigFile,
-	openRepositoryConfigFile,
-} from '@/renderer/api/ensemblr';
+import { useMemo } from 'react';
 import {
 	REPO_SECTION_TARGETS,
 	type RepoSectionId,
@@ -17,11 +13,14 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/renderer/components/ui/select';
+import { OpenTargetSplitButton } from '@/renderer/components/workbench-shell/open-target-split-button';
 import { ProjectAvatar } from '@/renderer/components/workbench-shell/project-avatar';
 import { useCloseSettings } from '@/renderer/hooks/use-close-settings';
+import { useSettingsFileOpenTargets } from '@/renderer/hooks/use-settings-file-open-targets';
 import { cn } from '@/renderer/lib/utils';
 import type { SettingsScope } from '@/renderer/types/settings';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
+import type { SettingsConfigFile } from '@/shared/ipc/contracts/open-target';
 
 const USER_DEFAULT = '/settings/general';
 const KNOWN_REPO_SECTIONS = Object.keys(
@@ -81,32 +80,14 @@ export function SettingsHeader({
 	};
 
 	const disableRepoTab = projects.length === 0;
-	const configLabel =
-		scope === 'user'
-			? 'Edit in config.json'
-			: 'Edit in .ensemblr/settings.toml';
 
 	// User scope opens ~/.config/ensemblr/config.json; repo scope opens the active
 	// repo's committed .ensemblr/settings.toml. Both are created if missing.
 	const activeRepo = projects.find((project) => project.id === activeRepoId);
-	const handleEditConfig = () => {
-		if (scope === 'user') {
-			void openAppConfigFile();
-			return;
-		}
-		if (!activeRepo) {
-			return;
-		}
-		void openRepositoryConfigFile({
-			repositoryPath: activeRepo.pathLabel,
-		}).then((result) => {
-			if (result.error) {
-				toast.error('Could not open the repository config.', {
-					description: result.error,
-				});
-			}
-		});
-	};
+	const configLabel =
+		scope === 'user'
+			? 'Edit in config.json'
+			: 'Edit in .ensemblr/settings.toml';
 
 	return (
 		<header className='native-toolbar macos-traffic-light-spacer flex h-11 shrink-0 items-center gap-3 border-b pr-3 pl-[var(--ensemblr-traffic-light-safe-inline)]'>
@@ -154,17 +135,62 @@ export function SettingsHeader({
 				) : null}
 			</div>
 			<div className='ml-auto'>
-				<Button
-					disabled={scope === 'repo' && !activeRepo}
-					onClick={handleEditConfig}
-					size='sm'
-					variant='ghost'
-				>
-					<FileCodeIcon aria-hidden='true' className='size-4' />
-					<span>{configLabel}</span>
-				</Button>
+				<EditConfigMenu
+					activeRepoPath={
+						scope === 'repo' ? (activeRepo?.pathLabel ?? null) : null
+					}
+					label={configLabel}
+					scope={scope}
+				/>
 			</div>
 		</header>
+	);
+}
+
+/**
+ * "Edit in…" split button for the active settings file. Reuses the workbench
+ * open-in menu so the file opens in the user's default/last-used app with a
+ * chevron to pick another. Renders a disabled placeholder while the app list
+ * loads or when a repo scope has no active repository.
+ */
+function EditConfigMenu({
+	activeRepoPath,
+	label,
+	scope,
+}: {
+	scope: SettingsScope;
+	label: string;
+	activeRepoPath: string | null;
+}) {
+	const config = useMemo<SettingsConfigFile>(
+		() =>
+			scope === 'user'
+				? { scope: 'user' }
+				: { repositoryPath: activeRepoPath ?? '', scope: 'repo' },
+		[activeRepoPath, scope],
+	);
+	const { invokeTarget, openTargets, primaryTarget } =
+		useSettingsFileOpenTargets(config);
+
+	const unavailable = scope === 'repo' && !activeRepoPath;
+	if (unavailable || !openTargets || !primaryTarget) {
+		return (
+			<Button disabled size='sm' variant='ghost'>
+				<FileCodeIcon aria-hidden='true' className='size-4' />
+				<span>{label}</span>
+			</Button>
+		);
+	}
+
+	return (
+		<OpenTargetSplitButton
+			menuAriaLabel={`${label} — choose an app`}
+			onInvoke={(target) => void invokeTarget(target)}
+			openTargets={openTargets}
+			primaryAriaLabel={`${label} in ${primaryTarget.label}`}
+			primaryLabel={label}
+			primaryTarget={primaryTarget}
+		/>
 	);
 }
 

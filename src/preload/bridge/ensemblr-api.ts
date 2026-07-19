@@ -202,6 +202,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		openExternal: (url) => invoke('openExternal', url),
 		openChatTab: (request) => invoke('openChatTab', request),
 		openPiSession: (request) => invoke('openPiSession', request),
+		openSettingsFileInTarget: (request) =>
+			invoke('openSettingsFileInTarget', request),
 		openWorkspaceInTarget: (request) =>
 			invoke('openWorkspaceInTarget', request),
 		detectWorkspaceDesktopRuntime: (request) =>

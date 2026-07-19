@@ -15,9 +15,14 @@ import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { Spinner } from '@/renderer/components/ui/spinner';
 import { terminalScrollbackMbAtom } from '@/renderer/state/preferences';
+import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
 
 /** Debounce window before a typed Pi executable path is persisted to SQLite. */
 const PI_PATH_SAVE_DEBOUNCE_MS = 500;
+
+/** Factory default for the terminal scrollback limit; drives the row's "modified" accent. */
+const DEFAULT_SCROLLBACK_MB =
+	DEFAULT_APP_SETTINGS.appearance.terminalScrollbackMb;
 
 /** Route for the Advanced settings section; renders the advanced-settings panel. */
 export const Route = createFileRoute('/_workbench/settings/advanced')({
@@ -38,12 +43,24 @@ function AdvancedSettings() {
 	});
 	const [piPath, setPiPath] = useState('');
 	const piSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	// Hydrate the input from the resolved SQLite override so it reflects runtime,
-	// not a stale local mirror. Re-seeds whenever the resolved override changes.
 	const resolvedOverride = piData?.overridePath ?? '';
+	const lastSyncedRef = useRef(resolvedOverride);
+
 	useEffect(() => {
+		if (resolvedOverride === lastSyncedRef.current) {
+			return;
+		}
+		lastSyncedRef.current = resolvedOverride;
 		setPiPath(resolvedOverride);
 	}, [resolvedOverride]);
+
+	useEffect(() => {
+		return () => {
+			if (piSaveTimerRef.current) {
+				clearTimeout(piSaveTimerRef.current);
+			}
+		};
+	}, []);
 
 	const invalidatePiPath = () => {
 		void queryClient.invalidateQueries({
@@ -232,6 +249,8 @@ function AdvancedSettings() {
 				}
 				description='Maximum size of each terminal pane scrollback buffer. Larger values keep more history at the cost of memory.'
 				label='Terminal scrollback limit'
+				modified={scrollbackMb !== DEFAULT_SCROLLBACK_MB}
+				onReset={() => setScrollbackMb(DEFAULT_SCROLLBACK_MB)}
 			/>
 
 			<SettingRow

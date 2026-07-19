@@ -253,7 +253,11 @@ export function registerIpcHandlers({
 		reviewService: createReviewService({ databaseService }),
 	});
 	registerLinearHandlers({ linearAuthService, linearService });
-	registerOpenTargetHandlers({ databaseService, openTargetService });
+	registerOpenTargetHandlers({
+		appSettingsService,
+		databaseService,
+		openTargetService,
+	});
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerTerminalHandlers({ terminalService });
 	registerWorkspaceScriptHandlers({ databaseService, scriptLifecycleService });

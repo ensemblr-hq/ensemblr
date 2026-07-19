@@ -75,6 +75,7 @@ function AppearanceSettings() {
 				description='Toggle with ⌘⌥T.'
 				label='Theme'
 				modified={theme !== DEFAULTS.theme}
+				onReset={() => setTheme(DEFAULTS.theme)}
 			/>
 
 			<SettingRow
@@ -99,6 +100,7 @@ function AppearanceSettings() {
 				description='Theme optimized for color vision differences.'
 				label='Accessible colors'
 				modified={accessibleColors !== DEFAULTS.accessibleColors}
+				onReset={() => setAccessibleColors(DEFAULTS.accessibleColors)}
 			/>
 
 			<SettingRow
@@ -123,6 +125,7 @@ function AppearanceSettings() {
 				description='Syntax highlighting for code blocks and editors.'
 				label='Code theme'
 				modified={codeTheme !== DEFAULTS.codeTheme}
+				onReset={() => setCodeTheme(DEFAULTS.codeTheme)}
 				stack
 			>
 				<CodeBlock className='mt-3' code={CODE_SAMPLE} language='typescript' />
@@ -141,6 +144,7 @@ function AppearanceSettings() {
 				description='Font used for code and diffs. The bundled Nerd Font is the default; custom fonts must be installed on your system.'
 				label='Mono font'
 				modified={monoFont !== DEFAULTS.monoFont}
+				onReset={() => setMonoFont(DEFAULTS.monoFont)}
 				stack
 			>
 				<pre className='mt-3 overflow-x-auto rounded-md bg-code px-4 py-3 text-code-foreground text-xs leading-relaxed ring-1 ring-code-border'>
@@ -155,6 +159,7 @@ function AppearanceSettings() {
 				description='Use font ligatures in file editors and diffs.'
 				label='Code ligatures'
 				modified={ligatures !== DEFAULTS.codeLigatures}
+				onReset={() => setLigatures(DEFAULTS.codeLigatures)}
 			/>
 
 			<SettingRow
@@ -176,6 +181,7 @@ function AppearanceSettings() {
 				description='Rendering style for markdown files.'
 				label='Markdown style'
 				modified={markdownStyle !== DEFAULTS.markdownStyle}
+				onReset={() => setMarkdownStyle(DEFAULTS.markdownStyle)}
 			/>
 
 			<SettingRow
@@ -191,6 +197,7 @@ function AppearanceSettings() {
 				description='The bundled Nerd Font is the default; enter another font name exactly as installed to override it.'
 				label='Terminal font'
 				modified={terminalFont !== DEFAULTS.terminalFont}
+				onReset={() => setTerminalFont(DEFAULTS.terminalFont)}
 			/>
 
 			<SettingRow
@@ -202,6 +209,7 @@ function AppearanceSettings() {
 				description='Adjust the size of text in the integrated terminal.'
 				label='Terminal font size'
 				modified={terminalSize !== DEFAULTS.terminalFontSize}
+				onReset={() => setTerminalSize(DEFAULTS.terminalFontSize)}
 				stack
 			>
 				<input

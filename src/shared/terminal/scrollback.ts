@@ -10,13 +10,31 @@ const BYTES_PER_MB = 1024 * 1024;
 const BYTES_PER_LINE_ESTIMATE = 128;
 
 /**
+ * Smallest scrollback size (in megabytes) the buffer is allowed to use. Also
+ * serves as the fallback for non-finite input read from config.
+ */
+const MIN_SCROLLBACK_MB = 1;
+
+/**
+ * Coerces a raw megabyte value from config into a finite number, falling back to
+ * the minimum when the input is NaN or Infinity. Negative and zero values are
+ * left for the caller's lower-bound clamp.
+ * @param megabytes - Raw scrollback size read from config.
+ * @returns A finite megabyte value safe to pass to `Math.round`/`Math.max`.
+ */
+function sanitizeScrollbackMb(megabytes: number): number {
+	return Number.isFinite(megabytes) ? megabytes : MIN_SCROLLBACK_MB;
+}
+
+/**
  * Converts the `appearance.terminalScrollbackMb` setting into a byte limit for
  * the main-process pty scrollback buffer.
  * @param megabytes - Configured scrollback size in megabytes.
  * @returns The buffer byte limit (at least 1 MB).
  */
 export function scrollbackMbToBytes(megabytes: number): number {
-	return Math.max(1, Math.round(megabytes)) * BYTES_PER_MB;
+	const sanitized = sanitizeScrollbackMb(megabytes);
+	return Math.max(MIN_SCROLLBACK_MB, Math.round(sanitized)) * BYTES_PER_MB;
 }
 
 /**

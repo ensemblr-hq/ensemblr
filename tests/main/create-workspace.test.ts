@@ -253,6 +253,42 @@ test('branches new workspaces from the configured branchFrom setting', async (t)
 	assert.equal(result.workspace?.baseBranch, 'develop');
 });
 
+test('falls back to the root branch when the configured branchFrom is missing', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readRepositorySettings: () => ({
+			app: { diagnostics: [], settings: [] },
+			repository: {
+				diagnostics: [],
+				settings: [
+					{
+						candidates: [],
+						key: 'branchFrom',
+						locked: false,
+						source: 'sqlite',
+						value: 'deleted-branch',
+					},
+				],
+			},
+		}),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'stale-base',
+		repositoryId: harness.repositoryId,
+	});
+
+	// A configured base that no longer resolves must not blow up creation with
+	// `git-worktree-failed`; it degrades to the live root branch instead.
+	assert.equal(result.status, 'success');
+	assert.notEqual(result.diagnostics[0]?.code, 'git-worktree-failed');
+	assert.equal(result.workspace?.baseBranch, 'main');
+});
+
 test('an explicit request base overrides the configured branchFrom', async (t) => {
 	const harness = createHarness(t);
 	runGit(harness.repositoryPath, ['branch', 'develop']);

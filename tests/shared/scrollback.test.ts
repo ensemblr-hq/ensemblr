@@ -15,6 +15,18 @@ test('scrollbackMbToBytes clamps to at least one megabyte', () => {
 	expect(scrollbackMbToBytes(-5)).toBe(1024 * 1024);
 });
 
+test('scrollbackMbToBytes coerces non-finite input to the minimum', () => {
+	expect(scrollbackMbToBytes(Number.NaN)).toBe(1024 * 1024);
+	expect(scrollbackMbToBytes(Number.POSITIVE_INFINITY)).toBe(1024 * 1024);
+	expect(scrollbackMbToBytes(Number.NEGATIVE_INFINITY)).toBe(1024 * 1024);
+});
+
+test('scrollbackMbToLines stays finite and positive for bad input', () => {
+	expect(scrollbackMbToLines(Number.NaN)).toBeGreaterThan(0);
+	expect(scrollbackMbToLines(Number.POSITIVE_INFINITY)).toBeGreaterThan(0);
+	expect(scrollbackMbToLines(-5)).toBeGreaterThan(0);
+});
+
 test('scrollbackMbToLines scales with megabytes and stays positive', () => {
 	expect(scrollbackMbToLines(1)).toBeGreaterThan(0);
 	expect(scrollbackMbToLines(10)).toBe(scrollbackMbToLines(1) * 10);

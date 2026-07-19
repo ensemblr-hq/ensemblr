@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useRef } from 'react';
 
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { SourceBadge } from '@/renderer/components/settings/source-badge';
 import { Input } from '@/renderer/components/ui/input';
 import { Switch } from '@/renderer/components/ui/switch';
+import { useDebouncedSettingField } from '@/renderer/hooks/use-debounced-setting-field';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
 import { useRepoSettingsWriter } from '@/renderer/hooks/use-repo-settings-writer';
 import type { ResolvedSettingSnapshot } from '@/shared/ipc/contracts/settings-resolution';
@@ -16,6 +16,13 @@ const SAVE_DEBOUNCE_MS = 500;
 /** Personal (SQLite) override value for a resolved setting, or `''` when it resolves from another source. */
 function personalValue(resolved: ResolvedSettingSnapshot | undefined): string {
 	return resolved?.source === 'sqlite' ? String(resolved.value ?? '') : '';
+}
+
+/** True when a resolved setting is currently supplied by a personal (SQLite) override. */
+function isPersonalOverride(
+	resolved: ResolvedSettingSnapshot | undefined,
+): boolean {
+	return resolved?.source === 'sqlite';
 }
 
 /** Route for a repository's Git settings; renders the repo-scoped git-defaults panel keyed by the `repoId` path param. */
@@ -40,8 +47,9 @@ function RepoGitSettings() {
 			<TextSetting
 				ariaLabel='Branch new workspaces from'
 				description='Each workspace is an isolated copy of your codebase. Set the upstream branch new workspaces fork from.'
-				key={personalValue(branchFrom)}
 				label='Branch new workspaces from'
+				modified={isPersonalOverride(branchFrom)}
+				onReset={() => save({ branchFrom: null })}
 				onSave={(value) => save({ branchFrom: value })}
 				placeholder={(branchFrom?.value as string) || 'origin/master'}
 				resolved={branchFrom}
@@ -84,6 +92,8 @@ function RepoGitSettings() {
 						/>
 					</span>
 				}
+				modified={isPersonalOverride(resolved('deleteLocalBranchOnArchive'))}
+				onReset={() => save({ deleteLocalBranchOnArchive: null })}
 			/>
 
 			<SettingRow
@@ -100,6 +110,8 @@ function RepoGitSettings() {
 						<SourceBadge source={resolved('archiveAfterMerge')?.source} />
 					</span>
 				}
+				modified={isPersonalOverride(resolved('archiveAfterMerge'))}
+				onReset={() => save({ archiveAfterMerge: null })}
 			/>
 
 			<p className='py-3 text-muted-foreground text-xs'>
@@ -119,6 +131,8 @@ function TextSetting({
 	ariaLabel,
 	description,
 	label,
+	modified,
+	onReset,
 	onSave,
 	placeholder,
 	resolved,
@@ -127,25 +141,22 @@ function TextSetting({
 	ariaLabel: string;
 	description: string;
 	label: string;
+	modified: boolean;
+	onReset: () => void;
 	onSave: (value: string | null) => void;
 	placeholder: string;
 	resolved: ResolvedSettingSnapshot | undefined;
 	seed: string;
 }) {
-	// Uncontrolled: the field seeds from `seed` via defaultValue and persists on a
-	// debounce. The parent remounts this component (via `key`) when the resolved
-	// personal value changes, so defaultValue re-seeds without mirroring state.
-	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	const onChange = (next: string) => {
-		if (timerRef.current) {
-			clearTimeout(timerRef.current);
-		}
-		timerRef.current = setTimeout(() => {
-			timerRef.current = null;
-			onSave(next.trim() || null);
-		}, SAVE_DEBOUNCE_MS);
-	};
+	const { onChange, value } = useDebouncedSettingField(
+		seed,
+		(next) => {
+			const trimmed = next.trim();
+			onSave(trimmed || null);
+			return trimmed;
+		},
+		SAVE_DEBOUNCE_MS,
+	);
 
 	return (
 		<SettingRow
@@ -153,9 +164,9 @@ function TextSetting({
 				<Input
 					aria-label={ariaLabel}
 					className='h-8 w-44 font-mono text-xs'
-					defaultValue={seed}
 					onChange={(e) => onChange(e.target.value)}
 					placeholder={placeholder}
+					value={value}
 				/>
 			}
 			description={description}
@@ -165,6 +176,8 @@ function TextSetting({
 					<SourceBadge source={resolved?.source} />
 				</span>
 			}
+			modified={modified}
+			onReset={onReset}
 		/>
 	);
 }
