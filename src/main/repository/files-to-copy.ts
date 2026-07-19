@@ -203,13 +203,12 @@ function resolvePatterns(
 		{ patterns: [...DEFAULT_PATTERNS], source: 'default' },
 	];
 
-	// The built-in default always has patterns, so a match is guaranteed.
-	const selected = candidates.find((candidate) => candidate.patterns !== null);
+	// The built-in default always has patterns, so `find` always resolves.
+	const selected =
+		candidates.find((candidate) => candidate.patterns !== null) ??
+		candidates[candidates.length - 1];
 
-	return {
-		patterns: selected?.patterns ?? [...DEFAULT_PATTERNS],
-		source: selected?.source ?? 'default',
-	};
+	return { patterns: selected.patterns ?? [], source: selected.source };
 }
 
 /**
