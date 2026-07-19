@@ -130,17 +130,16 @@ const REPO_SETTINGS_KEYS = [
 export type RepoSettingsKey = (typeof REPO_SETTINGS_KEYS)[number];
 
 /**
- * Personal per-repo overrides stored locally. The real source of truth lives
- * in the committed `.ensemblr/settings.toml` and SQLite — these atoms only hold
- * user-only personal preferences until edited through the shared config writer.
+ * Personal per-repo overrides still stored locally. Git, files-to-copy, and
+ * preview-URL overrides moved to repository-scoped SQLite (resolved via
+ * {@link useRepoSettings}); only the two below remain in localStorage:
+ * per-action instruction overrides (which the committed `[prompts]` merge
+ * *under*) and the spotlight-testing toggle, whose runtime is a separate feature
+ * (see `docs/product/discovery-spotlight-testing.md`).
  */
 export interface RepoSettingsOverride {
-	branchFrom?: string;
-	remoteOrigin?: string;
-	useSpotlight?: boolean;
-	filesToCopy?: string;
-	previewUrls?: Array<{ name: string; url: string }>;
 	actionPreferences?: Partial<Record<RepoActionKey, string>>;
+	useSpotlight?: boolean;
 }
 
 export const REPO_ACTION_KEYS = [
