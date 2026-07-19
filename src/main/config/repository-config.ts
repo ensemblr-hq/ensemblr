@@ -434,46 +434,22 @@ function normalizeGitBlock(
 	fieldPath: string,
 	source: SettingsResolutionSource,
 ): NormalizedConfigSource {
-	if (!isPlainRecord(value)) {
-		return { diagnostics: [], settings: {} };
-	}
-
-	const diagnostics: ConfigDiagnostic[] = [];
-	const settings: Record<string, unknown> = {};
-
-	for (const [key, gitValue] of Object.entries(value)) {
+	return normalizeMappedBlock(value, fieldPath, source, (key, entry) => {
 		const mapped = GIT_FIELD_MAP.get(key);
-
 		if (!mapped) {
-			diagnostics.push(
-				createUnsupportedFieldDiagnostic(key, source, `${fieldPath}.${key}`),
-			);
-			continue;
+			return { kind: 'unsupported' };
 		}
-
-		if (typeof gitValue !== mapped.type) {
-			diagnostics.push(
-				createInvalidFieldDiagnostic(
-					key,
-					source,
-					`${fieldPath}.${key}`,
-					mapped.type,
-				),
-			);
-			continue;
+		if (typeof entry !== mapped.type) {
+			return { expected: mapped.type, kind: 'invalid' };
 		}
-
-		settings[mapped.key] = gitValue;
-	}
-
-	return { diagnostics, settings };
+		return { canonicalKey: mapped.key, kind: 'accepted', value: entry };
+	});
 }
 
 /**
  * Normalises the `[prompts]` block, mapping each sub-key onto its canonical
  * `actionPreferences.<RepoActionKey>` key so committed shared prompts merge into
- * the same key family the runtime action runner reads. Non-string values and
- * unsupported sub-keys collect diagnostics.
+ * the same key family the runtime action runner reads.
  * @param value - Raw `prompts` value to normalise.
  * @param fieldPath - JSONPath used in diagnostic messages.
  * @param source - Source identifier used in diagnostics.
@@ -484,6 +460,45 @@ function normalizePromptsBlock(
 	fieldPath: string,
 	source: SettingsResolutionSource,
 ): NormalizedConfigSource {
+	return normalizeMappedBlock(value, fieldPath, source, (key, entry) => {
+		const mapped = PROMPT_FIELD_MAP.get(key);
+		if (!mapped) {
+			return { kind: 'unsupported' };
+		}
+		if (typeof entry !== 'string') {
+			return { expected: 'string', kind: 'invalid' };
+		}
+		return {
+			canonicalKey: `actionPreferences.${mapped}`,
+			kind: 'accepted',
+			value: entry,
+		};
+	});
+}
+
+/** Outcome of resolving one sub-key of a mapped config block. */
+type MappedFieldOutcome =
+	| { kind: 'unsupported' }
+	| { expected: string; kind: 'invalid' }
+	| { canonicalKey: string; kind: 'accepted'; value: unknown };
+
+/**
+ * Shared normalisation loop for object config blocks (`[git]`, `[prompts]`)
+ * whose sub-keys map onto canonical top-level keys. Delegates per-key mapping
+ * and validation to `resolveField`, emitting unsupported/invalid diagnostics
+ * consistently so each block only declares its own field map.
+ * @param value - Raw block value to normalise.
+ * @param fieldPath - JSONPath used in diagnostic messages.
+ * @param source - Source identifier used in diagnostics.
+ * @param resolveField - Maps and validates a single sub-key.
+ * @returns Canonical settings plus accumulated diagnostics.
+ */
+function normalizeMappedBlock(
+	value: unknown,
+	fieldPath: string,
+	source: SettingsResolutionSource,
+	resolveField: (key: string, entry: unknown) => MappedFieldOutcome,
+): NormalizedConfigSource {
 	if (!isPlainRecord(value)) {
 		return { diagnostics: [], settings: {} };
 	}
@@ -491,29 +506,19 @@ function normalizePromptsBlock(
 	const diagnostics: ConfigDiagnostic[] = [];
 	const settings: Record<string, unknown> = {};
 
-	for (const [key, promptValue] of Object.entries(value)) {
-		const mappedKey = PROMPT_FIELD_MAP.get(key);
+	for (const [key, entry] of Object.entries(value)) {
+		const outcome = resolveField(key, entry);
+		const path = `${fieldPath}.${key}`;
 
-		if (!mappedKey) {
+		if (outcome.kind === 'unsupported') {
+			diagnostics.push(createUnsupportedFieldDiagnostic(key, source, path));
+		} else if (outcome.kind === 'invalid') {
 			diagnostics.push(
-				createUnsupportedFieldDiagnostic(key, source, `${fieldPath}.${key}`),
+				createInvalidFieldDiagnostic(key, source, path, outcome.expected),
 			);
-			continue;
+		} else {
+			settings[outcome.canonicalKey] = outcome.value;
 		}
-
-		if (typeof promptValue !== 'string') {
-			diagnostics.push(
-				createInvalidFieldDiagnostic(
-					key,
-					source,
-					`${fieldPath}.${key}`,
-					'string',
-				),
-			);
-			continue;
-		}
-
-		settings[`actionPreferences.${mappedKey}`] = promptValue;
 	}
 
 	return { diagnostics, settings };

@@ -1,4 +1,4 @@
-import { existsSync, type FSWatcher, readFileSync, watch } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -13,6 +13,7 @@ import {
 	isPlainRecord,
 	isSensitiveKeyName,
 } from './json-utils.ts';
+import { watchConfigFile } from './watch-config-file.ts';
 
 export type { ConfigDiagnostic, ConfigStatusSnapshot };
 
@@ -257,8 +258,7 @@ export function createEnsemblrConfigService(
 	options: LoadEnsemblrConfigOptions = {},
 ): EnsemblrConfigService {
 	let cachedResult: EnsemblrConfigLoadResult | null = null;
-	let watcher: FSWatcher | null = null;
-	let debounce: ReturnType<typeof setTimeout> | null = null;
+	let watcherHandle: { stop: () => void } | null = null;
 	const configPath =
 		options.configPath ??
 		resolveEnsemblrConfigPath(options.homeDirectory ?? homedir());
@@ -272,30 +272,19 @@ export function createEnsemblrConfigService(
 	const startWatching = (
 		onChange: (snapshot: ConfigStatusSnapshot) => void,
 	): void => {
-		const fileName = path.basename(configPath);
-		// Watch the directory (not the file) so editors that save via
-		// rename-replace don't orphan the watcher; filter to our filename.
-		watcher = watch(path.dirname(configPath), (_event, changed) => {
-			if (changed && changed !== fileName) {
-				return;
-			}
-			if (debounce) {
-				clearTimeout(debounce);
-			}
-			debounce = setTimeout(() => {
+		watcherHandle = watchConfigFile({
+			debounceMs: CONFIG_WATCH_DEBOUNCE_MS,
+			filePath: configPath,
+			onChange: () => {
 				cachedResult = loadEnsemblrConfig(options);
 				onChange(cachedResult.snapshot);
-			}, CONFIG_WATCH_DEBOUNCE_MS);
+			},
 		});
 	};
 
 	const stop = (): void => {
-		if (debounce) {
-			clearTimeout(debounce);
-			debounce = null;
-		}
-		watcher?.close();
-		watcher = null;
+		watcherHandle?.stop();
+		watcherHandle = null;
 	};
 
 	return {
