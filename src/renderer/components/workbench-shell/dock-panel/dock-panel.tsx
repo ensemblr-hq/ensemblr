@@ -84,7 +84,7 @@ export function DockPanel({
 			  them and a 1px gap stayed visible. The shadow occupies the bottom
 			  content pixel, which the underline paints over.
 			*/}
-			<div className='flex h-9 shrink-0 items-center justify-between gap-2 overflow-hidden px-2 shadow-[inset_0_-0.0625rem_0_0_var(--color-border)]'>
+			<div className='@container/dock-header flex h-9 shrink-0 items-center justify-between gap-2 overflow-hidden px-2 shadow-[inset_0_-0.0625rem_0_0_var(--color-border)]'>
 				<Button
 					aria-label={
 						isCollapsed ? 'Expand terminal area' : 'Collapse terminal area'
