@@ -82,9 +82,11 @@ import type {
 	ListPiSlashCommandsResult,
 	OpenPiSessionRequest,
 	OpenPiSessionResult,
+	PiExecutablePathSnapshot,
 	PiExecutableSelectionResult,
 	PiRawFrameBroadcast,
 	PiSessionEventBroadcast,
+	SetPiExecutablePathRequest,
 	StopPiSessionRequest,
 	StopPiSessionResult,
 	SubmitPiPromptRequest,
@@ -486,6 +488,18 @@ export interface IpcHandlerMap {
 		LocalRepositorySelectionResult
 	>;
 	[IPC_CHANNELS.selectPiExecutable]: IpcHandlerEntry<
+		void,
+		PiExecutableSelectionResult
+	>;
+	[IPC_CHANNELS.getPiExecutablePath]: IpcHandlerEntry<
+		void,
+		PiExecutablePathSnapshot
+	>;
+	[IPC_CHANNELS.setPiExecutablePath]: IpcHandlerEntry<
+		SetPiExecutablePathRequest,
+		PiExecutableSelectionResult
+	>;
+	[IPC_CHANNELS.clearPiExecutablePath]: IpcHandlerEntry<
 		void,
 		PiExecutableSelectionResult
 	>;

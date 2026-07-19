@@ -95,16 +95,9 @@ export const developerModeAtom = atomWithStorage<boolean>(
 
 // ─── Advanced (user) ──────────────────────────────────────────────────────────
 
-/** Path to a custom Pi executable overriding the bundled one; empty means use the discovered system Pi. Persisted to localStorage. */
-export const customPiExecutablePathAtom = atomWithStorage<string>(
-	KEY('pi_executable_override'),
-	'',
-);
-/** Maximum size in megabytes of each terminal pane's scrollback buffer; persisted to localStorage. */
-export const terminalScrollbackMbAtom = atomWithStorage<number>(
-	KEY('terminal_scrollback_mb'),
-	10,
-);
+// Pi executable path and terminal scrollback moved off localStorage: Pi path is
+// the SQLite `pi.executablePath` setting (read/set/cleared over IPC), and
+// scrollback is the `appearance.terminalScrollbackMb` config.json setting.
 
 // ─── Repository overrides (per-repo, personal) ────────────────────────────────
 

@@ -106,6 +106,9 @@ export const ensemblrQueryKeys = {
 		[...ensemblrQueryKeys.all, 'repository-workspace-navigation'] as const,
 	/** Query key for the configured root directory. */
 	rootDirectory: () => [...ensemblrQueryKeys.all, 'root-directory'] as const,
+	/** Query key for the resolved Pi executable path snapshot. */
+	piExecutablePath: () =>
+		[...ensemblrQueryKeys.all, 'pi-executable-path'] as const,
 	/** Query key for a repository's on-disk configuration. */
 	repositoryConfig: (repositoryPath: string) =>
 		[...ensemblrQueryKeys.all, 'repository-config', repositoryPath] as const,

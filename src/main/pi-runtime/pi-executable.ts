@@ -20,6 +20,7 @@ import type {
 	LocalCommandService,
 } from '../commands/local-command';
 import type { EnsemblrConfigResolutionService } from '../config';
+import { deleteSetting } from '../environment/settings-table.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import { normalizeConfiguredPath } from './internal/normalize-configured-path.ts';
 
@@ -74,6 +75,7 @@ export function isExecutableReady(executable: PiExecutableSnapshot): boolean {
 
 /** Public surface of the Pi executable service. */
 export interface PiExecutableService {
+	clearOverride: () => PiExecutableSelectionResult;
 	getSnapshot: () => Promise<PiExecutableSnapshot>;
 	saveOverride: (executablePath: string) => PiExecutableSelectionResult;
 }
@@ -138,6 +140,10 @@ export function createPiExecutableService({
 	settingsResolutionService,
 }: CreatePiExecutableServiceOptions): PiExecutableService {
 	return {
+		clearOverride: () =>
+			clearPiExecutableOverride({
+				database: databaseService.getConnection()?.database ?? null,
+			}),
 		getSnapshot: () =>
 			resolvePiExecutable({
 				commonCandidatePaths,
@@ -323,6 +329,44 @@ export function savePiExecutableOverride({
 				error instanceof Error
 					? error.message
 					: 'Failed to save Pi executable selection.',
+		};
+	}
+}
+
+/**
+ * Removes the user's Pi executable override from the SQLite `settings` table so
+ * resolution falls back to the discovered/bundled Pi.
+ * @param input - Database handle.
+ * @returns A {@link PiExecutableSelectionResult}.
+ */
+export function clearPiExecutableOverride({
+	database,
+}: {
+	database: DatabaseSync | null;
+}): PiExecutableSelectionResult {
+	if (!database) {
+		return {
+			canceled: false,
+			error:
+				'SQLite is unavailable; the Pi executable override was not cleared.',
+		};
+	}
+
+	try {
+		deleteSetting({
+			database,
+			key: PI_EXECUTABLE_SETTING_KEY,
+			scope: { scope: 'app', scopeId: '' },
+		});
+
+		return { canceled: false };
+	} catch (error) {
+		return {
+			canceled: false,
+			error:
+				error instanceof Error
+					? error.message
+					: 'Failed to clear Pi executable override.',
 		};
 	}
 }

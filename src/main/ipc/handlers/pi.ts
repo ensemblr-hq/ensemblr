@@ -4,11 +4,40 @@ import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
 	ListPiSlashCommandsRequest,
 	ListPiSlashCommandsResult,
+	PiExecutablePathSnapshot,
 	PiExecutableSelectionResult,
+	SetPiExecutablePathRequest,
 } from '../../../shared/ipc/contracts/pi-session';
 import { resolvePiSlashCommands } from '../../pi-agent/pi-slash-commands.ts';
-import type { PiExecutableService } from '../../pi-runtime';
+import type {
+	PiExecutableService,
+	PiExecutableSnapshot,
+} from '../../pi-runtime';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
+
+/**
+ * Projects the internal Pi executable snapshot onto the IPC-safe path snapshot
+ * used to hydrate the Advanced settings screen. The override path is surfaced
+ * only when it comes from the user's SQLite setting so the input reflects what
+ * the user configured, not a config- or PATH-derived value.
+ * @param snapshot - Resolved Pi executable snapshot.
+ * @returns The IPC-safe path snapshot.
+ */
+function toPathSnapshot(
+	snapshot: PiExecutableSnapshot,
+): PiExecutablePathSnapshot {
+	const override =
+		snapshot.setting && snapshot.setting.source === 'sqlite'
+			? String(snapshot.setting.value ?? '')
+			: null;
+
+	return {
+		overridePath: override?.trim() ? override : null,
+		resolvedPath: snapshot.path || null,
+		source: snapshot.source,
+		status: snapshot.status,
+	};
+}
 
 /**
  * Registers IPC handlers for selecting and saving a Pi executable override
@@ -37,6 +66,26 @@ export function registerPiHandlers({
 
 			return piExecutableService.saveOverride(selection.path);
 		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.getPiExecutablePath,
+		async (): Promise<PiExecutablePathSnapshot> =>
+			toPathSnapshot(await piExecutableService.getSnapshot()),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.setPiExecutablePath,
+		(
+			_event,
+			request: SetPiExecutablePathRequest,
+		): PiExecutableSelectionResult =>
+			piExecutableService.saveOverride(request.path),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.clearPiExecutablePath,
+		(): PiExecutableSelectionResult => piExecutableService.clearOverride(),
 	);
 
 	ipcMain.handle(

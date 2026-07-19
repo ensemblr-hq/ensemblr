@@ -135,6 +135,10 @@ export const terminalFontSizeAtom = settingAtom(
 	'appearance',
 	'terminalFontSize',
 );
+export const terminalScrollbackMbAtom = settingAtom(
+	'appearance',
+	'terminalScrollbackMb',
+);
 
 /**
  * Hydrates {@link appSettingsAtom} from `config.json` on mount and live-reloads
