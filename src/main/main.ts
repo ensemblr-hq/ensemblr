@@ -372,6 +372,9 @@ const createWorkspaceServiceInstance = createWorkspaceService({
 	localCommandService,
 	/** Reads the user's default git settings for new workspaces. */
 	readGitDefaults: () => appSettingsService.read().git,
+	/** Resolves the repo's configured branchFrom base for new workspaces. */
+	readRepositorySettings: (request) =>
+		settingsResolutionService.resolve(request),
 	rootDirectoryService,
 });
 const sharedRootAdoptionService = createSharedRootAdoptionService({

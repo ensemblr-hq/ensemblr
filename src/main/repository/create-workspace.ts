@@ -11,6 +11,10 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type { GitSettings } from '../../shared/config/app-settings.ts';
 import type {
+	SettingsResolutionRequest,
+	SettingsResolutionSnapshot,
+} from '../../shared/ipc/contracts/settings-resolution';
+import type {
 	CreatedWorkspaceSnapshot,
 	CreateWorkspaceDiagnostic,
 	CreateWorkspaceDiagnosticCode,
@@ -75,6 +79,14 @@ export interface CreateWorkspaceServiceOptions {
 	 * resolution falls back to the repository config only (legacy behavior).
 	 */
 	readGitDefaults?: () => GitSettings;
+	/**
+	 * Resolves the effective repository settings so the configured `branchFrom`
+	 * can pick the base branch for new workspaces. When omitted (e.g. in tests),
+	 * base selection falls back to the live repository root branch.
+	 */
+	readRepositorySettings?: (
+		request: SettingsResolutionRequest,
+	) => SettingsResolutionSnapshot;
 	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
@@ -96,6 +108,36 @@ interface PreparedWorkspace {
 	path: string;
 	repository: SourceRepository;
 	slug: string;
+}
+
+/**
+ * Reads the repo's configured `branchFrom` base from resolved settings, or
+ * `undefined` when unset/unavailable so base selection falls back to the live
+ * repository root branch.
+ * @param input - Optional settings resolver and the source repository.
+ * @returns The configured base branch, or `undefined`.
+ */
+function resolveConfiguredBranchFrom({
+	readRepositorySettings,
+	repository,
+}: {
+	readRepositorySettings?: (
+		request: SettingsResolutionRequest,
+	) => SettingsResolutionSnapshot;
+	repository: SourceRepository;
+}): string | undefined {
+	const resolvedValue = readRepositorySettings?.({
+		repository: {
+			repositoryId: repository.id,
+			repositoryPath: repository.path,
+		},
+	})?.repository?.settings.find(
+		(setting) => setting.key === 'branchFrom',
+	)?.value;
+
+	return typeof resolvedValue === 'string' && resolvedValue.trim()
+		? resolvedValue.trim()
+		: undefined;
 }
 
 const DEFAULT_WORKSPACE_NAME = 'workspace';
@@ -122,6 +164,7 @@ export function createWorkspaceService({
 	localCommandService,
 	now = () => new Date(),
 	readGitDefaults,
+	readRepositorySettings,
 	rootDirectoryService,
 }: CreateWorkspaceServiceOptions): CreateWorkspaceService {
 	const filesToCopy =
@@ -180,16 +223,23 @@ export function createWorkspaceService({
 				githubUsernameResolver,
 				readGitDefaults,
 			});
-			// An explicit base (e.g. forking from another workspace) wins; otherwise
-			// new workspaces always branch from the repository root, resolved live so
-			// a stale/feature `default_branch` can't pin creation to the wrong base.
+			// An explicit base (e.g. forking from another workspace) wins; then the
+			// repo's configured `branchFrom`; otherwise new workspaces branch from
+			// the repository root, resolved live so a stale/feature `default_branch`
+			// can't pin creation to the wrong base.
 			const explicitBase = request.baseBranch?.trim();
+			const configuredBase = resolveConfiguredBranchFrom({
+				readRepositorySettings,
+				repository,
+			});
 			const baseBranchOverride = explicitBase
 				? explicitBase
-				: ((await resolveRootBranch({
+				: (configuredBase ??
+					(await resolveRootBranch({
 						localCommandService,
 						repositoryPath: repository.path,
-					})) ?? undefined);
+					})) ??
+					undefined);
 			const prepared = prepareWorkspace({
 				baseBranchOverride,
 				branchNameOverride: request.branchName,
@@ -503,20 +553,15 @@ function validateName(name: unknown): CreateWorkspaceDiagnostic | null {
 }
 
 /**
- * Reads `git.branchPrefix` from the loaded `.ensemblr/settings.toml` config;
- * returns an empty string when no string-valued prefix is configured.
+ * Reads the committed `[git] branch_prefix` from the loaded
+ * `.ensemblr/settings.toml` config. The TOML parser normalizes the nested
+ * `[git]` block onto canonical top-level keys, so the prefix lives at
+ * `branchPrefix`. Returns an empty string when no string-valued prefix is set.
  */
 function readBranchPrefix(config: LoadedRepositoryConfig): string {
-	const git = config.ensemblrConfig?.git;
+	const prefix = config.ensemblrConfig?.branchPrefix;
 
-	if (git && typeof git === 'object' && !Array.isArray(git)) {
-		const prefix = (git as Record<string, unknown>).branchPrefix;
-		if (typeof prefix === 'string' && prefix.length > 0) {
-			return prefix;
-		}
-	}
-
-	return '';
+	return typeof prefix === 'string' && prefix.length > 0 ? prefix : '';
 }
 
 /**

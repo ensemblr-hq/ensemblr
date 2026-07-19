@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { useEffect, useRef, useState } from 'react';
 
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
@@ -6,6 +7,16 @@ import { SourceBadge } from '@/renderer/components/settings/source-badge';
 import { Input } from '@/renderer/components/ui/input';
 import { Switch } from '@/renderer/components/ui/switch';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
+import { useRepoSettingsWriter } from '@/renderer/hooks/use-repo-settings-writer';
+import type { ResolvedSettingSnapshot } from '@/shared/ipc/contracts/settings-resolution';
+
+/** Debounce window before a typed repo-git field is persisted to SQLite. */
+const SAVE_DEBOUNCE_MS = 500;
+
+/** Personal (SQLite) override value for a resolved setting, or `''` when it resolves from another source. */
+function personalValue(resolved: ResolvedSettingSnapshot | undefined): string {
+	return resolved?.source === 'sqlite' ? String(resolved.value ?? '') : '';
+}
 
 /** Route for a repository's Git settings; renders the repo-scoped git-defaults panel keyed by the `repoId` path param. */
 export const Route = createFileRoute('/_workbench/settings/repo/$repoId/git')({
@@ -15,37 +26,25 @@ export const Route = createFileRoute('/_workbench/settings/repo/$repoId/git')({
 /** Repository-scoped Git settings panel for branch-from, remote origin, and archive defaults that override user-scope git settings. */
 function RepoGitSettings() {
 	const { repoId } = Route.useParams();
-	const { overrides, setOverrides, resolved } = useRepoSettings(repoId);
+	const { resolved, project } = useRepoSettings(repoId);
+	const save = useRepoSettingsWriter(repoId, project);
+
+	const branchFrom = resolved('branchFrom');
+	const remoteOrigin = resolved('remoteOrigin');
 
 	return (
 		<SettingsSection
 			description='Per-repository git defaults. These override your user-scope git settings for this repo only.'
 			title='Git'
 		>
-			<SettingRow
-				control={
-					<Input
-						aria-label='Branch new workspaces from'
-						className='h-8 w-44 font-mono text-xs'
-						onChange={(e) =>
-							setOverrides((prev) => ({
-								...prev,
-								branchFrom: e.target.value,
-							}))
-						}
-						placeholder={
-							(resolved('branchFrom')?.value as string) ?? 'origin/master'
-						}
-						value={overrides.branchFrom ?? ''}
-					/>
-				}
+			<TextSetting
+				ariaLabel='Branch new workspaces from'
 				description='Each workspace is an isolated copy of your codebase. Set the upstream branch new workspaces fork from.'
-				label={
-					<span className='flex items-center gap-2'>
-						Branch new workspaces from
-						<SourceBadge source={resolved('branchFrom')?.source} />
-					</span>
-				}
+				label='Branch new workspaces from'
+				onSave={(value) => save({ branchFrom: value })}
+				placeholder={(branchFrom?.value as string) || 'origin/master'}
+				resolved={branchFrom}
+				seed={personalValue(branchFrom)}
 			/>
 
 			<SettingRow
@@ -53,23 +52,15 @@ function RepoGitSettings() {
 					<Input
 						aria-label='Remote origin'
 						className='h-8 w-44 font-mono text-xs'
-						onChange={(e) =>
-							setOverrides((prev) => ({
-								...prev,
-								remoteOrigin: e.target.value,
-							}))
-						}
-						placeholder={
-							(resolved('remoteOrigin')?.value as string) ?? 'origin'
-						}
-						value={overrides.remoteOrigin ?? ''}
+						disabled
+						value={(remoteOrigin?.value as string) || 'origin'}
 					/>
 				}
-				description='Where Ensemblr pushes, pulls, and opens PRs.'
+				description='Where Ensemblr pushes, pulls, and opens PRs. Read-only for now — runtime honors the git "origin" remote; a configurable remote is planned.'
 				label={
 					<span className='flex items-center gap-2'>
 						Remote origin
-						<SourceBadge source={resolved('remoteOrigin')?.source} />
+						<SourceBadge source={remoteOrigin?.source} />
 					</span>
 				}
 			/>
@@ -78,10 +69,12 @@ function RepoGitSettings() {
 				control={
 					<Switch
 						checked={Boolean(resolved('deleteLocalBranchOnArchive')?.value)}
-						disabled
+						onCheckedChange={(checked) =>
+							save({ deleteLocalBranchOnArchive: checked })
+						}
 					/>
 				}
-				description='Delete the local branch when archiving a workspace. Resolved from repository / user defaults.'
+				description='Delete the local branch when archiving a workspace. Overrides your user-scope default for this repo.'
 				label={
 					<span className='flex items-center gap-2'>
 						Delete branch on archive
@@ -96,10 +89,10 @@ function RepoGitSettings() {
 				control={
 					<Switch
 						checked={Boolean(resolved('archiveAfterMerge')?.value)}
-						disabled
+						onCheckedChange={(checked) => save({ archiveAfterMerge: checked })}
 					/>
 				}
-				description='Automatically archive a workspace after merging its PR. Resolved from repository / user defaults.'
+				description='Automatically archive a workspace after merging its PR. Overrides your user-scope default for this repo.'
 				label={
 					<span className='flex items-center gap-2'>
 						Archive on merge
@@ -109,10 +102,73 @@ function RepoGitSettings() {
 			/>
 
 			<p className='py-3 text-muted-foreground text-xs'>
-				Toggle defaults are currently read-only. Edit{' '}
-				<code className='font-mono'>.ensemblr/settings.toml</code> to change
-				shared values for the team.
+				Committed <code className='font-mono'>.ensemblr/settings.toml</code>{' '}
+				values shared with the team still win over these personal overrides.
 			</p>
 		</SettingsSection>
+	);
+}
+
+/**
+ * A repo-git text setting whose personal SQLite value hydrates from the resolved
+ * snapshot and persists on a debounce. A blank value clears the personal row so
+ * the setting falls back to the next resolver source.
+ */
+function TextSetting({
+	ariaLabel,
+	description,
+	label,
+	onSave,
+	placeholder,
+	resolved,
+	seed,
+}: {
+	ariaLabel: string;
+	description: string;
+	label: string;
+	onSave: (value: string | null) => void;
+	placeholder: string;
+	resolved: ResolvedSettingSnapshot | undefined;
+	seed: string;
+}) {
+	const [value, setValue] = useState(seed);
+	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	// Re-seed from the resolved personal value whenever it changes (e.g. after a
+	// save round-trips or the repo switches).
+	useEffect(() => {
+		setValue(seed);
+	}, [seed]);
+
+	const onChange = (next: string) => {
+		setValue(next);
+		if (timerRef.current) {
+			clearTimeout(timerRef.current);
+		}
+		timerRef.current = setTimeout(() => {
+			timerRef.current = null;
+			onSave(next.trim() || null);
+		}, SAVE_DEBOUNCE_MS);
+	};
+
+	return (
+		<SettingRow
+			control={
+				<Input
+					aria-label={ariaLabel}
+					className='h-8 w-44 font-mono text-xs'
+					onChange={(e) => onChange(e.target.value)}
+					placeholder={placeholder}
+					value={value}
+				/>
+			}
+			description={description}
+			label={
+				<span className='flex items-center gap-2'>
+					{label}
+					<SourceBadge source={resolved?.source} />
+				</span>
+			}
+		/>
 	);
 }

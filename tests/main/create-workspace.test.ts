@@ -219,6 +219,75 @@ test('create produces a git worktree on a new branch from the configured base', 
 	assert.equal(row?.base_branch, 'main');
 });
 
+test('branches new workspaces from the configured branchFrom setting', async (t) => {
+	const harness = createHarness(t);
+	runGit(harness.repositoryPath, ['branch', 'develop']);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readRepositorySettings: () => ({
+			app: { diagnostics: [], settings: [] },
+			repository: {
+				diagnostics: [],
+				settings: [
+					{
+						candidates: [],
+						key: 'branchFrom',
+						locked: false,
+						source: 'sqlite',
+						value: 'develop',
+					},
+				],
+			},
+		}),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'from-develop',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.baseBranch, 'develop');
+});
+
+test('an explicit request base overrides the configured branchFrom', async (t) => {
+	const harness = createHarness(t);
+	runGit(harness.repositoryPath, ['branch', 'develop']);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readRepositorySettings: () => ({
+			app: { diagnostics: [], settings: [] },
+			repository: {
+				diagnostics: [],
+				settings: [
+					{
+						candidates: [],
+						key: 'branchFrom',
+						locked: false,
+						source: 'sqlite',
+						value: 'develop',
+					},
+				],
+			},
+		}),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		baseBranch: 'main',
+		name: 'explicit-main',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.baseBranch, 'main');
+});
+
 test('registers .context/ in the git exclude exactly once across workspaces', async (t) => {
 	const harness = createHarness(t);
 	const service = createWorkspaceService({

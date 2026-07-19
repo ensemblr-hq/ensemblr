@@ -73,6 +73,9 @@ const GIT_FIELD_MAP: ReadonlyMap<
 > = new Map([
 	['branch_from', { key: 'branchFrom', type: 'string' }],
 	['branch_prefix', { key: 'branchPrefix', type: 'string' }],
+	// Historically the branch prefix was the one camelCase `[git]` key; accept it
+	// so existing committed configs keep resolving after normalization.
+	['branchPrefix', { key: 'branchPrefix', type: 'string' }],
 	['remote_origin', { key: 'remoteOrigin', type: 'string' }],
 	[
 		'delete_local_branch_on_archive',
