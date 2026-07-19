@@ -23,6 +23,8 @@ import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 /**
  * Renders the run-script button cluster on the dock header. Setup controls live
  * in the Setup dock tab, not here — the tab row is reserved for run actions.
+ * Below the `md` dock-header container width the buttons collapse to icons to
+ * leave room for tabs; the Open control keeps its `:port` label.
  */
 export function DockPanelActions({
 	actions,
@@ -55,9 +57,14 @@ export function DockPanelActions({
 				{desktopRuntime ? (
 					<LaunchDesktopButton onLaunch={actions.onLaunchDesktopApp} />
 				) : null}
-				<Button onClick={actions.onStopRunScript} size='xs' variant='outline'>
+				<Button
+					aria-label='Stop run script'
+					onClick={actions.onStopRunScript}
+					size='xs'
+					variant='outline'
+				>
 					<SquareIcon data-icon='inline-start' />
-					Stop
+					<span className='@max-md/dock-header:hidden'>Stop</span>
 				</Button>
 			</>
 		);
@@ -65,9 +72,14 @@ export function DockPanelActions({
 
 	if (hasRunScript) {
 		return (
-			<Button onClick={actions.onRunScript} size='xs' variant='outline'>
+			<Button
+				aria-label='Run script'
+				onClick={actions.onRunScript}
+				size='xs'
+				variant='outline'
+			>
 				<PlayIcon data-icon='inline-start' />
-				Run
+				<span className='@max-md/dock-header:hidden'>Run</span>
 			</Button>
 		);
 	}
@@ -82,7 +94,8 @@ export function DockPanelActions({
  * Renders the dock Open control: a single button when one preview URL applies,
  * or a split button with a dropdown of the configured URLs when several do. The
  * first option is the default action. Renders nothing when no preview URL is
- * configured or auto-detected yet.
+ * configured or auto-detected yet. Collapses to an icon at narrow dock-header
+ * widths, but always keeps the `:port` label so the port stays visible.
  */
 function OpenPreviewControl({
 	onOpen,
@@ -100,11 +113,26 @@ function OpenPreviewControl({
 	}
 
 	if (options.length === 1) {
-		const label = port !== null ? `Open :${port}` : primary.name;
 		return (
-			<Button onClick={() => onOpen(primary.url)} size='xs' variant='outline'>
+			<Button
+				aria-label={
+					port !== null
+						? `Open preview on port ${port}`
+						: `Open ${primary.name}`
+				}
+				onClick={() => onOpen(primary.url)}
+				size='xs'
+				variant='outline'
+			>
 				<ExternalLinkIcon data-icon='inline-start' />
-				{label}
+				{port !== null ? (
+					<>
+						<span className='@max-md/dock-header:hidden'>Open :{port}</span>
+						<span className='hidden @max-md/dock-header:inline'>:{port}</span>
+					</>
+				) : (
+					<span className='@max-md/dock-header:hidden'>{primary.name}</span>
+				)}
 			</Button>
 		);
 	}
@@ -127,13 +155,14 @@ function OpenPreviewSplit({
 	return (
 		<div className='flex items-center'>
 			<Button
+				aria-label={`Open ${primary.name}`}
 				className='rounded-r-none'
 				onClick={() => onOpen(primary.url)}
 				size='xs'
 				variant='outline'
 			>
 				<ExternalLinkIcon data-icon='inline-start' />
-				{primary.name}
+				<span className='@max-md/dock-header:hidden'>{primary.name}</span>
 			</Button>
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
@@ -164,9 +193,14 @@ function OpenPreviewSplit({
 /** Focuses (or reopens) the workspace's detected desktop app window. */
 function LaunchDesktopButton({ onLaunch }: { onLaunch: () => void }) {
 	return (
-		<Button onClick={onLaunch} size='xs' variant='outline'>
+		<Button
+			aria-label='Launch desktop app'
+			onClick={onLaunch}
+			size='xs'
+			variant='outline'
+		>
 			<RocketIcon data-icon='inline-start' />
-			Launch
+			<span className='@max-md/dock-header:hidden'>Launch</span>
 		</Button>
 	);
 }
