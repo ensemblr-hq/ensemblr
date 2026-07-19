@@ -1,6 +1,8 @@
+import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useAtomValue } from 'jotai';
 import { useCallback, useMemo } from 'react';
+import { settingsResolutionQuery } from '@/renderer/api/ensemblr';
 import { CloseRunningChatDialog } from '@/renderer/components/workbench-shell/conversation-panel/close-running-chat-dialog';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
@@ -10,6 +12,10 @@ import {
 	createPlaceholderSession,
 	getComposerState,
 } from '@/renderer/lib/workbench';
+import {
+	resolveActionPreference,
+	sharedActionPreference,
+} from '@/renderer/lib/workbench/action-preference';
 import { useRegisterCloseAction } from '@/renderer/state/close-action';
 import {
 	usePiComposerController,
@@ -96,10 +102,19 @@ export function WorkspaceRouteContent({
 	const repoOverrides = useAtomValue(
 		repoSettingsOverrideAtomFamily(activeProject.id),
 	);
+	const { data: settingsResolution } = useQuery(
+		settingsResolutionQuery({
+			repositoryId: activeProject.id,
+			repositoryPath: activeProject.pathLabel,
+		}),
+	);
 	const piComposer = usePiComposerController({
 		chatTabId: activeSession.chatTabId,
 		currentPiSessionId: activeSession.piSessionId,
-		masterPrompt: repoOverrides.actionPreferences?.general ?? '',
+		masterPrompt: resolveActionPreference(
+			repoOverrides.actionPreferences?.general ?? '',
+			sharedActionPreference(settingsResolution, 'general'),
+		),
 		workspaceCwd: activeWorkspace.pathLabel,
 		workspaceId: activeWorkspace.id,
 	});

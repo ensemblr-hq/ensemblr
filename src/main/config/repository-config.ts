@@ -85,9 +85,34 @@ const GIT_FIELD_MAP: ReadonlyMap<
 	['set_upstream_on_push', { key: 'setUpstreamOnPush', type: 'boolean' }],
 ]);
 
+/**
+ * `[prompts]` TOML sub-keys mapped onto the canonical
+ * `actionPreferences.<RepoActionKey>` keys the runtime action runner reads.
+ * Accepts both snake_case and the historical piActions camelCase spellings so
+ * existing committed configs keep resolving. Without this the `[prompts]` block
+ * flattens to `prompts.*`, which no runtime consumer reads.
+ */
+const PROMPT_FIELD_MAP: ReadonlyMap<string, string> = new Map([
+	['review', 'codeReview'],
+	['code_review', 'codeReview'],
+	['codeReview', 'codeReview'],
+	['create_pr', 'createPr'],
+	['createPr', 'createPr'],
+	['fix_check_errors', 'fixErrors'],
+	['fixCheckErrors', 'fixErrors'],
+	['fix_errors', 'fixErrors'],
+	['fixErrors', 'fixErrors'],
+	['resolve_conflicts', 'resolveConflicts'],
+	['resolveConflicts', 'resolveConflicts'],
+	['branch_naming', 'branchRename'],
+	['branchNaming', 'branchRename'],
+	['branch_rename', 'branchRename'],
+	['branchRename', 'branchRename'],
+	['general', 'general'],
+]);
+
 const OBJECT_SETTING_KEYS = new Set([
 	'environmentVariables',
-	'prompts',
 	'spotlightTesting',
 ]);
 
@@ -285,6 +310,17 @@ function normalizeRepositoryConfigFields({
 			continue;
 		}
 
+		if (key === 'prompts') {
+			const normalizedPrompts = normalizePromptsBlock(
+				value,
+				'$.prompts',
+				source,
+			);
+			settings = mergeSettings(settings, normalizedPrompts.settings);
+			diagnostics.push(...normalizedPrompts.diagnostics);
+			continue;
+		}
+
 		const normalizedKey = fieldMap.get(key);
 
 		if (!normalizedKey) {
@@ -428,6 +464,56 @@ function normalizeGitBlock(
 		}
 
 		settings[mapped.key] = gitValue;
+	}
+
+	return { diagnostics, settings };
+}
+
+/**
+ * Normalises the `[prompts]` block, mapping each sub-key onto its canonical
+ * `actionPreferences.<RepoActionKey>` key so committed shared prompts merge into
+ * the same key family the runtime action runner reads. Non-string values and
+ * unsupported sub-keys collect diagnostics.
+ * @param value - Raw `prompts` value to normalise.
+ * @param fieldPath - JSONPath used in diagnostic messages.
+ * @param source - Source identifier used in diagnostics.
+ * @returns Partial settings record of canonical keys plus accumulated diagnostics.
+ */
+function normalizePromptsBlock(
+	value: unknown,
+	fieldPath: string,
+	source: SettingsResolutionSource,
+): NormalizedConfigSource {
+	if (!isPlainRecord(value)) {
+		return { diagnostics: [], settings: {} };
+	}
+
+	const diagnostics: ConfigDiagnostic[] = [];
+	const settings: Record<string, unknown> = {};
+
+	for (const [key, promptValue] of Object.entries(value)) {
+		const mappedKey = PROMPT_FIELD_MAP.get(key);
+
+		if (!mappedKey) {
+			diagnostics.push(
+				createUnsupportedFieldDiagnostic(key, source, `${fieldPath}.${key}`),
+			);
+			continue;
+		}
+
+		if (typeof promptValue !== 'string') {
+			diagnostics.push(
+				createInvalidFieldDiagnostic(
+					key,
+					source,
+					`${fieldPath}.${key}`,
+					'string',
+				),
+			);
+			continue;
+		}
+
+		settings[`actionPreferences.${mappedKey}`] = promptValue;
 	}
 
 	return { diagnostics, settings };

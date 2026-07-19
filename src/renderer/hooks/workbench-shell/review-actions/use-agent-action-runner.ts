@@ -1,8 +1,14 @@
+import { useQuery } from '@tanstack/react-query';
 import { useAtomValue, useStore } from 'jotai';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 
+import { settingsResolutionQuery } from '@/renderer/api/ensemblr';
 import { writeWorkspaceActionPrompt } from '@/renderer/api/ensemblr-queries';
+import {
+	resolveActionPreference,
+	sharedActionPreference,
+} from '@/renderer/lib/workbench/action-preference';
 import {
 	ACTION_KEY_BY_KIND,
 	ACTION_TRIGGER_MESSAGE,
@@ -110,6 +116,12 @@ export function useAgentActionRunner({
 	const overrides = useAtomValue(
 		repoSettingsOverrideAtomFamily(activeProject.id),
 	);
+	const { data: resolution } = useQuery(
+		settingsResolutionQuery({
+			repositoryId: activeProject.id,
+			repositoryPath: activeProject.pathLabel,
+		}),
+	);
 	const liveDraft = useAtomValue(
 		prDetailsLiveDraftAtomFamily(activeWorkspace.id),
 	);
@@ -125,10 +137,13 @@ export function useAgentActionRunner({
 					saved: savedDraft,
 					workspace: activeWorkspace,
 				});
+				const actionKey = ACTION_KEY_BY_KIND[action];
 				const content = composeActionPrompt({
 					action,
-					preferences:
-						overrides.actionPreferences?.[ACTION_KEY_BY_KIND[action]] ?? '',
+					preferences: resolveActionPreference(
+						overrides.actionPreferences?.[actionKey] ?? '',
+						sharedActionPreference(resolution, actionKey),
+					),
 					prDescription: prDetails.description,
 					prTitle: prDetails.title,
 					workspace: activeWorkspace,
@@ -185,6 +200,7 @@ export function useAgentActionRunner({
 			liveDraft,
 			openSessionTab,
 			overrides.actionPreferences,
+			resolution,
 			reviewModel,
 			reviewThinkingLevel,
 			savedDraft,

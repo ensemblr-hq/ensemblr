@@ -155,9 +155,9 @@ enabled = true
 		claudeExecutablePath: '/opt/homebrew/bin/claude',
 		enterpriseDataPrivacy: true,
 		environmentVariables: { DEBUG: 'ensemblr:*' },
+		'actionPreferences.codeReview': 'Check repository contracts.',
 		branchPrefix: 'ensemblr/',
 		filesToCopy: ['.env.local', 'config/*.json'],
-		prompts: { review: 'Check repository contracts.' },
 		runScriptMode: 'nonconcurrent',
 		scripts: {
 			archive: 'bun run archive',
@@ -197,6 +197,56 @@ set_upstream_on_push = false
 		setUpstreamOnPush: false,
 	});
 	assert.deepEqual(loaded.snapshot.diagnostics, []);
+});
+
+test('normalises [prompts] onto canonical actionPreferences keys', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		`
+[prompts]
+review = "Focus on contracts."
+create_pr = "Concise PR body."
+fixCheckErrors = "Fix root cause."
+`,
+	);
+
+	const loaded = loadRepositoryConfig({
+		repositoryPath: fixture.repositoryPath,
+	});
+	const source = getSource(loaded.snapshot, 'ensemblr-config');
+
+	assert.equal(source.status, 'loaded');
+	assert.deepEqual(source.settings, {
+		'actionPreferences.codeReview': 'Focus on contracts.',
+		'actionPreferences.createPr': 'Concise PR body.',
+		'actionPreferences.fixErrors': 'Fix root cause.',
+	});
+	assert.deepEqual(loaded.snapshot.diagnostics, []);
+});
+
+test('resolves committed [prompts] review to actionPreferences.codeReview', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		'[prompts]\nreview = "Focus on contracts."\n',
+	);
+
+	const snapshot = resolveSettings({
+		config: createConfig(),
+		repository: {
+			repositoryId: 'repo-prompts',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	const resolved = getRepositorySetting(
+		snapshot.repository,
+		'actionPreferences.codeReview',
+	);
+	assert.equal(resolved.source, 'ensemblr-config');
+	assert.equal(resolved.value, 'Focus on contracts.');
 });
 
 test('resolves committed [git] branch_from to the branchFrom key', (t) => {
