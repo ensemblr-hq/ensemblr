@@ -68,8 +68,8 @@ interface PrDetailsFormState {
  * Owns the editable PR title/description. The committed values persist locally
  * per workspace (Save); until the user saves, the inputs seed from the open PR.
  * Editing lives in local state so Discard reverts to the saved (or seeded)
- * baseline, and re-seeds when the workspace or its PR changes — using React's
- * "adjust state during render" pattern so edits survive background gh refreshes.
+ * baseline, and re-seeds untouched fields when the workspace, PR, or hydrated
+ * baseline changes while preserving local edits across background gh refreshes.
  */
 function usePrDetailsDraft(workspace: WorkspaceShellModel): PrDetailsFormState {
 	const [saved, setSaved] = useAtom(prDetailsDraftAtomFamily(workspace.id));
@@ -78,10 +78,30 @@ function usePrDetailsDraft(workspace: WorkspaceShellModel): PrDetailsFormState {
 	);
 	const baseline = saved ?? seedPrDetails(workspace);
 	const identity = prDraftIdentity(workspace);
+	const baselineEdit = {
+		baselineDescription: baseline.description,
+		baselineTitle: baseline.title,
+		description: baseline.description,
+		identity,
+		title: baseline.title,
+	};
 
-	const [edit, setEdit] = useState(() => ({ ...baseline, identity }));
+	const [edit, setEdit] = useState(() => baselineEdit);
 	if (edit.identity !== identity) {
-		setEdit({ ...baseline, identity });
+		setEdit(baselineEdit);
+	} else if (
+		edit.baselineTitle !== baseline.title ||
+		edit.baselineDescription !== baseline.description
+	) {
+		const isDescriptionDirty = edit.description !== edit.baselineDescription;
+		const isTitleDirty = edit.title !== edit.baselineTitle;
+		setEdit({
+			baselineDescription: baseline.description,
+			baselineTitle: baseline.title,
+			description: isDescriptionDirty ? edit.description : baseline.description,
+			identity,
+			title: isTitleDirty ? edit.title : baseline.title,
+		});
 	}
 
 	// Publish live edits so other surfaces (the sidebar "Create PR" menu) hand the
@@ -100,7 +120,7 @@ function usePrDetailsDraft(workspace: WorkspaceShellModel): PrDetailsFormState {
 	return {
 		canSave: isDirty && edit.title.trim().length > 0,
 		description: edit.description,
-		discard: () => setEdit({ ...baseline, identity }),
+		discard: () => setEdit(baselineEdit),
 		isDirty,
 		save: () => {
 			if (edit.title.trim().length === 0) {
@@ -145,6 +165,7 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 			canSave={draft.canSave}
 			description={draft.description}
 			isDirty={draft.isDirty}
+			isReadOnly={workspace.pullRequest.state === 'merged'}
 			onDescriptionChange={draft.setDescription}
 			onDiscard={draft.discard}
 			onSave={draft.save}
