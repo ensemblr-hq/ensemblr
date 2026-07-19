@@ -4,6 +4,7 @@ import type { WorkspaceOpenTargetSnapshot } from '@/shared/ipc/contracts/open-ta
 // type (`workspaceOpenTargetsQuery`); it is no longer a property of the
 // workspace shell model — the menu reads it from the React Query cache.
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
+import type { RepositoryPreviewUrl } from '@/shared/ipc/contracts/repository-settings';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
@@ -330,6 +331,12 @@ export interface WorkspaceShellModel {
 	dockTabs: DockTabModel[];
 	/** Owner/repo parsed from the repository's GitHub remote, when it has one. */
 	githubRepo?: GithubRepoRef | null;
+	/**
+	 * Repo-configured preview URLs (personal SQLite overrides) shown on the dock
+	 * Open control instead of the auto-detected URL. Resolved at the route-content
+	 * level so leaf dock components stay free of data hooks.
+	 */
+	configuredPreviewUrls?: RepositoryPreviewUrl[];
 	id: string;
 	/** True for optimistic rows shown while the main process creates the workspace. */
 	isPendingCreation?: boolean;

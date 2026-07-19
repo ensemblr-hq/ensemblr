@@ -7,9 +7,22 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { profileElectronIpcCall } from '@/renderer/lib/instrumentation';
 import type { ReviewMergeSettings } from '@/renderer/types/settings';
+import type { ConfigChangedBroadcast } from '@/shared/ipc/contracts/health';
 import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 
-import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
+import {
+	ensemblrQueryKeys,
+	getEnsemblrApi,
+	getEnsemblrApiOrNull,
+} from './query-keys';
+
+/** Subscribes to `config.json` reloads (external edits of non-App sections); returns an unsubscribe fn. */
+export function subscribeConfigChanged(
+	listener: (event: ConfigChangedBroadcast) => void,
+): () => void {
+	const api = getEnsemblrApiOrNull();
+	return api ? api.onConfigChanged(listener) : () => undefined;
+}
 
 /** Resolved settings snapshot for the entire app, optionally scoped to a repository. */
 export function settingsResolutionQuery(

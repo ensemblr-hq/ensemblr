@@ -24,6 +24,7 @@ export {
 	getEnsemblrApiOrNull,
 	isEnsemblrApiAvailable,
 } from './query-keys';
+export * from './repo-settings';
 export * from './repository-sources';
 export * from './settings';
 export * from './setup';

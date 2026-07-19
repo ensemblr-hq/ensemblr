@@ -13,6 +13,7 @@ import {
 	isPlainRecord,
 	isSensitiveKeyName,
 } from './json-utils.ts';
+import { watchConfigFile } from './watch-config-file.ts';
 
 export type { ConfigDiagnostic, ConfigStatusSnapshot };
 
@@ -71,6 +72,15 @@ export interface EnsemblrConfigService {
 	getConfig: () => EnsemblrConfig;
 	getSnapshot: () => ConfigStatusSnapshot;
 	load: () => ConfigStatusSnapshot;
+	/**
+	 * Watches config.json and reloads the cache when it changes on disk, firing
+	 * `onChange` with the fresh snapshot so consumers (e.g. the renderer) can
+	 * re-resolve settings. Covers the non-App sections (linear, security, managed,
+	 * environment, repositoryDefaults, repositoryRules) that lack their own
+	 * watcher.
+	 */
+	startWatching: (onChange: (snapshot: ConfigStatusSnapshot) => void) => void;
+	stop: () => void;
 }
 
 /** Name of a top-level section in the on-disk Ensemblr config file. */
@@ -84,6 +94,8 @@ type SectionName =
 
 const CONFIG_DIRECTORY = '.config/ensemblr';
 const CONFIG_FILENAME = 'config.json';
+/** Coalesce burst fs events (editor rename-replace fires several) before reloading. */
+const CONFIG_WATCH_DEBOUNCE_MS = 100;
 const ALLOWED_TOP_LEVEL_KEYS = new Set([
 	'app',
 	'environment',
@@ -246,6 +258,10 @@ export function createEnsemblrConfigService(
 	options: LoadEnsemblrConfigOptions = {},
 ): EnsemblrConfigService {
 	let cachedResult: EnsemblrConfigLoadResult | null = null;
+	let watcherHandle: { stop: () => void } | null = null;
+	const configPath =
+		options.configPath ??
+		resolveEnsemblrConfigPath(options.homeDirectory ?? homedir());
 
 	/** Loads the config on first call and caches the result. */
 	function ensureLoaded(): EnsemblrConfigLoadResult {
@@ -253,10 +269,30 @@ export function createEnsemblrConfigService(
 		return cachedResult;
 	}
 
+	const startWatching = (
+		onChange: (snapshot: ConfigStatusSnapshot) => void,
+	): void => {
+		watcherHandle = watchConfigFile({
+			debounceMs: CONFIG_WATCH_DEBOUNCE_MS,
+			filePath: configPath,
+			onChange: () => {
+				cachedResult = loadEnsemblrConfig(options);
+				onChange(cachedResult.snapshot);
+			},
+		});
+	};
+
+	const stop = (): void => {
+		watcherHandle?.stop();
+		watcherHandle = null;
+	};
+
 	return {
 		getConfig: () => ensureLoaded().config,
 		getSnapshot: () => ensureLoaded().snapshot,
 		load: () => ensureLoaded().snapshot,
+		startWatching,
+		stop,
 	};
 }
 

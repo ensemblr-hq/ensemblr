@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '../../shared/ipc/channels';
 import type { EnsemblrApi } from '../../shared/ipc/contracts/api';
 import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app-settings';
 import type { CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
+import type { ConfigChangedBroadcast } from '../../shared/ipc/contracts/health';
 import type {
 	PiRawFrameBroadcast,
 	PiSessionEventBroadcast,
@@ -21,6 +22,7 @@ type InvokeKey = Exclude<
 	keyof EnsemblrApi,
 	| 'getPathForFile'
 	| 'onAppSettingsChanged'
+	| 'onConfigChanged'
 	| 'onCloneGithubRepositoryProgress'
 	| 'onCloseActiveTabRequest'
 	| 'onPiRawFrame'
@@ -171,6 +173,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 				IPC_CHANNELS.appSettingsChanged,
 				listener,
 			),
+		onConfigChanged: (listener) =>
+			subscribe<ConfigChangedBroadcast>(IPC_CHANNELS.configChanged, listener),
 		onCloneGithubRepositoryProgress: (listener) =>
 			subscribe<CloneGithubRepositoryProgressEvent>(
 				IPC_CHANNELS.cloneGithubRepositoryProgress,
@@ -198,6 +202,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		openExternal: (url) => invoke('openExternal', url),
 		openChatTab: (request) => invoke('openChatTab', request),
 		openPiSession: (request) => invoke('openPiSession', request),
+		openSettingsFileInTarget: (request) =>
+			invoke('openSettingsFileInTarget', request),
 		openWorkspaceInTarget: (request) =>
 			invoke('openWorkspaceInTarget', request),
 		detectWorkspaceDesktopRuntime: (request) =>
@@ -240,6 +246,9 @@ export function createEnsemblrApi(): EnsemblrApi {
 		selectEnvFile: () => invoke('selectEnvFile'),
 		selectLocalRepository: () => invoke('selectLocalRepository'),
 		selectPiExecutable: () => invoke('selectPiExecutable'),
+		getPiExecutablePath: () => invoke('getPiExecutablePath'),
+		setPiExecutablePath: (request) => invoke('setPiExecutablePath', request),
+		clearPiExecutablePath: () => invoke('clearPiExecutablePath'),
 		selectRootDirectory: () => invoke('selectRootDirectory'),
 		setEnvironmentVariable: (request) =>
 			invoke('setEnvironmentVariable', request),
@@ -257,8 +266,12 @@ export function createEnsemblrApi(): EnsemblrApi {
 		unwatchWorkspaceFiles: (request) =>
 			invoke('unwatchWorkspaceFiles', request),
 		updateAppSettings: (patch) => invoke('updateAppSettings', patch),
+		openRepositoryConfigFile: (request) =>
+			invoke('openRepositoryConfigFile', request),
 		updateRepositoryScripts: (request) =>
 			invoke('updateRepositoryScripts', request),
+		updateRepositorySettings: (request) =>
+			invoke('updateRepositorySettings', request),
 		watchWorkspaceFiles: (request) => invoke('watchWorkspaceFiles', request),
 		writeForkSummary: (request) => invoke('writeForkSummary', request),
 		writeTerminalSession: (request) => invoke('writeTerminalSession', request),

@@ -8,11 +8,18 @@ import {
 	autoRunAfterSetupAtom,
 	developerModeAtom,
 } from '@/renderer/state/preferences';
+import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
 
 /** Route for the Experimental settings section; renders the experimental-features panel. */
 export const Route = createFileRoute('/_workbench/settings/experimental')({
 	component: ExperimentalSettings,
 });
+
+/** Factory defaults; a row shows its "modified" accent when its value differs. */
+const DEFAULTS = {
+	autoRunAfterSetup: DEFAULT_APP_SETTINGS.experimental.autoRunAfterSetup,
+	developerMode: false,
+} as const;
 
 /** Experimental features panel toggling developer-only controls and setup automation defaults. */
 function ExperimentalSettings() {
@@ -30,12 +37,16 @@ function ExperimentalSettings() {
 				}
 				description='Show developer-only diagnostics and Pi debug controls.'
 				label='Developer Mode'
+				modified={developerMode !== DEFAULTS.developerMode}
+				onReset={() => setDeveloperMode(DEFAULTS.developerMode)}
 			/>
 
 			<SettingRow
 				control={<Switch checked={autoRun} onCheckedChange={setAutoRun} />}
 				description="Start a repository's run script automatically after setup when no repository-specific setting overrides it."
 				label='Auto-run after setup'
+				modified={autoRun !== DEFAULTS.autoRunAfterSetup}
+				onReset={() => setAutoRun(DEFAULTS.autoRunAfterSetup)}
 			/>
 		</SettingsSection>
 	);

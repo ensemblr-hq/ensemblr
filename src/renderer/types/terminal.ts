@@ -18,5 +18,7 @@ export interface TerminalRendererAdapter {
 	onData: (listener: (data: string) => void) => () => void;
 	/** Live-updates the terminal typography; caller re-fits afterwards. */
 	setFont: (options: { fontFamily?: string; fontSize?: number }) => void;
+	/** Live-updates the scrollback buffer line limit without recreating the surface. */
+	setScrollback: (lines: number) => void;
 	write: (data: string) => void;
 }

@@ -11,6 +11,10 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type { GitSettings } from '../../shared/config/app-settings.ts';
 import type {
+	SettingsResolutionRequest,
+	SettingsResolutionSnapshot,
+} from '../../shared/ipc/contracts/settings-resolution';
+import type {
 	CreatedWorkspaceSnapshot,
 	CreateWorkspaceDiagnostic,
 	CreateWorkspaceDiagnosticCode,
@@ -75,6 +79,14 @@ export interface CreateWorkspaceServiceOptions {
 	 * resolution falls back to the repository config only (legacy behavior).
 	 */
 	readGitDefaults?: () => GitSettings;
+	/**
+	 * Resolves the effective repository settings so the configured `branchFrom`
+	 * can pick the base branch for new workspaces. When omitted (e.g. in tests),
+	 * base selection falls back to the live repository root branch.
+	 */
+	readRepositorySettings?: (
+		request: SettingsResolutionRequest,
+	) => SettingsResolutionSnapshot;
 	rootDirectoryService: EnsemblrRootDirectoryService;
 }
 
@@ -96,6 +108,119 @@ interface PreparedWorkspace {
 	path: string;
 	repository: SourceRepository;
 	slug: string;
+}
+
+/**
+ * Reads the repo's configured `branchFrom` base from resolved settings, or
+ * `undefined` when unset/unavailable so base selection falls back to the live
+ * repository root branch.
+ * @param resolved - Resolved settings snapshot, when available.
+ * @returns The configured base branch, or `undefined`.
+ */
+function resolveConfiguredBranchFrom(
+	resolved: SettingsResolutionSnapshot | undefined,
+): string | undefined {
+	const value = resolved?.repository?.settings.find(
+		(setting) => setting.key === 'branchFrom',
+	)?.value;
+
+	return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+/**
+ * Chooses the base branch override for a new workspace. An explicit request base
+ * (e.g. forking from another workspace) wins untouched; a configured personal
+ * `branchFrom` is honored only while it still resolves in the repository, so a
+ * base that was deleted or renamed never blocks every workspace creation with
+ * `git-worktree-failed`. When there is no explicit base and the configured one
+ * is unset or missing, creation falls back to the live repository root branch.
+ * @param options - Explicit/configured bases plus git command dependencies.
+ * @returns The resolved base override, or `undefined` to defer to the stored
+ * repository default.
+ */
+async function resolveBaseBranchOverride({
+	configuredBase,
+	explicitBase,
+	localCommandService,
+	repositoryPath,
+}: {
+	configuredBase: string | undefined;
+	explicitBase: string | undefined;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<string | undefined> {
+	if (explicitBase) {
+		return explicitBase;
+	}
+
+	if (
+		configuredBase &&
+		(await branchRefResolves({
+			baseBranch: configuredBase,
+			localCommandService,
+			repositoryPath,
+		}))
+	) {
+		return configuredBase;
+	}
+
+	return (
+		(await resolveRootBranch({ localCommandService, repositoryPath })) ??
+		undefined
+	);
+}
+
+/**
+ * Verifies that a ref resolves to a commit inside the repository, so a stale
+ * configured base is caught before it reaches `git worktree add`.
+ * @param options - Candidate base ref plus git command dependencies.
+ * @returns True when `git rev-parse` resolves the ref.
+ */
+async function branchRefResolves({
+	baseBranch,
+	localCommandService,
+	repositoryPath,
+}: {
+	baseBranch: string;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<boolean> {
+	try {
+		const result = await localCommandService.run({
+			args: ['rev-parse', '--verify', '--quiet', `${baseBranch}^{commit}`],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 4 * 1024,
+			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+		});
+		return result.status === 'success';
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Reads the repo's personal (SQLite) `filesToCopy` patterns from resolved
+ * settings so they can layer under committed config. Only the personal `sqlite`
+ * source is returned; committed sources are already applied by the files-to-copy
+ * service. Returns `undefined` when unset or from another source.
+ * @param resolved - Resolved settings snapshot, when available.
+ * @returns The personal pattern list, or `undefined`.
+ */
+function resolveConfiguredFilesToCopy(
+	resolved: SettingsResolutionSnapshot | undefined,
+): string[] | undefined {
+	const setting = resolved?.repository?.settings.find(
+		(candidate) => candidate.key === 'filesToCopy',
+	);
+
+	if (setting?.source !== 'sqlite' || !Array.isArray(setting.value)) {
+		return undefined;
+	}
+
+	return setting.value.filter(
+		(entry): entry is string => typeof entry === 'string',
+	);
 }
 
 const DEFAULT_WORKSPACE_NAME = 'workspace';
@@ -122,6 +247,7 @@ export function createWorkspaceService({
 	localCommandService,
 	now = () => new Date(),
 	readGitDefaults,
+	readRepositorySettings,
 	rootDirectoryService,
 }: CreateWorkspaceServiceOptions): CreateWorkspaceService {
 	const filesToCopy =
@@ -180,16 +306,23 @@ export function createWorkspaceService({
 				githubUsernameResolver,
 				readGitDefaults,
 			});
-			// An explicit base (e.g. forking from another workspace) wins; otherwise
-			// new workspaces always branch from the repository root, resolved live so
-			// a stale/feature `default_branch` can't pin creation to the wrong base.
-			const explicitBase = request.baseBranch?.trim();
-			const baseBranchOverride = explicitBase
-				? explicitBase
-				: ((await resolveRootBranch({
-						localCommandService,
-						repositoryPath: repository.path,
-					})) ?? undefined);
+			const resolvedSettings = readRepositorySettings?.({
+				repository: {
+					repositoryId: repository.id,
+					repositoryPath: repository.path,
+				},
+			});
+			// An explicit base (e.g. forking from another workspace) wins; then the
+			// repo's configured `branchFrom`, but only when it still resolves in the
+			// repo; otherwise new workspaces branch from the repository root, resolved
+			// live so a stale/feature `default_branch` — or a deleted or renamed
+			// configured base — can't pin creation to the wrong base.
+			const baseBranchOverride = await resolveBaseBranchOverride({
+				configuredBase: resolveConfiguredBranchFrom(resolvedSettings),
+				explicitBase: request.baseBranch?.trim(),
+				localCommandService,
+				repositoryPath: repository.path,
+			});
 			const prepared = prepareWorkspace({
 				baseBranchOverride,
 				branchNameOverride: request.branchName,
@@ -267,6 +400,7 @@ export function createWorkspaceService({
 			const filesToCopySnapshot = await runFilesToCopy({
 				config,
 				filesToCopyService: filesToCopy,
+				personalPatterns: resolveConfiguredFilesToCopy(resolvedSettings),
 				repositoryPath: repository.path,
 				workspacePath: prepared.path,
 			});
@@ -351,17 +485,20 @@ export function createWorkspaceService({
 async function runFilesToCopy({
 	config,
 	filesToCopyService,
+	personalPatterns,
 	repositoryPath,
 	workspacePath,
 }: {
 	config: LoadedRepositoryConfig;
 	filesToCopyService: FilesToCopyService;
+	personalPatterns?: readonly string[];
 	repositoryPath: string;
 	workspacePath: string;
 }): Promise<FilesToCopySnapshot> {
 	try {
 		return await filesToCopyService.copy({
 			config,
+			personalPatterns,
 			repositoryPath,
 			workspacePath,
 		});
@@ -503,20 +640,15 @@ function validateName(name: unknown): CreateWorkspaceDiagnostic | null {
 }
 
 /**
- * Reads `git.branchPrefix` from the loaded `.ensemblr/settings.toml` config;
- * returns an empty string when no string-valued prefix is configured.
+ * Reads the committed `[git] branch_prefix` from the loaded
+ * `.ensemblr/settings.toml` config. The TOML parser normalizes the nested
+ * `[git]` block onto canonical top-level keys, so the prefix lives at
+ * `branchPrefix`. Returns an empty string when no string-valued prefix is set.
  */
 function readBranchPrefix(config: LoadedRepositoryConfig): string {
-	const git = config.ensemblrConfig?.git;
+	const prefix = config.ensemblrConfig?.branchPrefix;
 
-	if (git && typeof git === 'object' && !Array.isArray(git)) {
-		const prefix = (git as Record<string, unknown>).branchPrefix;
-		if (typeof prefix === 'string' && prefix.length > 0) {
-			return prefix;
-		}
-	}
-
-	return '';
+	return typeof prefix === 'string' && prefix.length > 0 ? prefix : '';
 }
 
 /**

@@ -82,6 +82,7 @@ export type CreateWorkspaceStatus = 'failure' | 'success';
 export type FilesToCopySource =
 	| 'default'
 	| 'ensemblr-config'
+	| 'personal'
 	| 'worktreeinclude';
 
 /** Machine-readable codes for problems copying files into a new worktree. */

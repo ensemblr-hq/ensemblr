@@ -88,6 +88,9 @@ export function createXtermAdapter({
 				terminal.options.fontSize = nextSize;
 			}
 		},
+		setScrollback: (lines) => {
+			terminal.options.scrollback = lines;
+		},
 		write: (data) => terminal.write(data),
 	};
 }

@@ -232,6 +232,10 @@ export type {
 	ShellApi,
 } from './contracts/repository-navigation';
 export type {
+	RepositorySettingsPatch,
+	UpdateRepositorySettingsRequest,
+} from './contracts/repository-settings';
+export type {
 	DeleteReviewCommentRequest,
 	DeleteReviewCommentResult,
 	DeleteReviewTodoRequest,

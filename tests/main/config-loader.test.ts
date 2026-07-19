@@ -230,3 +230,37 @@ test('config service caches the startup load result', (t) => {
 	assert.equal(service.getSnapshot().status, 'ok');
 	assert.deepEqual(service.getConfig().ui, { theme: 'dark' });
 });
+
+test('startWatching reloads the cache and fires onChange on external edits', async (t) => {
+	const fixture = createConfigFixture();
+	t.after(fixture.cleanup);
+	fixture.writeConfig(
+		JSON.stringify({
+			repositoryDefaults: { branchFrom: 'main' },
+			schemaVersion: 1,
+		}),
+	);
+
+	const service = createEnsemblrConfigService({
+		homeDirectory: fixture.homeDirectory,
+		now: fixedClock,
+	});
+	t.after(() => service.stop());
+	service.load();
+
+	const changed = new Promise<void>((resolve) => {
+		service.startWatching(() => resolve());
+	});
+
+	fixture.writeConfig(
+		JSON.stringify({
+			repositoryDefaults: { branchFrom: 'develop' },
+			schemaVersion: 1,
+		}),
+	);
+
+	await changed;
+	assert.deepEqual(service.getConfig().repositoryDefaults, {
+		branchFrom: 'develop',
+	});
+});

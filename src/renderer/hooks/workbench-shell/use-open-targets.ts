@@ -1,83 +1,28 @@
-import { useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback } from 'react';
 import { toast } from 'sonner';
 
-import {
-	getEnsemblrApiOrNull,
-	workspaceOpenTargetsQuery,
-} from '@/renderer/api/ensemblr';
-import {
-	readLastUsedOpenTarget,
-	writeLastUsedOpenTarget,
-} from '@/renderer/state/workspace/open-target-history';
+import { getEnsemblrApiOrNull } from '@/renderer/api/ensemblr';
 import type {
 	OpenTargetPathOptions,
 	OpenTargetsState,
 	WorkspaceOpenTarget,
 } from '@/renderer/types/workbench';
 
+import { useOpenTargetMenu } from './use-open-target-menu';
+
 /**
- * Reads the installed-app list from the React Query cache, restores the
- * per-workspace last-used target, and exposes a single `invokeTarget`
- * action that calls the IPC handler and refreshes the last-used pointer
- * on success.
+ * Workspace flavour of the open-in menu: reuses {@link useOpenTargetMenu} for
+ * the detected-app list and last-used memory, then invokes the workspace IPC
+ * channel. Opening the workspace root repoints the last-used pointer; opening
+ * an individual file (with `options`) leaves it untouched.
  */
 export function useOpenTargets({
 	workspaceId,
 }: {
 	workspaceId: string;
 }): OpenTargetsState {
-	const hasBridge = getEnsemblrApiOrNull() !== null;
-	const { data } = useQuery({
-		...workspaceOpenTargetsQuery,
-		enabled: hasBridge,
-	});
-
-	// Per-workspace memory of the last launch-app target the user picked, so
-	// the split button defaults to it on the next visit. An inline-during-render
-	// comparison re-syncs the local copy when `workspaceId` changes without
-	// paying for an extra render that a useEffect-based reset would force.
-	const [lastUsedTargetId, setLastUsedTargetId] = useState<string | null>(() =>
-		readLastUsedOpenTarget(workspaceId),
-	);
-	const [prevWorkspaceId, setPrevWorkspaceId] = useState(workspaceId);
-	if (prevWorkspaceId !== workspaceId) {
-		setPrevWorkspaceId(workspaceId);
-		setLastUsedTargetId(readLastUsedOpenTarget(workspaceId));
-	}
-
-	const openTargets = useMemo<WorkspaceOpenTarget[] | null>(() => {
-		const fromQuery = data?.targets ?? null;
-		if (!fromQuery) {
-			return null;
-		}
-		return fromQuery.filter(
-			(target) => target.installed || target.kind === 'utility',
-		);
-	}, [data?.targets]);
-
-	const primaryTarget = useMemo<WorkspaceOpenTarget | null>(() => {
-		if (!openTargets) {
-			return null;
-		}
-		// copy-path is a clipboard action, not an "open" — never let it take
-		// over the split button. Anything that actually opens the workspace
-		// (launch-app, reveal-in-finder) is eligible for quick-launch memory.
-		const lastUsed =
-			lastUsedTargetId === null
-				? null
-				: (openTargets.find(
-						(target) =>
-							target.id === lastUsedTargetId && target.behavior !== 'copy-path',
-					) ?? null);
-		return (
-			lastUsed ??
-			openTargets.find((target) => target.isPrimary) ??
-			openTargets.find((target) => target.kind !== 'utility') ??
-			openTargets[0] ??
-			null
-		);
-	}, [lastUsedTargetId, openTargets]);
+	const { openTargets, primaryTarget, rememberTarget } =
+		useOpenTargetMenu(workspaceId);
 
 	const invokeTarget = useCallback(
 		async (target: WorkspaceOpenTarget, options?: OpenTargetPathOptions) => {
@@ -103,8 +48,7 @@ export function useOpenTargets({
 			// Quick-launch memory is for the header split button (workspace root);
 			// don't let opening an individual file repoint it.
 			if (target.behavior !== 'copy-path' && !options) {
-				writeLastUsedOpenTarget(workspaceId, target.id);
-				setLastUsedTargetId(target.id);
+				rememberTarget(target.id);
 			}
 			if (target.behavior === 'copy-path') {
 				toast.success(
@@ -112,7 +56,7 @@ export function useOpenTargets({
 				);
 			}
 		},
-		[workspaceId],
+		[rememberTarget, workspaceId],
 	);
 
 	return { invokeTarget, openTargets, primaryTarget };

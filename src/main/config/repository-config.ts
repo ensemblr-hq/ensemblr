@@ -62,10 +62,57 @@ const TOML_FIELD_MAP: ReadonlyMap<string, string> = new Map([
 	['pi_executable_path', 'piExecutablePath'],
 ] as const);
 
+/**
+ * Nested `[git]` TOML keys mapped onto the canonical top-level resolver keys the
+ * runtime reads, with the expected value type. Without this the `[git]` block
+ * flattens to `git.branch_from` etc., which no resolver key matches.
+ */
+const GIT_FIELD_MAP: ReadonlyMap<
+	string,
+	{ key: string; type: 'boolean' | 'string' }
+> = new Map([
+	['branch_from', { key: 'branchFrom', type: 'string' }],
+	['branch_prefix', { key: 'branchPrefix', type: 'string' }],
+	// Historically the branch prefix was the one camelCase `[git]` key; accept it
+	// so existing committed configs keep resolving after normalization.
+	['branchPrefix', { key: 'branchPrefix', type: 'string' }],
+	['remote_origin', { key: 'remoteOrigin', type: 'string' }],
+	[
+		'delete_local_branch_on_archive',
+		{ key: 'deleteLocalBranchOnArchive', type: 'boolean' },
+	],
+	['archive_after_merge', { key: 'archiveAfterMerge', type: 'boolean' }],
+	['set_upstream_on_push', { key: 'setUpstreamOnPush', type: 'boolean' }],
+]);
+
+/**
+ * `[prompts]` TOML sub-keys mapped onto the canonical
+ * `actionPreferences.<RepoActionKey>` keys the runtime action runner reads.
+ * Accepts both snake_case and the historical piActions camelCase spellings so
+ * existing committed configs keep resolving. Without this the `[prompts]` block
+ * flattens to `prompts.*`, which no runtime consumer reads.
+ */
+const PROMPT_FIELD_MAP: ReadonlyMap<string, string> = new Map([
+	['review', 'codeReview'],
+	['code_review', 'codeReview'],
+	['codeReview', 'codeReview'],
+	['create_pr', 'createPr'],
+	['createPr', 'createPr'],
+	['fix_check_errors', 'fixErrors'],
+	['fixCheckErrors', 'fixErrors'],
+	['fix_errors', 'fixErrors'],
+	['fixErrors', 'fixErrors'],
+	['resolve_conflicts', 'resolveConflicts'],
+	['resolveConflicts', 'resolveConflicts'],
+	['branch_naming', 'branchRename'],
+	['branchNaming', 'branchRename'],
+	['branch_rename', 'branchRename'],
+	['branchRename', 'branchRename'],
+	['general', 'general'],
+]);
+
 const OBJECT_SETTING_KEYS = new Set([
 	'environmentVariables',
-	'git',
-	'prompts',
 	'spotlightTesting',
 ]);
 
@@ -256,6 +303,24 @@ function normalizeRepositoryConfigFields({
 			continue;
 		}
 
+		if (key === 'git') {
+			const normalizedGit = normalizeGitBlock(value, '$.git', source);
+			settings = mergeSettings(settings, normalizedGit.settings);
+			diagnostics.push(...normalizedGit.diagnostics);
+			continue;
+		}
+
+		if (key === 'prompts') {
+			const normalizedPrompts = normalizePromptsBlock(
+				value,
+				'$.prompts',
+				source,
+			);
+			settings = mergeSettings(settings, normalizedPrompts.settings);
+			diagnostics.push(...normalizedPrompts.diagnostics);
+			continue;
+		}
+
 		const normalizedKey = fieldMap.get(key);
 
 		if (!normalizedKey) {
@@ -353,6 +418,143 @@ function normalizeScripts(
 	}
 
 	return { diagnostics, settings };
+}
+
+/**
+ * Normalises the `[git]` block, mapping each snake_case key onto its canonical
+ * top-level resolver key (`branch_from` -> `branchFrom`, etc.) and type-checking
+ * the value. Unsupported subkeys and mistyped values collect diagnostics.
+ * @param value - Raw `git` value to normalise.
+ * @param fieldPath - JSONPath used in diagnostic messages.
+ * @param source - Source identifier used in diagnostics.
+ * @returns Partial settings record of canonical keys plus accumulated diagnostics.
+ */
+function normalizeGitBlock(
+	value: unknown,
+	fieldPath: string,
+	source: SettingsResolutionSource,
+): NormalizedConfigSource {
+	return normalizeMappedBlock('git', value, fieldPath, source, (key, entry) => {
+		const mapped = GIT_FIELD_MAP.get(key);
+		if (!mapped) {
+			return { kind: 'unsupported' };
+		}
+		if (typeof entry !== mapped.type) {
+			return { expected: mapped.type, kind: 'invalid' };
+		}
+		return { canonicalKey: mapped.key, kind: 'accepted', value: entry };
+	});
+}
+
+/**
+ * Normalises the `[prompts]` block, mapping each sub-key onto its canonical
+ * `actionPreferences.<RepoActionKey>` key so committed shared prompts merge into
+ * the same key family the runtime action runner reads.
+ * @param value - Raw `prompts` value to normalise.
+ * @param fieldPath - JSONPath used in diagnostic messages.
+ * @param source - Source identifier used in diagnostics.
+ * @returns Partial settings record of canonical keys plus accumulated diagnostics.
+ */
+function normalizePromptsBlock(
+	value: unknown,
+	fieldPath: string,
+	source: SettingsResolutionSource,
+): NormalizedConfigSource {
+	return normalizeMappedBlock(
+		'prompts',
+		value,
+		fieldPath,
+		source,
+		(key, entry) => {
+			const mapped = PROMPT_FIELD_MAP.get(key);
+			if (!mapped) {
+				return { kind: 'unsupported' };
+			}
+			if (typeof entry !== 'string') {
+				return { expected: 'string', kind: 'invalid' };
+			}
+			return {
+				canonicalKey: `actionPreferences.${mapped}`,
+				kind: 'accepted',
+				value: entry,
+			};
+		},
+	);
+}
+
+/** Outcome of resolving one sub-key of a mapped config block. */
+type MappedFieldOutcome =
+	| { kind: 'unsupported' }
+	| { expected: string; kind: 'invalid' }
+	| { canonicalKey: string; kind: 'accepted'; value: unknown };
+
+/**
+ * Shared normalisation loop for object config blocks (`[git]`, `[prompts]`)
+ * whose sub-keys map onto canonical top-level keys. Delegates per-key mapping
+ * and validation to `resolveField`, emitting unsupported/invalid diagnostics
+ * consistently so each block only declares its own field map. A non-object block
+ * value (e.g. a scalar `git = "main"`) yields an expected-object diagnostic
+ * instead of being silently dropped.
+ * @param blockKey - Name of the block key, used in the expected-object diagnostic.
+ * @param value - Raw block value to normalise.
+ * @param fieldPath - JSONPath used in diagnostic messages.
+ * @param source - Source identifier used in diagnostics.
+ * @param resolveField - Maps and validates a single sub-key.
+ * @returns Canonical settings plus accumulated diagnostics.
+ */
+function normalizeMappedBlock(
+	blockKey: string,
+	value: unknown,
+	fieldPath: string,
+	source: SettingsResolutionSource,
+	resolveField: (key: string, entry: unknown) => MappedFieldOutcome,
+): NormalizedConfigSource {
+	if (!isPlainRecord(value)) {
+		return {
+			diagnostics: [
+				createInvalidFieldDiagnostic(blockKey, source, fieldPath, 'an object'),
+			],
+			settings: {},
+		};
+	}
+
+	const diagnostics: ConfigDiagnostic[] = [];
+	const settings: Record<string, unknown> = {};
+
+	for (const [key, entry] of Object.entries(value)) {
+		const outcome = resolveField(key, entry);
+
+		if (outcome.kind === 'accepted') {
+			settings[outcome.canonicalKey] = outcome.value;
+			continue;
+		}
+
+		diagnostics.push(
+			diagnosticForOutcome(outcome, key, source, `${fieldPath}.${key}`),
+		);
+	}
+
+	return { diagnostics, settings };
+}
+
+/**
+ * Builds the diagnostic for a non-accepted mapped-field outcome (unsupported key
+ * or invalid value type).
+ * @param outcome - The rejected outcome.
+ * @param key - Sub-key that produced it.
+ * @param source - Source identifier used in diagnostics.
+ * @param path - JSONPath used in diagnostic messages.
+ * @returns The matching diagnostic.
+ */
+function diagnosticForOutcome(
+	outcome: { kind: 'unsupported' } | { expected: string; kind: 'invalid' },
+	key: string,
+	source: SettingsResolutionSource,
+	path: string,
+): ConfigDiagnostic {
+	return outcome.kind === 'unsupported'
+		? createUnsupportedFieldDiagnostic(key, source, path)
+		: createInvalidFieldDiagnostic(key, source, path, outcome.expected);
 }
 
 /**

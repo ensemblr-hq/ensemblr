@@ -36,6 +36,7 @@ export {
 	setUpstreamOnPushAtom,
 	terminalFontAtom,
 	terminalFontSizeAtom,
+	terminalScrollbackMbAtom,
 	themeAtom,
 	toolCallCollapseAtom,
 	useAppSettingsSync,
@@ -53,7 +54,6 @@ export type {
 export {
 	chatModelOverrideAtomFamily,
 	chatThinkingOverrideAtomFamily,
-	customPiExecutablePathAtom,
 	developerModeAtom,
 	favouriteModelsAtom,
 	forgetChatOverrides,
@@ -61,7 +61,6 @@ export {
 	prDetailsLiveDraftAtomFamily,
 	REPO_ACTION_KEYS,
 	repoSettingsOverrideAtomFamily,
-	terminalScrollbackMbAtom,
 } from './atoms';
 export { useAppearanceEffect } from './use-appearance-effect';
 export { useThemeEffect } from './use-theme-effect';

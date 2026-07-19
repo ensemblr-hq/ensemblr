@@ -92,6 +92,7 @@ function ScriptsEditor({
 				description='Runs when a new workspace is created.'
 				label='Setup script'
 				onChange={(value) => updateForm({ setup: value })}
+				onReset={() => updateForm({ setup: '' })}
 				placeholder='e.g. bun install'
 				source={resolved('scripts.setup')?.source}
 				value={form.setup}
@@ -101,6 +102,7 @@ function ScriptsEditor({
 				description='Runs when you click the play button.'
 				label='Run script'
 				onChange={(value) => updateForm({ run: value })}
+				onReset={() => updateForm({ run: '' })}
 				placeholder='e.g. bun run dev'
 				source={resolved('scripts.run')?.source}
 				value={form.run}
@@ -165,6 +167,7 @@ function ScriptsEditor({
 				description='Runs before a workspace is archived.'
 				label='Archive script'
 				onChange={(value) => updateForm({ archive: value })}
+				onReset={() => updateForm({ archive: '' })}
 				placeholder='e.g. rm -rf node_modules'
 				source={resolved('scripts.archive')?.source}
 				value={form.archive}
@@ -178,6 +181,7 @@ interface ScriptRowProps {
 	description: string;
 	label: string;
 	onChange: (next: string) => void;
+	onReset: () => void;
 	placeholder: string;
 	source: ResolvedSettingSnapshot['source'] | undefined;
 	value: string;
@@ -188,11 +192,13 @@ function ScriptRow({
 	description,
 	label,
 	onChange,
+	onReset,
 	placeholder,
 	source,
 	value,
 }: ScriptRowProps) {
 	const overriddenByToml = source === 'ensemblr-config';
+	const isPersonalOverride = source === 'sqlite';
 
 	return (
 		<SettingRow
@@ -203,6 +209,8 @@ function ScriptRow({
 					<SourceBadge source={source} />
 				</span>
 			}
+			modified={isPersonalOverride}
+			onReset={onReset}
 			stack
 		>
 			<Textarea

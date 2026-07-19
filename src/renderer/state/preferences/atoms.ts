@@ -95,16 +95,9 @@ export const developerModeAtom = atomWithStorage<boolean>(
 
 // ─── Advanced (user) ──────────────────────────────────────────────────────────
 
-/** Path to a custom Pi executable overriding the bundled one; empty means use the discovered system Pi. Persisted to localStorage. */
-export const customPiExecutablePathAtom = atomWithStorage<string>(
-	KEY('pi_executable_override'),
-	'',
-);
-/** Maximum size in megabytes of each terminal pane's scrollback buffer; persisted to localStorage. */
-export const terminalScrollbackMbAtom = atomWithStorage<number>(
-	KEY('terminal_scrollback_mb'),
-	10,
-);
+// Pi executable path and terminal scrollback moved off localStorage: Pi path is
+// the SQLite `pi.executablePath` setting (read/set/cleared over IPC), and
+// scrollback is the `appearance.terminalScrollbackMb` config.json setting.
 
 // ─── Repository overrides (per-repo, personal) ────────────────────────────────
 
@@ -118,6 +111,8 @@ const REPO_SETTINGS_KEYS = [
 	'remoteOrigin',
 	'deleteLocalBranchOnArchive',
 	'archiveAfterMerge',
+	'filesToCopy',
+	'previewUrls',
 	'scripts.setup',
 	'scripts.run',
 	'scripts.archive',
@@ -128,16 +123,14 @@ const REPO_SETTINGS_KEYS = [
 export type RepoSettingsKey = (typeof REPO_SETTINGS_KEYS)[number];
 
 /**
- * Personal per-repo overrides stored locally. The real source of truth lives
- * in the committed `.ensemblr/settings.toml` and SQLite — these atoms only hold
- * user-only personal preferences until edited through the shared config writer.
+ * Personal per-repo overrides still stored locally. Git, files-to-copy, and
+ * preview-URL overrides moved to repository-scoped SQLite (resolved via
+ * {@link useRepoSettings}); only per-action instruction overrides remain here,
+ * and the committed `[prompts]` config merges *under* them. Spotlight testing
+ * is a separate, unbuilt feature — it will model its own state when it lands
+ * (see `docs/product/discovery-spotlight-testing.md`).
  */
 export interface RepoSettingsOverride {
-	branchFrom?: string;
-	remoteOrigin?: string;
-	useSpotlight?: boolean;
-	filesToCopy?: string;
-	previewUrls?: Array<{ name: string; url: string }>;
 	actionPreferences?: Partial<Record<RepoActionKey, string>>;
 }
 

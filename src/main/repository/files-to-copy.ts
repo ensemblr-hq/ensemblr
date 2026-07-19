@@ -27,6 +27,12 @@ export interface FilesToCopyService {
 /** Input for a single files-to-copy run. */
 interface CopyFilesToWorkspaceInput {
 	config: LoadedRepositoryConfig;
+	/**
+	 * Personal (SQLite) files-to-copy patterns resolved for the repo. When set,
+	 * they override the committed default but stay below `.worktreeinclude` and
+	 * `.ensemblr/settings.toml`, matching the settings resolver's precedence.
+	 */
+	personalPatterns?: readonly string[];
 	repositoryPath: string;
 	workspacePath: string;
 }
@@ -49,7 +55,7 @@ export function createFilesToCopyService({
 }): FilesToCopyService {
 	return {
 		copy: async (input) => {
-			const resolved = resolvePatterns(input.config);
+			const resolved = resolvePatterns(input.config, input.personalPatterns);
 
 			if (resolved.patterns.length === 0) {
 				return emptySnapshot(resolved.source, resolved.patterns);
@@ -166,31 +172,43 @@ export function createFilesToCopyService({
 }
 
 /**
- * Selects the highest-precedence config source that declared a `filesToCopy`
- * value; falls back to the built-in default when none did.
+ * Selects the highest-precedence source that declared a `filesToCopy` value:
+ * `.worktreeinclude`, then `.ensemblr/settings.toml`, then the personal SQLite
+ * override, then the built-in default. Mirrors the settings resolver's
+ * precedence so committed config still wins over a personal override.
  * @param config - Loaded repository configuration.
+ * @param personalPatterns - Personal (SQLite) patterns, when set.
  * @returns The chosen source plus its resolved pattern list.
  */
-function resolvePatterns(config: LoadedRepositoryConfig): {
+function resolvePatterns(
+	config: LoadedRepositoryConfig,
+	personalPatterns?: readonly string[],
+): {
 	patterns: string[];
 	source: FilesToCopySource;
 } {
 	const candidates: ReadonlyArray<{
-		record: Record<string, unknown> | undefined;
+		patterns: string[] | null;
 		source: FilesToCopySource;
 	}> = [
-		{ record: config.worktreeincludeConfig, source: 'worktreeinclude' },
-		{ record: config.ensemblrConfig, source: 'ensemblr-config' },
+		{
+			patterns: readPatternList(config.worktreeincludeConfig?.filesToCopy),
+			source: 'worktreeinclude',
+		},
+		{
+			patterns: readPatternList(config.ensemblrConfig?.filesToCopy),
+			source: 'ensemblr-config',
+		},
+		{ patterns: readPatternList(personalPatterns), source: 'personal' },
+		{ patterns: [...DEFAULT_PATTERNS], source: 'default' },
 	];
 
-	for (const candidate of candidates) {
-		const patterns = readPatternList(candidate.record?.filesToCopy);
-		if (patterns) {
-			return { patterns, source: candidate.source };
-		}
-	}
+	// The built-in default always has patterns, so `find` always resolves.
+	const selected =
+		candidates.find((candidate) => candidate.patterns !== null) ??
+		candidates[candidates.length - 1];
 
-	return { patterns: [...DEFAULT_PATTERNS], source: 'default' };
+	return { patterns: selected.patterns ?? [], source: selected.source };
 }
 
 /**

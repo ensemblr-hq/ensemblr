@@ -1,10 +1,8 @@
 import {
 	existsSync,
-	type FSWatcher,
 	mkdirSync,
 	readFileSync,
 	renameSync,
-	watch,
 	writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -17,6 +15,7 @@ import {
 	parseAppSettings,
 } from '../../shared/config/app-settings.ts';
 import { resolveEnsemblrConfigPath } from './config-loader.ts';
+import { watchConfigFile } from './watch-config-file.ts';
 
 /** Coalesces the burst of fs events an editor emits for a single save. */
 const WATCH_DEBOUNCE_MS = 120;
@@ -69,8 +68,7 @@ export function createAppSettingsService(
 	// Exact bytes of our last write — the watcher compares against this to ignore
 	// the fs event our own atomic write triggers.
 	let lastWritten: string | null = null;
-	let watcher: FSWatcher | null = null;
-	let debounce: ReturnType<typeof setTimeout> | null = null;
+	let watcherHandle: { stop: () => void } | null = null;
 
 	const readRaw = (): Record<string, unknown> => {
 		try {
@@ -149,17 +147,10 @@ export function createAppSettingsService(
 		} catch {
 			lastWritten = null;
 		}
-		// Watch the directory (not the file) so editors that save via
-		// rename-replace don't orphan the watcher; filter to our filename.
-		const fileName = path.basename(configPath);
-		watcher = watch(path.dirname(configPath), (_event, changed) => {
-			if (changed && changed !== fileName) {
-				return;
-			}
-			if (debounce) {
-				clearTimeout(debounce);
-			}
-			debounce = setTimeout(() => {
+		watcherHandle = watchConfigFile({
+			debounceMs: WATCH_DEBOUNCE_MS,
+			filePath: configPath,
+			onChange: () => {
 				let current: string;
 				try {
 					current = readFileSync(configPath, 'utf8');
@@ -171,17 +162,13 @@ export function createAppSettingsService(
 				}
 				lastWritten = current;
 				onChange(settingsFrom(asRecord(safeParse(current))));
-			}, WATCH_DEBOUNCE_MS);
+			},
 		});
 	};
 
 	const stop = (): void => {
-		if (debounce) {
-			clearTimeout(debounce);
-			debounce = null;
-		}
-		watcher?.close();
-		watcher = null;
+		watcherHandle?.stop();
+		watcherHandle = null;
 	};
 
 	return {

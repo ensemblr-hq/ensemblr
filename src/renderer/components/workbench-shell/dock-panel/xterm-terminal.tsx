@@ -8,9 +8,11 @@ import {
 import {
 	terminalFontAtom,
 	terminalFontSizeAtom,
+	terminalScrollbackMbAtom,
 } from '@/renderer/state/preferences';
 import type { TerminalRendererAdapter } from '@/renderer/types/terminal';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
+import { scrollbackMbToLines } from '@/shared/terminal/scrollback';
 
 /** Builds the terminal CSS font stack, prepending the user's chosen font. */
 function buildTerminalFontFamily(font: string): string {
@@ -39,7 +41,13 @@ export function XtermTerminal({
 	const adapterRef = useRef<TerminalRendererAdapter | null>(null);
 	const terminalFont = useAtomValue(terminalFontAtom);
 	const terminalFontSize = useAtomValue(terminalFontSizeAtom);
+	const terminalScrollbackMb = useAtomValue(terminalScrollbackMbAtom);
 	const fontFamily = buildTerminalFontFamily(terminalFont);
+	const scrollbackLines = scrollbackMbToLines(terminalScrollbackMb);
+	// Scrollback line count captured at construction; later changes are live-applied
+	// by the effect below (never remounting the surface), mirroring typography.
+	const scrollbackRef = useRef(scrollbackLines);
+	const appliedScrollbackRef = useRef(scrollbackLines);
 	// Latest typography, read at construction without re-mounting the surface on
 	// every font/size change (that is handled by the separate effect below).
 	const fontRef = useRef({ fontFamily, fontSize: terminalFontSize });
@@ -67,6 +75,7 @@ export function XtermTerminal({
 			fontFamily: fontRef.current.fontFamily,
 			fontSize: fontRef.current.fontSize,
 			readOnly,
+			scrollback: scrollbackRef.current,
 		});
 		adapterRef.current = adapter;
 		adapter.attach(container);
@@ -204,6 +213,15 @@ export function XtermTerminal({
 			});
 		}
 	}, [fontFamily, terminalFontSize, terminalId]);
+
+	useEffect(() => {
+		const adapter = adapterRef.current;
+		if (!adapter || appliedScrollbackRef.current === scrollbackLines) {
+			return;
+		}
+		appliedScrollbackRef.current = scrollbackLines;
+		adapter.setScrollback(scrollbackLines);
+	}, [scrollbackLines]);
 
 	return (
 		<div className='relative h-full min-h-0 w-full bg-sidebar'>

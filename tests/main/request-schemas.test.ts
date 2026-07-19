@@ -3,6 +3,7 @@ import { expect, test } from 'vitest';
 import {
 	parseCreateWorkspaceRequest,
 	parseGithubRepositoryListRequest,
+	parseUpdateRepositorySettingsRequest,
 } from '../../src/main/ipc/request-schemas.ts';
 
 const GITHUB_LINKED_ISSUE = {
@@ -79,4 +80,33 @@ test('github repository list request falls back to recent scope for garbage inpu
 	);
 	expect(parseGithubRepositoryListRequest('garbage').scope).toBe('recent');
 	expect(parseGithubRepositoryListRequest(null).scope).toBe('recent');
+});
+
+test('accepts a repository-settings patch and preserves explicit nulls', () => {
+	const parsed = parseUpdateRepositorySettingsRequest({
+		repositoryId: 'repo-1',
+		settings: {
+			archiveAfterMerge: null,
+			branchFrom: 'develop',
+			filesToCopy: ['.env'],
+			previewUrls: [{ name: 'Dev', url: 'http://localhost:3000' }],
+		},
+	});
+
+	expect(parsed).toEqual({
+		repositoryId: 'repo-1',
+		settings: {
+			archiveAfterMerge: null,
+			branchFrom: 'develop',
+			filesToCopy: ['.env'],
+			previewUrls: [{ name: 'Dev', url: 'http://localhost:3000' }],
+		},
+	});
+});
+
+test('rejects a repository-settings patch with a missing repository id', () => {
+	expect(
+		parseUpdateRepositorySettingsRequest({ repositoryId: '', settings: {} }),
+	).toBeNull();
+	expect(parseUpdateRepositorySettingsRequest('garbage')).toBeNull();
 });

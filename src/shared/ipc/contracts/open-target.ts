@@ -76,12 +76,30 @@ export interface OpenWorkspaceInTargetRequest {
 	workspaceId: string;
 }
 
+/**
+ * Which settings config file an "Edit in…" action targets. User scope resolves
+ * to `~/.config/ensemblr/config.json`; repo scope resolves to the repository's
+ * committed `.ensemblr/settings.toml`. Both files are created if missing.
+ */
+export type SettingsConfigFile =
+	| { scope: 'user' }
+	| { repositoryPath: string; scope: 'repo' };
+
+/** Request to open a settings config file in a chosen target app. */
+export interface OpenSettingsFileInTargetRequest {
+	config: SettingsConfigFile;
+	targetId: string;
+}
+
 /** Result of an open-in-target action: success, or a failure with an error message. */
 export type OpenTargetResult = { ok: true } | { error: string; ok: false };
 
 /** IPC surface for the open-in menu. */
 export interface OpenTargetApi {
 	listWorkspaceOpenTargets: () => Promise<ListWorkspaceOpenTargetsResult>;
+	openSettingsFileInTarget: (
+		request: OpenSettingsFileInTargetRequest,
+	) => Promise<OpenTargetResult>;
 	openWorkspaceInTarget: (
 		request: OpenWorkspaceInTargetRequest,
 	) => Promise<OpenTargetResult>;

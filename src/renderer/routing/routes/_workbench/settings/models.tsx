@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useEffect, useMemo } from 'react';
 
 import { piModelsQuery } from '@/renderer/api/ensemblr';
@@ -44,6 +44,7 @@ function ModelsSettings() {
 	const [reviewThinking, setReviewThinking] = useAtom(reviewThinkingLevelAtom);
 
 	const hidden = useAtomValue(hiddenModelsAtom);
+	const setHidden = useSetAtom(hiddenModelsAtom);
 	const hiddenSet = useMemo(() => new Set(hidden), [hidden]);
 	const allModels = useMemo(() => modelsData?.models ?? [], [modelsData]);
 	// Hidden models drop out of the default/review selects too, not just the
@@ -122,6 +123,11 @@ function ModelsSettings() {
 				}
 				description='Model used when you start a new chat. Falls back to the Pi-reported default when unset.'
 				label='Default model'
+				modified={defaultModel !== null || defaultThinking !== null}
+				onReset={() => {
+					setDefaultModel(null);
+					setDefaultThinking(null);
+				}}
 			/>
 
 			<SettingRow
@@ -144,11 +150,18 @@ function ModelsSettings() {
 				}
 				description='Model used for the Review action on a workspace.'
 				label='Review model'
+				modified={reviewModel !== null || reviewThinking !== null}
+				onReset={() => {
+					setReviewModel(null);
+					setReviewThinking(null);
+				}}
 			/>
 
 			<SettingRow
 				description='Hide models you don’t use from the model picker and the default/review selects. Hiding the selected default or review model switches it to the first available.'
 				label='Model visibility'
+				modified={hidden.length > 0}
+				onReset={() => setHidden([])}
 				stack
 			>
 				<ModelVisibilityList />

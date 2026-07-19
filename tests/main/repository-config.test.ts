@@ -155,9 +155,9 @@ enabled = true
 		claudeExecutablePath: '/opt/homebrew/bin/claude',
 		enterpriseDataPrivacy: true,
 		environmentVariables: { DEBUG: 'ensemblr:*' },
+		'actionPreferences.codeReview': 'Check repository contracts.',
+		branchPrefix: 'ensemblr/',
 		filesToCopy: ['.env.local', 'config/*.json'],
-		git: { branch_prefix: 'ensemblr/' },
-		prompts: { review: 'Check repository contracts.' },
 		runScriptMode: 'nonconcurrent',
 		scripts: {
 			archive: 'bun run archive',
@@ -167,6 +167,194 @@ enabled = true
 		spotlightTesting: { enabled: true },
 	});
 	assert.deepEqual(loaded.snapshot.diagnostics, []);
+});
+
+test('normalises nested [git] keys onto canonical top-level keys', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		`
+[git]
+branch_from = "develop"
+remote_origin = "upstream"
+delete_local_branch_on_archive = true
+archive_after_merge = true
+set_upstream_on_push = false
+`,
+	);
+
+	const loaded = loadRepositoryConfig({
+		repositoryPath: fixture.repositoryPath,
+	});
+	const source = getSource(loaded.snapshot, 'ensemblr-config');
+
+	assert.equal(source.status, 'loaded');
+	assert.deepEqual(source.settings, {
+		archiveAfterMerge: true,
+		branchFrom: 'develop',
+		deleteLocalBranchOnArchive: true,
+		remoteOrigin: 'upstream',
+		setUpstreamOnPush: false,
+	});
+	assert.deepEqual(loaded.snapshot.diagnostics, []);
+});
+
+test('normalises [prompts] onto canonical actionPreferences keys', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		`
+[prompts]
+review = "Focus on contracts."
+create_pr = "Concise PR body."
+fixCheckErrors = "Fix root cause."
+`,
+	);
+
+	const loaded = loadRepositoryConfig({
+		repositoryPath: fixture.repositoryPath,
+	});
+	const source = getSource(loaded.snapshot, 'ensemblr-config');
+
+	assert.equal(source.status, 'loaded');
+	assert.deepEqual(source.settings, {
+		'actionPreferences.codeReview': 'Focus on contracts.',
+		'actionPreferences.createPr': 'Concise PR body.',
+		'actionPreferences.fixErrors': 'Fix root cause.',
+	});
+	assert.deepEqual(loaded.snapshot.diagnostics, []);
+});
+
+test('resolves committed [prompts] review to actionPreferences.codeReview', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		'[prompts]\nreview = "Focus on contracts."\n',
+	);
+
+	const snapshot = resolveSettings({
+		config: createConfig(),
+		repository: {
+			repositoryId: 'repo-prompts',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	const resolved = getRepositorySetting(
+		snapshot.repository,
+		'actionPreferences.codeReview',
+	);
+	assert.equal(resolved.source, 'ensemblr-config');
+	assert.equal(resolved.value, 'Focus on contracts.');
+});
+
+test('applies repositoryDefaults to every repository', (t) => {
+	const fixture = createRepositoryFixture(t);
+
+	const snapshot = resolveSettings({
+		config: createConfig({ repositoryDefaults: { branchFrom: 'develop' } }),
+		repository: {
+			repositoryId: 'repo-defaults',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	const resolved = getRepositorySetting(snapshot.repository, 'branchFrom');
+	assert.equal(resolved.source, 'user-default');
+	assert.equal(resolved.value, 'develop');
+});
+
+test('a matching repositoryRule overrides repositoryDefaults', (t) => {
+	const fixture = createRepositoryFixture(t);
+
+	const snapshot = resolveSettings({
+		config: createConfig({
+			repositoryDefaults: { branchFrom: 'develop' },
+			repositoryRules: [
+				{
+					match: { path: path.basename(fixture.repositoryPath) },
+					settings: { branchFrom: 'release' },
+				},
+				{ match: { path: 'never-matches' }, settings: { branchFrom: 'nope' } },
+			],
+		}),
+		repository: {
+			repositoryId: 'repo-rules',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	assert.equal(
+		getRepositorySetting(snapshot.repository, 'branchFrom').value,
+		'release',
+	);
+});
+
+test('a committed .ensemblr value still wins over repositoryDefaults', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		'[git]\nbranch_from = "committed"\n',
+	);
+
+	const snapshot = resolveSettings({
+		config: createConfig({ repositoryDefaults: { branchFrom: 'develop' } }),
+		repository: {
+			repositoryId: 'repo-precedence',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	const resolved = getRepositorySetting(snapshot.repository, 'branchFrom');
+	assert.equal(resolved.source, 'ensemblr-config');
+	assert.equal(resolved.value, 'committed');
+});
+
+test('resolves committed [git] branch_from to the branchFrom key', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write('.ensemblr/settings.toml', '[git]\nbranch_from = "develop"\n');
+
+	const snapshot = resolveSettings({
+		config: createConfig(),
+		repository: {
+			repositoryId: 'repo-git',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	const resolved = getRepositorySetting(snapshot.repository, 'branchFrom');
+	assert.equal(resolved.source, 'ensemblr-config');
+	assert.equal(resolved.value, 'develop');
+});
+
+test('personal SQLite branchFrom resolves under the committed config', (t) => {
+	const fixture = createRepositoryFixture(t);
+	const database = createDatabaseFixture(t);
+	insertSetting({
+		database,
+		key: 'branchFrom',
+		scopeId: 'repo-1',
+		valueJson: JSON.stringify('feature-base'),
+	});
+
+	const snapshot = resolveSettings({
+		config: createConfig(),
+		database,
+		repository: {
+			repositoryId: 'repo-1',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	const resolved = getRepositorySetting(snapshot.repository, 'branchFrom');
+	assert.equal(resolved.source, 'sqlite');
+	assert.equal(resolved.value, 'feature-base');
 });
 
 test('.ensemblr/settings.toml overrides personal SQLite per-key', (t) => {

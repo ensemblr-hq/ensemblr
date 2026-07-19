@@ -1,6 +1,8 @@
+import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useAtomValue } from 'jotai';
 import { useCallback, useMemo } from 'react';
+import { settingsResolutionQuery } from '@/renderer/api/ensemblr';
 import { CloseRunningChatDialog } from '@/renderer/components/workbench-shell/conversation-panel/close-running-chat-dialog';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { WorkspaceWorkbenchContent } from '@/renderer/components/workbench-shell/workspace-content';
@@ -10,6 +12,11 @@ import {
 	createPlaceholderSession,
 	getComposerState,
 } from '@/renderer/lib/workbench';
+import {
+	resolveActionPreference,
+	sharedActionPreference,
+} from '@/renderer/lib/workbench/action-preference';
+import { configuredPreviewUrls } from '@/renderer/lib/workbench/preview-urls';
 import { useRegisterCloseAction } from '@/renderer/state/close-action';
 import {
 	usePiComposerController,
@@ -77,8 +84,24 @@ export function WorkspaceRouteContent({
 	});
 	const activeSession = sessionNavigation.effectiveActiveSession;
 	const terminalSessions = useWorkspaceTerminalSessions(activeWorkspace.id);
-	const { liveWorkspaceFiles, workspaceWithLiveDockTabs } =
+	const { data: settingsResolution } = useQuery(
+		settingsResolutionQuery({
+			repositoryId: activeProject.id,
+			repositoryPath: activeProject.pathLabel,
+		}),
+	);
+	const { liveWorkspaceFiles, workspaceWithLiveDockTabs: liveWorkspace } =
 		useLiveWorkspaceModel({ activeProject, activeWorkspace, terminalSessions });
+	// Resolve the repo's configured preview URLs here (where the settings query
+	// lives) and attach them to the model so the leaf dock components stay free
+	// of data hooks and remain statically renderable.
+	const workspaceWithLiveDockTabs = useMemo(
+		() => ({
+			...liveWorkspace,
+			configuredPreviewUrls: configuredPreviewUrls(settingsResolution),
+		}),
+		[liveWorkspace, settingsResolution],
+	);
 	usePublishWorkspaceDockActivity({
 		dockTabs: workspaceWithLiveDockTabs.dockTabs,
 		workspaceId: activeWorkspace.id,
@@ -99,7 +122,10 @@ export function WorkspaceRouteContent({
 	const piComposer = usePiComposerController({
 		chatTabId: activeSession.chatTabId,
 		currentPiSessionId: activeSession.piSessionId,
-		masterPrompt: repoOverrides.actionPreferences?.general ?? '',
+		masterPrompt: resolveActionPreference(
+			repoOverrides.actionPreferences?.general ?? '',
+			sharedActionPreference(settingsResolution, 'general'),
+		),
 		workspaceCwd: activeWorkspace.pathLabel,
 		workspaceId: activeWorkspace.id,
 	});

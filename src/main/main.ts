@@ -4,6 +4,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { app, BrowserWindow, shell } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc/channels';
 import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
+import type { ConfigChangedBroadcast } from '../shared/ipc/contracts/health';
 import type {
 	PiRawFrameBroadcast,
 	PiRawFrameKind,
@@ -14,6 +15,7 @@ import type {
 	TerminalOutputBroadcast,
 } from '../shared/ipc/contracts/terminal';
 import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
+import { scrollbackMbToBytes } from '../shared/terminal/scrollback';
 
 import { createMainWindow } from './app/main-window';
 import { createMainWindowStateStore } from './app/window-state';
@@ -372,6 +374,9 @@ const createWorkspaceServiceInstance = createWorkspaceService({
 	localCommandService,
 	/** Reads the user's default git settings for new workspaces. */
 	readGitDefaults: () => appSettingsService.read().git,
+	/** Resolves the repo's configured branchFrom base for new workspaces. */
+	readRepositorySettings: (request) =>
+		settingsResolutionService.resolve(request),
 	rootDirectoryService,
 });
 const sharedRootAdoptionService = createSharedRootAdoptionService({
@@ -453,6 +458,11 @@ const terminalService = createTerminalService({
 		broadcastToAllWindows(IPC_CHANNELS.terminalOutput, event),
 	/** Resolves the shell-derived base environment for terminal and script PTYs. */
 	resolveBaseEnv: async () => (await localCommandService.getEnvironment()).env,
+	/** Sizes each pty scrollback buffer from the user's terminal-scrollback setting. */
+	resolveScrollbackLimit: () =>
+		scrollbackMbToBytes(
+			appSettingsService.read().appearance.terminalScrollbackMb,
+		),
 	workspaceEnvironmentService,
 });
 const scriptLifecycleService = createScriptLifecycleService({
@@ -519,6 +529,14 @@ app.whenReady().then(() => {
 		} satisfies AppSettingsChangedBroadcast);
 		agentActivityMonitor.refresh();
 	});
+	// Live-reload the non-App config sections (linear, security, managed,
+	// environment, repositoryDefaults, repositoryRules) so external config.json
+	// edits take effect without a restart.
+	configService.startWatching((snapshot) => {
+		broadcastToAllWindows(IPC_CHANNELS.configChanged, {
+			snapshot,
+		} satisfies ConfigChangedBroadcast);
+	});
 	ipcHandlersHandle = registerIpcHandlers({
 		appSettingsService,
 		archiveRepositoryService,
@@ -562,6 +580,7 @@ app.whenReady().then(() => {
 
 app.on('will-quit', () => {
 	appSettingsService.stop();
+	configService.stop();
 	agentActivityMonitor.dispose();
 	terminalService.disposeAll();
 	ipcHandlersHandle?.dispose();

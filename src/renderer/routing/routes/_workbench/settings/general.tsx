@@ -68,6 +68,7 @@ function GeneralSettings() {
 				description={`Use ${NEWLINE_HINT} for new lines.`}
 				label='Send messages with'
 				modified={sendShortcut !== DEFAULTS.sendShortcut}
+				onReset={() => setSendShortcut(DEFAULTS.sendShortcut)}
 			/>
 
 			<SettingRow
@@ -89,6 +90,7 @@ function GeneralSettings() {
 				description='Queue messages to send after the agent finishes, or steer the agent mid-turn. Use ⌘J to queue.'
 				label='Follow-up behavior'
 				modified={followUp !== DEFAULTS.followUpBehavior}
+				onReset={() => setFollowUp(DEFAULTS.followUpBehavior)}
 			/>
 
 			<SettingRow
@@ -98,6 +100,7 @@ function GeneralSettings() {
 				description='Get notified when Pi finishes working in a chat.'
 				label='Desktop notifications'
 				modified={notifications !== DEFAULTS.desktopNotifications}
+				onReset={() => setNotifications(DEFAULTS.desktopNotifications)}
 			/>
 
 			<SettingRow
@@ -110,6 +113,7 @@ function GeneralSettings() {
 				description='Convert pasted text over 5000 characters into text attachments.'
 				label='Auto-convert long text'
 				modified={autoConvertLong !== DEFAULTS.autoConvertLongText}
+				onReset={() => setAutoConvertLong(DEFAULTS.autoConvertLongText)}
 			/>
 
 			<SettingRow
@@ -119,6 +123,7 @@ function GeneralSettings() {
 				description='Always show context usage. By default, only shown when more than 70% is used.'
 				label='Always show context usage'
 				modified={showContext !== DEFAULTS.alwaysShowContextUsage}
+				onReset={() => setShowContext(DEFAULTS.alwaysShowContextUsage)}
 			/>
 
 			<SettingRow
@@ -128,6 +133,7 @@ function GeneralSettings() {
 				description='Prevent your Mac from sleeping while Pi is actively working. Shuts off below 10% battery.'
 				label='Caffeinate while agents are running'
 				modified={caffeinate !== DEFAULTS.caffeinateWhileRunning}
+				onReset={() => setCaffeinate(DEFAULTS.caffeinateWhileRunning)}
 			/>
 
 			<SettingRow
@@ -140,6 +146,7 @@ function GeneralSettings() {
 				description={`Show all tool calls expanded by default instead of collapsed. Toggle with ${TOOL_CALL_TOGGLE_HINT}.`}
 				label="Don't collapse tool calls"
 				modified={toolCalls !== DEFAULTS.toolCallCollapse}
+				onReset={() => setToolCalls(DEFAULTS.toolCallCollapse)}
 			/>
 		</SettingsSection>
 	);
