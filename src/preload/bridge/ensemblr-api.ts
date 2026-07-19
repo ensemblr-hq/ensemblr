@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '../../shared/ipc/channels';
 import type { EnsemblrApi } from '../../shared/ipc/contracts/api';
 import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app-settings';
 import type { CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
+import type { ConfigChangedBroadcast } from '../../shared/ipc/contracts/health';
 import type {
 	PiRawFrameBroadcast,
 	PiSessionEventBroadcast,
@@ -21,6 +22,7 @@ type InvokeKey = Exclude<
 	keyof EnsemblrApi,
 	| 'getPathForFile'
 	| 'onAppSettingsChanged'
+	| 'onConfigChanged'
 	| 'onCloneGithubRepositoryProgress'
 	| 'onCloseActiveTabRequest'
 	| 'onPiRawFrame'
@@ -171,6 +173,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 				IPC_CHANNELS.appSettingsChanged,
 				listener,
 			),
+		onConfigChanged: (listener) =>
+			subscribe<ConfigChangedBroadcast>(IPC_CHANNELS.configChanged, listener),
 		onCloneGithubRepositoryProgress: (listener) =>
 			subscribe<CloneGithubRepositoryProgressEvent>(
 				IPC_CHANNELS.cloneGithubRepositoryProgress,

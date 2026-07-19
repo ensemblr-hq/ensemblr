@@ -7,6 +7,7 @@ export const IPC_CHANNELS = {
 	archiveRepository: 'ensemblr:archive-repository',
 	archiveWorkspace: 'ensemblr:archive-workspace',
 	appSettingsChanged: 'ensemblr:app-settings-changed',
+	configChanged: 'ensemblr:config-changed',
 	getAppSettings: 'ensemblr:get-app-settings',
 	updateAppSettings: 'ensemblr:update-app-settings',
 	openAppConfigFile: 'ensemblr:open-app-config-file',

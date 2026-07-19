@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, type FSWatcher, readFileSync, watch } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 
@@ -71,6 +71,15 @@ export interface EnsemblrConfigService {
 	getConfig: () => EnsemblrConfig;
 	getSnapshot: () => ConfigStatusSnapshot;
 	load: () => ConfigStatusSnapshot;
+	/**
+	 * Watches config.json and reloads the cache when it changes on disk, firing
+	 * `onChange` with the fresh snapshot so consumers (e.g. the renderer) can
+	 * re-resolve settings. Covers the non-App sections (linear, security, managed,
+	 * environment, repositoryDefaults, repositoryRules) that lack their own
+	 * watcher.
+	 */
+	startWatching: (onChange: (snapshot: ConfigStatusSnapshot) => void) => void;
+	stop: () => void;
 }
 
 /** Name of a top-level section in the on-disk Ensemblr config file. */
@@ -84,6 +93,8 @@ type SectionName =
 
 const CONFIG_DIRECTORY = '.config/ensemblr';
 const CONFIG_FILENAME = 'config.json';
+/** Coalesce burst fs events (editor rename-replace fires several) before reloading. */
+const CONFIG_WATCH_DEBOUNCE_MS = 100;
 const ALLOWED_TOP_LEVEL_KEYS = new Set([
 	'app',
 	'environment',
@@ -246,6 +257,11 @@ export function createEnsemblrConfigService(
 	options: LoadEnsemblrConfigOptions = {},
 ): EnsemblrConfigService {
 	let cachedResult: EnsemblrConfigLoadResult | null = null;
+	let watcher: FSWatcher | null = null;
+	let debounce: ReturnType<typeof setTimeout> | null = null;
+	const configPath =
+		options.configPath ??
+		resolveEnsemblrConfigPath(options.homeDirectory ?? homedir());
 
 	/** Loads the config on first call and caches the result. */
 	function ensureLoaded(): EnsemblrConfigLoadResult {
@@ -253,10 +269,41 @@ export function createEnsemblrConfigService(
 		return cachedResult;
 	}
 
+	const startWatching = (
+		onChange: (snapshot: ConfigStatusSnapshot) => void,
+	): void => {
+		const fileName = path.basename(configPath);
+		// Watch the directory (not the file) so editors that save via
+		// rename-replace don't orphan the watcher; filter to our filename.
+		watcher = watch(path.dirname(configPath), (_event, changed) => {
+			if (changed && changed !== fileName) {
+				return;
+			}
+			if (debounce) {
+				clearTimeout(debounce);
+			}
+			debounce = setTimeout(() => {
+				cachedResult = loadEnsemblrConfig(options);
+				onChange(cachedResult.snapshot);
+			}, CONFIG_WATCH_DEBOUNCE_MS);
+		});
+	};
+
+	const stop = (): void => {
+		if (debounce) {
+			clearTimeout(debounce);
+			debounce = null;
+		}
+		watcher?.close();
+		watcher = null;
+	};
+
 	return {
 		getConfig: () => ensureLoaded().config,
 		getSnapshot: () => ensureLoaded().snapshot,
 		load: () => ensureLoaded().snapshot,
+		startWatching,
+		stop,
 	};
 }
 

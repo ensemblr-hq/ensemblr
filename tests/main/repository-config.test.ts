@@ -249,6 +249,71 @@ test('resolves committed [prompts] review to actionPreferences.codeReview', (t) 
 	assert.equal(resolved.value, 'Focus on contracts.');
 });
 
+test('applies repositoryDefaults to every repository', (t) => {
+	const fixture = createRepositoryFixture(t);
+
+	const snapshot = resolveSettings({
+		config: createConfig({ repositoryDefaults: { branchFrom: 'develop' } }),
+		repository: {
+			repositoryId: 'repo-defaults',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	const resolved = getRepositorySetting(snapshot.repository, 'branchFrom');
+	assert.equal(resolved.source, 'user-default');
+	assert.equal(resolved.value, 'develop');
+});
+
+test('a matching repositoryRule overrides repositoryDefaults', (t) => {
+	const fixture = createRepositoryFixture(t);
+
+	const snapshot = resolveSettings({
+		config: createConfig({
+			repositoryDefaults: { branchFrom: 'develop' },
+			repositoryRules: [
+				{
+					match: { path: path.basename(fixture.repositoryPath) },
+					settings: { branchFrom: 'release' },
+				},
+				{ match: { path: 'never-matches' }, settings: { branchFrom: 'nope' } },
+			],
+		}),
+		repository: {
+			repositoryId: 'repo-rules',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	assert.equal(
+		getRepositorySetting(snapshot.repository, 'branchFrom').value,
+		'release',
+	);
+});
+
+test('a committed .ensemblr value still wins over repositoryDefaults', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		'[git]\nbranch_from = "committed"\n',
+	);
+
+	const snapshot = resolveSettings({
+		config: createConfig({ repositoryDefaults: { branchFrom: 'develop' } }),
+		repository: {
+			repositoryId: 'repo-precedence',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	const resolved = getRepositorySetting(snapshot.repository, 'branchFrom');
+	assert.equal(resolved.source, 'ensemblr-config');
+	assert.equal(resolved.value, 'committed');
+});
+
 test('resolves committed [git] branch_from to the branchFrom key', (t) => {
 	const fixture = createRepositoryFixture(t);
 	fixture.write('.ensemblr/settings.toml', '[git]\nbranch_from = "develop"\n');

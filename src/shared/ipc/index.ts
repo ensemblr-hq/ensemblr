@@ -106,6 +106,7 @@ export type {
 	PushWorkspaceBranchResult,
 } from './contracts/github';
 export type {
+	ConfigChangedBroadcast,
 	ConfigDiagnostic,
 	ConfigDiagnosticSeverity,
 	ConfigStatus,

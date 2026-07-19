@@ -24,6 +24,15 @@ export interface ConfigStatusSnapshot {
 	status: ConfigStatus;
 }
 
+/**
+ * Broadcast from main to renderer when `config.json` is reloaded after an
+ * external edit. Carries the fresh status snapshot; consumers re-resolve
+ * settings that derive from the non-App config sections.
+ */
+export interface ConfigChangedBroadcast {
+	snapshot: ConfigStatusSnapshot;
+}
+
 /** Health status of the local database. */
 export type DatabaseStatus = 'ok' | 'error';
 
@@ -53,4 +62,8 @@ export interface HealthSnapshot {
 /** Process / database health IPC surface. */
 export interface HealthApi {
 	health: () => Promise<HealthSnapshot>;
+	/** Subscribes to `config.json` reloads after external edits; returns an unsubscribe fn. */
+	onConfigChanged: (
+		listener: (event: ConfigChangedBroadcast) => void,
+	) => () => void;
 }

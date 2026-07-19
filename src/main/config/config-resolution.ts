@@ -222,6 +222,19 @@ export function resolveSettings({
 			collectSqliteSettings(database, 'repository', repository.repositoryId),
 			'sqlite',
 		);
+		// Rules are more specific than flat defaults, so add them first (same-source
+		// resolution is first-added-wins). Both sit above the app.git/experimental
+		// user defaults.
+		addCandidates(
+			repositoryCandidates,
+			collectRepositoryRuleCandidates(config, repository.repositoryPath),
+			'user-default',
+		);
+		addCandidates(
+			repositoryCandidates,
+			collectRepositoryDefaultCandidates(config),
+			'user-default',
+		);
 		addCandidates(
 			repositoryCandidates,
 			collectUserGitDefaultCandidates(userGitDefaults),
@@ -555,6 +568,75 @@ function getInvalidPermissionModeReason(value: unknown): string | null {
  * @param git - User git defaults, when available.
  * @returns Flat map of repo `key -> value`.
  */
+/**
+ * Flattens `repositoryDefaults` from config.json into repo resolution candidates
+ * applied to every repository as a `user-default` source.
+ * @param config - Validated declarative config.
+ * @returns Flat map of repo `key -> value`.
+ */
+function collectRepositoryDefaultCandidates(
+	config: EnsemblrConfig,
+): Map<string, unknown> {
+	return flattenRecord(config.repositoryDefaults ?? {});
+}
+
+/**
+ * Merges the settings of every `repositoryRules` entry that matches the
+ * repository into repo resolution candidates. Rules are applied in array order
+ * (later entries override earlier ones), so a more specific rule listed later
+ * wins. A rule with no (or an empty) `match` applies to all repositories.
+ * @param config - Validated declarative config.
+ * @param repositoryPath - Absolute repository path used for matching.
+ * @returns Flat map of repo `key -> value` from all matching rules.
+ */
+function collectRepositoryRuleCandidates(
+	config: EnsemblrConfig,
+	repositoryPath?: string,
+): Map<string, unknown> {
+	const merged = new Map<string, unknown>();
+
+	for (const rule of config.repositoryRules ?? []) {
+		if (!repositoryRuleMatches(rule, repositoryPath)) {
+			continue;
+		}
+
+		const settings = isPlainRecord(rule.settings) ? rule.settings : {};
+		for (const [key, value] of flattenRecord(settings)) {
+			merged.set(key, value);
+		}
+	}
+
+	return merged;
+}
+
+/**
+ * Decides whether a `repositoryRules` entry applies to a repository. A rule with
+ * no `match` (or an empty one) applies to all repositories; otherwise every
+ * provided condition must hold: `path` is a case-insensitive substring of the
+ * repository path.
+ * @param rule - A repository rule record.
+ * @param repositoryPath - Absolute repository path, when known.
+ * @returns True when the rule applies.
+ */
+function repositoryRuleMatches(
+	rule: Record<string, unknown>,
+	repositoryPath?: string,
+): boolean {
+	const match = rule.match;
+
+	if (!isPlainRecord(match) || Object.keys(match).length === 0) {
+		return true;
+	}
+
+	if (typeof match.path === 'string' && match.path.trim()) {
+		return (repositoryPath ?? '')
+			.toLowerCase()
+			.includes(match.path.trim().toLowerCase());
+	}
+
+	return false;
+}
+
 function collectUserGitDefaultCandidates(
 	git?: GitSettings,
 ): Map<string, unknown> {

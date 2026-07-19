@@ -4,6 +4,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { app, BrowserWindow, shell } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc/channels';
 import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
+import type { ConfigChangedBroadcast } from '../shared/ipc/contracts/health';
 import type {
 	PiRawFrameBroadcast,
 	PiRawFrameKind,
@@ -522,6 +523,14 @@ app.whenReady().then(() => {
 		} satisfies AppSettingsChangedBroadcast);
 		agentActivityMonitor.refresh();
 	});
+	// Live-reload the non-App config sections (linear, security, managed,
+	// environment, repositoryDefaults, repositoryRules) so external config.json
+	// edits take effect without a restart.
+	configService.startWatching((snapshot) => {
+		broadcastToAllWindows(IPC_CHANNELS.configChanged, {
+			snapshot,
+		} satisfies ConfigChangedBroadcast);
+	});
 	ipcHandlersHandle = registerIpcHandlers({
 		appSettingsService,
 		archiveRepositoryService,
@@ -565,6 +574,7 @@ app.whenReady().then(() => {
 
 app.on('will-quit', () => {
 	appSettingsService.stop();
+	configService.stop();
 	agentActivityMonitor.dispose();
 	terminalService.disposeAll();
 	ipcHandlersHandle?.dispose();
