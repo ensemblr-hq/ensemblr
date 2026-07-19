@@ -13,7 +13,6 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
-import { useConfiguredPreviewUrls } from '@/renderer/hooks/workbench-shell/use-configured-preview-urls';
 import {
 	type PreviewUrlOption,
 	resolvePreviewUrlOptions,
@@ -35,11 +34,10 @@ export function DockPanelActions({
 	const { run } = workspace.scripts;
 	const hasRunScript = run.status !== 'missing';
 	const desktopRuntime = workspace.desktopRuntime ?? null;
-	const configuredPreviewUrls = useConfiguredPreviewUrls(workspace.projectId);
 
 	if (hasRunScript && run.status === 'running') {
 		const previewOptions = resolvePreviewUrlOptions({
-			configured: configuredPreviewUrls,
+			configured: workspace.configuredPreviewUrls ?? [],
 			detectedUrl: run.previewUrl ?? null,
 			port: typeof run.port === 'number' ? run.port : null,
 			workspaceName: workspace.name,

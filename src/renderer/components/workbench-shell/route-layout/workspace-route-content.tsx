@@ -16,6 +16,7 @@ import {
 	resolveActionPreference,
 	sharedActionPreference,
 } from '@/renderer/lib/workbench/action-preference';
+import { configuredPreviewUrls } from '@/renderer/lib/workbench/preview-urls';
 import { useRegisterCloseAction } from '@/renderer/state/close-action';
 import {
 	usePiComposerController,
@@ -83,8 +84,22 @@ export function WorkspaceRouteContent({
 	});
 	const activeSession = sessionNavigation.effectiveActiveSession;
 	const terminalSessions = useWorkspaceTerminalSessions(activeWorkspace.id);
-	const { liveWorkspaceFiles, workspaceWithLiveDockTabs } =
+	const { data: settingsResolution } = useQuery(
+		settingsResolutionQuery({
+			repositoryId: activeProject.id,
+			repositoryPath: activeProject.pathLabel,
+		}),
+	);
+	const { liveWorkspaceFiles, workspaceWithLiveDockTabs: liveWorkspace } =
 		useLiveWorkspaceModel({ activeProject, activeWorkspace, terminalSessions });
+	// Resolve the repo's configured preview URLs here (where the settings query
+	// lives) and attach them to the model so the leaf dock components stay free
+	// of data hooks and remain statically renderable.
+	const previewUrls = configuredPreviewUrls(settingsResolution);
+	const workspaceWithLiveDockTabs = useMemo(
+		() => ({ ...liveWorkspace, configuredPreviewUrls: previewUrls }),
+		[liveWorkspace, previewUrls],
+	);
 	usePublishWorkspaceDockActivity({
 		dockTabs: workspaceWithLiveDockTabs.dockTabs,
 		workspaceId: activeWorkspace.id,
@@ -101,12 +116,6 @@ export function WorkspaceRouteContent({
 	const { state: setupDiagnosticsState } = useSetupDiagnostics();
 	const repoOverrides = useAtomValue(
 		repoSettingsOverrideAtomFamily(activeProject.id),
-	);
-	const { data: settingsResolution } = useQuery(
-		settingsResolutionQuery({
-			repositoryId: activeProject.id,
-			repositoryPath: activeProject.pathLabel,
-		}),
 	);
 	const piComposer = usePiComposerController({
 		chatTabId: activeSession.chatTabId,
