@@ -15,6 +15,8 @@ import type {
 	WorkspaceGitFileWire,
 } from '../../shared/ipc/contracts/workspace-git';
 import type { LocalCommandService } from '../commands/local-command';
+// react-doctor-disable-next-line -- Cross-concern imports use the stable public entrypoint.
+import { resolveWorkspaceCwd } from '../workspace-files/index.ts';
 import {
 	parseNameStatus,
 	parseNumstat,
@@ -726,20 +728,6 @@ function summarizeFiles(
 		deletions += file.deletions ?? 0;
 	}
 	return { files, summary: { additions, deletions, files: files.length } };
-}
-
-/** Validates and normalizes an absolute workspace cwd from the renderer. */
-function resolveWorkspaceCwd(
-	workspaceCwd: string,
-): { cwd: string; ok: true } | { message: string; ok: false } {
-	const cwd = workspaceCwd?.trim();
-	if (!cwd || !path.isAbsolute(cwd)) {
-		return {
-			message: 'Workspace path must be an absolute filesystem path.',
-			ok: false,
-		};
-	}
-	return { cwd, ok: true };
 }
 
 /** Rejects absolute or workspace-escaping relative paths from the renderer. */

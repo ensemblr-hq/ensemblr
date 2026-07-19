@@ -3,13 +3,13 @@ import type { PiExecutableSnapshot } from '../pi-runtime';
 import type { RenameWorkspaceService } from '../repository';
 import { parseMetadata } from '../repository/metadata.ts';
 import { selectWorkspaceWithRepositoryById } from '../storage/repositories/workspace-repository.ts';
+import { extractAgentMessageText } from './agent-message-text.ts';
 import {
 	composeRenamedBranch,
 	sanitizeBranchSlug,
 	shouldAutoRenameWorkspace,
 } from './branch-name-slug.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
-import type { PiAgentEvent } from './pi-agent-types.ts';
 import { appendWorkspaceRenamedMetadataEvent } from './pi-session-persistence.ts';
 import type { QueueChatTitleInput } from './session/session-open.ts';
 
@@ -165,7 +165,7 @@ async function generateBranchSlug({
 	});
 	const subscription = session.subscribe((event) => {
 		if (event.type === 'message' && event.role === 'agent') {
-			const text = extractBranchText(event);
+			const text = extractAgentMessageText(event);
 			if (text) {
 				chunks.push(text);
 			}
@@ -204,26 +204,6 @@ function buildBranchNamePrompt(prompt: string): string {
 		'REQUEST:',
 		prompt,
 	].join('\n');
-}
-
-/** Pulls finalized plain text out of a normalized pi agent message payload. */
-function extractBranchText(
-	event: Extract<PiAgentEvent, { type: 'message' }>,
-): string {
-	const payload = event.payload;
-	switch (payload.kind) {
-		case 'text':
-			return payload.text;
-		case 'message':
-			return payload.parts
-				.flatMap((part) =>
-					part.kind === 'text' && part.text ? [part.text] : [],
-				)
-				.join(' ')
-				.trim();
-		default:
-			return '';
-	}
 }
 
 /** Resolves once the session goes idle, or after the timeout, whichever is first. */

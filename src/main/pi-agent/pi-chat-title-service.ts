@@ -2,8 +2,8 @@ import type { DatabaseSync } from 'node:sqlite';
 
 import type { PiExecutableSnapshot } from '../pi-runtime';
 import { renameChatTab } from '../storage/repositories/chat-tab-repository.ts';
+import { extractAgentMessageText } from './agent-message-text.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
-import type { PiAgentEvent } from './pi-agent-types.ts';
 import { appendChatTitleMetadataEvent } from './pi-session-persistence.ts';
 import type { PiSessionEventSink } from './pi-session-types.ts';
 
@@ -186,7 +186,7 @@ async function generateChatTitle({
 	});
 	const subscription = session.subscribe((event) => {
 		if (event.type === 'message' && event.role === 'agent') {
-			const text = extractTitleText(event);
+			const text = extractAgentMessageText(event);
 			if (text) {
 				chunks.push(text);
 			}
@@ -236,30 +236,6 @@ function buildChatTitlePrompt(prompt: string): string {
 		'USER REQUEST:',
 		prompt,
 	].join('\n');
-}
-
-/**
- * Pulls plain text out of a normalized Pi agent message payload. Reasoning,
- * tool calls/results, prompt echoes, and streaming deltas are intentionally
- * excluded — only finalized `text` parts feed the title.
- */
-function extractTitleText(
-	event: Extract<PiAgentEvent, { type: 'message' }>,
-): string {
-	const payload = event.payload;
-	switch (payload.kind) {
-		case 'text':
-			return payload.text;
-		case 'message':
-			return payload.parts
-				.flatMap((part) =>
-					part.kind === 'text' && part.text ? [part.text] : [],
-				)
-				.join(' ')
-				.trim();
-		default:
-			return '';
-	}
 }
 
 /**

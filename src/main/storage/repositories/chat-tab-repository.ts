@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import { parseMetadata, serializeMetadata } from './metadata-json.ts';
 
 /** Kind of content a chat tab hosts: a chat, diff, document, file, or preview. */
 export type ChatTabKind = 'chat' | 'diff' | 'document' | 'file' | 'preview';
@@ -434,37 +435,4 @@ function mapRuntimeRow(row: RuntimeStateRowShape): PiRuntimeStateRow {
 		updatedAt: row.updated_at,
 		workspaceId: row.workspace_id,
 	};
-}
-
-/**
- * Serialize tab metadata to a JSON string, falling back to `{}` on missing or unserializable input.
- * @param metadata - Metadata record to serialize
- * @returns The JSON string, or `'{}'` when absent or serialization fails
- */
-function serializeMetadata(metadata?: Record<string, unknown>): string {
-	if (!metadata) {
-		return '{}';
-	}
-	try {
-		return JSON.stringify(metadata);
-	} catch {
-		return '{}';
-	}
-}
-
-/**
- * Parse a metadata JSON string into a record, returning `{}` on invalid or non-object input.
- * @param raw - JSON string to parse
- * @returns The parsed record, or an empty record when parsing fails
- */
-function parseMetadata(raw: string): Record<string, unknown> {
-	try {
-		const parsed = JSON.parse(raw);
-		if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-			return parsed as Record<string, unknown>;
-		}
-	} catch {
-		// fall through to empty
-	}
-	return {};
 }
