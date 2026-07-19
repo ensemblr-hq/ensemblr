@@ -4,17 +4,13 @@ import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
 import type { PullRequestHeaderTone } from '@/renderer/types/workbench';
 
-/** Pill-shaped PR number button, opening the URL when provided. */
-export function PullRequestNumberButton({
-	number,
-	tone,
-	url,
-}: {
-	number: number;
-	tone: PullRequestHeaderTone;
-	url?: string;
-}) {
-	const className = cn(
+/**
+ * Builds the shared PR/deployment pill styling so both controls keep matching borders.
+ * @param tone - PR header tone used to color the pill.
+ * @returns Tailwind classes for a header link pill.
+ */
+export function getPullRequestLinkButtonClassName(tone: PullRequestHeaderTone) {
+	return cn(
 		'h-6.5 rounded-sm border px-1.75 font-semibold text-xs',
 		tone === 'ready' &&
 			'border-status-ok/35 bg-status-ok/10 text-status-ok hover:bg-transparent dark:border-status-ok/35 dark:hover:bg-transparent',
@@ -27,6 +23,19 @@ export function PullRequestNumberButton({
 		tone === 'neutral' &&
 			'border-border bg-transparent text-muted-foreground hover:bg-muted/70',
 	);
+}
+
+/** Pill-shaped PR number button, opening the URL when provided. */
+export function PullRequestNumberButton({
+	number,
+	tone,
+	url,
+}: {
+	number: number;
+	tone: PullRequestHeaderTone;
+	url?: string;
+}) {
+	const className = getPullRequestLinkButtonClassName(tone);
 	const content = (
 		<>
 			<span className='font-mono tabular-nums'>#{number}</span>

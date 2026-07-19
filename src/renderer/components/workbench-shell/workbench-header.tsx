@@ -8,6 +8,7 @@ import type {
 } from '@/renderer/types/workbench';
 import { OpenWorkspaceMenu } from './open-workspace-menu';
 import { ProjectAvatar } from './project-avatar';
+import { RightSidebarHeaderInlineActions } from './right-sidebar-header/right-sidebar-header';
 import { useWorkbenchLayout } from './shell-contexts';
 
 /** Top toolbar showing project/workspace path, open-in menu and sidebar toggle. */
@@ -26,7 +27,7 @@ export function WorkbenchHeader({
 
 	return (
 		<header className='native-toolbar flex h-12 shrink-0 items-center justify-between gap-3 border-border border-b px-3'>
-			<div className='flex min-w-0 items-center gap-2'>
+			<div className='flex min-w-0 flex-1 items-center gap-2'>
 				<SidebarTrigger className='sidebar-collapsed-trigger' />
 				<div className='flex min-w-0 items-center gap-2'>
 					<ProjectAvatar project={activeProject} size='md' />
@@ -46,6 +47,9 @@ export function WorkbenchHeader({
 			</div>
 			<div className='flex shrink-0 items-center gap-2'>
 				<OpenWorkspaceMenu workspace={activeWorkspace} />
+				{isRightSidebarCollapsed ? (
+					<RightSidebarHeaderInlineActions activeWorkspace={activeWorkspace} />
+				) : null}
 				<Button
 					onClick={
 						isRightSidebarCollapsed
