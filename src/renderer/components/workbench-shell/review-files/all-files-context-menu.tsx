@@ -1,18 +1,16 @@
-import { ArrowUpRightIcon, CopyIcon } from 'lucide-react';
+import { CopyIcon } from 'lucide-react';
 
 import {
 	ContextMenuContent,
 	ContextMenuItem,
-	ContextMenuSub,
-	ContextMenuSubContent,
-	ContextMenuSubTrigger,
 } from '@/renderer/components/ui/context-menu';
-import { OpenTargetIcon } from '@/renderer/components/workbench-shell/open-target-icon';
 import type {
 	FileTreeMenuTarget,
 	OpenTargetsState,
 	WorkspaceOpenTarget,
 } from '@/renderer/types/workbench';
+
+import { OpenInTargetsSubmenu } from './open-in-targets-submenu';
 
 /**
  * Renders the single shared right-click menu for the all-files tree: "Open in
@@ -54,34 +52,7 @@ export function AllFilesContextMenuContent({
 			aria-label={`${target.relativePath} actions`}
 			className='w-44 bg-muted p-1'
 		>
-			{openInTargets.length ? (
-				<ContextMenuSub>
-					<ContextMenuSubTrigger className='h-8 gap-2 px-2 text-[0.8125rem]'>
-						<ArrowUpRightIcon
-							aria-hidden='true'
-							className='text-muted-foreground'
-						/>
-						<span className='min-w-0 flex-1'>Open in</span>
-					</ContextMenuSubTrigger>
-					<ContextMenuSubContent className='w-60 bg-muted p-1'>
-						{openInTargets.map((openTarget) => (
-							<ContextMenuItem
-								className='h-8 gap-2.5 px-2 text-[0.8125rem]'
-								key={openTarget.id}
-								onSelect={() => invoke(openTarget)}
-							>
-								<OpenTargetIcon className='size-4' target={openTarget} />
-								<span className='min-w-0 flex-1 truncate'>
-									{openTarget.label}
-								</span>
-								<span className='w-3.5 shrink-0 text-right text-muted-foreground text-xs tabular-nums'>
-									{openTarget.numberShortcutLabel}
-								</span>
-							</ContextMenuItem>
-						))}
-					</ContextMenuSubContent>
-				</ContextMenuSub>
-			) : null}
+			<OpenInTargetsSubmenu onSelect={invoke} openInTargets={openInTargets} />
 			{copyTarget ? (
 				<ContextMenuItem
 					className='h-8 gap-2 px-2 text-[0.8125rem]'

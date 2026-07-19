@@ -1,6 +1,5 @@
 import { Icon } from '@iconify/react';
 import { useQuery } from '@tanstack/react-query';
-import { TriangleAlertIcon } from 'lucide-react';
 
 import {
 	ensemblrQueryKeys,
@@ -13,6 +12,8 @@ import type {
 	ReadWorkspaceFileFailureCode,
 	ReadWorkspaceFileResult,
 } from '@/shared/ipc/contracts/workspace-files';
+
+import { PanelMessage } from './panel-message';
 
 /**
  * Read-only file content surface shown when a `kind: 'file'` tab is active.
@@ -38,28 +39,23 @@ export function FilePreviewPanel({
 	});
 
 	if (!filePath || !workspaceCwd) {
-		return (
-			<FilePreviewMessage message='This tab has no file associated with it.' />
-		);
+		return <PanelMessage message='This tab has no file associated with it.' />;
 	}
 
 	if (isPending) {
-		return <FilePreviewMessage message={`Loading ${filePath}…`} />;
+		return <PanelMessage message={`Loading ${filePath}…`} />;
 	}
 
 	if (isError) {
 		return (
-			<FilePreviewMessage
-				message={`Could not read ${filePath}.`}
-				tone='error'
-			/>
+			<PanelMessage message={`Could not read ${filePath}.`} tone='error' />
 		);
 	}
 
 	const result = data;
 	if (result.error) {
 		return (
-			<FilePreviewMessage
+			<PanelMessage
 				message={describeReadFailure(result.error.code, filePath)}
 				tone='error'
 			/>
@@ -121,35 +117,6 @@ function imageSourceForPreview(result: ReadWorkspaceFileResult): string | null {
 	}
 
 	return `data:${result.mimeType};base64,${result.content}`;
-}
-
-/** Renders a centered muted or error message inside the file-preview panel. */
-function FilePreviewMessage({
-	message,
-	tone = 'muted',
-}: {
-	message: string;
-	tone?: 'error' | 'muted';
-}) {
-	return (
-		<div className='flex min-h-0 flex-1 items-center justify-center p-6'>
-			<div className='flex items-center gap-2 text-sm'>
-				{tone === 'error' ? (
-					<TriangleAlertIcon
-						aria-hidden='true'
-						className='size-4 shrink-0 text-destructive'
-					/>
-				) : null}
-				<span
-					className={
-						tone === 'error' ? 'text-destructive' : 'text-muted-foreground'
-					}
-				>
-					{message}
-				</span>
-			</div>
-		</div>
-	);
 }
 
 /**

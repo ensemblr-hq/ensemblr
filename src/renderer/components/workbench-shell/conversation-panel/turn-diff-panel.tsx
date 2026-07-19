@@ -1,11 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { FileDiffIcon, TriangleAlertIcon } from 'lucide-react';
+import { FileDiffIcon } from 'lucide-react';
 
 import type { BundledLanguage } from 'shiki';
 
 import { turnDiffQuery } from '@/renderer/api/ensemblr-queries';
 import { CodeBlockContent } from '@/renderer/components/code-block';
 import type { TurnDiffFileWire } from '@/shared/ipc/contracts/checkpoint';
+
+import { PanelMessage } from './panel-message';
 
 /**
  * Read-only diff surface shown when a `kind: 'diff'` tab is active. Shows the
@@ -16,23 +18,23 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 	const { data, isError, isPending } = useQuery(turnDiffQuery(turnId));
 
 	if (!turnId) {
-		return <TurnDiffMessage message='This tab has no turn associated.' />;
+		return <PanelMessage message='This tab has no turn associated.' />;
 	}
 	if (isPending) {
-		return <TurnDiffMessage message='Computing turn diff…' />;
+		return <PanelMessage message='Computing turn diff…' />;
 	}
 	if (isError) {
-		return <TurnDiffMessage message='Could not compute diff.' tone='error' />;
+		return <PanelMessage message='Could not compute diff.' tone='error' />;
 	}
 
 	const result = data;
 	if (!result.ok) {
-		return <TurnDiffMessage message={result.error.message} tone='error' />;
+		return <PanelMessage message={result.error.message} tone='error' />;
 	}
 
 	const files = result.files;
 	if (files.length === 0) {
-		return <TurnDiffMessage message='No file changes in this turn.' />;
+		return <PanelMessage message='No file changes in this turn.' />;
 	}
 
 	return (
@@ -96,33 +98,4 @@ function statusGlyph(status: TurnDiffFileWire['status']): string {
 		default:
 			return 'M';
 	}
-}
-
-/** Renders a centered muted or error message inside the turn-diff panel. */
-function TurnDiffMessage({
-	message,
-	tone = 'muted',
-}: {
-	message: string;
-	tone?: 'error' | 'muted';
-}) {
-	return (
-		<div className='flex min-h-0 flex-1 items-center justify-center p-6'>
-			<div className='flex items-center gap-2 text-sm'>
-				{tone === 'error' ? (
-					<TriangleAlertIcon
-						aria-hidden='true'
-						className='size-4 shrink-0 text-destructive'
-					/>
-				) : null}
-				<span
-					className={
-						tone === 'error' ? 'text-destructive' : 'text-muted-foreground'
-					}
-				>
-					{message}
-				</span>
-			</div>
-		</div>
-	);
 }
