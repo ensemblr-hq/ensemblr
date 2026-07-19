@@ -106,7 +106,6 @@ export type {
 	PushWorkspaceBranchResult,
 } from './contracts/github';
 export type {
-	ConfigChangedBroadcast,
 	ConfigDiagnostic,
 	ConfigDiagnosticSeverity,
 	ConfigStatus,
@@ -233,13 +232,8 @@ export type {
 	ShellApi,
 } from './contracts/repository-navigation';
 export type {
-	OpenRepositoryConfigFileRequest,
-	OpenRepositoryConfigFileResult,
-	RepositoryPreviewUrl,
-	RepositorySettingsApi,
 	RepositorySettingsPatch,
 	UpdateRepositorySettingsRequest,
-	UpdateRepositorySettingsResult,
 } from './contracts/repository-settings';
 export type {
 	DeleteReviewCommentRequest,

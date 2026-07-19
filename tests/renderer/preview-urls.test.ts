@@ -2,7 +2,6 @@ import { expect, test } from 'vitest';
 
 import {
 	configuredPreviewUrls,
-	interpolatePreviewUrl,
 	resolvePreviewUrlOptions,
 } from '@/renderer/lib/workbench/preview-urls';
 import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
@@ -37,25 +36,31 @@ test('configuredPreviewUrls keeps only entries with a URL', () => {
 	expect(configuredPreviewUrls(undefined)).toEqual([]);
 });
 
-test('interpolatePreviewUrl substitutes port and workspace name', () => {
+test('resolvePreviewUrlOptions interpolates port and workspace name', () => {
 	expect(
-		interpolatePreviewUrl(
-			'https://$ENSEMBLR_WORKSPACE_NAME.test:$ENSEMBLR_PORT',
-			{
-				port: 5173,
-				workspaceName: 'alpha',
-			},
-		),
-	).toBe('https://alpha.test:5173');
+		resolvePreviewUrlOptions({
+			configured: [
+				{
+					name: 'Web',
+					url: 'https://$ENSEMBLR_WORKSPACE_NAME.test:$ENSEMBLR_PORT',
+				},
+			],
+			detectedUrl: null,
+			port: 5173,
+			workspaceName: 'alpha',
+		}),
+	).toEqual([{ name: 'Web', url: 'https://alpha.test:5173' }]);
 });
 
-test('interpolatePreviewUrl leaves the port token when the port is unknown', () => {
+test('resolvePreviewUrlOptions leaves the port token when the port is unknown', () => {
 	expect(
-		interpolatePreviewUrl('http://localhost:$ENSEMBLR_PORT', {
+		resolvePreviewUrlOptions({
+			configured: [{ name: 'Web', url: 'http://localhost:$ENSEMBLR_PORT' }],
+			detectedUrl: null,
 			port: null,
 			workspaceName: 'alpha',
 		}),
-	).toBe('http://localhost:$ENSEMBLR_PORT');
+	).toEqual([{ name: 'Web', url: 'http://localhost:$ENSEMBLR_PORT' }]);
 });
 
 test('resolvePreviewUrlOptions prefers configured entries, else the detected URL', () => {

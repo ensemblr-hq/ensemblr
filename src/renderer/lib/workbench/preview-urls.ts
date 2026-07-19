@@ -42,7 +42,7 @@ export function configuredPreviewUrls(
  * @param fields - The detected run port and the workspace name.
  * @returns The interpolated URL.
  */
-export function interpolatePreviewUrl(
+function interpolatePreviewUrl(
 	template: string,
 	fields: { port: number | null; workspaceName: string },
 ): string {

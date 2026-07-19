@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
@@ -40,6 +40,7 @@ function RepoGitSettings() {
 			<TextSetting
 				ariaLabel='Branch new workspaces from'
 				description='Each workspace is an isolated copy of your codebase. Set the upstream branch new workspaces fork from.'
+				key={personalValue(branchFrom)}
 				label='Branch new workspaces from'
 				onSave={(value) => save({ branchFrom: value })}
 				placeholder={(branchFrom?.value as string) || 'origin/master'}
@@ -131,14 +132,10 @@ function TextSetting({
 	resolved: ResolvedSettingSnapshot | undefined;
 	seed: string;
 }) {
+	// The parent remounts this component (via `key`) when the resolved personal
+	// value changes, so state is initialised from `seed` once per resolved value.
 	const [value, setValue] = useState(seed);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-	// Re-seed from the resolved personal value whenever it changes (e.g. after a
-	// save round-trips or the repo switches).
-	useEffect(() => {
-		setValue(seed);
-	}, [seed]);
 
 	const onChange = (next: string) => {
 		setValue(next);
