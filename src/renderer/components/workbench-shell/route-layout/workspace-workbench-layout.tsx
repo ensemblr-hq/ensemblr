@@ -1,11 +1,8 @@
-import { getRouteApi, useChildMatches } from '@tanstack/react-router';
+import { getRouteApi, Navigate, useChildMatches } from '@tanstack/react-router';
 
-import { WorkbenchEmptyStateContent } from '@/renderer/components/workbench-empty-state';
-import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import {
 	findWorkspaceNavigationSelection,
-	getEmptyStateCopy,
 	getStringRouteParam,
 } from '@/renderer/lib/workbench';
 
@@ -21,7 +18,6 @@ export function WorkspaceWorkbenchLayout() {
 	useRouteProfilerMount('WorkspaceWorkbenchLayout');
 
 	const model = useWorkbenchLayoutRouteModel();
-	const { state: setupDiagnosticsState } = useSetupDiagnostics();
 	const params = workspaceRouteApi.useParams();
 	const search = workspaceRouteApi.useSearch();
 	const chatId = useActiveWorkspaceChatId();
@@ -33,16 +29,12 @@ export function WorkspaceWorkbenchLayout() {
 		) ?? model.displaySelection;
 
 	if (!selection) {
-		return (
-			<WorkbenchEmptyStateContent
-				emptyState={getEmptyStateCopy({
-					isLoading: false,
-					navigationError: null,
-					projectCount: model.displayProjects.length,
-					setupStatus: setupDiagnosticsState.setupDiagnostics?.status,
-				})}
-			/>
-		);
+		// Loader (loadWorkspaceWorkbenchRoute) already redirects when the URL
+		// workspace is missing at load time; this fires only when live nav data
+		// drops the workspace after mount. Land on Welcome, never the old "No
+		// active workspaces" screen — the index loader keeps Welcome when no
+		// active workspace remains, so there is no redirect back here.
+		return <Navigate replace to='/' />;
 	}
 
 	return (

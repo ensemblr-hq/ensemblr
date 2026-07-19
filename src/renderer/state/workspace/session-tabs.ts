@@ -98,7 +98,11 @@ export function useSessionTabState({
 } {
 	const workspaceId = activeWorkspace.id;
 	const queryClient = useQueryClient();
-	const { data: chatTabsData } = useQuery(listChatTabsQuery(workspaceId));
+	const {
+		data: chatTabsData,
+		isFetching: isFetchingChatTabs,
+		isSuccess: hasLoadedChatTabs,
+	} = useQuery(listChatTabsQuery(workspaceId));
 	const { data: closedChatTabsData } = useQuery(
 		listClosedChatTabsWithSummaryQuery(workspaceId),
 	);
@@ -122,16 +126,19 @@ export function useSessionTabState({
 	}, [piSessions]);
 
 	const sessionTabs = useMemo<SessionTabModel[]>(() => {
-		if (!openTabs || openTabs.length === 0) {
-			// Fall back to the placeholder-derived sessions so the UI stays
-			// populated until the IPC query lands. Min-one-tab is enforced
-			// server-side; this branch covers first-paint and offline modes.
-			return activeWorkspace.sessions;
+		// The synthetic `<workspaceId>:overview` placeholder is never a strip tab.
+		// Surfacing it here made opening the first real tab look like a replace:
+		// the array swapped from `[placeholder]` to `[realTab]` at the 0->1 edge.
+		// Until the IPC query lands (first paint, and every switch to a
+		// not-yet-cached workspace) the strip is empty; the placeholder still
+		// backs `effectiveActiveSession` so content keeps rendering meanwhile.
+		if (!openTabs) {
+			return [];
 		}
 		return openTabs.map((tab) =>
 			toSessionTabModel(tab, piStatusByPiSessionId.get(tab.piSessionId ?? '')),
 		);
-	}, [openTabs, activeWorkspace.sessions, piStatusByPiSessionId]);
+	}, [openTabs, piStatusByPiSessionId]);
 
 	const closedSessions = useMemo<SessionTabModel[]>(() => {
 		if (!closedEntries) {
@@ -143,6 +150,10 @@ export function useSessionTabState({
 	const effectiveActiveSession =
 		sessionTabs.find((session) => session.id === activeSession.id) ??
 		sessionTabs[0] ??
+		activeWorkspace.sessions.find(
+			(session) => session.id === activeSession.id,
+		) ??
+		activeWorkspace.sessions[0] ??
 		activeSession;
 
 	const invalidateChatTabs = useCallback(() => {
@@ -237,10 +248,13 @@ export function useSessionTabState({
 		if (!bootstrap) {
 			return;
 		}
-		if (!chatTabsData) {
+		// Only act on a settled query. A mid-refetch snapshot can momentarily read
+		// as empty even when tabs exist; opening on that would spawn a spurious
+		// "New chat" and yank the user off their current tab (the 1->2 replace).
+		if (!hasLoadedChatTabs || isFetchingChatTabs) {
 			return;
 		}
-		if (chatTabsData.open.length > 0) {
+		if (!chatTabsData || chatTabsData.open.length > 0) {
 			return;
 		}
 		if (bootstrappedWorkspacesGlobal.has(workspaceId)) {
@@ -261,6 +275,8 @@ export function useSessionTabState({
 	}, [
 		bootstrap,
 		chatTabsData,
+		hasLoadedChatTabs,
+		isFetchingChatTabs,
 		invalidateChatTabs,
 		onSessionTabChange,
 		openChatTabMutation,

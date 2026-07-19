@@ -20,11 +20,11 @@ export function writeOpenedChatTabToCache({
 	queryClient.setQueryData<ListChatTabsResult>(
 		ensemblrQueryKeys.chatTabs(workspaceId),
 		(current) => {
+			// Without an existing snapshot, seeding `{ open: [tab] }` would drop any
+			// sibling tabs the refetch is about to return. Leave the cache untouched
+			// and let the caller's invalidate populate it authoritatively.
 			if (!current) {
-				return {
-					closed: [],
-					open: [tab],
-				};
+				return current;
 			}
 
 			return {

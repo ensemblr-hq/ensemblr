@@ -323,11 +323,13 @@ async function resolveLaunchProjects({
 	}
 
 	try {
-		// Index route is the launch entry point, so the navigation cache may be
-		// cold here; fetch live rather than reading a possibly-empty cache.
-		const snapshot = await queryClient.fetchQuery(
-			repositoryWorkspaceNavigationQuery,
-		);
+		// Force a live read: a warm-but-stale cache (within the query's
+		// staleTime) can still list a since-archived workspace, which would
+		// redirect launch into a dead workspace instead of holding on Welcome.
+		const snapshot = await queryClient.fetchQuery({
+			...repositoryWorkspaceNavigationQuery,
+			staleTime: 0,
+		});
 
 		return mapRepositoriesToProjects(snapshot.repositories);
 	} catch (error) {
