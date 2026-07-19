@@ -24,58 +24,78 @@ export function registerRepositorySettingsHandlers({
 }): void {
 	ipcMain.handle(
 		IPC_CHANNELS.updateRepositorySettings,
-		(_event, request: unknown): UpdateRepositorySettingsResult => {
-			const parsed = parseUpdateRepositorySettingsRequest(request);
-			const database = databaseService.getConnection()?.database;
-
-			if (!parsed || !database) {
-				return { ok: false };
-			}
-
-			try {
-				upsertRepositorySettings({
-					database,
-					repositoryId: parsed.repositoryId,
-					settings: parsed.settings,
-				});
-
-				return { ok: true };
-			} catch (error) {
-				console.error(
-					'[repository-settings] failed to persist repository settings',
-					error,
-				);
-
-				return { ok: false };
-			}
-		},
+		(_event, request: unknown): UpdateRepositorySettingsResult =>
+			persistRepositorySettings(databaseService, request),
 	);
 
 	ipcMain.handle(
 		IPC_CHANNELS.openRepositoryConfigFile,
-		async (
+		(
 			_event,
 			request: OpenRepositoryConfigFileRequest,
-		): Promise<OpenRepositoryConfigFileResult> => {
-			const repositoryPath =
-				typeof request?.repositoryPath === 'string'
-					? request.repositoryPath.trim()
-					: '';
-
-			if (!repositoryPath) {
-				return { error: 'A repository path is required to open its config.' };
-			}
-
-			try {
-				return await openInEditor(ensureRepositoryConfigFile(repositoryPath));
-			} catch (error) {
-				return {
-					error:
-						error instanceof Error
-							? error.message
-							: 'Failed to open the repository config file.',
-				};
-			}
-		},
+		): Promise<OpenRepositoryConfigFileResult> => openRepositoryConfig(request),
 	);
+}
+
+/**
+ * Validates and persists a repository-settings patch to SQLite, returning
+ * `{ ok: false }` for malformed input, a closed database, or a write error.
+ * @param databaseService - Database service providing the active connection.
+ * @param request - Raw IPC payload.
+ * @returns The write result.
+ */
+function persistRepositorySettings(
+	databaseService: EnsemblrDatabaseService,
+	request: unknown,
+): UpdateRepositorySettingsResult {
+	const parsed = parseUpdateRepositorySettingsRequest(request);
+	const database = databaseService.getConnection()?.database;
+
+	if (!parsed || !database) {
+		return { ok: false };
+	}
+
+	try {
+		upsertRepositorySettings({
+			database,
+			repositoryId: parsed.repositoryId,
+			settings: parsed.settings,
+		});
+		return { ok: true };
+	} catch (error) {
+		console.error(
+			'[repository-settings] failed to persist repository settings',
+			error,
+		);
+		return { ok: false };
+	}
+}
+
+/**
+ * Ensures the repo's committed config exists and opens it in the user's editor.
+ * @param request - Request carrying the repository path.
+ * @returns The open result, with `error` set when it could not be opened.
+ */
+async function openRepositoryConfig(
+	request: OpenRepositoryConfigFileRequest,
+): Promise<OpenRepositoryConfigFileResult> {
+	const repositoryPath =
+		typeof request?.repositoryPath === 'string'
+			? request.repositoryPath.trim()
+			: '';
+
+	if (!repositoryPath) {
+		return { error: 'A repository path is required to open its config.' };
+	}
+
+	try {
+		return await openInEditor(ensureRepositoryConfigFile(repositoryPath));
+	} catch (error) {
+		return {
+			error:
+				error instanceof Error
+					? error.message
+					: 'Failed to open the repository config file.',
+		};
+	}
 }

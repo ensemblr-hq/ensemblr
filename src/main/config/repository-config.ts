@@ -508,20 +508,38 @@ function normalizeMappedBlock(
 
 	for (const [key, entry] of Object.entries(value)) {
 		const outcome = resolveField(key, entry);
-		const path = `${fieldPath}.${key}`;
 
-		if (outcome.kind === 'unsupported') {
-			diagnostics.push(createUnsupportedFieldDiagnostic(key, source, path));
-		} else if (outcome.kind === 'invalid') {
-			diagnostics.push(
-				createInvalidFieldDiagnostic(key, source, path, outcome.expected),
-			);
-		} else {
+		if (outcome.kind === 'accepted') {
 			settings[outcome.canonicalKey] = outcome.value;
+			continue;
 		}
+
+		diagnostics.push(
+			diagnosticForOutcome(outcome, key, source, `${fieldPath}.${key}`),
+		);
 	}
 
 	return { diagnostics, settings };
+}
+
+/**
+ * Builds the diagnostic for a non-accepted mapped-field outcome (unsupported key
+ * or invalid value type).
+ * @param outcome - The rejected outcome.
+ * @param key - Sub-key that produced it.
+ * @param source - Source identifier used in diagnostics.
+ * @param path - JSONPath used in diagnostic messages.
+ * @returns The matching diagnostic.
+ */
+function diagnosticForOutcome(
+	outcome: { kind: 'unsupported' } | { expected: string; kind: 'invalid' },
+	key: string,
+	source: SettingsResolutionSource,
+	path: string,
+): ConfigDiagnostic {
+	return outcome.kind === 'unsupported'
+		? createUnsupportedFieldDiagnostic(key, source, path)
+		: createInvalidFieldDiagnostic(key, source, path, outcome.expected);
 }
 
 /**

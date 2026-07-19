@@ -634,15 +634,19 @@ function repositoryRuleMatches(
 ): boolean {
 	const match = rule.match;
 
-	if (!isPlainRecord(match) || Object.keys(match).length === 0) {
+	if (!isPlainRecord(match) || isEmptyRecord(match)) {
 		return true;
 	}
 
 	const needle = typeof match.path === 'string' ? match.path.trim() : '';
+	const haystack = (repositoryPath ?? '').toLowerCase();
 
-	return needle
-		? (repositoryPath ?? '').toLowerCase().includes(needle.toLowerCase())
-		: false;
+	return needle !== '' && haystack.includes(needle.toLowerCase());
+}
+
+/** True when a record has no own enumerable keys. */
+function isEmptyRecord(record: Record<string, unknown>): boolean {
+	return Object.keys(record).length === 0;
 }
 
 function collectUserGitDefaultCandidates(

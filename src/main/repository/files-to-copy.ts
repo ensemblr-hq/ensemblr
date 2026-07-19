@@ -200,13 +200,16 @@ function resolvePatterns(
 			source: 'ensemblr-config',
 		},
 		{ patterns: readPatternList(personalPatterns), source: 'personal' },
+		{ patterns: [...DEFAULT_PATTERNS], source: 'default' },
 	];
 
+	// The built-in default always has patterns, so a match is guaranteed.
 	const selected = candidates.find((candidate) => candidate.patterns !== null);
 
-	return selected?.patterns
-		? { patterns: selected.patterns, source: selected.source }
-		: { patterns: [...DEFAULT_PATTERNS], source: 'default' };
+	return {
+		patterns: selected?.patterns ?? [...DEFAULT_PATTERNS],
+		source: selected?.source ?? 'default',
+	};
 }
 
 /**

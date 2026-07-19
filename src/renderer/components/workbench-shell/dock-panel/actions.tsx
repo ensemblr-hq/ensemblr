@@ -99,18 +99,31 @@ function OpenPreviewControl({
 		return null;
 	}
 
-	const primaryLabel =
-		options.length === 1 && port !== null ? `Open :${port}` : primary.name;
-
 	if (options.length === 1) {
+		const label = port !== null ? `Open :${port}` : primary.name;
 		return (
 			<Button onClick={() => onOpen(primary.url)} size='xs' variant='outline'>
 				<ExternalLinkIcon data-icon='inline-start' />
-				{primaryLabel}
+				{label}
 			</Button>
 		);
 	}
 
+	return (
+		<OpenPreviewSplit onOpen={onOpen} options={options} primary={primary} />
+	);
+}
+
+/** Split Open button: primary opens the first URL, the dropdown lists the rest. */
+function OpenPreviewSplit({
+	onOpen,
+	options,
+	primary,
+}: {
+	onOpen: (url: string) => void;
+	options: PreviewUrlOption[];
+	primary: PreviewUrlOption;
+}) {
 	return (
 		<div className='flex items-center'>
 			<Button
