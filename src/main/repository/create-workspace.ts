@@ -44,6 +44,7 @@ import {
 	DEFAULT_FALLBACK_BRANCH,
 	GIT_WORKTREE_TIMEOUT_MS,
 	resolveRootBranch,
+	runBranchDelete,
 	runWorktreeAdd as runWorktreeAddShared,
 	syncBaseRef,
 } from './git-ops.ts';
@@ -292,6 +293,7 @@ export function createWorkspaceService({
 				});
 			} catch (error) {
 				await rollbackWorktree({
+					branchName: prepared.branchName,
 					localCommandService,
 					repositoryPath: repository.path,
 					workspacePath: prepared.path,
@@ -397,21 +399,26 @@ async function countWorkspaceFiles({
 	localCommandService: LocalCommandService;
 	workspacePath: string;
 }): Promise<number | null> {
-	const result = await localCommandService.run({
-		args: ['ls-files', '-z'],
-		command: 'git',
-		cwd: workspacePath,
-		maxOutputBytes: GIT_LS_FILES_MAX_OUTPUT_BYTES,
-		timeoutMs: GIT_LS_FILES_TIMEOUT_MS,
-	});
+	try {
+		const result = await localCommandService.run({
+			args: ['ls-files', '-z'],
+			command: 'git',
+			cwd: workspacePath,
+			maxOutputBytes: GIT_LS_FILES_MAX_OUTPUT_BYTES,
+			timeoutMs: GIT_LS_FILES_TIMEOUT_MS,
+		});
 
-	if (result.status !== 'success' || result.stdoutTruncated) {
+		if (result.status !== 'success' || result.stdoutTruncated) {
+			return null;
+		}
+
+		return (
+			parseNullSeparated(result.stdout).length +
+			filesToCopySnapshot.copied.length
+		);
+	} catch {
 		return null;
 	}
-
-	return (
-		parseNullSeparated(result.stdout).length + filesToCopySnapshot.copied.length
-	);
 }
 
 /**
@@ -833,14 +840,16 @@ async function runWorktreeAdd({
 }
 
 /**
- * Best-effort `git worktree remove --force` invoked when a post-worktree step
- * fails; failures are swallowed so the caller-facing diagnostic stays primary.
+ * Best-effort removal of a worktree and its newly-created branch after a
+ * post-worktree failure. Cleanup never replaces the primary diagnostic.
  */
 async function rollbackWorktree({
+	branchName,
 	localCommandService,
 	repositoryPath,
 	workspacePath,
 }: {
+	branchName: string;
 	localCommandService: LocalCommandService;
 	repositoryPath: string;
 	workspacePath: string;
@@ -852,6 +861,17 @@ async function rollbackWorktree({
 			cwd: repositoryPath,
 			maxOutputBytes: 16 * 1024,
 			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+		});
+	} catch {
+		// Leave any stuck state for manual inspection.
+	}
+	// Delete the branch even when worktree removal fails, so the freshly
+	// created branch never lingers after a rolled-back workspace.
+	try {
+		await runBranchDelete({
+			branchName,
+			localCommandService,
+			repositoryPath,
 		});
 	} catch {
 		// Leave any stuck state for manual inspection.
