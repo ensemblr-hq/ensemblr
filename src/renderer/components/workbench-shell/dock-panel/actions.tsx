@@ -128,7 +128,7 @@ function OpenPreviewControl({
 				{port !== null ? (
 					<>
 						<span className='@max-md/dock-header:hidden'>Open :{port}</span>
-						<span className='hidden @max-md/dock-header:inline'>:{port}</span>
+						<span className='@max-md/dock-header:inline hidden'>:{port}</span>
 					</>
 				) : (
 					<span className='@max-md/dock-header:hidden'>{primary.name}</span>

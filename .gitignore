@@ -3,11 +3,15 @@
 .vite/
 dist/
 node_modules/
-/out/
+out/
 /out.*/
 .playwright-cli/
 .fallow/
 .pi-capture-sandbox/
 coverage/
 assets/avatar.png
-.env*
+.env
+.env.*
+!.env.example
+*.p8
+*.p12

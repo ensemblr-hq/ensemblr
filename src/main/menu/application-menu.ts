@@ -6,8 +6,18 @@ import {
 	type MenuItemConstructorOptions,
 	shell,
 } from 'electron';
+import { author } from '../../../package.json';
 import { IPC_CHANNELS } from '../../shared/ipc/channels';
 import { getAccelerator } from '../../shared/keymap/matcher';
+
+/**
+ * Builds the About-panel copyright line from the package author and the current
+ * year, so the notice tracks the build date instead of a baked-in constant.
+ * @returns Copyright string such as `© Philipp Soldunov 2026`.
+ */
+function getCopyrightNotice(): string {
+	return `© ${author.name} ${new Date().getFullYear()}`;
+}
 
 /**
  * Returns the on-disk path to the bundled product roadmap markdown.
@@ -26,6 +36,8 @@ function getProductRoadmapPath(): string {
  * appearing only on darwin platforms.
  */
 export function installApplicationMenu(): void {
+	app.setAboutPanelOptions({ copyright: getCopyrightNotice() });
+
 	// Context-aware close: the renderer decides whether ⌘/Ctrl+W closes the
 	// active tab, navigates back, or closes the window. Replaces the default
 	// `close` role so the keydown reaches the web page logic instead of being
