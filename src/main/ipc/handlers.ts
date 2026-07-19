@@ -63,6 +63,7 @@ import { registerPiHandlers } from './handlers/pi';
 import { registerPiSessionHandlers } from './handlers/pi-session';
 import { registerRepositoryHandlers } from './handlers/repository';
 import { registerRepositoryConfigHandlers } from './handlers/repository-config';
+import { registerRepositorySettingsHandlers } from './handlers/repository-settings';
 import { registerRepositorySourcesHandlers } from './handlers/repository-sources';
 import { registerReviewHandlers } from './handlers/review';
 import { registerRootHandlers } from './handlers/root';
@@ -256,6 +257,7 @@ export function registerIpcHandlers({
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerTerminalHandlers({ terminalService });
 	registerWorkspaceScriptHandlers({ databaseService, scriptLifecycleService });
+	registerRepositorySettingsHandlers({ databaseService });
 	registerWorkspaceFilesHandlers({
 		listWorkspaceFilesService,
 		workspaceFilesWatcher,

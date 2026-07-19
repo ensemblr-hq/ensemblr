@@ -1,8 +1,10 @@
 # Settings Wiring Review
 
-Date: 2026-07-14
+Original review: 2026-07-14
 
-Purpose: record what user/global and repository settings are actually wired today, what is intentionally dead/removed, and what is still pending. This reflects the current codebase, not the older settings inventory screenshots.
+Last verified: 2026-07-19 against `034d12b`
+
+Purpose: record what user/global and repository settings are actually wired, what is intentionally dead/removed, and what is still pending. This reflects the current codebase rather than the older settings inventory screenshots.
 
 ## Summary
 
@@ -11,7 +13,7 @@ Ensemblr now has two real settings paths:
 1. **User/App settings** live in `~/.config/ensemblr/config.json` for migrated sections. They are owned by `AppSettingsService`, mirrored into renderer Jotai atoms, and live-reloaded when the file changes.
 2. **Repository settings** resolve through `.ensemblr/settings.toml`, `.worktreeinclude`, SQLite personal rows, user defaults, and built-in defaults. The resolver is real, but several repo settings screens still store values only in renderer `localStorage`, so those controls do not affect runtime behavior.
 
-Highest-risk gap: repo settings UI currently contains several false affordances. Scripts and environment are wired; Git/Misc/Actions are only partially wired.
+Highest-risk gap: repo settings UI still contains false affordances. Scripts and environment are wired, and personal action preferences now reach runtime prompts. Repo Git, Misc, spotlight testing, shared action prompts, and several Advanced controls remain partial or disconnected.
 
 ## User/App Settings
 
@@ -34,19 +36,14 @@ Removed by design:
 
 ### Models
 
-Status: **partially wired**.
-
-Wired:
+Status: **wired for the current flow**.
 
 - Default chat model.
 - Default chat thinking level.
+- Review model and review thinking level. The Review action opens a new chat, primes that chat's model/thinking overrides, attaches the generated review prompt, and auto-submits it.
 - Hidden models.
 - Favourite models, still localStorage because it is a composer picker preference.
-- Model catalog cache, still runtime/localStorage cache.
-
-Pending/dead:
-
-- Review model and review thinking level persist and render in Settings, but no runtime consumer was found. Current review action inserts a prompt into the active chat instead of spawning/routing through the configured review model.
+- Model catalog cache, still a runtime/localStorage cache.
 
 Removed by design:
 
@@ -85,9 +82,9 @@ Status: **mostly wired**.
 - Rename workspace when branch is named is used by the branch-name queue.
 - Delete local branch on archive, archive on merge, and set upstream on push feed runtime merge/archive/push behavior through resolved settings.
 
-Risk:
+Confirmed limitation:
 
-- Repository TOML nested Git keys may not normalize snake_case to the camelCase expected by runtime code. Example risk: a nested `branch_prefix` value may not become `branchPrefix`.
+- Repository TOML nested Git keys are preserved as nested snake_case values, for example `git.branch_prefix`. They do not normalize to the canonical top-level keys used by the resolver/runtime, such as `branchFrom`, `remoteOrigin`, `deleteLocalBranchOnArchive`, and `archiveAfterMerge`.
 
 ### Integrations and Diagnostics
 
@@ -129,7 +126,7 @@ Wired:
 
 Partially wired / broken:
 
-- Pi executable picker backend writes the real SQLite setting. The text field and clear button write localStorage only, so the UI can drift from the runtime override.
+- Pi executable **Browse** writes the real SQLite `piExecutablePath` setting used by diagnostics, Pi sessions, model discovery, and setup checks. The displayed text field hydrates from localStorage instead of the resolved SQLite value, and typing or **Use bundled Pi** changes only localStorage. There is no backend clear path, so the UI can drift from runtime.
 
 Pending/dead:
 
@@ -177,35 +174,35 @@ Status: **partially wired**.
 
 Wired/read-only:
 
-- Delete branch on archive.
-- Archive on merge.
-
-Pending:
-
-- Branch new workspaces from stores only in renderer localStorage and is not consumed by runtime.
-- Remote origin stores only in renderer localStorage and is not consumed by runtime.
-- Repo Git booleans have no editable SQLite path in the screen.
-
-### Repo Actions
-
-Status: **mostly pending**.
+- Delete branch on archive and archive on merge resolve from canonical repository SQLite rows, user defaults, or built-ins and feed runtime archive/merge behavior.
 
 Pending / false affordance:
 
-- Use spotlight testing stores only in renderer localStorage.
-- Code review preferences store only in renderer localStorage.
-- Create PR preferences store only in renderer localStorage.
-- Fix errors preferences store only in renderer localStorage.
-- Resolve conflicts preferences store only in renderer localStorage.
-- Branch rename preferences store only in renderer localStorage.
-- General action preferences store only in renderer localStorage.
+- Branch new workspaces from stores only in renderer localStorage and is not consumed by workspace creation.
+- Remote origin stores only in renderer localStorage and is not consumed by push/pull/PR behavior.
+- Repo Git booleans have no editable SQLite path in the screen.
+- The TOML `[git]` object remains nested and snake_case, so it does not currently supply the canonical keys above.
 
-Additional mismatch:
+### Repo Actions
 
-- Runtime agent-action prompts read resolver keys shaped like `piActions.review`.
-- Repo TOML parser accepts a `[prompts]` table as `prompts.review`.
-- The Actions settings UI writes neither key family into SQLite.
-- Result: built-in action prompts usually win.
+Status: **partially wired**.
+
+Wired, personal-only:
+
+- Code review, create PR, fix errors, resolve conflicts, branch rename, and general preferences persist in the per-repo localStorage override.
+- `useAgentActionRunner` now reads the matching preference, appends it after bounded built-in/context text, writes the generated action prompt as a workspace attachment, and submits it to the target chat.
+- Review actions additionally use the configured review model and thinking level in a new chat.
+
+Pending / false affordance:
+
+- Use spotlight testing stores only in renderer localStorage and has no runtime consumer.
+
+Shared-config mismatch:
+
+- The TOML parser accepts `[prompts]` as `prompts.*`.
+- Resolver built-ins use `piActions.*`.
+- The runtime action runner reads `actionPreferences` from renderer localStorage, not either resolver key family.
+- Shared TOML prompts and SQLite action rows therefore do not merge into the working personal action preferences.
 
 ### Repo Misc
 
@@ -241,14 +238,14 @@ Status: **pending**.
 
 ### LocalStorage repo override atoms
 
-`repoSettingsOverrideAtomFamily` is the main source of false settings affordances. It backs Repo Git, Actions, and Misc controls, but the real resolver/runtime mostly ignores those values.
+`repoSettingsOverrideAtomFamily` remains the main source of false settings affordances. It backs Repo Git, Actions, and Misc controls. Runtime now consumes `actionPreferences`, but still ignores `branchFrom`, `remoteOrigin`, `useSpotlight`, `previewUrls`, and `filesToCopy`.
 
 ## Recommended Next Work
 
 1. Remove or disable repo controls that only write localStorage, unless they are wired in the same change.
-2. Fix Pi executable Advanced UI to read/write/delete the real SQLite setting.
-3. Decide review model fate: wire it into a separate review runtime path or remove it.
-4. Normalize repo action preferences around one key family and wire UI → SQLite/TOML → resolver → runtime.
+2. Fix the Advanced Pi executable UI to hydrate, write, and clear the real SQLite setting.
+3. Normalize repo action preferences around one key family and merge personal/UI plus shared TOML values into the runtime prompt path.
+4. Normalize repository TOML Git fields and wire `branchFrom` / `remoteOrigin` into runtime behavior.
 5. Wire terminal scrollback limit or remove the control.
-6. Wire repo config edit action for `.ensemblr/settings.toml`.
+6. Wire the repo config edit action for `.ensemblr/settings.toml`.
 7. Decide whether `repositoryDefaults` and `repositoryRules` are still product scope; if yes, implement them in resolution.

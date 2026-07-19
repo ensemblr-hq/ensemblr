@@ -119,6 +119,7 @@ export const IPC_CHANNELS = {
 	unarchiveWorkspace: 'ensemblr:unarchive-workspace',
 	unwatchWorkspaceFiles: 'ensemblr:unwatch-workspace-files',
 	updateRepositoryScripts: 'ensemblr:update-repository-scripts',
+	updateRepositorySettings: 'ensemblr:update-repository-settings',
 	watchWorkspaceFiles: 'ensemblr:watch-workspace-files',
 	workspaceFilesChanged: 'ensemblr:workspace-files-changed',
 	writeForkSummary: 'ensemblr:write-fork-summary',

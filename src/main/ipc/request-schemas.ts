@@ -686,6 +686,44 @@ export function parseUpdateRepositoryScriptsRequest(
 	return parsed.success ? parsed.data : null;
 }
 
+/** Preview URL entry accepted by the repository-settings writer. */
+const repositoryPreviewUrlSchema = z.object({
+	name: z.string(),
+	url: z.string(),
+});
+
+/**
+ * Personal repository settings patch. Every field is optional; an explicit
+ * `null` clears the stored row so the value falls back to the next resolver
+ * source. {@link import('../../shared/ipc').RepositorySettingsPatch}.
+ */
+const repositorySettingsPatchSchema = z.object({
+	archiveAfterMerge: z.boolean().nullable().optional(),
+	branchFrom: z.string().nullable().optional(),
+	deleteLocalBranchOnArchive: z.boolean().nullable().optional(),
+	filesToCopy: z.array(z.string()).nullable().optional(),
+	previewUrls: z.array(repositoryPreviewUrlSchema).nullable().optional(),
+	remoteOrigin: z.string().nullable().optional(),
+});
+
+/** {@link import('../../shared/ipc').UpdateRepositorySettingsRequest}. */
+export const updateRepositorySettingsRequestSchema = z.object({
+	repositoryId: z.string().min(1),
+	settings: repositorySettingsPatchSchema,
+});
+
+/**
+ * Parses a repo-settings write request, returning `null` on malformed input so
+ * the handler can report a no-op without touching SQLite.
+ */
+export function parseUpdateRepositorySettingsRequest(
+	raw: unknown,
+): z.infer<typeof updateRepositorySettingsRequestSchema> | null {
+	const parsed = updateRepositorySettingsRequestSchema.safeParse(raw);
+
+	return parsed.success ? parsed.data : null;
+}
+
 // -----------------------------------------------------------------------------
 // review — STRICT (throws on bad input)
 // -----------------------------------------------------------------------------

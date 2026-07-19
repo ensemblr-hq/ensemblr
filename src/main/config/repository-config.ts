@@ -62,9 +62,28 @@ const TOML_FIELD_MAP: ReadonlyMap<string, string> = new Map([
 	['pi_executable_path', 'piExecutablePath'],
 ] as const);
 
+/**
+ * Nested `[git]` TOML keys mapped onto the canonical top-level resolver keys the
+ * runtime reads, with the expected value type. Without this the `[git]` block
+ * flattens to `git.branch_from` etc., which no resolver key matches.
+ */
+const GIT_FIELD_MAP: ReadonlyMap<
+	string,
+	{ key: string; type: 'boolean' | 'string' }
+> = new Map([
+	['branch_from', { key: 'branchFrom', type: 'string' }],
+	['branch_prefix', { key: 'branchPrefix', type: 'string' }],
+	['remote_origin', { key: 'remoteOrigin', type: 'string' }],
+	[
+		'delete_local_branch_on_archive',
+		{ key: 'deleteLocalBranchOnArchive', type: 'boolean' },
+	],
+	['archive_after_merge', { key: 'archiveAfterMerge', type: 'boolean' }],
+	['set_upstream_on_push', { key: 'setUpstreamOnPush', type: 'boolean' }],
+]);
+
 const OBJECT_SETTING_KEYS = new Set([
 	'environmentVariables',
-	'git',
 	'prompts',
 	'spotlightTesting',
 ]);
@@ -256,6 +275,13 @@ function normalizeRepositoryConfigFields({
 			continue;
 		}
 
+		if (key === 'git') {
+			const normalizedGit = normalizeGitBlock(value, '$.git', source);
+			settings = mergeSettings(settings, normalizedGit.settings);
+			diagnostics.push(...normalizedGit.diagnostics);
+			continue;
+		}
+
 		const normalizedKey = fieldMap.get(key);
 
 		if (!normalizedKey) {
@@ -350,6 +376,55 @@ function normalizeScripts(
 
 	if (Object.keys(scripts).length > 0) {
 		settings.scripts = scripts;
+	}
+
+	return { diagnostics, settings };
+}
+
+/**
+ * Normalises the `[git]` block, mapping each snake_case key onto its canonical
+ * top-level resolver key (`branch_from` -> `branchFrom`, etc.) and type-checking
+ * the value. Unsupported subkeys and mistyped values collect diagnostics.
+ * @param value - Raw `git` value to normalise.
+ * @param fieldPath - JSONPath used in diagnostic messages.
+ * @param source - Source identifier used in diagnostics.
+ * @returns Partial settings record of canonical keys plus accumulated diagnostics.
+ */
+function normalizeGitBlock(
+	value: unknown,
+	fieldPath: string,
+	source: SettingsResolutionSource,
+): NormalizedConfigSource {
+	if (!isPlainRecord(value)) {
+		return { diagnostics: [], settings: {} };
+	}
+
+	const diagnostics: ConfigDiagnostic[] = [];
+	const settings: Record<string, unknown> = {};
+
+	for (const [key, gitValue] of Object.entries(value)) {
+		const mapped = GIT_FIELD_MAP.get(key);
+
+		if (!mapped) {
+			diagnostics.push(
+				createUnsupportedFieldDiagnostic(key, source, `${fieldPath}.${key}`),
+			);
+			continue;
+		}
+
+		if (typeof gitValue !== mapped.type) {
+			diagnostics.push(
+				createInvalidFieldDiagnostic(
+					key,
+					source,
+					`${fieldPath}.${key}`,
+					mapped.type,
+				),
+			);
+			continue;
+		}
+
+		settings[mapped.key] = gitValue;
 	}
 
 	return { diagnostics, settings };

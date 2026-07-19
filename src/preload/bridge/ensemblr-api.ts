@@ -259,6 +259,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		updateAppSettings: (patch) => invoke('updateAppSettings', patch),
 		updateRepositoryScripts: (request) =>
 			invoke('updateRepositoryScripts', request),
+		updateRepositorySettings: (request) =>
+			invoke('updateRepositorySettings', request),
 		watchWorkspaceFiles: (request) => invoke('watchWorkspaceFiles', request),
 		writeForkSummary: (request) => invoke('writeForkSummary', request),
 		writeTerminalSession: (request) => invoke('writeTerminalSession', request),

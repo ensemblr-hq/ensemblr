@@ -111,6 +111,10 @@ import type {
 } from './contracts/repository-config';
 import type { RepositoryWorkspaceNavigationSnapshot } from './contracts/repository-navigation';
 import type {
+	UpdateRepositorySettingsRequest,
+	UpdateRepositorySettingsResult,
+} from './contracts/repository-settings';
+import type {
 	DeleteReviewCommentRequest,
 	DeleteReviewCommentResult,
 	DeleteReviewTodoRequest,
@@ -502,6 +506,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.updateRepositoryScripts]: IpcHandlerEntry<
 		UpdateRepositoryScriptsRequest,
 		UpdateRepositoryScriptsResult
+	>;
+	[IPC_CHANNELS.updateRepositorySettings]: IpcHandlerEntry<
+		UpdateRepositorySettingsRequest,
+		UpdateRepositorySettingsResult
 	>;
 	[IPC_CHANNELS.submitPiPrompt]: IpcHandlerEntry<
 		SubmitPiPromptRequest,

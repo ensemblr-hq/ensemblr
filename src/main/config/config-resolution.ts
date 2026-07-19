@@ -101,6 +101,7 @@ const VALID_PERMISSION_MODES = [
 const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> = {
 	archiveAfterMerge: false,
 	autoRunAfterSetup: false,
+	branchFrom: null,
 	deleteLocalBranchOnArchive: false,
 	filesToCopy: ['.env*'],
 	'piActions.branchNaming': null,
@@ -109,7 +110,9 @@ const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> = {
 	'piActions.general': null,
 	'piActions.resolveConflicts': null,
 	'piActions.review': null,
+	previewUrls: [],
 	previewUrlTemplate: null,
+	remoteOrigin: null,
 	runScriptMode: 'concurrent',
 	'security.permissionMode': DEFAULT_PERMISSION_MODE,
 	setUpstreamOnPush: true,

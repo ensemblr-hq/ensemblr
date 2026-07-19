@@ -13,6 +13,7 @@ import type { QuickStartApi } from './quick-start';
 import type { RepositoryApi } from './repository';
 import type { RepositoryConfigApi } from './repository-config';
 import type { NavigationApi, ShellApi } from './repository-navigation';
+import type { RepositorySettingsApi } from './repository-settings';
 import type { ReviewCommentsApi } from './review-comments';
 import type { RootDirectoryApi } from './root-directory';
 import type { SettingsApi } from './settings-resolution';
@@ -51,6 +52,7 @@ export interface EnsemblrApi
 		NavigationApi,
 		QuickStartApi,
 		RepositoryConfigApi,
+		RepositorySettingsApi,
 		SharedRootApi,
 		WorkspaceFilesApi,
 		WorkspaceGitApi,

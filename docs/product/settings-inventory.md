@@ -1,6 +1,6 @@
 # Settings Inventory
 
-Date: 2026-07-18
+Date: 2026-07-19
 
 This inventory reflects the settings screens as implemented in code. It separates
 app-wide settings from repository settings and assigns each setting to the right
@@ -17,7 +17,7 @@ Actions, Misc**. There is no Providers screen (removed).
 | --- | --- |
 | SQLite | Mutable local app state, personal overrides, cached integration status, workspace/repository records. |
 | `~/.config/ensemblr/config.json` | **Source of truth for App settings** — General, Models, Git, Appearance, and Experimental (partial: `autoRunAfterSetup`) are implemented under `app.general.*` / `app.models.*` / `app.git.*` / `app.appearance.*` / `app.experimental.*` (see ADR 0029) — plus declarative user defaults, managed policy-like settings, and repository matching rules. Created on first run; live-watched for external edits. |
-| `localStorage` (`atomWithStorage`) | Non-Settings-page UI state, the App toggles not backed by `config.json` (Experimental Developer Mode; Advanced Pi executable path and terminal scrollback limit), repo personal overrides, composer favourites, and the model-catalog cache. |
+| `localStorage` (`atomWithStorage`) | Non-Settings-page UI state, App controls not backed by `config.json` (Experimental Developer Mode and terminal scrollback limit), the Advanced Pi executable field's stale renderer mirror, Repo Git/Actions/Misc personal overrides, composer favourites, and the model-catalog cache. |
 | Repository config | Shared project behavior in the committed `.ensemblr/settings.toml`. Use for scripts, run mode, files-to-copy, and team-shared repository defaults. |
 | Pi user environment | Pi auth, models, provider settings, skills, extensions, prompts, themes, sessions, and project `.pi` resources. Ensemblr should not duplicate this as source of truth. |
 | macOS Keychain | Secret values such as tokens/API keys. SQLite may keep metadata only. |
@@ -163,8 +163,8 @@ refinement).
 | Setting | Ensemblr adaptation | Storage |
 | --- | --- | --- |
 | Ensemblr root directory | Browse to the Ensemblr root; changing it reconciles the repo list. Optional Conductor shared-root interoperability. | SQLite current value / root resolver. |
-| Pi executable path | Override the bundled Pi with `pi`, a wrapper script, or an alternate launcher; empty falls back to the discovered system Pi. | `localStorage` (`ensemblr_pref_pi_executable_override`). |
-| Terminal scrollback limit | xterm scrollback buffer, 1–200 MB (default 10). | `localStorage` (`ensemblr_pref_terminal_scrollback_mb`). |
+| Pi executable path | Override the bundled Pi with `pi`, a wrapper script, or an alternate launcher. **Browse** persists the runtime setting, but the text field and **Use bundled Pi** still update only a stale renderer mirror and cannot clear the runtime override. | SQLite (`piExecutablePath`) for runtime; `localStorage` (`ensemblr_pref_pi_executable_override`) for the disconnected field mirror. |
+| Terminal scrollback limit | Intended xterm/PTY scrollback buffer, 1–200 MB (default 10); the current terminal paths still use fixed defaults and ignore this value. | Disconnected `localStorage` value (`ensemblr_pref_terminal_scrollback_mb`). |
 | SSH private key path | Deferred with cloud/remote workspace support (ADR 0020). | Not applicable in v1. |
 
 Note: "Set upstream on plain `git push`" lives on the **Git** page
@@ -173,11 +173,14 @@ Note: "Set upstream on plain `git push`" lives on the **Git** page
 ## Repository Settings Sections
 
 The repo scope has five pages (`settings-sidebar.tsx` `REPO_NAV`): **Environment,
-Git, Scripts, Actions, Misc**. Personal repo overrides live in `localStorage`
-(`repoSettingsOverrideAtomFamily`, key `ensemblr_pref_repo_override_<repoId>`);
-resolved values come from the committed `.ensemblr/settings.toml` and SQLite
-through `useRepoSettings`. Each script/toggle row shows a `SourceBadge` and, where
-the committed toml wins, an "Overridden by the committed `.ensemblr/settings.toml`"
+Git, Scripts, Actions, Misc**. Repo Git/Actions/Misc personal overrides live in
+`localStorage` (`repoSettingsOverrideAtomFamily`, key
+`ensemblr_pref_repo_override_<repoId>`); Scripts personal overrides write SQLite.
+Resolved values come from the committed `.ensemblr/settings.toml` and SQLite
+through `useRepoSettings`. Action preferences are the only localStorage repo
+overrides currently consumed by runtime; the other local-only controls remain
+false affordances. Each script/toggle row shows a `SourceBadge` and, where the
+committed toml wins, an "Overridden by the committed `.ensemblr/settings.toml`"
 hint.
 
 ### Environment (repo)
@@ -189,23 +192,29 @@ panel as the user-scope Environment page but keyed to the repository scope.
 
 | Setting | Ensemblr adaptation | Storage |
 | --- | --- | --- |
-| Branch new workspaces from | Base ref for new workspace branches (`branchFrom`). | localStorage personal override; shared default in `.ensemblr/settings.toml`. |
-| Remote origin | Remote used for push/pull/PR (`remoteOrigin`). | localStorage personal override; inferred from git. |
-| Delete branch on archive | Read-only here; resolved from app/repo config. | Resolved value (edit in `.ensemblr/settings.toml`). |
-| Archive on merge | Read-only here; resolved from app/repo config. | Resolved value (edit in `.ensemblr/settings.toml`). |
+| Branch new workspaces from | Intended base ref for new workspace branches (`branchFrom`); the current control is not consumed by workspace creation. | localStorage screen value only. |
+| Remote origin | Intended remote for push/pull/PR (`remoteOrigin`); the current control is not consumed by runtime Git operations. | localStorage screen value only. |
+| Delete branch on archive | Read-only here; canonical SQLite rows, app defaults, and built-ins resolve into archive behavior. | Resolved value; no repository editor in the screen. |
+| Archive on merge | Read-only here; canonical SQLite rows, app defaults, and built-ins resolve into merge behavior. | Resolved value; no repository editor in the screen. |
+
+The TOML parser preserves `[git]` child keys such as `branch_prefix` in nested
+snake_case form. Those keys do not currently become the canonical top-level
+resolver keys used by the screen and runtime.
 
 ### Scripts
 
 | Setting | Ensemblr adaptation | Storage |
 | --- | --- | --- |
-| Setup script | Runs when a workspace is created or manually rerun; auto-skipped when the dependency fingerprint is unchanged (ADR 0034). | `.ensemblr/settings.toml` shared; localStorage personal override. |
-| Run script | Run button in the terminal dock. | `.ensemblr/settings.toml` shared; localStorage personal override. |
-| Run mode | Concurrent / nonconcurrent run behavior. | `.ensemblr/settings.toml` shared; localStorage personal override. |
-| Auto-run after setup | Start the run script automatically once setup completes. | `.ensemblr/settings.toml` shared; localStorage personal override. |
-| Archive script | Runs before archive. | `.ensemblr/settings.toml` shared; localStorage personal override. |
+| Setup script | Runs when a workspace is created or manually rerun; auto-skipped when the dependency fingerprint is unchanged (ADR 0034). | `.ensemblr/settings.toml` shared; SQLite personal override. |
+| Run script | Run button in the terminal dock. | `.ensemblr/settings.toml` shared; SQLite personal override. |
+| Run mode | Concurrent / nonconcurrent run behavior. | `.ensemblr/settings.toml` shared; SQLite personal override. |
+| Auto-run after setup | Start the run script automatically once setup completes. | `.ensemblr/settings.toml` shared; SQLite personal override. |
+| Archive script | Runs before archive. | `.ensemblr/settings.toml` shared; SQLite personal override. |
 
 The committed `.ensemblr/settings.toml` is hand-authored in the repo; Ensemblr
 reads it and does not generate it (there is no "create shared config" button).
+The Scripts form debounces writes through IPC into canonical repository-scoped
+SQLite rows; a committed TOML value wins and shadows the personal row.
 
 ### Actions
 
@@ -214,8 +223,8 @@ Spotlight testing plus per-action agent-preference text (`repo/$repoId/actions.t
 
 | Setting | Ensemblr adaptation | Storage |
 | --- | --- | --- |
-| Use spotlight testing | Replace the running app from root while testing workspace changes. | `.ensemblr/settings.toml` shared; localStorage personal override. |
-| Code review / Create PR / Fix errors / Resolve conflicts / Branch rename / General preferences | Custom Pi instructions for each workspace action (accordion of six textareas). | `.ensemblr/settings.toml` shared if safe; localStorage personal override. |
+| Use spotlight testing | Intended to replace Run with Spotlight for the repository; no runtime consumer exists yet. | localStorage screen value only; `[spotlight_testing]` parses but is not consumed. |
+| Code review / Create PR / Fix errors / Resolve conflicts / Branch rename / General preferences | Custom Pi instructions for each workspace action. The action runner appends the matching personal preference to the generated prompt, writes it as a workspace attachment, and submits it. | localStorage personal override, consumed at runtime. Shared `[prompts]` TOML values parse as `prompts.*` but are not merged into this path. |
 
 ### Misc
 
@@ -226,9 +235,13 @@ Identity/paths, preview URLs, files-to-copy, and repository removal
 | --- | --- | --- |
 | Root path | Path to the managed or adopted repository (read-only). | SQLite only. |
 | Workspaces path | Path to workspaces under the Ensemblr/shared root (read-only). | SQLite only. |
-| Preview URLs | Multi-row templates; support `$ENSEMBLR_WORKSPACE_NAME` and `$ENSEMBLR_PORT`. | localStorage personal override; shared default in `.ensemblr/settings.toml`. |
-| Files to copy | gitignore-style globs (textarea) copied into new worktrees. | `.ensemblr/settings.toml` shared; localStorage personal override. |
+| Preview URLs | Multi-row templates; support `$ENSEMBLR_WORKSPACE_NAME` and `$ENSEMBLR_PORT`, but the current Open button uses terminal-output auto-detection and ignores these values. | localStorage screen value only. |
+| Files to copy | gitignore-style globs copied into new worktrees. Runtime reads `.worktreeinclude` or `.ensemblr/settings.toml`; the current textarea does not write either source. | Runtime repository files plus a disconnected localStorage screen value. |
 | Remove repository | Remove from app records via a confirm dialog; the handler runs `archiveRepository` under the hood. | SQLite lifecycle. |
+
+Although `filesToCopy` can appear in the generic settings-resolution snapshot,
+the create-workspace copy service reads repository files directly and does not
+consume a personal SQLite row.
 
 ## Configuration Precedence
 
@@ -250,13 +263,14 @@ For app-wide behavior, use:
 > Migration status: General, Models, Git, Appearance, and Experimental's
 > `autoRunAfterSetup` are the source of truth in `config.json`. Appearance
 > additionally migrates its legacy `ensemblr_pref_*` `localStorage` values on first
-> launch (removing them only after a successful write). Only three App toggles
-> still persist to `localStorage`: Experimental **Developer Mode**, and Advanced
-> **Pi executable path** and **Terminal scrollback limit**. Repo personal
-> overrides also live in `localStorage`; the committed `.ensemblr/settings.toml`
+> launch (removing them only after a successful write). Developer Mode and
+> Terminal scrollback still persist only to `localStorage`. Pi executable Browse
+> writes SQLite, while its text/clear UI remains a disconnected localStorage
+> mirror. Repo Git/Actions/Misc personal overrides live in `localStorage`; Scripts
+> personal overrides live in SQLite. The committed `.ensemblr/settings.toml`
 > holds shared repo defaults.
 
 ## Open Settings Questions
 
 - Resolved (pi 0.79.1): plan mode is extension-only, fast mode and browser control have no core support, personality has no Pi concept — all dropped from the Models settings screen. Review-model separation is supported via a separate spawned session with its own `--model`.
-- No active settings product question remains from the 2026-07-18 refresh. New settings work should update this inventory when a value moves between `config.json`, SQLite, localStorage, repository config, or Keychain.
+- No active settings product question remains from the 2026-07-19 refresh. Known implementation gaps are tracked in `settings-wiring-review-2026-07-14.md`; new settings work should update both documents when a value moves between `config.json`, SQLite, localStorage, repository config, or Keychain.
