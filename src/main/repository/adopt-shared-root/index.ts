@@ -158,6 +158,27 @@ export async function reconcileSharedRoot({
 		diagnostics,
 		'repository-scan-failed',
 	);
+	const workspaceRepoChildren = readChildDirectories(
+		root.workspacesPath,
+		diagnostics,
+		'workspace-scan-failed',
+	);
+	const workspaceChildrenByRepository = new Map(
+		workspaceRepoChildren.map((repositorySlug) => {
+			const repositoryWorkspacesPath = path.join(
+				root.workspacesPath,
+				repositorySlug,
+			);
+			return [
+				repositorySlug,
+				readChildDirectories(
+					repositoryWorkspacesPath,
+					diagnostics,
+					'workspace-scan-failed',
+				),
+			] as const;
+		}),
+	);
 	const repositoryProbes = await Promise.all(
 		repositoryChildren.map(async (child) => {
 			const candidatePath = path.join(root.repositoriesPath, child);
@@ -231,11 +252,6 @@ export async function reconcileSharedRoot({
 	const scannedWorkspacePaths = new Set<string>();
 	const collisionsByRepo = new Map<string, Map<string, string[]>>();
 
-	const workspaceRepoChildren = readChildDirectories(
-		root.workspacesPath,
-		diagnostics,
-		'workspace-scan-failed',
-	);
 	for (const repoSlug of workspaceRepoChildren) {
 		const repoWorkspacesPath = path.join(root.workspacesPath, repoSlug);
 		const repoInfo =
@@ -252,11 +268,7 @@ export async function reconcileSharedRoot({
 			continue;
 		}
 
-		const workspaceChildren = readChildDirectories(
-			repoWorkspacesPath,
-			diagnostics,
-			'workspace-scan-failed',
-		);
+		const workspaceChildren = workspaceChildrenByRepository.get(repoSlug) ?? [];
 		const workspaceProbes = await Promise.all(
 			workspaceChildren.map(async (workspaceSlug) => {
 				const candidatePath = path.join(repoWorkspacesPath, workspaceSlug);

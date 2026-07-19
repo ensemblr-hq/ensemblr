@@ -510,6 +510,48 @@ test('create rolls back the directory and skips the SQLite row when git fails', 
 	assert.equal(count.count, 0);
 });
 
+test('create removes its branch when the workspace row insert fails', async (t) => {
+	const harness = createHarness(t);
+	const database = harness.databaseService.getConnection()
+		?.database as DatabaseSync;
+	database.exec(`
+		CREATE TRIGGER fail_workspace_insert
+		BEFORE INSERT ON workspaces
+		BEGIN
+			SELECT RAISE(ABORT, 'forced workspace insert failure');
+		END;
+	`);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'insert-failure',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'workspace-insert-failed');
+	assert.equal(
+		existsSync(
+			path.join(
+				harness.workspacesPath,
+				harness.repositorySlug,
+				'insert-failure',
+			),
+		),
+		false,
+	);
+	const branches = runGit(harness.repositoryPath, [
+		'branch',
+		'--format=%(refname:short)',
+	]).split(/\r?\n/);
+	assert.equal(branches.includes('insert-failure'), false);
+});
+
 test('create records files-to-copy snapshot in the success result', async (t) => {
 	const harness = createHarness(t);
 	writeFileSync(path.join(harness.repositoryPath, '.gitignore'), '.env*\n');
@@ -555,6 +597,38 @@ test('create records files-to-copy snapshot in the success result', async (t) =>
 	assert.equal(typeof filesToCopyMetadata, 'object');
 	assert.notEqual(filesToCopyMetadata, null);
 	assert.equal(result.workspace.metadata.workspaceFileCount, 3);
+});
+
+test('create succeeds when workspace file counting throws unexpectedly', async (t) => {
+	const harness = createHarness(t);
+	const commandService = createLocalCommandService();
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: {
+			getEnvironment: commandService.getEnvironment,
+			run: async (request, options) => {
+				if (
+					request.command === 'git' &&
+					request.args?.[0] === 'ls-files' &&
+					request.args[1] === '-z'
+				) {
+					throw new Error('forced file-count failure');
+				}
+				return commandService.run(request, options);
+			},
+		},
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'count-failure',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.ok(result.workspace);
+	assert.equal(result.workspace?.metadata.workspaceFileCount, undefined);
 });
 
 test('create returns null filesToCopy snapshot when it fails before copying', async (t) => {

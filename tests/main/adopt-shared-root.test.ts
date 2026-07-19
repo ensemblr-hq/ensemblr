@@ -11,16 +11,20 @@ import {
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test, { type TestContext } from 'node:test';
+import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
 import { reconcileSharedRoot } from '../../src/main/repository/adopt-shared-root/index.ts';
+import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
 import {
 	probeGitRepository,
 	probeGitWorktreeMetadata,
 } from '../../src/main/repository/git-probe.ts';
 import {
 	type EnsemblrDatabaseConnection,
+	type EnsemblrDatabaseService,
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import type { RootDirectorySnapshot } from '../../src/shared/ipc';
+import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
 
@@ -62,6 +66,23 @@ function createHarness(t: TestContext): Harness {
 	};
 
 	return { connection, rootPath, rootSnapshot };
+}
+
+function databaseServiceFor(harness: Harness): EnsemblrDatabaseService {
+	return {
+		close: () => harness.connection.database.close(),
+		getConnection: () => harness.connection,
+		getHealth: () => ({
+			path: harness.connection.path,
+			schemaVersion: harness.connection.schemaVersion,
+			status: 'ok',
+		}),
+		open: () => ({
+			path: harness.connection.path,
+			schemaVersion: harness.connection.schemaVersion,
+			status: 'ok',
+		}),
+	};
 }
 
 function runGit(cwd: string, args: string[]): string {
@@ -316,6 +337,178 @@ test('marks stale repository rows but auto-deletes stale workspace rows', async 
 
 	const wsRow = workspaceRow(harness, ghostWorkspacePath);
 	assert.ok(!wsRow, 'stale workspace row deleted');
+});
+
+test('does not delete a workspace created while reconciliation is scanning', async (t) => {
+	const harness = createHarness(t);
+	const repositoryPath = path.join(
+		harness.rootSnapshot.repositoriesPath,
+		'demo',
+	);
+	createGitRepository(repositoryPath);
+	await runReconcile(harness);
+
+	const repository = repositoryRow(harness, repositoryPath);
+	const repositoryId = repository?.id;
+	assert.equal(typeof repositoryId, 'string');
+	if (typeof repositoryId !== 'string') {
+		throw new Error('adopted repository id missing');
+	}
+
+	const existingWorkspacePath = path.join(
+		harness.rootSnapshot.workspacesPath,
+		'demo',
+		'existing',
+	);
+	addWorktree(repositoryPath, existingWorkspacePath, 'existing');
+
+	let signalProbeStarted: () => void = () => undefined;
+	const probeStarted = new Promise<void>((resolve) => {
+		signalProbeStarted = resolve;
+	});
+	let releaseProbe: () => void = () => undefined;
+	const probeRelease = new Promise<void>((resolve) => {
+		releaseProbe = resolve;
+	});
+	const reconcilePromise = reconcileSharedRoot({
+		database: harness.connection.database,
+		gitProbe: probeGitRepository,
+		loadConfig: () => ({
+			snapshot: {
+				diagnostics: [],
+				loadedAt: fixedNow().toISOString(),
+				repositoryPath: '',
+				sources: [],
+			},
+		}),
+		now: fixedNow,
+		root: harness.rootSnapshot,
+		worktreeProbe: async (candidatePath) => {
+			signalProbeStarted();
+			await probeRelease;
+			return probeGitWorktreeMetadata(candidatePath);
+		},
+	});
+	await probeStarted;
+
+	const createService = createWorkspaceService({
+		databaseService: databaseServiceFor(harness),
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: buildRootDirectoryStub({
+			rootPath: harness.rootPath,
+			workspacesPath: harness.rootSnapshot.workspacesPath,
+		}),
+	});
+	const createResult = await createService.create({
+		name: 'created-during-scan',
+		repositoryId,
+	});
+	assert.equal(createResult.status, 'success');
+	assert.ok(createResult.workspace);
+
+	releaseProbe();
+	const reconciliation = await reconcilePromise;
+	const createdWorkspacePath = createResult.workspace?.path ?? '';
+
+	assert.equal(
+		reconciliation.stale.workspaces.some(
+			(workspace) => workspace.id === createResult.workspace?.id,
+		),
+		false,
+	);
+	assert.ok(workspaceRow(harness, createdWorkspacePath));
+});
+
+test('does not adopt a worktree while workspace creation is still writing its row', async (t) => {
+	const harness = createHarness(t);
+	const repositoryPath = path.join(
+		harness.rootSnapshot.repositoriesPath,
+		'demo',
+	);
+	createGitRepository(repositoryPath);
+	await runReconcile(harness);
+
+	const repository = repositoryRow(harness, repositoryPath);
+	const repositoryId = repository?.id;
+	assert.equal(typeof repositoryId, 'string');
+	if (typeof repositoryId !== 'string') {
+		throw new Error('adopted repository id missing');
+	}
+
+	let signalRepositoryProbeStarted: () => void = () => undefined;
+	const repositoryProbeStarted = new Promise<void>((resolve) => {
+		signalRepositoryProbeStarted = resolve;
+	});
+	let releaseRepositoryProbe: () => void = () => undefined;
+	const repositoryProbeRelease = new Promise<void>((resolve) => {
+		releaseRepositoryProbe = resolve;
+	});
+	const reconcilePromise = reconcileSharedRoot({
+		database: harness.connection.database,
+		gitProbe: async (candidatePath) => {
+			signalRepositoryProbeStarted();
+			await repositoryProbeRelease;
+			return probeGitRepository(candidatePath);
+		},
+		loadConfig: () => ({
+			snapshot: {
+				diagnostics: [],
+				loadedAt: fixedNow().toISOString(),
+				repositoryPath: '',
+				sources: [],
+			},
+		}),
+		now: fixedNow,
+		root: harness.rootSnapshot,
+		worktreeProbe: probeGitWorktreeMetadata,
+	});
+	await repositoryProbeStarted;
+
+	let signalCopyStarted: () => void = () => undefined;
+	const copyStarted = new Promise<void>((resolve) => {
+		signalCopyStarted = resolve;
+	});
+	let releaseCopy: () => void = () => undefined;
+	const copyRelease = new Promise<void>((resolve) => {
+		releaseCopy = resolve;
+	});
+	const createService = createWorkspaceService({
+		databaseService: databaseServiceFor(harness),
+		filesToCopyService: {
+			copy: async () => {
+				signalCopyStarted();
+				await copyRelease;
+				return {
+					copied: [],
+					diagnostics: [],
+					patterns: [],
+					skipped: [],
+					source: 'default',
+				};
+			},
+		},
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: buildRootDirectoryStub({
+			rootPath: harness.rootPath,
+			workspacesPath: harness.rootSnapshot.workspacesPath,
+		}),
+	});
+	const createPromise = createService.create({
+		name: 'created-during-scan',
+		repositoryId,
+	});
+	await copyStarted;
+	releaseRepositoryProbe();
+	const reconciliation = await reconcilePromise;
+	releaseCopy();
+	const createResult = await createPromise;
+
+	assert.equal(reconciliation.adopted.workspaces.length, 0);
+	assert.equal(createResult.status, 'success');
+	assert.ok(createResult.workspace);
+	assert.ok(workspaceRow(harness, createResult.workspace?.path ?? ''));
 });
 
 test('flags two workspaces sharing the same branch as a collision', async (t) => {

@@ -1,3 +1,4 @@
+import { statSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
@@ -62,7 +63,7 @@ export function detectStaleRecords({
 		if (!row.path.startsWith(repositoriesPathPrefix)) {
 			continue;
 		}
-		if (scannedRepositoryPaths.has(row.path)) {
+		if (scannedRepositoryPaths.has(row.path) || directoryExists(row.path)) {
 			continue;
 		}
 		markRecordMissing({
@@ -83,7 +84,7 @@ export function detectStaleRecords({
 		if (!row.path.startsWith(workspacesPathPrefix)) {
 			continue;
 		}
-		if (scannedWorkspacePaths.has(row.path)) {
+		if (scannedWorkspacePaths.has(row.path) || directoryExists(row.path)) {
 			continue;
 		}
 		deleteWorkspaceRow({ database, id: row.id });
@@ -91,4 +92,13 @@ export function detectStaleRecords({
 	}
 
 	return { repositories, workspaces };
+}
+
+/** Confirms a path still names a directory when it appeared after the scan snapshot. */
+function directoryExists(candidatePath: string): boolean {
+	try {
+		return statSync(candidatePath).isDirectory();
+	} catch {
+		return false;
+	}
 }

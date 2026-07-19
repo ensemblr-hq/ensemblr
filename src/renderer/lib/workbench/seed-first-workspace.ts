@@ -8,6 +8,7 @@ import {
 import { queryClient } from '@/renderer/api/query-client';
 import type { StoredWorkspaceSelection } from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
+import type { CreateWorkspaceResult } from '@/shared/ipc/contracts/workspace';
 import { pickComposerSurname } from '@/shared/workspace-name-pool';
 import { mapRepositoriesToProjects } from './navigation-model';
 import { resolveWorkspaceRouteParams } from './navigation-selection';
@@ -44,11 +45,22 @@ export async function seedFirstWorkspace({
 	router,
 }: SeedFirstWorkspaceOptions): Promise<SeedFirstWorkspaceResult> {
 	const name = pickComposerSurname();
-	const result = await createWorkspace({
-		name,
-		placeholderName: true,
-		repositoryId,
-	});
+	let result: CreateWorkspaceResult;
+	try {
+		result = await createWorkspace({
+			name,
+			placeholderName: true,
+			repositoryId,
+		});
+	} catch (error) {
+		return {
+			error:
+				error instanceof Error
+					? error.message
+					: 'The starter workspace could not be created.',
+			status: 'failure',
+		};
+	}
 
 	if (result.status !== 'success' || !result.workspace) {
 		const reason =
@@ -85,20 +97,28 @@ export async function seedFirstWorkspace({
 		};
 	}
 
-	persistSelection({
-		projectId: routeParams.projectId,
-		workspaceId: routeParams.workspaceId,
-	});
+	try {
+		persistSelection({
+			projectId: routeParams.projectId,
+			workspaceId: routeParams.workspaceId,
+		});
 
-	if (router) {
-		await router.invalidate();
+		if (router) {
+			await router.invalidate();
+		}
+
+		await navigate({
+			params: routeParams,
+			replace: true,
+			to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
+		});
+	} catch (error) {
+		return {
+			error: getWorkspaceOpenErrorMessage(error),
+			status: 'failure',
+			workspaceId,
+		};
 	}
-
-	await navigate({
-		params: routeParams,
-		replace: true,
-		to: '/projects/$projectId/workspaces/$workspaceId/chats/$chatId',
-	});
 
 	return { status: 'success', workspaceId };
 }
@@ -128,4 +148,11 @@ function getNavigationRefreshErrorMessage(error: unknown): string {
 	return error instanceof Error
 		? error.message
 		: 'The starter workspace was created, but the navigation snapshot could not be refreshed.';
+}
+
+/** Builds the user-facing message for a failed post-create route transition. */
+function getWorkspaceOpenErrorMessage(error: unknown): string {
+	return error instanceof Error
+		? error.message
+		: 'The starter workspace was created, but it could not be opened.';
 }
