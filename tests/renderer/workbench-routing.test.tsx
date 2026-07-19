@@ -310,6 +310,49 @@ test('fetches live navigation before redirecting workbench launch', async () => 
 	});
 });
 
+test('refreshes fresh navigation cache before deciding whether Welcome redirects', async () => {
+	const queryClient = new QueryClient();
+	const staleSnapshot = createNavigationSnapshot({
+		repositoryId: 'repo-archived',
+		workspaceId: 'workspace-archived',
+	});
+	queryClient.setQueryData(
+		repositoryWorkspaceNavigationQuery.queryKey,
+		staleSnapshot,
+	);
+	let calls = 0;
+
+	Object.defineProperty(globalThis, 'window', {
+		configurable: true,
+		value: {
+			ensemblr: {
+				repositoryWorkspaceNavigation: async () => {
+					calls += 1;
+					return {
+						...staleSnapshot,
+						generatedAt: '2026-07-19T00:00:00.000Z',
+						repositories: staleSnapshot.repositories.map((repository) => ({
+							...repository,
+							workspaces: [],
+						})),
+					};
+				},
+			},
+			localStorage: {
+				getItem: () => null,
+			},
+		},
+	});
+	const loaderData = await loadWorkbenchRouteData(queryClient);
+	const result = await loadWorkbenchIndexRoute({
+		parentMatchPromise: Promise.resolve({ loaderData }),
+		queryClient,
+	});
+
+	expect(calls).toBe(1);
+	expect(result).toBeUndefined();
+});
+
 test('leaves workbench launch on welcome when no workspace exists', async () => {
 	const queryClient = new QueryClient();
 

@@ -1,9 +1,6 @@
 import { WorkbenchEmptyStateContent } from '@/renderer/components/workbench-empty-state';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
-import { getEmptyStateCopy } from '@/renderer/lib/workbench';
 import type { WorkbenchActiveView } from '@/renderer/types/workbench-shell';
-
-import { useWorkbenchLayoutRouteModel } from '../shell-contexts';
 
 /** Placeholder content for dashboard/history/help/settings views. */
 export function WorkbenchPlaceholderPage({
@@ -11,13 +8,11 @@ export function WorkbenchPlaceholderPage({
 }: {
 	view: Exclude<WorkbenchActiveView, 'welcome' | 'workspace'>;
 }) {
-	const model = useWorkbenchLayoutRouteModel();
 	const { state: setupDiagnosticsState } = useSetupDiagnostics();
 
 	return (
 		<WorkbenchEmptyStateContent
 			emptyState={getWorkbenchPlaceholderCopy({
-				projectCount: model.displayProjects.length,
 				setupStatus: setupDiagnosticsState.setupDiagnostics?.status,
 				view,
 			})}
@@ -27,21 +22,17 @@ export function WorkbenchPlaceholderPage({
 
 /** Picks placeholder title + detail copy for non-workspace workbench views. */
 function getWorkbenchPlaceholderCopy({
-	projectCount,
 	setupStatus,
 	view,
 }: {
-	projectCount: number;
 	setupStatus?: string;
 	view: Exclude<WorkbenchActiveView, 'welcome' | 'workspace'>;
 }) {
 	if (setupStatus === 'blocked') {
-		return getEmptyStateCopy({
-			isLoading: false,
-			navigationError: null,
-			projectCount,
-			setupStatus,
-		});
+		return {
+			detail: 'Complete setup checks before creating or opening workspaces.',
+			title: 'Setup required',
+		};
 	}
 
 	switch (view) {

@@ -16,7 +16,6 @@ export {
 } from './file-tree';
 export { healthTone } from './health-tone';
 export { formatLinkedIssueComposerSeed } from './linked-issue-composer-seed';
-export { getEmptyStateCopy } from './navigation-empty-state';
 export {
 	createPlaceholderSession,
 	getRenderableNavigationSnapshot,
