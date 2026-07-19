@@ -165,12 +165,15 @@ const config: ForgeConfig = {
 		 */
 		postMake: async (_config, makeResults) => {
 			if (!notarizationEnabled) return makeResults;
-			const dmgArtifacts = makeResults
-				.flatMap((result) => result.artifacts)
-				.filter((artifact) => artifact.endsWith('.dmg'));
-			for (const dmg of dmgArtifacts) {
-				await stapleNotarizedDmg(dmg);
+			const notarizationTasks: Promise<void>[] = [];
+			for (const result of makeResults) {
+				for (const artifact of result.artifacts) {
+					if (artifact.endsWith('.dmg')) {
+						notarizationTasks.push(stapleNotarizedDmg(artifact));
+					}
+				}
 			}
+			await Promise.all(notarizationTasks);
 			return makeResults;
 		},
 	},
