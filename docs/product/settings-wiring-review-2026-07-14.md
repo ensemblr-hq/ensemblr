@@ -15,6 +15,20 @@ Ensemblr now has two real settings paths:
 
 Highest-risk gap: repo settings UI still contains false affordances. Scripts and environment are wired, and personal action preferences now reach runtime prompts. Repo Git, Misc, spotlight testing, shared action prompts, and several Advanced controls remain partial or disconnected.
 
+## Implementation update — 2026-07-19
+
+The pending items in this review were implemented as a stacked series of PR-sized workstreams. The sections below describe the *pre-implementation* state; the current wiring is:
+
+- **Repo-settings persistence backbone** — a generic `updateRepositorySettings` IPC + SQLite writer keyed on canonical resolver keys, mirroring the Scripts pattern. Committed `[git]` TOML now normalizes onto canonical top-level keys; `[prompts]` normalizes onto `actionPreferences.<key>`.
+- **Advanced** — Pi executable path hydrates from / writes / clears the real SQLite setting (get/set/clear IPC); terminal scrollback is a real `appearance.terminalScrollbackMb` setting feeding xterm + the pty buffer.
+- **Repo Git** — delete-on-archive / archive-on-merge switches are writable; `branchFrom` persists to SQLite and drives workspace-creation base selection. `remoteOrigin` is read-only with a note (a configurable push/pull/PR remote is a separate effort — it spans several services that hardcode `origin`).
+- **Repo Actions** — resolver-only merge fix: committed `[prompts]` merge *under* personal `actionPreferences` at runtime; the UI and personal prefs are unchanged.
+- **Repo Misc** — `filesToCopy` persists to SQLite and layers into the files-to-copy service; `previewUrls` persist to SQLite and drive the dock Open control (with `$ENSEMBLR_PORT` / `$ENSEMBLR_WORKSPACE_NAME` interpolation and a dropdown for multiples).
+- **Repo Environment / config edit** — repo env files are enabled; the `.ensemblr/settings.toml` edit button opens the file (creating a starter when absent).
+- **Cross-cutting** — `repositoryDefaults` / `repositoryRules` now apply during resolution (path-matched rules override defaults); `config.json` live-reloads its non-App sections and broadcasts to the renderer.
+- **`repoSettingsOverrideAtomFamily`** slimmed to personal `actionPreferences` only; the migrated fields moved to SQLite.
+- **Spotlight testing** — remains a separate, unbuilt feature (workspace→root diff/apply with rollback; see `discovery-spotlight-testing.md`). Its toggle is now a disabled "Coming soon" control rather than a localStorage no-op.
+
 ## User/App Settings
 
 ### General
