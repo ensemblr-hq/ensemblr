@@ -1,4 +1,4 @@
-import { useAtom, useSetAtom } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type {
@@ -7,6 +7,8 @@ import type {
 } from '@/renderer/types/workbench-shell';
 import {
 	collapsedProjectIdsAtom,
+	disableProjectReorderLayoutAnimationAtom,
+	isProjectReorderLayoutAnimationDisabledAtom,
 	orderedProjectIdsAtom,
 	pinnedWorkspaceIdsAtom,
 	unreadWorkspaceIdsAtom,
@@ -93,6 +95,15 @@ function getReconciledShellItemIds<T extends { id: string }>(
 }
 
 /**
+ * Returns the shared action that suppresses project-row layout animation for
+ * one sidebar reflow.
+ * @returns A callback that starts or extends animation suppression.
+ */
+export function useDisableProjectReorderLayoutAnimation() {
+	return useSetAtom(disableProjectReorderLayoutAnimationAtom);
+}
+
+/**
  * React hook that exposes project sidebar state — order, collapse, pin, and
  * reorder helpers — backed by persisted Jotai atoms.
  * @param projects - Active project shell models.
@@ -102,9 +113,6 @@ export function useProjectNavigationState(
 	projects: ProjectShellModel[],
 ): ProjectNavigationState {
 	const projectCollapseMotionTimeoutRef = useRef<ReturnType<
-		typeof setTimeout
-	> | null>(null);
-	const projectPinMotionTimeoutRef = useRef<ReturnType<
 		typeof setTimeout
 	> | null>(null);
 	const [orderedProjectIds, setOrderedProjectIds] = useAtom(
@@ -123,10 +131,11 @@ export function useProjectNavigationState(
 		isProjectReorderPositionOnlyLayout,
 		setIsProjectReorderPositionOnlyLayout,
 	] = useState(false);
-	const [
-		isProjectReorderLayoutAnimationDisabled,
-		setIsProjectReorderLayoutAnimationDisabled,
-	] = useState(false);
+	const disableProjectReorderLayoutAnimation =
+		useDisableProjectReorderLayoutAnimation();
+	const isProjectReorderLayoutAnimationDisabled = useAtomValue(
+		isProjectReorderLayoutAnimationDisabledAtom,
+	);
 	const collapsedProjectIdSet = new Set(collapsedProjectIds);
 	const pinnedWorkspaceIdSet = new Set(pinnedWorkspaceIds);
 	const orderedProjects = getOrderedShellItems(projects, orderedProjectIds);
@@ -208,9 +217,6 @@ export function useProjectNavigationState(
 			if (projectCollapseMotionTimeoutRef.current) {
 				clearTimeout(projectCollapseMotionTimeoutRef.current);
 			}
-			if (projectPinMotionTimeoutRef.current) {
-				clearTimeout(projectPinMotionTimeoutRef.current);
-			}
 		},
 		[],
 	);
@@ -245,18 +251,6 @@ export function useProjectNavigationState(
 					)
 				: [...currentProjectIds, projectId],
 		);
-	};
-	/** Briefly disables layout animation during a pin-toggle reflow. */
-	const disableProjectReorderLayoutAnimation = () => {
-		if (projectPinMotionTimeoutRef.current) {
-			clearTimeout(projectPinMotionTimeoutRef.current);
-		}
-
-		setIsProjectReorderLayoutAnimationDisabled(true);
-		projectPinMotionTimeoutRef.current = setTimeout(() => {
-			setIsProjectReorderLayoutAnimationDisabled(false);
-			projectPinMotionTimeoutRef.current = null;
-		}, 180);
 	};
 	/** Toggles whether a workspace is pinned to the top of the sidebar. */
 	const toggleWorkspacePinned = (workspaceId: string) => {

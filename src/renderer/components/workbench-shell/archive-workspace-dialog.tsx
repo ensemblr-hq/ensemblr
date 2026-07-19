@@ -14,7 +14,6 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Label } from '@/renderer/components/ui/label';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
-import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
@@ -85,7 +84,6 @@ function ArchiveWorkspaceDialogForm({
 		});
 
 		if (result.status === 'success') {
-			deleteLastUsedOpenTarget(workspace.id);
 			await onArchived(workspace.id);
 			onOpenChange(false);
 			return;

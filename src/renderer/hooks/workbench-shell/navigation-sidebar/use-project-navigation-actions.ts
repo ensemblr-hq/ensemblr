@@ -300,42 +300,6 @@ export function useCreateWorkspaceFromProject({
 	};
 }
 
-/** Dependencies for the archive-workspace navigation action hook. */
-interface ArchiveWorkspaceActionDeps {
-	activeWorkspaceId: string | null;
-	disableProjectReorderLayoutAnimation: () => void;
-}
-
-/** Handles cache invalidation and Welcome navigation after a workspace archive. */
-export function useArchiveWorkspaceAction({
-	activeWorkspaceId,
-	disableProjectReorderLayoutAnimation,
-}: ArchiveWorkspaceActionDeps) {
-	const navigate = useNavigate();
-	const router = useRouter();
-
-	return useCallback(
-		async (archivedWorkspaceId: string) => {
-			// Kill the reorder layout animation BEFORE the parent project row
-			// shrinks: motion's auto-layout would otherwise flash the sibling
-			// project rows up as the archived workspace's height collapses.
-			disableProjectReorderLayoutAnimation();
-
-			if (activeWorkspaceId === archivedWorkspaceId) {
-				await navigate({ replace: true, to: '/' });
-			}
-
-			// Drop the stale navigation snapshot so the sidebar reflows around
-			// the deleted workspace, refresh the global History feed so a mounted
-			// History screen updates instantly, then re-run route loaders against
-			// the non-workspace route so archived workspaces never render a shell.
-			await invalidateWorkspaceListViews(queryClient);
-			await router.invalidate();
-		},
-		[activeWorkspaceId, disableProjectReorderLayoutAnimation, navigate, router],
-	);
-}
-
 /** Dependencies for the archive-project navigation action hook. */
 interface ArchiveProjectActionDeps {
 	activeProjectId: string | null;
