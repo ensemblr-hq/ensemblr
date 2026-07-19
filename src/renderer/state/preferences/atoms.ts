@@ -132,14 +132,13 @@ export type RepoSettingsKey = (typeof REPO_SETTINGS_KEYS)[number];
 /**
  * Personal per-repo overrides still stored locally. Git, files-to-copy, and
  * preview-URL overrides moved to repository-scoped SQLite (resolved via
- * {@link useRepoSettings}); only the two below remain in localStorage:
- * per-action instruction overrides (which the committed `[prompts]` merge
- * *under*) and the spotlight-testing toggle, whose runtime is a separate feature
+ * {@link useRepoSettings}); only per-action instruction overrides remain here,
+ * and the committed `[prompts]` config merges *under* them. Spotlight testing
+ * is a separate, unbuilt feature — it will model its own state when it lands
  * (see `docs/product/discovery-spotlight-testing.md`).
  */
 export interface RepoSettingsOverride {
 	actionPreferences?: Partial<Record<RepoActionKey, string>>;
-	useSpotlight?: boolean;
 }
 
 export const REPO_ACTION_KEYS = [

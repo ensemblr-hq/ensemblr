@@ -8,6 +8,7 @@ import {
 	AccordionItem,
 	AccordionTrigger,
 } from '@/renderer/components/ui/accordion';
+import { Badge } from '@/renderer/components/ui/badge';
 import { Switch } from '@/renderer/components/ui/switch';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import {
@@ -72,16 +73,14 @@ function RepoActionsSettings() {
 			title='Actions'
 		>
 			<SettingRow
-				control={
-					<Switch
-						checked={overrides.useSpotlight ?? false}
-						onCheckedChange={(v) =>
-							setOverrides((prev) => ({ ...prev, useSpotlight: v }))
-						}
-					/>
+				control={<Switch checked={false} disabled />}
+				description='Replace Run with Spotlight for this repository so workspace changes are tested in the repository root. Spotlight is a separate feature still in development (workspace→root diff/apply with rollback); see docs/product/discovery-spotlight-testing.md.'
+				label={
+					<span className='flex items-center gap-2'>
+						Use spotlight testing
+						<Badge variant='outline'>Coming soon</Badge>
+					</span>
 				}
-				description='Replace Run with Spotlight for this repository so workspace changes are tested in the repository root. Spotlight discovery is in progress; see docs/product/discovery-spotlight-testing.md.'
-				label='Use spotlight testing'
 			/>
 
 			<Accordion className='mt-2' collapsible type='single'>
