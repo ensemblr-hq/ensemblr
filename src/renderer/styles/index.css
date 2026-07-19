@@ -426,11 +426,11 @@
 
 	.right-sidebar-header[data-pr-tone="merged"],
 	.right-sidebar-header-actions[data-pr-tone="merged"] {
-		--right-sidebar-header-merged: oklch(0.72 0.21 304);
+		--right-sidebar-header-merged: oklch(0.5 0.2 304);
 		--right-sidebar-header-merged-border: color-mix(
 			in oklch,
 			var(--right-sidebar-header-merged),
-			transparent 54%
+			transparent 30%
 		);
 		--right-sidebar-header-merged-foreground: oklch(0.99 0 0);
 		--right-sidebar-header-merged-hover: color-mix(
@@ -443,6 +443,12 @@
 			var(--right-sidebar-header-merged),
 			transparent 86%
 		);
+	}
+
+	.dark .right-sidebar-header[data-pr-tone="merged"],
+	.dark .right-sidebar-header-actions[data-pr-tone="merged"] {
+		--right-sidebar-header-merged: oklch(0.76 0.19 304);
+		--right-sidebar-header-merged-foreground: oklch(0.14 0.006 35);
 	}
 
 	.right-sidebar-header[data-pr-tone="merged"] {
