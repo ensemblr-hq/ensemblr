@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { useAtom } from 'jotai';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
 	ensemblrQueryKeys,
@@ -14,10 +14,10 @@ import { Badge } from '@/renderer/components/ui/badge';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { Spinner } from '@/renderer/components/ui/spinner';
-import {
-	customPiExecutablePathAtom,
-	terminalScrollbackMbAtom,
-} from '@/renderer/state/preferences';
+import { terminalScrollbackMbAtom } from '@/renderer/state/preferences';
+
+/** Debounce window before a typed Pi executable path is persisted to SQLite. */
+const PI_PATH_SAVE_DEBOUNCE_MS = 500;
 
 /** Route for the Advanced settings section; renders the advanced-settings panel. */
 export const Route = createFileRoute('/_workbench/settings/advanced')({
@@ -29,9 +29,59 @@ function AdvancedSettings() {
 	const queryClient = useQueryClient();
 	const { data: rootData, isLoading: rootLoading } =
 		useQuery(rootDirectoryQuery);
-	const [piPath, setPiPath] = useAtom(customPiExecutablePathAtom);
 	const [scrollbackMb, setScrollbackMb] = useAtom(terminalScrollbackMbAtom);
 	const [pickError, setPickError] = useState<string | null>(null);
+
+	const { data: piData } = useQuery({
+		queryFn: () => getEnsemblrApi().getPiExecutablePath(),
+		queryKey: ensemblrQueryKeys.piExecutablePath(),
+	});
+	const [piPath, setPiPath] = useState('');
+	const piSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	// Hydrate the input from the resolved SQLite override so it reflects runtime,
+	// not a stale local mirror. Re-seeds whenever the resolved override changes.
+	const resolvedOverride = piData?.overridePath ?? '';
+	useEffect(() => {
+		setPiPath(resolvedOverride);
+	}, [resolvedOverride]);
+
+	const invalidatePiPath = () => {
+		void queryClient.invalidateQueries({
+			queryKey: ensemblrQueryKeys.piExecutablePath(),
+		});
+		void queryClient.invalidateQueries({
+			queryKey: ensemblrQueryKeys.setupDiagnostics(),
+		});
+	};
+
+	const persistPiPath = (value: string) => {
+		const trimmed = value.trim();
+		void (
+			trimmed
+				? getEnsemblrApi().setPiExecutablePath({ path: trimmed })
+				: getEnsemblrApi().clearPiExecutablePath()
+		).then(invalidatePiPath);
+	};
+
+	const onPiPathChange = (value: string) => {
+		setPiPath(value);
+		if (piSaveTimerRef.current) {
+			clearTimeout(piSaveTimerRef.current);
+		}
+		piSaveTimerRef.current = setTimeout(() => {
+			piSaveTimerRef.current = null;
+			persistPiPath(value);
+		}, PI_PATH_SAVE_DEBOUNCE_MS);
+	};
+
+	const clearPiPath = () => {
+		if (piSaveTimerRef.current) {
+			clearTimeout(piSaveTimerRef.current);
+			piSaveTimerRef.current = null;
+		}
+		setPiPath('');
+		void getEnsemblrApi().clearPiExecutablePath().then(invalidatePiPath);
+	};
 
 	const pickRoot = useMutation({
 		mutationFn: async () => {
@@ -71,9 +121,7 @@ function AdvancedSettings() {
 		},
 		onSuccess: (path) => {
 			if (path) setPiPath(path);
-			void queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.setupDiagnostics(),
-			});
+			invalidatePiPath();
 		},
 	});
 
@@ -144,7 +192,7 @@ function AdvancedSettings() {
 						</Button>
 						<Button
 							disabled={!piPath}
-							onClick={() => setPiPath('')}
+							onClick={clearPiPath}
 							size='sm'
 							variant='ghost'
 						>
@@ -159,7 +207,7 @@ function AdvancedSettings() {
 				<Input
 					aria-label='Pi executable path'
 					className='mt-2 h-8 font-mono text-xs'
-					onChange={(e) => setPiPath(e.target.value)}
+					onChange={(e) => onPiPathChange(e.target.value)}
 					placeholder='/opt/homebrew/bin/pi'
 					value={piPath}
 				/>

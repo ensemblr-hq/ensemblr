@@ -14,6 +14,7 @@ import type {
 	TerminalOutputBroadcast,
 } from '../shared/ipc/contracts/terminal';
 import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
+import { scrollbackMbToBytes } from '../shared/terminal/scrollback';
 
 import { createMainWindow } from './app/main-window';
 import { createMainWindowStateStore } from './app/window-state';
@@ -453,6 +454,11 @@ const terminalService = createTerminalService({
 		broadcastToAllWindows(IPC_CHANNELS.terminalOutput, event),
 	/** Resolves the shell-derived base environment for terminal and script PTYs. */
 	resolveBaseEnv: async () => (await localCommandService.getEnvironment()).env,
+	/** Sizes each pty scrollback buffer from the user's terminal-scrollback setting. */
+	resolveScrollbackLimit: () =>
+		scrollbackMbToBytes(
+			appSettingsService.read().appearance.terminalScrollbackMb,
+		),
 	workspaceEnvironmentService,
 });
 const scriptLifecycleService = createScriptLifecycleService({

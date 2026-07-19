@@ -78,6 +78,7 @@ const appearanceSettingsSchema = z.object({
 	markdownStyle: z.enum(['default', 'compact', 'prose']).catch('default'),
 	terminalFont: z.string().catch('JetBrainsMono Nerd Font Mono'),
 	terminalFontSize: z.number().int().min(8).max(24).catch(12),
+	terminalScrollbackMb: z.number().int().min(1).max(200).catch(10),
 });
 
 const appSettingsSchema = z.object({

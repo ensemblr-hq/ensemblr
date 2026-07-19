@@ -38,6 +38,7 @@ describe('parseAppSettings', () => {
 			markdownStyle: 'default',
 			terminalFont: 'JetBrainsMono Nerd Font Mono',
 			terminalFontSize: 12,
+			terminalScrollbackMb: 10,
 		});
 	});
 

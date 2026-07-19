@@ -240,6 +240,9 @@ export function createEnsemblrApi(): EnsemblrApi {
 		selectEnvFile: () => invoke('selectEnvFile'),
 		selectLocalRepository: () => invoke('selectLocalRepository'),
 		selectPiExecutable: () => invoke('selectPiExecutable'),
+		getPiExecutablePath: () => invoke('getPiExecutablePath'),
+		setPiExecutablePath: (request) => invoke('setPiExecutablePath', request),
+		clearPiExecutablePath: () => invoke('clearPiExecutablePath'),
 		selectRootDirectory: () => invoke('selectRootDirectory'),
 		setEnvironmentVariable: (request) =>
 			invoke('setEnvironmentVariable', request),

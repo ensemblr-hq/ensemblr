@@ -27,6 +27,7 @@ import {
 } from './pty-backend.ts';
 import {
 	createScrollbackBuffer,
+	DEFAULT_SCROLLBACK_LIMIT,
 	type ScrollbackBuffer,
 } from './terminal-scrollback.ts';
 import { resolveScriptShell, resolveUserShell } from './user-shell.ts';
@@ -111,6 +112,12 @@ export interface CreateTerminalServiceOptions {
 	 */
 	resolveBaseEnv?: TerminalBaseEnvResolver;
 	/**
+	 * Resolves the pty scrollback byte limit from the user's
+	 * `appearance.terminalScrollbackMb` setting. Read per new session so an edited
+	 * limit applies to terminals opened after the change.
+	 */
+	resolveScrollbackLimit?: () => number;
+	/**
 	 * Shell for script commands. Stays a POSIX-compatible shell on purpose:
 	 * repository scripts routinely use `VAR=x cmd` and other constructs that
 	 * fish rejects, so the user's interactive shell must not leak in here.
@@ -163,6 +170,7 @@ export function createTerminalService({
 	onLifecycle,
 	onOutput,
 	resolveBaseEnv = () => process.env,
+	resolveScrollbackLimit = () => DEFAULT_SCROLLBACK_LIMIT,
 	scriptShell = resolveScriptShell(),
 	workspaceEnvironmentService,
 }: CreateTerminalServiceOptions): TerminalService {
@@ -394,7 +402,7 @@ export function createTerminalService({
 			outputSeq: 0,
 			previewScanBuffer: '',
 			pty,
-			scrollback: createScrollbackBuffer(),
+			scrollback: createScrollbackBuffer(resolveScrollbackLimit()),
 			snapshot: {
 				cols: normalizedCols,
 				commandLabel,

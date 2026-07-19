@@ -256,6 +256,26 @@ export interface PiExecutableSelectionResult {
 	selectedPath?: string;
 }
 
+/**
+ * Snapshot of the Pi executable configuration used to hydrate the Advanced
+ * settings screen from the resolved SQLite setting rather than a local mirror.
+ */
+export interface PiExecutablePathSnapshot {
+	/** The user's configured override path (SQLite), or `null` when using bundled/discovered Pi. */
+	overridePath: string | null;
+	/** The finally-resolved executable path, or `null` when none resolved. */
+	resolvedPath: string | null;
+	/** Resolution source of the executable (e.g. `sqlite`, `path`, `common-location`). */
+	source: string | null;
+	/** Readiness status of the resolved executable. */
+	status: string;
+}
+
+/** Request to set an explicit Pi executable override path. */
+export interface SetPiExecutablePathRequest {
+	path: string;
+}
+
 /** Source category for a slash command that Pi can accept through prompt input. */
 export type PiSlashCommandSource = 'builtin' | 'extension' | 'prompt' | 'skill';
 
@@ -285,8 +305,13 @@ export interface ListPiSlashCommandsResult {
 
 /** Pi runtime / executable IPC surface (locate the Pi binary, etc). */
 export interface PiApi {
+	clearPiExecutablePath: () => Promise<PiExecutableSelectionResult>;
+	getPiExecutablePath: () => Promise<PiExecutablePathSnapshot>;
 	listPiSlashCommands: (
 		request?: ListPiSlashCommandsRequest,
 	) => Promise<ListPiSlashCommandsResult>;
 	selectPiExecutable: () => Promise<PiExecutableSelectionResult>;
+	setPiExecutablePath: (
+		request: SetPiExecutablePathRequest,
+	) => Promise<PiExecutableSelectionResult>;
 }
