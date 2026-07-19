@@ -10,3 +10,4 @@ node_modules/
 .pi-capture-sandbox/
 coverage/
 assets/avatar.png
+.env*
