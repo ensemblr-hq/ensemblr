@@ -245,10 +245,13 @@ function reconcileOpenTabOrder({
 		return true;
 	});
 
-	return [
-		...knownOrderedIds,
-		...openTabs.map((tab) => tab.id).filter((id) => !seenOrderedIds.has(id)),
-	];
+	const orderedResult = [...knownOrderedIds];
+	for (const tab of openTabs) {
+		if (!seenOrderedIds.has(tab.id)) {
+			orderedResult.push(tab.id);
+		}
+	}
+	return orderedResult;
 }
 
 /** True when a tab has no attached Pi session and should not enter history. */

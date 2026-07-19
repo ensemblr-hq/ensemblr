@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import { parseMetadata } from './metadata-json.ts';
 
 /** One git-backed checkpoint captured before a Pi user turn (ADR 0012). */
 export interface CheckpointRow {
@@ -180,21 +181,4 @@ function mapRow(row: CheckpointRowShape): CheckpointRow {
 		turnId: row.turn_id,
 		workspaceId: row.workspace_id,
 	};
-}
-
-/**
- * Parse a checkpoint metadata JSON string into a record, returning `{}` on invalid or non-object input.
- * @param raw - JSON string to parse
- * @returns The parsed record, or an empty record when parsing fails
- */
-function parseMetadata(raw: string): Record<string, unknown> {
-	try {
-		const parsed = JSON.parse(raw);
-		if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-			return parsed as Record<string, unknown>;
-		}
-	} catch {
-		// fall through to empty
-	}
-	return {};
 }

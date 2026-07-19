@@ -43,7 +43,9 @@ export function XtermTerminal({
 	// Latest typography, read at construction without re-mounting the surface on
 	// every font/size change (that is handled by the separate effect below).
 	const fontRef = useRef({ fontFamily, fontSize: terminalFontSize });
-	fontRef.current = { fontFamily, fontSize: terminalFontSize };
+	useEffect(() => {
+		fontRef.current = { fontFamily, fontSize: terminalFontSize };
+	});
 	// Typography the live adapter already reflects. Seeded with the construction
 	// values so the live-apply effect skips its redundant first run (and any
 	// remount that rebuilds the adapter with the same font).

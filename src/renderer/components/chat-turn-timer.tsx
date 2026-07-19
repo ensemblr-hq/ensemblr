@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useElapsedMs } from '@/renderer/hooks/use-elapsed-ms';
 import { formatTurnDuration } from '@/renderer/lib/format-duration';
 import { cn } from '@/renderer/lib/utils';
 
@@ -16,17 +16,13 @@ function ChatTurnTimer({
 	className?: string;
 	startMs: number;
 }) {
-	const [nowMs, setNowMs] = useState(() => Date.now());
-	useEffect(() => {
-		const id = window.setInterval(() => setNowMs(Date.now()), 100);
-		return () => window.clearInterval(id);
-	}, []);
+	const elapsedMs = useElapsedMs(startMs);
 	return (
 		<span
 			className={cn('text-muted-foreground/80 text-xs', className)}
 			data-role='turn-timer'
 		>
-			{formatTurnDuration(Math.max(0, nowMs - startMs))}
+			{formatTurnDuration(elapsedMs)}
 		</span>
 	);
 }

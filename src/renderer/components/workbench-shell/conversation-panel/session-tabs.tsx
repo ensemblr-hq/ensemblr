@@ -76,9 +76,12 @@ export function SessionTabs({
 	const canReorderTabs = sessionIds.length > 1;
 
 	useEffect(() => {
+		orderedSessionIdsRef.current = orderedSessionIds;
+	}, [orderedSessionIds]);
+
+	useEffect(() => {
 		setOrderedSessionIds((currentIds) => {
 			const nextIds = reconcileOrderedIds(currentIds, sessionIds);
-			orderedSessionIdsRef.current = nextIds;
 			return areStringArraysEqual(nextIds, currentIds) ? currentIds : nextIds;
 		});
 	}, [sessionIds]);

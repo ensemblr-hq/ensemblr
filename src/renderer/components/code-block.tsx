@@ -2,14 +2,7 @@
 
 import { useAtomValue } from 'jotai';
 import type { CSSProperties, HTMLAttributes } from 'react';
-import {
-	createContext,
-	memo,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import { createContext, memo, useEffect, useMemo, useState } from 'react';
 import type {
 	BundledLanguage,
 	BundledTheme,
@@ -382,15 +375,19 @@ export const CodeBlockContent = ({
 
 	// Async highlighting result (populated after shiki loads)
 	const [asyncTokens, setAsyncTokens] = useState<TokenizedCode | null>(null);
-	const asyncKeyRef = useRef({ code, language, theme: codeTheme });
+	const [asyncKey, setAsyncKey] = useState({
+		code,
+		language,
+		theme: codeTheme,
+	});
 
 	// Invalidate stale async tokens synchronously during render
 	if (
-		asyncKeyRef.current.code !== code ||
-		asyncKeyRef.current.language !== language ||
-		asyncKeyRef.current.theme !== codeTheme
+		asyncKey.code !== code ||
+		asyncKey.language !== language ||
+		asyncKey.theme !== codeTheme
 	) {
-		asyncKeyRef.current = { code, language, theme: codeTheme };
+		setAsyncKey({ code, language, theme: codeTheme });
 		setAsyncTokens(null);
 	}
 

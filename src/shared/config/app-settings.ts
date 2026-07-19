@@ -15,7 +15,7 @@ import { z } from 'zod';
 // No object-level `.default` — each field's `.catch` already fills a missing or
 // invalid value when the (possibly empty) object is parsed, which sidesteps
 // zod's requirement that `.default` receive a fully-populated object.
-export const generalSettingsSchema = z.object({
+const generalSettingsSchema = z.object({
 	sendShortcut: z.enum(['enter', 'mod+enter']).catch('enter'),
 	followUpBehavior: z.enum(['steer', 'queue', 'block']).catch('steer'),
 	desktopNotifications: z.boolean().catch(true),
@@ -25,7 +25,7 @@ export const generalSettingsSchema = z.object({
 	toolCallCollapse: z.enum(['collapsed', 'expanded']).catch('collapsed'),
 });
 
-export const modelSettingsSchema = z.object({
+const modelSettingsSchema = z.object({
 	defaultModel: z.string().nullable().catch(null),
 	defaultThinkingLevel: z.string().nullable().catch(null),
 	reviewModel: z.string().nullable().catch(null),
@@ -36,7 +36,7 @@ export const modelSettingsSchema = z.object({
 // Git user-scope defaults. Field names mirror the repository-resolution keys
 // (`deleteLocalBranchOnArchive`, `archiveAfterMerge`, `setUpstreamOnPush`, …) so
 // `resolveSettings` can feed them straight in as the `user-default` source.
-export const gitSettingsSchema = z.object({
+const gitSettingsSchema = z.object({
 	branchPrefixSource: z
 		.enum(['github-username', 'custom', 'none'])
 		.catch('github-username'),
@@ -48,7 +48,7 @@ export const gitSettingsSchema = z.object({
 });
 
 /** Experimental user defaults that can feed repository behavior. */
-export const experimentalSettingsSchema = z.object({
+const experimentalSettingsSchema = z.object({
 	autoRunAfterSetup: z.boolean().catch(false),
 });
 
@@ -56,7 +56,7 @@ export const experimentalSettingsSchema = z.object({
 // CSS var, ligature/accessible-color root classes) plus terminal and code-block
 // typography. Enum unions live here as the single source of truth; the renderer
 // atoms and the settings UI derive their types from this schema.
-export const appearanceSettingsSchema = z.object({
+const appearanceSettingsSchema = z.object({
 	theme: z.enum(['system', 'light', 'dark']).catch('system'),
 	accessibleColors: z
 		.enum(['default', 'protanopia', 'deuteranopia', 'tritanopia'])
@@ -80,7 +80,7 @@ export const appearanceSettingsSchema = z.object({
 	terminalFontSize: z.number().int().min(8).max(24).catch(12),
 });
 
-export const appSettingsSchema = z.object({
+const appSettingsSchema = z.object({
 	general: generalSettingsSchema,
 	models: modelSettingsSchema,
 	git: gitSettingsSchema,

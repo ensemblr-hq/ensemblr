@@ -24,6 +24,7 @@ import type {
 	WriteWorkspaceImageAttachmentResult,
 } from '../../shared/ipc/contracts/workspace-files';
 import type { LocalCommandService } from '../commands/local-command';
+import { resolveWorkspaceCwd } from './workspace-cwd.ts';
 
 const GIT_ARGS = [
 	'ls-files',
@@ -629,20 +630,6 @@ function collectDirectories(filePaths: readonly string[]): readonly string[] {
 		}
 	}
 	return [...directories].sort((a, b) => a.localeCompare(b));
-}
-
-/** Validates and normalizes an absolute workspace cwd from the renderer. */
-function resolveWorkspaceCwd(
-	workspaceCwd: string,
-): { cwd: string; ok: true } | { message: string; ok: false } {
-	const cwd = workspaceCwd?.trim();
-	if (!cwd || !path.isAbsolute(cwd)) {
-		return {
-			message: 'Workspace path must be an absolute filesystem path.',
-			ok: false,
-		};
-	}
-	return { cwd, ok: true };
 }
 
 /** Resolves a renderer-supplied relative file path inside the workspace. */
