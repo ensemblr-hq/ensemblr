@@ -15,6 +15,7 @@ function RepoEnvironmentSettings() {
 	return (
 		<EnvironmentVariablesPanel
 			description='Repository-scoped environment variables. Repository values override user defaults; secrets are stored in the macOS Keychain.'
+			enableEnvFiles
 			scope='repository'
 			scopeId={repoId}
 			title='Environment'

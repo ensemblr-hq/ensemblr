@@ -232,6 +232,8 @@ export type {
 	ShellApi,
 } from './contracts/repository-navigation';
 export type {
+	OpenRepositoryConfigFileRequest,
+	OpenRepositoryConfigFileResult,
 	RepositoryPreviewUrl,
 	RepositorySettingsApi,
 	RepositorySettingsPatch,

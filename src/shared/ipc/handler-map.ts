@@ -111,6 +111,8 @@ import type {
 } from './contracts/repository-config';
 import type { RepositoryWorkspaceNavigationSnapshot } from './contracts/repository-navigation';
 import type {
+	OpenRepositoryConfigFileRequest,
+	OpenRepositoryConfigFileResult,
 	UpdateRepositorySettingsRequest,
 	UpdateRepositorySettingsResult,
 } from './contracts/repository-settings';
@@ -510,6 +512,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.updateRepositorySettings]: IpcHandlerEntry<
 		UpdateRepositorySettingsRequest,
 		UpdateRepositorySettingsResult
+	>;
+	[IPC_CHANNELS.openRepositoryConfigFile]: IpcHandlerEntry<
+		OpenRepositoryConfigFileRequest,
+		OpenRepositoryConfigFileResult
 	>;
 	[IPC_CHANNELS.submitPiPrompt]: IpcHandlerEntry<
 		SubmitPiPromptRequest,

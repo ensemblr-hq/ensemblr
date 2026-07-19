@@ -32,8 +32,21 @@ export interface UpdateRepositorySettingsResult {
 	ok: boolean;
 }
 
+/** Request to open a repository's committed `.ensemblr/settings.toml` for editing. */
+export interface OpenRepositoryConfigFileRequest {
+	repositoryPath: string;
+}
+
+/** Result of opening the repo config file; `error` is set when it could not be opened. */
+export interface OpenRepositoryConfigFileResult {
+	error?: string;
+}
+
 /** Repository-settings slice of the `window.ensemblr` API. */
 export interface RepositorySettingsApi {
+	openRepositoryConfigFile: (
+		request: OpenRepositoryConfigFileRequest,
+	) => Promise<OpenRepositoryConfigFileResult>;
 	updateRepositorySettings: (
 		request: UpdateRepositorySettingsRequest,
 	) => Promise<UpdateRepositorySettingsResult>;

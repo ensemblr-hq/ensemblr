@@ -118,6 +118,7 @@ export const IPC_CHANNELS = {
 	terminalSnapshot: 'ensemblr:terminal-snapshot',
 	unarchiveWorkspace: 'ensemblr:unarchive-workspace',
 	unwatchWorkspaceFiles: 'ensemblr:unwatch-workspace-files',
+	openRepositoryConfigFile: 'ensemblr:open-repository-config-file',
 	updateRepositoryScripts: 'ensemblr:update-repository-scripts',
 	updateRepositorySettings: 'ensemblr:update-repository-settings',
 	watchWorkspaceFiles: 'ensemblr:watch-workspace-files',

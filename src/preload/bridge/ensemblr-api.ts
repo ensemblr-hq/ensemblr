@@ -257,6 +257,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		unwatchWorkspaceFiles: (request) =>
 			invoke('unwatchWorkspaceFiles', request),
 		updateAppSettings: (patch) => invoke('updateAppSettings', patch),
+		openRepositoryConfigFile: (request) =>
+			invoke('openRepositoryConfigFile', request),
 		updateRepositoryScripts: (request) =>
 			invoke('updateRepositoryScripts', request),
 		updateRepositorySettings: (request) =>

@@ -1,6 +1,10 @@
 import { useNavigate, useRouterState } from '@tanstack/react-router';
 import { ArrowLeftIcon, FileCodeIcon } from 'lucide-react';
-import { openAppConfigFile } from '@/renderer/api/ensemblr';
+import { toast } from 'sonner';
+import {
+	openAppConfigFile,
+	openRepositoryConfigFile,
+} from '@/renderer/api/ensemblr';
 import {
 	REPO_SECTION_TARGETS,
 	type RepoSectionId,
@@ -82,12 +86,26 @@ export function SettingsHeader({
 			? 'Edit in config.json'
 			: 'Edit in .ensemblr/settings.toml';
 
-	// User scope opens ~/.config/ensemblr/config.json (created if missing).
-	// Repo-scoped .ensemblr/settings.toml editing is not wired yet.
+	// User scope opens ~/.config/ensemblr/config.json; repo scope opens the active
+	// repo's committed .ensemblr/settings.toml. Both are created if missing.
+	const activeRepo = projects.find((project) => project.id === activeRepoId);
 	const handleEditConfig = () => {
 		if (scope === 'user') {
 			void openAppConfigFile();
+			return;
 		}
+		if (!activeRepo) {
+			return;
+		}
+		void openRepositoryConfigFile({
+			repositoryPath: activeRepo.pathLabel,
+		}).then((result) => {
+			if (result.error) {
+				toast.error('Could not open the repository config.', {
+					description: result.error,
+				});
+			}
+		});
 	};
 
 	return (
@@ -136,7 +154,12 @@ export function SettingsHeader({
 				) : null}
 			</div>
 			<div className='ml-auto'>
-				<Button onClick={handleEditConfig} size='sm' variant='ghost'>
+				<Button
+					disabled={scope === 'repo' && !activeRepo}
+					onClick={handleEditConfig}
+					size='sm'
+					variant='ghost'
+				>
 					<FileCodeIcon aria-hidden='true' className='size-4' />
 					<span>{configLabel}</span>
 				</Button>
