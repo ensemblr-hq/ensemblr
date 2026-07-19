@@ -424,7 +424,8 @@
 		}
 	}
 
-	.right-sidebar-header[data-pr-tone="merged"] {
+	.right-sidebar-header[data-pr-tone="merged"],
+	.right-sidebar-header-actions[data-pr-tone="merged"] {
 		--right-sidebar-header-merged: oklch(0.72 0.21 304);
 		--right-sidebar-header-merged-border: color-mix(
 			in oklch,
@@ -442,6 +443,9 @@
 			var(--right-sidebar-header-merged),
 			transparent 86%
 		);
+	}
+
+	.right-sidebar-header[data-pr-tone="merged"] {
 		background: color-mix(
 			in oklch,
 			var(--right-sidebar-header-merged),

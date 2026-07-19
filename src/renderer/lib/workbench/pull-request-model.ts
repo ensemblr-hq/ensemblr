@@ -239,7 +239,7 @@ function deriveLabel(
 		case 'checking':
 			return 'Checks running';
 		default:
-			return pullRequest.title || `PR #${pullRequest.number}`;
+			return '';
 	}
 }
 

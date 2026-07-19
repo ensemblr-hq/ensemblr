@@ -38,6 +38,18 @@ import { getRightSidebarHeaderState } from './state';
 /** Tone values extracted from {@link RightSidebarHeaderState}. */
 type HeaderTone = RightSidebarHeaderState extends { tone: infer T } ? T : never;
 
+/** Header states that can link to an existing PR and deployment. */
+type RightSidebarHeaderNumberedState = Extract<
+	RightSidebarHeaderState,
+	{ number: number }
+>;
+
+/** Resolved PR header state and local actions shared by sidebar chrome. */
+interface RightSidebarHeaderViewModel {
+	continueMergedWorkspace: () => void;
+	headerState: RightSidebarHeaderState;
+}
+
 const HEADER_LABEL_TONE_CLASSES: Record<HeaderTone, string> = {
 	blocked: 'text-status-danger',
 	neutral: 'text-muted-foreground',
@@ -62,33 +74,10 @@ export function RightSidebarHeader({
 }: {
 	activeWorkspace: WorkspaceShellModel;
 }) {
-	const hasBranchChanges = useReviewableChanges(activeWorkspace);
-	const [continuedMergedPullRequests, setContinuedMergedPullRequests] = useAtom(
-		continuedMergedPullRequestByWorkspaceAtom,
-	);
-	const continuedPullRequestNumber =
-		continuedMergedPullRequests[activeWorkspace.id];
-	const headerState = getRightSidebarHeaderState(
-		activeWorkspace,
-		hasBranchChanges,
-		{ continuedPullRequestNumber },
-	);
+	const { continueMergedWorkspace, headerState } =
+		useRightSidebarHeaderViewModel(activeWorkspace);
 	const hasPullRequestNumber = 'number' in headerState;
 	const hasHeaderLabel = 'label' in headerState;
-	const continueMergedWorkspace = useCallback(() => {
-		const pullRequestNumber = activeWorkspace.pullRequest.number;
-		if (pullRequestNumber === undefined) {
-			return;
-		}
-		setContinuedMergedPullRequests((current) => ({
-			...current,
-			[activeWorkspace.id]: pullRequestNumber,
-		}));
-	}, [
-		activeWorkspace.id,
-		activeWorkspace.pullRequest.number,
-		setContinuedMergedPullRequests,
-	]);
 
 	return (
 		<header
@@ -97,18 +86,7 @@ export function RightSidebarHeader({
 		>
 			<div className='flex min-w-0 flex-1 items-center gap-2.5'>
 				{hasPullRequestNumber ? (
-					<div className='flex shrink-0 items-center gap-1'>
-						<PullRequestNumberButton
-							number={headerState.number}
-							tone={headerState.tone}
-							url={headerState.url}
-						/>
-						{headerState.previewDeployment ? (
-							<PreviewDeploymentButton
-								deployment={headerState.previewDeployment}
-							/>
-						) : null}
-					</div>
+					<RightSidebarHeaderPullRequestLinks headerState={headerState} />
 				) : null}
 				{hasHeaderLabel ? (
 					<p
@@ -129,6 +107,90 @@ export function RightSidebarHeader({
 				/>
 			</div>
 		</header>
+	);
+}
+
+/** Compact PR controls shown in the main toolbar when the review sidebar is collapsed. */
+export function RightSidebarHeaderInlineActions({
+	activeWorkspace,
+}: {
+	activeWorkspace: WorkspaceShellModel;
+}) {
+	const { continueMergedWorkspace, headerState } =
+		useRightSidebarHeaderViewModel(activeWorkspace);
+	const hasPullRequestNumber = 'number' in headerState;
+
+	if (!hasPullRequestNumber && headerState.kind === 'empty') {
+		return null;
+	}
+
+	return (
+		<div
+			className='right-sidebar-header-actions flex shrink-0 items-center gap-2'
+			data-pr-tone={headerState.tone}
+		>
+			{hasPullRequestNumber ? (
+				<RightSidebarHeaderPullRequestLinks headerState={headerState} />
+			) : null}
+			<RightSidebarHeaderAction
+				activeWorkspace={activeWorkspace}
+				headerState={headerState}
+				onContinueMergedWorkspace={continueMergedWorkspace}
+			/>
+		</div>
+	);
+}
+
+/** Resolves PR header state and the local merged-PR continue action. */
+function useRightSidebarHeaderViewModel(
+	activeWorkspace: WorkspaceShellModel,
+): RightSidebarHeaderViewModel {
+	const hasBranchChanges = useReviewableChanges(activeWorkspace);
+	const [continuedMergedPullRequests, setContinuedMergedPullRequests] = useAtom(
+		continuedMergedPullRequestByWorkspaceAtom,
+	);
+	const continuedPullRequestNumber =
+		continuedMergedPullRequests[activeWorkspace.id];
+	const headerState = getRightSidebarHeaderState(
+		activeWorkspace,
+		hasBranchChanges,
+		{ continuedPullRequestNumber },
+	);
+	const continueMergedWorkspace = useCallback(() => {
+		const pullRequestNumber = activeWorkspace.pullRequest.number;
+		if (pullRequestNumber === undefined) {
+			return;
+		}
+		setContinuedMergedPullRequests((current) => ({
+			...current,
+			[activeWorkspace.id]: pullRequestNumber,
+		}));
+	}, [
+		activeWorkspace.id,
+		activeWorkspace.pullRequest.number,
+		setContinuedMergedPullRequests,
+	]);
+
+	return { continueMergedWorkspace, headerState };
+}
+
+/** Renders the existing pull request and preview deployment links. */
+function RightSidebarHeaderPullRequestLinks({
+	headerState,
+}: {
+	headerState: RightSidebarHeaderNumberedState;
+}) {
+	return (
+		<div className='flex shrink-0 items-center gap-1'>
+			<PullRequestNumberButton
+				number={headerState.number}
+				tone={headerState.tone}
+				url={headerState.url}
+			/>
+			{headerState.previewDeployment ? (
+				<PreviewDeploymentButton deployment={headerState.previewDeployment} />
+			) : null}
+		</div>
 	);
 }
 
