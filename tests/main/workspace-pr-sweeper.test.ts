@@ -13,16 +13,30 @@ const WORKSPACES: SweepableWorkspace[] = [
 describe('createWorkspacePrStatusSweeper', () => {
 	test('start refreshes every active workspace once, sequentially', async () => {
 		const order: string[] = [];
+		let activeRefreshes = 0;
+		let maxConcurrentRefreshes = 0;
 		const refreshSnapshot = vi.fn(async ({ workspaceId }) => {
-			order.push(workspaceId);
+			activeRefreshes += 1;
+			maxConcurrentRefreshes = Math.max(
+				maxConcurrentRefreshes,
+				activeRefreshes,
+			);
+			order.push(`start:${workspaceId}`);
+			// Yield so an unbounded Promise.all implementation would overlap calls.
+			await Promise.resolve();
+			order.push(`end:${workspaceId}`);
+			activeRefreshes -= 1;
 		});
 		createWorkspacePrStatusSweeper({
 			listActiveWorkspaces: () => WORKSPACES,
 			refreshSnapshot,
 			scheduleInterval: () => () => undefined,
 		}).start();
-		await vi.waitFor(() => expect(refreshSnapshot).toHaveBeenCalledTimes(2));
-		expect(order).toEqual(['a', 'b']);
+		await vi.waitFor(() =>
+			expect(order).toEqual(['start:a', 'end:a', 'start:b', 'end:b']),
+		);
+		expect(refreshSnapshot).toHaveBeenCalledTimes(2);
+		expect(maxConcurrentRefreshes).toBe(1);
 	});
 
 	test('one workspace failing does not abort the rest of the sweep', async () => {

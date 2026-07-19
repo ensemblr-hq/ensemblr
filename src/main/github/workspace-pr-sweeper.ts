@@ -73,16 +73,21 @@ export function createWorkspacePrStatusSweeper(
 		}
 		running = true;
 		try {
-			for (const workspace of options.listActiveWorkspaces()) {
-				try {
-					await options.refreshSnapshot({
-						workspaceCwd: workspace.path,
-						workspaceId: workspace.id,
-					});
-				} catch {
-					// A single workspace's refresh failing must not stop the sweep.
-				}
-			}
+			// Chain refreshes so each gh-heavy snapshot finishes before the next starts.
+			await options
+				.listActiveWorkspaces()
+				.reduce<Promise<void>>(async (previousRefresh, workspace) => {
+					// react-doctor-disable-next-line -- Sequential gh calls intentionally bound subprocess and API load.
+					await previousRefresh;
+					try {
+						await options.refreshSnapshot({
+							workspaceCwd: workspace.path,
+							workspaceId: workspace.id,
+						});
+					} catch {
+						// A single workspace's refresh failing must not stop the sweep.
+					}
+				}, Promise.resolve());
 		} finally {
 			running = false;
 		}
