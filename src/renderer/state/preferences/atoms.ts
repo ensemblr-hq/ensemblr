@@ -26,10 +26,10 @@ const KEY = (suffix: string) => `ensemblr_pref_${suffix}`;
 // ─── Composer memory (per-chat overrides) ──────────────────────────────────────
 
 /**
- * Per-chat model override, keyed by chat-tab id. `null` means "inherit the
- * Settings → Default model" ({@link defaultChatModelAtom}); a non-null value is
- * an explicit per-chat pick that survives reloads and is preserved for that
- * chat only. Picking a model in one chat never changes another chat's model.
+ * Per-chat model override, keyed by chat-tab id. `null` preserves an existing
+ * session's model, or inherits the Settings default ({@link defaultChatModelAtom})
+ * for a fresh chat. A non-null value is an explicit per-chat pick that survives
+ * reloads. Picking a model in one chat never changes another chat's model.
  */
 export const chatModelOverrideAtomFamily = atomFamily((chatTabId: string) =>
 	atomWithStorage<string | null>(KEY(`chat_model_${chatTabId}`), null),

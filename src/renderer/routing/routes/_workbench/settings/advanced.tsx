@@ -146,7 +146,7 @@ function AdvancedSettings() {
 
 	return (
 		<SettingsSection
-			description='Root directory, Pi executable override, and terminal-scrollback limits. SSH key for cloud workspaces is deferred (ADR 0020).'
+			description='Root directory, Pi executable override, and terminal-scrollback limits.'
 			title='Advanced'
 		>
 			<SettingRow
@@ -251,12 +251,6 @@ function AdvancedSettings() {
 				label='Terminal scrollback limit'
 				modified={scrollbackMb !== DEFAULT_SCROLLBACK_MB}
 				onReset={() => setScrollbackMb(DEFAULT_SCROLLBACK_MB)}
-			/>
-
-			<SettingRow
-				control={<Badge variant='outline'>Deferred</Badge>}
-				description='SSH private key for cloud workspaces. Cloud workspaces are deferred for v1 (ADR 0020).'
-				label='SSH private key path'
 			/>
 		</SettingsSection>
 	);

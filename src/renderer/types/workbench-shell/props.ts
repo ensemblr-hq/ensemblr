@@ -15,7 +15,6 @@ import type { WorkbenchDockActions, WorkbenchHealth } from './primitives';
 
 export type WorkbenchStaticNavigationTarget =
 	| 'dashboard'
-	| 'help'
 	| 'history'
 	| 'settings'
 	| { kind: 'repo-settings'; repoId: string };
@@ -41,7 +40,6 @@ export interface WorkbenchShellProps {
 	activeSession: SessionTabModel;
 	activeView:
 		| 'dashboard'
-		| 'help'
 		| 'history'
 		| 'linear'
 		| 'settings'

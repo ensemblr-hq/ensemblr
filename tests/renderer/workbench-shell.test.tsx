@@ -248,7 +248,6 @@ test('renders the Conductor-style workbench shell regions', () => {
 
 	expect(markup).toContain('Dashboard');
 	expect(markup).toContain('History');
-	expect(markup).toContain('Help');
 	expect(markup).toContain('Repositories');
 	expect(markup).toContain('Open repository creation menu');
 	expect(markup).toContain('Collapse repository ensemblr');

@@ -2,7 +2,7 @@ import { WorkbenchEmptyStateContent } from '@/renderer/components/workbench-empt
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
 import type { WorkbenchActiveView } from '@/renderer/types/workbench-shell';
 
-/** Placeholder content for dashboard/history/help/settings views. */
+/** Placeholder content for dashboard/history/settings views. */
 export function WorkbenchPlaceholderPage({
 	view,
 }: {
@@ -40,11 +40,6 @@ function getWorkbenchPlaceholderCopy({
 			return {
 				detail: 'Session history is not connected yet.',
 				title: 'History',
-			};
-		case 'help':
-			return {
-				detail: 'Help content is not connected yet.',
-				title: 'Help',
 			};
 		case 'settings':
 			return {

@@ -10,7 +10,6 @@ export function isWorkbenchActiveView(
 ): view is WorkbenchActiveView {
 	return (
 		view === 'dashboard' ||
-		view === 'help' ||
 		view === 'history' ||
 		view === 'linear' ||
 		view === 'settings' ||

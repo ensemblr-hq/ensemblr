@@ -3,7 +3,6 @@ import type { WorkbenchStaticNavigationTarget } from '@/renderer/types/workbench
 /** The set of static TanStack Router `to` paths reachable from the workbench chrome. */
 type WorkbenchStaticRouteTo =
 	| '/dashboard'
-	| '/help'
 	| '/history'
 	| '/settings'
 	| '/settings/repo/$repoId/environment';
@@ -19,7 +18,6 @@ const literalRouteByTarget: Record<
 	WorkbenchStaticRouteTo
 > = {
 	dashboard: '/dashboard',
-	help: '/help',
 	history: '/history',
 	settings: '/settings',
 };
