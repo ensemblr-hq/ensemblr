@@ -224,7 +224,7 @@ function RightSidebarHeaderAction({
 			return (
 				<div className='flex items-center gap-1.5'>
 					<Button
-						className='h-8 rounded-lg border-[color:var(--right-sidebar-header-merged-border)] border-dashed bg-transparent px-2.5 text-[color:var(--right-sidebar-header-merged)] text-sm hover:bg-[var(--right-sidebar-header-merged-soft)] hover:text-[color:var(--right-sidebar-header-merged)]'
+						className='h-8 rounded-lg border-[color:var(--right-sidebar-header-merged-border)] border-dashed bg-background/70 px-2.5 text-[color:var(--right-sidebar-header-merged)] text-sm hover:bg-[var(--right-sidebar-header-merged-soft)] hover:text-[color:var(--right-sidebar-header-merged)] dark:border-[color:var(--right-sidebar-header-merged-border)] dark:bg-background/65 dark:hover:bg-[var(--right-sidebar-header-merged-soft)]'
 						disabled={reviewActions?.isArchivingMergedWorkspace}
 						onClick={onContinueMergedWorkspace}
 						size='sm'
