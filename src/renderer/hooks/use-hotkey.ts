@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { matchesShortcut, type ShortcutId } from '@/shared/keymap';
 
 const TYPEABLE_TAGS = new Set(['INPUT', 'TEXTAREA']);
@@ -29,6 +29,10 @@ export function useHotkey(
 	options: { allowInTypeable?: boolean; enabled?: boolean } = {},
 ): void {
 	const { allowInTypeable = true, enabled = true } = options;
+	const handlerRef = useRef(handler);
+	useEffect(() => {
+		handlerRef.current = handler;
+	});
 	useEffect(() => {
 		if (!enabled) {
 			return;
@@ -41,9 +45,9 @@ export function useHotkey(
 				return;
 			}
 			event.preventDefault();
-			handler(event);
+			handlerRef.current(event);
 		};
 		window.addEventListener('keydown', onKey);
 		return () => window.removeEventListener('keydown', onKey);
-	}, [id, handler, allowInTypeable, enabled]);
+	}, [id, allowInTypeable, enabled]);
 }

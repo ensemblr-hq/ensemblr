@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 
 import {
 	settingsResolutionQuery,
@@ -25,6 +25,21 @@ import { useEnsureWorkspaceSetup } from './use-ensure-workspace-setup';
 import { useLivePullRequestModel } from './use-live-pull-request-model';
 import { usePullRequestAutoRefresh } from './use-pull-request-auto-refresh';
 import { useWorkspaceFilesWatch } from './use-workspace-files-watch';
+
+/**
+ * Builds a content signature for a workspace file listing so the mapped tree
+ * can be memoized by content and reuse its previous array reference when a
+ * refetch returns an equivalent set in a fresh array.
+ * @param entries - Raw workspace file entries from the live query.
+ * @returns A newline-joined signature string.
+ */
+function computeFilesSignature(
+	entries: readonly { isIgnored?: boolean; kind: string; path: string }[],
+): string {
+	return entries
+		.map((entry) => JSON.stringify([entry.path, entry.kind, entry.isIgnored]))
+		.join('\n');
+}
 
 /** The project of the current workspace navigation selection. */
 type ActiveProject = WorkspaceNavigationSelection['project'];
@@ -106,28 +121,35 @@ export function useLiveWorkspaceModel({
 		signature: string;
 		value: WorkspaceFileSummary[];
 	} | null>(null);
+	const remoteFiles = allFilesData?.files;
 	const liveWorkspaceFiles = useMemo(() => {
-		const remote = allFilesData?.files ?? [];
+		const remote = remoteFiles ?? [];
 		if (remote.length === 0) {
 			return activeWorkspace.workspaceFiles;
 		}
-		const signature = remote
-			.map((entry) => JSON.stringify([entry.path, entry.kind, entry.isIgnored]))
-			.join('\n');
+		const signature = computeFilesSignature(remote);
 		const cached = filesCacheRef.current;
 		if (cached && cached.signature === signature) {
 			return cached.value;
 		}
-		const value = remote.map((entry) => ({
+		return remote.map((entry) => ({
 			id: `wsfile:${entry.path}`,
 			isIgnored: entry.isIgnored,
 			kind: entry.kind,
 			name: entry.name,
 			path: entry.path,
 		}));
-		filesCacheRef.current = { signature, value };
-		return value;
-	}, [allFilesData?.files, activeWorkspace.workspaceFiles]);
+	}, [remoteFiles, activeWorkspace.workspaceFiles]);
+	useEffect(() => {
+		const remote = remoteFiles ?? [];
+		if (remote.length === 0) {
+			return;
+		}
+		filesCacheRef.current = {
+			signature: computeFilesSignature(remote),
+			value: liveWorkspaceFiles,
+		};
+	}, [remoteFiles, liveWorkspaceFiles]);
 
 	const liveReview = useMemo(() => {
 		if (!gitStatusData) {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import type { WorkspaceOpenTarget } from '@/renderer/types/workbench';
 
@@ -21,20 +21,28 @@ interface UseOpenTargetShortcutsOptions {
  * anywhere in the renderer; an input-focus guard prevents the bindings from
  * clobbering typing in inputs / textareas / contenteditable.
  */
-export function useOpenTargetShortcuts({
-	closeMenu,
-	invokeTarget,
-	isMenuOpen,
-	openTargets,
-	primaryTarget,
-}: UseOpenTargetShortcutsOptions): void {
+export function useOpenTargetShortcuts(
+	options: UseOpenTargetShortcutsOptions,
+): void {
+	const optionsRef = useRef(options);
 	useEffect(() => {
-		if (!openTargets || openTargets.length === 0) {
-			return undefined;
-		}
+		optionsRef.current = options;
+	});
 
+	useEffect(() => {
 		const handler = (event: KeyboardEvent) => {
 			if (event.defaultPrevented || shouldIgnoreShortcut(event)) {
+				return;
+			}
+
+			const {
+				closeMenu,
+				invokeTarget,
+				isMenuOpen,
+				openTargets,
+				primaryTarget,
+			} = optionsRef.current;
+			if (!openTargets || openTargets.length === 0) {
 				return;
 			}
 
@@ -90,7 +98,7 @@ export function useOpenTargetShortcuts({
 		return () => {
 			window.removeEventListener('keydown', handler);
 		};
-	}, [closeMenu, invokeTarget, isMenuOpen, openTargets, primaryTarget]);
+	}, []);
 }
 
 /**

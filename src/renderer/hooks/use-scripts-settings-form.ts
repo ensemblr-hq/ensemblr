@@ -65,7 +65,9 @@ export function useScriptsSettingsForm(
 
 	// Keep the latest persist closure reachable from the unmount-only cleanup.
 	const persistRef = useRef(persist);
-	persistRef.current = persist;
+	useEffect(() => {
+		persistRef.current = persist;
+	});
 
 	// Flush a pending debounced save on unmount so a just-typed edit survives
 	// navigating away inside the debounce window.

@@ -1,8 +1,5 @@
 import type { HealthSnapshot } from '@/shared/ipc/contracts/health';
-import type {
-	WorkspaceOpenTargetKind as SharedWorkspaceOpenTargetKind,
-	WorkspaceOpenTargetSnapshot,
-} from '@/shared/ipc/contracts/open-target';
+import type { WorkspaceOpenTargetSnapshot } from '@/shared/ipc/contracts/open-target';
 // `WorkspaceOpenTarget` is re-exported here for the renderer's query result
 // type (`workspaceOpenTargetsQuery`); it is no longer a property of the
 // workspace shell model — the menu reads it from the React Query cache.
@@ -310,8 +307,6 @@ export interface WorkspaceLandingSummary {
 	setupGuidance: WorkspaceLandingSetupSummary;
 	workspaceName: string;
 }
-
-export type WorkspaceOpenTargetKind = SharedWorkspaceOpenTargetKind;
 
 export type WorkspaceOpenTarget = WorkspaceOpenTargetSnapshot;
 

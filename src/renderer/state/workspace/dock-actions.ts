@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 
 import { activateWorkspaceDesktopApp } from '@/renderer/api/ensemblr/workspace-runtime';
@@ -56,13 +56,15 @@ export function useWorkspaceDockActions({
 }: UseWorkspaceDockActionsOptions): WorkbenchDockActions {
 	const navigate = useNavigate();
 	const askAgentSetupScriptRef = useRef(askAgentSetupScript);
-	askAgentSetupScriptRef.current = askAgentSetupScript;
 	const updateSearchRef = useRef(updateSearch);
-	updateSearchRef.current = updateSearch;
 	const sessionsRef = useRef(sessions);
-	sessionsRef.current = sessions;
 	const activeDockTabRef = useRef(activeDockTab);
-	activeDockTabRef.current = activeDockTab;
+	useEffect(() => {
+		askAgentSetupScriptRef.current = askAgentSetupScript;
+		updateSearchRef.current = updateSearch;
+		sessionsRef.current = sessions;
+		activeDockTabRef.current = activeDockTab;
+	});
 
 	return useMemo<WorkbenchDockActions>(
 		() => ({

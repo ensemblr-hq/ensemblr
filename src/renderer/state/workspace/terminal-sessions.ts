@@ -119,7 +119,7 @@ export function useWorkspaceTerminalSessions(
 		clearActivityTimers(activityTimersRef.current);
 		commandBuffersRef.current.clear();
 		commandOutputTerminalIdsRef.current.clear();
-		closedTerminalIdsRef.current = new Set();
+		closedTerminalIdsRef.current.clear();
 	}
 
 	useEffect(() => {

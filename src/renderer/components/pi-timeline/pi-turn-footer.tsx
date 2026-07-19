@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { CopyResponseButton } from '@/renderer/components/copy-response-button';
+import { useElapsedMs } from '@/renderer/hooks/use-elapsed-ms';
 import { formatTurnDuration } from '@/renderer/lib/format-duration';
 import { cn } from '@/renderer/lib/utils';
 import type { PiTurnFooterItem } from '@/renderer/types/pi-timeline';
@@ -50,18 +50,14 @@ export function PiLiveTurnFooter({
 	className?: string;
 	startedAtMs: number;
 }) {
-	const [nowMs, setNowMs] = useState(() => Date.now());
-	useEffect(() => {
-		const id = window.setInterval(() => setNowMs(Date.now()), 100);
-		return () => window.clearInterval(id);
-	}, []);
+	const elapsedMs = useElapsedMs(startedAtMs);
 	return (
 		<div
 			className={cn('text-muted-foreground/70 text-xs', className)}
 			data-kind='turn-footer-live'
 			data-role='timeline-item'
 		>
-			{formatTurnDuration(Math.max(0, nowMs - startedAtMs))}
+			{formatTurnDuration(elapsedMs)}
 		</div>
 	);
 }

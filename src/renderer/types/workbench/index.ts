@@ -87,7 +87,6 @@ export type {
 	WorkspaceLinkedIssueProvider,
 	WorkspaceLinkedIssueSummary,
 	WorkspaceOpenTarget,
-	WorkspaceOpenTargetKind,
 	WorkspaceScriptSummary,
 	WorkspaceShellData,
 	WorkspaceShellModel,
