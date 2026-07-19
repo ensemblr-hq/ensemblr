@@ -1,9 +1,4 @@
-import {
-	CircleHelpIcon,
-	HistoryIcon,
-	LayoutDashboardIcon,
-	SettingsIcon,
-} from 'lucide-react';
+import { HistoryIcon, LayoutDashboardIcon, SettingsIcon } from 'lucide-react';
 
 import {
 	SidebarGroup,
@@ -18,7 +13,7 @@ import type {
 
 import { StaticNavigationItem } from './static-navigation-item';
 
-/** Top-of-sidebar static navigation group (dashboard, history, settings, help). */
+/** Top-of-sidebar static navigation group (dashboard, history, settings). */
 export function SidebarPrimaryNavigation({
 	activeView,
 	onStaticNavigationSelect,
@@ -52,14 +47,6 @@ export function SidebarPrimaryNavigation({
 							label='Settings'
 							onSelect={onStaticNavigationSelect}
 							target='settings'
-						/>
-						<StaticNavigationItem
-							ariaLabel='Open help'
-							icon={<CircleHelpIcon aria-hidden='true' />}
-							isActive={activeView === 'help'}
-							label='Help'
-							onSelect={onStaticNavigationSelect}
-							target='help'
 						/>
 					</SidebarMenu>
 				</SidebarGroupContent>

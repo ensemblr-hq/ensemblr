@@ -135,11 +135,17 @@ export function usePiComposerController({
 		}));
 	}, [models]);
 
-	// Resolution order: explicit per-chat pick → Settings default → Pi-reported
-	// default → first available model. Each rung only fires when the one above
-	// is unset, so a fresh chat lands on the user's configured default.
+	const persistedActiveSession = sessionsData?.sessions.find(
+		(session) => session.id === currentPiSessionId,
+	);
+
+	// Resolution order: explicit per-chat pick → persisted session model →
+	// Settings default → Pi-reported default → first available model. Existing
+	// chats keep their session model when the default changes; only fresh chats
+	// inherit the latest configured default.
 	const modelId =
 		chatModelOverride ??
+		persistedActiveSession?.model ??
 		defaultModelId ??
 		models?.defaultModelId ??
 		availableModels[0]?.id ??
@@ -168,9 +174,6 @@ export function usePiComposerController({
 		}));
 	}, [models, modelId]);
 
-	const persistedActiveSession = sessionsData?.sessions.find(
-		(session) => session.id === currentPiSessionId,
-	);
 	const pendingSessionId =
 		pendingSession?.chatTabId === chatTabId ? pendingSession.sessionId : null;
 	const activeSessionId = persistedActiveSession?.id ?? pendingSessionId;

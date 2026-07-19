@@ -25,7 +25,6 @@ import { Route as WorkbenchSettingsDiagnosticsRouteImport } from './routes/_work
 import { Route as WorkbenchSettingsAppearanceRouteImport } from './routes/_workbench/settings/appearance'
 import { Route as WorkbenchSettingsAdvancedRouteImport } from './routes/_workbench/settings/advanced'
 import { Route as WorkbenchShellHistoryRouteImport } from './routes/_workbench/_shell/history'
-import { Route as WorkbenchShellHelpRouteImport } from './routes/_workbench/_shell/help'
 import { Route as WorkbenchShellDashboardRouteImport } from './routes/_workbench/_shell/dashboard'
 import { Route as WorkbenchSettingsRepoIndexRouteImport } from './routes/_workbench/settings/repo/index'
 import { Route as WorkbenchShellLinearIndexRouteImport } from './routes/_workbench/_shell/linear/index'
@@ -127,11 +126,6 @@ const WorkbenchShellHistoryRoute = WorkbenchShellHistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => WorkbenchShellRoute,
 } as any)
-const WorkbenchShellHelpRoute = WorkbenchShellHelpRouteImport.update({
-  id: '/help',
-  path: '/help',
-  getParentRoute: () => WorkbenchShellRoute,
-} as any)
 const WorkbenchShellDashboardRoute = WorkbenchShellDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -231,7 +225,6 @@ export interface FileRoutesByFullPath {
   '/settings': typeof WorkbenchSettingsRouteWithChildren
   '/debug/pi-replay': typeof DebugPiReplayRoute
   '/dashboard': typeof WorkbenchShellDashboardRoute
-  '/help': typeof WorkbenchShellHelpRoute
   '/history': typeof WorkbenchShellHistoryRoute
   '/settings/advanced': typeof WorkbenchSettingsAdvancedRoute
   '/settings/appearance': typeof WorkbenchSettingsAppearanceRoute
@@ -262,7 +255,6 @@ export interface FileRoutesByTo {
   '/': typeof WorkbenchShellIndexRoute
   '/debug/pi-replay': typeof DebugPiReplayRoute
   '/dashboard': typeof WorkbenchShellDashboardRoute
-  '/help': typeof WorkbenchShellHelpRoute
   '/history': typeof WorkbenchShellHistoryRoute
   '/settings/advanced': typeof WorkbenchSettingsAdvancedRoute
   '/settings/appearance': typeof WorkbenchSettingsAppearanceRoute
@@ -294,7 +286,6 @@ export interface FileRoutesById {
   '/_workbench/settings': typeof WorkbenchSettingsRouteWithChildren
   '/debug/pi-replay': typeof DebugPiReplayRoute
   '/_workbench/_shell/dashboard': typeof WorkbenchShellDashboardRoute
-  '/_workbench/_shell/help': typeof WorkbenchShellHelpRoute
   '/_workbench/_shell/history': typeof WorkbenchShellHistoryRoute
   '/_workbench/settings/advanced': typeof WorkbenchSettingsAdvancedRoute
   '/_workbench/settings/appearance': typeof WorkbenchSettingsAppearanceRoute
@@ -329,7 +320,6 @@ export interface FileRouteTypes {
     | '/settings'
     | '/debug/pi-replay'
     | '/dashboard'
-    | '/help'
     | '/history'
     | '/settings/advanced'
     | '/settings/appearance'
@@ -360,7 +350,6 @@ export interface FileRouteTypes {
     | '/'
     | '/debug/pi-replay'
     | '/dashboard'
-    | '/help'
     | '/history'
     | '/settings/advanced'
     | '/settings/appearance'
@@ -391,7 +380,6 @@ export interface FileRouteTypes {
     | '/_workbench/settings'
     | '/debug/pi-replay'
     | '/_workbench/_shell/dashboard'
-    | '/_workbench/_shell/help'
     | '/_workbench/_shell/history'
     | '/_workbench/settings/advanced'
     | '/_workbench/settings/appearance'
@@ -539,13 +527,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkbenchShellHistoryRouteImport
       parentRoute: typeof WorkbenchShellRoute
     }
-    '/_workbench/_shell/help': {
-      id: '/_workbench/_shell/help'
-      path: '/help'
-      fullPath: '/help'
-      preLoaderRoute: typeof WorkbenchShellHelpRouteImport
-      parentRoute: typeof WorkbenchShellRoute
-    }
     '/_workbench/_shell/dashboard': {
       id: '/_workbench/_shell/dashboard'
       path: '/dashboard'
@@ -689,7 +670,6 @@ const WorkbenchShellProjectsProjectIdRouteRouteWithChildren =
 
 interface WorkbenchShellRouteChildren {
   WorkbenchShellDashboardRoute: typeof WorkbenchShellDashboardRoute
-  WorkbenchShellHelpRoute: typeof WorkbenchShellHelpRoute
   WorkbenchShellHistoryRoute: typeof WorkbenchShellHistoryRoute
   WorkbenchShellIndexRoute: typeof WorkbenchShellIndexRoute
   WorkbenchShellProjectsProjectIdRouteRoute: typeof WorkbenchShellProjectsProjectIdRouteRouteWithChildren
@@ -699,7 +679,6 @@ interface WorkbenchShellRouteChildren {
 
 const WorkbenchShellRouteChildren: WorkbenchShellRouteChildren = {
   WorkbenchShellDashboardRoute: WorkbenchShellDashboardRoute,
-  WorkbenchShellHelpRoute: WorkbenchShellHelpRoute,
   WorkbenchShellHistoryRoute: WorkbenchShellHistoryRoute,
   WorkbenchShellIndexRoute: WorkbenchShellIndexRoute,
   WorkbenchShellProjectsProjectIdRouteRoute:

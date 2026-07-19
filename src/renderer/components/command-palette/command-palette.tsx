@@ -85,12 +85,6 @@ export function CommandPalette() {
 			icon: LayoutDashboardIcon,
 			run: go(() => navigate({ to: '/history' })),
 		},
-		{
-			id: 'go.help',
-			label: 'Open help',
-			icon: LayoutDashboardIcon,
-			run: go(() => navigate({ to: '/help' })),
-		},
 	];
 
 	const settings: ActionEntry[] = [
