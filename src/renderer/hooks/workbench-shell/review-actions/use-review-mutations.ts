@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useRouter } from '@tanstack/react-router';
 import { useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 
@@ -14,8 +13,8 @@ import {
 	ReviewActionError,
 	showReviewActionError,
 } from '@/renderer/components/workbench-shell/review-actions/review-action-error';
+import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import { continuedMergedPullRequestByWorkspaceAtom } from '@/renderer/state/workspace';
-import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
 import type { ReviewMergeSettings } from '@/renderer/types/settings';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
@@ -41,14 +40,15 @@ export function useReviewMutations({
 	mergeSettings: ReviewMergeSettings;
 	onSettled: () => void;
 }) {
-	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const router = useRouter();
 	const setContinuedMergedPullRequests = useSetAtom(
 		continuedMergedPullRequestByWorkspaceAtom,
 	);
 	const workspaceCwd = activeWorkspace.pathLabel;
 	const workspaceId = activeWorkspace.id;
+	const removeWorkspace = useRemoveWorkspaceAction({
+		activeWorkspaceId: workspaceId,
+	});
 
 	const archiveAfterMergeMutation = useMutation({
 		mutationFn: () =>
@@ -65,7 +65,6 @@ export function useReviewMutations({
 		},
 		onSuccess: async (result) => {
 			if (result.status === 'success') {
-				deleteLastUsedOpenTarget(workspaceId);
 				setContinuedMergedPullRequests((current) => {
 					if (!(workspaceId in current)) {
 						return current;
@@ -73,9 +72,7 @@ export function useReviewMutations({
 					const { [workspaceId]: _removed, ...rest } = current;
 					return rest;
 				});
-				await navigate({ replace: true, to: '/' });
-				await invalidateWorkspaceListViews(queryClient);
-				await router.invalidate();
+				await removeWorkspace(workspaceId);
 				toast.success('Workspace archived.');
 				return;
 			}

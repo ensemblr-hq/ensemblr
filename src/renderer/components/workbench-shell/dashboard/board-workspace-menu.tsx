@@ -6,15 +6,12 @@ import {
 	useState,
 } from 'react';
 
-import { useArchiveWorkspaceAction } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
+import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 import { ArchiveWorkspaceDialog } from '../archive-workspace-dialog';
 import { DeleteWorkspaceDialog } from '../delete-workspace-dialog';
 import { RenameWorkspaceDialog } from '../rename-workspace-dialog';
-
-/** No-op standing in for the sidebar-only reorder animation suppression. */
-const noop = () => undefined;
 
 /** Per-workspace openers for the board card's archive, delete, and rename dialogs. */
 export interface BoardWorkspaceMenuController {
@@ -79,9 +76,8 @@ export function useBoardWorkspaceMenu(): {
 		null,
 	);
 
-	const handleWorkspaceLifecycleAction = useArchiveWorkspaceAction({
+	const handleWorkspaceLifecycleAction = useRemoveWorkspaceAction({
 		activeWorkspaceId: null,
-		disableProjectReorderLayoutAnimation: noop,
 	});
 
 	const controller = useMemo<BoardWorkspaceMenuController>(

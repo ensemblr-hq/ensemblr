@@ -9,9 +9,9 @@ import {
 import {
 	useArchiveBrowseChange,
 	useArchiveProjectAction,
-	useArchiveWorkspaceAction,
 	useCreateWorkspaceFromProject,
 } from '@/renderer/hooks/workbench-shell/navigation-sidebar/use-project-navigation-actions';
+import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import type {
 	AddProjectActionId,
 	AddProjectMenuModel,
@@ -84,9 +84,8 @@ export function ProjectNavigationGroups({
 	// invalidation + navigation fallback. The dialogs decide which IPC ran; the
 	// callback only sees the workspace/project id that disappeared from the
 	// active surface.
-	const handleWorkspaceLifecycleAction = useArchiveWorkspaceAction({
+	const handleWorkspaceLifecycleAction = useRemoveWorkspaceAction({
 		activeWorkspaceId: activeWorkspace?.id ?? null,
-		disableProjectReorderLayoutAnimation,
 	});
 
 	const handleProjectLifecycleAction = useArchiveProjectAction({

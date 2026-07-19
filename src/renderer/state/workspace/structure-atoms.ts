@@ -1,8 +1,45 @@
+import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
 
 import type { WorkspaceBoardStatus } from './board-status';
 
 const workspaceStorageOptions = { getOnInit: true };
+
+/**
+ * Window during which project-row layout animation stays suppressed after a
+ * reflow-inducing change, long enough to outlast one sidebar reflow.
+ */
+const PROJECT_REORDER_LAYOUT_ANIMATION_SUPPRESS_MS = 180;
+
+/** Transient suppression state for project-row layout animation. */
+const projectReorderLayoutAnimationStateAtom = atom({
+	isDisabled: false,
+	revision: 0,
+});
+
+/** Whether project-row layout animation is currently suppressed. */
+export const isProjectReorderLayoutAnimationDisabledAtom = atom(
+	(get) => get(projectReorderLayoutAnimationStateAtom).isDisabled,
+);
+
+/** Suppresses project-row layout animation long enough for one sidebar reflow. */
+export const disableProjectReorderLayoutAnimationAtom = atom(
+	null,
+	(get, set) => {
+		const revision = get(projectReorderLayoutAnimationStateAtom).revision + 1;
+		set(projectReorderLayoutAnimationStateAtom, {
+			isDisabled: true,
+			revision,
+		});
+		setTimeout(() => {
+			set(projectReorderLayoutAnimationStateAtom, (current) =>
+				current.revision === revision
+					? { isDisabled: false, revision }
+					: current,
+			);
+		}, PROJECT_REORDER_LAYOUT_ANIMATION_SUPPRESS_MS);
+	},
+);
 
 /** Persisted user-defined ordering of project ids in the workspace sidebar. */
 export const orderedProjectIdsAtom = atomWithStorage<string[]>(

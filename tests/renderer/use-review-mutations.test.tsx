@@ -6,24 +6,17 @@ import type { ReactNode } from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 const {
-	navigate,
-	invalidate,
 	archiveWorkspace,
 	invalidateWorkspaceListViews,
 	mergePullRequest,
 	refreshPullRequestSnapshot,
+	removeWorkspace,
 } = vi.hoisted(() => ({
-	navigate: vi.fn().mockResolvedValue(undefined),
-	invalidate: vi.fn().mockResolvedValue(undefined),
 	archiveWorkspace: vi.fn(),
 	invalidateWorkspaceListViews: vi.fn().mockResolvedValue(undefined),
 	mergePullRequest: vi.fn().mockResolvedValue({ merged: true }),
 	refreshPullRequestSnapshot: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('@tanstack/react-router', () => ({
-	useNavigate: () => navigate,
-	useRouter: () => ({ invalidate }),
+	removeWorkspace: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/renderer/api/ensemblr-queries', () => ({
@@ -40,9 +33,16 @@ vi.mock('sonner', () => ({
 	toast: Object.assign(vi.fn(), { success: vi.fn(), warning: vi.fn() }),
 }));
 
-vi.mock('@/renderer/state/workspace/open-target-history', () => ({
-	deleteLastUsedOpenTarget: vi.fn(),
+vi.mock('@/renderer/hooks/workbench-shell/use-remove-workspace-action', () => ({
+	useRemoveWorkspaceAction: () => removeWorkspace,
 }));
+
+vi.mock('@/renderer/state/workspace', async () => {
+	const { continuedMergedPullRequestByWorkspaceAtom } = await import(
+		'../../src/renderer/state/workspace/layout-atoms'
+	);
+	return { continuedMergedPullRequestByWorkspaceAtom };
+});
 
 import { toast } from 'sonner';
 
@@ -93,17 +93,13 @@ test('does not show a merge-completed toast when archive-on-merge is disabled', 
 	expect(toast.success).not.toHaveBeenCalled();
 });
 
-test('redirects to Welcome and refreshes list views after archive-on-merge', async () => {
+test('uses the shared removal action after archiving a merged workspace', async () => {
 	archiveWorkspace.mockResolvedValue({ status: 'success' });
 	const { result } = renderReviewMutations(true);
 
-	await result.current.mergeMutation.mutateAsync();
+	await result.current.archiveAfterMergeMutation.mutateAsync();
 
-	await waitFor(() => {
-		expect(navigate).toHaveBeenCalledWith({ replace: true, to: '/' });
-	});
-	expect(invalidateWorkspaceListViews).toHaveBeenCalledTimes(1);
-	expect(invalidate).toHaveBeenCalledTimes(1);
+	expect(removeWorkspace).toHaveBeenCalledWith('san-antonio');
 });
 
 test('refreshes list views but stays put when the workspace is not archived', async () => {
@@ -118,7 +114,7 @@ test('refreshes list views but stays put when the workspace is not archived', as
 	await waitFor(() => {
 		expect(invalidateWorkspaceListViews).toHaveBeenCalledTimes(1);
 	});
-	expect(navigate).not.toHaveBeenCalled();
+	expect(removeWorkspace).not.toHaveBeenCalled();
 });
 
 test('refreshes list views but stays put when archiving throws', async () => {
@@ -130,5 +126,5 @@ test('refreshes list views but stays put when archiving throws', async () => {
 	await waitFor(() => {
 		expect(invalidateWorkspaceListViews).toHaveBeenCalledTimes(1);
 	});
-	expect(navigate).not.toHaveBeenCalled();
+	expect(removeWorkspace).not.toHaveBeenCalled();
 });
