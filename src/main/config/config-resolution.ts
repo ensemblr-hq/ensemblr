@@ -596,13 +596,8 @@ function collectRepositoryRuleCandidates(
 	const merged = new Map<string, unknown>();
 
 	for (const rule of config.repositoryRules ?? []) {
-		if (!repositoryRuleMatches(rule, repositoryPath)) {
-			continue;
-		}
-
-		const settings = isPlainRecord(rule.settings) ? rule.settings : {};
-		for (const [key, value] of flattenRecord(settings)) {
-			merged.set(key, value);
+		if (repositoryRuleMatches(rule, repositoryPath)) {
+			applyRuleSettings(merged, rule);
 		}
 	}
 
@@ -610,10 +605,25 @@ function collectRepositoryRuleCandidates(
 }
 
 /**
+ * Flattens a matched rule's `settings` into the accumulator, overwriting earlier
+ * rules' values so later matching rules win.
+ * @param merged - Accumulator of resolved rule settings.
+ * @param rule - A matched repository rule record.
+ */
+function applyRuleSettings(
+	merged: Map<string, unknown>,
+	rule: Record<string, unknown>,
+): void {
+	const settings = isPlainRecord(rule.settings) ? rule.settings : {};
+	for (const [key, value] of flattenRecord(settings)) {
+		merged.set(key, value);
+	}
+}
+
+/**
  * Decides whether a `repositoryRules` entry applies to a repository. A rule with
- * no `match` (or an empty one) applies to all repositories; otherwise every
- * provided condition must hold: `path` is a case-insensitive substring of the
- * repository path.
+ * no `match` (or an empty one) applies to all repositories; otherwise its `path`
+ * must be a case-insensitive substring of the repository path.
  * @param rule - A repository rule record.
  * @param repositoryPath - Absolute repository path, when known.
  * @returns True when the rule applies.
@@ -628,13 +638,11 @@ function repositoryRuleMatches(
 		return true;
 	}
 
-	if (typeof match.path === 'string' && match.path.trim()) {
-		return (repositoryPath ?? '')
-			.toLowerCase()
-			.includes(match.path.trim().toLowerCase());
-	}
+	const needle = typeof match.path === 'string' ? match.path.trim() : '';
 
-	return false;
+	return needle
+		? (repositoryPath ?? '').toLowerCase().includes(needle.toLowerCase())
+		: false;
 }
 
 function collectUserGitDefaultCandidates(

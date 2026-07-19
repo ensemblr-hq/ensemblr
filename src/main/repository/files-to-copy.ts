@@ -188,26 +188,25 @@ function resolvePatterns(
 	source: FilesToCopySource;
 } {
 	const candidates: ReadonlyArray<{
-		record: Record<string, unknown> | undefined;
+		patterns: string[] | null;
 		source: FilesToCopySource;
 	}> = [
-		{ record: config.worktreeincludeConfig, source: 'worktreeinclude' },
-		{ record: config.ensemblrConfig, source: 'ensemblr-config' },
+		{
+			patterns: readPatternList(config.worktreeincludeConfig?.filesToCopy),
+			source: 'worktreeinclude',
+		},
+		{
+			patterns: readPatternList(config.ensemblrConfig?.filesToCopy),
+			source: 'ensemblr-config',
+		},
+		{ patterns: readPatternList(personalPatterns), source: 'personal' },
 	];
 
-	for (const candidate of candidates) {
-		const patterns = readPatternList(candidate.record?.filesToCopy);
-		if (patterns) {
-			return { patterns, source: candidate.source };
-		}
-	}
+	const selected = candidates.find((candidate) => candidate.patterns !== null);
 
-	const personal = readPatternList(personalPatterns);
-	if (personal) {
-		return { patterns: personal, source: 'personal' };
-	}
-
-	return { patterns: [...DEFAULT_PATTERNS], source: 'default' };
+	return selected?.patterns
+		? { patterns: selected.patterns, source: selected.source }
+		: { patterns: [...DEFAULT_PATTERNS], source: 'default' };
 }
 
 /**
