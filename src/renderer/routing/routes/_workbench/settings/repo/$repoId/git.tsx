@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
@@ -132,13 +132,12 @@ function TextSetting({
 	resolved: ResolvedSettingSnapshot | undefined;
 	seed: string;
 }) {
-	// The parent remounts this component (via `key`) when the resolved personal
-	// value changes, so state is initialised from `seed` once per resolved value.
-	const [value, setValue] = useState(seed);
+	// Uncontrolled: the field seeds from `seed` via defaultValue and persists on a
+	// debounce. The parent remounts this component (via `key`) when the resolved
+	// personal value changes, so defaultValue re-seeds without mirroring state.
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const onChange = (next: string) => {
-		setValue(next);
 		if (timerRef.current) {
 			clearTimeout(timerRef.current);
 		}
@@ -154,9 +153,9 @@ function TextSetting({
 				<Input
 					aria-label={ariaLabel}
 					className='h-8 w-44 font-mono text-xs'
+					defaultValue={seed}
 					onChange={(e) => onChange(e.target.value)}
 					placeholder={placeholder}
-					value={value}
 				/>
 			}
 			description={description}

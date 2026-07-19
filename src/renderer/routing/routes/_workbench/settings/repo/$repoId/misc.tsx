@@ -271,11 +271,12 @@ function FilesToCopySetting({
 	onSave: (patterns: string[] | null) => void;
 	seed: string;
 }) {
-	const [value, setValue] = useState(seed);
+	// Uncontrolled: seeds from `seed` via defaultValue and persists on a debounce.
+	// The parent remounts this component (via `key`) when the resolved value
+	// changes, so defaultValue re-seeds without mirroring state.
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const onChange = (next: string) => {
-		setValue(next);
 		if (timerRef.current) {
 			clearTimeout(timerRef.current);
 		}
@@ -298,9 +299,9 @@ function FilesToCopySetting({
 			<Textarea
 				aria-label='Files to copy'
 				className='mt-2 min-h-18 font-mono text-xs'
+				defaultValue={seed}
 				onChange={(e) => onChange(e.target.value)}
 				placeholder='.env*'
-				value={value}
 			/>
 		</SettingRow>
 	);
