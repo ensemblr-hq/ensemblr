@@ -114,30 +114,41 @@ interface PreparedWorkspace {
  * Reads the repo's configured `branchFrom` base from resolved settings, or
  * `undefined` when unset/unavailable so base selection falls back to the live
  * repository root branch.
- * @param input - Optional settings resolver and the source repository.
+ * @param resolved - Resolved settings snapshot, when available.
  * @returns The configured base branch, or `undefined`.
  */
-function resolveConfiguredBranchFrom({
-	readRepositorySettings,
-	repository,
-}: {
-	readRepositorySettings?: (
-		request: SettingsResolutionRequest,
-	) => SettingsResolutionSnapshot;
-	repository: SourceRepository;
-}): string | undefined {
-	const resolvedValue = readRepositorySettings?.({
-		repository: {
-			repositoryId: repository.id,
-			repositoryPath: repository.path,
-		},
-	})?.repository?.settings.find(
+function resolveConfiguredBranchFrom(
+	resolved: SettingsResolutionSnapshot | undefined,
+): string | undefined {
+	const value = resolved?.repository?.settings.find(
 		(setting) => setting.key === 'branchFrom',
 	)?.value;
 
-	return typeof resolvedValue === 'string' && resolvedValue.trim()
-		? resolvedValue.trim()
-		: undefined;
+	return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+/**
+ * Reads the repo's personal (SQLite) `filesToCopy` patterns from resolved
+ * settings so they can layer under committed config. Only the personal `sqlite`
+ * source is returned; committed sources are already applied by the files-to-copy
+ * service. Returns `undefined` when unset or from another source.
+ * @param resolved - Resolved settings snapshot, when available.
+ * @returns The personal pattern list, or `undefined`.
+ */
+function resolveConfiguredFilesToCopy(
+	resolved: SettingsResolutionSnapshot | undefined,
+): string[] | undefined {
+	const setting = resolved?.repository?.settings.find(
+		(candidate) => candidate.key === 'filesToCopy',
+	);
+
+	if (setting?.source !== 'sqlite' || !Array.isArray(setting.value)) {
+		return undefined;
+	}
+
+	return setting.value.filter(
+		(entry): entry is string => typeof entry === 'string',
+	);
 }
 
 const DEFAULT_WORKSPACE_NAME = 'workspace';
@@ -223,15 +234,18 @@ export function createWorkspaceService({
 				githubUsernameResolver,
 				readGitDefaults,
 			});
+			const resolvedSettings = readRepositorySettings?.({
+				repository: {
+					repositoryId: repository.id,
+					repositoryPath: repository.path,
+				},
+			});
 			// An explicit base (e.g. forking from another workspace) wins; then the
 			// repo's configured `branchFrom`; otherwise new workspaces branch from
 			// the repository root, resolved live so a stale/feature `default_branch`
 			// can't pin creation to the wrong base.
 			const explicitBase = request.baseBranch?.trim();
-			const configuredBase = resolveConfiguredBranchFrom({
-				readRepositorySettings,
-				repository,
-			});
+			const configuredBase = resolveConfiguredBranchFrom(resolvedSettings);
 			const baseBranchOverride = explicitBase
 				? explicitBase
 				: (configuredBase ??
@@ -317,6 +331,7 @@ export function createWorkspaceService({
 			const filesToCopySnapshot = await runFilesToCopy({
 				config,
 				filesToCopyService: filesToCopy,
+				personalPatterns: resolveConfiguredFilesToCopy(resolvedSettings),
 				repositoryPath: repository.path,
 				workspacePath: prepared.path,
 			});
@@ -401,17 +416,20 @@ export function createWorkspaceService({
 async function runFilesToCopy({
 	config,
 	filesToCopyService,
+	personalPatterns,
 	repositoryPath,
 	workspacePath,
 }: {
 	config: LoadedRepositoryConfig;
 	filesToCopyService: FilesToCopyService;
+	personalPatterns?: readonly string[];
 	repositoryPath: string;
 	workspacePath: string;
 }): Promise<FilesToCopySnapshot> {
 	try {
 		return await filesToCopyService.copy({
 			config,
+			personalPatterns,
 			repositoryPath,
 			workspacePath,
 		});

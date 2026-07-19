@@ -82,6 +82,59 @@ test('default `.env*` pattern copies gitignored env files', async (t) => {
 	);
 });
 
+test('personal SQLite patterns apply above the built-in default', async (t) => {
+	const fixture = createFixture(t);
+	writeFileSync(path.join(fixture.repositoryPath, 'config.secret'), 'S=1\n');
+	writeFileSync(path.join(fixture.repositoryPath, '.gitignore'), '*.secret\n');
+
+	const service = createFilesToCopyService({
+		localCommandService: createLocalCommandService(),
+	});
+
+	const result = await service.copy({
+		config: loadRepositoryConfig({
+			now: fixedNow,
+			repositoryPath: fixture.repositoryPath,
+		}),
+		personalPatterns: ['*.secret'],
+		repositoryPath: fixture.repositoryPath,
+		workspacePath: fixture.workspacePath,
+	});
+
+	assert.equal(result.source, 'personal');
+	assert.deepEqual(result.patterns, ['*.secret']);
+	assert.equal(result.copied.length, 1);
+	assert.equal(result.copied[0]?.relativePath, 'config.secret');
+});
+
+test('committed .ensemblr config wins over personal SQLite patterns', async (t) => {
+	const fixture = createFixture(t);
+	mkdirSync(path.join(fixture.repositoryPath, '.ensemblr'), {
+		recursive: true,
+	});
+	writeFileSync(
+		path.join(fixture.repositoryPath, '.ensemblr', 'settings.toml'),
+		'file_include_globs = ["*.committed"]\n',
+	);
+
+	const service = createFilesToCopyService({
+		localCommandService: createLocalCommandService(),
+	});
+
+	const result = await service.copy({
+		config: loadRepositoryConfig({
+			now: fixedNow,
+			repositoryPath: fixture.repositoryPath,
+		}),
+		personalPatterns: ['*.secret'],
+		repositoryPath: fixture.repositoryPath,
+		workspacePath: fixture.workspacePath,
+	});
+
+	assert.equal(result.source, 'ensemblr-config');
+	assert.deepEqual(result.patterns, ['*.committed']);
+});
+
 test('tracked files matching patterns are not copied', async (t) => {
 	const fixture = createFixture(t);
 	writeFileSync(

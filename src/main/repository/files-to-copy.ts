@@ -27,6 +27,12 @@ export interface FilesToCopyService {
 /** Input for a single files-to-copy run. */
 interface CopyFilesToWorkspaceInput {
 	config: LoadedRepositoryConfig;
+	/**
+	 * Personal (SQLite) files-to-copy patterns resolved for the repo. When set,
+	 * they override the committed default but stay below `.worktreeinclude` and
+	 * `.ensemblr/settings.toml`, matching the settings resolver's precedence.
+	 */
+	personalPatterns?: readonly string[];
 	repositoryPath: string;
 	workspacePath: string;
 }
@@ -49,7 +55,7 @@ export function createFilesToCopyService({
 }): FilesToCopyService {
 	return {
 		copy: async (input) => {
-			const resolved = resolvePatterns(input.config);
+			const resolved = resolvePatterns(input.config, input.personalPatterns);
 
 			if (resolved.patterns.length === 0) {
 				return emptySnapshot(resolved.source, resolved.patterns);
@@ -166,12 +172,18 @@ export function createFilesToCopyService({
 }
 
 /**
- * Selects the highest-precedence config source that declared a `filesToCopy`
- * value; falls back to the built-in default when none did.
+ * Selects the highest-precedence source that declared a `filesToCopy` value:
+ * `.worktreeinclude`, then `.ensemblr/settings.toml`, then the personal SQLite
+ * override, then the built-in default. Mirrors the settings resolver's
+ * precedence so committed config still wins over a personal override.
  * @param config - Loaded repository configuration.
+ * @param personalPatterns - Personal (SQLite) patterns, when set.
  * @returns The chosen source plus its resolved pattern list.
  */
-function resolvePatterns(config: LoadedRepositoryConfig): {
+function resolvePatterns(
+	config: LoadedRepositoryConfig,
+	personalPatterns?: readonly string[],
+): {
 	patterns: string[];
 	source: FilesToCopySource;
 } {
@@ -188,6 +200,11 @@ function resolvePatterns(config: LoadedRepositoryConfig): {
 		if (patterns) {
 			return { patterns, source: candidate.source };
 		}
+	}
+
+	const personal = readPatternList(personalPatterns);
+	if (personal) {
+		return { patterns: personal, source: 'personal' };
 	}
 
 	return { patterns: [...DEFAULT_PATTERNS], source: 'default' };
