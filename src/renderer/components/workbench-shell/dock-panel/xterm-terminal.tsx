@@ -225,7 +225,10 @@ export function XtermTerminal({
 
 	return (
 		<div className='relative h-full min-h-0 w-full bg-sidebar'>
-			<div className='h-full min-h-0 w-full px-2 py-1' ref={containerRef} />
+			<div
+				className='h-full min-h-0 w-full px-2 pt-1 pb-3'
+				ref={containerRef}
+			/>
 			{exitNotice ? (
 				<div className='pointer-events-none absolute inset-x-0 bottom-0 border-border border-t bg-muted/80 px-3 py-1 text-muted-foreground text-xs'>
 					{exitNotice}
