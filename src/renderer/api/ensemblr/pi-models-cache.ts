@@ -1,5 +1,7 @@
 import type { ListPiModelsResult } from '@/shared/ipc/contracts/pi-session';
 
+import { isMissingProviderSubset } from './pi-models-catalog';
+
 /**
  * localStorage persistence for the Pi model catalog so the picker/settings have
  * the last-known list available instantly on launch while a fresh
@@ -70,7 +72,9 @@ export function readCachedPiModels(
 
 /**
  * Persists a catalog. No-op for an empty list so a transient `pi` failure never
- * clobbers the last-known-good cache. Write errors are swallowed.
+ * clobbers the last-known-good cache, and no-op for a partial listing that
+ * merely drops providers the cache already has (a cold-start race) so a
+ * sub-catalog never poisons the next launch's seed. Write errors are swallowed.
  */
 export function writeCachedPiModels(
 	result: ListPiModelsResult,
@@ -81,6 +85,10 @@ export function writeCachedPiModels(
 	}
 	const store = resolveStorage(storage);
 	if (!store) {
+		return;
+	}
+	const existing = readCachedPiModels(store);
+	if (existing && isMissingProviderSubset(result, existing)) {
 		return;
 	}
 	try {

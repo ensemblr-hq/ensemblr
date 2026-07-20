@@ -46,6 +46,40 @@ const EMPTY: ListPiModelsResult = {
 	models: [],
 };
 
+/** Two providers: the last-known-good catalog a cold start should preserve. */
+const TWO_PROVIDERS: ListPiModelsResult = {
+	defaultModelId: 'anthropic/sonnet',
+	defaultThinkingLevel: 'medium',
+	models: [
+		{
+			displayName: 'Sonnet',
+			id: 'anthropic/sonnet',
+			provider: 'anthropic',
+			thinkingLevels: ['off', 'medium', 'high'],
+		},
+		{
+			displayName: 'GPT',
+			id: 'openai-codex/gpt-5.6-sol',
+			provider: 'openai-codex',
+			thinkingLevels: ['off', 'medium', 'high'],
+		},
+	],
+};
+
+/** A cold-start partial: the `openai-codex` provider has not resolved yet. */
+const PARTIAL: ListPiModelsResult = {
+	defaultModelId: 'anthropic/sonnet',
+	defaultThinkingLevel: 'medium',
+	models: [
+		{
+			displayName: 'Sonnet',
+			id: 'anthropic/sonnet',
+			provider: 'anthropic',
+			thinkingLevels: ['off', 'medium', 'high'],
+		},
+	],
+};
+
 describe('pi-models-cache', () => {
 	test('round-trips a non-empty catalog', () => {
 		const store = fakeStorage();
@@ -77,5 +111,19 @@ describe('pi-models-cache', () => {
 	test('returns undefined when the stored catalog is empty', () => {
 		const store = fakeStorage({ [KEY]: JSON.stringify(EMPTY) });
 		expect(readCachedPiModels(store)).toBeUndefined();
+	});
+
+	test('a partial listing that drops a provider does not poison the cache', () => {
+		const store = fakeStorage();
+		writeCachedPiModels(TWO_PROVIDERS, store);
+		writeCachedPiModels(PARTIAL, store);
+		expect(readCachedPiModels(store)).toEqual(TWO_PROVIDERS);
+	});
+
+	test('a listing that adds a provider overwrites the cache', () => {
+		const store = fakeStorage();
+		writeCachedPiModels(PARTIAL, store);
+		writeCachedPiModels(TWO_PROVIDERS, store);
+		expect(readCachedPiModels(store)).toEqual(TWO_PROVIDERS);
 	});
 });
