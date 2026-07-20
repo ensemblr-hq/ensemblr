@@ -48,7 +48,7 @@ import {
 	electronPowerControls,
 } from './pi-agent/electron-activity-bindings';
 import { readMacosBattery } from './pi-agent/macos-battery';
-import { createBranchNameQueue } from './pi-agent/pi-branch-name-service';
+import { createSessionNaming } from './pi-agent/naming/session-naming';
 import { createPiSessionService } from './pi-agent/pi-session-service';
 import { createSessionSummaryWriter } from './pi-agent/session-summary-writer';
 import {
@@ -307,11 +307,13 @@ const renameWorkspaceService = createRenameWorkspaceService({
 	databaseService,
 	localCommandService,
 });
-// Best-effort auto branch-naming after the first turn: renames a placeholder
-// workspace + its branch to an LLM-suggested name. Gated by the
-// `renameWorkspaceOnBranch` user setting and placeholder metadata.
-const branchNameQueue = createBranchNameQueue({
+// Unified best-effort naming after the first (and each subsequent) turn: one
+// throwaway Pi session names the chat tab and, when the `renameWorkspaceOnBranch`
+// setting is on and the workspace still carries its placeholder name, renames the
+// workspace + git branch. Self-gates per field so it never clobbers a settled name.
+const sessionNamingQueue = createSessionNaming({
 	appSettingsService,
+	piAgentClient,
 	renameWorkspace: renameWorkspaceService.rename,
 });
 const piSessionService = createPiSessionService({
@@ -340,7 +342,7 @@ const piSessionService = createPiSessionService({
 		agentActivityMonitor.handle({ event: payload.event, sessionId });
 	},
 	piAgentClient,
-	queueBranchName: branchNameQueue,
+	queueNaming: sessionNamingQueue,
 	sessionSummaryWriter,
 });
 const localRepositoryRegistrationService =

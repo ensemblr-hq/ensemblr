@@ -4,6 +4,7 @@
  */
 
 import { joinBranchName } from '../repository/branch-name.ts';
+import { firstContentLine } from './naming/first-content-line.ts';
 
 const BRANCH_NAME_MAX_LENGTH = 40;
 
@@ -39,11 +40,7 @@ export function sanitizeBranchSlug(text: string): string | null {
 	if (!text) {
 		return null;
 	}
-	const stripped = text.replace(/```[a-z]*\s*([\s\S]*?)```/gi, '$1');
-	const firstLine = stripped
-		.split(/\r?\n/)
-		.map((line) => line.trim())
-		.find((line) => line.length > 0);
+	const firstLine = firstContentLine(text);
 	if (!firstLine) {
 		return null;
 	}

@@ -156,6 +156,13 @@ export interface RenameWorkspaceDiagnostic {
 export interface RenameWorkspaceRequest {
 	branchName?: string;
 	name?: string;
+	/**
+	 * When true, the rename only proceeds while the workspace still carries its
+	 * auto-generated placeholder name and has not been renamed before. Used by
+	 * automatic branch-naming so a user rename that races the LLM suggestion is
+	 * never overwritten; the check runs inside the rename's critical section.
+	 */
+	requirePlaceholderName?: boolean;
 	workspaceId: string;
 }
 

@@ -4,6 +4,7 @@ import {
 	updatePiSession,
 	updateTurn,
 } from '../../storage/repositories/pi-session-repository.ts';
+import type { SessionNamingInput } from '../naming/session-naming.ts';
 import type { PiAgentEvent } from '../pi-agent-types.ts';
 import type { PiSessionEventSink } from '../pi-session-types.ts';
 import type { ActiveSessionMap } from './active-session.ts';
@@ -24,6 +25,8 @@ interface RuntimeEventHandlerOptions {
 	eventSink: PiSessionEventSink | undefined;
 	now: () => Date;
 	persistRuntimeEvent: PersistRuntimeEventPort;
+	/** Retries the unified title + branch naming at every turn boundary; self-gates. */
+	queueNaming: (input: SessionNamingInput) => void;
 	summaryQueue: SummaryQueue;
 }
 
@@ -56,6 +59,7 @@ export function createRuntimeEventHandler({
 	eventSink,
 	now,
 	persistRuntimeEvent,
+	queueNaming,
 	summaryQueue,
 }: RuntimeEventHandlerOptions): RuntimeEventHandler {
 	const handle = ({
@@ -161,6 +165,23 @@ export function createRuntimeEventHandler({
 			});
 			if (event.status === 'idle') {
 				summaryQueue.queueSummaryAfterAgentResponse({ database, sessionId });
+				if (active) {
+					// Retry the unified naming off the settled turn; self-gates so a
+					// tab/branch already named (or user-owned) is never re-touched.
+					// Covers resumed sessions and first-attempt failures.
+					queueNaming({
+						branchId,
+						chatTabId: active.chatTabId,
+						database,
+						eventSink,
+						executable: active.executable,
+						initialPrompt: null,
+						model: active.row.model,
+						sessionId,
+						workspaceCwd: active.row.cwd,
+						workspaceId: active.row.workspaceId,
+					});
+				}
 			}
 		}
 		if (event.type === 'shutdown') {

@@ -12,6 +12,7 @@ import {
 	getPiSessionById,
 	updatePiSession,
 } from '../../storage/repositories/pi-session-repository.ts';
+import type { SessionNamingInput } from '../naming/session-naming.ts';
 import type { PiAgentClient, PiAgentSession } from '../pi-agent-client.ts';
 import type { PiAgentSubscription } from '../pi-agent-types.ts';
 import { PiSessionServiceError } from '../pi-session-service-error.ts';
@@ -36,32 +37,14 @@ interface OpenRequest {
 	workspaceId: string;
 }
 
-/** Input passed to the chat-title and branch-name generation callbacks for a newly opened session. */
-export interface QueueChatTitleInput {
-	branchId: string;
-	chatTitleTimeoutMs: number;
-	database: DatabaseSync;
-	eventSink: PiSessionEventSink | undefined;
-	executable: PiExecutableSnapshot;
-	initialPrompt: string | null;
-	model: string | null;
-	piAgentClient: PiAgentClient;
-	sessionId: string;
-	tabId: string;
-	workspaceCwd: string;
-	workspaceId: string;
-}
-
 /** Dependencies for {@link createSessionOpener}. */
 interface SessionOpenerOptions {
 	activeSessions: ActiveSessionMap;
-	chatTitleTimeoutMs: number;
 	eventSink: PiSessionEventSink | undefined;
 	now: () => Date;
 	piAgentClient: PiAgentClient;
-	/** Optional post-first-turn auto branch-naming; runs beside the title queue. */
-	queueBranchName?: (input: QueueChatTitleInput) => void;
-	queueChatTitle: (input: QueueChatTitleInput) => void;
+	/** Fires the unified title + branch naming attempt for a freshly opened session. */
+	queueNaming: (input: SessionNamingInput) => void;
 	subscribeToRuntime: (input: {
 		branchId: string;
 		database: DatabaseSync;
@@ -86,12 +69,10 @@ interface SessionOpener {
  */
 export function createSessionOpener({
 	activeSessions,
-	chatTitleTimeoutMs,
 	eventSink,
 	now,
 	piAgentClient,
-	queueBranchName,
-	queueChatTitle,
+	queueNaming,
 	subscribeToRuntime,
 }: SessionOpenerOptions): SessionOpener {
 	const resumePersistedSession = async ({
@@ -193,6 +174,7 @@ export function createSessionOpener({
 			branch: mainBranch,
 			chatTabId: attachedTab.id,
 			database,
+			executable: request.executable,
 			row: startingRow,
 			runtimeSession,
 			subscription,
@@ -274,29 +256,26 @@ export function createSessionOpener({
 			branch: mainBranch,
 			chatTabId: attachedTab.id,
 			database,
+			executable: request.executable,
 			row: startedRow,
 			runtimeSession,
 			subscription,
 		});
 
-		const titleInput: QueueChatTitleInput = {
+		// Single unified naming attempt (title + branch) off the first prompt; it
+		// self-gates per field and is retried on each turn-idle if anything failed.
+		queueNaming({
 			branchId: mainBranch.id,
-			chatTitleTimeoutMs,
+			chatTabId: attachedTab.id,
 			database,
 			eventSink,
 			executable: request.executable,
 			initialPrompt: request.initialPrompt ?? null,
 			model: startedRow.model,
-			piAgentClient,
 			sessionId: session.id,
-			tabId: attachedTab.id,
 			workspaceCwd: request.workspaceCwd,
 			workspaceId: request.workspaceId,
-		};
-		queueChatTitle(titleInput);
-		// Best-effort auto branch-naming shares the title queue's first-turn
-		// context; it self-gates on the setting + placeholder metadata.
-		queueBranchName?.(titleInput);
+		});
 
 		return toSnapshot({
 			branchId: mainBranch.id,
@@ -367,6 +346,7 @@ function insertActiveSession({
 	branch,
 	chatTabId,
 	database,
+	executable,
 	row,
 	runtimeSession,
 	subscription,
@@ -375,6 +355,7 @@ function insertActiveSession({
 	branch: PiSessionBranchRow;
 	chatTabId: string;
 	database: DatabaseSync;
+	executable: PiExecutableSnapshot;
 	row: PiSessionRow;
 	runtimeSession: PiAgentSession;
 	subscription: PiAgentSubscription;
@@ -385,6 +366,7 @@ function insertActiveSession({
 		branch,
 		chatTabId,
 		deltaCounter: 0,
+		executable,
 		lastBroadcastOrdinal: getMaxOrdinalForBranch({
 			branchId: branch.id,
 			database,

@@ -13,6 +13,7 @@ import {
 	updatePiSession,
 	updateTurn,
 } from '../storage/repositories/index.ts';
+import type { SessionNamingInput } from './naming/session-naming.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import { PiSessionServiceError } from './pi-session-service-error.ts';
 import type {
@@ -20,7 +21,6 @@ import type {
 	PiSessionSnapshot,
 } from './pi-session-types.ts';
 import type { ActiveSessionMap } from './session/active-session.ts';
-import { closeOpenChatTabs } from './session/chat-tab-plumbing.ts';
 import {
 	createRuntimeEventHandler,
 	type PersistRuntimeEventPort,
@@ -63,34 +63,19 @@ export interface SubmitPiPromptResult {
  */
 export type StopPiSessionRequest = StopPiSessionWireRequest;
 
-/** Chat-title port — lifecycle fires this once per new session to queue title gen. */
-export type QueueChatTitlePort = (input: {
-	branchId: string;
-	chatTitleTimeoutMs: number;
-	database: DatabaseSync;
-	eventSink: PiSessionEventSink | undefined;
-	executable: PiExecutableSnapshot;
-	initialPrompt: string | null;
-	model: string | null;
-	piAgentClient: PiAgentClient;
-	sessionId: string;
-	tabId: string;
-	workspaceCwd: string;
-	workspaceId: string;
-}) => void;
+/** Naming port — lifecycle fires this at open and each turn-idle; it self-gates. */
+export type QueueNamingPort = (input: SessionNamingInput) => void;
 
 /** Dependencies and configuration for {@link createPiSessionLifecycle}. */
 interface PiSessionLifecycleOptions {
 	/** Pre-prompt git checkpoint capture (ADR 0012); absent in tests. */
 	captureCheckpoint?: CheckpointCapturePort;
-	chatTitleTimeoutMs: number;
 	eventSink: PiSessionEventSink | undefined;
 	now: () => Date;
 	persistRuntimeEvent: PersistRuntimeEventPort;
 	piAgentClient: PiAgentClient;
-	/** Optional post-first-turn auto branch-naming; same first-turn payload. */
-	queueBranchName?: QueueChatTitlePort;
-	queueChatTitle: QueueChatTitlePort;
+	/** Unified title + branch naming, fired at open and every turn-idle. */
+	queueNaming: QueueNamingPort;
 	requireDatabase: () => DatabaseSync;
 	sessionSummaryWriter?: SessionSummaryWriter;
 }
@@ -119,13 +104,11 @@ interface ActiveSessionView {
  */
 export function createPiSessionLifecycle({
 	captureCheckpoint,
-	chatTitleTimeoutMs,
 	eventSink,
 	now,
 	persistRuntimeEvent,
 	piAgentClient,
-	queueBranchName,
-	queueChatTitle,
+	queueNaming,
 	requireDatabase,
 	sessionSummaryWriter,
 }: PiSessionLifecycleOptions): PiSessionLifecycle {
@@ -142,17 +125,16 @@ export function createPiSessionLifecycle({
 		eventSink,
 		now,
 		persistRuntimeEvent,
+		queueNaming,
 		summaryQueue,
 	});
 
 	const opener = createSessionOpener({
 		activeSessions,
-		chatTitleTimeoutMs,
 		eventSink,
 		now,
 		piAgentClient,
-		queueBranchName,
-		queueChatTitle,
+		queueNaming,
 		subscribeToRuntime: ({ branchId, database, runtimeSession, sessionId }) =>
 			runtimeSession.subscribe((event) => {
 				runtimeEventHandler.handle({
@@ -270,7 +252,11 @@ export function createPiSessionLifecycle({
 			id: request.sessionId,
 			patch: { status: 'closed', closedAt: now().toISOString() },
 		});
-		closeOpenChatTabs({ database, sessionId: request.sessionId });
+		// Stopping a turn tears down the runtime child but must never touch the
+		// chat tab: tab lifecycle is owned solely by the chat-tab service (which
+		// enforces the minimum-one-open-tab rule and idempotent close). Dropping
+		// the session from the active map flips `runtimeOpen` false so the next
+		// submit into this tab transparently resumes the persisted session.
 		activeSessions.delete(request.sessionId);
 	};
 
@@ -296,6 +282,10 @@ export function createPiSessionLifecycle({
 						summaryQueue.flushSummaryForSession({ database, sessionId }),
 					),
 				);
+				// Also await drains for sessions already removed from the active map
+				// (a stopSession that backgrounded its flush), so their final summary
+				// is not lost when the process exits right after.
+				await summaryQueue.awaitInFlight();
 			} catch {
 				// Database unavailable during teardown; skip the final flush.
 			}
