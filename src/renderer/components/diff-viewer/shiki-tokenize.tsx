@@ -205,6 +205,25 @@ interface DiffTokenNode {
 /** The default token renderer react-diff-view hands to a custom `renderToken`. */
 type DefaultTokenRender = (token: DiffTokenNode, index: number) => ReactNode;
 
+const TOKEN_KEYS = new WeakMap<DiffTokenNode, string>();
+let nextTokenKey = 0;
+
+/**
+ * Return a stable render key tied to a token node's object identity.
+ * @param token - The token node needing a React key
+ * @returns A stable key unique to the token node
+ */
+function tokenKey(token: DiffTokenNode): string {
+	const existingKey = TOKEN_KEYS.get(token);
+	if (existingKey) {
+		return existingKey;
+	}
+	const key = `diff-token-${nextTokenKey}`;
+	nextTokenKey += 1;
+	TOKEN_KEYS.set(token, key);
+	return key;
+}
+
 /**
  * Resolve the inline CSS style for a Shiki syntax token node.
  * @param token - The syntax token node carrying color and font-style bits
@@ -231,7 +250,7 @@ function syntaxStyle(token: DiffTokenNode): CSSProperties {
  * never drops a color.
  * @param token - The token node to render
  * @param renderDefault - The library's default token renderer
- * @param index - The token's index within its parent for the React key
+ * @param index - The token's index for the library's fallback renderer
  * @returns The rendered token
  */
 export function renderDiffToken(
@@ -249,13 +268,13 @@ export function renderDiffToken(
 	switch (token.type) {
 		case 'syntax':
 			return (
-				<span key={index} style={syntaxStyle(token)}>
+				<span key={tokenKey(token)} style={syntaxStyle(token)}>
 					{renderChildren()}
 				</span>
 			);
 		case 'edit':
 			return (
-				<span className='diff-code-edit' key={index}>
+				<span className='diff-code-edit' key={tokenKey(token)}>
 					{renderChildren()}
 				</span>
 			);
@@ -263,7 +282,7 @@ export function renderDiffToken(
 			return (
 				<span
 					className={`diff-code-mark diff-code-mark-${token.markType}`}
-					key={index}
+					key={tokenKey(token)}
 				>
 					{token.value}
 				</span>

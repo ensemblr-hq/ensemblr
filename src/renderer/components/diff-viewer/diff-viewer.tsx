@@ -32,6 +32,8 @@ import {
 } from './parse';
 import { renderDiffToken, useDiffTokens } from './shiki-tokenize';
 
+const EMPTY_HUNKS: HunkData[] = [];
+
 /** Whether the viewer shows only the diff hunks or the whole expanded file. */
 export type DiffViewMode = 'diff' | 'file';
 
@@ -85,7 +87,7 @@ export function DiffViewer({
 	const file = useMemo(() => parseSingleFileDiff(patch), [patch]);
 	const resolvedLanguage = language ?? languageForFilePath(filePath);
 
-	const baseHunks = file?.hunks ?? [];
+	const baseHunks = file?.hunks ?? EMPTY_HUNKS;
 	const canShowFile = Boolean(fullFileContent) && baseHunks.length > 0;
 
 	const displayHunks = useMemo(() => {
@@ -255,6 +257,7 @@ function DiffBody({
 			change &&
 			newLineNumberOf(change) !== null ? (
 				<button
+					aria-label='Add comment'
 					className='mx-auto flex size-4.5 items-center justify-center rounded-xs bg-foreground text-background shadow-xs transition-colors hover:bg-foreground/90'
 					onClick={() => onRequestComment(change)}
 					type='button'

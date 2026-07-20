@@ -65,6 +65,7 @@ describe('diff gutter add-comment control', () => {
 
 		const buttons = (row as Element).querySelectorAll('button');
 		expect(buttons.length).toBe(1);
+		expect(buttons[0]?.getAttribute('aria-label')).toBe('Add comment');
 
 		// The gutter cells themselves carry no pointer affordance — only the button.
 		for (const gutter of (row as Element).querySelectorAll('.diff-gutter')) {

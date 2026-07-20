@@ -45,7 +45,11 @@ export function localReviewCommentToSummary(
 export function selectLocalReviewComments(
 	comments: readonly ReviewCommentWire[],
 ): PullRequestCommentSummary[] {
-	return comments
-		.filter((comment) => comment.status !== 'archived')
-		.map(localReviewCommentToSummary);
+	const summaries: PullRequestCommentSummary[] = [];
+	for (const comment of comments) {
+		if (comment.status !== 'archived') {
+			summaries.push(localReviewCommentToSummary(comment));
+		}
+	}
+	return summaries;
 }
