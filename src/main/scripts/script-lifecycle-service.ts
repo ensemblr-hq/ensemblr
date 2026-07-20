@@ -88,6 +88,11 @@ export function createScriptLifecycleService({
 	settingsResolutionService,
 	terminalService,
 }: CreateScriptLifecycleServiceOptions): ScriptLifecycleService {
+	const pendingExclusiveScriptStarts = new Map<
+		string,
+		Promise<CreateTerminalSessionResult>
+	>();
+
 	/** Resolves the configured command and run mode from the workspace worktree. */
 	function resolveScriptConfig(
 		workspaceId: string,
@@ -149,9 +154,12 @@ export function createScriptLifecycleService({
 	}
 
 	/**
-	 * Start a workspace's setup/run/archive script session, honoring restart and the resolved concurrency mode.
-	 * @param options - Script kind, target workspace, and whether to restart a running session
-	 * @returns The terminal session create result, or a typed failure diagnostic
+	 * Start a workspace's setup/run/archive script session, honoring restart and
+	 * the resolved concurrency mode. Concurrent run launches start immediately;
+	 * every other launch is serialized so overlapping requests cannot create
+	 * duplicate sessions.
+	 * @param options - Script kind, target workspace, and whether to restart a running session.
+	 * @returns The terminal session create result, or a typed failure diagnostic.
 	 */
 	async function runScript({
 		kind,
@@ -174,42 +182,125 @@ export function createScriptLifecycleService({
 			);
 		}
 
+		const allowConcurrent =
+			kind === 'run' &&
+			resolved.settings.runScriptMode === 'concurrent' &&
+			!restart;
+
+		if (allowConcurrent) {
+			return createScriptSession({ command, kind, workspaceId });
+		}
+
+		return runExclusiveScript({ command, kind, restart, workspaceId });
+	}
+
+	/**
+	 * Serializes an exclusive script launch behind any in-flight launch for the
+	 * same workspace and kind. The pending promise spans the entire decision —
+	 * active-session check, restart kill/wait, and session create — so a
+	 * concurrent request always observes the first launch's session before it
+	 * decides, closing the duplicate-session race for both fresh starts and
+	 * restarts.
+	 * @param options - Resolved command, script kind, restart flag, and workspace.
+	 * @returns The terminal session create result, or a typed failure diagnostic.
+	 */
+	async function runExclusiveScript({
+		command,
+		kind,
+		restart,
+		workspaceId,
+	}: {
+		command: string;
+		kind: WorkspaceScriptKind;
+		restart: boolean;
+		workspaceId: string;
+	}): Promise<CreateTerminalSessionResult> {
+		const key = `${workspaceId}:${kind}`;
+		const pendingStart = pendingExclusiveScriptStarts.get(key);
+
+		if (pendingStart) {
+			await pendingStart.catch(() => undefined);
+		}
+
+		const launch = launchExclusiveScript({
+			command,
+			kind,
+			restart,
+			workspaceId,
+		});
+		pendingExclusiveScriptStarts.set(key, launch);
+
+		try {
+			return await launch;
+		} finally {
+			if (pendingExclusiveScriptStarts.get(key) === launch) {
+				pendingExclusiveScriptStarts.delete(key);
+			}
+		}
+	}
+
+	/**
+	 * Decides and performs one exclusive launch: fails when a session is already
+	 * running unless restart is set, in which case it stops the active session
+	 * and waits for it to exit before starting the replacement.
+	 * @param options - Resolved command, script kind, restart flag, and workspace.
+	 * @returns The terminal session create result, or a typed failure diagnostic.
+	 */
+	async function launchExclusiveScript({
+		command,
+		kind,
+		restart,
+		workspaceId,
+	}: {
+		command: string;
+		kind: WorkspaceScriptKind;
+		restart: boolean;
+		workspaceId: string;
+	}): Promise<CreateTerminalSessionResult> {
 		const activeSession = findActiveScriptSession(workspaceId, kind);
 
 		if (activeSession) {
-			// Run scripts honor the resolved concurrency mode; setup and archive
-			// scripts never run twice in parallel.
-			const allowConcurrent =
-				kind === 'run' &&
-				resolved.settings.runScriptMode === 'concurrent' &&
-				!restart;
-
-			if (allowConcurrent) {
-				// Fall through and start another named run session.
-			} else if (restart) {
-				terminalService.kill(activeSession.id);
-				const exited = await terminalService.waitForExit(
-					activeSession.id,
-					RESTART_WAIT_TIMEOUT_MS,
-				);
-
-				if (!exited) {
-					// Never stack a second session over one that refused to die.
-					return failure(
-						'script-restart-timeout',
-						`The running ${kind} script did not stop in time; the restart was aborted.`,
-						'warning',
-					);
-				}
-			} else {
+			if (!restart) {
 				return failure(
 					'script-already-running',
 					`The ${kind} script is already running. Stop it or restart explicitly.`,
 					'warning',
 				);
 			}
+
+			terminalService.kill(activeSession.id);
+			const exited = await terminalService.waitForExit(
+				activeSession.id,
+				RESTART_WAIT_TIMEOUT_MS,
+			);
+
+			if (!exited) {
+				return failure(
+					'script-restart-timeout',
+					`The running ${kind} script did not stop in time; the restart was aborted.`,
+					'warning',
+				);
+			}
 		}
 
+		return createScriptSession({ command, kind, workspaceId });
+	}
+
+	/**
+	 * Creates a workspace terminal session for a script kind, applying the
+	 * `<kind>-script` session kind and default dock title.
+	 * @param options - Resolved command, script kind, and workspace.
+	 * @returns The terminal session create result.
+	 */
+	function createScriptSession({
+		command,
+		kind,
+		workspaceId,
+	}: {
+		command: string;
+		kind: WorkspaceScriptKind;
+		workspaceId: string;
+	}): Promise<CreateTerminalSessionResult> {
 		return terminalService.create({
 			command,
 			kind: `${kind}-script`,

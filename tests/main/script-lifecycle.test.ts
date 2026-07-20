@@ -123,7 +123,13 @@ function createSettingsStub(
 }
 
 /** Fake terminal service that records created sessions and kill calls. */
-function createTerminalServiceFake({ killStops = true } = {}): {
+function createTerminalServiceFake({
+	beforeCreate,
+	killStops = true,
+}: {
+	beforeCreate?: () => Promise<void>;
+	killStops?: boolean;
+} = {}): {
 	createCalls: CreateTerminalSessionOptions[];
 	endSession: (terminalId: string, status: 'exited' | 'failed') => void;
 	killedIds: string[];
@@ -137,9 +143,11 @@ function createTerminalServiceFake({ killStops = true } = {}): {
 	const terminalService: TerminalService = {
 		create: async (options) => {
 			createCalls.push(options);
+			await beforeCreate?.();
 			counter += 1;
 			const session: TerminalSessionSnapshot = {
 				agentBusy: false,
+				agentSessionId: null,
 				agentTitle: null,
 				cols: 80,
 				commandLabel: options.command ?? '/bin/zsh',
@@ -479,6 +487,129 @@ test('runSetupScriptWithAutoRun chains the run script after a clean setup exit',
 		fixture.createCalls.map((call) => call.kind),
 		['setup-script', 'run-script'],
 	);
+});
+
+test('concurrent setup requests wait for one setup before auto-running', async (t) => {
+	let releaseCreate: (() => void) | undefined;
+	const createGate = new Promise<void>((resolve) => {
+		releaseCreate = resolve;
+	});
+	const fixture = createServiceFixture(
+		t,
+		{
+			autoRunAfterSetup: true,
+			run: 'bun run dev',
+			setup: 'bun install',
+		},
+		{ beforeCreate: () => createGate },
+	);
+
+	const autoRunPromise = fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+	const ensurePromise = fixture.service.runSetupScriptIfNeeded({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(
+		fixture.createCalls.filter((call) => call.kind === 'setup-script').length,
+		1,
+	);
+	releaseCreate?.();
+	await ensurePromise;
+
+	assert.deepEqual(
+		fixture.createCalls.map((call) => call.kind),
+		['setup-script'],
+	);
+	fixture.endSession('session-1', 'exited');
+	await autoRunPromise;
+	assert.deepEqual(
+		fixture.createCalls.map((call) => call.kind),
+		['setup-script', 'run-script'],
+	);
+});
+
+test('a losing duplicate setup request still auto-runs exactly once', async (t) => {
+	let releaseCreate: (() => void) | undefined;
+	const createGate = new Promise<void>((resolve) => {
+		releaseCreate = resolve;
+	});
+	const fixture = createServiceFixture(
+		t,
+		{
+			autoRunAfterSetup: true,
+			run: 'bun run dev',
+			setup: 'bun install',
+		},
+		{ beforeCreate: () => createGate },
+	);
+
+	const ensurePromise = fixture.service.runSetupScriptIfNeeded({
+		workspaceId: WORKSPACE_ID,
+	});
+	const autoRunPromise = fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(
+		fixture.createCalls.filter((call) => call.kind === 'setup-script').length,
+		1,
+	);
+	releaseCreate?.();
+	await Promise.all([ensurePromise, autoRunPromise]);
+
+	assert.deepEqual(
+		fixture.createCalls.map((call) => call.kind),
+		['setup-script'],
+	);
+	fixture.endSession('session-1', 'exited');
+	await new Promise((resolve) => setTimeout(resolve, 60));
+
+	assert.deepEqual(
+		fixture.createCalls.map((call) => call.kind),
+		['setup-script', 'run-script'],
+	);
+});
+
+test('concurrent restarts never leave two run sessions running', async (t) => {
+	const fixture = createServiceFixture(
+		t,
+		{ run: 'bun run dev', runScriptMode: 'nonconcurrent' },
+		{ killStops: false },
+	);
+
+	const first = await fixture.service.runScript({
+		kind: 'run',
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.ok(first.session);
+
+	const restartA = fixture.service.runScript({
+		kind: 'run',
+		restart: true,
+		workspaceId: WORKSPACE_ID,
+	});
+	const restartB = fixture.service.runScript({
+		kind: 'run',
+		restart: true,
+		workspaceId: WORKSPACE_ID,
+	});
+
+	const tick = () => new Promise((resolve) => setTimeout(resolve, 30));
+	await tick();
+	fixture.endSession('session-1', 'exited');
+	await tick();
+	fixture.endSession('session-2', 'exited');
+	await Promise.all([restartA, restartB]);
+
+	const running = fixture.terminalService
+		.list(WORKSPACE_ID)
+		.filter((session) => session.status === 'running');
+	assert.equal(running.length, 1);
+	// The second restart must stop the first restart's session rather than
+	// stacking beside it — only serialized launches kill session-2.
+	assert.ok(fixture.killedIds.includes('session-2'));
 });
 
 test('runSetupScriptWithAutoRun does not run when auto-run is disabled', async (t) => {
