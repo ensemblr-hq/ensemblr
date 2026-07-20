@@ -2,7 +2,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
-import { readAgentConversationTitle } from '../../src/main/terminal/agent-conversation-title.ts';
+import {
+	readAgentConversationInfo,
+	readAgentConversationTitle,
+} from '../../src/main/terminal/agent-conversation-title.ts';
 
 const CWD = '/Users/dev/workspaces/example/satie';
 const LAUNCH = '2026-07-20T10:00:00.000Z';
@@ -66,6 +69,7 @@ function writeVibeSession(
 	workingDirectory: string,
 	startedAt: string,
 	title: string,
+	sessionId = 'vibe-session-uuid',
 ): void {
 	const dir = path.join(home, '.vibe', 'logs', 'session', name);
 	mkdirSync(dir, { recursive: true });
@@ -73,6 +77,7 @@ function writeVibeSession(
 		path.join(dir, 'meta.json'),
 		JSON.stringify({
 			environment: { working_directory: workingDirectory },
+			session_id: sessionId,
 			start_time: startedAt,
 			title,
 		}),
@@ -197,5 +202,167 @@ describe('readAgentConversationTitle — vibe-log', () => {
 				since: LAUNCH,
 			}),
 		).toBeNull();
+	});
+});
+
+/**
+ * Writes a Codex rollout carrying an explicit `session_meta.id`, used to check
+ * that the reader surfaces the native session id.
+ * @param name - Rollout filename.
+ * @param id - The session id to record.
+ * @param cwd - The cwd to record.
+ * @param startedAt - The session start timestamp.
+ */
+function writeCodexRolloutWithId(
+	name: string,
+	id: string,
+	cwd: string,
+	startedAt: string,
+): void {
+	const dir = path.join(home, '.codex', 'sessions', '2026', '07', '20');
+	mkdirSync(dir, { recursive: true });
+	const lines = [
+		JSON.stringify({
+			payload: { cwd, id, timestamp: startedAt },
+			type: 'session_meta',
+		}),
+		JSON.stringify({
+			payload: { message: 'do the thing', type: 'user_message' },
+			type: 'event_msg',
+		}),
+	];
+	writeFileSync(path.join(dir, name), `${lines.join('\n')}\n`);
+}
+
+/**
+ * Writes a Claude transcript `.jsonl` named by its session id, whose first line
+ * records the tab's cwd, session id, and timestamp.
+ * @param sessionId - The session id (also the filename stem).
+ * @param cwd - The cwd to record on the first line.
+ * @param timestamp - The first-line timestamp gating the session.
+ */
+function writeClaudeTranscript(
+	sessionId: string,
+	cwd: string,
+	timestamp: string,
+): void {
+	const slug = cwd.replace(/[/.]/g, '-');
+	const dir = path.join(home, '.claude', 'projects', slug);
+	mkdirSync(dir, { recursive: true });
+	writeFileSync(
+		path.join(dir, `${sessionId}.jsonl`),
+		`${JSON.stringify({ cwd, sessionId, timestamp, type: 'user' })}\n`,
+	);
+}
+
+/**
+ * Writes a realistic Claude transcript whose leading header lines carry the
+ * `sessionId` but no `cwd`/`timestamp` (as Claude actually writes them), with the
+ * gating `cwd`/`timestamp` only appearing on a later line.
+ * @param sessionId - The session id (also the filename stem and on the header).
+ * @param cwd - The cwd recorded on the later event line.
+ * @param timestamp - The timestamp recorded on the later event line.
+ */
+function writeClaudeTranscriptWithHeader(
+	sessionId: string,
+	cwd: string,
+	timestamp: string,
+): void {
+	const slug = cwd.replace(/[/.]/g, '-');
+	const dir = path.join(home, '.claude', 'projects', slug);
+	mkdirSync(dir, { recursive: true });
+	const lines = [
+		JSON.stringify({ leafUuid: 'x', sessionId, type: 'last-prompt' }),
+		JSON.stringify({ mode: 'default', sessionId, type: 'mode' }),
+		JSON.stringify({ cwd, sessionId, timestamp, type: 'user' }),
+	];
+	writeFileSync(path.join(dir, `${sessionId}.jsonl`), `${lines.join('\n')}\n`);
+}
+
+describe('readAgentConversationInfo — session id', () => {
+	test('codex surfaces the session id and title of the matching rollout', async () => {
+		writeCodexRolloutWithId(
+			'rollout-a.jsonl',
+			'codex-uuid-1',
+			CWD,
+			AFTER_LAUNCH,
+		);
+		expect(
+			await readAgentConversationInfo('codex-rollout', CWD, {
+				home,
+				since: LAUNCH,
+			}),
+		).toEqual({ sessionId: 'codex-uuid-1', title: 'do the thing' });
+	});
+
+	test('vibe surfaces the session id from meta.session_id, not the dir name', async () => {
+		writeVibeSession(
+			'session_20260720_141443_4e46ab20',
+			CWD,
+			AFTER_LAUNCH,
+			'a vibe chat',
+			'4e46ab20-336e-8b89-f959-31118746bf80',
+		);
+		expect(
+			await readAgentConversationInfo('vibe-log', CWD, {
+				home,
+				since: LAUNCH,
+			}),
+		).toEqual({
+			sessionId: '4e46ab20-336e-8b89-f959-31118746bf80',
+			title: 'a vibe chat',
+		});
+	});
+
+	test('claude surfaces the transcript session id and no title', async () => {
+		writeClaudeTranscript('claude-abc', CWD, AFTER_LAUNCH);
+		expect(
+			await readAgentConversationInfo('claude-transcript', CWD, {
+				home,
+				since: LAUNCH,
+			}),
+		).toEqual({ sessionId: 'claude-abc', title: null });
+	});
+
+	test('claude ignores a transcript from before the tab launched', async () => {
+		writeClaudeTranscript('claude-old', CWD, BEFORE_LAUNCH);
+		expect(
+			await readAgentConversationInfo('claude-transcript', CWD, {
+				home,
+				since: LAUNCH,
+			}),
+		).toEqual({ sessionId: null, title: null });
+	});
+
+	test('claude ignores a transcript recorded for a different cwd', async () => {
+		writeClaudeTranscript('claude-other', '/other/dir', AFTER_LAUNCH);
+		expect(
+			await readAgentConversationInfo('claude-transcript', CWD, {
+				home,
+				since: LAUNCH,
+			}),
+		).toEqual({ sessionId: null, title: null });
+	});
+
+	test('claude reads the id past header lines that lack a timestamp', async () => {
+		writeClaudeTranscriptWithHeader('claude-hdr', CWD, AFTER_LAUNCH);
+		expect(
+			await readAgentConversationInfo('claude-transcript', CWD, {
+				home,
+				since: LAUNCH,
+			}),
+		).toEqual({ sessionId: 'claude-hdr', title: null });
+	});
+
+	test('claude gates on the real timestamp, not the timestamp-less header', async () => {
+		// The header's sessionId line has no timestamp; the gate must still exclude
+		// this prior conversation via the later event line's before-launch time.
+		writeClaudeTranscriptWithHeader('claude-prior', CWD, BEFORE_LAUNCH);
+		expect(
+			await readAgentConversationInfo('claude-transcript', CWD, {
+				home,
+				since: LAUNCH,
+			}),
+		).toEqual({ sessionId: null, title: null });
 	});
 });

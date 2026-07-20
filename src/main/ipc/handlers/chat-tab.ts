@@ -56,8 +56,13 @@ export function registerChatTabHandlers({
 	ipcMain.handle(
 		IPC_CHANNELS.closeChatTab,
 		async (_event, raw: unknown): Promise<CloseChatTabResult> => {
-			const request = closeChatTabRequestSchema.parse(raw);
-			const { deleted } = chatTabService.closeTab(request);
+			const { chatTabId, metadataPatch, title } =
+				closeChatTabRequestSchema.parse(raw);
+			const { deleted } = chatTabService.closeTab({
+				chatTabId,
+				metadataPatch,
+				title,
+			});
 			return { deleted, ok: true };
 		},
 	);

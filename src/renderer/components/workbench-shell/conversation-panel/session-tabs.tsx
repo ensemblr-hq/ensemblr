@@ -49,6 +49,7 @@ import {
 	harnessIconClassName,
 	harnessIconName,
 } from '@/renderer/lib/workbench';
+import { useRequestComposerFocus } from '@/renderer/state/composer';
 import { useDebugPanelToggle } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { shouldSelectOnTabClick } from '@/renderer/state/workspace';
@@ -118,6 +119,7 @@ export function SessionTabs({
 	sessions: SessionTabModel[];
 }) {
 	const [isOpening, setIsOpening] = useState(false);
+	const requestComposerFocus = useRequestComposerFocus();
 	const [debugOpen, setDebugOpen] = useDebugPanelToggle();
 	const developerMode = useAtomValue(developerModeAtom);
 	const sessionIds = useMemo(
@@ -177,6 +179,7 @@ export function SessionTabs({
 			.then((result) => {
 				if (result) {
 					onSessionTabChange(result.chatTabId);
+					requestComposerFocus(result.chatTabId);
 				}
 			})
 			.finally(() => setIsOpening(false));
@@ -500,6 +503,7 @@ function HarnessLauncherMenu({
 }) {
 	const [open, setOpen] = useState(false);
 	const [launchingId, setLaunchingId] = useState<string | null>(null);
+	const launchedRef = useRef(false);
 	const { data, isPending } = useQuery({
 		queryFn: async () =>
 			(await window.ensemblr?.listAgentHarnesses()) ?? { harnesses: [] },
@@ -524,6 +528,7 @@ function HarnessLauncherMenu({
 		void onLaunchHarness({ harnessId, harnessLabel })
 			.then((result) => {
 				if (result) {
+					launchedRef.current = true;
 					onSessionTabChange(result.chatTabId);
 				}
 			})
@@ -569,7 +574,18 @@ function HarnessLauncherMenu({
 	}
 
 	return (
-		<DropdownMenu onOpenChange={setOpen} open={open}>
+		<DropdownMenu
+			onOpenChange={(next) => {
+				// Reset the launch marker on every open so a launch that resolves
+				// after an early close (Escape while pending) can't leave a stale
+				// true that suppresses focus restore on the next plain close.
+				if (next) {
+					launchedRef.current = false;
+				}
+				setOpen(next);
+			}}
+			open={open}
+		>
 			<Tooltip>
 				<TooltipTrigger asChild>
 					<DropdownMenuTrigger asChild>
@@ -584,6 +600,16 @@ function HarnessLauncherMenu({
 			<DropdownMenuContent
 				align='end'
 				className='w-56 p-1'
+				onCloseAutoFocus={(event) => {
+					// A launch activates the new terminal tab, which mounts XtermTerminal
+					// and grabs keyboard focus. Radix otherwise restores focus to the
+					// trigger on close, stealing it back; skip the restore only for a
+					// launch so plain closes (Escape, click-outside) keep normal a11y.
+					if (launchedRef.current) {
+						launchedRef.current = false;
+						event.preventDefault();
+					}
+				}}
 				onKeyDown={handleNumberShortcut}
 			>
 				{installedHarnesses.length ? (
@@ -643,6 +669,41 @@ function HarnessLauncherMenu({
 	);
 }
 
+/**
+ * Leading icon for a closed-history row: the harness brand logo for a closed
+ * terminal (agent) tab, or the generic chat glyph for a closed chat. Mirrors
+ * {@link SessionTabIcon} so a conversation keeps the same icon in history.
+ */
+function ClosedSessionIcon({ session }: { session: SessionTabModel }) {
+	if (session.kind === 'terminal') {
+		const brandIconName = harnessIconName(session.harnessId);
+		if (brandIconName) {
+			return (
+				<Icon
+					aria-hidden='true'
+					className={cn(
+						'size-4 shrink-0 text-muted-foreground',
+						harnessIconClassName(session.harnessId),
+					)}
+					icon={brandIconName}
+				/>
+			);
+		}
+		return (
+			<BotIcon
+				aria-hidden='true'
+				className='size-4 shrink-0 text-muted-foreground'
+			/>
+		);
+	}
+	return (
+		<MessageSquareIcon
+			aria-hidden='true'
+			className='size-4 shrink-0 text-muted-foreground'
+		/>
+	);
+}
+
 /** Dropdown listing recently-closed session tabs for restoration. */
 function ClosedSessionHistoryMenu({
 	closedSessions,
@@ -672,10 +733,7 @@ function ClosedSessionHistoryMenu({
 							key={session.id}
 							onSelect={() => onSessionTabRestore(session.id)}
 						>
-							<MessageSquareIcon
-								aria-hidden='true'
-								className='size-4 shrink-0 text-muted-foreground'
-							/>
+							<ClosedSessionIcon session={session} />
 							<span className='min-w-0 flex-1 truncate font-medium'>
 								{session.label}
 							</span>

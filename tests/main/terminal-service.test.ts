@@ -10,7 +10,10 @@ import type { EnsemblrDatabaseService } from '../../src/main/storage/database.ts
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import { insertRepositoryRow } from '../../src/main/storage/repositories/repository-row-repository.ts';
 import { insertWorkspaceRow } from '../../src/main/storage/repositories/workspace-repository.ts';
-import type { ReadAgentConversationTitleOptions } from '../../src/main/terminal/agent-conversation-title.ts';
+import type {
+	AgentConversationInfo,
+	ReadAgentConversationTitleOptions,
+} from '../../src/main/terminal/agent-conversation-title.ts';
 import type {
 	PtyBackend,
 	PtyProcess,
@@ -20,7 +23,7 @@ import { createNodePtyBackend } from '../../src/main/terminal/pty-backend.ts';
 import { createScrollbackBuffer } from '../../src/main/terminal/terminal-scrollback.ts';
 import { createTerminalService } from '../../src/main/terminal/terminal-service.ts';
 import { resolveUserShell } from '../../src/main/terminal/user-shell.ts';
-import type { ConversationTitleSource } from '../../src/shared/agents/harness-registry.ts';
+import type { SessionLogSource } from '../../src/shared/agents/harness-registry.ts';
 import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
@@ -167,15 +170,15 @@ function createServiceFixture(
 	{
 		backend,
 		killGraceMs = 50,
-		readConversationTitle = async () => null,
+		readConversationInfo = async () => ({ sessionId: null, title: null }),
 	}: {
 		backend: PtyBackend;
 		killGraceMs?: number;
-		readConversationTitle?: (
-			source: ConversationTitleSource,
+		readConversationInfo?: (
+			source: SessionLogSource,
 			cwd: string,
 			options?: ReadAgentConversationTitleOptions,
-		) => Promise<string | null>;
+		) => Promise<AgentConversationInfo>;
 	},
 ) {
 	const database = createDatabaseFixture(t);
@@ -188,7 +191,7 @@ function createServiceFixture(
 		now: () => NOW,
 		onLifecycle: (event) => lifecycleEvents.push(event),
 		onOutput: (event) => outputEvents.push(event),
-		readConversationTitle,
+		readConversationInfo,
 		workspaceEnvironmentService: createWorkspaceEnvironmentStub(),
 	});
 
@@ -372,9 +375,9 @@ test('a fresh agent gates its conversation-title read by the launch time', async
 	const sinceValues: (string | undefined)[] = [];
 	const { service } = createServiceFixture(t, {
 		backend,
-		readConversationTitle: async (_source, _cwd, options) => {
+		readConversationInfo: async (_source, _cwd, options) => {
 			sinceValues.push(options?.since);
-			return null;
+			return { sessionId: null, title: null };
 		},
 	});
 
@@ -393,9 +396,9 @@ test('a resumed agent drops the title gate so it re-adopts its prior conversatio
 	const sinceValues: (string | undefined)[] = [];
 	const { service } = createServiceFixture(t, {
 		backend,
-		readConversationTitle: async (_source, _cwd, options) => {
+		readConversationInfo: async (_source, _cwd, options) => {
 			sinceValues.push(options?.since);
-			return null;
+			return { sessionId: null, title: null };
 		},
 	});
 

@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import {
-	type ConversationTitleSource,
 	harnessBusySource,
-	harnessConversationTitleSource,
+	harnessSessionLogSource,
+	type SessionLogSource,
 } from '../../shared/agents/harness-registry.ts';
 import type {
 	CreateTerminalSessionResult,
@@ -25,8 +25,9 @@ import {
 	markStaleRunningTerminalSessions,
 } from '../storage/repositories/terminal-session-repository.ts';
 import {
+	type AgentConversationInfo,
 	type ReadAgentConversationTitleOptions,
-	readAgentConversationTitle,
+	readAgentConversationInfo,
 } from './agent-conversation-title.ts';
 import {
 	createNodePtyBackend,
@@ -128,15 +129,15 @@ export interface CreateTerminalServiceOptions {
 	onLifecycle: (event: TerminalLifecycleBroadcast) => void;
 	onOutput: (event: TerminalOutputBroadcast) => void;
 	/**
-	 * Reads an agent harness's conversation title from its on-disk session log, for
-	 * harnesses whose OSC window title is not the title (Codex, Vibe). Injectable
-	 * for tests; defaults to the real filesystem reader.
+	 * Reads an agent harness's conversation title and native session id from its
+	 * on-disk session log. Injectable for tests; defaults to the real filesystem
+	 * reader.
 	 */
-	readConversationTitle?: (
-		source: ConversationTitleSource,
+	readConversationInfo?: (
+		source: SessionLogSource,
 		cwd: string,
 		options?: ReadAgentConversationTitleOptions,
-	) => Promise<string | null>;
+	) => Promise<AgentConversationInfo>;
 	/**
 	 * Resolves the user's shell-derived environment so setup/run scripts inherit
 	 * the same PATH and toolchain shims as diagnostics and Pi sessions.
@@ -171,15 +172,15 @@ interface TrackedSession {
 	 */
 	busyFromPtySpinner: boolean;
 	/**
-	 * Harness session-log title source when the tab reads its conversation title
-	 * from disk (Codex, Vibe), or null for OSC-titled and non-agent sessions.
+	 * Harness session-log source read for the conversation title (Codex, Vibe) and
+	 * native session id (all harnesses), or null for non-agent sessions.
 	 */
-	conversationTitleSource: ConversationTitleSource | null;
+	sessionLogSource: SessionLogSource | null;
 	/**
-	 * Launch time gating the on-disk conversation-title reader, or null to disable
-	 * the gate. Set to this session's `createdAt` for a fresh launch so it never
-	 * adopts a prior conversation's title; null when resuming, where the log
-	 * predates this session and the newest cwd-matching session is the right one.
+	 * Launch time gating the on-disk session-log reader, or null to disable the
+	 * gate. Set to this session's `createdAt` for a fresh launch so it never adopts
+	 * a prior conversation's title/id; null when resuming, where the log predates
+	 * this session and the newest cwd-matching session is the right one.
 	 */
 	conversationTitleSince: string | null;
 	/** Working directory the PTY spawned in, used to match on-disk session logs. */
@@ -275,6 +276,28 @@ const OSC_TITLE_PATTERN = new RegExp(
 );
 
 /**
+ * Computes the snapshot fields to update from a freshly read conversation info,
+ * keeping only the title and session id that actually changed. Returns null when
+ * nothing changed, so the caller can skip a redundant broadcast.
+ * @param snapshot - The session's current snapshot.
+ * @param info - The latest title and session id read from the harness log.
+ * @returns A partial snapshot patch, or null when neither field changed.
+ */
+function conversationInfoPatch(
+	snapshot: TerminalSessionSnapshot,
+	info: AgentConversationInfo,
+): Partial<TerminalSessionSnapshot> | null {
+	const patch: Partial<TerminalSessionSnapshot> = {};
+	if (info.title && info.title !== snapshot.agentTitle) {
+		patch.agentTitle = info.title;
+	}
+	if (info.sessionId && info.sessionId !== snapshot.agentSessionId) {
+		patch.agentSessionId = info.sessionId;
+	}
+	return Object.keys(patch).length > 0 ? patch : null;
+}
+
+/**
  * Builds the main-process PTY supervisor used by terminal dock tabs and script
  * execution. Owns process lifecycle (spawn, input, resize, SIGHUP→SIGKILL
  * termination), bounded scrollback for renderer re-attach, SQLite session
@@ -290,7 +313,7 @@ export function createTerminalService({
 	now = () => new Date(),
 	onLifecycle,
 	onOutput,
-	readConversationTitle = readAgentConversationTitle,
+	readConversationInfo = readAgentConversationInfo,
 	resolveBaseEnv = () => process.env,
 	resolveScrollbackLimit = () => DEFAULT_SCROLLBACK_LIMIT,
 	scriptShell = resolveScriptShell(),
@@ -399,48 +422,48 @@ export function createTerminalService({
 	}
 
 	/**
-	 * Reads a harness's on-disk conversation title once and, when it changed, stamps
-	 * it on the snapshot and broadcasts so the tab label updates. No-op for sessions
-	 * without a session-log title source or once they stop running. The reader
+	 * Reads a harness's on-disk conversation title and native session id once and,
+	 * when either changed, stamps it on the snapshot and broadcasts. No-op for
+	 * sessions without a session-log source or once they stop running. The reader
 	 * swallows filesystem errors, so a missing or half-written log yields no update.
 	 * @param session - Tracked agent session to refresh.
 	 */
-	async function refreshConversationTitle(
+	async function refreshConversationInfo(
 		session: TrackedSession,
 	): Promise<void> {
-		if (!session.conversationTitleSource) {
+		if (!session.sessionLogSource) {
 			return;
 		}
-		const title = await readConversationTitle(
-			session.conversationTitleSource,
+		const info = await readConversationInfo(
+			session.sessionLogSource,
 			session.cwd,
 			{ since: session.conversationTitleSince ?? undefined },
 		);
-		if (
-			session.snapshot.status !== 'running' ||
-			!title ||
-			title === session.snapshot.agentTitle
-		) {
+		if (session.snapshot.status !== 'running') {
 			return;
 		}
-		session.snapshot = { ...session.snapshot, agentTitle: title };
+		const patch = conversationInfoPatch(session.snapshot, info);
+		if (!patch) {
+			return;
+		}
+		session.snapshot = { ...session.snapshot, ...patch };
 		broadcastLifecycle(session);
 	}
 
 	/**
-	 * Starts polling a harness's on-disk conversation title for agent sessions whose
-	 * OSC window title is not the title (Codex, Vibe). Reads immediately, then on an
-	 * interval; the timer is unref'd so it never keeps the app alive and is cleared
-	 * when the session finalizes. No-op for other sessions.
+	 * Starts polling a harness's on-disk session log for agent sessions, refreshing
+	 * the conversation title (Codex, Vibe) and native session id (all harnesses).
+	 * Reads immediately, then on an interval; the timer is unref'd so it never keeps
+	 * the app alive and is cleared when the session finalizes. No-op for others.
 	 * @param session - Tracked agent session to begin polling.
 	 */
-	function startConversationTitlePolling(session: TrackedSession): void {
-		if (!session.conversationTitleSource) {
+	function startConversationInfoPolling(session: TrackedSession): void {
+		if (!session.sessionLogSource) {
 			return;
 		}
-		void refreshConversationTitle(session);
+		void refreshConversationInfo(session);
 		session.titlePollTimer = setInterval(() => {
-			void refreshConversationTitle(session);
+			void refreshConversationInfo(session);
 		}, CONVERSATION_TITLE_POLL_MS);
 		session.titlePollTimer.unref?.();
 	}
@@ -640,8 +663,8 @@ export function createTerminalService({
 			};
 		}
 
-		const conversationTitleSource =
-			kind === 'agent' ? harnessConversationTitleSource(harnessId) : null;
+		const sessionLogSource =
+			kind === 'agent' ? harnessSessionLogSource(harnessId) : null;
 		const busyFromPtySpinner =
 			kind === 'agent' && harnessBusySource(harnessId) === 'pty-spinner';
 
@@ -649,7 +672,7 @@ export function createTerminalService({
 			agentBusyIdleTimer: null,
 			busyFromPtySpinner,
 			conversationTitleSince: resumed ? null : createdAt,
-			conversationTitleSource,
+			sessionLogSource,
 			cwd: environment.cwd,
 			dataSubscription: null,
 			exitSubscription: null,
@@ -663,6 +686,7 @@ export function createTerminalService({
 			scrollback: createScrollbackBuffer(resolveScrollbackLimit()),
 			snapshot: {
 				agentBusy: false,
+				agentSessionId: null,
 				agentTitle: null,
 				cols: normalizedCols,
 				commandLabel,
@@ -695,7 +719,7 @@ export function createTerminalService({
 		});
 
 		sessions.set(id, session);
-		startConversationTitlePolling(session);
+		startConversationInfoPolling(session);
 
 		const database = getDatabase();
 

@@ -39,12 +39,16 @@ export interface LaunchAgentHarnessResult {
  * `fresh` is true the tab respawns with the harness's launch command (a new
  * conversation) instead of its cwd-scoped resume command; used for the extra
  * tabs of a harness so two instances never resume into one shared session log.
+ * `sessionId`, when present and `fresh` is false, reattaches that exact
+ * conversation via the harness's `--resume <id>` form instead of the cwd-scoped
+ * "most recent" resume; used when restoring a closed harness tab.
  */
 export interface ResumeAgentHarnessRequest {
 	chatTabId: string;
 	harnessId: string;
 	workspaceId: string;
 	fresh?: boolean;
+	sessionId?: string;
 }
 
 /** Agent-harness slice of the `window.ensemblr` API. */

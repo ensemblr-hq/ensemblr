@@ -16,6 +16,36 @@
 export type ConversationTitleSource = 'codex-rollout' | 'vibe-log';
 
 /**
+ * Identifies the on-disk session-log format a harness writes, used to read the
+ * harness's native session id for the running conversation. Unlike
+ * {@link ConversationTitleSource} this covers all harnesses (Claude included),
+ * since the id is captured for every harness to enable exact-conversation resume
+ * when restoring a closed tab. Claude records its id in the transcript filename
+ * under `~/.claude/projects/`; Codex in its rollout log; Vibe in its session dir.
+ */
+export type SessionLogSource =
+	| 'claude-transcript'
+	| 'codex-rollout'
+	| 'vibe-log';
+
+/**
+ * Characters allowed in a harness session id before it is spliced into a resume
+ * command run under `sh -c`. Every harness id we read is a UUID or a slug of
+ * `[A-Za-z0-9._-]`; rejecting anything else keeps a tampered persisted id from
+ * becoming a shell-injection vector.
+ */
+const SAFE_SESSION_ID = /^[A-Za-z0-9._-]+$/;
+
+/**
+ * Reports whether a session id is safe to splice into a shell resume command.
+ * @param sessionId - The candidate session id.
+ * @returns True when the id contains only safe characters.
+ */
+export function isSafeHarnessSessionId(sessionId: string): boolean {
+	return SAFE_SESSION_ID.test(sessionId);
+}
+
+/**
  * Where a harness's "busy" (mid-turn) state is observed. Most TUIs animate a
  * spinner glyph in their OSC window title, so the renderer reads busy from the
  * title. Mistral Vibe animates its spinner only in the terminal body, never the
@@ -37,6 +67,12 @@ export interface HarnessDefinition {
 	 */
 	conversationTitleSource?: ConversationTitleSource;
 	/**
+	 * Which on-disk session log to read this harness's native session id from, for
+	 * exact-conversation resume. Set for every harness; omit only for a harness
+	 * that persists no resumable session log.
+	 */
+	sessionLogSource?: SessionLogSource;
+	/**
 	 * Where this harness's busy (mid-turn) state is observed. Omitted → `osc-title`
 	 * (a spinner glyph animated in the OSC window title). Set to `pty-spinner` for
 	 * harnesses like Vibe that animate their spinner only in the terminal body.
@@ -55,14 +91,17 @@ export interface HarnessDefinition {
 	 */
 	buildCommand: (bin: string) => string;
 	/**
-	 * Builds the launch command that reattaches the harness's most recent
-	 * conversation in the current working directory, keeping the auto-approve
-	 * flag. Used when respawning a tab after an app restart. Omit for harnesses
-	 * with no cwd-scoped resume; callers then fall back to {@link buildCommand}.
+	 * Builds the launch command that reattaches a prior conversation, keeping the
+	 * auto-approve flag. With no `sessionId` it reattaches the harness's most
+	 * recent conversation in the current working directory (used when respawning a
+	 * tab after an app restart); with a `sessionId` it reattaches that exact
+	 * conversation (used when restoring a closed tab). Omit for harnesses with no
+	 * resume; callers then fall back to {@link buildCommand}.
 	 * @param bin - The resolved binary name (or absolute path) to invoke.
+	 * @param sessionId - Native harness session id to reattach exactly, if known.
 	 * @returns The resume command string run under `sh -c` in the terminal PTY.
 	 */
-	buildResumeCommand?: (bin: string) => string;
+	buildResumeCommand?: (bin: string, sessionId?: string) => string;
 }
 
 /**
@@ -78,11 +117,17 @@ export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 		id: 'claude',
 		label: 'Claude Code',
 		binaries: ['claude'],
+		// Claude records its session id in the transcript filename under
+		// `~/.claude/projects/<cwd-slug>/<session-id>.jsonl`.
+		sessionLogSource: 'claude-transcript',
 		buildCommand: (bin) => `${bin} --dangerously-skip-permissions`,
 		// code.claude.com/docs/en/cli-reference — `--continue` loads the most
-		// recent conversation for the current directory.
-		buildResumeCommand: (bin) =>
-			`${bin} --dangerously-skip-permissions --continue`,
+		// recent conversation for the current directory; `--resume <id>` reattaches
+		// an exact session.
+		buildResumeCommand: (bin, sessionId) =>
+			sessionId
+				? `${bin} --dangerously-skip-permissions --resume ${sessionId}`
+				: `${bin} --dangerously-skip-permissions --continue`,
 	},
 	{
 		// developers.openai.com/codex/cli/reference — `--yolo` is the short alias.
@@ -92,12 +137,15 @@ export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 		// Codex sets its OSC window title to the cwd, so read the title from the
 		// rollout log it writes under `~/.codex/sessions/`.
 		conversationTitleSource: 'codex-rollout',
+		sessionLogSource: 'codex-rollout',
 		buildCommand: (bin) => `${bin} --dangerously-bypass-approvals-and-sandbox`,
-		// developers.openai.com/codex/cli/reference — `resume` is a subcommand and
-		// `--last` skips the picker for the newest session; the top-level flag
-		// precedes the subcommand.
-		buildResumeCommand: (bin) =>
-			`${bin} --dangerously-bypass-approvals-and-sandbox resume --last`,
+		// developers.openai.com/codex/cli/reference — `resume` is a subcommand:
+		// `--last` skips the picker for the newest session, or a session id (UUID)
+		// reattaches an exact session. The top-level flag precedes the subcommand.
+		buildResumeCommand: (bin, sessionId) =>
+			sessionId
+				? `${bin} --dangerously-bypass-approvals-and-sandbox resume ${sessionId}`
+				: `${bin} --dangerously-bypass-approvals-and-sandbox resume --last`,
 	},
 	{
 		// docs.mistral.ai/vibe — built-in agent that auto-approves every tool.
@@ -108,12 +156,16 @@ export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 		// title it persists in `~/.vibe/logs/session/*/meta.json`. Its spinner
 		// animates only in the terminal body, so busy comes from PTY output.
 		conversationTitleSource: 'vibe-log',
+		sessionLogSource: 'vibe-log',
 		busySource: 'pty-spinner',
 		buildCommand: (bin) => `${bin} --agent auto-approve`,
 		// docs.mistral.ai/vibe/code/cli/work-with-cli — `--continue` resumes the
-		// most recent conversation for the directory (needs log_interactions=true,
-		// the default).
-		buildResumeCommand: (bin) => `${bin} --agent auto-approve --continue`,
+		// most recent conversation for the directory; `--resume <id>` reattaches an
+		// exact session (needs log_interactions=true, the default).
+		buildResumeCommand: (bin, sessionId) =>
+			sessionId
+				? `${bin} --agent auto-approve --resume ${sessionId}`
+				: `${bin} --agent auto-approve --continue`,
 	},
 ];
 
@@ -155,4 +207,20 @@ export function harnessBusySource(id: string | null | undefined): BusySource {
 		return 'osc-title';
 	}
 	return findHarnessDefinition(id)?.busySource ?? 'osc-title';
+}
+
+/**
+ * Resolves the session-log source used to read a harness's native session id, if
+ * any. Used to decide whether a tab should poll its session id for
+ * exact-conversation resume.
+ * @param id - The harness id to resolve.
+ * @returns The session-log source, or null when the harness has no id or none.
+ */
+export function harnessSessionLogSource(
+	id: string | null | undefined,
+): SessionLogSource | null {
+	if (!id) {
+		return null;
+	}
+	return findHarnessDefinition(id)?.sessionLogSource ?? null;
 }

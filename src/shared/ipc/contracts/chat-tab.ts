@@ -74,6 +74,17 @@ export interface OpenChatTabResult {
  */
 export interface CloseChatTabRequest {
 	chatTabId: string;
+	/**
+	 * Final title to stamp on a terminal (harness) tab as it is archived, so the
+	 * closed-history row shows the conversation title rather than the harness
+	 * label. Ignored for chat tabs, whose title is owned by the Pi session.
+	 */
+	title?: string;
+	/**
+	 * Metadata fields to merge onto a terminal (harness) tab as it is archived, so
+	 * a restored tab can reattach the exact conversation. Ignored for chat tabs.
+	 */
+	metadataPatch?: { agentSessionId?: string | null };
 }
 
 /** Result of closing a chat tab. */

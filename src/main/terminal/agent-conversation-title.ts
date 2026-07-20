@@ -10,11 +10,22 @@
  */
 
 import { createReadStream } from 'node:fs';
-import { readdir, readFile } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
-import type { ConversationTitleSource } from '../../shared/agents/harness-registry.ts';
+import type {
+	ConversationTitleSource,
+	SessionLogSource,
+} from '../../shared/agents/harness-registry.ts';
+
+/** Title and native session id derived from a harness's on-disk session log. */
+export interface AgentConversationInfo {
+	/** Native harness session id for the matched conversation, or null. */
+	sessionId: string | null;
+	/** Conversation title, or null for harnesses that title via their OSC stream. */
+	title: string | null;
+}
 
 /** Options for the conversation-title readers, injectable for tests. */
 export interface ReadAgentConversationTitleOptions {
@@ -196,14 +207,32 @@ async function collectCodexRollouts(root: string): Promise<string[]> {
 /** Outcome of scanning one Codex rollout for a matching cwd and its first prompt. */
 interface CodexScanResult {
 	matched: boolean;
+	sessionId: string | null;
 	title: string | null;
 }
 
 /** The one rollout line kind {@link scanCodexRollout} acts on, or `other`. */
 type CodexLine =
-	| { kind: 'session-meta'; cwd: string | null; startedAt: string | null }
+	| {
+			kind: 'session-meta';
+			cwd: string | null;
+			id: string | null;
+			startedAt: string | null;
+	  }
 	| { kind: 'user-message'; message: string | null }
 	| { kind: 'other' };
+
+/**
+ * Extracts the session UUID Codex embeds in a rollout filename
+ * (`rollout-<timestamp>-<uuid>.jsonl`), as a fallback when the `session_meta`
+ * line carries no explicit id.
+ * @param file - Absolute rollout path.
+ * @returns The UUID, or null when the name has none.
+ */
+function codexSessionIdFromFile(file: string): string | null {
+	const match = /-([0-9a-fA-F-]{36})\.jsonl$/.exec(path.basename(file));
+	return match?.[1] ?? null;
+}
 
 /**
  * Classifies a single Codex rollout JSONL line into the session-meta or first
@@ -222,6 +251,7 @@ function classifyCodexLine(line: string): CodexLine {
 		return {
 			kind: 'session-meta',
 			cwd: asString(payload.cwd),
+			id: asString(payload.id),
 			startedAt: asString(payload.timestamp),
 		};
 	}
@@ -254,6 +284,7 @@ function scanCodexRollout(
 		});
 		let lineNumber = 0;
 		let matched = false;
+		let sessionId: string | null = null;
 		let settled = false;
 
 		const finish = (result: CodexScanResult) => {
@@ -275,25 +306,29 @@ function scanCodexRollout(
 					sameCwd(parsed.cwd, targetCwd) &&
 					startedSinceLaunch(parsed.startedAt, since);
 				if (!usable) {
-					finish({ matched: false, title: null });
+					finish({ matched: false, sessionId: null, title: null });
 					return;
 				}
 				matched = true;
+				sessionId = parsed.id ?? codexSessionIdFromFile(file);
 				return;
 			}
 			if (matched && parsed.kind === 'user-message') {
 				finish({
 					matched: true,
+					sessionId,
 					title: parsed.message ? normalizeTitle(parsed.message) : null,
 				});
 				return;
 			}
 			if (lineNumber >= MAX_CODEX_LINES) {
-				finish({ matched, title: null });
+				finish({ matched, sessionId, title: null });
 			}
 		});
-		rl.on('close', () => finish({ matched, title: null }));
-		stream.on('error', () => finish({ matched: false, title: null }));
+		rl.on('close', () => finish({ matched, sessionId, title: null }));
+		stream.on('error', () =>
+			finish({ matched: false, sessionId: null, title: null }),
+		);
 	});
 }
 
@@ -307,68 +342,65 @@ function scanCodexRollout(
  * @param home - Home directory hosting `~/.codex`.
  * @returns The derived title, or null when no matching session yields one.
  */
-async function readCodexConversationTitle(
+async function readCodexConversationInfo(
 	targetCwd: string,
 	since: string | undefined,
 	home: string,
-): Promise<string | null> {
+): Promise<AgentConversationInfo> {
 	const root = path.join(home, '.codex', 'sessions');
 	let rollouts: string[];
 	try {
 		rollouts = await collectCodexRollouts(root);
 	} catch {
-		return null;
+		return { sessionId: null, title: null };
 	}
 	for (const file of rollouts) {
 		const result = await scanCodexRollout(file, targetCwd, since);
 		if (result.matched) {
-			return result.title;
+			return { sessionId: result.sessionId, title: result.title };
 		}
 	}
-	return null;
+	return { sessionId: null, title: null };
 }
 
 /**
- * Reads the conversation title for a Mistral Vibe tab from the newest session whose
- * `working_directory` matches and that started at/after the tab launched. Vibe
- * auto-generates and persists a `title`, so this yields a real conversation title.
- * @param targetCwd - The tab's working directory.
- * @param since - The tab's launch time.
- * @param home - Home directory hosting `~/.vibe`.
- * @returns The persisted title, or null when no matching session has one.
- */
-/**
- * Extracts a Vibe session's conversation title from its parsed `meta.json`, but
- * only when the session's working directory matches the tab and it started at/after
- * the tab launched. Returns null on any mismatch or absent title.
+ * Reports whether a Vibe session's parsed `meta.json` matches the tab: its
+ * `working_directory` equals the tab's cwd and it started at/after the tab
+ * launched. The session id is carried on the directory name, not the meta.
  * @param meta - The parsed `meta.json` record.
  * @param targetCwd - The tab's working directory to match.
  * @param since - The tab's launch time gating the session, or undefined to disable.
- * @returns The normalized title, or null when the session does not qualify.
+ * @returns True when the session qualifies.
  */
-function vibeTitleFromMeta(
+function vibeMetaMatches(
 	meta: Record<string, unknown>,
 	targetCwd: string,
 	since: string | undefined,
-): string | null {
+): boolean {
 	const environment = asRecord(meta.environment);
 	const workingDirectory = asString(environment?.working_directory);
-	if (
-		!workingDirectory ||
-		!sameCwd(workingDirectory, targetCwd) ||
-		!startedSinceLaunch(asString(meta.start_time), since)
-	) {
-		return null;
-	}
-	const title = asString(meta.title);
-	return title?.trim() ? normalizeTitle(title) : null;
+	return (
+		!!workingDirectory &&
+		sameCwd(workingDirectory, targetCwd) &&
+		startedSinceLaunch(asString(meta.start_time), since)
+	);
 }
 
-async function readVibeConversationTitle(
+/**
+ * Reads the title and session id for a Mistral Vibe tab from the newest session
+ * whose `working_directory` matches and that started at/after the tab launched.
+ * Vibe auto-generates and persists a `title` and records the resumable UUID as
+ * `meta.session_id`, so this yields both a real title and the exact resume id.
+ * @param targetCwd - The tab's working directory.
+ * @param since - The tab's launch time.
+ * @param home - Home directory hosting `~/.vibe`.
+ * @returns The matched session's info, or nulls when none qualifies.
+ */
+async function readVibeConversationInfo(
 	targetCwd: string,
 	since: string | undefined,
 	home: string,
-): Promise<string | null> {
+): Promise<AgentConversationInfo> {
 	const root = path.join(home, '.vibe', 'logs', 'session');
 	let sessionDirs: string[];
 	try {
@@ -376,7 +408,7 @@ async function readVibeConversationTitle(
 			name.startsWith('session_'),
 		);
 	} catch {
-		return null;
+		return { sessionId: null, title: null };
 	}
 	for (const dir of sessionDirs) {
 		let raw: string;
@@ -386,35 +418,198 @@ async function readVibeConversationTitle(
 			continue;
 		}
 		const meta = parseJsonRecord(raw);
-		const title = meta && vibeTitleFromMeta(meta, targetCwd, since);
-		if (title) {
-			return title;
+		if (!meta || !vibeMetaMatches(meta, targetCwd, since)) {
+			continue;
 		}
+		const rawTitle = asString(meta.title);
+		return {
+			// Vibe's `--resume` wants the UUID `meta.session_id`, not the
+			// `session_<timestamp>_<short>` directory-name suffix.
+			sessionId: asString(meta.session_id),
+			title: rawTitle?.trim() ? normalizeTitle(rawTitle) : null,
+		};
 	}
-	return null;
+	return { sessionId: null, title: null };
+}
+
+/**
+ * Encodes a working directory into the directory name Claude uses under
+ * `~/.claude/projects/`, replacing path separators and dots with dashes.
+ * @param cwd - The absolute working directory.
+ * @returns The project-slug directory name.
+ */
+function claudeProjectSlug(cwd: string): string {
+	return cwd.replace(/[/.]/g, '-');
+}
+
+/**
+ * Lists `.jsonl` files in a directory newest-first by modified time, capped to a
+ * bounded probe window. Claude names transcripts by UUID (no timestamp to sort
+ * on), so recency comes from `stat` rather than the name.
+ * @param directory - Directory to list.
+ * @returns Absolute `.jsonl` paths, newest first, capped to the probe window.
+ */
+async function listJsonlByMtime(directory: string): Promise<string[]> {
+	const entries = await readdir(directory, { withFileTypes: true });
+	const files: Array<{ mtimeMs: number; path: string }> = [];
+	for (const entry of entries) {
+		if (!entry.isFile() || !entry.name.endsWith('.jsonl')) {
+			continue;
+		}
+		const full = path.join(directory, entry.name);
+		try {
+			const stats = await stat(full);
+			files.push({ mtimeMs: stats.mtimeMs, path: full });
+		} catch {}
+	}
+	files.sort((a, b) => b.mtimeMs - a.mtimeMs);
+	return files.slice(0, MAX_SESSION_CANDIDATES).map((file) => file.path);
+}
+
+/** The identifying fields {@link readClaudeTranscriptHead} gleans from a head. */
+interface ClaudeTranscriptHead {
+	cwd: string | null;
+	sessionId: string | null;
+	timestamp: string | null;
+}
+
+/** How many leading transcript lines to scan for the identifying fields. */
+const MAX_CLAUDE_HEAD_LINES = 40;
+
+/**
+ * Scans the leading lines of a Claude transcript for the fields that identify
+ * and gate the session. Claude's first lines (`last-prompt`, `mode`, …) carry
+ * the `sessionId` but no `cwd`/`timestamp`; the first real event a few lines in
+ * carries both. Reading a bounded head (rather than only line 1) lets the launch
+ * gate see a real timestamp instead of silently passing on a missing one.
+ * @param file - Absolute path to a `.jsonl` transcript.
+ * @returns The first-seen id, cwd, and timestamp across the head, each nullable.
+ */
+function readClaudeTranscriptHead(file: string): Promise<ClaudeTranscriptHead> {
+	return new Promise((resolve) => {
+		const stream = createReadStream(file, { encoding: 'utf8' });
+		const rl = createInterface({
+			crlfDelay: Number.POSITIVE_INFINITY,
+			input: stream,
+		});
+		const head: ClaudeTranscriptHead = {
+			cwd: null,
+			sessionId: null,
+			timestamp: null,
+		};
+		let lineNumber = 0;
+		let settled = false;
+		const finish = () => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			rl.close();
+			stream.destroy();
+			resolve(head);
+		};
+		rl.on('line', (line) => {
+			lineNumber += 1;
+			const record = parseJsonRecord(line);
+			if (record) {
+				head.sessionId ??= asString(record.sessionId);
+				head.cwd ??= asString(record.cwd);
+				head.timestamp ??= asString(record.timestamp);
+			}
+			const complete = head.sessionId && head.cwd && head.timestamp;
+			if (complete || lineNumber >= MAX_CLAUDE_HEAD_LINES) {
+				finish();
+			}
+		});
+		rl.on('close', finish);
+		stream.on('error', finish);
+	});
+}
+
+/**
+ * Reads the native session id for a Claude Code tab from the newest transcript
+ * under `~/.claude/projects/<cwd-slug>/` whose recorded cwd matches and that
+ * started at/after the tab launched. Claude titles from its OSC stream, so no
+ * title is returned here — only the resumable id (the record's `sessionId`,
+ * falling back to the transcript filename stem).
+ * @param targetCwd - The tab's working directory.
+ * @param since - The tab's launch time.
+ * @param home - Home directory hosting `~/.claude`.
+ * @returns The matched session's id, or nulls when none qualifies.
+ */
+async function readClaudeConversationInfo(
+	targetCwd: string,
+	since: string | undefined,
+	home: string,
+): Promise<AgentConversationInfo> {
+	const directory = path.join(
+		home,
+		'.claude',
+		'projects',
+		claudeProjectSlug(targetCwd),
+	);
+	let files: string[];
+	try {
+		files = await listJsonlByMtime(directory);
+	} catch {
+		return { sessionId: null, title: null };
+	}
+	for (const file of files) {
+		const head = await readClaudeTranscriptHead(file);
+		if (head.cwd && !sameCwd(head.cwd, targetCwd)) {
+			continue;
+		}
+		if (!startedSinceLaunch(head.timestamp, since)) {
+			continue;
+		}
+		const stem = path.basename(file, '.jsonl');
+		return { sessionId: head.sessionId ?? stem, title: null };
+	}
+	return { sessionId: null, title: null };
+}
+
+/**
+ * Derives an agent tab's conversation title and native session id from the
+ * harness's on-disk session log, dispatching by the harness's declared log
+ * source. Never throws: any filesystem or parse failure resolves to nulls so the
+ * poller can retry later.
+ * @param source - Which harness log format to read.
+ * @param cwd - The tab's working directory used to match the right session.
+ * @param options - Optional overrides such as the home directory and launch time.
+ * @returns The derived title and session id, each null when unavailable.
+ */
+export function readAgentConversationInfo(
+	source: SessionLogSource,
+	cwd: string,
+	options: ReadAgentConversationTitleOptions = {},
+): Promise<AgentConversationInfo> {
+	const home = options.home ?? homedir();
+	switch (source) {
+		case 'claude-transcript':
+			return readClaudeConversationInfo(cwd, options.since, home);
+		case 'codex-rollout':
+			return readCodexConversationInfo(cwd, options.since, home);
+		case 'vibe-log':
+			return readVibeConversationInfo(cwd, options.since, home);
+		default:
+			return Promise.resolve({ sessionId: null, title: null });
+	}
 }
 
 /**
  * Derives an agent tab's conversation title from the harness's on-disk session
- * log, dispatching by the harness's declared title source. Never throws: any
- * filesystem or parse failure resolves to null so the poller can retry later.
+ * log. Thin wrapper over {@link readAgentConversationInfo} kept for callers that
+ * only need the title.
  * @param source - Which harness log format to read.
  * @param cwd - The tab's working directory used to match the right session.
  * @param options - Optional overrides such as the home directory and launch time.
  * @returns The derived conversation title, or null when none is available yet.
  */
-export function readAgentConversationTitle(
+export async function readAgentConversationTitle(
 	source: ConversationTitleSource,
 	cwd: string,
 	options: ReadAgentConversationTitleOptions = {},
 ): Promise<string | null> {
-	const home = options.home ?? homedir();
-	switch (source) {
-		case 'codex-rollout':
-			return readCodexConversationTitle(cwd, options.since, home);
-		case 'vibe-log':
-			return readVibeConversationTitle(cwd, options.since, home);
-		default:
-			return Promise.resolve(null);
-	}
+	const info = await readAgentConversationInfo(source, cwd, options);
+	return info.title;
 }

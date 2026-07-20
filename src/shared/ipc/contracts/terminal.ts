@@ -34,6 +34,14 @@ export interface TerminalSessionSnapshot {
 	 */
 	agentBusy: boolean;
 	/**
+	 * Native session id an agent harness records for the running conversation,
+	 * read from its on-disk session log (Claude transcript, Codex rollout, Vibe
+	 * session). `null` for non-agent sessions and before the first successful read.
+	 * Persisted onto the tab when it closes so a restored terminal tab can reattach
+	 * the exact conversation via the harness's `--resume <id>` command.
+	 */
+	agentSessionId: string | null;
+	/**
 	 * Conversation title read from an agent harness's on-disk session log, for
 	 * harnesses whose OSC window title is not the conversation title (Codex, Vibe).
 	 * `null` for non-agent sessions, harnesses that title via OSC, and before the

@@ -109,11 +109,14 @@ export function registerAgentHandlers({
 	ipcMain.handle(
 		IPC_CHANNELS.resumeAgentHarness,
 		async (_event, raw: unknown): Promise<LaunchAgentHarnessResult> => {
-			const { chatTabId, fresh, harnessId, workspaceId } =
+			const { chatTabId, fresh, harnessId, sessionId, workspaceId } =
 				resumeAgentHarnessRequestSchema.parse(raw);
 			const command = fresh
 				? await harnessDetectionService.resolveLaunchCommand(harnessId)
-				: await harnessDetectionService.resolveResumeCommand(harnessId);
+				: await harnessDetectionService.resolveResumeCommand(
+						harnessId,
+						sessionId,
+					);
 
 			if (!command) {
 				return harnessUnavailableResult(harnessId);

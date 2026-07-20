@@ -88,6 +88,26 @@ describe('createHarnessDetectionService', () => {
 		);
 	});
 
+	it('resolves the exact-conversation resume command for a valid session id', async () => {
+		const service = createHarnessDetectionService({
+			commonDirs: [],
+			localCommandService: stubCommandService(binDirWith('codex')),
+		});
+		expect(await service.resolveResumeCommand('codex', 'codex-uuid-1')).toBe(
+			'codex --dangerously-bypass-approvals-and-sandbox resume codex-uuid-1',
+		);
+	});
+
+	it('ignores an unsafe session id and falls back to the cwd resume', async () => {
+		const service = createHarnessDetectionService({
+			commonDirs: [],
+			localCommandService: stubCommandService(binDirWith('codex')),
+		});
+		expect(await service.resolveResumeCommand('codex', 'a; rm -rf /')).toBe(
+			'codex --dangerously-bypass-approvals-and-sandbox resume --last',
+		);
+	});
+
 	it('falls back to the launch command when a harness has no resume builder', async () => {
 		const service = createHarnessDetectionService({
 			commonDirs: [],

@@ -60,6 +60,10 @@ export const openChatTabRequestSchema = z.object({
 /** {@link import('../../shared/ipc').CloseChatTabRequest}. */
 export const closeChatTabRequestSchema = z.object({
 	chatTabId: z.string().min(1),
+	metadataPatch: z
+		.object({ agentSessionId: z.string().min(1).nullable().optional() })
+		.optional(),
+	title: optionalStringCoerceNullToUndefined,
 });
 
 /** {@link import('../../shared/ipc').BindPiSessionToTabRequest}. */
@@ -100,6 +104,7 @@ export const resumeAgentHarnessRequestSchema = z.object({
 	harnessId: z.string().min(1),
 	workspaceId: z.string().min(1),
 	fresh: z.boolean().optional(),
+	sessionId: z.string().min(1).optional(),
 });
 
 // -----------------------------------------------------------------------------
