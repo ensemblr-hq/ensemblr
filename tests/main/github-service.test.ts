@@ -564,6 +564,38 @@ test('mergePullRequest uses the requested merge method', async () => {
 	assert.ok(mergeCall?.args?.includes('--rebase'));
 });
 
+test('mergePullRequest targets the remote head branch, not the local name', async () => {
+	const { calls, service } = createService((request) => {
+		if (request.command === 'gh' && request.args?.[1] === 'view') {
+			return buildResult({ stdout: PR_VIEW_JSON });
+		}
+		if (request.command === 'git') {
+			if (request.args?.[0] === 'rev-parse') {
+				return buildResult({ stdout: 'local/worktree-name\n' });
+			}
+			if (request.args?.[0] === 'config') {
+				return buildResult({ stdout: 'refs/heads/remote/pr-branch\n' });
+			}
+			return buildResult({ stdout: '0\t0\n' });
+		}
+		return buildResult();
+	});
+
+	const result = await service.mergePullRequest({
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.merged, true);
+	const mergeCall = calls.find((call) => call.args?.[1] === 'merge');
+	assert.deepEqual(mergeCall?.args, [
+		'pr',
+		'merge',
+		'remote/pr-branch',
+		'--squash',
+	]);
+});
+
 test('getPullRequestSnapshot drops a closed PR whose head is not on the branch', async () => {
 	const { calls, service } = createService((request) => {
 		if (request.command === 'git') {

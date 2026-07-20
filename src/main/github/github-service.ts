@@ -570,9 +570,14 @@ export function createGithubService({
 				return { error: cwd.error, merged: false };
 			}
 			const method = request.method ?? 'squash';
+			const branchSync = await readBranchSync(cwd.cwd);
+			const headRef = branchSync?.branchName
+				? await resolveRemoteHeadRef(cwd.cwd, branchSync.branchName)
+				: null;
 			const mergeResult = await run('gh', cwd.cwd, [
 				'pr',
 				'merge',
+				...(headRef ? [headRef] : []),
 				`--${method}`,
 			]);
 			if (mergeResult.status !== 'success') {
