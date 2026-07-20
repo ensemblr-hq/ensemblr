@@ -19,7 +19,7 @@ import {
 } from '@/renderer/components/ui/context-menu';
 import { WorkspaceContextMenuContent } from '@/renderer/components/workbench-shell/workspace-sidebar-item/context-menu';
 import { WorkspaceDiffStats } from '@/renderer/components/workbench-shell/workspace-sidebar-item/diff-stats';
-import { useWorkspacePiBusy } from '@/renderer/hooks/workspace/use-workspace-pi-busy';
+import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import { useWorkspaceUnread } from '@/renderer/state/workspace';
@@ -174,7 +174,7 @@ function WorkspaceCardFooter({
 
 /** Badge showing a workspace's PR number tinted by its live PR/agent status. */
 function WorkspacePrBadge({ workspace }: { workspace: WorkspaceShellModel }) {
-	const agentBusy = useWorkspacePiBusy(workspace.id);
+	const agentBusy = useWorkspaceBusy(workspace.id);
 	const state = getWorkspaceSidebarState(workspace, { agentBusy });
 	const StateIcon = state.icon;
 	const stateLabel = state.kind.replace(/^pr-/, '').replace(/-/g, ' ');

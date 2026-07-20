@@ -11,7 +11,7 @@ import {
 import { SidebarMenuButton } from '@/renderer/components/ui/sidebar';
 import { useNavigation } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useLivePullRequestModel } from '@/renderer/hooks/workbench-shell/route-layout/use-live-pull-request-model';
-import { useWorkspacePiBusy } from '@/renderer/hooks/workspace/use-workspace-pi-busy';
+import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy';
 import { cn } from '@/renderer/lib/utils';
 import { getWorkspaceSidebarState } from '@/renderer/lib/workbench';
 import {
@@ -70,7 +70,7 @@ export function WorkspaceSidebarItem({
 	// Live Pi runtime activity flows through `agentBusy` so it takes spinner
 	// priority over PR/check states without disturbing the cached
 	// `workspace.status` semantics elsewhere in the renderer.
-	const agentBusy = useWorkspacePiBusy(workspace.id);
+	const agentBusy = useWorkspaceBusy(workspace.id);
 	// The active row shares the header's live PR snapshot (same query key), so its
 	// icon flips to ready-to-merge in the same render as the header — not one
 	// slower navigation poll later. Inactive rows keep the navigation snapshot's

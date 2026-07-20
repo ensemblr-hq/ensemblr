@@ -14,6 +14,7 @@ export {
 	getCompactFileDirectory,
 	listDirectoryPaths,
 } from './file-tree';
+export { harnessIconClassName, harnessIconName } from './harness-icons';
 export { healthTone } from './health-tone';
 export { formatLinkedIssueComposerSeed } from './linked-issue-composer-seed';
 export {

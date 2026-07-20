@@ -1,6 +1,8 @@
 import { Icon } from '@iconify/react';
+import { useQuery } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
 import {
+	BotIcon,
 	BugIcon,
 	FileDiffIcon,
 	FileIcon,
@@ -13,7 +15,14 @@ import {
 	XIcon,
 } from 'lucide-react';
 import { Reorder } from 'motion/react';
-import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	type KeyboardEvent,
+	type MouseEvent,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -26,7 +35,11 @@ import {
 	reconcileOrderedIds,
 } from '@/renderer/lib/ordered-ids';
 import { cn } from '@/renderer/lib/utils';
-import { getWorkspaceFileIconNameForPath } from '@/renderer/lib/workbench';
+import {
+	getWorkspaceFileIconNameForPath,
+	harnessIconClassName,
+	harnessIconName,
+} from '@/renderer/lib/workbench';
 import { useDebugPanelToggle } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { shouldSelectOnTabClick } from '@/renderer/state/workspace';
@@ -36,6 +49,7 @@ import type { SessionTabModel } from '@/renderer/types/workbench';
 export function SessionTabs({
 	activeSession,
 	closedSessions,
+	onLaunchHarness,
 	onSessionTabClose,
 	onSessionTabChange,
 	onSessionTabOpen,
@@ -45,6 +59,10 @@ export function SessionTabs({
 }: {
 	activeSession: SessionTabModel;
 	closedSessions: SessionTabModel[];
+	onLaunchHarness: (input: {
+		harnessId: string;
+		harnessLabel: string;
+	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabClose: (sessionId: string) => void;
 	onSessionTabChange: (sessionId: string) => void;
 	onSessionTabOpen: () => Promise<{ chatTabId: string } | null>;
@@ -196,6 +214,10 @@ export function SessionTabs({
 						<span className='sr-only'>Toggle Pi debug panel</span>
 					</Button>
 				) : null}
+				<HarnessLauncherMenu
+					onLaunchHarness={onLaunchHarness}
+					onSessionTabChange={onSessionTabChange}
+				/>
 				<ClosedSessionHistoryMenu
 					closedSessions={closedSessions}
 					onSessionTabRestore={onSessionTabRestore}
@@ -326,6 +348,19 @@ function SessionTabIcon({ session }: { session: SessionTabModel }) {
 		return <Icon aria-hidden='true' className='size-3.5' icon={fileIconName} />;
 	}
 
+	if (session.kind === 'terminal') {
+		const brandIconName = harnessIconName(session.harnessId);
+		if (brandIconName) {
+			return (
+				<Icon
+					aria-hidden='true'
+					className={cn('size-3.5', harnessIconClassName(session.harnessId))}
+					icon={brandIconName}
+				/>
+			);
+		}
+	}
+
 	const TabIcon = iconForTabKind(session.kind ?? 'chat');
 	return <TabIcon aria-hidden='true' className='size-3.5' />;
 }
@@ -354,9 +389,146 @@ function iconForTabKind(kind: NonNullable<SessionTabModel['kind']>) {
 		case 'file':
 		case 'preview':
 			return FileIcon;
+		case 'terminal':
+			return BotIcon;
 		default:
 			return MessageSquareIcon;
 	}
+}
+
+/**
+ * Robot-icon dropdown listing the installed AI coding-agent harnesses. Selecting
+ * one (by click or its number key) launches it in a new embedded-terminal tab
+ * and focuses that tab. Availability is detected in the main process; only
+ * installed harnesses are shown. The list is fetched lazily on first open.
+ */
+function HarnessLauncherMenu({
+	onLaunchHarness,
+	onSessionTabChange,
+}: {
+	onLaunchHarness: (input: {
+		harnessId: string;
+		harnessLabel: string;
+	}) => Promise<{ chatTabId: string } | null>;
+	onSessionTabChange: (sessionId: string) => void;
+}) {
+	const [open, setOpen] = useState(false);
+	const [launchingId, setLaunchingId] = useState<string | null>(null);
+	const { data } = useQuery({
+		enabled: open,
+		queryFn: async () =>
+			(await window.ensemblr?.listAgentHarnesses()) ?? { harnesses: [] },
+		queryKey: ['agent-harnesses'],
+		staleTime: 30_000,
+	});
+	const installedHarnesses = (data?.harnesses ?? []).filter(
+		(harness) => harness.available,
+	);
+
+	/** Launches the chosen harness, focuses the new tab, then closes the menu. */
+	function handleLaunch(harnessId: string, harnessLabel: string) {
+		if (launchingId) {
+			return;
+		}
+		setLaunchingId(harnessId);
+		void onLaunchHarness({ harnessId, harnessLabel })
+			.then((result) => {
+				if (result) {
+					onSessionTabChange(result.chatTabId);
+				}
+			})
+			.finally(() => {
+				setLaunchingId(null);
+				setOpen(false);
+			});
+	}
+
+	/** Launches the harness whose 1-based position matches the pressed number. */
+	function handleNumberShortcut(event: KeyboardEvent) {
+		if (launchingId) {
+			return;
+		}
+		const position = Number.parseInt(event.key, 10);
+		if (
+			Number.isNaN(position) ||
+			position < 1 ||
+			position > installedHarnesses.length
+		) {
+			return;
+		}
+		event.preventDefault();
+		const harness = installedHarnesses[position - 1];
+		handleLaunch(harness.id, harness.label);
+	}
+
+	return (
+		<DropdownMenu onOpenChange={setOpen} open={open}>
+			<DropdownMenuTrigger asChild>
+				<Button size='icon-sm' variant='ghost'>
+					<BotIcon />
+					<span className='sr-only'>Launch coding agent</span>
+				</Button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent
+				align='end'
+				className='w-56 p-1'
+				onKeyDown={handleNumberShortcut}
+			>
+				{installedHarnesses.length ? (
+					installedHarnesses.map((harness, index) => {
+						const iconName = harnessIconName(harness.id);
+						return (
+							<DropdownMenuItem
+								className='h-9 gap-2 px-2 text-[0.8125rem]'
+								disabled={launchingId !== null}
+								key={harness.id}
+								onSelect={(event) => {
+									event.preventDefault();
+									handleLaunch(harness.id, harness.label);
+								}}
+							>
+								{iconName ? (
+									<Icon
+										aria-hidden='true'
+										className={cn(
+											'size-4 shrink-0',
+											harnessIconClassName(harness.id),
+										)}
+										icon={iconName}
+									/>
+								) : (
+									<BotIcon
+										aria-hidden='true'
+										className='size-4 shrink-0 text-muted-foreground'
+									/>
+								)}
+								<span className='min-w-0 flex-1 truncate font-medium'>
+									{harness.label}
+								</span>
+								{launchingId === harness.id ? (
+									<LoaderCircleIcon
+										aria-hidden='true'
+										className='size-3.5 shrink-0 animate-spin'
+									/>
+								) : index < 9 ? (
+									<kbd className='grid size-4 shrink-0 place-items-center rounded-sm border border-border font-medium text-[0.625rem] text-muted-foreground'>
+										{index + 1}
+									</kbd>
+								) : null}
+							</DropdownMenuItem>
+						);
+					})
+				) : (
+					<DropdownMenuItem
+						className='h-9 px-2 text-muted-foreground text-xs'
+						disabled
+					>
+						No coding agents detected
+					</DropdownMenuItem>
+				)}
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
 }
 
 /** Dropdown listing recently-closed session tabs for restoration. */

@@ -59,6 +59,10 @@ export interface SessionTabActions {
 		label: string;
 		turnId: string;
 	}) => Promise<{ chatTabId: string } | null>;
+	openTerminalTab: (input: {
+		harnessId: string;
+		harnessLabel: string;
+	}) => Promise<{ chatTabId: string } | null>;
 	openWorkspaceFileDiffTab: (input: {
 		filePath: string;
 		scope?: WorkspaceGitDiffScope;

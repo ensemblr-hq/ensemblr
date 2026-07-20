@@ -48,7 +48,9 @@ export const listChatTabsRequestSchema = z.object({
 
 /** {@link import('../../shared/ipc').OpenChatTabRequest}. */
 export const openChatTabRequestSchema = z.object({
-	kind: z.enum(['chat', 'diff', 'document', 'file', 'preview']).optional(),
+	kind: z
+		.enum(['chat', 'diff', 'document', 'file', 'preview', 'terminal'])
+		.optional(),
 	metadata: z.record(z.string(), z.unknown()).optional(),
 	piSessionId: optionalNullableString,
 	title: optionalStringCoerceNullToUndefined,
@@ -79,6 +81,23 @@ export const reorderChatTabsRequestSchema = z.object({
 
 /** {@link import('../../shared/ipc').ListClosedChatTabsWithSummaryRequest}. */
 export const listClosedChatTabsWithSummaryRequestSchema = z.object({
+	workspaceId: z.string().min(1),
+});
+
+// -----------------------------------------------------------------------------
+// agents — STRICT (throws on bad input, caught by handler try/catch)
+// -----------------------------------------------------------------------------
+
+/** {@link import('../../shared/ipc/contracts/agents').LaunchAgentHarnessRequest}. */
+export const launchAgentHarnessRequestSchema = z.object({
+	harnessId: z.string().min(1),
+	workspaceId: z.string().min(1),
+});
+
+/** {@link import('../../shared/ipc/contracts/agents').ResumeAgentHarnessRequest}. */
+export const resumeAgentHarnessRequestSchema = z.object({
+	chatTabId: z.string().min(1),
+	harnessId: z.string().min(1),
 	workspaceId: z.string().min(1),
 });
 

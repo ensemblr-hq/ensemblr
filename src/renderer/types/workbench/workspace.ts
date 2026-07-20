@@ -146,8 +146,6 @@ export interface PullRequestGitStatusSummary {
 
 // --- Session / composer -----------------------------------------------------
 
-export type SessionTabKind = 'chat' | 'diff' | 'document' | 'file' | 'preview';
-
 interface SessionTabBase {
 	id: string;
 	chatTabId: string;
@@ -184,6 +182,17 @@ export type SessionTabModel =
 	| (SessionTabBase & {
 			filePath: string | null;
 			kind: 'file' | 'preview';
+			turnId?: null;
+	  })
+	| (SessionTabBase & {
+			/** Main-process terminal session id backing the embedded xterm. */
+			terminalId: string;
+			/** Registry id of the launched agent harness. */
+			harnessId: string;
+			/** Display label of the launched harness (also the tab title). */
+			harnessLabel: string;
+			filePath?: null;
+			kind: 'terminal';
 			turnId?: null;
 	  });
 

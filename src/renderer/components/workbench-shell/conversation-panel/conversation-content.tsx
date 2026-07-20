@@ -1,6 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { useCallback, useMemo } from 'react';
-
+import { XtermTerminal } from '@/renderer/components/workbench-shell/dock-panel/xterm-terminal';
 import { toWorkspaceLookupPath } from '@/renderer/lib/pi';
 import { formatLinkedIssueComposerSeed } from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
@@ -10,7 +10,6 @@ import type {
 	SessionTabModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-
 import { CommentPreviewPanel } from './comment-preview-panel';
 import { ComposerPanel } from './composer-panel';
 import {
@@ -39,6 +38,7 @@ export function WorkspaceConversationContent({
 	composer,
 	onDirectoryReveal,
 	onFilePreviewOpen,
+	onLaunchHarness,
 	onSessionTabChange,
 	onSessionTabClose,
 	onSessionTabOpen,
@@ -54,6 +54,10 @@ export function WorkspaceConversationContent({
 	onDirectoryReveal: (directoryPath: string) => void;
 	onFilePreviewOpen: (input: {
 		filePath: string;
+	}) => Promise<{ chatTabId: string } | null>;
+	onLaunchHarness: (input: {
+		harnessId: string;
+		harnessLabel: string;
 	}) => Promise<{ chatTabId: string } | null>;
 	onTurnDiffOpen: (input: {
 		label: string;
@@ -127,6 +131,7 @@ export function WorkspaceConversationContent({
 			<SessionTabs
 				activeSession={activeSession}
 				closedSessions={closedSessions}
+				onLaunchHarness={onLaunchHarness}
 				onSessionTabClose={onSessionTabClose}
 				onSessionTabChange={onSessionTabChange}
 				onSessionTabOpen={onSessionTabOpen}
@@ -156,28 +161,63 @@ export function WorkspaceConversationContent({
 						</TurnDiffOpenerProvider>
 					</FilePreviewOpenerProvider>
 				</WorkspacePathKindResolverProvider>
-			) : activeSession.kind === 'diff' ? (
-				activeSession.filePath ? (
-					<WorkspaceFileDiffPanel
-						filePath={activeSession.filePath}
-						onSelectChat={onSessionTabChange}
-						scope={activeSession.diffScope ?? undefined}
-						workspaceCwd={activeWorkspace.pathLabel ?? null}
-						workspaceId={activeWorkspace.id}
-					/>
-				) : (
-					<TurnDiffPanel turnId={activeSession.turnId ?? null} />
-				)
-			) : activeSession.kind === 'document' && activeSession.commentPreview ? (
-				<CommentPreviewPanel comment={activeSession.commentPreview} />
 			) : (
-				<FilePreviewPanel
-					filePath={activeSession.filePath ?? null}
-					workspaceCwd={activeWorkspace.pathLabel ?? null}
+				<ActiveAuxiliaryPanel
+					activeSession={activeSession}
+					activeWorkspace={activeWorkspace}
+					onSessionTabChange={onSessionTabChange}
 				/>
 			)}
 			{developerMode ? <PiRawFramePanel sessionId={debugSessionId} /> : null}
 		</section>
+	);
+}
+
+/**
+ * Renders the panel for a non-chat session tab (terminal, diff, document, or
+ * file). Split out of `WorkspaceConversationContent` so the per-kind branching
+ * lives in one focused component instead of inflating the parent's complexity.
+ */
+function ActiveAuxiliaryPanel({
+	activeSession,
+	activeWorkspace,
+	onSessionTabChange,
+}: {
+	activeSession: SessionTabModel;
+	activeWorkspace: WorkspaceShellModel;
+	onSessionTabChange: (sessionId: string) => void;
+}) {
+	if (activeSession.kind === 'terminal') {
+		return (
+			<div className='flex min-h-0 flex-1'>
+				<XtermTerminal
+					sessionStatus={null}
+					terminalId={activeSession.terminalId}
+				/>
+			</div>
+		);
+	}
+	if (activeSession.kind === 'diff') {
+		return activeSession.filePath ? (
+			<WorkspaceFileDiffPanel
+				filePath={activeSession.filePath}
+				onSelectChat={onSessionTabChange}
+				scope={activeSession.diffScope ?? undefined}
+				workspaceCwd={activeWorkspace.pathLabel ?? null}
+				workspaceId={activeWorkspace.id}
+			/>
+		) : (
+			<TurnDiffPanel turnId={activeSession.turnId ?? null} />
+		);
+	}
+	if (activeSession.kind === 'document' && activeSession.commentPreview) {
+		return <CommentPreviewPanel comment={activeSession.commentPreview} />;
+	}
+	return (
+		<FilePreviewPanel
+			filePath={activeSession.filePath ?? null}
+			workspaceCwd={activeWorkspace.pathLabel ?? null}
+		/>
 	);
 }
 

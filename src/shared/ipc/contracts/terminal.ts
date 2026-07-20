@@ -5,6 +5,7 @@
 
 /** What a terminal session hosts. */
 export type TerminalSessionKind =
+	| 'agent'
 	| 'archive-script'
 	| 'run-script'
 	| 'setup-script'

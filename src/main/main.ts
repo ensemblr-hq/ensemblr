@@ -16,7 +16,7 @@ import type {
 } from '../shared/ipc/contracts/terminal';
 import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
 import { scrollbackMbToBytes } from '../shared/terminal/scrollback';
-
+import { createHarnessDetectionService } from './agents/harness-detection-service.ts';
 import { createMainWindow } from './app/main-window';
 import { createMainWindowStateStore } from './app/window-state';
 import { createLocalCommandService } from './commands';
@@ -472,6 +472,9 @@ const scriptLifecycleService = createScriptLifecycleService({
 	settingsResolutionService,
 	terminalService,
 });
+const harnessDetectionService = createHarnessDetectionService({
+	localCommandService,
+});
 const createWorkspaceServiceWithSetup = withSetupScriptOnCreate({
 	createWorkspaceService: createWorkspaceServiceInstance,
 	scriptLifecycleService,
@@ -552,6 +555,7 @@ app.whenReady().then(() => {
 		environmentVariablesService,
 		githubCloneService,
 		githubRepositoryListService,
+		harnessDetectionService,
 		linearAuthService,
 		linearService,
 		listAllWorkspacesService,
