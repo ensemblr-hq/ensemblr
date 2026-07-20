@@ -1,4 +1,7 @@
-import type { LocalCommandService } from '../commands/local-command';
+import type {
+	LocalCommandResult,
+	LocalCommandService,
+} from '../commands/local-command';
 import { firstLine } from './first-line.ts';
 
 /** Outcome of a git operation that the caller maps to its own diagnostic code. */
@@ -37,6 +40,38 @@ export const DEFAULT_FALLBACK_BRANCH = 'main';
 const GIT_BRANCH_TIMEOUT_MS = 5_000;
 const GIT_FETCH_TIMEOUT_MS = 30_000;
 export const GIT_WORKTREE_TIMEOUT_MS = 15_000;
+
+/**
+ * `git worktree add` checks out the entire base tree, which on a cold OS file
+ * cache or a large repository legitimately takes far longer than the 15s used
+ * for git's fast metadata queries. The previous 15s cap killed slow-but-healthy
+ * checkouts, surfacing git's harmless "Preparing worktree" progress line as the
+ * failure; a generous cap lets the checkout finish on the first attempt.
+ */
+const GIT_WORKTREE_ADD_TIMEOUT_MS = 120_000;
+
+/** How many times to attempt `git worktree add` when it fails transiently. */
+const GIT_WORKTREE_ADD_MAX_ATTEMPTS = 3;
+
+/** Base backoff between `git worktree add` retries; scales with the attempt. */
+const GIT_WORKTREE_ADD_RETRY_DELAY_MS = 250;
+
+/**
+ * Matches the transient git lock-contention failures a retry resolves: another
+ * git process in the same repository briefly held `index.lock`, a ref lock, or
+ * the config lock. These fail fast (git does not wait on an existing lock), so
+ * retrying after a short delay is cheap and usually succeeds.
+ */
+const GIT_LOCK_CONTENTION =
+	/(index\.lock|ref[\w-]*\.lock|\.lock': File exists|could not lock|unable to create.*\.lock|another git process)/i;
+
+/** git stderr progress lines that precede — and must not mask — a real error. */
+const GIT_PROGRESS_PREFIXES = [
+	'Preparing worktree',
+	'HEAD is now at',
+	'Updating files',
+	'Checking out files',
+] as const;
 
 /**
  * Best-effort sync of a workspace base ref to the latest remote before a new
@@ -195,13 +230,71 @@ export async function runWorktreeAdd({
 		? ['worktree', 'add', '-b', branchName, workspacePath, baseBranch]
 		: ['worktree', 'add', workspacePath, branchName];
 
+	let lastFailure: GitWorktreeAddOutcome = {
+		status: 'failure',
+		message: 'git worktree add failed.',
+	};
+
+	for (
+		let attempt = 1;
+		attempt <= GIT_WORKTREE_ADD_MAX_ATTEMPTS;
+		attempt += 1
+	) {
+		const outcome = await attemptWorktreeAdd({
+			args,
+			localCommandService,
+			repositoryPath,
+		});
+
+		if (outcome.status === 'success' || outcome.status === 'git-missing') {
+			return outcome;
+		}
+
+		lastFailure = { status: 'failure', message: outcome.message };
+
+		if (!outcome.transient || attempt === GIT_WORKTREE_ADD_MAX_ATTEMPTS) {
+			return lastFailure;
+		}
+
+		// Clear any half-written worktree admin entry the failed attempt left
+		// behind so the retry starts from a clean registry.
+		await pruneWorktreeAdmin({ localCommandService, repositoryPath });
+		await delay(GIT_WORKTREE_ADD_RETRY_DELAY_MS * attempt);
+	}
+
+	return lastFailure;
+}
+
+/** Per-attempt outcome, adding `transient` so the caller can decide to retry. */
+type WorktreeAddAttempt =
+	| { status: 'success' }
+	| { status: 'git-missing'; message: string }
+	| { status: 'failure'; message: string; transient: boolean };
+
+/**
+ * Runs a single `git worktree add` invocation and classifies its outcome. A
+ * lock-contention failure is flagged `transient` so the caller retries it; a
+ * timeout or a real git error is reported with an actionable message rather
+ * than git's harmless "Preparing worktree" progress preamble.
+ * @param options - Prebuilt args and Git command dependencies.
+ * @returns The classified attempt outcome.
+ */
+async function attemptWorktreeAdd({
+	args,
+	localCommandService,
+	repositoryPath,
+}: {
+	args: string[];
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<WorktreeAddAttempt> {
 	try {
 		const result = await localCommandService.run({
 			args,
 			command: 'git',
 			cwd: repositoryPath,
 			maxOutputBytes: 64 * 1024,
-			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+			timeoutMs: GIT_WORKTREE_ADD_TIMEOUT_MS,
 		});
 
 		if (result.status === 'success') {
@@ -217,7 +310,8 @@ export async function runWorktreeAdd({
 
 		return {
 			status: 'failure',
-			message: firstLine(result.stderr) || 'git worktree add failed.',
+			message: describeWorktreeAddFailure(result),
+			transient: GIT_LOCK_CONTENTION.test(result.stderr),
 		};
 	} catch (error) {
 		return {
@@ -226,8 +320,83 @@ export async function runWorktreeAdd({
 				error instanceof Error
 					? error.message
 					: 'git worktree add threw unexpectedly.',
+			transient: false,
 		};
 	}
+}
+
+/**
+ * Turns a failed `git worktree add` result into a user-facing message. Timeouts
+ * and cancellations are reported explicitly; every other failure surfaces the
+ * real git error line, never the "Preparing worktree" progress preamble git
+ * prints to stderr before it does any work.
+ * @param result - The failed command result.
+ * @returns A concise, actionable failure message.
+ */
+function describeWorktreeAddFailure(result: LocalCommandResult): string {
+	if (result.failure?.code === 'timeout') {
+		const seconds = Math.round(GIT_WORKTREE_ADD_TIMEOUT_MS / 1000);
+		return `git worktree add timed out after ${seconds}s. Close other git operations on this repository and retry.`;
+	}
+
+	if (result.failure?.code === 'canceled') {
+		return 'git worktree add was canceled.';
+	}
+
+	return extractGitError(result.stderr) || 'git worktree add failed.';
+}
+
+/**
+ * Extracts the meaningful git error from stderr: the last `fatal:`/`error:`
+ * line when present, otherwise the last line that is not a known progress
+ * preamble. Returns an empty string when stderr carries only progress output.
+ * @param stderr - Raw stderr from the git process.
+ * @returns The real error line, or an empty string.
+ */
+function extractGitError(stderr: string): string {
+	const lines = stderr
+		.split(/\r?\n/)
+		.map((line) => line.trim())
+		.filter((line) => line.length > 0);
+	const fatal = lines.findLast((line) => /^(fatal|error):/i.test(line));
+	if (fatal) {
+		return fatal;
+	}
+	return lines.findLast((line) => !isGitProgressLine(line)) ?? '';
+}
+
+/** Reports whether a stderr line is one of git's benign progress preambles. */
+function isGitProgressLine(line: string): boolean {
+	return GIT_PROGRESS_PREFIXES.some((prefix) => line.startsWith(prefix));
+}
+
+/**
+ * Best-effort `git worktree prune` to drop stale worktree admin entries before
+ * a retry. Failures are ignored — the retry's `git worktree add` reports the
+ * real problem if pruning did not help.
+ * @param options - Git command dependencies.
+ */
+async function pruneWorktreeAdmin({
+	localCommandService,
+	repositoryPath,
+}: {
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<void> {
+	await runGitSucceeds({
+		args: ['worktree', 'prune'],
+		localCommandService,
+		repositoryPath,
+		timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+	});
+}
+
+/**
+ * Resolves after `ms` milliseconds; used to space out worktree-add retries.
+ * @param ms - Delay in milliseconds.
+ */
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**

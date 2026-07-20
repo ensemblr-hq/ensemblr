@@ -375,6 +375,38 @@ test('create defaults the workspace name to a placeholder slug', async (t) => {
 	assert.notEqual(first.workspace?.path, second.workspace?.path);
 });
 
+test('serializes concurrent creates for one repo into distinct workspaces', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const [first, second, third] = await Promise.all([
+		service.create({ repositoryId: harness.repositoryId }),
+		service.create({ repositoryId: harness.repositoryId }),
+		service.create({ repositoryId: harness.repositoryId }),
+	]);
+
+	assert.equal(first.status, 'success');
+	assert.equal(second.status, 'success');
+	assert.equal(third.status, 'success');
+
+	const slugs = new Set(
+		[first, second, third].map((result) => result.workspace?.slug),
+	);
+	assert.equal(slugs.size, 3);
+
+	const database = harness.databaseService.getConnection()
+		?.database as DatabaseSync;
+	const count = database
+		.prepare('SELECT COUNT(*) AS count FROM workspaces')
+		.get() as { count: number };
+	assert.equal(count.count, 3);
+});
+
 test('create keeps a placeholder name that no workspace uses', async (t) => {
 	const harness = createHarness(t);
 	const service = createWorkspaceService({
