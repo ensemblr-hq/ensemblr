@@ -182,7 +182,7 @@ interface TrackedSession {
 	 * a prior conversation's title/id; null when resuming, where the log predates
 	 * this session and the newest cwd-matching session is the right one.
 	 */
-	conversationTitleSince: string | null;
+	sessionLogSince: string | null;
 	/** Working directory the PTY spawned in, used to match on-disk session logs. */
 	cwd: string;
 	dataSubscription: { dispose: () => void } | null;
@@ -437,7 +437,7 @@ export function createTerminalService({
 		const info = await readConversationInfo(
 			session.sessionLogSource,
 			session.cwd,
-			{ since: session.conversationTitleSince ?? undefined },
+			{ since: session.sessionLogSince ?? undefined },
 		);
 		const patch = conversationInfoPatch(session.snapshot, info);
 		if (!patch) {
@@ -668,7 +668,7 @@ export function createTerminalService({
 		const session: TrackedSession = {
 			agentBusyIdleTimer: null,
 			busyFromPtySpinner,
-			conversationTitleSince: resumed ? null : createdAt,
+			sessionLogSince: resumed ? null : createdAt,
 			sessionLogSource,
 			cwd: environment.cwd,
 			dataSubscription: null,

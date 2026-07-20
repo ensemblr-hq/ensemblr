@@ -1111,9 +1111,15 @@ function toClosedSessionTabModel(
 	};
 	// Terminal (harness) tabs keep their harness identity so the history row shows
 	// the harness icon and a restore can reattach the exact conversation. The
-	// backing PTY is gone once closed, so `terminalId` is intentionally empty.
+	// backing PTY is gone once closed, so `terminalId` is cleared here: the stored
+	// metadata still carries the dead id, so blank it before building the model to
+	// keep "has a live PTY" (`terminalId.length > 0`) honest for history rows.
 	if (entry.tab.kind === 'terminal') {
-		return toTerminalSessionTab(base, entry.tab);
+		const closedTab: ChatTabWire = {
+			...entry.tab,
+			metadata: { ...entry.tab.metadata, terminalId: '' },
+		};
+		return toTerminalSessionTab(base, closedTab);
 	}
 	return { ...base, kind: 'chat' };
 }

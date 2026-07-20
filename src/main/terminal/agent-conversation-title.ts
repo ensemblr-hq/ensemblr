@@ -433,27 +433,51 @@ async function readVibeConversationInfo(
 }
 
 /**
- * Encodes a working directory into the directory name Claude uses under
- * `~/.claude/projects/`, replacing path separators and dots with dashes.
+ * Encodes a working directory into the candidate directory names Claude uses
+ * under `~/.claude/projects/`. Current Claude replaces only path separators with
+ * dashes and keeps dots (`…-thesetset.com`, `…-.claude-worktrees`); older
+ * versions also replaced dots. Both are probed so a cwd with a dotted segment
+ * still resolves regardless of the writing version. The recorded `cwd` is still
+ * verified per transcript, so an extra candidate can only miss, never mismatch.
  * @param cwd - The absolute working directory.
- * @returns The project-slug directory name.
+ * @returns The distinct project-slug directory names to probe.
  */
-function claudeProjectSlug(cwd: string): string {
-	return cwd.replace(/[/.]/g, '-');
+function claudeProjectSlugs(cwd: string): string[] {
+	const slashesOnly = cwd.replace(/\//g, '-');
+	const slashesAndDots = cwd.replace(/[/.]/g, '-');
+	return slashesOnly === slashesAndDots
+		? [slashesOnly]
+		: [slashesOnly, slashesAndDots];
 }
 
 /**
- * Lists `.jsonl` files in a directory newest-first by modified time, capped to a
- * bounded probe window. Claude names transcripts by UUID (no timestamp to sort
- * on), so recency comes from `stat` rather than the name.
+ * Lists the absolute `.jsonl` paths directly under one directory, or an empty
+ * list when the directory is missing, so a non-existent candidate slug is inert.
  * @param directory - Directory to list.
+ * @returns Absolute `.jsonl` paths in that directory.
+ */
+async function readJsonlPaths(directory: string): Promise<string[]> {
+	try {
+		const entries = await readdir(directory, { withFileTypes: true });
+		return entries
+			.filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
+			.map((entry) => path.join(directory, entry.name));
+	} catch {
+		return [];
+	}
+}
+
+/**
+ * Lists `.jsonl` files across one or more directories newest-first by modified
+ * time, capped to a bounded probe window. Claude names transcripts by UUID (no
+ * timestamp to sort on), so recency comes from `stat` rather than the name.
+ * Directories that do not exist are skipped so a missing candidate slug is inert.
+ * @param directories - Directories to list.
  * @returns Absolute `.jsonl` paths, newest first, capped to the probe window.
  */
-async function listJsonlByMtime(directory: string): Promise<string[]> {
-	const entries = await readdir(directory, { withFileTypes: true });
-	const jsonlPaths = entries
-		.filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
-		.map((entry) => path.join(directory, entry.name));
+async function listJsonlByMtime(directories: string[]): Promise<string[]> {
+	const listed = await Promise.all(directories.map(readJsonlPaths));
+	const jsonlPaths = listed.flat();
 	const stated = await Promise.all(
 		jsonlPaths.map(async (full) => {
 			try {
@@ -547,18 +571,11 @@ async function readClaudeConversationInfo(
 	since: string | undefined,
 	home: string,
 ): Promise<AgentConversationInfo> {
-	const directory = path.join(
-		home,
-		'.claude',
-		'projects',
-		claudeProjectSlug(targetCwd),
+	const projectsRoot = path.join(home, '.claude', 'projects');
+	const directories = claudeProjectSlugs(targetCwd).map((slug) =>
+		path.join(projectsRoot, slug),
 	);
-	let files: string[];
-	try {
-		files = await listJsonlByMtime(directory);
-	} catch {
-		return { sessionId: null, title: null };
-	}
+	const files = await listJsonlByMtime(directories);
 	for (const file of files) {
 		const head = await readClaudeTranscriptHead(file);
 		if (head.cwd && !sameCwd(head.cwd, targetCwd)) {

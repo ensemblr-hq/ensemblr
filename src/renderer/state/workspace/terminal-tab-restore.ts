@@ -58,7 +58,9 @@ function findOpenConversation(
  * Respawns the harness for a restored terminal (harness) tab, reattaching the
  * exact conversation via its persisted native session id and repointing the tab.
  * If that conversation is already open, focuses it and drops the duplicate; if
- * the harness or API is unavailable, selects the tab as-is without a resume.
+ * no session id was captured, spawns a fresh conversation (rather than an
+ * unguarded cwd resume that could corrupt a shared log); if the harness or API
+ * is unavailable, selects the tab as-is without a resume.
  * @param tab - The restored terminal tab wire row.
  * @param deps - The owning hook's collaborators.
  */
@@ -88,9 +90,16 @@ export function resumeRestoredTerminalTab(
 	// Claim the tab so the post-restart auto-resume effect does not also respawn
 	// it with the cwd-scoped "most recent" resume command.
 	deps.claimTab(tab.id);
+	// With a captured session id we reattach that exact conversation. Without one
+	// we cannot identify the conversation, and an unguarded cwd `--continue` here
+	// could collide with another live tab of the same harness resuming the same
+	// cwd (two `--continue` processes corrupt one shared log). Spawn a fresh
+	// conversation instead, which writes its own log and never collides.
+	const fresh = !agentSessionId;
 	void api
 		.resumeAgentHarness({
 			chatTabId: tab.id,
+			fresh,
 			harnessId,
 			sessionId: agentSessionId,
 			workspaceId: deps.workspaceId,

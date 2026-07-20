@@ -365,4 +365,24 @@ describe('readAgentConversationInfo — session id', () => {
 			}),
 		).toEqual({ sessionId: null, title: null });
 	});
+
+	test('claude finds a dotted-cwd transcript under the dot-keeping slug', async () => {
+		// Current Claude keeps dots in the project slug (only `/` becomes `-`), so a
+		// cwd with a dotted segment lives at `<…>-.claude-worktrees-…`. The reader
+		// must probe that encoding, not only the legacy dots-as-dashes one.
+		const dottedCwd = '/Users/dev/project/.claude-worktrees/agent-a1';
+		const slug = dottedCwd.replace(/\//g, '-');
+		const dir = path.join(home, '.claude', 'projects', slug);
+		mkdirSync(dir, { recursive: true });
+		writeFileSync(
+			path.join(dir, 'claude-dot.jsonl'),
+			`${JSON.stringify({ cwd: dottedCwd, sessionId: 'claude-dot', timestamp: AFTER_LAUNCH, type: 'user' })}\n`,
+		);
+		expect(
+			await readAgentConversationInfo('claude-transcript', dottedCwd, {
+				home,
+				since: LAUNCH,
+			}),
+		).toEqual({ sessionId: 'claude-dot', title: null });
+	});
 });
