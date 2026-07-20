@@ -17,38 +17,72 @@ import type {
 	WriteForkSummaryRequest,
 	WriteForkSummaryResult,
 } from '@/shared/ipc/contracts/pi-session';
-
 import { readCachedPiModels } from './pi-models-cache';
+import {
+	advancePiModelsPoll,
+	initialPiModelsPollState,
+	isMissingProviderSubset,
+	type PiModelsPollState,
+} from './pi-models-catalog';
 import {
 	ensemblrQueryKeys,
 	getEnsemblrApi,
 	getEnsemblrApiOrNull,
 } from './query-keys';
 
+// Process-lifetime progress of the post-launch catalog settling poll. The Pi
+// models query is a singleton, so a single module-scoped state tracks it; each
+// `refetchInterval` evaluation advances it purely via `advancePiModelsPoll`.
+let piModelsPollState: PiModelsPollState = initialPiModelsPollState();
+
 /**
  * Query options for the Pi model catalog. Seeds from the localStorage cache so
  * the catalog is available instantly on launch (`initialData`), then refetches
  * in the background (`initialDataUpdatedAt: 0` marks the seed stale). A
  * transient empty result (pi not ready) falls back to the cache so the picker
- * is never blanked mid-session. Fresh results are persisted by the query-cache
- * subscription in `query-client.ts`.
+ * is never blanked mid-session. A partial cold-start listing that drops whole
+ * providers (Claude/GPT still resolving) also falls back to the richer cache,
+ * and `refetchInterval` keeps polling until the catalog settles so the picker
+ * heals without a manual visit to Settings. Fresh results are persisted by the
+ * query-cache subscription in `query-client.ts`.
  */
 export const piModelsQuery = queryOptions({
 	/** Seeds the catalog from the localStorage cache for an instant first paint. */
 	initialData: () => readCachedPiModels(),
 	initialDataUpdatedAt: 0,
-	/** Fetches the live Pi model catalog over IPC, falling back to the cache on an empty result. */
+	/**
+	 * Fetches the live Pi model catalog over IPC. Falls back to the cached
+	 * catalog on an empty result, and on a partial listing that merely drops
+	 * providers the cache already has (a cold-start race), so the picker is
+	 * never blanked by a transient sub-catalog.
+	 */
 	queryFn: async (): Promise<ListPiModelsResult> => {
 		const result = await profileElectronIpcCall(
 			{ channel: 'ensemblr:list-pi-models', usesDatabase: false },
 			() => getEnsemblrApi().listPiModels(),
 		);
+		const cached = readCachedPiModels();
 		if (result.models.length === 0) {
-			return readCachedPiModels() ?? result;
+			return cached ?? result;
+		}
+		if (cached && isMissingProviderSubset(result, cached)) {
+			return cached;
 		}
 		return result;
 	},
 	queryKey: ensemblrQueryKeys.piModels(),
+	// Poll after launch until the catalog settles, then stop. Repairs the case
+	// where the first listing is empty/partial (pi not fully ready) and nothing
+	// else would refetch it before the user navigates.
+	/** Advances the settling poll, returning the next delay or `false` to stop. */
+	refetchInterval: (query) => {
+		const { intervalMs, state } = advancePiModelsPoll(
+			query.state.data,
+			piModelsPollState,
+		);
+		piModelsPollState = state;
+		return intervalMs;
+	},
 	// Prettify display names by convention (Claude/GPT) for every consumer —
 	// composer picker, default/review selects, visibility list. `id` and
 	// `provider` stay raw so resolution, matching, and search are unaffected.
