@@ -32,6 +32,7 @@ import {
 	CHAT_TAB_LIMIT,
 	CHAT_TAB_LIMIT_ERROR_CODE,
 	type ChatTabWire,
+	type CloseChatTabRequest,
 	type ClosedChatTabEntryWire,
 	type ListChatTabsResult,
 	type OpenChatTabRequest,
@@ -42,6 +43,7 @@ import {
 	type WorkspaceGitDiffScope,
 } from '@/shared/ipc/contracts/workspace-git';
 import { decideActiveClose, selectNeighborTab } from './session-tab-close';
+import { resumeRestoredTerminalTab } from './terminal-tab-restore';
 
 /**
  * Cross-instance lock for the workspace-level bootstrap. The route shell owns
@@ -138,6 +140,11 @@ export function useSessionTabState({
 	const [terminalTitles, setTerminalTitles] = useState<Record<string, string>>(
 		{},
 	);
+	// Latest live title and native session id per terminal, mirrored into refs so
+	// the close path can stamp them onto the archived tab without re-subscribing.
+	// Keyed by backing terminal id.
+	const terminalTitlesRef = useRef<Record<string, string>>({});
+	const terminalSessionIdsRef = useRef<Record<string, string>>({});
 	// Agent-terminal busy state, inferred from the spinner glyph a harness
 	// animates in its OSC title. Owned by a workspace-scoped hook so the same
 	// signal drives both this tab strip and the workspace sidebar/card rows.
@@ -319,16 +326,16 @@ export function useSessionTabState({
 	]);
 
 	const closeMutation = useMutation({
-		mutationFn: (chatTabId: string) => closeChatTab({ chatTabId }),
+		mutationFn: (request: CloseChatTabRequest) => closeChatTab(request),
 		onError: invalidateChatTabs,
-		onMutate: (chatTabId: string) => {
+		onMutate: ({ chatTabId }: CloseChatTabRequest) => {
 			removeOpenChatTabFromCache({
 				chatTabId,
 				queryClient,
 				workspaceId,
 			});
 		},
-		onSuccess: (result, chatTabId) => {
+		onSuccess: (result, { chatTabId }) => {
 			// Drop per-chat overrides and the composer draft only for hard-deleted
 			// tabs; tabs marked closed remain restorable and must keep their
 			// model/thinking picks and unsent draft.
@@ -559,11 +566,46 @@ export function useSessionTabState({
 	);
 
 	const closeSessionTabAsync = useCallback(
-		async (chatTabId: string): Promise<CloseSessionTabHandlerResult> => {
-			await closeMutation.mutateAsync(chatTabId);
+		async (
+			chatTabId: string,
+			patch?: Pick<CloseChatTabRequest, 'metadataPatch' | 'title'>,
+		): Promise<CloseSessionTabHandlerResult> => {
+			await closeMutation.mutateAsync({ chatTabId, ...patch });
 			return { replacementChatTabId: null };
 		},
 		[closeMutation],
+	);
+
+	/**
+	 * For a closing terminal (harness) tab, kills its live PTY and returns the
+	 * close patch stamping the final title + native session id onto the archived
+	 * tab so the history row shows the conversation and a restore can reattach it.
+	 * Returns undefined for non-terminal tabs, which need no sidecar teardown.
+	 */
+	const closeTerminalSidecar = useCallback(
+		(
+			closing: SessionTabModel | undefined,
+		): Pick<CloseChatTabRequest, 'metadataPatch' | 'title'> | undefined => {
+			if (closing?.kind !== 'terminal' || !closing.terminalId) {
+				return undefined;
+			}
+			const terminalId = closing.terminalId;
+			void window.ensemblr?.killTerminalSession({ terminalId });
+			const title = terminalTitlesRef.current[terminalId];
+			const agentSessionId =
+				terminalSessionIdsRef.current[terminalId] ??
+				closing.agentSessionId ??
+				null;
+			// The PTY is gone once closed; drop its ref entries so the maps do not
+			// accumulate across a long-lived workspace of spawned/closed terminals.
+			delete terminalTitlesRef.current[terminalId];
+			delete terminalSessionIdsRef.current[terminalId];
+			return {
+				metadataPatch: { agentSessionId },
+				...(title ? { title } : {}),
+			};
+		},
+		[],
 	);
 
 	/** Fire-and-forget close used by the SessionTabState contract. */
@@ -591,14 +633,8 @@ export function useSessionTabState({
 			if (activeSession.id === chatTabId && nextSession) {
 				onSessionTabChange(nextSession.id);
 			}
-			// A terminal tab owns a live PTY: kill it so closing the tab also stops
-			// the harness process (harmless if it already exited on its own).
-			if (closing?.kind === 'terminal' && closing.terminalId) {
-				void window.ensemblr?.killTerminalSession({
-					terminalId: closing.terminalId,
-				});
-			}
-			void closeSessionTabAsync(chatTabId)
+			const closePatch = closeTerminalSidecar(closing);
+			void closeSessionTabAsync(chatTabId, closePatch)
 				.then((result) => {
 					if (result.replacementChatTabId) {
 						onSessionTabChange(result.replacementChatTabId);
@@ -608,7 +644,13 @@ export function useSessionTabState({
 					closingTabIdsRef.current.delete(chatTabId);
 				});
 		},
-		[activeSession.id, closeSessionTabAsync, onSessionTabChange, sessionTabs],
+		[
+			activeSession.id,
+			closeSessionTabAsync,
+			closeTerminalSidecar,
+			onSessionTabChange,
+			sessionTabs,
+		],
 	);
 
 	// Map of live terminal-tab PTYs to their tab id and harness label, so a
@@ -640,15 +682,26 @@ export function useSessionTabState({
 			if (!tab) {
 				return;
 			}
-			if (event.session.status !== 'running') {
-				closeSessionTab(tab.tabId);
-				return;
+			if (event.session.agentSessionId) {
+				terminalSessionIdsRef.current[event.terminalId] =
+					event.session.agentSessionId;
 			}
 			const liveTitle = resolveLiveTerminalTitle(
 				tab.harnessId,
 				tab.harnessLabel,
 				event.session,
 			);
+			if (liveTitle) {
+				terminalTitlesRef.current[event.terminalId] = liveTitle;
+			} else {
+				delete terminalTitlesRef.current[event.terminalId];
+			}
+			// A stopped/exited harness is archived as restorable; the refs above hold
+			// the final title and session id the close path stamps on the tab.
+			if (event.session.status !== 'running') {
+				closeSessionTab(tab.tabId);
+				return;
+			}
 			setTerminalTitles((previous) => {
 				const current = previous[event.terminalId];
 				if (liveTitle) {
@@ -780,17 +833,44 @@ export function useSessionTabState({
 		sessionTabs,
 	]);
 
-	/** Reopens a previously-closed tab and selects it when restoration succeeds. */
+	/**
+	 * Reopens a previously-closed tab and selects it. A restored terminal (harness)
+	 * tab has no live PTY, so it respawns the harness — reattaching the exact
+	 * conversation via its persisted native session id — and repoints the tab. If
+	 * the same conversation is already open, it focuses that tab instead of
+	 * spawning a second PTY against one shared session log.
+	 */
 	const restoreSessionTab = useCallback(
 		(chatTabId: string) => {
 			void restoreChatTab({ chatTabId }).then((result) => {
-				invalidateChatTabs();
-				if (result.tab) {
-					onSessionTabChange(result.tab.id);
+				const tab = result.tab;
+				if (!tab) {
+					invalidateChatTabs();
+					return;
 				}
+				if (tab.kind !== 'terminal') {
+					invalidateChatTabs();
+					onSessionTabChange(tab.id);
+					return;
+				}
+				resumeRestoredTerminalTab(tab, {
+					claimTab: (id) => autoResumedTabIdsRef.current.add(id),
+					closeTab: closeSessionTabAsync,
+					invalidate: invalidateChatTabs,
+					releaseTab: (id) => autoResumedTabIdsRef.current.delete(id),
+					selectTab: onSessionTabChange,
+					sessionTabs,
+					workspaceId,
+				});
 			});
 		},
-		[invalidateChatTabs, onSessionTabChange],
+		[
+			closeSessionTabAsync,
+			invalidateChatTabs,
+			onSessionTabChange,
+			sessionTabs,
+			workspaceId,
+		],
 	);
 
 	return {
@@ -903,6 +983,7 @@ function toTerminalSessionTab(
 ): SessionTabModel {
 	return {
 		...base,
+		agentSessionId: metadataString(tab.metadata.agentSessionId, '') || null,
 		harnessId: metadataString(tab.metadata.harnessId, ''),
 		harnessLabel: metadataString(tab.metadata.harnessLabel, base.label),
 		kind: 'terminal',
@@ -1016,7 +1097,7 @@ function deriveTabStatus(
 function toClosedSessionTabModel(
 	entry: ClosedChatTabEntryWire,
 ): SessionTabModel {
-	return {
+	const base: SessionTabBaseFields = {
 		chatTabId: entry.tab.id,
 		id: entry.tab.id,
 		// Prefer the short chat-title that was visible on the open tab. The
@@ -1028,6 +1109,19 @@ function toClosedSessionTabModel(
 		summary: entry.summaryPath,
 		updatedLabel: formatRelativeClosedAt(entry.closedAt),
 	};
+	// Terminal (harness) tabs keep their harness identity so the history row shows
+	// the harness icon and a restore can reattach the exact conversation. The
+	// backing PTY is gone once closed, so `terminalId` is cleared here: the stored
+	// metadata still carries the dead id, so blank it before building the model to
+	// keep "has a live PTY" (`terminalId.length > 0`) honest for history rows.
+	if (entry.tab.kind === 'terminal') {
+		const closedTab: ChatTabWire = {
+			...entry.tab,
+			metadata: { ...entry.tab.metadata, terminalId: '' },
+		};
+		return toTerminalSessionTab(base, closedTab);
+	}
+	return { ...base, kind: 'chat' };
 }
 
 const MINUTE_MS = 60_000;

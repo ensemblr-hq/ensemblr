@@ -9,10 +9,10 @@ interface ComposerFocusRequest {
 
 /**
  * The chat whose composer should grab focus next, or null when none is pending.
- * A surface that routes the user to a chat (the diff viewer's "Add to chat")
- * sets it; the composer that mounts for that tab consumes and clears it. The
- * incrementing `requestId` makes back-to-back requests for the same tab distinct
- * so the consuming effect re-fires.
+ * A surface that routes the user to a chat (opening a new chat tab, or the diff
+ * viewer's "Add to chat") sets it; the composer that mounts for that tab
+ * consumes and clears it. The incrementing `requestId` makes back-to-back
+ * requests for the same tab distinct so the consuming effect re-fires.
  */
 const composerFocusRequestAtom = atom<ComposerFocusRequest | null>(null);
 

@@ -1,6 +1,7 @@
 import {
 	HARNESS_REGISTRY,
 	type HarnessDefinition,
+	isSafeHarnessSessionId,
 } from '../../shared/agents/harness-registry.ts';
 import type {
 	AgentHarnessSummary,
@@ -30,19 +31,27 @@ export interface HarnessDetectionService {
 	 */
 	resolveLaunchCommand: (harnessId: string) => Promise<string | null>;
 	/**
-	 * Resolves the trusted resume command for an installed harness, reattaching
-	 * its most recent conversation in the cwd. Falls back to the fresh launch
-	 * command for harnesses without a cwd-scoped resume.
+	 * Resolves the trusted resume command for an installed harness. With a valid
+	 * `sessionId` it reattaches that exact conversation; without one it reattaches
+	 * the harness's most recent conversation in the cwd. Falls back to the fresh
+	 * launch command for harnesses without a resume. A malformed `sessionId` is
+	 * ignored (never spliced into the command), degrading to the cwd resume.
 	 * @param harnessId - The registry id to resume.
+	 * @param sessionId - Native harness session id to reattach exactly, if known.
 	 * @returns The command string, or null when the id is unknown or absent.
 	 */
-	resolveResumeCommand: (harnessId: string) => Promise<string | null>;
+	resolveResumeCommand: (
+		harnessId: string,
+		sessionId?: string,
+	) => Promise<string | null>;
 }
 
 /** Internal cache entry keyed on the resolved PATH string. */
 interface DetectionCacheEntry {
 	pathKey: string;
 	expiresAt: number;
+	/** Resolved binary name/path per harness id, or null when not installed. */
+	binaryById: Map<string, string | null>;
 	commandById: Map<string, string | null>;
 	resumeCommandById: Map<string, string | null>;
 }
@@ -118,10 +127,12 @@ export function createHarnessDetectionService({
 		if (cache && cache.pathKey === pathKey && cache.expiresAt > current) {
 			return cache;
 		}
+		const binaryById = new Map<string, string | null>();
 		const commandById = new Map<string, string | null>();
 		const resumeCommandById = new Map<string, string | null>();
 		for (const harness of registry) {
 			const binary = resolveHarnessBinary(harness, pathKey, commonDirs);
+			binaryById.set(harness.id, binary);
 			commandById.set(harness.id, binary ? harness.buildCommand(binary) : null);
 			resumeCommandById.set(
 				harness.id,
@@ -131,6 +142,7 @@ export function createHarnessDetectionService({
 			);
 		}
 		cache = {
+			binaryById,
 			commandById,
 			expiresAt: current + DETECTION_CACHE_TTL_MS,
 			pathKey,
@@ -156,12 +168,27 @@ export function createHarnessDetectionService({
 			const resolved = await resolveCommands();
 			return resolved.commandById.get(harnessId) ?? null;
 		},
-		resolveResumeCommand: async (harnessId): Promise<string | null> => {
-			if (!findHarness(harnessId)) {
+		resolveResumeCommand: async (
+			harnessId,
+			sessionId,
+		): Promise<string | null> => {
+			const harness = findHarness(harnessId);
+			if (!harness) {
 				return null;
 			}
 			const resolved = await resolveCommands();
-			return resolved.resumeCommandById.get(harnessId) ?? null;
+			const cwdResume = resolved.resumeCommandById.get(harnessId) ?? null;
+			if (!sessionId || !isSafeHarnessSessionId(sessionId)) {
+				return cwdResume;
+			}
+			const binary = resolved.binaryById.get(harnessId) ?? null;
+			if (!binary) {
+				return cwdResume;
+			}
+			return (harness.buildResumeCommand ?? harness.buildCommand)(
+				binary,
+				sessionId,
+			);
 		},
 	};
 }

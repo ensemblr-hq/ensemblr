@@ -24,6 +24,7 @@ export {
 	reorderChatTabs,
 	restoreChatTab,
 	restoreClosedChatTab,
+	setChatTabMetadata,
 	setRuntimeState,
 } from './chat-tab-repository.ts';
 export type { CheckpointRow } from './checkpoint-repository.ts';

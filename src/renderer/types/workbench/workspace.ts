@@ -191,6 +191,11 @@ export type SessionTabModel =
 			harnessId: string;
 			/** Display label of the launched harness (also the tab title). */
 			harnessLabel: string;
+			/**
+			 * Native harness session id for the conversation, when captured. Persisted
+			 * on close so a restored terminal tab can reattach the exact conversation.
+			 */
+			agentSessionId: string | null;
 			filePath?: null;
 			kind: 'terminal';
 			turnId?: null;

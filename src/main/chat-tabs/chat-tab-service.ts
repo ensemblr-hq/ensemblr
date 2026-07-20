@@ -21,8 +21,10 @@ import {
 	listOpenForWorkspace,
 	markClosed,
 	openChatTab,
+	renameChatTab,
 	reorderChatTabs,
 	restoreClosedChatTab,
+	setChatTabMetadata,
 } from '../storage/repositories/index.ts';
 
 /** Thrown when opening a sixth chat tab; carries a renderer-detectable marker. */
@@ -58,7 +60,11 @@ interface ClosedChatTabEntry {
 /** Public surface of the chat-tab service used by IPC handlers. */
 export interface ChatTabService {
 	bindPiSession: (input: { chatTabId: string; piSessionId: string }) => void;
-	closeTab: (input: { chatTabId: string }) => { deleted: boolean };
+	closeTab: (input: {
+		chatTabId: string;
+		metadataPatch?: Record<string, unknown>;
+		title?: string;
+	}) => { deleted: boolean };
 	listClosedWithSummary: (input: {
 		workspaceId: string;
 	}) => ClosedChatTabEntry[];
@@ -111,7 +117,7 @@ export function createChatTabService({
 			}
 			bindPiSession({ database, id: chatTabId, piSessionId });
 		},
-		closeTab: ({ chatTabId }) => {
+		closeTab: ({ chatTabId, metadataPatch, title }) => {
 			const database = requireChatTabDatabase();
 			const existing = getChatTabById({ database, id: chatTabId });
 			// Idempotent: treat unknown or already-closed tabs as no-ops so a
@@ -121,8 +127,15 @@ export function createChatTabService({
 				return { deleted: false };
 			}
 
-			// Non-chat tabs (file/diff/document/preview) carry no session history:
-			// they are exempt from the min-one rule and hard-deleted on close.
+			// Terminal (harness) tabs carry a resumable conversation, so they are
+			// archived as restorable rather than deleted.
+			if (existing.kind === 'terminal') {
+				archiveTerminalTab({ database, existing, metadataPatch, title });
+				return { deleted: false };
+			}
+
+			// Other non-chat tabs (file/diff/document/preview) carry no session
+			// history: they are exempt from the min-one rule and hard-deleted.
 			if (existing.kind !== 'chat') {
 				deleteChatTab({ database, id: chatTabId });
 				return { deleted: true };
@@ -225,6 +238,39 @@ export function createChatTabService({
 			return restoreClosedChatTab({ database, id: chatTabId });
 		},
 	};
+}
+
+/**
+ * Archives a terminal (harness) tab as restorable, stamping its final title and
+ * merging the metadata patch (e.g. the native session id) so the closed-history
+ * row shows the right label and a restore can reattach the exact conversation.
+ * @param options - The open database, the tab row, and the optional title/metadata.
+ */
+function archiveTerminalTab({
+	database,
+	existing,
+	metadataPatch,
+	title,
+}: {
+	database: DatabaseSync;
+	existing: ChatTabRow;
+	metadataPatch?: Record<string, unknown>;
+	title?: string;
+}): void {
+	const closed = markClosed({ database, id: existing.id });
+	if (!closed) {
+		throw new Error(`Failed to close chat tab ${existing.id}.`);
+	}
+	if (title?.trim()) {
+		renameChatTab({ database, id: existing.id, title: title.trim() });
+	}
+	if (metadataPatch) {
+		setChatTabMetadata({
+			database,
+			id: existing.id,
+			metadata: { ...existing.metadata, ...metadataPatch },
+		});
+	}
 }
 
 /** Reconciles a drag payload with the current open tab rows before persisting. */

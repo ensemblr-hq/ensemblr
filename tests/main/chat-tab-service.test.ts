@@ -406,6 +406,71 @@ test('closeTab hard-deletes non-chat tabs without entering history', (t) => {
 	);
 });
 
+test('closeTab archives terminal tabs as restorable, stamping title and metadata', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const terminalTab = fixture.service.openTab({
+		kind: 'terminal',
+		metadata: { harnessId: 'claude', terminalId: 'pty-1' },
+		title: 'Claude Code',
+		workspaceId: fixture.workspaceId,
+	});
+
+	// Terminal tabs are archived (restorable), not hard-deleted.
+	assert.deepEqual(
+		fixture.service.closeTab({
+			chatTabId: terminalTab.id,
+			metadataPatch: { agentSessionId: 'claude-abc' },
+			title: 'Fix the auth bug',
+		}),
+		{ deleted: false },
+	);
+
+	const stored = getChatTabById({
+		database: fixture.connection.database,
+		id: terminalTab.id,
+	});
+	assert.ok(stored);
+	assert.notEqual(stored?.closedAt, null);
+	assert.equal(stored?.title, 'Fix the auth bug');
+	assert.equal(stored?.metadata.agentSessionId, 'claude-abc');
+	// The original harness metadata is preserved through the merge.
+	assert.equal(stored?.metadata.harnessId, 'claude');
+
+	const closed = fixture.service.listTabs({
+		workspaceId: fixture.workspaceId,
+	}).closed;
+	assert.equal(closed.length, 1);
+	assert.equal(closed[0]?.id, terminalTab.id);
+});
+
+test('restoreTab reopens an archived terminal tab', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const terminalTab = fixture.service.openTab({
+		kind: 'terminal',
+		metadata: { harnessId: 'codex', terminalId: 'pty-2' },
+		title: 'OpenAI Codex',
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.closeTab({
+		chatTabId: terminalTab.id,
+		metadataPatch: { agentSessionId: 'codex-xyz' },
+	});
+
+	const restored = fixture.service.restoreTab({ chatTabId: terminalTab.id });
+	assert.equal(restored?.id, terminalTab.id);
+	assert.equal(restored?.closedAt, null);
+	assert.equal(restored?.metadata.agentSessionId, 'codex-xyz');
+	assert.equal(
+		fixture.service.listTabs({ workspaceId: fixture.workspaceId }).closed
+			.length,
+		0,
+	);
+});
+
 test('min-one rule counts chat tabs only, not open file tabs', (t) => {
 	const fixture = openFixture(t);
 
