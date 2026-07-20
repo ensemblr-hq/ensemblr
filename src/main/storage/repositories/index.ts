@@ -17,7 +17,6 @@ export {
 	getRuntimeState,
 	listClosedForWorkspace,
 	listOpenChatTabs,
-	listOpenChatTabsBySession,
 	listOpenForWorkspace,
 	markClosed,
 	openChatTab,

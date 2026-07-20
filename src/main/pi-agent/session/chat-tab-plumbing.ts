@@ -2,8 +2,6 @@ import type { DatabaseSync } from 'node:sqlite';
 import {
 	bindPiSession,
 	type ChatTabRow,
-	closeChatTab,
-	listOpenChatTabsBySession,
 	openChatTab,
 } from '../../storage/repositories/index.ts';
 
@@ -41,18 +39,4 @@ export function attachSessionToChatTab({
 			workspaceId,
 		},
 	});
-}
-
-/** Closes every still-open chat tab pointing at a stopped session. */
-export function closeOpenChatTabs({
-	database,
-	sessionId,
-}: {
-	database: DatabaseSync;
-	sessionId: string;
-}): void {
-	const tabs = listOpenChatTabsBySession({ database, sessionId });
-	for (const tab of tabs) {
-		closeChatTab({ database, id: tab.id });
-	}
 }

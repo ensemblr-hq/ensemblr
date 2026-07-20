@@ -20,7 +20,6 @@ import type {
 	PiSessionSnapshot,
 } from './pi-session-types.ts';
 import type { ActiveSessionMap } from './session/active-session.ts';
-import { closeOpenChatTabs } from './session/chat-tab-plumbing.ts';
 import {
 	createRuntimeEventHandler,
 	type PersistRuntimeEventPort,
@@ -270,7 +269,11 @@ export function createPiSessionLifecycle({
 			id: request.sessionId,
 			patch: { status: 'closed', closedAt: now().toISOString() },
 		});
-		closeOpenChatTabs({ database, sessionId: request.sessionId });
+		// Stopping a turn tears down the runtime child but must never touch the
+		// chat tab: tab lifecycle is owned solely by the chat-tab service (which
+		// enforces the minimum-one-open-tab rule and idempotent close). Dropping
+		// the session from the active map flips `runtimeOpen` false so the next
+		// submit into this tab transparently resumes the persisted session.
 		activeSessions.delete(request.sessionId);
 	};
 

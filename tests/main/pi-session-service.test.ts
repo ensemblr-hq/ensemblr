@@ -429,6 +429,42 @@ test('stopSession aborts the runtime and marks the turn aborted', async (t) => {
 	assert.equal(runtime.length, 0, 'fake adapter should drop closed sessions');
 });
 
+test('stopSession leaves the session chat tab open for resume', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database);
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'task', sessionId: snapshot.id });
+	const tabId = snapshot.openedTabs[0]?.id;
+	assert.ok(tabId, 'expected the opened session to have a chat tab');
+
+	await service.stopSession({ sessionId: snapshot.id });
+
+	const openTabs = listOpenChatTabs({
+		database: fixture.database,
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(
+		openTabs.length,
+		1,
+		'stopping a turn must not close the chat tab',
+	);
+	assert.equal(openTabs[0]?.id, tabId);
+	assert.equal(
+		getChatTabById({ database: fixture.database, id: tabId })?.piSessionId,
+		snapshot.id,
+	);
+	assert.equal(
+		getPiSessionById({ database: fixture.database, id: snapshot.id })?.status,
+		'closed',
+		'the runtime is gone so the persisted session reads closed',
+	);
+});
+
 test('stopSession aborts without waiting for slow summary flushing', async (t) => {
 	const fixture = openFixture(t);
 	const sessionSummaryWriter: SessionSummaryWriter = {
