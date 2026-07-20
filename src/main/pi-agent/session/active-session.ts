@@ -1,3 +1,4 @@
+import type { PiExecutableSnapshot } from '../../pi-runtime';
 import type {
 	PiSessionBranchRow,
 	PiSessionRow,
@@ -11,6 +12,8 @@ export interface ActiveSession {
 	agentResponsePendingSummary: boolean;
 	branch: PiSessionBranchRow;
 	chatTabId: string;
+	/** Resolved Pi executable, kept so idle-time naming retries can spawn a helper session. */
+	executable: PiExecutableSnapshot;
 	piRuntimeSession: PiAgentSession;
 	row: PiSessionRow;
 	summaryQueued: boolean;

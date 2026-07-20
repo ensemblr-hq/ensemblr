@@ -62,14 +62,12 @@ function createReadyExecutable(): PiExecutableSnapshot {
 function createService(
 	database: DatabaseSync,
 	options: {
-		chatTitleTimeoutMs?: number;
 		sessionSummaryWriter?: SessionSummaryWriter;
 	} = {},
 ) {
 	const fake = createFakePiAgentAdapter();
 	const piAgentClient = createPiAgentClient({ adapter: fake.adapter });
 	const service = createPiSessionService({
-		chatTitleTimeoutMs: options.chatTitleTimeoutMs,
 		databaseService: {
 			close: () => undefined,
 			getConnection: () => ({ database, path: ':memory:', schemaVersion: 5 }),
@@ -77,28 +75,10 @@ function createService(
 			open: () => ({ path: ':memory:', schemaVersion: 5, status: 'ok' }),
 		},
 		piAgentClient,
+		queueNaming: () => undefined,
 		sessionSummaryWriter: options.sessionSummaryWriter,
 	});
 	return { fake, service };
-}
-
-async function waitForTabTitle({
-	database,
-	title,
-	workspaceId,
-}: {
-	database: DatabaseSync;
-	title: string;
-	workspaceId: string;
-}): Promise<void> {
-	for (let attempt = 0; attempt < 40; attempt += 1) {
-		const tabTitle = listOpenChatTabs({ database, workspaceId })[0]?.title;
-		if (tabTitle === title) {
-			return;
-		}
-		await delay(5);
-	}
-	assert.equal(listOpenChatTabs({ database, workspaceId })[0]?.title, title);
 }
 
 async function waitForSummaryCalls(
@@ -161,32 +141,6 @@ test('openSession binds an existing chat tab without opening a duplicate', async
 	assert.equal(tabs[0]?.id, tab.id);
 	assert.equal(tabs[0]?.piSessionId, snapshot.id);
 	assert.equal(tabs[0]?.title, 'Existing tab');
-});
-
-test('chat title timeout uses first prompt words as fallback', async (t) => {
-	const fixture = openFixture(t);
-	const { service } = createService(fixture.database, {
-		chatTitleTimeoutMs: 1,
-	});
-
-	const snapshot = await service.openSession({
-		executable: createReadyExecutable(),
-		initialPrompt: 'Fix flaky tests in setup diagnostics now',
-		workspaceCwd: '/tmp/ensemblr/svc/ws',
-		workspaceId: fixture.workspaceId,
-	});
-
-	await waitForTabTitle({
-		database: fixture.database,
-		title: 'Fix flaky tests in setup',
-		workspaceId: fixture.workspaceId,
-	});
-
-	const events = listEventsByBranch({
-		branchId: snapshot.branchId,
-		database: fixture.database,
-	});
-	assert.ok(events.some((event) => event.eventType === 'metadata'));
 });
 
 test('openSession persists and launches with a native Pi session id', async (t) => {

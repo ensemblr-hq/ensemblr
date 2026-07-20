@@ -95,6 +95,17 @@ export function createRenameWorkspaceService({
 				});
 			}
 
+			// Race guard for automatic branch-naming: re-check the placeholder gate
+			// against the freshly-read row, synchronously before any await, so a
+			// user rename that landed since the caller's pre-flight check wins and
+			// this attempt no-ops instead of clobbering it.
+			if (
+				request.requirePlaceholderName &&
+				!placeholderRenameEligible(source.metadataJson)
+			) {
+				return noOpResult(source, now);
+			}
+
 			const nextName = normalizeName(request.name, source.name);
 			const nameDiagnostic = validateWorkspaceName(nextName);
 			if (nameDiagnostic) {
@@ -339,6 +350,19 @@ function updateWorkspaceRow({
 			timestamp,
 		});
 	});
+}
+
+/**
+ * Tests whether a workspace still qualifies for an automatic placeholder
+ * rename: it must carry the `placeholderName` flag and never have been renamed.
+ * @param metadataJson - The workspace's stored metadata JSON.
+ * @returns True when an auto rename may proceed.
+ */
+function placeholderRenameEligible(metadataJson: string): boolean {
+	const metadata = parseMetadata(metadataJson);
+	return (
+		metadata.placeholderName === true && typeof metadata.renamedAt !== 'string'
+	);
 }
 
 /** Stamps `metadata.renamedAt` so consumers can see when the rename happened. */

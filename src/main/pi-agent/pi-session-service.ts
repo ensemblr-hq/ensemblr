@@ -33,13 +33,9 @@ import {
 } from '../storage/repositories/pi-session-repository.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import {
-	CHAT_TITLE_TIMEOUT_MS,
-	queueChatTitleGeneration,
-} from './pi-chat-title-service.ts';
-import {
 	createPiSessionLifecycle,
 	type OpenPiSessionRequest,
-	type QueueChatTitlePort,
+	type QueueNamingPort,
 	type StopPiSessionRequest,
 	type SubmitPiPromptRequest,
 	type SubmitPiPromptResult,
@@ -72,12 +68,11 @@ export type {
 interface PiSessionServiceOptions {
 	/** Override for tests; defaults to the git-backed capture (ADR 0012). */
 	captureCheckpoint?: CheckpointCapturePort;
-	chatTitleTimeoutMs?: number;
 	databaseService: EnsemblrDatabaseService;
 	eventSink?: PiSessionEventSink;
 	piAgentClient: PiAgentClient;
-	/** Optional post-first-turn auto branch-naming queue (best-effort). */
-	queueBranchName?: QueueChatTitlePort;
+	/** Unified title + branch naming queue, fired at open and each turn-idle. */
+	queueNaming: QueueNamingPort;
 	sessionSummaryWriter?: SessionSummaryWriter;
 	now?: () => Date;
 }
@@ -108,16 +103,15 @@ export interface PiSessionService {
  * Composes three collaborators wired by dependency injection:
  *   - {@link createPiSessionLifecycle} — open/submit/stop/runtime-event state machine
  *   - {@link persistRuntimeEvent} — discriminant mapping into `pi_session_events`
- *   - {@link queueChatTitleGeneration} — best-effort LLM tab title generation
+ *   - `queueNaming` — unified best-effort LLM tab-title + branch naming
  *   - `sessionSummaryWriter` — optional live summary updates after agent turns
  */
 export function createPiSessionService({
 	captureCheckpoint = createCheckpointCapture(),
-	chatTitleTimeoutMs = CHAT_TITLE_TIMEOUT_MS,
 	databaseService,
 	eventSink,
 	piAgentClient,
-	queueBranchName,
+	queueNaming,
 	sessionSummaryWriter,
 	now = () => new Date(),
 }: PiSessionServiceOptions): PiSessionService {
@@ -133,13 +127,11 @@ export function createPiSessionService({
 
 	const lifecycle = createPiSessionLifecycle({
 		captureCheckpoint,
-		chatTitleTimeoutMs,
 		eventSink,
 		now,
 		persistRuntimeEvent,
 		piAgentClient,
-		queueBranchName,
-		queueChatTitle: queueChatTitleGeneration,
+		queueNaming,
 		requireDatabase: requireSessionDatabase,
 		sessionSummaryWriter,
 	});

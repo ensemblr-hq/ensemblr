@@ -20,6 +20,13 @@ export interface SummaryQueue {
 		database: DatabaseSync;
 		sessionId: string;
 	}) => Promise<void>;
+	/**
+	 * Awaits every in-flight drain, including those for sessions already removed
+	 * from the active map (e.g. a `stopSession` that backgrounded its flush).
+	 * App shutdown calls this so a stopped session's final summary lands before
+	 * the process exits.
+	 */
+	awaitInFlight: () => Promise<void>;
 }
 
 /**
@@ -187,5 +194,16 @@ export function createSummaryQueue({
 		await startDrain({ database, sessionId });
 	};
 
-	return { flushSummaryForSession, queueSummaryAfterAgentResponse };
+	/** Awaits all currently in-flight drains, looping until the map settles. */
+	const awaitInFlight = async (): Promise<void> => {
+		while (inFlightDrains.size > 0) {
+			await Promise.allSettled([...inFlightDrains.values()]);
+		}
+	};
+
+	return {
+		awaitInFlight,
+		flushSummaryForSession,
+		queueSummaryAfterAgentResponse,
+	};
 }

@@ -29,6 +29,8 @@ export default defineConfig({
 			'tests/renderer/**/*.test.{ts,tsx}',
 			'tests/shared/**/*.test.ts',
 			'tests/main/branch-name-slug.test.ts',
+			'tests/main/sanitize-title.test.ts',
+			'tests/main/parse-naming-response.test.ts',
 			'tests/main/launch-env.test.ts',
 			'tests/main/request-schemas.test.ts',
 			'tests/main/external-links-policy.test.ts',

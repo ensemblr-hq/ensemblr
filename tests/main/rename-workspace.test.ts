@@ -312,6 +312,96 @@ test('rename is a no-op when the inputs match the current state', async (t) => {
 	assert.equal(result.workspace?.branchName, workspace.branchName);
 });
 
+function setWorkspaceMetadata(
+	harness: Harness,
+	id: string,
+	metadata: Record<string, unknown>,
+): void {
+	const database = harness.databaseService.getConnection()?.database;
+	if (!database) {
+		throw new Error('database unavailable');
+	}
+	database
+		.prepare('UPDATE workspaces SET metadata_json = ? WHERE id = ?')
+		.run(JSON.stringify(metadata), id);
+}
+
+test('requirePlaceholderName no-ops (no branch rename) when the workspace is not a placeholder', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, {});
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	const result = await service.rename({
+		name: 'mozart-suggested',
+		requirePlaceholderName: true,
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.name, workspace.name);
+	const row = workspaceRow(harness, workspace.id);
+	assert.equal(row?.name, workspace.name);
+	assert.equal(row?.branchName, workspace.branchName);
+	assert.equal(branchExists(harness.repositoryPath, 'bach'), true);
+	assert.equal(branchExists(harness.repositoryPath, 'mozart-suggested'), false);
+});
+
+test('requirePlaceholderName no-ops when the workspace was already renamed', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, {
+		placeholderName: true,
+		renamedAt: '2026-06-08T11:00:00.000Z',
+	});
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	const result = await service.rename({
+		name: 'mozart-suggested',
+		requirePlaceholderName: true,
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.name, workspace.name);
+	assert.equal(branchExists(harness.repositoryPath, 'bach'), true);
+});
+
+test('requirePlaceholderName renames a placeholder workspace and stamps renamedAt', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, { placeholderName: true });
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	const result = await service.rename({
+		name: 'add-dark-mode',
+		requirePlaceholderName: true,
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.name, 'add-dark-mode');
+	assert.equal(result.workspace?.branchName, 'add-dark-mode');
+	assert.equal(branchExists(harness.repositoryPath, 'add-dark-mode'), true);
+	const row = workspaceRow(harness, workspace.id);
+	const metadata = JSON.parse(row?.metadataJson ?? '{}') as {
+		renamedAt?: unknown;
+	};
+	assert.equal(typeof metadata.renamedAt, 'string');
+});
+
 test('rename rejects an unknown workspace id', async (t) => {
 	const harness = createHarness(t);
 	const service = createRenameWorkspaceService({
