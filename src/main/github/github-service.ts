@@ -3,7 +3,7 @@ import path from 'node:path';
 import {
 	extractPullRequestNumber,
 	extractPullRequestUrl,
-} from '../../shared/github';
+} from '../../shared/github.ts';
 import type {
 	CommitWorkspaceChangesRequest,
 	CommitWorkspaceChangesResult,
@@ -155,6 +155,34 @@ export function createGithubService({
 	}
 
 	/**
+	 * Resolves the remote branch name a local branch pushes to, from its upstream
+	 * `merge` ref. `gh pr view` with no arg matches PRs by the *local* branch name,
+	 * so a local branch that tracks a differently-named remote branch (common with
+	 * auto-generated worktree names) resolves to no PR. Passing the remote name
+	 * explicitly fixes the match.
+	 * @param cwd - Workspace working directory.
+	 * @param branchName - Current local branch name.
+	 * @returns The remote head branch name, or null when there is no upstream.
+	 */
+	async function resolveRemoteHeadRef(
+		cwd: string,
+		branchName: string,
+	): Promise<string | null> {
+		const result = await run('git', cwd, [
+			'config',
+			'--get',
+			`branch.${branchName}.merge`,
+		]);
+		if (result.status !== 'success') {
+			return null;
+		}
+		const mergeRef = result.stdout.trim();
+		return mergeRef.startsWith('refs/heads/')
+			? mergeRef.slice('refs/heads/'.length)
+			: null;
+	}
+
+	/**
 	 * Confirms a resolved PR belongs to the current branch by checking its head
 	 * commit is reachable from HEAD. `gh pr view` matches PRs by head-ref name
 	 * alone, so a reused or recreated branch name can resolve to a stale
@@ -216,10 +244,14 @@ export function createGithubService({
 		| { ok: true; snapshot: GithubPullRequestSnapshotWire }
 		| { error: GithubFailure; noPullRequest: boolean; ok: false }
 	> {
-		const [branchSync, viewResult] = await Promise.all([
-			readBranchSync(cwd),
-			run('gh', cwd, ['pr', 'view', '--json', PR_VIEW_JSON_FIELDS]),
-		]);
+		const branchSync = await readBranchSync(cwd);
+		const headRef = branchSync?.branchName
+			? await resolveRemoteHeadRef(cwd, branchSync.branchName)
+			: null;
+		const viewArgs = headRef
+			? ['pr', 'view', headRef, '--json', PR_VIEW_JSON_FIELDS]
+			: ['pr', 'view', '--json', PR_VIEW_JSON_FIELDS];
+		const viewResult = await run('gh', cwd, viewArgs);
 		if (viewResult.status !== 'success') {
 			const failure = classifyCommandFailure(
 				viewResult,

@@ -217,13 +217,13 @@ test('parseReviewThreads keeps resolution state', () => {
 							body: 'Fix this',
 							createdAt: '2026-06-10T10:00:00Z',
 							id: 'RC_1',
-							line: 12,
-							path: 'src/app.ts',
 							url: 'https://github.com/o/r/pull/7#discussion_r1',
 						},
 					],
 				},
 				isResolved: false,
+				line: 12,
+				path: 'src/app.ts',
 			},
 		],
 	});
@@ -372,6 +372,76 @@ test('getPullRequestSnapshot returns no-PR snapshot when gh finds none', async (
 	assert.equal(result.error, undefined);
 	assert.equal(result.snapshot?.pullRequest, null);
 	assert.equal(result.snapshot?.branchSync?.branchName, 'feature/x');
+});
+
+test('getPullRequestSnapshot queries gh by the remote head branch, not the local name', async () => {
+	const { calls, service } = createService((request) => {
+		if (request.command === 'git') {
+			if (request.args?.[0] === 'rev-parse') {
+				return buildResult({ stdout: 'local/worktree-name\n' });
+			}
+			if (request.args?.[0] === 'config') {
+				return buildResult({ stdout: 'refs/heads/remote/pr-branch\n' });
+			}
+			return buildResult({ stdout: '0\t0\n' });
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+			return buildResult({ stdout: PR_VIEW_JSON });
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.pullRequest?.number, 7);
+	const configCall = calls.find((call) => call.args?.[0] === 'config');
+	assert.deepEqual(configCall?.args, [
+		'config',
+		'--get',
+		'branch.local/worktree-name.merge',
+	]);
+	const viewCall = calls.find(
+		(call) => call.command === 'gh' && call.args?.[1] === 'view',
+	);
+	assert.deepEqual(viewCall?.args?.slice(0, 3), [
+		'pr',
+		'view',
+		'remote/pr-branch',
+	]);
+});
+
+test('getPullRequestSnapshot falls back to the no-arg gh query when no upstream is set', async () => {
+	const { calls, service } = createService((request) => {
+		if (request.command === 'git') {
+			if (request.args?.[0] === 'rev-parse') {
+				return buildResult({ stdout: 'feature/x\n' });
+			}
+			if (request.args?.[0] === 'config') {
+				return buildResult({ exitCode: 1, status: 'failure' });
+			}
+			return buildResult({ stdout: '0\t0\n' });
+		}
+		if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+			return buildResult({ stdout: PR_VIEW_JSON });
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.equal(result.snapshot?.pullRequest?.number, 7);
+	const viewCall = calls.find(
+		(call) => call.command === 'gh' && call.args?.[1] === 'view',
+	);
+	assert.equal(viewCall?.args?.[2], '--json');
 });
 
 test('getPullRequestSnapshot caches and serves fresh snapshots', async () => {
