@@ -431,7 +431,7 @@ export function createTerminalService({
 	async function refreshConversationInfo(
 		session: TrackedSession,
 	): Promise<void> {
-		if (!session.sessionLogSource) {
+		if (!session.sessionLogSource || session.snapshot.status !== 'running') {
 			return;
 		}
 		const info = await readConversationInfo(
@@ -439,9 +439,6 @@ export function createTerminalService({
 			session.cwd,
 			{ since: session.conversationTitleSince ?? undefined },
 		);
-		if (session.snapshot.status !== 'running') {
-			return;
-		}
 		const patch = conversationInfoPatch(session.snapshot, info);
 		if (!patch) {
 			return;

@@ -451,17 +451,22 @@ function claudeProjectSlug(cwd: string): string {
  */
 async function listJsonlByMtime(directory: string): Promise<string[]> {
 	const entries = await readdir(directory, { withFileTypes: true });
-	const files: Array<{ mtimeMs: number; path: string }> = [];
-	for (const entry of entries) {
-		if (!entry.isFile() || !entry.name.endsWith('.jsonl')) {
-			continue;
-		}
-		const full = path.join(directory, entry.name);
-		try {
-			const stats = await stat(full);
-			files.push({ mtimeMs: stats.mtimeMs, path: full });
-		} catch {}
-	}
+	const jsonlPaths = entries
+		.filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
+		.map((entry) => path.join(directory, entry.name));
+	const stated = await Promise.all(
+		jsonlPaths.map(async (full) => {
+			try {
+				const stats = await stat(full);
+				return { mtimeMs: stats.mtimeMs, path: full };
+			} catch {
+				return null;
+			}
+		}),
+	);
+	const files = stated.filter(
+		(entry): entry is { mtimeMs: number; path: string } => entry !== null,
+	);
 	files.sort((a, b) => b.mtimeMs - a.mtimeMs);
 	return files.slice(0, MAX_SESSION_CANDIDATES).map((file) => file.path);
 }
