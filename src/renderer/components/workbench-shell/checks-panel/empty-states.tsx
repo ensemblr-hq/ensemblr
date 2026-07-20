@@ -14,6 +14,7 @@ export { ChecksEmptyMessage };
 export function ChecksNoPullRequestState({
 	canCreatePullRequest = false,
 	children,
+	commentsSection,
 	onCommitAndPush,
 	onCreatePullRequest,
 	state,
@@ -27,6 +28,8 @@ export function ChecksNoPullRequestState({
 	 */
 	canCreatePullRequest?: boolean;
 	children?: ReactNode;
+	/** Comments section shown when the workspace has local review comments. */
+	commentsSection?: ReactNode;
 	onCommitAndPush?: () => void;
 	onCreatePullRequest?: () => void;
 	state: Extract<ChecksPanelState, { hasPullRequest: false }>;
@@ -68,6 +71,8 @@ export function ChecksNoPullRequestState({
 						/>
 					) : null}
 				</section>
+
+				{commentsSection}
 
 				{todoSection ?? (
 					<section className='flex min-w-0 flex-col gap-1.5'>

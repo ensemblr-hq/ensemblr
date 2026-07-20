@@ -18,10 +18,15 @@ export {
 	composerValueAtomFamily,
 	forgetComposerDraft,
 } from './composer-drafts';
+export {
+	useConsumeComposerFocusRequest,
+	useRequestComposerFocus,
+} from './composer-focus';
 export type { ComposerInsertRequest } from './composer-insert';
 export {
 	useComposerInsert,
 	useComposerInsertConsumer,
+	useComposerInsertToChat,
 } from './composer-insert';
 export type { ComposerSubmitRequest } from './composer-submit';
 export {

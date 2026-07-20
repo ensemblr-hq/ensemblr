@@ -436,7 +436,7 @@ export function useSessionTabState({
 				const result = await openAuxiliaryTabMutation.mutateAsync({
 					kind: 'diff',
 					metadata: { turnId },
-					title: `Diff: ${label}`,
+					title: label,
 				});
 				return result.tab ? { chatTabId: result.tab.id } : null;
 			} catch {
@@ -611,13 +611,17 @@ function basenameOf(path: string): string {
 	return trimmed.split('/').at(-1) ?? trimmed;
 }
 
-/** Tab title for a file diff, tagging the short hash when scoped to a commit. */
+/**
+ * Tab title for a file diff, tagging the short hash when scoped to a commit. The
+ * diff glyph on the tab already signals the kind, so the title is just the file
+ * name (no "Diff:" prefix).
+ */
 function diffTabTitle(filePath: string, scope?: WorkspaceGitDiffScope): string {
 	const name = basenameOf(filePath);
 	if (scope?.kind === 'commit') {
-		return `Diff: ${name} (${scope.commitHash.slice(0, 7)})`;
+		return `${name} (${scope.commitHash.slice(0, 7)})`;
 	}
-	return `Diff: ${name}`;
+	return name;
 }
 
 /** Maps an open chat-tab wire row into a renderer-facing `SessionTabModel`. */

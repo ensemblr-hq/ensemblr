@@ -124,7 +124,7 @@ type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
 };
 
 /** Highlighted code: the themed token grid plus resolved foreground and background colors. */
-interface TokenizedCode {
+export interface TokenizedCode {
 	tokens: ThemedToken[][];
 	fg: string;
 	bg: string;
@@ -221,7 +221,7 @@ const createRawTokens = (code: string): TokenizedCode => ({
  * @param callback - Optional subscriber invoked once async highlighting resolves
  * @returns The cached tokens, or null while highlighting runs in the background
  */
-const highlightCode = (
+export const highlightCode = (
 	code: string,
 	language: BundledLanguage,
 	theme: BundledTheme,
