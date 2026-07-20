@@ -6,6 +6,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { type RenderResult, render } from '@testing-library/react';
 import type { ReactElement } from 'react';
+import { TooltipProvider } from '@/renderer/components/ui/tooltip';
 
 /** A QueryClient tuned for tests: no retries, no background refetch churn. */
 export function createTestQueryClient(): QueryClient {
@@ -23,7 +24,9 @@ export function renderWithProviders(
 ): RenderResult & { client: QueryClient } {
 	const client = options.client ?? createTestQueryClient();
 	const result = render(
-		<QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+		<QueryClientProvider client={client}>
+			<TooltipProvider>{ui}</TooltipProvider>
+		</QueryClientProvider>,
 	);
 	return { ...result, client };
 }

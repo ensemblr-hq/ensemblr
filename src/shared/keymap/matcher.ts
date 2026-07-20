@@ -116,16 +116,31 @@ function isAsciiLetter(key: string): boolean {
 }
 
 /**
- * Matches the binding's key against the event. For alt+<letter> bindings we
- * compare the physical `event.code` (`KeyP`) instead of `event.key`, because
- * macOS composes Option+<letter> into a glyph (⌥P → "π") that would never equal
- * the bound letter. Falls back to `key` when `code` is absent (synthetic events)
- * or the binding isn't an alt+letter combo.
+ * Physical `event.code` for punctuation bindings whose printed character shifts
+ * (Shift+`]` becomes `}`), so their `event.key` cannot be matched reliably. The
+ * code is layout- and shift-stable, mirroring the alt+letter handling below.
+ */
+const PUNCTUATION_CODE_BY_KEY: Record<string, string> = {
+	']': 'BracketRight',
+	'[': 'BracketLeft',
+};
+
+/**
+ * Matches the binding's key against the event. For alt+<letter> and shiftable
+ * punctuation bindings we compare the physical `event.code` (`KeyP`,
+ * `BracketRight`) instead of `event.key`, because macOS composes Option+<letter>
+ * into a glyph (⌥P → "π") and Shift mangles punctuation (⇧] → "}") — neither
+ * would equal the bound key. Falls back to `key` when `code` is absent
+ * (synthetic events) or the binding needs no stabilization.
  */
 function keyMatches(binding: Binding, event: KeyboardEventLike): boolean {
 	const requiresAlt = (binding.modifiers ?? []).includes('alt');
 	if (requiresAlt && event.code && isAsciiLetter(binding.key)) {
 		return event.code === `Key${binding.key.toUpperCase()}`;
+	}
+	const punctuationCode = PUNCTUATION_CODE_BY_KEY[binding.key];
+	if (punctuationCode && event.code) {
+		return event.code === punctuationCode;
 	}
 	return event.key.toLowerCase() === binding.key.toLowerCase();
 }

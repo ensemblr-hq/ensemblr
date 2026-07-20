@@ -107,6 +107,73 @@ describe('matchesShortcut — non-alt bindings unaffected', () => {
 	});
 });
 
+describe('matchesShortcut — tab navigation', () => {
+	test('⌘⇧] matches next-tab via physical code (shifted key is "}")', () => {
+		expect(
+			matchesShortcut(
+				'tab.next',
+				event({
+					key: '}',
+					code: 'BracketRight',
+					metaKey: true,
+					shiftKey: true,
+				}),
+			),
+		).toBe(true);
+	});
+
+	test('⌘⇧[ matches prev-tab via physical code (shifted key is "{")', () => {
+		expect(
+			matchesShortcut(
+				'tab.prev',
+				event({ key: '{', code: 'BracketLeft', metaKey: true, shiftKey: true }),
+			),
+		).toBe(true);
+	});
+
+	test('the wrong bracket does not match', () => {
+		expect(
+			matchesShortcut(
+				'tab.next',
+				event({ key: '{', code: 'BracketLeft', metaKey: true, shiftKey: true }),
+			),
+		).toBe(false);
+	});
+
+	test('bracket without shift does not match the shifted binding', () => {
+		expect(
+			matchesShortcut(
+				'tab.next',
+				event({ key: ']', code: 'BracketRight', metaKey: true }),
+			),
+		).toBe(false);
+	});
+
+	test('falls back to key when code is absent (synthetic events)', () => {
+		expect(
+			matchesShortcut(
+				'tab.next',
+				event({ key: ']', metaKey: true, shiftKey: true }),
+			),
+		).toBe(true);
+	});
+
+	test('⌘1 matches select-tab-by-index', () => {
+		expect(
+			matchesShortcut(
+				'tab.selectByIndex',
+				event({ key: '1', code: 'Digit1', metaKey: true }),
+			),
+		).toBe(true);
+	});
+
+	test('bare digit does not match the mod-bound index shortcut', () => {
+		expect(
+			matchesShortcut('tab.selectByIndex', event({ key: '1', code: 'Digit1' })),
+		).toBe(false);
+	});
+});
+
 describe('matchesShortcut — composer submit', () => {
 	test('plain Enter matches composer.submit, not the mod variant', () => {
 		const e = event({ key: 'Enter', code: 'Enter' });

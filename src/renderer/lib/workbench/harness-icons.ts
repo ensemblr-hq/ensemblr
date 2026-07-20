@@ -11,7 +11,6 @@ addCollection(logosIcons);
 const HARNESS_ICON_BY_ID: Record<string, string> = {
 	claude: 'logos:claude-icon',
 	codex: 'logos:openai-icon',
-	gemini: 'logos:google-gemini',
 	vibe: 'logos:mistral-ai-icon',
 };
 
