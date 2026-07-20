@@ -35,12 +35,16 @@ export interface LaunchAgentHarnessResult {
 /**
  * Request to resume a harness in the terminal tab that owns it, respawning its
  * conversation after an app restart. `chatTabId` identifies the tab whose stored
- * `terminalId` metadata is rewritten to the freshly spawned session.
+ * `terminalId` metadata is rewritten to the freshly spawned session. When
+ * `fresh` is true the tab respawns with the harness's launch command (a new
+ * conversation) instead of its cwd-scoped resume command; used for the extra
+ * tabs of a harness so two instances never resume into one shared session log.
  */
 export interface ResumeAgentHarnessRequest {
 	chatTabId: string;
 	harnessId: string;
 	workspaceId: string;
+	fresh?: boolean;
 }
 
 /** Agent-harness slice of the `window.ensemblr` API. */

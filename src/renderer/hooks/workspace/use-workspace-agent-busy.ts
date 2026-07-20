@@ -19,7 +19,9 @@ interface WorkspaceAgentBusyState {
 /**
  * Reports whether any agent-harness terminal attached to `workspaceId` is
  * currently working, inferred from the spinner glyph the harness animates in its
- * OSC window title. This is the terminal-side analogue of `useWorkspacePiBusy`:
+ * OSC window title or, for spinner-less harnesses (Vibe), from the main-process
+ * `agentBusy` flag derived from the session log. This is the terminal-side
+ * analogue of `useWorkspacePiBusy`:
  * it subscribes to terminal lifecycle broadcasts (which carry `workspaceId` and
  * the session `kind`) so an inactive, non-focused sidebar row still lights up
  * while its agent is busy. Each spinner frame re-emits the title, so a per-
@@ -55,8 +57,11 @@ export function useWorkspaceAgentBusy(
 		});
 	}, []);
 
-	/** Marks a terminal busy until its harness stops animating for the idle window. */
-	const markBusy = useCallback(
+	/**
+	 * Marks a terminal busy from the OSC-title spinner, which re-emits per frame, so
+	 * an idle timer keeps it lit between frames and clears it when frames stop.
+	 */
+	const markSpinnerBusy = useCallback(
 		(terminalId: string) => {
 			setBusyTerminalIds((previous) =>
 				previous.has(terminalId) ? previous : new Set(previous).add(terminalId),
@@ -74,6 +79,23 @@ export function useWorkspaceAgentBusy(
 		[clearBusy],
 	);
 
+	/**
+	 * Marks a terminal busy from the main-process `agentBusy` level (Vibe), which is
+	 * authoritative: main broadcasts only the rising and falling edges, so this holds
+	 * the flag without an idle timer until a later event clears it.
+	 */
+	const markLevelBusy = useCallback((terminalId: string) => {
+		const timers = idleTimersRef.current;
+		const existing = timers.get(terminalId);
+		if (existing) {
+			clearTimeout(existing);
+			timers.delete(terminalId);
+		}
+		setBusyTerminalIds((previous) =>
+			previous.has(terminalId) ? previous : new Set(previous).add(terminalId),
+		);
+	}, []);
+
 	useEffect(() => {
 		const timers = idleTimersRef.current;
 		setBusyTerminalIds(new Set());
@@ -81,14 +103,19 @@ export function useWorkspaceAgentBusy(
 			if (event.workspaceId !== workspaceId || event.session.kind !== 'agent') {
 				return;
 			}
-			if (
-				event.session.status !== 'running' ||
-				!isHarnessTitleBusy(event.session.title)
-			) {
+			if (event.session.status !== 'running') {
 				clearBusy(event.terminalId);
 				return;
 			}
-			markBusy(event.terminalId);
+			if (event.session.agentBusy) {
+				markLevelBusy(event.terminalId);
+				return;
+			}
+			if (isHarnessTitleBusy(event.session.title)) {
+				markSpinnerBusy(event.terminalId);
+				return;
+			}
+			clearBusy(event.terminalId);
 		});
 		return () => {
 			unsubscribe?.();
@@ -97,7 +124,7 @@ export function useWorkspaceAgentBusy(
 			}
 			timers.clear();
 		};
-	}, [clearBusy, markBusy, workspaceId]);
+	}, [clearBusy, markLevelBusy, markSpinnerBusy, workspaceId]);
 
 	return { busyTerminalIds, isBusy: busyTerminalIds.size > 0 };
 }

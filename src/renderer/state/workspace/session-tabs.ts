@@ -27,6 +27,7 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { SessionTabState } from '@/renderer/types/workbench-shell';
+import { harnessConversationTitleSource } from '@/shared/agents/harness-registry';
 import {
 	CHAT_TAB_LIMIT,
 	CHAT_TAB_LIMIT_ERROR_CODE,
@@ -512,10 +513,11 @@ export function useSessionTabState({
 	/**
 	 * Launches an agent harness in a new terminal session and opens a terminal
 	 * tab bound to it. The launch command is assembled in the main process from
-	 * the trusted harness registry; this only forwards the selected id. When a
-	 * terminal tab for the same harness is already open it is focused instead of
-	 * launched again: the harnesses resume by cwd, not conversation id, so two
-	 * tabs of one harness would both reattach to the same latest conversation.
+	 * the trusted harness registry; this only forwards the selected id. Each
+	 * launch starts a fresh conversation, so opening the same harness more than
+	 * once yields independent instances rather than reusing one tab. (Only the
+	 * post-restart resume path is cwd-scoped; the effect below keeps two
+	 * same-harness tabs from resuming into one shared conversation log.)
 	 */
 	const openTerminalTab = useCallback(
 		async ({
@@ -525,13 +527,6 @@ export function useSessionTabState({
 			harnessId: string;
 			harnessLabel: string;
 		}): Promise<OpenSessionTabHandlerResult | null> => {
-			const existing = sessionTabs.find(
-				(session) =>
-					session.kind === 'terminal' && session.harnessId === harnessId,
-			);
-			if (existing) {
-				return { chatTabId: existing.id };
-			}
 			const launch = await window.ensemblr?.launchAgentHarness({
 				harnessId,
 				workspaceId,
@@ -560,7 +555,7 @@ export function useSessionTabState({
 				return null;
 			}
 		},
-		[openAuxiliaryTabMutation, sessionTabs, workspaceId],
+		[openAuxiliaryTabMutation, workspaceId],
 	);
 
 	const closeSessionTabAsync = useCallback(
@@ -620,10 +615,14 @@ export function useSessionTabState({
 	// harness that exits can auto-close its tab and a live OSC title can be
 	// distinguished from the initial harness-label title.
 	const terminalTabByTerminalId = useMemo(() => {
-		const map = new Map<string, { harnessLabel: string; tabId: string }>();
+		const map = new Map<
+			string,
+			{ harnessId: string; harnessLabel: string; tabId: string }
+		>();
 		for (const session of sessionTabs) {
 			if (session.kind === 'terminal' && session.terminalId) {
 				map.set(session.terminalId, {
+					harnessId: session.harnessId,
 					harnessLabel: session.harnessLabel,
 					tabId: session.id,
 				});
@@ -645,16 +644,14 @@ export function useSessionTabState({
 				closeSessionTab(tab.tabId);
 				return;
 			}
-			// The harness sets its own window title via an OSC escape. Strip the
-			// leading spinner/decoration glyphs many TUIs prepend (e.g. Claude's
-			// "✳ Claude Code"); adopt what remains only when it is a real title that
-			// diverges from the harness label, and reset to the label otherwise.
-			// (The spinner glyph itself drives the busy flag in useWorkspaceAgentBusy.)
-			const liveTitle = stripHarnessTitleDecoration(event.session.title);
-			const isRealTitle = Boolean(liveTitle) && liveTitle !== tab.harnessLabel;
+			const liveTitle = resolveLiveTerminalTitle(
+				tab.harnessId,
+				tab.harnessLabel,
+				event.session,
+			);
 			setTerminalTitles((previous) => {
 				const current = previous[event.terminalId];
-				if (isRealTitle) {
+				if (liveTitle) {
 					return current === liveTitle
 						? previous
 						: { ...previous, [event.terminalId]: liveTitle };
@@ -673,18 +670,25 @@ export function useSessionTabState({
 	// Terminal tabs a previous app session already respawned this session, so a
 	// re-render never resumes the same tab twice. Reset naturally on app reload.
 	const autoResumedTabIdsRef = useRef<Set<string>>(new Set());
+	// Harness ids that already claimed the cwd-scoped resume this app session.
+	// Resume reattaches by cwd, not conversation id, so at most one tab per
+	// harness may resume; a second concurrent `--continue` would write the same
+	// session log and corrupt it. Extras respawn fresh (a new conversation).
+	const resumedHarnessIdsRef = useRef<Set<string>>(new Set());
 	// After a restart, a terminal tab rehydrates with a `terminalId` that points
 	// to a PTY the previous process owned and killed. Probe each terminal tab; a
-	// null session means it is dead, so respawn the harness with its resume
-	// command (a fresh relaunch for harnesses without cwd-scoped resume) and
-	// repoint the tab to the new session. The main handler persists the new
-	// terminalId, so invalidating re-derives the tab against the live PTY.
+	// null session means it is dead, so respawn the harness and repoint the tab to
+	// the new session. The first dead tab of a harness resumes its latest cwd
+	// conversation; any further same-harness tabs launch fresh so they never
+	// collide on one shared log. The main handler persists the new terminalId, so
+	// invalidating re-derives the tab against the live PTY.
 	useEffect(() => {
 		const api = window.ensemblr;
 		if (!api) {
 			return;
 		}
 		const resumed = autoResumedTabIdsRef.current;
+		const resumedHarnessIds = resumedHarnessIdsRef.current;
 		for (const session of sessionTabs) {
 			if (
 				session.kind !== 'terminal' ||
@@ -702,13 +706,20 @@ export function useSessionTabState({
 					if (snapshot.session) {
 						return;
 					}
+					const fresh = resumedHarnessIds.has(harnessId);
+					if (!fresh) {
+						resumedHarnessIds.add(harnessId);
+					}
 					return api
-						.resumeAgentHarness({ chatTabId, harnessId, workspaceId })
+						.resumeAgentHarness({ chatTabId, fresh, harnessId, workspaceId })
 						.then((result) => {
 							if (result.session) {
 								invalidateChatTabs();
 							} else {
 								resumed.delete(chatTabId);
+								if (!fresh) {
+									resumedHarnessIds.delete(harnessId);
+								}
 							}
 						});
 				})
@@ -844,6 +855,30 @@ type SessionTabBaseFields = {
 /** Reads a metadata field as a string, falling back when it is absent or non-string. */
 function metadataString(value: unknown, fallback: string): string {
 	return typeof value === 'string' ? value : fallback;
+}
+
+/**
+ * Resolves the live label a terminal tab should show from a lifecycle snapshot.
+ * Codex and Vibe do not put their conversation title in the OSC window title
+ * (Codex uses the cwd, Vibe a static "Vibe"), so main reads it from the harness
+ * session log and delivers it as `agentTitle`; for those harnesses prefer it and
+ * ignore the OSC title. Every other harness titles from the OSC escape, stripping
+ * the leading spinner glyph (which still drives the busy flag elsewhere). Returns
+ * null when the title is empty or still just the harness label.
+ * @param harnessId - The tab's harness id, used to pick the title source.
+ * @param harnessLabel - The default harness label to treat as "no real title".
+ * @param session - The lifecycle snapshot carrying the OSC and agent titles.
+ * @returns The label to adopt, or null to fall back to the harness label.
+ */
+function resolveLiveTerminalTitle(
+	harnessId: string,
+	harnessLabel: string,
+	session: { agentTitle: string | null; title: string },
+): string | null {
+	const candidate = harnessConversationTitleSource(harnessId)
+		? (session.agentTitle ?? '').trim()
+		: stripHarnessTitleDecoration(session.title);
+	return candidate && candidate !== harnessLabel ? candidate : null;
 }
 
 /** Builds the `diff` variant, carrying its optional file path, turn id, and scope. */

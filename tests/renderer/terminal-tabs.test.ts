@@ -12,6 +12,8 @@ function createSession(
 	overrides: Partial<TerminalSessionSnapshot> = {},
 ): TerminalSessionSnapshot {
 	return {
+		agentBusy: false,
+		agentTitle: null,
 		cols: 80,
 		commandLabel: '/bin/zsh',
 		createdAt: '2026-06-11T00:00:00.000Z',

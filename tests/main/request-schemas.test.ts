@@ -50,6 +50,17 @@ test('resumeAgentHarnessRequestSchema requires chat tab, harness, and workspace 
 	).toThrow();
 });
 
+test('resumeAgentHarnessRequestSchema carries the fresh respawn flag', () => {
+	expect(
+		resumeAgentHarnessRequestSchema.parse({
+			chatTabId: 'tab-1',
+			fresh: true,
+			harnessId: 'codex',
+			workspaceId: 'ws-1',
+		}).fresh,
+	).toBe(true);
+});
+
 const GITHUB_LINKED_ISSUE = {
 	id: 'https://github.com/o/r/issues/44',
 	identifier: '#44',

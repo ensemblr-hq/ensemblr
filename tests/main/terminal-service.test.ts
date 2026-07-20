@@ -10,6 +10,7 @@ import type { EnsemblrDatabaseService } from '../../src/main/storage/database.ts
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import { insertRepositoryRow } from '../../src/main/storage/repositories/repository-row-repository.ts';
 import { insertWorkspaceRow } from '../../src/main/storage/repositories/workspace-repository.ts';
+import type { ReadAgentConversationTitleOptions } from '../../src/main/terminal/agent-conversation-title.ts';
 import type {
 	PtyBackend,
 	PtyProcess,
@@ -19,6 +20,7 @@ import { createNodePtyBackend } from '../../src/main/terminal/pty-backend.ts';
 import { createScrollbackBuffer } from '../../src/main/terminal/terminal-scrollback.ts';
 import { createTerminalService } from '../../src/main/terminal/terminal-service.ts';
 import { resolveUserShell } from '../../src/main/terminal/user-shell.ts';
+import type { ConversationTitleSource } from '../../src/shared/agents/harness-registry.ts';
 import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
@@ -162,7 +164,19 @@ function requireSpawnEnv(
 
 function createServiceFixture(
 	t: TestContext,
-	{ backend, killGraceMs = 50 }: { backend: PtyBackend; killGraceMs?: number },
+	{
+		backend,
+		killGraceMs = 50,
+		readConversationTitle = async () => null,
+	}: {
+		backend: PtyBackend;
+		killGraceMs?: number;
+		readConversationTitle?: (
+			source: ConversationTitleSource,
+			cwd: string,
+			options?: ReadAgentConversationTitleOptions,
+		) => Promise<string | null>;
+	},
 ) {
 	const database = createDatabaseFixture(t);
 	const lifecycleEvents: TerminalLifecycleBroadcast[] = [];
@@ -174,6 +188,7 @@ function createServiceFixture(
 		now: () => NOW,
 		onLifecycle: (event) => lifecycleEvents.push(event),
 		onOutput: (event) => outputEvents.push(event),
+		readConversationTitle,
 		workspaceEnvironmentService: createWorkspaceEnvironmentStub(),
 	});
 
@@ -312,6 +327,86 @@ test('ignores OSC titles for non-agent terminal sessions', async (t) => {
 		service.getSnapshot(terminalId).session?.title,
 		'should not stick',
 	);
+});
+
+test('flags a pty-spinner agent busy on braille spinner output', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { lifecycleEvents, service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		harnessId: 'vibe',
+		kind: 'agent',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+
+	assert.equal(service.getSnapshot(terminalId).session?.agentBusy, false);
+
+	fake.emitData('⠋ Generating (2s Esc to interrupt)');
+
+	assert.equal(service.getSnapshot(terminalId).session?.agentBusy, true);
+	assert.ok(lifecycleEvents.some((event) => event.session.agentBusy === true));
+});
+
+test('does not flag busy for an osc-title agent on braille output', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		harnessId: 'codex',
+		kind: 'agent',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('⠋ working');
+
+	assert.equal(service.getSnapshot(terminalId).session?.agentBusy, false);
+});
+
+test('a fresh agent gates its conversation-title read by the launch time', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const sinceValues: (string | undefined)[] = [];
+	const { service } = createServiceFixture(t, {
+		backend,
+		readConversationTitle: async (_source, _cwd, options) => {
+			sinceValues.push(options?.since);
+			return null;
+		},
+	});
+
+	await service.create({
+		harnessId: 'codex',
+		kind: 'agent',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(sinceValues[0], NOW.toISOString());
+});
+
+test('a resumed agent drops the title gate so it re-adopts its prior conversation', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const sinceValues: (string | undefined)[] = [];
+	const { service } = createServiceFixture(t, {
+		backend,
+		readConversationTitle: async (_source, _cwd, options) => {
+			sinceValues.push(options?.since);
+			return null;
+		},
+	});
+
+	await service.create({
+		harnessId: 'codex',
+		kind: 'agent',
+		resumed: true,
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(sinceValues[0], undefined);
 });
 
 test('does not detect a preview URL for interactive terminal sessions', async (t) => {

@@ -7,12 +7,41 @@
  * flags from being an injection vector.
  */
 
+/**
+ * Identifies the on-disk session-log format a harness writes, used to derive its
+ * conversation title when its OSC window title is not the title itself. Codex sets
+ * the window title to its cwd and Mistral Vibe emits a static "Vibe", so both need
+ * their title read from the harness's own log instead of the terminal stream.
+ */
+export type ConversationTitleSource = 'codex-rollout' | 'vibe-log';
+
+/**
+ * Where a harness's "busy" (mid-turn) state is observed. Most TUIs animate a
+ * spinner glyph in their OSC window title, so the renderer reads busy from the
+ * title. Mistral Vibe animates its spinner only in the terminal body, never the
+ * title, so its busy is derived from the braille spinner glyphs streaming in the
+ * PTY output instead. Defaults to `osc-title` when omitted.
+ */
+export type BusySource = 'osc-title' | 'pty-spinner';
+
 /** One launchable coding-agent harness and how to invoke it. */
 export interface HarnessDefinition {
 	/** Stable identifier used as the IPC lookup key and tab metadata. */
 	id: string;
 	/** Human-readable name shown in the robot menu and on the tab. */
 	label: string;
+	/**
+	 * Where to read this harness's conversation title when its OSC window title is
+	 * unreliable. Omitted for harnesses whose window title already carries the
+	 * conversation title (e.g. Claude Code), which use the OSC stream directly.
+	 */
+	conversationTitleSource?: ConversationTitleSource;
+	/**
+	 * Where this harness's busy (mid-turn) state is observed. Omitted → `osc-title`
+	 * (a spinner glyph animated in the OSC window title). Set to `pty-spinner` for
+	 * harnesses like Vibe that animate their spinner only in the terminal body.
+	 */
+	busySource?: BusySource;
 	/**
 	 * Candidate executable names to probe on PATH, in priority order. The first
 	 * one present on the machine is used to build the launch command.
@@ -61,6 +90,9 @@ export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 		id: 'codex',
 		label: 'OpenAI Codex',
 		binaries: ['codex'],
+		// Codex sets its OSC window title to the cwd, so read the title from the
+		// rollout log it writes under `~/.codex/sessions/`.
+		conversationTitleSource: 'codex-rollout',
 		buildCommand: (bin) => `${bin} --dangerously-bypass-approvals-and-sandbox`,
 		// developers.openai.com/codex/cli/reference — `resume` is a subcommand and
 		// `--last` skips the picker for the newest session; the top-level flag
@@ -112,6 +144,11 @@ export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 		id: 'vibe',
 		label: 'Mistral Vibe',
 		binaries: ['vibe'],
+		// Vibe emits a static "Vibe" as its OSC title, so read the auto-generated
+		// title it persists in `~/.vibe/logs/session/*/meta.json`. Its spinner
+		// animates only in the terminal body, so busy comes from PTY output.
+		conversationTitleSource: 'vibe-log',
+		busySource: 'pty-spinner',
 		buildCommand: (bin) => `${bin} --agent auto-approve`,
 		// docs.mistral.ai/vibe/code/cli/work-with-cli — `--continue` resumes the
 		// most recent conversation for the directory (needs log_interactions=true,
@@ -129,4 +166,33 @@ export function findHarnessDefinition(
 	id: string,
 ): HarnessDefinition | undefined {
 	return HARNESS_REGISTRY.find((harness) => harness.id === id);
+}
+
+/**
+ * Resolves the session-log title source for a harness id, if any. Used to decide
+ * whether a tab should read its conversation title from disk instead of the OSC
+ * window title.
+ * @param id - The harness id to resolve.
+ * @returns The title source, or null when the harness has no id or uses OSC.
+ */
+export function harnessConversationTitleSource(
+	id: string | null | undefined,
+): ConversationTitleSource | null {
+	if (!id) {
+		return null;
+	}
+	return findHarnessDefinition(id)?.conversationTitleSource ?? null;
+}
+
+/**
+ * Resolves where a harness's busy state is observed, defaulting to the OSC-title
+ * spinner when the harness declares no override.
+ * @param id - The harness id to resolve.
+ * @returns The busy source, or `osc-title` for an unknown or unset harness.
+ */
+export function harnessBusySource(id: string | null | undefined): BusySource {
+	if (!id) {
+		return 'osc-title';
+	}
+	return findHarnessDefinition(id)?.busySource ?? 'osc-title';
 }
