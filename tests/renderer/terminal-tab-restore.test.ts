@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
 
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import type { RestoreTerminalTabDeps } from '../../src/renderer/state/workspace/terminal-tab-restore';
+import { resumeRestoredTerminalTab } from '../../src/renderer/state/workspace/terminal-tab-restore';
 import type { LaunchAgentHarnessResult } from '../../src/shared/ipc/contracts/agents';
 import type { ChatTabWire } from '../../src/shared/ipc/contracts/chat-tab';
-import { resumeRestoredTerminalTab } from '../../src/renderer/state/workspace/terminal-tab-restore';
-import type { RestoreTerminalTabDeps } from '../../src/renderer/state/workspace/terminal-tab-restore';
 import { clearEnsemblrApi, installEnsemblrApi } from './support/dom';
 
 /**

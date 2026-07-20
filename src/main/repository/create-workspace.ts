@@ -252,88 +252,147 @@ export function createWorkspaceService({
 }: CreateWorkspaceServiceOptions): CreateWorkspaceService {
 	const filesToCopy =
 		filesToCopyService ?? createFilesToCopyService({ localCommandService });
-	return {
-		create: async (request) => {
-			const database = databaseService.getConnection()?.database;
-			if (!database) {
-				return failure({
-					code: 'database-unavailable',
-					message: 'SQLite is unavailable; the workspace was not created.',
-					severity: 'error',
-				});
-			}
+	// Serializes creation per repository so concurrent triggers ("+" clicks,
+	// first-workspace seeding, conversation forks) never run overlapping
+	// `git fetch`/`git worktree add` against the same repo — the lock contention
+	// that made creation fail intermittently. Different repositories still run in
+	// parallel: they have independent git directories and share no lock.
+	const pendingByRepository = new Map<string, Promise<CreateWorkspaceResult>>();
 
-			const requestedId =
-				typeof request.repositoryId === 'string'
-					? request.repositoryId.trim()
-					: '';
-			if (!requestedId) {
-				return failure({
-					code: 'repository-id-required',
-					message: 'A repository id is required to create a workspace.',
-					severity: 'error',
-				});
-			}
-
-			const repository = readRepository(database, requestedId);
-			if (!repository) {
-				return failure({
-					code: 'repository-not-found',
-					message: `No repository is registered with id ${requestedId}.`,
-					severity: 'error',
-				});
-			}
-
-			const nameDiagnostic = validateName(request.name);
-			if (nameDiagnostic) {
-				return failure(nameDiagnostic);
-			}
-
-			const rootSnapshot =
-				rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
-			if (!rootSnapshot.workspacesPath) {
-				return failure({
-					code: 'repositories-path-missing',
-					message:
-						'The managed root has no workspaces path; configure the root directory first.',
-					severity: 'error',
-				});
-			}
-
-			const config = loadConfig({ now, repositoryPath: repository.path });
-			const branchPrefix = await resolveBranchPrefix({
-				config,
-				githubUsernameResolver,
-				readGitDefaults,
+	/**
+	 * Runs a single workspace creation end to end: request validation,
+	 * base-branch resolution, `git worktree add`, files-to-copy, and the SQLite
+	 * row insert. Callers reach it through {@link create}, which serializes it
+	 * per repository.
+	 * @param request - The create-workspace IPC request.
+	 * @returns The create result — a success snapshot or failure diagnostics.
+	 */
+	const runCreate = async (
+		request: CreateWorkspaceRequest,
+	): Promise<CreateWorkspaceResult> => {
+		const database = databaseService.getConnection()?.database;
+		if (!database) {
+			return failure({
+				code: 'database-unavailable',
+				message: 'SQLite is unavailable; the workspace was not created.',
+				severity: 'error',
 			});
-			const resolvedSettings = readRepositorySettings?.({
-				repository: {
-					repositoryId: repository.id,
-					repositoryPath: repository.path,
-				},
+		}
+
+		const requestedId =
+			typeof request.repositoryId === 'string'
+				? request.repositoryId.trim()
+				: '';
+		if (!requestedId) {
+			return failure({
+				code: 'repository-id-required',
+				message: 'A repository id is required to create a workspace.',
+				severity: 'error',
 			});
-			// An explicit base (e.g. forking from another workspace) wins; then the
-			// repo's configured `branchFrom`, but only when it still resolves in the
-			// repo; otherwise new workspaces branch from the repository root, resolved
-			// live so a stale/feature `default_branch` — or a deleted or renamed
-			// configured base — can't pin creation to the wrong base.
-			const baseBranchOverride = await resolveBaseBranchOverride({
-				configuredBase: resolveConfiguredBranchFrom(resolvedSettings),
-				explicitBase: request.baseBranch?.trim(),
-				localCommandService,
+		}
+
+		const repository = readRepository(database, requestedId);
+		if (!repository) {
+			return failure({
+				code: 'repository-not-found',
+				message: `No repository is registered with id ${requestedId}.`,
+				severity: 'error',
+			});
+		}
+
+		const nameDiagnostic = validateName(request.name);
+		if (nameDiagnostic) {
+			return failure(nameDiagnostic);
+		}
+
+		const rootSnapshot =
+			rootDirectoryService.getSnapshot() ?? rootDirectoryService.ensure();
+		if (!rootSnapshot.workspacesPath) {
+			return failure({
+				code: 'repositories-path-missing',
+				message:
+					'The managed root has no workspaces path; configure the root directory first.',
+				severity: 'error',
+			});
+		}
+
+		const config = loadConfig({ now, repositoryPath: repository.path });
+		const branchPrefix = await resolveBranchPrefix({
+			config,
+			githubUsernameResolver,
+			readGitDefaults,
+		});
+		const resolvedSettings = readRepositorySettings?.({
+			repository: {
+				repositoryId: repository.id,
 				repositoryPath: repository.path,
-			});
-			const prepared = prepareWorkspace({
-				baseBranchOverride,
-				branchNameOverride: request.branchName,
-				branchPrefix,
-				database,
-				nameInput: request.name,
-				placeholderName: request.placeholderName === true,
-				repository,
-				workspacesPath: rootSnapshot.workspacesPath,
-			});
+			},
+		});
+		// An explicit base (e.g. forking from another workspace) wins; then the
+		// repo's configured `branchFrom`, but only when it still resolves in the
+		// repo; otherwise new workspaces branch from the repository root, resolved
+		// live so a stale/feature `default_branch` — or a deleted or renamed
+		// configured base — can't pin creation to the wrong base.
+		const baseBranchOverride = await resolveBaseBranchOverride({
+			configuredBase: resolveConfiguredBranchFrom(resolvedSettings),
+			explicitBase: request.baseBranch?.trim(),
+			localCommandService,
+			repositoryPath: repository.path,
+		});
+		const prepared = prepareWorkspace({
+			baseBranchOverride,
+			branchNameOverride: request.branchName,
+			branchPrefix,
+			database,
+			nameInput: request.name,
+			placeholderName: request.placeholderName === true,
+			repository,
+			workspacesPath: rootSnapshot.workspacesPath,
+		});
 
+		if (existsSync(prepared.path)) {
+			return failure({
+				code: 'destination-exists',
+				message: `A file or directory already exists at ${prepared.path}.`,
+				path: prepared.path,
+				severity: 'error',
+			});
+		}
+
+		const parentDiagnostic = ensureParentDirectory(prepared.parentDirectory);
+		if (parentDiagnostic) {
+			return failure(parentDiagnostic);
+		}
+
+		// Best-effort: pull the latest remote commits into the base branch so
+		// new workspaces fork from an up-to-date root when online. Any failure
+		// (offline, divergence, dirty tree) degrades to the local base rather
+		// than blocking creation, so workspaces can still be created offline.
+		await syncBaseRef({
+			baseBranch: prepared.baseBranch,
+			localCommandService,
+			repositoryPath: repository.path,
+		});
+
+		// A workspace created from a PR (or any remote branch not yet fetched)
+		// forks off `origin/<head>`; make sure that ref exists locally first.
+		await ensureBaseRefAvailable({
+			baseBranch: prepared.baseBranch,
+			localCommandService,
+			repositoryPath: repository.path,
+		});
+
+		const worktreeDiagnostic = await runWorktreeAdd({
+			baseBranch: prepared.baseBranch,
+			branchName: prepared.branchName,
+			localCommandService,
+			repositoryPath: repository.path,
+			workspacePath: prepared.path,
+		});
+		if (worktreeDiagnostic) {
+			// If the target now exists despite the pre-check, another worker
+			// won a TOCTOU race or the directory materialized concurrently.
+			// Do not delete it — it belongs to whoever got there first.
 			if (existsSync(prepared.path)) {
 				return failure({
 					code: 'destination-exists',
@@ -342,138 +401,130 @@ export function createWorkspaceService({
 					severity: 'error',
 				});
 			}
+			cleanupDirectory(prepared.path);
+			return failure(worktreeDiagnostic);
+		}
 
-			const parentDiagnostic = ensureParentDirectory(prepared.parentDirectory);
-			if (parentDiagnostic) {
-				return failure(parentDiagnostic);
-			}
+		// Best-effort: ensure `.context/` is git-ignored before anything can
+		// write to it. Failure is non-fatal (the directory is still usable;
+		// it just may show up in `git status`), so we do not roll back.
+		await addContextDirToGitExclude({
+			localCommandService,
+			workspacePath: prepared.path,
+		});
 
-			// Best-effort: pull the latest remote commits into the base branch so
-			// new workspaces fork from an up-to-date root when online. Any failure
-			// (offline, divergence, dirty tree) degrades to the local base rather
-			// than blocking creation, so workspaces can still be created offline.
-			await syncBaseRef({
-				baseBranch: prepared.baseBranch,
-				localCommandService,
-				repositoryPath: repository.path,
+		const filesToCopySnapshot = await runFilesToCopy({
+			config,
+			filesToCopyService: filesToCopy,
+			personalPatterns: resolveConfiguredFilesToCopy(resolvedSettings),
+			repositoryPath: repository.path,
+			workspacePath: prepared.path,
+		});
+		const workspaceFileCount = await countWorkspaceFiles({
+			filesToCopySnapshot,
+			localCommandService,
+			workspacePath: prepared.path,
+		});
+
+		const timestamp = now().toISOString();
+		const initialMetadata = buildInitialWorkspaceMetadata({
+			filesToCopySnapshot,
+			linkedIssue: request.linkedIssue,
+			placeholderName: request.placeholderName === true,
+			workspaceFileCount,
+		});
+		try {
+			insertWorkspaceRow({
+				database,
+				linkedIssue: request.linkedIssue,
+				metadataJson: JSON.stringify(initialMetadata),
+				prepared,
+				timestamp,
 			});
-
-			// A workspace created from a PR (or any remote branch not yet fetched)
-			// forks off `origin/<head>`; make sure that ref exists locally first.
-			await ensureBaseRefAvailable({
-				baseBranch: prepared.baseBranch,
-				localCommandService,
-				repositoryPath: repository.path,
-			});
-
-			const worktreeDiagnostic = await runWorktreeAdd({
-				baseBranch: prepared.baseBranch,
+		} catch (error) {
+			await rollbackWorktree({
 				branchName: prepared.branchName,
 				localCommandService,
 				repositoryPath: repository.path,
 				workspacePath: prepared.path,
 			});
-			if (worktreeDiagnostic) {
-				// If the target now exists despite the pre-check, another worker
-				// won a TOCTOU race or the directory materialized concurrently.
-				// Do not delete it — it belongs to whoever got there first.
-				if (existsSync(prepared.path)) {
-					return failure({
-						code: 'destination-exists',
-						message: `A file or directory already exists at ${prepared.path}.`,
-						path: prepared.path,
-						severity: 'error',
-					});
-				}
-				cleanupDirectory(prepared.path);
-				return failure(worktreeDiagnostic);
-			}
-
-			// Best-effort: ensure `.context/` is git-ignored before anything can
-			// write to it. Failure is non-fatal (the directory is still usable;
-			// it just may show up in `git status`), so we do not roll back.
-			await addContextDirToGitExclude({
-				localCommandService,
-				workspacePath: prepared.path,
-			});
-
-			const filesToCopySnapshot = await runFilesToCopy({
-				config,
-				filesToCopyService: filesToCopy,
-				personalPatterns: resolveConfiguredFilesToCopy(resolvedSettings),
-				repositoryPath: repository.path,
-				workspacePath: prepared.path,
-			});
-			const workspaceFileCount = await countWorkspaceFiles({
-				filesToCopySnapshot,
-				localCommandService,
-				workspacePath: prepared.path,
-			});
-
-			const timestamp = now().toISOString();
-			const initialMetadata = buildInitialWorkspaceMetadata({
-				filesToCopySnapshot,
-				linkedIssue: request.linkedIssue,
-				placeholderName: request.placeholderName === true,
-				workspaceFileCount,
-			});
-			try {
-				insertWorkspaceRow({
-					database,
-					linkedIssue: request.linkedIssue,
-					metadataJson: JSON.stringify(initialMetadata),
-					prepared,
-					timestamp,
-				});
-			} catch (error) {
-				await rollbackWorktree({
-					branchName: prepared.branchName,
-					localCommandService,
-					repositoryPath: repository.path,
-					workspacePath: prepared.path,
-				});
-				cleanupDirectory(prepared.path);
-				const message = error instanceof Error ? error.message : '';
-				// SQLite's UNIQUE(repository_id, slug) is the authoritative
-				// guard against concurrent same-slug workspace creation.
-				if (/UNIQUE constraint failed/i.test(message)) {
-					return failure({
-						code: 'destination-exists',
-						message: `A workspace with slug "${prepared.slug}" already exists for this repository.`,
-						path: prepared.path,
-						severity: 'error',
-					});
-				}
+			cleanupDirectory(prepared.path);
+			const message = error instanceof Error ? error.message : '';
+			// SQLite's UNIQUE(repository_id, slug) is the authoritative
+			// guard against concurrent same-slug workspace creation.
+			if (/UNIQUE constraint failed/i.test(message)) {
 				return failure({
-					code: 'workspace-insert-failed',
-					message: message || 'Failed to write the workspace record to SQLite.',
+					code: 'destination-exists',
+					message: `A workspace with slug "${prepared.slug}" already exists for this repository.`,
 					path: prepared.path,
 					severity: 'error',
 				});
 			}
-
-			const workspace: CreatedWorkspaceSnapshot = {
-				archivedAt: null,
-				baseBranch: prepared.baseBranch,
-				branchName: prepared.branchName,
-				createdAt: timestamp,
-				id: prepared.id,
-				metadata: initialMetadata,
-				name: prepared.name,
+			return failure({
+				code: 'workspace-insert-failed',
+				message: message || 'Failed to write the workspace record to SQLite.',
 				path: prepared.path,
-				repositoryId: repository.id,
-				slug: prepared.slug,
-				updatedAt: timestamp,
-			};
+				severity: 'error',
+			});
+		}
 
-			return {
-				diagnostics: [],
-				filesToCopy: filesToCopySnapshot,
-				status: 'success',
-				workspace,
-			};
-		},
+		const workspace: CreatedWorkspaceSnapshot = {
+			archivedAt: null,
+			baseBranch: prepared.baseBranch,
+			branchName: prepared.branchName,
+			createdAt: timestamp,
+			id: prepared.id,
+			metadata: initialMetadata,
+			name: prepared.name,
+			path: prepared.path,
+			repositoryId: repository.id,
+			slug: prepared.slug,
+			updatedAt: timestamp,
+		};
+
+		return {
+			diagnostics: [],
+			filesToCopy: filesToCopySnapshot,
+			status: 'success',
+			workspace,
+		};
 	};
+
+	/**
+	 * Serializes {@link runCreate} behind any in-flight creation for the same
+	 * repository so overlapping requests can never race on the repo's git locks
+	 * or on slug allocation. The pending promise spans the entire creation, so a
+	 * concurrent request always observes the prior one's committed workspace row
+	 * before it allocates its own slug. Creation for other repositories proceeds
+	 * concurrently.
+	 * @param request - The create-workspace IPC request.
+	 * @returns The create result — a success snapshot or failure diagnostics.
+	 */
+	const create = async (
+		request: CreateWorkspaceRequest,
+	): Promise<CreateWorkspaceResult> => {
+		const repositoryKey =
+			typeof request.repositoryId === 'string'
+				? request.repositoryId.trim()
+				: '';
+		const prior = pendingByRepository.get(repositoryKey);
+		const run = (async () => {
+			if (prior) {
+				await prior.catch(() => undefined);
+			}
+			return runCreate(request);
+		})();
+		pendingByRepository.set(repositoryKey, run);
+		try {
+			return await run;
+		} finally {
+			if (pendingByRepository.get(repositoryKey) === run) {
+				pendingByRepository.delete(repositoryKey);
+			}
+		}
+	};
+
+	return { create };
 }
 
 /**
