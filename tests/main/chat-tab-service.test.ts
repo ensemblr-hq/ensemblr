@@ -1,7 +1,7 @@
 /// <reference types="node" />
 
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -18,6 +18,7 @@ import {
 import {
 	getChatTabById,
 	listOpenForWorkspace,
+	setChatTabMetadata,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
 import { createPiSession } from '../../src/main/storage/repositories/pi-session-repository.ts';
 
@@ -73,8 +74,6 @@ VALUES ('ws-tab-svc', 'repo-tab-svc', 'tab-svc', 'TabSvc', '${WORKSPACE_CWD}');
 		databaseService,
 		lookups: {
 			piSessionExists: ({ piSessionId }) => piSessionId === session.id,
-			workspaceCwd: ({ workspaceId }) =>
-				workspaceId === 'ws-tab-svc' ? WORKSPACE_CWD : null,
 		},
 	});
 
@@ -234,7 +233,7 @@ test('bindPiSession validates tab and session existence', (t) => {
 	);
 });
 
-test('listClosedWithSummary resolves summary paths under .context/sessions', (t) => {
+test('listClosedWithSummary omits closed tabs without a written summary', (t) => {
 	const fixture = openFixture(t);
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
@@ -247,13 +246,87 @@ test('listClosedWithSummary resolves summary paths under .context/sessions', (t)
 	const entries = fixture.service.listClosedWithSummary({
 		workspaceId: fixture.workspaceId,
 	});
+	assert.equal(entries.length, 0);
+});
+
+test('listClosedWithSummary lists a closed tab whose summary file exists', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const bound = fixture.service.openTab({
+		piSessionId: fixture.piSessionId,
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.closeTab({ chatTabId: bound.id });
+
+	const summaryPath = path.join(
+		WORKSPACE_CWD,
+		'.context',
+		'sessions',
+		`${bound.id}.md`,
+	);
+	mkdirSync(path.dirname(summaryPath), { recursive: true });
+	writeFileSync(summaryPath, '# Three rules of robotics\n');
+	t.after(() => {
+		rmSync(path.join(WORKSPACE_CWD, '.context'), {
+			force: true,
+			recursive: true,
+		});
+	});
+	setChatTabMetadata({
+		database: fixture.connection.database,
+		id: bound.id,
+		metadata: {
+			summary: { path: summaryPath, title: 'Three rules of robotics' },
+		},
+	});
+
+	const entries = fixture.service.listClosedWithSummary({
+		workspaceId: fixture.workspaceId,
+	});
 	assert.equal(entries.length, 1);
 	assert.equal(entries[0]?.tab.id, bound.id);
 	assert.ok(entries[0]?.closedAt);
-	assert.equal(
-		entries[0]?.summaryPath,
-		path.join(WORKSPACE_CWD, '.context', 'sessions', `${bound.id}.md`),
+	assert.equal(entries[0]?.summaryTitle, 'Three rules of robotics');
+	assert.equal(entries[0]?.summaryPath, summaryPath);
+});
+
+test('listClosedWithSummary trusts the persisted summary path outside the workspace root', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const bound = fixture.service.openTab({
+		piSessionId: fixture.piSessionId,
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.closeTab({ chatTabId: bound.id });
+
+	const worktreeRoot = '/tmp/ensemblr/tab-service/worktree';
+	const summaryPath = path.join(
+		worktreeRoot,
+		'.context',
+		'sessions',
+		`${bound.id}.md`,
 	);
+	mkdirSync(path.dirname(summaryPath), { recursive: true });
+	writeFileSync(summaryPath, '# Written in a worktree\n');
+	t.after(() => {
+		rmSync(worktreeRoot, { force: true, recursive: true });
+	});
+	setChatTabMetadata({
+		database: fixture.connection.database,
+		id: bound.id,
+		metadata: {
+			summary: { path: summaryPath, title: 'Written in a worktree' },
+		},
+	});
+
+	const entries = fixture.service.listClosedWithSummary({
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(entries.length, 1);
+	assert.equal(entries[0]?.summaryPath, summaryPath);
+	assert.equal(entries[0]?.summaryTitle, 'Written in a worktree');
 });
 
 test('openTab blocks the sixth chat tab with the limit marker', (t) => {
@@ -506,7 +579,6 @@ test('service surfaces a clear error when the database is closed', (t) => {
 		},
 		lookups: {
 			piSessionExists: () => true,
-			workspaceCwd: () => null,
 		},
 	});
 

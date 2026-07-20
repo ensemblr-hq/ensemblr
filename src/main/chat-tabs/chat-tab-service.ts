@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 
 import {
@@ -8,7 +9,6 @@ import {
 	parseWorkspaceGitDiffScope,
 	serializeWorkspaceGitDiffScope,
 } from '../../shared/ipc/contracts/workspace-git.ts';
-import { resolveSessionSummaryPath } from '../pi-agent/session-summary-writer.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import { requireDatabase } from '../storage/database.ts';
 import {
@@ -45,8 +45,6 @@ export class ChatTabLimitError extends Error {
 interface ChatTabLookups {
 	/** Returns `true` when a Pi session exists for the given id. */
 	piSessionExists: (input: { piSessionId: string }) => boolean;
-	/** Returns the workspace's on-disk cwd, or `null` when absent. */
-	workspaceCwd: (input: { workspaceId: string }) => string | null;
 }
 
 /** A closed tab joined with its session-summary location and title. */
@@ -162,22 +160,9 @@ export function createChatTabService({
 		},
 		listClosedWithSummary: ({ workspaceId }) => {
 			const database = requireChatTabDatabase();
-			const workspaceCwd = lookups.workspaceCwd({ workspaceId });
-			const closed = listClosedForWorkspace({ database, workspaceId });
-
-			return closed
-				.filter((tab) => tab.closedAt !== null)
-				.map((tab) => ({
-					closedAt: tab.closedAt ?? '',
-					summaryPath: workspaceCwd
-						? resolveSessionSummaryPath({
-								fileBaseName: tab.id,
-								workspaceCwd,
-							})
-						: '',
-					summaryTitle: readSummaryTitleFromMetadata(tab.metadata),
-					tab,
-				}));
+			return listClosedForWorkspace({ database, workspaceId })
+				.map(toClosedEntry)
+				.filter((entry): entry is ClosedChatTabEntry => entry !== null);
 		},
 		listTabs: ({ workspaceId }) => {
 			const database = requireChatTabDatabase();
@@ -326,17 +311,55 @@ function readMetadataSubject(
 }
 
 /**
- * Read the summary title stored on a session-event metadata record.
- * @param metadata - Parsed event metadata record
- * @returns The summary title, or null when the record has no string title
+ * Build a transcript-picker entry for a closed tab, or null when the tab has no
+ * attachable summary. A tab qualifies only when its metadata carries the summary
+ * marker (persisted after a successful summary write) *and* the summary file it
+ * records is still on disk. This excludes terminal/harness tabs, aborted
+ * sessions, and writes that never landed — so the picker never offers a
+ * transcript whose attach would fail with ENOENT. The on-disk check uses the
+ * path the writer persisted (`summary.path`), not a path recomputed from the
+ * workspace root, because a session's cwd can differ from the workspace root
+ * (e.g. a worktree) and only the persisted path is authoritative.
+ * @param tab - The closed chat-tab row
+ * @returns The picker entry, or null when no summary is available
  */
-function readSummaryTitleFromMetadata(
+function toClosedEntry(tab: ChatTabRow): ClosedChatTabEntry | null {
+	if (tab.closedAt === null) {
+		return null;
+	}
+	const summary = readSummaryFromMetadata(tab.metadata);
+	if (!summary || !existsSync(summary.path)) {
+		return null;
+	}
+	return {
+		closedAt: tab.closedAt,
+		summaryPath: summary.path,
+		summaryTitle: summary.title,
+		tab,
+	};
+}
+
+/**
+ * Read the persisted session-summary marker from a tab's metadata. Present only
+ * after a summary write succeeded (see `persistSummaryMetadata`); absent for
+ * terminal tabs and chat tabs whose summary write never ran. Requires a
+ * non-empty `path` so callers can verify the recorded file still exists.
+ * @param metadata - Parsed chat-tab metadata record
+ * @returns The summary marker with its path and title, or null when no usable marker is present
+ */
+function readSummaryFromMetadata(
 	metadata: Record<string, unknown>,
-): string | null {
+): { path: string; title: string | null } | null {
 	const summary = metadata.summary;
 	if (!summary || typeof summary !== 'object') {
 		return null;
 	}
-	const candidate = (summary as { title?: unknown }).title;
-	return typeof candidate === 'string' ? candidate : null;
+	const record = summary as { path?: unknown; title?: unknown };
+	if (typeof record.path !== 'string' || record.path.length === 0) {
+		return null;
+	}
+	return {
+		path: record.path,
+		title: typeof record.title === 'string' ? record.title : null,
+	};
 }
