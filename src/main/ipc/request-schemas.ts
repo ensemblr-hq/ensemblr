@@ -99,6 +99,7 @@ export const resumeAgentHarnessRequestSchema = z.object({
 	chatTabId: z.string().min(1),
 	harnessId: z.string().min(1),
 	workspaceId: z.string().min(1),
+	fresh: z.boolean().optional(),
 });
 
 // -----------------------------------------------------------------------------

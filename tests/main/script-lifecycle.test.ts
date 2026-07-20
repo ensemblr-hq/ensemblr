@@ -139,6 +139,8 @@ function createTerminalServiceFake({ killStops = true } = {}): {
 			createCalls.push(options);
 			counter += 1;
 			const session: TerminalSessionSnapshot = {
+				agentBusy: false,
+				agentTitle: null,
 				cols: 80,
 				commandLabel: options.command ?? '/bin/zsh',
 				createdAt: NOW,

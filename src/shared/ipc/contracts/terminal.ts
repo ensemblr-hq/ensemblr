@@ -26,6 +26,21 @@ export interface TerminalDiagnostic {
 
 /** IPC-safe snapshot of one terminal session. */
 export interface TerminalSessionSnapshot {
+	/**
+	 * Whether a spinner-less agent harness (Vibe) is mid-turn, derived from its
+	 * on-disk session log. Always `false` for non-agent sessions and for harnesses
+	 * whose busy state comes from the OSC spinner (Codex, Claude); the renderer ORs
+	 * this with the spinner heuristic so either source can light the tab.
+	 */
+	agentBusy: boolean;
+	/**
+	 * Conversation title read from an agent harness's on-disk session log, for
+	 * harnesses whose OSC window title is not the conversation title (Codex, Vibe).
+	 * `null` for non-agent sessions, harnesses that title via OSC, and before the
+	 * first successful read. When set, the renderer prefers it over the OSC title
+	 * for the tab label; the busy indicator still reads {@link title}.
+	 */
+	agentTitle: string | null;
 	cols: number;
 	/** Command line shown in the UI; never includes secret values. */
 	commandLabel: string;

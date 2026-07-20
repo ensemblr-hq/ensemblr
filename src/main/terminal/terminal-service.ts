@@ -1,5 +1,9 @@
 import { randomUUID } from 'node:crypto';
-
+import {
+	type ConversationTitleSource,
+	harnessBusySource,
+	harnessConversationTitleSource,
+} from '../../shared/agents/harness-registry.ts';
 import type {
 	CreateTerminalSessionResult,
 	TerminalDiagnostic,
@@ -20,6 +24,10 @@ import {
 	insertTerminalSessionRow,
 	markStaleRunningTerminalSessions,
 } from '../storage/repositories/terminal-session-repository.ts';
+import {
+	type ReadAgentConversationTitleOptions,
+	readAgentConversationTitle,
+} from './agent-conversation-title.ts';
 import {
 	createNodePtyBackend,
 	type PtyBackend,
@@ -68,6 +76,14 @@ export interface CreateTerminalSessionOptions {
 	 */
 	harnessId?: string;
 	kind?: TerminalSessionKind;
+	/**
+	 * True when this session reattaches a harness's prior conversation after a
+	 * restart (a cwd-scoped resume). The on-disk title log predates this session's
+	 * `createdAt`, so the conversation-title reader must skip its launch-time gate
+	 * and adopt the newest cwd-matching session — otherwise the resumed tab reverts
+	 * to the generic harness label. Fresh launches leave this false to keep the gate.
+	 */
+	resumed?: boolean;
 	title?: string;
 	rows?: number;
 	workspaceId: string;
@@ -112,6 +128,16 @@ export interface CreateTerminalServiceOptions {
 	onLifecycle: (event: TerminalLifecycleBroadcast) => void;
 	onOutput: (event: TerminalOutputBroadcast) => void;
 	/**
+	 * Reads an agent harness's conversation title from its on-disk session log, for
+	 * harnesses whose OSC window title is not the title (Codex, Vibe). Injectable
+	 * for tests; defaults to the real filesystem reader.
+	 */
+	readConversationTitle?: (
+		source: ConversationTitleSource,
+		cwd: string,
+		options?: ReadAgentConversationTitleOptions,
+	) => Promise<string | null>;
+	/**
 	 * Resolves the user's shell-derived environment so setup/run scripts inherit
 	 * the same PATH and toolchain shims as diagnostics and Pi sessions.
 	 */
@@ -133,11 +159,38 @@ export interface CreateTerminalServiceOptions {
 
 /** Internal: one tracked session. */
 interface TrackedSession {
+	/**
+	 * Idle timer that clears {@link TerminalSessionSnapshot.agentBusy} once a
+	 * `pty-spinner` harness (Vibe) stops streaming spinner glyphs, or null when the
+	 * tab is not busy. Only used for {@link busyFromPtySpinner} sessions.
+	 */
+	agentBusyIdleTimer: NodeJS.Timeout | null;
+	/**
+	 * True when this agent tab derives its busy state from braille spinner glyphs in
+	 * PTY output (Vibe) rather than from a spinner in its OSC title.
+	 */
+	busyFromPtySpinner: boolean;
+	/**
+	 * Harness session-log title source when the tab reads its conversation title
+	 * from disk (Codex, Vibe), or null for OSC-titled and non-agent sessions.
+	 */
+	conversationTitleSource: ConversationTitleSource | null;
+	/**
+	 * Launch time gating the on-disk conversation-title reader, or null to disable
+	 * the gate. Set to this session's `createdAt` for a fresh launch so it never
+	 * adopts a prior conversation's title; null when resuming, where the log
+	 * predates this session and the newest cwd-matching session is the right one.
+	 */
+	conversationTitleSince: string | null;
+	/** Working directory the PTY spawned in, used to match on-disk session logs. */
+	cwd: string;
 	dataSubscription: { dispose: () => void } | null;
 	exitSubscription: { dispose: () => void } | null;
 	exitWaiters: Array<() => void>;
 	killTimer: NodeJS.Timeout | null;
 	outputSeq: number;
+	/** Poll timer re-reading the harness conversation title, or null when idle. */
+	titlePollTimer: NodeJS.Timeout | null;
 	/**
 	 * Rolling tail of recent run-script output kept only until a preview URL is
 	 * found. PTY output arrives in arbitrary fragments, so a dev-server URL can
@@ -168,6 +221,41 @@ const PREVIEW_SCAN_WINDOW = 8192;
  * for an OSC title escape to terminate. Comfortably longer than any title line.
  */
 const TITLE_SCAN_WINDOW = 512;
+
+/**
+ * How often to re-read a harness's on-disk conversation title. The harness writes
+ * its session log as the conversation progresses, so this keeps the tab label
+ * current (e.g. a Vibe title that only lands once a turn completes).
+ */
+const CONVERSATION_TITLE_POLL_MS = 1_500;
+
+/**
+ * How long a `pty-spinner` harness (Vibe) stays flagged busy after its last braille
+ * spinner glyph. Comfortably longer than the spinner's redraw cadence (its elapsed
+ * counter repaints at least once a second) so a working tab stays lit, short enough
+ * that going idle clears the indicator promptly.
+ */
+const PTY_SPINNER_BUSY_IDLE_MS = 1_500;
+
+/** Unicode braille block (U+2800–U+28FF), the frames Vibe animates as its spinner. */
+const BRAILLE_BLOCK_START = 0x2800;
+const BRAILLE_BLOCK_END = 0x28ff;
+
+/**
+ * Reports whether a PTY output chunk contains a braille spinner glyph, the signal
+ * that a `pty-spinner` harness (Vibe) is animating its "working" indicator.
+ * @param data - A raw PTY output chunk.
+ * @returns True when any character falls in the braille block.
+ */
+function containsBrailleSpinner(data: string): boolean {
+	for (const char of data) {
+		const codePoint = char.codePointAt(0) ?? 0;
+		if (codePoint >= BRAILLE_BLOCK_START && codePoint <= BRAILLE_BLOCK_END) {
+			return true;
+		}
+	}
+	return false;
+}
 
 /**
  * Matches an OSC window-title escape: `ESC ] (0|1|2) ; <title> (BEL | ESC \)`.
@@ -202,6 +290,7 @@ export function createTerminalService({
 	now = () => new Date(),
 	onLifecycle,
 	onOutput,
+	readConversationTitle = readAgentConversationTitle,
 	resolveBaseEnv = () => process.env,
 	resolveScrollbackLimit = () => DEFAULT_SCROLLBACK_LIMIT,
 	scriptShell = resolveScriptShell(),
@@ -310,6 +399,83 @@ export function createTerminalService({
 	}
 
 	/**
+	 * Reads a harness's on-disk conversation title once and, when it changed, stamps
+	 * it on the snapshot and broadcasts so the tab label updates. No-op for sessions
+	 * without a session-log title source or once they stop running. The reader
+	 * swallows filesystem errors, so a missing or half-written log yields no update.
+	 * @param session - Tracked agent session to refresh.
+	 */
+	async function refreshConversationTitle(
+		session: TrackedSession,
+	): Promise<void> {
+		if (!session.conversationTitleSource) {
+			return;
+		}
+		const title = await readConversationTitle(
+			session.conversationTitleSource,
+			session.cwd,
+			{ since: session.conversationTitleSince ?? undefined },
+		);
+		if (
+			session.snapshot.status !== 'running' ||
+			!title ||
+			title === session.snapshot.agentTitle
+		) {
+			return;
+		}
+		session.snapshot = { ...session.snapshot, agentTitle: title };
+		broadcastLifecycle(session);
+	}
+
+	/**
+	 * Starts polling a harness's on-disk conversation title for agent sessions whose
+	 * OSC window title is not the title (Codex, Vibe). Reads immediately, then on an
+	 * interval; the timer is unref'd so it never keeps the app alive and is cleared
+	 * when the session finalizes. No-op for other sessions.
+	 * @param session - Tracked agent session to begin polling.
+	 */
+	function startConversationTitlePolling(session: TrackedSession): void {
+		if (!session.conversationTitleSource) {
+			return;
+		}
+		void refreshConversationTitle(session);
+		session.titlePollTimer = setInterval(() => {
+			void refreshConversationTitle(session);
+		}, CONVERSATION_TITLE_POLL_MS);
+		session.titlePollTimer.unref?.();
+	}
+
+	/**
+	 * Marks a `pty-spinner` agent tab (Vibe) busy on seeing a braille spinner glyph
+	 * in its PTY output and arms an idle timer to clear it once the glyphs stop. The
+	 * rising edge and the later idle clear each broadcast once; the renderer holds
+	 * the flag between them, so no per-frame re-broadcast is needed. No-op for other
+	 * sessions and once the session stops running.
+	 * @param session - Tracked agent session whose output signalled work.
+	 */
+	function markPtySpinnerBusy(session: TrackedSession): void {
+		if (!session.busyFromPtySpinner || session.snapshot.status !== 'running') {
+			return;
+		}
+		if (!session.snapshot.agentBusy) {
+			session.snapshot = { ...session.snapshot, agentBusy: true };
+			broadcastLifecycle(session);
+		}
+		if (session.agentBusyIdleTimer) {
+			clearTimeout(session.agentBusyIdleTimer);
+		}
+		session.agentBusyIdleTimer = setTimeout(() => {
+			session.agentBusyIdleTimer = null;
+			if (!session.snapshot.agentBusy) {
+				return;
+			}
+			session.snapshot = { ...session.snapshot, agentBusy: false };
+			broadcastLifecycle(session);
+		}, PTY_SPINNER_BUSY_IDLE_MS);
+		session.agentBusyIdleTimer.unref?.();
+	}
+
+	/**
 	 * Tears down a session's PTY subscriptions, records its terminal status and
 	 * exit code, persists the outcome when a database is available, and wakes any
 	 * exit waiters and lifecycle listeners.
@@ -323,6 +489,14 @@ export function createTerminalService({
 		if (session.killTimer) {
 			clearTimeout(session.killTimer);
 			session.killTimer = null;
+		}
+		if (session.titlePollTimer) {
+			clearInterval(session.titlePollTimer);
+			session.titlePollTimer = null;
+		}
+		if (session.agentBusyIdleTimer) {
+			clearTimeout(session.agentBusyIdleTimer);
+			session.agentBusyIdleTimer = null;
 		}
 
 		session.dataSubscription?.dispose();
@@ -385,6 +559,7 @@ export function createTerminalService({
 		command,
 		harnessId,
 		kind = 'terminal',
+		resumed = false,
 		rows = DEFAULT_ROWS,
 		title,
 		workspaceId,
@@ -465,17 +640,30 @@ export function createTerminalService({
 			};
 		}
 
+		const conversationTitleSource =
+			kind === 'agent' ? harnessConversationTitleSource(harnessId) : null;
+		const busyFromPtySpinner =
+			kind === 'agent' && harnessBusySource(harnessId) === 'pty-spinner';
+
 		const session: TrackedSession = {
+			agentBusyIdleTimer: null,
+			busyFromPtySpinner,
+			conversationTitleSince: resumed ? null : createdAt,
+			conversationTitleSource,
+			cwd: environment.cwd,
 			dataSubscription: null,
 			exitSubscription: null,
 			exitWaiters: [],
 			killTimer: null,
 			outputSeq: 0,
 			previewScanBuffer: '',
+			titlePollTimer: null,
 			titleScanBuffer: '',
 			pty,
 			scrollback: createScrollbackBuffer(resolveScrollbackLimit()),
 			snapshot: {
+				agentBusy: false,
+				agentTitle: null,
 				cols: normalizedCols,
 				commandLabel,
 				createdAt,
@@ -498,12 +686,16 @@ export function createTerminalService({
 			onOutput({ data, seq: session.outputSeq, terminalId: id, workspaceId });
 			maybeDetectPreviewUrl(session, data);
 			maybeCaptureOscTitle(session, data);
+			if (session.busyFromPtySpinner && containsBrailleSpinner(data)) {
+				markPtySpinnerBusy(session);
+			}
 		});
 		session.exitSubscription = pty.onExit(({ exitCode }) => {
 			finalizeSession(session, exitCode);
 		});
 
 		sessions.set(id, session);
+		startConversationTitlePolling(session);
 
 		const database = getDatabase();
 
