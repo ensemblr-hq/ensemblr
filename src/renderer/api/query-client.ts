@@ -54,9 +54,11 @@ function seedQueryCacheFromInitialSnapshot(): void {
  */
 function persistPiModelsOnUpdate(): void {
 	// Compare each event against the models query's precomputed `queryHash`
-	// (TanStack stores it per query) so the cache-wide subscription does no
-	// per-event JSON.stringify. The unsubscribe handle is intentionally dropped:
-	// this client is a process-lifetime singleton.
+	// (TanStack stores it per query) so the cache-wide subscription filters on a
+	// cheap string compare, not a per-event serialisation. `writeCachedPiModels`
+	// does read+serialise the cache, but only on a matched successful model
+	// update — rare, not once per unrelated cache event. The unsubscribe handle
+	// is intentionally dropped: this client is a process-lifetime singleton.
 	const modelsHash = hashKey(ensemblrQueryKeys.piModels());
 	queryClient.getQueryCache().subscribe((event) => {
 		if (event.type !== 'updated' || event.query.queryHash !== modelsHash) {

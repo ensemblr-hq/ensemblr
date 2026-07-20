@@ -74,7 +74,14 @@ function providerKeyOf(result: ListPiModelsResult): string {
  * catalog is empty or still changing, and stops (returns `false`) once the
  * provider set has been non-empty and unchanged for {@link STABLE_POLL_TARGET}
  * polls, or the {@link MAX_POLLS} ceiling is hit.
- * @param data - The query's current raw catalog data, if any.
+ *
+ * Settling is judged on the catalog the query *returns*, which is the
+ * cache-masked value after `queryFn`'s subset fallback — not the raw `pi`
+ * output. So the poll converges once the picker-visible catalog stabilises
+ * (its whole point), even while live `pi` is still resolving providers behind
+ * the fallback. The {@link MAX_POLLS} ceiling bounds the no-cache case where
+ * nothing masks a persistently empty/partial listing.
+ * @param data - The catalog the query currently exposes, if any.
  * @param state - The prior poll state.
  * @returns The next interval (or `false` to stop) plus the advanced state.
  */

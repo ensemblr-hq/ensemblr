@@ -33,6 +33,9 @@ import {
 // Process-lifetime progress of the post-launch catalog settling poll. The Pi
 // models query is a singleton, so a single module-scoped state tracks it; each
 // `refetchInterval` evaluation advances it purely via `advancePiModelsPoll`.
+// This heals launch only: once it settles (or hits the ceiling) the poll does
+// not re-arm, so a mid-session `pi` restart relies on the subset fallback in
+// `queryFn`, not on renewed polling.
 let piModelsPollState: PiModelsPollState = initialPiModelsPollState();
 
 /**
