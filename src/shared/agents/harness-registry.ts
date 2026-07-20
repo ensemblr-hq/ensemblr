@@ -69,9 +69,8 @@ export interface HarnessDefinition {
  * The launchable harnesses, in menu display order. Each `buildCommand` bakes in
  * the harness's auto-approve flag (per the product decision to always skip
  * permission prompts). Flags below were verified against each tool's current
- * official documentation (July 2026) — do not edit them from memory. Two are
- * lower-confidence and worth reconfirming with the tool's own `--help`:
- * `cursor-agent --force` and Mistral Vibe's flag surface.
+ * official documentation (July 2026) — do not edit them from memory. Mistral
+ * Vibe's flag surface is lower-confidence and worth reconfirming with `--help`.
  */
 export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 	{
@@ -99,45 +98,6 @@ export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 		// precedes the subcommand.
 		buildResumeCommand: (bin) =>
 			`${bin} --dangerously-bypass-approvals-and-sandbox resume --last`,
-	},
-	{
-		// google-gemini.github.io/gemini-cli — `--yolo` == `--approval-mode=yolo`.
-		id: 'gemini',
-		label: 'Gemini CLI',
-		binaries: ['gemini'],
-		buildCommand: (bin) => `${bin} --yolo`,
-		// geminicli.com/docs/cli/session-management — `--resume` with no argument
-		// loads the latest session for the current directory.
-		buildResumeCommand: (bin) => `${bin} --yolo --resume`,
-	},
-	{
-		// aider.chat/docs/config/options.html — auto-confirms every prompt.
-		id: 'aider',
-		label: 'Aider',
-		binaries: ['aider'],
-		buildCommand: (bin) => `${bin} --yes-always`,
-		// aider.chat/docs/config/options.html — `--restore-chat-history` replays
-		// the prior chat history from `.aider.chat.history.md` (default off).
-		buildResumeCommand: (bin) => `${bin} --yes-always --restore-chat-history`,
-	},
-	{
-		// opencode.ai/docs/cli — `--auto` is the most-permissive built-in switch
-		// (still honors explicit deny rules; opencode has no full-bypass flag).
-		id: 'opencode',
-		label: 'opencode',
-		binaries: ['opencode'],
-		buildCommand: (bin) => `${bin} --auto`,
-		// opencode.ai/docs/cli — `--continue` continues the last session.
-		buildResumeCommand: (bin) => `${bin} --auto --continue`,
-	},
-	{
-		// cursor.com/docs/cli/using — `--force` auto-approves tool execution.
-		id: 'cursor',
-		label: 'Cursor Agent',
-		binaries: ['cursor-agent'],
-		buildCommand: (bin) => `${bin} --force`,
-		// cursor.com/docs/cli/using — `resume` reattaches the latest conversation.
-		buildResumeCommand: (bin) => `${bin} --force resume`,
 	},
 	{
 		// docs.mistral.ai/vibe — built-in agent that auto-approves every tool.

@@ -16,8 +16,11 @@ import {
 } from 'lucide-react';
 import { Reorder } from 'motion/react';
 import {
+	type ComponentPropsWithoutRef,
+	forwardRef,
 	type KeyboardEvent,
 	type MouseEvent,
+	type ReactNode,
 	useEffect,
 	useMemo,
 	useRef,
@@ -30,6 +33,12 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from '@/renderer/components/ui/tooltip';
+import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import {
 	areStringArraysEqual,
 	reconcileOrderedIds,
@@ -44,6 +53,44 @@ import { useDebugPanelToggle } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { shouldSelectOnTabClick } from '@/renderer/state/workspace';
 import type { SessionTabModel } from '@/renderer/types/workbench';
+import { formatShortcut } from '@/shared/keymap';
+
+/** Display label for the coding-agent launcher shortcut, e.g. `⌘⇧A`. */
+const AGENTS_SHORTCUT_HINT = formatShortcut('agents.open');
+
+/** Display label for the new-chat-tab shortcut, e.g. `⌘T`. */
+const NEW_TAB_SHORTCUT_HINT = formatShortcut('tab.new');
+
+/**
+ * Ghost `icon-sm` button carrying a screen-reader-only label. Forwards its ref
+ * and props so it can back a Radix `asChild` trigger (tooltip, dropdown).
+ */
+const GhostIconButton = forwardRef<
+	HTMLButtonElement,
+	{ icon: ReactNode; label: string } & ComponentPropsWithoutRef<typeof Button>
+>(({ icon, label, ...props }, ref) => (
+	<Button ref={ref} size='icon-sm' variant='ghost' {...props}>
+		{icon}
+		<span className='sr-only'>{label}</span>
+	</Button>
+));
+GhostIconButton.displayName = 'GhostIconButton';
+
+/** Tooltip body pairing a label with an optional keyboard-shortcut chip. */
+function ShortcutTooltipContent({
+	label,
+	shortcut,
+}: {
+	label: string;
+	shortcut?: string;
+}) {
+	return (
+		<TooltipContent>
+			{label}
+			{shortcut ? <kbd className='font-sans'>{shortcut}</kbd> : null}
+		</TooltipContent>
+	);
+}
 
 /** Horizontal session-tab bar with close, restore, new-tab, and drag-order controls. */
 export function SessionTabs({
@@ -92,6 +139,16 @@ export function SessionTabs({
 	const [isDraggingTab, setIsDraggingTab] = useState(false);
 	const orderedSessionIdsRef = useRef(orderedSessionIds);
 	const canReorderTabs = sessionIds.length > 1;
+
+	useHotkey('tab.new', () => handleOpen());
+	useHotkey('tab.next', () => cycleTab(1));
+	useHotkey('tab.prev', () => cycleTab(-1));
+	useHotkey('tab.selectByIndex', (event) => {
+		const position = Number.parseInt(event.key, 10);
+		if (!Number.isNaN(position)) {
+			selectTabByPosition(position);
+		}
+	});
 
 	useEffect(() => {
 		orderedSessionIdsRef.current = orderedSessionIds;
@@ -142,6 +199,30 @@ export function SessionTabs({
 		setOrderedSessionIds(nextIds);
 	}
 
+	/** Selects the tab `offset` positions from the active one, wrapping around. */
+	function cycleTab(offset: number) {
+		if (orderedSessionIds.length < 2) {
+			return;
+		}
+		const activeIndex = orderedSessionIds.indexOf(activeSession.id);
+		const base = activeIndex === -1 ? 0 : activeIndex;
+		const nextIndex =
+			(base + offset + orderedSessionIds.length) % orderedSessionIds.length;
+		onSessionTabChange(orderedSessionIds[nextIndex]);
+	}
+
+	/** Selects a tab by its 1-based position; `9` always jumps to the last tab. */
+	function selectTabByPosition(position: number) {
+		if (!orderedSessionIds.length) {
+			return;
+		}
+		const index = position === 9 ? orderedSessionIds.length - 1 : position - 1;
+		const targetId = orderedSessionIds[index];
+		if (targetId) {
+			onSessionTabChange(targetId);
+		}
+	}
+
 	/** Commits the final dragged order to the workspace tab controller. */
 	function handleReorderEnd() {
 		setIsDraggingTab(false);
@@ -187,15 +268,20 @@ export function SessionTabs({
 					})}
 				</Reorder.Group>
 				<div className='flex shrink-0 items-center gap-1'>
-					<Button
-						disabled={isOpening}
-						onClick={handleOpen}
-						size='icon-sm'
-						variant='ghost'
-					>
-						<PlusIcon />
-						<span className='sr-only'>New chat tab</span>
-					</Button>
+					<Tooltip>
+						<TooltipTrigger asChild>
+							<GhostIconButton
+								disabled={isOpening}
+								icon={<PlusIcon />}
+								label='New chat tab'
+								onClick={handleOpen}
+							/>
+						</TooltipTrigger>
+						<ShortcutTooltipContent
+							label='New chat tab'
+							shortcut={NEW_TAB_SHORTCUT_HINT}
+						/>
+					</Tooltip>
 				</div>
 			</div>
 			<div className='flex shrink-0 items-center gap-1'>
@@ -414,8 +500,7 @@ function HarnessLauncherMenu({
 }) {
 	const [open, setOpen] = useState(false);
 	const [launchingId, setLaunchingId] = useState<string | null>(null);
-	const { data } = useQuery({
-		enabled: open,
+	const { data, isPending } = useQuery({
 		queryFn: async () =>
 			(await window.ensemblr?.listAgentHarnesses()) ?? { harnesses: [] },
 		queryKey: ['agent-harnesses'],
@@ -424,6 +509,11 @@ function HarnessLauncherMenu({
 	const installedHarnesses = (data?.harnesses ?? []).filter(
 		(harness) => harness.available,
 	);
+	const noHarnessesDetected = !isPending && installedHarnesses.length === 0;
+
+	useHotkey('agents.open', () => setOpen(true), {
+		enabled: !noHarnessesDetected,
+	});
 
 	/** Launches the chosen harness, focuses the new tab, then closes the menu. */
 	function handleLaunch(harnessId: string, harnessLabel: string) {
@@ -461,14 +551,36 @@ function HarnessLauncherMenu({
 		handleLaunch(harness.id, harness.label);
 	}
 
+	if (noHarnessesDetected) {
+		return (
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<span className='inline-flex'>
+						<GhostIconButton
+							disabled
+							icon={<BotIcon />}
+							label='Launch coding agent'
+						/>
+					</span>
+				</TooltipTrigger>
+				<ShortcutTooltipContent label='No harnesses detected' />
+			</Tooltip>
+		);
+	}
+
 	return (
 		<DropdownMenu onOpenChange={setOpen} open={open}>
-			<DropdownMenuTrigger asChild>
-				<Button size='icon-sm' variant='ghost'>
-					<BotIcon />
-					<span className='sr-only'>Launch coding agent</span>
-				</Button>
-			</DropdownMenuTrigger>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<DropdownMenuTrigger asChild>
+						<GhostIconButton icon={<BotIcon />} label='Launch coding agent' />
+					</DropdownMenuTrigger>
+				</TooltipTrigger>
+				<ShortcutTooltipContent
+					label='Launch coding agent'
+					shortcut={AGENTS_SHORTCUT_HINT}
+				/>
+			</Tooltip>
 			<DropdownMenuContent
 				align='end'
 				className='w-56 p-1'
@@ -541,12 +653,17 @@ function ClosedSessionHistoryMenu({
 }) {
 	return (
 		<DropdownMenu>
-			<DropdownMenuTrigger asChild>
-				<Button size='icon-sm' variant='ghost'>
-					<HistoryIcon />
-					<span className='sr-only'>Open closed chat tabs</span>
-				</Button>
-			</DropdownMenuTrigger>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<DropdownMenuTrigger asChild>
+						<GhostIconButton
+							icon={<HistoryIcon />}
+							label='Open closed chat tabs'
+						/>
+					</DropdownMenuTrigger>
+				</TooltipTrigger>
+				<ShortcutTooltipContent label='Closed chat tabs' />
+			</Tooltip>
 			<DropdownMenuContent align='end' className='w-72 p-1'>
 				{closedSessions.length ? (
 					closedSessions.map((session) => (

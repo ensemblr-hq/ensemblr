@@ -44,6 +44,11 @@ const digitBindings: readonly Binding[] = Array.from(
 	(_, index): Binding => ({ key: String(index + 1) }),
 );
 
+const tabIndexBindings: readonly Binding[] = Array.from(
+	{ length: 9 },
+	(_, index): Binding => ({ key: String(index + 1), modifiers: ['mod'] }),
+);
+
 export const SHORTCUTS = {
 	'sidebar.toggle': {
 		description: 'Toggle sidebar',
@@ -159,6 +164,26 @@ export const SHORTCUTS = {
 		bindings: [{ key: 'w', modifiers: ['mod'] }],
 		accelerator: 'CommandOrControl+W',
 	},
+	'tab.new': {
+		description: 'New chat tab',
+		scope: 'global',
+		bindings: [{ key: 't', modifiers: ['mod'] }],
+	},
+	'tab.next': {
+		description: 'Next tab',
+		scope: 'global',
+		bindings: [{ key: ']', modifiers: ['mod', 'shift'] }],
+	},
+	'tab.prev': {
+		description: 'Previous tab',
+		scope: 'global',
+		bindings: [{ key: '[', modifiers: ['mod', 'shift'] }],
+	},
+	'tab.selectByIndex': {
+		description: 'Select tab by index (⌘1–8, ⌘9 last)',
+		scope: 'global',
+		bindings: tabIndexBindings,
+	},
 	'changes.uncommitted': {
 		description: 'Show uncommitted changes',
 		scope: 'global',
@@ -168,6 +193,12 @@ export const SHORTCUTS = {
 		description: 'Start or stop run script',
 		scope: 'global',
 		bindings: [{ key: 'r', modifiers: ['mod'] }],
+	},
+	'agents.open': {
+		description: 'Launch coding agent',
+		scope: 'global',
+		bindings: [{ key: 'a', modifiers: ['mod', 'shift'] }],
+		accelerator: 'CommandOrControl+Shift+A',
 	},
 } as const satisfies Record<string, ShortcutDef>;
 
