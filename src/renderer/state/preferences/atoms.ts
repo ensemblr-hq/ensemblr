@@ -85,6 +85,38 @@ export const favouriteModelsAtom = atomWithStorage<string[]>(
 // localStorage-only with no consumers; they now back the `app.git` section and
 // feed the repository settings resolver as the `user-default` source.
 
+// ─── Diff viewer (user) ────────────────────────────────────────────────────────
+
+/** Column layout of the diff viewer: one unified column or side-by-side split. */
+type DiffLayout = 'unified' | 'split';
+
+/**
+ * Whether the diff viewer lays out changes in one unified column or side-by-side;
+ * app-wide and persisted so the chosen layout sticks across files and reloads.
+ */
+export const diffLayoutAtom = atomWithStorage<DiffLayout>(
+	KEY('diff_layout'),
+	'unified',
+);
+
+/**
+ * Whether the diff viewer reveals hidden characters (tabs, carriage returns) as
+ * visible glyphs; app-wide and persisted across files and reloads.
+ */
+export const diffShowWhitespaceAtom = atomWithStorage<boolean>(
+	KEY('diff_show_whitespace'),
+	false,
+);
+
+/**
+ * Whether the diff viewer soft-wraps long lines instead of scrolling them
+ * horizontally; app-wide and persisted across files and reloads.
+ */
+export const diffWordWrapAtom = atomWithStorage<boolean>(
+	KEY('diff_word_wrap'),
+	false,
+);
+
 // ─── Experimental (user) ──────────────────────────────────────────────────────
 
 /** Whether developer-only diagnostics and debug controls are visible; persisted to localStorage. */

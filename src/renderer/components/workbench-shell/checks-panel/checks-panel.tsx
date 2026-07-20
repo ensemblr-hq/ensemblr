@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAtom, useSetAtom } from 'jotai';
 import {
 	type ReactNode,
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import {
 	deleteReviewTodo,
 	ensemblrQueryKeys,
+	reviewCommentsQuery,
 	saveReviewTodo,
 } from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
@@ -20,6 +21,7 @@ import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { getChecksPanelState } from '@/renderer/lib/workbench/checks-panel-state';
 import { buildCommitAndPushPrompt } from '@/renderer/lib/workbench/checks-pr-prompts';
+import { selectLocalReviewComments } from '@/renderer/lib/workbench/local-review-comments';
 import {
 	prDraftIdentity,
 	seedPrDetails,
@@ -38,7 +40,10 @@ import {
 	prDetailsLiveDraftAtomFamily,
 } from '@/renderer/state/preferences';
 import type { ChecksPanelState } from '@/renderer/types/components';
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import type {
+	PullRequestCommentSummary,
+	WorkspaceShellModel,
+} from '@/renderer/types/workbench';
 
 import { useCommentPreviewOpener } from '../conversation-panel/file-preview-context';
 import { useReviewActions } from '../review-actions/review-actions-context';
@@ -142,6 +147,13 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 	const submitToComposer = useComposerSubmit();
 	const reviewActions = useReviewActions();
 	const draft = usePrDetailsDraft(workspace);
+	const { data: reviewCommentsData } = useQuery(
+		reviewCommentsQuery(workspace.id),
+	);
+	const localComments = useMemo(
+		() => selectLocalReviewComments(reviewCommentsData?.comments ?? []),
+		[reviewCommentsData],
+	);
 	// "Create PR" stays available whenever the branch differs from base, even with
 	// a clean worktree once edits are committed.
 	const canCreatePullRequest = useReviewableChanges(workspace);
@@ -178,6 +190,14 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 		return (
 			<ChecksNoPullRequestState
 				canCreatePullRequest={canCreatePullRequest}
+				commentsSection={
+					localComments.length ? (
+						<CommentsSection
+							comments={localComments}
+							workspaceId={workspace.id}
+						/>
+					) : undefined
+				}
 				onCommitAndPush={sendCommitAndPush}
 				onCreatePullRequest={sendCreatePullRequest}
 				state={panelState}
@@ -196,6 +216,7 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 
 	return (
 		<ChecksPullRequestPanel
+			localComments={localComments}
 			onCommitAndPush={sendCommitAndPush}
 			onUpdatePullRequest={sendCreatePullRequest}
 			state={panelState}
@@ -272,6 +293,7 @@ function useTodoActions(workspaceId: string): TodoActions {
 /** Body of the checks panel when a pull request exists. */
 function ChecksPullRequestPanel({
 	children,
+	localComments,
 	onCommitAndPush,
 	onUpdatePullRequest,
 	state,
@@ -279,6 +301,8 @@ function ChecksPullRequestPanel({
 	workspace,
 }: {
 	children: ReactNode;
+	/** Ensemblr-local review comments, merged into the Comments section. */
+	localComments: readonly PullRequestCommentSummary[];
 	onCommitAndPush: () => void;
 	onUpdatePullRequest: () => void;
 	state: Extract<ChecksPanelState, { hasPullRequest: true }>;
@@ -287,36 +311,16 @@ function ChecksPullRequestPanel({
 }) {
 	const { pullRequest } = state;
 	const insertIntoComposer = useComposerInsert();
-	const openCommentPreview = useCommentPreviewOpener();
 	const showGitStatusAction = state.kind !== 'pr-ready';
 	// A merged/closed PR has no actionable git status, so the section is hidden.
 	const isClosedOrMerged =
 		pullRequest.state === 'merged' || pullRequest.state === 'closed';
 
-	// Hiding a comment dismisses it for this session only (it returns on reload).
-	// State is keyed by workspace id so hidden ids never leak across a workspace
-	// switch — the render-time reset mirrors usePrDetailsDraft's identity pattern.
-	const [hidden, setHidden] = useState(() => ({
-		ids: new Set<string>(),
-		workspaceId: workspace.id,
-	}));
-	if (hidden.workspaceId !== workspace.id) {
-		setHidden({ ids: new Set<string>(), workspaceId: workspace.id });
-	}
-	const visibleComments = pullRequest.comments.filter(
-		(comment) => !hidden.ids.has(comment.id),
+	// GitHub review comments first, then the user's own local notes.
+	const comments = useMemo(
+		() => [...pullRequest.comments, ...localComments],
+		[pullRequest.comments, localComments],
 	);
-
-	const addCommentToChat = (comment: (typeof pullRequest.comments)[number]) => {
-		insertIntoComposer(formatCommentContext(comment, pullRequest.number));
-		toast.success('Comment added to chat.');
-	};
-	const hideComment = (id: string) => {
-		setHidden((current) => ({
-			ids: new Set(current.ids).add(id),
-			workspaceId: current.workspaceId,
-		}));
-	};
 
 	return (
 		<ScrollArea className='h-full overflow-hidden'>
@@ -357,39 +361,11 @@ function ChecksPullRequestPanel({
 					)}
 				</section>
 
-				<section className='flex min-w-0 flex-col gap-1.5'>
-					<ChecksSectionHeader
-						actionLabel={visibleComments.length ? 'Add all to chat' : undefined}
-						label='Comments'
-						onAction={() => {
-							insertIntoComposer(
-								formatAllCommentsContext(visibleComments, pullRequest.number),
-							);
-							toast.success('All comments added to chat.');
-						}}
-					/>
-					{visibleComments.length ? (
-						visibleComments.map((comment) => (
-							<PullRequestCommentRow
-								comment={comment}
-								key={comment.id}
-								onAddToChat={() => addCommentToChat(comment)}
-								onHide={() => hideComment(comment.id)}
-								onOpenPreview={
-									openCommentPreview
-										? () =>
-												openCommentPreview({
-													comment,
-													prNumber: pullRequest.number,
-												})
-										: undefined
-								}
-							/>
-						))
-					) : (
-						<ChecksEmptyMessage label='No comments yet' />
-					)}
-				</section>
+				<CommentsSection
+					comments={comments}
+					prNumber={pullRequest.number}
+					workspaceId={workspace.id}
+				/>
 
 				<TodoSection
 					onAddToChat={(todo) => {
@@ -401,6 +377,79 @@ function ChecksPullRequestPanel({
 				/>
 			</div>
 		</ScrollArea>
+	);
+}
+
+/**
+ * "Comments" section listing GitHub review comments and Ensemblr-local notes
+ * together. Each row opens a read-only preview, adds itself to chat, or hides for
+ * the session; the header adds every visible comment to chat at once. Session
+ * hides are keyed by workspace so they never leak across a workspace switch.
+ */
+function CommentsSection({
+	comments,
+	prNumber,
+	workspaceId,
+}: {
+	comments: readonly PullRequestCommentSummary[];
+	prNumber?: number;
+	workspaceId: string;
+}) {
+	const insertIntoComposer = useComposerInsert();
+	const openCommentPreview = useCommentPreviewOpener();
+
+	const [hidden, setHidden] = useState(() => ({
+		ids: new Set<string>(),
+		workspaceId,
+	}));
+	if (hidden.workspaceId !== workspaceId) {
+		setHidden({ ids: new Set<string>(), workspaceId });
+	}
+	const visibleComments = comments.filter(
+		(comment) => !hidden.ids.has(comment.id),
+	);
+
+	const addCommentToChat = (comment: PullRequestCommentSummary) => {
+		insertIntoComposer(formatCommentContext(comment, prNumber));
+		toast.success('Comment added to chat.');
+	};
+	const hideComment = (id: string) => {
+		setHidden((current) => ({
+			ids: new Set(current.ids).add(id),
+			workspaceId: current.workspaceId,
+		}));
+	};
+
+	return (
+		<section className='flex min-w-0 flex-col gap-1.5'>
+			<ChecksSectionHeader
+				actionLabel={visibleComments.length ? 'Add all to chat' : undefined}
+				label='Comments'
+				onAction={() => {
+					insertIntoComposer(
+						formatAllCommentsContext(visibleComments, prNumber),
+					);
+					toast.success('All comments added to chat.');
+				}}
+			/>
+			{visibleComments.length ? (
+				visibleComments.map((comment) => (
+					<PullRequestCommentRow
+						comment={comment}
+						key={comment.id}
+						onAddToChat={() => addCommentToChat(comment)}
+						onHide={() => hideComment(comment.id)}
+						onOpenPreview={
+							openCommentPreview
+								? () => openCommentPreview({ comment, prNumber })
+								: undefined
+						}
+					/>
+				))
+			) : (
+				<ChecksEmptyMessage label='No comments yet' />
+			)}
+		</section>
 	);
 }
 

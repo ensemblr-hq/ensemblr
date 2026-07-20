@@ -65,11 +65,23 @@ export interface GithubCommentWire {
 	body: string;
 	createdAt: string;
 	id: string;
+	/** True when the comment's author is a GitHub App/bot (e.g. an Actions bot). */
+	isBot?: boolean;
+	/** True when the review thread no longer maps to the current diff. */
+	isOutdated?: boolean;
 	/** Resolution state for review threads; `null` when not applicable/unknown. */
 	isResolved: boolean | null;
 	kind: GithubCommentKind;
 	line?: number;
 	path?: string;
+	/** Replies on the same review thread, in chronological order. */
+	replies?: readonly GithubCommentWire[];
+	/** Diff side the line anchors to: `LEFT` (old) or `RIGHT` (new). */
+	side?: 'LEFT' | 'RIGHT';
+	/** First line of a multi-line review comment, when the thread spans a range. */
+	startLine?: number;
+	/** Identifier of the owning review thread, used to group replies. */
+	threadId?: string;
 	url?: string;
 }
 

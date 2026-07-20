@@ -135,7 +135,7 @@ function toCommentSummary(
 		detail: `${comment.author}: ${firstLine(comment.body)}${location}`,
 		id: comment.id,
 		...(comment.isResolved === null ? {} : { isResolved: comment.isResolved }),
-		provider: 'github',
+		provider: comment.isBot ? 'github-actions' : 'github',
 		...(comment.url ? { url: comment.url } : {}),
 	};
 }

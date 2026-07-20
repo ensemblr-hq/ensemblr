@@ -52,9 +52,15 @@ const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: In
     pullRequest(number: $number) {
       reviewThreads(first: 50) {
         nodes {
+          id
           isResolved
-          comments(first: 1) {
-            nodes { id body createdAt path line url author { login } }
+          isOutdated
+          path
+          line
+          startLine
+          diffSide
+          comments(first: 50) {
+            nodes { id body createdAt url author { login __typename } }
           }
         }
       }

@@ -97,6 +97,11 @@ export const SHORTCUTS = {
 		scope: 'composer',
 		bindings: [{ key: 'Enter', modifiers: ['shift'] }],
 	},
+	'diffComment.submit': {
+		description: 'Submit diff comment',
+		scope: 'composer',
+		bindings: [{ key: 'Enter', modifiers: ['mod'] }],
+	},
 	'composer.queue': {
 		description: 'Queue message as a follow-up',
 		scope: 'composer',

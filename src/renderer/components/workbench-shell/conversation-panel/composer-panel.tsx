@@ -14,6 +14,7 @@ import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useComposerState } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
 import { formatLinearIssueContext } from '@/renderer/lib/linear';
 import { cn } from '@/renderer/lib/utils';
+import { useConsumeComposerFocusRequest } from '@/renderer/state/composer';
 import {
 	alwaysShowContextUsageAtom,
 	sendShortcutAtom,
@@ -68,6 +69,7 @@ export function ComposerPanel({
 		state.textareaRef.current?.focus();
 	}, [state.textareaRef]);
 	useHotkey('composer.focus', focusTextarea);
+	useConsumeComposerFocusRequest(chatTabId, focusTextarea);
 
 	const pickersDisabled = composer.disabled || state.isStreaming;
 	const toggleModelPicker = useCallback(() => {

@@ -578,3 +578,94 @@
 		background-size: 100% 12px;
 	}
 }
+
+/*
+ * Diff viewer (react-diff-view) theming. Rules are scoped under `.ensemblr-diff`
+ * and kept top-level (outside @layer) so they override the library's own
+ * `:root`/element defaults regardless of stylesheet import order, and re-hue
+ * automatically from the semantic `--ensemblr-diff-*` tokens in light, dark, and
+ * every `a11y-*` colorblind mode.
+ */
+.ensemblr-diff {
+	--diff-font-family: var(--font-mono);
+	color: var(--color-foreground);
+	font-size: 0.8125rem;
+}
+
+.ensemblr-diff .diff-gutter-col {
+	width: var(--ensemblr-gutter-ch, 3ch);
+}
+
+.ensemblr-diff .diff-gutter {
+	color: var(--color-muted-foreground);
+	padding: 0 0.5ch;
+}
+
+.ensemblr-diff .diff-gutter-insert {
+	background-color: var(--color-diff-addition);
+	color: var(--color-diff-addition-foreground);
+}
+
+.ensemblr-diff .diff-gutter-delete {
+	background-color: var(--color-diff-deletion);
+	color: var(--color-diff-deletion-foreground);
+}
+
+.ensemblr-diff .diff-code-insert {
+	background-color: color-mix(
+		in oklch,
+		var(--color-diff-addition) 55%,
+		var(--color-background)
+	);
+}
+
+.ensemblr-diff .diff-code-delete {
+	background-color: color-mix(
+		in oklch,
+		var(--color-diff-deletion) 55%,
+		var(--color-background)
+	);
+}
+
+.ensemblr-diff .diff-code-insert .diff-code-edit {
+	background-color: var(--color-diff-addition);
+}
+
+.ensemblr-diff .diff-code-delete .diff-code-edit {
+	background-color: var(--color-diff-deletion);
+}
+
+.ensemblr-diff .diff-code-mark {
+	color: var(--color-muted-foreground);
+	opacity: 0.6;
+}
+
+.ensemblr-diff .diff-code.ensemblr-diff-nowrap {
+	white-space: pre;
+	word-break: normal;
+}
+
+/*
+ * Gap band rendered between two non-adjacent hunks (skipped unchanged lines),
+ * marking where one changed block ends and the next begins.
+ */
+.ensemblr-diff .diff-decoration-content {
+	padding: 0;
+}
+
+.ensemblr-diff-gap {
+	display: flex;
+	align-items: center;
+	gap: 0.5ch;
+	padding: 0.1875rem 1ch;
+	border-top: 1px solid var(--color-border);
+	border-bottom: 1px solid var(--color-border);
+	background-color: color-mix(
+		in oklch,
+		var(--color-muted) 45%,
+		var(--color-background)
+	);
+	color: var(--color-muted-foreground);
+	font-family: var(--font-sans);
+	font-size: 0.75rem;
+}

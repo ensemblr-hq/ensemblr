@@ -150,7 +150,67 @@ export function parseDeployments(
 	});
 }
 
-/** Parses GraphQL review-thread nodes into resolvable review comments. */
+/**
+ * Whether a GraphQL author node is a GitHub App/bot, used to badge Actions-bot
+ * review comments. Detects both the `Bot` GraphQL typename and the `[bot]`
+ * login suffix GitHub appends to app identities.
+ * @param author - The GraphQL `author` record, if present
+ * @returns True when the author is a bot
+ */
+function isBotAuthor(author: Record<string, unknown> | undefined): boolean {
+	if (!author) {
+		return false;
+	}
+	if (author.__typename === 'Bot') {
+		return true;
+	}
+	return readString(author.login).endsWith('[bot]');
+}
+
+/**
+ * Read the diff side of a review thread, normalizing to the wire `LEFT`/`RIGHT`
+ * union used to anchor a comment to the old or new side of the diff.
+ * @param value - The GraphQL `diffSide` value
+ * @returns The normalized side, or undefined when absent/unknown
+ */
+function readDiffSide(value: unknown): 'LEFT' | 'RIGHT' | undefined {
+	return value === 'LEFT' || value === 'RIGHT' ? value : undefined;
+}
+
+/**
+ * Map one review-thread comment node to a wire comment, tagging bot authors.
+ * @param node - The GraphQL comment node
+ * @param index - Position within the thread, for a stable id fallback
+ * @returns The wire comment, or null when the node is malformed
+ */
+function parseThreadComment(
+	node: unknown,
+	index: number,
+): GithubCommentWire | null {
+	if (typeof node !== 'object' || node === null) {
+		return null;
+	}
+	const record = node as Record<string, unknown>;
+	const author = record.author as Record<string, unknown> | undefined;
+	return {
+		author: readString(author?.login, 'unknown'),
+		body: readString(record.body),
+		createdAt: readString(record.createdAt),
+		id: readString(record.id, `comment-${index}`),
+		isBot: isBotAuthor(author),
+		isResolved: null,
+		kind: 'review-comment' as const,
+		...(readString(record.url) ? { url: readString(record.url) } : {}),
+	};
+}
+
+/**
+ * Parse GraphQL review-thread nodes into anchored review comments. Each thread
+ * yields one head comment carrying its diff anchor (path/line/side), resolution
+ * and outdated state, a bot flag, and its replies.
+ * @param value - The GraphQL `reviewThreads` connection
+ * @returns The parsed review-thread comments in wire form
+ */
 export function parseReviewThreads(value: unknown): GithubCommentWire[] {
 	if (typeof value !== 'object' || value === null) {
 		return [];
@@ -159,36 +219,45 @@ export function parseReviewThreads(value: unknown): GithubCommentWire[] {
 	if (!Array.isArray(nodes)) {
 		return [];
 	}
-	return nodes.flatMap((thread, threadIndex) => {
+	return nodes.flatMap((thread) => {
 		if (typeof thread !== 'object' || thread === null) {
 			return [];
 		}
 		const threadRecord = thread as Record<string, unknown>;
-		const isResolved = threadRecord.isResolved === true;
 		const commentNodes = (
 			threadRecord.comments as { nodes?: unknown } | undefined
 		)?.nodes;
 		if (!Array.isArray(commentNodes) || commentNodes.length === 0) {
 			return [];
 		}
-		const first = commentNodes[0];
-		if (typeof first !== 'object' || first === null) {
+		const head = parseThreadComment(commentNodes[0], 0);
+		if (!head) {
 			return [];
 		}
-		const comment = first as Record<string, unknown>;
-		const author = (comment.author as Record<string, unknown> | undefined)
-			?.login;
+		const replies = commentNodes
+			.slice(1)
+			.map((node, index) => parseThreadComment(node, index + 1))
+			.filter((comment): comment is GithubCommentWire => comment !== null);
+		const side = readDiffSide(threadRecord.diffSide);
 		return [
 			{
-				author: readString(author, 'unknown'),
-				body: readString(comment.body),
-				createdAt: readString(comment.createdAt),
-				id: readString(comment.id, `thread-${threadIndex}`),
-				isResolved,
-				kind: 'review-comment' as const,
-				...(typeof comment.line === 'number' ? { line: comment.line } : {}),
-				...(readString(comment.path) ? { path: readString(comment.path) } : {}),
-				...(readString(comment.url) ? { url: readString(comment.url) } : {}),
+				...head,
+				isOutdated: threadRecord.isOutdated === true,
+				isResolved: threadRecord.isResolved === true,
+				...(replies.length > 0 ? { replies } : {}),
+				...(readString(threadRecord.id)
+					? { threadId: readString(threadRecord.id) }
+					: {}),
+				...(typeof threadRecord.line === 'number'
+					? { line: threadRecord.line }
+					: {}),
+				...(readString(threadRecord.path)
+					? { path: readString(threadRecord.path) }
+					: {}),
+				...(side ? { side } : {}),
+				...(typeof threadRecord.startLine === 'number'
+					? { startLine: threadRecord.startLine }
+					: {}),
 			},
 		];
 	});

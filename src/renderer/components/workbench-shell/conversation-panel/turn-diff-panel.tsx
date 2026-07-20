@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { FileDiffIcon } from 'lucide-react';
-
-import type { BundledLanguage } from 'shiki';
+import { useMemo } from 'react';
 
 import { turnDiffQuery } from '@/renderer/api/ensemblr-queries';
-import { CodeBlockContent } from '@/renderer/components/code-block';
+import { DiffViewer } from '@/renderer/components/diff-viewer';
+import { splitCombinedPatch } from '@/renderer/components/diff-viewer/parse';
 import type { TurnDiffFileWire } from '@/shared/ipc/contracts/checkpoint';
 
 import { PanelMessage } from './panel-message';
@@ -12,10 +12,16 @@ import { PanelMessage } from './panel-message';
 /**
  * Read-only diff surface shown when a `kind: 'diff'` tab is active. Shows the
  * changes between a turn's pre-prompt checkpoint and the post-turn state
- * (next checkpoint, or the live working tree for the latest turn).
+ * (next checkpoint, or the live working tree for the latest turn), rendering
+ * one rich {@link DiffViewer} per changed file.
  */
 export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 	const { data, isError, isPending } = useQuery(turnDiffQuery(turnId));
+
+	const patchFiles = useMemo(
+		() => (data?.ok && data.patch ? splitCombinedPatch(data.patch) : []),
+		[data],
+	);
 
 	if (!turnId) {
 		return <PanelMessage message='This tab has no turn associated.' />;
@@ -71,12 +77,23 @@ export function TurnDiffPanel({ turnId }: { turnId: string | null }) {
 						</li>
 					))}
 				</ul>
-				{result.patch ? (
-					<CodeBlockContent
-						code={result.patch}
-						language={'diff' as BundledLanguage}
-					/>
-				) : null}
+				<div className='flex flex-col'>
+					{patchFiles.map((file) => (
+						<div
+							className='border-border border-b'
+							key={file.path || file.patch}
+						>
+							<div className='bg-muted/20 px-4 py-1 font-mono text-muted-foreground text-xs'>
+								{file.path}
+							</div>
+							<DiffViewer
+								fillHeight={false}
+								filePath={file.path}
+								patch={file.patch}
+							/>
+						</div>
+					))}
+				</div>
 			</div>
 		</div>
 	);
