@@ -1,3 +1,4 @@
+import type { AgentsApi } from './agents';
 import type { AppSettingsApi } from './app-settings';
 import type { ArchiveApi } from './archive-lifecycle';
 import type { ChatTabApi } from './chat-tab';
@@ -36,7 +37,8 @@ import type { RepositorySourcesApi } from './workspace-sources';
  * its contract next to the wire types it depends on.
  */
 export interface EnsemblrApi
-	extends AppSettingsApi,
+	extends AgentsApi,
+		AppSettingsApi,
 		WorkspaceApi,
 		RepositoryApi,
 		PiSessionApi,

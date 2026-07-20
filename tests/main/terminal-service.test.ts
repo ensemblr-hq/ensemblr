@@ -249,6 +249,71 @@ test('detects a run-script preview URL split across two output chunks', async (t
 	);
 });
 
+test('captures an agent OSC title terminated by BEL', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { lifecycleEvents, service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		kind: 'agent',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+
+	const ESC = String.fromCharCode(27);
+	const BEL = String.fromCharCode(7);
+	fake.emitData(`${ESC}]0;Fix the login bug${BEL}`);
+
+	assert.equal(
+		service.getSnapshot(terminalId).session?.title,
+		'Fix the login bug',
+	);
+	assert.ok(
+		lifecycleEvents.some(
+			(event) => event.session.title === 'Fix the login bug',
+		),
+	);
+});
+
+test('captures an agent OSC title terminated by ST split across chunks', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({
+		kind: 'agent',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+
+	const ESC = String.fromCharCode(27);
+	fake.emitData(`${ESC}]2;Refactor the parser`);
+	fake.emitData(`${ESC}\\`);
+
+	assert.equal(
+		service.getSnapshot(terminalId).session?.title,
+		'Refactor the parser',
+	);
+});
+
+test('ignores OSC titles for non-agent terminal sessions', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	const ESC = String.fromCharCode(27);
+	const BEL = String.fromCharCode(7);
+	fake.emitData(`${ESC}]0;should not stick${BEL}`);
+
+	assert.notEqual(
+		service.getSnapshot(terminalId).session?.title,
+		'should not stick',
+	);
+});
+
 test('does not detect a preview URL for interactive terminal sessions', async (t) => {
 	const fake = createFakePty();
 	const backend: PtyBackend = { spawn: () => fake.pty };

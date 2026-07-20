@@ -16,7 +16,13 @@ export type {
 } from './pi-message-payloads.ts';
 
 /** Kind of chat tab surfaced to the renderer. */
-export type ChatTabKindWire = 'chat' | 'diff' | 'document' | 'file' | 'preview';
+export type ChatTabKindWire =
+	| 'chat'
+	| 'diff'
+	| 'document'
+	| 'file'
+	| 'preview'
+	| 'terminal';
 
 /** Renderer-facing chat tab descriptor. */
 export interface PiChatTabWire {

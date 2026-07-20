@@ -62,6 +62,11 @@ export class TerminalServiceError extends Error {
 export interface CreateTerminalSessionOptions {
 	cols?: number;
 	command?: string;
+	/**
+	 * Harness registry id when the session runs an agent harness. Persisted in the
+	 * session's metadata so a restart can identify which harness to resume.
+	 */
+	harnessId?: string;
 	kind?: TerminalSessionKind;
 	title?: string;
 	rows?: number;
@@ -140,6 +145,11 @@ interface TrackedSession {
 	 * stops a split banner from hiding the dock's Open button.
 	 */
 	previewScanBuffer: string;
+	/**
+	 * Rolling tail of recent agent-terminal output kept to reassemble an OSC
+	 * window-title escape (`ESC ]0;…BEL`) that may straddle two PTY chunks.
+	 */
+	titleScanBuffer: string;
 	pty: PtyProcess | null;
 	scrollback: ScrollbackBuffer;
 	snapshot: TerminalSessionSnapshot;
@@ -152,6 +162,29 @@ interface TrackedSession {
  * split across chunks still lands whole inside the window.
  */
 const PREVIEW_SCAN_WINDOW = 8192;
+
+/**
+ * How many trailing characters of agent-terminal output to retain while waiting
+ * for an OSC title escape to terminate. Comfortably longer than any title line.
+ */
+const TITLE_SCAN_WINDOW = 512;
+
+/**
+ * Matches an OSC window-title escape: `ESC ] (0|1|2) ; <title> (BEL | ESC \)`.
+ * Built without literal control characters. Both terminators are accepted: agent
+ * TUIs are split between the BEL form (Claude) and the ST form `ESC \` (Codex,
+ * Gemini, Vibe). The capture class already excludes BEL and ESC, so it stops
+ * cleanly before either terminator.
+ */
+const OSC_TITLE_ESC = String.fromCharCode(27);
+const OSC_TITLE_BEL = String.fromCharCode(7);
+// ST terminator is `ESC \`; the backslash is doubled so the regex source matches
+// a literal backslash instead of escaping the group's closing paren.
+const OSC_TITLE_ST = `${OSC_TITLE_ESC}\\\\`;
+const OSC_TITLE_PATTERN = new RegExp(
+	`${OSC_TITLE_ESC}][012];([^${OSC_TITLE_BEL}${OSC_TITLE_ESC}]*)(?:${OSC_TITLE_BEL}|${OSC_TITLE_ST})`,
+	'g',
+);
 
 /**
  * Builds the main-process PTY supervisor used by terminal dock tabs and script
@@ -240,6 +273,43 @@ export function createTerminalService({
 	}
 
 	/**
+	 * Captures the window title an agent harness sets via an OSC escape and, when
+	 * it changes, stamps it on the session and broadcasts so the harness's own
+	 * conversation title surfaces on its tab. No-op for non-agent sessions.
+	 */
+	function maybeCaptureOscTitle(session: TrackedSession, data: string): void {
+		if (session.snapshot.kind !== 'agent') {
+			return;
+		}
+
+		session.titleScanBuffer += data;
+		let latestTitle: string | null = null;
+		let consumedEnd = 0;
+		for (const match of session.titleScanBuffer.matchAll(OSC_TITLE_PATTERN)) {
+			latestTitle = match[1] ?? '';
+			consumedEnd = (match.index ?? 0) + match[0].length;
+		}
+
+		if (consumedEnd > 0) {
+			session.titleScanBuffer = session.titleScanBuffer.slice(consumedEnd);
+		}
+		if (session.titleScanBuffer.length > TITLE_SCAN_WINDOW) {
+			session.titleScanBuffer = session.titleScanBuffer.slice(
+				-TITLE_SCAN_WINDOW,
+			);
+		}
+
+		if (latestTitle === null) {
+			return;
+		}
+		const nextTitle = latestTitle.trim();
+		if (nextTitle && nextTitle !== session.snapshot.title) {
+			session.snapshot = { ...session.snapshot, title: nextTitle };
+			broadcastLifecycle(session);
+		}
+	}
+
+	/**
 	 * Tears down a session's PTY subscriptions, records its terminal status and
 	 * exit code, persists the outcome when a database is available, and wakes any
 	 * exit waiters and lifecycle listeners.
@@ -313,6 +383,7 @@ export function createTerminalService({
 	async function create({
 		cols = DEFAULT_COLS,
 		command,
+		harnessId,
 		kind = 'terminal',
 		rows = DEFAULT_ROWS,
 		title,
@@ -401,6 +472,7 @@ export function createTerminalService({
 			killTimer: null,
 			outputSeq: 0,
 			previewScanBuffer: '',
+			titleScanBuffer: '',
 			pty,
 			scrollback: createScrollbackBuffer(resolveScrollbackLimit()),
 			snapshot: {
@@ -425,6 +497,7 @@ export function createTerminalService({
 			session.scrollback.append(data);
 			onOutput({ data, seq: session.outputSeq, terminalId: id, workspaceId });
 			maybeDetectPreviewUrl(session, data);
+			maybeCaptureOscTitle(session, data);
 		});
 		session.exitSubscription = pty.onExit(({ exitCode }) => {
 			finalizeSession(session, exitCode);
@@ -440,7 +513,9 @@ export function createTerminalService({
 					cwd: environment.cwd,
 					database,
 					id,
-					metadataJson: JSON.stringify({ kind }),
+					metadataJson: JSON.stringify(
+						harnessId ? { harnessId, kind } : { kind },
+					),
 					shell,
 					status: 'running',
 					timestamp: createdAt,
@@ -608,6 +683,8 @@ function clampDimension(value: number, fallback: number): number {
 /** Default tab title per session kind. */
 function defaultTitle(kind: TerminalSessionKind): string {
 	switch (kind) {
+		case 'agent':
+			return 'Agent';
 		case 'archive-script':
 			return 'Archive';
 		case 'run-script':
@@ -692,7 +769,7 @@ function mergeProcessEnvironment({
 		env.LANG = 'en_US.UTF-8';
 	}
 
-	if (kind === 'terminal') {
+	if (kind === 'terminal' || kind === 'agent') {
 		env.TERM_PROGRAM = 'Ensemblr';
 	}
 

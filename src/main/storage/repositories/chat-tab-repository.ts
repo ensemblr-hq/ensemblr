@@ -3,7 +3,13 @@ import type { DatabaseSync } from 'node:sqlite';
 import { parseMetadata, serializeMetadata } from './metadata-json.ts';
 
 /** Kind of content a chat tab hosts: a chat, diff, document, file, or preview. */
-export type ChatTabKind = 'chat' | 'diff' | 'document' | 'file' | 'preview';
+export type ChatTabKind =
+	| 'chat'
+	| 'diff'
+	| 'document'
+	| 'file'
+	| 'preview'
+	| 'terminal';
 
 /** Domain shape of a chat tab row returned by the repository. */
 export interface ChatTabRow {

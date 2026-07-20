@@ -1,10 +1,54 @@
 import { expect, test } from 'vitest';
 
 import {
+	launchAgentHarnessRequestSchema,
+	openChatTabRequestSchema,
 	parseCreateWorkspaceRequest,
 	parseGithubRepositoryListRequest,
 	parseUpdateRepositorySettingsRequest,
+	resumeAgentHarnessRequestSchema,
 } from '../../src/main/ipc/request-schemas.ts';
+
+test('openChatTabRequestSchema accepts the terminal tab kind', () => {
+	const parsed = openChatTabRequestSchema.parse({
+		kind: 'terminal',
+		metadata: { harnessId: 'claude', terminalId: 't-1' },
+		workspaceId: 'ws-1',
+	});
+	expect(parsed.kind).toBe('terminal');
+});
+
+test('launchAgentHarnessRequestSchema requires a harness id and workspace id', () => {
+	expect(
+		launchAgentHarnessRequestSchema.parse({
+			harnessId: 'claude',
+			workspaceId: 'ws-1',
+		}),
+	).toEqual({ harnessId: 'claude', workspaceId: 'ws-1' });
+	expect(() =>
+		launchAgentHarnessRequestSchema.parse({
+			harnessId: '',
+			workspaceId: 'ws-1',
+		}),
+	).toThrow();
+});
+
+test('resumeAgentHarnessRequestSchema requires chat tab, harness, and workspace ids', () => {
+	expect(
+		resumeAgentHarnessRequestSchema.parse({
+			chatTabId: 'tab-1',
+			harnessId: 'codex',
+			workspaceId: 'ws-1',
+		}),
+	).toEqual({ chatTabId: 'tab-1', harnessId: 'codex', workspaceId: 'ws-1' });
+	expect(() =>
+		resumeAgentHarnessRequestSchema.parse({
+			chatTabId: '',
+			harnessId: 'codex',
+			workspaceId: 'ws-1',
+		}),
+	).toThrow();
+});
 
 const GITHUB_LINKED_ISSUE = {
 	id: 'https://github.com/o/r/issues/44',

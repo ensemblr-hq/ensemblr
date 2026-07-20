@@ -12,6 +12,11 @@ export type WorkspaceMainContentState = Pick<
 	onFilePreviewOpen: (input: {
 		filePath: string;
 	}) => Promise<{ chatTabId: string } | null>;
+	/** Launches an agent harness in a new embedded-terminal tab. */
+	onLaunchHarness: (input: {
+		harnessId: string;
+		harnessLabel: string;
+	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabClose: (sessionId: string) => void;
 	/** Persists the tab strip order after drag-and-drop reordering. */
 	onSessionTabsReorder: (sessionIds: string[]) => void;

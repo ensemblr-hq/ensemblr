@@ -24,6 +24,7 @@ const EXPECTED_MIGRATIONS = [
 	'007_chat_tab_kinds',
 	'008_checkpoint_pi_linkage',
 	'009_linear_cache',
+	'010_chat_tab_terminal_kind',
 ];
 
 function createTestDatabasePath(): {

@@ -1,3 +1,4 @@
+import type { HarnessDetectionService } from '../agents/harness-detection-service.ts';
 import { createChatTabService } from '../chat-tabs/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import type {
@@ -49,6 +50,7 @@ import type {
 } from '../workspace-files';
 import { createWorkspaceGitService } from '../workspace-git';
 import { createWorkspaceRuntimeService } from '../workspace-runtime';
+import { registerAgentHandlers } from './handlers/agents';
 import { registerAppSettingsHandlers } from './handlers/app-settings';
 import { registerChatTabHandlers } from './handlers/chat-tab';
 import { registerCheckpointHandlers } from './handlers/checkpoint';
@@ -94,6 +96,7 @@ interface RegisterIpcHandlersOptions {
 	deleteWorkspaceService: DeleteWorkspaceService;
 	environmentVariablesService: EnvironmentVariablesService;
 	githubCloneService: GithubCloneService;
+	harnessDetectionService: HarnessDetectionService;
 	githubRepositoryListService: GithubRepositoryListService;
 	linearAuthService: LinearAuthService;
 	linearService: LinearService;
@@ -147,6 +150,7 @@ export function registerIpcHandlers({
 	environmentVariablesService,
 	githubCloneService,
 	githubRepositoryListService,
+	harnessDetectionService,
 	linearAuthService,
 	linearService,
 	listAllWorkspacesService,
@@ -260,6 +264,11 @@ export function registerIpcHandlers({
 	});
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerTerminalHandlers({ terminalService });
+	registerAgentHandlers({
+		databaseService,
+		harnessDetectionService,
+		terminalService,
+	});
 	registerWorkspaceScriptHandlers({ databaseService, scriptLifecycleService });
 	registerRepositorySettingsHandlers({ databaseService });
 	registerWorkspaceFilesHandlers({

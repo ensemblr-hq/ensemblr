@@ -32,6 +32,8 @@ export default defineConfig({
 			'tests/main/sanitize-title.test.ts',
 			'tests/main/parse-naming-response.test.ts',
 			'tests/main/launch-env.test.ts',
+			'tests/main/executable-discovery.test.ts',
+			'tests/main/harness-detection-service.test.ts',
 			'tests/main/request-schemas.test.ts',
 			'tests/main/external-links-policy.test.ts',
 			'tests/main/app-settings-service.test.ts',

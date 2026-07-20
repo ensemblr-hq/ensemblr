@@ -94,6 +94,7 @@
 	"dependencies": {
 		"@atlaskit/pragmatic-drag-and-drop": "^2.0.1",
 		"@atlaskit/pragmatic-drag-and-drop-hitbox": "^2.0.0",
+		"@iconify-json/logos": "^1.2.11",
 		"@iconify-json/vscode-icons": "^1.2.65",
 		"@iconify/react": "^6.0.2",
 		"@radix-ui/react-use-controllable-state": "^1.2.3",

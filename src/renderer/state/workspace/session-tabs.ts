@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
 	closeChatTab,
@@ -15,7 +15,9 @@ import {
 	writeOpenedChatTabToCache,
 	writeReorderedChatTabsToCache,
 } from '@/renderer/api/ensemblr-queries';
+import { useWorkspaceAgentBusy } from '@/renderer/hooks/workspace/use-workspace-agent-busy';
 import { areStringArraysEqual } from '@/renderer/lib/ordered-ids';
+import { stripHarnessTitleDecoration } from '@/renderer/lib/terminal/harness-title';
 import { forgetComposerDraft } from '@/renderer/state/composer';
 import { forgetChatOverrides } from '@/renderer/state/preferences';
 import type {
@@ -88,6 +90,10 @@ export function useSessionTabState({
 		label: string;
 		turnId: string;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
+	openTerminalTab: (input: {
+		harnessId: string;
+		harnessLabel: string;
+	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openWorkspaceFileDiffTab: (input: {
 		filePath: string;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
@@ -125,6 +131,21 @@ export function useSessionTabState({
 		return map;
 	}, [piSessions]);
 
+	// Live window titles agent harnesses emit via OSC escapes, keyed by their
+	// backing terminal id, so a running agent's own conversation title surfaces
+	// on its tab (falling back to the harness label until one arrives).
+	const [terminalTitles, setTerminalTitles] = useState<Record<string, string>>(
+		{},
+	);
+	// Agent-terminal busy state, inferred from the spinner glyph a harness
+	// animates in its OSC title. Owned by a workspace-scoped hook so the same
+	// signal drives both this tab strip and the workspace sidebar/card rows.
+	const { busyTerminalIds } = useWorkspaceAgentBusy(workspaceId);
+	// Tab ids whose close is already in flight, so the harness-exit lifecycle
+	// event cannot re-close a tab the user just closed (kill → synchronous exit
+	// broadcast would otherwise fire a second close on the same row).
+	const closingTabIdsRef = useRef<Set<string>>(new Set());
+
 	const sessionTabs = useMemo<SessionTabModel[]>(() => {
 		// The synthetic `<workspaceId>:overview` placeholder is never a strip tab.
 		// Surfacing it here made opening the first real tab look like a replace:
@@ -135,10 +156,23 @@ export function useSessionTabState({
 		if (!openTabs) {
 			return [];
 		}
-		return openTabs.map((tab) =>
-			toSessionTabModel(tab, piStatusByPiSessionId.get(tab.piSessionId ?? '')),
-		);
-	}, [openTabs, piStatusByPiSessionId]);
+		return openTabs.map((tab) => {
+			const model = toSessionTabModel(
+				tab,
+				piStatusByPiSessionId.get(tab.piSessionId ?? ''),
+			);
+			if (model.kind === 'terminal') {
+				const liveTitle = terminalTitles[model.terminalId];
+				const isBusy = busyTerminalIds.has(model.terminalId);
+				return {
+					...model,
+					...(liveTitle ? { label: liveTitle } : {}),
+					...(isBusy ? { status: 'working' as const } : {}),
+				};
+			}
+			return model;
+		});
+	}, [busyTerminalIds, openTabs, piStatusByPiSessionId, terminalTitles]);
 
 	const closedSessions = useMemo<SessionTabModel[]>(() => {
 		if (!closedEntries) {
@@ -475,6 +509,60 @@ export function useSessionTabState({
 		[openAuxiliaryTabMutation],
 	);
 
+	/**
+	 * Launches an agent harness in a new terminal session and opens a terminal
+	 * tab bound to it. The launch command is assembled in the main process from
+	 * the trusted harness registry; this only forwards the selected id. When a
+	 * terminal tab for the same harness is already open it is focused instead of
+	 * launched again: the harnesses resume by cwd, not conversation id, so two
+	 * tabs of one harness would both reattach to the same latest conversation.
+	 */
+	const openTerminalTab = useCallback(
+		async ({
+			harnessId,
+			harnessLabel,
+		}: {
+			harnessId: string;
+			harnessLabel: string;
+		}): Promise<OpenSessionTabHandlerResult | null> => {
+			const existing = sessionTabs.find(
+				(session) =>
+					session.kind === 'terminal' && session.harnessId === harnessId,
+			);
+			if (existing) {
+				return { chatTabId: existing.id };
+			}
+			const launch = await window.ensemblr?.launchAgentHarness({
+				harnessId,
+				workspaceId,
+			});
+			const session = launch?.session ?? null;
+			if (!session) {
+				const message = launch?.diagnostics.find(
+					(diagnostic) => diagnostic.severity === 'error',
+				)?.message;
+				toast.error('Could not launch agent', {
+					description: message ?? `${harnessLabel} is not available.`,
+				});
+				return null;
+			}
+			try {
+				const result = await openAuxiliaryTabMutation.mutateAsync({
+					kind: 'terminal',
+					metadata: { harnessId, harnessLabel, terminalId: session.id },
+					title: harnessLabel,
+				});
+				return result.tab ? { chatTabId: result.tab.id } : null;
+			} catch {
+				// The tab row failed to persist; kill the orphaned PTY so it does not
+				// linger without a surface. Surfaced as a toast by the mutation.
+				void window.ensemblr?.killTerminalSession({ terminalId: session.id });
+				return null;
+			}
+		},
+		[openAuxiliaryTabMutation, sessionTabs, workspaceId],
+	);
+
 	const closeSessionTabAsync = useCallback(
 		async (chatTabId: string): Promise<CloseSessionTabHandlerResult> => {
 			await closeMutation.mutateAsync(chatTabId);
@@ -486,6 +574,9 @@ export function useSessionTabState({
 	/** Fire-and-forget close used by the SessionTabState contract. */
 	const closeSessionTab = useCallback(
 		(chatTabId: string) => {
+			if (closingTabIdsRef.current.has(chatTabId)) {
+				return;
+			}
 			const closingIndex = sessionTabs.findIndex(
 				(session) => session.id === chatTabId,
 			);
@@ -500,18 +591,132 @@ export function useSessionTabState({
 					return;
 				}
 			}
+			closingTabIdsRef.current.add(chatTabId);
 			const nextSession = selectNeighborTab(sessionTabs, closingIndex);
 			if (activeSession.id === chatTabId && nextSession) {
 				onSessionTabChange(nextSession.id);
 			}
-			void closeSessionTabAsync(chatTabId).then((result) => {
-				if (result.replacementChatTabId) {
-					onSessionTabChange(result.replacementChatTabId);
-				}
-			});
+			// A terminal tab owns a live PTY: kill it so closing the tab also stops
+			// the harness process (harmless if it already exited on its own).
+			if (closing?.kind === 'terminal' && closing.terminalId) {
+				void window.ensemblr?.killTerminalSession({
+					terminalId: closing.terminalId,
+				});
+			}
+			void closeSessionTabAsync(chatTabId)
+				.then((result) => {
+					if (result.replacementChatTabId) {
+						onSessionTabChange(result.replacementChatTabId);
+					}
+				})
+				.finally(() => {
+					closingTabIdsRef.current.delete(chatTabId);
+				});
 		},
 		[activeSession.id, closeSessionTabAsync, onSessionTabChange, sessionTabs],
 	);
+
+	// Map of live terminal-tab PTYs to their tab id and harness label, so a
+	// harness that exits can auto-close its tab and a live OSC title can be
+	// distinguished from the initial harness-label title.
+	const terminalTabByTerminalId = useMemo(() => {
+		const map = new Map<string, { harnessLabel: string; tabId: string }>();
+		for (const session of sessionTabs) {
+			if (session.kind === 'terminal' && session.terminalId) {
+				map.set(session.terminalId, {
+					harnessLabel: session.harnessLabel,
+					tabId: session.id,
+				});
+			}
+		}
+		return map;
+	}, [sessionTabs]);
+
+	useEffect(() => {
+		if (terminalTabByTerminalId.size === 0) {
+			return;
+		}
+		const unsubscribe = window.ensemblr?.onTerminalLifecycle((event) => {
+			const tab = terminalTabByTerminalId.get(event.terminalId);
+			if (!tab) {
+				return;
+			}
+			if (event.session.status !== 'running') {
+				closeSessionTab(tab.tabId);
+				return;
+			}
+			// The harness sets its own window title via an OSC escape. Strip the
+			// leading spinner/decoration glyphs many TUIs prepend (e.g. Claude's
+			// "✳ Claude Code"); adopt what remains only when it is a real title that
+			// diverges from the harness label, and reset to the label otherwise.
+			// (The spinner glyph itself drives the busy flag in useWorkspaceAgentBusy.)
+			const liveTitle = stripHarnessTitleDecoration(event.session.title);
+			const isRealTitle = Boolean(liveTitle) && liveTitle !== tab.harnessLabel;
+			setTerminalTitles((previous) => {
+				const current = previous[event.terminalId];
+				if (isRealTitle) {
+					return current === liveTitle
+						? previous
+						: { ...previous, [event.terminalId]: liveTitle };
+				}
+				if (current === undefined) {
+					return previous;
+				}
+				const next = { ...previous };
+				delete next[event.terminalId];
+				return next;
+			});
+		});
+		return unsubscribe;
+	}, [closeSessionTab, terminalTabByTerminalId]);
+
+	// Terminal tabs a previous app session already respawned this session, so a
+	// re-render never resumes the same tab twice. Reset naturally on app reload.
+	const autoResumedTabIdsRef = useRef<Set<string>>(new Set());
+	// After a restart, a terminal tab rehydrates with a `terminalId` that points
+	// to a PTY the previous process owned and killed. Probe each terminal tab; a
+	// null session means it is dead, so respawn the harness with its resume
+	// command (a fresh relaunch for harnesses without cwd-scoped resume) and
+	// repoint the tab to the new session. The main handler persists the new
+	// terminalId, so invalidating re-derives the tab against the live PTY.
+	useEffect(() => {
+		const api = window.ensemblr;
+		if (!api) {
+			return;
+		}
+		const resumed = autoResumedTabIdsRef.current;
+		for (const session of sessionTabs) {
+			if (
+				session.kind !== 'terminal' ||
+				!session.terminalId ||
+				!session.harnessId ||
+				resumed.has(session.id)
+			) {
+				continue;
+			}
+			resumed.add(session.id);
+			const { harnessId, id: chatTabId, terminalId } = session;
+			void api
+				.terminalSnapshot({ terminalId })
+				.then((snapshot) => {
+					if (snapshot.session) {
+						return;
+					}
+					return api
+						.resumeAgentHarness({ chatTabId, harnessId, workspaceId })
+						.then((result) => {
+							if (result.session) {
+								invalidateChatTabs();
+							} else {
+								resumed.delete(chatTabId);
+							}
+						});
+				})
+				.catch(() => {
+					resumed.delete(chatTabId);
+				});
+		}
+	}, [invalidateChatTabs, sessionTabs, workspaceId]);
 
 	/** Persists a drag-and-drop tab order when it differs from the current model. */
 	const reorderSessionTabs = useCallback(
@@ -586,6 +791,7 @@ export function useSessionTabState({
 		openCommentPreviewTab,
 		openFilePreviewTab,
 		openSessionTab,
+		openTerminalTab,
 		openTurnDiffTab,
 		openWorkspaceFileDiffTab,
 		reorderSessionTabs,
@@ -624,12 +830,71 @@ function diffTabTitle(filePath: string, scope?: WorkspaceGitDiffScope): string {
 	return name;
 }
 
+/** Shared identity fields every session-tab model carries, derived from the row. */
+type SessionTabBaseFields = {
+	chatTabId: string;
+	id: string;
+	label: string;
+	piSessionId: string | null;
+	status: SessionTabModel['status'];
+	summary: string;
+	updatedLabel: string;
+};
+
+/** Reads a metadata field as a string, falling back when it is absent or non-string. */
+function metadataString(value: unknown, fallback: string): string {
+	return typeof value === 'string' ? value : fallback;
+}
+
+/** Builds the `diff` variant, carrying its optional file path, turn id, and scope. */
+function toDiffSessionTab(
+	base: SessionTabBaseFields,
+	tab: ChatTabWire,
+): SessionTabModel {
+	const diffScope = parseWorkspaceGitDiffScope(tab.metadata.diffScope);
+	return {
+		...base,
+		...(diffScope ? { diffScope } : {}),
+		filePath: metadataString(tab.metadata.filePath, '') || null,
+		kind: 'diff',
+		turnId: metadataString(tab.metadata.turnId, '') || null,
+	};
+}
+
+/** Builds the `terminal` variant, carrying its backing PTY id and harness identity. */
+function toTerminalSessionTab(
+	base: SessionTabBaseFields,
+	tab: ChatTabWire,
+): SessionTabModel {
+	return {
+		...base,
+		harnessId: metadataString(tab.metadata.harnessId, ''),
+		harnessLabel: metadataString(tab.metadata.harnessLabel, base.label),
+		kind: 'terminal',
+		terminalId: metadataString(tab.metadata.terminalId, ''),
+	};
+}
+
+/** Builds the `document` variant, carrying its optional inline-comment preview. */
+function toDocumentSessionTab(
+	base: SessionTabBaseFields,
+	tab: ChatTabWire,
+): SessionTabModel {
+	const commentPreview = parseCommentPreview(tab.metadata.commentPreview);
+	return {
+		...base,
+		...(commentPreview ? { commentPreview } : {}),
+		filePath: metadataString(tab.metadata.filePath, '') || null,
+		kind: 'document',
+	};
+}
+
 /** Maps an open chat-tab wire row into a renderer-facing `SessionTabModel`. */
 function toSessionTabModel(
 	tab: ChatTabWire,
 	piSession: PiSessionSnapshotWire | undefined,
 ): SessionTabModel {
-	const base = {
+	const base: SessionTabBaseFields = {
 		chatTabId: tab.id,
 		id: tab.id,
 		label: tab.title,
@@ -637,37 +902,23 @@ function toSessionTabModel(
 		status: deriveTabStatus(piSession),
 		summary: '',
 		updatedLabel: '',
-	} as const;
-	if (tab.kind === 'diff') {
-		const turnId = tab.metadata.turnId;
-		const filePath = tab.metadata.filePath;
-		const diffScope = parseWorkspaceGitDiffScope(tab.metadata.diffScope);
-		return {
-			...base,
-			...(diffScope ? { diffScope } : {}),
-			filePath: typeof filePath === 'string' ? filePath : null,
-			kind: 'diff',
-			turnId: typeof turnId === 'string' ? turnId : null,
-		};
-	}
-	if (tab.kind === 'chat') {
-		return { ...base, kind: 'chat' };
-	}
-	const filePath = tab.metadata.filePath;
-	if (tab.kind === 'document') {
-		const commentPreview = parseCommentPreview(tab.metadata.commentPreview);
-		return {
-			...base,
-			...(commentPreview ? { commentPreview } : {}),
-			filePath: typeof filePath === 'string' ? filePath : null,
-			kind: 'document',
-		};
-	}
-	return {
-		...base,
-		filePath: typeof filePath === 'string' ? filePath : null,
-		kind: tab.kind,
 	};
+	switch (tab.kind) {
+		case 'chat':
+			return { ...base, kind: 'chat' };
+		case 'diff':
+			return toDiffSessionTab(base, tab);
+		case 'terminal':
+			return toTerminalSessionTab(base, tab);
+		case 'document':
+			return toDocumentSessionTab(base, tab);
+		default:
+			return {
+				...base,
+				filePath: metadataString(tab.metadata.filePath, '') || null,
+				kind: tab.kind,
+			};
+	}
 }
 
 const COMMENT_PREVIEW_PROVIDERS: ReadonlySet<string> = new Set([

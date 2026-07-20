@@ -130,6 +130,7 @@ export function WorkspaceWorkbenchContent({
 		composer,
 		onDirectoryReveal: revealWorkspaceDirectory,
 		onFilePreviewOpen: sessionNavigation.openFilePreviewTab,
+		onLaunchHarness: sessionNavigation.openTerminalTab,
 		onSessionTabChange,
 		onSessionTabClose: sessionNavigation.closeSessionTab,
 		onSessionTabOpen: sessionNavigation.openSessionTab,
