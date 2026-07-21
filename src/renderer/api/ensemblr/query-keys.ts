@@ -164,16 +164,6 @@ export const ensemblrQueryKeys = {
 	/** Query key for the available workspace open targets. */
 	workspaceOpenTargets: () =>
 		[...ensemblrQueryKeys.all, 'workspace-open-targets'] as const,
-	/**
-	 * Prefix key matching every workspace's desktop-runtime query. Invalidate it
-	 * when Scripts settings change, since detection reads the run command and a
-	 * repo can back multiple workspaces.
-	 */
-	workspaceDesktopRuntimeAll: () =>
-		[...ensemblrQueryKeys.all, 'workspace-desktop-runtime'] as const,
-	/** Query key for a workspace's detected desktop runtime. */
-	workspaceDesktopRuntime: (workspaceId: string) =>
-		[...ensemblrQueryKeys.workspaceDesktopRuntimeAll(), workspaceId] as const,
 };
 
 /**

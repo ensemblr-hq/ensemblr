@@ -14,8 +14,6 @@ export interface WorkbenchDockActions {
 	 */
 	onAskAgentSetupScript: () => void;
 	onCloseTerminal: (terminalId: string) => void;
-	/** Focuses (or launches) the workspace's detected desktop app window. */
-	onLaunchDesktopApp: () => void;
 	onNewTerminal: () => void;
 	/** Opens the detected dev-server preview URL in the system browser. */
 	onOpenRunPort: (url: string) => void;

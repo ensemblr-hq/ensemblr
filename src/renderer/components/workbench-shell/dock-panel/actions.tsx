@@ -2,7 +2,6 @@ import {
 	ChevronDownIcon,
 	ExternalLinkIcon,
 	PlayIcon,
-	RocketIcon,
 	SquareIcon,
 } from 'lucide-react';
 
@@ -35,7 +34,6 @@ export function DockPanelActions({
 }) {
 	const { run } = workspace.scripts;
 	const hasRunScript = run.status !== 'missing';
-	const desktopRuntime = workspace.desktopRuntime ?? null;
 
 	if (hasRunScript && run.status === 'running') {
 		const previewOptions = resolvePreviewUrlOptions({
@@ -52,11 +50,6 @@ export function DockPanelActions({
 					options={previewOptions}
 					port={typeof run.port === 'number' ? run.port : null}
 				/>
-				{/* Launch only appears while running — there's no window to focus
-				    until the run script has started the desktop app. */}
-				{desktopRuntime ? (
-					<LaunchDesktopButton onLaunch={actions.onLaunchDesktopApp} />
-				) : null}
 				<Button
 					aria-label='Stop run script'
 					onClick={actions.onStopRunScript}
@@ -187,20 +180,5 @@ function OpenPreviewSplit({
 				</DropdownMenuContent>
 			</DropdownMenu>
 		</div>
-	);
-}
-
-/** Focuses (or reopens) the workspace's detected desktop app window. */
-function LaunchDesktopButton({ onLaunch }: { onLaunch: () => void }) {
-	return (
-		<Button
-			aria-label='Launch desktop app'
-			onClick={onLaunch}
-			size='xs'
-			variant='outline'
-		>
-			<RocketIcon data-icon='inline-start' />
-			<span className='@max-md/dock-header:hidden'>Launch</span>
-		</Button>
 	);
 }

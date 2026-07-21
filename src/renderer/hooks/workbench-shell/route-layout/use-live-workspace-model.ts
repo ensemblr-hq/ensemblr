@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef } from 'react';
 
 import {
 	settingsResolutionQuery,
-	workspaceDesktopRuntimeQuery,
 	workspaceFilesQuery,
 	workspaceGitStatusQuery,
 } from '@/renderer/api/ensemblr-queries';
@@ -108,10 +107,6 @@ export function useLiveWorkspaceModel({
 	const { data: allFilesData } = useQuery(
 		workspaceFilesQuery(activeWorkspace.pathLabel ?? null),
 	);
-	const { data: desktopRuntimeData } = useQuery(
-		workspaceDesktopRuntimeQuery(activeWorkspace.id),
-	);
-	const desktopRuntime = desktopRuntimeData?.runtime ?? null;
 
 	// Refetches (the 30s poll + the fs watcher) hand back a fresh `files` array
 	// even when the file set is unchanged. Key the remap on a content signature
@@ -190,7 +185,6 @@ export function useLiveWorkspaceModel({
 
 		return {
 			...activeWorkspace,
-			desktopRuntime,
 			dockTabs: [
 				...activeWorkspace.dockTabs.flatMap(
 					(tab): typeof activeWorkspace.dockTabs => {
@@ -222,7 +216,6 @@ export function useLiveWorkspaceModel({
 		};
 	}, [
 		activeWorkspace,
-		desktopRuntime,
 		liveReview,
 		liveWorkspaceFiles,
 		pullRequest,

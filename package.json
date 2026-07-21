@@ -167,5 +167,12 @@
 		"linkify-it": "^5.0.2",
 		"tar": "^7.5.19",
 		"tmp": "^0.2.7"
+	},
+	"allowScripts": {
+		"esbuild@0.28.1": true,
+		"fs-xattr@0.3.1": true,
+		"macos-alias@0.2.12": true,
+		"core-js-pure": false,
+		"node-pty": false
 	}
 }

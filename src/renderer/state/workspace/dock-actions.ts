@@ -2,7 +2,6 @@ import { useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 
-import { activateWorkspaceDesktopApp } from '@/renderer/api/ensemblr/workspace-runtime';
 import {
 	runWorkspaceScript,
 	stopWorkspaceScript,
@@ -102,17 +101,6 @@ export function useWorkspaceDockActions({
 					})
 					.catch(() => {
 						toast.error('The terminal could not start.');
-					});
-			},
-			onLaunchDesktopApp: () => {
-				void activateWorkspaceDesktopApp(workspaceId)
-					.then((result) => {
-						if (!result.ok) {
-							toast.error(result.error);
-						}
-					})
-					.catch(() => {
-						toast.error('The desktop app could not be focused.');
 					});
 			},
 			onOpenRunPort: (url) => {
