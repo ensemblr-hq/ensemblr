@@ -47,7 +47,12 @@ interface ChatTabLookups {
 	piSessionExists: (input: { piSessionId: string }) => boolean;
 }
 
-/** A closed tab joined with its session-summary location and title. */
+/**
+ * A closed tab plus its session-summary location and title. `summaryPath` is
+ * empty (and `summaryTitle` null) when the tab has no attachable on-disk
+ * summary — the tab is still listed so it can be restored, just without a
+ * transcript to attach.
+ */
 interface ClosedChatTabEntry {
 	closedAt: string;
 	summaryPath: string;
@@ -311,30 +316,30 @@ function readMetadataSubject(
 }
 
 /**
- * Build a transcript-picker entry for a closed tab, or null when the tab has no
- * attachable summary. A tab qualifies only when its metadata carries the summary
- * marker (persisted after a successful summary write) *and* the summary file it
- * records is still on disk. This excludes terminal/harness tabs, aborted
- * sessions, and writes that never landed — so the picker never offers a
- * transcript whose attach would fail with ENOENT. The on-disk check uses the
- * path the writer persisted (`summary.path`), not a path recomputed from the
- * workspace root, because a session's cwd can differ from the workspace root
- * (e.g. a worktree) and only the persisted path is authoritative.
+ * Build a closed-history entry for a closed tab, or null when the row is not
+ * actually closed. Every closed tab enters history so it can be restored —
+ * including terminal/harness tabs and chat sessions whose summary write never
+ * landed. The summary path/title are populated only when the metadata carries
+ * the summary marker (persisted after a successful summary write) *and* the
+ * recorded file is still on disk; otherwise they are left empty, marking the
+ * entry as restorable-but-not-attachable so a transcript attach can never fail
+ * with ENOENT. The on-disk check uses the path the writer persisted
+ * (`summary.path`), not a path recomputed from the workspace root, because a
+ * session's cwd can differ from the workspace root (e.g. a worktree) and only
+ * the persisted path is authoritative.
  * @param tab - The closed chat-tab row
- * @returns The picker entry, or null when no summary is available
+ * @returns The history entry, or null when the row is not closed
  */
 function toClosedEntry(tab: ChatTabRow): ClosedChatTabEntry | null {
 	if (tab.closedAt === null) {
 		return null;
 	}
 	const summary = readSummaryFromMetadata(tab.metadata);
-	if (!summary || !existsSync(summary.path)) {
-		return null;
-	}
+	const attachable = summary !== null && existsSync(summary.path);
 	return {
 		closedAt: tab.closedAt,
-		summaryPath: summary.path,
-		summaryTitle: summary.title,
+		summaryPath: attachable ? summary.path : '',
+		summaryTitle: attachable ? summary.title : null,
 		tab,
 	};
 }

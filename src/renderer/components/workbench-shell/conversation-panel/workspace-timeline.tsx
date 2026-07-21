@@ -39,7 +39,12 @@ export function WorkspaceTimeline({
 	const { data: transcriptsData } = useQuery(
 		listClosedChatTabsWithSummaryQuery(workspace.id),
 	);
-	const transcripts = transcriptsData?.entries ?? [];
+	// The closed-history query lists every restorable tab, including terminal and
+	// aborted-summary tabs with no attachable transcript. Only summary-bearing
+	// entries can become attachment chips here.
+	const transcripts = (transcriptsData?.entries ?? []).filter(
+		(entry) => entry.summaryPath.length > 0,
+	);
 
 	if (piSessionId) {
 		return (

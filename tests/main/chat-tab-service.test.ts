@@ -233,7 +233,7 @@ test('bindPiSession validates tab and session existence', (t) => {
 	);
 });
 
-test('listClosedWithSummary omits closed tabs without a written summary', (t) => {
+test('listClosedWithSummary lists closed tabs without a summary as restorable', (t) => {
 	const fixture = openFixture(t);
 
 	fixture.service.openTab({ workspaceId: fixture.workspaceId });
@@ -246,7 +246,44 @@ test('listClosedWithSummary omits closed tabs without a written summary', (t) =>
 	const entries = fixture.service.listClosedWithSummary({
 		workspaceId: fixture.workspaceId,
 	});
-	assert.equal(entries.length, 0);
+	// The tab still enters history so it can be restored; it just carries no
+	// attachable transcript, signalled by an empty summary path/title.
+	assert.equal(entries.length, 1);
+	assert.equal(entries[0]?.tab.id, bound.id);
+	assert.equal(entries[0]?.summaryPath, '');
+	assert.equal(entries[0]?.summaryTitle, null);
+});
+
+test('listClosedWithSummary leaves the summary empty when the file is gone', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const bound = fixture.service.openTab({
+		piSessionId: fixture.piSessionId,
+		workspaceId: fixture.workspaceId,
+	});
+	fixture.service.closeTab({ chatTabId: bound.id });
+
+	setChatTabMetadata({
+		database: fixture.connection.database,
+		id: bound.id,
+		metadata: {
+			summary: {
+				path: path.join(WORKSPACE_CWD, '.context', 'sessions', 'missing.md'),
+				title: 'Written but deleted',
+			},
+		},
+	});
+
+	const entries = fixture.service.listClosedWithSummary({
+		workspaceId: fixture.workspaceId,
+	});
+	// The tab is still restorable; the stale summary marker must not surface a
+	// path whose attach would fail with ENOENT.
+	assert.equal(entries.length, 1);
+	assert.equal(entries[0]?.tab.id, bound.id);
+	assert.equal(entries[0]?.summaryPath, '');
+	assert.equal(entries[0]?.summaryTitle, null);
 });
 
 test('listClosedWithSummary lists a closed tab whose summary file exists', (t) => {
