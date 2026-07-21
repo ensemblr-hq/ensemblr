@@ -131,8 +131,15 @@ export function createChatTabService({
 			}
 
 			// Terminal (harness) tabs carry a resumable conversation, so they are
-			// archived as restorable rather than deleted.
+			// archived as restorable rather than deleted — but only when the harness
+			// actually captured a native session id. One spawned and closed with no
+			// conversation has nothing to resume, so it is hard-deleted instead of
+			// entering closed history as an empty, unrestorable row.
 			if (existing.kind === 'terminal') {
+				if (isEmptyTerminalTab(existing, metadataPatch)) {
+					deleteChatTab({ database, id: chatTabId });
+					return { deleted: true };
+				}
 				archiveTerminalTab({ database, existing, metadataPatch, title });
 				return { deleted: false };
 			}
@@ -293,6 +300,29 @@ function reconcileOpenTabOrder({
 /** True when a tab has no attached Pi session and should not enter history. */
 function isEmptyChatTab(tab: ChatTabRow): boolean {
 	return tab.piSessionId === null;
+}
+
+/**
+ * True when a closing terminal tab never captured a native harness session id —
+ * neither previously persisted on the row nor supplied in the close patch — so it
+ * carries no resumable conversation and should be dropped rather than archived.
+ * @param tab - The closing terminal tab row
+ * @param metadataPatch - The close patch that may stamp a freshly captured id
+ * @returns True when no resumable session id exists, false otherwise
+ */
+function isEmptyTerminalTab(
+	tab: ChatTabRow,
+	metadataPatch: Record<string, unknown> | undefined,
+): boolean {
+	return !hasAgentSessionId(metadataPatch) && !hasAgentSessionId(tab.metadata);
+}
+
+/** True when a metadata record carries a non-empty `agentSessionId` string. */
+function hasAgentSessionId(
+	metadata: Record<string, unknown> | undefined,
+): boolean {
+	const agentSessionId = metadata?.agentSessionId;
+	return typeof agentSessionId === 'string' && agentSessionId.length > 0;
 }
 
 /**
