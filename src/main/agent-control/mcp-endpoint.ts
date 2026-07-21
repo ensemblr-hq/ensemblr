@@ -16,7 +16,7 @@ import { type ZodRawShape, z } from 'zod';
 import {
 	type AgentControlOp,
 	type AgentControlResult,
-	AWARENESS,
+	ORCHESTRATOR_AWARENESS,
 } from '../../shared/agent-control.ts';
 import type { AgentControlService } from './agent-control-service.ts';
 
@@ -225,7 +225,7 @@ function buildMcpServer(
 ): McpServer {
 	const server = new McpServer(
 		{ name: 'ensemblr-control', version: '1.0.0' },
-		{ instructions: AWARENESS },
+		{ instructions: ORCHESTRATOR_AWARENESS },
 	);
 	for (const def of TOOL_DEFS) {
 		server.registerTool(

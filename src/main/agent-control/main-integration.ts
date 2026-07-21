@@ -10,6 +10,7 @@ import path from 'node:path';
 
 import { type App, BrowserWindow, dialog } from 'electron';
 
+import { roleForDepth } from '../../shared/agent-control.ts';
 import { appendHarnessMcpConfig } from './harness-mcp-config.ts';
 import type { OriginRegistry } from './origin-registry.ts';
 import type { AgentControlEnvResolver } from './ports.ts';
@@ -120,6 +121,7 @@ export function createAgentControlIntegration(
 		return {
 			ENSEMBLR_CONTROL_URL: serverUrl,
 			ENSEMBLR_CONTROL_TOKEN: origin.token,
+			ENSEMBLR_CONTROL_ROLE: roleForDepth(origin.depth),
 		};
 	};
 
