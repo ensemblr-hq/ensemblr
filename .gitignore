@@ -6,6 +6,7 @@ node_modules/
 out/
 /out.*/
 .playwright-cli/
+.playwright-mcp/
 .fallow/
 .pi-capture-sandbox/
 coverage/

@@ -10,7 +10,7 @@
  */
 
 import { createReadStream } from 'node:fs';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
@@ -125,6 +125,33 @@ function asRecord(value: unknown): Record<string, unknown> | null {
  */
 function asString(value: unknown): string | null {
 	return typeof value === 'string' ? value : null;
+}
+
+/**
+ * Returns a value only when it is a boolean, collapsing everything else to null
+ * so a missing flag stays distinguishable from an explicit `false`.
+ * @param value - The value to check.
+ * @returns The boolean, or null.
+ */
+function asBoolean(value: unknown): boolean | null {
+	return typeof value === 'boolean' ? value : null;
+}
+
+/**
+ * Resolves a working directory to its canonical realpath, since Claude derives
+ * its `~/.claude/projects/<slug>/` from the process realpath. On macOS the
+ * managed root often sits under a symlinked ancestor (`/tmp`→`/private/tmp`,
+ * `/var`→`/private/var`), so the logical path would slug to a directory Claude
+ * never writes. Falls back to the input when the path cannot be resolved.
+ * @param cwd - The absolute working directory to canonicalize.
+ * @returns The realpath, or the original path when resolution fails.
+ */
+async function resolveRealCwd(cwd: string): Promise<string> {
+	try {
+		return await realpath(cwd);
+	} catch {
+		return cwd;
+	}
 }
 
 /**
@@ -500,6 +527,12 @@ interface ClaudeTranscriptHead {
 	cwd: string | null;
 	sessionId: string | null;
 	timestamp: string | null;
+	/**
+	 * True when the transcript is a sub-agent (Task) sidechain rather than the
+	 * main conversation. Sidechains carry their own `sessionId` that `--resume`
+	 * cannot reattach, so they must never be adopted as a tab's resumable id.
+	 */
+	isSidechain: boolean | null;
 }
 
 /** How many leading transcript lines to scan for the identifying fields. */
@@ -523,6 +556,7 @@ function readClaudeTranscriptHead(file: string): Promise<ClaudeTranscriptHead> {
 		});
 		const head: ClaudeTranscriptHead = {
 			cwd: null,
+			isSidechain: null,
 			sessionId: null,
 			timestamp: null,
 		};
@@ -544,6 +578,7 @@ function readClaudeTranscriptHead(file: string): Promise<ClaudeTranscriptHead> {
 				head.sessionId ??= asString(record.sessionId);
 				head.cwd ??= asString(record.cwd);
 				head.timestamp ??= asString(record.timestamp);
+				head.isSidechain ??= asBoolean(record.isSidechain);
 			}
 			const complete = head.sessionId && head.cwd && head.timestamp;
 			if (complete || lineNumber >= MAX_CLAUDE_HEAD_LINES) {
@@ -558,9 +593,12 @@ function readClaudeTranscriptHead(file: string): Promise<ClaudeTranscriptHead> {
 /**
  * Reads the native session id for a Claude Code tab from the newest transcript
  * under `~/.claude/projects/<cwd-slug>/` whose recorded cwd matches and that
- * started at/after the tab launched. Claude titles from its OSC stream, so no
- * title is returned here — only the resumable id (the record's `sessionId`,
- * falling back to the transcript filename stem).
+ * started at/after the tab launched. The cwd is canonicalized to its realpath
+ * first so the probed slug matches the one Claude derives from its process cwd
+ * even under a symlinked ancestor. Sub-agent (Task) sidechain transcripts are
+ * skipped because their `sessionId` is not resumable. Claude titles from its OSC
+ * stream, so no title is returned here — only the resumable id (the record's
+ * `sessionId`, falling back to the transcript filename stem).
  * @param targetCwd - The tab's working directory.
  * @param since - The tab's launch time.
  * @param home - Home directory hosting `~/.claude`.
@@ -571,14 +609,18 @@ async function readClaudeConversationInfo(
 	since: string | undefined,
 	home: string,
 ): Promise<AgentConversationInfo> {
+	const resolvedCwd = await resolveRealCwd(targetCwd);
 	const projectsRoot = path.join(home, '.claude', 'projects');
-	const directories = claudeProjectSlugs(targetCwd).map((slug) =>
+	const directories = claudeProjectSlugs(resolvedCwd).map((slug) =>
 		path.join(projectsRoot, slug),
 	);
 	const files = await listJsonlByMtime(directories);
 	for (const file of files) {
 		const head = await readClaudeTranscriptHead(file);
-		if (head.cwd && !sameCwd(head.cwd, targetCwd)) {
+		if (head.isSidechain) {
+			continue;
+		}
+		if (head.cwd && !sameCwd(head.cwd, resolvedCwd)) {
 			continue;
 		}
 		if (!startedSinceLaunch(head.timestamp, since)) {

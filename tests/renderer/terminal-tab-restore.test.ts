@@ -76,10 +76,40 @@ describe('resumeRestoredTerminalTab', () => {
 		});
 	});
 
-	test('spawns fresh (never an unguarded cwd resume) when no session id exists', () => {
+	test('reattaches the most recent cwd conversation when no session id exists', () => {
 		const resumeAgentHarness = vi.fn(async () => OK_RESULT);
 		installEnsemblrApi({ resumeAgentHarness });
 		const deps = makeDeps();
+
+		resumeRestoredTerminalTab(terminalTab({ harnessId: 'claude' }), deps);
+
+		expect(resumeAgentHarness).toHaveBeenCalledWith({
+			chatTabId: 'tab-1',
+			fresh: false,
+			harnessId: 'claude',
+			sessionId: undefined,
+			workspaceId: 'ws-1',
+		});
+	});
+
+	test('spawns fresh with no id when a same-harness tab is already live', () => {
+		const resumeAgentHarness = vi.fn(async () => OK_RESULT);
+		installEnsemblrApi({ resumeAgentHarness });
+		const deps = makeDeps({
+			sessionTabs: [
+				{
+					agentSessionId: null,
+					chatTabId: 'tab-live',
+					harnessId: 'claude',
+					harnessLabel: 'Claude Code',
+					id: 'tab-live',
+					kind: 'terminal',
+					label: 'Claude Code',
+					status: 'working',
+					terminalId: 'pty-live',
+				},
+			],
+		});
 
 		resumeRestoredTerminalTab(terminalTab({ harnessId: 'claude' }), deps);
 

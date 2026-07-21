@@ -600,8 +600,11 @@ export function useSessionTabState({
 			// accumulate across a long-lived workspace of spawned/closed terminals.
 			delete terminalTitlesRef.current[terminalId];
 			delete terminalSessionIdsRef.current[terminalId];
+			// Only patch the id when one was captured. Writing null here would clobber
+			// a previously-persisted id (e.g. a tab closed before a re-poll), leaving
+			// the archived tab unresumable and forcing a fresh session on restore.
 			return {
-				metadataPatch: { agentSessionId },
+				...(agentSessionId ? { metadataPatch: { agentSessionId } } : {}),
 				...(title ? { title } : {}),
 			};
 		},
@@ -723,18 +726,22 @@ export function useSessionTabState({
 	// Terminal tabs a previous app session already respawned this session, so a
 	// re-render never resumes the same tab twice. Reset naturally on app reload.
 	const autoResumedTabIdsRef = useRef<Set<string>>(new Set());
-	// Harness ids that already claimed the cwd-scoped resume this app session.
-	// Resume reattaches by cwd, not conversation id, so at most one tab per
-	// harness may resume; a second concurrent `--continue` would write the same
-	// session log and corrupt it. Extras respawn fresh (a new conversation).
+	// Harness ids that already claimed the cwd-scoped `--continue` resume this app
+	// session. When no native session id was captured we fall back to reattaching
+	// the harness's most recent cwd conversation, but at most one tab per harness
+	// may — two concurrent `--continue` would write and corrupt one shared log.
 	const resumedHarnessIdsRef = useRef<Set<string>>(new Set());
 	// After a restart, a terminal tab rehydrates with a `terminalId` that points
 	// to a PTY the previous process owned and killed. Probe each terminal tab; a
 	// null session means it is dead, so respawn the harness and repoint the tab to
-	// the new session. The first dead tab of a harness resumes its latest cwd
-	// conversation; any further same-harness tabs launch fresh so they never
-	// collide on one shared log. The main handler persists the new terminalId, so
-	// invalidating re-derives the tab against the live PTY.
+	// the new session. With a captured native session id we reattach that exact
+	// conversation (`--resume <id>`), which is per-conversation and never collides,
+	// so any number of same-harness tabs resume independently. Without an id (short
+	// or fast-exiting tabs, or harnesses whose id lands late) we fall back to the
+	// cwd `--continue` that reattaches the harness's most recent conversation — the
+	// first dead tab of a harness only; further same-harness tabs launch fresh so
+	// they never collide on one shared log. The main handler persists the new
+	// terminalId, so invalidating re-derives the tab against the live PTY.
 	useEffect(() => {
 		const api = window.ensemblr;
 		if (!api) {
@@ -752,25 +759,38 @@ export function useSessionTabState({
 				continue;
 			}
 			resumed.add(session.id);
-			const { harnessId, id: chatTabId, terminalId } = session;
+			const { agentSessionId, harnessId, id: chatTabId, terminalId } = session;
 			void api
 				.terminalSnapshot({ terminalId })
 				.then((snapshot) => {
 					if (snapshot.session) {
 						return;
 					}
-					const fresh = resumedHarnessIds.has(harnessId);
-					if (!fresh) {
+					// Exact-conversation resume when the native id was captured; it never
+					// collides on a shared log. Without an id, fall back to the cwd
+					// `--continue` — but only the first dead tab of a harness, since two
+					// concurrent `--continue` would corrupt one shared log; extras launch
+					// fresh. This mirrors the pre-exact-resume behavior so a tab whose id
+					// never persisted still reattaches instead of opening a blank session.
+					const cwdContinue =
+						!agentSessionId && !resumedHarnessIds.has(harnessId);
+					if (cwdContinue) {
 						resumedHarnessIds.add(harnessId);
 					}
 					return api
-						.resumeAgentHarness({ chatTabId, fresh, harnessId, workspaceId })
+						.resumeAgentHarness({
+							chatTabId,
+							fresh: !agentSessionId && !cwdContinue,
+							harnessId,
+							sessionId: agentSessionId ?? undefined,
+							workspaceId,
+						})
 						.then((result) => {
 							if (result.session) {
 								invalidateChatTabs();
 							} else {
 								resumed.delete(chatTabId);
-								if (!fresh) {
+								if (cwdContinue) {
 									resumedHarnessIds.delete(harnessId);
 								}
 							}
