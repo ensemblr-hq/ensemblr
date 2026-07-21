@@ -22,6 +22,16 @@ describe('guardrails: depth', () => {
 			expect(denied.code).toBe('denied-depth');
 		}
 	});
+
+	it('by default lets only the root spawn: a sub-agent is denied', () => {
+		const guardrails = createGuardrails();
+		expect(guardrails.evaluateSpawn(originAt(0)).ok).toBe(true);
+		const denied = guardrails.evaluateSpawn(originAt(1));
+		expect(denied.ok).toBe(false);
+		if (!denied.ok) {
+			expect(denied.code).toBe('denied-depth');
+		}
+	});
 });
 
 describe('guardrails: quota', () => {

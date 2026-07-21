@@ -18,7 +18,7 @@ export interface GuardrailConfig {
 
 /** Default guardrail limits applied when the composition root passes none. */
 export const DEFAULT_GUARDRAIL_CONFIG: GuardrailConfig = {
-	maxSpawnDepth: 2,
+	maxSpawnDepth: 1,
 	maxSpawnsPerSession: 20,
 	maxSpawnsPerMinute: 10,
 	waitTimeoutMs: 300_000,
