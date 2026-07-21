@@ -127,6 +127,17 @@ export interface CreateTerminalServiceOptions {
 	killGraceMs?: number;
 	now?: () => Date;
 	onLifecycle: (event: TerminalLifecycleBroadcast) => void;
+	/**
+	 * Called when an agent session's native session id is first read from its
+	 * on-disk log, so the wiring layer can persist it onto the backing chat tab
+	 * for exact-conversation resume after a restart. Terminal-service stays free of
+	 * chat-tab knowledge; the seam carries only ids. Omitted → not persisted.
+	 */
+	onAgentSessionCaptured?: (input: {
+		agentSessionId: string;
+		terminalId: string;
+		workspaceId: string;
+	}) => void;
 	onOutput: (event: TerminalOutputBroadcast) => void;
 	/**
 	 * Reads an agent harness's conversation title and native session id from its
@@ -347,6 +358,7 @@ export function createTerminalService({
 	defaultShell = resolveUserShell(),
 	killGraceMs = DEFAULT_KILL_GRACE_MS,
 	now = () => new Date(),
+	onAgentSessionCaptured,
 	onLifecycle,
 	onOutput,
 	readConversationInfo = readAgentConversationInfo,
@@ -480,7 +492,29 @@ export function createTerminalService({
 			return;
 		}
 		session.snapshot = { ...session.snapshot, ...patch };
+		notifyAgentSessionCaptured(session, patch);
 		broadcastLifecycle(session);
+	}
+
+	/**
+	 * Forwards a newly captured native session id to the wiring layer so it can be
+	 * persisted onto the backing chat tab. No-op when the patch carries no id or no
+	 * seam was injected, so a title-only patch never triggers a write.
+	 * @param session - Tracked agent session the id belongs to.
+	 * @param patch - The snapshot patch just applied.
+	 */
+	function notifyAgentSessionCaptured(
+		session: TrackedSession,
+		patch: Partial<TerminalSessionSnapshot>,
+	): void {
+		if (!onAgentSessionCaptured || !patch.agentSessionId) {
+			return;
+		}
+		onAgentSessionCaptured({
+			agentSessionId: patch.agentSessionId,
+			terminalId: session.snapshot.id,
+			workspaceId: session.snapshot.workspaceId,
+		});
 	}
 
 	/**
@@ -511,6 +545,7 @@ export function createTerminalService({
 		const patch = conversationInfoPatch(session.snapshot, info);
 		if (patch) {
 			session.snapshot = { ...session.snapshot, ...patch };
+			notifyAgentSessionCaptured(session, patch);
 		}
 	}
 

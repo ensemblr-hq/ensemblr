@@ -19,6 +19,7 @@ import { scrollbackMbToBytes } from '../shared/terminal/scrollback';
 import { createHarnessDetectionService } from './agents/harness-detection-service.ts';
 import { createMainWindow } from './app/main-window';
 import { createMainWindowStateStore } from './app/window-state';
+import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
 import { createLocalCommandService } from './commands';
 import {
 	createAppSettingsService,
@@ -452,6 +453,14 @@ const workspaceFilesWatcher = createWorkspaceFilesWatcher({
 });
 const terminalService = createTerminalService({
 	databaseService,
+	/** Persists a harness's native session id onto its tab for exact resume. */
+	onAgentSessionCaptured: ({ agentSessionId, terminalId, workspaceId }) =>
+		persistTerminalAgentSessionId({
+			agentSessionId,
+			database: databaseService.getConnection()?.database ?? null,
+			terminalId,
+			workspaceId,
+		}),
 	/** Broadcasts a terminal lifecycle event to all windows. */
 	onLifecycle: (event: TerminalLifecycleBroadcast) =>
 		broadcastToAllWindows(IPC_CHANNELS.terminalLifecycle, event),

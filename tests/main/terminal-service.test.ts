@@ -184,18 +184,30 @@ function createServiceFixture(
 	const database = createDatabaseFixture(t);
 	const lifecycleEvents: TerminalLifecycleBroadcast[] = [];
 	const outputEvents: TerminalOutputBroadcast[] = [];
+	const capturedAgentSessions: {
+		agentSessionId: string;
+		terminalId: string;
+		workspaceId: string;
+	}[] = [];
 	const service = createTerminalService({
 		backend,
 		databaseService: createDatabaseServiceStub(database),
 		killGraceMs,
 		now: () => NOW,
+		onAgentSessionCaptured: (input) => capturedAgentSessions.push(input),
 		onLifecycle: (event) => lifecycleEvents.push(event),
 		onOutput: (event) => outputEvents.push(event),
 		readConversationInfo,
 		workspaceEnvironmentService: createWorkspaceEnvironmentStub(),
 	});
 
-	return { database, lifecycleEvents, outputEvents, service };
+	return {
+		capturedAgentSessions,
+		database,
+		lifecycleEvents,
+		outputEvents,
+		service,
+	};
 }
 
 test('create spawns a PTY in the workspace cwd with the assembled env', async (t) => {
@@ -410,6 +422,48 @@ test('a resumed agent drops the title gate so it re-adopts its prior conversatio
 	});
 
 	assert.equal(sinceValues[0], undefined);
+});
+
+test('reports a captured native session id so the tab can persist it for resume', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { capturedAgentSessions, service } = createServiceFixture(t, {
+		backend,
+		readConversationInfo: async () => ({
+			sessionId: 'session-abc',
+			title: null,
+		}),
+	});
+
+	const result = await service.create({
+		harnessId: 'claude',
+		kind: 'agent',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+	await new Promise((resolve) => setTimeout(resolve, 0));
+
+	assert.deepEqual(capturedAgentSessions, [
+		{ agentSessionId: 'session-abc', terminalId, workspaceId: WORKSPACE_ID },
+	]);
+});
+
+test('does not report a captured session id when none is read from the log', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { capturedAgentSessions, service } = createServiceFixture(t, {
+		backend,
+		readConversationInfo: async () => ({ sessionId: null, title: 'A title' }),
+	});
+
+	await service.create({
+		harnessId: 'codex',
+		kind: 'agent',
+		workspaceId: WORKSPACE_ID,
+	});
+	await new Promise((resolve) => setTimeout(resolve, 0));
+
+	assert.equal(capturedAgentSessions.length, 0);
 });
 
 test('does not detect a preview URL for interactive terminal sessions', async (t) => {
