@@ -182,7 +182,14 @@ export function useWorkspaceTerminalSessions(
 					return;
 				}
 				setSessions(result.sessions);
-				if (result.sessions.length === 0) {
+				// Restore only when no interactive terminal is already live. Agent
+				// tabs and run/setup scripts also surface here, and a same-mount agent
+				// resume can create one before this list resolves; gating on the raw
+				// length would then wrongly skip the dock restore.
+				const hasLiveDockTerminal = result.sessions.some(
+					(session) => session.kind === 'terminal',
+				);
+				if (!hasLiveDockTerminal) {
 					void restoreDockTerminals(workspaceId, () => cancelled, setSessions);
 				}
 			})

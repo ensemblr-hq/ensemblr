@@ -796,8 +796,9 @@ export function createTerminalService({
 
 		// A terminated session's row is no longer restorable, so drop its persisted
 		// log rather than leaving a secret-bearing orphan. Quit is the exception:
-		// disposeAll flushes synchronously and the process exits before this runs,
-		// keeping the still-'running' row and its log recoverable on next launch.
+		// disposeAll disposes each exit subscription before signalling the PTY, so
+		// this never runs during shutdown, keeping the still-'running' row and its
+		// log recoverable on next launch.
 		discardSessionOutput(session);
 
 		session.dataSubscription?.dispose();
@@ -1093,11 +1094,19 @@ export function createTerminalService({
 		disposeAll: () => {
 			// Same SIGHUP→grace→SIGKILL path as kill(); the escalation timers are
 			// unref'd, so a quitting app exits without waiting and the kernel
-			// reaps anything that ignored SIGHUP once the PTY closes. Flush each
-			// session's scrollback first: on quit, finalizeSession's own flush may
-			// not run before the process exits, so persist synchronously here.
+			// reaps anything that ignored SIGHUP once the PTY closes.
+			//
+			// Flush each session's scrollback and DETACH its exit handler before
+			// signalling the PTY. A real shell exits on SIGHUP, and node-pty can
+			// deliver 'exit' in the window Electron spends tearing down after
+			// `will-quit` returns — which would run finalizeSession, flipping the
+			// row to 'exited' and deleting the just-written log, leaving the open
+			// tab unrecoverable. Detaching first keeps the row 'running' and its
+			// log intact so the next launch can restore it.
 			for (const session of sessions.values()) {
 				flushSessionOutput(session);
+				session.exitSubscription?.dispose();
+				session.exitSubscription = null;
 			}
 			for (const terminalId of sessions.keys()) {
 				try {

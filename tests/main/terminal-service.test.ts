@@ -902,6 +902,55 @@ test('a workspace restores its open interactive terminals after restart', async 
 	assert.equal(readTerminalOutput(cwd, originalId), null);
 });
 
+test('integration: a real PTY dock tab survives quit and restores after restart', async (t) => {
+	const cwd = createWorktreeCwd(t);
+	const database = createDatabaseFixture(t);
+
+	const before = createTerminalService({
+		backend: createNodePtyBackend(),
+		databaseService: createDatabaseServiceStub(database),
+		killGraceMs: 200,
+		onLifecycle: () => undefined,
+		onOutput: () => undefined,
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(cwd),
+	});
+	const opened = await before.create({
+		command: 'cat',
+		workspaceId: WORKSPACE_ID,
+	});
+	const originalId = opened.session?.id ?? '';
+
+	before.write(originalId, 'restore-me\r');
+	await waitFor(() =>
+		before.getSnapshot(originalId).scrollback.includes('restore-me'),
+	);
+
+	// Quit with the tab open: disposeAll SIGHUPs the real shell. Give the exit a
+	// window to fire — the fix detaches the exit handler before signalling, so it
+	// can neither finalize the row nor delete the log. Without it, the exiting
+	// `cat` would trip finalizeSession and the restore below would find nothing.
+	before.disposeAll();
+	await delay(400);
+
+	assert.match(readTerminalOutput(cwd, originalId) ?? '', /restore-me/);
+
+	const after = createTerminalService({
+		backend: createNodePtyBackend(),
+		databaseService: createDatabaseServiceStub(database),
+		onLifecycle: () => undefined,
+		onOutput: () => undefined,
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(cwd),
+	});
+	after.recoverStaleSessions();
+
+	const restorable = after.listRestorable(WORKSPACE_ID);
+	assert.equal(restorable.length, 1);
+	assert.equal(restorable[0]?.id, originalId);
+	assert.match(restorable[0]?.output ?? '', /restore-me/);
+
+	after.disposeAll();
+});
+
 test('agent sessions are never offered as restorable dock terminals', async (t) => {
 	const cwd = createWorktreeCwd(t);
 	const database = createDatabaseFixture(t);
@@ -935,6 +984,10 @@ test('agent sessions are never offered as restorable dock terminals', async (t) 
 
 	assert.equal(after.listRestorable(WORKSPACE_ID).length, 0);
 });
+
+function delay(ms: number): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function waitFor(
 	predicate: () => boolean,
