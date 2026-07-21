@@ -7,6 +7,7 @@ import {
 	CommandItem,
 	CommandList,
 } from '@/renderer/components/ui/command';
+import { useReviewFilePreviewOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import type { WorkspaceFileSummary } from '@/renderer/types/workbench';
 
 import { WorkspaceFileIcon } from './workspace-file-icon';
@@ -21,9 +22,14 @@ export function AllFilesSearchDialog({
 	onOpenChange: (open: boolean) => void;
 	open: boolean;
 }) {
+	const openFilePreview = useReviewFilePreviewOpener();
 	const searchableFiles = files.filter((file) => file.kind === 'file');
 	const closeSearch = () => {
 		onOpenChange(false);
+	};
+	const selectFile = (filePath: string) => {
+		openFilePreview?.(filePath);
+		closeSearch();
 	};
 
 	return (
@@ -44,7 +50,7 @@ export function AllFilesSearchDialog({
 								aria-label={`Open ${file.path} preview`}
 								className='min-h-10'
 								key={file.id}
-								onSelect={closeSearch}
+								onSelect={() => selectFile(file.path)}
 								value={`${file.name} ${file.path}`}
 							>
 								<WorkspaceFileIcon file={file} />

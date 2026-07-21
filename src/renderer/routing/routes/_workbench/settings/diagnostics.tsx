@@ -24,17 +24,19 @@ export const Route = createFileRoute('/_workbench/settings/diagnostics')({
  */
 function DiagnosticsRoute() {
 	const queryClient = useQueryClient();
-	const {
-		data: snapshot,
-		error: queryError,
-		isFetching: queryFetching,
-	} = useQuery(setupDiagnosticsQuery);
+	const { data: snapshot, error: queryError } = useQuery(setupDiagnosticsQuery);
 	const [copied, setCopied] = useState(false);
+	const [isManualRetrying, setIsManualRetrying] = useState(false);
 
 	const onRetry = async () => {
-		await queryClient.refetchQueries({
-			queryKey: ensemblrQueryKeys.setupDiagnostics(),
-		});
+		setIsManualRetrying(true);
+		try {
+			await queryClient.refetchQueries({
+				queryKey: ensemblrQueryKeys.setupDiagnostics(),
+			});
+		} finally {
+			setIsManualRetrying(false);
+		}
 	};
 
 	const onCopyBundle = async () => {
@@ -72,7 +74,7 @@ function DiagnosticsRoute() {
 		>
 			<SetupDiagnosticsPanel
 				error={queryError instanceof Error ? queryError.message : null}
-				isRetrying={queryFetching}
+				isRetrying={isManualRetrying}
 				onRetry={onRetry}
 				snapshot={snapshot ?? null}
 			/>

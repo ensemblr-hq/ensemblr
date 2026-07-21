@@ -21,15 +21,32 @@ export function createSpawnFailureSession({
 	listeners,
 	metadata,
 	now,
+	onClose,
 }: {
 	detail: string;
 	listeners: Set<PiAgentEventListener>;
 	metadata: PiAgentSessionMetadata;
 	now: () => Date;
+	onClose: () => void;
 }): PiAgentAdapterSession {
+	let closed = false;
+	// The spawn-failure placeholder is registered in the adapter's open-session
+	// set like any session; removing it on close/abort keeps it from lingering
+	// there for the adapter's whole lifetime.
+	const settle = (): void => {
+		if (closed) {
+			return;
+		}
+		closed = true;
+		onClose();
+	};
 	return {
-		abort: async () => undefined,
-		close: async () => undefined,
+		abort: async () => {
+			settle();
+		},
+		close: async () => {
+			settle();
+		},
 		getMetadata: () => metadata,
 		id: metadata.id,
 		subscribe: (listener) => {

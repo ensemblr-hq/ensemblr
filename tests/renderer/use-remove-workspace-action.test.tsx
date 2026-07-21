@@ -9,13 +9,11 @@ const {
 	navigate,
 	invalidate,
 	invalidateWorkspaceListViews,
-	disableProjectReorderLayoutAnimation,
 	deleteLastUsedOpenTarget,
 } = vi.hoisted(() => ({
 	navigate: vi.fn().mockResolvedValue(undefined),
 	invalidate: vi.fn().mockResolvedValue(undefined),
 	invalidateWorkspaceListViews: vi.fn().mockResolvedValue(undefined),
-	disableProjectReorderLayoutAnimation: vi.fn(),
 	deleteLastUsedOpenTarget: vi.fn(),
 }));
 
@@ -29,11 +27,6 @@ vi.mock('@/renderer/api/ensemblr', () => ({
 	ensemblrQueryKeys: { repositoryWorkspaceNavigation: () => ['nav'] },
 	invalidateWorkspaceListViews,
 	isEnsemblrApiAvailable: () => true,
-}));
-
-vi.mock('@/renderer/state/workspace', () => ({
-	useDisableProjectReorderLayoutAnimation: () =>
-		disableProjectReorderLayoutAnimation,
 }));
 
 vi.mock('@/renderer/state/workspace/open-target-history', () => ({
@@ -66,7 +59,6 @@ test('redirects to Welcome when the archived workspace is the active one', async
 		await view.result.current('san-antonio');
 	});
 
-	expect(disableProjectReorderLayoutAnimation).toHaveBeenCalledTimes(1);
 	expect(deleteLastUsedOpenTarget).toHaveBeenCalledWith('san-antonio');
 	expect(navigate).toHaveBeenCalledWith({ replace: true, to: '/' });
 	expect(invalidateWorkspaceListViews).toHaveBeenCalledTimes(1);
@@ -81,7 +73,6 @@ test('leaves navigation untouched when a background workspace is archived', asyn
 	});
 
 	expect(navigate).not.toHaveBeenCalled();
-	expect(disableProjectReorderLayoutAnimation).toHaveBeenCalledTimes(1);
 	expect(invalidateWorkspaceListViews).toHaveBeenCalledTimes(1);
 	expect(invalidate).toHaveBeenCalledTimes(1);
 });

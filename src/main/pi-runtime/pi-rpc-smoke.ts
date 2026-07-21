@@ -123,6 +123,12 @@ export function runPiRpcSmokeProcess({
 			stdio: ['pipe', 'pipe', 'pipe'],
 		});
 
+		// A `pi` that exits fast or lacks RPC mode closes its stdin read end, so
+		// the write below emits EPIPE asynchronously on the stdin socket. Without
+		// this listener that stream 'error' is unhandled and crashes the main
+		// process (child.on('error') covers the ChildProcess, not the stdin pipe).
+		child.stdin?.on('error', () => {});
+
 		try {
 			// `{"type":"prompt"}` with no `message` makes Pi reply with a
 			// structured `{"type":"response","success":false,"error":"..."}`

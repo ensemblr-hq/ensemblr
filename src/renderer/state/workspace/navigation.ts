@@ -1,5 +1,5 @@
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { useAtom, useSetAtom } from 'jotai';
+import { type ReactElement, useEffect } from 'react';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type {
 	ProjectNavigationState,
@@ -7,8 +7,6 @@ import type {
 } from '@/renderer/types/workbench-shell';
 import {
 	collapsedProjectIdsAtom,
-	disableProjectReorderLayoutAnimationAtom,
-	isProjectReorderLayoutAnimationDisabledAtom,
 	orderedProjectIdsAtom,
 	pinnedWorkspaceIdsAtom,
 	unreadWorkspaceIdsAtom,
@@ -95,15 +93,6 @@ function getReconciledShellItemIds<T extends { id: string }>(
 }
 
 /**
- * Returns the shared action that suppresses project-row layout animation for
- * one sidebar reflow.
- * @returns A callback that starts or extends animation suppression.
- */
-export function useDisableProjectReorderLayoutAnimation() {
-	return useSetAtom(disableProjectReorderLayoutAnimationAtom);
-}
-
-/**
  * React hook that exposes project sidebar state — order, collapse, pin, and
  * reorder helpers — backed by persisted Jotai atoms.
  * @param projects - Active project shell models.
@@ -112,9 +101,6 @@ export function useDisableProjectReorderLayoutAnimation() {
 export function useProjectNavigationState(
 	projects: ProjectShellModel[],
 ): ProjectNavigationState {
-	const projectCollapseMotionTimeoutRef = useRef<ReturnType<
-		typeof setTimeout
-	> | null>(null);
 	const [orderedProjectIds, setOrderedProjectIds] = useAtom(
 		orderedProjectIdsAtom,
 	);
@@ -127,15 +113,6 @@ export function useProjectNavigationState(
 	const setWorkspaceBoardStatus = useSetAtom(workspaceBoardStatusAtom);
 	const setWorkspaceBoardOrder = useSetAtom(workspaceBoardOrderAtom);
 	const setUnreadWorkspaceIds = useSetAtom(unreadWorkspaceIdsAtom);
-	const [
-		isProjectReorderPositionOnlyLayout,
-		setIsProjectReorderPositionOnlyLayout,
-	] = useState(false);
-	const disableProjectReorderLayoutAnimation =
-		useDisableProjectReorderLayoutAnimation();
-	const isProjectReorderLayoutAnimationDisabled = useAtomValue(
-		isProjectReorderLayoutAnimationDisabledAtom,
-	);
 	const collapsedProjectIdSet = new Set(collapsedProjectIds);
 	const pinnedWorkspaceIdSet = new Set(pinnedWorkspaceIds);
 	const orderedProjects = getOrderedShellItems(projects, orderedProjectIds);
@@ -212,14 +189,6 @@ export function useProjectNavigationState(
 		setWorkspaceBoardOrder,
 		setWorkspaceBoardStatus,
 	]);
-	useEffect(
-		() => () => {
-			if (projectCollapseMotionTimeoutRef.current) {
-				clearTimeout(projectCollapseMotionTimeoutRef.current);
-			}
-		},
-		[],
-	);
 
 	/** Persists a new project order after a drag-and-drop reorder. */
 	const reorderProjects = (reorderedElements: ReactElement[]) => {
@@ -229,21 +198,8 @@ export function useProjectNavigationState(
 			),
 		);
 	};
-	/** Briefly suppresses size animations during a collapse-toggle reflow. */
-	const activatePositionOnlyProjectReorderLayout = () => {
-		if (projectCollapseMotionTimeoutRef.current) {
-			clearTimeout(projectCollapseMotionTimeoutRef.current);
-		}
-
-		setIsProjectReorderPositionOnlyLayout(true);
-		projectCollapseMotionTimeoutRef.current = setTimeout(() => {
-			setIsProjectReorderPositionOnlyLayout(false);
-			projectCollapseMotionTimeoutRef.current = null;
-		}, 180);
-	};
 	/** Toggles whether a project's workspace group is collapsed. */
 	const toggleProjectCollapsed = (projectId: string) => {
-		activatePositionOnlyProjectReorderLayout();
 		setCollapsedProjectIds((currentProjectIds) =>
 			currentProjectIds.includes(projectId)
 				? currentProjectIds.filter(
@@ -254,7 +210,6 @@ export function useProjectNavigationState(
 	};
 	/** Toggles whether a workspace is pinned to the top of the sidebar. */
 	const toggleWorkspacePinned = (workspaceId: string) => {
-		disableProjectReorderLayoutAnimation();
 		setPinnedWorkspaceIds((currentWorkspaceIds) =>
 			currentWorkspaceIds.includes(workspaceId)
 				? currentWorkspaceIds.filter(
@@ -266,9 +221,6 @@ export function useProjectNavigationState(
 
 	return {
 		collapsedProjectIdSet,
-		disableProjectReorderLayoutAnimation,
-		isProjectReorderLayoutAnimationDisabled,
-		isProjectReorderPositionOnlyLayout,
 		orderedProjects,
 		pinnedWorkspaceEntries,
 		pinnedWorkspaceIdSet,

@@ -81,6 +81,13 @@ function createFakeChild(): FakeChildHandle {
 		getStdinChunks: () => stdinChunks.slice(),
 		kill: (signal: NodeJS.Signals = 'SIGTERM') => {
 			killSignals.push(signal);
+			// Model OS semantics so `close()`, which now awaits real termination,
+			// resolves: a process exits on SIGTERM and on the unignorable SIGKILL.
+			// SIGINT is left to the test — `abort` models a process that ignores it
+			// so the SIGKILL escalation stays observable.
+			if (signal === 'SIGTERM' || signal === 'SIGKILL') {
+				queueMicrotask(() => emitter.emit('exit', null, signal));
+			}
 			return true;
 		},
 		pid: 4242,

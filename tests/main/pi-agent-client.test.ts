@@ -317,7 +317,10 @@ test('unsubscribed listeners stop receiving events', async () => {
 		.filter((event) => event.type === 'status')
 		.map((event) => event.status);
 	assert.deepEqual(statuses, ['idle']);
-	assert.equal(controller.listenerCount(), 0);
+	// One listener remains: the client wrapper's internal shutdown watcher, which
+	// removes the session from the map and flips it closed when the child exits on
+	// its own. It unsubscribes on shutdown, not on user unsubscribe.
+	assert.equal(controller.listenerCount(), 1);
 });
 
 test('metadata events flow from controller into subscribers', async () => {

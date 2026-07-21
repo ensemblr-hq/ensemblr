@@ -39,7 +39,6 @@ export interface WorkbenchQueriesResult {
 	isRepositoryWorkspaceNavigationFetching: boolean;
 	isRepositoryWorkspaceNavigationLoading: boolean;
 	isRepositoryWorkspaceNavigationPlaceholderData: boolean;
-	isSetupDiagnosticsFetching: boolean;
 	navigationSnapshot: RepositoryWorkspaceNavigationSnapshot | null;
 	projects: ProjectShellModel[];
 	refetchSetupDiagnostics: () => Promise<unknown>;
@@ -78,7 +77,6 @@ export function useWorkbenchQueries({
 	const {
 		data: setupDiagnosticsData,
 		error: setupDiagnosticsErrorResult,
-		isFetching: isSetupDiagnosticsFetching,
 		refetch: refetchSetupDiagnostics,
 	} = useQuery({
 		...setupDiagnosticsQuery,
@@ -129,7 +127,6 @@ export function useWorkbenchQueries({
 		isRepositoryWorkspaceNavigationFetching,
 		isRepositoryWorkspaceNavigationLoading,
 		isRepositoryWorkspaceNavigationPlaceholderData,
-		isSetupDiagnosticsFetching,
 		navigationSnapshot,
 		projects,
 		refetchSetupDiagnostics,

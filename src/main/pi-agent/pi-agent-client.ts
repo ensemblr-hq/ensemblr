@@ -248,6 +248,34 @@ function wrapSession({
 	onClose: () => void;
 }): PiAgentSession {
 	let closed = false;
+	let removed = false;
+	let shutdownSubscription: PiAgentSubscription | null = null;
+
+	const remove = (): void => {
+		if (removed) {
+			return;
+		}
+		removed = true;
+		shutdownSubscription?.unsubscribe();
+		onClose();
+	};
+
+	// A crash exits the child on its own. Without observing the adapter's
+	// `shutdown` event the wrapper would never flip `closed`, leaving a dead
+	// session in the client map and letting post-crash `submit`/`subscribe` calls
+	// throw an untyped adapter error instead of a typed `session-closed` one.
+	shutdownSubscription = adapterSession.subscribe((event) => {
+		if (event.type === 'shutdown') {
+			closed = true;
+			remove();
+		}
+	});
+	// A synchronous `shutdown` during `subscribe` would run `remove()` before the
+	// assignment above, so `unsubscribe()` there is a no-op; drop the now-stale
+	// subscription once we actually hold the handle.
+	if (removed) {
+		shutdownSubscription.unsubscribe();
+	}
 
 	const ensureOpen = (operation: string): void => {
 		if (closed) {
@@ -267,7 +295,7 @@ function wrapSession({
 		try {
 			await op();
 		} finally {
-			onClose();
+			remove();
 		}
 	};
 

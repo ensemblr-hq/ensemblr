@@ -584,6 +584,30 @@ app.whenReady().then(() => {
 	createMainWindow({ windowStateStore: mainWindowStateStore });
 });
 
+let isShuttingDownAgents = false;
+// Terminate the Pi RPC children before the process exits. `close()` now resolves
+// only once each child has actually exited, so awaiting the client shutdowns
+// keeps orphaned `pi --mode rpc` processes from surviving app quit. `before-quit`
+// is synchronous, so defer the real quit until the async shutdown settles; a
+// bounded race guarantees a wedged child can never block quit indefinitely.
+app.on('before-quit', (event) => {
+	if (isShuttingDownAgents) {
+		return;
+	}
+	isShuttingDownAgents = true;
+	event.preventDefault();
+	void (async () => {
+		await Promise.race([
+			Promise.allSettled([
+				piAgentClient.shutdown(),
+				summaryPiAgentClient.shutdown(),
+			]),
+			new Promise((resolve) => setTimeout(resolve, 3000)),
+		]);
+		app.quit();
+	})();
+});
+
 app.on('will-quit', () => {
 	appSettingsService.stop();
 	configService.stop();

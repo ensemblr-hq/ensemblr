@@ -10,6 +10,12 @@ import type { PiRawFrameBroadcast } from '@/shared/ipc/contracts/pi-session';
  */
 const FRAME_BUFFER_SIZE = 1000;
 
+// Module-scoped so ids stay unique across effect re-subscribes (e.g. toggling
+// developer mode). A per-subscription counter would reset to 0 and could reuse
+// an id still held by a pre-toggle frame with the same timestamp+direction,
+// producing duplicate React keys.
+let rawFrameSequence = 0;
+
 /**
  * Lightweight classification computed at capture time so the panel can hide
  * noisy housekeeping traffic (get_session_stats / its response) without
@@ -99,12 +105,11 @@ export function usePiRawFrameCapture(enabled: boolean): void {
 			setAll([]);
 			return undefined;
 		}
-		let counter = 0;
 		const unsubscribe = subscribePiRawFrames((frame) => {
 			const buffered: BufferedFrame = {
 				...frame,
 				category: classifyFrame(frame),
-				id: `${frame.at}:${frame.direction}:${counter++}`,
+				id: `${frame.at}:${frame.direction}:${rawFrameSequence++}`,
 			};
 			setAll((prev) => {
 				const next = [...prev, buffered];
