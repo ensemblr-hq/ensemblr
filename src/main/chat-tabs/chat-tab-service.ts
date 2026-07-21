@@ -2,10 +2,6 @@ import { existsSync } from 'node:fs';
 import type { DatabaseSync } from 'node:sqlite';
 
 import {
-	CHAT_TAB_LIMIT,
-	CHAT_TAB_LIMIT_ERROR_CODE,
-} from '../../shared/ipc/contracts/chat-tab.ts';
-import {
 	parseWorkspaceGitDiffScope,
 	serializeWorkspaceGitDiffScope,
 } from '../../shared/ipc/contracts/workspace-git.ts';
@@ -26,16 +22,6 @@ import {
 	restoreClosedChatTab,
 	setChatTabMetadata,
 } from '../storage/repositories/chat-tab-repository.ts';
-
-/** Thrown when opening a sixth chat tab; carries a renderer-detectable marker. */
-export class ChatTabLimitError extends Error {
-	constructor() {
-		super(
-			`${CHAT_TAB_LIMIT_ERROR_CODE}: at most ${CHAT_TAB_LIMIT} chat tabs can be open per workspace. Close a chat tab to open a new one.`,
-		);
-		this.name = 'ChatTabLimitError';
-	}
-}
 
 /**
  * Cross-table lookups the chat-tab service needs without owning SQL for other
@@ -187,14 +173,7 @@ export function createChatTabService({
 			const database = requireChatTabDatabase();
 			const openTabs = listOpenForWorkspace({ database, workspaceId });
 
-			if (kind === 'chat') {
-				const openChatTabCount = openTabs.filter(
-					(tab) => tab.kind === 'chat',
-				).length;
-				if (openChatTabCount >= CHAT_TAB_LIMIT) {
-					throw new ChatTabLimitError();
-				}
-			} else {
+			if (kind !== 'chat') {
 				// Re-focus instead of duplicating when the same subject is already
 				// open (e.g. clicking the same attachment chip twice).
 				const subject = readMetadataSubject(metadata);

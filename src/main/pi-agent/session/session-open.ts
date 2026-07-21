@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import type { AgentControlEnvResolver } from '../../agent-control/ports.ts';
 import type { PiExecutableSnapshot } from '../../pi-runtime';
 import type {
 	PiSessionBranchRow,
@@ -31,6 +32,8 @@ interface OpenRequest {
 	initialPrompt?: string | null;
 	label?: string | null;
 	model?: string | null;
+	/** Spawning agent's session id when opened via the control layer, else absent. */
+	parentSessionId?: string | null;
 	resumeSessionId?: string | null;
 	thinkingLevel?: string | null;
 	workspaceCwd: string;
@@ -45,6 +48,12 @@ interface SessionOpenerOptions {
 	piAgentClient: PiAgentClient;
 	/** Fires the unified title + branch naming attempt for a freshly opened session. */
 	queueNaming: (input: SessionNamingInput) => void;
+	/**
+	 * Resolves the agent-control environment (control-server URL + per-session
+	 * token) injected into the Pi child so its shipped extension can call back
+	 * into the app. Absent in tests and when the control layer is disabled.
+	 */
+	resolveAgentControlEnv?: AgentControlEnvResolver;
 	subscribeToRuntime: (input: {
 		branchId: string;
 		database: DatabaseSync;
@@ -73,6 +82,7 @@ export function createSessionOpener({
 	now,
 	piAgentClient,
 	queueNaming,
+	resolveAgentControlEnv,
 	subscribeToRuntime,
 }: SessionOpenerOptions): SessionOpener {
 	const resumePersistedSession = async ({
@@ -155,6 +165,11 @@ export function createSessionOpener({
 			piAgentClient,
 			rowForErrorPatch: row,
 			sessionInput: {
+				env: resolveAgentControlEnv?.({
+					workspaceId: request.workspaceId,
+					sessionId: row.id,
+					parentSessionId: request.parentSessionId ?? null,
+				}),
 				executable: request.executable,
 				label: request.label ?? row.label ?? undefined,
 				piSessionId: nativePiSessionId,
@@ -230,6 +245,11 @@ export function createSessionOpener({
 			piAgentClient,
 			rowForErrorPatch: session,
 			sessionInput: {
+				env: resolveAgentControlEnv?.({
+					workspaceId: request.workspaceId,
+					sessionId: session.id,
+					parentSessionId: request.parentSessionId ?? null,
+				}),
 				executable: request.executable,
 				label: request.label ?? undefined,
 				piSessionId: nativePiSessionId,
@@ -271,6 +291,7 @@ export function createSessionOpener({
 			eventSink,
 			executable: request.executable,
 			initialPrompt: request.initialPrompt ?? null,
+			liveSession: runtimeSession,
 			model: startedRow.model,
 			sessionId: session.id,
 			workspaceCwd: request.workspaceCwd,
@@ -307,6 +328,7 @@ async function createRuntimeSessionOrFail({
 	piAgentClient: PiAgentClient;
 	rowForErrorPatch: PiSessionRow;
 	sessionInput: {
+		env?: Record<string, string>;
 		executable: PiExecutableSnapshot;
 		label?: string;
 		piSessionId: string;
@@ -316,6 +338,7 @@ async function createRuntimeSessionOrFail({
 }): Promise<PiAgentSession> {
 	try {
 		return await piAgentClient.createSession({
+			env: sessionInput.env,
 			executable: sessionInput.executable,
 			label: sessionInput.label,
 			modelOverride,

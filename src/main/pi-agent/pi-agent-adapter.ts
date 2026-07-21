@@ -2,6 +2,7 @@ import type {
 	PiAgentEventListener,
 	PiAgentSessionId,
 	PiAgentSessionMetadata,
+	PiAgentSessionState,
 	PiAgentSubmitAcknowledgement,
 	PiAgentSubmitRequest,
 	PiAgentSubscription,
@@ -45,6 +46,7 @@ export interface PiAgentAdapterSession {
 	abort: (reason?: string) => Promise<void>;
 	close: () => Promise<void>;
 	getMetadata: () => PiAgentSessionMetadata;
+	getState: () => Promise<PiAgentSessionState>;
 	id: PiAgentSessionId;
 	subscribe: (listener: PiAgentEventListener) => PiAgentSubscription;
 	submit: (

@@ -16,15 +16,11 @@ import type {
 	ParsedPrompt,
 	ParsedPromptAttachment,
 } from '@/renderer/types/pi-timeline';
-
-const ATTACHED_FILE_PATTERN =
-	/<attached_file path="([^"]*)">\n([\s\S]*?)\n<\/attached_file>/g;
-
-const USER_PREFERENCES_PATTERN =
-	/<user_preferences>\n([\s\S]*?)\n<\/user_preferences>/g;
-
-const REFERENCED_FOLDERS_PATTERN =
-	/^Referenced workspace folders:\n((?:@[^\n]+\n?)+)\s*/;
+import {
+	attachedFileBlockPattern,
+	leadingReferencedFoldersPattern,
+	userPreferencesBlockPattern,
+} from '@/shared/prompt-scaffolding';
 
 /**
  * Splits a persisted prompt into its attachment blocks (referenced workspace
@@ -37,7 +33,7 @@ export function parsePromptAttachments(prompt: string): ParsedPrompt {
 	let remaining = prompt;
 	const attachments: ParsedPromptAttachment[] = [];
 
-	const folderMatch = REFERENCED_FOLDERS_PATTERN.exec(remaining);
+	const folderMatch = leadingReferencedFoldersPattern().exec(remaining);
 	if (folderMatch) {
 		const block = folderMatch[1] ?? '';
 		const paths = block
@@ -52,7 +48,7 @@ export function parsePromptAttachments(prompt: string): ParsedPrompt {
 	}
 
 	remaining = remaining.replace(
-		ATTACHED_FILE_PATTERN,
+		attachedFileBlockPattern(),
 		(_match, rawPath: string, content: string) => {
 			attachments.push({
 				content: content ?? '',
@@ -64,7 +60,7 @@ export function parsePromptAttachments(prompt: string): ParsedPrompt {
 
 	// User preferences are context for the agent, not something to show back to
 	// the user — strip the block from the visible message without a chip.
-	remaining = remaining.replace(USER_PREFERENCES_PATTERN, '');
+	remaining = remaining.replace(userPreferencesBlockPattern(), '');
 
 	return { attachments, text: remaining.replace(/\n{3,}/g, '\n\n').trim() };
 }

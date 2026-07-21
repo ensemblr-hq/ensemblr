@@ -1,0 +1,12 @@
+{
+	"name": "ensemblr-pi-extensions",
+	"private": true,
+	"description": "Pi extensions shipped with Ensemblr, loaded via `pi -e`. Run `npm install` here so `typebox` resolves when Pi loads the extension.",
+	"type": "module",
+	"dependencies": {
+		"typebox": "^0.34.0"
+	},
+	"devDependencies": {
+		"@earendil-works/pi-coding-agent": "^0.79.1"
+	}
+}

@@ -28,14 +28,12 @@ import type {
 } from '@/renderer/types/workbench';
 import type { SessionTabState } from '@/renderer/types/workbench-shell';
 import { harnessConversationTitleSource } from '@/shared/agents/harness-registry';
-import {
-	CHAT_TAB_LIMIT,
-	CHAT_TAB_LIMIT_ERROR_CODE,
-	type ChatTabWire,
-	type CloseChatTabRequest,
-	type ClosedChatTabEntryWire,
-	type ListChatTabsResult,
-	type OpenChatTabRequest,
+import type {
+	ChatTabWire,
+	CloseChatTabRequest,
+	ClosedChatTabEntryWire,
+	ListChatTabsResult,
+	OpenChatTabRequest,
 } from '@/shared/ipc/contracts/chat-tab';
 import type { PiSessionSnapshotWire } from '@/shared/ipc/contracts/pi-session';
 import {
@@ -226,6 +224,22 @@ export function useSessionTabState({
 		return unsubscribe;
 	}, [queryClient, workspaceId]);
 
+	// An agent opening or closing a tab (main → renderer) is invisible to the
+	// tab list, which is a cached query only invalidated by renderer-local
+	// mutations. Invalidate on the broadcast so an agent-created tab appears at
+	// once instead of lingering until an unrelated refetch.
+	useEffect(() => {
+		const unsubscribe = window.ensemblr?.onAgentControlTabsChanged(
+			(broadcast) => {
+				if (broadcast.workspaceId !== workspaceId) {
+					return;
+				}
+				invalidateChatTabs();
+			},
+		);
+		return unsubscribe;
+	}, [invalidateChatTabs, workspaceId]);
+
 	const cacheOpenedTab = useCallback(
 		(result: { tab: ChatTabWire }) => {
 			writeOpenedChatTabToCache({
@@ -238,18 +252,10 @@ export function useSessionTabState({
 		[invalidateChatTabs, queryClient, workspaceId],
 	);
 
-	// Chat opens are subject to the per-workspace tab limit; the limit toast
-	// only makes sense here, so file/diff opens use a separate mutation below.
 	const openChatTabMutation = useMutation({
 		mutationFn: (request?: Omit<OpenChatTabRequest, 'workspaceId'>) =>
 			openChatTab({ ...request, workspaceId }),
-		onError: (error) => {
-			if (isChatTabLimitError(error)) {
-				toast.warning(`Chat tab limit reached`, {
-					description: `At most ${CHAT_TAB_LIMIT} chat tabs can be open in a workspace. Close one to open a new chat — closed chats stay available in history.`,
-				});
-				return;
-			}
+		onError: () => {
 			void queryClient.invalidateQueries({
 				queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 			});
@@ -383,17 +389,10 @@ export function useSessionTabState({
 		useCallback(async (): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
 				const result = await openChatTabMutation.mutateAsync(undefined);
-				if (!result.tab) {
-					return null;
-				}
 				return { chatTabId: result.tab.id };
-			} catch (error) {
-				// Limit errors are surfaced as a toast by the mutation; treat the
-				// blocked open as a soft no-op so callers do not navigate.
-				if (isChatTabLimitError(error)) {
-					return null;
-				}
-				throw error;
+			} catch {
+				// Surfaced as a toast by the mutation; callers treat as no-op.
+				return null;
 			}
 		}, [openChatTabMutation]);
 
@@ -909,13 +908,6 @@ export function useSessionTabState({
 		restoreSessionTab,
 		sessionTabs,
 	};
-}
-
-/** True when an IPC open-tab rejection carries the chat-tab-limit marker. */
-function isChatTabLimitError(error: unknown): boolean {
-	return (
-		error instanceof Error && error.message.includes(CHAT_TAB_LIMIT_ERROR_CODE)
-	);
 }
 
 /**

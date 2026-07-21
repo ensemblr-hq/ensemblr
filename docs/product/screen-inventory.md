@@ -167,7 +167,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Settings or configuration implied: Feature flags, developer diagnostics, optional integrations, UI density/visibility settings.
 - Ensemblr parity requirement: Maintain a feature-flag surface for non-core parity features and diagnostics.
 - Pi-specific adaptation: Voice and terminal features are runtime-agnostic; Graphite stack support depends on git workflow integration, not Pi. React profiler applies to Electron/React implementation.
-- Risks or implementation notes: Voice and Graphite are deferred by ADR 0020; production React profiler is deferred by ADR 0021; the chat-tab limit is resolved by ADR 0022.
+- Risks or implementation notes: Voice and Graphite are deferred by ADR 0020; production React profiler is deferred by ADR 0021; the chat-tab limit was resolved by ADR 0022 and later removed by ADR 0039 (chat tabs are now unlimited).
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.56.38@2x.png`
 

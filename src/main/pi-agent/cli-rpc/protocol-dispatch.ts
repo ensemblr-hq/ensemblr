@@ -40,6 +40,8 @@ export interface ProtocolDispatchDeps {
 	now: () => Date;
 	/** Pending `get_session_stats` request ids (mutated by both sides). */
 	pendingStatsIds: Set<string>;
+	/** Pending `get_state` request resolvers keyed by request id (mutated by both sides). */
+	pendingStateResolvers: Map<string, (data: unknown) => void>;
 }
 
 /** Handles a single raw Pi RPC frame. */
@@ -77,14 +79,21 @@ function handleSession(typed: FrameObject, deps: ProtocolDispatchDeps): void {
 
 /**
  * Handles a Pi command ack (`{"type":"response",…}`): resolves a pending
- * `get_session_stats` request into a context-usage event, or surfaces a failed
- * command as a recoverable adapter error.
+ * `get_state` request, resolves a pending `get_session_stats` request into a
+ * context-usage event, or surfaces a failed command as a recoverable adapter
+ * error.
  * @param typed - The `response` frame.
- * @param deps - Session callbacks and the pending-stats id set.
+ * @param deps - Session callbacks and the pending-request tracking.
  */
 function handleResponse(typed: FrameObject, deps: ProtocolDispatchDeps): void {
 	const success = typed.success !== false;
 	const responseId = typeof typed.id === 'string' ? typed.id : null;
+	if (responseId && deps.pendingStateResolvers.has(responseId)) {
+		const resolveState = deps.pendingStateResolvers.get(responseId);
+		deps.pendingStateResolvers.delete(responseId);
+		resolveState?.(success ? typed.data : null);
+		return;
+	}
 	if (responseId && deps.pendingStatsIds.has(responseId)) {
 		deps.pendingStatsIds.delete(responseId);
 		if (success) {

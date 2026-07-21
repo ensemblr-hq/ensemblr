@@ -15,7 +15,7 @@ vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
  * mounted composer in the app.
  */
 function renderAskAgent(
-	openSessionTab: () => Promise<{ chatTabId: string } | null>,
+	openSessionTab: () => Promise<{ chatTabId: string }>,
 	selectChat: (chatTabId: string) => void,
 ) {
 	const inserted: string[] = [];
@@ -63,23 +63,6 @@ test('opens a fresh chat and defers the seed until it is active', async () => {
 	expect(inserted[0]).toContain('.ensemblr/settings.toml');
 	expect(inserted[0]).toContain('[scripts]');
 	expect(toast.success).toHaveBeenCalledTimes(1);
-});
-
-test('does not seed when the chat-tab limit blocks a new chat', async () => {
-	const openSessionTab = vi.fn().mockResolvedValue(null);
-	const selectChat = vi.fn();
-	const { inserted, view } = renderAskAgent(openSessionTab, selectChat);
-
-	await act(async () => {
-		view.result.current();
-	});
-	act(() => {
-		view.rerender({ activeChatTabId: 'whatever' });
-	});
-
-	expect(selectChat).not.toHaveBeenCalled();
-	expect(inserted).toEqual([]);
-	expect(toast.success).not.toHaveBeenCalled();
 });
 
 test('surfaces an error and seeds nothing when opening the chat rejects', async () => {

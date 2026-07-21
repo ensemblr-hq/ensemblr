@@ -61,17 +61,15 @@ export function useAskAgentSetupScript({
 	return useCallback(() => {
 		void openSessionTab()
 			.then((opened) => {
-				// `openSessionTab` returns null when the chat-tab limit is hit; the
-				// mutation already surfaced a toast, so treat it as a soft no-op.
 				if (!opened) {
-					return;
+					throw new Error('New chat did not open.');
 				}
 				pendingChatIdRef.current = opened.chatTabId;
 				selectChat(opened.chatTabId);
 			})
 			.catch(() => {
-				// A rejection (vs the null limit case) means the new chat never
-				// opened, so nothing is pending to seed — surface it and stop.
+				// A null result or rejection means the new chat never opened, so nothing
+				// is pending to seed — surface it and stop.
 				toast.error('Could not open a new chat.', {
 					description: 'Try the "Ask agent" action again from the setup tab.',
 				});

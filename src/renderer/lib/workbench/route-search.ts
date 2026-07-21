@@ -39,8 +39,8 @@ function normalizeDockTab(value: unknown): DockTabId {
 	return isDockTab(value) ? value : DEFAULT_DOCK_TAB;
 }
 
-/** Type guard for the dock-panel tab enum. */
-function isDockTab(value: unknown): value is DockTabId {
+/** Type guard for the dock-panel tab enum (`'setup'`, `'run'`, or `terminal:*`). */
+export function isDockTab(value: unknown): value is DockTabId {
 	return value === 'setup' || value === 'run' || isTerminalDockTabId(value);
 }
 

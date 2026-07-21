@@ -12,6 +12,7 @@ import type {
 	PiAgentSessionId,
 	PiAgentSessionMetadata,
 	PiAgentSessionRequest,
+	PiAgentSessionState,
 	PiAgentSubmitAcknowledgement,
 	PiAgentSubmitRequest,
 	PiAgentSubscription,
@@ -34,6 +35,7 @@ export interface PiAgentSession {
 	abort: (reason?: string) => Promise<void>;
 	close: () => Promise<void>;
 	getMetadata: () => PiAgentSessionMetadata;
+	getState: () => Promise<PiAgentSessionState>;
 	id: PiAgentSessionId;
 	subscribe: (listener: PiAgentEventListener) => PiAgentSubscription;
 	submit: (
@@ -309,6 +311,10 @@ function wrapSession({
 				await adapterSession.close();
 			}),
 		getMetadata: () => adapterSession.getMetadata(),
+		getState: () => {
+			ensureOpen('get state from');
+			return adapterSession.getState();
+		},
 		id: adapterSession.id,
 		subscribe: (listener) => {
 			ensureOpen('subscribe to');

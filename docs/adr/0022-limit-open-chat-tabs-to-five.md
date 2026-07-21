@@ -4,7 +4,7 @@ Date: 2026-06-04
 
 ## Status
 
-Accepted
+Superseded by [0039](0039-remove-open-chat-tab-limit.md) (2026-07-21). Chat tabs are now unlimited.
 
 ## Context
 

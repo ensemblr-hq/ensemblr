@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Outlet, useNavigate } from '@tanstack/react-router';
 import { useAtomValue } from 'jotai';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { settingsResolutionQuery } from '@/renderer/api/ensemblr';
 import { CloseRunningChatDialog } from '@/renderer/components/workbench-shell/conversation-panel/close-running-chat-dialog';
 import { useSetupDiagnostics } from '@/renderer/components/workbench-shell/shell-contexts';
@@ -17,6 +17,7 @@ import {
 	sharedActionPreference,
 } from '@/renderer/lib/workbench/action-preference';
 import { configuredPreviewUrls } from '@/renderer/lib/workbench/preview-urls';
+import { isDockTab } from '@/renderer/lib/workbench/route-search';
 import { useRegisterCloseAction } from '@/renderer/state/close-action';
 import {
 	usePiComposerController,
@@ -38,6 +39,7 @@ import type {
 	WorkbenchRouteSearch,
 	WorkspaceNavigationSelection,
 } from '@/renderer/types/workbench';
+import type { FocusViewBroadcast } from '@/shared/agent-control';
 import { WorkspaceMainContentProvider } from '../shell-contexts';
 
 /** Workspace shell content — wires panel tabs, composer state, and navigation. */
@@ -262,6 +264,45 @@ export function WorkspaceRouteContent({
 			nextSearch,
 		});
 	}
+
+	// An agent-control focus request (main → renderer) brings a tab, dock
+	// terminal, or review panel to the foreground. A ref holds the latest apply
+	// closure so the subscription is registered once yet always calls the current
+	// navigation setters. Applied only for the window showing this workspace.
+	/**
+	 * Applies an agent-control focus request for the window showing this
+	 * workspace, ignoring requests targeting another workspace or carrying a dock
+	 * id that is not a valid {@link DockTabId} (the payload is agent-supplied).
+	 * @param payload - The focus request broadcast from the main process.
+	 */
+	const applyFocus = (payload: FocusViewBroadcast) => {
+		if (payload.workspaceId !== activeWorkspace.id) {
+			return;
+		}
+		const { target } = payload;
+		if (target.kind === 'tab') {
+			navigateToWorkspaceChat({ nextChatId: target.chatTabId });
+			return;
+		}
+		if (target.kind === 'dock') {
+			if (isDockTab(target.dock)) {
+				updateSearch({ dock: target.dock });
+			}
+			return;
+		}
+		updateSearch({ review: target.panel });
+	};
+	const applyFocusRef = useRef(applyFocus);
+	useEffect(() => {
+		applyFocusRef.current = applyFocus;
+	});
+	useEffect(
+		() =>
+			window.ensemblr?.onAgentControlFocusView((payload) =>
+				applyFocusRef.current(payload),
+			),
+		[],
+	);
 
 	return (
 		<>

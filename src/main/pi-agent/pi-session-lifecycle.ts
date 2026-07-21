@@ -4,6 +4,7 @@ import type {
 	StopPiSessionRequest as StopPiSessionWireRequest,
 	SubmitPiPromptRequest as SubmitPiPromptWireRequest,
 } from '../../shared/ipc/contracts/pi-session';
+import type { AgentControlEnvResolver } from '../agent-control/ports.ts';
 import type { CheckpointCapturePort } from '../checkpoints';
 import type { PiExecutableSnapshot } from '../pi-runtime';
 import {
@@ -12,7 +13,7 @@ import {
 	type PiSessionRow,
 	updatePiSession,
 	updateTurn,
-} from '../storage/repositories/index.ts';
+} from '../storage/repositories/pi-session-repository.ts';
 import type { SessionNamingInput } from './naming/session-naming.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import { PiSessionServiceError } from './pi-session-service-error.ts';
@@ -41,6 +42,12 @@ export { toSnapshot } from './session/session-snapshot.ts';
  */
 export interface OpenPiSessionRequest extends OpenPiSessionWireRequest {
 	executable: PiExecutableSnapshot;
+	/**
+	 * Session id of the agent that spawned this one, when opened through the
+	 * agent-control layer. Threaded into the child's control-env origin so
+	 * lineage (depth, deadlock) guardrails apply. Absent for user-opened sessions.
+	 */
+	parentSessionId?: string | null;
 }
 
 /**
@@ -77,6 +84,8 @@ interface PiSessionLifecycleOptions {
 	/** Unified title + branch naming, fired at open and every turn-idle. */
 	queueNaming: QueueNamingPort;
 	requireDatabase: () => DatabaseSync;
+	/** Injects the agent-control env (control URL + token) into each Pi child. */
+	resolveAgentControlEnv?: AgentControlEnvResolver;
 	sessionSummaryWriter?: SessionSummaryWriter;
 }
 
@@ -110,6 +119,7 @@ export function createPiSessionLifecycle({
 	piAgentClient,
 	queueNaming,
 	requireDatabase,
+	resolveAgentControlEnv,
 	sessionSummaryWriter,
 }: PiSessionLifecycleOptions): PiSessionLifecycle {
 	const activeSessions: ActiveSessionMap = new Map();
@@ -135,6 +145,7 @@ export function createPiSessionLifecycle({
 		now,
 		piAgentClient,
 		queueNaming,
+		resolveAgentControlEnv,
 		subscribeToRuntime: ({ branchId, database, runtimeSession, sessionId }) =>
 			runtimeSession.subscribe((event) => {
 				runtimeEventHandler.handle({

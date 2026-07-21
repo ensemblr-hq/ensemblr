@@ -51,7 +51,7 @@ Date: 2026-07-18
 ## Resolved Since Screenshot Review
 
 - AI-certainty phrase soften setting (ENS-069): removed from v1. It had no functional consumer, so Ensemblr does not expose or persist this as a user setting; Pi output should not be silently post-processed.
-- Experimental settings v1 scope (ENS-068): the implemented Experimental page has exactly Developer Mode (`localStorage`) and Auto-run after setup (`config.json`, `app.experimental.autoRunAfterSetup`). The earlier dashboard/sidebar/browser/resource flags are not present in code. Big-terminal mode is satisfied by the terminal dock. Tab-freak mode, Voice, Graphite, cloud SSH, production React profiler, and chat-tab limit remain resolved by ADR 0020/0021/0022.
+- Experimental settings v1 scope (ENS-068): the implemented Experimental page has exactly Developer Mode (`localStorage`) and Auto-run after setup (`config.json`, `app.experimental.autoRunAfterSetup`). The earlier dashboard/sidebar/browser/resource flags are not present in code. Big-terminal mode is satisfied by the terminal dock. Tab-freak mode, Voice, Graphite, cloud SSH, and production React profiler remain resolved by ADR 0020/0021. The chat-tab limit (ADR 0022) was removed by ADR 0039; chat tabs are now unlimited.
 - Root directory changes: switch root and reindex/adopt by default; migration/delete are explicit actions.
 - Secret storage: use macOS Keychain from the start; SQLite stores metadata only.
 - Ensemblr account model: defer app account/sign-in for v1; local-first with external auth.
@@ -59,7 +59,7 @@ Date: 2026-07-18
 - Linear integration: first-class v1 OAuth login, issue CRUD, and workspace creation from issues.
 - Voice mode, Graphite support, and cloud/remote SSH settings: defer until after core completion.
 - React profiler/developer diagnostics: development/internal diagnostics only, not a normal v1 production setting.
-- Many-tab mode: allow five open chat tabs per workspace; document/file previews do not count.
+- Many-tab mode: unlimited open chat tabs per workspace (ADR 0039 removed the former five-tab cap); document/file previews re-focus rather than duplicate.
 - Merge confirmation: prominent ready action when checks pass, then explicit confirmation/final merge/archive flow.
 - Hosted deployment preview URLs: derive from GitHub data through `gh` for v1, preferring deployment status `environment_url`/`target_url`, then check links, then provider bot PR comments. Do not require Vercel or Netlify login for the right PR header preview link.
 - GitHub integration model: `gh` and `gh api` are the GitHub integration path. Ensemblr does not build or store credentials for an app-owned GitHub OAuth/API layer.

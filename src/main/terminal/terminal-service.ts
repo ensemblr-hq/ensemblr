@@ -17,6 +17,7 @@ import type {
 } from '../../shared/ipc/contracts/terminal';
 import { detectPreviewUrl } from '../../shared/terminal/detect-preview-url.ts';
 import { stripReportRequests } from '../../shared/terminal/strip-report-requests.ts';
+import type { AgentControlEnvResolver } from '../agent-control/ports.ts';
 import type { WorkspaceEnvironmentService } from '../environment';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import { WorkspaceEnvironmentError } from '../environment/workspace-environment.ts';
@@ -208,6 +209,12 @@ export interface CreateTerminalServiceOptions {
 	 * the same PATH and toolchain shims as diagnostics and Pi sessions.
 	 */
 	resolveBaseEnv?: TerminalBaseEnvResolver;
+	/**
+	 * Injects the agent-control env (control-server URL + a workspace-scoped
+	 * harness token) into every terminal/harness process so a launched harness can
+	 * call back into the app. Absent when the control layer is disabled.
+	 */
+	resolveAgentControlEnv?: AgentControlEnvResolver;
 	/**
 	 * Resolves the pty scrollback byte limit from the user's
 	 * `appearance.terminalScrollbackMb` setting. Read per new session so an edited
@@ -421,6 +428,7 @@ export function createTerminalService({
 	onLifecycle,
 	onOutput,
 	readConversationInfo = readAgentConversationInfo,
+	resolveAgentControlEnv,
 	resolveBaseEnv = () => process.env,
 	resolveScrollbackLimit = () => DEFAULT_SCROLLBACK_LIMIT,
 	scriptShell = resolveScriptShell(),
@@ -892,6 +900,15 @@ export function createTerminalService({
 			}
 
 			throw error;
+		}
+
+		const controlEnv = resolveAgentControlEnv?.({
+			workspaceId,
+			sessionId: `ws:${workspaceId}`,
+			species: 'harness',
+		});
+		if (controlEnv) {
+			Object.assign(environment.env, controlEnv);
 		}
 
 		for (const diagnostic of environment.diagnostics) {

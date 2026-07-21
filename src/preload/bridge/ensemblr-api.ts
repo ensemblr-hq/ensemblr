@@ -1,4 +1,8 @@
 import { type IpcRendererEvent, ipcRenderer, webUtils } from 'electron';
+import type {
+	FocusViewBroadcast,
+	TabsChangedBroadcast,
+} from '../../shared/agent-control';
 import { IPC_CHANNELS } from '../../shared/ipc/channels';
 import type { EnsemblrApi } from '../../shared/ipc/contracts/api';
 import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app-settings';
@@ -187,6 +191,16 @@ export function createEnsemblrApi(): EnsemblrApi {
 			),
 		onCloseActiveTabRequest: (listener) =>
 			subscribe<void>(IPC_CHANNELS.closeActiveTab, listener),
+		onAgentControlFocusView: (listener) =>
+			subscribe<FocusViewBroadcast>(
+				IPC_CHANNELS.agentControlFocusView,
+				listener,
+			),
+		onAgentControlTabsChanged: (listener) =>
+			subscribe<TabsChangedBroadcast>(
+				IPC_CHANNELS.agentControlTabsChanged,
+				listener,
+			),
 		onPiRawFrame: (listener) =>
 			subscribe<PiRawFrameBroadcast>(IPC_CHANNELS.piRawFrame, listener),
 		onPiSessionEvent: (listener) =>

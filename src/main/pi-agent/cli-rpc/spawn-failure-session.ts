@@ -48,6 +48,7 @@ export function createSpawnFailureSession({
 			settle();
 		},
 		getMetadata: () => metadata,
+		getState: async () => ({ sessionName: null }),
 		id: metadata.id,
 		subscribe: (listener) => {
 			listeners.add(listener);

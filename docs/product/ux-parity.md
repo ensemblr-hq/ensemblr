@@ -135,7 +135,7 @@ Ensemblr equivalent:
 - Dock actions are script-state aware: show Setup Scripts when no scripts are configured, Run setup script before setup has run, Run when the dev server is stopped, and Open :PORT plus Stop when the dev server is running.
 - The new-terminal action creates another terminal session. It never creates additional Setup or Run tabs.
 - Pi RPC transcripts, app setup diagnostics, app health logs, and workspace setup/run script output must not be merged into user-spawned terminal sessions.
-- No separate big-terminal or many-tabs setting is implemented; the terminal dock and five-chat-tab ADR cover v1 behavior.
+- No separate big-terminal or many-tabs setting is implemented; the terminal dock covers big-terminal v1, and chat tabs are unlimited per ADR 0039 (superseding the five-chat-tab ADR 0022).
 
 Ensemblr equivalent:
 

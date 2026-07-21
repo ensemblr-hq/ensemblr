@@ -132,7 +132,7 @@ Exit criteria:
 - Agent chat pane UX/UI decisions are recorded after realistic Pi composer/timeline behavior exists.
 - Checkpoints are captured before Pi user prompts and mapped to workspace/session/turn metadata.
 - Users can inspect turn diffs and restore files without mutating Pi session files.
-- At most five chat tabs can be open per workspace; preview tabs do not count.
+- Any number of chat tabs can be open per workspace (the five-tab cap was removed by ADR 0039); preview tabs re-focus rather than duplicate.
 
 Primary source:
 

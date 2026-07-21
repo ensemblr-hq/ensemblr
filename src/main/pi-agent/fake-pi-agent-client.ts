@@ -27,6 +27,7 @@ export interface FakePiAgentAdapterSessionController {
 	id: PiAgentSessionId;
 	listenerCount: () => number;
 	setSessionId: (sessionId: string | null) => void;
+	setSessionName: (sessionName: string | null) => void;
 	setStatus: (status: PiAgentSessionStatus) => void;
 }
 
@@ -101,6 +102,7 @@ function createSessionEntry({
 	const requests: PiAgentSubmitRequest[] = [];
 	let metadata: PiAgentSessionMetadata = { ...input.metadata };
 	let closed = false;
+	let sessionName: string | null = null;
 
 	const emit = (event: PiAgentEvent): void => {
 		for (const listener of [...listeners]) {
@@ -143,6 +145,7 @@ function createSessionEntry({
 		abort: (_reason) => close('aborted'),
 		close: () => close('manual'),
 		getMetadata: () => metadata,
+		getState: async () => ({ sessionName }),
 		id: input.metadata.id,
 		subscribe: (listener) => {
 			listeners.add(listener);
@@ -183,6 +186,9 @@ function createSessionEntry({
 		listenerCount: () => listeners.size,
 		setSessionId: (sessionId) => {
 			updateMetadata({ sessionId });
+		},
+		setSessionName: (name) => {
+			sessionName = name;
 		},
 		setStatus: (status) => {
 			const previous = metadata.status;

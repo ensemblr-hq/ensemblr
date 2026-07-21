@@ -111,6 +111,35 @@ test('openSession persists a pi_sessions row plus a main branch', async (t) => {
 	assert.equal(snapshot.openedTabs.length, 1);
 });
 
+test('getSession reports live status for an active session, not a frozen starting snapshot', async (t) => {
+	const fixture = openFixture(t);
+	const { fake, service } = createService(fixture.database);
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	assert.equal(snapshot.status, 'starting');
+
+	await service.submitPrompt({ prompt: 'task', sessionId: snapshot.id });
+	assert.equal(
+		service.getSession(snapshot.id)?.status,
+		'streaming',
+		'status must advance past starting once the turn opens',
+	);
+
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime, 'expected one open runtime session');
+	runtime.setStatus('idle');
+	await delay(10);
+	assert.equal(
+		service.getSession(snapshot.id)?.status,
+		'idle',
+		'status must reflect the runtime idle event, not the cached open-time row',
+	);
+});
+
 test('openSession binds an existing chat tab without opening a duplicate', async (t) => {
 	const fixture = openFixture(t);
 	const { service } = createService(fixture.database);

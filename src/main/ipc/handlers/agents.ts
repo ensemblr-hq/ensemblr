@@ -68,10 +68,21 @@ function repointTerminalTab(
  * @param options - Required services.
  */
 export function registerAgentHandlers({
+	augmentHarnessCommand = (command) => command,
 	databaseService,
 	harnessDetectionService,
 	terminalService,
 }: {
+	/**
+	 * Appends agent-control MCP-config flags to a harness launch command so the
+	 * harness can reach the app. Defaults to identity when the control layer is
+	 * disabled.
+	 */
+	augmentHarnessCommand?: (
+		command: string,
+		harnessId: string,
+		workspaceId: string,
+	) => string;
 	databaseService: EnsemblrDatabaseService;
 	harnessDetectionService: HarnessDetectionService;
 	terminalService: TerminalService;
@@ -95,7 +106,7 @@ export function registerAgentHandlers({
 			}
 
 			const result = await terminalService.create({
-				command,
+				command: augmentHarnessCommand(command, harnessId, workspaceId),
 				harnessId,
 				kind: 'agent',
 				title: findHarnessDefinition(harnessId)?.label ?? harnessId,
@@ -123,7 +134,7 @@ export function registerAgentHandlers({
 			}
 
 			const result = await terminalService.create({
-				command,
+				command: augmentHarnessCommand(command, harnessId, workspaceId),
 				harnessId,
 				kind: 'agent',
 				resumed: !fresh,
