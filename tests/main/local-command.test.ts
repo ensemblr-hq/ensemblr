@@ -54,6 +54,8 @@ function createTestService(
 	env: Record<string, string> = {},
 	options: {
 		commonPathEntries?: readonly string[];
+		fallbackRetryCooldownMs?: number;
+		now?: () => Date;
 		shellEnvironmentLoader?: ShellEnvironmentLoader;
 	} = {},
 ): LocalCommandService {
@@ -64,7 +66,11 @@ function createTestService(
 		},
 		commonPathEntries: options.commonPathEntries ?? [],
 		environmentTimeoutMs: 25,
+		...(options.fallbackRetryCooldownMs !== undefined
+			? { fallbackRetryCooldownMs: options.fallbackRetryCooldownMs }
+			: {}),
 		killGraceMs: 25,
+		...(options.now ? { now: options.now } : {}),
 		shell: TEST_SHELL,
 		shellEnvironmentLoader:
 			options.shellEnvironmentLoader ?? createShellLoader(env),
@@ -163,11 +169,14 @@ test('falls back to process environment with diagnostics when shell resolution f
 	);
 });
 
-test('does not memoize a fallback resolution and retries the shell', async () => {
+test('caches a fallback resolution until the cooldown lapses, then retries the shell', async () => {
 	let attempt = 0;
+	let clockMs = 1_000_000;
 	const service = createTestService(
 		{},
 		{
+			fallbackRetryCooldownMs: 30_000,
+			now: () => new Date(clockMs),
 			shellEnvironmentLoader: async () => {
 				attempt += 1;
 
@@ -189,13 +198,20 @@ test('does not memoize a fallback resolution and retries the shell', async () =>
 	);
 
 	const first = await service.getEnvironment();
-	const second = await service.getEnvironment();
-	const third = await service.getEnvironment();
+	const withinCooldown = await service.getEnvironment();
 
 	assert.equal(first.source, 'fallback');
-	assert.equal(second.source, 'shell');
-	assert.equal(second.path, '/recovered/bin');
-	assert.equal(third.source, 'shell');
+	assert.equal(withinCooldown.source, 'fallback');
+	assert.equal(attempt, 1);
+
+	clockMs += 30_000;
+
+	const afterCooldown = await service.getEnvironment();
+	const memoizedShell = await service.getEnvironment();
+
+	assert.equal(afterCooldown.source, 'shell');
+	assert.equal(afterCooldown.path, '/recovered/bin');
+	assert.equal(memoizedShell.source, 'shell');
 	assert.equal(attempt, 2);
 });
 

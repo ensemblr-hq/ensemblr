@@ -555,6 +555,65 @@ test('closeTab archives terminal tabs as restorable, stamping title and metadata
 	assert.equal(closed[0]?.id, terminalTab.id);
 });
 
+test('closeTab hard-deletes terminal tabs that captured no session id', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const terminalTab = fixture.service.openTab({
+		kind: 'terminal',
+		metadata: { harnessId: 'claude', terminalId: 'pty-3' },
+		title: 'Claude Code',
+		workspaceId: fixture.workspaceId,
+	});
+
+	// A terminal spawned and closed with no conversation has no session id to
+	// resume, so it is deleted rather than archived into closed history.
+	assert.deepEqual(fixture.service.closeTab({ chatTabId: terminalTab.id }), {
+		deleted: true,
+	});
+
+	assert.equal(
+		getChatTabById({
+			database: fixture.connection.database,
+			id: terminalTab.id,
+		}),
+		null,
+	);
+	assert.equal(
+		fixture.service.listTabs({ workspaceId: fixture.workspaceId }).closed
+			.length,
+		0,
+	);
+});
+
+test('closeTab archives a terminal tab whose session id was persisted before close', (t) => {
+	const fixture = openFixture(t);
+
+	fixture.service.openTab({ workspaceId: fixture.workspaceId });
+	const terminalTab = fixture.service.openTab({
+		kind: 'terminal',
+		metadata: {
+			agentSessionId: 'claude-persisted',
+			harnessId: 'claude',
+			terminalId: 'pty-4',
+		},
+		title: 'Claude Code',
+		workspaceId: fixture.workspaceId,
+	});
+
+	// Even with no close patch, an id already on the row keeps the tab restorable.
+	assert.deepEqual(fixture.service.closeTab({ chatTabId: terminalTab.id }), {
+		deleted: false,
+	});
+
+	const stored = getChatTabById({
+		database: fixture.connection.database,
+		id: terminalTab.id,
+	});
+	assert.notEqual(stored?.closedAt, null);
+	assert.equal(stored?.metadata.agentSessionId, 'claude-persisted');
+});
+
 test('restoreTab reopens an archived terminal tab', (t) => {
 	const fixture = openFixture(t);
 
