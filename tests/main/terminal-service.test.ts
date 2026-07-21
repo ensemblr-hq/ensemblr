@@ -268,6 +268,24 @@ test('output streams broadcast and accumulate as scrollback', async (t) => {
 	assert.equal(service.getSnapshot(terminalId).scrollback, 'hello world');
 });
 
+test('getSnapshot strips answer-eliciting query sequences from replay scrollback', async (t) => {
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { outputEvents, service } = createServiceFixture(t, { backend });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	const ESC = String.fromCharCode(27);
+	const query = `before${ESC}]11;?${ESC}\\${ESC}[c${ESC}[6nafter`;
+	fake.emitData(query);
+
+	// The replay snapshot drops the queries so a reattaching xterm never answers
+	// them, but the live broadcast keeps them raw for the running program.
+	assert.equal(service.getSnapshot(terminalId).scrollback, 'beforeafter');
+	assert.equal(outputEvents.at(-1)?.data, query);
+});
+
 test('detects a run-script preview URL split across two output chunks', async (t) => {
 	const fake = createFakePty();
 	const backend: PtyBackend = { spawn: () => fake.pty };

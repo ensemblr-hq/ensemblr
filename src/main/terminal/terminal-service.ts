@@ -16,6 +16,7 @@ import type {
 	TerminalSnapshotResult,
 } from '../../shared/ipc/contracts/terminal';
 import { detectPreviewUrl } from '../../shared/terminal/detect-preview-url.ts';
+import { stripReportRequests } from '../../shared/terminal/strip-report-requests.ts';
 import type { WorkspaceEnvironmentService } from '../environment';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import { WorkspaceEnvironmentError } from '../environment/workspace-environment.ts';
@@ -1125,7 +1126,10 @@ export function createTerminalService({
 
 			return {
 				lastSeq: session.outputSeq,
-				scrollback: session.scrollback.read(),
+				// Strip answer-eliciting query sequences so replaying this scrollback
+				// into a fresh xterm never sends stale DA/DSR/color replies to the
+				// shell prompt, where they would echo as gibberish.
+				scrollback: stripReportRequests(session.scrollback.read()),
 				session: { ...session.snapshot },
 			};
 		},
