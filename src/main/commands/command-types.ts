@@ -128,6 +128,14 @@ export interface CreateLocalCommandServiceOptions {
 	baseEnv?: NodeJS.ProcessEnv | Record<string, string | undefined>;
 	commonPathEntries?: readonly string[];
 	environmentTimeoutMs?: number;
+	/**
+	 * Minimum gap between shell retries after a fallback resolution. A failed or
+	 * timed-out login shell caches its fallback for this window instead of
+	 * re-spawning on every lookup, so a persistently slow shell cannot storm the
+	 * user's machine with interactive-shell spawns (each of which is a chance for
+	 * macOS to relaunch Ensemblr as a stray second instance).
+	 */
+	fallbackRetryCooldownMs?: number;
 	killGraceMs?: number;
 	now?: () => Date;
 	shell?: string;

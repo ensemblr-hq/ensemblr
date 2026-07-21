@@ -116,7 +116,10 @@ export async function resolveCommandEnvironment({
 
 /**
  * Default {@link ShellEnvironmentLoader} that spawns the configured login shell
- * and prints sentinel-delimited NUL-separated environment entries to stdout.
+ * and prints sentinel-delimited NUL-separated environment entries to stdout. The
+ * shell runs interactively (`-lic`) so directory-aware version managers (mise,
+ * fnm, asdf), which activate in interactive startup files, contribute their
+ * toolchain PATH.
  * @param input - Loader request.
  * @returns Captured exit metadata and stdout/stderr.
  */
@@ -135,6 +138,11 @@ export function loadShellEnvironment({
 			],
 			{
 				cwd,
+				// An interactive login shell runs the user's arbitrary startup code,
+				// which may shell out to `open`/LaunchServices. Detach it into its own
+				// session so that activity can't be attributed to Ensemblr's process
+				// group and relaunch a stray second instance.
+				detached: true,
 				env: baseEnv,
 				shell: false,
 				stdio: ['ignore', 'pipe', 'pipe'],

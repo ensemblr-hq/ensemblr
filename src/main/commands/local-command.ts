@@ -48,6 +48,7 @@ export type {
 
 const DEFAULT_ENVIRONMENT_TIMEOUT_MS = 3000;
 const DEFAULT_KILL_GRACE_MS = 500;
+const DEFAULT_FALLBACK_RETRY_COOLDOWN_MS = 30_000;
 
 /**
  * Builds a service that runs local commands with sanitized logs and a
@@ -69,24 +70,30 @@ export function createLocalCommandService(
 	const environmentTimeoutMs =
 		options.environmentTimeoutMs ?? DEFAULT_ENVIRONMENT_TIMEOUT_MS;
 	const killGraceMs = options.killGraceMs ?? DEFAULT_KILL_GRACE_MS;
+	const fallbackRetryCooldownMs =
+		options.fallbackRetryCooldownMs ?? DEFAULT_FALLBACK_RETRY_COOLDOWN_MS;
 	const now = options.now ?? (() => new Date());
 	const shell = options.shell ?? resolveDefaultShell(baseEnv);
 	const shellEnvironmentLoader =
 		options.shellEnvironmentLoader ?? loadShellEnvironment;
 	// Keyed by resolution cwd ('' for the process-default env) so directory-aware
 	// version managers can be resolved per workspace without re-spawning a shell
-	// on every lookup. Only successful ('shell') snapshots are memoized so a
-	// transient timeout does not pin a directory to the fallback env for the
-	// whole session.
+	// on every lookup. A successful ('shell') snapshot is memoized for the whole
+	// session; a fallback snapshot is memoized only until its cooldown lapses so a
+	// transient timeout can recover, yet a persistently slow shell stops storming
+	// interactive-shell spawns (each of which risks a stray macOS relaunch).
 	const environmentPromises = new Map<
 		string,
 		Promise<CommandEnvironmentSnapshot>
 	>();
+	// Epoch-ms after which a cached fallback for a key may be retried.
+	const fallbackRetryAt = new Map<string, number>();
 
 	/**
 	 * Resolves the shell environment for a directory on first call and returns a
 	 * defensive clone on every subsequent call for the same directory. A fallback
-	 * resolution is not cached, so a later call retries the shell.
+	 * resolution is cached only until its cooldown lapses, so a later call retries
+	 * the shell without re-spawning one on every lookup in the meantime.
 	 * @param cwd - Directory to resolve the login-shell environment in; omitted
 	 * resolves the Electron process's default environment.
 	 * @returns A cloned environment snapshot.
@@ -98,7 +105,17 @@ export function createLocalCommandService(
 		const cached = environmentPromises.get(key);
 
 		if (cached) {
-			return cloneEnvironmentSnapshot(await cached);
+			const cachedSnapshot = await cached;
+			const retryAt = fallbackRetryAt.get(key);
+			const cooldownLapsed =
+				retryAt !== undefined && now().getTime() >= retryAt;
+
+			if (cachedSnapshot.source === 'shell' || !cooldownLapsed) {
+				return cloneEnvironmentSnapshot(cachedSnapshot);
+			}
+
+			environmentPromises.delete(key);
+			fallbackRetryAt.delete(key);
 		}
 
 		const environmentPromise = resolveCommandEnvironment({
@@ -114,8 +131,10 @@ export function createLocalCommandService(
 
 		const snapshot = await environmentPromise;
 
-		if (snapshot.source !== 'shell') {
-			environmentPromises.delete(key);
+		if (snapshot.source === 'shell') {
+			fallbackRetryAt.delete(key);
+		} else {
+			fallbackRetryAt.set(key, now().getTime() + fallbackRetryCooldownMs);
 		}
 
 		return cloneEnvironmentSnapshot(snapshot);
