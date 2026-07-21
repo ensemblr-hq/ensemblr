@@ -4,15 +4,6 @@
  */
 import type { ChatTabKindWire } from './pi-session.ts';
 
-/** Maximum number of concurrently open `kind: 'chat'` tabs per workspace (ADR 0022). */
-export const CHAT_TAB_LIMIT = 5;
-
-/**
- * Stable marker embedded in the IPC error message when the chat-tab limit is
- * hit, so the renderer can distinguish the blocked state from generic failures.
- */
-export const CHAT_TAB_LIMIT_ERROR_CODE = 'CHAT_TAB_LIMIT_REACHED';
-
 /** Renderer-facing snapshot of a chat-tab row. */
 export interface ChatTabWire {
 	closedAt: string | null;
@@ -51,7 +42,7 @@ export interface ListChatTabsResult {
 /**
  * Open a new tab in a workspace. `kind` defaults to `'chat'`; non-chat kinds
  * (file/diff/document/preview) carry their subject in `metadata` (e.g.
- * `{ filePath }`) and are exempt from the chat-tab limit.
+ * `{ filePath }`) and re-focus an already-open tab for the same subject.
  */
 export interface OpenChatTabRequest {
 	kind?: ChatTabKindWire;

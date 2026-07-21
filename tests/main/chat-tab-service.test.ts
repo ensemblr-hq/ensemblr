@@ -366,28 +366,23 @@ test('listClosedWithSummary trusts the persisted summary path outside the worksp
 	assert.equal(entries[0]?.summaryTitle, 'Written in a worktree');
 });
 
-test('openTab blocks the sixth chat tab with the limit marker', (t) => {
+test('openTab allows an unlimited number of chat tabs', (t) => {
 	const fixture = openFixture(t);
 
-	for (let index = 0; index < 5; index += 1) {
+	for (let index = 0; index < 25; index += 1) {
 		fixture.service.openTab({
 			title: `Chat ${index + 1}`,
 			workspaceId: fixture.workspaceId,
 		});
 	}
 
-	assert.throws(
-		() => fixture.service.openTab({ workspaceId: fixture.workspaceId }),
-		/CHAT_TAB_LIMIT_REACHED/,
-	);
-
 	const { open } = fixture.service.listTabs({
 		workspaceId: fixture.workspaceId,
 	});
-	assert.equal(open.length, 5);
+	assert.equal(open.length, 25);
 });
 
-test('non-chat tabs do not count against the chat-tab limit', (t) => {
+test('non-chat tabs open alongside chat tabs', (t) => {
 	const fixture = openFixture(t);
 
 	for (let index = 0; index < 5; index += 1) {

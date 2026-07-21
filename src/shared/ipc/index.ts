@@ -30,10 +30,6 @@ export type {
 	RestoreChatTabRequest,
 	RestoreChatTabResult,
 } from './contracts/chat-tab';
-export {
-	CHAT_TAB_LIMIT,
-	CHAT_TAB_LIMIT_ERROR_CODE,
-} from './contracts/chat-tab';
 export type {
 	CheckpointApi,
 	CheckpointFailure,

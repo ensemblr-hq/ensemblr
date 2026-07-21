@@ -1343,6 +1343,8 @@ Implementation notes:
 
 ## ENS-034 Chat Tab Limit and Session Tab Model
 
+> Update (2026-07-21): the five-open-chat-tab limit was later removed by ADR 0039. Chat tabs are now unlimited; the tab-model and history parts of this issue still stand. The limit-specific scope, acceptance, and verification items below are historical.
+
 Milestone: 4. Pi CLI RPC Runtime and Agent Timeline
 Type: Cross-cutting
 Priority: P1
@@ -2723,7 +2725,7 @@ Scope:
 - Evaluate workspace/sidebar visibility flags.
 - Evaluate resource usage display for workspace processes and Pi sessions.
 - Decide whether big terminal mode needs additional build work beyond terminal dock.
-- Confirm voice, Graphite, cloud SSH, production profiler, and chat-tab limit remain resolved by ADRs.
+- Confirm voice, Graphite, cloud SSH, and production profiler remain resolved by ADRs. The chat-tab limit was removed by ADR 0039 (chat tabs are now unlimited).
 
 Out of scope:
 - Implementing resource usage UI unless follow-up build ticket is created.
@@ -2951,4 +2953,4 @@ Source:
 - `docs/product/open-decisions.md`
 
 Implementation notes:
-- The five-chat-tab limit is not deferred; it is handled by `ENS-034`.
+- The five-chat-tab limit was handled by `ENS-034`, then removed by ADR 0039; chat tabs are now unlimited.

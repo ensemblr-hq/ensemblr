@@ -243,7 +243,7 @@ if original screenshot evidence is unavailable.
 
 | Area | Conductor Behavior | Ensemblr Target |
 | --- | --- | --- |
-| Chat tab limit | Allows multiple open chat tabs; user observation indicates five open chat tabs. | Allow five open chat tabs per workspace; document/file previews do not count. |
+| Chat tab limit | Allows multiple open chat tabs; user observation indicates five open chat tabs. | Intentional divergence (ADR 0039): unlimited open chat tabs per workspace. The former five-tab cap (ADR 0022) was removed; document/file previews still re-focus rather than duplicate. |
 | Merge flow | Ready-to-merge action when checks pass, followed by final merge/archive flow. | Require merge confirmation; default block merge with failing required checks; archive after merge according to setting. |
 | React profiler | Developer/diagnostic setting observed. | Development/internal diagnostics only for v1, not a normal production setting. |
 | Deferred integrations | Voice, Graphite, and cloud/remote SSH settings appear in screenshots. | Defer these until after core completion. |
