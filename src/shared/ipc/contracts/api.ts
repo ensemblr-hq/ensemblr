@@ -24,7 +24,6 @@ import type { TerminalApi } from './terminal';
 import type { WorkspaceApi } from './workspace';
 import type { WorkspaceFilesApi } from './workspace-files';
 import type { WorkspaceGitApi } from './workspace-git';
-import type { WorkspaceRuntimeApi } from './workspace-runtime';
 import type { WorkspaceScriptsApi } from './workspace-scripts';
 import type { RepositorySourcesApi } from './workspace-sources';
 
@@ -58,7 +57,6 @@ export interface EnsemblrApi
 		SharedRootApi,
 		WorkspaceFilesApi,
 		WorkspaceGitApi,
-		WorkspaceRuntimeApi,
 		GithubApi,
 		ReviewCommentsApi,
 		CheckpointApi,

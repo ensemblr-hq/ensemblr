@@ -8,7 +8,6 @@ import type { RepositoryPreviewUrl } from '@/shared/ipc/contracts/repository-set
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
-import type { WorkspaceDesktopRuntime } from '@/shared/ipc/contracts/workspace-runtime';
 import type { GithubRepoRef } from './github';
 
 import type { ProjectShellModel } from './project';
@@ -337,11 +336,6 @@ export interface WorkspaceShellModel {
 		label: string;
 		status: 'blocked' | 'pending' | 'ready';
 	};
-	/**
-	 * Detected Electron/Tauri desktop toolchain, or null/undefined for plain
-	 * web/server projects. Drives the dock's Launch button.
-	 */
-	desktopRuntime?: WorkspaceDesktopRuntime | null;
 	dockTabs: DockTabModel[];
 	/** Owner/repo parsed from the repository's GitHub remote, when it has one. */
 	githubRepo?: GithubRepoRef | null;

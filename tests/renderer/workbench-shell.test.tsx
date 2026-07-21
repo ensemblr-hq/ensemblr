@@ -64,7 +64,6 @@ const GROUPS: Record<SetupCheckId, SetupCheckGroupId> = {
 const DOCK_ACTIONS: WorkbenchDockActions = {
 	onAskAgentSetupScript: () => undefined,
 	onCloseTerminal: () => undefined,
-	onLaunchDesktopApp: () => undefined,
 	onNewTerminal: () => undefined,
 	onOpenRunPort: () => undefined,
 	onOpenSetupScripts: () => undefined,

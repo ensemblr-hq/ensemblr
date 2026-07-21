@@ -209,10 +209,6 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('openSettingsFileInTarget', request),
 		openWorkspaceInTarget: (request) =>
 			invoke('openWorkspaceInTarget', request),
-		detectWorkspaceDesktopRuntime: (request) =>
-			invoke('detectWorkspaceDesktopRuntime', request),
-		activateWorkspaceDesktopApp: (request) =>
-			invoke('activateWorkspaceDesktopApp', request),
 		prepareCloneGithubRepository: (request) =>
 			invoke('prepareCloneGithubRepository', request),
 		pushWorkspaceBranch: (request) => invoke('pushWorkspaceBranch', request),

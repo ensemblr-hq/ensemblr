@@ -55,9 +55,6 @@ export function useScriptsSettingsForm(
 			await queryClient.invalidateQueries({
 				queryKey: ensemblrQueryKeys.settingsResolution(repoId),
 			});
-			await queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.workspaceDesktopRuntimeAll(),
-			});
 		} catch {
 			toast.error('Could not save script settings.');
 		}
