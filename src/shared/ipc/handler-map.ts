@@ -162,6 +162,8 @@ import type {
 	CreateTerminalSessionResult,
 	KillTerminalRequest,
 	KillTerminalResult,
+	ListRestorableTerminalsRequest,
+	ListRestorableTerminalsResult,
 	ListTerminalSessionsRequest,
 	ListTerminalSessionsResult,
 	ResizeTerminalRequest,
@@ -407,6 +409,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.listReviewTodos]: IpcHandlerEntry<
 		ListReviewTodosRequest,
 		ListReviewTodosResult
+	>;
+	[IPC_CHANNELS.listRestorableTerminals]: IpcHandlerEntry<
+		ListRestorableTerminalsRequest,
+		ListRestorableTerminalsResult
 	>;
 	[IPC_CHANNELS.listTerminalSessions]: IpcHandlerEntry<
 		ListTerminalSessionsRequest,

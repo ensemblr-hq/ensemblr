@@ -109,7 +109,11 @@ export interface HarnessDefinition {
  * the harness's auto-approve flag (per the product decision to always skip
  * permission prompts). Flags below were verified against each tool's current
  * official documentation (July 2026) — do not edit them from memory. Mistral
- * Vibe's flag surface is lower-confidence and worth reconfirming with `--help`.
+ * Vibe pairs `--agent auto-approve` (approves tool calls) with `--trust` (skips
+ * the separate directory-trust prompt that would otherwise block a
+ * non-interactive PTY launch); the two are independent gates. Claude Code and
+ * Codex have no standalone trust flag — their bypass flags already suppress the
+ * trust prompt.
  */
 export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 	{
@@ -158,14 +162,17 @@ export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 		conversationTitleSource: 'vibe-log',
 		sessionLogSource: 'vibe-log',
 		busySource: 'pty-spinner',
-		buildCommand: (bin) => `${bin} --agent auto-approve`,
+		// `--trust` trusts the cwd for this invocation only (not persisted to
+		// trusted_folders.toml) and skips the trust prompt for non-interactive
+		// automation — verified via `vibe --help`.
+		buildCommand: (bin) => `${bin} --agent auto-approve --trust`,
 		// docs.mistral.ai/vibe/code/cli/work-with-cli — `--continue` resumes the
 		// most recent conversation for the directory; `--resume <id>` reattaches an
 		// exact session (needs log_interactions=true, the default).
 		buildResumeCommand: (bin, sessionId) =>
 			sessionId
-				? `${bin} --agent auto-approve --resume ${sessionId}`
-				: `${bin} --agent auto-approve --continue`,
+				? `${bin} --agent auto-approve --trust --resume ${sessionId}`
+				: `${bin} --agent auto-approve --trust --continue`,
 	},
 ];
 

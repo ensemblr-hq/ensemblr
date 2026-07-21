@@ -28,6 +28,56 @@ interface WorkspaceTerminalSessionsState {
 	sessions: TerminalSessionSnapshot[];
 }
 
+/**
+ * Relaunches the interactive dock terminals that were open when the app last
+ * quit, seeding each with its persisted prior output. Called only for a fresh
+ * dock (no live sessions); the main process offers each workspace's set once, so
+ * a later remount finds nothing to restore. Best-effort — a missing bridge or a
+ * failed relaunch simply skips that tab.
+ * @param workspaceId - Workspace whose dock to restore.
+ * @param isCancelled - Reports whether the owning effect has since torn down.
+ * @param setSessions - Folds each relaunched session into dock state.
+ */
+async function restoreDockTerminals(
+	workspaceId: string,
+	isCancelled: () => boolean,
+	setSessions: (
+		updater: (previous: TerminalSessionSnapshot[]) => TerminalSessionSnapshot[],
+	) => void,
+): Promise<void> {
+	const result = await window.ensemblr
+		?.listRestorableTerminals({ workspaceId })
+		.catch(() => null);
+
+	if (!result || isCancelled()) {
+		return;
+	}
+
+	for (const terminal of result.terminals) {
+		// Relaunch serially: each spawn assembles a workspace environment that
+		// allocates a port, so concurrent creates would race on allocation, and the
+		// between-spawn cancel check halts a torn-down effect mid-restore.
+		// react-doctor-disable-next-line -- Serial relaunch is intentional; see above.
+		const created = await window.ensemblr
+			?.createTerminalSession({
+				restoredFromId: terminal.id,
+				seedOutput: terminal.output,
+				title: terminal.title,
+				workspaceId,
+			})
+			.catch(() => null);
+
+		if (isCancelled()) {
+			return;
+		}
+
+		const session = created?.session;
+		if (session) {
+			setSessions((previous) => upsertTerminalSession(previous, session));
+		}
+	}
+}
+
 /** Clears every pending terminal-activity idle timer. */
 function clearActivityTimers(activityTimers: ActivityTimers): void {
 	for (const timer of activityTimers.values()) {
@@ -128,8 +178,19 @@ export function useWorkspaceTerminalSessions(
 		window.ensemblr
 			?.listTerminalSessions({ workspaceId })
 			.then((result) => {
-				if (!cancelled) {
-					setSessions(result.sessions);
+				if (cancelled) {
+					return;
+				}
+				setSessions(result.sessions);
+				// Restore only when no interactive terminal is already live. Agent
+				// tabs and run/setup scripts also surface here, and a same-mount agent
+				// resume can create one before this list resolves; gating on the raw
+				// length would then wrongly skip the dock restore.
+				const hasLiveDockTerminal = result.sessions.some(
+					(session) => session.kind === 'terminal',
+				);
+				if (!hasLiveDockTerminal) {
+					void restoreDockTerminals(workspaceId, () => cancelled, setSessions);
 				}
 			})
 			.catch(() => {

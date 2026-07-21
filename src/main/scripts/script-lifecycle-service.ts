@@ -355,7 +355,7 @@ export function createScriptLifecycleService({
 
 	/**
 	 * Persists the current setup fingerprint to the worktree's
-	 * `.ensemblr/setup.local.json` marker. Best-effort: silently no-ops when
+	 * `.context/setup.local.json` marker. Best-effort: silently no-ops when
 	 * SQLite or the workspace row is unavailable and swallows write errors, since
 	 * a missed record only costs one redundant setup run on the next open.
 	 * @param options - The setup command that completed and the target workspace.

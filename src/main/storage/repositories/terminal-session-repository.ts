@@ -85,6 +85,46 @@ export function finalizeTerminalSessionRow({
 		.run(status, endedAt, endedAt, metadataJson, id);
 }
 
+/** One terminal session that was still open when the app last quit. */
+export interface RestorableTerminalSessionRow {
+	cwd: string | null;
+	id: string;
+	metadataJson: string;
+	title: string;
+	workspaceId: string;
+}
+
+/**
+ * Selects the sessions that were still 'created'/'running' at the previous
+ * shutdown — the tabs open in the dock when the app was quit or crashed. Read on
+ * startup BEFORE {@link markStaleRunningTerminalSessions} flips them to failed,
+ * so their ids remain recoverable for the dock restore path.
+ * @param database - Open SQLite connection.
+ * @returns The rows for every session that was alive at last quit.
+ */
+export function selectRestorableTerminalSessionRows({
+	database,
+}: {
+	database: DatabaseSync;
+}): RestorableTerminalSessionRow[] {
+	const rows = database
+		.prepare(
+			`SELECT id, workspace_id, title, cwd, metadata_json
+				FROM terminal_sessions
+				WHERE status IN ('created', 'running')`,
+		)
+		.all() as Array<Record<string, unknown>>;
+
+	return rows.map((row) => ({
+		cwd: typeof row.cwd === 'string' ? row.cwd : null,
+		id: String(row.id),
+		metadataJson:
+			typeof row.metadata_json === 'string' ? row.metadata_json : '{}',
+		title: String(row.title),
+		workspaceId: String(row.workspace_id),
+	}));
+}
+
 /** Inputs for {@link markStaleRunningTerminalSessions}. */
 export interface MarkStaleRunningTerminalSessionsOptions {
 	database: DatabaseSync;

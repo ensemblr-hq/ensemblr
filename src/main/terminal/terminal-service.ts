@@ -6,6 +6,7 @@ import {
 } from '../../shared/agents/harness-registry.ts';
 import type {
 	CreateTerminalSessionResult,
+	RestorableTerminal,
 	TerminalDiagnostic,
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
@@ -15,14 +16,18 @@ import type {
 	TerminalSnapshotResult,
 } from '../../shared/ipc/contracts/terminal';
 import { detectPreviewUrl } from '../../shared/terminal/detect-preview-url.ts';
+import { stripReportRequests } from '../../shared/terminal/strip-report-requests.ts';
 import type { WorkspaceEnvironmentService } from '../environment';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';
 import { WorkspaceEnvironmentError } from '../environment/workspace-environment.ts';
+import { isRecord, isString } from '../repository/row-guards.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import {
 	finalizeTerminalSessionRow,
 	insertTerminalSessionRow,
 	markStaleRunningTerminalSessions,
+	type RestorableTerminalSessionRow,
+	selectRestorableTerminalSessionRows,
 } from '../storage/repositories/terminal-session-repository.ts';
 import {
 	type AgentConversationInfo,
@@ -34,6 +39,11 @@ import {
 	type PtyBackend,
 	type PtyProcess,
 } from './pty-backend.ts';
+import {
+	deleteTerminalOutput,
+	readTerminalOutput,
+	writeTerminalOutput,
+} from './terminal-output-file.ts';
 import {
 	createScrollbackBuffer,
 	DEFAULT_SCROLLBACK_LIMIT,
@@ -48,6 +58,34 @@ const MAX_DIMENSION = 1_000;
 const DEFAULT_KILL_GRACE_MS = 5_000;
 // Defense-in-depth against a compromised renderer flooding the PTY buffer.
 const MAX_WRITE_BYTES = 65_536;
+
+/**
+ * How long to coalesce a session's output writes before flushing scrollback to
+ * disk. Long enough that a chatty PTY does not thrash the filesystem, short
+ * enough that a crash loses little tail output.
+ */
+const OUTPUT_FLUSH_DEBOUNCE_MS = 1_000;
+
+/**
+ * Dim separator appended after a restored session's seeded scrollback, marking
+ * where the previous run's replayed output ends and the fresh shell begins. Built
+ * without literal control characters, matching the OSC helpers below.
+ */
+const RESTORE_BANNER = `\r\n${String.fromCharCode(27)}[2m── restored session — output above is from the previous run ──${String.fromCharCode(27)}[0m\r\n`;
+
+/**
+ * Reports whether a session kind is persisted to disk and offered for dock
+ * restore after a restart. Only plain interactive terminals qualify: agent tabs
+ * carry their own on-disk session logs and resume through the harness path, and
+ * script kinds (run/setup/archive) are transient runs that are never re-offered.
+ * The single source of truth for both the write side and the restore side, so
+ * the two can never persist a kind that restore would then orphan.
+ * @param kind - The session kind to test.
+ * @returns True only for interactive dock terminals.
+ */
+function isRestorableTerminalKind(kind: TerminalSessionKind): boolean {
+	return kind === 'terminal';
+}
 
 /** Machine-readable failure categories raised by the terminal service. */
 export type TerminalServiceErrorCode = 'session-not-found';
@@ -85,6 +123,16 @@ export interface CreateTerminalSessionOptions {
 	 * to the generic harness label. Fresh launches leave this false to keep the gate.
 	 */
 	resumed?: boolean;
+	/**
+	 * Id of the persisted dock terminal this create relaunches. When set, its
+	 * stored output log is removed once {@link seedOutput} has been seeded.
+	 */
+	restoredFromId?: string;
+	/**
+	 * Prior scrollback seeded ahead of live PTY output when relaunching a
+	 * persisted dock terminal, so the restored tab replays its history first.
+	 */
+	seedOutput?: string;
 	title?: string;
 	rows?: number;
 	workspaceId: string;
@@ -99,6 +147,12 @@ export interface TerminalService {
 	getSnapshot: (terminalId: string) => TerminalSnapshotResult;
 	kill: (terminalId: string) => TerminalSessionSnapshot | null;
 	list: (workspaceId: string) => TerminalSessionSnapshot[];
+	/**
+	 * Interactive dock terminals a workspace can relaunch after restart: those
+	 * open at last quit whose output was persisted. One-shot per workspace — the
+	 * set is consumed on read so a remount does not re-offer them.
+	 */
+	listRestorable: (workspaceId: string) => RestorableTerminal[];
 	recoverStaleSessions: () => void;
 	resize: (terminalId: string, cols: number, rows: number) => void;
 	/**
@@ -200,6 +254,11 @@ interface TrackedSession {
 	exitSubscription: { dispose: () => void } | null;
 	exitWaiters: Array<() => void>;
 	killTimer: NodeJS.Timeout | null;
+	/**
+	 * Debounce timer coalescing scrollback writes to disk for persisted dock
+	 * kinds, or null when no flush is pending. Unset for agent sessions.
+	 */
+	outputFlushTimer: NodeJS.Timeout | null;
 	outputSeq: number;
 	/** Poll timer re-reading the harness conversation title, or null when idle. */
 	titlePollTimer: NodeJS.Timeout | null;
@@ -368,6 +427,13 @@ export function createTerminalService({
 	workspaceEnvironmentService,
 }: CreateTerminalServiceOptions): TerminalService {
 	const sessions = new Map<string, TrackedSession>();
+	// Dock terminals that were open at the previous quit, captured on startup
+	// before their rows are marked stale. Consumed one-shot by listRestorable so
+	// a renderer remount does not re-offer an already-relaunched tab.
+	const restorableByWorkspace = new Map<
+		string,
+		RestorableTerminalSessionRow[]
+	>();
 
 	/**
 	 * Returns the active SQLite connection, or null when no database is open.
@@ -405,6 +471,114 @@ export function createTerminalService({
 			terminalId: session.snapshot.id,
 			workspaceId: session.snapshot.workspaceId,
 		});
+	}
+
+	/**
+	 * Builds a session's scrollback buffer, seeding a restored terminal's prior
+	 * output and the {@link RESTORE_BANNER} ahead of any live PTY data so the
+	 * replayed history reads before the fresh shell. Fresh spawns get an empty
+	 * buffer.
+	 * @param seedOutput - Prior scrollback to replay, or undefined for a fresh spawn.
+	 * @returns A scrollback buffer at the user's configured limit.
+	 */
+	function buildSessionScrollback(
+		seedOutput: string | undefined,
+	): ScrollbackBuffer {
+		const scrollback = createScrollbackBuffer(resolveScrollbackLimit());
+
+		if (seedOutput) {
+			scrollback.append(seedOutput);
+			scrollback.append(RESTORE_BANNER);
+		}
+
+		return scrollback;
+	}
+
+	/**
+	 * Removes the persisted output log of the dock terminal a restore superseded,
+	 * so the next restart restores from the freshly relaunched session rather than
+	 * the stale one. No-op when this create is not a restore.
+	 * @param cwd - Worktree root whose `.context/terminals` holds the log.
+	 * @param restoredFromId - Id of the superseded session, or undefined.
+	 */
+	function discardRestoredLog(
+		cwd: string,
+		restoredFromId: string | undefined,
+	): void {
+		if (restoredFromId) {
+			deleteTerminalOutput(cwd, restoredFromId);
+		}
+	}
+
+	/** Clears a session's pending debounced flush timer, if one is armed. */
+	function clearOutputFlushTimer(session: TrackedSession): void {
+		if (session.outputFlushTimer) {
+			clearTimeout(session.outputFlushTimer);
+			session.outputFlushTimer = null;
+		}
+	}
+
+	/**
+	 * Writes a restorable session's current scrollback to its `.context` output
+	 * log so a later app run can replay it. No-op for non-restorable kinds.
+	 * Best-effort — the writer swallows errors.
+	 * @param session - Tracked session whose scrollback to persist.
+	 */
+	function persistSessionOutput(session: TrackedSession): void {
+		if (!isRestorableTerminalKind(session.snapshot.kind)) {
+			return;
+		}
+
+		writeTerminalOutput(
+			session.cwd,
+			session.snapshot.id,
+			session.scrollback.read(),
+		);
+	}
+
+	/**
+	 * Flushes a session's scrollback to disk immediately and cancels any pending
+	 * debounced flush. Used on quit and before an active session is torn down.
+	 * @param session - Tracked session whose scrollback to persist.
+	 */
+	function flushSessionOutput(session: TrackedSession): void {
+		clearOutputFlushTimer(session);
+		persistSessionOutput(session);
+	}
+
+	/**
+	 * Drops a session's persisted output log and cancels any pending flush. Called
+	 * when a session terminates normally: its row is no longer `running`, so it is
+	 * never restorable and its log would otherwise linger as a secret-bearing
+	 * orphan in `.context/terminals`. No-op for non-restorable kinds.
+	 * @param session - Tracked session that has ended.
+	 */
+	function discardSessionOutput(session: TrackedSession): void {
+		clearOutputFlushTimer(session);
+		if (isRestorableTerminalKind(session.snapshot.kind)) {
+			deleteTerminalOutput(session.cwd, session.snapshot.id);
+		}
+	}
+
+	/**
+	 * Schedules a debounced scrollback flush for a restorable session, coalescing
+	 * bursty output into one write. No-op for non-restorable kinds. The timer is
+	 * unref'd so a pending flush never keeps the app alive.
+	 * @param session - Tracked session whose output changed.
+	 */
+	function scheduleOutputFlush(session: TrackedSession): void {
+		if (
+			!isRestorableTerminalKind(session.snapshot.kind) ||
+			session.outputFlushTimer
+		) {
+			return;
+		}
+
+		session.outputFlushTimer = setTimeout(() => {
+			session.outputFlushTimer = null;
+			persistSessionOutput(session);
+		}, OUTPUT_FLUSH_DEBOUNCE_MS);
+		session.outputFlushTimer.unref?.();
 	}
 
 	/**
@@ -621,6 +795,13 @@ export function createTerminalService({
 			session.agentBusyIdleTimer = null;
 		}
 
+		// A terminated session's row is no longer restorable, so drop its persisted
+		// log rather than leaving a secret-bearing orphan. Quit is the exception:
+		// disposeAll disposes each exit subscription before signalling the PTY, so
+		// this never runs during shutdown, keeping the still-'running' row and its
+		// log recoverable on next launch.
+		discardSessionOutput(session);
+
 		session.dataSubscription?.dispose();
 		session.exitSubscription?.dispose();
 		session.dataSubscription = null;
@@ -681,8 +862,10 @@ export function createTerminalService({
 		command,
 		harnessId,
 		kind = 'terminal',
+		restoredFromId,
 		resumed = false,
 		rows = DEFAULT_ROWS,
+		seedOutput,
 		title,
 		workspaceId,
 	}: CreateTerminalSessionOptions): Promise<CreateTerminalSessionResult> {
@@ -767,6 +950,9 @@ export function createTerminalService({
 		const busyFromPtySpinner =
 			kind === 'agent' && harnessBusySource(harnessId) === 'pty-spinner';
 
+		const restored = Boolean(seedOutput);
+		const scrollback = buildSessionScrollback(seedOutput);
+
 		const session: TrackedSession = {
 			agentBusyIdleTimer: null,
 			busyFromPtySpinner,
@@ -777,12 +963,13 @@ export function createTerminalService({
 			exitSubscription: null,
 			exitWaiters: [],
 			killTimer: null,
+			outputFlushTimer: null,
 			outputSeq: 0,
 			previewScanBuffer: '',
 			titlePollTimer: null,
 			titleScanBuffer: '',
 			pty,
-			scrollback: createScrollbackBuffer(resolveScrollbackLimit()),
+			scrollback,
 			snapshot: {
 				agentBusy: false,
 				agentSessionId: null,
@@ -795,6 +982,7 @@ export function createTerminalService({
 				id,
 				kind,
 				previewUrl: null,
+				restored,
 				rows: normalizedRows,
 				status: 'running',
 				title: title?.trim() || defaultTitle(kind),
@@ -803,9 +991,12 @@ export function createTerminalService({
 			stopRequested: false,
 		};
 
+		discardRestoredLog(environment.cwd, restoredFromId);
+
 		session.dataSubscription = pty.onData((data) => {
 			session.outputSeq += 1;
 			session.scrollback.append(data);
+			scheduleOutputFlush(session);
 			onOutput({ data, seq: session.outputSeq, terminalId: id, workspaceId });
 			maybeDetectPreviewUrl(session, data);
 			maybeCaptureOscTitle(session, data);
@@ -905,6 +1096,19 @@ export function createTerminalService({
 			// Same SIGHUP→grace→SIGKILL path as kill(); the escalation timers are
 			// unref'd, so a quitting app exits without waiting and the kernel
 			// reaps anything that ignored SIGHUP once the PTY closes.
+			//
+			// Flush each session's scrollback and DETACH its exit handler before
+			// signalling the PTY. A real shell exits on SIGHUP, and node-pty can
+			// deliver 'exit' in the window Electron spends tearing down after
+			// `will-quit` returns — which would run finalizeSession, flipping the
+			// row to 'exited' and deleting the just-written log, leaving the open
+			// tab unrecoverable. Detaching first keeps the row 'running' and its
+			// log intact so the next launch can restore it.
+			for (const session of sessions.values()) {
+				flushSessionOutput(session);
+				session.exitSubscription?.dispose();
+				session.exitSubscription = null;
+			}
 			for (const terminalId of sessions.keys()) {
 				try {
 					kill(terminalId);
@@ -922,7 +1126,10 @@ export function createTerminalService({
 
 			return {
 				lastSeq: session.outputSeq,
-				scrollback: session.scrollback.read(),
+				// Strip answer-eliciting query sequences so replaying this scrollback
+				// into a fresh xterm never sends stale DA/DSR/color replies to the
+				// shell prompt, where they would echo as gibberish.
+				scrollback: stripReportRequests(session.scrollback.read()),
 				session: { ...session.snapshot },
 			};
 		},
@@ -933,11 +1140,37 @@ export function createTerminalService({
 					? [{ ...session.snapshot }]
 					: [],
 			),
+		listRestorable: (workspaceId) => {
+			const rows = restorableByWorkspace.get(workspaceId);
+
+			if (!rows) {
+				return [];
+			}
+
+			restorableByWorkspace.delete(workspaceId);
+
+			return rows.flatMap((row) => {
+				const kind = restorableKindFromMetadata(row.metadataJson);
+				if (!kind || !isRestorableTerminalKind(kind)) {
+					return [];
+				}
+
+				const output = row.cwd ? readTerminalOutput(row.cwd, row.id) : null;
+
+				return output ? [{ id: row.id, output, title: row.title }] : [];
+			});
+		},
 		recoverStaleSessions: () => {
 			const database = getDatabase();
 
 			if (!database) {
 				return;
+			}
+
+			restorableByWorkspace.clear();
+			for (const row of selectRestorableTerminalSessionRows({ database })) {
+				const existing = restorableByWorkspace.get(row.workspaceId) ?? [];
+				restorableByWorkspace.set(row.workspaceId, [...existing, row]);
 			}
 
 			markStaleRunningTerminalSessions({
@@ -1003,6 +1236,28 @@ function clampDimension(value: number, fallback: number): number {
 	}
 
 	return Math.min(MAX_DIMENSION, Math.max(MIN_DIMENSION, Math.round(value)));
+}
+
+/**
+ * Reads the `kind` a terminal session persisted in its `metadata_json`, used to
+ * decide restore eligibility. Returns null when the JSON is malformed or carries
+ * no string kind, so only recognised dock kinds are ever restored.
+ * @param metadataJson - The row's raw `metadata_json` text.
+ * @returns The persisted session kind, or null.
+ */
+function restorableKindFromMetadata(
+	metadataJson: string,
+): TerminalSessionKind | null {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(metadataJson);
+	} catch {
+		return null;
+	}
+
+	return isRecord(parsed) && isString(parsed.kind)
+		? (parsed.kind as TerminalSessionKind)
+		: null;
 }
 
 /** Default tab title per session kind. */

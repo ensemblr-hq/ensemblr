@@ -63,6 +63,12 @@ export interface TerminalSessionSnapshot {
 	 * button. Always `null` for non-run-script sessions.
 	 */
 	previewUrl: string | null;
+	/**
+	 * True when this session was relaunched from a persisted dock terminal on app
+	 * restart, its prior output seeded into the scrollback ahead of live PTY data.
+	 * Lets the tab badge the replay as restored history. `false` for fresh spawns.
+	 */
+	restored: boolean;
 	rows: number;
 	status: TerminalSessionStatus;
 	title: string;
@@ -78,7 +84,18 @@ export interface CreateTerminalSessionRequest {
 	 */
 	command?: string;
 	kind?: TerminalSessionKind;
+	/**
+	 * Id of the persisted dock terminal this create relaunches. When set, the
+	 * previous session's stored output log is superseded and removed once its
+	 * output is seeded into the new session.
+	 */
+	restoredFromId?: string;
 	rows?: number;
+	/**
+	 * Prior scrollback to seed ahead of live PTY output when relaunching a
+	 * persisted dock terminal, so the restored tab replays its history first.
+	 */
+	seedOutput?: string;
 	title?: string;
 	workspaceId: string;
 }
@@ -123,6 +140,28 @@ export interface ListTerminalSessionsResult {
 	sessions: TerminalSessionSnapshot[];
 }
 
+/** Request for a workspace's restorable dock terminals. */
+export interface ListRestorableTerminalsRequest {
+	workspaceId: string;
+}
+
+/**
+ * One interactive dock terminal that was open when the app last quit and whose
+ * output was persisted, offered to the renderer to relaunch on restore.
+ */
+export interface RestorableTerminal {
+	/** Id of the persisted session, passed back as `restoredFromId` on relaunch. */
+	id: string;
+	/** Persisted scrollback to seed into the relaunched session. */
+	output: string;
+	title: string;
+}
+
+/** The dock terminals a workspace can relaunch after restart. */
+export interface ListRestorableTerminalsResult {
+	terminals: RestorableTerminal[];
+}
+
 /** Request for a terminal session's replay snapshot. */
 export interface TerminalSnapshotRequest {
 	terminalId: string;
@@ -163,6 +202,9 @@ export interface TerminalApi {
 	killTerminalSession: (
 		request: KillTerminalRequest,
 	) => Promise<KillTerminalResult>;
+	listRestorableTerminals: (
+		request: ListRestorableTerminalsRequest,
+	) => Promise<ListRestorableTerminalsResult>;
 	listTerminalSessions: (
 		request: ListTerminalSessionsRequest,
 	) => Promise<ListTerminalSessionsResult>;

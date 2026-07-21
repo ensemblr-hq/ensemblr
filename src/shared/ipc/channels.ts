@@ -78,6 +78,7 @@ export const IPC_CHANNELS = {
 	listPiSlashCommands: 'ensemblr:list-pi-slash-commands',
 	listReviewComments: 'ensemblr:list-review-comments',
 	listReviewTodos: 'ensemblr:list-review-todos',
+	listRestorableTerminals: 'ensemblr:list-restorable-terminals',
 	listTerminalSessions: 'ensemblr:list-terminal-sessions',
 	listWorkspaceFiles: 'ensemblr:list-workspace-files',
 	listWorkspaceOpenTargets: 'ensemblr:list-workspace-open-targets',

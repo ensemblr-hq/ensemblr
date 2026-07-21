@@ -5,6 +5,8 @@ import type {
 	CreateTerminalSessionResult,
 	KillTerminalRequest,
 	KillTerminalResult,
+	ListRestorableTerminalsRequest,
+	ListRestorableTerminalsResult,
 	ListTerminalSessionsRequest,
 	ListTerminalSessionsResult,
 	ResizeTerminalRequest,
@@ -17,7 +19,7 @@ import { TerminalServiceError } from '../../terminal/terminal-service';
 
 /**
  * Registers the IPC handlers for PTY-backed terminal sessions: create, input,
- * resize, kill, list, and re-attach snapshot.
+ * resize, kill, list, list-restorable, and re-attach snapshot.
  * @param options - Required services.
  */
 export function registerTerminalHandlers({
@@ -35,10 +37,22 @@ export function registerTerminalHandlers({
 				cols: request.cols,
 				command: request.command,
 				kind: request.kind,
+				restoredFromId: request.restoredFromId,
 				rows: request.rows,
+				seedOutput: request.seedOutput,
 				title: request.title,
 				workspaceId: request.workspaceId,
 			}),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.listRestorableTerminals,
+		(
+			_event,
+			request: ListRestorableTerminalsRequest,
+		): ListRestorableTerminalsResult => ({
+			terminals: terminalService.listRestorable(request.workspaceId),
+		}),
 	);
 
 	ipcMain.handle(
