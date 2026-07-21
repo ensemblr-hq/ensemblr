@@ -178,9 +178,7 @@ export function ReviewPanel({
 	const openFileSearch = useCallback(() => {
 		setIsFileSearchOpen(true);
 	}, []);
-	useHotkey('files.search', openFileSearch, {
-		enabled: activeTab === 'files',
-	});
+	useHotkey('files.search', openFileSearch);
 
 	// ⌥⌘U jumps straight to the uncommitted change set, switching tabs if needed.
 	const showUncommitted = useCallback(() => {

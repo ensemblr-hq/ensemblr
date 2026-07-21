@@ -1,12 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { isHarnessTitleBusy } from '@/renderer/lib/terminal/harness-title';
-
-/**
- * How long an agent terminal stays flagged busy after its last spinner-title
- * update. Comfortably longer than a spinner frame so a working agent stays lit,
- * short enough that going idle clears the indicator promptly.
- */
-const AGENT_BUSY_IDLE_MS = 2000;
 
 /** Live busy state of the agent terminals in one workspace. */
 interface WorkspaceAgentBusyState {
@@ -18,14 +11,18 @@ interface WorkspaceAgentBusyState {
 
 /**
  * Reports whether any agent-harness terminal attached to `workspaceId` is
- * currently working, inferred from the spinner glyph the harness animates in its
- * OSC window title or, for spinner-less harnesses (Vibe), from the main-process
- * `agentBusy` flag derived from the session log. This is the terminal-side
- * analogue of `useWorkspacePiBusy`:
- * it subscribes to terminal lifecycle broadcasts (which carry `workspaceId` and
- * the session `kind`) so an inactive, non-focused sidebar row still lights up
- * while its agent is busy. Each spinner frame re-emits the title, so a per-
- * terminal idle timer keeps the flag lit between frames and clears it on stop.
+ * currently working, inferred from the braille spinner glyph the harness animates
+ * in its OSC window title or, for spinner-less harnesses (Vibe), from the
+ * main-process `agentBusy` flag derived from the session log. This is the
+ * terminal-side analogue of `useWorkspacePiBusy`: it subscribes to terminal
+ * lifecycle broadcasts (which carry `workspaceId` and the session `kind`) so an
+ * inactive, non-focused sidebar row still lights up while its agent is busy.
+ *
+ * Both signals are treated as authoritative levels, not decaying pulses: main
+ * broadcasts a title change on every edge, and a harness leads its title with a
+ * braille spinner while a turn is in flight and drops it (a plain or ✳-prefixed
+ * title) the moment it goes idle. A harness re-emits its title only sporadically
+ * mid-turn, so a decay timer would clear the flag while it is still working.
  * @param workspaceId - Workspace whose agent terminals to watch.
  * @returns The busy terminal ids plus a workspace-level busy flag.
  */
@@ -35,18 +32,16 @@ export function useWorkspaceAgentBusy(
 	const [busyTerminalIds, setBusyTerminalIds] = useState<ReadonlySet<string>>(
 		() => new Set(),
 	);
-	const idleTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-		new Map(),
-	);
 
-	/** Removes a terminal from the busy set and clears its pending idle timer. */
+	/** Adds a terminal to the busy set, holding the flag until an idle event clears it. */
+	const markBusy = useCallback((terminalId: string) => {
+		setBusyTerminalIds((previous) =>
+			previous.has(terminalId) ? previous : new Set(previous).add(terminalId),
+		);
+	}, []);
+
+	/** Removes a terminal from the busy set. */
 	const clearBusy = useCallback((terminalId: string) => {
-		const timers = idleTimersRef.current;
-		const existing = timers.get(terminalId);
-		if (existing) {
-			clearTimeout(existing);
-			timers.delete(terminalId);
-		}
 		setBusyTerminalIds((previous) => {
 			if (!previous.has(terminalId)) {
 				return previous;
@@ -57,47 +52,7 @@ export function useWorkspaceAgentBusy(
 		});
 	}, []);
 
-	/**
-	 * Marks a terminal busy from the OSC-title spinner, which re-emits per frame, so
-	 * an idle timer keeps it lit between frames and clears it when frames stop.
-	 */
-	const markSpinnerBusy = useCallback(
-		(terminalId: string) => {
-			setBusyTerminalIds((previous) =>
-				previous.has(terminalId) ? previous : new Set(previous).add(terminalId),
-			);
-			const timers = idleTimersRef.current;
-			const existing = timers.get(terminalId);
-			if (existing) {
-				clearTimeout(existing);
-			}
-			timers.set(
-				terminalId,
-				setTimeout(() => clearBusy(terminalId), AGENT_BUSY_IDLE_MS),
-			);
-		},
-		[clearBusy],
-	);
-
-	/**
-	 * Marks a terminal busy from the main-process `agentBusy` level (Vibe), which is
-	 * authoritative: main broadcasts only the rising and falling edges, so this holds
-	 * the flag without an idle timer until a later event clears it.
-	 */
-	const markLevelBusy = useCallback((terminalId: string) => {
-		const timers = idleTimersRef.current;
-		const existing = timers.get(terminalId);
-		if (existing) {
-			clearTimeout(existing);
-			timers.delete(terminalId);
-		}
-		setBusyTerminalIds((previous) =>
-			previous.has(terminalId) ? previous : new Set(previous).add(terminalId),
-		);
-	}, []);
-
 	useEffect(() => {
-		const timers = idleTimersRef.current;
 		setBusyTerminalIds(new Set());
 		const unsubscribe = window.ensemblr?.onTerminalLifecycle((event) => {
 			if (event.workspaceId !== workspaceId || event.session.kind !== 'agent') {
@@ -107,24 +62,18 @@ export function useWorkspaceAgentBusy(
 				clearBusy(event.terminalId);
 				return;
 			}
-			if (event.session.agentBusy) {
-				markLevelBusy(event.terminalId);
-				return;
+			const busy =
+				event.session.agentBusy || isHarnessTitleBusy(event.session.title);
+			if (busy) {
+				markBusy(event.terminalId);
+			} else {
+				clearBusy(event.terminalId);
 			}
-			if (isHarnessTitleBusy(event.session.title)) {
-				markSpinnerBusy(event.terminalId);
-				return;
-			}
-			clearBusy(event.terminalId);
 		});
 		return () => {
 			unsubscribe?.();
-			for (const timer of timers.values()) {
-				clearTimeout(timer);
-			}
-			timers.clear();
 		};
-	}, [clearBusy, markLevelBusy, markSpinnerBusy, workspaceId]);
+	}, [clearBusy, markBusy, workspaceId]);
 
 	return { busyTerminalIds, isBusy: busyTerminalIds.size > 0 };
 }

@@ -32,6 +32,18 @@ function isTitleDecorationChar(char: string): boolean {
 }
 
 /**
+ * Reports whether a code point is a braille spinner frame (U+2800–U+28FF), the
+ * glyph a harness animates in its title while actively working (a turn in
+ * flight). A static symbol like the idle ✳ sparkle is deliberately excluded.
+ * @param char - A single-code-point string to classify.
+ * @returns True when the character is a braille spinner frame.
+ */
+function isBrailleSpinnerChar(char: string): boolean {
+	const codePoint = char.codePointAt(0) ?? 0;
+	return codePoint >= BRAILLE_BLOCK_START && codePoint <= BRAILLE_BLOCK_END;
+}
+
+/**
  * Strips the leading spinner/decoration glyphs (and surrounding whitespace) that
  * agent TUIs prepend to their window title, leaving the meaningful title text.
  * Only whitespace and symbol/emoji/braille-spinner glyphs are removed — regular
@@ -49,12 +61,17 @@ export function stripHarnessTitleDecoration(rawTitle: string): string {
 }
 
 /**
- * Reports whether a harness title indicates active work: a leading decoration
- * glyph (the animated spinner frame) is present. Each spinner frame re-emits the
- * title, so callers debounce this to keep a working agent lit between frames.
+ * Reports whether a harness title indicates active work: it leads with a braille
+ * spinner frame (U+2800–U+28FF), which a harness animates only mid-turn. The idle
+ * decoration (e.g. Claude's ✳ sparkle) is intentionally not treated as busy, so a
+ * title carries the working state as a stable level — busy while a braille frame
+ * leads it, idle once a plain or ✳-prefixed title lands — rather than a signal
+ * that must be debounced. Harnesses re-emit their title only sporadically while
+ * working, so any decay heuristic would drop the flag mid-turn.
  * @param rawTitle - The raw OSC window title from the harness.
- * @returns True when the title carries a leading spinner/decoration glyph.
+ * @returns True when the title leads with a braille spinner frame.
  */
 export function isHarnessTitleBusy(rawTitle: string): boolean {
-	return rawTitle.trim() !== stripHarnessTitleDecoration(rawTitle);
+	const firstChar = Array.from(rawTitle.trim())[0];
+	return firstChar !== undefined && isBrailleSpinnerChar(firstChar);
 }
