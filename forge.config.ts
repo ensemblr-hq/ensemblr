@@ -138,7 +138,10 @@ const config: ForgeConfig = {
 		// Per-channel bundle id so dogfood builds never share the release's
 		// LaunchServices registration (the Dock-flash root cause). See ADR 0032.
 		appBundleId: APP_BUNDLE_IDS[buildChannel],
-		extraResource: ['docs/product/mvp-sequencing.md'],
+		extraResource: [
+			'docs/product/mvp-sequencing.md',
+			'resources/pi-extensions',
+		],
 		// Packager resolves the platform extension (`icon.icns` on macOS).
 		// Regenerate with `npm run icon:generate`.
 		icon: './assets/icon',

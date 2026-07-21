@@ -176,6 +176,7 @@ export function createRuntimeEventHandler({
 						eventSink,
 						executable: active.executable,
 						initialPrompt: null,
+						liveSession: active.piRuntimeSession,
 						model: active.row.model,
 						sessionId,
 						workspaceCwd: active.row.cwd,

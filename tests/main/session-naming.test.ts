@@ -14,7 +14,9 @@ import {
 	type FakePiAgentAdapterController,
 	type FakePiAgentAdapterSessionController,
 } from '../../src/main/pi-agent/fake-pi-agent-client.ts';
+import { sanitizeChatTitle } from '../../src/main/pi-agent/naming/sanitize-title.ts';
 import { createSessionNaming } from '../../src/main/pi-agent/naming/session-naming.ts';
+import type { PiAgentSession } from '../../src/main/pi-agent/pi-agent-client.ts';
 import { createPiAgentClient } from '../../src/main/pi-agent/pi-agent-client.ts';
 import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 import type { RenameWorkspaceService } from '../../src/main/repository';
@@ -24,7 +26,10 @@ import {
 	openChatTab,
 	setChatTabMetadata,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
-import { createPiSession } from '../../src/main/storage/repositories/pi-session-repository.ts';
+import {
+	createPiSession,
+	createTurn,
+} from '../../src/main/storage/repositories/pi-session-repository.ts';
 import type { RenameWorkspaceRequest } from '../../src/shared/ipc/contracts/workspace';
 
 interface Fixture {
@@ -113,7 +118,23 @@ function settingsStub(renameWorkspaceOnBranch: boolean): AppSettingsService {
 	} as unknown as AppSettingsService;
 }
 
-/** Waits for the ephemeral naming session to be created and subscribed. */
+/** A live-session stub that reports the given Pi session name via `get_state`. */
+function liveSessionWithName(sessionName: string | null): PiAgentSession {
+	return {
+		getState: async () => ({ sessionName }),
+	} as unknown as PiAgentSession;
+}
+
+/** A live-session stub whose `get_state` rejects, exercising the fallback path. */
+function liveSessionThatFailsState(): PiAgentSession {
+	return {
+		getState: async () => {
+			throw new Error('get_state unavailable');
+		},
+	} as unknown as PiAgentSession;
+}
+
+/** Waits for the ephemeral branch-naming session to be created and subscribed. */
 async function waitForNamingSession(
 	fake: FakePiAgentAdapterController,
 ): Promise<FakePiAgentAdapterSessionController> {
@@ -127,7 +148,7 @@ async function waitForNamingSession(
 	throw new Error('naming session was never created');
 }
 
-/** Drives the naming session to reply with the given raw text, then go idle. */
+/** Drives the branch-naming session to reply with the given raw text, then go idle. */
 function replyAndSettle(
 	session: FakePiAgentAdapterSessionController,
 	text: string,
@@ -156,7 +177,11 @@ async function waitForTitle(
 	assert.equal(getChatTabById({ database, id: chatTabId })?.title, title);
 }
 
-function baseInput(fixture: Fixture, initialPrompt: string | null) {
+function baseInput(
+	fixture: Fixture,
+	initialPrompt: string | null,
+	liveSession: PiAgentSession | null = null,
+) {
 	return {
 		branchId: fixture.branchId,
 		chatTabId: fixture.chatTabId,
@@ -164,6 +189,7 @@ function baseInput(fixture: Fixture, initialPrompt: string | null) {
 		eventSink: undefined,
 		executable: readyExecutable(),
 		initialPrompt,
+		liveSession,
 		model: null,
 		sessionId: fixture.sessionId,
 		workspaceCwd: '/tmp/ensemblr/n/ws',
@@ -171,7 +197,7 @@ function baseInput(fixture: Fixture, initialPrompt: string | null) {
 	};
 }
 
-test('names the tab from a TITLE line and stamps auto provenance', async (t) => {
+test('derives the tab title from the first message without spawning a session', async (t) => {
 	const fixture = openFixture(t);
 	const fake = createFakePiAgentAdapter();
 	const piAgentClient = createPiAgentClient({ adapter: fake.adapter });
@@ -184,13 +210,16 @@ test('names the tab from a TITLE line and stamps auto provenance', async (t) => 
 	});
 
 	queueNaming(baseInput(fixture, 'Rework how tabs are renamed'));
-	const naming = await waitForNamingSession(fake);
-	replyAndSettle(naming, 'TITLE: Rework tab renaming');
 
 	await waitForTitle(
 		fixture.database,
 		fixture.chatTabId,
-		'Rework tab renaming',
+		'Rework how tabs are renamed',
+	);
+	assert.equal(
+		fake.getOpenSessions().length,
+		0,
+		'a deterministic title must never spawn an agent session',
 	);
 	const tab = getChatTabById({
 		database: fixture.database,
@@ -198,6 +227,80 @@ test('names the tab from a TITLE line and stamps auto provenance', async (t) => 
 	});
 	assert.equal(tab?.metadata.titleAutoNamed, true);
 	assert.equal(tab?.metadata.titleProvenance, 'auto');
+});
+
+test('prefers the Pi session name over the first message', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakePiAgentAdapter();
+	const piAgentClient = createPiAgentClient({ adapter: fake.adapter });
+	const queueNaming = createSessionNaming({
+		appSettingsService: settingsStub(false),
+		piAgentClient,
+		renameWorkspace: async () => {
+			throw new Error('rename must not run');
+		},
+	});
+
+	queueNaming(
+		baseInput(
+			fixture,
+			'this first message should be ignored',
+			liveSessionWithName('Auth rewrite'),
+		),
+	);
+
+	await waitForTitle(fixture.database, fixture.chatTabId, 'Auth rewrite');
+	assert.equal(fake.getOpenSessions().length, 0);
+});
+
+test('falls back to the first message when get_state rejects', async (t) => {
+	const fixture = openFixture(t);
+	const fake = createFakePiAgentAdapter();
+	const piAgentClient = createPiAgentClient({ adapter: fake.adapter });
+	const queueNaming = createSessionNaming({
+		appSettingsService: settingsStub(false),
+		piAgentClient,
+		renameWorkspace: async () => {
+			throw new Error('rename must not run');
+		},
+	});
+
+	queueNaming(
+		baseInput(fixture, 'Cache auth tokens', liveSessionThatFailsState()),
+	);
+
+	await waitForTitle(fixture.database, fixture.chatTabId, 'Cache auth tokens');
+	assert.equal(fake.getOpenSessions().length, 0);
+});
+
+test('recovers and strips a master-prompt-wrapped first turn', async (t) => {
+	const fixture = openFixture(t);
+	createTurn({
+		database: fixture.database,
+		input: {
+			branchId: fixture.branchId,
+			promptText:
+				'<user_preferences>\nBe concise.\n</user_preferences>\n\nFix the login redirect bug',
+		},
+	});
+	const fake = createFakePiAgentAdapter();
+	const piAgentClient = createPiAgentClient({ adapter: fake.adapter });
+	const queueNaming = createSessionNaming({
+		appSettingsService: settingsStub(false),
+		piAgentClient,
+		renameWorkspace: async () => {
+			throw new Error('rename must not run');
+		},
+	});
+
+	queueNaming(baseInput(fixture, null));
+
+	await waitForTitle(
+		fixture.database,
+		fixture.chatTabId,
+		'Fix the login redirect bug',
+	);
+	assert.equal(fake.getOpenSessions().length, 0);
 });
 
 test('is idempotent: a second attempt after naming spawns no session', async (t) => {
@@ -223,36 +326,6 @@ test('is idempotent: a second attempt after naming spawns no session', async (t)
 		fake.getOpenSessions().length,
 		0,
 		'no naming session should spawn once the tab is already named',
-	);
-});
-
-test('drops an overlapping attempt while one is already in flight', async (t) => {
-	const fixture = openFixture(t);
-	const fake = createFakePiAgentAdapter();
-	const piAgentClient = createPiAgentClient({ adapter: fake.adapter });
-	const queueNaming = createSessionNaming({
-		appSettingsService: settingsStub(false),
-		piAgentClient,
-		renameWorkspace: async () => {
-			throw new Error('rename must not run when the setting is off');
-		},
-	});
-
-	queueNaming(baseInput(fixture, 'Rework how tabs are renamed'));
-	const naming = await waitForNamingSession(fake);
-	queueNaming(baseInput(fixture, null));
-	await delay(20);
-	assert.equal(
-		fake.getOpenSessions().length,
-		1,
-		'the second fire must not spawn a concurrent naming session',
-	);
-
-	replyAndSettle(naming, 'TITLE: Rework tab renaming');
-	await waitForTitle(
-		fixture.database,
-		fixture.chatTabId,
-		'Rework tab renaming',
 	);
 });
 
@@ -283,37 +356,78 @@ test('never overwrites a user-owned title', async (t) => {
 	);
 });
 
-test('discards a timed-out response and leaves the tab retriable', async (t) => {
-	const fixture = openFixture(t);
+test('drops an overlapping attempt while a branch naming is in flight', async (t) => {
+	const fixture = openFixture(t, { placeholderName: true });
 	const fake = createFakePiAgentAdapter();
 	const piAgentClient = createPiAgentClient({ adapter: fake.adapter });
 	const queueNaming = createSessionNaming({
-		appSettingsService: settingsStub(false),
+		appSettingsService: settingsStub(true),
 		piAgentClient,
-		renameWorkspace: async () => {
-			throw new Error('rename must not run');
-		},
+		renameWorkspace: async () => ({
+			diagnostics: [],
+			status: 'success',
+			workspace: {
+				archivedAt: null,
+				baseBranch: 'main',
+				branchName: 'psoldunov/add-dark-mode',
+				createdAt: '2026-06-08T00:00:00.000Z',
+				id: fixture.workspaceId,
+				metadata: {},
+				name: 'add-dark-mode',
+				path: '/tmp/ensemblr/n/ws',
+				repositoryId: 'repo-n',
+				slug: 'n',
+				updatedAt: '2026-06-08T00:00:02.000Z',
+			},
+		}),
+	});
+
+	queueNaming(baseInput(fixture, 'Add a dark mode toggle to settings'));
+	await waitForNamingSession(fake);
+	queueNaming(baseInput(fixture, null));
+	await delay(20);
+	assert.equal(
+		fake.getOpenSessions().length,
+		1,
+		'the second fire must not spawn a concurrent branch naming session',
+	);
+});
+
+test('discards a timed-out branch response but keeps the deterministic title', async (t) => {
+	const fixture = openFixture(t, { placeholderName: true });
+	const fake = createFakePiAgentAdapter();
+	const piAgentClient = createPiAgentClient({ adapter: fake.adapter });
+	const renameCalls: RenameWorkspaceRequest[] = [];
+	const renameWorkspace: RenameWorkspaceService['rename'] = async (request) => {
+		renameCalls.push(request);
+		throw new Error('rename must not run for a timed-out branch');
+	};
+	const queueNaming = createSessionNaming({
+		appSettingsService: settingsStub(true),
+		piAgentClient,
+		renameWorkspace,
 		timeoutMs: 20,
 	});
 
-	queueNaming(baseInput(fixture, 'A prompt whose naming will time out'));
+	queueNaming(baseInput(fixture, 'Add dark mode toggle'));
 	const naming = await waitForNamingSession(fake);
 	// Reply but never settle to idle: the coordinator must discard the partial.
 	naming.emit({
 		at: '2026-06-08T00:00:01.000Z',
-		payload: { kind: 'text', text: 'TITLE: Half a th' },
+		payload: { kind: 'text', text: 'BRANCH: add-dark' },
 		role: 'agent',
 		turnId: 'naming-turn',
 		type: 'message',
 	});
 	await delay(60);
 
-	const tab = getChatTabById({
-		database: fixture.database,
-		id: fixture.chatTabId,
-	});
-	assert.equal(tab?.title, 'New chat', 'partial title must not be persisted');
-	assert.notEqual(tab?.metadata.titleAutoNamed, true);
+	assert.equal(renameCalls.length, 0, 'a timed-out branch must not rename');
+	assert.equal(
+		getChatTabById({ database: fixture.database, id: fixture.chatTabId })
+			?.title,
+		'Add dark mode toggle',
+		'the deterministic title lands regardless of the branch timeout',
+	);
 });
 
 test('renames the workspace branch when the setting is on and placeholder holds', async (t) => {
@@ -349,7 +463,7 @@ test('renames the workspace branch when the setting is on and placeholder holds'
 
 	queueNaming(baseInput(fixture, 'Add a dark mode toggle to settings'));
 	const naming = await waitForNamingSession(fake);
-	replyAndSettle(naming, 'TITLE: Add dark mode\nBRANCH: add-dark-mode');
+	replyAndSettle(naming, 'BRANCH: add-dark-mode');
 
 	for (
 		let attempt = 0;
@@ -362,4 +476,10 @@ test('renames the workspace branch when the setting is on and placeholder holds'
 	assert.equal(renameCalls[0]?.name, 'add-dark-mode');
 	assert.equal(renameCalls[0]?.requirePlaceholderName, true);
 	assert.equal(renameCalls[0]?.branchName, 'psoldunov/add-dark-mode');
+	assert.equal(
+		getChatTabById({ database: fixture.database, id: fixture.chatTabId })
+			?.title,
+		sanitizeChatTitle('Add a dark mode toggle to settings'),
+		'the title is derived deterministically alongside the branch rename',
+	);
 });

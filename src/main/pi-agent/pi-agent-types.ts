@@ -69,6 +69,12 @@ export interface PiAgentSessionMetadata {
 	updatedAt: string;
 }
 
+/** Live session state polled from the Pi runtime via the `get_state` RPC command. */
+export interface PiAgentSessionState {
+	/** User-set display name (Pi `/name`), or null when unset. */
+	sessionName: string | null;
+}
+
 /** Caller-supplied request that opens a Pi agent session. */
 export interface PiAgentSessionRequest {
 	/** Resolved Pi executable. Used as the spawn command. */

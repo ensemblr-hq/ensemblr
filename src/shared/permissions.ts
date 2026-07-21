@@ -10,6 +10,8 @@ export type PermissionMode = (typeof PERMISSION_MODES)[number];
 
 /** Discrete action kinds whose blast radius drives permission classification. */
 export type PermissionActionKind =
+	| 'app-control-read'
+	| 'app-control-write'
 	| 'app-settings-change'
 	| 'outside-workspace-write'
 	| 'pi-global-config-change'
@@ -127,7 +129,7 @@ export function classifyPermissionAction({
 	action: PermissionActionKind;
 	mode: PermissionMode;
 }): PermissionBoundarySnapshot {
-	if (action === 'workspace-read') {
+	if (action === 'workspace-read' || action === 'app-control-read') {
 		return createBoundary({
 			action,
 			boundary: 'allowed',

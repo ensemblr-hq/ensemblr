@@ -3,6 +3,10 @@ import type {
 	AgentActionKind,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
+import {
+	formatAttachedFileBlock,
+	USER_PREFERENCES_TAG,
+} from '@/shared/prompt-scaffolding';
 
 import { clampReviewContext } from './review-context';
 
@@ -262,8 +266,7 @@ export function buildActionAttachmentBlock(
 	path: string,
 	content: string,
 ): string {
-	const safePath = path.replaceAll('"', '&quot;');
-	return `<attached_file path="${safePath}">\n${content}\n</attached_file>`;
+	return formatAttachedFileBlock(path, content);
 }
 
 /**
@@ -281,5 +284,5 @@ export function wrapWithMasterPrompt(
 	if (!trimmed) {
 		return userPrompt;
 	}
-	return `${fenceData('user_preferences', trimmed)}\n\n${userPrompt}`;
+	return `${fenceData(USER_PREFERENCES_TAG, trimmed)}\n\n${userPrompt}`;
 }

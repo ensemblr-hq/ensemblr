@@ -85,6 +85,11 @@ interface RegisterIpcHandlersOptions {
 	archiveWorkspaceService: ArchiveWorkspaceService;
 	configService: EnsemblrConfigService;
 	createWorkspaceService: CreateWorkspaceService;
+	augmentHarnessCommand?: (
+		command: string,
+		harnessId: string,
+		workspaceId: string,
+	) => string;
 	databaseService: EnsemblrDatabaseService;
 	deleteArchivedWorkspaceService: DeleteArchivedWorkspaceService;
 	deleteRepositoryService: DeleteRepositoryService;
@@ -136,6 +141,7 @@ export function registerIpcHandlers({
 	appSettingsService,
 	archiveRepositoryService,
 	archiveWorkspaceService,
+	augmentHarnessCommand,
 	configService,
 	createWorkspaceService,
 	databaseService,
@@ -253,6 +259,7 @@ export function registerIpcHandlers({
 	registerSetupHandlers({ setupDiagnosticsService });
 	registerTerminalHandlers({ terminalService });
 	registerAgentHandlers({
+		augmentHarnessCommand,
 		databaseService,
 		harnessDetectionService,
 		terminalService,

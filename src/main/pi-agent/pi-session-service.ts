@@ -7,6 +7,7 @@ import type {
 	WriteForkSummaryRequest,
 	WriteForkSummaryResult,
 } from '../../shared/ipc/contracts/pi-session';
+import type { AgentControlEnvResolver } from '../agent-control/ports.ts';
 import type { CheckpointCapturePort } from '../checkpoints';
 import {
 	createCheckpointCapture,
@@ -73,6 +74,8 @@ interface PiSessionServiceOptions {
 	piAgentClient: PiAgentClient;
 	/** Unified title + branch naming queue, fired at open and each turn-idle. */
 	queueNaming: QueueNamingPort;
+	/** Injects the agent-control env (control URL + token) into each Pi child. */
+	resolveAgentControlEnv?: AgentControlEnvResolver;
 	sessionSummaryWriter?: SessionSummaryWriter;
 	now?: () => Date;
 }
@@ -112,6 +115,7 @@ export function createPiSessionService({
 	eventSink,
 	piAgentClient,
 	queueNaming,
+	resolveAgentControlEnv,
 	sessionSummaryWriter,
 	now = () => new Date(),
 }: PiSessionServiceOptions): PiSessionService {
@@ -133,6 +137,7 @@ export function createPiSessionService({
 		piAgentClient,
 		queueNaming,
 		requireDatabase: requireSessionDatabase,
+		resolveAgentControlEnv,
 		sessionSummaryWriter,
 	});
 
@@ -141,10 +146,17 @@ export function createPiSessionService({
 			const database = requireSessionDatabase();
 			const active = lifecycle.getActiveSession(sessionId);
 			if (active) {
+				// The active-session map caches the row from open time, so its
+				// `status` is frozen at `starting`; the live status lives in the DB
+				// (updated by the runtime status/shutdown handlers). Read the fresh
+				// row so status polls (e.g. agent-control `getConversationStatus` /
+				// `waitForAgents`) observe streaming → idle, not a stuck `starting`.
+				const freshRow =
+					getPiSessionById({ database, id: sessionId }) ?? active.row;
 				return toSnapshot({
 					branchId: active.branch.id,
 					database,
-					row: active.row,
+					row: freshRow,
 					runtimeOpen: true,
 				});
 			}

@@ -357,6 +357,7 @@ function makeHangingAgentClient(): { client: PiAgentClient } {
 		abort: async () => undefined,
 		close: async () => undefined,
 		getMetadata: () => metadata,
+		getState: async () => ({ sessionName: null }),
 		id: sessionId,
 		subscribe: (): PiAgentSubscription => ({ unsubscribe: () => undefined }),
 		submit: async () => ({
@@ -403,6 +404,7 @@ function makeFakeAgentClient(options: FakeAgentClientOptions): {
 		abort: async () => undefined,
 		close: async () => undefined,
 		getMetadata: () => metadata,
+		getState: async () => ({ sessionName: null }),
 		id: sessionId,
 		subscribe: (listener: PiAgentEventListener): PiAgentSubscription => {
 			queueMicrotask(() => {

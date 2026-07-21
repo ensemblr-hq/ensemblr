@@ -3,6 +3,10 @@ import type {
 	ExternalAttachment,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
+import {
+	formatAttachedFileBlock,
+	REFERENCED_FOLDERS_HEADER,
+} from '@/shared/prompt-scaffolding';
 
 /**
  * Upper bound on inlined attachment content sent to Pi. Long `.context`
@@ -66,10 +70,9 @@ const TEXT_INLINE_EXTENSIONS = new Set([
 const ATTACHMENT_PLACEHOLDER =
 	'[attachment saved in the workspace — inspect this file directly if needed]';
 
-/** Wraps one workspace file's content in an explicit attachment marker. */
+/** Wraps one workspace file's content in the shared attachment marker, truncated to budget. */
 function formatAttachedFileSection(pathValue: string, content: string): string {
-	const safePath = pathValue.replaceAll('"', '&quot;');
-	return `<attached_file path="${safePath}">\n${truncateAttachmentContent(content)}\n</attached_file>`;
+	return formatAttachedFileBlock(pathValue, truncateAttachmentContent(content));
 }
 
 /**
@@ -116,7 +119,7 @@ export async function formatMentionAttachmentText({
 	const directoryRefs = mentions.filter((entry) => entry.kind === 'directory');
 	if (directoryRefs.length > 0) {
 		sections.push(
-			`Referenced workspace folders:\n${directoryRefs.map((entry) => `@${entry.path}`).join('\n')}`,
+			`${REFERENCED_FOLDERS_HEADER}\n${directoryRefs.map((entry) => `@${entry.path}`).join('\n')}`,
 		);
 	}
 

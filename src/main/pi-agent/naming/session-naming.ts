@@ -16,13 +16,15 @@ import {
 	composeRenamedBranch,
 	shouldAutoRenameWorkspace,
 } from '../branch-name-slug.ts';
-import type { PiAgentClient } from '../pi-agent-client.ts';
+import type { PiAgentClient, PiAgentSession } from '../pi-agent-client.ts';
 import {
 	appendChatTitleMetadataEvent,
 	appendWorkspaceRenamedMetadataEvent,
 } from '../pi-session-persistence.ts';
 import type { PiSessionEventSink } from '../pi-session-types.ts';
-import { parseNamingResponse } from './parse-naming-response.ts';
+import { stripPromptScaffolding } from './derive-title-source.ts';
+import { parseBranchSlug } from './parse-naming-response.ts';
+import { sanitizeChatTitle } from './sanitize-title.ts';
 
 /** Time budget for the single ephemeral naming session. */
 export const NAMING_TIMEOUT_MS = 20000;
@@ -40,7 +42,9 @@ export interface SessionNamingInput {
 	executable: PiExecutableSnapshot;
 	/** The first user prompt when known; null on idle retries. */
 	initialPrompt: string | null;
-	/** Chat model mirrored in the ephemeral naming session; null = Pi default. */
+	/** Live Pi session for the tab, polled for its user-set name; null when unavailable. */
+	liveSession: PiAgentSession | null;
+	/** Chat model mirrored in the ephemeral branch-naming session; null = Pi default. */
 	model: string | null;
 	sessionId: string;
 	workspaceCwd: string;
@@ -69,16 +73,17 @@ interface WorkspaceRenameTarget {
 
 /**
  * Builds the unified naming coordinator that owns both chat-tab titling and
- * auto branch renaming. Each attempt runs at most one throwaway Pi session
- * (`ensemblr-session-naming`) that returns the still-needed fields, then
- * persists each field behind its own idempotent gate. Fully best-effort and
- * idempotent: a field is only produced while it is still auto-owned and unset,
- * so firing at open and again at every turn-idle can never clobber a settled
- * name — it simply retries fields that failed or were skipped. Bad, partial, or
- * timed-out model output is discarded (never persisted) and retried next turn.
- * An in-flight guard keyed by chat tab drops overlapping attempts (the open-time
- * fire and the first turn-idle fire race for the same tab), so the throwaway
- * naming session never runs twice concurrently for one turn.
+ * auto branch renaming. The title is derived deterministically (Pi's session
+ * name, else the first message) with no LLM; a throwaway Pi session
+ * (`ensemblr-session-naming`) is spawned only when a branch slug is still
+ * needed, so a tab with branch rename off never opens an agent. Each field is
+ * persisted behind its own idempotent gate — produced only while still
+ * auto-owned and unset — so firing at open and again at every turn-idle can
+ * never clobber a settled name; it simply retries fields that failed or were
+ * skipped. Bad, partial, or timed-out branch output is discarded (never
+ * persisted) and retried next turn. An in-flight guard keyed by chat tab drops
+ * overlapping attempts (the open-time fire and the first turn-idle fire race for
+ * the same tab).
  * @param deps - Settings reader, Pi client, workspace-rename entry point.
  * @returns A fire-and-forget `queueNaming(input)` to call from open and idle.
  */
@@ -113,7 +118,7 @@ export function createSessionNaming({
 	};
 }
 
-/** Runs one gated naming attempt: compute needed fields, one LLM call, persist. */
+/** Runs one gated naming attempt: derive+persist the title, then the branch slug. */
 async function runNaming({
 	appSettingsService,
 	input,
@@ -146,53 +151,48 @@ async function runNaming({
 		return;
 	}
 
-	const fields = await generateNaming({
-		executable: input.executable,
-		model: input.model,
-		piAgentClient,
-		prompt,
-		request: { wantBranch, wantTitle },
-		timeoutMs,
-		workspaceCwd: input.workspaceCwd,
-	});
+	if (wantTitle) {
+		const title = await deriveDeterministicTitle(input, prompt);
+		if (title) {
+			persistTitle({ input, title });
+		}
+	}
 
-	await applyNamingFields({
-		fields,
-		input,
-		renameWorkspace,
-		target,
-		wantBranch,
-		wantTitle,
-	});
+	if (wantBranch && target) {
+		const slug = await generateBranchSlug({
+			executable: input.executable,
+			model: input.model,
+			piAgentClient,
+			prompt,
+			timeoutMs,
+			workspaceCwd: input.workspaceCwd,
+		});
+		if (slug) {
+			await persistBranch({ input, renameWorkspace, slug, target });
+		}
+	}
 }
 
-/** Persists whichever generated fields survived their gate; skips empty ones. */
-async function applyNamingFields({
-	fields,
-	input,
-	renameWorkspace,
-	target,
-	wantBranch,
-	wantTitle,
-}: {
-	fields: { branchSlug: string | null; title: string | null };
-	input: SessionNamingInput;
-	renameWorkspace: RenameWorkspaceService['rename'];
-	target: WorkspaceRenameTarget | null;
-	wantBranch: boolean;
-	wantTitle: boolean;
-}): Promise<void> {
-	if (wantTitle && fields.title) {
-		persistTitle({ input, title: fields.title });
+/**
+ * Resolves the deterministic tab title without an LLM: Pi's user-set session
+ * name when present, else the user's first message with the composer/master-
+ * prompt scaffolding stripped. A `get_state` miss/error falls back to the
+ * message and never blocks or spawns a session.
+ * @param input - The naming payload carrying the live session and first prompt.
+ * @param prompt - The already-resolved first user prompt.
+ * @returns A sanitized title, or null when nothing usable remains.
+ */
+async function deriveDeterministicTitle(
+	input: SessionNamingInput,
+	prompt: string,
+): Promise<string | null> {
+	const sessionName = (
+		await input.liveSession?.getState().catch(() => null)
+	)?.sessionName?.trim();
+	if (sessionName) {
+		return sanitizeChatTitle(sessionName);
 	}
-	if (wantBranch && fields.branchSlug && target) {
-		await persistBranch({
-			input,
-			renameWorkspace,
-			slug: fields.branchSlug,
-			target,
-		});
-	}
+	return sanitizeChatTitle(stripPromptScaffolding(prompt));
 }
 
 /** Uses the passed first prompt, else recovers it from the first persisted turn. */
@@ -332,17 +332,16 @@ async function persistBranch({
 }
 
 /**
- * Runs the throwaway naming session and returns the sanitized fields. Waits for
- * the turn to settle (`status: 'idle'`); on timeout it discards whatever was
- * streamed and returns all-null so the caller keeps the placeholder and retries
- * — a partial chunk is never accepted as a title or branch name.
+ * Runs the throwaway naming session for a git branch slug and returns it. Waits
+ * for the turn to settle (`status: 'idle'`); on timeout it discards whatever was
+ * streamed and returns null so the caller keeps the placeholder and retries — a
+ * partial chunk is never accepted as a branch name.
  */
-async function generateNaming({
+async function generateBranchSlug({
 	executable,
 	model,
 	piAgentClient,
 	prompt,
-	request,
 	timeoutMs,
 	workspaceCwd,
 }: {
@@ -350,10 +349,9 @@ async function generateNaming({
 	model: string | null;
 	piAgentClient: PiAgentClient;
 	prompt: string;
-	request: { wantBranch: boolean; wantTitle: boolean };
 	timeoutMs: number;
 	workspaceCwd: string;
-}): Promise<{ branchSlug: string | null; title: string | null }> {
+}): Promise<string | null> {
 	const session = await piAgentClient.createSession({
 		executable,
 		label: 'ensemblr-session-naming',
@@ -382,42 +380,30 @@ async function generateNaming({
 	});
 
 	try {
-		await session.submit({ prompt: buildNamingPrompt(prompt, request) });
+		await session.submit({ prompt: buildBranchNamingPrompt(prompt) });
 		const settled = await raceTimeout(done, timeoutMs);
 		if (!settled) {
-			return { branchSlug: null, title: null };
+			return null;
 		}
-		return parseNamingResponse(chunks.join(' '), request);
+		return parseBranchSlug(chunks.join(' '));
 	} finally {
 		subscription.unsubscribe();
 		await session.close().catch(() => undefined);
 	}
 }
 
-/** Builds the structured naming instruction, asking only for still-needed fields. */
-function buildNamingPrompt(
-	prompt: string,
-	request: { wantBranch: boolean; wantTitle: boolean },
-): string {
-	const lines = ['Name the work described in the user request below.', ''];
-	lines.push('Output rules:');
-	if (request.wantTitle) {
-		lines.push(
-			'- Emit a line `TITLE: <title>` — a 2 to 5 word tab title, 32 characters max, noun phrase or imperative, no punctuation.',
-		);
-	}
-	if (request.wantBranch) {
-		lines.push(
-			'- Emit a line `BRANCH: <name>` — a kebab-case git branch name, 2 to 5 words, 40 characters max.',
-		);
-	}
-	lines.push(
-		'- Output only the requested labelled line(s). No quotes, markdown, code fences, reasoning, or explanation.',
+/** Builds the branch-naming instruction for the throwaway session. */
+function buildBranchNamingPrompt(prompt: string): string {
+	return [
+		'Name the work described in the user request below.',
+		'',
+		'Output rules:',
+		'- Emit a line `BRANCH: <name>` — a kebab-case git branch name, 2 to 5 words, 40 characters max.',
+		'- Output only the requested labelled line. No quotes, markdown, code fences, reasoning, or explanation.',
 		'',
 		'USER REQUEST:',
 		prompt,
-	);
-	return lines.join('\n');
+	].join('\n');
 }
 
 /** Resolves true when `done` settles first, or false after `timeoutMs`. */

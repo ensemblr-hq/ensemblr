@@ -14,6 +14,8 @@ export const IPC_CHANNELS = {
 	openExternal: 'ensemblr:open-external',
 	bindPiSessionToChatTab: 'ensemblr:bind-pi-session-to-chat-tab',
 	closeActiveTab: 'ensemblr:close-active-tab',
+	agentControlFocusView: 'ensemblr:agent-control-focus-view',
+	agentControlTabsChanged: 'ensemblr:agent-control-tabs-changed',
 	closeChatTab: 'ensemblr:close-chat-tab',
 	closeWindow: 'ensemblr:close-window',
 	cloneGithubRepositoryPrepare: 'ensemblr:clone-github-repository:prepare',

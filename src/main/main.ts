@@ -16,9 +16,20 @@ import type {
 } from '../shared/ipc/contracts/terminal';
 import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
 import { scrollbackMbToBytes } from '../shared/terminal/scrollback';
+import {
+	type AgentControlService,
+	type ControlServer,
+	createAgentControlIntegration,
+	createAgentControlPorts,
+	createAgentControlService,
+	createGuardrails,
+	createOriginRegistry,
+	startControlServer,
+} from './agent-control';
 import { createHarnessDetectionService } from './agents/harness-detection-service.ts';
 import { createMainWindow } from './app/main-window';
 import { createMainWindowStateStore } from './app/window-state';
+import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
 import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
 import { createLocalCommandService } from './commands';
 import {
@@ -34,6 +45,7 @@ import {
 	createWorkspaceEnvironmentService,
 } from './environment';
 import { type IpcHandlersHandle, registerIpcHandlers } from './ipc';
+import { readPermissionModeFromSnapshot } from './ipc/permission-gate.ts';
 import {
 	createLinearAuthService,
 	createLinearClient,
@@ -91,6 +103,7 @@ import {
 	createEnsemblrDatabaseService,
 	resolveDefaultDatabasePath,
 } from './storage';
+import { getWorkspacePathById } from './storage/repositories/workspace-repository.ts';
 import { createTerminalService } from './terminal';
 import {
 	createListWorkspaceFilesService,
@@ -280,6 +293,40 @@ const broadcastRawFrame = (sample: {
 		}
 	}
 };
+// ---------------------------------------------------------------------------
+// Agent control layer. Lets Pi and third-party harness agents drive the app
+// from inside their own sessions (spawn tabs, launch harnesses, start/stop
+// terminals). The loopback control server is started once its delegating
+// services exist (below); `resolveAgentControlEnv` hands each spawned agent its
+// per-workspace token plus the server URL so its control tools can call back.
+// ---------------------------------------------------------------------------
+const agentControlOriginRegistry = createOriginRegistry();
+const agentControlGuardrails = createGuardrails();
+let agentControlServer: ControlServer | null = null;
+// Assigned once its delegating services exist (below); the pi event sink is
+// wired before that point, so it reads this ref lazily to release a session's
+// control state on shutdown.
+let agentControlService: AgentControlService | null = null;
+
+// The env resolver, harness-command augmenter, native confirm dialog, and
+// resolved Pi extension path all live behind one integration factory; main.ts
+// keeps only the composition. `getServerUrl` reads the mutable server ref
+// lazily, so the resolver returns an empty overlay until the server is up.
+const {
+	resolveAgentControlEnv,
+	augmentHarnessCommand,
+	confirmAgentControlAction,
+	piControlExtensionPath,
+} = createAgentControlIntegration({
+	app,
+	originRegistry: agentControlOriginRegistry,
+	resolveWorkspaceCwd: (workspaceId) => {
+		const database = databaseService.getConnection()?.database;
+		return database ? getWorkspacePathById({ database, workspaceId }) : null;
+	},
+	getServerUrl: () => agentControlServer?.url ?? null,
+});
+
 /**
  * Base environment for every spawned Pi child. Uses the login-shell env (with
  * the user's PATH) so a packaged app launched from Finder — whose `process.env`
@@ -293,7 +340,12 @@ const piAgentAdapter = createCliRpcPiAgentAdapter({
 	onRawFrame: broadcastRawFrame,
 	resolveBaseEnv: resolvePiSpawnEnv,
 });
-const piAgentClient = createPiAgentClient({ adapter: piAgentAdapter });
+const piAgentClient = createPiAgentClient({
+	adapter: piAgentAdapter,
+	args: piControlExtensionPath
+		? ['--mode', 'rpc', '-e', piControlExtensionPath]
+		: undefined,
+});
 const summaryPiAgentAdapter = createCliRpcPiAgentAdapter({
 	onRawFrame: broadcastRawFrame,
 	resolveBaseEnv: resolvePiSpawnEnv,
@@ -349,9 +401,13 @@ const piSessionService = createPiSessionService({
 			}
 		}
 		agentActivityMonitor.handle({ event: payload.event, sessionId });
+		if (event.eventType === 'shutdown') {
+			agentControlService?.releaseSession(sessionId);
+		}
 	},
 	piAgentClient,
 	queueNaming: sessionNamingQueue,
+	resolveAgentControlEnv,
 	sessionSummaryWriter,
 });
 const localRepositoryRegistrationService =
@@ -475,6 +531,7 @@ const terminalService = createTerminalService({
 	/** Broadcasts terminal output to all windows. */
 	onOutput: (event: TerminalOutputBroadcast) =>
 		broadcastToAllWindows(IPC_CHANNELS.terminalOutput, event),
+	resolveAgentControlEnv,
 	/** Resolves the shell-derived base environment for terminal and script PTYs. */
 	resolveBaseEnv: async () => (await localCommandService.getEnvironment()).env,
 	/** Sizes each pty scrollback buffer from the user's terminal-scrollback setting. */
@@ -492,6 +549,42 @@ const scriptLifecycleService = createScriptLifecycleService({
 const harnessDetectionService = createHarnessDetectionService({
 	localCommandService,
 });
+const agentControlChatTabService = createChatTabService({
+	databaseService,
+	lookups: {
+		piSessionExists: ({ piSessionId }) =>
+			piSessionService.getSession(piSessionId) !== null,
+	},
+});
+agentControlService = createAgentControlService({
+	guardrails: agentControlGuardrails,
+	originRegistry: agentControlOriginRegistry,
+	ports: createAgentControlPorts({
+		augmentHarnessCommand,
+		broadcastFocus: (payload) =>
+			broadcastToAllWindows(IPC_CHANNELS.agentControlFocusView, payload),
+		broadcastTabsChanged: (payload) =>
+			broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, payload),
+		chatTabService: agentControlChatTabService,
+		confirm: { confirm: confirmAgentControlAction },
+		databaseService,
+		getPermissionMode: () =>
+			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
+		harnessDetectionService,
+		localCommandService,
+		piExecutableService,
+		piSessionService,
+		scriptLifecycleService,
+		terminalService,
+	}),
+});
+startControlServer(agentControlService)
+	.then((server) => {
+		agentControlServer = server;
+	})
+	.catch((error: unknown) => {
+		console.error('[agent-control] failed to start control server', error);
+	});
 const createWorkspaceServiceWithSetup = withSetupScriptOnCreate({
 	createWorkspaceService: createWorkspaceServiceInstance,
 	scriptLifecycleService,
@@ -563,6 +656,7 @@ app.whenReady().then(() => {
 		appSettingsService,
 		archiveRepositoryService,
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
+		augmentHarnessCommand,
 		configService,
 		createWorkspaceService: createWorkspaceServiceWithSetup,
 		databaseService,
@@ -629,6 +723,7 @@ app.on('will-quit', () => {
 	appSettingsService.stop();
 	configService.stop();
 	agentActivityMonitor.dispose();
+	void agentControlServer?.close();
 	terminalService.disposeAll();
 	ipcHandlersHandle?.dispose();
 	workspaceFilesWatcher.stopAll();

@@ -1,3 +1,8 @@
+import type {
+	FocusViewBroadcast,
+	TabsChangedBroadcast,
+} from '../../agent-control.ts';
+
 /** Open-ended metadata bag attached to a repository or workspace in the navigation tree. */
 export interface RepositoryWorkspaceNavigationMetadata {
 	[key: string]: unknown;
@@ -78,6 +83,23 @@ export interface ShellApi {
 	 * broadcast to the focused window. Returns an unsubscribe function.
 	 */
 	onCloseActiveTabRequest: (listener: () => void) => () => void;
+	/**
+	 * Subscribes to agent-control focus requests (an agent asked to bring a tab,
+	 * dock terminal, or review panel to the foreground). Returns an unsubscribe
+	 * function. The renderer applies it only for the window showing the payload's
+	 * workspace.
+	 */
+	onAgentControlFocusView: (
+		listener: (payload: FocusViewBroadcast) => void,
+	) => () => void;
+	/**
+	 * Subscribes to agent-control tab-set changes (an agent opened or closed a
+	 * tab). Returns an unsubscribe function. The renderer refreshes its tab list
+	 * only for the window showing the payload's workspace.
+	 */
+	onAgentControlTabsChanged: (
+		listener: (payload: TabsChangedBroadcast) => void,
+	) => () => void;
 	/** Opens an http/https URL in the user's default browser. */
 	openExternal: (url: string) => Promise<void>;
 }

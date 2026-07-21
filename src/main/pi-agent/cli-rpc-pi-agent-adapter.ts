@@ -24,6 +24,7 @@ import type {
 	PiAgentErrorCode,
 	PiAgentEventListener,
 	PiAgentSessionMetadata,
+	PiAgentSessionState,
 	PiAgentSessionStatus,
 	PiAgentShutdownReason,
 	PiAgentSubmitAcknowledgement,
@@ -41,6 +42,20 @@ const DEFAULT_KILL_GRACE_MS = 750;
 // in uninterruptible I/O can delay reaping; this bound keeps any caller —
 // app-quit runs its own outer race too — from blocking indefinitely.
 const CLOSE_EXIT_GRACE_MS = 2000;
+// Short ceiling on a `get_state` round-trip. Title derivation polls this and must
+// never stall a tab, so a slow/unresponsive child falls back silently instead.
+const STATE_TIMEOUT_MS = 5000;
+
+/** Reads `sessionName` out of a raw `get_state` response payload, defensively. */
+function normalizeSessionState(data: unknown): PiAgentSessionState {
+	if (!data || typeof data !== 'object') {
+		return { sessionName: null };
+	}
+	const name = (data as Record<string, unknown>).sessionName;
+	return {
+		sessionName: typeof name === 'string' && name.trim() ? name : null,
+	};
+}
 
 /** Raw JSONL line crossing the Pi RPC boundary, surfaced for debug only. */
 interface PiRawFrameSample {
@@ -327,6 +342,7 @@ function createCliRpcSession({
 	patchMetadata({ status: 'starting' });
 
 	const pendingStatsIds = new Set<string>();
+	const pendingStateResolvers = new Map<string, (data: unknown) => void>();
 
 	const requestContextUsage = (): void => {
 		if (closed || !child.stdin.writable) {
@@ -352,6 +368,7 @@ function createCliRpcSession({
 		now,
 		patchMetadata,
 		pendingStatsIds,
+		pendingStateResolvers,
 		requestContextUsage,
 		setStatus,
 	});
@@ -381,6 +398,12 @@ function createCliRpcSession({
 		listeners.clear();
 		lineStream.reset();
 		pendingStatsIds.clear();
+		// Settle any in-flight `get_state` promise so a caller awaiting it on child
+		// exit falls back instead of hanging forever.
+		for (const resolveState of pendingStateResolvers.values()) {
+			resolveState(null);
+		}
+		pendingStateResolvers.clear();
 		onClosed({ publicSession });
 		resolveClosed();
 	};
@@ -425,6 +448,38 @@ function createCliRpcSession({
 		if (!writeResult) {
 			await awaitStdinDrain(child.stdin);
 		}
+	};
+
+	const getState = async (): Promise<PiAgentSessionState> => {
+		if (closed || !child.stdin.writable) {
+			throw new Error('Pi RPC session is not writable.');
+		}
+		const id = turnIdFactory();
+		const data = await new Promise<unknown>((resolve, reject) => {
+			const timer = setTimeout(() => {
+				pendingStateResolvers.delete(id);
+				reject(new Error('Pi RPC get_state timed out.'));
+			}, STATE_TIMEOUT_MS);
+			timer.unref();
+			pendingStateResolvers.set(id, (value) => {
+				clearTimeout(timer);
+				resolve(value);
+			});
+			const line = `${JSON.stringify({ id, type: 'get_state' as const })}\n`;
+			try {
+				child.stdin.write(line, 'utf8');
+				emitRawFrame('tx', line.trimEnd());
+			} catch (cause) {
+				clearTimeout(timer);
+				pendingStateResolvers.delete(id);
+				reject(
+					new Error(
+						`Pi RPC get_state write failed: ${cause instanceof Error ? cause.message : String(cause)}`,
+					),
+				);
+			}
+		});
+		return normalizeSessionState(data);
 	};
 
 	const applyModelChange = async (
@@ -551,6 +606,7 @@ function createCliRpcSession({
 		abort,
 		close,
 		getMetadata: () => metadata,
+		getState,
 		id: metadata.id,
 		subscribe: attachListener,
 		submit,
