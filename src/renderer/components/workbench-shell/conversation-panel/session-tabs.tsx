@@ -202,6 +202,19 @@ export function SessionTabs({
 		setOrderedSessionIds(nextIds);
 	}
 
+	/**
+	 * Switches to a tab and, when it is a chat tab, queues composer focus so
+	 * keyboard-driven tab switches land the caret in the composer.
+	 * @param targetId - Session id of the tab to activate
+	 */
+	function selectSession(targetId: string) {
+		onSessionTabChange(targetId);
+		const target = sessionById.get(targetId);
+		if ((target?.kind ?? 'chat') === 'chat') {
+			requestComposerFocus(targetId);
+		}
+	}
+
 	/** Selects the tab `offset` positions from the active one, wrapping around. */
 	function cycleTab(offset: number) {
 		if (orderedSessionIds.length < 2) {
@@ -211,7 +224,7 @@ export function SessionTabs({
 		const base = activeIndex === -1 ? 0 : activeIndex;
 		const nextIndex =
 			(base + offset + orderedSessionIds.length) % orderedSessionIds.length;
-		onSessionTabChange(orderedSessionIds[nextIndex]);
+		selectSession(orderedSessionIds[nextIndex]);
 	}
 
 	/** Selects a tab by its 1-based position; `9` always jumps to the last tab. */
@@ -222,7 +235,7 @@ export function SessionTabs({
 		const index = position === 9 ? orderedSessionIds.length - 1 : position - 1;
 		const targetId = orderedSessionIds[index];
 		if (targetId) {
-			onSessionTabChange(targetId);
+			selectSession(targetId);
 		}
 	}
 
@@ -241,10 +254,10 @@ export function SessionTabs({
 
 	return (
 		<div className='flex h-12 shrink-0 items-center justify-between gap-3 border-border border-b bg-background px-3'>
-			<div className='flex min-w-0 flex-1 items-center gap-1.5'>
+			<div className='flex h-full min-w-0 flex-1 items-center gap-1.5'>
 				<Reorder.Group
 					axis='x'
-					className='no-scrollbar m-0 flex min-w-0 list-none gap-1 overflow-x-auto p-0'
+					className='no-scrollbar m-0 flex h-full min-w-0 list-none gap-1 overflow-x-auto p-0'
 					onReorder={handleReorder}
 					values={orderedSessionIds}
 				>
@@ -369,7 +382,7 @@ function SessionTab({
 				canReorderTabs && 'cursor-grab active:cursor-grabbing',
 				isActive
 					? 'border-primary bg-muted text-foreground'
-					: 'border-background bg-background text-muted-foreground hover:text-foreground',
+					: 'border-transparent bg-transparent text-muted-foreground hover:text-foreground',
 			)}
 			data-session-tab-reorderable={canReorderTabs}
 			dragElastic={canReorderTabs ? 0.08 : 0}
