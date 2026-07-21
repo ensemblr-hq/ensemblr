@@ -131,15 +131,12 @@ beforeEach(() => {
 });
 
 test('adds a disabled pending workspace before create IPC resolves', async () => {
-	const disableProjectReorderLayoutAnimation = vi.fn();
 	let resolveCreate: (result: CreateWorkspaceResult) => void = () => undefined;
 	const createResultPromise = new Promise<CreateWorkspaceResult>((resolve) => {
 		resolveCreate = resolve;
 	});
 	createWorkspace.mockReturnValue(createResultPromise);
-	const view = renderHook(() =>
-		useCreateWorkspaceFromProject({ disableProjectReorderLayoutAnimation }),
-	);
+	const view = renderHook(() => useCreateWorkspaceFromProject());
 	let createPromise: Promise<void> = Promise.resolve();
 
 	await act(async () => {
@@ -149,7 +146,6 @@ test('adds a disabled pending workspace before create IPC resolves', async () =>
 	});
 
 	const pendingWorkspace = navigationSnapshot?.repositories[0]?.workspaces[0];
-	expect(disableProjectReorderLayoutAnimation).toHaveBeenCalledTimes(1);
 	expect(pendingWorkspace).toMatchObject({
 		id: 'pending-workspace-repo-1-1',
 		name: 'Instant Workspace',

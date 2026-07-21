@@ -174,9 +174,7 @@ function IssueDetailHeader({
  */
 function CreateWorkspaceFromIssueButton({ issue }: { issue: LinearIssueWire }) {
 	const model = useWorkbenchLayoutRouteModel();
-	const { create, isCreating } = useCreateWorkspaceFromProject({
-		disableProjectReorderLayoutAnimation: () => {},
-	});
+	const { create, isCreating } = useCreateWorkspaceFromProject();
 
 	if (issue.archivedAt) {
 		return null;

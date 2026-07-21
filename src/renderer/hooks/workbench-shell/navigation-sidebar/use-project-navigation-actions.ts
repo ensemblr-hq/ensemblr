@@ -44,11 +44,6 @@ export function useArchiveBrowseChange() {
 	);
 }
 
-/** Dependencies for the create-workspace navigation action hook. */
-interface CreateWorkspaceActionDeps {
-	disableProjectReorderLayoutAnimation: () => void;
-}
-
 /** State and `create` handler exposed by the create-workspace action hook. */
 interface CreateWorkspaceActionResult {
 	create: (
@@ -199,9 +194,7 @@ function removeCreatingProjectId(
 }
 
 /** Creates a workspace with an optimistic sidebar row, then routes to the real workspace. */
-export function useCreateWorkspaceFromProject({
-	disableProjectReorderLayoutAnimation,
-}: CreateWorkspaceActionDeps): CreateWorkspaceActionResult {
+export function useCreateWorkspaceFromProject(): CreateWorkspaceActionResult {
 	const navigate = useNavigate();
 	const router = useRouter();
 	// Synchronous re-entrancy guard: blocks a double-submit within the same tick
@@ -233,7 +226,6 @@ export function useCreateWorkspaceFromProject({
 				addCreatingProjectId(current, project.id),
 			);
 			setError(null);
-			disableProjectReorderLayoutAnimation();
 			addPendingWorkspaceToCache({
 				id: pendingWorkspaceId,
 				name,
@@ -289,7 +281,7 @@ export function useCreateWorkspaceFromProject({
 				);
 			}
 		},
-		[disableProjectReorderLayoutAnimation, navigate, router],
+		[navigate, router],
 	);
 
 	return {
@@ -303,14 +295,12 @@ export function useCreateWorkspaceFromProject({
 /** Dependencies for the archive-project navigation action hook. */
 interface ArchiveProjectActionDeps {
 	activeProjectId: string | null;
-	disableProjectReorderLayoutAnimation: () => void;
 	orderedProjects: ProjectShellModel[];
 }
 
 /** Handles cache invalidation and fallback navigation after a project archive. */
 export function useArchiveProjectAction({
 	activeProjectId,
-	disableProjectReorderLayoutAnimation,
 	orderedProjects,
 }: ArchiveProjectActionDeps) {
 	const navigate = useNavigate();
@@ -318,8 +308,6 @@ export function useArchiveProjectAction({
 
 	return useCallback(
 		async (archivedProjectId: string) => {
-			disableProjectReorderLayoutAnimation();
-
 			// Refresh both the sidebar navigation snapshot and the global History
 			// feed so an archive/delete from the sidebar reflects instantly while
 			// the History screen is mounted (mirrors the unarchive path).
@@ -348,12 +336,6 @@ export function useArchiveProjectAction({
 
 			await navigate({ to: '/' });
 		},
-		[
-			activeProjectId,
-			disableProjectReorderLayoutAnimation,
-			navigate,
-			orderedProjects,
-			router,
-		],
+		[activeProjectId, navigate, orderedProjects, router],
 	);
 }

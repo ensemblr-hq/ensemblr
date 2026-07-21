@@ -10,13 +10,12 @@ import { cn } from '@/renderer/lib/utils';
 /** Drag-and-drop reorderable list backed by motion's `Reorder.Group`. */
 const ReorderList: React.FC<ReorderListProps> = ({
 	className,
-	disableLayoutAnimation = false,
 	itemClassName,
-	usePositionOnlyLayoutAnimation = false,
 	withDragHandle = false,
 	onReorderFinish,
 	...props
 }) => {
+	const [isReordering, setIsReordering] = useState(false);
 	const children = useMemo(
 		() =>
 			React.Children.toArray(props.children).filter((child) =>
@@ -91,10 +90,11 @@ const ReorderList: React.FC<ReorderListProps> = ({
 				return (
 					<ReorderListItem
 						key={key}
-						disableLayoutAnimation={disableLayoutAnimation}
+						isReordering={isReordering}
 						item={item}
 						itemKey={key}
-						usePositionOnlyLayoutAnimation={usePositionOnlyLayoutAnimation}
+						onReorderStart={() => setIsReordering(true)}
+						onReorderEnd={() => setIsReordering(false)}
 						withDragHandle={withDragHandle}
 						className={itemClassName}
 					/>
@@ -126,18 +126,20 @@ function areStringArraysEqual(first: string[], second: string[]) {
 
 /** Single item inside {@link ReorderList} with optional drag handle and raised-shadow effect. */
 const ReorderListItem: React.FC<{
-	disableLayoutAnimation?: boolean;
+	isReordering: boolean;
 	item: React.ReactElement;
 	itemKey: string;
 	className?: string;
-	usePositionOnlyLayoutAnimation?: boolean;
+	onReorderStart: () => void;
+	onReorderEnd: () => void;
 	withDragHandle?: boolean;
 }> = ({
-	disableLayoutAnimation = false,
+	isReordering,
 	item,
 	itemKey,
 	className,
-	usePositionOnlyLayoutAnimation = false,
+	onReorderStart,
+	onReorderEnd,
 	withDragHandle = false,
 }) => {
 	const y = useMotionValue(0);
@@ -149,10 +151,10 @@ const ReorderListItem: React.FC<{
 			data-slot='reorder-list-item'
 			id={itemKey}
 			value={itemKey}
-			layout={usePositionOnlyLayoutAnimation ? 'position' : undefined}
-			transition={
-				disableLayoutAnimation ? { layout: { duration: 0 } } : undefined
-			}
+			layout='position'
+			onDragStart={onReorderStart}
+			onDragEnd={onReorderEnd}
+			transition={isReordering ? undefined : { layout: { duration: 0 } }}
 			className={cn(
 				'm-0! list-none bg-background p-0!',
 				!withDragHandle ? 'cursor-grab' : '',
@@ -189,10 +191,6 @@ interface ReorderListProps
 	className?: string;
 	/** @public (optional) - The className of the item */
 	itemClassName?: string;
-	/** @public (optional) - Disable item layout animation */
-	disableLayoutAnimation?: boolean;
-	/** @public (optional) - Only animate item position layout changes */
-	usePositionOnlyLayoutAnimation?: boolean;
 	/** @public (optional) - With drag handle */
 	withDragHandle?: boolean;
 	/** @public (optional) - When the list is reordered */

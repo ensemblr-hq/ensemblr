@@ -29,10 +29,7 @@ export {
 	workspaceDirectoryRevealRequestAtom,
 	workspaceDockActivityByWorkspaceAtom,
 } from './layout-atoms';
-export {
-	useDisableProjectReorderLayoutAnimation,
-	useProjectNavigationState,
-} from './navigation';
+export { useProjectNavigationState } from './navigation';
 export {
 	getPreferredChatId,
 	getPreferredDockTab,

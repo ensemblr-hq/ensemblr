@@ -59,9 +59,6 @@ export function ProjectNavigationGroups({
 }) {
 	const {
 		collapsedProjectIdSet,
-		disableProjectReorderLayoutAnimation,
-		isProjectReorderLayoutAnimationDisabled,
-		isProjectReorderPositionOnlyLayout,
 		orderedProjects,
 		pinnedWorkspaceIdSet,
 		reorderProjects,
@@ -90,14 +87,11 @@ export function ProjectNavigationGroups({
 
 	const handleProjectLifecycleAction = useArchiveProjectAction({
 		activeProjectId: activeProject?.id ?? null,
-		disableProjectReorderLayoutAnimation,
 		orderedProjects,
 	});
 
 	const { create: handleCreateWorkspace, creatingProjectIds } =
-		useCreateWorkspaceFromProject({
-			disableProjectReorderLayoutAnimation,
-		});
+		useCreateWorkspaceFromProject();
 
 	const queryClient = useQueryClient();
 	const handleArchiveBrowseChange = useArchiveBrowseChange();
@@ -117,10 +111,8 @@ export function ProjectNavigationGroups({
 
 			<ReorderList
 				className='gap-0'
-				disableLayoutAnimation={isProjectReorderLayoutAnimationDisabled}
 				itemClassName='bg-transparent'
 				onReorderFinish={reorderProjects}
-				usePositionOnlyLayoutAnimation={isProjectReorderPositionOnlyLayout}
 			>
 				{orderedProjects.map((project) => {
 					const isProjectCollapsed = collapsedProjectIdSet.has(project.id);

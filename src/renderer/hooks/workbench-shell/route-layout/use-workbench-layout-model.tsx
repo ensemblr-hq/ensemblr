@@ -1,5 +1,5 @@
 import { getRouteApi } from '@tanstack/react-router';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useWorkbenchNavigation } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-navigation';
 import { useWorkbenchQueries } from '@/renderer/hooks/workbench-shell/route-layout/use-workbench-queries';
 import { useWorkspaceSelectionPersistence } from '@/renderer/hooks/workbench-shell/route-layout/use-workspace-selection-persistence';
@@ -81,9 +81,16 @@ export function useWorkbenchLayoutModel({
 
 	const nav = useWorkbenchNavigation({ displayProjects, setupSnapshot });
 
-	const onSetupDiagnosticsRetry = useCallback(() => {
-		if (queries.hasPreloadBridge) {
-			void queries.refetchSetupDiagnostics();
+	const [isManualRetrying, setIsManualRetrying] = useState(false);
+	const onSetupDiagnosticsRetry = useCallback(async () => {
+		if (!queries.hasPreloadBridge) {
+			return;
+		}
+		setIsManualRetrying(true);
+		try {
+			await queries.refetchSetupDiagnostics();
+		} finally {
+			setIsManualRetrying(false);
 		}
 	}, [queries.hasPreloadBridge, queries.refetchSetupDiagnostics]);
 
@@ -107,7 +114,7 @@ export function useWorkbenchLayoutModel({
 			state: {
 				setupDiagnostics: setupSnapshot,
 				setupDiagnosticsError: setupError,
-				isSetupDiagnosticsRetrying: queries.isSetupDiagnosticsFetching,
+				isSetupDiagnosticsRetrying: isManualRetrying,
 			},
 			actions: { onSetupDiagnosticsRetry },
 		},

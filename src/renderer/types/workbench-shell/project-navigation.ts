@@ -12,9 +12,6 @@ export interface WorkspaceEntry {
 
 export interface ProjectNavigationState {
 	collapsedProjectIdSet: Set<string>;
-	disableProjectReorderLayoutAnimation: () => void;
-	isProjectReorderLayoutAnimationDisabled: boolean;
-	isProjectReorderPositionOnlyLayout: boolean;
 	orderedProjects: ProjectShellModel[];
 	pinnedWorkspaceEntries: WorkspaceEntry[];
 	pinnedWorkspaceIdSet: Set<string>;
