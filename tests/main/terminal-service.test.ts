@@ -20,6 +20,10 @@ import type {
 	PtySpawnOptions,
 } from '../../src/main/terminal/pty-backend.ts';
 import { createNodePtyBackend } from '../../src/main/terminal/pty-backend.ts';
+import {
+	readTerminalOutput,
+	writeTerminalOutput,
+} from '../../src/main/terminal/terminal-output-file.ts';
 import { createScrollbackBuffer } from '../../src/main/terminal/terminal-scrollback.ts';
 import { createTerminalService } from '../../src/main/terminal/terminal-service.ts';
 import { resolveUserShell } from '../../src/main/terminal/user-shell.ts';
@@ -169,10 +173,12 @@ function createServiceFixture(
 	t: TestContext,
 	{
 		backend,
+		cwd,
 		killGraceMs = 50,
 		readConversationInfo = async () => ({ sessionId: null, title: null }),
 	}: {
 		backend: PtyBackend;
+		cwd?: string;
 		killGraceMs?: number;
 		readConversationInfo?: (
 			source: SessionLogSource,
@@ -198,7 +204,7 @@ function createServiceFixture(
 		onLifecycle: (event) => lifecycleEvents.push(event),
 		onOutput: (event) => outputEvents.push(event),
 		readConversationInfo,
-		workspaceEnvironmentService: createWorkspaceEnvironmentStub(),
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(cwd),
 	});
 
 	return {
@@ -208,6 +214,14 @@ function createServiceFixture(
 		outputEvents,
 		service,
 	};
+}
+
+/** A throwaway worktree root whose `.context` receives persisted output. */
+function createWorktreeCwd(t: TestContext): string {
+	const worktreePath = mkdtempSync(path.join(tmpdir(), 'ensemblr-term-cwd-'));
+	t.after(() => rmSync(worktreePath, { force: true, recursive: true }));
+
+	return worktreePath;
 }
 
 test('create spawns a PTY in the workspace cwd with the assembled env', async (t) => {
@@ -762,6 +776,164 @@ test('integration: real PTY runs a shell command, accepts input, and terminates'
 		integrationService.getSnapshot(interactiveId).session?.status,
 		'stopped',
 	);
+});
+
+test('a normally-closed dock terminal removes its persisted output log', async (t) => {
+	const cwd = createWorktreeCwd(t);
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend, cwd });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+
+	writeTerminalOutput(cwd, terminalId, 'build ok\r\n');
+	fake.emitData('build ok\r\n');
+	fake.emitExit(0);
+
+	assert.equal(readTerminalOutput(cwd, terminalId), null);
+});
+
+test('an agent session does not persist its output to .context', async (t) => {
+	const cwd = createWorktreeCwd(t);
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend, cwd });
+
+	const result = await service.create({
+		harnessId: 'claude',
+		kind: 'agent',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('secret agent output\r\n');
+	fake.emitExit(0);
+
+	assert.equal(readTerminalOutput(cwd, terminalId), null);
+});
+
+test('a run-script session does not persist its output to .context', async (t) => {
+	const cwd = createWorktreeCwd(t);
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend, cwd });
+
+	const result = await service.create({
+		command: 'npm run dev',
+		kind: 'run-script',
+		workspaceId: WORKSPACE_ID,
+	});
+	const terminalId = result.session?.id ?? '';
+
+	fake.emitData('listening on http://localhost:3000\r\n');
+	fake.emitExit(0);
+
+	assert.equal(readTerminalOutput(cwd, terminalId), null);
+});
+
+test('disposeAll flushes open dock terminals before killing them', async (t) => {
+	const cwd = createWorktreeCwd(t);
+	const fake = createFakePty();
+	const backend: PtyBackend = { spawn: () => fake.pty };
+	const { service } = createServiceFixture(t, { backend, cwd });
+
+	const result = await service.create({ workspaceId: WORKSPACE_ID });
+	const terminalId = result.session?.id ?? '';
+	fake.emitData('mid-session output');
+
+	service.disposeAll();
+
+	assert.equal(readTerminalOutput(cwd, terminalId), 'mid-session output');
+});
+
+test('a workspace restores its open interactive terminals after restart', async (t) => {
+	const cwd = createWorktreeCwd(t);
+	const database = createDatabaseFixture(t);
+	const first = createFakePty();
+	const second = createFakePty();
+
+	const before = createTerminalService({
+		backend: { spawn: () => first.pty },
+		databaseService: createDatabaseServiceStub(database),
+		now: () => NOW,
+		onLifecycle: () => undefined,
+		onOutput: () => undefined,
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(cwd),
+	});
+	const opened = await before.create({ workspaceId: WORKSPACE_ID });
+	const originalId = opened.session?.id ?? '';
+	first.emitData('prior shell output');
+	// Quit with the tab still open: flush, then the row stays 'running'.
+	before.disposeAll();
+
+	const after = createTerminalService({
+		backend: { spawn: () => second.pty },
+		databaseService: createDatabaseServiceStub(database),
+		now: () => NOW,
+		onLifecycle: () => undefined,
+		onOutput: () => undefined,
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(cwd),
+	});
+	after.recoverStaleSessions();
+
+	const restorable = after.listRestorable(WORKSPACE_ID);
+	assert.equal(restorable.length, 1);
+	assert.equal(restorable[0]?.id, originalId);
+	assert.equal(restorable[0]?.output, 'prior shell output');
+
+	// One-shot: a second read offers nothing.
+	assert.equal(after.listRestorable(WORKSPACE_ID).length, 0);
+
+	const relaunched = await after.create({
+		restoredFromId: originalId,
+		seedOutput: restorable[0]?.output,
+		title: restorable[0]?.title,
+		workspaceId: WORKSPACE_ID,
+	});
+	const relaunchedId = relaunched.session?.id ?? '';
+
+	assert.equal(relaunched.session?.restored, true);
+	assert.match(
+		after.getSnapshot(relaunchedId).scrollback,
+		/prior shell output/,
+	);
+	// The superseded log is removed so the next restart restores the fresh session.
+	assert.equal(readTerminalOutput(cwd, originalId), null);
+});
+
+test('agent sessions are never offered as restorable dock terminals', async (t) => {
+	const cwd = createWorktreeCwd(t);
+	const database = createDatabaseFixture(t);
+	const fake = createFakePty();
+
+	const before = createTerminalService({
+		backend: { spawn: () => fake.pty },
+		databaseService: createDatabaseServiceStub(database),
+		now: () => NOW,
+		onLifecycle: () => undefined,
+		onOutput: () => undefined,
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(cwd),
+	});
+	await before.create({
+		harnessId: 'claude',
+		kind: 'agent',
+		workspaceId: WORKSPACE_ID,
+	});
+	fake.emitData('agent tui output');
+	before.disposeAll();
+
+	const after = createTerminalService({
+		backend: { spawn: () => createFakePty().pty },
+		databaseService: createDatabaseServiceStub(database),
+		now: () => NOW,
+		onLifecycle: () => undefined,
+		onOutput: () => undefined,
+		workspaceEnvironmentService: createWorkspaceEnvironmentStub(cwd),
+	});
+	after.recoverStaleSessions();
+
+	assert.equal(after.listRestorable(WORKSPACE_ID).length, 0);
 });
 
 async function waitFor(
