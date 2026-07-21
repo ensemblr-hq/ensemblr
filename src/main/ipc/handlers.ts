@@ -39,10 +39,7 @@ import type { ScriptLifecycleService } from '../scripts';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsemblrDatabaseService } from '../storage';
 import { getPiSessionById } from '../storage/repositories/pi-session-repository';
-import {
-	getWorkspacePathById,
-	listActiveWorkspacePathRows,
-} from '../storage/repositories/workspace-repository';
+import { listActiveWorkspacePathRows } from '../storage/repositories/workspace-repository';
 import type { TerminalService } from '../terminal';
 import type {
 	ListWorkspaceFilesService,
@@ -241,13 +238,6 @@ export function registerIpcHandlers({
 						return false;
 					}
 					return getPiSessionById({ database, id: piSessionId }) !== null;
-				},
-				workspaceCwd: ({ workspaceId }) => {
-					const database = databaseService.getConnection()?.database;
-					if (!database) {
-						return null;
-					}
-					return getWorkspacePathById({ database, workspaceId });
 				},
 			},
 		}),
