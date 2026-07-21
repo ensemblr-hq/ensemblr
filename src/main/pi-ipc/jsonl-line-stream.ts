@@ -1,8 +1,15 @@
+import { StringDecoder } from 'node:string_decoder';
+
 /**
  * Chunked LF-delimited line buffer with a max-line-length guard. Designed for
  * RPC stdout: feed it chunks as they arrive; it emits complete lines and
  * reports an "oversize line" error if a single line outgrows the cap. The
  * trailing partial line stays buffered until the next chunk or `flush()`.
+ *
+ * Every chunk (Buffer, or a string via its UTF-8 bytes) is decoded through a
+ * persistent {@link StringDecoder} so a multibyte UTF-8 sequence (emoji, CJK)
+ * split across two chunk boundaries is held until its bytes complete instead of
+ * decoding to U+FFFD on both sides.
  *
  * Pure utility — no I/O, no globals — so it is unit-tested in isolation.
  */
@@ -45,6 +52,7 @@ export function createJsonlLineStream({
 }: JsonlLineStreamOptions): JsonlLineStream {
 	let buffer = '';
 	let oversizeActive = false;
+	let decoder = new StringDecoder('utf8');
 
 	const flushBufferedLine = (): void => {
 		if (oversizeActive) {
@@ -72,61 +80,76 @@ export function createJsonlLineStream({
 		onOversize?.({ droppedBytes, firstBytes });
 	};
 
-	return {
-		feed: (chunk) => {
-			const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
-			if (text.length === 0) {
+	const ingest = (text: string): void => {
+		if (text.length === 0) {
+			return;
+		}
+
+		let start = 0;
+		for (let index = 0; index < text.length; index += 1) {
+			if (text.charCodeAt(index) !== 0x0a) {
+				continue;
+			}
+			const slice = text.slice(start, index);
+			start = index + 1;
+
+			if (oversizeActive) {
+				// Discard remainder of the oversized line up to and including LF.
+				oversizeActive = false;
+				buffer = '';
+				continue;
+			}
+
+			const combined = buffer + slice;
+			buffer = '';
+			if (Buffer.byteLength(combined, 'utf8') > maxLineBytes) {
+				onOversize?.({
+					droppedBytes: Buffer.byteLength(combined, 'utf8'),
+					firstBytes: combined.slice(0, Math.min(128, combined.length)),
+				});
+				continue;
+			}
+			onLine(stripTrailingCarriageReturn(combined));
+		}
+
+		if (start < text.length) {
+			if (oversizeActive) {
+				// Already tripped; keep dropping until the next LF.
 				return;
 			}
-
-			let start = 0;
-			for (let index = 0; index < text.length; index += 1) {
-				if (text.charCodeAt(index) !== 0x0a) {
-					continue;
-				}
-				const slice = text.slice(start, index);
-				start = index + 1;
-
-				if (oversizeActive) {
-					// Discard remainder of the oversized line up to and including LF.
-					oversizeActive = false;
-					buffer = '';
-					continue;
-				}
-
-				const combined = buffer + slice;
-				buffer = '';
-				if (Buffer.byteLength(combined, 'utf8') > maxLineBytes) {
-					onOversize?.({
-						droppedBytes: Buffer.byteLength(combined, 'utf8'),
-						firstBytes: combined.slice(0, Math.min(128, combined.length)),
-					});
-					continue;
-				}
-				onLine(stripTrailingCarriageReturn(combined));
-			}
-
-			if (start < text.length) {
-				if (oversizeActive) {
-					// Already tripped; keep dropping until the next LF.
-					return;
-				}
-				const remainder = text.slice(start);
-				const projectedBytes = Buffer.byteLength(buffer + remainder, 'utf8');
-				if (projectedBytes > maxLineBytes) {
-					buffer += remainder;
-					tripOversize();
-					return;
-				}
+			const remainder = text.slice(start);
+			const projectedBytes = Buffer.byteLength(buffer + remainder, 'utf8');
+			if (projectedBytes > maxLineBytes) {
 				buffer += remainder;
+				tripOversize();
+				return;
 			}
+			buffer += remainder;
+		}
+	};
+
+	return {
+		feed: (chunk) => {
+			// Route string chunks through the decoder too (via their UTF-8 bytes) so
+			// a partial multibyte left pending by a prior Buffer feed is completed
+			// rather than stranded when feed types are mixed.
+			ingest(
+				decoder.write(
+					typeof chunk === 'string' ? Buffer.from(chunk, 'utf8') : chunk,
+				),
+			);
 		},
 		flush: () => {
+			const tail = decoder.end();
+			if (tail.length > 0) {
+				ingest(tail);
+			}
 			flushBufferedLine();
 		},
 		reset: () => {
 			buffer = '';
 			oversizeActive = false;
+			decoder = new StringDecoder('utf8');
 		},
 	};
 }

@@ -36,6 +36,11 @@ export { normalizePiPayload } from './pi-wire-normalizer.ts';
 const DEFAULT_MAX_LINE_BYTES = 1024 * 1024;
 const DEFAULT_STDERR_RING_BYTES = 64 * 1024;
 const DEFAULT_KILL_GRACE_MS = 750;
+// Extra slack past the SIGKILL deadline before `close()` stops waiting on the
+// child's `exit`. SIGKILL virtually always yields an `exit`, but a child wedged
+// in uninterruptible I/O can delay reaping; this bound keeps any caller —
+// app-quit runs its own outer race too — from blocking indefinitely.
+const CLOSE_EXIT_GRACE_MS = 2000;
 
 /** Raw JSONL line crossing the Pi RPC boundary, surfaced for debug only. */
 interface PiRawFrameSample {
@@ -213,6 +218,13 @@ function createCliRpcSession({
 	let metadata: PiAgentSessionMetadata = { ...input.metadata };
 	let closed = false;
 	let pendingShutdownReason: PiAgentShutdownReason | null = null;
+	// Resolves once the child has actually exited and shutdown is finalized, so
+	// `close()` can await genuine termination instead of returning the moment the
+	// kill signals are scheduled (which would let app-quit orphan a slow child).
+	let resolveClosed: () => void = () => {};
+	const closedPromise = new Promise<void>((resolve) => {
+		resolveClosed = resolve;
+	});
 	// Track the model/thinking already applied to the runtime so a per-turn
 	// submit only emits `set_model`/`set_thinking_level` when the selection
 	// actually changes. Seed both from the spawn-time flags (`--model` /
@@ -299,21 +311,22 @@ function createCliRpcSession({
 	} catch (cause) {
 		const detail = cause instanceof Error ? cause.message : String(cause);
 		patchMetadata({ status: 'errored' }, { silent: true });
-		return {
+		resolveClosed();
+		const failureHandle: CliRpcSession = {
 			publicSession: createSpawnFailureSession({
 				detail,
 				listeners,
 				metadata,
 				now,
+				onClose: () => onClosed(failureHandle),
 			}),
 		};
+		return failureHandle;
 	}
 
 	patchMetadata({ status: 'starting' });
 
 	const pendingStatsIds = new Set<string>();
-	// See `ProtocolDispatchDeps.streamedTurns` for the lifecycle/dedup rules.
-	const streamedTurns = new Set<string>();
 
 	const requestContextUsage = (): void => {
 		if (closed || !child.stdin.writable) {
@@ -341,13 +354,20 @@ function createCliRpcSession({
 		pendingStatsIds,
 		requestContextUsage,
 		setStatus,
-		streamedTurns,
 	});
 
 	const lineStream = createPiRpcLineStream({
 		emitError,
 		maxLineBytes,
-		onFrame: handleProtocolFrame,
+		// A buffered stdout flush can race the `exit` handler; ignore any frame
+		// that lands after shutdown so a late frame cannot resurrect a settled
+		// session's status.
+		onFrame: (frame) => {
+			if (closed) {
+				return;
+			}
+			handleProtocolFrame(frame);
+		},
 		onRawLine: (line) => emitRawFrame('rx', line),
 	});
 
@@ -360,7 +380,9 @@ function createCliRpcSession({
 		emit({ at: now().toISOString(), reason, type: 'shutdown' });
 		listeners.clear();
 		lineStream.reset();
+		pendingStatsIds.clear();
 		onClosed({ publicSession });
+		resolveClosed();
 	};
 
 	bindChildStreams({
@@ -499,14 +521,30 @@ function createCliRpcSession({
 		if (closed) {
 			return;
 		}
+		// `abort` already sent SIGINT and armed the SIGKILL escalation; re-arming
+		// here would reset that grace window and delay the hard kill. Only drive
+		// the signals when close is the first terminator.
+		const alreadyEscalating = pendingShutdownReason === 'aborted';
 		pendingShutdownReason = pendingShutdownReason ?? 'manual';
 		try {
 			child.stdin.end();
 		} catch {
 			// stdin may already be closed (child exited before close() ran).
 		}
-		sendSignal('SIGTERM');
-		killTimer.schedule(killGraceMs, () => sendSignal('SIGKILL'));
+		if (!alreadyEscalating) {
+			sendSignal('SIGTERM');
+			killTimer.schedule(killGraceMs, () => sendSignal('SIGKILL'));
+		}
+		// Resolve when the child has actually exited (SIGKILL guarantees the
+		// `exit` event fires), so callers like app-quit genuinely block on it —
+		// but never past the SIGKILL deadline plus slack, so a wedged child cannot
+		// hang the caller forever.
+		await Promise.race([
+			closedPromise,
+			new Promise<void>((resolve) => {
+				setTimeout(resolve, killGraceMs + CLOSE_EXIT_GRACE_MS).unref();
+			}),
+		]);
 	};
 
 	const publicSession: PiAgentAdapterSession = {

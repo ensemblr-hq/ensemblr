@@ -40,12 +40,6 @@ export interface ProtocolDispatchDeps {
 	now: () => Date;
 	/** Pending `get_session_stats` request ids (mutated by both sides). */
 	pendingStatsIds: Set<string>;
-	/**
-	 * Tracks turns for which we've emitted at least one text/reasoning delta.
-	 * On `message_end` we strip text/reasoning parts for these turns so the
-	 * authoritative final text does not duplicate the already-streamed deltas.
-	 */
-	streamedTurns: Set<string>;
 }
 
 /** Handles a single raw Pi RPC frame. */
@@ -118,11 +112,12 @@ function handleResponse(typed: FrameObject, deps: ProtocolDispatchDeps): void {
 }
 
 /**
- * Streams assistant text/thinking deltas from a `message_update` frame,
- * marking the turn as streamed so its final `message_end` can drop the
- * already-streamed parts.
+ * Streams assistant text/thinking deltas from a `message_update` frame. The
+ * final `message_end` re-emits the authoritative text as a `done` part, and the
+ * renderer's `dropStreamingPartsOfType` supersedes the streamed deltas with it,
+ * so no per-turn bookkeeping is needed here to avoid duplication.
  * @param typed - The `message_update` frame.
- * @param deps - Session callbacks and the streamed-turn set.
+ * @param deps - Session callbacks.
  */
 function handleMessageUpdate(
 	typed: FrameObject,
@@ -132,9 +127,6 @@ function handleMessageUpdate(
 	const deltas = extractMessageUpdateDeltas(typed);
 	if (deltas.length === 0) {
 		return;
-	}
-	if (turnId) {
-		deps.streamedTurns.add(turnId);
 	}
 	for (const delta of deltas) {
 		deps.emit({
@@ -152,7 +144,7 @@ function handleMessageUpdate(
  * one-shot model/provider failure. Tool-result echoes are dropped (the
  * `tool_execution_end` frame already carries the structured result).
  * @param typed - The `message_end` frame.
- * @param deps - Session callbacks and the streamed-turn set.
+ * @param deps - Session callbacks.
  * @param state - Per-prompt error-window tracking.
  */
 function handleMessageEnd(
@@ -173,9 +165,6 @@ function handleMessageEnd(
 			? typed.turnId
 			: (extractMessageId(typed.message) ?? 'pending');
 	const normalized = normalizeMessageEnd(message, wireRole);
-	if (turnId !== 'pending') {
-		deps.streamedTurns.delete(turnId);
-	}
 	deps.emit({
 		at: deps.now().toISOString(),
 		payload: normalized,

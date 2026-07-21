@@ -119,3 +119,31 @@ test('feed accepts Buffer chunks', () => {
 
 	assert.deepEqual(lines, ['hello']);
 });
+
+test('reassembles a multibyte UTF-8 char split across Buffer chunks', () => {
+	const lines: string[] = [];
+	const stream = createJsonlLineStream({ onLine: (line) => lines.push(line) });
+
+	// "😀" (U+1F600) is 4 bytes: F0 9F 98 80. Split the JSON line mid-emoji so
+	// each Buffer holds an incomplete sequence — a naive per-chunk toString would
+	// decode U+FFFD on both sides and corrupt the assistant text.
+	const full = Buffer.from('{"text":"😀"}\n', 'utf8');
+	const emojiStart = Buffer.from('{"text":"', 'utf8').length;
+	stream.feed(full.subarray(0, emojiStart + 2));
+	stream.feed(full.subarray(emojiStart + 2));
+
+	assert.deepEqual(lines, ['{"text":"😀"}']);
+	assert.equal(JSON.parse(lines[0] ?? '').text, '😀');
+});
+
+test('flushes a trailing partial multibyte char without a spurious replacement', () => {
+	const lines: string[] = [];
+	const stream = createJsonlLineStream({ onLine: (line) => lines.push(line) });
+
+	const cjk = Buffer.from('日本語', 'utf8');
+	stream.feed(cjk.subarray(0, 4));
+	stream.feed(cjk.subarray(4));
+	stream.flush();
+
+	assert.deepEqual(lines, ['日本語']);
+});

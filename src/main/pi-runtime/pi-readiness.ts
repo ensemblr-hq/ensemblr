@@ -36,7 +36,7 @@ export type {
 	ResolvePiReadinessOptions,
 } from './pi-runtime-types.ts';
 
-const DEFAULT_RPC_TIMEOUT_MS = 5000;
+const DEFAULT_RPC_TIMEOUT_MS = 10000;
 const DEFAULT_RPC_KILL_GRACE_MS = 500;
 const DEFAULT_PROVIDER_MODEL_TIMEOUT_MS = 10000;
 const DEFAULT_RPC_MAX_OUTPUT_BYTES = 64 * 1024;

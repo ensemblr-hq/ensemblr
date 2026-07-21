@@ -139,20 +139,31 @@ export function createPiExecutableService({
 	probeTimeoutMs,
 	settingsResolutionService,
 }: CreatePiExecutableServiceOptions): PiExecutableService {
+	// Deduplicates concurrent snapshot requests: one setup-diagnostics run asks
+	// for the executable both directly (the `pi-executable` check) and again
+	// inside `resolvePiReadiness`, which would otherwise spawn two identical
+	// `pi --version` probes at once. Cleared on settle so a later run re-resolves.
+	let inFlightSnapshot: Promise<PiExecutableSnapshot> | null = null;
+
 	return {
 		clearOverride: () =>
 			clearPiExecutableOverride({
 				database: databaseService.getConnection()?.database ?? null,
 			}),
-		getSnapshot: () =>
-			resolvePiExecutable({
+		getSnapshot: () => {
+			inFlightSnapshot ??= resolvePiExecutable({
 				commonCandidatePaths,
 				homeDirectory,
 				localCommandService,
 				now,
 				probeTimeoutMs,
 				settingsSnapshot: settingsResolutionService.resolve(),
-			}),
+			}).finally(() => {
+				inFlightSnapshot = null;
+			});
+
+			return inFlightSnapshot;
+		},
 		saveOverride: (executablePath) =>
 			savePiExecutableOverride({
 				database: databaseService.getConnection()?.database ?? null,
