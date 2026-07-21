@@ -238,6 +238,42 @@ const CONVERSATION_TITLE_POLL_MS = 1_500;
  */
 const PTY_SPINNER_BUSY_IDLE_MS = 1_500;
 
+/**
+ * Ceiling on the one final session-log read taken as a PTY exits. This read
+ * gates {@link finalizeSession} — and with it every exit waiter — so a stuck
+ * filesystem must not wedge session teardown. Comfortably longer than a healthy
+ * bounded head read, short enough that a stall still finalizes promptly.
+ */
+const FINAL_CONVERSATION_READ_TIMEOUT_MS = 2_000;
+
+/** Neutral conversation info used when the exit-time read times out. */
+const EMPTY_CONVERSATION_INFO: AgentConversationInfo = {
+	sessionId: null,
+	title: null,
+};
+
+/**
+ * Races a promise against a millisecond deadline, resolving to `fallback` when
+ * the deadline wins first. The timer is unref'd so it never keeps the app alive
+ * and is always cleared once the race settles.
+ * @param work - The promise to bound.
+ * @param ms - Deadline in milliseconds.
+ * @param fallback - Value resolved when the deadline wins.
+ * @returns The work's value, or `fallback` on timeout.
+ */
+function raceWithTimeout<T>(
+	work: Promise<T>,
+	ms: number,
+	fallback: T,
+): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const timeout = new Promise<T>((resolve) => {
+		timer = setTimeout(() => resolve(fallback), ms);
+		timer.unref?.();
+	});
+	return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
+}
+
 /** Unicode braille block (U+2800–U+28FF), the frames Vibe animates as its spinner. */
 const BRAILLE_BLOCK_START = 0x2800;
 const BRAILLE_BLOCK_END = 0x28ff;
@@ -445,6 +481,37 @@ export function createTerminalService({
 		}
 		session.snapshot = { ...session.snapshot, ...patch };
 		broadcastLifecycle(session);
+	}
+
+	/**
+	 * Reads a harness's session log one last time as the PTY exits and stamps a
+	 * newly captured native session id onto the snapshot. Unlike the interval
+	 * poller it never broadcasts — the imminent {@link finalizeSession} broadcasts
+	 * the stopped snapshot, carrying this id to the renderer's close path. Closes
+	 * the gap where the id lands on disk between the final poll tick and process
+	 * exit; without it that id would never reach the archived tab, so a restore
+	 * would spawn a fresh conversation. The read is bounded by
+	 * {@link FINAL_CONVERSATION_READ_TIMEOUT_MS} so a stuck filesystem cannot wedge
+	 * the exit finalization this gates; on timeout it keeps the id already known.
+	 * @param session - Tracked agent session that is exiting.
+	 */
+	async function captureFinalConversationInfo(
+		session: TrackedSession,
+	): Promise<void> {
+		if (!session.sessionLogSource) {
+			return;
+		}
+		const info = await raceWithTimeout(
+			readConversationInfo(session.sessionLogSource, session.cwd, {
+				since: session.sessionLogSince ?? undefined,
+			}),
+			FINAL_CONVERSATION_READ_TIMEOUT_MS,
+			EMPTY_CONVERSATION_INFO,
+		);
+		const patch = conversationInfoPatch(session.snapshot, info);
+		if (patch) {
+			session.snapshot = { ...session.snapshot, ...patch };
+		}
 	}
 
 	/**
@@ -712,7 +779,17 @@ export function createTerminalService({
 			}
 		});
 		session.exitSubscription = pty.onExit(({ exitCode }) => {
-			finalizeSession(session, exitCode);
+			// Plain terminals have no session log to read; finalize synchronously so
+			// callers observe the exit immediately. Agent tabs first read their log
+			// one last time to capture a just-written native session id before the
+			// stopped snapshot broadcasts.
+			if (!session.sessionLogSource) {
+				finalizeSession(session, exitCode);
+				return;
+			}
+			void captureFinalConversationInfo(session).finally(() => {
+				finalizeSession(session, exitCode);
+			});
 		});
 
 		sessions.set(id, session);

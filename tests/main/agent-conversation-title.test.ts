@@ -1,4 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	mkdirSync,
+	mkdtempSync,
+	realpathSync,
+	rmSync,
+	symlinkSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
@@ -279,6 +286,28 @@ function writeClaudeTranscriptWithHeader(
 	writeFileSync(path.join(dir, `${sessionId}.jsonl`), `${lines.join('\n')}\n`);
 }
 
+/**
+ * Writes a Claude sub-agent (Task) sidechain transcript: same cwd and launch
+ * window as the main conversation but flagged `isSidechain`, carrying a
+ * `sessionId` that `--resume` cannot reattach.
+ * @param sessionId - The sidechain session id (also the filename stem).
+ * @param cwd - The cwd recorded on the line.
+ * @param timestamp - The line timestamp.
+ */
+function writeClaudeSidechainTranscript(
+	sessionId: string,
+	cwd: string,
+	timestamp: string,
+): void {
+	const slug = cwd.replace(/\//g, '-');
+	const dir = path.join(home, '.claude', 'projects', slug);
+	mkdirSync(dir, { recursive: true });
+	writeFileSync(
+		path.join(dir, `${sessionId}.jsonl`),
+		`${JSON.stringify({ cwd, isSidechain: true, sessionId, timestamp, type: 'user' })}\n`,
+	);
+}
+
 describe('readAgentConversationInfo — session id', () => {
 	test('codex surfaces the session id and title of the matching rollout', async () => {
 		writeCodexRolloutWithId(
@@ -384,5 +413,52 @@ describe('readAgentConversationInfo — session id', () => {
 				since: LAUNCH,
 			}),
 		).toEqual({ sessionId: 'claude-dot', title: null });
+	});
+
+	test('claude skips a lone sub-agent sidechain transcript', async () => {
+		// A sidechain id is not resumable; adopting it would make `--resume` fail and
+		// fall through to a new session.
+		writeClaudeSidechainTranscript('claude-sidechain', CWD, AFTER_LAUNCH);
+		expect(
+			await readAgentConversationInfo('claude-transcript', CWD, {
+				home,
+				since: LAUNCH,
+			}),
+		).toEqual({ sessionId: null, title: null });
+	});
+
+	test('claude returns the main id past a newer sidechain transcript', async () => {
+		writeClaudeTranscript('claude-main', CWD, AFTER_LAUNCH);
+		// Written after the main transcript, so it wins on mtime; the sidechain gate
+		// must still exclude it and surface the main conversation.
+		writeClaudeSidechainTranscript('claude-sub', CWD, AFTER_LAUNCH);
+		expect(
+			await readAgentConversationInfo('claude-transcript', CWD, {
+				home,
+				since: LAUNCH,
+			}),
+		).toEqual({ sessionId: 'claude-main', title: null });
+	});
+
+	test('claude resolves a symlinked cwd to its realpath to find the transcript', async () => {
+		// Claude keys its project dir off the process realpath; a symlinked cwd (e.g.
+		// macOS /var→/private/var) would otherwise slug to a directory it never wrote.
+		const realDir = mkdtempSync(path.join(home, 'real-'));
+		const linkDir = path.join(home, 'link-cwd');
+		symlinkSync(realDir, linkDir);
+		const resolved = realpathSync(linkDir);
+		const slug = resolved.replace(/\//g, '-');
+		const dir = path.join(home, '.claude', 'projects', slug);
+		mkdirSync(dir, { recursive: true });
+		writeFileSync(
+			path.join(dir, 'claude-link.jsonl'),
+			`${JSON.stringify({ cwd: resolved, sessionId: 'claude-link', timestamp: AFTER_LAUNCH, type: 'user' })}\n`,
+		);
+		expect(
+			await readAgentConversationInfo('claude-transcript', linkDir, {
+				home,
+				since: LAUNCH,
+			}),
+		).toEqual({ sessionId: 'claude-link', title: null });
 	});
 });
