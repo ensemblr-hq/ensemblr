@@ -25,7 +25,7 @@ import {
 	reorderChatTabs,
 	restoreClosedChatTab,
 	setChatTabMetadata,
-} from '../storage/repositories/index.ts';
+} from '../storage/repositories/chat-tab-repository.ts';
 
 /** Thrown when opening a sixth chat tab; carries a renderer-detectable marker. */
 export class ChatTabLimitError extends Error {
