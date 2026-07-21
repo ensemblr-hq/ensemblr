@@ -55,12 +55,34 @@ function findOpenConversation(
 }
 
 /**
+ * Reports whether a live PTY-backed terminal tab of the given harness is already
+ * open. A cwd `--continue` reattaches the harness's most recent conversation, so
+ * restoring one without a captured id while another same-harness tab runs could
+ * point both at one shared session log. Callers spawn fresh instead when true.
+ * @param sessionTabs - The currently open tabs.
+ * @param harnessId - The harness id to look for a live tab of.
+ * @returns True when a live terminal tab of that harness is open.
+ */
+function hasLiveHarnessTab(
+	sessionTabs: SessionTabModel[],
+	harnessId: string,
+): boolean {
+	return sessionTabs.some(
+		(session) =>
+			session.kind === 'terminal' &&
+			session.terminalId.length > 0 &&
+			session.harnessId === harnessId,
+	);
+}
+
+/**
  * Respawns the harness for a restored terminal (harness) tab, reattaching the
  * exact conversation via its persisted native session id and repointing the tab.
  * If that conversation is already open, focuses it and drops the duplicate; if
- * no session id was captured, spawns a fresh conversation (rather than an
- * unguarded cwd resume that could corrupt a shared log); if the harness or API
- * is unavailable, selects the tab as-is without a resume.
+ * no session id was captured, reattaches the harness's most recent cwd
+ * conversation via `--continue` (spawning fresh only when a same-harness tab is
+ * already live, to avoid corrupting a shared log); if the harness or API is
+ * unavailable, selects the tab as-is without a resume.
  * @param tab - The restored terminal tab wire row.
  * @param deps - The owning hook's collaborators.
  */
@@ -90,12 +112,14 @@ export function resumeRestoredTerminalTab(
 	// Claim the tab so the post-restart auto-resume effect does not also respawn
 	// it with the cwd-scoped "most recent" resume command.
 	deps.claimTab(tab.id);
-	// With a captured session id we reattach that exact conversation. Without one
-	// we cannot identify the conversation, and an unguarded cwd `--continue` here
-	// could collide with another live tab of the same harness resuming the same
-	// cwd (two `--continue` processes corrupt one shared log). Spawn a fresh
-	// conversation instead, which writes its own log and never collides.
-	const fresh = !agentSessionId;
+	// With a captured session id we reattach that exact conversation via `--resume`,
+	// which never collides on a shared log. Without one we fall back to the cwd
+	// `--continue` that reattaches the harness's most recent conversation — unless a
+	// same-harness tab is already live, where two `--continue` processes could
+	// corrupt one shared log, so we spawn fresh instead.
+	const cwdContinue =
+		!agentSessionId && !hasLiveHarnessTab(sessionTabs, harnessId);
+	const fresh = !agentSessionId && !cwdContinue;
 	void api
 		.resumeAgentHarness({
 			chatTabId: tab.id,
