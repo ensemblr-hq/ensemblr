@@ -58,6 +58,20 @@ interface ControlResult {
 }
 
 /**
+ * Type guard for the app's control envelope, so an HTTP error body that is not
+ * a well-formed envelope is not mistaken for a valid result.
+ * @param value - Parsed response body.
+ * @returns True when the value has the `{ ok: boolean }` envelope shape.
+ */
+function isControlResult(value: unknown): value is ControlResult {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		typeof (value as { ok?: unknown }).ok === 'boolean'
+	);
+}
+
+/**
  * Posts a control op to the Ensemblr app and returns its result envelope.
  * @param op - Canonical control op name (e.g. `spawnChatTab`).
  * @param args - Validated tool arguments.
@@ -84,7 +98,28 @@ async function invoke(
 			},
 			body: JSON.stringify({ op, args, callerModel }),
 		});
-		return (await response.json()) as ControlResult;
+		if (!response.ok) {
+			// The app answers 4xx/5xx with the same JSON envelope, so parse the
+			// error body for its reason instead of treating the status alone.
+			const errorBody = await response.json().catch(() => undefined);
+			if (isControlResult(errorBody)) {
+				return errorBody;
+			}
+			return {
+				ok: false,
+				code: 'internal',
+				error: `Control channel returned HTTP ${response.status} with an unexpected body.`,
+			};
+		}
+		const body = await response.json().catch(() => undefined);
+		if (isControlResult(body)) {
+			return body;
+		}
+		return {
+			ok: false,
+			code: 'internal',
+			error: 'Control channel returned an unexpected body.',
+		};
 	} catch (error) {
 		return {
 			ok: false,

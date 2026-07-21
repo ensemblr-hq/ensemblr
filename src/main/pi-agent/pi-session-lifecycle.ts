@@ -13,7 +13,7 @@ import {
 	type PiSessionRow,
 	updatePiSession,
 	updateTurn,
-} from '../storage/repositories/index.ts';
+} from '../storage/repositories/pi-session-repository.ts';
 import type { SessionNamingInput } from './naming/session-naming.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import { PiSessionServiceError } from './pi-session-service-error.ts';

@@ -25,7 +25,7 @@ import { listOpenChatTabs } from '../storage/repositories/chat-tab-repository.ts
 import {
 	listEventsByBranch,
 	type PiEventRow,
-} from '../storage/repositories/index.ts';
+} from '../storage/repositories/pi-event-repository.ts';
 import {
 	getMainBranchForSession,
 	getPiSessionBranchById,

@@ -9,76 +9,60 @@ import type { AgentControlOp } from './contracts.ts';
 
 const nonEmpty = z.string().trim().min(1);
 
-const spawnChatTabSchema = z
-	.object({
-		title: nonEmpty.optional(),
-	})
-	.strict();
+const spawnChatTabSchema = z.strictObject({
+	title: nonEmpty.optional(),
+});
 
-const startConversationSchema = z
-	.object({
-		chatTabId: nonEmpty.optional(),
-		prompt: nonEmpty,
-		model: nonEmpty.optional(),
-		thinkingLevel: nonEmpty.optional(),
-		wait: z.boolean().optional(),
-	})
-	.strict();
+const startConversationSchema = z.strictObject({
+	chatTabId: nonEmpty.optional(),
+	prompt: nonEmpty,
+	model: nonEmpty.optional(),
+	thinkingLevel: nonEmpty.optional(),
+	wait: z.boolean().optional(),
+});
 
-const sendFollowUpSchema = z
-	.object({
-		piSessionId: nonEmpty,
-		prompt: nonEmpty,
-		wait: z.boolean().optional(),
-	})
-	.strict();
+const sendFollowUpSchema = z.strictObject({
+	piSessionId: nonEmpty,
+	prompt: nonEmpty,
+	wait: z.boolean().optional(),
+});
 
-const closeTabSchema = z
-	.object({
-		chatTabId: nonEmpty,
-	})
-	.strict();
+const closeTabSchema = z.strictObject({
+	chatTabId: nonEmpty,
+});
 
-const launchHarnessSchema = z
-	.object({
-		harnessId: nonEmpty,
-	})
-	.strict();
+const launchHarnessSchema = z.strictObject({
+	harnessId: nonEmpty,
+});
 
-const startTerminalSchema = z
-	.object({
-		kind: z.enum(['setup', 'run', 'spawn']),
-	})
-	.strict();
+const startTerminalSchema = z.strictObject({
+	kind: z.enum(['setup', 'run', 'spawn']),
+});
 
 const terminalIdOrKindSchema = z
-	.object({
+	.strictObject({
 		terminalId: nonEmpty.optional(),
 		kind: z.enum(['setup', 'run']).optional(),
 	})
-	.strict()
 	.refine((value) => Boolean(value.terminalId) !== Boolean(value.kind), {
 		message: 'Provide exactly one of terminalId or kind.',
 	});
 
 const stopTerminalSchema = terminalIdOrKindSchema;
 
-const writeTerminalSchema = z
-	.object({
-		terminalId: nonEmpty,
-		input: z.string().min(1),
-	})
-	.strict();
+const writeTerminalSchema = z.strictObject({
+	terminalId: nonEmpty,
+	input: z.string().min(1),
+});
 
 const openTabSchema = z
-	.object({
+	.strictObject({
 		variant: z.enum(['file', 'diff', 'comment']),
 		filePath: nonEmpty.optional(),
 		turnId: nonEmpty.optional(),
 		commentBody: nonEmpty.optional(),
 		prNumber: z.number().int().positive().optional(),
 	})
-	.strict()
 	.refine(
 		(value) =>
 			value.variant === 'comment'
@@ -87,60 +71,44 @@ const openTabSchema = z
 		{ message: 'file/diff tabs need filePath; comment tabs need commentBody.' },
 	);
 
-const listTabsSchema = z
-	.object({
-		workspaceId: nonEmpty.optional(),
-	})
-	.strict();
+const listTabsSchema = z.strictObject({
+	workspaceId: nonEmpty.optional(),
+});
 
-const listTerminalsSchema = z
-	.object({
-		workspaceId: nonEmpty.optional(),
-	})
-	.strict();
+const listTerminalsSchema = z.strictObject({
+	workspaceId: nonEmpty.optional(),
+});
 
-const conversationRefSchema = z
-	.object({
-		piSessionId: nonEmpty,
-	})
-	.strict();
+const conversationRefSchema = z.strictObject({
+	piSessionId: nonEmpty,
+});
 
-const readTerminalOutputSchema = z
-	.object({
-		terminalId: nonEmpty,
-	})
-	.strict();
+const readTerminalOutputSchema = z.strictObject({
+	terminalId: nonEmpty,
+});
 
-const focusTabSchema = z
-	.object({
-		chatTabId: nonEmpty,
-	})
-	.strict();
+const focusTabSchema = z.strictObject({
+	chatTabId: nonEmpty,
+});
 
 const focusDockTabSchema = terminalIdOrKindSchema;
 
-const focusPanelSchema = z
-	.object({
-		panel: z.enum(['files', 'changes', 'checks']),
-	})
-	.strict();
+const focusPanelSchema = z.strictObject({
+	panel: z.enum(['files', 'changes', 'checks']),
+});
 
-const waitForAgentsSchema = z
-	.object({
-		targets: z.array(nonEmpty).optional(),
-		mode: z.enum(['first', 'all']).optional(),
-		timeoutMs: z.number().int().positive().optional(),
-	})
-	.strict();
+const waitForAgentsSchema = z.strictObject({
+	targets: z.array(nonEmpty).optional(),
+	mode: z.enum(['first', 'all']).optional(),
+	timeoutMs: z.number().int().positive().optional(),
+});
 
-const notifyOrchestratorSchema = z
-	.object({
-		reason: z.enum(['need_decision', 'blocked', 'progress', 'done']),
-		message: nonEmpty,
-	})
-	.strict();
+const notifyOrchestratorSchema = z.strictObject({
+	reason: z.enum(['need_decision', 'blocked', 'progress', 'done']),
+	message: nonEmpty,
+});
 
-const emptySchema = z.object({}).strict();
+const emptySchema = z.strictObject({});
 
 /** Per-operation argument validators, keyed by {@link AgentControlOp}. */
 export const AGENT_CONTROL_ARG_SCHEMAS = {

@@ -79,7 +79,7 @@ export function useSessionTabState({
 	bootstrap?: boolean;
 	onSessionTabChange: (sessionId: string) => void;
 }): SessionTabState & {
-	openSessionTab: () => Promise<OpenSessionTabHandlerResult>;
+	openSessionTab: () => Promise<OpenSessionTabHandlerResult | null>;
 	openCommentPreviewTab: (input: {
 		comment: PullRequestCommentSummary;
 		prNumber?: number;
@@ -386,9 +386,14 @@ export function useSessionTabState({
 	});
 
 	const openSessionTab =
-		useCallback(async (): Promise<OpenSessionTabHandlerResult> => {
-			const result = await openChatTabMutation.mutateAsync(undefined);
-			return { chatTabId: result.tab.id };
+		useCallback(async (): Promise<OpenSessionTabHandlerResult | null> => {
+			try {
+				const result = await openChatTabMutation.mutateAsync(undefined);
+				return { chatTabId: result.tab.id };
+			} catch {
+				// Surfaced as a toast by the mutation; callers treat as no-op.
+				return null;
+			}
 		}, [openChatTabMutation]);
 
 	/** Opens (or re-focuses) a file-preview tab for a workspace-relative path. */
@@ -832,6 +837,9 @@ export function useSessionTabState({
 			return;
 		}
 		void openSessionTab().then((opened) => {
+			if (!opened) {
+				return;
+			}
 			onSessionTabChange(opened.chatTabId);
 			void closeSessionTabAsync(decision.activeId);
 		});
