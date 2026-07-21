@@ -139,7 +139,15 @@ if (isDev) {
 // dogfooding instance. Acquired after `setName` so it keys on the right userData.
 const hasSingleInstanceLock = isDev || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
-	app.quit();
+	// `exit(0)`, not `quit()`: this doomed instance still ran the whole module and
+	// registered `before-quit` below, which preventDefaults and races a 3s Pi
+	// shutdown. `quit()` would drag the loser through that path; `exit` fetches an
+	// immediate teardown so the relaunch folds into the primary at once. Safe
+	// because nothing owning shared userData has started yet — every real side
+	// effect (DB open, window, IPC) sits behind the `hasSingleInstanceLock` guard
+	// in `whenReady`, so the module-scope service graph below must stay construction
+	// -only (no filesystem/userData writes in a constructor) for this to hold.
+	app.exit(0);
 }
 
 // Derive each dev path from its production resolver rather than hardcoding the
@@ -627,10 +635,12 @@ app.on('will-quit', () => {
 	databaseService.close();
 });
 
+// Quit once the last window closes on every platform, macOS included. Ensemblr is
+// a single-window workbench, not a menu-bar resident, so keeping the process (and
+// its Pi RPC children) alive with no windows just wastes resources and leaves a
+// stray Dock tile. `before-quit` still drives the graceful Pi shutdown.
 app.on('window-all-closed', () => {
-	if (process.platform !== 'darwin') {
-		app.quit();
-	}
+	app.quit();
 });
 
 app.on('activate', () => {
