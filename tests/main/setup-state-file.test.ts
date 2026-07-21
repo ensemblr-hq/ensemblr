@@ -44,40 +44,39 @@ test('writeSetupStateFile then readSetupStateFile round-trips the state', (t) =>
 	assert.deepEqual(readSetupStateFile(worktreePath), STATE);
 });
 
-test('writeSetupStateFile writes the marker under .ensemblr', (t) => {
+test('writeSetupStateFile writes the marker under .context', (t) => {
 	const worktreePath = createWorktree(t);
 
 	writeSetupStateFile(worktreePath, STATE);
 
-	const markerPath = path.join(worktreePath, '.ensemblr', SETUP_STATE_FILENAME);
+	const markerPath = path.join(worktreePath, '.context', SETUP_STATE_FILENAME);
 	assert.deepEqual(JSON.parse(readFileSync(markerPath, 'utf8')), STATE);
 });
 
-test('writeSetupStateFile creates a .ensemblr/.gitignore that ignores local markers', (t) => {
+test('readSetupStateFile falls back to the legacy .ensemblr marker', (t) => {
 	const worktreePath = createWorktree(t);
-
-	writeSetupStateFile(worktreePath, STATE);
-
-	const gitignore = readFileSync(
-		path.join(worktreePath, '.ensemblr', '.gitignore'),
-		'utf8',
+	const legacyDir = path.join(worktreePath, '.ensemblr');
+	mkdirSync(legacyDir, { recursive: true });
+	writeFileSync(
+		path.join(legacyDir, SETUP_STATE_FILENAME),
+		JSON.stringify(STATE),
 	);
-	assert.match(gitignore, /^\*\.local\.\*$/m);
+
+	assert.deepEqual(readSetupStateFile(worktreePath), STATE);
 });
 
-test('writeSetupStateFile appends the pattern to a user-authored .gitignore once', (t) => {
+test('the .context marker takes precedence over a legacy .ensemblr marker', (t) => {
 	const worktreePath = createWorktree(t);
-	const ensemblrDir = path.join(worktreePath, '.ensemblr');
-	mkdirSync(ensemblrDir, { recursive: true });
-	const gitignorePath = path.join(ensemblrDir, '.gitignore');
-	writeFileSync(gitignorePath, 'notes.txt\n');
+	const legacyDir = path.join(worktreePath, '.ensemblr');
+	mkdirSync(legacyDir, { recursive: true });
+	writeFileSync(
+		path.join(legacyDir, SETUP_STATE_FILENAME),
+		JSON.stringify({ ...STATE, fingerprint: 'legacy' }),
+	);
 
 	writeSetupStateFile(worktreePath, STATE);
-	writeSetupStateFile(worktreePath, STATE);
 
-	const gitignore = readFileSync(gitignorePath, 'utf8');
-	assert.match(gitignore, /notes\.txt/);
-	assert.equal(gitignore.match(/\*\.local\.\*/g)?.length, 1);
+	assert.deepEqual(readSetupStateFile(worktreePath), STATE);
 });
 
 test('readSetupStateFile returns null for a malformed marker', (t) => {
@@ -85,7 +84,7 @@ test('readSetupStateFile returns null for a malformed marker', (t) => {
 
 	writeSetupStateFile(worktreePath, STATE);
 	writeFileSync(
-		path.join(worktreePath, '.ensemblr', SETUP_STATE_FILENAME),
+		path.join(worktreePath, '.context', SETUP_STATE_FILENAME),
 		'{ not json',
 	);
 

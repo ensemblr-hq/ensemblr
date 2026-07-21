@@ -1,73 +1,63 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { sep } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import path from 'node:path';
 
 import {
 	parseSetupState,
 	type WorkspaceSetupState,
 } from '../../shared/scripts/setup-state.ts';
+import { resolveContextPath } from '../config/context-directory.ts';
 import { ENSEMBLR_DIRECTORY } from '../config/repository-config.ts';
 
 /**
- * Filename of the gitignored per-worktree setup marker, written inside
- * {@link ENSEMBLR_DIRECTORY}. The `.local.` segment marks it as machine-local
- * state that {@link LOCAL_MARKER_IGNORE} keeps out of the user's repository.
+ * Filename of the machine-local per-worktree setup marker, written inside the
+ * worktree's `.context` directory. The `.local.` segment marks it as
+ * machine-local state, kept out of the repository by the root-level
+ * `.context/` gitignore rule.
  */
 export const SETUP_STATE_FILENAME = 'setup.local.json';
 
-/** `.gitignore` inside `.ensemblr` that keeps local markers untracked. */
-const ENSEMBLR_GITIGNORE_FILENAME = '.gitignore';
-/** Pattern that ignores every `*.local.*` marker the app writes. */
-const LOCAL_MARKER_IGNORE = '*.local.*';
-
-/** Converts a filesystem directory path into a file URL with a trailing slash. */
-function directoryUrl(directoryPath: string): URL {
-	const directory = directoryPath.endsWith(sep)
-		? directoryPath
-		: `${directoryPath}${sep}`;
-
-	return pathToFileURL(directory);
-}
-
-/** Absolute path to a worktree's `.ensemblr` directory. */
-function setupStateDirectory(worktreePath: string): string {
-	return fileURLToPath(
-		new URL(`${ENSEMBLR_DIRECTORY}/`, directoryUrl(worktreePath)),
-	);
-}
-
-/** Absolute path to a worktree's setup marker file. */
+/** Absolute path to a worktree's current setup marker under `.context`. */
 function setupStatePath(worktreePath: string): string {
-	return fileURLToPath(
-		new URL(
-			SETUP_STATE_FILENAME,
-			directoryUrl(setupStateDirectory(worktreePath)),
-		),
-	);
+	return resolveContextPath(worktreePath, SETUP_STATE_FILENAME);
 }
 
 /**
- * Reads the persisted setup marker from a worktree's `.ensemblr` directory.
- * @param worktreePath - Absolute path to the workspace worktree root.
- * @returns The stored setup state, or null when absent, unreadable, or malformed.
+ * Absolute path to the legacy `.ensemblr/setup.local.json` marker. Read as a
+ * fallback so workspaces set up before the move to `.context` are not forced to
+ * re-run setup on their first reopen.
  */
-export function readSetupStateFile(
-	worktreePath: string,
-): WorkspaceSetupState | null {
+function legacySetupStatePath(worktreePath: string): string {
+	return path.join(worktreePath, ENSEMBLR_DIRECTORY, SETUP_STATE_FILENAME);
+}
+
+/** Parses a setup marker at `markerPath`, or null when absent/unreadable/malformed. */
+function readMarker(markerPath: string): WorkspaceSetupState | null {
 	try {
-		return parseSetupState(
-			JSON.parse(readFileSync(setupStatePath(worktreePath), 'utf8')),
-		);
+		return parseSetupState(JSON.parse(readFileSync(markerPath, 'utf8')));
 	} catch {
 		return null;
 	}
 }
 
 /**
- * Writes the setup marker into a worktree's `.ensemblr` directory and ensures a
- * sibling `.gitignore` keeps `*.local.*` markers out of the user's repository.
- * Best-effort: a filesystem error only costs one redundant setup run on the next
- * open, so it is swallowed rather than surfaced.
+ * Reads the persisted setup marker from a worktree's `.context` directory,
+ * falling back to the legacy `.ensemblr` location when the new one is absent.
+ * @param worktreePath - Absolute path to the workspace worktree root.
+ * @returns The stored setup state, or null when absent, unreadable, or malformed.
+ */
+export function readSetupStateFile(
+	worktreePath: string,
+): WorkspaceSetupState | null {
+	return (
+		readMarker(setupStatePath(worktreePath)) ??
+		readMarker(legacySetupStatePath(worktreePath))
+	);
+}
+
+/**
+ * Writes the setup marker into a worktree's `.context` directory. Best-effort: a
+ * filesystem error only costs one redundant setup run on the next open, so it is
+ * swallowed rather than surfaced.
  * @param worktreePath - Absolute path to the workspace worktree root.
  * @param state - Setup state to persist.
  */
@@ -76,41 +66,8 @@ export function writeSetupStateFile(
 	state: WorkspaceSetupState,
 ): void {
 	try {
-		const directory = setupStateDirectory(worktreePath);
-		mkdirSync(directory, { recursive: true });
-		ensureLocalMarkerIgnored(directory);
-		writeFileSync(
-			fileURLToPath(new URL(SETUP_STATE_FILENAME, directoryUrl(directory))),
-			`${JSON.stringify(state, null, 2)}\n`,
-		);
+		const markerPath = setupStatePath(worktreePath);
+		mkdirSync(path.dirname(markerPath), { recursive: true });
+		writeFileSync(markerPath, `${JSON.stringify(state, null, 2)}\n`);
 	} catch {}
-}
-
-/**
- * Ensures `.ensemblr/.gitignore` excludes local markers, creating it when absent
- * and appending the pattern when a user-authored `.gitignore` lacks it.
- * @param directory - Absolute path to the worktree's `.ensemblr` directory.
- */
-function ensureLocalMarkerIgnored(directory: string): void {
-	const gitignorePath = fileURLToPath(
-		new URL(ENSEMBLR_GITIGNORE_FILENAME, directoryUrl(directory)),
-	);
-	const existing = readGitignore(gitignorePath);
-
-	if (existing?.split(/\r?\n/).includes(LOCAL_MARKER_IGNORE)) {
-		return;
-	}
-
-	const prefix =
-		existing && !existing.endsWith('\n') ? `${existing}\n` : (existing ?? '');
-	writeFileSync(gitignorePath, `${prefix}${LOCAL_MARKER_IGNORE}\n`);
-}
-
-/** Reads an existing `.gitignore`, returning null when it is absent. */
-function readGitignore(gitignorePath: string): string | null {
-	try {
-		return readFileSync(gitignorePath, 'utf8');
-	} catch {
-		return null;
-	}
 }

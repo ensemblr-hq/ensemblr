@@ -1,6 +1,6 @@
 /**
  * Persisted record that a workspace's setup script completed for a given
- * dependency fingerprint. Written to `.ensemblr/setup.local.json` inside the
+ * dependency fingerprint. Written to `.context/setup.local.json` inside the
  * worktree so reopening a workspace can skip re-running setup when neither the
  * command nor any dependency lockfile has changed.
  */
