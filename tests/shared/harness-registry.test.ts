@@ -18,8 +18,8 @@ describe('buildResumeCommand', () => {
 			id: 'codex',
 		},
 		{
-			cwd: '--agent auto-approve --continue',
-			exact: '--agent auto-approve --resume sess-1',
+			cwd: '--agent auto-approve --trust --continue',
+			exact: '--agent auto-approve --trust --resume sess-1',
 			id: 'vibe',
 		},
 	];
