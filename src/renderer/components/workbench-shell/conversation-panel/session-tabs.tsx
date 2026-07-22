@@ -470,6 +470,10 @@ function SessionTabIcon({ session }: { session: SessionTabModel }) {
 		}
 	}
 
+	if (session.isSubAgent) {
+		return <BotIcon aria-hidden='true' className='size-3.5' />;
+	}
+
 	const TabIcon = iconForTabKind(session.kind ?? 'chat');
 	return <TabIcon aria-hidden='true' className='size-3.5' />;
 }
@@ -691,8 +695,9 @@ function HarnessLauncherMenu({
 
 /**
  * Leading icon for a closed-history row: the harness brand logo for a closed
- * terminal (agent) tab, or the generic chat glyph for a closed chat. Mirrors
- * {@link SessionTabIcon} so a conversation keeps the same icon in history.
+ * terminal (agent) tab, the bot glyph for a closed subagent chat, or the
+ * generic chat glyph for a closed chat. Mirrors {@link SessionTabIcon} so a
+ * conversation keeps the same icon in history.
  */
 function ClosedSessionIcon({ session }: { session: SessionTabModel }) {
 	if (session.kind === 'terminal') {
@@ -709,6 +714,14 @@ function ClosedSessionIcon({ session }: { session: SessionTabModel }) {
 				/>
 			);
 		}
+		return (
+			<BotIcon
+				aria-hidden='true'
+				className='size-4 shrink-0 text-muted-foreground'
+			/>
+		);
+	}
+	if (session.isSubAgent) {
 		return (
 			<BotIcon
 				aria-hidden='true'
