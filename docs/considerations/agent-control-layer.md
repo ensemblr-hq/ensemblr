@@ -1,7 +1,9 @@
 # Agent → App Control Layer ("Ensemblr Control")
 
-> Design consideration + implementation notes. Lets agents drive Ensemblr from inside their own
-> sessions. Implemented on branch `psoldunov/penderecki`.
+> Design record + as-built notes for Ensemblr Control. Lets agents drive Ensemblr from inside their
+> own sessions. **Shipped:** #166 (control layer), #168 (role-aware orchestration), #169 (sub-agent
+> naming + status sync). See [ADR 0040](../adr/0040-use-loopback-control-server-for-agent-app-control.md)
+> for the accepted decision and [`docs/agent-control.md`](../agent-control.md) for the user-facing guide.
 >
 > **Architecture pivot vs. the original plan:** rather than Pi's `extension_ui_request`/`_response`
 > reverse channel (which needed a host-side response writer + `protocol-dispatch` routing), both
@@ -61,8 +63,10 @@ set is defined once (`src/shared/agent-control/`).
 **Awareness injection.** Every agent is silently told it runs inside Ensemblr and has the
 `ensemblr_*` orchestration tools, coupled to the tools actually being available: Pi via the
 extension's `before_agent_start` hook appending to the system prompt (fires only when the extension
-loaded); harnesses via the MCP server's `instructions` field (surfaced by MCP clients). One shared
-text — the Pi extension's `AWARENESS` and `mcp-endpoint.ts`'s `AWARENESS` are kept in sync.
+loaded); harnesses via the MCP server's `instructions` field (surfaced by MCP clients). Two role
+variants (`ORCHESTRATOR_AWARENESS` / `SUBAGENT_AWARENESS` in `src/shared/agent-control/awareness.ts`)
+are selected by lineage depth (`roleForDepth`); the Pi extension embeds byte-identical copies and a
+parity test guards drift (#168). See [`agent-orchestration-playbook.md`](./agent-orchestration-playbook.md).
 
 **Identity is per-workspace** (a pragmatic simplification of the plan's per-session tokens): one
 origin/token is minted per workspace and injected into every agent process in that workspace via
@@ -77,7 +81,7 @@ keeps per-session support for a later upgrade.
 | Branch | Decision |
 |---|---|
 | Controllers | **Pi + third-party harnesses** |
-| Transport | **Pi:** shipped pi extension + `extension_ui_request/response`. **Harnesses:** localhost HTTP MCP server. One shared App-Control Service. |
+| Transport | **One loopback HTTP control server.** Pi reaches it via a shipped extension (`POST /invoke`); harnesses via an MCP endpoint (`POST /mcp`). One shared App-Control Service. _(Superseded the original `extension_ui_request/response` plan — see the pivot note at the top.)_ |
 | Scope | **Writes: own workspace only. Reads: cross-workspace.** Identity injected at spawn; agent-supplied ids never trusted. |
 | Orchestration | **`wait` flag** — fire-and-forget default; `wait:true` blocks until child conversation completes. |
 | Guardrails | **All four:** max nesting depth, per-session spawn quota + rate limit, wait-mode timeout, lineage deadlock check. |
@@ -117,6 +121,11 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 
 ## Components to build
 
+> **Superseded — pre-pivot build plan (historical).** This section describes the original
+> `extension_ui_request`/`extension_ui_response` + `protocol-dispatch` routing approach. The shipped
+> design instead unifies on one loopback HTTP control server; **Architecture (as built)** above and
+> **Implementation status** below are authoritative. Retained to record the reasoning behind the pivot.
+
 ### 1. Shared contract — `src/shared/agent-control/`
 - `contracts.ts` — request/response types for every op above (mirrors `src/shared/ipc/contracts/` style).
 - `schemas.ts` — Zod validators for each op's args (validate at the service boundary; agents are untrusted input).
@@ -154,7 +163,7 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
   `origin` from the caller. Used only for guardrails, never for cleanup.
 
 ### 4. Recursion guardrails — `src/main/agent-control/guardrails.ts`
-- **Max depth:** deny spawn ops when `origin.depth >= MAX_SPAWN_DEPTH` (config, default 2).
+- **Max depth:** deny spawn ops when `origin.depth >= MAX_SPAWN_DEPTH` (config, default **1**; see `DEFAULT_GUARDRAIL_CONFIG` in `src/main/agent-control/guardrails.ts`).
 - **Quota + rate:** per-session counters — max N total spawns, M per minute.
 - **Wait timeout:** any `wait:true` op resolves with a `timeout` result after `WAIT_TIMEOUT_MS`
   (default 5 min); the child keeps running detached.
@@ -208,7 +217,7 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 - Tests: `tests/shared/agent-control.test.ts`, `tests/main/agent-control-{service,guardrails,
   origin-registry,control-server,mcp-endpoint}.test.ts` (the MCP test drives a real SDK client).
 
-**Remaining — needs a live run to verify (per repo scaffolding policy, don't guess CLI/runtime):**
+**Validated during the #166–#169 rollout (retained as the live-verification checklist):**
 
 1. **Pi extension loading is install-agnostic.** Pi's own extension loader bundles `typebox` and
    `@earendil-works/pi-coding-agent` for extensions (jiti `alias` in Node/npm/brew installs via

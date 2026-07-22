@@ -11,11 +11,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Ensemblr Control — Agent → App Control Layer** (`2d6503f`, #166): Agents running inside a workspace can now drive Ensemblr itself through permission-gated `ensemblr_*` tools — spawn/steer/close conversations, launch harnesses, run terminals, open file/diff/comment tabs, focus panels, and move the workspace board. Pi reaches a loopback HTTP control server via a shipped extension (`POST /invoke`); MCP-client harnesses (Claude Code, Codex) via an embedded MCP endpoint (`POST /mcp`). One service enforces a per-workspace bearer token, own-workspace write scope, the workspace permission mode, and fork-bomb guardrails (spawn depth 1, 20/session, 10/min, 5-min wait), delegating to existing services — no new capability code. See [ADR 0040](docs/adr/0040-use-loopback-control-server-for-agent-app-control.md) and [`docs/agent-control.md`](docs/agent-control.md).
+
+- **Multi-Agent Orchestration** (`fd71174`, #168): Role-aware guidance teaches a root orchestrator to *delegate → wait → evaluate → integrate* — spawn sub-agents, block on `ensemblr_wait_for_agents`, then integrate results — while a spawned sub-agent does its one unit of work and never fans out. The two role playbooks (`ORCHESTRATOR_AWARENESS` / `SUBAGENT_AWARENESS`) live in `src/shared/agent-control/awareness.ts` and are injected into every agent (Pi via the extension, harnesses via MCP `instructions`). See [`docs/considerations/agent-orchestration-playbook.md`](docs/considerations/agent-orchestration-playbook.md).
+
+- **Sub-Agent Naming & Live Status Sync** (`d4a4855`, #169): Sub-agents name their own tabs, and their live status syncs into the dock and session-tab UI.
+
+- **Multi-Harness Support — Claude Code, Codex, Vibe** (`ab8304e`, #152; `d9acabd`, #153): Launch third-party coding-agent CLIs in workspace terminal tabs with baked-in auto-approve flags, exact-conversation resume from each tool's on-disk session logs, busy-state detection, and conversation-title extraction. The renderer sends only a harness id, never free-text shell. See [`docs/harnesses.md`](docs/harnesses.md).
+
+- **Resumable Agent Sessions & Session Tabs** (`611525c`, #149; `2cd2140`, #154; `f88554c`, #162): Agent sessions resume across restart, session naming is consolidated and stopped chat tabs are preserved, and session-tab keyboard shortcuts move between tabs.
+
+- **Dock Terminal Session Restoration** (`923b86f`, #155; `432c0f0`, #165): Dock terminals (setup/run/spawn and agent terminals) restore across app restart with clean scrollback.
+
+- **Rich Diff Viewer with Inline Review Comments** (`fc7c610`, #151, THE-152): The Changes tab renders a rich diff viewer with review comments anchored inline to specific lines.
+
+- **Pull Request Check Status List** (`daae03b`, #137): The pull-request panel shows a per-check CI status list.
+
+- **Settings Persistence & Live Config Reload** (`890beb3`, #145; `a512e95`, #147): App and repository settings are wired to `~/.config/ensemblr/config.json` and apply on a live config reload with no restart; the per-chat model is preserved and deferred Help/nav rows were removed.
+
+- **macOS Code Signing & Notarization** (`289946d`, #148): `npm run make` produces a signed, hardened-runtime, notarized `.dmg` (stapled via the postMake hook) plus a `.zip` when Apple App Store Connect credentials are present; `ENSEMBLR_SKIP_SIGN` opts out, and channel builds (`make:canary` / `make:dev`) get their own bundle identity. See [`docs/build-and-release.md`](docs/build-and-release.md).
+
+- **Runtime-Aware Workspace Setup State** (`3f2f69b`, #135): Workspace setup state reflects the resolved agent runtime.
+
 - **Dashboard Workspace Board** (`c73ced6`, #125; `eee3e6f`, #128; `2f4aeb7`, #130): The Dashboard route now shows a draggable workspace board with Backlog, In progress, In review, Done, and Canceled columns, persisted local board status/order, workspace card action menus, and fixed drop targets. The board stays reachable when setup is blocked, the sidebar is collapsed, or no workspaces remain.
 
 - **Bundled Terminal Font** (`d2220aa`, #122): JetBrains Mono Nerd Font assets are bundled under `src/renderer/styles/fonts/` and wired into terminal/code typography so first launch has stable monospace rendering before user font customization.
 
-- **Clickable File & Directory References in Assistant Messages** (in progress, branch `psoldunov/check-master-sync`): Inline-code in assistant markdown that resolves to a workspace path now renders as an attachment chip instead of a plain `code` span. File chips open a file-preview tab; directory chips switch to the All files tab and expand/reveal that folder in the tree:
+- **Clickable File & Directory References in Assistant Messages** (`c94b502`, #100): Inline-code in assistant markdown that resolves to a workspace path now renders as an attachment chip instead of a plain `code` span. File chips open a file-preview tab; directory chips switch to the All files tab and expand/reveal that folder in the tree:
   - Path classification is isolated in `src/renderer/lib/pi/inline-attachment.ts` — an extension/filename allowlist gated by a safe-path pattern, excluding library display names (`node.js`, `next.js`, …) so prose does not render dead chips
   - `MessageInlineCode` (in `message.tsx`) wires the classifier into Streamdown's inline-code renderer; chips use per-extension icons via `@iconify/react` (`getWorkspaceFileIconName`) instead of generic file/folder glyphs
   - File-vs-directory is resolved through a new `WorkspacePathKindResolver` context; directory reveals flow through the transient `workspaceDirectoryRevealRequestAtom` and a new `expandDirectories` writer on `useFileTreeExpansion`; `toWorkspaceLookupPath` canonicalizes paths so chip lookups and tree keys compare equal
@@ -101,6 +123,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Workspace Services & Renderer State Refinements** (`455536e`, #143; `3f75d47`, #140; `7725421`, #138): Refined workspace services and renderer state handling, removed inactive-workspace dead ends and stabilized tabs, and persisted action prompts while preserving the app-detection cache.
+
+- **Pull Request Editing** (`dfebc6b`, #139): Improved pull-request editing and collapsed-header actions.
+
+- **Shared Renderer Components** (`8860cbe`, #146): Extracted a shared `OpenInTargetsSubmenu` and `PanelMessage` from duplicated renderer code.
+
 - **Workspace Process Environment** (`4695229`, #120; `b9bdd09`, #121): Setup/run scripts and terminal sessions now inherit the user's shell-derived environment and workspace toolchain `PATH`, then merge workspace environment overlays and `ENSEMBLR_*` variables while keeping macOS launch-context variables stripped.
 
 - **Setup Scripts Resolved from Workspace Settings** (`1de8f4f`, #97): Setup and Run scripts now resolve from the workspace's own resolved settings rather than repository-only config, so per-workspace `.ensemblr/settings.toml` `[scripts]` overrides take effect (`src/main/scripts/script-lifecycle-service.ts`, `src/renderer/hooks/use-scripts-settings-form.ts`). Live-workspace file watching and query keys were reworked to key off the workspace model.
@@ -130,6 +158,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **App Single-Instance Hardening** (`4dc992a`, #163; `74125bf`, #164): Prevent duplicate app instances during shell-environment loading; harden the single-instance lock and quit on last window.
+
+- **Pi RPC Startup & Workbench Recovery** (`496a6b4`, #160): Harden Pi RPC startup and workbench recovery paths.
+
+- **Startup Model Catalog** (`bd5a85c`, #158): Stabilize the model catalog on startup so the picker stays populated.
+
+- **Workspace Worktree Creation** (`69459c1`, #157; `d989259`, #141): Harden worktree creation and prevent workspace-creation race failures.
+
+- **Exclusive Script Launches** (`4e09b4a`, #156): Serialize exclusive script launches so setup/run cannot overlap.
+
+- **Transcript Picker Summaries** (`661decf`, #159): Fix unavailable summaries in the transcript picker.
+
+- **Install Scripts Audit** (`f84a661`, #161): Audit install scripts and remove desktop activation.
+
+- **PR Action Contrast & Layout Polish** (`7ba8f85`, #142; `034d12b`, #144; `ed3f094`, #136): Improve PR action color contrast, suppress layout animation when removing workspaces, and fix the dock tab close overlay border overlap.
+
 - **Session Tab Interaction Polish** (`4a8801b`, #123; `ae163fe`, #124): Close controls are easier to hit, drag overlays no longer interfere with tab controls, and active session selection stays stable after drag reorder.
 
 - **Workspace Dashboard Edge Cases** (`48e6b2f`, #131; `7da4597`, #132; `ed1461f`, #133): Placeholder workspace names avoid reuse collisions, collapsed sidebar triggers render again, and the Dashboard remains accessible when the last workspace is archived/deleted.
@@ -137,6 +181,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Base Branch Synced Before Workspace Creation** (`67cf369`, #98): Remote-backed base branches are fetched and fast-forwarded before a workspace is created, so new workspaces start from the latest `master`/`main` when online. The sync is best-effort, so offline workspace creation still works (`src/main/repository/create-workspace.ts`, `src/main/repository/git-ops.ts`; new `tests/main/create-workspace.test.ts`).
 
 - **Chat Close No Longer Blocked by a Running Session** (`1de8f4f`, #97): Closing a chat tab now stops its running Pi session without blocking the close (`src/main/pi-agent/pi-session-lifecycle.ts`, `src/renderer/state/workspace/close-running-chat-guard.ts`; new `tests/main/pi-session-service.test.ts`).
+
+- **Dependency Bump** (`ec6c93a`, #167): dompurify 3.4.11 → 3.4.12.
 
 - **Dependency Security Patches** (`3a373b3`, #93): Forced patched transitive dependencies via npm `overrides` to clear 10 Dependabot alerts — `linkify-it` 3.0.3 → 5.0.2 (ReDoS), `tar` 6.2.1 → 7.5.19 (path traversal), `tmp` 0.0.33 → 0.2.7 (path traversal). `npm audit` now reports 0 vulnerabilities.
 
@@ -169,6 +215,40 @@ Ensemblr follows a pre-1.0 semantic versioning approach where:
 
 | Commit | Date | Feature |
 | -------- | ------ | --------- |
+| `ec6c93a` | 2026-07-22 | build(deps): bump dompurify to 3.4.12 (#167) |
+| `d4a4855` | 2026-07-22 | feat(agent-control): subagent naming and status sync (#169) |
+| `fd71174` | 2026-07-21 | feat(agent-control): role-aware orchestration guidance (#168) |
+| `2d6503f` | 2026-07-21 | Add agent-to-app control layer (#166) |
+| `432c0f0` | 2026-07-21 | fix(terminal): restore dock terminal sessions across restart (#165) |
+| `74125bf` | 2026-07-21 | fix(main): harden single-instance lock, quit on last window (#164) |
+| `4dc992a` | 2026-07-21 | Prevent duplicate app instances during shell env loading (#163) |
+| `f88554c` | 2026-07-21 | Preserve resumable agent sessions, improve tab switching (#162) |
+| `f84a661` | 2026-07-21 | Audit install scripts and remove desktop activation (#161) |
+| `496a6b4` | 2026-07-21 | Harden Pi RPC startup and workbench recovery (#160) |
+| `661decf` | 2026-07-21 | Fix unavailable summaries in transcript picker (#159) |
+| `bd5a85c` | 2026-07-20 | fix(models): stabilize startup catalog (#158) |
+| `69459c1` | 2026-07-20 | fix(repository): harden workspace worktree creation (#157) |
+| `4e09b4a` | 2026-07-20 | fix(scripts): serialize exclusive script launches (#156) |
+| `923b86f` | 2026-07-20 | Restore agent terminal tabs (#155) |
+| `2cd2140` | 2026-07-20 | feat(workbench): session tab keyboard shortcuts (#154) |
+| `d9acabd` | 2026-07-20 | feat(agents): derive Codex/Vibe conversation titles (#153) |
+| `ab8304e` | 2026-07-20 | feat(agents): harness launch and session tabs (#152) |
+| `fc7c610` | 2026-07-20 | Rich diff viewer with inline review comments (#151, THE-152) |
+| `611525c` | 2026-07-20 | Consolidate session naming, preserve stopped chat tabs (#149) |
+| `289946d` | 2026-07-19 | feat(build): sign and notarize macOS DMG builds (#148) |
+| `a512e95` | 2026-07-19 | feat(renderer): preserve per-chat model, remove Help nav (#147) |
+| `8860cbe` | 2026-07-19 | refactor(renderer): extract OpenInTargetsSubmenu, PanelMessage (#146) |
+| `890beb3` | 2026-07-19 | feat(settings): settings persistence and live config reload (#145) |
+| `034d12b` | 2026-07-19 | fix(renderer): suppress layout animation on workspace removal (#144) |
+| `455536e` | 2026-07-19 | Refine workspace services and renderer state handling (#143) |
+| `7ba8f85` | 2026-07-19 | fix(renderer): improve PR action color contrast (#142) |
+| `d989259` | 2026-07-19 | fix(workspaces): prevent creation race failures (#141) |
+| `3f75d47` | 2026-07-19 | Remove inactive workspace dead ends, stabilize tabs (#140) |
+| `dfebc6b` | 2026-07-19 | Improve pull request editing and collapsed header actions (#139) |
+| `7725421` | 2026-07-19 | Persist action prompts, preserve app detection cache (#138) |
+| `daae03b` | 2026-07-18 | feat: show pull request check status list (#137) |
+| `ed3f094` | 2026-07-18 | Fix dock tab close overlay border overlap (#136) |
+| `3f2f69b` | 2026-07-18 | Add runtime-aware workspace setup state (#135) |
 | `ed1461f` | 2026-07-18 | Keep dashboard accessible when no workspaces remain (#133) |
 | `7da4597` | 2026-07-18 | fix: restore collapsed sidebar triggers (#132) |
 | `48e6b2f` | 2026-07-18 | fix(workspace): avoid reused placeholder names (#131) |
@@ -206,3 +286,20 @@ The following documentation files were updated to reflect these changes:
 - `docs/product/open-decisions.md` - Removed stale AI-certainty/experimental-flag decisions and marked board status/unread/review semantics resolved.
 - `docs/product/settings-inventory.md` - Reflected the actual Appearance schema and bundled default terminal font.
 - `docs/product/docs-consistency-audit.md` - Recorded the 2026-07-18 docs refresh audit.
+
+### 2026-07-22 documentation refresh (#135–#169)
+
+Brought the docs current with the agent-control, multi-harness, review, settings, and build work
+merged since the 2026-07-18 refresh (PR#134):
+
+- `README.md` - Reframed the intro (multi-agent, first-party Pi + harnesses + Ensemblr Control); added an "Agent runtimes" section and a new "Ensemblr Control & orchestration" section; added rich-diff, PR-check, dock-restore, and settings-persistence bullets; replaced the build block with the sign/notarize/channel matrix; fixed the ADR count (38 → 40); refreshed the tech-stack, project-structure, architecture, and Documentation sections.
+- `CHANGELOG.md` - This catch-up (#135–#169).
+- `CONTEXT.md` - Dropped the single-runtime "Pi-native" framing; added the Harness, Ensemblr Control, and Orchestrator / Sub-agent terms.
+- `docs/agent-control.md` - New: Ensemblr Control guide (permission model, guardrails, tool families, orchestration).
+- `docs/harnesses.md` - New: Claude Code / Codex / Vibe harness guide.
+- `docs/build-and-release.md` - New: packaging, signing, notarization, and build channels.
+- `docs/README.md` - New: documentation index.
+- `docs/adr/0040-use-loopback-control-server-for-agent-app-control.md` - New: the control-layer architecture decision.
+- `docs/considerations/agent-control-layer.md`, `agent-orchestration-playbook.md` - Reconciled to shipped state (transport row, role variants, spawn-depth = 1, board-status tools).
+- `docs/product/scaffold-audit-2026-06-04.md`, `docs/pi/rpc-protocol.md` - Annotated the remaining stale Bun references as historical.
+- `LICENSE` - New: MIT license file (previously declared only in `package.json`/README).

@@ -5,10 +5,13 @@ cites the source it was read from. Facts marked `OBSERVED` were not stated in
 docs and must be confirmed against the Phase 1 captures in
 `tests/fixtures/pi-captures/`.
 
-Sources inspected (pi `0.79.1`, from the `@earendil-works/pi-coding-agent`
-npm-global install; the original capture predates the Bun→npm migration in
-ADR 0038, so the historical `~/.bun/...` path below is stale — read the current
-install from `npm ls -g @earendil-works/pi-coding-agent`):
+Sources inspected (pi `0.79.1`, `@earendil-works/pi-coding-agent`). At runtime
+Ensemblr resolves the Pi executable through the Pi executable service
+(`resolvePiExecutable` in `src/main/pi-runtime/pi-executable.ts`) — an npm-global
+install, Homebrew, or an explicitly configured path — never a hardcoded
+location. The original 2026-06-11 capture predates the Bun→npm migration
+([ADR 0038](../adr/0038-migrate-package-manager-bun-to-npm.md)); read the current
+install with `npm ls -g @earendil-works/pi-coding-agent`:
 
 - `docs/rpc.md` — primary RPC mode documentation (cited below as `rpc.md`)
 - `dist/modes/rpc/rpc-mode.js` — RPC mode implementation

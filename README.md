@@ -1,10 +1,11 @@
 # Ensemblr
 
-**A Pi-native macOS workbench for isolated coding-agent workflows.**
+**A macOS workbench for isolated, multi-agent coding workflows.**
 
 Ensemblr is a native macOS desktop app (Electron) for running coding-agent work in isolated project
-workspaces. It borrows the workspace-and-review operating model from [Conductor](https://conductor.build)
-while using **Pi** as the agent runtime.
+workspaces. It borrows the workspace-and-review operating model from [Conductor](https://conductor.build).
+**Pi** is its first-party agent runtime; third-party harnesses (Claude Code, Codex, Vibe) run alongside
+it, and a permission-gated control surface — **Ensemblr Control** — lets agents drive the app itself.
 
 - **Version:** `0.1.0` (pre-1.0, polish stage)
 - **Platform:** macOS
@@ -28,7 +29,10 @@ The core vocabulary (see [`CONTEXT.md`](./CONTEXT.md)):
 | **Workspace** | An isolated project copy for one stream of work — its own branch, working tree, agent sessions, run state, and review path. |
 | **Workspace Task** | The unit of work assigned to a workspace: a feature, bug fix, experiment, PR, GitHub issue, or Linear issue. |
 | **Pi Session** | A saved Pi coding-agent conversation associated with a project or workspace. |
+| **Harness** | A third-party coding-agent CLI (Claude Code, Codex, Vibe) launched in a workspace terminal tab, alongside first-party Pi. |
 | **Session Branch** | A branch within Pi's tree-structured session history, to continue from an earlier point without losing the rest. |
+| **Ensemblr Control** | The permission-gated control surface that lets an agent drive the app itself — spawn conversations, launch harnesses, run terminals, focus panels, move the board — via `ensemblr_*` tools. |
+| **Orchestrator / Sub-agent** | Roles in multi-agent work: a root orchestrator delegates; a spawned sub-agent does its unit of work itself and never delegates onward. |
 | **Review Flow** | Inspect changes, run checks, create a PR, merge accepted work, or archive rejected work. |
 | **Ensemblr Root Directory** | The user-visible directory where Ensemblr stores managed repositories, workspaces, and archived workspace context. |
 
@@ -60,20 +64,38 @@ recent changes.
 - Quick-start: create a brand-new project and publish it to GitHub directly from Ensemblr.
 - Dashboard board groups workspaces into Backlog, In progress, In review, Done, and Canceled columns, with drag-and-drop ordering and workspace card action menus.
 
-### Pi agent runtime
+### Agent runtimes
 
-- Runs the Pi CLI in RPC mode (JSONL over stdio) with executable discovery and readiness checks.
-- Per-workspace Pi sessions persisted to SQLite, with tree-structured session branching.
+- **Pi** (first-party): runs the Pi CLI in RPC mode (JSONL over stdio) with executable discovery and
+  readiness checks. Per-workspace sessions persisted to SQLite, with tree-structured session branching.
 - Streaming conversation timeline with model and extended-thinking controls.
 - Composer accepts pasted image attachments and `@`-mention file payloads, resolved through the
   workspace-files service and rendered as attachment chips.
 - Git-backed checkpoints capture per-turn state so you can restore an earlier point.
 - Activity monitoring drives macOS notifications and power-state handling while the agent works.
+- **Third-party harnesses** — Claude Code, OpenAI Codex, and Mistral Vibe launch in workspace terminal
+  tabs with auto-approve flags and exact-conversation resume (see [`docs/harnesses.md`](./docs/harnesses.md)).
+- Resumable sessions and session tabs: agent sessions and dock terminals restore across restart, tabs
+  reorder by drag, and session-tab keyboard shortcuts move between them.
+
+### Ensemblr Control & orchestration
+
+- Agents can **drive the app itself** through a permission-gated, guardrailed control surface — Pi via
+  a shipped Pi extension, MCP-client harnesses (Claude Code, Codex) via an embedded MCP server.
+- The `ensemblr_*` tools spawn/steer/close conversations, launch harnesses, run terminals, open
+  file/diff/comment tabs, focus panels, and move the workspace across the board.
+- **Multi-agent orchestration**: a root orchestrator delegates independent workstreams to sub-agents,
+  then *delegate → wait → evaluate → integrate*; live sub-agent status surfaces in the dock.
+- Control actions follow the workspace permission mode (read-only / approval-required /
+  workspace-trusted) and are bounded by fork-bomb guardrails (shallow delegation, spawn quota + rate,
+  wait timeout).
+- See [`docs/agent-control.md`](./docs/agent-control.md).
 
 ### Review flow
 
 - Changed-files panel with add/delete/modify/rename/untracked status and line counts.
 - Source-scoped diffs (uncommitted vs. a commit vs. a branch) and per-file discard.
+- Rich diff viewer with inline review comments anchored to specific lines.
 - Collapsible file tree with live filesystem watch and lazy-loaded ignored directories.
 - Local review comments and todos tied to files and lines.
 
@@ -81,7 +103,7 @@ recent changes.
 
 - Inline PR title/description editor persisted per workspace.
 - Commit and push, with first-push upstream setup.
-- PR status, checks, and comments sourced through the GitHub CLI.
+- PR status, a per-check status list, and comments sourced through the GitHub CLI.
 - Merge confirmation flow.
 
 ### Integrations
@@ -96,6 +118,7 @@ recent changes.
 
 - xterm.js terminal backed by a `node-pty` PTY, in a collapsible dock.
 - Setup and Run scripts with read-only output panes, plus additional interactive terminal tabs.
+- Dock terminals restore across app restart with clean scrollback.
 - Workspace processes inherit the user's shell-derived environment, workspace toolchain `PATH`, and `ENSEMBLR_*` variables.
 - Bundled JetBrains Mono Nerd Font keeps terminal/code typography stable on first launch.
 
@@ -106,7 +129,8 @@ recent changes.
 
 ### Settings
 
-- Layered configuration (user / repository / workspace) stored in `~/.config/ensemblr/config.json`.
+- App and repository settings are persisted to `~/.config/ensemblr/config.json` (layered user /
+  repository / workspace) and apply on a live config reload — no restart.
 - Git defaults: branch-prefix source, auto-rename workspace on branch, delete local branch on archive,
   archive after merge, set upstream on push.
 - Setup diagnostics with per-check remediation actions.
@@ -125,9 +149,11 @@ recent changes.
 | Async data | TanStack Query, TanStack Virtual |
 | State | Jotai |
 | Terminal | xterm.js + `node-pty` |
+| Agent runtimes | Pi (first-party, RPC) + Claude Code / Codex / Vibe harnesses |
+| Agent control | Loopback HTTP + MCP (`@modelcontextprotocol/sdk`) |
 | Validation | Zod |
 | Storage | SQLite (`~/Library/Application Support/dev.ensemblr.app/ensemblr.db` on macOS) |
-| Build | Vite 8 |
+| Build | Vite 8, Electron Forge (DMG + ZIP, hardened runtime, notarized, arm64) |
 | Lint / format | Biome 2.5 |
 | Package manager | npm |
 
@@ -137,8 +163,10 @@ recent changes.
 
 - **macOS**
 - **[npm](https://www.npmjs.com)** — the enforced package manager, bundled with Node.js (see [`AGENTS.md`](./AGENTS.md)).
-- **Pi CLI** — the agent runtime; Ensemblr spawns it in RPC mode
+- **Pi CLI** — the first-party agent runtime; Ensemblr spawns it in RPC mode
   (see [`docs/pi/rpc-protocol.md`](./docs/pi/rpc-protocol.md)).
+- **Third-party harness CLIs** _(optional)_ — install `claude`, `codex`, and/or `vibe` to launch them
+  as harnesses; each appears only when its binary is on `PATH` (see [`docs/harnesses.md`](./docs/harnesses.md)).
 - **GitHub CLI (`gh`)** — authenticate once with `gh auth login`. Ensemblr reads PR/check data through
   `gh` and does not store GitHub tokens (see [ADR&nbsp;0013](./docs/adr/0013-use-gh-cli-for-v1-github-integration.md)).
 - **A Linear account** — for OAuth-based issue integration
@@ -157,15 +185,16 @@ npm install
 npm run dev
 ```
 
-Build outputs:
+Build outputs (macOS, arm64):
 
 ```bash
-# Package the app bundle
-npm run package
-
-# Produce a macOS distributable (.zip)
-npm run make
+npm run package    # unpacked .app under out/
+npm run make       # signed + notarized .dmg and .zip under out/make/
 ```
+
+`make` produces a release build; `make:canary` / `make:dev` build dogfood channels, and
+`make:unsigned` / `package:unsigned` skip signing. Signing, notarization, and channels are documented
+in [`docs/build-and-release.md`](./docs/build-and-release.md).
 
 ---
 
@@ -173,15 +202,19 @@ npm run make
 
 ```
 src/
-├── main/       Electron main process (Node): git, pi-agent, github, linear,
-│               terminal, storage, config, secrets, setup
+├── main/       Electron main process (Node): git, pi-agent, agent-control, github,
+│               linear, terminal, storage, config, secrets, setup
 ├── preload/    Context-isolated IPC bridge between main and renderer
 ├── renderer/   React UI (components, routing, Jotai state, hooks, styles)
-└── shared/     Cross-process contracts (Zod config, IPC contracts, keymap, Pi-RPC)
+└── shared/     Cross-process contracts (Zod config, IPC contracts, agent-control,
+                harness registry, keymap, Pi-RPC)
+
+resources/      Shipped Pi extensions (e.g. `ensemblr-control.mts`)
 
 docs/
-├── adr/            Architecture Decision Records (38)
-├── considerations/ Exploratory design notes (e.g. Deno desktop migration)
+├── adr/            Architecture Decision Records (40)
+├── agent-control.md · harnesses.md · build-and-release.md — feature & operator guides
+├── considerations/ Design records (Ensemblr Control, orchestration playbook, Deno migration)
 ├── pi/             Pi integration (RPC protocol, event taxonomy)
 ├── product/        Roadmap, parity notes, shell/settings inventories
 └── refactor/       Refactor plans
@@ -200,8 +233,9 @@ Each `src` subtree has its own scoped `AGENTS.md` with rules specific to that ru
 Ensemblr is organized around four runtime boundaries:
 
 - **`src/main`** — the Electron main process (Node). Entry: `src/main/main.ts`. Hosts services for
-  repository/git operations, the Pi agent (RPC), GitHub (`gh`), Linear, the terminal (PTY), storage
-  (SQLite), config resolution, secrets (Keychain), and setup diagnostics.
+  repository/git operations, the Pi agent (RPC), third-party harness launch, the agent-control layer,
+  GitHub (`gh`), Linear, the terminal (PTY), storage (SQLite), config resolution, secrets (Keychain),
+  and setup diagnostics.
 - **`src/preload`** — a context-isolated IPC bridge (`src/preload/bridge`) exposing a typed API to the
   renderer.
 - **`src/renderer`** — the React UI. Entry: `src/renderer/main.tsx` (mounts to `#root`). Navigation is
@@ -211,7 +245,8 @@ Ensemblr is organized around four runtime boundaries:
   modeled as Jotai atoms under `src/renderer/state/`; async data flows through TanStack Query over the
   preload bridge.
 - **`src/shared`** — cross-process contracts: the Zod config schema, ~30 typed IPC contract modules
-  (`src/shared/ipc/contracts/`), keymap definitions, and Pi-RPC parsing.
+  (`src/shared/ipc/contracts/`), the agent-control contracts and harness registry, keymap definitions,
+  and Pi-RPC parsing.
 
 **Data layer.** State persists to a SQLite database at `~/Library/Application Support/dev.ensemblr.app/ensemblr.db` on macOS (repositories,
 workspaces, Pi sessions, Pi events, chat tabs, settings) accessed through a repository layer under
@@ -220,6 +255,12 @@ hand-authored `.ensemblr/settings.toml`. Per-turn checkpoints are git-backed
 ([ADR&nbsp;0012](./docs/adr/0012-use-git-backed-checkpoints-for-pi-turns.md)), and secrets are stored in
 the macOS Keychain ([ADR&nbsp;0018](./docs/adr/0018-use-keychain-for-secrets.md)). The Ensemblr Root
 Directory holds managed repositories, workspaces, and archived context.
+
+**Agent Control layer.** Agents drive the app through a loopback HTTP control server
+(`src/main/agent-control/`): Pi via `POST /invoke` (a shipped extension), MCP-client harnesses via
+`POST /mcp`. One service resolves a per-workspace bearer token, enforces scope and the workspace
+permission mode, applies fork-bomb guardrails, and delegates to existing services — no new capability
+code ([ADR&nbsp;0040](./docs/adr/0040-use-loopback-control-server-for-agent-app-control.md)).
 
 ---
 
@@ -279,15 +320,22 @@ See `package.json` for the full list of `test:*` scripts.
 
 ## Documentation
 
+- [`docs/`](./docs) — documentation index.
 - [`CONTEXT.md`](./CONTEXT.md) — product definition and ubiquitous language.
 - [`CHANGELOG.md`](./CHANGELOG.md) — notable changes (Keep a Changelog format).
 - [`AGENTS.md`](./AGENTS.md) — contributor policies (package manager, Biome, state, Tailwind, docs).
-- [`docs/adr/`](./docs/adr) — 38 Architecture Decision Records.
-- [`docs/product/`](./docs/product) — roadmap, Conductor parity, shell/settings inventories.
+- [`docs/agent-control.md`](./docs/agent-control.md) — Ensemblr Control & orchestration.
+- [`docs/harnesses.md`](./docs/harnesses.md) — third-party agent harnesses.
+- [`docs/build-and-release.md`](./docs/build-and-release.md) — packaging, signing, notarization, channels.
+- [`docs/adr/`](./docs/adr) — 40 Architecture Decision Records.
+- [`docs/considerations/`](./docs/considerations) — design records (Ensemblr Control, orchestration).
 - [`docs/pi/`](./docs/pi) — Pi RPC protocol and event taxonomy.
+- [`docs/product/`](./docs/product) — roadmap, Conductor parity, shell/settings inventories.
+- [`docs/refactor/`](./docs/refactor) — refactor plans.
+- [`LICENSE`](./LICENSE) — MIT license.
 
 ---
 
 ## License
 
-MIT © Philipp Soldunov
+[MIT](./LICENSE) © Philipp Soldunov

@@ -2,6 +2,15 @@
 
 Date: 2026-06-04
 
+> **Historical snapshot (2026-06-04) — superseded.** This is a point-in-time
+> record of the initial scaffold, captured when the repository was Bun-managed.
+> It is retained for history and is **not** current guidance. Package management
+> has since moved to npm ([ADR 0038](../adr/0038-migrate-package-manager-bun-to-npm.md))
+> and repository config to `.ensemblr/settings.toml`
+> ([ADR 0030](../adr/0030-use-ensemblr-settings-toml-as-sole-repository-config.md)).
+> Every `bun` / `bunx` command below reflects the original scaffold; for current
+> commands see [`README.md`](../../README.md) and [`AGENTS.md`](../../AGENTS.md).
+
 Scope:
 Audit the initial `THE-101 / ENS-001` Electron app scaffold against the current official generator output and document every intentional deviation.
 
@@ -18,6 +27,9 @@ Reference generator command:
 ```sh
 bunx create-electron-app@latest .context/electron-forge-vite-ts --template=vite-typescript --skip-git
 ```
+
+> Historical command (Bun). Today the equivalent runs under npm, e.g.
+> `npx create-electron-app@latest … --template=vite-typescript` (ADR 0038).
 
 Important note:
 The generator internally resolved npm and ran npm installs inside `.context/electron-forge-vite-ts`. The repository root was kept Bun-managed and uses `bun.lock`.
@@ -169,7 +181,9 @@ Conductor setup/run commands should use the repository's Bun policy and the Vite
 
 ## Verification
 
-Commands run successfully:
+Commands run successfully (historical — Bun). The current npm equivalents are
+`npm run typecheck` and `npm run dev` (there is no `build` script; packaging is
+`npm run package` / `npm run make`). See [`README.md`](../../README.md).
 
 ```sh
 bun run typecheck

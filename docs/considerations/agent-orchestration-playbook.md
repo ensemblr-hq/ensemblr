@@ -3,7 +3,7 @@
 > The canonical guidance that teaches an agent to use the `ensemblr_*` control tools. The
 > authoritative text lives in two **role variants** — `ORCHESTRATOR_AWARENESS` and
 > `SUBAGENT_AWARENESS` in `src/shared/agent-control/awareness.ts` — selected by
-> `awarenessForRole`. Which variant an agent gets follows its lineage depth: a root (depth 0) is an
+> `roleForDepth`. Which variant an agent gets follows its lineage depth: a root (depth 0) is an
 > orchestrator that may delegate; a spawned child (depth ≥ 1) is a sub-agent that does its own work
 > and never fans out. Both reach the two always-on injection points:
 >
@@ -45,6 +45,7 @@ child's spawn attempt is denied `denied-depth`.
 | Inspect a child out of band | `ensemblr_get_conversation_status`, `ensemblr_get_last_message` |
 | Pull the orchestrator back (sub-agents) | `ensemblr_notify_orchestrator` |
 | See the workspace | `ensemblr_list_workspaces`, `ensemblr_list_tabs`, `ensemblr_list_terminals` |
+| Move / read the workspace board | `ensemblr_set_workspace_status`, `ensemblr_get_workspace_status` |
 | Pick a model for a child | `ensemblr_list_models` |
 | Surface work to the user | `ensemblr_focus_tab`, `ensemblr_focus_dock_tab`, `ensemblr_focus_panel` |
 | Tidy up | `ensemblr_close_tab` |
