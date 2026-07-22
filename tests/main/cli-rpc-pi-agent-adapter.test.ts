@@ -401,6 +401,34 @@ test('submit writes a JSONL frame to stdin and waits for Pi user echo', async ()
 	await adapter.shutdown();
 });
 
+test('setSessionName writes a set_session_name frame to stdin', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.setSessionName('  Refactor auth  ');
+
+	const frame = firstItem(child.getStdinChunks());
+	assert.match(frame, /"type":"set_session_name"/);
+	assert.match(frame, /"name":"Refactor auth"/);
+	assert.match(frame, /\n$/);
+	await adapter.shutdown();
+});
+
+test('setSessionName rejects a blank name without writing a frame', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await assert.rejects(() => session.setSessionName('   '), /empty/i);
+	assert.equal(child.getStdinChunks().length, 0);
+	await adapter.shutdown();
+});
+
 test('absorbs an async stdin EPIPE as a recoverable error, never uncaught', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });

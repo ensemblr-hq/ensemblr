@@ -153,6 +153,8 @@ interface SessionTabBase {
 	status: 'blocked' | 'idle' | 'working';
 	summary: string;
 	updatedLabel: string;
+	/** True when this tab hosts a spawned sub-agent, for distinct tinting. */
+	isSubAgent: boolean;
 }
 
 /**

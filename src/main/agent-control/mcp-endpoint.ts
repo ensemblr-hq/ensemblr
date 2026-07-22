@@ -17,6 +17,7 @@ import {
 	type AgentControlOp,
 	type AgentControlResult,
 	ORCHESTRATOR_AWARENESS,
+	WORKSPACE_BOARD_STATUSES,
 } from '../../shared/agent-control.ts';
 import type { AgentControlService } from './agent-control-service.ts';
 
@@ -45,12 +46,13 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_start_conversation',
 		op: 'startConversation',
 		description:
-			'Open (or reuse) a chat tab and start a Pi conversation. Set wait=true to block until it finishes.',
+			"Open a fresh chat tab (or reuse one via chatTabId) and start a Pi conversation. Pass a short, descriptive title to name the sub-agent's tab. Set wait=true to block until it finishes.",
 		shape: {
 			chatTabId: z.string().optional(),
 			prompt: z.string(),
 			model: z.string().optional(),
 			thinkingLevel: z.string().optional(),
+			title: z.string().optional(),
 			wait: z.boolean().optional(),
 		},
 	},
@@ -63,6 +65,13 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 			prompt: z.string(),
 			wait: z.boolean().optional(),
 		},
+	},
+	{
+		name: 'ensemblr_set_name',
+		op: 'setName',
+		description:
+			'Set a short, descriptive name for your own conversation tab so it is easy to identify.',
+		shape: { name: z.string() },
 	},
 	{
 		name: 'ensemblr_close_tab',
@@ -133,6 +142,20 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 		op: 'focusPanel',
 		description: 'Focus the Files, Changes, or Checks review panel.',
 		shape: { panel: z.enum(['files', 'changes', 'checks']) },
+	},
+	{
+		name: 'ensemblr_set_workspace_status',
+		op: 'setWorkspaceStatus',
+		description:
+			'Move your workspace across the kanban board by setting its status (backlog, in-progress, in-review, done, canceled). Acts on your own workspace.',
+		shape: { status: z.enum(WORKSPACE_BOARD_STATUSES) },
+	},
+	{
+		name: 'ensemblr_get_workspace_status',
+		op: 'getWorkspaceStatus',
+		description:
+			"Read your workspace's current kanban board status. Use ensemblr_list_workspaces to see every workspace's status.",
+		shape: {},
 	},
 	{
 		name: 'ensemblr_list_models',

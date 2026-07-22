@@ -24,7 +24,7 @@
 		"test:config": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/config-loader.test.ts tests/main/config-resolution.test.ts tests/main/repository-config.test.ts tests/main/repository-script-settings.test.ts tests/main/repository-settings.test.ts tests/main/repository-config-file.test.ts tests/main/permissions.test.ts",
 		"test:checkpoints": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/checkpoint-capture.test.ts tests/main/checkpoint-restore.test.ts",
 		"test:db": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/database.test.ts",
-		"test:pi-storage": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-session-repository.test.ts tests/main/pi-event-repository.test.ts tests/main/chat-tab-repository.test.ts",
+		"test:pi-storage": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/pi-session-repository.test.ts tests/main/pi-event-repository.test.ts tests/main/chat-tab-repository.test.ts tests/main/chat-tab-plumbing.test.ts",
 		"test:environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/environment-variables.test.ts",
 		"test:workspace-environment": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/workspace-environment.test.ts",
 		"test:terminal": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/terminal-service.test.ts",

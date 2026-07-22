@@ -14,6 +14,7 @@ export const AGENT_CONTROL_OPS = [
 	'spawnChatTab',
 	'startConversation',
 	'sendFollowUp',
+	'setName',
 	'closeTab',
 	'launchHarness',
 	'startTerminal',
@@ -23,6 +24,8 @@ export const AGENT_CONTROL_OPS = [
 	'focusTab',
 	'focusDockTab',
 	'focusPanel',
+	'setWorkspaceStatus',
+	'getWorkspaceStatus',
 	'listWorkspaces',
 	'listTabs',
 	'listTerminals',
@@ -33,6 +36,24 @@ export const AGENT_CONTROL_OPS = [
 	'waitForAgents',
 	'notifyOrchestrator',
 ] as const;
+
+/**
+ * The kanban board statuses an agent may set on its workspace, in column order.
+ * Canonical source of the board vocabulary: the renderer's `WorkspaceBoardStatus`
+ * and `BOARD_STATUS_ORDER` (`src/renderer/state/workspace/board-status.ts`) derive
+ * from this, so there is one list to keep in sync.
+ */
+export const WORKSPACE_BOARD_STATUSES = [
+	'backlog',
+	'in-progress',
+	'in-review',
+	'done',
+	'canceled',
+] as const;
+
+/** A single kanban board status value. */
+export type WorkspaceBoardStatusValue =
+	(typeof WORKSPACE_BOARD_STATUSES)[number];
 
 /** A single control operation identifier. */
 export type AgentControlOp = (typeof AGENT_CONTROL_OPS)[number];
@@ -46,6 +67,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'spawnChatTab',
 	'startConversation',
 	'sendFollowUp',
+	'setName',
 	'closeTab',
 	'launchHarness',
 	'startTerminal',
@@ -55,6 +77,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'focusTab',
 	'focusDockTab',
 	'focusPanel',
+	'setWorkspaceStatus',
 ]);
 
 /**
@@ -102,8 +125,15 @@ export interface StartConversationArgs {
 	prompt: string;
 	model?: string;
 	thinkingLevel?: AgentControlThinkingLevel;
+	/** Short, descriptive name for the new conversation's tab (Pi `/name`). */
+	title?: string;
 	/** Block until the child conversation completes, subject to the wait timeout. */
 	wait?: boolean;
+}
+
+/** Args for `setName`: set the display name of the caller's own conversation tab. */
+export interface SetNameArgs {
+	name: string;
 }
 
 /** Args for `sendFollowUp`: submit a follow-up prompt into an existing conversation. */
@@ -247,6 +277,21 @@ export interface FocusPanelArgs {
 	panel: FocusPanelName;
 }
 
+/** Args for `setWorkspaceStatus`: move the caller's own workspace on the kanban board. */
+export interface SetWorkspaceStatusArgs {
+	status: WorkspaceBoardStatusValue;
+}
+
+/**
+ * Main → renderer request to set a workspace's kanban board status. The renderer
+ * applies it to the shared board-status atom (and its localStorage) regardless of
+ * which workspace view is mounted, since the board is global.
+ */
+export interface BoardStatusBroadcast {
+	workspaceId: string;
+	status: WorkspaceBoardStatusValue;
+}
+
 /**
  * What a focus request targets, as broadcast to the renderer. `dock` is a
  * `DockTabId` string (`'setup'`, `'run'`, or `terminal:<id>`).
@@ -328,6 +373,8 @@ export interface AgentControlWorkspaceInfo {
 	workspaceId: string;
 	name: string;
 	cwd: string;
+	/** Current kanban board status (defaults to `backlog` when unreported). */
+	boardStatus: WorkspaceBoardStatusValue;
 }
 
 /** Conversation status returned by `getConversationStatus`. */

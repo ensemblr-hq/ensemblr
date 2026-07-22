@@ -21,6 +21,8 @@ import type {
 	OrchestratorSignal,
 	ReadTerminalOutputArgs,
 	SendFollowUpArgs,
+	SetNameArgs,
+	SetWorkspaceStatusArgs,
 	SpawnChatTabArgs,
 	StartConversationArgs,
 	StartTerminalArgs,
@@ -246,12 +248,30 @@ export function createAgentControlService({
 			prompt: args.prompt,
 			model: args.model,
 			thinkingLevel: args.thinkingLevel,
+			title: args.title,
 			callerModel,
 			parentSessionId: origin.sessionId,
 		});
 		guardrails.recordSpawn(origin.sessionId);
 		const result = await waitIfRequested(started.piSessionId, args.wait);
 		return ok({ ...started, result });
+	};
+
+	const handleSetName = async (
+		origin: AgentControlOrigin,
+		args: SetNameArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		const applied = await ports.conversations.setName({
+			piSessionId: origin.sessionId,
+			name: args.name,
+		});
+		if (!applied) {
+			return fail(
+				'not-found',
+				'Cannot name this tab: the calling conversation is not active.',
+			);
+		}
+		return ok(applied);
 	};
 
 	const handleSendFollowUp = async (
@@ -435,6 +455,23 @@ export function createAgentControlService({
 		return ok({ ok: true });
 	};
 
+	const handleSetWorkspaceStatus = (
+		origin: AgentControlOrigin,
+		args: SetWorkspaceStatusArgs,
+	): AgentControlResult<unknown> => {
+		ports.board.setWorkspaceStatus({
+			workspaceId: origin.workspaceId,
+			status: args.status,
+		});
+		return ok({ ok: true });
+	};
+
+	const handleGetWorkspaceStatus = (
+		origin: AgentControlOrigin,
+	): AgentControlResult<unknown> => {
+		return ok({ status: ports.board.getWorkspaceStatus(origin.workspaceId) });
+	};
+
 	const handleNotifyOrchestrator = (
 		origin: AgentControlOrigin,
 		args: NotifyOrchestratorArgs,
@@ -540,6 +577,8 @@ export function createAgentControlService({
 				);
 			case 'sendFollowUp':
 				return handleSendFollowUp(origin, args as SendFollowUpArgs);
+			case 'setName':
+				return handleSetName(origin, args as SetNameArgs);
 			case 'closeTab':
 				return handleCloseTab(origin, args as CloseTabArgs);
 			case 'launchHarness':
@@ -558,6 +597,10 @@ export function createAgentControlService({
 				return handleFocusDockTab(origin, args as FocusDockTabArgs);
 			case 'focusPanel':
 				return handleFocusPanel(origin, args as FocusPanelArgs);
+			case 'setWorkspaceStatus':
+				return handleSetWorkspaceStatus(origin, args as SetWorkspaceStatusArgs);
+			case 'getWorkspaceStatus':
+				return handleGetWorkspaceStatus(origin);
 			case 'listWorkspaces':
 				return ok(await ports.workspaces.listWorkspaces());
 			case 'listTabs':

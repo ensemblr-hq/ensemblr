@@ -1,5 +1,6 @@
 import { type IpcRendererEvent, ipcRenderer, webUtils } from 'electron';
 import type {
+	BoardStatusBroadcast,
 	FocusViewBroadcast,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control';
@@ -42,6 +43,7 @@ type InvokeKey = Exclude<
  */
 const CHANNEL_OVERRIDES = {
 	prepareCloneGithubRepository: IPC_CHANNELS.cloneGithubRepositoryPrepare,
+	reportBoardStatus: IPC_CHANNELS.agentControlReportBoardStatus,
 	resolveSettings: IPC_CHANNELS.settingsResolution,
 	startCloneGithubRepository: IPC_CHANNELS.cloneGithubRepositoryStart,
 } as const satisfies Partial<Record<InvokeKey, string>>;
@@ -201,6 +203,13 @@ export function createEnsemblrApi(): EnsemblrApi {
 				IPC_CHANNELS.agentControlTabsChanged,
 				listener,
 			),
+		onAgentControlBoardStatus: (listener) =>
+			subscribe<BoardStatusBroadcast>(
+				IPC_CHANNELS.agentControlBoardStatus,
+				listener,
+			),
+		reportBoardStatus: (statusByWorkspaceId) =>
+			invoke('reportBoardStatus', statusByWorkspaceId),
 		onPiRawFrame: (listener) =>
 			subscribe<PiRawFrameBroadcast>(IPC_CHANNELS.piRawFrame, listener),
 		onPiSessionEvent: (listener) =>

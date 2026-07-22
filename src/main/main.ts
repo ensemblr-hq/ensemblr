@@ -1,7 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { IPC_CHANNELS } from '../shared/ipc/channels';
 import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
 import type { ConfigChangedBroadcast } from '../shared/ipc/contracts/health';
@@ -18,10 +18,12 @@ import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/wor
 import { scrollbackMbToBytes } from '../shared/terminal/scrollback';
 import {
 	type AgentControlService,
+	type BoardStatusStore,
 	type ControlServer,
 	createAgentControlIntegration,
 	createAgentControlPorts,
 	createAgentControlService,
+	createBoardStatusStore,
 	createGuardrails,
 	createOriginRegistry,
 	startControlServer,
@@ -556,11 +558,23 @@ const agentControlChatTabService = createChatTabService({
 			piSessionService.getSession(piSessionId) !== null,
 	},
 });
+const boardStatusStore: BoardStatusStore = createBoardStatusStore();
+ipcMain.handle(
+	IPC_CHANNELS.agentControlReportBoardStatus,
+	(_event, statusByWorkspaceId: unknown) => {
+		boardStatusStore.replaceAll(
+			(statusByWorkspaceId ?? {}) as Record<string, unknown>,
+		);
+	},
+);
 agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,
 	originRegistry: agentControlOriginRegistry,
 	ports: createAgentControlPorts({
 		augmentHarnessCommand,
+		boardStatusStore,
+		broadcastBoardStatus: (payload) =>
+			broadcastToAllWindows(IPC_CHANNELS.agentControlBoardStatus, payload),
 		broadcastFocus: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlFocusView, payload),
 		broadcastTabsChanged: (payload) =>

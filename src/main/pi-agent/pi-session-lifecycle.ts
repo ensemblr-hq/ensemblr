@@ -93,6 +93,15 @@ interface PiSessionLifecycleOptions {
 interface PiSessionLifecycle {
 	getActiveSession: (sessionId: string) => ActiveSessionView | null;
 	openSession: (request: OpenPiSessionRequest) => Promise<PiSessionSnapshot>;
+	/**
+	 * Pushes a display name into the live Pi runtime (`/name`) for an active
+	 * session, returning the chat tab it is bound to so the caller can mirror the
+	 * name onto the tab. Resolves null when the session is not currently active.
+	 */
+	setSessionName: (
+		sessionId: string,
+		name: string,
+	) => Promise<{ chatTabId: string } | null>;
 	shutdownActiveSessions: () => Promise<void>;
 	stopSession: (request: StopPiSessionRequest) => Promise<void>;
 	submitPrompt: (
@@ -280,6 +289,14 @@ export function createPiSessionLifecycle({
 			return { branch: active.branch, row: active.row };
 		},
 		openSession,
+		setSessionName: async (sessionId, name) => {
+			const active = activeSessions.get(sessionId);
+			if (!active) {
+				return null;
+			}
+			await active.piRuntimeSession.setSessionName(name);
+			return { chatTabId: active.chatTabId };
+		},
 		shutdownActiveSessions: async () => {
 			const open = [...activeSessions.entries()];
 			// Flush owed summaries while sessions are still registered: once the

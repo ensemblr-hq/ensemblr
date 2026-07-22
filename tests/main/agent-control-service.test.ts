@@ -39,6 +39,9 @@ const makePorts = (
 			.fn()
 			.mockResolvedValue({ chatTabId: 't', piSessionId: 'pi-1' }),
 		sendFollowUp: vi.fn().mockResolvedValue(undefined),
+		setName: vi
+			.fn()
+			.mockResolvedValue({ chatTabId: 'named-tab', title: 'Named' }),
 		waitForIdle: vi.fn().mockResolvedValue('completed'),
 		getStatus: vi.fn().mockResolvedValue({
 			piSessionId: 'pi-1',
@@ -80,6 +83,10 @@ const makePorts = (
 		focusTab: vi.fn(),
 		focusDockTab: vi.fn(),
 		focusPanel: vi.fn(),
+	},
+	board: {
+		setWorkspaceStatus: vi.fn(),
+		getWorkspaceStatus: vi.fn().mockReturnValue('backlog'),
 	},
 	permissions: { getMode: () => overrides.mode ?? 'workspace-trusted' },
 	confirm: { confirm: vi.fn().mockResolvedValue(overrides.confirm ?? true) },
@@ -196,6 +203,52 @@ describe('agent-control service: gating', () => {
 			expect(result.code).toBe('denied-permission');
 		}
 		expect(ports.tabs.spawnChatTab).not.toHaveBeenCalled();
+	});
+});
+
+describe('agent-control service: board status', () => {
+	it('setWorkspaceStatus targets the caller own workspace and returns ok', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'setWorkspaceStatus',
+			token: 'tok-caller',
+			rawArgs: { status: 'in-review' },
+		});
+		expect(result.ok).toBe(true);
+		expect(ports.board.setWorkspaceStatus).toHaveBeenCalledWith({
+			workspaceId: 'ws',
+			status: 'in-review',
+		});
+	});
+
+	it('rejects an unknown board status', async () => {
+		const { service } = setup();
+		const result = await service.invoke({
+			op: 'setWorkspaceStatus',
+			token: 'tok-caller',
+			rawArgs: { status: 'shipped' },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('invalid-args');
+		}
+	});
+
+	it('getWorkspaceStatus returns the caller own workspace status', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.board.getWorkspaceStatus).mockReturnValue('done');
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'getWorkspaceStatus',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+		expect(ports.board.getWorkspaceStatus).toHaveBeenCalledWith('ws');
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toEqual({ status: 'done' });
+		}
 	});
 });
 
@@ -440,6 +493,51 @@ describe('agent-control service: delegation', () => {
 		expect(ports.conversations.startConversation).toHaveBeenCalledWith(
 			expect.objectContaining({ callerModel: 'master-model' }),
 		);
+	});
+
+	it('threads a spawn title through to startConversation', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		await service.invoke({
+			op: 'startConversation',
+			token: 'tok-caller',
+			rawArgs: { prompt: 'go', title: 'Refactor auth' },
+		});
+		expect(ports.conversations.startConversation).toHaveBeenCalledWith(
+			expect.objectContaining({ title: 'Refactor auth' }),
+		);
+	});
+
+	it('setName targets the caller’s own session', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'setName',
+			token: 'tok-caller',
+			rawArgs: { name: 'My task tab' },
+		});
+		expect(result.ok).toBe(true);
+		expect(ports.conversations.setName).toHaveBeenCalledWith({
+			piSessionId: 'caller',
+			name: 'My task tab',
+		});
+	});
+
+	it('setName reports not-found when the caller session is inactive', async () => {
+		const ports = makePorts();
+		(ports.conversations.setName as ReturnType<typeof vi.fn>).mockResolvedValue(
+			null,
+		);
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'setName',
+			token: 'tok-caller',
+			rawArgs: { name: 'x' },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('not-found');
+		}
 	});
 
 	it('settles an unknown wait target as status "unknown", not "closed"', async () => {

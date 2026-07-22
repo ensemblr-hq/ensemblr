@@ -7,12 +7,14 @@ export {
 	useWorkspaceUnread,
 } from './board-state';
 export {
+	applyBoardStatus,
 	BOARD_STATUS_LABELS,
 	BOARD_STATUS_ORDER,
 	DEFAULT_BOARD_STATUS,
 	resolveBoardStatus,
 	type WorkspaceBoardStatus,
 } from './board-status';
+export { installAgentControlBoardStatusSync } from './board-status-sync';
 export {
 	getRunningDockActivityState,
 	usePublishWorkspaceDockActivity,

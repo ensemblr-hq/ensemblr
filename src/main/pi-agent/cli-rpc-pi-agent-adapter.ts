@@ -482,6 +482,19 @@ function createCliRpcSession({
 		return normalizeSessionState(data);
 	};
 
+	/**
+	 * Sets the Pi session's display name (its `/name`) via the `set_session_name`
+	 * RPC command, so an agent can title its own tab.
+	 * @param name - The new session name; rejected when blank.
+	 */
+	const setSessionName = async (name: string): Promise<void> => {
+		const next = name.trim();
+		if (!next) {
+			throw new Error('Session name cannot be empty.');
+		}
+		await writeFrame({ name: next, type: 'set_session_name' });
+	};
+
 	const applyModelChange = async (
 		modelOverride: string | undefined,
 	): Promise<void> => {
@@ -608,6 +621,7 @@ function createCliRpcSession({
 		getMetadata: () => metadata,
 		getState,
 		id: metadata.id,
+		setSessionName,
 		subscribe: attachListener,
 		submit,
 	};

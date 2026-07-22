@@ -48,6 +48,8 @@ export interface PiAgentAdapterSession {
 	getMetadata: () => PiAgentSessionMetadata;
 	getState: () => Promise<PiAgentSessionState>;
 	id: PiAgentSessionId;
+	/** Sets the Pi session's display name (`/name`) via `set_session_name`. */
+	setSessionName: (name: string) => Promise<void>;
 	subscribe: (listener: PiAgentEventListener) => PiAgentSubscription;
 	submit: (
 		request: PiAgentSubmitRequest,

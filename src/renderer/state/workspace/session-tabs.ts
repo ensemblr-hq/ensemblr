@@ -937,6 +937,7 @@ function diffTabTitle(filePath: string, scope?: WorkspaceGitDiffScope): string {
 type SessionTabBaseFields = {
 	chatTabId: string;
 	id: string;
+	isSubAgent: boolean;
 	label: string;
 	piSessionId: string | null;
 	status: SessionTabModel['status'];
@@ -1025,6 +1026,7 @@ function toSessionTabModel(
 	const base: SessionTabBaseFields = {
 		chatTabId: tab.id,
 		id: tab.id,
+		isSubAgent: tab.metadata.agentRole === 'subagent',
 		label: tab.title,
 		piSessionId: tab.piSessionId,
 		status: deriveTabStatus(piSession),
@@ -1112,6 +1114,7 @@ function toClosedSessionTabModel(
 	const base: SessionTabBaseFields = {
 		chatTabId: entry.tab.id,
 		id: entry.tab.id,
+		isSubAgent: entry.tab.metadata.agentRole === 'subagent',
 		// Prefer the short chat-title that was visible on the open tab. The
 		// LLM-derived summary title is verbose and often diverges from what
 		// the user saw, so it is only used when no tab title exists.

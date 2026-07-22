@@ -37,6 +37,8 @@ export interface PiAgentSession {
 	getMetadata: () => PiAgentSessionMetadata;
 	getState: () => Promise<PiAgentSessionState>;
 	id: PiAgentSessionId;
+	/** Sets the Pi session's display name (`/name`) via `set_session_name`. */
+	setSessionName: (name: string) => Promise<void>;
 	subscribe: (listener: PiAgentEventListener) => PiAgentSubscription;
 	submit: (
 		request: PiAgentSubmitRequest,
@@ -316,6 +318,10 @@ function wrapSession({
 			return adapterSession.getState();
 		},
 		id: adapterSession.id,
+		setSessionName: (name) => {
+			ensureOpen('set session name on');
+			return adapterSession.setSessionName(name);
+		},
 		subscribe: (listener) => {
 			ensureOpen('subscribe to');
 			return adapterSession.subscribe(listener);

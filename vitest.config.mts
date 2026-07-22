@@ -57,6 +57,7 @@ export default defineConfig({
 			'tests/main/agent-control-model-resolution.test.ts',
 			'tests/main/agent-control-wait.test.ts',
 			'tests/main/agent-control-awareness-parity.test.ts',
+			'tests/main/board-status-store.test.ts',
 		],
 		coverage: {
 			provider: 'istanbul',

@@ -50,6 +50,11 @@ export function createSpawnFailureSession({
 		getMetadata: () => metadata,
 		getState: async () => ({ sessionName: null }),
 		id: metadata.id,
+		setSessionName: async () => {
+			throw new Error(
+				'Cannot set session name: Pi RPC process failed to spawn.',
+			);
+		},
 		subscribe: (listener) => {
 			listeners.add(listener);
 			queueMicrotask(() => {

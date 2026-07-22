@@ -21,7 +21,12 @@ import type {
 	PiSessionRow,
 	PiTurnRow,
 } from '../storage/repositories';
-import { listOpenChatTabs } from '../storage/repositories/chat-tab-repository.ts';
+import {
+	getChatTabById,
+	listOpenChatTabs,
+	renameChatTab,
+	setChatTabMetadata,
+} from '../storage/repositories/chat-tab-repository.ts';
 import {
 	listEventsByBranch,
 	type PiEventRow,
@@ -32,6 +37,7 @@ import {
 	getPiSessionById,
 	listPiSessionsByWorkspace,
 } from '../storage/repositories/pi-session-repository.ts';
+import { sanitizeChatTitle } from './naming/sanitize-title.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import {
 	createPiSessionLifecycle,
@@ -42,7 +48,10 @@ import {
 	type SubmitPiPromptResult,
 	toSnapshot,
 } from './pi-session-lifecycle.ts';
-import { persistRuntimeEvent } from './pi-session-persistence.ts';
+import {
+	appendChatTitleMetadataEvent,
+	persistRuntimeEvent,
+} from './pi-session-persistence.ts';
 import { PiSessionServiceError } from './pi-session-service-error.ts';
 import type {
 	PiSessionEventSink,
@@ -88,6 +97,16 @@ export interface PiSessionService {
 	) => readonly PiSessionSnapshot[];
 	listEvents: (branchId: string) => readonly PiEventRow[];
 	openSession: (request: OpenPiSessionRequest) => Promise<PiSessionSnapshot>;
+	/**
+	 * Sets the display name of an active Pi session via its runtime `/name`, then
+	 * mirrors the name onto its chat tab (marking the title user-owned so
+	 * auto-naming leaves it alone). Resolves null when the session is not active
+	 * or the name sanitizes to nothing.
+	 */
+	setSessionName: (request: {
+		sessionId: string;
+		name: string;
+	}) => Promise<{ chatTabId: string; title: string } | null>;
 	shutdown: () => Promise<void>;
 	stopSession: (request: StopPiSessionRequest) => Promise<void>;
 	submitPrompt: (
@@ -215,6 +234,47 @@ export function createPiSessionService({
 				.filter((snapshot): snapshot is PiSessionSnapshot => snapshot !== null);
 		},
 		openSession: lifecycle.openSession,
+		setSessionName: async ({ sessionId, name }) => {
+			const database = requireSessionDatabase();
+			const applied = await lifecycle.setSessionName(sessionId, name);
+			if (!applied) {
+				return null;
+			}
+			const tab = getChatTabById({ database, id: applied.chatTabId });
+			if (!tab) {
+				return null;
+			}
+			const title = sanitizeChatTitle(name) ?? name.trim();
+			if (!title) {
+				return null;
+			}
+			renameChatTab({ database, id: applied.chatTabId, title });
+			// An explicit `/name` (agent- or human-issued) is authoritative: mark it
+			// `user` provenance so the deterministic auto-namer never overrides it,
+			// including after tab reuse.
+			setChatTabMetadata({
+				database,
+				id: applied.chatTabId,
+				metadata: {
+					...tab.metadata,
+					titleAutoNamed: true,
+					titleProvenance: 'user',
+				},
+			});
+			const mainBranch = getMainBranchForSession({
+				database,
+				piSessionId: sessionId,
+			});
+			if (mainBranch) {
+				const event = appendChatTitleMetadataEvent({
+					branchId: mainBranch.id,
+					database,
+					title,
+				});
+				eventSink?.({ event, sessionId, workspaceId: tab.workspaceId });
+			}
+			return { chatTabId: applied.chatTabId, title };
+		},
 		shutdown: async () => {
 			await lifecycle.shutdownActiveSessions();
 			await piAgentClient.shutdown();
