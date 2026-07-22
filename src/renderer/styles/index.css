@@ -92,7 +92,6 @@
 	--ensemblr-diff-deletion-foreground: oklch(0.43 0.14 28);
 	--ensemblr-diff-modified: oklch(0.94 0.028 73);
 	--ensemblr-diff-modified-foreground: oklch(0.43 0.08 73);
-	--ensemblr-subagent-tab: oklch(0.955 0.012 222);
 	--ensemblr-traffic-light-safe-inline: 5.75rem;
 
 	--background: var(--ensemblr-canvas);
@@ -151,7 +150,6 @@
 		--ensemblr-diff-deletion-foreground: oklch(0.74 0.15 28);
 		--ensemblr-diff-modified: oklch(0.24 0.035 73);
 		--ensemblr-diff-modified-foreground: oklch(0.78 0.13 73);
-		--ensemblr-subagent-tab: oklch(0.225 0.02 222);
 		--primary: oklch(0.84 0.007 75);
 		--primary-foreground: oklch(0.14 0.006 35);
 		--sidebar: oklch(0.17 0.006 35 / 97%);
@@ -180,7 +178,6 @@
 	--ensemblr-diff-deletion-foreground: oklch(0.74 0.15 28);
 	--ensemblr-diff-modified: oklch(0.24 0.035 73);
 	--ensemblr-diff-modified-foreground: oklch(0.78 0.13 73);
-	--ensemblr-subagent-tab: oklch(0.26 0.045 222);
 	--primary: oklch(0.84 0.007 75);
 	--primary-foreground: oklch(0.14 0.006 35);
 	--sidebar: oklch(0.17 0.006 35 / 97%);
@@ -309,7 +306,6 @@
 	--color-diff-deletion-foreground: var(--ensemblr-diff-deletion-foreground);
 	--color-diff-modified: var(--ensemblr-diff-modified);
 	--color-diff-modified-foreground: var(--ensemblr-diff-modified-foreground);
-	--color-subagent-tab: var(--ensemblr-subagent-tab);
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);

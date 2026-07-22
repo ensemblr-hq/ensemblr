@@ -382,10 +382,10 @@ function SessionTab({
 				canReorderTabs && 'cursor-grab active:cursor-grabbing',
 				session.isSubAgent
 					? cn(
-							'bg-subagent-tab',
+							'border-t-2 border-t-accent-strong',
 							isActive
-								? 'border-primary text-foreground'
-								: 'border-transparent text-muted-foreground hover:text-foreground',
+								? 'border-b-primary bg-muted text-foreground'
+								: 'border-b-transparent bg-transparent text-muted-foreground hover:text-foreground',
 						)
 					: isActive
 						? 'border-primary bg-muted text-foreground'
@@ -420,11 +420,9 @@ function SessionTab({
 					aria-hidden='true'
 					className={cn(
 						'pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent opacity-0 transition-opacity group-hover/session-tab:opacity-100',
-						session.isSubAgent
-							? 'from-subagent-tab via-subagent-tab/90'
-							: isActive
-								? 'from-muted via-muted/90'
-								: 'from-background via-background/90',
+						isActive
+							? 'from-muted via-muted/90'
+							: 'from-background via-background/90',
 					)}
 				/>
 			) : null}
