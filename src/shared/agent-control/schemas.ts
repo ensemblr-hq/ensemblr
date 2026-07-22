@@ -5,7 +5,7 @@
  */
 import { z } from 'zod';
 
-import type { AgentControlOp } from './contracts.ts';
+import { type AgentControlOp, WORKSPACE_BOARD_STATUSES } from './contracts.ts';
 
 const nonEmpty = z.string().trim().min(1);
 
@@ -18,7 +18,12 @@ const startConversationSchema = z.strictObject({
 	prompt: nonEmpty,
 	model: nonEmpty.optional(),
 	thinkingLevel: nonEmpty.optional(),
+	title: nonEmpty.optional(),
 	wait: z.boolean().optional(),
+});
+
+const setNameSchema = z.strictObject({
+	name: nonEmpty,
 });
 
 const sendFollowUpSchema = z.strictObject({
@@ -97,6 +102,10 @@ const focusPanelSchema = z.strictObject({
 	panel: z.enum(['files', 'changes', 'checks']),
 });
 
+const setWorkspaceStatusSchema = z.strictObject({
+	status: z.enum(WORKSPACE_BOARD_STATUSES),
+});
+
 const waitForAgentsSchema = z.strictObject({
 	targets: z.array(nonEmpty).optional(),
 	mode: z.enum(['first', 'all']).optional(),
@@ -115,6 +124,7 @@ export const AGENT_CONTROL_ARG_SCHEMAS = {
 	spawnChatTab: spawnChatTabSchema,
 	startConversation: startConversationSchema,
 	sendFollowUp: sendFollowUpSchema,
+	setName: setNameSchema,
 	closeTab: closeTabSchema,
 	launchHarness: launchHarnessSchema,
 	startTerminal: startTerminalSchema,
@@ -124,6 +134,8 @@ export const AGENT_CONTROL_ARG_SCHEMAS = {
 	focusTab: focusTabSchema,
 	focusDockTab: focusDockTabSchema,
 	focusPanel: focusPanelSchema,
+	setWorkspaceStatus: setWorkspaceStatusSchema,
+	getWorkspaceStatus: emptySchema,
 	listWorkspaces: emptySchema,
 	listTabs: listTabsSchema,
 	listTerminals: listTerminalsSchema,

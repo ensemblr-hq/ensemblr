@@ -91,8 +91,9 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 
 **Writes (own workspace):**
 - `spawnChatTab()` → `{ chatTabId }`
-- `startConversation({ chatTabId?, prompt, model?, thinkingLevel?, wait? })` → `{ chatTabId, piSessionId, result? }`
+- `startConversation({ chatTabId?, prompt, model?, thinkingLevel?, title?, wait? })` → `{ chatTabId, piSessionId, result? }` (a spawned tab is marked a sub-agent and tinted; `title` names it via Pi `/name`)
 - `sendFollowUp({ piSessionId, prompt, wait? })` → `{ result? }` (Pi steer/follow_up + submitPrompt)
+- `setName({ name })` → `{ chatTabId, title }` — set the **caller's own** tab name via Pi `set_session_name`
 - `closeTab({ chatTabId })`
 - `launchHarness({ harnessId })` → `{ chatTabId, terminalId }`
 - `startTerminal({ kind: 'setup' | 'run' | 'spawn' })` → `{ terminalId }`

@@ -36,7 +36,8 @@ child's spawn attempt is denied `denied-depth`.
 
 | Goal | Tools |
 |---|---|
-| Delegate a subtask to a Pi sub-agent | `ensemblr_start_conversation` (keep its `piSessionId`) |
+| Delegate a subtask to a Pi sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `piSessionId`) |
+| Name your own tab | `ensemblr_set_name` |
 | **Block until children settle** | `ensemblr_wait_for_agents` |
 | Steer / correct a child | `ensemblr_send_follow_up` |
 | Delegate to a CLI agent | `ensemblr_launch_harness` (claude / codex) |
@@ -50,8 +51,10 @@ child's spawn attempt is denied `denied-depth`.
 
 ## Delegate → wait → evaluate → integrate
 
-1. **Spawn** each helper with `ensemblr_start_conversation` (omit `wait`). Keep the returned
-   `piSessionId`.
+1. **Spawn** each helper with `ensemblr_start_conversation` in its **own fresh tab** — pass a short,
+   descriptive `title` and do **not** pass `chatTabId` (reusing a prior tab keeps its old title).
+   Omit `wait` and keep the returned `piSessionId`. Every conversation can also rename its own tab
+   at any time with `ensemblr_set_name`; a sub-agent should do so early with a label for its task.
 2. **Wait.** Once everything that can run in parallel is delegated, call `ensemblr_wait_for_agents`
    and let it **block**. This is the mechanism that stops the orchestrator racing ahead — do **not**
    hand-roll a polling loop with `ensemblr_get_conversation_status`.

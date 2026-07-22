@@ -1,6 +1,7 @@
 import { createHashHistory, createRouter } from '@tanstack/react-router';
 import { queryClient } from '@/renderer/api/query-client';
 import { installRouteNavigationProfiler } from '@/renderer/lib/instrumentation';
+import { installAgentControlBoardStatusSync } from '@/renderer/state/workspace';
 import { routeTree } from './routeTree.gen';
 import { installSettingsReturnTracker } from './settings-return-tracker';
 
@@ -21,6 +22,7 @@ export const router = createRouter({
 
 installRouteNavigationProfiler(router);
 installSettingsReturnTracker(router);
+installAgentControlBoardStatusSync();
 
 declare module '@tanstack/react-router' {
 	/** Registers the app router type with TanStack Router so route paths and params are fully inferred. */

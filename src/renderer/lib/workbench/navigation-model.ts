@@ -63,6 +63,7 @@ export function createPlaceholderSession(
 	return {
 		chatTabId: id,
 		id,
+		isSubAgent: false,
 		label: 'Workspace',
 		piSessionId: null,
 		status: 'idle',
@@ -346,6 +347,7 @@ function createPlaceholderSessionFromSnapshot(
 	return {
 		chatTabId: id,
 		id,
+		isSubAgent: false,
 		label: 'Workspace',
 		piSessionId: null,
 		status: 'idle',

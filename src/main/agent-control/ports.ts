@@ -13,6 +13,7 @@ import type {
 	FocusPanelName,
 	OpenTabVariant,
 	StartTerminalKind,
+	WorkspaceBoardStatusValue,
 } from '../../shared/agent-control.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
 
@@ -92,6 +93,8 @@ export interface ConversationPort {
 		prompt: string;
 		model?: string;
 		thinkingLevel?: string;
+		/** Descriptive name applied to the new conversation's tab via Pi `/name`. */
+		title?: string;
 		/**
 		 * The spawning (master) agent's own model, used as a fallback when no valid
 		 * `model` is requested so a Pi child inherits the master's model rather than
@@ -107,6 +110,14 @@ export interface ConversationPort {
 		piSessionId: string;
 		prompt: string;
 	}) => Promise<void>;
+	/**
+	 * Sets the display name of an active conversation's tab (Pi `/name`).
+	 * Resolves null when the session is not active.
+	 */
+	setName: (input: {
+		piSessionId: string;
+		name: string;
+	}) => Promise<{ chatTabId: string; title: string } | null>;
 	/** Resolves once the session goes idle, or `'timeout'` after `timeoutMs`. */
 	waitForIdle: (
 		piSessionId: string,
@@ -166,6 +177,19 @@ export interface FocusPort {
 }
 
 /**
+ * Reads and writes a workspace's kanban board status. Writes broadcast to the
+ * renderer (which owns the board-status atom) and update the main-side mirror
+ * optimistically; reads serve from that mirror.
+ */
+export interface BoardPort {
+	setWorkspaceStatus: (input: {
+		workspaceId: string;
+		status: WorkspaceBoardStatusValue;
+	}) => void;
+	getWorkspaceStatus: (workspaceId: string) => WorkspaceBoardStatusValue;
+}
+
+/**
  * Resolves the active permission mode. The mode is a global app setting (the
  * same value the IPC permission gate reads), so it takes no workspace argument.
  */
@@ -193,6 +217,7 @@ export interface AgentControlPorts {
 	terminals: TerminalPort;
 	harnesses: HarnessPort;
 	focus: FocusPort;
+	board: BoardPort;
 	permissions: PermissionPort;
 	confirm: ConfirmPort;
 }

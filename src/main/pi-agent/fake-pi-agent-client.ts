@@ -147,6 +147,9 @@ function createSessionEntry({
 		getMetadata: () => metadata,
 		getState: async () => ({ sessionName }),
 		id: input.metadata.id,
+		setSessionName: async (name) => {
+			sessionName = name.trim() || null;
+		},
 		subscribe: (listener) => {
 			listeners.add(listener);
 			const subscription: PiAgentSubscription = {

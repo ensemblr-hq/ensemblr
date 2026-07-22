@@ -172,6 +172,41 @@ test('openSession binds an existing chat tab without opening a duplicate', async
 	assert.equal(tabs[0]?.title, 'Existing tab');
 });
 
+test('setSessionName renames the active tab and marks the title user-owned', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database);
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const tabId = snapshot.openedTabs[0]?.id;
+	assert.ok(tabId);
+
+	const applied = await service.setSessionName({
+		sessionId: snapshot.id,
+		name: 'Refactor auth flow',
+	});
+
+	assert.deepEqual(applied, { chatTabId: tabId, title: 'Refactor auth flow' });
+	const tab = getChatTabById({ database: fixture.database, id: tabId });
+	assert.equal(tab?.title, 'Refactor auth flow');
+	assert.equal(tab?.metadata.titleProvenance, 'user');
+});
+
+test('setSessionName resolves null for a session that is not active', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database);
+
+	const applied = await service.setSessionName({
+		sessionId: 'missing-session',
+		name: 'Whatever',
+	});
+
+	assert.equal(applied, null);
+});
+
 test('openSession persists and launches with a native Pi session id', async (t) => {
 	const fixture = openFixture(t);
 	const { fake, service } = createService(fixture.database);

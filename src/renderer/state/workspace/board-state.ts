@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 
 import { moveToColumnEnd, reorderBoardOrder } from './board-order';
 import {
-	DEFAULT_BOARD_STATUS,
+	applyBoardStatus,
 	resolveBoardStatus,
 	type WorkspaceBoardStatus,
 } from './board-status';
@@ -134,19 +134,9 @@ export function useWorkspaceBoardActions(): WorkspaceBoardActions {
 							),
 				),
 			setWorkspaceBoardStatus: (workspaceId, status) =>
-				setBoardStatus((statusByWorkspaceId) => {
-					if (status === DEFAULT_BOARD_STATUS) {
-						if (!(workspaceId in statusByWorkspaceId)) {
-							return statusByWorkspaceId;
-						}
-						const { [workspaceId]: _removed, ...rest } = statusByWorkspaceId;
-						return rest;
-					}
-					if (statusByWorkspaceId[workspaceId] === status) {
-						return statusByWorkspaceId;
-					}
-					return { ...statusByWorkspaceId, [workspaceId]: status };
-				}),
+				setBoardStatus((statusByWorkspaceId) =>
+					applyBoardStatus(statusByWorkspaceId, workspaceId, status),
+				),
 			toggleWorkspaceUnread: (workspaceId) =>
 				setUnreadWorkspaceIds((workspaceIds) =>
 					workspaceIds.includes(workspaceId)

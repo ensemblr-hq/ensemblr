@@ -4,6 +4,10 @@ export {
 	createAgentControlService,
 } from './agent-control-service.ts';
 export {
+	type BoardStatusStore,
+	createBoardStatusStore,
+} from './board-status-store.ts';
+export {
 	type ControlServer,
 	startControlServer,
 } from './control-server.ts';

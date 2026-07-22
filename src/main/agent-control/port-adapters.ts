@@ -12,6 +12,7 @@ import type {
 	AgentControlTabInfo,
 	AgentControlTerminalInfo,
 	AgentControlWorkspaceInfo,
+	BoardStatusBroadcast,
 	FocusViewBroadcast,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control.ts';
@@ -34,8 +35,10 @@ import {
 } from '../storage/repositories/chat-tab-repository.ts';
 import { listAllWorkspaceRows } from '../storage/repositories/workspace-repository.ts';
 import type { TerminalService } from '../terminal';
+import type { BoardStatusStore } from './board-status-store.ts';
 import type {
 	AgentControlPorts,
+	BoardPort,
 	ConfirmPort,
 	ConversationPort,
 	FocusPort,
@@ -66,6 +69,10 @@ export interface PortAdapterDeps {
 	broadcastFocus: (payload: FocusViewBroadcast) => void;
 	/** Broadcasts a tab-set change so the renderer refreshes its tab list. */
 	broadcastTabsChanged: (payload: TabsChangedBroadcast) => void;
+	/** Broadcasts a board-status change so the renderer updates its board atom. */
+	broadcastBoardStatus: (payload: BoardStatusBroadcast) => void;
+	/** Main-side mirror of the renderer's board-status map. */
+	boardStatusStore: BoardStatusStore;
 	confirm: ConfirmPort;
 }
 
@@ -103,6 +110,7 @@ function makeWorkspacePort(deps: PortAdapterDeps): WorkspacePort {
 					workspaceId: row.id,
 					name: row.name ?? row.id,
 					cwd: row.path,
+					boardStatus: deps.boardStatusStore.get(row.id),
 				}));
 		},
 	};
@@ -271,6 +279,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			prompt,
 			model,
 			thinkingLevel,
+			title,
 			callerModel,
 			parentSessionId,
 		}) => {
@@ -311,6 +320,14 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				});
 				throw error;
 			}
+			markTabAsSubAgent(deps, targetTabId);
+			if (title) {
+				await applyConversationName(deps, {
+					piSessionId: snapshot.id,
+					name: title,
+				});
+			}
+			deps.broadcastTabsChanged({ workspaceId });
 			return { chatTabId: targetTabId, piSessionId: snapshot.id };
 		},
 		sendFollowUp: async ({ piSessionId, prompt }) => {
@@ -321,6 +338,17 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				prompt,
 				streamingBehavior: streaming ? 'followUp' : undefined,
 			});
+		},
+		setName: async ({ piSessionId, name }) => {
+			const applied = await applyConversationName(deps, { piSessionId, name });
+			if (applied) {
+				const workspaceId =
+					deps.piSessionService.getSession(piSessionId)?.workspaceId;
+				if (workspaceId) {
+					deps.broadcastTabsChanged({ workspaceId });
+				}
+			}
+			return applied;
 		},
 		waitForIdle: async (piSessionId, timeoutMs) => {
 			const deadline = Date.now() + timeoutMs;
@@ -363,6 +391,49 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 		resolveConversationWorkspace: async (piSessionId) =>
 			deps.piSessionService.getSession(piSessionId)?.workspaceId ?? null,
 	};
+}
+
+/**
+ * Stamps a chat tab as hosting a spawned sub-agent so the renderer can tint it
+ * distinctly. Best-effort and idempotent: a missing database or tab is ignored.
+ * @param deps - Adapter collaborators.
+ * @param chatTabId - The tab bound to the spawned conversation.
+ */
+function markTabAsSubAgent(deps: PortAdapterDeps, chatTabId: string): void {
+	const database = deps.databaseService.getConnection()?.database;
+	if (!database) {
+		return;
+	}
+	const tab = getChatTabById({ database, id: chatTabId });
+	if (!tab || tab.metadata.agentRole === 'subagent') {
+		return;
+	}
+	setChatTabMetadata({
+		database,
+		id: chatTabId,
+		metadata: { ...tab.metadata, agentRole: 'subagent' },
+	});
+}
+
+/**
+ * Applies a display name to a conversation's tab via the Pi session service,
+ * swallowing failures so naming never breaks a spawn or a control call.
+ * @param deps - Adapter collaborators.
+ * @param input - The target session id and the requested name.
+ * @returns The applied tab id and title, or null when it could not be set.
+ */
+async function applyConversationName(
+	deps: PortAdapterDeps,
+	input: { piSessionId: string; name: string },
+): Promise<{ chatTabId: string; title: string } | null> {
+	try {
+		return await deps.piSessionService.setSessionName({
+			sessionId: input.piSessionId,
+			name: input.name,
+		});
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -542,6 +613,22 @@ function makeFocusPort(deps: PortAdapterDeps): FocusPort {
 }
 
 /**
+ * Builds the board port: writes broadcast to the renderer and update the mirror
+ * optimistically; reads serve from the mirror.
+ * @param deps - Adapter collaborators.
+ * @returns The board port.
+ */
+function makeBoardPort(deps: PortAdapterDeps): BoardPort {
+	return {
+		setWorkspaceStatus: ({ workspaceId, status }) => {
+			deps.boardStatusStore.setOne(workspaceId, status);
+			deps.broadcastBoardStatus({ workspaceId, status });
+		},
+		getWorkspaceStatus: (workspaceId) => deps.boardStatusStore.get(workspaceId),
+	};
+}
+
+/**
  * Assembles the full {@link AgentControlPorts} surface from real services.
  * @param deps - Adapter collaborators.
  * @returns Ports ready to pass to {@link createAgentControlService}.
@@ -556,6 +643,7 @@ export function createAgentControlPorts(
 		terminals: makeTerminalPort(deps),
 		harnesses: makeHarnessPort(deps),
 		focus: makeFocusPort(deps),
+		board: makeBoardPort(deps),
 		permissions: { getMode: () => deps.getPermissionMode() },
 		confirm: deps.confirm,
 	};

@@ -1,4 +1,5 @@
 import type {
+	BoardStatusBroadcast,
 	FocusViewBroadcast,
 	TabsChangedBroadcast,
 } from '../../agent-control.ts';
@@ -100,6 +101,22 @@ export interface ShellApi {
 	onAgentControlTabsChanged: (
 		listener: (payload: TabsChangedBroadcast) => void,
 	) => () => void;
+	/**
+	 * Subscribes to agent-control board-status requests (an agent moved its
+	 * workspace on the kanban board). Returns an unsubscribe function. The
+	 * renderer applies every payload to the global board-status atom.
+	 */
+	onAgentControlBoardStatus: (
+		listener: (payload: BoardStatusBroadcast) => void,
+	) => () => void;
+	/**
+	 * Reports the renderer's full board-status map to the main process so
+	 * agent-control reads (`getWorkspaceStatus`, `listWorkspaces`) have a source.
+	 * Fire-and-forget from the renderer's perspective.
+	 */
+	reportBoardStatus: (
+		statusByWorkspaceId: Record<string, string>,
+	) => Promise<void>;
 	/** Opens an http/https URL in the user's default browser. */
 	openExternal: (url: string) => Promise<void>;
 }

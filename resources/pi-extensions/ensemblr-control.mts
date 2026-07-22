@@ -28,15 +28,18 @@ const CONTROL_TOKEN = process.env.ENSEMBLR_CONTROL_TOKEN;
 const ORCHESTRATOR_AWARENESS = `You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`).
 
 What you can drive:
-- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), close a tab (\`ensemblr_close_tab\`).
+- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
 - Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
 - Terminals: start/stop the setup or run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`).
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message.
+- Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
+
+Name your own conversation tab early with a short, descriptive title via \`ensemblr_set_name\` so it is easy to identify at a glance.
 
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper to do a single unit of work you could do in one pass, and never delegate a task just because you can. Do not tell the user to click; drive the app yourself.
 
 When delegation is warranted — delegate → wait → evaluate → integrate:
-1. Spawn each helper with \`ensemblr_start_conversation\` (omit \`wait\`); keep the \`piSessionId\` it returns.
+1. Spawn each helper with \`ensemblr_start_conversation\` in its own fresh tab — pass a short, descriptive \`title\` and do NOT pass \`chatTabId\` (reusing a prior tab keeps its old title); omit \`wait\` and keep the \`piSessionId\` it returns.
 2. Once you have delegated everything you can in parallel, call \`ensemblr_wait_for_agents\` and let it block — this is how you avoid racing ahead. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`; the wait tool parks your turn efficiently and returns the moment a child finishes or needs you.
    - \`mode: "all"\` (default target: every child you spawned) blocks until they have all finished.
    - \`mode: "first"\` returns as soon as any one child finishes or raises a signal — use it to react to whichever lands first.
@@ -55,12 +58,15 @@ Etiquette & limits:
 const SUBAGENT_AWARENESS = `You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`).
 
 What you can drive:
-- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), close a tab (\`ensemblr_close_tab\`).
+- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
 - Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
 - Terminals: start/stop the setup or run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`).
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message.
+- Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
 
-You were spawned as a sub-agent to carry out one delegated unit of work. Do it yourself, end to end — the last message you leave is your report back to the orchestrator that spawned you. Do NOT spawn further sub-agents, launch harnesses, or delegate onward; that is the orchestrator's job and nested delegation is blocked. If you are blocked, or you hit a decision you genuinely cannot make alone, call \`ensemblr_notify_orchestrator\` (reason \`need_decision\` or \`blocked\`) instead of guessing or stalling — it pulls your orchestrator back to you; use \`progress\`/\`done\` to keep it informed. Do not tell the user to click; drive the app yourself.
+Name your own conversation tab early with a short, descriptive title via \`ensemblr_set_name\` so it is easy to identify at a glance.
+
+You were spawned as a sub-agent to carry out one delegated unit of work. Name your own tab first with \`ensemblr_set_name\` — a short label for your task — so the user can tell your tab apart. Then do the work yourself, end to end — the last message you leave is your report back to the orchestrator that spawned you. Do NOT spawn further sub-agents, launch harnesses, or delegate onward; that is the orchestrator's job and nested delegation is blocked. If you are blocked, or you hit a decision you genuinely cannot make alone, call \`ensemblr_notify_orchestrator\` (reason \`need_decision\` or \`blocked\`) instead of guessing or stalling — it pulls your orchestrator back to you; use \`progress\`/\`done\` to keep it informed. Do not tell the user to click; drive the app yourself.
 
 You may still read and inspect freely — list workspaces/tabs/terminals, read a conversation's status or last message, read terminal output — and focus a view so the user can follow along.
 
@@ -223,12 +229,13 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_start_conversation',
 		'startConversation',
-		'Open (or reuse) a chat tab and start a Pi conversation with a first prompt. Set wait=true to block until it finishes.',
+		"Open a fresh chat tab (or reuse one via chatTabId) and start a Pi conversation with a first prompt. Pass a short, descriptive title to name the sub-agent's tab. Set wait=true to block until it finishes.",
 		Type.Object({
 			chatTabId: Type.Optional(Type.String()),
 			prompt: Type.String(),
 			model: Type.Optional(Type.String()),
 			thinkingLevel: Type.Optional(Type.String()),
+			title: Type.Optional(Type.String()),
 			wait: Type.Optional(Type.Boolean()),
 		}),
 	);
@@ -241,6 +248,12 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			prompt: Type.String(),
 			wait: Type.Optional(Type.Boolean()),
 		}),
+	);
+	tool(
+		'ensemblr_set_name',
+		'setName',
+		'Set a short, descriptive name for your own conversation tab so it is easy to identify.',
+		Type.Object({ name: Type.String() }),
 	);
 	tool(
 		'ensemblr_close_tab',
@@ -327,6 +340,26 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 				Type.Literal('checks'),
 			]),
 		}),
+	);
+	tool(
+		'ensemblr_set_workspace_status',
+		'setWorkspaceStatus',
+		'Move your workspace across the kanban board by setting its status (backlog, in-progress, in-review, done, canceled). Acts on your own workspace.',
+		Type.Object({
+			status: Type.Union([
+				Type.Literal('backlog'),
+				Type.Literal('in-progress'),
+				Type.Literal('in-review'),
+				Type.Literal('done'),
+				Type.Literal('canceled'),
+			]),
+		}),
+	);
+	tool(
+		'ensemblr_get_workspace_status',
+		'getWorkspaceStatus',
+		"Read your workspace's current kanban board status. Use ensemblr_list_workspaces to see every workspace's status.",
+		empty,
 	);
 	tool(
 		'ensemblr_list_models',

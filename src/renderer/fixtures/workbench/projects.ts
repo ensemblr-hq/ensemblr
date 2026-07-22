@@ -123,6 +123,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'review-shell',
 						id: 'review-shell',
+						isSubAgent: false,
 						label: 'Review shell',
 						piSessionId: null,
 						status: 'idle',
@@ -133,6 +134,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'setup-thread',
 						id: 'setup-thread',
+						isSubAgent: false,
 						label: 'Setup notes',
 						piSessionId: null,
 						status: 'working',
@@ -197,6 +199,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'issue-kickoff',
 						id: 'issue-kickoff',
+						isSubAgent: false,
 						label: 'Issue kickoff',
 						piSessionId: null,
 						status: 'idle',
@@ -249,6 +252,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'plain-header',
 						id: 'plain-header',
+						isSubAgent: false,
 						label: 'Plain header',
 						piSessionId: null,
 						status: 'working',
@@ -310,6 +314,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'changed-header',
 						id: 'changed-header',
+						isSubAgent: false,
 						label: 'Changed header',
 						piSessionId: null,
 						status: 'working',
@@ -393,6 +398,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'checks-pass',
 						id: 'checks-pass',
+						isSubAgent: false,
 						label: 'Checks pass',
 						piSessionId: null,
 						status: 'working',

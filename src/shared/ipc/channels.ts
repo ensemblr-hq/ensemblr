@@ -16,6 +16,8 @@ export const IPC_CHANNELS = {
 	closeActiveTab: 'ensemblr:close-active-tab',
 	agentControlFocusView: 'ensemblr:agent-control-focus-view',
 	agentControlTabsChanged: 'ensemblr:agent-control-tabs-changed',
+	agentControlBoardStatus: 'ensemblr:agent-control-board-status',
+	agentControlReportBoardStatus: 'ensemblr:agent-control-report-board-status',
 	closeChatTab: 'ensemblr:close-chat-tab',
 	closeWindow: 'ensemblr:close-window',
 	cloneGithubRepositoryPrepare: 'ensemblr:clone-github-repository:prepare',

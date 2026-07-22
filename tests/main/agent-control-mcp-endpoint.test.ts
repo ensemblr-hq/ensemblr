@@ -54,7 +54,10 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).toContain('ensemblr_list_models');
 		expect(names).toContain('ensemblr_wait_for_agents');
 		expect(names).toContain('ensemblr_notify_orchestrator');
-		expect(tools).toHaveLength(21);
+		expect(names).toContain('ensemblr_set_name');
+		expect(names).toContain('ensemblr_set_workspace_status');
+		expect(names).toContain('ensemblr_get_workspace_status');
+		expect(tools).toHaveLength(24);
 		const instructions = client.getInstructions() ?? '';
 		expect(instructions).toContain('Ensemblr');
 		expect(instructions).toContain('orchestrator');
