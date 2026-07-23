@@ -20,33 +20,13 @@ import {
 	getRenderableNavigationSnapshot,
 	mapRepositoriesToProjects,
 } from '@/renderer/lib/workbench';
-import type {
-	ProjectShellModel,
-	WorkbenchShellData,
-} from '@/renderer/types/workbench';
+import type { WorkbenchShellData } from '@/renderer/types/workbench';
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 
 // The sidebar/board diff stats are a glanceable overview, not the active
 // workspace's live detail (which keeps the 10s poll in workspaceGitStatusQuery).
 // A slower fan-out interval keeps N per-workspace git-status calls cheap.
 const OVERVIEW_GIT_STATUS_REFETCH_INTERVAL_MS = 30_000;
-
-/** Live query data and loading flags returned by {@link useWorkbenchQueries}. */
-export interface WorkbenchQueriesResult {
-	hasPreloadBridge: boolean;
-	healthData: ReturnType<typeof useQuery<typeof healthQuery>>['data'];
-	healthErrorResult: unknown;
-	isRepositoryWorkspaceNavigationFetching: boolean;
-	isRepositoryWorkspaceNavigationLoading: boolean;
-	isRepositoryWorkspaceNavigationPlaceholderData: boolean;
-	navigationSnapshot: RepositoryWorkspaceNavigationSnapshot | null;
-	projects: ProjectShellModel[];
-	refetchSetupDiagnostics: () => Promise<unknown>;
-	setupDiagnosticsData: ReturnType<
-		typeof useQuery<typeof setupDiagnosticsQuery>
-	>['data'];
-	setupDiagnosticsErrorResult: unknown;
-}
 
 /**
  * Owns the three workbench-shell live queries (health, repository workspace

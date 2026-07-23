@@ -97,8 +97,6 @@ export type GeneralSettings = AppSettings['general'];
 type ModelSettings = AppSettings['models'];
 /** The `git` user-scope defaults section of App settings. */
 export type GitSettings = AppSettings['git'];
-/** Source of the workspace branch-name prefix: GitHub username, a custom string, or none. */
-export type BranchPrefixSource = GitSettings['branchPrefixSource'];
 /** The `appearance` section of App settings. */
 export type AppearanceSettings = AppSettings['appearance'];
 /** The `experimental` section of App settings. */

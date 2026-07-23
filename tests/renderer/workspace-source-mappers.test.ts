@@ -1,9 +1,11 @@
 import { expect, test } from 'vitest';
 
-import { mapGithubIssuesToWorkspaceSources } from '../../src/renderer/lib/github/issue-view.ts';
+import {
+	githubIssueSourceId,
+	mapGithubIssuesToWorkspaceSources,
+} from '../../src/renderer/lib/github/issue-view.ts';
 import {
 	branchSourceId,
-	githubIssueSourceId,
 	mapPullRequestsToWorkspaceSources,
 	mapRepositoryBranchesToWorkspaceSources,
 	pullRequestSourceId,

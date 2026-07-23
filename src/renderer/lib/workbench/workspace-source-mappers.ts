@@ -1,7 +1,4 @@
-import {
-	buildWorkspaceSeedFromGithubIssue,
-	githubIssueSourceId,
-} from '@/renderer/lib/github';
+import { buildWorkspaceSeedFromGithubIssue } from '@/renderer/lib/github';
 import { buildWorkspaceSeedFromLinearIssue } from '@/renderer/lib/linear';
 import type {
 	WorkspaceCreationSeed,
@@ -22,8 +19,6 @@ export function branchSourceId(name: string): string {
 export function pullRequestSourceId(prNumber: number): string {
 	return `pr:${prNumber}`;
 }
-
-export { githubIssueSourceId };
 
 /** Maps GitHub branches into create-from picker sources. */
 export function mapRepositoryBranchesToWorkspaceSources(

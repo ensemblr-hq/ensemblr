@@ -46,7 +46,6 @@ export {
 export { getWorkspaceSidebarState } from './workspace-sidebar-state';
 export {
 	branchSourceId,
-	githubIssueSourceId,
 	mapPullRequestsToWorkspaceSources,
 	mapRepositoryBranchesToWorkspaceSources,
 	pullRequestSourceId,
