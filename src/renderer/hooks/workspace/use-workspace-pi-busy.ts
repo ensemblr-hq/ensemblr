@@ -1,11 +1,8 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
-import {
-	ensemblrQueryKeys,
-	piSessionsForWorkspaceQuery,
-	subscribePiSessionEvents,
-} from '@/renderer/api/ensemblr-queries';
+import { piSessionsForWorkspaceQuery } from '@/renderer/api/ensemblr-queries';
+import { usePiSessionStatusInvalidation } from './use-pi-session-status-invalidation';
 
 /**
  * Reports whether any Pi session attached to `workspaceId` is currently
@@ -18,28 +15,10 @@ import {
  * sidebar row still updates while its Pi session is busy.
  */
 export function useWorkspacePiBusy(workspaceId: string): boolean {
-	const queryClient = useQueryClient();
 	const { data: sessionsData } = useQuery(
 		piSessionsForWorkspaceQuery(workspaceId),
 	);
-
-	useEffect(() => {
-		if (workspaceId.length === 0) {
-			return undefined;
-		}
-		const unsubscribe = subscribePiSessionEvents((broadcast) => {
-			if (broadcast.workspaceId !== workspaceId) {
-				return;
-			}
-			if (broadcast.event.eventType !== 'status') {
-				return;
-			}
-			void queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
-			});
-		});
-		return unsubscribe;
-	}, [queryClient, workspaceId]);
+	usePiSessionStatusInvalidation(workspaceId);
 
 	const sessions = sessionsData?.sessions;
 	return useMemo(() => {

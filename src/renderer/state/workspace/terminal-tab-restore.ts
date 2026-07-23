@@ -29,6 +29,22 @@ function metadataText(value: unknown): string | undefined {
 	return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+/** A terminal (harness) session tab, narrowed from the `SessionTabModel` union. */
+type TerminalSessionTab = Extract<SessionTabModel, { kind: 'terminal' }>;
+
+/**
+ * Narrows a session tab to a live PTY-backed terminal tab: kind `terminal` with a
+ * non-empty `terminalId`. Restart-orphaned or not-yet-spawned tabs carry an empty
+ * id and are excluded, so a match is always an attachable conversation.
+ * @param session - The session tab to test.
+ * @returns True when the tab is a terminal tab backed by a live terminal id.
+ */
+export function isLiveTerminalTab(
+	session: SessionTabModel,
+): session is TerminalSessionTab {
+	return session.kind === 'terminal' && session.terminalId.length > 0;
+}
+
 /**
  * Finds an open terminal tab already attached to the given native session id, so
  * a restore focuses it instead of spawning a second PTY against one shared log.
@@ -47,11 +63,40 @@ function findOpenConversation(
 	}
 	return sessionTabs.find(
 		(session) =>
-			session.kind === 'terminal' &&
-			session.terminalId.length > 0 &&
+			isLiveTerminalTab(session) &&
 			session.agentSessionId === agentSessionId &&
 			session.id !== excludeId,
 	);
+}
+
+/**
+ * Finds restart-orphaned duplicate terminal tabs: open tabs that share a
+ * captured `agentSessionId` with an earlier tab in the strip. A restart can
+ * leave several open terminal tabs bound to one conversation (an earlier build
+ * inserted a fresh tab on resume instead of repointing the existing one); only
+ * the first occurrence should resume — the rest are stale copies that would each
+ * `--resume` and thrash one shared session log, so callers archive them. Tabs
+ * with no captured id are never flagged; they reattach through the cwd
+ * `--continue` fallback, which is guarded separately.
+ * @param sessionTabs - The currently open tabs, in strip order.
+ * @returns Chat-tab ids of the duplicate terminal tabs to archive.
+ */
+export function findDuplicateTerminalTabIds(
+	sessionTabs: SessionTabModel[],
+): string[] {
+	const seenSessionIds = new Set<string>();
+	const duplicateIds: string[] = [];
+	for (const session of sessionTabs) {
+		if (!isLiveTerminalTab(session) || !session.agentSessionId) {
+			continue;
+		}
+		if (seenSessionIds.has(session.agentSessionId)) {
+			duplicateIds.push(session.id);
+		} else {
+			seenSessionIds.add(session.agentSessionId);
+		}
+	}
+	return duplicateIds;
 }
 
 /**
@@ -68,10 +113,7 @@ function hasLiveHarnessTab(
 	harnessId: string,
 ): boolean {
 	return sessionTabs.some(
-		(session) =>
-			session.kind === 'terminal' &&
-			session.terminalId.length > 0 &&
-			session.harnessId === harnessId,
+		(session) => isLiveTerminalTab(session) && session.harnessId === harnessId,
 	);
 }
 

@@ -11,10 +11,10 @@ import {
 	removeOpenChatTabFromCache,
 	reorderChatTabs,
 	restoreChatTab,
-	subscribePiSessionEvents,
 	writeOpenedChatTabToCache,
 	writeReorderedChatTabsToCache,
 } from '@/renderer/api/ensemblr-queries';
+import { usePiSessionStatusInvalidation } from '@/renderer/hooks/workspace/use-pi-session-status-invalidation';
 import { useWorkspaceAgentBusy } from '@/renderer/hooks/workspace/use-workspace-agent-busy';
 import { areStringArraysEqual } from '@/renderer/lib/ordered-ids';
 import { stripHarnessTitleDecoration } from '@/renderer/lib/terminal/harness-title';
@@ -41,7 +41,11 @@ import {
 	type WorkspaceGitDiffScope,
 } from '@/shared/ipc/contracts/workspace-git';
 import { decideActiveClose, selectNeighborTab } from './session-tab-close';
-import { resumeRestoredTerminalTab } from './terminal-tab-restore';
+import {
+	findDuplicateTerminalTabIds,
+	isLiveTerminalTab,
+	resumeRestoredTerminalTab,
+} from './terminal-tab-restore';
 
 /**
  * Cross-instance lock for the workspace-level bootstrap. The route shell owns
@@ -205,24 +209,10 @@ export function useSessionTabState({
 		});
 	}, [queryClient, workspaceId]);
 
-	// Tab-level subscription: refresh the Pi session list on status events
-	// across ALL sessions in this workspace so inactive-tab spinners update.
-	// The composer-bound subscription filters to one session id and would
-	// otherwise miss status changes on background tabs.
-	useEffect(() => {
-		const unsubscribe = subscribePiSessionEvents((broadcast) => {
-			if (broadcast.workspaceId !== workspaceId) {
-				return;
-			}
-			if (broadcast.event.eventType !== 'status') {
-				return;
-			}
-			void queryClient.invalidateQueries({
-				queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
-			});
-		});
-		return unsubscribe;
-	}, [queryClient, workspaceId]);
+	// Refresh the Pi session list on status events across ALL sessions in this
+	// workspace so inactive-tab spinners update. The composer-bound subscription
+	// filters to one session id and would otherwise miss background-tab changes.
+	usePiSessionStatusInvalidation(workspaceId);
 
 	// An agent opening or closing a tab (main → renderer) is invisible to the
 	// tab list, which is a cached query only invalidated by renderer-local
@@ -569,7 +559,13 @@ export function useSessionTabState({
 			chatTabId: string,
 			patch?: Pick<CloseChatTabRequest, 'metadataPatch' | 'title'>,
 		): Promise<CloseSessionTabHandlerResult> => {
-			await closeMutation.mutateAsync({ chatTabId, ...patch });
+			try {
+				await closeMutation.mutateAsync({ chatTabId, ...patch });
+			} catch {
+				// closeMutation.onError already rolls back the optimistic removal, so the
+				// many fire-and-forget callers can `void` this without leaking an
+				// unhandled rejection on a failed close.
+			}
 			return { replacementChatTabId: null };
 		},
 		[closeMutation],
@@ -748,16 +744,29 @@ export function useSessionTabState({
 		}
 		const resumed = autoResumedTabIdsRef.current;
 		const resumedHarnessIds = resumedHarnessIdsRef.current;
+		// A restart can leave several open terminal tabs bound to one captured
+		// session id; archive the extras so the strip converges to a single live
+		// tab per conversation instead of stale copies that would each `--resume`
+		// and thrash one shared session log.
+		const duplicateTabIds = new Set(findDuplicateTerminalTabIds(sessionTabs));
 		for (const session of sessionTabs) {
 			if (
-				session.kind !== 'terminal' ||
-				!session.terminalId ||
+				!isLiveTerminalTab(session) ||
 				!session.harnessId ||
 				resumed.has(session.id)
 			) {
 				continue;
 			}
 			resumed.add(session.id);
+			if (duplicateTabIds.has(session.id)) {
+				// Only restart-orphaned dead PTYs reach here: a live duplicate would be
+				// claimed by the restore path and skipped by `resumed` above, so no
+				// terminal teardown is needed. closeSessionTabAsync swallows a failed
+				// close internally, so this fire-and-forget archive cannot leak a
+				// rejection; a rare failure self-heals on the next app start.
+				void closeSessionTabAsync(session.id);
+				continue;
+			}
 			const { agentSessionId, harnessId, id: chatTabId, terminalId } = session;
 			void api
 				.terminalSnapshot({ terminalId })
@@ -799,7 +808,7 @@ export function useSessionTabState({
 					resumed.delete(chatTabId);
 				});
 		}
-	}, [invalidateChatTabs, sessionTabs, workspaceId]);
+	}, [closeSessionTabAsync, invalidateChatTabs, sessionTabs, workspaceId]);
 
 	/** Persists a drag-and-drop tab order when it differs from the current model. */
 	const reorderSessionTabs = useCallback(
