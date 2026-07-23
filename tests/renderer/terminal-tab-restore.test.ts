@@ -2,7 +2,12 @@
 
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { RestoreTerminalTabDeps } from '../../src/renderer/state/workspace/terminal-tab-restore';
-import { resumeRestoredTerminalTab } from '../../src/renderer/state/workspace/terminal-tab-restore';
+import {
+	findDuplicateTerminalTabIds,
+	isLiveTerminalTab,
+	resumeRestoredTerminalTab,
+} from '../../src/renderer/state/workspace/terminal-tab-restore';
+import type { SessionTabModel } from '../../src/renderer/types/workbench';
 import type { LaunchAgentHarnessResult } from '../../src/shared/ipc/contracts/agents';
 import type { ChatTabWire } from '../../src/shared/ipc/contracts/chat-tab';
 import { clearEnsemblrApi, installEnsemblrApi } from './support/dom';
@@ -149,5 +154,122 @@ describe('resumeRestoredTerminalTab', () => {
 		expect(resumeAgentHarness).not.toHaveBeenCalled();
 		expect(deps.closeTab).toHaveBeenCalledWith('tab-1');
 		expect(deps.selectTab).toHaveBeenCalledWith('tab-open');
+	});
+});
+
+/**
+ * Builds a terminal session-tab model with sensible defaults, overridable per
+ * case.
+ * @param over - Fields to override on the base terminal tab.
+ * @returns A terminal `SessionTabModel`.
+ */
+function terminalSessionTab(
+	over: Partial<Extract<SessionTabModel, { kind: 'terminal' }>> & {
+		id: string;
+	},
+): SessionTabModel {
+	return {
+		agentSessionId: null,
+		chatTabId: over.id,
+		harnessId: 'claude',
+		harnessLabel: 'Claude Code',
+		isSubAgent: false,
+		kind: 'terminal',
+		label: 'Claude Code',
+		piSessionId: null,
+		status: 'idle',
+		summary: '',
+		terminalId: 'pty',
+		updatedLabel: '',
+		...over,
+	};
+}
+
+describe('isLiveTerminalTab', () => {
+	test('accepts a terminal tab with a non-empty terminal id', () => {
+		expect(
+			isLiveTerminalTab(terminalSessionTab({ id: 'a', terminalId: 'pty-1' })),
+		).toBe(true);
+	});
+
+	test('rejects a terminal tab whose terminal id is empty', () => {
+		expect(
+			isLiveTerminalTab(terminalSessionTab({ id: 'a', terminalId: '' })),
+		).toBe(false);
+	});
+
+	test('rejects a non-terminal chat tab', () => {
+		expect(
+			isLiveTerminalTab({
+				chatTabId: 'chat',
+				id: 'chat',
+				isSubAgent: false,
+				kind: 'chat',
+				label: 'New chat',
+				piSessionId: null,
+				status: 'idle',
+				summary: '',
+				updatedLabel: '',
+			}),
+		).toBe(false);
+	});
+});
+
+describe('findDuplicateTerminalTabIds', () => {
+	test('flags every open tab after the first that shares a captured session id', () => {
+		const duplicates = findDuplicateTerminalTabIds([
+			terminalSessionTab({
+				id: 'a',
+				terminalId: 'p1',
+				agentSessionId: 'sid-x',
+			}),
+			terminalSessionTab({
+				id: 'b',
+				terminalId: 'p2',
+				agentSessionId: 'sid-x',
+			}),
+			terminalSessionTab({
+				id: 'c',
+				terminalId: 'p3',
+				agentSessionId: 'sid-x',
+			}),
+		]);
+
+		expect(duplicates).toEqual(['b', 'c']);
+	});
+
+	test('keeps distinct conversations and never flags tabs without a captured id', () => {
+		const duplicates = findDuplicateTerminalTabIds([
+			terminalSessionTab({ id: 'a', agentSessionId: 'sid-x' }),
+			terminalSessionTab({ id: 'b', agentSessionId: 'sid-y' }),
+			terminalSessionTab({ id: 'c', agentSessionId: null }),
+			terminalSessionTab({ id: 'd', agentSessionId: null }),
+		]);
+
+		expect(duplicates).toEqual([]);
+	});
+
+	test('ignores tabs with no live terminal id and non-terminal tabs', () => {
+		const duplicates = findDuplicateTerminalTabIds([
+			terminalSessionTab({
+				id: 'a',
+				terminalId: 'p1',
+				agentSessionId: 'sid-x',
+			}),
+			terminalSessionTab({ id: 'b', terminalId: '', agentSessionId: 'sid-x' }),
+			{
+				chatTabId: 'chat',
+				id: 'chat',
+				isSubAgent: false,
+				kind: 'chat',
+				label: 'New chat',
+				piSessionId: null,
+				status: 'idle',
+				summary: '',
+				updatedLabel: '',
+			},
+		]);
+
+		expect(duplicates).toEqual([]);
 	});
 });

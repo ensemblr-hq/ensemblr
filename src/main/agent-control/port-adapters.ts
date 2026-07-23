@@ -404,15 +404,20 @@ function markTabAsSubAgent(deps: PortAdapterDeps, chatTabId: string): void {
 	if (!database) {
 		return;
 	}
-	const tab = getChatTabById({ database, id: chatTabId });
-	if (!tab || tab.metadata.agentRole === 'subagent') {
-		return;
+	try {
+		const tab = getChatTabById({ database, id: chatTabId });
+		if (!tab || tab.metadata.agentRole === 'subagent') {
+			return;
+		}
+		setChatTabMetadata({
+			database,
+			id: chatTabId,
+			metadata: { ...tab.metadata, agentRole: 'subagent' },
+		});
+	} catch {
+		// Best-effort tab tint; a storage hiccup must not fail an already-started
+		// spawn (mirrors applyConversationName's swallow-and-continue).
 	}
-	setChatTabMetadata({
-		database,
-		id: chatTabId,
-		metadata: { ...tab.metadata, agentRole: 'subagent' },
-	});
 }
 
 /**

@@ -486,9 +486,11 @@ function claudeProjectSlugs(cwd: string): string[] {
 async function readJsonlPaths(directory: string): Promise<string[]> {
 	try {
 		const entries = await readdir(directory, { withFileTypes: true });
-		return entries
-			.filter((entry) => entry.isFile() && entry.name.endsWith('.jsonl'))
-			.map((entry) => path.join(directory, entry.name));
+		return entries.flatMap((entry) =>
+			entry.isFile() && entry.name.endsWith('.jsonl')
+				? [path.join(directory, entry.name)]
+				: [],
+		);
 	} catch {
 		return [];
 	}

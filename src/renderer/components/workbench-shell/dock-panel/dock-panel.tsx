@@ -229,7 +229,7 @@ function DockTabCloseButton({
 	return (
 		<button
 			aria-label={`Close ${label} tab`}
-			className='pointer-events-none absolute top-1/2 right-1 grid size-4 -translate-y-1/2 place-items-center rounded-sm text-muted-foreground opacity-0 transition-all hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-focus-within/dock-tab:pointer-events-auto group-focus-within/dock-tab:opacity-100 group-hover/dock-tab:pointer-events-auto group-hover/dock-tab:opacity-100'
+			className='pointer-events-none absolute top-1/2 right-1 grid size-4 -translate-y-1/2 place-items-center rounded-sm text-muted-foreground opacity-0 transition hover:text-foreground focus-visible:pointer-events-auto focus-visible:opacity-100 group-focus-within/dock-tab:pointer-events-auto group-focus-within/dock-tab:opacity-100 group-hover/dock-tab:pointer-events-auto group-hover/dock-tab:opacity-100'
 			onClick={(event) => {
 				event.stopPropagation();
 				onCloseTerminal(terminalId);
