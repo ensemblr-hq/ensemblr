@@ -429,7 +429,7 @@ function SessionTab({
 			{showCloseControls ? (
 				<button
 					aria-label={`Close ${session.label} tab`}
-					className='absolute top-1/2 right-2 grid size-5 -translate-y-1/2 place-items-center rounded-sm opacity-0 transition-all hover:bg-transparent hover:text-foreground focus-visible:opacity-100 group-hover/session-tab:opacity-100'
+					className='absolute top-1/2 right-2 grid size-5 -translate-y-1/2 place-items-center rounded-sm opacity-0 transition hover:bg-transparent hover:text-foreground focus-visible:opacity-100 group-hover/session-tab:opacity-100'
 					onClick={(event) => {
 						event.stopPropagation();
 						onClose(session.id);

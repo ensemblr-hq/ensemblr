@@ -336,6 +336,44 @@
 				// LazyMotion indirection here.
 				"files": ["src/renderer/components/shimmer.tsx"],
 				"rules": ["react-doctor/use-lazy-motion"]
+			},
+			{
+				// Main-process modules import their storage/checkpoint public surface
+				// through the `storage/repositories/index.ts` and `checkpoints/index.ts`
+				// barrels — the intended entrypoints (same rationale as the
+				// main.ts/handlers.ts override above). The no-barrel-import perf rule
+				// targets renderer bundle tree-shaking; the Electron main process is not
+				// bundled that way, so the cost is moot here.
+				"files": [
+					"src/main/checkpoints/checkpoint-service.ts",
+					"src/main/ipc/handlers/checkpoint.ts",
+					"src/main/pi-agent/pi-session-persistence.ts",
+					"src/main/pi-agent/session/chat-tab-plumbing.ts"
+				],
+				"rules": ["react-doctor/no-barrel-import"]
+			},
+			{
+				// Sequential by intent. The Codex rollout walk (agent-conversation-title)
+				// recurses newest-first under a MAX_SESSION_CANDIDATES budget with early
+				// returns; the pasted-file save loop (composer-attachments) preserves
+				// paste order, stops on the first error, and avoids saveCopy
+				// filename-collision races. Promise.all would overshoot the budget or
+				// change error/collision semantics.
+				"files": [
+					"src/main/terminal/agent-conversation-title.ts",
+					"src/renderer/lib/workbench/composer-attachments.ts"
+				],
+				"rules": ["react-doctor/async-await-in-loop"]
+			},
+			{
+				// The agent-control MCP server intentionally exposes agent-control tools —
+				// that IS the product surface. It is gated behind loopback-only host
+				// checks (DNS-rebinding guard) and a per-request bearer token: see
+				// control-server.ts, which 401s a missing token and delegates validation
+				// to AgentControlService.invoke. The capability is by design and
+				// authenticated, not an unguarded sink.
+				"files": ["src/main/agent-control/mcp-endpoint.ts"],
+				"rules": ["react-doctor/mcp-tool-capability-risk"]
 			}
 		]
 	}
