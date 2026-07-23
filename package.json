@@ -165,6 +165,7 @@
 		"vitest": "^4.1.10"
 	},
 	"overrides": {
+		"@electron/node-gyp": "10.2.0-electron.1",
 		"linkify-it": "^5.0.2",
 		"tar": "^7.5.19",
 		"tmp": "^0.2.7"

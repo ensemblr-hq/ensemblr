@@ -3,4 +3,4 @@
 [scripts]
 run = "npm run dev"
 run_mode = "concurrent"
-setup = "npm install"
+setup = "npm ci --allow-remote=all"
