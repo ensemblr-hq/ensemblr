@@ -14,7 +14,7 @@ export const REFERENCED_FOLDERS_HEADER = 'Referenced workspace folders:';
 export const USER_PREFERENCES_TAG = 'user_preferences';
 
 /** Tag wrapping an inlined workspace file or composed action attachment. */
-export const ATTACHED_FILE_TAG = 'attached_file';
+const ATTACHED_FILE_TAG = 'attached_file';
 
 /**
  * Wraps a file's content in the shared `<attached_file>` envelope, escaping

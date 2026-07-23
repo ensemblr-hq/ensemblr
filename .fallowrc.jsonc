@@ -16,7 +16,23 @@
 		"tests/**/*.test.{ts,tsx}",
 		// Dev tooling scripts run directly via `node` (.mjs) or `npx tsx` (.ts);
 		// treat each as an entry so fallow doesn't flag them as unused files.
-		"scripts/**/*.{mjs,ts}"
+		"scripts/**/*.{mjs,ts}",
+		// Pi extensions are loaded at runtime by the Pi child via
+		// `pi --mode rpc -e <file>`; nothing imports them statically.
+		"resources/pi-extensions/*.mts",
+		// Concern barrels are the mandated public entrypoints (src/shared
+		// AGENTS.md: "keep the root file as the public entrypoint"; renderer
+		// AGENTS.md: state via `state/<concern>/index.ts`, and `lib/<concern>/index.ts`
+		// runtime-value barrels). Their re-export surface is intentional public
+		// API consumed across process boundaries, not dead code — encode that here
+		// rather than leaving ~360 acknowledged "not a bug" barrel warnings.
+		"src/shared/ipc/index.ts",
+		"src/shared/pi-rpc/index.ts",
+		"src/shared/keymap/index.ts",
+		"src/renderer/state/*/index.ts",
+		"src/renderer/lib/*/index.ts",
+		"src/renderer/types/*/index.ts",
+		"src/renderer/components/**/index.ts"
 	],
 
 	"ignorePatterns": [
@@ -71,6 +87,11 @@
 	// even though current consumption lives in their declaring file.
 	"ignoreExports": [
 		{ "file": "src/renderer/components/ui/**/*.tsx", "exports": ["*"] },
+		// TanStack Router generates routeTree.gen.ts; its route types are consumed
+		// via module augmentation, not direct imports, and it is never hand-edited.
+		// Ignored per-export (not via ignorePatterns) to keep its edges to the
+		// route files intact for dead-code analysis.
+		{ "file": "src/renderer/routing/routeTree.gen.ts", "exports": ["*"] },
 		{ "file": "src/shared/permissions.ts", "exports": ["PERMISSION_MODES"] },
 		{
 			"file": "src/renderer/state/recents/atoms.ts",

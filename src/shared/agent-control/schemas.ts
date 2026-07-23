@@ -120,7 +120,7 @@ const notifyOrchestratorSchema = z.strictObject({
 const emptySchema = z.strictObject({});
 
 /** Per-operation argument validators, keyed by {@link AgentControlOp}. */
-export const AGENT_CONTROL_ARG_SCHEMAS = {
+const AGENT_CONTROL_ARG_SCHEMAS = {
 	spawnChatTab: spawnChatTabSchema,
 	startConversation: startConversationSchema,
 	sendFollowUp: sendFollowUpSchema,

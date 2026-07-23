@@ -5,7 +5,6 @@ import type {
 } from './pi-message-payloads.ts';
 
 export type {
-	PiContextUsageWire,
 	PiEventStreamWire,
 	PiPersistedEnvelope,
 	PiSessionStatusWire,
