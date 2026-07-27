@@ -26,48 +26,40 @@ Scaffold provenance guardrail:
 
 - Do not hand-author generated app structure from memory when an official generator exists.
 - Run the official generator in `.context/` or another disposable directory first, then copy or adapt from that generated output.
-- If the generator conflicts with nub, hooks, existing files, or other repo policy, stop and explain the conflict before choosing a workaround.
+- If the generator conflicts with npm, hooks, existing files, or other repo policy, stop and explain the conflict before choosing a workaround.
 - Record scaffold provenance in the final response or a tracked audit note: documentation source, exact generator command, generated files used, and every intentional deviation.
 - Treat manually added package names, versions, config keys, templates, or generated-file structure as invalid unless they are directly backed by current official docs, generator output, or an explicit user decision.
 
 ## Package Manager Policy
 
-This repository runs on [nub](https://nubjs.com/docs). nub is required — install it before working here (`brew install nub`, or `curl -fsSL https://nubjs.com/install.sh | bash`). The on-disk format stays npm's: `package.json` plus `package-lock.json`. See ADR 0039.
+This repository enforces npm for JavaScript and TypeScript package management.
 
-- Use `nub install` / `nub ci` instead of `npm install` / `npm ci`.
-- Use `nub run <script>` instead of `npm run <script>`.
-- Use `nubx <package>` instead of `npx <package>`, and `nub exec <bin>` for a bin that is already installed.
-- Use `nub add <package>` and `nub remove <package>` for dependency changes.
-- Use `nub <file>.ts` to run a TypeScript file directly. Do not reintroduce a `tsx` invocation for this; nub runs the full TypeScript surface.
-- Do not use `npm`, `npx`, `bun`, `pnpm`, or `yarn`. Do not create `bun.lock`, `pnpm-lock.yaml`, `yarn.lock`, or `nub.lock`; `package-lock.json` remains the only lockfile.
-- Keep `packageManager` set to an npm version. Counterintuitive but load-bearing: it is what makes nub treat npm as the incumbent and keep writing `package-lock.json` rather than switching to nub identity and `nub.lock`. Electron Forge and the vendored shadcn skill also read it.
-- Keep `tsx` in `devDependencies`. It is an optional peer of Vite (`vite -> tsx@^4.8.1`) used to load the `.mts` config files; it is no longer a script runner here, but removing it is not safe.
-- Keep `.nvmrc`. It is nub's Node pin — nub provisions the version named there regardless of what is on `PATH` — and `scripts/require-node-version.mjs` reads it directly. `mise.toml` was removed because nub does not read it; verified, a project pinned only by `mise.toml` falls back to the ambient Node.
-- Keep the `nub rebuild` step in the `build` / `package` / `make` scripts. `nub install` and `nub ci` compile native modules against the **ambient** Node, while `nub run` executes under the **pinned** Node 24, so a contributor on a different Node gets an ABI mismatch (`NODE_MODULE_VERSION 147` vs `137`). It surfaces as the DMG maker failing to load `macos-alias`. `nub rebuild` recompiles under the pin and costs a few seconds against a multi-minute build. If a native module fails to load outside a build, run `nub rebuild` by hand.
-- Do not add `legacy-peer-deps` back to `.npmrc`. nub refuses it (`ERR_NUB_UNSUPPORTED_CONFIG`) because it always resolves peers. Pin a stale peer range narrowly in `overrides` instead, the way `@electron-forge/plugin-fuses` is pinned.
-- Do not remove `node-linker=hoisted` from `.npmrc`. Electron Forge addresses `node_modules` by flat literal path, and `nub run make` fails outright under nub's default isolated layout.
-- `nub add` / `nub update` re-resolve the whole graph and can trip nub's supply-chain trust gate (`ERR_NUB_TRUST_DOWNGRADE`). `nub install` and `nub ci` skip resolution against a current lockfile and are unaffected. Review the trust diff rather than reflexively disabling the policy.
-- The local Codex hook `.codex/hooks/enforce-nub-package-manager.sh` (plus the Claude hook `.claude/hooks/enforce-nub.sh`) block direct `npm`, `npx`, `bun`, `bunx`, `pnpm`, `pnpx`, `yarn`, `yarnpkg`, and matching `corepack` calls. Both resolve the binary a segment actually invokes, so a command that merely mentions one of those names in an argument is not blocked.
+- Use `npm install` instead of `bun install`, `pnpm install`, or `yarn install`.
+- Use `npm run <script>` instead of `bun run <script>`, `pnpm run <script>`, or `yarn run <script>`.
+- Use `npx <package>` instead of `bunx`, `pnpx`, or `yarn dlx`.
+- Use `npm install <package>` and `npm uninstall <package>` for dependency changes.
+- Do not create `bun.lock`, `pnpm-lock.yaml`, or `yarn.lock`.
+- When creating or updating `package.json`, set `packageManager` to an npm version and keep `package-lock.json` as the lockfile.
+- The local Codex hook `.codex/hooks/enforce-npm-package-manager.sh` (plus the Claude hook `.claude/hooks/enforce-npm.sh`) block direct `bun`, `bunx`, `pnpm`, `pnpx`, `yarn`, `yarnpkg`, and matching `corepack` package-manager calls.
 
 ## Biome Policy
 
 This repository uses Biome instead of ESLint and Prettier.
 
-- Run `nub run check` before finishing changes that touch JavaScript, TypeScript, JSX, TSX, CSS, or JSON.
-- Use `nub run check:fix` to apply safe Biome fixes, including formatting and import organization.
-- Keep `nub run typecheck` as a separate verification step for TypeScript type errors. It checks two projects — the app (`tsconfig.json`) and dev scripts (`tsconfig.scripts.json`) — so `.ts` files under `scripts/` are type-checked even though `nub`/`node` run them without checking.
-- `tsconfig.json` sets `lib` to `ES2023` because the source uses `Array.prototype.findLast`. Do not lower it back to `ES2022`: the build only appeared to work there because a transitive `type-fest` copy leaked `/// <reference lib="esnext" />` into the compile, which any dependency bump can undo.
+- Run `npm run check` before finishing changes that touch JavaScript, TypeScript, JSX, TSX, CSS, or JSON.
+- Use `npm run check:fix` to apply safe Biome fixes, including formatting and import organization.
+- Keep `npm run typecheck` as a separate verification step for TypeScript type errors. It checks two projects — the app (`tsconfig.json`) and dev scripts (`tsconfig.scripts.json`) — so `.ts` files under `scripts/` are type-checked even though `npx tsx`/`node` run them without checking.
 - Do not add ESLint or Prettier configuration unless the user explicitly asks for it.
 
 ## Testing Policy
 
-Vitest is the mandated test runner for renderer and shared tests. Packages are driven by nub — Bun is no longer used (the enforcement hook blocks it), and the runner is Vitest, never `bun test`.
+Vitest is the mandated test runner for renderer and shared tests. npm is the package manager — Bun is no longer used (the enforcement hook blocks it), and the runner is Vitest, never `bun test`.
 
 - Renderer tests (`tests/renderer/**`) and shared tests (`tests/shared/**`) run under Vitest. Do not import from `bun:test`. Do not add Jest, Mocha, or any other runner.
-- Install test tooling with `nub add -D <pkg>` and run Vitest with `nubx vitest` (for example `nubx vitest run`, or a focused `nubx vitest run <file>`). Do not use `npm`/`npx`/`bun`/`bunx`/`pnpm`/`yarn`.
+- npm manages packages: install test tooling with `npm install -D` and run Vitest with `npx vitest` (for example `npx vitest run`, or a focused `npx vitest run <file>`). Do not use `bun`/`bunx`/`pnpm`/`yarn`.
 - Vitest config lives in `vitest.config.mts`. The default `environment` is `node` so platform-sensitive pure-logic tests (keymap, etc.) keep the real `navigator`/`process`. DOM component tests opt into happy-dom per file with a `// @vitest-environment happy-dom` docblock — never register a DOM globally.
 - DOM harness: `tests/renderer/support/dom.tsx` exposes `renderWithProviders` and the `window.ensemblr` stub helpers; jest-dom matchers are registered globally in `tests/renderer/support/vitest.setup.ts`. `@testing-library/react` auto-unmounts after each test because `globals: true`.
-- Coverage is native Istanbul: run `nubx vitest run --coverage` (provider `istanbul`) to emit `coverage/coverage-final.json`, which `fallow audit --coverage <file> --coverage_root <repo root>` reads directly. There is no lcov→istanbul bridge; do not reintroduce one.
+- Coverage is native Istanbul: run `npx vitest run --coverage` (provider `istanbul`) to emit `coverage/coverage-final.json`, which `fallow audit --coverage <file> --coverage_root <repo root>` reads directly. There is no lcov→istanbul bridge; do not reintroduce one.
 - Mocks use Vitest: `vi.fn()` for spies, `vi.spyOn()` for method spies, and `vi.mock()` (hoisted; use `vi.hoisted()` for factory-referenced variables) for module mocks. Do not use `mock()`/`mock.module()`.
 - Main-process tests (`tests/main/**`) stay on their `electron --test` scripts — they need the Electron runtime and are not run by Vitest.
 
@@ -89,7 +81,7 @@ Vitest is the mandated test runner for renderer and shared tests. Packages are d
 - Use canonical Tailwind classes before arbitrary values. For example, use `text-xs` instead of `text-[0.75rem]`, `rounded-2xl` instead of `rounded-[0.375rem]`, and `rounded-sm` instead of `rounded-[0.125rem]`.
 - If a value is not available as a canonical Tailwind class, use rem-based arbitrary values instead of px-based arbitrary values, especially for typography: use `text-[0.8125rem]` instead of `text-[13px]`.
 - Prefer semantic or existing tokenized utilities over new arbitrary values when the design system already exposes the needed value.
-- `nub run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. Update that script when adding another canonical class equivalence that agents should preserve.
+- `npm run check` runs `scripts/check-tailwind-classes.mjs`, which fails on square-bracket pixel utilities and known non-canonical arbitrary classes. Update that script when adding another canonical class equivalence that agents should preserve.
 
 ## Scoped Agent Instructions
 

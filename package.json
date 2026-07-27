@@ -13,7 +13,7 @@
 	"scripts": {
 		"dev": "electron-forge start",
 		"start": "electron-forge start",
-		"check": "biome check . && nub run check:tailwind",
+		"check": "biome check . && npm run check:tailwind",
 		"check:tailwind": "node scripts/check-tailwind-classes.mjs",
 		"check:fix": "biome check --write .",
 		"icon:generate": "node scripts/generate-app-icon.mjs",
@@ -69,16 +69,16 @@
 		"test:linear": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/linear-oauth.test.ts tests/main/linear-oauth-callback-server.test.ts tests/main/linear-auth-service.test.ts tests/main/linear-client.test.ts tests/main/linear-store.test.ts tests/main/linear-service.test.ts tests/main/workspace-create-linked-issue.test.ts",
 		"test:linear-renderer": "vitest run tests/renderer/linear-issue-view.test.ts tests/renderer/linear-issue-editor.test.ts tests/renderer/workspace-linked-issue-landing.test.ts",
 		"typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.scripts.json",
-		"build": "node scripts/require-node-version.mjs && nub rebuild && electron-forge package --arch=arm64",
-		"package": "node scripts/require-node-version.mjs && nub rebuild && electron-forge package --arch=arm64",
-		"make": "node scripts/require-node-version.mjs && nub rebuild && electron-forge make --arch=arm64",
-		"make:canary": "ENSEMBLR_BUILD_CHANNEL=canary nub run make",
-		"make:dev": "ENSEMBLR_BUILD_CHANNEL=dev nub run make",
-		"make:unsigned": "ENSEMBLR_SKIP_SIGN=1 nub run make",
-		"package:dev": "ENSEMBLR_BUILD_CHANNEL=dev nub run package",
-		"package:unsigned": "ENSEMBLR_SKIP_SIGN=1 nub run package",
+		"build": "node scripts/require-node-version.mjs && electron-forge package --arch=arm64",
+		"package": "node scripts/require-node-version.mjs && electron-forge package --arch=arm64",
+		"make": "node scripts/require-node-version.mjs && electron-forge make --arch=arm64",
+		"make:canary": "ENSEMBLR_BUILD_CHANNEL=canary npm run make",
+		"make:dev": "ENSEMBLR_BUILD_CHANNEL=dev npm run make",
+		"make:unsigned": "ENSEMBLR_SKIP_SIGN=1 npm run make",
+		"package:dev": "ENSEMBLR_BUILD_CHANNEL=dev npm run package",
+		"package:unsigned": "ENSEMBLR_SKIP_SIGN=1 npm run package",
 		"diagnose:dock-flash": "node scripts/diagnose-dock-flash.mjs",
-		"doctor": "nubx -y react-doctor@latest",
+		"doctor": "npx react-doctor@latest",
 		"postinstall": "node scripts/fix-node-pty-permissions.mjs"
 	},
 	"keywords": [
@@ -168,22 +168,12 @@
 		"@electron/node-gyp": "10.2.0-electron.1",
 		"linkify-it": "^5.0.2",
 		"tar": "^7.5.19",
-		"tmp": "^0.2.7",
-		"@electron-forge/plugin-fuses": {
-			"@electron/fuses": "$@electron/fuses"
-		}
+		"tmp": "^0.2.7"
 	},
 	"allowScripts": {
 		"esbuild@0.28.1": true,
 		"fs-xattr@0.3.1": true,
 		"macos-alias@0.2.12": true,
-		"core-js-pure": false,
-		"node-pty": false
-	},
-	"allowBuilds": {
-		"esbuild": true,
-		"fs-xattr": true,
-		"macos-alias": true,
 		"core-js-pure": false,
 		"node-pty": false
 	}

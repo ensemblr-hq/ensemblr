@@ -123,17 +123,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Toolchain → nub**: [nub](https://nubjs.com/docs) 0.6.0 replaces npm as the required toolchain — `nub install` / `nub ci`, `nub run <script>`, `nubx <pkg>`, `nub add` / `nub remove`, and `nub <file>.ts` for the TypeScript dev scripts. `package-lock.json` stays the lockfile and `packageManager` stays on npm (that field is what keeps nub in npm-incumbent mode). Enforcement hooks were renamed to `enforce-nub.sh` / `enforce-nub-package-manager.sh` and now block `npm`/`npx` alongside `bun`/`pnpm`/`yarn`; both hooks gained quote-aware command splitting, so a command that merely *mentions* a blocked name in an argument (`grep -nE 'npm |npx '`) is no longer falsely blocked. See [ADR 0039](docs/adr/0039-adopt-nub-toolchain.md). Details:
-  - Builds no longer depend on the ambient Node: nub reads `.nvmrc` and provisions Node 24 itself, so `nub run make` succeeds on machines where `npm run make` tripped the `require-node-version.mjs` guard
-  - `legacy-peer-deps=true` removed from `.npmrc` (nub refuses it); the single stale `@electron-forge/plugin-fuses` → `@electron/fuses@^1` peer edge is now pinned narrowly in `overrides`
-  - `node-linker=hoisted` added to `.npmrc` — Electron Forge addresses `node_modules` by flat literal path, and packaging fails under nub's default isolated layout
-  - `allowBuilds` added alongside `allowScripts` (npm 12 still reads the latter), keeping the `core-js-pure` / `node-pty` build denials explicit under both tools
-  - Fresh-workspace bootstrap (`.conductor/settings.toml`, `.ensemblr/settings.toml`) now runs `nub ci` and assumes nub is installed
-  - `mise.toml` removed — nub does not read it, so it was dead config; `.nvmrc` is now the single Node pin, read by both nub and `scripts/require-node-version.mjs`
-  - `minimumReleaseAgeStrict=false` set in `.npmrc` — nub's 24h cooling window otherwise hard-fails `nub run doctor` (`react-doctor@latest`) within a day of any release; resolution now degrades to the newest mature version instead, keeping the protection
-  - `doctor` script passes `nubx -y`: unlike `npx`, nub prompts for consent on a registry fetch and fails closed without a TTY
-  - `build` / `package` / `make` gained a `nub rebuild` step: nub compiles native modules against the ambient Node but runs scripts under the pinned Node 24, so on a machine defaulting to another Node `macos-alias` was built ABI 147 and failed to load under 137, breaking the DMG maker
-
 - **Workspace Services & Renderer State Refinements** (`455536e`, #143; `3f75d47`, #140; `7725421`, #138): Refined workspace services and renderer state handling, removed inactive-workspace dead ends and stabilized tabs, and persisted action prompts while preserving the app-detection cache.
 
 - **Pull Request Editing** (`dfebc6b`, #139): Improved pull-request editing and collapsed-header actions.
@@ -168,8 +157,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Main-process suites (`tests/main/**`) stay on `electron --test` — they need the Electron runtime
 
 ### Fixed
-
-- **Latent `tsconfig.json` lib gap**: `lib` moved `ES2022` → `ES2023`. The source uses `Array.prototype.findLast` (ES2023), and typecheck only passed because a hoisted transitive `type-fest@0.13.1` leaked `/// <reference lib="esnext" />` into the compile — any dedupe or dependency bump could have flipped that slot and broken the build. Surfaced by the nub migration; the bug predates it.
 
 - **App Single-Instance Hardening** (`4dc992a`, #163; `74125bf`, #164): Prevent duplicate app instances during shell-environment loading; harden the single-instance lock and quit on last window.
 

@@ -1,6 +1,6 @@
 "$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
 
 [scripts]
-run = "nub run dev"
+run = "npm run dev"
 run_mode = "concurrent"
-setup = "nub ci"
+setup = "npm ci --allow-remote=all"
