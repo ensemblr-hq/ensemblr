@@ -17,7 +17,7 @@ import type { ForgeConfig } from '@electron-forge/shared-types';
 // then hits the running instance's single-instance lock and quits, flashing a
 // stray Dock tile. Only the shipped release may claim the canonical id; every
 // dogfood build gets its own so it can never masquerade as (or collide with)
-// another channel. Release is the default so `npm run make`/`package` keep
+// another channel. Release is the default so `nub run make`/`package` keep
 // producing the store build; dogfood builds opt in via `ENSEMBLR_BUILD_CHANNEL`
 // (see the `make:canary` / `make:dev` scripts). See docs/adr/0032.
 const KNOWN_CHANNELS = ['release', 'canary', 'dev'] as const;
@@ -143,7 +143,7 @@ const config: ForgeConfig = {
 			'resources/pi-extensions',
 		],
 		// Packager resolves the platform extension (`icon.icns` on macOS).
-		// Regenerate with `npm run icon:generate`.
+		// Regenerate with `nub run icon:generate`.
 		icon: './assets/icon',
 		// Per-channel product name; also isolates userData (and the
 		// single-instance lock keyed on it) for non-release channels.

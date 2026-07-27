@@ -14,7 +14,7 @@
 		// Vitest runs renderer tests directly; treat each file as an entry so
 		// fallow doesn't flag them as unused.
 		"tests/**/*.test.{ts,tsx}",
-		// Dev tooling scripts run directly via `node` (.mjs) or `npx tsx` (.ts);
+		// Dev tooling scripts run directly via `node` (.mjs) or `nub` (.ts);
 		// treat each as an entry so fallow doesn't flag them as unused files.
 		"scripts/**/*.{mjs,ts}",
 		// Pi extensions are loaded at runtime by the Pi child via

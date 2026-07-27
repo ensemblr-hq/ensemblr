@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * Generates a 512x512 social avatar and writes `assets/avatar.png` (gitignored —
- * regenerate with `npm run avatar:generate`).
+ * regenerate with `nub run avatar:generate`).
  *
  * The avatar shares the icon's glitch "E" mark and emissive bloom but drops the
  * squircle body and rim: it renders full-bleed on the dark canvas token so it
  * fills the square with opaque, borderless corners. Profile surfaces mask
  * corners themselves and render icon transparency as black, so no rim is wanted.
  *
- * Run: `npm run avatar:generate` (or `node scripts/generate-avatar.mjs`).
+ * Run: `nub run avatar:generate` (or `node scripts/generate-avatar.mjs`).
  */
 
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';

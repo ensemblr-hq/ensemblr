@@ -7,7 +7,7 @@
  * `icon-colors.mjs` so the icon and the social avatar (`generate-avatar.mjs`)
  * stay in sync. `iconutil` assembles the final `.icns`.
  *
- * Run: `npm run icon:generate` (or `node scripts/generate-app-icon.mjs`).
+ * Run: `nub run icon:generate` (or `node scripts/generate-app-icon.mjs`).
  */
 
 import {

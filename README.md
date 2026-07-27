@@ -155,14 +155,17 @@ recent changes.
 | Storage | SQLite (`~/Library/Application Support/dev.ensemblr.app/ensemblr.db` on macOS) |
 | Build | Vite 8, Electron Forge (DMG + ZIP, hardened runtime, notarized, arm64) |
 | Lint / format | Biome 2.5 |
-| Package manager | npm |
+| Toolchain | nub (runner, TypeScript runtime, package manager) over npm-format `package-lock.json` |
 
 ---
 
 ## Prerequisites
 
 - **macOS**
-- **[npm](https://www.npmjs.com)** — the enforced package manager, bundled with Node.js (see [`AGENTS.md`](./AGENTS.md)).
+- **[nub](https://nubjs.com/docs)** — the required toolchain: script runner, TypeScript runtime, and
+  package manager. Install with `brew install nub` or `curl -fsSL https://nubjs.com/install.sh | bash`.
+  It provisions the pinned Node 24 itself, so no `nvm`/`mise` step is needed (see [`AGENTS.md`](./AGENTS.md)
+  and [ADR 0039](./docs/adr/0039-adopt-nub-toolchain.md)).
 - **Pi CLI** — the first-party agent runtime; Ensemblr spawns it in RPC mode
   (see [`docs/pi/rpc-protocol.md`](./docs/pi/rpc-protocol.md)).
 - **Third-party harness CLIs** _(optional)_ — install `claude`, `codex`, and/or `vibe` to launch them
@@ -179,17 +182,17 @@ recent changes.
 
 ```bash
 # Install dependencies (postinstall fixes node-pty native-module permissions)
-npm install
+nub install
 
 # Launch the app in development
-npm run dev
+nub run dev
 ```
 
 Build outputs (macOS, arm64):
 
 ```bash
-npm run package    # unpacked .app under out/
-npm run make       # signed + notarized .dmg and .zip under out/make/
+nub run package    # unpacked .app under out/
+nub run make       # signed + notarized .dmg and .zip under out/make/
 ```
 
 `make` produces a release build; `make:canary` / `make:dev` build dogfood channels, and
@@ -268,19 +271,21 @@ code ([ADR&nbsp;0040](./docs/adr/0040-use-loopback-control-server-for-agent-app-
 
 This repository has explicit contributor policies — see [`AGENTS.md`](./AGENTS.md). In brief:
 
-- **npm only.** Use `npm install`, `npm run <script>`, and `npx`. Do not create `bun.lock`,
-  `pnpm-lock.yaml`, or `yarn.lock`.
+- **nub only.** Use `nub install` / `nub ci`, `nub run <script>`, `nubx <pkg>`, `nub add <pkg>`, and
+  `nub <file>.ts`. `npm`, `npx`, `bun`, `pnpm`, and `yarn` are blocked by the enforcement hooks. The
+  lockfile stays npm-format: keep `package-lock.json`, and do not create `bun.lock`,
+  `pnpm-lock.yaml`, `yarn.lock`, or `nub.lock`.
 - **Biome** for lint + format (no ESLint/Prettier):
 
   ```bash
-  npm run check       # biome check + Tailwind class check
-  npm run check:fix   # apply safe fixes (format + import organization)
-  npm run format      # format only
-  npm run lint        # lint only
-  npm run typecheck   # tsc --noEmit for the app + scripts/ (tsconfig.scripts.json)
+  nub run check       # biome check + Tailwind class check
+  nub run check:fix   # apply safe fixes (format + import organization)
+  nub run format      # format only
+  nub run lint        # lint only
+  nub run typecheck   # tsc --noEmit for the app + scripts/ (tsconfig.scripts.json)
   ```
 
-- **Tailwind scale.** No px-based arbitrary utilities (e.g. `w-[13px]`); `npm run check` enforces this via
+- **Tailwind scale.** No px-based arbitrary utilities (e.g. `w-[13px]`); `nub run check` enforces this via
   `scripts/check-tailwind-classes.mjs`.
 - **State.** Jotai is the only app-level state solution.
 - **Docs.** JSDoc is expected on functions, hooks, components, atoms, and IPC contracts.
@@ -292,26 +297,26 @@ This repository has explicit contributor policies — see [`AGENTS.md`](./AGENTS
 
 ## Testing
 
-Tests run under two runners (npm is the package manager, not a test runner):
+Tests run under two runners (nub is the toolchain, not a test runner):
 
-- **Vitest** (`npx vitest run`) — shared (`tests/shared/**`) and renderer (`tests/renderer/**`) suites.
+- **Vitest** (`nubx vitest run`) — shared (`tests/shared/**`) and renderer (`tests/renderer/**`) suites.
   Config in `vitest.config.mts`; default `environment` is `node`, and DOM component tests opt into
   happy-dom per file with a `// @vitest-environment happy-dom` docblock.
 - **`electron --test`** (via `ELECTRON_RUN_AS_NODE=1`) — main-process suites (`tests/main/**`) that need Electron/Node APIs.
 
-Run everything with `npm run test`; add coverage with `npm run test:coverage` (native Istanbul →
+Run everything with `nub run test`; add coverage with `nub run test:coverage` (native Istanbul →
 `coverage/coverage-final.json`). Focused examples:
 
 ```bash
-npm run test              # full Vitest suite (renderer + shared)
-npm run test:coverage     # Vitest with Istanbul coverage
-npx vitest run <file>    # a single Vitest file
-npm run test:renderer     # renderer suites (Vitest)
-npm run test:pi-rpc       # Pi RPC parsing (Vitest)
-npm run test:db           # SQLite database (electron --test)
-npm run test:workspace    # workspace creation (electron --test)
-npm run test:github       # GitHub service (electron --test)
-npm run test:linear       # Linear OAuth/API (electron --test)
+nub run test              # full Vitest suite (renderer + shared)
+nub run test:coverage     # Vitest with Istanbul coverage
+nubx vitest run <file>    # a single Vitest file
+nub run test:renderer     # renderer suites (Vitest)
+nub run test:pi-rpc       # Pi RPC parsing (Vitest)
+nub run test:db           # SQLite database (electron --test)
+nub run test:workspace    # workspace creation (electron --test)
+nub run test:github       # GitHub service (electron --test)
+nub run test:linear       # Linear OAuth/API (electron --test)
 ```
 
 See `package.json` for the full list of `test:*` scripts.
