@@ -24,7 +24,7 @@
 				"hooks": [
 					{
 						"type": "command",
-						"command": ".claude/hooks/enforce-nub.sh"
+						"command": ".claude/hooks/enforce-npm.sh"
 					}
 				]
 			}

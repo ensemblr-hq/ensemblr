@@ -11,8 +11,8 @@
  * faithful even when a frame is malformed.
  *
  * Usage:
- *   nub scripts/capture-pi-fixtures.ts            # run all scenarios
- *   nub scripts/capture-pi-fixtures.ts file-edit  # run selected scenarios
+ *   npx tsx scripts/capture-pi-fixtures.ts            # run all scenarios
+ *   npx tsx scripts/capture-pi-fixtures.ts file-edit  # run selected scenarios
  *
  * Protocol notes: docs/pi/rpc-protocol.md
  */

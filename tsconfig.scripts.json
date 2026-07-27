@@ -1,8 +1,8 @@
 {
-	// Dev tooling scripts run under `node` (.mjs) or `nub` (.ts), not the Vite
-	// bundler, so they are excluded from the main `tsconfig.json` include. Typecheck
-	// them here (via `nub run typecheck`) so `.ts` scripts do not ship type errors
-	// that nub — which strips types without checking — would never catch.
+	// Dev tooling scripts run under `node`/`npx tsx`, not the Vite bundler, so they
+	// are excluded from the main `tsconfig.json` include. Typecheck them here (via
+	// `npm run typecheck`) so `.ts` scripts do not ship type errors that tsx — which
+	// strips types without checking — would never catch.
 	"extends": "./tsconfig.json",
 	"compilerOptions": {
 		"types": ["node"]

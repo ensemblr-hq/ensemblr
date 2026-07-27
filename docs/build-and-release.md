@@ -8,11 +8,8 @@ channels. The packaging config lives in `forge.config.ts`.
 ## Prerequisites
 
 - **macOS on Apple silicon** (builds are arm64-only).
-- **[nub](https://nubjs.com/docs)** — the required toolchain (`brew install nub`).
 - **Node `>=24 <25`** — enforced by `scripts/require-node-version.mjs`, which
-  `package`/`make` run first. Running builds through `nub run` satisfies this
-  automatically: nub reads `.nvmrc` and provisions Node 24 regardless of what is
-  on `PATH`, so the guard passes even when the default Node is newer.
+  `package`/`make` run first.
 - For a **signed, notarized** build:
   - A **Developer ID Application** certificate in your login keychain.
   - An **App Store Connect API key**, supplied via environment variables (a
@@ -26,10 +23,10 @@ Signing entitlements are in `entitlements.plist` (hardened runtime).
 ## Commands
 
 ```bash
-nub run dev          # run the app in development (electron-forge start)
+npm run dev          # run the app in development (electron-forge start)
 
-nub run package      # build an unpacked .app under out/ (arm64)
-nub run make         # build distributables (.dmg + .zip) under out/make/
+npm run package      # build an unpacked .app under out/ (arm64)
+npm run make         # build distributables (.dmg + .zip) under out/make/
 ```
 
 `make` and `package` cover the common cases; the channel/skip variants below
@@ -37,12 +34,12 @@ wrap them with environment variables:
 
 | Script | Channel | Signed? | Notes |
 | --- | --- | --- | --- |
-| `nub run make` | release | yes¹ | The shipping build (`dev.ensemblr.app` / "Ensemblr"). |
-| `nub run make:canary` | canary | yes¹ | Dogfood build with its own identity. |
-| `nub run make:dev` | dev | yes¹ | Dogfood build with its own identity. |
-| `nub run make:unsigned` | release | no | `ENSEMBLR_SKIP_SIGN=1` — skip signing/notarization. |
-| `nub run package:dev` | dev | — | Unpacked `.app`, dev channel. |
-| `nub run package:unsigned` | release | no | Unpacked `.app`, signing skipped. |
+| `npm run make` | release | yes¹ | The shipping build (`dev.ensemblr.app` / "Ensemblr"). |
+| `npm run make:canary` | canary | yes¹ | Dogfood build with its own identity. |
+| `npm run make:dev` | dev | yes¹ | Dogfood build with its own identity. |
+| `npm run make:unsigned` | release | no | `ENSEMBLR_SKIP_SIGN=1` — skip signing/notarization. |
+| `npm run package:dev` | dev | — | Unpacked `.app`, dev channel. |
+| `npm run package:unsigned` | release | no | Unpacked `.app`, signing skipped. |
 
 ¹ Signed and notarized **only** when the Apple credentials above are present and
 `ENSEMBLR_SKIP_SIGN` is not set; otherwise the same command produces an
@@ -87,24 +84,22 @@ the env-strip + single-instance lock that closed the other path).
 
 ## Outputs
 
-`nub run make` writes to `out/make/`:
+`npm run make` writes to `out/make/`:
 
 - **`.dmg`** (ULFO format) — the primary distributable.
 - **`.zip`** — a zipped `.app` for auto-update / direct download.
 
-`nub run package` writes the unpacked `.app` to `out/`.
+`npm run package` writes the unpacked `.app` to `out/`.
 
 ## Troubleshooting
 
-- **Stray Dock icon / duplicate instance.** Run `nub run diagnose:dock-flash`
+- **Stray Dock icon / duplicate instance.** Run `npm run diagnose:dock-flash`
   (`scripts/diagnose-dock-flash.mjs`): it lists every `dev.ensemblr.app*` Launch
   Services registration and flags id collisions and dangling entries; add
   `--fix` to unregister dangling ones (live sibling builds are left alone).
 - **Node version error at build.** `require-node-version.mjs` refuses to build on
-  a Node outside `>=24 <25`. Run the build through `nub run make` / `nub run package`
-  and nub provisions the pinned Node 24 itself; the error means the build was
-  started outside nub. `nvm` (which reads the same `.nvmrc`) remains a fallback.
-- **App icon.** Regenerate with `nub run icon:generate`
+  a Node outside `>=24 <25`; switch with `nvm`/`mise` (`.nvmrc` / `mise.toml`).
+- **App icon.** Regenerate with `npm run icon:generate`
   (`scripts/generate-app-icon.mjs`).
 
 ## See also

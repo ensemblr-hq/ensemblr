@@ -24,41 +24,6 @@ clean_token_base() {
   printf '%s' "$token"
 }
 
-# Split on shell command separators, but only outside quotes: a `|` inside
-# `grep -E 'npm |npx '` is data, not a pipe, and splitting on it would flag the
-# argument as an invocation.
-split_command_segments() {
-  local text="$1" quote="" out="" i char
-  for ((i = 0; i < ${#text}; i++)); do
-    char="${text:i:1}"
-    if [[ -n "$quote" ]]; then
-      # A newline inside quotes is data, not a separator; the read loop below
-      # splits on newlines, so fold it to a space to keep the quoted argument
-      # in one segment (else `-m "line1<newline>npm ..."` false-blocks).
-      if [[ "$char" == $'\n' ]]; then
-        out+=" "
-      else
-        out+="$char"
-      fi
-      [[ "$char" == "$quote" ]] && quote=""
-      continue
-    fi
-    case "$char" in
-      \'|\")
-        quote="$char"
-        out+="$char"
-        ;;
-      \;|\&|\|)
-        out+=$'\n'
-        ;;
-      *)
-        out+="$char"
-        ;;
-    esac
-  done
-  printf '%s\n' "$out"
-}
-
 first_invoked_command() {
   local segment
   segment="$(trim_left "$1")"
@@ -78,13 +43,13 @@ first_invoked_command() {
     local base
     base="$(clean_token_base "$token")"
 
-    if [[ "$token" =~ ^[A-Za-z_][A-Za-z0-9_]*=.*$ || "$token" == -* ]]; then
+    if [[ "$token" =~ ^[A-Za-z_][A-Za-z0-9_]*=.*$ ]]; then
       segment="$rest"
       continue
     fi
 
     case "$base" in
-      sudo|command|exec|time|noglob|nohup|xargs)
+      sudo|command|exec|time|noglob|nohup)
         segment="$rest"
         continue
         ;;
@@ -122,7 +87,7 @@ while IFS= read -r segment; do
   invoked="$(first_invoked_command "$segment")"
 
   case "$invoked" in
-    npm|npx|bun|bunx|pnpm|pnpx|yarn|yarnpkg)
+    bun|bunx|pnpm|pnpx|yarn|yarnpkg)
       blocked_command="$invoked"
       break
       ;;
@@ -133,14 +98,14 @@ while IFS= read -r segment; do
       fi
       ;;
   esac
-done < <(split_command_segments "$command_text")
+done < <(printf '%s\n' "$command_text" | sed -E 's/[;&]+/\n/g; s/[[:space:]]*\|\|[[:space:]]*/\n/g; s/[[:space:]]*\|[[:space:]]*/\n/g')
 
 if [[ -n "$blocked_command" ]]; then
   jq -cn --arg blocked "$blocked_command" '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
-      permissionDecisionReason: ("BLOCK: this repo runs on nub. Do not call " + $blocked + ". Use nub install / nub ci, nub add <pkg>, nub remove <pkg>, nub run <script>, nubx <pkg>, or nub <file>.ts. See ADR 0039.")
+      permissionDecisionReason: ("BLOCK: this repo enforces npm. Do not call " + $blocked + ". Use npm equivalents: npm install, npm i <pkg>, npm uninstall <pkg>, npm run <script>, or npx <pkg>.")
     }
   }'
 fi
