@@ -17,6 +17,10 @@ import type {
 	TabsChangedBroadcast,
 } from '../../shared/agent-control.ts';
 import { findHarnessDefinition } from '../../shared/agents/harness-registry.ts';
+import type {
+	PiPersistedEnvelope,
+	PiWireMessagePayload,
+} from '../../shared/ipc/contracts/pi-session';
 import type { PermissionMode } from '../../shared/permissions.ts';
 import type { HarnessDetectionService } from '../agents/harness-detection-service.ts';
 import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
@@ -372,6 +376,8 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				piSessionId: snapshot.id,
 				status: snapshot.status,
 				runtimeOpen: snapshot.runtimeOpen,
+				hasFinalMessage:
+					findLastAssistantText(deps, snapshot.branchId) !== null,
 			};
 		},
 		getLastMessage: async (piSessionId) => {
@@ -379,14 +385,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			if (!snapshot) {
 				return null;
 			}
-			const events = deps.piSessionService.listEvents(snapshot.branchId);
-			for (let i = events.length - 1; i >= 0; i -= 1) {
-				const text = extractAssistantText(events[i]?.payload);
-				if (text) {
-					return text;
-				}
-			}
-			return null;
+			return findLastAssistantText(deps, snapshot.branchId);
 		},
 		resolveConversationWorkspace: async (piSessionId) =>
 			deps.piSessionService.getSession(piSessionId)?.workspaceId ?? null,
@@ -476,34 +475,69 @@ async function rollbackConversation(
 }
 
 /**
- * Best-effort extraction of assistant text from a persisted Pi event payload.
- * Returns null when the payload is not an assistant message with text.
- * @param payload - Persisted event payload of unknown shape.
- * @returns The assistant text, or null.
+ * Scans a conversation branch newest-first for the last assistant answer,
+ * stopping at the first one found, so status and last-message reads share one
+ * definition of "has a final report" without loading the whole branch. The
+ * session service yields persisted payloads lazily and already excludes
+ * checkpoint-hidden turns; persisted events survive the session closing and app
+ * restarts, so this recovers a finished child's report even when it is no
+ * longer live.
+ * @param deps - Adapter collaborators exposing the Pi session service.
+ * @param branchId - The conversation branch whose events to scan.
+ * @returns The last assistant text, or null when the branch has none.
  */
-function extractAssistantText(payload: unknown): string | null {
-	if (!payload || typeof payload !== 'object') {
+function findLastAssistantText(
+	deps: PortAdapterDeps,
+	branchId: string,
+): string | null {
+	for (const payload of deps.piSessionService.iterateEventPayloadsDescending(
+		branchId,
+	)) {
+		const text = extractAssistantText(payload);
+		if (text) {
+			return text;
+		}
+	}
+	return null;
+}
+
+/**
+ * Extracts the assistant's visible answer from a persisted Pi event envelope.
+ * Persisted events are {@link PiPersistedEnvelope} tagged unions, so a completed
+ * assistant turn is an `agent`-role `message` whose inner payload holds the
+ * final text (as `message` parts or a standalone `text` payload). Reasoning
+ * parts, tool calls, streaming deltas, and non-agent envelopes yield null, so
+ * `getLastMessage` can scan newest-first for the last real answer.
+ * @param payload - A persisted Pi event envelope, or null for a gap.
+ * @returns The assistant text, or null when the event carries none.
+ */
+function extractAssistantText(
+	payload: PiPersistedEnvelope | null | undefined,
+): string | null {
+	if (payload?.kind !== 'message' || payload.role !== 'agent') {
 		return null;
 	}
-	const message = (payload as { message?: unknown }).message;
-	if (!message || typeof message !== 'object') {
-		return null;
-	}
-	const record = message as { role?: unknown; content?: unknown };
-	if (record.role !== 'assistant' || !Array.isArray(record.content)) {
-		return null;
-	}
-	const text = record.content
-		.filter(
-			(block): block is { type: 'text'; text: string } =>
-				typeof block === 'object' &&
-				block !== null &&
-				(block as { type?: unknown }).type === 'text' &&
-				typeof (block as { text?: unknown }).text === 'string',
-		)
-		.map((block) => block.text)
-		.join('');
+	const text = messagePayloadText(payload.payload);
 	return text.length > 0 ? text : null;
+}
+
+/**
+ * Concatenates the visible text of an agent message payload: the text parts of
+ * a completed message, or a standalone text payload. Reasoning, deltas, and
+ * tool payloads contribute nothing.
+ * @param payload - The inner wire message payload of an agent envelope.
+ * @returns The joined assistant text, possibly empty.
+ */
+function messagePayloadText(payload: PiWireMessagePayload): string {
+	if (payload.kind === 'text') {
+		return payload.text;
+	}
+	if (payload.kind === 'message') {
+		return payload.parts
+			.flatMap((part) => (part.kind === 'text' ? [part.text] : []))
+			.join('');
+	}
+	return '';
 }
 
 /**

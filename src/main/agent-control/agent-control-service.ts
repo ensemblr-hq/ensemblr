@@ -13,6 +13,7 @@ import type {
 	FocusDockTabArgs,
 	FocusPanelArgs,
 	FocusTabArgs,
+	GetLastMessageResult,
 	LaunchHarnessArgs,
 	ListTabsArgs,
 	ListTerminalsArgs,
@@ -624,11 +625,11 @@ export function createAgentControlService({
 					),
 				);
 			case 'getLastMessage':
-				return ok(
-					await ports.conversations.getLastMessage(
+				return ok({
+					message: await ports.conversations.getLastMessage(
 						(args as ConversationRef).piSessionId,
 					),
-				);
+				} satisfies GetLastMessageResult);
 			case 'readTerminalOutput':
 				return ok(
 					await ports.terminals.readOutput(

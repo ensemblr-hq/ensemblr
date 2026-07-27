@@ -241,6 +241,36 @@ export function listEventsByBranch({
 	return rows.map(mapEventRow);
 }
 
+/**
+ * Yields a branch's persisted payloads newest-first (descending ordinal),
+ * parsing each row lazily so a caller scanning for the most recent matching
+ * event stops reading as soon as it finds one instead of loading and parsing
+ * the whole branch. Each yielded ordinal lets callers honor checkpoint hidden
+ * ranges.
+ * @param params - Database handle and the branch whose payloads to scan.
+ * @returns A generator of `{ ordinal, payload }` in descending ordinal order.
+ */
+export function* iterateBranchPayloadsDescending({
+	database,
+	branchId,
+}: {
+	branchId: string;
+	database: DatabaseSync;
+}): Generator<{ ordinal: number; payload: PiEventPayload }> {
+	const rows = database
+		.prepare(
+			`SELECT ordinal, payload_json FROM pi_session_events WHERE branch_id = ? ORDER BY ordinal DESC`,
+		)
+		.iterate(branchId) as unknown as IterableIterator<{
+		ordinal: number;
+		payload_json: string;
+	}>;
+
+	for (const row of rows) {
+		yield { ordinal: row.ordinal, payload: parsePayload(row.payload_json) };
+	}
+}
+
 /** Returns events tied to a specific turn in ordinal order. */
 export function listEventsByTurn({
 	database,

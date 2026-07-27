@@ -2,6 +2,7 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import type {
 	PiChatTabWire,
+	PiPersistedEnvelope,
 	PiSessionEventWire,
 	PiSessionSnapshotWire,
 	WriteForkSummaryRequest,
@@ -28,6 +29,7 @@ import {
 	setChatTabMetadata,
 } from '../storage/repositories/chat-tab-repository.ts';
 import {
+	iterateBranchPayloadsDescending,
 	listEventsByBranch,
 	type PiEventRow,
 } from '../storage/repositories/pi-event-repository.ts';
@@ -96,6 +98,16 @@ export interface PiSessionService {
 		workspaceId: string,
 	) => readonly PiSessionSnapshot[];
 	listEvents: (branchId: string) => readonly PiEventRow[];
+	/**
+	 * Scans a branch's persisted events newest-first, honoring checkpoint hidden
+	 * ranges just like {@link PiSessionService.listEvents}, and yields each
+	 * visible payload lazily so a caller that only needs the most recent matching
+	 * event (e.g. the last assistant answer) can stop early instead of loading
+	 * the whole branch.
+	 */
+	iterateEventPayloadsDescending: (
+		branchId: string,
+	) => Iterable<PiPersistedEnvelope | null>;
 	openSession: (request: OpenPiSessionRequest) => Promise<PiSessionSnapshot>;
 	/**
 	 * Sets the display name of an active Pi session via its runtime `/name`, then
@@ -209,6 +221,20 @@ export function createPiSessionService({
 			return events.filter(
 				(event) => !isOrdinalHidden(event.ordinal, hiddenRanges),
 			);
+		},
+		iterateEventPayloadsDescending: function* (branchId) {
+			const database = requireSessionDatabase();
+			const branch = getPiSessionBranchById({ database, id: branchId });
+			const hiddenRanges = branch ? readHiddenEventRanges(branch.metadata) : [];
+			for (const { ordinal, payload } of iterateBranchPayloadsDescending({
+				branchId,
+				database,
+			})) {
+				if (isOrdinalHidden(ordinal, hiddenRanges)) {
+					continue;
+				}
+				yield payload;
+			}
 		},
 		listSessionsForWorkspace: (workspaceId) => {
 			const database = requireSessionDatabase();

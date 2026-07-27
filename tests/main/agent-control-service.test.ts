@@ -47,6 +47,7 @@ const makePorts = (
 			piSessionId: 'pi-1',
 			status: 'idle',
 			runtimeOpen: true,
+			hasFinalMessage: true,
 		}),
 		getLastMessage: vi.fn().mockResolvedValue('last'),
 		listModels: vi
@@ -570,6 +571,35 @@ describe('agent-control service: delegation', () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) {
 			expect(result.data).toEqual({ defaultModelId: 'm-default', models: [] });
+		}
+	});
+
+	it('wraps the last assistant message for getLastMessage', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'getLastMessage',
+			token: 'tok-caller',
+			rawArgs: { piSessionId: 'pi-1' },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toEqual({ message: 'last' });
+		}
+	});
+
+	it('keeps a missing last message as an explicit null, not an empty envelope', async () => {
+		const ports = makePorts();
+		ports.conversations.getLastMessage = vi.fn().mockResolvedValue(null);
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'getLastMessage',
+			token: 'tok-caller',
+			rawArgs: { piSessionId: 'pi-1' },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toEqual({ message: null });
 		}
 	});
 

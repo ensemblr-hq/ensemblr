@@ -10,6 +10,7 @@ import {
 	setChatTabMetadata,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
 import { listAllWorkspaceRows } from '../../src/main/storage/repositories/workspace-repository.ts';
+import type { PiPersistedEnvelope } from '../../src/shared/ipc/contracts/pi-session';
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
 	getChatTabById: vi.fn(() => ({ workspaceId: 'ws', metadata: {} })),
@@ -215,5 +216,155 @@ describe('agent-control port adapters: conversation naming', () => {
 			sessionId: 'sess-1',
 			name: 'Docs sweep',
 		});
+	});
+});
+
+describe('agent-control port adapters: last message', () => {
+	const agentMessage = (text: string): PiPersistedEnvelope => ({
+		kind: 'message',
+		role: 'agent',
+		payload: {
+			kind: 'message',
+			role: 'assistant',
+			parts: [
+				{ kind: 'reasoning', text: 'internal thoughts' },
+				{ kind: 'text', text },
+			],
+		},
+	});
+
+	const withPayloads = (payloads: readonly (PiPersistedEnvelope | null)[]) => {
+		const { deps } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			getSession: vi.fn(() => ({ branchId: 'branch-1' })),
+			iterateEventPayloadsDescending: vi.fn(() => payloads),
+		};
+		return createAgentControlPorts(deps);
+	};
+
+	it('extracts the text parts of a completed agent message, skipping reasoning', async () => {
+		const ports = withPayloads([agentMessage('The build is green.')]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toBe('The build is green.');
+	});
+
+	it('returns the newest assistant answer, skipping a later non-text event', async () => {
+		const ports = withPayloads([
+			{ kind: 'status', previous: 'idle', status: 'idle' },
+			agentMessage('newest answer'),
+			agentMessage('older answer'),
+		]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toBe('newest answer');
+	});
+
+	it('reads a standalone text payload', async () => {
+		const ports = withPayloads([
+			{
+				kind: 'message',
+				role: 'agent',
+				payload: { kind: 'text', text: 'hello' },
+			},
+		]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toBe('hello');
+	});
+
+	it('skips streaming deltas that were never finalized into a message', async () => {
+		const ports = withPayloads([
+			{
+				kind: 'message',
+				role: 'agent',
+				payload: { kind: 'text-delta', text: 'partial' },
+			},
+			{
+				kind: 'message',
+				role: 'agent',
+				payload: { kind: 'reasoning-delta', text: 'thinking' },
+			},
+		]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toBeNull();
+	});
+
+	it('ignores user and tool envelopes', async () => {
+		const ports = withPayloads([
+			{
+				kind: 'message',
+				role: 'tool',
+				payload: {
+					kind: 'tool-result',
+					isError: false,
+					output: 'ok',
+					toolCallId: 'call-1',
+				},
+			},
+			{
+				kind: 'message',
+				role: 'user',
+				payload: { kind: 'text', text: 'the question' },
+			},
+		]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toBeNull();
+	});
+
+	it('returns null for an unknown session', async () => {
+		const { deps } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			getSession: vi.fn(() => undefined),
+			iterateEventPayloadsDescending: vi.fn(() => []),
+		};
+		const ports = createAgentControlPorts(deps);
+		const result = await ports.conversations.getLastMessage('gone');
+		expect(result).toBeNull();
+	});
+});
+
+describe('agent-control port adapters: conversation status', () => {
+	const withStatus = (
+		snapshot: unknown,
+		payloads: readonly (PiPersistedEnvelope | null)[] = [],
+	) => {
+		const { deps } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			getSession: vi.fn(() => snapshot),
+			iterateEventPayloadsDescending: vi.fn(() => payloads),
+		};
+		return createAgentControlPorts(deps);
+	};
+
+	it('reports hasFinalMessage true when a persisted assistant answer exists', async () => {
+		const ports = withStatus(
+			{ id: 'sess-1', branchId: 'b1', status: 'closed', runtimeOpen: false },
+			[
+				{
+					kind: 'message',
+					role: 'agent',
+					payload: { kind: 'text', text: 'the report' },
+				},
+			],
+		);
+		const result = await ports.conversations.getStatus('sess-1');
+		expect(result).toEqual({
+			piSessionId: 'sess-1',
+			status: 'closed',
+			runtimeOpen: false,
+			hasFinalMessage: true,
+		});
+	});
+
+	it('reports hasFinalMessage false when the branch has no assistant answer', async () => {
+		const ports = withStatus(
+			{ id: 'sess-2', branchId: 'b2', status: 'idle', runtimeOpen: true },
+			[{ kind: 'status', previous: 'idle', status: 'idle' }],
+		);
+		const result = await ports.conversations.getStatus('sess-2');
+		expect(result?.hasFinalMessage).toBe(false);
+	});
+
+	it('returns null for an unknown session', async () => {
+		const ports = withStatus(undefined);
+		expect(await ports.conversations.getStatus('gone')).toBeNull();
 	});
 });
