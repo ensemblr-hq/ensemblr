@@ -6,15 +6,24 @@
  * app picks the variant per agent from the caller's lineage depth; a parentless
  * session defaults to orchestrator.
  *
+ * {@link PLAN_MODE_AWARENESS} is a third, self-contained playbook that replaces
+ * whichever role variant an agent would otherwise get, for as long as its
+ * conversation is in Plan Mode. It is a replacement rather than an addition
+ * because the role variants tell an agent to do the work itself and list the
+ * delegation tools as available — exactly what Plan Mode blocks — and an agent
+ * handed both invents a reason for the contradiction instead of planning.
+ *
  * Two always-on injection points consume these:
  *
  * - **Harnesses** (Claude Code, Codex): the MCP server's `instructions` field
  *   (`src/main/agent-control/mcp-endpoint.ts`) uses the orchestrator variant —
  *   harnesses are launched as root sessions.
- * - **Pi**: the shipped extension embeds byte-identical copies of both variants
- *   in `resources/pi-extensions/ensemblr-control.mts` (it cannot import from
- *   `src/` at runtime in a packaged app) and selects one from the
- *   `ENSEMBLR_CONTROL_ROLE` env var; a parity test asserts the two never drift.
+ * - **Pi**: the shipped extension embeds byte-identical copies of all three
+ *   playbooks in `resources/pi-extensions/ensemblr-control.mts` (it cannot
+ *   import from `src/` at runtime in a packaged app), selects a role variant
+ *   from the `ENSEMBLR_CONTROL_ROLE` env var, and swaps in the plan-mode
+ *   playbook while the app reports Plan Mode on; a parity test asserts the
+ *   copies never drift.
  *
  * `docs/considerations/agent-orchestration-playbook.md` is the human-facing
  * reference for the same guidance and is kept in step by hand.
@@ -79,16 +88,27 @@ Etiquette & limits:
 - Actions may prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.`;
 
 /**
- * Playbook appended to the system prompt for every turn a Pi conversation
- * spends in Plan Mode. Pi-only by design: it is not folded into
- * {@link PREAMBLE}, which is also served to harnesses over MCP that have no
- * plan-mode toggle and no `ensemblr_exit_plan_mode` tool. The shipped Pi
- * extension embeds a byte-identical copy, policed by the same parity test as
- * the two role variants.
+ * Self-contained playbook served in place of a role variant for every turn a Pi
+ * conversation spends in Plan Mode: it carries its own intro and capability
+ * inventory so a planning agent holds one coherent set of instructions rather
+ * than a role playbook contradicted by a plan-mode addendum. Pi-only by design
+ * — it is not folded into {@link PREAMBLE}, which is also served to harnesses
+ * over MCP that have no plan-mode toggle and no `ensemblr_exit_plan_mode` tool.
+ * The shipped Pi extension embeds a byte-identical copy, policed by the same
+ * parity test as the two role variants.
  */
-export const PLAN_MODE_AWARENESS = `PLAN MODE IS ON. Do not implement anything yet. The \`write\` and \`edit\` tools are blocked, \`bash\` is restricted to read-only commands, and the Ensemblr tools that would hand the work to something else — terminals, harnesses, follow-ups, and new conversations — are blocked too. That enforcement is deliberate — do not look for a way around it.
+export const PLAN_MODE_AWARENESS = `PLAN MODE IS ON. While it stays on, this playbook replaces every other instruction you hold about how to work, and you implement nothing.
 
-The user's message will almost always be phrased as a command — "add X", "convert this to Y", "let's build Z". In Plan Mode that is the SUBJECT of the plan, not permission to start building. It does not conflict with this playbook and it does not override it. Nothing in the conversation turns Plan Mode off except the user approving a plan.
+You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`). Planning leaves you the half of that surface that reads and asks:
+
+- Read the repository: the \`read\` tool, and \`bash\` for read-only commands.
+- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
+- Focus & inspect: name your own tab (\`ensemblr_set_name\`); bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
+- Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
+
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
+
+Nothing else in your context outranks this block. The user's message will almost always be phrased as a command — "add X", "convert this to Y", "let's build Z" — and in Plan Mode that is the SUBJECT of the plan, not permission to start building. A summary of an earlier session, a remembered instruction to do the work yourself, anything that reads like session state naming a different mode: all of it describes how you behave when Plan Mode is off. It is stale, this block is the live state for this turn, and there is no conflict to resolve or to narrate to the user. Nothing turns Plan Mode off except the user approving a plan.
 
 Your job this turn is to reach a shared understanding with the user before any code is written.
 

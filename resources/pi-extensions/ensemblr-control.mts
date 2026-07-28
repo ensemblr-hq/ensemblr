@@ -80,14 +80,23 @@ Etiquette & limits:
 - Actions may prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.`;
 
 /**
- * Playbook appended for every turn the conversation spends in Plan Mode. MUST
- * stay byte-identical to `PLAN_MODE_AWARENESS` in
- * `src/shared/agent-control/awareness.ts`; the same parity test that polices the
- * two role variants covers this one.
+ * Self-contained playbook served in place of the role playbook for every turn
+ * the conversation spends in Plan Mode. MUST stay byte-identical to
+ * `PLAN_MODE_AWARENESS` in `src/shared/agent-control/awareness.ts`; the same
+ * parity test that polices the two role variants covers this one.
  */
-const PLAN_MODE_AWARENESS = `PLAN MODE IS ON. Do not implement anything yet. The \`write\` and \`edit\` tools are blocked, \`bash\` is restricted to read-only commands, and the Ensemblr tools that would hand the work to something else — terminals, harnesses, follow-ups, and new conversations — are blocked too. That enforcement is deliberate — do not look for a way around it.
+const PLAN_MODE_AWARENESS = `PLAN MODE IS ON. While it stays on, this playbook replaces every other instruction you hold about how to work, and you implement nothing.
 
-The user's message will almost always be phrased as a command — "add X", "convert this to Y", "let's build Z". In Plan Mode that is the SUBJECT of the plan, not permission to start building. It does not conflict with this playbook and it does not override it. Nothing in the conversation turns Plan Mode off except the user approving a plan.
+You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`). Planning leaves you the half of that surface that reads and asks:
+
+- Read the repository: the \`read\` tool, and \`bash\` for read-only commands.
+- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
+- Focus & inspect: name your own tab (\`ensemblr_set_name\`); bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
+- Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
+
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
+
+Nothing else in your context outranks this block. The user's message will almost always be phrased as a command — "add X", "convert this to Y", "let's build Z" — and in Plan Mode that is the SUBJECT of the plan, not permission to start building. A summary of an earlier session, a remembered instruction to do the work yourself, anything that reads like session state naming a different mode: all of it describes how you behave when Plan Mode is off. It is stale, this block is the live state for this turn, and there is no conflict to resolve or to narrate to the user. Nothing turns Plan Mode off except the user approving a plan.
 
 Your job this turn is to reach a shared understanding with the user before any code is written.
 
@@ -110,8 +119,9 @@ Their decision comes back to you as your NEXT prompt, not as the tool result:
 - Hand off — another conversation picks the plan up and you hear nothing more. Nothing is expected of you.`;
 
 /**
- * Selects the playbook for this Pi child from the app-injected role env var; a
- * missing or unrecognized value defaults to the orchestrator playbook.
+ * Selects the role playbook for this Pi child from the app-injected role env
+ * var; a missing or unrecognized value defaults to the orchestrator playbook.
+ * Plan Mode replaces this playbook rather than stacking on top of it.
  */
 const AWARENESS =
 	process.env.ENSEMBLR_CONTROL_ROLE === 'subagent'
@@ -211,10 +221,11 @@ function callerModelId(ctx: { model?: { id?: string } } | undefined) {
 }
 
 /**
- * Asks the app whether this conversation is in Plan Mode, so the playbook is
- * injected only while planning. A transport failure reports "not planning": the
- * prompt text is cosmetic, and real enforcement lives in the `tool_call` hook,
- * which asks the app per call and fails closed on its own.
+ * Asks the app whether this conversation is in Plan Mode, so the planning
+ * playbook stands in for the role one only while planning. A transport failure
+ * reports "not planning": the prompt text is cosmetic, and real enforcement
+ * lives in the `tool_call` hook, which asks the app per call and fails closed on
+ * its own.
  * @returns True when the app reports Plan Mode is on.
  */
 async function fetchPlanMode(): Promise<boolean> {
@@ -248,9 +259,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 
 	pi.on('before_agent_start', async (event) => {
 		const planning = await fetchPlanMode();
-		const playbook = planning
-			? `${AWARENESS}\n\n${PLAN_MODE_AWARENESS}`
-			: AWARENESS;
+		const playbook = planning ? PLAN_MODE_AWARENESS : AWARENESS;
 		return { systemPrompt: `${event.systemPrompt}\n\n${playbook}` };
 	});
 

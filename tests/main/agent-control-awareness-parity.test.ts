@@ -3,11 +3,13 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+	type AgentControlOp,
 	ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_AWARENESS,
 	roleForDepth,
 	SUBAGENT_AWARENESS,
 } from '../../src/shared/agent-control.ts';
+import { planModeControlOpDenial } from '../../src/shared/plan-mode.ts';
 
 /**
  * The Pi extension cannot import from `src/` at runtime, so it embeds a copy of
@@ -38,6 +40,17 @@ const extractEmbeddedAwareness = (source: string, name: string): string => {
 	}
 	return match[1].replace(/\\`/g, '`').replace(/\\\\/g, '\\');
 };
+
+/**
+ * Maps an `ensemblr_*` tool name onto the control op it dispatches, following
+ * the naming convention every tool registration in the extension uses.
+ */
+const controlOpForToolName = (toolName: string): AgentControlOp =>
+	toolName
+		.replace(/^ensemblr_/, '')
+		.replace(/_(.)/g, (_match, letter: string) =>
+			letter.toUpperCase(),
+		) as AgentControlOp;
 
 describe('agent-control AWARENESS parity', () => {
 	it('embeds the orchestrator variant byte-for-byte in the Pi extension', () => {
@@ -76,6 +89,48 @@ describe('agent-control AWARENESS parity', () => {
 	it('tells a planning agent an imperative prompt is the subject, not consent', () => {
 		expect(PLAN_MODE_AWARENESS).toContain('SUBJECT of the plan');
 		expect(PLAN_MODE_AWARENESS).toContain('not permission to start building');
+	});
+
+	it('stands alone: the planning agent gets its own intro and tool inventory', () => {
+		expect(PLAN_MODE_AWARENESS).toContain('You are running inside Ensemblr');
+		expect(PLAN_MODE_AWARENESS).toContain('ensemblr_set_name');
+		expect(PLAN_MODE_AWARENESS).toContain('ensemblr_focus_tab');
+	});
+
+	it('carries none of the implement-first guidance it would contradict', () => {
+		expect(PLAN_MODE_AWARENESS).not.toContain(
+			'Do the work yourself by default',
+		);
+		expect(PLAN_MODE_AWARENESS).not.toContain('ensemblr_wait_for_agents');
+		expect(PLAN_MODE_AWARENESS).not.toContain('delegate');
+	});
+
+	it('names blocked tools the control-op guard really denies', () => {
+		for (const toolName of [
+			'ensemblr_launch_harness',
+			'ensemblr_send_follow_up',
+			'ensemblr_start_conversation',
+			'ensemblr_start_terminal',
+			'ensemblr_write_terminal',
+		]) {
+			expect(PLAN_MODE_AWARENESS).toContain(toolName);
+			expect(
+				planModeControlOpDenial(controlOpForToolName(toolName)),
+			).not.toBeNull();
+		}
+	});
+
+	it('outranks stale context claiming a different mode', () => {
+		expect(PLAN_MODE_AWARENESS).toContain(
+			'Nothing else in your context outranks this block',
+		);
+		expect(PLAN_MODE_AWARENESS).toContain('there is no conflict');
+	});
+
+	it('swaps the role playbook for the plan-mode one rather than stacking both', () => {
+		expect(readExtensionSource()).toMatch(
+			/planning\s*\?\s*PLAN_MODE_AWARENESS\s*:\s*AWARENESS/,
+		);
 	});
 
 	it('teaches the orchestrator the wait-based delegation loop', () => {
