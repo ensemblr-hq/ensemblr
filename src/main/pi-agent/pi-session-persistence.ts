@@ -131,6 +131,44 @@ export function appendChatTitleMetadataEvent({
 }
 
 /**
+ * Appends a synthetic assistant message to a branch's timeline, so app-authored
+ * content the Pi child never produced — a submitted plan, most of all — still
+ * lands as a persisted, broadcastable chat bubble. The envelope matches a
+ * finalized assistant answer (`agent` role, a single `text` part) so the
+ * renderer and the last-message recovery in agent-control read it exactly like
+ * one the runtime emitted.
+ * @param branchId - Branch whose timeline the message joins.
+ * @param database - Open session database.
+ * @param text - Markdown body of the message.
+ * @returns The persisted event row.
+ */
+export function appendAgentMessageEvent({
+	branchId,
+	database,
+	text,
+}: {
+	branchId: string;
+	database: DatabaseSync;
+	text: string;
+}): PiEventRow {
+	const envelope: PiPersistedEnvelope = {
+		kind: 'message',
+		payload: { kind: 'text', text },
+		role: 'agent',
+	};
+	return appendPiEvent({
+		database,
+		input: {
+			branchId,
+			eventType: 'message',
+			payload: envelope,
+			stream: 'protocol',
+			turnId: null,
+		},
+	});
+}
+
+/**
  * Appends a synthetic metadata event signalling that an auto branch-naming
  * rename landed, so renderer subscribers refetch the workspace list.
  */

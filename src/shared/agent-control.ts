@@ -6,8 +6,10 @@
 export { buildAskUserQuestionResult } from './agent-control/ask-user-question.ts';
 export {
 	ORCHESTRATOR_AWARENESS,
+	PLAN_MODE_AWARENESS,
 	roleForDepth,
 	SUBAGENT_AWARENESS,
 } from './agent-control/awareness.ts';
 export * from './agent-control/contracts.ts';
+export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
 export * from './agent-control/schemas.ts';

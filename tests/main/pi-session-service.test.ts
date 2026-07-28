@@ -9,7 +9,10 @@ import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createFakePiAgentAdapter } from '../../src/main/pi-agent/fake-pi-agent-client.ts';
 import { createPiAgentClient } from '../../src/main/pi-agent/pi-agent-client.ts';
-import { createPiSessionService } from '../../src/main/pi-agent/pi-session-service.ts';
+import {
+	createPiSessionService,
+	type PiSessionEventSink,
+} from '../../src/main/pi-agent/pi-session-service.ts';
 import type {
 	SessionSummaryWriter,
 	WriteSessionSummaryInput,
@@ -62,6 +65,7 @@ function createReadyExecutable(): PiExecutableSnapshot {
 function createService(
 	database: DatabaseSync,
 	options: {
+		eventSink?: PiSessionEventSink;
 		sessionSummaryWriter?: SessionSummaryWriter;
 	} = {},
 ) {
@@ -74,6 +78,7 @@ function createService(
 			getHealth: () => ({ path: ':memory:', schemaVersion: 5, status: 'ok' }),
 			open: () => ({ path: ':memory:', schemaVersion: 5, status: 'ok' }),
 		},
+		eventSink: options.eventSink,
 		piAgentClient,
 		queueNaming: () => undefined,
 		sessionSummaryWriter: options.sessionSummaryWriter,
@@ -205,6 +210,75 @@ test('setSessionName resolves null for a session that is not active', async (t) 
 	});
 
 	assert.equal(applied, null);
+});
+
+test('appendAgentMessage persists and broadcasts an assistant message onto the timeline', async (t) => {
+	const fixture = openFixture(t);
+	const broadcasts: Array<{
+		sessionId: string;
+		text: string;
+		workspaceId: string;
+	}> = [];
+	const { service } = createService(fixture.database, {
+		eventSink: ({ event, sessionId, workspaceId }) => {
+			const envelope = event.payload;
+			if (envelope?.kind === 'message' && envelope.payload.kind === 'text') {
+				broadcasts.push({
+					sessionId,
+					text: envelope.payload.text,
+					workspaceId,
+				});
+			}
+		},
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	service.appendAgentMessage({
+		sessionId: snapshot.id,
+		text: '# Plan\n\n1. Ship it',
+	});
+
+	const messages = listEventsByBranch({
+		branchId: snapshot.branchId,
+		database: fixture.database,
+	}).filter(
+		(event) =>
+			event.payload?.kind === 'message' && event.payload.role === 'agent',
+	);
+	assert.equal(messages.length, 1);
+	const envelope = messages[0]?.payload;
+	const persistedText =
+		envelope?.kind === 'message' && envelope.payload.kind === 'text'
+			? envelope.payload.text
+			: null;
+	assert.equal(persistedText, '# Plan\n\n1. Ship it');
+
+	assert.deepEqual(broadcasts, [
+		{
+			sessionId: snapshot.id,
+			text: '# Plan\n\n1. Ship it',
+			workspaceId: fixture.workspaceId,
+		},
+	]);
+});
+
+test('appendAgentMessage is a no-op for an unknown session', async (t) => {
+	const fixture = openFixture(t);
+	let broadcastCount = 0;
+	const { service } = createService(fixture.database, {
+		eventSink: () => {
+			broadcastCount += 1;
+		},
+	});
+
+	service.appendAgentMessage({ sessionId: 'missing-session', text: 'ignored' });
+
+	assert.equal(broadcastCount, 0);
 });
 
 test('openSession persists and launches with a native Pi session id', async (t) => {

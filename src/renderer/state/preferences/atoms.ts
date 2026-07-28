@@ -45,6 +45,17 @@ export const chatThinkingOverrideAtomFamily = atomFamily((chatTabId: string) =>
 );
 
 /**
+ * Whether a chat is in Plan Mode, keyed by chat-tab id. This is the durable
+ * source of truth: it rides every `openPiSession`/`submitPiPrompt` call into the
+ * main-process registry, which keeps no persistence of its own. Defaults to off,
+ * so a fresh chat — including one opened to implement a handed-off plan — starts
+ * unblocked.
+ */
+export const chatPlanModeAtomFamily = atomFamily((chatTabId: string) =>
+	atomWithStorage<boolean>(KEY(`chat_plan_mode_${chatTabId}`), false),
+);
+
+/**
  * Drops a chat's per-chat override atoms and their backing localStorage keys.
  * Call only when a chat tab is permanently deleted — closed tabs are restorable
  * and must keep their overrides. `atomFamily.remove` evicts just the in-memory
@@ -54,6 +65,7 @@ export const chatThinkingOverrideAtomFamily = atomFamily((chatTabId: string) =>
 export function forgetChatOverrides(chatTabId: string): void {
 	chatModelOverrideAtomFamily.remove(chatTabId);
 	chatThinkingOverrideAtomFamily.remove(chatTabId);
+	chatPlanModeAtomFamily.remove(chatTabId);
 	const storage =
 		typeof globalThis.localStorage === 'undefined'
 			? null
@@ -63,6 +75,7 @@ export function forgetChatOverrides(chatTabId: string): void {
 	}
 	storage.removeItem(KEY(`chat_model_${chatTabId}`));
 	storage.removeItem(KEY(`chat_thinking_${chatTabId}`));
+	storage.removeItem(KEY(`chat_plan_mode_${chatTabId}`));
 }
 
 // ─── Models (user defaults) ───────────────────────────────────────────────────

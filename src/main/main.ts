@@ -73,6 +73,11 @@ import {
 	createPiReadinessService,
 } from './pi-runtime';
 import {
+	createPlanFileWriter,
+	createPlanModeRegistry,
+	createPlanSubmission,
+} from './plan-mode';
+import {
 	createArchiveLifecycleService,
 	createArchiveRepositoryService,
 	createArchiveWorkspaceService,
@@ -595,6 +600,19 @@ ipcMain.handle(
 		}
 	},
 );
+const planModeRegistry = createPlanModeRegistry();
+const planSubmission = createPlanSubmission({
+	/** Pushes a finished plan to every window; only the owning chat renders it. */
+	broadcastReview: (payload) =>
+		broadcastToAllWindows(IPC_CHANNELS.agentControlExitPlanMode, payload),
+	/** Reports whether any window is alive to host the review panel. */
+	hasRenderer: () =>
+		BrowserWindow.getAllWindows().some((window) => !window.isDestroyed()),
+	planFileWriter: createPlanFileWriter(),
+	/** Posts the plan into the submitting chat's timeline so the user always sees it. */
+	postPlanMessage: ({ sessionId, plan }) =>
+		piSessionService.appendAgentMessage({ sessionId, text: plan }),
+});
 agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,
 	originRegistry: agentControlOriginRegistry,
@@ -621,6 +639,14 @@ agentControlService = createAgentControlService({
 		localCommandService,
 		piExecutableService,
 		piSessionService,
+		planMode: {
+			/** Saves the finished plan, surfaces the review, and ends the turn. */
+			exit: planSubmission.submit,
+			/** Reports whether the calling Pi session is still planning. */
+			isActive: planModeRegistry.isActive,
+			/** Forgets the session's Plan Mode state once it ends. */
+			releaseSession: planModeRegistry.release,
+		},
 		scriptLifecycleService,
 		terminalService,
 	}),
@@ -725,6 +751,7 @@ app.whenReady().then(() => {
 		openTargetService,
 		piExecutableService,
 		piSessionService,
+		planModeRegistry,
 		quickStartProjectService,
 		renameWorkspaceService,
 		onAppSettingsUpdated: () => agentActivityMonitor.refresh(),

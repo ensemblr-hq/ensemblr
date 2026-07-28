@@ -3,6 +3,7 @@ import type {
 	AskUserQuestionClosedBroadcast,
 	AskUserQuestionReply,
 	BoardStatusBroadcast,
+	ExitPlanModeBroadcast,
 	FocusViewBroadcast,
 	TabsChangedBroadcast,
 } from '../../agent-control.ts';
@@ -137,6 +138,15 @@ export interface ShellApi {
 	) => () => void;
 	/** Answers a pending questionnaire, unblocking the agent that asked it. */
 	answerUserQuestion: (reply: AskUserQuestionReply) => Promise<void>;
+	/**
+	 * Subscribes to finished agent plans (a Pi agent called `exitPlanMode` and
+	 * ended its turn). Returns an unsubscribe function. The renderer shows each
+	 * one in the chat tab bound to the payload's Pi session, and owns the
+	 * decision from there — nothing is waiting on an answer.
+	 */
+	onExitPlanMode: (
+		listener: (payload: ExitPlanModeBroadcast) => void,
+	) => () => void;
 	/** Opens an http/https URL in the user's default browser. */
 	openExternal: (url: string) => Promise<void>;
 }

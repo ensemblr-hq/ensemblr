@@ -19,6 +19,7 @@ import {
 	presentPiModels,
 	resolvePiProviderModels,
 } from '../../pi-runtime/pi-provider-models.ts';
+import type { PlanModeRegistry } from '../../plan-mode';
 import type { WithPermissionGate } from '../permission-gate.ts';
 import {
 	listPiSessionEventsRequestSchema,
@@ -43,11 +44,18 @@ export function registerPiSessionHandlers({
 	localCommandService,
 	piExecutableService,
 	piSessionService,
+	planModeRegistry,
 	withPermissionGate,
 }: {
 	localCommandService: LocalCommandService;
 	piExecutableService: PiExecutableService;
 	piSessionService: PiSessionService;
+	/**
+	 * Mirror of the renderer's per-chat Plan Mode toggle. Set here rather than
+	 * inside the session service: the renderer's setting is the durable source
+	 * and rides every open and submit, so the runtime never needs to persist it.
+	 */
+	planModeRegistry: PlanModeRegistry;
 	withPermissionGate: WithPermissionGate;
 }): void {
 	ipcMain.handle(
@@ -75,6 +83,7 @@ export function registerPiSessionHandlers({
 					workspaceCwd: request.workspaceCwd,
 					workspaceId: request.workspaceId,
 				});
+				planModeRegistry.setActive(snapshot.id, request.planMode === true);
 				return { session: snapshotToWire(snapshot) };
 			} catch (cause) {
 				return {
@@ -92,6 +101,10 @@ export function registerPiSessionHandlers({
 		async (_event, raw: unknown): Promise<SubmitPiPromptResult> => {
 			try {
 				const request = submitPiPromptRequestSchema.parse(raw);
+				planModeRegistry.setActive(
+					request.sessionId,
+					request.planMode === true,
+				);
 				const acknowledgement = await piSessionService.submitPrompt({
 					model: request.model ?? null,
 					prompt: request.prompt,

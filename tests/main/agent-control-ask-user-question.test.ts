@@ -46,6 +46,11 @@ const makeUnusedPorts = (): Omit<AgentControlPorts, 'ask'> =>
 		focus: {},
 		harnesses: {},
 		permissions: { getMode: () => 'workspace-trusted' },
+		planMode: {
+			exit: vi.fn(),
+			isActive: vi.fn().mockReturnValue(false),
+			releaseSession: vi.fn(),
+		},
 		tabs: {},
 		terminals: {},
 		workspaces: {},

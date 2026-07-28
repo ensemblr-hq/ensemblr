@@ -10,6 +10,7 @@ import {
 	type AgentControlOp,
 	ASK_USER_QUESTION_LIMITS,
 	ASK_USER_QUESTION_RESERVED_LABELS,
+	EXIT_PLAN_MODE_LIMITS,
 	WORKSPACE_BOARD_STATUSES,
 } from './contracts.ts';
 
@@ -174,6 +175,16 @@ const askUserQuestionSchema = z.strictObject({
 		),
 });
 
+const checkPlanModeToolSchema = z.strictObject({
+	tool: nonEmpty,
+	command: z.string().optional(),
+});
+
+const exitPlanModeSchema = z.strictObject({
+	title: nonEmpty.max(EXIT_PLAN_MODE_LIMITS.maxTitleLength),
+	plan: nonEmpty.max(EXIT_PLAN_MODE_LIMITS.maxPlanLength),
+});
+
 const emptySchema = z.strictObject({});
 
 /** Per-operation argument validators, keyed by {@link AgentControlOp}. */
@@ -203,6 +214,9 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	waitForAgents: waitForAgentsSchema,
 	notifyOrchestrator: notifyOrchestratorSchema,
 	askUserQuestion: askUserQuestionSchema,
+	getPlanMode: emptySchema,
+	checkPlanModeTool: checkPlanModeToolSchema,
+	exitPlanMode: exitPlanModeSchema,
 } satisfies Record<AgentControlOp, z.ZodType>;
 
 const askUserQuestionAnswerSchema = z.strictObject({
