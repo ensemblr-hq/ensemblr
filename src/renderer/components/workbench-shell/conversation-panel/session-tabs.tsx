@@ -143,6 +143,7 @@ export function SessionTabs({
 	);
 	const [orderedSessionIds, setOrderedSessionIds] =
 		useState<string[]>(sessionIds);
+	const [prevSessionIds, setPrevSessionIds] = useState(sessionIds);
 	const [isDraggingTab, setIsDraggingTab] = useState(false);
 	const orderedSessionIdsRef = useRef(orderedSessionIds);
 	const canReorderTabs = sessionIds.length > 1;
@@ -161,12 +162,13 @@ export function SessionTabs({
 		orderedSessionIdsRef.current = orderedSessionIds;
 	}, [orderedSessionIds]);
 
-	useEffect(() => {
+	if (prevSessionIds !== sessionIds) {
+		setPrevSessionIds(sessionIds);
 		setOrderedSessionIds((currentIds) => {
 			const nextIds = reconcileOrderedIds(currentIds, sessionIds);
 			return areStringArraysEqual(nextIds, currentIds) ? currentIds : nextIds;
 		});
-	}, [sessionIds]);
+	}
 
 	useEffect(() => {
 		if (!developerMode && debugOpen) {

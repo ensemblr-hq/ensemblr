@@ -38,5 +38,8 @@ export { useOptimisticPrompts } from './optimistic-prompts';
 export type { PiComposerControllerState } from './pi-composer';
 export { usePiComposerController } from './pi-composer';
 export type { PrimedAction } from './primed-action';
-export { primedActionAtomFamily } from './primed-action';
+export {
+	primedActionAtomFamily,
+	useComposerPrimedActionConsumer,
+} from './primed-action';
 export { useStopPiSession } from './use-stop-pi-session';

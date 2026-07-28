@@ -2,7 +2,7 @@
 
 import { Grip } from 'lucide-react';
 import { Reorder, useDragControls, useMotionValue } from 'motion/react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import { useRaisedShadow } from '@/renderer/hooks/use-raised-shadow';
 import { cn } from '@/renderer/lib/utils';
@@ -41,8 +41,10 @@ const ReorderList: React.FC<ReorderListProps> = ({
 		[childEntries],
 	);
 	const [orderedKeys, setOrderedKeys] = useState<string[]>(childKeys);
+	const [prevChildKeys, setPrevChildKeys] = useState(childKeys);
 
-	useEffect(() => {
+	if (prevChildKeys !== childKeys) {
+		setPrevChildKeys(childKeys);
 		setOrderedKeys((currentKeys) => {
 			const childKeySet = new Set(childKeys);
 			const currentKeySet = new Set(currentKeys);
@@ -55,7 +57,7 @@ const ReorderList: React.FC<ReorderListProps> = ({
 				? currentKeys
 				: nextKeys;
 		});
-	}, [childKeys]);
+	}
 
 	/** Persists the new order and forwards it to the parent callback as React elements. */
 	const handleReorderFinish = (newOrder: unknown[]) => {
