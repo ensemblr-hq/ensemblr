@@ -99,6 +99,7 @@ function sanitizeRefSegment(segment: string): string {
 	return segment.replaceAll(/[^\w.-]/g, '-');
 }
 
+/** Typed error thrown by checkpoint service operations for IPC translation. */
 export class CheckpointServiceError extends Error {
 	readonly code: 'no-checkpoint' | 'workspace-missing';
 

@@ -10,7 +10,7 @@ import {
 	type AppSettings,
 	type AppSettingsPatch,
 	DEFAULT_APP_SETTINGS,
-} from '@/shared/config/app-settings';
+} from '@/shared/config';
 
 /**
  * Renderer mirror of the App settings persisted in `config.json` (the source of

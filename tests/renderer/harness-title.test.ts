@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	isHarnessTitleBusy,
 	stripHarnessTitleDecoration,
-} from '@/renderer/lib/terminal/harness-title';
+} from '@/renderer/lib/terminal';
 
 describe('stripHarnessTitleDecoration', () => {
 	it('removes a leading spinner/symbol glyph and surrounding whitespace', () => {

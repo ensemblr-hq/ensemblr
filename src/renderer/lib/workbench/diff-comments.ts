@@ -5,7 +5,7 @@ import {
 	type HunkData,
 } from 'react-diff-view';
 
-import type { DiffComment } from '@/renderer/components/diff-viewer';
+import type { DiffComment } from '@/renderer/types/diff';
 import type { GithubCommentWire } from '@/shared/ipc/contracts/github';
 import type { ReviewCommentWire } from '@/shared/ipc/contracts/review-comments';
 

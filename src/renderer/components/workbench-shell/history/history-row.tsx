@@ -15,13 +15,13 @@ import {
 import { Button } from '@/renderer/components/ui/button';
 import { canRestoreArchivedWorkspace } from '@/renderer/lib/archive-restore';
 import { cn } from '@/renderer/lib/utils';
+import { formatRowDate } from '@/renderer/lib/workbench/relative-time';
 import type {
 	UnarchiveWorkspaceDiagnostic,
 	WorkspaceHistoryEntry,
 } from '@/shared/ipc/contracts/workspace';
 
 import { ArchiveDiagnosticsList } from '../archive-diagnostics-list';
-import { formatRowDate } from './relative-time';
 
 /** Shared row chrome: full-width hover surface, single baseline, rounded. */
 const ROW_CLASS_NAME =

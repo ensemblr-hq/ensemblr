@@ -1,21 +1,12 @@
 import { dropTargetForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { useEffect, useRef, useState } from 'react';
 
-import { BOARD_STATUS_PRESENTATION } from '@/renderer/components/workbench-shell/workspace-status/board-status-presentation';
 import { cn } from '@/renderer/lib/utils';
+import { BOARD_STATUS_PRESENTATION } from '@/renderer/lib/workbench/board-status-presentation';
 import type { WorkspaceBoardStatus } from '@/renderer/state/workspace';
-import type {
-	ProjectShellModel,
-	WorkspaceShellModel,
-} from '@/renderer/types/workbench';
+import type { BoardCard } from '@/renderer/types/workbench-shell';
 
 import { WorkspaceCard } from './workspace-card';
-
-/** A workspace paired with the project it belongs to, for board rendering. */
-export interface BoardCard {
-	project: ProjectShellModel;
-	workspace: WorkspaceShellModel;
-}
 
 /**
  * A single dashboard board column for one board status. Acts as a drop target

@@ -1,6 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { RunScriptMode } from '../../shared/scripts/script-settings.ts';
+import type { RunScriptMode } from '../../shared/scripts.ts';
 import { withTransaction } from '../storage/tx.ts';
 import type { NormalizedScope } from './environment-variable-types.ts';
 import { deleteSetting, upsertSetting } from './settings-table.ts';

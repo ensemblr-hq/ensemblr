@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 
 import { turnDiffQuery } from '@/renderer/api/ensemblr-queries';
 import { DiffViewer } from '@/renderer/components/diff-viewer';
-import { splitCombinedPatch } from '@/renderer/components/diff-viewer/parse';
+import { splitCombinedPatch } from '@/renderer/lib/diff/parse';
 import type { TurnDiffFileWire } from '@/shared/ipc/contracts/checkpoint';
 
 import { PanelMessage } from './panel-message';

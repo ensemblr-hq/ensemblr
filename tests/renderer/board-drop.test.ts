@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { resolveBoardDrop } from '../../src/renderer/components/workbench-shell/dashboard/use-board-drag';
+import { resolveBoardDrop } from '../../src/renderer/hooks/workbench-shell/dashboard/use-board-drag';
 
 describe('resolveBoardDrop', () => {
 	test('returns null when the source has no workspace id', () => {

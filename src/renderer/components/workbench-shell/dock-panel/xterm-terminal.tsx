@@ -1,6 +1,6 @@
 import { useAtomValue } from 'jotai';
 import { useEffect, useRef } from 'react';
-import { emitTerminalInput } from '@/renderer/lib/terminal/terminal-tabs';
+import { emitTerminalInput } from '@/renderer/lib/terminal';
 import {
 	createXtermAdapter,
 	DEFAULT_FONT_FAMILY,
@@ -12,7 +12,7 @@ import {
 } from '@/renderer/state/preferences';
 import type { TerminalRendererAdapter } from '@/renderer/types/terminal';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
-import { scrollbackMbToLines } from '@/shared/terminal/scrollback';
+import { scrollbackMbToLines } from '@/shared/terminal';
 
 /** Builds the terminal CSS font stack, prepending the user's chosen font. */
 function buildTerminalFontFamily(font: string): string {

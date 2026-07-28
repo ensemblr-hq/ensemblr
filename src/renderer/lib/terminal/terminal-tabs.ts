@@ -1,3 +1,4 @@
+import type { TerminalInputEventDetail } from '@/renderer/types/terminal';
 import type {
 	DockTabStatus,
 	TerminalDockTabModel,
@@ -12,12 +13,6 @@ export interface TerminalInputActivityResult {
 	commandSubmitted: boolean;
 	interrupted: boolean;
 	nextBuffer: string;
-}
-
-/** Raw terminal keystroke payload published to renderer-local input listeners. */
-export interface TerminalInputEventDetail {
-	data: string;
-	terminalId: string;
 }
 
 type TerminalInputListener = (detail: TerminalInputEventDetail) => void;

@@ -1,7 +1,7 @@
 import type { UIMessage } from 'ai';
 import { describe, expect, test } from 'vitest';
 
-import { resolveLiveTurnStartMs } from '../../src/renderer/components/workbench-shell/conversation-panel/timeline/timeline-timing';
+import { resolveLiveTurnStartMs } from '../../src/renderer/lib/workbench/timeline-timing';
 import type { OptimisticPrompt } from '../../src/renderer/state/composer';
 
 function userMessage(firstEventAt: string): UIMessage {

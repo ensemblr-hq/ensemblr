@@ -23,7 +23,7 @@ import {
 	type EnsemblrDatabaseService,
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
-import type { GitSettings } from '../../src/shared/config/app-settings.ts';
+import type { GitSettings } from '../../src/shared/config.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');

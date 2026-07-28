@@ -89,6 +89,11 @@ interface Scenario {
 	extraArgs?: string[];
 	/** Extra files seeded into the sandbox, relative path → content. */
 	extraFiles?: Record<string, string>;
+	/**
+	 * Drives the scenario against a live Pi session, resolving once the frames
+	 * it means to capture have arrived. Implementations own their own settle
+	 * condition so a scenario never returns mid-turn with a truncated capture.
+	 */
 	run(session: Session): Promise<void>;
 }
 

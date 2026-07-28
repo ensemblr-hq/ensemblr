@@ -8,9 +8,9 @@ import {
 } from '@/renderer/api/ensemblr-queries';
 import {
 	buildWorkspaceScriptSummaries,
+	mapTerminalSessionsToDockTabs,
 	scriptSummaryToDockStatus,
-} from '@/renderer/lib/terminal/script-summaries';
-import { mapTerminalSessionsToDockTabs } from '@/renderer/lib/terminal/terminal-tabs';
+} from '@/renderer/lib/terminal';
 import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
 import type { useWorkspaceTerminalSessions } from '@/renderer/state/workspace/terminal-sessions';
 import type {
@@ -18,7 +18,7 @@ import type {
 	WorkspaceNavigationSelection,
 } from '@/renderer/types/workbench';
 import type { SettingsResolutionSnapshot } from '@/shared/ipc/contracts/settings-resolution';
-import { parseWorkspaceScriptSettings } from '@/shared/scripts/script-settings';
+import { parseWorkspaceScriptSettings } from '@/shared/scripts';
 
 import { useEnsureWorkspaceSetup } from './use-ensure-workspace-setup';
 import { useLivePullRequestModel } from './use-live-pull-request-model';

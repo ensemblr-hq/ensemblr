@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 
-import { planBoardDrop } from '../../src/renderer/components/workbench-shell/dashboard/plan-board-drop';
-import type { BoardDrop } from '../../src/renderer/components/workbench-shell/dashboard/use-board-drag';
+import { planBoardDrop } from '../../src/renderer/lib/workbench/plan-board-drop';
+import type { BoardDrop } from '../../src/renderer/types/workbench-shell';
 
 const cardDrop = (overrides: Partial<BoardDrop> = {}): BoardDrop => ({
 	edge: 'top',

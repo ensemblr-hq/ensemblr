@@ -15,7 +15,7 @@ import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { Spinner } from '@/renderer/components/ui/spinner';
 import { terminalScrollbackMbAtom } from '@/renderer/state/preferences';
-import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
+import { DEFAULT_APP_SETTINGS } from '@/shared/config';
 
 /** Debounce window before a typed Pi executable path is persisted to SQLite. */
 const PI_PATH_SAVE_DEBOUNCE_MS = 500;

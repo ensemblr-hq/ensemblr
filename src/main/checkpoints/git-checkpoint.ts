@@ -28,6 +28,7 @@ interface CaptureWorkspaceCheckpointResult {
 	treeHash: string;
 }
 
+/** Typed error thrown when a checkpoint git step fails, naming the step. */
 export class GitCheckpointError extends Error {
 	readonly step: string;
 

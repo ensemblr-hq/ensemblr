@@ -6,7 +6,9 @@ import {
 	useSetupDiagnostics,
 	useWorkbenchLayoutRouteModel,
 } from '@/renderer/components/workbench-shell/shell-contexts';
-import { SHELL_INSET_CLASS } from '@/renderer/components/workbench-shell/shell-inset';
+import { useBoardDragMonitor } from '@/renderer/hooks/workbench-shell/dashboard/use-board-drag';
+import { planBoardDrop } from '@/renderer/lib/workbench/plan-board-drop';
+import { SHELL_INSET_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import {
 	BOARD_STATUS_ORDER,
 	orderColumnWorkspaceIds,
@@ -17,13 +19,12 @@ import {
 	type WorkspaceBoardStatus,
 } from '@/renderer/state/workspace';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
-import { type BoardCard, BoardColumn } from './board-column';
+import type { BoardCard, BoardDrop } from '@/renderer/types/workbench-shell';
+import { BoardColumn } from './board-column';
 import {
 	BoardWorkspaceMenuProvider,
 	useBoardWorkspaceMenu,
 } from './board-workspace-menu';
-import { planBoardDrop } from './plan-board-drop';
-import { type BoardDrop, useBoardDragMonitor } from './use-board-drag';
 
 /** Flattens the display projects into board cards, skipping optimistic rows. */
 function toBoardCards(projects: ProjectShellModel[]): BoardCard[] {

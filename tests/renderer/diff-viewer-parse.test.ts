@@ -7,7 +7,7 @@ import {
 	reconstructOldSource,
 	reconstructSideSources,
 	splitCombinedPatch,
-} from '../../src/renderer/components/diff-viewer/parse';
+} from '../../src/renderer/lib/diff/parse';
 
 const MODIFY_PATCH = `diff --git a/foo.ts b/foo.ts
 index 1111111..2222222 100644

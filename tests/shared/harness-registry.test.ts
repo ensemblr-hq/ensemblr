@@ -3,7 +3,7 @@ import {
 	findHarnessDefinition,
 	harnessSessionLogSource,
 	isSafeHarnessSessionId,
-} from '../../src/shared/agents/harness-registry.ts';
+} from '../../src/shared/agents.ts';
 
 describe('buildResumeCommand', () => {
 	const cases = [

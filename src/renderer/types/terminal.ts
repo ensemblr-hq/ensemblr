@@ -1,8 +1,14 @@
 /**
- * Public renderer type for the terminal boundary. The concrete xterm.js-backed
- * adapter lives in `lib/terminal`; this interface is the swap-friendly contract
- * dock UI and session wiring depend on.
+ * Public renderer types for the terminal boundary. The concrete xterm.js-backed
+ * adapter lives in `lib/terminal`; these are the swap-friendly contracts dock
+ * UI and session wiring depend on.
  */
+
+/** Raw terminal keystroke payload published to renderer-local input listeners. */
+export interface TerminalInputEventDetail {
+	data: string;
+	terminalId: string;
+}
 
 /**
  * Renderer-side terminal boundary. Components talk to this interface only so

@@ -3,7 +3,7 @@ import { ipcMain } from 'electron';
 import {
 	type AppSettings,
 	appSettingsPatchSchema,
-} from '../../../shared/config/app-settings.ts';
+} from '../../../shared/config.ts';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels.ts';
 import type { OpenAppConfigFileResult } from '../../../shared/ipc/contracts/app-settings.ts';
 import type { AppSettingsService } from '../../config';

@@ -9,7 +9,7 @@ import { describe, expect, test } from 'vitest';
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr/query-keys';
 import { usePiComposerController } from '../../src/renderer/state/composer';
 import { appSettingsAtom } from '../../src/renderer/state/preferences';
-import { DEFAULT_APP_SETTINGS } from '../../src/shared/config/app-settings';
+import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
 import type { PiSessionSnapshotWire } from '../../src/shared/ipc/contracts/pi-session';
 import { createTestQueryClient } from './support/dom';
 

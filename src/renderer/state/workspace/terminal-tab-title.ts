@@ -5,8 +5,8 @@
  * source and returning both the capped and untruncated forms together.
  */
 
-import { stripHarnessTitleDecoration } from '@/renderer/lib/terminal/harness-title';
-import { harnessConversationTitleSource } from '@/shared/agents/harness-registry';
+import { stripHarnessTitleDecoration } from '@/renderer/lib/terminal';
+import { harnessConversationTitleSource } from '@/shared/agents';
 
 /**
  * A live terminal title in both the form shown on the tab and the untruncated

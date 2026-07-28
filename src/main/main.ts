@@ -15,7 +15,7 @@ import type {
 	TerminalOutputBroadcast,
 } from '../shared/ipc/contracts/terminal';
 import type { WorkspaceFilesChangedBroadcast } from '../shared/ipc/contracts/workspace-files';
-import { scrollbackMbToBytes } from '../shared/terminal/scrollback';
+import { scrollbackMbToBytes } from '../shared/terminal.ts';
 import {
 	type AgentControlService,
 	type BoardStatusStore,
@@ -28,7 +28,7 @@ import {
 	createOriginRegistry,
 	startControlServer,
 } from './agent-control';
-import { createHarnessDetectionService } from './agents/harness-detection-service.ts';
+import { createHarnessDetectionService } from './agents';
 import { createMainWindow } from './app/main-window';
 import { createMainWindowStateStore } from './app/window-state';
 import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
@@ -322,10 +322,12 @@ const {
 } = createAgentControlIntegration({
 	app,
 	originRegistry: agentControlOriginRegistry,
+	/** Resolves a workspace's checkout path, or null before the database is open. */
 	resolveWorkspaceCwd: (workspaceId) => {
 		const database = databaseService.getConnection()?.database;
 		return database ? getWorkspacePathById({ database, workspaceId }) : null;
 	},
+	/** Reads the control server's URL lazily, null until the server is listening. */
 	getServerUrl: () => agentControlServer?.url ?? null,
 });
 
@@ -554,6 +556,7 @@ const harnessDetectionService = createHarnessDetectionService({
 const agentControlChatTabService = createChatTabService({
 	databaseService,
 	lookups: {
+		/** Reports whether a Pi session is still live before binding it to a tab. */
 		piSessionExists: ({ piSessionId }) =>
 			piSessionService.getSession(piSessionId) !== null,
 	},
@@ -573,15 +576,19 @@ agentControlService = createAgentControlService({
 	ports: createAgentControlPorts({
 		augmentHarnessCommand,
 		boardStatusStore,
+		/** Broadcasts an agent-reported board status update to all windows. */
 		broadcastBoardStatus: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlBoardStatus, payload),
+		/** Broadcasts an agent-requested view focus change to all windows. */
 		broadcastFocus: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlFocusView, payload),
+		/** Broadcasts an agent-driven chat-tab set change to all windows. */
 		broadcastTabsChanged: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, payload),
 		chatTabService: agentControlChatTabService,
 		confirm: { confirm: confirmAgentControlAction },
 		databaseService,
+		/** Reads the currently resolved permission mode that gates control ops. */
 		getPermissionMode: () =>
 			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
 		harnessDetectionService,

@@ -9,7 +9,7 @@ import { Input } from '@/renderer/components/ui/input';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { Spinner } from '@/renderer/components/ui/spinner';
 import { Switch } from '@/renderer/components/ui/switch';
-import { getProviderDisplayName } from '@/renderer/components/workbench-shell/conversation-panel/composer/model-picker-groups';
+import { getProviderDisplayName } from '@/renderer/lib/workbench/model-picker-groups';
 import { hiddenModelsAtom } from '@/renderer/state/preferences';
 import type { PiModelOptionWire } from '@/shared/ipc/contracts/pi-session';
 

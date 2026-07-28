@@ -3,7 +3,7 @@ import {
 	harnessBusySource,
 	harnessSessionLogSource,
 	type SessionLogSource,
-} from '../../shared/agents/harness-registry.ts';
+} from '../../shared/agents.ts';
 import type {
 	CreateTerminalSessionResult,
 	RestorableTerminal,
@@ -15,8 +15,10 @@ import type {
 	TerminalSessionStatus,
 	TerminalSnapshotResult,
 } from '../../shared/ipc/contracts/terminal';
-import { detectPreviewUrl } from '../../shared/terminal/detect-preview-url.ts';
-import { stripReportRequests } from '../../shared/terminal/strip-report-requests.ts';
+import {
+	detectPreviewUrl,
+	stripReportRequests,
+} from '../../shared/terminal.ts';
 import type { AgentControlEnvResolver } from '../agent-control/ports.ts';
 import type { WorkspaceEnvironmentService } from '../environment';
 import { stripLaunchContextEnv } from '../environment/launch-env.ts';

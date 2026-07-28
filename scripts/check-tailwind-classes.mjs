@@ -12,6 +12,11 @@ const canonicalClasses = new Map([
 
 const pixelArbitraryPattern = /\[[^\]]*px[^\]]*\]/g;
 
+/**
+ * Recursively yields every scannable source file beneath a directory.
+ * @param directory - Directory to walk
+ * @returns Async iterator over absolute file paths with a scannable extension
+ */
 async function* walk(directory) {
 	for (const entry of await readdir(directory, { withFileTypes: true })) {
 		const fullPath = path.join(directory, entry.name);
@@ -27,6 +32,12 @@ async function* walk(directory) {
 	}
 }
 
+/**
+ * Translates a character offset into a 1-based editor position.
+ * @param source - Full file contents the offset points into
+ * @param index - Zero-based character offset
+ * @returns The 1-based line and column of the offset
+ */
 function lineAndColumn(source, index) {
 	const prefix = source.slice(0, index);
 	const lines = prefix.split('\n');
@@ -37,6 +48,14 @@ function lineAndColumn(source, index) {
 	};
 }
 
+/**
+ * Records one violation against a source offset, resolving it to a position.
+ * @param findings - Accumulator the finding is appended to
+ * @param filePath - Path of the file the violation was found in
+ * @param source - Full file contents the offset points into
+ * @param index - Zero-based character offset of the offending class
+ * @param message - Operator-facing description of the violation
+ */
 function addFinding(findings, filePath, source, index, message) {
 	const location = lineAndColumn(source, index);
 

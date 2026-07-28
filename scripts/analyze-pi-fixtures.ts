@@ -205,6 +205,12 @@ function exampleOf(value: unknown): string {
 		: text;
 }
 
+/**
+ * Names a value's runtime type for signature keys, separating `null` and
+ * arrays from the `object` that `typeof` collapses them into.
+ * @param value - Value to describe
+ * @returns A stable type label such as `null`, `array`, or a `typeof` result
+ */
 function describeType(value: unknown): string {
 	if (value === null) return 'null';
 	if (Array.isArray(value)) return 'array';
@@ -281,6 +287,12 @@ function compressSequence(sequence: string[]): string[] {
 	return runs;
 }
 
+/**
+ * Looks up the renderer impact recorded for an event signature, matching the
+ * longest configured prefix before falling back to the unclassified default.
+ * @param signature - Event signature to classify
+ * @returns The impact level and operator note for the signature
+ */
 function classify(signature: string): { impact: string; note: string } {
 	for (const entry of CLASSIFICATION) {
 		if (

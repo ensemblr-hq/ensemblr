@@ -9,24 +9,11 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 import { cn } from '@/renderer/lib/utils';
+import type { DiffComment, DiffCommentSource } from '@/renderer/types/diff';
 import { formatShortcut, matchesShortcut } from '@/shared/keymap';
 
 /** Platform-formatted glyphs for the diff-comment submit shortcut. */
 const COMMENT_SUBMIT_HINT = formatShortcut('diffComment.submit');
-
-/** Where a diff comment originates, which drives its badge and editability. */
-export type DiffCommentSource = 'github' | 'github-actions' | 'local';
-
-/** A single comment anchored to a diff line, from Ensemblr-local or GitHub. */
-export interface DiffComment {
-	author?: string;
-	body: string;
-	id: string;
-	isOutdated?: boolean;
-	isResolved?: boolean;
-	source: DiffCommentSource;
-	url?: string;
-}
 
 /**
  * Inline comment thread mounted under a diff line: renders existing local and

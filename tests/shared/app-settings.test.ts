@@ -5,7 +5,7 @@ import {
 	DEFAULT_APP_SETTINGS,
 	mergeAppSettings,
 	parseAppSettings,
-} from '../../src/shared/config/app-settings';
+} from '../../src/shared/config';
 
 describe('parseAppSettings', () => {
 	test('fills all defaults from empty / nullish input', () => {

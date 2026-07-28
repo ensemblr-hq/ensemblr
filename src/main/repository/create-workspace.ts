@@ -9,7 +9,7 @@ import {
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { GitSettings } from '../../shared/config/app-settings.ts';
+import type { GitSettings } from '../../shared/config.ts';
 import type {
 	SettingsResolutionRequest,
 	SettingsResolutionSnapshot,

@@ -9,11 +9,11 @@ import {
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
 import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
+import { openLocalProjectFlow } from '@/renderer/lib/workbench/open-local-project-flow';
 import {
 	SHELL_FLOATING_TRIGGER_CLASS,
 	SHELL_INSET_CLASS,
-} from '@/renderer/components/workbench-shell/shell-inset';
-import { openLocalProjectFlow } from '@/renderer/lib/workbench/open-local-project-flow';
+} from '@/renderer/lib/workbench/shell-inset';
 import {
 	cloneDialogOpenAtom,
 	localProjectImportDialogOpenAtom,

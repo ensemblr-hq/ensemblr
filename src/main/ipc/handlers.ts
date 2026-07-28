@@ -1,4 +1,4 @@
-import type { HarnessDetectionService } from '../agents/harness-detection-service.ts';
+import type { HarnessDetectionService } from '../agents/index.ts';
 import { createChatTabService } from '../chat-tabs/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import type {
@@ -8,8 +8,10 @@ import type {
 	RepositoryConfigService,
 } from '../config';
 import type { EnvironmentVariablesService } from '../environment';
-import { createGithubService } from '../github/github-service';
-import { createWorkspacePrStatusSweeper } from '../github/workspace-pr-sweeper';
+import {
+	createGithubService,
+	createWorkspacePrStatusSweeper,
+} from '../github/index.ts';
 import type { LinearAuthService, LinearService } from '../linear';
 import type { OpenTargetService } from '../open-target';
 import type { PiSessionService } from '../pi-agent';

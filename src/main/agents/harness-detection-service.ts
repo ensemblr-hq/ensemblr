@@ -2,7 +2,7 @@ import {
 	HARNESS_REGISTRY,
 	type HarnessDefinition,
 	isSafeHarnessSessionId,
-} from '../../shared/agents/harness-registry.ts';
+} from '../../shared/agents.ts';
 import type {
 	AgentHarnessSummary,
 	ListAgentHarnessesResult,

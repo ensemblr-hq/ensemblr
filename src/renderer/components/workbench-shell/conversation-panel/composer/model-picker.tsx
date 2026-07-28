@@ -16,6 +16,7 @@ import {
 } from '@/renderer/components/ui/tooltip';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { cn } from '@/renderer/lib/utils';
+import { buildModelGroups } from '@/renderer/lib/workbench/model-picker-groups';
 import {
 	favouriteModelsAtom,
 	hiddenModelsAtom,
@@ -24,7 +25,6 @@ import type {
 	ComposerModelOption,
 	GroupedOptions,
 } from '@/renderer/types/workbench';
-import { buildModelGroups } from './model-picker-groups';
 import { ModelProviderIcon } from './model-provider-icon';
 
 const MAX_MENU_HEIGHT_REM = 24;

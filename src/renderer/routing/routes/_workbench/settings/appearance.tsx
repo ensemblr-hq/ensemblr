@@ -23,7 +23,7 @@ import {
 	terminalFontSizeAtom,
 	themeAtom,
 } from '@/renderer/state/preferences';
-import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
+import { DEFAULT_APP_SETTINGS } from '@/shared/config';
 
 /** Route for the Appearance settings section; renders the appearance-settings panel. */
 export const Route = createFileRoute('/_workbench/settings/appearance')({

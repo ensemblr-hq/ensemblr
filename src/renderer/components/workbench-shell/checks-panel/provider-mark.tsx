@@ -1,9 +1,8 @@
 import { CircleSlashIcon, GitBranchIcon, TriangleIcon } from 'lucide-react';
 
 import { cn } from '@/renderer/lib/utils';
+import { getProviderLabel } from '@/renderer/lib/workbench/provider-label';
 import type { ProviderMarkKind } from '@/renderer/types/components';
-
-import { getProviderLabel } from './provider-label';
 
 /** Renders the provider's brand mark (GitHub/Linear/Vercel/etc) inline. */
 export function ProviderMark({ provider }: { provider: ProviderMarkKind }) {

@@ -19,6 +19,7 @@ import {
 } from '@/renderer/components/ui/dropdown-menu';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { cn } from '@/renderer/lib/utils';
+import { getRightSidebarHeaderState } from '@/renderer/lib/workbench/right-sidebar-header-state';
 import { continuedMergedPullRequestByWorkspaceAtom } from '@/renderer/state/workspace';
 import type {
 	RightSidebarHeaderState,
@@ -33,7 +34,6 @@ import { useReviewActions } from '../review-actions/review-actions-context';
 import { CreatePullRequestMenu } from './create-pull-request-menu';
 import { PreviewDeploymentButton } from './preview-deployment-button';
 import { PullRequestNumberButton } from './pull-request-number-button';
-import { getRightSidebarHeaderState } from './state';
 
 /** Tone values extracted from {@link RightSidebarHeaderState}. */
 type HeaderTone = RightSidebarHeaderState extends { tone: infer T } ? T : never;

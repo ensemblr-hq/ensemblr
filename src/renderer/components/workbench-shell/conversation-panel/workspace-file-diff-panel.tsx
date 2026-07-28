@@ -18,7 +18,6 @@ import {
 	workspaceFileDiffQuery,
 } from '@/renderer/api/ensemblr-queries';
 import { DiffViewer } from '@/renderer/components/diff-viewer';
-import { parseSingleFileDiff } from '@/renderer/components/diff-viewer/parse';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
@@ -27,6 +26,7 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
+import { parseSingleFileDiff } from '@/renderer/lib/diff/parse';
 import { groupDiffComments } from '@/renderer/lib/workbench/diff-comments';
 import { formatFileDiffContext } from '@/renderer/lib/workbench/review-context';
 import {
