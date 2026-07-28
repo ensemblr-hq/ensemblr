@@ -8,10 +8,16 @@ import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
+	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
+import {
+	LifecycleSummary,
+	workspaceSummaryRows,
+} from '@/renderer/components/workbench-shell/lifecycle-summary';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { DeleteWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
@@ -33,7 +39,7 @@ export function DeleteWorkspaceDialog({
 }) {
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
-			<DialogContent className='gap-4 sm:max-w-md'>
+			<DialogContent className='sm:max-w-md'>
 				{workspace ? (
 					<DeleteWorkspaceDialogForm
 						key={`${workspace.id}:${open ? 'open' : 'closed'}`}
@@ -95,25 +101,15 @@ function DeleteWorkspaceDialogForm({
 	return (
 		<>
 			<DialogHeader>
-				<DialogTitle className='font-medium text-[0.9375rem]'>
-					Delete workspace?
-				</DialogTitle>
-				<p className='text-muted-foreground text-xs'>
+				<DialogTitle>Delete workspace?</DialogTitle>
+				<DialogDescription className='text-xs'>
 					Permanently removes the worktree folder, drops the local branch, and
 					deletes the workspace from Ensemblr. Anything not pushed to the remote
 					is lost. This cannot be undone.
-				</p>
+				</DialogDescription>
 			</DialogHeader>
 
-			<div className='flex flex-col gap-1 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs'>
-				<span className='font-medium'>{workspace.name}</span>
-				<span className='font-mono text-[0.6875rem] text-muted-foreground'>
-					{workspace.branchName}
-				</span>
-				<span className='truncate font-mono text-[0.6875rem] text-muted-foreground'>
-					{workspace.pathLabel}
-				</span>
-			</div>
+			<LifecycleSummary rows={workspaceSummaryRows(workspace)} />
 
 			{stage === 'failure' && diagnostics.length > 0 ? (
 				<ArchiveDiagnosticsList
@@ -122,18 +118,16 @@ function DeleteWorkspaceDialogForm({
 				/>
 			) : null}
 
-			<div className='-mx-4 -mb-4 flex justify-end gap-2 rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
+			<DialogFooter>
 				<Button
-					className='h-8'
 					disabled={isBusy}
 					onClick={handleClose}
 					type='button'
-					variant='outline'
+					variant='ghost'
 				>
 					Cancel
 				</Button>
 				<Button
-					className='h-8'
 					disabled={!canDelete}
 					onClick={handleDelete}
 					type='button'
@@ -141,7 +135,7 @@ function DeleteWorkspaceDialogForm({
 				>
 					{isBusy ? 'Deleting…' : 'Delete'}
 				</Button>
-			</div>
+			</DialogFooter>
 		</>
 	);
 }
