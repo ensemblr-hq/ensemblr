@@ -28,7 +28,7 @@ export function QuestionRows({
 	if (!question) {
 		return null;
 	}
-	const checkedLabels = state.checked[state.pageIndex] ?? [];
+	const checkedLabels = new Set(state.checked[state.pageIndex] ?? []);
 	const answer = state.answers[state.pageIndex];
 	return (
 		<ul className='-mx-2 flex flex-col'>
@@ -38,7 +38,7 @@ export function QuestionRows({
 						<QuestionOptionRow
 							checked={
 								question.multiSelect
-									? checkedLabels.includes(row.label)
+									? checkedLabels.has(row.label)
 									: answer?.answer === row.label
 							}
 							focused={state.focusIndex === index}

@@ -56,21 +56,19 @@ export function QuestionFooter({
 	if (!question) {
 		return null;
 	}
+	const pages = state.questions.map((item, index) => ({
+		answered: isAnswered(state, index),
+		key: item.question,
+		label: headerOf(item, index),
+	}));
 	return (
 		<div className='flex items-center justify-between gap-3'>
 			<div className='-ml-1 flex min-w-0 items-center gap-2'>
 				<QuestionPager
 					activeIndex={state.pageIndex}
-					answeredIndexes={
-						new Set(
-							state.questions
-								.map((_item, index) => index)
-								.filter((index) => isAnswered(state, index)),
-						)
-					}
-					labels={state.questions.map(headerOf)}
 					onGoToPage={(index) => run({ index, type: 'goToPage' })}
 					onMovePage={(delta) => run({ delta, type: 'movePage' })}
+					pages={pages}
 				/>
 				<p className='truncate pl-1 text-muted-foreground/60 text-xs'>
 					{keyHints(question, state.questions.length)}

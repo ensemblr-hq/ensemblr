@@ -72,9 +72,13 @@ export function useQuestionnaire({
 	const inputRef = useRef<HTMLInputElement>(null);
 	const shellRef = useRef<HTMLElement>(null);
 	const finishRef = useRef(onFinish);
-	finishRef.current = onFinish;
 	const stateRef = useRef(state);
-	stateRef.current = state;
+	// Sync in an effect, not during render: render must stay pure so React can
+	// replay it. `run`/`handleKeyDown` stay stable and read the latest via refs.
+	useEffect(() => {
+		finishRef.current = onFinish;
+		stateRef.current = state;
+	});
 
 	const run = useCallback((action: QuestionnaireAction) => {
 		const { outcome, state: next } = applyQuestionnaireAction(

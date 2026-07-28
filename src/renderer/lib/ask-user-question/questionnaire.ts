@@ -214,11 +214,14 @@ function toggleOption(
 		return state;
 	}
 	const current = state.checked[state.pageIndex] ?? [];
-	const selected = current.includes(label)
+	const currentSet = new Set(current);
+	const selected = currentSet.has(label)
 		? current.filter((entry) => entry !== label)
-		: question.options
-				.map((option) => option.label)
-				.filter((entry) => entry === label || current.includes(entry));
+		: question.options.flatMap((option) =>
+				option.label === label || currentSet.has(option.label)
+					? [option.label]
+					: [],
+			);
 	const drafts = { ...state.drafts };
 	delete drafts[state.pageIndex];
 	return {

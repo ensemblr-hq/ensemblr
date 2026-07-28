@@ -27,18 +27,16 @@ function dotFill(active: boolean, answered: boolean): string {
  */
 export function QuestionPager({
 	activeIndex,
-	answeredIndexes,
-	labels,
 	onGoToPage,
 	onMovePage,
+	pages,
 }: {
 	activeIndex: number;
-	answeredIndexes: ReadonlySet<number>;
-	labels: readonly string[];
 	onGoToPage: (index: number) => void;
 	onMovePage: (delta: number) => void;
+	pages: readonly { answered: boolean; key: string; label: string }[];
 }) {
-	if (labels.length < 2) {
+	if (pages.length < 2) {
 		return null;
 	}
 	return (
@@ -53,19 +51,19 @@ export function QuestionPager({
 				<ChevronLeftIcon aria-hidden='true' />
 			</Button>
 			<div className='flex items-center'>
-				{labels.map((label, index) => (
+				{pages.map((page, index) => (
 					<button
 						aria-current={index === activeIndex}
-						aria-label={label}
+						aria-label={page.label}
 						className='group/dot flex h-5 w-3.5 items-center justify-center'
-						key={`${index}-${label}`}
+						key={page.key}
 						onClick={() => onGoToPage(index)}
 						type='button'
 					>
 						<span
 							className={cn(
 								'size-1.5 rounded-full transition-colors group-hover/dot:bg-foreground',
-								dotFill(index === activeIndex, answeredIndexes.has(index)),
+								dotFill(index === activeIndex, page.answered),
 							)}
 						/>
 					</button>
