@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { PanelAlert } from '@/renderer/components/workbench-shell/panel-alert';
 import { formatCount } from '@/renderer/lib/format';
 import type { ChecksPanelState } from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
@@ -47,9 +48,10 @@ export function ChecksNoPullRequestState({
 				data-checks-panel-state={state.kind}
 			>
 				{workspace.pullRequest.syncError ? (
-					<div className='rounded-md border border-status-danger/40 bg-pane px-3 py-2 text-status-danger text-xs leading-5'>
-						GitHub refresh failed: {workspace.pullRequest.syncError}
-					</div>
+					<PanelAlert
+						detail={workspace.pullRequest.syncError}
+						title='Could not refresh from GitHub'
+					/>
 				) : null}
 				{children}
 

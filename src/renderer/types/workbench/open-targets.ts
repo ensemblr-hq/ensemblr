@@ -13,10 +13,14 @@ export interface OpenTargetPathOptions {
 
 /** Open-in menu snapshot: the invoke action plus detected and primary targets (`null` while loading). */
 export interface OpenTargetsState {
+	/** The copy-path target split out of `openTargets`, if one was detected. */
+	copyTarget: WorkspaceOpenTarget | undefined;
 	invokeTarget: (
 		target: WorkspaceOpenTarget,
 		options?: OpenTargetPathOptions,
 	) => Promise<void>;
+	/** `openTargets` minus the copy-path entry — the installable "open in" apps. */
+	openInTargets: readonly WorkspaceOpenTarget[];
 	openTargets: WorkspaceOpenTarget[] | null;
 	primaryTarget: WorkspaceOpenTarget | null;
 }

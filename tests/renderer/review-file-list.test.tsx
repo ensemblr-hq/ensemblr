@@ -5,6 +5,7 @@ import { expect, test } from 'vitest';
 import { TooltipProvider } from '../../src/renderer/components/ui/tooltip';
 import { ReviewFileList } from '../../src/renderer/components/workbench-shell/review-files/review-file-list';
 import type { ReviewFileSummary } from '../../src/renderer/types/workbench';
+import type { WorkspaceGitFailure } from '../../src/shared/ipc/contracts/workspace-git';
 
 const files: ReviewFileSummary[] = [
 	{
@@ -34,6 +35,25 @@ function renderList(viewMode: 'folders' | 'list') {
 					files={files}
 					onDiscardFile={() => {}}
 					viewMode={viewMode}
+					workspaceId='w1'
+				/>
+			</TooltipProvider>
+		</QueryClientProvider>,
+	);
+}
+
+function renderError(error: WorkspaceGitFailure) {
+	const queryClient = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	return renderToStaticMarkup(
+		<QueryClientProvider client={queryClient}>
+			<TooltipProvider>
+				<ReviewFileList
+					error={error}
+					files={[]}
+					onDiscardFile={() => {}}
+					viewMode='list'
 					workspaceId='w1'
 				/>
 			</TooltipProvider>
@@ -78,4 +98,30 @@ test('empty change set shows the empty state in either mode', () => {
 	);
 
 	expect(markup).toContain('No file changes yet');
+	expect(markup).toContain('Changes appear here.');
+	expect(markup).toContain('<svg');
+});
+
+test('a generic read failure leads with plain copy and demotes the raw error', () => {
+	const markup = renderError({
+		code: 'command-failed',
+		message: 'fatal: bad revision HEAD',
+	});
+
+	expect(markup).toContain('Could not read changes');
+	expect(markup).toContain('text-status-danger');
+	expect(markup).toContain('font-mono');
+	expect(markup).toContain('fatal: bad revision HEAD');
+});
+
+test('a missing git repository is named instead of shown as a raw git error', () => {
+	const markup = renderError({
+		code: 'not-a-git-repo',
+		message:
+			'fatal: not a git repository (or any of the parent directories): .git',
+	});
+
+	expect(markup).toContain('Not a git repository');
+	expect(markup).toContain('not tracked by git');
+	expect(markup).toContain('Initialize a repository here');
 });

@@ -553,3 +553,58 @@ test('getCommits (real git) scopes to branch commits when given a base ref', asy
 		['feat two', 'feat one', 'initial'],
 	);
 });
+
+test('getStatus surfaces git stderr instead of the generic exit-code message', async (t) => {
+	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-'));
+	t.after(() => rm(workspaceDir, { force: true, recursive: true }));
+
+	const { service } = stubCommandService(() =>
+		buildResult({
+			exitCode: 128,
+			failure: {
+				code: 'nonzero-exit',
+				exitCode: 128,
+				message: 'Command exited with code 128.',
+				signal: null,
+			},
+			status: 'failure',
+			stderr:
+				'fatal: not a git repository (or any of the parent directories): .git\n',
+		}),
+	);
+	const git = createWorkspaceGitService({ localCommandService: service });
+
+	const result = await git.getStatus({ workspaceCwd: workspaceDir });
+
+	assert.equal(result.error?.code, 'not-a-git-repo');
+	assert.equal(
+		result.error?.message,
+		'fatal: not a git repository (or any of the parent directories): .git',
+	);
+});
+
+test('getStatus decodes a bare git exit code when git said nothing', async (t) => {
+	const workspaceDir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-'));
+	t.after(() => rm(workspaceDir, { force: true, recursive: true }));
+
+	const { service } = stubCommandService(() =>
+		buildResult({
+			exitCode: 128,
+			failure: {
+				code: 'nonzero-exit',
+				exitCode: 128,
+				message: 'Command exited with code 128.',
+				signal: null,
+			},
+			status: 'failure',
+		}),
+	);
+	const git = createWorkspaceGitService({ localCommandService: service });
+
+	const result = await git.getStatus({ workspaceCwd: workspaceDir });
+
+	const message = result.error?.message ?? '';
+	assert.equal(result.error?.code, 'command-failed');
+	assert.match(message, /fatal error \(exit code 128\)/);
+	assert.doesNotMatch(message, /^Command exited with code/);
+});

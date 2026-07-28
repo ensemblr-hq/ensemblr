@@ -18,6 +18,7 @@ import {
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { PanelAlert } from '@/renderer/components/workbench-shell/panel-alert';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { getChecksPanelState } from '@/renderer/lib/workbench/checks-panel-state';
 import { buildCommitAndPushPrompt } from '@/renderer/lib/workbench/checks-pr-prompts';
@@ -329,9 +330,10 @@ function ChecksPullRequestPanel({
 				data-checks-panel-state={state.kind}
 			>
 				{pullRequest.syncError ? (
-					<div className='rounded-md border border-status-danger/40 bg-pane px-3 py-2 text-status-danger text-xs leading-5'>
-						GitHub refresh failed: {pullRequest.syncError}
-					</div>
+					<PanelAlert
+						detail={pullRequest.syncError}
+						title='Could not refresh from GitHub'
+					/>
 				) : null}
 				{children}
 

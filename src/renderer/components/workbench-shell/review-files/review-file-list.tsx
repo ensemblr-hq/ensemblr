@@ -1,3 +1,4 @@
+import { GitPullRequestArrowIcon, TriangleAlertIcon } from 'lucide-react';
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 
 import {
@@ -6,7 +7,9 @@ import {
 } from '@/renderer/components/ui/context-menu';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { useWorkspaceFileDiffOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
+import { PanelPlaceholder } from '@/renderer/components/workbench-shell/panel-placeholder';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
+import { describeWorkspaceGitFailure } from '@/renderer/lib/workbench/git-failure-copy';
 import type {
 	ReviewFileActions,
 	ReviewFileMenuTarget,
@@ -14,10 +17,12 @@ import type {
 	WorkspaceFileDiffOpener,
 } from '@/renderer/types/workbench';
 import type { ChangesViewMode } from '@/renderer/types/workbench-shell';
-import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
+import type {
+	WorkspaceGitDiffScope,
+	WorkspaceGitFailure,
+} from '@/shared/ipc/contracts/workspace-git';
 
 import { ReviewFileActionsProvider } from './review-file-actions-context';
-import { ReviewFileEmptyState } from './review-file-empty-state';
 import { ReviewFileRow } from './review-file-row';
 import { ReviewFileTree } from './review-file-tree';
 import { ReviewFilesContextMenuContent } from './review-files-context-menu';
@@ -26,7 +31,10 @@ import { ReviewFilesContextMenuContent } from './review-files-context-menu';
 export function ReviewFileList({
 	diffScope,
 	discardablePaths,
-	emptyState,
+	emptyState = {
+		message: 'Changes appear here.',
+		title: 'No file changes yet',
+	},
 	error,
 	files,
 	isLoading = false,
@@ -40,7 +48,7 @@ export function ReviewFileList({
 	discardablePaths?: ReadonlySet<string>;
 	/** Overrides the empty-state copy for the active source. */
 	emptyState?: { message: string; title: string };
-	error?: string;
+	error?: WorkspaceGitFailure;
 	files: ReviewFileSummary[];
 	/** True while the source's status query is in flight with no rows yet. */
 	isLoading?: boolean;
@@ -61,16 +69,9 @@ export function ReviewFileList({
 				: null,
 		[rawOpenDiff, diffScope],
 	);
-	const { invokeTarget, openTargets } = useOpenTargets({ workspaceId });
-	const openInTargets = useMemo(
-		() =>
-			(openTargets ?? []).filter((target) => target.behavior !== 'copy-path'),
-		[openTargets],
-	);
-	const copyTarget = useMemo(
-		() => (openTargets ?? []).find((target) => target.behavior === 'copy-path'),
-		[openTargets],
-	);
+	const { copyTarget, invokeTarget, openInTargets } = useOpenTargets({
+		workspaceId,
+	});
 	const isDiscardable = useMemo(
 		() => (filePath: string) =>
 			discardablePaths ? discardablePaths.has(filePath) : true,
@@ -120,13 +121,11 @@ export function ReviewFileList({
 
 	if (error) {
 		return (
-			<ScrollArea className='h-full'>
-				<div className='p-3'>
-					<div className='rounded-md border border-status-danger/40 bg-pane px-3 py-4 text-status-danger text-xs leading-5'>
-						Could not read workspace changes: {error}
-					</div>
-				</div>
-			</ScrollArea>
+			<PanelPlaceholder
+				{...describeWorkspaceGitFailure(error)}
+				icon={TriangleAlertIcon}
+				tone='danger'
+			/>
 		);
 	}
 
@@ -138,7 +137,7 @@ export function ReviewFileList({
 				</div>
 			);
 		}
-		return <ReviewFileEmptyState {...emptyState} />;
+		return <PanelPlaceholder icon={GitPullRequestArrowIcon} {...emptyState} />;
 	}
 
 	return (

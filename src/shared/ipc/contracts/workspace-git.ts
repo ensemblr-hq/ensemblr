@@ -108,12 +108,18 @@ export type WorkspaceGitFailureCode =
 	| 'invalid-cwd'
 	| 'not-a-git-repo';
 
+/**
+ * A failed workspace git read: the code the UI branches on, plus git's own
+ * words for the detail line.
+ */
+export interface WorkspaceGitFailure {
+	code: WorkspaceGitFailureCode;
+	message: string;
+}
+
 /** Changed-file rows and their aggregate summary, or a typed error on failure. */
 export interface GetWorkspaceGitStatusResult {
-	error?: {
-		code: WorkspaceGitFailureCode;
-		message: string;
-	};
+	error?: WorkspaceGitFailure;
 	files: readonly WorkspaceGitFileWire[];
 	summary: WorkspaceGitChangeSummaryWire;
 }

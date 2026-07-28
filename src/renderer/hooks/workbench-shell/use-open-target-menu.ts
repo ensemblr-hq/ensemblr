@@ -13,6 +13,10 @@ import type { WorkspaceOpenTarget } from '@/renderer/types/workbench';
 
 /** Detected targets plus last-used memory shared by every open-in menu. */
 export interface OpenTargetMenuState {
+	/** The copy-path target split out of `openTargets`, if one was detected. */
+	copyTarget: WorkspaceOpenTarget | undefined;
+	/** `openTargets` minus the copy-path entry — the installable "open in" apps. */
+	openInTargets: readonly WorkspaceOpenTarget[];
 	openTargets: WorkspaceOpenTarget[] | null;
 	primaryTarget: WorkspaceOpenTarget | null;
 	/** Persists `targetId` as the last-used pick for this menu's history key. */
@@ -25,7 +29,8 @@ export interface OpenTargetMenuState {
  * restores the last-used pick for `historyKey`, and derives the primary target.
  * Consumers layer their own `invokeTarget` (workspace vs. settings file) on top.
  * @param historyKey - Namespaced key the last-used pick is stored under.
- * @returns The filtered target list, primary target, and a remember callback.
+ * @returns The filtered target list split into installable apps and the
+ * copy-path entry, the primary target, and a remember callback.
  */
 export function useOpenTargetMenu(historyKey: string): OpenTargetMenuState {
 	const hasBridge = getEnsemblrApiOrNull() !== null;
@@ -60,6 +65,16 @@ export function useOpenTargetMenu(historyKey: string): OpenTargetMenuState {
 		[lastUsedTargetId, openTargets],
 	);
 
+	const openInTargets = useMemo(
+		() =>
+			(openTargets ?? []).filter((target) => target.behavior !== 'copy-path'),
+		[openTargets],
+	);
+	const copyTarget = useMemo(
+		() => (openTargets ?? []).find((target) => target.behavior === 'copy-path'),
+		[openTargets],
+	);
+
 	const rememberTarget = useCallback(
 		(targetId: string) => {
 			writeLastUsedOpenTarget(historyKey, targetId);
@@ -68,7 +83,13 @@ export function useOpenTargetMenu(historyKey: string): OpenTargetMenuState {
 		[historyKey],
 	);
 
-	return { openTargets, primaryTarget, rememberTarget };
+	return {
+		copyTarget,
+		openInTargets,
+		openTargets,
+		primaryTarget,
+		rememberTarget,
+	};
 }
 
 /**
