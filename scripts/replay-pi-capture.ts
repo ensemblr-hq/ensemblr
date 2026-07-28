@@ -22,6 +22,13 @@ type RawFrame = Record<string, unknown>;
 
 let ordinal = 0;
 
+/**
+ * Wraps a persisted envelope in a wire event, stamping a deterministic ordinal
+ * and timestamp so replays render identically across runs.
+ * @param payload - Persisted envelope to carry on the event
+ * @param turnId - Turn the event belongs to, or null when it is turn-less
+ * @returns A replay-scoped session event ready for the timeline
+ */
 function makeEvent(
 	payload: PiPersistedEnvelope,
 	turnId: string | null,
@@ -39,6 +46,12 @@ function makeEvent(
 	};
 }
 
+/**
+ * Converts raw capture content blocks into wire message parts, skipping any
+ * block whose shape the timeline cannot render.
+ * @param blocks - Untrusted content-block array read from a capture frame
+ * @returns The recognised text, reasoning, and tool-call parts in order
+ */
 function contentBlocksToParts(blocks: unknown): PiWireMessagePart[] {
 	if (!Array.isArray(blocks)) {
 		return [];
@@ -65,6 +78,12 @@ function contentBlocksToParts(blocks: unknown): PiWireMessagePart[] {
 	return parts;
 }
 
+/**
+ * Turns a captured JSONL transcript into the session events a replay renders,
+ * dropping lines that fail to parse rather than aborting the whole capture.
+ * @param lines - Raw JSONL lines from a Pi capture file
+ * @returns Ordered session events reconstructed from the recognised frames
+ */
 function framesToEvents(lines: readonly string[]): PiSessionEventWire[] {
 	const events: PiSessionEventWire[] = [];
 	for (const line of lines) {

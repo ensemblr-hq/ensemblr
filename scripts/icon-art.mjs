@@ -45,6 +45,11 @@ const GHOST_OPACITY = 0.7;
 export const BLOOM_SIGMA = 26; // gaussian radius of the emissive glow around the glyph
 export const BLOOM_STRENGTH = 0.82; // 0..1 dim factor before the glow is screened in
 
+/**
+ * Rounds a coordinate to two decimals so the emitted MVG stays compact.
+ * @param value - Raw coordinate or length
+ * @returns The value rounded to hundredths
+ */
 const round = (value) => Math.round(value * 100) / 100;
 
 /**
@@ -97,6 +102,11 @@ const RED_PIXELS = pixelOrigins(GHOST_OFFSET);
 
 const SQUIRCLE_POLYGON = SQUIRCLE.map(([x, y]) => `${x},${y}`).join(' ');
 
+/**
+ * Emits the MVG rounded-rectangle command for one glyph pixel.
+ * @param origin - Top-left `[x, y]` corner of the pixel cell
+ * @returns An MVG `roundrectangle` command sized to the pixel
+ */
 const roundRect = ([x, y]) =>
 	`roundrectangle ${x},${y} ${round(x + PIXEL_SIZE)},${round(y + PIXEL_SIZE)} ${round(PIXEL_RADIUS)},${round(PIXEL_RADIUS)}`;
 
