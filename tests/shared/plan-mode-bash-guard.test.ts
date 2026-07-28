@@ -27,6 +27,16 @@ const ALLOWED = [
 	'find . -name "*.ts"',
 	'ls src && cat package.json',
 	'rg planMode | head -5',
+	// `-o` on grep/rg means `--only-matching` and only reads; the output-file
+	// guard is scoped to the commands where `-o` actually writes (sort/tree).
+	'rg -o "\\w+" src',
+	'grep -o "planMode" src/main/main.ts',
+	// `--pre-glob` only filters which files `--pre` runs on and executes nothing.
+	'rg --pre-glob "*.md" planMode',
+	'fd -e ts src',
+	'date +%Y-%m-%d',
+	'sort package.json',
+	'tree -L 2 src',
 ];
 
 const DENIED = [
@@ -80,6 +90,18 @@ const DENIED = [
 	'git diff --output out.txt',
 	'git diff --output=out.txt',
 	'git log --output=out.txt',
+	// `fd` and `rg` are on the read allowlist but execute arbitrary commands via
+	// these flags, so they must be rejected like `find -exec`.
+	'fd -x rm',
+	'fd . --exec rm {}',
+	'fd -X rm',
+	'fd --exec-batch rm',
+	'rg --pre ./evil.sh planMode',
+	'rg --pre=./evil.sh planMode',
+	'rg --hostname-bin ./evil planMode',
+	// `date -s` sets the system clock rather than reading it.
+	'date -s "2020-01-01"',
+	'date --set 2020-01-01',
 ];
 
 describe('isReadOnlyBashCommand', () => {
@@ -127,5 +149,17 @@ describe('isReadOnlyBashCommand', () => {
 		expect(
 			isReadOnlyBashCommand('find . -name "*.ts" -o -name "*.tsx"'),
 		).toEqual({ ok: true });
+	});
+
+	it('rejects `fd --exec`, naming the flag that runs a command', () => {
+		const verdict = isReadOnlyBashCommand('fd -tf -x rm');
+		expect(verdict.ok).toBe(false);
+		if (!verdict.ok) {
+			expect(verdict.reason).toContain('fd -x');
+		}
+	});
+
+	it('allows `rg -o`, whose `-o` is `--only-matching`, not an output file', () => {
+		expect(isReadOnlyBashCommand('rg -o "\\w+" src')).toEqual({ ok: true });
 	});
 });

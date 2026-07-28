@@ -127,7 +127,13 @@ const AWARENESS =
 		? SUBAGENT_AWARENESS
 		: ORCHESTRATOR_AWARENESS;
 
-/** Built-in Pi tools Plan Mode restricts; everything else runs untouched. */
+/**
+ * Built-in Pi tools Plan Mode restricts; everything else runs untouched. MUST
+ * hold the same members as `PLAN_MODE_GUARDED_TOOLS` in
+ * `src/shared/plan-mode/tool-guard.ts` (this file cannot import from `src/` at
+ * runtime); a parity test enforces it. A mutation tool missing from both is
+ * never forwarded and bypasses Plan Mode silently.
+ */
 const PLAN_MODE_GUARDED_TOOLS = new Set(['bash', 'edit', 'write']);
 
 interface ControlResult {
@@ -272,7 +278,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		const result = await invoke(
 			'checkPlanModeTool',
 			{
-				command: (event.input as { command?: string }).command,
+				command: (event.input as { command?: string } | undefined)?.command,
 				tool: event.toolName,
 			},
 			undefined,

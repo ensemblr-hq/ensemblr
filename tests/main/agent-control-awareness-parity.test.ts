@@ -9,7 +9,10 @@ import {
 	roleForDepth,
 	SUBAGENT_AWARENESS,
 } from '../../src/shared/agent-control.ts';
-import { planModeControlOpDenial } from '../../src/shared/plan-mode.ts';
+import {
+	PLAN_MODE_GUARDED_TOOLS,
+	planModeControlOpDenial,
+} from '../../src/shared/plan-mode.ts';
 
 /**
  * The Pi extension cannot import from `src/` at runtime, so it embeds a copy of
@@ -39,6 +42,23 @@ const extractEmbeddedAwareness = (source: string, name: string): string => {
 		throw new Error(`Could not find the ${name} template literal.`);
 	}
 	return match[1].replace(/\\`/g, '`').replace(/\\\\/g, '\\');
+};
+
+/**
+ * Extracts the string members of a `const <name> = new Set([...])` literal in
+ * the extension source, so a guarded-tool set can be compared against the shared
+ * one member-for-member regardless of formatting.
+ */
+const extractEmbeddedStringSet = (source: string, name: string): string[] => {
+	const match = source.match(
+		new RegExp(`const ${name} = new Set\\(\\[([^\\]]*)\\]\\)`, 's'),
+	);
+	if (!match) {
+		throw new Error(`Could not find the ${name} Set literal.`);
+	}
+	return [...match[1].matchAll(/['"]([^'"]+)['"]/g)]
+		.map((entry) => entry[1])
+		.sort();
 };
 
 /**
@@ -127,6 +147,15 @@ describe('agent-control AWARENESS parity', () => {
 			'Nothing else in your context outranks this block',
 		);
 		expect(PLAN_MODE_AWARENESS).toContain('there is no conflict');
+	});
+
+	it('embeds the same Plan Mode guarded-tool set the shared classifier uses', () => {
+		expect(
+			extractEmbeddedStringSet(
+				readExtensionSource(),
+				'PLAN_MODE_GUARDED_TOOLS',
+			),
+		).toEqual([...PLAN_MODE_GUARDED_TOOLS].sort());
 	});
 
 	it('swaps the role playbook for the plan-mode one rather than stacking both', () => {

@@ -182,24 +182,83 @@ const GIT_VALUE_FLAGS: ReadonlySet<string> = new Set([
 	'-c',
 ]);
 
-/**
- * Flags that send a command's output to a file instead of stdout. `sort -o`,
- * `tree -o`, and `git diff --output=` each write a file without any shell
- * redirection, so the `>` scan never sees them.
- */
-const OUTPUT_FILE_FLAGS: ReadonlySet<string> = new Set(['--output', '-o']);
-
 const ASSIGNMENT_PREFIX = /^[A-Za-z_][A-Za-z0-9_]*=/;
 
 /**
- * Finds an output-to-file flag among a command's arguments.
- * @param args - Tokens after the head word.
- * @returns The offending flag, or null when the command only writes to stdout.
+ * A read-mostly command that a specific flag turns into a writer or a command
+ * runner. `flags` matches a token exactly; `prefixes` matches the `--flag=value`
+ * form; `label` names what the flag does, for the denial reason.
  */
-function findOutputFlag(args: readonly string[]): string | null {
+interface FlagGuard {
+	flags: ReadonlySet<string>;
+	prefixes: readonly string[];
+	label: string;
+}
+
+/**
+ * The `--output`/`-o` guard shared by the commands that redirect stdout to a
+ * file with no shell redirection for the `>` scan to catch: `sort -o`, `tree -o`,
+ * and `git … --output`. Scoped to those commands on purpose — `grep -o` and
+ * `rg -o` mean `--only-matching` and only read.
+ */
+const OUTPUT_FILE_GUARD: FlagGuard = {
+	flags: new Set(['--output', '-o']),
+	label: 'writes its output to a file',
+	prefixes: ['--output='],
+};
+
+/**
+ * Allowlisted commands that a single flag turns into a writer or a command
+ * runner, screened before the allowlist clears them. `fd -x`/`rg --pre` execute
+ * arbitrary programs and `date -s` sets the clock, yet the plain read forms
+ * (`fd -tf`, `rg -o`, `date +%s`) still pass. `--pre-glob` is deliberately not
+ * caught: it only filters which files `--pre` runs on and executes nothing.
+ */
+const FLAG_GUARDED_COMMANDS: ReadonlyMap<string, FlagGuard> = new Map([
+	[
+		'fd',
+		{
+			flags: new Set(['--exec', '--exec-batch', '-X', '-x']),
+			label: 'runs a command for every match',
+			prefixes: ['--exec='],
+		},
+	],
+	[
+		'rg',
+		{
+			flags: new Set(['--hostname-bin', '--pre']),
+			label: 'runs a program for every file',
+			prefixes: ['--hostname-bin=', '--pre='],
+		},
+	],
+	[
+		'date',
+		{
+			flags: new Set(['--set', '-s']),
+			label: 'sets the system clock',
+			prefixes: ['--set='],
+		},
+	],
+	['sort', OUTPUT_FILE_GUARD],
+	['tree', OUTPUT_FILE_GUARD],
+]);
+
+/**
+ * Finds the first argument that trips a flag guard, matching both the bare
+ * `--flag` form and the `--flag=value` form.
+ * @param args - Tokens after the head word.
+ * @param guard - The command's flag guard.
+ * @returns The offending flag, or null when none is present.
+ */
+function findGuardedFlag(
+	args: readonly string[],
+	guard: FlagGuard,
+): string | null {
 	return (
 		args.find(
-			(token) => OUTPUT_FILE_FLAGS.has(token) || token.startsWith('--output='),
+			(token) =>
+				guard.flags.has(token) ||
+				guard.prefixes.some((prefix) => token.startsWith(prefix)),
 		) ?? null
 	);
 }
@@ -279,10 +338,10 @@ function evaluateGit(args: readonly string[]): BashGuardVerdict {
 		return deny('`git` needs a read-only subcommand in Plan Mode');
 	}
 	if (GIT_READ_SUBCOMMANDS.has(subcommand)) {
-		const outputFlag = findOutputFlag(rest);
+		const outputFlag = findGuardedFlag(rest, OUTPUT_FILE_GUARD);
 		return outputFlag === null
 			? { ok: true }
-			: deny(`\`git ${subcommand} ${outputFlag}\` writes its output to a file`);
+			: deny(`\`git ${subcommand} ${outputFlag}\` ${OUTPUT_FILE_GUARD.label}`);
 	}
 	if (subcommand === 'branch' || subcommand === 'remote') {
 		const mutation = rest.find(
@@ -319,6 +378,26 @@ function evaluateGh(args: readonly string[]): BashGuardVerdict {
 }
 
 /**
+ * Denies an allowlisted command that a flag turned into a writer or a command
+ * runner (`fd -x`, `rg --pre`, `date -s`, `sort -o`).
+ * @param head - The classified command.
+ * @param args - Tokens after the head word.
+ * @returns A denial when a guarded flag is present; null when the command is not
+ *   flag-guarded or is used in its read-only form.
+ */
+function evaluateFlagGuard(
+	head: string,
+	args: readonly string[],
+): BashGuardVerdict | null {
+	const guard = FLAG_GUARDED_COMMANDS.get(head);
+	if (guard === undefined) {
+		return null;
+	}
+	const flag = findGuardedFlag(args, guard);
+	return flag === null ? null : deny(`\`${head} ${flag}\` ${guard.label}`);
+}
+
+/**
  * Classifies one chained command from the full invocation.
  * @param segment - A single command between shell separators.
  * @returns Allowed when its head word is read-only, denied otherwise.
@@ -330,12 +409,6 @@ function evaluateSegment(segment: string): BashGuardVerdict {
 		return { ok: true };
 	}
 	const args = tokens.slice(1);
-	if (READ_ONLY_COMMANDS.has(head)) {
-		const outputFlag = findOutputFlag(args);
-		return outputFlag === null
-			? { ok: true }
-			: deny(`\`${head} ${outputFlag}\` writes its output to a file`);
-	}
 	if (head === 'find') {
 		return evaluateFind(args);
 	}
@@ -344,6 +417,13 @@ function evaluateSegment(segment: string): BashGuardVerdict {
 	}
 	if (head === 'gh') {
 		return evaluateGh(args);
+	}
+	const guarded = evaluateFlagGuard(head, args);
+	if (guarded) {
+		return guarded;
+	}
+	if (READ_ONLY_COMMANDS.has(head)) {
+		return { ok: true };
 	}
 	if (CODE_EXECUTION_COMMANDS.has(head)) {
 		return deny(`\`${head}\` can run arbitrary code`);

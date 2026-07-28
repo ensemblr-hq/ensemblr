@@ -14,4 +14,7 @@ export type {
 	PlanModeToolRequest,
 	PlanModeToolVerdict,
 } from './plan-mode/tool-guard.ts';
-export { evaluatePlanModeTool } from './plan-mode/tool-guard.ts';
+export {
+	evaluatePlanModeTool,
+	PLAN_MODE_GUARDED_TOOLS,
+} from './plan-mode/tool-guard.ts';
