@@ -22,9 +22,11 @@ export function getComposerState({
 	isStreaming,
 	modelId,
 	onModelChange,
+	onPlanModeChange,
 	onStop,
 	onSubmit,
 	onThinkingChange,
+	planMode,
 	setupDiagnostics,
 	setupError,
 	thinkingLevel,
@@ -39,12 +41,14 @@ export function getComposerState({
 	isStreaming: boolean;
 	modelId: string | null;
 	onModelChange: (modelId: string) => void;
+	onPlanModeChange: (planMode: boolean) => void;
 	onStop: () => Promise<void> | void;
 	onSubmit: (
 		prompt: string,
 		options?: { streamingBehavior?: 'steer' | 'followUp' },
 	) => Promise<void> | void;
 	onThinkingChange: (thinkingLevel: string) => void;
+	planMode: boolean;
 	setupDiagnostics: SetupDiagnosticsSnapshot | null;
 	setupError: string | null;
 	thinkingLevel: string | null;
@@ -67,9 +71,11 @@ export function getComposerState({
 		modelId,
 		modelLabel,
 		onModelChange,
+		onPlanModeChange,
 		onStop,
 		onSubmit,
 		onThinkingChange,
+		planMode,
 		workspaceCwd: workspaceCwd ?? '',
 		thinkingLabel: thinkingLabelText,
 		thinkingLevel,
@@ -107,6 +113,8 @@ export function getComposerState({
 		...base,
 		disabled: false,
 		disabledReason: null,
-		placeholder: `Ask Pi to continue ${activeSession.label.toLowerCase()}`,
+		placeholder: planMode
+			? 'Describe what you want built — Pi will plan it with you before touching any files'
+			: `Ask Pi to continue ${activeSession.label.toLowerCase()}`,
 	};
 }

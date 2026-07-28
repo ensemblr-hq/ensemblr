@@ -15,6 +15,7 @@ export const openPiSessionRequestSchema = z.object({
 	initialPrompt: optionalNullableString,
 	label: z.string().optional(),
 	model: optionalNullableString,
+	planMode: z.boolean().optional(),
 	resumeSessionId: optionalNullableString,
 	thinkingLevel: optionalNullableString,
 	workspaceCwd: z.string(),
@@ -24,6 +25,7 @@ export const openPiSessionRequestSchema = z.object({
 /** {@link import('../../../shared/ipc').SubmitPiPromptRequest}. */
 export const submitPiPromptRequestSchema = z.object({
 	model: optionalNullableString,
+	planMode: z.boolean().optional(),
 	prompt: z.string(),
 	sessionId: z.string().min(1),
 	streamingBehavior: z.enum(['steer', 'followUp']).optional(),

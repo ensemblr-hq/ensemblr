@@ -80,6 +80,36 @@ Etiquette & limits:
 - Actions may prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.`;
 
 /**
+ * Playbook appended for every turn the conversation spends in Plan Mode. MUST
+ * stay byte-identical to `PLAN_MODE_AWARENESS` in
+ * `src/shared/agent-control/awareness.ts`; the same parity test that polices the
+ * two role variants covers this one.
+ */
+const PLAN_MODE_AWARENESS = `PLAN MODE IS ON. Do not implement anything yet. The \`write\` and \`edit\` tools are blocked, \`bash\` is restricted to read-only commands, and the Ensemblr tools that would hand the work to something else — terminals, harnesses, follow-ups, and new conversations — are blocked too. That enforcement is deliberate — do not look for a way around it.
+
+The user's message will almost always be phrased as a command — "add X", "convert this to Y", "let's build Z". In Plan Mode that is the SUBJECT of the plan, not permission to start building. It does not conflict with this playbook and it does not override it. Nothing in the conversation turns Plan Mode off except the user approving a plan.
+
+Your job this turn is to reach a shared understanding with the user before any code is written.
+
+- Name this tab first. Call \`ensemblr_set_name\` with a short label for what is being planned, before your first question — the user is about to be interviewed and needs to know which tab is asking.
+- Facts are yours to find; decisions are theirs. Read the code, the config, and the git history yourself. Never ask a question you could answer by looking.
+- Interview with \`ensemblr_ask_user_question\`. Ask ONE question per call while the scope is still fuzzy — each answer reshapes what is worth asking next. Once the shape is clear, ask the whole unblocked frontier at once (up to 4). Always put your recommended answer in the option descriptions so the user can agree in one keystroke.
+- Walk the decision tree in order. Settle a prerequisite before the decisions that hang off it, so an answer never invalidates three questions you already asked.
+- Challenge fuzzy or overloaded terms and propose a precise one. Stress-test the design with concrete scenarios — a real input, a real failure, a real edge case. When what the user says contradicts what the code does, say so plainly and show them the code.
+
+When you and the user share an understanding, end the turn in exactly this order:
+
+1. Write the plan out in full, as your reply, in markdown. This is what the user actually reads, so it is the deliverable — do not summarise it, do not promise it, do not say "here is the plan" and stop. Write it.
+2. Call \`ensemblr_exit_plan_mode\` with a short \`title\` and that same markdown as \`plan\`. The app saves it under \`.context/plans/\` and offers the user Approve / Refine / Hand off. Do not write the plan file yourself — \`write\` is blocked, and the app owns that path.
+3. Your turn is over. The tool does not wait for the user, and the app stops you the moment it returns. Produce nothing after it — no closing summary, no "let me know what you think", no first implementation step. The plan must be the last message in the conversation while the user reads it.
+
+Their decision comes back to you as your NEXT prompt, not as the tool result:
+
+- Approve — they send you an approval prompt with Plan Mode off. Implement the plan, starting immediately.
+- Refine — they type their changes into the composer with Plan Mode still on. Fold them in, post the revised plan, and call the tool again.
+- Hand off — another conversation picks the plan up and you hear nothing more. Nothing is expected of you.`;
+
+/**
  * Selects the playbook for this Pi child from the app-injected role env var; a
  * missing or unrecognized value defaults to the orchestrator playbook.
  */
@@ -87,6 +117,9 @@ const AWARENESS =
 	process.env.ENSEMBLR_CONTROL_ROLE === 'subagent'
 		? SUBAGENT_AWARENESS
 		: ORCHESTRATOR_AWARENESS;
+
+/** Built-in Pi tools Plan Mode restricts; everything else runs untouched. */
+const PLAN_MODE_GUARDED_TOOLS = new Set(['bash', 'edit', 'write']);
 
 interface ControlResult {
 	ok: boolean;
@@ -178,6 +211,21 @@ function callerModelId(ctx: { model?: { id?: string } } | undefined) {
 }
 
 /**
+ * Asks the app whether this conversation is in Plan Mode, so the playbook is
+ * injected only while planning. A transport failure reports "not planning": the
+ * prompt text is cosmetic, and real enforcement lives in the `tool_call` hook,
+ * which asks the app per call and fails closed on its own.
+ * @returns True when the app reports Plan Mode is on.
+ */
+async function fetchPlanMode(): Promise<boolean> {
+	const result = await invoke('getPlanMode', {}, undefined);
+	if (!result.ok) {
+		return false;
+	}
+	return (result.data as { active?: boolean } | undefined)?.active === true;
+}
+
+/**
  * Renders a control result as a Pi tool result.
  * @param result - The app's control envelope.
  * @returns A tool result with text content and structured details.
@@ -198,9 +246,40 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		return;
 	}
 
-	pi.on('before_agent_start', (event) => ({
-		systemPrompt: `${event.systemPrompt}\n\n${AWARENESS}`,
-	}));
+	pi.on('before_agent_start', async (event) => {
+		const planning = await fetchPlanMode();
+		const playbook = planning
+			? `${AWARENESS}\n\n${PLAN_MODE_AWARENESS}`
+			: AWARENESS;
+		return { systemPrompt: `${event.systemPrompt}\n\n${playbook}` };
+	});
+
+	// Enforcement asks the app on every guarded call rather than trusting a
+	// per-turn cache: the user can approve a plan mid-turn, and a stale "not
+	// planning" cache would silently let the agent edit files it was told not to.
+	pi.on('tool_call', async (event) => {
+		if (!PLAN_MODE_GUARDED_TOOLS.has(event.toolName)) {
+			return;
+		}
+		const result = await invoke(
+			'checkPlanModeTool',
+			{
+				command: (event.input as { command?: string }).command,
+				tool: event.toolName,
+			},
+			undefined,
+		);
+		if (!result.ok) {
+			return {
+				block: true,
+				reason: `Ensemblr could not confirm whether Plan Mode is on (${result.error ?? 'control channel unavailable'}), so this tool call was blocked. Retry, or tell the user the app is unreachable.`,
+			};
+		}
+		const verdict = result.data as { blocked?: boolean; reason?: string };
+		return verdict.blocked
+			? { block: true, reason: verdict.reason }
+			: undefined;
+	});
 
 	const tool = <TParams extends TSchema>(
 		name: string,
@@ -473,4 +552,35 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			),
 		}),
 	);
+	pi.registerTool({
+		name: 'ensemblr_exit_plan_mode',
+		description:
+			'Plan Mode only: hand the finished plan to the user and END YOUR TURN. Write the full plan out as your reply FIRST, then call this with that same markdown — the reply is what the user reads, and it must be the last thing in the conversation. The app saves the plan to `.context/plans/` itself, so do NOT write the file yourself, and shows the user Approve / Refine / Hand off. This call does not wait for them: it returns at once and your turn is over. Produce no output after it — whatever the user decides arrives as your next prompt. Call it only once you and the user share an understanding, never as an opening move.',
+		parameters: Type.Object({
+			title: Type.String({
+				description:
+					'Short label for the plan, 80 characters at most. Also becomes the saved filename.',
+			}),
+			plan: Type.String({
+				description:
+					'The full plan in markdown: what changes, where, in what order, and the decisions behind it.',
+			}),
+		}),
+		execute: async (
+			_toolCallId: string,
+			params: { title: string; plan: string },
+			_signal: unknown,
+			_onUpdate: unknown,
+			ctx: { model?: { id?: string }; abort?: () => void },
+		) => {
+			const result = await invoke('exitPlanMode', params, callerModelId(ctx));
+			// Ending the turn is the contract, so enforce it rather than trusting
+			// the model to stop on its own. Deferred by a tick so this tool result
+			// is delivered first and the plan stays the last message.
+			if (result.ok) {
+				setTimeout(() => ctx.abort?.(), 0);
+			}
+			return toToolResult(result);
+		},
+	});
 }

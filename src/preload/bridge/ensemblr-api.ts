@@ -3,6 +3,7 @@ import type {
 	AskUserQuestionBroadcast,
 	AskUserQuestionClosedBroadcast,
 	BoardStatusBroadcast,
+	ExitPlanModeBroadcast,
 	FocusViewBroadcast,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control';
@@ -34,6 +35,7 @@ type InvokeKey = Exclude<
 	| 'onCloseActiveTabRequest'
 	| 'onAskUserQuestion'
 	| 'onAskUserQuestionClosed'
+	| 'onExitPlanMode'
 	| 'onPiRawFrame'
 	| 'onPiSessionEvent'
 	| 'onTerminalLifecycle'
@@ -224,6 +226,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 				listener,
 			),
 		answerUserQuestion: (reply) => invoke('answerUserQuestion', reply),
+		onExitPlanMode: (listener) =>
+			subscribe<ExitPlanModeBroadcast>(
+				IPC_CHANNELS.agentControlExitPlanMode,
+				listener,
+			),
 		reportBoardStatus: (statusByWorkspaceId) =>
 			invoke('reportBoardStatus', statusByWorkspaceId),
 		onPiRawFrame: (listener) =>

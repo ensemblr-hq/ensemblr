@@ -10,12 +10,15 @@ import type {
 	AgentControlOp,
 	AgentControlResult,
 	AskUserQuestionArgs,
+	CheckPlanModeToolArgs,
 	CloseTabArgs,
 	ConversationRef,
+	ExitPlanModeArgs,
 	FocusDockTabArgs,
 	FocusPanelArgs,
 	FocusTabArgs,
 	GetLastMessageResult,
+	GetPlanModeResult,
 	LaunchHarnessArgs,
 	ListTabsArgs,
 	ListTerminalsArgs,
@@ -36,6 +39,10 @@ import type {
 } from '../../shared/agent-control.ts';
 import { isWriteOp, validateArgs } from '../../shared/agent-control.ts';
 import { classifyPermissionAction } from '../../shared/permissions.ts';
+import {
+	evaluatePlanModeTool,
+	planModeControlOpDenial,
+} from '../../shared/plan-mode.ts';
 import type { Guardrails } from './guardrails.ts';
 import type { OriginRegistry } from './origin-registry.ts';
 import type { AgentControlOrigin, AgentControlPorts } from './ports.ts';
@@ -166,6 +173,26 @@ export function createAgentControlService({
 }: AgentControlServiceOptions): AgentControlService {
 	/** Latest pending signal per child session id, set by `notifyOrchestrator`. */
 	const signalsByChild = new Map<string, OrchestratorSignal>();
+
+	/**
+	 * Blocks the control ops a planning agent must not reach. The Pi extension
+	 * intercepts `bash`, `edit`, and `write`, but Ensemblr's own tools can open a
+	 * terminal, launch a harness, or drive another conversation — each of which
+	 * puts an unrestricted writer on the same workspace.
+	 * @param op - The control op being dispatched.
+	 * @param origin - Resolved caller identity.
+	 * @returns A denial envelope, or null when the op may proceed.
+	 */
+	const gatePlanMode = (
+		op: AgentControlOp,
+		origin: AgentControlOrigin,
+	): AgentControlResult<never> | null => {
+		if (origin.species !== 'pi' || !ports.planMode.isActive(origin.sessionId)) {
+			return null;
+		}
+		const denial = planModeControlOpDenial(op);
+		return denial === null ? null : fail('denied-scope', denial);
+	};
 
 	const gatePermission = async (
 		op: AgentControlOp,
@@ -586,6 +613,57 @@ export function createAgentControlService({
 		return ok(await ports.ask.ask({ origin, questions: args.questions }));
 	};
 
+	/**
+	 * Classifies an intercepted tool call against Plan Mode policy. A session
+	 * that is not planning allows everything, so the extension can ask without
+	 * first knowing whether the toggle is still on.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The tool name and, for `bash`, its command.
+	 * @returns Whether the call is blocked, with the reason when it is.
+	 */
+	const handleCheckPlanModeTool = (
+		origin: AgentControlOrigin,
+		args: CheckPlanModeToolArgs,
+	): AgentControlResult<unknown> => {
+		if (origin.species !== 'pi' || !ports.planMode.isActive(origin.sessionId)) {
+			return ok({ blocked: false });
+		}
+		return ok(evaluatePlanModeTool(args));
+	};
+
+	/**
+	 * Puts a finished plan to the human for review. Restricted to Pi callers that
+	 * are actually planning: the review panel is rendered inside the chat tab
+	 * bound to the planning Pi session, and without the second check any agent
+	 * could drop a file in `.context/plans/` and put a decision panel — whose
+	 * Approve button submits a prompt — in front of the user unprompted.
+	 *
+	 * Deliberately classified as a read for the permission gate (see `WRITE_OPS`):
+	 * it is the only way out of Plan Mode, so blocking it under a restrictive mode
+	 * would strand the agent with every editing tool denied and no exit.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The plan title and markdown body.
+	 * @returns The submission result, or a scope failure for ineligible callers.
+	 */
+	const handleExitPlanMode = async (
+		origin: AgentControlOrigin,
+		args: ExitPlanModeArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		if (origin.species !== 'pi') {
+			return fail(
+				'denied-scope',
+				'Plan Mode is limited to native Pi conversations.',
+			);
+		}
+		if (!ports.planMode.isActive(origin.sessionId)) {
+			return fail(
+				'denied-scope',
+				'This conversation is not in Plan Mode, so there is no plan to submit. Implement the work directly.',
+			);
+		}
+		return ok(await ports.planMode.exit({ args, origin }));
+	};
+
 	const dispatch = async (
 		op: AgentControlOp,
 		origin: AgentControlOrigin,
@@ -675,6 +753,16 @@ export function createAgentControlService({
 				return handleNotifyOrchestrator(origin, args as NotifyOrchestratorArgs);
 			case 'askUserQuestion':
 				return handleAskUserQuestion(origin, args as AskUserQuestionArgs);
+			case 'getPlanMode':
+				return ok({
+					active:
+						origin.species === 'pi' &&
+						ports.planMode.isActive(origin.sessionId),
+				} satisfies GetPlanModeResult);
+			case 'checkPlanModeTool':
+				return handleCheckPlanModeTool(origin, args as CheckPlanModeToolArgs);
+			case 'exitPlanMode':
+				return handleExitPlanMode(origin, args as ExitPlanModeArgs);
 			default:
 				return fail('invalid-args', `Unsupported operation: ${String(op)}.`);
 		}
@@ -690,6 +778,10 @@ export function createAgentControlService({
 		const validated = validateArgs(command.op, command.rawArgs);
 		if (!validated.ok) {
 			return fail('invalid-args', validated.reason);
+		}
+		const planModeDenied = gatePlanMode(command.op, origin);
+		if (planModeDenied) {
+			return planModeDenied;
 		}
 		const permissionDenied = await gatePermission(command.op, origin);
 		if (permissionDenied) {
@@ -710,6 +802,7 @@ export function createAgentControlService({
 
 	const releaseSession = (sessionId: string): void => {
 		ports.ask.releaseSession(sessionId);
+		ports.planMode.releaseSession(sessionId);
 		signalsByChild.delete(sessionId);
 		guardrails.release(sessionId);
 		originRegistry.release(sessionId);

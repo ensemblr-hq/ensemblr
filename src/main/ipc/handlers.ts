@@ -16,6 +16,7 @@ import type { LinearAuthService, LinearService } from '../linear';
 import type { OpenTargetService } from '../open-target';
 import type { PiSessionService } from '../pi-agent';
 import type { PiExecutableService } from '../pi-runtime';
+import type { PlanModeRegistry } from '../plan-mode';
 import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
@@ -113,6 +114,7 @@ interface RegisterIpcHandlersOptions {
 	openTargetService: OpenTargetService;
 	piExecutableService: PiExecutableService;
 	piSessionService: PiSessionService;
+	planModeRegistry: PlanModeRegistry;
 	quickStartProjectService: QuickStartProjectService;
 	renameWorkspaceService: RenameWorkspaceService;
 	repositoryConfigService: RepositoryConfigService;
@@ -166,6 +168,7 @@ export function registerIpcHandlers({
 	openTargetService,
 	piExecutableService,
 	piSessionService,
+	planModeRegistry,
 	quickStartProjectService,
 	renameWorkspaceService,
 	repositoryConfigService,
@@ -232,6 +235,7 @@ export function registerIpcHandlers({
 		localCommandService,
 		piExecutableService,
 		piSessionService,
+		planModeRegistry,
 		withPermissionGate,
 	});
 	registerChatTabHandlers({

@@ -158,6 +158,7 @@ export function WorkspaceConversationContent({
 									activeWorkspace,
 									activeSession,
 								)}
+								workspace={activeWorkspace}
 							/>
 						</TurnDiffOpenerProvider>
 					</FilePreviewOpenerProvider>

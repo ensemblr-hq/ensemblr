@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAtom } from 'jotai';
+import { useAtom, useStore } from 'jotai';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
@@ -16,6 +16,7 @@ import { wrapWithMasterPrompt } from '@/renderer/lib/workbench/action-prompts';
 import { useOptimisticPrompts } from '@/renderer/state/composer/optimistic-prompts';
 import {
 	chatModelOverrideAtomFamily,
+	chatPlanModeAtomFamily,
 	chatThinkingOverrideAtomFamily,
 	defaultChatModelAtom,
 	defaultChatThinkingLevelAtom,
@@ -37,12 +38,14 @@ export interface PiComposerControllerState {
 	lastError: string | null;
 	modelId: string | null;
 	onModelChange: (modelId: string) => void;
+	onPlanModeChange: (planMode: boolean) => void;
 	onStop: () => Promise<void>;
 	onSubmit: (
 		prompt: string,
 		options?: { streamingBehavior?: PiStreamingBehavior },
 	) => Promise<void>;
 	onThinkingChange: (thinkingLevel: string) => void;
+	planMode: boolean;
 	thinkingLevel: string | null;
 }
 
@@ -113,6 +116,8 @@ export function usePiComposerController({
 	const [chatThinkingOverride, setChatThinkingOverride] = useAtom(
 		chatThinkingOverrideAtomFamily(chatTabId),
 	);
+	const [planMode, setPlanMode] = useAtom(chatPlanModeAtomFamily(chatTabId));
+	const store = useStore();
 	const [defaultModelId] = useAtom(defaultChatModelAtom);
 	const [defaultThinkingLevel] = useAtom(defaultChatThinkingLevelAtom);
 	const [lastError, setLastError] = useState<string | null>(null);
@@ -122,6 +127,18 @@ export function usePiComposerController({
 		sessionId: string;
 		usage: ComposerContextUsage;
 	} | null>(null);
+
+	/**
+	 * Reads the chat's Plan Mode flag from the store at call time. Approving a
+	 * plan turns the toggle off and submits in the same tick, and a mutation's
+	 * options are only refreshed on commit — so a render-scope read would send
+	 * `planMode: true` on the very turn meant to start implementing.
+	 * @returns Whether this chat is planning right now.
+	 */
+	const readPlanMode = useCallback(
+		() => store.get(chatPlanModeAtomFamily(chatTabId)),
+		[chatTabId, store],
+	);
 
 	const availableModels = useMemo<readonly ComposerModelOption[]>(() => {
 		if (!models) {
@@ -255,6 +272,7 @@ export function usePiComposerController({
 				chatTabId,
 				initialPrompt: input.initialPrompt,
 				model: modelId,
+				planMode: readPlanMode(),
 				resumeSessionId: input.resumeSessionId ?? null,
 				thinkingLevel,
 				workspaceCwd,
@@ -281,6 +299,7 @@ export function usePiComposerController({
 		}) =>
 			submitPiPrompt({
 				model: modelId,
+				planMode: readPlanMode(),
 				prompt: input.prompt,
 				sessionId: input.sessionId,
 				streamingBehavior: input.streamingBehavior,
@@ -402,6 +421,13 @@ export function usePiComposerController({
 		[setChatThinkingOverride],
 	);
 
+	const onPlanModeChange = useCallback(
+		(nextPlanMode: boolean) => {
+			setPlanMode(nextPlanMode);
+		},
+		[setPlanMode],
+	);
+
 	return {
 		activeSessionId,
 		availableModels,
@@ -415,9 +441,11 @@ export function usePiComposerController({
 		lastError,
 		modelId,
 		onModelChange,
+		onPlanModeChange,
 		onStop,
 		onSubmit,
 		onThinkingChange,
+		planMode,
 		thinkingLevel,
 	};
 }

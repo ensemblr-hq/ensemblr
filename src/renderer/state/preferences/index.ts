@@ -53,6 +53,7 @@ export type {
 } from './atoms';
 export {
 	chatModelOverrideAtomFamily,
+	chatPlanModeAtomFamily,
 	chatThinkingOverrideAtomFamily,
 	developerModeAtom,
 	diffLayoutAtom,

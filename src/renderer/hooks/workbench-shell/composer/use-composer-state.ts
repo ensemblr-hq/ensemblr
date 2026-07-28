@@ -66,7 +66,7 @@ interface UseComposerStateArgs {
  * designed so the JSX layer only wires refs, derived booleans, and event
  * handlers — it owns no domain logic.
  */
-interface ComposerStateApi {
+export interface ComposerStateApi {
 	activeIndex: number;
 	anchorRef: RefObject<HTMLDivElement | null>;
 	attachmentError: string | null;

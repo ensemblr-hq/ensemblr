@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	ORCHESTRATOR_AWARENESS,
+	PLAN_MODE_AWARENESS,
 	roleForDepth,
 	SUBAGENT_AWARENESS,
 } from '../../src/shared/agent-control.ts';
@@ -49,6 +50,32 @@ describe('agent-control AWARENESS parity', () => {
 		expect(
 			extractEmbeddedAwareness(readExtensionSource(), 'SUBAGENT_AWARENESS'),
 		).toBe(SUBAGENT_AWARENESS);
+	});
+
+	it('embeds the plan-mode playbook byte-for-byte in the Pi extension', () => {
+		expect(
+			extractEmbeddedAwareness(readExtensionSource(), 'PLAN_MODE_AWARENESS'),
+		).toBe(PLAN_MODE_AWARENESS);
+	});
+
+	it('tells a planning agent how enforcement works and how to leave plan mode', () => {
+		expect(PLAN_MODE_AWARENESS).toContain('ensemblr_exit_plan_mode');
+		expect(PLAN_MODE_AWARENESS).toContain('ensemblr_ask_user_question');
+		expect(PLAN_MODE_AWARENESS).toContain('do not look for a way around it');
+	});
+
+	it('orders the hand-off: name the tab, post the plan, then call the tool', () => {
+		const naming = PLAN_MODE_AWARENESS.indexOf('ensemblr_set_name');
+		const posting = PLAN_MODE_AWARENESS.indexOf('Write the plan out in full');
+		const exiting = PLAN_MODE_AWARENESS.indexOf('ensemblr_exit_plan_mode');
+		expect(naming).toBeGreaterThan(-1);
+		expect(posting).toBeGreaterThan(naming);
+		expect(exiting).toBeGreaterThan(posting);
+	});
+
+	it('tells a planning agent an imperative prompt is the subject, not consent', () => {
+		expect(PLAN_MODE_AWARENESS).toContain('SUBJECT of the plan');
+		expect(PLAN_MODE_AWARENESS).toContain('not permission to start building');
 	});
 
 	it('teaches the orchestrator the wait-based delegation loop', () => {

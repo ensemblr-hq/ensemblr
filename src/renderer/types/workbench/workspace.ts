@@ -239,6 +239,7 @@ export interface ComposerShellState {
 	modelId: string | null;
 	modelLabel: string;
 	onModelChange: (modelId: string) => void;
+	onPlanModeChange: (planMode: boolean) => void;
 	onStop: () => Promise<void> | void;
 	onSubmit: (
 		prompt: string,
@@ -246,6 +247,8 @@ export interface ComposerShellState {
 	) => Promise<void> | void;
 	onThinkingChange: (thinkingLevel: string) => void;
 	placeholder: string;
+	/** Whether this chat is planning: mutating tools are blocked until a plan is approved. */
+	planMode: boolean;
 	thinkingLabel: string;
 	thinkingLevel: string | null;
 	workspaceCwd: string;

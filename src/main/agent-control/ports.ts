@@ -12,6 +12,8 @@ import type {
 	AgentControlWorkspaceInfo,
 	AskUserQuestionItem,
 	AskUserQuestionResult,
+	ExitPlanModeArgs,
+	ExitPlanModeResult,
 	FocusPanelName,
 	OpenTabVariant,
 	StartTerminalKind,
@@ -238,9 +240,25 @@ export interface AskPort {
 	releaseSession: (sessionId: string) => void;
 }
 
+/**
+ * Reads a session's Plan Mode state and hands its finished plan to the user.
+ * `exit` returns as soon as the plan is saved and surfaced — it does not wait
+ * for a decision, so the agent's turn ends with the plan as its last message.
+ */
+export interface PlanModePort {
+	isActive: (sessionId: string) => boolean;
+	exit: (input: {
+		origin: AgentControlOrigin;
+		args: ExitPlanModeArgs;
+	}) => Promise<ExitPlanModeResult>;
+	/** Forgets a session's Plan Mode state once it ends. */
+	releaseSession: (sessionId: string) => void;
+}
+
 /** All collaborators the agent-control service composes. */
 export interface AgentControlPorts {
 	ask: AskPort;
+	planMode: PlanModePort;
 	workspaces: WorkspacePort;
 	tabs: TabPort;
 	conversations: ConversationPort;

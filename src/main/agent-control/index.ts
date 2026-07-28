@@ -49,6 +49,7 @@ export type {
 	ConversationPort,
 	HarnessPort,
 	PermissionPort,
+	PlanModePort,
 	TabPort,
 	TerminalPort,
 	WorkspacePort,

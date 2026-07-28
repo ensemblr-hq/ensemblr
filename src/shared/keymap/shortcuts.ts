@@ -87,6 +87,11 @@ export const SHORTCUTS = {
 		scope: 'composer',
 		bindings: [{ key: 't', modifiers: ['alt'] }],
 	},
+	'composer.togglePlanMode': {
+		description: 'Toggle plan mode',
+		scope: 'composer',
+		bindings: [{ key: 'p', modifiers: ['alt', 'shift'] }],
+	},
 	'composer.submit': {
 		description: 'Send message',
 		scope: 'composer',

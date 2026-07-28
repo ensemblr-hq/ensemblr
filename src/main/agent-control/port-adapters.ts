@@ -47,6 +47,7 @@ import type {
 	ConversationPort,
 	FocusPort,
 	HarnessPort,
+	PlanModePort,
 	TabPort,
 	TerminalPort,
 	WorkspacePort,
@@ -79,6 +80,7 @@ export interface PortAdapterDeps {
 	boardStatusStore: BoardStatusStore;
 	confirm: ConfirmPort;
 	ask: AskPort;
+	planMode: PlanModePort;
 }
 
 const IDLE_STATUSES: ReadonlySet<string> = new Set([
@@ -690,5 +692,6 @@ export function createAgentControlPorts(
 		permissions: { getMode: () => deps.getPermissionMode() },
 		confirm: deps.confirm,
 		ask: deps.ask,
+		planMode: deps.planMode,
 	};
 }

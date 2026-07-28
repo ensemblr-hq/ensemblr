@@ -82,6 +82,12 @@ export interface OpenPiSessionRequest {
 	/** First user prompt, used only to generate a short tab title. */
 	initialPrompt?: string | null;
 	label?: string;
+	/**
+	 * Whether the chat's Plan Mode toggle is on. The renderer's per-chat setting
+	 * is the durable source and re-sends this on every open and submit, so the
+	 * main-process registry is a derived, in-memory mirror.
+	 */
+	planMode?: boolean;
 	/** Existing Ensemblr Pi session id to reopen with native Pi history. */
 	resumeSessionId?: string | null;
 	model?: string | null;
@@ -107,6 +113,8 @@ export type PiStreamingBehavior = 'steer' | 'followUp';
 /** Submit a prompt to an open Pi session. */
 export interface SubmitPiPromptRequest {
 	model?: string | null;
+	/** Whether the chat's Plan Mode toggle is on for this turn. */
+	planMode?: boolean;
 	prompt: string;
 	sessionId: string;
 	/** Mid-turn delivery mode; omit for a normal (idle) submit. */

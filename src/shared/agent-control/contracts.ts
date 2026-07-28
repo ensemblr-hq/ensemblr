@@ -36,6 +36,9 @@ export const AGENT_CONTROL_OPS = [
 	'waitForAgents',
 	'notifyOrchestrator',
 	'askUserQuestion',
+	'getPlanMode',
+	'checkPlanModeTool',
+	'exitPlanMode',
 ] as const;
 
 /**
@@ -63,6 +66,10 @@ export type AgentControlOp = (typeof AGENT_CONTROL_OPS)[number];
  * Operations that mutate app state. Everything else is a read. Writes are scoped
  * to the caller's own workspace and follow the permission mode; reads are always
  * allowed and may span workspaces.
+ *
+ * `exitPlanMode` writes a plan file yet is deliberately absent: it is the only
+ * exit from Plan Mode, so gating it would strand a planning agent with every
+ * editing tool denied and no way out. It is gated on active Plan Mode instead.
  */
 const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'spawnChatTab',
@@ -364,6 +371,64 @@ export interface AskUserQuestionReply {
 	requestId: string;
 	answers: readonly AskUserQuestionAnswer[];
 	cancelled: boolean;
+}
+
+/**
+ * Upper bounds on an `exitPlanMode` submission. The title labels a review panel
+ * and a filename stem, so it stays short; the plan itself is a full markdown
+ * document and only needs a ceiling that keeps a runaway generation from
+ * filling the user's disk.
+ */
+export const EXIT_PLAN_MODE_LIMITS = {
+	maxPlanLength: 60_000,
+	maxTitleLength: 80,
+} as const;
+
+/** Args for `exitPlanMode`: hand the finished plan to the user for review. */
+export interface ExitPlanModeArgs {
+	/** Short label for the review panel and the saved plan's filename. */
+	title: string;
+	/** The full plan, in markdown. */
+	plan: string;
+}
+
+/**
+ * Result of `exitPlanMode`. The call does not wait for the user: it saves the
+ * plan, surfaces the review, and tells the agent to stop, so the plan stays the
+ * last message in the conversation while the user decides. What they choose
+ * reaches the agent as its next prompt, not as this result.
+ */
+export interface ExitPlanModeResult {
+	planPath: string | null;
+	summary: string;
+}
+
+/**
+ * Main → renderer request to put a finished plan to the user. The renderer
+ * shows it only in the chat tab bound to `piSessionId`, so a plan is reviewed
+ * in the conversation that wrote it. Carries no plan body: the agent posts the
+ * plan as its reply, so it is already in that tab's timeline, and shipping a
+ * second copy over IPC would only duplicate it on screen.
+ */
+export interface ExitPlanModeBroadcast {
+	requestId: string;
+	workspaceId: string;
+	piSessionId: string;
+	title: string;
+	/** Workspace-relative path of the saved plan, or null when the write failed. */
+	planPath: string | null;
+}
+
+/** Args for `checkPlanModeTool`: ask whether a tool call is allowed while planning. */
+export interface CheckPlanModeToolArgs {
+	tool: string;
+	/** The command a `bash` call would run; absent for other tools. */
+	command?: string;
+}
+
+/** Result of `getPlanMode`: whether the calling session is currently planning. */
+export interface GetPlanModeResult {
+	active: boolean;
 }
 
 /** Args for `focusTab`: bring a session tab (chat/terminal/diff/…) to the foreground. */
