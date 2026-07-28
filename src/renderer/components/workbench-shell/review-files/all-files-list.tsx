@@ -66,8 +66,8 @@ export function AllFilesList({
 		return (
 			<div className='p-2.5'>
 				<p className='rounded-md border border-border bg-pane px-3 py-4 text-muted-foreground text-xs leading-5'>
-					Repository files will appear here when the workspace file service is
-					wired.
+					This workspace has no files yet. Files appear here as soon as they are
+					created.
 				</p>
 			</div>
 		);

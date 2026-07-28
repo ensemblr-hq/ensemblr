@@ -60,6 +60,8 @@ function createConfigService(): EnsemblrConfigService {
 		getConfig: () => config,
 		getSnapshot: () => snapshot,
 		load: () => snapshot,
+		startWatching: () => {},
+		stop: () => {},
 	};
 }
 

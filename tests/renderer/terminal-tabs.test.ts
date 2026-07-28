@@ -13,6 +13,8 @@ function createSession(
 ): TerminalSessionSnapshot {
 	return {
 		agentBusy: false,
+		agentFullTitle: null,
+		agentSessionId: null,
 		agentTitle: null,
 		cols: 80,
 		commandLabel: '/bin/zsh',
@@ -22,6 +24,7 @@ function createSession(
 		id: 'terminal-1',
 		kind: 'terminal',
 		previewUrl: null,
+		restored: false,
 		rows: 24,
 		status: 'running',
 		title: 'Terminal',

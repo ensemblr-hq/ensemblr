@@ -16,7 +16,7 @@ const launchTarget: WorkspaceOpenTarget = {
 	iconName: 'lucide:file-code',
 	id: 'vscode',
 	installed: true,
-	kind: 'app',
+	kind: 'editor',
 	label: 'VS Code',
 	numberShortcutLabel: '1',
 };

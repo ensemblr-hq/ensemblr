@@ -334,6 +334,30 @@ describe('agent-control port adapters: conversation status', () => {
 		return createAgentControlPorts(deps);
 	};
 
+	it('returns the live snapshot without scanning persisted events', async () => {
+		const { deps } = makeDeps();
+		const iterateEventPayloadsDescending = vi.fn(() => []);
+		(deps as { piSessionService: unknown }).piSessionService = {
+			getSession: vi.fn(() => ({
+				id: 'sess-1',
+				branchId: 'b1',
+				status: 'closed',
+				runtimeOpen: false,
+			})),
+			iterateEventPayloadsDescending,
+		};
+		const ports = createAgentControlPorts(deps);
+		const result = await ports.conversations.getStatus('sess-1');
+		expect(result).toEqual({
+			piSessionId: 'sess-1',
+			status: 'closed',
+			runtimeOpen: false,
+		});
+		// The `waitForAgents` poll loop calls this every 250ms per child, so it
+		// must never touch the event store.
+		expect(iterateEventPayloadsDescending).not.toHaveBeenCalled();
+	});
+
 	it('reports hasFinalMessage true when a persisted assistant answer exists', async () => {
 		const ports = withStatus(
 			{ id: 'sess-1', branchId: 'b1', status: 'closed', runtimeOpen: false },
@@ -345,13 +369,7 @@ describe('agent-control port adapters: conversation status', () => {
 				},
 			],
 		);
-		const result = await ports.conversations.getStatus('sess-1');
-		expect(result).toEqual({
-			piSessionId: 'sess-1',
-			status: 'closed',
-			runtimeOpen: false,
-			hasFinalMessage: true,
-		});
+		expect(await ports.conversations.hasFinalMessage('sess-1')).toBe(true);
 	});
 
 	it('reports hasFinalMessage false when the branch has no assistant answer', async () => {
@@ -359,8 +377,12 @@ describe('agent-control port adapters: conversation status', () => {
 			{ id: 'sess-2', branchId: 'b2', status: 'idle', runtimeOpen: true },
 			[{ kind: 'status', previous: 'idle', status: 'idle' }],
 		);
-		const result = await ports.conversations.getStatus('sess-2');
-		expect(result?.hasFinalMessage).toBe(false);
+		expect(await ports.conversations.hasFinalMessage('sess-2')).toBe(false);
+	});
+
+	it('reports hasFinalMessage false for an unknown session', async () => {
+		const ports = withStatus(undefined);
+		expect(await ports.conversations.hasFinalMessage('gone')).toBe(false);
 	});
 
 	it('returns null for an unknown session', async () => {

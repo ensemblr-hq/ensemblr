@@ -126,6 +126,7 @@ function stubSessionNavigation(
 		openCommentPreviewTab: () => Promise.resolve(null),
 		openFilePreviewTab: () => Promise.resolve(null),
 		openSessionTab: () => Promise.resolve(null),
+		openTerminalTab: () => Promise.resolve(null),
 		openTurnDiffTab: () => Promise.resolve(null),
 		openWorkspaceFileDiffTab: () => Promise.resolve(null),
 		reorderSessionTabs: () => undefined,

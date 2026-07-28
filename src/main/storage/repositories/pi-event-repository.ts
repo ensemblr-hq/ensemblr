@@ -56,8 +56,19 @@ interface EventRowShape {
 	turn_id: string | null;
 }
 
+/** Projected row shape for the payload-only descending scan. */
+interface EventPayloadRowShape {
+	ordinal: number;
+	payload_json: string;
+}
+
 const SELECT_EVENT = `SELECT id, branch_id, turn_id, ordinal, event_type, stream, payload_json, created_at
 FROM pi_session_events`;
+
+const SELECT_BRANCH_PAYLOADS_DESC = `SELECT ordinal, payload_json
+FROM pi_session_events
+WHERE branch_id = ?
+ORDER BY ordinal DESC`;
 
 /**
  * Appends a single event to a branch with auto-incremented ordinal. Transaction
@@ -258,13 +269,8 @@ export function* iterateBranchPayloadsDescending({
 	database: DatabaseSync;
 }): Generator<{ ordinal: number; payload: PiEventPayload }> {
 	const rows = database
-		.prepare(
-			`SELECT ordinal, payload_json FROM pi_session_events WHERE branch_id = ? ORDER BY ordinal DESC`,
-		)
-		.iterate(branchId) as unknown as IterableIterator<{
-		ordinal: number;
-		payload_json: string;
-	}>;
+		.prepare(SELECT_BRANCH_PAYLOADS_DESC)
+		.iterate(branchId) as unknown as IterableIterator<EventPayloadRowShape>;
 
 	for (const row of rows) {
 		yield { ordinal: row.ordinal, payload: parsePayload(row.payload_json) };

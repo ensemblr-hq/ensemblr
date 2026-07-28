@@ -24,7 +24,7 @@ import {
 import type { PiSessionEventSink } from '../pi-session-types.ts';
 import { stripPromptScaffolding } from './derive-title-source.ts';
 import { parseBranchSlug } from './parse-naming-response.ts';
-import { sanitizeChatTitle } from './sanitize-title.ts';
+import { type ChatTitle, sanitizeChatTitle } from './sanitize-title.ts';
 
 /** Time budget for the single ephemeral naming session. */
 export const NAMING_TIMEOUT_MS = 20000;
@@ -180,12 +180,12 @@ async function runNaming({
  * message and never blocks or spawns a session.
  * @param input - The naming payload carrying the live session and first prompt.
  * @param prompt - The already-resolved first user prompt.
- * @returns A sanitized title, or null when nothing usable remains.
+ * @returns A sanitized title in display and full form, or null when nothing usable remains.
  */
 async function deriveDeterministicTitle(
 	input: SessionNamingInput,
 	prompt: string,
-): Promise<string | null> {
+): Promise<ChatTitle | null> {
 	const sessionName = (
 		await input.liveSession?.getState().catch(() => null)
 	)?.sessionName?.trim();
@@ -260,7 +260,7 @@ function persistTitle({
 	title,
 }: {
 	input: SessionNamingInput;
-	title: string;
+	title: ChatTitle;
 }): void {
 	if (!titleNeedsNaming(input.database, input.chatTabId)) {
 		return;
@@ -269,7 +269,12 @@ function persistTitle({
 	if (!tab) {
 		return;
 	}
-	renameChatTab({ database: input.database, id: input.chatTabId, title });
+	renameChatTab({
+		database: input.database,
+		fullTitle: title.full,
+		id: input.chatTabId,
+		title: title.display,
+	});
 	setChatTabMetadata({
 		database: input.database,
 		id: input.chatTabId,
@@ -282,7 +287,7 @@ function persistTitle({
 	const event = appendChatTitleMetadataEvent({
 		branchId: input.branchId,
 		database: input.database,
-		title,
+		title: title.display,
 	});
 	input.eventSink?.({
 		event,

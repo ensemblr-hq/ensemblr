@@ -7,6 +7,11 @@ import type { ChatTabKindWire } from './pi-session.ts';
 /** Renderer-facing snapshot of a chat-tab row. */
 export interface ChatTabWire {
 	closedAt: string | null;
+	/**
+	 * Untruncated title. `title` is capped for tab display, so this is what a
+	 * tooltip should show. Equals `title` when no longer form was ever recorded.
+	 */
+	fullTitle: string;
 	id: string;
 	kind: ChatTabKindWire;
 	metadata: Record<string, unknown>;
@@ -71,6 +76,11 @@ export interface CloseChatTabRequest {
 	 * label. Ignored for chat tabs, whose title is owned by the Pi session.
 	 */
 	title?: string;
+	/**
+	 * Untruncated form of {@link CloseChatTabRequest.title}, kept for the closed
+	 * row's tooltip. Falls back to `title` when the caller has nothing longer.
+	 */
+	fullTitle?: string;
 	/**
 	 * Metadata fields to merge onto a terminal (harness) tab as it is archived, so
 	 * a restored tab can reattach the exact conversation. Ignored for chat tabs.

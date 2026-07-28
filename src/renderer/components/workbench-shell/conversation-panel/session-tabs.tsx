@@ -55,6 +55,11 @@ import { developerModeAtom } from '@/renderer/state/preferences';
 import { shouldSelectOnTabClick } from '@/renderer/state/workspace';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 import { formatShortcut } from '@/shared/keymap';
+import {
+	sessionTabCloseFadeVariants,
+	sessionTabIndicatorVariants,
+	sessionTabVariants,
+} from './session-tabs-variants';
 
 /** Display label for the coding-agent launcher shortcut, e.g. `⌘⇧A`. */
 const AGENTS_SHORTCUT_HINT = formatShortcut('agents.open');
@@ -253,11 +258,11 @@ export function SessionTabs({
 	}
 
 	return (
-		<div className='flex h-12 shrink-0 items-center justify-between gap-3 border-border border-b bg-background px-3'>
+		<div className='flex h-10 shrink-0 items-center justify-between gap-3 border-border border-b bg-background pr-3'>
 			<div className='flex h-full min-w-0 flex-1 items-center gap-1.5'>
 				<Reorder.Group
 					axis='x'
-					className='no-scrollbar m-0 flex h-full min-w-0 list-none gap-1 overflow-x-auto p-0'
+					className='no-scrollbar isolate m-0 flex h-full min-w-0 list-none gap-1.5 overflow-x-auto overflow-y-hidden p-0'
 					onReorder={handleReorder}
 					values={orderedSessionIds}
 				>
@@ -377,20 +382,7 @@ function SessionTab({
 
 	return (
 		<Reorder.Item
-			className={cn(
-				'group/session-tab relative m-0 flex h-12 min-w-30 max-w-52 flex-none items-center overflow-hidden border-transparent border-b-2 bg-clip-padding p-0 text-xs transition-colors',
-				canReorderTabs && 'cursor-grab active:cursor-grabbing',
-				session.isSubAgent
-					? cn(
-							'border-t-2 border-t-accent-strong',
-							isActive
-								? 'border-b-primary bg-muted text-foreground'
-								: 'border-b-transparent bg-transparent text-muted-foreground hover:text-foreground',
-						)
-					: isActive
-						? 'border-primary bg-muted text-foreground'
-						: 'border-transparent bg-transparent text-muted-foreground hover:text-foreground',
-			)}
+			className={sessionTabVariants({ canReorder: canReorderTabs, isActive })}
 			data-session-tab-reorderable={canReorderTabs}
 			dragElastic={canReorderTabs ? 0.08 : 0}
 			dragListener={canReorderTabs}
@@ -413,17 +405,14 @@ function SessionTab({
 				<span className='grid size-3.5 shrink-0 place-items-center'>
 					<SessionTabIcon session={session} />
 				</span>
-				<span className='truncate'>{session.label}</span>
+				<span className='truncate' title={session.fullLabel ?? session.label}>
+					{session.label}
+				</span>
 			</button>
 			{showCloseControls ? (
 				<span
 					aria-hidden='true'
-					className={cn(
-						'pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent opacity-0 transition-opacity group-hover/session-tab:opacity-100',
-						isActive
-							? 'from-muted via-muted/90'
-							: 'from-background via-background/90',
-					)}
+					className={sessionTabCloseFadeVariants({ isActive })}
 				/>
 			) : null}
 			{showCloseControls ? (
@@ -440,6 +429,20 @@ function SessionTab({
 					<XIcon aria-hidden='true' className='size-3' />
 				</button>
 			) : null}
+			<span
+				aria-hidden='true'
+				className={sessionTabIndicatorVariants({
+					edge: 'top',
+					tone: session.isSubAgent ? 'accent' : 'none',
+				})}
+			/>
+			<span
+				aria-hidden='true'
+				className={sessionTabIndicatorVariants({
+					edge: 'bottom',
+					tone: isActive ? 'active' : 'none',
+				})}
+			/>
 		</Reorder.Item>
 	);
 }

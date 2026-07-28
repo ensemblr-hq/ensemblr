@@ -1,6 +1,7 @@
 import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { describe, expect, it } from 'vitest';
 import { createHarnessDetectionService } from '../../src/main/agents/harness-detection-service.ts';
 import type { CommandEnvironmentSnapshot } from '../../src/main/commands/command-types.ts';
 import type { LocalCommandService } from '../../src/main/commands/local-command';

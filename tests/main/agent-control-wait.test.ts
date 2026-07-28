@@ -7,7 +7,10 @@ import {
 	createOriginRegistry,
 	type OriginRegistry,
 } from '../../src/main/agent-control/index.ts';
-import type { WaitForAgentsResult } from '../../src/shared/agent-control.ts';
+import type {
+	AgentControlConversationStatus,
+	WaitForAgentsResult,
+} from '../../src/shared/agent-control.ts';
 
 /**
  * A deterministic scheduler: `sleep` advances a virtual clock so the wait loop's
@@ -41,10 +44,15 @@ const makePorts = (statuses: Map<string, string>): AgentControlPorts => ({
 			.fn()
 			.mockResolvedValue({ chatTabId: 't', piSessionId: 'p' }),
 		sendFollowUp: vi.fn().mockResolvedValue(undefined),
+		setName: vi.fn().mockResolvedValue(null),
 		waitForIdle: vi.fn().mockResolvedValue('completed'),
-		getStatus: vi.fn(async (piSessionId: string) => {
+		getStatus: vi.fn<
+			(piSessionId: string) => Promise<AgentControlConversationStatus | null>
+		>(async (piSessionId) => {
 			const status = statuses.get(piSessionId);
-			return status ? { piSessionId, status, runtimeOpen: true } : null;
+			return status
+				? { piSessionId, status, runtimeOpen: true, hasFinalMessage: false }
+				: null;
 		}),
 		getLastMessage: vi.fn(async (piSessionId: string) => `msg:${piSessionId}`),
 		listModels: vi.fn().mockResolvedValue({ defaultModelId: null, models: [] }),
@@ -64,6 +72,10 @@ const makePorts = (statuses: Map<string, string>): AgentControlPorts => ({
 			.mockResolvedValue({ chatTabId: 't', terminalId: 't' }),
 	},
 	focus: { focusTab: vi.fn(), focusDockTab: vi.fn(), focusPanel: vi.fn() },
+	board: {
+		setWorkspaceStatus: vi.fn(),
+		getWorkspaceStatus: () => 'backlog',
+	},
 	permissions: { getMode: () => 'workspace-trusted' },
 	confirm: { confirm: vi.fn().mockResolvedValue(true) },
 });

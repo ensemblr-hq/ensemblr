@@ -40,3 +40,29 @@ export function installEnsemblrApi(api: Record<string, unknown>): void {
 export function clearEnsemblrApi(): void {
 	(window as unknown as { ensemblr?: unknown }).ensemblr = undefined;
 }
+
+/**
+ * Installs a fresh Map-backed `window.localStorage`; happy-dom here ships none,
+ * so tests that touch storage must stub it. Reinstalling resets the store.
+ */
+export function installLocalStorage(): void {
+	const items = new Map<string, string>();
+	const storage: Storage = {
+		clear: () => items.clear(),
+		getItem: (key) => items.get(key) ?? null,
+		key: (index) => Array.from(items.keys())[index] ?? null,
+		get length() {
+			return items.size;
+		},
+		removeItem: (key) => {
+			items.delete(key);
+		},
+		setItem: (key, value) => {
+			items.set(key, value);
+		},
+	};
+	Object.defineProperty(window, 'localStorage', {
+		configurable: true,
+		value: storage,
+	});
+}

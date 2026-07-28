@@ -39,7 +39,10 @@ import {
 	getPiSessionById,
 	listPiSessionsByWorkspace,
 } from '../storage/repositories/pi-session-repository.ts';
-import { sanitizeChatTitle } from './naming/sanitize-title.ts';
+import {
+	sanitizeChatTitle,
+	truncateChatTitle,
+} from './naming/sanitize-title.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import {
 	createPiSessionLifecycle,
@@ -270,11 +273,13 @@ export function createPiSessionService({
 			if (!tab) {
 				return null;
 			}
-			const title = sanitizeChatTitle(name) ?? name.trim();
+			const sanitized = sanitizeChatTitle(name);
+			const fullTitle = sanitized?.full ?? name.trim();
+			const title = sanitized?.display ?? truncateChatTitle(fullTitle);
 			if (!title) {
 				return null;
 			}
-			renameChatTab({ database, id: applied.chatTabId, title });
+			renameChatTab({ database, fullTitle, id: applied.chatTabId, title });
 			// An explicit `/name` (agent- or human-issued) is authoritative: mark it
 			// `user` provenance so the deterministic auto-namer never overrides it,
 			// including after tab reuse.
@@ -379,6 +384,7 @@ export function snapshotToWire(
 	snapshot: PiSessionSnapshot,
 ): PiSessionSnapshotWire {
 	const tabs: PiChatTabWire[] = snapshot.openedTabs.map((tab) => ({
+		fullTitle: tab.fullTitle,
 		id: tab.id,
 		kind: tab.kind,
 		openedAt: tab.openedAt,

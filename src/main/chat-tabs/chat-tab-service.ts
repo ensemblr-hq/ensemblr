@@ -51,6 +51,7 @@ export interface ChatTabService {
 	bindPiSession: (input: { chatTabId: string; piSessionId: string }) => void;
 	closeTab: (input: {
 		chatTabId: string;
+		fullTitle?: string;
 		metadataPatch?: Record<string, unknown>;
 		title?: string;
 	}) => { deleted: boolean };
@@ -106,7 +107,7 @@ export function createChatTabService({
 			}
 			bindPiSession({ database, id: chatTabId, piSessionId });
 		},
-		closeTab: ({ chatTabId, metadataPatch, title }) => {
+		closeTab: ({ chatTabId, fullTitle, metadataPatch, title }) => {
 			const database = requireChatTabDatabase();
 			const existing = getChatTabById({ database, id: chatTabId });
 			// Idempotent: treat unknown or already-closed tabs as no-ops so a
@@ -126,7 +127,13 @@ export function createChatTabService({
 					deleteChatTab({ database, id: chatTabId });
 					return { deleted: true };
 				}
-				archiveTerminalTab({ database, existing, metadataPatch, title });
+				archiveTerminalTab({
+					database,
+					existing,
+					fullTitle,
+					metadataPatch,
+					title,
+				});
 				return { deleted: false };
 			}
 
@@ -225,11 +232,13 @@ export function createChatTabService({
 function archiveTerminalTab({
 	database,
 	existing,
+	fullTitle,
 	metadataPatch,
 	title,
 }: {
 	database: DatabaseSync;
 	existing: ChatTabRow;
+	fullTitle?: string;
 	metadataPatch?: Record<string, unknown>;
 	title?: string;
 }): void {
@@ -238,7 +247,12 @@ function archiveTerminalTab({
 		throw new Error(`Failed to close chat tab ${existing.id}.`);
 	}
 	if (title?.trim()) {
-		renameChatTab({ database, id: existing.id, title: title.trim() });
+		renameChatTab({
+			database,
+			fullTitle: fullTitle?.trim() || title.trim(),
+			id: existing.id,
+			title: title.trim(),
+		});
 	}
 	if (metadataPatch) {
 		setChatTabMetadata({

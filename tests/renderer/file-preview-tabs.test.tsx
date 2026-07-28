@@ -9,7 +9,6 @@ vi.mock('@iconify/react', () => ({
 	Icon: ({ icon }: { icon: string }) => <span data-icon={icon} />,
 }));
 
-// @ts-expect-error Vitest resolves the app alias for the component-under-test atom identity.
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr-queries';
 import { FilePreviewPanel } from '../../src/renderer/components/workbench-shell/conversation-panel/file-preview-panel';
@@ -26,6 +25,7 @@ const previewSession: SessionTabModel = {
 	chatTabId: 'preview-tab',
 	filePath: previewFilePath,
 	id: 'preview-tab',
+	isSubAgent: false,
 	kind: 'preview',
 	label: 'logo.png',
 	piSessionId: null,
@@ -53,6 +53,7 @@ describe('file preview tabs', () => {
 			<SessionTabs
 				activeSession={previewSession}
 				closedSessions={[]}
+				onLaunchHarness={async () => null}
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}
@@ -81,6 +82,7 @@ describe('file preview tabs', () => {
 				<SessionTabs
 					activeSession={previewSession}
 					closedSessions={[]}
+					onLaunchHarness={async () => null}
 					onSessionTabChange={() => undefined}
 					onSessionTabClose={() => undefined}
 					onSessionTabOpen={async () => null}
@@ -137,6 +139,7 @@ describe('file preview tabs', () => {
 const chatA: SessionTabModel = {
 	chatTabId: 'chat-a',
 	id: 'chat-a',
+	isSubAgent: false,
 	kind: 'chat',
 	label: 'Chat A',
 	piSessionId: null,
@@ -160,6 +163,7 @@ describe('session tab close controls', () => {
 			<SessionTabs
 				activeSession={chatA}
 				closedSessions={[]}
+				onLaunchHarness={async () => null}
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={onSessionTabClose}
 				onSessionTabOpen={async () => null}
@@ -192,6 +196,7 @@ describe('session tab close controls', () => {
 			<SessionTabs
 				activeSession={chatA}
 				closedSessions={[]}
+				onLaunchHarness={async () => null}
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}
@@ -209,6 +214,7 @@ describe('session tab close controls', () => {
 			<SessionTabs
 				activeSession={previewSession}
 				closedSessions={[]}
+				onLaunchHarness={async () => null}
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}

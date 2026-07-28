@@ -45,7 +45,10 @@ export function buildRegistrationStub(
 		calls,
 		service: {
 			register: async (request) => {
-				calls.push({ name: request.name, path: request.path });
+				calls.push({
+					name: request.name ?? path.basename(request.path),
+					path: request.path,
+				});
 				const result: RegisterLocalRepositoryResult = {
 					diagnostics: [],
 					registered: true,

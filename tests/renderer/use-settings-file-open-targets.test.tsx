@@ -6,7 +6,7 @@ import type { ReactNode } from 'react';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 import type { WorkspaceOpenTargetSnapshot } from '../../src/shared/ipc/contracts/open-target';
-import { createTestQueryClient } from './support/dom';
+import { createTestQueryClient, installLocalStorage } from './support/dom';
 
 const TARGETS: WorkspaceOpenTargetSnapshot[] = [
 	{
@@ -75,7 +75,7 @@ beforeEach(() => {
 	getEnsemblrApiOrNull.mockReturnValue({});
 	toastError.mockClear();
 	toastSuccess.mockClear();
-	window.localStorage.clear();
+	installLocalStorage();
 });
 
 test('invokes the settings IPC channel with the resolved user config', async () => {

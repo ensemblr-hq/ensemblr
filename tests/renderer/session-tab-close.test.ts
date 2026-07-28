@@ -8,10 +8,15 @@ import {
 } from '../../src/renderer/state/workspace/session-tab-close';
 import type { SessionTabModel } from '../../src/renderer/types/workbench';
 
-function createTab(overrides: Partial<SessionTabModel> = {}): SessionTabModel {
+function createTab(
+	overrides: Partial<
+		Pick<SessionTabModel, 'id' | 'piSessionId' | 'status'>
+	> = {},
+): SessionTabModel {
 	return {
 		chatTabId: 'chat-1',
 		id: 'chat-1',
+		isSubAgent: false,
 		kind: 'chat',
 		label: 'Chat',
 		piSessionId: null,

@@ -177,6 +177,66 @@ test('renameChatTab updates title only', (t) => {
 	assert.equal(renamed?.position, tab.position);
 });
 
+test('openChatTab defaults fullTitle to title when none is supplied', (t) => {
+	const fixture = openFixture(t);
+
+	const tab = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			piSessionId: fixture.piSessionId,
+			title: 'Short',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	assert.equal(tab.fullTitle, 'Short');
+});
+
+test('openChatTab keeps a supplied fullTitle alongside the capped title', (t) => {
+	const fixture = openFixture(t);
+
+	const tab = openChatTab({
+		database: fixture.database,
+		input: {
+			fullTitle: 'Migration Architect: Next.js App Router upgrade',
+			kind: 'chat',
+			piSessionId: fixture.piSessionId,
+			title: 'Migration Architect: Next.js…',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	assert.equal(tab.title, 'Migration Architect: Next.js…');
+	assert.equal(
+		tab.fullTitle,
+		'Migration Architect: Next.js App Router upgrade',
+	);
+});
+
+test('renameChatTab rewrites fullTitle so a stale one never survives', (t) => {
+	const fixture = openFixture(t);
+
+	const tab = openChatTab({
+		database: fixture.database,
+		input: {
+			fullTitle: 'The original untruncated title',
+			kind: 'chat',
+			piSessionId: fixture.piSessionId,
+			title: 'The original…',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	const renamed = renameChatTab({
+		database: fixture.database,
+		id: tab.id,
+		title: 'Renamed',
+	});
+
+	assert.equal(renamed?.fullTitle, 'Renamed');
+});
+
 test('listOpenForWorkspace mirrors listOpenChatTabs', (t) => {
 	const fixture = openFixture(t);
 

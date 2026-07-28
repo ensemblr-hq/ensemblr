@@ -147,6 +147,7 @@ function createTerminalServiceFake({
 			counter += 1;
 			const session: TerminalSessionSnapshot = {
 				agentBusy: false,
+				agentFullTitle: null,
 				agentSessionId: null,
 				agentTitle: null,
 				cols: 80,
@@ -157,6 +158,7 @@ function createTerminalServiceFake({
 				id: `session-${counter}`,
 				kind: options.kind ?? 'terminal',
 				previewUrl: null,
+				restored: false,
 				rows: 24,
 				status: 'running',
 				title: options.title ?? 'Terminal',
@@ -189,6 +191,7 @@ function createTerminalServiceFake({
 			Array.from(sessions.values()).filter(
 				(session) => session.workspaceId === workspaceId,
 			),
+		listRestorable: () => [],
 		recoverStaleSessions: () => undefined,
 		resize: () => undefined,
 		waitForExit: (terminalId, timeoutMs) =>

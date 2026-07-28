@@ -21,6 +21,11 @@ import type {
 
 /** Title and native session id derived from a harness's on-disk session log. */
 export interface AgentConversationInfo {
+	/**
+	 * Untruncated conversation title, for tooltips. Null whenever `title` is,
+	 * and equal to it when the raw title was already within the display cap.
+	 */
+	fullTitle: string | null;
 	/** Native harness session id for the matched conversation, or null. */
 	sessionId: string | null;
 	/** Conversation title, or null for harnesses that title via their OSC stream. */
@@ -79,19 +84,28 @@ function startedSinceLaunch(
 	return started >= launched - SESSION_START_SKEW_MS;
 }
 
+/** A harness title in both its capped display form and its untruncated form. */
+interface NormalizedTitle {
+	display: string;
+	full: string;
+}
+
 /**
- * Collapses a raw title to a single trimmed line capped at {@link MAX_TITLE_LENGTH}.
+ * Collapses a raw title to a single trimmed line, returning it both capped at
+ * {@link MAX_TITLE_LENGTH} for tab display and at full length for tooltips.
  * @param raw - The raw title text pulled from a session log.
- * @returns The cleaned title, or null when nothing meaningful remains.
+ * @returns Both title forms, or null when nothing meaningful remains.
  */
-function normalizeTitle(raw: string): string | null {
+function normalizeTitle(raw: string): NormalizedTitle | null {
 	const firstLine = raw.split('\n', 1)[0]?.trim() ?? '';
 	if (!firstLine) {
 		return null;
 	}
-	return firstLine.length > MAX_TITLE_LENGTH
-		? `${firstLine.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…`
-		: firstLine;
+	const display =
+		firstLine.length > MAX_TITLE_LENGTH
+			? `${firstLine.slice(0, MAX_TITLE_LENGTH - 1).trimEnd()}…`
+			: firstLine;
+	return { display, full: firstLine };
 }
 
 /**
@@ -235,7 +249,7 @@ async function collectCodexRollouts(root: string): Promise<string[]> {
 interface CodexScanResult {
 	matched: boolean;
 	sessionId: string | null;
-	title: string | null;
+	title: NormalizedTitle | null;
 }
 
 /** The one rollout line kind {@link scanCodexRollout} acts on, or `other`. */
@@ -379,15 +393,19 @@ async function readCodexConversationInfo(
 	try {
 		rollouts = await collectCodexRollouts(root);
 	} catch {
-		return { sessionId: null, title: null };
+		return { fullTitle: null, sessionId: null, title: null };
 	}
 	for (const file of rollouts) {
 		const result = await scanCodexRollout(file, targetCwd, since);
 		if (result.matched) {
-			return { sessionId: result.sessionId, title: result.title };
+			return {
+				fullTitle: result.title?.full ?? null,
+				sessionId: result.sessionId,
+				title: result.title?.display ?? null,
+			};
 		}
 	}
-	return { sessionId: null, title: null };
+	return { fullTitle: null, sessionId: null, title: null };
 }
 
 /**
@@ -435,7 +453,7 @@ async function readVibeConversationInfo(
 			name.startsWith('session_'),
 		);
 	} catch {
-		return { sessionId: null, title: null };
+		return { fullTitle: null, sessionId: null, title: null };
 	}
 	for (const dir of sessionDirs) {
 		let raw: string;
@@ -449,14 +467,16 @@ async function readVibeConversationInfo(
 			continue;
 		}
 		const rawTitle = asString(meta.title);
+		const normalized = rawTitle?.trim() ? normalizeTitle(rawTitle) : null;
 		return {
+			fullTitle: normalized?.full ?? null,
 			// Vibe's `--resume` wants the UUID `meta.session_id`, not the
 			// `session_<timestamp>_<short>` directory-name suffix.
 			sessionId: asString(meta.session_id),
-			title: rawTitle?.trim() ? normalizeTitle(rawTitle) : null,
+			title: normalized?.display ?? null,
 		};
 	}
-	return { sessionId: null, title: null };
+	return { fullTitle: null, sessionId: null, title: null };
 }
 
 /**
@@ -629,9 +649,9 @@ async function readClaudeConversationInfo(
 			continue;
 		}
 		const stem = path.basename(file, '.jsonl');
-		return { sessionId: head.sessionId ?? stem, title: null };
+		return { fullTitle: null, sessionId: head.sessionId ?? stem, title: null };
 	}
-	return { sessionId: null, title: null };
+	return { fullTitle: null, sessionId: null, title: null };
 }
 
 /**
@@ -658,7 +678,7 @@ export function readAgentConversationInfo(
 		case 'vibe-log':
 			return readVibeConversationInfo(cwd, options.since, home);
 		default:
-			return Promise.resolve({ sessionId: null, title: null });
+			return Promise.resolve({ fullTitle: null, sessionId: null, title: null });
 	}
 }
 

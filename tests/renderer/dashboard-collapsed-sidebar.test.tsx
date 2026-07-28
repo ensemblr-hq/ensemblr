@@ -39,7 +39,7 @@ const noop = () => undefined;
 const model: WorkbenchLayoutModel = {
 	activeProject: null,
 	activeWorkspace: null,
-	addProjectMenu: { actions: [], recentProjects: [] },
+	addProjectMenu: { actions: [], recents: [] },
 	displayProjects: shellFixtureProjects,
 	displaySelection: null,
 	health: { detail: 'Ready', label: 'Ready', state: 'online' },

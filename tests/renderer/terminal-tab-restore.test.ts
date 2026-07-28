@@ -20,6 +20,7 @@ import { clearEnsemblrApi, installEnsemblrApi } from './support/dom';
 function terminalTab(metadata: Record<string, unknown>): ChatTabWire {
 	return {
 		closedAt: null,
+		fullTitle: 'Claude Code',
 		id: 'tab-1',
 		kind: 'terminal',
 		metadata,
@@ -108,10 +109,14 @@ describe('resumeRestoredTerminalTab', () => {
 					harnessId: 'claude',
 					harnessLabel: 'Claude Code',
 					id: 'tab-live',
+					isSubAgent: false,
 					kind: 'terminal',
 					label: 'Claude Code',
+					piSessionId: null,
 					status: 'working',
+					summary: '',
 					terminalId: 'pty-live',
+					updatedLabel: '',
 				},
 			],
 		});
@@ -138,10 +143,14 @@ describe('resumeRestoredTerminalTab', () => {
 					harnessId: 'claude',
 					harnessLabel: 'Claude Code',
 					id: 'tab-open',
+					isSubAgent: false,
 					kind: 'terminal',
 					label: 'Claude Code',
+					piSessionId: null,
 					status: 'idle',
+					summary: '',
 					terminalId: 'pty-live',
+					updatedLabel: '',
 				},
 			],
 		});

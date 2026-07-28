@@ -175,7 +175,11 @@ function createServiceFixture(
 		backend,
 		cwd,
 		killGraceMs = 50,
-		readConversationInfo = async () => ({ sessionId: null, title: null }),
+		readConversationInfo = async () => ({
+			fullTitle: null,
+			sessionId: null,
+			title: null,
+		}),
 	}: {
 		backend: PtyBackend;
 		cwd?: string;
@@ -421,7 +425,7 @@ test('a fresh agent gates its conversation-title read by the launch time', async
 		backend,
 		readConversationInfo: async (_source, _cwd, options) => {
 			sinceValues.push(options?.since);
-			return { sessionId: null, title: null };
+			return { fullTitle: null, sessionId: null, title: null };
 		},
 	});
 
@@ -442,7 +446,7 @@ test('a resumed agent drops the title gate so it re-adopts its prior conversatio
 		backend,
 		readConversationInfo: async (_source, _cwd, options) => {
 			sinceValues.push(options?.since);
-			return { sessionId: null, title: null };
+			return { fullTitle: null, sessionId: null, title: null };
 		},
 	});
 
@@ -462,6 +466,7 @@ test('reports a captured native session id so the tab can persist it for resume'
 	const { capturedAgentSessions, service } = createServiceFixture(t, {
 		backend,
 		readConversationInfo: async () => ({
+			fullTitle: null,
 			sessionId: 'session-abc',
 			title: null,
 		}),
@@ -485,7 +490,11 @@ test('does not report a captured session id when none is read from the log', asy
 	const backend: PtyBackend = { spawn: () => fake.pty };
 	const { capturedAgentSessions, service } = createServiceFixture(t, {
 		backend,
-		readConversationInfo: async () => ({ sessionId: null, title: 'A title' }),
+		readConversationInfo: async () => ({
+			fullTitle: 'A title',
+			sessionId: null,
+			title: 'A title',
+		}),
 	});
 
 	await service.create({

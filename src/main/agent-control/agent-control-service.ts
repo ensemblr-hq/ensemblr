@@ -5,6 +5,7 @@
  * scope-checked, guardrailed, then delegated to an existing service via a port.
  */
 import type {
+	AgentControlConversationStatus,
 	AgentControlErrorCode,
 	AgentControlOp,
 	AgentControlResult,
@@ -618,12 +619,18 @@ export function createAgentControlService({
 							(args as ListTerminalsArgs).workspaceId ?? origin.workspaceId,
 					}),
 				);
-			case 'getConversationStatus':
-				return ok(
-					await ports.conversations.getStatus(
-						(args as ConversationRef).piSessionId,
-					),
-				);
+			case 'getConversationStatus': {
+				const { piSessionId } = args as ConversationRef;
+				const status = await ports.conversations.getStatus(piSessionId);
+				if (!status) {
+					return ok(null);
+				}
+				return ok({
+					...status,
+					hasFinalMessage:
+						await ports.conversations.hasFinalMessage(piSessionId),
+				} satisfies AgentControlConversationStatus);
+			}
 			case 'getLastMessage':
 				return ok({
 					message: await ports.conversations.getLastMessage(

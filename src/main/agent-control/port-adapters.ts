@@ -7,7 +7,6 @@
  */
 
 import type {
-	AgentControlConversationStatus,
 	AgentControlModelList,
 	AgentControlTabInfo,
 	AgentControlTerminalInfo,
@@ -365,9 +364,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			}
 			return 'timeout';
 		},
-		getStatus: async (
-			piSessionId,
-		): Promise<AgentControlConversationStatus | null> => {
+		getStatus: async (piSessionId) => {
 			const snapshot = deps.piSessionService.getSession(piSessionId);
 			if (!snapshot) {
 				return null;
@@ -376,9 +373,14 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				piSessionId: snapshot.id,
 				status: snapshot.status,
 				runtimeOpen: snapshot.runtimeOpen,
-				hasFinalMessage:
-					findLastAssistantText(deps, snapshot.branchId) !== null,
 			};
+		},
+		hasFinalMessage: async (piSessionId) => {
+			const snapshot = deps.piSessionService.getSession(piSessionId);
+			if (!snapshot) {
+				return false;
+			}
+			return findLastAssistantText(deps, snapshot.branchId) !== null;
 		},
 		getLastMessage: async (piSessionId) => {
 			const snapshot = deps.piSessionService.getSession(piSessionId);
