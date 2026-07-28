@@ -17,16 +17,17 @@ export function useDebouncedSettingField(
 	delayMs: number,
 ): { value: string; onChange: (next: string) => void } {
 	const [value, setValue] = useState(seed);
+	const [prevSeed, setPrevSeed] = useState(seed);
+	const [lastCommitted, setLastCommitted] = useState(seed);
 	const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-	const lastCommittedRef = useRef(seed);
 
-	useEffect(() => {
-		if (seed === lastCommittedRef.current) {
-			return;
+	if (seed !== prevSeed) {
+		setPrevSeed(seed);
+		if (seed !== lastCommitted) {
+			setLastCommitted(seed);
+			setValue(seed);
 		}
-		lastCommittedRef.current = seed;
-		setValue(seed);
-	}, [seed]);
+	}
 
 	useEffect(() => {
 		return () => {
@@ -43,7 +44,7 @@ export function useDebouncedSettingField(
 		}
 		timerRef.current = setTimeout(() => {
 			timerRef.current = null;
-			lastCommittedRef.current = commit(next);
+			setLastCommitted(commit(next));
 		}, delayMs);
 	};
 
