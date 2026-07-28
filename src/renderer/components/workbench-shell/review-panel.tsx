@@ -237,7 +237,7 @@ export function ReviewPanel({
 			onValueChange={(value) => onTabChange(value as ReviewPanelTab)}
 			value={activeTab}
 		>
-			<div className='flex h-12 shrink-0 items-center justify-between gap-2 overflow-hidden border-border border-b px-3'>
+			<div className='flex h-10 shrink-0 items-center justify-between gap-2 overflow-hidden border-border border-b px-3'>
 				<div className='no-scrollbar min-w-0 flex-1 overflow-x-auto overflow-y-hidden'>
 					<div className='flex w-max min-w-full items-center gap-1'>
 						{reviewTabs.map((tab) => (

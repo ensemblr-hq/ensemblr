@@ -572,6 +572,19 @@ CREATE INDEX idx_chat_tabs_session_id ON chat_tabs(pi_session_id);
 CREATE INDEX idx_chat_tabs_open ON chat_tabs(workspace_id, closed_at);
 `,
 	},
+	{
+		id: '011_chat_tab_full_title',
+		version: 11,
+		// `title` is capped for tab display, so the untruncated name was previously
+		// lost before it reached the renderer. `full_title` keeps it for tooltips.
+		// Existing rows backfill from `title`: their untruncated text is already
+		// gone, so the capped string is the best available value.
+		sql: `
+ALTER TABLE chat_tabs ADD COLUMN full_title TEXT NOT NULL DEFAULT '';
+
+UPDATE chat_tabs SET full_title = title;
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

@@ -17,9 +17,13 @@ import {
 import { usePiSessionStatusInvalidation } from '@/renderer/hooks/workspace/use-pi-session-status-invalidation';
 import { useWorkspaceAgentBusy } from '@/renderer/hooks/workspace/use-workspace-agent-busy';
 import { areStringArraysEqual } from '@/renderer/lib/ordered-ids';
-import { stripHarnessTitleDecoration } from '@/renderer/lib/terminal/harness-title';
 import { forgetComposerDraft } from '@/renderer/state/composer';
 import { forgetChatOverrides } from '@/renderer/state/preferences';
+import {
+	type LiveTerminalTitle,
+	resolveLiveTerminalTitle,
+	sameLiveTerminalTitle,
+} from '@/renderer/state/workspace/terminal-tab-title';
 import type {
 	CommentPreviewPayload,
 	PullRequestCommentSummary,
@@ -27,7 +31,6 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { SessionTabState } from '@/renderer/types/workbench-shell';
-import { harnessConversationTitleSource } from '@/shared/agents/harness-registry';
 import type {
 	ChatTabWire,
 	CloseChatTabRequest,
@@ -138,14 +141,16 @@ export function useSessionTabState({
 
 	// Live window titles agent harnesses emit via OSC escapes, keyed by their
 	// backing terminal id, so a running agent's own conversation title surfaces
-	// on its tab (falling back to the harness label until one arrives).
-	const [terminalTitles, setTerminalTitles] = useState<Record<string, string>>(
-		{},
-	);
+	// on its tab (falling back to the harness label until one arrives). Display
+	// and full forms travel as one value so a tab's label and its tooltip can
+	// never be sourced from different titles.
+	const [terminalTitles, setTerminalTitles] = useState<
+		Record<string, LiveTerminalTitle>
+	>({});
 	// Latest live title and native session id per terminal, mirrored into refs so
 	// the close path can stamp them onto the archived tab without re-subscribing.
 	// Keyed by backing terminal id.
-	const terminalTitlesRef = useRef<Record<string, string>>({});
+	const terminalTitlesRef = useRef<Record<string, LiveTerminalTitle>>({});
 	const terminalSessionIdsRef = useRef<Record<string, string>>({});
 	// Agent-terminal busy state, inferred from the spinner glyph a harness
 	// animates in its OSC title. Owned by a workspace-scoped hook so the same
@@ -176,7 +181,9 @@ export function useSessionTabState({
 				const isBusy = busyTerminalIds.has(model.terminalId);
 				return {
 					...model,
-					...(liveTitle ? { label: liveTitle } : {}),
+					...(liveTitle
+						? { fullLabel: liveTitle.full, label: liveTitle.display }
+						: {}),
 					...(isBusy ? { status: 'working' as const } : {}),
 				};
 			}
@@ -580,7 +587,9 @@ export function useSessionTabState({
 	const closeTerminalSidecar = useCallback(
 		(
 			closing: SessionTabModel | undefined,
-		): Pick<CloseChatTabRequest, 'metadataPatch' | 'title'> | undefined => {
+		):
+			| Pick<CloseChatTabRequest, 'fullTitle' | 'metadataPatch' | 'title'>
+			| undefined => {
 			if (closing?.kind !== 'terminal' || !closing.terminalId) {
 				return undefined;
 			}
@@ -600,7 +609,7 @@ export function useSessionTabState({
 			// the archived tab unresumable and forcing a fresh session on restore.
 			return {
 				...(agentSessionId ? { metadataPatch: { agentSessionId } } : {}),
-				...(title ? { title } : {}),
+				...(title ? { fullTitle: title.full, title: title.display } : {}),
 			};
 		},
 		[],
@@ -703,7 +712,7 @@ export function useSessionTabState({
 			setTerminalTitles((previous) => {
 				const current = previous[event.terminalId];
 				if (liveTitle) {
-					return current === liveTitle
+					return sameLiveTerminalTitle(current, liveTitle)
 						? previous
 						: { ...previous, [event.terminalId]: liveTitle };
 				}
@@ -945,6 +954,7 @@ function diffTabTitle(filePath: string, scope?: WorkspaceGitDiffScope): string {
 /** Shared identity fields every session-tab model carries, derived from the row. */
 type SessionTabBaseFields = {
 	chatTabId: string;
+	fullLabel: string;
 	id: string;
 	isSubAgent: boolean;
 	label: string;
@@ -957,30 +967,6 @@ type SessionTabBaseFields = {
 /** Reads a metadata field as a string, falling back when it is absent or non-string. */
 function metadataString(value: unknown, fallback: string): string {
 	return typeof value === 'string' ? value : fallback;
-}
-
-/**
- * Resolves the live label a terminal tab should show from a lifecycle snapshot.
- * Codex and Vibe do not put their conversation title in the OSC window title
- * (Codex uses the cwd, Vibe a static "Vibe"), so main reads it from the harness
- * session log and delivers it as `agentTitle`; for those harnesses prefer it and
- * ignore the OSC title. Every other harness titles from the OSC escape, stripping
- * the leading spinner glyph (which still drives the busy flag elsewhere). Returns
- * null when the title is empty or still just the harness label.
- * @param harnessId - The tab's harness id, used to pick the title source.
- * @param harnessLabel - The default harness label to treat as "no real title".
- * @param session - The lifecycle snapshot carrying the OSC and agent titles.
- * @returns The label to adopt, or null to fall back to the harness label.
- */
-function resolveLiveTerminalTitle(
-	harnessId: string,
-	harnessLabel: string,
-	session: { agentTitle: string | null; title: string },
-): string | null {
-	const candidate = harnessConversationTitleSource(harnessId)
-		? (session.agentTitle ?? '').trim()
-		: stripHarnessTitleDecoration(session.title);
-	return candidate && candidate !== harnessLabel ? candidate : null;
 }
 
 /** Builds the `diff` variant, carrying its optional file path, turn id, and scope. */
@@ -1034,6 +1020,7 @@ function toSessionTabModel(
 ): SessionTabModel {
 	const base: SessionTabBaseFields = {
 		chatTabId: tab.id,
+		fullLabel: tab.fullTitle || tab.title,
 		id: tab.id,
 		isSubAgent: tab.metadata.agentRole === 'subagent',
 		label: tab.title,
@@ -1122,6 +1109,11 @@ function toClosedSessionTabModel(
 ): SessionTabModel {
 	const base: SessionTabBaseFields = {
 		chatTabId: entry.tab.id,
+		fullLabel:
+			entry.tab.fullTitle ||
+			entry.tab.title ||
+			entry.summaryTitle ||
+			'Untitled chat',
 		id: entry.tab.id,
 		isSubAgent: entry.tab.metadata.agentRole === 'subagent',
 		// Prefer the short chat-title that was visible on the open tab. The

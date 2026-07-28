@@ -168,7 +168,11 @@ test('restoreTurnCheckpoint reverts tracked files and records truncation', async
 		input: {
 			branchId: fixture.branchId,
 			eventType: 'message',
-			payload: { kind: 'message' },
+			payload: {
+				kind: 'message',
+				payload: { kind: 'text', text: 'first' },
+				role: 'agent',
+			},
 			turnId: turn.id,
 		},
 	});
@@ -177,7 +181,11 @@ test('restoreTurnCheckpoint reverts tracked files and records truncation', async
 		input: {
 			branchId: fixture.branchId,
 			eventType: 'message',
-			payload: { kind: 'message' },
+			payload: {
+				kind: 'message',
+				payload: { kind: 'text', text: 'second' },
+				role: 'agent',
+			},
 			turnId: turn.id,
 		},
 	});

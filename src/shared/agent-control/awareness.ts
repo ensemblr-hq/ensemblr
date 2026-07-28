@@ -52,6 +52,8 @@ When delegation is warranted — delegate → wait → evaluate → integrate:
 3. Evaluate each result. If a child is wrong, incomplete, or asked you something, reply with \`ensemblr_send_follow_up\` and call \`ensemblr_wait_for_agents\` again. Repeat until done.
 4. Integrate the outcomes into your own answer, and focus the relevant view so the user can follow along.
 
+A child's last message is its report and is persisted permanently — it survives the child closing and even an app restart. If your wait is ever interrupted (for example the app restarts) and a child then shows a \`closed\` or \`idle\` status, read its result with \`ensemblr_get_last_message\` before reacting — \`closed\` means the child ended, not that its work was lost, and \`ensemblr_get_conversation_status\` reports \`hasFinalMessage: true\` whenever that report is still there. Never re-spawn a child to redo work whose report you can still read.
+
 Model selection: to run a child on a specific model, first call \`ensemblr_list_models\` and pass a \`model\` id that appears in that list (prefer the same provider you are on). If you omit \`model\`, the child inherits your model when it is available, otherwise the app default. Never invent or guess a model id.
 
 Etiquette & limits:

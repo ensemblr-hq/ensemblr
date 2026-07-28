@@ -56,10 +56,11 @@ export function registerChatTabHandlers({
 	ipcMain.handle(
 		IPC_CHANNELS.closeChatTab,
 		async (_event, raw: unknown): Promise<CloseChatTabResult> => {
-			const { chatTabId, metadataPatch, title } =
+			const { chatTabId, fullTitle, metadataPatch, title } =
 				closeChatTabRequestSchema.parse(raw);
 			const { deleted } = chatTabService.closeTab({
 				chatTabId,
+				fullTitle,
 				metadataPatch,
 				title,
 			});
@@ -122,6 +123,7 @@ export function registerChatTabHandlers({
 function toWire(row: ChatTabRow): ChatTabWire {
 	return {
 		closedAt: row.closedAt,
+		fullTitle: row.fullTitle,
 		id: row.id,
 		kind: row.kind,
 		metadata: row.metadata,

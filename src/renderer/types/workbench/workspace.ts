@@ -150,6 +150,12 @@ interface SessionTabBase {
 	chatTabId: string;
 	piSessionId: string | null;
 	label: string;
+	/**
+	 * Untruncated `label`, for the tab tooltip. `label` is capped for display, so
+	 * the two differ only when the full name exceeded that cap. Absent on
+	 * placeholder and fixture tabs, whose label is already the whole name.
+	 */
+	fullLabel?: string;
 	status: 'blocked' | 'idle' | 'working';
 	summary: string;
 	updatedLabel: string;

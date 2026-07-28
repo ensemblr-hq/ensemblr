@@ -325,6 +325,7 @@ const FINAL_CONVERSATION_READ_TIMEOUT_MS = 2_000;
 
 /** Neutral conversation info used when the exit-time read times out. */
 const EMPTY_CONVERSATION_INFO: AgentConversationInfo = {
+	fullTitle: null,
 	sessionId: null,
 	title: null,
 };
@@ -394,7 +395,7 @@ const OSC_TITLE_PATTERN = new RegExp(
  * nothing changed, so the caller can skip a redundant broadcast.
  * @param snapshot - The session's current snapshot.
  * @param info - The latest title and session id read from the harness log.
- * @returns A partial snapshot patch, or null when neither field changed.
+ * @returns A partial snapshot patch, or null when no field changed.
  */
 function conversationInfoPatch(
 	snapshot: TerminalSessionSnapshot,
@@ -403,6 +404,10 @@ function conversationInfoPatch(
 	const patch: Partial<TerminalSessionSnapshot> = {};
 	if (info.title && info.title !== snapshot.agentTitle) {
 		patch.agentTitle = info.title;
+	}
+	const fullTitle = info.fullTitle ?? info.title;
+	if (fullTitle && fullTitle !== snapshot.agentFullTitle) {
+		patch.agentFullTitle = fullTitle;
 	}
 	if (info.sessionId && info.sessionId !== snapshot.agentSessionId) {
 		patch.agentSessionId = info.sessionId;
@@ -990,6 +995,7 @@ export function createTerminalService({
 			snapshot: {
 				agentBusy: false,
 				agentSessionId: null,
+				agentFullTitle: null,
 				agentTitle: null,
 				cols: normalizedCols,
 				commandLabel,

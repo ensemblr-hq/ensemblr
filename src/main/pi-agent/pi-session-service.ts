@@ -2,6 +2,7 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import type {
 	PiChatTabWire,
+	PiPersistedEnvelope,
 	PiSessionEventWire,
 	PiSessionSnapshotWire,
 	WriteForkSummaryRequest,
@@ -28,6 +29,7 @@ import {
 	setChatTabMetadata,
 } from '../storage/repositories/chat-tab-repository.ts';
 import {
+	iterateBranchPayloadsDescending,
 	listEventsByBranch,
 	type PiEventRow,
 } from '../storage/repositories/pi-event-repository.ts';
@@ -37,7 +39,10 @@ import {
 	getPiSessionById,
 	listPiSessionsByWorkspace,
 } from '../storage/repositories/pi-session-repository.ts';
-import { sanitizeChatTitle } from './naming/sanitize-title.ts';
+import {
+	sanitizeChatTitle,
+	truncateChatTitle,
+} from './naming/sanitize-title.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import {
 	createPiSessionLifecycle,
@@ -96,6 +101,16 @@ export interface PiSessionService {
 		workspaceId: string,
 	) => readonly PiSessionSnapshot[];
 	listEvents: (branchId: string) => readonly PiEventRow[];
+	/**
+	 * Scans a branch's persisted events newest-first, honoring checkpoint hidden
+	 * ranges just like {@link PiSessionService.listEvents}, and yields each
+	 * visible payload lazily so a caller that only needs the most recent matching
+	 * event (e.g. the last assistant answer) can stop early instead of loading
+	 * the whole branch.
+	 */
+	iterateEventPayloadsDescending: (
+		branchId: string,
+	) => Iterable<PiPersistedEnvelope | null>;
 	openSession: (request: OpenPiSessionRequest) => Promise<PiSessionSnapshot>;
 	/**
 	 * Sets the display name of an active Pi session via its runtime `/name`, then
@@ -210,6 +225,20 @@ export function createPiSessionService({
 				(event) => !isOrdinalHidden(event.ordinal, hiddenRanges),
 			);
 		},
+		iterateEventPayloadsDescending: function* (branchId) {
+			const database = requireSessionDatabase();
+			const branch = getPiSessionBranchById({ database, id: branchId });
+			const hiddenRanges = branch ? readHiddenEventRanges(branch.metadata) : [];
+			for (const { ordinal, payload } of iterateBranchPayloadsDescending({
+				branchId,
+				database,
+			})) {
+				if (isOrdinalHidden(ordinal, hiddenRanges)) {
+					continue;
+				}
+				yield payload;
+			}
+		},
 		listSessionsForWorkspace: (workspaceId) => {
 			const database = requireSessionDatabase();
 			const rows = listPiSessionsByWorkspace({ database, workspaceId });
@@ -244,11 +273,13 @@ export function createPiSessionService({
 			if (!tab) {
 				return null;
 			}
-			const title = sanitizeChatTitle(name) ?? name.trim();
+			const sanitized = sanitizeChatTitle(name);
+			const fullTitle = sanitized?.full ?? name.trim();
+			const title = sanitized?.display ?? truncateChatTitle(fullTitle);
 			if (!title) {
 				return null;
 			}
-			renameChatTab({ database, id: applied.chatTabId, title });
+			renameChatTab({ database, fullTitle, id: applied.chatTabId, title });
 			// An explicit `/name` (agent- or human-issued) is authoritative: mark it
 			// `user` provenance so the deterministic auto-namer never overrides it,
 			// including after tab reuse.
@@ -353,6 +384,7 @@ export function snapshotToWire(
 	snapshot: PiSessionSnapshot,
 ): PiSessionSnapshotWire {
 	const tabs: PiChatTabWire[] = snapshot.openedTabs.map((tab) => ({
+		fullTitle: tab.fullTitle,
 		id: tab.id,
 		kind: tab.kind,
 		openedAt: tab.openedAt,

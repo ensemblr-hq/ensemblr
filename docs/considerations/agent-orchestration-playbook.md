@@ -69,6 +69,13 @@ child's spawn attempt is denied `denied-depth`.
 4. **Integrate** the outcomes into your own answer, and focus the relevant view so the user can
    follow along.
 
+> **Recovering a finished child.** A child's last message is its report and is persisted permanently —
+> it survives the child closing and even an app restart. If your wait is interrupted (for example the
+> app restarts) and a child then shows a `closed` or `idle` status, read its result with
+> `ensemblr_get_last_message` before reacting; `closed` means the child ended, not that its work was
+> lost, and `ensemblr_get_conversation_status` reports `hasFinalMessage: true` whenever that report is
+> still there. Never re-spawn a child to redo work whose report you can still read.
+
 ## Example — parallel delegation
 
 ```

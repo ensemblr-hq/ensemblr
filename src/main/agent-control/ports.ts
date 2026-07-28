@@ -123,9 +123,21 @@ export interface ConversationPort {
 		piSessionId: string,
 		timeoutMs: number,
 	) => Promise<'completed' | 'timeout'>;
+	/**
+	 * Live conversation status. Reads the in-memory snapshot only, with no
+	 * persisted-event scan, so the `waitForAgents` poll loop can call it every
+	 * tick; pair it with {@link ConversationPort.hasFinalMessage} when a caller
+	 * needs the full {@link AgentControlConversationStatus}.
+	 */
 	getStatus: (
 		piSessionId: string,
-	) => Promise<AgentControlConversationStatus | null>;
+	) => Promise<Omit<AgentControlConversationStatus, 'hasFinalMessage'> | null>;
+	/**
+	 * Whether a persisted assistant answer exists for the conversation. Scans
+	 * stored events, so it stays off the poll loop and is resolved only for the
+	 * callers that report the flag.
+	 */
+	hasFinalMessage: (piSessionId: string) => Promise<boolean>;
 	getLastMessage: (piSessionId: string) => Promise<string | null>;
 	/** Owning workspace of a Pi session, or null when it does not exist. */
 	resolveConversationWorkspace: (piSessionId: string) => Promise<string | null>;

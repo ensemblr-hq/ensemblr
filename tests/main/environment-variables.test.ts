@@ -58,6 +58,8 @@ function createConfigService(
 			schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 			status: 'ok',
 		}),
+		startWatching: () => {},
+		stop: () => {},
 	};
 }
 

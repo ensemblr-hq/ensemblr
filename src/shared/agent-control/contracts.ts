@@ -382,6 +382,23 @@ export interface AgentControlConversationStatus {
 	piSessionId: string;
 	status: string;
 	runtimeOpen: boolean;
+	/**
+	 * Whether a final assistant message is persisted and retrievable via
+	 * `getLastMessage`. Stays true after the session closes or the app restarts,
+	 * so an orchestrator can recover a finished child's report instead of
+	 * re-spawning it.
+	 */
+	hasFinalMessage: boolean;
+}
+
+/**
+ * Last assistant message returned by `getLastMessage`. `message` is null when
+ * the session is unknown or has produced no assistant text yet; the wrapping
+ * object keeps that null distinguishable from the empty success envelope a bare
+ * null would otherwise render as.
+ */
+export interface GetLastMessageResult {
+	message: string | null;
 }
 
 /** One available Pi model, as returned by `listModels`. */

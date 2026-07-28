@@ -56,8 +56,19 @@ interface EventRowShape {
 	turn_id: string | null;
 }
 
+/** Projected row shape for the payload-only descending scan. */
+interface EventPayloadRowShape {
+	ordinal: number;
+	payload_json: string;
+}
+
 const SELECT_EVENT = `SELECT id, branch_id, turn_id, ordinal, event_type, stream, payload_json, created_at
 FROM pi_session_events`;
+
+const SELECT_BRANCH_PAYLOADS_DESC = `SELECT ordinal, payload_json
+FROM pi_session_events
+WHERE branch_id = ?
+ORDER BY ordinal DESC`;
 
 /**
  * Appends a single event to a branch with auto-incremented ordinal. Transaction
@@ -239,6 +250,31 @@ export function listEventsByBranch({
 		.all(...values) as unknown as EventRowShape[];
 
 	return rows.map(mapEventRow);
+}
+
+/**
+ * Yields a branch's persisted payloads newest-first (descending ordinal),
+ * parsing each row lazily so a caller scanning for the most recent matching
+ * event stops reading as soon as it finds one instead of loading and parsing
+ * the whole branch. Each yielded ordinal lets callers honor checkpoint hidden
+ * ranges.
+ * @param params - Database handle and the branch whose payloads to scan.
+ * @returns A generator of `{ ordinal, payload }` in descending ordinal order.
+ */
+export function* iterateBranchPayloadsDescending({
+	database,
+	branchId,
+}: {
+	branchId: string;
+	database: DatabaseSync;
+}): Generator<{ ordinal: number; payload: PiEventPayload }> {
+	const rows = database
+		.prepare(SELECT_BRANCH_PAYLOADS_DESC)
+		.iterate(branchId) as unknown as IterableIterator<EventPayloadRowShape>;
+
+	for (const row of rows) {
+		yield { ordinal: row.ordinal, payload: parsePayload(row.payload_json) };
+	}
 }
 
 /** Returns events tied to a specific turn in ordinal order. */

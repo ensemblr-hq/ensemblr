@@ -3,6 +3,7 @@ import path from 'node:path';
 
 import type { PiSessionEventWire } from '../../shared/ipc/contracts/pi-session';
 import type { PiExecutableSnapshot } from '../pi-runtime';
+import { cleanTitleLine } from './naming/sanitize-title.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import type { PiAgentEvent } from './pi-agent-types.ts';
 
@@ -670,7 +671,7 @@ function splitTitle(text: string): { body: string; title: string | null } {
 		return { body: '', title: null };
 	}
 	const firstLineRaw = lines[firstLineIndex] ?? '';
-	const title = sanitizeSummaryTitle(firstLineRaw);
+	const title = cleanTitleLine(firstLineRaw);
 	const remainder = lines
 		.slice(firstLineIndex + 1)
 		.join('\n')
@@ -681,26 +682,4 @@ function splitTitle(text: string): { body: string; title: string | null } {
 			? `# ${heading}\n`
 			: `# ${heading}\n\n${remainder}\n`;
 	return { body, title };
-}
-
-/**
- * Cleans the LLM's first line so a conversational preamble (e.g.
- * "Here's a summary:") does not become the tab title.
- */
-function sanitizeSummaryTitle(line: string): string | null {
-	const cleaned = line
-		.replace(/^#+\s*/, '')
-		.replace(/^[-*+]\s*/, '')
-		.replace(/^\d+[.)]\s*/, '')
-		.replace(/^title\s*[:\-—]\s*/i, '')
-		.replace(
-			/^(?:here(?:'s| is)? (?:the |a )?(?:summary|session summary|title)|(?:the |a )?(?:summary|title) is)\s*[:\-—]?\s*/i,
-			'',
-		)
-		.replace(/[*_`~]/g, '')
-		.replace(/^["'“”‘’«»]+|["'“”‘’«»]+$/g, '')
-		.replace(/[.!?,;:]+$/g, '')
-		.replace(/\s+/g, ' ')
-		.trim();
-	return cleaned.length > 0 ? cleaned : null;
 }

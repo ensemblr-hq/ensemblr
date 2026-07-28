@@ -14,6 +14,11 @@ export type ChatTabKind =
 /** Domain shape of a chat tab row returned by the repository. */
 export interface ChatTabRow {
 	closedAt: string | null;
+	/**
+	 * Untruncated title, for tooltips and search. Equals `title` whenever the
+	 * producer had nothing longer, and for rows predating the column.
+	 */
+	fullTitle: string;
 	id: string;
 	kind: ChatTabKind;
 	metadata: Record<string, unknown>;
@@ -26,6 +31,8 @@ export interface ChatTabRow {
 
 /** Input for opening a new chat tab in a workspace. */
 export interface OpenChatTabInput {
+	/** Untruncated title; defaults to `title` when the caller has nothing longer. */
+	fullTitle?: string;
 	kind: ChatTabKind;
 	metadata?: Record<string, unknown>;
 	piSessionId?: string | null;
@@ -44,6 +51,7 @@ export interface PiRuntimeStateRow {
 /** Raw `chat_tabs` row shape with snake_case columns as stored in SQLite. */
 interface ChatTabRowShape {
 	closed_at: string | null;
+	full_title: string;
 	id: string;
 	kind: ChatTabKind;
 	metadata_json: string;
@@ -62,7 +70,7 @@ interface RuntimeStateRowShape {
 	workspace_id: string;
 }
 
-const SELECT_TAB = `SELECT id, workspace_id, pi_session_id, kind, title, position, opened_at, closed_at, metadata_json
+const SELECT_TAB = `SELECT id, workspace_id, pi_session_id, kind, title, full_title, position, opened_at, closed_at, metadata_json
 FROM chat_tabs`;
 
 const SELECT_RUNTIME = `SELECT workspace_id, active_tab_id, last_active_session_id, updated_at
@@ -89,8 +97,8 @@ export function openChatTab({
 
 		database
 			.prepare(
-				`INSERT INTO chat_tabs (id, workspace_id, pi_session_id, kind, title, position, metadata_json)
-					VALUES (?, ?, ?, ?, ?, ?, ?)`,
+				`INSERT INTO chat_tabs (id, workspace_id, pi_session_id, kind, title, full_title, position, metadata_json)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			)
 			.run(
 				id,
@@ -98,6 +106,7 @@ export function openChatTab({
 				input.piSessionId ?? null,
 				input.kind,
 				input.title,
+				input.fullTitle ?? input.title,
 				next.next,
 				metadata,
 			);
@@ -171,19 +180,25 @@ export function restoreChatTab({
 	return getChatTabById({ database, id });
 }
 
-/** Renames the chat tab title. */
+/**
+ * Renames the chat tab, storing the display title and its untruncated form.
+ * `fullTitle` falls back to `title` so callers without a longer variant keep the
+ * two columns consistent rather than leaving a stale full title behind.
+ */
 export function renameChatTab({
 	database,
+	fullTitle,
 	id,
 	title,
 }: {
 	database: DatabaseSync;
+	fullTitle?: string;
 	id: string;
 	title: string;
 }): ChatTabRow | null {
 	database
-		.prepare(`UPDATE chat_tabs SET title = ? WHERE id = ?`)
-		.run(title, id);
+		.prepare(`UPDATE chat_tabs SET title = ?, full_title = ? WHERE id = ?`)
+		.run(title, fullTitle ?? title, id);
 	return getChatTabById({ database, id });
 }
 
@@ -401,6 +416,7 @@ export function setRuntimeState({
 function mapTabRow(row: ChatTabRowShape): ChatTabRow {
 	return {
 		closedAt: row.closed_at,
+		fullTitle: row.full_title || row.title,
 		id: row.id,
 		kind: row.kind,
 		metadata: parseMetadata(row.metadata_json),

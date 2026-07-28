@@ -15,6 +15,7 @@ function relaunchedSnapshot(
 ): TerminalSessionSnapshot {
 	return {
 		agentBusy: false,
+		agentFullTitle: null,
 		agentSessionId: null,
 		agentTitle: null,
 		cols: 80,

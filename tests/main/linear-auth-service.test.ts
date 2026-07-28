@@ -5,6 +5,7 @@ import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 
 import {
+	type ConfigStatusSnapshot,
 	ENSEMBLR_CONFIG_SCHEMA_VERSION,
 	type EnsemblrConfig,
 	type EnsemblrConfigService,
@@ -36,7 +37,7 @@ function createConfigService(
 		security: {},
 		ui: {},
 	};
-	const snapshot = {
+	const snapshot: ConfigStatusSnapshot = {
 		blocksReadiness: false,
 		diagnostics: [],
 		displayPath: '~/.config/ensemblr/config.json',
@@ -44,12 +45,14 @@ function createConfigService(
 		path: '/Users/alice/.config/ensemblr/config.json',
 		schemaVersion: ENSEMBLR_CONFIG_SCHEMA_VERSION,
 		status: 'ok',
-	} as const;
+	};
 
 	return {
 		getConfig: () => config,
 		getSnapshot: () => snapshot,
 		load: () => snapshot,
+		startWatching: () => {},
+		stop: () => {},
 	};
 }
 

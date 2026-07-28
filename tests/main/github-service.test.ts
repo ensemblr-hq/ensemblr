@@ -311,7 +311,7 @@ test('pushWorkspaceBranch sets upstream by default', async () => {
 
 	assert.equal(result.ok, true);
 	const push = calls.find(
-		(call) => call.command === 'git' && call.args[0] === 'push',
+		(call) => call.command === 'git' && call.args?.[0] === 'push',
 	);
 	assert.deepEqual(push?.args, ['push', '--set-upstream', 'origin', 'HEAD']);
 });
@@ -326,7 +326,7 @@ test('pushWorkspaceBranch omits --set-upstream when disabled', async () => {
 
 	assert.equal(result.ok, true);
 	const push = calls.find(
-		(call) => call.command === 'git' && call.args[0] === 'push',
+		(call) => call.command === 'git' && call.args?.[0] === 'push',
 	);
 	assert.deepEqual(push?.args, ['push', 'origin', 'HEAD']);
 });

@@ -14,6 +14,7 @@ const WORKSPACE_ID = 'workspace-1';
 function createTab(id: string, position: number): ChatTabWire {
 	return {
 		closedAt: null,
+		fullTitle: id,
 		id,
 		kind: 'chat',
 		metadata: {},

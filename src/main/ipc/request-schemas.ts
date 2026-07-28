@@ -60,6 +60,7 @@ export const openChatTabRequestSchema = z.object({
 /** {@link import('../../shared/ipc').CloseChatTabRequest}. */
 export const closeChatTabRequestSchema = z.object({
 	chatTabId: z.string().min(1),
+	fullTitle: optionalStringCoerceNullToUndefined,
 	metadataPatch: z
 		.object({ agentSessionId: z.string().min(1).nullable().optional() })
 		.optional(),

@@ -25,6 +25,8 @@ export type ChatTabKindWire =
 
 /** Renderer-facing chat tab descriptor. */
 export interface PiChatTabWire {
+	/** Untruncated title; `title` is capped for tab display. */
+	fullTitle: string;
 	id: string;
 	kind: ChatTabKindWire;
 	openedAt: string;

@@ -321,7 +321,11 @@ describe('readAgentConversationInfo — session id', () => {
 				home,
 				since: LAUNCH,
 			}),
-		).toEqual({ sessionId: 'codex-uuid-1', title: 'do the thing' });
+		).toEqual({
+			fullTitle: 'do the thing',
+			sessionId: 'codex-uuid-1',
+			title: 'do the thing',
+		});
 	});
 
 	test('vibe surfaces the session id from meta.session_id, not the dir name', async () => {
@@ -338,6 +342,7 @@ describe('readAgentConversationInfo — session id', () => {
 				since: LAUNCH,
 			}),
 		).toEqual({
+			fullTitle: 'a vibe chat',
 			sessionId: '4e46ab20-336e-8b89-f959-31118746bf80',
 			title: 'a vibe chat',
 		});
@@ -350,7 +355,7 @@ describe('readAgentConversationInfo — session id', () => {
 				home,
 				since: LAUNCH,
 			}),
-		).toEqual({ sessionId: 'claude-abc', title: null });
+		).toEqual({ fullTitle: null, sessionId: 'claude-abc', title: null });
 	});
 
 	test('claude ignores a transcript from before the tab launched', async () => {
@@ -360,7 +365,7 @@ describe('readAgentConversationInfo — session id', () => {
 				home,
 				since: LAUNCH,
 			}),
-		).toEqual({ sessionId: null, title: null });
+		).toEqual({ fullTitle: null, sessionId: null, title: null });
 	});
 
 	test('claude ignores a transcript recorded for a different cwd', async () => {
@@ -370,7 +375,7 @@ describe('readAgentConversationInfo — session id', () => {
 				home,
 				since: LAUNCH,
 			}),
-		).toEqual({ sessionId: null, title: null });
+		).toEqual({ fullTitle: null, sessionId: null, title: null });
 	});
 
 	test('claude reads the id past header lines that lack a timestamp', async () => {
@@ -380,7 +385,7 @@ describe('readAgentConversationInfo — session id', () => {
 				home,
 				since: LAUNCH,
 			}),
-		).toEqual({ sessionId: 'claude-hdr', title: null });
+		).toEqual({ fullTitle: null, sessionId: 'claude-hdr', title: null });
 	});
 
 	test('claude gates on the real timestamp, not the timestamp-less header', async () => {
@@ -392,7 +397,7 @@ describe('readAgentConversationInfo — session id', () => {
 				home,
 				since: LAUNCH,
 			}),
-		).toEqual({ sessionId: null, title: null });
+		).toEqual({ fullTitle: null, sessionId: null, title: null });
 	});
 
 	test('claude finds a dotted-cwd transcript under the dot-keeping slug', async () => {
@@ -412,7 +417,7 @@ describe('readAgentConversationInfo — session id', () => {
 				home,
 				since: LAUNCH,
 			}),
-		).toEqual({ sessionId: 'claude-dot', title: null });
+		).toEqual({ fullTitle: null, sessionId: 'claude-dot', title: null });
 	});
 
 	test('claude skips a lone sub-agent sidechain transcript', async () => {
@@ -424,7 +429,7 @@ describe('readAgentConversationInfo — session id', () => {
 				home,
 				since: LAUNCH,
 			}),
-		).toEqual({ sessionId: null, title: null });
+		).toEqual({ fullTitle: null, sessionId: null, title: null });
 	});
 
 	test('claude returns the main id past a newer sidechain transcript', async () => {
@@ -437,7 +442,7 @@ describe('readAgentConversationInfo — session id', () => {
 				home,
 				since: LAUNCH,
 			}),
-		).toEqual({ sessionId: 'claude-main', title: null });
+		).toEqual({ fullTitle: null, sessionId: 'claude-main', title: null });
 	});
 
 	test('claude resolves a symlinked cwd to its realpath to find the transcript', async () => {
@@ -459,6 +464,6 @@ describe('readAgentConversationInfo — session id', () => {
 				home,
 				since: LAUNCH,
 			}),
-		).toEqual({ sessionId: 'claude-link', title: null });
+		).toEqual({ fullTitle: null, sessionId: 'claude-link', title: null });
 	});
 });

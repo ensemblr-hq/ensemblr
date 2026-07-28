@@ -22,12 +22,11 @@ import {
 	type SetupCheckProvider,
 } from '../../src/main/setup/setup-check-context.ts';
 import { createSetupDiagnosticsService } from '../../src/main/setup/setup-diagnostics.ts';
-import type {
-	DatabaseHealthSnapshot,
-	EnsemblrDatabaseService,
-} from '../../src/main/storage/database.ts';
+import type { EnsemblrDatabaseService } from '../../src/main/storage/database.ts';
 import type {
 	ConfigStatusSnapshot,
+	DatabaseHealthSnapshot,
+	LinearConnectionSnapshot,
 	RootDirectorySnapshot,
 	SetupCheckGroupId,
 	SetupCheckId,
@@ -108,6 +107,8 @@ function createConfigService(
 		}),
 		getSnapshot: () => configSnapshot,
 		load: () => configSnapshot,
+		startWatching: () => {},
+		stop: () => {},
 	};
 }
 
@@ -224,6 +225,9 @@ function createLocalCommandService(
 
 function createEnvironmentVariablesService(): EnvironmentVariablesService {
 	return {
+		addEnvFile: () => {
+			throw new Error('addEnvFile is not used by setup diagnostics tests.');
+		},
 		assembleEnvironment: async () => ({
 			diagnostics: [],
 			env: {},
@@ -237,11 +241,23 @@ function createEnvironmentVariablesService(): EnvironmentVariablesService {
 			requiredCount: 0,
 			variables: [],
 		}),
+		listEnvFiles: () => {
+			throw new Error('listEnvFiles is not used by setup diagnostics tests.');
+		},
+		readValue: () => {
+			throw new Error('readValue is not used by setup diagnostics tests.');
+		},
+		removeEnvFile: () => {
+			throw new Error('removeEnvFile is not used by setup diagnostics tests.');
+		},
 		setPlainValue: () => {
 			throw new Error('setPlainValue is not used by setup diagnostics tests.');
 		},
 		setSecretValue: async () => {
 			throw new Error('setSecretValue is not used by setup diagnostics tests.');
+		},
+		setValue: () => {
+			throw new Error('setValue is not used by setup diagnostics tests.');
 		},
 		unsetValue: async () => undefined,
 	};
@@ -367,6 +383,7 @@ function createPiExecutableService(
 	};
 
 	return {
+		clearOverride: () => ({ canceled: false }),
 		getSnapshot: async () => piSnapshot,
 		saveOverride: (selectedPath) => ({
 			canceled: false,
@@ -477,7 +494,7 @@ function createProvider(
 }
 
 function createLinearAuthService(): LinearAuthService {
-	const snapshot = {
+	const snapshot: LinearConnectionSnapshot = {
 		expiresAt: null,
 		organizationName: null,
 		organizationUrlKey: null,
@@ -486,7 +503,7 @@ function createLinearAuthService(): LinearAuthService {
 		updatedAt: null,
 		userEmail: null,
 		userName: null,
-	} as const;
+	};
 
 	return {
 		cancelLogin: async () => {},

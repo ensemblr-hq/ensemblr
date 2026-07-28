@@ -4,5 +4,6 @@ When the `code-review` skill is triggered, run automated diagnostics as its fina
 
 - Run the `react-doctor` skill on touched renderer or React code. It covers lint, dead code, accessibility, bundle size, and architecture diagnostics and includes a score regression check. Treat a score regression as a blocker; resolve flagged issues before finishing.
 - Run `fallow` on the changed set (use `check_changed` or `audit`) to catch changed-code risk, unused code, duplication, circular dependencies, and complexity hotspots. Resolve each finding or explicitly justify why it stands.
+- Check comment discipline on the changed diff only. Every comment the diff adds must be a JSDoc block, a tool directive, or a *why*-comment meeting the criteria in `.claude/rules/comments.md`. Flag any comment that restates what the code says, any commented-out code, and any bare `TODO`/`FIXME`. Pre-existing comments outside the diff are out of scope — do not gate a review on them.
 - These diagnostics are additive, not a replacement for `npm run check` and `npm run typecheck`. Run those first.
 - In the final response, state which tools ran and list any outstanding findings that were accepted rather than fixed.

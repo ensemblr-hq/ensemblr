@@ -49,6 +49,11 @@ export interface TerminalSessionSnapshot {
 	 * for the tab label; the busy indicator still reads {@link title}.
 	 */
 	agentTitle: string | null;
+	/**
+	 * Untruncated form of {@link agentTitle}, for tooltips. `agentTitle` is capped
+	 * for tab display; this is null under exactly the same conditions.
+	 */
+	agentFullTitle: string | null;
 	cols: number;
 	/** Command line shown in the UI; never includes secret values. */
 	commandLabel: string;
