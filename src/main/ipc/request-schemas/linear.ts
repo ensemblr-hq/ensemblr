@@ -1,0 +1,67 @@
+/**
+ * Linear issue and comment IPC request schemas.
+ *
+ * **Strict:** handlers call `schema.parse(raw)`, so a malformed renderer
+ * payload throws and surfaces as an IPC error in the renderer.
+ */
+import { z } from 'zod';
+
+/** Issue fields shared by the Linear create and update request schemas. */
+const linearIssueFieldsShape = {
+	assigneeId: z.string().min(1).optional(),
+	cycleId: z.string().min(1).optional(),
+	description: z.string().optional(),
+	dueDate: z.string().optional(),
+	labelIds: z.array(z.string().min(1)).optional(),
+	// Linear priority scale: 0=none, 1=urgent, 2=high, 3=medium, 4=low.
+	priority: z.number().int().min(0).max(4).optional(),
+	projectId: z.string().min(1).optional(),
+	stateId: z.string().min(1).optional(),
+};
+
+/** {@link import('../../../shared/ipc').ListLinearIssuesRequest}. */
+export const listLinearIssuesRequestSchema = z
+	.object({
+		query: z.string().optional(),
+		refresh: z.boolean().optional(),
+		teamId: z.string().min(1).optional(),
+	})
+	.optional()
+	.transform((value) => value ?? {});
+
+/** {@link import('../../../shared/ipc').GetLinearIssueRequest}. */
+export const getLinearIssueRequestSchema = z.object({
+	id: z.string().min(1),
+	refresh: z.boolean().optional(),
+});
+
+/** {@link import('../../../shared/ipc').GetLinearMetadataRequest}. */
+export const getLinearMetadataRequestSchema = z
+	.object({
+		refresh: z.boolean().optional(),
+	})
+	.optional()
+	.transform((value) => value ?? {});
+
+/** {@link import('../../../shared/ipc').CreateLinearIssueRequest}. */
+export const createLinearIssueRequestSchema = z.object({
+	...linearIssueFieldsShape,
+	teamId: z.string().min(1),
+	title: z.string().min(1),
+});
+
+/** {@link import('../../../shared/ipc').UpdateLinearIssueRequest}. */
+export const updateLinearIssueRequestSchema = z.object({
+	id: z.string().min(1),
+	input: z.object({
+		...linearIssueFieldsShape,
+		teamId: z.string().min(1).optional(),
+		title: z.string().min(1).optional(),
+	}),
+});
+
+/** {@link import('../../../shared/ipc').CreateLinearCommentRequest}. */
+export const createLinearCommentRequestSchema = z.object({
+	body: z.string().min(1),
+	issueId: z.string().min(1),
+});
