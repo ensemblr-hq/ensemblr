@@ -107,6 +107,11 @@ export const SHORTCUTS = {
 		scope: 'composer',
 		bindings: [{ key: 'Enter', modifiers: ['mod'] }],
 	},
+	'question.submit': {
+		description: 'Submit answers to an agent question',
+		scope: 'dialog',
+		bindings: [{ key: 'Enter', modifiers: ['mod'] }],
+	},
 	'composer.queue': {
 		description: 'Queue message as a follow-up',
 		scope: 'composer',

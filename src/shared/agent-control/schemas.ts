@@ -5,7 +5,13 @@
  */
 import { z } from 'zod';
 
-import { type AgentControlOp, WORKSPACE_BOARD_STATUSES } from './contracts.ts';
+import type { AskUserQuestionReply } from './contracts.ts';
+import {
+	type AgentControlOp,
+	ASK_USER_QUESTION_LIMITS,
+	ASK_USER_QUESTION_RESERVED_LABELS,
+	WORKSPACE_BOARD_STATUSES,
+} from './contracts.ts';
 
 const nonEmpty = z.string().trim().min(1);
 
@@ -117,6 +123,57 @@ const notifyOrchestratorSchema = z.strictObject({
 	message: nonEmpty,
 });
 
+const reservedLabels: ReadonlySet<string> = new Set(
+	ASK_USER_QUESTION_RESERVED_LABELS,
+);
+
+const askUserQuestionOptionSchema = z.strictObject({
+	label: nonEmpty
+		.max(ASK_USER_QUESTION_LIMITS.maxLabelLength)
+		.refine((label) => !reservedLabels.has(label.toLowerCase()), {
+			message: 'Label is reserved by the dialog; choose a different wording.',
+		}),
+	description: nonEmpty.optional(),
+});
+
+const askUserQuestionItemSchema = z.strictObject({
+	question: nonEmpty,
+	header: nonEmpty.max(ASK_USER_QUESTION_LIMITS.maxHeaderLength).optional(),
+	options: z
+		.array(askUserQuestionOptionSchema)
+		.min(ASK_USER_QUESTION_LIMITS.minOptions)
+		.max(ASK_USER_QUESTION_LIMITS.maxOptions)
+		.refine(
+			(options) =>
+				new Set(options.map((option) => option.label.toLowerCase())).size ===
+				options.length,
+			{ message: 'Option labels must be distinct.' },
+		),
+	multiSelect: z.boolean().optional(),
+});
+
+const askUserQuestionSchema = z.strictObject({
+	questions: z
+		.array(askUserQuestionItemSchema)
+		.min(1)
+		.max(ASK_USER_QUESTION_LIMITS.maxQuestions)
+		.refine(
+			(questions) =>
+				new Set(questions.map((item) => item.question.toLowerCase())).size ===
+				questions.length,
+			{ message: 'Questions must be distinct.' },
+		)
+		.refine(
+			(questions) => {
+				const headers = questions
+					.map((item) => item.header?.toLowerCase())
+					.filter((header) => header !== undefined);
+				return new Set(headers).size === headers.length;
+			},
+			{ message: 'Headers must be distinct; they label the question pager.' },
+		),
+});
+
 const emptySchema = z.strictObject({});
 
 /** Per-operation argument validators, keyed by {@link AgentControlOp}. */
@@ -145,7 +202,35 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	listModels: emptySchema,
 	waitForAgents: waitForAgentsSchema,
 	notifyOrchestrator: notifyOrchestratorSchema,
+	askUserQuestion: askUserQuestionSchema,
 } satisfies Record<AgentControlOp, z.ZodType>;
+
+const askUserQuestionAnswerSchema = z.strictObject({
+	questionIndex: z.number().int().min(0),
+	question: nonEmpty,
+	kind: z.enum(['option', 'custom', 'multi']),
+	answer: z.string().nullable(),
+	selected: z.array(z.string()).optional(),
+});
+
+const askUserQuestionReplySchema = z.strictObject({
+	requestId: nonEmpty,
+	answers: z.array(askUserQuestionAnswerSchema),
+	cancelled: z.boolean(),
+});
+
+/**
+ * Validates a renderer-supplied answer to a pending questionnaire before it
+ * settles an agent's blocked control call.
+ * @param raw - Untrusted reply payload from the renderer.
+ * @returns The parsed reply, or null when the payload is malformed.
+ */
+export function parseAskUserQuestionReply(
+	raw: unknown,
+): AskUserQuestionReply | null {
+	const parsed = askUserQuestionReplySchema.safeParse(raw);
+	return parsed.success ? parsed.data : null;
+}
 
 /** Parsed argument type for a given operation, inferred from its schema. */
 export type ArgsForOp<Op extends AgentControlOp> = z.infer<

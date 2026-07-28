@@ -1,5 +1,7 @@
 import { type IpcRendererEvent, ipcRenderer, webUtils } from 'electron';
 import type {
+	AskUserQuestionBroadcast,
+	AskUserQuestionClosedBroadcast,
 	BoardStatusBroadcast,
 	FocusViewBroadcast,
 	TabsChangedBroadcast,
@@ -30,6 +32,8 @@ type InvokeKey = Exclude<
 	| 'onConfigChanged'
 	| 'onCloneGithubRepositoryProgress'
 	| 'onCloseActiveTabRequest'
+	| 'onAskUserQuestion'
+	| 'onAskUserQuestionClosed'
 	| 'onPiRawFrame'
 	| 'onPiSessionEvent'
 	| 'onTerminalLifecycle'
@@ -42,6 +46,7 @@ type InvokeKey = Exclude<
  * from the method name (most match 1:1 against {@link IPC_CHANNELS}).
  */
 const CHANNEL_OVERRIDES = {
+	answerUserQuestion: IPC_CHANNELS.agentControlAnswerUserQuestion,
 	prepareCloneGithubRepository: IPC_CHANNELS.cloneGithubRepositoryPrepare,
 	reportBoardStatus: IPC_CHANNELS.agentControlReportBoardStatus,
 	resolveSettings: IPC_CHANNELS.settingsResolution,
@@ -208,6 +213,17 @@ export function createEnsemblrApi(): EnsemblrApi {
 				IPC_CHANNELS.agentControlBoardStatus,
 				listener,
 			),
+		onAskUserQuestion: (listener) =>
+			subscribe<AskUserQuestionBroadcast>(
+				IPC_CHANNELS.agentControlAskUserQuestion,
+				listener,
+			),
+		onAskUserQuestionClosed: (listener) =>
+			subscribe<AskUserQuestionClosedBroadcast>(
+				IPC_CHANNELS.agentControlAskUserQuestionClosed,
+				listener,
+			),
+		answerUserQuestion: (reply) => invoke('answerUserQuestion', reply),
 		reportBoardStatus: (statusByWorkspaceId) =>
 			invoke('reportBoardStatus', statusByWorkspaceId),
 		onPiRawFrame: (listener) =>

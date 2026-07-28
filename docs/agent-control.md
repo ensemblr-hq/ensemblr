@@ -68,6 +68,18 @@ the exact argument shapes):
   panel forward; list workspaces, tabs, terminals, and models; read a
   conversation's status or last message.
 - **Board** — move the workspace across the dashboard board and read its status.
+- **Ask the user** — put a multiple-choice question to the human and block until
+  they answer. Pi-only: the questionnaire renders in the chat tab that asked, in
+  place of the composer, so the answer lands where the question came from. A
+  harness caller has no such tab and is refused with `denied-scope`.
+
+  One questionnaire per session at a time: a second call while one is on screen
+  comes straight back unanswered rather than replacing it. A questionnaire left
+  alone for 30 minutes is withdrawn and the call released. Each of those, plus
+  the no-window case, resolves with a `summary` that tells the agent it was not
+  a decline, so it can retry rather than act on a refusal that never happened.
+  Main renders that `summary` from the answers it validated — the renderer never
+  supplies prose.
 
 ## Orchestration in practice
 

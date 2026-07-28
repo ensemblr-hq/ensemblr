@@ -3,6 +3,7 @@
  * argument/result types, and the argument validators from here rather than the
  * `agent-control/` implementation files.
  */
+export { buildAskUserQuestionResult } from './agent-control/ask-user-question.ts';
 export {
 	ORCHESTRATOR_AWARENESS,
 	roleForDepth,

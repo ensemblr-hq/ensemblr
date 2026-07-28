@@ -82,6 +82,7 @@ const makePorts = (statuses: Map<string, string>): AgentControlPorts => ({
 	},
 	permissions: { getMode: () => 'workspace-trusted' },
 	confirm: { confirm: vi.fn().mockResolvedValue(true) },
+	ask: { ask: vi.fn(), releaseSession: vi.fn() },
 });
 
 /**

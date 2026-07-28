@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 
 import { useConfigReloadSync } from '@/renderer/hooks/use-config-reload-sync';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { useAskUserQuestionSync } from '@/renderer/state/ask-user-question';
 import { CloseActionProvider } from '@/renderer/state/close-action';
 import {
 	toolCallCollapseAtom,
@@ -18,6 +19,7 @@ export function App() {
 	useAppearanceEffect();
 	useAppSettingsSync();
 	useConfigReloadSync();
+	useAskUserQuestionSync();
 
 	// App-wide toggle for the tool-call expand/collapse default (⌃O / Ctrl+O).
 	const setToolCallCollapse = useSetAtom(toolCallCollapseAtom);

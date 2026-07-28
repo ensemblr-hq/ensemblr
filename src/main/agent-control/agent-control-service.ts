@@ -9,6 +9,7 @@ import type {
 	AgentControlErrorCode,
 	AgentControlOp,
 	AgentControlResult,
+	AskUserQuestionArgs,
 	CloseTabArgs,
 	ConversationRef,
 	FocusDockTabArgs,
@@ -564,6 +565,27 @@ export function createAgentControlService({
 		}
 	};
 
+	/**
+	 * Puts a questionnaire to the human. Restricted to Pi callers: the dialog is
+	 * rendered inside the chat tab bound to the asking Pi session, and a harness
+	 * has no such tab to host it.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The validated questionnaire.
+	 * @returns The user's answers, or a scope failure for non-Pi callers.
+	 */
+	const handleAskUserQuestion = async (
+		origin: AgentControlOrigin,
+		args: AskUserQuestionArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		if (origin.species !== 'pi') {
+			return fail(
+				'denied-scope',
+				'Asking the user is limited to native Pi conversations.',
+			);
+		}
+		return ok(await ports.ask.ask({ origin, questions: args.questions }));
+	};
+
 	const dispatch = async (
 		op: AgentControlOp,
 		origin: AgentControlOrigin,
@@ -651,6 +673,8 @@ export function createAgentControlService({
 				return handleWaitForAgents(origin, args as WaitForAgentsArgs);
 			case 'notifyOrchestrator':
 				return handleNotifyOrchestrator(origin, args as NotifyOrchestratorArgs);
+			case 'askUserQuestion':
+				return handleAskUserQuestion(origin, args as AskUserQuestionArgs);
 			default:
 				return fail('invalid-args', `Unsupported operation: ${String(op)}.`);
 		}
@@ -685,6 +709,7 @@ export function createAgentControlService({
 	};
 
 	const releaseSession = (sessionId: string): void => {
+		ports.ask.releaseSession(sessionId);
 		signalsByChild.delete(sessionId);
 		guardrails.release(sessionId);
 		originRegistry.release(sessionId);

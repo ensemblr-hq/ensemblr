@@ -56,6 +56,7 @@ const makeDeps = (): PortAdapterDeps => {
 		augmentHarnessCommand: (command: string) => command,
 		broadcastFocus: vi.fn(),
 		broadcastTabsChanged: vi.fn(),
+		ask: { ask: vi.fn(), releaseSession: vi.fn() },
 		confirm: { confirm: vi.fn() },
 	} as unknown as PortAdapterDeps;
 };
@@ -146,6 +147,7 @@ describe('startConversation rollback on submit failure', () => {
 			augmentHarnessCommand: (command: string) => command,
 			broadcastFocus: vi.fn(),
 			broadcastTabsChanged: vi.fn(),
+			ask: { ask: vi.fn(), releaseSession: vi.fn() },
 			confirm: { confirm: vi.fn() },
 		} as unknown as PortAdapterDeps;
 		return { deps, stopSession, closeTab, openTab };

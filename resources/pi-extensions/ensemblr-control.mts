@@ -33,6 +33,7 @@ What you can drive:
 - Terminals: start/stop the setup or run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`).
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
+- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
 
 Name your own conversation tab early with a short, descriptive title via \`ensemblr_set_name\` so it is easy to identify at a glance.
 
@@ -65,6 +66,7 @@ What you can drive:
 - Terminals: start/stop the setup or run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`).
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
+- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
 
 Name your own conversation tab early with a short, descriptive title via \`ensemblr_set_name\` so it is easy to identify at a glance.
 
@@ -429,6 +431,46 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 				Type.Literal('done'),
 			]),
 			message: Type.String(),
+		}),
+	);
+	tool(
+		'ensemblr_ask_user_question',
+		'askUserQuestion',
+		"Ask the human a multiple-choice question and block until they answer. Use this whenever a decision is genuinely the user's to make — ambiguous requirements, a fork in the approach, a destructive step, or missing context you cannot infer — instead of guessing or stopping to ask in prose. Every question needs 2-6 concrete options; the user can also type a free-text answer or dismiss the dialog. Ask up to 4 related questions at once rather than calling this repeatedly. Do not use it for questions you can answer by reading the codebase.",
+		Type.Object({
+			questions: Type.Array(
+				Type.Object({
+					question: Type.String({
+						description: 'The full question, phrased for a human.',
+					}),
+					header: Type.Optional(
+						Type.String({
+							description:
+								'Short pager label, 16 characters or fewer, distinct from the other questions’ headers.',
+						}),
+					),
+					options: Type.Array(
+						Type.Object({
+							label: Type.String({
+								description:
+									'Short, concrete choice — a few words, 80 characters at most, distinct within the question. Do not use "Other" or "Next": the dialog always offers a free-text row of its own, and those labels are rejected.',
+							}),
+							description: Type.Optional(
+								Type.String({
+									description: 'The trade-off this choice implies.',
+								}),
+							),
+						}),
+						{ minItems: 2, maxItems: 6 },
+					),
+					multiSelect: Type.Optional(
+						Type.Boolean({
+							description: 'Let the user pick several options.',
+						}),
+					),
+				}),
+				{ minItems: 1, maxItems: 4 },
+			),
 		}),
 	);
 }

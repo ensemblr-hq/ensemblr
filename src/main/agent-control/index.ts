@@ -4,6 +4,10 @@ export {
 	createAgentControlService,
 } from './agent-control-service.ts';
 export {
+	type AskUserQuestionCoordinator,
+	createAskUserQuestionCoordinator,
+} from './ask-user-question.ts';
+export {
 	type BoardStatusStore,
 	createBoardStatusStore,
 } from './board-status-store.ts';
