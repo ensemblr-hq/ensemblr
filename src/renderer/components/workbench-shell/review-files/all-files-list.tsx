@@ -1,7 +1,11 @@
 import { Icon } from '@iconify/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useAtomValue } from 'jotai';
-import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
+import {
+	ChevronDownIcon,
+	ChevronRightIcon,
+	FolderOpenIcon,
+} from 'lucide-react';
 import {
 	type MouseEvent,
 	memo,
@@ -19,6 +23,7 @@ import {
 	ContextMenuTrigger,
 } from '@/renderer/components/ui/context-menu';
 import { useReviewFilePreviewOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
+import { PanelPlaceholder } from '@/renderer/components/workbench-shell/panel-placeholder';
 import { useFileTreeExpansion } from '@/renderer/hooks/workbench-shell/review-files/use-file-tree-expansion';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
 import { toWorkspaceLookupPath } from '@/renderer/lib/pi';
@@ -64,12 +69,11 @@ export function AllFilesList({
 }) {
 	if (!files.length) {
 		return (
-			<div className='p-2.5'>
-				<p className='rounded-md border border-border bg-pane px-3 py-4 text-muted-foreground text-xs leading-5'>
-					This workspace has no files yet. Files appear here as soon as they are
-					created.
-				</p>
-			</div>
+			<PanelPlaceholder
+				icon={FolderOpenIcon}
+				message='Files appear here as soon as they are created.'
+				title='No files yet'
+			/>
 		);
 	}
 
@@ -98,7 +102,9 @@ function WorkspaceFileTree({
 	workspaceId: string;
 }) {
 	const openFilePreview = useReviewFilePreviewOpener();
-	const { invokeTarget, openTargets } = useOpenTargets({ workspaceId });
+	const { copyTarget, invokeTarget, openInTargets } = useOpenTargets({
+		workspaceId,
+	});
 
 	// Children of ignored directories the main process left collapsed (e.g.
 	// node_modules), fetched one level per expand and merged into the flat list
@@ -241,17 +247,6 @@ function WorkspaceFileTree({
 		[toggleDirectory, loadIgnoredDirectory],
 	);
 
-	// Resolve the open-in targets once for the whole tree instead of filtering
-	// per row on every render.
-	const openInTargets = useMemo(
-		() =>
-			(openTargets ?? []).filter((target) => target.behavior !== 'copy-path'),
-		[openTargets],
-	);
-	const copyTarget = useMemo(
-		() => (openTargets ?? []).find((target) => target.behavior === 'copy-path'),
-		[openTargets],
-	);
 	const hasMenu = openInTargets.length > 0 || Boolean(copyTarget);
 
 	const [menuTarget, setMenuTarget] = useState<FileTreeMenuTarget | null>(null);

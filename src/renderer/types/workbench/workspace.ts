@@ -7,7 +7,10 @@ import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contrac
 import type { RepositoryPreviewUrl } from '@/shared/ipc/contracts/repository-settings';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
-import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
+import type {
+	WorkspaceGitDiffScope,
+	WorkspaceGitFailure,
+} from '@/shared/ipc/contracts/workspace-git';
 import type { GithubRepoRef } from './github';
 
 import type { ProjectShellModel } from './project';
@@ -381,8 +384,12 @@ export interface WorkspaceShellModel {
 		url?: string;
 	};
 	reviewFiles: ReviewFileSummary[];
-	/** Error surfaced when live git status could not be read for the worktree. */
-	reviewFilesError?: string;
+	/**
+	 * Typed failure surfaced when live git status could not be read for the
+	 * worktree. The code drives the panel's explanation; the message carries
+	 * git's own words.
+	 */
+	reviewFilesError?: WorkspaceGitFailure;
 	scripts: {
 		run: WorkspaceScriptSummary;
 		setup: WorkspaceScriptSummary;

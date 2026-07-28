@@ -21,8 +21,13 @@ export function useOpenTargets({
 }: {
 	workspaceId: string;
 }): OpenTargetsState {
-	const { openTargets, primaryTarget, rememberTarget } =
-		useOpenTargetMenu(workspaceId);
+	const {
+		copyTarget,
+		openInTargets,
+		openTargets,
+		primaryTarget,
+		rememberTarget,
+	} = useOpenTargetMenu(workspaceId);
 
 	const invokeTarget = useCallback(
 		async (target: WorkspaceOpenTarget, options?: OpenTargetPathOptions) => {
@@ -59,5 +64,11 @@ export function useOpenTargets({
 		[rememberTarget, workspaceId],
 	);
 
-	return { invokeTarget, openTargets, primaryTarget };
+	return {
+		copyTarget,
+		invokeTarget,
+		openInTargets,
+		openTargets,
+		primaryTarget,
+	};
 }

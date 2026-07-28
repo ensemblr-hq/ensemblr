@@ -47,8 +47,8 @@ const makePorts = (
 			piSessionId: 'pi-1',
 			status: 'idle',
 			runtimeOpen: true,
-			hasFinalMessage: true,
 		}),
+		hasFinalMessage: vi.fn().mockResolvedValue(true),
 		getLastMessage: vi.fn().mockResolvedValue('last'),
 		listModels: vi
 			.fn()

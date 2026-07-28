@@ -262,7 +262,7 @@ export function SessionTabs({
 			<div className='flex h-full min-w-0 flex-1 items-center gap-1.5'>
 				<Reorder.Group
 					axis='x'
-					className='no-scrollbar isolate m-0 flex h-full min-w-0 list-none gap-1.5 overflow-x-auto overflow-y-hidden p-0'
+					className='no-scrollbar isolate m-0 flex h-full min-w-0 list-none overflow-x-auto overflow-y-hidden p-0'
 					onReorder={handleReorder}
 					values={orderedSessionIds}
 				>

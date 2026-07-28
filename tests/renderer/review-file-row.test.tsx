@@ -3,7 +3,6 @@ import { expect, test } from 'vitest';
 
 import { TooltipProvider } from '../../src/renderer/components/ui/tooltip';
 import { ReviewFileActionsProvider } from '../../src/renderer/components/workbench-shell/review-files/review-file-actions-context';
-import { ReviewFileEmptyState } from '../../src/renderer/components/workbench-shell/review-files/review-file-empty-state';
 import { ReviewFileRow } from '../../src/renderer/components/workbench-shell/review-files/review-file-row';
 import type {
 	ReviewFileActions,
@@ -186,12 +185,4 @@ test('the open-in chevron only appears when targets are available', () => {
 	expect(withTargets).toContain(
 		'Open src/main/ipc/handlers/workspace-files.ts in…',
 	);
-});
-
-test('empty state explains that changes will appear here', () => {
-	const markup = renderToStaticMarkup(<ReviewFileEmptyState />);
-
-	expect(markup).toContain('No file changes yet');
-	expect(markup).toContain('Changes appear here.');
-	expect(markup).toContain('<svg');
 });

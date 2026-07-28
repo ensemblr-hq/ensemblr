@@ -47,13 +47,17 @@ const makePorts = (statuses: Map<string, string>): AgentControlPorts => ({
 		setName: vi.fn().mockResolvedValue(null),
 		waitForIdle: vi.fn().mockResolvedValue('completed'),
 		getStatus: vi.fn<
-			(piSessionId: string) => Promise<AgentControlConversationStatus | null>
+			(
+				piSessionId: string,
+			) => Promise<Omit<
+				AgentControlConversationStatus,
+				'hasFinalMessage'
+			> | null>
 		>(async (piSessionId) => {
 			const status = statuses.get(piSessionId);
-			return status
-				? { piSessionId, status, runtimeOpen: true, hasFinalMessage: false }
-				: null;
+			return status ? { piSessionId, status, runtimeOpen: true } : null;
 		}),
+		hasFinalMessage: vi.fn().mockResolvedValue(false),
 		getLastMessage: vi.fn(async (piSessionId: string) => `msg:${piSessionId}`),
 		listModels: vi.fn().mockResolvedValue({ defaultModelId: null, models: [] }),
 		resolveConversationWorkspace: vi.fn().mockResolvedValue('ws'),

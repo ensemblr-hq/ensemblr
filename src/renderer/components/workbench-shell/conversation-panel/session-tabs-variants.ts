@@ -11,7 +11,7 @@ import { cva } from 'class-variance-authority';
  * indicator would paint over the settling tab.
  */
 const sessionTabVariants = cva(
-	'group/session-tab relative isolate m-0 outline-none! flex h-full min-w-30 max-w-44 flex-none items-center overflow-hidden p-0 text-xs transition-colors',
+	'group/session-tab relative isolate m-0 outline-none! flex h-full min-w-24 max-w-44 flex-none items-center overflow-hidden p-0 text-xs transition-colors',
 	{
 		variants: {
 			isActive: {

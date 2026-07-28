@@ -32,9 +32,13 @@ function settingsHistoryKey(config: SettingsConfigFile): string {
 export function useSettingsFileOpenTargets(
 	config: SettingsConfigFile,
 ): OpenTargetsState {
-	const { openTargets, primaryTarget, rememberTarget } = useOpenTargetMenu(
-		settingsHistoryKey(config),
-	);
+	const {
+		copyTarget,
+		openInTargets,
+		openTargets,
+		primaryTarget,
+		rememberTarget,
+	} = useOpenTargetMenu(settingsHistoryKey(config));
 
 	const scope = config.scope;
 	const repositoryPath = config.scope === 'repo' ? config.repositoryPath : null;
@@ -66,5 +70,11 @@ export function useSettingsFileOpenTargets(
 		[rememberTarget, repositoryPath, scope],
 	);
 
-	return { invokeTarget, openTargets, primaryTarget };
+	return {
+		copyTarget,
+		invokeTarget,
+		openInTargets,
+		openTargets,
+		primaryTarget,
+	};
 }

@@ -281,7 +281,7 @@ export function ReviewPanel({
 					emptyState={emptyState}
 					error={
 						source.kind === 'commit'
-							? sourceStatusData?.error?.message
+							? sourceStatusData?.error
 							: workspace.reviewFilesError
 					}
 					files={sourceFiles}

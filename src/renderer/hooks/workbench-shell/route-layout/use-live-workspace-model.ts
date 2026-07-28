@@ -151,7 +151,7 @@ export function useLiveWorkspaceModel({
 			return {};
 		}
 		if (gitStatusData.error) {
-			return { reviewFilesError: gitStatusData.error.message };
+			return { reviewFilesError: gitStatusData.error };
 		}
 		return {
 			changeSummary: {

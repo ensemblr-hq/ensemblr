@@ -38,6 +38,14 @@ const DEV_NULL = process.platform === 'win32' ? 'NUL' : '/dev/null';
 const COMMIT_LOG_FORMAT = ['%H', '%h', '%an', '%aI', '%ar', '%s']
 	.join('%x1f')
 	.concat('%x1e');
+/**
+ * What git's own exit codes mean, for the rare failure where git exits without
+ * writing anything to stderr and the bare number is all we have to show.
+ */
+const GIT_EXIT_CODE_REASONS: Record<string, string | undefined> = {
+	128: 'git reported a fatal error (exit code 128) — usually a missing repository, an unreadable working tree, or an unknown revision.',
+	129: 'git rejected its own arguments (exit code 129).',
+};
 
 /** Read-only git service exposing status, diff, commit log, and change-discard operations for a workspace. */
 export interface WorkspaceGitService {
@@ -119,9 +127,7 @@ export function createWorkspaceGitService({
 					commits: [],
 					error: {
 						code: classifyGitFailure(result.stderr),
-						message:
-							result.failure?.message ??
-							(result.stderr.trim() || 'git log failed in workspace.'),
+						message: gitFailureMessage(result, 'git log failed in workspace.'),
 					},
 				};
 			}
@@ -234,8 +240,7 @@ export function createWorkspaceGitService({
 		if (statusResult.status !== 'success') {
 			return emptyStatusResult(
 				classifyGitFailure(statusResult.stderr),
-				statusResult.failure?.message ??
-					(statusResult.stderr.trim() || 'git status failed in workspace.'),
+				gitFailureMessage(statusResult, 'git status failed in workspace.'),
 			);
 		}
 
@@ -303,8 +308,7 @@ export function createWorkspaceGitService({
 		if (nameStatusResult.status !== 'success') {
 			return emptyStatusResult(
 				classifyGitFailure(nameStatusResult.stderr),
-				nameStatusResult.failure?.message ??
-					(nameStatusResult.stderr.trim() || 'git diff failed in workspace.'),
+				gitFailureMessage(nameStatusResult, 'git diff failed in workspace.'),
 			);
 		}
 
@@ -383,9 +387,7 @@ export function createWorkspaceGitService({
 		return {
 			error: {
 				code: classifyGitFailure(tracked.stderr),
-				message:
-					tracked.failure?.message ??
-					(tracked.stderr.trim() || 'git diff failed in workspace.'),
+				message: gitFailureMessage(tracked, 'git diff failed in workspace.'),
 			},
 			path: relPath,
 		};
@@ -413,9 +415,7 @@ export function createWorkspaceGitService({
 		return {
 			error: {
 				code: classifyGitFailure(result.stderr),
-				message:
-					result.failure?.message ??
-					(result.stderr.trim() || 'git diff failed in workspace.'),
+				message: gitFailureMessage(result, 'git diff failed in workspace.'),
 			},
 			path: relPath,
 		};
@@ -454,9 +454,7 @@ export function createWorkspaceGitService({
 		return {
 			error: {
 				code: classifyGitFailure(result.stderr),
-				message:
-					result.failure?.message ??
-					(result.stderr.trim() || 'git diff failed in workspace.'),
+				message: gitFailureMessage(result, 'git diff failed in workspace.'),
 			},
 			path: relPath,
 		};
@@ -621,9 +619,7 @@ export function createWorkspaceGitService({
 			return {
 				error: {
 					code: classifyGitFailure(restore.stderr),
-					message:
-						restore.failure?.message ??
-						(restore.stderr.trim() || `Could not restore ${relPath}.`),
+					message: gitFailureMessage(restore, `Could not restore ${relPath}.`),
 				},
 				ok: false,
 			};
@@ -644,9 +640,7 @@ export function createWorkspaceGitService({
 			return {
 				error: {
 					code: classifyGitFailure(unstage.stderr),
-					message:
-						unstage.failure?.message ??
-						(unstage.stderr.trim() || `Could not unstage ${relPath}.`),
+					message: gitFailureMessage(unstage, `Could not unstage ${relPath}.`),
 				},
 				ok: false,
 			};
@@ -701,6 +695,32 @@ function emptyStatusResult(
 		files: [],
 		summary: { additions: 0, deletions: 0, files: 0 },
 	};
+}
+
+/**
+ * Best available reason a git invocation failed. Git puts the real cause on
+ * stderr ("fatal: not a git repository"), while the spawn layer only knows the
+ * exit code, so stderr wins whenever it said anything at all.
+ * @param result - Outcome of the failed git invocation.
+ * @param fallback - Copy to use when git wrote nothing to stderr.
+ * @returns The most specific failure text available.
+ */
+function gitFailureMessage(
+	result: {
+		failure?: { exitCode: number | null; message: string };
+		stderr: string;
+	},
+	fallback: string,
+): string {
+	const stderr = result.stderr.trim();
+	if (stderr) {
+		return stderr;
+	}
+	const failure = result.failure;
+	if (!failure) {
+		return fallback;
+	}
+	return GIT_EXIT_CODE_REASONS[String(failure.exitCode)] ?? failure.message;
 }
 
 /** Distinguishes "not a repo" from generic git failures via stderr. */
