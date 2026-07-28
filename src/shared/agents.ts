@@ -124,10 +124,17 @@ export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 		// Claude records its session id in the transcript filename under
 		// `~/.claude/projects/<cwd-slug>/<session-id>.jsonl`.
 		sessionLogSource: 'claude-transcript',
+		/**
+		 * Launches Claude Code with its permission prompts bypassed
+		 * (code.claude.com/docs/en/permission-modes).
+		 */
 		buildCommand: (bin) => `${bin} --dangerously-skip-permissions`,
-		// code.claude.com/docs/en/cli-reference — `--continue` loads the most
-		// recent conversation for the current directory; `--resume <id>` reattaches
-		// an exact session.
+		/**
+		 * Reattaches a Claude Code conversation. Per
+		 * code.claude.com/docs/en/cli-reference, `--continue` loads the most recent
+		 * conversation for the current directory and `--resume <id>` reattaches an
+		 * exact session.
+		 */
 		buildResumeCommand: (bin, sessionId) =>
 			sessionId
 				? `${bin} --dangerously-skip-permissions --resume ${sessionId}`
@@ -142,10 +149,17 @@ export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 		// rollout log it writes under `~/.codex/sessions/`.
 		conversationTitleSource: 'codex-rollout',
 		sessionLogSource: 'codex-rollout',
+		/**
+		 * Launches Codex with approvals and sandboxing bypassed
+		 * (developers.openai.com/codex/cli/reference).
+		 */
 		buildCommand: (bin) => `${bin} --dangerously-bypass-approvals-and-sandbox`,
-		// developers.openai.com/codex/cli/reference — `resume` is a subcommand:
-		// `--last` skips the picker for the newest session, or a session id (UUID)
-		// reattaches an exact session. The top-level flag precedes the subcommand.
+		/**
+		 * Reattaches a Codex conversation. Per
+		 * developers.openai.com/codex/cli/reference, `resume` is a subcommand:
+		 * `--last` skips the picker for the newest session, or a session id (UUID)
+		 * reattaches an exact session. The top-level flag precedes the subcommand.
+		 */
 		buildResumeCommand: (bin, sessionId) =>
 			sessionId
 				? `${bin} --dangerously-bypass-approvals-and-sandbox resume ${sessionId}`
@@ -162,13 +176,18 @@ export const HARNESS_REGISTRY: readonly HarnessDefinition[] = [
 		conversationTitleSource: 'vibe-log',
 		sessionLogSource: 'vibe-log',
 		busySource: 'pty-spinner',
-		// `--trust` trusts the cwd for this invocation only (not persisted to
-		// trusted_folders.toml) and skips the trust prompt for non-interactive
-		// automation — verified via `vibe --help`.
+		/**
+		 * Launches Vibe under its auto-approve agent. `--trust` trusts the cwd for
+		 * this invocation only (not persisted to trusted_folders.toml) and skips the
+		 * trust prompt for non-interactive automation — verified via `vibe --help`.
+		 */
 		buildCommand: (bin) => `${bin} --agent auto-approve --trust`,
-		// docs.mistral.ai/vibe/code/cli/work-with-cli — `--continue` resumes the
-		// most recent conversation for the directory; `--resume <id>` reattaches an
-		// exact session (needs log_interactions=true, the default).
+		/**
+		 * Reattaches a Vibe conversation. Per
+		 * docs.mistral.ai/vibe/code/cli/work-with-cli, `--continue` resumes the most
+		 * recent conversation for the directory and `--resume <id>` reattaches an
+		 * exact session (needs log_interactions=true, the default).
+		 */
 		buildResumeCommand: (bin, sessionId) =>
 			sessionId
 				? `${bin} --agent auto-approve --trust --resume ${sessionId}`

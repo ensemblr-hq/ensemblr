@@ -102,7 +102,9 @@ const WAIT_POLL_MS = 250;
 
 /** Default real-clock scheduler for the wait loop. */
 const REAL_SCHEDULER: WaitScheduler = {
+	/** Reads the wall clock the wait loop measures its deadline against. */
 	now: () => Date.now(),
+	/** Suspends the wait loop for one poll interval. */
 	sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 };
 

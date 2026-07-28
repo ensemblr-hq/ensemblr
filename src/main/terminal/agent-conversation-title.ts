@@ -17,7 +17,7 @@ import { createInterface } from 'node:readline';
 import type {
 	ConversationTitleSource,
 	SessionLogSource,
-} from '../../shared/agents/harness-registry.ts';
+} from '../../shared/agents.ts';
 
 /** Title and native session id derived from a harness's on-disk session log. */
 export interface AgentConversationInfo {

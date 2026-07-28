@@ -4,8 +4,8 @@ import type {
 } from '@/renderer/types/workbench';
 import type { TerminalSessionSnapshot } from '@/shared/ipc/contracts/terminal';
 import type { WorkspaceScriptKind } from '@/shared/ipc/contracts/workspace-scripts';
-import type { WorkspaceScriptSettings } from '@/shared/scripts/script-settings';
-import { extractPreviewPort } from '@/shared/terminal/detect-preview-url';
+import type { WorkspaceScriptSettings } from '@/shared/scripts';
+import { extractPreviewPort } from '@/shared/terminal';
 
 /**
  * Pure helpers that fold resolved repository script settings and live terminal

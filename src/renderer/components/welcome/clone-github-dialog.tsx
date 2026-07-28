@@ -18,8 +18,7 @@ import { Label } from '@/renderer/components/ui/label';
 import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
 import { useCloneFlow } from '@/renderer/hooks/welcome/use-clone-flow';
 import { useCloneRepoSearch } from '@/renderer/hooks/welcome/use-clone-repo-search';
-import { joinDestination } from '@/renderer/lib/welcome/clone-destination';
-import { isUrlLikeInput } from '@/renderer/lib/welcome/github-repo-search';
+import { isUrlLikeInput, joinDestination } from '@/renderer/lib/welcome';
 import type { KeymapBinding } from '@/renderer/types/keymap';
 import type { CloneStage } from '@/renderer/types/welcome';
 

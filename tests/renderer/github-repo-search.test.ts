@@ -7,7 +7,7 @@ import {
 	filterGithubRepositories,
 	isUrlLikeInput,
 	nextHighlightIndex,
-} from '../../src/renderer/lib/welcome/github-repo-search.ts';
+} from '../../src/renderer/lib/welcome';
 import type {
 	GithubRepositoryEntry,
 	GithubRepositoryListResult,

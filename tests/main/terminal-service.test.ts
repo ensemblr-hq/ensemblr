@@ -27,7 +27,7 @@ import {
 import { createScrollbackBuffer } from '../../src/main/terminal/terminal-scrollback.ts';
 import { createTerminalService } from '../../src/main/terminal/terminal-service.ts';
 import { resolveUserShell } from '../../src/main/terminal/user-shell.ts';
-import type { SessionLogSource } from '../../src/shared/agents/harness-registry.ts';
+import type { SessionLogSource } from '../../src/shared/agents.ts';
 import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,

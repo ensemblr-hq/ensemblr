@@ -1,12 +1,12 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { ipcMain } from 'electron';
-import { findHarnessDefinition } from '../../../shared/agents/harness-registry.ts';
+import { findHarnessDefinition } from '../../../shared/agents.ts';
 import { IPC_CHANNELS } from '../../../shared/ipc/channels';
 import type {
 	LaunchAgentHarnessResult,
 	ListAgentHarnessesResult,
 } from '../../../shared/ipc/contracts/agents';
-import type { HarnessDetectionService } from '../../agents/harness-detection-service.ts';
+import type { HarnessDetectionService } from '../../agents/index.ts';
 import type { EnsemblrDatabaseService } from '../../storage';
 import {
 	getChatTabById,

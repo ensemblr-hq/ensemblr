@@ -6,6 +6,7 @@ import {
 	ResizablePanelGroup,
 } from '@/renderer/components/ui/resizable';
 import { SidebarInset } from '@/renderer/components/ui/sidebar';
+import { SHELL_INSET_CLASS } from '@/renderer/lib/workbench/shell-inset';
 import type {
 	DockTabId,
 	ProjectShellModel,
@@ -17,7 +18,6 @@ import { DockPanel } from './dock-panel/dock-panel';
 import { ReviewPanel } from './review-panel';
 import { RightSidebarHeader } from './right-sidebar-header/right-sidebar-header';
 import { useWorkbenchLayout } from './shell-contexts';
-import { SHELL_INSET_CLASS } from './shell-inset';
 import { WorkbenchHeader } from './workbench-header';
 
 /** Top-level resizable layout housing the main workspace and the review dock. */

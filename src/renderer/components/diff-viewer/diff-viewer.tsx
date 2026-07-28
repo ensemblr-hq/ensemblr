@@ -15,6 +15,12 @@ import 'react-diff-view/style/index.css';
 import type { BundledLanguage } from 'shiki';
 
 import { CodeBlockContent } from '@/renderer/components/code-block';
+import {
+	newLineNumberOf,
+	oldLineNumberOf,
+	parseSingleFileDiff,
+	reconstructOldSource,
+} from '@/renderer/lib/diff/parse';
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
 import { cn } from '@/renderer/lib/utils';
 import {
@@ -22,23 +28,15 @@ import {
 	diffShowWhitespaceAtom,
 	diffWordWrapAtom,
 } from '@/renderer/state/preferences';
-import { type DiffComment, DiffCommentThread } from './diff-comment-thread';
+import type { DiffComment, DiffViewMode } from '@/renderer/types/diff';
+import { DiffCommentThread } from './diff-comment-thread';
 import { DiffToolbar } from './diff-toolbar';
-import {
-	newLineNumberOf,
-	oldLineNumberOf,
-	parseSingleFileDiff,
-	reconstructOldSource,
-} from './parse';
 import { renderDiffToken, useDiffTokens } from './shiki-tokenize';
 
 const EMPTY_HUNKS: HunkData[] = [];
 
-/** Whether the viewer shows only the diff hunks or the whole expanded file. */
-export type DiffViewMode = 'diff' | 'file';
-
 /** Details of the line a new comment is being added to. */
-export interface AddCommentInput {
+interface AddCommentInput {
 	body: string;
 	changeKey: string;
 	lineNumber: number | null;

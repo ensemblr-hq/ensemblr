@@ -11,12 +11,12 @@ import {
 
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
+import { getProviderLabel } from '@/renderer/lib/workbench/provider-label';
 import type {
 	PullRequestCheckStatus,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
-import { getProviderLabel } from './provider-label';
 import { ProviderMark } from './provider-mark';
 
 /** Row showing the PR's current git status with optional action button. */

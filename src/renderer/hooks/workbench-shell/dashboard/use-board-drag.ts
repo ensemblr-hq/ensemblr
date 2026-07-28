@@ -1,22 +1,12 @@
 import { monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
-import {
-	type Edge,
-	extractClosestEdge,
-} from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+import { extractClosestEdge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
 import { useEffect } from 'react';
 
 import {
 	BOARD_STATUS_ORDER,
 	type WorkspaceBoardStatus,
 } from '@/renderer/state/workspace';
-
-/** A resolved board drop: the moved card and where it landed. */
-export interface BoardDrop {
-	edge: Edge | null;
-	sourceId: string;
-	targetCardId: string | null;
-	targetColumnStatus: WorkspaceBoardStatus | null;
-}
+import type { BoardDrop } from '@/renderer/types/workbench-shell';
 
 /** Drag-and-drop payload carried on a source or drop target. */
 type DragData = Record<string | symbol, unknown>;

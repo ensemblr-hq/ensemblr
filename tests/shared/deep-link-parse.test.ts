@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { isAllowedExternalUrl, parseDeepLink } from '@/shared/deep-link/parse';
+import { isAllowedExternalUrl, parseDeepLink } from '@/shared/deep-link';
 
 describe('parseDeepLink', () => {
 	test('parses workbench root', () => {

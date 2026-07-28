@@ -9,11 +9,11 @@ import {
 	mergePullRequest,
 	refreshPullRequestSnapshot,
 } from '@/renderer/api/ensemblr-queries';
+import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
 import {
 	ReviewActionError,
 	showReviewActionError,
-} from '@/renderer/components/workbench-shell/review-actions/review-action-error';
-import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
+} from '@/renderer/lib/workbench/review-action-error';
 import { continuedMergedPullRequestByWorkspaceAtom } from '@/renderer/state/workspace';
 import type { ReviewMergeSettings } from '@/renderer/types/settings';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';

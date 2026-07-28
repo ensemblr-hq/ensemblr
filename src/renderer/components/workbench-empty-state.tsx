@@ -1,11 +1,11 @@
 import { SidebarInset, SidebarTrigger } from '@/renderer/components/ui/sidebar';
 import { WorkbenchFrame } from '@/renderer/components/workbench-shell/frame';
 import { NavigationProvider } from '@/renderer/components/workbench-shell/shell-contexts';
+import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import {
 	SHELL_FLOATING_TRIGGER_CLASS,
 	SHELL_INSET_CLASS,
-} from '@/renderer/components/workbench-shell/shell-inset';
-import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
+} from '@/renderer/lib/workbench/shell-inset';
 import type { NavigationContextValue } from '@/renderer/types/contexts';
 import type {
 	ProjectShellModel,

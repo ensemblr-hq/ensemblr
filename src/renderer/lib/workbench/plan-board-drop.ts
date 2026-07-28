@@ -2,7 +2,7 @@ import {
 	resolveBoardStatus,
 	type WorkspaceBoardStatus,
 } from '@/renderer/state/workspace';
-import type { BoardDrop } from './use-board-drag';
+import type { BoardDrop } from '@/renderer/types/workbench-shell';
 
 /**
  * The mutation a resolved drop commits: the moved workspace, its new status,

@@ -8,10 +8,10 @@ import {
 } from '@/renderer/api/ensemblr';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { useWorkbenchLayoutRouteModel } from '@/renderer/components/workbench-shell/shell-contexts';
+import { bucketForDate } from '@/renderer/lib/workbench/relative-time';
 import type { WorkspaceHistoryEntry } from '@/shared/ipc/contracts/workspace';
 
 import { HistoryGroup } from './history-group';
-import { bucketForDate } from './relative-time';
 
 /** A relative-time group of workspace history entries under one bucket label. */
 interface HistoryGroupModel {

@@ -10,12 +10,10 @@ import {
 } from 'react-diff-view';
 import type { BundledLanguage, BundledTheme, ThemedToken } from 'shiki';
 
-import {
-	highlightCode,
-	type TokenizedCode,
-} from '@/renderer/components/code-block';
+import { highlightCode } from '@/renderer/components/code-block';
+import { reconstructSideSources } from '@/renderer/lib/diff/parse';
 import { codeThemeAtom } from '@/renderer/state/preferences';
-import { reconstructSideSources } from './parse';
+import type { TokenizedCode } from '@/renderer/types/code';
 
 // Shiki font-style bitflags: 1=italic, 2=bold, 4=underline.
 const ITALIC_BIT = 1;

@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 
-import { getRightSidebarHeaderState } from '../../src/renderer/components/workbench-shell/right-sidebar-header/state';
 import { getDefaultWorkspace } from '../../src/renderer/fixtures/workbench';
+import { getRightSidebarHeaderState } from '../../src/renderer/lib/workbench/right-sidebar-header-state';
 import type { WorkspaceShellModel } from '../../src/renderer/types/workbench';
 
 /** A no-PR workspace with the given uncommitted working-tree file count. */

@@ -7,7 +7,7 @@ import type { WorkspaceScriptKind } from '../../shared/ipc/contracts/workspace-s
 import {
 	parseWorkspaceScriptSettings,
 	type WorkspaceScriptSettings,
-} from '../../shared/scripts/script-settings.ts';
+} from '../../shared/scripts.ts';
 import type { EnsemblrConfigResolutionService } from '../config';
 import { isRecord, isString } from '../repository/row-guards.ts';
 import type { EnsemblrDatabaseService } from '../storage';

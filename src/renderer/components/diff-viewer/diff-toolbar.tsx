@@ -20,7 +20,7 @@ import {
 	diffShowWhitespaceAtom,
 	diffWordWrapAtom,
 } from '@/renderer/state/preferences';
-import type { DiffViewMode } from './diff-viewer';
+import type { DiffViewMode } from '@/renderer/types/diff';
 
 /**
  * Toolbar of diff-viewer toggles: a Diff/File segmented switch plus unified ↔

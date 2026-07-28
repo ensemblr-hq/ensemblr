@@ -49,17 +49,17 @@ import {
 	harnessIconClassName,
 	harnessIconName,
 } from '@/renderer/lib/workbench';
+import {
+	sessionTabCloseFadeVariants,
+	sessionTabIndicatorVariants,
+	sessionTabVariants,
+} from '@/renderer/lib/workbench/session-tabs-variants';
 import { useRequestComposerFocus } from '@/renderer/state/composer';
 import { useDebugPanelToggle } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { shouldSelectOnTabClick } from '@/renderer/state/workspace';
 import type { SessionTabModel } from '@/renderer/types/workbench';
 import { formatShortcut } from '@/shared/keymap';
-import {
-	sessionTabCloseFadeVariants,
-	sessionTabIndicatorVariants,
-	sessionTabVariants,
-} from './session-tabs-variants';
 
 /** Display label for the coding-agent launcher shortcut, e.g. `⌘⇧A`. */
 const AGENTS_SHORTCUT_HINT = formatShortcut('agents.open');

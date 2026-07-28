@@ -39,6 +39,7 @@ import {
 	looksLikeStackTrace,
 	turnMetadataOf,
 } from '@/renderer/lib/pi';
+import { resolveLiveTurnStartMs } from '@/renderer/lib/workbench/timeline-timing';
 import {
 	type OptimisticPrompt,
 	useOptimisticPrompts,
@@ -50,7 +51,6 @@ import type {
 } from '@/renderer/types/workbench';
 import { useTurnDiffOpener } from '../file-preview-context';
 import { RestoreCheckpointDialog } from './restore-checkpoint-dialog';
-import { resolveLiveTurnStartMs } from './timeline-timing';
 
 /**
  * Structured renderer for the Pi RPC event stream. Reads persisted events

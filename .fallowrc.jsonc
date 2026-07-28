@@ -29,6 +29,15 @@
 		"src/shared/ipc/index.ts",
 		"src/shared/pi-rpc/index.ts",
 		"src/shared/keymap/index.ts",
+		// Root-file form of the same rule, for the multi-file concerns that
+		// aggregate their `<concern>/` implementation dir behind `<concern>.ts`.
+		// That form is the one `src/shared/AGENTS.md` names first and the one the
+		// Node ESM loader can resolve from `electron --test` (a bare directory
+		// specifier cannot be). Single-file concerns are NOT listed here: they
+		// are plain modules reached through normal imports, so a real unused
+		// export in one should still surface.
+		"src/shared/scripts.ts",
+		"src/shared/terminal.ts",
 		"src/renderer/state/*/index.ts",
 		"src/renderer/lib/*/index.ts",
 		"src/renderer/types/*/index.ts",

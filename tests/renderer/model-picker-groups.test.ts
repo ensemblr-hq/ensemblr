@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { buildModelGroups } from '../../src/renderer/components/workbench-shell/conversation-panel/composer/model-picker-groups';
+import { buildModelGroups } from '../../src/renderer/lib/workbench/model-picker-groups';
 import type { ComposerModelOption } from '../../src/renderer/types/workbench';
 
 function model(id: string, provider: string): ComposerModelOption {

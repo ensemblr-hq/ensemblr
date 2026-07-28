@@ -48,13 +48,20 @@ interface ParsedStackTrace {
 	raw: string;
 }
 
+/** Opens the source location a stack frame points at. */
+type FilePathClickHandler = (
+	filePath: string,
+	line?: number,
+	column?: number,
+) => void;
+
 /** Context shared by the {@link StackTrace} compound components. */
 interface StackTraceContextValue {
 	trace: ParsedStackTrace;
 	raw: string;
 	isOpen: boolean;
 	setIsOpen: (open: boolean) => void;
-	onFilePathClick?: (filePath: string, line?: number, column?: number) => void;
+	onFilePathClick?: FilePathClickHandler;
 }
 
 const StackTraceContext = createContext<StackTraceContextValue | null>(null);
@@ -177,7 +184,7 @@ type StackTraceProps = ComponentProps<'div'> & {
 	open?: boolean;
 	defaultOpen?: boolean;
 	onOpenChange?: (open: boolean) => void;
-	onFilePathClick?: (filePath: string, line?: number, column?: number) => void;
+	onFilePathClick?: FilePathClickHandler;
 };
 
 /** Root of the stack-trace compound component: parses the trace and provides collapsible context to its parts. */
@@ -456,19 +463,15 @@ type StackTraceFramesProps = ComponentProps<'div'> & {
 	showInternalFrames?: boolean;
 };
 
-/** Props for the clickable file-path button in a stack frame. */
-interface FilePathButtonProps {
-	frame: StackFrame;
-	onFilePathClick?: (
-		filePath: string,
-		lineNumber?: number,
-		columnNumber?: number,
-	) => void;
-}
-
 /** Clickable file path that opens the frame's source location when clicked. */
 const FilePathButton = memo(
-	({ frame, onFilePathClick }: FilePathButtonProps) => {
+	({
+		frame,
+		onFilePathClick,
+	}: {
+		frame: StackFrame;
+		onFilePathClick?: FilePathClickHandler;
+	}) => {
 		const handleClick = useCallback(() => {
 			if (frame.filePath) {
 				onFilePathClick?.(

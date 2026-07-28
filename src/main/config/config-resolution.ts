@@ -2,10 +2,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
-import type {
-	ExperimentalSettings,
-	GitSettings,
-} from '../../shared/config/app-settings.ts';
+import type { ExperimentalSettings, GitSettings } from '../../shared/config.ts';
 import type {
 	RepositorySettingsResolutionRequest,
 	ResolvedSettingSnapshot,
@@ -753,6 +750,12 @@ function isEmptyRecord(record: Record<string, unknown>): boolean {
 	return Object.keys(record).length === 0;
 }
 
+/**
+ * Maps user-scope git defaults (`app.git` in config.json) onto repository
+ * resolution keys, contributing them as `user-default` values.
+ * @param git - User git defaults, when available.
+ * @returns Flat map of repo `key -> value`.
+ */
 function collectUserGitDefaultCandidates(
 	git?: GitSettings,
 ): Map<string, unknown> {

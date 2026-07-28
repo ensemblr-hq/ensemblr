@@ -13,7 +13,7 @@ import {
 	DEFAULT_APP_SETTINGS,
 	mergeAppSettings,
 	parseAppSettings,
-} from '../../shared/config/app-settings.ts';
+} from '../../shared/config.ts';
 import { resolveEnsemblrConfigPath } from './config-loader.ts';
 import { watchConfigFile } from './watch-config-file.ts';
 

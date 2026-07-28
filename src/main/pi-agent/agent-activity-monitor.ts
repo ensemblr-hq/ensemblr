@@ -1,4 +1,4 @@
-import type { AppSettings } from '../../shared/config/app-settings.ts';
+import type { AppSettings } from '../../shared/config.ts';
 import type { PiSessionEventWire } from '../../shared/ipc/contracts/pi-session.ts';
 
 /** One persisted Pi event plus the session it belongs to. */

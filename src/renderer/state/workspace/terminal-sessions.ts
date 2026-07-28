@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { TerminalInputEventDetail } from '@/renderer/lib/terminal/terminal-tabs';
 import {
 	reduceTerminalInputActivity,
 	subscribeTerminalInput,
 	upsertTerminalSession,
-} from '@/renderer/lib/terminal/terminal-tabs';
+} from '@/renderer/lib/terminal';
+import type { TerminalInputEventDetail } from '@/renderer/types/terminal';
 import type {
 	CreateTerminalSessionResult,
 	TerminalSessionSnapshot,

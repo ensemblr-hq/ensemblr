@@ -16,7 +16,7 @@ import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
 import type {
 	ExperimentalSettings,
 	GitSettings,
-} from '../../src/shared/config/app-settings.ts';
+} from '../../src/shared/config.ts';
 import type { SettingsResolutionGroupSnapshot } from '../../src/shared/ipc/index.ts';
 
 let settingCounter = 0;

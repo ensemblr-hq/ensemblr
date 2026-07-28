@@ -18,7 +18,7 @@ import {
 	ContextMenuSubTrigger,
 } from '@/renderer/components/ui/context-menu';
 import { SidebarContextMenuItem } from '@/renderer/components/workbench-shell/sidebar-context-menu-item';
-import { BOARD_STATUS_PRESENTATION } from '@/renderer/components/workbench-shell/workspace-status/board-status-presentation';
+import { BOARD_STATUS_PRESENTATION } from '@/renderer/lib/workbench/board-status-presentation';
 import {
 	BOARD_STATUS_ORDER,
 	useWorkspaceBoardActions,

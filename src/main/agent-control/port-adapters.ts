@@ -15,13 +15,13 @@ import type {
 	FocusViewBroadcast,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control.ts';
-import { findHarnessDefinition } from '../../shared/agents/harness-registry.ts';
+import { findHarnessDefinition } from '../../shared/agents.ts';
 import type {
 	PiPersistedEnvelope,
 	PiWireMessagePayload,
 } from '../../shared/ipc/contracts/pi-session';
 import type { PermissionMode } from '../../shared/permissions.ts';
-import type { HarnessDetectionService } from '../agents/harness-detection-service.ts';
+import type { HarnessDetectionService } from '../agents/index.ts';
 import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
 import type { LocalCommandService } from '../commands';
 import type { PiSessionService } from '../pi-agent/pi-session-service.ts';

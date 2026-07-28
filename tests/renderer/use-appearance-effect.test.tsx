@@ -10,7 +10,7 @@ import {
 import {
 	type AppearanceSettings,
 	DEFAULT_APP_SETTINGS,
-} from '../../src/shared/config/app-settings';
+} from '../../src/shared/config';
 
 /** Mounts the effect under a store seeded with the given appearance overrides. */
 function renderWithAppearance(appearance: Partial<AppearanceSettings>) {

@@ -17,7 +17,7 @@ import {
 	renameWorkspaceOnBranchAtom,
 	setUpstreamOnPushAtom,
 } from '@/renderer/state/preferences';
-import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
+import { DEFAULT_APP_SETTINGS } from '@/shared/config';
 
 /** Route for the Git settings section; renders the git-settings panel. */
 export const Route = createFileRoute('/_workbench/settings/git')({

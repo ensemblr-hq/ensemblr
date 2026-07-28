@@ -5,10 +5,10 @@ import { toast } from 'sonner';
 import { ChatMessageText } from '@/renderer/components/chat-message-text';
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
+import { getProviderLabel } from '@/renderer/lib/workbench/provider-label';
 import { formatCommentContext } from '@/renderer/lib/workbench/review-context';
 import { useComposerInsert } from '@/renderer/state/composer';
 import type { CommentPreviewPayload } from '@/renderer/types/workbench';
-import { getProviderLabel } from '../checks-panel/provider-label';
 import { ProviderMark } from '../checks-panel/provider-mark';
 
 /**

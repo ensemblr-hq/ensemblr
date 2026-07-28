@@ -20,7 +20,7 @@ import {
 	sendShortcutAtom,
 	toolCallCollapseAtom,
 } from '@/renderer/state/preferences';
-import { DEFAULT_APP_SETTINGS } from '@/shared/config/app-settings';
+import { DEFAULT_APP_SETTINGS } from '@/shared/config';
 import { formatShortcut } from '@/shared/keymap';
 
 /** Route for the General settings section; renders the general-settings panel. */

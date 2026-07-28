@@ -12,6 +12,7 @@ import type {
 import { createHighlighter } from 'shiki';
 import { cn } from '@/renderer/lib/utils';
 import { codeThemeAtom } from '@/renderer/state/preferences';
+import type { TokenizedCode } from '@/renderer/types/code';
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 /**
@@ -122,13 +123,6 @@ type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
 	language: BundledLanguage;
 	showLineNumbers?: boolean;
 };
-
-/** Highlighted code: the themed token grid plus resolved foreground and background colors. */
-export interface TokenizedCode {
-	tokens: ThemedToken[][];
-	fg: string;
-	bg: string;
-}
 
 /** Context value exposing the raw source code to CodeBlock subcomponents. */
 interface CodeBlockContextType {

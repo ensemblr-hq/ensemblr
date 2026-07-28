@@ -7,7 +7,7 @@ import {
 import {
 	type AppSettings,
 	DEFAULT_APP_SETTINGS,
-} from '../../src/shared/config/app-settings';
+} from '../../src/shared/config';
 import type { PiSessionEventWire } from '../../src/shared/ipc/contracts/pi-session';
 
 /** Lets the deferred async battery sample resolve before assertions. */

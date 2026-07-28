@@ -4,7 +4,7 @@ import path from 'node:path';
 import {
 	parseSetupState,
 	type WorkspaceSetupState,
-} from '../../shared/scripts/setup-state.ts';
+} from '../../shared/scripts.ts';
 import { resolveContextPath } from '../config/context-directory.ts';
 import { ENSEMBLR_DIRECTORY } from '../config/repository-config.ts';
 

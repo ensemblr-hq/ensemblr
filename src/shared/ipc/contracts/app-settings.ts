@@ -1,4 +1,4 @@
-import type { AppSettings, AppSettingsPatch } from '../../config/app-settings';
+import type { AppSettings, AppSettingsPatch } from '../../config.ts';
 
 export type { AppSettings, AppSettingsPatch };
 

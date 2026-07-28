@@ -16,7 +16,7 @@ import {
 	deriveRepoSearchView,
 	isUrlLikeInput,
 	nextHighlightIndex,
-} from '@/renderer/lib/welcome/github-repo-search';
+} from '@/renderer/lib/welcome';
 import type { KeymapBinding } from '@/renderer/types/keymap';
 import type { GithubRepositoryEntry } from '@/shared/ipc/contracts/clone';
 

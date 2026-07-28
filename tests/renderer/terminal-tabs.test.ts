@@ -5,7 +5,7 @@ import {
 	reduceTerminalInputActivity,
 	terminalSessionToDockStatus,
 	upsertTerminalSession,
-} from '../../src/renderer/lib/terminal/terminal-tabs';
+} from '../../src/renderer/lib/terminal';
 import type { TerminalSessionSnapshot } from '../../src/shared/ipc';
 
 function createSession(
