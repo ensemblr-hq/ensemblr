@@ -18,6 +18,10 @@ export const IPC_CHANNELS = {
 	agentControlTabsChanged: 'ensemblr:agent-control-tabs-changed',
 	agentControlBoardStatus: 'ensemblr:agent-control-board-status',
 	agentControlReportBoardStatus: 'ensemblr:agent-control-report-board-status',
+	agentControlAskUserQuestion: 'ensemblr:agent-control-ask-user-question',
+	agentControlAskUserQuestionClosed:
+		'ensemblr:agent-control-ask-user-question-closed',
+	agentControlAnswerUserQuestion: 'ensemblr:agent-control-answer-user-question',
 	closeChatTab: 'ensemblr:close-chat-tab',
 	closeWindow: 'ensemblr:close-window',
 	cloneGithubRepositoryPrepare: 'ensemblr:clone-github-repository:prepare',

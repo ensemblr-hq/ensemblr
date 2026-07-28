@@ -10,6 +10,8 @@ import type {
 	AgentControlTabInfo,
 	AgentControlTerminalInfo,
 	AgentControlWorkspaceInfo,
+	AskUserQuestionItem,
+	AskUserQuestionResult,
 	FocusPanelName,
 	OpenTabVariant,
 	StartTerminalKind,
@@ -221,8 +223,24 @@ export interface ConfirmPort {
 	}) => Promise<boolean>;
 }
 
+/**
+ * Puts an agent's questionnaire to the human and resolves once they answer or
+ * dismiss it. The call blocks the agent's turn for as long as the dialog is up,
+ * which is the point: the agent asked because it cannot proceed without a
+ * decision.
+ */
+export interface AskPort {
+	ask: (input: {
+		origin: AgentControlOrigin;
+		questions: readonly AskUserQuestionItem[];
+	}) => Promise<AskUserQuestionResult>;
+	/** Cancels every questionnaire still pending for a session that ended. */
+	releaseSession: (sessionId: string) => void;
+}
+
 /** All collaborators the agent-control service composes. */
 export interface AgentControlPorts {
+	ask: AskPort;
 	workspaces: WorkspacePort;
 	tabs: TabPort;
 	conversations: ConversationPort;

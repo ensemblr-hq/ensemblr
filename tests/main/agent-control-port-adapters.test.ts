@@ -53,6 +53,7 @@ const makeDeps = (): {
 		broadcastTabsChanged,
 		broadcastBoardStatus,
 		boardStatusStore,
+		ask: { ask: vi.fn(), releaseSession: vi.fn() },
 		confirm: { confirm: vi.fn() },
 	} as unknown as PortAdapterDeps;
 	return {

@@ -35,6 +35,7 @@ export const AGENT_CONTROL_OPS = [
 	'listModels',
 	'waitForAgents',
 	'notifyOrchestrator',
+	'askUserQuestion',
 ] as const;
 
 /**
@@ -256,6 +257,113 @@ export interface WaitForAgentsResult {
 export interface NotifyOrchestratorArgs {
 	reason: OrchestratorSignalReason;
 	message: string;
+}
+
+/**
+ * Upper bounds on an `askUserQuestion` questionnaire. Small on purpose: the
+ * dialog is a decision aid, not a form, and every option must stay reachable by
+ * a single number key.
+ */
+export const ASK_USER_QUESTION_LIMITS = {
+	maxQuestions: 4,
+	maxOptions: 6,
+	minOptions: 2,
+	maxHeaderLength: 16,
+	maxLabelLength: 80,
+} as const;
+
+/**
+ * Option labels the dialog reserves for its own rows, so an agent cannot render
+ * a choice indistinguishable from the free-text row.
+ */
+export const ASK_USER_QUESTION_RESERVED_LABELS = [
+	'other',
+	'next',
+	'type something',
+	'type something…',
+	'type something...',
+] as const;
+
+/** One selectable choice within an `askUserQuestion` question. */
+export interface AskUserQuestionOption {
+	label: string;
+	/** Trade-off or consequence shown under the label. */
+	description?: string;
+}
+
+/** A single question in an `askUserQuestion` questionnaire. */
+export interface AskUserQuestionItem {
+	question: string;
+	/** Short pager label; falls back to `Q<n>` when absent. */
+	header?: string;
+	options: readonly AskUserQuestionOption[];
+	/** Lets the user check several options instead of picking one. */
+	multiSelect?: boolean;
+}
+
+/** Args for `askUserQuestion`: put one or more choices to the human. */
+export interface AskUserQuestionArgs {
+	questions: readonly AskUserQuestionItem[];
+}
+
+/**
+ * How a question was answered: a picked option, free text typed by the user, or
+ * a multi-select set.
+ */
+export type AskUserQuestionAnswerKind = 'option' | 'custom' | 'multi';
+
+/** One answered question, in the order the questions were asked. */
+export interface AskUserQuestionAnswer {
+	questionIndex: number;
+	question: string;
+	kind: AskUserQuestionAnswerKind;
+	/** The single chosen label or typed text; null for a multi-select answer. */
+	answer: string | null;
+	/** Chosen labels when `kind` is `multi`. */
+	selected?: readonly string[];
+}
+
+/**
+ * Result of `askUserQuestion`. Unanswered questions are simply absent, so a
+ * partial submission is a normal success. `cancelled` marks a dismissed dialog —
+ * the agent should treat it as "the user declined", not as an error.
+ */
+export interface AskUserQuestionResult {
+	answers: readonly AskUserQuestionAnswer[];
+	cancelled: boolean;
+	/** Prose rendering of `answers`, so the model reads intent rather than JSON. */
+	summary: string;
+}
+
+/**
+ * Main → renderer request to put an agent's questionnaire to the user. The
+ * renderer shows it only in the chat tab bound to `piSessionId`, so a question
+ * is answered in the conversation that asked it.
+ */
+export interface AskUserQuestionBroadcast {
+	requestId: string;
+	workspaceId: string;
+	piSessionId: string;
+	questions: readonly AskUserQuestionItem[];
+}
+
+/**
+ * Main → renderer signal that a pending questionnaire is no longer answerable
+ * (its session ended or the app is tearing it down), so the renderer drops it.
+ */
+export interface AskUserQuestionClosedBroadcast {
+	requestId: string;
+}
+
+/**
+ * Renderer → main answer to a pending questionnaire. Carries only what the user
+ * did; main renders the model-facing summary itself, so the prose an agent acts
+ * on can never disagree with the answers behind it.
+ */
+export interface AskUserQuestionReply {
+	requestId: string;
+	answers: readonly AskUserQuestionAnswer[];
+	cancelled: boolean;
 }
 
 /** Args for `focusTab`: bring a session tab (chat/terminal/diff/…) to the foreground. */

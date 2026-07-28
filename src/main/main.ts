@@ -2,6 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { parseAskUserQuestionReply } from '../shared/agent-control.ts';
 import { IPC_CHANNELS } from '../shared/ipc/channels';
 import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
 import type { ConfigChangedBroadcast } from '../shared/ipc/contracts/health';
@@ -23,6 +24,7 @@ import {
 	createAgentControlIntegration,
 	createAgentControlPorts,
 	createAgentControlService,
+	createAskUserQuestionCoordinator,
 	createBoardStatusStore,
 	createGuardrails,
 	createOriginRegistry,
@@ -570,6 +572,29 @@ ipcMain.handle(
 		);
 	},
 );
+const askUserQuestionCoordinator = createAskUserQuestionCoordinator({
+	/** Pushes an agent's questionnaire to every window; only the owning chat renders it. */
+	broadcastAsk: (payload) =>
+		broadcastToAllWindows(IPC_CHANNELS.agentControlAskUserQuestion, payload),
+	/** Tells renderers to drop a questionnaire whose session ended unanswered. */
+	broadcastClosed: (payload) =>
+		broadcastToAllWindows(
+			IPC_CHANNELS.agentControlAskUserQuestionClosed,
+			payload,
+		),
+	/** Reports whether any window is alive to host the dialog. */
+	hasRenderer: () =>
+		BrowserWindow.getAllWindows().some((window) => !window.isDestroyed()),
+});
+ipcMain.handle(
+	IPC_CHANNELS.agentControlAnswerUserQuestion,
+	(_event, reply: unknown) => {
+		const parsed = parseAskUserQuestionReply(reply);
+		if (parsed) {
+			askUserQuestionCoordinator.settle(parsed);
+		}
+	},
+);
 agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,
 	originRegistry: agentControlOriginRegistry,
@@ -585,6 +610,7 @@ agentControlService = createAgentControlService({
 		/** Broadcasts an agent-driven chat-tab set change to all windows. */
 		broadcastTabsChanged: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, payload),
+		ask: askUserQuestionCoordinator.port,
 		chatTabService: agentControlChatTabService,
 		confirm: { confirm: confirmAgentControlAction },
 		databaseService,

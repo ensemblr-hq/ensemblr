@@ -11,7 +11,7 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import { CommentPreviewPanel } from './comment-preview-panel';
-import { ComposerPanel } from './composer-panel';
+import { ComposerSlot } from './composer-slot';
 import {
 	FilePreviewOpenerProvider,
 	TurnDiffOpenerProvider,
@@ -150,9 +150,10 @@ export function WorkspaceConversationContent({
 									workspace={activeWorkspace}
 								/>
 							</div>
-							<ComposerPanel
+							<ComposerSlot
 								chatTabId={activeSession.chatTabId}
 								composer={composer}
+								piSessionId={activeSession.piSessionId ?? null}
 								seedText={getLinkedIssueComposerSeed(
 									activeWorkspace,
 									activeSession,

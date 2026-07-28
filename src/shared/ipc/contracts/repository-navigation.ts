@@ -1,4 +1,7 @@
 import type {
+	AskUserQuestionBroadcast,
+	AskUserQuestionClosedBroadcast,
+	AskUserQuestionReply,
 	BoardStatusBroadcast,
 	FocusViewBroadcast,
 	TabsChangedBroadcast,
@@ -117,6 +120,23 @@ export interface ShellApi {
 	reportBoardStatus: (
 		statusByWorkspaceId: Record<string, string>,
 	) => Promise<void>;
+	/**
+	 * Subscribes to agent questionnaires (a Pi agent called `askUserQuestion` and
+	 * is blocked on the answer). Returns an unsubscribe function. The renderer
+	 * shows each one in the chat tab bound to the payload's Pi session.
+	 */
+	onAskUserQuestion: (
+		listener: (payload: AskUserQuestionBroadcast) => void,
+	) => () => void;
+	/**
+	 * Subscribes to questionnaire withdrawals (the asking session ended before the
+	 * user answered). Returns an unsubscribe function.
+	 */
+	onAskUserQuestionClosed: (
+		listener: (payload: AskUserQuestionClosedBroadcast) => void,
+	) => () => void;
+	/** Answers a pending questionnaire, unblocking the agent that asked it. */
+	answerUserQuestion: (reply: AskUserQuestionReply) => Promise<void>;
 	/** Opens an http/https URL in the user's default browser. */
 	openExternal: (url: string) => Promise<void>;
 }

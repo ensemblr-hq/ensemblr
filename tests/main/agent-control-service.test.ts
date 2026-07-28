@@ -91,6 +91,7 @@ const makePorts = (
 	},
 	permissions: { getMode: () => overrides.mode ?? 'workspace-trusted' },
 	confirm: { confirm: vi.fn().mockResolvedValue(overrides.confirm ?? true) },
+	ask: { ask: vi.fn(), releaseSession: vi.fn() },
 });
 
 const setup = (

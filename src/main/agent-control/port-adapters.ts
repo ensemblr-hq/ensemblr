@@ -41,6 +41,7 @@ import type { TerminalService } from '../terminal';
 import type { BoardStatusStore } from './board-status-store.ts';
 import type {
 	AgentControlPorts,
+	AskPort,
 	BoardPort,
 	ConfirmPort,
 	ConversationPort,
@@ -77,6 +78,7 @@ export interface PortAdapterDeps {
 	/** Main-side mirror of the renderer's board-status map. */
 	boardStatusStore: BoardStatusStore;
 	confirm: ConfirmPort;
+	ask: AskPort;
 }
 
 const IDLE_STATUSES: ReadonlySet<string> = new Set([
@@ -687,5 +689,6 @@ export function createAgentControlPorts(
 		board: makeBoardPort(deps),
 		permissions: { getMode: () => deps.getPermissionMode() },
 		confirm: deps.confirm,
+		ask: deps.ask,
 	};
 }

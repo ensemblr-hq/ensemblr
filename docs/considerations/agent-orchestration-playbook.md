@@ -44,6 +44,7 @@ child's spawn attempt is denied `denied-depth`.
 | Run / inspect commands | `ensemblr_start_terminal`, `ensemblr_write_terminal`, `ensemblr_read_terminal_output`, `ensemblr_stop_terminal` |
 | Inspect a child out of band | `ensemblr_get_conversation_status`, `ensemblr_get_last_message` |
 | Pull the orchestrator back (sub-agents) | `ensemblr_notify_orchestrator` |
+| Ask the human to decide | `ensemblr_ask_user_question` (blocks until answered; Pi chats only) |
 | See the workspace | `ensemblr_list_workspaces`, `ensemblr_list_tabs`, `ensemblr_list_terminals` |
 | Move / read the workspace board | `ensemblr_set_workspace_status`, `ensemblr_get_workspace_status` |
 | Pick a model for a child | `ensemblr_list_models` |
