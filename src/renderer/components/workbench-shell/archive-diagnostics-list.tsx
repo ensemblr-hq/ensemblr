@@ -20,7 +20,7 @@ export function ArchiveDiagnosticsList<T extends ArchiveDiagnosticItem>({
 }) {
 	return (
 		<ul
-			className='rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive text-xs'
+			className='flex flex-col gap-1.5 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-destructive text-xs'
 			data-testid={testId}
 		>
 			{diagnostics.map((diagnostic, index) => (
@@ -33,7 +33,7 @@ export function ArchiveDiagnosticsList<T extends ArchiveDiagnosticItem>({
 				>
 					<span className='font-medium'>{diagnostic.message}</span>
 					{diagnostic.path ? (
-						<span className='font-mono text-[0.6875rem] opacity-80'>
+						<span className='wrap-anywhere font-mono text-[0.6875rem] leading-normal opacity-80'>
 							{diagnostic.path}
 						</span>
 					) : null}

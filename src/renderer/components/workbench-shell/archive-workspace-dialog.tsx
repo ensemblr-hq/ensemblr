@@ -5,15 +5,20 @@ import {
 	isEnsemblrApiAvailable,
 } from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
-import { Checkbox } from '@/renderer/components/ui/checkbox';
 import {
 	Dialog,
 	DialogContent,
+	DialogDescription,
+	DialogFooter,
 	DialogHeader,
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
-import { Label } from '@/renderer/components/ui/label';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
+import { CleanupToggle } from '@/renderer/components/workbench-shell/cleanup-toggle';
+import {
+	LifecycleSummary,
+	workspaceSummaryRows,
+} from '@/renderer/components/workbench-shell/lifecycle-summary';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 
@@ -35,7 +40,7 @@ export function ArchiveWorkspaceDialog({
 }) {
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
-			<DialogContent className='gap-4 sm:max-w-md'>
+			<DialogContent className='sm:max-w-md'>
 				{workspace ? (
 					<ArchiveWorkspaceDialogForm
 						key={`${workspace.id}:${open ? 'open' : 'closed'}`}
@@ -109,50 +114,31 @@ function ArchiveWorkspaceDialogForm({
 	return (
 		<>
 			<DialogHeader>
-				<DialogTitle className='font-medium text-[0.9375rem]'>
-					Archive workspace?
-				</DialogTitle>
-				<p className='text-muted-foreground text-xs'>
+				<DialogTitle>Archive workspace?</DialogTitle>
+				<DialogDescription className='text-xs'>
 					Marks the workspace as archived and preserves its{' '}
 					<span className='font-mono'>.context/</span> handoff files under{' '}
 					<span className='font-mono'>archived-contexts/</span>. By default the
 					worktree folder and local branch stay on disk; nothing is committed or
 					pushed.
-				</p>
+				</DialogDescription>
 			</DialogHeader>
 
-			<div className='flex flex-col gap-1 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs'>
-				<span className='font-medium'>{workspace.name}</span>
-				<span className='font-mono text-[0.6875rem] text-muted-foreground'>
-					{workspace.branchName}
-				</span>
-				<span className='truncate font-mono text-[0.6875rem] text-muted-foreground'>
-					{workspace.pathLabel}
-				</span>
-			</div>
+			<LifecycleSummary rows={workspaceSummaryRows(workspace)} />
 
 			{hasBranch ? (
-				<div className='flex items-start gap-2 rounded-md border border-border bg-background px-3 py-2'>
-					<Checkbox
-						checked={branchCleanup}
-						disabled={isBusy}
-						id={`archive-workspace-branch-cleanup-${workspace.id}`}
-						onCheckedChange={(value) => setBranchCleanup(value === true)}
-					/>
-					<div className='flex flex-col gap-0.5'>
-						<Label
-							className='text-xs'
-							htmlFor={`archive-workspace-branch-cleanup-${workspace.id}`}
-						>
-							Also remove the worktree and drop the branch{' '}
-							<span className='font-mono'>{workspace.branchName}</span>
-						</Label>
-						<span className='text-[0.6875rem] text-muted-foreground'>
+				<CleanupToggle
+					checked={branchCleanup}
+					description={
+						<>
 							The <span className='font-mono'>.context/</span> handoff files are
 							preserved; anything else not pushed to the remote will be lost.
-						</span>
-					</div>
-				</div>
+						</>
+					}
+					disabled={isBusy}
+					label='Also remove the worktree and drop the local branch'
+					onCheckedChange={setBranchCleanup}
+				/>
 			) : null}
 
 			{stage === 'failure' && diagnostics.length > 0 ? (
@@ -162,18 +148,16 @@ function ArchiveWorkspaceDialogForm({
 				/>
 			) : null}
 
-			<div className='-mx-4 -mb-4 flex justify-end gap-2 rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
+			<DialogFooter>
 				<Button
-					className='h-8'
 					disabled={isBusy}
 					onClick={handleClose}
 					type='button'
-					variant='outline'
+					variant='ghost'
 				>
 					Cancel
 				</Button>
 				<Button
-					className='h-8'
 					disabled={!canArchive}
 					onClick={handleArchive}
 					type='button'
@@ -181,7 +165,7 @@ function ArchiveWorkspaceDialogForm({
 				>
 					{isBusy ? 'Archiving…' : 'Archive'}
 				</Button>
-			</div>
+			</DialogFooter>
 		</>
 	);
 }
