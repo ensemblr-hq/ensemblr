@@ -609,6 +609,9 @@ const planSubmission = createPlanSubmission({
 	hasRenderer: () =>
 		BrowserWindow.getAllWindows().some((window) => !window.isDestroyed()),
 	planFileWriter: createPlanFileWriter(),
+	/** Posts the plan into the submitting chat's timeline so the user always sees it. */
+	postPlanMessage: ({ sessionId, plan }) =>
+		piSessionService.appendAgentMessage({ sessionId, text: plan }),
 });
 agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,

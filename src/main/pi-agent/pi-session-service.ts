@@ -54,6 +54,7 @@ import {
 	toSnapshot,
 } from './pi-session-lifecycle.ts';
 import {
+	appendAgentMessageEvent,
 	appendChatTitleMetadataEvent,
 	persistRuntimeEvent,
 } from './pi-session-persistence.ts';
@@ -112,6 +113,14 @@ export interface PiSessionService {
 		branchId: string,
 	) => Iterable<PiPersistedEnvelope | null>;
 	openSession: (request: OpenPiSessionRequest) => Promise<PiSessionSnapshot>;
+	/**
+	 * Posts an agent (assistant) message into a session's timeline, persisted and
+	 * broadcast through the same path as a runtime message. Lets a main-process
+	 * caller surface app-authored content the Pi child never produced — a
+	 * submitted plan above all — so it appears as a real chat bubble regardless of
+	 * what the agent itself emitted. A no-op when the session cannot be resolved.
+	 */
+	appendAgentMessage: (input: { sessionId: string; text: string }) => void;
 	/**
 	 * Sets the display name of an active Pi session via its runtime `/name`, then
 	 * mirrors the name onto its chat tab (marking the title user-owned so
@@ -174,6 +183,35 @@ export function createPiSessionService({
 		resolveAgentControlEnv,
 		sessionSummaryWriter,
 	});
+
+	/**
+	 * Resolves the branch and workspace a synthetic timeline event should land on:
+	 * the live branch for an active session, else the persisted main branch.
+	 * @param database - Open session database.
+	 * @param sessionId - Session whose timeline to target.
+	 * @returns The branch and workspace ids, or null when the session is unknown.
+	 */
+	const resolveTimelineTarget = (
+		database: DatabaseSync,
+		sessionId: string,
+	): { branchId: string; workspaceId: string } | null => {
+		const active = lifecycle.getActiveSession(sessionId);
+		if (active) {
+			return {
+				branchId: active.branch.id,
+				workspaceId: active.row.workspaceId,
+			};
+		}
+		const row = getPiSessionById({ database, id: sessionId });
+		const branch = getMainBranchForSession({
+			database,
+			piSessionId: sessionId,
+		});
+		if (!row || !branch) {
+			return null;
+		}
+		return { branchId: branch.id, workspaceId: row.workspaceId };
+	};
 
 	return {
 		getSession: (sessionId) => {
@@ -263,6 +301,19 @@ export function createPiSessionService({
 				.filter((snapshot): snapshot is PiSessionSnapshot => snapshot !== null);
 		},
 		openSession: lifecycle.openSession,
+		appendAgentMessage: ({ sessionId, text }) => {
+			const database = requireSessionDatabase();
+			const target = resolveTimelineTarget(database, sessionId);
+			if (!target) {
+				return;
+			}
+			const event = appendAgentMessageEvent({
+				branchId: target.branchId,
+				database,
+				text,
+			});
+			eventSink?.({ event, sessionId, workspaceId: target.workspaceId });
+		},
 		setSessionName: async ({ sessionId, name }) => {
 			const database = requireSessionDatabase();
 			const applied = await lifecycle.setSessionName(sessionId, name);

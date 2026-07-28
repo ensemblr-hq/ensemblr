@@ -406,9 +406,10 @@ export interface ExitPlanModeResult {
 /**
  * Main → renderer request to put a finished plan to the user. The renderer
  * shows it only in the chat tab bound to `piSessionId`, so a plan is reviewed
- * in the conversation that wrote it. Carries no plan body: the agent posts the
- * plan as its reply, so it is already in that tab's timeline, and shipping a
- * second copy over IPC would only duplicate it on screen.
+ * in the conversation that wrote it. Carries no plan body: the app posts the
+ * plan into that tab's timeline as a separate assistant message, so this
+ * broadcast only needs the title and saved path — shipping the plan again here
+ * would duplicate it on screen.
  */
 export interface ExitPlanModeBroadcast {
 	requestId: string;

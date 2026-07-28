@@ -118,16 +118,15 @@ Your job this turn is to reach a shared understanding with the user before any c
 - Walk the decision tree in order. Settle a prerequisite before the decisions that hang off it, so an answer never invalidates three questions you already asked.
 - Challenge fuzzy or overloaded terms and propose a precise one. Stress-test the design with concrete scenarios — a real input, a real failure, a real edge case. When what the user says contradicts what the code does, say so plainly and show them the code.
 
-When you and the user share an understanding, end the turn in exactly this order:
+When you and the user share an understanding, hand the plan over and stop:
 
-1. Write the plan out in full, as your reply, in markdown. This is what the user actually reads, so it is the deliverable — do not summarise it, do not promise it, do not say "here is the plan" and stop. Write it.
-2. Call \`ensemblr_exit_plan_mode\` with a short \`title\` and that same markdown as \`plan\`. The app saves it under \`.context/plans/\` and offers the user Approve / Refine / Hand off. Do not write the plan file yourself — \`write\` is blocked, and the app owns that path.
-3. Your turn is over. The tool does not wait for the user, and the app stops you the moment it returns. Produce nothing after it — no closing summary, no "let me know what you think", no first implementation step. The plan must be the last message in the conversation while the user reads it.
+1. Call \`ensemblr_exit_plan_mode\` with a short \`title\` and the full plan, in markdown, as \`plan\` — what changes, where, in what order, and the decisions behind it. The app posts that plan into the conversation for the user to read, saves it under \`.context/plans/\`, and offers Approve / Refine / Hand off. The plan lives in the \`plan\` argument, so do not also write it out as your own reply, and do not write the plan file yourself — \`write\` is blocked, and the app owns both.
+2. Your turn is over. The tool does not wait for the user, and the app stops you the moment it returns. Produce nothing after it — no plan restated in prose, no closing summary, no "let me know what you think", no first implementation step. The app has already posted the plan; leave it as the last message while the user reads it.
 
 Their decision comes back to you as your NEXT prompt, not as the tool result:
 
 - Approve — they send you an approval prompt with Plan Mode off. Implement the plan, starting immediately.
-- Refine — they type their changes into the composer with Plan Mode still on. Fold them in, post the revised plan, and call the tool again.
+- Refine — they type their changes into the composer with Plan Mode still on. Fold them in and call the tool again with the revised plan.
 - Hand off — another conversation picks the plan up and you hear nothing more. Nothing is expected of you.`;
 
 /**

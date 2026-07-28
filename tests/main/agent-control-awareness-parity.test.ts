@@ -77,13 +77,15 @@ describe('agent-control AWARENESS parity', () => {
 		expect(PLAN_MODE_AWARENESS).toContain('do not look for a way around it');
 	});
 
-	it('orders the hand-off: name the tab, post the plan, then call the tool', () => {
+	it('orders the hand-off: name the tab, then hand the plan to the exit tool for the app to post', () => {
 		const naming = PLAN_MODE_AWARENESS.indexOf('ensemblr_set_name');
-		const posting = PLAN_MODE_AWARENESS.indexOf('Write the plan out in full');
 		const exiting = PLAN_MODE_AWARENESS.indexOf('ensemblr_exit_plan_mode');
+		const posting = PLAN_MODE_AWARENESS.indexOf(
+			'The app posts that plan into the conversation',
+		);
 		expect(naming).toBeGreaterThan(-1);
-		expect(posting).toBeGreaterThan(naming);
-		expect(exiting).toBeGreaterThan(posting);
+		expect(exiting).toBeGreaterThan(naming);
+		expect(posting).toBeGreaterThan(exiting);
 	});
 
 	it('tells a planning agent an imperative prompt is the subject, not consent', () => {

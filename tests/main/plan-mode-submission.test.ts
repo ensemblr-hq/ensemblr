@@ -21,6 +21,7 @@ const setup = (
 	options: { hasRenderer?: boolean; writeFails?: boolean } = {},
 ) => {
 	const reviews: ExitPlanModeBroadcast[] = [];
+	const postPlanMessage = vi.fn();
 	const writePlanFile = options.writeFails
 		? vi.fn().mockRejectedValue(new Error('disk full'))
 		: vi.fn().mockResolvedValue(PLAN_PATH);
@@ -30,13 +31,14 @@ const setup = (
 		createRequestId: () => `req-${++nextId}`,
 		hasRenderer: () => options.hasRenderer ?? true,
 		planFileWriter: { writePlanFile },
+		postPlanMessage,
 	});
-	return { reviews, submission, writePlanFile };
+	return { postPlanMessage, reviews, submission, writePlanFile };
 };
 
 describe('plan submission', () => {
 	it('saves the plan and broadcasts the review to the owning chat', async () => {
-		const { reviews, submission, writePlanFile } = setup();
+		const { postPlanMessage, reviews, submission, writePlanFile } = setup();
 
 		await submission.submit({ args: ARGS, origin: ORIGIN });
 
@@ -46,6 +48,10 @@ describe('plan submission', () => {
 			title: ARGS.title,
 			workspaceCwd: '/tmp/workspace',
 			workspaceId: 'ws-1',
+		});
+		expect(postPlanMessage).toHaveBeenCalledWith({
+			plan: ARGS.plan,
+			sessionId: 'sess-1',
 		});
 		expect(reviews).toEqual([
 			{
@@ -89,8 +95,19 @@ describe('plan submission', () => {
 		]);
 	});
 
+	it('posts the plan into the conversation, so the user sees it even if the agent never wrote it out', async () => {
+		const { postPlanMessage, submission } = setup();
+
+		await submission.submit({ args: ARGS, origin: ORIGIN });
+
+		expect(postPlanMessage).toHaveBeenCalledWith({
+			plan: ARGS.plan,
+			sessionId: 'sess-1',
+		});
+	});
+
 	it('still saves the plan when no window can show the review', async () => {
-		const { reviews, submission, writePlanFile } = setup({
+		const { postPlanMessage, reviews, submission, writePlanFile } = setup({
 			hasRenderer: false,
 		});
 
@@ -98,6 +115,10 @@ describe('plan submission', () => {
 
 		expect(writePlanFile).toHaveBeenCalledTimes(1);
 		expect(reviews).toHaveLength(0);
+		expect(postPlanMessage).toHaveBeenCalledWith({
+			plan: ARGS.plan,
+			sessionId: 'sess-1',
+		});
 		expect(result.planPath).toBe(PLAN_PATH);
 		expect(result.summary).toContain('never saw the review panel');
 	});
