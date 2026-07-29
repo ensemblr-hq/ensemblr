@@ -1,4 +1,5 @@
 import type { SessionTabModel } from '@/renderer/types/workbench';
+import { selectPreviouslyVisitedTab } from './tab-visit-order';
 
 /**
  * Picks the tab to activate after the tab at `closingIndex` is removed. Prefers
@@ -15,6 +16,31 @@ export function selectNeighborTab<T>(
 		return null;
 	}
 	return tabs[closingIndex + 1] ?? tabs[closingIndex - 1] ?? null;
+}
+
+/**
+ * Picks where the strip lands when the tab at `closingIndex` closes: the tab the
+ * user came from, so closing walks back through the visit history rather than
+ * sliding along the strip. Falls back to the neighbor rule when the history
+ * holds nothing still open, as after a fresh start or a restored workspace.
+ * @param tabs - Open tabs in left-to-right render order, closing tab included
+ * @param input - Index of the closing tab and the workspace's visit history
+ * @returns Id of the tab to activate, or null when nothing is left to show
+ */
+export function selectSuccessorTabId(
+	tabs: readonly SessionTabModel[],
+	{
+		closingIndex,
+		visitOrder,
+	}: { closingIndex: number; visitOrder?: readonly string[] },
+): string | null {
+	const visited = selectPreviouslyVisitedTab({
+		excludeId: tabs[closingIndex]?.id,
+		openIds: tabs.map((tab) => tab.id),
+		visitOrder: visitOrder ?? [],
+	});
+
+	return visited ?? selectNeighborTab(tabs, closingIndex)?.id ?? null;
 }
 
 /** What ⌘/Ctrl+W does to the active workspace tab. */

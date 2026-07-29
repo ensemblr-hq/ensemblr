@@ -15,7 +15,7 @@ const sessionTabVariants = cva(
 	{
 		variants: {
 			isActive: {
-				true: 'bg-muted text-foreground',
+				true: 'text-foreground',
 				false: 'bg-background text-muted-foreground hover:text-foreground',
 			},
 			canReorder: {
@@ -55,26 +55,14 @@ const sessionTabIndicatorVariants = cva(
 );
 
 /**
- * Class variants for the hover fade that masks tab text behind the close
- * control, tinted to match the active or inactive tab surface.
+ * Hover fade that masks tab text running under the close control. One tint
+ * covers both states now that active and inactive tabs share the background.
  */
-const sessionTabCloseFadeVariants = cva(
-	'pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l to-transparent opacity-0 transition-opacity group-hover/session-tab:opacity-100',
-	{
-		variants: {
-			isActive: {
-				true: 'from-muted via-muted/90',
-				false: 'from-background via-background/90',
-			},
-		},
-		defaultVariants: {
-			isActive: false,
-		},
-	},
-);
+const SESSION_TAB_CLOSE_FADE_CLASS =
+	'pointer-events-none absolute inset-y-0 right-0 w-16 bg-linear-to-l from-background via-background/90 to-transparent opacity-0 transition-opacity group-hover/session-tab:opacity-100';
 
 export {
-	sessionTabCloseFadeVariants,
+	SESSION_TAB_CLOSE_FADE_CLASS,
 	sessionTabIndicatorVariants,
 	sessionTabVariants,
 };

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAtomCallback } from 'jotai/utils';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -44,7 +45,8 @@ import {
 	parseWorkspaceGitDiffScope,
 	type WorkspaceGitDiffScope,
 } from '@/shared/ipc/contracts/workspace-git';
-import { decideActiveClose, selectNeighborTab } from './session-tab-close';
+import { sessionVisitOrderByWorkspaceAtom } from './selection-atoms';
+import { decideActiveClose, selectSuccessorTabId } from './session-tab-close';
 import {
 	findDuplicateTerminalTabIds,
 	isLiveTerminalTab,
@@ -112,6 +114,9 @@ export function useSessionTabState({
 	closeActiveOrReset: () => void;
 } {
 	const workspaceId = activeWorkspace.id;
+	const readSessionVisits = useAtomCallback(
+		useCallback((get) => get(sessionVisitOrderByWorkspaceAtom), []),
+	);
 	const queryClient = useQueryClient();
 	const scrollOffsets = useConversationScrollOffsets();
 	const {
@@ -639,9 +644,12 @@ export function useSessionTabState({
 				}
 			}
 			closingTabIdsRef.current.add(chatTabId);
-			const nextSession = selectNeighborTab(sessionTabs, closingIndex);
-			if (activeSession.id === chatTabId && nextSession) {
-				onSessionTabChange(nextSession.id);
+			const nextSessionId = selectSuccessorTabId(sessionTabs, {
+				closingIndex,
+				visitOrder: readSessionVisits()[workspaceId],
+			});
+			if (activeSession.id === chatTabId && nextSessionId) {
+				onSessionTabChange(nextSessionId);
 			}
 			const closePatch = closeTerminalSidecar(closing);
 			void closeSessionTabAsync(chatTabId, closePatch)
@@ -659,7 +667,9 @@ export function useSessionTabState({
 			closeSessionTabAsync,
 			closeTerminalSidecar,
 			onSessionTabChange,
+			readSessionVisits,
 			sessionTabs,
+			workspaceId,
 		],
 	);
 

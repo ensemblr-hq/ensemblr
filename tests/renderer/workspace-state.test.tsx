@@ -242,6 +242,14 @@ test('resolves per-workspace review and dock tab preferences', () => {
 			workspace,
 		}),
 	).toBe('setup');
+	// A closed terminal falls back to the dock tab visited before it, not Setup.
+	expect(
+		getPreferredDockTab({
+			dockTabsByWorkspace: { [workspace.id]: 'terminal:missing' },
+			visitOrder: ['terminal:missing', 'run', 'setup'],
+			workspace,
+		}),
+	).toBe('run');
 	// A valid route dock tab overrides the stored per-workspace preference.
 	expect(
 		getPreferredDockTab({

@@ -5,6 +5,7 @@ import {
 	decideActiveClose,
 	resolveRunningCloseTarget,
 	selectNeighborTab,
+	selectSuccessorTabId,
 } from '../../src/renderer/state/workspace/session-tab-close';
 import type { SessionTabModel } from '../../src/renderer/types/workbench';
 
@@ -45,6 +46,54 @@ describe('selectNeighborTab', () => {
 
 	test('returns null for an out-of-range index', () => {
 		expect(selectNeighborTab(tabs, -1)).toBeNull();
+	});
+});
+
+describe('selectSuccessorTabId', () => {
+	const tabs = [
+		createTab({ id: 'a' }),
+		createTab({ id: 'b' }),
+		createTab({ id: 'c' }),
+	];
+
+	test('lands on the tab visited before the closing one', () => {
+		expect(
+			selectSuccessorTabId(tabs, {
+				closingIndex: 2,
+				visitOrder: ['c', 'a', 'b'],
+			}),
+		).toBe('a');
+	});
+
+	test('ignores the closing tab even when it heads the history', () => {
+		expect(
+			selectSuccessorTabId(tabs, {
+				closingIndex: 0,
+				visitOrder: ['a', 'c'],
+			}),
+		).toBe('c');
+	});
+
+	test('falls back to the neighbor rule without usable history', () => {
+		expect(selectSuccessorTabId(tabs, { closingIndex: 0 })).toBe('b');
+		expect(
+			selectSuccessorTabId(tabs, { closingIndex: 0, visitOrder: [] }),
+		).toBe('b');
+		expect(
+			selectSuccessorTabId(tabs, {
+				closingIndex: 2,
+				visitOrder: ['c', 'closed-earlier'],
+			}),
+		).toBe('b');
+	});
+
+	test('returns null when the closing tab is the only one', () => {
+		expect(
+			selectSuccessorTabId([createTab({ id: 'solo' })], {
+				closingIndex: 0,
+				visitOrder: ['solo'],
+			}),
+		).toBeNull();
 	});
 });
 

@@ -1,4 +1,4 @@
-import { useAtom } from 'jotai';
+import { useAtom, useSetAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
 import {
 	DEFAULT_DOCK_TAB,
@@ -14,8 +14,13 @@ import type {
 import {
 	activeDockTabByWorkspaceAtom,
 	activeReviewTabByWorkspaceAtom,
+	dockVisitOrderByWorkspaceAtom,
 } from './layout-atoms';
-import { activeChatTabByWorkspaceAtom } from './selection-atoms';
+import {
+	activeChatTabByWorkspaceAtom,
+	sessionVisitOrderByWorkspaceAtom,
+} from './selection-atoms';
+import { recordTabVisit, selectPreviouslyVisitedTab } from './tab-visit-order';
 
 /** Per-workspace review-panel tab preferences, keyed by workspace id. */
 type ReviewTabPreferences = Record<string, unknown>;
@@ -46,6 +51,12 @@ export function useWorkspacePanelTabState({
 		activeDockTabByWorkspaceAtom,
 	);
 	const [, setChatTabsByWorkspace] = useAtom(activeChatTabByWorkspaceAtom);
+	const [dockVisitsByWorkspace, setDockVisitsByWorkspace] = useAtom(
+		dockVisitOrderByWorkspaceAtom,
+	);
+	const setSessionVisitsByWorkspace = useSetAtom(
+		sessionVisitOrderByWorkspaceAtom,
+	);
 	const activeReviewTab = getPreferredReviewTab({
 		reviewTabsByWorkspace,
 		routeReviewTab: search?.review,
@@ -54,6 +65,7 @@ export function useWorkspacePanelTabState({
 	const activeDockTab = getPreferredDockTab({
 		dockTabsByWorkspace,
 		routeDockTab: search?.dock,
+		visitOrder: dockVisitsByWorkspace[activeWorkspace.id],
 		workspace: activeWorkspace,
 	});
 
@@ -71,7 +83,18 @@ export function useWorkspacePanelTabState({
 				? current
 				: { ...current, [activeWorkspace.id]: activeDockTab },
 		);
-	}, [activeDockTab, activeWorkspace.id, setDockTabsByWorkspace]);
+		setDockVisitsByWorkspace((current) =>
+			recordTabVisit(current, {
+				tabId: activeDockTab,
+				workspaceId: activeWorkspace.id,
+			}),
+		);
+	}, [
+		activeDockTab,
+		activeWorkspace.id,
+		setDockTabsByWorkspace,
+		setDockVisitsByWorkspace,
+	]);
 
 	useEffect(() => {
 		if (!activeChatId) {
@@ -83,7 +106,18 @@ export function useWorkspacePanelTabState({
 				? current
 				: { ...current, [activeWorkspace.id]: activeChatId },
 		);
-	}, [activeChatId, activeWorkspace.id, setChatTabsByWorkspace]);
+		setSessionVisitsByWorkspace((current) =>
+			recordTabVisit(current, {
+				tabId: activeChatId,
+				workspaceId: activeWorkspace.id,
+			}),
+		);
+	}, [
+		activeChatId,
+		activeWorkspace.id,
+		setChatTabsByWorkspace,
+		setSessionVisitsByWorkspace,
+	]);
 
 	const getPreferredTabsForWorkspace = useCallback(
 		(workspace: WorkspaceShellModel) => ({
@@ -155,23 +189,35 @@ export function getPreferredReviewTab({
 
 /**
  * Picks the dock-tab to render, preferring the URL value, then the persisted
- * preference, then the default, then the first available tab on the workspace.
- * @param input - Persisted prefs, URL override and workspace.
+ * preference, then the most recently visited tab still open, then the default,
+ * then the first available tab on the workspace. The visit fallback is what
+ * keeps a closed terminal from dumping the user back on Setup.
+ * @param input - Persisted prefs, URL override, visit history and workspace.
  * @returns The chosen dock tab.
  */
 export function getPreferredDockTab({
 	dockTabsByWorkspace,
 	routeDockTab,
+	visitOrder,
 	workspace,
 }: {
 	dockTabsByWorkspace: DockTabPreferences;
 	routeDockTab?: DockTabId;
+	visitOrder?: readonly DockTabId[];
 	workspace: WorkspaceShellModel;
 }) {
 	const preferredDockTab = routeDockTab ?? dockTabsByWorkspace[workspace.id];
 
 	if (preferredDockTab && hasDockTab(workspace, preferredDockTab)) {
 		return preferredDockTab;
+	}
+
+	const visitedDockTab = selectPreviouslyVisitedTab({
+		openIds: workspace.dockTabs.map((tab) => tab.id),
+		visitOrder: visitOrder ?? [],
+	});
+	if (visitedDockTab) {
+		return visitedDockTab;
 	}
 
 	if (hasDockTab(workspace, DEFAULT_DOCK_TAB)) {

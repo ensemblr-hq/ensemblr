@@ -8,9 +8,10 @@ import {
 	WrenchIcon,
 	XIcon,
 } from 'lucide-react';
-import { Fragment, useEffect, useRef } from 'react';
+import { Fragment } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
+import { TabScroller } from '@/renderer/components/ui/tab-scroller';
 import {
 	Tabs,
 	TabsContent,
@@ -57,18 +58,6 @@ export function DockPanel({
 		? activeTab
 		: DEFAULT_DOCK_TAB;
 	const terminalTabs = workspace.dockTabs.filter(isTerminalDockTab);
-	const tabStripRef = useRef<HTMLDivElement | null>(null);
-	const lastTerminalTabId = terminalTabs.at(-1)?.id;
-
-	useEffect(() => {
-		const strip = tabStripRef.current;
-
-		// Newly created terminals land as the rightmost tab and become active;
-		// scroll the strip fully right so the new tab (and the "+" button) show.
-		if (strip && activeDockTab === lastTerminalTabId) {
-			strip.scrollLeft = strip.scrollWidth;
-		}
-	}, [activeDockTab, lastTerminalTabId]);
 
 	useRunScriptHotkey(workspace.scripts.run.status, actions);
 
@@ -100,10 +89,7 @@ export function DockPanel({
 				>
 					<DockToggleIcon aria-hidden='true' />
 				</Button>
-				<div
-					className='no-scrollbar h-full min-w-0 flex-1 overflow-x-auto overflow-y-hidden'
-					ref={tabStripRef}
-				>
+				<TabScroller activeKey={activeDockTab} className='h-full flex-1'>
 					<TabsList
 						className='h-full w-max min-w-full items-center justify-start gap-1 rounded-none bg-transparent p-0 group-data-horizontal/tabs:h-full'
 						variant='line'
@@ -117,7 +103,10 @@ export function DockPanel({
 
 							return (
 								<Fragment key={tab.id}>
-									<div className='group/dock-tab relative flex h-full flex-none items-center overflow-hidden'>
+									<div
+										className='group/dock-tab relative flex h-full flex-none items-center overflow-hidden'
+										data-tab-key={tab.id}
+									>
 										<TabsTrigger
 											className={cn(
 												// Chat-tab-style active indicator: full row height so the
@@ -145,7 +134,7 @@ export function DockPanel({
 							);
 						})}
 					</TabsList>
-				</div>
+				</TabScroller>
 				<Button
 					className='size-6 shrink-0 text-muted-foreground hover:text-foreground'
 					onClick={actions.onNewTerminal}
