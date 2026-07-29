@@ -1,7 +1,10 @@
 import { useAtomValue } from 'jotai';
 import { useCallback, useMemo } from 'react';
 import { XtermTerminal } from '@/renderer/components/workbench-shell/dock-panel/xterm-terminal';
-import { toWorkspaceLookupPath } from '@/renderer/lib/pi';
+import {
+	createWorkspacePathResolver,
+	toWorkspaceLookupPath,
+} from '@/renderer/lib/pi';
 import { formatLinkedIssueComposerSeed } from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
@@ -15,7 +18,7 @@ import { ComposerSlot } from './composer-slot';
 import {
 	FilePreviewOpenerProvider,
 	TurnDiffOpenerProvider,
-	WorkspacePathKindResolverProvider,
+	WorkspacePathResolverProvider,
 } from './file-preview-context';
 import { FilePreviewPanel } from './file-preview-panel';
 import { PiRawFramePanel } from './pi-raw-frame-panel';
@@ -78,24 +81,17 @@ export function WorkspaceConversationContent({
 
 	/** Opens or re-focuses the preview tab for a chip's file and navigates to it. */
 	const workspaceCwd = activeWorkspace.pathLabel ?? null;
-	const workspacePathKindByPath = useMemo(
+	const resolveWorkspacePath = useMemo(
 		() =>
-			new Map(
-				activeWorkspace.workspaceFiles.map((file) => [file.path, file.kind]),
-			),
-		[activeWorkspace.workspaceFiles],
-	);
-	const resolveWorkspacePathKind = useCallback(
-		(filePath: string) => {
-			const relativePath = toWorkspaceLookupPath(filePath, workspaceCwd);
-			return workspacePathKindByPath.get(relativePath) ?? null;
-		},
-		[workspaceCwd, workspacePathKindByPath],
+			createWorkspacePathResolver(activeWorkspace.workspaceFiles, workspaceCwd),
+		[activeWorkspace.workspaceFiles, workspaceCwd],
 	);
 	const openFilePreview = useCallback(
 		(filePath: string) => {
-			const relativePath = toWorkspaceLookupPath(filePath, workspaceCwd);
-			if (workspacePathKindByPath.get(relativePath) === 'directory') {
+			const resolved = resolveWorkspacePath(filePath);
+			const relativePath =
+				resolved?.path ?? toWorkspaceLookupPath(filePath, workspaceCwd);
+			if (resolved?.kind === 'directory') {
 				onDirectoryReveal(relativePath);
 				return;
 			}
@@ -109,8 +105,8 @@ export function WorkspaceConversationContent({
 			onDirectoryReveal,
 			onFilePreviewOpen,
 			onSessionTabChange,
+			resolveWorkspacePath,
 			workspaceCwd,
-			workspacePathKindByPath,
 		],
 	);
 
@@ -140,7 +136,7 @@ export function WorkspaceConversationContent({
 				sessions={sessionTabs}
 			/>
 			{isChatTab ? (
-				<WorkspacePathKindResolverProvider value={resolveWorkspacePathKind}>
+				<WorkspacePathResolverProvider value={resolveWorkspacePath}>
 					<FilePreviewOpenerProvider value={openFilePreview}>
 						<TurnDiffOpenerProvider value={openTurnDiff}>
 							<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
@@ -162,7 +158,7 @@ export function WorkspaceConversationContent({
 							/>
 						</TurnDiffOpenerProvider>
 					</FilePreviewOpenerProvider>
-				</WorkspacePathKindResolverProvider>
+				</WorkspacePathResolverProvider>
 			) : (
 				<ActiveAuxiliaryPanel
 					activeSession={activeSession}

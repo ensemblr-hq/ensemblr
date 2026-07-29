@@ -1,4 +1,4 @@
-import type { BundledLanguage } from 'shiki';
+import { type BundledLanguage, bundledLanguages } from 'shiki';
 
 const EXTENSION_LANGUAGE: Record<string, string> = {
 	bash: 'bash',
@@ -63,4 +63,27 @@ export function languageForFilePath(filePath: string): BundledLanguage {
 		? (basename.split('.').at(-1) ?? '')
 		: '';
 	return (EXTENSION_LANGUAGE[extension] ?? 'text') as BundledLanguage;
+}
+
+/**
+ * Resolves a free-form fence tag (` ```ts `, ` ```Dockerfile `) to a grammar
+ * Shiki actually bundles.
+ *
+ * The guard is load-bearing: `createHighlighter` rejects on an unknown grammar,
+ * and an assistant can fence a block with any word at all, so an unchecked tag
+ * would surface as an unhandled rejection rather than an unhighlighted block.
+ * @param tag - The language tag written on the fence
+ * @returns The matching bundled grammar, or plain `text` when there is none
+ */
+export function toBundledLanguage(tag: string): BundledLanguage {
+	const normalized = tag.trim().toLowerCase();
+	if (normalized.length === 0) {
+		return 'text' as BundledLanguage;
+	}
+	if (normalized in bundledLanguages) {
+		return normalized as BundledLanguage;
+	}
+	const byAlias =
+		BASENAME_LANGUAGE[normalized] ?? EXTENSION_LANGUAGE[normalized];
+	return (byAlias ?? 'text') as BundledLanguage;
 }

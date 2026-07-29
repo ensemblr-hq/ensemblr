@@ -1,6 +1,10 @@
+import type { UIMessage } from 'ai';
 import { describe, expect, test } from 'vitest';
 
-import { eventsToUIMessages } from '../../src/renderer/lib/pi/event-to-ui-message';
+import {
+	eventsToUIMessages,
+	noticeMetadataOf,
+} from '../../src/renderer/lib/pi/event-to-ui-message';
 import type {
 	PiPersistedEnvelope,
 	PiSessionEventWire,
@@ -205,13 +209,42 @@ describe('eventsToUIMessages', () => {
 		expect(messages[0]?.parts).toEqual([
 			{
 				input: { command: 'ls' },
-				output: 'README.md',
+				output: { details: null, text: 'README.md' },
 				state: 'output-available',
 				toolCallId: 'call-ls',
 				toolName: 'bash',
 				type: 'dynamic-tool',
 			},
 		]);
+	});
+
+	test('carries the tool details bag alongside the flattened text', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-edit-result',
+				payload: {
+					kind: 'message',
+					payload: {
+						isError: false,
+						kind: 'tool-result',
+						output: {
+							content: [{ text: 'Replaced 1 block.', type: 'text' }],
+							details: { firstChangedLine: 3, patch: '--- a\n+++ b\n' },
+						},
+						toolCallId: 'call-edit',
+					},
+					role: 'tool',
+				},
+				turnId: 'turn-edit',
+			}),
+		]);
+
+		expect(messages[0]?.parts[0]).toMatchObject({
+			output: {
+				details: { firstChangedLine: 3, patch: '--- a\n+++ b\n' },
+				text: 'Replaced 1 block.',
+			},
+		});
 	});
 
 	test('maps errored tool-result to an output-error tool part', () => {
@@ -234,7 +267,7 @@ describe('eventsToUIMessages', () => {
 
 		expect(messages[0]?.parts).toEqual([
 			{
-				errorText: '{"message":"Command failed"}',
+				errorText: '{\n  "message": "Command failed"\n}',
 				input: {},
 				state: 'output-error',
 				toolCallId: 'call-fail',
@@ -367,7 +400,7 @@ describe('eventsToUIMessages', () => {
 		expect(messages[1]?.role).toBe('assistant');
 	});
 
-	test('surfaces fatal errors and actionable stderr as system diagnostics', () => {
+	test('surfaces fatal errors as system diagnostics without a severity tag', () => {
 		const messages = eventsToUIMessages([
 			event({
 				eventType: 'error',
@@ -381,6 +414,17 @@ describe('eventsToUIMessages', () => {
 					kind: 'error',
 				},
 			}),
+		]);
+
+		expect(messages).toHaveLength(1);
+		expect(messages[0]?.role).toBe('system');
+		expect(messageText(messages)).toContain('Boom');
+		expect(messageText(messages)).toContain('stack trace here');
+		expect(messageText(messages)).not.toContain('[fatal]');
+	});
+
+	test('drops stderr rows and recoverable errors as non-fatal noise', () => {
+		const messages = eventsToUIMessages([
 			event({
 				id: 'evt-stderr',
 				payload: {
@@ -389,15 +433,88 @@ describe('eventsToUIMessages', () => {
 				},
 				stream: 'stderr',
 			}),
+			event({
+				eventType: 'error',
+				id: 'evt-recoverable',
+				payload: {
+					error: { message: 'Pi RPC command failed.', recoverable: true },
+					kind: 'error',
+				},
+			}),
+		]);
+
+		expect(messages).toEqual([]);
+	});
+
+	test('drops graceful process exits persisted before the adapter stopped reporting them', () => {
+		const messages = eventsToUIMessages([
+			event({
+				eventType: 'error',
+				id: 'evt-sigterm',
+				payload: {
+					error: {
+						message: 'Pi RPC process exited with code 143.',
+						recoverable: false,
+					},
+					kind: 'error',
+				},
+			}),
+			event({
+				eventType: 'error',
+				id: 'evt-oom',
+				payload: {
+					error: {
+						message: 'Pi RPC process exited with code 137.',
+						recoverable: false,
+					},
+					kind: 'error',
+				},
+			}),
+		]);
+
+		expect(messages).toHaveLength(1);
+		expect(messageText(messages)).toContain('exited with code 137');
+	});
+
+	test('marks an aborted shutdown as an interruption notice after the turn', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-answer',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: 'Working on it' },
+					role: 'agent',
+				},
+			}),
+			event({
+				eventType: 'shutdown',
+				id: 'evt-stop',
+				payload: { kind: 'shutdown', reason: 'aborted' },
+			}),
 		]);
 
 		expect(messages).toHaveLength(2);
-		expect(messages.map((message) => message.role)).toEqual([
-			'system',
-			'system',
-		]);
-		expect(messageText(messages)).toContain('[fatal] Boom');
-		expect(messageText(messages)).toContain('stack trace here');
-		expect(messageText(messages)).toContain('[stderr] ENOENT thing.txt');
+		expect(messages[0]?.role).toBe('assistant');
+		expect(messages[1]?.role).toBe('system');
+		expect(noticeMetadataOf(messages[1] as UIMessage)).toEqual({
+			notice: 'interrupted',
+		});
+		expect(messageText([messages[1] as UIMessage])).toContain(
+			'You stopped this turn',
+		);
+	});
+
+	test('leaves completed, crashed, and manual shutdowns unrendered', () => {
+		for (const reason of ['completed', 'crashed', 'manual']) {
+			const messages = eventsToUIMessages([
+				event({
+					eventType: 'shutdown',
+					id: `evt-${reason}`,
+					payload: { kind: 'shutdown', reason },
+				}),
+			]);
+
+			expect(messages, `reason=${reason}`).toEqual([]);
+		}
 	});
 });

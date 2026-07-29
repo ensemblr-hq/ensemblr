@@ -114,7 +114,7 @@ removes the legacy keys; the renamed `one-dark` code theme is carried over as
 | --- | --- | --- | --- |
 | Theme | Direct. | Ensemblr-specific themes. | `config.json` (`app.appearance.theme`). |
 | Accessible colors | Direct. | Ensemblr accessibility palette variants. | `config.json` (`app.appearance.accessibleColors`). |
-| Code theme | Direct. | Ensemblr code/diff highlighting theme. | `config.json` (`app.appearance.codeTheme`). |
+| Code theme | Direct. | Ensemblr code/diff highlighting theme. Picks a theme family; the stored id names the family and the app renders its light or dark cut to match the app theme. Only syntax colours follow it — code surfaces paint from the `code` design tokens. | `config.json` (`app.appearance.codeTheme`). |
 | Mono font | Direct. | Font for code, diffs, and inline code. | `config.json` (`app.appearance.monoFont`). |
 | Code ligatures | Direct. | Same. | `config.json` (`app.appearance.codeLigatures`). |
 | Markdown style | Direct. | Ensemblr markdown rendering preset. | `config.json` (`app.appearance.markdownStyle`). |

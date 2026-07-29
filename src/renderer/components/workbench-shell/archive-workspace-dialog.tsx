@@ -15,10 +15,8 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
 import { CleanupToggle } from '@/renderer/components/workbench-shell/cleanup-toggle';
-import {
-	LifecycleSummary,
-	workspaceSummaryRows,
-} from '@/renderer/components/workbench-shell/lifecycle-summary';
+import { LifecycleSummary } from '@/renderer/components/workbench-shell/lifecycle-summary';
+import { workspaceSummaryRows } from '@/renderer/lib/workbench/lifecycle-summary-rows';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { ArchiveWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 

@@ -26,6 +26,13 @@ export interface WorkbenchDockActions {
 
 export type ChangesViewMode = 'folders' | 'list';
 
+/** One label/value pair in a lifecycle dialog summary; `mono` marks machine values such as branches and paths. */
+export interface LifecycleSummaryRow {
+	label: string;
+	mono?: boolean;
+	value: string;
+}
+
 /**
  * Which slice of history the Changes tab is showing:
  *

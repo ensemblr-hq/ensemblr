@@ -1,4 +1,3 @@
-import { useAtomValue } from 'jotai';
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -10,9 +9,9 @@ import {
 } from 'react-diff-view';
 import type { BundledLanguage, BundledTheme, ThemedToken } from 'shiki';
 
-import { highlightCode } from '@/renderer/components/code-block';
+import { highlightCode } from '@/renderer/lib/code/highlighter';
 import { reconstructSideSources } from '@/renderer/lib/diff/parse';
-import { codeThemeAtom } from '@/renderer/state/preferences';
+import { useResolvedCodeTheme } from '@/renderer/state/preferences';
 import type { TokenizedCode } from '@/renderer/types/code';
 
 // Shiki font-style bitflags: 1=italic, 2=bold, 4=underline.
@@ -160,7 +159,7 @@ export function useDiffTokens(
 	language: BundledLanguage,
 	showWhitespace: boolean,
 ): ReturnType<typeof tokenize> | null {
-	const theme = useAtomValue(codeThemeAtom);
+	const theme = useResolvedCodeTheme();
 	const { oldText, newText } = useMemo(
 		() => reconstructSideSources(hunks),
 		[hunks],

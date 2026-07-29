@@ -1,0 +1,23 @@
+import { cn } from '@/renderer/lib/utils';
+import type { PullRequestHeaderTone } from '@/renderer/types/workbench';
+
+/**
+ * Builds the shared PR/deployment pill styling so both controls keep matching borders.
+ * @param tone - PR header tone used to color the pill.
+ * @returns Tailwind classes for a header link pill.
+ */
+export function getPullRequestLinkButtonClassName(tone: PullRequestHeaderTone) {
+	return cn(
+		'h-6.5 rounded-sm border px-1.75 font-semibold text-xs',
+		tone === 'ready' &&
+			'border-status-ok/35 bg-status-ok/10 text-status-ok hover:bg-transparent dark:border-status-ok/35 dark:hover:bg-transparent',
+		tone === 'pending' &&
+			'border-status-warning/55 bg-background/90 text-foreground hover:bg-status-warning/15 dark:border-status-warning dark:bg-background/80 dark:text-status-warning dark:hover:bg-status-warning/20',
+		tone === 'blocked' &&
+			'border-status-danger/35 bg-status-danger/10 text-status-danger hover:bg-status-danger/15',
+		tone === 'merged' &&
+			'border-[color:var(--right-sidebar-header-merged)] bg-background/90 text-[color:var(--right-sidebar-header-merged)] hover:bg-[var(--right-sidebar-header-merged-soft)] dark:border-[color:var(--right-sidebar-header-merged)] dark:bg-background/80 dark:hover:bg-[var(--right-sidebar-header-merged-soft)]',
+		tone === 'neutral' &&
+			'border-border bg-transparent text-muted-foreground hover:bg-muted/70',
+	);
+}

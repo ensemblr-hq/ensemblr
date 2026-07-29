@@ -67,4 +67,10 @@ export {
 	repoSettingsOverrideAtomFamily,
 } from './atoms';
 export { useAppearanceEffect } from './use-appearance-effect';
+export {
+	CODE_THEME_FAMILIES,
+	codeThemeFamilyId,
+	codeThemeForMode,
+	useResolvedCodeTheme,
+} from './use-code-theme';
 export { useThemeEffect } from './use-theme-effect';

@@ -18,6 +18,7 @@ import { usePiSessionStatusInvalidation } from '@/renderer/hooks/workspace/use-p
 import { useWorkspaceAgentBusy } from '@/renderer/hooks/workspace/use-workspace-agent-busy';
 import { areStringArraysEqual } from '@/renderer/lib/ordered-ids';
 import { forgetComposerDraft } from '@/renderer/state/composer';
+import { useConversationScrollOffsets } from '@/renderer/state/conversation-scroll';
 import { forgetChatOverrides } from '@/renderer/state/preferences';
 import {
 	type LiveTerminalTitle,
@@ -112,6 +113,7 @@ export function useSessionTabState({
 } {
 	const workspaceId = activeWorkspace.id;
 	const queryClient = useQueryClient();
+	const scrollOffsets = useConversationScrollOffsets();
 	const {
 		data: chatTabsData,
 		isFetching: isFetchingChatTabs,
@@ -345,6 +347,7 @@ export function useSessionTabState({
 			if (result.deleted) {
 				forgetChatOverrides(chatTabId);
 				forgetComposerDraft(chatTabId);
+				scrollOffsets.forget(chatTabId);
 			}
 			void queryClient.invalidateQueries({
 				queryKey: ensemblrQueryKeys.chatTabs(workspaceId),

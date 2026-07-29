@@ -2,7 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-/* Enables `prose` markdown rendering (Settings → Appearance → Markdown style). */
+/* Backs the `prose` utility used by tool-output bodies and stack traces. */
 @plugin "@tailwindcss/typography";
 
 /*
@@ -65,33 +65,91 @@
 		"JetBrainsMono Nerd Font Mono", "JetBrains Mono Variable", "JetBrains Mono",
 		Menlo, Consolas, monospace;
 
-	--ensemblr-canvas: oklch(0.965 0.003 265);
-	--ensemblr-toolbar: oklch(0.94 0.004 265 / 92%);
-	--ensemblr-surface: oklch(0.995 0 0);
-	--ensemblr-pane: oklch(0.94 0.004 265);
-	--ensemblr-pane-strong: oklch(0.89 0.006 265);
-	--ensemblr-ink: oklch(0.21 0.004 265);
-	--ensemblr-muted-ink: oklch(0.52 0.006 265);
-	--ensemblr-accent: oklch(0.609 0.111 222);
-	--ensemblr-accent-foreground: oklch(0.99 0 0);
-	--ensemblr-border: oklch(0.82 0.006 265);
-	--ensemblr-ring: oklch(0.609 0.111 222);
-	--ensemblr-status-ok: oklch(0.61 0.18 151);
-	--ensemblr-status-warning: oklch(0.68 0.15 73);
-	--ensemblr-status-danger: oklch(0.58 0.19 28);
-	--ensemblr-code: oklch(0.18 0.004 265);
-	--ensemblr-code-foreground: oklch(0.93 0.004 265);
-	--ensemblr-code-border: oklch(0.3 0.004 265);
+	/*
+	 * Polarity switch. Two states mean "dark" and they cannot be written as one
+	 * selector: `.dark`, which `useThemeEffect` pins on the root after mount, and
+	 * the classless first paint before that effect has run, which only a
+	 * `prefers-color-scheme` media query can reach. Rather than restate every
+	 * colour under both, each token below names its light and dark cut once and
+	 * reads whichever this pair unlocks — the arms further down set exactly one
+	 * of the two to an empty value and the other to `initial`, so one `var()`
+	 * substitutes to nothing and the other falls back to the cut it guards.
+	 *
+	 * `light-dark()` would say the same thing natively, but it resolves at used
+	 * value time, so `--sidebar`, `--foreground`, and `--primary` would come back
+	 * unresolved through the `getComputedStyle` reads in
+	 * `lib/terminal/xterm-adapter.ts`. A `var()` is substituted at computed value
+	 * time and survives that round trip.
+	 */
+	--ensemblr-if-light: initial;
+	--ensemblr-if-dark: ;
+
+	--ensemblr-canvas: var(--ensemblr-if-light, oklch(0.965 0.003 265))
+		var(--ensemblr-if-dark, oklch(0.135 0.006 35));
+	--ensemblr-toolbar: var(--ensemblr-if-light, oklch(0.94 0.004 265 / 92%))
+		var(--ensemblr-if-dark, oklch(0.18 0.006 35 / 94%));
+	--ensemblr-surface: var(--ensemblr-if-light, oklch(0.995 0 0))
+		var(--ensemblr-if-dark, oklch(0.16 0.006 35));
+	--ensemblr-pane: var(--ensemblr-if-light, oklch(0.94 0.004 265))
+		var(--ensemblr-if-dark, oklch(0.205 0.006 35));
+	--ensemblr-pane-strong: var(--ensemblr-if-light, oklch(0.89 0.006 265))
+		var(--ensemblr-if-dark, oklch(0.26 0.006 35));
+	--ensemblr-ink: var(--ensemblr-if-light, oklch(0.21 0.004 265))
+		var(--ensemblr-if-dark, oklch(0.91 0.006 75));
+	--ensemblr-muted-ink: var(--ensemblr-if-light, oklch(0.52 0.006 265))
+		var(--ensemblr-if-dark, oklch(0.67 0.006 75));
+	--ensemblr-accent: var(--ensemblr-if-light, oklch(0.609 0.111 222))
+		var(--ensemblr-if-dark, oklch(0.675 0.123 221));
+	--ensemblr-accent-foreground: var(--ensemblr-if-light, oklch(0.99 0 0))
+		var(--ensemblr-if-dark, oklch(0.14 0.006 35));
+	--ensemblr-border: var(--ensemblr-if-light, oklch(0.82 0.006 265))
+		var(--ensemblr-if-dark, oklch(0.31 0.006 35));
+	--ensemblr-ring: var(--ensemblr-if-light, oklch(0.609 0.111 222))
+		var(--ensemblr-if-dark, oklch(0.675 0.123 221));
+	--ensemblr-status-ok: var(--ensemblr-if-light, oklch(0.61 0.18 151))
+		var(--ensemblr-if-dark, oklch(0.74 0.18 151));
+	--ensemblr-status-warning: var(--ensemblr-if-light, oklch(0.68 0.15 73))
+		var(--ensemblr-if-dark, oklch(0.77 0.13 73));
+	--ensemblr-status-danger: var(--ensemblr-if-light, oklch(0.58 0.19 28))
+		var(--ensemblr-if-dark, oklch(0.68 0.15 28));
+	/*
+	 * Code surface. Owned by the app theme, not by the picked Shiki theme: a code
+	 * block reads as a panel of the app first and a syntax sample second, so its
+	 * background and border follow light/dark while only the token colours inside
+	 * come from Settings → Appearance → Code theme.
+	 */
+	--ensemblr-code: var(--ensemblr-if-light, oklch(0.945 0.004 265))
+		var(--ensemblr-if-dark, oklch(0.18 0.004 265));
+	--ensemblr-code-foreground: var(--ensemblr-if-light, oklch(0.22 0.004 265))
+		var(--ensemblr-if-dark, oklch(0.93 0.004 265));
+	--ensemblr-code-border: var(--ensemblr-if-light, oklch(0.86 0.004 265))
+		var(--ensemblr-if-dark, oklch(0.3 0.004 265));
+	/* The terminal is a dark panel in both modes, so it takes no second cut. */
 	--ensemblr-terminal: oklch(0.155 0.006 35);
 	--ensemblr-terminal-foreground: oklch(0.88 0.006 75);
 	--ensemblr-terminal-muted: oklch(0.63 0.006 75);
 	--ensemblr-terminal-border: oklch(0.31 0.006 35);
-	--ensemblr-diff-addition: oklch(0.94 0.041 151);
-	--ensemblr-diff-addition-foreground: oklch(0.37 0.11 151);
-	--ensemblr-diff-deletion: oklch(0.94 0.035 28);
-	--ensemblr-diff-deletion-foreground: oklch(0.43 0.14 28);
-	--ensemblr-diff-modified: oklch(0.94 0.028 73);
-	--ensemblr-diff-modified-foreground: oklch(0.43 0.08 73);
+	--ensemblr-diff-addition: var(--ensemblr-if-light, oklch(0.94 0.041 151))
+		var(--ensemblr-if-dark, oklch(0.22 0.052 151));
+	--ensemblr-diff-addition-foreground: var(
+			--ensemblr-if-light,
+			oklch(0.37 0.11 151)
+		)
+		var(--ensemblr-if-dark, oklch(0.78 0.18 151));
+	--ensemblr-diff-deletion: var(--ensemblr-if-light, oklch(0.94 0.035 28))
+		var(--ensemblr-if-dark, oklch(0.22 0.045 28));
+	--ensemblr-diff-deletion-foreground: var(
+			--ensemblr-if-light,
+			oklch(0.43 0.14 28)
+		)
+		var(--ensemblr-if-dark, oklch(0.74 0.15 28));
+	--ensemblr-diff-modified: var(--ensemblr-if-light, oklch(0.94 0.028 73))
+		var(--ensemblr-if-dark, oklch(0.24 0.035 73));
+	--ensemblr-diff-modified-foreground: var(
+			--ensemblr-if-light,
+			oklch(0.43 0.08 73)
+		)
+		var(--ensemblr-if-dark, oklch(0.78 0.13 73));
 	--ensemblr-traffic-light-safe-inline: 5.75rem;
 
 	--background: var(--ensemblr-canvas);
@@ -100,8 +158,10 @@
 	--card-foreground: var(--ensemblr-ink);
 	--popover: var(--ensemblr-surface);
 	--popover-foreground: var(--ensemblr-ink);
-	--primary: oklch(0.24 0.006 265);
-	--primary-foreground: oklch(0.99 0 0);
+	--primary: var(--ensemblr-if-light, oklch(0.24 0.006 265))
+		var(--ensemblr-if-dark, oklch(0.84 0.007 75));
+	--primary-foreground: var(--ensemblr-if-light, oklch(0.99 0 0))
+		var(--ensemblr-if-dark, oklch(0.14 0.006 35));
 	--secondary: var(--ensemblr-pane);
 	--secondary-foreground: var(--ensemblr-ink);
 	--muted: var(--ensemblr-pane);
@@ -118,70 +178,35 @@
 	--chart-4: oklch(0.537 0.098 222);
 	--chart-5: oklch(0.675 0.123 221);
 	--radius: 0.55rem;
-	--sidebar: oklch(0.925 0.004 265 / 96%);
+	--sidebar: var(--ensemblr-if-light, oklch(0.925 0.004 265 / 96%))
+		var(--ensemblr-if-dark, oklch(0.17 0.006 35 / 97%));
 	--sidebar-foreground: var(--ensemblr-ink);
 	--sidebar-primary: var(--primary);
 	--sidebar-primary-foreground: var(--primary-foreground);
-	--sidebar-accent: oklch(0.89 0.006 265);
+	--sidebar-accent: var(--ensemblr-if-light, oklch(0.89 0.006 265))
+		var(--ensemblr-if-dark, oklch(0.235 0.006 35));
 	--sidebar-accent-foreground: var(--ensemblr-ink);
 	--sidebar-border: var(--ensemblr-border);
 	--sidebar-ring: var(--ensemblr-ring);
 }
 
+/*
+ * The two arms that flip the palette above to its dark cut. The media arm is
+ * the pre-mount one: `index.html` ships no theme class, so until
+ * `useThemeEffect` writes one this is the only thing that keeps an OS-dark
+ * machine off a light canvas. `:not(.light)` keeps it out of the way once the
+ * user has pinned light against a dark OS.
+ */
 @media (prefers-color-scheme: dark) {
 	:root:not(.light) {
-		--ensemblr-canvas: oklch(0.135 0.006 35);
-		--ensemblr-toolbar: oklch(0.18 0.006 35 / 94%);
-		--ensemblr-surface: oklch(0.16 0.006 35);
-		--ensemblr-pane: oklch(0.205 0.006 35);
-		--ensemblr-pane-strong: oklch(0.26 0.006 35);
-		--ensemblr-ink: oklch(0.91 0.006 75);
-		--ensemblr-muted-ink: oklch(0.67 0.006 75);
-		--ensemblr-accent: oklch(0.675 0.123 221);
-		--ensemblr-accent-foreground: oklch(0.14 0.006 35);
-		--ensemblr-border: oklch(0.31 0.006 35);
-		--ensemblr-ring: oklch(0.675 0.123 221);
-		--ensemblr-status-ok: oklch(0.74 0.18 151);
-		--ensemblr-status-warning: oklch(0.77 0.13 73);
-		--ensemblr-status-danger: oklch(0.68 0.15 28);
-		--ensemblr-diff-addition: oklch(0.22 0.052 151);
-		--ensemblr-diff-addition-foreground: oklch(0.78 0.18 151);
-		--ensemblr-diff-deletion: oklch(0.22 0.045 28);
-		--ensemblr-diff-deletion-foreground: oklch(0.74 0.15 28);
-		--ensemblr-diff-modified: oklch(0.24 0.035 73);
-		--ensemblr-diff-modified-foreground: oklch(0.78 0.13 73);
-		--primary: oklch(0.84 0.007 75);
-		--primary-foreground: oklch(0.14 0.006 35);
-		--sidebar: oklch(0.17 0.006 35 / 97%);
-		--sidebar-accent: oklch(0.235 0.006 35);
+		--ensemblr-if-light: ;
+		--ensemblr-if-dark: initial;
 	}
 }
 
 .dark {
-	--ensemblr-canvas: oklch(0.135 0.006 35);
-	--ensemblr-toolbar: oklch(0.18 0.006 35 / 94%);
-	--ensemblr-surface: oklch(0.16 0.006 35);
-	--ensemblr-pane: oklch(0.205 0.006 35);
-	--ensemblr-pane-strong: oklch(0.26 0.006 35);
-	--ensemblr-ink: oklch(0.91 0.006 75);
-	--ensemblr-muted-ink: oklch(0.67 0.006 75);
-	--ensemblr-accent: oklch(0.675 0.123 221);
-	--ensemblr-accent-foreground: oklch(0.14 0.006 35);
-	--ensemblr-border: oklch(0.31 0.006 35);
-	--ensemblr-ring: oklch(0.675 0.123 221);
-	--ensemblr-status-ok: oklch(0.74 0.18 151);
-	--ensemblr-status-warning: oklch(0.77 0.13 73);
-	--ensemblr-status-danger: oklch(0.68 0.15 28);
-	--ensemblr-diff-addition: oklch(0.22 0.052 151);
-	--ensemblr-diff-addition-foreground: oklch(0.78 0.18 151);
-	--ensemblr-diff-deletion: oklch(0.22 0.045 28);
-	--ensemblr-diff-deletion-foreground: oklch(0.74 0.15 28);
-	--ensemblr-diff-modified: oklch(0.24 0.035 73);
-	--ensemblr-diff-modified-foreground: oklch(0.78 0.13 73);
-	--primary: oklch(0.84 0.007 75);
-	--primary-foreground: oklch(0.14 0.006 35);
-	--sidebar: oklch(0.17 0.006 35 / 97%);
-	--sidebar-accent: oklch(0.235 0.006 35);
+	--ensemblr-if-light: ;
+	--ensemblr-if-dark: initial;
 }
 
 /*
@@ -668,4 +693,285 @@
 	color: var(--color-muted-foreground);
 	font-family: var(--font-sans);
 	font-size: 0.75rem;
+}
+
+/*
+ * Assistant answer typography. Streamdown hard-codes its element styling as
+ * Tailwind utilities on the rendered nodes (`mt-6 mb-2 text-3xl` on an h1, and
+ * `space-y-4` on the root), which lands in `@layer utilities`. These rules stay
+ * unlayered so they win on cascade layer regardless of import order, the same
+ * way the diff theming above overrides react-diff-view.
+ *
+ * Every size is relative: the surface is rendered at `text-sm` for a settled
+ * answer and `text-xs` for intermediate commentary, and both need the same
+ * proportions. Density comes from four custom properties, so the two non-default
+ * Settings → Appearance → Markdown style modes only restate the rhythm.
+ */
+.ensemblr-answer {
+	--answer-block-gap: 1em;
+	--answer-heading-lead: 1.6em;
+	--answer-heading-trail: 0.6em;
+	--answer-list-gap: 0.375em;
+	line-height: 1.65;
+	text-underline-offset: 0.2em;
+}
+
+.ensemblr-answer-compact {
+	--answer-block-gap: 0.7em;
+	--answer-heading-lead: 1.2em;
+	--answer-heading-trail: 0.45em;
+	--answer-list-gap: 0.2em;
+	line-height: 1.55;
+}
+
+.ensemblr-answer-prose {
+	--answer-block-gap: 1.3em;
+	--answer-heading-lead: 2em;
+	--answer-heading-trail: 0.75em;
+	--answer-list-gap: 0.55em;
+	line-height: 1.75;
+}
+
+/*
+ * Flow rhythm. Spacing lives entirely on the gap between two blocks rather than
+ * on each block's own margins, so no pair can collapse into an unintended size
+ * and a heading can hug the content it introduces.
+ */
+.ensemblr-answer > * {
+	margin-block: 0;
+}
+
+.ensemblr-answer > * + * {
+	margin-block-start: var(--answer-block-gap);
+}
+
+.ensemblr-answer > * + :is(h1, h2, h3, h4, h5, h6) {
+	margin-block-start: var(--answer-heading-lead);
+}
+
+.ensemblr-answer > :is(h1, h2, h3, h4, h5, h6) + * {
+	margin-block-start: var(--answer-heading-trail);
+}
+
+.ensemblr-answer > * + hr,
+.ensemblr-answer > hr + * {
+	margin-block-start: calc(var(--answer-block-gap) * 1.75);
+}
+
+.ensemblr-answer :is(h1, h2, h3, h4, h5, h6) {
+	font-family: var(--font-heading);
+	font-weight: 600;
+	letter-spacing: -0.011em;
+	line-height: 1.3;
+	text-wrap: balance;
+}
+
+.ensemblr-answer h1 {
+	font-size: 1.5em;
+}
+
+.ensemblr-answer h2 {
+	font-size: 1.25em;
+}
+
+.ensemblr-answer h3 {
+	font-size: 1.0625em;
+}
+
+/*
+ * Below h3 there is no size left to spend without pushing the top of the scale
+ * out of proportion with the body, so the remaining levels step down in color
+ * instead.
+ */
+.ensemblr-answer :is(h4, h5, h6) {
+	color: var(--color-muted-foreground);
+	font-size: 1em;
+	letter-spacing: 0;
+}
+
+.ensemblr-answer :is(ul, ol) {
+	list-style-position: outside;
+	padding-inline-start: 1.5em;
+}
+
+.ensemblr-answer ul {
+	list-style-type: disc;
+}
+
+.ensemblr-answer ol {
+	list-style-type: decimal;
+}
+
+.ensemblr-answer li {
+	padding-block: 0;
+	padding-inline-start: 0.2em;
+}
+
+.ensemblr-answer li::marker {
+	color: color-mix(in oklch, var(--color-foreground) 45%, transparent);
+	font-variant-numeric: tabular-nums;
+}
+
+.ensemblr-answer li + li,
+.ensemblr-answer li > :is(ul, ol),
+.ensemblr-answer li > * + * {
+	margin-block-start: var(--answer-list-gap);
+}
+
+.ensemblr-answer li > p {
+	margin-block: 0;
+}
+
+.ensemblr-answer blockquote {
+	border-inline-start: 2px solid
+		color-mix(in oklch, var(--color-foreground) 20%, transparent);
+	color: var(--color-muted-foreground);
+	font-style: normal;
+	padding-inline-start: 1em;
+}
+
+.ensemblr-answer hr {
+	border: 0;
+	border-block-start: 1px solid var(--color-border);
+}
+
+/* Streamdown renders markdown links as a `button`, not an anchor. */
+.ensemblr-answer a,
+.ensemblr-answer [data-streamdown="link"] {
+	color: var(--color-accent-strong);
+	font-weight: inherit;
+	text-decoration-color: color-mix(
+		in oklch,
+		var(--color-accent-strong) 40%,
+		transparent
+	);
+	text-decoration-line: underline;
+	text-decoration-thickness: 0.0625em;
+}
+
+.ensemblr-answer a:hover,
+.ensemblr-answer [data-streamdown="link"]:hover {
+	text-decoration-color: currentcolor;
+}
+
+.ensemblr-answer strong {
+	font-weight: 600;
+}
+
+/*
+ * Inline code sits mid-sentence, so it reads as texture rather than as a boxed
+ * token: a tint with no outline, and just enough horizontal padding to separate
+ * it from the words either side. A run of these in one paragraph is common in
+ * answers about code, and outlining each one turns the paragraph into a grid.
+ */
+.ensemblr-answer :not(pre) > code {
+	background-color: color-mix(
+		in oklch,
+		var(--color-foreground) 8%,
+		transparent
+	);
+	border: 0;
+	border-radius: 0.25rem;
+	font-size: 0.9em;
+	font-weight: inherit;
+	padding: 0.125em 0.3em;
+	white-space: break-spaces;
+}
+
+.ensemblr-answer :not(pre) > code::before,
+.ensemblr-answer :not(pre) > code::after {
+	content: none;
+}
+
+/*
+ * A file path written as inline code is upgraded into an attachment chip. The
+ * chip lays itself out with `inline-flex` for the standalone rows it was built
+ * for; mid-sentence that misaligns it, because a flex container whose first
+ * item is an icon has no baseline to borrow and synthesizes one from its bottom
+ * edge. Laying it out as inline text puts the label back on the prose baseline
+ * and matches the inline-code tint above.
+ */
+.ensemblr-answer-chip {
+	background-color: color-mix(
+		in oklch,
+		var(--color-foreground) 8%,
+		transparent
+	);
+	border: 0;
+	border-radius: 0.25rem;
+	color: inherit;
+	display: inline;
+	font-size: 0.9em;
+	font-weight: inherit;
+	/*
+	 * A `button` keeps an inline-block box whatever `display` says, so its height
+	 * follows its line-height rather than its font's content area. Inheriting the
+	 * paragraph's 1.65 made the chip stand a third taller than the inline code
+	 * beside it; 1.35 matches the code's own box.
+	 */
+	line-height: 1.35;
+	max-width: none;
+	padding: 0.125em 0.35em;
+	vertical-align: baseline;
+}
+
+.ensemblr-answer-chip:hover {
+	background-color: color-mix(
+		in oklch,
+		var(--color-foreground) 15%,
+		transparent
+	);
+}
+
+/*
+ * The icon is an inline-block, so anything taller than the label's own content
+ * area stretches the chip's background past the line box and makes it bulge
+ * against the inline code beside it. Sizing it to the label keeps the chip the
+ * height of the text it sits in.
+ */
+.ensemblr-answer-chip > svg {
+	display: inline-block;
+	height: 1em;
+	margin-inline-end: 0.3em;
+	vertical-align: -0.15em;
+	width: 1em;
+}
+
+.ensemblr-answer table {
+	border-collapse: collapse;
+	font-size: 0.9375em;
+	font-variant-numeric: tabular-nums;
+	width: 100%;
+}
+
+/*
+ * Rows run tighter than the surrounding prose: the answer's 1.65 leading is set
+ * for reading paragraphs and leaves table rows looking loose and tall.
+ */
+.ensemblr-answer :is(th, td) {
+	border-block-end: 1px solid
+		color-mix(in oklch, var(--color-foreground) 8%, transparent);
+	line-height: 1.45;
+	padding: 0.5em 0.875em;
+	text-align: start;
+	vertical-align: top;
+}
+
+/*
+ * The header reads as a label over its column rather than a peer of the body:
+ * unfilled, a step smaller, muted and lightly tracked, over a divider that
+ * carries more weight than the hairlines between body rows.
+ */
+.ensemblr-answer th {
+	background-color: transparent;
+	border-block-end-color: var(--color-border);
+	color: var(--color-muted-foreground);
+	font-size: 0.9em;
+	font-weight: 600;
+	letter-spacing: 0.01em;
+	white-space: nowrap;
+}
+
+.ensemblr-answer tbody tr:last-child :is(th, td) {
+	border-block-end: 0;
 }

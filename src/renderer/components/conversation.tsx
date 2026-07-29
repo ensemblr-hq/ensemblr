@@ -3,7 +3,7 @@
 import { ArrowDownIcon } from 'lucide-react';
 import { ScrollArea as ScrollAreaPrimitive } from 'radix-ui';
 import type { ComponentProps, ReactNode } from 'react';
-import { useCallback, useLayoutEffect, useState } from 'react';
+import { useCallback } from 'react';
 import {
 	StickToBottom,
 	type StickToBottomContext,
@@ -11,6 +11,7 @@ import {
 } from 'use-stick-to-bottom';
 import { Button } from '@/renderer/components/ui/button';
 import { ScrollBar } from '@/renderer/components/ui/scroll-area';
+import { useConversationScrollRestore } from '@/renderer/hooks/conversation/use-conversation-scroll-restore';
 import { cn } from '@/renderer/lib/utils';
 
 /** Props for the Conversation wrapper — the underlying StickToBottom props. */
@@ -27,30 +28,32 @@ export const Conversation = ({ className, ...props }: ConversationProps) => (
 	/>
 );
 
-/** Props for ConversationContent — the StickToBottom.Content props. */
-type ConversationContentProps = ComponentProps<typeof StickToBottom.Content>;
+/**
+ * Props for ConversationContent — the StickToBottom.Content props, plus the
+ * key its scroll position is remembered under. Pass a stable per-conversation
+ * `scrollKey` (the chat tab id) to have the viewport reopen where the user left
+ * it; omit it for one-off surfaces that should always open at the newest
+ * message.
+ */
+type ConversationContentProps = ComponentProps<typeof StickToBottom.Content> & {
+	scrollKey?: string;
+};
 
 /** Renders sticky conversation content inside shadcn scroll-area chrome. */
 export const ConversationContent = ({
 	children,
 	className,
 	scrollClassName,
+	scrollKey,
 	...props
 }: ConversationContentProps) => {
 	const context = useStickToBottomContext();
-	const [ready, setReady] = useState(false);
-
-	// Jam scrollTop to the bottom before the first paint and only reveal the
-	// viewport once it lands there. The library's own initial scroll fires in
-	// a useEffect (post-paint), so without this the user briefly sees the top
-	// of long conversations on tab switch.
-	useLayoutEffect(() => {
-		const node = context.scrollRef.current;
-		if (node) {
-			node.scrollTop = node.scrollHeight;
-		}
-		setReady(true);
-	}, [context.scrollRef]);
+	const ready = useConversationScrollRestore({
+		scrollKey,
+		scrollRef: context.scrollRef,
+		scrollState: context.state,
+		stopScroll: context.stopScroll,
+	});
 
 	return (
 		<ScrollAreaPrimitive.Root
@@ -114,7 +117,7 @@ export const ConversationScrollButton = ({
 		!isAtBottom && (
 			<Button
 				className={cn(
-					'absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full dark:bg-background dark:hover:bg-muted',
+					'absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full dark:bg-background dark:hover:bg-muted',
 					className,
 				)}
 				onClick={handleScrollToBottom}

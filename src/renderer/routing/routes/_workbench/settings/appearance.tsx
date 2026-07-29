@@ -15,8 +15,10 @@ import {
 import { Switch } from '@/renderer/components/ui/switch';
 import {
 	accessibleColorsAtom,
+	CODE_THEME_FAMILIES,
 	codeLigaturesAtom,
 	codeThemeAtom,
+	codeThemeFamilyId,
 	markdownStyleAtom,
 	monoFontAtom,
 	terminalFontAtom,
@@ -107,22 +109,21 @@ function AppearanceSettings() {
 				control={
 					<Select
 						onValueChange={(v) => setCodeTheme(v as typeof codeTheme)}
-						value={codeTheme}
+						value={codeThemeFamilyId(codeTheme)}
 					>
 						<SelectTrigger className='w-44' size='sm'>
 							<SelectValue />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value='catppuccin-mocha'>Catppuccin Mocha</SelectItem>
-							<SelectItem value='catppuccin-latte'>Catppuccin Latte</SelectItem>
-							<SelectItem value='github-dark'>GitHub Dark</SelectItem>
-							<SelectItem value='github-light'>GitHub Light</SelectItem>
-							<SelectItem value='one-dark-pro'>One Dark Pro</SelectItem>
-							<SelectItem value='solarized-dark'>Solarized Dark</SelectItem>
+							{CODE_THEME_FAMILIES.map((family) => (
+								<SelectItem key={family.dark} value={family.dark}>
+									{family.label}
+								</SelectItem>
+							))}
 						</SelectContent>
 					</Select>
 				}
-				description='Syntax highlighting for code blocks and editors.'
+				description='Syntax highlighting for code blocks and editors. Each theme follows the app theme, using its light cut in light mode and its dark cut in dark mode.'
 				label='Code theme'
 				modified={codeTheme !== DEFAULTS.codeTheme}
 				onReset={() => setCodeTheme(DEFAULTS.codeTheme)}

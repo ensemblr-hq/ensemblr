@@ -1,6 +1,6 @@
 import { Button } from '@/renderer/components/ui/button';
+import { getPullRequestLinkButtonClassName } from '@/renderer/lib/workbench/pull-request-link-button';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
-import { getPullRequestLinkButtonClassName } from './pull-request-number-button';
 
 /** Preview deployment provider ids recognized by the shell. */
 type PreviewDeploymentProvider = NonNullable<

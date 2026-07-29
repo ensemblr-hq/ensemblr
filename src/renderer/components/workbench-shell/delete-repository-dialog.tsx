@@ -14,10 +14,8 @@ import {
 	DialogTitle,
 } from '@/renderer/components/ui/dialog';
 import { ArchiveDiagnosticsList } from '@/renderer/components/workbench-shell/archive-diagnostics-list';
-import {
-	LifecycleSummary,
-	projectSummaryRows,
-} from '@/renderer/components/workbench-shell/lifecycle-summary';
+import { LifecycleSummary } from '@/renderer/components/workbench-shell/lifecycle-summary';
+import { projectSummaryRows } from '@/renderer/lib/workbench/lifecycle-summary-rows';
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import type { DeleteRepositoryDiagnostic } from '@/shared/ipc/contracts/repository';
 

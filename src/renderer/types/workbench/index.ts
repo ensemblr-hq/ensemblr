@@ -13,6 +13,7 @@ export type {
 	GroupedOptions,
 	LinkedIssueComposerSeedInput,
 	SlashCommandDescriptor,
+	ThinkingBarStrength,
 } from './composer';
 export type {
 	ReviewFilePreviewOpener,
@@ -87,6 +88,8 @@ export type {
 	WorkspaceLinkedIssueProvider,
 	WorkspaceLinkedIssueSummary,
 	WorkspaceOpenTarget,
+	WorkspacePathMatch,
+	WorkspacePathResolver,
 	WorkspaceScriptSummary,
 	WorkspaceShellData,
 	WorkspaceShellModel,

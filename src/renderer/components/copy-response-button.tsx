@@ -1,26 +1,44 @@
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import {
-	Tooltip,
-	TooltipContent,
-	TooltipProvider,
-	TooltipTrigger,
-} from '@/renderer/components/ui/tooltip';
 import { cn } from '@/renderer/lib/utils';
+import { BlockControlButton } from './block-controls';
 
 const COPY_FEEDBACK_MS = 1500;
 
 /**
+ * Writes a payload to the clipboard, preferring the rich flavor when one is
+ * offered so a paste into an editor or a spreadsheet keeps the structure the
+ * plain-text flavor can only approximate.
+ * @param payload - Plain text to copy, plus an optional HTML flavor
+ */
+async function writeToClipboard(payload: { html?: string; text: string }) {
+	if (payload.html && typeof ClipboardItem !== 'undefined') {
+		await navigator.clipboard.write([
+			new ClipboardItem({
+				'text/html': new Blob([payload.html], { type: 'text/html' }),
+				'text/plain': new Blob([payload.text], { type: 'text/plain' }),
+			}),
+		]);
+		return;
+	}
+	await navigator.clipboard.writeText(payload.text);
+}
+
+/**
  * Icon-only clipboard button that copies the given text and flips to a check
- * for ~1.5s on success. Shared by the assistant turn footer and the replay
- * timeline footer.
+ * for ~1.5s on success. Shared by the assistant turn footer, the replay
+ * timeline footer, and the hover control on code surfaces and answer tables.
  */
 export function CopyResponseButton({
 	className,
+	label = 'Copy response',
 	text,
 }: {
 	className?: string;
-	text: string;
+	/** Names what is copied, for the tooltip and the accessible label. */
+	label?: string;
+	/** The text itself, or a getter run on click when it has to be read back from the DOM. */
+	text: string | (() => { html?: string; text: string });
 }) {
 	const [copied, setCopied] = useState(false);
 	const resetTimer = useRef<number | null>(null);
@@ -34,7 +52,7 @@ export function CopyResponseButton({
 	);
 	const copy = async () => {
 		try {
-			await navigator.clipboard.writeText(text);
+			await writeToClipboard(typeof text === 'string' ? { text } : text());
 			setCopied(true);
 			if (resetTimer.current !== null) {
 				window.clearTimeout(resetTimer.current);
@@ -49,24 +67,12 @@ export function CopyResponseButton({
 	};
 	const Icon = copied ? CheckIcon : CopyIcon;
 	return (
-		<TooltipProvider>
-			<Tooltip>
-				<TooltipTrigger asChild>
-					<button
-						aria-label='Copy response'
-						className={cn(
-							'rounded-md p-1 text-muted-foreground opacity-70 transition-[color,background-color,opacity] hover:bg-secondary/60 hover:text-foreground hover:opacity-100',
-							copied && 'text-status-ok opacity-100',
-							className,
-						)}
-						onClick={copy}
-						type='button'
-					>
-						<Icon aria-hidden='true' className='size-3.5' />
-					</button>
-				</TooltipTrigger>
-				<TooltipContent>Copy response</TooltipContent>
-			</Tooltip>
-		</TooltipProvider>
+		<BlockControlButton
+			className={cn(copied && 'text-status-ok opacity-100', className)}
+			label={label}
+			onClick={copy}
+		>
+			<Icon aria-hidden='true' className='size-3.5' />
+		</BlockControlButton>
 	);
 }

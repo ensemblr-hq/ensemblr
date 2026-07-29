@@ -25,6 +25,9 @@ export interface SlashCommandDescriptor {
 	autoSubmit: boolean;
 }
 
+/** Discrete thinking-effort strength from 0 (off) to 5 (extra-high). */
+export type ThinkingBarStrength = 0 | 1 | 2 | 3 | 4 | 5;
+
 /** Minimal linked-issue shape needed to seed the composer draft. */
 export interface LinkedIssueComposerSeedInput {
 	description?: string;

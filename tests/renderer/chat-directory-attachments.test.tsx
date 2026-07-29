@@ -9,11 +9,11 @@ vi.mock('@iconify/react', () => ({
 	Icon: ({ icon }: { icon: string }) => <span data-icon={icon} />,
 }));
 
-import { ChatToolRow } from '../../src/renderer/components/chat-activity-row';
+import { ChatToolCall } from '../../src/renderer/components/chat-tool-call';
 import { ChatUserPrompt } from '../../src/renderer/components/chat-user-prompt';
 import {
 	FilePreviewOpenerProvider,
-	WorkspacePathKindResolverProvider,
+	WorkspacePathResolverProvider,
 } from '../../src/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import { renderWithProviders } from './support/dom';
 
@@ -41,13 +41,16 @@ describe('directory attachment chips', () => {
 	test('renders read tool chips for known directories with a folder icon', () => {
 		const openPreview = vi.fn();
 		const { container } = renderWithProviders(
-			<WorkspacePathKindResolverProvider
-				value={(path) => (path === 'src/renderer' ? 'directory' : 'file')}
+			<WorkspacePathResolverProvider
+				value={(path) => ({
+					kind: path === 'src/renderer' ? 'directory' : 'file',
+					path,
+				})}
 			>
 				<FilePreviewOpenerProvider value={openPreview}>
-					<ChatToolRow part={readDirectoryPart('src/renderer')} />
+					<ChatToolCall part={readDirectoryPart('src/renderer')} />
 				</FilePreviewOpenerProvider>
-			</WorkspacePathKindResolverProvider>,
+			</WorkspacePathResolverProvider>,
 		);
 
 		expect(container.innerHTML).toContain('default-folder');
@@ -57,7 +60,7 @@ describe('directory attachment chips', () => {
 
 	test('omits redundant edit path when a file chip is present', () => {
 		renderWithProviders(
-			<ChatToolRow part={editFilePart('src/app/page.tsx')} />,
+			<ChatToolCall part={editFilePart('src/app/page.tsx')} />,
 		);
 
 		expect(screen.getByText('Edit')).toBeTruthy();

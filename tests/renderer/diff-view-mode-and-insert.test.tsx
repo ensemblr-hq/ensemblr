@@ -6,7 +6,7 @@ import { describe, expect, test } from 'vitest';
 
 import { DiffViewer } from '../../src/renderer/components/diff-viewer/diff-viewer';
 import { TooltipProvider } from '../../src/renderer/components/ui/tooltip';
-import { diffNewSideIsWorkingTree } from '../../src/renderer/components/workbench-shell/conversation-panel/workspace-file-diff-panel';
+import { diffNewSideIsWorkingTree } from '../../src/renderer/lib/diff/scope';
 import {
 	composerValueAtomFamily,
 	useComposerInsertToChat,

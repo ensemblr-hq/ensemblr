@@ -7,9 +7,10 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 import { cn } from '@/renderer/lib/utils';
+import { getThinkingStrength } from '@/renderer/lib/workbench/thinking-strength';
 import type { ComposerThinkingOption } from '@/renderer/types/workbench';
 
-import { getThinkingStrength, ThinkingBarIcon } from './thinking-bar-icon';
+import { ThinkingBarIcon } from './thinking-bar-icon';
 
 /** Computes the next thinking-level id when cycling through the available options. */
 export function getNextThinkingId(
