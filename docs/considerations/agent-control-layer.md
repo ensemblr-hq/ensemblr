@@ -97,7 +97,9 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 - `spawnChatTab()` → `{ chatTabId }`
 - `startConversation({ chatTabId?, prompt, model?, thinkingLevel?, title?, wait? })` → `{ chatTabId, piSessionId, result? }` (a spawned tab is marked a sub-agent and tinted; `title` names it via Pi `/name`)
 - `sendFollowUp({ piSessionId, prompt, wait? })` → `{ result? }` (Pi steer/follow_up + submitPrompt)
-- `setName({ name })` → `{ chatTabId, title }` — set the **caller's own** tab name via Pi `set_session_name`
+- `setName({ name })` → `{ chatTabId, title }` — set the **caller's own** tab name via Pi `set_session_name`. Stamps `titleProvenance: 'agent'`; a title the user chose outranks it and the call reports `applied: false`
+- `setBranchName({ name })` → `{ applied, name, branchName, message }` — name the caller's **workspace and its git branch** together from one slug. One-shot: applies only while the workspace still carries its generated placeholder name, and reports `applied: false` rather than failing once it does not
+- `setSummary({ title, summary })` → `{ capturedAtOrdinal, message }` — record the caller's session summary. **Pi-only** (a harness origin owns no chat tab). Writes SQLite only; the summary queue projects it to `.context/sessions/` at the next turn boundary, so nothing materializes `.context/` mid-turn
 - `closeTab({ chatTabId })`
 - `launchHarness({ harnessId })` → `{ chatTabId, terminalId }`
 - `startTerminal({ kind: 'setup' | 'run' | 'spawn' })` → `{ terminalId }`

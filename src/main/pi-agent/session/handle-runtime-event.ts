@@ -1,13 +1,14 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { PiEventRow } from '../../storage/repositories';
 import {
+	getPiSessionById,
 	updatePiSession,
 	updateTurn,
 } from '../../storage/repositories/pi-session-repository.ts';
 import type { SessionNamingInput } from '../naming/session-naming.ts';
 import type { PiAgentEvent } from '../pi-agent-types.ts';
 import type { PiSessionEventSink } from '../pi-session-types.ts';
-import type { ActiveSessionMap } from './active-session.ts';
+import type { ActiveSession, ActiveSessionMap } from './active-session.ts';
 import type { SummaryQueue } from './summary-queue.ts';
 
 /** Lifecycle calls this to mirror runtime events into `pi_session_events`. */
@@ -25,7 +26,7 @@ interface RuntimeEventHandlerOptions {
 	eventSink: PiSessionEventSink | undefined;
 	now: () => Date;
 	persistRuntimeEvent: PersistRuntimeEventPort;
-	/** Retries the unified title + branch naming at every turn boundary; self-gates. */
+	/** Retries the derived tab title at every turn boundary; self-gates. */
 	queueNaming: (input: SessionNamingInput) => void;
 	summaryQueue: SummaryQueue;
 }
@@ -104,9 +105,13 @@ export function createRuntimeEventHandler({
 					sessionId,
 					workspaceId: active.row.workspaceId,
 				});
-			} catch {
+			} catch (cause) {
 				// Sink failures (renderer gone, IPC closed) must not break the
 				// streaming path.
+				console.warn('[pi-session] failed to broadcast streaming delta', {
+					cause: cause instanceof Error ? cause.message : String(cause),
+					sessionId,
+				});
 			}
 			return;
 		}
@@ -128,16 +133,14 @@ export function createRuntimeEventHandler({
 			active.deltaCounter = 0;
 		}
 
-		if (persistedRow && eventSink && active) {
-			try {
-				eventSink({
-					event: persistedRow,
-					sessionId,
-					workspaceId: active.row.workspaceId,
-				});
-			} catch {
-				// Sink failures (renderer gone, IPC closed) must not break persistence.
-			}
+		if (persistedRow && eventSink) {
+			broadcastPersistedEvent({
+				active,
+				database,
+				event: persistedRow,
+				eventSink,
+				sessionId,
+			});
 		}
 
 		if (active && event.type === 'message' && event.role === 'agent') {
@@ -166,20 +169,17 @@ export function createRuntimeEventHandler({
 			if (event.status === 'idle') {
 				summaryQueue.queueSummaryAfterAgentResponse({ database, sessionId });
 				if (active) {
-					// Retry the unified naming off the settled turn; self-gates so a
-					// tab/branch already named (or user-owned) is never re-touched.
-					// Covers resumed sessions and first-attempt failures.
+					// Retry the derived title off the settled turn; self-gates so a tab
+					// already titled (or named by the agent or the user) is never
+					// re-touched. Covers resumed sessions and first-attempt failures.
 					queueNaming({
 						branchId,
 						chatTabId: active.chatTabId,
 						database,
 						eventSink,
-						executable: active.executable,
 						initialPrompt: null,
 						liveSession: active.piRuntimeSession,
-						model: active.row.model,
 						sessionId,
-						workspaceCwd: active.row.cwd,
 						workspaceId: active.row.workspaceId,
 					});
 				}
@@ -207,4 +207,51 @@ export function createRuntimeEventHandler({
 	};
 
 	return { handle };
+}
+
+/**
+ * Pushes a persisted event to the renderer, addressed to the workspace that
+ * owns the session. Drops the event only when the session is unknown, and never
+ * lets a sink failure (renderer gone, IPC closed) break persistence.
+ *
+ * The workspace falls back to the persisted row once the session has left the
+ * active map: `stopSession` drops it as soon as the abort signal is sent, while
+ * the runtime's `shutdown` only lands when the child exits. Without the
+ * fallback that tail — the marker saying the user stopped the turn — is
+ * persisted yet never broadcast, so it surfaces only on the next refetch.
+ * @param active - Active session entry, absent once the session was dropped
+ * @param database - Open session database
+ * @param event - The persisted row to broadcast
+ * @param eventSink - Sink that fans the event out to renderer windows
+ * @param sessionId - Session the event belongs to
+ */
+function broadcastPersistedEvent({
+	active,
+	database,
+	event,
+	eventSink,
+	sessionId,
+}: {
+	active: ActiveSession | undefined;
+	database: DatabaseSync;
+	event: PiEventRow;
+	eventSink: PiSessionEventSink;
+	sessionId: string;
+}): void {
+	const workspaceId =
+		active?.row.workspaceId ??
+		getPiSessionById({ database, id: sessionId })?.workspaceId;
+	if (!workspaceId) {
+		return;
+	}
+	try {
+		eventSink({ event, sessionId, workspaceId });
+	} catch (cause) {
+		// Sink failures (renderer gone, IPC closed) must not break persistence.
+		console.warn('[pi-session] failed to broadcast persisted event', {
+			cause: cause instanceof Error ? cause.message : String(cause),
+			eventType: event.eventType,
+			sessionId,
+		});
+	}
 }

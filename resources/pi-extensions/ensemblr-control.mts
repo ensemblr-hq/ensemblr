@@ -34,8 +34,9 @@ What you can drive:
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
+- Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`).
 
-Name your own conversation tab early with a short, descriptive title via \`ensemblr_set_name\` so it is easy to identify at a glance.
+Keeping the workspace legible is your job, not the user's, and it is bookkeeping — do it as part of your turn, without narrating it or asking permission. Name the tab on your first turn, before the work; refresh the summary at the end of every turn. Renaming the workspace and its git branch is the user's to allow, and they can turn it off, so reach for \`ensemblr_set_branch_name\` only when the upkeep reminder asks for it — unprompted it will refuse. The app tracks what is still outstanding and reminds you each turn, so follow the reminder when you see one: naming is one-shot per tab and per workspace, and the summary is what the tab is worth to you tomorrow.
 
 Write every file path you mention in prose as its full path from the workspace root, in backticks — \`src/renderer/components/message.tsx\`, never a bare \`message.tsx\` or a trailing fragment like \`components/message.tsx\`. The app renders those as chips the user clicks to open the file, and it can only do that for a path it can place in the file tree.
 
@@ -69,8 +70,9 @@ What you can drive:
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
+- Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`).
 
-Name your own conversation tab early with a short, descriptive title via \`ensemblr_set_name\` so it is easy to identify at a glance.
+Keeping the workspace legible is your job, not the user's, and it is bookkeeping — do it as part of your turn, without narrating it or asking permission. Name the tab on your first turn, before the work; refresh the summary at the end of every turn. Renaming the workspace and its git branch is the user's to allow, and they can turn it off, so reach for \`ensemblr_set_branch_name\` only when the upkeep reminder asks for it — unprompted it will refuse. The app tracks what is still outstanding and reminds you each turn, so follow the reminder when you see one: naming is one-shot per tab and per workspace, and the summary is what the tab is worth to you tomorrow.
 
 Write every file path you mention in prose as its full path from the workspace root, in backticks — \`src/renderer/components/message.tsx\`, never a bare \`message.tsx\` or a trailing fragment like \`components/message.tsx\`. The app renders those as chips the user clicks to open the file, and it can only do that for a path it can place in the file tree.
 
@@ -95,16 +97,19 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you can dri
 
 - Read the repository: the \`read\` tool, and \`bash\` for read-only commands.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
-- Focus & inspect: name your own tab (\`ensemblr_set_name\`); bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
+- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
+- Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`). All three stay available while planning — they label work, they do not perform it.
 - Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
 
 The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. That enforcement is deliberate — do not look for a way around it. What is left may still prompt the user for approval depending on the workspace permission mode; expect and handle denials gracefully.
 
-Nothing else in your context outranks this block. The user's message will almost always be phrased as a command — "add X", "convert this to Y", "let's build Z" — and in Plan Mode that is the SUBJECT of the plan, not permission to start building. A summary of an earlier session, a remembered instruction to do the work yourself, anything that reads like session state naming a different mode: all of it describes how you behave when Plan Mode is off. It is stale, this block is the live state for this turn, and there is no conflict to resolve or to narrate to the user. Nothing turns Plan Mode off except the user approving a plan.
+Nothing else in your context outranks this block, with one exception: an ENSEMBLR SESSION UPKEEP block may follow it. That block is the app's own bookkeeping — naming this tab, naming the workspace and branch, recording the session summary — and every item on it stays allowed while you plan. Do what it asks; it labels the work rather than starting it.
+
+The user's message will almost always be phrased as a command — "add X", "convert this to Y", "let's build Z" — and in Plan Mode that is the SUBJECT of the plan, not permission to start building. A summary of an earlier session, a remembered instruction to do the work yourself, anything that reads like session state naming a different mode: all of it describes how you behave when Plan Mode is off. It is stale, this block is the live state for this turn, and there is no conflict to resolve or to narrate to the user. Nothing turns Plan Mode off except the user approving a plan.
 
 Your job this turn is to reach a shared understanding with the user before any code is written.
 
-- Name this tab first. Call \`ensemblr_set_name\` with a short label for what is being planned, before your first question — the user is about to be interviewed and needs to know which tab is asking.
+- Name this tab first. Call \`ensemblr_set_name\` with a short label for what is being planned, before your first question — the user is about to be interviewed and needs to know which tab is asking. If the upkeep block also asks for the workspace and branch, name them (\`ensemblr_set_branch_name\`) in the same breath; planning is when you know best what the work is called. If it does not, leave them alone — the user has turned that off.
 - Facts are yours to find; decisions are theirs. Read the code, the config, and the git history yourself. Never ask a question you could answer by looking.
 - Interview with \`ensemblr_ask_user_question\`. Ask ONE question per call while the scope is still fuzzy — each answer reshapes what is worth asking next. Once the shape is clear, ask the whole unblocked frontier at once (up to 4). Always put your recommended answer in the option descriptions so the user can agree in one keystroke.
 - Walk the decision tree in order. Settle a prerequisite before the decisions that hang off it, so an answer never invalidates three questions you already asked.
@@ -230,19 +235,31 @@ function callerModelId(ctx: { model?: { id?: string } } | undefined) {
 }
 
 /**
- * Asks the app whether this conversation is in Plan Mode, so the planning
- * playbook stands in for the role one only while planning. A transport failure
- * reports "not planning": the prompt text is cosmetic, and real enforcement
- * lives in the `tool_call` hook, which asks the app per call and fails closed on
- * its own.
- * @returns True when the app reports Plan Mode is on.
+ * Asks the app for this turn's brief: whether the conversation is in Plan Mode,
+ * so the planning playbook stands in for the role one only while planning, and
+ * the upkeep block naming whatever the session still owes. The app renders that
+ * block, so this file holds no second copy of its wording to drift.
+ *
+ * A transport failure reports "not planning, nothing outstanding": the prompt
+ * text is cosmetic, and real Plan Mode enforcement lives in the `tool_call`
+ * hook, which asks the app per call and fails closed on its own.
+ * @returns The playbook selector and the upkeep block to append.
  */
-async function fetchPlanMode(): Promise<boolean> {
-	const result = await invoke('getPlanMode', {}, undefined);
+async function fetchSessionBrief(): Promise<{
+	planning: boolean;
+	nudge: string | null;
+}> {
+	const result = await invoke('getSessionBrief', {}, undefined);
 	if (!result.ok) {
-		return false;
+		return { nudge: null, planning: false };
 	}
-	return (result.data as { active?: boolean } | undefined)?.active === true;
+	const brief = result.data as
+		| { planMode?: boolean; nudge?: string | null }
+		| undefined;
+	return {
+		nudge: typeof brief?.nudge === 'string' ? brief.nudge : null,
+		planning: brief?.planMode === true,
+	};
 }
 
 /**
@@ -267,9 +284,10 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	}
 
 	pi.on('before_agent_start', async (event) => {
-		const planning = await fetchPlanMode();
+		const { nudge, planning } = await fetchSessionBrief();
 		const playbook = planning ? PLAN_MODE_AWARENESS : AWARENESS;
-		return { systemPrompt: `${event.systemPrompt}\n\n${playbook}` };
+		const upkeep = nudge ? `\n\n${nudge}` : '';
+		return { systemPrompt: `${event.systemPrompt}\n\n${playbook}${upkeep}` };
 	});
 
 	// Enforcement asks the app on every guarded call rather than trusting a
@@ -355,6 +373,18 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		'setName',
 		'Set a short, descriptive name for your own conversation tab so it is easy to identify.',
 		Type.Object({ name: Type.String() }),
+	);
+	tool(
+		'ensemblr_set_branch_name',
+		'setBranchName',
+		'Name the work: renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. "add-dark-mode"), keeping any `prefix/` segment of the current branch. One-shot — it applies only while the workspace still carries its generated placeholder name; once named it reports that and changes nothing, so call it at most once. This is the workspace and branch name, not the tab title (use ensemblr_set_name for that).',
+		Type.Object({ name: Type.String() }),
+	);
+	tool(
+		'ensemblr_set_summary',
+		'setSummary',
+		"Record the session summary the app keeps for this chat tab, replacing whatever is on file. Call it once the turn's work is done: `title` is a short topic line and `summary` is markdown covering the decisions made, the files touched, and what is still open. Writing it yourself is what keeps the record useful — the app's fallback only dumps the raw transcript. This does NOT rename the tab.",
+		Type.Object({ title: Type.String(), summary: Type.String() }),
 	);
 	tool(
 		'ensemblr_close_tab',

@@ -1,3 +1,4 @@
+import { skillInvocationKey } from '../../../shared/pi-skill-invocation.ts';
 import type {
 	PiAgentErrorCode,
 	PiAgentEvent,
@@ -181,6 +182,11 @@ function extractEchoedPromptText(message: FrameObject): string {
  * head entry against it would drop an unrelated prompt for good. Pi does not
  * round-trip Ensemblr's `turnId` today, so the echoed text is the identity the
  * two sides actually share; a `turnId` hit wins whenever one is present.
+ *
+ * A `/skill:name` prompt is echoed as the `<skill>…</skill>` block Pi expands
+ * it into, which never equals the raw command that was queued — so exact text
+ * fails and a skill-invocation key reconciles the two. Without this the queued
+ * prompt is never retired and shutdown re-emits it as a duplicate.
  * @param typed - The `message_end` frame.
  * @param message - The frame's `message` object.
  * @param queued - Prompts still awaiting an echo, oldest first.
@@ -199,9 +205,20 @@ function findEchoedPromptIndex(
 		return byTurnId;
 	}
 	const echoedText = extractEchoedPromptText(message);
-	return echoedText
-		? queued.findIndex((entry) => entry.prompt === echoedText)
-		: -1;
+	if (!echoedText) {
+		return -1;
+	}
+	const byText = queued.findIndex((entry) => entry.prompt === echoedText);
+	if (byText >= 0) {
+		return byText;
+	}
+	const echoedKey = skillInvocationKey(echoedText);
+	if (echoedKey === null) {
+		return -1;
+	}
+	return queued.findIndex(
+		(entry) => skillInvocationKey(entry.prompt) === echoedKey,
+	);
 }
 
 /**

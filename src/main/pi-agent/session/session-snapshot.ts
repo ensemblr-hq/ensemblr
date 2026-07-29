@@ -86,8 +86,8 @@ export function persistSummaryMetadata({
 		...tab.metadata,
 		summary: {
 			path: result.path,
+			source: result.source,
 			title: result.title,
-			usedLlm: result.usedLlm,
 		},
 	};
 	setChatTabMetadata({ database, id: tabId, metadata: nextMetadata });

@@ -29,6 +29,18 @@ describe('agent-control op classification', () => {
 		expect(isSpawnOp('focusDockTab')).toBe(false);
 	});
 
+	it('treats the naming ops as writes that create nothing', () => {
+		expect(isWriteOp('setBranchName')).toBe(true);
+		expect(isWriteOp('setSummary')).toBe(true);
+		expect(isSpawnOp('setBranchName')).toBe(false);
+		expect(isSpawnOp('setSummary')).toBe(false);
+	});
+
+	it('treats the per-turn session brief as a read', () => {
+		expect(isWriteOp('getSessionBrief')).toBe(false);
+		expect(isSpawnOp('getSessionBrief')).toBe(false);
+	});
+
 	it('exposes every op exactly once', () => {
 		expect(new Set(AGENT_CONTROL_OPS).size).toBe(AGENT_CONTROL_OPS.length);
 	});
@@ -89,5 +101,35 @@ describe('validateArgs', () => {
 	it('restricts focusPanel to files/changes/checks', () => {
 		expect(validateArgs('focusPanel', { panel: 'files' }).ok).toBe(true);
 		expect(validateArgs('focusPanel', { panel: 'nope' }).ok).toBe(false);
+	});
+
+	it('caps a runaway setBranchName slug', () => {
+		expect(validateArgs('setBranchName', { name: 'add-dark-mode' }).ok).toBe(
+			true,
+		);
+		expect(validateArgs('setBranchName', { name: '' }).ok).toBe(false);
+		expect(validateArgs('setBranchName', { name: 'a'.repeat(121) }).ok).toBe(
+			false,
+		);
+	});
+
+	it('requires both a title and a body for setSummary, within their caps', () => {
+		expect(
+			validateArgs('setSummary', { summary: '- Did the thing', title: 'Topic' })
+				.ok,
+		).toBe(true);
+		expect(validateArgs('setSummary', { title: 'Topic' }).ok).toBe(false);
+		expect(
+			validateArgs('setSummary', {
+				summary: 'body',
+				title: 'a'.repeat(81),
+			}).ok,
+		).toBe(false);
+		expect(
+			validateArgs('setSummary', {
+				summary: 'a'.repeat(4001),
+				title: 'Topic',
+			}).ok,
+		).toBe(false);
 	});
 });

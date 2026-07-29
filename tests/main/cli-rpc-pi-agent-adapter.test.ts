@@ -460,6 +460,40 @@ test('abort does not re-emit a prompt pi already echoed back', async () => {
 	assert.equal(userMessages.length, 1);
 });
 
+test('abort does not re-emit a skill prompt pi echoed back expanded', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	// Pi expands `/skill:name args` into a `<skill>` block before echoing it, so
+	// the echo never equals the queued command; the skill key must still retire
+	// it or shutdown re-emits the raw prompt as a duplicate user message.
+	await session.submit({ prompt: '/skill:caveman write me a poem' });
+	const expanded = [
+		'<skill name="caveman" location="/skills/caveman/SKILL.md">',
+		'Respond terse like smart caveman.',
+		'</skill>',
+		'',
+		'write me a poem',
+	].join('\n');
+	child.emitStdout(
+		`${JSON.stringify({
+			message: { content: [{ text: expanded, type: 'text' }], role: 'user' },
+			type: 'message_end',
+		})}\n`,
+	);
+	await session.abort('user clicked stop');
+
+	const userMessages = events.filter(
+		(event) => event.type === 'message' && event.role === 'user',
+	);
+	assert.equal(userMessages.length, 1);
+});
+
 test('a crash surfaces a prompt pi never echoed instead of dropping it', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
@@ -1005,6 +1039,48 @@ test('normalizePiPayload projects message_end frames into a composite message', 
 			},
 		],
 		role: 'assistant',
+	});
+});
+
+test('normalizePiPayload keeps an extension-injected message off the text path', () => {
+	const result = normalizePiPayload({
+		message: {
+			content: '[Context7 Docs: tailwind]\n# Usage',
+			customType: 'context7_docs',
+			display: false,
+			role: 'custom',
+		},
+		type: 'message_end',
+	});
+
+	assert.deepEqual(result, {
+		customType: 'context7_docs',
+		display: false,
+		kind: 'custom',
+		text: '[Context7 Docs: tailwind]\n# Usage',
+	});
+});
+
+test('normalizePiPayload joins the text blocks of an injected message', () => {
+	const result = normalizePiPayload({
+		message: {
+			content: [
+				{ text: 'first', type: 'text' },
+				{ data: '…', type: 'image' },
+				{ text: 'second', type: 'text' },
+			],
+			customType: 'notes',
+			display: true,
+			role: 'custom',
+		},
+		type: 'message_end',
+	});
+
+	assert.deepEqual(result, {
+		customType: 'notes',
+		display: true,
+		kind: 'custom',
+		text: 'first\nsecond',
 	});
 });
 

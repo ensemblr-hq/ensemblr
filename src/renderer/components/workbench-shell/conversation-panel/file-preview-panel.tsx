@@ -1,13 +1,17 @@
 import { Icon } from '@iconify/react';
 import { useQuery } from '@tanstack/react-query';
+import { useAtom } from 'jotai';
+import { WrapTextIcon } from 'lucide-react';
 
 import {
 	ensemblrQueryKeys,
 	readWorkspaceFile,
 } from '@/renderer/api/ensemblr-queries';
 import { CodeBlockContent } from '@/renderer/components/code-block';
+import { IconToggle } from '@/renderer/components/icon-toggle';
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
 import { getWorkspaceFileIconNameForPath } from '@/renderer/lib/workbench';
+import { filePreviewWordWrapAtom } from '@/renderer/state/preferences';
 import type {
 	ReadWorkspaceFileFailureCode,
 	ReadWorkspaceFileResult,
@@ -27,6 +31,7 @@ export function FilePreviewPanel({
 	filePath: string | null;
 	workspaceCwd: string | null;
 }) {
+	const [wordWrap, setWordWrap] = useAtom(filePreviewWordWrapAtom);
 	const { data, isError, isPending } = useQuery({
 		enabled: Boolean(filePath && workspaceCwd),
 		queryFn: () =>
@@ -66,7 +71,7 @@ export function FilePreviewPanel({
 
 	return (
 		<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-			<div className='flex h-9 shrink-0 items-center gap-2 border-border border-b bg-muted/30 px-4'>
+			<div className='flex h-9 shrink-0 items-center gap-2 border-border border-b bg-muted/30 pr-2 pl-4'>
 				<Icon
 					aria-hidden='true'
 					className='size-3.5 shrink-0 text-muted-foreground'
@@ -75,11 +80,22 @@ export function FilePreviewPanel({
 				<span className='truncate font-mono text-muted-foreground text-xs'>
 					{filePath}
 				</span>
-				{typeof result.sizeBytes === 'number' ? (
-					<span className='ml-auto shrink-0 text-muted-foreground text-xs'>
-						{formatSizeBytes(result.sizeBytes)}
-					</span>
-				) : null}
+				<div className='ml-auto flex shrink-0 items-center gap-2'>
+					{typeof result.sizeBytes === 'number' ? (
+						<span className='text-muted-foreground text-xs'>
+							{formatSizeBytes(result.sizeBytes)}
+						</span>
+					) : null}
+					{imageSource ? null : (
+						<IconToggle
+							active={wordWrap}
+							label={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
+							onClick={() => setWordWrap(!wordWrap)}
+						>
+							<WrapTextIcon />
+						</IconToggle>
+					)}
+				</div>
 			</div>
 			{imageSource ? (
 				<div className='flex min-h-0 flex-1 items-center justify-center overflow-auto bg-muted/10 p-4'>
@@ -90,13 +106,13 @@ export function FilePreviewPanel({
 					/>
 				</div>
 			) : (
-				<div className='min-h-0 flex-1 overflow-auto'>
-					<CodeBlockContent
-						code={result.content ?? ''}
-						language={languageForFilePath(filePath)}
-						showLineNumbers
-					/>
-				</div>
+				<CodeBlockContent
+					className='min-h-0 flex-1'
+					code={result.content ?? ''}
+					language={languageForFilePath(filePath)}
+					showLineNumbers
+					wrapLines={wordWrap}
+				/>
 			)}
 		</div>
 	);

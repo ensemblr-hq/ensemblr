@@ -1,6 +1,8 @@
 import type { DynamicToolUIPart } from 'ai';
 import {
+	ChatCustomMessage,
 	ChatReasoningCollapsible,
+	ChatSkillInvocation,
 	ChatToolCall,
 } from '@/renderer/components/chat-tool-call';
 import {
@@ -28,6 +30,22 @@ export function Playground() {
     </div>
   );
 }`;
+
+const INJECTED_DOCS = `[Context7 Docs: tailwind (/rails/tailwindcss-rails)]
+
+## tailwindcss:build
+
+Compiles Tailwind CSS from the source file into a minified output file. This
+task is automatically invoked during asset precompilation.
+
+### Options
+
+- **debug** — Disable minification; generates unminified CSS.
+- **verbose** — Enable verbose logging.
+
+\`\`\`bash
+bin/rails tailwindcss:build
+\`\`\``;
 
 const WRITE_CONTENT = `export interface ToolBadgeDescriptor {
 	additions: number | null;
@@ -115,6 +133,16 @@ export function TimelinePreview() {
 			<FilePreviewOpenerProvider value={() => undefined}>
 				<div className='flex flex-col gap-1'>
 					<ChatReasoningCollapsible text={THINKING_TEXT} />
+
+					<ChatCustomMessage
+						data={{
+							customType: 'context7_docs',
+							display: false,
+							text: INJECTED_DOCS,
+						}}
+					/>
+
+					<ChatSkillInvocation name='caveman' />
 
 					<ChatToolCall
 						part={toolPart(

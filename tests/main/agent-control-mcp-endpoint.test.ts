@@ -55,9 +55,13 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).toContain('ensemblr_wait_for_agents');
 		expect(names).toContain('ensemblr_notify_orchestrator');
 		expect(names).toContain('ensemblr_set_name');
+		expect(names).toContain('ensemblr_set_branch_name');
 		expect(names).toContain('ensemblr_set_workspace_status');
 		expect(names).toContain('ensemblr_get_workspace_status');
-		expect(tools).toHaveLength(24);
+		// Pi-only, like `ensemblr_ask_user_question` and `ensemblr_exit_plan_mode`:
+		// a harness origin is workspace-scoped and owns no chat tab to summarize.
+		expect(names).not.toContain('ensemblr_set_summary');
+		expect(tools).toHaveLength(25);
 		const instructions = client.getInstructions() ?? '';
 		expect(instructions).toContain('Ensemblr');
 		expect(instructions).toContain('orchestrator');

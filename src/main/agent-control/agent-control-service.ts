@@ -18,7 +18,7 @@ import type {
 	FocusPanelArgs,
 	FocusTabArgs,
 	GetLastMessageResult,
-	GetPlanModeResult,
+	GetSessionBriefResult,
 	LaunchHarnessArgs,
 	ListTabsArgs,
 	ListTerminalsArgs,
@@ -27,7 +27,10 @@ import type {
 	OrchestratorSignal,
 	ReadTerminalOutputArgs,
 	SendFollowUpArgs,
+	SetBranchNameArgs,
 	SetNameArgs,
+	SetNameResult,
+	SetSummaryArgs,
 	SetWorkspaceStatusArgs,
 	SpawnChatTabArgs,
 	StartConversationArgs,
@@ -37,12 +40,17 @@ import type {
 	WaitForAgentsArgs,
 	WriteTerminalArgs,
 } from '../../shared/agent-control.ts';
-import { isWriteOp, validateArgs } from '../../shared/agent-control.ts';
+import {
+	buildSessionBriefNudge,
+	isWriteOp,
+	validateArgs,
+} from '../../shared/agent-control.ts';
 import { classifyPermissionAction } from '../../shared/permissions.ts';
 import {
 	evaluatePlanModeTool,
 	planModeControlOpDenial,
 } from '../../shared/plan-mode.ts';
+import { BranchSlugRejected } from '../pi-agent/naming/apply-branch-slug.ts';
 import type { Guardrails } from './guardrails.ts';
 import type { OriginRegistry } from './origin-registry.ts';
 import type { AgentControlOrigin, AgentControlPorts } from './ports.ts';
@@ -289,21 +297,105 @@ export function createAgentControlService({
 		return ok({ ...started, result });
 	};
 
+	/**
+	 * Names the caller's own conversation tab. A title the user chose outranks
+	 * the agent and is reported as settled rather than failed, so the agent reads
+	 * "leave it alone" instead of a fault worth retrying.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The requested title.
+	 * @returns The resulting title and whether the rename landed.
+	 */
 	const handleSetName = async (
 		origin: AgentControlOrigin,
 		args: SetNameArgs,
 	): Promise<AgentControlResult<unknown>> => {
-		const applied = await ports.conversations.setName({
+		const result = await ports.conversations.setName({
 			piSessionId: origin.sessionId,
 			name: args.name,
 		});
-		if (!applied) {
+		if (!result) {
 			return fail(
 				'not-found',
 				'Cannot name this tab: the calling conversation is not active.',
 			);
 		}
-		return ok(applied);
+		return ok({
+			...result,
+			message: result.applied
+				? 'Named this tab.'
+				: 'This tab was named by the user; their title stands and nothing changed.',
+		} satisfies SetNameResult & { chatTabId: string });
+	};
+
+	/**
+	 * Names the caller's workspace and its git branch. A workspace the user (or
+	 * an earlier agent) already named is reported as settled rather than failed:
+	 * a failure envelope reads to a model like a transient fault worth retrying,
+	 * and there is nothing here to retry.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The requested slug.
+	 * @returns Whether the name was applied, or an `invalid-args` failure the agent can act on.
+	 */
+	const handleSetBranchName = async (
+		origin: AgentControlOrigin,
+		args: SetBranchNameArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		try {
+			return ok(
+				await ports.sessionNaming.setBranchName({ origin, slug: args.name }),
+			);
+		} catch (error) {
+			if (error instanceof BranchSlugRejected) {
+				return fail('invalid-args', error.message);
+			}
+			throw error;
+		}
+	};
+
+	/**
+	 * Records what the conversation has covered so far. Restricted to Pi callers:
+	 * the summary belongs to the chat tab bound to the Pi session, and a harness
+	 * has no such tab.
+	 * @param origin - Resolved caller identity.
+	 * @param args - The summary title and markdown body.
+	 * @returns The point in the conversation the summary now covers.
+	 */
+	const handleSetSummary = async (
+		origin: AgentControlOrigin,
+		args: SetSummaryArgs,
+	): Promise<AgentControlResult<unknown>> => {
+		if (origin.species !== 'pi') {
+			return fail(
+				'denied-scope',
+				'Recording a session summary is limited to native Pi conversations.',
+			);
+		}
+		return ok(
+			await ports.sessionNaming.setSummary({
+				origin,
+				summary: args.summary,
+				title: args.title,
+			}),
+		);
+	};
+
+	/**
+	 * Reports everything the Pi extension needs to assemble a turn's system
+	 * prompt in one round trip: whether the session is planning, what naming
+	 * upkeep it still owes, and the rendered upkeep block to append.
+	 * @param origin - Resolved caller identity.
+	 * @returns The session brief.
+	 */
+	const handleGetSessionBrief = async (
+		origin: AgentControlOrigin,
+	): Promise<AgentControlResult<unknown>> => {
+		const naming = await ports.sessionNaming.readBrief(origin);
+		return ok({
+			naming,
+			nudge: buildSessionBriefNudge(naming),
+			planMode:
+				origin.species === 'pi' && ports.planMode.isActive(origin.sessionId),
+		} satisfies GetSessionBriefResult);
 	};
 
 	const handleSendFollowUp = async (
@@ -683,6 +775,10 @@ export function createAgentControlService({
 				return handleSendFollowUp(origin, args as SendFollowUpArgs);
 			case 'setName':
 				return handleSetName(origin, args as SetNameArgs);
+			case 'setBranchName':
+				return handleSetBranchName(origin, args as SetBranchNameArgs);
+			case 'setSummary':
+				return handleSetSummary(origin, args as SetSummaryArgs);
 			case 'closeTab':
 				return handleCloseTab(origin, args as CloseTabArgs);
 			case 'launchHarness':
@@ -753,12 +849,8 @@ export function createAgentControlService({
 				return handleNotifyOrchestrator(origin, args as NotifyOrchestratorArgs);
 			case 'askUserQuestion':
 				return handleAskUserQuestion(origin, args as AskUserQuestionArgs);
-			case 'getPlanMode':
-				return ok({
-					active:
-						origin.species === 'pi' &&
-						ports.planMode.isActive(origin.sessionId),
-				} satisfies GetPlanModeResult);
+			case 'getSessionBrief':
+				return handleGetSessionBrief(origin);
 			case 'checkPlanModeTool':
 				return handleCheckPlanModeTool(origin, args as CheckPlanModeToolArgs);
 			case 'exitPlanMode':

@@ -8,12 +8,14 @@ export type ToolTone = 'default' | 'destructive';
  * so tool projection stays a pure data transform outside the render tree.
  */
 export type ToolGlyph =
+	| 'biceps-flexed'
 	| 'brain'
 	| 'circle-x'
 	| 'file-pen'
 	| 'file-plus'
 	| 'file-text'
 	| 'folder-tree'
+	| 'puzzle'
 	| 'search'
 	| 'stethoscope'
 	| 'terminal'

@@ -81,7 +81,7 @@ interface PiSessionLifecycleOptions {
 	now: () => Date;
 	persistRuntimeEvent: PersistRuntimeEventPort;
 	piAgentClient: PiAgentClient;
-	/** Unified title + branch naming, fired at open and every turn-idle. */
+	/** Derived tab titling, fired at open and every turn-idle. */
 	queueNaming: QueueNamingPort;
 	requireDatabase: () => DatabaseSync;
 	/** Injects the agent-control env (control URL + token) into each Pi child. */

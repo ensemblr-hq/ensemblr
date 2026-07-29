@@ -5,6 +5,7 @@ import { cn } from '@/renderer/lib/utils';
 import { codeThemeAtom } from '@/renderer/state/preferences';
 
 import { AnswerPreview } from './answer-preview.tsx';
+import { FilePreviewScene } from './file-preview.tsx';
 import { TimelinePreview } from './timeline-preview.tsx';
 import { TurnSummaryPreview } from './turn-summary-preview.tsx';
 
@@ -36,6 +37,12 @@ const SCENES = [
 		label: 'summary',
 		render: () => <TurnSummaryPreview />,
 		source: 'playground/turn-summary-preview.tsx',
+	},
+	{
+		id: 'file',
+		label: 'file',
+		render: () => <FilePreviewScene />,
+		source: 'playground/file-preview.tsx',
 	},
 ] as const;
 

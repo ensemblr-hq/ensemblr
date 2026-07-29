@@ -1,6 +1,12 @@
 import type { DynamicToolUIPart } from 'ai';
 import { useMemo } from 'react';
-import { presentReasoning, presentToolCall } from '@/renderer/lib/pi';
+import {
+	presentCustomMessage,
+	presentReasoning,
+	presentSkillInvocation,
+	presentToolCall,
+} from '@/renderer/lib/pi';
+import type { PiCustomMessageData } from '@/renderer/types/pi-timeline';
 import type { ToolPresentation } from '@/renderer/types/tool-presentation';
 import { ToolCollapsible } from './tool-collapsible';
 import { ToolBody } from './tool-collapsible/tool-body';
@@ -29,6 +35,26 @@ export function ChatReasoningCollapsible({ text }: { text: string }) {
 	if (trimmed.length === 0) {
 		return null;
 	}
+	return <ToolRow presentation={presentation} />;
+}
+
+/**
+ * One extension-injected message, rendered as the same collapsible row a tool
+ * call gets — context an extension pushed into the turn is activity, not prose
+ * the assistant wrote, and it stays folded until asked for.
+ */
+export function ChatCustomMessage({ data }: { data: PiCustomMessageData }) {
+	const presentation = useMemo(() => presentCustomMessage(data), [data]);
+	return <ToolRow presentation={presentation} />;
+}
+
+/**
+ * One skill activation, rendered as the same row a tool call gets: the skill
+ * named and marked "Skill activated", so invoking `/skill:name` reads as a step
+ * the turn took rather than the whole `SKILL.md` pasted above it.
+ */
+export function ChatSkillInvocation({ name }: { name: string }) {
+	const presentation = useMemo(() => presentSkillInvocation(name), [name]);
 	return <ToolRow presentation={presentation} />;
 }
 

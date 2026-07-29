@@ -5,6 +5,7 @@
  * it unit-tests under Vitest alongside `sanitize-title.ts`.
  */
 
+import { parseSlashCommand } from '../../../shared/pi-skill-invocation.ts';
 import {
 	attachedFileBlockPattern,
 	referencedFoldersBlockPattern,
@@ -27,4 +28,36 @@ export function stripPromptScaffolding(prompt: string): string {
 		.replace(attachedFileBlockPattern(), '')
 		.replace(/\n{3,}/g, '\n\n')
 		.trim();
+}
+
+/**
+ * Reduces a prompt to the text a tab title should describe: the composer
+ * scaffolding is stripped first, then a leading slash command is dropped in
+ * favor of its arguments, since `/skill:caveman` names the tool and
+ * `write a haiku` names the work. Stripping has to run first because the master
+ * prompt wraps the typed text, so the slash is not leading until it is gone.
+ * @param prompt - The raw persisted or composed prompt text.
+ * @returns The residual text describing the work, which is empty only when the prompt was pure scaffolding.
+ */
+export function deriveTitleSource(prompt: string): string {
+	const typed = stripPromptScaffolding(prompt);
+	const command = parseSlashCommand(typed);
+	if (!command) {
+		return typed;
+	}
+	return command.args || humanizeCommandName(command.name);
+}
+
+/**
+ * Renders a bare command name as prose, so a tab whose prompt carried no
+ * arguments still gets a readable title instead of a blank one.
+ * @param name - The command name without its leading slash, e.g. `skill:code-review`.
+ * @returns The name with its skill prefix and separators removed, sentence-cased.
+ */
+function humanizeCommandName(name: string): string {
+	const words = name
+		.replace(/^skill:/, '')
+		.replace(/[-_:]+/g, ' ')
+		.trim();
+	return words.charAt(0).toUpperCase() + words.slice(1);
 }

@@ -53,9 +53,21 @@ export type PiWireMessagePart =
  * runtime's `message_update` frame. They render as streaming-state parts on
  * the timeline; a subsequent `message` envelope for the same turn replaces
  * them with the authoritative final text.
+ *
+ * `custom` carries a message an extension injected into the conversation
+ * (Pi's `role: "custom"`). It is context the agent reads, not prose it wrote,
+ * so it is kept apart from `text` rather than folded into it.
  */
 export type PiWireMessagePayload =
 	| { kind: 'text'; text: string }
+	| {
+			/** Extension-chosen tag, e.g. `context7_docs`; identifies the injector. */
+			customType: string;
+			/** The injector's own visibility hint; false means background context. */
+			display: boolean;
+			kind: 'custom';
+			text: string;
+	  }
 	| { kind: 'reasoning'; text: string }
 	| { kind: 'text-delta'; text: string }
 	| { kind: 'reasoning-delta'; text: string }

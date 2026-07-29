@@ -259,23 +259,12 @@ const piReadinessService = createPiReadinessService({
  * debug panel can inspect them while iterating on conversation UI. Never
  * persisted; subscribers may discard frames at will.
  *
- * `kind` lets the renderer scope traffic to user-facing chat vs. internal
- * Ensemblr jobs (chat-title generation, session-summary generation). It is
- * derived from the session label so the same broadcast funnel covers both
- * the main client and the summary client.
+ * `kind` lets the renderer scope traffic to user-facing chat. It is derived
+ * from the session label; every ephemeral Ensemblr job that used to have its
+ * own label is gone, so anything that is not a chat session is `unknown`.
  */
-const classifyRawFrameKind = (label: string): PiRawFrameKind => {
-	if (label === 'ensemblr-chat-title') {
-		return 'title';
-	}
-	if (label === 'ensemblr-session-summary') {
-		return 'summary';
-	}
-	if (label === 'pi-agent-session') {
-		return 'chat';
-	}
-	return 'unknown';
-};
+const classifyRawFrameKind = (label: string): PiRawFrameKind =>
+	label === 'pi-agent-session' ? 'chat' : 'unknown';
 /**
  * Fan out a raw Pi RPC frame sample to every live renderer window for the debug
  * panel.
@@ -357,37 +346,15 @@ const piAgentClient = createPiAgentClient({
 		? ['--mode', 'rpc', '-e', piControlExtensionPath]
 		: undefined,
 });
-const summaryPiAgentAdapter = createCliRpcPiAgentAdapter({
-	onRawFrame: broadcastRawFrame,
-	resolveBaseEnv: resolvePiSpawnEnv,
-});
-const summaryPiAgentClient = createPiAgentClient({
-	adapter: summaryPiAgentAdapter,
-});
-const sessionSummaryWriter = createSessionSummaryWriter({
-	piAgentClient: summaryPiAgentClient,
-	/** Resolves the current Pi executable snapshot, or null when unavailable. */
-	resolveExecutable: async () => {
-		const snapshot = await piExecutableService.getSnapshot();
-		if (snapshot.status === 'error' || !snapshot.command) {
-			return null;
-		}
-		return snapshot;
-	},
-});
+const sessionSummaryWriter = createSessionSummaryWriter();
 const renameWorkspaceService = createRenameWorkspaceService({
 	databaseService,
 	localCommandService,
 });
-// Unified best-effort naming after the first (and each subsequent) turn: one
-// throwaway Pi session names the chat tab and, when the `renameWorkspaceOnBranch`
-// setting is on and the workspace still carries its placeholder name, renames the
-// workspace + git branch. Self-gates per field so it never clobbers a settled name.
-const sessionNamingQueue = createSessionNaming({
-	appSettingsService,
-	piAgentClient,
-	renameWorkspace: renameWorkspaceService.rename,
-});
+// Gives a fresh tab a derived title to carry until the agent names it properly
+// with `ensemblr_set_name`. No model runs, so a slow provider cannot leave a tab
+// unlabeled; the provenance ladder makes it yield to any chosen title.
+const sessionNamingQueue = createSessionNaming();
 const piSessionService = createPiSessionService({
 	databaseService,
 	/** Forwards a Pi session event to every window and the activity monitor. */
@@ -628,10 +595,12 @@ agentControlService = createAgentControlService({
 		/** Broadcasts an agent-driven chat-tab set change to all windows. */
 		broadcastTabsChanged: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, payload),
+		appSettingsService,
 		ask: askUserQuestionCoordinator.port,
 		chatTabService: agentControlChatTabService,
 		confirm: { confirm: confirmAgentControlAction },
 		databaseService,
+		renameWorkspace: renameWorkspaceService.rename,
 		/** Reads the currently resolved permission mode that gates control ops. */
 		getPermissionMode: () =>
 			readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
@@ -783,10 +752,7 @@ app.on('before-quit', (event) => {
 	event.preventDefault();
 	void (async () => {
 		await Promise.race([
-			Promise.allSettled([
-				piAgentClient.shutdown(),
-				summaryPiAgentClient.shutdown(),
-			]),
+			Promise.allSettled([piAgentClient.shutdown()]),
 			new Promise((resolve) => setTimeout(resolve, 3000)),
 		]);
 		app.quit();

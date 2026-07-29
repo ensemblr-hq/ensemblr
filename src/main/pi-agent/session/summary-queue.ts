@@ -1,6 +1,8 @@
 import type { DatabaseSync } from 'node:sqlite';
+import { getChatTabById } from '../../storage/repositories/chat-tab-repository.ts';
 import { listEventsByBranch } from '../../storage/repositories/pi-event-repository.ts';
 import { getPiSessionById } from '../../storage/repositories/pi-session-repository.ts';
+import { readAgentSummaryMarker } from '../agent-summary.ts';
 import type { SessionSummaryWriter } from '../session-summary-writer.ts';
 import type { ActiveSession, ActiveSessionMap } from './active-session.ts';
 import { persistSummaryMetadata, toEventWire } from './session-snapshot.ts';
@@ -103,11 +105,7 @@ export function createSummaryQueue({
 			if (!active?.summaryQueued || !sessionSummaryWriter) {
 				return;
 			}
-			activeSessions.set(sessionId, {
-				...active,
-				summaryQueued: false,
-				summaryWriteInFlight: true,
-			});
+			activeSessions.set(sessionId, { ...active, summaryQueued: false });
 			try {
 				await writeSummaryForSession({ active, database });
 			} catch (cause) {
@@ -116,21 +114,18 @@ export function createSummaryQueue({
 					sessionId,
 				});
 			}
-			const latest = activeSessions.get(sessionId);
-			if (!latest) {
-				return;
-			}
-			if (!latest.summaryQueued) {
-				activeSessions.set(sessionId, {
-					...latest,
-					summaryWriteInFlight: false,
-				});
+			if (!activeSessions.get(sessionId)?.summaryQueued) {
 				return;
 			}
 		}
 	};
 
-	/** Writes the current persisted transcript to the tab's summary markdown. */
+	/**
+	 * Projects the tab's session record to disk: the summary the agent recorded
+	 * this session when there is one, else the persisted transcript. Runs only at
+	 * turn boundaries, which is why `ensemblr_set_summary` stores to SQLite
+	 * instead of writing the file itself — `.context/` must not appear mid-turn.
+	 */
 	const writeSummaryForSession = async ({
 		active,
 		database,
@@ -150,11 +145,11 @@ export function createSummaryQueue({
 			database,
 		}).map(toEventWire);
 		const result = await sessionSummaryWriter.writeSessionSummary({
+			agentSummary: readSessionAgentSummary(database, active),
 			branchId: active.branch.id,
 			chatTabId: active.chatTabId,
 			closedAt: row.closedAt ?? now().toISOString(),
 			events,
-			model: row.model,
 			piSessionId: row.piSessionId,
 			workspaceCwd: row.cwd,
 		});
@@ -206,4 +201,27 @@ export function createSummaryQueue({
 		flushSummaryForSession,
 		queueSummaryAfterAgentResponse,
 	};
+}
+
+/**
+ * Reads the summary the agent recorded for a session's tab. A marker left over
+ * from an earlier session on a reused tab is ignored, since it describes a
+ * conversation this one never had.
+ * @param database - Open SQLite handle.
+ * @param active - The live session whose tab to read.
+ * @returns The agent's summary, or null to fall back to the transcript.
+ */
+function readSessionAgentSummary(
+	database: DatabaseSync,
+	active: ActiveSession,
+): { body: string; title: string } | null {
+	const tab = getChatTabById({ database, id: active.chatTabId });
+	if (!tab) {
+		return null;
+	}
+	const marker = readAgentSummaryMarker(tab.metadata);
+	if (!marker || marker.branchId !== active.branch.id) {
+		return null;
+	}
+	return { body: marker.body, title: marker.title };
 }

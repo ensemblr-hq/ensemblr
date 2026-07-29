@@ -141,7 +141,12 @@ export function DiffViewer({
 				onViewModeChange={setViewMode}
 				viewMode={viewMode}
 			>
-				<CodeBlockContent code={patch} language={'diff' as BundledLanguage} />
+				<CodeBlockContent
+					className='min-h-0 flex-1'
+					code={patch}
+					language={'diff' as BundledLanguage}
+					wrapLines={wordWrap}
+				/>
 			</DiffViewerFrame>
 		);
 	}
@@ -207,7 +212,8 @@ function maxLineDigits(hunks: ReturnType<typeof expandFromRawCode>): number {
 
 /**
  * Inner diff surface: tokenizes hunks with Shiki and renders the react-diff-view
- * table with line-number gutters and inline comment widgets.
+ * table with line-number gutters and inline comment widgets. Owns the viewer's
+ * only scroll container so the frame around it can stay a plain flex column.
  */
 function DiffBody({
 	commentingEnabled,
@@ -271,7 +277,7 @@ function DiffBody({
 
 	return (
 		<div
-			className='overflow-x-auto'
+			className='min-h-0 flex-1 overflow-auto'
 			style={{ '--ensemblr-gutter-ch': `${gutterWidthCh}ch` } as CSSProperties}
 		>
 			<Diff
@@ -309,7 +315,14 @@ function DiffBody({
 	);
 }
 
-/** Chrome around the diff body: the file path header, toggle toolbar, and actions. */
+/**
+ * Chrome around the diff body: the file path header, toggle toolbar, and actions.
+ *
+ * The content slot is a flex column rather than a scroll container: whichever
+ * body it holds brings its own `overflow-auto`, so a filled-height viewer keeps
+ * the horizontal scrollbar pinned to the panel edge instead of stacking a second
+ * scroller and pushing it below the last line.
+ */
 function DiffViewerFrame({
 	children,
 	fileModeDisabled,
@@ -340,7 +353,7 @@ function DiffViewerFrame({
 				/>
 				<div className='ml-auto flex items-center gap-1'>{headerActions}</div>
 			</div>
-			<div className={cn(fillHeight && 'min-h-0 flex-1 overflow-auto')}>
+			<div className={cn(fillHeight && 'flex min-h-0 flex-1 flex-col')}>
 				{children}
 			</div>
 		</div>

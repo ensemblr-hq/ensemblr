@@ -88,6 +88,15 @@ const makePorts = (statuses: Map<string, string>): AgentControlPorts => ({
 		isActive: vi.fn().mockReturnValue(false),
 		releaseSession: vi.fn(),
 	},
+	sessionNaming: {
+		readBrief: vi.fn().mockResolvedValue({
+			branch: { current: null, eligible: false },
+			summaryStale: false,
+			titleNeeded: false,
+		}),
+		setBranchName: vi.fn(),
+		setSummary: vi.fn(),
+	},
 });
 
 /**

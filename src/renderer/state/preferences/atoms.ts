@@ -130,6 +130,19 @@ export const diffWordWrapAtom = atomWithStorage<boolean>(
 	false,
 );
 
+// ─── File preview (user) ───────────────────────────────────────────────────────
+
+/**
+ * Whether the read-only file preview soft-wraps long lines instead of scrolling
+ * them horizontally; app-wide and persisted across files and reloads. Mirrors
+ * {@link diffWordWrapAtom}, but stays a separate key so wrapping a minified file
+ * in a preview tab does not reflow every diff the user opens next.
+ */
+export const filePreviewWordWrapAtom = atomWithStorage<boolean>(
+	KEY('file_preview_word_wrap'),
+	false,
+);
+
 // ─── Experimental (user) ──────────────────────────────────────────────────────
 
 /** Whether developer-only diagnostics and debug controls are visible; persisted to localStorage. */

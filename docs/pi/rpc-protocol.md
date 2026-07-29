@@ -40,11 +40,14 @@ install with `npm ls -g @earendil-works/pi-coding-agent`:
   (`{type,level}`) commands, which the adapter writes ahead of the next
   `prompt` only when the selection differs from what the runtime is already on
   (`src/main/pi-agent/cli-rpc-pi-agent-adapter.ts`).
-- **Ephemeral utility sessions (Ensemblr).** Chat-title and session-summary
-  generation spawn their own short-lived RPC sessions; each is launched with
-  `--model` set to the chat's current model (`pi_sessions.model`) so they run on
-  the same provider as the conversation rather than Pi's default
-  (`pi-chat-title-service.ts`, `session-summary-writer.ts`).
+- **No ephemeral utility sessions (Ensemblr).** Chat-title, branch-name, and
+  session-summary generation used to spawn short-lived RPC sessions on the
+  chat's own model, which on a local provider was slow enough to time out and
+  discard the result. Titles are now derived without a model
+  (`naming/session-naming.ts`), and the branch name and session summary come
+  from the agent itself via `ensemblr_set_branch_name` and
+  `ensemblr_set_summary`. Every RPC session Ensemblr opens is a real
+  conversation.
 - **Catalog caching (renderer).** `pi --list-models` output is cached in
   `localStorage` and used as React Query `initialData`, so the model picker is
   populated instantly on launch and refreshed silently in the background; an

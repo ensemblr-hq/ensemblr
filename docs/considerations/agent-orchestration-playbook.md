@@ -38,6 +38,8 @@ child's spawn attempt is denied `denied-depth`.
 |---|---|
 | Delegate a subtask to a Pi sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `piSessionId`) |
 | Name your own tab | `ensemblr_set_name` |
+| Name the workspace + git branch | `ensemblr_set_branch_name` (one-shot, placeholder names only; refuses unless the user enabled `git.renameWorkspaceOnBranch`, so call it only when the per-turn upkeep block asks) |
+| Record what the session covered | `ensemblr_set_summary` (every turn; Pi chats only) |
 | **Block until children settle** | `ensemblr_wait_for_agents` |
 | Steer / correct a child | `ensemblr_send_follow_up` |
 | Delegate to a CLI agent | `ensemblr_launch_harness` (claude / codex) |

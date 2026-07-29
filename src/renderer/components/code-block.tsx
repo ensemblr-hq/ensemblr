@@ -79,7 +79,6 @@ const TokenSpan = ({ token }: { token: ThemedToken }) => (
 
 // Line number styles using CSS counters
 const LINE_NUMBER_CLASSES = cn(
-	'block',
 	'before:content-[counter(line)]',
 	'before:inline-block',
 	'before:[counter-increment:line]',
@@ -91,16 +90,29 @@ const LINE_NUMBER_CLASSES = cn(
 	'before:select-none',
 );
 
+// A wrapped line must clear its own gutter, so the padding matches the line
+// number's `before:w-8` plus its `before:mr-4` and the negative indent pulls
+// only the first visual line back over it.
+const WRAPPED_LINE_NUMBER_CLASSES = '-indent-12 pl-12';
+
 // Line rendering component
 /** Renders one code line as a row of token spans, optionally with a CSS-counter line number. */
 const LineSpan = ({
 	keyedLine,
 	showLineNumbers,
+	wrapLines,
 }: {
 	keyedLine: KeyedLine;
 	showLineNumbers: boolean;
+	wrapLines: boolean;
 }) => (
-	<span className={showLineNumbers ? LINE_NUMBER_CLASSES : 'block'}>
+	<span
+		className={cn(
+			'block',
+			showLineNumbers && LINE_NUMBER_CLASSES,
+			showLineNumbers && wrapLines && WRAPPED_LINE_NUMBER_CLASSES,
+		)}
+	>
 		{keyedLine.tokens.length === 0
 			? '\n'
 			: keyedLine.tokens.map(({ token, key }) => (
@@ -110,11 +122,12 @@ const LineSpan = ({
 );
 
 // Types
-/** Props for the CodeBlock component: source code, its language, and an optional line-number toggle. */
+/** Props for the CodeBlock component: source code, its language, and optional line-number and wrap toggles. */
 type CodeBlockProps = HTMLAttributes<HTMLDivElement> & {
 	code: string;
 	language: BundledLanguage;
 	showLineNumbers?: boolean;
+	wrapLines?: boolean;
 };
 
 /** Context value exposing the raw source code to CodeBlock subcomponents. */
@@ -153,16 +166,21 @@ const createRawTokens = (code: string): TokenizedCode => ({
  * The surface comes from the app's `code` tokens rather than the Shiki theme's
  * own `bg`/`fg`, so a block stays dark in dark mode and light in light mode
  * whichever theme Settings → Appearance → Code theme is set to.
+ *
+ * Unwrapped, the block sizes itself to its widest line (`w-max`) instead of to
+ * its scroll container: a plain block would paint its background only across the
+ * viewport, leaving everything past that point bare once the reader scrolls
+ * sideways. `min-w-full` keeps a short file filling the container.
  */
 const CodeBlockBody = memo(
 	({
 		tokenized,
 		showLineNumbers,
-		className,
+		wrapLines,
 	}: {
 		tokenized: TokenizedCode;
 		showLineNumbers: boolean;
-		className?: string;
+		wrapLines: boolean;
 	}) => {
 		const keyedLines = useMemo(
 			() => addKeysToTokens(tokenized.tokens),
@@ -173,7 +191,7 @@ const CodeBlockBody = memo(
 			<pre
 				className={cn(
 					'm-0 bg-code p-4 text-code-foreground text-sm',
-					className,
+					wrapLines ? 'whitespace-pre-wrap break-words' : 'w-max min-w-full',
 				)}
 			>
 				<code
@@ -188,6 +206,7 @@ const CodeBlockBody = memo(
 							key={keyedLine.key}
 							keyedLine={keyedLine}
 							showLineNumbers={showLineNumbers}
+							wrapLines={wrapLines}
 						/>
 					))}
 				</code>
@@ -197,21 +216,37 @@ const CodeBlockBody = memo(
 	(prevProps, nextProps) =>
 		prevProps.tokenized === nextProps.tokenized &&
 		prevProps.showLineNumbers === nextProps.showLineNumbers &&
-		prevProps.className === nextProps.className,
+		prevProps.wrapLines === nextProps.wrapLines,
 );
 
 CodeBlockBody.displayName = 'CodeBlockBody';
 
-/** Highlights and renders code for a language, showing raw tokens immediately and swapping in Shiki output once it loads. */
-export const CodeBlockContent = ({
-	code,
-	language,
-	showLineNumbers = false,
-}: {
+/** Inputs for {@link CodeBlockContent}: the source to highlight and how to lay it out. */
+interface CodeBlockContentProps {
+	/** Extra classes for the scroll container, e.g. `min-h-0 flex-1` inside a flex column. */
+	className?: string;
 	code: string;
 	language: BundledLanguage;
 	showLineNumbers?: boolean;
-}) => {
+	wrapLines?: boolean;
+}
+
+/**
+ * Highlights and renders code for a language, showing raw tokens immediately and
+ * swapping in Shiki output once it loads.
+ *
+ * Scrolls its own overflow by default. A parent that is already a scroll
+ * container should pass `className='min-h-0 flex-1'` and drop its own wrapper,
+ * so the horizontal scrollbar stays pinned to the viewport instead of sitting
+ * below the last line of a long file.
+ */
+export const CodeBlockContent = ({
+	className,
+	code,
+	language,
+	showLineNumbers = false,
+	wrapLines = false,
+}: CodeBlockContentProps) => {
 	// Picked syntax theme (Settings → Appearance → Code theme), in the app's
 	// current polarity.
 	const codeTheme = useResolvedCodeTheme();
@@ -260,8 +295,12 @@ export const CodeBlockContent = ({
 	const tokenized = asyncTokens ?? syncTokens;
 
 	return (
-		<div className='relative overflow-auto'>
-			<CodeBlockBody showLineNumbers={showLineNumbers} tokenized={tokenized} />
+		<div className={cn('relative overflow-auto', className)}>
+			<CodeBlockBody
+				showLineNumbers={showLineNumbers}
+				tokenized={tokenized}
+				wrapLines={wrapLines}
+			/>
 		</div>
 	);
 };
@@ -293,6 +332,7 @@ export const CodeBlock = ({
 	code,
 	language,
 	showLineNumbers = false,
+	wrapLines = false,
 	className,
 	children,
 	...props
@@ -307,6 +347,7 @@ export const CodeBlock = ({
 					code={code}
 					language={language}
 					showLineNumbers={showLineNumbers}
+					wrapLines={wrapLines}
 				/>
 			</CodeBlockContainer>
 		</CodeBlockContext.Provider>

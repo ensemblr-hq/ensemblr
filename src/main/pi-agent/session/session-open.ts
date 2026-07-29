@@ -46,7 +46,7 @@ interface SessionOpenerOptions {
 	eventSink: PiSessionEventSink | undefined;
 	now: () => Date;
 	piAgentClient: PiAgentClient;
-	/** Fires the unified title + branch naming attempt for a freshly opened session. */
+	/** Fires the derived-title attempt for a freshly opened session. */
 	queueNaming: (input: SessionNamingInput) => void;
 	/**
 	 * Resolves the agent-control environment (control-server URL + per-session
@@ -189,7 +189,6 @@ export function createSessionOpener({
 			branch: mainBranch,
 			chatTabId: attachedTab.id,
 			database,
-			executable: request.executable,
 			row: startingRow,
 			runtimeSession,
 			subscription,
@@ -276,25 +275,21 @@ export function createSessionOpener({
 			branch: mainBranch,
 			chatTabId: attachedTab.id,
 			database,
-			executable: request.executable,
 			row: startedRow,
 			runtimeSession,
 			subscription,
 		});
 
-		// Single unified naming attempt (title + branch) off the first prompt; it
-		// self-gates per field and is retried on each turn-idle if anything failed.
+		// Derive a title off the first prompt so the tab is identifiable before the
+		// agent names it; self-gates and is retried on each turn-idle.
 		queueNaming({
 			branchId: mainBranch.id,
 			chatTabId: attachedTab.id,
 			database,
 			eventSink,
-			executable: request.executable,
 			initialPrompt: request.initialPrompt ?? null,
 			liveSession: runtimeSession,
-			model: startedRow.model,
 			sessionId: session.id,
-			workspaceCwd: request.workspaceCwd,
 			workspaceId: request.workspaceId,
 		});
 
@@ -369,7 +364,6 @@ function insertActiveSession({
 	branch,
 	chatTabId,
 	database,
-	executable,
 	row,
 	runtimeSession,
 	subscription,
@@ -378,7 +372,6 @@ function insertActiveSession({
 	branch: PiSessionBranchRow;
 	chatTabId: string;
 	database: DatabaseSync;
-	executable: PiExecutableSnapshot;
 	row: PiSessionRow;
 	runtimeSession: PiAgentSession;
 	subscription: PiAgentSubscription;
@@ -389,7 +382,6 @@ function insertActiveSession({
 		branch,
 		chatTabId,
 		deltaCounter: 0,
-		executable,
 		lastBroadcastOrdinal: getMaxOrdinalForBranch({
 			branchId: branch.id,
 			database,
@@ -397,7 +389,6 @@ function insertActiveSession({
 		piRuntimeSession: runtimeSession,
 		row,
 		summaryQueued: false,
-		summaryWriteInFlight: false,
 		subscription,
 	};
 	activeSessions.set(row.id, active);

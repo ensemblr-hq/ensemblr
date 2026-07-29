@@ -24,11 +24,13 @@ import type {
 } from '../storage/repositories';
 import {
 	getChatTabById,
+	getChatTabByPiSessionId,
 	listOpenChatTabs,
 	renameChatTab,
 	setChatTabMetadata,
 } from '../storage/repositories/chat-tab-repository.ts';
 import {
+	getMaxOrdinalForBranch,
 	iterateBranchPayloadsDescending,
 	listEventsByBranch,
 	type PiEventRow,
@@ -40,9 +42,18 @@ import {
 	listPiSessionsByWorkspace,
 } from '../storage/repositories/pi-session-repository.ts';
 import {
+	readAgentSummaryMarker,
+	withAgentSummaryMarker,
+} from './agent-summary.ts';
+import {
 	sanitizeChatTitle,
 	truncateChatTitle,
 } from './naming/sanitize-title.ts';
+import {
+	type ChatTitleProvenance,
+	canSetTitle,
+	readTitleProvenance,
+} from './naming/title-provenance.ts';
 import type { PiAgentClient } from './pi-agent-client.ts';
 import {
 	createPiSessionLifecycle,
@@ -56,6 +67,7 @@ import {
 import {
 	appendAgentMessageEvent,
 	appendChatTitleMetadataEvent,
+	appendWorkspaceRenamedMetadataEvent,
 	persistRuntimeEvent,
 } from './pi-session-persistence.ts';
 import { PiSessionServiceError } from './pi-session-service-error.ts';
@@ -87,7 +99,7 @@ interface PiSessionServiceOptions {
 	databaseService: EnsemblrDatabaseService;
 	eventSink?: PiSessionEventSink;
 	piAgentClient: PiAgentClient;
-	/** Unified title + branch naming queue, fired at open and each turn-idle. */
+	/** Derived tab-titling queue, fired at open and each turn-idle. */
 	queueNaming: QueueNamingPort;
 	/** Injects the agent-control env (control URL + token) into each Pi child. */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
@@ -122,15 +134,34 @@ export interface PiSessionService {
 	 */
 	appendAgentMessage: (input: { sessionId: string; text: string }) => void;
 	/**
+	 * Posts the workspace-renamed marker into a session's timeline so the
+	 * renderer refetches the workspace whose name and branch just changed. A
+	 * no-op when the session cannot be resolved.
+	 */
+	appendWorkspaceRenamed: (sessionId: string) => void;
+	/**
+	 * Records an agent-authored summary on the session's chat tab, stamped with
+	 * the branch and the event ordinal it describes. Storage only — the summary
+	 * file is projected at the next turn boundary, so this never materializes
+	 * `.context/` mid-turn. Resolves null when the session has no chat tab.
+	 */
+	setSessionSummary: (input: {
+		sessionId: string;
+		title: string;
+		summary: string;
+	}) => { capturedAtOrdinal: number } | null;
+	/**
 	 * Sets the display name of an active Pi session via its runtime `/name`, then
-	 * mirrors the name onto its chat tab (marking the title user-owned so
-	 * auto-naming leaves it alone). Resolves null when the session is not active
-	 * or the name sanitizes to nothing.
+	 * mirrors the name onto its chat tab under the given provenance. A tab whose
+	 * title outranks the caller keeps it and comes back `applied: false`.
+	 * Resolves null when the session is not active or the name sanitizes to
+	 * nothing.
 	 */
 	setSessionName: (request: {
 		sessionId: string;
 		name: string;
-	}) => Promise<{ chatTabId: string; title: string } | null>;
+		provenance: ChatTitleProvenance;
+	}) => Promise<{ applied: boolean; chatTabId: string; title: string } | null>;
 	shutdown: () => Promise<void>;
 	stopSession: (request: StopPiSessionRequest) => Promise<void>;
 	submitPrompt: (
@@ -149,7 +180,7 @@ export interface PiSessionService {
  * Composes three collaborators wired by dependency injection:
  *   - {@link createPiSessionLifecycle} — open/submit/stop/runtime-event state machine
  *   - {@link persistRuntimeEvent} — discriminant mapping into `pi_session_events`
- *   - `queueNaming` — unified best-effort LLM tab-title + branch naming
+ *   - `queueNaming` — best-effort derived tab titling (no model involved)
  *   - `sessionSummaryWriter` — optional live summary updates after agent turns
  */
 export function createPiSessionService({
@@ -314,7 +345,43 @@ export function createPiSessionService({
 			});
 			eventSink?.({ event, sessionId, workspaceId: target.workspaceId });
 		},
-		setSessionName: async ({ sessionId, name }) => {
+		appendWorkspaceRenamed: (sessionId) => {
+			const database = requireSessionDatabase();
+			const target = resolveTimelineTarget(database, sessionId);
+			if (!target) {
+				return;
+			}
+			const event = appendWorkspaceRenamedMetadataEvent({
+				branchId: target.branchId,
+				database,
+			});
+			eventSink?.({ event, sessionId, workspaceId: target.workspaceId });
+		},
+		setSessionSummary: ({ sessionId, title, summary }) => {
+			const database = requireSessionDatabase();
+			const target = resolveTimelineTarget(database, sessionId);
+			const tab = getChatTabByPiSessionId({ database, piSessionId: sessionId });
+			if (!target || !tab) {
+				return null;
+			}
+			const capturedAtOrdinal = getMaxOrdinalForBranch({
+				branchId: target.branchId,
+				database,
+			});
+			setChatTabMetadata({
+				database,
+				id: tab.id,
+				metadata: withAgentSummaryMarker(tab.metadata, {
+					body: summary,
+					branchId: target.branchId,
+					capturedAtOrdinal,
+					title,
+					updatedAt: new Date().toISOString(),
+				}),
+			});
+			return { capturedAtOrdinal };
+		},
+		setSessionName: async ({ sessionId, name, provenance }) => {
 			const database = requireSessionDatabase();
 			const applied = await lifecycle.setSessionName(sessionId, name);
 			if (!applied) {
@@ -330,17 +397,21 @@ export function createPiSessionService({
 			if (!title) {
 				return null;
 			}
+			if (!canSetTitle(readTitleProvenance(tab.metadata), provenance)) {
+				return {
+					applied: false,
+					chatTabId: applied.chatTabId,
+					title: tab.title,
+				};
+			}
 			renameChatTab({ database, fullTitle, id: applied.chatTabId, title });
-			// An explicit `/name` (agent- or human-issued) is authoritative: mark it
-			// `user` provenance so the deterministic auto-namer never overrides it,
-			// including after tab reuse.
 			setChatTabMetadata({
 				database,
 				id: applied.chatTabId,
 				metadata: {
 					...tab.metadata,
 					titleAutoNamed: true,
-					titleProvenance: 'user',
+					titleProvenance: provenance,
 				},
 			});
 			const mainBranch = getMainBranchForSession({
@@ -355,7 +426,7 @@ export function createPiSessionService({
 				});
 				eventSink?.({ event, sessionId, workspaceId: tab.workspaceId });
 			}
-			return { chatTabId: applied.chatTabId, title };
+			return { applied: true, chatTabId: applied.chatTabId, title };
 		},
 		shutdown: async () => {
 			await lifecycle.shutdownActiveSessions();
@@ -395,6 +466,12 @@ export function createPiSessionService({
 			);
 			try {
 				const result = await sessionSummaryWriter.writeSessionSummary({
+					agentSummary: forkAgentSummary({
+						branchId: request.branchId,
+						database,
+						piSessionId: request.sessionId,
+						upToOrdinal: request.upToOrdinal,
+					}),
 					branchId: request.branchId,
 					chatTabId: request.fileBaseName,
 					closedAt: now().toISOString(),
@@ -402,7 +479,6 @@ export function createPiSessionService({
 					// `fork-` prefix keeps the file clear of the destination tab's
 					// own live summary (`<chatTabId>.md`).
 					fileBaseName: `fork-${request.fileBaseName}`,
-					model: row.model,
 					piSessionId: row.piSessionId,
 					purpose: 'fork',
 					workspaceCwd: targetCwd,
@@ -424,6 +500,43 @@ export function createPiSessionService({
 			}
 		},
 	};
+}
+
+/**
+ * Picks the agent's recorded summary for a fork, but only when it describes the
+ * conversation at or before the point being forked from.
+ *
+ * The agent records a summary during its turn, so `capturedAtOrdinal` lands
+ * below that turn's last message — which is exactly the ordinal the UI passes
+ * as `upToOrdinal` when forking from it. Forking an earlier turn therefore
+ * finds a summary captured later and falls back to the transcript, which is the
+ * point: reusing it would leak work the fork is meant to exclude.
+ * @param input - The source session, its branch, and the fork point.
+ * @returns The agent's summary, or null to fall back to the transcript.
+ */
+function forkAgentSummary({
+	branchId,
+	database,
+	piSessionId,
+	upToOrdinal,
+}: {
+	branchId: string;
+	database: DatabaseSync;
+	piSessionId: string;
+	upToOrdinal: number | undefined;
+}): { body: string; title: string } | null {
+	const tab = getChatTabByPiSessionId({ database, piSessionId });
+	if (!tab) {
+		return null;
+	}
+	const marker = readAgentSummaryMarker(tab.metadata);
+	if (!marker || marker.branchId !== branchId) {
+		return null;
+	}
+	if (upToOrdinal !== undefined && marker.capturedAtOrdinal > upToOrdinal) {
+		return null;
+	}
+	return { body: marker.body, title: marker.title };
 }
 
 /**

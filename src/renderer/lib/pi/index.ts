@@ -8,6 +8,7 @@
  * exported renderer types belong under `@/renderer/types/`.
  */
 
+export { customMessageDataOf } from './custom-message-part';
 export {
 	eventsToUIMessages,
 	noticeMetadataOf,
@@ -18,6 +19,8 @@ export {
 	chipLabelForPath,
 	parsePromptAttachments,
 } from './prompt-attachment-parser';
+export { skillInvocationKey } from './skill-invocation';
+export { skillPartDataOf } from './skill-part';
 export { parseToolDiagnostics } from './tool-diagnostics';
 export {
 	classifyToolOutput,
@@ -25,7 +28,9 @@ export {
 } from './tool-output-classifier';
 export {
 	glyphForToolCall,
+	presentCustomMessage,
 	presentReasoning,
+	presentSkillInvocation,
 	presentToolCall,
 } from './tool-presentation';
 export {

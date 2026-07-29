@@ -7,10 +7,13 @@ import {
 } from '../../storage/repositories/index.ts';
 
 /**
- * Clears the auto-naming gate on a tab reused by a new Pi session, so the
+ * Clears the naming gate on a tab reused by a new Pi session, so the
  * deterministic namer re-titles it from the new conversation's first prompt
  * instead of leaving the previous session's title. A title the user explicitly
- * owns (`titleProvenance === 'user'`) is left untouched.
+ * owns (`titleProvenance === 'user'`) is left untouched; every other
+ * provenance is dropped along with the gate, since a title the previous
+ * session's agent chose is as stale as a derived one and would otherwise
+ * outrank the new session's namer.
  * @param database - Open SQLite handle.
  * @param tab - The existing tab a new session is rebinding to.
  */
@@ -21,10 +24,11 @@ function resetTitleGateForReuse(database: DatabaseSync, tab: ChatTabRow): void {
 	if (!tab.metadata.titleAutoNamed) {
 		return;
 	}
+	const { titleProvenance: _released, ...carried } = tab.metadata;
 	setChatTabMetadata({
 		database,
 		id: tab.id,
-		metadata: { ...tab.metadata, titleAutoNamed: false },
+		metadata: { ...carried, titleAutoNamed: false },
 	});
 }
 
