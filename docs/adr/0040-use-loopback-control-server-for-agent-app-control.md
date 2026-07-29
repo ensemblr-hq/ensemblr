@@ -45,10 +45,11 @@ Unify both species on **one loopback HTTP control server** (bound to
   handler `fetch`es `POST /invoke` (plain JSON) with a bearer token and URL
   injected into the Pi child's env. No Pi protocol changes.
 - **Harness bridge.** An MCP endpoint `POST /mcp` (streamable HTTP, built on
-  `@modelcontextprotocol/sdk`) exposes the same ops as MCP tools. The launch
-  command is augmented with per-harness MCP config for Claude Code and Codex
-  (`src/main/agent-control/harness-mcp-config.ts`). **Vibe** has no known
-  HTTP-MCP config mechanism and launches without control flags.
+  `@modelcontextprotocol/sdk`) exposes the ops a harness can use as MCP tools.
+  Every launch command is decorated with that harness's MCP config and playbook
+  (`src/main/agent-control/harness-launch-config.ts`) — flags for Claude Code
+  and Codex, a `VIBE_MCP_SERVERS` env prefix for **Vibe**, which has no
+  MCP-config flag.
 - **One authority.** The Agent-Control Service
   (`src/main/agent-control/agent-control-service.ts`) resolves each request's
   bearer token to an origin, enforces scope (writes act only on the caller's own

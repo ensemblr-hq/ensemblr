@@ -300,7 +300,9 @@ export function createAgentControlService({
 	/**
 	 * Names the caller's own conversation tab. A title the user chose outranks
 	 * the agent and is reported as settled rather than failed, so the agent reads
-	 * "leave it alone" instead of a fault worth retrying.
+	 * "leave it alone" instead of a fault worth retrying. Pi-only: a harness owns
+	 * a terminal tab whose title is derived from its own session log, so there is
+	 * nothing here for it to rename.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The requested title.
 	 * @returns The resulting title and whether the rename landed.
@@ -309,6 +311,12 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: SetNameArgs,
 	): Promise<AgentControlResult<unknown>> => {
+		if (origin.species !== 'pi') {
+			return fail(
+				'denied-scope',
+				'Naming a tab is limited to native Pi conversations; your tab is named from your own session log.',
+			);
+		}
 		const result = await ports.conversations.setName({
 			piSessionId: origin.sessionId,
 			name: args.name,

@@ -10,6 +10,7 @@ import {
 	type ControlServer,
 	startControlServer,
 } from '../../src/main/agent-control/index.ts';
+import { HARNESS_AWARENESS } from '../../src/shared/agent-control.ts';
 
 const calls: AgentControlCommand[] = [];
 let server: ControlServer | null = null;
@@ -54,18 +55,41 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).toContain('ensemblr_list_models');
 		expect(names).toContain('ensemblr_wait_for_agents');
 		expect(names).toContain('ensemblr_notify_orchestrator');
-		expect(names).toContain('ensemblr_set_name');
 		expect(names).toContain('ensemblr_set_branch_name');
 		expect(names).toContain('ensemblr_set_workspace_status');
 		expect(names).toContain('ensemblr_get_workspace_status');
-		// Pi-only, like `ensemblr_ask_user_question` and `ensemblr_exit_plan_mode`:
-		// a harness origin is workspace-scoped and owns no chat tab to summarize.
+		// Chat-tab ops a harness origin cannot use: its tab is a terminal titled
+		// from the harness's own session log, and the service gates the rest to Pi.
+		expect(names).not.toContain('ensemblr_set_name');
 		expect(names).not.toContain('ensemblr_set_summary');
-		expect(tools).toHaveLength(25);
+		expect(names).not.toContain('ensemblr_ask_user_question');
+		expect(names).not.toContain('ensemblr_exit_plan_mode');
+		expect(tools).toHaveLength(24);
+		await client.close();
+	});
+
+	it('serves the harness playbook as the MCP server instructions', async () => {
+		server = await startControlServer(stubService);
+		const client = await connect('good');
 		const instructions = client.getInstructions() ?? '';
+		expect(instructions).toBe(HARNESS_AWARENESS);
 		expect(instructions).toContain('Ensemblr');
-		expect(instructions).toContain('orchestrator');
 		expect(instructions).toContain('ensemblr_get_conversation_status');
+		await client.close();
+	});
+
+	// A playbook that names a tool the endpoint does not serve sends the model
+	// hunting for it, which is exactly what dropping `ensemblr_set_name` was for.
+	it('names only tools the endpoint actually serves', async () => {
+		server = await startControlServer(stubService);
+		const client = await connect('good');
+		const { tools } = await client.listTools();
+		const served = new Set(tools.map((tool) => tool.name));
+		const mentioned = new Set(
+			HARNESS_AWARENESS.match(/ensemblr_[a-z_]+/g) ?? [],
+		);
+		expect(mentioned.size).toBeGreaterThan(0);
+		expect([...mentioned].filter((name) => !served.has(name))).toEqual([]);
 		await client.close();
 	});
 

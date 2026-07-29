@@ -5,6 +5,7 @@
  */
 export { buildAskUserQuestionResult } from './agent-control/ask-user-question.ts';
 export {
+	HARNESS_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_AWARENESS,
 	roleForDepth,

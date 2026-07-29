@@ -227,15 +227,16 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
    needs no colocated `node_modules` regardless of how Pi was installed. Loading is also isolated:
    a failed `-e` extension is caught and reported, never crashing Pi — so `-e` is always safe to
    pass. Ensemblr resolves the Pi binary install-agnostically via `PiExecutableService`.
-2. **Harness MCP auto-config — wired for Claude Code + Codex.** `augmentHarnessCommand` (main.ts)
-   appends per-harness MCP flags to the launch command in both paths (user launch via
-   `handlers/agents.ts`, agent launch via the harness port), built by
-   `agent-control/harness-mcp-config.ts`: Claude gets `--mcp-config '<json>'` with the concrete
-   per-workspace token; Codex gets `-c mcp_servers.ensemblr.url=… -c
-   mcp_servers.ensemblr.bearer_token_env_var=ENSEMBLR_CONTROL_TOKEN` (reads the token from env). The
-   control-server URL is a session constant; the token is per-workspace. **Vibe** has no known
-   HTTP-MCP config mechanism → left unchanged (no flags). Live-verify the exact flag behavior with a
-   real Claude/Codex once (esp. Claude's inline `--mcp-config` parsing).
+2. **Harness MCP auto-config — wired for all three harnesses.** `augmentHarnessCommand` (main.ts)
+   decorates the launch command in both paths (user launch via `handlers/agents.ts`, agent launch
+   via the harness port), built by `agent-control/harness-launch-config.ts`. Claude gets
+   `--mcp-config '<json>'` whose bearer header expands `${ENSEMBLR_CONTROL_TOKEN}`; Codex gets `-c
+   mcp_servers.ensemblr.url=… -c mcp_servers.ensemblr.bearer_token_env_var=ENSEMBLR_CONTROL_TOKEN`;
+   **Vibe** has no MCP-config flag at all, so it gets a `VIBE_MCP_SERVERS='<json>'` env prefix with
+   `api_key_env`. No harness ever receives the token value on its command line. The control-server
+   URL is a session constant; the token is per-workspace. The harness playbook rides along the same
+   seam — `--append-system-prompt-file` for Claude, `--add-dir` for Vibe, and for Codex the MCP
+   server's `instructions` field, which is its only additive channel.
 3. **End-to-end smoke:** launch the app, spawn Pi, confirm the `ensemblr_*` tools appear and a
    `spawnChatTab` + `startConversation` round-trips; then in each permission mode confirm
    `workspace-trusted` auto-runs, `approval-required` shows the dialog, `read-only` blocks writes.

@@ -123,13 +123,56 @@ describe('presentToolCall', () => {
 		expect(presentation.body.kind).toBe('code');
 	});
 
-	test('routes ANSI-coloured output to the terminal body', () => {
+	test('titles a shell call by what its command does', () => {
+		const presentation = presentToolCall(
+			call('bash', { command: 'ls -la src' }, { text: 'README.md' }),
+		);
+
+		expect(presentation.title).toBe('Listing files');
+	});
+
+	test('opens the shell body with the command that produced it', () => {
+		const presentation = presentToolCall(
+			call('bash', { command: 'pwd && ls' }, { text: '/sandbox\nREADME.md' }),
+		);
+
+		expect(presentation.body).toMatchObject({
+			code: '$ pwd && ls\n/sandbox\nREADME.md',
+			kind: 'code',
+			language: 'bash',
+		});
+	});
+
+	test('marks every line of a multi-line command as command', () => {
+		const presentation = presentToolCall(
+			call('bash', { command: 'set -e\nnpm test' }, { text: 'ok' }),
+		);
+
+		expect(presentation.body).toMatchObject({
+			code: '$ set -e\n$ npm test\nok',
+			kind: 'code',
+		});
+	});
+
+	test('shows the command alone when a call produced no output', () => {
+		const presentation = presentToolCall(
+			call('bash', { command: 'touch a.txt' }, { text: '' }),
+		);
+
+		expect(presentation.body).toMatchObject({ code: '$ touch a.txt' });
+	});
+
+	test('routes ANSI-coloured output to the terminal body under its command', () => {
 		const coloured = `${String.fromCharCode(27)}[31mfail${String.fromCharCode(27)}[0m`;
 		const presentation = presentToolCall(
 			call('bash', { command: 'npm test' }, { text: coloured }),
 		);
 
-		expect(presentation.body).toEqual({ kind: 'terminal', text: coloured });
+		expect(presentation.body).toEqual({
+			kind: 'terminal',
+			text: `$ npm test\n${coloured}`,
+		});
+		expect(presentation.title).toBe('Running tests');
 	});
 
 	test('lists language-server diagnostics worst-first', () => {
@@ -255,7 +298,7 @@ describe('presentToolCall', () => {
 		});
 
 		expect(presentation.body).toMatchObject({
-			code: 'README.md',
+			code: '$ ls\nREADME.md',
 			kind: 'code',
 		});
 	});

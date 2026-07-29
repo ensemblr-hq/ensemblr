@@ -75,7 +75,7 @@ export interface PortAdapterDeps {
 	/** Names a workspace and its git branch together, for `setBranchName`. */
 	renameWorkspace: RenameWorkspaceService['rename'];
 	getPermissionMode: () => PermissionMode;
-	/** Appends agent-control MCP-config flags to a harness launch command. */
+	/** Adds the agent-control MCP config and playbook to a harness launch command. */
 	augmentHarnessCommand: (
 		command: string,
 		harnessId: string,

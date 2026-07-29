@@ -263,7 +263,7 @@ describe('tool call bodies', () => {
 			/>,
 		);
 
-		const body = openRow('Bash');
+		const body = openRow('Running tests');
 
 		expect(within(body).getByText('Terminal')).toBeInTheDocument();
 		expect(within(body).getByText('FAIL')).toBeInTheDocument();
@@ -362,7 +362,7 @@ describe('tool call bodies', () => {
 			/>,
 		);
 
-		const body = openRow('Bash');
+		const body = openRow('Type-checking');
 
 		expect(within(body).getByText('Running…')).toBeInTheDocument();
 	});
@@ -408,7 +408,7 @@ describe('tool row disclosure', () => {
 
 		expect(screen.getByText('npx tsc --noEmit')).toBeInTheDocument();
 
-		openRow('Bash');
+		openRow('Type-checking');
 
 		expect(screen.queryByText('npx tsc --noEmit')).toBeNull();
 	});

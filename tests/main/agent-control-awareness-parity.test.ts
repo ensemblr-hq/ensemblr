@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	type AgentControlOp,
+	HARNESS_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_AWARENESS,
 	roleForDepth,
@@ -236,5 +237,53 @@ describe('agent-control AWARENESS parity', () => {
 		expect(roleForDepth(0)).toBe('orchestrator');
 		expect(roleForDepth(1)).toBe('subagent');
 		expect(roleForDepth(2)).toBe('subagent');
+	});
+});
+
+describe('harness playbook', () => {
+	it('names no Pi-only tool, which the MCP endpoint never serves a harness', () => {
+		for (const toolName of [
+			'ensemblr_set_name',
+			'ensemblr_set_summary',
+			'ensemblr_ask_user_question',
+			'ensemblr_exit_plan_mode',
+		]) {
+			expect(HARNESS_AWARENESS).not.toContain(toolName);
+		}
+	});
+
+	it('tells a harness its tab is titled from its own session log', () => {
+		expect(HARNESS_AWARENESS).toContain(
+			'names itself from your own session log',
+		);
+	});
+
+	it('teaches the same wait-based delegation loop as the orchestrator variant', () => {
+		expect(HARNESS_AWARENESS).toContain('ensemblr_start_conversation');
+		expect(HARNESS_AWARENESS).toContain('ensemblr_wait_for_agents');
+		expect(HARNESS_AWARENESS).toContain('Do the work yourself by default');
+	});
+
+	// A harness receives no per-turn upkeep block — the app renders that into a Pi
+	// system prompt and a harness has no equivalent hook — so unlike the Pi
+	// playbooks this one has to carry the branch nudge itself. The tool still
+	// honours `git.renameWorkspaceOnBranch`; the playbook's job is to frame a
+	// refusal as settled rather than as a fault worth retrying.
+	it('carries the branch nudge itself, since a harness gets no upkeep block', () => {
+		expect(HARNESS_AWARENESS).toContain('ensemblr_set_branch_name');
+		expect(HARNESS_AWARENESS).toContain(
+			'settled outcome, not a fault to retry',
+		);
+		expect(HARNESS_AWARENESS).not.toContain(SESSION_BRIEF_NUDGE_HEADER);
+	});
+
+	it('stays lighter than the orchestrator variant it stands in for', () => {
+		expect(HARNESS_AWARENESS.length).toBeLessThan(
+			ORCHESTRATOR_AWARENESS.length,
+		);
+	});
+
+	it('is absent from the Pi extension, which never serves a harness', () => {
+		expect(readExtensionSource()).not.toContain('HARNESS_AWARENESS');
 	});
 });
