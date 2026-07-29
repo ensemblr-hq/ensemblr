@@ -11,6 +11,12 @@
 		"vite.main.config.mts",
 		"vite.preload.config.mts",
 		"vite.renderer.config.mts",
+		// Dev-only preview harness, served by `npm run dev:playground`. The config
+		// reaches playground/index.html through a `/playground/` redirect string,
+		// which is not a resolvable import edge, so the module the page loads is
+		// named directly the same way src/renderer/main.tsx is above.
+		"vite.playground.config.mts",
+		"playground/main.tsx",
 		// Vitest runs renderer tests directly; treat each file as an entry so
 		// fallow doesn't flag them as unused.
 		"tests/**/*.test.{ts,tsx}",

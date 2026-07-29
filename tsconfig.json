@@ -24,8 +24,10 @@
 	"include": [
 		"forge.config.ts",
 		"forge.env.d.ts",
+		"playground",
 		"src",
 		"vite.main.config.mts",
+		"vite.playground.config.mts",
 		"vite.preload.config.mts",
 		"vite.renderer.config.mts"
 	]
