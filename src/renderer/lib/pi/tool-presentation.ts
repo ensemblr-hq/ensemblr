@@ -13,6 +13,7 @@ import type {
 	ToolPresentation,
 	ToolPreviewDescriptor,
 } from '@/renderer/types/tool-presentation';
+import { shellCommandTitle } from './shell-command-title';
 import { parseToolDiagnostics } from './tool-diagnostics';
 import {
 	classifyToolOutput,
@@ -342,19 +343,44 @@ function presentEdit(part: DynamicToolUIPart): ToolPresenterResult {
 }
 
 /**
- * Runs a shell command; the command is the preview, its stdout the body.
+ * Joins a command to the output it produced, marking the command lines with a
+ * shell prompt so an expanded row reads as the transcript of one invocation
+ * rather than as output whose cause scrolled off with the collapsed preview.
+ *
+ * The marker is `$` rather than `>` because the body is highlighted as bash,
+ * where a leading `>` is the redirect operator and would colour the command as
+ * a write into a file named after its first word.
+ * @param command - The command line that ran
+ * @param output - Everything the command wrote
+ * @returns The transcript to render as the row's body
+ */
+function shellTranscript(command: string, output: string): string {
+	const prompt = command
+		.split('\n')
+		.map((line) => `$ ${line}`)
+		.join('\n');
+	return output.length > 0 ? `${prompt}\n${output}` : prompt;
+}
+
+/**
+ * Runs a shell command. The title says what the command does, the command line
+ * itself stays the preview, and the body holds the command with its output.
  * @param part - The shell tool part to project
  * @returns The row's title, badge, preview, and body
  */
 function presentBash(part: DynamicToolUIPart): ToolPresenterResult {
 	const input = inputOf(part);
-	const command = stringField(input, 'command', 'cmd') ?? '(no command)';
+	const command = stringField(input, 'command', 'cmd');
+	const commandLine = command ?? '(no command)';
 	const output = outputOf(part);
 	return {
 		badge: null,
-		body: textBody(output?.text ?? '', 'bash' as BundledLanguage),
-		preview: { font: 'mono', text: command },
-		title: 'Bash',
+		body: textBody(
+			shellTranscript(commandLine, output?.text ?? ''),
+			'bash' as BundledLanguage,
+		),
+		preview: { font: 'mono', text: commandLine },
+		title: command === null ? 'Bash' : shellCommandTitle(command),
 		tone: 'default',
 	};
 }

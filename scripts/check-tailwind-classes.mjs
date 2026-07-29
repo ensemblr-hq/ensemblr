@@ -10,7 +10,7 @@ const canonicalClasses = new Map([
 	['rounded-[0.125rem]', 'rounded-sm'],
 ]);
 
-const pixelArbitraryPattern = /\[[^\]]*px[^\]]*\]/g;
+const pixelArbitraryPattern = /\[[^\]\s'"`]*px[^\]\s'"`]*\]/g;
 
 /**
  * Recursively yields every scannable source file beneath a directory.
