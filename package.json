@@ -12,6 +12,7 @@
 	},
 	"scripts": {
 		"dev": "electron-forge start",
+		"dev:playground": "vite --config vite.playground.config.mts",
 		"start": "electron-forge start",
 		"check": "biome check . && npm run check:tailwind",
 		"check:tailwind": "node scripts/check-tailwind-classes.mjs",

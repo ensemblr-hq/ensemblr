@@ -7,6 +7,7 @@ import type {
 import {
 	extractMessageId,
 	isMessageRole,
+	normalizeContentParts,
 	normalizeLegacyMessageFrame,
 	normalizeMessageEnd,
 	normalizeToolExecutionFrame,
@@ -42,6 +43,20 @@ export interface ProtocolDispatchDeps {
 	pendingStatsIds: Set<string>;
 	/** Pending `get_state` request resolvers keyed by request id (mutated by both sides). */
 	pendingStateResolvers: Map<string, (data: unknown) => void>;
+	/**
+	 * Prompts written to stdin that Pi has not echoed back yet, oldest first
+	 * (mutated by both sides). Shutdown flushes whatever is left into the
+	 * transcript so an interrupted prompt is not lost.
+	 */
+	unechoedPrompts: UnechoedPrompt[];
+}
+
+/** One submitted prompt awaiting Pi's `message_end` echo. */
+export interface UnechoedPrompt {
+	/** Set once shutdown surfaced this prompt, so a late echo drops as a duplicate. */
+	flushed: boolean;
+	prompt: string;
+	turnId: string;
 }
 
 /** Handles a single raw Pi RPC frame. */
@@ -149,6 +164,68 @@ function handleMessageUpdate(
 }
 
 /**
+ * Concatenates the text blocks of an echoed user message so the echo can be
+ * compared against the prompt Ensemblr wrote to stdin.
+ * @param message - The `message` object carried by a `message_end` frame.
+ * @returns The echoed prompt text, empty when the message carries none.
+ */
+function extractEchoedPromptText(message: FrameObject): string {
+	return normalizeContentParts(message.content)
+		.flatMap((part) => (part.kind === 'text' ? [part.text] : []))
+		.join('');
+}
+
+/**
+ * Locates the queued prompt a user echo settles. Matching is by identity rather
+ * than arrival order: a steer/follow-up echo is never queued, and retiring the
+ * head entry against it would drop an unrelated prompt for good. Pi does not
+ * round-trip Ensemblr's `turnId` today, so the echoed text is the identity the
+ * two sides actually share; a `turnId` hit wins whenever one is present.
+ * @param typed - The `message_end` frame.
+ * @param message - The frame's `message` object.
+ * @param queued - Prompts still awaiting an echo, oldest first.
+ * @returns Index of the matching entry, or -1 when the echo was never queued.
+ */
+function findEchoedPromptIndex(
+	typed: FrameObject,
+	message: FrameObject,
+	queued: readonly UnechoedPrompt[],
+): number {
+	const echoedTurnId = typeof typed.turnId === 'string' ? typed.turnId : null;
+	const byTurnId = echoedTurnId
+		? queued.findIndex((entry) => entry.turnId === echoedTurnId)
+		: -1;
+	if (byTurnId >= 0) {
+		return byTurnId;
+	}
+	const echoedText = extractEchoedPromptText(message);
+	return echoedText
+		? queued.findIndex((entry) => entry.prompt === echoedText)
+		: -1;
+}
+
+/**
+ * Retires the queued prompt this user echo settles, and reports whether
+ * shutdown already surfaced it so the caller can drop the echo as a duplicate.
+ * @param typed - The `message_end` frame.
+ * @param message - The frame's `message` object.
+ * @param queued - Prompts still awaiting an echo (mutated in place).
+ * @returns True when the echo duplicates an already-surfaced prompt.
+ */
+function consumeEchoedPrompt(
+	typed: FrameObject,
+	message: FrameObject,
+	queued: UnechoedPrompt[],
+): boolean {
+	const index = findEchoedPromptIndex(typed, message, queued);
+	if (index < 0) {
+		return false;
+	}
+	const [settled] = queued.splice(index, 1);
+	return settled?.flushed === true;
+}
+
+/**
  * Projects a final `message_end` into a persisted message event and surfaces a
  * one-shot model/provider failure. Tool-result echoes are dropped (the
  * `tool_execution_end` frame already carries the structured result).
@@ -168,6 +245,9 @@ function handleMessageEnd(
 	const wireRole = isMessageRole(message.role) ? message.role : 'agent';
 	if (wireRole === 'user') {
 		state.promptErrorEmitted = false;
+		if (consumeEchoedPrompt(typed, message, deps.unechoedPrompts)) {
+			return;
+		}
 	}
 	const turnId =
 		typeof typed.turnId === 'string'
@@ -192,7 +272,10 @@ function handleMessageEnd(
 		!state.promptErrorEmitted
 	) {
 		state.promptErrorEmitted = true;
-		deps.emitError('adapter-failure', errorMessage, undefined, true);
+		// Fatal, not recoverable: the turn ended without an answer, and the
+		// timeline surfaces fatal errors only. Tagged recoverable it would vanish
+		// and leave the user staring at a turn that silently stopped.
+		deps.emitError('adapter-failure', errorMessage, undefined, false);
 	}
 }
 

@@ -1,8 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import type { DynamicToolUIPart, UIMessage } from 'ai';
-import type { ReactNode } from 'react';
+import type { UIMessage } from 'ai';
 import { useCallback, useEffect, useMemo } from 'react';
-import type { BundledLanguage } from 'shiki';
 import {
 	piSessionsForWorkspaceQuery,
 	turnCheckpointsQuery,
@@ -10,33 +8,19 @@ import {
 import { ChatAssistantTurn } from '@/renderer/components/chat-assistant-turn';
 import { ChatWorkingIndicator } from '@/renderer/components/chat-turn-timer';
 import { ChatUserPrompt } from '@/renderer/components/chat-user-prompt';
-import { CodeBlock } from '@/renderer/components/code-block';
 import {
 	Conversation,
 	ConversationContent,
 	ConversationScrollButton,
 } from '@/renderer/components/conversation';
-import { MessageResponse } from '@/renderer/components/message';
-import {
-	StackTrace,
-	StackTraceActions,
-	StackTraceContent,
-	StackTraceCopyButton,
-	StackTraceError,
-	StackTraceErrorMessage,
-	StackTraceErrorType,
-	StackTraceExpandButton,
-	StackTraceFrames,
-	StackTraceHeader,
-} from '@/renderer/components/stack-trace';
-import { Terminal } from '@/renderer/components/terminal';
+import { StackTraceDiagnostic } from '@/renderer/components/stack-trace-diagnostic';
 import { useForkConversation } from '@/renderer/hooks/workbench-shell/conversation-panel/use-fork-conversation';
 import { useCheckpointRestore } from '@/renderer/hooks/workbench-shell/timeline/use-checkpoint-restore';
 import { useTimelineEvents } from '@/renderer/hooks/workbench-shell/timeline/use-timeline-events';
 import {
-	classifyToolOutput,
 	eventsToUIMessages,
 	looksLikeStackTrace,
+	noticeMetadataOf,
 	turnMetadataOf,
 } from '@/renderer/lib/pi';
 import { resolveLiveTurnStartMs } from '@/renderer/lib/workbench/timeline-timing';
@@ -202,7 +186,10 @@ export function PiSessionTimeline({
 				className='min-h-0 w-full flex-1'
 				key={activeSession.chatTabId}
 			>
-				<ConversationContent className='mx-auto w-full max-w-3xl gap-6 px-4 pt-5 pb-5'>
+				<ConversationContent
+					className='mx-auto w-full max-w-3xl gap-6 px-4 pt-5 pb-5'
+					scrollKey={activeSession.chatTabId}
+				>
 					{messages.map((message, index) => (
 						<TimelineMessage
 							checkpointsByTurnId={checkpointsByTurnId}
@@ -352,7 +339,11 @@ function TimelineMessage({
 	onViewTurnDiff: ((input: { label: string; turnId: string }) => void) | null;
 }) {
 	if (message.role === 'system') {
-		return <RuntimeDiagnostic message={message} />;
+		return noticeMetadataOf(message) ? (
+			<TurnInterrupted text={textFromMessage(message)} />
+		) : (
+			<RuntimeDiagnostic message={message} />
+		);
 	}
 
 	if (message.role === 'user') {
@@ -397,37 +388,26 @@ function TimelineMessage({
 					? () => onViewTurnDiff({ label: checkpoint.label, turnId })
 					: undefined
 			}
-			renderToolDetail={(part) => renderToolDetailNode(part)}
 			timing={turnTiming}
 		/>
 	);
 }
 
 /**
- * Render the detail node for a tool part: a stack-trace diagnostic, a warning, or its output payload.
- * @param part - The dynamic tool UI part to render.
- * @returns The rendered detail node, or null when there is nothing to show.
+ * Renders the marker left where the user stopped a turn: a hairline rule with a
+ * quiet centered label, so an interruption reads as a deliberate boundary in the
+ * conversation rather than as a failure.
  */
-function renderToolDetailNode(part: DynamicToolUIPart): ReactNode {
-	if ('errorText' in part && part.errorText) {
-		const errorText = part.errorText;
-		return looksLikeStackTrace(errorText) ? (
-			<StackTraceDiagnostic trace={errorText} />
-		) : (
-			<MessageResponse className='text-status-warning'>
-				{errorText}
-			</MessageResponse>
-		);
-	}
-	if (!('output' in part) || part.output === undefined) {
-		return null;
-	}
+function TurnInterrupted({ text }: { text: string }) {
 	return (
-		<ToolPayload
-			state={part.state}
-			toolName={part.toolName}
-			value={part.output}
-		/>
+		<div
+			className='flex items-center gap-3 text-muted-foreground/70 text-xs'
+			data-role='turn-interrupted'
+		>
+			<span className='h-px flex-1 bg-border/60' />
+			<span>{text}</span>
+			<span className='h-px flex-1 bg-border/60' />
+		</div>
 	);
 }
 
@@ -441,7 +421,10 @@ function RuntimeDiagnostic({ message }: { message: UIMessage }) {
 	if (isStackTrace) {
 		return (
 			<div className='rounded-md border border-status-warning/30 bg-status-warning/10 p-3 text-xs'>
-				<StackTraceDiagnostic trace={text} />
+				<StackTraceDiagnostic
+					className='border-status-warning/30'
+					trace={text}
+				/>
 			</div>
 		);
 	}
@@ -449,90 +432,9 @@ function RuntimeDiagnostic({ message }: { message: UIMessage }) {
 	return <p className='px-1 text-status-warning text-xs'>{text}</p>;
 }
 
-/** Memoised payload renderer — classification runs once per (value, toolName). */
-function ToolPayload({
-	state,
-	toolName,
-	value,
-}: {
-	state: string;
-	toolName: string;
-	value: unknown;
-}): ReactNode {
-	const classification = useMemo(
-		() => classifyToolOutput(toolName, value),
-		[toolName, value],
-	);
-
-	switch (classification.kind) {
-		case 'stack-trace':
-			return <StackTraceDiagnostic trace={classification.text} />;
-		case 'terminal':
-			return (
-				<Terminal
-					isStreaming={isToolRunning(state)}
-					output={classification.text}
-				/>
-			);
-		case 'code':
-			return (
-				<CodeBlock
-					code={classification.text}
-					language={classification.language ?? 'typescript'}
-				/>
-			);
-		case 'path-tree':
-			return (
-				<CodeBlock
-					code={classification.text}
-					language={'text' as BundledLanguage}
-				/>
-			);
-		case 'json':
-			return <CodeBlock code={classification.text} language='json' />;
-		case 'text':
-			return <MessageResponse>{classification.text}</MessageResponse>;
-		default: {
-			const exhaustive: never = classification.kind;
-			void exhaustive;
-			return <MessageResponse>{classification.text}</MessageResponse>;
-		}
-	}
-}
-
-/** Renders a collapsed stack trace diagnostic from generated AI Elements parts. */
-function StackTraceDiagnostic({ trace }: { trace: string }) {
-	return (
-		<StackTrace
-			className='border-status-warning/30'
-			defaultOpen={false}
-			trace={trace}
-		>
-			<StackTraceHeader>
-				<StackTraceError>
-					<StackTraceErrorType />
-					<StackTraceErrorMessage />
-				</StackTraceError>
-				<StackTraceActions>
-					<StackTraceCopyButton />
-					<StackTraceExpandButton />
-				</StackTraceActions>
-			</StackTraceHeader>
-			<StackTraceContent>
-				<StackTraceFrames showInternalFrames={false} />
-			</StackTraceContent>
-		</StackTrace>
-	);
-}
-
 /** Converts all text parts in a message into one diagnostic string. */
 function textFromMessage(message: UIMessage): string {
 	return message.parts
 		.flatMap((part) => (part.type === 'text' && part.text ? [part.text] : []))
 		.join('\n');
-}
-
-/** Detects tool states that still represent active work. */
-function isToolRunning(state: string): boolean {
-	return state === 'input-available' || state === 'input-streaming';
 }

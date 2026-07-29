@@ -4,6 +4,7 @@ import type {
 	PullRequestCommentSummary,
 	ReviewFilePreviewOpener,
 	WorkspaceFileDiffOpener,
+	WorkspacePathResolver,
 } from '@/renderer/types/workbench';
 
 /**
@@ -18,17 +19,11 @@ const FilePreviewOpenerContext = createContext<FilePreviewOpener | null>(null);
 
 export const FilePreviewOpenerProvider = FilePreviewOpenerContext.Provider;
 
-/** File-system kind for a workspace-relative path. */
-type WorkspacePathKind = 'directory' | 'file';
+const WorkspacePathResolverContext =
+	createContext<WorkspacePathResolver | null>(null);
 
-/** Resolves a path to its current workspace file kind when the tree knows it. */
-type WorkspacePathKindResolver = (path: string) => WorkspacePathKind | null;
-
-const WorkspacePathKindResolverContext =
-	createContext<WorkspacePathKindResolver | null>(null);
-
-export const WorkspacePathKindResolverProvider =
-	WorkspacePathKindResolverContext.Provider;
+export const WorkspacePathResolverProvider =
+	WorkspacePathResolverContext.Provider;
 
 /**
  * Read the file-preview opener from context.
@@ -39,11 +34,12 @@ export function useFilePreviewOpener(): FilePreviewOpener | null {
 }
 
 /**
- * Read the workspace path-kind resolver from context.
- * @returns The resolver, or null outside a workspace conversation.
+ * Read the workspace path resolver from context.
+ * @returns The resolver, or null outside a workspace conversation, where chips
+ *   have no file tree to check against and stay non-interactive anyway.
  */
-export function useWorkspacePathKindResolver(): WorkspacePathKindResolver | null {
-	return use(WorkspacePathKindResolverContext);
+export function useWorkspacePathResolver(): WorkspacePathResolver | null {
+	return use(WorkspacePathResolverContext);
 }
 
 /** Opens (or re-focuses) a diff tab for a checkpointed turn. */

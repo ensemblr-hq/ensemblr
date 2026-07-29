@@ -1,5 +1,5 @@
 import type { DynamicToolUIPart } from 'ai';
-import type { UIMessagePart } from '@/renderer/types/pi-timeline';
+import type { PiToolOutput, UIMessagePart } from '@/renderer/types/pi-timeline';
 import type {
 	PiSessionEventWire,
 	PiWireMessagePart,
@@ -169,50 +169,60 @@ function pickToolName(a: string, b: string): string {
 }
 
 /**
- * Flattens Pi's MCP-style `{ content: [{ text }] }` envelope into plain text,
- * leaving non-envelope values untouched.
+ * Flattens Pi's MCP-style `{ content: [{ text }], details }` envelope into the
+ * renderer's tool-output shape: joined text plus the tool-specific details bag.
+ *
+ * Values arriving outside the envelope (a bare string, a plain object) are
+ * stringified into `text` with no details, so every consumer sees one shape.
  * @param output - The raw tool-result output value
- * @returns The extracted text, or the original value when it is not an envelope
+ * @returns The normalized text and details for this result
  */
-function normalizeToolOutput(output: unknown): unknown {
-	if (!output || typeof output !== 'object' || Array.isArray(output)) {
-		return output;
+function normalizeToolOutput(output: unknown): PiToolOutput {
+	if (!isPlainObject(output)) {
+		return { details: null, text: stringifyOutput(output) };
 	}
-	const content = (output as Record<string, unknown>).content;
-	if (!Array.isArray(content)) {
-		return output;
+	const details = isPlainObject(output.details) ? output.details : null;
+	if (!Array.isArray(output.content)) {
+		return { details, text: stringifyOutput(details ? null : output) };
 	}
-	const text = content
-		.map((block) => {
-			if (!block || typeof block !== 'object') {
-				return null;
-			}
-			const value = (block as Record<string, unknown>).text;
-			return typeof value === 'string' ? value : null;
-		})
+	const text = output.content
+		.map((block) =>
+			isPlainObject(block) && typeof block.text === 'string'
+				? block.text
+				: null,
+		)
 		.filter((value): value is string => value !== null)
 		.join('\n');
-	return text.length > 0 ? text : output;
+	return { details, text };
 }
 
 /**
- * Coerces a tool error payload into a displayable message, falling back to a
- * generic failure string.
- * @param output - The normalized error output value
+ * Renders any non-envelope tool payload as text without throwing.
+ * @param value - The raw payload
+ * @returns The payload as text, or an empty string when there is nothing to show
+ */
+function stringifyOutput(value: unknown): string {
+	if (typeof value === 'string') {
+		return value;
+	}
+	if (value === undefined || value === null) {
+		return '';
+	}
+	try {
+		return JSON.stringify(value, null, 2);
+	} catch {
+		return String(value);
+	}
+}
+
+/**
+ * Coerces a normalized tool failure into a displayable message, falling back to
+ * a generic failure string.
+ * @param output - The normalized error output
  * @returns A non-empty error message string
  */
-function normalizeToolError(output: unknown): string {
-	if (typeof output === 'string' && output.length > 0) {
-		return output;
-	}
-	if (output !== undefined && output !== null) {
-		try {
-			return JSON.stringify(output);
-		} catch {
-			return 'Tool execution failed.';
-		}
-	}
-	return 'Tool execution failed.';
+function normalizeToolError(output: PiToolOutput): string {
+	return output.text.length > 0 ? output.text : 'Tool execution failed.';
 }
 
 /**

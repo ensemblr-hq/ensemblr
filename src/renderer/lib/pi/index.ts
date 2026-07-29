@@ -8,15 +8,27 @@
  * exported renderer types belong under `@/renderer/types/`.
  */
 
-export { eventsToUIMessages, turnMetadataOf } from './event-to-ui-message';
+export {
+	eventsToUIMessages,
+	noticeMetadataOf,
+	turnMetadataOf,
+} from './event-to-ui-message';
 export { attachmentPathFromInlineCode } from './inline-attachment';
 export {
 	chipLabelForPath,
 	parsePromptAttachments,
 } from './prompt-attachment-parser';
+export { parseToolDiagnostics } from './tool-diagnostics';
 export {
 	classifyToolOutput,
 	looksLikeStackTrace,
 } from './tool-output-classifier';
-export { projectToolRow } from './tool-row-projector';
-export { toWorkspaceLookupPath } from './workspace-path';
+export {
+	glyphForToolCall,
+	presentReasoning,
+	presentToolCall,
+} from './tool-presentation';
+export {
+	createWorkspacePathResolver,
+	toWorkspaceLookupPath,
+} from './workspace-path';

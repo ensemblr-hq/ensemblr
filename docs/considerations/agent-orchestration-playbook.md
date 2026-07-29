@@ -112,6 +112,10 @@ caller-model or default fallback rather than failing the spawn — so never inve
 
 ## Etiquette & limits
 
+- Write every file path mentioned in prose as its **full path from the workspace root**, in
+  backticks — `src/renderer/components/message.tsx`, never a bare `message.tsx` or a trailing
+  fragment like `components/message.tsx`. The timeline turns those into chips the user clicks to
+  open the file, and only a path it can place in the file tree becomes clickable.
 - Delegation is **shallow by design** — only the root may spawn; children do their own work and
   cannot delegate onward. Nesting depth (default cap `1`), per-session spawn count, and spawn rate are
   all capped by the app; never fork-bomb. Waiting on an ancestor session is refused (it would

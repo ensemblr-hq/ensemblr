@@ -11,6 +11,7 @@ export type { WorkbenchLayoutModel } from './layout';
 export type {
 	ChangesSource,
 	ChangesViewMode,
+	LifecycleSummaryRow,
 	SessionTabActions,
 	WorkbenchDockActions,
 	WorkbenchHealth,

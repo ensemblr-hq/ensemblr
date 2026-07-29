@@ -1,6 +1,7 @@
 import type { UIMessage } from 'ai';
 import type {
 	PendingGroup,
+	PiNoticeMetadata,
 	PiTurnMetadata,
 	UIMessagePart,
 	UIRole,
@@ -13,7 +14,7 @@ import type {
 } from '@/shared/ipc/contracts/pi-session';
 import {
 	buildErrorMessage,
-	buildStderrMessage,
+	buildInterruptedMessage,
 } from './diagnostic-event-mapper';
 import {
 	dropStreamingPartsOfType,
@@ -38,9 +39,9 @@ import {
  *
  * Grouping rule: consecutive renderable `message` events that share the same
  * `turnId` and the same UI role collapse into a single `UIMessage`. Lifecycle,
- * metadata, status, shutdown, unknown, and no-op rows are skipped so runtime
- * bookkeeping does not appear as chat content. Actionable errors and stderr
- * diagnostics remain as compact system messages for the timeline renderer.
+ * metadata, status, shutdown, unknown, stderr, and recoverable-error rows are
+ * skipped so runtime bookkeeping does not appear as chat content. Only fatal
+ * errors remain, as compact system messages for the timeline renderer.
  */
 export function eventsToUIMessages(
 	events: readonly PiEventFrame[],
@@ -86,7 +87,7 @@ function withPromptTimes(messages: readonly UIMessage[]): UIMessage[] {
 
 /**
  * Routes one persisted Pi event to the appropriate handler, flushing the
- * pending group before emitting standalone stderr or error messages.
+ * pending group before emitting a standalone fatal-error message.
  * @param event - The persisted Pi event frame being processed
  * @param pending - The group currently being accumulated, or null when none is open
  * @param result - Accumulator of finalized UI messages, appended in place
@@ -98,13 +99,7 @@ function handleEvent(
 	result: UIMessage[],
 ): PendingGroup | null {
 	if (event.stream === 'stderr') {
-		const stderrMessage = buildStderrMessage(event);
-		if (!stderrMessage) {
-			return pending;
-		}
-		flush(pending, result);
-		result.push(stderrMessage);
-		return null;
+		return pending;
 	}
 
 	const envelope = event.payload;
@@ -115,14 +110,27 @@ function handleEvent(
 	switch (envelope.kind) {
 		case 'message':
 			return handleMessageEnvelope(event, envelope, pending, result);
-		case 'error':
+		case 'error': {
+			const errorMessage = buildErrorMessage(event, envelope);
+			if (!errorMessage) {
+				return pending;
+			}
 			flush(pending, result);
-			result.push(buildErrorMessage(event, envelope));
+			result.push(errorMessage);
 			return null;
+		}
+		case 'shutdown': {
+			const noticeMessage = buildInterruptedMessage(event, envelope);
+			if (!noticeMessage) {
+				return pending;
+			}
+			flush(pending, result);
+			result.push(noticeMessage);
+			return null;
+		}
 		case 'context-usage':
 		case 'status':
 		case 'metadata':
-		case 'shutdown':
 			return pending;
 		default: {
 			// Exhaustiveness guard: a future variant should be added above.
@@ -339,6 +347,24 @@ function finalizeGroup(group: PendingGroup): UIMessage {
 		parts,
 		role: group.role,
 	};
+}
+
+/**
+ * Reads the lifecycle-notice marker back off a mapped system message, if present.
+ * @param message - The mapped message to inspect
+ * @returns The notice metadata, or null when the message carries none
+ */
+export function noticeMetadataOf(message: UIMessage): PiNoticeMetadata | null {
+	const metadata = message.metadata;
+	if (
+		metadata &&
+		typeof metadata === 'object' &&
+		'notice' in metadata &&
+		(metadata as PiNoticeMetadata).notice === 'interrupted'
+	) {
+		return metadata as PiNoticeMetadata;
+	}
+	return null;
 }
 
 /** Reads the timing metadata back off a mapped message, if present. */

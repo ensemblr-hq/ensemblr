@@ -5,6 +5,8 @@ import { describe, expect, test, vi } from 'vitest';
 
 vi.mock('../../src/renderer/components/code-block', () => ({
 	CodeBlockContent: () => null,
+}));
+vi.mock('../../src/renderer/lib/code/highlighter', () => ({
 	highlightCode: () => null,
 }));
 

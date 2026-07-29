@@ -1,17 +1,11 @@
 'use client';
 
-import { useAtomValue } from 'jotai';
 import type { CSSProperties, HTMLAttributes } from 'react';
 import { createContext, memo, useEffect, useMemo, useState } from 'react';
-import type {
-	BundledLanguage,
-	BundledTheme,
-	HighlighterGeneric,
-	ThemedToken,
-} from 'shiki';
-import { createHighlighter } from 'shiki';
+import type { BundledLanguage, ThemedToken } from 'shiki';
+import { highlightCode } from '@/renderer/lib/code/highlighter';
 import { cn } from '@/renderer/lib/utils';
-import { codeThemeAtom } from '@/renderer/state/preferences';
+import { useResolvedCodeTheme } from '@/renderer/state/preferences';
 import type { TokenizedCode } from '@/renderer/types/code';
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
@@ -68,7 +62,6 @@ const addKeysToTokens = (lines: ThemedToken[][]): KeyedLine[] =>
 /** Renders a single syntax-highlighted token as a styled span. */
 const TokenSpan = ({ token }: { token: ThemedToken }) => (
 	<span
-		className='dark:!bg-[var(--shiki-dark-bg)] dark:!text-[var(--shiki-dark)]'
 		style={
 			{
 				backgroundColor: token.bgColor,
@@ -134,57 +127,6 @@ const CodeBlockContext = createContext<CodeBlockContextType>({
 	code: '',
 });
 
-// Highlighter cache (singleton per language)
-const highlighterCache = new Map<
-	string,
-	Promise<HighlighterGeneric<BundledLanguage, BundledTheme>>
->();
-
-// Token cache
-const tokensCache = new Map<string, TokenizedCode>();
-
-// Subscribers for async token updates
-const subscribers = new Map<string, Set<(result: TokenizedCode) => void>>();
-
-/**
- * Build a cache key for highlighted tokens from the theme, language, and a code fingerprint.
- * @param code - Source code being highlighted
- * @param language - Shiki language id
- * @param theme - Shiki theme id
- * @returns A cache key that fingerprints the code without hashing all of it
- */
-const getTokensCacheKey = (
-	code: string,
-	language: BundledLanguage,
-	theme: BundledTheme,
-) => {
-	const start = code.slice(0, 100);
-	const end = code.length > 100 ? code.slice(-100) : '';
-	return `${theme}:${language}:${code.length}:${start}:${end}`;
-};
-
-/**
- * Get or lazily create the cached Shiki highlighter for a language.
- * @param language - Shiki language to load
- * @returns A promise resolving to the shared highlighter instance
- */
-const getHighlighter = (
-	language: BundledLanguage,
-): Promise<HighlighterGeneric<BundledLanguage, BundledTheme>> => {
-	const cached = highlighterCache.get(language);
-	if (cached) {
-		return cached;
-	}
-
-	const highlighterPromise = createHighlighter({
-		langs: [language],
-		themes: ['github-light', 'github-dark'],
-	});
-
-	highlighterCache.set(language, highlighterPromise);
-	return highlighterPromise;
-};
-
 // Create raw tokens for immediate display while highlighting loads
 /**
  * Build unstyled tokens so code renders immediately before Shiki finishes highlighting.
@@ -192,8 +134,6 @@ const getHighlighter = (
  * @returns Tokenized code with inherited colors and one token per line
  */
 const createRawTokens = (code: string): TokenizedCode => ({
-	bg: 'transparent',
-	fg: 'inherit',
 	tokens: code.split('\n').map((line) =>
 		line === ''
 			? []
@@ -206,88 +146,14 @@ const createRawTokens = (code: string): TokenizedCode => ({
 	),
 });
 
-// Synchronous highlight with callback for async results
 /**
- * Return cached highlighted tokens synchronously, otherwise kick off async Shiki highlighting and resolve via callback.
- * @param code - Source code to highlight
- * @param language - Shiki language id
- * @param theme - Shiki theme id
- * @param callback - Optional subscriber invoked once async highlighting resolves
- * @returns The cached tokens, or null while highlighting runs in the background
+ * Renders the highlighted token grid inside a styled pre/code block; memoized
+ * against its tokens and options.
+ *
+ * The surface comes from the app's `code` tokens rather than the Shiki theme's
+ * own `bg`/`fg`, so a block stays dark in dark mode and light in light mode
+ * whichever theme Settings → Appearance → Code theme is set to.
  */
-export const highlightCode = (
-	code: string,
-	language: BundledLanguage,
-	theme: BundledTheme,
-	// oxlint-disable-next-line eslint-plugin-promise(prefer-await-to-callbacks)
-	callback?: (result: TokenizedCode) => void,
-): TokenizedCode | null => {
-	const tokensCacheKey = getTokensCacheKey(code, language, theme);
-
-	// Return cached result if available
-	const cached = tokensCache.get(tokensCacheKey);
-	if (cached) {
-		return cached;
-	}
-
-	// Subscribe callback if provided
-	if (callback) {
-		if (!subscribers.has(tokensCacheKey)) {
-			subscribers.set(tokensCacheKey, new Set());
-		}
-		subscribers.get(tokensCacheKey)?.add(callback);
-	}
-
-	// Start highlighting in background - fire-and-forget async pattern
-	getHighlighter(language)
-		// oxlint-disable-next-line eslint-plugin-promise(prefer-await-to-then)
-		.then(async (highlighter) => {
-			const availableLangs = highlighter.getLoadedLanguages();
-			const langToUse = availableLangs.includes(language) ? language : 'text';
-
-			// Only github-* are preloaded; other picked themes load on demand.
-			if (!highlighter.getLoadedThemes().includes(theme)) {
-				await highlighter.loadTheme(theme);
-			}
-
-			// Feed the single picked theme to both slots so it wins in light and
-			// dark app modes (the `--shiki-dark` swap becomes a no-op).
-			const result = highlighter.codeToTokens(code, {
-				lang: langToUse,
-				themes: {
-					dark: theme,
-					light: theme,
-				},
-			});
-
-			const tokenized: TokenizedCode = {
-				bg: result.bg ?? 'transparent',
-				fg: result.fg ?? 'inherit',
-				tokens: result.tokens,
-			};
-
-			// Cache the result
-			tokensCache.set(tokensCacheKey, tokenized);
-
-			// Notify all subscribers
-			const subs = subscribers.get(tokensCacheKey);
-			if (subs) {
-				for (const sub of subs) {
-					sub(tokenized);
-				}
-				subscribers.delete(tokensCacheKey);
-			}
-		})
-		// oxlint-disable-next-line eslint-plugin-promise(prefer-await-to-then), eslint-plugin-promise(prefer-await-to-callbacks)
-		.catch((error) => {
-			console.error('Failed to highlight code:', error);
-			subscribers.delete(tokensCacheKey);
-		});
-
-	return null;
-};
-
-/** Renders the highlighted token grid inside a styled pre/code block; memoized against its tokens and options. */
 const CodeBlockBody = memo(
 	({
 		tokenized,
@@ -298,14 +164,6 @@ const CodeBlockBody = memo(
 		showLineNumbers: boolean;
 		className?: string;
 	}) => {
-		const preStyle = useMemo(
-			() => ({
-				backgroundColor: tokenized.bg,
-				color: tokenized.fg,
-			}),
-			[tokenized.bg, tokenized.fg],
-		);
-
 		const keyedLines = useMemo(
 			() => addKeysToTokens(tokenized.tokens),
 			[tokenized.tokens],
@@ -314,10 +172,9 @@ const CodeBlockBody = memo(
 		return (
 			<pre
 				className={cn(
-					'dark:!bg-[var(--shiki-dark-bg)] dark:!text-[var(--shiki-dark)] m-0 p-4 text-sm',
+					'm-0 bg-code p-4 text-code-foreground text-sm',
 					className,
 				)}
-				style={preStyle}
 			>
 				<code
 					className={cn(
@@ -355,8 +212,9 @@ export const CodeBlockContent = ({
 	language: BundledLanguage;
 	showLineNumbers?: boolean;
 }) => {
-	// Picked syntax theme (Settings → Appearance → Code theme).
-	const codeTheme = useAtomValue(codeThemeAtom);
+	// Picked syntax theme (Settings → Appearance → Code theme), in the app's
+	// current polarity.
+	const codeTheme = useResolvedCodeTheme();
 
 	// Memoized raw tokens for immediate display
 	const rawTokens = useMemo(() => createRawTokens(code), [code]);

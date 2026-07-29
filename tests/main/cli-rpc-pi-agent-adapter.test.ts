@@ -333,6 +333,271 @@ test('crash with non-zero exit emits error then shutdown(crashed)', async () => 
 	);
 });
 
+test('crash detail carries the signal and the stderr tail', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	child.emitStderr('panic: out of memory\n');
+	child.emitExit(137, 'SIGKILL');
+
+	const crash = events.find(
+		(event): event is Extract<PiAgentEvent, { type: 'error' }> =>
+			event.type === 'error' &&
+			/exited with code 137/.test(event.error.message),
+	);
+	assert.ok(crash);
+	assert.equal(crash.error.recoverable, false);
+	assert.match(crash.error.detail ?? '', /signal=SIGKILL/);
+	assert.match(crash.error.detail ?? '', /panic: out of memory/);
+});
+
+test('graceful termination signals exit without an error diagnostic', async () => {
+	for (const [code, signal] of [
+		[143, null],
+		[130, null],
+		[null, 'SIGTERM'],
+	] as const) {
+		const recorder = createSpawnRecorder();
+		const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+		const session = await adapter.createSession({ metadata: buildMetadata() });
+		const { events, listener } = collectEvents();
+		session.subscribe(listener);
+		await waitForMicrotasks();
+		const child = firstItem(recorder.getChildren());
+
+		child.emitExit(code, signal);
+
+		assert.deepEqual(
+			events.filter((event) => event.type === 'error'),
+			[],
+			`expected no error for code=${code} signal=${signal}`,
+		);
+		assert.ok(events.some((event) => event.type === 'shutdown'));
+	}
+});
+
+test('abort flushes a prompt pi never echoed so the transcript keeps it', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({
+		killGraceMs: 5,
+		spawn: recorder.spawn,
+	});
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+
+	await session.submit({ prompt: 'okay howdy' });
+	await session.abort('user clicked stop');
+	await new Promise((resolve) => setTimeout(resolve, 25));
+
+	const userMessages = events.filter(
+		(event) => event.type === 'message' && event.role === 'user',
+	);
+	assert.equal(userMessages.length, 1);
+	const flushed = userMessages[0] as Extract<PiAgentEvent, { type: 'message' }>;
+	assert.deepEqual(flushed.payload, {
+		kind: 'message',
+		parts: [{ kind: 'text', text: 'okay howdy' }],
+		role: 'user',
+	});
+	// The prompt has to precede the shutdown so the timeline renders it above
+	// the "you stopped this turn" marker rather than after it.
+	const shutdownIndex = events.findIndex((event) => event.type === 'shutdown');
+	assert.ok(shutdownIndex >= 0);
+	assert.ok(events.indexOf(flushed) < shutdownIndex);
+});
+
+test('a prompt echo buffered past the abort does not duplicate the flush', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({
+		killGraceMs: 5000,
+		spawn: recorder.spawn,
+	});
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({ prompt: 'okay howdy' });
+	await session.abort('user clicked stop');
+	// Pi buffered the echo before the SIGINT landed; it arrives while the child
+	// is still winding down, after `abort` already surfaced the prompt.
+	child.emitStdout(
+		'{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"okay howdy"}]}}\n',
+	);
+
+	const userMessages = events.filter(
+		(event) => event.type === 'message' && event.role === 'user',
+	);
+	assert.equal(userMessages.length, 1);
+});
+
+test('abort does not re-emit a prompt pi already echoed back', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({ prompt: 'okay howdy' });
+	child.emitStdout(
+		'{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"okay howdy"}]}}\n',
+	);
+	await session.abort('user clicked stop');
+
+	const userMessages = events.filter(
+		(event) => event.type === 'message' && event.role === 'user',
+	);
+	assert.equal(userMessages.length, 1);
+});
+
+test('a crash surfaces a prompt pi never echoed instead of dropping it', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({ spawn: recorder.spawn });
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({ prompt: 'okay howdy' });
+	// The child dies before echoing the prompt back and nothing called `abort`,
+	// so only the shutdown path can keep the prompt in the transcript.
+	child.emitExit(1, null);
+
+	const userMessages = events.filter(
+		(event): event is Extract<PiAgentEvent, { type: 'message' }> =>
+			event.type === 'message' && event.role === 'user',
+	);
+	assert.equal(userMessages.length, 1);
+	const flushed = firstItem(userMessages);
+	assert.deepEqual(flushed.payload, {
+		kind: 'message',
+		parts: [{ kind: 'text', text: 'okay howdy' }],
+		role: 'user',
+	});
+	const shutdownIndex = events.findIndex((event) => event.type === 'shutdown');
+	assert.ok(shutdownIndex >= 0);
+	assert.ok(events.indexOf(flushed) < shutdownIndex);
+});
+
+test('app quit surfaces a prompt pi never echoed instead of dropping it', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({
+		killGraceMs: 5,
+		spawn: recorder.spawn,
+	});
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+
+	await session.submit({ prompt: 'okay howdy' });
+	// App quit closes every open session directly; it never routes through
+	// `abort`, so the flush cannot live on that path alone.
+	await adapter.shutdown();
+
+	const userMessages = events.filter(
+		(event): event is Extract<PiAgentEvent, { type: 'message' }> =>
+			event.type === 'message' && event.role === 'user',
+	);
+	assert.equal(userMessages.length, 1);
+	const flushed = firstItem(userMessages);
+	assert.deepEqual(flushed.payload, {
+		kind: 'message',
+		parts: [{ kind: 'text', text: 'okay howdy' }],
+		role: 'user',
+	});
+	const shutdownIndex = events.findIndex((event) => event.type === 'shutdown');
+	assert.ok(shutdownIndex >= 0);
+	assert.ok(events.indexOf(flushed) < shutdownIndex);
+});
+
+test('a steer echo does not retire the plain prompt still awaiting its own', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({
+		killGraceMs: 5,
+		spawn: recorder.spawn,
+	});
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({ prompt: 'okay howdy' });
+	await session.submit({ prompt: 'go this way', streamingBehavior: 'steer' });
+	// A steer is never queued, so echoing it must consume nothing: matching the
+	// queue positionally would retire 'okay howdy' here and lose it for good.
+	child.emitStdout(
+		'{"type":"message_end","message":{"role":"user","content":[{"type":"text","text":"go this way"}]}}\n',
+	);
+	await session.abort('user clicked stop');
+
+	const userMessages = events.filter(
+		(event): event is Extract<PiAgentEvent, { type: 'message' }> =>
+			event.type === 'message' && event.role === 'user',
+	);
+	assert.deepEqual(
+		userMessages.map((event) => event.payload),
+		[
+			{
+				kind: 'message',
+				parts: [{ kind: 'text', text: 'go this way' }],
+				role: 'user',
+			},
+			{
+				kind: 'message',
+				parts: [{ kind: 'text', text: 'okay howdy' }],
+				role: 'user',
+			},
+		],
+	);
+});
+
+test('a repeated abort duplicates nothing and re-arms no kill timer', async () => {
+	const recorder = createSpawnRecorder();
+	const adapter = createCliRpcPiAgentAdapter({
+		killGraceMs: 5,
+		spawn: recorder.spawn,
+	});
+	const session = await adapter.createSession({ metadata: buildMetadata() });
+	const { events, listener } = collectEvents();
+	session.subscribe(listener);
+	await waitForMicrotasks();
+	const child = firstItem(recorder.getChildren());
+
+	await session.submit({ prompt: 'okay howdy' });
+	// Two stops inside the SIGINT → SIGKILL grace window: the child has not
+	// exited yet, so `closed` is still false and the second call re-enters.
+	await session.abort('user clicked stop');
+	await session.abort('user clicked stop again');
+	await new Promise((resolve) => setTimeout(resolve, 25));
+
+	const userMessages = events.filter(
+		(event) => event.type === 'message' && event.role === 'user',
+	);
+	const abortErrors = events.filter(
+		(event) =>
+			event.type === 'error' &&
+			event.error.message === 'Pi RPC session aborted.',
+	);
+	assert.equal(userMessages.length, 1);
+	assert.equal(abortErrors.length, 1);
+	const signals = child.getKillSignals();
+	assert.equal(signals.filter((signal) => signal === 'SIGINT').length, 1);
+	assert.equal(signals.filter((signal) => signal === 'SIGKILL').length, 1);
+});
+
 test('abort signals SIGINT then SIGKILL after the grace window', async () => {
 	const recorder = createSpawnRecorder();
 	const adapter = createCliRpcPiAgentAdapter({

@@ -10,14 +10,14 @@ import { describe, expect, test, vi } from 'vitest';
 const seen = new Set<string>();
 vi.mock('../../src/renderer/components/code-block', () => ({
 	CodeBlockContent: () => null,
+}));
+vi.mock('../../src/renderer/lib/code/highlighter', () => ({
 	highlightCode: (code: string) => {
 		if (!seen.has(code)) {
 			seen.add(code);
 			return null;
 		}
 		return {
-			bg: 'transparent',
-			fg: 'inherit',
 			tokens: code
 				.split('\n')
 				.map((line) =>

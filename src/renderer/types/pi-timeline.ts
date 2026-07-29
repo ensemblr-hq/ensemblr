@@ -192,6 +192,15 @@ export interface PiTurnMetadata {
 	turnId: string | null;
 }
 
+/**
+ * Marks a system-role timeline message as a lifecycle notice rather than a
+ * runtime failure, so the renderer can style a deliberate interruption calmly
+ * instead of dressing it up as an error.
+ */
+export interface PiNoticeMetadata {
+	notice: 'interrupted';
+}
+
 /** One file attachment parsed from a persisted user prompt (path + inlined content). */
 export interface ParsedPromptAttachment {
 	content: string;
@@ -205,16 +214,15 @@ export interface ParsedPrompt {
 }
 
 /**
- * Compact one-line projection of a tool call for the activity-row renderer.
- * Mirrors the GIF reference: `[label]  [detail]  [optional chip]`.
+ * Normalized result of one tool call: Pi's MCP-style `{ content: [...] }`
+ * envelope flattened to text, alongside the tool-specific `details` bag it
+ * shipped with.
  *
- * Unknown tools fall through to a generic projection — the tool name as label,
- * the first scalar input value as detail. Keeps the surface uniform.
+ * `details` is what makes a rich body possible — `edit` puts its unified patch
+ * there, `lsp_diagnostics` its diagnostic list — so it is carried rather than
+ * dropped during flattening.
  */
-export interface ToolRowProjection {
-	chipLabel: string | null;
-	/** Full path backing the chip (as given in tool input), for preview opening. */
-	chipPath: string | null;
-	detail: string;
-	label: string;
+export interface PiToolOutput {
+	details: Readonly<Record<string, unknown>> | null;
+	text: string;
 }

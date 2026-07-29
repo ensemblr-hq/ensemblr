@@ -61,8 +61,11 @@ const appearanceSettingsSchema = z.object({
 	accessibleColors: z
 		.enum(['default', 'protanopia', 'deuteranopia', 'tritanopia'])
 		.catch('default'),
-	// Values are Shiki `BundledTheme` ids so consumers can pass them straight
-	// through (e.g. `one-dark-pro`, not `one-dark`).
+	// Values are Shiki `BundledTheme` ids (e.g. `one-dark-pro`, not `one-dark`),
+	// but they name a theme *family*: the renderer swaps in the light or dark cut
+	// to match the app theme, so do not pass this id to Shiki directly — see
+	// `useResolvedCodeTheme`. The light-cut ids remain accepted so settings saved
+	// before the picker collapsed to families still load.
 	codeTheme: z
 		.enum([
 			'catppuccin-mocha',

@@ -75,6 +75,22 @@ export interface WorkspaceFileSummary {
 	path: string;
 }
 
+/** A workspace file-tree entry that a path written by an agent was matched to. */
+export interface WorkspacePathMatch {
+	kind: 'directory' | 'file';
+	/** Canonical workspace-relative path; may be longer than the one asked for. */
+	path: string;
+}
+
+/**
+ * Matches a path an agent wrote against the workspace file tree. Returns null
+ * when the tree does not hold it, which is what makes a chip inert rather than
+ * opening a preview onto a file that was deleted, moved, or never existed.
+ */
+export type WorkspacePathResolver = (
+	filePath: string,
+) => WorkspacePathMatch | null;
+
 /**
  * A large pasted/dropped file referenced by absolute filesystem path instead of
  * being copied into the workspace. Distinct from {@link WorkspaceFileSummary},

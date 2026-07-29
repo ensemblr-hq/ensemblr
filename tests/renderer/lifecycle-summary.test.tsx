@@ -1,15 +1,15 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, test } from 'vitest';
 
-import {
-	LifecycleSummary,
-	projectSummaryRows,
-	workspaceSummaryRows,
-} from '../../src/renderer/components/workbench-shell/lifecycle-summary';
+import { LifecycleSummary } from '../../src/renderer/components/workbench-shell/lifecycle-summary';
 import {
 	getDefaultProject,
 	getDefaultWorkspace,
 } from '../../src/renderer/fixtures/workbench';
+import {
+	projectSummaryRows,
+	workspaceSummaryRows,
+} from '../../src/renderer/lib/workbench/lifecycle-summary-rows';
 
 test('workspaceSummaryRows lists workspace, branch, and path', () => {
 	const rows = workspaceSummaryRows({

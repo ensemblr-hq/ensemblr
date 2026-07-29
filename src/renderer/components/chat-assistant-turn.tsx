@@ -1,11 +1,12 @@
 import type { DynamicToolUIPart, UIMessage } from 'ai';
-import type { ReactNode } from 'react';
 import { useMemo } from 'react';
+import { glyphForToolCall } from '@/renderer/lib/pi';
 import { cn } from '@/renderer/lib/utils';
 import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
+import type { ToolGlyph } from '@/renderer/types/tool-presentation';
 
-import { ChatReasoningRow, ChatToolRow } from './chat-activity-row';
 import { ChatMessageText } from './chat-message-text';
+import { ChatReasoningCollapsible, ChatToolCall } from './chat-tool-call';
 import { ChatTurnFooter } from './chat-turn-footer';
 import { ChatTurnSummary } from './chat-turn-summary';
 import { ChatWorkingIndicator } from './chat-turn-timer';
@@ -31,7 +32,6 @@ export function ChatAssistantTurn({
 	onForkToNewWorkspace,
 	onRestoreToCheckpoint,
 	onViewTurnDiff,
-	renderToolDetail,
 	timing,
 }: {
 	className?: string;
@@ -43,7 +43,6 @@ export function ChatAssistantTurn({
 	onForkToNewWorkspace?: () => void;
 	onRestoreToCheckpoint?: () => void;
 	onViewTurnDiff?: () => void;
-	renderToolDetail?: (part: DynamicToolUIPart) => ReactNode;
 	timing: ChatAssistantTurnTiming;
 }) {
 	const { activityParts, finalParts } = useMemo(
@@ -53,12 +52,12 @@ export function ChatAssistantTurn({
 
 	const hasFinal = finalParts.length > 0;
 	const activityRows = activityParts.map((part, index) => (
-		<ActivityPart
-			key={`${message.id}:a:${index}`}
-			part={part}
-			renderToolDetail={hasFinal ? renderToolDetail : undefined}
-		/>
+		<ActivityPart key={`${message.id}:a:${index}`} part={part} />
 	));
+	const toolGlyphs = useMemo(
+		() => collectToolGlyphs(activityParts),
+		[activityParts],
+	);
 
 	const finalRows = finalParts.map((part, index) => {
 		const key = `${message.id}:f:${index}`;
@@ -90,7 +89,7 @@ export function ChatAssistantTurn({
 					<ChatTurnSummary
 						durationMs={null}
 						messageCount={countIntermediateText(activityParts)}
-						toolCount={countByType(activityParts, 'dynamic-tool')}
+						toolGlyphs={toolGlyphs}
 					>
 						{activityRows}
 					</ChatTurnSummary>
@@ -123,25 +122,13 @@ export function ChatAssistantTurn({
 	);
 }
 
-/** Renders one pre-answer activity part: reasoning, a tool call with optional detail, or muted intermediate commentary. */
-function ActivityPart({
-	part,
-	renderToolDetail,
-}: {
-	part: UIMessage['parts'][number];
-	renderToolDetail?: (part: DynamicToolUIPart) => ReactNode;
-}) {
+/** Renders one pre-answer activity part: reasoning, a tool call, or muted intermediate commentary. */
+function ActivityPart({ part }: { part: UIMessage['parts'][number] }) {
 	if (part.type === 'reasoning') {
-		return <ChatReasoningRow text={part.text} />;
+		return <ChatReasoningCollapsible text={part.text} />;
 	}
 	if (part.type === 'dynamic-tool') {
-		const detail = renderToolDetail?.(part as DynamicToolUIPart);
-		return (
-			<>
-				<ChatToolRow part={part as DynamicToolUIPart} />
-				{detail ? <div className='pl-6 text-xs'>{detail}</div> : null}
-			</>
-		);
+		return <ChatToolCall part={part as DynamicToolUIPart} />;
 	}
 	if (part.type === 'text') {
 		// Intermediate commentary between tool calls — keep compact and muted
@@ -190,22 +177,17 @@ function splitTurnParts(
 }
 
 /**
- * Count the parts of a given type within an activity-part list.
+ * Collect the icon of every tool call folded into a turn's summary, in the
+ * order the turn ran them.
  * @param parts - Message parts to scan
- * @param type - Part type to match
- * @returns The number of matching parts
+ * @returns One glyph per tool call
  */
-function countByType(
-	parts: UIMessage['parts'],
-	type: 'reasoning' | 'dynamic-tool',
-): number {
-	let count = 0;
-	for (const part of parts) {
-		if (part.type === type) {
-			count += 1;
-		}
-	}
-	return count;
+function collectToolGlyphs(parts: UIMessage['parts']): readonly ToolGlyph[] {
+	return parts.flatMap((part) =>
+		part.type === 'dynamic-tool'
+			? [glyphForToolCall(part as DynamicToolUIPart)]
+			: [],
+	);
 }
 
 /**

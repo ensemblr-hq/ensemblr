@@ -4,7 +4,10 @@ import { bindChildStreams } from './cli-rpc/child-streams.ts';
 import { createKillTimer } from './cli-rpc/kill-timer.ts';
 import { createPiRpcLineStream } from './cli-rpc/line-stream-handlers.ts';
 import { createListenerFanout } from './cli-rpc/listener-fanout.ts';
-import { createProtocolDispatcher } from './cli-rpc/protocol-dispatch.ts';
+import {
+	createProtocolDispatcher,
+	type UnechoedPrompt,
+} from './cli-rpc/protocol-dispatch.ts';
 import { createRingBuffer } from './cli-rpc/ring-buffer.ts';
 import {
 	buildSpawnEnv,
@@ -343,6 +346,7 @@ function createCliRpcSession({
 
 	const pendingStatsIds = new Set<string>();
 	const pendingStateResolvers = new Map<string, (data: unknown) => void>();
+	const unechoedPrompts: UnechoedPrompt[] = [];
 
 	const requestContextUsage = (): void => {
 		if (closed || !child.stdin.writable) {
@@ -371,6 +375,7 @@ function createCliRpcSession({
 		pendingStateResolvers,
 		requestContextUsage,
 		setStatus,
+		unechoedPrompts,
 	});
 
 	const lineStream = createPiRpcLineStream({
@@ -388,11 +393,58 @@ function createCliRpcSession({
 		onRawLine: (line) => emitRawFrame('rx', line),
 	});
 
+	/**
+	 * Emits the prompts Pi never echoed back as user messages so an interrupted
+	 * turn keeps the prompt that opened it. Pi is the transcript's usual source
+	 * for user messages, and it only echoes once the turn starts producing —
+	 * stopping before then would otherwise drop the prompt for good. Idempotent:
+	 * an entry already surfaced is never emitted twice, so repeated termination
+	 * attempts stay harmless whatever order the callers arrive in.
+	 */
+	const flushUnechoedPrompts = (): void => {
+		const pending = unechoedPrompts.filter((entry) => !entry.flushed);
+		if (pending.length === 0) {
+			return;
+		}
+		// Kept rather than drained: a frame Pi buffered before the SIGINT can still
+		// arrive during the grace window, and the entry is what tells the dispatcher
+		// that echo is now a duplicate.
+		const settled = unechoedPrompts.map((entry) => ({
+			...entry,
+			flushed: true,
+		}));
+		unechoedPrompts.length = 0;
+		unechoedPrompts.push(...settled);
+		for (const prompt of pending) {
+			emit({
+				at: now().toISOString(),
+				payload: {
+					kind: 'message',
+					parts: [{ kind: 'text', text: prompt.prompt }],
+					role: 'user',
+				},
+				role: 'user',
+				turnId: prompt.turnId,
+				type: 'message',
+			});
+		}
+	};
+
+	/**
+	 * Settles the session exactly once: rescues any unechoed prompt, marks the
+	 * metadata closed, announces the reason, and releases every pending waiter.
+	 * Runs for every terminal reason — completed, crashed, aborted, manual — so a
+	 * crash or an app quit preserves an in-flight prompt just like an abort does.
+	 * @param reason - Why the session terminated.
+	 */
 	const finalizeShutdown = (reason: PiAgentShutdownReason): void => {
 		if (closed) {
 			return;
 		}
 		closed = true;
+		// Ahead of the shutdown event so the timeline renders a rescued prompt above
+		// the marker that ended its turn rather than after it.
+		flushUnechoedPrompts();
 		patchMetadata({ status: 'closed' }, { silent: true });
 		emit({ at: now().toISOString(), reason, type: 'shutdown' });
 		listeners.clear();
@@ -571,15 +623,24 @@ function createCliRpcSession({
 			type: 'prompt' as const,
 		};
 		await writeFrame(frame);
+		unechoedPrompts.push({ flushed: false, prompt: request.prompt, turnId });
 		setStatus('streaming');
 		return { acceptedAt, turnId };
 	};
 
+	/**
+	 * Interrupts the running turn: surfaces any prompt Pi never echoed, reports
+	 * the abort, then SIGINT with a SIGKILL escalation. A no-op once a
+	 * termination is already in flight, so a repeated stop cannot duplicate the
+	 * transcript entry, re-report the abort, or reset the kill deadline.
+	 * @param reason - Operator-facing explanation attached to the abort error.
+	 */
 	const abort = async (reason?: string): Promise<void> => {
-		if (closed) {
+		if (closed || pendingShutdownReason !== null) {
 			return;
 		}
 		pendingShutdownReason = 'aborted';
+		flushUnechoedPrompts();
 		emitError('adapter-failure', 'Pi RPC session aborted.', reason, true);
 		sendSignal('SIGINT');
 		killTimer.schedule(killGraceMs, () => sendSignal('SIGKILL'));
