@@ -12,10 +12,17 @@ import type {
 	PiWireMessagePart,
 	PiWireMessagePayload,
 } from '@/shared/ipc/contracts/pi-session';
+import { buildCustomMessagePart } from './custom-message-part';
 import {
 	buildErrorMessage,
 	buildInterruptedMessage,
 } from './diagnostic-event-mapper';
+import {
+	parseSkillInvocation,
+	skillCommandText,
+	skillInvocationKey,
+} from './skill-invocation';
+import { buildSkillPart } from './skill-part';
 import {
 	dropStreamingPartsOfType,
 	isDoneTextPart,
@@ -57,7 +64,154 @@ export function eventsToUIMessages(
 		result.push(finalizeGroup(pending));
 	}
 
-	return withPromptTimes(result);
+	return withPromptTimes(
+		relocateSkillInvocations(dropFlushedSkillDuplicates(result)),
+	);
+}
+
+/**
+ * Reads the turn a message belongs to, as the key used to scope skill dedup.
+ * Null is a key in its own right: messages carrying no turn metadata bucket
+ * together and cannot be mistaken for a real turn.
+ * @param message - The finalized message to inspect
+ * @returns The message's turn id, or null when it carries no turn metadata
+ */
+function dedupTurnKey(message: UIMessage): string | null {
+	return turnMetadataOf(message)?.turnId ?? null;
+}
+
+/**
+ * Drops the raw `/skill:name` user message the adapter re-emits on shutdown when
+ * a matching `<skill>` echo is already in the stream. Pi only ever persists the
+ * expanded block, so a raw typed skill prompt is a shutdown-flush artifact; kept
+ * only when it stands alone (a turn interrupted before Pi echoed it), so an
+ * early-cancelled prompt is never lost.
+ *
+ * Scoped per turn, not per conversation: invoking the same skill with the same
+ * arguments again later produces the same key, so a session-wide set would read
+ * the second, interrupted invocation as a duplicate of the first and silently
+ * drop the user's prompt.
+ * @param messages - The finalized messages to filter
+ * @returns The messages with flushed skill duplicates removed
+ */
+function dropFlushedSkillDuplicates(
+	messages: readonly UIMessage[],
+): UIMessage[] {
+	const expandedKeysByTurn = new Map<string | null, Set<string>>();
+	for (const message of messages) {
+		if (message.role !== 'user') {
+			continue;
+		}
+		const text = joinTextParts(message);
+		if (!parseSkillInvocation(text).skill) {
+			continue;
+		}
+		const key = skillInvocationKey(text);
+		if (!key) {
+			continue;
+		}
+		const turnKey = dedupTurnKey(message);
+		const keys = expandedKeysByTurn.get(turnKey) ?? new Set<string>();
+		keys.add(key);
+		expandedKeysByTurn.set(turnKey, keys);
+	}
+	if (expandedKeysByTurn.size === 0) {
+		return [...messages];
+	}
+	return messages.filter((message) => {
+		if (message.role !== 'user') {
+			return true;
+		}
+		const text = joinTextParts(message);
+		if (parseSkillInvocation(text).skill) {
+			return true;
+		}
+		const key = skillInvocationKey(text);
+		if (key === null) {
+			return true;
+		}
+		return !expandedKeysByTurn.get(dedupTurnKey(message))?.has(key);
+	});
+}
+
+/**
+ * Rewrites each skill prompt Pi expanded into a `<skill>` block back to the
+ * `/skill:name` command the user typed, and moves the skill into the assistant
+ * turn it opened as a "Skill activated" marker. The prompt then reads as a
+ * normal bubble and the skill folds into the turn's activity instead of standing
+ * above it as the whole `SKILL.md`.
+ * @param messages - The finalized messages to transform
+ * @returns The messages with skill prompts rewritten and their markers relocated
+ */
+function relocateSkillInvocations(messages: readonly UIMessage[]): UIMessage[] {
+	const result: UIMessage[] = [];
+	let pending: { name: string; source: UIMessage } | null = null;
+	for (const message of messages) {
+		if (pending) {
+			if (message.role === 'assistant') {
+				result.push({
+					...message,
+					parts: [buildSkillPart(pending.name), ...message.parts],
+				});
+				pending = null;
+				continue;
+			}
+			result.push(skillActivationRow(pending.name, pending.source));
+			pending = null;
+		}
+		if (message.role !== 'user') {
+			result.push(message);
+			continue;
+		}
+		const { skill, text } = parseSkillInvocation(joinTextParts(message));
+		if (!skill) {
+			result.push(message);
+			continue;
+		}
+		result.push({
+			...message,
+			parts: [
+				{
+					state: 'done',
+					text: skillCommandText(skill.name, text),
+					type: 'text',
+				},
+			],
+		});
+		pending = { name: skill.name, source: message };
+	}
+	return result;
+}
+
+/**
+ * Builds the standalone assistant row that carries a skill marker when the
+ * message following the prompt is not an assistant turn — a fatally errored or
+ * interrupted turn. Without it the activation is lost, since `system` and
+ * `user` rows render their text and ignore their parts. A skill prompt that is
+ * still the last message gets no row: its turn may yet be streaming, and
+ * emitting one would flash a marker that the arriving turn immediately absorbs.
+ * @param name - The activated skill's name
+ * @param source - The user message that invoked it, whose turn metadata the row inherits
+ * @returns An assistant message carrying only the skill marker
+ */
+function skillActivationRow(name: string, source: UIMessage): UIMessage {
+	return {
+		id: `${source.id}-skill`,
+		metadata: source.metadata,
+		parts: [buildSkillPart(name)],
+		role: 'assistant',
+	};
+}
+
+/**
+ * Joins the text parts of a message into one string.
+ * @param message - The message to read
+ * @returns The concatenated text of every text part
+ */
+function joinTextParts(message: UIMessage): string {
+	return message.parts
+		.flatMap((part) => (part.type === 'text' && part.text ? [part.text] : []))
+		.join('\n');
 }
 
 /**
@@ -223,6 +377,16 @@ function projectMessagePayload(
 		case 'reasoning':
 			return payload.text
 				? [{ state: 'done', text: payload.text, type: 'reasoning' }]
+				: [];
+		case 'custom':
+			return payload.text
+				? [
+						buildCustomMessagePart({
+							customType: payload.customType,
+							display: payload.display,
+							text: payload.text,
+						}),
+					]
 				: [];
 		case 'text-delta':
 			return payload.text

@@ -242,6 +242,24 @@ export function getChatTabById({
 	return row ? mapTabRow(row) : null;
 }
 
+/**
+ * Returns the tab bound to a Pi session (open or closed), or `null` when none
+ * is. Lets a caller holding only a session id reach its tab without scanning
+ * the workspace's tab list.
+ */
+export function getChatTabByPiSessionId({
+	database,
+	piSessionId,
+}: {
+	database: DatabaseSync;
+	piSessionId: string;
+}): ChatTabRow | null {
+	const row = database
+		.prepare(`${SELECT_TAB} WHERE pi_session_id = ?`)
+		.get(piSessionId) as ChatTabRowShape | undefined;
+	return row ? mapTabRow(row) : null;
+}
+
 /** Returns all open tabs for a workspace in position order. */
 export function listOpenChatTabs({
 	database,

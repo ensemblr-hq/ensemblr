@@ -63,6 +63,22 @@ const makePorts = (planning: boolean): AgentControlPorts =>
 			),
 			releaseSession: vi.fn(),
 		},
+		sessionNaming: {
+			readBrief: vi.fn().mockResolvedValue({
+				branch: { current: null, eligible: false },
+				summaryStale: false,
+				titleNeeded: false,
+			}),
+			setBranchName: vi.fn().mockResolvedValue({
+				applied: true,
+				branchName: 'b',
+				message: 'ok',
+				name: 'n',
+			}),
+			setSummary: vi
+				.fn()
+				.mockResolvedValue({ capturedAtOrdinal: 3, message: 'ok' }),
+		},
 	}) as unknown as AgentControlPorts;
 
 const setup = (options: { planning: boolean; species?: AgentSpecies }) => {
@@ -154,21 +170,35 @@ describe('plan mode: control-op gate', () => {
 	});
 });
 
-describe('plan mode: getPlanMode', () => {
+describe('plan mode: getSessionBrief', () => {
 	it('reports the planning session as active', async () => {
 		const { service } = setup({ planning: true });
 
-		const result = await invoke(service, 'getPlanMode');
+		const result = await invoke(service, 'getSessionBrief');
 
-		expect(result).toMatchObject({ data: { active: true }, ok: true });
+		expect(result).toMatchObject({ data: { planMode: true }, ok: true });
 	});
 
 	it('reports a harness caller as never planning', async () => {
 		const { service } = setup({ planning: true, species: 'harness' });
 
-		const result = await invoke(service, 'getPlanMode');
+		const result = await invoke(service, 'getSessionBrief');
 
-		expect(result).toMatchObject({ data: { active: false }, ok: true });
+		expect(result).toMatchObject({ data: { planMode: false }, ok: true });
+	});
+
+	it('leaves the naming ops available while planning', async () => {
+		const { service } = setup({ planning: true });
+
+		expect(
+			await invoke(service, 'setBranchName', { name: 'add-dark-mode' }),
+		).toMatchObject({ ok: true });
+		expect(
+			await invoke(service, 'setSummary', { summary: 'Body.', title: 'Topic' }),
+		).toMatchObject({ ok: true });
+		expect(await invoke(service, 'setName', { name: 'Topic' })).toMatchObject({
+			ok: true,
+		});
 	});
 });
 

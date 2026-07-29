@@ -2,7 +2,9 @@ import type { DynamicToolUIPart } from 'ai';
 import { describe, expect, test } from 'vitest';
 
 import {
+	presentCustomMessage,
 	presentReasoning,
+	presentSkillInvocation,
 	presentToolCall,
 } from '../../src/renderer/lib/pi/tool-presentation';
 
@@ -269,5 +271,54 @@ describe('presentReasoning', () => {
 			preview: { font: 'sans' },
 			title: 'Thinking',
 		});
+	});
+});
+
+describe('presentCustomMessage', () => {
+	test('renders injected context as a markdown row named after the injector', () => {
+		const presentation = presentCustomMessage({
+			customType: 'context7_docs',
+			display: true,
+			text: '[Context7 Docs: tailwind]\n# Usage',
+		});
+
+		expect(presentation).toMatchObject({
+			body: { kind: 'markdown', text: '[Context7 Docs: tailwind]\n# Usage' },
+			glyph: 'puzzle',
+			preview: { font: 'sans' },
+			title: 'Context7 docs',
+		});
+	});
+
+	test('keeps the collapsed row bare when the injector asked to stay hidden', () => {
+		const presentation = presentCustomMessage({
+			customType: 'context7_docs',
+			display: false,
+			text: '[Context7 Docs: tailwind]\n# Usage',
+		});
+
+		expect(presentation.preview).toBeNull();
+		expect(presentation.body).toMatchObject({ kind: 'markdown' });
+	});
+});
+
+describe('presentSkillInvocation', () => {
+	test('marks the named skill activated with nothing to disclose', () => {
+		const presentation = presentSkillInvocation('caveman');
+
+		expect(presentation).toEqual({
+			badge: null,
+			body: { kind: 'empty' },
+			glyph: 'biceps-flexed',
+			preview: { font: 'mono', text: 'Skill activated' },
+			title: 'Caveman',
+			tone: 'default',
+		});
+	});
+
+	test('humanizes a hyphenated skill name for the title', () => {
+		const presentation = presentSkillInvocation('code-review');
+
+		expect(presentation.title).toBe('Code review');
 	});
 });

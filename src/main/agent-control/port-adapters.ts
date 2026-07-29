@@ -24,12 +24,19 @@ import type { PermissionMode } from '../../shared/permissions.ts';
 import type { HarnessDetectionService } from '../agents/index.ts';
 import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
 import type { LocalCommandService } from '../commands';
+import type { AppSettingsService } from '../config';
+import {
+	applyBranchSlug,
+	BranchSlugRejected,
+} from '../pi-agent/naming/apply-branch-slug.ts';
+import { readSessionBriefNaming } from '../pi-agent/naming/session-brief-naming.ts';
 import type { PiSessionService } from '../pi-agent/pi-session-service.ts';
 import type { PiExecutableService } from '../pi-runtime';
 import {
 	presentPiModels,
 	resolvePiProviderModels,
 } from '../pi-runtime/pi-provider-models.ts';
+import type { RenameWorkspaceService } from '../repository';
 import type { ScriptLifecycleService } from '../scripts/script-lifecycle-service.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import {
@@ -48,6 +55,7 @@ import type {
 	FocusPort,
 	HarnessPort,
 	PlanModePort,
+	SessionNamingPort,
 	TabPort,
 	TerminalPort,
 	WorkspacePort,
@@ -63,6 +71,9 @@ export interface PortAdapterDeps {
 	harnessDetectionService: HarnessDetectionService;
 	piExecutableService: PiExecutableService;
 	localCommandService: LocalCommandService;
+	appSettingsService: AppSettingsService;
+	/** Names a workspace and its git branch together, for `setBranchName`. */
+	renameWorkspace: RenameWorkspaceService['rename'];
 	getPermissionMode: () => PermissionMode;
 	/** Appends agent-control MCP-config flags to a harness launch command. */
 	augmentHarnessCommand: (
@@ -258,7 +269,12 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 		let catalog: AgentControlModelList;
 		try {
 			catalog = await loadModelCatalog();
-		} catch {
+		} catch (cause) {
+			console.warn('[agent-control] model catalog unavailable for a spawn.', {
+				cause: cause instanceof Error ? cause.message : String(cause),
+				requested: requested ?? null,
+				workspaceId,
+			});
 			return requested ?? callerModel ?? null;
 		}
 		const providerOf = new Map(
@@ -330,8 +346,8 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			markTabAsSubAgent(deps, targetTabId);
 			if (title) {
 				await applyConversationName(deps, {
-					piSessionId: snapshot.id,
 					name: title,
+					piSessionId: snapshot.id,
 				});
 			}
 			deps.broadcastTabsChanged({ workspaceId });
@@ -347,8 +363,8 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			});
 		},
 		setName: async ({ piSessionId, name }) => {
-			const applied = await applyConversationName(deps, { piSessionId, name });
-			if (applied) {
+			const applied = await applyConversationName(deps, { name, piSessionId });
+			if (applied?.applied) {
 				const workspaceId =
 					deps.piSessionService.getSession(piSessionId)?.workspaceId;
 				if (workspaceId) {
@@ -419,29 +435,38 @@ function markTabAsSubAgent(deps: PortAdapterDeps, chatTabId: string): void {
 			id: chatTabId,
 			metadata: { ...tab.metadata, agentRole: 'subagent' },
 		});
-	} catch {
-		// Best-effort tab tint; a storage hiccup must not fail an already-started
-		// spawn (mirrors applyConversationName's swallow-and-continue).
+	} catch (cause) {
+		console.warn('[agent-control] could not tint a tab as a sub-agent.', {
+			cause: cause instanceof Error ? cause.message : String(cause),
+			chatTabId,
+		});
 	}
 }
 
 /**
  * Applies a display name to a conversation's tab via the Pi session service,
- * swallowing failures so naming never breaks a spawn or a control call.
+ * swallowing failures so naming never breaks a spawn or a control call. Always
+ * claims `agent` provenance: every route here is an agent naming a tab, so a
+ * title the user chose outranks it and comes back `applied: false`.
  * @param deps - Adapter collaborators.
  * @param input - The target session id and the requested name.
- * @returns The applied tab id and title, or null when it could not be set.
+ * @returns The tab id and title with whether the rename landed, or null when the session could not be named.
  */
 async function applyConversationName(
 	deps: PortAdapterDeps,
 	input: { piSessionId: string; name: string },
-): Promise<{ chatTabId: string; title: string } | null> {
+): Promise<{ applied: boolean; chatTabId: string; title: string } | null> {
 	try {
 		return await deps.piSessionService.setSessionName({
-			sessionId: input.piSessionId,
 			name: input.name,
+			provenance: 'agent',
+			sessionId: input.piSessionId,
 		});
-	} catch {
+	} catch (cause) {
+		console.warn('[agent-control] could not name a conversation tab.', {
+			cause: cause instanceof Error ? cause.message : String(cause),
+			piSessionId: input.piSessionId,
+		});
 		return null;
 	}
 }
@@ -467,15 +492,21 @@ async function rollbackConversation(
 			sessionId: target.piSessionId,
 			reason: 'agent-control-start-failed',
 		});
-	} catch {
-		// The session may never have started streaming; ignore stop failures.
+	} catch (cause) {
+		console.warn('[agent-control] could not stop a failed spawn.', {
+			cause: cause instanceof Error ? cause.message : String(cause),
+			piSessionId: target.piSessionId,
+		});
 	}
 	if (target.openedTabId) {
 		try {
 			deps.chatTabService.closeTab({ chatTabId: target.openedTabId });
 			deps.broadcastTabsChanged({ workspaceId: target.workspaceId });
-		} catch {
-			// Tab may already be gone; the caller's error still propagates.
+		} catch (cause) {
+			console.warn('[agent-control] could not close a failed spawn tab.', {
+				cause: cause instanceof Error ? cause.message : String(cause),
+				chatTabId: target.openedTabId,
+			});
 		}
 	}
 }
@@ -674,6 +705,73 @@ function makeBoardPort(deps: PortAdapterDeps): BoardPort {
 }
 
 /**
+ * Builds the session-naming port over the workspace rename service, the naming
+ * policy module, and the Pi session service. Naming policy itself lives in
+ * `pi-agent/naming/`; this stays wiring — resolve the database and the user's
+ * setting, delegate, then broadcast whatever landed.
+ * @param deps - Adapter collaborators.
+ * @returns The session-naming port.
+ */
+function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
+	/**
+	 * Reads the user's "Let agents name the workspace and branch" setting, which
+	 * gates both the per-turn branch nudge and the `setBranchName` tool itself.
+	 * @returns True while the user lets agents name the workspace and branch.
+	 */
+	const namingEnabled = (): boolean =>
+		deps.appSettingsService.read().git.renameWorkspaceOnBranch;
+
+	return {
+		readBrief: async (origin) =>
+			readSessionBriefNaming({
+				caller: origin,
+				database: deps.databaseService.getConnection()?.database,
+				namingEnabled,
+			}),
+		setBranchName: async ({ origin, slug }) => {
+			const database = deps.databaseService.getConnection()?.database;
+			if (!database) {
+				throw new BranchSlugRejected(
+					'unknown-workspace',
+					'The workspace database is unavailable.',
+				);
+			}
+			const result = await applyBranchSlug({
+				database,
+				name: slug,
+				namingEnabled: namingEnabled(),
+				renameWorkspace: deps.renameWorkspace,
+				workspaceId: origin.workspaceId,
+			});
+			if (result.applied && origin.species === 'pi') {
+				deps.piSessionService.appendWorkspaceRenamed(origin.sessionId);
+			}
+			if (result.applied) {
+				deps.broadcastTabsChanged({ workspaceId: origin.workspaceId });
+			}
+			return result;
+		},
+		setSummary: async ({ origin, summary, title }) => {
+			const recorded = deps.piSessionService.setSessionSummary({
+				sessionId: origin.sessionId,
+				summary,
+				title,
+			});
+			if (!recorded) {
+				throw new Error(
+					'Cannot record a summary: the calling conversation has no chat tab.',
+				);
+			}
+			return {
+				capturedAtOrdinal: recorded.capturedAtOrdinal,
+				message:
+					'Recorded. Refresh it at the end of each turn so the tab always describes where the work stands.',
+			};
+		},
+	};
+}
+
+/**
  * Assembles the full {@link AgentControlPorts} surface from real services.
  * @param deps - Adapter collaborators.
  * @returns Ports ready to pass to {@link createAgentControlService}.
@@ -689,6 +787,7 @@ export function createAgentControlPorts(
 		harnesses: makeHarnessPort(deps),
 		focus: makeFocusPort(deps),
 		board: makeBoardPort(deps),
+		sessionNaming: makeSessionNamingPort(deps),
 		permissions: { getMode: () => deps.getPermissionMode() },
 		confirm: deps.confirm,
 		ask: deps.ask,

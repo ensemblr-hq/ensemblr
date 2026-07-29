@@ -7,6 +7,7 @@ import {
 	ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_AWARENESS,
 	roleForDepth,
+	SESSION_BRIEF_NUDGE_HEADER,
 	SUBAGENT_AWARENESS,
 } from '../../src/shared/agent-control.ts';
 import {
@@ -164,6 +165,34 @@ describe('agent-control AWARENESS parity', () => {
 		);
 	});
 
+	it('leaves the naming ops available while planning and says so', () => {
+		for (const toolName of [
+			'ensemblr_set_name',
+			'ensemblr_set_branch_name',
+			'ensemblr_set_summary',
+		]) {
+			expect(PLAN_MODE_AWARENESS).toContain(toolName);
+			expect(
+				planModeControlOpDenial(controlOpForToolName(toolName)),
+			).toBeNull();
+		}
+	});
+
+	it('tells a planning agent the upkeep block is the one thing that outranks nothing', () => {
+		expect(PLAN_MODE_AWARENESS).toContain(SESSION_BRIEF_NUDGE_HEADER);
+	});
+
+	// The upkeep block is built from live state, so it has no literal the parity
+	// extractor could compare. Rendering it in the app and shipping the finished
+	// string in the brief is what keeps it single-sourced — a copy that drifted
+	// into the extension would be invisible to every other test here.
+	it('never embeds the dynamic upkeep block, which the app renders', () => {
+		const source = readExtensionSource();
+		expect(source).not.toContain('buildSessionBriefNudge');
+		expect(source).not.toContain(`const ${SESSION_BRIEF_NUDGE_HEADER}`);
+		expect(source).toContain('getSessionBrief');
+	});
+
 	it('teaches the orchestrator the wait-based delegation loop', () => {
 		expect(ORCHESTRATOR_AWARENESS).toContain('ensemblr_wait_for_agents');
 		expect(ORCHESTRATOR_AWARENESS).toContain('ensemblr_notify_orchestrator');
@@ -173,6 +202,34 @@ describe('agent-control AWARENESS parity', () => {
 		expect(SUBAGENT_AWARENESS).toContain('Do NOT spawn further sub-agents');
 		expect(SUBAGENT_AWARENESS).toContain('ensemblr_notify_orchestrator');
 		expect(SUBAGENT_AWARENESS).not.toContain('ensemblr_wait_for_agents');
+	});
+
+	// The `git.renameWorkspaceOnBranch` setting gates `ensemblr_set_branch_name`,
+	// but a playbook is static and cannot see it. Only the per-turn upkeep block,
+	// which is built from live state and already honours the setting, may tell an
+	// agent to name the branch — otherwise an opted-out user's agent is ordered to
+	// call a tool that will refuse it.
+	it('never orders branch naming from a static playbook, which cannot see the setting', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			SUBAGENT_AWARENESS,
+			PLAN_MODE_AWARENESS,
+		]) {
+			expect(playbook).not.toContain('Name the tab and the branch');
+			expect(playbook).not.toContain('name the workspace and branch on your');
+		}
+	});
+
+	it('defers branch naming to the upkeep block in both role and plan playbooks', () => {
+		expect(ORCHESTRATOR_AWARENESS).toContain(
+			'only when the upkeep reminder asks for it',
+		);
+		expect(SUBAGENT_AWARENESS).toContain(
+			'only when the upkeep reminder asks for it',
+		);
+		expect(PLAN_MODE_AWARENESS).toContain(
+			'If the upkeep block also asks for the workspace and branch',
+		);
 	});
 
 	it('treats only the root as orchestrator; every descendant is a sub-agent', () => {

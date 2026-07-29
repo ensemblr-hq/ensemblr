@@ -74,6 +74,13 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 		shape: { name: z.string() },
 	},
 	{
+		name: 'ensemblr_set_branch_name',
+		op: 'setBranchName',
+		description:
+			'Name the work: renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. "add-dark-mode"), keeping any `prefix/` segment of the current branch. One-shot — it applies only while the workspace still carries its generated placeholder name; once named it reports that and changes nothing, so call it at most once. This is the workspace and branch name, not the tab title (use ensemblr_set_name for that).',
+		shape: { name: z.string() },
+	},
+	{
 		name: 'ensemblr_close_tab',
 		op: 'closeTab',
 		description: 'Close a chat or terminal tab in the current workspace.',

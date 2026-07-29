@@ -98,8 +98,8 @@ function GitSettings() {
 						onCheckedChange={setRenameOnBranch}
 					/>
 				}
-				description='Automatically rename workspaces from their placeholder composer name to the branch name generated from the first message.'
-				label='Rename workspace when branch is named'
+				description='Ask the agent to rename a workspace from its placeholder composer name, and its git branch to match, once it knows what the work is. Off leaves the placeholder name in place.'
+				label='Let agents name the workspace and branch'
 				modified={renameOnBranch !== DEFAULTS.renameWorkspaceOnBranch}
 				onReset={() => setRenameOnBranch(DEFAULTS.renameWorkspaceOnBranch)}
 			/>

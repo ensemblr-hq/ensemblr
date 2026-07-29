@@ -6,8 +6,9 @@ import {
 	FileIcon,
 	WrapTextIcon,
 } from 'lucide-react';
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentType } from 'react';
 
+import { IconToggle } from '@/renderer/components/icon-toggle';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Tooltip,
@@ -58,14 +59,14 @@ export function DiffToolbar({
 					onClick={() => onViewModeChange('file')}
 				/>
 			</div>
-			<ToggleButton
+			<IconToggle
 				active={layout === 'split'}
 				label={layout === 'split' ? 'Unified view' : 'Split view'}
 				onClick={() => setLayout(layout === 'split' ? 'unified' : 'split')}
 			>
 				<Columns2Icon />
-			</ToggleButton>
-			<ToggleButton
+			</IconToggle>
+			<IconToggle
 				active={showWhitespace}
 				label={
 					showWhitespace ? 'Hide hidden characters' : 'Show hidden characters'
@@ -73,14 +74,14 @@ export function DiffToolbar({
 				onClick={() => setShowWhitespace(!showWhitespace)}
 			>
 				<EyeIcon />
-			</ToggleButton>
-			<ToggleButton
+			</IconToggle>
+			<IconToggle
 				active={wordWrap}
 				label={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
 				onClick={() => setWordWrap(!wordWrap)}
 			>
 				<WrapTextIcon />
-			</ToggleButton>
+			</IconToggle>
 		</div>
 	);
 }
@@ -131,40 +132,6 @@ function ViewModeButton({
 				<span className='inline-flex'>{button}</span>
 			</TooltipTrigger>
 			<TooltipContent>{disabledHint}</TooltipContent>
-		</Tooltip>
-	);
-}
-
-/** A single ghost icon toggle with a tooltip, highlighted when active. */
-function ToggleButton({
-	active,
-	children,
-	disabled,
-	label,
-	onClick,
-}: {
-	active: boolean;
-	children: ReactNode;
-	disabled?: boolean;
-	label: string;
-	onClick: () => void;
-}) {
-	return (
-		<Tooltip>
-			<TooltipTrigger asChild>
-				<Button
-					aria-label={label}
-					aria-pressed={active}
-					className='size-7 [&_svg]:size-4'
-					disabled={disabled}
-					onClick={onClick}
-					size='icon-sm'
-					variant={active ? 'secondary' : 'ghost'}
-				>
-					{children}
-				</Button>
-			</TooltipTrigger>
-			<TooltipContent>{label}</TooltipContent>
 		</Tooltip>
 	);
 }

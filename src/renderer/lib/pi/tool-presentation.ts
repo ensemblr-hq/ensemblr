@@ -2,7 +2,10 @@ import type { DynamicToolUIPart } from 'ai';
 import type { BundledLanguage } from 'shiki';
 import { buildToolDiffRows } from '@/renderer/lib/diff/tool-rows';
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
-import type { PiToolOutput } from '@/renderer/types/pi-timeline';
+import type {
+	PiCustomMessageData,
+	PiToolOutput,
+} from '@/renderer/types/pi-timeline';
 import type {
 	ToolBadgeDescriptor,
 	ToolBodyDescriptor,
@@ -555,6 +558,49 @@ export function presentReasoning(text: string): ToolPresentation {
 		glyph: 'brain',
 		preview: { font: 'sans', text },
 		title: 'Thinking',
+		tone: 'default',
+	};
+}
+
+/**
+ * Projects an extension-injected message into a row, so context an extension
+ * pushed into the conversation announces itself without occupying the surface
+ * the answer needs.
+ *
+ * An injector that set no `display` hint asked to stay out of the conversation,
+ * so its row keeps the preview line empty: the title says something arrived,
+ * and the payload waits behind the disclosure.
+ * @param data - The injector's tag, visibility hint, and text
+ * @returns The row presentation for the injected message
+ */
+export function presentCustomMessage(
+	data: PiCustomMessageData,
+): ToolPresentation {
+	return {
+		badge: null,
+		body: { kind: 'markdown', text: data.text },
+		glyph: 'puzzle',
+		preview: data.display ? { font: 'sans', text: data.text } : null,
+		title: humanizeToolName(data.customType),
+		tone: 'default',
+	};
+}
+
+/**
+ * Projects a skill activation into a row, so a `/skill:name` invocation reads as
+ * one line of turn activity — the skill named, marked "Skill activated" — rather
+ * than the whole `SKILL.md` Pi expanded into the prompt. The body is empty: the
+ * skill's effect is the turn that follows, not text to unfold.
+ * @param name - The invoked skill's name
+ * @returns The row presentation for the activation
+ */
+export function presentSkillInvocation(name: string): ToolPresentation {
+	return {
+		badge: null,
+		body: { kind: 'empty' },
+		glyph: 'biceps-flexed',
+		preview: { font: 'mono', text: 'Skill activated' },
+		title: humanizeToolName(name),
 		tone: 'default',
 	};
 }

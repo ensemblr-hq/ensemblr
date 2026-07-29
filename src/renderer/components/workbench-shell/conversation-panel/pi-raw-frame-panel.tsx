@@ -31,15 +31,10 @@ export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
 	// does not match the renderer-side Ensemblr session id. Until that
 	// mapping is plumbed, scoping silently hides everything.
 	const [sessionScope, setSessionScope] = useState<boolean>(false);
-	// Per-kind visibility — main chat traffic is the default surface; the
-	// internal title-gen and summary-gen sessions are noisy so they start
-	// hidden and can be toggled in.
 	const [kindToggles, setKindToggles] = useState<
 		Record<PiRawFrameKind, boolean>
 	>({
 		chat: true,
-		summary: false,
-		title: false,
 		unknown: true,
 	});
 	const toggleKind = (kind: PiRawFrameKind): void => {
@@ -172,16 +167,6 @@ export function PiRawFramePanel({ sessionId }: { sessionId: string | null }) {
 						active={kindToggles.chat}
 						label='chat'
 						onClick={() => toggleKind('chat')}
-					/>
-					<KindToggle
-						active={kindToggles.title}
-						label='title-gen'
-						onClick={() => toggleKind('title')}
-					/>
-					<KindToggle
-						active={kindToggles.summary}
-						label='summary-gen'
-						onClick={() => toggleKind('summary')}
 					/>
 					<KindToggle
 						active={kindToggles.unknown}

@@ -2,8 +2,8 @@ import { describe, expect, test } from 'vitest';
 
 import {
 	composeRenamedBranch,
+	isWorkspaceNameable,
 	sanitizeBranchSlug,
-	shouldAutoRenameWorkspace,
 } from '../../src/main/pi-agent/branch-name-slug';
 import { joinBranchName } from '../../src/main/repository/branch-name';
 
@@ -50,64 +50,31 @@ describe('joinBranchName', () => {
 	});
 });
 
-describe('shouldAutoRenameWorkspace', () => {
-	const pass = {
-		metadata: { placeholderName: true },
-		prompt: 'add dark mode',
-		renameEnabled: true,
-	};
-
-	test('renames an un-renamed placeholder with a prompt and the setting on', () => {
-		expect(shouldAutoRenameWorkspace(pass)).toBe(true);
+describe('isWorkspaceNameable', () => {
+	test('accepts an un-renamed placeholder workspace', () => {
+		expect(isWorkspaceNameable({ placeholderName: true })).toBe(true);
 	});
 
-	test('skips an empty or whitespace-only prompt', () => {
-		expect(shouldAutoRenameWorkspace({ ...pass, prompt: '' })).toBe(false);
-		expect(shouldAutoRenameWorkspace({ ...pass, prompt: '   ' })).toBe(false);
-		expect(shouldAutoRenameWorkspace({ ...pass, prompt: undefined })).toBe(
-			false,
-		);
-	});
-
-	test('skips when the setting is off', () => {
-		expect(shouldAutoRenameWorkspace({ ...pass, renameEnabled: false })).toBe(
-			false,
-		);
-	});
-
-	test('skips a non-placeholder workspace', () => {
-		expect(shouldAutoRenameWorkspace({ ...pass, metadata: {} })).toBe(false);
-		expect(
-			shouldAutoRenameWorkspace({
-				...pass,
-				metadata: { placeholderName: false },
-			}),
-		).toBe(false);
+	test('rejects a workspace whose name was chosen', () => {
+		expect(isWorkspaceNameable({})).toBe(false);
+		expect(isWorkspaceNameable({ placeholderName: false })).toBe(false);
 		// Must be a strict boolean true, not a truthy string.
-		expect(
-			shouldAutoRenameWorkspace({
-				...pass,
-				metadata: { placeholderName: 'true' },
-			}),
-		).toBe(false);
+		expect(isWorkspaceNameable({ placeholderName: 'true' })).toBe(false);
 	});
 
-	test('skips a workspace already auto-renamed (renamedAt stamped)', () => {
+	test('rejects a workspace already renamed (renamedAt stamped)', () => {
 		expect(
-			shouldAutoRenameWorkspace({
-				...pass,
-				metadata: { placeholderName: true, renamedAt: '2026-06-16T00:00:00Z' },
+			isWorkspaceNameable({
+				placeholderName: true,
+				renamedAt: '2026-06-16T00:00:00Z',
 			}),
 		).toBe(false);
 	});
 
 	test('a non-string renamedAt does not block (only a string timestamp does)', () => {
-		expect(
-			shouldAutoRenameWorkspace({
-				...pass,
-				metadata: { placeholderName: true, renamedAt: 0 },
-			}),
-		).toBe(true);
+		expect(isWorkspaceNameable({ placeholderName: true, renamedAt: 0 })).toBe(
+			true,
+		);
 	});
 });
 

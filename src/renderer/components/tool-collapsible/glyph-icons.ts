@@ -1,4 +1,5 @@
 import {
+	BicepsFlexedIcon,
 	BrainIcon,
 	CircleXIcon,
 	FilePenIcon,
@@ -6,6 +7,7 @@ import {
 	FileTextIcon,
 	FolderTreeIcon,
 	type LucideIcon,
+	PuzzleIcon,
 	SearchIcon,
 	StethoscopeIcon,
 	TerminalIcon,
@@ -18,12 +20,14 @@ import type { ToolGlyph } from '@/renderer/types/tool-presentation';
  * summary strip so one tool always reads as the same mark wherever it appears.
  */
 export const GLYPH_ICONS: Record<ToolGlyph, LucideIcon> = {
+	'biceps-flexed': BicepsFlexedIcon,
 	brain: BrainIcon,
 	'circle-x': CircleXIcon,
 	'file-pen': FilePenIcon,
 	'file-plus': FilePlusIcon,
 	'file-text': FileTextIcon,
 	'folder-tree': FolderTreeIcon,
+	puzzle: PuzzleIcon,
 	search: SearchIcon,
 	stethoscope: StethoscopeIcon,
 	terminal: TerminalIcon,

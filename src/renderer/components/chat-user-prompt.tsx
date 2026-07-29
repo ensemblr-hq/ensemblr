@@ -8,6 +8,10 @@ import { useFilePreviewOpener } from './workbench-shell/conversation-panel/file-
  * the `Referenced workspace folders` header) out of the persisted prompt text
  * and shows the typed message first, followed by inline attachment chips. Reads
  * as a single horizontal strip rather than a tall bubble.
+ *
+ * A `/skill:name` invocation shows here as that command; the mapper has already
+ * lifted the expanded `SKILL.md` into the assistant turn as a "Skill activated"
+ * marker, so the bubble keeps only what the user typed.
  */
 export function ChatUserPrompt({
 	className,
@@ -18,7 +22,8 @@ export function ChatUserPrompt({
 }) {
 	const { attachments, text } = parsePromptAttachments(prompt);
 	const openFilePreview = useFilePreviewOpener();
-	if (attachments.length === 0 && text.length === 0) {
+	const hasBubble = attachments.length > 0 || text.length > 0;
+	if (!hasBubble) {
 		return null;
 	}
 	return (

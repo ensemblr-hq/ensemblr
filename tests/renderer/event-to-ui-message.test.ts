@@ -504,6 +504,316 @@ describe('eventsToUIMessages', () => {
 		);
 	});
 
+	test('keeps an extension-injected message off the text path', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-custom',
+				payload: {
+					kind: 'message',
+					payload: {
+						customType: 'context7_docs',
+						display: false,
+						kind: 'custom',
+						text: '[Context7 Docs: tailwind]\n# Usage',
+					},
+					role: 'agent',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				id: 'evt-answer',
+				ordinal: 1,
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: 'Converted the app.' },
+					role: 'agent',
+				},
+				turnId: 'turn-1',
+			}),
+		]);
+
+		expect(messages).toHaveLength(1);
+		expect(messages[0]?.parts).toEqual([
+			{
+				data: {
+					customType: 'context7_docs',
+					display: false,
+					text: '[Context7 Docs: tailwind]\n# Usage',
+				},
+				type: 'data-pi-custom',
+			},
+			{ state: 'done', text: 'Converted the app.', type: 'text' },
+		]);
+		expect(messageText(messages)).not.toContain('Context7 Docs');
+	});
+
+	test('drops an injected message that carried no content', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-empty-custom',
+				payload: {
+					kind: 'message',
+					payload: {
+						customType: 'context7_docs',
+						display: true,
+						kind: 'custom',
+						text: '',
+					},
+					role: 'agent',
+				},
+			}),
+		]);
+
+		expect(messages).toEqual([]);
+	});
+
+	test('rewrites a skill prompt to its command and marks the turn activated', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-skill',
+				payload: {
+					kind: 'message',
+					payload: {
+						kind: 'prompt',
+						prompt: [
+							'<skill name="caveman" location="/skills/caveman/SKILL.md">',
+							'Respond terse like smart caveman.',
+							'</skill>',
+							'',
+							'summarize the diff',
+						].join('\n'),
+					},
+					role: 'user',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				id: 'evt-answer',
+				ordinal: 1,
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: 'Ready. What task?' },
+					role: 'agent',
+				},
+				turnId: 'turn-1',
+			}),
+		]);
+
+		expect(messages).toHaveLength(2);
+		expect(messages[0]?.role).toBe('user');
+		expect(messages[0]?.parts).toEqual([
+			{
+				state: 'done',
+				text: '/skill:caveman summarize the diff',
+				type: 'text',
+			},
+		]);
+		expect(messages[1]?.role).toBe('assistant');
+		expect(messages[1]?.parts).toEqual([
+			{ data: { name: 'caveman' }, type: 'data-pi-skill' },
+			{ state: 'done', text: 'Ready. What task?', type: 'text' },
+		]);
+		expect(messageText(messages)).not.toContain('Respond terse');
+	});
+
+	test('rewrites a bodyless skill invocation to a bare command', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-skill-noargs',
+				payload: {
+					kind: 'message',
+					payload: {
+						kind: 'prompt',
+						prompt: [
+							'<skill name="caveman" location="/skills/caveman/SKILL.md">',
+							'Respond terse.',
+							'</skill>',
+						].join('\n'),
+					},
+					role: 'user',
+				},
+				turnId: 'turn-2',
+			}),
+		]);
+
+		expect(messages).toHaveLength(1);
+		expect(messages[0]?.parts).toEqual([
+			{ state: 'done', text: '/skill:caveman', type: 'text' },
+		]);
+	});
+
+	test('drops the raw skill prompt the adapter flushes after its echo', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-skill',
+				payload: {
+					kind: 'message',
+					payload: {
+						kind: 'prompt',
+						prompt: [
+							'<skill name="caveman" location="/skills/caveman/SKILL.md">',
+							'Respond terse.',
+							'</skill>',
+							'',
+							'write me a poem',
+						].join('\n'),
+					},
+					role: 'user',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				id: 'evt-answer',
+				ordinal: 1,
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: 'Me poem' },
+					role: 'agent',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				id: 'evt-flush',
+				ordinal: 2,
+				payload: {
+					kind: 'message',
+					payload: { kind: 'prompt', prompt: '/skill:caveman write me a poem' },
+					role: 'user',
+				},
+				turnId: 'turn-1',
+			}),
+		]);
+
+		expect(messages).toHaveLength(2);
+		expect(messages[0]?.role).toBe('user');
+		expect(messages[0]?.parts).toEqual([
+			{ state: 'done', text: '/skill:caveman write me a poem', type: 'text' },
+		]);
+		expect(messages[1]?.role).toBe('assistant');
+		expect(messages[1]?.parts).toEqual([
+			{ data: { name: 'caveman' }, type: 'data-pi-skill' },
+			{ state: 'done', text: 'Me poem', type: 'text' },
+		]);
+	});
+
+	test('keeps a re-invoked skill prompt whose own turn was interrupted', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-skill',
+				payload: {
+					kind: 'message',
+					payload: {
+						kind: 'prompt',
+						prompt: [
+							'<skill name="caveman" location="/skills/caveman/SKILL.md">',
+							'Respond terse.',
+							'</skill>',
+							'',
+							'write me a poem',
+						].join('\n'),
+					},
+					role: 'user',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				id: 'evt-answer',
+				ordinal: 1,
+				payload: {
+					kind: 'message',
+					payload: { kind: 'text', text: 'Me poem' },
+					role: 'agent',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				id: 'evt-reinvoke',
+				ordinal: 2,
+				payload: {
+					kind: 'message',
+					payload: { kind: 'prompt', prompt: '/skill:caveman write me a poem' },
+					role: 'user',
+				},
+				turnId: 'turn-2',
+			}),
+		]);
+
+		const prompts = messages
+			.filter((message) => message.role === 'user')
+			.map((message) =>
+				message.parts
+					.flatMap((part) =>
+						part.type === 'text' && part.text ? [part.text] : [],
+					)
+					.join('\n'),
+			);
+
+		expect(prompts).toEqual([
+			'/skill:caveman write me a poem',
+			'/skill:caveman write me a poem',
+		]);
+	});
+
+	test('keeps the activation marker when the turn errors before replying', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-skill',
+				payload: {
+					kind: 'message',
+					payload: {
+						kind: 'prompt',
+						prompt: [
+							'<skill name="caveman" location="/skills/caveman/SKILL.md">',
+							'Respond terse.',
+							'</skill>',
+							'',
+							'write me a poem',
+						].join('\n'),
+					},
+					role: 'user',
+				},
+				turnId: 'turn-1',
+			}),
+			event({
+				eventType: 'error',
+				id: 'evt-error',
+				ordinal: 1,
+				payload: {
+					error: { message: 'provider exploded', recoverable: false },
+					kind: 'error',
+				},
+				turnId: 'turn-1',
+			}),
+		]);
+
+		const skillParts = messages.flatMap((message) =>
+			message.parts.filter((part) => part.type === 'data-pi-skill'),
+		);
+
+		expect(skillParts).toEqual([
+			{ data: { name: 'caveman' }, type: 'data-pi-skill' },
+		]);
+	});
+
+	test('keeps a lone raw skill prompt with no echo to reconcile against', () => {
+		const messages = eventsToUIMessages([
+			event({
+				id: 'evt-flush-only',
+				payload: {
+					kind: 'message',
+					payload: { kind: 'prompt', prompt: '/skill:caveman write me a poem' },
+					role: 'user',
+				},
+				turnId: 'turn-1',
+			}),
+		]);
+
+		expect(messages).toHaveLength(1);
+		expect(messages[0]?.parts).toEqual([
+			{ state: 'done', text: '/skill:caveman write me a poem', type: 'text' },
+		]);
+	});
+
 	test('leaves completed, crashed, and manual shutdowns unrendered', () => {
 		for (const reason of ['completed', 'crashed', 'manual']) {
 			const messages = eventsToUIMessages([

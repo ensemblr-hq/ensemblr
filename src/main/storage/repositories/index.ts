@@ -14,6 +14,7 @@ export {
 	closeChatTab,
 	deleteChatTab,
 	getChatTabById,
+	getChatTabByPiSessionId,
 	getRuntimeState,
 	listClosedForWorkspace,
 	listOpenChatTabs,

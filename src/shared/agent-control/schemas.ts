@@ -11,6 +11,8 @@ import {
 	ASK_USER_QUESTION_LIMITS,
 	ASK_USER_QUESTION_RESERVED_LABELS,
 	EXIT_PLAN_MODE_LIMITS,
+	SET_BRANCH_NAME_LIMITS,
+	SET_SUMMARY_LIMITS,
 	WORKSPACE_BOARD_STATUSES,
 } from './contracts.ts';
 
@@ -31,6 +33,15 @@ const startConversationSchema = z.strictObject({
 
 const setNameSchema = z.strictObject({
 	name: nonEmpty,
+});
+
+const setBranchNameSchema = z.strictObject({
+	name: nonEmpty.max(SET_BRANCH_NAME_LIMITS.maxRawLength),
+});
+
+const setSummarySchema = z.strictObject({
+	title: nonEmpty.max(SET_SUMMARY_LIMITS.maxTitleLength),
+	summary: nonEmpty.max(SET_SUMMARY_LIMITS.maxSummaryLength),
 });
 
 const sendFollowUpSchema = z.strictObject({
@@ -193,6 +204,8 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	startConversation: startConversationSchema,
 	sendFollowUp: sendFollowUpSchema,
 	setName: setNameSchema,
+	setBranchName: setBranchNameSchema,
+	setSummary: setSummarySchema,
 	closeTab: closeTabSchema,
 	launchHarness: launchHarnessSchema,
 	startTerminal: startTerminalSchema,
@@ -214,7 +227,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	waitForAgents: waitForAgentsSchema,
 	notifyOrchestrator: notifyOrchestratorSchema,
 	askUserQuestion: askUserQuestionSchema,
-	getPlanMode: emptySchema,
+	getSessionBrief: emptySchema,
 	checkPlanModeTool: checkPlanModeToolSchema,
 	exitPlanMode: exitPlanModeSchema,
 } satisfies Record<AgentControlOp, z.ZodType>;

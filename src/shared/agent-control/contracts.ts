@@ -15,6 +15,8 @@ export const AGENT_CONTROL_OPS = [
 	'startConversation',
 	'sendFollowUp',
 	'setName',
+	'setBranchName',
+	'setSummary',
 	'closeTab',
 	'launchHarness',
 	'startTerminal',
@@ -36,7 +38,7 @@ export const AGENT_CONTROL_OPS = [
 	'waitForAgents',
 	'notifyOrchestrator',
 	'askUserQuestion',
-	'getPlanMode',
+	'getSessionBrief',
 	'checkPlanModeTool',
 	'exitPlanMode',
 ] as const;
@@ -76,6 +78,8 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'startConversation',
 	'sendFollowUp',
 	'setName',
+	'setBranchName',
+	'setSummary',
 	'closeTab',
 	'launchHarness',
 	'startTerminal',
@@ -142,6 +146,75 @@ export interface StartConversationArgs {
 /** Args for `setName`: set the display name of the caller's own conversation tab. */
 export interface SetNameArgs {
 	name: string;
+}
+
+/**
+ * Result of `setName`. A tab the user named themselves is left alone rather
+ * than failing the call, so the agent reads "already settled" instead of a
+ * retryable error.
+ */
+export interface SetNameResult {
+	applied: boolean;
+	title: string;
+	message: string;
+}
+
+/**
+ * Ceiling on the raw `setBranchName` argument. Only a runaway guard:
+ * `sanitizeBranchSlug` already truncates to the real branch-name limit at a
+ * word boundary, so this rejects a generation that never stopped.
+ */
+export const SET_BRANCH_NAME_LIMITS = {
+	maxRawLength: 120,
+} as const;
+
+/** Args for `setBranchName`: name the caller's workspace and its git branch. */
+export interface SetBranchNameArgs {
+	/** Kebab-case slug describing the work, e.g. `add-dark-mode`. */
+	name: string;
+}
+
+/**
+ * Result of `setBranchName`. Naming is one-shot — a workspace the user (or an
+ * earlier agent) already named reports `applied: false` rather than failing, so
+ * the agent stops retrying instead of treating it as a transient fault.
+ */
+export interface SetBranchNameResult {
+	applied: boolean;
+	/** The workspace's display name after the call, applied or not. */
+	name: string;
+	/** The git branch after the call, or null when the workspace has none. */
+	branchName: string | null;
+	message: string;
+}
+
+/**
+ * Upper bounds on a `setSummary` submission. The title labels a file chip and a
+ * markdown heading, so it matches the plan-title ceiling; the body sits
+ * deliberately below the transcript cap, since a session record that grows to
+ * transcript size has stopped being a summary.
+ */
+export const SET_SUMMARY_LIMITS = {
+	maxSummaryLength: 4_000,
+	maxTitleLength: 80,
+} as const;
+
+/** Args for `setSummary`: record what this conversation has covered so far. */
+export interface SetSummaryArgs {
+	/** Short topic line, rendered as the summary's heading. */
+	title: string;
+	/** The summary body, in markdown. */
+	summary: string;
+}
+
+/**
+ * Result of `setSummary`. The point in the conversation the summary covers is
+ * echoed back, so a later fork can tell whether the record predates the turn it
+ * is forking from.
+ */
+export interface SetSummaryResult {
+	capturedAtOrdinal: number;
+	message: string;
 }
 
 /** Args for `sendFollowUp`: submit a follow-up prompt into an existing conversation. */
@@ -427,9 +500,36 @@ export interface CheckPlanModeToolArgs {
 	command?: string;
 }
 
-/** Result of `getPlanMode`: whether the calling session is currently planning. */
-export interface GetPlanModeResult {
-	active: boolean;
+/**
+ * The upkeep the calling session still owes, as reported by `getSessionBrief`.
+ * Each flag clears once the corresponding tool has been called, which is what
+ * lets the nudge built from it fall silent instead of repeating every turn.
+ */
+export interface SessionBriefNaming {
+	/** The tab still carries a title derived from the prompt, not chosen. */
+	titleNeeded: boolean;
+	branch: {
+		/** The workspace still has its generated placeholder name. */
+		eligible: boolean;
+		/** The workspace's current git branch, or null when it has none. */
+		current: string | null;
+	};
+	/** Turns have landed since the recorded summary was written. */
+	summaryStale: boolean;
+}
+
+/**
+ * Result of `getSessionBrief`: everything the Pi extension needs to assemble
+ * this turn's system prompt in one round trip. `nudge` is rendered by the app
+ * rather than the extension so there is no second copy of the wording to drift
+ * — the extension appends a string it never authors.
+ */
+export interface GetSessionBriefResult {
+	/** Whether the calling session is currently planning. */
+	planMode: boolean;
+	naming: SessionBriefNaming;
+	/** Ready-to-append upkeep block, or null when nothing is outstanding. */
+	nudge: string | null;
 }
 
 /** Args for `focusTab`: bring a session tab (chat/terminal/diff/…) to the foreground. */

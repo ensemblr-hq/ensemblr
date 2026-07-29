@@ -196,12 +196,12 @@ export interface PiSessionEventBroadcast {
 }
 
 /**
- * Coarse kind tag attached to every raw Pi frame so the debug panel can
- * scope traffic to user-facing chat vs. internal Ensemblr jobs (chat-title
- * generation, session-summary generation). Derived from the session label
- * supplied at adapter create time.
+ * Coarse kind tag attached to every raw Pi frame so the debug panel can scope
+ * traffic to user-facing chat. Derived from the session label supplied at
+ * adapter create time; Ensemblr no longer runs any ephemeral Pi job of its own,
+ * so everything else is `unknown`.
  */
-export type PiRawFrameKind = 'chat' | 'title' | 'summary' | 'unknown';
+export type PiRawFrameKind = 'chat' | 'unknown';
 
 /**
  * Raw JSONL line as exchanged between Ensemblr and a Pi RPC subprocess.

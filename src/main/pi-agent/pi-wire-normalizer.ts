@@ -31,14 +31,44 @@ export function extractMessageId(message: unknown): string | null {
  * Normalizes a Pi `message_end` frame into the tagged-union payload consumed
  * downstream. Pi's wire shape uses a `role` plus a `content[]` of typed
  * blocks; we collapse the role and project blocks to typed parts.
+ *
+ * Extension-injected messages arrive under Pi's `custom` role, which
+ * {@link isMessageRole} does not recognize — left to the default path they
+ * would read as prose the assistant wrote, so they branch off first.
  */
 export function normalizeMessageEnd(
 	message: Record<string, unknown>,
 	wireRole: 'agent' | 'tool' | 'user',
 ): PiAgentMessagePayload {
+	if (message.role === 'custom') {
+		return normalizeCustomMessage(message);
+	}
 	const role: 'assistant' | 'user' = wireRole === 'user' ? 'user' : 'assistant';
 	const parts = normalizeContentParts(message.content);
 	return { kind: 'message', parts, role };
+}
+
+/**
+ * Normalizes Pi's `role: "custom"` message — what an extension injects through
+ * `sendMessage` or a `before_agent_start` hook — into the `custom` payload.
+ * @param message - The `custom` message object off a `message_end` frame
+ * @returns The custom payload carrying the injector's tag, hint, and text
+ */
+function normalizeCustomMessage(
+	message: Record<string, unknown>,
+): PiAgentMessagePayload {
+	const customType =
+		typeof message.customType === 'string' && message.customType.length > 0
+			? message.customType
+			: 'custom';
+	return {
+		customType,
+		display: message.display === true,
+		kind: 'custom',
+		text: normalizeContentParts(message.content)
+			.flatMap((part) => (part.kind === 'text' ? [part.text] : []))
+			.join('\n'),
+	};
 }
 
 /**

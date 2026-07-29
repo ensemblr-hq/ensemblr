@@ -214,6 +214,42 @@ export interface ParsedPrompt {
 }
 
 /**
+ * A `/skill:name` invocation, which Pi expands into a `<skill>` block wrapping
+ * the whole skill body before echoing the prompt back.
+ */
+export interface ParsedSkillInvocation {
+	/** The skill's markdown body, frontmatter already stripped by Pi. */
+	content: string;
+	name: string;
+}
+
+/** A persisted prompt split into the skill it invoked and the arguments left over. */
+export interface ParsedSkillPrompt {
+	skill: ParsedSkillInvocation | null;
+	text: string;
+}
+
+/**
+ * One extension-injected Pi message, carried on a `data-pi-custom` message part
+ * so the timeline can tell background context apart from assistant prose.
+ */
+export interface PiCustomMessageData {
+	customType: string;
+	/** The injector's visibility hint; false means it never asked to be read. */
+	display: boolean;
+	text: string;
+}
+
+/**
+ * The skill named by a `data-pi-skill` part — the marker the mapper lifts out
+ * of a skill prompt and drops into the assistant turn it opened, so the turn
+ * shows "Skill activated" instead of the whole `SKILL.md`.
+ */
+export interface PiSkillPartData {
+	name: string;
+}
+
+/**
  * Normalized result of one tool call: Pi's MCP-style `{ content: [...] }`
  * envelope flattened to text, alongside the tool-specific `details` bag it
  * shipped with.

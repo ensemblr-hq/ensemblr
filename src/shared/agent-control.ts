@@ -13,3 +13,7 @@ export {
 export * from './agent-control/contracts.ts';
 export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
 export * from './agent-control/schemas.ts';
+export {
+	buildSessionBriefNudge,
+	SESSION_BRIEF_NUDGE_HEADER,
+} from './agent-control/session-brief.ts';

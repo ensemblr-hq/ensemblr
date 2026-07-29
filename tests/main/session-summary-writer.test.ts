@@ -1,58 +1,22 @@
-import assert from 'node:assert/strict';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
-import { setTimeout as delay } from 'node:timers/promises';
-import type {
-	PiAgentClient,
-	PiAgentSession,
-} from '../../src/main/pi-agent/pi-agent-client.ts';
-import type {
-	PiAgentEventListener,
-	PiAgentSessionMetadata,
-	PiAgentSubmitRequest,
-	PiAgentSubscription,
-} from '../../src/main/pi-agent/pi-agent-types.ts';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+
 import { createSessionSummaryWriter } from '../../src/main/pi-agent/session-summary-writer.ts';
-import type { PiExecutableSnapshot } from '../../src/main/pi-runtime/pi-executable.ts';
 import type { PiSessionEventWire } from '../../src/shared/ipc/contracts/pi-session.ts';
 
-function makeFakeExecutable(): PiExecutableSnapshot {
-	return {
-		command: '/fake/pi',
-		diagnostics: [],
-		displayPath: '/fake/pi',
-		path: '/fake/pi',
-		probe: null,
-		setting: null,
-		source: 'built-in-default',
-		status: 'ok',
-		updatedAt: '2026-01-01T00:00:00.000Z',
-	} satisfies PiExecutableSnapshot;
-}
+const cleanups: Array<() => void> = [];
 
-interface ThrowingClientHandle {
-	client: PiAgentClient;
-	getCreateCalls: () => number;
-}
+afterEach(() => {
+	while (cleanups.length > 0) {
+		cleanups.pop()?.();
+	}
+});
 
-function makeThrowingClient(): ThrowingClientHandle {
-	let createCalls = 0;
-	const client: PiAgentClient = {
-		createSession: async () => {
-			createCalls += 1;
-			throw new Error('boom');
-		},
-		listSessions: () => [],
-		shutdown: async () => undefined,
-	};
-	return { client, getCreateCalls: () => createCalls };
-}
-
-function makeWorkspaceDir(t: import('node:test').TestContext): string {
+function makeWorkspaceDir(): string {
 	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-summary-'));
-	t.after(() => rmSync(directory, { force: true, recursive: true }));
+	cleanups.push(() => rmSync(directory, { force: true, recursive: true }));
 	return directory;
 }
 
@@ -94,358 +58,117 @@ function makeAgentEvent(text: string, turnId = 't-1'): PiSessionEventWire {
 	};
 }
 
-test('writes a stub when piSessionId is null', async (t) => {
-	const workspaceCwd = makeWorkspaceDir(t);
-	const writer = createSessionSummaryWriter();
+const CONVERSATION = [
+	makeUserEvent('Fix the login redirect bug'),
+	makeAgentEvent('Patched the guard in auth.ts.'),
+];
 
-	const result = await writer.writeSessionSummary({
-		branchId: null,
-		chatTabId: 'tab-empty',
-		closedAt: '2026-01-01T00:00:00.000Z',
-		events: [],
-		piSessionId: null,
-		workspaceCwd,
-	});
-
-	assert.equal(result.usedLlm, false);
-	assert.equal(result.title, null);
-	assert.equal(
-		result.path,
-		path.join(workspaceCwd, '.context', 'sessions', 'tab-empty.md'),
-	);
-	const contents = readFileSync(result.path, 'utf8');
-	assert.match(contents, /chatTabId: "tab-empty"/);
-	assert.match(contents, /piSessionId: null/);
-	assert.match(contents, /summaryModel: null/);
-	assert.match(contents, /messageCount: 0/);
-	assert.match(contents, /turnCount: 0/);
-	assert.match(contents, /Empty tab/);
-});
-
-test('writes a stub when events array is empty even with a piSessionId', async (t) => {
-	const workspaceCwd = makeWorkspaceDir(t);
-	const writer = createSessionSummaryWriter();
-
-	const result = await writer.writeSessionSummary({
-		branchId: 'branch-1',
-		chatTabId: 'tab-empty-events',
-		closedAt: '2026-01-01T00:00:00.000Z',
-		events: [],
-		piSessionId: 'pi-session-1',
-		workspaceCwd,
-	});
-
-	assert.equal(result.usedLlm, false);
-	assert.equal(result.title, null);
-	const contents = readFileSync(result.path, 'utf8');
-	assert.match(contents, /Empty tab/);
-});
-
-test('falls back to deterministic transcript when no Pi client is supplied', async (t) => {
-	const workspaceCwd = makeWorkspaceDir(t);
-	const writer = createSessionSummaryWriter();
-
-	const result = await writer.writeSessionSummary({
-		branchId: 'branch-1',
-		chatTabId: 'tab-no-llm',
-		closedAt: '2026-01-02T00:00:00.000Z',
-		events: [
-			makeUserEvent('Help me refactor the auth module', 't-1'),
-			makeAgentEvent('Sure — extracting providers into a service.', 't-1'),
-		],
-		piSessionId: 'pi-session-1',
-		workspaceCwd,
-	});
-
-	assert.equal(result.usedLlm, false);
-	assert.equal(result.title, 'Help me refactor the auth module');
-	const contents = readFileSync(result.path, 'utf8');
-	assert.match(contents, /chatTabId: "tab-no-llm"/);
-	assert.match(contents, /piSessionId: "pi-session-1"/);
-	assert.match(contents, /branchId: "branch-1"/);
-	assert.match(contents, /summaryModel: null/);
-	assert.match(contents, /messageCount: 2/);
-	assert.match(contents, /turnCount: 1/);
-	assert.match(contents, /# Help me refactor the auth module/);
-	assert.match(contents, /\[user\]: Help me refactor the auth module/);
-	assert.match(
-		contents,
-		/\[agent\]: Sure — extracting providers into a service\./,
-	);
-});
-
-test('fileBaseName overrides the summary filename and resists traversal', async (t) => {
-	const workspaceCwd = makeWorkspaceDir(t);
-	const writer = createSessionSummaryWriter();
-
-	const result = await writer.writeSessionSummary({
-		branchId: 'branch-1',
-		chatTabId: 'tab-1',
-		closedAt: '2026-01-02T00:00:00.000Z',
-		events: [
-			makeUserEvent('Continue the refactor', 't-1'),
-			makeAgentEvent('Picking up from the fork point.', 't-1'),
-		],
-		fileBaseName: '../../escape/fork-tab-9',
-		piSessionId: 'pi-session-1',
-		purpose: 'fork',
-		workspaceCwd,
-	});
-
-	// Traversal segments are stripped; only the basename survives.
-	assert.equal(
-		result.path,
-		path.join(workspaceCwd, '.context', 'sessions', 'fork-tab-9.md'),
-	);
-	const contents = readFileSync(result.path, 'utf8');
-	assert.match(contents, /chatTabId: "tab-1"/);
-	assert.match(contents, /\[user\]: Continue the refactor/);
-});
-
-test('falls back deterministically when the ephemeral Pi session throws', async (t) => {
-	const workspaceCwd = makeWorkspaceDir(t);
-	const throwingClient = makeThrowingClient();
-	const writer = createSessionSummaryWriter({
-		piAgentClient: throwingClient.client,
-		resolveExecutable: async () => makeFakeExecutable(),
-	});
-
-	const result = await writer.writeSessionSummary({
-		branchId: 'branch-1',
-		chatTabId: 'tab-llm-fail',
-		closedAt: '2026-01-03T00:00:00.000Z',
-		events: [
-			makeUserEvent('Investigate flaky test', 't-1'),
-			makeAgentEvent('Looking into it now', 't-1'),
-		],
-		piSessionId: 'pi-session-2',
-		workspaceCwd,
-	});
-
-	assert.equal(result.usedLlm, false);
-	assert.equal(result.title, 'Investigate flaky test');
-	assert.equal(throwingClient.getCreateCalls(), 1);
-	const contents = readFileSync(result.path, 'utf8');
-	assert.match(contents, /# Investigate flaky test/);
-});
-
-test('writes the deterministic transcript before waiting on LLM summary', async (t) => {
-	const workspaceCwd = makeWorkspaceDir(t);
-	const writer = createSessionSummaryWriter({
-		piAgentClient: makeHangingAgentClient().client,
-		resolveExecutable: async () => makeFakeExecutable(),
-		timeoutMs: 50,
-	});
-
-	const pending = writer.writeSessionSummary({
-		branchId: 'branch-1',
-		chatTabId: 'tab-live-safe',
-		closedAt: '2026-01-04T00:00:00.000Z',
-		events: [
-			makeUserEvent('Persist the transcript immediately', 't-1'),
-			makeAgentEvent('Transcript is safely written first', 't-1'),
-		],
-		piSessionId: 'pi-session-live',
-		workspaceCwd,
-	});
-
-	const filePath = path.join(
-		workspaceCwd,
-		'.context',
-		'sessions',
-		'tab-live-safe.md',
-	);
-	await delay(5);
-	const liveContents = readFileSync(filePath, 'utf8');
-	assert.match(liveContents, /# Persist the transcript immediately/);
-	assert.match(liveContents, /Transcript is safely written first/);
-
-	const result = await pending;
-	assert.equal(result.usedLlm, false);
-});
-
-test('produces an LLM summary when the ephemeral session emits agent messages', async (t) => {
-	const workspaceCwd = makeWorkspaceDir(t);
-	let submittedPrompt: string | null = null;
-
-	const fakeClient = makeFakeAgentClient({
-		onSubmit: (request) => {
-			submittedPrompt = request.prompt;
-		},
-		response: 'Refactor auth providers\n\n- Extract `AuthService`\n- Add tests',
-	});
-
-	const writer = createSessionSummaryWriter({
-		piAgentClient: fakeClient.client,
-		resolveExecutable: async () => makeFakeExecutable(),
-	});
-
-	const result = await writer.writeSessionSummary({
-		branchId: 'branch-1',
-		chatTabId: 'tab-llm-ok',
-		closedAt: '2026-01-04T00:00:00.000Z',
-		events: [
-			makeUserEvent('Refactor auth providers', 't-1'),
-			makeAgentEvent('Working on it', 't-1'),
-		],
-		piSessionId: 'pi-session-3',
-		workspaceCwd,
-	});
-
-	assert.equal(result.usedLlm, true);
-	assert.equal(result.title, 'Refactor auth providers');
-	const promptValue = submittedPrompt as string | null;
-	assert.ok(
-		typeof promptValue === 'string' && promptValue.includes('TRANSCRIPT:'),
-	);
-	const contents = readFileSync(result.path, 'utf8');
-	assert.match(contents, /summaryModel: null/);
-	assert.match(contents, /# Refactor auth providers/);
-	assert.match(contents, /- Extract `AuthService`/);
-});
-
-test('forwards the chat model to the ephemeral summary session', async (t) => {
-	const workspaceCwd = makeWorkspaceDir(t);
-	let createdWith: string | null | undefined;
-
-	const fakeClient = makeFakeAgentClient({
-		onCreateSession: (request) => {
-			createdWith = request.modelOverride;
-		},
-		response: 'Summary body',
-	});
-
-	const writer = createSessionSummaryWriter({
-		piAgentClient: fakeClient.client,
-		resolveExecutable: async () => makeFakeExecutable(),
-	});
-
-	await writer.writeSessionSummary({
-		branchId: 'branch-1',
-		chatTabId: 'tab-model',
-		closedAt: '2026-01-04T00:00:00.000Z',
-		events: [
-			makeUserEvent('Hi', 't-1'),
-			makeAgentEvent('Working on it', 't-1'),
-		],
-		model: 'anthropic/claude-sonnet-4',
-		piSessionId: 'pi-session-model',
-		workspaceCwd,
-	});
-
-	assert.equal(createdWith, 'anthropic/claude-sonnet-4');
-});
-
-function makeHangingAgentClient(): { client: PiAgentClient } {
-	const sessionId = 'session-hanging';
-	const metadata: PiAgentSessionMetadata = {
-		args: ['--mode', 'rpc'],
-		command: '/fake/pi',
-		cwd: '/fake/cwd',
-		env: {},
-		id: sessionId,
-		label: 'ensemblr-session-summary',
-		model: null,
-		piAgentDirectoryPreserved: true,
-		sessionId: null,
-		startedAt: '2026-01-04T00:00:00.000Z',
-		status: 'starting',
-		thinking: null,
-		updatedAt: '2026-01-04T00:00:00.000Z',
-	};
-	const session: PiAgentSession = {
-		abort: async () => undefined,
-		close: async () => undefined,
-		getMetadata: () => metadata,
-		getState: async () => ({ sessionName: null }),
-		id: sessionId,
-		setSessionName: async () => undefined,
-		subscribe: (): PiAgentSubscription => ({ unsubscribe: () => undefined }),
-		submit: async () => ({
-			acceptedAt: '2026-01-04T00:00:00.500Z',
-			turnId: 'turn-hanging',
-		}),
-	};
+function baseInput(workspaceCwd: string) {
 	return {
-		client: {
-			createSession: async () => session,
-			listSessions: () => [session],
-			shutdown: async () => undefined,
-		},
+		branchId: 'b-1',
+		chatTabId: 'tab-1',
+		closedAt: '2026-01-01T00:00:00.000Z',
+		events: CONVERSATION,
+		piSessionId: 'native-1',
+		workspaceCwd,
 	};
 }
 
-interface FakeAgentClientOptions {
-	onCreateSession?: (request: { modelOverride?: string | null }) => void;
-	onSubmit?: (request: PiAgentSubmitRequest) => void;
-	response: string;
-}
+describe('writeSessionSummary', () => {
+	test('writes a stub when the tab never opened a session', async () => {
+		const workspaceCwd = makeWorkspaceDir();
 
-function makeFakeAgentClient(options: FakeAgentClientOptions): {
-	client: PiAgentClient;
-} {
-	const sessionId = 'session-stub';
-	const metadata: PiAgentSessionMetadata = {
-		args: ['--mode', 'rpc'],
-		command: '/fake/pi',
-		cwd: '/fake/cwd',
-		env: {},
-		id: sessionId,
-		label: 'ensemblr-session-summary',
-		model: null,
-		piAgentDirectoryPreserved: true,
-		sessionId: null,
-		startedAt: '2026-01-04T00:00:00.000Z',
-		status: 'starting',
-		thinking: null,
-		updatedAt: '2026-01-04T00:00:00.000Z',
-	};
+		const result = await createSessionSummaryWriter().writeSessionSummary({
+			branchId: null,
+			chatTabId: 'tab-empty',
+			closedAt: '2026-01-01T00:00:00.000Z',
+			events: [],
+			piSessionId: null,
+			workspaceCwd,
+		});
 
-	const session: PiAgentSession = {
-		abort: async () => undefined,
-		close: async () => undefined,
-		getMetadata: () => metadata,
-		getState: async () => ({ sessionName: null }),
-		id: sessionId,
-		setSessionName: async () => undefined,
-		subscribe: (listener: PiAgentEventListener): PiAgentSubscription => {
-			queueMicrotask(() => {
-				listener({
-					at: '2026-01-04T00:00:01.000Z',
-					payload: {
-						kind: 'message',
-						parts: [{ kind: 'text', text: options.response }],
-						role: 'assistant',
-					},
-					role: 'agent',
-					turnId: 'turn-1',
-					type: 'message',
-				});
-				listener({
-					at: '2026-01-04T00:00:02.000Z',
-					previous: 'streaming',
-					status: 'idle',
-					type: 'status',
-				});
-			});
-			return { unsubscribe: () => undefined };
-		},
-		submit: async (request) => {
-			options.onSubmit?.(request);
-			return {
-				acceptedAt: '2026-01-04T00:00:00.500Z',
-				turnId: 'turn-1',
-			};
-		},
-	};
+		expect(result.source).toBe('transcript');
+		expect(result.title).toBeNull();
+		expect(readFileSync(result.path, 'utf8')).toContain('_Empty tab');
+	});
 
-	const client: PiAgentClient = {
-		createSession: async (request) => {
-			options.onCreateSession?.(request);
-			return session;
-		},
-		listSessions: () => [session],
-		shutdown: async () => undefined,
-	};
-	return { client };
-}
+	test('falls back to the transcript when the agent recorded nothing', async () => {
+		const workspaceCwd = makeWorkspaceDir();
+
+		const result = await createSessionSummaryWriter().writeSessionSummary(
+			baseInput(workspaceCwd),
+		);
+
+		const contents = readFileSync(result.path, 'utf8');
+		expect(result.source).toBe('transcript');
+		expect(result.title).toBe('Fix the login redirect bug');
+		expect(contents).toContain('[user]: Fix the login redirect bug');
+		expect(contents).toContain('[agent]: Patched the guard in auth.ts.');
+		expect(contents).toContain('source: "transcript"');
+	});
+
+	test("renders the agent's own summary when it recorded one", async () => {
+		const workspaceCwd = makeWorkspaceDir();
+
+		const result = await createSessionSummaryWriter().writeSessionSummary({
+			...baseInput(workspaceCwd),
+			agentSummary: {
+				body: '- Fixed the redirect guard\n- Tests still to write',
+				title: 'Login redirect fix',
+			},
+		});
+
+		const contents = readFileSync(result.path, 'utf8');
+		expect(result.source).toBe('agent');
+		expect(result.title).toBe('Login redirect fix');
+		expect(contents).toContain('# Login redirect fix');
+		expect(contents).toContain('- Fixed the redirect guard');
+		expect(contents).toContain('source: "agent"');
+		// The transcript is superseded, not appended.
+		expect(contents).not.toContain('[user]:');
+	});
+
+	test('writes the file exactly once', async () => {
+		const workspaceCwd = makeWorkspaceDir();
+		const writeFile = vi.fn().mockResolvedValue(undefined);
+
+		await createSessionSummaryWriter({
+			mkdir: vi.fn().mockResolvedValue(undefined),
+			writeFile,
+		}).writeSessionSummary({
+			...baseInput(workspaceCwd),
+			agentSummary: { body: 'Body.', title: 'Topic' },
+		});
+
+		expect(writeFile).toHaveBeenCalledTimes(1);
+	});
+
+	test('records the conversation counts and purpose in the frontmatter', async () => {
+		const workspaceCwd = makeWorkspaceDir();
+
+		const result = await createSessionSummaryWriter().writeSessionSummary({
+			...baseInput(workspaceCwd),
+			purpose: 'fork',
+		});
+
+		const contents = readFileSync(result.path, 'utf8');
+		expect(contents).toContain('chatTabId: "tab-1"');
+		expect(contents).toContain('branchId: "b-1"');
+		expect(contents).toContain('messageCount: 2');
+		expect(contents).toContain('turnCount: 1');
+		expect(contents).toContain('purpose: "fork"');
+	});
+
+	test('keeps a caller-supplied stem inside the sessions directory', async () => {
+		const workspaceCwd = makeWorkspaceDir();
+
+		const result = await createSessionSummaryWriter().writeSessionSummary({
+			...baseInput(workspaceCwd),
+			fileBaseName: '../../escape',
+		});
+
+		expect(result.path).toBe(
+			path.join(workspaceCwd, '.context', 'sessions', 'escape.md'),
+		);
+	});
+});

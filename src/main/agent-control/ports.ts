@@ -16,6 +16,9 @@ import type {
 	ExitPlanModeResult,
 	FocusPanelName,
 	OpenTabVariant,
+	SessionBriefNaming,
+	SetBranchNameResult,
+	SetSummaryResult,
 	StartTerminalKind,
 	WorkspaceBoardStatusValue,
 } from '../../shared/agent-control.ts';
@@ -116,12 +119,13 @@ export interface ConversationPort {
 	}) => Promise<void>;
 	/**
 	 * Sets the display name of an active conversation's tab (Pi `/name`).
-	 * Resolves null when the session is not active.
+	 * Resolves null when the session is not active, and `applied: false` when the
+	 * user owns the title and the rename was declined.
 	 */
 	setName: (input: {
 		piSessionId: string;
 		name: string;
-	}) => Promise<{ chatTabId: string; title: string } | null>;
+	}) => Promise<{ applied: boolean; chatTabId: string; title: string } | null>;
 	/** Resolves once the session goes idle, or `'timeout'` after `timeoutMs`. */
 	waitForIdle: (
 		piSessionId: string,
@@ -255,10 +259,39 @@ export interface PlanModePort {
 	releaseSession: (sessionId: string) => void;
 }
 
+/**
+ * Reads and writes the caller's own session identity: the per-turn upkeep
+ * brief, the one-shot workspace/branch naming, and the tab's session summary.
+ * Separate from {@link TabPort} (id plumbing for scope checks) and
+ * {@link ConversationPort} (Pi lifecycle) because neither should grow workspace
+ * metadata or git-rename responsibilities. Every operation resolves the
+ * caller's tab and branch from its origin rather than taking them as arguments.
+ */
+export interface SessionNamingPort {
+	/** Best-effort: an unresolvable caller reports nothing outstanding. */
+	readBrief: (origin: AgentControlOrigin) => Promise<SessionBriefNaming>;
+	/**
+	 * One-shot naming of the workspace and its git branch. Gated on the user's
+	 * "Let agents name the workspace and branch" setting as well as the
+	 * placeholder-name check: with the setting off nothing is renamed and the
+	 * result comes back `applied: false`, however insistently the agent asks.
+	 */
+	setBranchName: (input: {
+		origin: AgentControlOrigin;
+		slug: string;
+	}) => Promise<SetBranchNameResult>;
+	setSummary: (input: {
+		origin: AgentControlOrigin;
+		title: string;
+		summary: string;
+	}) => Promise<SetSummaryResult>;
+}
+
 /** All collaborators the agent-control service composes. */
 export interface AgentControlPorts {
 	ask: AskPort;
 	planMode: PlanModePort;
+	sessionNaming: SessionNamingPort;
 	workspaces: WorkspacePort;
 	tabs: TabPort;
 	conversations: ConversationPort;

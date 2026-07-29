@@ -9,7 +9,10 @@ import {
 	getChatTabById,
 	setChatTabMetadata,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
-import { listAllWorkspaceRows } from '../../src/main/storage/repositories/workspace-repository.ts';
+import {
+	listAllWorkspaceRows,
+	selectWorkspaceWithRepositoryById,
+} from '../../src/main/storage/repositories/workspace-repository.ts';
 import type { PiPersistedEnvelope } from '../../src/shared/ipc/contracts/pi-session';
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
@@ -19,6 +22,7 @@ vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
 
 vi.mock('../../src/main/storage/repositories/workspace-repository.ts', () => ({
 	listAllWorkspaceRows: vi.fn(() => []),
+	selectWorkspaceWithRepositoryById: vi.fn(),
 }));
 
 /**
@@ -143,9 +147,11 @@ describe('agent-control port adapters: conversation naming', () => {
 	});
 
 	it('setName forwards to the pi session service and broadcasts', async () => {
-		const setSessionName = vi
-			.fn()
-			.mockResolvedValue({ chatTabId: 'tab-1', title: 'Refactor auth' });
+		const setSessionName = vi.fn().mockResolvedValue({
+			applied: true,
+			chatTabId: 'tab-1',
+			title: 'Refactor auth',
+		});
 		const { deps, broadcastTabsChanged } = makeDeps();
 		(deps as { piSessionService: unknown }).piSessionService = {
 			setSessionName,
@@ -157,11 +163,36 @@ describe('agent-control port adapters: conversation naming', () => {
 			name: 'Refactor auth',
 		});
 		expect(setSessionName).toHaveBeenCalledWith({
-			sessionId: 'sess-1',
 			name: 'Refactor auth',
+			provenance: 'agent',
+			sessionId: 'sess-1',
 		});
-		expect(result).toEqual({ chatTabId: 'tab-1', title: 'Refactor auth' });
+		expect(result).toEqual({
+			applied: true,
+			chatTabId: 'tab-1',
+			title: 'Refactor auth',
+		});
 		expect(broadcastTabsChanged).toHaveBeenCalledWith({ workspaceId: 'ws' });
+	});
+
+	it('setName does not broadcast when the user owns the title', async () => {
+		const setSessionName = vi.fn().mockResolvedValue({
+			applied: false,
+			chatTabId: 'tab-1',
+			title: 'Chosen by hand',
+		});
+		const { deps, broadcastTabsChanged } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			setSessionName,
+			getSession: vi.fn(() => ({ workspaceId: 'ws' })),
+		};
+		const ports = createAgentControlPorts(deps);
+		const result = await ports.conversations.setName({
+			piSessionId: 'sess-1',
+			name: 'Agent guess',
+		});
+		expect(result).toMatchObject({ applied: false, title: 'Chosen by hand' });
+		expect(broadcastTabsChanged).not.toHaveBeenCalled();
 	});
 
 	it('setName returns null and does not broadcast for an inactive session', async () => {
@@ -181,9 +212,11 @@ describe('agent-control port adapters: conversation naming', () => {
 	});
 
 	it('startConversation stamps the tab as a sub-agent and applies the title', async () => {
-		const setSessionName = vi
-			.fn()
-			.mockResolvedValue({ chatTabId: 'tab-1', title: 'Docs sweep' });
+		const setSessionName = vi.fn().mockResolvedValue({
+			applied: true,
+			chatTabId: 'tab-1',
+			title: 'Docs sweep',
+		});
 		const { deps } = makeDeps();
 		(deps as { piSessionService: unknown }).piSessionService = {
 			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
@@ -214,9 +247,82 @@ describe('agent-control port adapters: conversation naming', () => {
 			}),
 		);
 		expect(setSessionName).toHaveBeenCalledWith({
-			sessionId: 'sess-1',
 			name: 'Docs sweep',
+			provenance: 'agent',
+			sessionId: 'sess-1',
 		});
+	});
+});
+
+describe('agent-control port adapters: branch naming', () => {
+	const origin = {
+		depth: 0,
+		parentSessionId: null,
+		sessionId: 'sess-1',
+		species: 'pi' as const,
+		token: 'tok',
+		workspaceCwd: '/ws',
+		workspaceId: 'ws',
+	};
+
+	const withNamingSetting = (renameWorkspaceOnBranch: boolean) => {
+		const { deps, broadcastTabsChanged } = makeDeps();
+		const renameWorkspace = vi.fn().mockResolvedValue({
+			diagnostics: [],
+			status: 'success',
+			workspace: {
+				branchName: 'psoldunov/add-dark-mode',
+				name: 'add-dark-mode',
+			},
+		});
+		Object.assign(deps, {
+			appSettingsService: {
+				read: () => ({ git: { renameWorkspaceOnBranch } }),
+			},
+			piSessionService: { appendWorkspaceRenamed: vi.fn() },
+			renameWorkspace,
+		});
+		vi.mocked(selectWorkspaceWithRepositoryById).mockReturnValue({
+			branchName: 'psoldunov/bach',
+			metadataJson: JSON.stringify({ placeholderName: true }),
+			name: 'bach',
+		} as ReturnType<typeof selectWorkspaceWithRepositoryById>);
+		return {
+			broadcastTabsChanged,
+			ports: createAgentControlPorts(deps),
+			renameWorkspace,
+		};
+	};
+
+	it('names a placeholder workspace while the user allows it', async () => {
+		const { broadcastTabsChanged, ports, renameWorkspace } =
+			withNamingSetting(true);
+
+		const result = await ports.sessionNaming.setBranchName({
+			origin,
+			slug: 'add-dark-mode',
+		});
+
+		expect(renameWorkspace).toHaveBeenCalledWith(
+			expect.objectContaining({ name: 'add-dark-mode', workspaceId: 'ws' }),
+		);
+		expect(result).toMatchObject({ applied: true, name: 'add-dark-mode' });
+		expect(broadcastTabsChanged).toHaveBeenCalledWith({ workspaceId: 'ws' });
+	});
+
+	it('refuses to name a placeholder workspace when the user turned naming off', async () => {
+		const { broadcastTabsChanged, ports, renameWorkspace } =
+			withNamingSetting(false);
+
+		const result = await ports.sessionNaming.setBranchName({
+			origin,
+			slug: 'add-dark-mode',
+		});
+
+		expect(renameWorkspace).not.toHaveBeenCalled();
+		expect(result).toMatchObject({ applied: false, name: 'bach' });
+		expect(result.message).toContain('do not call this tool again');
+		expect(broadcastTabsChanged).not.toHaveBeenCalled();
 	});
 });
 

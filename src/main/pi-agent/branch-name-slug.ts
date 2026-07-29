@@ -64,47 +64,24 @@ export function sanitizeBranchSlug(text: string): string | null {
 	return truncated.replace(/-+$/g, '');
 }
 
-/** Workspace metadata fields consulted by the auto-rename gate. */
-interface AutoRenameMetadata {
+/** Workspace metadata fields consulted by the naming gate. */
+interface WorkspaceNamingMetadata {
 	placeholderName?: unknown;
 	renamedAt?: unknown;
 }
 
-/** Inputs to {@link shouldAutoRenameWorkspace}. */
-interface AutoRenameGate {
-	/** The first-turn prompt (pre-trim); empty/whitespace blocks the rename. */
-	prompt: string | undefined;
-	/** The `git.renameWorkspaceOnBranch` user setting. */
-	renameEnabled: boolean;
-	/** The workspace's parsed metadata. */
-	metadata: AutoRenameMetadata;
-}
-
 /**
- * Decides whether a fresh session's first turn should trigger an auto branch
- * rename. Renames only when all hold: a non-empty prompt exists, the user
- * setting is on, the workspace still carries its auto-generated placeholder
- * name, and it was not already auto-renamed (`renamedAt` stamped). Pure so the
- * full gating contract is unit-tested without the pi/sqlite runtime.
- * @param gate - Prompt, setting, and metadata.
- * @returns True when the rename should proceed.
+ * Reports whether a workspace still carries the auto-generated placeholder name
+ * it was created with and has never been renamed. That is the only state naming
+ * may overwrite: once the workspace has a chosen name, it is the user's. Pure so
+ * the gating contract is unit-tested without the pi/sqlite runtime.
+ * @param metadata - The workspace's parsed metadata.
+ * @returns True while the workspace has never been named.
  */
-export function shouldAutoRenameWorkspace({
-	metadata,
-	prompt,
-	renameEnabled,
-}: AutoRenameGate): boolean {
-	if (!prompt?.trim()) {
-		return false;
-	}
-	if (!renameEnabled) {
-		return false;
-	}
-	if (metadata.placeholderName !== true) {
-		return false;
-	}
-	if (typeof metadata.renamedAt === 'string') {
-		return false;
-	}
-	return true;
+export function isWorkspaceNameable(
+	metadata: WorkspaceNamingMetadata,
+): boolean {
+	return (
+		metadata.placeholderName === true && typeof metadata.renamedAt !== 'string'
+	);
 }

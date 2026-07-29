@@ -1,12 +1,21 @@
 import type { DynamicToolUIPart, UIMessage } from 'ai';
 import { useMemo } from 'react';
-import { glyphForToolCall } from '@/renderer/lib/pi';
+import {
+	customMessageDataOf,
+	glyphForToolCall,
+	skillPartDataOf,
+} from '@/renderer/lib/pi';
 import { cn } from '@/renderer/lib/utils';
 import type { ChatAssistantTurnTiming } from '@/renderer/types/chat';
 import type { ToolGlyph } from '@/renderer/types/tool-presentation';
 
 import { ChatMessageText } from './chat-message-text';
-import { ChatReasoningCollapsible, ChatToolCall } from './chat-tool-call';
+import {
+	ChatCustomMessage,
+	ChatReasoningCollapsible,
+	ChatSkillInvocation,
+	ChatToolCall,
+} from './chat-tool-call';
 import { ChatTurnFooter } from './chat-turn-footer';
 import { ChatTurnSummary } from './chat-turn-summary';
 import { ChatWorkingIndicator } from './chat-turn-timer';
@@ -55,7 +64,7 @@ export function ChatAssistantTurn({
 		<ActivityPart key={`${message.id}:a:${index}`} part={part} />
 	));
 	const toolGlyphs = useMemo(
-		() => collectToolGlyphs(activityParts),
+		() => collectActivityGlyphs(activityParts),
 		[activityParts],
 	);
 
@@ -122,13 +131,21 @@ export function ChatAssistantTurn({
 	);
 }
 
-/** Renders one pre-answer activity part: reasoning, a tool call, or muted intermediate commentary. */
+/** Renders one pre-answer activity part: reasoning, a tool call, a skill activation, injected context, or muted intermediate commentary. */
 function ActivityPart({ part }: { part: UIMessage['parts'][number] }) {
 	if (part.type === 'reasoning') {
 		return <ChatReasoningCollapsible text={part.text} />;
 	}
 	if (part.type === 'dynamic-tool') {
 		return <ChatToolCall part={part as DynamicToolUIPart} />;
+	}
+	const skillData = skillPartDataOf(part);
+	if (skillData) {
+		return <ChatSkillInvocation name={skillData.name} />;
+	}
+	const customData = customMessageDataOf(part);
+	if (customData) {
+		return <ChatCustomMessage data={customData} />;
 	}
 	if (part.type === 'text') {
 		// Intermediate commentary between tool calls — keep compact and muted
@@ -177,17 +194,24 @@ function splitTurnParts(
 }
 
 /**
- * Collect the icon of every tool call folded into a turn's summary, in the
- * order the turn ran them.
+ * Collect the icon of every row folded into a turn's summary, in the order the
+ * turn produced them, so a turn that only injected context still shows a mark
+ * rather than an empty chip.
  * @param parts - Message parts to scan
- * @returns One glyph per tool call
+ * @returns One glyph per tool call, skill activation, and injected message
  */
-function collectToolGlyphs(parts: UIMessage['parts']): readonly ToolGlyph[] {
-	return parts.flatMap((part) =>
-		part.type === 'dynamic-tool'
-			? [glyphForToolCall(part as DynamicToolUIPart)]
-			: [],
-	);
+function collectActivityGlyphs(
+	parts: UIMessage['parts'],
+): readonly ToolGlyph[] {
+	return parts.flatMap((part) => {
+		if (part.type === 'dynamic-tool') {
+			return [glyphForToolCall(part as DynamicToolUIPart)];
+		}
+		if (skillPartDataOf(part)) {
+			return ['biceps-flexed'] as const;
+		}
+		return customMessageDataOf(part) ? (['puzzle'] as const) : [];
+	});
 }
 
 /**

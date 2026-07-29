@@ -8,6 +8,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createFakePiAgentAdapter } from '../../src/main/pi-agent/fake-pi-agent-client.ts';
+import type { PiAgentAdapter } from '../../src/main/pi-agent/pi-agent-adapter.ts';
 import { createPiAgentClient } from '../../src/main/pi-agent/pi-agent-client.ts';
 import {
 	createPiSessionService,
@@ -62,15 +63,41 @@ function createReadyExecutable(): PiExecutableSnapshot {
 	};
 }
 
+// The CLI adapter's `abort()` only signals the child: the `shutdown` event
+// lands later, on process exit, once `stopSession` already dropped the session
+// from the active map. The fake emits it inline, so tests that care about that
+// tail opt into this wrapper.
+function deferAbortUntilExit(adapter: PiAgentAdapter): PiAgentAdapter {
+	return {
+		createSession: async (input) => {
+			const session = await adapter.createSession(input);
+			return {
+				...session,
+				abort: async (reason) => {
+					setTimeout(() => {
+						void session.abort(reason);
+					}, 0);
+				},
+			};
+		},
+		shutdown: adapter.shutdown,
+	};
+}
+
 function createService(
 	database: DatabaseSync,
 	options: {
+		deferAbort?: boolean;
 		eventSink?: PiSessionEventSink;
 		sessionSummaryWriter?: SessionSummaryWriter;
 	} = {},
 ) {
 	const fake = createFakePiAgentAdapter();
-	const piAgentClient = createPiAgentClient({ adapter: fake.adapter });
+	const piAgentClient = createPiAgentClient({
+		adapter: options.deferAbort
+			? deferAbortUntilExit(fake.adapter)
+			: fake.adapter,
+	});
 	const service = createPiSessionService({
 		databaseService: {
 			close: () => undefined,
@@ -177,7 +204,7 @@ test('openSession binds an existing chat tab without opening a duplicate', async
 	assert.equal(tabs[0]?.title, 'Existing tab');
 });
 
-test('setSessionName renames the active tab and marks the title user-owned', async (t) => {
+test('setSessionName renames the active tab and stamps the caller as its owner', async (t) => {
 	const fixture = openFixture(t);
 	const { service } = createService(fixture.database);
 
@@ -190,13 +217,47 @@ test('setSessionName renames the active tab and marks the title user-owned', asy
 	assert.ok(tabId);
 
 	const applied = await service.setSessionName({
-		sessionId: snapshot.id,
 		name: 'Refactor auth flow',
+		provenance: 'agent',
+		sessionId: snapshot.id,
 	});
 
-	assert.deepEqual(applied, { chatTabId: tabId, title: 'Refactor auth flow' });
+	assert.deepEqual(applied, {
+		applied: true,
+		chatTabId: tabId,
+		title: 'Refactor auth flow',
+	});
 	const tab = getChatTabById({ database: fixture.database, id: tabId });
 	assert.equal(tab?.title, 'Refactor auth flow');
+	assert.equal(tab?.metadata.titleProvenance, 'agent');
+});
+
+test('setSessionName leaves a title the user owns alone', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database);
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const tabId = snapshot.openedTabs[0]?.id;
+	assert.ok(tabId);
+
+	await service.setSessionName({
+		name: 'Chosen by hand',
+		provenance: 'user',
+		sessionId: snapshot.id,
+	});
+	const applied = await service.setSessionName({
+		name: 'Agent guess',
+		provenance: 'agent',
+		sessionId: snapshot.id,
+	});
+
+	assert.equal(applied?.applied, false);
+	const tab = getChatTabById({ database: fixture.database, id: tabId });
+	assert.equal(tab?.title, 'Chosen by hand');
 	assert.equal(tab?.metadata.titleProvenance, 'user');
 });
 
@@ -205,8 +266,9 @@ test('setSessionName resolves null for a session that is not active', async (t) 
 	const { service } = createService(fixture.database);
 
 	const applied = await service.setSessionName({
-		sessionId: 'missing-session',
 		name: 'Whatever',
+		provenance: 'agent',
+		sessionId: 'missing-session',
 	});
 
 	assert.equal(applied, null);
@@ -398,8 +460,8 @@ test('writes the chat summary at the turn boundary, not mid-turn', async (t) => 
 			summaryCalls.push(input);
 			return {
 				path: `${input.workspaceCwd}/.context/sessions/${input.chatTabId}.md`,
+				source: 'transcript' as const,
 				title: 'Live summary',
-				usedLlm: false,
 			};
 		},
 	};
@@ -454,8 +516,8 @@ test('writes the chat summary at the turn boundary, not mid-turn', async (t) => 
 		: null;
 	assert.deepEqual(tab?.metadata.summary, {
 		path: `/tmp/ensemblr/svc/ws/.context/sessions/${tabId}.md`,
+		source: 'transcript',
 		title: 'Live summary',
-		usedLlm: false,
 	});
 });
 
@@ -467,8 +529,8 @@ test('stopSession flushes the owed summary before closing', async (t) => {
 			summaryCalls.push(input);
 			return {
 				path: `${input.workspaceCwd}/.context/sessions/${input.chatTabId}.md`,
+				source: 'transcript' as const,
 				title: 'Closed summary',
-				usedLlm: false,
 			};
 		},
 	};
@@ -519,6 +581,35 @@ test('stopSession aborts the runtime and marks the turn aborted', async (t) => {
 
 	const runtime = fake.getOpenSessions();
 	assert.equal(runtime.length, 0, 'fake adapter should drop closed sessions');
+});
+
+test('stopSession broadcasts the shutdown that lands after the session left the active map', async (t) => {
+	const fixture = openFixture(t);
+	const shutdowns: Array<{ reason: string; workspaceId: string }> = [];
+	const { service } = createService(fixture.database, {
+		deferAbort: true,
+		eventSink: ({ event, workspaceId }) => {
+			const envelope = event.payload;
+			if (envelope?.kind === 'shutdown') {
+				shutdowns.push({ reason: envelope.reason, workspaceId });
+			}
+		},
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'task', sessionId: snapshot.id });
+	await service.stopSession({ sessionId: snapshot.id });
+	await delay(20);
+
+	assert.deepEqual(
+		shutdowns,
+		[{ reason: 'aborted', workspaceId: fixture.workspaceId }],
+		'the interrupted marker must reach the renderer without a refetch',
+	);
 });
 
 test('stopSession leaves the session chat tab open for resume', async (t) => {
@@ -606,4 +697,178 @@ test('listSessionsForWorkspace returns active and persisted sessions', async (t)
 	const sessions = service.listSessionsForWorkspace(fixture.workspaceId);
 	assert.equal(sessions.length, 1);
 	assert.equal(sessions[0]?.workspaceId, fixture.workspaceId);
+});
+
+test('setSessionSummary records the agent summary against the branch it describes', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database);
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const tabId = snapshot.openedTabs[0]?.id;
+	assert.ok(tabId);
+
+	const recorded = service.setSessionSummary({
+		sessionId: snapshot.id,
+		summary: '- Fixed the redirect guard',
+		title: 'Login redirect fix',
+	});
+
+	assert.ok(recorded);
+	const marker = getChatTabById({ database: fixture.database, id: tabId })
+		?.metadata.agentSummary as Record<string, unknown> | undefined;
+	assert.equal(marker?.title, 'Login redirect fix');
+	assert.equal(marker?.body, '- Fixed the redirect guard');
+	assert.equal(marker?.branchId, snapshot.branchId);
+	assert.equal(marker?.capturedAtOrdinal, recorded?.capturedAtOrdinal);
+});
+
+test('setSessionSummary resolves null for a session that has no tab', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database);
+
+	assert.equal(
+		service.setSessionSummary({
+			sessionId: 'missing-session',
+			summary: 'Body.',
+			title: 'Topic',
+		}),
+		null,
+	);
+});
+
+test('the turn-boundary summary carries the agent body once it recorded one', async (t) => {
+	const fixture = openFixture(t);
+	const summaryCalls: WriteSessionSummaryInput[] = [];
+	const sessionSummaryWriter: SessionSummaryWriter = {
+		writeSessionSummary: async (input) => {
+			summaryCalls.push(input);
+			return {
+				path: `${input.workspaceCwd}/.context/sessions/${input.chatTabId}.md`,
+				source: input.agentSummary
+					? ('agent' as const)
+					: ('transcript' as const),
+				title: input.agentSummary?.title ?? null,
+			};
+		},
+	};
+	const { fake, service } = createService(fixture.database, {
+		sessionSummaryWriter,
+	});
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'do it', sessionId: snapshot.id });
+	const runtime = fake.getOpenSessions()[0];
+	assert.ok(runtime);
+	runtime.emit({
+		at: '2026-06-08T00:00:01.000Z',
+		payload: { kind: 'text', text: 'agent reply' },
+		role: 'agent',
+		turnId: 'fake-turn',
+		type: 'message',
+	});
+	service.setSessionSummary({
+		sessionId: snapshot.id,
+		summary: '- Did the thing',
+		title: 'The thing',
+	});
+
+	runtime.setStatus('idle');
+	await waitForSummaryCalls(summaryCalls, 1);
+
+	assert.deepEqual(summaryCalls[0]?.agentSummary, {
+		body: '- Did the thing',
+		title: 'The thing',
+	});
+});
+
+test('a fork from the latest turn reuses the agent summary', async (t) => {
+	const fixture = openFixture(t);
+	const summaryCalls: WriteSessionSummaryInput[] = [];
+	const sessionSummaryWriter: SessionSummaryWriter = {
+		writeSessionSummary: async (input) => {
+			summaryCalls.push(input);
+			return {
+				path: `${input.workspaceCwd}/.context/sessions/${input.chatTabId}.md`,
+				source: input.agentSummary
+					? ('agent' as const)
+					: ('transcript' as const),
+				title: input.agentSummary?.title ?? null,
+			};
+		},
+	};
+	const { service } = createService(fixture.database, { sessionSummaryWriter });
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'do it', sessionId: snapshot.id });
+	const recorded = service.setSessionSummary({
+		sessionId: snapshot.id,
+		summary: '- Did the thing',
+		title: 'The thing',
+	});
+	assert.ok(recorded);
+
+	await service.writeForkSummary({
+		branchId: snapshot.branchId,
+		fileBaseName: 'dest-tab',
+		sessionId: snapshot.id,
+		upToOrdinal: recorded.capturedAtOrdinal + 1,
+	});
+
+	assert.deepEqual(summaryCalls.at(-1)?.agentSummary, {
+		body: '- Did the thing',
+		title: 'The thing',
+	});
+});
+
+test('a fork from an earlier turn falls back to the transcript', async (t) => {
+	const fixture = openFixture(t);
+	const summaryCalls: WriteSessionSummaryInput[] = [];
+	const sessionSummaryWriter: SessionSummaryWriter = {
+		writeSessionSummary: async (input) => {
+			summaryCalls.push(input);
+			return {
+				path: `${input.workspaceCwd}/.context/sessions/${input.chatTabId}.md`,
+				source: input.agentSummary
+					? ('agent' as const)
+					: ('transcript' as const),
+				title: input.agentSummary?.title ?? null,
+			};
+		},
+	};
+	const { service } = createService(fixture.database, { sessionSummaryWriter });
+
+	const snapshot = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	await service.submitPrompt({ prompt: 'do it', sessionId: snapshot.id });
+	const recorded = service.setSessionSummary({
+		sessionId: snapshot.id,
+		summary: '- Did the thing',
+		title: 'The thing',
+	});
+	assert.ok(recorded);
+
+	// Forking a turn that predates the summary must not leak later work into it.
+	await service.writeForkSummary({
+		branchId: snapshot.branchId,
+		fileBaseName: 'dest-tab',
+		sessionId: snapshot.id,
+		upToOrdinal: recorded.capturedAtOrdinal - 1,
+	});
+
+	assert.equal(summaryCalls.at(-1)?.agentSummary, null);
 });
