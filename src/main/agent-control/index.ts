@@ -22,9 +22,11 @@ export {
 	type Guardrails,
 } from './guardrails.ts';
 export {
-	appendHarnessMcpConfig,
-	buildHarnessMcpArgs,
-} from './harness-mcp-config.ts';
+	buildHarnessLaunchDecoration,
+	decorateHarnessCommand,
+	type HarnessLaunchContext,
+	type HarnessLaunchDecoration,
+} from './harness-launch-config.ts';
 export {
 	type AgentControlIntegration,
 	createAgentControlIntegration,

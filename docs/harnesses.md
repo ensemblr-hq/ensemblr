@@ -65,13 +65,31 @@ this directory" form.
 
 ## Ensemblr Control auto-config
 
-Claude Code and Codex are MCP clients, so Ensemblr appends a per-workspace MCP
-config to their launch command
-(`src/main/agent-control/harness-mcp-config.ts`) that points at the loopback
-control server with a scoped bearer token — giving them the `ensemblr_*` tools
-described in [`agent-control.md`](./agent-control.md). **Vibe** has no known
-HTTP-MCP config mechanism and is launched without control flags; it runs as a
-plain auto-approve harness.
+All three harnesses are MCP clients, so Ensemblr decorates every launch command
+(`src/main/agent-control/harness-launch-config.ts`) to point them at the
+loopback control server with a scoped bearer token — giving them the
+`ensemblr_*` tools described in [`agent-control.md`](./agent-control.md). The
+token itself never enters the command line; each harness reads it from the
+injected `ENSEMBLR_CONTROL_TOKEN` env var.
+
+| Harness | MCP config | Playbook |
+|---|---|---|
+| Claude Code | `--mcp-config '<json>'`, bearer header expands `${ENSEMBLR_CONTROL_TOKEN}` | `--append-system-prompt-file` |
+| Codex | `-c mcp_servers.ensemblr.url=…` + `-c mcp_servers.ensemblr.bearer_token_env_var=…` | none — reads the MCP server's `instructions` field as its tool-namespace description |
+| Mistral Vibe | `VIBE_MCP_SERVERS='<json>'` env prefix with `api_key_env` — Vibe has no MCP-config flag, only `VIBE_*` env vars | `--add-dir <dir>`, whose `AGENTS.md` it loads as project instructions |
+
+The playbook is `HARNESS_AWARENESS` (`src/shared/agent-control/awareness.ts`),
+rewritten to `<userData>/harness-instructions/AGENTS.md` on every harness launch
+— through a staging file and a rename, so a harness still reading the file
+during another launch never sees a half-written prompt. It is a shorter,
+harness-shaped variant of the Pi role playbooks: a harness tab is a
+terminal titled from the harness's own session log, so the chat-tab tools
+(`ensemblr_set_name`, `ensemblr_set_summary`, `ensemblr_ask_user_question`, Plan
+Mode) are neither served over MCP nor mentioned.
+
+> Vibe fails silently when the control server is unreachable — no error, no
+> stderr, exit 0, just no tools. To check the wiring, ask it to list the tools
+> whose names contain `ensemblr`.
 
 ## See also
 

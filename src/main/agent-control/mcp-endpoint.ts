@@ -1,11 +1,17 @@
 /**
  * MCP (streamable HTTP) surface over the agent-control service, for third-party
- * harnesses (Claude Code, Codex) that are native MCP clients. It exposes the
- * same ops as the Pi extension as MCP tools; each tool forwards to
+ * harnesses (Claude Code, Codex, Mistral Vibe) that are native MCP clients. It
+ * exposes the ops a harness can actually use as MCP tools; each forwards to
  * {@link AgentControlService.invoke} with the per-request bearer token, so the
  * service remains the single validation/scope/permission authority. Stateless:
  * a fresh server + transport per request (no sessions), token read from the
  * request's Authorization header by the caller.
+ *
+ * The chat-tab ops are deliberately absent: a harness owns a terminal tab whose
+ * title is derived from the harness's own session log, so `setName` would have
+ * no tab to rename, and `setSummary`, `askUserQuestion`, and the Plan Mode ops
+ * are gated to Pi callers in the service. Listing a tool the service would only
+ * refuse teaches the model to keep reaching for it.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
@@ -16,7 +22,7 @@ import { type ZodRawShape, z } from 'zod';
 import {
 	type AgentControlOp,
 	type AgentControlResult,
-	ORCHESTRATOR_AWARENESS,
+	HARNESS_AWARENESS,
 	WORKSPACE_BOARD_STATUSES,
 } from '../../shared/agent-control.ts';
 import type { AgentControlService } from './agent-control-service.ts';
@@ -67,17 +73,10 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 		},
 	},
 	{
-		name: 'ensemblr_set_name',
-		op: 'setName',
-		description:
-			'Set a short, descriptive name for your own conversation tab so it is easy to identify.',
-		shape: { name: z.string() },
-	},
-	{
 		name: 'ensemblr_set_branch_name',
 		op: 'setBranchName',
 		description:
-			'Name the work: renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. "add-dark-mode"), keeping any `prefix/` segment of the current branch. One-shot — it applies only while the workspace still carries its generated placeholder name; once named it reports that and changes nothing, so call it at most once. This is the workspace and branch name, not the tab title (use ensemblr_set_name for that).',
+			'Name the work: renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. "add-dark-mode"), keeping any `prefix/` segment of the current branch. One-shot — it applies only while the workspace still carries its generated placeholder name; once named it reports that and changes nothing, so call it at most once. This names the workspace and branch, not your terminal tab, which titles itself from your own session log.',
 		shape: { name: z.string() },
 	},
 	{
@@ -255,7 +254,7 @@ function buildMcpServer(
 ): McpServer {
 	const server = new McpServer(
 		{ name: 'ensemblr-control', version: '1.0.0' },
-		{ instructions: ORCHESTRATOR_AWARENESS },
+		{ instructions: HARNESS_AWARENESS },
 	);
 	for (const def of TOOL_DEFS) {
 		server.registerTool(

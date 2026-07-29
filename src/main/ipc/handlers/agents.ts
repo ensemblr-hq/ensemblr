@@ -74,9 +74,9 @@ export function registerAgentHandlers({
 	terminalService,
 }: {
 	/**
-	 * Appends agent-control MCP-config flags to a harness launch command so the
-	 * harness can reach the app. Defaults to identity when the control layer is
-	 * disabled.
+	 * Adds the agent-control MCP config and the harness playbook to a launch
+	 * command so the harness can reach the app and knows what for. Defaults to
+	 * identity when the control layer is disabled.
 	 */
 	augmentHarnessCommand?: (
 		command: string,

@@ -5,13 +5,16 @@
  * the resolved Pi control-extension path — behind one factory, so main.ts holds
  * only the composition and stays free of fs/path, dialog, and env-assembly detail.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { type App, BrowserWindow, dialog } from 'electron';
 
-import { roleForDepth } from '../../shared/agent-control.ts';
-import { appendHarnessMcpConfig } from './harness-mcp-config.ts';
+import { HARNESS_AWARENESS, roleForDepth } from '../../shared/agent-control.ts';
+import {
+	decorateHarnessCommand,
+	HARNESS_INSTRUCTIONS_FILENAME,
+} from './harness-launch-config.ts';
 import type { OriginRegistry } from './origin-registry.ts';
 import type { AgentControlEnvResolver } from './ports.ts';
 
@@ -60,6 +63,41 @@ function resolvePiControlExtensionPath(app: App): string | null {
 		}
 	}
 	return null;
+}
+
+/**
+ * Writes the harness playbook into its own directory under `userData` and
+ * returns that directory, or null when the write fails — a harness then
+ * launches with MCP tools but no prose about them, which beats not launching.
+ *
+ * Called per launch rather than once at construction: `main.ts` requires the
+ * module-scope service graph to stay construction-only so a process that loses
+ * the single-instance lock never touches shared userData before exiting. Doing
+ * it per launch also keeps the file tracking the shipped playbook and restores
+ * it if anything removed it. It lives alone in its directory because Vibe
+ * trusts the whole directory it is pointed at.
+ *
+ * Every workspace shares this one file, so a launch can land while an earlier
+ * harness is still reading it. Writing through a staging file and renaming makes
+ * the swap atomic: a concurrent reader sees the previous playbook or the new one
+ * and never a half-truncated prompt. A staging file left behind by a failed
+ * write is inert — a harness reads only `AGENTS.md` — and the next write reuses
+ * and consumes it.
+ * @param app - The Electron app, for the `userData` path.
+ * @returns Absolute path to the directory holding the playbook, or null.
+ */
+function writeHarnessInstructions(app: App): string | null {
+	const directory = path.join(app.getPath('userData'), 'harness-instructions');
+	const playbook = path.join(directory, HARNESS_INSTRUCTIONS_FILENAME);
+	const staging = `${playbook}.tmp`;
+	try {
+		mkdirSync(directory, { recursive: true });
+		writeFileSync(staging, `${HARNESS_AWARENESS}\n`, 'utf8');
+		renameSync(staging, playbook);
+		return directory;
+	} catch {
+		return null;
+	}
 }
 
 /**
@@ -130,16 +168,17 @@ export function createAgentControlIntegration(
 		harnessId: string,
 		workspaceId: string,
 	): string =>
-		appendHarnessMcpConfig(
-			command,
+		decorateHarnessCommand(command, {
+			baseUrl: deps.getServerUrl(),
 			harnessId,
-			deps.getServerUrl(),
-			resolveAgentControlEnv({
-				workspaceId,
-				sessionId: `ws:${workspaceId}`,
-				species: 'harness',
-			}).ENSEMBLR_CONTROL_TOKEN ?? null,
-		);
+			instructionsDirectory: writeHarnessInstructions(deps.app),
+			token:
+				resolveAgentControlEnv({
+					workspaceId,
+					sessionId: `ws:${workspaceId}`,
+					species: 'harness',
+				}).ENSEMBLR_CONTROL_TOKEN ?? null,
+		});
 
 	return {
 		resolveAgentControlEnv,

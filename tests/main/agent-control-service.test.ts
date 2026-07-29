@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
 	type AgentControlPorts,
+	type AgentSpecies,
 	createAgentControlService,
 	createGuardrails,
 	createOriginRegistry,
@@ -112,6 +113,7 @@ const setup = (
 	options: {
 		ports?: AgentControlPorts;
 		guardrails?: Partial<GuardrailConfig>;
+		species?: AgentSpecies;
 	} = {},
 ) => {
 	const registry = createOriginRegistry({ generateToken: () => 'tok-caller' });
@@ -119,7 +121,7 @@ const setup = (
 		sessionId: 'caller',
 		workspaceId: 'ws',
 		workspaceCwd: '/ws',
-		species: 'pi',
+		species: options.species ?? 'pi',
 	});
 	const ports = options.ports ?? makePorts();
 	const service = createAgentControlService({
@@ -537,6 +539,21 @@ describe('agent-control service: delegation', () => {
 			piSessionId: 'caller',
 			name: 'My task tab',
 		});
+	});
+
+	it('setName refuses a harness caller, whose tab titles itself', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports, species: 'harness' });
+		const result = await service.invoke({
+			op: 'setName',
+			token: 'tok-caller',
+			rawArgs: { name: 'My task tab' },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+		}
+		expect(ports.conversations.setName).not.toHaveBeenCalled();
 	});
 
 	it('setName reports not-found when the caller session is inactive', async () => {

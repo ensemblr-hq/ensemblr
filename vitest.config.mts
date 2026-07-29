@@ -58,7 +58,7 @@ export default defineConfig({
 			'tests/main/agent-control-control-server.test.ts',
 			'tests/main/agent-control-mcp-endpoint.test.ts',
 			'tests/main/agent-control-port-adapters.test.ts',
-			'tests/main/agent-control-harness-mcp-config.test.ts',
+			'tests/main/agent-control-harness-launch-config.test.ts',
 			'tests/main/agent-control-model-resolution.test.ts',
 			'tests/main/agent-control-wait.test.ts',
 			'tests/main/agent-control-awareness-parity.test.ts',

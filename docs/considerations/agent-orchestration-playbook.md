@@ -12,12 +12,31 @@
 >   Because a packaged app cannot import `src/` at runtime,
 >   `resources/pi-extensions/ensemblr-control.mts` embeds byte-identical copies of both; a parity
 >   test (`tests/main/agent-control-awareness-parity.test.ts`) fails if either drifts.
-> - **Harnesses** (Claude Code, Codex) — the MCP server's `instructions` field
->   (`src/main/agent-control/mcp-endpoint.ts`) uses `ORCHESTRATOR_AWARENESS`; harnesses launch as
->   root sessions.
+> - **Harnesses** (Claude Code, Codex, Mistral Vibe) — a harness launches as a root session but
+>   owns a *terminal* tab, so it gets its own shorter variant, `HARNESS_AWARENESS`. The MCP server's
+>   `instructions` field (`src/main/agent-control/mcp-endpoint.ts`) carries it, and
+>   `src/main/agent-control/harness-launch-config.ts` also appends it to the launch command as a
+>   system prompt, because no harness reliably surfaces an MCP server's `instructions` to its model.
 >
 > This file is the human-facing reference for that guidance; keep it in step with the constants by
 > hand.
+
+## What a harness does not get
+
+The MCP endpoint serves a harness only the ops it can actually use. The chat-tab ops are absent by
+design, and the service refuses them for a `harness` origin even if one is reached directly:
+
+| Absent | Why |
+|---|---|
+| `ensemblr_set_name` | A harness tab is a terminal whose title is derived from the harness's own session log (`src/main/terminal/agent-conversation-title.ts`) — there is no chat tab to rename. |
+| `ensemblr_set_summary` | Session summaries hang off a Pi chat tab. |
+| `ensemblr_ask_user_question` | The question panel renders inside the chat tab bound to the Pi session. |
+| `ensemblr_exit_plan_mode` | Plan Mode is a Pi-conversation toggle. |
+
+A harness also gets no per-turn upkeep block — the app renders that into a Pi system prompt and a
+harness has no equivalent hook — so `HARNESS_AWARENESS` carries the branch-naming nudge itself.
+`ensemblr_set_branch_name` still enforces `git.renameWorkspaceOnBranch` on its own; the playbook's
+job is to frame a refusal as settled rather than as a fault worth retrying.
 
 ## Role
 
@@ -37,12 +56,12 @@ child's spawn attempt is denied `denied-depth`.
 | Goal | Tools |
 |---|---|
 | Delegate a subtask to a Pi sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `piSessionId`) |
-| Name your own tab | `ensemblr_set_name` |
+| Name your own tab | `ensemblr_set_name` (Pi chats only) |
 | Name the workspace + git branch | `ensemblr_set_branch_name` (one-shot, placeholder names only; refuses unless the user enabled `git.renameWorkspaceOnBranch`, so call it only when the per-turn upkeep block asks) |
 | Record what the session covered | `ensemblr_set_summary` (every turn; Pi chats only) |
 | **Block until children settle** | `ensemblr_wait_for_agents` |
 | Steer / correct a child | `ensemblr_send_follow_up` |
-| Delegate to a CLI agent | `ensemblr_launch_harness` (claude / codex) |
+| Delegate to a CLI agent | `ensemblr_launch_harness` (claude / codex / vibe) |
 | Run / inspect commands | `ensemblr_start_terminal`, `ensemblr_write_terminal`, `ensemblr_read_terminal_output`, `ensemblr_stop_terminal` |
 | Inspect a child out of band | `ensemblr_get_conversation_status`, `ensemblr_get_last_message` |
 | Pull the orchestrator back (sub-agents) | `ensemblr_notify_orchestrator` |
