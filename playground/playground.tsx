@@ -6,6 +6,7 @@ import { codeThemeAtom } from '@/renderer/state/preferences';
 
 import { AnswerPreview } from './answer-preview.tsx';
 import { FilePreviewScene } from './file-preview.tsx';
+import { TabScrollerScene } from './tab-scroller-preview.tsx';
 import { TimelinePreview } from './timeline-preview.tsx';
 import { TurnSummaryPreview } from './turn-summary-preview.tsx';
 
@@ -43,6 +44,12 @@ const SCENES = [
 		label: 'file',
 		render: () => <FilePreviewScene />,
 		source: 'playground/file-preview.tsx',
+	},
+	{
+		id: 'tabs',
+		label: 'tabs',
+		render: () => <TabScrollerScene />,
+		source: 'playground/tab-scroller-preview.tsx',
 	},
 ] as const;
 

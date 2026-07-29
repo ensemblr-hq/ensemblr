@@ -33,6 +33,7 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
+import { TabScroller } from '@/renderer/components/ui/tab-scroller';
 import {
 	Tooltip,
 	TooltipContent,
@@ -50,7 +51,7 @@ import {
 	harnessIconName,
 } from '@/renderer/lib/workbench';
 import {
-	sessionTabCloseFadeVariants,
+	SESSION_TAB_CLOSE_FADE_CLASS,
 	sessionTabIndicatorVariants,
 	sessionTabVariants,
 } from '@/renderer/lib/workbench/session-tabs-variants';
@@ -262,34 +263,36 @@ export function SessionTabs({
 	return (
 		<div className='flex h-10 shrink-0 items-center justify-between gap-3 border-border border-b bg-background pr-3'>
 			<div className='flex h-full min-w-0 flex-1 items-center gap-1.5'>
-				<Reorder.Group
-					axis='x'
-					className='no-scrollbar isolate m-0 flex h-full min-w-0 list-none overflow-x-auto overflow-y-hidden p-0'
-					onReorder={handleReorder}
-					values={orderedSessionIds}
-				>
-					{orderedSessionIds.map((sessionId) => {
-						const session = sessionById.get(sessionId);
-						if (!session) {
-							return null;
-						}
+				<TabScroller activeKey={activeSession.id} className='h-full'>
+					<Reorder.Group
+						axis='x'
+						className='isolate m-0 flex h-full w-max min-w-full list-none p-0'
+						onReorder={handleReorder}
+						values={orderedSessionIds}
+					>
+						{orderedSessionIds.map((sessionId) => {
+							const session = sessionById.get(sessionId);
+							if (!session) {
+								return null;
+							}
 
-						return (
-							<SessionTab
-								canReorderTabs={canReorderTabs}
-								isActive={session.id === activeSession.id}
-								isDraggingTab={isDraggingTab}
-								key={session.id}
-								onClose={onSessionTabClose}
-								onDragEnd={handleReorderEnd}
-								onDragStart={handleReorderStart}
-								onSelect={onSessionTabChange}
-								openChatTabCount={openChatTabCount}
-								session={session}
-							/>
-						);
-					})}
-				</Reorder.Group>
+							return (
+								<SessionTab
+									canReorderTabs={canReorderTabs}
+									isActive={session.id === activeSession.id}
+									isDraggingTab={isDraggingTab}
+									key={session.id}
+									onClose={onSessionTabClose}
+									onDragEnd={handleReorderEnd}
+									onDragStart={handleReorderStart}
+									onSelect={onSessionTabChange}
+									openChatTabCount={openChatTabCount}
+									session={session}
+								/>
+							);
+						})}
+					</Reorder.Group>
+				</TabScroller>
 				<div className='flex shrink-0 items-center gap-1'>
 					<Tooltip>
 						<TooltipTrigger asChild>
@@ -386,6 +389,7 @@ function SessionTab({
 		<Reorder.Item
 			className={sessionTabVariants({ canReorder: canReorderTabs, isActive })}
 			data-session-tab-reorderable={canReorderTabs}
+			data-tab-key={session.id}
 			dragElastic={canReorderTabs ? 0.08 : 0}
 			dragListener={canReorderTabs}
 			layout='position'
@@ -412,10 +416,7 @@ function SessionTab({
 				</span>
 			</button>
 			{showCloseControls ? (
-				<span
-					aria-hidden='true'
-					className={sessionTabCloseFadeVariants({ isActive })}
-				/>
+				<span aria-hidden='true' className={SESSION_TAB_CLOSE_FADE_CLASS} />
 			) : null}
 			{showCloseControls ? (
 				<button
