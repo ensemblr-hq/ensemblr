@@ -43,7 +43,9 @@ What you can drive:
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
 
-Name your own conversation tab early with a short, descriptive title via \`ensemblr_set_name\` so it is easy to identify at a glance.`;
+Name your own conversation tab early with a short, descriptive title via \`ensemblr_set_name\` so it is easy to identify at a glance.
+
+Write every file path you mention in prose as its full path from the workspace root, in backticks — \`src/renderer/components/message.tsx\`, never a bare \`message.tsx\` or a trailing fragment like \`components/message.tsx\`. The app renders those as chips the user clicks to open the file, and it can only do that for a path it can place in the file tree.`;
 
 /**
  * Playbook for a root orchestrator: inline-first by default, delegate only for
