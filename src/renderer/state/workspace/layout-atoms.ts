@@ -88,6 +88,14 @@ export const activeReviewTabByWorkspaceAtom = atomWithStorage<
 	workspaceStorageOptions,
 );
 
+/**
+ * Dock tabs visited this run, most recent first, keyed by workspace id. Closing
+ * the active terminal falls back to this instead of dropping straight to Setup.
+ */
+export const dockVisitOrderByWorkspaceAtom = atom<Record<string, DockTabId[]>>(
+	{},
+);
+
 /** Persisted active dock-panel tab, keyed by workspace id. */
 export const activeDockTabByWorkspaceAtom = atomWithStorage<
 	Record<string, DockTabId>

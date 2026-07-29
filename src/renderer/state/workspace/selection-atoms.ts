@@ -23,6 +23,15 @@ export const lastWorkspaceSelectionAtom = atomWithStorage<{
 	workspaceStorageOptions,
 );
 
+/**
+ * Chat tabs visited this run, most recent first, keyed by workspace id. Drives
+ * where the strip lands when the active tab closes. In-memory on purpose: a
+ * fresh app run has no back-track to honour and falls back to the neighbor rule.
+ */
+export const sessionVisitOrderByWorkspaceAtom = atom<Record<string, string[]>>(
+	{},
+);
+
 /** Persisted active chat-tab session id, keyed by workspace id. */
 export const activeChatTabByWorkspaceAtom = atomWithStorage<
 	Record<string, string>
