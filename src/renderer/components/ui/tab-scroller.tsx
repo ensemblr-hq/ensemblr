@@ -35,7 +35,7 @@ export function TabScroller({
 			</div>
 			<div
 				aria-hidden='true'
-				className='pointer-events-none absolute bottom-1 left-0 h-1 w-0 touch-none rounded-full bg-muted-foreground/40 opacity-0 transition-opacity duration-200 ease-out will-change-transform hover:bg-muted-foreground/70 data-[visible=true]:pointer-events-auto data-[visible=true]:opacity-100'
+				className='pointer-events-none absolute bottom-1 left-0 h-1 w-0 touch-none rounded-full bg-muted-foreground/40 opacity-0 transition-opacity duration-200 ease-out hover:bg-muted-foreground/70 data-[visible=true]:pointer-events-auto data-[visible=true]:opacity-100'
 				data-slot='tab-scroller-thumb'
 				ref={thumbRef}
 			/>

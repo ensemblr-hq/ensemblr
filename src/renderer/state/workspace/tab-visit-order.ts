@@ -53,12 +53,15 @@ export function selectPreviouslyVisitedTab<T extends string>({
 	openIds: readonly T[];
 	visitOrder: readonly string[];
 }): T | null {
+	const openById = new Map<string, T>(
+		openIds.map((id): [string, T] => [id, id]),
+	);
 	for (const visitedId of visitOrder) {
 		if (visitedId === excludeId) {
 			continue;
 		}
-		const openId = openIds.find((candidate) => candidate === visitedId);
-		if (openId) {
+		const openId = openById.get(visitedId);
+		if (openId !== undefined) {
 			return openId;
 		}
 	}

@@ -171,6 +171,17 @@ function attachOverlayScrollbar({
 	let isDragging = false;
 
 	/**
+	 * Shows or hides the thumb and pairs the GPU compositing hint with it, so
+	 * `will-change: transform` is live only while the moving thumb is on screen and
+	 * never promotes a layer for a scrollbar sitting at rest.
+	 * @param visible - Whether the thumb should be shown
+	 */
+	const showThumb = (visible: boolean) => {
+		thumb.dataset.visible = visible ? 'true' : 'false';
+		thumb.style.willChange = visible ? 'transform' : 'auto';
+	};
+
+	/**
 	 * Resizes the thumb, shows it whenever the strip overflows, and queues the
 	 * fade-out unless the pointer is still hovering or dragging the strip.
 	 */
@@ -180,12 +191,12 @@ function attachOverlayScrollbar({
 			clearTimeout(hideTimer);
 			hideTimer = null;
 		}
-		thumb.dataset.visible = isOverflowing ? 'true' : 'false';
+		showThumb(isOverflowing);
 		if (!isOverflowing || isHovered || isDragging) {
 			return;
 		}
 		hideTimer = setTimeout(() => {
-			thumb.dataset.visible = 'false';
+			showThumb(false);
 		}, THUMB_HIDE_DELAY_MS);
 	};
 
