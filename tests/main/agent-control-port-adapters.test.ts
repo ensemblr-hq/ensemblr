@@ -262,6 +262,135 @@ describe('agent-control port adapters: conversation naming', () => {
 			sessionId: 'sess-1',
 		});
 	});
+
+	// The renderer resolves a tab's branch id out of the session list, so until the
+	// binding is announced the timeline has no branch to query and the tab renders
+	// blank. `submitPrompt` captures a git checkpoint first, which makes that gap
+	// seconds long — so the announcement has to come first.
+	it('startConversation announces the tab-to-session binding before submitting', async () => {
+		const submitPrompt = vi.fn().mockResolvedValue({});
+		const { broadcastTabsChanged, deps } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
+			submitPrompt,
+			setSessionName: vi.fn().mockResolvedValue({ applied: true }),
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ status: 'ready', command: 'pi' }),
+		};
+		(deps as { localCommandService: unknown }).localCommandService = {};
+		const ports = createAgentControlPorts(deps);
+
+		await ports.conversations.startConversation({
+			workspaceId: 'ws',
+			workspaceCwd: '/ws',
+			prompt: 'do it',
+			parentSessionId: 'parent-1',
+			planMode: false,
+		});
+
+		const markedAt = vi.mocked(setChatTabMetadata).mock.invocationCallOrder[0];
+		const submittedAt = submitPrompt.mock.invocationCallOrder[0];
+		expect(markedAt).toBeLessThan(submittedAt);
+		const announcedBetween =
+			broadcastTabsChanged.mock.invocationCallOrder.filter(
+				(order) => order > markedAt && order < submittedAt,
+			);
+		expect(announcedBetween).toHaveLength(1);
+	});
+
+	// The marker now lands before the submit that can fail. A tab this call opened
+	// is closed on rollback, but a tab the caller passed in survives — and would
+	// keep a locked composer forever if the marker stayed behind.
+	it('startConversation clears the sub-agent marker when a reused tab fails to submit', async () => {
+		const { deps } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
+			submitPrompt: vi.fn().mockRejectedValue(new Error('pi is not ready')),
+			stopSession: vi.fn().mockResolvedValue(undefined),
+			setSessionName: vi.fn(),
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ status: 'ready', command: 'pi' }),
+		};
+		(deps as { localCommandService: unknown }).localCommandService = {};
+		vi.mocked(getChatTabById)
+			.mockReturnValueOnce({
+				metadata: { pinned: true },
+				workspaceId: 'ws',
+			} as unknown as ReturnType<typeof getChatTabById>)
+			.mockReturnValueOnce({
+				metadata: { agentRole: 'subagent', pinned: true },
+				workspaceId: 'ws',
+			} as unknown as ReturnType<typeof getChatTabById>);
+		const ports = createAgentControlPorts(deps);
+
+		await expect(
+			ports.conversations.startConversation({
+				workspaceId: 'ws',
+				workspaceCwd: '/ws',
+				chatTabId: 'tab-reused',
+				prompt: 'do it',
+				parentSessionId: 'parent-1',
+				planMode: false,
+			}),
+		).rejects.toThrow('pi is not ready');
+
+		expect(setChatTabMetadata).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				id: 'tab-reused',
+				metadata: { pinned: true },
+			}),
+		);
+	});
+
+	// The other half of that rollback. Reusing an already-marked tab writes
+	// nothing, so clearing the marker on failure would strip a live sub-agent of
+	// its role — and after a restart the depth counter reads it as a root, handing
+	// back the whole surface the role policy exists to deny it.
+	it('startConversation leaves a pre-existing sub-agent marker alone when the submit fails', async () => {
+		const { deps } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			openSession: vi.fn().mockResolvedValue({ id: 'sess-2' }),
+			submitPrompt: vi.fn().mockRejectedValue(new Error('pi is not ready')),
+			stopSession: vi.fn().mockResolvedValue(undefined),
+			setSessionName: vi.fn(),
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ status: 'ready', command: 'pi' }),
+		};
+		(deps as { localCommandService: unknown }).localCommandService = {};
+		vi.mocked(getChatTabById).mockReturnValue({
+			metadata: { agentRole: 'subagent', pinned: true },
+			workspaceId: 'ws',
+		} as unknown as ReturnType<typeof getChatTabById>);
+		const ports = createAgentControlPorts(deps);
+
+		await expect(
+			ports.conversations.startConversation({
+				workspaceId: 'ws',
+				workspaceCwd: '/ws',
+				chatTabId: 'tab-already-subagent',
+				prompt: 'do it',
+				parentSessionId: 'parent-1',
+				planMode: false,
+			}),
+		).rejects.toThrow('pi is not ready');
+
+		expect(setChatTabMetadata).not.toHaveBeenCalled();
+	});
 });
 
 describe('agent-control port adapters: branch naming', () => {

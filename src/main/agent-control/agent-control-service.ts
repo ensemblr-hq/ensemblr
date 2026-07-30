@@ -40,6 +40,8 @@ import type {
 	StopTerminalArgs,
 	WaitedAgent,
 	WaitForAgentsArgs,
+	WaitForAgentsResult,
+	WaitMode,
 	WaitReportDetail,
 	WriteTerminalArgs,
 } from '../../shared/agent-control.ts';
@@ -47,7 +49,8 @@ import {
 	briefReport,
 	buildSessionBriefNudge,
 	isWriteOp,
-	roleForDepth,
+	resolveAgentRole,
+	subAgentControlOpDenial,
 	validateArgs,
 } from '../../shared/agent-control.ts';
 import { classifyPermissionAction } from '../../shared/permissions.ts';
@@ -195,6 +198,57 @@ function stillRunning(
 }
 
 /**
+ * Assembles a wait result, attaching the instruction that a timed-out wait is a
+ * lap of the loop rather than a failure. A child doing real work outlives the
+ * app's wait ceiling routinely, and a bare `timedOut: true` reads to an
+ * orchestrator as something to report to the user or work around — so the call
+ * that resumes the wait travels as prose, the same reason a shortened report
+ * carries its own re-fetch pointer. The note echoes the caller's own mode, because
+ * a caller that chose `first` to react to whichever child lands first did not ask
+ * to start blocking on all of them.
+ * @param outcome - The settled children, the ones still running, whether the window expired, and the mode the caller waited in.
+ * @returns The wait result, with a resume note when one is warranted.
+ */
+/**
+ * The result of a wait with nothing to wait on. When the caller named its targets
+ * and got none, that is a settled answer. When it let the default stand and the
+ * lineage registry came back empty, it may instead have lost its children to a
+ * restart — that registry is in-memory — so the note says how to recover rather
+ * than letting a signalling child's escalation land in a wait that reads nothing.
+ * @param defaulted - True when the caller omitted `targets` and the registry resolved empty.
+ * @returns An empty wait result, with a recovery note when the lineage may be lost.
+ */
+function emptyWait(defaulted: boolean): WaitForAgentsResult {
+	const result = { completed: [], pending: [], timedOut: false };
+	if (!defaulted) {
+		return result;
+	}
+	return {
+		...result,
+		note: 'No children are registered to this session. If you spawned children earlier and the app has restarted since, that lineage is gone and the default target cannot find them — wait again with their piSessionIds in `targets`, taken from the ensemblr_start_conversation results earlier in this conversation, or read a report directly with ensemblr_get_last_message.',
+	};
+}
+
+function waitOutcome(outcome: {
+	completed: readonly WaitedAgent[];
+	pending: readonly PendingAgent[];
+	timedOut: boolean;
+	mode: WaitMode;
+}): WaitForAgentsResult {
+	const { mode, ...result } = outcome;
+	if (!result.timedOut || result.pending.length === 0) {
+		return result;
+	}
+	const targets = result.pending
+		.map((entry) => `"${entry.piSessionId}"`)
+		.join(', ');
+	return {
+		...result,
+		note: `Not a failure: the wait window expired while ${result.pending.length} child(ren) were still working. Keep waiting with ensemblr_wait_for_agents({ mode: "${mode}", targets: [${targets}] }).`,
+	};
+}
+
+/**
  * Confirms a resolved workspace matches the caller's, for write-scope checks.
  * @param actualWorkspaceId - Owning workspace of the target, or null when missing.
  * @param origin - Resolved caller identity.
@@ -253,11 +307,42 @@ export function createAgentControlService({
 	 */
 	const resolveRole = async (
 		origin: AgentControlOrigin,
-	): Promise<AgentControlRole> => {
-		const spawned = await ports.conversations.isSpawnedSubAgent(
-			origin.sessionId,
+	): Promise<AgentControlRole> =>
+		resolveAgentRole(
+			await ports.conversations.isSpawnedSubAgent(origin.sessionId),
+			origin.depth,
 		);
-		return spawned ? 'subagent' : roleForDepth(origin.depth);
+
+	/**
+	 * Blocks the ops that belong to the orchestrator rather than to the one unit of
+	 * work a child was handed, whatever mode it is in. Runs before the plan-mode
+	 * gate because the role is a durable fact about the session while planning is a
+	 * property of the turn, so a sub-agent should hear why it is a sub-agent rather
+	 * than why it is planning.
+	 *
+	 * This is what a sub-agent used to be denied only by accident: the spawn
+	 * guardrail refusing `origin.depth >= 1`. That counter lives in an in-memory
+	 * registry, so a session resumed after a restart came back at depth 0 holding
+	 * the whole surface again.
+	 *
+	 * The op is checked before the role because resolving the role reads the tab
+	 * marker out of the database, and this runs on every dispatch: an op no role is
+	 * denied costs nothing to clear.
+	 * @param op - The control op being dispatched.
+	 * @param origin - Resolved caller identity.
+	 * @returns A denial envelope, or null when the op may proceed.
+	 */
+	const gateSubAgentRole = async (
+		op: AgentControlOp,
+		origin: AgentControlOrigin,
+	): Promise<AgentControlResult<never> | null> => {
+		const denial = subAgentControlOpDenial(op);
+		if (denial === null) {
+			return null;
+		}
+		return (await resolveRole(origin)) === 'subagent'
+			? fail('denied-scope', denial)
+			: null;
 	};
 
 	/**
@@ -425,6 +510,12 @@ export function createAgentControlService({
 	 * an earlier agent) already named is reported as settled rather than failed:
 	 * a failure envelope reads to a model like a transient fault worth retrying,
 	 * and there is nothing here to retry.
+	 *
+	 * Root callers only, which {@link gateSubAgentRole} enforces before dispatch:
+	 * the workspace name and its git branch describe the whole body of work and
+	 * outlive any one delegated unit of it. The session brief withholds the branch
+	 * bullet from a sub-agent for the same reason, so a child never sees the upkeep
+	 * block ask for this.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The requested slug.
 	 * @returns Whether the name was applied, or an `invalid-args` failure the agent can act on.
@@ -706,11 +797,27 @@ export function createAgentControlService({
 		return ok({ status: ports.board.getWorkspaceStatus(origin.workspaceId) });
 	};
 
-	const handleNotifyOrchestrator = (
+	/**
+	 * Parks a child's signal for the orchestrator's next wait tick. Gated on the
+	 * durable role rather than on live lineage: `origin.parentSessionId` lives in
+	 * the in-memory registry, so a session resumed after a restart would lose its
+	 * one sanctioned escape hatch at exactly the moment the depth counter stopped
+	 * denying it everything else. The signal is keyed by child, and a wait reads it
+	 * by child id, so recovering the parent's id is not needed to deliver it.
+	 *
+	 * Delivery still needs the orchestrator to name the child. A default wait
+	 * resolves its targets from the same in-memory lineage, so after a restart it
+	 * finds none — {@link emptyWait} is what tells the orchestrator to pass the ids
+	 * explicitly rather than read the empty result as "nothing needs me".
+	 * @param origin - Resolved caller identity.
+	 * @param args - The signal reason and its message.
+	 * @returns An acknowledgement, or a `not-found` failure for a root caller.
+	 */
+	const handleNotifyOrchestrator = async (
 		origin: AgentControlOrigin,
 		args: NotifyOrchestratorArgs,
-	): AgentControlResult<unknown> => {
-		if (!origin.parentSessionId) {
+	): Promise<AgentControlResult<unknown>> => {
+		if ((await resolveRole(origin)) !== 'subagent') {
 			return fail(
 				'not-found',
 				'No orchestrator to notify: this session was not spawned by another agent.',
@@ -784,7 +891,7 @@ export function createAgentControlService({
 			...originRegistry.childrenOf(origin.sessionId),
 		];
 		if (targets.length === 0) {
-			return ok({ completed: [], pending: [], timedOut: false });
+			return ok(emptyWait(args.targets === undefined));
 		}
 		const ancestors = originRegistry.ancestorsOf(origin.sessionId);
 		for (const target of targets) {
@@ -812,11 +919,14 @@ export function createAgentControlService({
 				for (const entry of completed) {
 					signalsByChild.delete(entry.piSessionId);
 				}
-				return ok({
-					completed,
-					pending: stillRunning(settled),
-					timedOut: !satisfied && expired,
-				});
+				return ok(
+					waitOutcome({
+						completed,
+						mode,
+						pending: stillRunning(settled),
+						timedOut: !satisfied && expired,
+					}),
+				);
 			}
 			await scheduler.sleep(WAIT_POLL_MS);
 		}
@@ -1008,6 +1118,10 @@ export function createAgentControlService({
 		const validated = validateArgs(command.op, command.rawArgs);
 		if (!validated.ok) {
 			return fail('invalid-args', validated.reason);
+		}
+		const roleDenied = await gateSubAgentRole(command.op, origin);
+		if (roleDenied) {
+			return roleDenied;
 		}
 		const planModeDenied = await gatePlanMode(command.op, origin);
 		if (planModeDenied) {

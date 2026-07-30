@@ -57,6 +57,34 @@ Delegation is bounded so a runaway agent cannot fork-bomb the app
 - A blocking wait times out after **5 minutes**; the child keeps running.
 - Waiting on an ancestor session is refused (it would deadlock).
 
+## The sub-agent role policy
+
+Guardrails count spawns; they do not decide who may do what. That is the role
+policy in `src/shared/agent-control/subagent-policy.ts`, which refuses a spawned
+sub-agent thirteen ops with `denied-scope` **whatever mode it is in**:
+
+`spawnChatTab`, `startConversation`, `sendFollowUp`, `launchHarness`,
+`startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`, `closeTab`,
+`setBranchName`, `setWorkspaceStatus`, `askUserQuestion`, `exitPlanMode`.
+
+Two things run together and are easy to confuse. The spawn guardrail reads
+`origin.depth`, which lives in the in-memory origin registry; the role policy
+reads the **durable sub-agent marker** on the chat tab. Only the second survives
+a restart. Before it existed, a resumed child re-registered at depth 0, read as a
+root, and got the whole surface back — while `notifyOrchestrator`, its one
+sanctioned escape hatch, broke on the same missing lineage. `notifyOrchestrator`
+now keys off the marker too, so the two move together.
+
+`waitForAgents` and `listModels` are not denied — a sub-agent simply has no
+children to wait on and no spawn to pick a model for. They are withheld from its
+tool list along with the thirteen above, because listing a tool the service would
+only refuse teaches the model to keep reaching for it. The Pi extension registers
+the complement of `SUBAGENT_WITHHELD_OPS` for a child, and a parity test compares
+its copy of that set against the shared one.
+
+What a sub-agent keeps: every read, `focusTab`/`focusDockTab`/`focusPanel`,
+`setName`, `setSummary`, and `notifyOrchestrator`.
+
 ## What an agent can do
 
 The `ensemblr_*` tools group into a few families (see the
@@ -101,7 +129,10 @@ itself and never fans out. The intended loop is **delegate → wait → evaluate
 integrate**:
 
 1. **Delegate** each independent, substantial workstream to its own fresh tab
-   with `ensemblr_start_conversation` (give it a short `title`).
+   with `ensemblr_start_conversation` (give it a short `title`), briefing each
+   child with what to deliver — the question, the defaults to assume, and
+   whether it reports inline or writes a named file. Shared groundwork is read
+   once by the orchestrator, not re-derived by every child.
 2. **Wait** with `ensemblr_wait_for_agents` — it blocks efficiently instead of
    polling, and returns the moment a child finishes or signals it needs a
    decision. It hands back each child's whole final turn by default;
@@ -116,13 +147,40 @@ integrate**:
    follow along.
 
 Delegation is the exception, not the default — one agent in one thread is the
-right tool for almost every task. A sub-agent that hits a blocker calls
-`ensemblr_notify_orchestrator` to pull the orchestrator back rather than stalling.
+right tool for almost every task. A sub-agent's report is its only deliverable —
+it writes no files unless its brief names a path.
+
+Decisions the user owns end a child's report under an `Open questions` heading:
+each one a question, 2-6 options, and the option the child took. The orchestrator
+gathers those across its children and asks them in one `ensemblr_ask_user_question`
+round before it answers. `ensemblr_notify_orchestrator` is reserved for a child
+that cannot produce its deliverable at all until someone replies — in practice
+children almost never use it, which is why the question rides the report instead.
+
+A sub-agent's chat tab is read-only to the user **while its turn runs**: the
+composer is disabled there, because the orchestrator owns that conversation and
+steers it with `ensemblr_send_follow_up`, so a prompt typed alongside would
+interleave with the turn it is waiting on. The Stop button stays live throughout.
+Once the child settles the composer reopens — the marker is permanent, and locking
+on the marker alone left a finished conversation nobody could reply to after the
+orchestrator closed. Nothing asks the user from that tab either —
+`ensemblr_ask_user_question` is refused to a sub-agent, precisely because the
+orchestrator that owns the conversation is blocked waiting on its report.
+
+Two things a wait returns as prose rather than as a flag. `timedOut: true` with
+children still `pending` carries a `note` naming the exact resume call, in the
+caller's own mode, because an orchestrator reads a bare timeout as a fault to
+report. And a *default* wait that finds no registered children carries a `note`
+too: lineage lives in the in-memory origin registry, so after a restart the
+default target resolves empty even though `notifyOrchestrator` — keyed off the
+durable marker — still works. Without the note, a resumed child's signal parks
+in a wait that reads back "nothing needs me". The recovery is to wait again with
+explicit `targets`, which the orchestrator still holds in its own transcript.
 
 The same loop runs while planning, with read-only children: each one answers a
 question about the codebase and reports back, and the orchestrator folds those
-findings into the plan it submits. A planning sub-agent cannot submit a plan or
-question the user — see
+findings into the plan it submits. A sub-agent cannot submit a plan or question
+the user in any mode — see
 [Planning with sub-agents](./considerations/agent-orchestration-playbook.md#planning-with-sub-agents).
 
 ## See also

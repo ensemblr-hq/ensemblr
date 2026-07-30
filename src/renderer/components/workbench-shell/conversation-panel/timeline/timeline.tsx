@@ -35,6 +35,7 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import { useTurnDiffOpener } from '../file-preview-context';
+import { PanelMessage } from '../panel-message';
 import { RestoreCheckpointDialog } from './restore-checkpoint-dialog';
 
 /**
@@ -46,6 +47,31 @@ import { RestoreCheckpointDialog } from './restore-checkpoint-dialog';
  * shared `Conversation` + `Message` primitives so we get sticky scroll,
  * reasoning collapse, and tool cards across the chat surface.
  */
+/**
+ * Picks the stand-in an empty transcript shows, or null to render nothing. A tab
+ * whose session the list has not caught up with is still loading — but only while
+ * that list is in flight, because a session that stays missing after the fetch
+ * settles is gone, and a spinner that never resolves is worse than a blank panel.
+ * @param state - Whether the tab is bound, whether its session resolved, whether the session list is in flight, and whether the turn is live.
+ * @returns The message to show, or null when there is nothing to stand in for.
+ */
+function resolveStartingLabel(state: {
+	hasSession: boolean;
+	isStreaming: boolean;
+	sessionResolved: boolean;
+	sessionsFetching: boolean;
+}): string | null {
+	if (!state.hasSession) {
+		return null;
+	}
+	if (state.isStreaming) {
+		return 'Starting agent…';
+	}
+	return !state.sessionResolved && state.sessionsFetching
+		? 'Loading conversation…'
+		: null;
+}
+
 export function PiSessionTimeline({
 	activePiSessionId,
 	activeSession,
@@ -55,7 +81,7 @@ export function PiSessionTimeline({
 	activeSession: SessionTabModel;
 	workspace: WorkspaceShellModel;
 }) {
-	const { data: sessionsData } = useQuery(
+	const { data: sessionsData, isFetching: sessionsFetching } = useQuery(
 		piSessionsForWorkspaceQuery(workspace.id),
 	);
 	const tabPiSessionId = activeSession.piSessionId ?? activePiSessionId;
@@ -173,8 +199,29 @@ export function PiSessionTimeline({
 		);
 	}
 
+	// An agent-spawned tab has no optimistic prompt to stand in for the real one,
+	// and Pi only echoes the prompt back once its child process has booted, so an
+	// empty transcript here means "starting", not "nothing to show".
+	const startingLabel = resolveStartingLabel({
+		hasSession: tabPiSessionId !== null,
+		isStreaming,
+		sessionResolved: activePiSession !== undefined,
+		sessionsFetching,
+	});
+
 	if (messages.length === 0) {
-		return null;
+		if (startingLabel === null) {
+			return null;
+		}
+		return (
+			<section
+				aria-label='Pi session timeline'
+				className='flex min-h-0 flex-1 flex-col'
+				data-timeline-state='starting'
+			>
+				<PanelMessage message={startingLabel} />
+			</section>
+		);
 	}
 
 	return (

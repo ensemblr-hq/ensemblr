@@ -51,8 +51,10 @@ you can. When delegation is warranted, spawn helpers, **wait on them**, evaluate
 integrate the result — and never tell the user to click.
 
 Only the **root** orchestrator delegates. A spawned sub-agent does its assigned work itself and
-cannot delegate onward (see [Sub-agent side](#sub-agent-side)); the default depth cap is `1`, so a
-child's spawn attempt is denied `denied-depth`.
+cannot delegate onward (see [Sub-agent side](#sub-agent-side)). Two independent checks say so: the
+role table refuses a marked child `denied-scope`, and the depth cap — default `1` — refuses any
+caller at depth ≥ 1 `denied-depth`. The role check is the durable one; the cap is what stops a root
+from fork-bombing.
 
 ### The answer goes last
 
@@ -99,9 +101,20 @@ a permission denial stays visible.
 
 ## Delegate → wait → evaluate → integrate
 
+**Split the work before you split the agents.** A child cold-starts with nothing but its brief, so
+every fact two children both need is a repository read paid for twice — and that re-derivation is
+what makes a fan-out cost more context than doing the work inline. When the workstreams share a
+foundation, the orchestrator establishes it once — itself, or with one scout child — and puts the
+findings with full paths into every brief; cold fan-out is for work that is genuinely disjoint. All
+three orchestrating playbooks say so and a parity test pins it.
+
 1. **Spawn** each helper with `ensemblr_start_conversation` in its **own fresh tab** — pass a short,
    descriptive `title` and do **not** pass `chatTabId` (reusing a prior tab keeps its old title).
-   Omit `wait` and keep the returned `piSessionId`. Every conversation can also rename its own tab
+   Omit `wait` and keep the returned `piSessionId`. **Brief each child with what to deliver, not
+   just what to look at:** the question it answers, the defaults it should assume rather than come
+   back and ask about, and whether it reports inline (the default) or writes a file at a path the
+   orchestrator names — a brief phrased as a noun ("produce a reference doc", "write up the
+   mapping") reads as an instruction to create one. Every conversation can also rename its own tab
    at any time with `ensemblr_set_name`; a sub-agent should do so early with a label for its task.
 2. **Wait.** Once everything that can run in parallel is delegated, call `ensemblr_wait_for_agents`
    and let it **block**. This is the mechanism that stops the orchestrator racing ahead — do **not**
@@ -115,6 +128,13 @@ a permission denial stays visible.
    - `reports: "brief"` (default `"full"`) shortens each `lastMessage` to `BRIEF_REPORT_CHARS`
      and appends a pointer to `ensemblr_get_last_message`, setting `reportTruncated`. Opt-in,
      because the full report is what makes a wait citable; see the note below on why it exists.
+   - `timedOut: true` with targets still in `pending` is a **lap of the loop, not a fault**. The
+     window is capped at `waitTimeoutMs` (5 min, `src/main/agent-control/guardrails.ts`) and
+     `timeoutMs` can only ask for *less* (`Math.min`), so a child doing real work outlives it
+     routinely. The result carries a `note` naming the resume call, because an orchestrator reads a
+     bare boolean as something to report to the user or work around — same reason a shortened
+     report carries its own re-fetch pointer. See `resumeWaitNote`
+     (`src/main/agent-control/agent-control-service.ts`).
    - A child that hits a decision point calls `ensemblr_notify_orchestrator` (`need_decision` /
      `blocked`), which wakes the wait immediately **in either mode**. `waitAllSatisfied`
      (`src/main/agent-control/agent-control-service.ts`) is what makes that true under `all`:
@@ -126,7 +146,10 @@ a permission denial stays visible.
    claim, not a fact the orchestrator checked; nothing else in the loop prompts a check, so a
    cited path reads as verified when nobody opened it. Both orchestrator playbooks now say so
    outright, and a parity test pins the wording.
-5. **Integrate** the outcomes into your own answer, and focus the relevant view so the user can
+5. **Ask** — gather every child's `Open questions`, drop what you can settle by reading, merge the
+   duplicates, and put the survivors to the user with `ensemblr_ask_user_question` before writing
+   the answer. See the note below on why the questions arrive here rather than mid-run.
+6. **Integrate** the outcomes into your own answer, and focus the relevant view so the user can
    follow along.
 
 > **Recovering a finished child.** A child's last message is its report and is persisted permanently —
@@ -200,11 +223,14 @@ safety. The renderer's per-chat atom is tri-state — `null` means "the user has
 tab" and the request omits `planMode` entirely, because sending `false` for no-opinion is what used to
 clear an inherited flag on the user's first message.
 
-What a **planning sub-agent** may not do, enforced in `src/shared/plan-mode/control-ops.ts`:
+What a **planning sub-agent** may not do, enforced in `src/shared/plan-mode/control-ops.ts`. All four
+are now also in the unconditional role table above, which runs first — this table is what a *planning*
+caller would have met, and it survives so the plan-mode policy stays complete on its own terms rather
+than depending on a second gate to cover a hole:
 
 | Denied | Why |
 |---|---|
-| `ensemblr_start_conversation` | Nested delegation is blocked anyway (`denied-depth`); the investigation is its own to do. |
+| `ensemblr_start_conversation` | Nested delegation is blocked; the investigation is its own to do. |
 | `ensemblr_send_follow_up` | It has no conversations of its own to steer. |
 | `ensemblr_exit_plan_mode` | The plan belongs to the orchestrator. A plan submitted here posts into the sub-agent's own tab and renders an Approve button whose handler clears that tab's Plan Mode and submits an implementation prompt — one click would turn a read-only investigator into a writer. |
 | `ensemblr_ask_user_question` | The modal renders in the sub-agent's tab while the orchestrator sits in `ensemblr_wait_for_agents`, so nobody is watching it and the child hangs to the wait timeout. `ensemblr_notify_orchestrator` reaches someone. |
@@ -264,11 +290,93 @@ needs has to be **in** it: the answer first, then the evidence with full file pa
 then anything that changes the shape of the work. A pointer to work earlier in the turn ("report
 delivered above") is the one failure mode the playbook names outright — it is all the orchestrator
 would get if the turn were read one message at a time. Do **not** spawn
-further sub-agents, launch harnesses, or delegate onward; that is the orchestrator's job and nested
-delegation is blocked (`denied-depth`). If you are blocked or hit a decision you genuinely cannot make
-alone, call `ensemblr_notify_orchestrator` (reason `need_decision` or `blocked`) instead of guessing
-or stalling — it pulls your orchestrator back to you. `progress` / `done` are informational and do not
-interrupt it. You may still read and inspect freely, and focus a view so the user can follow along.
+further sub-agents, launch harnesses, or delegate onward; that is the orchestrator's job. You may
+still read and inspect freely, and focus a view so the user can follow along.
+
+**The surface is narrowed by role, not by depth.** `SUBAGENT_BLOCKED_OPS`
+(`src/shared/agent-control/subagent-policy.ts`) fails `denied-scope` for thirteen ops whatever mode
+the child is in — `spawnChatTab`, `startConversation`, `sendFollowUp`, `launchHarness`,
+`startTerminal`, `stopTerminal`, `writeTerminal`, `openTab`, `closeTab`, `setBranchName`,
+`setWorkspaceStatus`, `askUserQuestion`, `exitPlanMode` — and `gateSubAgentRole` runs it before the
+plan-mode gate on every dispatch.
+
+That check reads the **durable tab marker** via `resolveRole`, not `origin.depth`. The distinction
+is the whole point: lineage lives in the in-memory origin registry, so a child resumed after a
+restart re-registers at depth 0 and a depth-only test lets it through. Most of these ops used to be
+denied only as a side effect of the spawn guardrail refusing `depth >= 1`, which meant a restart
+handed a child the spawn tools back — while `notifyOrchestrator`, its one escape hatch, broke on the
+same missing lineage. It keys off the marker now too.
+
+The three ops with no gate at all before this — `stopTerminal`, `writeTerminal`, `setWorkspaceStatus`
+— were the sharpest of these. None is a spawn op, so no depth check ever saw them: a child could
+type into any terminal in the workspace (including a harness the orchestrator launched), kill the
+run script, or move the whole workspace's kanban card from inside one unit of work.
+
+`waitForAgents` and `listModels` are *not* denied, only withheld from the tool list: a child has no
+children to wait on and no spawn to pick a model for, so refusing them would imply a hazard where
+there is only noise. The Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` for a
+sub-agent, and a parity test compares its embedded copy of that set against the shared one.
+
+Withholding and denying are complements. The child's tool list omits the tool so it never reaches;
+the service still refuses it so a stale or hand-rolled call fails closed. Listing a tool the service
+would only refuse is what teaches a model to keep reaching for it — the same reasoning that trims
+the harness MCP surface.
+
+**Naming the workspace is root-only.** `ensemblr_set_branch_name` renames the workspace *and* its
+git branch, and that name describes the whole body of work rather than the one unit a child was
+handed — a sub-agent naming it would label the workspace after a fragment. Two places have to agree
+with the denial above: `readSessionBriefNaming`
+(`src/main/pi-agent/naming/session-brief-naming.ts`) withholds the branch bullet from a child, so the
+upkeep block never asks for a call that would be refused, and both sub-agent playbooks name the tool
+only to say it is refused. `setWorkspaceStatus` is denied for the same reason and had gone the other
+way until this landed.
+
+**Work from the brief.** When a brief already quotes a file's contents, the child takes them as
+given and reads only what the brief did not supply. Both halves of that rule have to exist: an
+orchestrator that scouts first and pastes the inventory into every brief buys nothing if the child
+re-opens the same four files to confirm them — which is exactly what one did before this landed.
+
+**The report is the deliverable.** A sub-agent creates no files unless its brief names a path —
+output that genuinely has to outlive the tab goes under `.context/`, cited by full path in the
+report. Without that rule a brief phrased as a noun ("a planning reference") gets read as an
+instruction to write one, and the orchestrator ends up diffing a workspace to discover what its
+children left behind.
+
+**Open questions travel in the report, not in a signal.** Children reliably decline to interrupt:
+across two instrumented test runs with textbook `need_decision` setups — including one where the
+orchestrator deliberately withheld a fork and gave the child no instruction about being stuck — not
+a single child ever called `ensemblr_notify_orchestrator`. Each one picked an option, built out both
+branches, and editorialized in its closing paragraph. Rather than keep sharpening a rule the models
+do not follow, the design now routes the question the way they already behave:
+
+- A sub-agent ends its report with a literal **`Open questions`** heading: each decision as a
+  one-line question, 2-6 concrete options, and which it took. That shape is not decorative — it maps
+  onto `ensemblr_ask_user_question`'s questionnaire (up to 4 questions, 2-6 options each), so the
+  orchestrator can lift it without re-authoring. Anything that will not fit the shape is a *gap*,
+  not a question, and belongs earlier in the report.
+- The orchestrator gathers those sections across all children, drops what it can settle by reading,
+  merges duplicates, and asks the survivors **once, before it writes its answer**. A planning
+  orchestrator folds them into its interview round instead. Skipping the step is how a decision the
+  user cared about ships as a silent default.
+- `notify_orchestrator` survives for the case it is actually good at: a child that cannot produce
+  its deliverable *at all* until someone answers. Both orchestrator playbooks now warn that a wait
+  returning no signal does **not** mean nothing needs asking — under this design that inference is
+  backwards. `progress` / `done` stay informational.
+
+A sub-agent's chat tab is **read-only to the user while its turn runs**: `getComposerState`
+(`src/renderer/lib/workbench/composer.ts`) disables the composer when the active session is both
+`isSubAgent` and streaming, because the orchestrator owns that conversation and a prompt typed
+alongside would interleave with the delegated turn it is waiting on. The streaming half matters: the
+marker is permanent, so locking on it alone left a finished conversation nobody could ever reply to
+once the orchestrator had closed. A settled child's tab reopens to the user. The renderer
+reads the tab marker (`metadata.agentRole === 'subagent'`, written by `writeSubAgentMarker` in
+`src/main/agent-control/port-adapters.ts`), which is stamped before the first prompt is submitted so
+it lands on the same `broadcastTabsChanged` that reveals the spawned tab's session. If that submit
+then fails on a tab the caller reused, `rollbackConversation` clears the marker again rather than
+leaving a bricked composer behind. Nothing questions the user from that tab either:
+`ensemblr_ask_user_question` is refused to a sub-agent in every mode, because the orchestrator that
+owns the conversation is the one blocked waiting on the report. The question rides the report's
+`Open questions` heading instead.
 
 ## Model selection
 

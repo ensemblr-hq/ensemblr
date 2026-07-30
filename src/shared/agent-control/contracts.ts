@@ -344,12 +344,15 @@ export interface PendingAgent {
  * Result of `waitForAgents`: the children that settled, the ones still running,
  * and whether it timed out. `pending` spares the caller a status poll per child
  * when the wait returns before every target is done — on `mode: "first"`, on a
- * signal, or on a timeout.
+ * signal, or on a timeout. `note` carries the same instruction as prose, because
+ * an orchestrator reads a bare `timedOut: true` as a fault to report rather than
+ * a lap of the wait loop.
  */
 export interface WaitForAgentsResult {
 	completed: readonly WaitedAgent[];
 	pending: readonly PendingAgent[];
 	timedOut: boolean;
+	note?: string;
 }
 
 /**

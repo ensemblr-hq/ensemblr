@@ -292,6 +292,41 @@ describe('agent-control service: scope', () => {
 		expect(ports.tabs.closeTab).not.toHaveBeenCalled();
 	});
 
+	// The workspace name and its git branch describe the whole body of work, so a
+	// child naming them from inside one delegated unit would label the workspace
+	// after a fragment. Marked-tab rather than depth, because lineage does not
+	// survive a restart and a resumed child re-registers at depth 0.
+	it('denies setBranchName to a caller whose tab is marked a sub-agent', async () => {
+		const ports = makePorts({ spawnedSubAgent: true });
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'setBranchName',
+			token: 'tok-caller',
+			rawArgs: { name: 'add-dark-mode' },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+		}
+		expect(ports.sessionNaming.setBranchName).not.toHaveBeenCalled();
+	});
+
+	it('allows setBranchName from an unmarked root caller', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'setBranchName',
+			token: 'tok-caller',
+			rawArgs: { name: 'add-dark-mode' },
+		});
+
+		expect(result.ok).toBe(true);
+		expect(ports.sessionNaming.setBranchName).toHaveBeenCalled();
+	});
+
 	it('reports not-found for a missing target', async () => {
 		const ports = makePorts({ tabWorkspace: null });
 		const { service } = setup({ ports });
@@ -380,7 +415,11 @@ describe('agent-control service: guardrails', () => {
 		}
 	});
 
-	it('blocks a follow-up wait on an ancestor session', async () => {
+	// The deadlock guard is now belt-and-braces: `sendFollowUp` is refused to a
+	// sub-agent outright, and only a root — which has no ancestors — can reach it.
+	// The role denial is the one a child actually meets, and it says something the
+	// child can act on rather than naming a lineage it cannot see.
+	it('refuses a sub-agent a follow-up on its ancestor, by role', async () => {
 		const registry = createOriginRegistry({
 			generateToken: () => 'tok-child',
 		});
@@ -410,8 +449,18 @@ describe('agent-control service: guardrails', () => {
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
-			expect(result.code).toBe('denied-deadlock');
+			expect(result.code).toBe('denied-scope');
+			expect(result.error).toContain('no conversations of your own to steer');
 		}
+	});
+
+	it('still refuses a wait targeting an ancestor at the guardrail', () => {
+		const guardrails = createGuardrails();
+		expect(guardrails.evaluateWaitTarget('ancestor', ['ancestor'])).toEqual({
+			ok: false,
+			code: 'denied-deadlock',
+			reason: 'Refusing to wait on an ancestor session (would deadlock).',
+		});
 	});
 });
 
@@ -478,6 +527,168 @@ describe('agent-control service: role of a resumed sub-agent', () => {
 		expect(ports.conversations.isSpawnedSubAgent).toHaveBeenCalledWith(
 			'caller',
 		);
+	});
+});
+
+// Every caller here is registered at depth 0 with no parent and is NOT planning,
+// which is exactly how a sub-agent comes back after a restart: the in-memory
+// lineage is gone, so the spawn guardrail no longer denies it anything. Only the
+// durable tab marker still says what it is, and these are the ops that used to
+// unlock when it stopped saying so.
+describe('agent-control service: sub-agent role gate outside plan mode', () => {
+	const BLOCKED: Record<string, Record<string, unknown>> = {
+		spawnChatTab: {},
+		startConversation: { prompt: 'go' },
+		sendFollowUp: { piSessionId: 'pi-1', prompt: 'hi' },
+		launchHarness: { harnessId: 'claude' },
+		startTerminal: { kind: 'spawn' },
+		stopTerminal: { kind: 'run' },
+		writeTerminal: { input: 'ls\n', terminalId: 'term-1' },
+		openTab: { filePath: 'src/a.ts', variant: 'file' },
+		closeTab: { chatTabId: 'abc' },
+		setBranchName: { name: 'add-dark-mode' },
+		setWorkspaceStatus: { status: 'done' },
+		askUserQuestion: {
+			questions: [
+				{ options: [{ label: 'A' }, { label: 'B' }], question: 'Q?' },
+			],
+		},
+		exitPlanMode: { plan: '# Findings', title: 'Findings' },
+	};
+
+	for (const op of Object.keys(BLOCKED)) {
+		it(`denies \`${op}\` to a marked sub-agent that is not planning`, async () => {
+			const ports = makePorts({ planning: false, spawnedSubAgent: true });
+			const { service } = setup({ ports });
+
+			const result = await service.invoke({
+				op: op as 'closeTab',
+				token: 'tok-caller',
+				rawArgs: BLOCKED[op],
+			});
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.code).toBe('denied-scope');
+			}
+		});
+	}
+
+	// The four ops with no gate of their own before this one: nothing else in the
+	// service was checking the caller's role, its depth, or its lineage for them.
+	it('performs none of the side effects it denies', async () => {
+		const ports = makePorts({ planning: false, spawnedSubAgent: true });
+		const { service } = setup({ ports });
+
+		for (const op of Object.keys(BLOCKED)) {
+			await service.invoke({
+				op: op as 'closeTab',
+				token: 'tok-caller',
+				rawArgs: BLOCKED[op],
+			});
+		}
+
+		expect(ports.board.setWorkspaceStatus).not.toHaveBeenCalled();
+		expect(ports.tabs.closeTab).not.toHaveBeenCalled();
+		expect(ports.terminals.stopTerminal).not.toHaveBeenCalled();
+		expect(ports.terminals.writeTerminal).not.toHaveBeenCalled();
+		expect(ports.harnesses.launchHarness).not.toHaveBeenCalled();
+		expect(ports.conversations.startConversation).not.toHaveBeenCalled();
+	});
+
+	it('leaves the same ops open to an unmarked root', async () => {
+		const ports = makePorts({ planning: false, spawnedSubAgent: false });
+		const { service } = setup({ ports });
+
+		for (const op of ['setWorkspaceStatus', 'closeTab', 'stopTerminal']) {
+			const result = await service.invoke({
+				op: op as 'closeTab',
+				token: 'tok-caller',
+				rawArgs: BLOCKED[op],
+			});
+			expect(result.ok).toBe(true);
+		}
+		expect(ports.board.setWorkspaceStatus).toHaveBeenCalled();
+		expect(ports.tabs.closeTab).toHaveBeenCalled();
+		expect(ports.terminals.stopTerminal).toHaveBeenCalled();
+	});
+
+	// A harness registers under a per-workspace session id with no parent, so it is
+	// always a root and this policy never touches it. That matters because
+	// `HARNESS_AWARENESS` advertises the whole surface and has no sub-agent
+	// variant — narrowing a harness by role would leave its playbook describing
+	// tools the service refuses.
+	it('never narrows a harness caller, which is always a root', async () => {
+		const ports = makePorts({ spawnedSubAgent: false });
+		const { service } = setup({ ports, species: 'harness' });
+
+		for (const op of ['setWorkspaceStatus', 'stopTerminal', 'closeTab']) {
+			const result = await service.invoke({
+				op: op as 'closeTab',
+				token: 'tok-caller',
+				rawArgs: BLOCKED[op],
+			});
+			expect(result.ok, `expected \`${op}\` to be allowed`).toBe(true);
+		}
+	});
+
+	it('leaves a sub-agent every read it is promised', async () => {
+		const ports = makePorts({ planning: false, spawnedSubAgent: true });
+		const { service } = setup({ ports });
+
+		for (const [op, rawArgs] of [
+			['listTabs', {}],
+			['listTerminals', {}],
+			['listWorkspaces', {}],
+			['getWorkspaceStatus', {}],
+			['getConversationStatus', { piSessionId: 'pi-1' }],
+			['getLastMessage', { piSessionId: 'pi-1' }],
+			['readTerminalOutput', { terminalId: 'term-1' }],
+			['focusTab', { chatTabId: 'abc' }],
+			['focusPanel', { panel: 'changes' }],
+			['setName', { name: 'Investigating the composer' }],
+		] as const) {
+			const result = await service.invoke({
+				op: op as 'listTabs',
+				token: 'tok-caller',
+				rawArgs,
+			});
+			expect(result.ok, `expected \`${op}\` to be allowed`).toBe(true);
+		}
+	});
+});
+
+// The escape hatch used to key off `origin.parentSessionId`, which lives only in
+// the in-memory registry — so a restart took it away at exactly the moment the
+// depth counter stopped denying the child everything else.
+describe('agent-control service: notifying the orchestrator', () => {
+	it('accepts a signal from a marked sub-agent with no live lineage', async () => {
+		const ports = makePorts({ spawnedSubAgent: true });
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'notifyOrchestrator',
+			token: 'tok-caller',
+			rawArgs: { message: 'which framework?', reason: 'need_decision' },
+		});
+
+		expect(result.ok).toBe(true);
+	});
+
+	it('refuses a signal from a caller nobody spawned', async () => {
+		const ports = makePorts({ spawnedSubAgent: false });
+		const { service } = setup({ ports });
+
+		const result = await service.invoke({
+			op: 'notifyOrchestrator',
+			token: 'tok-caller',
+			rawArgs: { message: 'anyone there?', reason: 'progress' },
+		});
+
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('not-found');
+		}
 	});
 });
 

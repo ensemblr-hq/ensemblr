@@ -9,9 +9,24 @@ import type {
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 /**
+ * Why a running sub-agent's composer is inert: the orchestrator that spawned the
+ * child owns the conversation and steers it with `ensemblr_send_follow_up`, so a
+ * prompt typed here would interleave with the delegated turn the orchestrator is
+ * waiting on. Shown as the send-button tooltip.
+ */
+const SUB_AGENT_COMPOSER_REASON =
+	'This sub-agent is working — the conversation that spawned it steers it until the turn ends.';
+
+/** Textarea placeholder standing in for the disabled composer on a busy sub-agent tab. */
+const SUB_AGENT_COMPOSER_PLACEHOLDER =
+	'Driven by the conversation that spawned it — send follow-ups from there';
+
+/**
  * Computes the composer shell state from setup readiness, the active session,
- * and a Pi controller. Disables the composer when setup is not yet ready or
- * Pi runtime checks fail.
+ * and a Pi controller. Disables the composer while setup is not yet ready, while
+ * Pi runtime checks fail, and while a spawned sub-agent is mid-turn. A settled
+ * sub-agent's tab reopens to the user: nothing is steering it any more, and the
+ * alternative is a conversation nobody can ever reply to.
  */
 export function getComposerState({
 	activeSession,
@@ -106,6 +121,15 @@ export function getComposerState({
 			disabled: true,
 			disabledReason: `${setupDiagnostics.blockedCount} required setup checks need attention.`,
 			placeholder: 'Fix setup blockers before sending a prompt.',
+		};
+	}
+
+	if (activeSession.isSubAgent && isStreaming) {
+		return {
+			...base,
+			disabled: true,
+			disabledReason: SUB_AGENT_COMPOSER_REASON,
+			placeholder: SUB_AGENT_COMPOSER_PLACEHOLDER,
 		};
 	}
 

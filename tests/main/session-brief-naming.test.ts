@@ -23,6 +23,7 @@ vi.mock('../../src/main/storage/repositories/workspace-repository.ts', () => ({
 const database = {} as never;
 
 const piCaller = {
+	isSubAgent: false,
 	sessionId: 'sess-1',
 	species: 'pi' as const,
 	workspaceId: 'ws-1',
@@ -55,7 +56,12 @@ function read(
 	overrides: {
 		caller?:
 			| typeof piCaller
-			| { sessionId: string; species: 'harness'; workspaceId: string };
+			| {
+					isSubAgent: boolean;
+					sessionId: string;
+					species: 'harness';
+					workspaceId: string;
+			  };
 		database?: unknown;
 		namingEnabled?: boolean;
 	} = {},
@@ -151,6 +157,18 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 		});
 	});
 
+	// `setBranchName` refuses a spawned child, so the upkeep block must not ask one
+	// for it — an agent handed a reminder for a call that fails has no way to
+	// satisfy the reminder and will keep retrying it.
+	test('withholds the branch bullet from a spawned sub-agent', () => {
+		const brief = read({ caller: { ...piCaller, isSubAgent: true } });
+
+		expect(brief.branch).toEqual({
+			current: 'psoldunov/bach',
+			eligible: false,
+		});
+	});
+
 	test('reports a renamed workspace as no longer nameable', () => {
 		selectWorkspaceWithRepositoryById.mockReturnValue(
 			workspaceRow({
@@ -194,6 +212,7 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 	test('reports only branch upkeep for a harness caller', () => {
 		const brief = read({
 			caller: {
+				isSubAgent: false,
 				sessionId: 'harness-1',
 				species: 'harness',
 				workspaceId: 'ws-1',

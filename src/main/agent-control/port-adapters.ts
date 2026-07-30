@@ -16,6 +16,7 @@ import type {
 	PlanModeChangedBroadcast,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control.ts';
+import { resolveAgentRole } from '../../shared/agent-control.ts';
 import { findHarnessDefinition } from '../../shared/agents.ts';
 import type {
 	PiPersistedEnvelope,
@@ -358,6 +359,11 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 					workspaceId,
 				});
 			}
+			// `submitPrompt` captures a git checkpoint first, and the renderer resolves
+			// a tab's branch id out of the session list, so a binding announced after
+			// it leaves the tab a blank rectangle for that whole window.
+			const markerApplied = writeSubAgentMarker(deps, targetTabId, 'subagent');
+			deps.broadcastTabsChanged({ workspaceId });
 			try {
 				await deps.piSessionService.submitPrompt({
 					sessionId: snapshot.id,
@@ -369,11 +375,11 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				await rollbackConversation(deps, {
 					piSessionId: snapshot.id,
 					openedTabId,
+					markedTabId: markerApplied ? targetTabId : null,
 					workspaceId,
 				});
 				throw error;
 			}
-			markTabAsSubAgent(deps, targetTabId);
 			if (title) {
 				await applyConversationName(deps, {
 					name: title,
@@ -447,36 +453,54 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 }
 
 /**
- * Stamps a chat tab as hosting a spawned sub-agent so the renderer can tint it
- * distinctly. Best-effort and idempotent: a missing database or tab is ignored.
+ * Stamps or clears the sub-agent marker on a chat tab. The renderer reads it to
+ * tint the tab and to lock its composer, so it is written before the first prompt
+ * is submitted and cleared again if that submit fails. Best-effort and idempotent:
+ * a missing database or tab is ignored.
+ *
+ * The return value is what makes the rollback safe. A caller may reuse a tab that
+ * is already marked from an earlier spawn, in which case this writes nothing —
+ * and a rollback that cleared the marker anyway would strip a live sub-agent of
+ * its role, handing it back the whole control surface.
  * @param deps - Adapter collaborators.
  * @param chatTabId - The tab bound to the spawned conversation.
+ * @param role - `'subagent'` to stamp the marker, `null` to clear it.
+ * @returns True when this call changed the marker, false when it was already there.
  */
-function markTabAsSubAgent(deps: PortAdapterDeps, chatTabId: string): void {
+function writeSubAgentMarker(
+	deps: PortAdapterDeps,
+	chatTabId: string,
+	role: 'subagent' | null,
+): boolean {
 	const database = deps.databaseService.getConnection()?.database;
 	if (!database) {
-		return;
+		return false;
 	}
 	try {
 		const tab = getChatTabById({ database, id: chatTabId });
-		if (!tab || tab.metadata.agentRole === 'subagent') {
-			return;
+		if (!tab || (tab.metadata.agentRole ?? null) === role) {
+			return false;
 		}
+		const withoutRole = Object.fromEntries(
+			Object.entries(tab.metadata).filter(([key]) => key !== 'agentRole'),
+		);
 		setChatTabMetadata({
 			database,
 			id: chatTabId,
-			metadata: { ...tab.metadata, agentRole: 'subagent' },
+			metadata: role ? { ...withoutRole, agentRole: role } : withoutRole,
 		});
+		return true;
 	} catch (cause) {
 		console.warn('[agent-control] could not tint a tab as a sub-agent.', {
 			cause: cause instanceof Error ? cause.message : String(cause),
 			chatTabId,
 		});
+		return false;
 	}
 }
 
 /**
- * Reads the sub-agent marker {@link markTabAsSubAgent} wrote, off the chat tab
+ * Reads the sub-agent marker {@link writeSubAgentMarker} wrote, off the chat tab
  * bound to a Pi session.
  * @param deps - Adapter collaborators.
  * @param piSessionId - The session whose tab to inspect.
@@ -528,17 +552,21 @@ async function applyConversationName(
  * session that never planned is a no-op, and the shutdown path cannot be relied
  * on here because this function swallows a failed `stopSession`.
  * @param deps - Adapter collaborators.
- * @param target - The session to stop, the tab this call opened (if any), and its workspace.
+ * @param target - The session to stop, the tab this call opened, the tab this call marked, and its workspace.
  */
 async function rollbackConversation(
 	deps: PortAdapterDeps,
 	target: {
 		piSessionId: string;
 		openedTabId: string | null;
+		markedTabId: string | null;
 		workspaceId: string;
 	},
 ): Promise<void> {
 	deps.planMode.releaseSession(target.piSessionId);
+	if (target.markedTabId) {
+		writeSubAgentMarker(deps, target.markedTabId, null);
+	}
 	try {
 		await deps.piSessionService.stopSession({
 			sessionId: target.piSessionId,
@@ -816,7 +844,16 @@ function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 	return {
 		readBrief: async (origin) =>
 			readSessionBriefNaming({
-				caller: origin,
+				caller: {
+					isSubAgent:
+						resolveAgentRole(
+							readSubAgentMarker(deps, origin.sessionId),
+							origin.depth,
+						) === 'subagent',
+					sessionId: origin.sessionId,
+					species: origin.species,
+					workspaceId: origin.workspaceId,
+				},
 				database: deps.databaseService.getConnection()?.database,
 				namingEnabled,
 			}),

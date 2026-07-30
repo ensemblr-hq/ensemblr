@@ -27,13 +27,16 @@ import { isWorkspaceNameable } from '../branch-name-slug.ts';
 
 /**
  * The caller fields the brief consults, satisfied structurally by a resolved
- * agent-control origin. Only a `pi` caller owns a chat tab and a conversation
- * branch, so title and summary upkeep are read for that species alone.
+ * agent-control origin plus the caller's resolved role. Only a `pi` caller owns a
+ * chat tab and a conversation branch, so title and summary upkeep are read for
+ * that species alone, and only a root may name the workspace, so `isSubAgent`
+ * gates the branch bullet.
  */
 export interface SessionBriefCaller {
 	species: 'pi' | 'harness';
 	sessionId: string;
 	workspaceId: string;
+	isSubAgent: boolean;
 }
 
 /**
@@ -70,11 +73,16 @@ export function readSessionBriefNaming({
 		return nothingOutstanding();
 	}
 	try {
-		const branch = readWorkspaceNaming({
+		const workspaceNaming = readWorkspaceNaming({
 			database,
 			namingEnabled,
 			workspaceId: caller.workspaceId,
 		});
+		// Withholding eligibility is what stops the upkeep block asking a child for
+		// a `setBranchName` call the role policy refuses.
+		const branch = caller.isSubAgent
+			? { ...workspaceNaming, eligible: false }
+			: workspaceNaming;
 		if (caller.species !== 'pi') {
 			return { ...nothingOutstanding(), branch };
 		}
