@@ -63,13 +63,16 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).toContain('ensemblr_get_workspace_diff');
 		expect(names).toContain('ensemblr_get_diff_comments');
 		expect(names).toContain('ensemblr_add_diff_comments');
+		// Auditing a delegated conversation is a read over persisted events, so it
+		// is served to every origin that may read a report at all.
+		expect(names).toContain('ensemblr_read_conversation');
 		// Chat-tab ops a harness origin cannot use: its tab is a terminal titled
 		// from the harness's own session log, and the service gates the rest to Pi.
 		expect(names).not.toContain('ensemblr_set_name');
 		expect(names).not.toContain('ensemblr_set_summary');
 		expect(names).not.toContain('ensemblr_ask_user_question');
 		expect(names).not.toContain('ensemblr_exit_plan_mode');
-		expect(tools).toHaveLength(27);
+		expect(tools).toHaveLength(28);
 		await client.close();
 	});
 

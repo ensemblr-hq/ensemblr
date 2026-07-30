@@ -19,6 +19,7 @@ export {
 	briefReport,
 } from './agent-control/brief-report.ts';
 export * from './agent-control/contracts.ts';
+export { buildConversationTranscript } from './agent-control/conversation-transcript.ts';
 export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
 export * from './agent-control/schemas.ts';
 export {

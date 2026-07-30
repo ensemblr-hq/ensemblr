@@ -73,6 +73,15 @@ export type StopPiSessionRequest = StopPiSessionWireRequest;
 /** Naming port — lifecycle fires this at open and each turn-idle; it self-gates. */
 export type QueueNamingPort = (input: SessionNamingInput) => void;
 
+/**
+ * Lineage port — resolves the sessions a given session spawned as sub-agents, so
+ * a stop can reach them. Backed by the agent-control origin registry.
+ */
+export type SpawnedChildrenPort = (sessionId: string) => readonly string[];
+
+/** Stop reason recorded on a sub-agent stopped because its orchestrator was. */
+const ORCHESTRATOR_STOPPED_REASON = 'orchestrator-stopped';
+
 /** Dependencies and configuration for {@link createPiSessionLifecycle}. */
 interface PiSessionLifecycleOptions {
 	/** Pre-prompt git checkpoint capture (ADR 0012); absent in tests. */
@@ -86,6 +95,11 @@ interface PiSessionLifecycleOptions {
 	requireDatabase: () => DatabaseSync;
 	/** Injects the agent-control env (control URL + token) into each Pi child. */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
+	/**
+	 * Resolves a session's spawned sub-agents so stopping it stops them too.
+	 * Omitted, a stop reaches only the session it names.
+	 */
+	resolveSpawnedChildren?: SpawnedChildrenPort;
 	sessionSummaryWriter?: SessionSummaryWriter;
 }
 
@@ -129,6 +143,7 @@ export function createPiSessionLifecycle({
 	queueNaming,
 	requireDatabase,
 	resolveAgentControlEnv,
+	resolveSpawnedChildren,
 	sessionSummaryWriter,
 }: PiSessionLifecycleOptions): PiSessionLifecycle {
 	const activeSessions: ActiveSessionMap = new Map();
@@ -237,7 +252,15 @@ export function createPiSessionLifecycle({
 		return acknowledgement;
 	};
 
-	const stopSession: PiSessionLifecycle['stopSession'] = async (request) => {
+	/**
+	 * Aborts one session's in-flight turn and closes it, leaving anything it
+	 * spawned untouched. A session that is not currently active is already
+	 * stopped, so this is a no-op for it.
+	 * @param request - The session to stop and the reason to record.
+	 */
+	const abortActiveSession = async (
+		request: StopPiSessionRequest,
+	): Promise<void> => {
 		const database = requireDatabase();
 		const active = activeSessions.get(request.sessionId);
 		if (!active) {
@@ -279,6 +302,52 @@ export function createPiSessionLifecycle({
 		// submit into this tab transparently resumes the persisted session.
 		activeSessions.delete(request.sessionId);
 	};
+
+	/**
+	 * Stops a session and then every sub-agent below it in the lineage. A spawned
+	 * child's tab carries no composer, so the orchestrator is the only thing that
+	 * can end its turn — leaving it running once that orchestrator stops strands an
+	 * agent nobody is reading. `stopped` makes a lineage that points back at itself
+	 * terminate, and a child that refuses to abort is logged rather than thrown, so
+	 * one stuck sub-agent cannot fail the stop the user asked for. The descendants
+	 * are collected in a `finally` because a wedged session is both the likeliest
+	 * one to fail its abort and the one whose children most need collecting; its
+	 * failure still reaches the caller, it just no longer strands the lineage.
+	 * @param request - The session to stop and the reason to record.
+	 * @param stopped - Session ids this cascade already visited.
+	 */
+	const stopSessionTree = async (
+		request: StopPiSessionRequest,
+		stopped: Set<string>,
+	): Promise<void> => {
+		if (stopped.has(request.sessionId)) {
+			return;
+		}
+		stopped.add(request.sessionId);
+		const children = resolveSpawnedChildren?.(request.sessionId) ?? [];
+		try {
+			await abortActiveSession(request);
+		} finally {
+			await Promise.all(
+				children.map(async (sessionId) => {
+					try {
+						await stopSessionTree(
+							{ reason: ORCHESTRATOR_STOPPED_REASON, sessionId },
+							stopped,
+						);
+					} catch (cause) {
+						console.warn('[pi-session] could not stop a spawned sub-agent.', {
+							cause: cause instanceof Error ? cause.message : String(cause),
+							sessionId,
+						});
+					}
+				}),
+			);
+		}
+	};
+
+	const stopSession: PiSessionLifecycle['stopSession'] = (request) =>
+		stopSessionTree(request, new Set());
 
 	return {
 		getActiveSession: (sessionId) => {

@@ -20,6 +20,8 @@ import type {
 	GetDiffCommentsResult,
 	GetWorkspaceDiffResult,
 	OpenTabVariant,
+	ReadConversationArgs,
+	ReadConversationResult,
 	SessionBriefNaming,
 	SetBranchNameResult,
 	SetSummaryResult,
@@ -164,6 +166,16 @@ export interface ConversationPort {
 	 * shadow them.
 	 */
 	getLastMessage: (piSessionId: string) => Promise<string | null>;
+	/**
+	 * A page of the conversation's persisted transcript: its prompts, answers, and
+	 * tool calls with arguments and results. Loads the branch's events, so it is a
+	 * deliberate read rather than something a poll loop should reach for. An
+	 * unknown session reads as an empty branch, which is what an auditor needs to
+	 * tell "nothing happened" from "the tool failed".
+	 */
+	readTranscript: (
+		args: ReadConversationArgs,
+	) => Promise<ReadConversationResult>;
 	/**
 	 * Whether a Pi session's chat tab carries the sub-agent marker its spawn
 	 * persisted. Role resolution needs a signal that outlives the process: a

@@ -5,7 +5,10 @@ import {
 	createWorkspacePathResolver,
 	toWorkspaceLookupPath,
 } from '@/renderer/lib/pi';
-import { formatLinkedIssueComposerSeed } from '@/renderer/lib/workbench';
+import {
+	formatLinkedIssueComposerSeed,
+	showsComposer,
+} from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import type {
@@ -149,16 +152,18 @@ export function WorkspaceConversationContent({
 									workspace={activeWorkspace}
 								/>
 							</div>
-							<ComposerSlot
-								chatTabId={activeSession.chatTabId}
-								composer={composer}
-								piSessionId={activeSession.piSessionId ?? null}
-								seedText={getLinkedIssueComposerSeed(
-									activeWorkspace,
-									activeSession,
-								)}
-								workspace={activeWorkspace}
-							/>
+							{showsComposer(activeSession) ? (
+								<ComposerSlot
+									chatTabId={activeSession.chatTabId}
+									composer={composer}
+									piSessionId={activeSession.piSessionId ?? null}
+									seedText={getLinkedIssueComposerSeed(
+										activeWorkspace,
+										activeSession,
+									)}
+									workspace={activeWorkspace}
+								/>
+							) : null}
 						</TurnDiffOpenerProvider>
 					</FilePreviewOpenerProvider>
 				</WorkspacePathResolverProvider>

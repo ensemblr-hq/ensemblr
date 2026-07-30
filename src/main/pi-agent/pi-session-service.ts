@@ -59,6 +59,7 @@ import {
 	createPiSessionLifecycle,
 	type OpenPiSessionRequest,
 	type QueueNamingPort,
+	type SpawnedChildrenPort,
 	type StopPiSessionRequest,
 	type SubmitPiPromptRequest,
 	type SubmitPiPromptResult,
@@ -103,6 +104,11 @@ interface PiSessionServiceOptions {
 	queueNaming: QueueNamingPort;
 	/** Injects the agent-control env (control URL + token) into each Pi child. */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
+	/**
+	 * Resolves the sub-agents a session spawned, so stopping an orchestrator stops
+	 * the children it was steering. Omitted, a stop reaches one session.
+	 */
+	resolveSpawnedChildren?: SpawnedChildrenPort;
 	sessionSummaryWriter?: SessionSummaryWriter;
 	now?: () => Date;
 }
@@ -190,6 +196,7 @@ export function createPiSessionService({
 	piAgentClient,
 	queueNaming,
 	resolveAgentControlEnv,
+	resolveSpawnedChildren,
 	sessionSummaryWriter,
 	now = () => new Date(),
 }: PiSessionServiceOptions): PiSessionService {
@@ -212,6 +219,7 @@ export function createPiSessionService({
 		queueNaming,
 		requireDatabase: requireSessionDatabase,
 		resolveAgentControlEnv,
+		resolveSpawnedChildren,
 		sessionSummaryWriter,
 	});
 

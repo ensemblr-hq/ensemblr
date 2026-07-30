@@ -131,6 +131,13 @@ const conversationRefSchema = z.strictObject({
 	piSessionId: nonEmpty,
 });
 
+const readConversationSchema = z.strictObject({
+	piSessionId: nonEmpty,
+	stat: z.boolean().optional(),
+	fromOrdinal: z.number().int().min(0).optional(),
+	ordinal: z.number().int().min(0).optional(),
+});
+
 const readTerminalOutputSchema = z.strictObject({
 	terminalId: nonEmpty,
 });
@@ -275,6 +282,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	listTerminals: listTerminalsSchema,
 	getConversationStatus: conversationRefSchema,
 	getLastMessage: conversationRefSchema,
+	readConversation: readConversationSchema,
 	readTerminalOutput: readTerminalOutputSchema,
 	listModels: emptySchema,
 	waitForAgents: waitForAgentsSchema,

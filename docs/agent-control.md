@@ -225,13 +225,22 @@ round before it answers. `ensemblr_notify_orchestrator` is reserved for a child
 that cannot produce its deliverable at all until someone replies — in practice
 children almost never use it, which is why the question rides the report instead.
 
-A sub-agent's chat tab is read-only to the user **while its turn runs**: the
-composer is disabled there, because the orchestrator owns that conversation and
-steers it with `ensemblr_send_follow_up`, so a prompt typed alongside would
-interleave with the turn it is waiting on. The Stop button stays live throughout.
-Once the child settles the composer reopens — the marker is permanent, and locking
-on the marker alone left a finished conversation nobody could reply to after the
-orchestrator closed. Nothing asks the user from that tab either —
+A sub-agent's chat tab is read-only to the user: it renders **no composer at
+all**, because the orchestrator owns that conversation and steers it with
+`ensemblr_send_follow_up` for the tab's whole life. The transcript stays readable
+— the report a child leaves behind is the point of the tab.
+
+Stopping a conversation stops every sub-agent below it. The stop walks the origin
+registry's lineage (`childrenOf`) and aborts each live child with reason
+`orchestrator-stopped`, so a child is never left running with nobody able to
+steer it or read its report. The descendants are collected even when the stopped
+session's own abort fails — a wedged orchestrator is the likeliest one to refuse,
+and the likeliest to have stranded something.
+
+Withholding the composer withholds the Stop button with it, so the user's route
+into a running child is its tab's close control: closing a tab whose agent is
+mid-turn raises the confirm-then-cancel guard (`useCloseRunningChatGuard`), whose
+Stop action cancels that session by id. Nothing asks the user from that tab either —
 `ensemblr_ask_user_question` is refused to a sub-agent, precisely because the
 orchestrator that owns the conversation is blocked waiting on its report.
 

@@ -30,6 +30,7 @@ import type {
 	OpenTabArgs,
 	OrchestratorSignal,
 	PendingAgent,
+	ReadConversationArgs,
 	ReadTerminalOutputArgs,
 	SendFollowUpArgs,
 	SetBranchNameArgs,
@@ -1112,6 +1113,12 @@ export function createAgentControlService({
 						(args as ConversationRef).piSessionId,
 					),
 				} satisfies GetLastMessageResult);
+			case 'readConversation':
+				return ok(
+					await ports.conversations.readTranscript(
+						args as ReadConversationArgs,
+					),
+				);
 			case 'readTerminalOutput':
 				return ok(
 					await ports.terminals.readOutput(

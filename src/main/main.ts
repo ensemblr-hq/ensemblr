@@ -395,6 +395,9 @@ const piSessionService = createPiSessionService({
 	piAgentClient,
 	queueNaming: sessionNamingQueue,
 	resolveAgentControlEnv,
+	/** Live sub-agents of a session, so stopping an orchestrator stops its children. */
+	resolveSpawnedChildren: (sessionId) =>
+		agentControlOriginRegistry.childrenOf(sessionId),
 	sessionSummaryWriter,
 });
 const localRepositoryRegistrationService =

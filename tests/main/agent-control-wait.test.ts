@@ -64,6 +64,15 @@ const makePorts = (
 		getLastMessage: vi.fn(async (piSessionId: string) =>
 			lastMessage(piSessionId),
 		),
+		readTranscript: vi.fn().mockResolvedValue({
+			entries: [],
+			entryCount: 0,
+			firstOrdinal: null,
+			lastOrdinal: null,
+			nextOrdinal: null,
+			piSessionId: 'p',
+			turnCount: 0,
+		}),
 		isSpawnedSubAgent: vi.fn().mockResolvedValue(false),
 		listModels: vi.fn().mockResolvedValue({ defaultModelId: null, models: [] }),
 		resolveConversationWorkspace: vi.fn().mockResolvedValue('ws'),

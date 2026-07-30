@@ -162,6 +162,11 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		object: 'a tab',
 		verb: ['Opened', 'Opening'],
 	},
+	ensemblr_read_conversation: {
+		glyph: 'bot',
+		object: "a sub-agent's transcript",
+		verb: ['Read', 'Reading'],
+	},
 	ensemblr_read_terminal_output: {
 		glyph: 'terminal',
 		object: 'terminal output',

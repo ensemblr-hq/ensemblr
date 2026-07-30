@@ -238,6 +238,18 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		shape: { piSessionId: z.string() },
 	},
 	{
+		name: 'ensemblr_read_conversation',
+		op: 'readConversation',
+		description:
+			'Read what a Pi conversation actually did — its prompts, its answers, and every tool call with its arguments and result — rather than only the report ensemblr_get_last_message hands back. This is how you audit a sub-agent: confirm it ran what it claims to have run before you act on its findings. Call it with stat=true FIRST: that returns the entry count, the turn count, and the ordinal range with no content, so you know how much there is before you read it. Then page forward with fromOrdinal, resuming from the nextOrdinal each page returns, or pass ordinal to read a single entry whole — stat, ordinal, and fromOrdinal are alternatives, not a combination. Long fields are cut and marked with the ordinal that reads them in full.',
+		shape: {
+			piSessionId: z.string(),
+			stat: z.boolean().optional(),
+			fromOrdinal: z.number().optional(),
+			ordinal: z.number().optional(),
+		},
+	},
+	{
 		name: 'ensemblr_read_terminal_output',
 		op: 'readTerminalOutput',
 		description: 'Read the current scrollback of a terminal or harness.',

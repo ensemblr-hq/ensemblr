@@ -365,12 +365,20 @@ do not follow, the design now routes the question the way they already behave:
   returning no signal does **not** mean nothing needs asking — under this design that inference is
   backwards. `progress` / `done` stay informational.
 
-A sub-agent's chat tab is **read-only to the user while its turn runs**: `getComposerState`
-(`src/renderer/lib/workbench/composer.ts`) disables the composer when the active session is both
-`isSubAgent` and streaming, because the orchestrator owns that conversation and a prompt typed
-alongside would interleave with the delegated turn it is waiting on. The streaming half matters: the
-marker is permanent, so locking on it alone left a finished conversation nobody could ever reply to
-once the orchestrator had closed. A settled child's tab reopens to the user. The renderer
+A sub-agent's chat tab is **read-only to the user**: `showsComposer`
+(`src/renderer/lib/workbench/composer.ts`) withholds the composer for the whole life of an
+`isSubAgent` tab, and `WorkspaceConversationContent` renders nothing in its place, because the
+orchestrator owns that conversation and a prompt typed alongside would interleave with the delegated
+turn it is waiting on. A disabled composer used to stand there while the child streamed; it only
+advertised an affordance that never unlocks. What keeps that from stranding a child nobody can
+reach: stopping a conversation now cascades into everything it spawned — `stopSession`
+(`src/main/pi-agent/pi-session-lifecycle.ts`) walks the origin registry's lineage and aborts each
+live descendant with reason `orchestrator-stopped`, guarding against a lineage that points back at
+itself and logging rather than throwing when one child refuses to abort. The descendants are
+collected in a `finally`, so a root whose own abort rejects still surfaces that failure to the
+caller without taking the lineage down with it. The user's own route into a running child is the
+tab close control rather than a Stop button, which left with the composer: closing a mid-turn tab
+raises the confirm-then-cancel guard whose Stop action cancels that session by id. The renderer
 reads the tab marker (`metadata.agentRole === 'subagent'`, written by `writeSubAgentMarker` in
 `src/main/agent-control/port-adapters.ts`), which is stamped before the first prompt is submitted so
 it lands on the same `broadcastTabsChanged` that reveals the spawned tab's session. If that submit

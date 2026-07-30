@@ -99,6 +99,15 @@ describe('timeline startup state', () => {
 		expect(container.textContent).toContain('Starting agent');
 	});
 
+	test('renders the dot-matrix scan as decoration, not as content', () => {
+		const { container } = renderTimeline({ sessions: [piSession('starting')] });
+
+		const scan = container.querySelector('[data-role="boot-scan"]');
+		expect(scan).not.toBeNull();
+		expect(scan?.getAttribute('aria-hidden')).toBe('true');
+		expect(scan?.querySelectorAll('rect').length).toBeGreaterThan(0);
+	});
+
 	test('shows a loading affordance while the session list is still in flight', () => {
 		const { container } = renderTimeline({ sessions: 'in-flight' });
 
