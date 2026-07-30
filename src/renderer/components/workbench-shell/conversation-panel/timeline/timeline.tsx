@@ -35,8 +35,8 @@ import type {
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import { useTurnDiffOpener } from '../file-preview-context';
-import { PanelMessage } from '../panel-message';
 import { RestoreCheckpointDialog } from './restore-checkpoint-dialog';
+import { TimelineStartingState } from './timeline-starting-state';
 
 /**
  * Structured renderer for the Pi RPC event stream. Reads persisted events
@@ -65,10 +65,10 @@ function resolveStartingLabel(state: {
 		return null;
 	}
 	if (state.isStreaming) {
-		return 'Starting agent…';
+		return 'Starting agent';
 	}
 	return !state.sessionResolved && state.sessionsFetching
-		? 'Loading conversation…'
+		? 'Loading conversation'
 		: null;
 }
 
@@ -219,7 +219,7 @@ export function PiSessionTimeline({
 				className='flex min-h-0 flex-1 flex-col'
 				data-timeline-state='starting'
 			>
-				<PanelMessage message={startingLabel} />
+				<TimelineStartingState label={startingLabel} />
 			</section>
 		);
 	}
