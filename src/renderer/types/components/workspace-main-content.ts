@@ -1,4 +1,7 @@
-import type { WorkbenchShellProps } from '@/renderer/types/workbench-shell';
+import type {
+	SessionTabPlacement,
+	WorkbenchShellProps,
+} from '@/renderer/types/workbench-shell';
 
 /** State and handlers passed from the workbench shell into the main content. */
 export type WorkspaceMainContentState = Pick<
@@ -24,7 +27,9 @@ export type WorkspaceMainContentState = Pick<
 		label: string;
 		turnId: string;
 	}) => Promise<{ chatTabId: string } | null>;
-	onSessionTabOpen: () => Promise<{ chatTabId: string } | null>;
+	onSessionTabOpen: (options?: {
+		placement?: SessionTabPlacement;
+	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabRestore: (sessionId: string) => void;
 	sessionTabs: WorkbenchShellProps['activeWorkspace']['sessions'];
 };

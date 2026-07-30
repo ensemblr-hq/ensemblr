@@ -32,7 +32,10 @@ import type {
 	SessionTabModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type { SessionTabState } from '@/renderer/types/workbench-shell';
+import type {
+	SessionTabPlacement,
+	SessionTabState,
+} from '@/renderer/types/workbench-shell';
 import type {
 	ChatTabWire,
 	CloseChatTabRequest,
@@ -47,6 +50,7 @@ import {
 } from '@/shared/ipc/contracts/workspace-git';
 import { sessionVisitOrderByWorkspaceAtom } from './selection-atoms';
 import { decideActiveClose, selectSuccessorTabId } from './session-tab-close';
+import { resolveInsertAnchorId } from './session-tab-insert-anchor';
 import {
 	findDuplicateTerminalTabIds,
 	isLiveTerminalTab,
@@ -89,7 +93,9 @@ export function useSessionTabState({
 	bootstrap?: boolean;
 	onSessionTabChange: (sessionId: string) => void;
 }): SessionTabState & {
-	openSessionTab: () => Promise<OpenSessionTabHandlerResult | null>;
+	openSessionTab: (options?: {
+		placement?: SessionTabPlacement;
+	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openCommentPreviewTab: (input: {
 		comment: PullRequestCommentSummary;
 		prNumber?: number;
@@ -214,6 +220,11 @@ export function useSessionTabState({
 		activeWorkspace.sessions[0] ??
 		activeSession;
 
+	const insertAnchorTabId = resolveInsertAnchorId(
+		sessionTabs,
+		effectiveActiveSession.id,
+	);
+
 	const invalidateChatTabs = useCallback(() => {
 		void queryClient.invalidateQueries({
 			queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
@@ -276,8 +287,14 @@ export function useSessionTabState({
 	});
 
 	const openAuxiliaryTabMutation = useMutation({
-		mutationFn: (request: Omit<OpenChatTabRequest, 'workspaceId'>) =>
-			openChatTab({ ...request, workspaceId }),
+		mutationFn: (
+			request: Omit<OpenChatTabRequest, 'insertAfterChatTabId' | 'workspaceId'>,
+		) =>
+			openChatTab({
+				...request,
+				insertAfterChatTabId: insertAnchorTabId,
+				workspaceId,
+			}),
 		onError: (error) => {
 			invalidateChatTabs();
 			toast.error('Could not open tab', {
@@ -390,16 +407,31 @@ export function useSessionTabState({
 		},
 	});
 
-	const openSessionTab =
-		useCallback(async (): Promise<OpenSessionTabHandlerResult | null> => {
+	/**
+	 * Opens a chat tab. Spawned chats (review actions, setup-script prompts, the
+	 * ⌘W reset) land right of the active tab; only the strip's new-tab button asks
+	 * for `append`.
+	 */
+	const openSessionTab = useCallback(
+		async ({
+			placement = 'after-active',
+		}: {
+			placement?: SessionTabPlacement;
+		} = {}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
-				const result = await openChatTabMutation.mutateAsync(undefined);
+				const result = await openChatTabMutation.mutateAsync(
+					placement === 'append'
+						? undefined
+						: { insertAfterChatTabId: insertAnchorTabId },
+				);
 				return { chatTabId: result.tab.id };
 			} catch {
 				// Surfaced as a toast by the mutation; callers treat as no-op.
 				return null;
 			}
-		}, [openChatTabMutation]);
+		},
+		[insertAnchorTabId, openChatTabMutation],
+	);
 
 	/** Opens (or re-focuses) a file-preview tab for a workspace-relative path. */
 	const openFilePreviewTab = useCallback(

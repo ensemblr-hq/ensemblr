@@ -33,6 +33,12 @@ export interface ChatTabRow {
 export interface OpenChatTabInput {
 	/** Untruncated title; defaults to `title` when the caller has nothing longer. */
 	fullTitle?: string;
+	/**
+	 * Open tab the new tab is placed directly to the right of. Appends after the
+	 * last open tab when absent, or when the id is not an open tab of this
+	 * workspace.
+	 */
+	insertAfterChatTabId?: string | null;
 	kind: ChatTabKind;
 	metadata?: Record<string, unknown>;
 	piSessionId?: string | null;
@@ -76,7 +82,10 @@ FROM chat_tabs`;
 const SELECT_RUNTIME = `SELECT workspace_id, active_tab_id, last_active_session_id, updated_at
 FROM pi_runtime_state`;
 
-/** Opens a new chat tab, appending it to the end of the open-tab ordering. */
+/**
+ * Opens a new chat tab, placing it directly right of `insertAfterChatTabId` and
+ * appending it to the end of the open-tab ordering when no such open tab exists.
+ */
 export function openChatTab({
 	database,
 	input,
@@ -89,11 +98,16 @@ export function openChatTab({
 
 	database.exec('BEGIN IMMEDIATE');
 	try {
-		const next = database
-			.prepare(
-				`SELECT COALESCE(MAX(position), -1) + 1 AS next FROM chat_tabs WHERE workspace_id = ? AND closed_at IS NULL`,
-			)
-			.get(input.workspaceId) as { next: number };
+		const position = resolveOpenPosition({
+			database,
+			insertAfterChatTabId: input.insertAfterChatTabId ?? null,
+			workspaceId: input.workspaceId,
+		});
+		shiftOpenPositionsFrom({
+			database,
+			position,
+			workspaceId: input.workspaceId,
+		});
 
 		database
 			.prepare(
@@ -107,7 +121,7 @@ export function openChatTab({
 				input.kind,
 				input.title,
 				input.fullTitle ?? input.title,
-				next.next,
+				position,
 				metadata,
 			);
 
@@ -159,17 +173,17 @@ export function restoreChatTab({
 
 	database.exec('BEGIN IMMEDIATE');
 	try {
-		const next = database
-			.prepare(
-				`SELECT COALESCE(MAX(position), -1) + 1 AS next FROM chat_tabs WHERE workspace_id = ? AND closed_at IS NULL`,
-			)
-			.get(existing.workspaceId) as { next: number };
+		const position = resolveOpenPosition({
+			database,
+			insertAfterChatTabId: null,
+			workspaceId: existing.workspaceId,
+		});
 
 		database
 			.prepare(
 				`UPDATE chat_tabs SET closed_at = NULL, position = ? WHERE id = ?`,
 			)
-			.run(next.next, id);
+			.run(position, id);
 
 		database.exec('COMMIT');
 	} catch (error) {
@@ -424,6 +438,65 @@ export function setRuntimeState({
 		.run(workspaceId, activeTabId ?? null, lastActiveSessionId ?? null);
 
 	return getRuntimeState({ database, workspaceId });
+}
+
+/**
+ * Resolves the strip position a tab entering the open set takes. An anchor that
+ * is itself an open tab of the workspace puts the new tab immediately to its
+ * right; anything else (no anchor, a closed tab, another workspace's tab) lands
+ * after the last open tab.
+ * @param options - Open database handle, the anchor tab id, and the workspace
+ * @returns The position the entering tab should occupy
+ */
+function resolveOpenPosition({
+	database,
+	insertAfterChatTabId,
+	workspaceId,
+}: {
+	database: DatabaseSync;
+	insertAfterChatTabId: string | null;
+	workspaceId: string;
+}): number {
+	const anchor = insertAfterChatTabId
+		? (database
+				.prepare(
+					`SELECT position FROM chat_tabs WHERE id = ? AND workspace_id = ? AND closed_at IS NULL`,
+				)
+				.get(insertAfterChatTabId, workspaceId) as
+				| { position: number }
+				| undefined)
+		: undefined;
+	if (anchor) {
+		return anchor.position + 1;
+	}
+
+	const last = database
+		.prepare(
+			`SELECT COALESCE(MAX(position), -1) AS last FROM chat_tabs WHERE workspace_id = ? AND closed_at IS NULL`,
+		)
+		.get(workspaceId) as { last: number };
+	return last.last + 1;
+}
+
+/**
+ * Frees a position by pushing every open tab at or after it one slot right, so
+ * an insert in the middle of the strip cannot collide with its neighbours.
+ * @param options - Open database handle, the position to free, and the workspace
+ */
+function shiftOpenPositionsFrom({
+	database,
+	position,
+	workspaceId,
+}: {
+	database: DatabaseSync;
+	position: number;
+	workspaceId: string;
+}): void {
+	database
+		.prepare(
+			`UPDATE chat_tabs SET position = position + 1 WHERE workspace_id = ? AND closed_at IS NULL AND position >= ?`,
+		)
+		.run(workspaceId, position);
 }
 
 /**

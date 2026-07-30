@@ -63,6 +63,8 @@ export interface ChatTabService {
 		open: readonly ChatTabRow[];
 	};
 	openTab: (input: {
+		/** Open tab to place the new tab right of; appends to the end when absent. */
+		insertAfterChatTabId?: string | null;
 		kind?: ChatTabKind;
 		metadata?: Record<string, unknown>;
 		piSessionId?: string | null;
@@ -176,7 +178,14 @@ export function createChatTabService({
 				open: listOpenForWorkspace({ database, workspaceId }),
 			};
 		},
-		openTab: ({ kind = 'chat', metadata, piSessionId, title, workspaceId }) => {
+		openTab: ({
+			insertAfterChatTabId,
+			kind = 'chat',
+			metadata,
+			piSessionId,
+			title,
+			workspaceId,
+		}) => {
 			const database = requireChatTabDatabase();
 			const openTabs = listOpenForWorkspace({ database, workspaceId });
 
@@ -199,6 +208,7 @@ export function createChatTabService({
 			return openChatTab({
 				database,
 				input: {
+					insertAfterChatTabId: insertAfterChatTabId ?? null,
 					kind,
 					metadata,
 					piSessionId: piSessionId ?? null,

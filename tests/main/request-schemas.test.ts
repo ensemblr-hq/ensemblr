@@ -18,6 +18,22 @@ test('openChatTabRequestSchema accepts the terminal tab kind', () => {
 	expect(parsed.kind).toBe('terminal');
 });
 
+test('openChatTabRequestSchema carries the insert-after anchor through', () => {
+	expect(
+		openChatTabRequestSchema.parse({
+			insertAfterChatTabId: 'tab-1',
+			kind: 'file',
+			workspaceId: 'ws-1',
+		}).insertAfterChatTabId,
+	).toBe('tab-1');
+	expect(
+		openChatTabRequestSchema.parse({
+			insertAfterChatTabId: null,
+			workspaceId: 'ws-1',
+		}).insertAfterChatTabId,
+	).toBeNull();
+});
+
 test('launchAgentHarnessRequestSchema requires a harness id and workspace id', () => {
 	expect(
 		launchAgentHarnessRequestSchema.parse({

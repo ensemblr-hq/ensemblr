@@ -406,6 +406,38 @@ test('non-chat tabs open alongside chat tabs', (t) => {
 	assert.equal(open.length, 6);
 });
 
+test('openTab honours the insert-after anchor, appending without one', (t) => {
+	const fixture = openFixture(t);
+
+	const first = fixture.service.openTab({
+		title: 'Chat A',
+		workspaceId: fixture.workspaceId,
+	});
+	const second = fixture.service.openTab({
+		title: 'Chat B',
+		workspaceId: fixture.workspaceId,
+	});
+
+	const anchored = fixture.service.openTab({
+		insertAfterChatTabId: first.id,
+		kind: 'file',
+		metadata: { filePath: 'src/index.ts' },
+		title: 'index.ts',
+		workspaceId: fixture.workspaceId,
+	});
+	const appended = fixture.service.openTab({
+		title: 'Chat C',
+		workspaceId: fixture.workspaceId,
+	});
+
+	assert.deepEqual(
+		fixture.service
+			.listTabs({ workspaceId: fixture.workspaceId })
+			.open.map((tab) => tab.id),
+		[first.id, anchored.id, second.id, appended.id],
+	);
+});
+
 test('reorderTabs persists a reconciled open-tab sequence', (t) => {
 	const fixture = openFixture(t);
 

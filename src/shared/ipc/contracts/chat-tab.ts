@@ -50,6 +50,13 @@ export interface ListChatTabsResult {
  * `{ filePath }`) and re-focus an already-open tab for the same subject.
  */
 export interface OpenChatTabRequest {
+	/**
+	 * Open tab the new tab is placed directly to the right of, used by tabs opened
+	 * from inside a conversation (file, diff, comment, terminal) so they appear
+	 * next to their origin. Omitted by the tab strip's new-chat button, which
+	 * appends to the end of the strip.
+	 */
+	insertAfterChatTabId?: string | null;
 	kind?: ChatTabKindWire;
 	metadata?: Record<string, unknown>;
 	piSessionId?: string | null;

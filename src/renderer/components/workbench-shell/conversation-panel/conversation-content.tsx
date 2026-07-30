@@ -13,6 +13,7 @@ import type {
 	SessionTabModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
+import type { SessionTabPlacement } from '@/renderer/types/workbench-shell';
 import { CommentPreviewPanel } from './comment-preview-panel';
 import { ComposerSlot } from './composer-slot';
 import {
@@ -68,7 +69,9 @@ export function WorkspaceConversationContent({
 	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabChange: (sessionId: string) => void;
 	onSessionTabClose: (sessionId: string) => void;
-	onSessionTabOpen: () => Promise<{ chatTabId: string } | null>;
+	onSessionTabOpen: (options?: {
+		placement?: SessionTabPlacement;
+	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabRestore: (sessionId: string) => void;
 	onSessionTabsReorder: (sessionIds: string[]) => void;
 	sessionTabs: SessionTabModel[];
