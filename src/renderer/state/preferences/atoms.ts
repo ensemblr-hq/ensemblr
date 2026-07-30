@@ -45,14 +45,20 @@ export const chatThinkingOverrideAtomFamily = atomFamily((chatTabId: string) =>
 );
 
 /**
- * Whether a chat is in Plan Mode, keyed by chat-tab id. This is the durable
- * source of truth: it rides every `openPiSession`/`submitPiPrompt` call into the
- * main-process registry, which keeps no persistence of its own. Defaults to off,
- * so a fresh chat — including one opened to implement a handed-off plan — starts
- * unblocked.
+ * Whether a chat is in Plan Mode, keyed by chat-tab id. This is the durable record
+ * of what the user chose: it rides every `openPiSession`/`submitPiPrompt` call into
+ * the main-process registry, which keeps no persistence of its own.
+ *
+ * `null` means the user has never decided for this tab, and is deliberately
+ * distinct from `false`. A spawned conversation inherits its parent's Plan Mode
+ * through the control layer, so main can hold a planning session the renderer has
+ * no opinion about — and sending `false` for "no opinion" would clear it on the
+ * user's first message. Main seeds the value over `agentControlPlanModeChanged`
+ * when it spawns a planning child; a fresh chat, including one opened to implement
+ * a handed-off plan, starts with no opinion and therefore unblocked.
  */
 export const chatPlanModeAtomFamily = atomFamily((chatTabId: string) =>
-	atomWithStorage<boolean>(KEY(`chat_plan_mode_${chatTabId}`), false),
+	atomWithStorage<boolean | null>(KEY(`chat_plan_mode_${chatTabId}`), null),
 );
 
 /**

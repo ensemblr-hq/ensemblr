@@ -129,16 +129,20 @@ export function usePiComposerController({
 	} | null>(null);
 
 	/**
-	 * Reads the chat's Plan Mode flag from the store at call time. Approving a
-	 * plan turns the toggle off and submits in the same tick, and a mutation's
-	 * options are only refreshed on commit — so a render-scope read would send
-	 * `planMode: true` on the very turn meant to start implementing.
-	 * @returns Whether this chat is planning right now.
+	 * Builds the Plan Mode half of an open/submit request, reading the store at call
+	 * time. Approving a plan turns the toggle off and submits in the same tick, and a
+	 * mutation's options are only refreshed on commit — so a render-scope read would
+	 * send `planMode: true` on the very turn meant to start implementing.
+	 *
+	 * Omits the field entirely when the user has never decided for this tab, so main
+	 * keeps whatever it already holds. A spawned child inherits Plan Mode through the
+	 * control layer, and sending `false` for "no opinion" would clear it.
+	 * @returns The `planMode` field to spread into the request, or nothing.
 	 */
-	const readPlanMode = useCallback(
-		() => store.get(chatPlanModeAtomFamily(chatTabId)),
-		[chatTabId, store],
-	);
+	const planModeRequest = useCallback((): { planMode?: boolean } => {
+		const decided = store.get(chatPlanModeAtomFamily(chatTabId));
+		return decided === null ? {} : { planMode: decided };
+	}, [chatTabId, store]);
 
 	const availableModels = useMemo<readonly ComposerModelOption[]>(() => {
 		if (!models) {
@@ -272,7 +276,7 @@ export function usePiComposerController({
 				chatTabId,
 				initialPrompt: input.initialPrompt,
 				model: modelId,
-				planMode: readPlanMode(),
+				...planModeRequest(),
 				resumeSessionId: input.resumeSessionId ?? null,
 				thinkingLevel,
 				workspaceCwd,
@@ -299,7 +303,7 @@ export function usePiComposerController({
 		}) =>
 			submitPiPrompt({
 				model: modelId,
-				planMode: readPlanMode(),
+				...planModeRequest(),
 				prompt: input.prompt,
 				sessionId: input.sessionId,
 				streamingBehavior: input.streamingBehavior,
@@ -445,7 +449,7 @@ export function usePiComposerController({
 		onStop,
 		onSubmit,
 		onThinkingChange,
-		planMode,
+		planMode: planMode === true,
 		thinkingLevel,
 	};
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	AGENT_CONTROL_OPS,
+	ASK_USER_QUESTION_LIMITS,
 	isSpawnOp,
 	isWriteOp,
 	validateArgs,
@@ -131,5 +132,58 @@ describe('validateArgs', () => {
 				title: 'Topic',
 			}).ok,
 		).toBe(false);
+	});
+
+	it('trims a long askUserQuestion header instead of rejecting the questionnaire', () => {
+		const longHeader =
+			'Islands versus vanilla script tags, and what each one costs us later on';
+		const result = validateArgs('askUserQuestion', {
+			questions: [
+				{
+					header: longHeader,
+					options: [{ label: 'Islands' }, { label: 'Vanilla' }],
+					question: 'Which rendering approach?',
+				},
+			],
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const { questions } = result.value as {
+				questions: { header?: string }[];
+			};
+			const trimmed = questions[0]?.header ?? '';
+			expect(trimmed).toHaveLength(ASK_USER_QUESTION_LIMITS.maxHeaderLength);
+			expect(longHeader.startsWith(trimmed)).toBe(true);
+		}
+	});
+
+	it('accepts the header that used to blow the old 16-character cap', () => {
+		expect(
+			validateArgs('askUserQuestion', {
+				questions: [
+					{
+						header: 'Islands vs vanilla',
+						options: [{ label: 'Islands' }, { label: 'Vanilla' }],
+						question: 'Which rendering approach?',
+					},
+				],
+			}).ok,
+		).toBe(true);
+	});
+
+	it('accepts repeated askUserQuestion headers, which the pager disambiguates', () => {
+		const question = (text: string) => ({
+			header: 'Scope',
+			options: [{ label: 'Main' }, { label: 'Renderer' }],
+			question: text,
+		});
+		expect(
+			validateArgs('askUserQuestion', {
+				questions: [
+					question('Which part first?'),
+					question('Which part after?'),
+				],
+			}).ok,
+		).toBe(true);
 	});
 });

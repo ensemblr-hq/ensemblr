@@ -68,6 +68,9 @@ export default defineConfig({
 			'tests/main/plan-mode-submission.test.ts',
 			'tests/main/plan-mode-plan-file-writer.test.ts',
 			'tests/main/plan-mode-control-gate.test.ts',
+			'tests/main/plan-mode-spawn-inheritance.test.ts',
+			'tests/main/plan-mode-op-policy.test.ts',
+			'tests/main/agent-control-env-role.test.ts',
 		],
 		coverage: {
 			provider: 'istanbul',

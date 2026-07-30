@@ -5,6 +5,7 @@ import type {
 	BoardStatusBroadcast,
 	ExitPlanModeBroadcast,
 	FocusViewBroadcast,
+	PlanModeChangedBroadcast,
 	TabsChangedBroadcast,
 } from '../../agent-control.ts';
 
@@ -146,6 +147,16 @@ export interface ShellApi {
 	 */
 	onExitPlanMode: (
 		listener: (payload: ExitPlanModeBroadcast) => void,
+	) => () => void;
+	/**
+	 * Subscribes to Plan Mode changes main made on the renderer's behalf, which
+	 * today means a spawned conversation inheriting its parent's Plan Mode through
+	 * the control layer. Returns an unsubscribe function. The renderer mirrors each
+	 * one into the per-chat toggle so the composer tells the truth and the user's
+	 * next message does not clear a state they never set.
+	 */
+	onPlanModeChanged: (
+		listener: (payload: PlanModeChangedBroadcast) => void,
 	) => () => void;
 	/** Opens an http/https URL in the user's default browser. */
 	openExternal: (url: string) => Promise<void>;

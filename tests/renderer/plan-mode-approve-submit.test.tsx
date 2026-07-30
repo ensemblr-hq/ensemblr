@@ -30,11 +30,14 @@ import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr/query-keys';
 import { usePlanReview } from '../../src/renderer/hooks/workbench-shell/conversation-panel/use-plan-review';
 import { usePiComposerController } from '../../src/renderer/state/composer';
 import { pendingPlanReviewsAtom } from '../../src/renderer/state/plan-mode/atoms';
-import { appSettingsAtom } from '../../src/renderer/state/preferences';
+import {
+	appSettingsAtom,
+	chatPlanModeAtomFamily,
+} from '../../src/renderer/state/preferences';
 import type { WorkspaceShellModel } from '../../src/renderer/types/workbench';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
 import type { PiSessionSnapshotWire } from '../../src/shared/ipc/contracts/pi-session';
-import { createTestQueryClient } from './support/dom';
+import { createTestQueryClient, installLocalStorage } from './support/dom';
 
 const CHAT_TAB_ID = 'chat-plan-approve';
 const WORKSPACE_ID = 'workspace-plan-approve';
@@ -66,8 +69,12 @@ function createSession(): PiSessionSnapshotWire {
 	};
 }
 
-/** Renders the composer controller and the plan review that drives it. */
-function renderPlanningChat() {
+/**
+ * Renders the composer controller and the plan review that drives it.
+ * @param seedPlanMode - Pre-set the chat's Plan Mode as main's spawn broadcast
+ *   would, i.e. without the user ever touching the toggle.
+ */
+function renderPlanningChat(seedPlanMode?: boolean) {
 	const client = createTestQueryClient();
 	client.setQueryData(ensemblrQueryKeys.piModels(), {
 		defaultModelId: MODEL,
@@ -93,6 +100,9 @@ function renderPlanningChat() {
 
 	const store = createStore();
 	store.set(appSettingsAtom, DEFAULT_APP_SETTINGS);
+	if (seedPlanMode !== undefined) {
+		store.set(chatPlanModeAtomFamily(CHAT_TAB_ID), seedPlanMode);
+	}
 	store.set(pendingPlanReviewsAtom, {
 		[SESSION_ID]: {
 			piSessionId: SESSION_ID,
@@ -130,9 +140,11 @@ function renderPlanningChat() {
 	);
 }
 
+// `atomWithStorage` re-reads storage when the atom mounts, so a value seeded
+// before render survives only if storage exists. happy-dom ships none here.
 beforeEach(() => {
 	vi.clearAllMocks();
-	globalThis.localStorage?.clear();
+	installLocalStorage();
 	openPiSession.mockResolvedValue({ session: createSession() });
 	submitPiPrompt.mockResolvedValue({});
 });
@@ -160,6 +172,21 @@ describe('approving a plan', () => {
 				prompt: 'Approved — implement the plan.',
 				sessionId: SESSION_ID,
 			}),
+		);
+	});
+
+	// Plan Mode that arrived from main rather than from the toggle must clear the
+	// same way, or a spawned chat handed a plan could never start implementing.
+	it('submits with plan mode off even when main set it, not the user', async () => {
+		const { result } = renderPlanningChat(true);
+		expect(result.current.composer.planMode).toBe(true);
+
+		await act(async () => {
+			result.current.plan.approve();
+		});
+
+		expect(submitPiPrompt).toHaveBeenCalledWith(
+			expect.objectContaining({ planMode: false }),
 		);
 	});
 

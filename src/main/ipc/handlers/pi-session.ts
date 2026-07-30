@@ -52,8 +52,12 @@ export function registerPiSessionHandlers({
 	piSessionService: PiSessionService;
 	/**
 	 * Mirror of the renderer's per-chat Plan Mode toggle. Set here rather than
-	 * inside the session service: the renderer's setting is the durable source
-	 * and rides every open and submit, so the runtime never needs to persist it.
+	 * inside the session service: the renderer's setting is the durable record of
+	 * what the user chose and rides every open and submit, so the runtime never
+	 * needs to persist it. An absent `planMode` means the user has no opinion about
+	 * this tab, not that it is off — a spawned child inherits Plan Mode through the
+	 * control layer, and clearing that from a request which never mentioned it
+	 * would unblock a conversation nobody asked to unblock.
 	 */
 	planModeRegistry: PlanModeRegistry;
 	withPermissionGate: WithPermissionGate;
@@ -83,7 +87,9 @@ export function registerPiSessionHandlers({
 					workspaceCwd: request.workspaceCwd,
 					workspaceId: request.workspaceId,
 				});
-				planModeRegistry.setActive(snapshot.id, request.planMode === true);
+				if (request.planMode !== undefined) {
+					planModeRegistry.setActive(snapshot.id, request.planMode);
+				}
 				return { session: snapshotToWire(snapshot) };
 			} catch (cause) {
 				return {
@@ -101,10 +107,9 @@ export function registerPiSessionHandlers({
 		async (_event, raw: unknown): Promise<SubmitPiPromptResult> => {
 			try {
 				const request = submitPiPromptRequestSchema.parse(raw);
-				planModeRegistry.setActive(
-					request.sessionId,
-					request.planMode === true,
-				);
+				if (request.planMode !== undefined) {
+					planModeRegistry.setActive(request.sessionId, request.planMode);
+				}
 				const acknowledgement = await piSessionService.submitPrompt({
 					model: request.model ?? null,
 					prompt: request.prompt,

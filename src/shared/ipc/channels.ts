@@ -23,6 +23,7 @@ export const IPC_CHANNELS = {
 		'ensemblr:agent-control-ask-user-question-closed',
 	agentControlAnswerUserQuestion: 'ensemblr:agent-control-answer-user-question',
 	agentControlExitPlanMode: 'ensemblr:agent-control-exit-plan-mode',
+	agentControlPlanModeChanged: 'ensemblr:agent-control-plan-mode-changed',
 	closeChatTab: 'ensemblr:close-chat-tab',
 	closeWindow: 'ensemblr:close-window',
 	cloneGithubRepositoryPrepare: 'ensemblr:clone-github-repository:prepare',

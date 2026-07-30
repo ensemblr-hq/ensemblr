@@ -28,6 +28,7 @@ import {
 	createBoardStatusStore,
 	createGuardrails,
 	createOriginRegistry,
+	isSessionTabMarkedSubAgent,
 	startControlServer,
 } from './agent-control';
 import { createHarnessDetectionService } from './agents';
@@ -325,6 +326,12 @@ const {
 	},
 	/** Reads the control server's URL lazily, null until the server is listening. */
 	getServerUrl: () => agentControlServer?.url ?? null,
+	/** Reads the durable sub-agent marker so a resumed child keeps its playbook. */
+	isSpawnedSubAgent: (piSessionId) =>
+		isSessionTabMarkedSubAgent(
+			databaseService.getConnection()?.database,
+			piSessionId,
+		),
 });
 
 /**
@@ -595,6 +602,9 @@ agentControlService = createAgentControlService({
 		/** Broadcasts an agent-driven chat-tab set change to all windows. */
 		broadcastTabsChanged: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, payload),
+		/** Broadcasts an inherited Plan Mode state so the owning chat tab shows it. */
+		broadcastPlanMode: (payload) =>
+			broadcastToAllWindows(IPC_CHANNELS.agentControlPlanModeChanged, payload),
 		appSettingsService,
 		ask: askUserQuestionCoordinator.port,
 		chatTabService: agentControlChatTabService,
@@ -613,6 +623,9 @@ agentControlService = createAgentControlService({
 			exit: planSubmission.submit,
 			/** Reports whether the calling Pi session is still planning. */
 			isActive: planModeRegistry.isActive,
+			/** Starts a spawned child planning; narrowed to on-only on purpose. */
+			activateForSpawn: (sessionId) =>
+				planModeRegistry.setActive(sessionId, true),
 			/** Forgets the session's Plan Mode state once it ends. */
 			releaseSession: planModeRegistry.release,
 		},

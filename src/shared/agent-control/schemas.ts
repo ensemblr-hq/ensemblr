@@ -127,6 +127,7 @@ const setWorkspaceStatusSchema = z.strictObject({
 const waitForAgentsSchema = z.strictObject({
 	targets: z.array(nonEmpty).optional(),
 	mode: z.enum(['first', 'all']).optional(),
+	reports: z.enum(['full', 'brief']).optional(),
 	timeoutMs: z.number().int().positive().optional(),
 });
 
@@ -150,7 +151,11 @@ const askUserQuestionOptionSchema = z.strictObject({
 
 const askUserQuestionItemSchema = z.strictObject({
 	question: nonEmpty,
-	header: nonEmpty.max(ASK_USER_QUESTION_LIMITS.maxHeaderLength).optional(),
+	header: nonEmpty
+		.transform((header) =>
+			header.slice(0, ASK_USER_QUESTION_LIMITS.maxHeaderLength),
+		)
+		.optional(),
 	options: z
 		.array(askUserQuestionOptionSchema)
 		.min(ASK_USER_QUESTION_LIMITS.minOptions)
@@ -174,15 +179,6 @@ const askUserQuestionSchema = z.strictObject({
 				new Set(questions.map((item) => item.question.toLowerCase())).size ===
 				questions.length,
 			{ message: 'Questions must be distinct.' },
-		)
-		.refine(
-			(questions) => {
-				const headers = questions
-					.map((item) => item.header?.toLowerCase())
-					.filter((header) => header !== undefined);
-				return new Set(headers).size === headers.length;
-			},
-			{ message: 'Headers must be distinct; they label the question pager.' },
 		),
 });
 

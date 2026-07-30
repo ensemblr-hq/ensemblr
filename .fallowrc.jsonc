@@ -127,7 +127,15 @@
 
 	"health": {
 		"maxCognitive": 20,
-		"maxCyclomatic": 25
+		"maxCyclomatic": 25,
+		// CRAP is `cyclomatic² × (1 − coverage)³ + cyclomatic`, so without real
+		// coverage fallow estimates the coverage term from export references and
+		// the cubed factor dominates — an 11-line function with cyclomatic 5 lands
+		// on the complexity list purely for looking untested. Point at the Istanbul
+		// report `npx vitest run --coverage` writes so the scores are measured
+		// instead. Absent (a fresh clone that has not run coverage yet) fallow
+		// falls back to the estimate and still exits 0, so this is safe to commit.
+		"coverage": "coverage/coverage-final.json"
 	},
 
 	"rules": {
