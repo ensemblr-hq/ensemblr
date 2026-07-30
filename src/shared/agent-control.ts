@@ -30,3 +30,9 @@ export {
 	SUBAGENT_WITHHELD_OPS,
 	subAgentControlOpDenial,
 } from './agent-control/subagent-policy.ts';
+export type { DiffFilePatch } from './agent-control/workspace-diff.ts';
+export {
+	budgetWorkspaceDiff,
+	clampFilePatch,
+	MAX_AGENT_PAYLOAD_CHARS,
+} from './agent-control/workspace-diff.ts';

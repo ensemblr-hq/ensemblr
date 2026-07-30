@@ -99,10 +99,15 @@ describe('isHiddenEnsemblrToolCall', () => {
 		expect(isHiddenEnsemblrToolCall(transportFailure(toolName))).toBe(false);
 	});
 
+	// Review work is the user's to see: a comment an agent files lands in their
+	// Changes panel, so the row that filed it is not the app's own bookkeeping.
 	test.each([
 		'ensemblr_start_conversation',
 		'ensemblr_wait_for_agents',
 		'ensemblr_close_tab',
+		'ensemblr_get_workspace_diff',
+		'ensemblr_get_diff_comments',
+		'ensemblr_add_diff_comments',
 		'bash',
 		'read',
 	])('keeps %s visible', (toolName) => {
@@ -136,6 +141,33 @@ describe('ensemblrToolLabel', () => {
 			expect(running).not.toBe(settled);
 			expect(running?.endsWith('ing') || running?.includes('ing ')).toBe(true);
 		}
+	});
+
+	test('reads the review tools as the review action taken', () => {
+		expect(ensemblrToolLabel('ensemblr_get_workspace_diff', {}, false)).toEqual(
+			{
+				glyph: 'file-diff',
+				title: 'Read the diff',
+			},
+		);
+		expect(ensemblrToolLabel('ensemblr_get_diff_comments', {}, false)).toEqual({
+			glyph: 'message-square-text',
+			title: 'Read review comments',
+		});
+		expect(ensemblrToolLabel('ensemblr_add_diff_comments', {}, true)).toEqual({
+			glyph: 'message-square-text',
+			title: 'Leaving review comments',
+		});
+	});
+
+	test('folds the file under review into the diff label', () => {
+		expect(
+			ensemblrToolLabel(
+				'ensemblr_get_workspace_diff',
+				{ file: 'src/main/main.ts' },
+				false,
+			)?.title,
+		).toBe('Read the diff: src/main/main.ts');
 	});
 
 	test('folds the spawned tab title into the label', () => {

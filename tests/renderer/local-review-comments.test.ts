@@ -20,6 +20,7 @@ function makeComment(
 		filePath: 'src/lib/trail-map.ts',
 		id: 'c1',
 		lineNumber: 42,
+		origin: 'user',
 		status: 'open',
 		updatedAt: '2026-07-20T00:00:00.000Z',
 		workspaceId: 'ws1',
@@ -35,8 +36,17 @@ describe('localReviewCommentToSummary', () => {
 			detail: 'needs a guard',
 			id: 'c1',
 			isResolved: false,
+			origin: 'user',
 			provider: 'local',
 		});
+	});
+
+	// The location has taken the author slot, so authorship needs a field of its
+	// own or an agent's note reads exactly like one the user left.
+	test('carries authorship through, since the author slot holds the location', () => {
+		expect(
+			localReviewCommentToSummary(makeComment({ origin: 'agent' })),
+		).toMatchObject({ author: 'trail-map.ts:42', origin: 'agent' });
 	});
 
 	test('file-level comment (no line) drops the line suffix', () => {

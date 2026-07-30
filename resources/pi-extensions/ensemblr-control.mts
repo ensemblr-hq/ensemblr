@@ -36,6 +36,7 @@ What you can drive:
 - Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
 - Terminals: start/stop the setup or run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`).
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message.
+- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`).
@@ -78,6 +79,7 @@ const SUBAGENT_AWARENESS = `You are running inside Ensemblr, a desktop coding-wo
 
 What you can drive:
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read a terminal's output (\`ensemblr_read_terminal_output\`).
+- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's.
 - Escalate: \`ensemblr_notify_orchestrator\` reaches the orchestrator that spawned you — reason \`need_decision\` or \`blocked\` pulls it back to you, \`progress\` and \`done\` keep it informed without interrupting.
 
@@ -126,6 +128,7 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you can dri
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
 - Delegate reading: spawn a sub-agent to answer a question for you (\`ensemblr_start_conversation\`), block until your children settle (\`ensemblr_wait_for_agents\`), steer one (\`ensemblr_send_follow_up\`), read its report (\`ensemblr_get_last_message\`), close its tab (\`ensemblr_close_tab\`). See the fan-out section below.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
+- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. All three stay available while planning — annotating a diff is planning output, not a change to the repository.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`). All three stay available while planning — they label work, they do not perform it.
 - Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
 
@@ -176,6 +179,7 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you were sp
 - Read the repository: the \`read\` tool, and \`bash\` for read-only commands.
 - Report to your orchestrator: \`ensemblr_notify_orchestrator\` with reason \`need_decision\` or \`blocked\` pulls it back to you; \`progress\` and \`done\` keep it informed without interrupting.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
+- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. All three stay available while planning — annotating a diff is planning output, not a change to the repository.
 - Keep your tab legible: name it (\`ensemblr_set_name\`) and record what the conversation has covered (\`ensemblr_set_summary\`). Both stay available while planning — they label work, they do not perform it. Naming the WORKSPACE and its git branch is not yours: \`ensemblr_set_branch_name\` belongs to the orchestrator that spawned you and is refused here.
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`). Moving the board is not yours: it describes the whole workspace rather than the question you were handed, so \`ensemblr_set_workspace_status\` is refused here.
 
@@ -477,7 +481,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_start_conversation',
 		'startConversation',
-		"Open a fresh chat tab (or reuse one via chatTabId) and start a Pi conversation with a first prompt. Pass a short, descriptive title to name the sub-agent's tab. Set wait=true to block until it finishes.",
+		"Open a fresh chat tab (or reuse one via chatTabId) and start a Pi conversation. Pass a short, descriptive title to name the sub-agent's tab. Brief it with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask about, and whether it reports inline (the default) or writes a file at a path you name. Set wait=true to block until it finishes.",
 		Type.Object({
 			chatTabId: Type.Optional(Type.String()),
 			prompt: Type.String(),
@@ -524,7 +528,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_launch_harness',
 		'launchHarness',
-		'Launch a third-party agent harness (e.g. claude, codex, vibe) in a new terminal tab.',
+		'Launch a third-party agent harness (claude, codex, vibe) in a new terminal tab.',
 		Type.Object({ harnessId: Type.String() }),
 	);
 	tool(
@@ -542,7 +546,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_stop_terminal',
 		'stopTerminal',
-		'Stop a dock terminal by id, or stop the setup/run script by kind.',
+		'Stop a dock terminal by id, or the setup/run script by kind.',
 		Type.Object({
 			terminalId: Type.Optional(Type.String()),
 			kind: Type.Optional(
@@ -553,13 +557,13 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_write_terminal',
 		'writeTerminal',
-		'Write input into an existing terminal or harness (drives its stdin).',
+		'Write input into an existing terminal or harness.',
 		Type.Object({ terminalId: Type.String(), input: Type.String() }),
 	);
 	tool(
 		'ensemblr_open_tab',
 		'openTab',
-		'Open a non-chat tab: a file preview, a diff, or a PR-comment preview.',
+		'Open a non-chat tab: a file preview, a diff, or a comment.',
 		Type.Object({
 			variant: Type.Union([
 				Type.Literal('file'),
@@ -664,9 +668,57 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		Type.Object({ terminalId: Type.String() }),
 	);
 	tool(
+		'ensemblr_get_workspace_diff',
+		'getWorkspaceDiff',
+		"Read this workspace's diff — every change on its branch, committed and uncommitted alike, the same set the Changes panel shows. Call it with stat=true FIRST: that returns the changed files with their +/- counts and no patch text, so you can see how big the diff is before you read it. Then read the whole diff, or pass file to read one file's patch on its own — file and stat are alternatives, not a pair. Every read is capped: a full read names what it dropped in omittedFiles for you to re-request by file, and a single file too large to carry is cut at a hunk boundary.",
+		Type.Object({
+			file: Type.Optional(
+				Type.String({
+					description:
+						"Workspace-relative path of a single file to read whole, e.g. src/main/main.ts. Also how you recover a file listed in a previous read's omittedFiles.",
+				}),
+			),
+			stat: Type.Optional(
+				Type.Boolean({
+					description:
+						'Return the changed-file rows and totals only, with no patch text. Call this first.',
+				}),
+			),
+		}),
+	);
+	tool(
+		'ensemblr_get_diff_comments',
+		'getDiffComments',
+		"Read the review comments on this workspace's diff — the ones the user left in the Changes panel and the ones agents filed there. Pass file to narrow it to one path. Comments synced from a GitHub pull request are not included.",
+		Type.Object({ file: Type.Optional(Type.String()) }),
+	);
+	tool(
+		'ensemblr_add_diff_comments',
+		'addDiffComments',
+		"File review comments on this workspace's diff, anchored to a file and optionally a line. They appear in the Changes panel labelled as yours, so use them to leave findings on the code itself rather than describing a location in prose. Batch a review's comments into one call.",
+		Type.Object({
+			comments: Type.Array(
+				Type.Object({
+					filePath: Type.String({
+						description:
+							'Workspace-relative path the comment is against, e.g. src/main/main.ts.',
+					}),
+					lineNumber: Type.Optional(
+						Type.Union([Type.Number(), Type.Null()], {
+							description:
+								"1-based line on the file's new side. Omit or pass null for a file-level comment.",
+						}),
+					),
+					body: Type.String({ maxLength: 4000 }),
+				}),
+				{ maxItems: 50, minItems: 1 },
+			),
+		}),
+	);
+	tool(
 		'ensemblr_wait_for_agents',
 		'waitForAgents',
-		'Block until delegated Pi sub-agents finish or need a decision, then return each settled one\'s status and report (its whole final turn), plus `pending` naming the children still running so you can wait on exactly those next. Prefer this over polling get_conversation_status. targets defaults to every child you spawned; mode defaults to "first", which returns on the first to settle — pass "all" to wait for every target. A need_decision/blocked signal wakes the wait whatever the mode.',
+		'Block until delegated Pi sub-agents finish or need a decision, then return each settled one\'s status and report (its whole final turn), plus `pending` naming the children still running so you can wait on exactly those next. Prefer this over polling get_conversation_status. targets defaults to every child you spawned; mode defaults to "first", which returns on the first to settle — pass "all" to wait for every target. A need_decision/blocked signal wakes the wait whatever the mode. reports: "brief" returns each report\'s opening plus a pointer to ensemblr_get_last_message for the rest, instead of every child\'s whole turn at once — worth it on a wide fan-out, where reading four full reports to use one line of each is what makes delegation cost you more context than doing the work inline.',
 		Type.Object({
 			targets: Type.Optional(Type.Array(Type.String())),
 			mode: Type.Optional(
@@ -684,7 +736,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_notify_orchestrator',
 		'notifyOrchestrator',
-		'Sub-agents only: notify the orchestrator that spawned you. reason need_decision/blocked wakes its wait immediately so it can answer; progress/done are informational.',
+		'Sub-agents only: notify the orchestrator that spawned you. reason need_decision/blocked wakes its wait immediately so it can answer, so use it when the answer changes what you do next; a decision that only bites after you report belongs in your report as options and tradeoffs. progress/done are informational.',
 		Type.Object({
 			reason: Type.Union([
 				Type.Literal('need_decision'),

@@ -26,8 +26,8 @@ reach it:
 - **Pi** — the first-party runtime, a child process speaking JSONL-RPC over
   stdio (ADR 0025). Stock Pi has no MCP support.
 - **Third-party harnesses** — Claude Code, Codex, and Vibe — external CLIs
-  launched in PTY terminal tabs. Claude Code and Codex are native MCP clients;
-  Vibe is neither.
+  launched in PTY terminal tabs. All three are native MCP clients; Claude Code
+  and Codex take an MCP-config flag, Vibe only a `VIBE_MCP_SERVERS` env var.
 
 An initial plan routed Pi through its `extension_ui_request` /
 `extension_ui_response` reverse channel — which required a host-side response
@@ -83,9 +83,11 @@ Unify both species on **one loopback HTTP control server** (bound to
   lineage-deadlock detection degrade to no-ops under a shared workspace token.
   The registry API keeps per-session support for a later upgrade.
 - The service introduces **no new capability code** — it delegates to the
-  existing chat-tab, Pi-session, terminal, script, and harness-launch services.
-- **Vibe cannot be driven** through Ensemblr Control (no MCP config path); it
-  launches as a plain auto-approve harness.
+  existing chat-tab, Pi-session, terminal, script, workspace-git, review, and
+  harness-launch services.
+- **Vibe is driven like the others** — it has no MCP-config flag, so its server
+  travels as a `VIBE_MCP_SERVERS` env prefix carrying `api_key_env`, and its
+  playbook as an extra trusted root whose `AGENTS.md` it reads.
 - Focus ops are the one family that reaches the renderer (active tab/panel is
   renderer state); they broadcast over IPC and apply only in the window showing
   the target workspace, so focus stays workspace-scoped.

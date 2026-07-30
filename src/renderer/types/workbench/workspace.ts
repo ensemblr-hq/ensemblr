@@ -5,6 +5,7 @@ import type { WorkspaceOpenTargetSnapshot } from '@/shared/ipc/contracts/open-ta
 // workspace shell model — the menu reads it from the React Query cache.
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 import type { RepositoryPreviewUrl } from '@/shared/ipc/contracts/repository-settings';
+import type { ReviewCommentOrigin } from '@/shared/ipc/contracts/review-comments';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 import type {
@@ -128,6 +129,12 @@ export interface PullRequestCommentSummary {
 	id: string;
 	/** Resolution state for GitHub review threads; absent when not applicable. */
 	isResolved?: boolean | null;
+	/**
+	 * Who wrote an Ensemblr-local comment; absent for every other provider. A
+	 * local comment spends its `author` slot on the `path:line` location, so
+	 * authorship needs a field of its own to reach the row.
+	 */
+	origin?: ReviewCommentOrigin;
 	provider: 'github' | 'github-actions' | 'linear' | 'local';
 	url?: string;
 }

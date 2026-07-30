@@ -41,7 +41,14 @@ const startStop = z.enum(['setup', 'run']);
  * MCP tool definitions mirroring the control vocabulary. Input shapes are
  * advisory for the client; the service re-validates authoritatively.
  */
-const TOOL_DEFS: readonly McpToolDef[] = [
+/**
+ * Every tool this endpoint exposes. Exported so the parity test can hold each
+ * description against the Pi extension's copy: the two registration sites cannot
+ * share a module (the extension runs outside the app bundle), and these strings
+ * carry behaviour — `stat=true FIRST` is the only thing stopping a model from
+ * pulling a whole workspace diff it did not need.
+ */
+export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_spawn_chat_tab',
 		op: 'spawnChatTab',
@@ -162,6 +169,35 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 		description:
 			"Read your workspace's current kanban board status. Use ensemblr_list_workspaces to see every workspace's status.",
 		shape: {},
+	},
+	{
+		name: 'ensemblr_get_workspace_diff',
+		op: 'getWorkspaceDiff',
+		description:
+			"Read this workspace's diff — every change on its branch, committed and uncommitted alike, the same set the Changes panel shows. Call it with stat=true FIRST: that returns the changed files with their +/- counts and no patch text, so you can see how big the diff is before you read it. Then read the whole diff, or pass file to read one file's patch on its own — file and stat are alternatives, not a pair. Every read is capped: a full read names what it dropped in omittedFiles for you to re-request by file, and a single file too large to carry is cut at a hunk boundary.",
+		shape: { file: z.string().optional(), stat: z.boolean().optional() },
+	},
+	{
+		name: 'ensemblr_get_diff_comments',
+		op: 'getDiffComments',
+		description:
+			"Read the review comments on this workspace's diff — the ones the user left in the Changes panel and the ones agents filed there. Pass file to narrow it to one path. Comments synced from a GitHub pull request are not included.",
+		shape: { file: z.string().optional() },
+	},
+	{
+		name: 'ensemblr_add_diff_comments',
+		op: 'addDiffComments',
+		description:
+			"File review comments on this workspace's diff, anchored to a file and optionally a line. They appear in the Changes panel labelled as yours, so use them to leave findings on the code itself rather than describing a location in prose. Batch a review's comments into one call.",
+		shape: {
+			comments: z.array(
+				z.object({
+					filePath: z.string(),
+					lineNumber: z.number().nullable().optional(),
+					body: z.string(),
+				}),
+			),
+		},
 	},
 	{
 		name: 'ensemblr_list_models',

@@ -93,14 +93,31 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		object: 'a tab',
 		verb: ['Focused', 'Focusing'],
 	},
+	ensemblr_add_diff_comments: {
+		glyph: 'message-square-text',
+		object: 'review comments',
+		verb: ['Left', 'Leaving'],
+	},
 	ensemblr_get_conversation_status: {
 		glyph: 'bot',
 		object: 'a sub-agent',
 		verb: ['Checked', 'Checking'],
 	},
+	ensemblr_get_diff_comments: {
+		detailKeys: ['file'],
+		glyph: 'message-square-text',
+		object: 'review comments',
+		verb: ['Read', 'Reading'],
+	},
 	ensemblr_get_last_message: {
 		glyph: 'bot',
 		object: "a sub-agent's report",
+		verb: ['Read', 'Reading'],
+	},
+	ensemblr_get_workspace_diff: {
+		detailKeys: ['file'],
+		glyph: 'file-diff',
+		object: 'the diff',
 		verb: ['Read', 'Reading'],
 	},
 	ensemblr_get_workspace_status: {

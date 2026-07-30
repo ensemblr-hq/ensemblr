@@ -14,9 +14,13 @@ import type {
 	BoardStatusBroadcast,
 	FocusViewBroadcast,
 	PlanModeChangedBroadcast,
+	ReviewCommentsChangedBroadcast,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control.ts';
-import { resolveAgentRole } from '../../shared/agent-control.ts';
+import {
+	MAX_AGENT_PAYLOAD_CHARS,
+	resolveAgentRole,
+} from '../../shared/agent-control.ts';
 import { findHarnessDefinition } from '../../shared/agents.ts';
 import type {
 	PiPersistedEnvelope,
@@ -39,6 +43,7 @@ import {
 	resolvePiProviderModels,
 } from '../pi-runtime/pi-provider-models.ts';
 import type { RenameWorkspaceService } from '../repository';
+import type { ReviewService } from '../review';
 import type { ScriptLifecycleService } from '../scripts/script-lifecycle-service.ts';
 import type { EnsemblrDatabaseService } from '../storage';
 import {
@@ -47,6 +52,7 @@ import {
 } from '../storage/repositories/chat-tab-repository.ts';
 import { listAllWorkspaceRows } from '../storage/repositories/workspace-repository.ts';
 import type { TerminalService } from '../terminal';
+import type { WorkspaceGitService } from '../workspace-git';
 import type { BoardStatusStore } from './board-status-store.ts';
 import type {
 	AgentControlPorts,
@@ -62,6 +68,7 @@ import type {
 	TerminalPort,
 	WorkspacePort,
 } from './ports.ts';
+import { makeDiffPort, makeReviewPort } from './review-ports.ts';
 import { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';
 
 /** Collaborators the adapters delegate to; supplied by the composition root. */
@@ -75,6 +82,8 @@ export interface PortAdapterDeps {
 	piExecutableService: PiExecutableService;
 	localCommandService: LocalCommandService;
 	appSettingsService: AppSettingsService;
+	workspaceGitService: WorkspaceGitService;
+	reviewService: ReviewService;
 	/** Names a workspace and its git branch together, for `setBranchName`. */
 	renameWorkspace: RenameWorkspaceService['rename'];
 	getPermissionMode: () => PermissionMode;
@@ -88,6 +97,13 @@ export interface PortAdapterDeps {
 	broadcastFocus: (payload: FocusViewBroadcast) => void;
 	/** Broadcasts a tab-set change so the renderer refreshes its tab list. */
 	broadcastTabsChanged: (payload: TabsChangedBroadcast) => void;
+	/**
+	 * Broadcasts an agent's review-comment write so the renderer refreshes the
+	 * comment list a user may already be watching.
+	 */
+	broadcastReviewCommentsChanged: (
+		payload: ReviewCommentsChangedBroadcast,
+	) => void;
 	/**
 	 * Broadcasts a chat tab's Plan Mode state so the renderer's per-chat toggle
 	 * matches a spawn the renderer never made. Best-effort mirror only —
@@ -109,16 +125,6 @@ const IDLE_STATUSES: ReadonlySet<string> = new Set([
 	'errored',
 ]);
 const WAIT_POLL_MS = 400;
-
-/**
- * Ceiling on the joined report {@link findFinalTurnText} returns. A turn's
- * assistant messages are read newest-first, so the cap sheds the narration that
- * opened the turn rather than the answer that closed it. It bounds a single
- * message too — clamped to its opening, which is where a report states its
- * answer — so one tool-heavy child cannot flood its orchestrator's context from
- * a single tool result it pasted whole.
- */
-const MAX_REPORT_CHARS = 32_000;
 
 /** Row shape read from {@link listAllWorkspaceRows} for the workspace listing. */
 interface WorkspaceRow {
@@ -601,7 +607,7 @@ async function rollbackConversation(
  * prompt that has not been answered yet is skipped rather than treated as the
  * end, so a child re-prompted mid-read still reports the work it already filed.
  * A tool-heavy turn can hold dozens of assistant messages, so the join stops at
- * {@link MAX_REPORT_CHARS} and drops the oldest — the narration an agent writes
+ * {@link MAX_AGENT_PAYLOAD_CHARS} and drops the oldest — the narration an agent writes
  * on its way to the answer, never the answer itself, which is the newest. A
  * newest message that busts the ceiling on its own is clamped to its opening
  * rather than returned whole, so the ceiling really is a ceiling.
@@ -632,7 +638,7 @@ function findFinalTurnText(
 		if (!text) {
 			continue;
 		}
-		const remaining = MAX_REPORT_CHARS - size;
+		const remaining = MAX_AGENT_PAYLOAD_CHARS - size;
 		if (text.length <= remaining) {
 			turn.push(text);
 			size += text.length;
@@ -916,6 +922,8 @@ export function createAgentControlPorts(
 		harnesses: makeHarnessPort(deps),
 		focus: makeFocusPort(deps),
 		board: makeBoardPort(deps),
+		diff: makeDiffPort(deps),
+		review: makeReviewPort(deps),
 		sessionNaming: makeSessionNamingPort(deps),
 		permissions: { getMode: () => deps.getPermissionMode() },
 		confirm: deps.confirm,

@@ -218,6 +218,11 @@ export function PullRequestCommentRow({
 				<span className='min-w-0 truncate text-muted-foreground text-xs'>
 					{comment.detail}
 				</span>
+				{comment.origin === 'agent' ? (
+					<span className='shrink-0 rounded-sm bg-muted px-1 text-muted-foreground text-xxs'>
+						Agent
+					</span>
+				) : null}
 				{comment.isResolved === false ? (
 					<span className='shrink-0 rounded-sm bg-status-warning/15 px-1 text-status-warning text-xxs'>
 						Unresolved

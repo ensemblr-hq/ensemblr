@@ -17,6 +17,8 @@ function basenameOf(path: string): string {
  * Checks panel can render it in the same list as GitHub comments. The `path:line`
  * location fills the author slot (GitHub embeds its location in `detail`), and an
  * open comment reports as unresolved so it shows the same badge as GitHub threads.
+ * Authorship rides along separately, because the location has taken the slot it
+ * would otherwise use and an agent's note has to read as an agent's note.
  * @param comment - The stored local review comment
  * @returns The comment as a Checks-panel comment summary
  */
@@ -32,6 +34,7 @@ export function localReviewCommentToSummary(
 		detail: comment.body,
 		id: comment.id,
 		isResolved: comment.status === 'resolved',
+		origin: comment.origin,
 		provider: 'local',
 	};
 }

@@ -95,6 +95,22 @@ const makePorts = (
 		setWorkspaceStatus: vi.fn(),
 		getWorkspaceStatus: vi.fn().mockReturnValue('backlog'),
 	},
+	diff: {
+		readWorkspaceDiff: vi.fn().mockResolvedValue({
+			baseRef: 'origin/master',
+			diff: 'diff --git a/a.ts b/a.ts',
+			omittedFiles: [],
+			truncated: false,
+		}),
+	},
+	review: {
+		listComments: vi.fn().mockResolvedValue({ comments: [] }),
+		addComments: vi.fn().mockResolvedValue({
+			added: 1,
+			commentIds: ['c-1'],
+			message: 'Filed 1 review comment(s).',
+		}),
+	},
 	permissions: { getMode: () => overrides.mode ?? 'workspace-trusted' },
 	confirm: { confirm: vi.fn().mockResolvedValue(overrides.confirm ?? true) },
 	ask: { ask: vi.fn(), releaseSession: vi.fn() },
@@ -931,6 +947,160 @@ describe('agent-control service: delegation', () => {
 		if (!result.ok) {
 			expect(result.code).toBe('internal');
 			expect(result.error).toContain('boom');
+		}
+	});
+});
+
+describe('agent-control service: review', () => {
+	it('reads the diff for the caller’s own workspace', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'getWorkspaceDiff',
+			token: 'tok-caller',
+			rawArgs: { stat: true },
+		});
+		expect(result.ok).toBe(true);
+		expect(ports.diff.readWorkspaceDiff).toHaveBeenCalledWith({
+			file: undefined,
+			stat: true,
+			workspaceCwd: '/ws',
+			workspaceId: 'ws',
+		});
+	});
+
+	it('passes a single-file request straight through', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		await service.invoke({
+			op: 'getWorkspaceDiff',
+			token: 'tok-caller',
+			rawArgs: { file: 'src/a.ts' },
+		});
+		expect(ports.diff.readWorkspaceDiff).toHaveBeenCalledWith(
+			expect.objectContaining({ file: 'src/a.ts', stat: undefined }),
+		);
+	});
+
+	it('narrows a comment read to one file', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		await service.invoke({
+			op: 'getDiffComments',
+			token: 'tok-caller',
+			rawArgs: { file: 'src/a.ts' },
+		});
+		expect(ports.review.listComments).toHaveBeenCalledWith({
+			file: 'src/a.ts',
+			workspaceId: 'ws',
+		});
+	});
+
+	// The write takes no workspace argument at all, so a cross-workspace comment
+	// is unreachable by construction rather than by a check that could be missed.
+	it('binds a comment write to the caller’s workspace', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'addDiffComments',
+			token: 'tok-caller',
+			rawArgs: {
+				comments: [{ body: 'nit', filePath: 'src/a.ts', lineNumber: 3 }],
+			},
+		});
+		expect(result.ok).toBe(true);
+		expect(ports.review.addComments).toHaveBeenCalledWith({
+			comments: [{ body: 'nit', filePath: 'src/a.ts', lineNumber: 3 }],
+			workspaceId: 'ws',
+		});
+	});
+
+	it('allows both review reads in read-only mode', async () => {
+		const { service } = setup({ ports: makePorts({ mode: 'read-only' }) });
+		for (const op of ['getWorkspaceDiff', 'getDiffComments'] as const) {
+			expect(
+				(await service.invoke({ op, token: 'tok-caller', rawArgs: {} })).ok,
+			).toBe(true);
+		}
+	});
+
+	it('blocks the comment write in read-only mode', async () => {
+		const ports = makePorts({ mode: 'read-only' });
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'addDiffComments',
+			token: 'tok-caller',
+			rawArgs: { comments: [{ body: 'nit', filePath: 'src/a.ts' }] },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-permission');
+		}
+		expect(ports.review.addComments).not.toHaveBeenCalled();
+	});
+
+	// A delegated reviewer filing comments is the point of the op, so the
+	// sub-agent role must not withhold any of the three.
+	it('leaves all three available to a spawned sub-agent', async () => {
+		const ports = makePorts({ spawnedSubAgent: true });
+		const { service } = setup({ ports });
+		const results = await Promise.all([
+			service.invoke({
+				op: 'getWorkspaceDiff',
+				token: 'tok-caller',
+				rawArgs: {},
+			}),
+			service.invoke({
+				op: 'getDiffComments',
+				token: 'tok-caller',
+				rawArgs: {},
+			}),
+			service.invoke({
+				op: 'addDiffComments',
+				token: 'tok-caller',
+				rawArgs: { comments: [{ body: 'nit', filePath: 'src/a.ts' }] },
+			}),
+		]);
+		expect(results.every((result) => result.ok)).toBe(true);
+	});
+
+	it('leaves all three available while planning', async () => {
+		const ports = makePorts({ planning: true });
+		const { service } = setup({ ports });
+		const results = await Promise.all([
+			service.invoke({
+				op: 'getWorkspaceDiff',
+				token: 'tok-caller',
+				rawArgs: {},
+			}),
+			service.invoke({
+				op: 'getDiffComments',
+				token: 'tok-caller',
+				rawArgs: {},
+			}),
+			service.invoke({
+				op: 'addDiffComments',
+				token: 'tok-caller',
+				rawArgs: { comments: [{ body: 'nit', filePath: 'src/a.ts' }] },
+			}),
+		]);
+		expect(results.every((result) => result.ok)).toBe(true);
+	});
+
+	it('reports a git failure as an internal error rather than an empty diff', async () => {
+		const ports = makePorts();
+		ports.diff.readWorkspaceDiff = vi
+			.fn()
+			.mockRejectedValue(new Error('fatal: not a git repository'));
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'getWorkspaceDiff',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.error).toContain('not a git repository');
 		}
 	});
 });

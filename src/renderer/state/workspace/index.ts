@@ -38,6 +38,7 @@ export {
 	getPreferredReviewTab,
 	useWorkspacePanelTabState,
 } from './panel-tabs';
+export { installAgentControlReviewCommentsSync } from './review-comments-sync';
 export {
 	activeChatTabByWorkspaceAtom,
 	lastWorkspaceNavigationRenderStateAtom,

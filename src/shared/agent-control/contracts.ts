@@ -8,6 +8,11 @@
  * delegates. The op names are namespaced `ensemblr.<op>` on the wire; this module
  * defines the bare op identifiers and their argument/result shapes.
  */
+import type { ReviewCommentWire } from '../ipc/contracts/review-comments.ts';
+import type {
+	WorkspaceGitChangeSummaryWire,
+	WorkspaceGitFileWire,
+} from '../ipc/contracts/workspace-git.ts';
 
 /** Every control operation an agent may request, read and write alike. */
 export const AGENT_CONTROL_OPS = [
@@ -28,6 +33,9 @@ export const AGENT_CONTROL_OPS = [
 	'focusPanel',
 	'setWorkspaceStatus',
 	'getWorkspaceStatus',
+	'getWorkspaceDiff',
+	'getDiffComments',
+	'addDiffComments',
 	'listWorkspaces',
 	'listTabs',
 	'listTerminals',
@@ -90,6 +98,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'focusDockTab',
 	'focusPanel',
 	'setWorkspaceStatus',
+	'addDiffComments',
 ]);
 
 /**
@@ -602,6 +611,93 @@ export interface SetWorkspaceStatusArgs {
 }
 
 /**
+ * Args for `getWorkspaceDiff`: read the caller's own workspace diff, scoped the
+ * way the Changes panel scopes it — every change on this branch, committed and
+ * uncommitted alike. `stat` is the cheap probe that reports which files changed
+ * and how large the diff is; `file` reads one file's patch, which is also how a
+ * file dropped from a budgeted full read is recovered. The two are alternatives
+ * rather than a filter pair, and sending both is rejected: a single file has no
+ * stat, and silent precedence would leave the caller unsure which read it got.
+ */
+export interface GetWorkspaceDiffArgs {
+	/** Workspace-relative path of a single file to read. */
+	file?: string;
+	/** Return the changed-file rows and totals only, with no patch text. */
+	stat?: boolean;
+}
+
+/**
+ * Result of `getWorkspaceDiff`. Which fields are populated follows the request:
+ * `stat` returns `files` + `summary` and no `diff`; a single `file` returns
+ * `diff` alone; the full read returns all of them. `truncated` covers every cut
+ * the payload can take — whole files dropped for the budget, one file's patch
+ * cut at a hunk boundary to fit it, and a patch git itself cut at its output cap.
+ */
+export interface GetWorkspaceDiffResult {
+	/** Ref the branch diff forks from, or null when it fell back to the working tree. */
+	baseRef: string | null;
+	files?: readonly WorkspaceGitFileWire[];
+	summary?: WorkspaceGitChangeSummaryWire;
+	diff?: string;
+	truncated: boolean;
+	/** Files left out of `diff`; each is re-requestable on its own with `file`. */
+	omittedFiles: readonly string[];
+}
+
+/**
+ * Args for `getDiffComments`: read the review comments on the caller's own
+ * workspace, optionally narrowed to one file.
+ */
+export interface GetDiffCommentsArgs {
+	file?: string;
+}
+
+/**
+ * Result of `getDiffComments`. Ensemblr-local comments only — the ones the user
+ * left in the Changes panel and the ones agents filed there. Comments synced
+ * from a GitHub pull request live in a separate snapshot and are deliberately
+ * absent, because nothing in this surface could reply to or resolve one.
+ */
+export interface GetDiffCommentsResult {
+	comments: readonly ReviewCommentWire[];
+}
+
+/**
+ * Upper bounds on an `addDiffComments` batch. The body cap matches
+ * {@link SET_SUMMARY_LIMITS}: a review note that grows past it has stopped being
+ * a comment on a line. The batch cap is a runaway guard — fifty notes is already
+ * more than a human reviewer leaves on one pass.
+ */
+export const DIFF_COMMENT_LIMITS = {
+	maxComments: 50,
+	maxBodyLength: 4_000,
+} as const;
+
+/** One review comment an agent files against a line of the workspace diff. */
+export interface AgentDiffComment {
+	/** Workspace-relative path of the file being commented on. */
+	filePath: string;
+	/** 1-based line in the file's new side; null for a file-level comment. */
+	lineNumber?: number | null;
+	body: string;
+}
+
+/** Args for `addDiffComments`: file review comments on the caller's own workspace. */
+export interface AddDiffCommentsArgs {
+	comments: readonly AgentDiffComment[];
+}
+
+/**
+ * Result of `addDiffComments`. Ids rather than whole rows: the agent wrote the
+ * bodies, so echoing them back spends its context on text it already holds.
+ */
+export interface AddDiffCommentsResult {
+	added: number;
+	commentIds: readonly string[];
+	message: string;
+}
+
+/**
  * Main → renderer request to set a workspace's kanban board status. The renderer
  * applies it to the shared board-status atom (and its localStorage) regardless of
  * which workspace view is mounted, since the board is global.
@@ -636,6 +732,17 @@ export interface FocusViewBroadcast {
  * an unrelated refetch.
  */
 export interface TabsChangedBroadcast {
+	workspaceId: string;
+}
+
+/**
+ * Main → renderer signal that an agent filed review comments on a workspace. The
+ * comment list is a cached query that only renderer-local mutations invalidate,
+ * and the query client refetches neither on an interval nor on window focus — so
+ * without this the Changes panel a user is watching while an agent reviews shows
+ * nothing until it remounts.
+ */
+export interface ReviewCommentsChangedBroadcast {
 	workspaceId: string;
 }
 

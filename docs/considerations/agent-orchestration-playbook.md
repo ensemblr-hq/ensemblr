@@ -95,6 +95,8 @@ a permission denial stays visible.
 | Ask the human to decide | `ensemblr_ask_user_question` (blocks until answered; Pi chats only) |
 | See the workspace | `ensemblr_list_workspaces`, `ensemblr_list_tabs`, `ensemblr_list_terminals` |
 | Move / read the workspace board | `ensemblr_set_workspace_status`, `ensemblr_get_workspace_status` |
+| Read the workspace diff | `ensemblr_get_workspace_diff` — call it with `stat: true` first, then read the whole diff or one `file` at a time |
+| Read / leave review comments | `ensemblr_get_diff_comments`, `ensemblr_add_diff_comments` (Ensemblr-local comments only; GitHub PR threads are not included) |
 | Pick a model for a child | `ensemblr_list_models` |
 | Surface work to the user | `ensemblr_focus_tab`, `ensemblr_focus_dock_tab`, `ensemblr_focus_panel` |
 | Tidy up | `ensemblr_close_tab` |

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { TOOL_DEFS } from '../../src/main/agent-control/index.ts';
 import {
 	type AgentControlOp,
 	ASK_USER_QUESTION_LIMITS,
@@ -105,6 +106,43 @@ const controlOpForToolName = (toolName: string): AgentControlOp =>
 		.replace(/_(.)/g, (_match, letter: string) =>
 			letter.toUpperCase(),
 		) as AgentControlOp;
+
+/**
+ * Matches one `tool(name, op, description, …)` registration in the extension,
+ * capturing the three leading string literals. The description alternates
+ * between quote styles across registrations, so the closing quote is
+ * back-referenced rather than fixed.
+ */
+const EXTENSION_TOOL_PATTERN =
+	/\btool\(\s*(['"])(ensemblr_[a-z_0-9]+)\1,\s*(['"])([A-Za-z]+)\3,\s*(['"])((?:\\.|(?!\5)[^\\])*)\5/gs;
+
+/**
+ * Tools whose description is allowed to differ between the two surfaces, because
+ * it names something only one species has. `setBranchName` closes by pointing at
+ * the tab-naming tool a Pi agent should use instead — advice a harness cannot
+ * follow, since it owns a terminal tab that titles itself from its session log.
+ * Everything absent from this set must match byte-for-byte.
+ */
+const SPECIES_SPECIFIC_DESCRIPTIONS: ReadonlySet<string> = new Set([
+	'ensemblr_set_branch_name',
+]);
+
+/**
+ * Reads each tool description the Pi extension registers, keyed by tool name, so
+ * it can be held against the MCP endpoint's copy of the same string.
+ */
+const extractEmbeddedToolDescriptions = (
+	source: string,
+): Map<string, string> => {
+	const byName = new Map<string, string>();
+	for (const match of source.matchAll(EXTENSION_TOOL_PATTERN)) {
+		byName.set(
+			match[2],
+			match[6].replace(/\\(['"\\])/g, '$1').replace(/\\n/g, '\n'),
+		);
+	}
+	return byName;
+};
 
 describe('agent-control AWARENESS parity', () => {
 	it('embeds the orchestrator variant byte-for-byte in the Pi extension', () => {
@@ -764,5 +802,57 @@ describe('harness playbook', () => {
 
 	it('is absent from the Pi extension, which never serves a harness', () => {
 		expect(readExtensionSource()).not.toContain('HARNESS_AWARENESS');
+	});
+});
+
+// A tool description is the only instruction a model gets before its first call,
+// and the two registration sites cannot import one another. Drift here shows up
+// as one species behaving differently from the other, which is invisible until
+// somebody compares transcripts.
+describe('agent-control tool description parity', () => {
+	it('registers every MCP tool in the Pi extension under the same op', () => {
+		const embedded = extractEmbeddedToolDescriptions(readExtensionSource());
+		for (const def of TOOL_DEFS) {
+			expect(embedded.has(def.name)).toBe(true);
+			expect(controlOpForToolName(def.name)).toBe(def.op);
+		}
+	});
+
+	it('describes each shared tool identically in both surfaces', () => {
+		const embedded = extractEmbeddedToolDescriptions(readExtensionSource());
+		for (const def of TOOL_DEFS) {
+			if (SPECIES_SPECIFIC_DESCRIPTIONS.has(def.name)) {
+				continue;
+			}
+			expect(`${def.name}: ${embedded.get(def.name)}`).toBe(
+				`${def.name}: ${def.description}`,
+			);
+		}
+	});
+
+	// An allowlisted tool is exempt because its two descriptions say genuinely
+	// different things; one that has drifted back into agreement is an entry to
+	// delete, not a passing case.
+	it('keeps every species-specific description actually divergent', () => {
+		const embedded = extractEmbeddedToolDescriptions(readExtensionSource());
+		for (const name of SPECIES_SPECIFIC_DESCRIPTIONS) {
+			const def = TOOL_DEFS.find((entry) => entry.name === name);
+			expect(def).toBeDefined();
+			expect(embedded.get(name)).not.toBe(def?.description);
+		}
+	});
+
+	// The stat probe is the cheap read that stands between a model and a whole
+	// workspace diff, so both surfaces have to lead with it in the imperative.
+	it('leads the diff tool with the stat probe in both surfaces', () => {
+		const diffTool = TOOL_DEFS.find(
+			(def) => def.op === 'getWorkspaceDiff',
+		)?.description;
+		expect(diffTool).toContain('stat=true FIRST');
+		expect(
+			extractEmbeddedToolDescriptions(readExtensionSource()).get(
+				'ensemblr_get_workspace_diff',
+			),
+		).toContain('stat=true FIRST');
 	});
 });

@@ -6,6 +6,7 @@ import type {
 	ExitPlanModeBroadcast,
 	FocusViewBroadcast,
 	PlanModeChangedBroadcast,
+	ReviewCommentsChangedBroadcast,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control';
 import { IPC_CHANNELS } from '../../shared/ipc/channels';
@@ -210,6 +211,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 		onAgentControlTabsChanged: (listener) =>
 			subscribe<TabsChangedBroadcast>(
 				IPC_CHANNELS.agentControlTabsChanged,
+				listener,
+			),
+		onAgentControlReviewCommentsChanged: (listener) =>
+			subscribe<ReviewCommentsChangedBroadcast>(
+				IPC_CHANNELS.agentControlReviewCommentsChanged,
 				listener,
 			),
 		onAgentControlBoardStatus: (listener) =>

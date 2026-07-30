@@ -5,16 +5,20 @@
  * terminal, script, and harness services at composition time.
  */
 import type {
+	AddDiffCommentsResult,
 	AgentControlConversationStatus,
 	AgentControlModelList,
 	AgentControlTabInfo,
 	AgentControlTerminalInfo,
 	AgentControlWorkspaceInfo,
+	AgentDiffComment,
 	AskUserQuestionItem,
 	AskUserQuestionResult,
 	ExitPlanModeArgs,
 	ExitPlanModeResult,
 	FocusPanelName,
+	GetDiffCommentsResult,
+	GetWorkspaceDiffResult,
 	OpenTabVariant,
 	SessionBriefNaming,
 	SetBranchNameResult,
@@ -234,6 +238,42 @@ export interface BoardPort {
 }
 
 /**
+ * Reads the workspace's own diff, scoped the way the Changes panel scopes it.
+ * The port owns the whole assembly — resolving the base branch, composing the
+ * status read with the per-file patches, and fitting the result to the payload
+ * budget — so the service stays a dispatch and the git service stays unaware
+ * that an agent is one of its callers.
+ */
+export interface DiffPort {
+	readWorkspaceDiff: (input: {
+		workspaceId: string;
+		workspaceCwd: string;
+		/** Read one file's patch whole instead of the budgeted whole-workspace diff. */
+		file?: string;
+		/** Return changed-file rows and totals only, issuing no per-file git calls. */
+		stat?: boolean;
+	}) => Promise<GetWorkspaceDiffResult>;
+}
+
+/**
+ * Reads and writes the workspace's Ensemblr-local review comments — the ones
+ * the Changes panel renders. Separate from {@link DiffPort} because it fronts
+ * the review service and its SQLite store rather than git, and writes here are
+ * bound to the caller's own workspace by construction: no member takes a
+ * workspace argument the agent could point elsewhere.
+ */
+export interface ReviewPort {
+	listComments: (input: {
+		workspaceId: string;
+		file?: string;
+	}) => Promise<GetDiffCommentsResult>;
+	addComments: (input: {
+		workspaceId: string;
+		comments: readonly AgentDiffComment[];
+	}) => Promise<AddDiffCommentsResult>;
+}
+
+/**
  * Resolves the active permission mode. The mode is a global app setting (the
  * same value the IPC permission gate reads), so it takes no workspace argument.
  */
@@ -331,6 +371,8 @@ export interface AgentControlPorts {
 	harnesses: HarnessPort;
 	focus: FocusPort;
 	board: BoardPort;
+	diff: DiffPort;
+	review: ReviewPort;
 	permissions: PermissionPort;
 	confirm: ConfirmPort;
 }

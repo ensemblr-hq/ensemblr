@@ -26,6 +26,7 @@ const EXPECTED_MIGRATIONS = [
 	'009_linear_cache',
 	'010_chat_tab_terminal_kind',
 	'011_chat_tab_full_title',
+	'012_comment_origin',
 ];
 
 function createTestDatabasePath(): {
@@ -108,6 +109,32 @@ test('opens an isolated database and applies foundation migrations', (t) => {
 		'todos',
 		'workspaces',
 	]);
+});
+
+test('gives every comment an author, defaulting rows that predate the column', (t) => {
+	const fixture = createTestDatabasePath();
+	t.after(fixture.cleanup);
+
+	const connection = openEnsemblrDatabase({
+		databasePath: fixture.databasePath,
+	});
+	t.after(() => connection.database.close());
+
+	const columns = connection.database
+		.prepare('PRAGMA table_info(comments)')
+		.all()
+		.map((row) => (row as { name: string }).name);
+	assert.equal(columns.includes('origin'), true);
+
+	connection.database.exec(`
+		INSERT INTO repositories (id, slug, name, path) VALUES ('r-1', 'r', 'R', '/r');
+		INSERT INTO workspaces (id, repository_id, slug, name, path) VALUES ('w-1', 'r-1', 'w', 'W', '/w');
+		INSERT INTO comments (id, workspace_id, file_path, body) VALUES ('c-1', 'w-1', 'a.ts', 'note');
+	`);
+	const row = connection.database
+		.prepare('SELECT origin FROM comments WHERE id = ?')
+		.get('c-1') as { origin: string };
+	assert.equal(row.origin, 'user');
 });
 
 test('runs migrations idempotently on reopen', (t) => {

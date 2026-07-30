@@ -5,6 +5,7 @@
  * scope-checked, guardrailed, then delegated to an existing service via a port.
  */
 import type {
+	AddDiffCommentsArgs,
 	AgentControlConversationStatus,
 	AgentControlErrorCode,
 	AgentControlOp,
@@ -18,8 +19,10 @@ import type {
 	FocusDockTabArgs,
 	FocusPanelArgs,
 	FocusTabArgs,
+	GetDiffCommentsArgs,
 	GetLastMessageResult,
 	GetSessionBriefResult,
+	GetWorkspaceDiffArgs,
 	LaunchHarnessArgs,
 	ListTabsArgs,
 	ListTerminalsArgs,
@@ -1049,6 +1052,32 @@ export function createAgentControlService({
 				return handleSetWorkspaceStatus(origin, args as SetWorkspaceStatusArgs);
 			case 'getWorkspaceStatus':
 				return handleGetWorkspaceStatus(origin);
+			// All three take their workspace from the origin rather than from an
+			// argument, so a cross-workspace read or write is unreachable by
+			// construction and there is nothing left here to gate.
+			case 'getWorkspaceDiff':
+				return ok(
+					await ports.diff.readWorkspaceDiff({
+						file: (args as GetWorkspaceDiffArgs).file,
+						stat: (args as GetWorkspaceDiffArgs).stat,
+						workspaceCwd: origin.workspaceCwd,
+						workspaceId: origin.workspaceId,
+					}),
+				);
+			case 'getDiffComments':
+				return ok(
+					await ports.review.listComments({
+						file: (args as GetDiffCommentsArgs).file,
+						workspaceId: origin.workspaceId,
+					}),
+				);
+			case 'addDiffComments':
+				return ok(
+					await ports.review.addComments({
+						comments: (args as AddDiffCommentsArgs).comments,
+						workspaceId: origin.workspaceId,
+					}),
+				);
 			case 'listWorkspaces':
 				return ok(await ports.workspaces.listWorkspaces());
 			case 'listTabs':

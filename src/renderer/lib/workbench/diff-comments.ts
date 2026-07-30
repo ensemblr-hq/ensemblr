@@ -68,7 +68,9 @@ function place(
 
 /**
  * Map a local review comment onto its diff line. Local comments are authored
- * against the current file, so they anchor to the new side.
+ * against the current file, so they anchor to the new side. An agent-filed
+ * comment carries an author so the thread badges who wrote it — a note the user
+ * left themselves needs no label, one an agent left does.
  * @param comment - The local review comment
  * @returns The diff comment view model
  */
@@ -78,6 +80,7 @@ function toLocalDiffComment(comment: ReviewCommentWire): DiffComment {
 		id: `local:${comment.id}`,
 		isResolved: comment.status === 'resolved',
 		source: 'local',
+		...(comment.origin === 'agent' ? { author: 'Agent' } : {}),
 	};
 }
 

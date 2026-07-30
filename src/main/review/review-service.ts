@@ -117,6 +117,7 @@ export function createReviewService({
 					database,
 					filePath: request.filePath,
 					lineNumber: request.lineNumber ?? null,
+					origin: request.origin ?? 'user',
 					workspaceId: request.workspaceId,
 				}),
 			};

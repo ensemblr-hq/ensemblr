@@ -70,11 +70,22 @@ const SUBAGENT_LEGIBILITY = `- Keep the workspace legible: name your tab (\`ense
 
 Keeping your own tab legible is your job, not the user's, and it is bookkeeping — do it as part of your turn, without narrating it or asking permission. Name the tab on your first turn, before the work; refresh the summary at the end of every turn. Naming the WORKSPACE and its git branch is not yours: that name describes the whole body of work rather than the one unit you were handed, so \`ensemblr_set_branch_name\` belongs to the root conversation that spawned you and is refused here. If the work deserves a different name, say so in your report and let your orchestrator make the call.`;
 
+/**
+ * The review bullet, shared verbatim by every role, because every role holds all
+ * three ops: they act on the workspace's own git worktree and its comment store
+ * rather than on a chat tab. Stat mode is named first and in capitals on purpose
+ * — a whole-workspace diff is the one payload in this surface with no natural
+ * ceiling, and the cheap probe is what stands between a model and thousands of
+ * characters of patch it did not need.
+ */
+const REVIEW_INVENTORY = `- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.`;
+
 /** Everything a root may drive: the whole control surface. */
 const ORCHESTRATOR_INVENTORY = `- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
 - Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
 - Terminals: start/stop the setup or run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`).
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message.
+${REVIEW_INVENTORY}
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.`;
 
@@ -87,6 +98,7 @@ const ORCHESTRATOR_INVENTORY = `- Conversations: open a chat tab and start a Pi 
  * so a child that went looking would only spend a turn on a refusal.
  */
 const SUBAGENT_INVENTORY = `- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read a terminal's output (\`ensemblr_read_terminal_output\`).
+${REVIEW_INVENTORY}
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's.
 - Escalate: \`ensemblr_notify_orchestrator\` reaches the orchestrator that spawned you — reason \`need_decision\` or \`blocked\` pulls it back to you, \`progress\` and \`done\` keep it informed without interrupting.
 
@@ -223,6 +235,7 @@ What you can drive:
 - Pi sub-agents: start one in a fresh chat tab (\`ensemblr_start_conversation\`), steer it (\`ensemblr_send_follow_up\`), block until children settle (\`ensemblr_wait_for_agents\`), read a child's status or last message, close its tab (\`ensemblr_close_tab\`).
 - Harnesses & terminals: launch another CLI harness (\`ensemblr_launch_harness\`); start/stop the setup or run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`).
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces, tabs, and terminals. Reads may span every open workspace.
+${REVIEW_INVENTORY}
 - Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
 - Name the work: \`ensemblr_set_branch_name\` renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. \`add-dark-mode\`), keeping any \`prefix/\` segment. Call it once, early, as soon as you know what the work is called. It applies only while the workspace still carries its generated placeholder name and the user can switch it off, so a reply saying nothing changed is a settled outcome, not a fault to retry.
 
@@ -256,6 +269,15 @@ const PLAN_MODE_HEADLINE = `PLAN MODE IS ON. While it stays on, this playbook re
 const PLAN_MODE_READ_BULLET = `- Read the repository: the \`read\` tool, and \`bash\` for read-only commands.`;
 
 /**
+ * The review bullet for a planning agent. All three ops survive planning, and
+ * the added sentence says why: a comment anchored to a line records what you
+ * found rather than changing it, which is the same argument that keeps naming
+ * and the board available. Without it a planning agent reads a write op on its
+ * allowed list as a contradiction and leaves it alone.
+ */
+const PLAN_MODE_REVIEW = `${REVIEW_INVENTORY} All three stay available while planning — annotating a diff is planning output, not a change to the repository.`;
+
+/**
  * The inspect and board bullets. Naming stays available on purpose: it labels
  * work rather than performing it. Two blocks split by role — only a root may name
  * the workspace, and only a root may move the board, because the kanban status
@@ -266,6 +288,7 @@ const PLAN_MODE_READ_BULLET = `- Read the repository: the \`read\` tool, and \`b
  */
 const planModeInspectBullets = (legibility: string, board: string): string =>
 	`- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
+${PLAN_MODE_REVIEW}
 ${legibility}
 ${board}`;
 

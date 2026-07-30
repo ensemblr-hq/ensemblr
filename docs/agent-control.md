@@ -10,9 +10,10 @@ a place a team of agents runs itself.
 It is available to every agent species Ensemblr can run:
 
 - **Pi** (first-party) gets the tools through a shipped Pi extension.
-- **Claude Code** and **Codex** get them through an embedded MCP server that
-  Ensemblr auto-configures at launch.
-- **Vibe** runs without control (no MCP config path) — see [`harnesses.md`](./harnesses.md).
+- **Claude Code**, **Codex**, and **Vibe** get them through an embedded MCP
+  server that Ensemblr auto-configures at launch. Vibe has no MCP-config flag, so
+  its server arrives as a `VIBE_MCP_SERVERS` env prefix — see
+  [`harnesses.md`](./harnesses.md).
 
 ## How it works
 
@@ -32,7 +33,7 @@ the full design record is [`considerations/agent-control-layer.md`](./considerat
 Control actions follow the **workspace permission mode** (the same setting that
 gates the agent's local tool use):
 
-| Mode | Reads | Writes (spawn, launch, terminals, focus, board) |
+| Mode | Reads | Writes (spawn, launch, terminals, focus, board, review comments) |
 | --- | --- | --- |
 | `read-only` | allowed | blocked |
 | `approval-required` | allowed | prompt the user to confirm |
@@ -100,6 +101,10 @@ the exact argument shapes):
   panel forward; list workspaces, tabs, terminals, and models; read a
   conversation's status or last message.
 - **Board** — move the workspace across the dashboard board and read its status.
+- **Review** — read the workspace diff (`ensemblr_get_workspace_diff`), read the
+  review comments on it (`ensemblr_get_diff_comments`), and leave comments of
+  your own (`ensemblr_add_diff_comments`). All three act on the caller's own
+  workspace; none takes a workspace argument. See below.
 - **Ask the user** — put a multiple-choice question to the human and block until
   they answer. Pi-only: the questionnaire renders in the chat tab that asked, in
   place of the composer, so the answer lands where the question came from. A
@@ -120,6 +125,69 @@ the exact argument shapes):
   and bought nothing. Headers no longer have to be distinct either: `headerOf`
   leads every label with its `Q<n>` position, so the pager is unambiguous however
   the agent worded them.
+
+## Reviewing the diff
+
+The three review ops let an agent read the work in its workspace and annotate it
+where the user will find the annotation — on the line, in the Changes panel, not
+buried in a chat turn.
+
+**Scope is the review panel's scope.** `ensemblr_get_workspace_diff` resolves the
+workspace's `base_branch` and diffs from `merge-base(base, HEAD)` to the working
+tree, so committed-on-branch edits, uncommitted edits, and untracked files all
+appear — the same set the Changes panel renders. A workspace with no recorded
+base degrades to the uncommitted change set, exactly as the panel does.
+
+**Call `stat: true` first.** A workspace diff is the one payload in this surface
+with no natural size ceiling. Stat mode returns the changed-file rows and totals
+and issues no per-file git call, so it is the cheap probe that says whether the
+full read is worth making. `file` and `stat` are alternatives rather than a
+filter pair — sending both is refused as `invalid-args`, since a single file has
+no stat and silent precedence would leave the caller unsure which read it got.
+
+**Every read is capped at 32,000 characters** — the same `MAX_AGENT_PAYLOAD_CHARS`
+ceiling a joined child report gets. A full read cuts on **whole-file boundaries
+only**, because a patch severed mid-hunk is unparseable; the files it drops come
+back in `omittedFiles`, each re-requestable with `file: "<path>"`. That per-file
+call carries the same ceiling, cutting at a **hunk boundary**: the files a full
+read drops are by definition the large ones, so leaving the recovery route
+unbounded would turn `omittedFiles` into an instruction to blow the context the
+budget had just protected. Git's own 2 MB output cap sits well above both, so the
+ceiling that binds is always this one.
+
+**Per-file reads go out eight at a time.** The app has no whole-workspace unified
+diff — the Changes panel renders one file at a time — so the port composes one
+from a status read plus a patch read per changed file. Those run in windows
+rather than serially, and the budget is re-checked between windows, so a wide
+diff stops issuing git calls once the patches already in hand fill the payload.
+
+**Comments are Ensemblr-local.** `ensemblr_get_diff_comments` returns the notes in
+the workspace's own SQLite store — the ones the user left in the Changes panel and
+the ones agents filed there. Comments synced from a GitHub pull request are
+deliberately **excluded**: they are a live `gh` snapshot rather than local rows,
+and nothing in this surface could reply to or resolve one, so returning them would
+be reading with no action attached. Every comment carries an `origin` (`user` or
+`agent`), so a future `getPullRequestComments` op is purely additive.
+
+**Authorship is stamped, not claimed.** `ensemblr_add_diff_comments` writes rows
+with `origin: 'agent'` set by the port; nothing an agent can send makes its
+comment read as the user's. Both surfaces badge it: the diff viewer labels the
+thread, and the Checks panel carries `origin` alongside the `path:line` that has
+taken its author slot.
+
+**The write announces itself.** The comment list is a cached query that only
+renderer-local mutations invalidate, and the client refetches neither on an
+interval nor on window focus — so an agent's write would otherwise sit invisible
+until the panel remounted. `addDiffComments` broadcasts on
+`ensemblr:agent-control-review-comments-changed`, which the renderer turns into a
+cache invalidation for that workspace, the same shape `tabsChanged` already uses.
+
+**All three survive both gates.** The two reads are reads, allowed in every
+permission mode. `addDiffComments` is a write and follows the mode like any other.
+Plan Mode leaves all three alone — a comment anchored to a line records what you
+found rather than changing it, the same argument that keeps naming and the board
+available while planning. A spawned sub-agent keeps all three too: a delegated
+reviewer filing comments is the point.
 
 ## Orchestration in practice
 
