@@ -9,24 +9,25 @@ import type {
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 /**
- * Why a running sub-agent's composer is inert: the orchestrator that spawned the
- * child owns the conversation and steers it with `ensemblr_send_follow_up`, so a
- * prompt typed here would interleave with the delegated turn the orchestrator is
- * waiting on. Shown as the send-button tooltip.
+ * Whether a session tab gets a composer at all. A spawned sub-agent's tab never
+ * does: the orchestrator that spawned it owns the conversation and steers it
+ * with `ensemblr_send_follow_up` for the tab's whole life, so a prompt typed
+ * here would put a second writer on a delegated turn. Nothing renders in the
+ * composer's place — a disabled textarea only advertises an affordance that
+ * never unlocks, and a child left running when its orchestrator stops is stopped
+ * with it rather than handed back to the user.
+ * @param session - The session tab about to be rendered.
+ * @returns True when the tab is the user's to type into.
  */
-const SUB_AGENT_COMPOSER_REASON =
-	'This sub-agent is working — the conversation that spawned it steers it until the turn ends.';
-
-/** Textarea placeholder standing in for the disabled composer on a busy sub-agent tab. */
-const SUB_AGENT_COMPOSER_PLACEHOLDER =
-	'Driven by the conversation that spawned it — send follow-ups from there';
+export function showsComposer(session: SessionTabModel): boolean {
+	return !session.isSubAgent;
+}
 
 /**
  * Computes the composer shell state from setup readiness, the active session,
- * and a Pi controller. Disables the composer while setup is not yet ready, while
- * Pi runtime checks fail, and while a spawned sub-agent is mid-turn. A settled
- * sub-agent's tab reopens to the user: nothing is steering it any more, and the
- * alternative is a conversation nobody can ever reply to.
+ * and a Pi controller. Disables the composer while setup is not yet ready and
+ * while Pi runtime checks fail. Sub-agent tabs never reach here — they render no
+ * composer at all; see {@link showsComposer}.
  */
 export function getComposerState({
 	activeSession,
@@ -121,15 +122,6 @@ export function getComposerState({
 			disabled: true,
 			disabledReason: `${setupDiagnostics.blockedCount} required setup checks need attention.`,
 			placeholder: 'Fix setup blockers before sending a prompt.',
-		};
-	}
-
-	if (activeSession.isSubAgent && isStreaming) {
-		return {
-			...base,
-			disabled: true,
-			disabledReason: SUB_AGENT_COMPOSER_REASON,
-			placeholder: SUB_AGENT_COMPOSER_PLACEHOLDER,
 		};
 	}
 

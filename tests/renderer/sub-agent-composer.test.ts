@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
-import { getComposerState } from '../../src/renderer/lib/workbench';
+import {
+	getComposerState,
+	showsComposer,
+} from '../../src/renderer/lib/workbench';
 import type { SessionTabModel } from '../../src/renderer/types/workbench';
 import type { SetupDiagnosticsSnapshot } from '../../src/shared/ipc/contracts/setup';
 
@@ -57,29 +60,15 @@ const composerStateFor = (
 	});
 
 describe('sub-agent composer', () => {
-	test('disables the composer while a spawned sub-agent is mid-turn', () => {
-		const composer = composerStateFor(chatSession(true), {
-			isStreaming: true,
-		});
-
-		expect(composer.disabled).toBe(true);
-		expect(composer.disabledReason).toBe(
-			'This sub-agent is working — the conversation that spawned it steers it until the turn ends.',
-		);
-		expect(composer.placeholder).toBe(
-			'Driven by the conversation that spawned it — send follow-ups from there',
-		);
+	// The tab belongs to the orchestrator that spawned it for the whole life of
+	// the conversation, so there is no state in which typing here is the right
+	// move — a disabled composer only advertised an affordance that never unlocks.
+	test('withholds the composer from a spawned sub-agent tab', () => {
+		expect(showsComposer(chatSession(true))).toBe(false);
 	});
 
-	// A sub-agent tab keeps its marker for life, so locking it on the marker alone
-	// left a finished conversation nobody could ever reply to — not the user, and
-	// not an orchestrator that has since closed or been lost to a restart.
-	test('reopens a settled sub-agent tab to the user', () => {
-		const composer = composerStateFor(chatSession(true));
-
-		expect(composer.disabled).toBe(false);
-		expect(composer.disabledReason).toBeNull();
-		expect(composer.placeholder).toBe('Ask Pi to continue astro inventory');
+	test('gives an ordinary chat tab a composer', () => {
+		expect(showsComposer(chatSession(false))).toBe(true);
 	});
 
 	test('leaves the composer enabled on an ordinary chat tab', () => {
@@ -90,15 +79,13 @@ describe('sub-agent composer', () => {
 		expect(composer.placeholder).toBe('Ask Pi to continue astro inventory');
 	});
 
-	// A setup blocker is the actionable one: the sub-agent lock lifts on its own
-	// when the turn ends, and a broken workspace does not.
-	test('reports a setup blocker ahead of the sub-agent lock', () => {
-		const composer = composerStateFor(chatSession(true), {
-			isStreaming: true,
+	test('disables an ordinary chat tab’s composer on a setup blocker', () => {
+		const composer = composerStateFor(chatSession(false), {
 			setupDiagnostics: null,
 			setupError: 'Setup script failed',
 		});
 
+		expect(composer.disabled).toBe(true);
 		expect(composer.disabledReason).toBe('Setup script failed');
 	});
 });

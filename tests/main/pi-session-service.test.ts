@@ -84,19 +84,58 @@ function deferAbortUntilExit(adapter: PiAgentAdapter): PiAgentAdapter {
 	};
 }
 
+// A runtime that refuses to die is exactly the case a stop cascade exists for,
+// so the fake has to be able to reject an abort the way a wedged child would.
+function rejectAbortForSession(
+	adapter: PiAgentAdapter,
+	shouldReject: (index: number) => boolean,
+): PiAgentAdapter {
+	let created = 0;
+	return {
+		createSession: async (input) => {
+			const session = await adapter.createSession(input);
+			const index = created;
+			created += 1;
+			if (!shouldReject(index)) {
+				return session;
+			}
+			return {
+				...session,
+				abort: async () => {
+					throw new Error('runtime is wedged');
+				},
+			};
+		},
+		shutdown: adapter.shutdown,
+	};
+}
+
+function resolveAdapter(
+	fake: ReturnType<typeof createFakePiAgentAdapter>,
+	options: {
+		deferAbort?: boolean;
+		rejectAbortFor?: (index: number) => boolean;
+	},
+): PiAgentAdapter {
+	if (options.rejectAbortFor) {
+		return rejectAbortForSession(fake.adapter, options.rejectAbortFor);
+	}
+	return options.deferAbort ? deferAbortUntilExit(fake.adapter) : fake.adapter;
+}
+
 function createService(
 	database: DatabaseSync,
 	options: {
 		deferAbort?: boolean;
 		eventSink?: PiSessionEventSink;
+		rejectAbortFor?: (index: number) => boolean;
+		resolveSpawnedChildren?: (sessionId: string) => readonly string[];
 		sessionSummaryWriter?: SessionSummaryWriter;
 	} = {},
 ) {
 	const fake = createFakePiAgentAdapter();
 	const piAgentClient = createPiAgentClient({
-		adapter: options.deferAbort
-			? deferAbortUntilExit(fake.adapter)
-			: fake.adapter,
+		adapter: resolveAdapter(fake, options),
 	});
 	const service = createPiSessionService({
 		databaseService: {
@@ -108,6 +147,7 @@ function createService(
 		eventSink: options.eventSink,
 		piAgentClient,
 		queueNaming: () => undefined,
+		resolveSpawnedChildren: options.resolveSpawnedChildren,
 		sessionSummaryWriter: options.sessionSummaryWriter,
 	});
 	return { fake, service };
@@ -581,6 +621,129 @@ test('stopSession aborts the runtime and marks the turn aborted', async (t) => {
 
 	const runtime = fake.getOpenSessions();
 	assert.equal(runtime.length, 0, 'fake adapter should drop closed sessions');
+});
+
+// A spawned sub-agent's tab carries no composer, so nobody but the orchestrator
+// can end its turn. Stopping the orchestrator has to reach the whole lineage or
+// the children keep working with no one left to read their reports.
+test('stopSession stops the whole lineage the stopped session spawned', async (t) => {
+	const fixture = openFixture(t);
+	const lineage = new Map<string, readonly string[]>();
+	const { fake, service } = createService(fixture.database, {
+		resolveSpawnedChildren: (sessionId) => lineage.get(sessionId) ?? [],
+	});
+
+	const openWorking = async () => {
+		const snapshot = await service.openSession({
+			executable: createReadyExecutable(),
+			workspaceCwd: '/tmp/ensemblr/svc/ws',
+			workspaceId: fixture.workspaceId,
+		});
+		await service.submitPrompt({ prompt: 'work', sessionId: snapshot.id });
+		return snapshot;
+	};
+
+	const orchestrator = await openWorking();
+	const child = await openWorking();
+	const grandchild = await openWorking();
+	lineage.set(orchestrator.id, [child.id]);
+	lineage.set(child.id, [grandchild.id]);
+
+	await service.stopSession({ sessionId: orchestrator.id });
+
+	assert.equal(fake.getOpenSessions().length, 0, 'every runtime is closed');
+	for (const spawned of [child, grandchild]) {
+		assert.equal(
+			getPiSessionById({ database: fixture.database, id: spawned.id })?.status,
+			'closed',
+		);
+	}
+});
+
+// The orchestrator is the session most likely to be wedged when the user reaches
+// for Stop, and it is the one whose children the cascade exists to collect. A
+// root that cannot abort must still surface as a failure to the caller.
+test('stopSession stops the children even when the stopped session cannot abort', async (t) => {
+	const fixture = openFixture(t);
+	const lineage = new Map<string, readonly string[]>();
+	const { service } = createService(fixture.database, {
+		rejectAbortFor: (index) => index === 0,
+		resolveSpawnedChildren: (sessionId) => lineage.get(sessionId) ?? [],
+	});
+
+	const openWorking = async () => {
+		const snapshot = await service.openSession({
+			executable: createReadyExecutable(),
+			workspaceCwd: '/tmp/ensemblr/svc/ws',
+			workspaceId: fixture.workspaceId,
+		});
+		await service.submitPrompt({ prompt: 'work', sessionId: snapshot.id });
+		return snapshot;
+	};
+
+	const orchestrator = await openWorking();
+	const child = await openWorking();
+	lineage.set(orchestrator.id, [child.id]);
+
+	await assert.rejects(service.stopSession({ sessionId: orchestrator.id }));
+
+	assert.equal(
+		getPiSessionById({ database: fixture.database, id: child.id })?.status,
+		'closed',
+		'a child must not be stranded by an orchestrator that would not abort',
+	);
+});
+
+test('stopSession leaves conversations the stopped session never spawned alone', async (t) => {
+	const fixture = openFixture(t);
+	const { service } = createService(fixture.database, {
+		resolveSpawnedChildren: () => [],
+	});
+
+	const stopped = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const bystander = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+
+	await service.stopSession({ sessionId: stopped.id });
+
+	assert.equal(service.getSession(bystander.id)?.runtimeOpen, true);
+});
+
+// Lineage comes from an in-memory registry the app rebuilds across restarts, so
+// the cascade cannot assume it is walking a tree.
+test('stopSession terminates on a lineage that points back at itself', async (t) => {
+	const fixture = openFixture(t);
+	const lineage = new Map<string, readonly string[]>();
+	const { service } = createService(fixture.database, {
+		resolveSpawnedChildren: (sessionId) => lineage.get(sessionId) ?? [],
+	});
+
+	const first = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	const second = await service.openSession({
+		executable: createReadyExecutable(),
+		workspaceCwd: '/tmp/ensemblr/svc/ws',
+		workspaceId: fixture.workspaceId,
+	});
+	lineage.set(first.id, [second.id]);
+	lineage.set(second.id, [first.id]);
+
+	await service.stopSession({ sessionId: first.id });
+
+	assert.equal(
+		getPiSessionById({ database: fixture.database, id: second.id })?.status,
+		'closed',
+	);
 });
 
 test('stopSession broadcasts the shutdown that lands after the session left the active map', async (t) => {
