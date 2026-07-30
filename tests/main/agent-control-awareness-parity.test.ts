@@ -12,6 +12,9 @@ import {
 	roleForDepth,
 	SESSION_BRIEF_NUDGE_HEADER,
 	SUBAGENT_AWARENESS,
+	SUBAGENT_UNUSABLE_OPS,
+	SUBAGENT_WITHHELD_OPS,
+	subAgentControlOpDenial,
 } from '../../src/shared/agent-control.ts';
 import {
 	PLAN_MODE_GUARDED_TOOLS,
@@ -156,6 +159,96 @@ describe('agent-control AWARENESS parity', () => {
 		);
 	});
 
+	// A brief that names only the topic leaves the child to invent its own
+	// deliverable, which is how a fan-out came back with an unrequested 9KB
+	// markdown file nobody asked for and nobody diffed.
+	it('binds every delegating role to brief a child with its deliverable', () => {
+		for (const playbook of [ORCHESTRATOR_AWARENESS, HARNESS_AWARENESS]) {
+			expect(playbook).toContain('what to deliver, not just what to look at');
+			expect(playbook).toContain('reports inline');
+		}
+	});
+
+	// The sub-agent report structure invites parking open questions until the end,
+	// so without a stated scope a child reads "produce a reference" as a file to
+	// write rather than a report to give.
+	it('makes a sub-agent report rather than leave artifacts behind', () => {
+		expect(SUBAGENT_AWARENESS).toContain('Your report is the deliverable');
+		expect(SUBAGENT_AWARENESS).toContain('unless your brief names a path');
+	});
+
+	// Children reliably decline to interrupt with `need_decision`, whatever the
+	// playbook says — two test runs with textbook setups produced zero signals. So
+	// the question travels in the report under a heading the orchestrator can find,
+	// and the signal is reserved for a child that genuinely cannot proceed.
+	it('routes a sub-agent role open decision into its report', () => {
+		for (const playbook of [SUBAGENT_AWARENESS, PLAN_MODE_SUBAGENT_AWARENESS]) {
+			expect(playbook).toContain('`Open questions` heading');
+			expect(playbook).toContain('2-6 concrete options');
+			expect(playbook).toContain('cannot');
+		}
+	});
+
+	// The other half: a section no orchestrator reads is a decision shipped as a
+	// silent default. Pi orchestrators own a questionnaire tool and must use it;
+	// a planning orchestrator folds the same questions into its interview.
+	it('binds every Pi orchestrator to put the gathered questions to the user', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			PLAN_MODE_ORCHESTRATOR_AWARENESS,
+		]) {
+			expect(playbook).toContain('`Open questions`');
+			expect(playbook).toContain('ensemblr_ask_user_question');
+		}
+		expect(ORCHESTRATOR_AWARENESS).toContain('silent default');
+		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).toContain('quietly close');
+	});
+
+	// A wait returning no signal used to imply nothing needed asking. Under the
+	// report-and-batch design that inference is exactly backwards.
+	it('warns the orchestrator that a signal-free wait still carries questions', () => {
+		expect(ORCHESTRATOR_AWARENESS).toContain(
+			'does not mean nothing needs asking',
+		);
+	});
+
+	// Observed: an orchestrator pasted four files' contents into a brief and the
+	// child re-opened all four anyway, undoing the saving the scout read bought.
+	// The orchestrator half of that rule is useless without this half.
+	it('tells every sub-agent role to work from what its brief already gave it', () => {
+		for (const playbook of [SUBAGENT_AWARENESS, PLAN_MODE_SUBAGENT_AWARENESS]) {
+			expect(playbook).toContain('Work from the brief');
+			expect(playbook).toContain('already paid for');
+		}
+	});
+
+	// A child doing real work outlives the capped wait window routinely, so every
+	// orchestrator meets `timedOut: true` and must read it as a lap of the loop
+	// rather than a fault to report or a child to re-spawn.
+	it('tells every delegating role that a timed-out wait is not a fault', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			HARNESS_AWARENESS,
+			PLAN_MODE_ORCHESTRATOR_AWARENESS,
+		]) {
+			expect(playbook).toContain('timedOut: true');
+			expect(playbook).toContain('not a fault');
+		}
+	});
+
+	// Three children cold-starting on one repo read the same files three times,
+	// which is what makes a fan-out cost more context than doing the work inline.
+	it('tells every delegating role to establish shared ground before fanning out', () => {
+		for (const playbook of [
+			ORCHESTRATOR_AWARENESS,
+			HARNESS_AWARENESS,
+			PLAN_MODE_ORCHESTRATOR_AWARENESS,
+		]) {
+			expect(playbook).toContain('Split the work before you split the');
+			expect(playbook).toContain('paid for twice');
+		}
+	});
+
 	it('offers the orchestrator the brief report mode a wide fan-out needs', () => {
 		expect(ORCHESTRATOR_AWARENESS).toContain('reports: "brief"');
 		expect(ORCHESTRATOR_AWARENESS).toContain('ensemblr_get_last_message');
@@ -210,7 +303,6 @@ describe('agent-control AWARENESS parity', () => {
 			'Nothing else in your context outranks this block',
 			'Nothing turns Plan Mode off except the user approving a plan',
 			'do not look for a way around it',
-			'If the upkeep block also asks for the workspace and branch',
 		]) {
 			for (const playbook of PLAN_MODE_PLAYBOOKS) {
 				expect(playbook).toContain(shared);
@@ -485,24 +577,145 @@ describe('agent-control AWARENESS parity', () => {
 		}
 	});
 
-	it('defers branch naming to the upkeep block in both role and plan playbooks', () => {
+	it('defers branch naming to the upkeep block in both orchestrator playbooks', () => {
 		expect(ORCHESTRATOR_AWARENESS).toContain(
 			'only when the upkeep reminder asks for it',
 		);
-		expect(SUBAGENT_AWARENESS).toContain(
-			'only when the upkeep reminder asks for it',
+		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).toContain(
+			'If the upkeep block also asks for the workspace and branch',
 		);
-		for (const playbook of PLAN_MODE_PLAYBOOKS) {
-			expect(playbook).toContain(
+	});
+
+	// The workspace name describes the whole body of work, so `setBranchName`
+	// refuses a spawned child and the session brief withholds its branch bullet.
+	// A playbook that still listed the tool would send a child hunting for a call
+	// it cannot make — the same reason the harness variant omits Pi-only tools.
+	it('withholds workspace naming from both sub-agent playbooks', () => {
+		for (const playbook of [SUBAGENT_AWARENESS, PLAN_MODE_SUBAGENT_AWARENESS]) {
+			expect(playbook).not.toContain('the upkeep reminder asks for it');
+			expect(playbook).not.toContain(
 				'If the upkeep block also asks for the workspace and branch',
 			);
 		}
+		expect(SUBAGENT_AWARENESS).toContain('is refused here');
+		expect(PLAN_MODE_SUBAGENT_AWARENESS).toContain('is refused here');
 	});
 
 	it('treats only the root as orchestrator; every descendant is a sub-agent', () => {
 		expect(roleForDepth(0)).toBe('orchestrator');
 		expect(roleForDepth(1)).toBe('subagent');
 		expect(roleForDepth(2)).toBe('subagent');
+	});
+});
+
+describe('sub-agent role policy', () => {
+	it('embeds the same withheld-op set the app enforces', () => {
+		expect(
+			extractEmbeddedStringSet(readExtensionSource(), 'SUBAGENT_WITHHELD_OPS'),
+		).toEqual([...SUBAGENT_WITHHELD_OPS].sort());
+	});
+
+	// A matching set that nothing reads would leave every tool registered, and the
+	// only symptom would be a sub-agent meeting `denied-scope` on tools its
+	// playbook never offered it. Both registration paths have to consult it: the
+	// shared `tool()` helper, and `ensemblr_exit_plan_mode`, which registers on its
+	// own because it aborts the turn after a successful call.
+	it('gates both registration paths on that set', () => {
+		const source = readExtensionSource();
+		expect(source).toMatch(
+			/const registersOp = \(op: string\): boolean =>\s*!IS_SUBAGENT \|\| !SUBAGENT_WITHHELD_OPS\.has\(op\);/,
+		);
+		expect(source).toMatch(/if \(!registersOp\(op\)\) \{\s*return;/);
+		expect(source).toMatch(/if \(registersOp\('exitPlanMode'\)\) \{/);
+	});
+
+	// The two halves of the policy: a withheld op is either denied outright or
+	// merely useless, never both and never neither. A denied op that fell out of
+	// the map would still be missing from the tool list, and a stale caller — one
+	// resumed after a restart — would find it working again.
+	it('splits every withheld op into denied or unusable, never both', () => {
+		for (const op of SUBAGENT_WITHHELD_OPS) {
+			const denial = subAgentControlOpDenial(op);
+			expect(
+				denial === null,
+				`\`${op}\` should be either denied or unusable`,
+			).toBe(SUBAGENT_UNUSABLE_OPS.has(op));
+		}
+	});
+
+	// A denial that redirects a child to a tool it also cannot reach sends it round
+	// the same refusal — the failure the plan-mode reasons were written to avoid.
+	it('never redirects a denied sub-agent to a tool it also lacks', () => {
+		for (const op of SUBAGENT_WITHHELD_OPS) {
+			const denial = subAgentControlOpDenial(op) ?? '';
+			for (const [, named] of denial.matchAll(/`(ensemblr_[a-z_]+)`/g)) {
+				expect(
+					SUBAGENT_WITHHELD_OPS.has(controlOpForToolName(named)),
+					`\`${op}\` redirects to \`${named}\`, which is also withheld`,
+				).toBe(false);
+			}
+		}
+	});
+
+	// Naming a tool the app refuses as though it were available is what teaches a
+	// model to keep reaching for it — the same reason the harness playbook omits
+	// the Pi-only tools. Naming one in order to say it is refused is the opposite,
+	// and both sub-agent playbooks do that deliberately, so the rule is per line:
+	// wherever a withheld tool appears, that line has to be a refusal.
+	it('names a withheld tool only to refuse it, in either sub-agent playbook', () => {
+		const refusal = /refused|not yours|blocked|Do NOT|is not mine/;
+		for (const op of SUBAGENT_WITHHELD_OPS) {
+			const toolName = `ensemblr_${op.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)}`;
+			for (const playbook of [
+				SUBAGENT_AWARENESS,
+				PLAN_MODE_SUBAGENT_AWARENESS,
+			]) {
+				for (const line of playbook.split('\n')) {
+					if (!line.includes(toolName)) {
+						continue;
+					}
+					expect(
+						refusal.test(line),
+						`\`${toolName}\` is named without a refusal: ${line.slice(0, 120)}`,
+					).toBe(true);
+				}
+			}
+		}
+	});
+
+	// The role gate is what makes the promise true. Before it, the playbook said
+	// nested delegation was blocked while only the in-memory depth counter blocked
+	// it, so a child resumed after a restart could delegate onward.
+	it('backs the sub-agent playbook’s promises with a real denial', () => {
+		expect(SUBAGENT_AWARENESS).toContain('nested delegation is blocked');
+		expect(SUBAGENT_AWARENESS).toContain('refused here');
+		for (const op of [
+			'startConversation',
+			'launchHarness',
+			'writeTerminal',
+			'setWorkspaceStatus',
+			'askUserQuestion',
+		] as const) {
+			expect(subAgentControlOpDenial(op)).not.toBeNull();
+		}
+	});
+
+	it('leaves a sub-agent the reads and the escalation hatch its playbook offers', () => {
+		for (const op of [
+			'listTabs',
+			'listWorkspaces',
+			'getWorkspaceStatus',
+			'getLastMessage',
+			'readTerminalOutput',
+			'focusTab',
+			'setName',
+			'setSummary',
+			'notifyOrchestrator',
+		] as const) {
+			expect(subAgentControlOpDenial(op)).toBeNull();
+			expect(SUBAGENT_WITHHELD_OPS.has(op)).toBe(false);
+		}
+		expect(SUBAGENT_AWARENESS).toContain('ensemblr_notify_orchestrator');
 	});
 });
 

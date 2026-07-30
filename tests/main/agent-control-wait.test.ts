@@ -206,6 +206,109 @@ describe('agent-control waitForAgents', () => {
 		}
 	});
 
+	// A child doing real work outlives the capped wait window routinely, and an
+	// orchestrator reading a bare `timedOut: true` treats it as a fault to report
+	// or a child to re-spawn. The call that resumes the wait has to travel as
+	// prose, naming the ids, the same way a shortened report carries its pointer.
+	it('tells a timed-out wait to resume on the pending children', async () => {
+		const statuses = new Map([
+			['c1', 'idle'],
+			['c2', 'streaming'],
+		]);
+		const { service, master } = setup({ statuses, children: ['c1', 'c2'] });
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all', timeoutMs: 1000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.note).toContain('Not a failure');
+			expect(data.note).toContain('ensemblr_wait_for_agents');
+			expect(data.note).toContain('"c2"');
+			expect(data.note).not.toContain('"c1"');
+			expect(data.note).toContain('mode: "all"');
+		}
+	});
+
+	// A caller that chose `first` to react to whichever child lands first did not
+	// ask to start blocking on all of them, so the resume note has to echo its own
+	// mode rather than hand back the one the note was first written for.
+	it('echoes the caller’s own mode in the resume note', async () => {
+		const statuses = new Map([['c1', 'streaming']]);
+		const { service, master } = setup({ statuses, children: ['c1'] });
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.timedOut).toBe(true);
+			expect(data.note).toContain('mode: "first"');
+			expect(data.note).not.toContain('mode: "all"');
+		}
+	});
+
+	// After a restart the lineage registry is empty, so a default wait finds no
+	// children and used to return a bare empty result — which reads as "nothing
+	// needs me" at exactly the moment a resumed child's signal is parked and
+	// unreachable. The recovery has to travel as prose.
+	it('tells a default wait with no registered children how to recover them', async () => {
+		const { service, master } = setup({ statuses: new Map(), children: [] });
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: {},
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.completed).toEqual([]);
+			expect(data.pending).toEqual([]);
+			expect(data.timedOut).toBe(false);
+			expect(data.note).toContain('restarted');
+			expect(data.note).toContain('targets');
+			expect(data.note).toContain('ensemblr_get_last_message');
+		}
+	});
+
+	// The same empty result is a settled answer when the caller named its targets,
+	// so the recovery note would only be noise.
+	it('omits the recovery note when the caller named an empty target list', async () => {
+		const { service, master } = setup({ statuses: new Map(), children: [] });
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { targets: [] },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect((result.data as WaitForAgentsResult).note).toBeUndefined();
+		}
+	});
+
+	it('omits the resume note when every child settled', async () => {
+		const statuses = new Map([
+			['c1', 'idle'],
+			['c2', 'idle'],
+		]);
+		const { service, master } = setup({ statuses, children: ['c1', 'c2'] });
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all' },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.timedOut).toBe(false);
+			expect(data.note).toBeUndefined();
+		}
+	});
+
 	it('is woken early by a child need_decision signal', async () => {
 		const statuses = new Map([
 			['c1', 'streaming'],
@@ -351,11 +454,10 @@ describe('agent-control waitForAgents', () => {
 		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.data).toEqual({
-				completed: [],
-				pending: [],
-				timedOut: false,
-			});
+			const data = result.data as WaitForAgentsResult;
+			expect(data.completed).toEqual([]);
+			expect(data.pending).toEqual([]);
+			expect(data.timedOut).toBe(false);
 		}
 	});
 

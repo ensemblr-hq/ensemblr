@@ -52,7 +52,7 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_start_conversation',
 		op: 'startConversation',
 		description:
-			"Open a fresh chat tab (or reuse one via chatTabId) and start a Pi conversation. Pass a short, descriptive title to name the sub-agent's tab. Set wait=true to block until it finishes.",
+			"Open a fresh chat tab (or reuse one via chatTabId) and start a Pi conversation. Pass a short, descriptive title to name the sub-agent's tab. Brief it with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask about, and whether it reports inline (the default) or writes a file at a path you name. Set wait=true to block until it finishes.",
 		shape: {
 			chatTabId: z.string().optional(),
 			prompt: z.string(),
@@ -223,7 +223,7 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_notify_orchestrator',
 		op: 'notifyOrchestrator',
 		description:
-			'Sub-agents only: notify the orchestrator that spawned you. reason need_decision/blocked wakes its wait immediately so it can answer; progress/done are informational.',
+			'Sub-agents only: notify the orchestrator that spawned you. reason need_decision/blocked wakes its wait immediately so it can answer, so use it when the answer changes what you do next; a decision that only bites after you report belongs in your report as options and tradeoffs. progress/done are informational.',
 		shape: {
 			reason: z.enum(['need_decision', 'blocked', 'progress', 'done']),
 			message: z.string(),

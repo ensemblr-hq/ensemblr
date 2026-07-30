@@ -537,7 +537,12 @@ describe('plan mode: askUserQuestion', () => {
 		expect(ports.ask.ask).not.toHaveBeenCalled();
 	});
 
-	it('leaves a non-planning sub-agent able to ask', async () => {
+	// This used to be allowed, and the reason it was denied while planning never
+	// depended on Plan Mode: the orchestrator owns the conversation with the user
+	// and is blocked in `waitForAgents` either way, so a dialog opened here waits
+	// in a tab nobody is watching. The denial is unconditional now, in
+	// `src/shared/agent-control/subagent-policy.ts`.
+	it('refuses a non-planning sub-agent too, for the same reason', async () => {
 		const { ports, service } = setup({ planning: false, subAgent: true });
 
 		const result = await invoke(service, 'askUserQuestion', {
@@ -546,7 +551,12 @@ describe('plan mode: askUserQuestion', () => {
 			],
 		});
 
-		expect(result.ok).toBe(true);
-		expect(ports.ask.ask).toHaveBeenCalled();
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-scope');
+			expect(result.error).toContain('ensemblr_notify_orchestrator');
+			expect(result.error).toContain('Open questions');
+		}
+		expect(ports.ask.ask).not.toHaveBeenCalled();
 	});
 });

@@ -10,7 +10,10 @@ import path from 'node:path';
 
 import { type App, BrowserWindow, dialog } from 'electron';
 
-import { HARNESS_AWARENESS, roleForDepth } from '../../shared/agent-control.ts';
+import {
+	HARNESS_AWARENESS,
+	resolveAgentRole,
+} from '../../shared/agent-control.ts';
 import {
 	decorateHarnessCommand,
 	HARNESS_INSTRUCTIONS_FILENAME,
@@ -166,7 +169,7 @@ export function createAgentControlIntegration(
 		return {
 			ENSEMBLR_CONTROL_URL: serverUrl,
 			ENSEMBLR_CONTROL_TOKEN: origin.token,
-			ENSEMBLR_CONTROL_ROLE: marked ? 'subagent' : roleForDepth(origin.depth),
+			ENSEMBLR_CONTROL_ROLE: resolveAgentRole(marked, origin.depth),
 		};
 	};
 

@@ -232,6 +232,11 @@ export function useSessionTabState({
 		void queryClient.invalidateQueries({
 			queryKey: ensemblrQueryKeys.closedChatTabsWithSummary(workspaceId),
 		});
+		// The timeline resolves a tab's branch id out of the session list, so a tab
+		// that just gained a Pi session has no branch to query until this refetches.
+		void queryClient.invalidateQueries({
+			queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
+		});
 	}, [queryClient, workspaceId]);
 
 	// Refresh the Pi session list on status events across ALL sessions in this
