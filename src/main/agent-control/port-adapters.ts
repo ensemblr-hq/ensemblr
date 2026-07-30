@@ -18,6 +18,7 @@ import type {
 	TabsChangedBroadcast,
 } from '../../shared/agent-control.ts';
 import {
+	buildConversationTranscript,
 	MAX_AGENT_PAYLOAD_CHARS,
 	resolveAgentRole,
 } from '../../shared/agent-control.ts';
@@ -450,6 +451,16 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				return null;
 			}
 			return findFinalTurnText(deps, snapshot.branchId);
+		},
+		readTranscript: async ({ piSessionId, ...page }) => {
+			const snapshot = deps.piSessionService.getSession(piSessionId);
+			return buildConversationTranscript({
+				events: snapshot
+					? deps.piSessionService.listEvents(snapshot.branchId)
+					: [],
+				piSessionId,
+				...page,
+			});
 		},
 		isSpawnedSubAgent: async (piSessionId) =>
 			readSubAgentMarker(deps, piSessionId),

@@ -35,7 +35,7 @@ What you can drive:
 - Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
 - Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
 - Terminals: start/stop the setup or run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`).
-- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message.
+- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
@@ -61,7 +61,7 @@ When delegation is warranted — delegate → wait → evaluate → integrate:
    - A child that cannot produce its deliverable at all until someone answers calls \`ensemblr_notify_orchestrator\` with reason \`need_decision\` or \`blocked\`, which wakes your wait immediately whatever the mode. Ordinary open decisions do NOT arrive this way — children park those in their reports for you to batch in step 5, so a wait that returns no signal does not mean nothing needs asking.
    - \`timedOut: true\` with children still in \`pending\` is a lap of the loop, not a fault: the wait window is capped and a child doing real work outlives it routinely. Wait again on the pending ids. Do not report a timeout to the user as a problem, work around it, or re-spawn the child — it is still working.
 3. Evaluate each result. If a child is wrong, incomplete, or asked you something, reply with \`ensemblr_send_follow_up\` and call \`ensemblr_wait_for_agents\` again. Repeat until done.
-4. Verify before you rely. A report is a claim, not a fact you checked. Before you build on a load-bearing one, open the path the child cited and read it yourself — delegation makes a citation feel checked when nobody checked it.
+4. Verify before you rely. A report is a claim, not a fact you checked. Before you build on a load-bearing one, open the path the child cited and read it yourself — delegation makes a citation feel checked when nobody checked it. When the claim is about what the child did rather than what a file says — a test suite it ran, a command that passed — \`ensemblr_read_conversation\` replays its actual tool calls; probe it with \`stat: true\` first.
 5. Put the open questions to the user, once, before you answer. Read every child's \`Open questions\` section, drop the ones you can settle yourself by reading, merge the duplicates across children, and ask what survives with \`ensemblr_ask_user_question\` — up to 4 per call, 2-6 options each, your recommendation in the option descriptions. One questionnaire at the end is why children park questions instead of interrupting you mid-run; skipping it is how a decision the user cared about ships as a silent default. Then fold the answers into the work.
 6. Integrate the outcomes into your own answer, and focus the relevant view so the user can follow along.
 
@@ -78,7 +78,7 @@ Etiquette & limits:
 const SUBAGENT_AWARENESS = `You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`).
 
 What you can drive:
-- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read a terminal's output (\`ensemblr_read_terminal_output\`).
+- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`).
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's.
 - Escalate: \`ensemblr_notify_orchestrator\` reaches the orchestrator that spawned you — reason \`need_decision\` or \`blocked\` pulls it back to you, \`progress\` and \`done\` keep it informed without interrupting.
@@ -127,7 +127,7 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you can dri
 - Read the repository: the \`read\` tool, and \`bash\` for read-only commands.
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
 - Delegate reading: spawn a sub-agent to answer a question for you (\`ensemblr_start_conversation\`), block until your children settle (\`ensemblr_wait_for_agents\`), steer one (\`ensemblr_send_follow_up\`), read its report (\`ensemblr_get_last_message\`), close its tab (\`ensemblr_close_tab\`). See the fan-out section below.
-- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
+- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. All three stay available while planning — annotating a diff is planning output, not a change to the repository.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`). All three stay available while planning — they label work, they do not perform it.
 - Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
@@ -152,7 +152,7 @@ Finding those facts does not have to be serial. When the plan hinges on facts sp
 2. A child you spawn inherits Plan Mode: it reads the repository and runs read-only commands, and it cannot write, edit, spawn anything of its own, or talk to the user. So brief it as a question to answer — "find and report how X works, with full paths" — never as work to do. A child briefed to implement will come back saying it could not. Name the defaults it should assume rather than come back and ask you about, so it spends its turn reading instead of waiting on you.
 3. Once everything that can run in parallel is delegated, call \`ensemblr_wait_for_agents\` and let it block. Do NOT hand-roll a polling loop with \`ensemblr_get_conversation_status\`. \`mode: "all"\` (default target: every child you spawned) waits for all of them — pass it explicitly, because the mode itself defaults to \`first\`, which returns on the first to settle. Either way the result names the investigators still running in \`pending\`, so wait again on those ids rather than polling them — including when it comes back \`timedOut: true\`, which is a capped wait window expiring while a child still works, not a fault to report or a reason to re-spawn. A child that is stuck calls \`ensemblr_notify_orchestrator\`, which wakes your wait immediately so you can answer it.
 4. Evaluate each report. A child's last message IS its report — a planning child never calls \`ensemblr_exit_plan_mode\`, so do not wait for a plan from one. If a report is thin or off-target, reply with \`ensemblr_send_follow_up\` and wait again. \`ensemblr_get_last_message\` recovers a report if your wait was interrupted. A child cannot ask the user anything, so its \`Open questions\` section is interview material for you: drop what you can settle by reading, merge what several children raised, and fold the rest into your next \`ensemblr_ask_user_question\` round. A decision a child left open is not one you may quietly close.
-5. Verify before you rely. A report is a claim, not a fact you checked. Before a load-bearing one — a version floor, a package or config wiring, a constraint that picks the approach — goes into your plan, open the path the child cited and read it yourself; that is what the full paths are for. Delegation makes a citation feel checked when nobody checked it. A child that read documentation rather than this repository leaves you nothing to re-read, so attribute that claim to its report in the plan instead of asserting it.
+5. Verify before you rely. A report is a claim, not a fact you checked. Before a load-bearing one — a version floor, a package or config wiring, a constraint that picks the approach — goes into your plan, open the path the child cited and read it yourself; that is what the full paths are for. Delegation makes a citation feel checked when nobody checked it. A child that read documentation rather than this repository leaves you nothing to re-read, so attribute that claim to its report in the plan instead of asserting it. A claim about what the child did rather than what a file says is settled by \`ensemblr_read_conversation\`, which replays its actual tool calls.
 6. Integrate the findings as EVIDENCE for the plan you will submit, not as the plan. You still own the interview, the decisions, and the exit call. Never forward a child's report to the user as your plan.
 7. Close the investigation tabs you opened (\`ensemblr_close_tab\`) once you have their reports.
 
@@ -178,7 +178,7 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you were sp
 
 - Read the repository: the \`read\` tool, and \`bash\` for read-only commands.
 - Report to your orchestrator: \`ensemblr_notify_orchestrator\` with reason \`need_decision\` or \`blocked\` pulls it back to you; \`progress\` and \`done\` keep it informed without interrupting.
-- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
+- Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. All three stay available while planning — annotating a diff is planning output, not a change to the repository.
 - Keep your tab legible: name it (\`ensemblr_set_name\`) and record what the conversation has covered (\`ensemblr_set_summary\`). Both stay available while planning — they label work, they do not perform it. Naming the WORKSPACE and its git branch is not yours: \`ensemblr_set_branch_name\` belongs to the orchestrator that spawned you and is refused here.
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`). Moving the board is not yours: it describes the whole workspace rather than the question you were handed, so \`ensemblr_set_workspace_status\` is refused here.
@@ -660,6 +660,32 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 		'getLastMessage',
 		"Get a Pi conversation's report: every assistant message of its newest answered turn, joined in the order it was written. Persisted, so it survives the conversation closing and an app restart.",
 		Type.Object({ piSessionId: Type.String() }),
+	);
+	tool(
+		'ensemblr_read_conversation',
+		'readConversation',
+		'Read what a Pi conversation actually did — its prompts, its answers, and every tool call with its arguments and result — rather than only the report ensemblr_get_last_message hands back. This is how you audit a sub-agent: confirm it ran what it claims to have run before you act on its findings. Call it with stat=true FIRST: that returns the entry count, the turn count, and the ordinal range with no content, so you know how much there is before you read it. Then page forward with fromOrdinal, resuming from the nextOrdinal each page returns, or pass ordinal to read a single entry whole — stat, ordinal, and fromOrdinal are alternatives, not a combination. Long fields are cut and marked with the ordinal that reads them in full.',
+		Type.Object({
+			piSessionId: Type.String(),
+			stat: Type.Optional(
+				Type.Boolean({
+					description:
+						'Return the entry and turn counts and the ordinal range only, with no content. Call this first.',
+				}),
+			),
+			fromOrdinal: Type.Optional(
+				Type.Number({
+					description:
+						'Inclusive lower bound on entry ordinal — the nextOrdinal a previous page handed back.',
+				}),
+			),
+			ordinal: Type.Optional(
+				Type.Number({
+					description:
+						'Read the entry at this ordinal on its own, with its field cap lifted.',
+				}),
+			),
+		}),
 	);
 	tool(
 		'ensemblr_read_terminal_output',

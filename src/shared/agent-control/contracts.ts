@@ -13,6 +13,7 @@ import type {
 	WorkspaceGitChangeSummaryWire,
 	WorkspaceGitFileWire,
 } from '../ipc/contracts/workspace-git.ts';
+import { MAX_AGENT_PAYLOAD_CHARS } from './workspace-diff.ts';
 
 /** Every control operation an agent may request, read and write alike. */
 export const AGENT_CONTROL_OPS = [
@@ -41,6 +42,7 @@ export const AGENT_CONTROL_OPS = [
 	'listTerminals',
 	'getConversationStatus',
 	'getLastMessage',
+	'readConversation',
 	'readTerminalOutput',
 	'listModels',
 	'waitForAgents',
@@ -288,6 +290,69 @@ export interface ListTerminalsArgs {
 /** Args for `getConversationStatus` / `getLastMessage`: target a Pi session. */
 export interface ConversationRef {
 	piSessionId: string;
+}
+
+/**
+ * Upper bounds on a `readConversation` page. The field cap is what stops one
+ * pathological tool result — a whole file read, a megabyte of test output — from
+ * being the only thing a page can carry, and the page cap is the same ceiling
+ * every other agent payload answers to.
+ */
+export const READ_CONVERSATION_LIMITS = {
+	maxFieldChars: 2_000,
+	maxPageChars: MAX_AGENT_PAYLOAD_CHARS,
+} as const;
+
+/**
+ * Args for `readConversation`: page through a conversation's persisted
+ * transcript. `stat`, `ordinal`, and `fromOrdinal` are alternatives rather than
+ * a combination, and are honoured in that order.
+ */
+export interface ReadConversationArgs {
+	piSessionId: string;
+	/** Counts and ordinal range only, with no entries. */
+	stat?: boolean;
+	/** Inclusive lower bound on entry ordinal — the cursor a previous page returned. */
+	fromOrdinal?: number;
+	/** Read one entry on its own, with its field cap lifted to the page budget. */
+	ordinal?: number;
+}
+
+/**
+ * One projected step of a conversation, ordered by the event ordinal it came
+ * from. A `tool` entry merges a call with its result and carries the call's
+ * ordinal, so a result persisted much later still reads in sequence.
+ */
+export type ConversationTranscriptEntry =
+	| { kind: 'prompt'; ordinal: number; text: string }
+	| { kind: 'message'; ordinal: number; text: string }
+	| {
+			kind: 'tool';
+			ordinal: number;
+			name: string;
+			input: string;
+			output: string;
+			isError: boolean;
+	  }
+	| { kind: 'error'; ordinal: number; text: string };
+
+/**
+ * A page of a conversation's transcript. The counts and ordinal bounds describe
+ * the whole branch rather than the page, which is what makes a `stat` probe
+ * worth calling before a read: it says how much there is to page through.
+ */
+export interface ReadConversationResult {
+	piSessionId: string;
+	/** Entries on the whole branch, after checkpoint-hidden events are excluded. */
+	entryCount: number;
+	/** User prompts on the branch — one per turn. */
+	turnCount: number;
+	firstOrdinal: number | null;
+	lastOrdinal: number | null;
+	/** This page, ascending by ordinal. Empty for a `stat` probe. */
+	entries: readonly ConversationTranscriptEntry[];
+	/** Cursor for the next page, or null when this page reached the end. */
+	nextOrdinal: number | null;
 }
 
 /** Args for `readTerminalOutput`: read a terminal's current scrollback. */

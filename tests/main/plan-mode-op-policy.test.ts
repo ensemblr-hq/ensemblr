@@ -50,6 +50,7 @@ const EXPECTED_DENIALS: Record<
 	listWorkspaces: [],
 	notifyOrchestrator: [],
 	openTab: [],
+	readConversation: [],
 	readTerminalOutput: [],
 	sendFollowUp: 'conditional',
 	setBranchName: [],

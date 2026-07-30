@@ -53,6 +53,15 @@ const makePorts = (
 		}),
 		hasFinalMessage: vi.fn().mockResolvedValue(true),
 		getLastMessage: vi.fn().mockResolvedValue('last'),
+		readTranscript: vi.fn().mockResolvedValue({
+			entries: [],
+			entryCount: 0,
+			firstOrdinal: null,
+			lastOrdinal: null,
+			nextOrdinal: null,
+			piSessionId: 'pi-1',
+			turnCount: 0,
+		}),
 		isSpawnedSubAgent: vi
 			.fn()
 			.mockResolvedValue(overrides.spawnedSubAgent ?? false),
@@ -659,6 +668,7 @@ describe('agent-control service: sub-agent role gate outside plan mode', () => {
 			['getWorkspaceStatus', {}],
 			['getConversationStatus', { piSessionId: 'pi-1' }],
 			['getLastMessage', { piSessionId: 'pi-1' }],
+			['readConversation', { piSessionId: 'pi-1', stat: true }],
 			['readTerminalOutput', { terminalId: 'term-1' }],
 			['focusTab', { chatTabId: 'abc' }],
 			['focusPanel', { panel: 'changes' }],
@@ -917,6 +927,33 @@ describe('agent-control service: delegation', () => {
 		if (result.ok) {
 			expect(result.data).toEqual({ message: 'last' });
 		}
+	});
+
+	it('hands readConversation its page arguments rather than only the session', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'readConversation',
+			token: 'tok-caller',
+			rawArgs: { piSessionId: 'pi-1', fromOrdinal: 12 },
+		});
+		expect(result.ok).toBe(true);
+		expect(ports.conversations.readTranscript).toHaveBeenCalledWith({
+			fromOrdinal: 12,
+			piSessionId: 'pi-1',
+		});
+	});
+
+	it('rejects a readConversation cursor that is not a whole ordinal', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'readConversation',
+			token: 'tok-caller',
+			rawArgs: { piSessionId: 'pi-1', fromOrdinal: -3 },
+		});
+		expect(result.ok).toBe(false);
+		expect(ports.conversations.readTranscript).not.toHaveBeenCalled();
 	});
 
 	it('keeps a missing last message as an explicit null, not an empty envelope', async () => {

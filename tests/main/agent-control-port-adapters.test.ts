@@ -622,6 +622,90 @@ describe('agent-control port adapters: last message', () => {
 	});
 });
 
+describe('agent-control port adapters: readTranscript', () => {
+	const prompt = (text: string): PiPersistedEnvelope => ({
+		kind: 'message',
+		payload: { kind: 'prompt', prompt: text },
+		role: 'user',
+	});
+
+	const answer = (text: string): PiPersistedEnvelope => ({
+		kind: 'message',
+		payload: { kind: 'text', text },
+		role: 'agent',
+	});
+
+	const withEvents = (
+		events: readonly { ordinal: number; payload: PiPersistedEnvelope }[],
+		session: { branchId: string } | null = { branchId: 'branch-1' },
+	) => {
+		const listEvents = vi.fn(() =>
+			events.map((event) => ({ ...event, stream: 'protocol' as const })),
+		);
+		const { deps } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			getSession: vi.fn(() => session),
+			listEvents,
+		};
+		return { listEvents, ports: createAgentControlPorts(deps) };
+	};
+
+	it('projects the session’s branch into a transcript page', async () => {
+		const { listEvents, ports } = withEvents([
+			{ ordinal: 1, payload: prompt('audit the parser') },
+			{ ordinal: 2, payload: answer('parser looks sound') },
+		]);
+
+		const result = await ports.conversations.readTranscript({
+			piSessionId: 'sess-1',
+		});
+
+		expect(listEvents).toHaveBeenCalledWith('branch-1');
+		expect(result.entries).toEqual([
+			{ kind: 'prompt', ordinal: 1, text: 'audit the parser' },
+			{ kind: 'message', ordinal: 2, text: 'parser looks sound' },
+		]);
+		expect(result.piSessionId).toBe('sess-1');
+		expect(result.turnCount).toBe(1);
+	});
+
+	it('forwards the read mode rather than always paging from the start', async () => {
+		const { ports } = withEvents([
+			{ ordinal: 1, payload: prompt('go') },
+			{ ordinal: 2, payload: answer('done') },
+		]);
+
+		const result = await ports.conversations.readTranscript({
+			piSessionId: 'sess-1',
+			stat: true,
+		});
+
+		expect(result.entries).toEqual([]);
+		expect(result.entryCount).toBe(2);
+	});
+
+	// An auditor has to be able to tell a child that did nothing from a call that
+	// failed, so a session the app no longer knows reads as an empty branch.
+	it('reads an unknown session as an empty branch', async () => {
+		const { listEvents, ports } = withEvents([], null);
+
+		const result = await ports.conversations.readTranscript({
+			piSessionId: 'gone',
+		});
+
+		expect(listEvents).not.toHaveBeenCalled();
+		expect(result).toEqual({
+			entries: [],
+			entryCount: 0,
+			firstOrdinal: null,
+			lastOrdinal: null,
+			nextOrdinal: null,
+			piSessionId: 'gone',
+			turnCount: 0,
+		});
+	});
+});
+
 describe('agent-control port adapters: sub-agent marker', () => {
 	const tab = (metadata: Record<string, unknown>) =>
 		({ id: 'tab-1', metadata }) as ReturnType<typeof getChatTabByPiSessionId>;
