@@ -21,6 +21,8 @@ const makePorts = (
 		tabWorkspace: string | null;
 		conversationWorkspace: string | null;
 		terminalWorkspace: string | null;
+		planning: boolean;
+		spawnedSubAgent: boolean;
 	}> = {},
 ): AgentControlPorts => ({
 	workspaces: { listWorkspaces: vi.fn().mockResolvedValue([]) },
@@ -51,6 +53,9 @@ const makePorts = (
 		}),
 		hasFinalMessage: vi.fn().mockResolvedValue(true),
 		getLastMessage: vi.fn().mockResolvedValue('last'),
+		isSpawnedSubAgent: vi
+			.fn()
+			.mockResolvedValue(overrides.spawnedSubAgent ?? false),
 		listModels: vi
 			.fn()
 			.mockResolvedValue({ defaultModelId: 'm-default', models: [] }),
@@ -94,8 +99,9 @@ const makePorts = (
 	confirm: { confirm: vi.fn().mockResolvedValue(overrides.confirm ?? true) },
 	ask: { ask: vi.fn(), releaseSession: vi.fn() },
 	planMode: {
-		exit: vi.fn(),
-		isActive: vi.fn().mockReturnValue(false),
+		activateForSpawn: vi.fn(),
+		exit: vi.fn().mockResolvedValue({ planPath: 'p.md', summary: 'saved' }),
+		isActive: vi.fn().mockReturnValue(overrides.planning ?? false),
 		releaseSession: vi.fn(),
 	},
 	sessionNaming: {
@@ -406,6 +412,72 @@ describe('agent-control service: guardrails', () => {
 		if (!result.ok) {
 			expect(result.code).toBe('denied-deadlock');
 		}
+	});
+});
+
+// `parentSessionId` is never persisted, so a resumed conversation re-registers
+// with no parent and lands at depth 0 — while its Plan Mode comes back from the
+// renderer's per-tab store. Resolving the role from lineage alone would hand a
+// restored investigator the orchestrator policy after a restart, or after its tab
+// was closed and restored, and let it reach the three ops that policy denies.
+describe('agent-control service: role of a resumed sub-agent', () => {
+	const DENIED_WHILE_PLANNING: Record<string, Record<string, unknown>> = {
+		exitPlanMode: { plan: '# Findings', title: 'Findings' },
+		askUserQuestion: {
+			questions: [
+				{ options: [{ label: 'A' }, { label: 'B' }], question: 'Q?' },
+			],
+		},
+		startConversation: { prompt: 'go' },
+	};
+
+	for (const op of Object.keys(DENIED_WHILE_PLANNING)) {
+		it(`denies \`${op}\` to a planning depth-0 caller whose tab is marked a sub-agent`, async () => {
+			const ports = makePorts({ planning: true, spawnedSubAgent: true });
+			const { service } = setup({ ports });
+
+			const result = await service.invoke({
+				op: op as 'exitPlanMode',
+				token: 'tok-caller',
+				rawArgs: DENIED_WHILE_PLANNING[op],
+			});
+
+			expect(result.ok).toBe(false);
+			if (!result.ok) {
+				expect(result.code).toBe('denied-scope');
+			}
+			expect(ports.planMode.exit).not.toHaveBeenCalled();
+			expect(ports.ask.ask).not.toHaveBeenCalled();
+			expect(ports.conversations.startConversation).not.toHaveBeenCalled();
+		});
+
+		it(`still allows \`${op}\` to a planning root with no sub-agent marker`, async () => {
+			const ports = makePorts({ planning: true, spawnedSubAgent: false });
+			const { service } = setup({ ports });
+
+			const result = await service.invoke({
+				op: op as 'exitPlanMode',
+				token: 'tok-caller',
+				rawArgs: DENIED_WHILE_PLANNING[op],
+			});
+
+			expect(result.ok).toBe(true);
+		});
+	}
+
+	it('reads the marker for the caller’s own session', async () => {
+		const ports = makePorts({ planning: true, spawnedSubAgent: true });
+		const { service } = setup({ ports });
+
+		await service.invoke({
+			op: 'exitPlanMode',
+			token: 'tok-caller',
+			rawArgs: { plan: '# Findings', title: 'Findings' },
+		});
+
+		expect(ports.conversations.isSpawnedSubAgent).toHaveBeenCalledWith(
+			'caller',
+		);
 	});
 });
 

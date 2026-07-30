@@ -78,6 +78,16 @@ describe('buildSessionBriefNudge', () => {
 		expect(nudge).toContain('does NOT rename the tab');
 	});
 
+	// "Once this turn's work is done" reads as "after you have answered", and a
+	// summary call landing after the answer folds that answer into the turn's
+	// collapsed activity row. The bullet has to place the call before the answer.
+	test('places the summary call before the closing answer to the user', () => {
+		const nudge = buildSessionBriefNudge(naming({ summaryStale: true }));
+
+		expect(nudge).toContain('BEFORE you write your closing answer');
+		expect(nudge).not.toContain("Once this turn's work is done");
+	});
+
 	test('orders the outstanding items title, branch, then summary', () => {
 		const nudge =
 			buildSessionBriefNudge(

@@ -9,6 +9,7 @@ import type {
 	AgentControlErrorCode,
 	AgentControlOp,
 	AgentControlResult,
+	AgentControlRole,
 	AskUserQuestionArgs,
 	CheckPlanModeToolArgs,
 	CloseTabArgs,
@@ -25,6 +26,7 @@ import type {
 	NotifyOrchestratorArgs,
 	OpenTabArgs,
 	OrchestratorSignal,
+	PendingAgent,
 	ReadTerminalOutputArgs,
 	SendFollowUpArgs,
 	SetBranchNameArgs,
@@ -38,17 +40,21 @@ import type {
 	StopTerminalArgs,
 	WaitedAgent,
 	WaitForAgentsArgs,
+	WaitReportDetail,
 	WriteTerminalArgs,
 } from '../../shared/agent-control.ts';
 import {
+	briefReport,
 	buildSessionBriefNudge,
 	isWriteOp,
+	roleForDepth,
 	validateArgs,
 } from '../../shared/agent-control.ts';
 import { classifyPermissionAction } from '../../shared/permissions.ts';
 import {
 	evaluatePlanModeTool,
 	planModeControlOpDenial,
+	planModeFollowUpDenial,
 } from '../../shared/plan-mode.ts';
 import { BranchSlugRejected } from '../pi-agent/naming/apply-branch-slug.ts';
 import type { Guardrails } from './guardrails.ts';
@@ -147,6 +153,48 @@ function fail(
 }
 
 /**
+ * Whether a child's pending signal is one only the orchestrator can clear.
+ * @param signal - The child's pending signal, or null when it has none.
+ * @returns True for `need_decision` and `blocked`.
+ */
+function needsAttention(signal: OrchestratorSignal | null): boolean {
+	return signal !== null && ATTENTION_REASONS.has(signal.reason);
+}
+
+/**
+ * Whether a `mode: "all"` wait may return. Every target settling is the ordinary
+ * case; a child asking for a decision releases the wait too, because the caller
+ * is the only one who can answer it and its still-running siblings would
+ * otherwise hold the question there until the wait timeout expires.
+ * @param settled - Per-target settle state from the current poll tick.
+ * @returns True when the wait may return.
+ */
+function waitAllSatisfied(
+	settled: readonly { agent: WaitedAgent; settled: boolean }[],
+): boolean {
+	return (
+		settled.every((entry) => entry.settled) ||
+		settled.some((entry) => needsAttention(entry.agent.signal))
+	);
+}
+
+/**
+ * Names the targets a wait is leaving behind, so the caller can wait on exactly
+ * those next instead of polling each child's status.
+ * @param settled - Per-target settle state from the poll tick that returned.
+ * @returns The unsettled targets and their current status.
+ */
+function stillRunning(
+	settled: readonly { agent: WaitedAgent; settled: boolean }[],
+): PendingAgent[] {
+	return settled.flatMap((entry) =>
+		entry.settled
+			? []
+			: [{ piSessionId: entry.agent.piSessionId, status: entry.agent.status }],
+	);
+}
+
+/**
  * Confirms a resolved workspace matches the caller's, for write-scope checks.
  * @param actualWorkspaceId - Owning workspace of the target, or null when missing.
  * @param origin - Resolved caller identity.
@@ -183,22 +231,58 @@ export function createAgentControlService({
 	const signalsByChild = new Map<string, OrchestratorSignal>();
 
 	/**
+	 * Whether the caller is a Pi conversation that is currently planning. Plan Mode
+	 * is a native chat feature, so a harness caller is never planning however its
+	 * session id resolves.
+	 * @param origin - Resolved caller identity.
+	 * @returns True when Plan Mode governs this caller's turn.
+	 */
+	const isPlanning = (origin: AgentControlOrigin): boolean =>
+		origin.species === 'pi' && ports.planMode.isActive(origin.sessionId);
+
+	/**
+	 * The caller's control-layer role. Prefers the sub-agent marker its spawn
+	 * persisted on its chat tab over live lineage, because lineage does not
+	 * survive a restart: `parentSessionId` is not stored, so a resumed session
+	 * re-registers at depth 0, while Plan Mode is restored from the renderer's
+	 * per-tab store. Without the durable marker a restored investigator would come
+	 * back holding the orchestrator policy and could submit a plan, question the
+	 * user, or delegate onward — the three ops that policy exists to deny it.
+	 * @param origin - Resolved caller identity.
+	 * @returns The role that selects which half of the plan-mode policy applies.
+	 */
+	const resolveRole = async (
+		origin: AgentControlOrigin,
+	): Promise<AgentControlRole> => {
+		const spawned = await ports.conversations.isSpawnedSubAgent(
+			origin.sessionId,
+		);
+		return spawned ? 'subagent' : roleForDepth(origin.depth);
+	};
+
+	/**
 	 * Blocks the control ops a planning agent must not reach. The Pi extension
 	 * intercepts `bash`, `edit`, and `write`, but Ensemblr's own tools can open a
 	 * terminal, launch a harness, or drive another conversation — each of which
-	 * puts an unrestricted writer on the same workspace.
+	 * puts an unrestricted writer on the same workspace. Policy splits by role: a
+	 * planning orchestrator may fan out read-only investigators, a planning
+	 * sub-agent may not delegate, submit a plan, or question the user.
+	 *
+	 * This is not the whole plan-mode policy. `sendFollowUp` from an orchestrator
+	 * depends on whether its target is itself planning, which cannot be resolved
+	 * before the workspace scope check, so `handleSendFollowUp` owns that half.
 	 * @param op - The control op being dispatched.
 	 * @param origin - Resolved caller identity.
 	 * @returns A denial envelope, or null when the op may proceed.
 	 */
-	const gatePlanMode = (
+	const gatePlanMode = async (
 		op: AgentControlOp,
 		origin: AgentControlOrigin,
-	): AgentControlResult<never> | null => {
-		if (origin.species !== 'pi' || !ports.planMode.isActive(origin.sessionId)) {
+	): Promise<AgentControlResult<never> | null> => {
+		if (!isPlanning(origin)) {
 			return null;
 		}
-		const denial = planModeControlOpDenial(op);
+		const denial = planModeControlOpDenial(op, await resolveRole(origin));
 		return denial === null ? null : fail('denied-scope', denial);
 	};
 
@@ -291,6 +375,7 @@ export function createAgentControlService({
 			title: args.title,
 			callerModel,
 			parentSessionId: origin.sessionId,
+			planMode: isPlanning(origin),
 		});
 		guardrails.recordSpawn(origin.sessionId);
 		const result = await waitIfRequested(started.piSessionId, args.wait);
@@ -401,11 +486,20 @@ export function createAgentControlService({
 		return ok({
 			naming,
 			nudge: buildSessionBriefNudge(naming),
-			planMode:
-				origin.species === 'pi' && ports.planMode.isActive(origin.sessionId),
+			planMode: isPlanning(origin),
 		} satisfies GetSessionBriefResult);
 	};
 
+	/**
+	 * Steers another conversation. A planning caller may only reach a target that
+	 * is itself planning, so delegation cannot be laundered into an edit through a
+	 * conversation that is not restricted. The plan-mode check runs after the scope
+	 * check on purpose: answering it earlier would tell a caller in another
+	 * workspace whether a session it cannot see is planning.
+	 * @param origin - Resolved caller identity.
+	 * @param args - Target session, prompt, and whether to block on it.
+	 * @returns The wait outcome, or a denial envelope.
+	 */
 	const handleSendFollowUp = async (
 		origin: AgentControlOrigin,
 		args: SendFollowUpArgs,
@@ -416,6 +510,14 @@ export function createAgentControlService({
 		const scoped = outOfScope(owner, origin);
 		if (scoped) {
 			return scoped;
+		}
+		if (isPlanning(origin)) {
+			const denial = planModeFollowUpDenial(
+				ports.planMode.isActive(args.piSessionId),
+			);
+			if (denial) {
+				return fail('denied-scope', denial);
+			}
 		}
 		if (args.wait) {
 			const deadlock = guardrails.evaluateWaitTarget(
@@ -621,34 +723,56 @@ export function createAgentControlService({
 		return ok({ ok: true });
 	};
 
+	/**
+	 * Reads one target's live settle state for a poll tick. Deliberately cheap:
+	 * status plus any pending signal, never the child's report, because this runs
+	 * for every target on every tick and reading a report means a synchronous
+	 * descending scan of its whole final turn on the main thread. The report is
+	 * fetched once, by {@link reportOn}, on the tick that returns.
+	 * @param piSessionId - The child to inspect.
+	 * @returns The child's current state and whether it counts as settled.
+	 */
 	const settleTarget = async (
 		piSessionId: string,
 	): Promise<{ agent: WaitedAgent; settled: boolean }> => {
 		const status = (await ports.conversations.getStatus(piSessionId))?.status;
 		const signal = signalsByChild.get(piSessionId) ?? null;
-		const attention = signal !== null && ATTENTION_REASONS.has(signal.reason);
 		const terminal = status === undefined || TERMINAL_STATUSES.has(status);
-		const settled = terminal || attention;
-		if (!settled) {
-			return {
-				agent: {
-					piSessionId,
-					status: status ?? 'unknown',
-					lastMessage: null,
-					signal,
-				},
-				settled: false,
-			};
-		}
-		const lastMessage = await ports.conversations.getLastMessage(piSessionId);
 		return {
 			agent: {
 				piSessionId,
 				status: status ?? 'unknown',
-				lastMessage,
+				lastMessage: null,
+				reportTruncated: false,
 				signal,
 			},
-			settled: true,
+			settled: terminal || needsAttention(signal),
+		};
+	};
+
+	/**
+	 * Attaches one settled child's report at the caller's requested detail. `full`
+	 * hands the whole final turn over; `brief` keeps its opening and points at
+	 * `getLastMessage` for the rest.
+	 * @param agent - The settled child as `settleTarget` built it, with no report yet.
+	 * @param detail - The detail level the caller asked for.
+	 * @returns The child to report on, shortened when asked for.
+	 */
+	const reportOn = async (
+		agent: WaitedAgent,
+		detail: WaitReportDetail,
+	): Promise<WaitedAgent> => {
+		const lastMessage = await ports.conversations.getLastMessage(
+			agent.piSessionId,
+		);
+		if (detail === 'full') {
+			return { ...agent, lastMessage };
+		}
+		const brief = briefReport(lastMessage, agent.piSessionId);
+		return {
+			...agent,
+			lastMessage: brief.text,
+			reportTruncated: brief.truncated,
 		};
 	};
 
@@ -660,7 +784,7 @@ export function createAgentControlService({
 			...originRegistry.childrenOf(origin.sessionId),
 		];
 		if (targets.length === 0) {
-			return ok({ completed: [], timedOut: false });
+			return ok({ completed: [], pending: [], timedOut: false });
 		}
 		const ancestors = originRegistry.ancestorsOf(origin.sessionId);
 		for (const target of targets) {
@@ -679,14 +803,20 @@ export function createAgentControlService({
 			const settled = await Promise.all(targets.map(settleTarget));
 			const done = settled.filter((entry) => entry.settled);
 			const satisfied =
-				mode === 'first' ? done.length > 0 : done.length === targets.length;
+				mode === 'first' ? done.length > 0 : waitAllSatisfied(settled);
 			const expired = scheduler.now() >= deadline;
 			if (satisfied || expired) {
-				const completed = done.map((entry) => entry.agent);
+				const completed = await Promise.all(
+					done.map((entry) => reportOn(entry.agent, args.reports ?? 'full')),
+				);
 				for (const entry of completed) {
 					signalsByChild.delete(entry.piSessionId);
 				}
-				return ok({ completed, timedOut: !satisfied && expired });
+				return ok({
+					completed,
+					pending: stillRunning(settled),
+					timedOut: !satisfied && expired,
+				});
 			}
 			await scheduler.sleep(WAIT_POLL_MS);
 		}
@@ -725,7 +855,7 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: CheckPlanModeToolArgs,
 	): AgentControlResult<unknown> => {
-		if (origin.species !== 'pi' || !ports.planMode.isActive(origin.sessionId)) {
+		if (!isPlanning(origin)) {
 			return ok({ blocked: false });
 		}
 		return ok(evaluatePlanModeTool(args));
@@ -879,7 +1009,7 @@ export function createAgentControlService({
 		if (!validated.ok) {
 			return fail('invalid-args', validated.reason);
 		}
-		const planModeDenied = gatePlanMode(command.op, origin);
+		const planModeDenied = await gatePlanMode(command.op, origin);
 		if (planModeDenied) {
 			return planModeDenied;
 		}

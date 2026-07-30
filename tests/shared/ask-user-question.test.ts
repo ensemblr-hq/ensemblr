@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+	ASK_USER_QUESTION_LIMITS,
 	buildAskUserQuestionResult,
 	parseAskUserQuestionReply,
 	validateArgs,
@@ -95,14 +96,14 @@ describe('askUserQuestion args', () => {
 		expect(result.ok).toBe(false);
 	});
 
-	it('rejects duplicate headers, which label the pager', () => {
+	it('accepts duplicate headers, which the pager tells apart by position', () => {
 		const result = validateArgs('askUserQuestion', {
 			questions: [
 				question({ header: 'Scope' }),
 				question({ header: 'Scope', question: 'When?' }),
 			],
 		});
-		expect(result.ok).toBe(false);
+		expect(result.ok).toBe(true);
 	});
 
 	it('accepts questions that both omit a header', () => {
@@ -121,11 +122,19 @@ describe('askUserQuestion args', () => {
 		expect(result.ok).toBe(false);
 	});
 
-	it('rejects a header longer than sixteen characters', () => {
+	it('trims an over-long header instead of rejecting the questionnaire', () => {
 		const result = validateArgs('askUserQuestion', {
-			questions: [question({ header: 'A'.repeat(17) })],
+			questions: [question({ header: 'A'.repeat(200) })],
 		});
-		expect(result.ok).toBe(false);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const { questions } = result.value as {
+				questions: { header?: string }[];
+			};
+			expect(questions[0]?.header).toHaveLength(
+				ASK_USER_QUESTION_LIMITS.maxHeaderLength,
+			);
+		}
 	});
 
 	it('rejects unknown fields', () => {

@@ -9,7 +9,13 @@
  */
 export type { BashGuardVerdict } from './plan-mode/bash-guard.ts';
 export { isReadOnlyBashCommand } from './plan-mode/bash-guard.ts';
-export { planModeControlOpDenial } from './plan-mode/control-ops.ts';
+export {
+	PLAN_MODE_CONDITIONAL_OPS,
+	planModeControlOpDenial,
+	planModeFollowUpDenial,
+} from './plan-mode/control-ops.ts';
+export type { LexedCommand } from './plan-mode/shell-lexer.ts';
+export { lexCommand } from './plan-mode/shell-lexer.ts';
 export type {
 	PlanModeToolRequest,
 	PlanModeToolVerdict,

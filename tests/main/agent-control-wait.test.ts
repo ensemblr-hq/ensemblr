@@ -30,7 +30,10 @@ const makeScheduler = (): WaitScheduler => {
  * Stub ports whose only live behavior is `getStatus` (driven by a per-session
  * status map) and `getLastMessage`. Everything else is a resolved no-op.
  */
-const makePorts = (statuses: Map<string, string>): AgentControlPorts => ({
+const makePorts = (
+	statuses: Map<string, string>,
+	lastMessage: (piSessionId: string) => string = (id) => `msg:${id}`,
+): AgentControlPorts => ({
 	workspaces: { listWorkspaces: vi.fn().mockResolvedValue([]) },
 	tabs: {
 		spawnChatTab: vi.fn().mockResolvedValue({ chatTabId: 't' }),
@@ -58,7 +61,10 @@ const makePorts = (statuses: Map<string, string>): AgentControlPorts => ({
 			return status ? { piSessionId, status, runtimeOpen: true } : null;
 		}),
 		hasFinalMessage: vi.fn().mockResolvedValue(false),
-		getLastMessage: vi.fn(async (piSessionId: string) => `msg:${piSessionId}`),
+		getLastMessage: vi.fn(async (piSessionId: string) =>
+			lastMessage(piSessionId),
+		),
+		isSpawnedSubAgent: vi.fn().mockResolvedValue(false),
 		listModels: vi.fn().mockResolvedValue({ defaultModelId: null, models: [] }),
 		resolveConversationWorkspace: vi.fn().mockResolvedValue('ws'),
 	},
@@ -84,6 +90,7 @@ const makePorts = (statuses: Map<string, string>): AgentControlPorts => ({
 	confirm: { confirm: vi.fn().mockResolvedValue(true) },
 	ask: { ask: vi.fn(), releaseSession: vi.fn() },
 	planMode: {
+		activateForSpawn: vi.fn(),
 		exit: vi.fn(),
 		isActive: vi.fn().mockReturnValue(false),
 		releaseSession: vi.fn(),
@@ -107,6 +114,7 @@ const setup = (options: {
 	statuses: Map<string, string>;
 	children: string[];
 	guardrails?: Parameters<typeof createGuardrails>[0];
+	lastMessage?: (piSessionId: string) => string;
 }) => {
 	const registry: OriginRegistry = createOriginRegistry({
 		generateToken: () => `tok-${Math.random()}`,
@@ -127,7 +135,7 @@ const setup = (options: {
 		}),
 	);
 	const service = createAgentControlService({
-		ports: makePorts(options.statuses),
+		ports: makePorts(options.statuses, options.lastMessage),
 		originRegistry: registry,
 		guardrails: createGuardrails(options.guardrails),
 		scheduler: makeScheduler(),
@@ -230,6 +238,93 @@ describe('agent-control waitForAgents', () => {
 		}
 	});
 
+	// The playbook promises a `need_decision` wakes the wait immediately, with no
+	// mode attached to the promise. Under `all` the child would otherwise sit on
+	// its question until the five-minute wait timeout.
+	it('is woken by a signal under mode all, while a sibling still runs', async () => {
+		const statuses = new Map([
+			['c1', 'streaming'],
+			['c2', 'streaming'],
+		]);
+		const { service, master, childOrigins } = setup({
+			statuses,
+			children: ['c1', 'c2'],
+		});
+		await service.invoke({
+			op: 'notifyOrchestrator',
+			token: childOrigins[1].token,
+			rawArgs: { reason: 'blocked', message: 'the credentials are missing' },
+		});
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all', timeoutMs: 1000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.timedOut).toBe(false);
+			expect(data.completed.map((agent) => agent.piSessionId)).toEqual(['c2']);
+			expect(data.pending).toEqual([
+				{ piSessionId: 'c1', status: 'streaming' },
+			]);
+		}
+	});
+
+	// An informational signal is not a question, so it must not cut a wait short.
+	it('keeps waiting through a progress signal under mode all', async () => {
+		const statuses = new Map([
+			['c1', 'idle'],
+			['c2', 'streaming'],
+		]);
+		const { service, master, childOrigins } = setup({
+			statuses,
+			children: ['c1', 'c2'],
+		});
+		await service.invoke({
+			op: 'notifyOrchestrator',
+			token: childOrigins[1].token,
+			rawArgs: { reason: 'progress', message: 'halfway through' },
+		});
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all', timeoutMs: 1000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.timedOut).toBe(true);
+			expect(data.completed.map((agent) => agent.piSessionId)).toEqual(['c1']);
+		}
+	});
+
+	it('names the children still running so the caller can wait on them again', async () => {
+		const statuses = new Map([
+			['c1', 'idle'],
+			['c2', 'streaming'],
+			['c3', 'streaming'],
+		]);
+		const { service, master } = setup({
+			statuses,
+			children: ['c1', 'c2', 'c3'],
+		});
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.completed.map((agent) => agent.piSessionId)).toEqual(['c1']);
+			expect(data.pending).toEqual([
+				{ piSessionId: 'c2', status: 'streaming' },
+				{ piSessionId: 'c3', status: 'streaming' },
+			]);
+		}
+	});
+
 	it('refuses to wait on an ancestor session (deadlock)', async () => {
 		const statuses = new Map([['master', 'streaming']]);
 		const { service, childOrigins } = setup({
@@ -256,8 +351,132 @@ describe('agent-control waitForAgents', () => {
 		});
 		expect(result.ok).toBe(true);
 		if (result.ok) {
-			expect(result.data).toEqual({ completed: [], timedOut: false });
+			expect(result.data).toEqual({
+				completed: [],
+				pending: [],
+				timedOut: false,
+			});
 		}
+	});
+
+	it('hands back the whole report by default', async () => {
+		const report = `answer\n\n${'evidence\n'.repeat(400)}`;
+		const { service, master } = setup({
+			statuses: new Map([['c1', 'idle']]),
+			children: ['c1'],
+			lastMessage: () => report,
+		});
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all' },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.completed[0]?.lastMessage).toBe(report);
+			expect(data.completed[0]?.reportTruncated).toBe(false);
+		}
+	});
+
+	it('shortens a long report and points at get_last_message when asked to', async () => {
+		const report = `The loader reads settings.toml.\n\n${'evidence\n'.repeat(400)}`;
+		const { service, master } = setup({
+			statuses: new Map([['c1', 'idle']]),
+			children: ['c1'],
+			lastMessage: () => report,
+		});
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all', reports: 'brief' },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			const shortened = data.completed[0];
+			expect(shortened?.reportTruncated).toBe(true);
+			expect(shortened?.lastMessage).toContain(
+				'The loader reads settings.toml.',
+			);
+			expect(shortened?.lastMessage).toContain('ensemblr_get_last_message');
+			expect(shortened?.lastMessage).toContain('c1');
+			expect((shortened?.lastMessage ?? '').length).toBeLessThan(report.length);
+		}
+	});
+
+	it('leaves a short report alone even under brief reports', async () => {
+		const { service, master } = setup({
+			statuses: new Map([['c1', 'idle']]),
+			children: ['c1'],
+		});
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all', reports: 'brief' },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.completed[0]?.lastMessage).toBe('msg:c1');
+			expect(data.completed[0]?.reportTruncated).toBe(false);
+		}
+	});
+
+	// Reading a report means a synchronous descending scan of a whole final turn on
+	// the main thread. A child that settles early would otherwise be re-read on every
+	// 250ms tick until its siblings finish, and every read but the last discarded.
+	it('reads an early-settling child’s report once, not on every poll tick', async () => {
+		const reads: string[] = [];
+		const { service, master } = setup({
+			statuses: new Map([
+				['c1', 'idle'],
+				['c2', 'streaming'],
+			]),
+			children: ['c1', 'c2'],
+			lastMessage: (piSessionId) => {
+				reads.push(piSessionId);
+				return `msg:${piSessionId}`;
+			},
+		});
+
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'all', timeoutMs: 1000 },
+		});
+
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.timedOut).toBe(true);
+			expect(data.completed).toEqual([
+				{
+					piSessionId: 'c1',
+					status: 'idle',
+					lastMessage: 'msg:c1',
+					reportTruncated: false,
+					signal: null,
+				},
+			]);
+			expect(data.pending).toEqual([
+				{ piSessionId: 'c2', status: 'streaming' },
+			]);
+		}
+		expect(reads).toEqual(['c1']);
+	});
+
+	it('rejects a report detail it does not offer', async () => {
+		const { service, master } = setup({
+			statuses: new Map([['c1', 'idle']]),
+			children: ['c1'],
+		});
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { reports: 'summary' },
+		});
+		expect(result.ok).toBe(false);
 	});
 });
 

@@ -7,6 +7,7 @@ import {
 } from '../../src/main/agent-control/index.ts';
 import {
 	getChatTabById,
+	getChatTabByPiSessionId,
 	setChatTabMetadata,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
 import {
@@ -17,6 +18,7 @@ import type { PiPersistedEnvelope } from '../../src/shared/ipc/contracts/pi-sess
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
 	getChatTabById: vi.fn(() => ({ workspaceId: 'ws', metadata: {} })),
+	getChatTabByPiSessionId: vi.fn(() => null),
 	setChatTabMetadata: vi.fn(),
 }));
 
@@ -56,9 +58,16 @@ const makeDeps = (): {
 		broadcastFocus: vi.fn(),
 		broadcastTabsChanged,
 		broadcastBoardStatus,
+		broadcastPlanMode: vi.fn(),
 		boardStatusStore,
 		ask: { ask: vi.fn(), releaseSession: vi.fn() },
 		confirm: { confirm: vi.fn() },
+		planMode: {
+			activateForSpawn: vi.fn(),
+			exit: vi.fn(),
+			isActive: vi.fn(() => false),
+			releaseSession: vi.fn(),
+		},
 	} as unknown as PortAdapterDeps;
 	return {
 		deps,
@@ -238,6 +247,7 @@ describe('agent-control port adapters: conversation naming', () => {
 			prompt: 'do it',
 			title: 'Docs sweep',
 			parentSessionId: 'parent-1',
+			planMode: false,
 		});
 		expect(result).toEqual({ chatTabId: 'tab-1', piSessionId: 'sess-1' });
 		expect(setChatTabMetadata).toHaveBeenCalledWith(
@@ -340,6 +350,12 @@ describe('agent-control port adapters: last message', () => {
 		},
 	});
 
+	const userPrompt = (text: string): PiPersistedEnvelope => ({
+		kind: 'message',
+		role: 'user',
+		payload: { kind: 'prompt', prompt: text },
+	});
+
 	const withPayloads = (payloads: readonly (PiPersistedEnvelope | null)[]) => {
 		const { deps } = makeDeps();
 		(deps as { piSessionService: unknown }).piSessionService = {
@@ -355,14 +371,36 @@ describe('agent-control port adapters: last message', () => {
 		expect(result).toBe('The build is green.');
 	});
 
-	it('returns the newest assistant answer, skipping a later non-text event', async () => {
+	it('joins every assistant message of the final turn in the order it was written', async () => {
 		const ports = withPayloads([
 			{ kind: 'status', previous: 'idle', status: 'idle' },
-			agentMessage('newest answer'),
-			agentMessage('older answer'),
+			agentMessage('Report delivered above.'),
+			agentMessage('The full findings.'),
+			userPrompt('investigate the backend'),
 		]);
 		const result = await ports.conversations.getLastMessage('sess-1');
-		expect(result).toBe('newest answer');
+		expect(result).toBe('The full findings.\n\nReport delivered above.');
+	});
+
+	it('stops at the prompt that opened the final turn, leaving earlier turns out', async () => {
+		const ports = withPayloads([
+			agentMessage('this turn'),
+			userPrompt('the follow-up'),
+			agentMessage('the previous turn'),
+			userPrompt('the first prompt'),
+		]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toBe('this turn');
+	});
+
+	it('falls back to the newest turn that answered when the final one has not yet', async () => {
+		const ports = withPayloads([
+			userPrompt('the follow-up it is still working on'),
+			agentMessage('the report it already filed'),
+			userPrompt('the first prompt'),
+		]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toBe('the report it already filed');
 	});
 
 	it('reads a standalone text payload', async () => {
@@ -416,6 +454,33 @@ describe('agent-control port adapters: last message', () => {
 		expect(result).toBeNull();
 	});
 
+	it('sheds the oldest messages of a turn that runs past the report ceiling', async () => {
+		const filler = 'x'.repeat(11_000);
+		const ports = withPayloads([
+			agentMessage('the answer'),
+			agentMessage(filler),
+			agentMessage(filler),
+			agentMessage(filler),
+			agentMessage('the narration that opened the turn'),
+			userPrompt('do the work'),
+		]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toContain('the answer');
+		expect(result).not.toContain('the narration that opened the turn');
+		expect((result ?? '').length).toBeLessThanOrEqual(32_000);
+	});
+
+	// The ceiling exists so one child cannot flood its orchestrator's context from a
+	// single pasted tool result, which it could while the newest message skipped the
+	// cap. A report states its answer first, so the clamp keeps the opening.
+	it('clamps a single answer that busts the ceiling on its own', async () => {
+		const huge = `the answer${'y'.repeat(40_000)}`;
+		const ports = withPayloads([agentMessage(huge), userPrompt('do the work')]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toHaveLength(32_000);
+		expect(result).toBe(huge.slice(0, 32_000));
+	});
+
 	it('returns null for an unknown session', async () => {
 		const { deps } = makeDeps();
 		(deps as { piSessionService: unknown }).piSessionService = {
@@ -425,6 +490,52 @@ describe('agent-control port adapters: last message', () => {
 		const ports = createAgentControlPorts(deps);
 		const result = await ports.conversations.getLastMessage('gone');
 		expect(result).toBeNull();
+	});
+});
+
+describe('agent-control port adapters: sub-agent marker', () => {
+	const tab = (metadata: Record<string, unknown>) =>
+		({ id: 'tab-1', metadata }) as ReturnType<typeof getChatTabByPiSessionId>;
+
+	beforeEach(() => {
+		vi.mocked(getChatTabByPiSessionId).mockReset();
+	});
+
+	it('reports the marker a spawn stamped on the session’s tab', async () => {
+		vi.mocked(getChatTabByPiSessionId).mockReturnValue(
+			tab({ agentRole: 'subagent' }),
+		);
+		const { deps } = makeDeps();
+		const ports = createAgentControlPorts(deps);
+		expect(await ports.conversations.isSpawnedSubAgent?.('sess-1')).toBe(true);
+		expect(getChatTabByPiSessionId).toHaveBeenCalledWith(
+			expect.objectContaining({ piSessionId: 'sess-1' }),
+		);
+	});
+
+	it('reports no marker for a tab that was never spawned into', async () => {
+		vi.mocked(getChatTabByPiSessionId).mockReturnValue(tab({}));
+		const { deps } = makeDeps();
+		const ports = createAgentControlPorts(deps);
+		expect(await ports.conversations.isSpawnedSubAgent?.('sess-1')).toBe(false);
+	});
+
+	it('reports no marker for a session with no tab', async () => {
+		vi.mocked(getChatTabByPiSessionId).mockReturnValue(null);
+		const { deps } = makeDeps();
+		const ports = createAgentControlPorts(deps);
+		expect(await ports.conversations.isSpawnedSubAgent?.('gone')).toBe(false);
+	});
+
+	// Role resolution falls back to live lineage when the marker cannot be read, so
+	// a storage failure must not throw out of the plan-mode gate.
+	it('reports no marker when the read fails', async () => {
+		vi.mocked(getChatTabByPiSessionId).mockImplementation(() => {
+			throw new Error('database is closed');
+		});
+		const { deps } = makeDeps();
+		const ports = createAgentControlPorts(deps);
+		expect(await ports.conversations.isSpawnedSubAgent?.('sess-1')).toBe(false);
 	});
 });
 

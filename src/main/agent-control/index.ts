@@ -56,3 +56,4 @@ export type {
 	TerminalPort,
 	WorkspacePort,
 } from './ports.ts';
+export { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';

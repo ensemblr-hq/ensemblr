@@ -110,6 +110,13 @@ export interface ConversationPort {
 		callerModel?: string;
 		/** Caller session id, threaded into the child's spawn env for lineage. */
 		parentSessionId: string;
+		/**
+		 * Whether the child starts in Plan Mode, snapshotted from the spawning agent
+		 * at spawn time; the child owns the flag afterwards. Required rather than
+		 * optional so a future second spawn route cannot silently produce an
+		 * unrestricted child from a planning parent.
+		 */
+		planMode: boolean;
 	}) => Promise<{ chatTabId: string; piSessionId: string }>;
 	/** Lists the available Pi models plus the default, for model selection. */
 	listModels: () => Promise<AgentControlModelList>;
@@ -146,7 +153,24 @@ export interface ConversationPort {
 	 * callers that report the flag.
 	 */
 	hasFinalMessage: (piSessionId: string) => Promise<boolean>;
+	/**
+	 * The conversation's report: every assistant message of its newest answered
+	 * turn, joined, or null when it has produced none. A whole turn rather than a
+	 * single message so an agent that signs off after its findings does not
+	 * shadow them.
+	 */
 	getLastMessage: (piSessionId: string) => Promise<string | null>;
+	/**
+	 * Whether a Pi session's chat tab carries the sub-agent marker its spawn
+	 * persisted. Role resolution needs a signal that outlives the process: a
+	 * caller's `parentSessionId` is never stored, so a conversation resumed after
+	 * a restart re-registers at depth 0, while its Plan Mode comes back from the
+	 * renderer's per-tab store — lineage alone would hand a restored investigator
+	 * the orchestrator policy. An implementation that cannot read the marker
+	 * reports false rather than throwing, which leaves the role to depth exactly
+	 * as it was before the marker existed.
+	 */
+	isSpawnedSubAgent: (piSessionId: string) => Promise<boolean>;
 	/** Owning workspace of a Pi session, or null when it does not exist. */
 	resolveConversationWorkspace: (piSessionId: string) => Promise<string | null>;
 }
@@ -255,6 +279,14 @@ export interface PlanModePort {
 		origin: AgentControlOrigin;
 		args: ExitPlanModeArgs;
 	}) => Promise<ExitPlanModeResult>;
+	/**
+	 * Puts a freshly spawned child into Plan Mode, so a planning parent's
+	 * delegation stays read-only. Deliberately one-way: this port is reachable
+	 * from every control handler, and a member that could turn Plan Mode *off*
+	 * would be a route for a future op to unblock its own session, contradicting
+	 * the promise the agent is given that only the user's approval ends planning.
+	 */
+	activateForSpawn: (sessionId: string) => void;
 	/** Forgets a session's Plan Mode state once it ends. */
 	releaseSession: (sessionId: string) => void;
 }

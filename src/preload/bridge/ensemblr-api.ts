@@ -5,6 +5,7 @@ import type {
 	BoardStatusBroadcast,
 	ExitPlanModeBroadcast,
 	FocusViewBroadcast,
+	PlanModeChangedBroadcast,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control';
 import { IPC_CHANNELS } from '../../shared/ipc/channels';
@@ -36,6 +37,7 @@ type InvokeKey = Exclude<
 	| 'onAskUserQuestion'
 	| 'onAskUserQuestionClosed'
 	| 'onExitPlanMode'
+	| 'onPlanModeChanged'
 	| 'onPiRawFrame'
 	| 'onPiSessionEvent'
 	| 'onTerminalLifecycle'
@@ -229,6 +231,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 		onExitPlanMode: (listener) =>
 			subscribe<ExitPlanModeBroadcast>(
 				IPC_CHANNELS.agentControlExitPlanMode,
+				listener,
+			),
+		onPlanModeChanged: (listener) =>
+			subscribe<PlanModeChangedBroadcast>(
+				IPC_CHANNELS.agentControlPlanModeChanged,
 				listener,
 			),
 		reportBoardStatus: (statusByWorkspaceId) =>

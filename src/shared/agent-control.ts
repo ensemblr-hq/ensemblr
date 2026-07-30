@@ -4,13 +4,19 @@
  * `agent-control/` implementation files.
  */
 export { buildAskUserQuestionResult } from './agent-control/ask-user-question.ts';
+export type { AgentControlRole } from './agent-control/awareness.ts';
 export {
 	HARNESS_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
-	PLAN_MODE_AWARENESS,
+	PLAN_MODE_ORCHESTRATOR_AWARENESS,
+	PLAN_MODE_SUBAGENT_AWARENESS,
 	roleForDepth,
 	SUBAGENT_AWARENESS,
 } from './agent-control/awareness.ts';
+export {
+	BRIEF_REPORT_CHARS,
+	briefReport,
+} from './agent-control/brief-report.ts';
 export * from './agent-control/contracts.ts';
 export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
 export * from './agent-control/schemas.ts';

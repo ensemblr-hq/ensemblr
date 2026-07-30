@@ -13,6 +13,7 @@ import type {
 	AgentControlWorkspaceInfo,
 	BoardStatusBroadcast,
 	FocusViewBroadcast,
+	PlanModeChangedBroadcast,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control.ts';
 import { findHarnessDefinition } from '../../shared/agents.ts';
@@ -60,6 +61,7 @@ import type {
 	TerminalPort,
 	WorkspacePort,
 } from './ports.ts';
+import { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';
 
 /** Collaborators the adapters delegate to; supplied by the composition root. */
 export interface PortAdapterDeps {
@@ -85,6 +87,12 @@ export interface PortAdapterDeps {
 	broadcastFocus: (payload: FocusViewBroadcast) => void;
 	/** Broadcasts a tab-set change so the renderer refreshes its tab list. */
 	broadcastTabsChanged: (payload: TabsChangedBroadcast) => void;
+	/**
+	 * Broadcasts a chat tab's Plan Mode state so the renderer's per-chat toggle
+	 * matches a spawn the renderer never made. Best-effort mirror only —
+	 * enforcement reads the main-process registry, never this.
+	 */
+	broadcastPlanMode: (payload: PlanModeChangedBroadcast) => void;
 	/** Broadcasts a board-status change so the renderer updates its board atom. */
 	broadcastBoardStatus: (payload: BoardStatusBroadcast) => void;
 	/** Main-side mirror of the renderer's board-status map. */
@@ -100,6 +108,16 @@ const IDLE_STATUSES: ReadonlySet<string> = new Set([
 	'errored',
 ]);
 const WAIT_POLL_MS = 400;
+
+/**
+ * Ceiling on the joined report {@link findFinalTurnText} returns. A turn's
+ * assistant messages are read newest-first, so the cap sheds the narration that
+ * opened the turn rather than the answer that closed it. It bounds a single
+ * message too — clamped to its opening, which is where a report states its
+ * answer — so one tool-heavy child cannot flood its orchestrator's context from
+ * a single tool result it pasted whole.
+ */
+const MAX_REPORT_CHARS = 32_000;
 
 /** Row shape read from {@link listAllWorkspaceRows} for the workspace listing. */
 interface WorkspaceRow {
@@ -305,6 +323,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			title,
 			callerModel,
 			parentSessionId,
+			planMode,
 		}) => {
 			const executable = await requireExecutable();
 			const resolvedModel = await resolveModel(model, callerModel, workspaceId);
@@ -328,6 +347,17 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				executable,
 				parentSessionId,
 			});
+			// Registered before `submitPrompt` because the child can reach
+			// `before_agent_start` first.
+			if (planMode) {
+				deps.planMode.activateForSpawn(snapshot.id);
+				deps.broadcastPlanMode({
+					chatTabId: targetTabId,
+					piSessionId: snapshot.id,
+					planMode: true,
+					workspaceId,
+				});
+			}
 			try {
 				await deps.piSessionService.submitPrompt({
 					sessionId: snapshot.id,
@@ -400,15 +430,17 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			if (!snapshot) {
 				return false;
 			}
-			return findLastAssistantText(deps, snapshot.branchId) !== null;
+			return findFinalTurnText(deps, snapshot.branchId) !== null;
 		},
 		getLastMessage: async (piSessionId) => {
 			const snapshot = deps.piSessionService.getSession(piSessionId);
 			if (!snapshot) {
 				return null;
 			}
-			return findLastAssistantText(deps, snapshot.branchId);
+			return findFinalTurnText(deps, snapshot.branchId);
 		},
+		isSpawnedSubAgent: async (piSessionId) =>
+			readSubAgentMarker(deps, piSessionId),
 		resolveConversationWorkspace: async (piSessionId) =>
 			deps.piSessionService.getSession(piSessionId)?.workspaceId ?? null,
 	};
@@ -444,6 +476,23 @@ function markTabAsSubAgent(deps: PortAdapterDeps, chatTabId: string): void {
 }
 
 /**
+ * Reads the sub-agent marker {@link markTabAsSubAgent} wrote, off the chat tab
+ * bound to a Pi session.
+ * @param deps - Adapter collaborators.
+ * @param piSessionId - The session whose tab to inspect.
+ * @returns True when the session's tab is stamped as hosting a spawned sub-agent.
+ */
+function readSubAgentMarker(
+	deps: PortAdapterDeps,
+	piSessionId: string,
+): boolean {
+	return isSessionTabMarkedSubAgent(
+		deps.databaseService.getConnection()?.database,
+		piSessionId,
+	);
+}
+
+/**
  * Applies a display name to a conversation's tab via the Pi session service,
  * swallowing failures so naming never breaks a spawn or a control call. Always
  * claims `agent` provenance: every route here is an agent naming a tab, so a
@@ -475,7 +524,9 @@ async function applyConversationName(
  * Tears down a conversation that failed to submit its first prompt, so a throw
  * mid-`startConversation` does not strand a live Pi session or an empty chat
  * tab. Best-effort: cleanup errors are swallowed so the original failure is the
- * one surfaced to the caller.
+ * one surfaced to the caller. The Plan Mode release is unconditional — dropping a
+ * session that never planned is a no-op, and the shutdown path cannot be relied
+ * on here because this function swallows a failed `stopSession`.
  * @param deps - Adapter collaborators.
  * @param target - The session to stop, the tab this call opened (if any), and its workspace.
  */
@@ -487,6 +538,7 @@ async function rollbackConversation(
 		workspaceId: string;
 	},
 ): Promise<void> {
+	deps.planMode.releaseSession(target.piSessionId);
 	try {
 		await deps.piSessionService.stopSession({
 			sessionId: target.piSessionId,
@@ -512,30 +564,70 @@ async function rollbackConversation(
 }
 
 /**
- * Scans a conversation branch newest-first for the last assistant answer,
- * stopping at the first one found, so status and last-message reads share one
- * definition of "has a final report" without loading the whole branch. The
- * session service yields persisted payloads lazily and already excludes
+ * Scans a conversation branch newest-first for the newest turn that produced an
+ * answer and joins every assistant message in it, so status and last-message
+ * reads share one definition of "has a final report" without loading the whole
+ * branch. A whole turn rather than a single message because an agent that writes
+ * its report and then signs off with a one-line hand-off leaves two messages, and
+ * reading only the newest returns the hand-off and throws the report away. A
+ * prompt that has not been answered yet is skipped rather than treated as the
+ * end, so a child re-prompted mid-read still reports the work it already filed.
+ * A tool-heavy turn can hold dozens of assistant messages, so the join stops at
+ * {@link MAX_REPORT_CHARS} and drops the oldest — the narration an agent writes
+ * on its way to the answer, never the answer itself, which is the newest. A
+ * newest message that busts the ceiling on its own is clamped to its opening
+ * rather than returned whole, so the ceiling really is a ceiling.
+ * The session service yields persisted payloads lazily and already excludes
  * checkpoint-hidden turns; persisted events survive the session closing and app
  * restarts, so this recovers a finished child's report even when it is no
  * longer live.
  * @param deps - Adapter collaborators exposing the Pi session service.
  * @param branchId - The conversation branch whose events to scan.
- * @returns The last assistant text, or null when the branch has none.
+ * @returns The final turn's assistant text, or null when the branch has none.
  */
-function findLastAssistantText(
+function findFinalTurnText(
 	deps: PortAdapterDeps,
 	branchId: string,
 ): string | null {
+	const turn: string[] = [];
+	let size = 0;
 	for (const payload of deps.piSessionService.iterateEventPayloadsDescending(
 		branchId,
 	)) {
-		const text = extractAssistantText(payload);
-		if (text) {
-			return text;
+		if (isTurnBoundary(payload)) {
+			if (turn.length > 0) {
+				break;
+			}
+			continue;
 		}
+		const text = extractAssistantText(payload);
+		if (!text) {
+			continue;
+		}
+		const remaining = MAX_REPORT_CHARS - size;
+		if (text.length <= remaining) {
+			turn.push(text);
+			size += text.length;
+			continue;
+		}
+		if (turn.length === 0) {
+			turn.push(text.slice(0, remaining));
+		}
+		break;
 	}
-	return null;
+	return turn.length > 0 ? turn.reverse().join('\n\n') : null;
+}
+
+/**
+ * Whether a persisted event is the user prompt that opened a turn, which is
+ * where a newest-first scan of the final turn stops.
+ * @param payload - A persisted Pi event envelope, or null for a gap.
+ * @returns True when the envelope is a user-role message.
+ */
+function isTurnBoundary(
+	payload: PiPersistedEnvelope | null | undefined,
+): boolean {
+	return payload?.kind === 'message' && payload.role === 'user';
 }
 
 /**
@@ -543,8 +635,8 @@ function findLastAssistantText(
  * Persisted events are {@link PiPersistedEnvelope} tagged unions, so a completed
  * assistant turn is an `agent`-role `message` whose inner payload holds the
  * final text (as `message` parts or a standalone `text` payload). Reasoning
- * parts, tool calls, streaming deltas, and non-agent envelopes yield null, so
- * `getLastMessage` can scan newest-first for the last real answer.
+ * parts, tool calls, streaming deltas, and non-agent envelopes yield null, so a
+ * final-turn scan collects only the answers the agent meant to leave behind.
  * @param payload - A persisted Pi event envelope, or null for a gap.
  * @returns The assistant text, or null when the event carries none.
  */

@@ -112,7 +112,7 @@ test('cancels on Escape', async () => {
 
 test('walks through several questions before finishing', async () => {
 	const { onFinish, user } = renderCard(TWO_QUESTIONS);
-	expect(screen.getByRole('button', { name: 'Scope' })).toBeInTheDocument();
+	expect(screen.getByRole('button', { name: 'Q1: Scope' })).toBeInTheDocument();
 	await user.keyboard('2');
 	expect(
 		screen.getByRole('heading', { name: 'When should I do it?' }),

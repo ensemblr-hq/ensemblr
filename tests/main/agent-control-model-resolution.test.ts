@@ -56,8 +56,15 @@ const makeDeps = (): PortAdapterDeps => {
 		augmentHarnessCommand: (command: string) => command,
 		broadcastFocus: vi.fn(),
 		broadcastTabsChanged: vi.fn(),
+		broadcastPlanMode: vi.fn(),
 		ask: { ask: vi.fn(), releaseSession: vi.fn() },
 		confirm: { confirm: vi.fn() },
+		planMode: {
+			activateForSpawn: vi.fn(),
+			exit: vi.fn(),
+			isActive: vi.fn(() => false),
+			releaseSession: vi.fn(),
+		},
 	} as unknown as PortAdapterDeps;
 };
 
@@ -71,6 +78,7 @@ const spawn = async (input: {
 		workspaceCwd: '/ws',
 		prompt: 'go',
 		parentSessionId: 'ws:ws',
+		planMode: false,
 		...input,
 	});
 	return openSession.mock.calls[0][0].model;
@@ -117,10 +125,12 @@ describe('startConversation rollback on submit failure', () => {
 		stopSession: ReturnType<typeof vi.fn>;
 		closeTab: ReturnType<typeof vi.fn>;
 		openTab: ReturnType<typeof vi.fn>;
+		releasePlanMode: ReturnType<typeof vi.fn>;
 	} => {
 		const stopSession = vi.fn(async () => {});
 		const closeTab = vi.fn(() => ({ deleted: true }));
 		const openTab = vi.fn(() => ({ id: 'tab-new', metadata: {} }));
+		const releasePlanMode = vi.fn();
 		const deps = {
 			databaseService: { getConnection: () => ({ database: {} }) },
 			chatTabService: { openTab, closeTab },
@@ -147,10 +157,17 @@ describe('startConversation rollback on submit failure', () => {
 			augmentHarnessCommand: (command: string) => command,
 			broadcastFocus: vi.fn(),
 			broadcastTabsChanged: vi.fn(),
+			broadcastPlanMode: vi.fn(),
 			ask: { ask: vi.fn(), releaseSession: vi.fn() },
 			confirm: { confirm: vi.fn() },
+			planMode: {
+				activateForSpawn: vi.fn(),
+				exit: vi.fn(),
+				isActive: vi.fn(() => false),
+				releaseSession: releasePlanMode,
+			},
 		} as unknown as PortAdapterDeps;
-		return { deps, stopSession, closeTab, openTab };
+		return { deps, stopSession, closeTab, openTab, releasePlanMode };
 	};
 
 	it('stops the session and closes the tab it opened when the first prompt fails', async () => {
@@ -162,6 +179,7 @@ describe('startConversation rollback on submit failure', () => {
 				workspaceCwd: '/ws',
 				prompt: 'go',
 				parentSessionId: 'ws:ws',
+				planMode: false,
 			}),
 		).rejects.toThrow('submit failed');
 		expect(stopSession).toHaveBeenCalledWith(
@@ -180,10 +198,31 @@ describe('startConversation rollback on submit failure', () => {
 				chatTabId: 'caller-tab',
 				prompt: 'go',
 				parentSessionId: 'ws:ws',
+				planMode: false,
 			}),
 		).rejects.toThrow('submit failed');
 		expect(openTab).not.toHaveBeenCalled();
 		expect(stopSession).toHaveBeenCalled();
 		expect(closeTab).not.toHaveBeenCalled();
+	});
+
+	// Unconditional on purpose: releasing a session that never planned is a no-op
+	// `Set.delete`, and the shutdown path cannot be relied on here because rollback
+	// swallows a failed `stopSession`.
+	it('releases the child from Plan Mode on rollback, planning or not', async () => {
+		for (const planMode of [true, false]) {
+			const { deps, releasePlanMode } = makeFailingDeps();
+			const ports = createAgentControlPorts(deps);
+			await expect(
+				ports.conversations.startConversation({
+					workspaceId: 'ws',
+					workspaceCwd: '/ws',
+					prompt: 'go',
+					parentSessionId: 'ws:ws',
+					planMode,
+				}),
+			).rejects.toThrow('submit failed');
+			expect(releasePlanMode).toHaveBeenCalledWith('pi-child');
+		}
 	});
 });

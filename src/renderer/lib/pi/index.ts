@@ -9,6 +9,7 @@
  */
 
 export { customMessageDataOf } from './custom-message-part';
+export { isHiddenEnsemblrToolCall } from './ensemblr-tool-presentation';
 export {
 	eventsToUIMessages,
 	noticeMetadataOf,

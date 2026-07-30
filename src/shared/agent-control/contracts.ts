@@ -290,14 +290,23 @@ export interface ReadTerminalOutputArgs {
 export type WaitMode = 'first' | 'all';
 
 /**
+ * How much of each child's report a wait returns. `full` hands back the whole
+ * final turn; `brief` keeps the opening of it and points at
+ * `getLastMessage` for the rest, so a wide fan-out costs the orchestrator's
+ * context once rather than once per child.
+ */
+export type WaitReportDetail = 'full' | 'brief';
+
+/**
  * Args for `waitForAgents`: block the caller's turn until delegated Pi children
  * finish or need a decision. `targets` defaults to every live child of the
- * caller; `mode` defaults to `'first'`; `timeoutMs` is clamped to the app's wait
- * timeout.
+ * caller; `mode` defaults to `'first'`; `reports` defaults to `'full'`;
+ * `timeoutMs` is clamped to the app's wait timeout.
  */
 export interface WaitForAgentsArgs {
 	targets?: string[];
 	mode?: WaitMode;
+	reports?: WaitReportDetail;
 	timeoutMs?: number;
 }
 
@@ -321,11 +330,25 @@ export interface WaitedAgent {
 	lastMessage: string | null;
 	/** The child's pending signal when it woke the wait, else null. */
 	signal: OrchestratorSignal | null;
+	/** Whether `lastMessage` was shortened and the rest is still fetchable. */
+	reportTruncated: boolean;
 }
 
-/** Result of `waitForAgents`: the children that settled, and whether it timed out. */
+/** A target that had not settled when `waitForAgents` returned. */
+export interface PendingAgent {
+	piSessionId: string;
+	status: string;
+}
+
+/**
+ * Result of `waitForAgents`: the children that settled, the ones still running,
+ * and whether it timed out. `pending` spares the caller a status poll per child
+ * when the wait returns before every target is done — on `mode: "first"`, on a
+ * signal, or on a timeout.
+ */
 export interface WaitForAgentsResult {
 	completed: readonly WaitedAgent[];
+	pending: readonly PendingAgent[];
 	timedOut: boolean;
 }
 
@@ -340,15 +363,17 @@ export interface NotifyOrchestratorArgs {
 }
 
 /**
- * Upper bounds on an `askUserQuestion` questionnaire. Small on purpose: the
- * dialog is a decision aid, not a form, and every option must stay reachable by
- * a single number key.
+ * Upper bounds on an `askUserQuestion` questionnaire. The counts are small on
+ * purpose: the dialog is a decision aid, not a form, and every option must stay
+ * reachable by a single number key. `maxHeaderLength` is a trim point rather
+ * than a rejection — the header is only ever a pager dot's accessible name, so
+ * losing a questionnaire over it costs the agent a round trip and buys nothing.
  */
 export const ASK_USER_QUESTION_LIMITS = {
 	maxQuestions: 4,
 	maxOptions: 6,
 	minOptions: 2,
-	maxHeaderLength: 16,
+	maxHeaderLength: 64,
 	maxLabelLength: 80,
 } as const;
 
@@ -374,7 +399,7 @@ export interface AskUserQuestionOption {
 /** A single question in an `askUserQuestion` questionnaire. */
 export interface AskUserQuestionItem {
 	question: string;
-	/** Short pager label; falls back to `Q<n>` when absent. */
+	/** Accessible name for this question's pager dot, appended to its `Q<n>` position. */
 	header?: string;
 	options: readonly AskUserQuestionOption[];
 	/** Lets the user check several options instead of picking one. */
@@ -491,6 +516,23 @@ export interface ExitPlanModeBroadcast {
 	title: string;
 	/** Workspace-relative path of the saved plan, or null when the write failed. */
 	planPath: string | null;
+}
+
+/**
+ * Main → renderer notice that a chat tab's Plan Mode state changed underneath the
+ * renderer. A spawned conversation inherits its parent's Plan Mode through the
+ * control layer, which bypasses the IPC handlers the renderer's own toggle rides,
+ * so without this push the child's composer would show the toggle off while its
+ * tools are blocked — and the user's next message would clear the inherited state.
+ * Keyed by chat tab, because that is what the renderer's per-chat toggle is keyed
+ * by. Enforcement never depends on this landing: the registry is written first and
+ * this is a best-effort mirror.
+ */
+export interface PlanModeChangedBroadcast {
+	workspaceId: string;
+	chatTabId: string;
+	piSessionId: string;
+	planMode: boolean;
 }
 
 /** Args for `checkPlanModeTool`: ask whether a tool call is allowed while planning. */
@@ -666,10 +708,13 @@ export interface AgentControlConversationStatus {
 }
 
 /**
- * Last assistant message returned by `getLastMessage`. `message` is null when
- * the session is unknown or has produced no assistant text yet; the wrapping
- * object keeps that null distinguishable from the empty success envelope a bare
- * null would otherwise render as.
+ * The report returned by `getLastMessage`: every assistant message of the
+ * conversation's newest answered turn, joined in the order it was written, so a
+ * child that files its findings and then signs off with a hand-off line still
+ * hands back the findings. `message` is null when the session is unknown or has
+ * produced no assistant text yet; the wrapping object keeps that null
+ * distinguishable from the empty success envelope a bare null would otherwise
+ * render as.
  */
 export interface GetLastMessageResult {
 	message: string | null;

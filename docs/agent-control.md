@@ -50,6 +50,10 @@ Delegation is bounded so a runaway agent cannot fork-bomb the app
 - **Shallow by design** — only a root orchestrator may spawn; a spawned
   sub-agent cannot delegate onward (spawn depth capped at **1**).
 - **20 spawns per session** (lifetime) and **10 per minute** (rolling).
+- **Plan Mode is inherited** — a spawn from a planning parent produces a planning
+  child, so a planning orchestrator can fan out read-only investigators without
+  handing any of them a way to edit the repository. The depth cap still applies,
+  so inheritance never recurses.
 - A blocking wait times out after **5 minutes**; the child keeps running.
 - Waiting on an ancestor session is refused (it would deadlock).
 
@@ -81,6 +85,14 @@ the exact argument shapes):
   Main renders that `summary` from the answers it validated — the renderer never
   supplies prose.
 
+  Length rules are asymmetric on purpose. An over-long option **label** is
+  rejected, because the label is rendered and truncating it would change the
+  choice. An over-long question **header** is **trimmed**, because it is only the
+  accessible name of a pager dot — rejecting the batch over it cost a round trip
+  and bought nothing. Headers no longer have to be distinct either: `headerOf`
+  leads every label with its `Q<n>` position, so the pager is unambiguous however
+  the agent worded them.
+
 ## Orchestration in practice
 
 An agent starts as an **orchestrator** (the root, lineage depth 0) and may
@@ -92,15 +104,26 @@ integrate**:
    with `ensemblr_start_conversation` (give it a short `title`).
 2. **Wait** with `ensemblr_wait_for_agents` — it blocks efficiently instead of
    polling, and returns the moment a child finishes or signals it needs a
-   decision.
+   decision. It hands back each child's whole final turn by default;
+   `reports: "brief"` returns each report's opening plus a pointer to
+   `ensemblr_get_last_message`, which is what a wide fan-out wants.
 3. **Evaluate** each result; steer a child with `ensemblr_send_follow_up` and
    wait again if needed.
-4. **Integrate** the outcomes and focus the relevant view so the user can
+4. **Verify** a load-bearing claim before building on it. A child's report is a
+   claim, not a fact the orchestrator checked, and a cited path reads as verified
+   even when nobody opened it — both orchestrator playbooks say so outright.
+5. **Integrate** the outcomes and focus the relevant view so the user can
    follow along.
 
 Delegation is the exception, not the default — one agent in one thread is the
 right tool for almost every task. A sub-agent that hits a blocker calls
 `ensemblr_notify_orchestrator` to pull the orchestrator back rather than stalling.
+
+The same loop runs while planning, with read-only children: each one answers a
+question about the codebase and reports back, and the orchestrator folds those
+findings into the plan it submits. A planning sub-agent cannot submit a plan or
+question the user — see
+[Planning with sub-agents](./considerations/agent-orchestration-playbook.md#planning-with-sub-agents).
 
 ## See also
 

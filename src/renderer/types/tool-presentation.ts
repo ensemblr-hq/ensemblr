@@ -9,12 +9,18 @@ export type ToolTone = 'default' | 'destructive';
  */
 export type ToolGlyph =
 	| 'biceps-flexed'
+	| 'bot'
 	| 'brain'
 	| 'circle-x'
+	| 'clipboard-list'
 	| 'file-pen'
 	| 'file-plus'
 	| 'file-text'
 	| 'folder-tree'
+	| 'kanban'
+	| 'list'
+	| 'message-circle-question'
+	| 'panels-top-left'
 	| 'puzzle'
 	| 'search'
 	| 'stethoscope'

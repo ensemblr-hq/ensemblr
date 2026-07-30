@@ -13,6 +13,11 @@ import type {
 	ToolPresentation,
 	ToolPreviewDescriptor,
 } from '@/renderer/types/tool-presentation';
+import {
+	ensemblrControlFailure,
+	ensemblrToolGlyph,
+	ensemblrToolLabel,
+} from './ensemblr-tool-presentation';
 import { shellCommandTitle } from './shell-command-title';
 import { parseToolDiagnostics } from './tool-diagnostics';
 import {
@@ -520,6 +525,43 @@ const PRESENTERS: Record<
 	write_file: presentWrite,
 };
 
+/** Stands in when a failed call reported neither a reason nor any output. */
+const UNSPECIFIED_FAILURE = 'The call failed without a reported reason.';
+
+/**
+ * Reads the message a failed call should render.
+ *
+ * A control tool reports a refusal as an ordinary result carrying `ok: false`
+ * and never sets the transport's error text, so a row that trusts the error text
+ * alone titles a denial as the action it was refused.
+ * @param part - The tool part to inspect
+ * @returns The failure message, or null when the call did not fail
+ */
+function failureTextOf(part: DynamicToolUIPart): string | null {
+	if ('errorText' in part && part.errorText) {
+		return part.errorText;
+	}
+	const controlFailure = ensemblrControlFailure(part);
+	if (controlFailure === null) {
+		return null;
+	}
+	const reported = controlFailure.error ?? outputOf(part)?.text ?? '';
+	return reported.length > 0 ? reported : UNSPECIFIED_FAILURE;
+}
+
+/**
+ * Resolves the icon a tool answers to at rest, before any failure is considered.
+ * @param part - The tool part to identify
+ * @returns The glyph for the tool's name
+ */
+function restingGlyph(part: DynamicToolUIPart): ToolGlyph {
+	return (
+		TOOL_GLYPHS[part.toolName.toLowerCase()] ??
+		ensemblrToolGlyph(part.toolName) ??
+		'wrench'
+	);
+}
+
 /**
  * Projects any tool call into everything its row needs to render.
  *
@@ -534,24 +576,34 @@ const PRESENTERS: Record<
  * @returns The row's icon, title, badge, preview, and body
  */
 export function presentToolCall(part: DynamicToolUIPart): ToolPresentation {
-	const glyph = glyphForToolCall(part);
-	const label = humanizeToolName(part.toolName);
-	if ('errorText' in part && part.errorText) {
-		const errorText = part.errorText;
+	const failureText = failureTextOf(part);
+	if (failureText !== null) {
 		return {
 			badge: null,
-			body: looksLikeStackTrace(errorText)
-				? { kind: 'stack-trace', trace: errorText }
-				: { kind: 'error', text: errorText },
-			glyph,
-			preview: { font: 'mono', text: errorText },
-			title: `${label} failed`,
+			body: looksLikeStackTrace(failureText)
+				? { kind: 'stack-trace', trace: failureText }
+				: { kind: 'error', text: failureText },
+			glyph: 'circle-x',
+			preview: { font: 'mono', text: failureText },
+			title: `${humanizeToolName(part.toolName)} failed`,
 			tone: 'destructive',
 		};
 	}
+	const glyph = restingGlyph(part);
+	const isRunning = RUNNING_STATES.has(part.state);
 	const presenter = PRESENTERS[part.toolName.toLowerCase()] ?? presentGeneric;
-	const presentation = { ...presenter(part), glyph };
-	if (RUNNING_STATES.has(part.state)) {
+	const projected = presenter(part);
+	const controlLabel = ensemblrToolLabel(
+		part.toolName,
+		inputOf(part),
+		isRunning,
+	);
+	const presentation = {
+		...projected,
+		glyph,
+		title: controlLabel?.title ?? projected.title,
+	};
+	if (isRunning) {
 		return { ...presentation, body: { kind: 'pending' } };
 	}
 	return presentation;
@@ -562,13 +614,10 @@ export function presentToolCall(part: DynamicToolUIPart): ToolPresentation {
  * summary paints one of these per call, so it must stay cheap on turns holding
  * dozens of them.
  * @param part - The tool part to identify
- * @returns The glyph for the tool, or the failure mark when the call errored
+ * @returns The glyph for the tool, or the failure mark when the call failed
  */
 export function glyphForToolCall(part: DynamicToolUIPart): ToolGlyph {
-	if ('errorText' in part && part.errorText) {
-		return 'circle-x';
-	}
-	return TOOL_GLYPHS[part.toolName.toLowerCase()] ?? 'wrench';
+	return failureTextOf(part) === null ? restingGlyph(part) : 'circle-x';
 }
 
 /**
