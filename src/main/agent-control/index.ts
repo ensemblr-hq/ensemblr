@@ -31,7 +31,7 @@ export {
 	type AgentControlIntegration,
 	createAgentControlIntegration,
 } from './main-integration.ts';
-export { handleMcpRequest } from './mcp-endpoint.ts';
+export { handleMcpRequest, TOOL_DEFS } from './mcp-endpoint.ts';
 export {
 	createOriginRegistry,
 	type OriginRegistry,

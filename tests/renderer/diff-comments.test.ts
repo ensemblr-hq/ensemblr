@@ -30,6 +30,7 @@ function localComment(
 		filePath: 'foo.ts',
 		id: 'l1',
 		lineNumber: null,
+		origin: 'user',
 		status: 'open',
 		updatedAt: '',
 		workspaceId: 'w1',

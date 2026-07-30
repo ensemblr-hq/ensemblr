@@ -23,6 +23,7 @@ function createTestDatabase(): DatabaseSync {
 		file_path TEXT NOT NULL,
 		line_number INTEGER,
 		body TEXT NOT NULL,
+		origin TEXT NOT NULL DEFAULT 'user',
 		status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved', 'archived')),
 		created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 		updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -50,6 +51,7 @@ test('review comments support add, list, resolve, and delete', () => {
 		database,
 		filePath: 'src/app.ts',
 		lineNumber: 42,
+		origin: 'user',
 		workspaceId: 'ws-1',
 	});
 	assert.equal(comment.status, 'open');
@@ -86,6 +88,7 @@ test('review comments are scoped per workspace and hide archived', () => {
 		database,
 		filePath: 'a.ts',
 		lineNumber: null,
+		origin: 'user',
 		workspaceId: 'ws-1',
 	});
 	insertReviewComment({
@@ -93,6 +96,7 @@ test('review comments are scoped per workspace and hide archived', () => {
 		database,
 		filePath: 'b.ts',
 		lineNumber: null,
+		origin: 'user',
 		workspaceId: 'ws-2',
 	});
 	const archived = insertReviewComment({
@@ -100,6 +104,7 @@ test('review comments are scoped per workspace and hide archived', () => {
 		database,
 		filePath: 'c.ts',
 		lineNumber: 1,
+		origin: 'user',
 		workspaceId: 'ws-1',
 	});
 	updateReviewComment({ database, id: archived.id, status: 'archived' });
@@ -141,6 +146,45 @@ test('review todos append positions and support status flips', () => {
 
 	deleteReviewTodo({ database, id: second.id });
 	assert.equal(listReviewTodos({ database, workspaceId: 'ws-1' }).length, 1);
+});
+
+test('review comments record and keep their author', () => {
+	const database = createTestDatabase();
+	const agentComment = insertReviewComment({
+		body: 'This branch is unreachable',
+		database,
+		filePath: 'src/app.ts',
+		lineNumber: 7,
+		origin: 'agent',
+		workspaceId: 'ws-1',
+	});
+	assert.equal(agentComment.origin, 'agent');
+
+	const userComment = insertReviewComment({
+		body: 'Agreed',
+		database,
+		filePath: 'src/app.ts',
+		lineNumber: 8,
+		origin: 'user',
+		workspaceId: 'ws-1',
+	});
+	assert.equal(userComment.origin, 'user');
+
+	// Editing or resolving a comment says nothing about who wrote it, so the
+	// update path must leave the author alone rather than defaulting it back.
+	const resolved = updateReviewComment({
+		body: 'Still unreachable',
+		database,
+		id: agentComment.id,
+		status: 'resolved',
+	});
+	assert.equal(resolved?.origin, 'agent');
+
+	const listed = listReviewComments({ database, workspaceId: 'ws-1' });
+	assert.deepEqual(
+		listed.map((row) => row.origin),
+		['agent', 'user'],
+	);
 });
 
 test('updates against missing rows return null', () => {

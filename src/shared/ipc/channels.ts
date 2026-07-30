@@ -16,6 +16,8 @@ export const IPC_CHANNELS = {
 	closeActiveTab: 'ensemblr:close-active-tab',
 	agentControlFocusView: 'ensemblr:agent-control-focus-view',
 	agentControlTabsChanged: 'ensemblr:agent-control-tabs-changed',
+	agentControlReviewCommentsChanged:
+		'ensemblr:agent-control-review-comments-changed',
 	agentControlBoardStatus: 'ensemblr:agent-control-board-status',
 	agentControlReportBoardStatus: 'ensemblr:agent-control-report-board-status',
 	agentControlAskUserQuestion: 'ensemblr:agent-control-ask-user-question',

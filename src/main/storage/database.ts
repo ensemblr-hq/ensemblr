@@ -585,6 +585,18 @@ ALTER TABLE chat_tabs ADD COLUMN full_title TEXT NOT NULL DEFAULT '';
 UPDATE chat_tabs SET full_title = title;
 `,
 	},
+	{
+		id: '012_comment_origin',
+		version: 12,
+		// Agents can now file review comments, so a comment has to say who wrote
+		// it. Existing rows are the user's by definition, which is also the
+		// default a renderer that predates this column would have implied. No
+		// inline CHECK: SQLite's ADD COLUMN restrictions make one fragile, and the
+		// value set is enforced by the TS union and the Zod schema at the boundary.
+		sql: `
+ALTER TABLE comments ADD COLUMN origin TEXT NOT NULL DEFAULT 'user';
+`,
+	},
 ];
 
 /** Highest declared migration version embedded in this build. */

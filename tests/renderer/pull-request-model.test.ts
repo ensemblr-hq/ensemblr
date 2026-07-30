@@ -221,6 +221,7 @@ describe('buildPullRequestShellModel', () => {
 					filePath: 'src/app.ts',
 					id: 'lc1',
 					lineNumber: 4,
+					origin: 'user',
 					status: 'open',
 					updatedAt: '2026-06-11T09:00:00Z',
 					workspaceId: 'ws-1',

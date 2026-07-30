@@ -6,6 +6,7 @@ import type {
 	ExitPlanModeBroadcast,
 	FocusViewBroadcast,
 	PlanModeChangedBroadcast,
+	ReviewCommentsChangedBroadcast,
 	TabsChangedBroadcast,
 } from '../../agent-control.ts';
 
@@ -105,6 +106,14 @@ export interface ShellApi {
 	 */
 	onAgentControlTabsChanged: (
 		listener: (payload: TabsChangedBroadcast) => void,
+	) => () => void;
+	/**
+	 * Subscribes to agent-control review-comment writes (an agent filed comments
+	 * on a workspace diff). Returns an unsubscribe function. The renderer
+	 * invalidates its cached comment list for the payload's workspace.
+	 */
+	onAgentControlReviewCommentsChanged: (
+		listener: (payload: ReviewCommentsChangedBroadcast) => void,
 	) => () => void;
 	/**
 	 * Subscribes to agent-control board-status requests (an agent moved its

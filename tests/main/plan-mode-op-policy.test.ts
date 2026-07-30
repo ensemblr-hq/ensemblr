@@ -29,9 +29,11 @@ const EXPECTED_DENIALS: Record<
 	AgentControlOp,
 	readonly AgentControlRole[] | 'conditional'
 > = {
+	addDiffComments: [],
 	askUserQuestion: ['subagent'],
 	checkPlanModeTool: [],
 	closeTab: [],
+	getDiffComments: [],
 	exitPlanMode: ['subagent'],
 	focusDockTab: [],
 	focusPanel: [],
@@ -39,6 +41,7 @@ const EXPECTED_DENIALS: Record<
 	getConversationStatus: [],
 	getLastMessage: [],
 	getSessionBrief: [],
+	getWorkspaceDiff: [],
 	getWorkspaceStatus: [],
 	launchHarness: ['orchestrator', 'subagent'],
 	listModels: [],

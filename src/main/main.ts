@@ -98,6 +98,7 @@ import {
 	createUnarchiveWorkspaceService,
 	createWorkspaceService,
 } from './repository';
+import { createReviewService } from './review';
 import {
 	createEnsemblrRootDirectoryService,
 	reconcileRootDirectory,
@@ -119,6 +120,7 @@ import {
 	createListWorkspaceFilesService,
 	createWorkspaceFilesWatcher,
 } from './workspace-files';
+import { createWorkspaceGitService } from './workspace-git';
 
 // The dev build (`electron-forge start`, unpackaged) runs alongside the
 // installed app while dogfooding. Isolate all of its persistent state so
@@ -602,6 +604,12 @@ agentControlService = createAgentControlService({
 		/** Broadcasts an agent-driven chat-tab set change to all windows. */
 		broadcastTabsChanged: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, payload),
+		/** Broadcasts an agent's review-comment write so the Changes panel refreshes. */
+		broadcastReviewCommentsChanged: (payload) =>
+			broadcastToAllWindows(
+				IPC_CHANNELS.agentControlReviewCommentsChanged,
+				payload,
+			),
 		/** Broadcasts an inherited Plan Mode state so the owning chat tab shows it. */
 		broadcastPlanMode: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlPlanModeChanged, payload),
@@ -618,6 +626,11 @@ agentControlService = createAgentControlService({
 		localCommandService,
 		piExecutableService,
 		piSessionService,
+		// Both are stateless factories over services already constructed here, so
+		// the control layer builds its own rather than reaching into the IPC
+		// handlers that build theirs the same way.
+		reviewService: createReviewService({ databaseService }),
+		workspaceGitService: createWorkspaceGitService({ localCommandService }),
 		planMode: {
 			/** Saves the finished plan, surfaces the review, and ends the turn. */
 			exit: planSubmission.submit,
