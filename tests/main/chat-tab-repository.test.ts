@@ -88,6 +88,102 @@ test('openChatTab assigns sequential positions to open tabs', (t) => {
 	assert.equal(b.closedAt, null);
 });
 
+test('openChatTab places a tab right of the anchor and shifts later tabs', (t) => {
+	const fixture = openFixture(t);
+
+	const first = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Chat A',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	const last = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Chat B',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	const inserted = openChatTab({
+		database: fixture.database,
+		input: {
+			insertAfterChatTabId: first.id,
+			kind: 'file',
+			title: 'notes.md',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	assert.equal(inserted.position, 1);
+	assert.deepEqual(
+		listOpenChatTabs({
+			database: fixture.database,
+			workspaceId: fixture.workspaceId,
+		}).map((tab) => tab.id),
+		[first.id, inserted.id, last.id],
+	);
+	assert.equal(
+		listOpenChatTabs({
+			database: fixture.database,
+			workspaceId: fixture.workspaceId,
+		}).find((tab) => tab.id === last.id)?.position,
+		2,
+	);
+});
+
+test('openChatTab appends when the anchor is not an open tab', (t) => {
+	const fixture = openFixture(t);
+
+	const first = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Chat A',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	const closed = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Chat B',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	closeChatTab({ database: fixture.database, id: closed.id });
+
+	const afterClosed = openChatTab({
+		database: fixture.database,
+		input: {
+			insertAfterChatTabId: closed.id,
+			kind: 'file',
+			title: 'notes.md',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	const afterUnknown = openChatTab({
+		database: fixture.database,
+		input: {
+			insertAfterChatTabId: 'missing-tab',
+			kind: 'file',
+			title: 'other.md',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	assert.deepEqual(
+		listOpenChatTabs({
+			database: fixture.database,
+			workspaceId: fixture.workspaceId,
+		}).map((tab) => tab.id),
+		[first.id, afterClosed.id, afterUnknown.id],
+	);
+});
+
 test('closeChatTab leaves the row but flags closed_at', (t) => {
 	const fixture = openFixture(t);
 

@@ -42,7 +42,7 @@ import {
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import {
 	areStringArraysEqual,
-	reconcileOrderedIds,
+	reconcileOrderedIdsByCanonicalSlot,
 } from '@/renderer/lib/ordered-ids';
 import { cn } from '@/renderer/lib/utils';
 import {
@@ -60,6 +60,7 @@ import { useDebugPanelToggle } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { shouldSelectOnTabClick } from '@/renderer/state/workspace';
 import type { SessionTabModel } from '@/renderer/types/workbench';
+import type { SessionTabPlacement } from '@/renderer/types/workbench-shell';
 import { formatShortcut } from '@/shared/keymap';
 
 /** Display label for the coding-agent launcher shortcut, e.g. `⌘⇧A`. */
@@ -119,7 +120,9 @@ export function SessionTabs({
 	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabClose: (sessionId: string) => void;
 	onSessionTabChange: (sessionId: string) => void;
-	onSessionTabOpen: () => Promise<{ chatTabId: string } | null>;
+	onSessionTabOpen: (options?: {
+		placement?: SessionTabPlacement;
+	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabRestore: (sessionId: string) => void;
 	onSessionTabsReorder: (sessionIds: string[]) => void;
 	sessions: SessionTabModel[];
@@ -166,7 +169,10 @@ export function SessionTabs({
 	if (prevSessionIds !== sessionIds) {
 		setPrevSessionIds(sessionIds);
 		setOrderedSessionIds((currentIds) => {
-			const nextIds = reconcileOrderedIds(currentIds, sessionIds);
+			const nextIds = reconcileOrderedIdsByCanonicalSlot(
+				currentIds,
+				sessionIds,
+			);
 			return areStringArraysEqual(nextIds, currentIds) ? currentIds : nextIds;
 		});
 	}
@@ -177,13 +183,17 @@ export function SessionTabs({
 		}
 	}, [debugOpen, developerMode, setDebugOpen]);
 
-	/** Opens a chat tab through the workspace-level controller and selects it. */
+	/**
+	 * Opens a chat tab through the workspace-level controller and selects it. The
+	 * strip's own button is the one place a new tab appends rather than landing
+	 * beside the active tab.
+	 */
 	function handleOpen() {
 		if (isOpening) {
 			return;
 		}
 		setIsOpening(true);
-		void onSessionTabOpen()
+		void onSessionTabOpen({ placement: 'append' })
 			.then((result) => {
 				if (result) {
 					onSessionTabChange(result.chatTabId);

@@ -13,6 +13,7 @@ export type {
 	ChangesViewMode,
 	LifecycleSummaryRow,
 	SessionTabActions,
+	SessionTabPlacement,
 	WorkbenchDockActions,
 	WorkbenchHealth,
 } from './primitives';

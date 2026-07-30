@@ -17,6 +17,7 @@ export const listChatTabsRequestSchema = z.object({
 
 /** {@link import('../../../shared/ipc').OpenChatTabRequest}. */
 export const openChatTabRequestSchema = z.object({
+	insertAfterChatTabId: optionalNullableString,
 	kind: z
 		.enum(['chat', 'diff', 'document', 'file', 'preview', 'terminal'])
 		.optional(),

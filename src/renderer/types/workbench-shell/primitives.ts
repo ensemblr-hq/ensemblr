@@ -48,11 +48,20 @@ export type ChangesSource =
 	| { hash: string; kind: 'commit'; shortHash: string; subject: string };
 
 /**
+ * Where a newly opened chat tab lands in the strip. `after-active` (the default
+ * for every spawned tab) keeps it next to the tab it came from; `append` puts it
+ * last and is reserved for the strip's explicit new-tab button.
+ */
+export type SessionTabPlacement = 'after-active' | 'append';
+
+/**
  * Extended session-tab state surface — adds async open/close handlers used by
  * the conversation-panel SessionTabs to drive routing on mutation success.
  */
 export interface SessionTabActions {
-	openSessionTab: () => Promise<{ chatTabId: string } | null>;
+	openSessionTab: (options?: {
+		placement?: SessionTabPlacement;
+	}) => Promise<{ chatTabId: string } | null>;
 	openCommentPreviewTab: (input: {
 		comment: PullRequestCommentSummary;
 		prNumber?: number;

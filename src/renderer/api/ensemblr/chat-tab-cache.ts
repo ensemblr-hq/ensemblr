@@ -29,10 +29,7 @@ export function writeOpenedChatTabToCache({
 
 			return {
 				closed: current.closed.filter((closedTab) => closedTab.id !== tab.id),
-				open: [
-					...current.open.filter((openTab) => openTab.id !== tab.id),
-					tab,
-				].sort(compareChatTabsByPosition),
+				open: getOpenTabsWithInsertion(current.open, tab),
 			};
 		},
 	);
@@ -85,6 +82,31 @@ export function writeReorderedChatTabsToCache({
 			};
 		},
 	);
+}
+
+/**
+ * Places an opened tab in the strip, mirroring the main-process insert: siblings
+ * from the new tab's position onward shift one slot right so a mid-strip open
+ * lands beside its anchor instead of colliding with the neighbour it displaced.
+ * A tab already present is a re-focus, not an insert, so nothing shifts.
+ * @param openTabs - The currently cached open tabs
+ * @param tab - The tab the open mutation returned
+ * @returns The open tabs including `tab`, in strip order
+ */
+function getOpenTabsWithInsertion(
+	openTabs: readonly ChatTabWire[],
+	tab: ChatTabWire,
+): ChatTabWire[] {
+	const isRefocus = openTabs.some((openTab) => openTab.id === tab.id);
+	const siblings = openTabs.filter((openTab) => openTab.id !== tab.id);
+	const displaced = isRefocus
+		? siblings
+		: siblings.map((sibling) =>
+				sibling.position >= tab.position
+					? { ...sibling, position: sibling.position + 1 }
+					: sibling,
+			);
+	return [...displaced, tab].sort(compareChatTabsByPosition);
 }
 
 /** Orders chat tabs by persisted strip position, then creation timestamp. */
