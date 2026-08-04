@@ -65,6 +65,7 @@ export type {
 	FixedDockTabId,
 	PullRequestCheckStatus,
 	PullRequestCheckSummary,
+	PullRequestCommentReplySummary,
 	PullRequestCommentSummary,
 	PullRequestGitStatusSummary,
 	PullRequestPreviewDeploymentSummary,

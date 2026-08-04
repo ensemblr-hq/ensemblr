@@ -33,12 +33,27 @@ describe('localReviewCommentToSummary', () => {
 		const summary = localReviewCommentToSummary(makeComment());
 		expect(summary).toEqual({
 			author: 'trail-map.ts:42',
+			body: 'needs a guard',
+			createdAt: '2026-07-20T00:00:00.000Z',
 			detail: 'needs a guard',
 			id: 'c1',
 			isResolved: false,
+			line: 42,
 			origin: 'user',
+			path: 'src/lib/trail-map.ts',
 			provider: 'local',
 		});
+	});
+
+	// The preview renders the whole body, so a multi-line note has to reach it
+	// intact while the row still gets a single line it can truncate.
+	test('carries the full body and summarizes only the row label', () => {
+		const summary = localReviewCommentToSummary(
+			makeComment({ body: 'needs a guard\n\nsee the null path' }),
+		);
+
+		expect(summary.body).toBe('needs a guard\n\nsee the null path');
+		expect(summary.detail).toBe('needs a guard');
 	});
 
 	// The location has taken the author slot, so authorship needs a field of its

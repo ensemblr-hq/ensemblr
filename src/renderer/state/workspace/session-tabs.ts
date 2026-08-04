@@ -27,7 +27,6 @@ import {
 	sameLiveTerminalTitle,
 } from '@/renderer/state/workspace/terminal-tab-title';
 import type {
-	CommentPreviewPayload,
 	PullRequestCommentSummary,
 	SessionTabModel,
 	WorkspaceShellModel,
@@ -48,6 +47,11 @@ import {
 	parseWorkspaceGitDiffScope,
 	type WorkspaceGitDiffScope,
 } from '@/shared/ipc/contracts/workspace-git';
+import {
+	buildCommentTabTitle,
+	parseCommentPreview,
+	toCommentPreviewMetadata,
+} from './comment-preview-tab';
 import { usePreviewTabSlot } from './preview-tab-slot';
 import { sessionVisitOrderByWorkspaceAtom } from './selection-atoms';
 import { decideActiveClose, selectSuccessorTabId } from './session-tab-close';
@@ -496,29 +500,13 @@ export function useSessionTabState({
 			prNumber?: number;
 		}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
-				const author = comment.author?.trim();
 				const result = await openAuxiliaryTabMutation.mutateAsync({
 					kind: 'document',
 					metadata: {
-						// Persist only the fields `parseCommentPreview` reads back, so a
-						// future `PullRequestCommentSummary` field can't leak unintended
-						// (or non-serializable) data into the tab's SQLite metadata.
-						commentPreview: {
-							...(comment.author === undefined
-								? {}
-								: { author: comment.author }),
-							detail: comment.detail,
-							id: comment.id,
-							...(comment.isResolved === undefined
-								? {}
-								: { isResolved: comment.isResolved }),
-							provider: comment.provider,
-							...(comment.url === undefined ? {} : { url: comment.url }),
-							...(typeof prNumber === 'number' ? { prNumber } : {}),
-						},
+						commentPreview: toCommentPreviewMetadata(comment, prNumber),
 					},
 					preview,
-					title: author ? `Comment · ${author}` : 'Comment',
+					title: buildCommentTabTitle(comment),
 				});
 				return result.tab ? { chatTabId: result.tab.id } : null;
 			} catch {
@@ -1134,49 +1122,6 @@ function toSessionTabModel(
 				kind: tab.kind,
 			};
 	}
-}
-
-const COMMENT_PREVIEW_PROVIDERS: ReadonlySet<string> = new Set([
-	'github',
-	'github-actions',
-	'linear',
-	'local',
-]);
-
-/**
- * Defensively parses the inline comment payload carried on a `document` tab's
- * metadata (untyped wire `Record<string, unknown>`). Returns `undefined` for
- * regular document tabs or malformed payloads so hydration degrades gracefully.
- */
-function parseCommentPreview(
-	value: unknown,
-): CommentPreviewPayload | undefined {
-	if (typeof value !== 'object' || value === null) {
-		return undefined;
-	}
-	const record = value as Record<string, unknown>;
-	const { detail, id, provider } = record;
-	if (
-		typeof id !== 'string' ||
-		typeof detail !== 'string' ||
-		typeof provider !== 'string' ||
-		!COMMENT_PREVIEW_PROVIDERS.has(provider)
-	) {
-		return undefined;
-	}
-	return {
-		...(typeof record.author === 'string' ? { author: record.author } : {}),
-		detail,
-		id,
-		...(typeof record.isResolved === 'boolean'
-			? { isResolved: record.isResolved }
-			: {}),
-		...(typeof record.prNumber === 'number'
-			? { prNumber: record.prNumber }
-			: {}),
-		provider: provider as CommentPreviewPayload['provider'],
-		...(typeof record.url === 'string' ? { url: record.url } : {}),
-	};
 }
 
 /** Maps a Pi session's runtime status to the tab spinner state. */

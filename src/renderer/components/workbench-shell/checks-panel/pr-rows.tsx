@@ -189,7 +189,8 @@ export function ChecksActionRow({
  * workspace's ephemeral preview slot, and double-clicking keeps that tab open;
  * hovering reveals Hide (session-only dismiss) and Add-to-chat actions. The
  * leading badge shows the comment author (falling back to the provider label),
- * and `detail` already embeds any `path:line` location from the gh snapshot.
+ * and `detail` carries the comment's first line of prose, falling back to its
+ * `path:line` location when the body has none.
  */
 export function PullRequestCommentRow({
 	comment,

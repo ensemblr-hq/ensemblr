@@ -5,6 +5,7 @@ import { cn } from '@/renderer/lib/utils';
 import { codeThemeAtom } from '@/renderer/state/preferences';
 
 import { AnswerPreview } from './answer-preview.tsx';
+import { CommentPreviewScene } from './comment-preview.tsx';
 import { ConversationScrollScene } from './conversation-scroll-preview.tsx';
 import { FilePreviewScene } from './file-preview.tsx';
 import { StartingStatePreview } from './starting-state-preview.tsx';
@@ -46,6 +47,12 @@ const SCENES = [
 		label: 'file',
 		render: () => <FilePreviewScene />,
 		source: 'playground/file-preview.tsx',
+	},
+	{
+		id: 'comment',
+		label: 'comment',
+		render: () => <CommentPreviewScene />,
+		source: 'playground/comment-preview.tsx',
 	},
 	{
 		id: 'tabs',

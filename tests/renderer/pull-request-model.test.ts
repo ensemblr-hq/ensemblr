@@ -4,9 +4,11 @@ import { buildPullRequestShellModel } from '../../src/renderer/lib/workbench/pul
 import {
 	clampReviewContext,
 	formatAllCommentsContext,
+	formatCommentContext,
 	REVIEW_CONTEXT_CHAR_LIMIT,
 } from '../../src/renderer/lib/workbench/review-context';
 import type {
+	GithubCommentWire,
 	GithubPullRequestSnapshotWire,
 	GithubPullRequestWire,
 	ReviewTodoWire,
@@ -523,18 +525,171 @@ describe('buildPullRequestShellModel', () => {
 	});
 });
 
+describe('comment summaries', () => {
+	/**
+	 * Build a model whose PR carries one GitHub comment.
+	 * @param comment - The comment fields to place on the pull request
+	 * @returns The single comment summary the model produced
+	 */
+	function summarize(comment: Partial<GithubCommentWire>) {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					comments: [
+						{
+							author: 'octocat',
+							body: '',
+							createdAt: '2026-07-20T09:00:00.000Z',
+							id: 'c1',
+							isResolved: null,
+							kind: 'review-comment',
+							...comment,
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+		return model.comments[0];
+	}
+
+	test('the full body travels to the renderer, not just its first line', () => {
+		const summary = summarize({ body: 'Line one\n\nLine two' });
+
+		expect(summary?.body).toBe('Line one\n\nLine two');
+	});
+
+	test('the row detail drops the author, which the row already renders', () => {
+		const summary = summarize({ body: 'needs a guard' });
+
+		expect(summary?.detail).toBe('needs a guard');
+	});
+
+	test('a body opening with a blank line still summarizes, rather than reading as empty', () => {
+		const summary = summarize({
+			body: '\n**Warning:** unchecked cast',
+			line: 57,
+			path: 'src/app/page.tsx',
+		});
+
+		expect(summary?.detail).toBe('Warning: unchecked cast');
+	});
+
+	test("a bot's metadata blob is stripped from both the body and the summary", () => {
+		const summary = summarize({
+			body: '[vc]: #Un4Opd4tSVroIz2CPCZ3Oikl6ACPaRKqIX4FhWyWCdo=:eyJpc01vbm9yZXBv\n\nPreview ready',
+			isBot: true,
+		});
+
+		expect(summary?.body).toBe('Preview ready');
+		expect(summary?.detail).toBe('Preview ready');
+	});
+
+	test('a body-less thread falls back to its diff location', () => {
+		const summary = summarize({
+			body: '',
+			line: 57,
+			path: 'src/app/page.tsx',
+		});
+
+		expect(summary?.detail).toBe('src/app/page.tsx:57');
+	});
+
+	test('the diff anchor, timestamp, and replies ride along for the preview', () => {
+		const summary = summarize({
+			body: 'needs a guard',
+			isOutdated: true,
+			line: 57,
+			path: 'src/app/page.tsx',
+			replies: [
+				{
+					author: 'psoldunov',
+					body: 'Fixed.',
+					createdAt: '2026-07-20T10:00:00.000Z',
+					id: 'c2',
+					isResolved: null,
+					kind: 'review-comment',
+				},
+			],
+		});
+
+		expect(summary).toMatchObject({
+			createdAt: '2026-07-20T09:00:00.000Z',
+			isOutdated: true,
+			line: 57,
+			path: 'src/app/page.tsx',
+			replies: [
+				{
+					author: 'psoldunov',
+					body: 'Fixed.',
+					createdAt: '2026-07-20T10:00:00.000Z',
+					id: 'c2',
+				},
+			],
+		});
+	});
+});
+
 describe('review context formatting', () => {
+	test('a comment context block carries the whole body and its replies', () => {
+		const text = formatCommentContext(
+			{
+				author: 'octocat',
+				body: 'Line one\n\nLine two',
+				detail: 'Line one',
+				id: 'c1',
+				isResolved: false,
+				line: 57,
+				path: 'src/app/page.tsx',
+				provider: 'github',
+				replies: [{ author: 'psoldunov', body: 'Fixed.', id: 'c2' }],
+			},
+			9,
+		);
+
+		expect(text).toContain('GitHub comment on PR #9 on src/app/page.tsx:57:');
+		expect(text).toContain('Line one\n\nLine two');
+		expect(text).toContain('Reply from psoldunov:\nFixed.');
+		expect(text).toContain('Thread is unresolved.');
+	});
+
 	test('all-comments context numbers each comment', () => {
 		const text = formatAllCommentsContext(
 			[
-				{ detail: 'a: first', id: '1', provider: 'github' },
-				{ detail: 'b: second', id: '2', provider: 'local' },
+				{ body: 'first', detail: 'a: first', id: '1', provider: 'github' },
+				{ body: 'second', detail: 'b: second', id: '2', provider: 'local' },
 			],
 			9,
 		);
 
-		expect(text).toContain('1. a: first');
-		expect(text).toContain('2. b: second');
+		expect(text).toContain('1. GitHub comment on PR #9 — a: first');
+		expect(text).toContain('2. Local review comment — b: second');
+	});
+
+	// The row summary no longer embeds the author or the file, so the bulk block
+	// has to attribute and anchor each line itself or Pi cannot tell the comments
+	// apart, let alone find what they point at.
+	test('all-comments context attributes and anchors each comment', () => {
+		const text = formatAllCommentsContext(
+			[
+				{
+					author: 'octocat',
+					body: 'needs a guard',
+					detail: 'needs a guard',
+					id: '1',
+					line: 12,
+					path: 'src/main/index.ts',
+					provider: 'github',
+				},
+			],
+			9,
+		);
+
+		expect(text).toContain(
+			'1. octocat — GitHub comment on PR #9 on src/main/index.ts:12 — needs a guard',
+		);
 	});
 
 	test('clampReviewContext truncates oversized payloads with a marker', () => {

@@ -123,26 +123,43 @@ export interface PullRequestCheckSummary {
 	url?: string;
 }
 
+/** One reply on a review thread, shown under the head comment in the preview. */
+export interface PullRequestCommentReplySummary {
+	author?: string;
+	body: string;
+	createdAt?: string;
+	id: string;
+}
+
 export interface PullRequestCommentSummary {
 	author?: string;
+	/** Full comment markdown with bot metadata stripped; what the preview renders. */
+	body: string;
+	createdAt?: string;
+	/** One-line label for the row, derived from `body`. */
 	detail: string;
 	id: string;
+	/** True when the review thread no longer maps to the current diff. */
+	isOutdated?: boolean;
 	/** Resolution state for GitHub review threads; absent when not applicable. */
 	isResolved?: boolean | null;
+	line?: number;
 	/**
 	 * Who wrote an Ensemblr-local comment; absent for every other provider. A
 	 * local comment spends its `author` slot on the `path:line` location, so
 	 * authorship needs a field of its own to reach the row.
 	 */
 	origin?: ReviewCommentOrigin;
+	path?: string;
 	provider: 'github' | 'github-actions' | 'linear' | 'local';
+	replies?: readonly PullRequestCommentReplySummary[];
 	url?: string;
 }
 
 /**
  * Self-contained comment payload carried inline on a `document` session tab so
- * the comment preview survives reloads without re-fetching — the body is the
- * `detail`, and `prNumber` lets the preview's "Add to chat" reuse the same
+ * the comment preview survives reloads without re-fetching — the whole thread
+ * rides along, and `prNumber` lets the preview's "Add to chat" reuse the same
  * context formatter the Checks panel uses.
  */
 export interface CommentPreviewPayload extends PullRequestCommentSummary {

@@ -8,6 +8,7 @@ import {
 import type { DiffComment } from '@/renderer/types/diff';
 import type { GithubCommentWire } from '@/shared/ipc/contracts/github';
 import type { ReviewCommentWire } from '@/shared/ipc/contracts/review-comments';
+import { stripCommentMetadata } from './comment-body';
 
 /** Grouped inline comments: anchored by change key, plus any that failed to anchor. */
 export interface GroupedDiffComments {
@@ -94,7 +95,7 @@ function toGithubDiffComments(comment: GithubCommentWire): DiffComment[] {
 	const source = comment.isBot ? 'github-actions' : 'github';
 	const head: DiffComment = {
 		author: comment.author,
-		body: comment.body,
+		body: stripCommentMetadata(comment.body),
 		id: `gh:${comment.id}`,
 		source,
 		...(comment.isOutdated === undefined
@@ -106,7 +107,7 @@ function toGithubDiffComments(comment: GithubCommentWire): DiffComment[] {
 	const replies = (comment.replies ?? []).map(
 		(reply): DiffComment => ({
 			author: reply.author,
-			body: reply.body,
+			body: stripCommentMetadata(reply.body),
 			id: `gh:${reply.id}`,
 			source: reply.isBot ? 'github-actions' : 'github',
 			...(reply.url ? { url: reply.url } : {}),
