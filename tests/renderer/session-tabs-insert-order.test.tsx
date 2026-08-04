@@ -2,7 +2,7 @@
 
 import { act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { afterEach, beforeEach, expect, test } from 'vitest';
 
 import { SessionTabs } from '../../src/renderer/components/workbench-shell/conversation-panel/session-tabs';
@@ -40,7 +40,11 @@ const IDS_AFTER_INSERT = ['a', 'inserted', 'b', 'c'];
  */
 function StripHarness({ onSwap }: { onSwap: (swap: () => void) => void }) {
 	const [ids, setIds] = useState(INITIAL_IDS);
-	onSwap(() => setIds(IDS_AFTER_INSERT));
+	useEffect(() => {
+		onSwap(() => {
+			setIds(IDS_AFTER_INSERT);
+		});
+	}, [onSwap]);
 	const sessions = ids.map(createTab);
 	return (
 		<SessionTabs

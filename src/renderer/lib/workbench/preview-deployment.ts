@@ -134,21 +134,25 @@ function fromCheckLink(
 function fromBotComment(
 	comments: readonly GithubCommentWire[],
 ): PullRequestPreviewDeploymentSummary | undefined {
-	const url = comments
-		.filter((comment) => DEPLOYMENT_BOT_AUTHOR_PATTERN.test(comment.author))
-		.flatMap((comment) => comment.body.match(COMMENT_URL_PATTERN) ?? [])
-		.find((candidate) => isHostedPreviewUrl(candidate));
-	if (!url) {
-		return undefined;
+	for (const comment of comments) {
+		if (!DEPLOYMENT_BOT_AUTHOR_PATTERN.test(comment.author)) {
+			continue;
+		}
+		const url = (comment.body.match(COMMENT_URL_PATTERN) ?? []).find(
+			(candidate) => isHostedPreviewUrl(candidate),
+		);
+		if (url) {
+			return {
+				label: 'Preview',
+				provider: inferDeploymentProvider(url),
+				source: 'pr-comment',
+				status: 'ready',
+				url,
+			};
+		}
 	}
 
-	return {
-		label: 'Preview',
-		provider: inferDeploymentProvider(url),
-		source: 'pr-comment',
-		status: 'ready',
-		url,
-	};
+	return undefined;
 }
 
 /**
