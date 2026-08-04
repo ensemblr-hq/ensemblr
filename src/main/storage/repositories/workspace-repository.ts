@@ -214,6 +214,39 @@ export function updateWorkspaceRenameRow({
 		.run(name, branchName, timestamp, metadataJson, id);
 }
 
+/** Inputs for {@link updateWorkspaceBranchRow}. */
+export interface UpdateWorkspaceBranchRowOptions {
+	branchName: string;
+	database: DatabaseSync;
+	id: string;
+	metadataJson: string;
+	timestamp: string;
+}
+
+/**
+ * Points a workspace at a different branch, carrying the metadata that records
+ * which branches it has continued off, without touching its name — used when
+ * the workspace continues onto a successor branch after its pull request
+ * merged.
+ */
+export function updateWorkspaceBranchRow({
+	branchName,
+	database,
+	id,
+	metadataJson,
+	timestamp,
+}: UpdateWorkspaceBranchRowOptions): void {
+	database
+		.prepare(
+			`UPDATE workspaces
+				SET branch_name = ?,
+					metadata_json = ?,
+					updated_at = ?
+				WHERE id = ?`,
+		)
+		.run(branchName, metadataJson, timestamp, id);
+}
+
 /** Inputs for {@link stampWorkspaceArchived}. */
 export interface StampWorkspaceArchivedOptions {
 	archivedAt: string;

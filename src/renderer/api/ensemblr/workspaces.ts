@@ -11,6 +11,8 @@ import type {
 	RegisterLocalRepositoryResult,
 } from '@/shared/ipc/contracts/repository';
 import type {
+	ContinueWorkspaceBranchRequest,
+	ContinueWorkspaceBranchResult,
 	CreateWorkspaceRequest,
 	CreateWorkspaceResult,
 	DeleteWorkspaceRequest,
@@ -66,6 +68,21 @@ export function renameWorkspace(
 	return profileElectronIpcCall(
 		{ channel: 'ensemblr:rename-workspace', usesDatabase: true },
 		() => getEnsemblrApi().renameWorkspace(request),
+	);
+}
+
+/**
+ * Branches the workspace onto a `-v<n>` successor and checks it out, so work
+ * continues without the merged pull request following along. The successor
+ * forks from the base branch once the merged work is upstream, so the review
+ * panel opens empty; the merged branch stays put.
+ */
+export function continueWorkspaceBranch(
+	request: ContinueWorkspaceBranchRequest,
+): Promise<ContinueWorkspaceBranchResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemblr:continue-workspace-branch', usesDatabase: true },
+		() => getEnsemblrApi().continueWorkspaceBranch(request),
 	);
 }
 

@@ -13,8 +13,16 @@ import type { WorkspaceOpenTarget } from './workspace';
 export interface ReviewActionsValue {
 	/** Archives the merged workspace from the post-merge header action. */
 	archiveMergedWorkspace: () => void;
+	/**
+	 * Branches the workspace onto a `-v<n>` successor of its current branch from
+	 * the post-merge header action, so work continues without the merged pull
+	 * request trailing along.
+	 */
+	continueMergedWorkspace: () => void;
 	/** Whether the merged workspace archive action is currently running. */
 	isArchivingMergedWorkspace: boolean;
+	/** Whether the merged workspace continue action is currently running. */
+	isContinuingMergedWorkspace: boolean;
 	isRefreshingPullRequest: boolean;
 	openMergeConfirmation: () => void;
 	refreshPullRequest: () => void;

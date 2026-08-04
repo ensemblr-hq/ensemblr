@@ -57,6 +57,7 @@
 		"test:coverage": "vitest run --coverage",
 		"test:repository": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/register-repository.test.ts tests/main/import-local-repository.test.ts tests/main/clone-repository.test.ts tests/main/list-github-repositories.test.ts tests/main/quick-start-project.test.ts",
 		"test:workspace": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/create-workspace.test.ts",
+		"test:continue-branch": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/continue-workspace-branch.test.ts",
 		"test:ensure-base-ref": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/ensure-base-ref.test.ts",
 		"test:repository-sources": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/repository-sources.test.ts",
 		"test:workspace-git": "ELECTRON_RUN_AS_NODE=1 electron --test tests/main/workspace-git-status.test.ts",
