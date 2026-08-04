@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { BundledLanguage } from 'shiki';
-import { highlightCode } from '@/renderer/lib/code/highlighter';
+import { highlightCode } from '@/renderer/lib/code';
 import { useResolvedCodeTheme } from '@/renderer/state/preferences';
 import type { TokenizedCode } from '@/renderer/types/code';
 

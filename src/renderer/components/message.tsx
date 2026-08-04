@@ -24,7 +24,7 @@ import type {
 } from '@/renderer/types/workbench';
 import { AnswerTable } from './answer-table';
 import { ChatAttachmentChip } from './chat-attachment-chip';
-import { CodePanel } from './code-surface';
+import { CodePanel } from './code-surface/code-panel';
 import {
 	useFilePreviewOpener,
 	useWorkspacePathResolver,
