@@ -1,5 +1,8 @@
 import { Button } from '@/renderer/components/ui/button';
-import { getPullRequestLinkButtonClassName } from '@/renderer/lib/workbench/pull-request-link-button';
+import {
+	getPullRequestLinkButtonClassName,
+	resolvePreviewPillTone,
+} from '@/renderer/lib/workbench/pull-request-link-button';
 import type {
 	PullRequestHeaderTone,
 	WorkspaceShellModel,
@@ -26,10 +29,8 @@ const GENERIC_DEPLOYMENT_LABELS = new Set(['deploy', 'deployment', 'preview']);
 
 /**
  * Pill-shaped preview-deployment button that opens the provider's URL, tinted by
- * the sidebar header's tone so both header pills read as one control group. A
- * failed deployment overrides that tone, because GitHub reports deployments
- * separately from checks and the header tone can stay green while the linked
- * build is broken.
+ * the sidebar header's tone so both header pills read as one control group,
+ * unless the deployment's own status outranks it.
  */
 export function PreviewDeploymentButton({
 	deployment,
@@ -55,7 +56,7 @@ export function PreviewDeploymentButton({
 	const shouldShowTextLabel =
 		normalizedDeploymentLabel.length > 0 &&
 		(providerIconPath === null || !isLabelRedundant);
-	const pillTone = deployment.status === 'blocked' ? 'blocked' : tone;
+	const pillTone = resolvePreviewPillTone(tone, deployment.status);
 
 	return (
 		<Button

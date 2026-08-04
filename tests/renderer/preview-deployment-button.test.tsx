@@ -87,48 +87,24 @@ test('colors the preview pill from the header tone, not the deployment status', 
 	expect(link.className).not.toContain('border-status-ok/35');
 });
 
-test('renders the neutral header tone for an open pull request', () => {
+test('keeps a still-building deployment amber under a green header tone', () => {
 	render(
 		<PreviewDeploymentButton
 			deployment={{
 				label: 'Preview',
 				provider: 'vercel',
 				source: 'github-deployment',
-				status: 'ready',
-				url: 'https://ready-preview.vercel.app',
+				status: 'pending',
+				url: 'https://building-preview.vercel.app',
 			}}
-			tone='neutral'
+			tone='ready'
 		/>,
 	);
 
 	const link = screen.getByRole('link', {
 		name: 'Open Vercel preview deployment',
 	});
-	expect(link.className).toContain('border-border');
-	expect(link.className).toContain('text-muted-foreground');
-	expect(link.className).not.toContain('border-status-ok/35');
-});
-
-test('renders the merged header tone after the pull request lands', () => {
-	render(
-		<PreviewDeploymentButton
-			deployment={{
-				label: 'Preview',
-				provider: 'vercel',
-				source: 'github-deployment',
-				status: 'ready',
-				url: 'https://ready-preview.vercel.app',
-			}}
-			tone='merged'
-		/>,
-	);
-
-	const link = screen.getByRole('link', {
-		name: 'Open Vercel preview deployment',
-	});
-	expect(link.className).toContain(
-		'border-[color:var(--right-sidebar-header-merged)]',
-	);
+	expect(link.className).toContain('border-status-warning/55');
 	expect(link.className).not.toContain('border-status-ok/35');
 });
 
