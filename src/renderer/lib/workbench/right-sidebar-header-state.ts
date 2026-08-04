@@ -8,6 +8,12 @@ interface RightSidebarHeaderStateOptions {
 	continuedPullRequestNumber?: number;
 }
 
+/** The parts of a PR-linked header state that vary with pull-request status. */
+type NumberedHeaderVariant = Pick<
+	Extract<RightSidebarHeaderState, { number: number }>,
+	'kind' | 'label' | 'tone'
+>;
+
 /**
  * Derives the right-sidebar header state (kind, label, tone, URL) from the
  * workspace's pull-request status.
@@ -48,14 +54,31 @@ export function getRightSidebarHeaderState(
 		};
 	}
 
+	return {
+		...resolveNumberedHeaderVariant(pullRequest, pullRequestNumber),
+		number: pullRequestNumber,
+		previewDeployment: pullRequest.previewDeployment,
+		url: pullRequest.url,
+	};
+}
+
+/**
+ * Maps a pull request onto the kind, label, and tone its header pill shows. Kept
+ * separate from the state literal so every PR-linked branch is built once and a
+ * new header field cannot be dropped from one status.
+ * @param pullRequest - Pull-request slice of the workspace model.
+ * @param pullRequestNumber - PR number used as the last-resort label.
+ * @returns The status-dependent parts of the header state.
+ */
+function resolveNumberedHeaderVariant(
+	pullRequest: WorkspaceShellModel['pullRequest'],
+	pullRequestNumber: number,
+): NumberedHeaderVariant {
 	if (pullRequest.state === 'merged') {
 		return {
 			kind: 'pr-merged',
 			label: pullRequest.label || 'Merged',
-			number: pullRequestNumber,
-			previewDeployment: pullRequest.previewDeployment,
 			tone: 'merged',
-			url: pullRequest.url,
 		};
 	}
 
@@ -63,44 +86,20 @@ export function getRightSidebarHeaderState(
 		return {
 			kind: 'pr-ready',
 			label: pullRequest.label || 'Ready to merge',
-			number: pullRequestNumber,
-			previewDeployment: pullRequest.previewDeployment,
 			tone: 'ready',
-			url: pullRequest.url,
 		};
 	}
 
 	if (pullRequest.status === 'checking') {
-		return {
-			kind: 'pr-checking',
-			label: pullRequest.label,
-			number: pullRequestNumber,
-			previewDeployment: pullRequest.previewDeployment,
-			tone: 'pending',
-			url: pullRequest.url,
-		};
+		return { kind: 'pr-checking', label: pullRequest.label, tone: 'pending' };
 	}
 
 	if (pullRequest.status === 'blocked') {
-		return {
-			kind: 'pr-blocked',
-			label: pullRequest.label,
-			number: pullRequestNumber,
-			previewDeployment: pullRequest.previewDeployment,
-			tone: 'blocked',
-			url: pullRequest.url,
-		};
+		return { kind: 'pr-blocked', label: pullRequest.label, tone: 'blocked' };
 	}
 
 	if (pullRequest.status === 'agent-working') {
-		return {
-			kind: 'pr-working',
-			label: 'Working...',
-			number: pullRequestNumber,
-			previewDeployment: pullRequest.previewDeployment,
-			tone: 'neutral',
-			url: pullRequest.url,
-		};
+		return { kind: 'pr-working', label: 'Working...', tone: 'neutral' };
 	}
 
 	return {
@@ -109,9 +108,6 @@ export function getRightSidebarHeaderState(
 			pullRequest.label ||
 			pullRequest.title ||
 			`PR #${pullRequestNumber.toString()}`,
-		number: pullRequestNumber,
-		previewDeployment: pullRequest.previewDeployment,
 		tone: 'neutral',
-		url: pullRequest.url,
 	};
 }
