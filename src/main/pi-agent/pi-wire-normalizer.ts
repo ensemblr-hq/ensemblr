@@ -171,64 +171,112 @@ export function normalizeLegacyMessageFrame(
 	typed: Record<string, unknown>,
 	wireRole: 'agent' | 'tool' | 'user',
 ): PiAgentMessagePayload {
-	const inner =
-		typed.payload &&
-		typeof typed.payload === 'object' &&
-		!Array.isArray(typed.payload)
-			? (typed.payload as Record<string, unknown>)
-			: typed;
+	const inner = readInnerPayload(typed);
 
 	if (wireRole === 'tool') {
-		const toolCallId =
-			typeof inner.toolCallId === 'string' && inner.toolCallId.length > 0
-				? inner.toolCallId
-				: 'tool-call';
-		const name =
-			typeof inner.toolName === 'string'
-				? inner.toolName
-				: typeof inner.name === 'string'
-					? inner.name
-					: 'tool';
-		if (typed.type === 'tool_result') {
-			const output = inner.output ?? inner.result ?? inner.partialResult;
-			return {
-				isError: inner.isError === true,
-				kind: 'tool-result',
-				output,
-				toolCallId,
-			};
-		}
-		const input = (inner.input as unknown) ?? (inner.args as unknown) ?? {};
-		return { input, kind: 'tool-call', name, toolCallId };
+		return normalizeLegacyToolFrame(typed, inner);
 	}
 
 	if (wireRole === 'user' && typeof inner.prompt === 'string') {
 		return { kind: 'prompt', prompt: inner.prompt };
 	}
 
-	const role: 'assistant' | 'user' = wireRole === 'user' ? 'user' : 'assistant';
-	const parts: PiAgentMessagePart[] = [];
-	if (Array.isArray(inner.content)) {
-		for (const block of inner.content) {
-			const part = contentBlockToPart(block);
-			if (part) {
-				parts.push(part);
-			}
-		}
-	}
-	if (typeof inner.reasoning === 'string' && inner.reasoning.length > 0) {
-		parts.push({ kind: 'reasoning', text: inner.reasoning });
-	} else if (typeof inner.thinking === 'string' && inner.thinking.length > 0) {
-		parts.push({ kind: 'reasoning', text: inner.thinking });
-	}
-	if (typeof inner.text === 'string' && inner.text.length > 0) {
-		parts.push({ kind: 'text', text: inner.text });
-	}
+	const parts = readLegacyParts(inner);
 	if (parts.length > 0) {
-		return { kind: 'message', parts, role };
+		return {
+			kind: 'message',
+			parts,
+			role: wireRole === 'user' ? 'user' : 'assistant',
+		};
 	}
 	const frameType = typeof typed.type === 'string' ? typed.type : 'message';
 	return { frameType, kind: 'unknown', raw: typed };
+}
+
+/**
+ * Unwraps the nested `payload` object a legacy frame may wrap its fields in.
+ * @param typed - The raw legacy frame
+ * @returns The nested payload when present, otherwise the frame itself
+ */
+function readInnerPayload(
+	typed: Record<string, unknown>,
+): Record<string, unknown> {
+	return typed.payload &&
+		typeof typed.payload === 'object' &&
+		!Array.isArray(typed.payload)
+		? (typed.payload as Record<string, unknown>)
+		: typed;
+}
+
+/**
+ * Normalizes a legacy `tool_call` / `tool_result` frame into its tool payload.
+ * @param typed - The raw legacy frame, read for its `type` discriminator
+ * @param inner - The frame's unwrapped field bag
+ * @returns The tool-call or tool-result payload
+ */
+function normalizeLegacyToolFrame(
+	typed: Record<string, unknown>,
+	inner: Record<string, unknown>,
+): PiAgentMessagePayload {
+	const toolCallId = readNonEmptyString(inner.toolCallId) ?? 'tool-call';
+	if (typed.type === 'tool_result') {
+		return {
+			isError: inner.isError === true,
+			kind: 'tool-result',
+			output: inner.output ?? inner.result ?? inner.partialResult,
+			toolCallId,
+		};
+	}
+	return {
+		input: (inner.input as unknown) ?? (inner.args as unknown) ?? {},
+		kind: 'tool-call',
+		name: readLegacyToolName(inner),
+		toolCallId,
+	};
+}
+
+/**
+ * Reads the tool name a legacy frame publishes under either `toolName` or `name`.
+ * @param inner - The frame's unwrapped field bag
+ * @returns The tool name, defaulting to `tool`
+ */
+function readLegacyToolName(inner: Record<string, unknown>): string {
+	if (typeof inner.toolName === 'string') {
+		return inner.toolName;
+	}
+	return typeof inner.name === 'string' ? inner.name : 'tool';
+}
+
+/**
+ * Collects the content, reasoning, and text parts a legacy message frame carries.
+ * @param inner - The frame's unwrapped field bag
+ * @returns The parts in render order, empty when the frame carries none
+ */
+function readLegacyParts(
+	inner: Record<string, unknown>,
+): readonly PiAgentMessagePart[] {
+	const parts: PiAgentMessagePart[] = Array.isArray(inner.content)
+		? [...normalizeContentParts(inner.content)]
+		: [];
+	const reasoning =
+		readNonEmptyString(inner.reasoning) ?? readNonEmptyString(inner.thinking);
+	if (reasoning) {
+		parts.push({ kind: 'reasoning', text: reasoning });
+	}
+	const text = readNonEmptyString(inner.text);
+	if (text) {
+		parts.push({ kind: 'text', text });
+	}
+	return parts;
+}
+
+/**
+ * Reads a wire field as a non-empty string.
+ * @param value - Raw field value
+ * @returns The string, or null when it is absent or empty
+ */
+function readNonEmptyString(value: unknown): string | null {
+	return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 /**

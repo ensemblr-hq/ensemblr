@@ -342,42 +342,49 @@ function readRecord(value: unknown): Record<string, unknown> | null {
 export function parsePullRequests(
 	stdout: string,
 ): RepositoryPullRequestWire[] | null {
-	const parsed = safeParseArray(stdout);
-	if (!parsed) {
-		return null;
-	}
-	const rows: RepositoryPullRequestWire[] = [];
-	for (const raw of parsed) {
-		if (!raw || typeof raw !== 'object') {
-			continue;
-		}
-		const record = raw as Record<string, unknown>;
-		if (typeof record.number !== 'number') {
-			continue;
-		}
-		rows.push({
-			authorLogin: readAuthorLogin(record.author),
-			headRefName:
-				typeof record.headRefName === 'string' ? record.headRefName : '',
-			isCrossRepository: record.isCrossRepository === true,
-			isDraft: record.isDraft === true,
-			number: record.number,
-			state: typeof record.state === 'string' ? record.state : '',
-			title: typeof record.title === 'string' ? record.title : '',
-			updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : '',
-			url: typeof record.url === 'string' ? record.url : '',
-		});
-	}
-	return rows;
+	return parseNumberedRows(stdout, (record, shared) => ({
+		...shared,
+		headRefName: readStringField(record.headRefName),
+		isCrossRepository: record.isCrossRepository === true,
+		isDraft: record.isDraft === true,
+	}));
 }
 
 /** Parses `gh issue list --json` output; null when the shape is unusable. */
 export function parseIssues(stdout: string): RepositoryIssueWire[] | null {
+	return parseNumberedRows(stdout, (record, shared) => ({
+		...shared,
+		body: readStringField(record.body),
+		labels: readLabelNames(record.labels),
+	}));
+}
+
+/** Fields every numbered `gh` row — pull request or issue — publishes. */
+interface NumberedGhFields {
+	authorLogin: string | null;
+	number: number;
+	state: string;
+	title: string;
+	updatedAt: string;
+	url: string;
+}
+
+/**
+ * Parse a numbered `gh ... --json` listing, dropping entries that are not
+ * objects or that carry no issue/PR number.
+ * @param stdout - Raw `gh` stdout
+ * @param toRow - Maps one raw record plus its shared fields onto a wire row
+ * @returns The mapped rows, or null when stdout is not a JSON array
+ */
+function parseNumberedRows<Row>(
+	stdout: string,
+	toRow: (record: Record<string, unknown>, shared: NumberedGhFields) => Row,
+): Row[] | null {
 	const parsed = safeParseArray(stdout);
 	if (!parsed) {
 		return null;
 	}
-	const rows: RepositoryIssueWire[] = [];
+	const rows: Row[] = [];
 	for (const raw of parsed) {
 		if (!raw || typeof raw !== 'object') {
 			continue;
@@ -386,18 +393,23 @@ export function parseIssues(stdout: string): RepositoryIssueWire[] | null {
 		if (typeof record.number !== 'number') {
 			continue;
 		}
-		rows.push({
-			authorLogin: readAuthorLogin(record.author),
-			body: typeof record.body === 'string' ? record.body : '',
-			labels: readLabelNames(record.labels),
-			number: record.number,
-			state: typeof record.state === 'string' ? record.state : '',
-			title: typeof record.title === 'string' ? record.title : '',
-			updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : '',
-			url: typeof record.url === 'string' ? record.url : '',
-		});
+		rows.push(
+			toRow(record, {
+				authorLogin: readAuthorLogin(record.author),
+				number: record.number,
+				state: readStringField(record.state),
+				title: readStringField(record.title),
+				updatedAt: readStringField(record.updatedAt),
+				url: readStringField(record.url),
+			}),
+		);
 	}
 	return rows;
+}
+
+/** Reads a `gh` field as a string, substituting an empty string for any other type. */
+function readStringField(value: unknown): string {
+	return typeof value === 'string' ? value : '';
 }
 
 /** Parses stdout as a JSON array; null on parse error or non-array. */

@@ -21,6 +21,7 @@ import {
 	pushLifecycleDiagnostics,
 } from './archive-diagnostics.ts';
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
+import { toLifecycleTargets } from './archive-lifecycle-targets.ts';
 import { runWorktreeAdd as runWorktreeAddShared } from './git-ops.ts';
 import {
 	hasWorkspaceRepositoryIdentity,
@@ -128,20 +129,7 @@ export function createUnarchiveWorkspaceService({
 					archivedAt,
 					archivedContextPath: source.archivedContextPath,
 					branchCleanup: source.branchCleanup,
-					repository: {
-						id: source.repositoryId,
-						name: source.repositoryName,
-						path: source.repositoryPath,
-						slug: source.repositorySlug,
-					},
-					workspace: {
-						branchName: source.branchName,
-						id: source.id,
-						name: source.name,
-						path: source.path,
-						repositoryId: source.repositoryId,
-						slug: source.slug,
-					},
+					...toLifecycleTargets(source),
 				},
 			);
 			pushLifecycleDiagnostics(diagnostics, preHookOutcome.diagnostics);
@@ -245,20 +233,7 @@ export function createUnarchiveWorkspaceService({
 					archivedAt,
 					archivedContextPath: source.archivedContextPath,
 					branchCleanup: source.branchCleanup,
-					repository: {
-						id: source.repositoryId,
-						name: source.repositoryName,
-						path: source.repositoryPath,
-						slug: source.repositorySlug,
-					},
-					workspace: {
-						branchName: source.branchName,
-						id: source.id,
-						name: source.name,
-						path: source.path,
-						repositoryId: source.repositoryId,
-						slug: source.slug,
-					},
+					...toLifecycleTargets(source),
 				},
 			);
 			pushLifecycleDiagnostics(diagnostics, postHookOutcome.diagnostics);

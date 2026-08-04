@@ -7,7 +7,8 @@ import {
 	renameWorkspace,
 } from '@/renderer/api/ensemblr-queries';
 import { queryClient } from '@/renderer/api/query-client';
-import { Button } from '@/renderer/components/ui/button';
+import { DialogActionFooter } from '@/renderer/components/dialog-action-footer';
+import { DialogDiagnosticsList } from '@/renderer/components/dialog-diagnostics-list';
 import {
 	Dialog,
 	DialogContent,
@@ -17,6 +18,7 @@ import {
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
 import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
+import { validateEntityName } from '@/renderer/lib/entity-name-validation';
 import type { KeymapBinding } from '@/renderer/types/keymap';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { RenameWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
@@ -51,7 +53,6 @@ export function RenameWorkspaceDialog({
 type RenameWorkspaceStage = 'failure' | 'idle' | 'renaming';
 
 const NAME_PATTERN = /^[A-Za-z0-9 ._-]+$/;
-const NAME_MAX_LENGTH = 100;
 
 /** Inner state-owned form that resets each time the dialog re-opens. */
 function RenameWorkspaceDialogForm({
@@ -72,7 +73,12 @@ function RenameWorkspaceDialogForm({
 
 	const trimmedName = name.trim();
 	const trimmedBranch = branchName.trim();
-	const localValidation = validateNameLocally(trimmedName);
+	const localValidation = validateEntityName({
+		allowedCharacters: 'letters, numbers, spaces, dots, dashes, or underscores',
+		name: trimmedName,
+		noun: 'Workspace',
+		pattern: NAME_PATTERN,
+	});
 	const isUnchanged =
 		trimmedName === workspace.name && trimmedBranch === workspace.branchName;
 	const canRename =
@@ -198,80 +204,18 @@ function RenameWorkspaceDialogForm({
 			</div>
 
 			{stage === 'failure' && diagnostics.length > 0 ? (
-				<RenameWorkspaceDiagnosticsList diagnostics={diagnostics} />
+				<DialogDiagnosticsList
+					diagnostics={diagnostics}
+					testId='rename-workspace-diagnostics'
+				/>
 			) : null}
 
-			<div className='-mx-4 -mb-4 flex justify-end gap-2 rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
-				{stage === 'failure' ? (
-					<Button
-						className='h-8'
-						onClick={handleRetry}
-						type='button'
-						variant='outline'
-					>
-						Try again
-					</Button>
-				) : null}
-				<Button
-					className='h-8 gap-2'
-					disabled={!canRename}
-					onClick={handleRename}
-					type='button'
-				>
-					{stage === 'renaming' ? 'Renaming…' : 'Rename'}
-					<span
-						aria-hidden='true'
-						className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'
-					>
-						⌘↵
-					</span>
-				</Button>
-			</div>
+			<DialogActionFooter
+				onRetry={stage === 'failure' ? handleRetry : null}
+				onSubmit={handleRename}
+				submitDisabled={!canRename}
+				submitLabel={stage === 'renaming' ? 'Renaming…' : 'Rename'}
+			/>
 		</>
 	);
-}
-
-/** Renders the diagnostics card shown on a rename failure. */
-function RenameWorkspaceDiagnosticsList({
-	diagnostics,
-}: {
-	diagnostics: RenameWorkspaceDiagnostic[];
-}) {
-	return (
-		<ul
-			className='rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive text-xs'
-			data-testid='rename-workspace-diagnostics'
-		>
-			{diagnostics.map((diagnostic) => (
-				<li className='flex flex-col gap-0.5' key={diagnostic.code}>
-					<span className='font-medium'>{diagnostic.message}</span>
-					{diagnostic.path ? (
-						<span className='font-mono text-[0.6875rem] opacity-80'>
-							{diagnostic.path}
-						</span>
-					) : null}
-				</li>
-			))}
-		</ul>
-	);
-}
-
-/**
- * Mirrors the main-process workspace name rules so we surface immediate
- * feedback before the IPC round-trip.
- */
-function validateNameLocally(name: string): string | null {
-	if (!name) {
-		return null;
-	}
-	if (name.length > NAME_MAX_LENGTH) {
-		return `Workspace names must be ${NAME_MAX_LENGTH} characters or fewer.`;
-	}
-	if (name === '.' || name === '..' || name.startsWith('.')) {
-		return 'Workspace names cannot start with a dot.';
-	}
-	if (!NAME_PATTERN.test(name)) {
-		return 'Use only letters, numbers, spaces, dots, dashes, or underscores.';
-	}
-	return null;
 }

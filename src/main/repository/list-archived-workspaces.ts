@@ -7,6 +7,7 @@ import type {
 } from '../../shared/ipc/contracts/workspace';
 import type { EnsemblrDatabaseService } from '../storage';
 import { listArchivedWorkspaceRowsByRepository } from '../storage/repositories/workspace-repository.ts';
+import { readNullableString, readStringColumns } from './row-guards.ts';
 
 /** Public surface of the archived workspace browser. */
 export interface ListArchivedWorkspacesService {
@@ -81,35 +82,24 @@ function readEntries(
  * @returns The list entry, or null when the row is malformed
  */
 function toListEntry(row: unknown): ArchivedWorkspaceListEntry | null {
-	if (typeof row !== 'object' || row === null) {
-		return null;
-	}
-	const candidate = row as Record<string, unknown>;
-	if (
-		typeof candidate.id !== 'string' ||
-		typeof candidate.slug !== 'string' ||
-		typeof candidate.name !== 'string' ||
-		typeof candidate.path !== 'string' ||
-		typeof candidate.repositoryId !== 'string' ||
-		typeof candidate.archivedAt !== 'string'
-	) {
+	const candidate = readStringColumns(row, [
+		'archivedAt',
+		'id',
+		'name',
+		'path',
+		'repositoryId',
+		'slug',
+	]);
+	if (!candidate) {
 		return null;
 	}
 	return {
 		archivedAt: candidate.archivedAt,
-		archivedContextPath:
-			typeof candidate.archivedContextPath === 'string'
-				? candidate.archivedContextPath
-				: null,
-		archiveRecordId:
-			typeof candidate.archiveRecordId === 'string'
-				? candidate.archiveRecordId
-				: null,
-		baseBranch:
-			typeof candidate.baseBranch === 'string' ? candidate.baseBranch : null,
+		archivedContextPath: readNullableString(candidate.archivedContextPath),
+		archiveRecordId: readNullableString(candidate.archiveRecordId),
+		baseBranch: readNullableString(candidate.baseBranch),
 		branchCleanup: candidate.branchCleanupRaw === 1,
-		branchName:
-			typeof candidate.branchName === 'string' ? candidate.branchName : null,
+		branchName: readNullableString(candidate.branchName),
 		id: candidate.id,
 		name: candidate.name,
 		path: candidate.path,

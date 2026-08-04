@@ -308,6 +308,34 @@ export function parseReviewThreads(value: unknown): GithubCommentWire[] {
  * @returns The parsed issue comments in wire form
  */
 function parseIssueComments(value: unknown): GithubCommentWire[] {
+	return parseBodiedNodes({
+		idPrefix: 'comment',
+		kind: 'issue-comment',
+		readCreatedAt: (record) => record.createdAt,
+		value,
+	});
+}
+
+/**
+ * Parse GraphQL nodes that carry a free-text body into wire comments, dropping
+ * ones without a body.
+ * @param idPrefix - Prefix for the synthetic id used when a node carries none
+ * @param kind - Wire comment kind stamped on every parsed node
+ * @param readCreatedAt - Reads the timestamp field this node type publishes
+ * @param value - Raw nodes from the gh GraphQL response
+ * @returns The parsed nodes in wire comment form
+ */
+function parseBodiedNodes({
+	idPrefix,
+	kind,
+	readCreatedAt,
+	value,
+}: {
+	idPrefix: string;
+	kind: GithubCommentWire['kind'];
+	readCreatedAt: (record: Record<string, unknown>) => unknown;
+	value: unknown;
+}): GithubCommentWire[] {
 	if (!Array.isArray(value)) {
 		return [];
 	}
@@ -316,20 +344,20 @@ function parseIssueComments(value: unknown): GithubCommentWire[] {
 			return [];
 		}
 		const record = node as Record<string, unknown>;
-		const author = (record.author as Record<string, unknown> | undefined)
-			?.login;
 		const body = readString(record.body);
 		if (!body) {
 			return [];
 		}
+		const author = (record.author as Record<string, unknown> | undefined)
+			?.login;
 		return [
 			{
 				author: readString(author, 'unknown'),
 				body,
-				createdAt: readString(record.createdAt),
-				id: readString(record.id, `comment-${index}`),
+				createdAt: readString(readCreatedAt(record)),
+				id: readString(record.id, `${idPrefix}-${index}`),
 				isResolved: null,
-				kind: 'issue-comment' as const,
+				kind,
 				...(readString(record.url) ? { url: readString(record.url) } : {}),
 			},
 		];
@@ -342,31 +370,11 @@ function parseIssueComments(value: unknown): GithubCommentWire[] {
  * @returns The parsed reviews in wire comment form
  */
 function parseReviews(value: unknown): GithubCommentWire[] {
-	if (!Array.isArray(value)) {
-		return [];
-	}
-	return value.flatMap((node, index) => {
-		if (typeof node !== 'object' || node === null) {
-			return [];
-		}
-		const record = node as Record<string, unknown>;
-		const body = readString(record.body);
-		if (!body) {
-			return [];
-		}
-		const author = (record.author as Record<string, unknown> | undefined)
-			?.login;
-		return [
-			{
-				author: readString(author, 'unknown'),
-				body,
-				createdAt: readString(record.submittedAt ?? record.createdAt),
-				id: readString(record.id, `review-${index}`),
-				isResolved: null,
-				kind: 'review' as const,
-				...(readString(record.url) ? { url: readString(record.url) } : {}),
-			},
-		];
+	return parseBodiedNodes({
+		idPrefix: 'review',
+		kind: 'review',
+		readCreatedAt: (record) => record.submittedAt ?? record.createdAt,
+		value,
 	});
 }
 

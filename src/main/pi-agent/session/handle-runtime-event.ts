@@ -6,7 +6,11 @@ import {
 	updateTurn,
 } from '../../storage/repositories/pi-session-repository.ts';
 import type { SessionNamingInput } from '../naming/session-naming.ts';
-import type { PiAgentEvent } from '../pi-agent-types.ts';
+import type {
+	PiAgentEvent,
+	PiAgentSessionStatus,
+	PiAgentShutdownReason,
+} from '../pi-agent-types.ts';
 import type { PiSessionEventSink } from '../pi-session-types.ts';
 import type { ActiveSession, ActiveSessionMap } from './active-session.ts';
 import type { SummaryQueue } from './summary-queue.ts';
@@ -63,6 +67,149 @@ export function createRuntimeEventHandler({
 	queueNaming,
 	summaryQueue,
 }: RuntimeEventHandlerOptions): RuntimeEventHandler {
+	/**
+	 * Fast path for live message deltas: synthesizes an ephemeral row with a
+	 * fractional ordinal between the last persisted event and the next one and
+	 * broadcasts it directly, skipping the `BEGIN IMMEDIATE` write per token. The
+	 * authoritative `message_end` still persists the full text so a refetch
+	 * rehydrates correctly.
+	 * @param active - The live session, when it is still in the active map
+	 * @param branchId - Branch the event belongs to
+	 * @param event - The normalized runtime event
+	 * @param sessionId - Session the event belongs to
+	 * @returns True when the event was a delta this broadcast, false to fall through to persistence
+	 */
+	const tryBroadcastDelta = ({
+		active,
+		branchId,
+		event,
+		sessionId,
+	}: {
+		active: ActiveSession | undefined;
+		branchId: string;
+		event: PiAgentEvent;
+		sessionId: string;
+	}): boolean => {
+		if (
+			event.type !== 'message' ||
+			(event.payload.kind !== 'text-delta' &&
+				event.payload.kind !== 'reasoning-delta') ||
+			!active ||
+			!eventSink
+		) {
+			return false;
+		}
+
+		active.deltaCounter += 1;
+		const syntheticRow: PiEventRow = {
+			branchId,
+			createdAt: event.at,
+			eventType: event.type,
+			id: `delta:${sessionId}:${active.lastBroadcastOrdinal}:${active.deltaCounter}`,
+			ordinal: active.lastBroadcastOrdinal + active.deltaCounter * 1e-6,
+			payload: { kind: 'message', payload: event.payload, role: event.role },
+			stream: 'protocol',
+			turnId: active.activeTurnId,
+		};
+		try {
+			eventSink({
+				event: syntheticRow,
+				sessionId,
+				workspaceId: active.row.workspaceId,
+			});
+		} catch (cause) {
+			// Sink failures (renderer gone, IPC closed) must not break the
+			// streaming path.
+			console.warn('[pi-session] failed to broadcast streaming delta', {
+				cause: cause instanceof Error ? cause.message : String(cause),
+				sessionId,
+			});
+		}
+		return true;
+	};
+
+	/**
+	 * Applies a status change: patches the session row, and at a turn boundary
+	 * drains the summary queue and retries the derived tab title.
+	 * @param active - The live session, when it is still in the active map
+	 * @param branchId - Branch the event belongs to
+	 * @param database - Open database handle
+	 * @param sessionId - Session the event belongs to
+	 * @param status - The status the runtime reported
+	 */
+	const applyStatus = ({
+		active,
+		branchId,
+		database,
+		sessionId,
+		status,
+	}: {
+		active: ActiveSession | undefined;
+		branchId: string;
+		database: DatabaseSync;
+		sessionId: string;
+		status: PiAgentSessionStatus;
+	}): void => {
+		updatePiSession({ database, id: sessionId, patch: { status } });
+		if (status !== 'idle') {
+			return;
+		}
+		summaryQueue.queueSummaryAfterAgentResponse({ database, sessionId });
+		if (active) {
+			// Retry the derived title off the settled turn; self-gates so a tab
+			// already titled (or named by the agent or the user) is never
+			// re-touched. Covers resumed sessions and first-attempt failures.
+			queueNaming({
+				branchId,
+				chatTabId: active.chatTabId,
+				database,
+				eventSink,
+				initialPrompt: null,
+				liveSession: active.piRuntimeSession,
+				sessionId,
+				workspaceId: active.row.workspaceId,
+			});
+		}
+	};
+
+	/**
+	 * Closes out a session the runtime shut down: stamps the row closed, drains
+	 * the summary queue, settles the open turn, and drops the active entry.
+	 * @param active - The live session, when it is still in the active map
+	 * @param database - Open database handle
+	 * @param reason - Why the runtime shut the session down
+	 * @param sessionId - Session the event belongs to
+	 */
+	const applyShutdown = ({
+		active,
+		database,
+		reason,
+		sessionId,
+	}: {
+		active: ActiveSession | undefined;
+		database: DatabaseSync;
+		reason: PiAgentShutdownReason;
+		sessionId: string;
+	}): void => {
+		updatePiSession({
+			database,
+			id: sessionId,
+			patch: { closedAt: now().toISOString(), status: 'closed' },
+		});
+		summaryQueue.queueSummaryAfterAgentResponse({ database, sessionId });
+		if (active?.activeTurnId) {
+			updateTurn({
+				database,
+				id: active.activeTurnId,
+				patch: {
+					completedAt: now().toISOString(),
+					status: reason === 'completed' ? 'completed' : 'aborted',
+				},
+			});
+		}
+		activeSessions.delete(sessionId);
+	};
+
 	const handle = ({
 		branchId,
 		database,
@@ -76,43 +223,7 @@ export function createRuntimeEventHandler({
 	}): void => {
 		const active = activeSessions.get(sessionId);
 
-		// Fast path: live message deltas bypass SQLite. We synthesize an
-		// ephemeral PiEventRow with a fractional ordinal between the last
-		// persisted event and the next one, broadcast directly, and skip the
-		// `BEGIN IMMEDIATE` write per token. The authoritative `message_end`
-		// still persists with the full text so refetch rehydrates correctly.
-		if (
-			event.type === 'message' &&
-			(event.payload.kind === 'text-delta' ||
-				event.payload.kind === 'reasoning-delta') &&
-			active &&
-			eventSink
-		) {
-			active.deltaCounter += 1;
-			const syntheticRow: PiEventRow = {
-				branchId,
-				createdAt: event.at,
-				eventType: event.type,
-				id: `delta:${sessionId}:${active.lastBroadcastOrdinal}:${active.deltaCounter}`,
-				ordinal: active.lastBroadcastOrdinal + active.deltaCounter * 1e-6,
-				payload: { kind: 'message', payload: event.payload, role: event.role },
-				stream: 'protocol',
-				turnId: active.activeTurnId,
-			};
-			try {
-				eventSink({
-					event: syntheticRow,
-					sessionId,
-					workspaceId: active.row.workspaceId,
-				});
-			} catch (cause) {
-				// Sink failures (renderer gone, IPC closed) must not break the
-				// streaming path.
-				console.warn('[pi-session] failed to broadcast streaming delta', {
-					cause: cause instanceof Error ? cause.message : String(cause),
-					sessionId,
-				});
-			}
+		if (tryBroadcastDelta({ active, branchId, event, sessionId })) {
 			return;
 		}
 
@@ -161,48 +272,16 @@ export function createRuntimeEventHandler({
 			});
 		}
 		if (event.type === 'status') {
-			updatePiSession({
+			applyStatus({
+				active,
+				branchId,
 				database,
-				id: sessionId,
-				patch: { status: event.status },
+				sessionId,
+				status: event.status,
 			});
-			if (event.status === 'idle') {
-				summaryQueue.queueSummaryAfterAgentResponse({ database, sessionId });
-				if (active) {
-					// Retry the derived title off the settled turn; self-gates so a tab
-					// already titled (or named by the agent or the user) is never
-					// re-touched. Covers resumed sessions and first-attempt failures.
-					queueNaming({
-						branchId,
-						chatTabId: active.chatTabId,
-						database,
-						eventSink,
-						initialPrompt: null,
-						liveSession: active.piRuntimeSession,
-						sessionId,
-						workspaceId: active.row.workspaceId,
-					});
-				}
-			}
 		}
 		if (event.type === 'shutdown') {
-			updatePiSession({
-				database,
-				id: sessionId,
-				patch: { closedAt: now().toISOString(), status: 'closed' },
-			});
-			summaryQueue.queueSummaryAfterAgentResponse({ database, sessionId });
-			if (active?.activeTurnId) {
-				updateTurn({
-					database,
-					id: active.activeTurnId,
-					patch: {
-						completedAt: now().toISOString(),
-						status: event.reason === 'completed' ? 'completed' : 'aborted',
-					},
-				});
-			}
-			activeSessions.delete(sessionId);
+			applyShutdown({ active, database, reason: event.reason, sessionId });
 		}
 	};
 

@@ -1,12 +1,10 @@
 import path from 'node:path';
 
-import type { AdoptedRepositorySnapshot } from '../../../shared/ipc/contracts/repository';
 import type {
 	SharedRootAdoptionDiagnostic,
 	SharedRootAdoptionSnapshot,
 	SharedRootAdoptionStatus,
 } from '../../../shared/ipc/contracts/shared-root-adoption';
-import type { AdoptedWorkspaceSnapshot } from '../../../shared/ipc/contracts/workspace';
 import {
 	type LoadedRepositoryConfig,
 	type LoadRepositoryConfigOptions,
@@ -14,31 +12,18 @@ import {
 } from '../../config/repository-config.ts';
 import type { EnsemblrRootDirectoryService } from '../../root';
 import type { EnsemblrDatabaseService } from '../../storage/database.ts';
-import { hasArchivedRepositoryMarker } from '../archived-marker.ts';
 import {
 	type GitRepositoryProbeFn,
 	type GitWorktreeProbeFn,
 	probeGitRepository,
 	probeGitWorktreeMetadata,
 } from '../git-probe.ts';
-import {
-	appendBranchCollisionDiagnostics,
-	trackBranchCollision,
-} from './branch-collisions.ts';
+import { appendBranchCollisionDiagnostics } from './branch-collisions.ts';
 import { emptySnapshot, type ReconcileSharedRootInput } from './internal.ts';
-import {
-	adoptRepositoryRow,
-	findRepositoryByPath,
-	findRepositoryBySlug,
-	refreshRepositoryRow,
-} from './repository-adoption.ts';
+import { reconcileRepositories } from './repository-adoption.ts';
 import { readChildDirectories } from './scan.ts';
 import { detectStaleRecords } from './stale-detection.ts';
-import {
-	adoptWorkspaceRow,
-	findWorkspaceByPath,
-	refreshWorkspaceRow,
-} from './workspace-adoption.ts';
+import { reconcileWorkspaces } from './workspace-adoption.ts';
 
 /** Public surface of the shared-root adoption service. */
 export interface SharedRootAdoptionService {
@@ -145,19 +130,6 @@ export async function reconcileSharedRoot({
 		});
 	}
 
-	const adoptedRepositories: AdoptedRepositorySnapshot[] = [];
-	const refreshedRepositoryIds: string[] = [];
-	const scannedRepositoryPaths = new Set<string>();
-	const repositoriesBySlug = new Map<
-		string,
-		{ defaultBranch: string | null; id: string; path: string; slug: string }
-	>();
-
-	const repositoryChildren = readChildDirectories(
-		root.repositoriesPath,
-		diagnostics,
-		'repository-scan-failed',
-	);
 	const workspaceRepoChildren = readChildDirectories(
 		root.workspacesPath,
 		diagnostics,
@@ -179,198 +151,74 @@ export async function reconcileSharedRoot({
 			] as const;
 		}),
 	);
-	const repositoryProbes = await Promise.all(
-		repositoryChildren.map(async (child) => {
-			const candidatePath = path.join(root.repositoriesPath, child);
-			// Folders the user has explicitly archived carry a sentinel file. Skip
-			// them so a restart never resurrects what the user just removed.
-			if (hasArchivedRepositoryMarker(candidatePath)) {
-				return { candidatePath, archived: true as const };
-			}
-			const probe = await gitProbe(candidatePath);
-			return { candidatePath, archived: false as const, probe };
-		}),
-	);
 
-	for (const entry of repositoryProbes) {
-		const { candidatePath } = entry;
-		scannedRepositoryPaths.add(candidatePath);
+	const repositories = await reconcileRepositories({
+		children: readChildDirectories(
+			root.repositoriesPath,
+			diagnostics,
+			'repository-scan-failed',
+		),
+		database,
+		diagnostics,
+		gitProbe,
+		loadConfig,
+		now,
+		repositoriesPath: root.repositoriesPath,
+		timestamp: scannedAt,
+	});
 
-		if (entry.archived) {
-			continue;
-		}
-
-		const probe = entry.probe;
-
-		if (!probe.isGitRepository || probe.topLevel !== candidatePath) {
-			diagnostics.push({
-				code: 'invalid-repository',
-				message: probe.error ?? 'The directory is not a valid git repository.',
-				path: candidatePath,
-				severity: 'warning',
-			});
-			continue;
-		}
-
-		const existing = findRepositoryByPath(database, candidatePath);
-		if (existing) {
-			refreshRepositoryRow({
-				database,
-				id: existing.id,
-				probe,
-				timestamp: scannedAt,
-			});
-			refreshedRepositoryIds.push(existing.id);
-			repositoriesBySlug.set(existing.slug, {
-				defaultBranch: probe.defaultBranch ?? existing.defaultBranch,
-				id: existing.id,
-				path: candidatePath,
-				slug: existing.slug,
-			});
-			continue;
-		}
-
-		const adopted = adoptRepositoryRow({
-			candidatePath,
-			database,
-			loadConfig,
-			now,
-			probe,
-			timestamp: scannedAt,
-		});
-		adoptedRepositories.push(adopted);
-		repositoriesBySlug.set(adopted.slug, {
-			defaultBranch: adopted.defaultBranch,
-			id: adopted.id,
-			path: candidatePath,
-			slug: adopted.slug,
-		});
-	}
-
-	const adoptedWorkspaces: AdoptedWorkspaceSnapshot[] = [];
-	const refreshedWorkspaceIds: string[] = [];
-	const scannedWorkspacePaths = new Set<string>();
-	const collisionsByRepo = new Map<string, Map<string, string[]>>();
-
-	for (const repoSlug of workspaceRepoChildren) {
-		const repoWorkspacesPath = path.join(root.workspacesPath, repoSlug);
-		const repoInfo =
-			repositoriesBySlug.get(repoSlug) ??
-			findRepositoryBySlug(database, repoSlug);
-
-		if (!repoInfo) {
-			diagnostics.push({
-				code: 'workspace-orphaned',
-				message: `Workspaces exist for unknown repository slug "${repoSlug}".`,
-				path: repoWorkspacesPath,
-				severity: 'warning',
-			});
-			continue;
-		}
-
-		const workspaceChildren = workspaceChildrenByRepository.get(repoSlug) ?? [];
-		const workspaceProbes = await Promise.all(
-			workspaceChildren.map(async (workspaceSlug) => {
-				const candidatePath = path.join(repoWorkspacesPath, workspaceSlug);
-				const probe = await worktreeProbe(candidatePath);
-				return { candidatePath, probe, workspaceSlug };
-			}),
-		);
-
-		for (const { candidatePath, probe, workspaceSlug } of workspaceProbes) {
-			scannedWorkspacePaths.add(candidatePath);
-
-			if (!probe.isWorktree || probe.topLevel !== candidatePath) {
-				diagnostics.push({
-					code: 'invalid-worktree',
-					message: probe.error ?? 'The directory is not a git worktree.',
-					path: candidatePath,
-					severity: 'warning',
-				});
-				continue;
-			}
-
-			if (
-				probe.mainRepositoryPath &&
-				path.resolve(probe.mainRepositoryPath) !== path.resolve(repoInfo.path)
-			) {
-				diagnostics.push({
-					code: 'worktree-repository-mismatch',
-					message:
-						'The worktree main repository does not match the parent repo slug.',
-					path: candidatePath,
-					severity: 'warning',
-				});
-			}
-
-			const existing = findWorkspaceByPath(database, candidatePath);
-			if (existing) {
-				refreshWorkspaceRow({
-					database,
-					id: existing.id,
-					probe,
-					timestamp: scannedAt,
-				});
-				refreshedWorkspaceIds.push(existing.id);
-				trackBranchCollision({
-					branch: probe.headBranch,
-					collisionsByRepo,
-					id: existing.id,
-					repositoryId: repoInfo.id,
-				});
-				continue;
-			}
-
-			const adopted = adoptWorkspaceRow({
-				candidatePath,
-				database,
-				probe,
-				repository: repoInfo,
-				slug: workspaceSlug,
-				timestamp: scannedAt,
-			});
-			adoptedWorkspaces.push(adopted);
-			trackBranchCollision({
-				branch: probe.headBranch,
-				collisionsByRepo,
-				id: adopted.id,
-				repositoryId: repoInfo.id,
-			});
-		}
-	}
+	const workspaces = await reconcileWorkspaces({
+		childrenByRepository: workspaceChildrenByRepository,
+		database,
+		diagnostics,
+		repositoriesBySlug: repositories.repositoriesBySlug,
+		repositorySlugs: workspaceRepoChildren,
+		timestamp: scannedAt,
+		workspacesPath: root.workspacesPath,
+		worktreeProbe,
+	});
 
 	const stale = detectStaleRecords({
 		database,
 		rootRepositoriesPath: root.repositoriesPath,
 		rootWorkspacesPath: root.workspacesPath,
-		scannedRepositoryPaths,
-		scannedWorkspacePaths,
+		scannedRepositoryPaths: repositories.scannedPaths,
+		scannedWorkspacePaths: workspaces.scannedPaths,
 		timestamp: scannedAt,
 	});
 
-	appendBranchCollisionDiagnostics({ collisionsByRepo, diagnostics });
-
-	const status: SharedRootAdoptionStatus = diagnostics.some(
-		(diagnostic) => diagnostic.severity === 'error',
-	)
-		? 'error'
-		: diagnostics.length > 0
-			? 'warning'
-			: 'ok';
+	appendBranchCollisionDiagnostics({
+		collisionsByRepo: workspaces.collisionsByRepo,
+		diagnostics,
+	});
 
 	return {
 		adopted: {
-			repositories: adoptedRepositories,
-			workspaces: adoptedWorkspaces,
+			repositories: repositories.adopted,
+			workspaces: workspaces.adopted,
 		},
 		diagnostics,
 		refreshed: {
-			repositoryIds: refreshedRepositoryIds,
-			workspaceIds: refreshedWorkspaceIds,
+			repositoryIds: repositories.refreshedIds,
+			workspaceIds: workspaces.refreshedIds,
 		},
 		rootPath: root.path,
 		scannedAt,
 		stale,
-		status,
+		status: resolveAdoptionStatus(diagnostics),
 	};
+}
+
+/**
+ * Reduce the scan's diagnostics to the status the snapshot reports.
+ * @param diagnostics - Every diagnostic the scan collected
+ * @returns `error` when any diagnostic is fatal, `warning` when any exist, else `ok`
+ */
+function resolveAdoptionStatus(
+	diagnostics: readonly SharedRootAdoptionDiagnostic[],
+): SharedRootAdoptionStatus {
+	if (diagnostics.some((diagnostic) => diagnostic.severity === 'error')) {
+		return 'error';
+	}
+	return diagnostics.length > 0 ? 'warning' : 'ok';
 }

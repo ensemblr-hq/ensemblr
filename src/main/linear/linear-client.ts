@@ -482,31 +482,23 @@ interface ConnectionPayload<T> {
 	pageInfo: { endCursor?: string | null; hasNextPage: boolean };
 }
 
-/** Raw issue node shape as returned by the Linear GraphQL selections. */
-interface IssueNode {
-	archivedAt?: string | null;
-	assignee?: { id: string; name: string } | null;
-	cycle?: { id: string; name: string } | null;
-	description?: string | null;
-	dueDate?: string | null;
-	id: string;
-	labels?: {
-		nodes: Array<{ color?: string | null; id: string; name: string }>;
-	} | null;
-	identifier: string;
-	priority?: number | null;
-	project?: { id: string; name: string } | null;
-	state?: {
-		color?: string | null;
-		id: string;
-		name: string;
-		type?: string | null;
-	} | null;
-	team?: { id: string; key: string; name: string } | null;
-	title: string;
-	updatedAt?: string | null;
-	url: string;
-}
+/**
+ * Raw issue node as returned by the Linear GraphQL selections: the loose form
+ * of {@link LinearIssueData} where the API may omit any non-identity field, and
+ * where labels and state arrive Relay-shaped rather than flattened.
+ */
+type IssueNode = Partial<Omit<LinearIssueData, 'labels' | 'state'>> &
+	Pick<LinearIssueData, 'id' | 'identifier' | 'title' | 'url'> & {
+		labels?: {
+			nodes: Array<{ color?: string | null; id: string; name: string }>;
+		} | null;
+		state?: {
+			color?: string | null;
+			id: string;
+			name: string;
+			type?: string | null;
+		} | null;
+	};
 
 /** Raw comment node shape as returned by the Linear GraphQL selections. */
 interface CommentNode {

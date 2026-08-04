@@ -30,56 +30,11 @@ export function getWorkbenchHealth({
 	}
 
 	if (healthSnapshot) {
-		if (healthSnapshot.database.status === 'error') {
-			return {
-				detail: healthSnapshot.database.error ?? 'Database failed to open.',
-				label: `${healthSnapshot.appName} database unavailable`,
-				state: 'unavailable',
-			};
-		}
-
-		if (healthSnapshot.config.blocksReadiness) {
-			return {
-				detail:
-					healthSnapshot.config.diagnostics[0]?.message ??
-					'Declarative config blocks readiness.',
-				label: `${healthSnapshot.appName} config requires attention`,
-				state: 'unavailable',
-			};
-		}
-
-		if (setupError) {
-			return {
-				detail: setupError,
-				label: 'Setup diagnostics unavailable',
-				state: 'unavailable',
-			};
-		}
-
-		if (!setupSnapshot) {
-			return {
-				detail: 'Ensemblr is collecting setup readiness checks.',
-				label: 'Checking setup',
-				state: 'pending',
-			};
-		}
-
-		if (setupSnapshot.status !== 'ready') {
-			return {
-				detail: `${setupSnapshot.blockedCount} required setup checks need attention.`,
-				label:
-					setupSnapshot.status === 'checking'
-						? 'Setup checks pending'
-						: 'Setup blocked',
-				state: setupSnapshot.status === 'checking' ? 'pending' : 'unavailable',
-			};
-		}
-
-		return {
-			detail: `Electron ${healthSnapshot.versions.electron} on ${healthSnapshot.platform}. Database schema v${healthSnapshot.database.schemaVersion}.`,
-			label: `${healthSnapshot.appName} IPC online`,
-			state: 'online',
-		};
+		return resolveReachableHealth({
+			healthSnapshot,
+			setupError,
+			setupSnapshot,
+		});
 	}
 
 	if (healthError) {
@@ -95,5 +50,74 @@ export function getWorkbenchHealth({
 			'Renderer is calling the typed preload bridge through TanStack Query.',
 		label: 'Checking IPC',
 		state: 'pending',
+	};
+}
+
+/**
+ * Reduces a reachable main process to its health summary, reporting the first
+ * blocker it finds across the database, declarative config, and setup checks.
+ * @param healthSnapshot - Health the main process reported
+ * @param setupError - Error raised while collecting setup diagnostics, if any
+ * @param setupSnapshot - Setup readiness snapshot, or null while it is loading
+ * @returns The workbench health summary
+ */
+function resolveReachableHealth({
+	healthSnapshot,
+	setupError,
+	setupSnapshot,
+}: {
+	healthSnapshot: HealthSnapshot;
+	setupError: string | null;
+	setupSnapshot: SetupDiagnosticsSnapshot | null;
+}): WorkbenchHealth {
+	if (healthSnapshot.database.status === 'error') {
+		return {
+			detail: healthSnapshot.database.error ?? 'Database failed to open.',
+			label: `${healthSnapshot.appName} database unavailable`,
+			state: 'unavailable',
+		};
+	}
+
+	if (healthSnapshot.config.blocksReadiness) {
+		return {
+			detail:
+				healthSnapshot.config.diagnostics[0]?.message ??
+				'Declarative config blocks readiness.',
+			label: `${healthSnapshot.appName} config requires attention`,
+			state: 'unavailable',
+		};
+	}
+
+	if (setupError) {
+		return {
+			detail: setupError,
+			label: 'Setup diagnostics unavailable',
+			state: 'unavailable',
+		};
+	}
+
+	if (!setupSnapshot) {
+		return {
+			detail: 'Ensemblr is collecting setup readiness checks.',
+			label: 'Checking setup',
+			state: 'pending',
+		};
+	}
+
+	if (setupSnapshot.status !== 'ready') {
+		return {
+			detail: `${setupSnapshot.blockedCount} required setup checks need attention.`,
+			label:
+				setupSnapshot.status === 'checking'
+					? 'Setup checks pending'
+					: 'Setup blocked',
+			state: setupSnapshot.status === 'checking' ? 'pending' : 'unavailable',
+		};
+	}
+
+	return {
+		detail: `Electron ${healthSnapshot.versions.electron} on ${healthSnapshot.platform}. Database schema v${healthSnapshot.database.schemaVersion}.`,
+		label: `${healthSnapshot.appName} IPC online`,
+		state: 'online',
 	};
 }

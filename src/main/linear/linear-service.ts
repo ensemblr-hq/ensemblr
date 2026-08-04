@@ -441,12 +441,16 @@ function issueDataToWire(
 	issue: LinearIssueData,
 	syncedAt: string | null,
 ): LinearIssueWire {
+	const assignee = flattenNamedRef(issue.assignee);
+	const cycle = flattenNamedRef(issue.cycle);
+	const project = flattenNamedRef(issue.project);
+
 	return {
 		archivedAt: issue.archivedAt,
-		assigneeId: issue.assignee?.id ?? null,
-		assigneeName: issue.assignee?.name ?? null,
-		cycleId: issue.cycle?.id ?? null,
-		cycleName: issue.cycle?.name ?? null,
+		assigneeId: assignee.id,
+		assigneeName: assignee.name,
+		cycleId: cycle.id,
+		cycleName: cycle.name,
 		description: issue.description,
 		dueDate: issue.dueDate,
 		id: issue.id,
@@ -457,19 +461,63 @@ function issueDataToWire(
 			name: label.name,
 		})),
 		priority: issue.priority,
-		projectId: issue.project?.id ?? null,
-		projectName: issue.project?.name ?? null,
-		stateColor: issue.state?.color ?? null,
-		stateId: issue.state?.id ?? null,
-		stateName: issue.state?.name ?? null,
-		stateType: issue.state?.type ?? null,
+		projectId: project.id,
+		projectName: project.name,
+		...flattenState(issue.state),
 		syncedAt,
-		teamId: issue.team?.id ?? null,
-		teamKey: issue.team?.key ?? null,
-		teamName: issue.team?.name ?? null,
+		...flattenTeam(issue.team),
 		title: issue.title,
 		updatedAt: issue.updatedAt,
 		url: issue.url,
+	};
+}
+
+/**
+ * Split an optional `{ id, name }` relation into the nullable id/name pair the
+ * wire shape carries.
+ * @param ref - Relation returned by the Linear client, if any
+ * @returns The relation's id and name, each null when the relation is absent
+ */
+function flattenNamedRef(ref: { id: string; name: string } | null): {
+	id: string | null;
+	name: string | null;
+} {
+	return { id: ref?.id ?? null, name: ref?.name ?? null };
+}
+
+/**
+ * Split an issue's workflow state into its four nullable wire columns.
+ * @param state - Workflow state returned by the Linear client, if any
+ * @returns The state columns, each null when the state is absent
+ */
+function flattenState(state: LinearIssueData['state']): {
+	stateColor: string | null;
+	stateId: string | null;
+	stateName: string | null;
+	stateType: string | null;
+} {
+	return {
+		stateColor: state?.color ?? null,
+		stateId: state?.id ?? null,
+		stateName: state?.name ?? null,
+		stateType: state?.type ?? null,
+	};
+}
+
+/**
+ * Split an issue's team into its three nullable wire columns.
+ * @param team - Team returned by the Linear client, if any
+ * @returns The team columns, each null when the team is absent
+ */
+function flattenTeam(team: LinearIssueData['team']): {
+	teamId: string | null;
+	teamKey: string | null;
+	teamName: string | null;
+} {
+	return {
+		teamId: team?.id ?? null,
+		teamKey: team?.key ?? null,
+		teamName: team?.name ?? null,
 	};
 }
 

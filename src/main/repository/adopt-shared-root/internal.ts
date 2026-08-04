@@ -67,6 +67,36 @@ export function emptySnapshot({
 	};
 }
 
+/**
+ * Merge a patch into a row's `adoption` metadata bag, preserving every other
+ * field a caller wrote earlier.
+ * @param metadataJson - Stored metadata JSON, or undefined when the row has none
+ * @param patch - Adoption fields to write over the stored ones
+ * @returns The metadata object with its adoption bag patched
+ */
+export function patchAdoptionMetadata({
+	metadataJson,
+	patch,
+}: {
+	metadataJson: string | undefined;
+	patch: Record<string, unknown>;
+}): Record<string, unknown> {
+	const existing = parseMetadata(metadataJson);
+	return {
+		...existing,
+		adoption: { ...readAdoptionBag(existing), ...patch },
+	};
+}
+
+/** Reads the `adoption` bag off parsed metadata, defaulting to an empty record. */
+function readAdoptionBag(
+	metadata: Record<string, unknown>,
+): Record<string, unknown> {
+	return typeof metadata.adoption === 'object' && metadata.adoption !== null
+		? (metadata.adoption as Record<string, unknown>)
+		: {};
+}
+
 /** Persists a `missingSince` flag onto a row's metadata without deleting it. */
 export function markRecordMissing({
 	database,
@@ -81,25 +111,13 @@ export function markRecordMissing({
 	table: 'repositories' | 'workspaces';
 	timestamp: string;
 }): void {
-	const existing = parseMetadata(metadataJson);
-	const adoption =
-		typeof existing.adoption === 'object' && existing.adoption !== null
-			? (existing.adoption as Record<string, unknown>)
-			: {};
-
-	if (adoption.missingSince === timestamp) {
+	if (readAdoptionBag(parseMetadata(metadataJson)).missingSince === timestamp) {
 		return;
 	}
 
-	const nextMetadata = {
-		...existing,
-		adoption: {
-			...adoption,
-			missingSince: timestamp,
-		},
-	};
-
-	const nextMetadataJson = JSON.stringify(nextMetadata);
+	const nextMetadataJson = JSON.stringify(
+		patchAdoptionMetadata({ metadataJson, patch: { missingSince: timestamp } }),
+	);
 	if (table === 'repositories') {
 		updateRepositoryMetadataJson({
 			database,

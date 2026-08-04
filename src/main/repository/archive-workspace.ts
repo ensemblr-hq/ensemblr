@@ -23,6 +23,7 @@ import {
 	pushLifecycleDiagnostics,
 } from './archive-diagnostics.ts';
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
+import { toLifecycleTargets } from './archive-lifecycle-targets.ts';
 import { insertArchiveRecord } from './archive-records.ts';
 import { readContinuedBranches } from './continued-branches.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
@@ -150,20 +151,7 @@ export function createArchiveWorkspaceService({
 					archivedAt,
 					archivedContextPath: preserved.archivedContextPath,
 					branchCleanup,
-					repository: {
-						id: source.repositoryId,
-						name: source.repositoryName,
-						path: source.repositoryPath,
-						slug: source.repositorySlug,
-					},
-					workspace: {
-						branchName: source.branchName,
-						id: source.id,
-						name: source.name,
-						path: source.path,
-						repositoryId: source.repositoryId,
-						slug: source.slug,
-					},
+					...toLifecycleTargets(source),
 				},
 			);
 			pushLifecycleDiagnostics(diagnostics, preHookOutcome.diagnostics);
@@ -264,20 +252,7 @@ export function createArchiveWorkspaceService({
 					archivedAt,
 					archivedContextPath: preserved.archivedContextPath,
 					branchCleanup,
-					repository: {
-						id: source.repositoryId,
-						name: source.repositoryName,
-						path: source.repositoryPath,
-						slug: source.repositorySlug,
-					},
-					workspace: {
-						branchName: source.branchName,
-						id: source.id,
-						name: source.name,
-						path: source.path,
-						repositoryId: source.repositoryId,
-						slug: source.slug,
-					},
+					...toLifecycleTargets(source),
 				},
 			);
 			pushLifecycleDiagnostics(diagnostics, postHookOutcome.diagnostics);

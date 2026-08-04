@@ -18,12 +18,72 @@ export function classifyCommandFailure(
 		result.stderr.trim() || result.failure?.message || fallbackMessage;
 
 	const code = classifyStderr(stderr, result);
+	const remediation = remediationFor(code);
 	return {
 		code,
 		message,
-		...(remediationFor(code) ? { remediation: remediationFor(code) } : {}),
+		...(remediation ? { remediation } : {}),
 	};
 }
+
+/** Stderr substrings that identify a failure code, in match-priority order. */
+const STDERR_SIGNATURES: readonly {
+	code: GithubFailureCode;
+	markers: readonly string[];
+}[] = [
+	{
+		code: 'gh-not-installed',
+		markers: ['command not found', 'no such file or directory'],
+	},
+	{
+		code: 'gh-not-authenticated',
+		markers: [
+			'gh auth login',
+			'authentication',
+			'not logged in',
+			'bad credentials',
+			'http 401',
+		],
+	},
+	{
+		code: 'permission-denied',
+		markers: ['http 403', 'permission', 'protected branch', 'not authorized'],
+	},
+	{
+		code: 'no-pull-request',
+		markers: ['no pull requests found', 'could not find pull request'],
+	},
+	{
+		code: 'no-remote',
+		markers: [
+			'no remote',
+			'does not appear to be a git repository',
+			'could not read from remote repository',
+			'no upstream',
+		],
+	},
+	{
+		code: 'nothing-to-commit',
+		markers: ['nothing to commit', 'no changes added to commit'],
+	},
+	{
+		code: 'merge-blocked',
+		markers: [
+			'not mergeable',
+			'merge is blocked',
+			'required status check',
+			'review is required',
+		],
+	},
+	{
+		code: 'dirty-state',
+		markers: [
+			'uncommitted changes',
+			'your local changes',
+			'would be overwritten',
+		],
+	},
+];
 
 /**
  * Classify a failed `gh` invocation into a coarse failure code from its stderr
@@ -38,65 +98,25 @@ function classifyStderr(
 ): GithubFailureCode {
 	if (
 		result.failure?.code === 'command-not-found' ||
-		result.failure?.code === 'spawn-error' ||
-		stderr.includes('command not found') ||
-		stderr.includes('no such file or directory')
+		result.failure?.code === 'spawn-error'
 	) {
 		return 'gh-not-installed';
 	}
-	if (
-		stderr.includes('gh auth login') ||
-		stderr.includes('authentication') ||
-		stderr.includes('not logged in') ||
-		stderr.includes('bad credentials') ||
-		stderr.includes('http 401')
-	) {
-		return 'gh-not-authenticated';
-	}
-	if (
-		stderr.includes('http 403') ||
-		stderr.includes('permission') ||
-		stderr.includes('protected branch') ||
-		stderr.includes('not authorized')
-	) {
-		return 'permission-denied';
-	}
-	if (
-		stderr.includes('no pull requests found') ||
-		stderr.includes('could not find pull request')
-	) {
-		return 'no-pull-request';
-	}
-	if (
-		stderr.includes('no remote') ||
-		stderr.includes('does not appear to be a git repository') ||
-		stderr.includes('could not read from remote repository') ||
-		stderr.includes('no upstream')
-	) {
-		return 'no-remote';
-	}
-	if (
-		stderr.includes('nothing to commit') ||
-		stderr.includes('no changes added to commit')
-	) {
-		return 'nothing-to-commit';
-	}
-	if (
-		stderr.includes('not mergeable') ||
-		stderr.includes('merge is blocked') ||
-		stderr.includes('required status check') ||
-		stderr.includes('review is required')
-	) {
-		return 'merge-blocked';
-	}
-	if (
-		stderr.includes('uncommitted changes') ||
-		stderr.includes('your local changes') ||
-		stderr.includes('would be overwritten')
-	) {
-		return 'dirty-state';
-	}
-	return 'command-failed';
+	const matched = STDERR_SIGNATURES.find(({ markers }) =>
+		matchesAnyMarker(stderr, markers),
+	);
+	return matched?.code ?? 'command-failed';
+}
+
+/**
+ * Whether any of a signature's markers appears in the stderr text.
+ * @param stderr - Lowercased stderr output from the gh command
+ * @param markers - Substrings that identify one failure code
+ * @returns True when stderr contains at least one marker
+ */
+function matchesAnyMarker(stderr: string, markers: readonly string[]): boolean {
+	// oxlint-disable-next-line react-doctor/js-set-map-lookups -- String.includes is a substring search, not an array membership test, so a Set cannot replace it
+	return markers.some((marker) => stderr.includes(marker));
 }
 
 /**

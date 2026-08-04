@@ -189,67 +189,106 @@ function inspectManagedDirectories({
 	missingManagedDirectorySeverity?: RootDirectoryDiagnostic['severity'] | null;
 }): void {
 	for (const managedPath of managedPaths) {
-		if (!existsSync(managedPath.path)) {
-			if (!allowCreate) {
-				managedPath.status = 'missing';
-				if (missingManagedDirectorySeverity) {
-					diagnostics.push({
-						code: 'managed-directory-missing',
-						message:
-							missingManagedDirectorySeverity === 'info'
-								? `Managed directory "${managedPath.key}" will be created after confirmation.`
-								: `Managed directory "${managedPath.key}" is missing.`,
-						path: managedPath.path,
-						severity: missingManagedDirectorySeverity,
-					});
-				}
-				continue;
-			}
-
-			if (
-				createDirectory(
-					managedPath.path,
-					createdPaths,
-					diagnostics,
-					'managed-directory-create-failed',
-					'managed-directory-unwritable',
-				)
-			) {
-				managedPath.status = 'created';
-			}
+		if (existsSync(managedPath.path)) {
+			inspectExistingManagedDirectory(managedPath, diagnostics);
 			continue;
 		}
-
-		const managedStats = getDirectoryStats(
-			managedPath.path,
+		provisionMissingManagedDirectory({
+			allowCreate,
+			createdPaths,
 			diagnostics,
-			'managed-directory-stat-failed',
-		);
-
-		if (!managedStats) {
-			managedPath.status = 'invalid';
-			continue;
-		}
-
-		if (!managedStats.isDirectory()) {
-			managedPath.status = 'invalid';
-			diagnostics.push({
-				code: 'managed-path-not-directory',
-				message: `Managed path "${managedPath.key}" exists but is not a directory.`,
-				path: managedPath.path,
-				severity: 'error',
-			});
-			continue;
-		}
-
-		managedPath.status = 'present';
-		assertWritable(
-			managedPath.path,
-			diagnostics,
-			'managed-directory-unwritable',
-		);
-		detectSharedManagedContent(managedPath, diagnostics);
+			managedPath,
+			missingManagedDirectorySeverity,
+		});
 	}
+}
+
+/**
+ * Handles a managed subdirectory that is not on disk: creates it when the
+ * caller permits, otherwise records it as missing at the requested severity.
+ * @param allowCreate - Whether this inspection may create directories
+ * @param createdPaths - Collector of paths this inspection created
+ * @param diagnostics - Diagnostic sink
+ * @param managedPath - The managed-path snapshot to update in place
+ * @param missingManagedDirectorySeverity - Severity for the missing diagnostic, or null to stay silent
+ */
+function provisionMissingManagedDirectory({
+	allowCreate,
+	createdPaths,
+	diagnostics,
+	managedPath,
+	missingManagedDirectorySeverity,
+}: {
+	allowCreate: boolean;
+	createdPaths: string[];
+	diagnostics: RootDirectoryDiagnostic[];
+	managedPath: RootDirectoryManagedPathSnapshot;
+	missingManagedDirectorySeverity?: RootDirectoryDiagnostic['severity'] | null;
+}): void {
+	if (allowCreate) {
+		if (
+			createDirectory(
+				managedPath.path,
+				createdPaths,
+				diagnostics,
+				'managed-directory-create-failed',
+				'managed-directory-unwritable',
+			)
+		) {
+			managedPath.status = 'created';
+		}
+		return;
+	}
+
+	managedPath.status = 'missing';
+	if (missingManagedDirectorySeverity) {
+		diagnostics.push({
+			code: 'managed-directory-missing',
+			message:
+				missingManagedDirectorySeverity === 'info'
+					? `Managed directory "${managedPath.key}" will be created after confirmation.`
+					: `Managed directory "${managedPath.key}" is missing.`,
+			path: managedPath.path,
+			severity: missingManagedDirectorySeverity,
+		});
+	}
+}
+
+/**
+ * Validates a managed subdirectory that already exists, marking it invalid when
+ * it cannot be stat-ed or is not a directory at all.
+ * @param managedPath - The managed-path snapshot to update in place
+ * @param diagnostics - Diagnostic sink
+ */
+function inspectExistingManagedDirectory(
+	managedPath: RootDirectoryManagedPathSnapshot,
+	diagnostics: RootDirectoryDiagnostic[],
+): void {
+	const managedStats = getDirectoryStats(
+		managedPath.path,
+		diagnostics,
+		'managed-directory-stat-failed',
+	);
+
+	if (!managedStats) {
+		managedPath.status = 'invalid';
+		return;
+	}
+
+	if (!managedStats.isDirectory()) {
+		managedPath.status = 'invalid';
+		diagnostics.push({
+			code: 'managed-path-not-directory',
+			message: `Managed path "${managedPath.key}" exists but is not a directory.`,
+			path: managedPath.path,
+			severity: 'error',
+		});
+		return;
+	}
+
+	managedPath.status = 'present';
+	assertWritable(managedPath.path, diagnostics, 'managed-directory-unwritable');
+	detectSharedManagedContent(managedPath, diagnostics);
 }
 
 /**

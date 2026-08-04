@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { AdoptedRepositorySnapshot } from '../../../shared/ipc/contracts/repository';
+import type { SharedRootAdoptionDiagnostic } from '../../../shared/ipc/contracts/shared-root-adoption';
 import {
 	insertRepositoryRow,
 	refreshRepositoryAdoptionRow,
@@ -11,11 +12,135 @@ import {
 	selectRepositoryLookupBySlug,
 	selectRepositoryMetadataJson,
 } from '../../storage/repositories/repository-row-repository.ts';
-import type { GitRepositoryProbe } from '../git-probe.ts';
+import { hasArchivedRepositoryMarker } from '../archived-marker.ts';
+import type { GitRepositoryProbe, GitRepositoryProbeFn } from '../git-probe.ts';
 import { normalizeRemoteUrl } from '../github-url.ts';
-import { parseMetadata } from '../metadata.ts';
 import { toSlug } from '../slug.ts';
-import { ADOPTION_MODE, type LoadConfigFn } from './internal.ts';
+import {
+	ADOPTION_MODE,
+	type LoadConfigFn,
+	patchAdoptionMetadata,
+	type RepositoryAdoptionInfo,
+} from './internal.ts';
+
+/**
+ * What one pass over the shared root's repositories produced: newly adopted
+ * rows, refreshed row ids, the slug index workspace adoption resolves against,
+ * and every path the scan visited.
+ */
+export interface RepositoryReconciliation {
+	adopted: AdoptedRepositorySnapshot[];
+	refreshedIds: string[];
+	repositoriesBySlug: Map<string, RepositoryAdoptionInfo>;
+	scannedPaths: Set<string>;
+}
+
+/**
+ * Probe every child of the shared root's repositories directory and reconcile
+ * SQLite with what is on disk, adopting new git repositories and refreshing
+ * known ones. Directories the user archived carry a sentinel file and are
+ * skipped so a restart never resurrects what they just removed.
+ * @param children - Directory names directly under the repositories root
+ * @param database - Open database handle
+ * @param diagnostics - Collector the adoption snapshot reports through
+ * @param gitProbe - Probe that inspects a candidate directory as a git repository
+ * @param loadConfig - Loads a repository's resolved config for adoption metadata
+ * @param now - Clock used for config resolution
+ * @param repositoriesPath - Absolute path of the repositories root
+ * @param timestamp - Scan timestamp stamped onto adopted and refreshed rows
+ * @returns The reconciliation outcome for the repositories layer
+ */
+export async function reconcileRepositories({
+	children,
+	database,
+	diagnostics,
+	gitProbe,
+	loadConfig,
+	now,
+	repositoriesPath,
+	timestamp,
+}: {
+	children: readonly string[];
+	database: DatabaseSync;
+	diagnostics: SharedRootAdoptionDiagnostic[];
+	gitProbe: GitRepositoryProbeFn;
+	loadConfig: LoadConfigFn;
+	now: () => Date;
+	repositoriesPath: string;
+	timestamp: string;
+}): Promise<RepositoryReconciliation> {
+	const probes = await Promise.all(
+		children.map(async (child) => {
+			const candidatePath = path.join(repositoriesPath, child);
+			if (hasArchivedRepositoryMarker(candidatePath)) {
+				return { archived: true as const, candidatePath };
+			}
+			return {
+				archived: false as const,
+				candidatePath,
+				probe: await gitProbe(candidatePath),
+			};
+		}),
+	);
+
+	const outcome: RepositoryReconciliation = {
+		adopted: [],
+		refreshedIds: [],
+		repositoriesBySlug: new Map(),
+		scannedPaths: new Set(),
+	};
+
+	for (const entry of probes) {
+		const { candidatePath } = entry;
+		outcome.scannedPaths.add(candidatePath);
+
+		if (entry.archived) {
+			continue;
+		}
+
+		const { probe } = entry;
+		if (!probe.isGitRepository || probe.topLevel !== candidatePath) {
+			diagnostics.push({
+				code: 'invalid-repository',
+				message: probe.error ?? 'The directory is not a valid git repository.',
+				path: candidatePath,
+				severity: 'warning',
+			});
+			continue;
+		}
+
+		const existing = findRepositoryByPath(database, candidatePath);
+		if (existing) {
+			refreshRepositoryRow({ database, id: existing.id, probe, timestamp });
+			outcome.refreshedIds.push(existing.id);
+			outcome.repositoriesBySlug.set(existing.slug, {
+				defaultBranch: probe.defaultBranch ?? existing.defaultBranch,
+				id: existing.id,
+				path: candidatePath,
+				slug: existing.slug,
+			});
+			continue;
+		}
+
+		const adopted = adoptRepositoryRow({
+			candidatePath,
+			database,
+			loadConfig,
+			now,
+			probe,
+			timestamp,
+		});
+		outcome.adopted.push(adopted);
+		outcome.repositoriesBySlug.set(adopted.slug, {
+			defaultBranch: adopted.defaultBranch,
+			id: adopted.id,
+			path: candidatePath,
+			slug: adopted.slug,
+		});
+	}
+
+	return outcome;
+}
 
 /** Loads the repository row matching `repositoryPath`, if any. */
 export function findRepositoryByPath(
@@ -83,19 +208,13 @@ export function refreshRepositoryRow({
 	probe: GitRepositoryProbe;
 	timestamp: string;
 }): void {
-	const metadataJson = selectRepositoryMetadataJson({ database, id });
-	const existing = parseMetadata(metadataJson ?? undefined);
-	const adoption =
-		typeof existing.adoption === 'object' && existing.adoption !== null
-			? (existing.adoption as Record<string, unknown>)
-			: {};
+	const refreshed = patchAdoptionMetadata({
+		metadataJson: selectRepositoryMetadataJson({ database, id }) ?? undefined,
+		patch: { lastSeenAt: timestamp },
+	});
 	const nextMetadata = {
-		...existing,
-		adoption: {
-			...adoption,
-			lastSeenAt: timestamp,
-		},
-		remoteUrl: probe.remoteUrl ?? existing.remoteUrl ?? null,
+		...refreshed,
+		remoteUrl: probe.remoteUrl ?? refreshed.remoteUrl ?? null,
 	};
 
 	refreshRepositoryAdoptionRow({

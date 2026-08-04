@@ -103,27 +103,15 @@ export function DiffViewer({
 	const baseHunks = file?.hunks ?? EMPTY_HUNKS;
 	const canShowFile = Boolean(fullFileContent) && baseHunks.length > 0;
 
-	const displayHunks = useMemo(() => {
-		if (viewMode !== 'file' || !fullFileContent || baseHunks.length === 0) {
-			return baseHunks;
-		}
-		const oldSource = reconstructOldSource(fullFileContent, baseHunks);
-		if (!oldSource) {
-			return baseHunks;
-		}
-		const totalLines = oldSource.split('\n').length;
-		return expandFromRawCode(baseHunks, oldSource, 1, totalLines + 1);
-	}, [viewMode, fullFileContent, baseHunks]);
+	const displayHunks = useMemo(
+		() => expandHunksForViewMode({ baseHunks, fullFileContent, viewMode }),
+		[baseHunks, fullFileContent, viewMode],
+	);
 
-	const changeByKey = useMemo(() => {
-		const map = new Map<string, ChangeData>();
-		for (const hunk of displayHunks) {
-			for (const change of hunk.changes) {
-				map.set(getChangeKey(change), change);
-			}
-		}
-		return map;
-	}, [displayHunks]);
+	const changeByKey = useMemo(
+		() => indexChangesByKey(displayHunks),
+		[displayHunks],
+	);
 
 	const commentingEnabled = Boolean(onAddComment);
 
@@ -192,6 +180,53 @@ export function DiffViewer({
 			/>
 		</DiffViewerFrame>
 	);
+}
+
+/**
+ * Expand the parsed hunks to whole-file context while the viewer is in file
+ * mode and the full source is available, falling back to the diff's own hunks
+ * whenever the old source cannot be reconstructed.
+ * @param baseHunks - Hunks parsed straight out of the patch
+ * @param fullFileContent - Current full file content, when the caller has it
+ * @param viewMode - Whether the viewer shows the diff or the whole file
+ * @returns The hunks to render
+ */
+function expandHunksForViewMode({
+	baseHunks,
+	fullFileContent,
+	viewMode,
+}: {
+	baseHunks: HunkData[];
+	fullFileContent: string | null | undefined;
+	viewMode: DiffViewMode;
+}): HunkData[] {
+	if (viewMode !== 'file' || !fullFileContent || baseHunks.length === 0) {
+		return baseHunks;
+	}
+	const oldSource = reconstructOldSource(fullFileContent, baseHunks);
+	if (!oldSource) {
+		return baseHunks;
+	}
+	const totalLines = oldSource.split('\n').length;
+	return expandFromRawCode(baseHunks, oldSource, 1, totalLines + 1);
+}
+
+/**
+ * Index every change in the displayed hunks by its stable change key so widgets
+ * and the comment composer can resolve a line without rescanning.
+ * @param hunks - The hunks currently rendered
+ * @returns Each change keyed by {@link getChangeKey}
+ */
+function indexChangesByKey(
+	hunks: readonly HunkData[],
+): Map<string, ChangeData> {
+	const map = new Map<string, ChangeData>();
+	for (const hunk of hunks) {
+		for (const change of hunk.changes) {
+			map.set(getChangeKey(change), change);
+		}
+	}
+	return map;
 }
 
 /**

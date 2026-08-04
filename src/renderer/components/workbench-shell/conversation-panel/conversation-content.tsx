@@ -1,10 +1,7 @@
 import { useAtomValue } from 'jotai';
-import { useCallback, useMemo } from 'react';
 import { XtermTerminal } from '@/renderer/components/workbench-shell/dock-panel/xterm-terminal';
-import {
-	createWorkspacePathResolver,
-	toWorkspaceLookupPath,
-} from '@/renderer/lib/pi';
+import { useConversationOpeners } from '@/renderer/hooks/workbench-shell/conversation-panel/use-conversation-openers';
+import type { createWorkspacePathResolver } from '@/renderer/lib/pi';
 import {
 	formatLinkedIssueComposerSeed,
 	showsComposer,
@@ -90,48 +87,14 @@ export function WorkspaceConversationContent({
 		activeSession.piSessionId ?? composer.activePiSessionId ?? null;
 	const isChatTab = (activeSession.kind ?? 'chat') === 'chat';
 
-	/** Opens or re-focuses the preview tab for a chip's file and navigates to it. */
-	const workspaceCwd = activeWorkspace.pathLabel ?? null;
-	const resolveWorkspacePath = useMemo(
-		() =>
-			createWorkspacePathResolver(activeWorkspace.workspaceFiles, workspaceCwd),
-		[activeWorkspace.workspaceFiles, workspaceCwd],
-	);
-	const openFilePreview = useCallback(
-		(filePath: string) => {
-			const resolved = resolveWorkspacePath(filePath);
-			const relativePath =
-				resolved?.path ?? toWorkspaceLookupPath(filePath, workspaceCwd);
-			if (resolved?.kind === 'directory') {
-				onDirectoryReveal(relativePath);
-				return;
-			}
-			void onFilePreviewOpen({ filePath: relativePath }).then((result) => {
-				if (result) {
-					onSessionTabChange(result.chatTabId);
-				}
-			});
-		},
-		[
+	const { openFilePreview, openTurnDiff, resolveWorkspacePath } =
+		useConversationOpeners({
+			activeWorkspace,
 			onDirectoryReveal,
 			onFilePreviewOpen,
 			onSessionTabChange,
-			resolveWorkspacePath,
-			workspaceCwd,
-		],
-	);
-
-	/** Opens or re-focuses the diff tab for a checkpointed turn. */
-	const openTurnDiff = useCallback(
-		({ label, turnId }: { label: string; turnId: string }) => {
-			void onTurnDiffOpen({ label, turnId }).then((result) => {
-				if (result) {
-					onSessionTabChange(result.chatTabId);
-				}
-			});
-		},
-		[onTurnDiffOpen, onSessionTabChange],
-	);
+			onTurnDiffOpen,
+		});
 
 	return (
 		<section className='relative flex min-h-0 flex-1 flex-col overflow-hidden'>
@@ -148,31 +111,14 @@ export function WorkspaceConversationContent({
 				sessions={sessionTabs}
 			/>
 			{isChatTab ? (
-				<WorkspacePathResolverProvider value={resolveWorkspacePath}>
-					<FilePreviewOpenerProvider value={openFilePreview}>
-						<TurnDiffOpenerProvider value={openTurnDiff}>
-							<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-								<WorkspaceTimeline
-									activeSession={activeSession}
-									composer={composer}
-									workspace={activeWorkspace}
-								/>
-							</div>
-							{showsComposer(activeSession) ? (
-								<ComposerSlot
-									chatTabId={activeSession.chatTabId}
-									composer={composer}
-									piSessionId={activeSession.piSessionId ?? null}
-									seedText={getLinkedIssueComposerSeed(
-										activeWorkspace,
-										activeSession,
-									)}
-									workspace={activeWorkspace}
-								/>
-							) : null}
-						</TurnDiffOpenerProvider>
-					</FilePreviewOpenerProvider>
-				</WorkspacePathResolverProvider>
+				<ChatTabBody
+					activeSession={activeSession}
+					activeWorkspace={activeWorkspace}
+					composer={composer}
+					openFilePreview={openFilePreview}
+					openTurnDiff={openTurnDiff}
+					resolveWorkspacePath={resolveWorkspacePath}
+				/>
 			) : (
 				<ActiveAuxiliaryPanel
 					activeSession={activeSession}
@@ -182,6 +128,57 @@ export function WorkspaceConversationContent({
 			)}
 			{developerMode ? <PiRawFramePanel sessionId={debugSessionId} /> : null}
 		</section>
+	);
+}
+
+/** Options a chat tab's body needs to render its timeline and composer. */
+interface ChatTabBodyProps {
+	activeSession: SessionTabModel;
+	activeWorkspace: WorkspaceShellModel;
+	composer: ComposerShellState;
+	openFilePreview: (filePath: string) => void;
+	openTurnDiff: (input: { label: string; turnId: string }) => void;
+	resolveWorkspacePath: ReturnType<typeof createWorkspacePathResolver>;
+}
+
+/**
+ * Renders a chat tab's timeline and composer under the path-resolution and
+ * preview-opener context the conversation surface provides.
+ */
+function ChatTabBody({
+	activeSession,
+	activeWorkspace,
+	composer,
+	openFilePreview,
+	openTurnDiff,
+	resolveWorkspacePath,
+}: ChatTabBodyProps) {
+	return (
+		<WorkspacePathResolverProvider value={resolveWorkspacePath}>
+			<FilePreviewOpenerProvider value={openFilePreview}>
+				<TurnDiffOpenerProvider value={openTurnDiff}>
+					<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+						<WorkspaceTimeline
+							activeSession={activeSession}
+							composer={composer}
+							workspace={activeWorkspace}
+						/>
+					</div>
+					{showsComposer(activeSession) ? (
+						<ComposerSlot
+							chatTabId={activeSession.chatTabId}
+							composer={composer}
+							piSessionId={activeSession.piSessionId ?? null}
+							seedText={getLinkedIssueComposerSeed(
+								activeWorkspace,
+								activeSession,
+							)}
+							workspace={activeWorkspace}
+						/>
+					) : null}
+				</TurnDiffOpenerProvider>
+			</FilePreviewOpenerProvider>
+		</WorkspacePathResolverProvider>
 	);
 }
 

@@ -98,54 +98,52 @@ function BrowseArchiveDialogBody({
 		await onChange(project.id);
 	}, [onChange, project.id, queryClient]);
 
-	const handleUnarchive = useCallback(
-		async (entry: ArchivedWorkspaceListEntry) => {
+	const runRowAction = useCallback(
+		async ({
+			action,
+			entry,
+			request,
+		}: {
+			action: 'delete' | 'unarchive';
+			entry: ArchivedWorkspaceListEntry;
+			request: (payload: {
+				workspaceId: string;
+			}) => Promise<{ diagnostics: RowDiagnostic[]; status: string }>;
+		}) => {
 			if (!apiAvailable) {
 				return;
 			}
 			setPendingId(entry.id);
-			setPendingAction('unarchive');
+			setPendingAction(action);
 			setDiagnostics(null);
 
-			const result = await unarchiveWorkspace({ workspaceId: entry.id });
+			const result = await request({ workspaceId: entry.id });
 
 			if (result.status === 'success') {
 				await invalidate();
-				setPendingId(null);
-				setPendingAction(null);
-				return;
+			} else {
+				setDiagnostics({ entries: result.diagnostics, workspaceId: entry.id });
 			}
-
-			setDiagnostics({ workspaceId: entry.id, entries: result.diagnostics });
 			setPendingId(null);
 			setPendingAction(null);
 		},
 		[apiAvailable, invalidate],
 	);
 
+	const handleUnarchive = useCallback(
+		(entry: ArchivedWorkspaceListEntry) =>
+			runRowAction({ action: 'unarchive', entry, request: unarchiveWorkspace }),
+		[runRowAction],
+	);
+
 	const handleDelete = useCallback(
-		async (entry: ArchivedWorkspaceListEntry) => {
-			if (!apiAvailable) {
-				return;
-			}
-			setPendingId(entry.id);
-			setPendingAction('delete');
-			setDiagnostics(null);
-
-			const result = await deleteArchivedWorkspace({ workspaceId: entry.id });
-
-			if (result.status === 'success') {
-				await invalidate();
-				setPendingId(null);
-				setPendingAction(null);
-				return;
-			}
-
-			setDiagnostics({ workspaceId: entry.id, entries: result.diagnostics });
-			setPendingId(null);
-			setPendingAction(null);
-		},
-		[apiAvailable, invalidate],
+		(entry: ArchivedWorkspaceListEntry) =>
+			runRowAction({
+				action: 'delete',
+				entry,
+				request: deleteArchivedWorkspace,
+			}),
+		[runRowAction],
 	);
 
 	return (
