@@ -88,11 +88,11 @@ const TokenSpan = ({ token }: { token: ThemedToken }) => (
 // takes its width from the same `codeGutterDigits` measurement every other code
 // surface uses, so a file and its diff line their content up at one offset.
 const LINE_NUMBER_CLASSES = cn(
-	'before:content-[counter(line)]',
+	'before:code-line-counter',
 	'before:inline-block',
 	'before:[counter-increment:line]',
 	'before:box-content',
-	'before:w-[var(--ensemblr-gutter-ch)]',
+	'before:w-code-gutter',
 	'before:border-code-border',
 	'before:border-r',
 	'before:px-code-pad',
@@ -105,10 +105,10 @@ const LINE_NUMBER_CLASSES = cn(
 
 // A wrapped line must clear its own gutter, so the indent spans the gutter's
 // full width — digits, padding either side, hairline, and margin, summed into
-// `--ensemblr-gutter-indent` — and the negative indent pulls only the first
+// the `code-gutter-indent` token — and the negative indent pulls only the first
 // visual line back over it.
 const WRAPPED_LINE_NUMBER_CLASSES =
-	'-indent-[var(--ensemblr-gutter-indent)] pl-[var(--ensemblr-gutter-indent)]';
+	'-indent-code-gutter-indent pl-code-gutter-indent';
 
 // Line rendering component
 /** Renders one code line as a row of token spans, optionally with a CSS-counter line number. */

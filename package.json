@@ -11,6 +11,7 @@
 		"node": ">=24 <25"
 	},
 	"scripts": {
+		"preinstall": "node scripts/require-node-version.mjs --stage=install",
 		"dev": "electron-forge start",
 		"dev:playground": "vite --config vite.playground.config.mts",
 		"start": "electron-forge start",
