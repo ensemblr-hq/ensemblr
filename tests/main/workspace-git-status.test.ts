@@ -510,13 +510,16 @@ test('getStatus (real git) stamps working-tree rows so equal-count edits differ'
 	await writeFile(path.join(dir, 'logo.png'), Buffer.from([8, 9, 10, 11]));
 	const after = await rowsByPath();
 
-	assert.equal(after.get('a.ts').additions, before.get('a.ts').additions);
-	assert.equal(after.get('logo.png').additions, null);
-	assert.notEqual(after.get('a.ts').contentId, before.get('a.ts').contentId);
-	assert.notEqual(
-		after.get('logo.png').contentId,
-		before.get('logo.png').contentId,
-	);
+	const beforeSource = before.get('a.ts');
+	const afterSource = after.get('a.ts');
+	const beforeImage = before.get('logo.png');
+	const afterImage = after.get('logo.png');
+	assert.ok(beforeSource && afterSource && beforeImage && afterImage);
+
+	assert.equal(afterSource.additions, beforeSource.additions);
+	assert.equal(afterImage.additions, null);
+	assert.notEqual(afterSource.contentId, beforeSource.contentId);
+	assert.notEqual(afterImage.contentId, beforeImage.contentId);
 });
 
 test('getStatus (real git) leaves commit-scope rows unstamped', async (t) => {

@@ -39,7 +39,7 @@ function makeActions(
 		isDiscardable: () => true,
 		isViewed: () => false,
 		onDiscardFile: () => {},
-		openDiff: () => {},
+		openFile: () => {},
 		openInTargets: [],
 		...overrides,
 	};

@@ -58,9 +58,28 @@ describe('rows', () => {
 		expect(rows.at(-1)?.kind).toBe('freeText');
 	});
 
-	it('falls back to a Q-prefixed pager label', () => {
-		expect(headerOf(MULTI_QUESTION[0] as AskUserQuestionItem, 0)).toBe('Scope');
+	it('leads every pager label with its position, header or not', () => {
+		expect(headerOf(MULTI_QUESTION[0] as AskUserQuestionItem, 0)).toBe(
+			'Q1: Scope',
+		);
 		expect(headerOf(MULTI_QUESTION[1] as AskUserQuestionItem, 1)).toBe('Q2');
+	});
+
+	it('keeps repeated headers distinguishable by position', () => {
+		const repeated: readonly AskUserQuestionItem[] = [
+			{
+				header: 'Scope',
+				options: [{ label: 'a' }, { label: 'b' }],
+				question: 'One?',
+			},
+			{
+				header: 'Scope',
+				options: [{ label: 'a' }, { label: 'b' }],
+				question: 'Two?',
+			},
+		];
+		const labels = repeated.map((item, index) => headerOf(item, index));
+		expect(new Set(labels).size).toBe(labels.length);
 	});
 });
 

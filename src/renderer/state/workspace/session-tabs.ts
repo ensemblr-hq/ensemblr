@@ -27,12 +27,14 @@ import {
 	sameLiveTerminalTitle,
 } from '@/renderer/state/workspace/terminal-tab-title';
 import type {
-	CommentPreviewPayload,
 	PullRequestCommentSummary,
 	SessionTabModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import type { SessionTabState } from '@/renderer/types/workbench-shell';
+import type {
+	SessionTabPlacement,
+	SessionTabState,
+} from '@/renderer/types/workbench-shell';
 import type {
 	ChatTabWire,
 	CloseChatTabRequest,
@@ -45,8 +47,15 @@ import {
 	parseWorkspaceGitDiffScope,
 	type WorkspaceGitDiffScope,
 } from '@/shared/ipc/contracts/workspace-git';
+import {
+	buildCommentTabTitle,
+	parseCommentPreview,
+	toCommentPreviewMetadata,
+} from './comment-preview-tab';
+import { usePreviewTabSlot } from './preview-tab-slot';
 import { sessionVisitOrderByWorkspaceAtom } from './selection-atoms';
 import { decideActiveClose, selectSuccessorTabId } from './session-tab-close';
+import { resolveInsertAnchorId } from './session-tab-insert-anchor';
 import {
 	findDuplicateTerminalTabIds,
 	isLiveTerminalTab,
@@ -89,16 +98,21 @@ export function useSessionTabState({
 	bootstrap?: boolean;
 	onSessionTabChange: (sessionId: string) => void;
 }): SessionTabState & {
-	openSessionTab: () => Promise<OpenSessionTabHandlerResult | null>;
+	openSessionTab: (options?: {
+		placement?: SessionTabPlacement;
+	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openCommentPreviewTab: (input: {
 		comment: PullRequestCommentSummary;
+		preview?: boolean;
 		prNumber?: number;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openFilePreviewTab: (input: {
 		filePath: string;
+		preview?: boolean;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openTurnDiffTab: (input: {
 		label: string;
+		preview?: boolean;
 		turnId: string;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openTerminalTab: (input: {
@@ -107,7 +121,9 @@ export function useSessionTabState({
 	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openWorkspaceFileDiffTab: (input: {
 		filePath: string;
+		preview?: boolean;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
+	pinSessionTab: (chatTabId: string) => void;
 	closeSessionTabAsync: (
 		chatTabId: string,
 	) => Promise<CloseSessionTabHandlerResult>;
@@ -214,12 +230,22 @@ export function useSessionTabState({
 		activeWorkspace.sessions[0] ??
 		activeSession;
 
+	const insertAnchorTabId = resolveInsertAnchorId(
+		sessionTabs,
+		effectiveActiveSession.id,
+	);
+
 	const invalidateChatTabs = useCallback(() => {
 		void queryClient.invalidateQueries({
 			queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
 		});
 		void queryClient.invalidateQueries({
 			queryKey: ensemblrQueryKeys.closedChatTabsWithSummary(workspaceId),
+		});
+		// The timeline resolves a tab's branch id out of the session list, so a tab
+		// that just gained a Pi session has no branch to query until this refetches.
+		void queryClient.invalidateQueries({
+			queryKey: ensemblrQueryKeys.piSessionsForWorkspace(workspaceId),
 		});
 	}, [queryClient, workspaceId]);
 
@@ -276,8 +302,14 @@ export function useSessionTabState({
 	});
 
 	const openAuxiliaryTabMutation = useMutation({
-		mutationFn: (request: Omit<OpenChatTabRequest, 'workspaceId'>) =>
-			openChatTab({ ...request, workspaceId }),
+		mutationFn: (
+			request: Omit<OpenChatTabRequest, 'insertAfterChatTabId' | 'workspaceId'>,
+		) =>
+			openChatTab({
+				...request,
+				insertAfterChatTabId: insertAnchorTabId,
+				workspaceId,
+			}),
 		onError: (error) => {
 			invalidateChatTabs();
 			toast.error('Could not open tab', {
@@ -363,6 +395,13 @@ export function useSessionTabState({
 		},
 	});
 
+	const { pinSessionTab } = usePreviewTabSlot({
+		invalidateChatTabs,
+		queryClient,
+		sessionTabs,
+		workspaceId,
+	});
+
 	const reorderChatTabsMutation = useMutation({
 		mutationFn: (orderedIds: readonly string[]) =>
 			reorderChatTabs({ orderedIds, workspaceId }),
@@ -390,28 +429,50 @@ export function useSessionTabState({
 		},
 	});
 
-	const openSessionTab =
-		useCallback(async (): Promise<OpenSessionTabHandlerResult | null> => {
+	/**
+	 * Opens a chat tab. Spawned chats (review actions, setup-script prompts, the
+	 * ⌘W reset) land right of the active tab; only the strip's new-tab button asks
+	 * for `append`.
+	 */
+	const openSessionTab = useCallback(
+		async ({
+			placement = 'after-active',
+		}: {
+			placement?: SessionTabPlacement;
+		} = {}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
-				const result = await openChatTabMutation.mutateAsync(undefined);
+				const result = await openChatTabMutation.mutateAsync(
+					placement === 'append'
+						? undefined
+						: { insertAfterChatTabId: insertAnchorTabId },
+				);
 				return { chatTabId: result.tab.id };
 			} catch {
 				// Surfaced as a toast by the mutation; callers treat as no-op.
 				return null;
 			}
-		}, [openChatTabMutation]);
+		},
+		[insertAnchorTabId, openChatTabMutation],
+	);
 
-	/** Opens (or re-focuses) a file-preview tab for a workspace-relative path. */
+	/**
+	 * Opens (or re-focuses) a file-preview tab for a workspace-relative path.
+	 * Ephemeral by default, so browsing files reuses one preview slot; pass
+	 * `preview: false` for a gesture that means "keep this open".
+	 */
 	const openFilePreviewTab = useCallback(
 		async ({
 			filePath,
+			preview = true,
 		}: {
 			filePath: string;
+			preview?: boolean;
 		}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
 				const result = await openAuxiliaryTabMutation.mutateAsync({
 					kind: 'file',
 					metadata: { filePath },
+					preview,
 					title: basenameOf(filePath),
 				});
 				return result.tab ? { chatTabId: result.tab.id } : null;
@@ -431,34 +492,21 @@ export function useSessionTabState({
 	const openCommentPreviewTab = useCallback(
 		async ({
 			comment,
+			preview = true,
 			prNumber,
 		}: {
 			comment: PullRequestCommentSummary;
+			preview?: boolean;
 			prNumber?: number;
 		}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
-				const author = comment.author?.trim();
 				const result = await openAuxiliaryTabMutation.mutateAsync({
 					kind: 'document',
 					metadata: {
-						// Persist only the fields `parseCommentPreview` reads back, so a
-						// future `PullRequestCommentSummary` field can't leak unintended
-						// (or non-serializable) data into the tab's SQLite metadata.
-						commentPreview: {
-							...(comment.author === undefined
-								? {}
-								: { author: comment.author }),
-							detail: comment.detail,
-							id: comment.id,
-							...(comment.isResolved === undefined
-								? {}
-								: { isResolved: comment.isResolved }),
-							provider: comment.provider,
-							...(comment.url === undefined ? {} : { url: comment.url }),
-							...(typeof prNumber === 'number' ? { prNumber } : {}),
-						},
+						commentPreview: toCommentPreviewMetadata(comment, prNumber),
 					},
-					title: author ? `Comment · ${author}` : 'Comment',
+					preview,
+					title: buildCommentTabTitle(comment),
 				});
 				return result.tab ? { chatTabId: result.tab.id } : null;
 			} catch {
@@ -473,15 +521,18 @@ export function useSessionTabState({
 	const openTurnDiffTab = useCallback(
 		async ({
 			label,
+			preview = true,
 			turnId,
 		}: {
 			label: string;
+			preview?: boolean;
 			turnId: string;
 		}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
 				const result = await openAuxiliaryTabMutation.mutateAsync({
 					kind: 'diff',
 					metadata: { turnId },
+					preview,
 					title: label,
 				});
 				return result.tab ? { chatTabId: result.tab.id } : null;
@@ -501,15 +552,18 @@ export function useSessionTabState({
 	const openWorkspaceFileDiffTab = useCallback(
 		async ({
 			filePath,
+			preview = true,
 			scope,
 		}: {
 			filePath: string;
+			preview?: boolean;
 			scope?: WorkspaceGitDiffScope;
 		}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
 				const result = await openAuxiliaryTabMutation.mutateAsync({
 					kind: 'diff',
 					metadata: { filePath, ...(scope ? { diffScope: scope } : {}) },
+					preview,
 					title: diffTabTitle(filePath, scope),
 				});
 				return result.tab ? { chatTabId: result.tab.id } : null;
@@ -832,9 +886,15 @@ export function useSessionTabState({
 		}
 	}, [closeSessionTabAsync, invalidateChatTabs, sessionTabs, workspaceId]);
 
-	/** Persists a drag-and-drop tab order when it differs from the current model. */
+	/**
+	 * Persists a drag-and-drop tab order when it differs from the current model.
+	 * Dragging the preview tab pins it on the way: placing a tab deliberately
+	 * means keeping it, so the next preview must not take it. Tabs the drag only
+	 * pushed aside keep their preview state — their index moved, the user's
+	 * intent did not.
+	 */
 	const reorderSessionTabs = useCallback(
-		(sessionIds: string[]) => {
+		(sessionIds: string[], draggedSessionId: string) => {
 			const currentIds = sessionTabs.map((session) => session.id);
 			const currentIdSet = new Set(currentIds);
 			const nextIds = sessionIds.filter((sessionId) =>
@@ -848,9 +908,10 @@ export function useSessionTabState({
 				return;
 			}
 
+			pinSessionTab(draggedSessionId);
 			reorderChatTabsMutation.mutate(nextIds);
 		},
-		[reorderChatTabsMutation, sessionTabs],
+		[pinSessionTab, reorderChatTabsMutation, sessionTabs],
 	);
 
 	/**
@@ -935,6 +996,7 @@ export function useSessionTabState({
 		openTerminalTab,
 		openTurnDiffTab,
 		openWorkspaceFileDiffTab,
+		pinSessionTab,
 		reorderSessionTabs,
 		restoreSessionTab,
 		sessionTabs,
@@ -969,6 +1031,7 @@ type SessionTabBaseFields = {
 	chatTabId: string;
 	fullLabel: string;
 	id: string;
+	isPreview: boolean;
 	isSubAgent: boolean;
 	label: string;
 	piSessionId: string | null;
@@ -1035,6 +1098,7 @@ function toSessionTabModel(
 		chatTabId: tab.id,
 		fullLabel: tab.fullTitle || tab.title,
 		id: tab.id,
+		isPreview: tab.isPreview,
 		isSubAgent: tab.metadata.agentRole === 'subagent',
 		label: tab.title,
 		piSessionId: tab.piSessionId,
@@ -1058,49 +1122,6 @@ function toSessionTabModel(
 				kind: tab.kind,
 			};
 	}
-}
-
-const COMMENT_PREVIEW_PROVIDERS: ReadonlySet<string> = new Set([
-	'github',
-	'github-actions',
-	'linear',
-	'local',
-]);
-
-/**
- * Defensively parses the inline comment payload carried on a `document` tab's
- * metadata (untyped wire `Record<string, unknown>`). Returns `undefined` for
- * regular document tabs or malformed payloads so hydration degrades gracefully.
- */
-function parseCommentPreview(
-	value: unknown,
-): CommentPreviewPayload | undefined {
-	if (typeof value !== 'object' || value === null) {
-		return undefined;
-	}
-	const record = value as Record<string, unknown>;
-	const { detail, id, provider } = record;
-	if (
-		typeof id !== 'string' ||
-		typeof detail !== 'string' ||
-		typeof provider !== 'string' ||
-		!COMMENT_PREVIEW_PROVIDERS.has(provider)
-	) {
-		return undefined;
-	}
-	return {
-		...(typeof record.author === 'string' ? { author: record.author } : {}),
-		detail,
-		id,
-		...(typeof record.isResolved === 'boolean'
-			? { isResolved: record.isResolved }
-			: {}),
-		...(typeof record.prNumber === 'number'
-			? { prNumber: record.prNumber }
-			: {}),
-		provider: provider as CommentPreviewPayload['provider'],
-		...(typeof record.url === 'string' ? { url: record.url } : {}),
-	};
 }
 
 /** Maps a Pi session's runtime status to the tab spinner state. */
@@ -1128,6 +1149,7 @@ function toClosedSessionTabModel(
 			entry.summaryTitle ||
 			'Untitled chat',
 		id: entry.tab.id,
+		isPreview: false,
 		isSubAgent: entry.tab.metadata.agentRole === 'subagent',
 		// Prefer the short chat-title that was visible on the open tab. The
 		// LLM-derived summary title is verbose and often diverges from what

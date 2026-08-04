@@ -12,6 +12,7 @@ import {
 	type GithubService,
 } from '../../src/main/github/github-service.ts';
 import {
+	parseDeployments,
 	parsePullRequestView,
 	parseReviewThreads,
 	parseStatusCheckRollup,
@@ -159,6 +160,55 @@ const PR_VIEW_JSON = JSON.stringify({
 	url: 'https://github.com/o/r/pull/7',
 });
 
+const DEPLOYMENT_ROWS_JSON = JSON.stringify([
+	{ environment: 'Preview – app', id: 99 },
+]);
+
+const DEPLOYMENT_STATUSES_JSON = JSON.stringify([
+	{
+		created_at: '2026-06-11T10:00:00Z',
+		environment_url: 'https://app-git-feature-acme.vercel.app',
+		state: 'success',
+	},
+]);
+
+function respondToGitPrelude(
+	request: LocalCommandRequest,
+): LocalCommandResult | undefined {
+	if (request.command !== 'git') {
+		return undefined;
+	}
+	if (request.args?.[0] === 'rev-parse') {
+		return buildResult({ stdout: 'feature/x\n' });
+	}
+	if (request.args?.[0] === 'config') {
+		return buildResult({ exitCode: 1, status: 'failure' });
+	}
+	return buildResult({ stdout: '0\t0\n' });
+}
+
+function respondToSnapshotPrelude(
+	request: LocalCommandRequest,
+): LocalCommandResult | undefined {
+	if (request.args?.[0] === 'pr' && request.args?.[1] === 'view') {
+		return buildResult({ stdout: PR_VIEW_JSON });
+	}
+	return respondToGitPrelude(request);
+}
+
+function readDeploymentsRef(request: LocalCommandRequest): string | undefined {
+	if (request.args?.[3] !== 'repos/{owner}/{repo}/deployments') {
+		return undefined;
+	}
+	return request.args
+		.find((arg) => arg.startsWith('ref='))
+		?.slice('ref='.length);
+}
+
+function isDeploymentStatusesCall(request: LocalCommandRequest): boolean {
+	return request.args?.[3]?.endsWith('/statuses') === true;
+}
+
 test('parsePullRequestView maps fields and check buckets', () => {
 	const pullRequest = parsePullRequestView(PR_VIEW_JSON);
 
@@ -232,6 +282,76 @@ test('parseReviewThreads keeps resolution state', () => {
 	assert.equal(comments[0]?.isResolved, false);
 	assert.equal(comments[0]?.kind, 'review-comment');
 	assert.equal(comments[0]?.path, 'src/app.ts');
+});
+
+test('parseDeployments reads state from the newest status', () => {
+	const deployments = parseDeployments(
+		[{ environment: 'Preview – app', id: 42 }],
+		new Map([
+			[
+				'42',
+				[
+					{
+						created_at: '2026-06-11T10:00:00Z',
+						environment_url: 'https://app-abc.vercel.app',
+						state: 'success',
+					},
+					{ created_at: '2026-06-11T09:00:00Z', state: 'pending' },
+				],
+			],
+		]),
+	);
+
+	assert.equal(deployments.length, 1);
+	assert.equal(deployments[0]?.state, 'success');
+	assert.equal(deployments[0]?.url, 'https://app-abc.vercel.app');
+	assert.equal(deployments[0]?.environment, 'Preview – app');
+});
+
+test('parseDeployments keeps the last known URL while a redeploy is pending', () => {
+	const deployments = parseDeployments(
+		[{ environment: 'Preview – app', id: 42 }],
+		new Map([
+			[
+				'42',
+				[
+					{ created_at: '2026-06-11T09:00:00Z', state: 'pending' },
+					{
+						created_at: '2026-06-11T10:00:00Z',
+						environment_url: 'https://app-abc.vercel.app',
+						state: 'success',
+					},
+					{ created_at: '2026-06-11T11:00:00Z', state: 'pending' },
+				],
+			],
+		]),
+	);
+
+	assert.equal(deployments[0]?.state, 'pending');
+	assert.equal(deployments[0]?.url, 'https://app-abc.vercel.app');
+});
+
+test('parseDeployments falls back to target_url and drops missing URLs', () => {
+	const deployments = parseDeployments(
+		[{ id: 1 }, { id: 2 }],
+		new Map([
+			[
+				'1',
+				[
+					{
+						created_at: '2026-06-11T10:00:00Z',
+						state: 'success',
+						target_url: 'https://app-def.vercel.app',
+					},
+				],
+			],
+		]),
+	);
+
+	assert.equal(deployments[0]?.url, 'https://app-def.vercel.app');
+	assert.equal(deployments[0]?.environment, 'deployment');
+	assert.equal(deployments[1]?.url, undefined);
+	assert.equal(deployments[1]?.state, 'pending');
 });
 
 test('commitWorkspaceChanges stages, commits, and reports the hash', async () => {
@@ -442,6 +562,68 @@ test('getPullRequestSnapshot falls back to the no-arg gh query when no upstream 
 		(call) => call.command === 'gh' && call.args?.[1] === 'view',
 	);
 	assert.equal(viewCall?.args?.[2], '--json');
+});
+
+test('getPullRequestSnapshot retries the deployments query by branch name when the head sha has none', async () => {
+	const { calls, service } = createService((request) => {
+		const prelude = respondToSnapshotPrelude(request);
+		if (prelude) {
+			return prelude;
+		}
+		const ref = readDeploymentsRef(request);
+		if (ref === 'feature-tip-oid') {
+			return buildResult({ stdout: '[]' });
+		}
+		if (ref === 'feature/x') {
+			return buildResult({ stdout: DEPLOYMENT_ROWS_JSON });
+		}
+		if (isDeploymentStatusesCall(request)) {
+			return buildResult({ stdout: DEPLOYMENT_STATUSES_JSON });
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	const result = await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.deepEqual(
+		calls.flatMap((call) => readDeploymentsRef(call) ?? []),
+		['feature-tip-oid', 'feature/x'],
+	);
+	assert.equal(
+		result.snapshot?.pullRequest?.deployments[0]?.url,
+		'https://app-git-feature-acme.vercel.app',
+	);
+});
+
+test('getPullRequestSnapshot does not re-query deployments when the head sha has rows', async () => {
+	const { calls, service } = createService((request) => {
+		const prelude = respondToSnapshotPrelude(request);
+		if (prelude) {
+			return prelude;
+		}
+		if (readDeploymentsRef(request)) {
+			return buildResult({ stdout: DEPLOYMENT_ROWS_JSON });
+		}
+		if (isDeploymentStatusesCall(request)) {
+			return buildResult({ stdout: DEPLOYMENT_STATUSES_JSON });
+		}
+		return buildResult({ exitCode: 1, status: 'failure', stderr: 'HTTP 404' });
+	});
+
+	await service.getPullRequestSnapshot({
+		refresh: true,
+		workspaceCwd: '/tmp/ws',
+		workspaceId: 'ws-1',
+	});
+
+	assert.deepEqual(
+		calls.flatMap((call) => readDeploymentsRef(call) ?? []),
+		['feature-tip-oid'],
+	);
 });
 
 test('getPullRequestSnapshot caches and serves fresh snapshots', async () => {

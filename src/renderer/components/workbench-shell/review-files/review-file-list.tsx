@@ -6,9 +6,13 @@ import {
 	ContextMenuTrigger,
 } from '@/renderer/components/ui/context-menu';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
-import { useWorkspaceFileDiffOpener } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
+import {
+	useReviewFilePreviewOpener,
+	useWorkspaceFileDiffOpener,
+} from '@/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import { PanelPlaceholder } from '@/renderer/components/workbench-shell/panel-placeholder';
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
+import { diffNewSideIsWorkingTree } from '@/renderer/lib/diff/scope';
 import { describeWorkspaceGitFailure } from '@/renderer/lib/workbench/git-failure-copy';
 import {
 	reviewFileRevision,
@@ -19,18 +23,46 @@ import type {
 	ReviewFileActions,
 	ReviewFileMenuTarget,
 	ReviewFileSummary,
-	WorkspaceFileDiffOpener,
 } from '@/renderer/types/workbench';
 import type { ChangesViewMode } from '@/renderer/types/workbench-shell';
 import type {
 	WorkspaceGitDiffScope,
 	WorkspaceGitFailure,
 } from '@/shared/ipc/contracts/workspace-git';
+import { isPreviewableImagePath } from '@/shared/preview-image';
 
 import { ReviewFileActionsProvider } from './review-file-actions-context';
 import { ReviewFileRow } from './review-file-row';
 import { ReviewFileTree } from './review-file-tree';
 import { ReviewFilesContextMenuContent } from './review-files-context-menu';
+
+/**
+ * Paths in a change set that belong in the image preview instead of a diff: a
+ * previewable image the workspace still holds. Git renders a changed image as
+ * "Binary files differ", so the preview is the only view that shows the change.
+ * Only scopes whose new side is the working tree qualify — a commit's image is a
+ * historical blob the preview cannot read from disk.
+ * @param files - The change set's file rows.
+ * @param diffScope - The scope those rows were listed at.
+ * @returns Workspace-relative paths a row click should preview.
+ */
+function previewableImagePathsIn(
+	files: ReviewFileSummary[],
+	diffScope: WorkspaceGitDiffScope | undefined,
+): ReadonlySet<string> {
+	if (!diffNewSideIsWorkingTree(diffScope)) {
+		return new Set();
+	}
+
+	const paths = new Set<string>();
+	for (const file of files) {
+		if (file.status !== 'deleted' && isPreviewableImagePath(file.path)) {
+			paths.add(file.path);
+		}
+	}
+
+	return paths;
+}
 
 /**
  * Renders the changes panel as either a flat list or a collapsible folder tree.
@@ -64,19 +96,28 @@ export function ReviewFileList({
 	viewMode: ChangesViewMode;
 	workspaceId: string;
 }) {
-	// Read the diff opener and open-in targets once here rather than in every
-	// file row: a large change set would otherwise create one subscription per
-	// row.
-	const rawOpenDiff = useWorkspaceFileDiffOpener();
-	// Inject the active source's scope so a row opens the matching diff (e.g. a
-	// commit's own diff), not always the working tree.
-	const openDiff = useMemo<WorkspaceFileDiffOpener | null>(
-		() =>
-			rawOpenDiff
-				? (filePath: string) => rawOpenDiff(filePath, diffScope)
-				: null,
-		[rawOpenDiff, diffScope],
+	// Read the openers and open-in targets once here rather than in every file
+	// row: a large change set would otherwise create one subscription per row.
+	const openDiff = useWorkspaceFileDiffOpener();
+	const openPreview = useReviewFilePreviewOpener();
+	const imagePreviewPaths = useMemo(
+		() => previewableImagePathsIn(files, diffScope),
+		[files, diffScope],
 	);
+	// Gated on the diff opener alone — the fallback every changed file has. A
+	// preview-only mount would make this a callable that no-ops on source rows.
+	const openFile = useMemo<ReviewFileActions['openFile']>(() => {
+		if (!openDiff) {
+			return null;
+		}
+		return (filePath, options) => {
+			if (openPreview && imagePreviewPaths.has(filePath)) {
+				openPreview(filePath, options);
+				return;
+			}
+			openDiff(filePath, diffScope, options);
+		};
+	}, [openDiff, openPreview, imagePreviewPaths, diffScope]);
 	const { copyTarget, invokeTarget, openInTargets } = useOpenTargets({
 		workspaceId,
 	});
@@ -102,7 +143,7 @@ export function ReviewFileList({
 			isDiscardable,
 			isViewed,
 			onDiscardFile,
-			openDiff,
+			openFile,
 			openInTargets,
 		}),
 		[
@@ -111,7 +152,7 @@ export function ReviewFileList({
 			isDiscardable,
 			isViewed,
 			onDiscardFile,
-			openDiff,
+			openFile,
 			openInTargets,
 		],
 	);

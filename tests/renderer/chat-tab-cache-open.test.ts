@@ -16,6 +16,7 @@ function createTab(id: string, position: number): ChatTabWire {
 		closedAt: null,
 		fullTitle: id,
 		id,
+		isPreview: false,
 		kind: 'chat',
 		metadata: {},
 		openedAt: `2026-07-11T00:00:0${position}.000Z`,
@@ -63,6 +64,24 @@ describe('writeOpenedChatTabToCache', () => {
 		});
 
 		expect(read()?.open.map((tab) => tab.id)).toEqual(['b', 'a']);
+	});
+
+	test('shifts displaced siblings so a mid-strip insert keeps its slot', () => {
+		const { queryClient, read } = seedCache([
+			createTab('a', 0),
+			createTab('b', 1),
+			createTab('c', 2),
+		]);
+
+		writeOpenedChatTabToCache({
+			queryClient,
+			tab: createTab('inserted', 1),
+			workspaceId: WORKSPACE_ID,
+		});
+
+		const open = read()?.open ?? [];
+		expect(open.map((tab) => tab.id)).toEqual(['a', 'inserted', 'b', 'c']);
+		expect(open.map((tab) => tab.position)).toEqual([0, 1, 2, 3]);
 	});
 
 	test('replaces an existing row for the same id rather than duplicating it', () => {

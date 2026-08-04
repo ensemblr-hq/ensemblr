@@ -38,6 +38,7 @@ export {
 	getPreferredReviewTab,
 	useWorkspacePanelTabState,
 } from './panel-tabs';
+export { installAgentControlReviewCommentsSync } from './review-comments-sync';
 export {
 	activeChatTabByWorkspaceAtom,
 	lastWorkspaceNavigationRenderStateAtom,
@@ -46,10 +47,7 @@ export {
 export { readStoredWorkspaceSelection } from './selection-storage';
 export { resolveRunningCloseTarget } from './session-tab-close';
 export { shouldSelectOnTabClick } from './session-tab-select';
-export {
-	formatRelativeClosedAt,
-	useSessionTabState,
-} from './session-tabs';
+export { formatRelativeClosedAt, useSessionTabState } from './session-tabs';
 export {
 	collapsedProjectIdsAtom,
 	orderedProjectIdsAtom,

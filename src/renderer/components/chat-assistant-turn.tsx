@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import {
 	customMessageDataOf,
 	glyphForToolCall,
+	isHiddenEnsemblrToolCall,
 	skillPartDataOf,
 } from '@/renderer/lib/pi';
 import { cn } from '@/renderer/lib/utils';
@@ -55,8 +56,8 @@ export function ChatAssistantTurn({
 	timing: ChatAssistantTurnTiming;
 }) {
 	const { activityParts, finalParts } = useMemo(
-		() => splitTurnParts(message, isStreaming),
-		[message, isStreaming],
+		() => splitTurnParts(visibleTurnParts(message.parts), isStreaming),
+		[message.parts, isStreaming],
 	);
 
 	const hasFinal = finalParts.length > 0;
@@ -161,6 +162,22 @@ function ActivityPart({ part }: { part: UIMessage['parts'][number] }) {
 }
 
 /**
+ * Drops the app's own bookkeeping calls, so naming a tab or filing a session
+ * summary neither costs the turn a row nor stands between the answer and the end
+ * of the turn — the split below promotes only the text that trails the last part,
+ * so a hidden call left in place would fold the answer away with it.
+ * @param parts - The turn's parts, in the order it produced them
+ * @returns The parts the timeline renders
+ */
+function visibleTurnParts(parts: UIMessage['parts']): UIMessage['parts'] {
+	return parts.filter(
+		(part) =>
+			part.type !== 'dynamic-tool' ||
+			!isHiddenEnsemblrToolCall(part as DynamicToolUIPart),
+	);
+}
+
+/**
  * Final response = the trailing contiguous run of finalized text parts. While
  * the turn is still streaming everything stays in the activity feed — the
  * "answer" is only promoted once the stream settles, which prevents an
@@ -168,18 +185,18 @@ function ActivityPart({ part }: { part: UIMessage['parts'][number] }) {
  * earlier activity into a premature collapse.
  */
 function splitTurnParts(
-	message: UIMessage,
+	parts: UIMessage['parts'],
 	isStreaming: boolean,
 ): {
 	activityParts: UIMessage['parts'];
 	finalParts: UIMessage['parts'];
 } {
 	if (isStreaming) {
-		return { activityParts: message.parts, finalParts: [] };
+		return { activityParts: parts, finalParts: [] };
 	}
-	let splitIndex = message.parts.length;
-	for (let index = message.parts.length - 1; index >= 0; index -= 1) {
-		const part = message.parts[index];
+	let splitIndex = parts.length;
+	for (let index = parts.length - 1; index >= 0; index -= 1) {
+		const part = parts[index];
 		const isFinalText =
 			part?.type === 'text' && 'state' in part && part.state === 'done';
 		if (!isFinalText) {
@@ -188,8 +205,8 @@ function splitTurnParts(
 		splitIndex = index;
 	}
 	return {
-		activityParts: message.parts.slice(0, splitIndex),
-		finalParts: message.parts.slice(splitIndex),
+		activityParts: parts.slice(0, splitIndex),
+		finalParts: parts.slice(splitIndex),
 	};
 }
 

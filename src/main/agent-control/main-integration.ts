@@ -10,7 +10,10 @@ import path from 'node:path';
 
 import { type App, BrowserWindow, dialog } from 'electron';
 
-import { HARNESS_AWARENESS, roleForDepth } from '../../shared/agent-control.ts';
+import {
+	HARNESS_AWARENESS,
+	resolveAgentRole,
+} from '../../shared/agent-control.ts';
 import {
 	decorateHarnessCommand,
 	HARNESS_INSTRUCTIONS_FILENAME,
@@ -26,6 +29,12 @@ interface AgentControlIntegrationDeps {
 	resolveWorkspaceCwd: (workspaceId: string) => string | null;
 	/** Current control-server base URL, or null before the server is up. */
 	getServerUrl: () => string | null;
+	/**
+	 * Whether a session was spawned as somebody's sub-agent, read from the durable
+	 * tab marker rather than lineage. Omitted, the role falls back to spawn depth,
+	 * which reads a resumed sub-agent as a root orchestrator.
+	 */
+	isSpawnedSubAgent?: (piSessionId: string) => boolean;
 }
 
 /** The main-process primitives the agent-control layer contributes. */
@@ -156,10 +165,11 @@ export function createAgentControlIntegration(
 			species: identity.species ?? 'pi',
 			parentSessionId: identity.parentSessionId ?? null,
 		});
+		const marked = deps.isSpawnedSubAgent?.(identity.sessionId) === true;
 		return {
 			ENSEMBLR_CONTROL_URL: serverUrl,
 			ENSEMBLR_CONTROL_TOKEN: origin.token,
-			ENSEMBLR_CONTROL_ROLE: roleForDepth(origin.depth),
+			ENSEMBLR_CONTROL_ROLE: resolveAgentRole(marked, origin.depth),
 		};
 	};
 

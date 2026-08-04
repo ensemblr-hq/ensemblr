@@ -1029,6 +1029,17 @@
 	width: 1em;
 }
 
+/*
+ * An image renders inline, so a bot's status dot or project favicon stays on the
+ * line with the link beside it. Streamdown unwraps the paragraph around an image
+ * that stands alone, which leaves it a block-level child of the answer — that one
+ * reads as a figure and gets the rounded, full-width treatment.
+ */
+.ensemblr-answer > [data-streamdown="image"] {
+	border-radius: var(--radius-md);
+	display: block;
+}
+
 .ensemblr-answer table {
 	border-collapse: collapse;
 	font-size: 0.9375em;

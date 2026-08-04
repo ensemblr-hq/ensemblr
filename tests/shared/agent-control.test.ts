@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
 	AGENT_CONTROL_OPS,
+	ASK_USER_QUESTION_LIMITS,
 	isSpawnOp,
 	isWriteOp,
 	validateArgs,
@@ -39,6 +40,18 @@ describe('agent-control op classification', () => {
 	it('treats the per-turn session brief as a read', () => {
 		expect(isWriteOp('getSessionBrief')).toBe(false);
 		expect(isSpawnOp('getSessionBrief')).toBe(false);
+	});
+
+	// Reading a diff or the notes on it changes nothing, so both stay allowed in
+	// every permission mode; filing a comment persists a row and is a write. None
+	// of the three creates a tab, terminal, or conversation, so none is a spawn.
+	it('treats the review reads as reads and only the comment write as a write', () => {
+		expect(isWriteOp('getWorkspaceDiff')).toBe(false);
+		expect(isWriteOp('getDiffComments')).toBe(false);
+		expect(isWriteOp('addDiffComments')).toBe(true);
+		expect(isSpawnOp('getWorkspaceDiff')).toBe(false);
+		expect(isSpawnOp('getDiffComments')).toBe(false);
+		expect(isSpawnOp('addDiffComments')).toBe(false);
 	});
 
 	it('exposes every op exactly once', () => {
@@ -129,6 +142,153 @@ describe('validateArgs', () => {
 			validateArgs('setSummary', {
 				summary: 'a'.repeat(4001),
 				title: 'Topic',
+			}).ok,
+		).toBe(false);
+	});
+
+	it('trims a long askUserQuestion header instead of rejecting the questionnaire', () => {
+		const longHeader =
+			'Islands versus vanilla script tags, and what each one costs us later on';
+		const result = validateArgs('askUserQuestion', {
+			questions: [
+				{
+					header: longHeader,
+					options: [{ label: 'Islands' }, { label: 'Vanilla' }],
+					question: 'Which rendering approach?',
+				},
+			],
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const { questions } = result.value as {
+				questions: { header?: string }[];
+			};
+			const trimmed = questions[0]?.header ?? '';
+			expect(trimmed).toHaveLength(ASK_USER_QUESTION_LIMITS.maxHeaderLength);
+			expect(longHeader.startsWith(trimmed)).toBe(true);
+		}
+	});
+
+	it('accepts the header that used to blow the old 16-character cap', () => {
+		expect(
+			validateArgs('askUserQuestion', {
+				questions: [
+					{
+						header: 'Islands vs vanilla',
+						options: [{ label: 'Islands' }, { label: 'Vanilla' }],
+						question: 'Which rendering approach?',
+					},
+				],
+			}).ok,
+		).toBe(true);
+	});
+
+	it('accepts repeated askUserQuestion headers, which the pager disambiguates', () => {
+		const question = (text: string) => ({
+			header: 'Scope',
+			options: [{ label: 'Main' }, { label: 'Renderer' }],
+			question: text,
+		});
+		expect(
+			validateArgs('askUserQuestion', {
+				questions: [
+					question('Which part first?'),
+					question('Which part after?'),
+				],
+			}).ok,
+		).toBe(true);
+	});
+
+	it('accepts a bare workspace diff read and its two narrowing modes', () => {
+		expect(validateArgs('getWorkspaceDiff', {}).ok).toBe(true);
+		expect(validateArgs('getWorkspaceDiff', { stat: true }).ok).toBe(true);
+		expect(
+			validateArgs('getWorkspaceDiff', { file: 'src/main/main.ts' }).ok,
+		).toBe(true);
+	});
+
+	// The two narrowing modes are alternatives, not a filter pair. Letting one
+	// silently win leaves the caller unable to tell which read it got back.
+	it('refuses a diff read that asks for a file and a stat at once', () => {
+		expect(
+			validateArgs('getWorkspaceDiff', { file: 'src/a.ts', stat: true }).ok,
+		).toBe(false);
+		expect(
+			validateArgs('getWorkspaceDiff', { file: 'src/a.ts', stat: false }).ok,
+		).toBe(true);
+	});
+
+	// The path reaches a git pathspec, so a traversal has to be refused at the
+	// boundary rather than left to the git service's own check — an agent that
+	// gets `invalid-args` can correct the path, one that gets a git failure
+	// cannot tell a rejected path from a broken repository.
+	it.each([
+		['..', 'a bare parent'],
+		['../outside.ts', 'a relative climb'],
+		['src/../../outside.ts', 'a climb buried mid-path'],
+		['/etc/passwd', 'an absolute POSIX path'],
+		['C:\\Windows\\win.ini', 'an absolute Windows path'],
+		['..\\outside.ts', 'a backslash climb'],
+		['src/main\0.ts', 'an embedded NUL'],
+		['', 'an empty path'],
+	])('rejects %s as a diff target (%s)', (file) => {
+		expect(validateArgs('getWorkspaceDiff', { file }).ok).toBe(false);
+	});
+
+	it('applies the same path rule to a comment target', () => {
+		expect(
+			validateArgs('addDiffComments', {
+				comments: [{ body: 'nit', filePath: '../outside.ts' }],
+			}).ok,
+		).toBe(false);
+	});
+
+	it('accepts a comment with and without a line number', () => {
+		expect(
+			validateArgs('addDiffComments', {
+				comments: [
+					{ body: 'Line note', filePath: 'src/a.ts', lineNumber: 12 },
+					{ body: 'File note', filePath: 'src/b.ts', lineNumber: null },
+					{ body: 'Also a file note', filePath: 'src/c.ts' },
+				],
+			}).ok,
+		).toBe(true);
+	});
+
+	it('rejects a zero or negative line number', () => {
+		for (const lineNumber of [0, -1]) {
+			expect(
+				validateArgs('addDiffComments', {
+					comments: [{ body: 'nit', filePath: 'src/a.ts', lineNumber }],
+				}).ok,
+			).toBe(false);
+		}
+	});
+
+	it('rejects an empty batch, an empty body, and an oversized body', () => {
+		expect(validateArgs('addDiffComments', { comments: [] }).ok).toBe(false);
+		expect(
+			validateArgs('addDiffComments', {
+				comments: [{ body: '   ', filePath: 'src/a.ts' }],
+			}).ok,
+		).toBe(false);
+		expect(
+			validateArgs('addDiffComments', {
+				comments: [{ body: 'x'.repeat(4_001), filePath: 'src/a.ts' }],
+			}).ok,
+		).toBe(false);
+	});
+
+	it('caps a runaway comment batch', () => {
+		const comment = { body: 'nit', filePath: 'src/a.ts' };
+		expect(
+			validateArgs('addDiffComments', {
+				comments: Array.from({ length: 50 }, () => comment),
+			}).ok,
+		).toBe(true);
+		expect(
+			validateArgs('addDiffComments', {
+				comments: Array.from({ length: 51 }, () => comment),
 			}).ok,
 		).toBe(false);
 	});

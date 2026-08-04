@@ -16,6 +16,7 @@ function createTab(id: string, position: number): ChatTabWire {
 		closedAt: null,
 		fullTitle: id,
 		id,
+		isPreview: false,
 		kind: 'chat',
 		metadata: {},
 		openedAt: `2026-07-11T00:00:0${position}.000Z`,

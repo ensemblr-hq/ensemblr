@@ -42,7 +42,7 @@ import {
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import {
 	areStringArraysEqual,
-	reconcileOrderedIds,
+	reconcileOrderedIdsByCanonicalSlot,
 } from '@/renderer/lib/ordered-ids';
 import { cn } from '@/renderer/lib/utils';
 import {
@@ -60,6 +60,7 @@ import { useDebugPanelToggle } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import { shouldSelectOnTabClick } from '@/renderer/state/workspace';
 import type { SessionTabModel } from '@/renderer/types/workbench';
+import type { SessionTabPlacement } from '@/renderer/types/workbench-shell';
 import { formatShortcut } from '@/shared/keymap';
 
 /** Display label for the coding-agent launcher shortcut, e.g. `⌘⇧A`. */
@@ -107,6 +108,7 @@ export function SessionTabs({
 	onSessionTabClose,
 	onSessionTabChange,
 	onSessionTabOpen,
+	onSessionTabPin,
 	onSessionTabRestore,
 	onSessionTabsReorder,
 	sessions,
@@ -119,9 +121,15 @@ export function SessionTabs({
 	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabClose: (sessionId: string) => void;
 	onSessionTabChange: (sessionId: string) => void;
-	onSessionTabOpen: () => Promise<{ chatTabId: string } | null>;
+	onSessionTabOpen: (options?: {
+		placement?: SessionTabPlacement;
+	}) => Promise<{ chatTabId: string } | null>;
+	onSessionTabPin: (sessionId: string) => void;
 	onSessionTabRestore: (sessionId: string) => void;
-	onSessionTabsReorder: (sessionIds: string[]) => void;
+	onSessionTabsReorder: (
+		sessionIds: string[],
+		draggedSessionId: string,
+	) => void;
 	sessions: SessionTabModel[];
 }) {
 	const [isOpening, setIsOpening] = useState(false);
@@ -150,6 +158,7 @@ export function SessionTabs({
 	const canReorderTabs = sessionIds.length > 1;
 
 	useHotkey('tab.new', () => handleOpen());
+	useHotkey('tab.keepOpen', () => onSessionTabPin(activeSession.id));
 	useHotkey('tab.next', () => cycleTab(1));
 	useHotkey('tab.prev', () => cycleTab(-1));
 	useHotkey('tab.selectByIndex', (event) => {
@@ -166,7 +175,10 @@ export function SessionTabs({
 	if (prevSessionIds !== sessionIds) {
 		setPrevSessionIds(sessionIds);
 		setOrderedSessionIds((currentIds) => {
-			const nextIds = reconcileOrderedIds(currentIds, sessionIds);
+			const nextIds = reconcileOrderedIdsByCanonicalSlot(
+				currentIds,
+				sessionIds,
+			);
 			return areStringArraysEqual(nextIds, currentIds) ? currentIds : nextIds;
 		});
 	}
@@ -177,13 +189,17 @@ export function SessionTabs({
 		}
 	}, [debugOpen, developerMode, setDebugOpen]);
 
-	/** Opens a chat tab through the workspace-level controller and selects it. */
+	/**
+	 * Opens a chat tab through the workspace-level controller and selects it. The
+	 * strip's own button is the one place a new tab appends rather than landing
+	 * beside the active tab.
+	 */
 	function handleOpen() {
 		if (isOpening) {
 			return;
 		}
 		setIsOpening(true);
-		void onSessionTabOpen()
+		void onSessionTabOpen({ placement: 'append' })
 			.then((result) => {
 				if (result) {
 					onSessionTabChange(result.chatTabId);
@@ -247,8 +263,13 @@ export function SessionTabs({
 		}
 	}
 
-	/** Commits the final dragged order to the workspace tab controller. */
-	function handleReorderEnd() {
+	/**
+	 * Commits the final dragged order to the workspace tab controller, naming the
+	 * tab the drag was pointed at so the controller can tell a deliberate
+	 * placement from a tab that was merely pushed aside.
+	 * @param draggedSessionId - Session id of the tab the user dragged
+	 */
+	function handleReorderEnd(draggedSessionId: string) {
 		setIsDraggingTab(false);
 		if (!canReorderTabs) {
 			return;
@@ -257,7 +278,7 @@ export function SessionTabs({
 		if (areStringArraysEqual(nextIds, sessionIds)) {
 			return;
 		}
-		onSessionTabsReorder(nextIds);
+		onSessionTabsReorder(nextIds, draggedSessionId);
 	}
 
 	return (
@@ -283,8 +304,9 @@ export function SessionTabs({
 									isDraggingTab={isDraggingTab}
 									key={session.id}
 									onClose={onSessionTabClose}
-									onDragEnd={handleReorderEnd}
+									onDragEnd={() => handleReorderEnd(session.id)}
 									onDragStart={handleReorderStart}
+									onPin={onSessionTabPin}
 									onSelect={onSessionTabChange}
 									openChatTabCount={openChatTabCount}
 									session={session}
@@ -349,6 +371,8 @@ interface SessionTabProps {
 	openChatTabCount: number;
 	onSelect: (sessionId: string) => void;
 	onClose: (sessionId: string) => void;
+	/** Promotes this tab out of the ephemeral preview slot. */
+	onPin: (sessionId: string) => void;
 	onDragStart: () => void;
 	onDragEnd: () => void;
 }
@@ -362,6 +386,7 @@ function SessionTab({
 	openChatTabCount,
 	onSelect,
 	onClose,
+	onPin,
 	onDragStart,
 	onDragEnd,
 }: SessionTabProps) {
@@ -403,6 +428,7 @@ function SessionTab({
 				aria-current={isActive ? 'page' : undefined}
 				className='flex h-full min-w-0 flex-1 cursor-inherit items-center gap-2 px-3 text-left'
 				onClick={handleSelect}
+				onDoubleClick={() => onPin(session.id)}
 				onPointerDown={() => {
 					didDragRef.current = false;
 				}}
@@ -411,7 +437,10 @@ function SessionTab({
 				<span className='grid size-3.5 shrink-0 place-items-center'>
 					<SessionTabIcon session={session} />
 				</span>
-				<span className='truncate' title={session.fullLabel ?? session.label}>
+				<span
+					className={cn('truncate', session.isPreview && 'italic')}
+					title={session.fullLabel ?? session.label}
+				>
 					{session.label}
 				</span>
 			</button>

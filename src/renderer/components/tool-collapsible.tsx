@@ -1,6 +1,7 @@
 import { MinusIcon, PlusIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useId, useState } from 'react';
+import { useId } from 'react';
+import { useAnchoredDisclosure } from '@/renderer/hooks/conversation/use-anchored-disclosure';
 import { cn } from '@/renderer/lib/utils';
 import type { ToolGlyph, ToolTone } from '@/renderer/types/tool-presentation';
 import { GLYPH_ICONS } from './tool-collapsible/glyph-icons';
@@ -31,6 +32,9 @@ interface ToolCollapsibleProps {
  * the disclosure button, so the hover surface hugs them rather than filling the
  * row — that leaves the badge free to hold its own controls, which a nested
  * button could not do.
+ *
+ * Opening a row keeps the row itself still: the body unfolds beneath the
+ * heading instead of the transcript sliding down to its newest message.
  */
 export function ToolCollapsible({
 	children,
@@ -42,14 +46,18 @@ export function ToolCollapsible({
 	toolBadge,
 	toolPreview,
 }: ToolCollapsibleProps) {
-	const [open, setOpen] = useState(false);
+	const { isOpen: open, rowRef, toggle } = useAnchoredDisclosure();
 	const bodyId = useId();
 	const ToolIcon = GLYPH_ICONS[glyph];
 	const DisclosureIcon = open ? MinusIcon : PlusIcon;
 	const isOpen = open && !disabled;
 
 	return (
-		<div className='relative flex justify-start' data-role='activity-row'>
+		<div
+			className='relative flex justify-start'
+			data-role='activity-row'
+			ref={rowRef}
+		>
 			<div className='wrap-break-word flex w-full max-w-xl flex-col space-y-1 lg:max-w-3xl'>
 				<div className='group/collapsible flex max-w-full items-center gap-2'>
 					<button
@@ -60,7 +68,7 @@ export function ToolCollapsible({
 							disabled ? 'cursor-default' : 'cursor-pointer hover:bg-muted/50',
 						)}
 						disabled={disabled}
-						onClick={() => setOpen(!open)}
+						onClick={toggle}
 						type='button'
 					>
 						<span className='relative shrink-0'>

@@ -20,8 +20,16 @@ import {
 	renameChatTab,
 	reorderChatTabs,
 	restoreClosedChatTab,
+	retargetChatTab,
 	setChatTabMetadata,
 } from '../storage/repositories/chat-tab-repository.ts';
+import {
+	canPreviewKind,
+	findPreviewSlot,
+	isPreviewTab,
+	withoutPreviewFlag,
+	withPreviewFlag,
+} from './preview-tab-slot.ts';
 
 /**
  * Cross-table lookups the chat-tab service needs without owning SQL for other
@@ -63,12 +71,17 @@ export interface ChatTabService {
 		open: readonly ChatTabRow[];
 	};
 	openTab: (input: {
+		/** Open tab to place the new tab right of; appends to the end when absent. */
+		insertAfterChatTabId?: string | null;
 		kind?: ChatTabKind;
 		metadata?: Record<string, unknown>;
 		piSessionId?: string | null;
+		/** Opens into the workspace's single ephemeral preview slot. */
+		preview?: boolean;
 		title?: string;
 		workspaceId: string;
 	}) => ChatTabRow;
+	pinTab: (input: { chatTabId: string }) => ChatTabRow | null;
 	reorderTabs: (input: {
 		orderedIds: readonly string[];
 		workspaceId: string;
@@ -176,36 +189,53 @@ export function createChatTabService({
 				open: listOpenForWorkspace({ database, workspaceId }),
 			};
 		},
-		openTab: ({ kind = 'chat', metadata, piSessionId, title, workspaceId }) => {
+		openTab: ({
+			insertAfterChatTabId,
+			kind = 'chat',
+			metadata,
+			piSessionId,
+			preview = false,
+			title,
+			workspaceId,
+		}) => {
 			const database = requireChatTabDatabase();
 			const openTabs = listOpenForWorkspace({ database, workspaceId });
+			const resolvedTitle = title?.trim() || DEFAULT_TAB_TITLE;
+			const asPreview = preview && canPreviewKind(kind);
 
 			if (kind !== 'chat') {
-				// Re-focus instead of duplicating when the same subject is already
-				// open (e.g. clicking the same attachment chip twice).
-				const subject = readMetadataSubject(metadata);
-				const existing = subject
-					? openTabs.find(
-							(tab) =>
-								tab.kind === kind &&
-								readMetadataSubject(tab.metadata) === subject,
-						)
-					: undefined;
-				if (existing) {
-					return existing;
+				const reused = reuseOpenTab({
+					asPreview,
+					database,
+					kind,
+					metadata,
+					openTabs,
+					title: resolvedTitle,
+				});
+				if (reused) {
+					return reused;
 				}
 			}
 
 			return openChatTab({
 				database,
 				input: {
+					insertAfterChatTabId: insertAfterChatTabId ?? null,
 					kind,
-					metadata,
+					metadata: asPreview ? withPreviewFlag(metadata) : metadata,
 					piSessionId: piSessionId ?? null,
-					title: title?.trim() || DEFAULT_TAB_TITLE,
+					title: resolvedTitle,
 					workspaceId,
 				},
 			});
+		},
+		pinTab: ({ chatTabId }) => {
+			const database = requireChatTabDatabase();
+			const existing = getChatTabById({ database, id: chatTabId });
+			if (!existing || !isPreviewTab(existing)) {
+				return existing;
+			}
+			return pinOpenTab({ database, tab: existing });
 		},
 		reorderTabs: ({ orderedIds, workspaceId }) => {
 			const database = requireChatTabDatabase();
@@ -221,6 +251,95 @@ export function createChatTabService({
 			return restoreClosedChatTab({ database, id: chatTabId });
 		},
 	};
+}
+
+/**
+ * Resolves the already-open tab a non-chat open should land on instead of
+ * adding a row: the tab already showing this subject, or — for a preview open —
+ * the workspace's ephemeral preview slot retargeted at the new subject. A
+ * permanent open of a subject that is currently previewed pins it, mirroring an
+ * editor promoting a preview tab you opened for real.
+ * @param options - The open database, the requested kind/metadata/title, the workspace's open tabs, and whether this is a preview open
+ * @returns The tab to focus, or null when the open needs a new row
+ */
+function reuseOpenTab({
+	asPreview,
+	database,
+	kind,
+	metadata,
+	openTabs,
+	title,
+}: {
+	asPreview: boolean;
+	database: DatabaseSync;
+	kind: ChatTabKind;
+	metadata: Record<string, unknown> | undefined;
+	openTabs: readonly ChatTabRow[];
+	title: string;
+}): ChatTabRow | null {
+	const sameSubject = findOpenTabForSubject({ kind, metadata, openTabs });
+	if (sameSubject) {
+		if (asPreview || !isPreviewTab(sameSubject)) {
+			return sameSubject;
+		}
+		return pinOpenTab({ database, tab: sameSubject });
+	}
+	const slot = asPreview ? findPreviewSlot(openTabs) : undefined;
+	if (!slot) {
+		return null;
+	}
+	return retargetChatTab({
+		database,
+		id: slot.id,
+		kind,
+		metadata: withPreviewFlag(metadata),
+		title,
+	});
+}
+
+/**
+ * Finds the open tab already showing a subject, so clicking the same file,
+ * diff, or comment twice re-focuses instead of duplicating.
+ * @param options - The requested kind and metadata plus the workspace's open tabs
+ * @returns The matching open tab, or undefined when the subject is not open (or has no identity)
+ */
+function findOpenTabForSubject({
+	kind,
+	metadata,
+	openTabs,
+}: {
+	kind: ChatTabKind;
+	metadata: Record<string, unknown> | undefined;
+	openTabs: readonly ChatTabRow[];
+}): ChatTabRow | undefined {
+	const subject = readMetadataSubject(metadata);
+	if (!subject) {
+		return undefined;
+	}
+	return openTabs.find(
+		(tab) => tab.kind === kind && readMetadataSubject(tab.metadata) === subject,
+	);
+}
+
+/**
+ * Promotes a preview tab to a permanent one by dropping its marker, freeing the
+ * slot so the next preview open takes a fresh tab.
+ * @param options - The open database and the tab to pin
+ * @returns The pinned tab row
+ */
+function pinOpenTab({
+	database,
+	tab,
+}: {
+	database: DatabaseSync;
+	tab: ChatTabRow;
+}): ChatTabRow | null {
+	setChatTabMetadata({
+		database,
+		id: tab.id,
+		metadata: withoutPreviewFlag(tab.metadata),
+	});
+	return getChatTabById({ database, id: tab.id });
 }
 
 /**
@@ -322,20 +441,49 @@ function hasAgentSessionId(
  * Identity of a non-chat tab's subject. Diff tabs are keyed by their diff scope
  * *and* file path, so the same file viewed at the working tree, in a specific
  * commit, and across the whole branch each get their own tab instead of
- * stealing focus from one another. Turn diffs (no file path) key on the turn id.
+ * stealing focus from one another. Turn diffs (no file path) key on the turn id,
+ * and comment previews on the comment id.
  */
 function readMetadataSubject(
 	metadata: Record<string, unknown> | undefined,
 ): string | null {
-	const filePath = metadata?.filePath;
-	if (typeof filePath === 'string' && filePath.length > 0) {
+	const filePath = readNonEmptyString(metadata?.filePath);
+	if (filePath) {
 		const scopeKey = serializeWorkspaceGitDiffScope(
 			parseWorkspaceGitDiffScope(metadata?.diffScope),
 		);
 		return `${scopeKey}::${filePath}`;
 	}
-	const turnId = metadata?.turnId;
-	return typeof turnId === 'string' && turnId.length > 0 ? turnId : null;
+	const commentId = readCommentPreviewId(metadata);
+	if (commentId) {
+		return `comment::${commentId}`;
+	}
+	return readNonEmptyString(metadata?.turnId);
+}
+
+/**
+ * Reads the comment id a `document` tab previews, which identifies the tab's
+ * subject when it carries no file path.
+ * @param metadata - Parsed chat-tab metadata record
+ * @returns The comment id, or null for document tabs that preview no comment
+ */
+function readCommentPreviewId(
+	metadata: Record<string, unknown> | undefined,
+): string | null {
+	const commentPreview = metadata?.commentPreview;
+	if (!commentPreview || typeof commentPreview !== 'object') {
+		return null;
+	}
+	return readNonEmptyString((commentPreview as { id?: unknown }).id);
+}
+
+/**
+ * Narrows an untyped metadata value to a usable string.
+ * @param value - Value read off a tab's metadata record
+ * @returns The string, or null when it is absent, empty, or another type
+ */
+function readNonEmptyString(value: unknown): string | null {
+	return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 /**

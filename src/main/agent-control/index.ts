@@ -31,7 +31,7 @@ export {
 	type AgentControlIntegration,
 	createAgentControlIntegration,
 } from './main-integration.ts';
-export { handleMcpRequest } from './mcp-endpoint.ts';
+export { handleMcpRequest, TOOL_DEFS } from './mcp-endpoint.ts';
 export {
 	createOriginRegistry,
 	type OriginRegistry,
@@ -56,3 +56,4 @@ export type {
 	TerminalPort,
 	WorkspacePort,
 } from './ports.ts';
+export { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';

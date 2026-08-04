@@ -27,6 +27,7 @@ export {
 	listChatTabsRequestSchema,
 	listClosedChatTabsWithSummaryRequestSchema,
 	openChatTabRequestSchema,
+	pinChatTabRequestSchema,
 	reorderChatTabsRequestSchema,
 	restoreChatTabRequestSchema,
 } from './request-schemas/chat-tab.ts';
@@ -72,6 +73,7 @@ export {
 export {
 	archiveRepositoryRequestSchema,
 	archiveWorkspaceRequestSchema,
+	continueWorkspaceBranchRequestSchema,
 	createWorkspaceRequestSchema,
 	deleteArchivedWorkspaceRequestSchema,
 	deleteRepositoryRequestSchema,
@@ -79,6 +81,7 @@ export {
 	listArchivedWorkspacesRequestSchema,
 	parseArchiveRepositoryRequest,
 	parseArchiveWorkspaceRequest,
+	parseContinueWorkspaceBranchRequest,
 	parseCreateWorkspaceRequest,
 	parseDeleteArchivedWorkspaceRequest,
 	parseDeleteRepositoryRequest,

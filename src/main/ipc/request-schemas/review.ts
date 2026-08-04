@@ -20,6 +20,7 @@ export const saveReviewCommentRequestSchema = z.object({
 	filePath: z.string().optional(),
 	id: z.string().optional(),
 	lineNumber: z.number().int().nullable().optional(),
+	origin: z.enum(['agent', 'user']).optional(),
 	status: z.enum(['archived', 'open', 'resolved']).optional(),
 	workspaceId: z.string().min(1),
 });

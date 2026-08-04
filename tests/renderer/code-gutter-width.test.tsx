@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 vi.mock('@iconify/react', () => ({
 	addCollection: () => undefined,
@@ -11,7 +11,15 @@ import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr-queries';
 import { CodePanel } from '../../src/renderer/components/code-surface';
 import { FilePreviewPanel } from '../../src/renderer/components/workbench-shell/conversation-panel/file-preview-panel';
 import { codeGutterDigits } from '../../src/renderer/lib/code/gutter';
-import { createTestQueryClient, renderWithProviders } from './support/dom';
+import {
+	createTestQueryClient,
+	installLocalStorage,
+	renderWithProviders,
+} from './support/dom';
+
+beforeEach(() => {
+	installLocalStorage();
+});
 
 const workspaceCwd = '/workspace/ensemblr';
 

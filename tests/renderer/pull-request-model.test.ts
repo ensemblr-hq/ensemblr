@@ -4,15 +4,27 @@ import { buildPullRequestShellModel } from '../../src/renderer/lib/workbench/pul
 import {
 	clampReviewContext,
 	formatAllCommentsContext,
+	formatCommentContext,
 	REVIEW_CONTEXT_CHAR_LIMIT,
 } from '../../src/renderer/lib/workbench/review-context';
 import type {
+	GithubCommentWire,
 	GithubPullRequestSnapshotWire,
 	GithubPullRequestWire,
 	ReviewTodoWire,
 } from '../../src/shared/ipc';
 
 const NO_CHANGES = { additions: 0, deletions: 0, files: 0 };
+
+const NETLIFY_BOT_COMMENT_BODY = [
+	'### <span aria-hidden="true">✅</span> Deploy Preview for **acme** ready!',
+	'',
+	'|  Name | Link |',
+	'| :-: | ------- |',
+	'|<span aria-hidden="true">🔨</span> Latest commit | 8f2c1a9 |',
+	'|<span aria-hidden="true">🔍</span> Latest deploy log | https://app.netlify.com/sites/acme/deploys/6653f0a1 |',
+	'|<span aria-hidden="true">😎</span> Deploy Preview | https://deploy-preview-7--acme.netlify.app |',
+].join('\n');
 
 function createPullRequest(
 	overrides: Partial<GithubPullRequestWire> = {},
@@ -211,6 +223,253 @@ describe('buildPullRequestShellModel', () => {
 		expect(model.previewDeployment?.source).toBe('check-link');
 	});
 
+	test('vercel review tooling checks never become the preview deployment', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					checks: [
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://vercel.com/vercel-agent/request-review',
+							id: 'c1',
+							name: 'Vercel Agent Review',
+						},
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://vercel.com/github',
+							id: 'c2',
+							name: 'Vercel Preview Comments',
+						},
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://vercel.com/acme/app/dep123',
+							id: 'c3',
+							name: 'Vercel – app',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.url).toBe(
+			'https://vercel.com/acme/app/dep123',
+		);
+		expect(model.previewDeployment?.label).toBe('Vercel – app');
+	});
+
+	test('a hosted preview URL wins over a provider dashboard link', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					checks: [
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://vercel.com/acme/app/dep123',
+							id: 'c1',
+							name: 'Vercel – app',
+						},
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://app-git-feature-acme.vercel.app',
+							id: 'c2',
+							name: 'Vercel Preview',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.url).toBe(
+			'https://app-git-feature-acme.vercel.app',
+		);
+	});
+
+	test('the provider bot comment supplies the preview when links point at dashboards', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					checks: [
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://vercel.com/acme/app/dep123',
+							id: 'c1',
+							name: 'Vercel – app',
+						},
+					],
+					comments: [
+						{
+							author: 'vercel',
+							body: '| [app](https://vercel.com/acme/app) | [Ready](https://vercel.com/acme/app/dep123) | [Preview](https://app-git-feature-acme.vercel.app) |',
+							createdAt: '2026-06-11T09:00:00Z',
+							id: 'bot-1',
+							isResolved: null,
+							kind: 'issue-comment',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.source).toBe('pr-comment');
+		expect(model.previewDeployment?.url).toBe(
+			'https://app-git-feature-acme.vercel.app',
+		);
+		expect(model.previewDeployment?.label).toBe('Preview');
+	});
+
+	test('a preview URL in a human comment is not treated as the deployment', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					comments: [
+						{
+							author: 'octocat',
+							body: 'Looks broken on https://app-git-old-acme.vercel.app',
+							createdAt: '2026-06-11T09:00:00Z',
+							id: 'human-1',
+							isResolved: null,
+							kind: 'issue-comment',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment).toBeUndefined();
+	});
+
+	test('netlify deploy-preview comment is recognized', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					comments: [
+						{
+							author: 'netlify[bot]',
+							body: NETLIFY_BOT_COMMENT_BODY,
+							createdAt: '2026-06-11T09:00:00Z',
+							id: 'bot-1',
+							isResolved: null,
+							kind: 'issue-comment',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.provider).toBe('netlify');
+		expect(model.previewDeployment?.url).toBe(
+			'https://deploy-preview-7--acme.netlify.app',
+		);
+	});
+
+	test('a later bot comment supplies the preview when an earlier one links only a dashboard', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					comments: [
+						{
+							author: 'netlify[bot]',
+							body: 'Deploy log: https://app.netlify.com/sites/acme/deploys/6653f0a1',
+							createdAt: '2026-06-11T09:00:00Z',
+							id: 'bot-1',
+							isResolved: null,
+							kind: 'issue-comment',
+						},
+						{
+							author: 'netlify[bot]',
+							body: NETLIFY_BOT_COMMENT_BODY,
+							createdAt: '2026-06-11T09:05:00Z',
+							id: 'bot-2',
+							isResolved: null,
+							kind: 'issue-comment',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.source).toBe('pr-comment');
+		expect(model.previewDeployment?.url).toBe(
+			'https://deploy-preview-7--acme.netlify.app',
+		);
+	});
+
+	test('a hosted preview check survives a review-tooling word in its label', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					checks: [
+						{
+							bucket: 'passing',
+							detailsUrl:
+								'https://code-review-tool-git-feature-acme.vercel.app',
+							id: 'c1',
+							name: 'Vercel – code-review-tool',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.url).toBe(
+			'https://code-review-tool-git-feature-acme.vercel.app',
+		);
+	});
+
+	test('a hosted deployment URL outranks an earlier dashboard-only deployment', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					deployments: [
+						{
+							environment: 'Inspect – app',
+							id: 'd1',
+							source: 'github-deployment',
+							state: 'success',
+							url: 'https://vercel.com/acme/app/dep123',
+						},
+						{
+							environment: 'Preview – app',
+							id: 'd2',
+							source: 'github-deployment',
+							state: 'success',
+							url: 'https://app-git-feature-acme.vercel.app',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.url).toBe(
+			'https://app-git-feature-acme.vercel.app',
+		);
+		expect(model.previewDeployment?.label).toBe('Preview – app');
+	});
+
 	test('todos and local comments are merged into the model', () => {
 		const model = buildPullRequestShellModel({
 			changeSummary: NO_CHANGES,
@@ -221,6 +480,7 @@ describe('buildPullRequestShellModel', () => {
 					filePath: 'src/app.ts',
 					id: 'lc1',
 					lineNumber: 4,
+					origin: 'user',
 					status: 'open',
 					updatedAt: '2026-06-11T09:00:00Z',
 					workspaceId: 'ws-1',
@@ -265,18 +525,171 @@ describe('buildPullRequestShellModel', () => {
 	});
 });
 
+describe('comment summaries', () => {
+	/**
+	 * Build a model whose PR carries one GitHub comment.
+	 * @param comment - The comment fields to place on the pull request
+	 * @returns The single comment summary the model produced
+	 */
+	function summarize(comment: Partial<GithubCommentWire>) {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					comments: [
+						{
+							author: 'octocat',
+							body: '',
+							createdAt: '2026-07-20T09:00:00.000Z',
+							id: 'c1',
+							isResolved: null,
+							kind: 'review-comment',
+							...comment,
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+		return model.comments[0];
+	}
+
+	test('the full body travels to the renderer, not just its first line', () => {
+		const summary = summarize({ body: 'Line one\n\nLine two' });
+
+		expect(summary?.body).toBe('Line one\n\nLine two');
+	});
+
+	test('the row detail drops the author, which the row already renders', () => {
+		const summary = summarize({ body: 'needs a guard' });
+
+		expect(summary?.detail).toBe('needs a guard');
+	});
+
+	test('a body opening with a blank line still summarizes, rather than reading as empty', () => {
+		const summary = summarize({
+			body: '\n**Warning:** unchecked cast',
+			line: 57,
+			path: 'src/app/page.tsx',
+		});
+
+		expect(summary?.detail).toBe('Warning: unchecked cast');
+	});
+
+	test("a bot's metadata blob is stripped from both the body and the summary", () => {
+		const summary = summarize({
+			body: '[vc]: #Un4Opd4tSVroIz2CPCZ3Oikl6ACPaRKqIX4FhWyWCdo=:eyJpc01vbm9yZXBv\n\nPreview ready',
+			isBot: true,
+		});
+
+		expect(summary?.body).toBe('Preview ready');
+		expect(summary?.detail).toBe('Preview ready');
+	});
+
+	test('a body-less thread falls back to its diff location', () => {
+		const summary = summarize({
+			body: '',
+			line: 57,
+			path: 'src/app/page.tsx',
+		});
+
+		expect(summary?.detail).toBe('src/app/page.tsx:57');
+	});
+
+	test('the diff anchor, timestamp, and replies ride along for the preview', () => {
+		const summary = summarize({
+			body: 'needs a guard',
+			isOutdated: true,
+			line: 57,
+			path: 'src/app/page.tsx',
+			replies: [
+				{
+					author: 'psoldunov',
+					body: 'Fixed.',
+					createdAt: '2026-07-20T10:00:00.000Z',
+					id: 'c2',
+					isResolved: null,
+					kind: 'review-comment',
+				},
+			],
+		});
+
+		expect(summary).toMatchObject({
+			createdAt: '2026-07-20T09:00:00.000Z',
+			isOutdated: true,
+			line: 57,
+			path: 'src/app/page.tsx',
+			replies: [
+				{
+					author: 'psoldunov',
+					body: 'Fixed.',
+					createdAt: '2026-07-20T10:00:00.000Z',
+					id: 'c2',
+				},
+			],
+		});
+	});
+});
+
 describe('review context formatting', () => {
+	test('a comment context block carries the whole body and its replies', () => {
+		const text = formatCommentContext(
+			{
+				author: 'octocat',
+				body: 'Line one\n\nLine two',
+				detail: 'Line one',
+				id: 'c1',
+				isResolved: false,
+				line: 57,
+				path: 'src/app/page.tsx',
+				provider: 'github',
+				replies: [{ author: 'psoldunov', body: 'Fixed.', id: 'c2' }],
+			},
+			9,
+		);
+
+		expect(text).toContain('GitHub comment on PR #9 on src/app/page.tsx:57:');
+		expect(text).toContain('Line one\n\nLine two');
+		expect(text).toContain('Reply from psoldunov:\nFixed.');
+		expect(text).toContain('Thread is unresolved.');
+	});
+
 	test('all-comments context numbers each comment', () => {
 		const text = formatAllCommentsContext(
 			[
-				{ detail: 'a: first', id: '1', provider: 'github' },
-				{ detail: 'b: second', id: '2', provider: 'local' },
+				{ body: 'first', detail: 'a: first', id: '1', provider: 'github' },
+				{ body: 'second', detail: 'b: second', id: '2', provider: 'local' },
 			],
 			9,
 		);
 
-		expect(text).toContain('1. a: first');
-		expect(text).toContain('2. b: second');
+		expect(text).toContain('1. GitHub comment on PR #9 — a: first');
+		expect(text).toContain('2. Local review comment — b: second');
+	});
+
+	// The row summary no longer embeds the author or the file, so the bulk block
+	// has to attribute and anchor each line itself or Pi cannot tell the comments
+	// apart, let alone find what they point at.
+	test('all-comments context attributes and anchors each comment', () => {
+		const text = formatAllCommentsContext(
+			[
+				{
+					author: 'octocat',
+					body: 'needs a guard',
+					detail: 'needs a guard',
+					id: '1',
+					line: 12,
+					path: 'src/main/index.ts',
+					provider: 'github',
+				},
+			],
+			9,
+		);
+
+		expect(text).toContain(
+			'1. octocat — GitHub comment on PR #9 on src/main/index.ts:12 — needs a guard',
+		);
 	});
 
 	test('clampReviewContext truncates oversized payloads with a marker', () => {

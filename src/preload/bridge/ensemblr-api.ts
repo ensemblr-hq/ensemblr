@@ -5,6 +5,8 @@ import type {
 	BoardStatusBroadcast,
 	ExitPlanModeBroadcast,
 	FocusViewBroadcast,
+	PlanModeChangedBroadcast,
+	ReviewCommentsChangedBroadcast,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control';
 import { IPC_CHANNELS } from '../../shared/ipc/channels';
@@ -36,6 +38,7 @@ type InvokeKey = Exclude<
 	| 'onAskUserQuestion'
 	| 'onAskUserQuestionClosed'
 	| 'onExitPlanMode'
+	| 'onPlanModeChanged'
 	| 'onPiRawFrame'
 	| 'onPiSessionEvent'
 	| 'onTerminalLifecycle'
@@ -122,6 +125,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		computeTurnDiff: (request) => invoke('computeTurnDiff', request),
 		confirmRootDirectoryChange: (request) =>
 			invoke('confirmRootDirectoryChange', request),
+		continueWorkspaceBranch: (request) =>
+			invoke('continueWorkspaceBranch', request),
 		createPullRequest: (request) => invoke('createPullRequest', request),
 		createTerminalSession: (request) =>
 			invoke('createTerminalSession', request),
@@ -210,6 +215,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 				IPC_CHANNELS.agentControlTabsChanged,
 				listener,
 			),
+		onAgentControlReviewCommentsChanged: (listener) =>
+			subscribe<ReviewCommentsChangedBroadcast>(
+				IPC_CHANNELS.agentControlReviewCommentsChanged,
+				listener,
+			),
 		onAgentControlBoardStatus: (listener) =>
 			subscribe<BoardStatusBroadcast>(
 				IPC_CHANNELS.agentControlBoardStatus,
@@ -229,6 +239,11 @@ export function createEnsemblrApi(): EnsemblrApi {
 		onExitPlanMode: (listener) =>
 			subscribe<ExitPlanModeBroadcast>(
 				IPC_CHANNELS.agentControlExitPlanMode,
+				listener,
+			),
+		onPlanModeChanged: (listener) =>
+			subscribe<PlanModeChangedBroadcast>(
+				IPC_CHANNELS.agentControlPlanModeChanged,
 				listener,
 			),
 		reportBoardStatus: (statusByWorkspaceId) =>
@@ -257,6 +272,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('openSettingsFileInTarget', request),
 		openWorkspaceInTarget: (request) =>
 			invoke('openWorkspaceInTarget', request),
+		pinChatTab: (request) => invoke('pinChatTab', request),
 		prepareCloneGithubRepository: (request) =>
 			invoke('prepareCloneGithubRepository', request),
 		pushWorkspaceBranch: (request) => invoke('pushWorkspaceBranch', request),

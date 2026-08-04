@@ -1,6 +1,6 @@
 /**
- * Public surface of the pending plan-review state: the sync effect the app root
- * installs, plus the per-chat read and resolve hooks.
+ * Public surface of the renderer's Plan Mode state: the two sync effects the app
+ * root installs, plus the per-chat read and resolve hooks for a pending review.
  */
 export { pendingPlanReviewsAtom } from './atoms.ts';
 export {
@@ -8,3 +8,4 @@ export {
 	usePendingPlanReview,
 	usePlanReviewSync,
 } from './pending-reviews.ts';
+export { usePlanModeSync } from './plan-mode-sync.ts';

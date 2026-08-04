@@ -5,6 +5,7 @@ import type { WorkspaceOpenTargetSnapshot } from '@/shared/ipc/contracts/open-ta
 // workspace shell model — the menu reads it from the React Query cache.
 import type { RepositoryWorkspaceNavigationSnapshot } from '@/shared/ipc/contracts/repository-navigation';
 import type { RepositoryPreviewUrl } from '@/shared/ipc/contracts/repository-settings';
+import type { ReviewCommentOrigin } from '@/shared/ipc/contracts/review-comments';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 import type { TerminalSessionStatus } from '@/shared/ipc/contracts/terminal';
 import type {
@@ -128,20 +129,43 @@ export interface PullRequestCheckSummary {
 	url?: string;
 }
 
+/** One reply on a review thread, shown under the head comment in the preview. */
+export interface PullRequestCommentReplySummary {
+	author?: string;
+	body: string;
+	createdAt?: string;
+	id: string;
+}
+
 export interface PullRequestCommentSummary {
 	author?: string;
+	/** Full comment markdown with bot metadata stripped; what the preview renders. */
+	body: string;
+	createdAt?: string;
+	/** One-line label for the row, derived from `body`. */
 	detail: string;
 	id: string;
+	/** True when the review thread no longer maps to the current diff. */
+	isOutdated?: boolean;
 	/** Resolution state for GitHub review threads; absent when not applicable. */
 	isResolved?: boolean | null;
+	line?: number;
+	/**
+	 * Who wrote an Ensemblr-local comment; absent for every other provider. A
+	 * local comment spends its `author` slot on the `path:line` location, so
+	 * authorship needs a field of its own to reach the row.
+	 */
+	origin?: ReviewCommentOrigin;
+	path?: string;
 	provider: 'github' | 'github-actions' | 'linear' | 'local';
+	replies?: readonly PullRequestCommentReplySummary[];
 	url?: string;
 }
 
 /**
  * Self-contained comment payload carried inline on a `document` session tab so
- * the comment preview survives reloads without re-fetching — the body is the
- * `detail`, and `prNumber` lets the preview's "Add to chat" reuse the same
+ * the comment preview survives reloads without re-fetching — the whole thread
+ * rides along, and `prNumber` lets the preview's "Add to chat" reuse the same
  * context formatter the Checks panel uses.
  */
 export interface CommentPreviewPayload extends PullRequestCommentSummary {
@@ -186,6 +210,11 @@ interface SessionTabBase {
 	updatedLabel: string;
 	/** True when this tab hosts a spawned sub-agent, for distinct tinting. */
 	isSubAgent: boolean;
+	/**
+	 * True while this tab holds the workspace's ephemeral preview slot: the next
+	 * preview open retargets it, and the strip renders its label in italics.
+	 */
+	isPreview: boolean;
 }
 
 /**

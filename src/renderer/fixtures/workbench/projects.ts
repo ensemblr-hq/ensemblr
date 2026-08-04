@@ -55,18 +55,30 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					],
 					comments: [
 						{
-							detail: '<!-- linear-linkback --> <details> <summary><a hre...',
+							author: 'linear',
+							body: 'Linked to [THE-106](https://linear.app/the-swiss-cheese/issue/THE-106).',
+							createdAt: '2026-07-20T09:12:00.000Z',
+							detail: 'Linked to THE-106.',
 							id: 'linear-linkback',
 							provider: 'linear',
 						},
 						{
-							detail: '<!-- react-doctor:summary --> **React Doctor** fo...',
+							author: 'github-actions',
+							body: '**React Doctor** found 2 issues\n\n| Rule | Count |\n| --- | --- |\n| `no-render-phase-prev-props` | 2 |',
+							createdAt: '2026-07-20T09:20:00.000Z',
+							detail: 'React Doctor found 2 issues',
 							id: 'react-doctor-summary',
 							provider: 'github-actions',
 						},
 						{
-							detail: 'src/renderer/routing/router.tsx:69',
+							author: 'github-actions',
+							body: 'This route loader runs on every navigation. Memoize the search parse so the sidebar stops re-rendering.',
+							createdAt: '2026-07-20T09:24:00.000Z',
+							detail: 'This route loader runs on every navigation.',
 							id: 'router-comment',
+							isResolved: false,
+							line: 69,
+							path: 'src/renderer/routing/router.tsx',
 							provider: 'github-actions',
 						},
 					],
@@ -127,6 +139,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'review-shell',
 						id: 'review-shell',
+						isPreview: false,
 						isSubAgent: false,
 						label: 'Review shell',
 						piSessionId: null,
@@ -138,6 +151,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'setup-thread',
 						id: 'setup-thread',
+						isPreview: false,
 						isSubAgent: false,
 						label: 'Setup notes',
 						piSessionId: null,
@@ -203,6 +217,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'issue-kickoff',
 						id: 'issue-kickoff',
+						isPreview: false,
 						isSubAgent: false,
 						label: 'Issue kickoff',
 						piSessionId: null,
@@ -256,6 +271,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'plain-header',
 						id: 'plain-header',
+						isPreview: false,
 						isSubAgent: false,
 						label: 'Plain header',
 						piSessionId: null,
@@ -319,6 +335,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'changed-header',
 						id: 'changed-header',
+						isPreview: false,
 						isSubAgent: false,
 						label: 'Changed header',
 						piSessionId: null,
@@ -403,6 +420,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					{
 						chatTabId: 'checks-pass',
 						id: 'checks-pass',
+						isPreview: false,
 						isSubAgent: false,
 						label: 'Checks pass',
 						piSessionId: null,

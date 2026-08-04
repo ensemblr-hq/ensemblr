@@ -5,7 +5,10 @@ import {
 	createWorkspacePathResolver,
 	toWorkspaceLookupPath,
 } from '@/renderer/lib/pi';
-import { formatLinkedIssueComposerSeed } from '@/renderer/lib/workbench';
+import {
+	formatLinkedIssueComposerSeed,
+	showsComposer,
+} from '@/renderer/lib/workbench';
 import { usePiRawFrameCapture } from '@/renderer/state/pi';
 import { developerModeAtom } from '@/renderer/state/preferences';
 import type {
@@ -13,6 +16,7 @@ import type {
 	SessionTabModel,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
+import type { SessionTabPlacement } from '@/renderer/types/workbench-shell';
 import { CommentPreviewPanel } from './comment-preview-panel';
 import { ComposerSlot } from './composer-slot';
 import {
@@ -45,6 +49,7 @@ export function WorkspaceConversationContent({
 	onSessionTabChange,
 	onSessionTabClose,
 	onSessionTabOpen,
+	onSessionTabPin,
 	onSessionTabRestore,
 	onSessionTabsReorder,
 	onTurnDiffOpen,
@@ -68,9 +73,15 @@ export function WorkspaceConversationContent({
 	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabChange: (sessionId: string) => void;
 	onSessionTabClose: (sessionId: string) => void;
-	onSessionTabOpen: () => Promise<{ chatTabId: string } | null>;
+	onSessionTabOpen: (options?: {
+		placement?: SessionTabPlacement;
+	}) => Promise<{ chatTabId: string } | null>;
+	onSessionTabPin: (sessionId: string) => void;
 	onSessionTabRestore: (sessionId: string) => void;
-	onSessionTabsReorder: (sessionIds: string[]) => void;
+	onSessionTabsReorder: (
+		sessionIds: string[],
+		draggedSessionId: string,
+	) => void;
 	sessionTabs: SessionTabModel[];
 }) {
 	const developerMode = useAtomValue(developerModeAtom);
@@ -131,6 +142,7 @@ export function WorkspaceConversationContent({
 				onSessionTabClose={onSessionTabClose}
 				onSessionTabChange={onSessionTabChange}
 				onSessionTabOpen={onSessionTabOpen}
+				onSessionTabPin={onSessionTabPin}
 				onSessionTabRestore={onSessionTabRestore}
 				onSessionTabsReorder={onSessionTabsReorder}
 				sessions={sessionTabs}
@@ -146,16 +158,18 @@ export function WorkspaceConversationContent({
 									workspace={activeWorkspace}
 								/>
 							</div>
-							<ComposerSlot
-								chatTabId={activeSession.chatTabId}
-								composer={composer}
-								piSessionId={activeSession.piSessionId ?? null}
-								seedText={getLinkedIssueComposerSeed(
-									activeWorkspace,
-									activeSession,
-								)}
-								workspace={activeWorkspace}
-							/>
+							{showsComposer(activeSession) ? (
+								<ComposerSlot
+									chatTabId={activeSession.chatTabId}
+									composer={composer}
+									piSessionId={activeSession.piSessionId ?? null}
+									seedText={getLinkedIssueComposerSeed(
+										activeWorkspace,
+										activeSession,
+									)}
+									workspace={activeWorkspace}
+								/>
+							) : null}
 						</TurnDiffOpenerProvider>
 					</FilePreviewOpenerProvider>
 				</WorkspacePathResolverProvider>

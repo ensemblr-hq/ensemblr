@@ -18,7 +18,7 @@ into free-text shell.
 | --- | --- | --- | --- | --- |
 | Claude Code | `claude` | `claude` | yes | yes (MCP) |
 | OpenAI Codex | `codex` | `codex` | yes | yes (MCP) |
-| Mistral Vibe | `vibe` | `vibe` | yes | no |
+| Mistral Vibe | `vibe` | `vibe` | yes | yes (MCP, via `VIBE_MCP_SERVERS`) |
 
 A harness only appears in the launch menu when its binary is found on `PATH`.
 Install and authenticate each from its own vendor before launching it in

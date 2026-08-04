@@ -1,6 +1,12 @@
 import { Button } from '@/renderer/components/ui/button';
-import { getPullRequestLinkButtonClassName } from '@/renderer/lib/workbench/pull-request-link-button';
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import {
+	getPullRequestLinkButtonClassName,
+	resolvePreviewPillTone,
+} from '@/renderer/lib/workbench/pull-request-link-button';
+import type {
+	PullRequestHeaderTone,
+	WorkspaceShellModel,
+} from '@/renderer/types/workbench';
 
 /** Preview deployment provider ids recognized by the shell. */
 type PreviewDeploymentProvider = NonNullable<
@@ -15,13 +21,25 @@ const PREVIEW_DEPLOYMENT_PROVIDER_ICON_PATHS: Partial<
 	vercel: 'm12 1.608 12 20.784H0Z',
 };
 
-/** Pill-shaped preview-deployment button that opens the provider's URL. */
+/**
+ * Deployment labels that add nothing next to the provider mark, since the pill's
+ * icon and aria-label already say it is a preview deployment.
+ */
+const GENERIC_DEPLOYMENT_LABELS = new Set(['deploy', 'deployment', 'preview']);
+
+/**
+ * Pill-shaped preview-deployment button that opens the provider's URL, tinted by
+ * the sidebar header's tone so both header pills read as one control group,
+ * unless the deployment's own status outranks it.
+ */
 export function PreviewDeploymentButton({
 	deployment,
+	tone,
 }: {
 	deployment: NonNullable<
 		WorkspaceShellModel['pullRequest']['previewDeployment']
 	>;
+	tone: PullRequestHeaderTone;
 }) {
 	const providerLabel = getPreviewDeploymentProviderLabel(deployment.provider);
 	const previewLabel =
@@ -32,16 +50,19 @@ export function PreviewDeploymentButton({
 		deployment.provider,
 	);
 	const normalizedDeploymentLabel = deployment.label.trim().toLowerCase();
+	const isLabelRedundant =
+		normalizedDeploymentLabel === providerLabel.toLowerCase() ||
+		GENERIC_DEPLOYMENT_LABELS.has(normalizedDeploymentLabel);
 	const shouldShowTextLabel =
 		normalizedDeploymentLabel.length > 0 &&
-		(providerIconPath === null ||
-			normalizedDeploymentLabel !== providerLabel.toLowerCase());
+		(providerIconPath === null || !isLabelRedundant);
+	const pillTone = resolvePreviewPillTone(tone, deployment.status);
 
 	return (
 		<Button
 			aria-label={`Open ${previewLabel}`}
 			asChild
-			className={getPullRequestLinkButtonClassName(deployment.status)}
+			className={getPullRequestLinkButtonClassName(pillTone)}
 			size='sm'
 			variant='outline'
 		>

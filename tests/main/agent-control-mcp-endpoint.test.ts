@@ -58,13 +58,35 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).toContain('ensemblr_set_branch_name');
 		expect(names).toContain('ensemblr_set_workspace_status');
 		expect(names).toContain('ensemblr_get_workspace_status');
+		// The review ops act on the workspace's git worktree and its comment
+		// store, both of which a harness caller owns, so all three are served.
+		expect(names).toContain('ensemblr_get_workspace_diff');
+		expect(names).toContain('ensemblr_get_diff_comments');
+		expect(names).toContain('ensemblr_add_diff_comments');
+		// Auditing a delegated conversation is a read over persisted events, so it
+		// is served to every origin that may read a report at all.
+		expect(names).toContain('ensemblr_read_conversation');
 		// Chat-tab ops a harness origin cannot use: its tab is a terminal titled
 		// from the harness's own session log, and the service gates the rest to Pi.
 		expect(names).not.toContain('ensemblr_set_name');
 		expect(names).not.toContain('ensemblr_set_summary');
 		expect(names).not.toContain('ensemblr_ask_user_question');
 		expect(names).not.toContain('ensemblr_exit_plan_mode');
-		expect(tools).toHaveLength(24);
+		expect(tools).toHaveLength(28);
+		await client.close();
+	});
+
+	// Stat mode is the whole mitigation for a diff with no natural size ceiling,
+	// so the description a harness reads has to lead with it.
+	it('tells a harness to probe the diff size before reading it', async () => {
+		server = await startControlServer(stubService);
+		const client = await connect('good');
+		const { tools } = await client.listTools();
+		const diffTool = tools.find(
+			(tool) => tool.name === 'ensemblr_get_workspace_diff',
+		);
+		expect(diffTool?.description).toContain('stat=true FIRST');
+		expect(diffTool?.description).toContain('omittedFiles');
 		await client.close();
 	});
 

@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
 	areStringArraysEqual,
 	reconcileOrderedIds,
+	reconcileOrderedIdsByCanonicalSlot,
 } from '../../src/renderer/lib/ordered-ids';
 
 describe('areStringArraysEqual', () => {
@@ -56,5 +57,49 @@ describe('reconcileOrderedIds', () => {
 
 	test('returns the canonical order when the preferred order is empty', () => {
 		expect(reconcileOrderedIds([], ['a', 'b'])).toEqual(['a', 'b']);
+	});
+});
+
+describe('reconcileOrderedIdsByCanonicalSlot', () => {
+	test('inserts a new id after its canonical predecessor, not at the end', () => {
+		expect(
+			reconcileOrderedIdsByCanonicalSlot(
+				['a', 'b', 'c'],
+				['a', 'inserted', 'b', 'c'],
+			),
+		).toEqual(['a', 'inserted', 'b', 'c']);
+	});
+
+	test('honours the canonical slot even when the preferred order was dragged', () => {
+		expect(
+			reconcileOrderedIdsByCanonicalSlot(
+				['c', 'a', 'b'],
+				['a', 'inserted', 'b', 'c'],
+			),
+		).toEqual(['c', 'a', 'inserted', 'b']);
+	});
+
+	test('keeps consecutive new ids in canonical order behind one predecessor', () => {
+		expect(
+			reconcileOrderedIdsByCanonicalSlot(['a', 'b'], ['a', 'x', 'y', 'b']),
+		).toEqual(['a', 'x', 'y', 'b']);
+	});
+
+	test('puts a new leading id at the front', () => {
+		expect(
+			reconcileOrderedIdsByCanonicalSlot(['a', 'b'], ['first', 'a', 'b']),
+		).toEqual(['first', 'a', 'b']);
+	});
+
+	test('still drops ids that are no longer available', () => {
+		expect(
+			reconcileOrderedIdsByCanonicalSlot(['a', 'gone', 'b'], ['a', 'b']),
+		).toEqual(['a', 'b']);
+	});
+
+	test('drops duplicate ids in the preferred order', () => {
+		expect(
+			reconcileOrderedIdsByCanonicalSlot(['b', 'b', 'a'], ['a', 'b']),
+		).toEqual(['b', 'a']);
 	});
 });

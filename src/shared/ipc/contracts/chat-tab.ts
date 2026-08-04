@@ -13,6 +13,12 @@ export interface ChatTabWire {
 	 */
 	fullTitle: string;
 	id: string;
+	/**
+	 * True while this tab holds the workspace's single ephemeral preview slot.
+	 * Derived in the main process, which owns where the marker is stored, so the
+	 * renderer never reads the marker out of {@link ChatTabWire.metadata}.
+	 */
+	isPreview: boolean;
 	kind: ChatTabKindWire;
 	metadata: Record<string, unknown>;
 	openedAt: string;
@@ -50,9 +56,23 @@ export interface ListChatTabsResult {
  * `{ filePath }`) and re-focus an already-open tab for the same subject.
  */
 export interface OpenChatTabRequest {
+	/**
+	 * Open tab the new tab is placed directly to the right of, used by tabs opened
+	 * from inside a conversation (file, diff, comment, terminal) so they appear
+	 * next to their origin. Omitted by the tab strip's new-chat button, which
+	 * appends to the end of the strip.
+	 */
+	insertAfterChatTabId?: string | null;
 	kind?: ChatTabKindWire;
 	metadata?: Record<string, unknown>;
 	piSessionId?: string | null;
+	/**
+	 * Opens the tab as the workspace's single ephemeral preview slot: the next
+	 * preview open retargets this same tab instead of adding another one, until
+	 * {@link PinChatTabRequest} makes it permanent. Ignored for chat and terminal
+	 * kinds, which own a session and are never ephemeral.
+	 */
+	preview?: boolean;
 	title?: string;
 	workspaceId: string;
 }
@@ -121,6 +141,19 @@ export interface ReorderChatTabsResult {
 	open: readonly ChatTabWire[];
 }
 
+/**
+ * Promote an ephemeral preview tab to a permanent one, so later preview opens
+ * take a fresh slot rather than retargeting it.
+ */
+export interface PinChatTabRequest {
+	chatTabId: string;
+}
+
+/** Result of pinning a tab: the pinned tab, or null when no row matched. */
+export interface PinChatTabResult {
+	tab: ChatTabWire | null;
+}
+
 /** Attach a Pi session to an already-open tab. */
 export interface BindPiSessionToTabRequest {
 	chatTabId: string;
@@ -157,6 +190,7 @@ export interface ChatTabApi {
 		request: ListClosedChatTabsWithSummaryRequest,
 	) => Promise<ListClosedChatTabsWithSummaryResult>;
 	openChatTab: (request: OpenChatTabRequest) => Promise<OpenChatTabResult>;
+	pinChatTab: (request: PinChatTabRequest) => Promise<PinChatTabResult>;
 	reorderChatTabs: (
 		request: ReorderChatTabsRequest,
 	) => Promise<ReorderChatTabsResult>;

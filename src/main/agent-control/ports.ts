@@ -5,17 +5,23 @@
  * terminal, script, and harness services at composition time.
  */
 import type {
+	AddDiffCommentsResult,
 	AgentControlConversationStatus,
 	AgentControlModelList,
 	AgentControlTabInfo,
 	AgentControlTerminalInfo,
 	AgentControlWorkspaceInfo,
+	AgentDiffComment,
 	AskUserQuestionItem,
 	AskUserQuestionResult,
 	ExitPlanModeArgs,
 	ExitPlanModeResult,
 	FocusPanelName,
+	GetDiffCommentsResult,
+	GetWorkspaceDiffResult,
 	OpenTabVariant,
+	ReadConversationArgs,
+	ReadConversationResult,
 	SessionBriefNaming,
 	SetBranchNameResult,
 	SetSummaryResult,
@@ -110,6 +116,13 @@ export interface ConversationPort {
 		callerModel?: string;
 		/** Caller session id, threaded into the child's spawn env for lineage. */
 		parentSessionId: string;
+		/**
+		 * Whether the child starts in Plan Mode, snapshotted from the spawning agent
+		 * at spawn time; the child owns the flag afterwards. Required rather than
+		 * optional so a future second spawn route cannot silently produce an
+		 * unrestricted child from a planning parent.
+		 */
+		planMode: boolean;
 	}) => Promise<{ chatTabId: string; piSessionId: string }>;
 	/** Lists the available Pi models plus the default, for model selection. */
 	listModels: () => Promise<AgentControlModelList>;
@@ -146,7 +159,34 @@ export interface ConversationPort {
 	 * callers that report the flag.
 	 */
 	hasFinalMessage: (piSessionId: string) => Promise<boolean>;
+	/**
+	 * The conversation's report: every assistant message of its newest answered
+	 * turn, joined, or null when it has produced none. A whole turn rather than a
+	 * single message so an agent that signs off after its findings does not
+	 * shadow them.
+	 */
 	getLastMessage: (piSessionId: string) => Promise<string | null>;
+	/**
+	 * A page of the conversation's persisted transcript: its prompts, answers, and
+	 * tool calls with arguments and results. Loads the branch's events, so it is a
+	 * deliberate read rather than something a poll loop should reach for. An
+	 * unknown session reads as an empty branch, which is what an auditor needs to
+	 * tell "nothing happened" from "the tool failed".
+	 */
+	readTranscript: (
+		args: ReadConversationArgs,
+	) => Promise<ReadConversationResult>;
+	/**
+	 * Whether a Pi session's chat tab carries the sub-agent marker its spawn
+	 * persisted. Role resolution needs a signal that outlives the process: a
+	 * caller's `parentSessionId` is never stored, so a conversation resumed after
+	 * a restart re-registers at depth 0, while its Plan Mode comes back from the
+	 * renderer's per-tab store — lineage alone would hand a restored investigator
+	 * the orchestrator policy. An implementation that cannot read the marker
+	 * reports false rather than throwing, which leaves the role to depth exactly
+	 * as it was before the marker existed.
+	 */
+	isSpawnedSubAgent: (piSessionId: string) => Promise<boolean>;
 	/** Owning workspace of a Pi session, or null when it does not exist. */
 	resolveConversationWorkspace: (piSessionId: string) => Promise<string | null>;
 }
@@ -210,6 +250,42 @@ export interface BoardPort {
 }
 
 /**
+ * Reads the workspace's own diff, scoped the way the Changes panel scopes it.
+ * The port owns the whole assembly — resolving the base branch, composing the
+ * status read with the per-file patches, and fitting the result to the payload
+ * budget — so the service stays a dispatch and the git service stays unaware
+ * that an agent is one of its callers.
+ */
+export interface DiffPort {
+	readWorkspaceDiff: (input: {
+		workspaceId: string;
+		workspaceCwd: string;
+		/** Read one file's patch whole instead of the budgeted whole-workspace diff. */
+		file?: string;
+		/** Return changed-file rows and totals only, issuing no per-file git calls. */
+		stat?: boolean;
+	}) => Promise<GetWorkspaceDiffResult>;
+}
+
+/**
+ * Reads and writes the workspace's Ensemblr-local review comments — the ones
+ * the Changes panel renders. Separate from {@link DiffPort} because it fronts
+ * the review service and its SQLite store rather than git, and writes here are
+ * bound to the caller's own workspace by construction: no member takes a
+ * workspace argument the agent could point elsewhere.
+ */
+export interface ReviewPort {
+	listComments: (input: {
+		workspaceId: string;
+		file?: string;
+	}) => Promise<GetDiffCommentsResult>;
+	addComments: (input: {
+		workspaceId: string;
+		comments: readonly AgentDiffComment[];
+	}) => Promise<AddDiffCommentsResult>;
+}
+
+/**
  * Resolves the active permission mode. The mode is a global app setting (the
  * same value the IPC permission gate reads), so it takes no workspace argument.
  */
@@ -255,6 +331,14 @@ export interface PlanModePort {
 		origin: AgentControlOrigin;
 		args: ExitPlanModeArgs;
 	}) => Promise<ExitPlanModeResult>;
+	/**
+	 * Puts a freshly spawned child into Plan Mode, so a planning parent's
+	 * delegation stays read-only. Deliberately one-way: this port is reachable
+	 * from every control handler, and a member that could turn Plan Mode *off*
+	 * would be a route for a future op to unblock its own session, contradicting
+	 * the promise the agent is given that only the user's approval ends planning.
+	 */
+	activateForSpawn: (sessionId: string) => void;
 	/** Forgets a session's Plan Mode state once it ends. */
 	releaseSession: (sessionId: string) => void;
 }
@@ -299,6 +383,8 @@ export interface AgentControlPorts {
 	harnesses: HarnessPort;
 	focus: FocusPort;
 	board: BoardPort;
+	diff: DiffPort;
+	review: ReviewPort;
 	permissions: PermissionPort;
 	confirm: ConfirmPort;
 }

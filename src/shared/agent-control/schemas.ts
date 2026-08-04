@@ -10,6 +10,7 @@ import {
 	type AgentControlOp,
 	ASK_USER_QUESTION_LIMITS,
 	ASK_USER_QUESTION_RESERVED_LABELS,
+	DIFF_COMMENT_LIMITS,
 	EXIT_PLAN_MODE_LIMITS,
 	SET_BRANCH_NAME_LIMITS,
 	SET_SUMMARY_LIMITS,
@@ -17,6 +18,30 @@ import {
 } from './contracts.ts';
 
 const nonEmpty = z.string().trim().min(1);
+
+/**
+ * Whether a path stays inside the workspace it is relative to. Hand-rolled
+ * rather than delegated to `node:path` because this module is shared with the
+ * renderer bundle, and checked here rather than left to the git service so a
+ * traversal attempt comes back as `invalid-args` the agent can correct instead
+ * of as a git failure. Both separators are rejected: a Windows-style path
+ * reaches a POSIX git as one opaque segment, which hides a `..` from the check.
+ * @param value - The agent-supplied path.
+ * @returns True when the path is relative and never climbs out.
+ */
+const staysInsideWorkspace = (value: string): boolean => {
+	if (value.includes('\0') || value.startsWith('/') || value.startsWith('\\')) {
+		return false;
+	}
+	if (/^[A-Za-z]:[\\/]/.test(value)) {
+		return false;
+	}
+	return !value.split(/[\\/]/).includes('..');
+};
+
+const workspaceRelativePath = nonEmpty.refine(staysInsideWorkspace, {
+	message: 'File path must be relative to the workspace and stay inside it.',
+});
 
 const spawnChatTabSchema = z.strictObject({
 	title: nonEmpty.optional(),
@@ -106,6 +131,13 @@ const conversationRefSchema = z.strictObject({
 	piSessionId: nonEmpty,
 });
 
+const readConversationSchema = z.strictObject({
+	piSessionId: nonEmpty,
+	stat: z.boolean().optional(),
+	fromOrdinal: z.number().int().min(0).optional(),
+	ordinal: z.number().int().min(0).optional(),
+});
+
 const readTerminalOutputSchema = z.strictObject({
 	terminalId: nonEmpty,
 });
@@ -124,9 +156,39 @@ const setWorkspaceStatusSchema = z.strictObject({
 	status: z.enum(WORKSPACE_BOARD_STATUSES),
 });
 
+const getWorkspaceDiffSchema = z
+	.strictObject({
+		file: workspaceRelativePath.optional(),
+		stat: z.boolean().optional(),
+	})
+	// Reading one file already knows which file it wants, so a stat alongside it
+	// is a contradiction rather than a refinement. Rejecting says which of the two
+	// the caller is going to get; silent precedence leaves it guessing.
+	.refine((args) => !(args.file && args.stat), {
+		message: 'Pass either file or stat, not both: a single file has no stat.',
+	});
+
+const getDiffCommentsSchema = z.strictObject({
+	file: workspaceRelativePath.optional(),
+});
+
+const addDiffCommentsSchema = z.strictObject({
+	comments: z
+		.array(
+			z.strictObject({
+				filePath: workspaceRelativePath,
+				lineNumber: z.number().int().positive().nullable().optional(),
+				body: nonEmpty.max(DIFF_COMMENT_LIMITS.maxBodyLength),
+			}),
+		)
+		.min(1)
+		.max(DIFF_COMMENT_LIMITS.maxComments),
+});
+
 const waitForAgentsSchema = z.strictObject({
 	targets: z.array(nonEmpty).optional(),
 	mode: z.enum(['first', 'all']).optional(),
+	reports: z.enum(['full', 'brief']).optional(),
 	timeoutMs: z.number().int().positive().optional(),
 });
 
@@ -150,7 +212,11 @@ const askUserQuestionOptionSchema = z.strictObject({
 
 const askUserQuestionItemSchema = z.strictObject({
 	question: nonEmpty,
-	header: nonEmpty.max(ASK_USER_QUESTION_LIMITS.maxHeaderLength).optional(),
+	header: nonEmpty
+		.transform((header) =>
+			header.slice(0, ASK_USER_QUESTION_LIMITS.maxHeaderLength),
+		)
+		.optional(),
 	options: z
 		.array(askUserQuestionOptionSchema)
 		.min(ASK_USER_QUESTION_LIMITS.minOptions)
@@ -174,15 +240,6 @@ const askUserQuestionSchema = z.strictObject({
 				new Set(questions.map((item) => item.question.toLowerCase())).size ===
 				questions.length,
 			{ message: 'Questions must be distinct.' },
-		)
-		.refine(
-			(questions) => {
-				const headers = questions
-					.map((item) => item.header?.toLowerCase())
-					.filter((header) => header !== undefined);
-				return new Set(headers).size === headers.length;
-			},
-			{ message: 'Headers must be distinct; they label the question pager.' },
 		),
 });
 
@@ -217,11 +274,15 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	focusPanel: focusPanelSchema,
 	setWorkspaceStatus: setWorkspaceStatusSchema,
 	getWorkspaceStatus: emptySchema,
+	getWorkspaceDiff: getWorkspaceDiffSchema,
+	getDiffComments: getDiffCommentsSchema,
+	addDiffComments: addDiffCommentsSchema,
 	listWorkspaces: emptySchema,
 	listTabs: listTabsSchema,
 	listTerminals: listTerminalsSchema,
 	getConversationStatus: conversationRefSchema,
 	getLastMessage: conversationRefSchema,
+	readConversation: readConversationSchema,
 	readTerminalOutput: readTerminalOutputSchema,
 	listModels: emptySchema,
 	waitForAgents: waitForAgentsSchema,

@@ -25,6 +25,7 @@ export {
 	reorderChatTabs,
 	restoreChatTab,
 	restoreClosedChatTab,
+	retargetChatTab,
 	setChatTabMetadata,
 	setRuntimeState,
 } from './chat-tab-repository.ts';

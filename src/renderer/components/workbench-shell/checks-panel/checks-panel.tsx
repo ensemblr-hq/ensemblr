@@ -443,7 +443,8 @@ function CommentsSection({
 						onHide={() => hideComment(comment.id)}
 						onOpenPreview={
 							openCommentPreview
-								? () => openCommentPreview({ comment, prNumber })
+								? (options) =>
+										openCommentPreview({ comment, prNumber, ...options })
 								: undefined
 						}
 					/>

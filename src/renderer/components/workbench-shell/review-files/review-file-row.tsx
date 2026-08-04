@@ -35,10 +35,11 @@ const fileStatusLabel: Record<ReviewFileSummary['status'], string> = {
 };
 
 /**
- * Single changed-file row. Click (or the trailing open-diff icon) opens the
- * working-tree diff. On hover — or while its open-in menu is open — the trailing
- * +/- stats swap for a Discard button and an "Open in" dropdown. A row marked
- * viewed in the diff toolbar dims until the file changes again.
+ * Single changed-file row. Click opens the file — its diff, or the image preview
+ * when the workspace still holds a previewable image. On hover — or while its
+ * open-in menu is open — the trailing +/- stats swap for a Discard button and an
+ * "Open in" dropdown. A row marked viewed in the diff toolbar dims until the file
+ * changes again.
  */
 export function ReviewFileRow({
 	ariaLevel,
@@ -58,7 +59,7 @@ export function ReviewFileRow({
 		isDiscardable,
 		isViewed,
 		onDiscardFile,
-		openDiff,
+		openFile,
 		openInTargets,
 	} = useReviewFileActions();
 	const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -67,7 +68,10 @@ export function ReviewFileRow({
 	const hasOpenInMenu = openInTargets.length > 0 || Boolean(copyTarget);
 	const canDiscard = isDiscardable(file.path);
 	const viewed = isViewed(file);
-	const openThisDiff = openDiff ? () => openDiff(file.path) : undefined;
+	const openThisFile = openFile ? () => openFile(file.path) : undefined;
+	const keepThisFileOpen = openFile
+		? () => openFile(file.path, { preview: false })
+		: undefined;
 
 	return (
 		<div
@@ -89,9 +93,10 @@ export function ReviewFileRow({
 				: { 'aria-level': ariaLevel, role: 'treeitem' as const })}
 		>
 			<button
-				aria-label={`Open ${file.path} diff`}
+				aria-label={`Open ${file.path}`}
 				className='flex h-full min-w-0 flex-1 items-center gap-2 self-stretch rounded-md px-2 text-left font-mono text-xs'
-				onClick={openThisDiff}
+				onClick={openThisFile}
+				onDoubleClick={keepThisFileOpen}
 				type='button'
 			>
 				<Icon

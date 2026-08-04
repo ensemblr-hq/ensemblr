@@ -17,13 +17,20 @@ export const listChatTabsRequestSchema = z.object({
 
 /** {@link import('../../../shared/ipc').OpenChatTabRequest}. */
 export const openChatTabRequestSchema = z.object({
+	insertAfterChatTabId: optionalNullableString,
 	kind: z
 		.enum(['chat', 'diff', 'document', 'file', 'preview', 'terminal'])
 		.optional(),
 	metadata: z.record(z.string(), z.unknown()).optional(),
 	piSessionId: optionalNullableString,
+	preview: z.boolean().optional(),
 	title: optionalStringCoerceNullToUndefined,
 	workspaceId: z.string().min(1),
+});
+
+/** {@link import('../../../shared/ipc').PinChatTabRequest}. */
+export const pinChatTabRequestSchema = z.object({
+	chatTabId: z.string().min(1),
 });
 
 /** {@link import('../../../shared/ipc').CloseChatTabRequest}. */

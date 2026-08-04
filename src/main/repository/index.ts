@@ -33,6 +33,11 @@ export type {
 } from './clone-repository.ts';
 export { createGithubCloneService } from './clone-repository.ts';
 export type {
+	ContinueWorkspaceBranchService,
+	CreateContinueWorkspaceBranchServiceOptions,
+} from './continue-workspace-branch.ts';
+export { createContinueWorkspaceBranchService } from './continue-workspace-branch.ts';
+export type {
 	CreateWorkspaceService,
 	CreateWorkspaceServiceOptions,
 } from './create-workspace.ts';

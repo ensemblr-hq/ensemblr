@@ -1,6 +1,7 @@
 import { BotIcon, CheckIcon, XIcon } from 'lucide-react';
 import { useState } from 'react';
 
+import { CommentMarkdown } from '@/renderer/components/comment-markdown';
 import { Button } from '@/renderer/components/ui/button';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import {
@@ -67,7 +68,12 @@ export function DiffCommentThread({
 	);
 }
 
-/** Renders one comment with a source badge and, for local comments, resolve/delete actions. */
+/**
+ * Renders one comment with a source badge and, for local comments, resolve and
+ * delete actions. Remote bodies render as markdown, since bots answer in tables,
+ * fences, and suggestion blocks that read as noise in plain text; a local note is
+ * plain text the user typed, so it stays that way.
+ */
 function DiffCommentRow({
 	comment,
 	onDelete,
@@ -99,51 +105,77 @@ function DiffCommentRow({
 						</span>
 					) : null}
 				</div>
-				<p
-					className={cn(
-						'whitespace-pre-wrap text-xs',
-						comment.isResolved && 'text-muted-foreground line-through',
-					)}
-				>
-					{comment.body}
-				</p>
+				{isLocal ? (
+					<p
+						className={cn(
+							'whitespace-pre-wrap text-xs',
+							comment.isResolved && 'text-muted-foreground line-through',
+						)}
+					>
+						{comment.body}
+					</p>
+				) : (
+					<CommentMarkdown
+						body={comment.body}
+						className={cn(
+							'text-xs',
+							comment.isResolved && 'text-muted-foreground',
+						)}
+					/>
+				)}
 			</div>
 			{isLocal ? (
-				<div className='flex shrink-0 items-center gap-0.5'>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button
-								className='size-6'
-								onClick={onResolve}
-								size='icon-xs'
-								variant='ghost'
-							>
-								<CheckIcon />
-								<span className='sr-only'>
-									{comment.isResolved ? 'Reopen comment' : 'Resolve comment'}
-								</span>
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent>
-							{comment.isResolved ? 'Reopen comment' : 'Resolve comment'}
-						</TooltipContent>
-					</Tooltip>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button
-								className='size-6'
-								onClick={onDelete}
-								size='icon-xs'
-								variant='ghost'
-							>
-								<XIcon />
-								<span className='sr-only'>Delete comment</span>
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent>Delete comment</TooltipContent>
-					</Tooltip>
-				</div>
+				<LocalCommentActions
+					isResolved={comment.isResolved === true}
+					onDelete={onDelete}
+					onResolve={onResolve}
+				/>
 			) : null}
+		</div>
+	);
+}
+
+/** Resolve and delete buttons, offered only on comments Ensemblr owns. */
+function LocalCommentActions({
+	isResolved,
+	onDelete,
+	onResolve,
+}: {
+	isResolved: boolean;
+	onDelete: () => void;
+	onResolve: () => void;
+}) {
+	const resolveLabel = isResolved ? 'Reopen comment' : 'Resolve comment';
+	return (
+		<div className='flex shrink-0 items-center gap-0.5'>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<Button
+						className='size-6'
+						onClick={onResolve}
+						size='icon-xs'
+						variant='ghost'
+					>
+						<CheckIcon />
+						<span className='sr-only'>{resolveLabel}</span>
+					</Button>
+				</TooltipTrigger>
+				<TooltipContent>{resolveLabel}</TooltipContent>
+			</Tooltip>
+			<Tooltip>
+				<TooltipTrigger asChild>
+					<Button
+						className='size-6'
+						onClick={onDelete}
+						size='icon-xs'
+						variant='ghost'
+					>
+						<XIcon />
+						<span className='sr-only'>Delete comment</span>
+					</Button>
+				</TooltipTrigger>
+				<TooltipContent>Delete comment</TooltipContent>
+			</Tooltip>
 		</div>
 	);
 }

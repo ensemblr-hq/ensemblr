@@ -1,5 +1,5 @@
 import type { AgentActionKind } from './agent-actions';
-import type { WorkspaceFileDiffOpener } from './file-preview';
+import type { ReviewFilePreviewOpener } from './file-preview';
 import type { OpenTargetsState } from './open-targets';
 import type { ReviewFileSummary, WorkspaceOpenTarget } from './workspace';
 
@@ -13,8 +13,16 @@ import type { ReviewFileSummary, WorkspaceOpenTarget } from './workspace';
 export interface ReviewActionsValue {
 	/** Archives the merged workspace from the post-merge header action. */
 	archiveMergedWorkspace: () => void;
+	/**
+	 * Branches the workspace onto a `-v<n>` successor of its current branch from
+	 * the post-merge header action, so work continues without the merged pull
+	 * request trailing along.
+	 */
+	continueMergedWorkspace: () => void;
 	/** Whether the merged workspace archive action is currently running. */
 	isArchivingMergedWorkspace: boolean;
+	/** Whether the merged workspace continue action is currently running. */
+	isContinuingMergedWorkspace: boolean;
 	isRefreshingPullRequest: boolean;
 	openMergeConfirmation: () => void;
 	refreshPullRequest: () => void;
@@ -35,8 +43,12 @@ export interface ReviewFileActions {
 	copyTarget: WorkspaceOpenTarget | undefined;
 	/** Runs the chosen open-in/copy target against a workspace-relative file path. */
 	invokeTarget: OpenTargetsState['invokeTarget'];
-	/** Opens (or re-focuses) the diff for a file at the active source's scope. `null` outside a conversation. */
-	openDiff: WorkspaceFileDiffOpener | null;
+	/**
+	 * Opens (or re-focuses) the surface that shows a changed file: the image
+	 * preview when the workspace still holds a previewable image, otherwise the
+	 * diff at the active source's scope. `null` outside a conversation.
+	 */
+	openFile: ReviewFilePreviewOpener | null;
 	/** Discards the working-tree changes for a single file. */
 	onDiscardFile: (filePath: string) => void;
 	/**

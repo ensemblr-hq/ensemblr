@@ -7,6 +7,7 @@ import {
 } from '../../src/main/agent-control/index.ts';
 import {
 	getChatTabById,
+	getChatTabByPiSessionId,
 	setChatTabMetadata,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
 import {
@@ -17,6 +18,7 @@ import type { PiPersistedEnvelope } from '../../src/shared/ipc/contracts/pi-sess
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
 	getChatTabById: vi.fn(() => ({ workspaceId: 'ws', metadata: {} })),
+	getChatTabByPiSessionId: vi.fn(() => null),
 	setChatTabMetadata: vi.fn(),
 }));
 
@@ -56,9 +58,16 @@ const makeDeps = (): {
 		broadcastFocus: vi.fn(),
 		broadcastTabsChanged,
 		broadcastBoardStatus,
+		broadcastPlanMode: vi.fn(),
 		boardStatusStore,
 		ask: { ask: vi.fn(), releaseSession: vi.fn() },
 		confirm: { confirm: vi.fn() },
+		planMode: {
+			activateForSpawn: vi.fn(),
+			exit: vi.fn(),
+			isActive: vi.fn(() => false),
+			releaseSession: vi.fn(),
+		},
 	} as unknown as PortAdapterDeps;
 	return {
 		deps,
@@ -238,6 +247,7 @@ describe('agent-control port adapters: conversation naming', () => {
 			prompt: 'do it',
 			title: 'Docs sweep',
 			parentSessionId: 'parent-1',
+			planMode: false,
 		});
 		expect(result).toEqual({ chatTabId: 'tab-1', piSessionId: 'sess-1' });
 		expect(setChatTabMetadata).toHaveBeenCalledWith(
@@ -251,6 +261,135 @@ describe('agent-control port adapters: conversation naming', () => {
 			provenance: 'agent',
 			sessionId: 'sess-1',
 		});
+	});
+
+	// The renderer resolves a tab's branch id out of the session list, so until the
+	// binding is announced the timeline has no branch to query and the tab renders
+	// blank. `submitPrompt` captures a git checkpoint first, which makes that gap
+	// seconds long — so the announcement has to come first.
+	it('startConversation announces the tab-to-session binding before submitting', async () => {
+		const submitPrompt = vi.fn().mockResolvedValue({});
+		const { broadcastTabsChanged, deps } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
+			submitPrompt,
+			setSessionName: vi.fn().mockResolvedValue({ applied: true }),
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ status: 'ready', command: 'pi' }),
+		};
+		(deps as { localCommandService: unknown }).localCommandService = {};
+		const ports = createAgentControlPorts(deps);
+
+		await ports.conversations.startConversation({
+			workspaceId: 'ws',
+			workspaceCwd: '/ws',
+			prompt: 'do it',
+			parentSessionId: 'parent-1',
+			planMode: false,
+		});
+
+		const markedAt = vi.mocked(setChatTabMetadata).mock.invocationCallOrder[0];
+		const submittedAt = submitPrompt.mock.invocationCallOrder[0];
+		expect(markedAt).toBeLessThan(submittedAt);
+		const announcedBetween =
+			broadcastTabsChanged.mock.invocationCallOrder.filter(
+				(order) => order > markedAt && order < submittedAt,
+			);
+		expect(announcedBetween).toHaveLength(1);
+	});
+
+	// The marker now lands before the submit that can fail. A tab this call opened
+	// is closed on rollback, but a tab the caller passed in survives — and would
+	// keep a locked composer forever if the marker stayed behind.
+	it('startConversation clears the sub-agent marker when a reused tab fails to submit', async () => {
+		const { deps } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			openSession: vi.fn().mockResolvedValue({ id: 'sess-1' }),
+			submitPrompt: vi.fn().mockRejectedValue(new Error('pi is not ready')),
+			stopSession: vi.fn().mockResolvedValue(undefined),
+			setSessionName: vi.fn(),
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ status: 'ready', command: 'pi' }),
+		};
+		(deps as { localCommandService: unknown }).localCommandService = {};
+		vi.mocked(getChatTabById)
+			.mockReturnValueOnce({
+				metadata: { pinned: true },
+				workspaceId: 'ws',
+			} as unknown as ReturnType<typeof getChatTabById>)
+			.mockReturnValueOnce({
+				metadata: { agentRole: 'subagent', pinned: true },
+				workspaceId: 'ws',
+			} as unknown as ReturnType<typeof getChatTabById>);
+		const ports = createAgentControlPorts(deps);
+
+		await expect(
+			ports.conversations.startConversation({
+				workspaceId: 'ws',
+				workspaceCwd: '/ws',
+				chatTabId: 'tab-reused',
+				prompt: 'do it',
+				parentSessionId: 'parent-1',
+				planMode: false,
+			}),
+		).rejects.toThrow('pi is not ready');
+
+		expect(setChatTabMetadata).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				id: 'tab-reused',
+				metadata: { pinned: true },
+			}),
+		);
+	});
+
+	// The other half of that rollback. Reusing an already-marked tab writes
+	// nothing, so clearing the marker on failure would strip a live sub-agent of
+	// its role — and after a restart the depth counter reads it as a root, handing
+	// back the whole surface the role policy exists to deny it.
+	it('startConversation leaves a pre-existing sub-agent marker alone when the submit fails', async () => {
+		const { deps } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			openSession: vi.fn().mockResolvedValue({ id: 'sess-2' }),
+			submitPrompt: vi.fn().mockRejectedValue(new Error('pi is not ready')),
+			stopSession: vi.fn().mockResolvedValue(undefined),
+			setSessionName: vi.fn(),
+			getSession: vi.fn(),
+			listSessionsForWorkspace: () => [],
+		};
+		(deps as { piExecutableService: unknown }).piExecutableService = {
+			getSnapshot: vi
+				.fn()
+				.mockResolvedValue({ status: 'ready', command: 'pi' }),
+		};
+		(deps as { localCommandService: unknown }).localCommandService = {};
+		vi.mocked(getChatTabById).mockReturnValue({
+			metadata: { agentRole: 'subagent', pinned: true },
+			workspaceId: 'ws',
+		} as unknown as ReturnType<typeof getChatTabById>);
+		const ports = createAgentControlPorts(deps);
+
+		await expect(
+			ports.conversations.startConversation({
+				workspaceId: 'ws',
+				workspaceCwd: '/ws',
+				chatTabId: 'tab-already-subagent',
+				prompt: 'do it',
+				parentSessionId: 'parent-1',
+				planMode: false,
+			}),
+		).rejects.toThrow('pi is not ready');
+
+		expect(setChatTabMetadata).not.toHaveBeenCalled();
 	});
 });
 
@@ -340,6 +479,12 @@ describe('agent-control port adapters: last message', () => {
 		},
 	});
 
+	const userPrompt = (text: string): PiPersistedEnvelope => ({
+		kind: 'message',
+		role: 'user',
+		payload: { kind: 'prompt', prompt: text },
+	});
+
 	const withPayloads = (payloads: readonly (PiPersistedEnvelope | null)[]) => {
 		const { deps } = makeDeps();
 		(deps as { piSessionService: unknown }).piSessionService = {
@@ -355,14 +500,36 @@ describe('agent-control port adapters: last message', () => {
 		expect(result).toBe('The build is green.');
 	});
 
-	it('returns the newest assistant answer, skipping a later non-text event', async () => {
+	it('joins every assistant message of the final turn in the order it was written', async () => {
 		const ports = withPayloads([
 			{ kind: 'status', previous: 'idle', status: 'idle' },
-			agentMessage('newest answer'),
-			agentMessage('older answer'),
+			agentMessage('Report delivered above.'),
+			agentMessage('The full findings.'),
+			userPrompt('investigate the backend'),
 		]);
 		const result = await ports.conversations.getLastMessage('sess-1');
-		expect(result).toBe('newest answer');
+		expect(result).toBe('The full findings.\n\nReport delivered above.');
+	});
+
+	it('stops at the prompt that opened the final turn, leaving earlier turns out', async () => {
+		const ports = withPayloads([
+			agentMessage('this turn'),
+			userPrompt('the follow-up'),
+			agentMessage('the previous turn'),
+			userPrompt('the first prompt'),
+		]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toBe('this turn');
+	});
+
+	it('falls back to the newest turn that answered when the final one has not yet', async () => {
+		const ports = withPayloads([
+			userPrompt('the follow-up it is still working on'),
+			agentMessage('the report it already filed'),
+			userPrompt('the first prompt'),
+		]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toBe('the report it already filed');
 	});
 
 	it('reads a standalone text payload', async () => {
@@ -416,6 +583,33 @@ describe('agent-control port adapters: last message', () => {
 		expect(result).toBeNull();
 	});
 
+	it('sheds the oldest messages of a turn that runs past the report ceiling', async () => {
+		const filler = 'x'.repeat(11_000);
+		const ports = withPayloads([
+			agentMessage('the answer'),
+			agentMessage(filler),
+			agentMessage(filler),
+			agentMessage(filler),
+			agentMessage('the narration that opened the turn'),
+			userPrompt('do the work'),
+		]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toContain('the answer');
+		expect(result).not.toContain('the narration that opened the turn');
+		expect((result ?? '').length).toBeLessThanOrEqual(32_000);
+	});
+
+	// The ceiling exists so one child cannot flood its orchestrator's context from a
+	// single pasted tool result, which it could while the newest message skipped the
+	// cap. A report states its answer first, so the clamp keeps the opening.
+	it('clamps a single answer that busts the ceiling on its own', async () => {
+		const huge = `the answer${'y'.repeat(40_000)}`;
+		const ports = withPayloads([agentMessage(huge), userPrompt('do the work')]);
+		const result = await ports.conversations.getLastMessage('sess-1');
+		expect(result).toHaveLength(32_000);
+		expect(result).toBe(huge.slice(0, 32_000));
+	});
+
 	it('returns null for an unknown session', async () => {
 		const { deps } = makeDeps();
 		(deps as { piSessionService: unknown }).piSessionService = {
@@ -425,6 +619,136 @@ describe('agent-control port adapters: last message', () => {
 		const ports = createAgentControlPorts(deps);
 		const result = await ports.conversations.getLastMessage('gone');
 		expect(result).toBeNull();
+	});
+});
+
+describe('agent-control port adapters: readTranscript', () => {
+	const prompt = (text: string): PiPersistedEnvelope => ({
+		kind: 'message',
+		payload: { kind: 'prompt', prompt: text },
+		role: 'user',
+	});
+
+	const answer = (text: string): PiPersistedEnvelope => ({
+		kind: 'message',
+		payload: { kind: 'text', text },
+		role: 'agent',
+	});
+
+	const withEvents = (
+		events: readonly { ordinal: number; payload: PiPersistedEnvelope }[],
+		session: { branchId: string } | null = { branchId: 'branch-1' },
+	) => {
+		const listEvents = vi.fn(() =>
+			events.map((event) => ({ ...event, stream: 'protocol' as const })),
+		);
+		const { deps } = makeDeps();
+		(deps as { piSessionService: unknown }).piSessionService = {
+			getSession: vi.fn(() => session),
+			listEvents,
+		};
+		return { listEvents, ports: createAgentControlPorts(deps) };
+	};
+
+	it('projects the session’s branch into a transcript page', async () => {
+		const { listEvents, ports } = withEvents([
+			{ ordinal: 1, payload: prompt('audit the parser') },
+			{ ordinal: 2, payload: answer('parser looks sound') },
+		]);
+
+		const result = await ports.conversations.readTranscript({
+			piSessionId: 'sess-1',
+		});
+
+		expect(listEvents).toHaveBeenCalledWith('branch-1');
+		expect(result.entries).toEqual([
+			{ kind: 'prompt', ordinal: 1, text: 'audit the parser' },
+			{ kind: 'message', ordinal: 2, text: 'parser looks sound' },
+		]);
+		expect(result.piSessionId).toBe('sess-1');
+		expect(result.turnCount).toBe(1);
+	});
+
+	it('forwards the read mode rather than always paging from the start', async () => {
+		const { ports } = withEvents([
+			{ ordinal: 1, payload: prompt('go') },
+			{ ordinal: 2, payload: answer('done') },
+		]);
+
+		const result = await ports.conversations.readTranscript({
+			piSessionId: 'sess-1',
+			stat: true,
+		});
+
+		expect(result.entries).toEqual([]);
+		expect(result.entryCount).toBe(2);
+	});
+
+	// An auditor has to be able to tell a child that did nothing from a call that
+	// failed, so a session the app no longer knows reads as an empty branch.
+	it('reads an unknown session as an empty branch', async () => {
+		const { listEvents, ports } = withEvents([], null);
+
+		const result = await ports.conversations.readTranscript({
+			piSessionId: 'gone',
+		});
+
+		expect(listEvents).not.toHaveBeenCalled();
+		expect(result).toEqual({
+			entries: [],
+			entryCount: 0,
+			firstOrdinal: null,
+			lastOrdinal: null,
+			nextOrdinal: null,
+			piSessionId: 'gone',
+			turnCount: 0,
+		});
+	});
+});
+
+describe('agent-control port adapters: sub-agent marker', () => {
+	const tab = (metadata: Record<string, unknown>) =>
+		({ id: 'tab-1', metadata }) as ReturnType<typeof getChatTabByPiSessionId>;
+
+	beforeEach(() => {
+		vi.mocked(getChatTabByPiSessionId).mockReset();
+	});
+
+	it('reports the marker a spawn stamped on the session’s tab', async () => {
+		vi.mocked(getChatTabByPiSessionId).mockReturnValue(
+			tab({ agentRole: 'subagent' }),
+		);
+		const { deps } = makeDeps();
+		const ports = createAgentControlPorts(deps);
+		expect(await ports.conversations.isSpawnedSubAgent?.('sess-1')).toBe(true);
+		expect(getChatTabByPiSessionId).toHaveBeenCalledWith(
+			expect.objectContaining({ piSessionId: 'sess-1' }),
+		);
+	});
+
+	it('reports no marker for a tab that was never spawned into', async () => {
+		vi.mocked(getChatTabByPiSessionId).mockReturnValue(tab({}));
+		const { deps } = makeDeps();
+		const ports = createAgentControlPorts(deps);
+		expect(await ports.conversations.isSpawnedSubAgent?.('sess-1')).toBe(false);
+	});
+
+	it('reports no marker for a session with no tab', async () => {
+		vi.mocked(getChatTabByPiSessionId).mockReturnValue(null);
+		const { deps } = makeDeps();
+		const ports = createAgentControlPorts(deps);
+		expect(await ports.conversations.isSpawnedSubAgent?.('gone')).toBe(false);
+	});
+
+	// Role resolution falls back to live lineage when the marker cannot be read, so
+	// a storage failure must not throw out of the plan-mode gate.
+	it('reports no marker when the read fails', async () => {
+		vi.mocked(getChatTabByPiSessionId).mockImplementation(() => {
+			throw new Error('database is closed');
+		});
+		const { deps } = makeDeps();
+		const ports = createAgentControlPorts(deps);
+		expect(await ports.conversations.isSpawnedSubAgent?.('sess-1')).toBe(false);
 	});
 });
 

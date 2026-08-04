@@ -1,14 +1,8 @@
 import { type RefObject, useLayoutEffect, useState } from 'react';
 import type { StickToBottomState } from 'use-stick-to-bottom';
+import { readScrollOffset } from '@/renderer/lib/conversation/viewport';
 import { useConversationScrollOffsets } from '@/renderer/state/conversation-scroll';
 import type { ConversationScrollOffset } from '@/renderer/types/chat';
-
-/**
- * Distance from the bottom that still counts as following the stream. Mirrors
- * use-stick-to-bottom's own `STICK_TO_BOTTOM_OFFSET_PX` so a viewport the
- * library treats as locked is remembered as locked too.
- */
-const NEAR_BOTTOM_THRESHOLD_PX = 70;
 
 /**
  * Positions a conversation viewport where its tab was last left and keeps that
@@ -81,18 +75,4 @@ function resolveRestoreScrollTop(
 		return null;
 	}
 	return offset.scrollTop;
-}
-
-/**
- * Snapshot a viewport's current position.
- * @param viewport - The scrolling element
- * @returns Its scroll offset, flagged when it is still following the stream.
- */
-function readScrollOffset(viewport: HTMLElement): ConversationScrollOffset {
-	const distanceFromBottom =
-		viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-	return {
-		scrollTop: viewport.scrollTop,
-		stuckToBottom: distanceFromBottom <= NEAR_BOTTOM_THRESHOLD_PX,
-	};
 }

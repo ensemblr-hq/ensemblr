@@ -2,7 +2,7 @@
 
 import { act, fireEvent, screen } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 vi.mock('@iconify/react', () => ({
 	addCollection: () => undefined,
@@ -15,7 +15,15 @@ import { FilePreviewPanel } from '../../src/renderer/components/workbench-shell/
 import { SessionTabs } from '../../src/renderer/components/workbench-shell/conversation-panel/session-tabs';
 import { getWorkspaceFileIconNameForPath } from '../../src/renderer/lib/workbench';
 import type { SessionTabModel } from '../../src/renderer/types/workbench';
-import { createTestQueryClient, renderWithProviders } from './support/dom';
+import {
+	createTestQueryClient,
+	installLocalStorage,
+	renderWithProviders,
+} from './support/dom';
+
+beforeEach(() => {
+	installLocalStorage();
+});
 
 const workspaceCwd = '/workspace/ensemblr';
 const previewFilePath = 'assets/logo.png';
@@ -25,6 +33,7 @@ const previewSession: SessionTabModel = {
 	chatTabId: 'preview-tab',
 	filePath: previewFilePath,
 	id: 'preview-tab',
+	isPreview: false,
 	isSubAgent: false,
 	kind: 'preview',
 	label: 'logo.png',
@@ -57,6 +66,7 @@ describe('file preview tabs', () => {
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}
+				onSessionTabPin={() => undefined}
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[previewSession]}
@@ -86,6 +96,7 @@ describe('file preview tabs', () => {
 					onSessionTabChange={() => undefined}
 					onSessionTabClose={() => undefined}
 					onSessionTabOpen={async () => null}
+					onSessionTabPin={() => undefined}
 					onSessionTabRestore={() => undefined}
 					onSessionTabsReorder={() => undefined}
 					sessions={[previewSession]}
@@ -140,6 +151,7 @@ describe('file preview tabs', () => {
 const chatA: SessionTabModel = {
 	chatTabId: 'chat-a',
 	id: 'chat-a',
+	isPreview: false,
 	isSubAgent: false,
 	kind: 'chat',
 	label: 'Chat A',
@@ -168,6 +180,7 @@ describe('session tab close controls', () => {
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={onSessionTabClose}
 				onSessionTabOpen={async () => null}
+				onSessionTabPin={() => undefined}
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[chatA, chatB]}
@@ -201,6 +214,7 @@ describe('session tab close controls', () => {
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}
+				onSessionTabPin={() => undefined}
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[chatA]}
@@ -219,6 +233,7 @@ describe('session tab close controls', () => {
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}
+				onSessionTabPin={() => undefined}
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[previewSession]}

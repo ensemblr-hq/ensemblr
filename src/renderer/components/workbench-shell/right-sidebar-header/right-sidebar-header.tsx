@@ -1,4 +1,4 @@
-import { useAtom } from 'jotai';
+import { useAtomValue } from 'jotai';
 import {
 	ArchiveIcon,
 	ExternalLinkIcon,
@@ -8,7 +8,6 @@ import {
 	MoreVerticalIcon,
 	RefreshCwIcon,
 } from 'lucide-react';
-import { useCallback } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -44,12 +43,6 @@ type RightSidebarHeaderNumberedState = Extract<
 	{ number: number }
 >;
 
-/** Resolved PR header state and local actions shared by sidebar chrome. */
-interface RightSidebarHeaderViewModel {
-	continueMergedWorkspace: () => void;
-	headerState: RightSidebarHeaderState;
-}
-
 const HEADER_LABEL_TONE_CLASSES: Record<HeaderTone, string> = {
 	blocked: 'text-status-danger',
 	neutral: 'text-muted-foreground',
@@ -74,8 +67,7 @@ export function RightSidebarHeader({
 }: {
 	activeWorkspace: WorkspaceShellModel;
 }) {
-	const { continueMergedWorkspace, headerState } =
-		useRightSidebarHeaderViewModel(activeWorkspace);
+	const headerState = useRightSidebarHeaderState(activeWorkspace);
 	const hasPullRequestNumber = 'number' in headerState;
 	const hasHeaderLabel = 'label' in headerState;
 
@@ -103,7 +95,6 @@ export function RightSidebarHeader({
 				<RightSidebarHeaderAction
 					activeWorkspace={activeWorkspace}
 					headerState={headerState}
-					onContinueMergedWorkspace={continueMergedWorkspace}
 				/>
 			</div>
 		</header>
@@ -116,8 +107,7 @@ export function RightSidebarHeaderInlineActions({
 }: {
 	activeWorkspace: WorkspaceShellModel;
 }) {
-	const { continueMergedWorkspace, headerState } =
-		useRightSidebarHeaderViewModel(activeWorkspace);
+	const headerState = useRightSidebarHeaderState(activeWorkspace);
 	const hasPullRequestNumber = 'number' in headerState;
 
 	if (!hasPullRequestNumber && headerState.kind === 'empty') {
@@ -135,43 +125,29 @@ export function RightSidebarHeaderInlineActions({
 			<RightSidebarHeaderAction
 				activeWorkspace={activeWorkspace}
 				headerState={headerState}
-				onContinueMergedWorkspace={continueMergedWorkspace}
 			/>
 		</div>
 	);
 }
 
-/** Resolves PR header state and the local merged-PR continue action. */
-function useRightSidebarHeaderViewModel(
+/**
+ * Resolves the header state for a workspace, honouring the locally dismissed
+ * merged PR so a continued workspace stops showing the merged header before the
+ * next `gh` snapshot lands.
+ * @param activeWorkspace - Workspace the header renders for.
+ * @returns The resolved header state.
+ */
+function useRightSidebarHeaderState(
 	activeWorkspace: WorkspaceShellModel,
-): RightSidebarHeaderViewModel {
+): RightSidebarHeaderState {
 	const hasBranchChanges = useReviewableChanges(activeWorkspace);
-	const [continuedMergedPullRequests, setContinuedMergedPullRequests] = useAtom(
+	const continuedMergedPullRequests = useAtomValue(
 		continuedMergedPullRequestByWorkspaceAtom,
 	);
-	const continuedPullRequestNumber =
-		continuedMergedPullRequests[activeWorkspace.id];
-	const headerState = getRightSidebarHeaderState(
-		activeWorkspace,
-		hasBranchChanges,
-		{ continuedPullRequestNumber },
-	);
-	const continueMergedWorkspace = useCallback(() => {
-		const pullRequestNumber = activeWorkspace.pullRequest.number;
-		if (pullRequestNumber === undefined) {
-			return;
-		}
-		setContinuedMergedPullRequests((current) => ({
-			...current,
-			[activeWorkspace.id]: pullRequestNumber,
-		}));
-	}, [
-		activeWorkspace.id,
-		activeWorkspace.pullRequest.number,
-		setContinuedMergedPullRequests,
-	]);
 
-	return { continueMergedWorkspace, headerState };
+	return getRightSidebarHeaderState(activeWorkspace, hasBranchChanges, {
+		continuedPullRequestNumber: continuedMergedPullRequests[activeWorkspace.id],
+	});
 }
 
 /** Renders the existing pull request and preview deployment links. */
@@ -188,7 +164,10 @@ function RightSidebarHeaderPullRequestLinks({
 				url={headerState.url}
 			/>
 			{headerState.previewDeployment ? (
-				<PreviewDeploymentButton deployment={headerState.previewDeployment} />
+				<PreviewDeploymentButton
+					deployment={headerState.previewDeployment}
+					tone={headerState.tone}
+				/>
 			) : null}
 		</div>
 	);
@@ -198,11 +177,9 @@ function RightSidebarHeaderPullRequestLinks({
 function RightSidebarHeaderAction({
 	activeWorkspace,
 	headerState,
-	onContinueMergedWorkspace,
 }: {
 	activeWorkspace: WorkspaceShellModel;
 	headerState: RightSidebarHeaderState;
-	onContinueMergedWorkspace: () => void;
 }) {
 	const reviewActions = useReviewActions();
 
@@ -225,19 +202,33 @@ function RightSidebarHeaderAction({
 				<div className='flex items-center gap-1.5'>
 					<Button
 						className='h-8 rounded-lg border-[color:var(--right-sidebar-header-merged-border)] border-dashed bg-background/70 px-2.5 text-[color:var(--right-sidebar-header-merged)] text-sm hover:bg-[var(--right-sidebar-header-merged-soft)] hover:text-[color:var(--right-sidebar-header-merged)] dark:border-[color:var(--right-sidebar-header-merged-border)] dark:bg-background/65 dark:hover:bg-[var(--right-sidebar-header-merged-soft)]'
-						disabled={reviewActions?.isArchivingMergedWorkspace}
-						onClick={onContinueMergedWorkspace}
+						disabled={
+							reviewActions === null ||
+							reviewActions.isArchivingMergedWorkspace ||
+							reviewActions.isContinuingMergedWorkspace
+						}
+						onClick={reviewActions?.continueMergedWorkspace}
 						size='sm'
 						variant='outline'
 					>
-						<FastForwardIcon aria-hidden='true' data-icon='inline-start' />
+						{reviewActions?.isContinuingMergedWorkspace ? (
+							<LoaderCircleIcon
+								aria-hidden='true'
+								className='animate-spin'
+								data-icon='inline-start'
+							/>
+						) : (
+							<FastForwardIcon aria-hidden='true' data-icon='inline-start' />
+						)}
 						Continue
 					</Button>
 					<Button
 						className='h-8 rounded-lg bg-[var(--right-sidebar-header-merged)] px-2.5 text-[color:var(--right-sidebar-header-merged-foreground)] text-sm hover:bg-[var(--right-sidebar-header-merged-hover)]'
 						data-permission-boundary={archiveBoundary.boundary}
 						disabled={
-							reviewActions === null || reviewActions.isArchivingMergedWorkspace
+							reviewActions === null ||
+							reviewActions.isArchivingMergedWorkspace ||
+							reviewActions.isContinuingMergedWorkspace
 						}
 						onClick={reviewActions?.archiveMergedWorkspace}
 						size='sm'

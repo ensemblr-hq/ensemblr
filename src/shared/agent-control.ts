@@ -4,17 +4,36 @@
  * `agent-control/` implementation files.
  */
 export { buildAskUserQuestionResult } from './agent-control/ask-user-question.ts';
+export type { AgentControlRole } from './agent-control/awareness.ts';
 export {
 	HARNESS_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
-	PLAN_MODE_AWARENESS,
+	PLAN_MODE_ORCHESTRATOR_AWARENESS,
+	PLAN_MODE_SUBAGENT_AWARENESS,
+	resolveAgentRole,
 	roleForDepth,
 	SUBAGENT_AWARENESS,
 } from './agent-control/awareness.ts';
+export {
+	BRIEF_REPORT_CHARS,
+	briefReport,
+} from './agent-control/brief-report.ts';
 export * from './agent-control/contracts.ts';
+export { buildConversationTranscript } from './agent-control/conversation-transcript.ts';
 export { buildPlanSubmittedResult } from './agent-control/plan-mode.ts';
 export * from './agent-control/schemas.ts';
 export {
 	buildSessionBriefNudge,
 	SESSION_BRIEF_NUDGE_HEADER,
 } from './agent-control/session-brief.ts';
+export {
+	SUBAGENT_UNUSABLE_OPS,
+	SUBAGENT_WITHHELD_OPS,
+	subAgentControlOpDenial,
+} from './agent-control/subagent-policy.ts';
+export type { DiffFilePatch } from './agent-control/workspace-diff.ts';
+export {
+	budgetWorkspaceDiff,
+	clampFilePatch,
+	MAX_AGENT_PAYLOAD_CHARS,
+} from './agent-control/workspace-diff.ts';

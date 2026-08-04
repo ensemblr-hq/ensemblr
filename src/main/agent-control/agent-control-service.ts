@@ -5,10 +5,12 @@
  * scope-checked, guardrailed, then delegated to an existing service via a port.
  */
 import type {
+	AddDiffCommentsArgs,
 	AgentControlConversationStatus,
 	AgentControlErrorCode,
 	AgentControlOp,
 	AgentControlResult,
+	AgentControlRole,
 	AskUserQuestionArgs,
 	CheckPlanModeToolArgs,
 	CloseTabArgs,
@@ -17,14 +19,18 @@ import type {
 	FocusDockTabArgs,
 	FocusPanelArgs,
 	FocusTabArgs,
+	GetDiffCommentsArgs,
 	GetLastMessageResult,
 	GetSessionBriefResult,
+	GetWorkspaceDiffArgs,
 	LaunchHarnessArgs,
 	ListTabsArgs,
 	ListTerminalsArgs,
 	NotifyOrchestratorArgs,
 	OpenTabArgs,
 	OrchestratorSignal,
+	PendingAgent,
+	ReadConversationArgs,
 	ReadTerminalOutputArgs,
 	SendFollowUpArgs,
 	SetBranchNameArgs,
@@ -38,17 +44,24 @@ import type {
 	StopTerminalArgs,
 	WaitedAgent,
 	WaitForAgentsArgs,
+	WaitForAgentsResult,
+	WaitMode,
+	WaitReportDetail,
 	WriteTerminalArgs,
 } from '../../shared/agent-control.ts';
 import {
+	briefReport,
 	buildSessionBriefNudge,
 	isWriteOp,
+	resolveAgentRole,
+	subAgentControlOpDenial,
 	validateArgs,
 } from '../../shared/agent-control.ts';
 import { classifyPermissionAction } from '../../shared/permissions.ts';
 import {
 	evaluatePlanModeTool,
 	planModeControlOpDenial,
+	planModeFollowUpDenial,
 } from '../../shared/plan-mode.ts';
 import { BranchSlugRejected } from '../pi-agent/naming/apply-branch-slug.ts';
 import type { Guardrails } from './guardrails.ts';
@@ -147,6 +160,99 @@ function fail(
 }
 
 /**
+ * Whether a child's pending signal is one only the orchestrator can clear.
+ * @param signal - The child's pending signal, or null when it has none.
+ * @returns True for `need_decision` and `blocked`.
+ */
+function needsAttention(signal: OrchestratorSignal | null): boolean {
+	return signal !== null && ATTENTION_REASONS.has(signal.reason);
+}
+
+/**
+ * Whether a `mode: "all"` wait may return. Every target settling is the ordinary
+ * case; a child asking for a decision releases the wait too, because the caller
+ * is the only one who can answer it and its still-running siblings would
+ * otherwise hold the question there until the wait timeout expires.
+ * @param settled - Per-target settle state from the current poll tick.
+ * @returns True when the wait may return.
+ */
+function waitAllSatisfied(
+	settled: readonly { agent: WaitedAgent; settled: boolean }[],
+): boolean {
+	return (
+		settled.every((entry) => entry.settled) ||
+		settled.some((entry) => needsAttention(entry.agent.signal))
+	);
+}
+
+/**
+ * Names the targets a wait is leaving behind, so the caller can wait on exactly
+ * those next instead of polling each child's status.
+ * @param settled - Per-target settle state from the poll tick that returned.
+ * @returns The unsettled targets and their current status.
+ */
+function stillRunning(
+	settled: readonly { agent: WaitedAgent; settled: boolean }[],
+): PendingAgent[] {
+	return settled.flatMap((entry) =>
+		entry.settled
+			? []
+			: [{ piSessionId: entry.agent.piSessionId, status: entry.agent.status }],
+	);
+}
+
+/**
+ * Assembles a wait result, attaching the instruction that a timed-out wait is a
+ * lap of the loop rather than a failure. A child doing real work outlives the
+ * app's wait ceiling routinely, and a bare `timedOut: true` reads to an
+ * orchestrator as something to report to the user or work around — so the call
+ * that resumes the wait travels as prose, the same reason a shortened report
+ * carries its own re-fetch pointer. The note echoes the caller's own mode, because
+ * a caller that chose `first` to react to whichever child lands first did not ask
+ * to start blocking on all of them.
+ * @param outcome - The settled children, the ones still running, whether the window expired, and the mode the caller waited in.
+ * @returns The wait result, with a resume note when one is warranted.
+ */
+/**
+ * The result of a wait with nothing to wait on. When the caller named its targets
+ * and got none, that is a settled answer. When it let the default stand and the
+ * lineage registry came back empty, it may instead have lost its children to a
+ * restart — that registry is in-memory — so the note says how to recover rather
+ * than letting a signalling child's escalation land in a wait that reads nothing.
+ * @param defaulted - True when the caller omitted `targets` and the registry resolved empty.
+ * @returns An empty wait result, with a recovery note when the lineage may be lost.
+ */
+function emptyWait(defaulted: boolean): WaitForAgentsResult {
+	const result = { completed: [], pending: [], timedOut: false };
+	if (!defaulted) {
+		return result;
+	}
+	return {
+		...result,
+		note: 'No children are registered to this session. If you spawned children earlier and the app has restarted since, that lineage is gone and the default target cannot find them — wait again with their piSessionIds in `targets`, taken from the ensemblr_start_conversation results earlier in this conversation, or read a report directly with ensemblr_get_last_message.',
+	};
+}
+
+function waitOutcome(outcome: {
+	completed: readonly WaitedAgent[];
+	pending: readonly PendingAgent[];
+	timedOut: boolean;
+	mode: WaitMode;
+}): WaitForAgentsResult {
+	const { mode, ...result } = outcome;
+	if (!result.timedOut || result.pending.length === 0) {
+		return result;
+	}
+	const targets = result.pending
+		.map((entry) => `"${entry.piSessionId}"`)
+		.join(', ');
+	return {
+		...result,
+		note: `Not a failure: the wait window expired while ${result.pending.length} child(ren) were still working. Keep waiting with ensemblr_wait_for_agents({ mode: "${mode}", targets: [${targets}] }).`,
+	};
+}
+
+/**
  * Confirms a resolved workspace matches the caller's, for write-scope checks.
  * @param actualWorkspaceId - Owning workspace of the target, or null when missing.
  * @param origin - Resolved caller identity.
@@ -183,22 +289,89 @@ export function createAgentControlService({
 	const signalsByChild = new Map<string, OrchestratorSignal>();
 
 	/**
-	 * Blocks the control ops a planning agent must not reach. The Pi extension
-	 * intercepts `bash`, `edit`, and `write`, but Ensemblr's own tools can open a
-	 * terminal, launch a harness, or drive another conversation — each of which
-	 * puts an unrestricted writer on the same workspace.
+	 * Whether the caller is a Pi conversation that is currently planning. Plan Mode
+	 * is a native chat feature, so a harness caller is never planning however its
+	 * session id resolves.
+	 * @param origin - Resolved caller identity.
+	 * @returns True when Plan Mode governs this caller's turn.
+	 */
+	const isPlanning = (origin: AgentControlOrigin): boolean =>
+		origin.species === 'pi' && ports.planMode.isActive(origin.sessionId);
+
+	/**
+	 * The caller's control-layer role. Prefers the sub-agent marker its spawn
+	 * persisted on its chat tab over live lineage, because lineage does not
+	 * survive a restart: `parentSessionId` is not stored, so a resumed session
+	 * re-registers at depth 0, while Plan Mode is restored from the renderer's
+	 * per-tab store. Without the durable marker a restored investigator would come
+	 * back holding the orchestrator policy and could submit a plan, question the
+	 * user, or delegate onward — the three ops that policy exists to deny it.
+	 * @param origin - Resolved caller identity.
+	 * @returns The role that selects which half of the plan-mode policy applies.
+	 */
+	const resolveRole = async (
+		origin: AgentControlOrigin,
+	): Promise<AgentControlRole> =>
+		resolveAgentRole(
+			await ports.conversations.isSpawnedSubAgent(origin.sessionId),
+			origin.depth,
+		);
+
+	/**
+	 * Blocks the ops that belong to the orchestrator rather than to the one unit of
+	 * work a child was handed, whatever mode it is in. Runs before the plan-mode
+	 * gate because the role is a durable fact about the session while planning is a
+	 * property of the turn, so a sub-agent should hear why it is a sub-agent rather
+	 * than why it is planning.
+	 *
+	 * This is what a sub-agent used to be denied only by accident: the spawn
+	 * guardrail refusing `origin.depth >= 1`. That counter lives in an in-memory
+	 * registry, so a session resumed after a restart came back at depth 0 holding
+	 * the whole surface again.
+	 *
+	 * The op is checked before the role because resolving the role reads the tab
+	 * marker out of the database, and this runs on every dispatch: an op no role is
+	 * denied costs nothing to clear.
 	 * @param op - The control op being dispatched.
 	 * @param origin - Resolved caller identity.
 	 * @returns A denial envelope, or null when the op may proceed.
 	 */
-	const gatePlanMode = (
+	const gateSubAgentRole = async (
 		op: AgentControlOp,
 		origin: AgentControlOrigin,
-	): AgentControlResult<never> | null => {
-		if (origin.species !== 'pi' || !ports.planMode.isActive(origin.sessionId)) {
+	): Promise<AgentControlResult<never> | null> => {
+		const denial = subAgentControlOpDenial(op);
+		if (denial === null) {
 			return null;
 		}
-		const denial = planModeControlOpDenial(op);
+		return (await resolveRole(origin)) === 'subagent'
+			? fail('denied-scope', denial)
+			: null;
+	};
+
+	/**
+	 * Blocks the control ops a planning agent must not reach. The Pi extension
+	 * intercepts `bash`, `edit`, and `write`, but Ensemblr's own tools can open a
+	 * terminal, launch a harness, or drive another conversation — each of which
+	 * puts an unrestricted writer on the same workspace. Policy splits by role: a
+	 * planning orchestrator may fan out read-only investigators, a planning
+	 * sub-agent may not delegate, submit a plan, or question the user.
+	 *
+	 * This is not the whole plan-mode policy. `sendFollowUp` from an orchestrator
+	 * depends on whether its target is itself planning, which cannot be resolved
+	 * before the workspace scope check, so `handleSendFollowUp` owns that half.
+	 * @param op - The control op being dispatched.
+	 * @param origin - Resolved caller identity.
+	 * @returns A denial envelope, or null when the op may proceed.
+	 */
+	const gatePlanMode = async (
+		op: AgentControlOp,
+		origin: AgentControlOrigin,
+	): Promise<AgentControlResult<never> | null> => {
+		if (!isPlanning(origin)) {
+			return null;
+		}
+		const denial = planModeControlOpDenial(op, await resolveRole(origin));
 		return denial === null ? null : fail('denied-scope', denial);
 	};
 
@@ -291,6 +464,7 @@ export function createAgentControlService({
 			title: args.title,
 			callerModel,
 			parentSessionId: origin.sessionId,
+			planMode: isPlanning(origin),
 		});
 		guardrails.recordSpawn(origin.sessionId);
 		const result = await waitIfRequested(started.piSessionId, args.wait);
@@ -340,6 +514,12 @@ export function createAgentControlService({
 	 * an earlier agent) already named is reported as settled rather than failed:
 	 * a failure envelope reads to a model like a transient fault worth retrying,
 	 * and there is nothing here to retry.
+	 *
+	 * Root callers only, which {@link gateSubAgentRole} enforces before dispatch:
+	 * the workspace name and its git branch describe the whole body of work and
+	 * outlive any one delegated unit of it. The session brief withholds the branch
+	 * bullet from a sub-agent for the same reason, so a child never sees the upkeep
+	 * block ask for this.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The requested slug.
 	 * @returns Whether the name was applied, or an `invalid-args` failure the agent can act on.
@@ -401,11 +581,20 @@ export function createAgentControlService({
 		return ok({
 			naming,
 			nudge: buildSessionBriefNudge(naming),
-			planMode:
-				origin.species === 'pi' && ports.planMode.isActive(origin.sessionId),
+			planMode: isPlanning(origin),
 		} satisfies GetSessionBriefResult);
 	};
 
+	/**
+	 * Steers another conversation. A planning caller may only reach a target that
+	 * is itself planning, so delegation cannot be laundered into an edit through a
+	 * conversation that is not restricted. The plan-mode check runs after the scope
+	 * check on purpose: answering it earlier would tell a caller in another
+	 * workspace whether a session it cannot see is planning.
+	 * @param origin - Resolved caller identity.
+	 * @param args - Target session, prompt, and whether to block on it.
+	 * @returns The wait outcome, or a denial envelope.
+	 */
 	const handleSendFollowUp = async (
 		origin: AgentControlOrigin,
 		args: SendFollowUpArgs,
@@ -416,6 +605,14 @@ export function createAgentControlService({
 		const scoped = outOfScope(owner, origin);
 		if (scoped) {
 			return scoped;
+		}
+		if (isPlanning(origin)) {
+			const denial = planModeFollowUpDenial(
+				ports.planMode.isActive(args.piSessionId),
+			);
+			if (denial) {
+				return fail('denied-scope', denial);
+			}
 		}
 		if (args.wait) {
 			const deadlock = guardrails.evaluateWaitTarget(
@@ -604,11 +801,27 @@ export function createAgentControlService({
 		return ok({ status: ports.board.getWorkspaceStatus(origin.workspaceId) });
 	};
 
-	const handleNotifyOrchestrator = (
+	/**
+	 * Parks a child's signal for the orchestrator's next wait tick. Gated on the
+	 * durable role rather than on live lineage: `origin.parentSessionId` lives in
+	 * the in-memory registry, so a session resumed after a restart would lose its
+	 * one sanctioned escape hatch at exactly the moment the depth counter stopped
+	 * denying it everything else. The signal is keyed by child, and a wait reads it
+	 * by child id, so recovering the parent's id is not needed to deliver it.
+	 *
+	 * Delivery still needs the orchestrator to name the child. A default wait
+	 * resolves its targets from the same in-memory lineage, so after a restart it
+	 * finds none — {@link emptyWait} is what tells the orchestrator to pass the ids
+	 * explicitly rather than read the empty result as "nothing needs me".
+	 * @param origin - Resolved caller identity.
+	 * @param args - The signal reason and its message.
+	 * @returns An acknowledgement, or a `not-found` failure for a root caller.
+	 */
+	const handleNotifyOrchestrator = async (
 		origin: AgentControlOrigin,
 		args: NotifyOrchestratorArgs,
-	): AgentControlResult<unknown> => {
-		if (!origin.parentSessionId) {
+	): Promise<AgentControlResult<unknown>> => {
+		if ((await resolveRole(origin)) !== 'subagent') {
 			return fail(
 				'not-found',
 				'No orchestrator to notify: this session was not spawned by another agent.',
@@ -621,34 +834,56 @@ export function createAgentControlService({
 		return ok({ ok: true });
 	};
 
+	/**
+	 * Reads one target's live settle state for a poll tick. Deliberately cheap:
+	 * status plus any pending signal, never the child's report, because this runs
+	 * for every target on every tick and reading a report means a synchronous
+	 * descending scan of its whole final turn on the main thread. The report is
+	 * fetched once, by {@link reportOn}, on the tick that returns.
+	 * @param piSessionId - The child to inspect.
+	 * @returns The child's current state and whether it counts as settled.
+	 */
 	const settleTarget = async (
 		piSessionId: string,
 	): Promise<{ agent: WaitedAgent; settled: boolean }> => {
 		const status = (await ports.conversations.getStatus(piSessionId))?.status;
 		const signal = signalsByChild.get(piSessionId) ?? null;
-		const attention = signal !== null && ATTENTION_REASONS.has(signal.reason);
 		const terminal = status === undefined || TERMINAL_STATUSES.has(status);
-		const settled = terminal || attention;
-		if (!settled) {
-			return {
-				agent: {
-					piSessionId,
-					status: status ?? 'unknown',
-					lastMessage: null,
-					signal,
-				},
-				settled: false,
-			};
-		}
-		const lastMessage = await ports.conversations.getLastMessage(piSessionId);
 		return {
 			agent: {
 				piSessionId,
 				status: status ?? 'unknown',
-				lastMessage,
+				lastMessage: null,
+				reportTruncated: false,
 				signal,
 			},
-			settled: true,
+			settled: terminal || needsAttention(signal),
+		};
+	};
+
+	/**
+	 * Attaches one settled child's report at the caller's requested detail. `full`
+	 * hands the whole final turn over; `brief` keeps its opening and points at
+	 * `getLastMessage` for the rest.
+	 * @param agent - The settled child as `settleTarget` built it, with no report yet.
+	 * @param detail - The detail level the caller asked for.
+	 * @returns The child to report on, shortened when asked for.
+	 */
+	const reportOn = async (
+		agent: WaitedAgent,
+		detail: WaitReportDetail,
+	): Promise<WaitedAgent> => {
+		const lastMessage = await ports.conversations.getLastMessage(
+			agent.piSessionId,
+		);
+		if (detail === 'full') {
+			return { ...agent, lastMessage };
+		}
+		const brief = briefReport(lastMessage, agent.piSessionId);
+		return {
+			...agent,
+			lastMessage: brief.text,
+			reportTruncated: brief.truncated,
 		};
 	};
 
@@ -660,7 +895,7 @@ export function createAgentControlService({
 			...originRegistry.childrenOf(origin.sessionId),
 		];
 		if (targets.length === 0) {
-			return ok({ completed: [], timedOut: false });
+			return ok(emptyWait(args.targets === undefined));
 		}
 		const ancestors = originRegistry.ancestorsOf(origin.sessionId);
 		for (const target of targets) {
@@ -679,14 +914,23 @@ export function createAgentControlService({
 			const settled = await Promise.all(targets.map(settleTarget));
 			const done = settled.filter((entry) => entry.settled);
 			const satisfied =
-				mode === 'first' ? done.length > 0 : done.length === targets.length;
+				mode === 'first' ? done.length > 0 : waitAllSatisfied(settled);
 			const expired = scheduler.now() >= deadline;
 			if (satisfied || expired) {
-				const completed = done.map((entry) => entry.agent);
+				const completed = await Promise.all(
+					done.map((entry) => reportOn(entry.agent, args.reports ?? 'full')),
+				);
 				for (const entry of completed) {
 					signalsByChild.delete(entry.piSessionId);
 				}
-				return ok({ completed, timedOut: !satisfied && expired });
+				return ok(
+					waitOutcome({
+						completed,
+						mode,
+						pending: stillRunning(settled),
+						timedOut: !satisfied && expired,
+					}),
+				);
 			}
 			await scheduler.sleep(WAIT_POLL_MS);
 		}
@@ -725,7 +969,7 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: CheckPlanModeToolArgs,
 	): AgentControlResult<unknown> => {
-		if (origin.species !== 'pi' || !ports.planMode.isActive(origin.sessionId)) {
+		if (!isPlanning(origin)) {
 			return ok({ blocked: false });
 		}
 		return ok(evaluatePlanModeTool(args));
@@ -809,6 +1053,32 @@ export function createAgentControlService({
 				return handleSetWorkspaceStatus(origin, args as SetWorkspaceStatusArgs);
 			case 'getWorkspaceStatus':
 				return handleGetWorkspaceStatus(origin);
+			// All three take their workspace from the origin rather than from an
+			// argument, so a cross-workspace read or write is unreachable by
+			// construction and there is nothing left here to gate.
+			case 'getWorkspaceDiff':
+				return ok(
+					await ports.diff.readWorkspaceDiff({
+						file: (args as GetWorkspaceDiffArgs).file,
+						stat: (args as GetWorkspaceDiffArgs).stat,
+						workspaceCwd: origin.workspaceCwd,
+						workspaceId: origin.workspaceId,
+					}),
+				);
+			case 'getDiffComments':
+				return ok(
+					await ports.review.listComments({
+						file: (args as GetDiffCommentsArgs).file,
+						workspaceId: origin.workspaceId,
+					}),
+				);
+			case 'addDiffComments':
+				return ok(
+					await ports.review.addComments({
+						comments: (args as AddDiffCommentsArgs).comments,
+						workspaceId: origin.workspaceId,
+					}),
+				);
 			case 'listWorkspaces':
 				return ok(await ports.workspaces.listWorkspaces());
 			case 'listTabs':
@@ -843,6 +1113,12 @@ export function createAgentControlService({
 						(args as ConversationRef).piSessionId,
 					),
 				} satisfies GetLastMessageResult);
+			case 'readConversation':
+				return ok(
+					await ports.conversations.readTranscript(
+						args as ReadConversationArgs,
+					),
+				);
 			case 'readTerminalOutput':
 				return ok(
 					await ports.terminals.readOutput(
@@ -879,7 +1155,11 @@ export function createAgentControlService({
 		if (!validated.ok) {
 			return fail('invalid-args', validated.reason);
 		}
-		const planModeDenied = gatePlanMode(command.op, origin);
+		const roleDenied = await gateSubAgentRole(command.op, origin);
+		if (roleDenied) {
+			return roleDenied;
+		}
+		const planModeDenied = await gatePlanMode(command.op, origin);
 		if (planModeDenied) {
 			return planModeDenied;
 		}

@@ -41,7 +41,14 @@ const startStop = z.enum(['setup', 'run']);
  * MCP tool definitions mirroring the control vocabulary. Input shapes are
  * advisory for the client; the service re-validates authoritatively.
  */
-const TOOL_DEFS: readonly McpToolDef[] = [
+/**
+ * Every tool this endpoint exposes. Exported so the parity test can hold each
+ * description against the Pi extension's copy: the two registration sites cannot
+ * share a module (the extension runs outside the app bundle), and these strings
+ * carry behaviour — `stat=true FIRST` is the only thing stopping a model from
+ * pulling a whole workspace diff it did not need.
+ */
+export const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_spawn_chat_tab',
 		op: 'spawnChatTab',
@@ -52,7 +59,7 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_start_conversation',
 		op: 'startConversation',
 		description:
-			"Open a fresh chat tab (or reuse one via chatTabId) and start a Pi conversation. Pass a short, descriptive title to name the sub-agent's tab. Set wait=true to block until it finishes.",
+			"Open a fresh chat tab (or reuse one via chatTabId) and start a Pi conversation. Pass a short, descriptive title to name the sub-agent's tab. Brief it with what to deliver, not just what to look at: the question it answers, the defaults it should assume rather than come back and ask about, and whether it reports inline (the default) or writes a file at a path you name. Set wait=true to block until it finishes.",
 		shape: {
 			chatTabId: z.string().optional(),
 			prompt: z.string(),
@@ -164,6 +171,35 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 		shape: {},
 	},
 	{
+		name: 'ensemblr_get_workspace_diff',
+		op: 'getWorkspaceDiff',
+		description:
+			"Read this workspace's diff — every change on its branch, committed and uncommitted alike, the same set the Changes panel shows. Call it with stat=true FIRST: that returns the changed files with their +/- counts and no patch text, so you can see how big the diff is before you read it. Then read the whole diff, or pass file to read one file's patch on its own — file and stat are alternatives, not a pair. Every read is capped: a full read names what it dropped in omittedFiles for you to re-request by file, and a single file too large to carry is cut at a hunk boundary.",
+		shape: { file: z.string().optional(), stat: z.boolean().optional() },
+	},
+	{
+		name: 'ensemblr_get_diff_comments',
+		op: 'getDiffComments',
+		description:
+			"Read the review comments on this workspace's diff — the ones the user left in the Changes panel and the ones agents filed there. Pass file to narrow it to one path. Comments synced from a GitHub pull request are not included.",
+		shape: { file: z.string().optional() },
+	},
+	{
+		name: 'ensemblr_add_diff_comments',
+		op: 'addDiffComments',
+		description:
+			"File review comments on this workspace's diff, anchored to a file and optionally a line. They appear in the Changes panel labelled as yours, so use them to leave findings on the code itself rather than describing a location in prose. Batch a review's comments into one call.",
+		shape: {
+			comments: z.array(
+				z.object({
+					filePath: z.string(),
+					lineNumber: z.number().nullable().optional(),
+					body: z.string(),
+				}),
+			),
+		},
+	},
+	{
 		name: 'ensemblr_list_models',
 		op: 'listModels',
 		description:
@@ -197,8 +233,21 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 	{
 		name: 'ensemblr_get_last_message',
 		op: 'getLastMessage',
-		description: 'Get the last assistant message text of a Pi conversation.',
+		description:
+			"Get a Pi conversation's report: every assistant message of its newest answered turn, joined in the order it was written. Persisted, so it survives the conversation closing and an app restart.",
 		shape: { piSessionId: z.string() },
+	},
+	{
+		name: 'ensemblr_read_conversation',
+		op: 'readConversation',
+		description:
+			'Read what a Pi conversation actually did — its prompts, its answers, and every tool call with its arguments and result — rather than only the report ensemblr_get_last_message hands back. This is how you audit a sub-agent: confirm it ran what it claims to have run before you act on its findings. Call it with stat=true FIRST: that returns the entry count, the turn count, and the ordinal range with no content, so you know how much there is before you read it. Then page forward with fromOrdinal, resuming from the nextOrdinal each page returns, or pass ordinal to read a single entry whole — stat, ordinal, and fromOrdinal are alternatives, not a combination. Long fields are cut and marked with the ordinal that reads them in full.',
+		shape: {
+			piSessionId: z.string(),
+			stat: z.boolean().optional(),
+			fromOrdinal: z.number().optional(),
+			ordinal: z.number().optional(),
+		},
 	},
 	{
 		name: 'ensemblr_read_terminal_output',
@@ -210,18 +259,19 @@ const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_wait_for_agents',
 		op: 'waitForAgents',
 		description:
-			'Block until delegated Pi sub-agents finish or need a decision, then return each one\'s status and last message. Prefer this over polling get_conversation_status. targets defaults to every child you spawned; mode "all" waits for all of them, mode "first" returns on the first to settle.',
+			'Block until delegated Pi sub-agents finish or need a decision, then return each settled one\'s status and report (its whole final turn), plus `pending` naming the children still running so you can wait on exactly those next. Prefer this over polling get_conversation_status. targets defaults to every child you spawned; mode defaults to "first", which returns on the first to settle — pass "all" to wait for every target. A need_decision/blocked signal wakes the wait whatever the mode. reports: "brief" returns each report\'s opening plus a pointer to ensemblr_get_last_message for the rest, instead of every child\'s whole turn at once — worth it on a wide fan-out, where reading four full reports to use one line of each is what makes delegation cost you more context than doing the work inline.',
 		shape: {
 			targets: z.array(z.string()).optional(),
 			mode: z.enum(['first', 'all']).optional(),
 			timeoutMs: z.number().optional(),
+			reports: z.enum(['full', 'brief']).optional(),
 		},
 	},
 	{
 		name: 'ensemblr_notify_orchestrator',
 		op: 'notifyOrchestrator',
 		description:
-			'Sub-agents only: notify the orchestrator that spawned you. reason need_decision/blocked wakes its wait immediately so it can answer; progress/done are informational.',
+			'Sub-agents only: notify the orchestrator that spawned you. reason need_decision/blocked wakes its wait immediately so it can answer, so use it when the answer changes what you do next; a decision that only bites after you report belongs in your report as options and tradeoffs. progress/done are informational.',
 		shape: {
 			reason: z.enum(['need_decision', 'blocked', 'progress', 'done']),
 			message: z.string(),

@@ -1,8 +1,8 @@
 import type {
 	PullRequestCheckSummary,
+	PullRequestCommentReplySummary,
 	PullRequestCommentSummary,
 	PullRequestGitStatusSummary,
-	PullRequestPreviewDeploymentSummary,
 	PullRequestShellStatus,
 	PullRequestTodoSummary,
 	WorkspaceShellModel,
@@ -11,7 +11,6 @@ import { deriveOpenPullRequestStatus } from '@/shared/github-pr-presentation';
 import type {
 	GithubCheckWire,
 	GithubCommentWire,
-	GithubDeploymentWire,
 	GithubPullRequestSnapshotWire,
 	GithubPullRequestWire,
 } from '@/shared/ipc/contracts/github';
@@ -19,6 +18,13 @@ import type {
 	ReviewCommentWire,
 	ReviewTodoWire,
 } from '@/shared/ipc/contracts/review-comments';
+import {
+	describeComment,
+	formatCommentLocation,
+	stripCommentMetadata,
+	summarizeCommentBody,
+} from './comment-body';
+import { derivePreviewDeployment } from './preview-deployment';
 
 /** Inputs for building the workspace shell PR model: local changes, review rows, and the gh snapshot. */
 interface BuildPullRequestShellModelInput {
@@ -67,10 +73,11 @@ export function buildPullRequestShellModel({
 
 	const checks = pullRequest.checks.map(toCheckSummary);
 	const status = derivePullRequestStatus(pullRequest);
-	const previewDeployment = derivePreviewDeployment(
-		pullRequest.deployments,
+	const previewDeployment = derivePreviewDeployment({
 		checks,
-	);
+		comments: pullRequest.comments,
+		deployments: pullRequest.deployments,
+	});
 
 	return {
 		checks,
@@ -119,24 +126,64 @@ function toCheckSummary(check: GithubCheckWire): PullRequestCheckSummary {
 }
 
 /**
- * Maps a GitHub PR comment into the shell comment summary, folding its path and
- * line into the detail line.
+ * Maps a GitHub PR comment into the shell comment summary, carrying the whole
+ * thread so the preview can render it. The body is stripped of the metadata bots
+ * hide in it, and the row's detail line is the first prose that survives.
  * @param comment - The GitHub comment wire record
  * @returns The PR comment summary for the sidebar
  */
 function toCommentSummary(
 	comment: GithubCommentWire,
 ): PullRequestCommentSummary {
-	const location = comment.path
-		? ` (${comment.path}${comment.line ? `:${comment.line}` : ''})`
-		: '';
+	const body = stripCommentMetadata(comment.body);
+	const replies = (comment.replies ?? []).map(toCommentReplySummary);
+	const anchor = toCommentAnchor(comment);
 	return {
+		...anchor,
 		author: comment.author,
-		detail: `${comment.author}: ${firstLine(comment.body)}${location}`,
+		body,
+		...(comment.createdAt ? { createdAt: comment.createdAt } : {}),
+		detail: describeComment({ ...anchor, body, replies }),
 		id: comment.id,
+		...(comment.isOutdated === undefined
+			? {}
+			: { isOutdated: comment.isOutdated }),
 		...(comment.isResolved === null ? {} : { isResolved: comment.isResolved }),
 		provider: comment.isBot ? 'github-actions' : 'github',
+		...(replies.length > 0 ? { replies } : {}),
 		...(comment.url ? { url: comment.url } : {}),
+	};
+}
+
+/**
+ * Reads the diff anchor a review thread carries, as summary fields.
+ * @param comment - The GitHub comment wire record
+ * @returns The comment's `path` and `line`, when it has them
+ */
+function toCommentAnchor(comment: GithubCommentWire): {
+	line?: number;
+	path?: string;
+} {
+	return {
+		...(comment.line === undefined ? {} : { line: comment.line }),
+		...(comment.path ? { path: comment.path } : {}),
+	};
+}
+
+/**
+ * Maps a review-thread reply into the summary shape the preview renders under
+ * the head comment.
+ * @param reply - The reply's GitHub comment wire record
+ * @returns The reply summary
+ */
+function toCommentReplySummary(
+	reply: GithubCommentWire,
+): PullRequestCommentReplySummary {
+	return {
+		author: reply.author,
+		body: stripCommentMetadata(reply.body),
+		...(reply.createdAt ? { createdAt: reply.createdAt } : {}),
+		id: reply.id,
 	};
 }
 
@@ -153,10 +200,17 @@ function buildLocalCommentSummaries(
 		comment.status === 'open'
 			? [
 					{
-						detail: `${comment.filePath}${
-							comment.lineNumber ? `:${comment.lineNumber}` : ''
-						} — ${firstLine(comment.body)}`,
+						body: comment.body,
+						createdAt: comment.createdAt,
+						detail: `${formatCommentLocation(
+							comment.filePath,
+							comment.lineNumber ?? undefined,
+						)} — ${summarizeCommentBody(comment.body)}`,
 						id: `local:${comment.id}`,
+						...(comment.lineNumber === null
+							? {}
+							: { line: comment.lineNumber }),
+						path: comment.filePath,
 						provider: 'local' as const,
 					},
 				]
@@ -282,62 +336,6 @@ function deriveDetail({
 	}
 }
 
-/**
- * Picks the preview deployment: GitHub deployment statuses first, preview
- * provider check links second (v1 source order from the ENS-056 discovery).
- */
-function derivePreviewDeployment(
-	deployments: readonly GithubDeploymentWire[],
-	checks: readonly PullRequestCheckSummary[],
-): PullRequestPreviewDeploymentSummary | undefined {
-	const deployment = deployments.find((entry) => entry.url);
-	if (deployment?.url) {
-		return {
-			label: deployment.environment || 'Preview',
-			provider: inferDeploymentProvider(deployment.url),
-			source: 'github-deployment',
-			status:
-				deployment.state === 'failure'
-					? 'blocked'
-					: deployment.state === 'pending'
-						? 'pending'
-						: 'ready',
-			url: deployment.url,
-		};
-	}
-
-	const previewCheck = checks.find(
-		(check) => check.provider === 'vercel' && check.url,
-	);
-	if (previewCheck?.url) {
-		return {
-			label: previewCheck.label,
-			provider: inferDeploymentProvider(previewCheck.url),
-			source: 'check-link',
-			status: previewCheck.status,
-			url: previewCheck.url,
-		};
-	}
-	return undefined;
-}
-
-/**
- * Infers the preview deployment provider from a deployment URL.
- * @param url - The deployment URL
- * @returns The detected provider, or `'unknown'` when none matches
- */
-function inferDeploymentProvider(
-	url: string,
-): PullRequestPreviewDeploymentSummary['provider'] {
-	if (/vercel/i.test(url)) {
-		return 'vercel';
-	}
-	if (/netlify/i.test(url)) {
-		return 'netlify';
-	}
-	return 'unknown';
-}
-
 /** Builds the git-status row from local change counts + branch sync state. */
 function buildGitStatus(
 	changeSummary: WorkspaceShellModel['changeSummary'],
@@ -398,13 +396,4 @@ function formatDuration(
 	}
 	const minutes = Math.floor(seconds / 60);
 	return `${minutes}m ${seconds % 60}s`;
-}
-
-/**
- * Returns the first line of a multi-line string.
- * @param text - The text to read
- * @returns The text up to the first newline
- */
-function firstLine(text: string): string {
-	return text.split('\n', 1)[0] ?? '';
 }

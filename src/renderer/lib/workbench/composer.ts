@@ -9,9 +9,25 @@ import type {
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 /**
+ * Whether a session tab gets a composer at all. A spawned sub-agent's tab never
+ * does: the orchestrator that spawned it owns the conversation and steers it
+ * with `ensemblr_send_follow_up` for the tab's whole life, so a prompt typed
+ * here would put a second writer on a delegated turn. Nothing renders in the
+ * composer's place — a disabled textarea only advertises an affordance that
+ * never unlocks, and a child left running when its orchestrator stops is stopped
+ * with it rather than handed back to the user.
+ * @param session - The session tab about to be rendered.
+ * @returns True when the tab is the user's to type into.
+ */
+export function showsComposer(session: SessionTabModel): boolean {
+	return !session.isSubAgent;
+}
+
+/**
  * Computes the composer shell state from setup readiness, the active session,
- * and a Pi controller. Disables the composer when setup is not yet ready or
- * Pi runtime checks fail.
+ * and a Pi controller. Disables the composer while setup is not yet ready and
+ * while Pi runtime checks fail. Sub-agent tabs never reach here — they render no
+ * composer at all; see {@link showsComposer}.
  */
 export function getComposerState({
 	activeSession,

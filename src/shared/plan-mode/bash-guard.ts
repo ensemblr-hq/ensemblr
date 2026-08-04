@@ -3,7 +3,11 @@
  * conversation is in Plan Mode. Deny by default: a false block is recoverable —
  * the agent reads the reason and adapts — while a false allow silently mutates
  * the user's repository, which is the whole thing Plan Mode exists to prevent.
+ *
+ * Splitting the command into segments and tokens is {@link lexCommand}'s job.
+ * This module only decides what a segment's head word is allowed to do.
  */
+import { lexCommand } from './shell-lexer.ts';
 
 /** Outcome of classifying a command: allowed, or denied with a reason. */
 export type BashGuardVerdict = { ok: true } | { ok: false; reason: string };
@@ -15,6 +19,9 @@ export type BashGuardVerdict = { ok: true } | { ok: false; reason: string };
 const READ_ONLY_COMMANDS: ReadonlySet<string> = new Set([
 	'basename',
 	'cat',
+	// `cd` changes the directory of a shell that exits with the command, and every
+	// segment chained after it is still classified on its own.
+	'cd',
 	'column',
 	'cut',
 	'date',
@@ -78,24 +85,6 @@ const CODE_EXECUTION_COMMANDS: ReadonlySet<string> = new Set([
 	'zsh',
 ]);
 
-/**
- * Redirection tokens that discard output rather than write a file. Ordered
- * longest-first so stripping never leaves a dangling fragment behind.
- */
-const DISCARD_REDIRECTIONS = ['2>/dev/null', '2>&1', '>/dev/null'] as const;
-
-/** Shell constructs that reach past the classified command, matched after stripping discards. */
-const FORBIDDEN_CONSTRUCTS: readonly { pattern: RegExp; label: string }[] = [
-	{ label: 'command substitution `$(…)`', pattern: /\$\(/ },
-	{ label: 'command substitution with backticks', pattern: /`/ },
-	{ label: 'process substitution `<(…)`', pattern: /<\(/ },
-	{ label: 'heredoc input `<<`', pattern: /<</ },
-	{ label: 'output redirection `>`', pattern: />/ },
-];
-
-/** Separators that chain several commands into one bash invocation. */
-const SEGMENT_SEPARATORS = /&&|\|\||;|\||\n|&/;
-
 /** `find` actions that run a command or delete/write files. */
 const FIND_MUTATING_ACTIONS: ReadonlySet<string> = new Set([
 	'-delete',
@@ -113,30 +102,58 @@ const FIND_MUTATING_ACTIONS: ReadonlySet<string> = new Set([
 const GIT_READ_SUBCOMMANDS: ReadonlySet<string> = new Set([
 	'blame',
 	'cat-file',
+	'count-objects',
 	'describe',
 	'diff',
+	'for-each-ref',
+	'grep',
 	'log',
 	'ls-files',
+	'ls-tree',
 	'merge-base',
+	'name-rev',
+	'rev-list',
 	'rev-parse',
 	'shortlog',
 	'show',
+	'show-ref',
 	'status',
+]);
+
+/**
+ * `git` subcommands whose read-only forms are named actions rather than flags.
+ * `git worktree list` inspects; `git worktree add` checks a branch out.
+ */
+const GIT_SUBCOMMAND_READ_ACTIONS: ReadonlyMap<
+	string,
+	ReadonlySet<string>
+> = new Map([
+	['stash', new Set(['list', 'show'])],
+	['worktree', new Set(['list'])],
 ]);
 
 /** `git branch` / `git remote` flags that mutate rather than list. */
 const GIT_REF_MUTATING_FLAGS: ReadonlySet<string> = new Set([
 	'--copy',
 	'--delete',
+	'--edit-description',
+	'--force',
 	'--move',
+	'--set-upstream',
 	'--set-upstream-to',
+	'--unset-upstream',
 	'-C',
 	'-D',
 	'-M',
+	'-c',
 	'-d',
+	'-f',
 	'-m',
 	'-u',
 ]);
+
+/** The `--flag=value` forms of {@link GIT_REF_MUTATING_FLAGS}. */
+const GIT_REF_MUTATING_PREFIXES: readonly string[] = ['--set-upstream-to='];
 
 /** `git remote` subcommands that mutate the configured remotes. */
 const GIT_REMOTE_MUTATING_SUBCOMMANDS: ReadonlySet<string> = new Set([
@@ -179,7 +196,37 @@ const GIT_VALUE_FLAGS: ReadonlySet<string> = new Set([
 	'--git-dir',
 	'--work-tree',
 	'-C',
+]);
+
+/**
+ * `git` global flags that hand git a program to run, which no read-only
+ * subcommand makes safe. `-c diff.external=…` and `-c diff.<driver>.textconv=…`
+ * execute during `git diff`, `-c core.fsmonitor=…` during `git status`, and
+ * `-c core.pager=…` whenever git pages — none of it visible to the classifier,
+ * because the command it runs is a config value rather than a token. Skipping
+ * the value the way {@link GIT_VALUE_FLAGS} does would let all four through.
+ */
+const GIT_PROGRAM_INJECTING_FLAGS: ReadonlySet<string> = new Set([
+	'--config-env',
+	'--exec-path',
 	'-c',
+]);
+
+/** The `--flag=value` forms of {@link GIT_PROGRAM_INJECTING_FLAGS}. */
+const GIT_PROGRAM_INJECTING_PREFIXES: readonly string[] = [
+	'--config-env=',
+	'--exec-path=',
+];
+
+/** `git branch` flags that consume the token after them while still only listing. */
+const GIT_BRANCH_VALUE_FLAGS: ReadonlySet<string> = new Set([
+	'--contains',
+	'--format',
+	'--merged',
+	'--no-contains',
+	'--no-merged',
+	'--points-at',
+	'--sort',
 ]);
 
 const ASSIGNMENT_PREFIX = /^[A-Za-z_][A-Za-z0-9_]*=/;
@@ -244,6 +291,22 @@ const FLAG_GUARDED_COMMANDS: ReadonlyMap<string, FlagGuard> = new Map([
 ]);
 
 /**
+ * Extra flag guards for individual read-only `git` subcommands, screened
+ * alongside {@link OUTPUT_FILE_GUARD}. `git grep -O` hands every match to a pager
+ * command of the caller's choosing, so it runs a program the classifier cannot see.
+ */
+const GIT_SUBCOMMAND_FLAG_GUARDS: ReadonlyMap<string, FlagGuard> = new Map([
+	[
+		'grep',
+		{
+			flags: new Set(['--open-files-in-pager', '-O']),
+			label: 'runs a pager program of its own',
+			prefixes: ['--open-files-in-pager=', '-O'],
+		},
+	],
+]);
+
+/**
  * Finds the first argument that trips a flag guard, matching both the bare
  * `--flag` form and the `--flag=value` form.
  * @param args - Tokens after the head word.
@@ -264,26 +327,12 @@ function findGuardedFlag(
 }
 
 /**
- * Removes the discard-only redirection tokens so the forbidden-construct scan
- * and the segment split both see a command free of their `>` and `&`.
- * @param command - Raw command text.
- * @returns The command with discard redirections blanked out.
+ * Drops the leading `FOO=bar` environment assignments so the head word is the
+ * command the segment actually runs.
+ * @param tokens - One lexed segment.
+ * @returns The tokens from the head word onward.
  */
-function stripDiscardRedirections(command: string): string {
-	return DISCARD_REDIRECTIONS.reduce(
-		(text, token) => text.split(token).join(' '),
-		command,
-	);
-}
-
-/**
- * Splits a segment into whitespace-separated tokens, dropping leading
- * `FOO=bar` environment assignments.
- * @param segment - One chained command from the full invocation.
- * @returns The segment's tokens with assignments removed.
- */
-function tokenize(segment: string): readonly string[] {
-	const tokens = segment.trim().split(/\s+/).filter(Boolean);
+function stripAssignments(tokens: readonly string[]): readonly string[] {
 	let start = 0;
 	while (start < tokens.length && ASSIGNMENT_PREFIX.test(tokens[start] ?? '')) {
 		start += 1;
@@ -312,18 +361,146 @@ function evaluateFind(args: readonly string[]): BashGuardVerdict {
 		: deny(`\`find ${action}\` runs commands or deletes files`);
 }
 
+/** The tokens at `git`'s subcommand, or the global flag that disqualified it. */
+type GitGlobals = { rest: readonly string[] } | { violation: string };
+
+/**
+ * Reports whether a `git` global flag names a program for git to run.
+ * @param flag - One global flag token, in either the bare or `--flag=value` form.
+ * @returns True when the flag injects configuration or relocates git's helpers.
+ */
+function injectsGitProgram(flag: string): boolean {
+	return (
+		GIT_PROGRAM_INJECTING_FLAGS.has(flag) ||
+		GIT_PROGRAM_INJECTING_PREFIXES.some((prefix) => flag.startsWith(prefix))
+	);
+}
+
 /**
  * Drops `git`'s global flags (and the values they consume) to reach the
- * subcommand.
+ * subcommand, rejecting the ones that hand git a program to run.
  * @param args - Tokens after the `git` head word.
- * @returns The tokens starting at the subcommand.
+ * @returns The tokens starting at the subcommand, or the violation to report.
  */
-function skipGitGlobalFlags(args: readonly string[]): readonly string[] {
+function skipGitGlobalFlags(args: readonly string[]): GitGlobals {
 	let index = 0;
 	while (index < args.length && (args[index] ?? '').startsWith('-')) {
-		index += GIT_VALUE_FLAGS.has(args[index] ?? '') ? 2 : 1;
+		const flag = args[index] ?? '';
+		if (injectsGitProgram(flag)) {
+			return {
+				violation: `\`git ${flag}\` sets configuration that can name a program git runs`,
+			};
+		}
+		index += GIT_VALUE_FLAGS.has(flag) ? 2 : 1;
 	}
-	return args.slice(index);
+	return { rest: args.slice(index) };
+}
+
+/**
+ * Reports whether `git branch` was handed a bare name, which creates or resets a
+ * ref. `--list` marks its positional as a match pattern rather than a new name.
+ * @param rest - Tokens after the `branch` subcommand.
+ * @returns True when a positional argument would write a ref.
+ */
+function createsGitBranch(rest: readonly string[]): boolean {
+	if (rest.includes('--list')) {
+		return false;
+	}
+	let index = 0;
+	while (index < rest.length) {
+		const token = rest[index] ?? '';
+		if (!token.startsWith('-')) {
+			return true;
+		}
+		index += GIT_BRANCH_VALUE_FLAGS.has(token) ? 2 : 1;
+	}
+	return false;
+}
+
+/**
+ * Screens a read-only `git` subcommand for the flags that turn it into a writer
+ * or a program runner.
+ * @param subcommand - The git subcommand already cleared as read-only.
+ * @param rest - Tokens after the subcommand.
+ * @returns A denial naming the offending flag, or null when there is none.
+ */
+function evaluateGitReadFlags(
+	subcommand: string,
+	rest: readonly string[],
+): BashGuardVerdict | null {
+	const guards = [
+		OUTPUT_FILE_GUARD,
+		GIT_SUBCOMMAND_FLAG_GUARDS.get(subcommand),
+	];
+	for (const guard of guards) {
+		const flag = guard === undefined ? null : findGuardedFlag(rest, guard);
+		if (guard !== undefined && flag !== null) {
+			return deny(`\`git ${subcommand} ${flag}\` ${guard.label}`);
+		}
+	}
+	return null;
+}
+
+/**
+ * Classifies a `git` subcommand whose read-only form is a named action rather
+ * than a flag.
+ * @param subcommand - The git subcommand.
+ * @param readActions - Actions that only inspect.
+ * @param rest - Tokens after the subcommand.
+ * @returns Allowed only when the named action is one that inspects.
+ */
+function evaluateGitReadAction(
+	subcommand: string,
+	readActions: ReadonlySet<string>,
+	rest: readonly string[],
+): BashGuardVerdict {
+	const action = rest.find((token) => !token.startsWith('-'));
+	if (action !== undefined && readActions.has(action)) {
+		return { ok: true };
+	}
+	const allowed = [...readActions].map((name) => `\`${name}\``).join(' or ');
+	return deny(
+		`\`git ${subcommand}\` is read-only in Plan Mode with ${allowed}`,
+	);
+}
+
+/**
+ * Classifies `git branch` and `git remote`, which list refs until a flag or a
+ * named action turns them into ref surgery.
+ * @param subcommand - Either `branch` or `remote`.
+ * @param rest - Tokens after the subcommand.
+ * @returns Allowed unless a mutating flag or action is present.
+ */
+function evaluateGitRefs(
+	subcommand: string,
+	rest: readonly string[],
+): BashGuardVerdict {
+	const mutation = rest.find(
+		(token) =>
+			GIT_REF_MUTATING_FLAGS.has(token) ||
+			GIT_REF_MUTATING_PREFIXES.some((prefix) => token.startsWith(prefix)) ||
+			(subcommand === 'remote' && GIT_REMOTE_MUTATING_SUBCOMMANDS.has(token)),
+	);
+	if (mutation !== undefined) {
+		return deny(`\`git ${subcommand} ${mutation}\` mutates refs`);
+	}
+	if (subcommand === 'branch' && createsGitBranch(rest)) {
+		return deny(
+			'`git branch <name>` creates a ref; `git branch` and `git branch --list` only list',
+		);
+	}
+	return { ok: true };
+}
+
+/**
+ * Classifies `git config`, which reads only when a reading flag says so.
+ * @param rest - Tokens after `config`.
+ * @returns Allowed only for the reading flags.
+ */
+function evaluateGitConfig(rest: readonly string[]): BashGuardVerdict {
+	return rest.some((token) => GIT_CONFIG_READ_FLAGS.has(token))
+		? { ok: true }
+		: deny('`git config` is read-only in Plan Mode with `--get` or `--list`');
 }
 
 /**
@@ -333,30 +510,26 @@ function skipGitGlobalFlags(args: readonly string[]): readonly string[] {
  * @returns Allowed only for inspection subcommands.
  */
 function evaluateGit(args: readonly string[]): BashGuardVerdict {
-	const [subcommand, ...rest] = skipGitGlobalFlags(args);
+	const globals = skipGitGlobalFlags(args);
+	if ('violation' in globals) {
+		return deny(globals.violation);
+	}
+	const [subcommand, ...rest] = globals.rest;
 	if (!subcommand) {
 		return deny('`git` needs a read-only subcommand in Plan Mode');
 	}
 	if (GIT_READ_SUBCOMMANDS.has(subcommand)) {
-		const outputFlag = findGuardedFlag(rest, OUTPUT_FILE_GUARD);
-		return outputFlag === null
-			? { ok: true }
-			: deny(`\`git ${subcommand} ${outputFlag}\` ${OUTPUT_FILE_GUARD.label}`);
+		return evaluateGitReadFlags(subcommand, rest) ?? { ok: true };
+	}
+	const readActions = GIT_SUBCOMMAND_READ_ACTIONS.get(subcommand);
+	if (readActions) {
+		return evaluateGitReadAction(subcommand, readActions, rest);
 	}
 	if (subcommand === 'branch' || subcommand === 'remote') {
-		const mutation = rest.find(
-			(token) =>
-				GIT_REF_MUTATING_FLAGS.has(token) ||
-				(subcommand === 'remote' && GIT_REMOTE_MUTATING_SUBCOMMANDS.has(token)),
-		);
-		return mutation === undefined
-			? { ok: true }
-			: deny(`\`git ${subcommand} ${mutation}\` mutates refs`);
+		return evaluateGitRefs(subcommand, rest);
 	}
 	if (subcommand === 'config') {
-		return rest.some((token) => GIT_CONFIG_READ_FLAGS.has(token))
-			? { ok: true }
-			: deny('`git config` is read-only in Plan Mode with `--get` or `--list`');
+		return evaluateGitConfig(rest);
 	}
 	return deny(`\`git ${subcommand}\` is not a read-only git subcommand`);
 }
@@ -399,11 +572,11 @@ function evaluateFlagGuard(
 
 /**
  * Classifies one chained command from the full invocation.
- * @param segment - A single command between shell separators.
+ * @param segment - The lexed tokens of a single command between shell separators.
  * @returns Allowed when its head word is read-only, denied otherwise.
  */
-function evaluateSegment(segment: string): BashGuardVerdict {
-	const tokens = tokenize(segment);
+function evaluateSegment(segment: readonly string[]): BashGuardVerdict {
+	const tokens = stripAssignments(segment);
 	const head = tokens[0];
 	if (head === undefined) {
 		return { ok: true };
@@ -438,17 +611,14 @@ function evaluateSegment(segment: string): BashGuardVerdict {
  * @returns Allowed, or denied with the reason to hand back to the agent.
  */
 export function isReadOnlyBashCommand(command: string): BashGuardVerdict {
-	const sanitized = stripDiscardRedirections(command);
-	if (sanitized.trim().length === 0) {
+	if (command.trim().length === 0) {
 		return deny('an empty command cannot be classified as read-only');
 	}
-	const construct = FORBIDDEN_CONSTRUCTS.find((entry) =>
-		entry.pattern.test(sanitized),
-	);
-	if (construct) {
-		return deny(`${construct.label} can write files or run other commands`);
+	const lexed = lexCommand(command);
+	if (lexed.violation) {
+		return deny(lexed.violation);
 	}
-	for (const segment of sanitized.split(SEGMENT_SEPARATORS)) {
+	for (const segment of lexed.segments) {
 		const verdict = evaluateSegment(segment);
 		if (!verdict.ok) {
 			return verdict;

@@ -16,6 +16,7 @@ export type {
 	ThinkingBarStrength,
 } from './composer';
 export type {
+	FileOpenOptions,
 	ReviewFilePreviewOpener,
 	WorkspaceFileDiffOpener,
 } from './file-preview';
@@ -64,6 +65,7 @@ export type {
 	FixedDockTabId,
 	PullRequestCheckStatus,
 	PullRequestCheckSummary,
+	PullRequestCommentReplySummary,
 	PullRequestCommentSummary,
 	PullRequestGitStatusSummary,
 	PullRequestPreviewDeploymentSummary,

@@ -57,13 +57,18 @@ export function rowsOf(
 }
 
 /**
- * Reads the pager label for a question.
+ * Builds the accessible name for a question's pager dot. The position leads so
+ * every dot is distinct whatever the agent supplied — which is why the contract
+ * no longer asks agents to keep their headers unique.
  * @param question - Question to label.
  * @param index - Its position in the questionnaire.
- * @returns The agent-supplied header, or a `Q<n>` fallback.
+ * @returns `Q<n>`, followed by the agent's header when it sent one.
  */
 export function headerOf(question: AskUserQuestionItem, index: number): string {
-	return question.header ?? `Q${index + 1}`;
+	const position = `Q${index + 1}`;
+	return question.header === undefined
+		? position
+		: `${position}: ${question.header}`;
 }
 
 /**

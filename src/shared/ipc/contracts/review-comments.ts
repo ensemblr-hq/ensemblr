@@ -6,6 +6,13 @@
 
 export type ReviewCommentStatus = 'archived' | 'open' | 'resolved';
 
+/**
+ * Who wrote a local review comment. Persisted rather than inferred: an agent
+ * comment reads differently to the user than one they left themselves, and a
+ * comment outlives the session that filed it.
+ */
+export type ReviewCommentOrigin = 'agent' | 'user';
+
 /** Wire shape of a single Ensemblr-local review comment. */
 export interface ReviewCommentWire {
 	body: string;
@@ -13,6 +20,7 @@ export interface ReviewCommentWire {
 	filePath: string;
 	id: string;
 	lineNumber: number | null;
+	origin: ReviewCommentOrigin;
 	status: ReviewCommentStatus;
 	updatedAt: string;
 	workspaceId: string;
@@ -42,12 +50,17 @@ export interface ListReviewCommentsResult {
 	comments: readonly ReviewCommentWire[];
 }
 
-/** Create (no `id`) or update (with `id`) a local review comment. */
+/**
+ * Create (no `id`) or update (with `id`) a local review comment. `origin` is
+ * honoured on create only and defaults to `user`; an edit never rewrites who
+ * wrote the comment.
+ */
 export interface SaveReviewCommentRequest {
 	body?: string;
 	filePath?: string;
 	id?: string;
 	lineNumber?: number | null;
+	origin?: ReviewCommentOrigin;
 	status?: ReviewCommentStatus;
 	workspaceId: string;
 }

@@ -7,10 +7,12 @@ import type {
 	ListChatTabsResult,
 	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabResult,
+	PinChatTabResult,
 	ReorderChatTabsResult,
 	RestoreChatTabResult,
 } from '../../../shared/ipc/contracts/chat-tab';
 import type { ChatTabService } from '../../chat-tabs';
+import { isPreviewTab } from '../../chat-tabs/preview-tab-slot.ts';
 import type { ChatTabRow } from '../../storage/repositories';
 import {
 	bindPiSessionToChatTabRequestSchema,
@@ -18,6 +20,7 @@ import {
 	listChatTabsRequestSchema,
 	listClosedChatTabsWithSummaryRequestSchema,
 	openChatTabRequestSchema,
+	pinChatTabRequestSchema,
 	reorderChatTabsRequestSchema,
 	restoreChatTabRequestSchema,
 } from '../request-schemas.ts';
@@ -50,6 +53,15 @@ export function registerChatTabHandlers({
 			const request = openChatTabRequestSchema.parse(raw);
 			const tab = chatTabService.openTab(request);
 			return { tab: toWire(tab) };
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.pinChatTab,
+		async (_event, raw: unknown): Promise<PinChatTabResult> => {
+			const request = pinChatTabRequestSchema.parse(raw);
+			const pinned = chatTabService.pinTab(request);
+			return { tab: pinned ? toWire(pinned) : null };
 		},
 	);
 
@@ -125,6 +137,7 @@ function toWire(row: ChatTabRow): ChatTabWire {
 		closedAt: row.closedAt,
 		fullTitle: row.fullTitle,
 		id: row.id,
+		isPreview: isPreviewTab(row),
 		kind: row.kind,
 		metadata: row.metadata,
 		openedAt: row.openedAt,

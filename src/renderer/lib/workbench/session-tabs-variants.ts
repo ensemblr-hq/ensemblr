@@ -1,22 +1,24 @@
 import { cva } from 'class-variance-authority';
 
 /**
- * Class variants for a session tab shell. The active state owns the surface and
- * text colors; reorderable tabs advertise the drag affordance through the
- * cursor. Edge accents live in `sessionTabIndicatorVariants` rather than on
- * borders, so they never consume layout height.
+ * Class variants for a session tab shell. Both states paint an opaque
+ * `bg-background` surface so a lifted or reordered tab never shows its siblings
+ * through it; the states differ in text color and in the edge accent. Those
+ * accents live in `sessionTabIndicatorVariants` rather than on borders, so they
+ * never consume layout height. Reorderable tabs advertise the drag affordance
+ * through the cursor.
  *
  * `isolate` scopes those accents to their own tab: motion clears the drag
  * `zIndex` before the drop animation finishes, so without it a sibling's
  * indicator would paint over the settling tab.
  */
 const sessionTabVariants = cva(
-	'group/session-tab relative isolate m-0 outline-none! flex h-full min-w-24 max-w-44 flex-none items-center overflow-hidden p-0 text-xs transition-colors',
+	'group/session-tab relative isolate m-0 outline-none! flex h-full min-w-24 max-w-44 flex-none items-center overflow-hidden bg-background p-0 text-xs transition-colors',
 	{
 		variants: {
 			isActive: {
 				true: 'text-foreground',
-				false: 'bg-background text-muted-foreground hover:text-foreground',
+				false: 'text-muted-foreground hover:text-foreground',
 			},
 			canReorder: {
 				true: 'cursor-grab active:cursor-grabbing',

@@ -8,6 +8,12 @@
  * delegates. The op names are namespaced `ensemblr.<op>` on the wire; this module
  * defines the bare op identifiers and their argument/result shapes.
  */
+import type { ReviewCommentWire } from '../ipc/contracts/review-comments.ts';
+import type {
+	WorkspaceGitChangeSummaryWire,
+	WorkspaceGitFileWire,
+} from '../ipc/contracts/workspace-git.ts';
+import { MAX_AGENT_PAYLOAD_CHARS } from './workspace-diff.ts';
 
 /** Every control operation an agent may request, read and write alike. */
 export const AGENT_CONTROL_OPS = [
@@ -28,11 +34,15 @@ export const AGENT_CONTROL_OPS = [
 	'focusPanel',
 	'setWorkspaceStatus',
 	'getWorkspaceStatus',
+	'getWorkspaceDiff',
+	'getDiffComments',
+	'addDiffComments',
 	'listWorkspaces',
 	'listTabs',
 	'listTerminals',
 	'getConversationStatus',
 	'getLastMessage',
+	'readConversation',
 	'readTerminalOutput',
 	'listModels',
 	'waitForAgents',
@@ -90,6 +100,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'focusDockTab',
 	'focusPanel',
 	'setWorkspaceStatus',
+	'addDiffComments',
 ]);
 
 /**
@@ -281,6 +292,69 @@ export interface ConversationRef {
 	piSessionId: string;
 }
 
+/**
+ * Upper bounds on a `readConversation` page. The field cap is what stops one
+ * pathological tool result — a whole file read, a megabyte of test output — from
+ * being the only thing a page can carry, and the page cap is the same ceiling
+ * every other agent payload answers to.
+ */
+export const READ_CONVERSATION_LIMITS = {
+	maxFieldChars: 2_000,
+	maxPageChars: MAX_AGENT_PAYLOAD_CHARS,
+} as const;
+
+/**
+ * Args for `readConversation`: page through a conversation's persisted
+ * transcript. `stat`, `ordinal`, and `fromOrdinal` are alternatives rather than
+ * a combination, and are honoured in that order.
+ */
+export interface ReadConversationArgs {
+	piSessionId: string;
+	/** Counts and ordinal range only, with no entries. */
+	stat?: boolean;
+	/** Inclusive lower bound on entry ordinal — the cursor a previous page returned. */
+	fromOrdinal?: number;
+	/** Read one entry on its own, with its field cap lifted to the page budget. */
+	ordinal?: number;
+}
+
+/**
+ * One projected step of a conversation, ordered by the event ordinal it came
+ * from. A `tool` entry merges a call with its result and carries the call's
+ * ordinal, so a result persisted much later still reads in sequence.
+ */
+export type ConversationTranscriptEntry =
+	| { kind: 'prompt'; ordinal: number; text: string }
+	| { kind: 'message'; ordinal: number; text: string }
+	| {
+			kind: 'tool';
+			ordinal: number;
+			name: string;
+			input: string;
+			output: string;
+			isError: boolean;
+	  }
+	| { kind: 'error'; ordinal: number; text: string };
+
+/**
+ * A page of a conversation's transcript. The counts and ordinal bounds describe
+ * the whole branch rather than the page, which is what makes a `stat` probe
+ * worth calling before a read: it says how much there is to page through.
+ */
+export interface ReadConversationResult {
+	piSessionId: string;
+	/** Entries on the whole branch, after checkpoint-hidden events are excluded. */
+	entryCount: number;
+	/** User prompts on the branch — one per turn. */
+	turnCount: number;
+	firstOrdinal: number | null;
+	lastOrdinal: number | null;
+	/** This page, ascending by ordinal. Empty for a `stat` probe. */
+	entries: readonly ConversationTranscriptEntry[];
+	/** Cursor for the next page, or null when this page reached the end. */
+	nextOrdinal: number | null;
+}
+
 /** Args for `readTerminalOutput`: read a terminal's current scrollback. */
 export interface ReadTerminalOutputArgs {
 	terminalId: string;
@@ -290,14 +364,23 @@ export interface ReadTerminalOutputArgs {
 export type WaitMode = 'first' | 'all';
 
 /**
+ * How much of each child's report a wait returns. `full` hands back the whole
+ * final turn; `brief` keeps the opening of it and points at
+ * `getLastMessage` for the rest, so a wide fan-out costs the orchestrator's
+ * context once rather than once per child.
+ */
+export type WaitReportDetail = 'full' | 'brief';
+
+/**
  * Args for `waitForAgents`: block the caller's turn until delegated Pi children
  * finish or need a decision. `targets` defaults to every live child of the
- * caller; `mode` defaults to `'first'`; `timeoutMs` is clamped to the app's wait
- * timeout.
+ * caller; `mode` defaults to `'first'`; `reports` defaults to `'full'`;
+ * `timeoutMs` is clamped to the app's wait timeout.
  */
 export interface WaitForAgentsArgs {
 	targets?: string[];
 	mode?: WaitMode;
+	reports?: WaitReportDetail;
 	timeoutMs?: number;
 }
 
@@ -321,12 +404,29 @@ export interface WaitedAgent {
 	lastMessage: string | null;
 	/** The child's pending signal when it woke the wait, else null. */
 	signal: OrchestratorSignal | null;
+	/** Whether `lastMessage` was shortened and the rest is still fetchable. */
+	reportTruncated: boolean;
 }
 
-/** Result of `waitForAgents`: the children that settled, and whether it timed out. */
+/** A target that had not settled when `waitForAgents` returned. */
+export interface PendingAgent {
+	piSessionId: string;
+	status: string;
+}
+
+/**
+ * Result of `waitForAgents`: the children that settled, the ones still running,
+ * and whether it timed out. `pending` spares the caller a status poll per child
+ * when the wait returns before every target is done — on `mode: "first"`, on a
+ * signal, or on a timeout. `note` carries the same instruction as prose, because
+ * an orchestrator reads a bare `timedOut: true` as a fault to report rather than
+ * a lap of the wait loop.
+ */
 export interface WaitForAgentsResult {
 	completed: readonly WaitedAgent[];
+	pending: readonly PendingAgent[];
 	timedOut: boolean;
+	note?: string;
 }
 
 /**
@@ -340,15 +440,17 @@ export interface NotifyOrchestratorArgs {
 }
 
 /**
- * Upper bounds on an `askUserQuestion` questionnaire. Small on purpose: the
- * dialog is a decision aid, not a form, and every option must stay reachable by
- * a single number key.
+ * Upper bounds on an `askUserQuestion` questionnaire. The counts are small on
+ * purpose: the dialog is a decision aid, not a form, and every option must stay
+ * reachable by a single number key. `maxHeaderLength` is a trim point rather
+ * than a rejection — the header is only ever a pager dot's accessible name, so
+ * losing a questionnaire over it costs the agent a round trip and buys nothing.
  */
 export const ASK_USER_QUESTION_LIMITS = {
 	maxQuestions: 4,
 	maxOptions: 6,
 	minOptions: 2,
-	maxHeaderLength: 16,
+	maxHeaderLength: 64,
 	maxLabelLength: 80,
 } as const;
 
@@ -374,7 +476,7 @@ export interface AskUserQuestionOption {
 /** A single question in an `askUserQuestion` questionnaire. */
 export interface AskUserQuestionItem {
 	question: string;
-	/** Short pager label; falls back to `Q<n>` when absent. */
+	/** Accessible name for this question's pager dot, appended to its `Q<n>` position. */
 	header?: string;
 	options: readonly AskUserQuestionOption[];
 	/** Lets the user check several options instead of picking one. */
@@ -493,6 +595,23 @@ export interface ExitPlanModeBroadcast {
 	planPath: string | null;
 }
 
+/**
+ * Main → renderer notice that a chat tab's Plan Mode state changed underneath the
+ * renderer. A spawned conversation inherits its parent's Plan Mode through the
+ * control layer, which bypasses the IPC handlers the renderer's own toggle rides,
+ * so without this push the child's composer would show the toggle off while its
+ * tools are blocked — and the user's next message would clear the inherited state.
+ * Keyed by chat tab, because that is what the renderer's per-chat toggle is keyed
+ * by. Enforcement never depends on this landing: the registry is written first and
+ * this is a best-effort mirror.
+ */
+export interface PlanModeChangedBroadcast {
+	workspaceId: string;
+	chatTabId: string;
+	piSessionId: string;
+	planMode: boolean;
+}
+
 /** Args for `checkPlanModeTool`: ask whether a tool call is allowed while planning. */
 export interface CheckPlanModeToolArgs {
 	tool: string;
@@ -557,6 +676,93 @@ export interface SetWorkspaceStatusArgs {
 }
 
 /**
+ * Args for `getWorkspaceDiff`: read the caller's own workspace diff, scoped the
+ * way the Changes panel scopes it — every change on this branch, committed and
+ * uncommitted alike. `stat` is the cheap probe that reports which files changed
+ * and how large the diff is; `file` reads one file's patch, which is also how a
+ * file dropped from a budgeted full read is recovered. The two are alternatives
+ * rather than a filter pair, and sending both is rejected: a single file has no
+ * stat, and silent precedence would leave the caller unsure which read it got.
+ */
+export interface GetWorkspaceDiffArgs {
+	/** Workspace-relative path of a single file to read. */
+	file?: string;
+	/** Return the changed-file rows and totals only, with no patch text. */
+	stat?: boolean;
+}
+
+/**
+ * Result of `getWorkspaceDiff`. Which fields are populated follows the request:
+ * `stat` returns `files` + `summary` and no `diff`; a single `file` returns
+ * `diff` alone; the full read returns all of them. `truncated` covers every cut
+ * the payload can take — whole files dropped for the budget, one file's patch
+ * cut at a hunk boundary to fit it, and a patch git itself cut at its output cap.
+ */
+export interface GetWorkspaceDiffResult {
+	/** Ref the branch diff forks from, or null when it fell back to the working tree. */
+	baseRef: string | null;
+	files?: readonly WorkspaceGitFileWire[];
+	summary?: WorkspaceGitChangeSummaryWire;
+	diff?: string;
+	truncated: boolean;
+	/** Files left out of `diff`; each is re-requestable on its own with `file`. */
+	omittedFiles: readonly string[];
+}
+
+/**
+ * Args for `getDiffComments`: read the review comments on the caller's own
+ * workspace, optionally narrowed to one file.
+ */
+export interface GetDiffCommentsArgs {
+	file?: string;
+}
+
+/**
+ * Result of `getDiffComments`. Ensemblr-local comments only — the ones the user
+ * left in the Changes panel and the ones agents filed there. Comments synced
+ * from a GitHub pull request live in a separate snapshot and are deliberately
+ * absent, because nothing in this surface could reply to or resolve one.
+ */
+export interface GetDiffCommentsResult {
+	comments: readonly ReviewCommentWire[];
+}
+
+/**
+ * Upper bounds on an `addDiffComments` batch. The body cap matches
+ * {@link SET_SUMMARY_LIMITS}: a review note that grows past it has stopped being
+ * a comment on a line. The batch cap is a runaway guard — fifty notes is already
+ * more than a human reviewer leaves on one pass.
+ */
+export const DIFF_COMMENT_LIMITS = {
+	maxComments: 50,
+	maxBodyLength: 4_000,
+} as const;
+
+/** One review comment an agent files against a line of the workspace diff. */
+export interface AgentDiffComment {
+	/** Workspace-relative path of the file being commented on. */
+	filePath: string;
+	/** 1-based line in the file's new side; null for a file-level comment. */
+	lineNumber?: number | null;
+	body: string;
+}
+
+/** Args for `addDiffComments`: file review comments on the caller's own workspace. */
+export interface AddDiffCommentsArgs {
+	comments: readonly AgentDiffComment[];
+}
+
+/**
+ * Result of `addDiffComments`. Ids rather than whole rows: the agent wrote the
+ * bodies, so echoing them back spends its context on text it already holds.
+ */
+export interface AddDiffCommentsResult {
+	added: number;
+	commentIds: readonly string[];
+	message: string;
+}
+
+/**
  * Main → renderer request to set a workspace's kanban board status. The renderer
  * applies it to the shared board-status atom (and its localStorage) regardless of
  * which workspace view is mounted, since the board is global.
@@ -591,6 +797,17 @@ export interface FocusViewBroadcast {
  * an unrelated refetch.
  */
 export interface TabsChangedBroadcast {
+	workspaceId: string;
+}
+
+/**
+ * Main → renderer signal that an agent filed review comments on a workspace. The
+ * comment list is a cached query that only renderer-local mutations invalidate,
+ * and the query client refetches neither on an interval nor on window focus — so
+ * without this the Changes panel a user is watching while an agent reviews shows
+ * nothing until it remounts.
+ */
+export interface ReviewCommentsChangedBroadcast {
 	workspaceId: string;
 }
 
@@ -666,10 +883,13 @@ export interface AgentControlConversationStatus {
 }
 
 /**
- * Last assistant message returned by `getLastMessage`. `message` is null when
- * the session is unknown or has produced no assistant text yet; the wrapping
- * object keeps that null distinguishable from the empty success envelope a bare
- * null would otherwise render as.
+ * The report returned by `getLastMessage`: every assistant message of the
+ * conversation's newest answered turn, joined in the order it was written, so a
+ * child that files its findings and then signs off with a hand-off line still
+ * hands back the findings. `message` is null when the session is unknown or has
+ * produced no assistant text yet; the wrapping object keeps that null
+ * distinguishable from the empty success envelope a bare null would otherwise
+ * render as.
  */
 export interface GetLastMessageResult {
 	message: string | null;

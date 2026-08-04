@@ -177,6 +177,60 @@ export interface RenameWorkspaceResult {
 }
 
 /**
+ * Continues a workspace past its merged pull request by branching onto a
+ * `-v<n>` successor and checking it out. The successor forks from the base
+ * branch when the workspace's committed tree already matches it, so the review
+ * panel opens empty rather than re-listing squash-merged work; when the branch
+ * still holds commits the base has not taken, the fork falls back to the current
+ * HEAD and the result carries a `base-branch-unsynced` warning. The merged
+ * branch stays where it is, so the old PR keeps its history while the workspace
+ * stops resolving to it — `gh pr view` matches by head-ref name, and the fresh
+ * branch has none until a new PR is opened. Uncommitted work carries over
+ * untouched.
+ */
+export type ContinueWorkspaceBranchDiagnosticCode =
+	| 'base-branch-unsynced'
+	| 'branch-checkout-failed'
+	| 'branch-rollback-failed'
+	| 'branch-unresolved'
+	| 'database-unavailable'
+	| 'workspace-not-found'
+	| 'workspace-update-failed';
+
+/** Severity level attached to a continue-workspace-branch diagnostic. */
+export type ContinueWorkspaceBranchDiagnosticSeverity =
+	| 'error'
+	| 'info'
+	| 'warning';
+
+/** A single problem reported while continuing a workspace onto a new branch. */
+export interface ContinueWorkspaceBranchDiagnostic {
+	code: ContinueWorkspaceBranchDiagnosticCode;
+	message: string;
+	severity: ContinueWorkspaceBranchDiagnosticSeverity;
+}
+
+/** Request payload for continuing a workspace onto a successor branch. */
+export interface ContinueWorkspaceBranchRequest {
+	workspaceId: string;
+}
+
+/** Outcome of a continue-workspace-branch request. */
+export type ContinueWorkspaceBranchStatus = 'failure' | 'success';
+
+/** Result of a continue-workspace-branch request. */
+export interface ContinueWorkspaceBranchResult {
+	/** The branch now checked out, or null when the request failed. */
+	branchName: string | null;
+	/** Empty on a clean success; a successful continue can still carry warnings. */
+	diagnostics: ContinueWorkspaceBranchDiagnostic[];
+	/** The branch the workspace was on before, retained for the success toast. */
+	previousBranchName: string | null;
+	status: ContinueWorkspaceBranchStatus;
+	workspaceId: string;
+}
+
+/**
  * Lifecycle archive of a workspace. Preserves the `.context/` directory under
  * `<root>/archived-contexts/`, records an archive snapshot for later script
  * hooks (ENS-038) and after-merge cleanup (ENS-060), and stamps
@@ -489,8 +543,11 @@ export interface ArchiveRecordSnapshot {
 	workspaceSlug: string | null;
 }
 
-/** Workspace lifecycle IPC surface (create / rename / hard-delete). */
+/** Workspace lifecycle IPC surface (create / rename / continue / hard-delete). */
 export interface WorkspaceApi {
+	continueWorkspaceBranch: (
+		request: ContinueWorkspaceBranchRequest,
+	) => Promise<ContinueWorkspaceBranchResult>;
 	createWorkspace: (
 		request: CreateWorkspaceRequest,
 	) => Promise<CreateWorkspaceResult>;

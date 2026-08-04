@@ -36,7 +36,7 @@ const TITLE_BULLET =
 
 /** Bullet asking the agent to record what the turn covered. */
 const SUMMARY_BULLET =
-	"- Session summary: the summary on file for this tab is older than the conversation. Once this turn's work is done, call `ensemblr_set_summary` with a short `title` and a markdown `summary` covering the decisions made, the files touched, and what is still open. It replaces the record the app keeps for this tab; it does NOT rename the tab.";
+	"- Session summary: the summary on file for this tab is older than the conversation. Call `ensemblr_set_summary` once the work is done but BEFORE you write your closing answer to the user — prose you follow with another tool call gets folded into the turn's collapsed activity row. Pass a short `title` and a markdown `summary` covering the decisions made, the files touched, and what is still open. It replaces the record the app keeps for this tab; it does NOT rename the tab.";
 
 /**
  * Builds the bullet asking the agent to name the workspace and its branch,

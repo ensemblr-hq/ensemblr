@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
 import type {
+	ReviewCommentOrigin,
 	ReviewCommentStatus,
 	ReviewCommentWire,
 	ReviewTodoStatus,
@@ -15,6 +16,7 @@ interface CommentRowShape {
 	file_path: string;
 	id: string;
 	line_number: number | null;
+	origin: string;
 	status: string;
 	updated_at: string;
 	workspace_id: string;
@@ -31,7 +33,7 @@ interface TodoRowShape {
 	workspace_id: string;
 }
 
-const COMMENT_COLUMNS = `id, workspace_id, file_path, line_number, body, status, created_at, updated_at`;
+const COMMENT_COLUMNS = `id, workspace_id, file_path, line_number, body, origin, status, created_at, updated_at`;
 const TODO_COLUMNS = `id, workspace_id, title, status, position, created_at, updated_at`;
 const SELECT_COMMENT = `SELECT ${COMMENT_COLUMNS} FROM comments`;
 const SELECT_TODO = `SELECT ${TODO_COLUMNS} FROM todos`;
@@ -58,19 +60,21 @@ export function insertReviewComment({
 	database,
 	filePath,
 	lineNumber,
+	origin,
 	workspaceId,
 }: {
 	body: string;
 	database: DatabaseSync;
 	filePath: string;
 	lineNumber: number | null;
+	origin: ReviewCommentOrigin;
 	workspaceId: string;
 }): ReviewCommentWire {
 	const row = database
 		.prepare(
-			`INSERT INTO comments (id, workspace_id, file_path, line_number, body) VALUES (?, ?, ?, ?, ?) RETURNING ${COMMENT_COLUMNS}`,
+			`INSERT INTO comments (id, workspace_id, file_path, line_number, body, origin) VALUES (?, ?, ?, ?, ?, ?) RETURNING ${COMMENT_COLUMNS}`,
 		)
-		.get(randomUUID(), workspaceId, filePath, lineNumber, body) as
+		.get(randomUUID(), workspaceId, filePath, lineNumber, body, origin) as
 		| CommentRowShape
 		| undefined;
 	if (!row) {
@@ -192,6 +196,7 @@ function toCommentWire(row: CommentRowShape): ReviewCommentWire {
 		filePath: row.file_path,
 		id: row.id,
 		lineNumber: row.line_number,
+		origin: row.origin as ReviewCommentOrigin,
 		status: row.status as ReviewCommentStatus,
 		updatedAt: row.updated_at,
 		workspaceId: row.workspace_id,

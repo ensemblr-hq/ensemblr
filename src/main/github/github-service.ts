@@ -46,6 +46,17 @@ const MAX_OUTPUT_BYTES = 8 * 1024 * 1024;
  * by the cache, while still deduping overlapping reads within the window.
  */
 const SNAPSHOT_TTL_MS = 5_000;
+/**
+ * Deployment rows read per snapshot. A monorepo publishes one deployment per
+ * Vercel/Netlify project for the same commit, and each one needs its own status
+ * lookup before a preview URL can be surfaced.
+ */
+const DEPLOYMENT_PAGE_SIZE = 5;
+/**
+ * Status rows read per deployment. A deployment reports `queued`/`pending`
+ * before `success`, and only the successful row carries `environment_url`.
+ */
+const DEPLOYMENT_STATUS_PAGE_SIZE = 10;
 
 const REVIEW_THREADS_QUERY = `query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
@@ -291,7 +302,10 @@ export function createGithubService({
 		}
 
 		const [deployments, reviewThreads] = await Promise.all([
-			fetchDeployments(cwd, pullRequest.headRefName),
+			fetchDeployments(
+				cwd,
+				[pullRequest.headRefOid, pullRequest.headRefName].filter(Boolean),
+			),
 			fetchReviewThreads(cwd, pullRequest.number),
 		]);
 
@@ -310,21 +324,43 @@ export function createGithubService({
 	}
 
 	/**
-	 * Reads deployment + latest-status rows for the branch through authenticated
-	 * `gh api`. GET calls pass query fields, so `-X GET` stays explicit per
+	 * Reads deployment + status rows for a PR head, trying each candidate ref in
+	 * turn. GitHub matches `ref` against the literal string a deployment was
+	 * recorded under and never resolves branch to commit, so a head SHA misses
+	 * deployments a workflow recorded under the branch name and vice versa.
+	 * @param cwd - Workspace working directory.
+	 * @param refs - Candidate refs, most precise first.
+	 * @returns Deployment wire rows for the first ref that has any.
+	 */
+	async function fetchDeployments(cwd: string, refs: readonly string[]) {
+		for (const ref of refs) {
+			const deployments = await fetchDeploymentsForRef(cwd, ref);
+			if (deployments.length > 0) {
+				return deployments;
+			}
+		}
+		return [];
+	}
+
+	/**
+	 * Reads deployment + status rows for one ref through authenticated `gh api`.
+	 * GET calls pass query fields, so `-X GET` stays explicit per
 	 * ENS-055/ENS-056. Failures degrade to an empty list — preview links are
 	 * best-effort.
+	 * @param cwd - Workspace working directory.
+	 * @param ref - Branch name or commit SHA to match deployments against.
+	 * @returns Deployment wire rows for the ref, or an empty list.
 	 */
-	async function fetchDeployments(cwd: string, branch: string) {
+	async function fetchDeploymentsForRef(cwd: string, ref: string) {
 		const deploymentsResult = await run('gh', cwd, [
 			'api',
 			'-X',
 			'GET',
 			'repos/{owner}/{repo}/deployments',
 			'-f',
-			`ref=${branch}`,
+			`ref=${ref}`,
 			'-f',
-			'per_page=5',
+			`per_page=${DEPLOYMENT_PAGE_SIZE}`,
 		]);
 		if (deploymentsResult.status !== 'success') {
 			return [];
@@ -339,38 +375,46 @@ export function createGithubService({
 			return [];
 		}
 
-		const statuses = new Map<string, unknown>();
+		const statuses = new Map<string, readonly unknown[]>();
 		await Promise.all(
-			deployments.slice(0, 3).map(async (deployment) => {
+			deployments.map(async (deployment) => {
 				const id = String(
 					(deployment as Record<string, unknown> | null)?.id ?? '',
 				);
-				if (!id) {
-					return undefined;
+				const rows = id ? await fetchDeploymentStatuses(cwd, id) : [];
+				if (rows.length > 0) {
+					statuses.set(id, rows);
 				}
-				const statusResult = await run('gh', cwd, [
-					'api',
-					'-X',
-					'GET',
-					`repos/{owner}/{repo}/deployments/${id}/statuses`,
-					'-f',
-					'per_page=1',
-				]);
-				if (statusResult.status !== 'success') {
-					return undefined;
-				}
-				try {
-					const parsed = JSON.parse(statusResult.stdout) as unknown[];
-					if (Array.isArray(parsed) && parsed.length > 0) {
-						statuses.set(id, parsed[0]);
-					}
-				} catch {
-					// Status row stays absent; deployment renders without a URL.
-				}
-				return undefined;
 			}),
 		);
 		return parseDeployments(deployments, statuses);
+	}
+
+	/**
+	 * Reads the status rows of one deployment. An unreadable response degrades to
+	 * no rows, which renders the deployment without a preview URL.
+	 * @param cwd - Workspace working directory.
+	 * @param deploymentId - GitHub deployment id.
+	 * @returns The raw status rows, or an empty list.
+	 */
+	async function fetchDeploymentStatuses(cwd: string, deploymentId: string) {
+		const statusResult = await run('gh', cwd, [
+			'api',
+			'-X',
+			'GET',
+			`repos/{owner}/{repo}/deployments/${deploymentId}/statuses`,
+			'-f',
+			`per_page=${DEPLOYMENT_STATUS_PAGE_SIZE}`,
+		]);
+		if (statusResult.status !== 'success') {
+			return [];
+		}
+		try {
+			const parsed = JSON.parse(statusResult.stdout) as unknown;
+			return Array.isArray(parsed) ? (parsed as unknown[]) : [];
+		} catch {
+			return [];
+		}
 	}
 
 	/** Reads review-thread resolution state through `gh api graphql`. */

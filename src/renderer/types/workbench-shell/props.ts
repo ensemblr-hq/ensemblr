@@ -28,8 +28,13 @@ export interface SessionTabState {
 	closedSessions: SessionTabModel[];
 	closeSessionTab: (sessionId: string) => void;
 	effectiveActiveSession: SessionTabModel;
-	/** Persists the current left-to-right order of open session tabs. */
-	reorderSessionTabs: (sessionIds: string[]) => void;
+	/**
+	 * Persists the current left-to-right order of open session tabs.
+	 * `draggedSessionId` is the tab the user actually moved, which is what
+	 * decides whether the preview slot was placed deliberately or merely pushed
+	 * aside.
+	 */
+	reorderSessionTabs: (sessionIds: string[], draggedSessionId: string) => void;
 	restoreSessionTab: (sessionId: string) => void;
 	sessionTabs: SessionTabModel[];
 }

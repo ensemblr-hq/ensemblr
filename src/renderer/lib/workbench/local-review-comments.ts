@@ -1,5 +1,6 @@
 import type { PullRequestCommentSummary } from '@/renderer/types/workbench';
 import type { ReviewCommentWire } from '@/shared/ipc/contracts/review-comments';
+import { summarizeCommentBody } from './comment-body';
 
 /**
  * Final path segment of a workspace-relative file path, used to label a local
@@ -15,8 +16,12 @@ function basenameOf(path: string): string {
 /**
  * Map a stored local review comment onto the shared comment-summary shape so the
  * Checks panel can render it in the same list as GitHub comments. The `path:line`
- * location fills the author slot (GitHub embeds its location in `detail`), and an
- * open comment reports as unresolved so it shows the same badge as GitHub threads.
+ * location fills the author slot, since a local note has no author to name there,
+ * and an open comment reports as unresolved so it shows the same badge as GitHub
+ * threads. The location also rides along as `path` and `line`, which is where
+ * every consumer past the row reads it from.
+ * Authorship rides along separately, because the location has taken the slot it
+ * would otherwise use and an agent's note has to read as an agent's note.
  * @param comment - The stored local review comment
  * @returns The comment as a Checks-panel comment summary
  */
@@ -29,9 +34,14 @@ export function localReviewCommentToSummary(
 			: `${basenameOf(comment.filePath)}:${comment.lineNumber}`;
 	return {
 		author: location,
-		detail: comment.body,
+		body: comment.body,
+		createdAt: comment.createdAt,
+		detail: summarizeCommentBody(comment.body),
 		id: comment.id,
 		isResolved: comment.status === 'resolved',
+		...(comment.lineNumber === null ? {} : { line: comment.lineNumber }),
+		origin: comment.origin,
+		path: comment.filePath,
 		provider: 'local',
 	};
 }

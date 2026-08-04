@@ -116,10 +116,16 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
   for the window showing the payload's `workspaceId`, so focus is workspace-scoped. Focus ops are
   writes (mode-gated) but not spawns (no quota/depth).
 
+- `addDiffComments({ comments: [{ filePath, lineNumber?, body }] })` → `{ added, commentIds, message }` — file review comments on the caller's **own** workspace diff. Rows land in the `comments` table with `origin: 'agent'`, stamped by the port rather than taken from the args, and render in the Changes panel. Takes no `workspaceId`, so a cross-workspace write is unreachable by construction
+
 **Reads (cross-workspace):**
 - `listWorkspaces()`, `listTabs({ workspaceId? })`, `listTerminals({ workspaceId? })`
 - `getConversationStatus({ piSessionId })`, `getLastMessage({ piSessionId })`
 - `readTerminalOutput({ terminalId })`
+
+**Reads (own workspace only):**
+- `getWorkspaceDiff({ file?, stat? })` → `{ baseRef, files?, summary?, diff?, truncated, omittedFiles }` — the workspace's branch diff, scoped like the Changes panel (`merge-base(base_branch, HEAD)` → working tree, untracked files included). `stat: true` returns rows and totals with **no** per-file git call; `file` returns one patch whole. The full read is capped at `MAX_AGENT_PAYLOAD_CHARS` (32,000), cut on whole-file boundaries, with the dropped paths in `omittedFiles`
+- `getDiffComments({ file? })` → `{ comments }` — the workspace's Ensemblr-local review comments, each carrying `origin`. GitHub-synced PR threads are excluded: they are a live `gh` snapshot rather than local rows, and no op here could reply to or resolve one
 
 ## Components to build
 

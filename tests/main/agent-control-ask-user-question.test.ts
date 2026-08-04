@@ -42,7 +42,7 @@ const makeUnusedPorts = (): Omit<AgentControlPorts, 'ask'> =>
 			setWorkspaceStatus: vi.fn(),
 		},
 		confirm: { confirm: vi.fn() },
-		conversations: {},
+		conversations: { isSpawnedSubAgent: vi.fn().mockResolvedValue(false) },
 		focus: {},
 		harnesses: {},
 		permissions: { getMode: () => 'workspace-trusted' },
@@ -284,6 +284,16 @@ const serviceSetup = (species: 'pi' | 'harness') => {
 	return { asked, coordinator, service };
 };
 
+/**
+ * Drains microtasks until the dialog port has been handed a request, so a test
+ * never depends on how many `await`s the service makes before it dispatches.
+ */
+const waitForAsk = async (asked: readonly unknown[]): Promise<void> => {
+	for (let tick = 0; tick < 50 && asked.length === 0; tick += 1) {
+		await Promise.resolve();
+	}
+};
+
 describe('askUserQuestion op', () => {
 	it('resolves with the user’s answer for a Pi caller', async () => {
 		const { asked, coordinator, service } = serviceSetup('pi');
@@ -292,8 +302,7 @@ describe('askUserQuestion op', () => {
 			rawArgs: { questions: QUESTIONS },
 			token: 'tok-caller',
 		});
-		await Promise.resolve();
-		await Promise.resolve();
+		await waitForAsk(asked);
 		const requestId = asked[0]?.requestId;
 		expect(requestId).toBeDefined();
 		coordinator.settle({
@@ -348,8 +357,7 @@ describe('askUserQuestion op', () => {
 			rawArgs: { questions: QUESTIONS },
 			token: 'tok-caller',
 		});
-		await Promise.resolve();
-		await Promise.resolve();
+		await waitForAsk(asked);
 		expect(asked).toHaveLength(1);
 		service.releaseSession('caller');
 		const result = await pending;

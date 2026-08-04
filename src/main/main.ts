@@ -28,6 +28,7 @@ import {
 	createBoardStatusStore,
 	createGuardrails,
 	createOriginRegistry,
+	isSessionTabMarkedSubAgent,
 	startControlServer,
 } from './agent-control';
 import { createHarnessDetectionService } from './agents';
@@ -81,6 +82,7 @@ import {
 	createArchiveLifecycleService,
 	createArchiveRepositoryService,
 	createArchiveWorkspaceService,
+	createContinueWorkspaceBranchService,
 	createDeleteArchivedWorkspaceService,
 	createDeleteRepositoryService,
 	createDeleteWorkspaceService,
@@ -97,6 +99,7 @@ import {
 	createUnarchiveWorkspaceService,
 	createWorkspaceService,
 } from './repository';
+import { createReviewService } from './review';
 import {
 	createEnsemblrRootDirectoryService,
 	reconcileRootDirectory,
@@ -118,6 +121,7 @@ import {
 	createListWorkspaceFilesService,
 	createWorkspaceFilesWatcher,
 } from './workspace-files';
+import { createWorkspaceGitService } from './workspace-git';
 
 // The dev build (`electron-forge start`, unpackaged) runs alongside the
 // installed app while dogfooding. Isolate all of its persistent state so
@@ -325,6 +329,12 @@ const {
 	},
 	/** Reads the control server's URL lazily, null until the server is listening. */
 	getServerUrl: () => agentControlServer?.url ?? null,
+	/** Reads the durable sub-agent marker so a resumed child keeps its playbook. */
+	isSpawnedSubAgent: (piSessionId) =>
+		isSessionTabMarkedSubAgent(
+			databaseService.getConnection()?.database,
+			piSessionId,
+		),
 });
 
 /**
@@ -348,6 +358,10 @@ const piAgentClient = createPiAgentClient({
 });
 const sessionSummaryWriter = createSessionSummaryWriter();
 const renameWorkspaceService = createRenameWorkspaceService({
+	databaseService,
+	localCommandService,
+});
+const continueWorkspaceBranchService = createContinueWorkspaceBranchService({
 	databaseService,
 	localCommandService,
 });
@@ -386,6 +400,9 @@ const piSessionService = createPiSessionService({
 	piAgentClient,
 	queueNaming: sessionNamingQueue,
 	resolveAgentControlEnv,
+	/** Live sub-agents of a session, so stopping an orchestrator stops its children. */
+	resolveSpawnedChildren: (sessionId) =>
+		agentControlOriginRegistry.childrenOf(sessionId),
 	sessionSummaryWriter,
 });
 const localRepositoryRegistrationService =
@@ -595,6 +612,15 @@ agentControlService = createAgentControlService({
 		/** Broadcasts an agent-driven chat-tab set change to all windows. */
 		broadcastTabsChanged: (payload) =>
 			broadcastToAllWindows(IPC_CHANNELS.agentControlTabsChanged, payload),
+		/** Broadcasts an agent's review-comment write so the Changes panel refreshes. */
+		broadcastReviewCommentsChanged: (payload) =>
+			broadcastToAllWindows(
+				IPC_CHANNELS.agentControlReviewCommentsChanged,
+				payload,
+			),
+		/** Broadcasts an inherited Plan Mode state so the owning chat tab shows it. */
+		broadcastPlanMode: (payload) =>
+			broadcastToAllWindows(IPC_CHANNELS.agentControlPlanModeChanged, payload),
 		appSettingsService,
 		ask: askUserQuestionCoordinator.port,
 		chatTabService: agentControlChatTabService,
@@ -608,11 +634,19 @@ agentControlService = createAgentControlService({
 		localCommandService,
 		piExecutableService,
 		piSessionService,
+		// Both are stateless factories over services already constructed here, so
+		// the control layer builds its own rather than reaching into the IPC
+		// handlers that build theirs the same way.
+		reviewService: createReviewService({ databaseService }),
+		workspaceGitService: createWorkspaceGitService({ localCommandService }),
 		planMode: {
 			/** Saves the finished plan, surfaces the review, and ends the turn. */
 			exit: planSubmission.submit,
 			/** Reports whether the calling Pi session is still planning. */
 			isActive: planModeRegistry.isActive,
+			/** Starts a spawned child planning; narrowed to on-only on purpose. */
+			activateForSpawn: (sessionId) =>
+				planModeRegistry.setActive(sessionId, true),
 			/** Forgets the session's Plan Mode state once it ends. */
 			releaseSession: planModeRegistry.release,
 		},
@@ -700,6 +734,7 @@ app.whenReady().then(() => {
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
 		augmentHarnessCommand,
 		configService,
+		continueWorkspaceBranchService,
 		createWorkspaceService: createWorkspaceServiceWithSetup,
 		databaseService,
 		deleteArchivedWorkspaceService,

@@ -61,6 +61,34 @@ test('a merged PR uses the post-merge header actions', () => {
 	expect(state.tone).toBe('merged');
 });
 
+test('a merged PR keeps its preview deployment link', () => {
+	const base = getDefaultWorkspace();
+	const previewDeployment = {
+		label: 'Preview',
+		provider: 'vercel',
+		source: 'github-deployment',
+		status: 'ready',
+		url: 'https://ready-preview.vercel.app',
+	} as const;
+	const withMergedPr: WorkspaceShellModel = {
+		...base,
+		pullRequest: {
+			...base.pullRequest,
+			label: 'Merged',
+			number: 42,
+			previewDeployment,
+			state: 'merged',
+			status: 'idle',
+		},
+	};
+
+	expect(getRightSidebarHeaderState(withMergedPr, false)).toMatchObject({
+		kind: 'pr-merged',
+		previewDeployment,
+		tone: 'merged',
+	});
+});
+
 test('a continued merged PR behaves like a brand-new workspace header', () => {
 	const base = getDefaultWorkspace();
 	const withMergedPr: WorkspaceShellModel = {

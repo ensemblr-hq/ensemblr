@@ -13,6 +13,7 @@ import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
 import { getProviderLabel } from '@/renderer/lib/workbench/provider-label';
 import type {
+	FileOpenOptions,
 	PullRequestCheckStatus,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
@@ -184,10 +185,12 @@ export function ChecksActionRow({
 }
 
 /**
- * Single PR comment row. Clicking the row opens a read-only preview tab; hovering
- * reveals Hide (session-only dismiss) and Add-to-chat actions. The leading badge
- * shows the comment author (falling back to the provider label), and `detail`
- * already embeds any `path:line` location from the gh snapshot.
+ * Single PR comment row. Clicking the row opens a read-only preview tab into the
+ * workspace's ephemeral preview slot, and double-clicking keeps that tab open;
+ * hovering reveals Hide (session-only dismiss) and Add-to-chat actions. The
+ * leading badge shows the comment author (falling back to the provider label),
+ * and `detail` carries the comment's first line of prose, falling back to its
+ * `path:line` location when the body has none.
  */
 export function PullRequestCommentRow({
 	comment,
@@ -198,7 +201,7 @@ export function PullRequestCommentRow({
 	comment: WorkspaceShellModel['pullRequest']['comments'][number];
 	onAddToChat?: () => void;
 	onHide?: () => void;
-	onOpenPreview?: () => void;
+	onOpenPreview?: (options?: FileOpenOptions) => void;
 }) {
 	return (
 		<div className='group flex min-h-7 min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md px-1 hover:bg-muted'>
@@ -208,7 +211,10 @@ export function PullRequestCommentRow({
 					onOpenPreview ? 'cursor-pointer' : 'cursor-default',
 				)}
 				disabled={!onOpenPreview}
-				onClick={onOpenPreview}
+				onClick={onOpenPreview ? () => onOpenPreview() : undefined}
+				onDoubleClick={
+					onOpenPreview ? () => onOpenPreview({ preview: false }) : undefined
+				}
 				type='button'
 			>
 				<ProviderMark provider={comment.provider} />
@@ -218,6 +224,11 @@ export function PullRequestCommentRow({
 				<span className='min-w-0 truncate text-muted-foreground text-xs'>
 					{comment.detail}
 				</span>
+				{comment.origin === 'agent' ? (
+					<span className='shrink-0 rounded-sm bg-muted px-1 text-muted-foreground text-xxs'>
+						Agent
+					</span>
+				) : null}
 				{comment.isResolved === false ? (
 					<span className='shrink-0 rounded-sm bg-status-warning/15 px-1 text-status-warning text-xxs'>
 						Unresolved

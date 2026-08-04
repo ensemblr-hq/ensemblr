@@ -42,6 +42,7 @@ function setup(
 		},
 		confirm: { confirm: vi.fn().mockResolvedValue(true) },
 		conversations: {
+			isSpawnedSubAgent: vi.fn().mockResolvedValue(false),
 			setName:
 				overrides.setName ??
 				vi.fn().mockResolvedValue({

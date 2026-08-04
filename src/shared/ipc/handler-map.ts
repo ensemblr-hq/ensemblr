@@ -30,6 +30,8 @@ import type {
 	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabRequest,
 	OpenChatTabResult,
+	PinChatTabRequest,
+	PinChatTabResult,
 	ReorderChatTabsRequest,
 	ReorderChatTabsResult,
 	RestoreChatTabRequest,
@@ -176,6 +178,8 @@ import type {
 import type {
 	ArchiveWorkspaceRequest,
 	ArchiveWorkspaceResult,
+	ContinueWorkspaceBranchRequest,
+	ContinueWorkspaceBranchResult,
 	CreateWorkspaceRequest,
 	CreateWorkspaceResult,
 	DeleteArchivedWorkspaceRequest,
@@ -271,6 +275,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.createWorkspace]: IpcHandlerEntry<
 		CreateWorkspaceRequest,
 		CreateWorkspaceResult
+	>;
+	[IPC_CHANNELS.continueWorkspaceBranch]: IpcHandlerEntry<
+		ContinueWorkspaceBranchRequest,
+		ContinueWorkspaceBranchResult
 	>;
 	[IPC_CHANNELS.deleteArchivedWorkspace]: IpcHandlerEntry<
 		DeleteArchivedWorkspaceRequest,
@@ -442,6 +450,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.openChatTab]: IpcHandlerEntry<
 		OpenChatTabRequest,
 		OpenChatTabResult
+	>;
+	[IPC_CHANNELS.pinChatTab]: IpcHandlerEntry<
+		PinChatTabRequest,
+		PinChatTabResult
 	>;
 	[IPC_CHANNELS.openPiSession]: IpcHandlerEntry<
 		OpenPiSessionRequest,
