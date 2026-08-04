@@ -1,5 +1,4 @@
 import type { AgentActionKind } from './agent-actions';
-import type { WorkspaceFileDiffOpener } from './file-preview';
 import type { OpenTargetsState } from './open-targets';
 import type { WorkspaceOpenTarget } from './workspace';
 
@@ -43,8 +42,12 @@ export interface ReviewFileActions {
 	copyTarget: WorkspaceOpenTarget | undefined;
 	/** Runs the chosen open-in/copy target against a workspace-relative file path. */
 	invokeTarget: OpenTargetsState['invokeTarget'];
-	/** Opens (or re-focuses) the diff for a file at the active source's scope. `null` outside a conversation. */
-	openDiff: WorkspaceFileDiffOpener | null;
+	/**
+	 * Opens (or re-focuses) the surface that shows a changed file: the image
+	 * preview when the workspace still holds a previewable image, otherwise the
+	 * diff at the active source's scope. `null` outside a conversation.
+	 */
+	openFile: ((filePath: string) => void) | null;
 	/** Discards the working-tree changes for a single file. */
 	onDiscardFile: (filePath: string) => void;
 	/**

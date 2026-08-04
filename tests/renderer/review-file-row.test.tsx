@@ -38,7 +38,7 @@ function makeActions(
 		invokeTarget: async () => {},
 		isDiscardable: () => true,
 		onDiscardFile: () => {},
-		openDiff: () => {},
+		openFile: () => {},
 		openInTargets: [],
 		...overrides,
 	};

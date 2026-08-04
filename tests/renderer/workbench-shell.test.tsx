@@ -709,7 +709,7 @@ test('shows review action and changes menu only on changes tab', () => {
 	expect(changesMarkup).toContain('review-panel-action-label">Review</span>');
 	expect(changesMarkup).toContain('Show changes as folders');
 	expect(changesMarkup).toContain(
-		'Open src/renderer/components/workbench-shell.tsx diff',
+		'Open src/renderer/components/workbench-shell.tsx',
 	);
 	expect(changesMarkup).toContain('Open changes menu');
 	expect(checksMarkup).not.toContain(
