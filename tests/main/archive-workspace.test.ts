@@ -304,7 +304,7 @@ test('branchCleanup drops every branch a continued workspace moved off', async (
 	const second = await continueService.continueBranch({
 		workspaceId: workspace.id,
 	});
-	assert.equal(second.branchName, 'cleanup-chain.v2');
+	assert.equal(second.branchName, 'cleanup-chain-v2');
 
 	const { service } = makeArchiveService(harness);
 	const result = await service.archive({
@@ -317,8 +317,8 @@ test('branchCleanup drops every branch a continued workspace moved off', async (
 	const remaining = listBranches(harness.repositoryPath);
 	for (const branch of [
 		'cleanup-chain',
-		'cleanup-chain.v1',
-		'cleanup-chain.v2',
+		'cleanup-chain-v1',
+		'cleanup-chain-v2',
 	]) {
 		assert.equal(remaining.includes(branch), false, `${branch} survived`);
 	}

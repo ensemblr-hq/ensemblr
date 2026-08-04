@@ -286,7 +286,7 @@ function workspaceRow(
 	return row;
 }
 
-test('continue branches onto .v1 and leaves the merged branch in place', async (t) => {
+test('continue branches onto -v1 and leaves the merged branch in place', async (t) => {
 	const harness = createHarness(t);
 	const workspace = await seedWorkspace(harness, 'Bach');
 
@@ -295,11 +295,11 @@ test('continue branches onto .v1 and leaves the merged branch in place', async (
 	});
 
 	assert.equal(result.status, 'success');
-	assert.equal(result.branchName, 'bach.v1');
+	assert.equal(result.branchName, 'bach-v1');
 	assert.equal(result.previousBranchName, 'bach');
 	assert.deepEqual(result.diagnostics, []);
-	assert.equal(currentBranch(workspace.path), 'bach.v1');
-	assert.equal(workspaceRow(harness, workspace.id).branchName, 'bach.v1');
+	assert.equal(currentBranch(workspace.path), 'bach-v1');
+	assert.equal(workspaceRow(harness, workspace.id).branchName, 'bach-v1');
 	assert.equal(branchExists(harness.repositoryPath, 'bach'), true);
 });
 
@@ -312,9 +312,9 @@ test('continue bumps the marker on a repeat instead of stacking', async (t) => {
 	const second = await service.continueBranch({ workspaceId: workspace.id });
 
 	assert.equal(second.status, 'success');
-	assert.equal(second.branchName, 'bach.v2');
-	assert.equal(second.previousBranchName, 'bach.v1');
-	assert.equal(currentBranch(workspace.path), 'bach.v2');
+	assert.equal(second.branchName, 'bach-v2');
+	assert.equal(second.previousBranchName, 'bach-v1');
+	assert.equal(currentBranch(workspace.path), 'bach-v2');
 });
 
 test('continue records every branch it moved off for later cleanup', async (t) => {
@@ -327,7 +327,7 @@ test('continue records every branch it moved off for later cleanup', async (t) =
 
 	assert.deepEqual(
 		readContinuedBranches(workspaceRow(harness, workspace.id).metadataJson),
-		['bach', 'bach.v1'],
+		['bach', 'bach-v1'],
 	);
 });
 
@@ -354,11 +354,11 @@ test('continue forks from the base once the work is squash-merged', async (t) =>
 	assert.equal(result.status, 'success');
 	assert.deepEqual(result.diagnostics, []);
 	assert.equal(
-		runGit(workspace.path, ['diff', '--name-only', 'main...bach.v1']),
+		runGit(workspace.path, ['diff', '--name-only', 'main...bach-v1']),
 		'',
 	);
 	assert.equal(
-		runGit(workspace.path, ['rev-parse', 'bach.v1']),
+		runGit(workspace.path, ['rev-parse', 'bach-v1']),
 		runGit(harness.repositoryPath, ['rev-parse', 'main']),
 	);
 });
@@ -397,11 +397,11 @@ test('continue keeps commits the base has not taken and warns about them', async
 	assert.equal(result.diagnostics[0]?.code, 'base-branch-unsynced');
 	assert.equal(result.diagnostics[0]?.severity, 'warning');
 	assert.equal(
-		runGit(workspace.path, ['rev-parse', 'bach.v1']),
+		runGit(workspace.path, ['rev-parse', 'bach-v1']),
 		runGit(workspace.path, ['rev-parse', 'bach']),
 	);
 	assert.match(
-		runGit(workspace.path, ['diff', '--name-only', 'main...bach.v1']),
+		runGit(workspace.path, ['diff', '--name-only', 'main...bach-v1']),
 		/followup\.txt/,
 	);
 });
@@ -412,7 +412,7 @@ test('continue skips a name that survives only as a remote-tracking ref', async 
 	const head = runGit(harness.repositoryPath, ['rev-parse', 'main']);
 	runGit(harness.repositoryPath, [
 		'update-ref',
-		'refs/remotes/origin/bach.v1',
+		'refs/remotes/origin/bach-v1',
 		head,
 	]);
 
@@ -421,8 +421,8 @@ test('continue skips a name that survives only as a remote-tracking ref', async 
 	});
 
 	assert.equal(result.status, 'success');
-	assert.equal(result.branchName, 'bach.v2');
-	assert.equal(branchExists(harness.repositoryPath, 'bach.v1'), false);
+	assert.equal(result.branchName, 'bach-v2');
+	assert.equal(branchExists(harness.repositoryPath, 'bach-v1'), false);
 });
 
 test('continue drops the cached pull-request snapshot', async (t) => {
@@ -519,7 +519,7 @@ test('continue rolls the worktree back when the SQLite write fails', async (t) =
 	assert.equal(result.diagnostics[0]?.code, 'workspace-update-failed');
 	assert.equal(result.diagnostics.length, 1);
 	assert.equal(currentBranch(workspace.path), 'bach');
-	assert.equal(branchExists(harness.repositoryPath, 'bach.v1'), false);
+	assert.equal(branchExists(harness.repositoryPath, 'bach-v1'), false);
 	assert.equal(workspaceRow(harness, workspace.id).branchName, 'bach');
 });
 
@@ -538,6 +538,6 @@ test('continue warns when the rollback itself cannot restore the worktree', asyn
 	assert.equal(result.diagnostics[0]?.code, 'workspace-update-failed');
 	assert.equal(result.diagnostics[1]?.code, 'branch-rollback-failed');
 	assert.equal(result.diagnostics[1]?.severity, 'warning');
-	assert.match(result.diagnostics[1]?.message ?? '', /bach\.v1/);
-	assert.equal(currentBranch(workspace.path), 'bach.v1');
+	assert.match(result.diagnostics[1]?.message ?? '', /bach-v1/);
+	assert.equal(currentBranch(workspace.path), 'bach-v1');
 });

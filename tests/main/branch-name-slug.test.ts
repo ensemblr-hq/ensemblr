@@ -55,18 +55,18 @@ describe('joinBranchName', () => {
 });
 
 describe('nextContinuationBranchName', () => {
-	test('appends a .v1 marker to an unmarked branch', () => {
+	test('appends a -v1 marker to an unmarked branch', () => {
 		expect(nextContinuationBranchName('psoldunov/bach', [])).toBe(
-			'psoldunov/bach.v1',
+			'psoldunov/bach-v1',
 		);
 	});
 
 	test('bumps an existing marker instead of stacking a second one', () => {
-		expect(nextContinuationBranchName('psoldunov/bach.v1', [])).toBe(
-			'psoldunov/bach.v2',
+		expect(nextContinuationBranchName('psoldunov/bach-v1', [])).toBe(
+			'psoldunov/bach-v2',
 		);
-		expect(nextContinuationBranchName('psoldunov/bach.v9', [])).toBe(
-			'psoldunov/bach.v10',
+		expect(nextContinuationBranchName('psoldunov/bach-v9', [])).toBe(
+			'psoldunov/bach-v10',
 		);
 	});
 
@@ -74,28 +74,28 @@ describe('nextContinuationBranchName', () => {
 		expect(
 			nextContinuationBranchName('psoldunov/bach', [
 				'psoldunov/bach',
-				'psoldunov/bach.v1',
-				'psoldunov/bach.v2',
+				'psoldunov/bach-v1',
+				'psoldunov/bach-v2',
 			]),
-		).toBe('psoldunov/bach.v3');
+		).toBe('psoldunov/bach-v3');
 	});
 
-	test('leaves a dash-v version suffix intact instead of bumping it', () => {
+	test('bumps a branch that already ends in a dash-v version', () => {
 		expect(nextContinuationBranchName('psoldunov/bump-eslint-v9', [])).toBe(
-			'psoldunov/bump-eslint-v9.v1',
+			'psoldunov/bump-eslint-v10',
 		);
 	});
 
 	test('treats a non-marker v segment as part of the base name', () => {
-		expect(nextContinuationBranchName('release.v', [])).toBe('release.v.v1');
-		expect(nextContinuationBranchName('bump.v2.deps', [])).toBe(
-			'bump.v2.deps.v1',
+		expect(nextContinuationBranchName('release-v', [])).toBe('release-v-v1');
+		expect(nextContinuationBranchName('bump-v2-deps', [])).toBe(
+			'bump-v2-deps-v1',
 		);
 	});
 
 	test('leaves an over-long digit run as part of the base name', () => {
-		expect(nextContinuationBranchName('epoch.v1234567890', [])).toBe(
-			'epoch.v1234567890.v1',
+		expect(nextContinuationBranchName('epoch-v1234567890', [])).toBe(
+			'epoch-v1234567890-v1',
 		);
 	});
 });
@@ -111,7 +111,7 @@ describe('branchNameFromRef', () => {
 		expect(branchNameFromRef('refs/remotes/origin/psoldunov/bach')).toBe(
 			'psoldunov/bach',
 		);
-		expect(branchNameFromRef('refs/remotes/upstream/bach.v1')).toBe('bach.v1');
+		expect(branchNameFromRef('refs/remotes/upstream/bach-v1')).toBe('bach-v1');
 	});
 
 	test('claims no name for a remote HEAD pointer', () => {

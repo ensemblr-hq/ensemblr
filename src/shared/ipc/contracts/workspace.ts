@@ -178,7 +178,7 @@ export interface RenameWorkspaceResult {
 
 /**
  * Continues a workspace past its merged pull request by branching onto a
- * `.v<n>` successor and checking it out. The successor forks from the base
+ * `-v<n>` successor and checking it out. The successor forks from the base
  * branch when the workspace's committed tree already matches it, so the review
  * panel opens empty rather than re-listing squash-merged work; when the branch
  * still holds commits the base has not taken, the fork falls back to the current

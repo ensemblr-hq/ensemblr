@@ -72,7 +72,7 @@ export function renameWorkspace(
 }
 
 /**
- * Branches the workspace onto a `.v<n>` successor and checks it out, so work
+ * Branches the workspace onto a `-v<n>` successor and checks it out, so work
  * continues without the merged pull request following along. The successor
  * forks from the base branch once the merged work is upstream, so the review
  * panel opens empty; the merged branch stays put.

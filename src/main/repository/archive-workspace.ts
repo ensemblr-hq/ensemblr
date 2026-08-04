@@ -324,7 +324,7 @@ function readWorkspace(
 
 /**
  * Deletes the workspace's branch along with every branch it continued off, so a
- * workspace that moved through `feature`, `feature.v1`, `feature.v2` does not
+ * workspace that moved through `feature`, `feature-v1`, `feature-v2` does not
  * leave the first two behind. A missing predecessor is expected — the user may
  * have pruned it already — and only real failures raise a diagnostic.
  * @param branchName - The branch the workspace ended on.
