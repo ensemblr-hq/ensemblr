@@ -99,6 +99,11 @@ the env-strip + single-instance lock that closed the other path).
   `--fix` to unregister dangling ones (live sibling builds are left alone).
 - **Node version error at build.** `require-node-version.mjs` refuses to build on
   a Node outside `>=24 <25`; switch with `nvm`/`mise` (`.nvmrc` / `mise.toml`).
+- **Node version error at install.** Non-interactive shells (Conductor's
+  `setup`/`run` scripts, CI, hooks) never source the mise/nvm hooks, so they run
+  under whatever Node is on PATH. Prefix the command with
+  `./scripts/with-pinned-node.sh` — it resolves the `.nvmrc` Node via mise, nvm,
+  or Homebrew `node@24` and then execs the command unchanged.
 - **App icon.** Regenerate with `npm run icon:generate`
   (`scripts/generate-app-icon.mjs`).
 

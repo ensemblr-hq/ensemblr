@@ -123,6 +123,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`shadcn` 3 → 4, Moved To `devDependencies`**: `src/renderer/styles/index.css` imports `shadcn/tailwind.css`, so the package is a build-time asset, not a runtime dependency — Vite inlines the CSS and `electron-forge` now prunes the CLI out of the packaged app. The v3 line also pulled in `node-fetch@3` → `fetch-blob` → the deprecated `node-domexception`, plus `msw` (an otherwise-unused optional peer of `@vitest/mocker`), which tripped npm's deprecation and `allow-scripts` warnings on every install; v4 drops both (it uses `undici`). `dist/tailwind.css` is a strict superset of v3's — 0 removed lines.
+
 - **Workspace Services & Renderer State Refinements** (`455536e`, #143; `3f75d47`, #140; `7725421`, #138): Refined workspace services and renderer state handling, removed inactive-workspace dead ends and stabilized tabs, and persisted action prompts while preserving the app-detection cache.
 
 - **Pull Request Editing** (`dfebc6b`, #139): Improved pull-request editing and collapsed-header actions.
@@ -157,6 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Main-process suites (`tests/main/**`) stay on `electron --test` — they need the Electron runtime
 
 ### Fixed
+
+- **Conductor Workspace Setup Under The Wrong Node**: Conductor runs its `setup`/`run` scripts in a non-interactive shell, which never sources the mise/nvm hooks, so `npm ci` ran under Homebrew's Node 26 and died in the `preinstall` guard. Both scripts now go through `scripts/with-pinned-node.sh`, which resolves the `.nvmrc` Node via mise → nvm → `node@24` before handing the command over, and falls through untouched when no version manager exists.
 
 - **App Single-Instance Hardening** (`4dc992a`, #163; `74125bf`, #164): Prevent duplicate app instances during shell-environment loading; harden the single-instance lock and quit on last window.
 

@@ -1,6 +1,6 @@
 "$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
 
 [scripts]
-run = "npm run dev"
+run = "./scripts/with-pinned-node.sh npm run dev"
 run_mode = "concurrent"
-setup = "npm ci --allow-remote=all"
+setup = "./scripts/with-pinned-node.sh npm ci --allow-remote=all"
