@@ -101,7 +101,11 @@ export function WorkspaceWorkbenchContent({
 		[onSessionTabChange, openFilePreviewTab],
 	);
 	const openCommentPreview = useCallback(
-		(input: { comment: PullRequestCommentSummary; prNumber?: number }) => {
+		(input: {
+			comment: PullRequestCommentSummary;
+			preview?: boolean;
+			prNumber?: number;
+		}) => {
 			void openCommentPreviewTab(input).then((result) => {
 				if (result) {
 					onSessionTabChange(result.chatTabId);

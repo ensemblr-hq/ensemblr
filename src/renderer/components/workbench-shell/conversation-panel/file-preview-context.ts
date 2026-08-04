@@ -92,6 +92,8 @@ export function useReviewFilePreviewOpener(): ReviewFilePreviewOpener | null {
  */
 type CommentPreviewOpener = (input: {
 	comment: PullRequestCommentSummary;
+	/** Defaults to true; false opens a permanent tab the preview slot skips. */
+	preview?: boolean;
 	prNumber?: number;
 }) => void;
 
