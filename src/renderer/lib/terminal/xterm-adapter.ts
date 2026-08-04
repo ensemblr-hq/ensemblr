@@ -46,12 +46,16 @@ export function createXtermAdapter({
 		disableStdin: readOnly,
 		fontFamily,
 		fontSize,
+		linkHandler: {
+			/** Sends OSC 8 hyperlink clicks down the same external-open path. */
+			activate: openTerminalLink,
+		},
 		scrollback,
 		theme: readThemeFromDocument(),
 	});
 	const fitAddon = new FitAddon();
 	terminal.loadAddon(fitAddon);
-	terminal.loadAddon(new WebLinksAddon());
+	terminal.loadAddon(new WebLinksAddon(openTerminalLink));
 	const themeObserver = observeDocumentTheme(() => {
 		terminal.options.theme = readThemeFromDocument();
 	});
@@ -93,6 +97,22 @@ export function createXtermAdapter({
 		},
 		write: (data) => terminal.write(data),
 	};
+}
+
+/**
+ * Sends a clicked terminal hyperlink to the default browser through the main
+ * process, covering both regex-detected URLs and OSC 8 hyperlinks. Replaces
+ * xterm's two built-in handlers, which each call `window.open()` with no URL
+ * (the OSC 8 one behind a `confirm()` prompt): the app's window-open guard sees
+ * `about:blank`, refuses to open it externally, and the click silently does
+ * nothing.
+ * @param _event - The originating click, unused — the URI carries everything.
+ * @param uri - The link target under the cursor.
+ */
+function openTerminalLink(_event: MouseEvent, uri: string): void {
+	window.ensemblr?.openExternal(uri).catch((error: unknown) => {
+		console.error('[terminal] failed to open link', uri, error);
+	});
 }
 
 /**
