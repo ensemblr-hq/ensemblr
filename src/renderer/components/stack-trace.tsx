@@ -22,6 +22,7 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from '@/renderer/components/ui/collapsible';
+import { useScrollAnchor } from '@/renderer/hooks/conversation/use-anchored-disclosure';
 import { cn } from '@/renderer/lib/utils';
 
 // Regex patterns for parsing stack traces
@@ -197,6 +198,7 @@ export const StackTrace = memo(
 		onOpenChange,
 		onFilePathClick,
 		children,
+		ref,
 		...props
 	}: StackTraceProps) => {
 		const [isOpen, setIsOpen] = useControllableState({
@@ -204,6 +206,29 @@ export const StackTrace = memo(
 			onChange: onOpenChange,
 			prop: open,
 		});
+		const { anchorRef, captureAnchor } = useScrollAnchor();
+
+		const toggleOpen = useCallback(
+			(next: boolean) => {
+				captureAnchor();
+				setIsOpen(next);
+			},
+			[captureAnchor, setIsOpen],
+		);
+
+		const attachRow = useCallback(
+			(node: HTMLDivElement | null) => {
+				anchorRef.current = node;
+				if (typeof ref === 'function') {
+					ref(node);
+					return;
+				}
+				if (ref) {
+					ref.current = node;
+				}
+			},
+			[anchorRef, ref],
+		);
 
 		const parsedTrace = useMemo(() => parseStackTrace(trace), [trace]);
 
@@ -220,12 +245,13 @@ export const StackTrace = memo(
 
 		return (
 			<StackTraceContext.Provider value={contextValue}>
-				<Collapsible onOpenChange={setIsOpen} open={isOpen}>
+				<Collapsible onOpenChange={toggleOpen} open={isOpen}>
 					<div
 						className={cn(
 							'not-prose w-full overflow-hidden rounded-lg border bg-background font-mono text-sm',
 							className,
 						)}
+						ref={attachRow}
 						{...props}
 					>
 						{children}

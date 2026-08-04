@@ -175,6 +175,13 @@ export function PiSessionTimeline({
 		[persistedMessages, optimisticUnmatched],
 	);
 
+	// Counts prompts rather than watching the trailing message id, which changes
+	// again when an optimistic prompt is swapped for its persisted twin.
+	const promptCount = useMemo(
+		() => messages.filter((message) => message.role === 'user').length,
+		[messages],
+	);
+
 	// Show a live "Working…" indicator in the pre-first-token gap: the turn is
 	// streaming but no assistant turn exists yet (trailing message is the user
 	// prompt). Anchored at the submit time so it ticks continuously into the
@@ -236,6 +243,7 @@ export function PiSessionTimeline({
 			>
 				<ConversationContent
 					className='mx-auto w-full max-w-3xl gap-6 px-4 pt-5 pb-5'
+					followKey={promptCount}
 					scrollKey={activeSession.chatTabId}
 				>
 					{messages.map((message, index) => (
