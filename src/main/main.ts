@@ -82,6 +82,7 @@ import {
 	createArchiveLifecycleService,
 	createArchiveRepositoryService,
 	createArchiveWorkspaceService,
+	createContinueWorkspaceBranchService,
 	createDeleteArchivedWorkspaceService,
 	createDeleteRepositoryService,
 	createDeleteWorkspaceService,
@@ -357,6 +358,10 @@ const piAgentClient = createPiAgentClient({
 });
 const sessionSummaryWriter = createSessionSummaryWriter();
 const renameWorkspaceService = createRenameWorkspaceService({
+	databaseService,
+	localCommandService,
+});
+const continueWorkspaceBranchService = createContinueWorkspaceBranchService({
 	databaseService,
 	localCommandService,
 });
@@ -729,6 +734,7 @@ app.whenReady().then(() => {
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
 		augmentHarnessCommand,
 		configService,
+		continueWorkspaceBranchService,
 		createWorkspaceService: createWorkspaceServiceWithSetup,
 		databaseService,
 		deleteArchivedWorkspaceService,

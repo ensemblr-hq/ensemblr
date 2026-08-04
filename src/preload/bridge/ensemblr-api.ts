@@ -125,6 +125,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		computeTurnDiff: (request) => invoke('computeTurnDiff', request),
 		confirmRootDirectoryChange: (request) =>
 			invoke('confirmRootDirectoryChange', request),
+		continueWorkspaceBranch: (request) =>
+			invoke('continueWorkspaceBranch', request),
 		createPullRequest: (request) => invoke('createPullRequest', request),
 		createTerminalSession: (request) =>
 			invoke('createTerminalSession', request),

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 
 import {
 	archiveWorkspace,
+	continueWorkspaceBranch,
 	ensemblrQueryKeys,
 	invalidateWorkspaceListViews,
 	mergePullRequest,
@@ -17,11 +18,33 @@ import {
 import { continuedMergedPullRequestByWorkspaceAtom } from '@/renderer/state/workspace';
 import type { ReviewMergeSettings } from '@/renderer/types/settings';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import type { ContinueWorkspaceBranchResult } from '@/shared/ipc/contracts/workspace';
 
 /**
- * Owns the merge-pull-request mutation plus the archive mutation, which runs
+ * Announces a completed continue, downgrading to a warning toast when the
+ * successor branch still carries commits the base has not taken.
+ * @param branchName - The branch now checked out.
+ * @param diagnostics - Warnings the service attached to the success.
+ */
+function announceContinueSuccess(
+	branchName: string,
+	diagnostics: ContinueWorkspaceBranchResult['diagnostics'],
+): void {
+	const [warning] = diagnostics;
+	if (warning) {
+		toast.warning(`Continuing on ${branchName}.`, {
+			description: warning.message,
+		});
+		return;
+	}
+	toast.success(`Continuing on ${branchName}.`);
+}
+
+/**
+ * Owns the merge-pull-request mutation, the archive mutation (which runs
  * automatically after a merge when archive-after-merge is enabled and otherwise
- * on demand from the merged-header Archive action.
+ * on demand from the merged-header Archive action), and the continue mutation
+ * behind the merged-header Continue action.
  * (PR creation is handed to the chat agent — see `CreatePullRequestMenu`.)
  * Callers pass the active workspace and merge-settings snapshot, plus an
  * `onSettled` callback the provider uses to dismiss its active dialog.
@@ -49,6 +72,23 @@ export function useReviewMutations({
 	const removeWorkspace = useRemoveWorkspaceAction({
 		activeWorkspaceId: workspaceId,
 	});
+
+	/**
+	 * Records a merged PR as locally dismissed so the merged header stops
+	 * rendering for this workspace. No-ops when no PR number is known.
+	 * @param pullRequestNumber - The merged PR the user moved past.
+	 */
+	const dismissMergedPullRequest = (
+		pullRequestNumber: number | undefined,
+	): void => {
+		if (pullRequestNumber === undefined) {
+			return;
+		}
+		setContinuedMergedPullRequests((current) => ({
+			...current,
+			[workspaceId]: pullRequestNumber,
+		}));
+	};
 
 	const archiveAfterMergeMutation = useMutation({
 		mutationFn: () =>
@@ -83,6 +123,38 @@ export function useReviewMutations({
 		},
 	});
 
+	const continueMergedWorkspaceMutation = useMutation({
+		mutationFn: () => continueWorkspaceBranch({ workspaceId }),
+		onError: (cause) => {
+			toast.error('Could not continue past the merged pull request.', {
+				description: cause instanceof Error ? cause.message : undefined,
+			});
+		},
+		onSuccess: async (result) => {
+			if (result.status !== 'success' || result.branchName === null) {
+				toast.error('Could not continue past the merged pull request.', {
+					description: result.diagnostics[0]?.message,
+				});
+				return;
+			}
+			// The snapshot refresh below is what actually retires the merged
+			// header; dismissing locally first keeps it from flashing meanwhile.
+			dismissMergedPullRequest(activeWorkspace.pullRequest.number);
+			announceContinueSuccess(result.branchName, result.diagnostics);
+			await Promise.all([
+				refreshPullRequestSnapshot({
+					queryClient,
+					workspaceCwd,
+					workspaceId,
+				}),
+				queryClient.invalidateQueries({
+					queryKey: ensemblrQueryKeys.workspaceGitStatus(workspaceCwd),
+				}),
+				invalidateWorkspaceListViews(queryClient),
+			]);
+		},
+	});
+
 	const mergeMutation = useMutation({
 		mutationFn: async () => {
 			const result = await mergePullRequest({ workspaceCwd, workspaceId });
@@ -111,6 +183,7 @@ export function useReviewMutations({
 
 	return {
 		archiveAfterMergeMutation,
+		continueMergedWorkspaceMutation,
 		mergeMutation,
 	};
 }

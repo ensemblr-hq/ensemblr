@@ -45,6 +45,26 @@ export function readCachedPullRequestSnapshot({
 	}
 }
 
+/**
+ * Drops a workspace's cached PR snapshot so the next read falls through to
+ * `gh` instead of serving a pull request the workspace has moved off (e.g. when
+ * it continues onto a successor branch after a merge).
+ */
+export function deleteCachedPullRequestSnapshot({
+	database,
+	workspaceId,
+}: {
+	database: DatabaseSync;
+	workspaceId: string;
+}): void {
+	database
+		.prepare(
+			`DELETE FROM integration_metadata
+			 WHERE provider = ? AND resource_type = ? AND resource_id = ?`,
+		)
+		.run(PROVIDER, RESOURCE_TYPE, workspaceId);
+}
+
 /** Upserts the PR snapshot cache row for a workspace (idempotent refresh). */
 export function writeCachedPullRequestSnapshot({
 	database,

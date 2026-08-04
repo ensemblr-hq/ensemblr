@@ -5,7 +5,11 @@ import {
 	isWorkspaceNameable,
 	sanitizeBranchSlug,
 } from '../../src/main/pi-agent/branch-name-slug';
-import { joinBranchName } from '../../src/main/repository/branch-name';
+import {
+	branchNameFromRef,
+	joinBranchName,
+	nextContinuationBranchName,
+} from '../../src/main/repository/branch-name';
 
 describe('composeRenamedBranch', () => {
 	test('preserves a single-segment prefix', () => {
@@ -47,6 +51,77 @@ describe('joinBranchName', () => {
 		expect(joinBranchName('team/feature//', 'fix-login')).toBe(
 			'team/feature/fix-login',
 		);
+	});
+});
+
+describe('nextContinuationBranchName', () => {
+	test('appends a .v1 marker to an unmarked branch', () => {
+		expect(nextContinuationBranchName('psoldunov/bach', [])).toBe(
+			'psoldunov/bach.v1',
+		);
+	});
+
+	test('bumps an existing marker instead of stacking a second one', () => {
+		expect(nextContinuationBranchName('psoldunov/bach.v1', [])).toBe(
+			'psoldunov/bach.v2',
+		);
+		expect(nextContinuationBranchName('psoldunov/bach.v9', [])).toBe(
+			'psoldunov/bach.v10',
+		);
+	});
+
+	test('skips names already taken in the repository', () => {
+		expect(
+			nextContinuationBranchName('psoldunov/bach', [
+				'psoldunov/bach',
+				'psoldunov/bach.v1',
+				'psoldunov/bach.v2',
+			]),
+		).toBe('psoldunov/bach.v3');
+	});
+
+	test('leaves a dash-v version suffix intact instead of bumping it', () => {
+		expect(nextContinuationBranchName('psoldunov/bump-eslint-v9', [])).toBe(
+			'psoldunov/bump-eslint-v9.v1',
+		);
+	});
+
+	test('treats a non-marker v segment as part of the base name', () => {
+		expect(nextContinuationBranchName('release.v', [])).toBe('release.v.v1');
+		expect(nextContinuationBranchName('bump.v2.deps', [])).toBe(
+			'bump.v2.deps.v1',
+		);
+	});
+
+	test('leaves an over-long digit run as part of the base name', () => {
+		expect(nextContinuationBranchName('epoch.v1234567890', [])).toBe(
+			'epoch.v1234567890.v1',
+		);
+	});
+});
+
+describe('branchNameFromRef', () => {
+	test('strips the local branch prefix', () => {
+		expect(branchNameFromRef('refs/heads/psoldunov/bach')).toBe(
+			'psoldunov/bach',
+		);
+	});
+
+	test('strips the remote prefix and its remote segment', () => {
+		expect(branchNameFromRef('refs/remotes/origin/psoldunov/bach')).toBe(
+			'psoldunov/bach',
+		);
+		expect(branchNameFromRef('refs/remotes/upstream/bach.v1')).toBe('bach.v1');
+	});
+
+	test('claims no name for a remote HEAD pointer', () => {
+		expect(branchNameFromRef('refs/remotes/origin/HEAD')).toBeNull();
+	});
+
+	test('ignores tags and other ref namespaces', () => {
+		expect(branchNameFromRef('refs/tags/v1.0.0')).toBeNull();
+		expect(branchNameFromRef('refs/stash')).toBeNull();
+		expect(branchNameFromRef('')).toBeNull();
 	});
 });
 

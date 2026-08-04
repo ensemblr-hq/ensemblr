@@ -176,6 +176,8 @@ import type {
 import type {
 	ArchiveWorkspaceRequest,
 	ArchiveWorkspaceResult,
+	ContinueWorkspaceBranchRequest,
+	ContinueWorkspaceBranchResult,
 	CreateWorkspaceRequest,
 	CreateWorkspaceResult,
 	DeleteArchivedWorkspaceRequest,
@@ -271,6 +273,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.createWorkspace]: IpcHandlerEntry<
 		CreateWorkspaceRequest,
 		CreateWorkspaceResult
+	>;
+	[IPC_CHANNELS.continueWorkspaceBranch]: IpcHandlerEntry<
+		ContinueWorkspaceBranchRequest,
+		ContinueWorkspaceBranchResult
 	>;
 	[IPC_CHANNELS.deleteArchivedWorkspace]: IpcHandlerEntry<
 		DeleteArchivedWorkspaceRequest,

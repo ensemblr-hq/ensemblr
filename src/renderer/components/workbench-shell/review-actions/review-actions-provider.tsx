@@ -59,7 +59,11 @@ export function ReviewActionsProvider({
 			workspaceId: activeWorkspace.id,
 		},
 	);
-	const { archiveAfterMergeMutation, mergeMutation } = useReviewMutations({
+	const {
+		archiveAfterMergeMutation,
+		continueMergedWorkspaceMutation,
+		mergeMutation,
+	} = useReviewMutations({
 		activeWorkspace,
 		mergeSettings,
 		onSettled: closeDialog,
@@ -68,7 +72,9 @@ export function ReviewActionsProvider({
 	const value = useMemo<ReviewActionsValue>(
 		() => ({
 			archiveMergedWorkspace: () => archiveAfterMergeMutation.mutate(),
+			continueMergedWorkspace: () => continueMergedWorkspaceMutation.mutate(),
 			isArchivingMergedWorkspace: archiveAfterMergeMutation.isPending,
+			isContinuingMergedWorkspace: continueMergedWorkspaceMutation.isPending,
 			isRefreshingPullRequest,
 			openMergeConfirmation: () => setActiveDialog({ kind: 'merge' }),
 			refreshPullRequest,
@@ -76,6 +82,7 @@ export function ReviewActionsProvider({
 		}),
 		[
 			archiveAfterMergeMutation,
+			continueMergedWorkspaceMutation,
 			isRefreshingPullRequest,
 			refreshPullRequest,
 			runAgentAction,

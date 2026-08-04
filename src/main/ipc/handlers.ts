@@ -20,6 +20,7 @@ import type { PlanModeRegistry } from '../plan-mode';
 import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
+	ContinueWorkspaceBranchService,
 	CreateWorkspaceService,
 	DeleteArchivedWorkspaceService,
 	DeleteRepositoryService,
@@ -87,6 +88,7 @@ interface RegisterIpcHandlersOptions {
 	archiveRepositoryService: ArchiveRepositoryService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
 	configService: EnsemblrConfigService;
+	continueWorkspaceBranchService: ContinueWorkspaceBranchService;
 	createWorkspaceService: CreateWorkspaceService;
 	augmentHarnessCommand?: (
 		command: string,
@@ -147,6 +149,7 @@ export function registerIpcHandlers({
 	archiveWorkspaceService,
 	augmentHarnessCommand,
 	configService,
+	continueWorkspaceBranchService,
 	createWorkspaceService,
 	databaseService,
 	deleteArchivedWorkspaceService,
@@ -211,6 +214,7 @@ export function registerIpcHandlers({
 	registerRepositoryHandlers({
 		archiveRepositoryService,
 		archiveWorkspaceService,
+		continueWorkspaceBranchService,
 		createWorkspaceService,
 		deleteArchivedWorkspaceService,
 		deleteRepositoryService,

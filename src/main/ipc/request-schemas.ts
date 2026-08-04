@@ -72,6 +72,7 @@ export {
 export {
 	archiveRepositoryRequestSchema,
 	archiveWorkspaceRequestSchema,
+	continueWorkspaceBranchRequestSchema,
 	createWorkspaceRequestSchema,
 	deleteArchivedWorkspaceRequestSchema,
 	deleteRepositoryRequestSchema,
@@ -79,6 +80,7 @@ export {
 	listArchivedWorkspacesRequestSchema,
 	parseArchiveRepositoryRequest,
 	parseArchiveWorkspaceRequest,
+	parseContinueWorkspaceBranchRequest,
 	parseCreateWorkspaceRequest,
 	parseDeleteArchivedWorkspaceRequest,
 	parseDeleteRepositoryRequest,

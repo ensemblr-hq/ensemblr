@@ -172,6 +172,28 @@ export function parseRenameWorkspaceRequest(raw: unknown): {
 	return result;
 }
 
+/** {@link import('../../../shared/ipc').ContinueWorkspaceBranchRequest}. */
+export const continueWorkspaceBranchRequestSchema = z.object({
+	workspaceId: z.string(),
+});
+
+/**
+ * Parses a continue-workspace-branch payload, falling back to
+ * `{ workspaceId: '' }` on malformed input. The service emits a
+ * `workspace-not-found` diagnostic.
+ * @param raw - Raw IPC payload.
+ * @returns The normalized continue-workspace-branch request.
+ */
+export function parseContinueWorkspaceBranchRequest(raw: unknown): {
+	workspaceId: string;
+} {
+	const parsed = continueWorkspaceBranchRequestSchema.safeParse(raw);
+	if (!parsed.success) {
+		return { workspaceId: '' };
+	}
+	return { workspaceId: parsed.data.workspaceId };
+}
+
 /** {@link import('../../../shared/ipc').ArchiveWorkspaceRequest}. */
 export const archiveWorkspaceRequestSchema = z.object({
 	branchCleanup: optionalBoolean,

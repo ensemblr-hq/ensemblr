@@ -10,6 +10,7 @@ import type {
 import type { SharedRootAdoptionSnapshot } from '../../../shared/ipc/contracts/shared-root-adoption';
 import type {
 	ArchiveWorkspaceResult,
+	ContinueWorkspaceBranchResult,
 	CreateWorkspaceResult,
 	DeleteArchivedWorkspaceResult,
 	DeleteWorkspaceResult,
@@ -21,6 +22,7 @@ import type {
 import type {
 	ArchiveRepositoryService,
 	ArchiveWorkspaceService,
+	ContinueWorkspaceBranchService,
 	CreateWorkspaceService,
 	DeleteArchivedWorkspaceService,
 	DeleteRepositoryService,
@@ -38,6 +40,7 @@ import type { WithPermissionGate } from '../permission-gate.ts';
 import {
 	parseArchiveRepositoryRequest,
 	parseArchiveWorkspaceRequest,
+	parseContinueWorkspaceBranchRequest,
 	parseCreateWorkspaceRequest,
 	parseDeleteArchivedWorkspaceRequest,
 	parseDeleteRepositoryRequest,
@@ -54,6 +57,7 @@ import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 interface RepositoryHandlersOptions {
 	archiveRepositoryService: ArchiveRepositoryService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
+	continueWorkspaceBranchService: ContinueWorkspaceBranchService;
 	createWorkspaceService: CreateWorkspaceService;
 	deleteArchivedWorkspaceService: DeleteArchivedWorkspaceService;
 	deleteRepositoryService: DeleteRepositoryService;
@@ -77,6 +81,7 @@ interface RepositoryHandlersOptions {
 export function registerRepositoryHandlers({
 	archiveRepositoryService,
 	archiveWorkspaceService,
+	continueWorkspaceBranchService,
 	createWorkspaceService,
 	deleteArchivedWorkspaceService,
 	deleteRepositoryService,
@@ -146,6 +151,14 @@ export function registerRepositoryHandlers({
 		IPC_CHANNELS.archiveWorkspace,
 		(_event, raw: unknown): Promise<ArchiveWorkspaceResult> =>
 			archiveWorkspaceService.archive(parseArchiveWorkspaceRequest(raw)),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.continueWorkspaceBranch,
+		(_event, raw: unknown): Promise<ContinueWorkspaceBranchResult> =>
+			continueWorkspaceBranchService.continueBranch(
+				parseContinueWorkspaceBranchRequest(raw),
+			),
 	);
 
 	withPermissionGate(

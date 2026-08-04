@@ -16,6 +16,7 @@ import test, { type TestContext } from 'node:test';
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
 import { createArchiveLifecycleService } from '../../src/main/repository/archive-lifecycle.ts';
 import { createArchiveWorkspaceService } from '../../src/main/repository/archive-workspace.ts';
+import { createContinueWorkspaceBranchService } from '../../src/main/repository/continue-workspace-branch.ts';
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
 import {
 	type EnsemblrDatabaseConnection,
@@ -288,6 +289,39 @@ test('branchCleanup opt-in removes the worktree registration and drops the local
 		? archiveRecord(harness.databaseService, result.archiveRecordId)
 		: undefined;
 	assert.equal(archiveRow?.branch_cleanup, 1);
+});
+
+test('branchCleanup drops every branch a continued workspace moved off', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'cleanup-chain');
+	const continueService = createContinueWorkspaceBranchService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	await continueService.continueBranch({ workspaceId: workspace.id });
+	const second = await continueService.continueBranch({
+		workspaceId: workspace.id,
+	});
+	assert.equal(second.branchName, 'cleanup-chain.v2');
+
+	const { service } = makeArchiveService(harness);
+	const result = await service.archive({
+		branchCleanup: true,
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.branchDeleted, true);
+	const remaining = listBranches(harness.repositoryPath);
+	for (const branch of [
+		'cleanup-chain',
+		'cleanup-chain.v1',
+		'cleanup-chain.v2',
+	]) {
+		assert.equal(remaining.includes(branch), false, `${branch} survived`);
+	}
 });
 
 test('pre-archive hook abort short-circuits the lifecycle without stamping archived_at', async (t) => {

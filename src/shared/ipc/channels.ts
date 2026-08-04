@@ -34,6 +34,7 @@ export const IPC_CHANNELS = {
 	commitWorkspaceChanges: 'ensemblr:commit-workspace-changes',
 	computeTurnDiff: 'ensemblr:compute-turn-diff',
 	confirmRootDirectoryChange: 'ensemblr:confirm-root-directory-change',
+	continueWorkspaceBranch: 'ensemblr:continue-workspace-branch',
 	createPullRequest: 'ensemblr:create-pull-request',
 	createTerminalSession: 'ensemblr:create-terminal-session',
 	createWorkspace: 'ensemblr:create-workspace',

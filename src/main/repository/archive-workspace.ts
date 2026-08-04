@@ -24,6 +24,7 @@ import {
 } from './archive-diagnostics.ts';
 import type { ArchiveLifecycleService } from './archive-lifecycle.ts';
 import { insertArchiveRecord } from './archive-records.ts';
+import { readContinuedBranches } from './continued-branches.ts';
 import { runBranchDelete, runWorktreeRemove } from './git-ops.ts';
 import { hasWorkspaceRepositoryIdentity, isRecord } from './row-guards.ts';
 
@@ -49,6 +50,7 @@ interface SourceWorkspace {
 	baseBranch: string | null;
 	branchName: string | null;
 	id: string;
+	metadataJson: string;
 	name: string;
 	path: string;
 	repositoryId: string;
@@ -234,20 +236,13 @@ export function createArchiveWorkspaceService({
 					});
 				}
 
-				const branchOutcome = await runBranchDelete({
+				branchDeleted = await deleteBranchChain({
 					branchName: source.branchName,
+					diagnostics,
 					localCommandService,
+					predecessors: readContinuedBranches(source.metadataJson),
 					repositoryPath: source.repositoryPath,
 				});
-				if (branchOutcome.status === 'success') {
-					branchDeleted = true;
-				} else if (branchOutcome.status === 'failure') {
-					diagnostics.push({
-						code: 'branch-cleanup-failed',
-						message: branchOutcome.message,
-						severity: 'warning',
-					});
-				}
 			}
 
 			if (preserved.archivedContextPath) {
@@ -325,6 +320,55 @@ function readWorkspace(
 		return null;
 	}
 	return row;
+}
+
+/**
+ * Deletes the workspace's branch along with every branch it continued off, so a
+ * workspace that moved through `feature`, `feature.v1`, `feature.v2` does not
+ * leave the first two behind. A missing predecessor is expected — the user may
+ * have pruned it already — and only real failures raise a diagnostic.
+ * @param branchName - The branch the workspace ended on.
+ * @param diagnostics - Collector the archive result reports through.
+ * @param localCommandService - Command runner used for git.
+ * @param predecessors - Branches recorded in the continuation chain.
+ * @param repositoryPath - Repository the branches live in.
+ * @returns True when the workspace's own branch was deleted.
+ */
+async function deleteBranchChain({
+	branchName,
+	diagnostics,
+	localCommandService,
+	predecessors,
+	repositoryPath,
+}: {
+	branchName: string;
+	diagnostics: ArchiveWorkspaceDiagnostic[];
+	localCommandService: LocalCommandService;
+	predecessors: readonly string[];
+	repositoryPath: string;
+}): Promise<boolean> {
+	let branchDeleted = false;
+	for (const candidate of [branchName, ...predecessors]) {
+		// Deletions stay sequential: concurrent `git branch -D` runs in one repo
+		// contend on packed-refs.lock and fail rather than wait.
+		// oxlint-disable-next-line react-doctor/async-await-in-loop
+		const outcome = await runBranchDelete({
+			branchName: candidate,
+			localCommandService,
+			repositoryPath,
+		});
+		if (outcome.status === 'success' && candidate === branchName) {
+			branchDeleted = true;
+		}
+		if (outcome.status === 'failure') {
+			diagnostics.push({
+				code: 'branch-cleanup-failed',
+				message: outcome.message,
+				severity: 'warning',
+			});
+		}
+	}
+	return branchDeleted;
 }
 
 /**
@@ -549,7 +593,8 @@ function isWorkspaceRow(row: unknown): row is SourceWorkspace {
 	}
 	return (
 		hasWorkspaceRepositoryIdentity(row) &&
-		(row.baseBranch === null || typeof row.baseBranch === 'string')
+		(row.baseBranch === null || typeof row.baseBranch === 'string') &&
+		typeof row.metadataJson === 'string'
 	);
 }
 
