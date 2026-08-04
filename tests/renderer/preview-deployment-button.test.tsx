@@ -50,6 +50,29 @@ test('renders the neutral header tone for an open pull request', () => {
 	expect(link.className).not.toContain('border-status-ok/35');
 });
 
+test('renders the merged header tone after the pull request lands', () => {
+	render(
+		<PreviewDeploymentButton
+			deployment={{
+				label: 'Preview',
+				provider: 'vercel',
+				source: 'github-deployment',
+				status: 'ready',
+				url: 'https://ready-preview.vercel.app',
+			}}
+			tone='merged'
+		/>,
+	);
+
+	const link = screen.getByRole('link', {
+		name: 'Open Vercel preview deployment',
+	});
+	expect(link.className).toContain(
+		'border-[color:var(--right-sidebar-header-merged)]',
+	);
+	expect(link.className).not.toContain('border-status-ok/35');
+});
+
 test('keeps a failed deployment red under a green header tone', () => {
 	render(
 		<PreviewDeploymentButton

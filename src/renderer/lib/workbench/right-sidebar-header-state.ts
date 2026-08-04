@@ -53,6 +53,7 @@ export function getRightSidebarHeaderState(
 			kind: 'pr-merged',
 			label: pullRequest.label || 'Merged',
 			number: pullRequestNumber,
+			previewDeployment: pullRequest.previewDeployment,
 			tone: 'merged',
 			url: pullRequest.url,
 		};
