@@ -13,6 +13,7 @@ import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
 import { getProviderLabel } from '@/renderer/lib/workbench/provider-label';
 import type {
+	FileOpenOptions,
 	PullRequestCheckStatus,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
@@ -184,10 +185,11 @@ export function ChecksActionRow({
 }
 
 /**
- * Single PR comment row. Clicking the row opens a read-only preview tab; hovering
- * reveals Hide (session-only dismiss) and Add-to-chat actions. The leading badge
- * shows the comment author (falling back to the provider label), and `detail`
- * already embeds any `path:line` location from the gh snapshot.
+ * Single PR comment row. Clicking the row opens a read-only preview tab into the
+ * workspace's ephemeral preview slot, and double-clicking keeps that tab open;
+ * hovering reveals Hide (session-only dismiss) and Add-to-chat actions. The
+ * leading badge shows the comment author (falling back to the provider label),
+ * and `detail` already embeds any `path:line` location from the gh snapshot.
  */
 export function PullRequestCommentRow({
 	comment,
@@ -198,7 +200,7 @@ export function PullRequestCommentRow({
 	comment: WorkspaceShellModel['pullRequest']['comments'][number];
 	onAddToChat?: () => void;
 	onHide?: () => void;
-	onOpenPreview?: () => void;
+	onOpenPreview?: (options?: FileOpenOptions) => void;
 }) {
 	return (
 		<div className='group flex min-h-7 min-w-0 items-center justify-between gap-2 overflow-hidden rounded-md px-1 hover:bg-muted'>
@@ -208,7 +210,10 @@ export function PullRequestCommentRow({
 					onOpenPreview ? 'cursor-pointer' : 'cursor-default',
 				)}
 				disabled={!onOpenPreview}
-				onClick={onOpenPreview}
+				onClick={onOpenPreview ? () => onOpenPreview() : undefined}
+				onDoubleClick={
+					onOpenPreview ? () => onOpenPreview({ preview: false }) : undefined
+				}
 				type='button'
 			>
 				<ProviderMark provider={comment.provider} />
