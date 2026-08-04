@@ -49,6 +49,7 @@ export function WorkspaceConversationContent({
 	onSessionTabChange,
 	onSessionTabClose,
 	onSessionTabOpen,
+	onSessionTabPin,
 	onSessionTabRestore,
 	onSessionTabsReorder,
 	onTurnDiffOpen,
@@ -75,8 +76,12 @@ export function WorkspaceConversationContent({
 	onSessionTabOpen: (options?: {
 		placement?: SessionTabPlacement;
 	}) => Promise<{ chatTabId: string } | null>;
+	onSessionTabPin: (sessionId: string) => void;
 	onSessionTabRestore: (sessionId: string) => void;
-	onSessionTabsReorder: (sessionIds: string[]) => void;
+	onSessionTabsReorder: (
+		sessionIds: string[],
+		draggedSessionId: string,
+	) => void;
 	sessionTabs: SessionTabModel[];
 }) {
 	const developerMode = useAtomValue(developerModeAtom);
@@ -137,6 +142,7 @@ export function WorkspaceConversationContent({
 				onSessionTabClose={onSessionTabClose}
 				onSessionTabChange={onSessionTabChange}
 				onSessionTabOpen={onSessionTabOpen}
+				onSessionTabPin={onSessionTabPin}
 				onSessionTabRestore={onSessionTabRestore}
 				onSessionTabsReorder={onSessionTabsReorder}
 				sessions={sessionTabs}

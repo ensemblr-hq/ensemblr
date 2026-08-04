@@ -17,6 +17,7 @@ function createTab(
 	return {
 		chatTabId: 'chat-1',
 		id: 'chat-1',
+		isPreview: false,
 		isSubAgent: false,
 		kind: 'chat',
 		label: 'Chat',

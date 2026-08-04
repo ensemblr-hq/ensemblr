@@ -1,4 +1,5 @@
 import type { AgentActionKind } from './agent-actions';
+import type { ReviewFilePreviewOpener } from './file-preview';
 import type { OpenTargetsState } from './open-targets';
 import type { WorkspaceOpenTarget } from './workspace';
 
@@ -47,7 +48,7 @@ export interface ReviewFileActions {
 	 * preview when the workspace still holds a previewable image, otherwise the
 	 * diff at the active source's scope. `null` outside a conversation.
 	 */
-	openFile: ((filePath: string) => void) | null;
+	openFile: ReviewFilePreviewOpener | null;
 	/** Discards the working-tree changes for a single file. */
 	onDiscardFile: (filePath: string) => void;
 	/**

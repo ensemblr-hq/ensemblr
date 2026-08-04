@@ -72,6 +72,9 @@ export function ReviewFileRow({
 	const hasOpenInMenu = openInTargets.length > 0 || Boolean(copyTarget);
 	const canDiscard = isDiscardable(file.path);
 	const openThisFile = openFile ? () => openFile(file.path) : undefined;
+	const keepThisFileOpen = openFile
+		? () => openFile(file.path, { preview: false })
+		: undefined;
 
 	return (
 		<div
@@ -92,6 +95,7 @@ export function ReviewFileRow({
 				aria-label={`Open ${file.path}`}
 				className='flex h-full min-w-0 flex-1 items-center gap-2 self-stretch rounded-md px-2 text-left font-mono text-xs'
 				onClick={openThisFile}
+				onDoubleClick={keepThisFileOpen}
 				type='button'
 			>
 				<Icon

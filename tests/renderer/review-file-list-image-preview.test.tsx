@@ -82,7 +82,7 @@ describe('ReviewFileList image routing', () => {
 			screen.getByRole('button', { name: 'Open assets/logo.png' }),
 		);
 
-		expect(openPreview).toHaveBeenCalledWith('assets/logo.png');
+		expect(openPreview).toHaveBeenCalledWith('assets/logo.png', undefined);
 		expect(openDiff).not.toHaveBeenCalled();
 	});
 
@@ -93,7 +93,11 @@ describe('ReviewFileList image routing', () => {
 			screen.getByRole('button', { name: 'Open src/main/index.ts' }),
 		);
 
-		expect(openDiff).toHaveBeenCalledWith('src/main/index.ts', undefined);
+		expect(openDiff).toHaveBeenCalledWith(
+			'src/main/index.ts',
+			undefined,
+			undefined,
+		);
 		expect(openPreview).not.toHaveBeenCalled();
 	});
 
@@ -104,7 +108,11 @@ describe('ReviewFileList image routing', () => {
 			screen.getByRole('button', { name: 'Open assets/removed.png' }),
 		);
 
-		expect(openDiff).toHaveBeenCalledWith('assets/removed.png', undefined);
+		expect(openDiff).toHaveBeenCalledWith(
+			'assets/removed.png',
+			undefined,
+			undefined,
+		);
 		expect(openPreview).not.toHaveBeenCalled();
 	});
 
@@ -119,7 +127,7 @@ describe('ReviewFileList image routing', () => {
 			screen.getByRole('button', { name: 'Open assets/logo.png' }),
 		);
 
-		expect(openDiff).toHaveBeenCalledWith('assets/logo.png', scope);
+		expect(openDiff).toHaveBeenCalledWith('assets/logo.png', scope, undefined);
 		expect(openPreview).not.toHaveBeenCalled();
 	});
 
@@ -134,7 +142,7 @@ describe('ReviewFileList image routing', () => {
 			screen.getByRole('button', { name: 'Open assets/logo.png' }),
 		);
 
-		expect(openPreview).toHaveBeenCalledWith('assets/logo.png');
+		expect(openPreview).toHaveBeenCalledWith('assets/logo.png', undefined);
 		expect(openDiff).not.toHaveBeenCalled();
 	});
 
@@ -144,12 +152,16 @@ describe('ReviewFileList image routing', () => {
 		fireEvent.click(
 			screen.getByRole('button', { name: 'Open assets/logo.png' }),
 		);
-		expect(openPreview).toHaveBeenCalledWith('assets/logo.png');
+		expect(openPreview).toHaveBeenCalledWith('assets/logo.png', undefined);
 
 		fireEvent.click(
 			screen.getByRole('button', { name: 'Open src/main/index.ts' }),
 		);
-		expect(openDiff).toHaveBeenCalledWith('src/main/index.ts', undefined);
+		expect(openDiff).toHaveBeenCalledWith(
+			'src/main/index.ts',
+			undefined,
+			undefined,
+		);
 	});
 
 	test('the right-click View item previews a changed image', async () => {
@@ -158,7 +170,7 @@ describe('ReviewFileList image routing', () => {
 		openRowMenu('assets/logo.png');
 		fireEvent.click(await screen.findByRole('menuitem', { name: 'View' }));
 
-		expect(openPreview).toHaveBeenCalledWith('assets/logo.png');
+		expect(openPreview).toHaveBeenCalledWith('assets/logo.png', undefined);
 		expect(openDiff).not.toHaveBeenCalled();
 	});
 
@@ -168,7 +180,11 @@ describe('ReviewFileList image routing', () => {
 		openRowMenu('src/main/index.ts');
 		fireEvent.click(await screen.findByRole('menuitem', { name: 'View' }));
 
-		expect(openDiff).toHaveBeenCalledWith('src/main/index.ts', undefined);
+		expect(openDiff).toHaveBeenCalledWith(
+			'src/main/index.ts',
+			undefined,
+			undefined,
+		);
 		expect(openPreview).not.toHaveBeenCalled();
 	});
 

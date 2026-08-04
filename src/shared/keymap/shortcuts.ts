@@ -179,6 +179,11 @@ export const SHORTCUTS = {
 		scope: 'global',
 		bindings: [{ key: 't', modifiers: ['mod'] }],
 	},
+	'tab.keepOpen': {
+		description: 'Keep preview tab open',
+		scope: 'global',
+		bindings: [{ key: 'Enter', modifiers: ['mod', 'shift'] }],
+	},
 	'tab.next': {
 		description: 'Next tab',
 		scope: 'global',

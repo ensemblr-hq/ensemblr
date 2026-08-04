@@ -26,6 +26,7 @@ const WORKSPACE_ID = 'ws-1';
 const activeSession: SessionTabModel = {
 	chatTabId: 'tab-1',
 	id: 'tab-1',
+	isPreview: false,
 	isSubAgent: false,
 	kind: 'chat',
 	label: 'Chat',

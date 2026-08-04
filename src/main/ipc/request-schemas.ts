@@ -27,6 +27,7 @@ export {
 	listChatTabsRequestSchema,
 	listClosedChatTabsWithSummaryRequestSchema,
 	openChatTabRequestSchema,
+	pinChatTabRequestSchema,
 	reorderChatTabsRequestSchema,
 	restoreChatTabRequestSchema,
 } from './request-schemas/chat-tab.ts';

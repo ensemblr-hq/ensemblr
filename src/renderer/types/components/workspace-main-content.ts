@@ -21,8 +21,16 @@ export type WorkspaceMainContentState = Pick<
 		harnessLabel: string;
 	}) => Promise<{ chatTabId: string } | null>;
 	onSessionTabClose: (sessionId: string) => void;
-	/** Persists the tab strip order after drag-and-drop reordering. */
-	onSessionTabsReorder: (sessionIds: string[]) => void;
+	/** Promotes an ephemeral preview tab to a permanent one. */
+	onSessionTabPin: (sessionId: string) => void;
+	/**
+	 * Persists the tab strip order after drag-and-drop reordering, along with the
+	 * tab the user dragged.
+	 */
+	onSessionTabsReorder: (
+		sessionIds: string[],
+		draggedSessionId: string,
+	) => void;
 	onTurnDiffOpen: (input: {
 		label: string;
 		turnId: string;

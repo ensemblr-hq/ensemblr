@@ -8,6 +8,8 @@ import type {
 	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabRequest,
 	OpenChatTabResult,
+	PinChatTabRequest,
+	PinChatTabResult,
 	ReorderChatTabsRequest,
 	ReorderChatTabsResult,
 	RestoreChatTabRequest,
@@ -61,6 +63,16 @@ export function openChatTab(
 	return profileElectronIpcCall(
 		{ channel: 'ensemblr:open-chat-tab', usesDatabase: true },
 		() => getEnsemblrApi().openChatTab(request),
+	);
+}
+
+/** Promotes an ephemeral preview tab to a permanent one. */
+export function pinChatTab(
+	request: PinChatTabRequest,
+): Promise<PinChatTabResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemblr:pin-chat-tab', usesDatabase: true },
+		() => getEnsemblrApi().pinChatTab(request),
 	);
 }
 

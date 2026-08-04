@@ -108,6 +108,7 @@ export function SessionTabs({
 	onSessionTabClose,
 	onSessionTabChange,
 	onSessionTabOpen,
+	onSessionTabPin,
 	onSessionTabRestore,
 	onSessionTabsReorder,
 	sessions,
@@ -123,8 +124,12 @@ export function SessionTabs({
 	onSessionTabOpen: (options?: {
 		placement?: SessionTabPlacement;
 	}) => Promise<{ chatTabId: string } | null>;
+	onSessionTabPin: (sessionId: string) => void;
 	onSessionTabRestore: (sessionId: string) => void;
-	onSessionTabsReorder: (sessionIds: string[]) => void;
+	onSessionTabsReorder: (
+		sessionIds: string[],
+		draggedSessionId: string,
+	) => void;
 	sessions: SessionTabModel[];
 }) {
 	const [isOpening, setIsOpening] = useState(false);
@@ -153,6 +158,7 @@ export function SessionTabs({
 	const canReorderTabs = sessionIds.length > 1;
 
 	useHotkey('tab.new', () => handleOpen());
+	useHotkey('tab.keepOpen', () => onSessionTabPin(activeSession.id));
 	useHotkey('tab.next', () => cycleTab(1));
 	useHotkey('tab.prev', () => cycleTab(-1));
 	useHotkey('tab.selectByIndex', (event) => {
@@ -257,8 +263,13 @@ export function SessionTabs({
 		}
 	}
 
-	/** Commits the final dragged order to the workspace tab controller. */
-	function handleReorderEnd() {
+	/**
+	 * Commits the final dragged order to the workspace tab controller, naming the
+	 * tab the drag was pointed at so the controller can tell a deliberate
+	 * placement from a tab that was merely pushed aside.
+	 * @param draggedSessionId - Session id of the tab the user dragged
+	 */
+	function handleReorderEnd(draggedSessionId: string) {
 		setIsDraggingTab(false);
 		if (!canReorderTabs) {
 			return;
@@ -267,7 +278,7 @@ export function SessionTabs({
 		if (areStringArraysEqual(nextIds, sessionIds)) {
 			return;
 		}
-		onSessionTabsReorder(nextIds);
+		onSessionTabsReorder(nextIds, draggedSessionId);
 	}
 
 	return (
@@ -293,8 +304,9 @@ export function SessionTabs({
 									isDraggingTab={isDraggingTab}
 									key={session.id}
 									onClose={onSessionTabClose}
-									onDragEnd={handleReorderEnd}
+									onDragEnd={() => handleReorderEnd(session.id)}
 									onDragStart={handleReorderStart}
+									onPin={onSessionTabPin}
 									onSelect={onSessionTabChange}
 									openChatTabCount={openChatTabCount}
 									session={session}
@@ -359,6 +371,8 @@ interface SessionTabProps {
 	openChatTabCount: number;
 	onSelect: (sessionId: string) => void;
 	onClose: (sessionId: string) => void;
+	/** Promotes this tab out of the ephemeral preview slot. */
+	onPin: (sessionId: string) => void;
 	onDragStart: () => void;
 	onDragEnd: () => void;
 }
@@ -372,6 +386,7 @@ function SessionTab({
 	openChatTabCount,
 	onSelect,
 	onClose,
+	onPin,
 	onDragStart,
 	onDragEnd,
 }: SessionTabProps) {
@@ -413,6 +428,7 @@ function SessionTab({
 				aria-current={isActive ? 'page' : undefined}
 				className='flex h-full min-w-0 flex-1 cursor-inherit items-center gap-2 px-3 text-left'
 				onClick={handleSelect}
+				onDoubleClick={() => onPin(session.id)}
 				onPointerDown={() => {
 					didDragRef.current = false;
 				}}
@@ -421,7 +437,10 @@ function SessionTab({
 				<span className='grid size-3.5 shrink-0 place-items-center'>
 					<SessionTabIcon session={session} />
 				</span>
-				<span className='truncate' title={session.fullLabel ?? session.label}>
+				<span
+					className={cn('truncate', session.isPreview && 'italic')}
+					title={session.fullLabel ?? session.label}
+				>
 					{session.label}
 				</span>
 			</button>

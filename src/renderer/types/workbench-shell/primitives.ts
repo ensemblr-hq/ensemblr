@@ -64,13 +64,19 @@ export interface SessionTabActions {
 	}) => Promise<{ chatTabId: string } | null>;
 	openCommentPreviewTab: (input: {
 		comment: PullRequestCommentSummary;
+		/** Defaults to true; false opens a permanent tab the preview slot skips. */
+		preview?: boolean;
 		prNumber?: number;
 	}) => Promise<{ chatTabId: string } | null>;
 	openFilePreviewTab: (input: {
 		filePath: string;
+		/** Defaults to true; false opens a permanent tab the preview slot skips. */
+		preview?: boolean;
 	}) => Promise<{ chatTabId: string } | null>;
 	openTurnDiffTab: (input: {
 		label: string;
+		/** Defaults to true; false opens a permanent tab the preview slot skips. */
+		preview?: boolean;
 		turnId: string;
 	}) => Promise<{ chatTabId: string } | null>;
 	openTerminalTab: (input: {
@@ -79,8 +85,12 @@ export interface SessionTabActions {
 	}) => Promise<{ chatTabId: string } | null>;
 	openWorkspaceFileDiffTab: (input: {
 		filePath: string;
+		/** Defaults to true; false opens a permanent tab the preview slot skips. */
+		preview?: boolean;
 		scope?: WorkspaceGitDiffScope;
 	}) => Promise<{ chatTabId: string } | null>;
+	/** Promotes an ephemeral preview tab to a permanent one. */
+	pinSessionTab: (chatTabId: string) => void;
 	closeSessionTabAsync: (
 		chatTabId: string,
 	) => Promise<{ replacementChatTabId: string | null }>;

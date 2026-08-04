@@ -130,6 +130,7 @@ function stubSessionNavigation(
 		openTurnDiffTab: () => Promise.resolve(null),
 		openWorkspaceFileDiffTab: () => Promise.resolve(null),
 		reorderSessionTabs: () => undefined,
+		pinSessionTab: () => undefined,
 		restoreSessionTab: () => undefined,
 		sessionTabs: activeWorkspace.sessions,
 	};
