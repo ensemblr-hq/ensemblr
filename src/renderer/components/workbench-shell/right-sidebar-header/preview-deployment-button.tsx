@@ -19,6 +19,12 @@ const PREVIEW_DEPLOYMENT_PROVIDER_ICON_PATHS: Partial<
 };
 
 /**
+ * Deployment labels that add nothing next to the provider mark, since the pill's
+ * icon and aria-label already say it is a preview deployment.
+ */
+const GENERIC_DEPLOYMENT_LABELS = new Set(['deploy', 'deployment', 'preview']);
+
+/**
  * Pill-shaped preview-deployment button that opens the provider's URL, tinted by
  * the sidebar header's tone so both header pills read as one control group. A
  * failed deployment overrides that tone, because GitHub reports deployments
@@ -43,10 +49,12 @@ export function PreviewDeploymentButton({
 		deployment.provider,
 	);
 	const normalizedDeploymentLabel = deployment.label.trim().toLowerCase();
+	const isLabelRedundant =
+		normalizedDeploymentLabel === providerLabel.toLowerCase() ||
+		GENERIC_DEPLOYMENT_LABELS.has(normalizedDeploymentLabel);
 	const shouldShowTextLabel =
 		normalizedDeploymentLabel.length > 0 &&
-		(providerIconPath === null ||
-			normalizedDeploymentLabel !== providerLabel.toLowerCase());
+		(providerIconPath === null || !isLabelRedundant);
 	const pillTone = deployment.status === 'blocked' ? 'blocked' : tone;
 
 	return (

@@ -7,6 +7,65 @@ import { expect, test } from 'vitest';
 import { PreviewDeploymentButton } from '../../src/renderer/components/workbench-shell/right-sidebar-header/preview-deployment-button';
 import { PullRequestNumberButton } from '../../src/renderer/components/workbench-shell/right-sidebar-header/pull-request-number-button';
 
+test('drops a generic Preview label but keeps it in the accessible name', () => {
+	render(
+		<PreviewDeploymentButton
+			deployment={{
+				label: 'Preview',
+				provider: 'vercel',
+				source: 'github-deployment',
+				status: 'ready',
+				url: 'https://ready-preview.vercel.app',
+			}}
+			tone='ready'
+		/>,
+	);
+
+	const link = screen.getByRole('link', {
+		name: 'Open Vercel preview deployment',
+	});
+	expect(link).not.toHaveTextContent('Preview');
+	expect(link.querySelector('svg')).not.toBeNull();
+});
+
+test('keeps an environment label the provider mark cannot convey', () => {
+	render(
+		<PreviewDeploymentButton
+			deployment={{
+				label: 'staging',
+				provider: 'vercel',
+				source: 'github-deployment',
+				status: 'ready',
+				url: 'https://staging-preview.vercel.app',
+			}}
+			tone='ready'
+		/>,
+	);
+
+	expect(
+		screen.getByRole('link', { name: 'Open Vercel preview deployment' }),
+	).toHaveTextContent('staging');
+});
+
+test('keeps a generic label when no provider mark can stand in for it', () => {
+	render(
+		<PreviewDeploymentButton
+			deployment={{
+				label: 'Preview',
+				provider: 'unknown',
+				source: 'pr-comment',
+				status: 'ready',
+				url: 'https://preview.example.com',
+			}}
+			tone='ready'
+		/>,
+	);
+
+	expect(
+		screen.getByRole('link', { name: 'Open preview deployment' }),
+	).toHaveTextContent('Preview');
+});
+
 test('colors the preview pill from the header tone, not the deployment status', () => {
 	render(
 		<PreviewDeploymentButton
