@@ -25,9 +25,12 @@ import {
 
 const comment: WorkspaceShellModel['pullRequest']['comments'][number] = {
 	author: 'octocat',
-	detail: 'src/main/index.ts:12 — needs a guard here',
+	body: 'needs a guard here',
+	detail: 'needs a guard here',
 	id: 'comment-1',
+	line: 12,
 	origin: 'user',
+	path: 'src/main/index.ts',
 	provider: 'github',
 };
 

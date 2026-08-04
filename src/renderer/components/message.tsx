@@ -39,6 +39,9 @@ type InlineCodeProps = ComponentProps<'code'> & { node?: unknown };
 /** Props received by Streamdown's fenced code-block renderer. */
 type FencedCodeProps = ComponentProps<'code'> & { node?: unknown };
 
+/** Props received by Streamdown's image renderer. */
+type MessageImageProps = ComponentProps<'img'> & { node?: unknown };
+
 /** Renders assistant markdown through Streamdown, honoring the user's chosen code theme and markdown style. */
 export const MessageResponse = memo(
 	({ className, components, ...props }: MessageResponseProps) => {
@@ -63,6 +66,7 @@ export const MessageResponse = memo(
 			() => ({
 				...components,
 				code: MessageCodeBlock,
+				img: MessageImage,
 				inlineCode: MessageInlineCode,
 				table: AnswerTable,
 			}),
@@ -106,6 +110,38 @@ function MessageCodeBlock({ children, className }: FencedCodeProps) {
 			code={textFromCodeChildren(children).replace(/\n$/, '')}
 			copyable
 			language={toBundledLanguage(tag)}
+		/>
+	);
+}
+
+/**
+ * Renders a markdown image as a plain image, inline with the text around it.
+ *
+ * Streamdown frames every image in a block media widget — a 1rem block margin
+ * plus a hover overlay and download button — which suits a generated picture but
+ * not the badges bots write. A PR comment's status dot and project favicon sit on
+ * the line with the link beside them, and that margin drops the link onto a line
+ * of its own. An image that stands alone still reads as a figure; Streamdown
+ * unwraps its paragraph, so the stylesheet blocks it out from the answer root.
+ *
+ * A PR comment is third-party markdown and its images are fetched from whatever
+ * host wrote them, so an image is a read receipt for whoever hosts it. Deferring
+ * the fetch until the image scrolls into view keeps a thread nobody opened from
+ * announcing itself, and dropping the referrer keeps the request from carrying
+ * where in the app it came from.
+ */
+function MessageImage({ className, node: _node, ...props }: MessageImageProps) {
+	if (!props.src) {
+		return null;
+	}
+	return (
+		<img
+			{...props}
+			alt={props.alt ?? ''}
+			className={cn('inline-block max-w-full align-middle', className)}
+			data-streamdown='image'
+			loading='lazy'
+			referrerPolicy='no-referrer'
 		/>
 	);
 }
