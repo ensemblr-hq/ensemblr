@@ -113,10 +113,15 @@ export function parseStatusCheckRollup(value: unknown): GithubCheckWire[] {
 	});
 }
 
-/** Maps GitHub deployment + latest status rows from `gh api` to wire shape. */
+/**
+ * Maps GitHub deployment + status rows from `gh api` to wire shape. The state
+ * comes from the newest status, the URL from the newest status that carries
+ * one — a redeploy reports `pending` with no URL before it reports success, and
+ * the header should still link to the build that is live right now.
+ */
 export function parseDeployments(
 	deployments: unknown,
-	statusesByDeploymentId: ReadonlyMap<string, unknown>,
+	statusesByDeploymentId: ReadonlyMap<string, readonly unknown[]>,
 ): GithubDeploymentWire[] {
 	if (!Array.isArray(deployments)) {
 		return [];
@@ -130,24 +135,58 @@ export function parseDeployments(
 		if (!id) {
 			return [];
 		}
-		const status = statusesByDeploymentId.get(id);
-		const statusRecord =
-			typeof status === 'object' && status !== null
-				? (status as Record<string, unknown>)
-				: null;
-		const url =
-			readString(statusRecord?.environment_url) ||
-			readString(statusRecord?.target_url);
+		const statuses = parseDeploymentStatuses(statusesByDeploymentId.get(id));
+		const url = statuses.map(readDeploymentStatusUrl).find(Boolean) ?? '';
 		return [
 			{
 				environment: readString(record.environment, 'deployment'),
 				id,
 				source: 'github-deployment' as const,
-				state: parseDeploymentState(readString(statusRecord?.state)),
+				state: parseDeploymentState(readString(statuses[0]?.state)),
 				...(url ? { url } : {}),
 			},
 		];
 	});
+}
+
+/**
+ * Narrows raw deployment status rows to records ordered newest first, so
+ * callers never depend on the order `gh api` happened to return.
+ * @param value - Raw status rows for one deployment.
+ * @returns The status records, newest first.
+ */
+function parseDeploymentStatuses(value: unknown): Record<string, unknown>[] {
+	if (!Array.isArray(value)) {
+		return [];
+	}
+	const records = value.flatMap((entry) =>
+		typeof entry === 'object' && entry !== null
+			? [entry as Record<string, unknown>]
+			: [],
+	);
+	return [...records].sort(
+		(left, right) =>
+			readTimestamp(right.created_at) - readTimestamp(left.created_at),
+	);
+}
+
+/**
+ * Reads the hosted URL a deployment status carries.
+ * @param status - A deployment status record.
+ * @returns The environment URL, its target-URL fallback, or an empty string.
+ */
+function readDeploymentStatusUrl(status: Record<string, unknown>): string {
+	return readString(status.environment_url) || readString(status.target_url);
+}
+
+/**
+ * Reads an ISO timestamp field as a sortable number.
+ * @param value - Raw timestamp field.
+ * @returns Milliseconds since the epoch, or 0 when absent or unparseable.
+ */
+function readTimestamp(value: unknown): number {
+	const parsed = Date.parse(readString(value));
+	return Number.isFinite(parsed) ? parsed : 0;
 }
 
 /**

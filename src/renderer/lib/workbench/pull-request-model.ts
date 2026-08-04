@@ -2,7 +2,6 @@ import type {
 	PullRequestCheckSummary,
 	PullRequestCommentSummary,
 	PullRequestGitStatusSummary,
-	PullRequestPreviewDeploymentSummary,
 	PullRequestShellStatus,
 	PullRequestTodoSummary,
 	WorkspaceShellModel,
@@ -11,7 +10,6 @@ import { deriveOpenPullRequestStatus } from '@/shared/github-pr-presentation';
 import type {
 	GithubCheckWire,
 	GithubCommentWire,
-	GithubDeploymentWire,
 	GithubPullRequestSnapshotWire,
 	GithubPullRequestWire,
 } from '@/shared/ipc/contracts/github';
@@ -19,6 +17,7 @@ import type {
 	ReviewCommentWire,
 	ReviewTodoWire,
 } from '@/shared/ipc/contracts/review-comments';
+import { derivePreviewDeployment } from './preview-deployment';
 
 /** Inputs for building the workspace shell PR model: local changes, review rows, and the gh snapshot. */
 interface BuildPullRequestShellModelInput {
@@ -67,10 +66,11 @@ export function buildPullRequestShellModel({
 
 	const checks = pullRequest.checks.map(toCheckSummary);
 	const status = derivePullRequestStatus(pullRequest);
-	const previewDeployment = derivePreviewDeployment(
-		pullRequest.deployments,
+	const previewDeployment = derivePreviewDeployment({
 		checks,
-	);
+		comments: pullRequest.comments,
+		deployments: pullRequest.deployments,
+	});
 
 	return {
 		checks,
@@ -280,62 +280,6 @@ function deriveDetail({
 				? 'Draft pull request — mark ready for review to run policy gates.'
 				: 'Pull request is open.';
 	}
-}
-
-/**
- * Picks the preview deployment: GitHub deployment statuses first, preview
- * provider check links second (v1 source order from the ENS-056 discovery).
- */
-function derivePreviewDeployment(
-	deployments: readonly GithubDeploymentWire[],
-	checks: readonly PullRequestCheckSummary[],
-): PullRequestPreviewDeploymentSummary | undefined {
-	const deployment = deployments.find((entry) => entry.url);
-	if (deployment?.url) {
-		return {
-			label: deployment.environment || 'Preview',
-			provider: inferDeploymentProvider(deployment.url),
-			source: 'github-deployment',
-			status:
-				deployment.state === 'failure'
-					? 'blocked'
-					: deployment.state === 'pending'
-						? 'pending'
-						: 'ready',
-			url: deployment.url,
-		};
-	}
-
-	const previewCheck = checks.find(
-		(check) => check.provider === 'vercel' && check.url,
-	);
-	if (previewCheck?.url) {
-		return {
-			label: previewCheck.label,
-			provider: inferDeploymentProvider(previewCheck.url),
-			source: 'check-link',
-			status: previewCheck.status,
-			url: previewCheck.url,
-		};
-	}
-	return undefined;
-}
-
-/**
- * Infers the preview deployment provider from a deployment URL.
- * @param url - The deployment URL
- * @returns The detected provider, or `'unknown'` when none matches
- */
-function inferDeploymentProvider(
-	url: string,
-): PullRequestPreviewDeploymentSummary['provider'] {
-	if (/vercel/i.test(url)) {
-		return 'vercel';
-	}
-	if (/netlify/i.test(url)) {
-		return 'netlify';
-	}
-	return 'unknown';
 }
 
 /** Builds the git-status row from local change counts + branch sync state. */
