@@ -16,6 +16,7 @@ export type {
 	ThinkingBarStrength,
 } from './composer';
 export type {
+	FileOpenOptions,
 	ReviewFilePreviewOpener,
 	WorkspaceFileDiffOpener,
 } from './file-preview';

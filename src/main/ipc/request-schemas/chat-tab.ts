@@ -23,8 +23,14 @@ export const openChatTabRequestSchema = z.object({
 		.optional(),
 	metadata: z.record(z.string(), z.unknown()).optional(),
 	piSessionId: optionalNullableString,
+	preview: z.boolean().optional(),
 	title: optionalStringCoerceNullToUndefined,
 	workspaceId: z.string().min(1),
+});
+
+/** {@link import('../../../shared/ipc').PinChatTabRequest}. */
+export const pinChatTabRequestSchema = z.object({
+	chatTabId: z.string().min(1),
 });
 
 /** {@link import('../../../shared/ipc').CloseChatTabRequest}. */

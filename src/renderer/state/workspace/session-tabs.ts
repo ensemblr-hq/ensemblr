@@ -48,6 +48,7 @@ import {
 	parseWorkspaceGitDiffScope,
 	type WorkspaceGitDiffScope,
 } from '@/shared/ipc/contracts/workspace-git';
+import { usePreviewTabSlot } from './preview-tab-slot';
 import { sessionVisitOrderByWorkspaceAtom } from './selection-atoms';
 import { decideActiveClose, selectSuccessorTabId } from './session-tab-close';
 import { resolveInsertAnchorId } from './session-tab-insert-anchor';
@@ -98,13 +99,16 @@ export function useSessionTabState({
 	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openCommentPreviewTab: (input: {
 		comment: PullRequestCommentSummary;
+		preview?: boolean;
 		prNumber?: number;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openFilePreviewTab: (input: {
 		filePath: string;
+		preview?: boolean;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openTurnDiffTab: (input: {
 		label: string;
+		preview?: boolean;
 		turnId: string;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openTerminalTab: (input: {
@@ -113,7 +117,9 @@ export function useSessionTabState({
 	}) => Promise<OpenSessionTabHandlerResult | null>;
 	openWorkspaceFileDiffTab: (input: {
 		filePath: string;
+		preview?: boolean;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
+	pinSessionTab: (chatTabId: string) => void;
 	closeSessionTabAsync: (
 		chatTabId: string,
 	) => Promise<CloseSessionTabHandlerResult>;
@@ -385,6 +391,13 @@ export function useSessionTabState({
 		},
 	});
 
+	const { pinSessionTab } = usePreviewTabSlot({
+		invalidateChatTabs,
+		queryClient,
+		sessionTabs,
+		workspaceId,
+	});
+
 	const reorderChatTabsMutation = useMutation({
 		mutationFn: (orderedIds: readonly string[]) =>
 			reorderChatTabs({ orderedIds, workspaceId }),
@@ -438,17 +451,24 @@ export function useSessionTabState({
 		[insertAnchorTabId, openChatTabMutation],
 	);
 
-	/** Opens (or re-focuses) a file-preview tab for a workspace-relative path. */
+	/**
+	 * Opens (or re-focuses) a file-preview tab for a workspace-relative path.
+	 * Ephemeral by default, so browsing files reuses one preview slot; pass
+	 * `preview: false` for a gesture that means "keep this open".
+	 */
 	const openFilePreviewTab = useCallback(
 		async ({
 			filePath,
+			preview = true,
 		}: {
 			filePath: string;
+			preview?: boolean;
 		}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
 				const result = await openAuxiliaryTabMutation.mutateAsync({
 					kind: 'file',
 					metadata: { filePath },
+					preview,
 					title: basenameOf(filePath),
 				});
 				return result.tab ? { chatTabId: result.tab.id } : null;
@@ -468,9 +488,11 @@ export function useSessionTabState({
 	const openCommentPreviewTab = useCallback(
 		async ({
 			comment,
+			preview = true,
 			prNumber,
 		}: {
 			comment: PullRequestCommentSummary;
+			preview?: boolean;
 			prNumber?: number;
 		}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
@@ -495,6 +517,7 @@ export function useSessionTabState({
 							...(typeof prNumber === 'number' ? { prNumber } : {}),
 						},
 					},
+					preview,
 					title: author ? `Comment · ${author}` : 'Comment',
 				});
 				return result.tab ? { chatTabId: result.tab.id } : null;
@@ -510,15 +533,18 @@ export function useSessionTabState({
 	const openTurnDiffTab = useCallback(
 		async ({
 			label,
+			preview = true,
 			turnId,
 		}: {
 			label: string;
+			preview?: boolean;
 			turnId: string;
 		}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
 				const result = await openAuxiliaryTabMutation.mutateAsync({
 					kind: 'diff',
 					metadata: { turnId },
+					preview,
 					title: label,
 				});
 				return result.tab ? { chatTabId: result.tab.id } : null;
@@ -538,15 +564,18 @@ export function useSessionTabState({
 	const openWorkspaceFileDiffTab = useCallback(
 		async ({
 			filePath,
+			preview = true,
 			scope,
 		}: {
 			filePath: string;
+			preview?: boolean;
 			scope?: WorkspaceGitDiffScope;
 		}): Promise<OpenSessionTabHandlerResult | null> => {
 			try {
 				const result = await openAuxiliaryTabMutation.mutateAsync({
 					kind: 'diff',
 					metadata: { filePath, ...(scope ? { diffScope: scope } : {}) },
+					preview,
 					title: diffTabTitle(filePath, scope),
 				});
 				return result.tab ? { chatTabId: result.tab.id } : null;
@@ -869,9 +898,15 @@ export function useSessionTabState({
 		}
 	}, [closeSessionTabAsync, invalidateChatTabs, sessionTabs, workspaceId]);
 
-	/** Persists a drag-and-drop tab order when it differs from the current model. */
+	/**
+	 * Persists a drag-and-drop tab order when it differs from the current model.
+	 * Dragging the preview tab pins it on the way: placing a tab deliberately
+	 * means keeping it, so the next preview must not take it. Tabs the drag only
+	 * pushed aside keep their preview state — their index moved, the user's
+	 * intent did not.
+	 */
 	const reorderSessionTabs = useCallback(
-		(sessionIds: string[]) => {
+		(sessionIds: string[], draggedSessionId: string) => {
 			const currentIds = sessionTabs.map((session) => session.id);
 			const currentIdSet = new Set(currentIds);
 			const nextIds = sessionIds.filter((sessionId) =>
@@ -885,9 +920,10 @@ export function useSessionTabState({
 				return;
 			}
 
+			pinSessionTab(draggedSessionId);
 			reorderChatTabsMutation.mutate(nextIds);
 		},
-		[reorderChatTabsMutation, sessionTabs],
+		[pinSessionTab, reorderChatTabsMutation, sessionTabs],
 	);
 
 	/**
@@ -972,6 +1008,7 @@ export function useSessionTabState({
 		openTerminalTab,
 		openTurnDiffTab,
 		openWorkspaceFileDiffTab,
+		pinSessionTab,
 		reorderSessionTabs,
 		restoreSessionTab,
 		sessionTabs,
@@ -1006,6 +1043,7 @@ type SessionTabBaseFields = {
 	chatTabId: string;
 	fullLabel: string;
 	id: string;
+	isPreview: boolean;
 	isSubAgent: boolean;
 	label: string;
 	piSessionId: string | null;
@@ -1072,6 +1110,7 @@ function toSessionTabModel(
 		chatTabId: tab.id,
 		fullLabel: tab.fullTitle || tab.title,
 		id: tab.id,
+		isPreview: tab.isPreview,
 		isSubAgent: tab.metadata.agentRole === 'subagent',
 		label: tab.title,
 		piSessionId: tab.piSessionId,
@@ -1165,6 +1204,7 @@ function toClosedSessionTabModel(
 			entry.summaryTitle ||
 			'Untitled chat',
 		id: entry.tab.id,
+		isPreview: false,
 		isSubAgent: entry.tab.metadata.agentRole === 'subagent',
 		// Prefer the short chat-title that was visible on the open tab. The
 		// LLM-derived summary title is verbose and often diverges from what

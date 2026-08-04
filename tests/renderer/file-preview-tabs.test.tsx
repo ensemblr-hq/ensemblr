@@ -25,6 +25,7 @@ const previewSession: SessionTabModel = {
 	chatTabId: 'preview-tab',
 	filePath: previewFilePath,
 	id: 'preview-tab',
+	isPreview: false,
 	isSubAgent: false,
 	kind: 'preview',
 	label: 'logo.png',
@@ -57,6 +58,7 @@ describe('file preview tabs', () => {
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}
+				onSessionTabPin={() => undefined}
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[previewSession]}
@@ -86,6 +88,7 @@ describe('file preview tabs', () => {
 					onSessionTabChange={() => undefined}
 					onSessionTabClose={() => undefined}
 					onSessionTabOpen={async () => null}
+					onSessionTabPin={() => undefined}
 					onSessionTabRestore={() => undefined}
 					onSessionTabsReorder={() => undefined}
 					sessions={[previewSession]}
@@ -139,6 +142,7 @@ describe('file preview tabs', () => {
 const chatA: SessionTabModel = {
 	chatTabId: 'chat-a',
 	id: 'chat-a',
+	isPreview: false,
 	isSubAgent: false,
 	kind: 'chat',
 	label: 'Chat A',
@@ -167,6 +171,7 @@ describe('session tab close controls', () => {
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={onSessionTabClose}
 				onSessionTabOpen={async () => null}
+				onSessionTabPin={() => undefined}
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[chatA, chatB]}
@@ -200,6 +205,7 @@ describe('session tab close controls', () => {
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}
+				onSessionTabPin={() => undefined}
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[chatA]}
@@ -218,6 +224,7 @@ describe('session tab close controls', () => {
 				onSessionTabChange={() => undefined}
 				onSessionTabClose={() => undefined}
 				onSessionTabOpen={async () => null}
+				onSessionTabPin={() => undefined}
 				onSessionTabRestore={() => undefined}
 				onSessionTabsReorder={() => undefined}
 				sessions={[previewSession]}

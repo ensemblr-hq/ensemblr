@@ -216,6 +216,34 @@ export function renameChatTab({
 	return getChatTabById({ database, id });
 }
 
+/**
+ * Points an existing open tab at a new subject, replacing its kind, title, and
+ * metadata while keeping its id and strip position. Backs the preview slot: the
+ * tab the user is looking at swaps content in place instead of being closed and
+ * reopened elsewhere in the strip. `full_title` tracks `title`, matching how
+ * auxiliary tabs are opened; {@link renameChatTab} is what records a longer form.
+ */
+export function retargetChatTab({
+	database,
+	id,
+	kind,
+	metadata,
+	title,
+}: {
+	database: DatabaseSync;
+	id: string;
+	kind: ChatTabKind;
+	metadata?: Record<string, unknown>;
+	title: string;
+}): ChatTabRow | null {
+	database
+		.prepare(
+			`UPDATE chat_tabs SET kind = ?, title = ?, full_title = ?, metadata_json = ? WHERE id = ?`,
+		)
+		.run(kind, title, title, serializeMetadata(metadata), id);
+	return getChatTabById({ database, id });
+}
+
 /** Replaces the JSON metadata blob for a chat tab. */
 export function setChatTabMetadata({
 	database,

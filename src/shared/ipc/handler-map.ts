@@ -30,6 +30,8 @@ import type {
 	ListClosedChatTabsWithSummaryResult,
 	OpenChatTabRequest,
 	OpenChatTabResult,
+	PinChatTabRequest,
+	PinChatTabResult,
 	ReorderChatTabsRequest,
 	ReorderChatTabsResult,
 	RestoreChatTabRequest,
@@ -448,6 +450,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.openChatTab]: IpcHandlerEntry<
 		OpenChatTabRequest,
 		OpenChatTabResult
+	>;
+	[IPC_CHANNELS.pinChatTab]: IpcHandlerEntry<
+		PinChatTabRequest,
+		PinChatTabResult
 	>;
 	[IPC_CHANNELS.openPiSession]: IpcHandlerEntry<
 		OpenPiSessionRequest,

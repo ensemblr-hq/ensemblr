@@ -9,6 +9,7 @@ function createTab(id: string): SessionTabModel {
 		chatTabId: id,
 		fullLabel: id,
 		id,
+		isPreview: false,
 		isSubAgent: false,
 		kind: 'chat',
 		label: id,

@@ -98,16 +98,16 @@ export function ReviewFileList({
 	);
 	// Gated on the diff opener alone — the fallback every changed file has. A
 	// preview-only mount would make this a callable that no-ops on source rows.
-	const openFile = useMemo<((filePath: string) => void) | null>(() => {
+	const openFile = useMemo<ReviewFileActions['openFile']>(() => {
 		if (!openDiff) {
 			return null;
 		}
-		return (filePath: string) => {
+		return (filePath, options) => {
 			if (openPreview && imagePreviewPaths.has(filePath)) {
-				openPreview(filePath);
+				openPreview(filePath, options);
 				return;
 			}
-			openDiff(filePath, diffScope);
+			openDiff(filePath, diffScope, options);
 		};
 	}, [openDiff, openPreview, imagePreviewPaths, diffScope]);
 	const { copyTarget, invokeTarget, openInTargets } = useOpenTargets({

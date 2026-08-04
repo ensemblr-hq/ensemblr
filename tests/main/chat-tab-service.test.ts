@@ -1,89 +1,20 @@
 /// <reference types="node" />
 
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 
-import {
-	type ChatTabService,
-	createChatTabService,
-} from '../../src/main/chat-tabs/chat-tab-service.ts';
-import {
-	type EnsemblrDatabaseConnection,
-	type EnsemblrDatabaseService,
-	openEnsemblrDatabase,
-} from '../../src/main/storage/database.ts';
+import { createChatTabService } from '../../src/main/chat-tabs/chat-tab-service.ts';
 import {
 	getChatTabById,
 	listOpenForWorkspace,
 	setChatTabMetadata,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
-import { createPiSession } from '../../src/main/storage/repositories/pi-session-repository.ts';
-
-interface Fixture {
-	connection: EnsemblrDatabaseConnection;
-	piSessionId: string;
-	service: ChatTabService;
-	workspaceId: string;
-}
-
-const WORKSPACE_CWD = '/tmp/ensemblr/tab-service/ws';
-
-function openFixture(t: import('node:test').TestContext): Fixture {
-	const directory = mkdtempSync(
-		path.join(tmpdir(), 'ensemblr-chat-tab-service-'),
-	);
-	const connection = openEnsemblrDatabase({
-		databasePath: path.join(directory, 'chat-tab-service-test.db'),
-	});
-	t.after(() => {
-		connection.database.close();
-		rmSync(directory, { force: true, recursive: true });
-	});
-
-	connection.database.exec(`
-INSERT INTO repositories (id, slug, name, path, default_branch)
-VALUES ('repo-tab-svc', 'tab-svc', 'TabSvc', '/tmp/ensemblr/tab-service', 'main');
-INSERT INTO workspaces (id, repository_id, slug, name, path)
-VALUES ('ws-tab-svc', 'repo-tab-svc', 'tab-svc', 'TabSvc', '${WORKSPACE_CWD}');
-`);
-
-	const { session } = createPiSession({
-		database: connection.database,
-		input: { cwd: WORKSPACE_CWD, workspaceId: 'ws-tab-svc' },
-	});
-
-	const databaseService: EnsemblrDatabaseService = {
-		close: () => undefined,
-		getConnection: () => connection,
-		getHealth: () => ({
-			path: connection.path,
-			schemaVersion: connection.schemaVersion,
-			status: 'ok',
-		}),
-		open: () => ({
-			path: connection.path,
-			schemaVersion: connection.schemaVersion,
-			status: 'ok',
-		}),
-	};
-
-	const service = createChatTabService({
-		databaseService,
-		lookups: {
-			piSessionExists: ({ piSessionId }) => piSessionId === session.id,
-		},
-	});
-
-	return {
-		connection,
-		piSessionId: session.id,
-		service,
-		workspaceId: 'ws-tab-svc',
-	};
-}
+import {
+	openChatTabServiceFixture as openFixture,
+	CHAT_TAB_FIXTURE_WORKSPACE_CWD as WORKSPACE_CWD,
+} from './helpers/chat-tab-service-fixture.ts';
 
 test('openTab defaults blank titles and lists the tab as open', (t) => {
 	const fixture = openFixture(t);

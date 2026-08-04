@@ -21,6 +21,7 @@ function createTab(id: string): SessionTabModel {
 		chatTabId: id,
 		fullLabel: id,
 		id,
+		isPreview: false,
 		isSubAgent: false,
 		kind: 'chat',
 		label: id,
@@ -54,6 +55,7 @@ function StripHarness({ onSwap }: { onSwap: (swap: () => void) => void }) {
 			onSessionTabChange={() => undefined}
 			onSessionTabClose={() => undefined}
 			onSessionTabOpen={() => Promise.resolve(null)}
+			onSessionTabPin={() => undefined}
 			onSessionTabRestore={() => undefined}
 			onSessionTabsReorder={() => undefined}
 			sessions={sessions}
@@ -93,6 +95,7 @@ test('asks for append placement from the strip new-tab button', async () => {
 				placements.push(options?.placement);
 				return Promise.resolve(null);
 			}}
+			onSessionTabPin={() => undefined}
 			onSessionTabRestore={() => undefined}
 			onSessionTabsReorder={() => undefined}
 			sessions={sessions}

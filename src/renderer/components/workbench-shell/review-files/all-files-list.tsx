@@ -247,7 +247,8 @@ function WorkspaceFileTree({
 		[toggleDirectory, loadIgnoredDirectory],
 	);
 
-	const hasMenu = openInTargets.length > 0 || Boolean(copyTarget);
+	const hasMenu =
+		openInTargets.length > 0 || Boolean(copyTarget) || Boolean(openFilePreview);
 
 	const [menuTarget, setMenuTarget] = useState<FileTreeMenuTarget | null>(null);
 	const handleContextCapture = useCallback(
@@ -350,6 +351,7 @@ function WorkspaceFileTree({
 				<AllFilesContextMenuContent
 					copyTarget={copyTarget}
 					invokeTarget={invokeTarget}
+					openFilePreview={openFilePreview}
 					openInTargets={openInTargets}
 					target={menuTarget}
 				/>
@@ -489,6 +491,11 @@ const WorkspaceFileRow = memo(function WorkspaceFileRow({
 			data-row-kind='file'
 			data-row-path={file.path}
 			onClick={openFilePreview ? () => openFilePreview(file.path) : undefined}
+			onDoubleClick={
+				openFilePreview
+					? () => openFilePreview(file.path, { preview: false })
+					: undefined
+			}
 			role='treeitem'
 			size='sm'
 			variant='ghost'

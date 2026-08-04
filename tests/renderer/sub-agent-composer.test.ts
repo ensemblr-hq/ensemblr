@@ -21,6 +21,7 @@ const readySetup: SetupDiagnosticsSnapshot = {
 const chatSession = (isSubAgent: boolean): SessionTabModel => ({
 	chatTabId: 'tab-1',
 	id: 'tab-1',
+	isPreview: false,
 	isSubAgent,
 	kind: 'chat',
 	label: 'Astro inventory',

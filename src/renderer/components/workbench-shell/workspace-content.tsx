@@ -6,7 +6,10 @@ import { useRightSidebarController } from '@/renderer/hooks/workbench-shell/use-
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
 import { workspaceDirectoryRevealRequestAtom } from '@/renderer/state/workspace';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
-import type { PullRequestCommentSummary } from '@/renderer/types/workbench';
+import type {
+	FileOpenOptions,
+	PullRequestCommentSummary,
+} from '@/renderer/types/workbench';
 import type {
 	SessionTabActions,
 	SessionTabState,
@@ -68,8 +71,16 @@ export function WorkspaceWorkbenchContent({
 		openCommentPreviewTab,
 	} = sessionNavigation;
 	const openWorkspaceFileDiff = useCallback(
-		(filePath: string, scope?: WorkspaceGitDiffScope) => {
-			void openWorkspaceFileDiffTab({ filePath, scope }).then((result) => {
+		(
+			filePath: string,
+			scope?: WorkspaceGitDiffScope,
+			options?: FileOpenOptions,
+		) => {
+			void openWorkspaceFileDiffTab({
+				filePath,
+				preview: options?.preview,
+				scope,
+			}).then((result) => {
 				if (result) {
 					onSessionTabChange(result.chatTabId);
 				}
@@ -78,12 +89,14 @@ export function WorkspaceWorkbenchContent({
 		[onSessionTabChange, openWorkspaceFileDiffTab],
 	);
 	const openReviewFilePreview = useCallback(
-		(filePath: string) => {
-			void openFilePreviewTab({ filePath }).then((result) => {
-				if (result) {
-					onSessionTabChange(result.chatTabId);
-				}
-			});
+		(filePath: string, options?: FileOpenOptions) => {
+			void openFilePreviewTab({ filePath, preview: options?.preview }).then(
+				(result) => {
+					if (result) {
+						onSessionTabChange(result.chatTabId);
+					}
+				},
+			);
 		},
 		[onSessionTabChange, openFilePreviewTab],
 	);
@@ -134,6 +147,7 @@ export function WorkspaceWorkbenchContent({
 		onSessionTabChange,
 		onSessionTabClose: sessionNavigation.closeSessionTab,
 		onSessionTabOpen: sessionNavigation.openSessionTab,
+		onSessionTabPin: sessionNavigation.pinSessionTab,
 		onSessionTabRestore: sessionNavigation.restoreSessionTab,
 		onSessionTabsReorder: sessionNavigation.reorderSessionTabs,
 		onTurnDiffOpen: sessionNavigation.openTurnDiffTab,

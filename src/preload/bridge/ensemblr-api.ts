@@ -272,6 +272,7 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('openSettingsFileInTarget', request),
 		openWorkspaceInTarget: (request) =>
 			invoke('openWorkspaceInTarget', request),
+		pinChatTab: (request) => invoke('pinChatTab', request),
 		prepareCloneGithubRepository: (request) =>
 			invoke('prepareCloneGithubRepository', request),
 		pushWorkspaceBranch: (request) => invoke('pushWorkspaceBranch', request),

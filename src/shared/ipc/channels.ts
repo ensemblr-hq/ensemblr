@@ -101,6 +101,7 @@ export const IPC_CHANNELS = {
 	openPiSession: 'ensemblr:open-pi-session',
 	piRawFrame: 'ensemblr:pi-raw-frame',
 	piSessionEvent: 'ensemblr:pi-session-event',
+	pinChatTab: 'ensemblr:pin-chat-tab',
 	quickStartProject: 'ensemblr:quick-start-project',
 	readWorkspaceDirectory: 'ensemblr:read-workspace-directory',
 	readWorkspaceFile: 'ensemblr:read-workspace-file',

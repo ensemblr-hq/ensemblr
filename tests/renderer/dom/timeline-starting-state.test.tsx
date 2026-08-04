@@ -31,6 +31,7 @@ const workspace = { id: WORKSPACE_ID } as unknown as WorkspaceShellModel;
 const chatTab: SessionTabModel = {
 	chatTabId: 'tab-1',
 	id: 'tab-1',
+	isPreview: false,
 	isSubAgent: true,
 	kind: 'chat',
 	label: 'Astro inventory',
