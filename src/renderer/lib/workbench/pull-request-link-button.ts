@@ -1,5 +1,25 @@
 import { cn } from '@/renderer/lib/utils';
-import type { PullRequestHeaderTone } from '@/renderer/types/workbench';
+import type {
+	PullRequestCheckStatus,
+	PullRequestHeaderTone,
+} from '@/renderer/types/workbench';
+
+/**
+ * Picks the tone of the preview-deployment pill, letting an unfinished
+ * deployment outrank the header tone. GitHub reports deployments separately from
+ * checks, so the header can read green or merged while the linked build is still
+ * running or already broken; only a `ready` deployment has nothing to add and
+ * defers to the header so both pills read as one control group.
+ * @param headerTone - Tone the sidebar header resolved from pull-request status.
+ * @param deploymentStatus - Status of the linked preview deployment.
+ * @returns The tone the deployment pill should render.
+ */
+export function resolvePreviewPillTone(
+	headerTone: PullRequestHeaderTone,
+	deploymentStatus: PullRequestCheckStatus,
+): PullRequestHeaderTone {
+	return deploymentStatus === 'ready' ? headerTone : deploymentStatus;
+}
 
 /**
  * Builds the shared PR/deployment pill styling so both controls keep matching borders.
