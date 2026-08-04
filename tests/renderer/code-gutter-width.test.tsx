@@ -9,6 +9,7 @@ vi.mock('@iconify/react', () => ({
 
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr-queries';
 import { CodePanel } from '../../src/renderer/components/code-surface';
+import { DiffViewer } from '../../src/renderer/components/diff-viewer/diff-viewer';
 import { FilePreviewPanel } from '../../src/renderer/components/workbench-shell/conversation-panel/file-preview-panel';
 import { codeGutterDigits } from '../../src/renderer/lib/code/gutter';
 import {
@@ -22,6 +23,18 @@ beforeEach(() => {
 });
 
 const workspaceCwd = '/workspace/ensemblr';
+
+const NINETY_NINE_LINE_PATCH = `diff --git a/f.ts b/f.ts
+index 111..222 100644
+--- a/f.ts
++++ b/f.ts
+@@ -96,4 +96,4 @@
+ a
+-b
++c
+ d
+ e
+`;
 
 /** Renders the file viewer over a file of `lineCount` lines, returning its `pre`. */
 function renderFileViewer(lineCount: number) {
@@ -89,5 +102,18 @@ describe('every code surface sizes its gutter the same way', () => {
 		expect(codeGutterDigits(4)).toBe(2);
 		expect(renderFileViewer(4).style.getPropertyValue('--ensemblr-gutter-ch')) //
 			.toBe('2ch');
+	});
+
+	// The hunk covers lines 96-99 on both sides, so the widest number it renders
+	// is two digits. Measuring the hunk as reaching line 100 would buy a third.
+	test('the diff viewer measures its gutter against the last line it draws', () => {
+		const { container } = renderWithProviders(
+			<DiffViewer filePath='f.ts' patch={NINETY_NINE_LINE_PATCH} />,
+		);
+		const pane = container.querySelector<HTMLElement>('.ensemblr-diff-pane');
+
+		expect(pane?.style.getPropertyValue('--ensemblr-gutter-ch')).toBe(
+			`${codeGutterDigits(99) + 2}ch`,
+		);
 	});
 });

@@ -182,10 +182,14 @@ function ReviewFileStats({ file }: { file: ReviewFileSummary }) {
 				<span className='truncate text-muted-foreground'>{statusLabel}</span>
 			) : null}
 			{file.additions > 0 ? (
-				<span className='shrink-0 text-status-ok'>+{file.additions}</span>
+				<span className='shrink-0 text-diff-addition-foreground'>
+					+{file.additions}
+				</span>
 			) : null}
 			{file.deletions > 0 ? (
-				<span className='shrink-0 text-status-danger'>-{file.deletions}</span>
+				<span className='shrink-0 text-diff-deletion-foreground'>
+					-{file.deletions}
+				</span>
 			) : null}
 		</div>
 	);

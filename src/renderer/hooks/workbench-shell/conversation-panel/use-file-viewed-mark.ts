@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 
 import { workspaceGitStatusQuery } from '@/renderer/api/ensemblr-queries';
 import { findReviewFileRevision } from '@/renderer/lib/workbench/review-files';
@@ -37,8 +37,7 @@ export function useFileViewedMark({
 }): FileViewedMark {
 	const { data } = useQuery(workspaceGitStatusQuery(workspaceCwd, scope));
 	const files = data && !data.error ? data.files : undefined;
-	const changedPaths = useMemo(() => files?.map((file) => file.path), [files]);
-	const { isViewed, setViewed } = useViewedChanges(workspaceId, changedPaths);
+	const { isViewed, setViewed } = useViewedChanges(workspaceId);
 	const revision = files ? findReviewFileRevision(files, filePath) : null;
 
 	const onViewedChange = useCallback(

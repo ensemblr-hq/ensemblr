@@ -26,6 +26,10 @@ function ScrollArea({
 	);
 }
 
+// Deviates from the shadcn baseline: the padding and transparent borders are
+// dropped and the size comes from the `scrollbar` spacing token, so an overlay
+// bar matches the native `.sleek-scrollbar` in `styles/index.css`. Re-running
+// the shadcn CLI over this file restores the baseline and desyncs the two.
 function ScrollBar({
 	className,
 	orientation = 'vertical',

@@ -14,6 +14,7 @@ import {
 } from '../../src/renderer/lib/workbench/review-files';
 import {
 	forgetWorkspaceViewedChangesAtom,
+	MAX_VIEWED_MARKS_PER_WORKSPACE,
 	useViewedChanges,
 	viewedChangesByWorkspaceAtom,
 } from '../../src/renderer/state/workspace';
@@ -250,46 +251,32 @@ describe('a revision tracks content, not just the shape of the change', () => {
 	});
 });
 
-describe('marks do not outlive what they describe', () => {
-	test('writing prunes paths that have left the change set', () => {
-		const store = createStore();
-		const wrapper = ({ children }: { children: ReactNode }) => (
-			<Provider store={store}>{children}</Provider>
-		);
-		const both = renderHook(
-			() => useViewedChanges('w1', [FIRST.path, SECOND.path]),
-			{ wrapper },
+describe('marks outlive the change set they were made against', () => {
+	test('a write under one diff scope keeps marks made under another', () => {
+		const { result, store } = renderViewedChanges();
+
+		// Signed off while the Changes source was the working tree.
+		act(() =>
+			result.current.setViewed(FIRST.path, reviewFileRevision(FIRST), true),
 		);
 		act(() =>
-			both.result.current.setViewed(
-				FIRST.path,
-				reviewFileRevision(FIRST),
-				true,
-			),
+			result.current.setViewed(SECOND.path, reviewFileRevision(SECOND), true),
 		);
+
+		// A commit source holds neither of those paths. Signing off one of its
+		// files must not read as "the working tree's files were never reviewed".
+		act(() =>
+			result.current.setViewed('docs/only-in-commit.md', 'commit-rev', true),
+		);
+
 		expect(store.get(viewedChangesByWorkspaceAtom).w1).toEqual({
+			'docs/only-in-commit.md': 'commit-rev',
 			[FIRST.path]: reviewFileRevision(FIRST),
-		});
-
-		// FIRST has since been committed, so the next write is made against a
-		// change set that no longer holds it.
-		const shrunk = renderHook(() => useViewedChanges('w1', [SECOND.path]), {
-			wrapper,
-		});
-		act(() =>
-			shrunk.result.current.setViewed(
-				SECOND.path,
-				reviewFileRevision(SECOND),
-				true,
-			),
-		);
-
-		expect(store.get(viewedChangesByWorkspaceAtom).w1).toEqual({
 			[SECOND.path]: reviewFileRevision(SECOND),
 		});
 	});
 
-	test('a reader that names no change set prunes nothing', () => {
+	test('unmarking drops that path alone', () => {
 		const { result, store } = renderViewedChanges();
 
 		act(() =>
@@ -298,11 +285,30 @@ describe('marks do not outlive what they describe', () => {
 		act(() =>
 			result.current.setViewed(SECOND.path, reviewFileRevision(SECOND), true),
 		);
+		act(() =>
+			result.current.setViewed(FIRST.path, reviewFileRevision(FIRST), false),
+		);
 
-		expect(Object.keys(store.get(viewedChangesByWorkspaceAtom).w1)).toEqual([
-			FIRST.path,
-			SECOND.path,
-		]);
+		expect(store.get(viewedChangesByWorkspaceAtom).w1).toEqual({
+			[SECOND.path]: reviewFileRevision(SECOND),
+		});
+	});
+
+	test('a workspace holds a bounded number of marks, oldest dropped first', () => {
+		const { result, store } = renderViewedChanges();
+		const overflow = MAX_VIEWED_MARKS_PER_WORKSPACE + 2;
+
+		act(() => {
+			for (let index = 0; index < overflow; index += 1) {
+				result.current.setViewed(`src/file-${index}.ts`, 'rev', true);
+			}
+		});
+
+		const marks = store.get(viewedChangesByWorkspaceAtom).w1;
+		expect(Object.keys(marks)).toHaveLength(MAX_VIEWED_MARKS_PER_WORKSPACE);
+		expect(marks['src/file-0.ts']).toBeUndefined();
+		expect(marks['src/file-1.ts']).toBeUndefined();
+		expect(marks[`src/file-${overflow - 1}.ts`]).toBe('rev');
 	});
 
 	test('removing a workspace drops its marks and leaves the others', () => {

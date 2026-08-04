@@ -42,10 +42,13 @@ export function useHighlightedCode(
 	);
 
 	useEffect(() => {
+		if (syncTokens) {
+			return;
+		}
 		let cancelled = false;
 		// highlightCode fires the callback only for a fresh async highlight; on a
-		// warm cache it returns synchronously and never calls back. Capture that
-		// return so the tokens are never dropped.
+		// cache warmed between this render and this effect it returns synchronously
+		// and never calls back. Capture that return so the tokens are never dropped.
 		const immediate = highlightCode(code, language, theme, (result) => {
 			if (!cancelled) {
 				setAsyncTokens(result);
@@ -57,7 +60,7 @@ export function useHighlightedCode(
 		return () => {
 			cancelled = true;
 		};
-	}, [code, language, theme]);
+	}, [code, language, theme, syncTokens]);
 
 	return syncTokens ?? asyncTokens;
 }
@@ -105,7 +108,10 @@ export function useHighlightedHunks(
 				setAsyncTokens((previous) => new Map(previous).set(source, result));
 			}
 		};
-		for (const source of sources) {
+		for (const [index, source] of sources.entries()) {
+			if (syncTokens[index]) {
+				continue;
+			}
 			// highlightCode calls back only for a fresh run; a hunk whose tokens
 			// landed between this render and this effect comes back synchronously
 			// instead, and dropping that return would leave it uncoloured.
@@ -119,7 +125,7 @@ export function useHighlightedHunks(
 		return () => {
 			cancelled = true;
 		};
-	}, [sources, language, theme]);
+	}, [sources, language, theme, syncTokens]);
 
 	return useMemo(
 		() =>

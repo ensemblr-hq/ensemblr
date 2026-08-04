@@ -256,8 +256,8 @@ function highestLineNumber(
 	for (const hunk of hunks) {
 		max = Math.max(
 			max,
-			hunk.oldStart + hunk.oldLines,
-			hunk.newStart + hunk.newLines,
+			hunk.oldStart + hunk.oldLines - 1,
+			hunk.newStart + hunk.newLines - 1,
 		);
 	}
 	return max;
