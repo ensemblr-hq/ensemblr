@@ -24,10 +24,10 @@ const COMMENT_SUBMIT_HINT = formatShortcut('diffComment.submit');
  * Sized to the viewer's pane rather than to the row it hangs under: the widget
  * cell spans a diff table that, without word wrap, is as wide as its longest
  * line, so a thread laid out normally would run far past the visible pane and
- * only be reachable by scrolling sideways. `100cqi` measures the `.ensemblr-diff-pane`
- * scroll container — the width the reader actually sees, in both wrap modes —
- * and `sticky left-0` keeps the thread at the near edge of that pane however far
- * the code behind it is scrolled.
+ * only be reachable by scrolling sideways. `w-container-inline` measures the
+ * `.ensemblr-diff-pane` scroll container — the width the reader actually sees, in
+ * both wrap modes — and `sticky left-0` keeps the thread at the near edge of that
+ * pane however far the code behind it is scrolled.
  *
  * Wears the same band recipe as `CodeHunkGap` — the app's other chrome mounted
  * between two code rows — so the two read as one language: the code border's
@@ -52,7 +52,7 @@ export function DiffCommentThread({
 	onSubmit: (body: string) => void;
 }) {
 	return (
-		<div className='sticky left-0 flex w-[100cqi] flex-col gap-1.5 border-code-border border-y bg-muted/40 px-3 py-2 font-sans'>
+		<div className='sticky left-0 flex w-container-inline flex-col gap-1.5 border-code-border border-y bg-muted/40 px-3 py-2 font-sans'>
 			{comments.map((comment) => (
 				<DiffCommentRow
 					comment={comment}

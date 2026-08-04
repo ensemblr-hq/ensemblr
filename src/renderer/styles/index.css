@@ -340,6 +340,22 @@
 	--text-code-body: var(--ensemblr-code-size);
 	--leading-code: var(--ensemblr-code-row);
 	--spacing-code-pad: var(--ensemblr-code-pad);
+	/*
+	 * The line-number gutter's width and the wrapped-line indent that clears it.
+	 * Both are measured per surface from its digit count, so the values live on
+	 * the element as `--ensemblr-gutter-ch` / `--ensemblr-gutter-indent` and these
+	 * tokens only name them: `@theme inline` inlines the `var()` reference itself,
+	 * so `w-code-gutter` resolves against whichever surface it lands on. Set by
+	 * `CodeBlockBody` and `DiffViewer` from `codeGutterDigits`.
+	 */
+	--spacing-code-gutter: var(--ensemblr-gutter-ch);
+	--spacing-code-gutter-indent: var(--ensemblr-gutter-indent);
+	/*
+	 * The inline size of the nearest container-query container, for chrome that
+	 * must fill the pane a reader sees rather than the scrolled content it hangs
+	 * inside. Spent as `w-container-inline`.
+	 */
+	--spacing-container-inline: 100cqi;
 	--spacing-scrollbar: var(--ensemblr-scrollbar-size);
 	--color-canvas: var(--ensemblr-canvas);
 	--color-toolbar: var(--ensemblr-toolbar);
@@ -425,6 +441,19 @@
 	--shadow-terminal: inset 0 1px 0 rgb(255 255 255 / 0.04);
 	--spacing-shell: 0.75rem;
 	--spacing-dock: 0.75rem;
+}
+
+/*
+ * The line number a code surface draws from the `line` CSS counter rather than
+ * from a real column, so a wrapped line still clears its own gutter. Registered
+ * as a utility, not a plain class, because it is only ever spent through the
+ * `before:` variant — and it writes `--tw-content` the way Tailwind's own
+ * `content-*` utilities do, so that variant's default empty content gives way
+ * to it.
+ */
+@utility code-line-counter {
+	--tw-content: counter(line);
+	content: var(--tw-content);
 }
 
 @layer base {
@@ -679,8 +708,9 @@
 
 /*
  * The scroll pane around the diff table. Its inline size is what the inline
- * comment threads measure with `100cqi` to fill the pane the reader sees rather
- * than the table, which without word wrap is as wide as its longest line.
+ * comment threads measure with `w-container-inline` to fill the pane the reader
+ * sees rather than the table, which without word wrap is as wide as its longest
+ * line.
  *
  * The two declarations belong together: container query units resolve against the
  * padding box, which does *not* subtract a vertical scrollbar, so `100cqi` came
