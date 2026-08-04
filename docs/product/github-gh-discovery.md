@@ -17,10 +17,10 @@ review-flow needs of Milestone 7 without an app-owned GitHub OAuth client
 | Review summaries (approve/request-changes bodies) | `gh pr view --json reviews` | First-class | |
 | Review threads + resolution state | `gh api graphql` (`reviewThreads { isResolved … }`) | `gh api` only | First-class `gh` commands do not expose thread resolution; GraphQL does. Implemented in `GithubService.fetchReviewThreads`. |
 | Resolving / replying to review threads | `gh api graphql` mutations (`resolveReviewThread`, `addPullRequestReviewThreadReply`) | `gh api` only — deferred | Mutations exist but v1 ships read-only GitHub comments; local comments cover annotation needs (ENS-052). Comment mutation UI stays out of scope per ENS-056. |
-| Deployments | `gh api -X GET repos/{owner}/{repo}/deployments -f ref=<branch>` | `gh api` only | Returns deployment rows; environment URL requires the statuses call below. |
-| Deployment status / preview URL | `gh api -X GET repos/{owner}/{repo}/deployments/{id}/statuses` | `gh api` only | `environment_url` carries the hosted preview URL. |
-| Preview URLs (fallback 2) | `gh pr view --json statusCheckRollup` check links | First-class | Vercel/Netlify checks expose `detailsUrl`/`targetUrl`. |
-| Preview URLs (fallback 3) | Provider bot PR comments (`gh pr view --json comments`) | First-class | Parse bot comment bodies only when deployment statuses and check links are empty. |
+| Deployments | `gh api -X GET repos/{owner}/{repo}/deployments -f ref=<head sha>`, retried with `-f ref=<head branch>` | `gh api` only | Returns deployment rows; environment URL requires the statuses call below. Vercel and Netlify record deployments against the commit SHA, so the query tries `headRefOid` first (a branch name only resolves when the branch lives in the base repo). GitHub matches `ref` against the literal string the deployment was recorded under and never resolves branch to commit — verified against `nuxt/nuxt`, where one commit carries deployments under both a branch ref and a SHA ref and each query returns only its own — so an empty SHA result is retried with `headRefName` to keep workflow-created deployments (`ref: github.head_ref`) discoverable. |
+| Deployment status / preview URL | `gh api -X GET repos/{owner}/{repo}/deployments/{id}/statuses` | `gh api` only | `environment_url` carries the hosted preview URL. A deployment reports `queued`/`pending` with no URL before it reports `success`, so the snapshot reads a page of statuses and keeps the newest one that carries a URL. |
+| Preview URLs (fallback 2) | `gh pr view --json statusCheckRollup` check links | First-class | Vercel/Netlify checks expose `detailsUrl`/`targetUrl`. Provider rows that link to review tooling (`Vercel Agent Review`, `Vercel Preview Comments`) are skipped — they are not deployments. That label heuristic applies only to rows whose URL is not already a hosted preview, so a project named `code-review-tool` keeps its link. |
+| Preview URLs (fallback 3) | Provider bot PR comments (`gh pr view --json comments`) | First-class | The `vercel`/`netlify` bot comment links the hosted preview (`[Preview](https://<project>-git-<branch>.vercel.app)`, `**Deploy Preview URL**`). |
 | Merge | `gh pr merge --squash/--merge/--rebase` | First-class | Used by ENS-058 confirmation flow. |
 
 ## v1 preview URL source order (validated)
@@ -29,11 +29,20 @@ review-flow needs of Milestone 7 without an app-owned GitHub OAuth client
 2. **Check links** from `statusCheckRollup` (`detailsUrl`/`targetUrl`).
 3. **Provider bot PR comments** as last resort.
 
+A URL on a provider-hosted origin (`*.vercel.app`, `*.netlify.app`) outranks
+this order: the header links the deployed build whenever any source exposes
+one, and falls back to the source order only when every candidate points at a
+provider dashboard or inspector page instead. The same preference applies
+*within* a source — the Netlify bot comment lists its `app.netlify.com` deploy
+log above the `.netlify.app` preview, and a monorepo publishes several
+deployments per commit where only some carry a preview URL. `app.netlify.com`
+is therefore not a hosted origin; legacy `*.netlify.com` site URLs were retired
+in 2020 and redirect to `.netlify.app`.
+
 No Vercel/Netlify/provider auth is required: all three sources ride on `gh`
-authentication. Implemented in `GithubService.fetchDeployments` (source 1)
-with check links already present in the checks rows (source 2); bot-comment
-parsing (source 3) is wired only as data (comments list) and used by the UI
-when the first two sources yield nothing.
+authentication. `GithubService.fetchDeployments` reads source 1; sources 2 and 3
+ride on the checks and comments already in the snapshot. All three are ranked in
+`derivePreviewDeployment` (`src/renderer/lib/workbench/preview-deployment.ts`).
 
 ## Add-all-comments-to-chat feasibility
 

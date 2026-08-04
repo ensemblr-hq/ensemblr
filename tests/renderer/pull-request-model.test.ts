@@ -14,6 +14,16 @@ import type {
 
 const NO_CHANGES = { additions: 0, deletions: 0, files: 0 };
 
+const NETLIFY_BOT_COMMENT_BODY = [
+	'### <span aria-hidden="true">✅</span> Deploy Preview for **acme** ready!',
+	'',
+	'|  Name | Link |',
+	'| :-: | ------- |',
+	'|<span aria-hidden="true">🔨</span> Latest commit | 8f2c1a9 |',
+	'|<span aria-hidden="true">🔍</span> Latest deploy log | https://app.netlify.com/sites/acme/deploys/6653f0a1 |',
+	'|<span aria-hidden="true">😎</span> Deploy Preview | https://deploy-preview-7--acme.netlify.app |',
+].join('\n');
+
 function createPullRequest(
 	overrides: Partial<GithubPullRequestWire> = {},
 ): GithubPullRequestWire {
@@ -209,6 +219,218 @@ describe('buildPullRequestShellModel', () => {
 		});
 
 		expect(model.previewDeployment?.source).toBe('check-link');
+	});
+
+	test('vercel review tooling checks never become the preview deployment', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					checks: [
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://vercel.com/vercel-agent/request-review',
+							id: 'c1',
+							name: 'Vercel Agent Review',
+						},
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://vercel.com/github',
+							id: 'c2',
+							name: 'Vercel Preview Comments',
+						},
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://vercel.com/acme/app/dep123',
+							id: 'c3',
+							name: 'Vercel – app',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.url).toBe(
+			'https://vercel.com/acme/app/dep123',
+		);
+		expect(model.previewDeployment?.label).toBe('Vercel – app');
+	});
+
+	test('a hosted preview URL wins over a provider dashboard link', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					checks: [
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://vercel.com/acme/app/dep123',
+							id: 'c1',
+							name: 'Vercel – app',
+						},
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://app-git-feature-acme.vercel.app',
+							id: 'c2',
+							name: 'Vercel Preview',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.url).toBe(
+			'https://app-git-feature-acme.vercel.app',
+		);
+	});
+
+	test('the provider bot comment supplies the preview when links point at dashboards', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					checks: [
+						{
+							bucket: 'passing',
+							detailsUrl: 'https://vercel.com/acme/app/dep123',
+							id: 'c1',
+							name: 'Vercel – app',
+						},
+					],
+					comments: [
+						{
+							author: 'vercel',
+							body: '| [app](https://vercel.com/acme/app) | [Ready](https://vercel.com/acme/app/dep123) | [Preview](https://app-git-feature-acme.vercel.app) |',
+							createdAt: '2026-06-11T09:00:00Z',
+							id: 'bot-1',
+							isResolved: null,
+							kind: 'issue-comment',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.source).toBe('pr-comment');
+		expect(model.previewDeployment?.url).toBe(
+			'https://app-git-feature-acme.vercel.app',
+		);
+		expect(model.previewDeployment?.label).toBe('Preview');
+	});
+
+	test('a preview URL in a human comment is not treated as the deployment', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					comments: [
+						{
+							author: 'octocat',
+							body: 'Looks broken on https://app-git-old-acme.vercel.app',
+							createdAt: '2026-06-11T09:00:00Z',
+							id: 'human-1',
+							isResolved: null,
+							kind: 'issue-comment',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment).toBeUndefined();
+	});
+
+	test('netlify deploy-preview comment is recognized', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					comments: [
+						{
+							author: 'netlify[bot]',
+							body: NETLIFY_BOT_COMMENT_BODY,
+							createdAt: '2026-06-11T09:00:00Z',
+							id: 'bot-1',
+							isResolved: null,
+							kind: 'issue-comment',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.provider).toBe('netlify');
+		expect(model.previewDeployment?.url).toBe(
+			'https://deploy-preview-7--acme.netlify.app',
+		);
+	});
+
+	test('a hosted preview check survives a review-tooling word in its label', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					checks: [
+						{
+							bucket: 'passing',
+							detailsUrl:
+								'https://code-review-tool-git-feature-acme.vercel.app',
+							id: 'c1',
+							name: 'Vercel – code-review-tool',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.url).toBe(
+			'https://code-review-tool-git-feature-acme.vercel.app',
+		);
+	});
+
+	test('a hosted deployment URL outranks an earlier dashboard-only deployment', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					deployments: [
+						{
+							environment: 'Inspect – app',
+							id: 'd1',
+							source: 'github-deployment',
+							state: 'success',
+							url: 'https://vercel.com/acme/app/dep123',
+						},
+						{
+							environment: 'Preview – app',
+							id: 'd2',
+							source: 'github-deployment',
+							state: 'success',
+							url: 'https://app-git-feature-acme.vercel.app',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.url).toBe(
+			'https://app-git-feature-acme.vercel.app',
+		);
+		expect(model.previewDeployment?.label).toBe('Preview – app');
 	});
 
 	test('todos and local comments are merged into the model', () => {
