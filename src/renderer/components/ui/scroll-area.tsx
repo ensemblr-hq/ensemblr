@@ -26,6 +26,10 @@ function ScrollArea({
 	);
 }
 
+// Deviates from the shadcn baseline: the padding and transparent borders are
+// dropped and the size comes from the `scrollbar` spacing token, so an overlay
+// bar matches the native `.sleek-scrollbar` in `styles/index.css`. Re-running
+// the shadcn CLI over this file restores the baseline and desyncs the two.
 function ScrollBar({
 	className,
 	orientation = 'vertical',
@@ -37,14 +41,14 @@ function ScrollBar({
 			data-orientation={orientation}
 			orientation={orientation}
 			className={cn(
-				'flex touch-none select-none p-px transition-colors data-horizontal:h-2.5 data-vertical:h-full data-vertical:w-2.5 data-horizontal:flex-col data-horizontal:border-t data-horizontal:border-t-transparent data-vertical:border-l data-vertical:border-l-transparent',
+				'group/scrollbar flex touch-none select-none transition-colors data-horizontal:h-scrollbar data-vertical:h-full data-vertical:w-scrollbar data-horizontal:flex-col',
 				className,
 			)}
 			{...props}
 		>
 			<ScrollAreaPrimitive.ScrollAreaThumb
 				data-slot='scroll-area-thumb'
-				className='relative flex-1 rounded-full bg-border'
+				className='relative flex-1 rounded-full bg-border transition-colors group-hover/scrollbar:bg-muted-foreground'
 			/>
 		</ScrollAreaPrimitive.ScrollAreaScrollbar>
 	);

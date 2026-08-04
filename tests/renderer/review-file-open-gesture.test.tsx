@@ -13,6 +13,7 @@ import { installLocalStorage, renderWithProviders } from './support/dom';
 
 const sourceFile: ReviewFileSummary = {
 	additions: 4,
+	contentId: null,
 	deletions: 1,
 	id: 'src',
 	path: 'src/main/index.ts',

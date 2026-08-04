@@ -89,12 +89,16 @@ export function ToolFileBadge({
 				path={badge.path}
 			/>
 			{hasCounts ? (
-				<span className='flex shrink-0 items-center gap-1.5 font-mono text-xxs leading-4'>
+				<span className='flex shrink-0 items-center gap-1.5 font-mono text-xxs tabular-nums leading-4'>
 					{badge.additions !== null ? (
-						<span className='text-status-ok'>+{badge.additions}</span>
+						<span className='text-diff-addition-foreground'>
+							+{badge.additions}
+						</span>
 					) : null}
 					{badge.deletions !== null ? (
-						<span className='text-status-danger'>-{badge.deletions}</span>
+						<span className='text-diff-deletion-foreground'>
+							-{badge.deletions}
+						</span>
 					) : null}
 				</span>
 			) : null}

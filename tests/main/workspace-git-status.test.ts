@@ -4,6 +4,7 @@ import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { setTimeout } from 'node:timers/promises';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -19,6 +20,7 @@ import {
 	parsePorcelainStatus,
 } from '../../src/main/workspace-git/workspace-git-parsers.ts';
 import { createWorkspaceGitService } from '../../src/main/workspace-git/workspace-git-status.ts';
+import type { WorkspaceGitDiffScope } from '../../src/shared/ipc/contracts/workspace-git';
 
 const fixedNow = () => new Date('2026-06-11T12:00:00.000Z');
 
@@ -169,10 +171,18 @@ test('getStatus merges porcelain entries with numstat counts', async (t) => {
 	const result = await git.getStatus({ workspaceCwd: workspaceDir });
 
 	assert.equal(result.error, undefined);
-	assert.deepEqual(result.files, [
-		{ additions: 5, deletions: 2, path: 'src/app.ts', status: 'modified' },
-		{ additions: 2, deletions: 0, path: 'notes.md', status: 'untracked' },
-	]);
+	// The content stamp is a live mtime, so the row shape is asserted without it.
+	assert.deepEqual(
+		result.files.map(({ contentId: _stamp, ...row }) => row),
+		[
+			{ additions: 5, deletions: 2, path: 'src/app.ts', status: 'modified' },
+			{ additions: 2, deletions: 0, path: 'notes.md', status: 'untracked' },
+		],
+	);
+	// Only `notes.md` exists on disk here; a path git named but the tree lacks
+	// has nothing to stamp.
+	assert.equal(result.files[0]?.contentId, null);
+	assert.equal(typeof result.files[1]?.contentId, 'string');
 	assert.deepEqual(result.summary, { additions: 7, deletions: 2, files: 2 });
 });
 
@@ -457,6 +467,74 @@ test("getStatus (real git) returns a single commit's files for commit scope", as
 		workspaceCwd: dir,
 	});
 	assert.ok(diff.patch?.includes('+more'));
+});
+
+/** Seeds a repo holding one text and one binary file, both committed. */
+async function seedStampRepo(dir: string) {
+	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
+	await git('init', '-q');
+	await git('config', 'user.email', 'test@example.com');
+	await git('config', 'user.name', 'Test');
+	await writeFile(path.join(dir, 'a.ts'), 'one\n');
+	await writeFile(path.join(dir, 'logo.png'), Buffer.from([0, 1, 2, 3]));
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'first');
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+	return {
+		git,
+		rowsByPath: async (scope?: WorkspaceGitDiffScope) =>
+			new Map(
+				(await service.getStatus({ scope, workspaceCwd: dir })).files.map(
+					(file) => [file.path, file],
+				),
+			),
+	};
+}
+
+test('getStatus (real git) stamps working-tree rows so equal-count edits differ', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-stamp-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	const { rowsByPath } = await seedStampRepo(dir);
+
+	await writeFile(path.join(dir, 'a.ts'), 'first\n');
+	await writeFile(path.join(dir, 'logo.png'), Buffer.from([4, 5, 6, 7]));
+	const before = await rowsByPath();
+
+	// Both rewrites keep git's own numbers identical — one line swapped for
+	// another, and a binary file whose counts are always null — so the stamp is
+	// the only thing that can tell the reviewer the file moved on.
+	await setTimeout(10);
+	await writeFile(path.join(dir, 'a.ts'), 'second\n');
+	await writeFile(path.join(dir, 'logo.png'), Buffer.from([8, 9, 10, 11]));
+	const after = await rowsByPath();
+
+	const beforeSource = before.get('a.ts');
+	const afterSource = after.get('a.ts');
+	const beforeImage = before.get('logo.png');
+	const afterImage = after.get('logo.png');
+	assert.ok(beforeSource && afterSource && beforeImage && afterImage);
+
+	assert.equal(afterSource.additions, beforeSource.additions);
+	assert.equal(afterImage.additions, null);
+	assert.notEqual(afterSource.contentId, beforeSource.contentId);
+	assert.notEqual(afterImage.contentId, beforeImage.contentId);
+});
+
+test('getStatus (real git) leaves commit-scope rows unstamped', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-frozen-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	const { git, rowsByPath } = await seedStampRepo(dir);
+	const headHash = (await git('rev-parse', 'HEAD')).stdout.trim();
+
+	// A commit's content is frozen, so its rows carry no stamp to expire.
+	const rows = await rowsByPath({ commitHash: headHash, kind: 'commit' });
+
+	assert.ok(rows.size > 0);
+	for (const row of rows.values()) {
+		assert.equal(row.contentId, undefined);
+	}
 });
 
 test('getStatus (real git) branch scope spans commits + uncommitted', async (t) => {

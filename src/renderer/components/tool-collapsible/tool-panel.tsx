@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { cn } from '@/renderer/lib/utils';
 import type { ToolPanelSectionDescriptor } from '@/renderer/types/tool-presentation';
 
@@ -7,16 +6,17 @@ import type { ToolPanelSectionDescriptor } from '@/renderer/types/tool-presentat
  * Panel shared by tool bodies that show plain payloads rather than code. Sits
  * on the app's code surface, like the code bodies do, so every tool body reads
  * as one family; it wraps instead of scrolling sideways.
+ *
+ * Scrolls natively under `sleek-scrollbar`, the same way the code surfaces and
+ * the file and diff viewers do, so its scrollbar neither looks nor behaves like
+ * a different component's.
  */
 export function ToolPanel({ children }: { children: ReactNode }) {
 	return (
 		<div className='select-text rounded-md border border-code-border bg-code p-3 font-mono text-code-foreground text-xs'>
-			<ScrollArea
-				className='overflow-hidden **:data-[slot=scroll-area-viewport]:max-h-96 **:data-[slot=scroll-area-viewport]:overscroll-contain'
-				type='scroll'
-			>
+			<div className='sleek-scrollbar max-h-96 overflow-auto overscroll-contain'>
 				{children}
-			</ScrollArea>
+			</div>
 		</div>
 	);
 }

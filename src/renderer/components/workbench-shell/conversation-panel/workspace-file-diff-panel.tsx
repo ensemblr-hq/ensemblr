@@ -1,9 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-	ChevronDownIcon,
-	MessageSquarePlusIcon,
-	TriangleAlertIcon,
-} from 'lucide-react';
+import { ChevronDownIcon } from 'lucide-react';
 import { useMemo } from 'react';
 import { toast } from 'sonner';
 
@@ -26,6 +22,8 @@ import {
 	DropdownMenuLabel,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
+import { OpenInToolbarMenu } from '@/renderer/components/workbench-shell/open-in-toolbar-menu';
+import { useFileViewedMark } from '@/renderer/hooks/workbench-shell/conversation-panel/use-file-viewed-mark';
 import { parseSingleFileDiff } from '@/renderer/lib/diff/parse';
 import { diffNewSideIsWorkingTree } from '@/renderer/lib/diff/scope';
 import { groupDiffComments } from '@/renderer/lib/workbench/diff-comments';
@@ -36,6 +34,8 @@ import {
 } from '@/renderer/state/composer';
 import type { ChatTabWire } from '@/shared/ipc/contracts/chat-tab';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
+
+import { PanelMessage } from './panel-message';
 
 const LOCAL_ID_PREFIX = 'local:';
 
@@ -58,8 +58,9 @@ function localCommentId(id: string): string | null {
  * Rich single-file diff surface for a `kind: 'diff'` tab that carries a
  * `filePath`. Renders the unified patch through the shared {@link DiffViewer}
  * with line numbers, inline comments (Ensemblr-local, editable; GitHub review
- * threads and Action-bot comments, read-only), and diff/full-file, split,
- * whitespace, and word-wrap toggles. The optional `scope` selects the diff
+ * threads and Action-bot comments, read-only), diff/full-file, split,
+ * whitespace, and word-wrap toggles, and a Viewed marker that dims the file and
+ * sends it to the end of the Changes list. The optional `scope` selects the diff
  * (working tree by default, a commit, or the whole branch).
  */
 export function WorkspaceFileDiffPanel({
@@ -97,6 +98,13 @@ export function WorkspaceFileDiffPanel({
 			}),
 		queryKey: ensemblrQueryKeys.filePreview(workspaceCwd ?? '', resolvedPath),
 		staleTime: 10_000,
+	});
+
+	const { onViewedChange, viewed } = useFileViewedMark({
+		filePath: resolvedPath,
+		scope,
+		workspaceCwd,
+		workspaceId,
 	});
 
 	const invalidateComments = () =>
@@ -147,19 +155,19 @@ export function WorkspaceFileDiffPanel({
 	}, [patch, resolvedPath, githubComments, localComments]);
 
 	if (!filePath) {
-		return <DiffMessage message='This tab has no file associated.' />;
+		return <PanelMessage message='This tab has no file associated.' />;
 	}
 	if (diff.isPending) {
-		return <DiffMessage message='Loading diff…' />;
+		return <PanelMessage message='Loading diff…' />;
 	}
 	if (diff.isError) {
-		return <DiffMessage message='Could not load diff.' tone='error' />;
+		return <PanelMessage message='Could not load diff.' tone='error' />;
 	}
 	if (diff.data.error) {
-		return <DiffMessage message={diff.data.error.message} tone='error' />;
+		return <PanelMessage message={diff.data.error.message} tone='error' />;
 	}
 	if (!patch) {
-		return <DiffMessage message='No changes in this file.' />;
+		return <PanelMessage message='No changes in this file.' />;
 	}
 
 	const fullFileContent =
@@ -181,6 +189,10 @@ export function WorkspaceFileDiffPanel({
 						patch={patch}
 						workspaceId={workspaceId}
 					/>
+					<OpenInToolbarMenu
+						filePath={resolvedPath}
+						workspaceId={workspaceId}
+					/>
 				</>
 			}
 			onAddComment={({ body, lineNumber }) =>
@@ -198,7 +210,9 @@ export function WorkspaceFileDiffPanel({
 					resolveMutation.mutate({ id: local, resolved });
 				}
 			}}
+			onViewedChange={onViewedChange}
 			patch={patch}
+			viewed={viewed}
 		/>
 	);
 }
@@ -250,7 +264,6 @@ function AddToChatMenu({
 				size='xs'
 				variant='ghost'
 			>
-				<MessageSquarePlusIcon data-icon='inline-start' />
 				Add to chat
 			</Button>
 		);
@@ -260,18 +273,23 @@ function AddToChatMenu({
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
 				<Button className='h-6 px-1.5 text-xs' size='xs' variant='ghost'>
-					<MessageSquarePlusIcon data-icon='inline-start' />
 					Add to chat
 					<ChevronDownIcon data-icon='inline-end' />
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align='end' className='max-w-64'>
-				<DropdownMenuLabel>Add diff to chat</DropdownMenuLabel>
+			<DropdownMenuContent align='end' className='w-56 bg-muted p-1'>
+				<DropdownMenuLabel className='px-2'>Add diff to chat</DropdownMenuLabel>
 				{chats.map((tab, index) => (
-					<DropdownMenuItem key={tab.id} onSelect={() => addToChat(tab)}>
-						<span className='truncate'>{tab.title || 'Untitled chat'}</span>
+					<DropdownMenuItem
+						className='h-8 gap-2.5 px-2 text-[0.8125rem]'
+						key={tab.id}
+						onSelect={() => addToChat(tab)}
+					>
+						<span className='min-w-0 flex-1 truncate'>
+							{tab.title || 'Untitled chat'}
+						</span>
 						{index === 0 ? (
-							<span className='ml-auto text-muted-foreground text-xs'>
+							<span className='shrink-0 text-muted-foreground text-xs'>
 								latest
 							</span>
 						) : null}
@@ -290,33 +308,4 @@ function notifyCommentFailed(error: unknown): void {
 	toast.error('Comment update failed', {
 		description: error instanceof Error ? error.message : undefined,
 	});
-}
-
-/** Renders a centered muted or error message inside the workspace file-diff panel. */
-function DiffMessage({
-	message,
-	tone = 'muted',
-}: {
-	message: string;
-	tone?: 'error' | 'muted';
-}) {
-	return (
-		<div className='flex min-h-24 flex-1 items-center justify-center p-6'>
-			<div className='flex items-center gap-2 text-sm'>
-				{tone === 'error' ? (
-					<TriangleAlertIcon
-						aria-hidden='true'
-						className='size-4 shrink-0 text-destructive'
-					/>
-				) : null}
-				<span
-					className={
-						tone === 'error' ? 'text-destructive' : 'text-muted-foreground'
-					}
-				>
-					{message}
-				</span>
-			</div>
-		</div>
-	);
 }

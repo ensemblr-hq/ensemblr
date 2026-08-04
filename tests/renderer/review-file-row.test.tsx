@@ -37,6 +37,7 @@ function makeActions(
 		copyTarget: undefined,
 		invokeTarget: async () => {},
 		isDiscardable: () => true,
+		isViewed: () => false,
 		onDiscardFile: () => {},
 		openFile: () => {},
 		openInTargets: [],
@@ -60,6 +61,7 @@ function renderRow(
 
 const modifiedFile: ReviewFileSummary = {
 	additions: 10,
+	contentId: null,
 	deletions: 3,
 	id: 'f1',
 	path: 'src/main/ipc/handlers/workspace-files.ts',
@@ -94,6 +96,7 @@ test('an untracked file surfaces its status letter', () => {
 	const markup = renderRow(
 		{
 			additions: 4,
+			contentId: null,
 			deletions: 0,
 			id: 'f2',
 			path: 'notes.md',
@@ -116,6 +119,7 @@ test('each row shows a Conductor-style status square for its git state', () => {
 		renderRow(
 			{
 				additions: 4,
+				contentId: null,
 				deletions: 0,
 				id: 'n',
 				path: 'new.ts',
@@ -128,6 +132,7 @@ test('each row shows a Conductor-style status square for its git state', () => {
 		renderRow(
 			{
 				additions: 0,
+				contentId: null,
 				deletions: 9,
 				id: 'd',
 				path: 'gone.ts',

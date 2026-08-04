@@ -1,8 +1,13 @@
 import { useMemo } from 'react';
 import type { BundledLanguage } from 'shiki';
 import {
+	CODE_CONTENT_CLASSES,
+	CodeGutter,
+	CodeHunkGap,
 	CodeLineTokens,
 	CodeSurface,
+	DIFF_GUTTER_TINT,
+	DIFF_ROW_SURFACE,
 } from '@/renderer/components/code-surface';
 import { useHighlightedHunks } from '@/renderer/hooks/code-surface/use-highlighted-code';
 import { buildToolDiffRows } from '@/renderer/lib/diff/tool-rows';
@@ -10,25 +15,15 @@ import { cn } from '@/renderer/lib/utils';
 import type { TokenizedCode } from '@/renderer/types/code';
 import type { ToolDiffRow } from '@/renderer/types/diff';
 
-const DIFF_ROW_BACKGROUND = {
-	delete: 'bg-status-danger/15',
-	insert: 'bg-status-ok/15',
-	normal: '',
-} as const;
-
-const DIFF_ROW_MARKER = { delete: '-', insert: '+', normal: ' ' } as const;
-
-/** Narrowest gutter that still fits the widest line number, plus breathing room. */
-const MIN_GUTTER_DIGITS = 2;
-
 /**
  * Body for a file edit: a read-only diff with gutters, change tints, and a
  * skipped-lines band. Feed it a unified diff for one file.
  *
  * Purpose-built rather than reusing the app's `DiffViewer`, which brings a
  * toolbar, view-mode switching, and inline commenting — all noise inside a chat
- * row. It reads the same `parseSingleFileDiff` the real viewer does, so hunk
- * parsing cannot drift between the two.
+ * row. It reads the same `parseSingleFileDiff` the real viewer does and paints
+ * from the same gutter, tint, and skipped-lines recipes, so neither the hunk
+ * parsing nor the look can drift between the two.
  */
 export function ToolDiffPreview({
 	language,
@@ -39,22 +34,17 @@ export function ToolDiffPreview({
 }) {
 	const { rows, sources } = useMemo(() => buildToolDiffRows(patch), [patch]);
 	const tokensByHunk = useHighlightedHunks(sources, language);
-	const gutterWidth = useMemo(() => `${gutterDigits(rows)}ch`, [rows]);
+	const maxLineNumber = useMemo(() => highestLineNumber(rows), [rows]);
 
 	return (
 		<CodeSurface>
 			{rows.map((row) =>
 				row.kind === 'gap' ? (
-					<div
-						className='select-none border-code-border border-y bg-code-foreground/5 px-3 py-0.5 opacity-60'
-						key={row.key}
-					>
-						{row.label}
-					</div>
+					<CodeHunkGap key={row.key} label={row.label} />
 				) : (
 					<ToolDiffLine
-						gutterWidth={gutterWidth}
 						key={row.key}
+						maxLineNumber={maxLineNumber}
 						row={row}
 						tokens={tokensByHunk[row.hunkIndex]?.tokens[row.lineIndex] ?? null}
 					/>
@@ -65,49 +55,49 @@ export function ToolDiffPreview({
 }
 
 /**
- * Measures the gutter against the highest line number either side reaches.
+ * Highest line number either side of the diff reaches, which sizes both gutters.
  * @param rows - The rows about to be rendered
- * @returns The gutter width in characters
+ * @returns The largest line number in the diff
  */
-function gutterDigits(rows: readonly ToolDiffRow[]): number {
-	const widest = rows.reduce(
+function highestLineNumber(rows: readonly ToolDiffRow[]): number {
+	return rows.reduce(
 		(max, row) =>
 			row.kind === 'gap'
 				? max
 				: Math.max(max, row.newLine ?? 0, row.oldLine ?? 0),
 		0,
 	);
-	return Math.max(MIN_GUTTER_DIGITS, String(widest).length) + 1;
 }
 
-/** One diff line: old and new gutters, the change marker, then highlighted content. */
+/**
+ * One diff line: the old and new line-number gutters, then highlighted content.
+ * The change reads from the row's tint and its tinted gutter cell — the same
+ * cues the full diff viewer uses, and the ones the colorblind modes re-hue.
+ */
 function ToolDiffLine({
-	gutterWidth,
+	maxLineNumber,
 	row,
 	tokens,
 }: {
-	gutterWidth: string;
+	maxLineNumber: number;
 	row: Extract<ToolDiffRow, { kind: 'delete' | 'insert' | 'normal' }>;
 	tokens: TokenizedCode['tokens'][number] | null;
 }) {
+	const tint = DIFF_GUTTER_TINT[row.kind];
 	return (
-		<div className={cn('flex', DIFF_ROW_BACKGROUND[row.kind])}>
-			<span
-				className='box-content shrink-0 select-none pr-2 pl-3 text-right tabular-nums opacity-40'
-				style={{ width: gutterWidth }}
-			>
-				{row.oldLine ?? ''}
-			</span>
-			<span
-				className='box-content shrink-0 select-none pr-2 text-right tabular-nums opacity-40'
-				style={{ width: gutterWidth }}
-			>
-				{row.newLine ?? ''}
-			</span>
-			<span className='shrink-0 select-none pr-2 opacity-50'>
-				{DIFF_ROW_MARKER[row.kind]}
-			</span>
-			<span className='whitespace-pre pr-4'>
+		<div className={cn('flex', DIFF_ROW_SURFACE[row.kind])}>
+			<CodeGutter
+				maxLineNumber={maxLineNumber}
+				tint={tint}
+				value={row.oldLine ?? ''}
+			/>
+			<CodeGutter
+				divider
+				maxLineNumber={maxLineNumber}
+				tint={tint}
+				value={row.newLine ?? ''}
+			/>
+			<span className={CODE_CONTENT_CLASSES}>
 				<CodeLineTokens fallback={row.text} lineKey={row.key} tokens={tokens} />
 			</span>
 		</div>

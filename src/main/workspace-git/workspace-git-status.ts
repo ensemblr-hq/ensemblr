@@ -1,4 +1,4 @@
-import { open, rm } from 'node:fs/promises';
+import { open, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import type {
@@ -261,7 +261,7 @@ export function createWorkspaceGitService({
 			}),
 		);
 
-		return summarizeFiles(files);
+		return summarizeFiles(await withContentIds(cwd, files));
 	}
 
 	/** The changes a single commit introduced (`<parent>..<hash>`). */
@@ -292,14 +292,17 @@ export function createWorkspaceGitService({
 
 	/**
 	 * Builds file rows from a `git diff` against `diffArgs` (a single ref to
-	 * compare with the working tree, or `parent hash` for a commit range). When
-	 * `includeUntracked` is set, working-tree untracked files are appended — a
-	 * plain `git diff` never lists them.
+	 * compare with the working tree, or `parent hash` for a commit range).
+	 *
+	 * `newSideIsWorkingTree` says which of the two the rows describe. When set,
+	 * untracked files are appended — a plain `git diff` never lists them — and
+	 * every row carries a content stamp, since the bytes it describes can still
+	 * change. A commit range needs neither: its content is already frozen.
 	 */
 	async function buildDiffStatus(
 		cwd: string,
 		diffArgs: readonly string[],
-		includeUntracked: boolean,
+		newSideIsWorkingTree: boolean,
 	): Promise<GetWorkspaceGitStatusResult> {
 		const [nameStatusResult, numstatResult] = await Promise.all([
 			runGit(cwd, ['diff', '--no-color', '--name-status', '-z', ...diffArgs]),
@@ -325,11 +328,32 @@ export function createWorkspaceGitService({
 			return { ...entry, ...counts };
 		});
 
-		if (includeUntracked) {
-			files.push(...(await readUntrackedFiles(cwd)));
+		if (!newSideIsWorkingTree) {
+			return summarizeFiles(files);
 		}
+		files.push(...(await readUntrackedFiles(cwd)));
+		return summarizeFiles(await withContentIds(cwd, files));
+	}
 
-		return summarizeFiles(files);
+	/**
+	 * Stamps each row with the current bytes of its working-tree file, so a
+	 * reviewer's "viewed" mark stops matching the moment the file is written
+	 * again — including for a binary file, whose line counts are always `null`,
+	 * and for an edit that happens to leave the counts unchanged.
+	 * @param cwd - Absolute workspace directory the paths are relative to
+	 * @param files - Rows whose new side is the working tree
+	 * @returns The same rows, each carrying a content stamp
+	 */
+	async function withContentIds(
+		cwd: string,
+		files: readonly WorkspaceGitFileWire[],
+	): Promise<WorkspaceGitFileWire[]> {
+		return Promise.all(
+			files.map(async (file) => ({
+				...file,
+				contentId: await readContentId(cwd, file.path),
+			})),
+		);
 	}
 
 	/** Working-tree untracked files with line counts, for the branch view. */
@@ -661,6 +685,31 @@ export function createWorkspaceGitService({
 			};
 		}
 		return { ok: true };
+	}
+}
+
+/**
+ * Stamp of one working-tree file's current bytes.
+ *
+ * Size and modification time rather than a content hash: git's own index uses
+ * the same pair to decide a file is dirty, while hashing would cost a
+ * `git hash-object` process per changed row on every status poll. The trade is
+ * deliberate — the stamp can change when the bytes did not (a rewrite with
+ * identical content), which expires a mark that need not have expired, but it
+ * cannot stay the same across a real edit, which is the failure that matters.
+ * @param cwd - Absolute workspace directory the path is relative to
+ * @param relativePath - Workspace-relative path to stamp
+ * @returns An opaque stamp, or null when the path is gone or unreadable
+ */
+async function readContentId(
+	cwd: string,
+	relativePath: string,
+): Promise<string | null> {
+	try {
+		const stats = await stat(path.join(cwd, relativePath));
+		return stats.isFile() ? `${stats.size}:${stats.mtimeMs}` : null;
+	} catch {
+		return null;
 	}
 }
 

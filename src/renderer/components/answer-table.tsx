@@ -46,7 +46,7 @@ function TableFrame({
 		<div className='group/block relative'>
 			<div
 				className={cn(
-					'overflow-auto rounded-md border border-border',
+					'sleek-scrollbar overflow-auto rounded-md border border-border',
 					viewportClassName,
 				)}
 			>

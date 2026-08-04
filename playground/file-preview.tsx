@@ -1,10 +1,10 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 
-import { ensemblrQueryKeys } from '@/renderer/api/ensemblr-queries';
 import { FilePreviewPanel } from '@/renderer/components/workbench-shell/conversation-panel/file-preview-panel';
+import { useSeededFileClient } from './seeded-file-client.ts';
 
 const WORKSPACE_CWD = '/workspace/ensemblr';
+const WORKSPACE_ID = 'playground-workspace';
 const FILE_PATH = 'docs/plans/astro-migration.md';
 
 const FILE_CONTENT = [
@@ -34,28 +34,16 @@ const FILE_CONTENT = [
  * the Electron runtime.
  */
 export function FilePreviewScene() {
-	const [client] = useState(() => {
-		const seeded = new QueryClient({
-			defaultOptions: {
-				queries: { retry: false, staleTime: Number.POSITIVE_INFINITY },
-			},
-		});
-		seeded.setQueryData(
-			ensemblrQueryKeys.filePreview(WORKSPACE_CWD, FILE_PATH),
-			{
-				content: FILE_CONTENT,
-				contentEncoding: 'utf8',
-				path: FILE_PATH,
-				sizeBytes: FILE_CONTENT.length,
-			},
-		);
-		return seeded;
-	});
+	const client = useSeededFileClient(WORKSPACE_CWD, FILE_PATH, FILE_CONTENT);
 
 	return (
 		<QueryClientProvider client={client}>
 			<div className='flex h-96 flex-col overflow-hidden rounded-md border border-border bg-surface'>
-				<FilePreviewPanel filePath={FILE_PATH} workspaceCwd={WORKSPACE_CWD} />
+				<FilePreviewPanel
+					filePath={FILE_PATH}
+					workspaceCwd={WORKSPACE_CWD}
+					workspaceId={WORKSPACE_ID}
+				/>
 			</div>
 		</QueryClientProvider>
 	);

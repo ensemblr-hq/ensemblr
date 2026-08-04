@@ -12,6 +12,7 @@ import { StartingStatePreview } from './starting-state-preview.tsx';
 import { TabScrollerScene } from './tab-scroller-preview.tsx';
 import { TimelinePreview } from './timeline-preview.tsx';
 import { TurnSummaryPreview } from './turn-summary-preview.tsx';
+import { ViewersScene } from './viewers-preview.tsx';
 
 const CANVAS_WIDTHS = [
 	{ className: 'max-w-md', id: 'narrow', label: '448' },
@@ -59,6 +60,12 @@ const SCENES = [
 		label: 'tabs',
 		render: () => <TabScrollerScene />,
 		source: 'playground/tab-scroller-preview.tsx',
+	},
+	{
+		id: 'viewers',
+		label: 'viewers',
+		render: () => <ViewersScene />,
+		source: 'playground/viewers-preview.tsx',
 	},
 	{
 		id: 'scroll',

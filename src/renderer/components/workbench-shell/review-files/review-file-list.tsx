@@ -14,6 +14,11 @@ import { PanelPlaceholder } from '@/renderer/components/workbench-shell/panel-pl
 import { useOpenTargets } from '@/renderer/hooks/workbench-shell/use-open-targets';
 import { diffNewSideIsWorkingTree } from '@/renderer/lib/diff/scope';
 import { describeWorkspaceGitFailure } from '@/renderer/lib/workbench/git-failure-copy';
+import {
+	reviewFileRevision,
+	sortReviewFilesByViewed,
+} from '@/renderer/lib/workbench/review-files';
+import { useViewedChanges } from '@/renderer/state/workspace';
 import type {
 	ReviewFileActions,
 	ReviewFileMenuTarget,
@@ -59,7 +64,10 @@ function previewableImagePathsIn(
 	return paths;
 }
 
-/** Renders the changes panel as either a flat list or a collapsible folder tree. */
+/**
+ * Renders the changes panel as either a flat list or a collapsible folder tree.
+ * Rows marked viewed dim, and in the flat list they sink below the rest.
+ */
 export function ReviewFileList({
 	diffScope,
 	discardablePaths,
@@ -119,11 +127,21 @@ export function ReviewFileList({
 		[discardablePaths],
 	);
 
+	// Marks are stored against the revision they were set at, so a row the agent
+	// touched again reads as unviewed and climbs back out of the reviewed group.
+	const { isViewed: isPathViewed } = useViewedChanges(workspaceId);
+	const isViewed = useCallback(
+		(file: ReviewFileSummary) =>
+			isPathViewed(file.path, reviewFileRevision(file)),
+		[isPathViewed],
+	);
+
 	const actions = useMemo<ReviewFileActions>(
 		() => ({
 			copyTarget,
 			invokeTarget,
 			isDiscardable,
+			isViewed,
 			onDiscardFile,
 			openFile,
 			openInTargets,
@@ -132,10 +150,18 @@ export function ReviewFileList({
 			copyTarget,
 			invokeTarget,
 			isDiscardable,
+			isViewed,
 			onDiscardFile,
 			openFile,
 			openInTargets,
 		],
+	);
+
+	// Only the flat list reorders: the folder tree's order is its structure, so a
+	// viewed file there dims in place rather than jumping out of its directory.
+	const listedFiles = useMemo(
+		() => sortReviewFilesByViewed(files, isViewed),
+		[files, isViewed],
 	);
 
 	// One shared right-click menu serves every row; the clicked row is captured
@@ -191,7 +217,7 @@ export function ReviewFileList({
 								{viewMode === 'folders' ? (
 									<ReviewFileTree files={files} />
 								) : (
-									files.map((file) => (
+									listedFiles.map((file) => (
 										<ReviewFileRow file={file} key={file.id} showPath />
 									))
 								)}

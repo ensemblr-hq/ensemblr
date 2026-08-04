@@ -2,7 +2,7 @@
 
 import { act, fireEvent, screen } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
-import { describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 vi.mock('@iconify/react', () => ({
 	addCollection: () => undefined,
@@ -15,7 +15,15 @@ import { FilePreviewPanel } from '../../src/renderer/components/workbench-shell/
 import { SessionTabs } from '../../src/renderer/components/workbench-shell/conversation-panel/session-tabs';
 import { getWorkspaceFileIconNameForPath } from '../../src/renderer/lib/workbench';
 import type { SessionTabModel } from '../../src/renderer/types/workbench';
-import { createTestQueryClient, renderWithProviders } from './support/dom';
+import {
+	createTestQueryClient,
+	installLocalStorage,
+	renderWithProviders,
+} from './support/dom';
+
+beforeEach(() => {
+	installLocalStorage();
+});
 
 const workspaceCwd = '/workspace/ensemblr';
 const previewFilePath = 'assets/logo.png';
@@ -122,6 +130,7 @@ describe('file preview tabs', () => {
 			<FilePreviewPanel
 				filePath={previewFilePath}
 				workspaceCwd={workspaceCwd}
+				workspaceId='workspace-1'
 			/>,
 			{ client },
 		);

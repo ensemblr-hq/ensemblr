@@ -59,6 +59,12 @@ export type ReviewPanelTab = 'changes' | 'checks' | 'files';
 
 export interface ReviewFileSummary {
 	additions: number;
+	/**
+	 * Opaque stamp of the file's current bytes, or null where the scope's content
+	 * cannot change and where git could not read the path. Backs the expiry of a
+	 * review "viewed" mark.
+	 */
+	contentId: string | null;
 	deletions: number;
 	id: string;
 	path: string;

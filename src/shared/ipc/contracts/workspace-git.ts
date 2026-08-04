@@ -18,6 +18,12 @@ export type WorkspaceGitFileStatus =
 export interface WorkspaceGitFileWire {
 	/** Lines added, or `null` for binary files. */
 	additions: number | null;
+	/**
+	 * Opaque stamp of the file's current bytes, changing on every write. Present
+	 * only where the diff's new side is the working tree; `null` for a commit
+	 * scope, whose content cannot change, and for a file git can no longer read.
+	 */
+	contentId?: string | null;
 	/** Lines deleted, or `null` for binary files. */
 	deletions: number | null;
 	path: string;

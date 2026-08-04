@@ -10,6 +10,7 @@ import type { WorkspaceGitFailure } from '../../src/shared/ipc/contracts/workspa
 const files: ReviewFileSummary[] = [
 	{
 		additions: 10,
+		contentId: null,
 		deletions: 3,
 		id: 'a',
 		path: 'src/main/ipc/handlers/workspace-files.ts',
@@ -17,6 +18,7 @@ const files: ReviewFileSummary[] = [
 	},
 	{
 		additions: 5,
+		contentId: null,
 		deletions: 1,
 		id: 'b',
 		path: 'src/main/repository/create-workspace.ts',

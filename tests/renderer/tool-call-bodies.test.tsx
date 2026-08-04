@@ -204,8 +204,8 @@ describe('tool call bodies', () => {
 				"const CODE_THEME = 'catppuccin-mocha' as BundledTheme;",
 			),
 		).toBeInTheDocument();
-		expect(within(body).getAllByText('+')).toHaveLength(3);
-		expect(within(body).getAllByText('-')).toHaveLength(2);
+		expect(body.querySelectorAll('.bg-diff-addition-surface')).toHaveLength(3);
+		expect(body.querySelectorAll('.bg-diff-deletion-surface')).toHaveLength(2);
 	});
 
 	test('paints language-server diagnostics worst-first with their positions', () => {

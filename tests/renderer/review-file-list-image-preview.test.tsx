@@ -15,6 +15,7 @@ import { installLocalStorage, renderWithProviders } from './support/dom';
 
 const imageFile: ReviewFileSummary = {
 	additions: 0,
+	contentId: null,
 	deletions: 0,
 	id: 'img',
 	path: 'assets/logo.png',
@@ -23,6 +24,7 @@ const imageFile: ReviewFileSummary = {
 
 const sourceFile: ReviewFileSummary = {
 	additions: 4,
+	contentId: null,
 	deletions: 1,
 	id: 'src',
 	path: 'src/main/index.ts',
@@ -31,6 +33,7 @@ const sourceFile: ReviewFileSummary = {
 
 const deletedImageFile: ReviewFileSummary = {
 	additions: 0,
+	contentId: null,
 	deletions: 0,
 	id: 'gone',
 	path: 'assets/removed.png',

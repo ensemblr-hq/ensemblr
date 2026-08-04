@@ -3,10 +3,15 @@
 import type { CSSProperties, HTMLAttributes } from 'react';
 import { createContext, memo, useEffect, useMemo, useState } from 'react';
 import type { BundledLanguage, ThemedToken } from 'shiki';
+import { codeGutterDigits } from '@/renderer/lib/code/gutter';
 import { highlightCode } from '@/renderer/lib/code/highlighter';
 import { cn } from '@/renderer/lib/utils';
 import { useResolvedCodeTheme } from '@/renderer/state/preferences';
 import type { TokenizedCode } from '@/renderer/types/code';
+import {
+	CODE_PANEL_TEXT_CLASSES,
+	CODE_SURFACE_CLASSES,
+} from './code-surface/code-style';
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
 /**
@@ -77,23 +82,33 @@ const TokenSpan = ({ token }: { token: ThemedToken }) => (
 	</span>
 );
 
-// Line number styles using CSS counters
+// Line numbers come from a CSS counter rather than a real column so a wrapped
+// line still clears its own gutter. The recipe restates `CODE_GUTTER_CLASSES`
+// through `before:` variants, including the hairline that abuts the code, and
+// takes its width from the same `codeGutterDigits` measurement every other code
+// surface uses, so a file and its diff line their content up at one offset.
 const LINE_NUMBER_CLASSES = cn(
 	'before:content-[counter(line)]',
 	'before:inline-block',
 	'before:[counter-increment:line]',
-	'before:w-8',
-	'before:mr-4',
+	'before:box-content',
+	'before:w-[var(--ensemblr-gutter-ch)]',
+	'before:border-code-border',
+	'before:border-r',
+	'before:px-code-pad',
+	'before:mr-code-pad',
 	'before:text-right',
-	'before:text-muted-foreground/50',
+	'before:text-code-foreground/40',
 	'before:font-mono',
 	'before:select-none',
 );
 
-// A wrapped line must clear its own gutter, so the padding matches the line
-// number's `before:w-8` plus its `before:mr-4` and the negative indent pulls
-// only the first visual line back over it.
-const WRAPPED_LINE_NUMBER_CLASSES = '-indent-12 pl-12';
+// A wrapped line must clear its own gutter, so the indent spans the gutter's
+// full width — digits, padding either side, hairline, and margin, summed into
+// `--ensemblr-gutter-indent` — and the negative indent pulls only the first
+// visual line back over it.
+const WRAPPED_LINE_NUMBER_CLASSES =
+	'-indent-[var(--ensemblr-gutter-indent)] pl-[var(--ensemblr-gutter-indent)]';
 
 // Line rendering component
 /** Renders one code line as a row of token spans, optionally with a CSS-counter line number. */
@@ -165,7 +180,8 @@ const createRawTokens = (code: string): TokenizedCode => ({
  *
  * The surface comes from the app's `code` tokens rather than the Shiki theme's
  * own `bg`/`fg`, so a block stays dark in dark mode and light in light mode
- * whichever theme Settings → Appearance → Code theme is set to.
+ * whichever theme Settings → Appearance → Code theme is set to. Panel density —
+ * one step up from the chat-row `CodePanel`, on the same row height.
  *
  * Unwrapped, the block sizes itself to its widest line (`w-max`) instead of to
  * its scroll container: a plain block would paint its background only across the
@@ -186,17 +202,26 @@ const CodeBlockBody = memo(
 			() => addKeysToTokens(tokenized.tokens),
 			[tokenized.tokens],
 		);
+		const gutterDigits = codeGutterDigits(keyedLines.length);
 
 		return (
 			<pre
 				className={cn(
-					'm-0 bg-code p-4 text-code-foreground text-sm',
-					wrapLines ? 'whitespace-pre-wrap break-words' : 'w-max min-w-full',
+					'm-0 py-2 pr-4',
+					CODE_SURFACE_CLASSES,
+					CODE_PANEL_TEXT_CLASSES,
+					!showLineNumbers && 'pl-4',
+					wrapLines ? 'wrap-anywhere whitespace-pre-wrap' : 'w-max min-w-full',
 				)}
+				style={
+					{
+						'--ensemblr-gutter-ch': `${gutterDigits}ch`,
+						'--ensemblr-gutter-indent': `calc(${gutterDigits + 3}ch + var(--ensemblr-hairline))`,
+					} as CSSProperties
+				}
 			>
 				<code
 					className={cn(
-						'font-mono text-sm',
 						showLineNumbers &&
 							'[counter-increment:line_0] [counter-reset:line]',
 					)}
@@ -295,7 +320,7 @@ export const CodeBlockContent = ({
 	const tokenized = asyncTokens ?? syncTokens;
 
 	return (
-		<div className={cn('relative overflow-auto', className)}>
+		<div className={cn('sleek-scrollbar relative overflow-auto', className)}>
 			<CodeBlockBody
 				showLineNumbers={showLineNumbers}
 				tokenized={tokenized}
@@ -314,7 +339,8 @@ const CodeBlockContainer = ({
 }: HTMLAttributes<HTMLDivElement> & { language: string }) => (
 	<div
 		className={cn(
-			'group relative w-full overflow-hidden rounded-md border bg-background text-foreground',
+			'group relative w-full overflow-hidden rounded-md border border-code-border',
+			CODE_SURFACE_CLASSES,
 			className,
 		)}
 		data-language={language}
