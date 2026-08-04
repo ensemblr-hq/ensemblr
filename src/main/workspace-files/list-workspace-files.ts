@@ -23,6 +23,7 @@ import type {
 	WriteWorkspaceImageAttachmentRequest,
 	WriteWorkspaceImageAttachmentResult,
 } from '../../shared/ipc/contracts/workspace-files';
+import { previewImageMimeTypeForPath } from '../../shared/preview-image.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import { resolveWorkspaceCwd } from './workspace-cwd.ts';
 
@@ -64,15 +65,6 @@ const IMAGE_EXTENSION_BY_MIME_TYPE: Readonly<Record<string, string>> = {
 	'image/png': 'png',
 	'image/tiff': 'tiff',
 	'image/webp': 'webp',
-};
-const PREVIEW_IMAGE_MIME_TYPE_BY_EXTENSION: Readonly<Record<string, string>> = {
-	avif: 'image/avif',
-	bmp: 'image/bmp',
-	gif: 'image/gif',
-	jpeg: 'image/jpeg',
-	jpg: 'image/jpeg',
-	png: 'image/png',
-	webp: 'image/webp',
 };
 const BASE64_PATTERN = /^[A-Za-z0-9+/]+={0,2}$/;
 // Per-ignored-directory enumeration cap. A small ignored dir expands fully so
@@ -704,16 +696,6 @@ async function isWithinWorkspaceReal(
 /** Resolves a safe file extension for a pasted image MIME type. */
 function extensionForImageMimeType(mimeType: string): string | null {
 	return IMAGE_EXTENSION_BY_MIME_TYPE[mimeType.toLowerCase()] ?? null;
-}
-
-/**
- * Returns a browser-previewable image MIME type for a workspace file path.
- * @param filePath - Workspace-relative file path.
- * @returns The image MIME type, or null when the extension is not previewable.
- */
-function previewImageMimeTypeForPath(filePath: string): string | null {
-	const extension = path.extname(filePath).slice(1).toLowerCase();
-	return PREVIEW_IMAGE_MIME_TYPE_BY_EXTENSION[extension] ?? null;
 }
 
 /**

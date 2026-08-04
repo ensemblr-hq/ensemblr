@@ -12,9 +12,9 @@ import { OpenInTargetsSubmenu } from './open-in-targets-submenu';
 import { useReviewFileActions } from './review-file-actions-context';
 
 /**
- * Single shared right-click menu for the changes panel: View (open diff), "Open
- * in <app>" for every installed target, Copy path, and Discard changes — scoped
- * to whichever row the user right-clicked.
+ * Single shared right-click menu for the changes panel: View (the file's diff,
+ * or its image preview), "Open in <app>" for every installed target, Copy path,
+ * and Discard changes — scoped to whichever row the user right-clicked.
  *
  * One menu serves the whole list (the clicked row is captured into `target`)
  * instead of mounting a Radix menu per row. Renders nothing until a row is
@@ -30,7 +30,7 @@ export function ReviewFilesContextMenuContent({
 		invokeTarget,
 		isDiscardable,
 		onDiscardFile,
-		openDiff,
+		openFile,
 		openInTargets,
 	} = useReviewFileActions();
 
@@ -51,10 +51,10 @@ export function ReviewFilesContextMenuContent({
 			aria-label={`${path} actions`}
 			className='w-48 bg-muted p-1'
 		>
-			{openDiff ? (
+			{openFile ? (
 				<ContextMenuItem
 					className='h-8 gap-2 px-2 text-[0.8125rem]'
-					onSelect={() => openDiff(path)}
+					onSelect={() => openFile(path)}
 				>
 					<EyeIcon aria-hidden='true' className='text-muted-foreground' />
 					<span className='min-w-0 flex-1'>View</span>
