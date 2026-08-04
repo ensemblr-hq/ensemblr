@@ -215,6 +215,7 @@ function ActiveAuxiliaryPanel({
 		<FilePreviewPanel
 			filePath={activeSession.filePath ?? null}
 			workspaceCwd={activeWorkspace.pathLabel ?? null}
+			workspaceId={activeWorkspace.id}
 		/>
 	);
 }

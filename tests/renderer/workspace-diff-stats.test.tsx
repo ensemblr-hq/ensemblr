@@ -15,9 +15,13 @@ function renderStats() {
 }
 
 describe('WorkspaceDiffStats', () => {
-	test('always colors additions green and deletions red', () => {
+	test('hues additions and deletions from the shared diff tokens', () => {
 		renderStats();
-		expect(screen.getByText('+3').className).toContain('text-status-ok');
-		expect(screen.getByText('-2').className).toContain('text-status-danger');
+		expect(screen.getByText('+3').className).toContain(
+			'text-diff-addition-foreground',
+		);
+		expect(screen.getByText('-2').className).toContain(
+			'text-diff-deletion-foreground',
+		);
 	});
 });

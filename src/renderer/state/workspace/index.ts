@@ -56,3 +56,9 @@ export {
 	pinnedWorkspaceIdsAtom,
 } from './structure-atoms';
 export { useCloseRunningChatGuard } from './use-close-running-chat-guard';
+export type { ViewedChangesState } from './viewed-changes';
+export {
+	forgetWorkspaceViewedChangesAtom,
+	useViewedChanges,
+	viewedChangesByWorkspaceAtom,
+} from './viewed-changes';

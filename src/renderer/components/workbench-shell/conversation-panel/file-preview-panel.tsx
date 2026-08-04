@@ -1,4 +1,3 @@
-import { Icon } from '@iconify/react';
 import { useQuery } from '@tanstack/react-query';
 import { useAtom } from 'jotai';
 import { WrapTextIcon } from 'lucide-react';
@@ -8,9 +7,10 @@ import {
 	readWorkspaceFile,
 } from '@/renderer/api/ensemblr-queries';
 import { CodeBlockContent } from '@/renderer/components/code-block';
+import { CodeViewerHeader } from '@/renderer/components/code-surface';
 import { IconToggle } from '@/renderer/components/icon-toggle';
+import { OpenInToolbarMenu } from '@/renderer/components/workbench-shell/open-in-toolbar-menu';
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
-import { getWorkspaceFileIconNameForPath } from '@/renderer/lib/workbench';
 import { filePreviewWordWrapAtom } from '@/renderer/state/preferences';
 import type {
 	ReadWorkspaceFileFailureCode,
@@ -27,9 +27,11 @@ import { PanelMessage } from './panel-message';
 export function FilePreviewPanel({
 	filePath,
 	workspaceCwd,
+	workspaceId,
 }: {
 	filePath: string | null;
 	workspaceCwd: string | null;
+	workspaceId: string;
 }) {
 	const [wordWrap, setWordWrap] = useAtom(filePreviewWordWrapAtom);
 	const { data, isError, isPending } = useQuery({
@@ -71,34 +73,30 @@ export function FilePreviewPanel({
 
 	return (
 		<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-			<div className='flex h-9 shrink-0 items-center gap-2 border-border border-b bg-muted/30 pr-2 pl-4'>
-				<Icon
-					aria-hidden='true'
-					className='size-3.5 shrink-0 text-muted-foreground'
-					icon={getWorkspaceFileIconNameForPath(filePath)}
-				/>
-				<span className='truncate font-mono text-muted-foreground text-xs'>
-					{filePath}
-				</span>
-				<div className='ml-auto flex shrink-0 items-center gap-2'>
-					{typeof result.sizeBytes === 'number' ? (
-						<span className='text-muted-foreground text-xs'>
-							{formatSizeBytes(result.sizeBytes)}
-						</span>
-					) : null}
-					{imageSource ? null : (
-						<IconToggle
-							active={wordWrap}
-							label={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
-							onClick={() => setWordWrap(!wordWrap)}
-						>
-							<WrapTextIcon />
-						</IconToggle>
-					)}
-				</div>
-			</div>
+			<CodeViewerHeader
+				actions={
+					<>
+						{typeof result.sizeBytes === 'number' ? (
+							<span className='text-muted-foreground text-xs tabular-nums'>
+								{formatSizeBytes(result.sizeBytes)}
+							</span>
+						) : null}
+						<OpenInToolbarMenu filePath={filePath} workspaceId={workspaceId} />
+						{imageSource ? null : (
+							<IconToggle
+								active={wordWrap}
+								label={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
+								onClick={() => setWordWrap(!wordWrap)}
+							>
+								<WrapTextIcon />
+							</IconToggle>
+						)}
+					</>
+				}
+				title={filePath}
+			/>
 			{imageSource ? (
-				<div className='flex min-h-0 flex-1 items-center justify-center overflow-auto bg-muted/10 p-4'>
+				<div className='sleek-scrollbar flex min-h-0 flex-1 items-center justify-center overflow-auto bg-code p-4'>
 					<img
 						alt={`Preview of ${filePath}`}
 						className='max-h-full max-w-full rounded-md object-contain shadow-sm'

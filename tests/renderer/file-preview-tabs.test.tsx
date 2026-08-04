@@ -119,6 +119,7 @@ describe('file preview tabs', () => {
 			<FilePreviewPanel
 				filePath={previewFilePath}
 				workspaceCwd={workspaceCwd}
+				workspaceId='workspace-1'
 			/>,
 			{ client },
 		);

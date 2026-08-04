@@ -1,5 +1,5 @@
 import { useAtomValue } from 'jotai';
-import { PlusIcon, UnfoldVerticalIcon } from 'lucide-react';
+import { PlusIcon } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -15,6 +15,13 @@ import 'react-diff-view/style/index.css';
 import type { BundledLanguage } from 'shiki';
 
 import { CodeBlockContent } from '@/renderer/components/code-block';
+import {
+	CODE_PANEL_TEXT_CLASSES,
+	CODE_SURFACE_CLASSES,
+	CodeHunkGap,
+	CodeViewerHeader,
+} from '@/renderer/components/code-surface';
+import { codeGutterDigits } from '@/renderer/lib/code/gutter';
 import {
 	newLineNumberOf,
 	oldLineNumberOf,
@@ -45,9 +52,9 @@ interface AddCommentInput {
 /**
  * Rich single-file diff viewer: parsed hunks with line-number gutters, Shiki
  * syntax colors, click-a-line inline comments (local editable + GitHub/bot
- * read-only), and toggles for full-file view, split layout, hidden characters,
- * and word wrap. Falls back to a plain highlighted patch when the diff cannot
- * be parsed.
+ * read-only), toggles for full-file view, split layout, hidden characters, and
+ * word wrap, plus a Viewed marker wherever the caller tracks review progress.
+ * Falls back to a plain highlighted patch when the diff cannot be parsed.
  */
 export function DiffViewer({
 	commentsByChangeKey,
@@ -59,7 +66,9 @@ export function DiffViewer({
 	onAddComment,
 	onDeleteComment,
 	onResolveComment,
+	onViewedChange,
 	patch,
+	viewed,
 }: {
 	commentsByChangeKey?: ReadonlyMap<string, readonly DiffComment[]>;
 	/** Whether the viewer fills its parent's height (true) or sizes to content. */
@@ -73,12 +82,18 @@ export function DiffViewer({
 	onAddComment?: (input: AddCommentInput) => void;
 	onDeleteComment?: (id: string) => void;
 	onResolveComment?: (id: string, resolved: boolean) => void;
+	/** When set, the toolbar offers a Viewed marker; omit where nothing tracks it. */
+	onViewedChange?: (viewed: boolean) => void;
 	patch: string;
+	viewed?: boolean;
 }) {
-	const [viewMode, setViewMode] = useState<DiffViewMode>('diff');
-	const [activeComposerKey, setActiveComposerKey] = useState<string | null>(
-		null,
+	const [viewMode, setViewMode] = useFileScopedState<DiffViewMode>(
+		filePath,
+		'diff',
 	);
+	const [activeComposerKey, setActiveComposerKey] = useFileScopedState<
+		string | null
+	>(filePath, null);
 	const layout = useAtomValue(diffLayoutAtom);
 	const wordWrap = useAtomValue(diffWordWrapAtom);
 
@@ -119,7 +134,7 @@ export function DiffViewer({
 			}
 			setActiveComposerKey(getChangeKey(change));
 		},
-		[commentingEnabled],
+		[commentingEnabled, setActiveComposerKey],
 	);
 
 	const widgets = useDiffWidgets({
@@ -137,8 +152,11 @@ export function DiffViewer({
 			<DiffViewerFrame
 				fileModeDisabled
 				fillHeight={fillHeight}
+				filePath={filePath}
 				headerActions={headerActions}
+				onViewedChange={onViewedChange}
 				onViewModeChange={setViewMode}
+				viewed={viewed}
 				viewMode={viewMode}
 			>
 				<CodeBlockContent
@@ -155,8 +173,11 @@ export function DiffViewer({
 		<DiffViewerFrame
 			fileModeDisabled={!canShowFile}
 			fillHeight={fillHeight}
+			filePath={filePath}
 			headerActions={headerActions}
+			onViewedChange={onViewedChange}
 			onViewModeChange={setViewMode}
+			viewed={viewed}
 			viewMode={viewMode}
 		>
 			<DiffBody
@@ -171,6 +192,36 @@ export function DiffViewer({
 			/>
 		</DiffViewerFrame>
 	);
+}
+
+/**
+ * State remembered per file rather than per mount, reading back as `initial` for
+ * any file that has not set it.
+ *
+ * The viewer is mounted once per panel and re-pointed at another file by prop
+ * rather than remounted, so plain `useState` survives a tab switch. That leaks:
+ * change keys are line numbers with no file in them, so a composer left open on
+ * one file matches a real line on the next and reopens itself over the wrong
+ * diff, and a `file` view mode carries onto a diff that may not offer it.
+ *
+ * Held against the path instead of reset on change so each file keeps the mode it
+ * was last read in, and so the answer never depends on which files were visited
+ * in between.
+ * @param filePath - Path the stored value belongs to
+ * @param initial - Value read for any file that has not set one
+ * @returns The value held for `filePath`, and a setter that records against it
+ */
+function useFileScopedState<T>(
+	filePath: string,
+	initial: T,
+): [T, (next: T) => void] {
+	const [byFile, setByFile] = useState<ReadonlyMap<string, T>>(() => new Map());
+	const setValue = useCallback(
+		(next: T) => setByFile((current) => new Map(current).set(filePath, next)),
+		[filePath],
+	);
+	const held = byFile.get(filePath);
+	return [held === undefined ? initial : held, setValue];
 }
 
 /**
@@ -193,12 +244,14 @@ function hunkGapLabel(previous: HunkData, next: HunkData): string {
 const EMPTY_COMMENTS: ReadonlyMap<string, readonly DiffComment[]> = new Map();
 
 /**
- * Widest line-number digit count across a diff's hunks, used to size the gutter
- * to its content (minimum two digits) so it grows only when line numbers do.
+ * Highest line number either side of a diff reaches, which sizes the gutter to
+ * its content so it grows only when line numbers do.
  * @param hunks - The hunks being rendered
- * @returns The number of digits in the largest line number (at least 2)
+ * @returns The largest line number the hunks will render
  */
-function maxLineDigits(hunks: ReturnType<typeof expandFromRawCode>): number {
+function highestLineNumber(
+	hunks: ReturnType<typeof expandFromRawCode>,
+): number {
 	let max = 0;
 	for (const hunk of hunks) {
 		max = Math.max(
@@ -207,7 +260,7 @@ function maxLineDigits(hunks: ReturnType<typeof expandFromRawCode>): number {
 			hunk.newStart + hunk.newLines,
 		);
 	}
-	return Math.max(2, String(max).length);
+	return max;
 }
 
 /**
@@ -236,7 +289,12 @@ function DiffBody({
 }) {
 	const showWhitespace = useAtomValue(diffShowWhitespaceAtom);
 	const tokens = useDiffTokens(hunks, language, showWhitespace);
-	const gutterWidthCh = useMemo(() => maxLineDigits(hunks) + 1, [hunks]);
+	// The gutter column is border-box, so it carries the shared 1ch of padding on
+	// either side of the digits the app's other code surfaces add outside theirs.
+	const gutterWidthCh = useMemo(
+		() => codeGutterDigits(highestLineNumber(hunks)) + 2,
+		[hunks],
+	);
 
 	// The add-comment control is the only interactive gutter element: it appears
 	// on the new side of a hovered row as a shadcn-style button and owns the
@@ -244,6 +302,11 @@ function DiffBody({
 	// new-side line keeps unified view to a single button and blocks commenting
 	// on a deleted row, whose new-side line number is null — a comment there
 	// would persist against the old line and mis-anchor to the new side on reload.
+	//
+	// The line number stays in flow, merely hidden, and the button floats over it:
+	// the gutter column is sized by its content, so swapping a two-character number
+	// for an 18px button would widen the column and shove the whole diff sideways
+	// under the cursor.
 	const renderAddCommentGutter = useCallback(
 		({
 			change,
@@ -260,14 +323,17 @@ function DiffBody({
 			side === 'new' &&
 			change &&
 			newLineNumberOf(change) !== null ? (
-				<button
-					aria-label='Add comment'
-					className='mx-auto flex size-4.5 items-center justify-center rounded-xs bg-foreground text-background shadow-xs transition-colors hover:bg-foreground/90'
-					onClick={() => onRequestComment(change)}
-					type='button'
-				>
-					<PlusIcon className='size-3.5' />
-				</button>
+				<>
+					<span className='invisible'>{renderDefault()}</span>
+					<button
+						aria-label='Add comment'
+						className='absolute inset-0 m-auto flex size-4.5 cursor-pointer items-center justify-center rounded-xs bg-foreground text-background shadow-xs transition-colors hover:bg-foreground/90'
+						onClick={() => onRequestComment(change)}
+						type='button'
+					>
+						<PlusIcon className='size-3.5' />
+					</button>
+				</>
 			) : (
 				renderDefault()
 			),
@@ -277,11 +343,15 @@ function DiffBody({
 
 	return (
 		<div
-			className='min-h-0 flex-1 overflow-auto'
+			className={cn(
+				'ensemblr-diff-pane sleek-scrollbar min-h-0 flex-1 overflow-auto',
+				CODE_SURFACE_CLASSES,
+				CODE_PANEL_TEXT_CLASSES,
+			)}
 			style={{ '--ensemblr-gutter-ch': `${gutterWidthCh}ch` } as CSSProperties}
 		>
 			<Diff
-				className='ensemblr-diff'
+				className={cn('ensemblr-diff', !wordWrap && 'ensemblr-diff-scroll')}
 				codeClassName={wordWrap ? undefined : 'ensemblr-diff-nowrap'}
 				diffType={diffType}
 				gutterType='default'
@@ -301,10 +371,9 @@ function DiffBody({
 						}
 						return [
 							<Decoration key={`gap-${hunk.content}`}>
-								<div className='ensemblr-diff-gap'>
-									<UnfoldVerticalIcon className='size-3' />
-									{hunkGapLabel(renderHunks[index - 1], hunk)}
-								</div>
+								<CodeHunkGap
+									label={hunkGapLabel(renderHunks[index - 1], hunk)}
+								/>
 							</Decoration>,
 							...rows,
 						];
@@ -315,8 +384,25 @@ function DiffBody({
 	);
 }
 
+/** Inputs for {@link DiffViewerFrame}: what the header names, and what it offers. */
+interface DiffViewerFrameProps {
+	children: ReactNode;
+	fileModeDisabled: boolean;
+	fillHeight: boolean;
+	filePath: string;
+	headerActions?: ReactNode;
+	onViewedChange?: (viewed: boolean) => void;
+	onViewModeChange: (mode: DiffViewMode) => void;
+	viewed?: boolean;
+	viewMode: DiffViewMode;
+}
+
 /**
- * Chrome around the diff body: the file path header, toggle toolbar, and actions.
+ * Chrome around the diff body: the shared code-viewer header carrying the file
+ * path, then the toggle toolbar and the caller's actions.
+ *
+ * The header is the same bar the file viewer uses, so toggling a tab between a
+ * file and its diff moves nothing but the body underneath.
  *
  * The content slot is a flex column rather than a scroll container: whichever
  * body it holds brings its own `overflow-auto`, so a filled-height viewer keeps
@@ -327,17 +413,13 @@ function DiffViewerFrame({
 	children,
 	fileModeDisabled,
 	fillHeight,
+	filePath,
 	headerActions,
+	onViewedChange,
 	onViewModeChange,
+	viewed,
 	viewMode,
-}: {
-	children: ReactNode;
-	fileModeDisabled: boolean;
-	fillHeight: boolean;
-	headerActions?: ReactNode;
-	onViewModeChange: (mode: DiffViewMode) => void;
-	viewMode: DiffViewMode;
-}) {
+}: DiffViewerFrameProps) {
 	return (
 		<div
 			className={cn(
@@ -345,14 +427,21 @@ function DiffViewerFrame({
 				fillHeight && 'min-h-0 flex-1',
 			)}
 		>
-			<div className='flex h-9 shrink-0 items-center gap-2 border-border border-b bg-muted/30 px-2'>
-				<DiffToolbar
-					fileModeDisabled={fileModeDisabled}
-					onViewModeChange={onViewModeChange}
-					viewMode={viewMode}
-				/>
-				<div className='ml-auto flex items-center gap-1'>{headerActions}</div>
-			</div>
+			<CodeViewerHeader
+				actions={
+					<>
+						{headerActions}
+						<DiffToolbar
+							fileModeDisabled={fileModeDisabled}
+							onViewedChange={onViewedChange}
+							onViewModeChange={onViewModeChange}
+							viewed={viewed}
+							viewMode={viewMode}
+						/>
+					</>
+				}
+				title={filePath}
+			/>
 			<div className={cn(fillHeight && 'flex min-h-0 flex-1 flex-col')}>
 				{children}
 			</div>

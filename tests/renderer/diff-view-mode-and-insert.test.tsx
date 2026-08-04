@@ -112,7 +112,7 @@ describe('hunk gap separators', () => {
 				</TooltipProvider>
 			</Provider>,
 		);
-		const gaps = container.querySelectorAll('.ensemblr-diff-gap');
+		const gaps = container.querySelectorAll('[data-slot="code-hunk-gap"]');
 		expect(gaps.length).toBe(1);
 		// old side: first hunk covers 8..11, second starts at 32 → 32-12 = 20 hidden.
 		expect(gaps[0].textContent).toContain('20 unchanged lines');

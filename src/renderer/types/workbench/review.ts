@@ -1,7 +1,7 @@
 import type { AgentActionKind } from './agent-actions';
 import type { WorkspaceFileDiffOpener } from './file-preview';
 import type { OpenTargetsState } from './open-targets';
-import type { WorkspaceOpenTarget } from './workspace';
+import type { ReviewFileSummary, WorkspaceOpenTarget } from './workspace';
 
 /**
  * Review-flow actions shared by the right sidebar header and the Checks panel.
@@ -45,6 +45,11 @@ export interface ReviewFileActions {
 	 * a specific-commit view are not discardable.
 	 */
 	isDiscardable: (filePath: string) => boolean;
+	/**
+	 * Whether the reviewer marked this row viewed at the state it currently shows.
+	 * Takes the whole row because the answer expires when the file changes again.
+	 */
+	isViewed: (file: ReviewFileSummary) => boolean;
 }
 
 /** The changed file a right-click opened the shared menu against. */

@@ -124,6 +124,36 @@
 		var(--ensemblr-if-dark, oklch(0.93 0.004 265));
 	--ensemblr-code-border: var(--ensemblr-if-light, oklch(0.86 0.004 265))
 		var(--ensemblr-if-dark, oklch(0.3 0.004 265));
+	/*
+	 * One rhythm for every code surface in the app — chat code block, file
+	 * viewer, diff viewer, and the diff preview inside a tool row all stack their
+	 * lines on the same row height and read at the same size, so two of them side
+	 * by side look like one component at two densities. Surfaced to Tailwind as
+	 * `leading-code` and `text-code-body`, and read directly by the
+	 * react-diff-view overrides below, so components and this stylesheet cannot
+	 * drift apart. Chat-density surfaces keep `text-xs` on the same row height.
+	 */
+	--ensemblr-code-row: 1.25rem;
+	--ensemblr-code-size: 0.8125rem;
+	/*
+	 * The gutter's padding and the code cell's indent, in character widths.
+	 * Surfaced to Tailwind as the `code-pad` spacing token, so the components
+	 * spend it as `px-code-pad` rather than restating the measurement.
+	 */
+	--ensemblr-code-pad: 1ch;
+	/*
+	 * The app's hairline. Named so a component can add it into a `calc()` — the
+	 * gutter's total indent, for one — without writing a pixel value into a
+	 * Tailwind arbitrary utility, which the class check rejects.
+	 */
+	--ensemblr-hairline: 1px;
+	/*
+	 * Thickness of every scrollbar the app draws, native or Radix-rendered. Read
+	 * by `.sleek-scrollbar` below and, as the `scrollbar` spacing token, by the
+	 * Radix `ScrollBar` primitive, so the two mechanisms cannot end up different
+	 * widths.
+	 */
+	--ensemblr-scrollbar-size: 0.375rem;
 	/* The terminal is a dark panel in both modes, so it takes no second cut. */
 	--ensemblr-terminal: oklch(0.155 0.006 35);
 	--ensemblr-terminal-foreground: oklch(0.88 0.006 75);
@@ -307,6 +337,10 @@
 		-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
 	--font-mono: var(--ensemblr-font-mono);
 	--text-xxs: 0.6875rem;
+	--text-code-body: var(--ensemblr-code-size);
+	--leading-code: var(--ensemblr-code-row);
+	--spacing-code-pad: var(--ensemblr-code-pad);
+	--spacing-scrollbar: var(--ensemblr-scrollbar-size);
 	--color-canvas: var(--ensemblr-canvas);
 	--color-toolbar: var(--ensemblr-toolbar);
 	--color-surface: var(--ensemblr-surface);
@@ -331,6 +365,22 @@
 	--color-diff-deletion-foreground: var(--ensemblr-diff-deletion-foreground);
 	--color-diff-modified: var(--ensemblr-diff-modified);
 	--color-diff-modified-foreground: var(--ensemblr-diff-modified-foreground);
+	/*
+	 * A changed row's fill: the change hue laid over the code surface rather than
+	 * over the window, so the same tint reads identically in a chat row and in a
+	 * full diff panel. Full-strength `diff-addition`/`diff-deletion` stay for the
+	 * gutter cell and word-level edit marks, which need to carry over it.
+	 */
+	--color-diff-addition-surface: color-mix(
+		in oklch,
+		var(--ensemblr-diff-addition) 55%,
+		var(--ensemblr-code)
+	);
+	--color-diff-deletion-surface: color-mix(
+		in oklch,
+		var(--ensemblr-diff-deletion) 55%,
+		var(--ensemblr-code)
+	);
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -516,18 +566,29 @@
 		display: none;
 	}
 
-	/* Thin, overlay-style scrollbar — subtle thumb, no track or buttons. */
-	.sleek-scrollbar {
-		scrollbar-width: thin;
-		scrollbar-color: var(--border) transparent;
-	}
-
+	/*
+	 * The app's one scrollbar: a thin rounded thumb, no track, no buttons, no
+	 * corner. Every scroll container the app styles wears this — the file viewer,
+	 * the diff viewer, the chat blocks — so a scrollbar never announces which
+	 * component it belongs to. The Radix `ScrollBar` primitive restates the same
+	 * width and colours for the overlay scrollbars it draws in JS.
+	 *
+	 * Chromium paints a light square where a horizontal and a vertical bar meet
+	 * unless the corner is cleared, which reads as a chip out of the surface.
+	 *
+	 * Styled through the `::-webkit-scrollbar` pseudo-elements alone: Chromium
+	 * ignores them entirely once `scrollbar-width` or `scrollbar-color` is set, and
+	 * those standard properties can express neither this width nor a hover state.
+	 * The app only ever renders in Chromium, so adding `scrollbar-width: thin` back
+	 * would silently coarsen every bar in the app.
+	 */
 	.sleek-scrollbar::-webkit-scrollbar {
-		width: 0.375rem;
-		height: 0.375rem;
+		width: var(--ensemblr-scrollbar-size);
+		height: var(--ensemblr-scrollbar-size);
 	}
 
-	.sleek-scrollbar::-webkit-scrollbar-track {
+	.sleek-scrollbar::-webkit-scrollbar-track,
+	.sleek-scrollbar::-webkit-scrollbar-corner {
 		background: transparent;
 	}
 
@@ -613,17 +674,65 @@
  */
 .ensemblr-diff {
 	--diff-font-family: var(--font-mono);
-	color: var(--color-foreground);
-	font-size: 0.8125rem;
+	font-size: var(--ensemblr-code-size);
+}
+
+/*
+ * The scroll pane around the diff table. Its inline size is what the inline
+ * comment threads measure with `100cqi` to fill the pane the reader sees rather
+ * than the table, which without word wrap is as wide as its longest line.
+ *
+ * The two declarations belong together: container query units resolve against the
+ * padding box, which does *not* subtract a vertical scrollbar, so `100cqi` came
+ * out one scrollbar too wide and a thread pushed the pane into a few pixels of
+ * horizontal scroll. Reserving the gutter unconditionally makes the two agree —
+ * and stops the code reflowing when the vertical bar appears.
+ */
+.ensemblr-diff-pane {
+	container-type: inline-size;
+	scrollbar-gutter: stable;
+}
+
+/*
+ * Nowrap diffs size the table to its widest line instead of to the scroll
+ * viewport. The library's `table-layout: fixed; width: 100%` pins the table to
+ * the viewport and lets long lines spill past it, so a row's change tint — and
+ * every other painted cell — stopped dead at the fold once the reader scrolled
+ * sideways. Wrapped diffs keep the library sizing: `max-content` over
+ * `pre-wrap` text resolves to the longest unbroken run and would never wrap.
+ */
+.ensemblr-diff.ensemblr-diff-scroll {
+	table-layout: auto;
+	width: max-content;
+	min-width: 100%;
+}
+
+.ensemblr-diff .diff-line {
+	line-height: var(--ensemblr-code-row);
 }
 
 .ensemblr-diff .diff-gutter-col {
-	width: var(--ensemblr-gutter-ch, 3ch);
+	width: var(--ensemblr-gutter-ch, 4ch);
 }
 
+/*
+ * The gutter is the positioning context for the add-comment button, which floats
+ * over the line number instead of replacing it — see `renderAddCommentGutter`.
+ */
 .ensemblr-diff .diff-gutter {
-	color: var(--color-muted-foreground);
-	padding: 0 0.5ch;
+	color: color-mix(in oklch, var(--color-code-foreground) 40%, transparent);
+	cursor: default;
+	padding: 0 var(--ensemblr-code-pad);
+	position: relative;
+}
+
+/*
+ * The gutter that abuts the code carries the same hairline the app's other code
+ * surfaces draw between their line numbers and their content. Selecting it by
+ * position covers unified (one rule, the new-side gutter) and split (both).
+ */
+.ensemblr-diff .diff-gutter:has(+ .diff-code) {
+	border-right: 1px solid var(--color-code-border);
 }
 
 .ensemblr-diff .diff-gutter-insert {
@@ -636,20 +745,18 @@
 	color: var(--color-diff-deletion-foreground);
 }
 
+.ensemblr-diff .diff-code {
+	overflow-wrap: anywhere;
+	padding: 0 1rem 0 var(--ensemblr-code-pad);
+	word-break: normal;
+}
+
 .ensemblr-diff .diff-code-insert {
-	background-color: color-mix(
-		in oklch,
-		var(--color-diff-addition) 55%,
-		var(--color-background)
-	);
+	background-color: var(--color-diff-addition-surface);
 }
 
 .ensemblr-diff .diff-code-delete {
-	background-color: color-mix(
-		in oklch,
-		var(--color-diff-deletion) 55%,
-		var(--color-background)
-	);
+	background-color: var(--color-diff-deletion-surface);
 }
 
 .ensemblr-diff .diff-code-insert .diff-code-edit {
@@ -671,28 +778,13 @@
 }
 
 /*
- * Gap band rendered between two non-adjacent hunks (skipped unchanged lines),
- * marking where one changed block ends and the next begins.
+ * The skipped-lines band and the inline comment threads are React components on
+ * the app's own surfaces, so the decoration and widget cells give up the
+ * library's padding and let those components own their own chrome.
  */
-.ensemblr-diff .diff-decoration-content {
+.ensemblr-diff .diff-decoration-content,
+.ensemblr-diff .diff-widget-content {
 	padding: 0;
-}
-
-.ensemblr-diff-gap {
-	display: flex;
-	align-items: center;
-	gap: 0.5ch;
-	padding: 0.1875rem 1ch;
-	border-top: 1px solid var(--color-border);
-	border-bottom: 1px solid var(--color-border);
-	background-color: color-mix(
-		in oklch,
-		var(--color-muted) 45%,
-		var(--color-background)
-	);
-	color: var(--color-muted-foreground);
-	font-family: var(--font-sans);
-	font-size: 0.75rem;
 }
 
 /*

@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useRouter } from '@tanstack/react-router';
+import { useSetAtom } from 'jotai';
 import { useCallback } from 'react';
 
 import { invalidateWorkspaceListViews } from '@/renderer/api/ensemblr';
+import { forgetWorkspaceViewedChangesAtom } from '@/renderer/state/workspace';
 import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
 
 /**
@@ -19,10 +21,12 @@ export function useRemoveWorkspaceAction(options: {
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 	const router = useRouter();
+	const forgetViewedChanges = useSetAtom(forgetWorkspaceViewedChangesAtom);
 
 	return useCallback(
 		async (removedWorkspaceId: string) => {
 			deleteLastUsedOpenTarget(removedWorkspaceId);
+			forgetViewedChanges(removedWorkspaceId);
 
 			if (activeWorkspaceId === removedWorkspaceId) {
 				await navigate({ replace: true, to: '/' });
@@ -31,6 +35,6 @@ export function useRemoveWorkspaceAction(options: {
 			await invalidateWorkspaceListViews(queryClient);
 			await router.invalidate();
 		},
-		[activeWorkspaceId, navigate, queryClient, router],
+		[activeWorkspaceId, forgetViewedChanges, navigate, queryClient, router],
 	);
 }

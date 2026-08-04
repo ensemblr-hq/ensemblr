@@ -91,6 +91,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				reviewFiles: [
 					{
 						additions: 220,
+						contentId: null,
 						deletions: 34,
 						id: 'renderer-app',
 						path: 'src/renderer/components/app.tsx',
@@ -98,6 +99,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					},
 					{
 						additions: 280,
+						contentId: null,
 						deletions: 0,
 						id: 'workbench-shell',
 						path: 'src/renderer/components/workbench-shell.tsx',
@@ -105,6 +107,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					},
 					{
 						additions: 96,
+						contentId: null,
 						deletions: 0,
 						id: 'workbench-fixtures',
 						path: 'src/renderer/fixtures/workbench/projects.ts',
@@ -112,6 +115,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					},
 					{
 						additions: 34,
+						contentId: null,
 						deletions: 8,
 						id: 'main',
 						path: 'src/renderer/main.tsx',
@@ -303,6 +307,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 				reviewFiles: [
 					{
 						additions: 18,
+						contentId: null,
 						deletions: 3,
 						id: 'right-sidebar-header',
 						path: 'src/renderer/components/workbench-shell.tsx',

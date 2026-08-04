@@ -19,6 +19,21 @@ const COMMENT_SUBMIT_HINT = formatShortcut('diffComment.submit');
  * Inline comment thread mounted under a diff line: renders existing local and
  * GitHub/bot comments and, when the composer is open, an editor to add a new
  * local comment. GitHub and bot comments are read-only.
+ *
+ * Sized to the viewer's pane rather than to the row it hangs under: the widget
+ * cell spans a diff table that, without word wrap, is as wide as its longest
+ * line, so a thread laid out normally would run far past the visible pane and
+ * only be reachable by scrolling sideways. `100cqi` measures the `.ensemblr-diff-pane`
+ * scroll container — the width the reader actually sees, in both wrap modes —
+ * and `sticky left-0` keeps the thread at the near edge of that pane however far
+ * the code behind it is scrolled.
+ *
+ * Wears the same band recipe as `CodeHunkGap` — the app's other chrome mounted
+ * between two code rows — so the two read as one language: the code border's
+ * hairline, the muted fill, and the sans face the whole thread inherits. Prose
+ * and controls are not code, and the diff pane sets `font-mono` on everything
+ * beneath it, so without that face the placeholder and the buttons come out in
+ * the code face.
  */
 export function DiffCommentThread({
 	comments,
@@ -36,7 +51,7 @@ export function DiffCommentThread({
 	onSubmit: (body: string) => void;
 }) {
 	return (
-		<div className='flex flex-col gap-1.5 border-border border-y bg-muted/20 px-4 py-2'>
+		<div className='sticky left-0 flex w-[100cqi] flex-col gap-1.5 border-code-border border-y bg-muted/40 px-3 py-2 font-sans'>
 			{comments.map((comment) => (
 				<DiffCommentRow
 					comment={comment}
@@ -64,7 +79,7 @@ function DiffCommentRow({
 }) {
 	const isLocal = comment.source === 'local';
 	return (
-		<div className='flex items-start justify-between gap-2 rounded-md border border-border bg-background px-2.5 py-1.5'>
+		<div className='flex items-start justify-between gap-2 rounded-md border border-code-border bg-background px-2.5 py-1.5'>
 			<div className='min-w-0 flex-1'>
 				<div className='flex items-center gap-2 text-xxs'>
 					<SourceBadge source={comment.source} />
@@ -157,7 +172,14 @@ function SourceBadge({ source }: { source: DiffCommentSource }) {
 	);
 }
 
-/** Textarea composer for adding a new local comment on a diff line. */
+/**
+ * Textarea composer for adding a new local comment on a diff line.
+ *
+ * Carries no frame of its own: the thread band around it is the frame, and a
+ * bordered card inside a bordered band inside a bordered input stacked three
+ * outlines deep. The input is the only edge, sized and cornered like the app's
+ * code surfaces.
+ */
 function DiffCommentComposer({
 	onCancel,
 	onSubmit,
@@ -175,11 +197,11 @@ function DiffCommentComposer({
 	};
 
 	return (
-		<div className='flex flex-col gap-1.5 rounded-md border border-border bg-background p-2'>
+		<div className='flex flex-col gap-1.5'>
 			<Textarea
 				autoFocus
 				aria-label='New line comment'
-				className='min-h-14 text-xs'
+				className='min-h-14 resize-none rounded-md bg-background text-xs md:text-xs'
 				onChange={(event) => setBody(event.target.value)}
 				onKeyDown={(event) => {
 					if (event.key === 'Escape') {

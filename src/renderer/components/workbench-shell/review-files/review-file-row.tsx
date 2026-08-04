@@ -1,7 +1,7 @@
 import { Icon } from '@iconify/react';
 import {
+	CheckIcon,
 	ChevronDownIcon,
-	CopyIcon,
 	DotSquareIcon,
 	MinusSquareIcon,
 	PlusSquareIcon,
@@ -9,20 +9,14 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
+import { FilePathLabel } from '@/renderer/components/file-path-label';
 import { Button } from '@/renderer/components/ui/button';
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownMenuTrigger,
-} from '@/renderer/components/ui/dropdown-menu';
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
-import { OpenTargetIcon } from '@/renderer/components/workbench-shell/open-target-icon';
+import { OpenInFileMenu } from '@/renderer/components/workbench-shell/open-in-file-menu';
 import { cn } from '@/renderer/lib/utils';
 import {
 	fileTreeIndentClassName,
@@ -43,7 +37,8 @@ const fileStatusLabel: Record<ReviewFileSummary['status'], string> = {
 /**
  * Single changed-file row. Click (or the trailing open-diff icon) opens the
  * working-tree diff. On hover — or while its open-in menu is open — the trailing
- * +/- stats swap for a Discard button and an "Open in" dropdown.
+ * +/- stats swap for a Discard button and an "Open in" dropdown. A row marked
+ * viewed in the diff toolbar dims until the file changes again.
  */
 export function ReviewFileRow({
 	ariaLevel,
@@ -61,6 +56,7 @@ export function ReviewFileRow({
 		copyTarget,
 		invokeTarget,
 		isDiscardable,
+		isViewed,
 		onDiscardFile,
 		openDiff,
 		openInTargets,
@@ -70,6 +66,7 @@ export function ReviewFileRow({
 	const fileName = getReviewFileName(file.path);
 	const hasOpenInMenu = openInTargets.length > 0 || Boolean(copyTarget);
 	const canDiscard = isDiscardable(file.path);
+	const viewed = isViewed(file);
 	const openThisDiff = openDiff ? () => openDiff(file.path) : undefined;
 
 	return (
@@ -77,6 +74,10 @@ export function ReviewFileRow({
 			className={cn(
 				'group relative flex h-8 w-full items-center rounded-md pr-1.5 hover:bg-muted',
 				isMenuOpen && 'bg-muted',
+				// Dim the whole row rather than its text so the file icon and status
+				// mark recede with it, and lift it back on hover so a reviewer
+				// returning to a signed-off file can still read it.
+				viewed && 'opacity-50 hover:opacity-100',
 				fileTreeIndentClassName(level),
 			)}
 			data-row-kind='file'
@@ -99,7 +100,7 @@ export function ReviewFileRow({
 					icon={getWorkspaceFileIconName({ kind: 'file', name: fileName })}
 				/>
 				{showPath ? (
-					<ReviewFilePath path={file.path} />
+					<FilePathLabel path={file.path} />
 				) : (
 					<span className='min-w-0 truncate'>{fileName}</span>
 				)}
@@ -110,6 +111,13 @@ export function ReviewFileRow({
 					isMenuOpen ? 'hidden' : 'flex group-hover:hidden',
 				)}
 			>
+				{viewed ? (
+					<CheckIcon
+						aria-label='Viewed'
+						className='size-3.5 shrink-0 text-muted-foreground'
+						role='img'
+					/>
+				) : null}
 				<ReviewFileStats file={file} />
 				<ReviewFileStatusMark status={file.status} />
 			</div>
@@ -136,105 +144,25 @@ export function ReviewFileRow({
 					</Tooltip>
 				) : null}
 				{hasOpenInMenu ? (
-					<ReviewFileOpenInMenu
+					<OpenInFileMenu
 						copyTarget={copyTarget}
 						filePath={file.path}
 						invokeTarget={invokeTarget}
 						onOpenChange={setIsMenuOpen}
 						openInTargets={openInTargets}
-					/>
+					>
+						<Button
+							aria-label={`Open ${file.path} in…`}
+							className='text-muted-foreground hover:text-foreground'
+							size='icon-xs'
+							variant='ghost'
+						>
+							<ChevronDownIcon />
+						</Button>
+					</OpenInFileMenu>
 				) : null}
 			</div>
 		</div>
-	);
-}
-
-/** Trailing "Open in <app>" dropdown shown on row hover. */
-function ReviewFileOpenInMenu({
-	copyTarget,
-	filePath,
-	invokeTarget,
-	onOpenChange,
-	openInTargets,
-}: {
-	copyTarget: ReturnType<typeof useReviewFileActions>['copyTarget'];
-	filePath: string;
-	invokeTarget: ReturnType<typeof useReviewFileActions>['invokeTarget'];
-	onOpenChange: (open: boolean) => void;
-	openInTargets: ReturnType<typeof useReviewFileActions>['openInTargets'];
-}) {
-	const invoke = (target: Parameters<typeof invokeTarget>[0]) =>
-		void invokeTarget(target, {
-			relativePath: filePath,
-			relativePathKind: 'file',
-		});
-
-	return (
-		<DropdownMenu onOpenChange={onOpenChange}>
-			<DropdownMenuTrigger asChild>
-				<Button
-					aria-label={`Open ${filePath} in…`}
-					className='text-muted-foreground hover:text-foreground'
-					size='icon-xs'
-					variant='ghost'
-				>
-					<ChevronDownIcon />
-				</Button>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent align='end' className='w-56 bg-muted p-1'>
-				{openInTargets.map((openTarget) => (
-					<DropdownMenuItem
-						className='h-8 gap-2.5 px-2 text-[0.8125rem]'
-						key={openTarget.id}
-						onSelect={() => invoke(openTarget)}
-					>
-						<OpenTargetIcon className='size-4' target={openTarget} />
-						<span className='min-w-0 flex-1 truncate'>{openTarget.label}</span>
-						<span className='w-3.5 shrink-0 text-right text-muted-foreground text-xs tabular-nums'>
-							{openTarget.numberShortcutLabel}
-						</span>
-					</DropdownMenuItem>
-				))}
-				{copyTarget ? (
-					<>
-						{openInTargets.length ? (
-							<DropdownMenuSeparator className='my-1' />
-						) : null}
-						<DropdownMenuItem
-							className='h-8 gap-2.5 px-2 text-[0.8125rem]'
-							onSelect={() => invoke(copyTarget)}
-						>
-							<CopyIcon
-								aria-hidden='true'
-								className='size-4 text-muted-foreground'
-							/>
-							<span className='min-w-0 flex-1'>Copy path</span>
-						</DropdownMenuItem>
-					</>
-				) : null}
-			</DropdownMenuContent>
-		</DropdownMenu>
-	);
-}
-
-/**
- * Renders a file path with a dimmed directory prefix. When the row is too narrow
- * the directory truncates (ellipsis) while the file name stays fully visible —
- * the name is what identifies the change, so it never gets clipped first.
- */
-function ReviewFilePath({ path }: { path: string }) {
-	const directory = getReviewFileDirectory(path);
-	const fileName = getReviewFileName(path);
-
-	return (
-		<span className='flex min-w-0 items-center overflow-hidden'>
-			{directory ? (
-				<span className='min-w-0 truncate text-muted-foreground'>
-					{directory}/
-				</span>
-			) : null}
-			<span className='shrink-0'>{fileName}</span>
-		</span>
 	);
 }
 
@@ -309,13 +237,6 @@ function ReviewFileStatusMark({
 			role='img'
 		/>
 	);
-}
-
-/** Returns the parent-directory portion of a file path, or `''` when none. */
-function getReviewFileDirectory(path: string) {
-	const lastSeparatorIndex = path.lastIndexOf('/');
-
-	return lastSeparatorIndex === -1 ? '' : path.slice(0, lastSeparatorIndex);
 }
 
 /** Returns the basename portion of a file path. */

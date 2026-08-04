@@ -30,7 +30,11 @@ function renderPreview() {
 	});
 
 	const rendered = renderWithProviders(
-		<FilePreviewPanel filePath={filePath} workspaceCwd={workspaceCwd} />,
+		<FilePreviewPanel
+			filePath={filePath}
+			workspaceCwd={workspaceCwd}
+			workspaceId='workspace-1'
+		/>,
 		{ client },
 	);
 	const pre = rendered.container.querySelector('pre');
