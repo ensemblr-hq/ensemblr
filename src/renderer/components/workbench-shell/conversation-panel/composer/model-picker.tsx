@@ -1,6 +1,5 @@
-import { useAtom, useAtomValue } from 'jotai';
 import { CheckIcon, SparklesIcon, StarIcon } from 'lucide-react';
-import { type CSSProperties, useCallback, useMemo, useState } from 'react';
+import { type CSSProperties, useMemo, useState } from 'react';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Popover,
@@ -14,13 +13,8 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
-import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { useModelPickerState } from '@/renderer/hooks/workbench-shell/composer/use-model-picker-state';
 import { cn } from '@/renderer/lib/utils';
-import { buildModelGroups } from '@/renderer/lib/workbench/model-picker-groups';
-import {
-	favouriteModelsAtom,
-	hiddenModelsAtom,
-} from '@/renderer/state/preferences';
 import type {
 	ComposerModelOption,
 	GroupedOptions,
@@ -41,13 +35,6 @@ interface ModelPickerProps {
 	open?: boolean;
 	options: readonly ComposerModelOption[];
 	value: string | null;
-}
-
-/** Builds keyboard shortcut indices for displayed model rows. */
-function buildShortcutIndexById(
-	models: readonly ComposerModelOption[],
-): ReadonlyMap<string, number> {
-	return new Map(models.map((model, index) => [model.id, index + 1]));
 }
 
 /** Estimates content height so Radix ScrollArea receives a definite height. */
@@ -187,68 +174,28 @@ export function ModelPicker({
 	options,
 	value,
 }: ModelPickerProps) {
-	const [internalOpen, setInternalOpen] = useState(false);
 	const [tooltipOpen, setTooltipOpen] = useState(false);
-	const open = controlledOpen ?? internalOpen;
-	const setOpen = useCallback(
-		(next: boolean) => {
-			if (controlledOpen === undefined) {
-				setInternalOpen(next);
-			}
-			onOpenChange?.(next);
-		},
-		[controlledOpen, onOpenChange],
-	);
-	const [favourites, setFavourites] = useAtom(favouriteModelsAtom);
-	const hidden = useAtomValue(hiddenModelsAtom);
-	const favouriteIds = useMemo(() => new Set(favourites), [favourites]);
-	const toggleFavourite = useCallback(
-		(modelId: string) => {
-			setFavourites((prev) =>
-				prev.includes(modelId)
-					? prev.filter((id) => id !== modelId)
-					: [...prev, modelId],
-			);
-		},
-		[setFavourites],
-	);
-	const groups = useMemo(
-		() => buildModelGroups(options, favourites, hidden),
-		[options, favourites, hidden],
-	);
-	// Every model is hidden: the catalog isn't empty but the list is. The
-	// `options.length === 0` guard below won't catch this, so the popover renders
-	// a hint instead of a zero-height scroll box.
-	const allHidden = options.length > 0 && groups.length === 0;
-	const orderedShortcuts = useMemo(
-		() => groups.flatMap((group) => group.models),
-		[groups],
-	);
-	const shortcutIndexById = useMemo(
-		() => buildShortcutIndexById(orderedShortcuts),
-		[orderedShortcuts],
-	);
+	const {
+		allHidden,
+		favouriteIds,
+		groups,
+		open,
+		selectModel,
+		selected,
+		setOpen,
+		shortcutIndexById,
+		toggleFavourite,
+	} = useModelPickerState({
+		controlledOpen,
+		onChange,
+		onOpenChange,
+		options,
+		value,
+	});
 	const scrollAreaStyle = useMemo<CSSProperties>(
 		() => ({ height: getMenuHeight(groups) }),
 		[groups],
 	);
-	const selected = options.find((option) => option.id === value) ?? null;
-
-	const handleDigitShortcut = useCallback(
-		(event: KeyboardEvent) => {
-			const index = Number.parseInt(event.key, 10) - 1;
-			const target = orderedShortcuts[index];
-			if (!target) {
-				return;
-			}
-			onChange(target.id);
-			setOpen(false);
-		},
-		[onChange, orderedShortcuts, setOpen],
-	);
-	useHotkey('modelPicker.selectByIndex', handleDigitShortcut, {
-		enabled: open,
-	});
 
 	if (options.length === 0) {
 		return (
@@ -294,10 +241,7 @@ export function ModelPicker({
 						<ModelOptionsList
 							favouriteIds={favouriteIds}
 							groups={groups}
-							onSelect={(modelId) => {
-								onChange(modelId);
-								setOpen(false);
-							}}
+							onSelect={selectModel}
 							onToggleFavourite={toggleFavourite}
 							selectedId={selected?.id ?? null}
 							shortcutIndexById={shortcutIndexById}

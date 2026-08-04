@@ -95,64 +95,19 @@ export function createRenameWorkspaceService({
 				});
 			}
 
-			// Race guard for automatic branch-naming: re-check the placeholder gate
-			// against the freshly-read row, synchronously before any await, so a
-			// user rename that landed since the caller's pre-flight check wins and
-			// this attempt no-ops instead of clobbering it.
-			if (
-				request.requirePlaceholderName &&
-				!placeholderRenameEligible(source.metadataJson)
-			) {
+			const plan = planRename({ database, request, source });
+			if (plan.kind === 'no-op') {
 				return noOpResult(source, now);
 			}
-
-			const nextName = normalizeName(request.name, source.name);
-			const nameDiagnostic = validateWorkspaceName(nextName);
-			if (nameDiagnostic) {
-				return failure(nameDiagnostic);
-			}
-
-			const isNameChanging = nextName !== source.name;
-			// When the caller does not provide an explicit branchName but the name
-			// is changing, slugify the new name and use it as the branch — keeps
-			// the workspace label and its branch in sync without an extra prompt.
-			const explicitBranch = normalizeBranchName(request.branchName);
-			const derivedBranch =
-				explicitBranch === null && isNameChanging
-					? toRenameSlug(nextName)
-					: null;
-			const nextBranch = explicitBranch ?? derivedBranch;
-			const branchDiagnostic = nextBranch
-				? validateBranchName(nextBranch)
-				: null;
-			if (branchDiagnostic) {
-				return failure(branchDiagnostic);
-			}
-
-			const isBranchChanging =
-				nextBranch !== null && nextBranch !== source.branchName;
-
-			if (!isBranchChanging && !isNameChanging) {
-				return noOpResult(source, now);
-			}
-
-			if (
-				isNameChanging &&
-				nameCollidesInRepository(database, source, nextName)
-			) {
-				return failure({
-					code: 'name-already-in-use',
-					message:
-						'Another workspace in this repository already uses that name.',
-					severity: 'error',
-				});
+			if (plan.kind === 'reject') {
+				return failure(plan.diagnostic);
 			}
 
 			let branchRenamed = false;
-			if (isBranchChanging && nextBranch && source.branchName) {
+			if (plan.isBranchChanging && plan.nextBranch && source.branchName) {
 				const diagnostic = await runBranchRename({
 					localCommandService,
-					newBranch: nextBranch,
+					newBranch: plan.nextBranch,
 					oldBranch: source.branchName,
 					repositoryPath: source.repositoryPath,
 				});
@@ -163,35 +118,23 @@ export function createRenameWorkspaceService({
 			}
 
 			const timestamp = now().toISOString();
-			const resolvedBranchName = isBranchChanging
-				? nextBranch
+			const resolvedBranchName = plan.isBranchChanging
+				? plan.nextBranch
 				: source.branchName;
-			try {
-				updateWorkspaceRow({
-					branchName: resolvedBranchName,
-					database,
-					id: source.id,
-					metadataJson: source.metadataJson,
-					name: nextName,
-					timestamp,
-				});
-			} catch (error) {
-				if (branchRenamed && source.branchName && nextBranch) {
-					await runBranchRename({
-						localCommandService,
-						newBranch: source.branchName,
-						oldBranch: nextBranch,
-						repositoryPath: source.repositoryPath,
-					});
-				}
-				return failure({
-					code: 'workspace-update-failed',
-					message:
-						error instanceof Error
-							? error.message
-							: 'Failed to write the rename to SQLite.',
-					severity: 'error',
-				});
+			const writeDiagnostic = await writeRenamedRow({
+				branchName: resolvedBranchName,
+				database,
+				localCommandService,
+				name: plan.nextName,
+				rollbackBranch:
+					branchRenamed && source.branchName && plan.nextBranch
+						? { from: plan.nextBranch, to: source.branchName }
+						: null,
+				source,
+				timestamp,
+			});
+			if (writeDiagnostic) {
+				return failure(writeDiagnostic);
 			}
 
 			const workspace: CreatedWorkspaceSnapshot = {
@@ -201,7 +144,7 @@ export function createRenameWorkspaceService({
 				createdAt: source.createdAt,
 				id: source.id,
 				metadata: parseMetadata(source.metadataJson),
-				name: nextName,
+				name: plan.nextName,
 				path: source.path,
 				repositoryId: source.repositoryId,
 				slug: source.slug,
@@ -215,6 +158,146 @@ export function createRenameWorkspaceService({
 			};
 		},
 	};
+}
+
+/**
+ * What a validated rename request resolves to: the name and branch to write, a
+ * request that changes nothing, or a diagnostic that rejects it.
+ */
+type RenamePlan =
+	| {
+			kind: 'apply';
+			isBranchChanging: boolean;
+			nextBranch: string | null;
+			nextName: string;
+	  }
+	| { kind: 'no-op' }
+	| { kind: 'reject'; diagnostic: RenameWorkspaceDiagnostic };
+
+/**
+ * Validate a rename request against the stored row and resolve the name and
+ * branch it should land on.
+ * @param database - Open database handle, used for the name-collision check
+ * @param request - The incoming rename request
+ * @param source - The workspace row as it currently stands
+ * @returns The plan to apply, or the reason the rename does nothing
+ */
+function planRename({
+	database,
+	request,
+	source,
+}: {
+	database: DatabaseSync;
+	request: RenameWorkspaceRequest;
+	source: SourceWorkspace;
+}): RenamePlan {
+	// Race guard for automatic branch-naming: re-check the placeholder gate
+	// against the freshly-read row, synchronously before any await, so a user
+	// rename that landed since the caller's pre-flight check wins and this
+	// attempt no-ops instead of clobbering it.
+	if (
+		request.requirePlaceholderName &&
+		!placeholderRenameEligible(source.metadataJson)
+	) {
+		return { kind: 'no-op' };
+	}
+
+	const nextName = normalizeName(request.name, source.name);
+	const nameDiagnostic = validateWorkspaceName(nextName);
+	if (nameDiagnostic) {
+		return { diagnostic: nameDiagnostic, kind: 'reject' };
+	}
+
+	const isNameChanging = nextName !== source.name;
+	// When the caller does not provide an explicit branchName but the name is
+	// changing, slugify the new name and use it as the branch — keeps the
+	// workspace label and its branch in sync without an extra prompt.
+	const explicitBranch = normalizeBranchName(request.branchName);
+	const derivedBranch =
+		explicitBranch === null && isNameChanging ? toRenameSlug(nextName) : null;
+	const nextBranch = explicitBranch ?? derivedBranch;
+	const branchDiagnostic = nextBranch ? validateBranchName(nextBranch) : null;
+	if (branchDiagnostic) {
+		return { diagnostic: branchDiagnostic, kind: 'reject' };
+	}
+
+	const isBranchChanging =
+		nextBranch !== null && nextBranch !== source.branchName;
+	if (!isBranchChanging && !isNameChanging) {
+		return { kind: 'no-op' };
+	}
+
+	if (isNameChanging && nameCollidesInRepository(database, source, nextName)) {
+		return {
+			diagnostic: {
+				code: 'name-already-in-use',
+				message: 'Another workspace in this repository already uses that name.',
+				severity: 'error',
+			},
+			kind: 'reject',
+		};
+	}
+
+	return { isBranchChanging, kind: 'apply', nextBranch, nextName };
+}
+
+/**
+ * Persist the renamed row, undoing an already-applied git branch rename when
+ * the write fails so the branch and the database stay in agreement.
+ * @param branchName - Branch the row should end on
+ * @param database - Open database handle
+ * @param localCommandService - Command runner used for the rollback git call
+ * @param name - Display name the row should end on
+ * @param rollbackBranch - Branch rename to undo on failure, or null when none was applied
+ * @param source - The workspace row as it currently stands
+ * @param timestamp - Rename timestamp written to the row
+ * @returns A diagnostic when the write failed, or null on success
+ */
+async function writeRenamedRow({
+	branchName,
+	database,
+	localCommandService,
+	name,
+	rollbackBranch,
+	source,
+	timestamp,
+}: {
+	branchName: string | null;
+	database: DatabaseSync;
+	localCommandService: LocalCommandService;
+	name: string;
+	rollbackBranch: { from: string; to: string } | null;
+	source: SourceWorkspace;
+	timestamp: string;
+}): Promise<RenameWorkspaceDiagnostic | null> {
+	try {
+		updateWorkspaceRow({
+			branchName,
+			database,
+			id: source.id,
+			metadataJson: source.metadataJson,
+			name,
+			timestamp,
+		});
+		return null;
+	} catch (error) {
+		if (rollbackBranch) {
+			await runBranchRename({
+				localCommandService,
+				newBranch: rollbackBranch.to,
+				oldBranch: rollbackBranch.from,
+				repositoryPath: source.repositoryPath,
+			});
+		}
+		return {
+			code: 'workspace-update-failed',
+			message:
+				error instanceof Error
+					? error.message
+					: 'Failed to write the rename to SQLite.',
+			severity: 'error',
+		};
+	}
 }
 
 /**

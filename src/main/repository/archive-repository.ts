@@ -118,20 +118,22 @@ export function createArchiveRepositoryService({
 			const archivedAt = now().toISOString();
 			const diagnostics: ArchiveRepositoryDiagnostic[] = [];
 
+			const lifecycleContext = {
+				archivedAt,
+				archivedContextPath: null,
+				branchCleanup,
+				repository: {
+					id: source.id,
+					name: source.name,
+					path: source.path,
+					slug: source.slug,
+				},
+				workspace: null,
+			};
+
 			const preHookOutcome = await archiveLifecycleService.invoke(
 				'pre-archive-repository',
-				{
-					archivedAt,
-					archivedContextPath: null,
-					branchCleanup,
-					repository: {
-						id: source.id,
-						name: source.name,
-						path: source.path,
-						slug: source.slug,
-					},
-					workspace: null,
-				},
+				lifecycleContext,
 			);
 			pushLifecycleDiagnostics(diagnostics, preHookOutcome.diagnostics);
 
@@ -152,45 +154,16 @@ export function createArchiveRepositoryService({
 				};
 			}
 
-			const archivedWorkspaceIds: string[] = [];
-			let workspacesArchived = 0;
-			let cascadeFailed = false;
+			const cascade = await archiveChildWorkspaces({
+				archiveWorkspaceService,
+				branchCleanup,
+				diagnostics,
+				reason,
+				workspaces: source.workspaces,
+			});
+			const { archivedWorkspaceIds, workspacesArchived } = cascade;
 
-			for (const workspace of source.workspaces) {
-				if (workspace.archivedAt) {
-					archivedWorkspaceIds.push(workspace.id);
-					continue;
-				}
-				const workspaceResult = await archiveWorkspaceService.archive({
-					branchCleanup,
-					workspaceId: workspace.id,
-					...(reason ? { reason } : {}),
-				});
-
-				for (const diagnostic of workspaceResult.diagnostics) {
-					diagnostics.push({
-						code:
-							diagnostic.code === 'workspace-update-failed'
-								? 'workspace-archive-failed'
-								: 'workspace-archive-failed',
-						message: `Workspace "${workspace.name}": ${diagnostic.message}`,
-						path: diagnostic.path,
-						severity: diagnostic.severity,
-						workspaceId: workspace.id,
-					});
-				}
-
-				if (workspaceResult.status === 'success') {
-					archivedWorkspaceIds.push(workspace.id);
-					workspacesArchived += 1;
-					continue;
-				}
-
-				cascadeFailed = true;
-				break;
-			}
-
-			if (cascadeFailed) {
+			if (cascade.failed) {
 				return {
 					archiveRecordId: null,
 					diagnostics,
@@ -231,18 +204,7 @@ export function createArchiveRepositoryService({
 
 			const postHookOutcome = await archiveLifecycleService.invoke(
 				'post-archive-repository',
-				{
-					archivedAt,
-					archivedContextPath: null,
-					branchCleanup,
-					repository: {
-						id: source.id,
-						name: source.name,
-						path: source.path,
-						slug: source.slug,
-					},
-					workspace: null,
-				},
+				lifecycleContext,
 			);
 			pushLifecycleDiagnostics(diagnostics, postHookOutcome.diagnostics);
 
@@ -264,6 +226,71 @@ export function createArchiveRepositoryService({
 			};
 		},
 	};
+}
+
+/**
+ * Cascade the archive across a repository's workspaces, stopping at the first
+ * one that fails so a partial cascade is reported rather than pushed further.
+ * @param archiveWorkspaceService - Service each live workspace is funnelled through
+ * @param branchCleanup - Whether the request opted into branch cleanup
+ * @param diagnostics - Collector the repository result reports through
+ * @param reason - Archive reason forwarded to each workspace, if any
+ * @param workspaces - The repository's workspace children
+ * @returns The workspaces now archived, how many this run archived, and whether the cascade failed
+ */
+async function archiveChildWorkspaces({
+	archiveWorkspaceService,
+	branchCleanup,
+	diagnostics,
+	reason,
+	workspaces,
+}: {
+	archiveWorkspaceService: ArchiveWorkspaceService;
+	branchCleanup: boolean;
+	diagnostics: ArchiveRepositoryDiagnostic[];
+	reason: string | null;
+	workspaces: readonly SourceWorkspace[];
+}): Promise<{
+	archivedWorkspaceIds: string[];
+	failed: boolean;
+	workspacesArchived: number;
+}> {
+	const archivedWorkspaceIds: string[] = [];
+	let workspacesArchived = 0;
+
+	for (const workspace of workspaces) {
+		if (workspace.archivedAt) {
+			archivedWorkspaceIds.push(workspace.id);
+			continue;
+		}
+		// Archives stay sequential: each one runs destructive git steps in the
+		// same repository, which contend on the index and packed-refs locks.
+		// oxlint-disable-next-line react-doctor/async-await-in-loop
+		const workspaceResult = await archiveWorkspaceService.archive({
+			branchCleanup,
+			workspaceId: workspace.id,
+			...(reason ? { reason } : {}),
+		});
+
+		for (const diagnostic of workspaceResult.diagnostics) {
+			diagnostics.push({
+				code: 'workspace-archive-failed',
+				message: `Workspace "${workspace.name}": ${diagnostic.message}`,
+				path: diagnostic.path,
+				severity: diagnostic.severity,
+				workspaceId: workspace.id,
+			});
+		}
+
+		if (workspaceResult.status !== 'success') {
+			return { archivedWorkspaceIds, failed: true, workspacesArchived };
+		}
+
+		archivedWorkspaceIds.push(workspace.id);
+		workspacesArchived += 1;
+	}
+
+	return { archivedWorkspaceIds, failed: false, workspacesArchived };
 }
 
 /**

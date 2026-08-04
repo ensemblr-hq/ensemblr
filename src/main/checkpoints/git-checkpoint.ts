@@ -72,32 +72,12 @@ export async function captureWorkspaceCheckpoint({
 
 	await runGit({ args: ['rev-parse', '--git-dir'], cwd, step: 'verify-repo' });
 
-	const indexDirectory = await mkdtemp(
-		path.join(tmpdir(), 'ensemblr-checkpoint-'),
-	);
-	const indexEnv = {
-		...GIT_IDENTITY_ENV,
-		GIT_INDEX_FILE: path.join(indexDirectory, 'index'),
-	};
+	return await withTemporaryIndex(async (indexEnv) => {
+		const [treeHash, parentHash] = await Promise.all([
+			writeWorkingTree({ cwd, indexEnv }),
+			resolveHeadCommit(cwd),
+		]);
 
-	try {
-		// Stage the entire working tree into the temporary index. `add -A`
-		// includes untracked files and records deletions; ignored files stay out.
-		await runGit({
-			args: ['add', '-A', '--', '.'],
-			cwd,
-			env: indexEnv,
-			step: 'stage-working-tree',
-		});
-
-		const treeHash = await runGit({
-			args: ['write-tree'],
-			cwd,
-			env: indexEnv,
-			step: 'write-tree',
-		});
-
-		const parentHash = await resolveHeadCommit(cwd);
 		const commitArgs = ['commit-tree', treeHash, '-m', message];
 		if (parentHash) {
 			commitArgs.push('-p', parentHash);
@@ -116,9 +96,58 @@ export async function captureWorkspaceCheckpoint({
 		});
 
 		return { commitHash, ref, treeHash };
+	});
+}
+
+/**
+ * Run `body` against a throwaway git index file so the user's real index is
+ * never touched, removing the temporary directory once it settles.
+ * @param body - Receives the environment overlay pointing git at the temporary index
+ * @returns Whatever `body` resolves to
+ */
+async function withTemporaryIndex<T>(
+	body: (indexEnv: Record<string, string>) => Promise<T>,
+): Promise<T> {
+	const indexDirectory = await mkdtemp(
+		path.join(tmpdir(), 'ensemblr-checkpoint-'),
+	);
+	try {
+		return await body({
+			...GIT_IDENTITY_ENV,
+			GIT_INDEX_FILE: path.join(indexDirectory, 'index'),
+		});
 	} finally {
 		await rm(indexDirectory, { force: true, recursive: true });
 	}
+}
+
+/**
+ * Stage the whole working tree into the temporary index and write it out as a
+ * tree object. `add -A` includes untracked files and records deletions, while
+ * ignored files stay out.
+ * @param cwd - Workspace directory to stage
+ * @param indexEnv - Environment overlay pointing git at the temporary index
+ * @returns Hash of the written tree object
+ */
+async function writeWorkingTree({
+	cwd,
+	indexEnv,
+}: {
+	cwd: string;
+	indexEnv: Record<string, string>;
+}): Promise<string> {
+	await runGit({
+		args: ['add', '-A', '--', '.'],
+		cwd,
+		env: indexEnv,
+		step: 'stage-working-tree',
+	});
+	return await runGit({
+		args: ['write-tree'],
+		cwd,
+		env: indexEnv,
+		step: 'write-tree',
+	});
 }
 
 /**
@@ -128,29 +157,9 @@ export async function captureWorkspaceCheckpoint({
  * exists yet.
  */
 export async function snapshotWorkingTree(cwd: string): Promise<string> {
-	const indexDirectory = await mkdtemp(
-		path.join(tmpdir(), 'ensemblr-checkpoint-'),
+	return await withTemporaryIndex((indexEnv) =>
+		writeWorkingTree({ cwd, indexEnv }),
 	);
-	const indexEnv = {
-		...GIT_IDENTITY_ENV,
-		GIT_INDEX_FILE: path.join(indexDirectory, 'index'),
-	};
-	try {
-		await runGit({
-			args: ['add', '-A', '--', '.'],
-			cwd,
-			env: indexEnv,
-			step: 'stage-working-tree',
-		});
-		return await runGit({
-			args: ['write-tree'],
-			cwd,
-			env: indexEnv,
-			step: 'write-tree',
-		});
-	} finally {
-		await rm(indexDirectory, { force: true, recursive: true });
-	}
 }
 
 /** A single file's change within a git diff, with per-file line counts and status. */

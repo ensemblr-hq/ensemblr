@@ -113,6 +113,16 @@ interface AgentControlServiceOptions {
 	scheduler?: WaitScheduler;
 }
 
+/**
+ * Runs one control op. Args arrive pre-validated against the op's schema, so a
+ * handler may cast them to its own argument shape.
+ */
+type OpHandler = (input: {
+	args: unknown;
+	callerModel: string | undefined;
+	origin: AgentControlOrigin;
+}) => Promise<AgentControlResult<unknown>> | AgentControlResult<unknown>;
+
 /** Session statuses that mean a Pi child has stopped working. */
 const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
 	'idle',
@@ -1008,140 +1018,134 @@ export function createAgentControlService({
 		return ok(await ports.planMode.exit({ args, origin }));
 	};
 
+	const readConversationStatus = async (
+		piSessionId: string,
+	): Promise<AgentControlResult<unknown>> => {
+		const status = await ports.conversations.getStatus(piSessionId);
+		if (!status) {
+			return ok(null);
+		}
+		return ok({
+			...status,
+			hasFinalMessage: await ports.conversations.hasFinalMessage(piSessionId),
+		} satisfies AgentControlConversationStatus);
+	};
+
+	// getWorkspaceDiff / getDiffComments / addDiffComments take their workspace
+	// from the origin rather than from an argument, so a cross-workspace read or
+	// write is unreachable by construction and there is nothing left to gate.
+	const opHandlers: Record<AgentControlOp, OpHandler> = {
+		addDiffComments: ({ args, origin }) =>
+			ports.review
+				.addComments({
+					comments: (args as AddDiffCommentsArgs).comments,
+					workspaceId: origin.workspaceId,
+				})
+				.then(ok),
+		askUserQuestion: ({ args, origin }) =>
+			handleAskUserQuestion(origin, args as AskUserQuestionArgs),
+		checkPlanModeTool: ({ args, origin }) =>
+			handleCheckPlanModeTool(origin, args as CheckPlanModeToolArgs),
+		closeTab: ({ args, origin }) =>
+			handleCloseTab(origin, args as CloseTabArgs),
+		exitPlanMode: ({ args, origin }) =>
+			handleExitPlanMode(origin, args as ExitPlanModeArgs),
+		focusDockTab: ({ args, origin }) =>
+			handleFocusDockTab(origin, args as FocusDockTabArgs),
+		focusPanel: ({ args, origin }) =>
+			handleFocusPanel(origin, args as FocusPanelArgs),
+		focusTab: ({ args, origin }) =>
+			handleFocusTab(origin, args as FocusTabArgs),
+		getConversationStatus: ({ args }) =>
+			readConversationStatus((args as ConversationRef).piSessionId),
+		getDiffComments: ({ args, origin }) =>
+			ports.review
+				.listComments({
+					file: (args as GetDiffCommentsArgs).file,
+					workspaceId: origin.workspaceId,
+				})
+				.then(ok),
+		getLastMessage: async ({ args }) =>
+			ok({
+				message: await ports.conversations.getLastMessage(
+					(args as ConversationRef).piSessionId,
+				),
+			} satisfies GetLastMessageResult),
+		getSessionBrief: ({ origin }) => handleGetSessionBrief(origin),
+		getWorkspaceDiff: ({ args, origin }) =>
+			ports.diff
+				.readWorkspaceDiff({
+					file: (args as GetWorkspaceDiffArgs).file,
+					stat: (args as GetWorkspaceDiffArgs).stat,
+					workspaceCwd: origin.workspaceCwd,
+					workspaceId: origin.workspaceId,
+				})
+				.then(ok),
+		getWorkspaceStatus: ({ origin }) => handleGetWorkspaceStatus(origin),
+		launchHarness: ({ args, origin }) =>
+			handleLaunchHarness(origin, args as LaunchHarnessArgs),
+		listModels: () => ports.conversations.listModels().then(ok),
+		listTabs: ({ args, origin }) =>
+			ports.tabs
+				.listTabs({
+					workspaceId: (args as ListTabsArgs).workspaceId ?? origin.workspaceId,
+				})
+				.then(ok),
+		listTerminals: ({ args, origin }) =>
+			ports.terminals
+				.listTerminals({
+					workspaceId:
+						(args as ListTerminalsArgs).workspaceId ?? origin.workspaceId,
+				})
+				.then(ok),
+		listWorkspaces: () => ports.workspaces.listWorkspaces().then(ok),
+		notifyOrchestrator: ({ args, origin }) =>
+			handleNotifyOrchestrator(origin, args as NotifyOrchestratorArgs),
+		openTab: ({ args, origin }) => handleOpenTab(origin, args as OpenTabArgs),
+		readConversation: ({ args }) =>
+			ports.conversations.readTranscript(args as ReadConversationArgs).then(ok),
+		readTerminalOutput: ({ args }) =>
+			ports.terminals
+				.readOutput((args as ReadTerminalOutputArgs).terminalId)
+				.then(ok),
+		sendFollowUp: ({ args, origin }) =>
+			handleSendFollowUp(origin, args as SendFollowUpArgs),
+		setBranchName: ({ args, origin }) =>
+			handleSetBranchName(origin, args as SetBranchNameArgs),
+		setName: ({ args, origin }) => handleSetName(origin, args as SetNameArgs),
+		setSummary: ({ args, origin }) =>
+			handleSetSummary(origin, args as SetSummaryArgs),
+		setWorkspaceStatus: ({ args, origin }) =>
+			handleSetWorkspaceStatus(origin, args as SetWorkspaceStatusArgs),
+		spawnChatTab: ({ args, origin }) =>
+			handleSpawnChatTab(origin, args as SpawnChatTabArgs),
+		startConversation: ({ args, callerModel, origin }) =>
+			handleStartConversation(
+				origin,
+				args as StartConversationArgs,
+				callerModel,
+			),
+		startTerminal: ({ args, origin }) =>
+			handleStartTerminal(origin, args as StartTerminalArgs),
+		stopTerminal: ({ args, origin }) =>
+			handleStopTerminal(origin, args as StopTerminalArgs),
+		waitForAgents: ({ args, origin }) =>
+			handleWaitForAgents(origin, args as WaitForAgentsArgs),
+		writeTerminal: ({ args, origin }) =>
+			handleWriteTerminal(origin, args as WriteTerminalArgs),
+	};
+
 	const dispatch = async (
 		op: AgentControlOp,
 		origin: AgentControlOrigin,
 		args: unknown,
 		callerModel: string | undefined,
 	): Promise<AgentControlResult<unknown>> => {
-		switch (op) {
-			case 'spawnChatTab':
-				return handleSpawnChatTab(origin, args as SpawnChatTabArgs);
-			case 'startConversation':
-				return handleStartConversation(
-					origin,
-					args as StartConversationArgs,
-					callerModel,
-				);
-			case 'sendFollowUp':
-				return handleSendFollowUp(origin, args as SendFollowUpArgs);
-			case 'setName':
-				return handleSetName(origin, args as SetNameArgs);
-			case 'setBranchName':
-				return handleSetBranchName(origin, args as SetBranchNameArgs);
-			case 'setSummary':
-				return handleSetSummary(origin, args as SetSummaryArgs);
-			case 'closeTab':
-				return handleCloseTab(origin, args as CloseTabArgs);
-			case 'launchHarness':
-				return handleLaunchHarness(origin, args as LaunchHarnessArgs);
-			case 'startTerminal':
-				return handleStartTerminal(origin, args as StartTerminalArgs);
-			case 'stopTerminal':
-				return handleStopTerminal(origin, args as StopTerminalArgs);
-			case 'writeTerminal':
-				return handleWriteTerminal(origin, args as WriteTerminalArgs);
-			case 'openTab':
-				return handleOpenTab(origin, args as OpenTabArgs);
-			case 'focusTab':
-				return handleFocusTab(origin, args as FocusTabArgs);
-			case 'focusDockTab':
-				return handleFocusDockTab(origin, args as FocusDockTabArgs);
-			case 'focusPanel':
-				return handleFocusPanel(origin, args as FocusPanelArgs);
-			case 'setWorkspaceStatus':
-				return handleSetWorkspaceStatus(origin, args as SetWorkspaceStatusArgs);
-			case 'getWorkspaceStatus':
-				return handleGetWorkspaceStatus(origin);
-			// All three take their workspace from the origin rather than from an
-			// argument, so a cross-workspace read or write is unreachable by
-			// construction and there is nothing left here to gate.
-			case 'getWorkspaceDiff':
-				return ok(
-					await ports.diff.readWorkspaceDiff({
-						file: (args as GetWorkspaceDiffArgs).file,
-						stat: (args as GetWorkspaceDiffArgs).stat,
-						workspaceCwd: origin.workspaceCwd,
-						workspaceId: origin.workspaceId,
-					}),
-				);
-			case 'getDiffComments':
-				return ok(
-					await ports.review.listComments({
-						file: (args as GetDiffCommentsArgs).file,
-						workspaceId: origin.workspaceId,
-					}),
-				);
-			case 'addDiffComments':
-				return ok(
-					await ports.review.addComments({
-						comments: (args as AddDiffCommentsArgs).comments,
-						workspaceId: origin.workspaceId,
-					}),
-				);
-			case 'listWorkspaces':
-				return ok(await ports.workspaces.listWorkspaces());
-			case 'listTabs':
-				return ok(
-					await ports.tabs.listTabs({
-						workspaceId:
-							(args as ListTabsArgs).workspaceId ?? origin.workspaceId,
-					}),
-				);
-			case 'listTerminals':
-				return ok(
-					await ports.terminals.listTerminals({
-						workspaceId:
-							(args as ListTerminalsArgs).workspaceId ?? origin.workspaceId,
-					}),
-				);
-			case 'getConversationStatus': {
-				const { piSessionId } = args as ConversationRef;
-				const status = await ports.conversations.getStatus(piSessionId);
-				if (!status) {
-					return ok(null);
-				}
-				return ok({
-					...status,
-					hasFinalMessage:
-						await ports.conversations.hasFinalMessage(piSessionId),
-				} satisfies AgentControlConversationStatus);
-			}
-			case 'getLastMessage':
-				return ok({
-					message: await ports.conversations.getLastMessage(
-						(args as ConversationRef).piSessionId,
-					),
-				} satisfies GetLastMessageResult);
-			case 'readConversation':
-				return ok(
-					await ports.conversations.readTranscript(
-						args as ReadConversationArgs,
-					),
-				);
-			case 'readTerminalOutput':
-				return ok(
-					await ports.terminals.readOutput(
-						(args as ReadTerminalOutputArgs).terminalId,
-					),
-				);
-			case 'listModels':
-				return ok(await ports.conversations.listModels());
-			case 'waitForAgents':
-				return handleWaitForAgents(origin, args as WaitForAgentsArgs);
-			case 'notifyOrchestrator':
-				return handleNotifyOrchestrator(origin, args as NotifyOrchestratorArgs);
-			case 'askUserQuestion':
-				return handleAskUserQuestion(origin, args as AskUserQuestionArgs);
-			case 'getSessionBrief':
-				return handleGetSessionBrief(origin);
-			case 'checkPlanModeTool':
-				return handleCheckPlanModeTool(origin, args as CheckPlanModeToolArgs);
-			case 'exitPlanMode':
-				return handleExitPlanMode(origin, args as ExitPlanModeArgs);
-			default:
-				return fail('invalid-args', `Unsupported operation: ${String(op)}.`);
+		const handler = opHandlers[op];
+		if (!handler) {
+			return fail('invalid-args', `Unsupported operation: ${String(op)}.`);
 		}
+		return await handler({ args, callerModel, origin });
 	};
 
 	const invoke = async (

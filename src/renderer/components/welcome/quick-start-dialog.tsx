@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 
 import { isEnsemblrApiAvailable } from '@/renderer/api/ensemblr-queries';
+import { DialogActionFooter } from '@/renderer/components/dialog-action-footer';
+import { DialogDiagnosticsList } from '@/renderer/components/dialog-diagnostics-list';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -12,8 +14,8 @@ import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
 import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
 import { useQuickStartFlow } from '@/renderer/hooks/welcome/use-quick-start-flow';
+import { validateEntityName } from '@/renderer/lib/entity-name-validation';
 import type { KeymapBinding } from '@/renderer/types/keymap';
-import type { QuickStartProjectDiagnostic } from '@/shared/ipc/contracts/quick-start';
 
 /** Modal for creating a brand-new local project (folder + git init + register). */
 export function QuickStartDialog({
@@ -36,7 +38,6 @@ export function QuickStartDialog({
 }
 
 const NAME_PATTERN = /^[A-Za-z0-9._-]+$/;
-const NAME_MAX_LENGTH = 100;
 
 /** Inner state-owned form that resets each time the dialog re-opens. */
 function QuickStartDialogForm({
@@ -65,7 +66,12 @@ function QuickStartDialogForm({
 	const [name, setName] = useState('');
 
 	const trimmedName = name.trim();
-	const localValidation = validateNameLocally(trimmedName);
+	const localValidation = validateEntityName({
+		allowedCharacters: 'letters, numbers, dots, dashes, or underscores',
+		name: trimmedName,
+		noun: 'Project',
+		pattern: NAME_PATTERN,
+	});
 	const canCreate =
 		!isBusy &&
 		trimmedName.length > 0 &&
@@ -171,80 +177,18 @@ function QuickStartDialogForm({
 			</div>
 
 			{stage === 'failure' && diagnostics.length > 0 ? (
-				<QuickStartDiagnosticsList diagnostics={diagnostics} />
+				<DialogDiagnosticsList
+					diagnostics={diagnostics}
+					testId='quick-start-diagnostics'
+				/>
 			) : null}
 
-			<div className='-mx-4 -mb-4 flex justify-end gap-2 rounded-b-xl border-border border-t bg-muted/40 px-4 py-3'>
-				{stage === 'failure' ? (
-					<Button
-						className='h-8'
-						onClick={retry}
-						type='button'
-						variant='outline'
-					>
-						Try again
-					</Button>
-				) : null}
-				<Button
-					className='h-8 gap-2'
-					disabled={!canCreate}
-					onClick={handleCreate}
-					type='button'
-				>
-					{stage === 'creating' ? 'Creating…' : 'Create'}
-					<span
-						aria-hidden='true'
-						className='ml-1 inline-flex items-center gap-0.5 text-[0.6875rem] opacity-70'
-					>
-						⌘↵
-					</span>
-				</Button>
-			</div>
+			<DialogActionFooter
+				onRetry={stage === 'failure' ? retry : null}
+				onSubmit={handleCreate}
+				submitDisabled={!canCreate}
+				submitLabel={stage === 'creating' ? 'Creating…' : 'Create'}
+			/>
 		</>
 	);
-}
-
-/** Renders the diagnostics card shown on a quick-start failure. */
-function QuickStartDiagnosticsList({
-	diagnostics,
-}: {
-	diagnostics: QuickStartProjectDiagnostic[];
-}) {
-	return (
-		<ul
-			className='rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive text-xs'
-			data-testid='quick-start-diagnostics'
-		>
-			{diagnostics.map((diagnostic) => (
-				<li className='flex flex-col gap-0.5' key={diagnostic.code}>
-					<span className='font-medium'>{diagnostic.message}</span>
-					{diagnostic.path ? (
-						<span className='font-mono text-[0.6875rem] opacity-80'>
-							{diagnostic.path}
-						</span>
-					) : null}
-				</li>
-			))}
-		</ul>
-	);
-}
-
-/**
- * Mirrors the main-process name rules so we surface immediate feedback before
- * the IPC round-trip.
- */
-function validateNameLocally(name: string): string | null {
-	if (!name) {
-		return null;
-	}
-	if (name.length > NAME_MAX_LENGTH) {
-		return `Project names must be ${NAME_MAX_LENGTH} characters or fewer.`;
-	}
-	if (name === '.' || name === '..' || name.startsWith('.')) {
-		return 'Project names cannot start with a dot.';
-	}
-	if (!NAME_PATTERN.test(name)) {
-		return 'Use only letters, numbers, dots, dashes, or underscores.';
-	}
-	return null;
 }

@@ -16,6 +16,13 @@ import {
 	writeEnvFilePaths,
 } from './env-files-repository.ts';
 import {
+	EMPTY_ENVIRONMENT_LAYER,
+	missingRequiredDiagnostics,
+	readEnvFileLayer,
+	readPlainLayer,
+	readSecretLayer,
+} from './environment-assembly.ts';
+import {
 	compareCatalogEntries,
 	createCatalogMap,
 	getCatalogEntryForKey,
@@ -265,108 +272,27 @@ export function createEnvironmentVariablesService({
 			scope: normalizeScope(options),
 			secretStore: getSecretStore(databaseConnection),
 		});
-		const env: Record<string, string> = {};
-		const redactValues: string[] = [];
+		// Env-file values are the lowest precedence within the scope, explicit
+		// plain variables override them, and resolved secrets override both.
+		const envFiles = readEnvFileLayer({ database: databaseConnection, state });
+		const plain = readPlainLayer(state);
+		const secrets =
+			(options.includeSecrets ?? true)
+				? await readSecretLayer(state)
+				: EMPTY_ENVIRONMENT_LAYER;
 
-		// Env-file values are the lowest precedence within the scope: explicit
-		// plain/secret variables below override them, and reserved runtime keys
-		// are never sourced from files. Secret-shaped file values are still
-		// redacted from command output, matching the secret store's guarantee.
-		if (databaseConnection) {
-			const envFiles = loadScopeEnvFiles({
-				database: databaseConnection,
-				scope: normalizeScope(options),
-			});
-
-			state.diagnostics.push(...envFiles.diagnostics);
-
-			for (const [key, value] of Object.entries(envFiles.values)) {
-				if (isReservedEnvironmentVariableKey(key, state.catalogByKey)) {
-					continue;
-				}
-
-				env[key] = value;
-
-				if (isSecretEnvironmentVariableKey(key, state.catalogByKey)) {
-					redactValues.push(value);
-				}
-			}
-		}
-
-		for (const [key, candidate] of state.plainValues) {
-			if (isReservedEnvironmentVariableKey(key, state.catalogByKey)) {
-				continue;
-			}
-
-			if (state.secretMetadata.has(key)) {
-				continue;
-			}
-
-			env[key] = candidate.value;
-		}
-
-		if (options.includeSecrets ?? true) {
-			if (!state.secretStore && state.secretMetadata.size > 0) {
-				state.diagnostics.push({
-					code: 'secret-store-unavailable',
-					message:
-						'Secret metadata exists, but the secret store is unavailable.',
-					severity: 'warning',
-				});
-			}
-
-			if (state.secretStore) {
-				const secretStore = state.secretStore;
-				const resolvedSecrets = await Promise.all(
-					Array.from(state.secretMetadata).map(async ([key, metadata]) => {
-						if (isReservedEnvironmentVariableKey(key, state.catalogByKey)) {
-							return null;
-						}
-						const value = await secretStore.read({
-							key: metadata.key,
-							scope: metadata.scope,
-							scopeId: metadata.scopeId || undefined,
-						});
-						return { key, value };
-					}),
-				);
-
-				for (const entry of resolvedSecrets) {
-					if (!entry) {
-						continue;
-					}
-					if (entry.value === null) {
-						state.diagnostics.push({
-							code: 'secret-value-missing',
-							key: entry.key,
-							message:
-								'Secret metadata exists, but the secret value was not found.',
-							severity: 'warning',
-						});
-						continue;
-					}
-
-					env[entry.key] = entry.value;
-					redactValues.push(entry.value);
-				}
-			}
-		}
-
-		for (const requiredKey of state.requiredKeys) {
-			if (!env[requiredKey]) {
-				state.diagnostics.push({
-					code: 'required-variable-missing',
-					key: requiredKey,
-					message: `${requiredKey} is required but unset.`,
-					severity: 'error',
-				});
-			}
-		}
+		const env = { ...envFiles.env, ...plain.env, ...secrets.env };
+		state.diagnostics.push(
+			...envFiles.diagnostics,
+			...plain.diagnostics,
+			...secrets.diagnostics,
+			...missingRequiredDiagnostics({ env, requiredKeys: state.requiredKeys }),
+		);
 
 		return {
 			diagnostics: state.diagnostics,
 			env,
-			redactValues,
+			redactValues: [...envFiles.redactValues, ...secrets.redactValues],
 		};
 	}
 

@@ -37,6 +37,34 @@ export function isNullableNumber(value: unknown): value is number | null {
 }
 
 /**
+ * Read a column as a string, treating any other stored type as absent.
+ * @param value - Raw column value
+ * @returns The string value, or null when the column holds anything else
+ */
+export function readNullableString(value: unknown): string | null {
+	return isString(value) ? value : null;
+}
+
+/**
+ * Narrow a raw SQLite row to a record whose named columns all carry strings, so
+ * row mappers can read those columns without re-testing each one.
+ * @param row - Candidate row returned by a query
+ * @param columns - Column names that must hold a string value
+ * @returns The row with the named columns typed as strings, or null when it is malformed
+ */
+export function readStringColumns<Column extends string>(
+	row: unknown,
+	columns: readonly Column[],
+): (Record<string, unknown> & Record<Column, string>) | null {
+	if (!isRecord(row)) {
+		return null;
+	}
+	return columns.every((column) => isString(row[column]))
+		? (row as Record<string, unknown> & Record<Column, string>)
+		: null;
+}
+
+/**
  * Verifies that `candidate` has the shared workspace + repository identity
  * columns used by both the archive-workspace and unarchive-workspace queries.
  * Per-service guards layer their extra columns on top of this check.

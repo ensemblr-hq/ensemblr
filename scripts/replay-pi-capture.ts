@@ -85,96 +85,140 @@ function contentBlocksToParts(blocks: unknown): PiWireMessagePart[] {
  * @returns Ordered session events reconstructed from the recognised frames
  */
 function framesToEvents(lines: readonly string[]): PiSessionEventWire[] {
-	const events: PiSessionEventWire[] = [];
-	for (const line of lines) {
-		let frame: RawFrame;
-		try {
-			frame = JSON.parse(line) as RawFrame;
-		} catch {
-			continue;
-		}
-		const type = frame.type;
-		if (type === 'message_end') {
-			const message = (frame.message ?? {}) as RawFrame;
-			if (message.role === 'toolResult') {
-				// Mirrors protocol-dispatch: tool_execution_end already carries it.
-				continue;
-			}
-			const role = message.role === 'user' ? 'user' : 'agent';
-			const parts = contentBlocksToParts(message.content);
-			if (parts.length === 0) {
-				continue;
-			}
-			events.push(
-				makeEvent(
-					{
-						kind: 'message',
-						payload: { kind: 'message', parts, role: role as 'user' },
-						role: role as 'user',
-					},
-					null,
-				),
-			);
-		} else if (type === 'message_update') {
-			const event = (frame as RawFrame).assistantMessageEvent as
-				| RawFrame
-				| undefined;
-			const text =
-				event && typeof event.text === 'string'
-					? event.text
-					: event && typeof event.delta === 'string'
-						? event.delta
-						: null;
-			if (text) {
-				events.push(
-					makeEvent(
-						{
-							kind: 'message',
-							payload: { kind: 'text-delta', text },
-							role: 'agent',
-						},
-						null,
-					),
-				);
-			}
-		} else if (type === 'tool_execution_start') {
-			events.push(
-				makeEvent(
-					{
-						kind: 'message',
-						payload: {
-							input: frame.args ?? {},
-							kind: 'tool-call',
-							name:
-								typeof frame.toolName === 'string' ? frame.toolName : 'tool',
-							toolCallId:
-								typeof frame.toolCallId === 'string' ? frame.toolCallId : '',
-						},
-						role: 'tool',
-					},
-					typeof frame.toolCallId === 'string' ? frame.toolCallId : null,
-				),
-			);
-		} else if (type === 'tool_execution_end') {
-			events.push(
-				makeEvent(
-					{
-						kind: 'message',
-						payload: {
-							isError: frame.isError === true,
-							kind: 'tool-result',
-							output: frame.result,
-							toolCallId:
-								typeof frame.toolCallId === 'string' ? frame.toolCallId : '',
-						},
-						role: 'tool',
-					},
-					typeof frame.toolCallId === 'string' ? frame.toolCallId : null,
-				),
-			);
-		}
+	return lines.flatMap((line) => {
+		const frame = parseFrame(line);
+		return frame ? frameToEvents(frame) : [];
+	});
+}
+
+/**
+ * Parse one JSONL line into a raw frame.
+ * @param line - Raw JSONL line from a Pi capture file
+ * @returns The parsed frame, or null when the line is not valid JSON
+ */
+function parseFrame(line: string): RawFrame | null {
+	try {
+		return JSON.parse(line) as RawFrame;
+	} catch {
+		return null;
 	}
-	return events;
+}
+
+/**
+ * Project one recognised capture frame onto the session events a replay renders.
+ * @param frame - A parsed capture frame
+ * @returns The events the frame produces, empty for frames a replay ignores
+ */
+function frameToEvents(frame: RawFrame): PiSessionEventWire[] {
+	switch (frame.type) {
+		case 'message_end':
+			return messageEndEvents(frame);
+		case 'message_update':
+			return messageUpdateEvents(frame);
+		case 'tool_execution_start':
+			return [toolCallEvent(frame)];
+		case 'tool_execution_end':
+			return [toolResultEvent(frame)];
+		default:
+			return [];
+	}
+}
+
+/**
+ * Project a `message_end` frame, dropping tool results (which
+ * `tool_execution_end` already carries) and messages with no renderable parts.
+ * @param frame - The `message_end` frame
+ * @returns The message event, or nothing when the frame carries no content
+ */
+function messageEndEvents(frame: RawFrame): PiSessionEventWire[] {
+	const message = (frame.message ?? {}) as RawFrame;
+	// Mirrors protocol-dispatch: tool_execution_end already carries it.
+	if (message.role === 'toolResult') {
+		return [];
+	}
+	const parts = contentBlocksToParts(message.content);
+	if (parts.length === 0) {
+		return [];
+	}
+	const role = (message.role === 'user' ? 'user' : 'agent') as 'user';
+	return [
+		makeEvent(
+			{ kind: 'message', payload: { kind: 'message', parts, role }, role },
+			null,
+		),
+	];
+}
+
+/**
+ * Project a `message_update` frame into a streaming text delta.
+ * @param frame - The `message_update` frame
+ * @returns The delta event, or nothing when the frame carries no text
+ */
+function messageUpdateEvents(frame: RawFrame): PiSessionEventWire[] {
+	const event = frame.assistantMessageEvent as RawFrame | undefined;
+	const text = readString(event?.text) ?? readString(event?.delta);
+	if (!text) {
+		return [];
+	}
+	return [
+		makeEvent(
+			{ kind: 'message', payload: { kind: 'text-delta', text }, role: 'agent' },
+			null,
+		),
+	];
+}
+
+/**
+ * Project a `tool_execution_start` frame into its tool-call event.
+ * @param frame - The `tool_execution_start` frame
+ * @returns The tool-call event
+ */
+function toolCallEvent(frame: RawFrame): PiSessionEventWire {
+	const toolCallId = readString(frame.toolCallId);
+	return makeEvent(
+		{
+			kind: 'message',
+			payload: {
+				input: frame.args ?? {},
+				kind: 'tool-call',
+				name: readString(frame.toolName) ?? 'tool',
+				toolCallId: toolCallId ?? '',
+			},
+			role: 'tool',
+		},
+		toolCallId,
+	);
+}
+
+/**
+ * Project a `tool_execution_end` frame into its tool-result event.
+ * @param frame - The `tool_execution_end` frame
+ * @returns The tool-result event
+ */
+function toolResultEvent(frame: RawFrame): PiSessionEventWire {
+	const toolCallId = readString(frame.toolCallId);
+	return makeEvent(
+		{
+			kind: 'message',
+			payload: {
+				isError: frame.isError === true,
+				kind: 'tool-result',
+				output: frame.result,
+				toolCallId: toolCallId ?? '',
+			},
+			role: 'tool',
+		},
+		toolCallId,
+	);
+}
+
+/**
+ * Read a capture field as a string.
+ * @param value - Raw field value
+ * @returns The string, or null when the field holds anything else
+ */
+function readString(value: unknown): string | null {
+	return typeof value === 'string' ? value : null;
 }
 
 const file = process.argv[2];
