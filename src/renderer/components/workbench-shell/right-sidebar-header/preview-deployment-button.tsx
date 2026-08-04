@@ -1,6 +1,9 @@
 import { Button } from '@/renderer/components/ui/button';
 import { getPullRequestLinkButtonClassName } from '@/renderer/lib/workbench/pull-request-link-button';
-import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import type {
+	PullRequestHeaderTone,
+	WorkspaceShellModel,
+} from '@/renderer/types/workbench';
 
 /** Preview deployment provider ids recognized by the shell. */
 type PreviewDeploymentProvider = NonNullable<
@@ -15,13 +18,21 @@ const PREVIEW_DEPLOYMENT_PROVIDER_ICON_PATHS: Partial<
 	vercel: 'm12 1.608 12 20.784H0Z',
 };
 
-/** Pill-shaped preview-deployment button that opens the provider's URL. */
+/**
+ * Pill-shaped preview-deployment button that opens the provider's URL, tinted by
+ * the sidebar header's tone so both header pills read as one control group. A
+ * failed deployment overrides that tone, because GitHub reports deployments
+ * separately from checks and the header tone can stay green while the linked
+ * build is broken.
+ */
 export function PreviewDeploymentButton({
 	deployment,
+	tone,
 }: {
 	deployment: NonNullable<
 		WorkspaceShellModel['pullRequest']['previewDeployment']
 	>;
+	tone: PullRequestHeaderTone;
 }) {
 	const providerLabel = getPreviewDeploymentProviderLabel(deployment.provider);
 	const previewLabel =
@@ -36,12 +47,13 @@ export function PreviewDeploymentButton({
 		normalizedDeploymentLabel.length > 0 &&
 		(providerIconPath === null ||
 			normalizedDeploymentLabel !== providerLabel.toLowerCase());
+	const pillTone = deployment.status === 'blocked' ? 'blocked' : tone;
 
 	return (
 		<Button
 			aria-label={`Open ${previewLabel}`}
 			asChild
-			className={getPullRequestLinkButtonClassName(deployment.status)}
+			className={getPullRequestLinkButtonClassName(pillTone)}
 			size='sm'
 			variant='outline'
 		>

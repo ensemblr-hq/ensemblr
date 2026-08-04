@@ -188,7 +188,10 @@ function RightSidebarHeaderPullRequestLinks({
 				url={headerState.url}
 			/>
 			{headerState.previewDeployment ? (
-				<PreviewDeploymentButton deployment={headerState.previewDeployment} />
+				<PreviewDeploymentButton
+					deployment={headerState.previewDeployment}
+					tone={headerState.tone}
+				/>
 			) : null}
 		</div>
 	);
