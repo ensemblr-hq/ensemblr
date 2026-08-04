@@ -161,12 +161,16 @@ export function missingRequiredDiagnostics({
 	env: Record<string, string>;
 	requiredKeys: ReadonlySet<string>;
 }): EnvironmentVariableDiagnostic[] {
-	return Array.from(requiredKeys)
-		.filter((requiredKey) => !env[requiredKey])
-		.map((requiredKey) => ({
-			code: 'required-variable-missing',
-			key: requiredKey,
-			message: `${requiredKey} is required but unset.`,
-			severity: 'error',
-		}));
+	const diagnostics: EnvironmentVariableDiagnostic[] = [];
+	for (const requiredKey of requiredKeys) {
+		if (!env[requiredKey]) {
+			diagnostics.push({
+				code: 'required-variable-missing',
+				key: requiredKey,
+				message: `${requiredKey} is required but unset.`,
+				severity: 'error',
+			});
+		}
+	}
+	return diagnostics;
 }
