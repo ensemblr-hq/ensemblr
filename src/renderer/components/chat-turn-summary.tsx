@@ -2,6 +2,7 @@ import { useAtomValue } from 'jotai';
 import { ChevronRightIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useId, useState } from 'react';
+import { useScrollAnchor } from '@/renderer/hooks/conversation/use-anchored-disclosure';
 import { formatTurnDuration } from '@/renderer/lib/format-duration';
 import { cn } from '@/renderer/lib/utils';
 import { toolCallCollapseAtom } from '@/renderer/state/preferences';
@@ -50,6 +51,7 @@ export function ChatTurnSummary({
 		override?.mode === collapseMode
 			? override.open
 			: defaultOpen || collapseMode === 'expanded';
+	const { anchorRef, captureAnchor } = useScrollAnchor();
 	const segments: string[] = [];
 	if (toolGlyphs.length > 0) {
 		segments.push(
@@ -68,12 +70,16 @@ export function ChatTurnSummary({
 		<div
 			className={cn('flex flex-col gap-2', className)}
 			data-role='turn-summary'
+			ref={anchorRef}
 		>
 			<button
 				aria-controls={bodyId}
 				aria-expanded={open}
 				className='-ml-1.5 flex w-fit max-w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-muted-foreground text-xs leading-5 transition-colors hover:bg-muted/50 hover:text-foreground'
-				onClick={() => setOverride({ mode: collapseMode, open: !open })}
+				onClick={() => {
+					captureAnchor();
+					setOverride({ mode: collapseMode, open: !open });
+				}}
 				type='button'
 			>
 				<ChevronRightIcon
