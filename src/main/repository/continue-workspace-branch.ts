@@ -143,10 +143,10 @@ export function createContinueWorkspaceBranchService({
 		if (head && head !== DETACHED_HEAD_LABEL) {
 			return { continuationBase: head, restoreTarget: head };
 		}
-		const headCommit = await readGitValue(source.path, ['rev-parse', 'HEAD']);
 		if (!source.branchName) {
 			return null;
 		}
+		const headCommit = await readGitValue(source.path, ['rev-parse', 'HEAD']);
 		return {
 			continuationBase: source.branchName,
 			restoreTarget: headCommit ?? source.branchName,

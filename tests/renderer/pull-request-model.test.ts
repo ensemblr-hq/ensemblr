@@ -375,6 +375,41 @@ describe('buildPullRequestShellModel', () => {
 		);
 	});
 
+	test('a later bot comment supplies the preview when an earlier one links only a dashboard', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					comments: [
+						{
+							author: 'netlify[bot]',
+							body: 'Deploy log: https://app.netlify.com/sites/acme/deploys/6653f0a1',
+							createdAt: '2026-06-11T09:00:00Z',
+							id: 'bot-1',
+							isResolved: null,
+							kind: 'issue-comment',
+						},
+						{
+							author: 'netlify[bot]',
+							body: NETLIFY_BOT_COMMENT_BODY,
+							createdAt: '2026-06-11T09:05:00Z',
+							id: 'bot-2',
+							isResolved: null,
+							kind: 'issue-comment',
+						},
+					],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.previewDeployment?.source).toBe('pr-comment');
+		expect(model.previewDeployment?.url).toBe(
+			'https://deploy-preview-7--acme.netlify.app',
+		);
+	});
+
 	test('a hosted preview check survives a review-tooling word in its label', () => {
 		const model = buildPullRequestShellModel({
 			changeSummary: NO_CHANGES,
