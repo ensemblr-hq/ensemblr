@@ -21,7 +21,7 @@ import {
 	CodeHunkGap,
 	CodeViewerHeader,
 } from '@/renderer/components/code-surface';
-import { codeGutterDigits } from '@/renderer/lib/code/gutter';
+import { codeGutterDigits } from '@/renderer/lib/code';
 import {
 	newLineNumberOf,
 	oldLineNumberOf,

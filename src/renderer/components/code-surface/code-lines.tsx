@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { codeGutterDigits } from '@/renderer/lib/code/gutter';
+import { codeGutterDigits } from '@/renderer/lib/code';
 import { cn } from '@/renderer/lib/utils';
 import type { TokenizedCode } from '@/renderer/types/code';
 import { CODE_GUTTER_CLASSES, CODE_GUTTER_DIVIDER_CLASSES } from './code-style';

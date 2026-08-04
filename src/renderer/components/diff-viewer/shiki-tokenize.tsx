@@ -9,7 +9,7 @@ import {
 } from 'react-diff-view';
 import type { BundledLanguage, BundledTheme, ThemedToken } from 'shiki';
 
-import { highlightCode } from '@/renderer/lib/code/highlighter';
+import { highlightCode } from '@/renderer/lib/code';
 import { reconstructSideSources } from '@/renderer/lib/diff/parse';
 import { useResolvedCodeTheme } from '@/renderer/state/preferences';
 import type { TokenizedCode } from '@/renderer/types/code';

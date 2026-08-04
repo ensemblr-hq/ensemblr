@@ -3,8 +3,7 @@
 import type { CSSProperties, HTMLAttributes } from 'react';
 import { createContext, memo, useEffect, useMemo, useState } from 'react';
 import type { BundledLanguage, ThemedToken } from 'shiki';
-import { codeGutterDigits } from '@/renderer/lib/code/gutter';
-import { highlightCode } from '@/renderer/lib/code/highlighter';
+import { codeGutterDigits, highlightCode } from '@/renderer/lib/code';
 import { cn } from '@/renderer/lib/utils';
 import { useResolvedCodeTheme } from '@/renderer/state/preferences';
 import type { TokenizedCode } from '@/renderer/types/code';
