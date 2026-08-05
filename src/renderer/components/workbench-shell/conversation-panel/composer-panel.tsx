@@ -83,7 +83,7 @@ export function ComposerPanel({
 		<div className='relative' ref={state.anchorRef}>
 			<Textarea
 				aria-label='Pi composer'
-				className='max-h-64 min-h-28 resize-none px-0 py-0 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0'
+				className='sleek-scrollbar max-h-64 min-h-28 resize-none px-0 py-0 text-sm leading-relaxed shadow-none placeholder:text-muted-foreground/70 focus-visible:ring-0'
 				disabled={composer.disabled}
 				onBlur={() => setFocused(false)}
 				onChange={state.handleChange}
