@@ -149,6 +149,16 @@ export const filePreviewWordWrapAtom = atomWithStorage<boolean>(
 	false,
 );
 
+/**
+ * Whether the read-only file preview renders a `.md` file's formatted preview
+ * instead of its raw source; app-wide and persisted across files and reloads.
+ * Defaults off, matching every other file type's plain-source view.
+ */
+export const filePreviewMarkdownPreviewAtom = atomWithStorage<boolean>(
+	KEY('file_preview_markdown_preview'),
+	false,
+);
+
 // ─── Experimental (user) ──────────────────────────────────────────────────────
 
 /** Whether developer-only diagnostics and debug controls are visible; persisted to localStorage. */

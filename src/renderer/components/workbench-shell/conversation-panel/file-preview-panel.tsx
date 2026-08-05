@@ -1,22 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { useAtom } from 'jotai';
-import { WrapTextIcon } from 'lucide-react';
 
 import {
 	ensemblrQueryKeys,
 	readWorkspaceFile,
 } from '@/renderer/api/ensemblr-queries';
-import { CodeBlockContent } from '@/renderer/components/code-block';
 import { CodeViewerHeader } from '@/renderer/components/code-surface';
-import { IconToggle } from '@/renderer/components/icon-toggle';
-import { OpenInToolbarMenu } from '@/renderer/components/workbench-shell/open-in-toolbar-menu';
-import { languageForFilePath } from '@/renderer/lib/language-from-path';
-import { filePreviewWordWrapAtom } from '@/renderer/state/preferences';
-import type {
-	ReadWorkspaceFileFailureCode,
-	ReadWorkspaceFileResult,
-} from '@/shared/ipc/contracts/workspace-files';
+import type { ReadWorkspaceFileFailureCode } from '@/shared/ipc/contracts/workspace-files';
 
+import { FilePreviewActions } from './file-preview-actions';
+import { FilePreviewBody } from './file-preview-body';
 import { PanelMessage } from './panel-message';
 
 /**
@@ -33,7 +25,6 @@ export function FilePreviewPanel({
 	workspaceCwd: string | null;
 	workspaceId: string;
 }) {
-	const [wordWrap, setWordWrap] = useAtom(filePreviewWordWrapAtom);
 	const { data, isError, isPending } = useQuery({
 		enabled: Boolean(filePath && workspaceCwd),
 		queryFn: () =>
@@ -69,68 +60,21 @@ export function FilePreviewPanel({
 		);
 	}
 
-	const imageSource = imageSourceForPreview(result);
-
 	return (
 		<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
 			<CodeViewerHeader
 				actions={
-					<>
-						{typeof result.sizeBytes === 'number' ? (
-							<span className='text-muted-foreground text-xs tabular-nums'>
-								{formatSizeBytes(result.sizeBytes)}
-							</span>
-						) : null}
-						<OpenInToolbarMenu filePath={filePath} workspaceId={workspaceId} />
-						{imageSource ? null : (
-							<IconToggle
-								active={wordWrap}
-								label={wordWrap ? 'Disable word wrap' : 'Enable word wrap'}
-								onClick={() => setWordWrap(!wordWrap)}
-							>
-								<WrapTextIcon />
-							</IconToggle>
-						)}
-					</>
+					<FilePreviewActions
+						filePath={filePath}
+						result={result}
+						workspaceId={workspaceId}
+					/>
 				}
 				title={filePath}
 			/>
-			{imageSource ? (
-				<div className='sleek-scrollbar flex min-h-0 flex-1 items-center justify-center overflow-auto bg-code p-4'>
-					<img
-						alt={`Preview of ${filePath}`}
-						className='max-h-full max-w-full rounded-md object-contain shadow-sm'
-						src={imageSource}
-					/>
-				</div>
-			) : (
-				<CodeBlockContent
-					className='min-h-0 flex-1'
-					code={result.content ?? ''}
-					language={languageForFilePath(filePath)}
-					showLineNumbers
-					wrapLines={wordWrap}
-				/>
-			)}
+			<FilePreviewBody filePath={filePath} result={result} />
 		</div>
 	);
-}
-
-/**
- * Builds an embeddable data URL for image payloads returned by file preview.
- * @param result - File-read result from the workspace preview IPC.
- * @returns An image data URL, or null when the result contains text content.
- */
-function imageSourceForPreview(result: ReadWorkspaceFileResult): string | null {
-	if (
-		result.contentEncoding !== 'base64' ||
-		!result.mimeType?.startsWith('image/') ||
-		!result.content
-	) {
-		return null;
-	}
-
-	return `data:${result.mimeType};base64,${result.content}`;
 }
 
 /**
@@ -157,19 +101,4 @@ function describeReadFailure(
 		default:
 			return `Could not read ${filePath}.`;
 	}
-}
-
-/**
- * Format a byte count as a B/KB/MB string.
- * @param sizeBytes - The size in bytes.
- * @returns The formatted, human-readable size.
- */
-function formatSizeBytes(sizeBytes: number): string {
-	if (sizeBytes < 1024) {
-		return `${sizeBytes} B`;
-	}
-	if (sizeBytes < 1024 * 1024) {
-		return `${(sizeBytes / 1024).toFixed(1)} KB`;
-	}
-	return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }

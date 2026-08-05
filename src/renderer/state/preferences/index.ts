@@ -60,6 +60,7 @@ export {
 	diffShowWhitespaceAtom,
 	diffWordWrapAtom,
 	favouriteModelsAtom,
+	filePreviewMarkdownPreviewAtom,
 	filePreviewWordWrapAtom,
 	forgetChatOverrides,
 	prDetailsDraftAtomFamily,
