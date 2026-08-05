@@ -25,6 +25,14 @@ export type ChecksPanelState =
 			title: string;
 	  };
 
+/** Which of the git-status section's two actions the checks panel offers. */
+export interface ChecksGitStatusSection {
+	/** Offers the row's own action — "Commit and push", "Push branch", or "Push". */
+	showCommitAction: boolean;
+	/** Offers "Update PR" beside the section heading. */
+	showUpdateAction: boolean;
+}
+
 export type ProviderMarkKind =
 	| WorkspaceShellModel['pullRequest']['checks'][number]['provider']
 	| WorkspaceShellModel['pullRequest']['comments'][number]['provider']

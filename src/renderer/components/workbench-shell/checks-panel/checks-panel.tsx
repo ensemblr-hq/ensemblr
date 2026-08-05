@@ -21,7 +21,10 @@ import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { PanelAlert } from '@/renderer/components/workbench-shell/panel-alert';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-conflicts';
-import { getChecksPanelState } from '@/renderer/lib/workbench/checks-panel-state';
+import {
+	getChecksPanelState,
+	resolveGitStatusSection,
+} from '@/renderer/lib/workbench/checks-panel-state';
 import { describeMergeConflictProbeFailure } from '@/renderer/lib/workbench/git-failure-copy';
 import { selectLocalReviewComments } from '@/renderer/lib/workbench/local-review-comments';
 import {
@@ -333,10 +336,7 @@ function ChecksPullRequestPanel({
 }) {
 	const { pullRequest } = state;
 	const insertIntoComposer = useComposerInsert();
-	const showGitStatusAction = state.kind !== 'pr-ready';
-	// A merged/closed PR has no actionable git status, so the section is hidden.
-	const isClosedOrMerged =
-		pullRequest.state === 'merged' || pullRequest.state === 'closed';
+	const gitStatusSection = resolveGitStatusSection(state);
 
 	// GitHub review comments first, then the user's own local notes.
 	const comments = useMemo(
@@ -358,22 +358,24 @@ function ChecksPullRequestPanel({
 				) : null}
 				{children}
 
-				{isClosedOrMerged ? null : (
+				{gitStatusSection ? (
 					<section className='flex min-w-0 flex-col gap-1.5'>
 						<ChecksSectionHeader
-							actionLabel='Update PR'
+							actionLabel={
+								gitStatusSection.showUpdateAction ? 'Update PR' : undefined
+							}
 							disabled={isAgentWorking}
 							label='Git status'
 							onAction={onUpdatePullRequest}
 						/>
 						<PullRequestStatusRow
 							disabled={isAgentWorking}
-							hideAction={!showGitStatusAction}
+							hideAction={!gitStatusSection.showCommitAction}
 							onAction={onCommitAndPush}
 							status={pullRequest.gitStatus}
 						/>
 					</section>
-				)}
+				) : null}
 
 				{conflictsSection}
 

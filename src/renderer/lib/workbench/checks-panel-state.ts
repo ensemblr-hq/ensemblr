@@ -1,5 +1,8 @@
 import { formatCount } from '@/renderer/lib/format';
-import type { ChecksPanelState } from '@/renderer/types/components';
+import type {
+	ChecksGitStatusSection,
+	ChecksPanelState,
+} from '@/renderer/types/components';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 /** Derives the checks-panel summary state from the workspace + PR. */
@@ -86,5 +89,33 @@ export function getChecksPanelState(
 			pullRequest.label ||
 			pullRequest.title ||
 			`Pull request #${pullRequest.number}`,
+	};
+}
+
+/**
+ * Decides whether the checks panel renders its git-status section, and which of
+ * the section's two actions it offers. Work the remote does not have — whether
+ * uncommitted, unpublished, or unpushed — keeps the section alive even on a
+ * ready-to-merge or already-merged PR, because that work still needs its way out
+ * of the worktree. Only a clean worktree drops the section's own action, and a
+ * closed or merged PR is past the point where "Update PR" means anything.
+ * @param state - Resolved checks-panel state for a workspace that has a PR.
+ * @returns The section's available actions, or null when there is nothing to show.
+ */
+export function resolveGitStatusSection(
+	state: Extract<ChecksPanelState, { hasPullRequest: true }>,
+): ChecksGitStatusSection | null {
+	const { pullRequest } = state;
+	const isClosedOrMerged =
+		pullRequest.state === 'merged' || pullRequest.state === 'closed';
+	const hasUnsentLocalWork = pullRequest.gitStatus.kind !== 'clean';
+
+	if (isClosedOrMerged && !hasUnsentLocalWork) {
+		return null;
+	}
+
+	return {
+		showCommitAction: state.kind !== 'pr-ready' || hasUnsentLocalWork,
+		showUpdateAction: !isClosedOrMerged,
 	};
 }
