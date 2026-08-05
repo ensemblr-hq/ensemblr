@@ -3,8 +3,10 @@ import { CheckIcon, PencilIcon, SplitIcon } from 'lucide-react';
 import { Button } from '@/renderer/components/ui/button';
 
 /**
- * Decision bar for a finished agent plan. Sits directly above the composer
- * card, inside the composer's footer, so it shares the footer's width.
+ * Decision bar for a finished agent plan. Renders as the composer card's
+ * header — same rounded card, same dashed border, divided from the textarea
+ * below by a hairline rather than a gap — so it reads as the top of the
+ * composer, not a separate floating panel above it.
  *
  * Deliberately spare: the plan itself is the message immediately above, and the
  * agent has already stopped. All this surface has to do is name the plan and
@@ -28,7 +30,7 @@ export function PlanReviewPanel({
 	return (
 		<section
 			aria-label='Plan review'
-			className='mx-auto mb-2 flex w-full max-w-4xl flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-accent-strong/25 bg-accent-strong/5 px-3 py-2'
+			className='flex flex-wrap items-center gap-x-3 gap-y-2 border-accent-strong/25 border-b border-dashed bg-accent-strong/[0.06] px-4 py-2.5'
 		>
 			<h2 className='min-w-0 flex-1 truncate font-medium text-sm'>{title}</h2>
 			<div className='flex shrink-0 items-center gap-1'>

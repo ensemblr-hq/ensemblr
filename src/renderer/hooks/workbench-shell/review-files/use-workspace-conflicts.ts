@@ -30,6 +30,11 @@ const NO_CONFLICTS: WorkspaceConflicts = { paths: new Set() };
  * attempt, so the failure is passed through for the caller to show rather than
  * being flattened into "this branch is fine".
  *
+ * A merged or closed pull request will never be merged again, so the trial
+ * merge is skipped once GitHub reports either state — running `git merge-tree`
+ * against a base that has since moved on routinely finds "conflicts" nobody can
+ * or needs to resolve, which is just noise on an already-settled branch.
+ *
  * Shared by the sidebar header, the Changes list, and the Checks panel; all
  * three issue the same query key, so React Query dedupes it to one probe per
  * workspace.
@@ -40,21 +45,26 @@ const NO_CONFLICTS: WorkspaceConflicts = { paths: new Set() };
 export function useWorkspaceConflicts(
 	workspace: WorkspaceShellModel,
 ): WorkspaceConflicts {
-	const localConflicts = useMemo(
-		() =>
-			workspace.reviewFiles
-				.filter((file) => file.status === 'conflicted')
-				.map((file) => file.path),
-		[workspace.reviewFiles],
-	);
+	const localConflicts = useMemo(() => {
+		const paths: string[] = [];
+		for (const file of workspace.reviewFiles) {
+			if (file.status === 'conflicted') {
+				paths.push(file.path);
+			}
+		}
+		return paths;
+	}, [workspace.reviewFiles]);
 	const baseRef = workspace.landingSummary?.branchSource.baseBranch ?? null;
+	const isSettledPullRequest =
+		workspace.pullRequest.state === 'merged' ||
+		workspace.pullRequest.state === 'closed';
 	// No `keepPreviousData`: the key carries the workspace, so carrying the last
 	// result across a switch would name another workspace's files here — and the
 	// probe runs a `git fetch`, long enough for that to be read and acted on.
 	const { data } = useQuery(
 		workspaceMergeConflictsQuery({
 			baseRef,
-			enabled: localConflicts.length === 0,
+			enabled: localConflicts.length === 0 && !isSettledPullRequest,
 			workspaceCwd: workspace.pathLabel ?? null,
 		}),
 	);
@@ -63,12 +73,15 @@ export function useWorkspaceConflicts(
 		if (localConflicts.length > 0) {
 			return { paths: new Set(localConflicts) };
 		}
-		if (!data) {
+		// Ignore any trial-merge result still cached from before the pull request
+		// settled — the query key doesn't carry PR state, so disabling the probe
+		// alone doesn't clear a result fetched while it was still open.
+		if (isSettledPullRequest || !data) {
 			return NO_CONFLICTS;
 		}
 		return {
 			...(data.error ? { error: data.error } : {}),
 			paths: new Set(data.paths),
 		};
-	}, [data, localConflicts]);
+	}, [data, isSettledPullRequest, localConflicts]);
 }
