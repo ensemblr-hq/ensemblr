@@ -294,6 +294,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 			invoke('registerLocalRepository', request),
 		removeEnvFile: (request) => invoke('removeEnvFile', request),
 		renameWorkspace: (request) => invoke('renameWorkspace', request),
+		setWorkspaceBaseBranch: (request) =>
+			invoke('setWorkspaceBaseBranch', request),
 		reorderChatTabs: (request) => invoke('reorderChatTabs', request),
 		repositoryConfig: (request) => invoke('repositoryConfig', request),
 		repositoryWorkspaceNavigation: () =>

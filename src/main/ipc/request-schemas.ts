@@ -90,10 +90,12 @@ export {
 	parseQuickStartProjectRequest,
 	parseRegisterLocalRepositoryRequest,
 	parseRenameWorkspaceRequest,
+	parseSetWorkspaceBaseBranchRequest,
 	parseUnarchiveWorkspaceRequest,
 	quickStartProjectRequestSchema,
 	registerLocalRepositoryRequestSchema,
 	renameWorkspaceRequestSchema,
+	setWorkspaceBaseBranchRequestSchema,
 	unarchiveWorkspaceRequestSchema,
 } from './request-schemas/repository.ts';
 export {

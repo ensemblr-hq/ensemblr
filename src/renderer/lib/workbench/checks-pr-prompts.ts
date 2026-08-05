@@ -1,5 +1,6 @@
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
+import { bareBranchName } from './branch-ref';
 import { clampReviewContext } from './review-context';
 
 /**
@@ -31,7 +32,9 @@ function formatChangedFiles(workspace: WorkspaceShellModel): string {
 
 /** Describes the branch and its base for an agent prompt. */
 function formatBranch(workspace: WorkspaceShellModel): string {
-	const baseBranch = workspace.landingSummary?.branchSource.baseBranch;
+	const baseBranch = bareBranchName(
+		workspace.landingSummary?.branchSource.baseBranch,
+	);
 	return `Branch: ${workspace.branchName}${
 		baseBranch ? ` (base: ${baseBranch})` : ''
 	}`;

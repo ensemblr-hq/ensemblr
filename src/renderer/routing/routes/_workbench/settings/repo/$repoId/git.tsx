@@ -1,28 +1,34 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { BranchPicker } from '@/renderer/components/git/branch-picker';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { SourceBadge } from '@/renderer/components/settings/source-badge';
 import { Input } from '@/renderer/components/ui/input';
 import { Switch } from '@/renderer/components/ui/switch';
-import { useDebouncedSettingField } from '@/renderer/hooks/use-debounced-setting-field';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
 import { useRepoSettingsWriter } from '@/renderer/hooks/use-repo-settings-writer';
+import { originQualifiedRef } from '@/renderer/lib/workbench/branch-ref';
+import type { RepositorySettingsPatch } from '@/shared/ipc/contracts/repository-settings';
 import type { ResolvedSettingSnapshot } from '@/shared/ipc/contracts/settings-resolution';
-
-/** Debounce window before a typed repo-git field is persisted to SQLite. */
-const SAVE_DEBOUNCE_MS = 500;
-
-/** Personal (SQLite) override value for a resolved setting, or `''` when it resolves from another source. */
-function personalValue(resolved: ResolvedSettingSnapshot | undefined): string {
-	return resolved?.source === 'sqlite' ? String(resolved.value ?? '') : '';
-}
 
 /** True when a resolved setting is currently supplied by a personal (SQLite) override. */
 function isPersonalOverride(
 	resolved: ResolvedSettingSnapshot | undefined,
 ): boolean {
 	return resolved?.source === 'sqlite';
+}
+
+/**
+ * Reads a resolved setting as a string, since the resolver types values as
+ * `unknown` and a malformed config row must not reach a string-only consumer.
+ * @param resolved - The resolved setting snapshot, if the key resolved at all.
+ * @returns The string value, or undefined when it is absent or another type.
+ */
+function stringValue(
+	resolved: ResolvedSettingSnapshot | undefined,
+): string | undefined {
+	return typeof resolved?.value === 'string' ? resolved.value : undefined;
 }
 
 /** Route for a repository's Git settings; renders the repo-scoped git-defaults panel keyed by the `repoId` path param. */
@@ -36,43 +42,18 @@ function RepoGitSettings() {
 	const { resolved, project } = useRepoSettings(repoId);
 	const save = useRepoSettingsWriter(repoId, project);
 
-	const branchFrom = resolved('branchFrom');
-	const remoteOrigin = resolved('remoteOrigin');
-
 	return (
 		<SettingsSection
 			description='Per-repository git defaults. These override your user-scope git settings for this repo only.'
 			title='Git'
 		>
-			<TextSetting
-				ariaLabel='Branch new workspaces from'
-				description='Each workspace is an isolated copy of your codebase. Set the upstream branch new workspaces fork from.'
-				label='Branch new workspaces from'
-				modified={isPersonalOverride(branchFrom)}
-				onReset={() => save({ branchFrom: null })}
-				onSave={(value) => save({ branchFrom: value })}
-				placeholder={(branchFrom?.value as string) || 'origin/master'}
-				resolved={branchFrom}
-				seed={personalValue(branchFrom)}
+			<BranchFromSetting
+				repoId={repoId}
+				resolved={resolved('branchFrom')}
+				save={save}
 			/>
 
-			<SettingRow
-				control={
-					<Input
-						aria-label='Remote origin'
-						className='h-8 w-44 font-mono text-xs'
-						disabled
-						value={(remoteOrigin?.value as string) || 'origin'}
-					/>
-				}
-				description='Where Ensemblr pushes, pulls, and opens PRs. Read-only for now — runtime honors the git "origin" remote; a configurable remote is planned.'
-				label={
-					<span className='flex items-center gap-2'>
-						Remote origin
-						<SourceBadge source={remoteOrigin?.source} />
-					</span>
-				}
-			/>
+			<RemoteOriginSetting resolved={resolved('remoteOrigin')} />
 
 			<SettingRow
 				control={
@@ -123,61 +104,83 @@ function RepoGitSettings() {
 }
 
 /**
- * A repo-git text setting whose personal SQLite value hydrates from the resolved
- * snapshot and persists on a debounce. A blank value clears the personal row so
- * the setting falls back to the next resolver source.
+ * Read-only display of the remote every git operation targets. Editable once a
+ * configurable remote lands; until then it exists so the resolved value and its
+ * source are visible rather than implied.
  */
-function TextSetting({
-	ariaLabel,
-	description,
-	label,
-	modified,
-	onReset,
-	onSave,
-	placeholder,
+function RemoteOriginSetting({
 	resolved,
-	seed,
 }: {
-	ariaLabel: string;
-	description: string;
-	label: string;
-	modified: boolean;
-	onReset: () => void;
-	onSave: (value: string | null) => void;
-	placeholder: string;
 	resolved: ResolvedSettingSnapshot | undefined;
-	seed: string;
 }) {
-	const { onChange, value } = useDebouncedSettingField(
-		seed,
-		(next) => {
-			const trimmed = next.trim();
-			onSave(trimmed || null);
-			return trimmed;
-		},
-		SAVE_DEBOUNCE_MS,
-	);
-
 	return (
 		<SettingRow
 			control={
 				<Input
-					aria-label={ariaLabel}
+					aria-label='Remote origin'
 					className='h-8 w-44 font-mono text-xs'
-					onChange={(e) => onChange(e.target.value)}
-					placeholder={placeholder}
-					value={value}
+					disabled
+					value={stringValue(resolved) || 'origin'}
 				/>
 			}
-			description={description}
+			description='Where Ensemblr pushes, pulls, and opens PRs. Read-only for now — runtime honors the git "origin" remote; a configurable remote is planned.'
 			label={
 				<span className='flex items-center gap-2'>
-					{label}
+					Remote origin
 					<SourceBadge source={resolved?.source} />
 				</span>
 			}
-			modified={modified}
-			onReset={onReset}
+		/>
+	);
+}
+
+/**
+ * Repo-scoped picker for the branch new workspaces fork from. Choosing
+ * "Repository default" clears the personal SQLite row so the setting falls back
+ * to the next resolver source rather than pinning the probed default. Typed refs
+ * are stored verbatim, keeping non-GitHub repositories, other remotes, and tags
+ * reachable now that the list itself comes from `gh`.
+ */
+function BranchFromSetting({
+	repoId,
+	resolved,
+	save,
+}: {
+	repoId: string;
+	resolved: ResolvedSettingSnapshot | undefined;
+	save: (patch: RepositorySettingsPatch) => Promise<void>;
+}) {
+	const clear = () => save({ branchFrom: null });
+
+	return (
+		<SettingRow
+			control={
+				<BranchPicker
+					className='max-w-48'
+					fallbackOption={{
+						isActive: !isPersonalOverride(resolved),
+						label: 'Repository default',
+						onSelect: clear,
+					}}
+					onSelect={(branchName) =>
+						save({ branchFrom: originQualifiedRef(branchName) })
+					}
+					onSelectCustomRef={(ref) => save({ branchFrom: ref })}
+					placeholder='Repository default'
+					repositoryId={repoId}
+					searchPlaceholder='Search or enter a ref…'
+					value={stringValue(resolved)}
+				/>
+			}
+			description='Each workspace is an isolated copy of your codebase. Set the upstream branch new workspaces fork from.'
+			label={
+				<span className='flex items-center gap-2'>
+					Branch new workspaces from
+					<SourceBadge source={resolved?.source} />
+				</span>
+			}
+			modified={isPersonalOverride(resolved)}
+			onReset={clear}
 		/>
 	);
 }

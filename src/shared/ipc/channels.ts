@@ -123,6 +123,7 @@ export const IPC_CHANNELS = {
 	saveReviewComment: 'ensemblr:save-review-comment',
 	saveReviewTodo: 'ensemblr:save-review-todo',
 	selectCloneDestination: 'ensemblr:select-clone-destination',
+	setWorkspaceBaseBranch: 'ensemblr:set-workspace-base-branch',
 	selectLocalRepository: 'ensemblr:select-local-repository',
 	clearPiExecutablePath: 'ensemblr:clear-pi-executable-path',
 	getPiExecutablePath: 'ensemblr:get-pi-executable-path',

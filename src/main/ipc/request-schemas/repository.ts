@@ -135,6 +135,30 @@ export function parseCreateWorkspaceRequest(raw: unknown): {
 	return result;
 }
 
+/** {@link import('../../../shared/ipc').SetWorkspaceBaseBranchRequest}. */
+export const setWorkspaceBaseBranchRequestSchema = z.object({
+	baseBranch: z.string().trim(),
+	workspaceId: z.string().trim(),
+});
+
+/**
+ * Parses a set-workspace-base-branch payload, falling back to empty strings on
+ * malformed input. The service emits `workspace-not-found` or
+ * `base-branch-invalid` diagnostics for those.
+ * @param raw - Raw IPC payload.
+ * @returns The normalized set-workspace-base-branch request.
+ */
+export function parseSetWorkspaceBaseBranchRequest(raw: unknown): {
+	baseBranch: string;
+	workspaceId: string;
+} {
+	const parsed = setWorkspaceBaseBranchRequestSchema.safeParse(raw);
+	if (!parsed.success) {
+		return { baseBranch: '', workspaceId: '' };
+	}
+	return parsed.data;
+}
+
 /** {@link import('../../../shared/ipc').RenameWorkspaceRequest}. */
 export const renameWorkspaceRequestSchema = z.object({
 	branchName: optionalTrimmedString,

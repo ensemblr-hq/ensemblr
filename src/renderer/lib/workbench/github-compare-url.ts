@@ -1,4 +1,5 @@
 import type { GithubRepoRef } from '@/renderer/types/workbench';
+import { bareBranchName } from './branch-ref';
 
 /**
  * Extracts the `{ owner, repo }` pair from a GitHub remote URL, covering HTTPS,
@@ -28,6 +29,8 @@ export function parseGithubRepoFromRemoteUrl(
  * browser, pre-expanded. When `base` is known the range is `base...head`;
  * otherwise GitHub defaults the base to the repository's default branch. Branch
  * names are URL-encoded so a head like `user/feature` becomes `user%2Ffeature`.
+ * The base is stored remote-qualified but GitHub compares by branch name, so
+ * the `origin/` prefix is stripped first.
  */
 export function buildGithubCompareUrl({
 	base,
@@ -40,8 +43,9 @@ export function buildGithubCompareUrl({
 	owner: string;
 	repo: string;
 }): string {
-	const range = base
-		? `${encodeURIComponent(base)}...${encodeURIComponent(head)}`
+	const compareBase = bareBranchName(base);
+	const range = compareBase
+		? `${encodeURIComponent(compareBase)}...${encodeURIComponent(head)}`
 		: encodeURIComponent(head);
 
 	return `https://github.com/${owner}/${repo}/compare/${range}?body=&expand=1`;

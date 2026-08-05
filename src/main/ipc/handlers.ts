@@ -33,6 +33,7 @@ import type {
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
 	RenameWorkspaceService,
+	SetWorkspaceBaseBranchService,
 	SharedRootAdoptionService,
 	UnarchiveWorkspaceService,
 } from '../repository';
@@ -122,6 +123,7 @@ interface RegisterIpcHandlersOptions {
 	repositoryConfigService: RepositoryConfigService;
 	rootDirectoryService: EnsemblrRootDirectoryService;
 	scriptLifecycleService: ScriptLifecycleService;
+	setWorkspaceBaseBranchService: SetWorkspaceBaseBranchService;
 	sharedRootAdoptionService: SharedRootAdoptionService;
 	setupDiagnosticsService: SetupDiagnosticsService;
 	settingsResolutionService: EnsemblrConfigResolutionService;
@@ -177,6 +179,7 @@ export function registerIpcHandlers({
 	repositoryConfigService,
 	rootDirectoryService,
 	scriptLifecycleService,
+	setWorkspaceBaseBranchService,
 	setupDiagnosticsService,
 	settingsResolutionService,
 	sharedRootAdoptionService,
@@ -225,6 +228,7 @@ export function registerIpcHandlers({
 		localRepositoryRegistrationService,
 		quickStartProjectService,
 		renameWorkspaceService,
+		setWorkspaceBaseBranchService,
 		sharedRootAdoptionService,
 		unarchiveWorkspaceService,
 		withPermissionGate,

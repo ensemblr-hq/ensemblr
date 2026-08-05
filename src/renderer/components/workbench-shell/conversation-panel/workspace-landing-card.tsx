@@ -1,6 +1,7 @@
 import { FolderIcon, GitBranchIcon } from 'lucide-react';
 
 import { LinkedIssueStatus } from '@/renderer/components/linear/linked-issue-status';
+import { bareBranchName } from '@/renderer/lib/workbench/branch-ref';
 import type { WorkspaceLandingSummary } from '@/renderer/types/workbench';
 
 /**
@@ -25,6 +26,7 @@ export function WorkspaceLandingCard({
 
 	const { branchSource, copiedFiles, repositoryName, workspaceName } =
 		landingSummary;
+	const baseBranch = bareBranchName(branchSource.baseBranch);
 
 	return (
 		<section
@@ -49,13 +51,11 @@ export function WorkspaceLandingCard({
 					<span className='font-mono text-foreground'>
 						{branchSource.branchName}
 					</span>
-					{branchSource.baseBranch ? (
+					{baseBranch ? (
 						<>
 							{' '}
 							from{' '}
-							<span className='font-mono text-foreground'>
-								{branchSource.baseBranch}
-							</span>
+							<span className='font-mono text-foreground'>{baseBranch}</span>
 						</>
 					) : null}
 				</span>

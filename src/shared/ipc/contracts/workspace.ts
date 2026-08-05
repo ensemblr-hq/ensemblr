@@ -176,6 +176,43 @@ export interface RenameWorkspaceResult {
 	workspace: CreatedWorkspaceSnapshot | null;
 }
 
+/** Machine-readable codes for problems raised while retargeting a workspace. */
+export type SetWorkspaceBaseBranchDiagnosticCode =
+	| 'base-branch-invalid'
+	| 'base-branch-unresolvable'
+	| 'database-unavailable'
+	| 'workspace-not-found';
+
+/** Severity level attached to a set-workspace-base-branch diagnostic. */
+export type SetWorkspaceBaseBranchDiagnosticSeverity = 'error' | 'warning';
+
+/** A single problem reported while retargeting a workspace's base branch. */
+export interface SetWorkspaceBaseBranchDiagnostic {
+	code: SetWorkspaceBaseBranchDiagnosticCode;
+	message: string;
+	severity: SetWorkspaceBaseBranchDiagnosticSeverity;
+}
+
+/**
+ * Retargets which branch a workspace reviews and opens pull requests against.
+ * The worktree keeps the fork point it was created from; only the merge-base
+ * used for diffs, conflicts, and the PR target changes.
+ */
+export interface SetWorkspaceBaseBranchRequest {
+	baseBranch: string;
+	workspaceId: string;
+}
+
+/** Outcome of a set-workspace-base-branch request. */
+export type SetWorkspaceBaseBranchStatus = 'failure' | 'success';
+
+/** Result of a set-workspace-base-branch request. */
+export interface SetWorkspaceBaseBranchResult {
+	baseBranch: string | null;
+	diagnostics: SetWorkspaceBaseBranchDiagnostic[];
+	status: SetWorkspaceBaseBranchStatus;
+}
+
 /**
  * Continues a workspace past its merged pull request by branching onto a
  * `-v<n>` successor and checking it out. The successor forks from the base
@@ -557,4 +594,7 @@ export interface WorkspaceApi {
 	renameWorkspace: (
 		request: RenameWorkspaceRequest,
 	) => Promise<RenameWorkspaceResult>;
+	setWorkspaceBaseBranch: (
+		request: SetWorkspaceBaseBranchRequest,
+	) => Promise<SetWorkspaceBaseBranchResult>;
 }

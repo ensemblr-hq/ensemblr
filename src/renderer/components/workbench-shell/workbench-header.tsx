@@ -1,7 +1,14 @@
 import { PanelRightCloseIcon, PanelRightOpenIcon } from 'lucide-react';
 
+import { BranchPicker } from '@/renderer/components/git/branch-picker';
 import { Button } from '@/renderer/components/ui/button';
 import { SidebarTrigger } from '@/renderer/components/ui/sidebar';
+import {
+	Tooltip,
+	TooltipContent,
+	TooltipTrigger,
+} from '@/renderer/components/ui/tooltip';
+import { useWorkspaceTargetBranch } from '@/renderer/hooks/workbench-shell/use-workspace-target-branch';
 import type {
 	ProjectShellModel,
 	WorkspaceShellModel,
@@ -38,6 +45,10 @@ export function WorkbenchHeader({
 							<span className='truncate font-medium'>
 								{activeWorkspace.branchName}
 							</span>
+							<WorkspaceTargetBranch
+								activeWorkspace={activeWorkspace}
+								repositoryId={activeProject.id}
+							/>
 						</div>
 						<p className='truncate text-muted-foreground text-xxs'>
 							{activeWorkspace.pathLabel}
@@ -68,5 +79,45 @@ export function WorkbenchHeader({
 				</Button>
 			</div>
 		</header>
+	);
+}
+
+/**
+ * Header control retargeting the branch this workspace reviews and opens pull
+ * requests against. Changing it re-scopes the diff, conflicts, and PR base; the
+ * worktree keeps the fork point it was created from.
+ */
+function WorkspaceTargetBranch({
+	activeWorkspace,
+	repositoryId,
+}: {
+	activeWorkspace: WorkspaceShellModel;
+	repositoryId: string;
+}) {
+	const { isPending, retargetBranch, retargetRef } = useWorkspaceTargetBranch(
+		activeWorkspace.id,
+	);
+
+	return (
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<span className='shrink-0'>
+					<BranchPicker
+						className='h-6 max-w-40'
+						disabled={isPending}
+						onSelect={retargetBranch}
+						onSelectCustomRef={retargetRef}
+						placeholder='Set target branch'
+						repositoryId={repositoryId}
+						searchPlaceholder='Search or enter a branch…'
+						value={activeWorkspace.landingSummary?.branchSource.baseBranch}
+					/>
+				</span>
+			</TooltipTrigger>
+			<TooltipContent>
+				Target branch — what this workspace diffs and opens pull requests
+				against.
+			</TooltipContent>
+		</Tooltip>
 	);
 }
