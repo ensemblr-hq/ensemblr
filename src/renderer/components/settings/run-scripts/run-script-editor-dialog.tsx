@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { Button } from '@/renderer/components/ui/button';
 import {
@@ -18,6 +18,9 @@ import {
 } from '@/shared/scripts';
 
 import { RunScriptIconPicker } from './run-script-icon-picker';
+
+/** Form key used when adding, so an add never reuses a previous edit's draft. */
+const ADD_SCRIPT_KEY = '__add__';
 
 /** A blank run script, used to seed the dialog when adding rather than editing. */
 const BLANK_RUN_SCRIPT: RunScriptDefinition = {
@@ -48,21 +51,6 @@ export function RunScriptEditorDialog({
 	/** Script being edited, or null when adding a new one. */
 	script: RunScriptDefinition | null;
 }) {
-	const [draft, setDraft] = useState<RunScriptDefinition>(
-		script ?? BLANK_RUN_SCRIPT,
-	);
-
-	useEffect(() => {
-		if (open) {
-			setDraft(script ?? BLANK_RUN_SCRIPT);
-		}
-	}, [open, script]);
-
-	const { canSave, duplicateName, trimmedName } = validateDraft(
-		draft,
-		nameConflicts,
-	);
-
 	return (
 		<Dialog onOpenChange={onOpenChange} open={open}>
 			<DialogContent className='sm:max-w-lg'>
@@ -77,36 +65,70 @@ export function RunScriptEditorDialog({
 					</DialogDescription>
 				</DialogHeader>
 
-				<RunScriptEditorFields
-					draft={draft}
-					duplicateName={duplicateName}
-					onChange={setDraft}
+				<RunScriptEditorForm
+					key={script?.name ?? ADD_SCRIPT_KEY}
+					nameConflicts={nameConflicts}
+					onCancel={() => onOpenChange(false)}
+					onSubmit={onSubmit}
+					script={script}
 				/>
-
-				<DialogFooter>
-					<Button
-						onClick={() => onOpenChange(false)}
-						type='button'
-						variant='ghost'
-					>
-						Cancel
-					</Button>
-					<Button
-						disabled={!canSave}
-						onClick={() =>
-							onSubmit({
-								...draft,
-								command: draft.command.trim(),
-								name: trimmedName,
-							})
-						}
-						type='button'
-					>
-						{script ? 'Save' : 'Add'}
-					</Button>
-				</DialogFooter>
 			</DialogContent>
 		</Dialog>
+	);
+}
+
+/**
+ * Draft state and controls for the script being edited. Keyed by that script so
+ * React remounts it — and reseeds the draft — instead of resetting state in an
+ * effect whenever the dialog switches to a different script.
+ */
+function RunScriptEditorForm({
+	nameConflicts,
+	onCancel,
+	onSubmit,
+	script,
+}: {
+	nameConflicts: (name: string) => boolean;
+	onCancel: () => void;
+	onSubmit: (script: RunScriptDefinition) => void;
+	script: RunScriptDefinition | null;
+}) {
+	const [draft, setDraft] = useState<RunScriptDefinition>(
+		script ?? BLANK_RUN_SCRIPT,
+	);
+
+	const { canSave, duplicateName, trimmedName } = validateDraft(
+		draft,
+		nameConflicts,
+	);
+
+	return (
+		<>
+			<RunScriptEditorFields
+				draft={draft}
+				duplicateName={duplicateName}
+				onChange={setDraft}
+			/>
+
+			<DialogFooter>
+				<Button onClick={onCancel} type='button' variant='ghost'>
+					Cancel
+				</Button>
+				<Button
+					disabled={!canSave}
+					onClick={() =>
+						onSubmit({
+							...draft,
+							command: draft.command.trim(),
+							name: trimmedName,
+						})
+					}
+					type='button'
+				>
+					{script ? 'Save' : 'Add'}
+				</Button>
+			</DialogFooter>
+		</>
 	);
 }
 
