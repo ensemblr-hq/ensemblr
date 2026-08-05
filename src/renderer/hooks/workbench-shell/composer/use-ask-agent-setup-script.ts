@@ -13,13 +13,23 @@ const ASK_AGENT_SETUP_PROMPT = `Set up this repository's Ensemblr config so a fr
 Inspect the project first (package manager, language toolchain, lockfiles), then create or update \`.ensemblr/settings.toml\` with a \`[scripts]\` table:
 
 - \`setup\`: the command that installs dependencies / prepares a new workspace.
-- \`run\`: the command that starts the dev server or main local process (only if the repo has one).
+- \`run\`: the command that starts the dev server or main local process (only if the repo has one). If the repo runs more than one independent dev process (e.g. a frontend and a backend), \`run\` can be an array of named targets instead of a single command.
 
 Example:
 
     [scripts]
     setup = "<install command>"
     run = "<dev command>"
+
+Multi-target example (use only if the repo genuinely has more than one process to run):
+
+    [[scripts.run]]
+    name = "Web"
+    command = "<web dev command>"
+
+    [[scripts.run]]
+    name = "API"
+    command = "<api dev command>"
 
 Use the commands that actually apply to this repo, then tell me what you chose and why.`;
 
