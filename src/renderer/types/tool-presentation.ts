@@ -18,6 +18,7 @@ export type ToolGlyph =
 	| 'file-plus'
 	| 'file-text'
 	| 'folder-tree'
+	| 'image'
 	| 'kanban'
 	| 'list'
 	| 'message-circle-question'
