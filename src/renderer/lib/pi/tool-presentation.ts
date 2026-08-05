@@ -28,6 +28,12 @@ import {
 /** Matches an ANSI colour escape, which only the terminal body can render. */
 const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`);
 
+/**
+ * Matches the `read` tool's placeholder text for an image target ("Read image
+ * file [image/png]") — the whole result, not file content to number as code.
+ */
+const IMAGE_READ_PLACEHOLDER = /^Read image file \[[^[\]]+\]$/;
+
 /** Tool states that still represent work in flight rather than a result. */
 const RUNNING_STATES = new Set(['input-streaming', 'input-available']);
 
@@ -57,8 +63,14 @@ const TOOL_GLYPHS: Record<string, ToolGlyph> = {
 	write_file: 'file-plus',
 };
 
-/** Everything a presenter decides; the glyph follows from the tool's name. */
-type ToolPresenterResult = Omit<ToolPresentation, 'glyph'>;
+/**
+ * Everything a presenter decides. The glyph normally follows from the tool's
+ * name, so it stays optional here; a presenter sets it only to override that
+ * default, e.g. an image `read` marking itself distinctly from a text one.
+ */
+type ToolPresenterResult = Omit<ToolPresentation, 'glyph'> & {
+	glyph?: ToolGlyph;
+};
 
 /**
  * Narrows a value to a non-array object record.
@@ -277,6 +289,19 @@ function presentRead(part: DynamicToolUIPart): ToolPresenterResult {
 	const path = pathOf(input);
 	const output = outputOf(part);
 	const text = output?.text ?? '';
+	// The read tool never returns a numbered file body for an image — only this
+	// one-line placeholder — so a line-numbered code body and a "Read N lines"
+	// title would both be fiction. Fall back to the plain file badge instead.
+	if (IMAGE_READ_PLACEHOLDER.test(text.trim())) {
+		return {
+			badge: fileBadge(path),
+			body: { kind: 'empty' },
+			glyph: 'image',
+			preview: missingPathPreview(path),
+			title: 'Read image',
+			tone: 'default',
+		};
+	}
 	const offset = numberField(
 		input,
 		'offset',
@@ -600,7 +625,7 @@ export function presentToolCall(part: DynamicToolUIPart): ToolPresentation {
 	);
 	const presentation = {
 		...projected,
-		glyph,
+		glyph: projected.glyph ?? glyph,
 		title: controlLabel?.title ?? projected.title,
 	};
 	if (isRunning) {
