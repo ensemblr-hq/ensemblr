@@ -1,3 +1,4 @@
+import type { RunScriptDefinition } from '../../scripts/run-scripts';
 import type {
 	CreateTerminalSessionResult,
 	KillTerminalResult,
@@ -11,6 +12,11 @@ export interface RunWorkspaceScriptRequest {
 	kind: WorkspaceScriptKind;
 	/** Stop the active session of this kind before starting a new one. */
 	restart?: boolean;
+	/**
+	 * Which named run script to launch (`kind: 'run'` only). Omitted or null
+	 * launches the repository's default script.
+	 */
+	scriptName?: string | null;
 	workspaceId: string;
 }
 
@@ -51,7 +57,8 @@ export interface UpdateRepositoryScriptsRequest {
 	archive: string | null;
 	autoRunAfterSetup: boolean;
 	repositoryId: string;
-	run: string | null;
+	/** Named run scripts; an empty list clears the personal override. */
+	runScripts: RunScriptDefinition[];
 	runScriptMode: 'concurrent' | 'nonconcurrent';
 	setup: string | null;
 }

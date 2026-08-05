@@ -1,4 +1,5 @@
 import type { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
+import type { RunScriptDefinition } from '@/shared/scripts';
 
 /** The variable a sheet opens for: a brand-new entry or an existing key. */
 export interface EnvironmentVariableSheetTarget {
@@ -18,8 +19,9 @@ export type RunMode = 'concurrent' | 'nonconcurrent';
 export interface ScriptsForm {
 	archive: string;
 	autoRun: boolean;
-	run: string;
 	runMode: RunMode;
+	/** Named run scripts, in the order they appear in the list and the Run menu. */
+	runScripts: RunScriptDefinition[];
 	setup: string;
 }
 

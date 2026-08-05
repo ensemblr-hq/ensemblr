@@ -42,6 +42,16 @@ Shared script fields:
 - `scripts.setup`, `scripts.run`, `scripts.archive`, and `runScriptMode` retain the same functional meaning in both `ensemblr.json` and `conductor.json`.
 - Conductor-specific fields that do not apply to Ensemblr should be ignored safely unless Ensemblr implements equivalent behavior.
 
+Named run scripts (superseding the single `scripts.run` command):
+
+- A repository declares any number of run scripts as `[scripts.run.<name>]` tables, each carrying `command`, an optional `icon` from Ensemblr's curated set, an optional `default = true`, and an optional `available_in`.
+- A bare `run = "..."` string is still accepted and resolves to one implicit script named `run`, so pre-existing repositories and personal SQLite overrides keep working with no migration. A named list beats the legacy string when both resolve.
+- `available_in` gates on the launching environment. Ensemblr runs workspaces locally only, so an entry that declares environments without `local` is filtered out rather than offered and failed.
+- An unrecognised `icon` falls back to the default icon with a warning diagnostic; a table without a usable `command` is dropped with one. A blank table key, an unrecognised field, and a second `default = true` each diagnose as well, the last of which is demoted so exactly one script stays the ⌘R target.
+- One normaliser (`src/shared/scripts/run-scripts.ts`) owns every field rule and reports what it rejected, so the config loader and the settings resolver cannot judge a committed table and a personal SQLite row differently.
+- Only one run script runs per workspace at a time: starting a second refuses with `script-already-running` unless the request asks for a restart.
+- `runScriptMode` governs concurrency *across* workspaces, not inside one. `nonconcurrent` stops run scripts in the repository's other workspaces before starting; `concurrent` leaves them running, which per-workspace `ENSEMBLR_PORT` allocation makes safe.
+
 ## Alternatives Considered
 
 ### Ensemblr-only configuration

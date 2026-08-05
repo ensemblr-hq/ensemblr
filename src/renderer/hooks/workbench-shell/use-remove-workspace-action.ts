@@ -4,6 +4,7 @@ import { useSetAtom } from 'jotai';
 import { useCallback } from 'react';
 
 import { invalidateWorkspaceListViews } from '@/renderer/api/ensemblr';
+import { forgetLastRunScript } from '@/renderer/state/preferences';
 import { forgetWorkspaceViewedChangesAtom } from '@/renderer/state/workspace';
 import { deleteLastUsedOpenTarget } from '@/renderer/state/workspace/open-target-history';
 
@@ -26,6 +27,7 @@ export function useRemoveWorkspaceAction(options: {
 	return useCallback(
 		async (removedWorkspaceId: string) => {
 			deleteLastUsedOpenTarget(removedWorkspaceId);
+			forgetLastRunScript(removedWorkspaceId);
 			forgetViewedChanges(removedWorkspaceId);
 
 			if (activeWorkspaceId === removedWorkspaceId) {

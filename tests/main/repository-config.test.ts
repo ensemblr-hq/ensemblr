@@ -169,6 +169,204 @@ enabled = true
 	assert.deepEqual(loaded.snapshot.diagnostics, []);
 });
 
+test('normalises [scripts.run.*] tables into named run scripts', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		`
+[scripts]
+setup = "npm ci"
+run_mode = "concurrent"
+
+[scripts.run.dev]
+command = "PORT=$ENSEMBLR_PORT npm run dev"
+icon = "server"
+default = true
+available_in = ["local"]
+
+[scripts.run.checks]
+command = "npm run check"
+icon = "list-checks"
+`,
+	);
+
+	const loaded = loadRepositoryConfig({
+		repositoryPath: fixture.repositoryPath,
+	});
+	const source = getSource(loaded.snapshot, 'ensemblr-config');
+
+	assert.equal(source.status, 'loaded');
+	assert.deepEqual(source.settings, {
+		runScriptMode: 'concurrent',
+		scripts: {
+			runScripts: [
+				{
+					availableIn: ['local'],
+					command: 'PORT=$ENSEMBLR_PORT npm run dev',
+					icon: 'server',
+					isDefault: true,
+					name: 'dev',
+				},
+				{
+					availableIn: null,
+					command: 'npm run check',
+					icon: 'list-checks',
+					isDefault: false,
+					name: 'checks',
+				},
+			],
+			setup: 'npm ci',
+		},
+	});
+	assert.deepEqual(loaded.snapshot.diagnostics, []);
+});
+
+test('normalises [scripts] auto_run_after_setup onto the autoRunAfterSetup key', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		`
+[scripts]
+setup = "npm ci"
+auto_run_after_setup = true
+`,
+	);
+
+	const loaded = loadRepositoryConfig({
+		repositoryPath: fixture.repositoryPath,
+	});
+	const source = getSource(loaded.snapshot, 'ensemblr-config');
+
+	assert.equal(source.status, 'loaded');
+	assert.deepEqual(source.settings, {
+		autoRunAfterSetup: true,
+		scripts: { setup: 'npm ci' },
+	});
+	assert.deepEqual(loaded.snapshot.diagnostics, []);
+});
+
+test('diagnoses a non-boolean [scripts] auto_run_after_setup', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		'[scripts]\nauto_run_after_setup = "yes"\n',
+	);
+
+	const loaded = loadRepositoryConfig({
+		repositoryPath: fixture.repositoryPath,
+	});
+	const source = getSource(loaded.snapshot, 'ensemblr-config');
+
+	assert.deepEqual(source.settings, {});
+	assert.deepEqual(
+		loaded.snapshot.diagnostics.map((diagnostic) => ({
+			code: diagnostic.code,
+			fieldPath: diagnostic.fieldPath,
+		})),
+		[
+			{
+				code: 'invalid-repository-config-field',
+				fieldPath: '$.scripts.auto_run_after_setup',
+			},
+		],
+	);
+});
+
+test('diagnoses malformed [scripts.run.*] entries', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		`
+[scripts.run.missing_command]
+icon = "play"
+
+[scripts.run.bad_types]
+command = "npm run dev"
+icon = "not-a-real-icon"
+default = "yes"
+available_in = "local"
+mystery = 1
+`,
+	);
+
+	const loaded = loadRepositoryConfig({
+		repositoryPath: fixture.repositoryPath,
+	});
+	const source = getSource(loaded.snapshot, 'ensemblr-config');
+	const codes = loaded.snapshot.diagnostics.map((diagnostic) => ({
+		code: diagnostic.code,
+		fieldPath: diagnostic.fieldPath,
+	}));
+
+	assert.deepEqual(source.settings, {
+		scripts: {
+			runScripts: [
+				{
+					availableIn: null,
+					command: 'npm run dev',
+					icon: 'play',
+					isDefault: false,
+					name: 'bad_types',
+				},
+			],
+		},
+	});
+	assert.deepEqual(codes, [
+		{
+			code: 'invalid-repository-config-field',
+			fieldPath: '$.scripts.run.missing_command.command',
+		},
+		{
+			code: 'invalid-repository-config-field',
+			fieldPath: '$.scripts.run.bad_types.icon',
+		},
+		{
+			code: 'invalid-repository-config-field',
+			fieldPath: '$.scripts.run.bad_types.default',
+		},
+		{
+			code: 'invalid-repository-config-field',
+			fieldPath: '$.scripts.run.bad_types.available_in',
+		},
+		{
+			code: 'unsupported-repository-config-field',
+			fieldPath: '$.scripts.run.bad_types.mystery',
+		},
+	]);
+});
+
+test('resolves committed named run scripts through the settings resolver', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		'[scripts.run.dev]\ncommand = "npm run dev"\n',
+	);
+
+	const snapshot = resolveSettings({
+		config: createConfig(),
+		repository: {
+			repositoryId: 'repo-run-scripts',
+			repositoryPath: fixture.repositoryPath,
+		},
+	});
+
+	assert.ok(snapshot.repository);
+	const resolved = getRepositorySetting(
+		snapshot.repository,
+		'scripts.runScripts',
+	);
+	assert.equal(resolved.source, 'ensemblr-config');
+	assert.deepEqual(resolved.value, [
+		{
+			availableIn: null,
+			command: 'npm run dev',
+			icon: 'play',
+			isDefault: false,
+			name: 'dev',
+		},
+	]);
+});
+
 test('normalises nested [git] keys onto canonical top-level keys', (t) => {
 	const fixture = createRepositoryFixture(t);
 	fixture.write(

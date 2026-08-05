@@ -5,7 +5,9 @@ import type {
 } from '../../shared/ipc/contracts/terminal';
 import type { WorkspaceScriptKind } from '../../shared/ipc/contracts/workspace-scripts';
 import {
+	formatRunScriptLabel,
 	parseWorkspaceScriptSettings,
+	resolveRunScript,
 	type WorkspaceScriptSettings,
 } from '../../shared/scripts.ts';
 import type { EnsemblrConfigResolutionService } from '../config';
@@ -29,12 +31,32 @@ export interface RunScriptOptions {
 	kind: WorkspaceScriptKind;
 	/** Stop the active session of this kind before starting a new one. */
 	restart?: boolean;
+	/**
+	 * Which named run script to launch (`kind: 'run'` only). Omitted launches the
+	 * repository's default; a name that is not configured fails rather than
+	 * falling back, so a stale selection never runs the wrong command.
+	 */
+	scriptName?: string | null;
 	workspaceId: string;
 }
 
 /** Inputs for {@link ScriptLifecycleService.stopScript}. */
 export interface StopScriptOptions {
 	kind: WorkspaceScriptKind;
+	workspaceId: string;
+}
+
+/** One resolved script launch: everything needed to spawn its session. */
+interface ScriptLaunch {
+	command: string;
+	kind: WorkspaceScriptKind;
+	/** Repository the target workspace belongs to. */
+	repositoryId: string;
+	/** Configured run-script name, or null for setup/archive. */
+	scriptName: string | null;
+	/** True when `nonconcurrent` run mode must clear the repository's siblings first. */
+	stopSiblingWorkspaces: boolean;
+	title: string;
 	workspaceId: string;
 }
 
@@ -93,12 +115,18 @@ export function createScriptLifecycleService({
 		Promise<CreateTerminalSessionResult>
 	>();
 
-	/** Resolves the configured command and run mode from the workspace worktree. */
-	function resolveScriptConfig(
-		workspaceId: string,
-	):
-		| { error: CreateTerminalSessionResult; settings: null }
-		| { error: null; settings: WorkspaceScriptSettings } {
+	/**
+	 * Resolves the configured command and run mode from the workspace worktree,
+	 * along with the repository the workspace belongs to — which run launches
+	 * need to serialize and to reach the workspace's siblings.
+	 */
+	function resolveScriptConfig(workspaceId: string):
+		| { error: CreateTerminalSessionResult; repositoryId: null; settings: null }
+		| {
+				error: null;
+				repositoryId: string;
+				settings: WorkspaceScriptSettings;
+		  } {
 		const database = databaseService.getConnection()?.database ?? null;
 
 		if (!database) {
@@ -107,6 +135,7 @@ export function createScriptLifecycleService({
 					'database-unavailable',
 					'SQLite is unavailable; the script cannot be resolved.',
 				),
+				repositoryId: null,
 				settings: null,
 			};
 		}
@@ -119,6 +148,7 @@ export function createScriptLifecycleService({
 					'workspace-not-found',
 					`No workspace is registered with id ${workspaceId}.`,
 				),
+				repositoryId: null,
 				settings: null,
 			};
 		}
@@ -132,6 +162,7 @@ export function createScriptLifecycleService({
 
 		return {
 			error: null,
+			repositoryId: row.repositoryId,
 			settings: parseWorkspaceScriptSettings(
 				snapshot.repository?.settings ?? [],
 			),
@@ -154,16 +185,18 @@ export function createScriptLifecycleService({
 	}
 
 	/**
-	 * Start a workspace's setup/run/archive script session, honoring restart and
-	 * the resolved concurrency mode. Concurrent run launches start immediately;
-	 * every other launch is serialized so overlapping requests cannot create
-	 * duplicate sessions.
-	 * @param options - Script kind, target workspace, and whether to restart a running session.
+	 * Start a workspace's setup/run/archive script session. Only one script of a
+	 * kind runs per workspace at a time, so launches are serialized and a second
+	 * request is refused unless it asks for a restart. In `nonconcurrent` run
+	 * mode a run launch additionally stops run scripts in the repository's other
+	 * workspaces.
+	 * @param options - Script kind, target workspace, requested run script, and whether to restart.
 	 * @returns The terminal session create result, or a typed failure diagnostic.
 	 */
 	async function runScript({
 		kind,
 		restart = false,
+		scriptName,
 		workspaceId,
 	}: RunScriptOptions): Promise<CreateTerminalSessionResult> {
 		const resolved = resolveScriptConfig(workspaceId);
@@ -172,68 +205,103 @@ export function createScriptLifecycleService({
 			return resolved.error;
 		}
 
-		const command = resolved.settings.scripts[kind];
+		const launch = resolveScriptLaunch({
+			kind,
+			repositoryId: resolved.repositoryId,
+			requestedName: scriptName,
+			settings: resolved.settings,
+			workspaceId,
+		});
 
-		if (!command) {
+		if (!launch) {
 			return failure(
 				'script-not-configured',
-				`No ${kind} script is configured for this repository.`,
+				describeMissingScript(kind, scriptName),
 				'info',
 			);
 		}
 
-		const allowConcurrent =
-			kind === 'run' &&
-			resolved.settings.runScriptMode === 'concurrent' &&
-			!restart;
-
-		if (allowConcurrent) {
-			return createScriptSession({ command, kind, workspaceId });
-		}
-
-		return runExclusiveScript({ command, kind, restart, workspaceId });
+		return runExclusiveScript(launch, restart);
 	}
 
 	/**
-	 * Serializes an exclusive script launch behind any in-flight launch for the
-	 * same workspace and kind. The pending promise spans the entire decision —
-	 * active-session check, restart kill/wait, and session create — so a
-	 * concurrent request always observes the first launch's session before it
-	 * decides, closing the duplicate-session race for both fresh starts and
-	 * restarts.
-	 * @param options - Resolved command, script kind, restart flag, and workspace.
-	 * @returns The terminal session create result, or a typed failure diagnostic.
+	 * Resolves which command a launch request runs, mapping the run kind onto one
+	 * of the repository's named run scripts.
+	 * @param options - Script kind, requested run-script name, resolved settings, and workspace.
+	 * @returns The launch record, or null when nothing is configured for it.
 	 */
-	async function runExclusiveScript({
-		command,
+	function resolveScriptLaunch({
 		kind,
-		restart,
+		repositoryId,
+		requestedName,
+		settings,
 		workspaceId,
 	}: {
-		command: string;
 		kind: WorkspaceScriptKind;
-		restart: boolean;
+		repositoryId: string;
+		requestedName: string | null | undefined;
+		settings: WorkspaceScriptSettings;
 		workspaceId: string;
-	}): Promise<CreateTerminalSessionResult> {
-		const key = `${workspaceId}:${kind}`;
+	}): ScriptLaunch | null {
+		if (kind !== 'run') {
+			const command = settings.scripts[kind];
+
+			return command
+				? {
+						command,
+						kind,
+						repositoryId,
+						scriptName: null,
+						stopSiblingWorkspaces: false,
+						title: defaultScriptTitle(kind),
+						workspaceId,
+					}
+				: null;
+		}
+
+		const runScript = resolveRunScript(settings.runScripts, requestedName);
+
+		return runScript
+			? {
+					command: runScript.command,
+					kind,
+					repositoryId,
+					scriptName: runScript.name,
+					stopSiblingWorkspaces: settings.runScriptMode === 'nonconcurrent',
+					title: formatRunScriptLabel(runScript.name),
+					workspaceId,
+				}
+			: null;
+	}
+
+	/**
+	 * Serializes a script launch behind any in-flight launch sharing its lock.
+	 * The pending promise spans the entire decision — active-session check,
+	 * restart kill/wait, sibling stop, and session create — so a concurrent
+	 * request always observes the first launch's session before it decides,
+	 * closing the duplicate-session race for both fresh starts and restarts.
+	 * @param launch - The resolved launch.
+	 * @param restart - Whether to replace a session that is already running.
+	 * @returns The terminal session create result, or a typed failure diagnostic.
+	 */
+	async function runExclusiveScript(
+		launch: ScriptLaunch,
+		restart: boolean,
+	): Promise<CreateTerminalSessionResult> {
+		const key = exclusiveLaunchKey(launch);
 		const pendingStart = pendingExclusiveScriptStarts.get(key);
 
 		if (pendingStart) {
 			await pendingStart.catch(() => undefined);
 		}
 
-		const launch = launchExclusiveScript({
-			command,
-			kind,
-			restart,
-			workspaceId,
-		});
-		pendingExclusiveScriptStarts.set(key, launch);
+		const started = launchExclusiveScript(launch, restart);
+		pendingExclusiveScriptStarts.set(key, started);
 
 		try {
-			return await launch;
+			return await started;
 		} finally {
-			if (pendingExclusiveScriptStarts.get(key) === launch) {
+			if (pendingExclusiveScriptStarts.get(key) === started) {
 				pendingExclusiveScriptStarts.delete(key);
 			}
 		}
@@ -243,27 +311,24 @@ export function createScriptLifecycleService({
 	 * Decides and performs one exclusive launch: fails when a session is already
 	 * running unless restart is set, in which case it stops the active session
 	 * and waits for it to exit before starting the replacement.
-	 * @param options - Resolved command, script kind, restart flag, and workspace.
+	 * @param launch - The resolved launch.
+	 * @param restart - Whether to replace a session that is already running.
 	 * @returns The terminal session create result, or a typed failure diagnostic.
 	 */
-	async function launchExclusiveScript({
-		command,
-		kind,
-		restart,
-		workspaceId,
-	}: {
-		command: string;
-		kind: WorkspaceScriptKind;
-		restart: boolean;
-		workspaceId: string;
-	}): Promise<CreateTerminalSessionResult> {
-		const activeSession = findActiveScriptSession(workspaceId, kind);
+	async function launchExclusiveScript(
+		launch: ScriptLaunch,
+		restart: boolean,
+	): Promise<CreateTerminalSessionResult> {
+		const activeSession = findActiveScriptSession(
+			launch.workspaceId,
+			launch.kind,
+		);
 
 		if (activeSession) {
 			if (!restart) {
 				return failure(
 					'script-already-running',
-					`The ${kind} script is already running. Stop it or restart explicitly.`,
+					`The ${launch.kind} script is already running. Stop it or restart explicitly.`,
 					'warning',
 				);
 			}
@@ -277,35 +342,88 @@ export function createScriptLifecycleService({
 			if (!exited) {
 				return failure(
 					'script-restart-timeout',
-					`The running ${kind} script did not stop in time; the restart was aborted.`,
+					`The running ${launch.kind} script did not stop in time; the restart was aborted.`,
 					'warning',
 				);
 			}
 		}
 
-		return createScriptSession({ command, kind, workspaceId });
+		if (launch.stopSiblingWorkspaces) {
+			await stopSiblingWorkspaceRunScripts(launch);
+		}
+
+		return createScriptSession(launch);
 	}
 
 	/**
-	 * Creates a workspace terminal session for a script kind, applying the
-	 * `<kind>-script` session kind and default dock title.
-	 * @param options - Resolved command, script kind, and workspace.
+	 * Stops run scripts running in the repository's other workspaces, which is
+	 * what `nonconcurrent` run mode means: one workspace of a repository holds
+	 * the dev server at a time. Best-effort — a sibling that ignores the kill is
+	 * left behind rather than blocking this workspace's launch. Siblings stop
+	 * together, so one that has to be waited out does not delay the rest.
+	 * @param launch - The run launch about to start.
+	 */
+	async function stopSiblingWorkspaceRunScripts(
+		launch: ScriptLaunch,
+	): Promise<void> {
+		await Promise.all(
+			findSiblingRunSessionIds(launch).map((sessionId) => {
+				terminalService.kill(sessionId);
+
+				return terminalService.waitForExit(sessionId, RESTART_WAIT_TIMEOUT_MS);
+			}),
+		);
+	}
+
+	/**
+	 * Live run-script sessions belonging to the repository's other workspaces.
+	 * @param launch - The run launch about to start.
+	 * @returns The sibling session ids, or none when SQLite is unavailable.
+	 */
+	function findSiblingRunSessionIds(launch: ScriptLaunch): string[] {
+		const database = databaseService.getConnection()?.database ?? null;
+
+		if (!database) {
+			return [];
+		}
+
+		const sharesRepository = (sessionWorkspaceId: string): boolean => {
+			const sibling = selectWorkspaceWithRepositoryById({
+				database,
+				workspaceId: sessionWorkspaceId,
+			});
+
+			return (
+				isWorkspaceRow(sibling) && sibling.repositoryId === launch.repositoryId
+			);
+		};
+
+		return terminalService
+			.listByKind('run-script')
+			.filter(
+				(session) =>
+					session.workspaceId !== launch.workspaceId &&
+					session.status === 'running' &&
+					sharesRepository(session.workspaceId),
+			)
+			.map((session) => session.id);
+	}
+
+	/**
+	 * Creates a workspace terminal session for a resolved launch, applying the
+	 * `<kind>-script` session kind, dock title, and run-script name.
+	 * @param launch - The resolved launch.
 	 * @returns The terminal session create result.
 	 */
-	function createScriptSession({
-		command,
-		kind,
-		workspaceId,
-	}: {
-		command: string;
-		kind: WorkspaceScriptKind;
-		workspaceId: string;
-	}): Promise<CreateTerminalSessionResult> {
+	function createScriptSession(
+		launch: ScriptLaunch,
+	): Promise<CreateTerminalSessionResult> {
 		return terminalService.create({
-			command,
-			kind: `${kind}-script`,
-			title: defaultScriptTitle(kind),
-			workspaceId,
+			command: launch.command,
+			kind: `${launch.kind}-script`,
+			title: launch.title,
+			workspaceId: launch.workspaceId,
+			...(launch.scriptName ? { scriptName: launch.scriptName } : {}),
 		});
 	}
 
@@ -345,7 +463,7 @@ export function createScriptLifecycleService({
 		if (
 			fresh.error ||
 			!fresh.settings.autoRunAfterSetup ||
-			!fresh.settings.scripts.run
+			fresh.settings.runScripts.length === 0
 		) {
 			return;
 		}
@@ -573,7 +691,23 @@ function failure(
 	};
 }
 
-/** Default dock title per script kind. */
+/**
+ * Lock a launch is serialized behind. Run launches lock on the repository, not
+ * the workspace: `nonconcurrent` mode stops the launching workspace's siblings,
+ * and it can only see a sibling whose session already exists. Two workspaces of
+ * one repository starting at once would otherwise each find no sibling and both
+ * survive, which is the port collision the mode exists to prevent. Setup and
+ * archive stay per-workspace — they never reach outside their own worktree.
+ * @param launch - The resolved launch.
+ * @returns The key its start promise is held under.
+ */
+function exclusiveLaunchKey(launch: ScriptLaunch): string {
+	return launch.kind === 'run'
+		? `repository:${launch.repositoryId}:run`
+		: `workspace:${launch.workspaceId}:${launch.kind}`;
+}
+
+/** Default dock title per script kind; named run scripts title themselves. */
 function defaultScriptTitle(kind: WorkspaceScriptKind): string {
 	switch (kind) {
 		case 'archive':
@@ -583,6 +717,24 @@ function defaultScriptTitle(kind: WorkspaceScriptKind): string {
 		case 'setup':
 			return 'Setup';
 	}
+}
+
+/**
+ * Explains why a launch found no command, distinguishing a repository with no
+ * script of that kind from a request naming a run script that no longer exists.
+ * @param kind - The requested script kind.
+ * @param scriptName - The requested run-script name, when one was given.
+ * @returns The diagnostic message.
+ */
+function describeMissingScript(
+	kind: WorkspaceScriptKind,
+	scriptName: string | null | undefined,
+): string {
+	if (kind === 'run' && scriptName) {
+		return `No run script named "${scriptName}" is configured for this repository.`;
+	}
+
+	return `No ${kind} script is configured for this repository.`;
 }
 
 /** Type guard for the workspace join-row fields this service reads. */

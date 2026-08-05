@@ -1,6 +1,21 @@
 "$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
 
 [scripts]
-run = "./scripts/with-pinned-node.sh npm run dev"
 run_mode = "concurrent"
 setup = "./scripts/with-pinned-node.sh npm ci --allow-remote=all"
+
+# Node 24 is pinned by scripts/require-node-version.mjs and mise only activates
+# in interactive shells, so every command goes through the wrapper.
+[scripts.run.dev]
+command = "./scripts/with-pinned-node.sh npm run dev"
+available_in = ["local"]
+default = true
+icon = "play"
+
+[scripts.run.checks]
+command = "./scripts/with-pinned-node.sh npm run check && ./scripts/with-pinned-node.sh npm run typecheck"
+icon = "list-checks"
+
+[scripts.run.test]
+command = "./scripts/with-pinned-node.sh npm test"
+icon = "test-tube"

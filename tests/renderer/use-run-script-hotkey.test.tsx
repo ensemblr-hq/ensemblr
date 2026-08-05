@@ -6,6 +6,7 @@ import { expect, test, vi } from 'vitest';
 import { useRunScriptHotkey } from '@/renderer/hooks/workbench-shell/dock-panel/use-run-script-hotkey';
 import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
 import { matchesShortcut } from '@/shared/keymap';
+import type { RunScriptDefinition } from '@/shared/scripts';
 
 /**
  * Dispatches a ⌘R / Ctrl+R `keydown` matching the `run.start` binding on the
@@ -31,12 +32,27 @@ function dispatchRunHotkey(): KeyboardEvent {
 	return event;
 }
 
+const DEV_RUN_SCRIPT: RunScriptDefinition = {
+	availableIn: null,
+	command: 'npm run dev',
+	icon: 'play',
+	isDefault: true,
+	name: 'dev',
+};
+
 /** Mounts the hook at `status` with fresh start/stop spies. */
-function setup(status: WorkspaceScriptSummary['status']) {
+function setup(
+	status: WorkspaceScriptSummary['status'],
+	activeRunScript: RunScriptDefinition | null = DEV_RUN_SCRIPT,
+) {
 	const onRunScript = vi.fn();
 	const onStopRunScript = vi.fn();
 	renderHook(() =>
-		useRunScriptHotkey(status, { onRunScript, onStopRunScript }),
+		useRunScriptHotkey(
+			status,
+			{ onRunScript, onStopRunScript },
+			activeRunScript,
+		),
 	);
 	return { onRunScript, onStopRunScript };
 }
@@ -59,12 +75,12 @@ test.each<WorkspaceScriptSummary['status']>([
 
 	dispatchRunHotkey();
 
-	expect(onRunScript).toHaveBeenCalledTimes(1);
+	expect(onRunScript).toHaveBeenCalledExactlyOnceWith('dev');
 	expect(onStopRunScript).not.toHaveBeenCalled();
 });
 
 test('⌘R is a no-op when no run script is configured', () => {
-	const { onRunScript, onStopRunScript } = setup('missing');
+	const { onRunScript, onStopRunScript } = setup('missing', null);
 
 	dispatchRunHotkey();
 
@@ -73,7 +89,7 @@ test('⌘R is a no-op when no run script is configured', () => {
 });
 
 test('⌘R is captured (default reload suppressed) even when missing', () => {
-	setup('missing');
+	setup('missing', null);
 
 	// preventDefault must fire regardless of run status, otherwise ⌘R falls
 	// through to a native Electron reload.

@@ -211,6 +211,7 @@ export function useLiveWorkspaceModel({
 			],
 			...liveReview,
 			pullRequest,
+			runScripts: scriptSettingsData?.runScripts ?? [],
 			scripts,
 			workspaceFiles: liveWorkspaceFiles,
 		};

@@ -7,6 +7,10 @@ import type {
 	RepositoryConfigSourceStatus,
 } from '../../shared/ipc/contracts/repository-config';
 import type { SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
+import {
+	normalizeRunScriptTable,
+	type RunScriptIssue,
+} from '../../shared/scripts.ts';
 import { cloneRecord, isPlainRecord } from './json-utils.ts';
 import {
 	formatSourceName,
@@ -266,7 +270,6 @@ function normalizeTomlRepositoryConfig(
 	return normalizeRepositoryConfigFields({
 		config,
 		fieldMap: TOML_FIELD_MAP,
-		scriptSupportsRunMode: true,
 		source,
 	});
 }
@@ -279,12 +282,10 @@ function normalizeTomlRepositoryConfig(
 function normalizeRepositoryConfigFields({
 	config,
 	fieldMap,
-	scriptSupportsRunMode,
 	source,
 }: {
 	config: Record<string, unknown>;
 	fieldMap: ReadonlyMap<string, string>;
-	scriptSupportsRunMode: boolean;
 	source: SettingsResolutionSource;
 }): { diagnostics: ConfigDiagnostic[]; settings: Record<string, unknown> } {
 	const diagnostics: ConfigDiagnostic[] = [];
@@ -292,12 +293,7 @@ function normalizeRepositoryConfigFields({
 
 	for (const [key, value] of Object.entries(config)) {
 		if (key === 'scripts') {
-			const normalizedScripts = normalizeScripts(
-				value,
-				'$.scripts',
-				source,
-				scriptSupportsRunMode,
-			);
+			const normalizedScripts = normalizeScripts(value, '$.scripts', source);
 			settings = mergeSettings(settings, normalizedScripts.settings);
 			diagnostics.push(...normalizedScripts.diagnostics);
 			continue;
@@ -349,19 +345,33 @@ function normalizeRepositoryConfigFields({
 }
 
 /**
- * Normalises the `scripts` block (setup/run/archive plus optional `run_mode`),
- * collecting diagnostics for unsupported keys and non-string values.
+ * `[scripts]` keys that carry repository behaviour rather than a command, and
+ * so resolve onto a top-level setting key instead of into the `scripts` record.
+ */
+const SCRIPT_BEHAVIOUR_FIELDS = new Map<
+	string,
+	{ expected: 'boolean' | 'string'; settingKey: string }
+>([
+	['run_mode', { expected: 'string', settingKey: 'runScriptMode' }],
+	[
+		'auto_run_after_setup',
+		{ expected: 'boolean', settingKey: 'autoRunAfterSetup' },
+	],
+]);
+
+/**
+ * Normalises the `scripts` block (setup/run/archive plus the behaviour keys
+ * `run_mode` and `auto_run_after_setup`), collecting diagnostics for
+ * unsupported keys and mistyped values.
  * @param value - Raw `scripts` value to normalise.
  * @param fieldPath - JSONPath used in diagnostic messages.
  * @param source - Source identifier used in diagnostics.
- * @param supportRunMode - Whether to accept the TOML-only `run_mode` key.
  * @returns Partial settings record plus accumulated diagnostics.
  */
 function normalizeScripts(
 	value: unknown,
 	fieldPath: string,
 	source: SettingsResolutionSource,
-	supportRunMode: boolean,
 ): NormalizedConfigSource {
 	if (!isPlainRecord(value)) {
 		return { diagnostics: [], settings: {} };
@@ -375,33 +385,32 @@ function normalizeScripts(
 		const normalizedScriptKey = SCRIPT_FIELD_MAP.get(
 			key as 'archive' | 'run' | 'setup',
 		);
+		const keyPath = `${fieldPath}.${key}`;
 
 		if (normalizedScriptKey) {
-			if (typeof scriptValue === 'string') {
-				scripts[normalizedScriptKey] = scriptValue;
-			} else {
-				diagnostics.push(
-					createInvalidFieldDiagnostic(
-						key,
-						source,
-						`${fieldPath}.${key}`,
-						'string',
-					),
-				);
-			}
+			const command = normalizeScriptCommand({
+				keyPath,
+				scriptKey: normalizedScriptKey,
+				source,
+				value: scriptValue,
+			});
+			diagnostics.push(...command.diagnostics);
+			Object.assign(scripts, command.scripts);
 			continue;
 		}
 
-		if (supportRunMode && key === 'run_mode') {
-			if (typeof scriptValue === 'string') {
-				settings.runScriptMode = scriptValue;
+		const behaviourField = SCRIPT_BEHAVIOUR_FIELDS.get(key);
+
+		if (behaviourField) {
+			if (typeof scriptValue === behaviourField.expected) {
+				settings[behaviourField.settingKey] = scriptValue;
 			} else {
 				diagnostics.push(
 					createInvalidFieldDiagnostic(
 						key,
 						source,
-						`${fieldPath}.${key}`,
-						'string',
+						keyPath,
+						behaviourField.expected,
 					),
 				);
 			}
@@ -418,6 +427,86 @@ function normalizeScripts(
 	}
 
 	return { diagnostics, settings };
+}
+
+/**
+ * Normalises one `scripts.<kind>` entry. Every kind takes a plain command
+ * string; `run` additionally accepts a table of named run scripts, which
+ * normalises onto the separate `runScripts` key.
+ * @param input - The raw value, its script kind, diagnostic path, and source.
+ * @returns The partial `scripts` record to merge, plus diagnostics.
+ */
+function normalizeScriptCommand({
+	keyPath,
+	scriptKey,
+	source,
+	value,
+}: {
+	keyPath: string;
+	scriptKey: 'archive' | 'run' | 'setup';
+	source: SettingsResolutionSource;
+	value: unknown;
+}): { diagnostics: ConfigDiagnostic[]; scripts: Record<string, unknown> } {
+	if (scriptKey === 'run' && isPlainRecord(value)) {
+		const issues: RunScriptIssue[] = [];
+		const definitions = normalizeRunScriptTable(value, issues);
+
+		return {
+			diagnostics: issues.map((issue) =>
+				createRunScriptDiagnostic(issue, keyPath, source),
+			),
+			scripts: definitions.length > 0 ? { runScripts: definitions } : {},
+		};
+	}
+
+	if (typeof value === 'string') {
+		return { diagnostics: [], scripts: { [scriptKey]: value } };
+	}
+
+	return {
+		diagnostics: [
+			createInvalidFieldDiagnostic(
+				scriptKey,
+				source,
+				keyPath,
+				scriptKey === 'run'
+					? 'a string or a table of named run scripts'
+					: 'string',
+			),
+		],
+		scripts: {},
+	};
+}
+
+/**
+ * Translates one {@link RunScriptIssue} into the diagnostic the config snapshot
+ * reports, anchoring it on the offending table or field.
+ * @param issue - The rejected field the shared normaliser reported.
+ * @param fieldPath - JSONPath of the owning `scripts.run` table.
+ * @param source - Source identifier used in diagnostics.
+ * @returns The diagnostic to report.
+ */
+function createRunScriptDiagnostic(
+	issue: RunScriptIssue,
+	fieldPath: string,
+	source: SettingsResolutionSource,
+): ConfigDiagnostic {
+	const entryPath = `${fieldPath}.${issue.script}`;
+
+	if (issue.kind === 'unsupported') {
+		return createUnsupportedFieldDiagnostic(
+			issue.field,
+			source,
+			`${entryPath}.${issue.field}`,
+		);
+	}
+
+	return createInvalidFieldDiagnostic(
+		issue.field ?? issue.script,
+		source,
+		issue.field ? `${entryPath}.${issue.field}` : entryPath,
+		issue.expected,
+	);
 }
 
 /**

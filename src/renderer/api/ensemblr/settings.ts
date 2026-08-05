@@ -41,6 +41,9 @@ export function settingsResolutionQuery(
 			repository?.repositoryId ?? null,
 			repository?.repositoryPath,
 		),
+		// `.ensemblr/settings.toml` is hand-editable and only open workspace
+		// worktrees are watched, so refetch on focus to pick up an outside edit.
+		refetchOnWindowFocus: true,
 		staleTime: 15_000,
 	});
 }

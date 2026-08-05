@@ -28,6 +28,7 @@ function relaunchedSnapshot(
 		previewUrl: null,
 		restored: Boolean(request.seedOutput),
 		rows: 24,
+		scriptName: null,
 		status: 'running',
 		title: request.title ?? 'Terminal',
 		workspaceId: request.workspaceId,

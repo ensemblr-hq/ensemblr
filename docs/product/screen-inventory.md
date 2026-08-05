@@ -198,7 +198,7 @@ No onboarding PNG files were captured under `.context/conductor-screens/01-onboa
 - Data shown: Private repository name, paths, and script commands are visible but described generically.
 - Settings or configuration implied: Repository root path, workspace path, default branch, remote origin, preview URL template, files-to-copy patterns, scripts.
 - Ensemblr parity requirement: Provide repository-scoped settings that override shared config and expose config/source diagnostics.
-- Pi-specific adaptation: Read the committed `.ensemblr/settings.toml`, and expose `ENSEMBLR_*` variables in preview URLs and scripts.
+- Pi-specific adaptation: Read the committed `.ensemblr/settings.toml` (and write its `[scripts]` block from the Scripts screen, per ADR 0041), and expose `ENSEMBLR_*` variables in preview URLs and scripts.
 - Risks or implementation notes: Do not move/delete repository or workspace directories from settings; archive or remove through explicit lifecycle actions.
 
 ### `.context/conductor-screens/02-root-settings/CleanShot 2026-06-04 at 17.56.59@2x.png`

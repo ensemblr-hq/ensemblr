@@ -159,7 +159,9 @@ Current intended precedence:
 4. User defaults from `config.json`.
 5. Built-in defaults.
 
-`.ensemblr/settings.toml` is read-only to the app. Users hand-edit and commit it.
+`.ensemblr/settings.toml` is hand-edited and committed by users. Since ADR 0041
+the Scripts settings screen also writes its `[scripts]` block; every other
+section is still read-only to the app.
 
 ### Repo Environment
 
@@ -180,7 +182,7 @@ Status: **wired**.
 - Run mode.
 - Auto-run after setup.
 
-The UI writes personal SQLite rows. If `.ensemblr/settings.toml` defines the same key, the committed value wins and the SQLite edit is shadowed.
+Superseded by ADR 0041: the UI now rewrites the repository root's committed `.ensemblr/settings.toml` instead of writing personal SQLite rows, and the legacy rows were migrated into the file.
 
 ### Repo Git
 

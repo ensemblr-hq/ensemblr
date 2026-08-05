@@ -25,11 +25,13 @@ import type {
 
 const NOW = '2026-06-11T00:00:00.000Z';
 const WORKSPACE_ID = 'workspace-1';
+/** Second workspace of the same repository, for cross-workspace run-mode tests. */
+const SIBLING_WORKSPACE_ID = 'workspace-2';
+/** Workspace of an unrelated repository, which run mode must never touch. */
+const OTHER_REPO_WORKSPACE_ID = 'workspace-3';
 
 function createDatabaseFixture(t: TestContext): DatabaseSync {
 	const directory = mkdtempSync(path.join(tmpdir(), 'ensemblr-scripts-'));
-	const worktreePath = path.join(directory, 'worktree');
-	mkdirSync(worktreePath, { recursive: true });
 	const connection = openEnsemblrDatabase({
 		databasePath: path.join(directory, 'ensemblr-test.db'),
 	});
@@ -39,29 +41,42 @@ function createDatabaseFixture(t: TestContext): DatabaseSync {
 		rmSync(directory, { force: true, recursive: true });
 	});
 
-	insertRepositoryRow({
-		database: connection.database,
-		defaultBranch: 'main',
-		id: 'repo-1',
-		metadataJson: '{}',
-		name: 'ensemblr',
-		path: '/tmp/repo',
-		remoteUrl: '',
-		slug: 'ensemblr',
-		timestamp: NOW,
-	});
-	insertWorkspaceRow({
-		baseBranch: 'main',
-		branchName: 'philipp/monterrey',
-		database: connection.database,
-		id: WORKSPACE_ID,
-		metadataJson: '{}',
-		name: 'monterrey',
-		path: worktreePath,
-		repositoryId: 'repo-1',
-		slug: 'monterrey',
-		timestamp: NOW,
-	});
+	for (const repositoryId of ['repo-1', 'repo-2']) {
+		insertRepositoryRow({
+			database: connection.database,
+			defaultBranch: 'main',
+			id: repositoryId,
+			metadataJson: '{}',
+			name: repositoryId,
+			path: `/tmp/${repositoryId}`,
+			remoteUrl: '',
+			slug: repositoryId,
+			timestamp: NOW,
+		});
+	}
+
+	const workspaces = [
+		{ id: WORKSPACE_ID, name: 'monterrey', repositoryId: 'repo-1' },
+		{ id: SIBLING_WORKSPACE_ID, name: 'sibling', repositoryId: 'repo-1' },
+		{ id: OTHER_REPO_WORKSPACE_ID, name: 'stranger', repositoryId: 'repo-2' },
+	];
+
+	for (const workspace of workspaces) {
+		const worktreePath = path.join(directory, workspace.name);
+		mkdirSync(worktreePath, { recursive: true });
+		insertWorkspaceRow({
+			baseBranch: 'main',
+			branchName: `philipp/${workspace.name}`,
+			database: connection.database,
+			id: workspace.id,
+			metadataJson: '{}',
+			name: workspace.name,
+			path: worktreePath,
+			repositoryId: workspace.repositoryId,
+			slug: workspace.name,
+			timestamp: NOW,
+		});
+	}
 
 	return connection.database;
 }
@@ -79,6 +94,12 @@ function createSettingsStub(
 		archive?: string;
 		autoRunAfterSetup?: boolean;
 		run?: string;
+		runScripts?: Array<{
+			command: string;
+			default?: boolean;
+			icon?: string;
+			name: string;
+		}>;
 		runScriptMode?: string;
 		setup?: string;
 	},
@@ -92,6 +113,10 @@ function createSettingsStub(
 		entries.push({ key: `scripts.${kind}`, value: settings[kind] ?? null });
 	}
 
+	entries.push({
+		key: 'scripts.runScripts',
+		value: settings.runScripts ?? [],
+	});
 	entries.push({
 		key: 'runScriptMode',
 		value: settings.runScriptMode ?? 'concurrent',
@@ -160,6 +185,7 @@ function createTerminalServiceFake({
 				previewUrl: null,
 				restored: false,
 				rows: 24,
+				scriptName: options.scriptName ?? null,
 				status: 'running',
 				title: options.title ?? 'Terminal',
 				workspaceId: options.workspaceId,
@@ -191,6 +217,8 @@ function createTerminalServiceFake({
 			Array.from(sessions.values()).filter(
 				(session) => session.workspaceId === workspaceId,
 			),
+		listByKind: (kind) =>
+			Array.from(sessions.values()).filter((session) => session.kind === kind),
 		listRestorable: () => [],
 		recoverStaleSessions: () => undefined,
 		resize: () => undefined,
@@ -292,7 +320,7 @@ test('runScript resolves committed config from the workspace worktree', async (t
 
 	const request = requests[0] as SettingsResolutionRequest | undefined;
 	assert.equal(request?.repository?.repositoryId, 'repo-1');
-	assert.match(request?.repository?.repositoryPath ?? '', /worktree$/);
+	assert.match(request?.repository?.repositoryPath ?? '', /monterrey$/);
 });
 
 test('runScript reports unconfigured scripts without spawning', async (t) => {
@@ -329,25 +357,193 @@ test('nonconcurrent mode blocks duplicate active runs', async (t) => {
 	assert.equal(createCalls.length, 1);
 });
 
-test('concurrent mode allows multiple named run sessions', async (t) => {
+test('concurrent mode still allows only one run script per workspace', async (t) => {
 	const { createCalls, service } = createServiceFixture(t, {
-		run: 'bun dev',
 		runScriptMode: 'concurrent',
+		runScripts: [
+			{ command: 'npm run dev', default: true, name: 'dev' },
+			{ command: 'npm test', name: 'test' },
+		],
 	});
 
 	const first = await service.runScript({
 		kind: 'run',
+		scriptName: 'dev',
 		workspaceId: WORKSPACE_ID,
 	});
 	const second = await service.runScript({
 		kind: 'run',
+		scriptName: 'test',
 		workspaceId: WORKSPACE_ID,
 	});
 
 	assert.ok(first.session);
+	assert.equal(second.session, null);
+	assert.equal(second.diagnostics[0]?.code, 'script-already-running');
+	assert.equal(createCalls.length, 1);
+});
+
+test('runScript launches the requested named run script', async (t) => {
+	const { createCalls, service } = createServiceFixture(t, {
+		runScripts: [
+			{ command: 'npm run dev', default: true, name: 'dev' },
+			{ command: 'npm test', icon: 'test-tube', name: 'test' },
+		],
+	});
+
+	const result = await service.runScript({
+		kind: 'run',
+		scriptName: 'test',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(result.session);
+	assert.equal(createCalls[0]?.command, 'npm test');
+	assert.equal(createCalls[0]?.scriptName, 'test');
+	assert.equal(createCalls[0]?.title, 'Test');
+});
+
+test('runScript without a name launches the default run script', async (t) => {
+	const { createCalls, service } = createServiceFixture(t, {
+		runScripts: [
+			{ command: 'npm run dev', name: 'dev' },
+			{ command: 'npm test', default: true, name: 'test' },
+		],
+	});
+
+	await service.runScript({ kind: 'run', workspaceId: WORKSPACE_ID });
+
+	assert.equal(createCalls[0]?.command, 'npm test');
+});
+
+test('runScript reports an unknown run script name without spawning', async (t) => {
+	const { createCalls, service } = createServiceFixture(t, {
+		runScripts: [{ command: 'npm run dev', name: 'dev' }],
+	});
+
+	const result = await service.runScript({
+		kind: 'run',
+		scriptName: 'ghost',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(result.session, null);
+	assert.equal(result.diagnostics[0]?.code, 'script-not-configured');
+	assert.equal(createCalls.length, 0);
+});
+
+test('a legacy run string still launches as the implicit default script', async (t) => {
+	const { createCalls, service } = createServiceFixture(t, { run: 'bun dev' });
+
+	const result = await service.runScript({
+		kind: 'run',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(result.session);
+	assert.equal(createCalls[0]?.command, 'bun dev');
+	assert.equal(createCalls[0]?.scriptName, 'run');
+});
+
+test('nonconcurrent mode stops run scripts in sibling workspaces', async (t) => {
+	const { killedIds, service } = createServiceFixture(t, {
+		runScriptMode: 'nonconcurrent',
+		runScripts: [{ command: 'npm run dev', name: 'dev' }],
+	});
+
+	const sibling = await service.runScript({
+		kind: 'run',
+		workspaceId: SIBLING_WORKSPACE_ID,
+	});
+	const stranger = await service.runScript({
+		kind: 'run',
+		workspaceId: OTHER_REPO_WORKSPACE_ID,
+	});
+	assert.ok(sibling.session);
+	assert.ok(stranger.session);
+
+	const started = await service.runScript({
+		kind: 'run',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(started.session);
+	assert.deepEqual(killedIds, [sibling.session.id]);
+});
+
+test('nonconcurrent mode survives two workspaces launching at once', async (t) => {
+	const fixture = createServiceFixture(
+		t,
+		{
+			runScriptMode: 'nonconcurrent',
+			runScripts: [{ command: 'npm run dev', name: 'dev' }],
+		},
+		{ beforeCreate: () => new Promise((resolve) => setTimeout(resolve, 20)) },
+	);
+
+	const [first, second] = await Promise.all([
+		fixture.service.runScript({ kind: 'run', workspaceId: WORKSPACE_ID }),
+		fixture.service.runScript({
+			kind: 'run',
+			workspaceId: SIBLING_WORKSPACE_ID,
+		}),
+	]);
+
+	assert.ok(first.session);
 	assert.ok(second.session);
-	assert.notEqual(first.session.id, second.session.id);
-	assert.equal(createCalls.length, 2);
+
+	// Run launches serialize on the repository, not the workspace: unserialized,
+	// neither launch would see the other's session yet and both would survive.
+	const running = fixture.terminalService
+		.listByKind('run-script')
+		.filter((session) => session.status === 'running');
+	assert.equal(running.length, 1);
+});
+
+test('setup launches stay independent across workspaces', async (t) => {
+	const fixture = createServiceFixture(
+		t,
+		{ setup: 'npm ci' },
+		{ beforeCreate: () => new Promise((resolve) => setTimeout(resolve, 20)) },
+	);
+
+	const [first, second] = await Promise.all([
+		fixture.service.runScript({ kind: 'setup', workspaceId: WORKSPACE_ID }),
+		fixture.service.runScript({
+			kind: 'setup',
+			workspaceId: SIBLING_WORKSPACE_ID,
+		}),
+	]);
+
+	assert.ok(first.session);
+	assert.ok(second.session);
+	assert.deepEqual(fixture.killedIds, []);
+	assert.equal(
+		fixture.terminalService
+			.listByKind('setup-script')
+			.filter((session) => session.status === 'running').length,
+		2,
+	);
+});
+
+test('concurrent mode leaves sibling workspace run scripts alone', async (t) => {
+	const { killedIds, service } = createServiceFixture(t, {
+		runScriptMode: 'concurrent',
+		runScripts: [{ command: 'npm run dev', name: 'dev' }],
+	});
+
+	const sibling = await service.runScript({
+		kind: 'run',
+		workspaceId: SIBLING_WORKSPACE_ID,
+	});
+	const started = await service.runScript({
+		kind: 'run',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(sibling.session);
+	assert.ok(started.session);
+	assert.deepEqual(killedIds, []);
 });
 
 test('restart stops the active run before starting a new one', async (t) => {

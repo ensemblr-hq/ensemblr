@@ -153,6 +153,7 @@ function mapWorkspaceNavigationSnapshot(
 		projectId: repository.id,
 		pullRequest: mapPresentationPullRequest(presentation),
 		reviewFiles: [],
+		runScripts: [],
 		scripts: createPlaceholderScripts(),
 		sessions: [createPlaceholderSessionFromSnapshot(workspace)],
 		sourceSummary: isPendingCreation

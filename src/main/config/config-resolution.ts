@@ -116,6 +116,7 @@ const REPOSITORY_BUILT_IN_DEFAULTS: Readonly<Record<string, unknown>> =
 		setUpstreamOnPush: true,
 		'scripts.archive': null,
 		'scripts.run': null,
+		'scripts.runScripts': Object.freeze([]),
 		'scripts.setup': null,
 	});
 

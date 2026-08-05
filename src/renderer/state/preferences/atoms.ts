@@ -99,6 +99,32 @@ export const favouriteModelsAtom = atomWithStorage<string[]>(
 	[],
 );
 
+// ─── Run scripts (per-workspace memory) ───────────────────────────────────────
+
+/**
+ * Name of the run script last launched in a workspace, so the dock's Run button
+ * and ⌘R keep targeting it across reloads. `null` falls back to the
+ * repository's default script. Per workspace on purpose: two workspaces of one
+ * repo commonly run different scripts.
+ */
+export const lastRunScriptAtomFamily = atomFamily((workspaceId: string) =>
+	atomWithStorage<string | null>(KEY(`last_run_script_${workspaceId}`), null),
+);
+
+/**
+ * Drops a workspace's remembered run script and its backing localStorage key.
+ * Call when a workspace is archived or deleted — `atomWithStorage` leaves the
+ * stored key behind otherwise, so it would accumulate one key per workspace the
+ * install has ever opened.
+ */
+export function forgetLastRunScript(workspaceId: string): void {
+	lastRunScriptAtomFamily.remove(workspaceId);
+
+	if (typeof globalThis.localStorage !== 'undefined') {
+		globalThis.localStorage.removeItem(KEY(`last_run_script_${workspaceId}`));
+	}
+}
+
 // ─── Git (user defaults) ──────────────────────────────────────────────────────
 // Moved to config.json (see ./app-settings). The atoms previously here were
 // localStorage-only with no consumers; they now back the `app.git` section and
@@ -189,6 +215,7 @@ const REPO_SETTINGS_KEYS = [
 	'previewUrls',
 	'scripts.setup',
 	'scripts.run',
+	'scripts.runScripts',
 	'scripts.archive',
 	'runScriptMode',
 	'autoRunAfterSetup',
