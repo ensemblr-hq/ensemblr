@@ -84,7 +84,7 @@ if original screenshot evidence is unavailable.
 | Area | Conductor Behavior | Ensemblr Target |
 | --- | --- | --- |
 | Setup script | Runs when workspace is created or manually rerun. | **Implemented.** Runs in the fixed Setup dock pane through the terminal service, with visible status/output, stop control, shell-derived env, workspace toolchain `PATH`, and `ENSEMBLR_*` vars. |
-| Run script | Runs from Run button inside workspace. | **Implemented.** Runs in the fixed Run dock pane with run/stop, ⌘/Ctrl+R toggle, preview-url open action when detected, shell-derived env, workspace toolchain `PATH`, and `ENSEMBLR_*` vars. |
+| Run script | Runs from Run button inside workspace. | **Implemented, extended (ADR 0041).** `scripts.run` accepts a single command (Conductor-parity shape) or a list of named run targets; Ensemblr runs one dock tab per target, each with its own run/stop and preview-url open action, all able to run concurrently. ⌘/Ctrl+R toggles the last-used (or first configured) target. Shell-derived env, workspace toolchain `PATH`, and `ENSEMBLR_*` vars unchanged. |
 | Archive script | Runs before workspace archive. | Same target via the lifecycle hook registry from ADR 0027; `ENS-038` registers a `pre-archive-workspace` subscriber that runs the configured archive script and can veto archive on failure. |
 | Run script mode | `concurrent` or `nonconcurrent`. | Same target. |
 | Terminal dock | Fixed read-only Setup and Run output tabs plus default and user-spawned terminal tabs stay visible beside chat/files/checks. | **Implemented.** Same target with live node-pty/xterm.js and Electron process supervision; user terminals are independent IDE-style terminal sessions. |
@@ -105,7 +105,7 @@ if original screenshot evidence is unavailable.
 | Area | Conductor Behavior | Ensemblr Target |
 | --- | --- | --- |
 | Shared file | `conductor.json` at repo root. | The committed `.ensemblr/settings.toml` is the sole repository config file (see ADR 0030). |
-| Fields | `scripts.setup`, `scripts.run`, `scripts.archive`, `runScriptMode`, `enterpriseDataPrivacy`. | Same functional fields where applicable; Pi-specific fields belong in `.ensemblr/settings.toml`. |
+| Fields | `scripts.setup`, `scripts.run`, `scripts.archive`, `runScriptMode`, `enterpriseDataPrivacy`. | Same functional fields where applicable; Pi-specific fields belong in `.ensemblr/settings.toml`. `scripts.run` additionally accepts an Ensemblr-only list of named run targets (ADR 0041) — Conductor still reads/writes the single-string shape. |
 | Preview URL | Repository settings can define a preview URL template using workspace environment variables. | Same target with `ENSEMBLR_*` variables. |
 | Action preferences | Repository settings include per-action agent instructions for review, PR creation, fixing errors, conflict resolution, branch naming, and general chats. | Same target as Pi instruction templates with personal and shared sources. |
 | Precedence | Personal repository settings override shared config. | Reversed for Ensemblr: the committed `.ensemblr/settings.toml` overrides personal SQLite settings per key (see ADR 0030). |

@@ -206,7 +206,7 @@ resolver keys used by the screen and runtime.
 | Setting | Ensemblr adaptation | Storage |
 | --- | --- | --- |
 | Setup script | Runs when a workspace is created or manually rerun; auto-skipped when the dependency fingerprint is unchanged (ADR 0034). | `.ensemblr/settings.toml` shared; SQLite personal override. |
-| Run script | Run button in the terminal dock. | `.ensemblr/settings.toml` shared; SQLite personal override. |
+| Run script(s) | One dock tab per named run target (ADR 0041); each starts/stops independently and can run concurrently with the others. `scripts.run` accepts either a single command string (legacy/simple case) or `[[scripts.run]]` tables with `name`/`command`. | `.ensemblr/settings.toml` shared; SQLite personal override. |
 | Run mode | Concurrent / nonconcurrent run behavior. | `.ensemblr/settings.toml` shared; SQLite personal override. |
 | Auto-run after setup | Start the run script automatically once setup completes. | `.ensemblr/settings.toml` shared; SQLite personal override. |
 | Archive script | Runs before archive. | `.ensemblr/settings.toml` shared; SQLite personal override. |
