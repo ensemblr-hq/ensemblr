@@ -19,3 +19,13 @@ available_in = ["local"]
 command = "./scripts/with-pinned-node.sh npm test"
 icon = "test-tube"
 available_in = ["local"]
+
+[scripts.run.playground]
+command = "./scripts/with-pinned-node.sh npm run playground"
+icon = "play"
+available_in = ["local"]
+
+[scripts.run.unsigned]
+command = "./scripts/with-pinned-node.sh npm run make:unsigned && open out"
+icon = "package"
+available_in = ["local"]
