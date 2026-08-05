@@ -10,6 +10,12 @@ import { serializeWorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace
 import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
 
 const GIT_STATUS_REFETCH_INTERVAL_MS = 10_000;
+/**
+ * Conflicts appear when the *base* branch moves, which nothing local observes,
+ * so this query has to poll rather than wait for an invalidation. It runs a
+ * `git fetch` per pass, so it polls far slower than the status query.
+ */
+const MERGE_CONFLICTS_REFETCH_INTERVAL_MS = 120_000;
 
 /**
  * Query options for a workspace's changed-file rows and +/- summary. The
@@ -37,6 +43,49 @@ export function workspaceGitStatusQuery(
 		),
 		refetchInterval: GIT_STATUS_REFETCH_INTERVAL_MS,
 		staleTime: 5_000,
+	});
+}
+
+/**
+ * Query options for the paths that would conflict merging `baseRef` into the
+ * workspace branch. Disabled until a base ref is known, since without one there
+ * is nothing to merge against.
+ *
+ * `staleTime` deliberately matches the poll interval: the header, the Checks
+ * panel, and the Changes list all read this, and a shorter window would let
+ * their mount and unmount churn — not the base branch actually moving — decide
+ * how often the workspace talks to the network.
+ */
+export function workspaceMergeConflictsQuery({
+	baseRef,
+	enabled = true,
+	workspaceCwd,
+}: {
+	baseRef: string | null;
+	/** Lets a caller suspend the probe, e.g. while the worktree is mid-merge. */
+	enabled?: boolean;
+	workspaceCwd: string | null;
+}) {
+	return queryOptions({
+		enabled: enabled && !!workspaceCwd && !!baseRef,
+		queryFn: () =>
+			profileElectronIpcCall(
+				{
+					channel: 'ensemblr:get-workspace-merge-conflicts',
+					usesDatabase: false,
+				},
+				() =>
+					getEnsemblrApi().getWorkspaceMergeConflicts({
+						baseRef: baseRef ?? '',
+						workspaceCwd: workspaceCwd ?? '',
+					}),
+			),
+		queryKey: ensemblrQueryKeys.workspaceMergeConflicts(
+			workspaceCwd ?? '',
+			baseRef ?? '',
+		),
+		refetchInterval: MERGE_CONFLICTS_REFETCH_INTERVAL_MS,
+		staleTime: MERGE_CONFLICTS_REFETCH_INTERVAL_MS,
 	});
 }
 

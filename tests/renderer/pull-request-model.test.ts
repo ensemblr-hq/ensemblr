@@ -174,6 +174,25 @@ describe('buildPullRequestShellModel', () => {
 
 		expect(model.status).toBe('blocked');
 		expect(model.detail).toContain('conflict');
+		expect(model.isConflicting).toBe(true);
+		// `blocked` covers several causes; the label names this one.
+		expect(model.label).toBe('Merge conflicts');
+	});
+
+	test('a PR blocked by failing checks keeps the generic Blocked label', () => {
+		const model = buildPullRequestShellModel({
+			changeSummary: NO_CHANGES,
+			localComments: [],
+			snapshot: createSnapshot(
+				createPullRequest({
+					checks: [{ bucket: 'failing', id: 'c1', name: 'build' }],
+				}),
+			),
+			todos: [],
+		});
+
+		expect(model.label).toBe('Blocked');
+		expect(model.isConflicting).toBe(false);
 	});
 
 	test('github deployment with URL becomes the preview deployment', () => {

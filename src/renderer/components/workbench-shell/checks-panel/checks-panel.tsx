@@ -20,8 +20,9 @@ import { Input } from '@/renderer/components/ui/input';
 import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { PanelAlert } from '@/renderer/components/workbench-shell/panel-alert';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
+import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-conflicts';
 import { getChecksPanelState } from '@/renderer/lib/workbench/checks-panel-state';
-import { buildCommitAndPushPrompt } from '@/renderer/lib/workbench/checks-pr-prompts';
+import { describeMergeConflictProbeFailure } from '@/renderer/lib/workbench/git-failure-copy';
 import { selectLocalReviewComments } from '@/renderer/lib/workbench/local-review-comments';
 import {
 	prDraftIdentity,
@@ -32,10 +33,7 @@ import {
 	formatCommentContext,
 	formatTodoContext,
 } from '@/renderer/lib/workbench/review-context';
-import {
-	useComposerInsert,
-	useComposerSubmit,
-} from '@/renderer/state/composer';
+import { useComposerInsert } from '@/renderer/state/composer';
 import {
 	prDetailsDraftAtomFamily,
 	prDetailsLiveDraftAtomFamily,
@@ -45,6 +43,7 @@ import type {
 	PullRequestCommentSummary,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
+import type { WorkspaceGitFailure } from '@/shared/ipc/contracts/workspace-git';
 
 import { useCommentPreviewOpener } from '../conversation-panel/file-preview-context';
 import { useReviewActions } from '../review-actions/review-actions-context';
@@ -54,6 +53,7 @@ import { ChecksSectionHeader } from './pr-metadata';
 import {
 	PullRequestCheckRow,
 	PullRequestCommentRow,
+	PullRequestConflictRow,
 	PullRequestStatusRow,
 	PullRequestTodoRow,
 } from './pr-rows';
@@ -145,8 +145,8 @@ function usePrDetailsDraft(workspace: WorkspaceShellModel): PrDetailsFormState {
 export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 	const panelState = getChecksPanelState(workspace);
 	const todoActions = useTodoActions(workspace.id);
-	const submitToComposer = useComposerSubmit();
 	const reviewActions = useReviewActions();
+	const isAgentWorking = reviewActions?.isAgentWorking === true;
 	const draft = usePrDetailsDraft(workspace);
 	const { data: reviewCommentsData } = useQuery(
 		reviewCommentsQuery(workspace.id),
@@ -158,11 +158,7 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 	// "Create PR" stays available whenever the branch differs from base, even with
 	// a clean worktree once edits are committed.
 	const canCreatePullRequest = useReviewableChanges(workspace);
-
-	const sendCommitAndPush = useCallback(() => {
-		submitToComposer(buildCommitAndPushPrompt(workspace));
-		toast.success('Asked the agent to commit and push.');
-	}, [submitToComposer, workspace]);
+	const conflicts = useWorkspaceConflicts(workspace);
 
 	const sendCreatePullRequest = useCallback(() => {
 		reviewActions?.runAgentAction('create-pr');
@@ -172,6 +168,21 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 				: 'Asked the agent to open a pull request.',
 		);
 	}, [reviewActions, workspace.pullRequest.number]);
+
+	const sendResolveConflicts = useCallback(() => {
+		reviewActions?.runAgentAction('resolve-conflicts');
+		toast.success('Asked the agent to resolve the merge conflicts.');
+	}, [reviewActions]);
+
+	const conflictsSection =
+		conflicts.paths.size || conflicts.error ? (
+			<ConflictsSection
+				error={conflicts.error}
+				isAgentWorking={isAgentWorking}
+				onResolve={sendResolveConflicts}
+				paths={[...conflicts.paths]}
+			/>
+		) : undefined;
 
 	const prForm = (
 		<PrDetailsForm
@@ -199,7 +210,9 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 						/>
 					) : undefined
 				}
-				onCommitAndPush={sendCommitAndPush}
+				conflictsSection={conflictsSection}
+				isAgentWorking={isAgentWorking}
+				onCommitAndPush={reviewActions?.commitAndPush}
 				onCreatePullRequest={sendCreatePullRequest}
 				state={panelState}
 				todoSection={
@@ -217,8 +230,10 @@ export function ChecksPanel({ workspace }: { workspace: WorkspaceShellModel }) {
 
 	return (
 		<ChecksPullRequestPanel
+			conflictsSection={conflictsSection}
+			isAgentWorking={isAgentWorking}
 			localComments={localComments}
-			onCommitAndPush={sendCommitAndPush}
+			onCommitAndPush={reviewActions?.commitAndPush}
 			onUpdatePullRequest={sendCreatePullRequest}
 			state={panelState}
 			todoActions={todoActions}
@@ -294,6 +309,8 @@ function useTodoActions(workspaceId: string): TodoActions {
 /** Body of the checks panel when a pull request exists. */
 function ChecksPullRequestPanel({
 	children,
+	conflictsSection,
+	isAgentWorking,
 	localComments,
 	onCommitAndPush,
 	onUpdatePullRequest,
@@ -302,9 +319,13 @@ function ChecksPullRequestPanel({
 	workspace,
 }: {
 	children: ReactNode;
+	/** Conflicts section, omitted when the branch merges cleanly. */
+	conflictsSection?: ReactNode;
+	/** Freezes the git actions while an agent turn is in flight. */
+	isAgentWorking: boolean;
 	/** Ensemblr-local review comments, merged into the Comments section. */
 	localComments: readonly PullRequestCommentSummary[];
-	onCommitAndPush: () => void;
+	onCommitAndPush?: () => void;
 	onUpdatePullRequest: () => void;
 	state: Extract<ChecksPanelState, { hasPullRequest: true }>;
 	todoActions: TodoActions;
@@ -341,16 +362,20 @@ function ChecksPullRequestPanel({
 					<section className='flex min-w-0 flex-col gap-1.5'>
 						<ChecksSectionHeader
 							actionLabel='Update PR'
+							disabled={isAgentWorking}
 							label='Git status'
 							onAction={onUpdatePullRequest}
 						/>
 						<PullRequestStatusRow
+							disabled={isAgentWorking}
 							hideAction={!showGitStatusAction}
 							onAction={onCommitAndPush}
 							status={pullRequest.gitStatus}
 						/>
 					</section>
 				)}
+
+				{conflictsSection}
 
 				<section className='flex min-w-0 flex-col gap-1.5'>
 					<ChecksSectionHeader label='Checks' />
@@ -379,6 +404,42 @@ function ChecksPullRequestPanel({
 				/>
 			</div>
 		</ScrollArea>
+	);
+}
+
+/**
+ * "Conflicts" section naming every file that will not merge with the base, with
+ * one action that hands the whole resolution to the agent. Rendered only when
+ * there is something to say — a conflict, or the reason the check could not run
+ * — so a clean branch never carries a dead section. A probe that failed offers
+ * no Resolve action, because it never learned what there is to resolve.
+ */
+function ConflictsSection({
+	error,
+	isAgentWorking,
+	onResolve,
+	paths,
+}: {
+	/** Why the trial merge could not answer; replaces the rows when set. */
+	error?: WorkspaceGitFailure;
+	isAgentWorking: boolean;
+	onResolve: () => void;
+	paths: readonly string[];
+}) {
+	return (
+		<section className='flex min-w-0 flex-col gap-1.5'>
+			<ChecksSectionHeader
+				actionLabel={error ? undefined : 'Resolve'}
+				disabled={isAgentWorking}
+				label='Conflicts'
+				onAction={onResolve}
+			/>
+			{error ? (
+				<PanelAlert {...describeMergeConflictProbeFailure(error)} />
+			) : (
+				paths.map((path) => <PullRequestConflictRow key={path} path={path} />)
+			)}
+		</section>
 	);
 }
 

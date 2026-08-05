@@ -402,6 +402,8 @@ export type {
 	GetWorkspaceFileDiffResult,
 	GetWorkspaceGitStatusRequest,
 	GetWorkspaceGitStatusResult,
+	GetWorkspaceMergeConflictsRequest,
+	GetWorkspaceMergeConflictsResult,
 	WorkspaceFileDiffFailureCode,
 	WorkspaceGitApi,
 	WorkspaceGitChangeSummaryWire,

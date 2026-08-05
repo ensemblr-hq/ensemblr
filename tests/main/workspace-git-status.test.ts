@@ -15,6 +15,7 @@ import type {
 	LocalCommandService,
 } from '../../src/main/commands/local-command';
 import {
+	parseMergeTreeConflicts,
 	parseNameStatus,
 	parseNumstat,
 	parsePorcelainStatus,
@@ -90,13 +91,21 @@ function realCommandService(): LocalCommandService {
 				});
 				return buildResult({ args, cwd: request.cwd, stderr, stdout });
 			} catch (error) {
-				const failure = error as { code?: number; stderr?: string };
+				const failure = error as {
+					code?: number;
+					stderr?: string;
+					stdout?: string;
+				};
+				// The real service collects stdout regardless of exit code, and some
+				// commands (`git merge-tree`) put their answer there while exiting
+				// non-zero, so the double has to carry it through too.
 				return buildResult({
 					args,
 					cwd: request.cwd,
 					exitCode: typeof failure.code === 'number' ? failure.code : 1,
 					status: 'failure',
 					stderr: failure.stderr ?? '',
+					stdout: failure.stdout ?? '',
 				});
 			}
 		},
@@ -416,6 +425,119 @@ test('parseNameStatus classifies entries and reads rename paths', () => {
 		// A type-change (T) is surfaced as a modification.
 		{ path: 'src/mode.ts', status: 'modified' },
 	]);
+});
+
+test('parseMergeTreeConflicts drops the tree id and stops at the info section', () => {
+	const stdout = [
+		'6b1dd25dbf2ba93410b752fc5d649618dfe090cc',
+		'src/a.ts',
+		'src/b.ts',
+		'',
+		'1',
+		'src/a.ts',
+		'CONFLICT (contents)',
+		'CONFLICT (content): Merge conflict in src/a.ts',
+		'',
+	].join('\0');
+
+	assert.deepEqual(parseMergeTreeConflicts(stdout), ['src/a.ts', 'src/b.ts']);
+});
+
+test('parseMergeTreeConflicts reports nothing when only a tree id came back', () => {
+	assert.deepEqual(
+		parseMergeTreeConflicts('6b1dd25dbf2ba93410b752fc5d649618dfe090cc'),
+		[],
+	);
+});
+
+test('getMergeConflicts never lets a base ref reach git in option position', async () => {
+	// The request schema rejects a leading `-`, but stripping `origin/` can expose
+	// one behind the prefix — and `git fetch origin --upload-pack=<cmd>` runs it.
+	const { calls, service } = stubCommandService(() =>
+		buildResult({ exitCode: 1, status: 'failure' }),
+	);
+	const gitService = createWorkspaceGitService({
+		localCommandService: service,
+	});
+
+	await gitService.getMergeConflicts({
+		baseRef: 'origin/--upload-pack=touch /tmp/pwned',
+		workspaceCwd: process.cwd(),
+	});
+
+	assert.ok(calls.length > 0, 'expected the probe to shell out to git');
+	for (const call of calls) {
+		const args = call.args ?? [];
+		const dashed = args.findIndex(
+			(arg) => arg.startsWith('-') && arg !== '--end-of-options',
+		);
+		const guard = args.indexOf('--end-of-options');
+		assert.ok(guard !== -1, `no --end-of-options in: ${args.join(' ')}`);
+		assert.ok(
+			dashed === -1 || dashed < guard,
+			`ref reached git as a flag in: ${args.join(' ')}`,
+		);
+	}
+});
+
+test('getMergeConflicts (real git) names the files that cannot merge', async (t) => {
+	const dir = await mkdtemp(path.join(tmpdir(), 'ensemblr-git-conflict-'));
+	t.after(() => rm(dir, { force: true, recursive: true }));
+	const git = (...args: string[]) => execFileAsync('git', args, { cwd: dir });
+	await git('init', '-q', '-b', 'main');
+	await git('config', 'user.email', 'test@example.com');
+	await git('config', 'user.name', 'Test');
+	await writeFile(path.join(dir, 'a.ts'), 'base\n');
+	await writeFile(path.join(dir, 'b.ts'), 'untouched\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'first');
+
+	// A sidecar branch off the shared root that only adds a file: merges cleanly.
+	await git('checkout', '-q', '-b', 'sidecar');
+	await writeFile(path.join(dir, 'c.ts'), 'added\n');
+	await git('add', '.');
+	await git('commit', '-q', '-m', 'sidecar');
+
+	// The branch under review and its base both rewrite a.ts: conflicts.
+	await git('checkout', '-q', 'main');
+	await git('checkout', '-q', '-b', 'feature');
+	await writeFile(path.join(dir, 'a.ts'), 'feature\n');
+	await git('commit', '-q', '-a', '-m', 'feature edit');
+	await git('checkout', '-q', 'main');
+	await writeFile(path.join(dir, 'a.ts'), 'main\n');
+	await git('commit', '-q', '-a', '-m', 'main edit');
+	await git('checkout', '-q', 'feature');
+
+	const service = createWorkspaceGitService({
+		localCommandService: realCommandService(),
+	});
+
+	// This repo has no `origin`, so the refresh fails and the probe falls back to
+	// the local branch of the same name.
+	const conflicting = await service.getMergeConflicts({
+		baseRef: 'main',
+		workspaceCwd: dir,
+	});
+	assert.equal(conflicting.error, undefined);
+	assert.deepEqual(conflicting.paths, ['a.ts']);
+
+	const clean = await service.getMergeConflicts({
+		baseRef: 'sidecar',
+		workspaceCwd: dir,
+	});
+	assert.equal(clean.error, undefined);
+	assert.deepEqual(clean.paths, []);
+
+	const unknown = await service.getMergeConflicts({
+		baseRef: 'no-such-branch',
+		workspaceCwd: dir,
+	});
+	assert.equal(unknown.error?.code, 'command-failed');
+	assert.deepEqual(unknown.paths, []);
+
+	// The trial merge must leave the worktree exactly as it found it.
+	const status = await git('status', '--porcelain');
+	assert.equal(status.stdout, '');
 });
 
 test("getStatus (real git) returns a single commit's files for commit scope", async (t) => {

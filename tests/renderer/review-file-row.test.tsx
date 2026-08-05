@@ -143,6 +143,26 @@ test('each row shows a Conductor-style status square for its git state', () => {
 	).toContain('aria-label="Deleted"');
 });
 
+test('a conflicted file is marked U with a danger-toned warning triangle', () => {
+	const markup = renderRow(
+		{
+			additions: 28,
+			contentId: null,
+			deletions: 0,
+			id: 'c',
+			path: 'playground/playground.tsx',
+			status: 'conflicted',
+		},
+		{ showPath: true },
+	);
+
+	expect(markup).toContain('>U<');
+	expect(markup).toContain('+28');
+	expect(markup).toContain('aria-label="Conflicted"');
+	expect(markup).toContain('text-status-danger');
+	expect(markup).toContain('lucide-triangle-alert');
+});
+
 test('tree mode renders only the basename and tree semantics', () => {
 	const markup = renderRow(modifiedFile, {
 		ariaLevel: 3,

@@ -3,9 +3,9 @@ import type { WorkspaceGitFileWire } from '@/shared/ipc/contracts/workspace-git'
 
 /**
  * Maps git status wire rows to the review panel's changed-file summaries.
- * Ignored files are dropped; conflicted files render as modified (the review
- * surface has no distinct conflict affordance). Shared by the live workspace
- * model and the Changes-tab source query so both derive rows identically.
+ * Ignored files are dropped; every other status carries through, conflicts
+ * included. Shared by the live workspace model and the Changes-tab source query
+ * so both derive rows identically.
  */
 export function mapGitStatusToReviewFiles(
 	files: readonly WorkspaceGitFileWire[],
@@ -21,10 +21,7 @@ export function mapGitStatusToReviewFiles(
 						id: `git:${file.path}`,
 						path: file.path,
 						...(file.renamedFrom ? { renamedFrom: file.renamedFrom } : {}),
-						status:
-							file.status === 'conflicted'
-								? ('modified' as const)
-								: file.status,
+						status: file.status,
 					},
 				],
 	);
@@ -63,6 +60,61 @@ export function findReviewFileRevision(
 	const wireFile = files.find((entry) => entry.path === filePath);
 	const [file] = wireFile ? mapGitStatusToReviewFiles([wireFile]) : [];
 	return file ? reviewFileRevision(file) : null;
+}
+
+/**
+ * Restates trial-merge conflicts as row status, so a file that will not merge
+ * carries the same mark whether git already flagged it during a real merge or a
+ * trial merge only predicted it. Folding the two sources together here is what
+ * lets the folder tree — which never sees `conflictPaths` — show conflicts too.
+ *
+ * @param files - The change set as git reported it.
+ * @param conflictPaths - Paths that cannot merge cleanly, if any are known.
+ * @returns The same rows, with conflicting ones restated as `conflicted`.
+ */
+export function markConflictedFiles(
+	files: ReviewFileSummary[],
+	conflictPaths: ReadonlySet<string> | undefined,
+): ReviewFileSummary[] {
+	if (!conflictPaths?.size) {
+		return files;
+	}
+	return files.map((file) =>
+		conflictPaths.has(file.path) && file.status !== 'conflicted'
+			? { ...file, status: 'conflicted' as const }
+			: file,
+	);
+}
+
+/**
+ * Splits the change set into the files that will not merge and the rest.
+ *
+ * Conflicts are taken from `files` rather than `orderedFiles` so they keep their
+ * natural order: a file that will not merge is the next thing to act on, and
+ * sinking it for having been viewed would bury the work.
+ *
+ * @param files - The change set in its natural order.
+ * @param orderedFiles - The same rows in the order the flat list would show them.
+ * @param conflictPaths - Paths that cannot merge cleanly, if any are known.
+ * @returns The two groups, or null when nothing in the change set conflicts and
+ *   the caller should render one ungrouped list.
+ */
+export function groupReviewFilesByConflict(
+	files: readonly ReviewFileSummary[],
+	orderedFiles: readonly ReviewFileSummary[],
+	conflictPaths: ReadonlySet<string> | undefined,
+): { clean: ReviewFileSummary[]; conflicted: ReviewFileSummary[] } | null {
+	if (!conflictPaths?.size) {
+		return null;
+	}
+	const conflicted = files.filter((file) => conflictPaths.has(file.path));
+	if (conflicted.length === 0) {
+		return null;
+	}
+	return {
+		clean: orderedFiles.filter((file) => !conflictPaths.has(file.path)),
+		conflicted,
+	};
 }
 
 /**

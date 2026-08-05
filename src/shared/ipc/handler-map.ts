@@ -212,6 +212,8 @@ import type {
 	GetWorkspaceFileDiffResult,
 	GetWorkspaceGitStatusRequest,
 	GetWorkspaceGitStatusResult,
+	GetWorkspaceMergeConflictsRequest,
+	GetWorkspaceMergeConflictsResult,
 } from './contracts/workspace-git';
 import type {
 	RunWorkspaceScriptRequest,
@@ -333,6 +335,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.getWorkspaceGitStatus]: IpcHandlerEntry<
 		GetWorkspaceGitStatusRequest,
 		GetWorkspaceGitStatusResult
+	>;
+	[IPC_CHANNELS.getWorkspaceMergeConflicts]: IpcHandlerEntry<
+		GetWorkspaceMergeConflictsRequest,
+		GetWorkspaceMergeConflictsResult
 	>;
 	[IPC_CHANNELS.githubRepositoryList]: IpcHandlerEntry<
 		GithubRepositoryListRequest | undefined,

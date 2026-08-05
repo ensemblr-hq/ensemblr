@@ -1,11 +1,28 @@
+import { MERGE_CONFLICTS_LABEL } from '@/renderer/lib/workbench/pull-request-model';
 import type {
 	RightSidebarHeaderState,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 
-/** Options that adjust header derivation for user-dismissed terminal PR states. */
+/** Label the header falls back to while an agent turn is in flight. */
+const AGENT_WORKING_LABEL = 'Working...';
+
+/** Options that adjust header derivation for signals outside the PR snapshot. */
 interface RightSidebarHeaderStateOptions {
+	/**
+	 * Whether any agent attached to the workspace is mid-turn. Passed in by the
+	 * caller rather than read from `workspace.status` so cached fixtures keep
+	 * their PR-priority semantics, mirroring `getWorkspaceSidebarState`.
+	 */
+	agentBusy?: boolean;
 	continuedPullRequestNumber?: number;
+	/**
+	 * Whether the local trial merge found conflicting paths. OR'd with GitHub's
+	 * own verdict so the header, the Checks panel, and the Changes list never
+	 * disagree about whether this branch merges — the trial merge sees a moved
+	 * base before `gh` does, and answers even when no pull request exists.
+	 */
+	hasConflicts?: boolean;
 }
 
 /** The parts of a PR-linked header state that vary with pull-request status. */
@@ -25,7 +42,7 @@ type NumberedHeaderVariant = Pick<
  *
  * @param workspace - Workspace model containing pull-request and branch state.
  * @param hasBranchChanges - Whether the branch diff has reviewable changes.
- * @param options - User-local header state overrides.
+ * @param options - Header state inputs that live outside the PR snapshot.
  * @returns The header state consumed by the review sidebar shell.
  */
 export function getRightSidebarHeaderState(
@@ -36,26 +53,32 @@ export function getRightSidebarHeaderState(
 	const pullRequest = workspace.pullRequest;
 	const pullRequestNumber = pullRequest.number;
 	const hasPullRequestNumber = typeof pullRequestNumber === 'number';
+	const isAgentWorking =
+		options.agentBusy === true || pullRequest.status === 'agent-working';
+	const workingLabel = isAgentWorking ? AGENT_WORKING_LABEL : '';
+	const hasConflicts =
+		options.hasConflicts === true || pullRequest.isConflicting === true;
 
-	if (!hasPullRequestNumber) {
-		return {
-			kind: hasBranchChanges ? 'create-pr' : 'empty',
-			tone: 'neutral',
-		};
-	}
-
-	if (
+	const isDismissedMergedPullRequest =
 		pullRequest.state === 'merged' &&
-		options.continuedPullRequestNumber === pullRequestNumber
-	) {
+		options.continuedPullRequestNumber === pullRequestNumber;
+
+	if (!hasPullRequestNumber || isDismissedMergedPullRequest) {
 		return {
+			hasConflicts,
+			isAgentWorking,
 			kind: hasBranchChanges ? 'create-pr' : 'empty',
-			tone: 'neutral',
+			label: hasConflicts ? MERGE_CONFLICTS_LABEL : workingLabel,
+			tone: hasConflicts ? 'blocked' : 'neutral',
 		};
 	}
 
+	const variant = resolveNumberedHeaderVariant(pullRequest, hasConflicts);
 	return {
-		...resolveNumberedHeaderVariant(pullRequest, pullRequestNumber),
+		...variant,
+		hasConflicts,
+		isAgentWorking,
+		label: variant.label || workingLabel,
 		number: pullRequestNumber,
 		previewDeployment: pullRequest.previewDeployment,
 		url: pullRequest.url,
@@ -65,20 +88,47 @@ export function getRightSidebarHeaderState(
 /**
  * Maps a pull request onto the kind, label, and tone its header pill shows. Kept
  * separate from the state literal so every PR-linked branch is built once and a
- * new header field cannot be dropped from one status.
+ * new header field cannot be dropped from one status. Every label is a status,
+ * blank when there is none to report; the header never shows the PR title, which
+ * the number pill already links to.
+ *
+ * Local work the remote does not have outranks the PR's own status, because a
+ * checks verdict against an unpublished tree is stale — but not a merged PR,
+ * whose git state is no longer actionable from this header. A conflict sits just
+ * below that local work, since the branch has to be committed before it can be
+ * resolved, and above every checks-derived status, which it makes moot.
+ *
  * @param pullRequest - Pull-request slice of the workspace model.
- * @param pullRequestNumber - PR number used as the last-resort label.
+ * @param hasConflicts - Whether either conflict source found the branch unmergeable.
  * @returns The status-dependent parts of the header state.
  */
 function resolveNumberedHeaderVariant(
 	pullRequest: WorkspaceShellModel['pullRequest'],
-	pullRequestNumber: number,
+	hasConflicts: boolean,
 ): NumberedHeaderVariant {
 	if (pullRequest.state === 'merged') {
 		return {
 			kind: 'pr-merged',
 			label: pullRequest.label || 'Merged',
 			tone: 'merged',
+		};
+	}
+
+	const gitStatus = pullRequest.gitStatus;
+
+	if (gitStatus.kind === 'uncommitted') {
+		return { kind: 'pr-uncommitted', label: gitStatus.label, tone: 'pending' };
+	}
+
+	if (gitStatus.kind === 'unpublished' || gitStatus.kind === 'unpushed') {
+		return { kind: 'pr-unpushed', label: gitStatus.label, tone: 'pending' };
+	}
+
+	if (hasConflicts) {
+		return {
+			kind: 'pr-blocked',
+			label: MERGE_CONFLICTS_LABEL,
+			tone: 'blocked',
 		};
 	}
 
@@ -98,16 +148,5 @@ function resolveNumberedHeaderVariant(
 		return { kind: 'pr-blocked', label: pullRequest.label, tone: 'blocked' };
 	}
 
-	if (pullRequest.status === 'agent-working') {
-		return { kind: 'pr-working', label: 'Working...', tone: 'neutral' };
-	}
-
-	return {
-		kind: 'pr-open',
-		label:
-			pullRequest.label ||
-			pullRequest.title ||
-			`PR #${pullRequestNumber.toString()}`,
-		tone: 'neutral',
-	};
+	return { kind: 'pr-open', label: pullRequest.label, tone: 'neutral' };
 }

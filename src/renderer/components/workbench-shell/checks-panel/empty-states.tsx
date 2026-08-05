@@ -16,6 +16,8 @@ export function ChecksNoPullRequestState({
 	canCreatePullRequest = false,
 	children,
 	commentsSection,
+	conflictsSection,
+	isAgentWorking = false,
 	onCommitAndPush,
 	onCreatePullRequest,
 	state,
@@ -31,6 +33,10 @@ export function ChecksNoPullRequestState({
 	children?: ReactNode;
 	/** Comments section shown when the workspace has local review comments. */
 	commentsSection?: ReactNode;
+	/** Conflicts section, omitted when the branch merges cleanly. */
+	conflictsSection?: ReactNode;
+	/** Freezes the git actions while an agent turn is in flight. */
+	isAgentWorking?: boolean;
 	onCommitAndPush?: () => void;
 	onCreatePullRequest?: () => void;
 	state: Extract<ChecksPanelState, { hasPullRequest: false }>;
@@ -59,12 +65,14 @@ export function ChecksNoPullRequestState({
 					<ChecksSectionHeader label='Git status' />
 					<ChecksActionRow
 						actionLabel={canCreatePullRequest ? 'Create PR' : undefined}
+						disabled={isAgentWorking}
 						label='No PR open'
 						onAction={onCreatePullRequest}
 					/>
 					{hasUncommittedChanges ? (
 						<ChecksActionRow
 							actionLabel='Commit and push'
+							disabled={isAgentWorking}
 							label={formatCount(
 								workspace.changeSummary.files,
 								'uncommitted change',
@@ -73,6 +81,8 @@ export function ChecksNoPullRequestState({
 						/>
 					) : null}
 				</section>
+
+				{conflictsSection}
 
 				{commentsSection}
 

@@ -136,7 +136,15 @@
 		// report `npx vitest run --coverage` writes so the scores are measured
 		// instead. Absent (a fresh clone that has not run coverage yet) fallow
 		// falls back to the estimate and still exits 0, so this is safe to commit.
-		"coverage": "coverage/coverage-final.json"
+		"coverage": "coverage/coverage-final.json",
+
+		"thresholdOverrides": [
+			{
+				"files": ["playground/**"],
+				"maxCrap": 60,
+				"reason": "Dev-only preview harness. Vitest never runs playground/, so its coverage term is structurally 0 and CRAP collapses to cyclomatic² + cyclomatic — a 12-line fixture that defaults seven fields lands at 56 purely for being untested by design. Cyclomatic and cognitive ceilings still apply unchanged, so a genuinely convoluted scene is still reported."
+			}
+		]
 	},
 
 	"rules": {

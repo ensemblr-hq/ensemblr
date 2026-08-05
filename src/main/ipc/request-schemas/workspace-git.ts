@@ -45,6 +45,12 @@ export const getWorkspaceFileDiffRequestSchema = z.object({
 	workspaceCwd: z.string().min(1),
 });
 
+/** {@link import('../../../shared/ipc').GetWorkspaceMergeConflictsRequest}. */
+export const getWorkspaceMergeConflictsRequestSchema = z.object({
+	baseRef: gitRefSchema,
+	workspaceCwd: z.string().min(1),
+});
+
 /** {@link import('../../../shared/ipc').GetWorkspaceCommitsRequest}. */
 export const getWorkspaceCommitsRequestSchema = z.object({
 	baseRef: gitRefSchema.optional(),

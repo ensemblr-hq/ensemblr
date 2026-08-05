@@ -83,6 +83,24 @@ export function parsePorcelainStatus(
 	return entries;
 }
 
+/**
+ * Parses `git merge-tree --write-tree --name-only -z` output into the conflicted
+ * paths. The stream is `<tree-oid>\0<path>\0…\0\0<info records>`: the first
+ * field is the merged tree's object id, and an empty field closes the path
+ * section before git's own conflict messages, which this drops.
+ */
+export function parseMergeTreeConflicts(stdout: string): readonly string[] {
+	const [, ...fields] = stdout.split('\0');
+	const paths: string[] = [];
+	for (const field of fields) {
+		if (!field) {
+			break;
+		}
+		paths.push(field);
+	}
+	return paths;
+}
+
 /** Maps porcelain XY codes to a renderer-facing file status. */
 function classifyPorcelainCodes(
 	staged: string,

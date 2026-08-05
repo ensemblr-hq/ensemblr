@@ -9,7 +9,11 @@ import { ScrollArea } from '@/renderer/components/ui/scroll-area';
 import { PanelPlaceholder } from '@/renderer/components/workbench-shell/panel-placeholder';
 import { useBuildReviewFileActions } from '@/renderer/hooks/workbench-shell/review-files/use-build-review-file-actions';
 import { describeWorkspaceGitFailure } from '@/renderer/lib/workbench/git-failure-copy';
-import { sortReviewFilesByViewed } from '@/renderer/lib/workbench/review-files';
+import {
+	groupReviewFilesByConflict,
+	markConflictedFiles,
+	sortReviewFilesByViewed,
+} from '@/renderer/lib/workbench/review-files';
 import type {
 	ReviewFileMenuTarget,
 	ReviewFileSummary,
@@ -30,6 +34,7 @@ import { ReviewFilesContextMenuContent } from './review-files-context-menu';
  * Rows marked viewed dim, and in the flat list they sink below the rest.
  */
 export function ReviewFileList({
+	conflictPaths,
 	diffScope,
 	discardablePaths,
 	emptyState = {
@@ -43,6 +48,11 @@ export function ReviewFileList({
 	viewMode,
 	workspaceId,
 }: {
+	/**
+	 * Paths that cannot merge cleanly. They take a conflicted status mark in both
+	 * view modes, and split the flat list into two groups.
+	 */
+	conflictPaths?: ReadonlySet<string>;
 	/** Which diff a row click opens — the active source's scope. */
 	diffScope?: WorkspaceGitDiffScope;
 	/** Paths that can be discarded (uncommitted); others hide the discard action. */
@@ -57,10 +67,15 @@ export function ReviewFileList({
 	viewMode: ChangesViewMode;
 	workspaceId: string;
 }) {
+	const markedFiles = useMemo(
+		() => markConflictedFiles(files, conflictPaths),
+		[conflictPaths, files],
+	);
+
 	const { actions, isViewed } = useBuildReviewFileActions({
 		diffScope,
 		discardablePaths,
-		files,
+		files: markedFiles,
 		onDiscardFile,
 		workspaceId,
 	});
@@ -68,8 +83,13 @@ export function ReviewFileList({
 	// Only the flat list reorders: the folder tree's order is its structure, so a
 	// viewed file there dims in place rather than jumping out of its directory.
 	const listedFiles = useMemo(
-		() => sortReviewFilesByViewed(files, isViewed),
-		[files, isViewed],
+		() => sortReviewFilesByViewed(markedFiles, isViewed),
+		[markedFiles, isViewed],
+	);
+
+	const conflictGroups = useMemo(
+		() => groupReviewFilesByConflict(markedFiles, listedFiles, conflictPaths),
+		[conflictPaths, markedFiles, listedFiles],
 	);
 
 	// One shared right-click menu serves every row; the clicked row is captured
@@ -115,6 +135,17 @@ export function ReviewFileList({
 		return <PanelPlaceholder icon={GitPullRequestArrowIcon} {...emptyState} />;
 	}
 
+	const flatList = conflictGroups ? (
+		<>
+			<ReviewFileGroup files={conflictGroups.conflicted} label='Conflicts' />
+			<ReviewFileGroup files={conflictGroups.clean} label='Clean' />
+		</>
+	) : (
+		listedFiles.map((file) => (
+			<ReviewFileRow file={file} key={file.id} showPath />
+		))
+	);
+
 	return (
 		<ReviewFileActionsProvider value={actions}>
 			<ContextMenu>
@@ -123,11 +154,9 @@ export function ReviewFileList({
 						<ScrollArea className='h-full'>
 							<div className='flex flex-col gap-1 p-3'>
 								{viewMode === 'folders' ? (
-									<ReviewFileTree files={files} />
+									<ReviewFileTree files={markedFiles} />
 								) : (
-									listedFiles.map((file) => (
-										<ReviewFileRow file={file} key={file.id} showPath />
-									))
+									flatList
 								)}
 							</div>
 						</ScrollArea>
@@ -136,5 +165,29 @@ export function ReviewFileList({
 				<ReviewFilesContextMenuContent target={menuTarget} />
 			</ContextMenu>
 		</ReviewFileActionsProvider>
+	);
+}
+
+/** One labelled band of the flat list, used when conflicts split it in two. */
+function ReviewFileGroup({
+	files,
+	label,
+}: {
+	files: readonly ReviewFileSummary[];
+	label: string;
+}) {
+	if (files.length === 0) {
+		return null;
+	}
+
+	return (
+		<section className='flex min-w-0 flex-col gap-1'>
+			<h3 className='px-2 pt-1 font-semibold text-muted-foreground text-xs'>
+				{label}
+			</h3>
+			{files.map((file) => (
+				<ReviewFileRow file={file} key={file.id} showPath />
+			))}
+		</section>
 	);
 }

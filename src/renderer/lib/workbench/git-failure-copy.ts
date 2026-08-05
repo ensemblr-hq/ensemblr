@@ -39,3 +39,19 @@ export function describeWorkspaceGitFailure(
 		title: 'Could not read changes',
 	};
 }
+
+/**
+ * Panel copy for a trial merge that could not run. Worth showing rather than
+ * swallowing, because the probe reports no conflicting paths both when the
+ * branch merges cleanly and when it never got to find out.
+ * @param failure - The typed failure reported by the workspace git service.
+ * @returns Title and the raw git message to show underneath.
+ */
+export function describeMergeConflictProbeFailure(
+	failure: WorkspaceGitFailure,
+): Omit<GitFailureCopy, 'message'> {
+	return {
+		detail: failure.message,
+		title: 'Could not check for merge conflicts',
+	};
+}

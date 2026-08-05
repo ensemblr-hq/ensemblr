@@ -26,7 +26,10 @@ const files: ReviewFileSummary[] = [
 	},
 ];
 
-function renderList(viewMode: 'folders' | 'list') {
+function renderList(
+	viewMode: 'folders' | 'list',
+	conflictPaths?: ReadonlySet<string>,
+) {
 	const queryClient = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
 	});
@@ -34,6 +37,7 @@ function renderList(viewMode: 'folders' | 'list') {
 		<QueryClientProvider client={queryClient}>
 			<TooltipProvider>
 				<ReviewFileList
+					conflictPaths={conflictPaths}
 					files={files}
 					onDiscardFile={() => {}}
 					viewMode={viewMode}
@@ -68,6 +72,44 @@ test('list mode renders a flat list with dimmed directory prefixes', () => {
 
 	expect(markup).not.toContain('role="tree"');
 	expect(markup).toContain('>src/main/ipc/handlers/</span>');
+});
+
+test('conflicting paths split the flat list into Conflicts then Clean', () => {
+	const markup = renderList(
+		'list',
+		new Set(['src/main/repository/create-workspace.ts']),
+	);
+
+	expect(markup).toContain('Conflicts');
+	expect(markup).toContain('Clean');
+	// The conflicting file leads, ahead of the clean one it followed before.
+	expect(markup.indexOf('create-workspace.ts')).toBeLessThan(
+		markup.indexOf('workspace-files.ts'),
+	);
+});
+
+test('an empty conflict set leaves the flat list exactly as it was', () => {
+	expect(renderList('list', new Set())).toEqual(renderList('list'));
+});
+
+test('a conflict set matching no changed file leaves the list ungrouped', () => {
+	const markup = renderList('list', new Set(['some/other/file.ts']));
+
+	expect(markup).not.toContain('Conflicts');
+	expect(markup).toEqual(renderList('list'));
+});
+
+test('folders mode marks conflicting files even though it never groups them', () => {
+	const markup = renderList(
+		'folders',
+		new Set(['src/main/repository/create-workspace.ts']),
+	);
+
+	// The tree keeps its structure — no Conflicts/Clean bands — but the row that
+	// will not merge still reads as conflicted.
+	expect(markup).not.toContain('Conflicts');
+	expect(markup).toContain('aria-label="Conflicted"');
+	expect(markup).toContain('>U<');
 });
 
 test('folders mode renders a collapsible tree, not a flat list', () => {

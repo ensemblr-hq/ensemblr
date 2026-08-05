@@ -60,6 +60,7 @@ export const IPC_CHANNELS = {
 	getWorkspaceCommits: 'ensemblr:get-workspace-commits',
 	getWorkspaceFileDiff: 'ensemblr:get-workspace-file-diff',
 	getWorkspaceGitStatus: 'ensemblr:get-workspace-git-status',
+	getWorkspaceMergeConflicts: 'ensemblr:get-workspace-merge-conflicts',
 	mergePullRequest: 'ensemblr:merge-pull-request',
 	pushWorkspaceBranch: 'ensemblr:push-workspace-branch',
 	githubRepositoryList: 'ensemblr:github-repository-list',
