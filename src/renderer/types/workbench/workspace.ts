@@ -18,9 +18,11 @@ import type { ProjectShellModel } from './project';
 
 // --- Dock tabs --------------------------------------------------------------
 
-export type FixedDockTabId = 'run' | 'setup';
+export type FixedDockTabId = 'setup';
+/** One dock tab per configured run target (ADR 0041), keyed by the target's stable id. */
+export type RunDockTabId = `run:${string}`;
 export type TerminalDockTabId = `terminal:${string}`;
-export type DockTabId = FixedDockTabId | TerminalDockTabId;
+export type DockTabId = FixedDockTabId | RunDockTabId | TerminalDockTabId;
 export type DockTabStatus = 'idle' | 'ready' | 'running' | 'warning';
 
 export interface SetupScriptDockTabModel {
@@ -31,9 +33,11 @@ export interface SetupScriptDockTabModel {
 }
 
 export interface RunScriptDockTabModel {
-	id: 'run';
+	id: RunDockTabId;
 	kind: 'run-script';
 	label: string;
+	/** Which configured run target this tab renders. */
+	runTargetId: string;
 	status: DockTabStatus;
 }
 
@@ -341,6 +345,17 @@ export interface WorkspaceScriptSummary {
 	terminalId?: string | null;
 }
 
+/**
+ * One named run target's dock summary (ADR 0041): the same fields as
+ * {@link WorkspaceScriptSummary}, plus the target's stable id and display
+ * name so the dock can render one tab per configured run target.
+ */
+export interface WorkspaceRunTargetSummary extends WorkspaceScriptSummary {
+	id: string;
+	/** Display label; blank for the legacy unnamed single-run-script shape (renders as "Run"). */
+	name: string;
+}
+
 /** Classifies the provenance used to explain why a workspace was created. */
 export type WorkspaceLandingKind =
 	| 'cloned-repo'
@@ -470,7 +485,7 @@ export interface WorkspaceShellModel {
 	 */
 	reviewFilesError?: WorkspaceGitFailure;
 	scripts: {
-		run: WorkspaceScriptSummary;
+		runTargets: WorkspaceRunTargetSummary[];
 		setup: WorkspaceScriptSummary;
 	};
 	sessions: SessionTabModel[];

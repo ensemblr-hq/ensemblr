@@ -11,6 +11,7 @@ export {
 } from './harness-title';
 export {
 	buildWorkspaceScriptSummaries,
+	MISSING_RUN_TARGET_ID,
 	scriptSummaryToDockStatus,
 } from './script-summaries';
 export {

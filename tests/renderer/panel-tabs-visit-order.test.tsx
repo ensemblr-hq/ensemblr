@@ -84,11 +84,11 @@ describe('useWorkspacePanelTabState visit tracking', () => {
 			search: { dock: 'setup' },
 		});
 
-		rerender({ activeWorkspace, search: { dock: 'run' } });
+		rerender({ activeWorkspace, search: { dock: 'run:default' } });
 		rerender({ activeWorkspace, search: { dock: 'terminal:1' } });
 
 		expect(store.get(dockVisitOrderByWorkspaceAtom)).toEqual({
-			[workspace.id]: ['terminal:1', 'run', 'setup'],
+			[workspace.id]: ['terminal:1', 'run:default', 'setup'],
 		});
 	});
 
@@ -96,7 +96,7 @@ describe('useWorkspacePanelTabState visit tracking', () => {
 		const withTerminal = withTerminalTab(workspace);
 		const { rerender, result } = renderPanelTabs(store, {
 			activeWorkspace: withTerminal,
-			search: { dock: 'run' },
+			search: { dock: 'run:default' },
 		});
 
 		rerender({ activeWorkspace: withTerminal, search: { dock: 'terminal:1' } });
@@ -104,7 +104,7 @@ describe('useWorkspacePanelTabState visit tracking', () => {
 
 		rerender({ activeWorkspace: workspace });
 
-		expect(result.current.activeDockTab).toBe('run');
+		expect(result.current.activeDockTab).toBe('run:default');
 	});
 
 	test('keeps visit history separate per workspace', () => {

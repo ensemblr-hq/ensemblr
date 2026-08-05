@@ -136,6 +136,8 @@ export interface CreateTerminalSessionOptions {
 	 * persisted dock terminal, so the restored tab replays its history first.
 	 */
 	seedOutput?: string;
+	/** Which configured run target this session belongs to; only meaningful for `kind: 'run-script'`. */
+	runTargetId?: string | null;
 	title?: string;
 	rows?: number;
 	workspaceId: string;
@@ -880,6 +882,7 @@ export function createTerminalService({
 		restoredFromId,
 		resumed = false,
 		rows = DEFAULT_ROWS,
+		runTargetId = null,
 		seedOutput,
 		title,
 		workspaceId,
@@ -1009,6 +1012,7 @@ export function createTerminalService({
 				previewUrl: null,
 				restored,
 				rows: normalizedRows,
+				runTargetId: kind === 'run-script' ? runTargetId : null,
 				status: 'running',
 				title: title?.trim() || defaultTitle(kind),
 				workspaceId,

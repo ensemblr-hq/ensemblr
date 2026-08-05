@@ -20,9 +20,10 @@ export function createDockTabs({
 			status: setupStatus,
 		},
 		{
-			id: 'run',
+			id: 'run:default',
 			kind: 'run-script',
 			label: 'Run',
+			runTargetId: 'default',
 			status: runStatus,
 		},
 	];

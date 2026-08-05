@@ -4,7 +4,7 @@ import { renderHook } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { useRunScriptHotkey } from '@/renderer/hooks/workbench-shell/dock-panel/use-run-script-hotkey';
-import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
+import type { WorkspaceRunTargetSummary } from '@/renderer/types/workbench';
 import { matchesShortcut } from '@/shared/keymap';
 
 /**
@@ -31,40 +31,51 @@ function dispatchRunHotkey(): KeyboardEvent {
 	return event;
 }
 
-/** Mounts the hook at `status` with fresh start/stop spies. */
-function setup(status: WorkspaceScriptSummary['status']) {
-	const onRunScript = vi.fn();
-	const onStopRunScript = vi.fn();
-	renderHook(() =>
-		useRunScriptHotkey(status, { onRunScript, onStopRunScript }),
-	);
-	return { onRunScript, onStopRunScript };
+function target(
+	id: string,
+	status: WorkspaceRunTargetSummary['status'],
+): WorkspaceRunTargetSummary {
+	return { command: 'bun run dev', id, name: id, status };
 }
 
-test('⌘R stops the run script while it is running', () => {
-	const { onRunScript, onStopRunScript } = setup('running');
+/** Mounts the hook against `runTargets` with fresh start/stop spies. */
+function setup(runTargets: WorkspaceRunTargetSummary[]) {
+	const onRunScript = vi.fn();
+	const onStopRunScript = vi.fn();
+	const view = renderHook(
+		(targets: WorkspaceRunTargetSummary[]) =>
+			useRunScriptHotkey(targets, { onRunScript, onStopRunScript }),
+		{ initialProps: runTargets },
+	);
+	return { onRunScript, onStopRunScript, view };
+}
+
+test('⌘R stops the sole run target while it is running', () => {
+	const { onRunScript, onStopRunScript } = setup([
+		target('default', 'running'),
+	]);
 
 	dispatchRunHotkey();
 
-	expect(onStopRunScript).toHaveBeenCalledTimes(1);
+	expect(onStopRunScript).toHaveBeenCalledExactlyOnceWith('default');
 	expect(onRunScript).not.toHaveBeenCalled();
 });
 
-test.each<WorkspaceScriptSummary['status']>([
+test.each<WorkspaceRunTargetSummary['status']>([
 	'not-run',
 	'stopped',
 	'succeeded',
-])('⌘R starts the run script when status is %s', (status) => {
-	const { onRunScript, onStopRunScript } = setup(status);
+])('⌘R starts the sole run target when status is %s', (status) => {
+	const { onRunScript, onStopRunScript } = setup([target('default', status)]);
 
 	dispatchRunHotkey();
 
-	expect(onRunScript).toHaveBeenCalledTimes(1);
+	expect(onRunScript).toHaveBeenCalledExactlyOnceWith('default');
 	expect(onStopRunScript).not.toHaveBeenCalled();
 });
 
-test('⌘R is a no-op when no run script is configured', () => {
-	const { onRunScript, onStopRunScript } = setup('missing');
+test('⌘R is a no-op when no run target is configured', () => {
+	const { onRunScript, onStopRunScript } = setup([]);
 
 	dispatchRunHotkey();
 
@@ -72,10 +83,40 @@ test('⌘R is a no-op when no run script is configured', () => {
 	expect(onStopRunScript).not.toHaveBeenCalled();
 });
 
-test('⌘R is captured (default reload suppressed) even when missing', () => {
-	setup('missing');
+test('⌘R is captured (default reload suppressed) even with no run targets', () => {
+	setup([]);
 
 	// preventDefault must fire regardless of run status, otherwise ⌘R falls
 	// through to a native Electron reload.
 	expect(dispatchRunHotkey().defaultPrevented).toBe(true);
+});
+
+test('⌘R acts on the first configured target before any target has been used', () => {
+	const { onRunScript } = setup([
+		target('web', 'stopped'),
+		target('api', 'stopped'),
+	]);
+
+	dispatchRunHotkey();
+
+	expect(onRunScript).toHaveBeenCalledExactlyOnceWith('web');
+});
+
+test('⌘R re-targets the last-used run target on a later press', () => {
+	const { onRunScript, onStopRunScript, view } = setup([
+		target('web', 'stopped'),
+		target('api', 'stopped'),
+	]);
+
+	dispatchRunHotkey();
+	expect(onRunScript).toHaveBeenCalledExactlyOnceWith('web');
+
+	// api starts running; re-render with fresh statuses (as the live model would).
+	view.rerender([target('web', 'stopped'), target('api', 'running')]);
+	dispatchRunHotkey();
+
+	// The hotkey still targets 'web' (the last id it acted on) since 'web' is
+	// still stopped, not 'api'.
+	expect(onRunScript).toHaveBeenCalledTimes(2);
+	expect(onStopRunScript).not.toHaveBeenCalled();
 });

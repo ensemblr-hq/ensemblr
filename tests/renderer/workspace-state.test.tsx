@@ -232,10 +232,10 @@ test('resolves per-workspace review and dock tab preferences', () => {
 	).toBe('checks');
 	expect(
 		getPreferredDockTab({
-			dockTabsByWorkspace: { [workspace.id]: 'run' },
+			dockTabsByWorkspace: { [workspace.id]: 'run:default' },
 			workspace,
 		}),
-	).toBe('run');
+	).toBe('run:default');
 	expect(
 		getPreferredDockTab({
 			dockTabsByWorkspace: { [workspace.id]: 'terminal:missing' },
@@ -246,14 +246,14 @@ test('resolves per-workspace review and dock tab preferences', () => {
 	expect(
 		getPreferredDockTab({
 			dockTabsByWorkspace: { [workspace.id]: 'terminal:missing' },
-			visitOrder: ['terminal:missing', 'run', 'setup'],
+			visitOrder: ['terminal:missing', 'run:default', 'setup'],
 			workspace,
 		}),
-	).toBe('run');
+	).toBe('run:default');
 	// A valid route dock tab overrides the stored per-workspace preference.
 	expect(
 		getPreferredDockTab({
-			dockTabsByWorkspace: { [workspace.id]: 'run' },
+			dockTabsByWorkspace: { [workspace.id]: 'run:default' },
 			routeDockTab: 'setup',
 			workspace,
 		}),

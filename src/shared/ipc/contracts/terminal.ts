@@ -75,6 +75,12 @@ export interface TerminalSessionSnapshot {
 	 */
 	restored: boolean;
 	rows: number;
+	/**
+	 * Which configured run target this session belongs to, for `run-script`
+	 * sessions with more than one target configured. `null` for every other kind
+	 * and for the legacy single-run-script shape.
+	 */
+	runTargetId: string | null;
 	status: TerminalSessionStatus;
 	title: string;
 	workspaceId: string;
@@ -96,6 +102,8 @@ export interface CreateTerminalSessionRequest {
 	 */
 	restoredFromId?: string;
 	rows?: number;
+	/** Which configured run target this session belongs to; only meaningful for `kind: 'run-script'`. */
+	runTargetId?: string | null;
 	/**
 	 * Prior scrollback to seed ahead of live PTY output when relaunching a
 	 * persisted dock terminal, so the restored tab replays its history first.

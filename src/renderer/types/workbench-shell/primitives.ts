@@ -15,12 +15,14 @@ export interface WorkbenchDockActions {
 	onAskAgentSetupScript: () => void;
 	onCloseTerminal: (terminalId: string) => void;
 	onNewTerminal: () => void;
-	/** Opens the detected dev-server preview URL in the system browser. */
-	onOpenRunPort: (url: string) => void;
+	/** Opens the detected dev-server preview URL for one run target in the system browser. */
+	onOpenRunPort: (runTargetId: string, url: string) => void;
 	onOpenSetupScripts: () => void;
-	onRunScript: () => void;
+	/** Starts the named run target (ADR 0041). */
+	onRunScript: (runTargetId: string) => void;
 	onRunSetupScript: () => void;
-	onStopRunScript: () => void;
+	/** Stops the named run target's active session. */
+	onStopRunScript: (runTargetId: string) => void;
 	onStopSetupScript: () => void;
 }
 

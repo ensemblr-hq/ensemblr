@@ -1,8 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { PlusIcon, XIcon } from 'lucide-react';
 
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
 import { SourceBadge } from '@/renderer/components/settings/source-badge';
+import { Button } from '@/renderer/components/ui/button';
+import { Input } from '@/renderer/components/ui/input';
 import {
 	RadioGroup,
 	RadioGroupItem,
@@ -14,9 +17,11 @@ import { useScriptsSettingsForm } from '@/renderer/hooks/use-scripts-settings-fo
 import type {
 	RepoProject,
 	RunMode,
+	ScriptRunTargetFormEntry,
 	ScriptsForm,
 } from '@/renderer/types/settings';
 import type { ResolvedSettingSnapshot } from '@/shared/ipc/contracts/settings-resolution';
+import { DEFAULT_RUN_TARGET_ID, readRunTargetEntry } from '@/shared/scripts';
 
 /** Route for a repository's Scripts settings; renders the setup/run/archive script editor keyed by the `repoId` path param. */
 export const Route = createFileRoute(
@@ -30,6 +35,45 @@ type ResolveSetting = ReturnType<typeof useRepoSettings>['resolved'];
 
 const SCRIPTS_DESCRIPTION =
 	'Commands that run when workspaces are set up, run, or archived.';
+
+/**
+ * Normalizes a resolved `scripts.run` value (legacy string, array of
+ * `{ name?, command, id? }` tables, or absent) into the editable form's row
+ * list, assigning a fresh id to any entry that doesn't already carry one so a
+ * running session's identity survives a rename. The legacy single-string shape
+ * keeps {@link DEFAULT_RUN_TARGET_ID} rather than minting a UUID, so a session
+ * already started under that id keeps its dock tab and stop control when the
+ * command is first edited here.
+ * @param value - Resolved `scripts.run` candidate value.
+ * @returns Editable run-target rows, in resolved order.
+ */
+function parseInitialRunTargets(value: unknown): ScriptRunTargetFormEntry[] {
+	if (typeof value === 'string') {
+		return value.trim()
+			? [{ command: value, id: DEFAULT_RUN_TARGET_ID, name: '' }]
+			: [];
+	}
+
+	if (!Array.isArray(value)) {
+		return [];
+	}
+
+	return value.flatMap((entry): ScriptRunTargetFormEntry[] => {
+		const raw = readRunTargetEntry(entry);
+
+		if (!raw) {
+			return [];
+		}
+
+		return [
+			{
+				command: raw.command,
+				id: raw.id || crypto.randomUUID(),
+				name: raw.name,
+			},
+		];
+	});
+}
 
 /**
  * Per-repository Scripts settings. Reads the resolved values (which prefer the
@@ -56,7 +100,7 @@ function RepoScriptsSettings() {
 	const initial: ScriptsForm = {
 		archive: (resolved('scripts.archive')?.value as string) ?? '',
 		autoRun: resolved('autoRunAfterSetup')?.value === true,
-		run: (resolved('scripts.run')?.value as string) ?? '',
+		run: parseInitialRunTargets(resolved('scripts.run')?.value),
 		runMode: (resolved('runScriptMode')?.value as RunMode) ?? 'concurrent',
 		setup: (resolved('scripts.setup')?.value as string) ?? '',
 	};
@@ -98,14 +142,10 @@ function ScriptsEditor({
 				value={form.setup}
 			/>
 
-			<ScriptRow
-				description='Runs when you click the play button.'
-				label='Run script'
-				onChange={(value) => updateForm({ run: value })}
-				onReset={() => updateForm({ run: '' })}
-				placeholder='e.g. bun run dev'
+			<RunTargetsEditor
+				onChange={(run) => updateForm({ run })}
 				source={resolved('scripts.run')?.source}
-				value={form.run}
+				targets={form.run}
 			/>
 
 			<SettingRow
@@ -173,6 +213,116 @@ function ScriptsEditor({
 				value={form.archive}
 			/>
 		</SettingsSection>
+	);
+}
+
+/**
+ * Editable list of named run targets (ADR 0041): each row is one
+ * independently start/stop-able dev-server/watcher command, plus an "Add run
+ * target" action. The whole array resolves atomically from one source (TOML
+ * vs. personal SQLite vs. built-in), so the source badge and toml-override
+ * hint apply to the list as a whole rather than per row.
+ */
+function RunTargetsEditor({
+	onChange,
+	source,
+	targets,
+}: {
+	onChange: (next: ScriptRunTargetFormEntry[]) => void;
+	source: ResolvedSettingSnapshot['source'] | undefined;
+	targets: ScriptRunTargetFormEntry[];
+}) {
+	const overriddenByToml = source === 'ensemblr-config';
+	const isPersonalOverride = source === 'sqlite';
+
+	const updateTarget = (
+		id: string,
+		patch: Partial<Pick<ScriptRunTargetFormEntry, 'command' | 'name'>>,
+	): void => {
+		onChange(
+			targets.map((target) =>
+				target.id === id ? { ...target, ...patch } : target,
+			),
+		);
+	};
+
+	const removeTarget = (id: string): void => {
+		onChange(targets.filter((target) => target.id !== id));
+	};
+
+	const addTarget = (): void => {
+		onChange([...targets, { command: '', id: crypto.randomUUID(), name: '' }]);
+	};
+
+	return (
+		<SettingRow
+			description='Runs when you click the play button. Add more than one to run several dev servers side by side (e.g. one per project in a monorepo).'
+			label={
+				<span className='flex items-center gap-2'>
+					Run scripts
+					<SourceBadge source={source} />
+				</span>
+			}
+			modified={isPersonalOverride}
+			onReset={() => onChange([])}
+			stack
+		>
+			<div className='mt-2 flex flex-col gap-3'>
+				{targets.map((target) => (
+					<div
+						className='flex flex-col gap-1.5 rounded-md border p-2'
+						key={target.id}
+					>
+						<div className='flex items-center gap-2'>
+							<Input
+								aria-label='Run target name'
+								className='h-7 text-xs'
+								onChange={(event) =>
+									updateTarget(target.id, { name: event.target.value })
+								}
+								placeholder='Name (e.g. Web) — optional'
+								value={target.name}
+							/>
+							<Button
+								aria-label='Remove run target'
+								className='size-7 shrink-0 text-muted-foreground hover:text-foreground'
+								onClick={() => removeTarget(target.id)}
+								size='icon-xs'
+								type='button'
+								variant='ghost'
+							>
+								<XIcon aria-hidden='true' />
+							</Button>
+						</div>
+						<Textarea
+							aria-label='Run target command'
+							className='min-h-18 font-mono text-xs'
+							onChange={(event) =>
+								updateTarget(target.id, { command: event.target.value })
+							}
+							placeholder='e.g. bun run dev'
+							value={target.command}
+						/>
+					</div>
+				))}
+				<Button
+					className='gap-1.5 self-start'
+					onClick={addTarget}
+					size='xs'
+					type='button'
+					variant='outline'
+				>
+					<PlusIcon aria-hidden='true' data-icon='inline-start' />
+					Add run target
+				</Button>
+			</div>
+			{overriddenByToml ? (
+				<p className='mt-1 text-muted-foreground text-xs'>
+					Overridden by the committed .ensemblr/settings.toml; your edit is
+					saved but shadowed until that key is removed.
+				</p>
+			) : null}
+		</SettingRow>
 	);
 }
 

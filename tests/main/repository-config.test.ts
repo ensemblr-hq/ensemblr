@@ -169,6 +169,61 @@ enabled = true
 	assert.deepEqual(loaded.snapshot.diagnostics, []);
 });
 
+test('parses [[scripts.run]] array-of-tables into named run targets', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		`
+[[scripts.run]]
+name = "Web"
+command = "npm run dev:web"
+
+[[scripts.run]]
+name = "API"
+command = "npm run dev:api"
+`,
+	);
+
+	const loaded = loadRepositoryConfig({
+		repositoryPath: fixture.repositoryPath,
+	});
+	const source = getSource(loaded.snapshot, 'ensemblr-config');
+
+	assert.equal(source.status, 'loaded');
+	// js-toml returns null-prototype objects for inline/array-of-table entries;
+	// round-trip through JSON so the comparison isn't sensitive to that.
+	assert.deepEqual(JSON.parse(JSON.stringify(source.settings.scripts)), {
+		run: [
+			{ command: 'npm run dev:web', name: 'Web' },
+			{ command: 'npm run dev:api', name: 'API' },
+		],
+	});
+	assert.deepEqual(loaded.snapshot.diagnostics, []);
+});
+
+test('rejects a [[scripts.run]] entry with no command', (t) => {
+	const fixture = createRepositoryFixture(t);
+	fixture.write(
+		'.ensemblr/settings.toml',
+		`
+[[scripts.run]]
+name = "Web"
+`,
+	);
+
+	const loaded = loadRepositoryConfig({
+		repositoryPath: fixture.repositoryPath,
+	});
+	const source = getSource(loaded.snapshot, 'ensemblr-config');
+
+	assert.equal(source.settings.scripts, undefined);
+	assert.equal(loaded.snapshot.diagnostics.length, 1);
+	assert.equal(
+		loaded.snapshot.diagnostics[0]?.code,
+		'invalid-repository-config-field',
+	);
+});
+
 test('normalises nested [git] keys onto canonical top-level keys', (t) => {
 	const fixture = createRepositoryFixture(t);
 	fixture.write(

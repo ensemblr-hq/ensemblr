@@ -78,7 +78,7 @@ function createSettingsStub(
 	settings: {
 		archive?: string;
 		autoRunAfterSetup?: boolean;
-		run?: string;
+		run?: string | Array<{ command: string; id?: string; name?: string }>;
 		runScriptMode?: string;
 		setup?: string;
 	},
@@ -160,6 +160,7 @@ function createTerminalServiceFake({
 				previewUrl: null,
 				restored: false,
 				rows: 24,
+				runTargetId: options.runTargetId ?? null,
 				status: 'running',
 				title: options.title ?? 'Terminal',
 				workspaceId: options.workspaceId,
@@ -348,6 +349,175 @@ test('concurrent mode allows multiple named run sessions', async (t) => {
 	assert.ok(second.session);
 	assert.notEqual(first.session.id, second.session.id);
 	assert.equal(createCalls.length, 2);
+});
+
+test('different run targets start concurrently even in nonconcurrent mode', async (t) => {
+	const { createCalls, service } = createServiceFixture(t, {
+		run: [
+			{ command: 'npm run dev:web', id: 'web', name: 'Web' },
+			{ command: 'npm run dev:api', id: 'api', name: 'API' },
+		],
+		runScriptMode: 'nonconcurrent',
+	});
+
+	const web = await service.runScript({
+		kind: 'run',
+		runTargetId: 'web',
+		workspaceId: WORKSPACE_ID,
+	});
+	const api = await service.runScript({
+		kind: 'run',
+		runTargetId: 'api',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(web.session);
+	assert.ok(api.session);
+	assert.equal(web.session.title, 'Web');
+	assert.equal(api.session.title, 'API');
+	assert.equal(createCalls.length, 2);
+});
+
+test('nonconcurrent mode still blocks a duplicate launch of the same target', async (t) => {
+	const { createCalls, service } = createServiceFixture(t, {
+		run: [
+			{ command: 'npm run dev:web', id: 'web', name: 'Web' },
+			{ command: 'npm run dev:api', id: 'api', name: 'API' },
+		],
+		runScriptMode: 'nonconcurrent',
+	});
+
+	const first = await service.runScript({
+		kind: 'run',
+		runTargetId: 'web',
+		workspaceId: WORKSPACE_ID,
+	});
+	const second = await service.runScript({
+		kind: 'run',
+		runTargetId: 'web',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(first.session);
+	assert.equal(second.session, null);
+	assert.equal(second.diagnostics[0]?.code, 'script-already-running');
+	assert.equal(createCalls.length, 1);
+});
+
+test("restarting one run target never touches another target's session", async (t) => {
+	const { killedIds, service } = createServiceFixture(t, {
+		run: [
+			{ command: 'npm run dev:web', id: 'web', name: 'Web' },
+			{ command: 'npm run dev:api', id: 'api', name: 'API' },
+		],
+		runScriptMode: 'nonconcurrent',
+	});
+
+	const web = await service.runScript({
+		kind: 'run',
+		runTargetId: 'web',
+		workspaceId: WORKSPACE_ID,
+	});
+	const api = await service.runScript({
+		kind: 'run',
+		runTargetId: 'api',
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.ok(web.session);
+	assert.ok(api.session);
+
+	const restartedApi = await service.runScript({
+		kind: 'run',
+		restart: true,
+		runTargetId: 'api',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.ok(restartedApi.session);
+	assert.deepEqual(killedIds, [api.session.id]);
+	assert.notEqual(restartedApi.session.id, api.session.id);
+});
+
+test('runScript falls back to the first configured target when runTargetId is omitted', async (t) => {
+	const { service } = createServiceFixture(t, {
+		run: [
+			{ command: 'npm run dev:web', id: 'web', name: 'Web' },
+			{ command: 'npm run dev:api', id: 'api', name: 'API' },
+		],
+	});
+
+	const result = await service.runScript({
+		kind: 'run',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(result.session?.title, 'Web');
+});
+
+test('stopScript is scoped to the requested run target', async (t) => {
+	const { killedIds, service } = createServiceFixture(t, {
+		run: [
+			{ command: 'npm run dev:web', id: 'web', name: 'Web' },
+			{ command: 'npm run dev:api', id: 'api', name: 'API' },
+		],
+	});
+
+	const web = await service.runScript({
+		kind: 'run',
+		runTargetId: 'web',
+		workspaceId: WORKSPACE_ID,
+	});
+	const api = await service.runScript({
+		kind: 'run',
+		runTargetId: 'api',
+		workspaceId: WORKSPACE_ID,
+	});
+	assert.ok(web.session);
+	assert.ok(api.session);
+
+	const stopped = await service.stopScript({
+		kind: 'run',
+		runTargetId: 'web',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.equal(stopped.session?.status, 'stopped');
+	assert.deepEqual(killedIds, [web.session.id]);
+
+	// api's session is untouched by web's stop.
+	const apiSessions = service
+		.stopScript({ kind: 'run', runTargetId: 'api', workspaceId: WORKSPACE_ID })
+		.then((result) => result.session);
+	assert.equal((await apiSessions)?.id, api.session.id);
+	assert.equal((await apiSessions)?.status, 'stopped');
+});
+
+test('runSetupScriptWithAutoRun starts every configured run target', async (t) => {
+	const fixture = createServiceFixture(t, {
+		autoRunAfterSetup: true,
+		run: [
+			{ command: 'npm run dev:web', id: 'web', name: 'Web' },
+			{ command: 'npm run dev:api', id: 'api', name: 'API' },
+		],
+		setup: 'bun install',
+	});
+
+	setTimeout(() => fixture.endSession('session-1', 'exited'), 20);
+
+	await fixture.service.runSetupScriptWithAutoRun({
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.deepEqual(
+		fixture.createCalls.map((call) => call.kind),
+		['setup-script', 'run-script', 'run-script'],
+	);
+	assert.deepEqual(
+		fixture.createCalls
+			.filter((call) => call.kind === 'run-script')
+			.map((call) => call.runTargetId),
+		['web', 'api'],
+	);
 });
 
 test('restart stops the active run before starting a new one', async (t) => {

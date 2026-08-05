@@ -6,11 +6,32 @@ import type {
 /** Repository-configured workspace script kinds (ADR 0007). */
 export type WorkspaceScriptKind = 'archive' | 'run' | 'setup';
 
+/**
+ * One named run target (ADR 0041): a run command a workspace can start
+ * independently of, and concurrently with, its other run targets. `id` is
+ * stable across renames; `name` is the editable display label (blank for the
+ * legacy single-run-script shape, which renders as "Run").
+ */
+export interface WorkspaceRunTarget {
+	command: string;
+	id: string;
+	name: string;
+}
+
+/** Write-side shape of a run target; `id` is optional on create. */
+export interface WorkspaceRunTargetInput {
+	command: string;
+	id?: string;
+	name: string;
+}
+
 /** Request to run a repository-configured workspace script. */
 export interface RunWorkspaceScriptRequest {
 	kind: WorkspaceScriptKind;
 	/** Stop the active session of this kind before starting a new one. */
 	restart?: boolean;
+	/** Which run target to act on; required when `kind` is `'run'` and multiple targets are configured. */
+	runTargetId?: string;
 	workspaceId: string;
 }
 
@@ -36,6 +57,8 @@ export type EnsureWorkspaceSetupResult = CreateTerminalSessionResult;
 /** Request to stop a workspace's running script session of a given kind. */
 export interface StopWorkspaceScriptRequest {
 	kind: WorkspaceScriptKind;
+	/** Which run target to act on; required when `kind` is `'run'` and multiple targets are configured. */
+	runTargetId?: string;
 	workspaceId: string;
 }
 
@@ -51,7 +74,8 @@ export interface UpdateRepositoryScriptsRequest {
 	archive: string | null;
 	autoRunAfterSetup: boolean;
 	repositoryId: string;
-	run: string | null;
+	/** Empty array clears the stored row, same as a blank command did before. */
+	run: WorkspaceRunTargetInput[] | null;
 	runScriptMode: 'concurrent' | 'nonconcurrent';
 	setup: string | null;
 }

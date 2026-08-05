@@ -44,7 +44,13 @@ export function useScriptsSettingsForm(
 				archive: next.archive.trim() ? next.archive : null,
 				autoRunAfterSetup: next.autoRun,
 				repositoryId: repoId,
-				run: next.run.trim() ? next.run : null,
+				run: next.run
+					.filter((target) => target.command.trim())
+					.map((target) => ({
+						command: target.command,
+						id: target.id,
+						name: target.name,
+					})),
 				runScriptMode: next.runMode,
 				setup: next.setup.trim() ? next.setup : null,
 			});

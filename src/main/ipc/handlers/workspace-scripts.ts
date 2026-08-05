@@ -48,6 +48,7 @@ export function registerWorkspaceScriptHandlers({
 			scriptLifecycleService.runScript({
 				kind: request.kind,
 				restart: request.restart,
+				runTargetId: request.runTargetId,
 				workspaceId: request.workspaceId,
 			}),
 	);
@@ -60,6 +61,7 @@ export function registerWorkspaceScriptHandlers({
 		): Promise<StopWorkspaceScriptResult> =>
 			scriptLifecycleService.stopScript({
 				kind: request.kind,
+				runTargetId: request.runTargetId,
 				workspaceId: request.workspaceId,
 			}),
 	);

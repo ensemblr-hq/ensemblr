@@ -1,12 +1,18 @@
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 export const runningDevScripts = {
-	run: {
-		command: 'bun run dev',
-		port: 5173,
-		previewUrl: 'http://localhost:5173',
-		status: 'running',
-	},
+	runTargets: [
+		{
+			command: 'bun run dev',
+			id: 'default',
+			name: '',
+			port: 5173,
+			previewUrl: 'http://localhost:5173',
+			sessionStatus: 'running',
+			status: 'running',
+			terminalId: 'run-session-1',
+		},
+	],
 	setup: {
 		command: 'bun install',
 		status: 'succeeded',
@@ -14,10 +20,9 @@ export const runningDevScripts = {
 } satisfies WorkspaceShellModel['scripts'];
 
 export const setupPendingScripts = {
-	run: {
-		command: 'bun run dev',
-		status: 'stopped',
-	},
+	runTargets: [
+		{ command: 'bun run dev', id: 'default', name: '', status: 'stopped' },
+	],
 	setup: {
 		command: 'bun install',
 		status: 'not-run',
@@ -25,10 +30,9 @@ export const setupPendingScripts = {
 } satisfies WorkspaceShellModel['scripts'];
 
 export const stoppedRunScripts = {
-	run: {
-		command: 'bun run dev',
-		status: 'stopped',
-	},
+	runTargets: [
+		{ command: 'bun run dev', id: 'default', name: '', status: 'stopped' },
+	],
 	setup: {
 		command: 'bun install',
 		status: 'succeeded',
@@ -36,9 +40,10 @@ export const stoppedRunScripts = {
 } satisfies WorkspaceShellModel['scripts'];
 
 export const missingScripts = {
-	run: {
-		status: 'missing',
-	},
+	// A workspace with no configured run target still gets one placeholder tab
+	// (see MISSING_RUN_TARGET_ID in lib/terminal/script-summaries.ts) so the
+	// "No run script configured" empty state stays discoverable.
+	runTargets: [{ id: 'default', name: '', status: 'missing' }],
 	setup: {
 		status: 'missing',
 	},

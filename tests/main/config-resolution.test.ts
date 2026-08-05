@@ -343,6 +343,41 @@ test('.ensemblr/settings.toml outranks personal SQLite per-key', (t) => {
 	]);
 });
 
+test('scripts.run resolves an array-of-named-targets candidate the same as a string one (ADR 0041)', (t) => {
+	const database = createDatabaseFixture(t);
+	const runTargets = [
+		{ command: 'npm run dev:web', id: 'web', name: 'Web' },
+		{ command: 'npm run dev:api', id: 'api', name: 'API' },
+	];
+	insertSetting({
+		database,
+		key: 'scripts.run',
+		scope: 'repository',
+		scopeId: 'repo-1',
+		valueJson: JSON.stringify(runTargets),
+	});
+
+	const snapshot = resolveSettings({
+		config: createConfig(),
+		database,
+		repository: { repositoryId: 'repo-1' },
+	});
+
+	if (!snapshot.repository) {
+		assert.fail('Expected repository settings resolution');
+	}
+
+	// The resolver treats scripts.run as an opaque value — same precedence
+	// selection whether it holds a string or an array of named run targets.
+	assert.deepEqual(
+		{
+			source: getSetting(snapshot.repository, 'scripts.run').source,
+			value: getSetting(snapshot.repository, 'scripts.run').value,
+		},
+		{ source: 'sqlite', value: runTargets },
+	);
+});
+
 test('invalid app permission mode falls back to the next valid source', (t) => {
 	const database = createDatabaseFixture(t);
 	insertSetting({

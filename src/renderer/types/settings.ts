@@ -14,11 +14,22 @@ export type SettingsScope = 'user' | 'repo';
 /** Run-script concurrency mode (values match the resolver's `runScriptMode`). */
 export type RunMode = 'concurrent' | 'nonconcurrent';
 
+/**
+ * One editable row of the Scripts-screen run-target list. `id` is assigned on
+ * creation (see {@link useScriptsSettingsForm}) and stays stable across
+ * renames, so a running session's exclusivity lock survives an edit to `name`.
+ */
+export interface ScriptRunTargetFormEntry {
+	command: string;
+	id: string;
+	name: string;
+}
+
 /** Editable Scripts-screen form state, mirrored to a ref for debounced saves. */
 export interface ScriptsForm {
 	archive: string;
 	autoRun: boolean;
-	run: string;
+	run: ScriptRunTargetFormEntry[];
 	runMode: RunMode;
 	setup: string;
 }

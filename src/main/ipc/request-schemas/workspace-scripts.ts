@@ -6,12 +6,19 @@
  */
 import { z } from 'zod';
 
+/** One `[[scripts.run]]`-shaped entry accepted by the Scripts-settings writer. */
+const workspaceRunTargetInputSchema = z.object({
+	command: z.string().min(1),
+	id: z.string().optional(),
+	name: z.string(),
+});
+
 /** {@link import('../../../shared/ipc').UpdateRepositoryScriptsRequest}. */
 export const updateRepositoryScriptsRequestSchema = z.object({
 	archive: z.string().nullable(),
 	autoRunAfterSetup: z.boolean(),
 	repositoryId: z.string().min(1),
-	run: z.string().nullable(),
+	run: z.array(workspaceRunTargetInputSchema).nullable(),
 	runScriptMode: z.enum(['concurrent', 'nonconcurrent']),
 	setup: z.string().nullable(),
 });

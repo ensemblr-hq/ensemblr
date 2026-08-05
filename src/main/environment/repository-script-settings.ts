@@ -1,6 +1,9 @@
 import type { DatabaseSync } from 'node:sqlite';
 
-import type { RunScriptMode } from '../../shared/scripts.ts';
+import type {
+	RunScriptMode,
+	WorkspaceRunTargetInput,
+} from '../../shared/scripts.ts';
 import { withTransaction } from '../storage/tx.ts';
 import type { NormalizedScope } from './environment-variable-types.ts';
 import { deleteSetting, upsertSetting } from './settings-table.ts';
@@ -11,7 +14,8 @@ interface UpsertRepositoryScriptSettingsInput {
 	autoRunAfterSetup: boolean;
 	database: DatabaseSync;
 	repositoryId: string;
-	run: string | null;
+	/** Empty array clears the stored row, same as a blank command did before. */
+	run: WorkspaceRunTargetInput[] | null;
 	runScriptMode: RunScriptMode;
 	setup: string | null;
 }
@@ -42,7 +46,7 @@ export function upsertRepositoryScriptSettings({
 	// back instead of leaving the Scripts settings partially applied.
 	withTransaction(database, () => {
 		setScriptCommand({ database, key: 'scripts.setup', scope, value: setup });
-		setScriptCommand({ database, key: 'scripts.run', scope, value: run });
+		setRunTargets({ database, run, scope });
 		setScriptCommand({
 			database,
 			key: 'scripts.archive',
@@ -62,6 +66,36 @@ export function upsertRepositoryScriptSettings({
 			scope,
 			valueJson: JSON.stringify(autoRunAfterSetup),
 		});
+	});
+}
+
+/**
+ * Upserts the `scripts.run` row as a JSON array of run targets, or deletes it
+ * when the list is empty so the key falls back to `.ensemblr/settings.toml` /
+ * built-in defaults. Blank-command entries are dropped; blank names are kept
+ * (they render as the unnamed "Run" target).
+ */
+function setRunTargets({
+	database,
+	run,
+	scope,
+}: {
+	database: DatabaseSync;
+	run: WorkspaceRunTargetInput[] | null;
+	scope: NormalizedScope;
+}): void {
+	const targets = (run ?? []).filter((target) => target.command.trim());
+
+	if (targets.length === 0) {
+		deleteSetting({ database, key: 'scripts.run', scope });
+		return;
+	}
+
+	upsertSetting({
+		database,
+		key: 'scripts.run',
+		scope,
+		valueJson: JSON.stringify(targets),
 	});
 }
 

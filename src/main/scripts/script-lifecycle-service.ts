@@ -6,6 +6,7 @@ import type {
 import type { WorkspaceScriptKind } from '../../shared/ipc/contracts/workspace-scripts';
 import {
 	parseWorkspaceScriptSettings,
+	type WorkspaceRunTarget,
 	type WorkspaceScriptSettings,
 } from '../../shared/scripts.ts';
 import type { EnsemblrConfigResolutionService } from '../config';
@@ -29,12 +30,16 @@ export interface RunScriptOptions {
 	kind: WorkspaceScriptKind;
 	/** Stop the active session of this kind before starting a new one. */
 	restart?: boolean;
+	/** Which run target to act on; only meaningful when `kind` is `'run'`. Falls back to the first configured target when omitted. */
+	runTargetId?: string;
 	workspaceId: string;
 }
 
 /** Inputs for {@link ScriptLifecycleService.stopScript}. */
 export interface StopScriptOptions {
 	kind: WorkspaceScriptKind;
+	/** Which run target to act on; only meaningful when `kind` is `'run'`. Falls back to the first configured target when omitted. */
+	runTargetId?: string;
 	workspaceId: string;
 }
 
@@ -138,18 +143,48 @@ export function createScriptLifecycleService({
 		};
 	}
 
-	/** Returns the active (running) script session of `kind`, if any. */
+	/**
+	 * Returns the active (running) script session of `kind`, if any. For
+	 * `kind: 'run'`, also matches on `runTargetId` — each named run target is
+	 * tracked independently, so `web` running never shows up as `api`'s active
+	 * session (or vice versa).
+	 */
 	function findActiveScriptSession(
 		workspaceId: string,
 		kind: WorkspaceScriptKind,
+		runTargetId?: string,
 	): TerminalSessionSnapshot | null {
 		return (
-			terminalService
-				.list(workspaceId)
-				.find(
-					(session) =>
-						session.kind === `${kind}-script` && session.status === 'running',
-				) ?? null
+			terminalService.list(workspaceId).find((session) => {
+				if (session.kind !== `${kind}-script` || session.status !== 'running') {
+					return false;
+				}
+
+				return kind === 'run'
+					? session.runTargetId === (runTargetId ?? null)
+					: true;
+			}) ?? null
+		);
+	}
+
+	/**
+	 * Picks the run target `runTargetId` names, or the first configured target
+	 * when omitted — the fallback that keeps single-run-script callers working
+	 * unchanged.
+	 * @param settings - Resolved script settings for the workspace.
+	 * @param runTargetId - Requested target id, or undefined.
+	 * @returns The matching target, or null when none is configured/found.
+	 */
+	function resolveRunTarget(
+		settings: WorkspaceScriptSettings,
+		runTargetId: string | undefined,
+	): WorkspaceRunTarget | null {
+		if (!runTargetId) {
+			return settings.runTargets[0] ?? null;
+		}
+
+		return (
+			settings.runTargets.find((target) => target.id === runTargetId) ?? null
 		);
 	}
 
@@ -164,12 +199,22 @@ export function createScriptLifecycleService({
 	async function runScript({
 		kind,
 		restart = false,
+		runTargetId,
 		workspaceId,
 	}: RunScriptOptions): Promise<CreateTerminalSessionResult> {
 		const resolved = resolveScriptConfig(workspaceId);
 
 		if (resolved.error) {
 			return resolved.error;
+		}
+
+		if (kind === 'run') {
+			return startRunTarget({
+				restart,
+				runTargetId,
+				settings: resolved.settings,
+				workspaceId,
+			});
 		}
 
 		const command = resolved.settings.scripts[kind];
@@ -182,16 +227,68 @@ export function createScriptLifecycleService({
 			);
 		}
 
-		const allowConcurrent =
-			kind === 'run' &&
-			resolved.settings.runScriptMode === 'concurrent' &&
-			!restart;
+		return runExclusiveScript({
+			command,
+			kind,
+			restart,
+			title: defaultScriptTitle(kind),
+			workspaceId,
+		});
+	}
 
-		if (allowConcurrent) {
-			return createScriptSession({ command, kind, workspaceId });
+	/**
+	 * Starts one run target: resolves it from settings, then either launches
+	 * immediately (concurrent mode, no restart) or serializes an exclusive
+	 * launch. Returns an info failure when the workspace has no run target
+	 * configured (or the requested id is unknown).
+	 * @param options - Restart flag, requested target id, resolved settings, and workspace.
+	 * @returns The terminal session create result, or a typed failure diagnostic.
+	 */
+	function startRunTarget({
+		restart,
+		runTargetId,
+		settings,
+		workspaceId,
+	}: {
+		restart: boolean;
+		runTargetId: string | undefined;
+		settings: WorkspaceScriptSettings;
+		workspaceId: string;
+	}): Promise<CreateTerminalSessionResult> {
+		const target = resolveRunTarget(settings, runTargetId);
+
+		if (!target) {
+			return Promise.resolve(
+				failure(
+					'script-not-configured',
+					'No run script is configured for this repository.',
+					'info',
+				),
+			);
 		}
 
-		return runExclusiveScript({ command, kind, restart, workspaceId });
+		const allowConcurrent =
+			settings.runScriptMode === 'concurrent' && !restart;
+		const title = target.name || 'Run';
+
+		if (allowConcurrent) {
+			return createScriptSession({
+				command: target.command,
+				kind: 'run',
+				runTargetId: target.id,
+				title,
+				workspaceId,
+			});
+		}
+
+		return runExclusiveScript({
+			command: target.command,
+			kind: 'run',
+			restart,
+			runTargetId: target.id,
+			title,
+			workspaceId,
+		});
 	}
 
 	/**
@@ -208,14 +305,20 @@ export function createScriptLifecycleService({
 		command,
 		kind,
 		restart,
+		runTargetId,
+		title,
 		workspaceId,
 	}: {
 		command: string;
 		kind: WorkspaceScriptKind;
 		restart: boolean;
+		runTargetId?: string;
+		title: string;
 		workspaceId: string;
 	}): Promise<CreateTerminalSessionResult> {
-		const key = `${workspaceId}:${kind}`;
+		// Scoped per run target as well as per kind, so restarting `web` never waits
+		// behind (or races) an in-flight launch of `api`.
+		const key = `${workspaceId}:${kind}:${runTargetId ?? ''}`;
 		const pendingStart = pendingExclusiveScriptStarts.get(key);
 
 		if (pendingStart) {
@@ -226,6 +329,8 @@ export function createScriptLifecycleService({
 			command,
 			kind,
 			restart,
+			runTargetId,
+			title,
 			workspaceId,
 		});
 		pendingExclusiveScriptStarts.set(key, launch);
@@ -250,14 +355,22 @@ export function createScriptLifecycleService({
 		command,
 		kind,
 		restart,
+		runTargetId,
+		title,
 		workspaceId,
 	}: {
 		command: string;
 		kind: WorkspaceScriptKind;
 		restart: boolean;
+		runTargetId?: string;
+		title: string;
 		workspaceId: string;
 	}): Promise<CreateTerminalSessionResult> {
-		const activeSession = findActiveScriptSession(workspaceId, kind);
+		const activeSession = findActiveScriptSession(
+			workspaceId,
+			kind,
+			runTargetId,
+		);
 
 		if (activeSession) {
 			if (!restart) {
@@ -283,38 +396,51 @@ export function createScriptLifecycleService({
 			}
 		}
 
-		return createScriptSession({ command, kind, workspaceId });
+		return createScriptSession({
+			command,
+			kind,
+			runTargetId,
+			title,
+			workspaceId,
+		});
 	}
 
 	/**
 	 * Creates a workspace terminal session for a script kind, applying the
-	 * `<kind>-script` session kind and default dock title.
-	 * @param options - Resolved command, script kind, and workspace.
+	 * `<kind>-script` session kind and dock title.
+	 * @param options - Resolved command, script kind, target workspace, and
+	 * (for `kind: 'run'`) the run target id and its display title.
 	 * @returns The terminal session create result.
 	 */
 	function createScriptSession({
 		command,
 		kind,
+		runTargetId,
+		title,
 		workspaceId,
 	}: {
 		command: string;
 		kind: WorkspaceScriptKind;
+		runTargetId?: string;
+		title: string;
 		workspaceId: string;
 	}): Promise<CreateTerminalSessionResult> {
 		return terminalService.create({
 			command,
 			kind: `${kind}-script`,
-			title: defaultScriptTitle(kind),
+			runTargetId: kind === 'run' ? (runTargetId ?? null) : undefined,
+			title,
 			workspaceId,
 		});
 	}
 
 	/**
 	 * Waits for a setup session to finish and, when it exits cleanly, records the
-	 * dependency fingerprint so later opens can skip setup, then chains the run
-	 * script if the repository enables `autoRunAfterSetup`. The wait is bounded;
-	 * setup failures, hangs, and mid-flight stops skip both the record and the
-	 * chain. Settings are re-read after the wait so a mid-setup opt-out is honored.
+	 * dependency fingerprint so later opens can skip setup, then starts every
+	 * configured run target if the repository enables `autoRunAfterSetup`. The
+	 * wait is bounded; setup failures, hangs, and mid-flight stops skip both the
+	 * record and the chain. Settings are re-read after the wait so a mid-setup
+	 * opt-out is honored.
 	 * @param options - The setup command, its session id, and the target workspace.
 	 */
 	async function finalizeSetup({
@@ -345,12 +471,18 @@ export function createScriptLifecycleService({
 		if (
 			fresh.error ||
 			!fresh.settings.autoRunAfterSetup ||
-			!fresh.settings.scripts.run
+			fresh.settings.runTargets.length === 0
 		) {
 			return;
 		}
 
-		await runScript({ kind: 'run', workspaceId }).catch(() => {});
+		await Promise.all(
+			fresh.settings.runTargets.map((target) =>
+				runScript({ kind: 'run', runTargetId: target.id, workspaceId }).catch(
+					() => {},
+				),
+			),
+		);
 	}
 
 	/**
@@ -506,15 +638,50 @@ export function createScriptLifecycleService({
 	}
 
 	/**
-	 * Stop the active script session of a given kind for a workspace.
-	 * @param options - Script kind and target workspace
+	 * Resolves the run target `stopScript` should act on when the caller omitted
+	 * `runTargetId`: the first configured target, or undefined when settings
+	 * can't be resolved or no run target is configured (in which case the lookup
+	 * simply finds nothing running, which is the desired no-op outcome).
+	 * @param workspaceId - Target workspace.
+	 * @param runTargetId - Caller-supplied target id, passed through unchanged when present.
+	 * @returns The target id to look up, or undefined.
+	 */
+	function resolveStopTargetId(
+		workspaceId: string,
+		runTargetId: string | undefined,
+	): string | undefined {
+		if (runTargetId) {
+			return runTargetId;
+		}
+
+		const resolved = resolveScriptConfig(workspaceId);
+
+		return resolved.error
+			? undefined
+			: resolveRunTarget(resolved.settings, undefined)?.id;
+	}
+
+	/**
+	 * Stop the active script session of a given kind for a workspace. For
+	 * `kind: 'run'` with `runTargetId` omitted, falls back to the first
+	 * configured target — the same fallback `runScript` uses.
+	 * @param options - Script kind, target workspace, and (for `kind: 'run'`) which target.
 	 * @returns The kill result, or an info diagnostic when no session is running
 	 */
 	async function stopScript({
 		kind,
+		runTargetId,
 		workspaceId,
 	}: StopScriptOptions): Promise<KillTerminalResult> {
-		const activeSession = findActiveScriptSession(workspaceId, kind);
+		const resolvedTargetId =
+			kind === 'run'
+				? resolveStopTargetId(workspaceId, runTargetId)
+				: undefined;
+		const activeSession = findActiveScriptSession(
+			workspaceId,
+			kind,
+			resolvedTargetId,
+		);
 
 		if (!activeSession) {
 			return {
@@ -573,13 +740,15 @@ function failure(
 	};
 }
 
-/** Default dock title per script kind. */
-function defaultScriptTitle(kind: WorkspaceScriptKind): string {
+/**
+ * Default dock title for the non-run script kinds. `'run'` titles come from
+ * the resolved run target's name instead (see {@link runScript}), since a
+ * workspace can have several.
+ */
+function defaultScriptTitle(kind: 'archive' | 'setup'): string {
 	switch (kind) {
 		case 'archive':
 			return 'Archive';
-		case 'run':
-			return 'Run';
 		case 'setup':
 			return 'Setup';
 	}

@@ -67,7 +67,7 @@ test('upsertRepositoryScriptSettings persists rows the resolver reads as sqlite'
 		autoRunAfterSetup: true,
 		database,
 		repositoryId: REPO_ID,
-		run: 'bun run dev',
+		run: [{ command: 'bun run dev', name: '' }],
 		runScriptMode: 'nonconcurrent',
 		setup: 'bun install',
 	});
@@ -86,12 +86,36 @@ test('upsertRepositoryScriptSettings persists rows the resolver reads as sqlite'
 		{
 			archive: 'bun run archive',
 			autoRun: true,
-			run: 'bun run dev',
+			run: [{ command: 'bun run dev', name: '' }],
 			runMode: 'nonconcurrent',
 			setup: 'bun install',
 			source: 'sqlite',
 		},
 	);
+});
+
+test('upsertRepositoryScriptSettings persists multiple named run targets', (t) => {
+	const database = createDatabaseFixture(t);
+
+	upsertRepositoryScriptSettings({
+		archive: null,
+		autoRunAfterSetup: false,
+		database,
+		repositoryId: REPO_ID,
+		run: [
+			{ command: 'npm run dev:web', id: 'web', name: 'Web' },
+			{ command: 'npm run dev:api', id: 'api', name: 'API' },
+		],
+		runScriptMode: 'concurrent',
+		setup: null,
+	});
+
+	const resolved = resolvedRepository(database);
+
+	assert.deepEqual(resolved('scripts.run')?.value, [
+		{ command: 'npm run dev:web', id: 'web', name: 'Web' },
+		{ command: 'npm run dev:api', id: 'api', name: 'API' },
+	]);
 });
 
 test('blank script commands delete their row and fall back to defaults', (t) => {
@@ -102,7 +126,7 @@ test('blank script commands delete their row and fall back to defaults', (t) => 
 		autoRunAfterSetup: false,
 		database,
 		repositoryId: REPO_ID,
-		run: 'bun run dev',
+		run: [{ command: 'bun run dev', name: '' }],
 		runScriptMode: 'concurrent',
 		setup: 'bun install',
 	});
@@ -112,7 +136,7 @@ test('blank script commands delete their row and fall back to defaults', (t) => 
 		autoRunAfterSetup: false,
 		database,
 		repositoryId: REPO_ID,
-		run: '   ',
+		run: [],
 		runScriptMode: 'concurrent',
 		setup: 'bun install',
 	});

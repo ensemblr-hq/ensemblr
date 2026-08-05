@@ -1,37 +1,51 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
-import type { WorkspaceScriptSummary } from '@/renderer/types/workbench';
+import type { WorkspaceRunTargetSummary } from '@/renderer/types/workbench';
 
 /**
- * Registers the ⌘/Ctrl+R (`run.start`) hotkey to toggle the active workspace's
- * run script: stop it while running, start it otherwise, and no-op when no run
- * script is configured (`missing`).
+ * Registers the ⌘/Ctrl+R (`run.start`) hotkey to toggle one run target
+ * (ADR 0041): stop it while running, start it otherwise. Targets `runTargets`
+ * the workspace last started or stopped through this hotkey, falling back to
+ * the first configured target when none has been used yet — which reduces to
+ * today's exact behavior for the common single-target repository. No-ops when
+ * no run target is configured.
  *
  * The underlying {@link useHotkey} keeps its default `allowInTypeable: true` on
  * purpose — ⌘R must be captured, and its native browser reload suppressed, even
  * while a text field or the terminal's hidden textarea holds focus. This mirrors
  * the accelerator-less Reload menu item (see `application-menu.ts`); dropping the
  * capture would let ⌘R fall through to an Electron reload mid-edit.
- * @param runStatus - Current run-script status from the workspace model.
- * @param actions - Start/stop callbacks for the run script.
+ * @param runTargets - The workspace's configured run targets and their live status.
+ * @param actions - Target-scoped start/stop callbacks for a run target.
  */
 export function useRunScriptHotkey(
-	runStatus: WorkspaceScriptSummary['status'],
-	actions: { onRunScript: () => void; onStopRunScript: () => void },
+	runTargets: readonly WorkspaceRunTargetSummary[],
+	actions: {
+		onRunScript: (runTargetId: string) => void;
+		onStopRunScript: (runTargetId: string) => void;
+	},
 ): void {
 	const { onRunScript, onStopRunScript } = actions;
+	const lastUsedTargetIdRef = useRef<string | null>(null);
 
 	const handleRunHotkey = useCallback(() => {
-		if (runStatus === 'missing') {
+		const target =
+			runTargets.find((entry) => entry.id === lastUsedTargetIdRef.current) ??
+			runTargets[0];
+
+		if (!target) {
 			return;
 		}
-		if (runStatus === 'running') {
-			onStopRunScript();
+
+		lastUsedTargetIdRef.current = target.id;
+
+		if (target.status === 'running') {
+			onStopRunScript(target.id);
 			return;
 		}
-		onRunScript();
-	}, [onRunScript, onStopRunScript, runStatus]);
+		onRunScript(target.id);
+	}, [onRunScript, onStopRunScript, runTargets]);
 
 	useHotkey('run.start', handleRunHotkey);
 }

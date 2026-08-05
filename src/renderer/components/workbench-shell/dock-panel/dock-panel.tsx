@@ -30,7 +30,6 @@ import type {
 } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 
-import { DockPanelActions } from './actions';
 import { RunScriptOutputPanel } from './run-script-output';
 import { SetupScriptOutputPanel } from './setup-script-output';
 import { XtermTerminal } from './xterm-terminal';
@@ -59,7 +58,7 @@ export function DockPanel({
 		: DEFAULT_DOCK_TAB;
 	const terminalTabs = workspace.dockTabs.filter(isTerminalDockTab);
 
-	useRunScriptHotkey(workspace.scripts.run.status, actions);
+	useRunScriptHotkey(workspace.scripts.runTargets, actions);
 
 	return (
 		<Tabs
@@ -145,9 +144,6 @@ export function DockPanel({
 					<PlusIcon aria-hidden='true' />
 					<span className='sr-only'>New terminal</span>
 				</Button>
-				<div className='flex shrink-0 items-center gap-1'>
-					<DockPanelActions actions={actions} workspace={workspace} />
-				</div>
 			</div>
 			{/*
 			  Dock panels stay mounted across tab switches (forceMount + hidden):
@@ -167,17 +163,24 @@ export function DockPanel({
 					script={workspace.scripts.setup}
 				/>
 			</TabsContent>
-			<TabsContent
-				className='min-h-0 overflow-hidden data-[state=inactive]:hidden'
-				forceMount
-				value='run'
-			>
-				<RunScriptOutputPanel
-					onOpenSetupScripts={actions.onOpenSetupScripts}
-					onRunScript={actions.onRunScript}
-					script={workspace.scripts.run}
-				/>
-			</TabsContent>
+			{workspace.scripts.runTargets.map((target) => (
+				<TabsContent
+					className='min-h-0 overflow-hidden data-[state=inactive]:hidden'
+					forceMount
+					key={target.id}
+					value={`run:${target.id}`}
+				>
+					<RunScriptOutputPanel
+						configuredPreviewUrls={workspace.configuredPreviewUrls ?? []}
+						onOpenRunPort={(url) => actions.onOpenRunPort(target.id, url)}
+						onOpenSetupScripts={actions.onOpenSetupScripts}
+						onRunScript={() => actions.onRunScript(target.id)}
+						onStopRunScript={() => actions.onStopRunScript(target.id)}
+						target={target}
+						workspaceName={workspace.name}
+					/>
+				</TabsContent>
+			))}
 			{terminalTabs.map((tab) => (
 				<TabsContent
 					className='min-h-0 overflow-hidden data-[state=inactive]:hidden'

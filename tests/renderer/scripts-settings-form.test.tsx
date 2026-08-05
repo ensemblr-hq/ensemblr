@@ -30,7 +30,7 @@ const project = {
 const initial: ScriptsForm = {
 	archive: '',
 	autoRun: false,
-	run: '',
+	run: [],
 	runMode: 'concurrent',
 	setup: '',
 };
@@ -81,7 +81,9 @@ describe('useScriptsSettingsForm', () => {
 		act(() => {
 			result.current.updateForm({ setup: 'bun ins' });
 			result.current.updateForm({ setup: 'bun install' });
-			result.current.updateForm({ run: '   ' });
+			result.current.updateForm({
+				run: [{ command: '   ', id: 'target-1', name: 'Web' }],
+			});
 		});
 
 		expect(updateRepositoryScriptsMock).not.toHaveBeenCalled();
@@ -95,7 +97,8 @@ describe('useScriptsSettingsForm', () => {
 			archive: null,
 			autoRunAfterSetup: false,
 			repositoryId: 'repo-1',
-			run: null,
+			// A blank command is filtered out even though the row (with its name) survived the edit.
+			run: [],
 			runScriptMode: 'concurrent',
 			setup: 'bun install',
 		});

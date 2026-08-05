@@ -7,6 +7,7 @@ import type {
 	RepositoryConfigSourceStatus,
 } from '../../shared/ipc/contracts/repository-config';
 import type { SettingsResolutionSource } from '../../shared/ipc/contracts/settings-resolution';
+import { readRunTargetEntry } from '../../shared/scripts.ts';
 import { cloneRecord, isPlainRecord } from './json-utils.ts';
 import {
 	formatSourceName,
@@ -376,6 +377,21 @@ function normalizeScripts(
 			key as 'archive' | 'run' | 'setup',
 		);
 
+		if (normalizedScriptKey === 'run') {
+			const normalizedRun = normalizeRunScriptValue(
+				scriptValue,
+				`${fieldPath}.${key}`,
+				source,
+			);
+
+			if (normalizedRun.accepted) {
+				scripts.run = normalizedRun.value;
+			} else {
+				diagnostics.push(normalizedRun.diagnostic);
+			}
+			continue;
+		}
+
 		if (normalizedScriptKey) {
 			if (typeof scriptValue === 'string') {
 				scripts[normalizedScriptKey] = scriptValue;
@@ -418,6 +434,49 @@ function normalizeScripts(
 	}
 
 	return { diagnostics, settings };
+}
+
+/**
+ * Normalises `scripts.run` (ADR 0041): either the legacy single command
+ * string, or an array of `{ name?, command, id? }` tables for multiple named
+ * run targets. Array entries are shape-checked but not deep-validated here —
+ * {@link import('../../shared/scripts').parseWorkspaceScriptSettings} does the
+ * final id derivation and blank-command filtering.
+ * @param value - Raw `scripts.run` value to normalise.
+ * @param fieldPath - JSONPath used in diagnostic messages.
+ * @param source - Source identifier used in diagnostics.
+ * @returns Either the accepted raw value (passed through untouched for the
+ * shared parser) or a diagnostic explaining why it was rejected.
+ */
+function normalizeRunScriptValue(
+	value: unknown,
+	fieldPath: string,
+	source: SettingsResolutionSource,
+):
+	| { accepted: true; value: unknown }
+	| { accepted: false; diagnostic: ConfigDiagnostic } {
+	if (typeof value === 'string') {
+		return { accepted: true, value };
+	}
+
+	if (Array.isArray(value) && value.every(isRunTargetTableEntry)) {
+		return { accepted: true, value };
+	}
+
+	return {
+		accepted: false,
+		diagnostic: createInvalidFieldDiagnostic(
+			'run',
+			source,
+			fieldPath,
+			'a string, or an array of { name, command } tables',
+		),
+	};
+}
+
+/** True when `entry` has the minimal shape of one `[[scripts.run]]` table: a non-empty `command` string. */
+function isRunTargetTableEntry(entry: unknown): boolean {
+	return (readRunTargetEntry(entry)?.command.trim().length ?? 0) > 0;
 }
 
 /**

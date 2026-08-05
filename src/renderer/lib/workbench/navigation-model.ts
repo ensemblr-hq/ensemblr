@@ -1,3 +1,4 @@
+import { MISSING_RUN_TARGET_ID } from '@/renderer/lib/terminal';
 import { parseGithubRepoFromRemoteUrl } from '@/renderer/lib/workbench/github-compare-url';
 import { PENDING_WORKSPACE_CREATION_METADATA_KEY } from '@/renderer/lib/workbench/optimistic-workspace';
 import type {
@@ -314,7 +315,12 @@ function parseGithubOwnerFromRemoteUrl(
 
 // --- Placeholder builders (private) -----------------------------------------
 
-/** Returns the placeholder dock tabs (setup/run/default terminal). */
+/**
+ * Returns the placeholder dock tabs (setup + run + default terminal). The
+ * placeholder has no configured run targets yet, but still shows one "Run"
+ * tab (id {@link MISSING_RUN_TARGET_ID}) with the missing-script empty state,
+ * mirroring the always-present Setup tab (ADR 0041).
+ */
 function createPlaceholderDockTabs(): DockTabModel[] {
 	return [
 		{
@@ -324,20 +330,19 @@ function createPlaceholderDockTabs(): DockTabModel[] {
 			status: 'idle',
 		},
 		{
-			id: 'run',
+			id: `run:${MISSING_RUN_TARGET_ID}`,
 			kind: 'run-script',
 			label: 'Run',
+			runTargetId: MISSING_RUN_TARGET_ID,
 			status: 'idle',
 		},
 	];
 }
 
-/** Returns placeholder run/setup script blocks marked as missing. */
+/** Returns placeholder run/setup script blocks: one missing run target, setup missing. */
 function createPlaceholderScripts(): WorkspaceShellModel['scripts'] {
 	return {
-		run: {
-			status: 'missing',
-		},
+		runTargets: [{ id: MISSING_RUN_TARGET_ID, name: '', status: 'missing' }],
 		setup: {
 			status: 'missing',
 		},

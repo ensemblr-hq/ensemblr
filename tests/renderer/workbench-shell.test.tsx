@@ -359,7 +359,7 @@ test('models fixed script output tabs and no default terminal tab', () => {
 		label: 'Setup',
 	});
 	expect(dockTabs[1]).toMatchObject({
-		id: 'run',
+		id: 'run:default',
 		kind: 'run-script',
 		label: 'Run',
 	});
@@ -814,7 +814,7 @@ test('renders missing setup and run script empty states', () => {
 		),
 		activeWorkspace,
 		'checks',
-		'run',
+		'run:default',
 	);
 
 	expect(setupMarkup).toContain('Add setup script');
@@ -844,7 +844,7 @@ test('renders run action when dev server is stopped', () => {
 		),
 		activeWorkspace,
 		'checks',
-		'run',
+		'run:default',
 	);
 
 	expect(markup).toContain('Run');

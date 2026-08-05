@@ -188,21 +188,25 @@ export function useLiveWorkspaceModel({
 			dockTabs: [
 				...activeWorkspace.dockTabs.flatMap(
 					(tab): typeof activeWorkspace.dockTabs => {
-						if (tab.kind === 'terminal') {
+						if (tab.kind !== 'setup-script') {
 							return [];
 						}
-						if (tab.kind === 'setup-script') {
-							return [
-								{ ...tab, status: scriptSummaryToDockStatus(scripts.setup) },
-							];
-						}
-						if (tab.kind === 'run-script') {
-							return [
-								{ ...tab, status: scriptSummaryToDockStatus(scripts.run) },
-							];
-						}
-						return [tab];
+						return [
+							{ ...tab, status: scriptSummaryToDockStatus(scripts.setup) },
+						];
 					},
+				),
+				// One tab per configured run target (ADR 0041), rebuilt fresh each time
+				// rather than patched from the previous tab list — so adding/removing a
+				// target in Settings adds/removes its dock tab immediately.
+				...scripts.runTargets.map(
+					(target): (typeof activeWorkspace.dockTabs)[number] => ({
+						id: `run:${target.id}`,
+						kind: 'run-script',
+						label: target.name || 'Run',
+						runTargetId: target.id,
+						status: scriptSummaryToDockStatus(target),
+					}),
 				),
 				...mapTerminalSessionsToDockTabs({
 					activeTerminalIds: terminalSessions.activeTerminalIds,

@@ -103,7 +103,7 @@ export function useWorkspaceDockActions({
 						toast.error('The terminal could not start.');
 					});
 			},
-			onOpenRunPort: (url) => {
+			onOpenRunPort: (_runTargetId, url) => {
 				void window.ensemblr?.openExternal(url);
 			},
 			onOpenSetupScripts: () => {
@@ -112,11 +112,11 @@ export function useWorkspaceDockActions({
 					to: '/settings/repo/$repoId/scripts',
 				});
 			},
-			onRunScript: () => {
-				void runWorkspaceScript({ kind: 'run', workspaceId })
+			onRunScript: (runTargetId) => {
+				void runWorkspaceScript({ kind: 'run', runTargetId, workspaceId })
 					.then((result) => notifyScriptConflict(result.diagnostics))
 					.catch(() => undefined);
-				updateSearchRef.current({ dock: 'run' });
+				updateSearchRef.current({ dock: `run:${runTargetId}` });
 			},
 			onRunSetupScript: () => {
 				void runWorkspaceScript({ kind: 'setup', workspaceId })
@@ -124,10 +124,12 @@ export function useWorkspaceDockActions({
 					.catch(() => undefined);
 				updateSearchRef.current({ dock: 'setup' });
 			},
-			onStopRunScript: () => {
-				void stopWorkspaceScript({ kind: 'run', workspaceId }).catch(
-					() => undefined,
-				);
+			onStopRunScript: (runTargetId) => {
+				void stopWorkspaceScript({
+					kind: 'run',
+					runTargetId,
+					workspaceId,
+				}).catch(() => undefined);
 			},
 			onStopSetupScript: () => {
 				void stopWorkspaceScript({ kind: 'setup', workspaceId }).catch(
