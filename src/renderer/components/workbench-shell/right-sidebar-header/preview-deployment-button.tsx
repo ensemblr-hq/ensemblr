@@ -28,6 +28,17 @@ const PREVIEW_DEPLOYMENT_PROVIDER_ICON_PATHS: Partial<
 const GENERIC_DEPLOYMENT_LABELS = new Set(['deploy', 'deployment', 'preview']);
 
 /**
+ * Drops the deployment label once the sidebar header's `pr-header` container has
+ * less room than the pills plus the status label need, leaving the provider mark
+ * to stand in for it and the status label room to read before it truncates. The
+ * pill carries the same label as its `title`, so the collapsed mark still names
+ * its deployment on hover.
+ * Only a host that declares `@container/pr-header` collapses the label; anywhere
+ * else the named query never matches and the label always shows.
+ */
+const COLLAPSE_LABEL_TO_PROVIDER_MARK = '@max-xs/pr-header:hidden';
+
+/**
  * Pill-shaped preview-deployment button that opens the provider's URL, tinted by
  * the sidebar header's tone so both header pills read as one control group,
  * unless the deployment's own status outranks it.
@@ -56,6 +67,7 @@ export function PreviewDeploymentButton({
 	const shouldShowTextLabel =
 		normalizedDeploymentLabel.length > 0 &&
 		(providerIconPath === null || !isLabelRedundant);
+	const canCollapseTextLabel = shouldShowTextLabel && providerIconPath !== null;
 	const pillTone = resolvePreviewPillTone(tone, deployment.status);
 
 	return (
@@ -66,11 +78,24 @@ export function PreviewDeploymentButton({
 			size='sm'
 			variant='outline'
 		>
-			<a href={deployment.url} rel='noreferrer' target='_blank'>
+			<a
+				href={deployment.url}
+				rel='noreferrer'
+				target='_blank'
+				title={canCollapseTextLabel ? deployment.label : undefined}
+			>
 				{providerIconPath ? (
 					<PreviewDeploymentProviderIcon path={providerIconPath} />
 				) : null}
-				{shouldShowTextLabel ? <span>{deployment.label}</span> : null}
+				{shouldShowTextLabel ? (
+					<span
+						className={
+							canCollapseTextLabel ? COLLAPSE_LABEL_TO_PROVIDER_MARK : undefined
+						}
+					>
+						{deployment.label}
+					</span>
+				) : null}
 			</a>
 		</Button>
 	);

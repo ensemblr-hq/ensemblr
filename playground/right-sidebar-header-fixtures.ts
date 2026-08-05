@@ -9,13 +9,23 @@ import { readBridgeWorkspaceCwd } from './bridge';
 /** Workspace id whose merged PR the scene treats as user-dismissed. */
 export const CONTINUED_WORKSPACE_ID = 'playground-pr-continued';
 
-/** Preview deployment attached to every state when the scene's toggle is on. */
-export const READY_PREVIEW_DEPLOYMENT: PullRequestPreviewDeploymentSummary = {
+/** Baseline healthy Vercel deployment the scene's other variants are built from. */
+const READY_PREVIEW_DEPLOYMENT: PullRequestPreviewDeploymentSummary = {
 	label: 'Preview',
 	provider: 'vercel',
 	source: 'github-deployment',
 	status: 'ready',
 	url: 'https://ensemblr-git-the-118.vercel.app',
+};
+
+/**
+ * The deployment shape a real Vercel preview arrives in: a label naming the
+ * project, which the provider mark cannot stand in for and which a narrow header
+ * therefore collapses. Attached to the header rows so the scene shows that.
+ */
+export const NAMED_PREVIEW_DEPLOYMENT: PullRequestPreviewDeploymentSummary = {
+	...READY_PREVIEW_DEPLOYMENT,
+	label: 'Preview – kast-calculator',
 };
 
 /**
@@ -243,6 +253,32 @@ export const HEADER_STATE_FIXTURES: readonly HeaderStateFixture[] = [
 		}),
 	},
 ];
+
+const PREVIEW_LABEL_COLLAPSE_WORKSPACE = workspaceForState({
+	files: 0,
+	id: 'playground-pr-preview-label',
+	label: 'Ready to merge',
+	number: 118,
+	state: 'open',
+	status: 'ready-to-merge',
+});
+
+/**
+ * A ready-to-merge PR carrying a named preview deployment, for the row that shows
+ * the pill's label collapsing. Built as its own fixture rather than picked out of
+ * {@link HEADER_STATE_FIXTURES} so reordering that list cannot silently retarget
+ * the row at a state with no preview pill to collapse.
+ */
+export const PREVIEW_LABEL_COLLAPSE_FIXTURE: HeaderStateFixture = {
+	expectedKind: 'pr-ready',
+	workspace: {
+		...PREVIEW_LABEL_COLLAPSE_WORKSPACE,
+		pullRequest: {
+			...PREVIEW_LABEL_COLLAPSE_WORKSPACE.pullRequest,
+			previewDeployment: NAMED_PREVIEW_DEPLOYMENT,
+		},
+	},
+};
 
 /** PR number the continued-merged fixture dismisses, seeded into the atom. */
 export const CONTINUED_PULL_REQUEST_NUMBER = 15;

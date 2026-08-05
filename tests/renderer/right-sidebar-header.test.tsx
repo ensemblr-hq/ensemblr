@@ -18,6 +18,8 @@ import type {
 
 import { installLocalStorage, renderWithProviders } from './support/dom';
 
+const PR_HEADER_CONTAINER_SELECTOR = '[class~="@container/pr-header"]';
+
 /** A review-actions value with every action stubbed, plus the given overrides. */
 function stubReviewActions(
 	overrides: Partial<ReviewActionsValue> = {},
@@ -75,6 +77,19 @@ function workspaceWithoutPr(): WorkspaceShellModel {
 		...base,
 		changeSummary: { ...base.changeSummary, files: 0 },
 		pullRequest: { ...base.pullRequest, number: undefined, status: 'idle' },
+	};
+}
+
+/** A ready Vercel deployment whose label is long enough to crowd a narrow header. */
+function namedPreviewDeployment(): NonNullable<
+	WorkspaceShellModel['pullRequest']['previewDeployment']
+> {
+	return {
+		label: 'Preview – kast-calculator',
+		provider: 'vercel',
+		source: 'github-deployment',
+		status: 'ready',
+		url: 'https://kast-calculator.vercel.app',
 	};
 }
 
@@ -249,4 +264,30 @@ test('the collapsed toolbar still shows the spinner while an agent works', () =>
 	);
 
 	expect(screen.getByLabelText('Agent working')).toBeInTheDocument();
+});
+
+test('the sidebar header gives its pills the pr-header query container', () => {
+	renderHeader(
+		workspaceWithPr({ previewDeployment: namedPreviewDeployment() }),
+		stubReviewActions(),
+	);
+
+	expect(
+		screen
+			.getByRole('link', { name: 'Open Vercel preview deployment' })
+			.closest(PR_HEADER_CONTAINER_SELECTOR),
+	).not.toBeNull();
+});
+
+test('the collapsed toolbar keeps the preview label, having no container to collapse against', () => {
+	renderInlineActions(
+		workspaceWithPr({ previewDeployment: namedPreviewDeployment() }),
+		stubReviewActions(),
+	);
+
+	const link = screen.getByRole('link', {
+		name: 'Open Vercel preview deployment',
+	});
+	expect(link.closest(PR_HEADER_CONTAINER_SELECTOR)).toBeNull();
+	expect(link).toHaveTextContent('Preview – kast-calculator');
 });
