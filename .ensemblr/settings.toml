@@ -1,3 +1,21 @@
 [scripts]
 setup = "npm ci"
-run = "npm run dev"
+
+# Electron dev server. Node 24 is pinned by scripts/require-node-version.mjs, so
+# every command goes through the wrapper — non-interactive shells never activate
+# mise on their own.
+[scripts.run.dev]
+command = "./scripts/with-pinned-node.sh npm run dev"
+icon = "play"
+default = true
+available_in = ["local"]
+
+[scripts.run.checks]
+command = "./scripts/with-pinned-node.sh npm run check && ./scripts/with-pinned-node.sh npm run typecheck"
+icon = "list-checks"
+available_in = ["local"]
+
+[scripts.run.test]
+command = "./scripts/with-pinned-node.sh npm test"
+icon = "test-tube"
+available_in = ["local"]

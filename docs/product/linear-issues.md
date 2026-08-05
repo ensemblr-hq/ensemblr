@@ -593,7 +593,7 @@ Source:
 - `docs/product/settings-inventory.md`
 
 Implementation notes:
-- Keep all repository fields in the committed `.ensemblr/settings.toml`; the app reads it and never writes it.
+- Keep all repository fields in the committed `.ensemblr/settings.toml`. Superseded for scripts by ADR 0041: the Scripts settings screen writes the `[scripts]` block; the app still only reads the other sections.
 
 ## ENS-016 Root Switch Reindex/Adopt Flow
 
@@ -2531,7 +2531,7 @@ Implement repository settings forms and source diagnostics for paths, branch, re
 Scope:
 - Repository identity/path, branch source, remote origin, branch naming, preview template, files-to-copy, scripts, run mode, create shared config file, spotlight flag, action preferences, archive/remove actions.
 - Show which source won per field.
-- Write personal overrides to SQLite; the shared `.ensemblr/settings.toml` is committed by hand and read-only to the app.
+- Write personal overrides to SQLite; the shared `.ensemblr/settings.toml` is committed by hand and read-only to the app. (ADR 0041 later moved script settings into that file, written by the app.)
 - Show source diagnostics, including when the committed `.ensemblr/settings.toml` overrides a SQLite value.
 
 Out of scope:
@@ -2541,7 +2541,7 @@ Out of scope:
 Acceptance criteria:
 - Users can inspect and edit repository overrides.
 - Source precedence is visible and correct.
-- Personal edits persist to SQLite; the app never writes the committed `.ensemblr/settings.toml`.
+- Personal edits persist to SQLite; the app never writes the committed `.ensemblr/settings.toml`. (ADR 0041 carves out `[scripts]`, which the Scripts screen writes.)
 - Remove repository distinguishes app record removal from deleting files.
 
 Verification:

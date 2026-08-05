@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { RunScriptsSection } from '@/renderer/components/settings/run-scripts/run-scripts-section';
 import { SettingRow } from '@/renderer/components/settings/setting-row';
 import { SettingsSection } from '@/renderer/components/settings/settings-section';
-import { SourceBadge } from '@/renderer/components/settings/source-badge';
 import {
 	RadioGroup,
 	RadioGroupItem,
@@ -11,12 +11,16 @@ import { Switch } from '@/renderer/components/ui/switch';
 import { Textarea } from '@/renderer/components/ui/textarea';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
 import { useScriptsSettingsForm } from '@/renderer/hooks/use-scripts-settings-form';
+import type { RepoSettingsKey } from '@/renderer/state/preferences';
 import type {
 	RepoProject,
 	RunMode,
 	ScriptsForm,
 } from '@/renderer/types/settings';
-import type { ResolvedSettingSnapshot } from '@/shared/ipc/contracts/settings-resolution';
+import {
+	type RunScriptDefinition,
+	readConfiguredRunScripts,
+} from '@/shared/scripts';
 
 /** Route for a repository's Scripts settings; renders the setup/run/archive script editor keyed by the `repoId` path param. */
 export const Route = createFileRoute(
@@ -29,21 +33,40 @@ export const Route = createFileRoute(
 type ResolveSetting = ReturnType<typeof useRepoSettings>['resolved'];
 
 const SCRIPTS_DESCRIPTION =
-	'Commands that run when workspaces are set up, run, or archived.';
+	'Commands that run when workspaces are set up, run, or archived. Saved to the repository’s committed .ensemblr/settings.toml.';
 
 /**
- * Per-repository Scripts settings. Reads the resolved values (which prefer the
- * committed `.ensemblr/settings.toml` over personal SQLite) to seed the editor
- * and render source badges. The editor is remounted per repo via `key` once the
- * snapshot has loaded, so its initial values seed from render state instead of a
- * derive-into-state effect.
+ * Reads the repository's named run scripts through the shared parser, so a
+ * legacy single `scripts.run` command shows up here as the implicit script the
+ * dock already launches. Reads the unfiltered list on purpose: the editor saves
+ * back what it shows, so a script gated to another environment must survive the
+ * round-trip rather than be deleted by the next save.
+ * @param resolved - Resolved-settings lookup for this repository.
+ * @returns The run scripts to seed the editor with.
+ */
+function readResolvedRunScripts(
+	resolved: ResolveSetting,
+): RunScriptDefinition[] {
+	return readConfiguredRunScripts([
+		{ key: 'scripts.run', value: resolved('scripts.run')?.value },
+		{ key: 'scripts.runScripts', value: resolved('scripts.runScripts')?.value },
+	]);
+}
+
+/**
+ * Per-repository Scripts settings. Reads and writes the repository root's
+ * committed `.ensemblr/settings.toml`, which is the sole store for these
+ * settings and the copy that gets committed and merged. The editor is remounted
+ * per repo via `key` once the snapshot has loaded, so its initial values seed
+ * from render state instead of a derive-into-state effect.
  */
 function RepoScriptsSettings() {
 	const { repoId } = Route.useParams();
-	const { resolved, project } = useRepoSettings(repoId);
+	const root = useRepoSettings(repoId, 'root');
+	const workspace = useRepoSettings(repoId, 'workspace');
 
 	// runScriptMode always resolves (built-in default) once the snapshot loads.
-	const settingsLoaded = resolved('runScriptMode') !== undefined;
+	const settingsLoaded = root.resolved('runScriptMode') !== undefined;
 
 	if (!settingsLoaded) {
 		return (
@@ -53,23 +76,76 @@ function RepoScriptsSettings() {
 		);
 	}
 
-	const initial: ScriptsForm = {
-		archive: (resolved('scripts.archive')?.value as string) ?? '',
-		autoRun: resolved('autoRunAfterSetup')?.value === true,
-		run: (resolved('scripts.run')?.value as string) ?? '',
-		runMode: (resolved('runScriptMode')?.value as RunMode) ?? 'concurrent',
-		setup: (resolved('scripts.setup')?.value as string) ?? '',
-	};
-
 	return (
 		<ScriptsEditor
-			initial={initial}
+			initial={readInitialForm(root.resolved)}
 			key={repoId}
-			project={project}
+			project={root.project}
 			repoId={repoId}
-			resolved={resolved}
+			workspaceDiverges={workspaceScriptsDiverge(root, workspace)}
 		/>
 	);
+}
+
+/**
+ * Reports whether the open workspace's branch commits different scripts than
+ * the repository root. The dock resolves against the worktree, so when the two
+ * disagree the screen would otherwise imply it controls what that workspace
+ * runs.
+ * @param root - Settings bundle resolved against the repository root.
+ * @param workspace - Settings bundle resolved against the open workspace.
+ * @returns True when the two checkouts resolve different script settings.
+ */
+function workspaceScriptsDiverge(
+	root: ReturnType<typeof useRepoSettings>,
+	workspace: ReturnType<typeof useRepoSettings>,
+): boolean {
+	if (
+		!workspace.settingsPath ||
+		workspace.settingsPath === root.settingsPath ||
+		workspace.resolved('runScriptMode') === undefined
+	) {
+		return false;
+	}
+
+	return (
+		JSON.stringify(readInitialForm(root.resolved)) !==
+		JSON.stringify(readInitialForm(workspace.resolved))
+	);
+}
+
+/**
+ * Reads a resolved command into the form, treating a value the resolver did not
+ * produce as a string — a hand-edited config can put anything here — as blank.
+ * @param resolved - Resolved-settings lookup for this repository.
+ * @param key - Resolver key holding the command.
+ * @returns The command, or an empty string.
+ */
+function readCommandField(
+	resolved: ResolveSetting,
+	key: RepoSettingsKey,
+): string {
+	const value = resolved(key)?.value;
+
+	return typeof value === 'string' ? value : '';
+}
+
+/**
+ * Seeds the editor from the repository root's resolved snapshot.
+ * @param resolved - Resolved-settings lookup for this repository.
+ * @returns The form's initial values.
+ */
+function readInitialForm(resolved: ResolveSetting): ScriptsForm {
+	return {
+		archive: readCommandField(resolved, 'scripts.archive'),
+		autoRun: resolved('autoRunAfterSetup')?.value === true,
+		runMode:
+			resolved('runScriptMode')?.value === 'nonconcurrent'
+				? 'nonconcurrent'
+				: 'concurrent',
+		runScripts: readResolvedRunScripts(resolved),
+		setup: readCommandField(resolved, 'scripts.setup'),
+	};
 }
 
 /** The live Scripts form once settings have loaded; remounted per repo via `key`. */
@@ -77,45 +153,42 @@ function ScriptsEditor({
 	initial,
 	project,
 	repoId,
-	resolved,
+	workspaceDiverges,
 }: {
 	initial: ScriptsForm;
 	project: RepoProject;
 	repoId: string;
-	resolved: ResolveSetting;
+	/** True when the open workspace's branch commits different scripts. */
+	workspaceDiverges: boolean;
 }) {
 	const { form, updateForm } = useScriptsSettingsForm(repoId, project, initial);
 
 	return (
 		<SettingsSection description={SCRIPTS_DESCRIPTION} title='Scripts'>
+			{workspaceDiverges ? (
+				<p className='pt-4 text-muted-foreground text-xs'>
+					The workspace you have open commits different scripts on its branch,
+					and runs those. Merge this file to change what it runs.
+				</p>
+			) : null}
+
 			<ScriptRow
 				description='Runs when a new workspace is created.'
 				label='Setup script'
 				onChange={(value) => updateForm({ setup: value })}
 				onReset={() => updateForm({ setup: '' })}
-				placeholder='e.g. bun install'
-				source={resolved('scripts.setup')?.source}
+				placeholder='e.g. npm ci'
 				value={form.setup}
 			/>
 
-			<ScriptRow
-				description='Runs when you click the play button.'
-				label='Run script'
-				onChange={(value) => updateForm({ run: value })}
-				onReset={() => updateForm({ run: '' })}
-				placeholder='e.g. bun run dev'
-				source={resolved('scripts.run')?.source}
-				value={form.run}
+			<RunScriptsSection
+				onChange={(runScripts) => updateForm({ runScripts })}
+				scripts={form.runScripts}
 			/>
 
 			<SettingRow
 				description='Whether run scripts can run in parallel across workspaces.'
-				label={
-					<span className='flex items-center gap-2'>
-						Run mode
-						<SourceBadge source={resolved('runScriptMode')?.source} />
-					</span>
-				}
+				label='Run mode'
 				stack
 			>
 				<RadioGroup
@@ -169,47 +242,33 @@ function ScriptsEditor({
 				onChange={(value) => updateForm({ archive: value })}
 				onReset={() => updateForm({ archive: '' })}
 				placeholder='e.g. rm -rf node_modules'
-				source={resolved('scripts.archive')?.source}
 				value={form.archive}
 			/>
 		</SettingsSection>
 	);
 }
 
-/** Props for {@link ScriptRow}. */
-interface ScriptRowProps {
-	description: string;
-	label: string;
-	onChange: (next: string) => void;
-	onReset: () => void;
-	placeholder: string;
-	source: ResolvedSettingSnapshot['source'] | undefined;
-	value: string;
-}
-
-/** One script command editor with a source badge and toml-override hint. */
+/** One script command editor, cleared by the row's revert control. */
 function ScriptRow({
 	description,
 	label,
 	onChange,
 	onReset,
 	placeholder,
-	source,
 	value,
-}: ScriptRowProps) {
-	const overriddenByToml = source === 'ensemblr-config';
-	const isPersonalOverride = source === 'sqlite';
-
+}: {
+	description: string;
+	label: string;
+	onChange: (next: string) => void;
+	onReset: () => void;
+	placeholder: string;
+	value: string;
+}) {
 	return (
 		<SettingRow
 			description={description}
-			label={
-				<span className='flex items-center gap-2'>
-					{label}
-					<SourceBadge source={source} />
-				</span>
-			}
-			modified={isPersonalOverride}
+			label={label}
+			modified={value.trim().length > 0}
 			onReset={onReset}
 			stack
 		>
@@ -220,12 +279,6 @@ function ScriptRow({
 				placeholder={placeholder}
 				value={value}
 			/>
-			{overriddenByToml ? (
-				<p className='mt-1 text-muted-foreground text-xs'>
-					Overridden by the committed .ensemblr/settings.toml; your edit is
-					saved but shadowed until that key is removed.
-				</p>
-			) : null}
 		</SettingRow>
 	);
 }

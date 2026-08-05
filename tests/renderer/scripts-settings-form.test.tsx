@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { useScriptsSettingsForm } from '@/renderer/hooks/use-scripts-settings-form';
 import type { ScriptsForm } from '@/renderer/types/settings';
+import type { RunScriptDefinition } from '@/shared/scripts';
 
 const { updateRepositoryScriptsMock } = vi.hoisted(() => ({
 	updateRepositoryScriptsMock: vi.fn(),
@@ -30,9 +31,17 @@ const project = {
 const initial: ScriptsForm = {
 	archive: '',
 	autoRun: false,
-	run: '',
 	runMode: 'concurrent',
+	runScripts: [],
 	setup: '',
+};
+
+const devRunScript: RunScriptDefinition = {
+	availableIn: null,
+	command: 'npm run dev',
+	icon: 'play',
+	isDefault: true,
+	name: 'dev',
 };
 
 /** Fresh QueryClientProvider wrapper for the hook under test. */
@@ -81,7 +90,7 @@ describe('useScriptsSettingsForm', () => {
 		act(() => {
 			result.current.updateForm({ setup: 'bun ins' });
 			result.current.updateForm({ setup: 'bun install' });
-			result.current.updateForm({ run: '   ' });
+			result.current.updateForm({ archive: '   ' });
 		});
 
 		expect(updateRepositoryScriptsMock).not.toHaveBeenCalled();
@@ -90,15 +99,30 @@ describe('useScriptsSettingsForm', () => {
 			await vi.advanceTimersByTimeAsync(500);
 		});
 
-		expect(updateRepositoryScriptsMock).toHaveBeenCalledTimes(1);
-		expect(updateRepositoryScriptsMock).toHaveBeenCalledWith({
+		expect(updateRepositoryScriptsMock).toHaveBeenCalledExactlyOnceWith({
 			archive: null,
 			autoRunAfterSetup: false,
 			repositoryId: 'repo-1',
-			run: null,
+			runScripts: [],
 			runScriptMode: 'concurrent',
 			setup: 'bun install',
 		});
+	});
+
+	test('persists the edited run-script list verbatim', async () => {
+		vi.useFakeTimers();
+		const { result } = renderForm();
+
+		act(() => {
+			result.current.updateForm({ runScripts: [devRunScript] });
+		});
+		await act(async () => {
+			await vi.advanceTimersByTimeAsync(500);
+		});
+
+		expect(updateRepositoryScriptsMock).toHaveBeenCalledExactlyOnceWith(
+			expect.objectContaining({ runScripts: [devRunScript] }),
+		);
 	});
 
 	test('flushes a pending debounced save on unmount', async () => {

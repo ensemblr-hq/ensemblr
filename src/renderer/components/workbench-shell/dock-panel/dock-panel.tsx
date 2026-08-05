@@ -1,3 +1,4 @@
+import { useAtomValue } from 'jotai';
 import {
 	ChevronDownIcon,
 	ChevronUpIcon,
@@ -20,8 +21,10 @@ import {
 } from '@/renderer/components/ui/tabs';
 import { useWorkbenchLayout } from '@/renderer/components/workbench-shell/shell-contexts';
 import { useRunScriptHotkey } from '@/renderer/hooks/workbench-shell/dock-panel/use-run-script-hotkey';
+import { selectActiveRunScript } from '@/renderer/lib/terminal';
 import { cn } from '@/renderer/lib/utils';
 import { DEFAULT_DOCK_TAB } from '@/renderer/lib/workbench';
+import { lastRunScriptAtomFamily } from '@/renderer/state/preferences';
 import type {
 	DockTabId,
 	DockTabModel,
@@ -58,8 +61,16 @@ export function DockPanel({
 		? activeTab
 		: DEFAULT_DOCK_TAB;
 	const terminalTabs = workspace.dockTabs.filter(isTerminalDockTab);
+	const rememberedRunScript = useAtomValue(
+		lastRunScriptAtomFamily(workspace.id),
+	);
+	const activeRunScript = selectActiveRunScript({
+		rememberedName: rememberedRunScript,
+		runScripts: workspace.runScripts,
+		runSummary: workspace.scripts.run,
+	});
 
-	useRunScriptHotkey(workspace.scripts.run.status, actions);
+	useRunScriptHotkey(workspace.scripts.run.status, actions, activeRunScript);
 
 	return (
 		<Tabs
@@ -73,7 +84,7 @@ export function DockPanel({
 			  them and a 1px gap stayed visible. The shadow occupies the bottom
 			  content pixel, which the underline paints over.
 			*/}
-			<div className='@container/dock-header flex h-9 shrink-0 items-center justify-between gap-2 overflow-hidden px-2 shadow-[inset_0_-0.0625rem_0_0_var(--color-border)]'>
+			<div className='@container/dock-header flex h-9 shrink-0 items-center justify-between gap-2 overflow-hidden px-2 shadow-bottom-rule'>
 				<Button
 					aria-label={
 						isCollapsed ? 'Expand terminal area' : 'Collapse terminal area'
@@ -146,7 +157,11 @@ export function DockPanel({
 					<span className='sr-only'>New terminal</span>
 				</Button>
 				<div className='flex shrink-0 items-center gap-1'>
-					<DockPanelActions actions={actions} workspace={workspace} />
+					<DockPanelActions
+						actions={actions}
+						activeRunScript={activeRunScript}
+						workspace={workspace}
+					/>
 				</div>
 			</div>
 			{/*

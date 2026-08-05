@@ -12,6 +12,7 @@ export {
 export {
 	buildWorkspaceScriptSummaries,
 	scriptSummaryToDockStatus,
+	selectActiveRunScript,
 } from './script-summaries';
 export {
 	emitTerminalInput,

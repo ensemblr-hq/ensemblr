@@ -1,15 +1,17 @@
 import {
 	ChevronDownIcon,
 	ExternalLinkIcon,
-	PlayIcon,
+	SettingsIcon,
 	SquareIcon,
 } from 'lucide-react';
 
+import { RunScriptIcon } from '@/renderer/components/run-script-icon';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
+	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '@/renderer/components/ui/dropdown-menu';
 import {
@@ -18,6 +20,11 @@ import {
 } from '@/renderer/lib/workbench/preview-urls';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
+import { formatShortcut } from '@/shared/keymap';
+import {
+	formatRunScriptLabel,
+	type RunScriptDefinition,
+} from '@/shared/scripts';
 
 /**
  * Renders the run-script button cluster on the dock header. Setup controls live
@@ -27,15 +34,17 @@ import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
  */
 export function DockPanelActions({
 	actions,
+	activeRunScript,
 	workspace,
 }: {
 	actions: WorkbenchDockActions;
+	/** Script the Run button targets, or null when the repository configures none. */
+	activeRunScript: RunScriptDefinition | null;
 	workspace: WorkspaceShellModel;
 }) {
 	const { run } = workspace.scripts;
-	const hasRunScript = run.status !== 'missing';
 
-	if (hasRunScript && run.status === 'running') {
+	if (run.status === 'running') {
 		const previewOptions = resolvePreviewUrlOptions({
 			configured: workspace.configuredPreviewUrls ?? [],
 			detectedUrl: run.previewUrl ?? null,
@@ -57,23 +66,23 @@ export function DockPanelActions({
 					variant='outline'
 				>
 					<SquareIcon data-icon='inline-start' />
-					<span className='@max-md/dock-header:hidden'>Stop</span>
+					<span className='@max-md/dock-header:hidden whitespace-nowrap'>
+						Stop
+					</span>
+					<RunShortcutHint />
 				</Button>
 			</>
 		);
 	}
 
-	if (hasRunScript) {
+	if (activeRunScript) {
 		return (
-			<Button
-				aria-label='Run script'
-				onClick={actions.onRunScript}
-				size='xs'
-				variant='outline'
-			>
-				<PlayIcon data-icon='inline-start' />
-				<span className='@max-md/dock-header:hidden'>Run</span>
-			</Button>
+			<RunScriptControl
+				active={activeRunScript}
+				onConfigure={actions.onOpenSetupScripts}
+				onRun={actions.onRunScript}
+				scripts={workspace.runScripts}
+			/>
 		);
 	}
 
@@ -81,6 +90,99 @@ export function DockPanelActions({
 	// actions. The Setup Scripts entry point lives in the Setup dock tab and its
 	// settings page, not the header.
 	return null;
+}
+
+/**
+ * The ⌘R hint the run and stop buttons carry. Drops out below the `lg` dock
+ * header width, one step after the text label, so the shortcut is the first
+ * thing sacrificed when the tab row needs the room.
+ */
+function RunShortcutHint() {
+	return (
+		<span
+			aria-hidden='true'
+			className='@max-lg/dock-header:hidden text-muted-foreground'
+		>
+			{formatShortcut('run.start')}
+		</span>
+	);
+}
+
+/**
+ * Run control for the dock header: a plain button when the repository declares
+ * one script, or a split button whose dropdown lists every script plus a
+ * Configure shortcut when it declares several. The primary action always runs
+ * the active script, which is what ⌘R targets.
+ */
+function RunScriptControl({
+	active,
+	onConfigure,
+	onRun,
+	scripts,
+}: {
+	active: RunScriptDefinition;
+	onConfigure: () => void;
+	onRun: (scriptName: string) => void;
+	scripts: readonly RunScriptDefinition[];
+}) {
+	const label = formatRunScriptLabel(active.name);
+	const primary = (
+		<Button
+			aria-label={`Run ${label}`}
+			className={scripts.length > 1 ? 'rounded-r-none' : undefined}
+			onClick={() => onRun(active.name)}
+			size='xs'
+			variant='outline'
+		>
+			<RunScriptIcon data-icon='inline-start' name={active.icon} />
+			<span className='@max-md/dock-header:hidden whitespace-nowrap'>
+				{label}
+			</span>
+			<RunShortcutHint />
+		</Button>
+	);
+
+	if (scripts.length <= 1) {
+		return primary;
+	}
+
+	return (
+		<div className='flex items-center'>
+			{primary}
+			<DropdownMenu>
+				<DropdownMenuTrigger asChild>
+					<Button
+						aria-label='Choose run script'
+						className='rounded-l-none border-l-0 px-1'
+						size='xs'
+						variant='outline'
+					>
+						<ChevronDownIcon className='size-3' />
+					</Button>
+				</DropdownMenuTrigger>
+				<DropdownMenuContent align='end'>
+					{scripts.map((script) => (
+						<DropdownMenuItem
+							className='whitespace-nowrap'
+							key={script.name}
+							onSelect={() => onRun(script.name)}
+						>
+							<RunScriptIcon name={script.icon} />
+							{formatRunScriptLabel(script.name)}
+						</DropdownMenuItem>
+					))}
+					<DropdownMenuSeparator />
+					<DropdownMenuItem
+						className='whitespace-nowrap'
+						onSelect={onConfigure}
+					>
+						<SettingsIcon />
+						Configure
+					</DropdownMenuItem>
+				</DropdownMenuContent>
+			</DropdownMenu>
+		</div>
+	);
 }
 
 /**

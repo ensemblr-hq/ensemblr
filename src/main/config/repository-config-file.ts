@@ -8,6 +8,8 @@ import {
 
 /** Starter contents written when a repo has no committed `.ensemblr/settings.toml` yet. */
 const STARTER_TOML = `# Ensemblr repository settings (committed, shared with your team).
+# The Scripts settings screen writes this file; comments are not preserved
+# through an edit made there.
 # See https://ensemblr.dev for the full reference.
 #
 # [git]
@@ -15,7 +17,15 @@ const STARTER_TOML = `# Ensemblr repository settings (committed, shared with you
 #
 # [scripts]
 # setup = "npm install"
-# run = "npm run dev"
+# archive = "rm -rf node_modules"
+# run_mode = "concurrent"          # or "nonconcurrent"
+# auto_run_after_setup = false
+#
+# [scripts.run.dev]
+# command = "PORT=$ENSEMBLR_PORT npm run dev"
+# icon = "play"
+# default = true
+# available_in = ["local"]
 #
 # [prompts]
 # review = "Focus on correctness and tests."

@@ -8,15 +8,15 @@ import {
 } from '@/renderer/api/ensemblr';
 import type { RepoProject, ScriptsForm } from '@/renderer/types/settings';
 
-/** Debounce window before a form edit is persisted to SQLite. */
+/** Debounce window before a form edit is written to the committed config. */
 const SAVE_DEBOUNCE_MS = 500;
 
 /**
  * Owns the Scripts settings form: local edit state seeded once at mount,
- * debounced persistence to repository-scoped SQLite, a flush on unmount so an
- * in-flight edit is never dropped, and error surfacing via a toast. When
- * `project` is `undefined` (unknown repo) edits stay local and are not
- * persisted.
+ * debounced writes to the repository's committed `.ensemblr/settings.toml`
+ * (ADR 0041), a flush on unmount so an in-flight edit is never dropped, and
+ * error surfacing via a toast. When `project` is `undefined` (unknown repo)
+ * edits stay local and are not persisted.
  *
  * @param repoId - Repository whose scripts are being edited.
  * @param project - Resolved repo project, or `undefined` for an unknown repo.
@@ -44,7 +44,7 @@ export function useScriptsSettingsForm(
 				archive: next.archive.trim() ? next.archive : null,
 				autoRunAfterSetup: next.autoRun,
 				repositoryId: repoId,
-				run: next.run.trim() ? next.run : null,
+				runScripts: next.runScripts,
 				runScriptMode: next.runMode,
 				setup: next.setup.trim() ? next.setup : null,
 			});

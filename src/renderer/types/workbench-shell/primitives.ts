@@ -18,7 +18,11 @@ export interface WorkbenchDockActions {
 	/** Opens the detected dev-server preview URL in the system browser. */
 	onOpenRunPort: (url: string) => void;
 	onOpenSetupScripts: () => void;
-	onRunScript: () => void;
+	/**
+	 * Launches a named run script, remembering it as the workspace's ⌘R target.
+	 * Omitting the name launches the repository's default script.
+	 */
+	onRunScript: (scriptName?: string) => void;
 	onRunSetupScript: () => void;
 	onStopRunScript: () => void;
 	onStopSetupScript: () => void;

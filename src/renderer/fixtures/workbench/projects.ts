@@ -1,6 +1,7 @@
 import type { ProjectShellModel } from '@/renderer/types/workbench';
 import { createDockTabs } from './dock-tabs';
 import {
+	devRunScripts,
 	missingScripts,
 	runningDevScripts,
 	setupPendingScripts,
@@ -135,6 +136,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 						status: 'modified',
 					},
 				],
+				runScripts: devRunScripts,
 				scripts: runningDevScripts,
 				sessions: [
 					{
@@ -214,6 +216,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					todos: [],
 				},
 				reviewFiles: [],
+				runScripts: devRunScripts,
 				scripts: setupPendingScripts,
 				sessions: [
 					{
@@ -269,6 +272,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					todos: [],
 				},
 				reviewFiles: [],
+				runScripts: [],
 				scripts: missingScripts,
 				sessions: [
 					{
@@ -334,6 +338,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 						status: 'modified',
 					},
 				],
+				runScripts: devRunScripts,
 				scripts: stoppedRunScripts,
 				sessions: [
 					{
@@ -420,6 +425,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					url: 'https://github.com/psoldunov/ensemblr/pull/29',
 				},
 				reviewFiles: [],
+				runScripts: devRunScripts,
 				scripts: runningDevScripts,
 				sessions: [
 					{

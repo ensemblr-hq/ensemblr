@@ -132,6 +132,11 @@ export interface CreateTerminalSessionOptions {
 	 */
 	restoredFromId?: string;
 	/**
+	 * Name of the repository run script this session runs (`run-script` kind
+	 * only). Lets the dock tell which of several configured run scripts is live.
+	 */
+	scriptName?: string;
+	/**
 	 * Prior scrollback seeded ahead of live PTY output when relaunching a
 	 * persisted dock terminal, so the restored tab replays its history first.
 	 */
@@ -150,6 +155,12 @@ export interface TerminalService {
 	getSnapshot: (terminalId: string) => TerminalSnapshotResult;
 	kill: (terminalId: string) => TerminalSessionSnapshot | null;
 	list: (workspaceId: string) => TerminalSessionSnapshot[];
+	/**
+	 * Every live session of one kind, across all workspaces. Backs the
+	 * `nonconcurrent` run mode, which has to reach outside the launching
+	 * workspace to stop a sibling's run script.
+	 */
+	listByKind: (kind: TerminalSessionKind) => TerminalSessionSnapshot[];
 	/**
 	 * Interactive dock terminals a workspace can relaunch after restart: those
 	 * open at last quit whose output was persisted. One-shot per workspace — the
@@ -880,6 +891,7 @@ export function createTerminalService({
 		restoredFromId,
 		resumed = false,
 		rows = DEFAULT_ROWS,
+		scriptName,
 		seedOutput,
 		title,
 		workspaceId,
@@ -1009,6 +1021,7 @@ export function createTerminalService({
 				previewUrl: null,
 				restored,
 				rows: normalizedRows,
+				scriptName: scriptName ?? null,
 				status: 'running',
 				title: title?.trim() || defaultTitle(kind),
 				workspaceId,
@@ -1164,6 +1177,10 @@ export function createTerminalService({
 				session.snapshot.workspaceId === workspaceId
 					? [{ ...session.snapshot }]
 					: [],
+			),
+		listByKind: (kind) =>
+			Array.from(sessions.values()).flatMap((session) =>
+				session.snapshot.kind === kind ? [{ ...session.snapshot }] : [],
 			),
 		listRestorable: (workspaceId) => {
 			const rows = restorableByWorkspace.get(workspaceId);

@@ -42,6 +42,7 @@ import {
 	createEnsemblrConfigResolutionService,
 	createEnsemblrConfigService,
 	createRepositoryConfigService,
+	migrateAllRepositoryScriptSettings,
 	resolveEnsemblrConfigPath,
 } from './config';
 import {
@@ -705,6 +706,37 @@ const mainWindowStateStore = createMainWindowStateStore({
 	databaseService,
 });
 
+/**
+ * Moves personal script settings into each repository's committed
+ * `.ensemblr/settings.toml` (ADR 0041). Runs before any window opens so the
+ * Scripts screen never reads a half-migrated repository. Fails open: the pass
+ * is retried on the next launch, so nothing here is worth a windowless start.
+ */
+function moveRepositoryScriptsIntoCommittedConfig(): void {
+	const database = databaseService.getConnection()?.database;
+
+	if (!database) {
+		return;
+	}
+
+	try {
+		const migrated = migrateAllRepositoryScriptSettings(database);
+
+		if (migrated.length > 0) {
+			console.info(
+				'[repository-scripts] moved personal script settings into .ensemblr/settings.toml for',
+				migrated.length,
+				'repositories',
+			);
+		}
+	} catch (error) {
+		console.error(
+			'[repository-scripts] migration pass failed; retrying on next launch',
+			error,
+		);
+	}
+}
+
 app.whenReady().then(() => {
 	// The instance that lost the single-instance lock is already quitting; skip
 	// state loading and window creation so it never touches shared userData.
@@ -714,6 +746,7 @@ app.whenReady().then(() => {
 
 	configService.load();
 	databaseService.open();
+	moveRepositoryScriptsIntoCommittedConfig();
 	rootDirectoryService.ensure();
 	void sharedRootAdoptionService.reconcile();
 	installApplicationMenu();

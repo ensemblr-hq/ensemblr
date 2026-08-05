@@ -26,6 +26,7 @@ function createSession(
 		previewUrl: null,
 		restored: false,
 		rows: 24,
+		scriptName: null,
 		status: 'running',
 		title: 'Terminal',
 		workspaceId: 'workspace-1',

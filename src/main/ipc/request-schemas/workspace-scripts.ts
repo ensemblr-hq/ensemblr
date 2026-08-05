@@ -6,12 +6,36 @@
  */
 import { z } from 'zod';
 
+import { RUN_SCRIPT_ICON_NAMES } from '../../../shared/scripts.ts';
+
+/** One named run script the Scripts settings screen persists. */
+const runScriptDefinitionSchema = z.object({
+	availableIn: z.array(z.string()).nullable(),
+	command: z.string().min(1),
+	icon: z.enum(RUN_SCRIPT_ICON_NAMES),
+	isDefault: z.boolean(),
+	name: z.string().min(1),
+});
+
+/**
+ * Named run scripts. Names are rejected as a set rather than one at a time: the
+ * writer keys `[scripts.run.<name>]` tables by name, so a duplicate would drop
+ * the earlier script instead of failing the save.
+ */
+const runScriptListSchema = z
+	.array(runScriptDefinitionSchema)
+	.refine(
+		(scripts) =>
+			new Set(scripts.map((script) => script.name)).size === scripts.length,
+		{ message: 'Run script names must be unique.' },
+	);
+
 /** {@link import('../../../shared/ipc').UpdateRepositoryScriptsRequest}. */
 export const updateRepositoryScriptsRequestSchema = z.object({
 	archive: z.string().nullable(),
 	autoRunAfterSetup: z.boolean(),
 	repositoryId: z.string().min(1),
-	run: z.string().nullable(),
+	runScripts: runScriptListSchema,
 	runScriptMode: z.enum(['concurrent', 'nonconcurrent']),
 	setup: z.string().nullable(),
 });

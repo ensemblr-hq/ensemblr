@@ -5,21 +5,33 @@ import { useComposerInsert } from '@/renderer/state/composer';
 
 /**
  * Composer seed for the setup-tab "Ask agent" affordance: directs the agent to
- * author the repository's `.ensemblr/settings.toml` `[scripts]` block after
- * inspecting the project's tooling. Seeded for review, never auto-submitted.
+ * author the repository's `.ensemblr/settings.toml` scripts after inspecting the
+ * project's tooling. Seeded for review, never auto-submitted.
  */
-const ASK_AGENT_SETUP_PROMPT = `Set up this repository's Ensemblr config so a fresh workspace can install its dependencies automatically.
+const ASK_AGENT_SETUP_PROMPT = `Set up this repository's Ensemblr config so a fresh workspace can install its dependencies and start its common tasks.
 
-Inspect the project first (package manager, language toolchain, lockfiles), then create or update \`.ensemblr/settings.toml\` with a \`[scripts]\` table:
+Inspect the project first (package manager, language toolchain, lockfiles, existing scripts), then create or update \`.ensemblr/settings.toml\`:
 
-- \`setup\`: the command that installs dependencies / prepares a new workspace.
-- \`run\`: the command that starts the dev server or main local process (only if the repo has one).
+- \`[scripts]\` \`setup\`: the command that installs dependencies / prepares a new workspace.
+- One \`[scripts.run.<name>]\` table per task worth a one-click button — the dev server, the test suite, lint/typecheck, a build. Each takes a \`command\`, and optionally an \`icon\`, \`default = true\` (the ⌘R target, at most one), and \`available_in = ["local"]\`.
+
+Every workspace gets its own \`$ENSEMBLR_PORT\`, so pass it to anything that binds a port instead of hardcoding one.
 
 Example:
 
     [scripts]
     setup = "<install command>"
-    run = "<dev command>"
+
+    [scripts.run.dev]
+    command = "<dev command using $ENSEMBLR_PORT>"
+    icon = "play"
+    default = true
+
+    [scripts.run.test]
+    command = "<test command>"
+    icon = "test-tube"
+
+Pick icon names from Ensemblr's set (play, server, terminal, test-tube, flask-conical, list-checks, hammer, rocket, bug, database, globe, zap, ...); an unknown name falls back to the default icon.
 
 Use the commands that actually apply to this repo, then tell me what you chose and why.`;
 

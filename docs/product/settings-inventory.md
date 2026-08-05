@@ -175,13 +175,13 @@ Note: "Set upstream on plain `git push`" lives on the **Git** page
 The repo scope has five pages (`settings-sidebar.tsx` `REPO_NAV`): **Environment,
 Git, Scripts, Actions, Misc**. Repo Git/Actions/Misc personal overrides live in
 `localStorage` (`repoSettingsOverrideAtomFamily`, key
-`ensemblr_pref_repo_override_<repoId>`); Scripts personal overrides write SQLite.
+`ensemblr_pref_repo_override_<repoId>`); Scripts has no personal layer — it reads
+and writes the committed `.ensemblr/settings.toml` directly (ADR 0041).
 Resolved values come from the committed `.ensemblr/settings.toml` and SQLite
 through `useRepoSettings`. Action preferences are the only localStorage repo
 overrides currently consumed by runtime; the other local-only controls remain
-false affordances. Each script/toggle row shows a `SourceBadge` and, where the
-committed toml wins, an "Overridden by the committed `.ensemblr/settings.toml`"
-hint.
+false affordances. Git/Actions/Misc rows show a `SourceBadge`; the Scripts screen
+does not, because every value there comes from one file.
 
 ### Environment (repo)
 
@@ -205,16 +205,18 @@ resolver keys used by the screen and runtime.
 
 | Setting | Ensemblr adaptation | Storage |
 | --- | --- | --- |
-| Setup script | Runs when a workspace is created or manually rerun; auto-skipped when the dependency fingerprint is unchanged (ADR 0034). | `.ensemblr/settings.toml` shared; SQLite personal override. |
-| Run script | Run button in the terminal dock. | `.ensemblr/settings.toml` shared; SQLite personal override. |
-| Run mode | Concurrent / nonconcurrent run behavior. | `.ensemblr/settings.toml` shared; SQLite personal override. |
-| Auto-run after setup | Start the run script automatically once setup completes. | `.ensemblr/settings.toml` shared; SQLite personal override. |
-| Archive script | Runs before archive. | `.ensemblr/settings.toml` shared; SQLite personal override. |
+| Setup script | Runs when a workspace is created or manually rerun; auto-skipped when the dependency fingerprint is unchanged (ADR 0034). | `[scripts] setup` in `.ensemblr/settings.toml`. |
+| Run scripts | Named shortcuts behind the terminal dock's Run button. | `[scripts.run.<name>]` tables in `.ensemblr/settings.toml`. |
+| Run mode | Concurrent / nonconcurrent run behavior. | `[scripts] run_mode` in `.ensemblr/settings.toml`. |
+| Auto-run after setup | Start the run script automatically once setup completes. | `[scripts] auto_run_after_setup` in `.ensemblr/settings.toml`. |
+| Archive script | Runs before archive. | `[scripts] archive` in `.ensemblr/settings.toml`. |
 
-The committed `.ensemblr/settings.toml` is hand-authored in the repo; Ensemblr
-reads it and does not generate it (there is no "create shared config" button).
-The Scripts form debounces writes through IPC into canonical repository-scoped
-SQLite rows; a committed TOML value wins and shadows the personal row.
+The Scripts form debounces writes through IPC and rewrites the repository root's
+committed `.ensemblr/settings.toml` (ADR 0041) — there is no personal SQLite
+layer for scripts, and legacy rows were migrated into the file once. The rewrite
+preserves other sections by value but not their comments, and refuses to touch a
+file that does not parse. Running still resolves from the workspace worktree, so
+the screen flags a workspace whose branch commits different scripts.
 
 ### Actions
 
@@ -249,7 +251,7 @@ For repository behavior, resolve each key with this precedence (highest to lowes
 
 1. `.worktreeinclude` for files-to-copy patterns.
 2. The committed `.ensemblr/settings.toml` at the repository root.
-3. Personal repository settings in SQLite (edited via the Scripts settings screen).
+3. Personal repository settings in SQLite (edited via the Git and Misc settings screens; scripts no longer have this layer, per ADR 0041).
 4. User defaults from `~/.config/ensemblr/config.json`.
 5. Built-in defaults.
 
@@ -267,8 +269,8 @@ For app-wide behavior, use:
 > Terminal scrollback still persist only to `localStorage`. Pi executable Browse
 > writes SQLite, while its text/clear UI remains a disconnected localStorage
 > mirror. Repo Git/Actions/Misc personal overrides live in `localStorage`; Scripts
-> personal overrides live in SQLite. The committed `.ensemblr/settings.toml`
-> holds shared repo defaults.
+> settings live only in the committed `.ensemblr/settings.toml`, which the
+> Scripts screen writes. The committed file also holds shared repo defaults.
 
 ## Open Settings Questions
 

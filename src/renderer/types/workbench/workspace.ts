@@ -12,6 +12,7 @@ import type {
 	WorkspaceGitDiffScope,
 	WorkspaceGitFailure,
 } from '@/shared/ipc/contracts/workspace-git';
+import type { RunScriptDefinition } from '@/shared/scripts';
 import type { GithubRepoRef } from './github';
 
 import type { ProjectShellModel } from './project';
@@ -334,6 +335,8 @@ export interface WorkspaceScriptSummary {
 	port?: number;
 	/** Auto-detected local dev-server URL for a running run script, when seen. */
 	previewUrl?: string | null;
+	/** Name of the run script the latest session ran, when it carried one. */
+	scriptName?: string | null;
 	/** Status of the most recent script session, when one exists. */
 	sessionStatus?: TerminalSessionStatus | null;
 	status: 'missing' | 'not-run' | 'running' | 'stopped' | 'succeeded';
@@ -469,6 +472,8 @@ export interface WorkspaceShellModel {
 	 * git's own words.
 	 */
 	reviewFilesError?: WorkspaceGitFailure;
+	/** Named run scripts the dock's Run menu offers, in declaration order. */
+	runScripts: RunScriptDefinition[];
 	scripts: {
 		run: WorkspaceScriptSummary;
 		setup: WorkspaceScriptSummary;

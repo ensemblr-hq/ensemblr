@@ -46,6 +46,7 @@ export default defineConfig({
 			'tests/main/external-links-policy.test.ts',
 			'tests/main/app-settings-service.test.ts',
 			'tests/main/open-in-editor.test.ts',
+			'tests/main/workspace-scripts-handler.test.ts',
 			'tests/main/workspace-files-watcher.test.ts',
 			'tests/main/agent-activity-monitor.test.ts',
 			'tests/main/macos-battery.test.ts',

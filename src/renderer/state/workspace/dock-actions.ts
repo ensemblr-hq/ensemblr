@@ -1,4 +1,5 @@
 import { useNavigate } from '@tanstack/react-router';
+import { useSetAtom } from 'jotai';
 import { useEffect, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 
@@ -6,6 +7,7 @@ import {
 	runWorkspaceScript,
 	stopWorkspaceScript,
 } from '@/renderer/api/ensemblr/workspace-scripts';
+import { lastRunScriptAtomFamily } from '@/renderer/state/preferences';
 import type { WorkbenchRouteSearch } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 import type {
@@ -54,6 +56,7 @@ export function useWorkspaceDockActions({
 	workspaceId,
 }: UseWorkspaceDockActionsOptions): WorkbenchDockActions {
 	const navigate = useNavigate();
+	const setLastRunScript = useSetAtom(lastRunScriptAtomFamily(workspaceId));
 	const askAgentSetupScriptRef = useRef(askAgentSetupScript);
 	const updateSearchRef = useRef(updateSearch);
 	const sessionsRef = useRef(sessions);
@@ -112,8 +115,16 @@ export function useWorkspaceDockActions({
 					to: '/settings/repo/$repoId/scripts',
 				});
 			},
-			onRunScript: () => {
-				void runWorkspaceScript({ kind: 'run', workspaceId })
+			onRunScript: (scriptName) => {
+				if (scriptName) {
+					setLastRunScript(scriptName);
+				}
+
+				void runWorkspaceScript({
+					kind: 'run',
+					scriptName: scriptName ?? null,
+					workspaceId,
+				})
 					.then((result) => notifyScriptConflict(result.diagnostics))
 					.catch(() => undefined);
 				updateSearchRef.current({ dock: 'run' });
@@ -135,7 +146,14 @@ export function useWorkspaceDockActions({
 				);
 			},
 		}),
-		[closeTerminal, createTerminal, navigate, repositoryId, workspaceId],
+		[
+			closeTerminal,
+			createTerminal,
+			navigate,
+			repositoryId,
+			setLastRunScript,
+			workspaceId,
+		],
 	);
 }
 

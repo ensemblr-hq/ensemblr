@@ -156,6 +156,66 @@ export function selectRepositoryWithDefaultsById({
 		.get(id);
 }
 
+/** Inputs for {@link selectRepositoryPathById}. */
+export interface SelectRepositoryPathByIdOptions {
+	database: DatabaseSync;
+	id: string;
+}
+
+/**
+ * Reads a repository's root clone path, which callers need before touching any
+ * of its on-disk files.
+ * @param options - Database handle and repository id.
+ * @returns The absolute path, or null when the repository is unknown.
+ */
+export function selectRepositoryPathById({
+	database,
+	id,
+}: SelectRepositoryPathByIdOptions): string | null {
+	const row = database
+		.prepare('SELECT path FROM repositories WHERE id = ?')
+		.get(id);
+
+	if (!row || typeof row !== 'object') {
+		return null;
+	}
+
+	const { path } = row as Record<string, unknown>;
+
+	return typeof path === 'string' && path ? path : null;
+}
+
+/** A repository's id paired with its root clone path. */
+export interface RepositoryPathRow {
+	id: string;
+	path: string;
+}
+
+/**
+ * Lists every live repository's id and root clone path, for passes that have to
+ * touch each repository's on-disk files. Archived repositories are skipped
+ * because their checkouts may no longer exist.
+ * @param options - Database handle.
+ * @returns One row per live repository.
+ */
+export function selectLiveRepositoryPaths({
+	database,
+}: {
+	database: DatabaseSync;
+}): RepositoryPathRow[] {
+	const rows = database
+		.prepare(
+			'SELECT id, path FROM repositories WHERE archived_at IS NULL ORDER BY id',
+		)
+		.all() as { id: unknown; path: unknown }[];
+
+	return rows.flatMap((row) =>
+		typeof row.id === 'string' && typeof row.path === 'string' && row.path
+			? [{ id: row.id, path: row.path }]
+			: [],
+	);
+}
+
 /** Inputs for {@link selectRepositoryForArchive}. */
 export interface SelectRepositoryForArchiveOptions {
 	database: DatabaseSync;

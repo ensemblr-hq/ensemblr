@@ -18,7 +18,6 @@ describe('parseWorkspaceScriptSettings', () => {
 				autoRunAfterSetup: true,
 				runScriptMode: 'nonconcurrent',
 				'scripts.archive': 'bun run archive',
-				'scripts.run': 'bun run dev',
 				'scripts.setup': 'bun install',
 			}),
 		);
@@ -26,9 +25,9 @@ describe('parseWorkspaceScriptSettings', () => {
 		expect(parsed).toEqual({
 			autoRunAfterSetup: true,
 			runScriptMode: 'nonconcurrent',
+			runScripts: [],
 			scripts: {
 				archive: 'bun run archive',
-				run: 'bun run dev',
 				setup: 'bun install',
 			},
 		});
@@ -47,6 +46,7 @@ describe('parseWorkspaceScriptSettings', () => {
 		expect(parsed).toEqual({
 			autoRunAfterSetup: false,
 			runScriptMode: 'concurrent',
+			runScripts: [],
 			scripts: {},
 		});
 	});
@@ -56,5 +56,67 @@ describe('parseWorkspaceScriptSettings', () => {
 			parseWorkspaceScriptSettings(entries({ 'scripts.setup': 'bun install' }))
 				.autoRunAfterSetup,
 		).toBe(false);
+	});
+
+	test('upgrades a legacy run string into an implicit default script', () => {
+		expect(
+			parseWorkspaceScriptSettings(entries({ 'scripts.run': 'bun run dev' }))
+				.runScripts,
+		).toEqual([
+			{
+				availableIn: null,
+				command: 'bun run dev',
+				icon: 'play',
+				isDefault: true,
+				name: 'run',
+			},
+		]);
+	});
+
+	test('prefers the named run scripts over a legacy run string', () => {
+		const parsed = parseWorkspaceScriptSettings(
+			entries({
+				'scripts.run': 'bun run dev',
+				'scripts.runScripts': [
+					{
+						command: 'npm run dev',
+						default: true,
+						icon: 'server',
+						name: 'dev',
+					},
+					{ command: 'npm test', name: 'test' },
+				],
+			}),
+		);
+
+		expect(parsed.runScripts.map((script) => script.name)).toEqual([
+			'dev',
+			'test',
+		]);
+		expect(parsed.runScripts[0]?.icon).toBe('server');
+	});
+
+	test('drops run scripts unavailable in the local environment', () => {
+		const parsed = parseWorkspaceScriptSettings(
+			entries({
+				'scripts.runScripts': [
+					{
+						available_in: ['cloud'],
+						command: 'npm run remote',
+						name: 'remote',
+					},
+					{ available_in: ['local'], command: 'npm run dev', name: 'dev' },
+				],
+			}),
+		);
+
+		expect(parsed.runScripts.map((script) => script.name)).toEqual(['dev']);
+	});
+
+	test('ignores a malformed run-scripts value', () => {
+		expect(
+			parseWorkspaceScriptSettings(entries({ 'scripts.runScripts': 'nope' }))
+				.runScripts,
+		).toEqual([]);
 	});
 });

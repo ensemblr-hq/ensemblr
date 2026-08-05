@@ -63,6 +63,8 @@ export {
 	filePreviewMarkdownPreviewAtom,
 	filePreviewWordWrapAtom,
 	forgetChatOverrides,
+	forgetLastRunScript,
+	lastRunScriptAtomFamily,
 	prDetailsDraftAtomFamily,
 	prDetailsLiveDraftAtomFamily,
 	REPO_ACTION_KEYS,

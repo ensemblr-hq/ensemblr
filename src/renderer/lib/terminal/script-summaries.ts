@@ -4,13 +4,37 @@ import type {
 } from '@/renderer/types/workbench';
 import type { TerminalSessionSnapshot } from '@/shared/ipc/contracts/terminal';
 import type { WorkspaceScriptKind } from '@/shared/ipc/contracts/workspace-scripts';
-import type { WorkspaceScriptSettings } from '@/shared/scripts';
+import {
+	type RunScriptDefinition,
+	resolveRunScript,
+	selectDefaultRunScript,
+	type WorkspaceScriptSettings,
+} from '@/shared/scripts';
 import { extractPreviewPort } from '@/shared/terminal';
 
 /**
  * Pure helpers that fold resolved repository script settings and live terminal
  * sessions into the dock's setup/run script summaries.
  */
+
+/**
+ * Reads the command a script kind is configured with. The run kind has no
+ * single command — its summary reports the default of the named run scripts, so
+ * the dock can tell "nothing configured" from "configured but never started".
+ * @param kind - The script kind.
+ * @param settings - Resolved repository script settings.
+ * @returns The command, or undefined when the kind is unconfigured.
+ */
+function resolveConfiguredCommand(
+	kind: WorkspaceScriptKind,
+	settings: WorkspaceScriptSettings | null,
+): string | undefined {
+	if (kind !== 'run') {
+		return settings?.scripts[kind];
+	}
+
+	return selectDefaultRunScript(settings?.runScripts ?? [])?.command;
+}
 
 /** Builds the setup and run script summaries for the dock panels. */
 export function buildWorkspaceScriptSummaries({
@@ -24,6 +48,33 @@ export function buildWorkspaceScriptSummaries({
 		run: buildScriptSummary({ kind: 'run', sessions, settings }),
 		setup: buildScriptSummary({ kind: 'setup', sessions, settings }),
 	};
+}
+
+/**
+ * Picks the run script the dock's Run button targets: whatever is running wins,
+ * then the workspace's remembered pick, then the repository's default. Keeping
+ * the running session first means the Stop button and ⌘R always act on the
+ * script the user is actually watching.
+ * @param options - Configured run scripts, the live run summary, and the remembered name.
+ * @returns The active run script, or null when none are configured.
+ */
+export function selectActiveRunScript({
+	rememberedName,
+	runScripts,
+	runSummary,
+}: {
+	rememberedName: string | null;
+	runScripts: readonly RunScriptDefinition[];
+	runSummary: WorkspaceScriptSummary;
+}): RunScriptDefinition | null {
+	const runningName =
+		runSummary.status === 'running' ? (runSummary.scriptName ?? null) : null;
+
+	return (
+		(runningName ? resolveRunScript(runScripts, runningName) : null) ??
+		(rememberedName ? resolveRunScript(runScripts, rememberedName) : null) ??
+		selectDefaultRunScript(runScripts)
+	);
 }
 
 /** Maps a script summary to the dock tab activity state. */
@@ -60,7 +111,7 @@ function buildScriptSummary({
 	sessions: readonly TerminalSessionSnapshot[];
 	settings: WorkspaceScriptSettings | null;
 }): WorkspaceScriptSummary {
-	const command = settings?.scripts[kind];
+	const command = resolveConfiguredCommand(kind, settings);
 	const latestSession = sessions.findLast(
 		(session) => session.kind === `${kind}-script`,
 	);
@@ -69,32 +120,52 @@ function buildScriptSummary({
 		return { status: 'missing' };
 	}
 
-	// The main process auto-detects a dev-server URL from run-script output and
-	// stamps it on the session; carry it (and its port) onto the summary so the
-	// dock can render the Open button.
-	const previewUrl = latestSession?.previewUrl ?? null;
-	const previewPort = previewUrl ? extractPreviewPort(previewUrl) : null;
-
-	const base: WorkspaceScriptSummary = {
+	return {
 		...(command ? { command } : {}),
-		...(previewUrl ? { previewUrl } : {}),
-		...(previewPort !== null ? { port: previewPort } : {}),
+		...previewFields(latestSession),
+		scriptName: latestSession?.scriptName ?? null,
 		sessionStatus: latestSession?.status ?? null,
-		status: 'not-run',
+		status: latestSession ? summaryStatus(latestSession.status) : 'not-run',
 		terminalId: latestSession?.id ?? null,
 	};
+}
 
-	if (!latestSession) {
-		return base;
+/**
+ * Carries a session's auto-detected dev-server URL (and its port) onto the
+ * summary. The main process stamps the URL on `run-script` sessions as it scans
+ * their output; both fields stay absent until one is seen.
+ * @param session - The latest script session, when one exists.
+ * @returns The preview fields to spread onto the summary.
+ */
+function previewFields(
+	session: TerminalSessionSnapshot | undefined,
+): Pick<WorkspaceScriptSummary, 'port' | 'previewUrl'> {
+	const previewUrl = session?.previewUrl ?? null;
+
+	if (!previewUrl) {
+		return {};
 	}
 
-	switch (latestSession.status) {
+	const port = extractPreviewPort(previewUrl);
+
+	return { previewUrl, ...(port !== null ? { port } : {}) };
+}
+
+/**
+ * Maps a terminal session's lifecycle state onto the dock's script status.
+ * @param status - The session's status.
+ * @returns The matching summary status.
+ */
+function summaryStatus(
+	status: TerminalSessionSnapshot['status'],
+): WorkspaceScriptSummary['status'] {
+	switch (status) {
 		case 'running':
-			return { ...base, status: 'running' };
+			return 'running';
 		case 'exited':
-			return { ...base, status: 'succeeded' };
+			return 'succeeded';
 		case 'failed':
 		case 'stopped':
-			return { ...base, status: 'stopped' };
+			return 'stopped';
 	}
 }

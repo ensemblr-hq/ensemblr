@@ -75,6 +75,12 @@ export interface TerminalSessionSnapshot {
 	 */
 	restored: boolean;
 	rows: number;
+	/**
+	 * Name of the repository run script this session runs, or `null` for every
+	 * other session kind. Lets the dock show which of several configured run
+	 * scripts is live and gate the Run button on it.
+	 */
+	scriptName: string | null;
 	status: TerminalSessionStatus;
 	title: string;
 	workspaceId: string;

@@ -50,6 +50,19 @@ export {
 	loadRepositoryConfig,
 	normalizeRepositoryConfigRequest,
 } from './repository-config.ts';
+export type {
+	MigrateRepositoryScriptSettingsInput,
+	MigrateRepositoryScriptSettingsOutcome,
+} from './repository-scripts-migration.ts';
+export {
+	migrateAllRepositoryScriptSettings,
+	migrateRepositoryScriptSettings,
+} from './repository-scripts-migration.ts';
+export type {
+	WriteRepositoryScriptsInput,
+	WriteRepositoryScriptsResult,
+} from './repository-scripts-writer.ts';
+export { writeRepositoryScripts } from './repository-scripts-writer.ts';
 
 /** Service exposed to IPC handlers for inspecting per-repository config. */
 export interface RepositoryConfigService {

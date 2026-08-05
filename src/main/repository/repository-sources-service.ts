@@ -15,7 +15,7 @@ import type {
 import type { LocalCommandService } from '../commands/local-command';
 import { classifyCommandFailure } from '../github/gh-failures.ts';
 import type { EnsemblrDatabaseService } from '../storage';
-import { selectRepositoryWithDefaultsById } from '../storage/repositories/repository-row-repository.ts';
+import { selectRepositoryPathById } from '../storage/repositories/repository-row-repository.ts';
 import { listActiveWorkspaceBranchRowsByRepository } from '../storage/repositories/workspace-repository.ts';
 
 const GH_TIMEOUT_MS = 45_000;
@@ -86,7 +86,7 @@ export function createRepositorySourcesService({
 			if (!database) {
 				return null;
 			}
-			return readRepositoryPath(database, repositoryId);
+			return selectRepositoryPathById({ database, id: repositoryId });
 		});
 
 	/**
@@ -268,21 +268,6 @@ export function createRepositorySourcesService({
 			return { issues, status: 'ok' };
 		},
 	};
-}
-
-/** Reads the repository path projection from SQLite; null when absent. */
-function readRepositoryPath(
-	database: DatabaseSync,
-	repositoryId: string,
-): string | null {
-	const row = selectRepositoryWithDefaultsById({ database, id: repositoryId });
-	if (!row || typeof row !== 'object') {
-		return null;
-	}
-	const candidate = row as Record<string, unknown>;
-	return typeof candidate.path === 'string' && candidate.path
-		? candidate.path
-		: null;
 }
 
 /**

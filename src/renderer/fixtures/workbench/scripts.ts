@@ -43,3 +43,20 @@ export const missingScripts = {
 		status: 'missing',
 	},
 } satisfies WorkspaceShellModel['scripts'];
+
+export const devRunScripts = [
+	{
+		availableIn: null,
+		command: 'bun run dev',
+		icon: 'play',
+		isDefault: true,
+		name: 'dev',
+	},
+	{
+		availableIn: null,
+		command: 'bun test',
+		icon: 'test-tube',
+		isDefault: false,
+		name: 'test',
+	},
+] satisfies WorkspaceShellModel['runScripts'];
