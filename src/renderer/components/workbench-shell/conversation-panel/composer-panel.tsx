@@ -29,7 +29,7 @@ export function ComposerPanel({
 }: {
 	chatTabId: string;
 	composer: ComposerShellState;
-	/** Plan review panel rendered inside the footer, above the composer card. */
+	/** Plan review header rendered inside the composer card, above the textarea. */
 	planReview?: ReactNode;
 	seedText?: string;
 }) {
@@ -106,11 +106,10 @@ export function ComposerPanel({
 
 	return (
 		<footer className='shrink-0 bg-background px-4 pt-2 pb-5'>
-			{planReview}
 			{/* biome-ignore lint/a11y/noStaticElementInteractions: drop zone is a passive file target, not a keyboard/pointer control */}
 			<div
 				className={cn(
-					'relative mx-auto flex w-full max-w-4xl flex-col gap-2 rounded-xl border border-border bg-pane/80 px-4 pt-3 pb-2.5 shadow-panel transition-shadow',
+					'relative mx-auto flex w-full max-w-4xl flex-col overflow-hidden rounded-xl border border-border bg-pane/80 shadow-panel transition-shadow',
 					composer.planMode
 						? 'border-accent-strong/50 border-dashed'
 						: focused && 'ring-1 ring-ring/40',
@@ -118,44 +117,47 @@ export function ComposerPanel({
 				onDragOver={state.handleDragOver}
 				onDrop={state.handleDrop}
 			>
-				<input
-					accept='*/*'
-					aria-label='Upload attachment'
-					className='hidden'
-					multiple
-					onChange={state.handleFileChange}
-					ref={state.fileInputRef}
-					tabIndex={-1}
-					type='file'
-				/>
+				{planReview}
+				<div className='flex flex-col gap-2 px-4 pt-3 pb-2.5'>
+					<input
+						accept='*/*'
+						aria-label='Upload attachment'
+						className='hidden'
+						multiple
+						onChange={state.handleFileChange}
+						ref={state.fileInputRef}
+						tabIndex={-1}
+						type='file'
+					/>
 
-				<ComposerNotices state={state} />
+					<ComposerNotices state={state} />
 
-				<ComposerAutocompletePopover
-					activeIndex={state.activeIndex}
-					kind={state.autocomplete.kind}
-					mentionMatches={state.mentionMatches}
-					onHover={state.setActiveIndex}
-					onMentionSelect={state.onMentionSelect}
-					onOpenChange={(open) => {
-						if (!open) {
-							state.dismissAutocomplete();
-						}
-					}}
-					onSlashSelect={state.onSlashSelect}
-					slashMatches={state.slashMatches}
-				>
-					{textareaBlock}
-				</ComposerAutocompletePopover>
+					<ComposerAutocompletePopover
+						activeIndex={state.activeIndex}
+						kind={state.autocomplete.kind}
+						mentionMatches={state.mentionMatches}
+						onHover={state.setActiveIndex}
+						onMentionSelect={state.onMentionSelect}
+						onOpenChange={(open) => {
+							if (!open) {
+								state.dismissAutocomplete();
+							}
+						}}
+						onSlashSelect={state.onSlashSelect}
+						slashMatches={state.slashMatches}
+					>
+						{textareaBlock}
+					</ComposerAutocompletePopover>
 
-				<ComposerControls
-					composer={composer}
-					modelPickerOpen={modelPickerOpen}
-					onLinkIssue={() => setIssuePickerOpen(true)}
-					onModelPickerOpenChange={setModelPickerOpen}
-					pickersDisabled={pickersDisabled}
-					state={state}
-				/>
+					<ComposerControls
+						composer={composer}
+						modelPickerOpen={modelPickerOpen}
+						onLinkIssue={() => setIssuePickerOpen(true)}
+						onModelPickerOpenChange={setModelPickerOpen}
+						pickersDisabled={pickersDisabled}
+						state={state}
+					/>
+				</div>
 			</div>
 			<LinearIssuePickerDialog
 				onOpenChange={setIssuePickerOpen}

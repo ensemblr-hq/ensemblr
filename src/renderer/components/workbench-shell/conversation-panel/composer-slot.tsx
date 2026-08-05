@@ -3,9 +3,9 @@
  * blocked on `ask_user_question` it becomes that questionnaire instead, so the
  * user answers where the agent asked rather than hunting for a dialog.
  *
- * A finished plan rides *above* the composer instead of replacing it: the agent
- * has already stopped, the plan is the message right above, and refining it
- * means typing into that same composer.
+ * A finished plan rides as the composer's own header instead of replacing it:
+ * the agent has already stopped, the plan is the message right above, and
+ * refining it means typing into that same composer.
  */
 import { useCallback } from 'react';
 
