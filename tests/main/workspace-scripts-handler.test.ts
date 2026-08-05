@@ -56,9 +56,10 @@ function updateRequest(overrides: Record<string, unknown> = {}) {
 function readConfig(): Record<string, unknown> {
 	const configPath = path.join(repositoryPath, '.ensemblr', 'settings.toml');
 
-	return JSON.parse(
-		JSON.stringify(load(readFileSync(configPath, 'utf8'))),
-	) as Record<string, unknown>;
+	return structuredClone(load(readFileSync(configPath, 'utf8'))) as Record<
+		string,
+		unknown
+	>;
 }
 
 beforeEach(() => {

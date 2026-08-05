@@ -35,11 +35,12 @@ function createRepositoryFixture(t: TestContext): {
 		configPath,
 		read: () => readFileSync(configPath, 'utf8'),
 		// js-toml returns null-prototype tables, which deepStrictEqual rejects
-		// against object literals; round-tripping through JSON re-parents them.
+		// against object literals; structuredClone re-parents them.
 		readRecord: () =>
-			JSON.parse(
-				JSON.stringify(load(readFileSync(configPath, 'utf8'))),
-			) as Record<string, unknown>,
+			structuredClone(load(readFileSync(configPath, 'utf8'))) as Record<
+				string,
+				unknown
+			>,
 		repositoryPath,
 		write: (source) => {
 			mkdirSync(path.dirname(configPath), { recursive: true });
