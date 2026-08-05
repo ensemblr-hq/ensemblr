@@ -64,9 +64,10 @@ function createFixture(t: TestContext): MigrationFixture {
 		configPath,
 		database: connection.database,
 		readRecord: () =>
-			JSON.parse(
-				JSON.stringify(load(readFileSync(configPath, 'utf8'))),
-			) as Record<string, unknown>,
+			structuredClone(load(readFileSync(configPath, 'utf8'))) as Record<
+				string,
+				unknown
+			>,
 		repositoryPath,
 		seed: (key, value) => {
 			connection.database

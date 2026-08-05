@@ -11,6 +11,7 @@ import { PullRequestNumberButton } from '@/renderer/components/workbench-shell/r
 import { RightSidebarHeader } from '@/renderer/components/workbench-shell/right-sidebar-header/right-sidebar-header';
 import { WorkbenchHeader } from '@/renderer/components/workbench-shell/workbench-header';
 import { getDefaultProject } from '@/renderer/fixtures/workbench';
+import { cn } from '@/renderer/lib/utils';
 import { getRightSidebarHeaderState } from '@/renderer/lib/workbench/right-sidebar-header-state';
 import { continuedMergedPullRequestByWorkspaceAtom } from '@/renderer/state/workspace';
 import type {
@@ -29,8 +30,9 @@ import {
 	HEADER_STATE_FIXTURES,
 	HEADER_TONES,
 	type HeaderStateFixture,
+	NAMED_PREVIEW_DEPLOYMENT,
 	PREVIEW_DEPLOYMENT_VARIANTS,
-	READY_PREVIEW_DEPLOYMENT,
+	PREVIEW_LABEL_COLLAPSE_FIXTURE,
 } from './right-sidebar-header-fixtures.ts';
 import { ControlGroup, SceneSection, SceneToggle } from './scene-chrome.tsx';
 import { StubbedWorkbenchLayout } from './stubbed-workbench-layout.tsx';
@@ -39,6 +41,29 @@ import { StubbedWorkbenchLayout } from './stubbed-workbench-layout.tsx';
 type BusyAction = 'archiving' | 'continuing' | 'idle';
 
 const BUSY_ACTIONS: readonly BusyAction[] = ['idle', 'continuing', 'archiving'];
+
+/**
+ * The two sidebar widths that bracket the preview pill's collapse breakpoint.
+ * `max-w-sm` leaves the `pr-header` row under 20rem once the padding, gap, and
+ * trailing action are taken out, which is where the pill drops its label;
+ * `max-w-lg` clears it.
+ */
+const PREVIEW_LABEL_WIDTHS: readonly {
+	label: string;
+	note: string;
+	width: string;
+}[] = [
+	{
+		label: 'sidebar at its 22rem minimum',
+		note: 'row falls under the breakpoint — the pill keeps only its provider mark, and the label moves to the hover title',
+		width: 'max-w-sm',
+	},
+	{
+		label: 'sidebar dragged wider',
+		note: 'row clears the breakpoint — the pill shows the deployment label in full',
+		width: 'max-w-lg',
+	},
+];
 
 /**
  * Every state of the review sidebar header, on both surfaces it mounts on, with
@@ -113,6 +138,7 @@ export function RightSidebarHeaderScene() {
 						fixtures={fixtures}
 						isAgentWorking={isAgentWorking}
 					/>
+					<PreviewLabelCollapseStates />
 					<CollapsedToolbarStates
 						fixtures={fixtures}
 						isAgentWorking={isAgentWorking}
@@ -146,6 +172,35 @@ function SidebarHeaderStates({
 				>
 					<div className='w-full max-w-sm overflow-hidden rounded-md border border-border'>
 						<RightSidebarHeader activeWorkspace={fixture.workspace} />
+					</div>
+				</MeasuredRow>
+			))}
+		</SceneSection>
+	);
+}
+
+/**
+ * One header at both sides of the preview pill's collapse breakpoint, since every
+ * other sidebar row in this scene renders at `max-w-sm` and so only ever shows
+ * the collapsed side of it.
+ */
+function PreviewLabelCollapseStates() {
+	return (
+		<SceneSection
+			label='preview label collapse — RightSidebarHeader'
+			note='the pill drops its label to the provider mark once the pr-header container falls under 20rem'
+		>
+			{PREVIEW_LABEL_WIDTHS.map(({ label, note, width }) => (
+				<MeasuredRow key={width} label={label} note={note}>
+					<div
+						className={cn(
+							'w-full overflow-hidden rounded-md border border-border',
+							width,
+						)}
+					>
+						<RightSidebarHeader
+							activeWorkspace={PREVIEW_LABEL_COLLAPSE_FIXTURE.workspace}
+						/>
 					</div>
 				</MeasuredRow>
 			))}
@@ -414,7 +469,7 @@ function withPreviewDeployment(
 			...fixture.workspace,
 			pullRequest: {
 				...fixture.workspace.pullRequest,
-				previewDeployment: enabled ? READY_PREVIEW_DEPLOYMENT : undefined,
+				previewDeployment: enabled ? NAMED_PREVIEW_DEPLOYMENT : undefined,
 			},
 		},
 	};

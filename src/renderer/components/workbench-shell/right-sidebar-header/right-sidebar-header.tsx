@@ -39,7 +39,15 @@ const HEADER_LABEL_TONE_CLASSES: Record<HeaderTone, string> = {
 	ready: 'text-status-ok',
 };
 
-/** Header above the review sidebar — shows PR number, tone, and primary action. */
+/**
+ * Header above the review sidebar — shows PR number, tone, and primary action.
+ * The row holding the pills and the status label is the `pr-header` query
+ * container: it measures the space left after the trailing action, which is what
+ * {@link PreviewDeploymentButton} collapses its text label against. The class
+ * belongs on that row because `flex-1` sizes it from the outside; an
+ * `inline-size` container that took its width from its own contents would
+ * measure itself as empty and collapse to zero.
+ */
 export function RightSidebarHeader({
 	activeWorkspace,
 }: {
@@ -54,7 +62,7 @@ export function RightSidebarHeader({
 			className='native-toolbar right-sidebar-header flex h-12 w-full shrink-0 items-center gap-3 border-border border-b px-3'
 			data-pr-tone={headerState.tone}
 		>
-			<div className='flex min-w-0 flex-1 items-center gap-2.5'>
+			<div className='@container/pr-header flex min-w-0 flex-1 items-center gap-2.5'>
 				{hasPullRequestNumber ? (
 					<RightSidebarHeaderPullRequestLinks headerState={headerState} />
 				) : null}
@@ -79,7 +87,13 @@ export function RightSidebarHeader({
 	);
 }
 
-/** Compact PR controls shown in the main toolbar when the review sidebar is collapsed. */
+/**
+ * Compact PR controls shown in the main toolbar when the review sidebar is
+ * collapsed. This row is deliberately not a `pr-header` container: the toolbar
+ * sizes it from its own contents, so making it one would collapse it to zero
+ * width. The preview pill keeps its text label here and the branch name beside
+ * it truncates instead.
+ */
 export function RightSidebarHeaderInlineActions({
 	activeWorkspace,
 }: {

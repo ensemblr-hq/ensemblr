@@ -1,4 +1,8 @@
-export type { ChecksPanelState, ProviderMarkKind } from './checks-panel';
+export type {
+	ChecksGitStatusSection,
+	ChecksPanelState,
+	ProviderMarkKind,
+} from './checks-panel';
 export type {
 	WorkbenchChildMatch,
 	WorkbenchShellRouteState,

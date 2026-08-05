@@ -54,3 +54,48 @@ test('deleting a script reports the remaining list', async () => {
 
 	expect(onChange).toHaveBeenCalledWith([TEST]);
 });
+
+test('reopening the editor discards an abandoned draft', async () => {
+	const user = userEvent.setup();
+	renderWithProviders(
+		<RunScriptsSection onChange={vi.fn()} scripts={[DEV, TEST]} />,
+	);
+
+	await user.click(screen.getByRole('button', { name: 'Edit dev' }));
+	await user.clear(screen.getByLabelText('Name'));
+	await user.type(screen.getByLabelText('Name'), 'scratch');
+	await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+	await user.click(screen.getByRole('button', { name: 'Edit dev' }));
+
+	expect(screen.getByLabelText('Name')).toHaveValue('dev');
+	expect(screen.getByLabelText('Command')).toHaveValue('npm run dev');
+});
+
+test('editing a different script reseeds the editor from that script', async () => {
+	const user = userEvent.setup();
+	renderWithProviders(
+		<RunScriptsSection onChange={vi.fn()} scripts={[DEV, TEST]} />,
+	);
+
+	await user.click(screen.getByRole('button', { name: 'Edit dev' }));
+	await user.click(screen.getByRole('button', { name: 'Cancel' }));
+	await user.click(screen.getByRole('button', { name: 'Edit test' }));
+
+	expect(screen.getByLabelText('Name')).toHaveValue('test');
+	expect(screen.getByLabelText('Command')).toHaveValue('npm test');
+});
+
+test('adding after an edit starts from a blank draft', async () => {
+	const user = userEvent.setup();
+	renderWithProviders(
+		<RunScriptsSection onChange={vi.fn()} scripts={[DEV, TEST]} />,
+	);
+
+	await user.click(screen.getByRole('button', { name: 'Edit dev' }));
+	await user.click(screen.getByRole('button', { name: 'Cancel' }));
+	await user.click(screen.getByRole('button', { name: 'Add' }));
+
+	expect(screen.getByLabelText('Name')).toHaveValue('');
+	expect(screen.getByLabelText('Command')).toHaveValue('');
+});

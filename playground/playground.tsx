@@ -6,6 +6,7 @@ import { codeThemeAtom } from '@/renderer/state/preferences';
 
 import { AnswerPreview } from './answer-preview.tsx';
 import { CommentPreviewScene } from './comment-preview.tsx';
+import { ComposerScene } from './composer-preview.tsx';
 import { ConflictsScene } from './conflicts-preview.tsx';
 import { ConversationScrollScene } from './conversation-scroll-preview.tsx';
 import { FilePreviewScene } from './file-preview.tsx';
@@ -92,6 +93,12 @@ const SCENES = [
 		label: 'conflicts',
 		render: () => <ConflictsScene />,
 		source: 'playground/conflicts-preview.tsx',
+	},
+	{
+		id: 'composer',
+		label: 'composer',
+		render: () => <ComposerScene />,
+		source: 'playground/composer-preview.tsx',
 	},
 ] as const;
 
