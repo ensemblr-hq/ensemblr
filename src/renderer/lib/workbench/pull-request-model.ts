@@ -26,6 +26,13 @@ import {
 } from './comment-body';
 import { derivePreviewDeployment } from './preview-deployment';
 
+/**
+ * The one name a conflicting branch goes by. Shared with the sidebar header,
+ * which reports conflicts the local trial merge found before `gh` has caught up,
+ * so both routes to the same fact read identically.
+ */
+export const MERGE_CONFLICTS_LABEL = 'Merge conflicts';
+
 /** Inputs for building the workspace shell PR model: local changes, review rows, and the gh snapshot. */
 interface BuildPullRequestShellModelInput {
 	changeSummary: WorkspaceShellModel['changeSummary'];
@@ -90,6 +97,7 @@ export function buildPullRequestShellModel({
 			: [],
 		detail: deriveDetail({ pullRequest, status, syncError }),
 		gitStatus,
+		isConflicting: pullRequest.mergeable === 'conflicting',
 		label: deriveLabel(pullRequest, status),
 		number: pullRequest.number,
 		...(previewDeployment ? { previewDeployment } : {}),
@@ -289,7 +297,12 @@ function deriveLabel(
 		case 'ready-to-merge':
 			return 'Ready to merge';
 		case 'blocked':
-			return 'Blocked';
+			// `blocked` covers failing checks, requested changes, and conflicts
+			// alike; name the conflict, because it is the one a reviewer resolves
+			// here rather than on GitHub.
+			return pullRequest.mergeable === 'conflicting'
+				? MERGE_CONFLICTS_LABEL
+				: 'Blocked';
 		case 'checking':
 			return 'Checks running';
 		default:
@@ -344,6 +357,7 @@ function buildGitStatus(
 	if (changeSummary.files > 0) {
 		return {
 			actionLabel: 'Commit and push',
+			kind: 'uncommitted',
 			label: `${changeSummary.files} uncommitted change${
 				changeSummary.files === 1 ? '' : 's'
 			}`,
@@ -354,6 +368,7 @@ function buildGitStatus(
 	if (branchSync && !branchSync.hasUpstream) {
 		return {
 			actionLabel: 'Push branch',
+			kind: 'unpublished',
 			label: 'Branch not pushed yet',
 			status: 'pending',
 		};
@@ -361,6 +376,7 @@ function buildGitStatus(
 	if (branchSync && branchSync.ahead > 0) {
 		return {
 			actionLabel: 'Push',
+			kind: 'unpushed',
 			label: `${branchSync.ahead} unpushed commit${
 				branchSync.ahead === 1 ? '' : 's'
 			}`,
@@ -368,6 +384,7 @@ function buildGitStatus(
 		};
 	}
 	return {
+		kind: 'clean',
 		label: 'Up to date with remote',
 		status: 'open',
 	};

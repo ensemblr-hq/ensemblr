@@ -6,8 +6,10 @@ import { codeThemeAtom } from '@/renderer/state/preferences';
 
 import { AnswerPreview } from './answer-preview.tsx';
 import { CommentPreviewScene } from './comment-preview.tsx';
+import { ConflictsScene } from './conflicts-preview.tsx';
 import { ConversationScrollScene } from './conversation-scroll-preview.tsx';
 import { FilePreviewScene } from './file-preview.tsx';
+import { RightSidebarHeaderScene } from './right-sidebar-header-preview.tsx';
 import { StartingStatePreview } from './starting-state-preview.tsx';
 import { TabScrollerScene } from './tab-scroller-preview.tsx';
 import { TimelinePreview } from './timeline-preview.tsx';
@@ -79,6 +81,18 @@ const SCENES = [
 		render: () => <StartingStatePreview />,
 		source: 'playground/starting-state-preview.tsx',
 	},
+	{
+		id: 'pr-header',
+		label: 'pr header',
+		render: () => <RightSidebarHeaderScene />,
+		source: 'playground/right-sidebar-header-preview.tsx',
+	},
+	{
+		id: 'conflicts',
+		label: 'conflicts',
+		render: () => <ConflictsScene />,
+		source: 'playground/conflicts-preview.tsx',
+	},
 ] as const;
 
 const THEMES = ['light', 'dark'] as const;
@@ -122,48 +136,20 @@ export function Playground() {
 
 	return (
 		<div className='flex h-screen w-screen flex-col overflow-hidden bg-canvas text-foreground'>
-			<header className='flex shrink-0 items-center gap-4 border-border border-b bg-toolbar px-4 py-2'>
-				<span className='truncate font-mono text-muted-foreground text-xs'>
-					{scene.source}
-				</span>
-				<div className='ml-auto flex items-center gap-2'>
-					{SCENES.map((option) => (
-						<ToolbarToggle
-							isActive={option.id === sceneId}
-							key={option.id}
-							label={option.label}
-							onClick={() => setSceneId(option.id)}
-						/>
-					))}
-					{CODE_THEMES.map((option) => (
-						<ToolbarToggle
-							isActive={option === codeTheme}
-							key={option}
-							label={option.replace(/-.*$/, '')}
-							onClick={() => {
-								setCodeThemeLabel(option);
-								setCodeTheme(option);
-							}}
-						/>
-					))}
-					{CANVAS_WIDTHS.map((option) => (
-						<ToolbarToggle
-							isActive={option.id === width}
-							key={option.id}
-							label={option.label}
-							onClick={() => setWidth(option.id)}
-						/>
-					))}
-					{THEMES.map((candidate) => (
-						<ToolbarToggle
-							isActive={candidate === theme}
-							key={candidate}
-							label={candidate}
-							onClick={() => setTheme(candidate)}
-						/>
-					))}
-				</div>
-			</header>
+			<PlaygroundToolbar
+				codeTheme={codeTheme}
+				onCodeThemeChange={(option) => {
+					setCodeThemeLabel(option);
+					setCodeTheme(option);
+				}}
+				onSceneChange={setSceneId}
+				onThemeChange={setTheme}
+				onWidthChange={setWidth}
+				sceneId={sceneId}
+				source={scene.source}
+				theme={theme}
+				width={width}
+			/>
 
 			<div className='flex min-h-0 flex-1 justify-center overflow-hidden bg-canvas'>
 				<div
@@ -175,6 +161,108 @@ export function Playground() {
 					{scene.render()}
 				</div>
 			</div>
+		</div>
+	);
+}
+
+/**
+ * Playground chrome: the scene picker on its own row, then the active scene's
+ * source path beside the canvas controls. The scene list grows with the app, so
+ * it gets the full width and the canvas controls are labelled — one flat run of
+ * pills stopped fitting and stopped being readable.
+ */
+function PlaygroundToolbar({
+	codeTheme,
+	onCodeThemeChange,
+	onSceneChange,
+	onThemeChange,
+	onWidthChange,
+	sceneId,
+	source,
+	theme,
+	width,
+}: {
+	codeTheme: (typeof CODE_THEMES)[number];
+	onCodeThemeChange: (option: (typeof CODE_THEMES)[number]) => void;
+	onSceneChange: (id: (typeof SCENES)[number]['id']) => void;
+	onThemeChange: (theme: PlaygroundTheme) => void;
+	onWidthChange: (id: (typeof CANVAS_WIDTHS)[number]['id']) => void;
+	sceneId: (typeof SCENES)[number]['id'];
+	source: string;
+	theme: PlaygroundTheme;
+	width: (typeof CANVAS_WIDTHS)[number]['id'];
+}) {
+	return (
+		<header className='flex shrink-0 flex-col gap-2 border-border border-b bg-toolbar px-4 py-2'>
+			<div className='flex flex-wrap items-center gap-1'>
+				{SCENES.map((option) => (
+					<ToolbarToggle
+						isActive={option.id === sceneId}
+						key={option.id}
+						label={option.label}
+						onClick={() => onSceneChange(option.id)}
+					/>
+				))}
+			</div>
+			<div className='flex flex-wrap items-center gap-x-4 gap-y-1.5'>
+				<span className='truncate font-mono text-muted-foreground text-xxs'>
+					{source}
+				</span>
+				<div className='ml-auto flex flex-wrap items-center gap-x-4 gap-y-1.5'>
+					<ToolbarGroup label='code'>
+						{CODE_THEMES.map((option) => (
+							<ToolbarToggle
+								isActive={option === codeTheme}
+								key={option}
+								label={option.replace(/-.*$/, '')}
+								onClick={() => onCodeThemeChange(option)}
+							/>
+						))}
+					</ToolbarGroup>
+					<ToolbarGroup label='width'>
+						{CANVAS_WIDTHS.map((option) => (
+							<ToolbarToggle
+								isActive={option.id === width}
+								key={option.id}
+								label={option.label}
+								onClick={() => onWidthChange(option.id)}
+							/>
+						))}
+					</ToolbarGroup>
+					<ToolbarGroup label='theme'>
+						{THEMES.map((candidate) => (
+							<ToolbarToggle
+								isActive={candidate === theme}
+								key={candidate}
+								label={candidate}
+								onClick={() => onThemeChange(candidate)}
+							/>
+						))}
+					</ToolbarGroup>
+				</div>
+			</div>
+		</header>
+	);
+}
+
+/**
+ * Names one cluster of canvas toggles. The scene list grows with the app, so the
+ * canvas controls carry their own labels rather than being told apart by
+ * position in a single undifferentiated run of pills.
+ */
+function ToolbarGroup({
+	children,
+	label,
+}: {
+	children: React.ReactNode;
+	label: string;
+}) {
+	return (
+		<div className='flex items-center gap-1'>
+			<span className='font-mono text-muted-foreground text-xxs uppercase tracking-wide'>
+				{label}
+			</span>
+			{children}
 		</div>
 	);
 }

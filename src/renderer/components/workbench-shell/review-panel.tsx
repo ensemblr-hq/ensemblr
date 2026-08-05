@@ -14,6 +14,7 @@ import { Button } from '@/renderer/components/ui/button';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
+import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-conflicts';
 import { cn } from '@/renderer/lib/utils';
 import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
 import {
@@ -121,6 +122,8 @@ export function ReviewPanel({
 	// Query dedupes it; when source is the default "all" + a known base it also
 	// matches `scope` below, adding no extra git read.
 	const canReview = useReviewableChanges(workspace);
+
+	const { paths: conflictPaths } = useWorkspaceConflicts(workspace);
 
 	// Source-aware status drives both the tab count and the file list. The
 	// working-tree scope reuses the live model's query (same key), so only the
@@ -276,6 +279,7 @@ export function ReviewPanel({
 			</TabsContent>
 			<TabsContent className='min-h-0 overflow-hidden' value='changes'>
 				<ReviewFileList
+					conflictPaths={conflictPaths}
 					diffScope={scope}
 					discardablePaths={discardablePaths}
 					emptyState={emptyState}

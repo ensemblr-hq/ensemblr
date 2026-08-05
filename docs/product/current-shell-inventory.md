@@ -134,18 +134,30 @@ PR header's create-PR affordance rather than by overloading the row icon.
 ## Right PR Header State Contract
 
 The right PR header derives one render state from `workspace.pullRequest` and
-`workspace.changeSummary`.
+`workspace.changeSummary`, plus the live agent-busy flag the review-actions
+context publishes.
 
 | State | Model condition | Header label | Left affordance | Right action | Tone |
 | --- | --- | --- | --- | --- | --- |
 | Empty | No PR number and no changed files | None | None | None | Neutral |
 | Create PR | No PR number and changed files exist | None | None | `Create PR` split button | Neutral |
-| PR working | PR number exists and status is `agent-working` | `Working...` | PR number external/open button | Spinner | Neutral |
+| PR merged | `state === 'merged'` and not user-continued | PR status label | PR number external/open button | Continue + Archive actions | Merged (purple) |
+| PR uncommitted | PR number exists and `gitStatus.kind` is `uncommitted` | `N uncommitted changes` | PR number external/open button | `Commit and push` | Pending |
+| PR unpushed | PR number exists and `gitStatus.kind` is `unpushed` or `unpublished` | `N unpushed commits` | PR number external/open button | `Push` | Pending |
+| PR blocked (conflict) | PR number exists and either conflict source reports one | `Merge conflicts` | PR number external/open button | Overflow/remediation menu | Blocked |
 | PR checking | PR number exists and status is `checking` | PR status label | PR number external/open button | Spinner | Pending |
 | PR blocked | PR number exists and status is `blocked` | PR status label | PR number external/open button | Overflow/remediation menu | Blocked |
 | PR ready | PR number exists and status is `ready-to-merge` | PR status label, usually `Ready to merge` | PR number external/open button | `Merge` | Ready |
-| PR open | PR number exists and status is `idle` or another non-active open state | PR label, PR title, or PR number fallback | PR number external/open button | Overflow menu | Neutral |
-| PR merged | `state === 'merged'` and not user-continued | PR status label | PR number external/open button | Continue + Archive actions | Merged (purple) |
+| PR open | PR number exists and status is `idle` or another non-active open state | PR status label, blank when there is none | PR number external/open button | Overflow menu | Neutral |
+
+The table is in resolution order. Local work the remote does not have outranks
+the PR's own status — a checks verdict against an unpublished tree is stale — but
+never outranks merged, whose git state is no longer actionable from this header.
+A conflict sits between the two; see the Merge Conflict Contract below.
+`Commit and push` hands the chore to the chat agent (`buildCommitAndPushPrompt`
+through `useComposerSubmit`, the same path the Checks panel uses); `Push` is the
+one review chore that skips the agent and calls `pushWorkspaceBranch` directly,
+for commits an agent made but never pushed.
 
 A user "Continue" collapses a merged workspace back to create-pr/empty via
 `continuedMergedPullRequestByWorkspaceAtom` (`layout-atoms.ts`); "Archive" runs the
@@ -155,10 +167,23 @@ Merged tone uses the `--right-sidebar-header-merged` purple. The enum split matt
 drives the working/checks state, while PR `state = 'closed' | 'merged' | 'open'` drives the
 merged state — merged is driven by `state`, not `status`.
 
-`Working...` is reserved for `agent-working`; an idle/open PR must not display
-working affordances. No-PR/no-change workspaces stay visually quiet in this
-header because workspace and agent activity are already represented in the
-sidebar, chat tabs, and timeline.
+### Agent-working overlay
+
+Agent activity is an overlay on the table above, not a row in it. While
+`ReviewActionsValue.isAgentWorking` is true — any Pi session starting/streaming or
+any agent-harness terminal animating, via `useWorkspaceBusy` — the header keeps
+its resolved kind, label, and tone but replaces **every** trailing action with a
+spinner. Nothing is clickable for the length of the turn, because whatever the
+action would commit, merge, or push is about to move under it. The empty state is
+the one shape that changes: a busy no-PR workspace renders the spinner in the
+collapsed toolbar instead of nothing.
+
+`Working...` is the label's fallback, used only when the PR has no status of its
+own to report; a real status message (`2 checks failing`, `Ready to merge`)
+supersedes it. `workspace.pullRequest.status === 'agent-working'` remains a valid
+second input to the same flag. Otherwise no-PR/no-change workspaces stay visually
+quiet in this header, because workspace and agent activity are already represented
+in the sidebar, chat tabs, and timeline.
 
 If `pullRequest.previewDeployment` is present while a PR number exists, render a
 `Preview` external-link button immediately beside the PR number. The v1 data
@@ -188,6 +213,45 @@ Empty checks, comments, descriptions, and todos must render explicit empty text
 instead of blank sections. Check rows should render an external link only when
 the model includes a check URL. Preview deployments should appear in a
 Deployments section as well as beside the PR number in the header.
+
+The panel keeps its evidence body while an agent works, but its git actions
+follow the same freeze as the header: `Update PR`, `Commit and push`, and
+`Create PR` are disabled whenever `ReviewActionsValue.isAgentWorking` is true.
+`Commit and push` is that context's action, not a panel-local one, so both
+surfaces send the identical prompt. Any action row whose handler is absent —
+which happens only outside the review-actions provider — renders disabled rather
+than as a live button that does nothing.
+
+## Merge Conflict Contract
+
+One question — does this branch merge into its base — answers three surfaces, so
+they read from one hook (`useWorkspaceConflicts`) rather than deriving it apiece.
+
+It has two sources, used at different moments:
+
+- **A worktree already mid-merge or mid-rebase.** Git has marked the unmerged
+  files, so those rows are authoritative and the trial merge is suspended;
+  probing a half-merged HEAD would describe a state nobody is in.
+- **Otherwise, a trial merge.** `getWorkspaceMergeConflicts` runs
+  `git merge-tree --write-tree` entirely in the object database — it writes no
+  ref and never touches the working tree — because GitHub's own mergeability
+  signal is one boolean and cannot name files. It fetches the base first, so it
+  polls slowly and its `staleTime` matches that interval: mount and unmount churn
+  across the three readers must not decide how often a workspace hits the
+  network.
+
+An empty result means "clean" only when the probe ran. A probe that failed
+reports `error`, and every surface shows that instead of implying the branch is
+fine.
+
+Where it shows up:
+
+| Surface | Behavior |
+| --- | --- |
+| Right PR header | `hasConflicts` is the trial merge OR'd with GitHub's `mergeable === 'conflicting'`, so either source alone blocks the header. It resolves to `pr-blocked` with the label `Merge conflicts`, below uncommitted/unpushed work — which has to be committed before a conflict can be resolved — and above every checks-derived status, which a conflict makes moot. It applies with no PR too: a `create-pr` header reports conflicts in its label and tone. |
+| Overflow menu | Conflicts swap the `Merge…` entry for `Resolve conflicts` rather than offering both: a failing check or a requested change can still be merged past by someone with the rights to, a conflict cannot. |
+| Checks panel | A `Conflicts` section names every file and offers one `Resolve` action that hands the job to the agent. A failed probe replaces the rows with the reason and withdraws the action. |
+| Changes list | Conflicting paths are restated as `conflicted` row status, so both view modes mark them. The flat list additionally splits into `Conflicts` then `Clean`; the folder tree keeps its structure, since its order is its meaning. |
 
 ## GitHub PR Data Source Contract
 

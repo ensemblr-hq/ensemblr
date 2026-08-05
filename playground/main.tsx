@@ -6,7 +6,9 @@ import { TooltipProvider } from '@/renderer/components/ui/tooltip';
 import '@/renderer/styles/index.css';
 
 import { installPlaygroundBridge } from './bridge.ts';
+import { resolveFixtureMergeConflicts } from './conflicts-fixtures.ts';
 import { Playground } from './playground.tsx';
+import { resolveFixtureGitStatus } from './right-sidebar-header-fixtures.ts';
 
 const rootElement = document.getElementById('root');
 
@@ -14,7 +16,10 @@ if (!rootElement) {
 	throw new Error('Ensemblr playground root element was not found.');
 }
 
-installPlaygroundBridge();
+installPlaygroundBridge({
+	getWorkspaceGitStatus: resolveFixtureGitStatus,
+	getWorkspaceMergeConflicts: resolveFixtureMergeConflicts,
+});
 
 const queryClient = new QueryClient({
 	defaultOptions: {

@@ -1,17 +1,50 @@
+/** Answers one `window.ensemblr` method with a scene-supplied stand-in result. */
+type BridgeHandler = (payload: unknown) => unknown;
+
 /**
- * Stand-in for the preload `window.ensemblr` bridge. Renderer modules throw
- * when it is missing, so the playground installs a permissive no-op instead of
+ * Reads the workspace path out of a bridge request. Handlers receive `unknown`
+ * because the stub bypasses the typed preload surface, so every fixture that
+ * answers a per-workspace call has to narrow the same shape.
+ * @param payload - The request a renderer query passed to the bridge.
+ * @returns The requested workspace path, or an empty string when absent.
+ */
+export function readBridgeWorkspaceCwd(payload: unknown): string {
+	if (typeof payload !== 'object' || payload === null) {
+		return '';
+	}
+	return 'workspaceCwd' in payload ? String(payload.workspaceCwd) : '';
+}
+
+/**
+ * Stand-in for the preload `window.ensemblr` bridge. Renderer modules throw when
+ * it is missing, so the playground installs a permissive no-op instead of
  * hand-maintaining a mock of the whole IPC surface: `subscribe*` calls hand back
  * an unsubscribe function, every other call resolves to `undefined`.
+ *
+ * `handlers` covers the calls a scene actually depends on. React Query rejects
+ * an `undefined` result, so any polled query a scene drives has to answer here
+ * rather than lean on the blanket no-op — seeding the cache is not enough, since
+ * the query's own `refetchInterval` overrides the client's defaults.
+ * @param handlers - Method-name to stand-in result, keyed as on the bridge.
  */
-export function installPlaygroundBridge(): void {
+export function installPlaygroundBridge(
+	handlers: Record<string, BridgeHandler> = {},
+): void {
 	const bridge = new Proxy(
 		{},
 		{
-			get: (_target, property) =>
-				typeof property === 'string' && property.startsWith('subscribe')
-					? () => () => undefined
-					: () => Promise.resolve(undefined),
+			get: (_target, property) => {
+				if (typeof property !== 'string') {
+					return () => Promise.resolve(undefined);
+				}
+				if (property.startsWith('subscribe')) {
+					return () => () => undefined;
+				}
+				const handler = handlers[property];
+				return handler
+					? (payload: unknown) => Promise.resolve(handler(payload))
+					: () => Promise.resolve(undefined);
+			},
 			has: () => true,
 		},
 	);

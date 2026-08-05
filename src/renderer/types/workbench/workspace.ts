@@ -70,7 +70,13 @@ export interface ReviewFileSummary {
 	path: string;
 	/** Previous path when `status` is `renamed`; discarding restores it too. */
 	renamedFrom?: string;
-	status: 'added' | 'deleted' | 'modified' | 'renamed' | 'untracked';
+	status:
+		| 'added'
+		| 'conflicted'
+		| 'deleted'
+		| 'modified'
+		| 'renamed'
+		| 'untracked';
 }
 
 export interface WorkspaceFileSummary {
@@ -186,8 +192,21 @@ export interface PullRequestPreviewDeploymentSummary {
 	url: string;
 }
 
+/**
+ * What the branch is carrying that the remote does not have yet, and therefore
+ * which action publishes it: nothing (`clean`), working-tree edits
+ * (`uncommitted`), commits on a branch with no upstream (`unpublished`), or
+ * commits ahead of an existing upstream (`unpushed`).
+ */
+export type PullRequestGitStatusKind =
+	| 'clean'
+	| 'uncommitted'
+	| 'unpublished'
+	| 'unpushed';
+
 export interface PullRequestGitStatusSummary {
 	actionLabel?: string;
+	kind: PullRequestGitStatusKind;
 	label: string;
 	status: PullRequestCheckStatus | 'open';
 }
@@ -423,6 +442,12 @@ export interface WorkspaceShellModel {
 		description: string[];
 		detail: string;
 		gitStatus: PullRequestGitStatusSummary;
+		/**
+		 * Whether GitHub reports the pull request as conflicting with its base.
+		 * Kept separate from `status`, which folds conflicts in with failing checks
+		 * and requested changes under `blocked`.
+		 */
+		isConflicting?: boolean;
 		label: string;
 		number?: number;
 		previewDeployment?: PullRequestPreviewDeploymentSummary;

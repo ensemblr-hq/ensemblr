@@ -13,6 +13,8 @@ import type { ReviewFileSummary, WorkspaceOpenTarget } from './workspace';
 export interface ReviewActionsValue {
 	/** Archives the merged workspace from the post-merge header action. */
 	archiveMergedWorkspace: () => void;
+	/** Asks the chat agent to stage, commit, and push everything in the worktree. */
+	commitAndPush: () => void;
 	/**
 	 * Branches the workspace onto a `-v<n>` successor of its current branch from
 	 * the post-merge header action, so work continues without the merged pull
@@ -21,10 +23,20 @@ export interface ReviewActionsValue {
 	continueMergedWorkspace: () => void;
 	/** Whether the merged workspace archive action is currently running. */
 	isArchivingMergedWorkspace: boolean;
+	/**
+	 * Whether any agent attached to the workspace is mid-turn. Every review
+	 * surface freezes its actions while this is true, because the agent is about
+	 * to change the state those actions would act on.
+	 */
+	isAgentWorking: boolean;
 	/** Whether the merged workspace continue action is currently running. */
 	isContinuingMergedWorkspace: boolean;
+	/** Whether the direct branch push is currently running. */
+	isPushingBranch: boolean;
 	isRefreshingPullRequest: boolean;
 	openMergeConfirmation: () => void;
+	/** Pushes the branch with git, skipping the agent. */
+	pushBranch: () => void;
 	refreshPullRequest: () => void;
 	/** Inserts the resolved agent-action prompt into the composer (ENS-059). */
 	runAgentAction: (action: AgentActionKind) => void;

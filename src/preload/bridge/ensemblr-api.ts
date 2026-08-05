@@ -151,6 +151,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		getWorkspaceFileDiff: (request) => invoke('getWorkspaceFileDiff', request),
 		getWorkspaceGitStatus: (request) =>
 			invoke('getWorkspaceGitStatus', request),
+		getWorkspaceMergeConflicts: (request) =>
+			invoke('getWorkspaceMergeConflicts', request),
 		githubRepositoryList: (request) => invoke('githubRepositoryList', request),
 		health: () => invoke('health'),
 		importLocalRepository: (request) =>

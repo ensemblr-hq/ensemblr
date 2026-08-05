@@ -125,7 +125,7 @@ test('keeps a failed deployment red under a green header tone', () => {
 	const link = screen.getByRole('link', {
 		name: 'Open Vercel preview deployment',
 	});
-	expect(link.className).toContain('border-status-danger/35');
+	expect(link.className).toContain('border-status-danger/55');
 	expect(link.className).not.toContain('border-status-ok/35');
 });
 
@@ -157,5 +157,6 @@ test('renders the same pill classes as the pull request button for one tone', ()
 		name: 'Open Netlify preview deployment',
 	});
 	expect(previewLink.className).toBe(pullRequestLink.className);
-	expect(previewLink.className).toContain('border-status-danger/35');
+	expect(previewLink.className).toContain('border-status-danger/55');
+	expect(previewLink.className).toContain('dark:border-status-danger');
 });

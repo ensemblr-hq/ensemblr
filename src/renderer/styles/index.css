@@ -368,6 +368,19 @@
 	--color-status-warning: var(--ensemblr-status-warning);
 	--color-status-danger: var(--ensemblr-status-danger);
 	--color-status-merged: oklch(0.72 0.21 304);
+	/*
+	 * The merged-PR header's purple, as utilities rather than arbitrary values.
+	 * The underlying properties are scoped to `[data-pr-tone="merged"]` and cut
+	 * differently per polarity, so — like `--spacing-code-gutter` above —
+	 * `@theme inline` inlines the `var()` reference and each utility resolves
+	 * against the header it lands in. Outside that scope they resolve to nothing,
+	 * which is the intent: nothing else is a merged pull request.
+	 */
+	--color-pr-merged: var(--right-sidebar-header-merged);
+	--color-pr-merged-border: var(--right-sidebar-header-merged-border);
+	--color-pr-merged-foreground: var(--right-sidebar-header-merged-foreground);
+	--color-pr-merged-hover: var(--right-sidebar-header-merged-hover);
+	--color-pr-merged-soft: var(--right-sidebar-header-merged-soft);
 	--color-code: var(--ensemblr-code);
 	--color-code-foreground: var(--ensemblr-code-foreground);
 	--color-code-border: var(--ensemblr-code-border);

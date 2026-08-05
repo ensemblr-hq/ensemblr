@@ -5,6 +5,7 @@ import {
 	DotSquareIcon,
 	MinusSquareIcon,
 	PlusSquareIcon,
+	TriangleAlertIcon,
 	Undo2Icon,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -28,6 +29,7 @@ import { useReviewFileActions } from './review-file-actions-context';
 
 const fileStatusLabel: Record<ReviewFileSummary['status'], string> = {
 	added: 'A',
+	conflicted: 'U',
 	deleted: 'D',
 	modified: 'M',
 	renamed: 'R',
@@ -197,8 +199,9 @@ function ReviewFileStats({ file }: { file: ReviewFileSummary }) {
 
 /**
  * Trailing status square, mirroring the way Conductor marks rows: a plus for new
- * files, a centered dot for in-place edits, a minus for deletions. Purely a
- * status marker — opening the diff is the row's own click.
+ * files, a centered dot for in-place edits, a minus for deletions, and a warning
+ * triangle for a file git could not merge. Purely a status marker — opening the
+ * diff is the row's own click.
  */
 const reviewFileStatusMark: Record<
 	ReviewFileSummary['status'],
@@ -208,6 +211,11 @@ const reviewFileStatusMark: Record<
 		Icon: PlusSquareIcon,
 		className: 'text-muted-foreground',
 		label: 'Added',
+	},
+	conflicted: {
+		Icon: TriangleAlertIcon,
+		className: 'text-status-danger',
+		label: 'Conflicted',
 	},
 	deleted: {
 		Icon: MinusSquareIcon,

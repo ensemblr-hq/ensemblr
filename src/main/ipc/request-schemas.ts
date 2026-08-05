@@ -120,6 +120,7 @@ export {
 	getWorkspaceCommitsRequestSchema,
 	getWorkspaceFileDiffRequestSchema,
 	getWorkspaceGitStatusRequestSchema,
+	getWorkspaceMergeConflictsRequestSchema,
 } from './request-schemas/workspace-git.ts';
 export {
 	parseUpdateRepositoryScriptsRequest,

@@ -10,6 +10,8 @@ import type {
 	GetWorkspaceFileDiffResult,
 	GetWorkspaceGitStatusRequest,
 	GetWorkspaceGitStatusResult,
+	GetWorkspaceMergeConflictsRequest,
+	GetWorkspaceMergeConflictsResult,
 	WorkspaceGitDiffScope,
 	WorkspaceGitFailureCode,
 	WorkspaceGitFileWire,
@@ -17,6 +19,11 @@ import type {
 import type { LocalCommandService } from '../commands/local-command';
 // react-doctor-disable-next-line -- Cross-concern imports use the stable public entrypoint.
 import { resolveWorkspaceCwd } from '../workspace-files/index.ts';
+import {
+	classifyGitFailure,
+	gitFailureMessage,
+} from './workspace-git-failures.ts';
+import { readMergeConflicts } from './workspace-git-merge-conflicts.ts';
 import {
 	parseNameStatus,
 	parseNumstat,
@@ -38,14 +45,6 @@ const DEV_NULL = process.platform === 'win32' ? 'NUL' : '/dev/null';
 const COMMIT_LOG_FORMAT = ['%H', '%h', '%an', '%aI', '%ar', '%s']
 	.join('%x1f')
 	.concat('%x1e');
-/**
- * What git's own exit codes mean, for the rare failure where git exits without
- * writing anything to stderr and the bare number is all we have to show.
- */
-const GIT_EXIT_CODE_REASONS: Record<string, string | undefined> = {
-	128: 'git reported a fatal error (exit code 128) — usually a missing repository, an unreadable working tree, or an unknown revision.',
-	129: 'git rejected its own arguments (exit code 129).',
-};
 
 /** Read-only git service exposing status, diff, commit log, and change-discard operations for a workspace. */
 export interface WorkspaceGitService {
@@ -61,6 +60,9 @@ export interface WorkspaceGitService {
 	getStatus: (
 		request: GetWorkspaceGitStatusRequest,
 	) => Promise<GetWorkspaceGitStatusResult>;
+	getMergeConflicts: (
+		request: GetWorkspaceMergeConflictsRequest,
+	) => Promise<GetWorkspaceMergeConflictsResult>;
 }
 
 /**
@@ -149,6 +151,17 @@ export function createWorkspaceGitService({
 				return getBranchStatus(cwd.cwd, scope.baseRef);
 			}
 			return getWorkingTreeStatus(cwd.cwd);
+		},
+
+		async getMergeConflicts(request) {
+			const cwd = resolveWorkspaceCwd(request.workspaceCwd);
+			if (!cwd.ok) {
+				return {
+					error: { code: 'invalid-cwd', message: cwd.message },
+					paths: [],
+				};
+			}
+			return readMergeConflicts(runGit, cwd.cwd, request.baseRef);
 		},
 
 		async discardChanges(request) {
@@ -744,46 +757,6 @@ function emptyStatusResult(
 		files: [],
 		summary: { additions: 0, deletions: 0, files: 0 },
 	};
-}
-
-/**
- * Best available reason a git invocation failed. Git puts the real cause on
- * stderr ("fatal: not a git repository"), while the spawn layer only knows the
- * exit code, so stderr wins whenever it said anything at all.
- * @param result - Outcome of the failed git invocation.
- * @param fallback - Copy to use when git wrote nothing to stderr.
- * @returns The most specific failure text available.
- */
-function gitFailureMessage(
-	result: {
-		failure?: { exitCode: number | null; message: string };
-		stderr: string;
-	},
-	fallback: string,
-): string {
-	const stderr = result.stderr.trim();
-	if (stderr) {
-		return stderr;
-	}
-	const failure = result.failure;
-	if (!failure) {
-		return fallback;
-	}
-	return GIT_EXIT_CODE_REASONS[String(failure.exitCode)] ?? failure.message;
-}
-
-/** Distinguishes "not a repo" from generic git failures via stderr. */
-function classifyGitFailure(
-	stderr: string,
-): 'command-failed' | 'not-a-git-repo' {
-	const lowered = stderr.toLowerCase();
-	if (
-		lowered.includes('not a git repository') ||
-		lowered.includes('does not have any git working tree')
-	) {
-		return 'not-a-git-repo';
-	}
-	return 'command-failed';
 }
 
 /** Totals additions/deletions across the rows into a status result. */

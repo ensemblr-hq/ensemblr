@@ -216,6 +216,24 @@ export interface DiscardWorkspaceChangesResult {
 	};
 }
 
+/** Request for the paths that would conflict merging a base branch into this one. */
+export interface GetWorkspaceMergeConflictsRequest {
+	/** Base branch to test the merge against, with or without an `origin/` prefix. */
+	baseRef: string;
+	workspaceCwd: string;
+}
+
+/**
+ * Result of a trial merge of `baseRef` into the workspace branch. `paths` is
+ * empty both when the merge is clean and when the trial could not run, so
+ * callers that need to tell those apart read `error`.
+ */
+export interface GetWorkspaceMergeConflictsResult {
+	error?: WorkspaceGitFailure;
+	/** Workspace-relative paths git could not merge automatically. */
+	paths: readonly string[];
+}
+
 /** Workspace git IPC surface — change status rows and unified per-file diffs. */
 export interface WorkspaceGitApi {
 	discardWorkspaceChanges: (
@@ -230,4 +248,7 @@ export interface WorkspaceGitApi {
 	getWorkspaceGitStatus: (
 		request: GetWorkspaceGitStatusRequest,
 	) => Promise<GetWorkspaceGitStatusResult>;
+	getWorkspaceMergeConflicts: (
+		request: GetWorkspaceMergeConflictsRequest,
+	) => Promise<GetWorkspaceMergeConflictsResult>;
 }

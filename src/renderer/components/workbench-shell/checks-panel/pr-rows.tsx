@@ -6,9 +6,11 @@ import {
 	EyeOffIcon,
 	LoaderCircleIcon,
 	MessageSquarePlusIcon,
+	TriangleAlertIcon,
 	XIcon,
 } from 'lucide-react';
 
+import { FilePathLabel } from '@/renderer/components/file-path-label';
 import { Button } from '@/renderer/components/ui/button';
 import { cn } from '@/renderer/lib/utils';
 import { getProviderLabel } from '@/renderer/lib/workbench/provider-label';
@@ -22,10 +24,16 @@ import { ProviderMark } from './provider-mark';
 
 /** Row showing the PR's current git status with optional action button. */
 export function PullRequestStatusRow({
+	disabled = false,
 	hideAction = false,
 	onAction,
 	status,
 }: {
+	/**
+	 * Blocks the action while an agent turn is changing the state it acts on. A
+	 * missing `onAction` blocks it too, so the button is never a live no-op.
+	 */
+	disabled?: boolean;
 	hideAction?: boolean;
 	onAction?: () => void;
 	status: WorkspaceShellModel['pullRequest']['gitStatus'];
@@ -44,6 +52,7 @@ export function PullRequestStatusRow({
 			{status.actionLabel && !hideAction ? (
 				<Button
 					className='h-6 px-1.5 text-xs'
+					disabled={disabled || !onAction}
 					onClick={onAction}
 					size='xs'
 					variant='subtle'
@@ -51,6 +60,23 @@ export function PullRequestStatusRow({
 					{status.actionLabel}
 				</Button>
 			) : null}
+		</div>
+	);
+}
+
+/** Row naming one file that cannot merge cleanly with the base branch. */
+export function PullRequestConflictRow({ path }: { path: string }) {
+	return (
+		<div
+			className='flex min-h-7 min-w-0 items-center gap-2 px-1 font-mono text-xs'
+			data-conflict-path={path}
+		>
+			<TriangleAlertIcon
+				aria-label='Conflicted'
+				className='size-3.5 shrink-0 text-status-danger'
+				role='img'
+			/>
+			<FilePathLabel path={path} />
 		</div>
 	);
 }
@@ -154,10 +180,16 @@ export function PullRequestCheckRow({
 /** Reusable row with leading icon, label/detail text, and trailing action. */
 export function ChecksActionRow({
 	actionLabel,
+	disabled = false,
 	label,
 	onAction,
 }: {
 	actionLabel?: string;
+	/**
+	 * Blocks the action while an agent turn is changing the state it acts on. A
+	 * missing `onAction` blocks it too, so the button is never a live no-op.
+	 */
+	disabled?: boolean;
 	label: string;
 	onAction?: () => void;
 }) {
@@ -173,6 +205,7 @@ export function ChecksActionRow({
 			{actionLabel ? (
 				<Button
 					className='h-6 px-1.5 text-xs'
+					disabled={disabled || !onAction}
 					onClick={onAction}
 					size='xs'
 					variant='ghost'

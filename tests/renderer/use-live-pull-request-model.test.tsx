@@ -23,7 +23,7 @@ const FALLBACK_PULL_REQUEST: WorkspaceShellModel['pullRequest'] = {
 	comments: [],
 	description: [],
 	detail: 'Pull request is open.',
-	gitStatus: { label: 'Up to date with remote', status: 'open' },
+	gitStatus: { kind: 'clean', label: 'Up to date with remote', status: 'open' },
 	label: 'PR #7',
 	number: 7,
 	state: 'open',

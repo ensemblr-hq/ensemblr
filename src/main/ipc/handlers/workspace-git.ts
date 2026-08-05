@@ -5,6 +5,7 @@ import type {
 	GetWorkspaceCommitsResult,
 	GetWorkspaceFileDiffResult,
 	GetWorkspaceGitStatusResult,
+	GetWorkspaceMergeConflictsResult,
 } from '../../../shared/ipc/contracts/workspace-git';
 import type { WorkspaceGitService } from '../../workspace-git';
 import {
@@ -12,6 +13,7 @@ import {
 	getWorkspaceCommitsRequestSchema,
 	getWorkspaceFileDiffRequestSchema,
 	getWorkspaceGitStatusRequestSchema,
+	getWorkspaceMergeConflictsRequestSchema,
 } from '../request-schemas.ts';
 
 /** Registers IPC handlers for workspace git status and per-file diffs. */
@@ -32,6 +34,13 @@ export function registerWorkspaceGitHandlers({
 		(_event, raw: unknown): Promise<GetWorkspaceFileDiffResult> =>
 			workspaceGitService.getFileDiff(
 				getWorkspaceFileDiffRequestSchema.parse(raw),
+			),
+	);
+	ipcMain.handle(
+		IPC_CHANNELS.getWorkspaceMergeConflicts,
+		(_event, raw: unknown): Promise<GetWorkspaceMergeConflictsResult> =>
+			workspaceGitService.getMergeConflicts(
+				getWorkspaceMergeConflictsRequestSchema.parse(raw),
 			),
 	);
 	ipcMain.handle(

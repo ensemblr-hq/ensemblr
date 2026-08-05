@@ -293,7 +293,7 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).not.toContain('Rerun');
 	expect(markup).toContain('#13');
 	expect(markup).toContain('Working...');
-	expect(markup).toContain('Pull request activity in progress');
+	expect(markup).toContain('Agent working');
 	expect(markup).toContain('THE-102 Rework workbench shell');
 	expect(markup).toContain('Add all to chat');
 	// Reworked comment rows expose hover actions; "Hide comment" is unique to the
@@ -507,6 +507,7 @@ test('renders merge-ready pull request state in the right header', () => {
 			detail: 'All required checks passed.',
 			gitStatus: {
 				actionLabel: 'Merge',
+				kind: 'clean',
 				label: 'Ready to merge',
 				status: 'ready',
 			},
@@ -582,6 +583,7 @@ test('renders an open idle pull request without working affordances', () => {
 			description: [],
 			detail: 'Pull request is open.',
 			gitStatus: {
+				kind: 'clean',
 				label: 'Open',
 				status: 'open',
 			},
@@ -643,7 +645,11 @@ test('hides the git status section on a merged or closed pull request', () => {
 			...base,
 			pullRequest: {
 				...base.pullRequest,
-				gitStatus: { label: 'Up to date with remote', status: 'open' },
+				gitStatus: {
+					kind: 'clean',
+					label: 'Up to date with remote',
+					status: 'open',
+				},
 				...(state ? { state } : {}),
 			},
 		};
@@ -668,6 +674,7 @@ test('renders a blocked pull request header with danger state actions', () => {
 		pullRequest: {
 			...getDefaultWorkspace().pullRequest,
 			gitStatus: {
+				kind: 'clean',
 				label: 'Checks failed',
 				status: 'blocked',
 			},
@@ -860,6 +867,7 @@ test('renders no pull request empty state in the checks tab', () => {
 			description: [],
 			detail: 'No pull request yet.',
 			gitStatus: {
+				kind: 'clean',
 				label: 'No PR open',
 				status: 'open',
 			},
@@ -950,7 +958,7 @@ test('renders uncommitted no pull request state in the checks tab', () => {
 	expect(markup).toContain('PR description');
 });
 
-test('renders plain working header fixture without pull request number', () => {
+test('an agent working before a PR exists freezes the header to a spinner', () => {
 	const activeWorkspace = shellFixtureProjects[0].workspaces.find(
 		(workspace: WorkspaceShellModel) => workspace.id === 'normal-right-header',
 	);
@@ -971,8 +979,9 @@ test('renders plain working header fixture without pull request number', () => {
 	);
 
 	expect(markup).toContain('Normal right header');
-	expect(markup).not.toContain('Working...');
-	expect(markup).not.toContain('Pull request activity in progress');
+	expect(markup).toContain('Working...');
+	expect(markup).toContain('Agent working');
+	// No PR means no pills, and the freeze replaces every action it would offer.
 	expect(markup).not.toContain('Create PR');
 	expect(markup).not.toContain('#13');
 	expect(markup).not.toContain('Open pull request menu');

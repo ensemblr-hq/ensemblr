@@ -8,6 +8,7 @@ import {
 	ensemblrQueryKeys,
 	invalidateWorkspaceListViews,
 	mergePullRequest,
+	pushWorkspaceBranch,
 	refreshPullRequestSnapshot,
 } from '@/renderer/api/ensemblr-queries';
 import { useRemoveWorkspaceAction } from '@/renderer/hooks/workbench-shell/use-remove-workspace-action';
@@ -43,8 +44,10 @@ function announceContinueSuccess(
 /**
  * Owns the merge-pull-request mutation, the archive mutation (which runs
  * automatically after a merge when archive-after-merge is enabled and otherwise
- * on demand from the merged-header Archive action), and the continue mutation
- * behind the merged-header Continue action.
+ * on demand from the merged-header Archive action), the continue mutation
+ * behind the merged-header Continue action, and the direct branch push behind
+ * the header's Push action — the one review chore that skips the agent, for
+ * commits an agent made but never pushed.
  * (PR creation is handed to the chat agent — see `CreatePullRequestMenu`.)
  * Callers pass the active workspace and merge-settings snapshot, plus an
  * `onSettled` callback the provider uses to dismiss its active dialog.
@@ -181,9 +184,32 @@ export function useReviewMutations({
 		},
 	});
 
+	const pushBranchMutation = useMutation({
+		mutationFn: async () => {
+			const result = await pushWorkspaceBranch({
+				setUpstream: mergeSettings.setUpstreamOnPush,
+				workspaceCwd,
+			});
+			if (!result.ok) {
+				throw new ReviewActionError(result.error);
+			}
+		},
+		onError: (error) => showReviewActionError('Push failed', error),
+		onSuccess: async () => {
+			toast.success('Branch pushed.');
+			await Promise.all([
+				refreshPullRequestSnapshot({ queryClient, workspaceCwd, workspaceId }),
+				queryClient.invalidateQueries({
+					queryKey: ensemblrQueryKeys.workspaceGitStatus(workspaceCwd),
+				}),
+			]);
+		},
+	});
+
 	return {
 		archiveAfterMergeMutation,
 		continueMergedWorkspaceMutation,
 		mergeMutation,
+		pushBranchMutation,
 	};
 }

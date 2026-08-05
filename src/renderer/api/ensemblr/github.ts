@@ -5,6 +5,8 @@ import type {
 	GetPullRequestSnapshotResult,
 	MergePullRequestRequest,
 	MergePullRequestResult,
+	PushWorkspaceBranchRequest,
+	PushWorkspaceBranchResult,
 } from '@/shared/ipc/contracts/github';
 import type {
 	DeleteReviewCommentRequest,
@@ -244,6 +246,18 @@ export function mergePullRequest(
 	request: MergePullRequestRequest,
 ): Promise<MergePullRequestResult> {
 	return getEnsemblrApi().mergePullRequest(request);
+}
+
+/**
+ * Pushes the workspace branch through the main-process GitHub service, skipping
+ * the agent — the header's Push action for commits the agent left unpushed.
+ * @param request - Workspace path and whether to set the upstream
+ * @returns Outcome of the push attempt
+ */
+export function pushWorkspaceBranch(
+	request: PushWorkspaceBranchRequest,
+): Promise<PushWorkspaceBranchResult> {
+	return getEnsemblrApi().pushWorkspaceBranch(request);
 }
 
 /**

@@ -1,9 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 import { reviewMergeSettingsQuery } from '@/renderer/api/ensemblr-queries';
 import { usePullRequestRefresh } from '@/renderer/hooks/workbench-shell/review-actions/use-pull-request-refresh';
 import { useReviewMutations } from '@/renderer/hooks/workbench-shell/review-actions/use-review-mutations';
+import { useWorkspaceBusy } from '@/renderer/hooks/workspace/use-workspace-busy';
+import { buildCommitAndPushPrompt } from '@/renderer/lib/workbench/checks-pr-prompts';
+import { useComposerSubmit } from '@/renderer/state/composer';
 import type {
 	AgentActionKind,
 	ProjectShellModel,
@@ -30,6 +34,10 @@ const DEFAULT_MERGE_SETTINGS = {
  *
  * Merge never happens on the first click — the confirmation dialog is the only
  * path to `gh pr merge` (ADR 0023).
+ *
+ * Agent activity is read once here and published as `isAgentWorking`: every
+ * review surface — both header variants and the Checks panel — sits under this
+ * provider, so one busy subscription freezes them all in step.
  */
 export function ReviewActionsProvider({
 	activeProject,
@@ -63,27 +71,41 @@ export function ReviewActionsProvider({
 		archiveAfterMergeMutation,
 		continueMergedWorkspaceMutation,
 		mergeMutation,
+		pushBranchMutation,
 	} = useReviewMutations({
 		activeWorkspace,
 		mergeSettings,
 		onSettled: closeDialog,
 	});
+	const isAgentWorking = useWorkspaceBusy(activeWorkspace.id);
+	const submitToComposer = useComposerSubmit();
+	const commitAndPush = useCallback(() => {
+		submitToComposer(buildCommitAndPushPrompt(activeWorkspace));
+		toast.success('Asked the agent to commit and push.');
+	}, [activeWorkspace, submitToComposer]);
 
 	const value = useMemo<ReviewActionsValue>(
 		() => ({
 			archiveMergedWorkspace: () => archiveAfterMergeMutation.mutate(),
+			commitAndPush,
 			continueMergedWorkspace: () => continueMergedWorkspaceMutation.mutate(),
+			isAgentWorking,
 			isArchivingMergedWorkspace: archiveAfterMergeMutation.isPending,
 			isContinuingMergedWorkspace: continueMergedWorkspaceMutation.isPending,
+			isPushingBranch: pushBranchMutation.isPending,
 			isRefreshingPullRequest,
 			openMergeConfirmation: () => setActiveDialog({ kind: 'merge' }),
+			pushBranch: () => pushBranchMutation.mutate(),
 			refreshPullRequest,
 			runAgentAction,
 		}),
 		[
 			archiveAfterMergeMutation,
+			commitAndPush,
 			continueMergedWorkspaceMutation,
+			isAgentWorking,
 			isRefreshingPullRequest,
+			pushBranchMutation,
 			refreshPullRequest,
 			runAgentAction,
 		],

@@ -213,7 +213,11 @@ function mapPresentationPullRequest(
 		checks: [],
 		comments: [],
 		description: [],
-		gitStatus: { label: 'No PR open', status: 'open' as const },
+		gitStatus: {
+			kind: 'clean' as const,
+			label: 'No PR open',
+			status: 'open' as const,
+		},
 		title: '',
 		todos: [],
 	};

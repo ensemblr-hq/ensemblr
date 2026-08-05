@@ -1,22 +1,7 @@
 import { useAtomValue } from 'jotai';
-import {
-	ArchiveIcon,
-	ExternalLinkIcon,
-	FastForwardIcon,
-	GitMergeIcon,
-	LoaderCircleIcon,
-	MoreVerticalIcon,
-	RefreshCwIcon,
-} from 'lucide-react';
 
-import { Button } from '@/renderer/components/ui/button';
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from '@/renderer/components/ui/dropdown-menu';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
+import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-conflicts';
 import { cn } from '@/renderer/lib/utils';
 import { getRightSidebarHeaderState } from '@/renderer/lib/workbench/right-sidebar-header-state';
 import { continuedMergedPullRequestByWorkspaceAtom } from '@/renderer/state/workspace';
@@ -24,14 +9,17 @@ import type {
 	RightSidebarHeaderState,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
-import {
-	classifyPermissionAction,
-	DEFAULT_PERMISSION_MODE,
-	getPermissionBoundaryLabel,
-} from '@/shared/permissions';
 import { useReviewActions } from '../review-actions/review-actions-context';
 import { CreatePullRequestMenu } from './create-pull-request-menu';
+import {
+	CommitAndPushAction,
+	HeaderActivitySpinner,
+	MergePullRequestAction,
+	PushBranchAction,
+} from './header-action-buttons';
+import { MergedHeaderActions } from './merged-header-actions';
 import { PreviewDeploymentButton } from './preview-deployment-button';
+import { PullRequestMenu } from './pull-request-menu';
 import { PullRequestNumberButton } from './pull-request-number-button';
 
 /** Tone values extracted from {@link RightSidebarHeaderState}. */
@@ -47,19 +35,9 @@ const HEADER_LABEL_TONE_CLASSES: Record<HeaderTone, string> = {
 	blocked: 'text-status-danger',
 	neutral: 'text-muted-foreground',
 	pending: 'text-foreground',
-	merged: 'text-[color:var(--right-sidebar-header-merged)]',
+	merged: 'text-pr-merged',
 	ready: 'text-status-ok',
 };
-
-const archiveBoundary = classifyPermissionAction({
-	action: 'workspace-archive-delete',
-	mode: DEFAULT_PERMISSION_MODE,
-});
-const mergeBoundary = classifyPermissionAction({
-	action: 'pull-request-merge',
-	mode: DEFAULT_PERMISSION_MODE,
-});
-const mergeBoundaryLabel = getPermissionBoundaryLabel(mergeBoundary.boundary);
 
 /** Header above the review sidebar — shows PR number, tone, and primary action. */
 export function RightSidebarHeader({
@@ -69,7 +47,7 @@ export function RightSidebarHeader({
 }) {
 	const headerState = useRightSidebarHeaderState(activeWorkspace);
 	const hasPullRequestNumber = 'number' in headerState;
-	const hasHeaderLabel = 'label' in headerState;
+	const headerLabel = 'label' in headerState ? headerState.label : '';
 
 	return (
 		<header
@@ -80,14 +58,14 @@ export function RightSidebarHeader({
 				{hasPullRequestNumber ? (
 					<RightSidebarHeaderPullRequestLinks headerState={headerState} />
 				) : null}
-				{hasHeaderLabel ? (
+				{headerLabel ? (
 					<p
 						className={cn(
 							'min-w-0 truncate font-semibold text-sm leading-none',
 							HEADER_LABEL_TONE_CLASSES[headerState.tone],
 						)}
 					>
-						{headerState.label}
+						{headerLabel}
 					</p>
 				) : null}
 			</div>
@@ -110,7 +88,11 @@ export function RightSidebarHeaderInlineActions({
 	const headerState = useRightSidebarHeaderState(activeWorkspace);
 	const hasPullRequestNumber = 'number' in headerState;
 
-	if (!hasPullRequestNumber && headerState.kind === 'empty') {
+	if (
+		!hasPullRequestNumber &&
+		headerState.kind === 'empty' &&
+		!headerState.isAgentWorking
+	) {
 		return null;
 	}
 
@@ -133,7 +115,9 @@ export function RightSidebarHeaderInlineActions({
 /**
  * Resolves the header state for a workspace, honouring the locally dismissed
  * merged PR so a continued workspace stops showing the merged header before the
- * next `gh` snapshot lands.
+ * next `gh` snapshot lands, the live agent-busy flag the review provider
+ * publishes so the header freezes for the length of an agent turn, and the same
+ * conflict probe the Checks panel and Changes list read so all three agree.
  * @param activeWorkspace - Workspace the header renders for.
  * @returns The resolved header state.
  */
@@ -141,12 +125,16 @@ function useRightSidebarHeaderState(
 	activeWorkspace: WorkspaceShellModel,
 ): RightSidebarHeaderState {
 	const hasBranchChanges = useReviewableChanges(activeWorkspace);
+	const reviewActions = useReviewActions();
+	const { paths: conflictPaths } = useWorkspaceConflicts(activeWorkspace);
 	const continuedMergedPullRequests = useAtomValue(
 		continuedMergedPullRequestByWorkspaceAtom,
 	);
 
 	return getRightSidebarHeaderState(activeWorkspace, hasBranchChanges, {
+		agentBusy: reviewActions?.isAgentWorking === true,
 		continuedPullRequestNumber: continuedMergedPullRequests[activeWorkspace.id],
+		hasConflicts: conflictPaths.size > 0,
 	});
 }
 
@@ -173,7 +161,11 @@ function RightSidebarHeaderPullRequestLinks({
 	);
 }
 
-/** Dispatches the header's trailing action based on the resolved header state. */
+/**
+ * Dispatches the header's trailing action based on the resolved header state.
+ * An agent turn replaces every action with a spinner: whatever the action would
+ * commit, merge, or push is about to move under it.
+ */
 function RightSidebarHeaderAction({
 	activeWorkspace,
 	headerState,
@@ -181,120 +173,32 @@ function RightSidebarHeaderAction({
 	activeWorkspace: WorkspaceShellModel;
 	headerState: RightSidebarHeaderState;
 }) {
-	const reviewActions = useReviewActions();
+	if (headerState.isAgentWorking) {
+		return <HeaderActivitySpinner label='Agent working' />;
+	}
 
 	switch (headerState.kind) {
 		case 'pr-ready':
-			return (
-				<Button
-					className='h-7 rounded-md bg-status-ok px-2.5 text-primary-foreground hover:bg-status-ok/90'
-					data-permission-boundary={mergeBoundary.boundary}
-					onClick={reviewActions?.openMergeConfirmation}
-					size='sm'
-				>
-					<GitMergeIcon data-icon='inline-start' />
-					Merge
-					<span className='sr-only'>{mergeBoundaryLabel}</span>
-				</Button>
-			);
+			return <MergePullRequestAction />;
 		case 'pr-merged':
-			return (
-				<div className='flex items-center gap-1.5'>
-					<Button
-						className='h-8 rounded-lg border-[color:var(--right-sidebar-header-merged-border)] border-dashed bg-background/70 px-2.5 text-[color:var(--right-sidebar-header-merged)] text-sm hover:bg-[var(--right-sidebar-header-merged-soft)] hover:text-[color:var(--right-sidebar-header-merged)] dark:border-[color:var(--right-sidebar-header-merged-border)] dark:bg-background/65 dark:hover:bg-[var(--right-sidebar-header-merged-soft)]'
-						disabled={
-							reviewActions === null ||
-							reviewActions.isArchivingMergedWorkspace ||
-							reviewActions.isContinuingMergedWorkspace
-						}
-						onClick={reviewActions?.continueMergedWorkspace}
-						size='sm'
-						variant='outline'
-					>
-						{reviewActions?.isContinuingMergedWorkspace ? (
-							<LoaderCircleIcon
-								aria-hidden='true'
-								className='animate-spin'
-								data-icon='inline-start'
-							/>
-						) : (
-							<FastForwardIcon aria-hidden='true' data-icon='inline-start' />
-						)}
-						Continue
-					</Button>
-					<Button
-						className='h-8 rounded-lg bg-[var(--right-sidebar-header-merged)] px-2.5 text-[color:var(--right-sidebar-header-merged-foreground)] text-sm hover:bg-[var(--right-sidebar-header-merged-hover)]'
-						data-permission-boundary={archiveBoundary.boundary}
-						disabled={
-							reviewActions === null ||
-							reviewActions.isArchivingMergedWorkspace ||
-							reviewActions.isContinuingMergedWorkspace
-						}
-						onClick={reviewActions?.archiveMergedWorkspace}
-						size='sm'
-					>
-						{reviewActions?.isArchivingMergedWorkspace ? (
-							<LoaderCircleIcon
-								aria-hidden='true'
-								className='animate-spin'
-								data-icon='inline-start'
-							/>
-						) : (
-							<ArchiveIcon aria-hidden='true' data-icon='inline-start' />
-						)}
-						Archive
-					</Button>
-				</div>
-			);
-		case 'pr-working':
+			return <MergedHeaderActions />;
 		case 'pr-checking':
 			return (
-				<output
-					aria-label='Pull request activity in progress'
-					className='grid size-7 place-items-center text-muted-foreground'
-				>
-					<LoaderCircleIcon
-						aria-hidden='true'
-						className='size-4 animate-spin'
-					/>
-				</output>
+				<HeaderActivitySpinner label='Pull request activity in progress' />
 			);
+		case 'pr-uncommitted':
+			return <CommitAndPushAction />;
+		case 'pr-unpushed':
+			return <PushBranchAction />;
 		case 'create-pr':
 			return <CreatePullRequestMenu workspace={activeWorkspace} />;
 		case 'pr-blocked':
 		case 'pr-open':
 			return (
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button size='icon-sm' variant='ghost'>
-							<MoreVerticalIcon />
-							<span className='sr-only'>Open pull request menu</span>
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align='end'>
-						<DropdownMenuItem
-							disabled={reviewActions?.isRefreshingPullRequest}
-							onSelect={() => reviewActions?.refreshPullRequest()}
-						>
-							<RefreshCwIcon aria-hidden='true' />
-							Refresh PR status
-						</DropdownMenuItem>
-						{headerState.url ? (
-							<DropdownMenuItem asChild>
-								<a href={headerState.url} rel='noreferrer' target='_blank'>
-									<ExternalLinkIcon aria-hidden='true' />
-									Open on GitHub
-								</a>
-							</DropdownMenuItem>
-						) : null}
-						<DropdownMenuItem
-							onSelect={() => reviewActions?.openMergeConfirmation()}
-						>
-							<GitMergeIcon aria-hidden='true' />
-							Merge…
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
+				<PullRequestMenu
+					hasConflicts={headerState.hasConflicts}
+					url={headerState.url}
+				/>
 			);
 		case 'empty':
 			return null;

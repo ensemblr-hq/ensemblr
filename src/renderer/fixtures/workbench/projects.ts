@@ -91,6 +91,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					detail: 'The agent is updating this workspace.',
 					gitStatus: {
 						actionLabel: 'Merge',
+						kind: 'clean',
 						label: 'Ready to merge',
 						status: 'ready',
 					},
@@ -202,6 +203,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					],
 					detail: '1 check pending...',
 					gitStatus: {
+						kind: 'clean',
 						label: '1 check pending...',
 						status: 'pending',
 					},
@@ -257,6 +259,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					description: [],
 					detail: 'The agent is working before a PR exists.',
 					gitStatus: {
+						kind: 'clean',
 						label: 'No PR open',
 						status: 'open',
 					},
@@ -312,11 +315,12 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					description: [],
 					detail: 'Local changes are ready for pull request creation.',
 					gitStatus: {
+						kind: 'clean',
 						label: 'No PR open',
 						status: 'open',
 					},
 					label: 'No PR',
-					status: 'agent-working',
+					status: 'idle',
 					title: '',
 					todos: [],
 				},
@@ -397,6 +401,7 @@ export const shellFixtureProjects: ProjectShellModel[] = [
 					detail: 'All required checks passed.',
 					gitStatus: {
 						actionLabel: 'Merge',
+						kind: 'clean',
 						label: 'Ready to merge',
 						status: 'ready',
 					},

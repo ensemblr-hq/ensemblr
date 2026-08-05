@@ -161,6 +161,14 @@ export const ensemblrQueryKeys = {
 			workspaceCwd,
 			scopeKey,
 		] as const,
+	/** Query key for the paths that conflict between a workspace and its base. */
+	workspaceMergeConflicts: (workspaceCwd: string, baseRef = '') =>
+		[
+			...ensemblrQueryKeys.all,
+			'workspace-merge-conflicts',
+			workspaceCwd,
+			baseRef,
+		] as const,
 	/** Query key for the available workspace open targets. */
 	workspaceOpenTargets: () =>
 		[...ensemblrQueryKeys.all, 'workspace-open-targets'] as const,
