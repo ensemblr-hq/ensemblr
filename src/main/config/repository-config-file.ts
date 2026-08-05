@@ -17,6 +17,16 @@ const STARTER_TOML = `# Ensemblr repository settings (committed, shared with you
 # setup = "npm install"
 # run = "npm run dev"
 #
+# Need more than one dev server? "run" also accepts an array of named
+# targets instead of a single string, each start/stop-able on its own:
+# [[scripts.run]]
+# name = "Web"
+# command = "npm run dev:web"
+#
+# [[scripts.run]]
+# name = "API"
+# command = "npm run dev:api"
+#
 # [prompts]
 # review = "Focus on correctness and tests."
 `;
