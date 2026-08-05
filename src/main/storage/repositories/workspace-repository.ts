@@ -247,6 +247,35 @@ export function updateWorkspaceBranchRow({
 		.run(branchName, metadataJson, timestamp, id);
 }
 
+/** Inputs for {@link updateWorkspaceBaseBranchRow}. */
+export interface UpdateWorkspaceBaseBranchRowOptions {
+	baseBranch: string;
+	database: DatabaseSync;
+	id: string;
+	timestamp: string;
+}
+
+/**
+ * Retargets the base a workspace reviews and opens pull requests against,
+ * leaving its own branch and worktree untouched — the fork already happened, so
+ * only the merge-base for diffs, conflicts, and the PR target moves.
+ */
+export function updateWorkspaceBaseBranchRow({
+	baseBranch,
+	database,
+	id,
+	timestamp,
+}: UpdateWorkspaceBaseBranchRowOptions): void {
+	database
+		.prepare(
+			`UPDATE workspaces
+				SET base_branch = ?,
+					updated_at = ?
+				WHERE id = ?`,
+		)
+		.run(baseBranch, timestamp, id);
+}
+
 /** Inputs for {@link stampWorkspaceArchived}. */
 export interface StampWorkspaceArchivedOptions {
 	archivedAt: string;

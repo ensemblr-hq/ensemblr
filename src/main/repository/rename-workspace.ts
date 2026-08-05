@@ -18,6 +18,7 @@ import { withTransaction } from '../storage/tx.ts';
 import { firstLine } from './first-line.ts';
 import { parseMetadata } from './metadata.ts';
 import { toSlug } from './slug.ts';
+import { validateGitRef } from './validate-git-ref.ts';
 import { validateWorkspaceName as validateWorkspaceNameShared } from './workspace-validation.ts';
 /** Public surface of the workspace rename service. */
 export interface RenameWorkspaceService {
@@ -45,7 +46,6 @@ interface SourceWorkspace {
 	slug: string;
 }
 
-const BRANCH_NAME_MAX_LENGTH = 255;
 const GIT_BRANCH_TIMEOUT_MS = 5_000;
 
 /**
@@ -331,21 +331,15 @@ function validateWorkspaceName(name: string): RenameWorkspaceDiagnostic | null {
 
 /** Validates `branchName`, returning a diagnostic when the input is rejected. */
 function validateBranchName(branch: string): RenameWorkspaceDiagnostic | null {
-	if (branch.length > BRANCH_NAME_MAX_LENGTH) {
-		return {
-			code: 'name-invalid',
-			message: 'Branch names must be 255 characters or fewer.',
-			severity: 'error',
-		};
+	const rejection = validateGitRef(branch);
+	if (!rejection) {
+		return null;
 	}
-	if (/\s/.test(branch) || branch.includes('..') || branch.startsWith('-')) {
-		return {
-			code: 'name-invalid',
-			message: 'Branch name contains invalid characters.',
-			severity: 'error',
-		};
-	}
-	return null;
+	return {
+		code: 'name-invalid',
+		message: rejection.message,
+		severity: 'error',
+	};
 }
 
 /** Tests whether another workspace in the same repository already uses `name`. */

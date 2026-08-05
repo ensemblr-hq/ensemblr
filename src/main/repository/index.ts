@@ -115,6 +115,11 @@ export type {
 export { createRenameWorkspaceService } from './rename-workspace.ts';
 export type { RepositorySourcesService } from './repository-sources-service.ts';
 export type {
+	CreateSetWorkspaceBaseBranchServiceOptions,
+	SetWorkspaceBaseBranchService,
+} from './set-workspace-base-branch.ts';
+export { createSetWorkspaceBaseBranchService } from './set-workspace-base-branch.ts';
+export type {
 	CreateUnarchiveWorkspaceServiceOptions,
 	UnarchiveWorkspaceService,
 } from './unarchive-workspace.ts';

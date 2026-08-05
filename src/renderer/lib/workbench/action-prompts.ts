@@ -8,6 +8,7 @@ import {
 	USER_PREFERENCES_TAG,
 } from '@/shared/prompt-scaffolding';
 
+import { bareBranchName } from './branch-ref';
 import { clampReviewContext } from './review-context';
 
 /**
@@ -235,7 +236,8 @@ export function composeActionPrompt({
 			: 'No title was provided; write a clear, accurate one.',
 		PREFIX: branchPrefix,
 		TARGET_BRANCH:
-			workspace.landingSummary?.branchSource.baseBranch ?? 'the base branch',
+			bareBranchName(workspace.landingSummary?.branchSource.baseBranch) ??
+			'the base branch',
 		YOUR_BRANCH: workspace.branchName,
 	});
 

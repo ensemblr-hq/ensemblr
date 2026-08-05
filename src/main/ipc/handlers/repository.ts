@@ -17,6 +17,7 @@ import type {
 	ListAllWorkspacesResult,
 	ListArchivedWorkspacesResult,
 	RenameWorkspaceResult,
+	SetWorkspaceBaseBranchResult,
 	UnarchiveWorkspaceResult,
 } from '../../../shared/ipc/contracts/workspace';
 import type {
@@ -33,6 +34,7 @@ import type {
 	LocalRepositoryRegistrationService,
 	QuickStartProjectService,
 	RenameWorkspaceService,
+	SetWorkspaceBaseBranchService,
 	SharedRootAdoptionService,
 	UnarchiveWorkspaceService,
 } from '../../repository';
@@ -49,6 +51,7 @@ import {
 	parseQuickStartProjectRequest,
 	parseRegisterLocalRepositoryRequest,
 	parseRenameWorkspaceRequest,
+	parseSetWorkspaceBaseBranchRequest,
 	parseUnarchiveWorkspaceRequest,
 } from '../request-schemas.ts';
 import { showDirectorySelectionDialog } from './dialog-helpers.ts';
@@ -68,6 +71,7 @@ interface RepositoryHandlersOptions {
 	localRepositoryRegistrationService: LocalRepositoryRegistrationService;
 	quickStartProjectService: QuickStartProjectService;
 	renameWorkspaceService: RenameWorkspaceService;
+	setWorkspaceBaseBranchService: SetWorkspaceBaseBranchService;
 	sharedRootAdoptionService: SharedRootAdoptionService;
 	unarchiveWorkspaceService: UnarchiveWorkspaceService;
 	withPermissionGate: WithPermissionGate;
@@ -92,6 +96,7 @@ export function registerRepositoryHandlers({
 	localRepositoryRegistrationService,
 	quickStartProjectService,
 	renameWorkspaceService,
+	setWorkspaceBaseBranchService,
 	sharedRootAdoptionService,
 	unarchiveWorkspaceService,
 	withPermissionGate,
@@ -145,6 +150,14 @@ export function registerRepositoryHandlers({
 		IPC_CHANNELS.renameWorkspace,
 		(_event, raw: unknown): Promise<RenameWorkspaceResult> =>
 			renameWorkspaceService.rename(parseRenameWorkspaceRequest(raw)),
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.setWorkspaceBaseBranch,
+		(_event, raw: unknown): Promise<SetWorkspaceBaseBranchResult> =>
+			setWorkspaceBaseBranchService.setBaseBranch(
+				parseSetWorkspaceBaseBranchRequest(raw),
+			),
 	);
 
 	ipcMain.handle(

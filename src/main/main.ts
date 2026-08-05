@@ -95,6 +95,7 @@ import {
 	createLocalRepositoryRegistrationService,
 	createQuickStartProjectService,
 	createRenameWorkspaceService,
+	createSetWorkspaceBaseBranchService,
 	createSharedRootAdoptionService,
 	createUnarchiveWorkspaceService,
 	createWorkspaceService,
@@ -358,6 +359,10 @@ const piAgentClient = createPiAgentClient({
 });
 const sessionSummaryWriter = createSessionSummaryWriter();
 const renameWorkspaceService = createRenameWorkspaceService({
+	databaseService,
+	localCommandService,
+});
+const setWorkspaceBaseBranchService = createSetWorkspaceBaseBranchService({
 	databaseService,
 	localCommandService,
 });
@@ -762,6 +767,7 @@ app.whenReady().then(() => {
 		repositoryConfigService,
 		rootDirectoryService,
 		scriptLifecycleService,
+		setWorkspaceBaseBranchService,
 		setupDiagnosticsService,
 		settingsResolutionService,
 		sharedRootAdoptionService,

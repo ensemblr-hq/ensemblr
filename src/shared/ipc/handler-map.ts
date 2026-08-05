@@ -190,6 +190,8 @@ import type {
 	ListArchivedWorkspacesResult,
 	RenameWorkspaceRequest,
 	RenameWorkspaceResult,
+	SetWorkspaceBaseBranchRequest,
+	SetWorkspaceBaseBranchResult,
 	UnarchiveWorkspaceRequest,
 	UnarchiveWorkspaceResult,
 } from './contracts/workspace';
@@ -498,6 +500,10 @@ export interface IpcHandlerMap {
 	[IPC_CHANNELS.renameWorkspace]: IpcHandlerEntry<
 		RenameWorkspaceRequest,
 		RenameWorkspaceResult
+	>;
+	[IPC_CHANNELS.setWorkspaceBaseBranch]: IpcHandlerEntry<
+		SetWorkspaceBaseBranchRequest,
+		SetWorkspaceBaseBranchResult
 	>;
 	[IPC_CHANNELS.reorderChatTabs]: IpcHandlerEntry<
 		ReorderChatTabsRequest,

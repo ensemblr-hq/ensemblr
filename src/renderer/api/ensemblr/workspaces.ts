@@ -19,6 +19,8 @@ import type {
 	DeleteWorkspaceResult,
 	RenameWorkspaceRequest,
 	RenameWorkspaceResult,
+	SetWorkspaceBaseBranchRequest,
+	SetWorkspaceBaseBranchResult,
 } from '@/shared/ipc/contracts/workspace';
 
 import { getEnsemblrApi } from './query-keys';
@@ -68,6 +70,19 @@ export function renameWorkspace(
 	return profileElectronIpcCall(
 		{ channel: 'ensemblr:rename-workspace', usesDatabase: true },
 		() => getEnsemblrApi().renameWorkspace(request),
+	);
+}
+
+/**
+ * Retargets the branch a workspace reviews and opens pull requests against.
+ * The worktree keeps its fork point; only the merge-base moves.
+ */
+export function setWorkspaceBaseBranch(
+	request: SetWorkspaceBaseBranchRequest,
+): Promise<SetWorkspaceBaseBranchResult> {
+	return profileElectronIpcCall(
+		{ channel: 'ensemblr:set-workspace-base-branch', usesDatabase: true },
+		() => getEnsemblrApi().setWorkspaceBaseBranch(request),
 	);
 }
 
