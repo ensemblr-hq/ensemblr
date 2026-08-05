@@ -81,7 +81,6 @@ export function ComposerSlot({
 						onApprove={plan.approve}
 						onHandoff={plan.handOff}
 						onRefine={plan.refine}
-						title={plan.review.title}
 					/>
 				) : null
 			}

@@ -12,6 +12,11 @@ available_in = ["local"]
 default = true
 icon = "play"
 
+[scripts.run.playground]
+command = "./scripts/with-pinned-node.sh npm run dev:playground"
+available_in = ["local"]
+icon = "palette"
+
 [scripts.run.checks]
 command = "./scripts/with-pinned-node.sh npm run check && ./scripts/with-pinned-node.sh npm run typecheck"
 icon = "list-checks"

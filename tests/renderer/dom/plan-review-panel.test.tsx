@@ -18,7 +18,6 @@ const renderPanel = (
 			onApprove={onApprove}
 			onHandoff={onHandoff}
 			onRefine={onRefine}
-			title='Add Plan Mode'
 			{...props}
 		/>,
 	);
@@ -26,10 +25,14 @@ const renderPanel = (
 };
 
 describe('PlanReviewPanel', () => {
-	it('names the plan', () => {
+	// The plan's own heading is the message right above the composer, so the bar
+	// carries actions only — no title, no prose.
+	it('carries nothing but the actions', () => {
 		renderPanel();
 
-		expect(screen.getByText('Add Plan Mode')).toBeInTheDocument();
+		const panel = screen.getByRole('region', { name: 'Plan review' });
+
+		expect(panel).toHaveTextContent(/^ApproveRefineHand off$/);
 	});
 
 	it('offers exactly the three ways forward', () => {
