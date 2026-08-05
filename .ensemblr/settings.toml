@@ -21,7 +21,7 @@ icon = "test-tube"
 available_in = ["local"]
 
 [scripts.run.playground]
-command = "./scripts/with-pinned-node.sh npm run playground"
+command = "./scripts/with-pinned-node.sh npm run dev:playground"
 icon = "play"
 available_in = ["local"]
 
