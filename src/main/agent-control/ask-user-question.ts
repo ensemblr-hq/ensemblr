@@ -1,8 +1,10 @@
 /**
  * Blocking question channel between an agent and the human. `askUserQuestion`
  * holds the agent's control call open while the renderer shows the questionnaire
- * in the chat tab that asked it, then settles when the user answers, dismisses,
- * the wait runs out, or the session goes away.
+ * in the chat tab that asked it, then settles when the user answers or dismisses
+ * it, the asking turn ends, or the session goes away. There is deliberately no
+ * timeout: a question the user has not got to yet is still a question worth
+ * answering, and the agent has nothing to do until they do.
  */
 import { randomUUID } from 'node:crypto';
 
@@ -26,8 +28,6 @@ interface AskUserQuestionCoordinatorOptions {
 	hasRenderer: () => boolean;
 	/** Overrides request-id minting; defaults to a random UUID. */
 	createRequestId?: () => string;
-	/** Overrides how long a questionnaire may wait unanswered. */
-	timeoutMs?: number;
 }
 
 /** Public surface of the ask coordinator. */
@@ -39,21 +39,24 @@ export interface AskUserQuestionCoordinator {
 	 * ignored, so a late or duplicate reply cannot throw across the IPC boundary.
 	 */
 	settle: (reply: AskUserQuestionReply) => void;
+	/**
+	 * Every questionnaire still waiting on the user, as the broadcasts that first
+	 * announced them. A renderer holds its pending questions in memory only, so a
+	 * window that reloads or opens late replays these to get back in step —
+	 * without them the card is gone while the agent stays blocked.
+	 */
+	openAsks: () => AskUserQuestionBroadcast[];
 }
 
 /** A questionnaire waiting on the user, keyed by its request id. */
 interface PendingAsk {
 	sessionId: string;
 	resolve: (result: AskUserQuestionResult) => void;
-	timer: ReturnType<typeof setTimeout>;
+	/** Detaches the caller's abort listener; a no-op when it had no signal. */
+	dispose: () => void;
+	/** The announcement to replay to a renderer that missed or lost it. */
+	broadcast: AskUserQuestionBroadcast;
 }
-
-/**
- * How long a questionnaire may sit unanswered before the agent is released.
- * Generous: the dialog takes over the composer, so the user has to deal with it
- * to keep chatting — this only catches a chat left alone for the afternoon.
- */
-const ASK_TIMEOUT_MS = 1_800_000;
 
 /** Told to the agent when no window exists to render the questionnaire. */
 const NO_RENDERER_SUMMARY =
@@ -63,14 +66,13 @@ const NO_RENDERER_SUMMARY =
 const CONCURRENT_ASK_SUMMARY =
 	'This conversation already has a question waiting on the user, so this one was not shown. Do not treat this as a decline — wait for the first answer, and ask related questions in a single call.';
 
-/** Told to the agent when the user left the questionnaire unanswered too long. */
-const TIMED_OUT_SUMMARY =
-	'The user did not answer in time and the question was withdrawn. Do not treat this as a decline — proceed on your best judgement, or ask again in your reply.';
+/** Told to the agent when its turn ended before the user answered. */
+const ABANDONED_SUMMARY =
+	'The turn that asked this question ended before the user answered, so the question was taken off screen. Do not treat this as a decline — ask again in your reply.';
 
 /**
  * Creates the ask-user-question coordinator.
- * @param options - Broadcast hooks, renderer availability, id minting, and the
- *   unanswered-question timeout.
+ * @param options - Broadcast hooks, renderer availability, and id minting.
  * @returns The control port plus the settle and release entry points main wires
  *   to IPC and session teardown.
  */
@@ -79,13 +81,12 @@ export function createAskUserQuestionCoordinator({
 	broadcastClosed,
 	hasRenderer,
 	createRequestId = randomUUID,
-	timeoutMs = ASK_TIMEOUT_MS,
 }: AskUserQuestionCoordinatorOptions): AskUserQuestionCoordinator {
 	const pending = new Map<string, PendingAsk>();
 
 	/**
-	 * Removes a pending questionnaire, stops its timer, and tells renderers to
-	 * drop it — including the windows that did not answer it.
+	 * Removes a pending questionnaire, detaches its abort listener, and tells
+	 * renderers to drop it — including the windows that did not answer it.
 	 * @param requestId - Request to withdraw.
 	 * @returns The removed entry, or null when the request was already settled.
 	 */
@@ -94,7 +95,7 @@ export function createAskUserQuestionCoordinator({
 		if (!entry) {
 			return null;
 		}
-		clearTimeout(entry.timer);
+		entry.dispose();
 		pending.delete(requestId);
 		broadcastClosed({ requestId });
 		return entry;
@@ -126,9 +127,11 @@ export function createAskUserQuestionCoordinator({
 	const ask = ({
 		origin,
 		questions,
+		signal,
 	}: {
 		origin: { sessionId: string; workspaceId: string };
 		questions: readonly AskUserQuestionItem[];
+		signal?: AbortSignal;
 	}): Promise<AskUserQuestionResult> => {
 		if (!hasRenderer()) {
 			return unanswered(NO_RENDERER_SUMMARY);
@@ -136,23 +139,32 @@ export function createAskUserQuestionCoordinator({
 		if (isAsking(origin.sessionId)) {
 			return unanswered(CONCURRENT_ASK_SUMMARY);
 		}
+		if (signal?.aborted) {
+			return unanswered(ABANDONED_SUMMARY);
+		}
 		const requestId = createRequestId();
+		const broadcast: AskUserQuestionBroadcast = {
+			piSessionId: origin.sessionId,
+			questions,
+			requestId,
+			workspaceId: origin.workspaceId,
+		};
 		return new Promise<AskUserQuestionResult>((resolve) => {
-			const timer = setTimeout(() => {
+			const onAbort = () => {
 				withdraw(requestId)?.resolve({
 					answers: [],
 					cancelled: true,
-					summary: TIMED_OUT_SUMMARY,
+					summary: ABANDONED_SUMMARY,
 				});
-			}, timeoutMs);
-			timer.unref?.();
-			pending.set(requestId, { resolve, sessionId: origin.sessionId, timer });
-			broadcastAsk({
-				piSessionId: origin.sessionId,
-				questions,
-				requestId,
-				workspaceId: origin.workspaceId,
+			};
+			signal?.addEventListener('abort', onAbort, { once: true });
+			pending.set(requestId, {
+				broadcast,
+				dispose: () => signal?.removeEventListener('abort', onAbort),
+				resolve,
+				sessionId: origin.sessionId,
 			});
+			broadcastAsk(broadcast);
 		});
 	};
 
@@ -172,5 +184,8 @@ export function createAskUserQuestionCoordinator({
 		}
 	};
 
-	return { port: { ask, releaseSession }, settle };
+	const openAsks = (): AskUserQuestionBroadcast[] =>
+		[...pending.values()].map((entry) => entry.broadcast);
+
+	return { openAsks, port: { ask, releaseSession }, settle };
 }

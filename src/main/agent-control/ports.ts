@@ -326,13 +326,15 @@ export interface ConfirmPort {
 /**
  * Puts an agent's questionnaire to the human and resolves once they answer or
  * dismiss it. The call blocks the agent's turn for as long as the dialog is up,
- * which is the point: the agent asked because it cannot proceed without a
- * decision.
+ * with no time limit, which is the point: the agent asked because it cannot
+ * proceed without a decision, and a human is allowed to take their time.
  */
 export interface AskPort {
 	ask: (input: {
 		origin: AgentControlOrigin;
 		questions: readonly AskUserQuestionItem[];
+		/** Withdraws the dialog when the asking turn ends before they answer. */
+		signal?: AbortSignal;
 	}) => Promise<AskUserQuestionResult>;
 	/** Cancels every questionnaire still pending for a session that ended. */
 	releaseSession: (sessionId: string) => void;

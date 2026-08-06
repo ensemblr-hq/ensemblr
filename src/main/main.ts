@@ -707,6 +707,24 @@ const mainWindowStateStore = createMainWindowStateStore({
 });
 
 /**
+ * Opens the workbench window and re-announces any questionnaire still waiting on
+ * the user. A renderer keeps its pending questions in memory only, and an
+ * `askUserQuestion` call has no timeout to fall back on, so a window that
+ * reloads would otherwise lose the card while the agent stayed blocked on it.
+ */
+function openMainWindow(): void {
+	const window = createMainWindow({ windowStateStore: mainWindowStateStore });
+	window.webContents.on('did-finish-load', () => {
+		for (const payload of askUserQuestionCoordinator.openAsks()) {
+			window.webContents.send(
+				IPC_CHANNELS.agentControlAskUserQuestion,
+				payload,
+			);
+		}
+	});
+}
+
+/**
  * Moves personal script settings into each repository's committed
  * `.ensemblr/settings.toml` (ADR 0041). Runs before any window opens so the
  * Scripts screen never reads a half-migrated repository. Fails open: the pass
@@ -809,7 +827,7 @@ app.whenReady().then(() => {
 		workspaceFilesWatcher,
 	});
 	terminalService.recoverStaleSessions();
-	createMainWindow({ windowStateStore: mainWindowStateStore });
+	openMainWindow();
 });
 
 let isShuttingDownAgents = false;
@@ -854,7 +872,7 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
 	if (BrowserWindow.getAllWindows().length === 0) {
-		createMainWindow({ windowStateStore: mainWindowStateStore });
+		openMainWindow();
 	}
 });
 
@@ -877,5 +895,5 @@ app.on('second-instance', (_event, argv, workingDirectory) => {
 		existing.focus();
 		return;
 	}
-	createMainWindow({ windowStateStore: mainWindowStateStore });
+	openMainWindow();
 });

@@ -172,7 +172,7 @@ describe('setName', () => {
 			}),
 		});
 
-		const result = await invoke('setName', { name: 'Agent guess' });
+		const result = await invoke('setName', { title: 'Agent guess' });
 
 		expect(result.ok).toBe(true);
 		if (result.ok) {
@@ -186,7 +186,7 @@ describe('setName', () => {
 	it('fails when the conversation is not active', async () => {
 		const { invoke } = setup({ setName: vi.fn().mockResolvedValue(null) });
 
-		const result = await invoke('setName', { name: 'Whatever' });
+		const result = await invoke('setName', { title: 'Whatever' });
 
 		expect(result.ok).toBe(false);
 		if (!result.ok) {

@@ -78,7 +78,7 @@ Keeping your own tab legible is your job, not the user's, and it is bookkeeping 
  * ceiling, and the cheap probe is what stands between a model and thousands of
  * characters of patch it did not need.
  */
-const REVIEW_INVENTORY = `- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.`;
+const REVIEW_INVENTORY = `- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.`;
 
 /** Everything a root may drive: the whole control surface. */
 const ORCHESTRATOR_INVENTORY = `- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
@@ -87,7 +87,7 @@ const ORCHESTRATOR_INVENTORY = `- Conversations: open a chat tab and start a Pi 
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
 ${REVIEW_INVENTORY}
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
-- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.`;
+- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.`;
 
 /**
  * The narrower surface a spawned child holds. It names only the tools the child
@@ -342,7 +342,7 @@ export const PLAN_MODE_ORCHESTRATOR_AWARENESS = `${PLAN_MODE_HEADLINE}
 You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`). Planning leaves you the half of that surface that reads, asks, and delegates reading:
 
 ${PLAN_MODE_READ_BULLET}
-- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
+- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Delegate reading: spawn a sub-agent to answer a question for you (\`ensemblr_start_conversation\`), block until your children settle (\`ensemblr_wait_for_agents\`), steer one (\`ensemblr_send_follow_up\`), read its report (\`ensemblr_get_last_message\`), close its tab (\`ensemblr_close_tab\`). See the fan-out section below.
 ${planModeInspectBullets(PLAN_MODE_ORCHESTRATOR_LEGIBILITY, PLAN_MODE_ORCHESTRATOR_BOARD)}
 

@@ -9,6 +9,9 @@
  * Loaded via `pi --mode rpc -e <this file>`. Requires `typebox` resolvable at
  * runtime (declared in the sibling package.json).
  */
+import { Buffer } from 'node:buffer';
+import { request as httpRequest } from 'node:http';
+
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { type Static, type TSchema, Type } from 'typebox';
 
@@ -36,9 +39,9 @@ What you can drive:
 - Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
 - Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
-- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.
+- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
-- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
+- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`).
 
 Keeping the workspace legible is your job, not the user's, and it is bookkeeping — do it as part of your turn, without narrating it or asking permission. Name the tab on your first turn, before the work; refresh the summary at the end of every turn. Renaming the workspace and its git branch is the user's to allow, and they can turn it off, so reach for \`ensemblr_set_branch_name\` only when the upkeep reminder asks for it — unprompted it will refuse. The app tracks what is still outstanding and reminds you each turn, so follow the reminder when you see one: naming is one-shot per tab and per workspace, and the summary is what the tab is worth to you tomorrow.
@@ -79,7 +82,7 @@ const SUBAGENT_AWARENESS = `You are running inside Ensemblr, a desktop coding-wo
 
 What you can drive:
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read a terminal's output (\`ensemblr_read_terminal_output\`).
-- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.
+- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's.
 - Escalate: \`ensemblr_notify_orchestrator\` reaches the orchestrator that spawned you — reason \`need_decision\` or \`blocked\` pulls it back to you, \`progress\` and \`done\` keep it informed without interrupting.
 
@@ -125,10 +128,10 @@ const PLAN_MODE_ORCHESTRATOR_AWARENESS = `PLAN MODE IS ON. While it stays on, th
 You are running inside Ensemblr, a desktop coding-workspace app, and you can drive the app itself with the Ensemblr control tools (prefixed \`ensemblr_\`). Planning leaves you the half of that surface that reads, asks, and delegates reading:
 
 - Read the repository: the \`read\` tool, and \`bash\` for read-only commands.
-- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer, and they can type their own answer or dismiss it.
+- Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Delegate reading: spawn a sub-agent to answer a question for you (\`ensemblr_start_conversation\`), block until your children settle (\`ensemblr_wait_for_agents\`), steer one (\`ensemblr_send_follow_up\`), read its report (\`ensemblr_get_last_message\`), close its tab (\`ensemblr_close_tab\`). See the fan-out section below.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
-- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. All three stay available while planning — annotating a diff is planning output, not a change to the repository.
+- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. All three stay available while planning — annotating a diff is planning output, not a change to the repository.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`). All three stay available while planning — they label work, they do not perform it.
 - Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).
 
@@ -179,7 +182,7 @@ You are running inside Ensemblr, a desktop coding-workspace app, and you were sp
 - Read the repository: the \`read\` tool, and \`bash\` for read-only commands.
 - Report to your orchestrator: \`ensemblr_notify_orchestrator\` with reason \`need_decision\` or \`blocked\` pulls it back to you; \`progress\` and \`done\` keep it informed without interrupting.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`); read terminal output (\`ensemblr_read_terminal_output\`). Reads may span every open workspace.
-- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. All three stay available while planning — annotating a diff is planning output, not a change to the repository.
+- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel. All three stay available while planning — annotating a diff is planning output, not a change to the repository.
 - Keep your tab legible: name it (\`ensemblr_set_name\`) and record what the conversation has covered (\`ensemblr_set_summary\`). Both stay available while planning — they label work, they do not perform it. Naming the WORKSPACE and its git branch is not yours: \`ensemblr_set_branch_name\` belongs to the orchestrator that spawned you and is refused here.
 - Board: read your workspace's kanban status (\`ensemblr_get_workspace_status\`). Moving the board is not yours: it describes the whole workspace rather than the question you were handed, so \`ensemblr_set_workspace_status\` is refused here.
 
@@ -299,15 +302,115 @@ function isControlResult(value: unknown): value is ControlResult {
 }
 
 /**
+ * Posts a JSON body to the control server and resolves with its status and raw
+ * body.
+ *
+ * Deliberately not `fetch`: Node's fetch is undici, whose `headersTimeout`
+ * defaults to five minutes. That silently killed every call that blocks on a
+ * human (`askUserQuestion`, any permission confirm) or on a child
+ * (`waitForAgents`), collapsing them into a bare "fetch failed" while the app
+ * kept the dialog on screen and later discarded the answer.
+ * `http.ClientRequest` has no response timeout, so the call lasts exactly as
+ * long as the app holds it.
+ * @param url - Base URL of the app's control server.
+ * @param token - Per-session bearer token the server authenticates against.
+ * @param payload - Serialized request body.
+ * @param signal - Aborts the request when the calling turn ends.
+ * @returns The response status and its body as text.
+ */
+function postControl(
+	url: string,
+	token: string,
+	payload: string,
+	signal: AbortSignal | undefined,
+): Promise<{ status: number; body: string }> {
+	return new Promise((resolve, reject) => {
+		const req = httpRequest(
+			`${url}/invoke`,
+			{
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					// Byte length, not character count: questions and playbooks are
+					// full of em dashes, and a short count truncates the body.
+					'content-length': Buffer.byteLength(payload),
+					authorization: `Bearer ${token}`,
+				},
+				agent: false,
+				signal,
+			},
+			(res) => {
+				const chunks: Buffer[] = [];
+				res.on('data', (chunk: Buffer) => chunks.push(chunk));
+				res.on('error', reject);
+				res.on('end', () =>
+					resolve({
+						status: res.statusCode ?? 0,
+						body: Buffer.concat(chunks).toString('utf8'),
+					}),
+				);
+			},
+		);
+		req.on('error', reject);
+		req.end(payload);
+	});
+}
+
+/**
+ * Parses a response body, yielding undefined rather than throwing.
+ * @param raw - Raw response text.
+ * @returns The parsed value, or undefined when it is not JSON.
+ */
+function parseJson(raw: string): unknown {
+	try {
+		return JSON.parse(raw) as unknown;
+	} catch {
+		return undefined;
+	}
+}
+
+/**
+ * Flattens an error into one line, following `cause`, so a transport failure
+ * names its real reason instead of the opaque wrapper it would otherwise carry.
+ * @param error - The thrown value.
+ * @returns A single-line description.
+ */
+function describeError(error: unknown): string {
+	if (!(error instanceof Error)) {
+		return String(error);
+	}
+	const code = (error as { code?: string }).code;
+	const head = code ? `${code}: ${error.message}` : error.message;
+	const cause = (error as { cause?: unknown }).cause;
+	return cause instanceof Error ? `${head} (${cause.message})` : head;
+}
+
+/**
+ * Narrows Pi's per-call cancellation argument to a real `AbortSignal`. This file
+ * is not typechecked and Pi's API is not resolvable here, so anything else is
+ * dropped rather than handed to `http.request`, which throws on a bad `signal` —
+ * and that would break every control call, not just the cancellable ones.
+ * @param value - Whatever Pi passed in the signal position.
+ * @returns The signal, or undefined when it is not one.
+ */
+function asAbortSignal(value: unknown): AbortSignal | undefined {
+	return typeof AbortSignal !== 'undefined' && value instanceof AbortSignal
+		? value
+		: undefined;
+}
+
+/**
  * Posts a control op to the Ensemblr app and returns its result envelope.
  * @param op - Canonical control op name (e.g. `spawnChatTab`).
  * @param args - Validated tool arguments.
+ * @param signal - Aborts the call when the calling turn ends.
  * @returns The app's `{ ok, data | code, error }` envelope.
  */
 async function invoke(
 	op: string,
 	args: unknown,
 	callerModel: string | undefined,
+	signal?: AbortSignal,
 ): Promise<ControlResult> {
 	if (!CONTROL_URL || !CONTROL_TOKEN) {
 		return {
@@ -317,30 +420,24 @@ async function invoke(
 		};
 	}
 	try {
-		const response = await fetch(`${CONTROL_URL}/invoke`, {
-			method: 'POST',
-			headers: {
-				'content-type': 'application/json',
-				authorization: `Bearer ${CONTROL_TOKEN}`,
-			},
-			body: JSON.stringify({ op, args, callerModel }),
-		});
-		if (!response.ok) {
-			// The app answers 4xx/5xx with the same JSON envelope, so parse the
-			// error body for its reason instead of treating the status alone.
-			const errorBody = await response.json().catch(() => undefined);
-			if (isControlResult(errorBody)) {
-				return errorBody;
-			}
+		const { status, body } = await postControl(
+			CONTROL_URL,
+			CONTROL_TOKEN,
+			JSON.stringify({ op, args, callerModel }),
+			signal,
+		);
+		const parsed = parseJson(body);
+		// The app answers 4xx/5xx with the same JSON envelope, so a well-formed
+		// body carries the real reason whatever the status says.
+		if (isControlResult(parsed)) {
+			return parsed;
+		}
+		if (status < 200 || status > 299) {
 			return {
 				ok: false,
 				code: 'internal',
-				error: `Control channel returned HTTP ${response.status} with an unexpected body.`,
+				error: `Control channel returned HTTP ${status} with an unexpected body.`,
 			};
-		}
-		const body = await response.json().catch(() => undefined);
-		if (isControlResult(body)) {
-			return body;
 		}
 		return {
 			ok: false,
@@ -348,11 +445,7 @@ async function invoke(
 			error: 'Control channel returned an unexpected body.',
 		};
 	} catch (error) {
-		return {
-			ok: false,
-			code: 'internal',
-			error: error instanceof Error ? error.message : String(error),
-		};
+		return { ok: false, code: 'internal', error: describeError(error) };
 	}
 }
 
@@ -465,10 +558,13 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			execute: async (
 				_toolCallId: string,
 				params: Static<TParams>,
-				_signal: unknown,
+				signal: unknown,
 				_onUpdate: unknown,
 				ctx: { model?: { id?: string } },
-			) => toToolResult(await invoke(op, params, callerModelId(ctx))),
+			) =>
+				toToolResult(
+					await invoke(op, params, callerModelId(ctx), asAbortSignal(signal)),
+				),
 		});
 	};
 
@@ -506,8 +602,8 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_set_name',
 		'setName',
-		'Set a short, descriptive name for your own conversation tab so it is easy to identify.',
-		Type.Object({ name: Type.String() }),
+		'Set a short, descriptive title for your own conversation tab so it is easy to identify. The label goes in `title`, the same key ensemblr_start_conversation names a tab with. This is the tab label, not the workspace or branch name — ensemblr_set_branch_name owns that.',
+		Type.Object({ title: Type.String() }),
 	);
 	tool(
 		'ensemblr_set_branch_name',
@@ -710,9 +806,9 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_get_workspace_diff',
 		'getWorkspaceDiff',
-		"Read this workspace's diff — every change on its branch, committed and uncommitted alike, the same set the Changes panel shows. Call it with stat=true FIRST: that returns the changed files with their +/- counts and no patch text, so you can see how big the diff is before you read it. Then read the whole diff, or pass file to read one file's patch on its own — file and stat are alternatives, not a pair. Every read is capped: a full read names what it dropped in omittedFiles for you to re-request by file, and a single file too large to carry is cut at a hunk boundary.",
+		"Read this workspace's diff — every change on its branch, committed and uncommitted alike, the same set the Changes panel shows. Call it with stat=true FIRST: that returns the changed files with their +/- counts and no patch text, so you can see how big the diff is before you read it. Then read the whole diff, or pass filePath to read one file's patch on its own — filePath and stat are alternatives, not a pair. Every read is capped: a full read names what it dropped in omittedFiles for you to re-request by filePath, and a single file too large to carry is cut at a hunk boundary.",
 		Type.Object({
-			file: Type.Optional(
+			filePath: Type.Optional(
 				Type.String({
 					description:
 						"Workspace-relative path of a single file to read whole, e.g. src/main/main.ts. Also how you recover a file listed in a previous read's omittedFiles.",
@@ -729,8 +825,8 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_get_diff_comments',
 		'getDiffComments',
-		"Read the review comments on this workspace's diff — the ones the user left in the Changes panel and the ones agents filed there. Pass file to narrow it to one path. Comments synced from a GitHub pull request are not included.",
-		Type.Object({ file: Type.Optional(Type.String()) }),
+		"Read the review comments on this workspace's diff — the ones the user left in the Changes panel and the ones agents filed there. Pass filePath to narrow it to one path. Comments synced from a GitHub pull request are not included.",
+		Type.Object({ filePath: Type.Optional(Type.String()) }),
 	);
 	tool(
 		'ensemblr_add_diff_comments',
@@ -790,7 +886,7 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_ask_user_question',
 		'askUserQuestion',
-		"Ask the human a multiple-choice question and block until they answer. Use this whenever a decision is genuinely the user's to make — ambiguous requirements, a fork in the approach, a destructive step, or missing context you cannot infer — instead of guessing or stopping to ask in prose. Every question needs 2-6 concrete options; the user can also type a free-text answer or dismiss the dialog. Ask up to 4 related questions at once rather than calling this repeatedly. Do not use it for questions you can answer by reading the codebase.",
+		"Ask the human a multiple-choice question and block until they answer. Use this whenever a decision is genuinely the user's to make — ambiguous requirements, a fork in the approach, a destructive step, or missing context you cannot infer — instead of guessing or stopping to ask in prose. This call has no time limit: it stays open until the user answers or dismisses it, however long that takes, so treat it as a real wait rather than something that comes back on its own. Every question needs 2-6 concrete options; the user can also type a free-text answer or dismiss the dialog. Ask up to 4 related questions at once rather than calling this repeatedly. Do not use it for questions you can answer by reading the codebase.",
 		Type.Object({
 			questions: Type.Array(
 				Type.Object({
@@ -846,11 +942,16 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 			execute: async (
 				_toolCallId: string,
 				params: { title: string; plan: string },
-				_signal: unknown,
+				signal: unknown,
 				_onUpdate: unknown,
 				ctx: { model?: { id?: string }; abort?: () => void },
 			) => {
-				const result = await invoke('exitPlanMode', params, callerModelId(ctx));
+				const result = await invoke(
+					'exitPlanMode',
+					params,
+					callerModelId(ctx),
+					asAbortSignal(signal),
+				);
 				// Ending the turn is the contract, so enforce it rather than trusting
 				// the model to stop on its own. Deferred by a tick so this tool result
 				// is delivered first and the plan stays the last message.

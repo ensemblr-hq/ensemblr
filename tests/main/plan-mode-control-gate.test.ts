@@ -382,7 +382,7 @@ describe('plan mode: getSessionBrief', () => {
 		expect(
 			await invoke(service, 'setSummary', { summary: 'Body.', title: 'Topic' }),
 		).toMatchObject({ ok: true });
-		expect(await invoke(service, 'setName', { name: 'Topic' })).toMatchObject({
+		expect(await invoke(service, 'setName', { title: 'Topic' })).toMatchObject({
 			ok: true,
 		});
 	});

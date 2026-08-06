@@ -3,6 +3,11 @@
  * argument/result types, and the argument validators from here rather than the
  * `agent-control/` implementation files.
  */
+export {
+	AGENT_CONTROL_ARG_ALIASES,
+	CANONICAL_ARG_KEYS,
+	canonicalizeArgs,
+} from './agent-control/arg-naming.ts';
 export { buildAskUserQuestionResult } from './agent-control/ask-user-question.ts';
 export type { AgentControlRole } from './agent-control/awareness.ts';
 export {

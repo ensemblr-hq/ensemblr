@@ -1,6 +1,7 @@
 import { request } from 'node:http';
+import { connect } from 'node:net';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type {
 	AgentControlCommand,
@@ -77,9 +78,10 @@ describe('control server', () => {
 			ok: true,
 			data: { echoed: 'spawnChatTab' },
 		});
-		expect(calls).toEqual([
+		expect(calls).toMatchObject([
 			{ op: 'spawnChatTab', token: 'good', rawArgs: { title: 'hi' } },
 		]);
+		expect(calls[0]?.signal).toBeInstanceOf(AbortSignal);
 	});
 
 	it('relays a service denial as a 403 with the error envelope', async () => {
@@ -160,5 +162,93 @@ describe('control server', () => {
 		});
 		expect(status).toBe(403);
 		expect(calls).toHaveLength(0);
+	});
+
+	it('answers a request it held far longer than its own request timeout', async () => {
+		const holdingService: AgentControlService = {
+			invoke: async (command) => {
+				calls.push(command);
+				await new Promise((resolve) => setTimeout(resolve, 600));
+				return { ok: true, data: { echoed: command.op } };
+			},
+			releaseSession: () => {},
+		};
+		server = await startControlServer(holdingService, {
+			requestTimeoutMs: 200,
+		});
+		const startedAt = Date.now();
+		const response = await post(server.url, 'good', {
+			op: 'askUserQuestion',
+			args: {},
+		});
+		expect(response.status).toBe(200);
+		expect(Date.now() - startedAt).toBeGreaterThanOrEqual(550);
+	});
+
+	// Pins the wiring, not just the value: Node only honours `requestTimeout` off
+	// the constructor options, so assigning it to the server afterwards leaves the
+	// test above passing for the wrong reason.
+	it('still cuts off a caller that stalls part-way through its body', async () => {
+		server = await startControlServer(stubService, { requestTimeoutMs: 150 });
+		const socket = connect(
+			Number(new URL(server.url).port),
+			'127.0.0.1',
+			() => {
+				socket.write(
+					[
+						'POST /invoke HTTP/1.1',
+						'Host: 127.0.0.1',
+						'authorization: Bearer good',
+						'content-type: application/json',
+						'content-length: 200',
+						'',
+						'{"op":"listTabs"',
+					].join('\r\n'),
+				);
+			},
+		);
+		try {
+			const reply = await new Promise<string>((resolve) => {
+				socket.on('data', (chunk: Buffer) =>
+					resolve(chunk.toString().split('\r\n')[0]),
+				);
+				socket.on('close', () => resolve('closed with no reply'));
+				socket.setTimeout(3_000, () => resolve('held open past its timeout'));
+			});
+			expect(reply).toContain('408');
+			expect(calls).toHaveLength(0);
+		} finally {
+			socket.destroy();
+		}
+	});
+
+	it('cancels the op when the caller hangs up before the answer', async () => {
+		let seen: AbortSignal | undefined;
+		const holdingService: AgentControlService = {
+			invoke: async (command) => {
+				calls.push(command);
+				seen = command.signal;
+				await new Promise((resolve) => setTimeout(resolve, 400));
+				return { ok: true, data: { echoed: command.op } };
+			},
+			releaseSession: () => {},
+		};
+		server = await startControlServer(holdingService);
+		const aborter = new AbortController();
+		const inFlight = fetch(`${server.url}/invoke`, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				authorization: 'Bearer good',
+			},
+			body: JSON.stringify({ op: 'askUserQuestion', args: {} }),
+			signal: aborter.signal,
+		});
+		await vi.waitFor(() => expect(seen).toBeDefined());
+		expect(seen?.aborted).toBe(false);
+
+		aborter.abort();
+		await expect(inFlight).rejects.toThrow();
+		await vi.waitFor(() => expect(seen?.aborted).toBe(true));
 	});
 });
