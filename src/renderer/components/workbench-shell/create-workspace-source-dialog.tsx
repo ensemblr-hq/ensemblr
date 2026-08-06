@@ -30,6 +30,7 @@ import { useWorkspaceSourcePicker } from '@/renderer/hooks/workbench-shell/navig
 import {
 	getWorkspaceSourceActions,
 	getWorkspaceSourceKindLabel,
+	openableWorkspaceId,
 	WORKSPACE_SOURCE_KINDS,
 	workspaceSeedFromSourceItem,
 } from '@/renderer/lib/workbench';
@@ -97,14 +98,13 @@ export function CreateWorkspaceSourceDialog({
 	) => {
 		const item = itemsById.get(source.id);
 		if (item) {
-			const openBranch =
-				action.id === 'open' && item.kind === 'branch' ? item.branch : null;
-			if (openBranch?.workspaceId) {
-				onOpenWorkspace?.({ repoId, workspaceId: openBranch.workspaceId });
+			const existingWorkspaceId = openableWorkspaceId(item, action.id);
+			if (existingWorkspaceId) {
+				onOpenWorkspace?.({ repoId, workspaceId: existingWorkspaceId });
 			} else {
 				onCreateWorkspace?.({
 					repoId,
-					seed: workspaceSeedFromSourceItem(item),
+					seed: workspaceSeedFromSourceItem(item, action.id),
 				});
 			}
 		}

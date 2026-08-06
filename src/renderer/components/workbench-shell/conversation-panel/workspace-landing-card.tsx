@@ -1,14 +1,14 @@
 import { FolderIcon, GitBranchIcon } from 'lucide-react';
 
 import { LinkedIssueStatus } from '@/renderer/components/linear/linked-issue-status';
-import { bareBranchName } from '@/renderer/lib/workbench/branch-ref';
 import type { WorkspaceLandingSummary } from '@/renderer/types/workbench';
+import { bareBranchName } from '@/shared/branch-ref';
 
 /**
  * Minimal workspace-landing surface shown when a freshly created workspace
  * has no chat history yet. Three lines:
  *  1. Pill — `You're in a new copy of {repo} called {workspace}`.
- *  2. Branch source — `Branched {branch} from {baseBranch}`.
+ *  2. Branch source — `On {branch}, compared against {baseBranch}`.
  *  3. File copy result — `Created {workspace}` plus workspace file count.
  *
  * Diagnostic state (setup readiness, composer not-ready reasons, setup-script
@@ -47,14 +47,13 @@ export function WorkspaceLandingCard({
 			<p className='flex items-center gap-2 text-muted-foreground text-xs'>
 				<GitBranchIcon aria-hidden='true' className='size-3.5 shrink-0' />
 				<span>
-					Branched{' '}
+					On{' '}
 					<span className='font-mono text-foreground'>
 						{branchSource.branchName}
 					</span>
 					{baseBranch ? (
 						<>
-							{' '}
-							from{' '}
+							, compared against{' '}
 							<span className='font-mono text-foreground'>{baseBranch}</span>
 						</>
 					) : null}

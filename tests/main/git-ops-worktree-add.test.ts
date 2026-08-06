@@ -93,8 +93,8 @@ test('reports a timeout with an actionable message, not the progress preamble', 
 	]);
 
 	const outcome = await runWorktreeAdd({
-		baseBranch: 'main',
 		branchName: 'psoldunov/marianelli',
+		placement: { forkRef: 'main', kind: 'create' },
 		localCommandService: service,
 		repositoryPath: '/repo',
 		workspacePath: '/repo/ws',
@@ -122,8 +122,8 @@ test('surfaces the real fatal line when it follows the progress preamble', async
 	]);
 
 	const outcome = await runWorktreeAdd({
-		baseBranch: 'main',
 		branchName: 'psoldunov/marianelli',
+		placement: { forkRef: 'main', kind: 'create' },
 		localCommandService: service,
 		repositoryPath: '/repo',
 		workspacePath: '/repo/ws',
@@ -148,8 +148,8 @@ test('retries a transient lock-contention failure and succeeds', async () => {
 	]);
 
 	const outcome = await runWorktreeAdd({
-		baseBranch: 'main',
 		branchName: 'x',
+		placement: { forkRef: 'main', kind: 'create' },
 		localCommandService: service,
 		repositoryPath: '/repo',
 		workspacePath: '/repo/ws',
@@ -173,8 +173,8 @@ test('stops after the attempt cap and reports the real lock error', async () => 
 	]);
 
 	const outcome = await runWorktreeAdd({
-		baseBranch: 'main',
 		branchName: 'x',
+		placement: { forkRef: 'main', kind: 'create' },
 		localCommandService: service,
 		repositoryPath: '/repo',
 		workspacePath: '/repo/ws',
@@ -199,8 +199,8 @@ test('does not retry a non-transient failure', async () => {
 	]);
 
 	const outcome = await runWorktreeAdd({
-		baseBranch: 'main',
 		branchName: 'x',
+		placement: { forkRef: 'main', kind: 'create' },
 		localCommandService: service,
 		repositoryPath: '/repo',
 		workspacePath: '/repo/ws',
@@ -220,8 +220,8 @@ test('reports git-missing without retrying', async () => {
 	]);
 
 	const outcome = await runWorktreeAdd({
-		baseBranch: 'main',
 		branchName: 'x',
+		placement: { forkRef: 'main', kind: 'create' },
 		localCommandService: service,
 		repositoryPath: '/repo',
 		workspacePath: '/repo/ws',
@@ -229,4 +229,46 @@ test('reports git-missing without retrying', async () => {
 
 	assert.equal(outcome.status, 'git-missing');
 	assert.equal(countAddCalls(calls), 1);
+});
+
+test('builds one argv per branch placement', async () => {
+	const placements = [
+		{
+			expected: ['worktree', 'add', '-b', 'x', '/repo/ws', 'main'],
+			placement: { forkRef: 'main', kind: 'create' } as const,
+		},
+		{
+			expected: ['worktree', 'add', '/repo/ws', 'x'],
+			placement: { kind: 'checkout' } as const,
+		},
+		{
+			expected: [
+				'worktree',
+				'add',
+				'--track',
+				'-b',
+				'x',
+				'/repo/ws',
+				'origin/x',
+			],
+			placement: { kind: 'track', remoteRef: 'origin/x' } as const,
+		},
+	];
+
+	for (const { expected, placement } of placements) {
+		const { calls, service } = stubService([
+			buildResult({ status: 'success' }),
+		]);
+
+		const outcome = await runWorktreeAdd({
+			branchName: 'x',
+			localCommandService: service,
+			placement,
+			repositoryPath: '/repo',
+			workspacePath: '/repo/ws',
+		});
+
+		assert.equal(outcome.status, 'success');
+		assert.deepEqual(calls[0]?.args, expected);
+	}
 });

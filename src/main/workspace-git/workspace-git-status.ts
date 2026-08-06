@@ -1,6 +1,7 @@
 import { open, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
 
+import { bareBranchName, originQualifiedRef } from '../../shared/branch-ref.ts';
 import type {
 	DiscardWorkspaceChangesRequest,
 	DiscardWorkspaceChangesResult,
@@ -45,6 +46,22 @@ const DEV_NULL = process.platform === 'win32' ? 'NUL' : '/dev/null';
 const COMMIT_LOG_FORMAT = ['%H', '%h', '%an', '%aI', '%ar', '%s']
 	.join('%x1f')
 	.concat('%x1e');
+
+/**
+ * The refs to try as a merge-base, in order: the stored ref first, then its
+ * other shape. A stored `origin/x` falls back to the local `x` (repositories
+ * whose remote is not named `origin`), and a stored bare `x` falls back to
+ * `origin/x` (a target branch the user has never checked out locally).
+ * @param baseRef - The base ref as persisted on the workspace.
+ * @returns Candidate refs, deduplicated and in priority order.
+ */
+function mergeBaseCandidates(baseRef: string): string[] {
+	const alternate =
+		baseRef === bareBranchName(baseRef)
+			? originQualifiedRef(baseRef)
+			: bareBranchName(baseRef);
+	return [...new Set([baseRef, alternate ?? ''].filter(Boolean))];
+}
 
 /** Read-only git service exposing status, diff, commit log, and change-discard operations for a workspace. */
 export interface WorkspaceGitService {
@@ -537,14 +554,26 @@ export function createWorkspaceGitService({
 		return EMPTY_TREE_HASH;
 	}
 
-	/** The merge-base of `baseRef` and HEAD, or `null` when none resolves. */
+	/**
+	 * The merge-base of `baseRef` and HEAD, or `null` when none resolves.
+	 *
+	 * Base refs reach SQLite in both shapes — bare from a repository's probed
+	 * default, `origin/<name>` from a picked branch or pull request — so a ref
+	 * that does not resolve as stored is retried in the other shape. Without
+	 * that, an unresolvable base silently degrades the whole review panel to
+	 * uncommitted changes only, with nothing to tell the user why.
+	 */
 	async function resolveMergeBase(
 		cwd: string,
 		baseRef: string,
 	): Promise<string | null> {
-		const result = await runGit(cwd, ['merge-base', baseRef, 'HEAD']);
-		if (result.status === 'success') {
-			return result.stdout.trim() || null;
+		for (const candidate of mergeBaseCandidates(baseRef)) {
+			const result = await runGit(cwd, ['merge-base', candidate, 'HEAD']);
+			const mergeBase =
+				result.status === 'success' ? result.stdout.trim() : null;
+			if (mergeBase) {
+				return mergeBase;
+			}
 		}
 		return null;
 	}

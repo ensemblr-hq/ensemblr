@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-
-import {
-	bareBranchName,
-	originQualifiedRef,
-} from '@/renderer/lib/workbench/branch-ref';
 import { buildGithubCompareUrl } from '@/renderer/lib/workbench/github-compare-url';
+import { bareBranchName, originQualifiedRef } from '@/shared/branch-ref';
 
 describe('bareBranchName', () => {
 	it('strips the origin qualifier', () => {

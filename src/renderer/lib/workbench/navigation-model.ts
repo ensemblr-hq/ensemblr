@@ -127,9 +127,11 @@ function mapWorkspaceNavigationSnapshot(
 		workspace.slug;
 	const isPendingCreation =
 		workspace.metadata[PENDING_WORKSPACE_CREATION_METADATA_KEY] === true;
+	const adoptedBranch = workspace.metadata.adoptedBranch === true;
 	const presentation = workspace.pullRequest ?? null;
 
 	return {
+		...(adoptedBranch ? { adoptedBranch } : {}),
 		branchName,
 		changeSummary: {
 			additions: 0,
@@ -262,13 +264,13 @@ function mapPresentationStatus(status: WorkspacePrPresentation['status']): {
 	}
 }
 
-/** Renders a short summary of the workspace's source branch. */
+/** Renders a short summary of the branch the workspace is measured against. */
 function getWorkspaceSourceSummary(
 	repository: RepositoryWorkspaceNavigationRepository,
 	workspace: RepositoryWorkspaceNavigationWorkspace,
 ): string {
 	if (workspace.baseBranch) {
-		return `branched from ${workspace.baseBranch}`;
+		return `targets ${workspace.baseBranch}`;
 	}
 
 	if (repository.defaultBranch) {
@@ -383,8 +385,8 @@ function createPlaceholderLandingSummary(
 		? 'linked-issue'
 		: inferPlaceholderLandingKind({ baseBranch, branchName });
 	const branchDetail = baseBranch
-		? `Worktree branched from ${baseBranch}.`
-		: 'Worktree created from repository default branch.';
+		? `Changes are compared against ${baseBranch}.`
+		: 'Changes are compared against the repository default branch.';
 	const headline = linkedIssue
 		? `Workspace created from ${linkedIssue.reference}`
 		: kind === 'cloned-repo'

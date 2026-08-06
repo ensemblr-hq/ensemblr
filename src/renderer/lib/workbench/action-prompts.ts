@@ -3,12 +3,11 @@ import type {
 	AgentActionKind,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
+import { bareBranchName } from '@/shared/branch-ref';
 import {
 	formatAttachedFileBlock,
 	USER_PREFERENCES_TAG,
 } from '@/shared/prompt-scaffolding';
-
-import { bareBranchName } from './branch-ref';
 import { clampReviewContext } from './review-context';
 
 /**

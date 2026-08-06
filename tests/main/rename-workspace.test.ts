@@ -402,6 +402,103 @@ test('requirePlaceholderName renames a placeholder workspace and stamps renamedA
 	assert.equal(typeof metadata.renamedAt, 'string');
 });
 
+test('rename leaves an adopted branch alone and only moves the display name', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, { adoptedBranch: true });
+	const originalBranch = workspace.branchName;
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	const result = await service.rename({
+		name: 'add-dark-mode',
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.name, 'add-dark-mode');
+	// The branch predates the workspace and usually backs a pull request:
+	// renaming it here would orphan that PR.
+	assert.equal(result.workspace?.branchName, originalBranch);
+	assert.equal(branchExists(harness.repositoryPath, 'add-dark-mode'), false);
+	assert.equal(
+		branchExists(harness.repositoryPath, String(originalBranch)),
+		true,
+	);
+});
+
+test('an explicit branch rename on an adopted branch is rejected, not dropped', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, { adoptedBranch: true });
+	const originalBranch = workspace.branchName;
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	const result = await service.rename({
+		branchName: 'renamed-branch',
+		name: 'add-dark-mode',
+		workspaceId: workspace.id,
+	});
+
+	// Reporting success while silently discarding the branch the user typed is
+	// worse than refusing: the dialog would close on a rename that never happened.
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'branch-adopted');
+	assert.match(String(result.diagnostics[0]?.message), /took over/);
+	assert.equal(branchExists(harness.repositoryPath, 'renamed-branch'), false);
+	assert.equal(
+		branchExists(harness.repositoryPath, String(originalBranch)),
+		true,
+	);
+});
+
+test('a branch-only rename on an adopted branch never reports success', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, { adoptedBranch: true });
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	const result = await service.rename({
+		branchName: 'renamed-branch',
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'branch-adopted');
+});
+
+test('re-submitting an adopted workspace’s own branch name is not a rejection', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, { adoptedBranch: true });
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	const result = await service.rename({
+		branchName: String(workspace.branchName),
+		name: 'add-dark-mode',
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.name, 'add-dark-mode');
+	assert.equal(result.workspace?.branchName, workspace.branchName);
+});
+
 test('rename rejects an unknown workspace id', async (t) => {
 	const harness = createHarness(t);
 	const service = createRenameWorkspaceService({

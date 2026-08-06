@@ -6,7 +6,7 @@ import type {
 	LocalCommandResult,
 	LocalCommandService,
 } from '../../src/main/commands/local-command';
-import { ensureBaseRefAvailable } from '../../src/main/repository/create-workspace.ts';
+import { ensureBaseRefAvailable } from '../../src/main/repository/git-ops.ts';
 
 const fixedNow = () => new Date('2026-06-07T12:00:00.000Z');
 

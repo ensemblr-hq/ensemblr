@@ -699,6 +699,20 @@ test('getStatus (real git) branch scope spans commits + uncommitted', async (t) 
 		],
 	);
 
+	// A base stored remote-qualified still resolves against the local branch, so
+	// a repository whose remote is not named `origin` keeps the full branch diff
+	// instead of silently collapsing to uncommitted changes.
+	const qualified = await service.getStatus({
+		scope: { baseRef: `origin/${baseBranch}`, kind: 'branch' },
+		workspaceCwd: dir,
+	});
+	assert.equal(qualified.error, undefined);
+	assert.deepEqual(qualified.files.map((file) => file.path).sort(), [
+		'base.ts',
+		'feat.ts',
+		'untracked.ts',
+	]);
+
 	// An unresolvable base ref degrades to the working-tree (uncommitted) set.
 	const fallback = await service.getStatus({
 		scope: { baseRef: 'no-such-ref', kind: 'branch' },

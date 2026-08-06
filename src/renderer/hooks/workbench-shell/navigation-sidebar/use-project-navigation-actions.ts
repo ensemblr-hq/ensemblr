@@ -90,11 +90,26 @@ function buildCreateWorkspaceRequest({
 	return {
 		...(seed?.baseBranch ? { baseBranch: seed.baseBranch } : {}),
 		...(seed?.branchName ? { branchName: seed.branchName } : {}),
+		...(seed?.branchPlan ? { branchPlan: seed.branchPlan } : {}),
 		...(seed?.linkedIssue ? { linkedIssue: seed.linkedIssue } : {}),
 		name,
 		placeholderName: !seed?.name,
 		repositoryId: projectId,
 	};
+}
+
+/**
+ * The branch the optimistic sidebar row should show before the real snapshot
+ * lands: an adopted branch is already known by name, while a branch about to be
+ * cut is not named until the service allocates the workspace slug.
+ * @param seed - The creation seed, when the workspace came from a source.
+ * @returns The branch name to display, or undefined when it is not known yet.
+ */
+function pendingBranchName(seed?: WorkspaceCreationSeed): string | undefined {
+	if (seed?.branchPlan?.kind === 'adopt') {
+		return seed.branchPlan.branch;
+	}
+	return seed?.branchName;
 }
 
 /** Adds the pending workspace row that makes the sidebar respond immediately. */
@@ -111,7 +126,9 @@ function addPendingWorkspaceToCache({
 			current
 				? addPendingWorkspaceToNavigationSnapshot(current, {
 						...(seed?.baseBranch ? { baseBranch: seed.baseBranch } : {}),
-						...(seed?.branchName ? { branchName: seed.branchName } : {}),
+						...(pendingBranchName(seed)
+							? { branchName: pendingBranchName(seed) }
+							: {}),
 						id,
 						name,
 						repositoryId: projectId,

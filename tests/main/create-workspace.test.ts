@@ -18,12 +18,14 @@ import test, { type TestContext } from 'node:test';
 
 import { createLocalCommandService } from '../../src/main/commands/local-command.ts';
 import { createWorkspaceService } from '../../src/main/repository/create-workspace.ts';
+import { createWorktree } from '../../src/main/repository/worktree-placement.ts';
 import {
 	type EnsemblrDatabaseConnection,
 	type EnsemblrDatabaseService,
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import type { GitSettings } from '../../src/shared/config.ts';
+import { toWorkspaceDisplayName } from '../../src/shared/workspace-name.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
@@ -1086,4 +1088,573 @@ test('an explicit base branch still overrides the live root', async (t) => {
 
 	assert.equal(result.status, 'success');
 	assert.equal(result.workspace?.baseBranch, 'develop');
+});
+
+/** Commits a file on a new branch, then returns the repository to `main`. */
+function commitOnBranch(
+	repositoryPath: string,
+	branchName: string,
+	fileName: string,
+): string {
+	runGit(repositoryPath, ['checkout', '-b', branchName]);
+	writeFileSync(path.join(repositoryPath, fileName), 'branch work\n');
+	runGit(repositoryPath, ['add', '.']);
+	runGit(repositoryPath, ['commit', '-m', `work on ${branchName}`]);
+	const tip = runGit(repositoryPath, ['rev-parse', branchName]);
+	runGit(repositoryPath, ['checkout', 'main']);
+	return tip;
+}
+
+test('adopting a branch checks it out and still diffs against the base branch', async (t) => {
+	const harness = createHarness(t);
+	const featureTip = commitOnBranch(
+		harness.repositoryPath,
+		'feature-x',
+		'feature.txt',
+	);
+	const mainTip = runGit(harness.repositoryPath, ['rev-parse', 'main']);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'feature-x', kind: 'adopt' },
+		name: 'feature-x',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	const { workspace } = result;
+	if (!workspace) {
+		throw new Error('workspace missing');
+	}
+
+	// The adopted branch keeps its own name — no prefix, no slug.
+	assert.equal(workspace.branchName, 'feature-x');
+	assert.equal(workspace.baseBranch, 'main');
+	assert.equal(
+		runGit(workspace.path, ['rev-parse', '--abbrev-ref', 'HEAD']),
+		'feature-x',
+	);
+	assert.equal(runGit(workspace.path, ['rev-parse', 'HEAD']), featureTip);
+	// The review panel diffs from merge-base(base, HEAD). It has to land on
+	// main's tip; landing on the branch itself is what left the panel empty.
+	assert.notEqual(featureTip, mainTip);
+	assert.equal(runGit(workspace.path, ['merge-base', 'main', 'HEAD']), mainTip);
+
+	const row = workspaceRow(harness.databaseService, workspace.id);
+	assert.equal(row?.branch_name, 'feature-x');
+	assert.equal(row?.base_branch, 'main');
+	assert.equal(
+		JSON.parse(String(row?.metadata_json)).adoptedBranch,
+		true,
+		'adoption is recorded so rename never renames the branch',
+	);
+});
+
+test('adopting a branch that exists only on the remote tracks it', async (t) => {
+	const harness = createHarness(t);
+	const remotePath = path.join(harness.rootPath, 'remote.git');
+	const collaboratorPath = path.join(harness.rootPath, 'collaborator');
+	runGit(harness.rootPath, ['init', '--bare', remotePath]);
+	runGit(remotePath, ['symbolic-ref', 'HEAD', 'refs/heads/main']);
+	runGit(harness.repositoryPath, ['remote', 'add', 'origin', remotePath]);
+	runGit(harness.repositoryPath, ['push', '-u', 'origin', 'main']);
+	runGit(harness.rootPath, ['clone', remotePath, collaboratorPath]);
+	runGit(collaboratorPath, ['config', 'user.email', 'test@ensemblr.dev']);
+	runGit(collaboratorPath, ['config', 'user.name', 'Ensemblr Test']);
+	runGit(collaboratorPath, ['checkout', '-b', 'remote-only']);
+	writeFileSync(path.join(collaboratorPath, 'pr.txt'), 'work from the PR\n');
+	runGit(collaboratorPath, ['add', '.']);
+	runGit(collaboratorPath, ['commit', '-m', 'pr work']);
+	runGit(collaboratorPath, ['push', '-u', 'origin', 'remote-only']);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'remote-only', kind: 'adopt' },
+		name: 'remote only',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	const { workspace } = result;
+	if (!workspace) {
+		throw new Error('workspace missing');
+	}
+	assert.equal(workspace.branchName, 'remote-only');
+	assert.equal(
+		runGit(workspace.path, ['rev-parse', '--abbrev-ref', 'HEAD']),
+		'remote-only',
+	);
+	assert.equal(
+		runGit(workspace.path, [
+			'rev-parse',
+			'--abbrev-ref',
+			'remote-only@{upstream}',
+		]),
+		'origin/remote-only',
+	);
+	assert.equal(existsSync(path.join(workspace.path, 'pr.txt')), true);
+});
+
+test('adopting a branch another worktree already holds is refused', async (t) => {
+	const harness = createHarness(t);
+	commitOnBranch(harness.repositoryPath, 'feature-x', 'feature.txt');
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const first = await service.create({
+		branchPlan: { branch: 'feature-x', kind: 'adopt' },
+		name: 'first',
+		repositoryId: harness.repositoryId,
+	});
+	assert.equal(first.status, 'success');
+
+	const second = await service.create({
+		branchPlan: { branch: 'feature-x', kind: 'adopt' },
+		name: 'second',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(second.status, 'failure');
+	assert.equal(second.diagnostics[0]?.code, 'branch-already-checked-out');
+	assert.match(String(second.diagnostics[0]?.message), /already checked out/);
+	assert.equal(
+		runGit(first.workspace?.path ?? harness.repositoryPath, [
+			'rev-parse',
+			'--abbrev-ref',
+			'HEAD',
+		]),
+		'feature-x',
+	);
+});
+
+test('a failed row insert never deletes an adopted branch', async (t) => {
+	const harness = createHarness(t);
+	commitOnBranch(harness.repositoryPath, 'feature-x', 'feature.txt');
+	const database = harness.databaseService.getConnection()
+		?.database as DatabaseSync;
+	database.exec(`
+		CREATE TRIGGER fail_workspace_insert
+		BEFORE INSERT ON workspaces
+		BEGIN
+			SELECT RAISE(ABORT, 'forced workspace insert failure');
+		END;
+	`);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'feature-x', kind: 'adopt' },
+		name: 'adopt-failure',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'workspace-insert-failed');
+	const branches = runGit(harness.repositoryPath, [
+		'branch',
+		'--format=%(refname:short)',
+	]).split(/\r?\n/);
+	assert.equal(
+		branches.includes('feature-x'),
+		true,
+		'rollback must not delete a branch the workspace did not create',
+	);
+});
+
+test('a fork plan cuts a new branch at the fork ref, keeping the base as target', async (t) => {
+	const harness = createHarness(t);
+	const featureTip = commitOnBranch(
+		harness.repositoryPath,
+		'feature-x',
+		'feature.txt',
+	);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { forkRef: 'feature-x', kind: 'create' },
+		name: 'duplicate',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	const { workspace } = result;
+	if (!workspace) {
+		throw new Error('workspace missing');
+	}
+	assert.equal(workspace.branchName, 'duplicate');
+	assert.equal(workspace.baseBranch, 'main');
+	assert.equal(runGit(workspace.path, ['rev-parse', 'HEAD']), featureTip);
+
+	const row = workspaceRow(harness.databaseService, workspace.id);
+	assert.equal(
+		JSON.parse(String(row?.metadata_json)).adoptedBranch,
+		undefined,
+		'a forked branch is this workspace’s own, so rename may still move it',
+	);
+});
+
+test('a fork plan still honors the configured branchFrom as the target', async (t) => {
+	const harness = createHarness(t);
+	runGit(harness.repositoryPath, ['branch', 'develop']);
+	const featureTip = commitOnBranch(
+		harness.repositoryPath,
+		'feature-x',
+		'feature.txt',
+	);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readRepositorySettings: () => ({
+			app: { diagnostics: [], settings: [] },
+			repository: {
+				diagnostics: [],
+				settings: [
+					{
+						candidates: [],
+						key: 'branchFrom',
+						locked: false,
+						source: 'sqlite',
+						value: 'develop',
+					},
+				],
+			},
+		}),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { forkRef: 'feature-x', kind: 'create' },
+		name: 'duplicate',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.baseBranch, 'develop');
+	assert.equal(
+		runGit(result.workspace?.path ?? '', ['rev-parse', 'HEAD']),
+		featureTip,
+	);
+});
+
+// The whole point of adopting is to review the branch's commits; a base that
+// names the adopted branch puts the merge-base on HEAD and empties the panel.
+test('adopting the configured branchFrom retargets instead of self-diffing', async (t) => {
+	const harness = createHarness(t);
+	const developTip = commitOnBranch(
+		harness.repositoryPath,
+		'develop',
+		'develop.txt',
+	);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		readRepositorySettings: () => ({
+			app: { diagnostics: [], settings: [] },
+			repository: {
+				diagnostics: [],
+				settings: [
+					{
+						candidates: [],
+						key: 'branchFrom',
+						locked: false,
+						source: 'sqlite',
+						value: 'develop',
+					},
+				],
+			},
+		}),
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'develop', kind: 'adopt' },
+		name: 'develop',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.branchName, 'develop');
+	assert.equal(result.workspace?.baseBranch, 'main');
+	assert.equal(
+		runGit(result.workspace?.path ?? '', ['rev-parse', 'HEAD']),
+		developTip,
+	);
+	assert.notEqual(
+		runGit(result.workspace?.path ?? '', ['merge-base', 'main', 'HEAD']),
+		developTip,
+	);
+});
+
+test('an explicit base naming the adopted branch retargets too', async (t) => {
+	const harness = createHarness(t);
+	commitOnBranch(harness.repositoryPath, 'feature-x', 'feature.txt');
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		baseBranch: 'origin/feature-x',
+		branchPlan: { branch: 'feature-x', kind: 'adopt' },
+		name: 'feature x',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.branchName, 'feature-x');
+	assert.equal(result.workspace?.baseBranch, 'main');
+});
+
+// `createWorktree` is reached directly here: the service fills the fork point in
+// before it calls, so only the placement boundary can show that a bare `create`
+// plan cuts a branch rather than being read as an adoption and rejected.
+test('a bare create placement cuts at the base instead of hunting a branch', async (t) => {
+	const harness = createHarness(t);
+	const mainTip = runGit(harness.repositoryPath, ['rev-parse', 'main']);
+	const workspacePath = path.join(harness.workspacesPath, 'bare-placement');
+
+	const outcome = await createWorktree({
+		localCommandService: createLocalCommandService(),
+		repositoryPath: harness.repositoryPath,
+		request: {
+			baseBranch: 'main',
+			branchName: 'cut-me',
+			plan: { kind: 'create' },
+			workspacePath,
+		},
+	});
+
+	assert.ok(!('diagnostic' in outcome), 'placement should not be rejected');
+	assert.equal(runGit(workspacePath, ['rev-parse', 'HEAD']), mainTip);
+	assert.equal(
+		runGit(workspacePath, ['rev-parse', '--abbrev-ref', 'HEAD']),
+		'cut-me',
+	);
+});
+
+// A `create` plan carries no fork point until the service fills one in. Reading
+// that absence as an adoption would reject a branch it was asked to cut.
+test('a create plan with no fork ref cuts from the base branch', async (t) => {
+	const harness = createHarness(t);
+	const mainTip = runGit(harness.repositoryPath, ['rev-parse', 'main']);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { kind: 'create' },
+		name: 'bare-create',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.baseBranch, 'main');
+	assert.equal(
+		runGit(result.workspace?.path ?? '', ['rev-parse', 'HEAD']),
+		mainTip,
+	);
+});
+
+test('rejects a branch plan whose ref could smuggle a git option', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'origin/--upload-pack=/tmp/pwned.sh', kind: 'adopt' },
+		name: 'evil',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'branch-name-invalid');
+});
+
+test('adopting a nested branch name does not fail on workspace-name rules', async (t) => {
+	const harness = createHarness(t);
+	commitOnBranch(harness.repositoryPath, 'psoldunov/feature-x', 'feature.txt');
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'psoldunov/feature-x', kind: 'adopt' },
+		// The picker seeds the name from the branch, and a slash is not a legal
+		// workspace-name character, so an unsanitized seed fails with
+		// `name-invalid` before git is ever reached.
+		name: toWorkspaceDisplayName('psoldunov/feature-x') ?? undefined,
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.branchName, 'psoldunov/feature-x');
+	assert.equal(result.workspace?.name, 'psoldunov feature-x');
+});
+
+test('rejects a raw nested branch name so sanitizing stays the caller’s job', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'psoldunov/feature-x',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'name-invalid');
+});
+
+test('names the repository folder, not a workspace, when it holds the branch', async (t) => {
+	const harness = createHarness(t);
+	// `main` is checked out in the repository folder itself, so there is no
+	// workspace to send the user to.
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'main', kind: 'adopt' },
+		name: 'takeover',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'branch-already-checked-out');
+	const message = String(result.diagnostics[0]?.message);
+	assert.match(message, /repository folder/);
+	assert.doesNotMatch(
+		message,
+		/Open that workspace/,
+		'there is no workspace to open when the repository folder holds the branch',
+	);
+});
+
+test('picks another placeholder name when a leftover branch holds the first', async (t) => {
+	const harness = createHarness(t);
+	// A deleted workspace takes its SQLite row with it but leaves the branch, so
+	// the name reads as free while `git worktree add -b` still collides.
+	runGit(harness.repositoryPath, ['branch', 'bach']);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'Bach',
+		placeholderName: true,
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success', JSON.stringify(result.diagnostics));
+	assert.notEqual(result.workspace?.branchName, 'bach');
+	assert.equal(existsSync(String(result.workspace?.path)), true);
+});
+
+test('adopting a branch does not bump the slug over that same branch', async (t) => {
+	const harness = createHarness(t);
+	commitOnBranch(harness.repositoryPath, 'bach', 'feature.txt');
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'bach', kind: 'adopt' },
+		name: 'bach',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	// Adoption checks the branch out rather than cutting it, so the branch it
+	// takes over must not read as a name collision with itself.
+	assert.equal(result.workspace?.slug, 'bach');
+	assert.equal(result.workspace?.branchName, 'bach');
+});
+
+test('repeated placeholder creation keeps succeeding with distinct branches', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const branches: string[] = [];
+	for (let attempt = 0; attempt < 4; attempt += 1) {
+		const result = await service.create({
+			// Every attempt suggests the same surname, as the renderer does when it
+			// picks optimistically without knowing the repository's history.
+			name: 'Bach',
+			placeholderName: true,
+			repositoryId: harness.repositoryId,
+		});
+		assert.equal(
+			result.status,
+			'success',
+			`attempt ${attempt}: ${JSON.stringify(result.diagnostics)}`,
+		);
+		branches.push(String(result.workspace?.branchName));
+	}
+
+	assert.equal(new Set(branches).size, branches.length, branches.join(', '));
 });

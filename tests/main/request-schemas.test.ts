@@ -122,6 +122,51 @@ test('accepts a Linear-provider linked issue and keeps the repository id', () =>
 	expect(parsed.linkedIssue?.teamKey).toBe('THE');
 });
 
+// `parseCreateWorkspaceRequest` copies fields one by one, so a forgotten field
+// is a silent drop rather than a type error — and dropping the branch plan
+// would quietly fork a new branch where the caller asked to adopt one.
+test('carries an adopt branch plan through, trimmed', () => {
+	const parsed = parseCreateWorkspaceRequest({
+		branchPlan: { branch: '  feature-x  ', kind: 'adopt' },
+		repositoryId: 'repo-1',
+	});
+
+	expect(parsed.branchPlan).toEqual({ branch: 'feature-x', kind: 'adopt' });
+});
+
+test('carries a create branch plan with its fork ref through', () => {
+	const parsed = parseCreateWorkspaceRequest({
+		branchPlan: { forkRef: 'origin/feature-x', kind: 'create' },
+		repositoryId: 'repo-1',
+	});
+
+	expect(parsed.branchPlan).toEqual({
+		forkRef: 'origin/feature-x',
+		kind: 'create',
+	});
+});
+
+test('omits the branch plan entirely when the caller sends none', () => {
+	const parsed = parseCreateWorkspaceRequest({ repositoryId: 'repo-1' });
+
+	expect(parsed.branchPlan).toBeUndefined();
+	expect(parsed.repositoryId).toBe('repo-1');
+});
+
+test.each([
+	['an unknown kind', { branchPlan: { branch: 'x', kind: 'borrow' } }],
+	['a blank adopt branch', { branchPlan: { branch: '   ', kind: 'adopt' } }],
+	['a missing adopt branch', { branchPlan: { kind: 'adopt' } }],
+])('rejects a branch plan with %s rather than guessing', (_label, payload) => {
+	const parsed = parseCreateWorkspaceRequest({
+		...payload,
+		repositoryId: 'repo-1',
+	});
+
+	expect(parsed.repositoryId).toBe('');
+	expect(parsed.branchPlan).toBeUndefined();
+});
+
 test('falls back to an empty repository id when the provider is unknown', () => {
 	const parsed = parseCreateWorkspaceRequest({
 		linkedIssue: { ...GITHUB_LINKED_ISSUE, provider: 'jira' },

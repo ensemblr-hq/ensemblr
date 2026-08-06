@@ -9,7 +9,7 @@ import {
 	selectWorkspaceWithRepositoryById,
 	updateWorkspaceBaseBranchRow,
 } from '../storage/repositories/workspace-repository.ts';
-import { ensureBaseRefAvailable } from './create-workspace.ts';
+import { ensureBaseRefAvailable } from './git-ops.ts';
 import { validateGitRef } from './validate-git-ref.ts';
 
 /** Public surface of the workspace base-branch retargeting service. */

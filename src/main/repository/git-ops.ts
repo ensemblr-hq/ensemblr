@@ -112,7 +112,7 @@ export async function syncBaseRef({
 			repositoryPath,
 		})) ??
 		(await readOriginTrackingRef({
-			baseBranch,
+			branch: baseBranch,
 			localCommandService,
 			repositoryPath,
 		}));
@@ -204,31 +204,75 @@ async function advanceLocalBase({
 }
 
 /**
- * Adds a new git worktree at `workspacePath`. When `createBranch` is true
- * (default), uses `-b <branchName>` to create the branch from `baseBranch`;
- * otherwise checks out the existing branch at the worktree path.
+ * How `git worktree add` puts `branchName` into the new worktree: cut it fresh
+ * at a fork point, move an existing local branch across, or create it from a
+ * remote-tracking ref for a branch that only exists on the remote so far.
+ */
+export type WorktreeBranchPlacement =
+	| { forkRef: string; kind: 'create' }
+	| { kind: 'checkout' }
+	| { kind: 'track'; remoteRef: string };
+
+/**
+ * Builds the `git worktree add` argv for a branch placement.
+ * @param options - Branch name, placement, and destination path.
+ * @returns The argument list to pass after `git`.
+ */
+function worktreeAddArgs({
+	branchName,
+	placement,
+	workspacePath,
+}: {
+	branchName: string;
+	placement: WorktreeBranchPlacement;
+	workspacePath: string;
+}): string[] {
+	switch (placement.kind) {
+		case 'checkout':
+			return ['worktree', 'add', workspacePath, branchName];
+		case 'create':
+			return [
+				'worktree',
+				'add',
+				'-b',
+				branchName,
+				workspacePath,
+				placement.forkRef,
+			];
+		case 'track':
+			return [
+				'worktree',
+				'add',
+				'--track',
+				'-b',
+				branchName,
+				workspacePath,
+				placement.remoteRef,
+			];
+	}
+}
+
+/**
+ * Adds a new git worktree at `workspacePath` with `branchName` checked out,
+ * placed according to {@link WorktreeBranchPlacement}.
  *
  * Returns `git-missing` when the git binary is not on PATH so callers can
  * surface an install hint distinct from generic failures.
  */
 export async function runWorktreeAdd({
-	baseBranch,
 	branchName,
-	createBranch = true,
 	localCommandService,
+	placement,
 	repositoryPath,
 	workspacePath,
 }: {
-	baseBranch: string;
 	branchName: string;
-	createBranch?: boolean;
 	localCommandService: LocalCommandService;
+	placement: WorktreeBranchPlacement;
 	repositoryPath: string;
 	workspacePath: string;
 }): Promise<GitWorktreeAddOutcome> {
-	const args = createBranch
-		? ['worktree', 'add', '-b', branchName, workspacePath, baseBranch]
-		: ['worktree', 'add', workspacePath, branchName];
+	const args = worktreeAddArgs({ branchName, placement, workspacePath });
 
 	let lastFailure: GitWorktreeAddOutcome = {
 		status: 'failure',
@@ -500,16 +544,18 @@ async function readUpstreamRef({
 }
 
 /**
- * Falls back to an existing `origin/<base>` tracking ref when no upstream is set.
+ * Resolves an existing `origin/<branch>` tracking ref — the fallback when a
+ * local branch has no upstream set, and the start point when a workspace adopts
+ * a branch that exists only on the remote.
  * @param options - Local branch and Git command dependencies.
  * @returns The origin tracking ref, or `null` when none is available.
  */
-async function readOriginTrackingRef({
-	baseBranch,
+export async function readOriginTrackingRef({
+	branch,
 	localCommandService,
 	repositoryPath,
 }: {
-	baseBranch: string;
+	branch: string;
 	localCommandService: LocalCommandService;
 	repositoryPath: string;
 }): Promise<string | null> {
@@ -523,13 +569,132 @@ async function readOriginTrackingRef({
 		return null;
 	}
 
-	const trackingRef = `${remote}/${baseBranch}`;
+	const trackingRef = `${remote}/${branch}`;
 	const exists = await runGitSucceeds({
 		args: ['show-ref', '--verify', '--quiet', `refs/remotes/${trackingRef}`],
 		localCommandService,
 		repositoryPath,
 	});
 	return exists ? trackingRef : null;
+}
+
+/**
+ * Lists every local branch, plus the trailing segment of each prefixed one.
+ *
+ * `git worktree add -b <name>` refuses a name any local branch already holds,
+ * and a branch outlives the workspace that cut it, so a caller allocating a name
+ * has to steer around branches no database row mentions. Segments are included
+ * because callers allocate the slug, not the whole prefixed branch: `bach` has
+ * to read as taken when `psoldunov/bach` exists.
+ * @param options - Git command dependencies.
+ * @returns Lowercased branch names and segments; empty when git cannot answer.
+ */
+export async function listLocalBranchNames({
+	localCommandService,
+	repositoryPath,
+}: {
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<Set<string>> {
+	const stdout = await runGitText({
+		args: ['for-each-ref', '--format=%(refname:short)', 'refs/heads'],
+		localCommandService,
+		maxOutputBytes: 1024 * 1024,
+		repositoryPath,
+	});
+	const names = new Set<string>();
+	for (const line of (stdout ?? '').split('\n')) {
+		const branch = line.trim().toLowerCase();
+		if (!branch) {
+			continue;
+		}
+		names.add(branch);
+		names.add(branch.slice(branch.lastIndexOf('/') + 1));
+	}
+	return names;
+}
+
+/**
+ * Verifies that a ref resolves to a commit inside the repository, so a stale
+ * configured base or a branch that exists nowhere is caught before it reaches a
+ * worktree command.
+ * @param options - Candidate ref plus git command dependencies.
+ * @returns True when `git rev-parse` resolves the ref.
+ */
+export async function refResolvesToCommit({
+	localCommandService,
+	ref,
+	repositoryPath,
+}: {
+	localCommandService: LocalCommandService;
+	ref: string;
+	repositoryPath: string;
+}): Promise<boolean> {
+	try {
+		const result = await localCommandService.run({
+			args: ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 4 * 1024,
+			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+		});
+		return result.status === 'success';
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Ensures a ref resolves locally before a worktree command needs it. When it
+ * does not (e.g. a pull-request head like `origin/feature-x` that was never
+ * fetched), attempts a best-effort `git fetch <remote> <branch>`. Already-present
+ * refs (local branches, fetched remotes) skip the fetch. All failures are
+ * swallowed — the worktree command surfaces the real, actionable error if the
+ * ref is still missing afterward.
+ * @param options - Candidate ref plus git command dependencies.
+ */
+export async function ensureBaseRefAvailable({
+	baseBranch,
+	localCommandService,
+	repositoryPath,
+}: {
+	baseBranch: string;
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<void> {
+	try {
+		// The probe runs inline rather than through `refResolvesToCommit`, which
+		// swallows throws: a git binary that cannot run at all must skip the fetch
+		// too, not fall through to a second doomed invocation.
+		const verify = await localCommandService.run({
+			args: ['rev-parse', '--verify', '--quiet', `${baseBranch}^{commit}`],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 4 * 1024,
+			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
+		});
+		if (verify.status === 'success') {
+			return;
+		}
+
+		const separator = baseBranch.indexOf('/');
+		if (separator <= 0) {
+			return;
+		}
+		await localCommandService.run({
+			args: [
+				'fetch',
+				baseBranch.slice(0, separator),
+				baseBranch.slice(separator + 1),
+			],
+			command: 'git',
+			cwd: repositoryPath,
+			maxOutputBytes: 64 * 1024,
+			timeoutMs: GIT_FETCH_TIMEOUT_MS,
+		});
+	} catch {
+		// Best effort: leave it to the worktree command to report a missing ref.
+	}
 }
 
 /**
@@ -561,10 +726,12 @@ async function fetchRemoteRef({
 async function runGitText({
 	args,
 	localCommandService,
+	maxOutputBytes = 16 * 1024,
 	repositoryPath,
 }: {
 	args: string[];
 	localCommandService: LocalCommandService;
+	maxOutputBytes?: number;
 	repositoryPath: string;
 }): Promise<string> {
 	try {
@@ -572,7 +739,7 @@ async function runGitText({
 			args,
 			command: 'git',
 			cwd: repositoryPath,
-			maxOutputBytes: 16 * 1024,
+			maxOutputBytes,
 			timeoutMs: GIT_BRANCH_TIMEOUT_MS,
 		});
 		return result.status === 'success' ? result.stdout.trim() : '';

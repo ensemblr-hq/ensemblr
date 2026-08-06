@@ -1,3 +1,8 @@
+import {
+	WORKSPACE_NAME_MAX_LENGTH,
+	WORKSPACE_NAME_PATTERN,
+} from '../../shared/workspace-name.ts';
+
 /**
  * Shared workspace name validation rules used by create and rename services.
  *
@@ -12,11 +17,10 @@ type WorkspaceNameValidation =
 			valid: false;
 	  };
 
-/** Maximum allowed length of a workspace display name. */
-export const WORKSPACE_NAME_MAX_LENGTH = 100;
-
-/** Characters allowed in a workspace name. */
-export const WORKSPACE_NAME_PATTERN = /^[A-Za-z0-9 ._-]+$/;
+export {
+	WORKSPACE_NAME_MAX_LENGTH,
+	WORKSPACE_NAME_PATTERN,
+} from '../../shared/workspace-name.ts';
 
 /**
  * Validates a workspace name against the shared length / character / dot rules.

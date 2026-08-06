@@ -118,8 +118,11 @@ export function useForkConversation({
 			setIsForking(true);
 			void (async () => {
 				try {
+					const targetBranch =
+						workspace.landingSummary?.branchSource.baseBranch;
 					const created = await createWorkspace({
-						baseBranch: workspace.branchName,
+						...(targetBranch ? { baseBranch: targetBranch } : {}),
+						branchPlan: { forkRef: workspace.branchName, kind: 'create' },
 						name: pickComposerSurname(),
 						placeholderName: true,
 						repositoryId: workspace.projectId,

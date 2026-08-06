@@ -23,7 +23,7 @@ const GH_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 const LIST_LIMIT = 50;
 const BRANCH_LIST_LIMIT = 100;
 const PR_JSON_FIELDS =
-	'number,title,headRefName,author,isDraft,state,updatedAt,url,isCrossRepository';
+	'number,title,headRefName,baseRefName,author,isDraft,state,updatedAt,url,isCrossRepository';
 const ISSUE_JSON_FIELDS = 'number,title,state,updatedAt,author,labels,url,body';
 
 /**
@@ -230,11 +230,24 @@ export function createRepositorySourcesService({
 					status: 'error',
 				};
 			}
-			// A workspace forks off `origin/<headRefName>`, which only resolves for
-			// same-repo PRs; a fork's head never reaches the origin remote, so drop
-			// cross-repo PRs rather than offer a row that fails on create.
-			const pullRequests = parsed.filter(
-				(pullRequest) => !pullRequest.isCrossRepository,
+			// A workspace checks `headRefName` out and pushes back to it, which only
+			// works for same-repo PRs; a fork's head never reaches the origin remote,
+			// so drop cross-repo PRs rather than offer a row that fails on create.
+			const activeBranches = readWorkspaceBranchMap(
+				request.repositoryId,
+				listActiveWorkspaceBranchRowsByRepository,
+			);
+			const pullRequests: RepositoryPullRequestWire[] = parsed.flatMap(
+				(pullRequest) => {
+					if (pullRequest.isCrossRepository) {
+						return [];
+					}
+					const workspaceId =
+						activeBranches.get(pullRequest.headRefName) ?? null;
+					return [
+						{ ...pullRequest, hasWorkspace: workspaceId !== null, workspaceId },
+					];
+				},
 			);
 			return { pullRequests, status: 'ok' };
 		},
@@ -323,12 +336,21 @@ function readRecord(value: unknown): Record<string, unknown> | null {
 		: null;
 }
 
+/**
+ * A pull request as `gh` reports it, before local workspace ownership is known.
+ * The parser has no database access, so those two fields are filled in by
+ * {@link RepositorySourcesService.listPullRequests}.
+ */
+type ParsedPullRequest = Omit<
+	RepositoryPullRequestWire,
+	'hasWorkspace' | 'workspaceId'
+>;
+
 /** Parses `gh pr list --json` output; null when the shape is unusable. */
-export function parsePullRequests(
-	stdout: string,
-): RepositoryPullRequestWire[] | null {
+export function parsePullRequests(stdout: string): ParsedPullRequest[] | null {
 	return parseNumberedRows(stdout, (record, shared) => ({
 		...shared,
+		baseRefName: readStringField(record.baseRefName),
 		headRefName: readStringField(record.headRefName),
 		isCrossRepository: record.isCrossRepository === true,
 		isDraft: record.isDraft === true,

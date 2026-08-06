@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 import { setWorkspaceBaseBranch } from '@/renderer/api/ensemblr';
 import { invalidateWorkspaceListViews } from '@/renderer/api/ensemblr/invalidate-workspace-list-views';
-import { originQualifiedRef } from '@/renderer/lib/workbench/branch-ref';
+import { originQualifiedRef } from '@/shared/branch-ref';
 
 /** Shown when the bridge rejects, where no service diagnostic exists to quote. */
 const RETARGET_FAILED_MESSAGE = 'Could not change the target branch.';

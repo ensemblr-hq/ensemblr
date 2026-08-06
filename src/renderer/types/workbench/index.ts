@@ -37,6 +37,7 @@ export type {
 	RecentProject,
 	WorkspaceSource,
 	WorkspaceSourceAction,
+	WorkspaceSourceActionId,
 	WorkspaceSourceKind,
 	WorkspaceSourceProvider,
 } from './project';

@@ -1,6 +1,6 @@
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
-import { bareBranchName } from './branch-ref';
+import { bareBranchName } from '@/shared/branch-ref';
 import { clampReviewContext } from './review-context';
 
 /**

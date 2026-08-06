@@ -1,5 +1,5 @@
 import type { GithubRepoRef } from '@/renderer/types/workbench';
-import { bareBranchName } from './branch-ref';
+import { bareBranchName } from '@/shared/branch-ref';
 
 /**
  * Extracts the `{ owner, repo }` pair from a GitHub remote URL, covering HTTPS,

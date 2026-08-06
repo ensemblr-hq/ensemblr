@@ -12,6 +12,9 @@ export interface LinkedIssueRef {
 
 /** Machine-readable codes for problems raised while creating a workspace. */
 export type CreateWorkspaceDiagnosticCode =
+	| 'branch-already-checked-out'
+	| 'branch-name-invalid'
+	| 'branch-not-found'
 	| 'database-unavailable'
 	| 'destination-exists'
 	| 'destination-not-writable'
@@ -45,10 +48,28 @@ export interface WorkspaceLinkedIssueInput extends LinkedIssueRef {
 	teamName?: string;
 }
 
+/**
+ * How a new workspace's branch comes into being.
+ *
+ * `adopt` checks an existing branch out into the worktree, so the workspace
+ * owns that branch and pushes land on whatever pull request already tracks it.
+ * `create` cuts a fresh branch at `forkRef` (defaulting to the base branch).
+ *
+ * The fork point is deliberately absent from `adopt` and never persisted in
+ * either case: once the worktree exists, the branch's own history records where
+ * it came from, while `baseBranch` keeps its separate meaning as the merge
+ * target that diffs, conflicts, and pull requests are measured against.
+ */
+export type WorkspaceBranchPlan =
+	| { branch: string; kind: 'adopt' }
+	| { forkRef?: string; kind: 'create' };
+
 /** Request payload for creating a workspace. */
 export interface CreateWorkspaceRequest {
 	baseBranch?: string;
 	branchName?: string;
+	/** Defaults to `{ kind: 'create' }`, cutting a new branch at the base branch. */
+	branchPlan?: WorkspaceBranchPlan;
 	linkedIssue?: WorkspaceLinkedIssueInput;
 	name?: string;
 	/**
@@ -131,6 +152,7 @@ export interface CreateWorkspaceResult {
 
 /** Machine-readable codes for problems raised while renaming a workspace. */
 export type RenameWorkspaceDiagnosticCode =
+	| 'branch-adopted'
 	| 'branch-already-exists'
 	| 'branch-rename-failed'
 	| 'database-unavailable'

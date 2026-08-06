@@ -73,10 +73,22 @@ const workspaceLinkedIssueSchema = z.object({
 	url: z.string(),
 });
 
+/**
+ * How the new workspace's branch comes into being. Structural only: the ref
+ * strings are checked against {@link import('../../repository/validate-git-ref').validateGitRef}
+ * inside the creation service, which can name the offending branch in its
+ * diagnostic instead of collapsing the whole request.
+ */
+const workspaceBranchPlanSchema = z.discriminatedUnion('kind', [
+	z.object({ branch: z.string().trim().min(1), kind: z.literal('adopt') }),
+	z.object({ forkRef: optionalTrimmedString, kind: z.literal('create') }),
+]);
+
 /** {@link import('../../../shared/ipc').CreateWorkspaceRequest}. */
 export const createWorkspaceRequestSchema = z.object({
 	baseBranch: optionalTrimmedString,
 	branchName: optionalTrimmedString,
+	branchPlan: workspaceBranchPlanSchema.optional(),
 	linkedIssue: workspaceLinkedIssueSchema.optional(),
 	name: optionalTrimmedString,
 	placeholderName: z.boolean().optional(),
@@ -92,6 +104,7 @@ export const createWorkspaceRequestSchema = z.object({
 export function parseCreateWorkspaceRequest(raw: unknown): {
 	baseBranch?: string;
 	branchName?: string;
+	branchPlan?: z.infer<typeof workspaceBranchPlanSchema>;
 	linkedIssue?: z.infer<typeof workspaceLinkedIssueSchema>;
 	name?: string;
 	placeholderName?: boolean;
@@ -104,6 +117,7 @@ export function parseCreateWorkspaceRequest(raw: unknown): {
 	const {
 		baseBranch,
 		branchName,
+		branchPlan,
 		linkedIssue,
 		name,
 		placeholderName,
@@ -112,6 +126,7 @@ export function parseCreateWorkspaceRequest(raw: unknown): {
 	const result: {
 		baseBranch?: string;
 		branchName?: string;
+		branchPlan?: z.infer<typeof workspaceBranchPlanSchema>;
 		linkedIssue?: z.infer<typeof workspaceLinkedIssueSchema>;
 		name?: string;
 		placeholderName?: boolean;
@@ -122,6 +137,9 @@ export function parseCreateWorkspaceRequest(raw: unknown): {
 	}
 	if (branchName !== undefined) {
 		result.branchName = branchName;
+	}
+	if (branchPlan !== undefined) {
+		result.branchPlan = branchPlan;
 	}
 	if (linkedIssue !== undefined) {
 		result.linkedIssue = linkedIssue;

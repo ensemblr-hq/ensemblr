@@ -48,6 +48,7 @@ export {
 	branchSourceId,
 	mapPullRequestsToWorkspaceSources,
 	mapRepositoryBranchesToWorkspaceSources,
+	openableWorkspaceId,
 	pullRequestSourceId,
 	workspaceSeedFromSourceItem,
 } from './workspace-source-mappers';
