@@ -42,6 +42,7 @@ import {
 import {
 	DEFAULT_FALLBACK_BRANCH,
 	GIT_WORKTREE_TIMEOUT_MS,
+	listLocalBranchNames,
 	refResolvesToCommit,
 	resolveRootBranch,
 	runBranchDelete,
@@ -358,6 +359,10 @@ export function createWorkspaceService({
 			branchPoint,
 			branchPrefix,
 			database,
+			existingBranches: await listLocalBranchNames({
+				localCommandService,
+				repositoryPath: repository.path,
+			}),
 			nameInput: request.name,
 			placeholderName: request.placeholderName === true,
 			repository,
@@ -746,6 +751,7 @@ function prepareWorkspace({
 	branchPoint,
 	branchPrefix,
 	database,
+	existingBranches,
 	nameInput,
 	placeholderName,
 	repository,
@@ -755,6 +761,7 @@ function prepareWorkspace({
 	branchPoint: WorkspaceBranchPoint;
 	branchPrefix: string;
 	database: DatabaseSync;
+	existingBranches: ReadonlySet<string>;
 	nameInput: string | undefined;
 	placeholderName: boolean;
 	repository: SourceRepository;
@@ -764,18 +771,24 @@ function prepareWorkspace({
 		typeof nameInput === 'string' && nameInput.trim()
 			? nameInput.trim()
 			: DEFAULT_WORKSPACE_NAME;
+	// Only a plan that cuts a branch can collide with one. Adoption checks an
+	// existing branch out, so letting it steer the slug would make every adopted
+	// workspace land in a `-2` folder over the very branch it takes over.
+	const taken = collectTakenWorkspaceNames({
+		database,
+		existingBranches:
+			branchPoint.plan.kind === 'create' ? existingBranches : new Set(),
+		repositoryId: repository.id,
+	});
 	const resolvedName = placeholderName
-		? resolvePlaceholderName({
-				database,
-				repositoryId: repository.id,
-				requestedName: trimmedName,
-			})
+		? resolvePlaceholderName({ requestedName: trimmedName, taken })
 		: trimmedName;
 	const baseSlug = toWorkspaceSlug(resolvedName);
 	const slug = allocateUniqueWorkspaceSlug({
 		baseSlug,
 		database,
 		repositoryId: repository.id,
+		taken,
 	});
 	const parentDirectory = path.join(workspacesPath, repository.slug);
 	const workspacePath = path.join(parentDirectory, slug);
@@ -801,27 +814,22 @@ function prepareWorkspace({
 }
 
 /**
- * Chooses a placeholder workspace name that no active or archived workspace in
- * the repository already uses, and that none used prior to a rename. Keeps the
- * caller's suggested composer surname when it is free (the common case, so the
- * optimistic sidebar row does not flicker); otherwise repicks another surname
- * that avoids every taken name, slug, and branch. Falls back to the suggested
+ * Chooses a placeholder workspace name nothing in the repository already claims.
+ * Keeps the caller's suggested composer surname when it is free (the common
+ * case, so the optimistic sidebar row does not flicker); otherwise repicks
+ * another surname that avoids every taken token. Falls back to the suggested
  * name when the pool is exhausted, leaving slug allocation to disambiguate.
- * @param options.database - Open SQLite connection.
- * @param options.repositoryId - Repository whose workspaces constrain the name.
  * @param options.requestedName - Surname the renderer optimistically picked.
+ * @param options.taken - Every name, slug, and branch already claimed.
  * @returns A workspace display name unused across the repository's history.
  */
 function resolvePlaceholderName({
-	database,
-	repositoryId,
 	requestedName,
+	taken,
 }: {
-	database: DatabaseSync;
-	repositoryId: string;
 	requestedName: string;
+	taken: ReadonlySet<string>;
 }): string {
-	const taken = collectTakenWorkspaceNames({ database, repositoryId });
 	const requestedTokens = [
 		requestedName.toLowerCase(),
 		toWorkspaceSlug(requestedName),
@@ -833,23 +841,32 @@ function resolvePlaceholderName({
 }
 
 /**
- * Builds the lowercased set of every name and slug already used by a workspace
- * in the repository, active or archived. Slugs are included because a renamed
- * workspace keeps its original slug, so it reveals the name used before the
- * rename.
+ * Builds the lowercased set of every token a new workspace may not reuse: the
+ * names and slugs of the repository's workspaces, active or archived, plus every
+ * local git branch.
+ *
+ * Slugs are included because a renamed workspace keeps its original slug, so it
+ * reveals the name used before the rename. Branches are included because a
+ * branch outlives the workspace that cut it — a deleted workspace takes its row
+ * with it and leaves the branch, which reads as a free name right up until
+ * `git worktree add -b` refuses it.
+ * @param options - Repository scope, git branches, and the open connection.
+ * @returns The lowercased set of claimed tokens.
  */
 function collectTakenWorkspaceNames({
 	database,
+	existingBranches,
 	repositoryId,
 }: {
 	database: DatabaseSync;
+	existingBranches: ReadonlySet<string>;
 	repositoryId: string;
 }): Set<string> {
 	const rows = listWorkspaceNameSlugRowsByRepository({
 		database,
 		repositoryId,
 	});
-	const taken = new Set<string>();
+	const taken = new Set<string>(existingBranches);
 	for (const { name, slug } of rows) {
 		for (const value of [name, slug]) {
 			if (typeof value === 'string' && value.trim()) {
@@ -861,21 +878,28 @@ function collectTakenWorkspaceNames({
 }
 
 /**
- * Produces a slug that does not collide with any existing workspace slug for
- * the same repository, suffixing `-2`, `-3`, ... until a free slot is found.
+ * Produces a slug that collides with no existing workspace slug and no local
+ * branch, suffixing `-2`, `-3`, ... until a free slot is found.
+ * @param options - Base slug, repository scope, claimed tokens, and connection.
+ * @returns The free slug.
  */
 function allocateUniqueWorkspaceSlug({
 	baseSlug,
 	database,
 	repositoryId,
+	taken,
 }: {
 	baseSlug: string;
 	database: DatabaseSync;
 	repositoryId: string;
+	taken: ReadonlySet<string>;
 }): string {
 	let candidate = baseSlug;
 	let suffix = 2;
-	while (workspaceSlugExists(database, repositoryId, candidate)) {
+	while (
+		taken.has(candidate) ||
+		workspaceSlugExists(database, repositoryId, candidate)
+	) {
 		candidate = `${baseSlug}-${suffix}`;
 		suffix += 1;
 	}

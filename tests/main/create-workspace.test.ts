@@ -1454,3 +1454,80 @@ test('names the repository folder, not a workspace, when it holds the branch', a
 		'there is no workspace to open when the repository folder holds the branch',
 	);
 });
+
+test('picks another placeholder name when a leftover branch holds the first', async (t) => {
+	const harness = createHarness(t);
+	// A deleted workspace takes its SQLite row with it but leaves the branch, so
+	// the name reads as free while `git worktree add -b` still collides.
+	runGit(harness.repositoryPath, ['branch', 'bach']);
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'Bach',
+		placeholderName: true,
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success', JSON.stringify(result.diagnostics));
+	assert.notEqual(result.workspace?.branchName, 'bach');
+	assert.equal(existsSync(String(result.workspace?.path)), true);
+});
+
+test('adopting a branch does not bump the slug over that same branch', async (t) => {
+	const harness = createHarness(t);
+	commitOnBranch(harness.repositoryPath, 'bach', 'feature.txt');
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'bach', kind: 'adopt' },
+		name: 'bach',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	// Adoption checks the branch out rather than cutting it, so the branch it
+	// takes over must not read as a name collision with itself.
+	assert.equal(result.workspace?.slug, 'bach');
+	assert.equal(result.workspace?.branchName, 'bach');
+});
+
+test('repeated placeholder creation keeps succeeding with distinct branches', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const branches: string[] = [];
+	for (let attempt = 0; attempt < 4; attempt += 1) {
+		const result = await service.create({
+			// Every attempt suggests the same surname, as the renderer does when it
+			// picks optimistically without knowing the repository's history.
+			name: 'Bach',
+			placeholderName: true,
+			repositoryId: harness.repositoryId,
+		});
+		assert.equal(
+			result.status,
+			'success',
+			`attempt ${attempt}: ${JSON.stringify(result.diagnostics)}`,
+		);
+		branches.push(String(result.workspace?.branchName));
+	}
+
+	assert.equal(new Set(branches).size, branches.length, branches.join(', '));
+});

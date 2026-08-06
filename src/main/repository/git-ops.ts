@@ -579,6 +579,42 @@ export async function readOriginTrackingRef({
 }
 
 /**
+ * Lists every local branch, plus the trailing segment of each prefixed one.
+ *
+ * `git worktree add -b <name>` refuses a name any local branch already holds,
+ * and a branch outlives the workspace that cut it, so a caller allocating a name
+ * has to steer around branches no database row mentions. Segments are included
+ * because callers allocate the slug, not the whole prefixed branch: `bach` has
+ * to read as taken when `psoldunov/bach` exists.
+ * @param options - Git command dependencies.
+ * @returns Lowercased branch names and segments; empty when git cannot answer.
+ */
+export async function listLocalBranchNames({
+	localCommandService,
+	repositoryPath,
+}: {
+	localCommandService: LocalCommandService;
+	repositoryPath: string;
+}): Promise<Set<string>> {
+	const stdout = await runGitText({
+		args: ['for-each-ref', '--format=%(refname:short)', 'refs/heads'],
+		localCommandService,
+		maxOutputBytes: 1024 * 1024,
+		repositoryPath,
+	});
+	const names = new Set<string>();
+	for (const line of (stdout ?? '').split('\n')) {
+		const branch = line.trim().toLowerCase();
+		if (!branch) {
+			continue;
+		}
+		names.add(branch);
+		names.add(branch.slice(branch.lastIndexOf('/') + 1));
+	}
+	return names;
+}
+
+/**
  * Verifies that a ref resolves to a commit inside the repository, so a stale
  * configured base or a branch that exists nowhere is caught before it reaches a
  * worktree command.
@@ -690,10 +726,12 @@ async function fetchRemoteRef({
 async function runGitText({
 	args,
 	localCommandService,
+	maxOutputBytes = 16 * 1024,
 	repositoryPath,
 }: {
 	args: string[];
 	localCommandService: LocalCommandService;
+	maxOutputBytes?: number;
 	repositoryPath: string;
 }): Promise<string> {
 	try {
@@ -701,7 +739,7 @@ async function runGitText({
 			args,
 			command: 'git',
 			cwd: repositoryPath,
-			maxOutputBytes: 16 * 1024,
+			maxOutputBytes,
 			timeoutMs: GIT_BRANCH_TIMEOUT_MS,
 		});
 		return result.status === 'success' ? result.stdout.trim() : '';
