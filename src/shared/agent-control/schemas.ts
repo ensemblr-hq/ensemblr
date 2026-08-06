@@ -5,6 +5,7 @@
  */
 import { z } from 'zod';
 
+import { canonicalizeArgs } from './arg-naming.ts';
 import type { AskUserQuestionReply } from './contracts.ts';
 import {
 	type AgentControlOp,
@@ -57,7 +58,7 @@ const startConversationSchema = z.strictObject({
 });
 
 const setNameSchema = z.strictObject({
-	name: nonEmpty,
+	title: nonEmpty,
 });
 
 const setBranchNameSchema = z.strictObject({
@@ -163,18 +164,19 @@ const setWorkspaceStatusSchema = z.strictObject({
 
 const getWorkspaceDiffSchema = z
 	.strictObject({
-		file: workspaceRelativePath.optional(),
+		filePath: workspaceRelativePath.optional(),
 		stat: z.boolean().optional(),
 	})
 	// Reading one file already knows which file it wants, so a stat alongside it
 	// is a contradiction rather than a refinement. Rejecting says which of the two
 	// the caller is going to get; silent precedence leaves it guessing.
-	.refine((args) => !(args.file && args.stat), {
-		message: 'Pass either file or stat, not both: a single file has no stat.',
+	.refine((args) => !(args.filePath && args.stat), {
+		message:
+			'Pass either filePath or stat, not both: a single file has no stat.',
 	});
 
 const getDiffCommentsSchema = z.strictObject({
-	file: workspaceRelativePath.optional(),
+	filePath: workspaceRelativePath.optional(),
 });
 
 const addDiffCommentsSchema = z.strictObject({
@@ -299,6 +301,19 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	exitPlanMode: exitPlanModeSchema,
 } satisfies Record<AgentControlOp, z.ZodType>;
 
+/**
+ * The argument keys an op accepts, read off its own schema — every one here is
+ * an object schema, refined or not, so its shape is the vocabulary the boundary
+ * really enforces. The naming-conformance and cross-surface parity tests measure
+ * against this rather than a hand-kept list that could drift from it.
+ * @param op - Operation whose vocabulary to read.
+ * @returns Its argument keys, sorted.
+ */
+export const argKeysForOp = (op: AgentControlOp): readonly string[] =>
+	Object.keys(
+		(AGENT_CONTROL_ARG_SCHEMAS[op] as unknown as { shape: object }).shape,
+	).sort();
+
 const askUserQuestionAnswerSchema = z.strictObject({
 	questionIndex: z.number().int().min(0),
 	question: nonEmpty,
@@ -337,8 +352,31 @@ export type ValidateArgsResult<Op extends AgentControlOp> =
 	| { ok: false; reason: string };
 
 /**
+ * Names the keys an op does accept, to close a failure caused by one it does
+ * not. The agent cannot see the schema, so a bare "unrecognized key" leaves it
+ * guessing a second word where naming the vocabulary settles the retry.
+ * @param op - Operation whose schema rejected the args.
+ * @param issues - Validation issues the parse produced.
+ * @returns A trailing sentence, or an empty string when no key was unrecognized.
+ */
+const describeAcceptedKeys = (
+	op: AgentControlOp,
+	issues: readonly { code: string }[],
+): string => {
+	const accepted = argKeysForOp(op);
+	const rejectedAKey = issues.some(
+		(issue) => issue.code === 'unrecognized_keys',
+	);
+	return rejectedAKey && accepted.length > 0
+		? `. This op accepts: ${accepted.join(', ')}.`
+		: '';
+};
+
+/**
  * Validates raw agent-supplied args for an operation against its schema,
- * returning the args typed to that op so callers avoid an unsafe cast.
+ * returning the args typed to that op so callers avoid an unsafe cast. Known
+ * near-miss keys are rewritten to their canonical name first, so a model that
+ * reached for the wrong word keeps its turn.
  * @param op - Operation whose schema to apply.
  * @param rawArgs - Untrusted argument object from the agent.
  * @returns The parsed value on success, or a human-readable reason on failure.
@@ -348,12 +386,15 @@ export function validateArgs<Op extends AgentControlOp>(
 	rawArgs: unknown,
 ): ValidateArgsResult<Op> {
 	const schema = AGENT_CONTROL_ARG_SCHEMAS[op];
-	const parsed = schema.safeParse(rawArgs ?? {});
+	const parsed = schema.safeParse(canonicalizeArgs(op, rawArgs ?? {}));
 	if (parsed.success) {
 		return { ok: true, value: parsed.data as ArgsForOp<Op> };
 	}
 	const reason = parsed.error.issues
 		.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
 		.join('; ');
-	return { ok: false, reason };
+	return {
+		ok: false,
+		reason: `${reason}${describeAcceptedKeys(op, parsed.error.issues)}`,
+	};
 }

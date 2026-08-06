@@ -203,7 +203,7 @@ describe('validateArgs', () => {
 		expect(validateArgs('getWorkspaceDiff', {}).ok).toBe(true);
 		expect(validateArgs('getWorkspaceDiff', { stat: true }).ok).toBe(true);
 		expect(
-			validateArgs('getWorkspaceDiff', { file: 'src/main/main.ts' }).ok,
+			validateArgs('getWorkspaceDiff', { filePath: 'src/main/main.ts' }).ok,
 		).toBe(true);
 	});
 
@@ -211,10 +211,11 @@ describe('validateArgs', () => {
 	// silently win leaves the caller unable to tell which read it got back.
 	it('refuses a diff read that asks for a file and a stat at once', () => {
 		expect(
-			validateArgs('getWorkspaceDiff', { file: 'src/a.ts', stat: true }).ok,
+			validateArgs('getWorkspaceDiff', { filePath: 'src/a.ts', stat: true }).ok,
 		).toBe(false);
 		expect(
-			validateArgs('getWorkspaceDiff', { file: 'src/a.ts', stat: false }).ok,
+			validateArgs('getWorkspaceDiff', { filePath: 'src/a.ts', stat: false })
+				.ok,
 		).toBe(true);
 	});
 
@@ -231,8 +232,8 @@ describe('validateArgs', () => {
 		['..\\outside.ts', 'a backslash climb'],
 		['src/main\0.ts', 'an embedded NUL'],
 		['', 'an empty path'],
-	])('rejects %s as a diff target (%s)', (file) => {
-		expect(validateArgs('getWorkspaceDiff', { file }).ok).toBe(false);
+	])('rejects %s as a diff target (%s)', (filePath) => {
+		expect(validateArgs('getWorkspaceDiff', { filePath }).ok).toBe(false);
 	});
 
 	it('applies the same path rule to a comment target', () => {

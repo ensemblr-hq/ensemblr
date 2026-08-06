@@ -155,9 +155,9 @@ export interface StartConversationArgs {
 	wait?: boolean;
 }
 
-/** Args for `setName`: set the display name of the caller's own conversation tab. */
+/** Args for `setName`: set the display title of the caller's own conversation tab. */
 export interface SetNameArgs {
-	name: string;
+	title: string;
 }
 
 /**
@@ -685,21 +685,22 @@ export interface SetWorkspaceStatusArgs {
  * Args for `getWorkspaceDiff`: read the caller's own workspace diff, scoped the
  * way the Changes panel scopes it — every change on this branch, committed and
  * uncommitted alike. `stat` is the cheap probe that reports which files changed
- * and how large the diff is; `file` reads one file's patch, which is also how a
- * file dropped from a budgeted full read is recovered. The two are alternatives
- * rather than a filter pair, and sending both is rejected: a single file has no
- * stat, and silent precedence would leave the caller unsure which read it got.
+ * and how large the diff is; `filePath` reads one file's patch, which is also
+ * how a file dropped from a budgeted full read is recovered. The two are
+ * alternatives rather than a filter pair, and sending both is rejected: a single
+ * file has no stat, and silent precedence would leave the caller unsure which
+ * read it got.
  */
 export interface GetWorkspaceDiffArgs {
 	/** Workspace-relative path of a single file to read. */
-	file?: string;
+	filePath?: string;
 	/** Return the changed-file rows and totals only, with no patch text. */
 	stat?: boolean;
 }
 
 /**
  * Result of `getWorkspaceDiff`. Which fields are populated follows the request:
- * `stat` returns `files` + `summary` and no `diff`; a single `file` returns
+ * `stat` returns `files` + `summary` and no `diff`; a single `filePath` returns
  * `diff` alone; the full read returns all of them. `truncated` covers every cut
  * the payload can take — whole files dropped for the budget, one file's patch
  * cut at a hunk boundary to fit it, and a patch git itself cut at its output cap.
@@ -711,7 +712,7 @@ export interface GetWorkspaceDiffResult {
 	summary?: WorkspaceGitChangeSummaryWire;
 	diff?: string;
 	truncated: boolean;
-	/** Files left out of `diff`; each is re-requestable on its own with `file`. */
+	/** Files left out of `diff`; each is re-requestable on its own with `filePath`. */
 	omittedFiles: readonly string[];
 }
 
@@ -720,7 +721,7 @@ export interface GetWorkspaceDiffResult {
  * workspace, optionally narrowed to one file.
  */
 export interface GetDiffCommentsArgs {
-	file?: string;
+	filePath?: string;
 }
 
 /**

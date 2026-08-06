@@ -80,6 +80,12 @@ export interface AgentControlCommand {
 	 * fallback for spawned conversations. Absent for harness (MCP) callers.
 	 */
 	callerModel?: string;
+	/**
+	 * Aborts when the caller goes away mid-call, so an op that blocks on a human
+	 * or a child can stop instead of finishing for nobody. Optional: the MCP
+	 * bridge omits it, as does any caller that cannot be cancelled.
+	 */
+	signal?: AbortSignal;
 }
 
 /** Public surface of the agent-control service. */
@@ -121,6 +127,7 @@ type OpHandler = (input: {
 	args: unknown;
 	callerModel: string | undefined;
 	origin: AgentControlOrigin;
+	signal: AbortSignal | undefined;
 }) => Promise<AgentControlResult<unknown>> | AgentControlResult<unknown>;
 
 /** Session statuses that mean a Pi child has stopped working. */
@@ -528,7 +535,7 @@ export function createAgentControlService({
 		}
 		const result = await ports.conversations.setName({
 			piSessionId: origin.sessionId,
-			name: args.name,
+			name: args.title,
 		});
 		if (!result) {
 			return fail(
@@ -926,9 +933,80 @@ export function createAgentControlService({
 		};
 	};
 
+	/**
+	 * Reports on the children that finished and consumes the escalations they
+	 * carried, because handing a signal to a caller is what spends it.
+	 * @param done - The settled targets from the tick that returned.
+	 * @param detail - The report detail the caller asked for.
+	 * @returns Each finished child with its report attached.
+	 */
+	const collectReports = async (
+		done: readonly { agent: WaitedAgent }[],
+		detail: WaitReportDetail,
+	): Promise<WaitedAgent[]> => {
+		const completed = await Promise.all(
+			done.map((entry) => reportOn(entry.agent, detail)),
+		);
+		for (const entry of completed) {
+			signalsByChild.delete(entry.piSessionId);
+		}
+		return completed;
+	};
+
+	/**
+	 * Polls the targets until the mode is satisfied, the deadline passes, or the
+	 * waiting turn ends. An abandoned wait returns before it reports: the report
+	 * is expensive and it spends the children's escalations, so a turn that is
+	 * already gone must not be the one to take them.
+	 * @param input - The targets to poll, the caller's mode and report detail, the
+	 *   deadline, and the signal that ends the wait early.
+	 * @returns What settled, what is still running, and whether time ran out.
+	 */
+	const pollUntilSettled = async (input: {
+		targets: readonly string[];
+		mode: WaitMode;
+		detail: WaitReportDetail;
+		deadline: number;
+		signal: AbortSignal | undefined;
+	}): Promise<WaitForAgentsResult> => {
+		const { deadline, detail, mode, signal, targets } = input;
+		for (;;) {
+			const settled = await Promise.all(targets.map(settleTarget));
+			const pending = stillRunning(settled);
+			if (signal?.aborted) {
+				return waitOutcome({ completed: [], mode, pending, timedOut: false });
+			}
+			const done = settled.filter((entry) => entry.settled);
+			const satisfied =
+				mode === 'first' ? done.length > 0 : waitAllSatisfied(settled);
+			const expired = scheduler.now() >= deadline;
+			if (satisfied || expired) {
+				return waitOutcome({
+					completed: await collectReports(done, detail),
+					mode,
+					pending,
+					timedOut: !satisfied && expired,
+				});
+			}
+			await scheduler.sleep(WAIT_POLL_MS);
+		}
+	};
+
+	/**
+	 * Blocks the caller until its children settle or its deadline passes, then
+	 * reports on whichever of them finished. A turn that ends mid-wait bails out
+	 * without a report, since there is no longer anyone to read one.
+	 * @param origin - Resolved caller identity, whose children are the default
+	 *   targets.
+	 * @param args - Validated targets, mode, report detail, and timeout.
+	 * @param signal - Aborts when the waiting turn ends, so the poll loop stops
+	 *   rather than running its full window for nobody.
+	 * @returns The wait outcome, or a guardrail denial for a deadlocking target.
+	 */
 	const handleWaitForAgents = async (
 		origin: AgentControlOrigin,
 		args: WaitForAgentsArgs,
+		signal: AbortSignal | undefined,
 	): Promise<AgentControlResult<unknown>> => {
 		const targets = args.targets ?? [
 			...originRegistry.childrenOf(origin.sessionId),
@@ -943,36 +1021,19 @@ export function createAgentControlService({
 				return fail(deadlock.code, deadlock.reason);
 			}
 		}
-		const mode = args.mode ?? 'first';
 		const timeoutMs = Math.min(
 			args.timeoutMs ?? guardrails.waitTimeoutMs,
 			guardrails.waitTimeoutMs,
 		);
-		const deadline = scheduler.now() + timeoutMs;
-		for (;;) {
-			const settled = await Promise.all(targets.map(settleTarget));
-			const done = settled.filter((entry) => entry.settled);
-			const satisfied =
-				mode === 'first' ? done.length > 0 : waitAllSatisfied(settled);
-			const expired = scheduler.now() >= deadline;
-			if (satisfied || expired) {
-				const completed = await Promise.all(
-					done.map((entry) => reportOn(entry.agent, args.reports ?? 'full')),
-				);
-				for (const entry of completed) {
-					signalsByChild.delete(entry.piSessionId);
-				}
-				return ok(
-					waitOutcome({
-						completed,
-						mode,
-						pending: stillRunning(settled),
-						timedOut: !satisfied && expired,
-					}),
-				);
-			}
-			await scheduler.sleep(WAIT_POLL_MS);
-		}
+		return ok(
+			await pollUntilSettled({
+				deadline: scheduler.now() + timeoutMs,
+				detail: args.reports ?? 'full',
+				mode: args.mode ?? 'first',
+				signal,
+				targets,
+			}),
+		);
 	};
 
 	/**
@@ -981,11 +1042,13 @@ export function createAgentControlService({
 	 * has no such tab to host it.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The validated questionnaire.
+	 * @param signal - Aborts when the asking turn ends, withdrawing the dialog.
 	 * @returns The user's answers, or a scope failure for non-Pi callers.
 	 */
 	const handleAskUserQuestion = async (
 		origin: AgentControlOrigin,
 		args: AskUserQuestionArgs,
+		signal: AbortSignal | undefined,
 	): Promise<AgentControlResult<unknown>> => {
 		if (origin.species !== 'pi') {
 			return fail(
@@ -993,7 +1056,9 @@ export function createAgentControlService({
 				'Asking the user is limited to native Pi conversations.',
 			);
 		}
-		return ok(await ports.ask.ask({ origin, questions: args.questions }));
+		return ok(
+			await ports.ask.ask({ origin, questions: args.questions, signal }),
+		);
 	};
 
 	/**
@@ -1071,8 +1136,8 @@ export function createAgentControlService({
 					workspaceId: origin.workspaceId,
 				})
 				.then(ok),
-		askUserQuestion: ({ args, origin }) =>
-			handleAskUserQuestion(origin, args as AskUserQuestionArgs),
+		askUserQuestion: ({ args, origin, signal }) =>
+			handleAskUserQuestion(origin, args as AskUserQuestionArgs, signal),
 		checkPlanModeTool: ({ args, origin }) =>
 			handleCheckPlanModeTool(origin, args as CheckPlanModeToolArgs),
 		closeTab: ({ args, origin }) =>
@@ -1090,7 +1155,7 @@ export function createAgentControlService({
 		getDiffComments: ({ args, origin }) =>
 			ports.review
 				.listComments({
-					file: (args as GetDiffCommentsArgs).file,
+					file: (args as GetDiffCommentsArgs).filePath,
 					workspaceId: origin.workspaceId,
 				})
 				.then(ok),
@@ -1104,7 +1169,7 @@ export function createAgentControlService({
 		getWorkspaceDiff: ({ args, origin }) =>
 			ports.diff
 				.readWorkspaceDiff({
-					file: (args as GetWorkspaceDiffArgs).file,
+					file: (args as GetWorkspaceDiffArgs).filePath,
 					stat: (args as GetWorkspaceDiffArgs).stat,
 					workspaceCwd: origin.workspaceCwd,
 					workspaceId: origin.workspaceId,
@@ -1162,8 +1227,8 @@ export function createAgentControlService({
 			handleStartTerminal(origin, args as StartTerminalArgs),
 		stopTerminal: ({ args, origin }) =>
 			handleStopTerminal(origin, args as StopTerminalArgs),
-		waitForAgents: ({ args, origin }) =>
-			handleWaitForAgents(origin, args as WaitForAgentsArgs),
+		waitForAgents: ({ args, origin, signal }) =>
+			handleWaitForAgents(origin, args as WaitForAgentsArgs, signal),
 		writeTerminal: ({ args, origin }) =>
 			handleWriteTerminal(origin, args as WriteTerminalArgs),
 	};
@@ -1173,12 +1238,13 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: unknown,
 		callerModel: string | undefined,
+		signal: AbortSignal | undefined,
 	): Promise<AgentControlResult<unknown>> => {
 		const handler = opHandlers[op];
 		if (!handler) {
 			return fail('invalid-args', `Unsupported operation: ${String(op)}.`);
 		}
-		return await handler({ args, callerModel, origin });
+		return await handler({ args, callerModel, origin, signal });
 	};
 
 	const invoke = async (
@@ -1210,6 +1276,7 @@ export function createAgentControlService({
 				origin,
 				validated.value,
 				command.callerModel,
+				command.signal,
 			);
 		} catch (error) {
 			const detail = error instanceof Error ? error.message : String(error);

@@ -684,7 +684,7 @@ describe('agent-control service: sub-agent role gate outside plan mode', () => {
 			['readTerminalOutput', { terminalId: 'term-1' }],
 			['focusTab', { chatTabId: 'abc' }],
 			['focusPanel', { panel: 'changes' }],
-			['setName', { name: 'Investigating the composer' }],
+			['setName', { title: 'Investigating the composer' }],
 		] as const) {
 			const result = await service.invoke({
 				op: op as 'listTabs',
@@ -853,7 +853,7 @@ describe('agent-control service: delegation', () => {
 		const result = await service.invoke({
 			op: 'setName',
 			token: 'tok-caller',
-			rawArgs: { name: 'My task tab' },
+			rawArgs: { title: 'My task tab' },
 		});
 		expect(result.ok).toBe(true);
 		expect(ports.conversations.setName).toHaveBeenCalledWith({
@@ -868,7 +868,7 @@ describe('agent-control service: delegation', () => {
 		const result = await service.invoke({
 			op: 'setName',
 			token: 'tok-caller',
-			rawArgs: { name: 'My task tab' },
+			rawArgs: { title: 'My task tab' },
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
@@ -886,7 +886,7 @@ describe('agent-control service: delegation', () => {
 		const result = await service.invoke({
 			op: 'setName',
 			token: 'tok-caller',
-			rawArgs: { name: 'x' },
+			rawArgs: { title: 'x' },
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) {
@@ -1149,7 +1149,7 @@ describe('agent-control service: review', () => {
 		await service.invoke({
 			op: 'getWorkspaceDiff',
 			token: 'tok-caller',
-			rawArgs: { file: 'src/a.ts' },
+			rawArgs: { filePath: 'src/a.ts' },
 		});
 		expect(ports.diff.readWorkspaceDiff).toHaveBeenCalledWith(
 			expect.objectContaining({ file: 'src/a.ts', stat: undefined }),
@@ -1162,7 +1162,7 @@ describe('agent-control service: review', () => {
 		await service.invoke({
 			op: 'getDiffComments',
 			token: 'tok-caller',
-			rawArgs: { file: 'src/a.ts' },
+			rawArgs: { filePath: 'src/a.ts' },
 		});
 		expect(ports.review.listComments).toHaveBeenCalledWith({
 			file: 'src/a.ts',

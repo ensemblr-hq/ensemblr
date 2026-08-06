@@ -1,10 +1,7 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { TOOL_DEFS } from '../../src/main/agent-control/index.ts';
 import {
-	type AgentControlOp,
 	ASK_USER_QUESTION_LIMITS,
 	HARNESS_AWARENESS,
 	ORCHESTRATOR_AWARENESS,
@@ -22,28 +19,17 @@ import {
 	planModeControlOpDenial,
 	planModeFollowUpDenial,
 } from '../../src/shared/plan-mode.ts';
+import {
+	controlOpForToolName,
+	extractEmbeddedToolDescriptions,
+	readExtensionSource,
+} from './support/pi-extension-source.ts';
 
 /** Both plan-mode playbooks, for the assertions that hold whatever the role. */
 const PLAN_MODE_PLAYBOOKS = [
 	PLAN_MODE_ORCHESTRATOR_AWARENESS,
 	PLAN_MODE_SUBAGENT_AWARENESS,
 ] as const;
-
-/**
- * The Pi extension cannot import from `src/` at runtime, so it embeds a copy of
- * each shared awareness constant. These tests are the guardrail that stops the
- * two injection points from drifting.
- */
-const readExtensionSource = (): string =>
-	readFileSync(
-		fileURLToPath(
-			new URL(
-				'../../resources/pi-extensions/ensemblr-control.mts',
-				import.meta.url,
-			),
-		),
-		'utf8',
-	);
 
 /**
  * Extracts the value of a named `const <name> = \`...\`` template literal from the
@@ -97,26 +83,6 @@ const extractSchemaConstraint = (
 };
 
 /**
- * Maps an `ensemblr_*` tool name onto the control op it dispatches, following
- * the naming convention every tool registration in the extension uses.
- */
-const controlOpForToolName = (toolName: string): AgentControlOp =>
-	toolName
-		.replace(/^ensemblr_/, '')
-		.replace(/_(.)/g, (_match, letter: string) =>
-			letter.toUpperCase(),
-		) as AgentControlOp;
-
-/**
- * Matches one `tool(name, op, description, …)` registration in the extension,
- * capturing the three leading string literals. The description alternates
- * between quote styles across registrations, so the closing quote is
- * back-referenced rather than fixed.
- */
-const EXTENSION_TOOL_PATTERN =
-	/\btool\(\s*(['"])(ensemblr_[a-z_0-9]+)\1,\s*(['"])([A-Za-z]+)\3,\s*(['"])((?:\\.|(?!\5)[^\\])*)\5/gs;
-
-/**
  * Tools whose description is allowed to differ between the two surfaces, because
  * it names something only one species has. `setBranchName` closes by pointing at
  * the tab-naming tool a Pi agent should use instead — advice a harness cannot
@@ -126,23 +92,6 @@ const EXTENSION_TOOL_PATTERN =
 const SPECIES_SPECIFIC_DESCRIPTIONS: ReadonlySet<string> = new Set([
 	'ensemblr_set_branch_name',
 ]);
-
-/**
- * Reads each tool description the Pi extension registers, keyed by tool name, so
- * it can be held against the MCP endpoint's copy of the same string.
- */
-const extractEmbeddedToolDescriptions = (
-	source: string,
-): Map<string, string> => {
-	const byName = new Map<string, string>();
-	for (const match of source.matchAll(EXTENSION_TOOL_PATTERN)) {
-		byName.set(
-			match[2],
-			match[6].replace(/\\(['"\\])/g, '$1').replace(/\\n/g, '\n'),
-		);
-	}
-	return byName;
-};
 
 describe('agent-control AWARENESS parity', () => {
 	it('embeds the orchestrator variant byte-for-byte in the Pi extension', () => {
@@ -854,5 +803,30 @@ describe('agent-control tool description parity', () => {
 				'ensemblr_get_workspace_diff',
 			),
 		).toContain('stat=true FIRST');
+	});
+});
+
+// The extension is outside every tsconfig and importable by nothing, so these
+// source reads are the only guard there is. `askUserQuestion` holds its call
+// open for as long as the user takes, and `fetch` — undici, five-minute
+// `headersTimeout` — silently cut that short and lost the answer.
+describe('control transport', () => {
+	it('posts control ops over node:http, never fetch', () => {
+		const source = readExtensionSource();
+		expect(source).toContain("from 'node:http'");
+		// Anchored on the call, not the word: the awareness prose lives here too,
+		// and every call form counts, not just the awaited one.
+		expect(source).not.toMatch(/\bfetch\s*\(/);
+	});
+
+	it('forwards Pi’s per-call cancellation signal into the control request', () => {
+		const source = readExtensionSource();
+		expect(source).toContain('function asAbortSignal(');
+		expect(source).toMatch(/asAbortSignal\(signal\)/);
+		expect(source).not.toMatch(/_signal: unknown/);
+	});
+
+	it('measures the request body in bytes, so wide characters survive it', () => {
+		expect(readExtensionSource()).toContain('Buffer.byteLength(payload)');
 	});
 });

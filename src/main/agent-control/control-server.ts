@@ -1,10 +1,15 @@
 /**
  * Loopback HTTP transport for the agent-control service. Both agent species
- * reach the app through this one server: the Pi extension's tools `fetch`
- * `POST /invoke`, and the harness MCP bridge forwards tool calls to the same
+ * reach the app through this one server: the Pi extension's tools post to
+ * `/invoke`, and the harness MCP bridge forwards tool calls to the same
  * endpoint. It binds to 127.0.0.1 on an ephemeral port and authenticates each
  * request by the per-session token minted in the origin registry — the server
  * never resolves identity itself, it hands the token to the service.
+ *
+ * A response may be held open for hours: `askUserQuestion` blocks until the
+ * human answers. So the socket closing before a reply was written is the only
+ * signal that the caller is gone, and it cancels the op rather than being
+ * ignored.
  */
 import {
 	createServer,
@@ -29,6 +34,15 @@ export interface ControlServer {
 
 const MAX_BODY_BYTES = 1_000_000;
 const OP_SET: ReadonlySet<string> = new Set(AGENT_CONTROL_OPS);
+
+/**
+ * How long a caller has to finish sending a request. It bounds receiving one,
+ * not answering it — {@link handleInvoke} drains the body before it awaits the
+ * service, and `askUserQuestion` then holds the response for as long as the user
+ * takes. Pinned rather than left to a reading of Node's default, because that
+ * hold has no limit of its own.
+ */
+const REQUEST_TIMEOUT_MS = 300_000;
 
 /** Host names that may address the loopback control server. */
 const LOOPBACK_HOSTS: ReadonlySet<string> = new Set([
@@ -129,6 +143,40 @@ function sendJson(res: ServerResponse, status: number, body: unknown): void {
 }
 
 /**
+ * Signals that the caller behind a response has gone away, so an op still
+ * holding that response can stop and clean up after itself.
+ * @param res - Server response whose socket is being watched.
+ * @returns A signal that aborts when the socket closes unanswered.
+ */
+function abortOnHangUp(res: ServerResponse): AbortSignal {
+	const aborter = new AbortController();
+	res.on('close', () => {
+		if (!res.writableEnded) {
+			aborter.abort();
+		}
+	});
+	return aborter.signal;
+}
+
+/**
+ * Writes a result unless the caller already hung up, which a held response makes
+ * routine rather than exceptional.
+ * @param res - Server response.
+ * @param status - HTTP status code.
+ * @param body - Serializable payload.
+ */
+function replyUnlessGone(
+	res: ServerResponse,
+	status: number,
+	body: unknown,
+): void {
+	if (res.writableEnded || res.destroyed) {
+		return;
+	}
+	sendJson(res, status, body);
+}
+
+/**
  * Handles a single `POST /invoke` request end to end.
  * @param req - Incoming request.
  * @param res - Server response.
@@ -175,8 +223,9 @@ async function handleInvoke(
 		rawArgs: record.args,
 		callerModel:
 			typeof record.callerModel === 'string' ? record.callerModel : undefined,
+		signal: abortOnHangUp(res),
 	});
-	sendJson(res, result.ok ? 200 : statusForError(result.code), result);
+	replyUnlessGone(res, result.ok ? 200 : statusForError(result.code), result);
 }
 
 /**
@@ -214,48 +263,72 @@ async function handleMcp(
 }
 
 /**
+ * How often Node sweeps for requests that overran their timeout. Its own 30s
+ * default would round any shorter timeout up to itself, so scale with the
+ * timeout and leave production's at the default.
+ * @param requestTimeoutMs - The configured request timeout.
+ * @returns The sweep interval in milliseconds.
+ */
+function sweepInterval(requestTimeoutMs: number): number {
+	return Math.max(10, Math.min(30_000, Math.floor(requestTimeoutMs / 4)));
+}
+
+/**
  * Starts the loopback control server bound to 127.0.0.1 on an ephemeral port.
  * @param service - Agent-control service every request delegates to.
+ * @param options - Overrides for the request-phase timeout; tests scale it down.
  * @returns A promise resolving to the running server and its URL.
  */
 export function startControlServer(
 	service: AgentControlService,
+	options: { requestTimeoutMs?: number } = {},
 ): Promise<ControlServer> {
-	const server: Server = createServer((req, res) => {
-		if (!isLoopbackHost(req)) {
-			sendJson(res, 403, {
+	const requestTimeout = options.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
+	// Both settings only apply when Node reads them off the constructor options;
+	// assigning `server.requestTimeout` afterwards is silently ignored.
+	const server: Server = createServer(
+		{
+			connectionsCheckingInterval: sweepInterval(requestTimeout),
+			requestTimeout,
+		},
+		(req, res) => {
+			if (!isLoopbackHost(req)) {
+				sendJson(res, 403, {
+					ok: false,
+					code: 'denied-permission',
+					error: 'Requests must address the loopback interface.',
+				});
+				return;
+			}
+			if (req.method === 'GET' && req.url === '/health') {
+				sendJson(res, 200, { ok: true });
+				return;
+			}
+			if (req.method === 'POST' && req.url === '/invoke') {
+				handleInvoke(req, res, service).catch((error) => {
+					const detail = error instanceof Error ? error.message : String(error);
+					if (!res.headersSent && !res.destroyed) {
+						sendJson(res, 500, { ok: false, code: 'internal', error: detail });
+					}
+				});
+				return;
+			}
+			if (req.url === '/mcp') {
+				handleMcp(req, res, service).catch((error) => {
+					const detail = error instanceof Error ? error.message : String(error);
+					if (!res.headersSent) {
+						sendJson(res, 500, { ok: false, code: 'internal', error: detail });
+					}
+				});
+				return;
+			}
+			sendJson(res, 404, {
 				ok: false,
-				code: 'denied-permission',
-				error: 'Requests must address the loopback interface.',
+				code: 'not-found',
+				error: 'No such route.',
 			});
-			return;
-		}
-		if (req.method === 'GET' && req.url === '/health') {
-			sendJson(res, 200, { ok: true });
-			return;
-		}
-		if (req.method === 'POST' && req.url === '/invoke') {
-			handleInvoke(req, res, service).catch((error) => {
-				const detail = error instanceof Error ? error.message : String(error);
-				sendJson(res, 500, { ok: false, code: 'internal', error: detail });
-			});
-			return;
-		}
-		if (req.url === '/mcp') {
-			handleMcp(req, res, service).catch((error) => {
-				const detail = error instanceof Error ? error.message : String(error);
-				if (!res.headersSent) {
-					sendJson(res, 500, { ok: false, code: 'internal', error: detail });
-				}
-			});
-			return;
-		}
-		sendJson(res, 404, {
-			ok: false,
-			code: 'not-found',
-			error: 'No such route.',
-		});
-	});
+		},
+	);
 
 	return new Promise<ControlServer>((resolve, reject) => {
 		server.once('error', reject);

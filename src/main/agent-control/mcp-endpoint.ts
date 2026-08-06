@@ -184,15 +184,15 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_get_workspace_diff',
 		op: 'getWorkspaceDiff',
 		description:
-			"Read this workspace's diff — every change on its branch, committed and uncommitted alike, the same set the Changes panel shows. Call it with stat=true FIRST: that returns the changed files with their +/- counts and no patch text, so you can see how big the diff is before you read it. Then read the whole diff, or pass file to read one file's patch on its own — file and stat are alternatives, not a pair. Every read is capped: a full read names what it dropped in omittedFiles for you to re-request by file, and a single file too large to carry is cut at a hunk boundary.",
-		shape: { file: z.string().optional(), stat: z.boolean().optional() },
+			"Read this workspace's diff — every change on its branch, committed and uncommitted alike, the same set the Changes panel shows. Call it with stat=true FIRST: that returns the changed files with their +/- counts and no patch text, so you can see how big the diff is before you read it. Then read the whole diff, or pass filePath to read one file's patch on its own — filePath and stat are alternatives, not a pair. Every read is capped: a full read names what it dropped in omittedFiles for you to re-request by filePath, and a single file too large to carry is cut at a hunk boundary.",
+		shape: { filePath: z.string().optional(), stat: z.boolean().optional() },
 	},
 	{
 		name: 'ensemblr_get_diff_comments',
 		op: 'getDiffComments',
 		description:
-			"Read the review comments on this workspace's diff — the ones the user left in the Changes panel and the ones agents filed there. Pass file to narrow it to one path. Comments synced from a GitHub pull request are not included.",
-		shape: { file: z.string().optional() },
+			"Read the review comments on this workspace's diff — the ones the user left in the Changes panel and the ones agents filed there. Pass filePath to narrow it to one path. Comments synced from a GitHub pull request are not included.",
+		shape: { filePath: z.string().optional() },
 	},
 	{
 		name: 'ensemblr_add_diff_comments',

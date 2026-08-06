@@ -111,12 +111,30 @@ the exact argument shapes):
   harness caller has no such tab and is refused with `denied-scope`.
 
   One questionnaire per session at a time: a second call while one is on screen
-  comes straight back unanswered rather than replacing it. A questionnaire left
-  alone for 30 minutes is withdrawn and the call released. Each of those, plus
-  the no-window case, resolves with a `summary` that tells the agent it was not
-  a decline, so it can retry rather than act on a refusal that never happened.
-  Main renders that `summary` from the answers it validated — the renderer never
-  supplies prose.
+  comes straight back unanswered rather than replacing it.
+
+  There is no timeout. The call is held until the user answers or dismisses it,
+  the asking turn ends, or the session does — a question left overnight is still
+  waiting in the morning. The transport has to hold too, which is why the Pi
+  extension posts over `node:http` rather than `fetch`: Node's `fetch` is undici,
+  whose `headersTimeout` defaults to five minutes, and it used to abort the call
+  while the dialog stayed on screen, so the answer the user eventually gave was
+  written to a dead socket and lost. Do not "tidy" that back to `fetch`.
+
+  A turn that ends before the user answers takes its questionnaire off screen:
+  the socket closes unanswered, `/invoke` aborts the op, and the coordinator
+  withdraws it. Without that the card would outlive its asker, look live, and
+  block the session's next question forever.
+
+  The reverse also has to hold: a window that reloads loses the card but not the
+  call, since the renderer keeps its pending questions in memory only. Main
+  re-announces every open questionnaire on `did-finish-load`, so the card comes
+  back rather than leaving the agent blocked on something nobody can see.
+
+  The withdrawn case, the concurrent-ask case, and the no-window case each
+  resolve with a `summary` that tells the agent it was not a decline, so it can
+  retry rather than act on a refusal that never happened. Main renders that
+  `summary` from the answers it validated — the renderer never supplies prose.
 
   Length rules are asymmetric on purpose. An over-long option **label** is
   rejected, because the label is rendered and truncating it would change the
@@ -125,6 +143,47 @@ the exact argument shapes):
   and bought nothing. Headers no longer have to be distinct either: `headerOf`
   leads every label with its `Q<n>` position, so the pager is unambiguous however
   the agent worded them.
+
+## Argument naming
+
+Three sites describe the same ops — the Pi extension's TypeBox schemas, the MCP
+endpoint's `TOOL_DEFS`, and the authoritative Zod schemas in
+`src/shared/agent-control/schemas.ts`. A concept spelled two ways across them
+reaches the model as two words for one thing, and it guesses: `ensemblr_set_name`
+used to take `name` while `ensemblr_start_conversation` took `title` for the same
+chat-tab label, so agents crossed them.
+
+`src/shared/agent-control/arg-naming.ts` holds the vocabulary.
+`CANONICAL_ARG_KEYS` lists every argument key the surface may use and the concept
+it carries; an op needing a concept already listed reuses its key rather than
+coining a synonym, and one needing a genuinely new concept adds a row first. The
+rules that decide most cases:
+
+- **`title`** — the human-readable label of a UI surface or an artifact: a chat
+  tab, a plan, a summary. Never `name`.
+- **`name`** — the identity of a durable, addressable thing: the workspace and
+  its git branch. Qualified where the bare word would be ambiguous (`scriptName`).
+- **`<noun>Id`** — an opaque identifier: `chatTabId`, `piSessionId`,
+  `terminalId`, `workspaceId`, `harnessId`, `turnId`.
+- **`filePath`** — a workspace-relative path, everywhere. Never `file` or `path`.
+- Text by its audience: `prompt` to a conversation, `input` to a terminal,
+  `message` to a human or an orchestrator, `body` to a review comment.
+
+Scope is the agent-facing surface only. The main-process ports behind it keep
+their own vocabulary, and the service maps between the two at dispatch.
+
+**Near misses are forgiven, not rejected.** `AGENT_CONTROL_ARG_ALIASES` maps the
+spellings a tool's own name invites — `set_name` invites `name`,
+`set_branch_name` invites `slug` — onto the canonical key, and `validateArgs`
+rewrites them before the schema runs. A canonical key sent alongside an alias
+wins. The rewrite is silent on purpose: the canonical key already travels to the
+model in the tool schema, so an error would cost a round trip to teach what the
+description said. When a key really is unknown, the failure names the keys the op
+does accept, so the retry is informed.
+
+`tests/main/agent-control-arg-naming.test.ts` enforces all of it — every schema
+key against the vocabulary, every alias against its op's real keys, and the
+parameter keys of all three surfaces against one another.
 
 ## Reviewing the diff
 
@@ -141,14 +200,14 @@ base degrades to the uncommitted change set, exactly as the panel does.
 **Call `stat: true` first.** A workspace diff is the one payload in this surface
 with no natural size ceiling. Stat mode returns the changed-file rows and totals
 and issues no per-file git call, so it is the cheap probe that says whether the
-full read is worth making. `file` and `stat` are alternatives rather than a
+full read is worth making. `filePath` and `stat` are alternatives rather than a
 filter pair — sending both is refused as `invalid-args`, since a single file has
 no stat and silent precedence would leave the caller unsure which read it got.
 
 **Every read is capped at 32,000 characters** — the same `MAX_AGENT_PAYLOAD_CHARS`
 ceiling a joined child report gets. A full read cuts on **whole-file boundaries
 only**, because a patch severed mid-hunk is unparseable; the files it drops come
-back in `omittedFiles`, each re-requestable with `file: "<path>"`. That per-file
+back in `omittedFiles`, each re-requestable with `filePath: "<path>"`. That per-file
 call carries the same ceiling, cutting at a **hunk boundary**: the files a full
 read drops are by definition the large ones, so leaving the recovery route
 unbounded would turn `omittedFiles` into an instruction to blow the context the

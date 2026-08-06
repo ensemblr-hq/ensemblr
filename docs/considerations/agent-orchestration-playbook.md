@@ -83,7 +83,7 @@ a permission denial stays visible.
 | Goal | Tools |
 |---|---|
 | Delegate a subtask to a Pi sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `piSessionId`). While planning, the child inherits Plan Mode. |
-| Name your own tab | `ensemblr_set_name` (Pi chats only) |
+| Name your own tab | `ensemblr_set_name` (Pi chats only; the label goes in `title`, as it does everywhere) |
 | Name the workspace + git branch | `ensemblr_set_branch_name` (one-shot, placeholder names only; refuses unless the user enabled `git.renameWorkspaceOnBranch`, so call it only when the per-turn upkeep block asks) |
 | Record what the session covered | `ensemblr_set_summary` (every turn; Pi chats only) |
 | **Block until children settle** | `ensemblr_wait_for_agents` |
@@ -96,7 +96,7 @@ a permission denial stays visible.
 | Ask the human to decide | `ensemblr_ask_user_question` (blocks until answered; Pi chats only) |
 | See the workspace | `ensemblr_list_workspaces`, `ensemblr_list_tabs`, `ensemblr_list_terminals` |
 | Move / read the workspace board | `ensemblr_set_workspace_status`, `ensemblr_get_workspace_status` |
-| Read the workspace diff | `ensemblr_get_workspace_diff` — call it with `stat: true` first, then read the whole diff or one `file` at a time |
+| Read the workspace diff | `ensemblr_get_workspace_diff` — call it with `stat: true` first, then read the whole diff or one `filePath` at a time |
 | Read / leave review comments | `ensemblr_get_diff_comments`, `ensemblr_add_diff_comments` (Ensemblr-local comments only; GitHub PR threads are not included) |
 | Pick a model for a child | `ensemblr_list_models` |
 | Surface work to the user | `ensemblr_focus_tab`, `ensemblr_focus_dock_tab`, `ensemblr_focus_panel` |

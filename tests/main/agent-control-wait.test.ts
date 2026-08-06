@@ -353,6 +353,63 @@ describe('agent-control waitForAgents', () => {
 		}
 	});
 
+	it('reports nothing when the waiting turn ends mid-wait', async () => {
+		const statuses = new Map([['c1', 'streaming']]);
+		const { service, master } = setup({ statuses, children: ['c1'] });
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+			signal: AbortSignal.abort(),
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.completed).toEqual([]);
+			expect(data.timedOut).toBe(false);
+			expect(data.pending).toEqual([
+				{ piSessionId: 'c1', status: 'streaming' },
+			]);
+		}
+	});
+
+	// Reading a report consumes the child's escalation, so an abandoned wait must
+	// not take one: the child raised its hand for whoever asks next, not for a turn
+	// that has already gone.
+	it('leaves a child’s signal for the next wait when its turn ended', async () => {
+		const statuses = new Map([['c1', 'streaming']]);
+		const { service, master, childOrigins } = setup({
+			statuses,
+			children: ['c1'],
+		});
+		await service.invoke({
+			op: 'notifyOrchestrator',
+			token: childOrigins[0].token,
+			rawArgs: { reason: 'need_decision', message: 'which framework?' },
+		});
+		await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+			signal: AbortSignal.abort(),
+		});
+
+		const result = await service.invoke({
+			op: 'waitForAgents',
+			token: master.token,
+			rawArgs: { mode: 'first', timeoutMs: 1000 },
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			const data = result.data as WaitForAgentsResult;
+			expect(data.completed).toHaveLength(1);
+			expect(data.completed[0]).toMatchObject({
+				piSessionId: 'c1',
+				signal: { reason: 'need_decision', message: 'which framework?' },
+			});
+		}
+	});
+
 	// The playbook promises a `need_decision` wakes the wait immediately, with no
 	// mode attached to the promise. Under `all` the child would otherwise sit on
 	// its question until the five-minute wait timeout.
