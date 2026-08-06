@@ -24,6 +24,7 @@ import {
 	openEnsemblrDatabase,
 } from '../../src/main/storage/database.ts';
 import type { GitSettings } from '../../src/shared/config.ts';
+import { toWorkspaceDisplayName } from '../../src/shared/workspace-name.ts';
 import { buildRootDirectoryStub } from './helpers/root-directory-stub.ts';
 
 const fixedNow = () => new Date('2026-06-08T12:00:00.000Z');
@@ -1381,4 +1382,47 @@ test('rejects a branch plan whose ref could smuggle a git option', async (t) => 
 
 	assert.equal(result.status, 'failure');
 	assert.equal(result.diagnostics[0]?.code, 'branch-name-invalid');
+});
+
+test('adopting a nested branch name does not fail on workspace-name rules', async (t) => {
+	const harness = createHarness(t);
+	commitOnBranch(harness.repositoryPath, 'psoldunov/feature-x', 'feature.txt');
+
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'psoldunov/feature-x', kind: 'adopt' },
+		// The picker seeds the name from the branch, and a slash is not a legal
+		// workspace-name character, so an unsanitized seed fails with
+		// `name-invalid` before git is ever reached.
+		name: toWorkspaceDisplayName('psoldunov/feature-x') ?? undefined,
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.branchName, 'psoldunov/feature-x');
+	assert.equal(result.workspace?.name, 'psoldunov feature-x');
+});
+
+test('rejects a raw nested branch name so sanitizing stays the caller’s job', async (t) => {
+	const harness = createHarness(t);
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		name: 'psoldunov/feature-x',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'name-invalid');
 });

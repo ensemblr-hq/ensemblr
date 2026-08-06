@@ -113,7 +113,8 @@ test('use-branch seed adopts the branch and leaves the base to the service', () 
 	);
 
 	expect(seed.branchPlan).toEqual({ branch: 'feat/nested/x', kind: 'adopt' });
-	expect(seed.name).toBe('feat/nested/x');
+	// The plan keeps the real branch; only the display name is sanitized.
+	expect(seed.name).toBe('feat nested x');
 	expect(seed.baseBranch).toBeUndefined();
 	expect(seed.linkedIssue).toBeUndefined();
 	expect(seed.branchName).toBeUndefined();
@@ -175,6 +176,51 @@ test('github-issue seed attaches the linked issue and never sets a baseBranch', 
 	expect(seed.linkedIssue?.provider).toBe('github');
 	expect(seed.linkedIssue?.identifier).toBe('#44');
 	expect(seed.linkedIssue?.description).toBe('Repro steps');
+});
+
+// The service rejects a name outside `[A-Za-z0-9 ._-]`, so a seed that passes a
+// raw branch name or PR title through fails creation with `name-invalid`.
+test('a slashed branch name is sanitized into a usable workspace name', () => {
+	const seed = workspaceSeedFromSourceItem(
+		{ branch: branch({ name: 'psoldunov/feat/nested-x' }), kind: 'branch' },
+		'use-branch',
+	);
+
+	expect(seed.name).toBe('psoldunov feat nested-x');
+	expect(seed.branchPlan).toEqual({
+		branch: 'psoldunov/feat/nested-x',
+		kind: 'adopt',
+	});
+});
+
+test('a punctuated pull-request title is sanitized into a usable name', () => {
+	const seed = workspaceSeedFromSourceItem(
+		{
+			kind: 'pull-request',
+			pullRequest: pullRequest({
+				headRefName: 'fix-y',
+				title: 'fix(review): stop diffing a branch against itself',
+			}),
+		},
+		'use-branch',
+	);
+
+	expect(seed.name).toBe('fix review stop diffing a branch against itself');
+	expect(seed.branchPlan).toEqual({ branch: 'fix-y', kind: 'adopt' });
+});
+
+test('a source whose label sanitizes to nothing falls back to a placeholder', () => {
+	const branchSeed = workspaceSeedFromSourceItem(
+		{ branch: branch({ name: '///' }), kind: 'branch' },
+		'use-branch',
+	);
+	const prSeed = workspaceSeedFromSourceItem(
+		{ kind: 'pull-request', pullRequest: pullRequest({ title: '🚀' }) },
+		'create',
+	);
+
+	expect(branchSeed.name).toBeUndefined();
+	expect(prSeed.name).toBeUndefined();
 });
 
 test('duplicating a pull request forks the head and keeps the PR base', () => {

@@ -11,6 +11,7 @@ import type {
 	RepositoryBranchWire,
 	RepositoryPullRequestWire,
 } from '@/shared/ipc/contracts/workspace-sources';
+import { toWorkspaceDisplayName } from '@/shared/workspace-name';
 
 /** Stable picker-row id for a branch source. */
 export function branchSourceId(name: string): string {
@@ -77,6 +78,18 @@ export function openableWorkspaceId(
 }
 
 /**
+ * The `name` fragment to spread into a seed, sanitized from a source's own
+ * label. Omitted entirely when nothing usable survives, which leaves the
+ * workspace on the generated-placeholder path rather than failing creation.
+ * @param label - The source's raw label: a branch name or pull-request title.
+ * @returns A spreadable `{ name }`, or an empty object.
+ */
+function displayName(label: string): { name?: string } {
+	const name = toWorkspaceDisplayName(label);
+	return name ? { name } : {};
+}
+
+/**
  * Builds the workspace creation seed for a selected picker item.
  *
  * A branch or pull request hands the workspace that branch outright, so its
@@ -105,7 +118,7 @@ export function workspaceSeedFromSourceItem(
 					}
 				: {
 						branchPlan: { branch: item.branch.name, kind: 'adopt' },
-						name: item.branch.name,
+						...displayName(item.branch.name),
 					};
 		case 'pull-request': {
 			const target = originQualifiedRef(item.pullRequest.baseRefName);
@@ -124,7 +137,7 @@ export function workspaceSeedFromSourceItem(
 							branch: item.pullRequest.headRefName,
 							kind: 'adopt',
 						},
-						name: item.pullRequest.title,
+						...displayName(item.pullRequest.title),
 					};
 		}
 		case 'linear-issue':

@@ -23,6 +23,7 @@ import type { KeymapBinding } from '@/renderer/types/keymap';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 import type { RenameWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 import { toSlug } from '@/shared/slug';
+import { WORKSPACE_NAME_PATTERN } from '@/shared/workspace-name';
 
 /** Modal that renames the selected workspace, optionally renaming its branch. */
 export function RenameWorkspaceDialog({
@@ -52,8 +53,6 @@ export function RenameWorkspaceDialog({
 /** Progress stage of the workspace rename flow. */
 type RenameWorkspaceStage = 'failure' | 'idle' | 'renaming';
 
-const NAME_PATTERN = /^[A-Za-z0-9 ._-]+$/;
-
 /** Inner state-owned form that resets each time the dialog re-opens. */
 function RenameWorkspaceDialogForm({
 	onOpenChange,
@@ -77,7 +76,7 @@ function RenameWorkspaceDialogForm({
 		allowedCharacters: 'letters, numbers, spaces, dots, dashes, or underscores',
 		name: trimmedName,
 		noun: 'Workspace',
-		pattern: NAME_PATTERN,
+		pattern: WORKSPACE_NAME_PATTERN,
 	});
 	// An adopted branch may already back a pull request, so the service refuses to
 	// move it; pin the field rather than let the user submit a rejected rename.
