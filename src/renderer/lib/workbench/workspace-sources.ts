@@ -56,7 +56,9 @@ export function getWorkspaceSourceKindLabel(kind: WorkspaceSourceKind): string {
  * Row actions for a source, primary action first. A branch or pull-request head
  * that an active workspace already holds can be opened or duplicated — git
  * allows a branch in one worktree at a time, so offering to take it over again
- * would only fail on create. Issues always create.
+ * would only fail on create. The default branch is the same constraint from the
+ * other side: the repository folder holds it, so that row only ever creates.
+ * Issues always create.
  */
 export function getWorkspaceSourceActions(
 	source: WorkspaceSource,
@@ -65,6 +67,9 @@ export function getWorkspaceSourceActions(
 		case 'issue':
 			return [CREATE_ACTION];
 		case 'branch':
+			if (source.isDefaultBranch) {
+				return [CREATE_ACTION];
+			}
 			return source.hasWorkspace
 				? [...EXISTING_WORKSPACE_ACTIONS]
 				: [USE_BRANCH_ACTION];

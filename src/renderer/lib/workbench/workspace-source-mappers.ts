@@ -30,6 +30,7 @@ export function mapRepositoryBranchesToWorkspaceSources(
 	return branches.map((branch) => ({
 		hasWorkspace: branch.hasWorkspace,
 		id: branchSourceId(branch.name),
+		isDefaultBranch: branch.isDefault,
 		kind: 'branch',
 		provider: 'github',
 		title: branch.name,
@@ -94,11 +95,16 @@ function displayName(label: string): { name?: string } {
  *
  * A branch or pull request hands the workspace that branch outright, so its
  * commits show up in the review panel and pushes land on the pull request the
- * branch already backs. `duplicate-branch` is the deliberate exception: it forks
- * a copy off the branch tip instead. Neither one sets the branch as the base —
- * that stays the branch being merged *into*, defaulting to the repository's
- * configured target when the source does not name one. Issue sources cut a fresh
- * branch and attach the linked issue + composer context.
+ * branch already backs. Neither one sets the branch as the base — that stays the
+ * branch being merged *into*, defaulting to the repository's configured target
+ * when the source does not name one.
+ *
+ * Two cases fork instead. `duplicate-branch` is the explicit one. The default
+ * branch is the implicit one: the repository folder already has it checked out,
+ * and git allows a branch in a single worktree, so taking it over could only
+ * fail — picking it means "start something new off master", which also makes it
+ * the merge target. Issue sources cut a fresh branch and attach the linked issue
+ * + composer context.
  * @param item - The picker row the user selected.
  * @param actionId - Which of the row's actions was invoked.
  * @returns The seed to send with the create-workspace request.
@@ -108,18 +114,21 @@ export function workspaceSeedFromSourceItem(
 	actionId: WorkspaceSourceActionId,
 ): WorkspaceCreationSeed {
 	switch (item.kind) {
-		case 'branch':
+		case 'branch': {
+			const tip = `origin/${item.branch.name}`;
+			if (item.branch.isDefault) {
+				return {
+					baseBranch: tip,
+					branchPlan: { forkRef: tip, kind: 'create' },
+				};
+			}
 			return actionId === 'duplicate-branch'
-				? {
-						branchPlan: {
-							forkRef: `origin/${item.branch.name}`,
-							kind: 'create',
-						},
-					}
+				? { branchPlan: { forkRef: tip, kind: 'create' } }
 				: {
 						branchPlan: { branch: item.branch.name, kind: 'adopt' },
 						...displayName(item.branch.name),
 					};
+		}
 		case 'pull-request': {
 			const target = originQualifiedRef(item.pullRequest.baseRefName);
 			const base = target ? { baseBranch: target } : {};

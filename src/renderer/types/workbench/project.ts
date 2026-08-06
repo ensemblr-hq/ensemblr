@@ -43,6 +43,11 @@ export type WorkspaceSourceProvider = 'github' | 'linear';
 export interface WorkspaceSource {
 	hasWorkspace?: boolean;
 	id: string;
+	/**
+	 * True for the repository's default branch. The repository folder already has
+	 * it checked out, so such a row forks a new branch rather than taking it over.
+	 */
+	isDefaultBranch?: boolean;
 	kind: WorkspaceSourceKind;
 	provider: WorkspaceSourceProvider;
 	reference?: string;

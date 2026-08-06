@@ -1,4 +1,5 @@
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, realpathSync, rmSync } from 'node:fs';
+import path from 'node:path';
 
 import type {
 	CreateWorkspaceDiagnostic,
@@ -253,6 +254,49 @@ export function readWorktreePathForBranch(
 }
 
 /**
+ * Compares two paths by their real location. Git reports worktree paths with
+ * symlinks resolved, so a repository registered under `/var/...` on macOS comes
+ * back as `/private/var/...` and a plain string compare would miss the match.
+ * @param left - First path.
+ * @param right - Second path.
+ * @returns True when both name the same directory.
+ */
+function isSamePath(left: string, right: string): boolean {
+	try {
+		return realpathSync(left) === realpathSync(right);
+	} catch {
+		return path.resolve(left) === path.resolve(right);
+	}
+}
+
+/**
+ * Explains that a branch is spoken for, pointing at whoever holds it. The
+ * repository folder is called out by name: it is not a workspace, so telling the
+ * user to open it would send them nowhere.
+ * @param options - The branch, its holder, and the repository root.
+ * @returns The rejection diagnostic.
+ */
+function occupiedDiagnostic({
+	branchName,
+	occupiedBy,
+	repositoryPath,
+}: {
+	branchName: string;
+	occupiedBy: string;
+	repositoryPath: string;
+}): CreateWorkspaceDiagnostic {
+	const heldByRepository = isSamePath(occupiedBy, repositoryPath);
+	return {
+		code: 'branch-already-checked-out',
+		message: heldByRepository
+			? `Branch "${branchName}" is checked out in the repository folder at ${occupiedBy}, and git allows a branch in one worktree at a time. Duplicate the branch to work on a copy.`
+			: `Branch "${branchName}" is already checked out at ${occupiedBy}. Open that workspace, or duplicate the branch to work on a copy.`,
+		path: occupiedBy,
+		severity: 'error',
+	};
+}
+
+/**
  * Refreshes the refs the placement depends on, then settles how `git worktree
  * add` will place its branch — refusing up front when the branch is already
  * checked out in another worktree, which git would reject anyway but only after
@@ -296,12 +340,11 @@ async function planBranchPlacement({
 		: null;
 	if (occupiedBy) {
 		return {
-			diagnostic: {
-				code: 'branch-already-checked-out',
-				message: `Branch "${request.branchName}" is already checked out at ${occupiedBy}. Open that workspace, or duplicate the branch to work on a copy.`,
-				path: occupiedBy,
-				severity: 'error',
-			},
+			diagnostic: occupiedDiagnostic({
+				branchName: request.branchName,
+				occupiedBy,
+				repositoryPath,
+			}),
 		};
 	}
 

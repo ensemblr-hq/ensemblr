@@ -178,6 +178,49 @@ test('github-issue seed attaches the linked issue and never sets a baseBranch', 
 	expect(seed.linkedIssue?.description).toBe('Repro steps');
 });
 
+// Git allows a branch in one worktree at a time and the repository folder
+// already holds the default branch, so adopting it could only ever fail.
+test('the default branch forks instead of adopting', () => {
+	const seed = workspaceSeedFromSourceItem(
+		{ branch: branch({ isDefault: true, name: 'master' }), kind: 'branch' },
+		'create',
+	);
+
+	expect(seed.branchPlan).toEqual({ forkRef: 'origin/master', kind: 'create' });
+	expect(seed.baseBranch).toBe('origin/master');
+	// No name: a fresh branch off master gets the generated placeholder, the
+	// same as every other new workspace.
+	expect(seed.name).toBeUndefined();
+});
+
+test('a non-default branch still adopts', () => {
+	const seed = workspaceSeedFromSourceItem(
+		{ branch: branch({ isDefault: false, name: 'feature-x' }), kind: 'branch' },
+		'use-branch',
+	);
+
+	expect(seed.branchPlan).toEqual({ branch: 'feature-x', kind: 'adopt' });
+});
+
+test('the default branch row offers Create, not Use branch', () => {
+	const [defaultRow] = mapRepositoryBranchesToWorkspaceSources([
+		branch({ isDefault: true, name: 'master' }),
+	]);
+	const [featureRow] = mapRepositoryBranchesToWorkspaceSources([
+		branch({ isDefault: false, name: 'feature-x' }),
+	]);
+	if (!defaultRow || !featureRow) {
+		throw new Error('sources missing');
+	}
+
+	expect(
+		getWorkspaceSourceActions(defaultRow).map((action) => action.id),
+	).toEqual(['create']);
+	expect(
+		getWorkspaceSourceActions(featureRow).map((action) => action.id),
+	).toEqual(['use-branch']);
+});
+
 // The service rejects a name outside `[A-Za-z0-9 ._-]`, so a seed that passes a
 // raw branch name or PR title through fails creation with `name-invalid`.
 test('a slashed branch name is sanitized into a usable workspace name', () => {

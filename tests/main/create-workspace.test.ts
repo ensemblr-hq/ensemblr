@@ -1426,3 +1426,31 @@ test('rejects a raw nested branch name so sanitizing stays the caller’s job', 
 	assert.equal(result.status, 'failure');
 	assert.equal(result.diagnostics[0]?.code, 'name-invalid');
 });
+
+test('names the repository folder, not a workspace, when it holds the branch', async (t) => {
+	const harness = createHarness(t);
+	// `main` is checked out in the repository folder itself, so there is no
+	// workspace to send the user to.
+	const service = createWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+		rootDirectoryService: rootDirectoryStub(harness),
+	});
+
+	const result = await service.create({
+		branchPlan: { branch: 'main', kind: 'adopt' },
+		name: 'takeover',
+		repositoryId: harness.repositoryId,
+	});
+
+	assert.equal(result.status, 'failure');
+	assert.equal(result.diagnostics[0]?.code, 'branch-already-checked-out');
+	const message = String(result.diagnostics[0]?.message);
+	assert.match(message, /repository folder/);
+	assert.doesNotMatch(
+		message,
+		/Open that workspace/,
+		'there is no workspace to open when the repository folder holds the branch',
+	);
+});
