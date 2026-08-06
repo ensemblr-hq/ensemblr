@@ -43,8 +43,10 @@ test('provides row actions per source', () => {
 		provider: 'github',
 		title: 'master',
 	};
+	// A free pull-request head is taken over, not cut, so it reads the same as a
+	// free branch. Only an issue, which has no branch at all, creates one.
 	expect(getWorkspaceSourceActions(pullRequest).map((a) => a.label)).toEqual([
-		'Create',
+		'Use branch',
 	]);
 	expect(getWorkspaceSourceActions(issue).map((a) => a.label)).toEqual([
 		'Create',

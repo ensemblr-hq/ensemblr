@@ -58,7 +58,11 @@ export function getWorkspaceSourceKindLabel(kind: WorkspaceSourceKind): string {
  * allows a branch in one worktree at a time, so offering to take it over again
  * would only fail on create. The default branch is the same constraint from the
  * other side: the repository folder holds it, so that row only ever creates.
- * Issues always create.
+ *
+ * A free branch and a free pull-request head share the same primary action:
+ * both hand the workspace an existing branch, and labelling one of them
+ * "Create" would promise a new branch the workspace does not cut. Issues, which
+ * genuinely have no branch yet, are the only rows that create.
  */
 export function getWorkspaceSourceActions(
 	source: WorkspaceSource,
@@ -76,7 +80,7 @@ export function getWorkspaceSourceActions(
 		case 'pull-request':
 			return source.hasWorkspace
 				? [...EXISTING_WORKSPACE_ACTIONS]
-				: [CREATE_ACTION];
+				: [USE_BRANCH_ACTION];
 	}
 }
 

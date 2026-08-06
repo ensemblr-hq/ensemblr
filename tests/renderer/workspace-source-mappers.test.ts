@@ -144,7 +144,7 @@ test('pull-request seed adopts the head and targets the PR base', () => {
 				title: 'Fix the y axis',
 			}),
 		},
-		'create',
+		'use-branch',
 	);
 
 	expect(seed.branchPlan).toEqual({ branch: 'fix-y', kind: 'adopt' });
@@ -159,7 +159,7 @@ test('pull-request seed omits the base when the PR reports no base ref', () => {
 			kind: 'pull-request',
 			pullRequest: pullRequest({ baseRefName: '', headRefName: 'fix-y' }),
 		},
-		'create',
+		'use-branch',
 	);
 
 	expect(seed.baseBranch).toBeUndefined();
@@ -259,7 +259,7 @@ test('a source whose label sanitizes to nothing falls back to a placeholder', ()
 	);
 	const prSeed = workspaceSeedFromSourceItem(
 		{ kind: 'pull-request', pullRequest: pullRequest({ title: '🚀' }) },
-		'create',
+		'use-branch',
 	);
 
 	expect(branchSeed.name).toBeUndefined();
@@ -334,6 +334,23 @@ test('a pull request whose head is held offers open and duplicate', () => {
 		'duplicate-branch',
 	]);
 	expect(getWorkspaceSourceActions(free).map((action) => action.id)).toEqual([
-		'create',
+		'use-branch',
 	]);
+});
+
+// The row takes the head branch over, so it must not be labelled with a promise
+// to cut a new one.
+test('a free pull-request row offers the same take-over action as a branch', () => {
+	const [pullRequestRow] = mapPullRequestsToWorkspaceSources([pullRequest()]);
+	const [branchRow] = mapRepositoryBranchesToWorkspaceSources([branch()]);
+	if (!pullRequestRow || !branchRow) {
+		throw new Error('sources missing');
+	}
+
+	expect(getWorkspaceSourceActions(pullRequestRow)).toEqual(
+		getWorkspaceSourceActions(branchRow),
+	);
+	expect(getWorkspaceSourceActions(pullRequestRow)[0]?.label).toBe(
+		'Use branch',
+	);
 });
