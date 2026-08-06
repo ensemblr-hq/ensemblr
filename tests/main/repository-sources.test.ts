@@ -120,6 +120,7 @@ test('parsePullRequests maps gh JSON and tolerates missing author', () => {
 	const stdout = JSON.stringify([
 		{
 			author: { login: 'octocat' },
+			baseRefName: 'master',
 			headRefName: 'feature-x',
 			isDraft: false,
 			number: 30,
@@ -146,10 +147,14 @@ test('parsePullRequests maps gh JSON and tolerates missing author', () => {
 	assert.equal(rows?.length, 2);
 	assert.equal(rows?.[0]?.authorLogin, 'octocat');
 	assert.equal(rows?.[0]?.headRefName, 'feature-x');
+	assert.equal(rows?.[0]?.baseRefName, 'master');
 	assert.equal(rows?.[0]?.isCrossRepository, false);
 	assert.equal(rows?.[1]?.authorLogin, null);
 	assert.equal(rows?.[1]?.isDraft, true);
 	assert.equal(rows?.[1]?.isCrossRepository, true);
+	// A PR listing without baseRefName degrades to an empty target rather than
+	// dropping the row; the seed then leaves the base to the creation service.
+	assert.equal(rows?.[1]?.baseRefName, '');
 });
 
 test('parsePullRequests returns null for non-JSON', () => {
@@ -263,6 +268,40 @@ test('listPullRequests calls gh in the repo path and maps rows', async () => {
 	assert.equal(calls[0]?.command, 'gh');
 	assert.equal(calls[0]?.cwd, '/repo');
 	assert.deepEqual(calls[0]?.args?.slice(0, 2), ['pr', 'list']);
+	// The workspace targets the PR's base, so the base ref must be requested.
+	assert.ok(calls[0]?.args?.some((arg) => arg.includes('baseRefName')));
+});
+
+test('listPullRequests marks a head branch an active workspace already holds', async () => {
+	const stdout = JSON.stringify([
+		{
+			author: { login: 'octocat' },
+			baseRefName: 'master',
+			headRefName: 'feature-x',
+			isCrossRepository: false,
+			isDraft: false,
+			number: 30,
+			state: 'OPEN',
+			title: 'Add the picker',
+			updatedAt: '2026-06-06T17:30:00.000Z',
+			url: 'https://github.com/o/r/pull/30',
+		},
+	]);
+	const { service: commandService } = stubCommandService(() =>
+		buildResult('gh', { status: 'success', stdout }),
+	);
+	const service = createRepositorySourcesService({
+		databaseService: fakeDatabaseService([
+			{ branchName: 'feature-x', id: 'ws-1' },
+		]),
+		localCommandService: commandService,
+		resolveRepositoryPath: () => '/repo',
+	});
+
+	const result = await service.listPullRequests({ repositoryId: 'repo-1' });
+
+	assert.equal(result.pullRequests[0]?.hasWorkspace, true);
+	assert.equal(result.pullRequests[0]?.workspaceId, 'ws-1');
 });
 
 test('listPullRequests drops cross-repository (fork) PRs', async () => {

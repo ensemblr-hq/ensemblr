@@ -1,11 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import {
-	appendFileSync,
-	existsSync,
-	mkdirSync,
-	readFileSync,
-	rmSync,
-} from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
@@ -21,6 +15,7 @@ import type {
 	CreateWorkspaceRequest,
 	CreateWorkspaceResult,
 	FilesToCopySnapshot,
+	WorkspaceBranchPlan,
 	WorkspaceLinkedIssueInput,
 } from '../../shared/ipc/contracts/workspace';
 import { pickComposerSurname } from '../../shared/workspace-name-pool.ts';
@@ -47,14 +42,17 @@ import {
 import {
 	DEFAULT_FALLBACK_BRANCH,
 	GIT_WORKTREE_TIMEOUT_MS,
+	refResolvesToCommit,
 	resolveRootBranch,
 	runBranchDelete,
-	runWorktreeAdd as runWorktreeAddShared,
-	syncBaseRef,
 } from './git-ops.ts';
 import type { GithubUsernameResolver } from './github-username.ts';
 import { toSlug } from './slug.ts';
 import { validateWorkspaceName } from './workspace-validation.ts';
+import {
+	cleanupWorkspaceDirectory,
+	createWorktree,
+} from './worktree-placement.ts';
 
 /** Public surface of the workspace creation service. */
 export interface CreateWorkspaceService {
@@ -98,6 +96,18 @@ interface SourceRepository {
 	slug: string;
 }
 
+/**
+ * Internal: the two refs a new workspace needs, kept apart because they answer
+ * different questions. `baseBranch` is the merge target the workspace is
+ * measured against forever; the fork point is consumed once by
+ * `git worktree add` and then lives in the branch's own history.
+ */
+interface WorkspaceBranchPoint {
+	/** Merge target: diff base, conflict probe, and pull-request base. */
+	baseBranch: string;
+	plan: WorkspaceBranchPlan;
+}
+
 /** Internal: validated request plus derived placement fields. */
 interface PreparedWorkspace {
 	baseBranch: string;
@@ -106,6 +116,8 @@ interface PreparedWorkspace {
 	name: string;
 	parentDirectory: string;
 	path: string;
+	/** How `branchName` comes into being: adopted from an existing branch, or cut. */
+	plan: WorkspaceBranchPlan;
 	repository: SourceRepository;
 	slug: string;
 }
@@ -128,75 +140,83 @@ function resolveConfiguredBranchFrom(
 }
 
 /**
- * Chooses the base branch override for a new workspace. An explicit request base
- * (e.g. forking from another workspace) wins untouched; a configured personal
- * `branchFrom` is honored only while it still resolves in the repository, so a
- * base that was deleted or renamed never blocks every workspace creation with
- * `git-worktree-failed`. When there is no explicit base and the configured one
- * is unset or missing, creation falls back to the live repository root branch.
- * @param options - Explicit/configured bases plus git command dependencies.
- * @returns The resolved base override, or `undefined` to defer to the stored
- * repository default.
+ * Resolves both refs a new workspace needs, keeping the merge target separate
+ * from the fork point so the review panel never diffs a branch against itself.
+ * @param options - The request's branch plan, configured base, and git deps.
+ * @returns The workspace's merge target plus either an adopted branch or a fork
+ * point.
  */
-async function resolveBaseBranchOverride({
+async function resolveBranchPoint({
+	configuredBase,
+	localCommandService,
+	repository,
+	request,
+}: {
+	configuredBase: string | undefined;
+	localCommandService: LocalCommandService;
+	repository: SourceRepository;
+	request: CreateWorkspaceRequest;
+}): Promise<WorkspaceBranchPoint> {
+	const baseBranch = await resolveBaseBranch({
+		configuredBase,
+		explicitBase: request.baseBranch?.trim(),
+		localCommandService,
+		repository,
+	});
+	const plan = request.branchPlan ?? { kind: 'create' };
+	if (plan.kind === 'adopt') {
+		return { baseBranch, plan: { branch: plan.branch.trim(), kind: 'adopt' } };
+	}
+	return {
+		baseBranch,
+		plan: { forkRef: plan.forkRef?.trim() || baseBranch, kind: 'create' },
+	};
+}
+
+/**
+ * Chooses the branch a new workspace merges into. An explicit request base wins
+ * untouched; a configured personal `branchFrom` is honored only while it still
+ * resolves in the repository, so a base that was deleted or renamed never blocks
+ * every workspace creation with `git-worktree-failed`. Otherwise creation falls
+ * back to the live repository root branch, resolved fresh so a stale stored
+ * `default_branch` cannot pin the workspace to the wrong target.
+ * @param options - Explicit/configured bases plus git command dependencies.
+ * @returns The resolved merge target.
+ */
+async function resolveBaseBranch({
 	configuredBase,
 	explicitBase,
 	localCommandService,
-	repositoryPath,
+	repository,
 }: {
 	configuredBase: string | undefined;
 	explicitBase: string | undefined;
 	localCommandService: LocalCommandService;
-	repositoryPath: string;
-}): Promise<string | undefined> {
+	repository: SourceRepository;
+}): Promise<string> {
 	if (explicitBase) {
 		return explicitBase;
 	}
 
 	if (
 		configuredBase &&
-		(await branchRefResolves({
-			baseBranch: configuredBase,
+		(await refResolvesToCommit({
 			localCommandService,
-			repositoryPath,
+			ref: configuredBase,
+			repositoryPath: repository.path,
 		}))
 	) {
 		return configuredBase;
 	}
 
 	return (
-		(await resolveRootBranch({ localCommandService, repositoryPath })) ??
-		undefined
+		(await resolveRootBranch({
+			localCommandService,
+			repositoryPath: repository.path,
+		})) ??
+		repository.defaultBranch ??
+		DEFAULT_FALLBACK_BRANCH
 	);
-}
-
-/**
- * Verifies that a ref resolves to a commit inside the repository, so a stale
- * configured base is caught before it reaches `git worktree add`.
- * @param options - Candidate base ref plus git command dependencies.
- * @returns True when `git rev-parse` resolves the ref.
- */
-async function branchRefResolves({
-	baseBranch,
-	localCommandService,
-	repositoryPath,
-}: {
-	baseBranch: string;
-	localCommandService: LocalCommandService;
-	repositoryPath: string;
-}): Promise<boolean> {
-	try {
-		const result = await localCommandService.run({
-			args: ['rev-parse', '--verify', '--quiet', `${baseBranch}^{commit}`],
-			command: 'git',
-			cwd: repositoryPath,
-			maxOutputBytes: 4 * 1024,
-			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
-		});
-		return result.status === 'success';
-	} catch {
-		return false;
-	}
 }
 
 /**
@@ -225,7 +245,6 @@ function resolveConfiguredFilesToCopy(
 
 const DEFAULT_WORKSPACE_NAME = 'workspace';
 const CONTEXT_DIRECTORY = '.context';
-const GIT_FETCH_TIMEOUT_MS = 30_000;
 const GIT_LS_FILES_TIMEOUT_MS = 15_000;
 const GIT_LS_FILES_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
 
@@ -328,20 +347,15 @@ export function createWorkspaceService({
 				repositoryPath: repository.path,
 			},
 		});
-		// An explicit base (e.g. forking from another workspace) wins; then the
-		// repo's configured `branchFrom`, but only when it still resolves in the
-		// repo; otherwise new workspaces branch from the repository root, resolved
-		// live so a stale/feature `default_branch` — or a deleted or renamed
-		// configured base — can't pin creation to the wrong base.
-		const baseBranchOverride = await resolveBaseBranchOverride({
+		const branchPoint = await resolveBranchPoint({
 			configuredBase: resolveConfiguredBranchFrom(resolvedSettings),
-			explicitBase: request.baseBranch?.trim(),
 			localCommandService,
-			repositoryPath: repository.path,
+			repository,
+			request,
 		});
 		const prepared = prepareWorkspace({
-			baseBranchOverride,
 			branchNameOverride: request.branchName,
+			branchPoint,
 			branchPrefix,
 			database,
 			nameInput: request.name,
@@ -364,45 +378,18 @@ export function createWorkspaceService({
 			return failure(parentDiagnostic);
 		}
 
-		// Best-effort: pull the latest remote commits into the base branch so
-		// new workspaces fork from an up-to-date root when online. Any failure
-		// (offline, divergence, dirty tree) degrades to the local base rather
-		// than blocking creation, so workspaces can still be created offline.
-		await syncBaseRef({
-			baseBranch: prepared.baseBranch,
+		const worktree = await createWorktree({
 			localCommandService,
 			repositoryPath: repository.path,
+			request: {
+				baseBranch: prepared.baseBranch,
+				branchName: prepared.branchName,
+				plan: prepared.plan,
+				workspacePath: prepared.path,
+			},
 		});
-
-		// A workspace created from a PR (or any remote branch not yet fetched)
-		// forks off `origin/<head>`; make sure that ref exists locally first.
-		await ensureBaseRefAvailable({
-			baseBranch: prepared.baseBranch,
-			localCommandService,
-			repositoryPath: repository.path,
-		});
-
-		const worktreeDiagnostic = await runWorktreeAdd({
-			baseBranch: prepared.baseBranch,
-			branchName: prepared.branchName,
-			localCommandService,
-			repositoryPath: repository.path,
-			workspacePath: prepared.path,
-		});
-		if (worktreeDiagnostic) {
-			// If the target now exists despite the pre-check, another worker
-			// won a TOCTOU race or the directory materialized concurrently.
-			// Do not delete it — it belongs to whoever got there first.
-			if (existsSync(prepared.path)) {
-				return failure({
-					code: 'destination-exists',
-					message: `A file or directory already exists at ${prepared.path}.`,
-					path: prepared.path,
-					severity: 'error',
-				});
-			}
-			cleanupDirectory(prepared.path);
-			return failure(worktreeDiagnostic);
+		if ('diagnostic' in worktree) {
+			return failure(worktree.diagnostic);
 		}
 
 		// Best-effort: ensure `.context/` is git-ignored before anything can
@@ -428,6 +415,7 @@ export function createWorkspaceService({
 
 		const timestamp = now().toISOString();
 		const initialMetadata = buildInitialWorkspaceMetadata({
+			adoptedBranch: prepared.plan.kind === 'adopt',
 			filesToCopySnapshot,
 			linkedIssue: request.linkedIssue,
 			placeholderName: request.placeholderName === true,
@@ -444,11 +432,12 @@ export function createWorkspaceService({
 		} catch (error) {
 			await rollbackWorktree({
 				branchName: prepared.branchName,
+				createdBranch: worktree.createdBranch,
 				localCommandService,
 				repositoryPath: repository.path,
 				workspacePath: prepared.path,
 			});
-			cleanupDirectory(prepared.path);
+			cleanupWorkspaceDirectory(prepared.path);
 			const message = error instanceof Error ? error.message : '';
 			// SQLite's UNIQUE(repository_id, slug) is the authoritative
 			// guard against concurrent same-slug workspace creation.
@@ -748,11 +737,13 @@ async function resolveBranchPrefix({
 
 /**
  * Resolves the placeholder name, allocates a unique slug for the repository,
- * derives the branch name and base branch, and computes the workspace path.
+ * settles on the branch the worktree will carry, and computes the workspace
+ * path. An adopted branch keeps its own name; every other mode derives one from
+ * the caller's override or the prefixed slug.
  */
 function prepareWorkspace({
-	baseBranchOverride,
 	branchNameOverride,
+	branchPoint,
 	branchPrefix,
 	database,
 	nameInput,
@@ -760,8 +751,8 @@ function prepareWorkspace({
 	repository,
 	workspacesPath,
 }: {
-	baseBranchOverride: string | undefined;
 	branchNameOverride: string | undefined;
+	branchPoint: WorkspaceBranchPoint;
 	branchPrefix: string;
 	database: DatabaseSync;
 	nameInput: string | undefined;
@@ -788,22 +779,22 @@ function prepareWorkspace({
 	});
 	const parentDirectory = path.join(workspacesPath, repository.slug);
 	const workspacePath = path.join(parentDirectory, slug);
-	const branchName =
+	const cutBranchName =
 		typeof branchNameOverride === 'string' && branchNameOverride.trim()
 			? branchNameOverride.trim()
 			: joinBranchName(branchPrefix, slug);
-	const baseBranch =
-		typeof baseBranchOverride === 'string' && baseBranchOverride.trim()
-			? baseBranchOverride.trim()
-			: (repository.defaultBranch ?? DEFAULT_FALLBACK_BRANCH);
 
 	return {
-		baseBranch,
-		branchName,
+		baseBranch: branchPoint.baseBranch,
+		branchName:
+			branchPoint.plan.kind === 'adopt'
+				? branchPoint.plan.branch
+				: cutBranchName,
 		id: `workspace-${randomUUID()}`,
 		name: resolvedName,
 		parentDirectory,
 		path: workspacePath,
+		plan: branchPoint.plan,
 		repository,
 		slug,
 	};
@@ -929,110 +920,20 @@ function ensureParentDirectory(
 }
 
 /**
- * Ensures the worktree base ref resolves locally before `git worktree add`.
- * When it does not (e.g. a pull-request head like `origin/feature-x` that was
- * never fetched), attempts a best-effort `git fetch <remote> <branch>` so the
- * fork can proceed. Already-present refs (local branches, fetched remotes) skip
- * the fetch. All failures are swallowed — `git worktree add` surfaces the real,
- * actionable error if the ref is still missing afterward.
- */
-export async function ensureBaseRefAvailable({
-	baseBranch,
-	localCommandService,
-	repositoryPath,
-}: {
-	baseBranch: string;
-	localCommandService: LocalCommandService;
-	repositoryPath: string;
-}): Promise<void> {
-	try {
-		const verify = await localCommandService.run({
-			args: ['rev-parse', '--verify', '--quiet', `${baseBranch}^{commit}`],
-			command: 'git',
-			cwd: repositoryPath,
-			maxOutputBytes: 4 * 1024,
-			timeoutMs: GIT_WORKTREE_TIMEOUT_MS,
-		});
-		if (verify.status === 'success') {
-			return;
-		}
-
-		const separator = baseBranch.indexOf('/');
-		if (separator <= 0) {
-			return;
-		}
-		const remote = baseBranch.slice(0, separator);
-		const branch = baseBranch.slice(separator + 1);
-		await localCommandService.run({
-			args: ['fetch', remote, branch],
-			command: 'git',
-			cwd: repositoryPath,
-			maxOutputBytes: 64 * 1024,
-			timeoutMs: GIT_FETCH_TIMEOUT_MS,
-		});
-	} catch {
-		// Best effort: leave it to `git worktree add` to report a missing ref.
-	}
-}
-
-/**
- * Runs `git worktree add -b <branch> <path> <base>` inside the source repo
- * by delegating to the shared {@link runWorktreeAddShared} helper, mapping its
- * outcome onto this service's diagnostic shape.
- * @returns A diagnostic on failure; `null` on success.
- */
-async function runWorktreeAdd({
-	baseBranch,
-	branchName,
-	localCommandService,
-	repositoryPath,
-	workspacePath,
-}: {
-	baseBranch: string;
-	branchName: string;
-	localCommandService: LocalCommandService;
-	repositoryPath: string;
-	workspacePath: string;
-}): Promise<CreateWorkspaceDiagnostic | null> {
-	const outcome = await runWorktreeAddShared({
-		baseBranch,
-		branchName,
-		localCommandService,
-		repositoryPath,
-		workspacePath,
-	});
-
-	if (outcome.status === 'success') {
-		return null;
-	}
-
-	if (outcome.status === 'git-missing') {
-		return {
-			code: 'git-not-installed',
-			message: outcome.message,
-			severity: 'error',
-		};
-	}
-
-	return {
-		code: 'git-worktree-failed',
-		message: outcome.message,
-		path: workspacePath,
-		severity: 'error',
-	};
-}
-
-/**
- * Best-effort removal of a worktree and its newly-created branch after a
- * post-worktree failure. Cleanup never replaces the primary diagnostic.
+ * Best-effort removal of a worktree and, when this creation cut it, its branch
+ * after a post-worktree failure. A branch the workspace adopted is left alone —
+ * it predates the workspace and may still back a pull request. Cleanup never
+ * replaces the primary diagnostic.
  */
 async function rollbackWorktree({
 	branchName,
+	createdBranch,
 	localCommandService,
 	repositoryPath,
 	workspacePath,
 }: {
 	branchName: string;
+	createdBranch: boolean;
 	localCommandService: LocalCommandService;
 	repositoryPath: string;
 	workspacePath: string;
@@ -1047,6 +948,9 @@ async function rollbackWorktree({
 		});
 	} catch {
 		// Leave any stuck state for manual inspection.
+	}
+	if (!createdBranch) {
+		return;
 	}
 	// Delete the branch even when worktree removal fails, so the freshly
 	// created branch never lingers after a rolled-back workspace.
@@ -1126,15 +1030,6 @@ async function addContextDirToGitExclude({
 	}
 }
 
-/** Removes a half-created workspace directory; failures are swallowed. */
-function cleanupDirectory(workspacePath: string): void {
-	try {
-		rmSync(workspacePath, { force: true, recursive: true });
-	} catch {
-		// Best effort: leave any stuck files for the user to clean.
-	}
-}
-
 /**
  * Builds the initial workspace metadata record stored under `metadata_json`,
  * capturing the files-to-copy outcome plus the total workspace file count so
@@ -1148,11 +1043,13 @@ function cleanupDirectory(workspacePath: string): void {
  * at creation and never updated afterwards.
  */
 function buildInitialWorkspaceMetadata({
+	adoptedBranch,
 	filesToCopySnapshot,
 	linkedIssue,
 	placeholderName,
 	workspaceFileCount,
 }: {
+	adoptedBranch?: boolean;
 	filesToCopySnapshot: FilesToCopySnapshot;
 	linkedIssue?: WorkspaceLinkedIssueInput;
 	placeholderName?: boolean;
@@ -1167,6 +1064,7 @@ function buildInitialWorkspaceMetadata({
 		...(workspaceFileCount !== null ? { workspaceFileCount } : {}),
 		...(linkedIssue ? { linkedIssue } : {}),
 		...(placeholderName ? { placeholderName: true } : {}),
+		...(adoptedBranch ? { adoptedBranch: true } : {}),
 	};
 }
 

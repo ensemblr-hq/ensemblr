@@ -209,20 +209,19 @@ function planRename({
 	}
 
 	const isNameChanging = nextName !== source.name;
-	// When the caller does not provide an explicit branchName but the name is
-	// changing, slugify the new name and use it as the branch — keeps the
-	// workspace label and its branch in sync without an extra prompt.
-	const explicitBranch = normalizeBranchName(request.branchName);
-	const derivedBranch =
-		explicitBranch === null && isNameChanging ? toRenameSlug(nextName) : null;
-	const nextBranch = explicitBranch ?? derivedBranch;
-	const branchDiagnostic = nextBranch ? validateBranchName(nextBranch) : null;
-	if (branchDiagnostic) {
-		return { diagnostic: branchDiagnostic, kind: 'reject' };
+	const branch = resolveNextBranch({
+		isNameChanging,
+		nextName,
+		request,
+		source,
+	});
+	if ('diagnostic' in branch) {
+		return { diagnostic: branch.diagnostic, kind: 'reject' };
 	}
 
+	const nextBranch = branch.nextBranch;
 	const isBranchChanging =
-		nextBranch !== null && nextBranch !== source.branchName;
+		nextBranch !== null && isBranchMoving(nextBranch, source);
 	if (!isBranchChanging && !isNameChanging) {
 		return { kind: 'no-op' };
 	}
@@ -239,6 +238,48 @@ function planRename({
 	}
 
 	return { isBranchChanging, kind: 'apply', nextBranch, nextName };
+}
+
+/**
+ * Settles the branch a rename should land on. An explicit `branchName` wins;
+ * otherwise a changing display name slugs into one, keeping the workspace label
+ * and its branch in sync without an extra prompt.
+ *
+ * An adopted branch may not move at all. The derived slug is dropped silently
+ * because the caller never asked for it, but an explicit branch is refused —
+ * reporting success while discarding what the user typed would close the rename
+ * dialog on a change that never happened.
+ * @param options - The request, the resolved name, and the stored row.
+ * @returns The branch to land on (null to keep the current one), or the
+ * diagnostic that rejects the rename.
+ */
+function resolveNextBranch({
+	isNameChanging,
+	nextName,
+	request,
+	source,
+}: {
+	isNameChanging: boolean;
+	nextName: string;
+	request: RenameWorkspaceRequest;
+	source: SourceWorkspace;
+}): { diagnostic: RenameWorkspaceDiagnostic } | { nextBranch: string | null } {
+	const explicitBranch = normalizeBranchName(request.branchName);
+	const requestedBranch =
+		explicitBranch ?? (isNameChanging ? toRenameSlug(nextName) : null);
+	const branchDiagnostic = requestedBranch
+		? validateBranchName(requestedBranch)
+		: null;
+	if (branchDiagnostic) {
+		return { diagnostic: branchDiagnostic };
+	}
+
+	if (!(source.branchName !== null && branchWasAdopted(source.metadataJson))) {
+		return { nextBranch: requestedBranch };
+	}
+	return explicitBranch !== null && isBranchMoving(explicitBranch, source)
+		? { diagnostic: adoptedBranchDiagnostic(source) }
+		: { nextBranch: null };
 }
 
 /**
@@ -440,6 +481,44 @@ function placeholderRenameEligible(metadataJson: string): boolean {
 	return (
 		metadata.placeholderName === true && typeof metadata.renamedAt !== 'string'
 	);
+}
+
+/**
+ * Reports whether the workspace took over a branch that already existed rather
+ * than cutting its own. Such a branch predates the workspace and usually backs a
+ * pull request, so renaming the workspace must leave the git branch alone.
+ * @param metadataJson - The workspace's stored metadata blob.
+ * @returns True when the branch was adopted.
+ */
+function branchWasAdopted(metadataJson: string): boolean {
+	return parseMetadata(metadataJson).adoptedBranch === true;
+}
+
+/**
+ * Reports whether landing on `candidate` would actually move the workspace's
+ * branch, rather than restating the one it already carries.
+ * @param candidate - The branch the rename would land on.
+ * @param source - The workspace row as it currently stands.
+ * @returns True when the branch would change.
+ */
+function isBranchMoving(candidate: string, source: SourceWorkspace): boolean {
+	return candidate !== source.branchName;
+}
+
+/**
+ * Explains why an adopted branch cannot be renamed, naming the branch so the
+ * user can tell which one is pinned.
+ * @param source - The workspace row as it currently stands.
+ * @returns The rejection diagnostic.
+ */
+function adoptedBranchDiagnostic(
+	source: SourceWorkspace,
+): RenameWorkspaceDiagnostic {
+	return {
+		code: 'branch-adopted',
+		message: `This workspace took over the existing branch "${source.branchName}", which may already back a pull request, so its branch cannot be renamed here.`,
+		severity: 'error',
+	};
 }
 
 /** Stamps `metadata.renamedAt` so consumers can see when the rename happened. */

@@ -1,5 +1,8 @@
 import type { LinearIssueWire } from '@/shared/ipc/contracts/linear';
-import type { WorkspaceLinkedIssueInput } from '@/shared/ipc/contracts/workspace';
+import type {
+	WorkspaceBranchPlan,
+	WorkspaceLinkedIssueInput,
+} from '@/shared/ipc/contracts/workspace';
 import type {
 	RepositoryBranchWire,
 	RepositoryIssueWire,
@@ -8,9 +11,11 @@ import type {
 
 /** Optional provenance seed (e.g. from an issue, branch, or PR) for a workspace. */
 export interface WorkspaceCreationSeed {
-	/** Branch/PR sources fork the new workspace off this ref (e.g. `origin/x`). */
+	/** Branch the workspace merges into and diffs against (e.g. `origin/main`). */
 	baseBranch?: string;
 	branchName?: string;
+	/** How the workspace's branch comes into being; defaults to cutting a new one. */
+	branchPlan?: WorkspaceBranchPlan;
 	linkedIssue?: WorkspaceLinkedIssueInput;
 	name?: string;
 }

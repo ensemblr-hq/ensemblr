@@ -18,7 +18,7 @@ import {
 } from '@/renderer/components/ui/popover';
 import { useBranchOptions } from '@/renderer/hooks/git/use-branch-options';
 import { cn } from '@/renderer/lib/utils';
-import { bareBranchName } from '@/renderer/lib/workbench/branch-ref';
+import { bareBranchName } from '@/shared/branch-ref';
 import type { RepositoryBranchWire } from '@/shared/ipc/contracts/workspace-sources';
 
 /** Props for {@link BranchPicker}. */

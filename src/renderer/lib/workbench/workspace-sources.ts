@@ -32,7 +32,7 @@ const USE_BRANCH_ACTION: WorkspaceSourceAction = {
 	variant: 'primary',
 };
 
-const BRANCH_WORKSPACE_ACTIONS: readonly WorkspaceSourceAction[] = [
+const EXISTING_WORKSPACE_ACTIONS: readonly WorkspaceSourceAction[] = [
 	{ id: 'open', label: 'Open', shortcut: '↵', variant: 'secondary' },
 	{
 		id: 'duplicate-branch',
@@ -53,9 +53,10 @@ export function getWorkspaceSourceKindLabel(kind: WorkspaceSourceKind): string {
 }
 
 /**
- * Row actions for a source, primary action first. A branch that already has a
- * workspace in the project can be opened or duplicated; every other source
- * creates a new workspace.
+ * Row actions for a source, primary action first. A branch or pull-request head
+ * that an active workspace already holds can be opened or duplicated — git
+ * allows a branch in one worktree at a time, so offering to take it over again
+ * would only fail on create. Issues always create.
  */
 export function getWorkspaceSourceActions(
 	source: WorkspaceSource,
@@ -64,13 +65,13 @@ export function getWorkspaceSourceActions(
 		case 'issue':
 			return [CREATE_ACTION];
 		case 'branch':
-			// A branch backing an active workspace offers Open + Duplicate;
-			// otherwise it forks a fresh workspace.
 			return source.hasWorkspace
-				? [...BRANCH_WORKSPACE_ACTIONS]
+				? [...EXISTING_WORKSPACE_ACTIONS]
 				: [USE_BRANCH_ACTION];
 		case 'pull-request':
-			return [CREATE_ACTION];
+			return source.hasWorkspace
+				? [...EXISTING_WORKSPACE_ACTIONS]
+				: [CREATE_ACTION];
 	}
 }
 

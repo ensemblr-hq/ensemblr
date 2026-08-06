@@ -79,8 +79,12 @@ function RenameWorkspaceDialogForm({
 		noun: 'Workspace',
 		pattern: NAME_PATTERN,
 	});
+	// An adopted branch may already back a pull request, so the service refuses to
+	// move it; pin the field rather than let the user submit a rejected rename.
+	const branchPinned = workspace.adoptedBranch === true;
 	const isUnchanged =
-		trimmedName === workspace.name && trimmedBranch === workspace.branchName;
+		trimmedName === workspace.name &&
+		(branchPinned || trimmedBranch === workspace.branchName);
 	const canRename =
 		stage !== 'renaming' &&
 		trimmedName.length > 0 &&
@@ -98,7 +102,7 @@ function RenameWorkspaceDialogForm({
 		const result = await renameWorkspace({
 			workspaceId: workspace.id,
 			...(trimmedName !== workspace.name ? { name: trimmedName } : {}),
-			...(trimmedBranch !== workspace.branchName
+			...(!branchPinned && trimmedBranch !== workspace.branchName
 				? { branchName: trimmedBranch }
 				: {}),
 		});
@@ -117,6 +121,7 @@ function RenameWorkspaceDialogForm({
 		setStage('failure');
 		setDiagnostics(result.diagnostics);
 	}, [
+		branchPinned,
 		canRename,
 		onOpenChange,
 		trimmedBranch,
@@ -153,9 +158,9 @@ function RenameWorkspaceDialogForm({
 					Rename workspace
 				</DialogTitle>
 				<p className='text-muted-foreground text-xs'>
-					Updates the workspace name. The branch is auto-renamed from the
-					slugged name unless you override it below. The worktree folder stays
-					put.
+					{branchPinned
+						? 'Updates the workspace name. This workspace took over an existing branch, so the branch keeps its name. The worktree folder stays put.'
+						: 'Updates the workspace name. The branch is auto-renamed from the slugged name unless you override it below. The worktree folder stays put.'}
 				</p>
 			</DialogHeader>
 
@@ -171,7 +176,7 @@ function RenameWorkspaceDialogForm({
 					onChange={(event) => {
 						const next = event.target.value;
 						setName(next);
-						if (!branchTouchedRef.current) {
+						if (!branchPinned && !branchTouchedRef.current) {
 							setBranchName(toSlug(next, 'workspace'));
 						}
 					}}
@@ -189,7 +194,7 @@ function RenameWorkspaceDialogForm({
 				</Label>
 				<Input
 					className='h-9 font-mono text-xs'
-					disabled={isBusy}
+					disabled={isBusy || branchPinned}
 					id='rename-workspace-branch'
 					onChange={(event) => {
 						branchTouchedRef.current = true;
@@ -199,7 +204,9 @@ function RenameWorkspaceDialogForm({
 					value={branchName}
 				/>
 				<p className='text-[0.6875rem] text-muted-foreground'>
-					Follows the workspace name slug until you edit it.
+					{branchPinned
+						? 'This branch came from a branch or pull request the workspace took over, so renaming it here would orphan that work.'
+						: 'Follows the workspace name slug until you edit it.'}
 				</p>
 			</div>
 

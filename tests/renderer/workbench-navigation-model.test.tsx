@@ -113,7 +113,7 @@ test('maps SQLite navigation snapshot into workbench shell projects', () => {
 		id: 'workspace-1',
 		name: 'THE-120 Sidebar nav',
 		projectId: 'repo-1',
-		sourceSummary: 'branched from master',
+		sourceSummary: 'targets master',
 	});
 	expect(projects[1]?.workspaces[0]).toMatchObject({
 		branchName: 'main',

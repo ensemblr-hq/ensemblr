@@ -8,7 +8,7 @@ import { Input } from '@/renderer/components/ui/input';
 import { Switch } from '@/renderer/components/ui/switch';
 import { useRepoSettings } from '@/renderer/hooks/use-repo-settings';
 import { useRepoSettingsWriter } from '@/renderer/hooks/use-repo-settings-writer';
-import { originQualifiedRef } from '@/renderer/lib/workbench/branch-ref';
+import { originQualifiedRef } from '@/shared/branch-ref';
 import type { RepositorySettingsPatch } from '@/shared/ipc/contracts/repository-settings';
 import type { ResolvedSettingSnapshot } from '@/shared/ipc/contracts/settings-resolution';
 

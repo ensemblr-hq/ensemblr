@@ -50,8 +50,20 @@ export interface WorkspaceSource {
 	title: string;
 }
 
+/**
+ * Row action a picker source offers. The id selects what selecting the row
+ * does: `use-branch` and `create` hand the workspace an existing branch or a
+ * fresh one, `duplicate-branch` forks a copy, and `open` navigates to the
+ * workspace that already holds the branch.
+ */
+export type WorkspaceSourceActionId =
+	| 'create'
+	| 'duplicate-branch'
+	| 'open'
+	| 'use-branch';
+
 export interface WorkspaceSourceAction {
-	id: string;
+	id: WorkspaceSourceActionId;
 	label: string;
 	shortcut: string;
 	variant: 'primary' | 'secondary';

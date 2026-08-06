@@ -43,6 +43,7 @@ export default defineConfig({
 			'tests/main/agent-conversation-title.test.ts',
 			'tests/main/request-schemas.test.ts',
 			'tests/main/validate-git-ref.test.ts',
+			'tests/main/worktree-placement.test.ts',
 			'tests/main/external-links-policy.test.ts',
 			'tests/main/app-settings-service.test.ts',
 			'tests/main/open-in-editor.test.ts',

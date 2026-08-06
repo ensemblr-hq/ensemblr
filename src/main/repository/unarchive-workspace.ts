@@ -312,9 +312,9 @@ async function runWorktreeAdd({
 	workspacePath: string;
 }): Promise<UnarchiveWorkspaceDiagnostic | null> {
 	const outcome = await runWorktreeAddShared({
-		baseBranch,
 		branchName,
 		localCommandService,
+		placement: { forkRef: baseBranch, kind: 'create' },
 		repositoryPath,
 		workspacePath,
 	});

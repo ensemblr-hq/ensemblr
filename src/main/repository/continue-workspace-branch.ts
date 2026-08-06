@@ -18,8 +18,8 @@ import {
 	nextContinuationBranchName,
 } from './branch-name.ts';
 import { appendContinuedBranch } from './continued-branches.ts';
-import { ensureBaseRefAvailable } from './create-workspace.ts';
 import { firstLine } from './first-line.ts';
+import { ensureBaseRefAvailable } from './git-ops.ts';
 
 /** Public surface of the continue-workspace-branch service. */
 export interface ContinueWorkspaceBranchService {

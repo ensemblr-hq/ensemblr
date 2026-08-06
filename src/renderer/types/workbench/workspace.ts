@@ -412,6 +412,12 @@ export interface WorkspaceLandingSummary {
 export type WorkspaceOpenTarget = WorkspaceOpenTargetSnapshot;
 
 export interface WorkspaceShellModel {
+	/**
+	 * True when the workspace took over a branch that already existed rather than
+	 * cutting its own. Such a branch may back a pull request, so the rename dialog
+	 * pins it instead of offering to move it.
+	 */
+	adoptedBranch?: boolean;
 	branchName: string;
 	changeSummary: {
 		additions: number;

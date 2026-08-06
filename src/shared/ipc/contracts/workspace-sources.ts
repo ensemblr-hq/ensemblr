@@ -28,15 +28,19 @@ export interface RepositoryBranchWire {
 
 /**
  * An open pull request offered as a workspace source. Limited to same-repo PRs:
- * a workspace forks off `origin/<headRefName>`, which only resolves when the head
- * lives on the origin remote, so {@link isCrossRepository} PRs are filtered out
- * before they reach the picker.
+ * a workspace checks {@link headRefName} out and pushes back to it, which only
+ * works when the head lives on the origin remote, so {@link isCrossRepository}
+ * PRs are filtered out before they reach the picker.
  */
 export interface RepositoryPullRequestWire {
 	authorLogin: string | null;
-	/** Head branch name; the new workspace forks off `origin/<headRefName>`. */
+	/** Branch the PR merges into; becomes the workspace's target branch. */
+	baseRefName: string;
+	/** True when another active workspace already holds {@link headRefName}. */
+	hasWorkspace: boolean;
+	/** Head branch name; the new workspace checks this branch out and owns it. */
 	headRefName: string;
-	/** True when the head lives on a fork; such PRs cannot be forked locally. */
+	/** True when the head lives on a fork; such PRs cannot be checked out locally. */
 	isCrossRepository: boolean;
 	isDraft: boolean;
 	number: number;
@@ -44,6 +48,8 @@ export interface RepositoryPullRequestWire {
 	title: string;
 	updatedAt: string;
 	url: string;
+	/** Id of the active workspace holding the head branch when {@link hasWorkspace}. */
+	workspaceId: string | null;
 }
 
 /** A GitHub issue offered as a workspace source. */

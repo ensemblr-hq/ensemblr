@@ -7,8 +7,9 @@ const DEFAULT_REMOTE = 'origin';
  * Strips the remote qualifier from a stored base ref, yielding the plain branch
  * name. Base refs reach SQLite in both shapes — bare from a repository's probed
  * default, `origin/<name>` from a picked branch — but `gh pr create --base`,
- * GitHub compare URLs, and prompt templates that add their own `origin/` all
- * need the bare name, and passing the qualified ref to any of them fails.
+ * GitHub compare URLs, prompt templates that add their own `origin/`, and the
+ * main process's merge-base probe all need the bare name, and passing the
+ * qualified ref to any of them fails.
  * @param ref - A base ref, qualified or bare.
  * @returns The bare branch name, or null when no ref was given.
  */
