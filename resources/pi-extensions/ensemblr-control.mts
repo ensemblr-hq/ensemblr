@@ -34,7 +34,7 @@ const ORCHESTRATOR_AWARENESS = `You are running inside Ensemblr, a desktop codin
 What you can drive:
 - Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
 - Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
-- Terminals: start/stop the setup or run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`).
+- Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
 - Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`file\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
@@ -242,9 +242,10 @@ const PLAN_MODE_GUARDED_TOOLS = new Set(['bash', 'edit', 'write']);
 /**
  * Control ops left out of a spawned sub-agent's tool list. Most are refused by
  * the app for a sub-agent whatever the mode, and the rest — waiting on children
- * it cannot spawn, listing models it cannot pass — are ops it can never usefully
- * call. Registering either kind teaches the model to keep reaching for a tool it
- * will not get. MUST hold the same members as `SUBAGENT_WITHHELD_OPS` in
+ * it cannot spawn, listing models it cannot pass, listing run scripts it cannot
+ * start — are ops it can never usefully call. Registering either kind teaches
+ * the model to keep reaching for a tool it will not get. MUST hold the same
+ * members as `SUBAGENT_WITHHELD_OPS` in
  * `src/shared/agent-control/subagent-policy.ts` (this file cannot import from
  * `src/` at runtime); a parity test enforces it.
  */
@@ -254,6 +255,7 @@ const SUBAGENT_WITHHELD_OPS = new Set([
 	'exitPlanMode',
 	'launchHarness',
 	'listModels',
+	'listRunScripts',
 	'openTab',
 	'sendFollowUp',
 	'setBranchName',
@@ -534,14 +536,26 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_start_terminal',
 		'startTerminal',
-		'Start a dock terminal: the setup script, the run script, or an interactive spawn terminal.',
+		'Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one run script runs per workspace at a time.',
 		Type.Object({
 			kind: Type.Union([
 				Type.Literal('setup'),
 				Type.Literal('run'),
 				Type.Literal('spawn'),
 			]),
+			scriptName: Type.Optional(
+				Type.String({
+					description:
+						'Name of the run script to start, from ensemblr_list_run_scripts. Applies to kind=run only.',
+				}),
+			),
 		}),
+	);
+	tool(
+		'ensemblr_list_run_scripts',
+		'listRunScripts',
+		"List the run scripts this workspace's repository configures (name, command, and which one is the default), so you can start the right one by name with ensemblr_start_terminal. An empty list means the repository configures none and kind=run has nothing to start.",
+		empty,
 	);
 	tool(
 		'ensemblr_stop_terminal',

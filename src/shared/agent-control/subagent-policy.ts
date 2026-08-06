@@ -13,7 +13,8 @@
  * This table takes the durable role instead, so the answer survives a restart and
  * matches what {@link SUBAGENT_AWARENESS} promises. Ops whose only problem is that
  * a sub-agent has no use for them — `waitForAgents` with no children to wait on,
- * `listModels` when it cannot spawn — are absent on purpose: they are withheld
+ * `listModels` when it cannot spawn, `listRunScripts` when it cannot start one —
+ * are absent on purpose: they are withheld
  * from the sub-agent's tool list rather than denied, because a denial implies a
  * hazard where there is only noise.
  *
@@ -91,6 +92,7 @@ const SUBAGENT_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 export const SUBAGENT_UNUSABLE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'waitForAgents',
 	'listModels',
+	'listRunScripts',
 ]);
 
 /**

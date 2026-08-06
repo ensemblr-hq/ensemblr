@@ -27,7 +27,9 @@ import type {
 	PiPersistedEnvelope,
 	PiWireMessagePayload,
 } from '../../shared/ipc/contracts/pi-session';
+import type { CreateTerminalSessionResult } from '../../shared/ipc/contracts/terminal.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
+import { selectDefaultRunScript } from '../../shared/scripts.ts';
 import type { HarnessDetectionService } from '../agents/index.ts';
 import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
 import type { LocalCommandService } from '../commands';
@@ -65,6 +67,7 @@ import type {
 	HarnessPort,
 	PlanModePort,
 	SessionNamingPort,
+	StartTerminalOutcome,
 	TabPort,
 	TerminalPort,
 	WorkspacePort,
@@ -715,25 +718,72 @@ function messagePayloadText(payload: PiWireMessagePayload): string {
 }
 
 /**
+ * Reads a terminal-service create result as a port outcome, keeping the
+ * lifecycle diagnostic that explains a launch nobody got. The services report a
+ * refusal as a session-less result rather than by throwing, so dropping the
+ * diagnostics here is what would turn "no run script named playground" into a
+ * successful-looking empty terminal id.
+ * @param result - The create result from the terminal or script lifecycle service.
+ * @param fallbackMessage - Message to report when the result carries no diagnostic.
+ * @returns The started terminal, or the reason none started.
+ */
+function toStartTerminalOutcome(
+	result: CreateTerminalSessionResult,
+	fallbackMessage: string,
+): StartTerminalOutcome {
+	if (result.session) {
+		return { ok: true, terminalId: result.session.id };
+	}
+
+	const diagnostic = result.diagnostics.at(0);
+
+	return {
+		ok: false,
+		code: diagnostic?.code ?? 'terminal-not-started',
+		message: diagnostic?.message ?? fallbackMessage,
+	};
+}
+
+/**
  * Builds the terminal port over the terminal and script-lifecycle services.
  * @param deps - Adapter collaborators.
  * @returns The terminal port.
  */
 function makeTerminalPort(deps: PortAdapterDeps): TerminalPort {
 	return {
-		startTerminal: async ({ workspaceId, kind }) => {
+		startTerminal: async ({ workspaceId, kind, scriptName }) => {
 			if (kind === 'spawn') {
-				const result = await deps.terminalService.create({
-					kind: 'terminal',
-					workspaceId,
-				});
-				return { terminalId: result.session?.id ?? '' };
+				return toStartTerminalOutcome(
+					await deps.terminalService.create({
+						kind: 'terminal',
+						workspaceId,
+					}),
+					'The terminal could not be started.',
+				);
 			}
-			const result = await deps.scriptLifecycleService.runScript({
-				kind,
+
+			return toStartTerminalOutcome(
+				await deps.scriptLifecycleService.runScript({
+					kind,
+					scriptName: scriptName ?? null,
+					workspaceId,
+				}),
+				`The ${kind} script could not be started.`,
+			);
+		},
+		listRunScripts: async ({ workspaceId }) => {
+			const scripts = deps.scriptLifecycleService.listRunScripts({
 				workspaceId,
 			});
-			return { terminalId: result.session?.id ?? '' };
+			const fallback = selectDefaultRunScript(scripts);
+
+			return {
+				scripts: scripts.map((script) => ({
+					command: script.command,
+					isDefault: script.name === fallback?.name,
+					name: script.name,
+				})),
+			};
 		},
 		stopTerminal: async ({ workspaceId, terminalId, kind }) => {
 			if (terminalId) {
@@ -755,6 +805,7 @@ function makeTerminalPort(deps: PortAdapterDeps): TerminalPort {
 			deps.terminalService.list(workspaceId).map((session) => ({
 				terminalId: session.id,
 				kind: session.kind,
+				scriptName: session.scriptName ?? null,
 				status: session.status,
 				workspaceId: session.workspaceId,
 			})),

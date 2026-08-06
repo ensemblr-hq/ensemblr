@@ -83,9 +83,14 @@ const launchHarnessSchema = z.strictObject({
 	harnessId: nonEmpty,
 });
 
-const startTerminalSchema = z.strictObject({
-	kind: z.enum(['setup', 'run', 'spawn']),
-});
+const startTerminalSchema = z
+	.strictObject({
+		kind: z.enum(['setup', 'run', 'spawn']),
+		scriptName: nonEmpty.optional(),
+	})
+	.refine((value) => !value.scriptName || value.kind === 'run', {
+		message: 'scriptName applies to kind "run" only.',
+	});
 
 const terminalIdOrKindSchema = z
 	.strictObject({
@@ -285,6 +290,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	readConversation: readConversationSchema,
 	readTerminalOutput: readTerminalOutputSchema,
 	listModels: emptySchema,
+	listRunScripts: emptySchema,
 	waitForAgents: waitForAgentsSchema,
 	notifyOrchestrator: notifyOrchestratorSchema,
 	askUserQuestion: askUserQuestionSchema,

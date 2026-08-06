@@ -77,11 +77,23 @@ const makePorts = (
 			),
 	},
 	terminals: {
-		startTerminal: vi.fn().mockResolvedValue({ terminalId: 'term-1' }),
+		startTerminal: vi
+			.fn()
+			.mockResolvedValue({ ok: true, terminalId: 'term-1' }),
 		stopTerminal: vi.fn().mockResolvedValue(undefined),
 		writeTerminal: vi.fn().mockResolvedValue(undefined),
 		readOutput: vi.fn().mockResolvedValue('output'),
 		listTerminals: vi.fn().mockResolvedValue([]),
+		listRunScripts: vi.fn().mockResolvedValue({
+			scripts: [
+				{ command: 'npm run dev', isDefault: true, name: 'dev' },
+				{
+					command: 'npm run dev:playground',
+					isDefault: false,
+					name: 'playground',
+				},
+			],
+		}),
 		resolveTerminalWorkspace: vi
 			.fn()
 			.mockResolvedValue(
@@ -913,6 +925,131 @@ describe('agent-control service: delegation', () => {
 		if (result.ok) {
 			expect(result.data).toEqual({ defaultModelId: 'm-default', models: [] });
 		}
+	});
+
+	it('returns the workspace run scripts for listRunScripts', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'listRunScripts',
+			token: 'tok-caller',
+			rawArgs: {},
+		});
+		expect(ports.terminals.listRunScripts).toHaveBeenCalledWith({
+			workspaceId: 'ws',
+		});
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.data).toEqual({
+				scripts: [
+					{ command: 'npm run dev', isDefault: true, name: 'dev' },
+					{
+						command: 'npm run dev:playground',
+						isDefault: false,
+						name: 'playground',
+					},
+				],
+			});
+		}
+	});
+
+	// The whole point of naming a script: without this the port receives no name
+	// and the lifecycle service falls back to the repository default.
+	it('forwards the named run script to the terminal port', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', scriptName: 'playground' },
+		});
+		expect(result.ok).toBe(true);
+		expect(ports.terminals.startTerminal).toHaveBeenCalledWith(
+			expect.objectContaining({ kind: 'run', scriptName: 'playground' }),
+		);
+	});
+
+	it('rejects a run script name paired with a non-run terminal kind', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'spawn', scriptName: 'playground' },
+		});
+		expect(result.ok).toBe(false);
+		expect(ports.terminals.startTerminal).not.toHaveBeenCalled();
+	});
+
+	// A launch nobody got used to answer with an empty terminal id inside a
+	// success envelope, so the diagnostic naming the configured scripts — the one
+	// thing that lets a caller correct a guess — never reached it.
+	it('fails a startTerminal whose script never launched, with the reason', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.startTerminal).mockResolvedValue({
+			ok: false,
+			code: 'script-not-configured',
+			message:
+				'No run script named "ghost" is configured for this repository. Configured run scripts: dev.',
+		});
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', scriptName: 'ghost' },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('not-found');
+			expect(result.error).toContain('Configured run scripts: dev.');
+		}
+	});
+
+	it('reports a run script already holding the workspace as a conflict', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.startTerminal).mockResolvedValue({
+			ok: false,
+			code: 'script-already-running',
+			message: 'The run script "dev" is already running.',
+		});
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', scriptName: 'playground' },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('conflict');
+			expect(result.error).toContain('"dev"');
+		}
+	});
+
+	// A wrong guess is cheap to make and cheap to correct, so it must not cost a
+	// spawn: the retry that names the right script has to still fit the quota.
+	it('does not spend the spawn budget on a script that never launched', async () => {
+		const ports = makePorts();
+		vi.mocked(ports.terminals.startTerminal).mockResolvedValueOnce({
+			ok: false,
+			code: 'script-not-configured',
+			message: 'No run script named "ghost" is configured for this repository.',
+		});
+		const { service } = setup({
+			ports,
+			guardrails: { maxSpawnsPerSession: 1 },
+		});
+		const guessed = await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', scriptName: 'ghost' },
+		});
+		const corrected = await service.invoke({
+			op: 'startTerminal',
+			token: 'tok-caller',
+			rawArgs: { kind: 'run', scriptName: 'dev' },
+		});
+		expect(guessed.ok).toBe(false);
+		expect(corrected.ok).toBe(true);
 	});
 
 	it('wraps the last assistant message for getLastMessage', async () => {

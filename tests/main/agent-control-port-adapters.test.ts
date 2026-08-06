@@ -15,6 +15,11 @@ import {
 	selectWorkspaceWithRepositoryById,
 } from '../../src/main/storage/repositories/workspace-repository.ts';
 import type { PiPersistedEnvelope } from '../../src/shared/ipc/contracts/pi-session';
+import type { CreateTerminalSessionResult } from '../../src/shared/ipc/contracts/terminal.ts';
+import {
+	DEFAULT_RUN_SCRIPT_ICON,
+	type RunScriptDefinition,
+} from '../../src/shared/scripts.ts';
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
 	getChatTabById: vi.fn(() => ({ workspaceId: 'ws', metadata: {} })),
@@ -819,5 +824,153 @@ describe('agent-control port adapters: conversation status', () => {
 	it('returns null for an unknown session', async () => {
 		const ports = withStatus(undefined);
 		expect(await ports.conversations.getStatus('gone')).toBeNull();
+	});
+});
+
+/** Builds a run-script definition with the fields the terminal port reads. */
+const runScript = (
+	name: string,
+	command: string,
+	isDefault = false,
+): RunScriptDefinition => ({
+	availableIn: null,
+	command,
+	icon: DEFAULT_RUN_SCRIPT_ICON,
+	isDefault,
+	name,
+});
+
+/**
+ * Builds ports over a script-lifecycle stub, so the terminal port's own mapping
+ * is what the assertions see.
+ */
+const withScripts = (script: {
+	listRunScripts?: readonly RunScriptDefinition[];
+	runScript?: CreateTerminalSessionResult;
+}): ReturnType<typeof createAgentControlPorts> => {
+	const { deps } = makeDeps();
+	return createAgentControlPorts({
+		...deps,
+		scriptLifecycleService: {
+			listRunScripts: () => script.listRunScripts ?? [],
+			runScript: async () =>
+				script.runScript ?? { diagnostics: [], session: null },
+		},
+	} as unknown as PortAdapterDeps);
+};
+
+describe('agent-control port adapters: run scripts', () => {
+	it('marks the script the repository flags as default', async () => {
+		const ports = withScripts({
+			listRunScripts: [
+				runScript('dev', 'npm run dev'),
+				runScript('playground', 'npm run dev:playground', true),
+			],
+		});
+		expect(await ports.terminals.listRunScripts({ workspaceId: 'ws' })).toEqual(
+			{
+				scripts: [
+					{ command: 'npm run dev', isDefault: false, name: 'dev' },
+					{
+						command: 'npm run dev:playground',
+						isDefault: true,
+						name: 'playground',
+					},
+				],
+			},
+		);
+	});
+
+	// The effective default is what `startTerminal` runs with no name, which is
+	// the first declared script when the repository flags none — so reporting
+	// every script as non-default would tell an agent nothing would start.
+	it('falls back to the first declared script when none is flagged', async () => {
+		const ports = withScripts({
+			listRunScripts: [
+				runScript('dev', 'npm run dev'),
+				runScript('playground', 'npm run dev:playground'),
+			],
+		});
+		const { scripts } = await ports.terminals.listRunScripts({
+			workspaceId: 'ws',
+		});
+		expect(scripts.map((script) => [script.name, script.isDefault])).toEqual([
+			['dev', true],
+			['playground', false],
+		]);
+	});
+
+	it('reports no scripts, and so no default, for a repository configuring none', async () => {
+		const ports = withScripts({ listRunScripts: [] });
+		expect(await ports.terminals.listRunScripts({ workspaceId: 'ws' })).toEqual(
+			{
+				scripts: [],
+			},
+		);
+	});
+
+	it('returns the session id when the run script starts', async () => {
+		const ports = withScripts({
+			runScript: {
+				diagnostics: [],
+				session: { id: 'term-1' } as CreateTerminalSessionResult['session'],
+			},
+		});
+		expect(
+			await ports.terminals.startTerminal({
+				kind: 'run',
+				scriptName: 'playground',
+				workspaceCwd: '/tmp/ws',
+				workspaceId: 'ws',
+			}),
+		).toEqual({ ok: true, terminalId: 'term-1' });
+	});
+
+	// A launch that starts nothing used to answer with an empty terminal id,
+	// which reads as success to every caller that only checks for a throw.
+	it('surfaces the lifecycle diagnostic when no session starts', async () => {
+		const ports = withScripts({
+			runScript: {
+				diagnostics: [
+					{
+						code: 'script-not-configured',
+						message:
+							'No run script named "ghost" is configured for this repository. Configured run scripts: dev.',
+						severity: 'info',
+					},
+				],
+				session: null,
+			},
+		});
+		expect(
+			await ports.terminals.startTerminal({
+				kind: 'run',
+				scriptName: 'ghost',
+				workspaceCwd: '/tmp/ws',
+				workspaceId: 'ws',
+			}),
+		).toEqual({
+			ok: false,
+			code: 'script-not-configured',
+			message:
+				'No run script named "ghost" is configured for this repository. Configured run scripts: dev.',
+		});
+	});
+
+	it('falls back to a kind-specific message when a failure carries no diagnostic', async () => {
+		const ports = withScripts({
+			runScript: { diagnostics: [], session: null },
+		});
+		expect(
+			await ports.terminals.startTerminal({
+				kind: 'setup',
+				workspaceCwd: '/tmp/ws',
+				workspaceId: 'ws',
+			}),
+		).toEqual({
+			ok: false,
+			code: 'terminal-not-started',
+			message: 'The setup script could not be started.',
+		});
 	});
 });

@@ -7,6 +7,7 @@ import type { WorkspaceScriptKind } from '../../shared/ipc/contracts/workspace-s
 import {
 	formatRunScriptLabel,
 	parseWorkspaceScriptSettings,
+	type RunScriptDefinition,
 	resolveRunScript,
 	type WorkspaceScriptSettings,
 } from '../../shared/scripts.ts';
@@ -62,6 +63,14 @@ interface ScriptLaunch {
 
 /** Public surface of the script lifecycle service. */
 export interface ScriptLifecycleService {
+	/**
+	 * Run scripts the workspace's repository offers, in declaration order and
+	 * already narrowed to the ones Ensemblr can launch locally. Empty when the
+	 * workspace, its repository config, or SQLite cannot be read.
+	 */
+	listRunScripts: (options: {
+		workspaceId: string;
+	}) => readonly RunScriptDefinition[];
 	/** Runs the archive script and resolves when it finishes (or times out). */
 	runArchiveScriptAndWait: (options: {
 		timeoutMs?: number;
@@ -216,7 +225,7 @@ export function createScriptLifecycleService({
 		if (!launch) {
 			return failure(
 				'script-not-configured',
-				describeMissingScript(kind, scriptName),
+				describeMissingScript(kind, scriptName, resolved.settings.runScripts),
 				'info',
 			);
 		}
@@ -328,7 +337,7 @@ export function createScriptLifecycleService({
 			if (!restart) {
 				return failure(
 					'script-already-running',
-					`The ${launch.kind} script is already running. Stop it or restart explicitly.`,
+					describeRunningScript(launch.kind, activeSession.scriptName),
 					'warning',
 				);
 			}
@@ -654,6 +663,11 @@ export function createScriptLifecycleService({
 	}
 
 	return {
+		listRunScripts: ({ workspaceId }) => {
+			const resolved = resolveScriptConfig(workspaceId);
+
+			return resolved.error ? [] : resolved.settings.runScripts;
+		},
 		runArchiveScriptAndWait: async ({
 			timeoutMs = SCRIPT_EXIT_WAIT_TIMEOUT_MS,
 			workspaceId,
@@ -722,19 +736,48 @@ function defaultScriptTitle(kind: WorkspaceScriptKind): string {
 /**
  * Explains why a launch found no command, distinguishing a repository with no
  * script of that kind from a request naming a run script that no longer exists.
+ * A stale name is answered with the names that do exist, so an agent that
+ * guessed can correct itself without a second round trip.
  * @param kind - The requested script kind.
  * @param scriptName - The requested run-script name, when one was given.
+ * @param runScripts - The run scripts the repository actually configures.
  * @returns The diagnostic message.
  */
 function describeMissingScript(
 	kind: WorkspaceScriptKind,
 	scriptName: string | null | undefined,
+	runScripts: readonly RunScriptDefinition[],
 ): string {
-	if (kind === 'run' && scriptName) {
-		return `No run script named "${scriptName}" is configured for this repository.`;
+	if (kind !== 'run' || !scriptName) {
+		return `No ${kind} script is configured for this repository.`;
 	}
 
-	return `No ${kind} script is configured for this repository.`;
+	const configured = runScripts.map((script) => script.name).join(', ');
+
+	return configured
+		? `No run script named "${scriptName}" is configured for this repository. Configured run scripts: ${configured}.`
+		: `No run script named "${scriptName}" is configured for this repository, which configures none at all.`;
+}
+
+/**
+ * Explains which session already holds the workspace, naming the run script by
+ * name. A caller that asked for one of several run scripts cannot otherwise tell
+ * whether the session already up is the one it wanted or a different one it has
+ * to stop first.
+ * @param kind - The requested script kind.
+ * @param activeScriptName - Name of the run script already running, when it has one.
+ * @returns The diagnostic message.
+ */
+function describeRunningScript(
+	kind: WorkspaceScriptKind,
+	activeScriptName: string | null,
+): string {
+	const subject =
+		kind === 'run' && activeScriptName
+			? `The run script "${activeScriptName}"`
+			: `The ${kind} script`;
+
+	return `${subject} is already running. Stop it or restart explicitly.`;
 }
 
 /** Type guard for the workspace join-row fields this service reads. */

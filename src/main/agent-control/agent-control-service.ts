@@ -170,6 +170,31 @@ function fail(
 }
 
 /**
+ * Control-envelope code for each way a script launch declines, so a caller can
+ * branch on the outcome before reading the prose: a name that resolves to
+ * nothing is `not-found`, a run script already holding the workspace is
+ * `conflict`, and a restart that outlasts its wait is `timeout`.
+ */
+const START_TERMINAL_ERROR_CODES: Readonly<
+	Record<string, AgentControlErrorCode>
+> = {
+	'database-unavailable': 'internal',
+	'script-already-running': 'conflict',
+	'script-not-configured': 'not-found',
+	'script-restart-timeout': 'timeout',
+	'workspace-not-found': 'not-found',
+};
+
+/**
+ * Maps a script-lifecycle diagnostic code onto the control envelope's code.
+ * @param code - The diagnostic code the lifecycle service reported.
+ * @returns The matching control error code, or `internal` for an unmapped one.
+ */
+function startTerminalErrorCode(code: string): AgentControlErrorCode {
+	return START_TERMINAL_ERROR_CODES[code] ?? 'internal';
+}
+
+/**
  * Whether a child's pending signal is one only the orchestrator can clear.
  * @param signal - The child's pending signal, or null when it has none.
  * @returns True for `need_decision` and `blocked`.
@@ -679,13 +704,17 @@ export function createAgentControlService({
 		if (spawnDenied) {
 			return spawnDenied;
 		}
-		const created = await ports.terminals.startTerminal({
+		const started = await ports.terminals.startTerminal({
 			workspaceId: origin.workspaceId,
 			workspaceCwd: origin.workspaceCwd,
 			kind: args.kind,
+			...(args.scriptName ? { scriptName: args.scriptName } : {}),
 		});
+		if (!started.ok) {
+			return fail(startTerminalErrorCode(started.code), started.message);
+		}
 		guardrails.recordSpawn(origin.sessionId);
-		return ok(created);
+		return ok({ terminalId: started.terminalId });
 	};
 
 	const handleStopTerminal = async (
@@ -1085,6 +1114,10 @@ export function createAgentControlService({
 		launchHarness: ({ args, origin }) =>
 			handleLaunchHarness(origin, args as LaunchHarnessArgs),
 		listModels: () => ports.conversations.listModels().then(ok),
+		listRunScripts: ({ origin }) =>
+			ports.terminals
+				.listRunScripts({ workspaceId: origin.workspaceId })
+				.then(ok),
 		listTabs: ({ args, origin }) =>
 			ports.tabs
 				.listTabs({

@@ -78,11 +78,12 @@ const makePorts = (
 		resolveConversationWorkspace: vi.fn().mockResolvedValue('ws'),
 	},
 	terminals: {
-		startTerminal: vi.fn().mockResolvedValue({ terminalId: 't' }),
+		startTerminal: vi.fn().mockResolvedValue({ ok: true, terminalId: 't' }),
 		stopTerminal: vi.fn().mockResolvedValue(undefined),
 		writeTerminal: vi.fn().mockResolvedValue(undefined),
 		readOutput: vi.fn().mockResolvedValue(''),
 		listTerminals: vi.fn().mockResolvedValue([]),
+		listRunScripts: vi.fn().mockResolvedValue({ scripts: [] }),
 		resolveTerminalWorkspace: vi.fn().mockResolvedValue('ws'),
 	},
 	harnesses: {

@@ -136,6 +136,11 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		object: 'models',
 		verb: ['Listed', 'Listing'],
 	},
+	ensemblr_list_run_scripts: {
+		glyph: 'list',
+		object: 'run scripts',
+		verb: ['Listed', 'Listing'],
+	},
 	ensemblr_list_tabs: {
 		glyph: 'list',
 		object: 'tabs',
@@ -196,6 +201,7 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		verb: ['Started', 'Starting'],
 	},
 	ensemblr_start_terminal: {
+		detailKeys: ['scriptName', 'kind'],
 		glyph: 'terminal',
 		object: 'a terminal',
 		verb: ['Started', 'Starting'],
