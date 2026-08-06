@@ -3,6 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 
+import { bareBranchName } from '../../shared/branch-ref.ts';
 import type { GitSettings } from '../../shared/config.ts';
 import type {
 	SettingsResolutionRequest,
@@ -158,13 +159,14 @@ async function resolveBranchPoint({
 	repository: SourceRepository;
 	request: CreateWorkspaceRequest;
 }): Promise<WorkspaceBranchPoint> {
+	const plan = request.branchPlan ?? { kind: 'create' };
 	const baseBranch = await resolveBaseBranch({
+		adoptedBranch: plan.kind === 'adopt' ? plan.branch.trim() : null,
 		configuredBase,
 		explicitBase: request.baseBranch?.trim(),
 		localCommandService,
 		repository,
 	});
-	const plan = request.branchPlan ?? { kind: 'create' };
 	if (plan.kind === 'adopt') {
 		return { baseBranch, plan: { branch: plan.branch.trim(), kind: 'adopt' } };
 	}
@@ -181,26 +183,37 @@ async function resolveBranchPoint({
  * every workspace creation with `git-worktree-failed`. Otherwise creation falls
  * back to the live repository root branch, resolved fresh so a stale stored
  * `default_branch` cannot pin the workspace to the wrong target.
- * @param options - Explicit/configured bases plus git command dependencies.
+ *
+ * A candidate naming the branch the workspace is adopting is skipped: measuring
+ * a branch against itself puts the merge-base on HEAD, which empties the review
+ * panel of the very commits the workspace was opened to review.
+ * @param options - The adopted branch, explicit/configured bases, and git deps.
  * @returns The resolved merge target.
  */
 async function resolveBaseBranch({
+	adoptedBranch,
 	configuredBase,
 	explicitBase,
 	localCommandService,
 	repository,
 }: {
+	adoptedBranch: string | null;
 	configuredBase: string | undefined;
 	explicitBase: string | undefined;
 	localCommandService: LocalCommandService;
 	repository: SourceRepository;
 }): Promise<string> {
-	if (explicitBase) {
+	const wouldSelfDiff = (candidate: string): boolean =>
+		adoptedBranch !== null &&
+		bareBranchName(candidate) === bareBranchName(adoptedBranch);
+
+	if (explicitBase && !wouldSelfDiff(explicitBase)) {
 		return explicitBase;
 	}
 
 	if (
 		configuredBase &&
+		!wouldSelfDiff(configuredBase) &&
 		(await refResolvesToCommit({
 			localCommandService,
 			ref: configuredBase,
@@ -218,6 +231,30 @@ async function resolveBaseBranch({
 		repository.defaultBranch ??
 		DEFAULT_FALLBACK_BRANCH
 	);
+}
+
+/**
+ * The local branch names a slug must steer around, or an empty set when the
+ * workspace adopts a branch instead of cutting one. Only a plan that cuts can
+ * collide: adoption checks an existing branch out, so letting branches steer the
+ * slug there would land every adopted workspace in a `-2` folder over the very
+ * branch it takes over.
+ * @param options - The resolved branch plan plus git command dependencies.
+ * @returns Lowercased branch names and segments to treat as claimed.
+ */
+async function branchNamesToAvoid({
+	localCommandService,
+	plan,
+	repositoryPath,
+}: {
+	localCommandService: LocalCommandService;
+	plan: WorkspaceBranchPlan;
+	repositoryPath: string;
+}): Promise<ReadonlySet<string>> {
+	if (plan.kind !== 'create') {
+		return new Set<string>();
+	}
+	return listLocalBranchNames({ localCommandService, repositoryPath });
 }
 
 /**
@@ -359,8 +396,9 @@ export function createWorkspaceService({
 			branchPoint,
 			branchPrefix,
 			database,
-			existingBranches: await listLocalBranchNames({
+			existingBranches: await branchNamesToAvoid({
 				localCommandService,
+				plan: branchPoint.plan,
 				repositoryPath: repository.path,
 			}),
 			nameInput: request.name,
@@ -745,6 +783,10 @@ async function resolveBranchPrefix({
  * settles on the branch the worktree will carry, and computes the workspace
  * path. An adopted branch keeps its own name; every other mode derives one from
  * the caller's override or the prefixed slug.
+ *
+ * `existingBranches` arrives already scoped to the plan: the caller passes the
+ * repository's branches only when one is about to be cut, and an empty set when
+ * the workspace adopts a branch that by definition already exists.
  */
 function prepareWorkspace({
 	branchNameOverride,
@@ -771,13 +813,9 @@ function prepareWorkspace({
 		typeof nameInput === 'string' && nameInput.trim()
 			? nameInput.trim()
 			: DEFAULT_WORKSPACE_NAME;
-	// Only a plan that cuts a branch can collide with one. Adoption checks an
-	// existing branch out, so letting it steer the slug would make every adopted
-	// workspace land in a `-2` folder over the very branch it takes over.
 	const taken = collectTakenWorkspaceNames({
 		database,
-		existingBranches:
-			branchPoint.plan.kind === 'create' ? existingBranches : new Set(),
+		existingBranches,
 		repositoryId: repository.id,
 	});
 	const resolvedName = placeholderName

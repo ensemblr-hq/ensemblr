@@ -68,6 +68,9 @@ export async function createWorktree({
 		return planned;
 	}
 
+	// Sampled before git runs, because it is the only way to tell a directory
+	// this attempt must not touch from one git itself left behind.
+	const destinationPredatesAdd = existsSync(request.workspacePath);
 	const worktreeDiagnostic = await runWorktreeAdd({
 		branchName: request.branchName,
 		localCommandService,
@@ -79,10 +82,14 @@ export async function createWorktree({
 		return { createdBranch: planned.placement.kind !== 'checkout' };
 	}
 
-	// If the target now exists despite the pre-check, another worker won a
-	// TOCTOU race or the directory materialized concurrently. Do not delete it —
-	// it belongs to whoever got there first.
-	if (existsSync(request.workspacePath)) {
+	// A destination that was already there lost a TOCTOU race against another
+	// worker and belongs to whoever got there first, so it stays. Anything else
+	// is this attempt's own debris: git creates the directory before it checks
+	// out, and a failure partway (full disk, unwritable path, a retry that trips
+	// over the previous attempt) leaves it behind. Keeping it would strand the
+	// slug, since every later creation resolves the same path and reports a
+	// stale "already exists" in place of the real error.
+	if (destinationPredatesAdd) {
 		return {
 			diagnostic: {
 				code: 'destination-exists',
@@ -117,11 +124,18 @@ function adoptedBranchOf(plan: WorkspaceBranchPlan): string | null {
 /**
  * The commit a newly cut branch starts at, or null when the plan adopts an
  * existing branch instead.
- * @param plan - How the workspace's branch comes into being.
+ *
+ * A `create` plan that names no fork point cuts from the base branch. The
+ * default belongs here rather than at the caller: without it a fork point of
+ * null reads as an adoption further down, and a branch this placement was asked
+ * to *make* would be rejected as one it could not find.
+ * @param request - The placement request.
  * @returns The fork point, or null.
  */
-function forkRefOf(plan: WorkspaceBranchPlan): string | null {
-	return plan.kind === 'create' ? (plan.forkRef ?? null) : null;
+function forkRefOf(request: WorktreePlacementRequest): string | null {
+	return request.plan.kind === 'create'
+		? (request.plan.forkRef ?? request.baseBranch)
+		: null;
 }
 
 /**
@@ -133,12 +147,14 @@ function forkRefOf(plan: WorkspaceBranchPlan): string | null {
 function validatePlacementRefs(
 	request: WorktreePlacementRequest,
 ): CreateWorkspaceDiagnostic | null {
-	const refs = [
-		request.baseBranch,
-		adoptedBranchOf(request.plan),
-		forkRefOf(request.plan),
-	].filter((ref): ref is string => ref !== null);
-	const rejection = refs
+	const refs = new Set(
+		[
+			request.baseBranch,
+			adoptedBranchOf(request.plan),
+			forkRefOf(request),
+		].filter((ref): ref is string => ref !== null),
+	);
+	const rejection = [...refs]
 		.map((ref) => validateGitRef(ref))
 		.find((result) => result !== null);
 	return rejection
@@ -159,7 +175,7 @@ function validatePlacementRefs(
  */
 function refsRequiredBy(request: WorktreePlacementRequest): string[] {
 	const branchSource =
-		forkRefOf(request.plan) ?? `${ORIGIN_REMOTE}/${request.branchName}`;
+		forkRefOf(request) ?? `${ORIGIN_REMOTE}/${request.branchName}`;
 	return [...new Set([request.baseBranch, branchSource])];
 }
 
@@ -381,7 +397,7 @@ async function resolveBranchPlacement({
 	repositoryPath: string;
 	request: WorktreePlacementRequest;
 }): Promise<WorktreeBranchPlacement | null> {
-	const forkRef = forkRefOf(request.plan);
+	const forkRef = forkRefOf(request);
 	if (forkRef) {
 		return { forkRef, kind: 'create' };
 	}
