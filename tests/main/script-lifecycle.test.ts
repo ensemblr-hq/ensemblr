@@ -383,6 +383,43 @@ test('concurrent mode still allows only one run script per workspace', async (t)
 	assert.equal(createCalls.length, 1);
 });
 
+test('a blocked run launch names the run script already holding the workspace', async (t) => {
+	const { service } = createServiceFixture(t, {
+		runScripts: [
+			{ command: 'npm run dev', default: true, name: 'dev' },
+			{ command: 'npm run dev:playground', name: 'playground' },
+		],
+	});
+
+	await service.runScript({
+		kind: 'run',
+		scriptName: 'dev',
+		workspaceId: WORKSPACE_ID,
+	});
+	const second = await service.runScript({
+		kind: 'run',
+		scriptName: 'playground',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.match(second.diagnostics[0]?.message ?? '', /run script "dev"/);
+});
+
+test('a blocked setup launch keeps the kind-only wording', async (t) => {
+	const { service } = createServiceFixture(t, { setup: 'npm install' });
+
+	await service.runScript({ kind: 'setup', workspaceId: WORKSPACE_ID });
+	const second = await service.runScript({
+		kind: 'setup',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.match(
+		second.diagnostics[0]?.message ?? '',
+		/^The setup script is already running\./,
+	);
+});
+
 test('runScript launches the requested named run script', async (t) => {
 	const { createCalls, service } = createServiceFixture(t, {
 		runScripts: [
@@ -430,6 +467,50 @@ test('runScript reports an unknown run script name without spawning', async (t) 
 	assert.equal(result.session, null);
 	assert.equal(result.diagnostics[0]?.code, 'script-not-configured');
 	assert.equal(createCalls.length, 0);
+});
+
+test('an unknown run script name is answered with the names that exist', async (t) => {
+	const { service } = createServiceFixture(t, {
+		runScripts: [
+			{ command: 'npm run dev', name: 'dev' },
+			{ command: 'npm run dev:playground', name: 'playground' },
+		],
+	});
+
+	const result = await service.runScript({
+		kind: 'run',
+		scriptName: 'ghost',
+		workspaceId: WORKSPACE_ID,
+	});
+
+	assert.match(result.diagnostics[0]?.message ?? '', /dev, playground/);
+});
+
+test('listRunScripts reports the repository run scripts in declaration order', async (t) => {
+	const { service } = createServiceFixture(t, {
+		runScripts: [
+			{ command: 'npm run dev', name: 'dev' },
+			{ command: 'npm test', default: true, name: 'test' },
+		],
+	});
+
+	assert.deepEqual(
+		service
+			.listRunScripts({ workspaceId: WORKSPACE_ID })
+			.map((script) => [script.name, script.isDefault]),
+		[
+			['dev', false],
+			['test', true],
+		],
+	);
+});
+
+test('listRunScripts reports none for an unknown workspace', async (t) => {
+	const { service } = createServiceFixture(t, {
+		runScripts: [{ command: 'npm run dev', name: 'dev' }],
+	});
+
+	assert.deepEqual(service.listRunScripts({ workspaceId: 'nope' }), []);
 });
 
 test('a legacy run string still launches as the implicit default script', async (t) => {

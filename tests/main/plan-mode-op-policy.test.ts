@@ -45,6 +45,7 @@ const EXPECTED_DENIALS: Record<
 	getWorkspaceStatus: [],
 	launchHarness: ['orchestrator', 'subagent'],
 	listModels: [],
+	listRunScripts: [],
 	listTabs: [],
 	listTerminals: [],
 	listWorkspaces: [],

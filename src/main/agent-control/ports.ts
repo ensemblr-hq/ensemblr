@@ -8,6 +8,7 @@ import type {
 	AddDiffCommentsResult,
 	AgentControlConversationStatus,
 	AgentControlModelList,
+	AgentControlRunScriptList,
 	AgentControlTabInfo,
 	AgentControlTerminalInfo,
 	AgentControlWorkspaceInfo,
@@ -191,13 +192,30 @@ export interface ConversationPort {
 	resolveConversationWorkspace: (piSessionId: string) => Promise<string | null>;
 }
 
+/**
+ * A dock terminal that started, or the lifecycle diagnostic explaining why none
+ * did. A script launch fails for ordinary, correctable reasons — a run script
+ * named that the repository does not configure, another one already up — and the
+ * caller has to read them, so the failure travels rather than collapsing into an
+ * empty terminal id that reads as success.
+ */
+export type StartTerminalOutcome =
+	| { ok: true; terminalId: string }
+	| { ok: false; code: string; message: string };
+
 /** Dock terminal operations plus their scope-check and read helpers. */
 export interface TerminalPort {
 	startTerminal: (input: {
 		workspaceId: string;
 		workspaceCwd: string;
 		kind: StartTerminalKind;
-	}) => Promise<{ terminalId: string }>;
+		/** Named run script to start; omitted starts the repository's default. */
+		scriptName?: string;
+	}) => Promise<StartTerminalOutcome>;
+	/** The run scripts the workspace's repository offers, in declaration order. */
+	listRunScripts: (input: {
+		workspaceId: string;
+	}) => Promise<AgentControlRunScriptList>;
 	stopTerminal: (input: {
 		workspaceId: string;
 		terminalId?: string;

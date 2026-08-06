@@ -39,11 +39,14 @@ const makePorts = (planningSessions: ReadonlySet<string>): AgentControlPorts =>
 			resolveConversationWorkspace: vi.fn().mockResolvedValue('ws'),
 		},
 		terminals: {
-			startTerminal: vi.fn().mockResolvedValue({ terminalId: 'term-1' }),
+			startTerminal: vi
+				.fn()
+				.mockResolvedValue({ ok: true, terminalId: 'term-1' }),
 			stopTerminal: vi.fn().mockResolvedValue(undefined),
 			writeTerminal: vi.fn().mockResolvedValue(undefined),
 			readOutput: vi.fn().mockResolvedValue('output'),
 			listTerminals: vi.fn().mockResolvedValue([]),
+			listRunScripts: vi.fn().mockResolvedValue({ scripts: [] }),
 			resolveTerminalWorkspace: vi.fn().mockResolvedValue('ws'),
 		},
 		harnesses: {

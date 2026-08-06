@@ -103,8 +103,18 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_start_terminal',
 		op: 'startTerminal',
 		description:
-			'Start a dock terminal: the setup script, the run script, or an interactive spawn terminal.',
-		shape: { kind: z.enum(['setup', 'run', 'spawn']) },
+			'Start a dock terminal: the setup script, a run script, or an interactive spawn terminal. A repository can configure several named run scripts (a dev server, a playground, an unsigned build), so with kind=run call ensemblr_list_run_scripts FIRST and pass the scriptName you actually want — omitting it silently starts whichever one the repository marks default, which is rarely the one you meant. Only one run script runs per workspace at a time.',
+		shape: {
+			kind: z.enum(['setup', 'run', 'spawn']),
+			scriptName: z.string().optional(),
+		},
+	},
+	{
+		name: 'ensemblr_list_run_scripts',
+		op: 'listRunScripts',
+		description:
+			"List the run scripts this workspace's repository configures (name, command, and which one is the default), so you can start the right one by name with ensemblr_start_terminal. An empty list means the repository configures none and kind=run has nothing to start.",
+		shape: {},
 	},
 	{
 		name: 'ensemblr_stop_terminal',

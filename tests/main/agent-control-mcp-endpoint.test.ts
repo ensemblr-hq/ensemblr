@@ -53,6 +53,7 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).toContain('ensemblr_list_workspaces');
 		expect(names).toContain('ensemblr_focus_panel');
 		expect(names).toContain('ensemblr_list_models');
+		expect(names).toContain('ensemblr_list_run_scripts');
 		expect(names).toContain('ensemblr_wait_for_agents');
 		expect(names).toContain('ensemblr_notify_orchestrator');
 		expect(names).toContain('ensemblr_set_branch_name');
@@ -72,7 +73,7 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).not.toContain('ensemblr_set_summary');
 		expect(names).not.toContain('ensemblr_ask_user_question');
 		expect(names).not.toContain('ensemblr_exit_plan_mode');
-		expect(tools).toHaveLength(28);
+		expect(tools).toHaveLength(29);
 		await client.close();
 	});
 
@@ -87,6 +88,37 @@ describe('agent-control MCP endpoint', () => {
 		);
 		expect(diffTool?.description).toContain('stat=true FIRST');
 		expect(diffTool?.description).toContain('omittedFiles');
+		await client.close();
+	});
+
+	// Omitting scriptName runs whichever script the repository marks default, so a
+	// harness that never learns the parameter exists silently starts the wrong one.
+	it('offers a run script by name and points at the list tool first', async () => {
+		server = await startControlServer(stubService);
+		const client = await connect('good');
+		const { tools } = await client.listTools();
+		const startTool = tools.find(
+			(tool) => tool.name === 'ensemblr_start_terminal',
+		);
+		expect(startTool?.description).toContain('ensemblr_list_run_scripts');
+		expect(startTool?.inputSchema.properties).toHaveProperty('scriptName');
+		await client.close();
+	});
+
+	it('forwards the run script name a harness asked for', async () => {
+		server = await startControlServer(stubService);
+		const client = await connect('secret-token');
+		await client.callTool({
+			name: 'ensemblr_start_terminal',
+			arguments: { kind: 'run', scriptName: 'playground' },
+		});
+		expect(calls).toEqual([
+			{
+				op: 'startTerminal',
+				token: 'secret-token',
+				rawArgs: { kind: 'run', scriptName: 'playground' },
+			},
+		]);
 		await client.close();
 	});
 

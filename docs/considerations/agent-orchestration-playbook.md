@@ -90,6 +90,7 @@ a permission denial stays visible.
 | Steer / correct a child | `ensemblr_send_follow_up`. While planning, reaches only a target that is itself planning. |
 | Delegate to a CLI agent | `ensemblr_launch_harness` (claude / codex / vibe). Blocked while planning. |
 | Run / inspect commands | `ensemblr_start_terminal`, `ensemblr_write_terminal`, `ensemblr_read_terminal_output`, `ensemblr_stop_terminal` |
+| Pick a run script to start | `ensemblr_list_run_scripts`, then `ensemblr_start_terminal` with `kind: "run"` and that `scriptName` |
 | Inspect a child out of band | `ensemblr_get_conversation_status`, `ensemblr_get_last_message` |
 | Pull the orchestrator back (sub-agents) | `ensemblr_notify_orchestrator` |
 | Ask the human to decide | `ensemblr_ask_user_question` (blocks until answered; Pi chats only) |
@@ -314,10 +315,11 @@ The three ops with no gate at all before this — `stopTerminal`, `writeTerminal
 type into any terminal in the workspace (including a harness the orchestrator launched), kill the
 run script, or move the whole workspace's kanban card from inside one unit of work.
 
-`waitForAgents` and `listModels` are *not* denied, only withheld from the tool list: a child has no
-children to wait on and no spawn to pick a model for, so refusing them would imply a hazard where
-there is only noise. The Pi extension registers the complement of `SUBAGENT_WITHHELD_OPS` for a
-sub-agent, and a parity test compares its embedded copy of that set against the shared one.
+`waitForAgents`, `listModels`, and `listRunScripts` are *not* denied, only withheld from the tool
+list: a child has no children to wait on, no spawn to pick a model for, and no `startTerminal` to
+pick a run script for, so refusing them would imply a hazard where there is only noise. The Pi
+extension registers the complement of `SUBAGENT_WITHHELD_OPS` for a sub-agent, and a parity test
+compares its embedded copy of that set against the shared one.
 
 Withholding and denying are complements. The child's tool list omits the tool so it never reaches;
 the service still refuses it so a stale or hand-rolled call fails closed. Listing a tool the service
@@ -396,6 +398,27 @@ same provider you are on. If you omit `model`, the child inherits the caller's m
 available (Pi callers only; the extension forwards it), otherwise the app default. The server
 **validates** the requested model against the catalog: an unknown id is dropped in favor of the
 caller-model or default fallback rather than failing the spawn — so never invent a model id.
+
+## Run scripts
+
+A repository declares its run scripts by name in `.ensemblr/settings.toml` (`[scripts.run.<name>]`) —
+a dev server, a playground, an unsigned build — and the dock's Run button offers all of them. An
+agent gets the same choice: call `ensemblr_list_run_scripts` (returns each script's `name`, `command`,
+and which one is the effective default) and pass that `scriptName` to `ensemblr_start_terminal` with
+`kind: "run"`. Omitting `scriptName` starts whichever script the repository marks default, falling
+back to the first declared one — rarely the one an agent meant. A name that is not configured fails
+with `not-found` and lists the names that are, rather than quietly launching something else. Only one
+run script runs per workspace at a time, and `nonconcurrent` run mode extends that across the
+repository's workspaces.
+
+A launch that starts nothing is a **failure envelope, not an empty success** — every reason a script
+declines carries its own code, so a caller can branch before reading the prose: `not-found` for a
+name the repository does not configure, `conflict` for a run script already holding the workspace
+(named, so a caller can tell whether it is the one it wanted), `timeout` for a restart that outlasts
+its wait. A `conflict` is cleared with `ensemblr_stop_terminal` (`kind: "run"`) and a fresh start;
+`ensemblr_list_terminals` reports each terminal's `scriptName`, so the running one is identifiable
+without starting anything. A refused launch costs no spawn budget, so correcting a guessed name is
+free.
 
 ## Etiquette & limits
 

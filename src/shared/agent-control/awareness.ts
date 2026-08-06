@@ -83,7 +83,7 @@ const REVIEW_INVENTORY = `- Review: read this workspace's diff (\`ensemblr_get_w
 /** Everything a root may drive: the whole control surface. */
 const ORCHESTRATOR_INVENTORY = `- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
 - Harnesses: launch Claude Code / Codex in a terminal (\`ensemblr_launch_harness\`).
-- Terminals: start/stop the setup or run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`).
+- Terminals: start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces/tabs/terminals; read a conversation's status or last message; audit what a conversation actually did, tool calls included (\`ensemblr_read_conversation\`).
 ${REVIEW_INVENTORY}
 - Board: move your workspace across the kanban board and read its status (\`ensemblr_set_workspace_status\`/\`ensemblr_get_workspace_status\`); \`ensemblr_list_workspaces\` shows every workspace's board status.
@@ -233,7 +233,7 @@ export const HARNESS_AWARENESS = `You are running inside Ensemblr, a desktop cod
 
 What you can drive:
 - Pi sub-agents: start one in a fresh chat tab (\`ensemblr_start_conversation\`), steer it (\`ensemblr_send_follow_up\`), block until children settle (\`ensemblr_wait_for_agents\`), read a child's status or last message, audit what it actually did (\`ensemblr_read_conversation\`), close its tab (\`ensemblr_close_tab\`).
-- Harnesses & terminals: launch another CLI harness (\`ensemblr_launch_harness\`); start/stop the setup or run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`).
+- Harnesses & terminals: launch another CLI harness (\`ensemblr_launch_harness\`); start/stop the setup script, a run script, or a spawn terminal (\`ensemblr_start_terminal\`/\`ensemblr_stop_terminal\`); type into one (\`ensemblr_write_terminal\`); read its output (\`ensemblr_read_terminal_output\`). A repository configures its run scripts by name — a dev server, a playground, an unsigned build — so call \`ensemblr_list_run_scripts\` and pass the \`scriptName\` you want; starting a run script without one takes the repository's default, which is rarely the one you meant.
 - Focus & inspect: bring a tab/terminal or the Files/Changes/Checks panel forward (\`ensemblr_focus_tab\`/\`ensemblr_focus_dock_tab\`/\`ensemblr_focus_panel\`); list workspaces, tabs, and terminals. Reads may span every open workspace.
 ${REVIEW_INVENTORY}
 - Board: read and set your workspace's kanban status (\`ensemblr_get_workspace_status\`/\`ensemblr_set_workspace_status\`).

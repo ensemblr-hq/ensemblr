@@ -45,6 +45,7 @@ export const AGENT_CONTROL_OPS = [
 	'readConversation',
 	'readTerminalOutput',
 	'listModels',
+	'listRunScripts',
 	'waitForAgents',
 	'notifyOrchestrator',
 	'askUserQuestion',
@@ -251,6 +252,11 @@ export type StartTerminalKind = 'setup' | 'run' | 'spawn';
 /** Args for `startTerminal`: start a dock terminal (setup/run script or interactive spawn). */
 export interface StartTerminalArgs {
 	kind: StartTerminalKind;
+	/**
+	 * Which named run script to start (`kind: 'run'` only), as listed by
+	 * `listRunScripts`. Omitted starts the repository's default script.
+	 */
+	scriptName?: string;
 }
 
 /** Args for `stopTerminal`: stop a dock terminal by id, or a script terminal by kind. */
@@ -821,6 +827,7 @@ export type AgentControlErrorCode =
 	| 'denied-rate'
 	| 'denied-deadlock'
 	| 'not-found'
+	| 'conflict'
 	| 'timeout'
 	| 'internal';
 
@@ -857,6 +864,8 @@ export interface AgentControlTerminalInfo {
 	kind: string;
 	status: string;
 	workspaceId: string;
+	/** Named run script this terminal is running, or null for every other kind. */
+	scriptName: string | null;
 }
 
 /** Lightweight workspace descriptor returned by `listWorkspaces`. */
@@ -906,4 +915,21 @@ export interface AgentControlModelInfo {
 export interface AgentControlModelList {
 	defaultModelId: string | null;
 	models: readonly AgentControlModelInfo[];
+}
+
+/** One run script the workspace's repository configures, as returned by `listRunScripts`. */
+export interface AgentControlRunScriptInfo {
+	name: string;
+	command: string;
+	/** True for the script `startTerminal` runs when no name is given. */
+	isDefault: boolean;
+}
+
+/**
+ * The run scripts a workspace can launch, returned by `listRunScripts`. Empty
+ * when the repository configures none, in which case `startTerminal` with
+ * `kind: 'run'` has nothing to start.
+ */
+export interface AgentControlRunScriptList {
+	scripts: readonly AgentControlRunScriptInfo[];
 }
