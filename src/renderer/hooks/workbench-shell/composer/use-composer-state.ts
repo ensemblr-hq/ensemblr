@@ -496,7 +496,7 @@ export function useComposerState({
 			pending,
 		],
 	);
-	useComposerSubmitConsumer(submitFromChannel);
+	useComposerSubmitConsumer(chatTabId, submitFromChannel);
 
 	// Cmd+J explicitly queues the current draft as a follow-up regardless of the
 	// Follow-up setting; when idle it just sends normally.

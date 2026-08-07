@@ -36,7 +36,7 @@ export function CreatePullRequestMenu({
 }: {
 	workspace: WorkspaceShellModel;
 }) {
-	const submitToComposer = useComposerSubmit();
+	const submitToComposer = useComposerSubmit(workspace.id);
 	const reviewActions = useReviewActions();
 	// Hand the agent the live title/description from the Checks tab (including
 	// unsaved edits), falling back to the saved draft and then the open PR. Only
@@ -65,7 +65,7 @@ export function CreatePullRequestMenu({
 	};
 
 	const createDraftPullRequest = () => {
-		submitToComposer(
+		const queued = submitToComposer(
 			buildCreatePullRequestPrompt({
 				description,
 				draft: true,
@@ -73,6 +73,10 @@ export function CreatePullRequestMenu({
 				workspace,
 			}),
 		);
+		if (!queued) {
+			toast.error('Open a chat tab to hand this to the agent.');
+			return;
+		}
 		toast.success('Asked the agent to open a draft pull request.');
 	};
 

@@ -155,7 +155,12 @@ export function closeChatTab({
 	return getChatTabById({ database, id });
 }
 
-/** Reopens a closed chat tab and moves it to the end of the open-tab ordering. */
+/**
+ * Reopens a closed chat tab and moves it to the end of the open-tab ordering.
+ * An archived tab keeps its session id so it can resume, but that session may
+ * have been moved onto another tab meanwhile — the restore then comes back
+ * detached rather than reintroducing a second surface for one conversation.
+ */
 export function restoreChatTab({
 	database,
 	id,
@@ -184,6 +189,19 @@ export function restoreChatTab({
 				`UPDATE chat_tabs SET closed_at = NULL, position = ? WHERE id = ?`,
 			)
 			.run(position, id);
+		database
+			.prepare(
+				`UPDATE chat_tabs SET agent_session_id = NULL
+				 WHERE id = ?
+				   AND agent_session_id IS NOT NULL
+				   AND EXISTS (
+				     SELECT 1 FROM chat_tabs AS holder
+				     WHERE holder.agent_session_id = chat_tabs.agent_session_id
+				       AND holder.id <> chat_tabs.id
+				       AND holder.closed_at IS NULL
+				   )`,
+			)
+			.run(id);
 
 		database.exec('COMMIT');
 	} catch (error) {
@@ -297,7 +315,10 @@ export function getChatTabByAgentSessionId({
 	database: DatabaseSync;
 }): ChatTabRow | null {
 	const row = database
-		.prepare(`${SELECT_TAB} WHERE agent_session_id = ?`)
+		.prepare(
+			`${SELECT_TAB} WHERE agent_session_id = ?
+			 ORDER BY closed_at IS NULL DESC, opened_at DESC LIMIT 1`,
+		)
 		.get(agentSessionId) as ChatTabRowShape | undefined;
 	return row ? mapTabRow(row) : null;
 }
@@ -373,8 +394,16 @@ export function restoreClosedChatTab({
 }
 
 /**
- * Attaches an existing agent session to a chat tab. Returns the updated row, or
- * `null` when no tab with `id` exists.
+ * Moves an existing agent session onto a chat tab, detaching whichever *open*
+ * tab held it before. A session backs exactly one conversation surface, so
+ * leaving the old pointer in place would render the same transcript in two tabs
+ * and let both composers steer one runtime. An archived tab is not a surface and
+ * keeps its pointer, so history stays intact; {@link restoreChatTab} applies the
+ * same rule again if that tab ever reopens.
+ * @param agentSessionId - Session to attach
+ * @param database - Open database handle
+ * @param id - Tab that should own the session
+ * @returns The updated row, or `null` when no tab with `id` exists
  */
 export function bindAgentSession({
 	agentSessionId,
@@ -385,9 +414,22 @@ export function bindAgentSession({
 	database: DatabaseSync;
 	id: string;
 }): ChatTabRow | null {
-	database
-		.prepare(`UPDATE chat_tabs SET agent_session_id = ? WHERE id = ?`)
-		.run(agentSessionId, id);
+	database.exec('BEGIN IMMEDIATE');
+	try {
+		database
+			.prepare(
+				`UPDATE chat_tabs SET agent_session_id = NULL
+				 WHERE agent_session_id = ? AND id <> ? AND closed_at IS NULL`,
+			)
+			.run(agentSessionId, id);
+		database
+			.prepare(`UPDATE chat_tabs SET agent_session_id = ? WHERE id = ?`)
+			.run(agentSessionId, id);
+		database.exec('COMMIT');
+	} catch (error) {
+		database.exec('ROLLBACK');
+		throw error;
+	}
 	return getChatTabById({ database, id });
 }
 

@@ -13,6 +13,7 @@ import {
 	subscribeAgentSessionEvents,
 } from '@/renderer/api/ensemblr-queries';
 import { wrapWithMasterPrompt } from '@/renderer/lib/workbench/action-prompts';
+import { useInFlightTurns } from '@/renderer/state/composer/in-flight-turns';
 import { useOptimisticPrompts } from '@/renderer/state/composer/optimistic-prompts';
 import {
 	chatModelOverrideAtomFamily,
@@ -66,10 +67,16 @@ export interface AgentComposerControllerState {
 	thinkingLevel: string | null;
 }
 
-/** Locally tracks the agent session opened for one chat tab before refetch lands. */
-interface PendingTabSession {
-	chatTabId: string;
-	sessionId: string;
+/**
+ * Model, thinking level, and Plan Mode one turn is sent with, snapshotted when
+ * the user fired it. Both requests of a first turn (open, then submit) carry the
+ * same snapshot, so a tab switch while the runtime spawns cannot re-stamp the
+ * second request with the newly-active tab's picks.
+ */
+interface AgentTurnOptions {
+	model: string | null;
+	planMode?: boolean;
+	thinkingLevel: string | null;
 }
 
 /**
@@ -83,12 +90,19 @@ interface PendingTabSession {
 export function useAgentComposerController({
 	chatTabId,
 	currentAgentSessionId,
+	isResolvingChatTab = false,
 	masterPrompt = '',
 	workspaceCwd,
 	workspaceId,
 }: {
 	chatTabId: string;
 	currentAgentSessionId: string | null;
+	/**
+	 * True while the routed tab id has no row in the tab list yet, so `chatTabId`
+	 * names a real tab whose session has not loaded. Submitting then would read as
+	 * a fresh chat and open a second session over the one the tab already owns.
+	 */
+	isResolvingChatTab?: boolean;
 	/** Repository `general` preferences prepended to the first message of a new chat. */
 	masterPrompt?: string;
 	workspaceCwd: string;
@@ -114,18 +128,23 @@ export function useAgentComposerController({
 	const [defaultModelId] = useAtom(defaultChatModelAtom);
 	const [defaultThinkingLevel] = useAtom(defaultChatThinkingLevelAtom);
 	const [lastError, setLastError] = useState<string | null>(null);
-	const [pendingSession, setPendingSession] =
-		useState<PendingTabSession | null>(null);
+	// Sessions opened this mount, keyed by the tab that opened them, standing in
+	// until the refetch lands. Keyed rather than a single slot so a second tab
+	// starting a chat cannot erase the first tab's freshly-opened session.
+	const [pendingSessionByTab, setPendingSessionByTab] = useState<
+		Readonly<Record<string, string | undefined>>
+	>({});
+	const inFlight = useInFlightTurns();
 	const [liveContextUsage, setLiveContextUsage] = useState<{
 		sessionId: string;
 		usage: ComposerContextUsage;
 	} | null>(null);
 
 	/**
-	 * Builds the Plan Mode half of an open/submit request, reading the store at call
-	 * time. Approving a plan turns the toggle off and submits in the same tick, and a
-	 * mutation's options are only refreshed on commit — so a render-scope read would
-	 * send `planMode: true` on the very turn meant to start implementing.
+	 * Builds the Plan Mode half of a turn snapshot, reading the store at call time.
+	 * Approving a plan turns the toggle off and submits in the same tick, and a
+	 * render-scope read would still hold `true` on the very turn meant to start
+	 * implementing.
 	 *
 	 * Omits the field entirely when the user has never decided for this tab, so main
 	 * keeps whatever it already holds. A spawned child inherits Plan Mode through the
@@ -189,8 +208,7 @@ export function useAgentComposerController({
 		}));
 	}, [models, modelId]);
 
-	const pendingSessionId =
-		pendingSession?.chatTabId === chatTabId ? pendingSession.sessionId : null;
+	const pendingSessionId = pendingSessionByTab[chatTabId] ?? null;
 	const activeSessionId = persistedActiveSession?.id ?? pendingSessionId;
 	const activeSessionSnapshot = sessionsData?.sessions.find(
 		(session) => session.id === activeSessionId,
@@ -268,24 +286,34 @@ export function useAgentComposerController({
 		return unsubscribe;
 	}, [activeSessionId, queryClient, workspaceId]);
 
+	// Everything that identifies the turn — target tab, model, thinking level, Plan
+	// Mode — rides in the mutation variables rather than being read from render
+	// scope. TanStack rebuilds a mutation from the newest options at mutate time,
+	// and a first turn submits only after awaiting its own `openAgentSession`, so a
+	// render-scope read would stamp whichever tab the user switched to while the
+	// agent process was still spawning.
 	const openSessionMutation = useMutation({
 		mutationFn: (input: {
+			chatTabId: string;
 			initialPrompt: string | null;
 			resumeSessionId?: string | null;
+			turn: AgentTurnOptions;
 		}) =>
 			openAgentSession({
-				chatTabId,
+				...input.turn,
+				chatTabId: input.chatTabId,
 				initialPrompt: input.initialPrompt,
-				model: modelId,
-				...planModeRequest(),
 				resumeSessionId: input.resumeSessionId ?? null,
-				thinkingLevel,
 				workspaceCwd,
 				workspaceId,
 			}),
-		onSuccess: (result) => {
+		onSuccess: (result, variables) => {
 			if (result.session) {
-				setPendingSession({ chatTabId, sessionId: result.session.id });
+				const openedSessionId = result.session.id;
+				setPendingSessionByTab((previous) => ({
+					...previous,
+					[variables.chatTabId]: openedSessionId,
+				}));
 				void queryClient.invalidateQueries({
 					queryKey: ensemblrQueryKeys.agentSessionsForWorkspace(workspaceId),
 				});
@@ -301,14 +329,13 @@ export function useAgentComposerController({
 			prompt: string;
 			sessionId: string;
 			streamingBehavior?: PiStreamingBehavior;
+			turn: AgentTurnOptions;
 		}) =>
 			submitAgentPrompt({
-				model: modelId,
-				...planModeRequest(),
+				...input.turn,
 				prompt: input.prompt,
 				sessionId: input.sessionId,
 				streamingBehavior: input.streamingBehavior,
-				thinkingLevel,
 			}),
 		onSuccess: () =>
 			queryClient.invalidateQueries({
@@ -318,8 +345,12 @@ export function useAgentComposerController({
 
 	const stopMutation = useMutation({
 		mutationFn: (sessionId: string) => stopAgentSession({ sessionId }),
-		onSuccess: () => {
-			setPendingSession(null);
+		onSuccess: (_result, sessionId) => {
+			setPendingSessionByTab((previous) =>
+				Object.fromEntries(
+					Object.entries(previous).filter(([, id]) => id !== sessionId),
+				),
+			);
 			void queryClient.invalidateQueries({
 				queryKey: ensemblrQueryKeys.agentSessionsForWorkspace(workspaceId),
 			});
@@ -338,13 +369,18 @@ export function useAgentComposerController({
 			if (!trimmed) {
 				return;
 			}
-			if (!isRealChatTabId) {
+			if (!isRealChatTabId || isResolvingChatTab) {
 				setLastError(
 					'Workspace chat tab is still initializing. Try again in a moment.',
 				);
 				return;
 			}
 			setLastError(null);
+			const turn: AgentTurnOptions = {
+				model: modelId,
+				...planModeRequest(),
+				thinkingLevel,
+			};
 
 			// Prepend the repository's `general` master prompt to the very first
 			// message of a fresh chat only. It is agent-only context: the timeline
@@ -367,10 +403,14 @@ export function useAgentComposerController({
 				persistedActiveSession !== undefined &&
 				!persistedActiveSession.runtimeOpen;
 			if (!sessionId || needsRuntimeResume) {
-				const opened = await openSessionMutation.mutateAsync({
-					initialPrompt: sessionId ? null : trimmed,
-					resumeSessionId: sessionId,
-				});
+				const opened = await inFlight.track(chatTabId, () =>
+					openSessionMutation.mutateAsync({
+						chatTabId,
+						initialPrompt: sessionId ? null : trimmed,
+						resumeSessionId: sessionId,
+						turn,
+					}),
+				);
 				if (opened.error) {
 					setLastError(opened.error);
 					optimistic.remove(optimisticEntry.id);
@@ -384,11 +424,15 @@ export function useAgentComposerController({
 				return;
 			}
 
-			const result = await submitMutation.mutateAsync({
-				prompt: promptToSend,
-				sessionId,
-				streamingBehavior: options?.streamingBehavior,
-			});
+			const turnSessionId = sessionId;
+			const result = await inFlight.track(turnSessionId, () =>
+				submitMutation.mutateAsync({
+					prompt: promptToSend,
+					sessionId: turnSessionId,
+					streamingBehavior: options?.streamingBehavior,
+					turn,
+				}),
+			);
 			if (result.error) {
 				setLastError(result.error);
 				optimistic.remove(optimisticEntry.id);
@@ -396,12 +440,18 @@ export function useAgentComposerController({
 		},
 		[
 			activeSessionId,
+			chatTabId,
+			inFlight,
 			isRealChatTabId,
+			isResolvingChatTab,
 			masterPrompt,
+			modelId,
 			openSessionMutation,
 			optimistic,
 			persistedActiveSession,
+			planModeRequest,
 			submitMutation,
+			thinkingLevel,
 		],
 	);
 
@@ -409,8 +459,10 @@ export function useAgentComposerController({
 		if (!activeSessionId) {
 			return;
 		}
-		await stopMutation.mutateAsync(activeSessionId);
-	}, [activeSessionId, stopMutation]);
+		await inFlight.track(activeSessionId, () =>
+			stopMutation.mutateAsync(activeSessionId),
+		);
+	}, [activeSessionId, inFlight, stopMutation]);
 
 	const onModelChange = useCallback(
 		(nextModelId: string) => {
@@ -433,16 +485,19 @@ export function useAgentComposerController({
 		[setPlanMode],
 	);
 
+	// One controller instance serves whichever tab is active, so a shared mutation's
+	// own pending flag would report a sibling's turn as this tab's. The in-flight
+	// set is keyed by tab (a session still spawning) and by session (a turn or a
+	// stop already under way), so several tabs can run turns independently.
+	const hasInFlightTurn =
+		inFlight.isBusy(chatTabId) || inFlight.isBusy(activeSessionId);
+
 	return {
 		activeSessionId,
 		availableModels,
 		availableThinkingLevels,
 		contextUsage,
-		isStreaming:
-			isAgentSessionStreaming ||
-			openSessionMutation.isPending ||
-			submitMutation.isPending ||
-			stopMutation.isPending,
+		isStreaming: isAgentSessionStreaming || hasInFlightTurn,
 		lastError,
 		lockedProvider,
 		modelId,

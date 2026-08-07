@@ -78,9 +78,12 @@ export function ReviewActionsProvider({
 		onSettled: closeDialog,
 	});
 	const isAgentWorking = useWorkspaceBusy(activeWorkspace.id);
-	const submitToComposer = useComposerSubmit();
+	const submitToComposer = useComposerSubmit(activeWorkspace.id);
 	const commitAndPush = useCallback(() => {
-		submitToComposer(buildCommitAndPushPrompt(activeWorkspace));
+		if (!submitToComposer(buildCommitAndPushPrompt(activeWorkspace))) {
+			toast.error('Open a chat tab to hand this to the agent.');
+			return;
+		}
 		toast.success('Asked the agent to commit and push.');
 	}, [activeWorkspace, submitToComposer]);
 

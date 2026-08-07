@@ -18,7 +18,10 @@ import {
 import { useAgentSessionStatusInvalidation } from '@/renderer/hooks/workspace/use-agent-session-status-invalidation';
 import { useWorkspaceAgentBusy } from '@/renderer/hooks/workspace/use-workspace-agent-busy';
 import { areStringArraysEqual } from '@/renderer/lib/ordered-ids';
-import { forgetComposerDraft } from '@/renderer/state/composer';
+import {
+	forgetComposerDraft,
+	useDropComposerSubmits,
+} from '@/renderer/state/composer';
 import { useConversationScrollOffsets } from '@/renderer/state/conversation-scroll';
 import { forgetChatOverrides } from '@/renderer/state/preferences';
 import {
@@ -99,6 +102,8 @@ export function useSessionTabState({
 	bootstrap?: boolean;
 	onSessionTabChange: (sessionId: string) => void;
 }): SessionTabState & {
+	/** True while the routed tab has no row in the list yet, so its session is unknown. */
+	isResolvingActiveSession: boolean;
 	openSessionTab: (options?: {
 		placement?: SessionTabPlacement;
 	}) => Promise<OpenSessionTabHandlerResult | null>;
@@ -136,6 +141,7 @@ export function useSessionTabState({
 	);
 	const queryClient = useQueryClient();
 	const scrollOffsets = useConversationScrollOffsets();
+	const dropComposerSubmits = useDropComposerSubmits();
 	const {
 		data: chatTabsData,
 		isFetching: isFetchingChatTabs,
@@ -222,14 +228,46 @@ export function useSessionTabState({
 		return closedEntries.map(toClosedSessionTabModel);
 	}, [closedEntries]);
 
-	const effectiveActiveSession =
-		sessionTabs.find((session) => session.id === activeSession.id) ??
-		sessionTabs[0] ??
-		activeWorkspace.sessions.find(
-			(session) => session.id === activeSession.id,
-		) ??
-		activeWorkspace.sessions[0] ??
-		activeSession;
+	const resolvedActiveSession = useMemo(
+		() =>
+			sessionTabs.find((session) => session.id === activeSession.id) ?? null,
+		[activeSession.id, sessionTabs],
+	);
+	// The routed tab exists but the list has not caught up with it yet (first
+	// paint, just opened, just restored, focused by an agent). Callers must treat
+	// the tab as not-yet-usable: it is a real tab, so nothing rejects a submit on
+	// its id, but its agent session is unknown and a submit would read as a fresh
+	// chat and open a second session over the one the tab already owns.
+	const isResolvingActiveSession =
+		resolvedActiveSession === null &&
+		(!hasLoadedChatTabs || isFetchingChatTabs);
+
+	// An unresolved routed tab id resolves to itself with nothing attached rather
+	// than to a neighbour: substituting another tab's model here hands its agent
+	// session to a tab that does not own it, and the composer then steers that
+	// session.
+	const effectiveActiveSession = useMemo<SessionTabModel>(() => {
+		if (resolvedActiveSession) {
+			return resolvedActiveSession;
+		}
+		if (isResolvingActiveSession) {
+			return { ...activeSession, agentSessionId: null, status: 'idle' };
+		}
+		return (
+			sessionTabs[0] ??
+			activeWorkspace.sessions.find(
+				(session) => session.id === activeSession.id,
+			) ??
+			activeWorkspace.sessions[0] ??
+			activeSession
+		);
+	}, [
+		activeSession,
+		activeWorkspace.sessions,
+		isResolvingActiveSession,
+		resolvedActiveSession,
+		sessionTabs,
+	]);
 
 	const insertAnchorTabId = resolveInsertAnchorId(
 		sessionTabs,
@@ -387,6 +425,18 @@ export function useSessionTabState({
 				forgetChatOverrides(chatTabId);
 				forgetComposerDraft(chatTabId);
 				scrollOffsets.forget(chatTabId);
+			}
+			// Queued auto-submits are not restorable the way a draft is: they drain
+			// only through a mounted composer, which a closed tab no longer has. Drop
+			// them either way and say so, rather than leave a chore the user was told
+			// had been handed over sitting undeliverable.
+			const droppedSubmits = dropComposerSubmits(chatTabId);
+			if (droppedSubmits > 0) {
+				toast.warning(
+					droppedSubmits === 1
+						? 'Cancelled a queued action for the closed chat.'
+						: `Cancelled ${droppedSubmits} queued actions for the closed chat.`,
+				);
 			}
 			void queryClient.invalidateQueries({
 				queryKey: ensemblrQueryKeys.chatTabs(workspaceId),
@@ -998,6 +1048,7 @@ export function useSessionTabState({
 		closeSessionTab,
 		closeSessionTabAsync,
 		effectiveActiveSession,
+		isResolvingActiveSession,
 		openCommentPreviewTab,
 		openFilePreviewTab,
 		openSessionTab,
