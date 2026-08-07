@@ -10,6 +10,13 @@ import type { AgentProviderId } from '@/shared/agent-provider';
 /** Nothing to offer until the runtime answers, for a runtime with no catalogue. */
 const NO_SLASH_COMMANDS: readonly SlashCommandDescriptor[] = [];
 
+/** A runtime's slash catalogue plus whether discovery is still in flight. */
+export interface SlashCommandCatalogue {
+	commands: readonly SlashCommandDescriptor[];
+	/** True while the runtime has been asked but has not answered yet. */
+	loading: boolean;
+}
+
 /** Ranks slash commands in the default empty-query menu. */
 function getSlashCommandRank(command: SlashCommandDescriptor): number {
 	if (command.source === 'skill' && command.sourceScope === 'project') {
@@ -27,17 +34,50 @@ function getSlashCommandRank(command: SlashCommandDescriptor): number {
 	return 4;
 }
 
-/** Sorts prompt-invokable commands by desired default slash-menu groups. */
-export function sortSlashCommands(
+/** Ranks a described command ahead of an otherwise equal bare one. */
+function getDescriptionRank(command: SlashCommandDescriptor): number {
+	return command.description.trim().length > 0 ? 0 : 1;
+}
+
+/** Orders commands by menu group, then by how much each says about itself. */
+function compareSlashCommands(
+	left: SlashCommandDescriptor,
+	right: SlashCommandDescriptor,
+): number {
+	const sourceDiff = getSlashCommandRank(left) - getSlashCommandRank(right);
+	if (sourceDiff !== 0) {
+		return sourceDiff;
+	}
+	const descriptionDiff = getDescriptionRank(left) - getDescriptionRank(right);
+	if (descriptionDiff !== 0) {
+		return descriptionDiff;
+	}
+	return left.command.localeCompare(right.command);
+}
+
+/**
+ * Sorts prompt-invokable commands into the default slash-menu groups and keeps
+ * one entry per command name.
+ *
+ * A runtime can report the same command many times: Claude Code resolves a
+ * skill once per discovery root it reaches, so a single `/code-review` arrives
+ * four times, and pi reports a skill once per scope it is installed in. The
+ * menu identifies a row by its command name, so repeats collide into one React
+ * key and the highlight stops tracking the row under the pointer. Sorting first
+ * means the surviving entry is the best-ranked, most descriptive one.
+ * @param commands - Raw catalogue as the runtime reported it.
+ * @returns Menu-ordered commands with repeated names removed.
+ */
+export function normalizeSlashCommands(
 	commands: readonly SlashCommandDescriptor[],
 ): SlashCommandDescriptor[] {
-	return [...commands].sort((left, right) => {
-		const sourceDiff = getSlashCommandRank(left) - getSlashCommandRank(right);
-		if (sourceDiff !== 0) {
-			return sourceDiff;
+	const byName = new Map<string, SlashCommandDescriptor>();
+	for (const command of [...commands].sort(compareSlashCommands)) {
+		if (!byName.has(command.command)) {
+			byName.set(command.command, command);
 		}
-		return left.command.localeCompare(right.command);
-	});
+	}
+	return [...byName.values()];
 }
 
 /**
@@ -79,15 +119,16 @@ function useEverOpened(menuOpen: boolean): boolean {
  * @param provider - Agent runtime the composer is currently speaking for.
  * @param workspaceCwd - Workspace directory used for project-local resources.
  * @param menuOpen - Whether the composer's slash menu is currently open.
+ * @returns The runtime's commands plus whether discovery is still running.
  */
 export function useSlashCommands(
 	provider: AgentProviderId,
 	workspaceCwd: string,
 	menuOpen: boolean,
-): readonly SlashCommandDescriptor[] {
+): SlashCommandCatalogue {
 	const everOpened = useEverOpened(menuOpen);
 	const query = agentProviderSlashCommandsQuery(provider, workspaceCwd);
-	const { data } = useQuery({
+	const { data, isFetching } = useQuery({
 		...query,
 		enabled: everOpened && query.enabled,
 		retry: false,
@@ -96,20 +137,23 @@ export function useSlashCommands(
 	return useMemo(() => {
 		const fallback =
 			provider === 'pi' ? PI_STATIC_SLASH_COMMANDS : NO_SLASH_COMMANDS;
-		if (!data) {
-			return sortSlashCommands(fallback);
+		if (!data || (data.source !== 'runtime' && data.commands.length === 0)) {
+			return {
+				commands: normalizeSlashCommands(fallback),
+				loading: isFetching,
+			};
 		}
-		if (data.source !== 'runtime' && data.commands.length === 0) {
-			return sortSlashCommands(fallback);
-		}
-		return sortSlashCommands(
-			data.commands.map((entry) => ({
-				autoSubmit: entry.autoSubmit,
-				command: entry.command,
-				description: entry.description,
-				source: entry.source,
-				sourceScope: entry.sourceScope,
-			})),
-		);
-	}, [data, provider]);
+		return {
+			commands: normalizeSlashCommands(
+				data.commands.map((entry) => ({
+					autoSubmit: entry.autoSubmit,
+					command: entry.command,
+					description: entry.description,
+					source: entry.source,
+					sourceScope: entry.sourceScope,
+				})),
+			),
+			loading: isFetching,
+		};
+	}, [data, isFetching, provider]);
 }

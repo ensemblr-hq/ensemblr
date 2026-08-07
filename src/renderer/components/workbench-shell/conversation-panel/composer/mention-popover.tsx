@@ -27,6 +27,8 @@ interface ComposerAutocompletePopoverProps {
 	onMentionSelect: (entry: WorkspaceFileSummary) => void;
 	onOpenChange: (open: boolean) => void;
 	onSlashSelect: (command: string, autoSubmit: boolean) => void;
+	/** True while the runtime is still being asked for its command catalogue. */
+	slashLoading: boolean;
 	slashMatches: readonly SlashCommandDescriptor[];
 }
 
@@ -90,8 +92,7 @@ function renderMentionRows({
 			active={index === activeIndex}
 			icon={<WorkspaceFileIcon file={match} />}
 			key={match.id}
-			keyId={match.id}
-			onMouseEnter={() => onHover(index)}
+			onHover={() => onHover(index)}
 			onSelect={() => onSelect(match)}
 			primary={match.name}
 			secondary={match.path === match.name ? undefined : match.path}
@@ -102,11 +103,13 @@ function renderMentionRows({
 /** Renders slash command autocomplete rows. */
 function renderSlashRows({
 	activeIndex,
+	loading,
 	matches,
 	onHover,
 	onSelect,
 }: {
 	activeIndex: number;
+	loading: boolean;
 	matches: readonly SlashCommandDescriptor[];
 	onHover: (index: number) => void;
 	onSelect: (command: string, autoSubmit: boolean) => void;
@@ -114,7 +117,7 @@ function renderSlashRows({
 	if (matches.length === 0) {
 		return (
 			<div className='px-2 py-1.5 text-muted-foreground text-xs'>
-				No matching commands
+				{loading ? 'Loading commands…' : 'No matching commands'}
 			</div>
 		);
 	}
@@ -123,8 +126,7 @@ function renderSlashRows({
 		<AutocompleteRow
 			active={index === activeIndex}
 			key={match.command}
-			keyId={match.command}
-			onMouseEnter={() => onHover(index)}
+			onHover={() => onHover(index)}
 			onSelect={() => onSelect(match.command, match.autoSubmit)}
 			primary={
 				<span>
@@ -147,6 +149,7 @@ export function ComposerAutocompletePopover({
 	onMentionSelect,
 	onOpenChange,
 	onSlashSelect,
+	slashLoading,
 	slashMatches,
 }: ComposerAutocompletePopoverProps) {
 	const open = kind === 'mention' || kind === 'slash';
@@ -162,6 +165,7 @@ export function ComposerAutocompletePopover({
 				})
 			: renderSlashRows({
 					activeIndex,
+					loading: slashLoading,
 					matches: slashMatches,
 					onHover,
 					onSelect: onSlashSelect,

@@ -147,6 +147,7 @@ export function ComposerPanel({
 							}
 						}}
 						onSlashSelect={state.onSlashSelect}
+						slashLoading={state.slashLoading}
 						slashMatches={state.slashMatches}
 					>
 						{textareaBlock}

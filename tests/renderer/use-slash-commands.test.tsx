@@ -83,11 +83,11 @@ test('keeps the catalogue after the menu closes again', async () => {
 		renderSlashCommandsClosed();
 
 	rerender({ menuOpen: true });
-	await waitFor(() => expect(result.current).not.toEqual([]));
+	await waitFor(() => expect(result.current.commands).not.toEqual([]));
 
 	rerender({ menuOpen: false });
 
-	expect(result.current.map((entry) => entry.command)).toEqual([
+	expect(result.current.commands.map((entry) => entry.command)).toEqual([
 		'code-review',
 		'security-review',
 	]);
@@ -109,7 +109,7 @@ test('returns the runtime commands rather than a vendored catalogue', async () =
 	const { result } = renderSlashCommands('claude');
 
 	await waitFor(() =>
-		expect(result.current.map((entry) => entry.command)).toEqual([
+		expect(result.current.commands.map((entry) => entry.command)).toEqual([
 			'code-review',
 			'security-review',
 		]),
@@ -123,7 +123,7 @@ test('offers nothing for Claude Code when discovery fails', async () => {
 		source: 'runtime',
 	});
 
-	await waitFor(() => expect(result.current).toEqual([]));
+	await waitFor(() => expect(result.current.commands).toEqual([]));
 });
 
 test("falls back to pi's vendored catalogue only for pi", async () => {
@@ -134,6 +134,54 @@ test("falls back to pi's vendored catalogue only for pi", async () => {
 	});
 
 	await waitFor(() =>
-		expect(result.current.map((entry) => entry.command)).toContain('compact'),
+		expect(result.current.commands.map((entry) => entry.command)).toContain(
+			'compact',
+		),
 	);
+});
+
+// Claude Code reports a skill once per discovery root, so the raw catalogue
+// carries four identical `/code-review` entries the menu must not render.
+test('collapses commands the runtime reported more than once', async () => {
+	const { result } = renderSlashCommands('claude', {
+		commands: [
+			{ autoSubmit: false, command: 'code-review', description: 'Review' },
+			{ autoSubmit: false, command: 'code-review', description: 'Review' },
+			{ autoSubmit: false, command: 'code-review', description: 'Review' },
+			{ autoSubmit: false, command: 'code-review', description: 'Review' },
+		],
+		error: null,
+		source: 'runtime',
+	});
+
+	await waitFor(() =>
+		expect(result.current.commands.map((entry) => entry.command)).toEqual([
+			'code-review',
+		]),
+	);
+});
+
+// Discovery spawns a `claude` process, so the menu opens on an empty list. It
+// must not claim nothing matched before the runtime has answered.
+test('reports discovery as loading until the runtime answers', async () => {
+	const { rerender, result } = renderSlashCommandsClosed();
+
+	expect(result.current.loading).toBe(false);
+
+	rerender({ menuOpen: true });
+	expect(result.current.loading).toBe(true);
+
+	await waitFor(() => expect(result.current.loading).toBe(false));
+	expect(result.current.commands).not.toEqual([]);
+});
+
+test('stops reporting loading once discovery comes back empty', async () => {
+	const { result } = renderSlashCommands('claude', {
+		commands: [],
+		error: 'No claude executable was found on your PATH.',
+		source: 'runtime',
+	});
+
+	await waitFor(() => expect(result.current.loading).toBe(false));
+	expect(result.current.commands).toEqual([]);
 });

@@ -111,6 +111,8 @@ export interface ComposerStateApi {
 	removeMention: (path: string) => void;
 	removeUpload: (index: number) => void;
 	setActiveIndex: (index: number) => void;
+	/** True while the runtime is still being asked for its command catalogue. */
+	slashLoading: boolean;
 	slashMatches: readonly SlashCommandDescriptor[];
 	textareaRef: RefObject<HTMLTextAreaElement | null>;
 	uploadAttachments: readonly File[];
@@ -127,6 +129,29 @@ const EMPTY_AUTOCOMPLETE: AutocompleteState = {
 
 /** Pasted text at or above this length is auto-converted into an attachment. */
 const PASTE_ATTACHMENT_THRESHOLD = 5_000;
+
+/**
+ * Module-level so `useFuzzyMatches` keeps its memo across renders; an inline
+ * arrow would be a fresh dependency every render and rescore the whole
+ * catalogue on each keystroke.
+ * @param entry - Slash command being scored.
+ * @returns The text the fuzzy query is matched against.
+ */
+function getSlashCommandKey(entry: SlashCommandDescriptor): string {
+	return entry.command;
+}
+
+/**
+ * Steps the autocomplete highlight, clamping the stored index into the list
+ * first so a list that shrank under it still steps from the row on screen.
+ * @param stored - The index currently held in state, which may be out of range.
+ * @param delta - How far to move, positive or negative.
+ * @param total - How many rows the list currently offers.
+ * @returns The index to highlight next.
+ */
+function stepActiveIndex(stored: number, delta: number, total: number): number {
+	return (Math.min(stored, Math.max(0, total - 1)) + delta + total) % total;
+}
 
 /**
  * Owns the composer's local state machine: textarea value, mention + slash
@@ -196,15 +221,15 @@ export function useComposerState({
 	const mentionOpen = autocomplete.kind === 'mention';
 	const slashOpen = autocomplete.kind === 'slash';
 
-	const slashCommands = useSlashCommands(
+	const slashCatalogue = useSlashCommands(
 		resolveComposerProvider(composer),
 		composer.workspaceCwd,
 		slashOpen,
 	);
 	const slashMatches = useFuzzyMatches(
-		slashCommands,
+		slashCatalogue.commands,
 		slashOpen ? autocomplete.query : '',
-		(entry) => entry.command,
+		getSlashCommandKey,
 		80,
 	);
 
@@ -658,6 +683,13 @@ export function useComposerState({
 				? slashMatches.length
 				: 0;
 	const autocompleteActive = autocompleteKind !== null && autocompleteTotal > 0;
+	// The list can shrink under a stored index — a slash catalogue refetch drops
+	// entries while the token is untouched — which would strand the highlight off
+	// the end and make Enter a silent no-op.
+	const safeActiveIndex = Math.min(
+		activeIndex,
+		Math.max(0, autocompleteTotal - 1),
+	);
 
 	const sendShortcut = useAtomValue(sendShortcutAtom);
 
@@ -669,7 +701,9 @@ export function useComposerState({
 					if (!autocompleteActive) {
 						return false;
 					}
-					setActiveIndex((prev) => (prev + 1) % autocompleteTotal);
+					setActiveIndex((stored) =>
+						stepActiveIndex(stored, 1, autocompleteTotal),
+					);
 				},
 			],
 			[
@@ -678,8 +712,8 @@ export function useComposerState({
 					if (!autocompleteActive) {
 						return false;
 					}
-					setActiveIndex(
-						(prev) => (prev - 1 + autocompleteTotal) % autocompleteTotal,
+					setActiveIndex((stored) =>
+						stepActiveIndex(stored, -1, autocompleteTotal),
 					);
 				},
 			],
@@ -690,12 +724,12 @@ export function useComposerState({
 						return false;
 					}
 					if (autocompleteKind === 'mention') {
-						const match = mentionMatches[activeIndex];
+						const match = mentionMatches[safeActiveIndex];
 						if (match) {
 							onMentionSelect(match);
 						}
 					} else {
-						const match = slashMatches[activeIndex];
+						const match = slashMatches[safeActiveIndex];
 						if (match) {
 							onSlashSelect(match.command, match.autoSubmit);
 						}
@@ -751,7 +785,6 @@ export function useComposerState({
 			],
 		],
 		[
-			activeIndex,
 			autocompleteActive,
 			autocompleteKind,
 			autocompleteTotal,
@@ -762,6 +795,7 @@ export function useComposerState({
 			onMentionSelect,
 			onSlashSelect,
 			queueCurrent,
+			safeActiveIndex,
 			sendShortcut,
 			slashMatches,
 			value.length,
@@ -838,7 +872,7 @@ export function useComposerState({
 		externalAttachments.length > 0;
 
 	return {
-		activeIndex,
+		activeIndex: safeActiveIndex,
 		anchorRef,
 		attachmentError,
 		blockedNotice,
@@ -874,6 +908,7 @@ export function useComposerState({
 		removeMention,
 		removeUpload,
 		setActiveIndex,
+		slashLoading: slashOpen && slashCatalogue.loading,
 		slashMatches,
 		textareaRef,
 		uploadAttachments,
