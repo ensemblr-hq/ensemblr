@@ -6,8 +6,8 @@ import { cn } from '@/renderer/lib/utils';
 interface AutocompleteRowProps {
 	active: boolean;
 	icon?: React.ReactNode;
-	keyId: string;
-	onMouseEnter: () => void;
+	/** Claims the highlight when the pointer genuinely moves over this row. */
+	onHover: () => void;
 	onSelect: () => void;
 	primary: React.ReactNode;
 	secondary?: React.ReactNode;
@@ -17,7 +17,7 @@ interface AutocompleteRowProps {
 export function AutocompleteRow({
 	active,
 	icon,
-	onMouseEnter,
+	onHover,
 	onSelect,
 	primary,
 	secondary,
@@ -28,6 +28,14 @@ export function AutocompleteRow({
 			ref.current.scrollIntoView({ block: 'nearest' });
 		}
 	}, [active]);
+	// Arrow keys scroll the list under a resting pointer, and that alone fires
+	// mouseenter — which would snap the highlight straight back to the row the
+	// cursor happens to sit over. mousemove only fires on real pointer motion.
+	const claimHighlight = (): void => {
+		if (!active) {
+			onHover();
+		}
+	};
 	return (
 		<Button
 			className={cn(
@@ -35,7 +43,7 @@ export function AutocompleteRow({
 				active && 'bg-muted text-foreground',
 			)}
 			onClick={onSelect}
-			onMouseEnter={onMouseEnter}
+			onMouseMove={claimHighlight}
 			ref={ref}
 			size='sm'
 			type='button'

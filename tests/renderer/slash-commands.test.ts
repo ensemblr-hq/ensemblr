@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { sortSlashCommands } from '../../src/renderer/hooks/workbench-shell/composer/use-slash-commands';
+import { normalizeSlashCommands } from '../../src/renderer/hooks/workbench-shell/composer/use-slash-commands';
 import type { SlashCommandDescriptor } from '../../src/renderer/types/workbench';
 
 const COMMANDS: SlashCommandDescriptor[] = [
@@ -47,7 +47,7 @@ const COMMANDS: SlashCommandDescriptor[] = [
 ];
 
 test('slash commands default to repo skills, global skills, extensions', () => {
-	const commands = sortSlashCommands(COMMANDS).map(
+	const commands = normalizeSlashCommands(COMMANDS).map(
 		(command) => command.command,
 	);
 
@@ -59,4 +59,61 @@ test('slash commands default to repo skills, global skills, extensions', () => {
 		'prompt-template',
 		'builtin-command',
 	]);
+});
+
+// Claude Code reports a skill once per discovery root it resolved through, so
+// one `/code-review` arrives four times and every copy renders as its own row.
+test('collapses a command reported more than once into a single entry', () => {
+	const repeated: SlashCommandDescriptor[] = [
+		{ autoSubmit: false, command: 'code-review', description: 'Deep review' },
+		{ autoSubmit: false, command: 'code-review', description: 'Deep review' },
+		{ autoSubmit: false, command: 'code-review', description: 'Deep review' },
+		{ autoSubmit: false, command: 'react-doctor', description: 'Diagnostics' },
+		{ autoSubmit: false, command: 'react-doctor', description: 'Diagnostics' },
+	];
+
+	expect(normalizeSlashCommands(repeated)).toEqual([
+		{ autoSubmit: false, command: 'code-review', description: 'Deep review' },
+		{ autoSubmit: false, command: 'react-doctor', description: 'Diagnostics' },
+	]);
+});
+
+test('keeps the best-ranked copy of a repeated command name', () => {
+	const repeated: SlashCommandDescriptor[] = [
+		{
+			autoSubmit: false,
+			command: 'review',
+			description: '',
+			source: 'prompt',
+			sourceScope: 'user',
+		},
+		{
+			autoSubmit: true,
+			command: 'review',
+			description: 'Project review skill',
+			source: 'skill',
+			sourceScope: 'project',
+		},
+	];
+
+	expect(normalizeSlashCommands(repeated)).toEqual([
+		{
+			autoSubmit: true,
+			command: 'review',
+			description: 'Project review skill',
+			source: 'skill',
+			sourceScope: 'project',
+		},
+	]);
+});
+
+test('prefers the described copy when two repeats rank the same', () => {
+	const repeated: SlashCommandDescriptor[] = [
+		{ autoSubmit: false, command: 'ship', description: '   ' },
+		{ autoSubmit: false, command: 'ship', description: 'Ship the release' },
+	];
+
+	expect(normalizeSlashCommands(repeated)[0]?.description).toBe(
+		'Ship the release',
+	);
 });

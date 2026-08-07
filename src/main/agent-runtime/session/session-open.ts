@@ -33,6 +33,7 @@ import type { ActiveSession, ActiveSessionMap } from './active-session.ts';
 import {
 	type AgentControlWiring,
 	resolveAgentControlWiring,
+	type SessionBriefNudgeResolver,
 } from './agent-control-wiring.ts';
 import { attachSessionToChatTab } from './chat-tab-plumbing.ts';
 import { assertProviderPin } from './provider-pin.ts';
@@ -95,6 +96,12 @@ interface SessionOpenerOptions {
 	 */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
 	/**
+	 * Renders the per-turn upkeep block for a session, for runtimes whose system
+	 * prompt is fixed at open and that therefore need it prepended per turn.
+	 * Absent in tests and when the control layer is disabled.
+	 */
+	resolveSessionBriefNudge?: SessionBriefNudgeResolver;
+	/**
 	 * Reads the workspace's permission mode. Called per open rather than captured
 	 * once, so a mode the user changes between sessions reaches the next one.
 	 */
@@ -136,6 +143,7 @@ export function createSessionOpener({
 	resolveAgentControlEnv,
 	resolvePermissionMode,
 	resolveProviderExecutable,
+	resolveSessionBriefNudge,
 	subscribeToRuntime,
 }: SessionOpenerOptions): SessionOpener {
 	/**
@@ -229,6 +237,7 @@ export function createSessionOpener({
 				parentSessionId: request.parentSessionId ?? null,
 				provider: row.provider,
 				resolveAgentControlEnv,
+				resolveSessionBriefNudge,
 				sessionId: row.id,
 				workspaceId: request.workspaceId,
 			}),
@@ -332,6 +341,7 @@ export function createSessionOpener({
 				parentSessionId: request.parentSessionId ?? null,
 				provider,
 				resolveAgentControlEnv,
+				resolveSessionBriefNudge,
 				sessionId: session.id,
 				workspaceId: request.workspaceId,
 			}),
@@ -533,6 +543,7 @@ async function createRuntimeSessionOrFail({
 			modelOverride,
 			permissionMode,
 			planMode,
+			resolveTurnPreamble: control.resolveTurnPreamble,
 			resumeRuntimeSession: sessionInput.resumeRuntimeSession,
 			runtimeSessionId: sessionInput.runtimeSessionId,
 			provider,

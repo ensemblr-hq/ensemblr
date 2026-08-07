@@ -166,6 +166,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 		expect(read().branch).toEqual({
 			current: 'psoldunov/bach',
 			eligible: true,
+			namesWorkspace: true,
 		});
 	});
 
@@ -178,6 +179,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 		expect(brief.branch).toEqual({
 			current: 'psoldunov/bach',
 			eligible: false,
+			namesWorkspace: true,
 		});
 	});
 
@@ -195,6 +197,7 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 		expect(read().branch).toEqual({
 			current: 'psoldunov/add-dark-mode',
 			eligible: false,
+			namesWorkspace: false,
 		});
 	});
 
@@ -210,13 +213,54 @@ describe('readSessionBriefNaming: workspace naming eligibility', () => {
 		expect(read({ namingEnabled: false }).branch).toEqual({
 			current: 'psoldunov/bach',
 			eligible: false,
+			namesWorkspace: true,
 		});
 	});
 
 	test('reports a missing workspace as nothing nameable', () => {
 		selectWorkspaceWithRepositoryById.mockReturnValue(undefined);
 
-		expect(read().branch).toEqual({ current: null, eligible: false });
+		expect(read().branch).toEqual({
+			current: null,
+			eligible: false,
+			namesWorkspace: false,
+		});
+	});
+
+	// The rename dialog retitles a workspace without moving its branch. Judging
+	// the branch by the display name withheld the bullet for a branch still
+	// carrying the slug it was cut with, so the branch was never named.
+	test('still asks for the branch of a workspace the user retitled', () => {
+		selectWorkspaceWithRepositoryById.mockReturnValue(
+			workspaceRow({
+				metadataJson: JSON.stringify({
+					branchNamed: false,
+					placeholderName: true,
+					renamedAt: '2026-06-16T00:00:00Z',
+				}),
+			}),
+		);
+
+		expect(read().branch).toEqual({
+			current: 'psoldunov/bach',
+			eligible: true,
+			namesWorkspace: false,
+		});
+	});
+
+	test('stops asking once a rename has moved the branch', () => {
+		selectWorkspaceWithRepositoryById.mockReturnValue(
+			workspaceRow({
+				branchName: 'psoldunov/add-dark-mode',
+				metadataJson: JSON.stringify({
+					branchNamed: true,
+					placeholderName: true,
+					renamedAt: '2026-06-16T00:00:00Z',
+				}),
+			}),
+		);
+
+		expect(read().branch.eligible).toBe(false);
 	});
 });
 
@@ -232,7 +276,11 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 		});
 
 		expect(brief).toEqual({
-			branch: { current: 'psoldunov/bach', eligible: true },
+			branch: {
+				current: 'psoldunov/bach',
+				eligible: true,
+				namesWorkspace: true,
+			},
 			summaryStale: false,
 			titleNeeded: false,
 		});
@@ -243,7 +291,11 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 		getChatTabByAgentSessionId.mockReturnValue(null);
 
 		expect(read()).toEqual({
-			branch: { current: 'psoldunov/bach', eligible: true },
+			branch: {
+				current: 'psoldunov/bach',
+				eligible: true,
+				namesWorkspace: true,
+			},
 			summaryStale: false,
 			titleNeeded: false,
 		});
@@ -259,7 +311,7 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 describe('readSessionBriefNaming: degradation', () => {
 	test('reports nothing outstanding without a database', () => {
 		expect(read({ database: null })).toEqual({
-			branch: { current: null, eligible: false },
+			branch: { current: null, eligible: false, namesWorkspace: false },
 			summaryStale: false,
 			titleNeeded: false,
 		});
@@ -273,7 +325,7 @@ describe('readSessionBriefNaming: degradation', () => {
 		});
 
 		expect(read()).toEqual({
-			branch: { current: null, eligible: false },
+			branch: { current: null, eligible: false, namesWorkspace: false },
 			summaryStale: false,
 			titleNeeded: false,
 		});

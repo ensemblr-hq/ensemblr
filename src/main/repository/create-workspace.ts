@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
-
+import { joinBranchName } from '../../shared/branch-name.ts';
 import { bareBranchName } from '../../shared/branch-ref.ts';
 import type { GitSettings } from '../../shared/config.ts';
 import type {
@@ -35,7 +35,6 @@ import {
 	workspaceSlugExists as workspaceSlugExistsStorage,
 } from '../storage/repositories/workspace-repository.ts';
 import { withTransaction } from '../storage/tx.ts';
-import { joinBranchName } from './branch-name.ts';
 import {
 	createFilesToCopyService,
 	type FilesToCopyService,

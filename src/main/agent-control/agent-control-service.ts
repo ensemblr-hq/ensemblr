@@ -108,6 +108,17 @@ export interface AgentControlService {
 	 */
 	describeAudience: (token: string) => Promise<ControlAudience>;
 	/**
+	 * Renders the per-turn upkeep block for a session the app drives itself.
+	 *
+	 * Pi pulls the same block over `getSessionBrief` from its own extension, but a
+	 * runtime whose only channel is MCP has no per-turn hook to pull it from — its
+	 * playbook is appended once, at session open. Without this the branch bullet
+	 * never reaches it and the branch is never named.
+	 * @param sessionId - The agent session the block describes.
+	 * @returns The block to prepend to the turn, or null when nothing is outstanding.
+	 */
+	readSessionBriefNudge: (sessionId: string) => Promise<string | null>;
+	/**
 	 * Releases all per-session state (pending orchestrator signal, spawn
 	 * counters, origin token) when an agent session ends, keeping the in-memory
 	 * maps bounded. Idempotent; safe to call for unknown sessions.
@@ -591,7 +602,11 @@ export function createAgentControlService({
 	): Promise<AgentControlResult<unknown>> => {
 		try {
 			return ok(
-				await ports.sessionNaming.setBranchName({ origin, slug: args.name }),
+				await ports.sessionNaming.setBranchName({
+					origin,
+					slug: args.name,
+					userRequested: args.userRequested === true,
+				}),
 			);
 		} catch (error) {
 			if (error instanceof BranchSlugRejected) {
@@ -1316,6 +1331,16 @@ export function createAgentControlService({
 		};
 	};
 
+	const readSessionBriefNudge = async (
+		sessionId: string,
+	): Promise<string | null> => {
+		const origin = originRegistry.resolveBySession(sessionId);
+		if (!origin) {
+			return null;
+		}
+		return buildSessionBriefNudge(await ports.sessionNaming.readBrief(origin));
+	};
+
 	const releaseSession = (sessionId: string): void => {
 		ports.ask.releaseSession(sessionId);
 		ports.planMode.releaseSession(sessionId);
@@ -1324,5 +1349,10 @@ export function createAgentControlService({
 		originRegistry.release(sessionId);
 	};
 
-	return { describeAudience, invoke, releaseSession };
+	return {
+		describeAudience,
+		invoke,
+		readSessionBriefNudge,
+		releaseSession,
+	};
 }

@@ -409,6 +409,8 @@ export interface SessionNamingPort {
 	setBranchName: (input: {
 		origin: AgentControlOrigin;
 		slug: string;
+		/** Whether the user asked for this rename, lifting the once-per-branch gate. */
+		userRequested: boolean;
 	}) => Promise<SetBranchNameResult>;
 	setSummary: (input: {
 		origin: AgentControlOrigin;

@@ -21,6 +21,7 @@ import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
 import { validateEntityName } from '@/renderer/lib/entity-name-validation';
 import type { KeymapBinding } from '@/renderer/types/keymap';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
+import { composeRenamedBranch } from '@/shared/branch-name';
 import type { RenameWorkspaceDiagnostic } from '@/shared/ipc/contracts/workspace';
 import { toSlug } from '@/shared/slug';
 import { WORKSPACE_NAME_PATTERN } from '@/shared/workspace-name';
@@ -98,12 +99,16 @@ function RenameWorkspaceDialogForm({
 		setStage('renaming');
 		setDiagnostics([]);
 
+		// Sent whenever the user has touched the field, even unchanged: omitting it
+		// lets the service derive a branch from the new name, which would move the
+		// branch out from under the value they are looking at.
+		const sendsBranch =
+			!branchPinned &&
+			(branchTouchedRef.current || trimmedBranch !== workspace.branchName);
 		const result = await renameWorkspace({
 			workspaceId: workspace.id,
 			...(trimmedName !== workspace.name ? { name: trimmedName } : {}),
-			...(!branchPinned && trimmedBranch !== workspace.branchName
-				? { branchName: trimmedBranch }
-				: {}),
+			...(sendsBranch ? { branchName: trimmedBranch } : {}),
 		});
 
 		if (result.status === 'success' && result.workspace) {
@@ -176,7 +181,12 @@ function RenameWorkspaceDialogForm({
 						const next = event.target.value;
 						setName(next);
 						if (!branchPinned && !branchTouchedRef.current) {
-							setBranchName(toSlug(next, 'workspace'));
+							setBranchName(
+								composeRenamedBranch(
+									workspace.branchName,
+									toSlug(next, 'workspace'),
+								),
+							);
 						}
 					}}
 					onKeyDown={handleSubmitKey}

@@ -81,6 +81,7 @@ import {
 	canSetTitle,
 	readTitleProvenance,
 } from './naming/title-provenance.ts';
+import type { SessionBriefNudgeResolver } from './session/agent-control-wiring.ts';
 import type { SessionSummaryWriter } from './session-summary-writer.ts';
 
 export type {
@@ -116,6 +117,8 @@ interface AgentSessionServiceOptions {
 	queueNaming: QueueNamingPort;
 	/** Injects the agent-control env (control URL + token) into each agent child. */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
+	/** Renders the per-turn upkeep block for runtimes whose system prompt is fixed at open. */
+	resolveSessionBriefNudge?: SessionBriefNudgeResolver;
 	/**
 	 * Reads the workspace's permission mode at open time. Omitted, sessions open
 	 * under {@link DEFAULT_PERMISSION_MODE} — the same full-workspace control a
@@ -225,6 +228,7 @@ export function createAgentSessionService({
 	resolveAgentControlEnv,
 	resolvePermissionMode = () => DEFAULT_PERMISSION_MODE,
 	resolveProviderExecutable,
+	resolveSessionBriefNudge,
 	resolveSpawnedChildren,
 	sessionSummaryWriter,
 	now = () => new Date(),
@@ -251,6 +255,7 @@ export function createAgentSessionService({
 		resolveAgentControlEnv,
 		resolvePermissionMode,
 		resolveProviderExecutable,
+		resolveSessionBriefNudge,
 		resolveSpawnedChildren,
 		sessionSummaryWriter,
 	});

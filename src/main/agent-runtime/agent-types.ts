@@ -148,6 +148,13 @@ export interface AgentSessionRequest {
 	controlMcp?: AgentControlMcpConfig | null;
 	/** Extra instructions appended to the runtime's own system prompt. */
 	systemPromptAppend?: string | null;
+	/**
+	 * Resolves the app's per-turn upkeep block, prepended to each prompt the
+	 * runtime receives and to nothing the user sees. A runtime whose system
+	 * prompt is fixed at session open has no other way to be told what naming the
+	 * session still owes, because that is live state the opening prompt predates.
+	 */
+	resolveTurnPreamble?: (() => Promise<string | null>) | null;
 	/** Optional human-readable label attached to session metadata for logs. */
 	label?: string;
 	/**

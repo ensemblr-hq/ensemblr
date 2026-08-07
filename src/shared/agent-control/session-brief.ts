@@ -39,14 +39,17 @@ const SUMMARY_BULLET =
 	"- Session summary: the summary on file for this tab is older than the conversation. Call `ensemblr_set_summary` once the work is done but BEFORE you write your closing answer to the user — prose you follow with another tool call gets folded into the turn's collapsed activity row. Pass a short `title` and a markdown `summary` covering the decisions made, the files touched, and what is still open. It replaces the record the app keeps for this tab; it does NOT rename the tab.";
 
 /**
- * Builds the bullet asking the agent to name the workspace and its branch,
- * naming the current branch only when the workspace has one.
- * @param current - The workspace's current git branch, or null when it has none.
+ * Builds the bullet asking the agent to name the branch, and the workspace with
+ * it while the workspace has no chosen title.
+ * @param branch - The branch's current name and whether naming it also retitles the workspace.
  * @returns The branch upkeep bullet.
  */
-function branchBullet(current: string | null): string {
-	const where = current ? ` and sits on branch \`${current}\`` : '';
-	return `- Workspace & branch: this workspace still has its generated placeholder name${where}. Call \`ensemblr_set_branch_name\` once with a kebab-case slug naming the work (2-5 words, e.g. \`add-dark-mode\`) — it renames the workspace and the git branch together and keeps any \`prefix/\` segment. It applies only while the placeholder name is untouched, so do it now and only once.`;
+function branchBullet(branch: SessionBriefNaming['branch']): string {
+	const where = branch.current ? ` \`${branch.current}\`` : '';
+	const scope = branch.namesWorkspace
+		? `- Workspace & branch: this workspace still has its generated placeholder name and sits on the branch${where} it was cut with. Call \`ensemblr_set_branch_name\` once with a kebab-case slug naming the work (2-5 words, e.g. \`add-dark-mode\`) — it renames the workspace and the git branch together and keeps any \`prefix/\` segment.`
+		: `- Branch: the user has titled this workspace, but its git branch${where} still carries the name it was cut with. Call \`ensemblr_set_branch_name\` once with a kebab-case slug naming the work (2-5 words, e.g. \`add-dark-mode\`) — it moves the branch, keeps any \`prefix/\` segment, and leaves the title the user chose alone.`;
+	return `${scope} Do it now and only once; never reach for \`git branch -m\` instead, which renames the branch behind the app.`;
 }
 
 /**
@@ -59,7 +62,7 @@ export function buildSessionBriefNudge(
 ): string | null {
 	const bullets = [
 		naming.titleNeeded ? TITLE_BULLET : null,
-		naming.branch.eligible ? branchBullet(naming.branch.current) : null,
+		naming.branch.eligible ? branchBullet(naming.branch) : null,
 		naming.summaryStale ? SUMMARY_BULLET : null,
 	].filter((bullet) => bullet !== null);
 	if (bullets.length === 0) {

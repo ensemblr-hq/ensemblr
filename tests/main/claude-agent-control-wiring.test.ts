@@ -60,6 +60,7 @@ const setup = (
 			parentSessionId: input.parentSessionId ?? null,
 			provider: input.provider,
 			resolveAgentControlEnv,
+			resolveSessionBriefNudge: undefined,
 			sessionId: input.sessionId,
 			workspaceId: WORKSPACE,
 		});
@@ -156,6 +157,7 @@ describe('agent-control wiring: the control MCP endpoint', () => {
 			parentSessionId: null,
 			provider: 'claude',
 			resolveAgentControlEnv: undefined,
+			resolveSessionBriefNudge: undefined,
 			sessionId: 'claude-1',
 			workspaceId: WORKSPACE,
 		});
@@ -163,8 +165,60 @@ describe('agent-control wiring: the control MCP endpoint', () => {
 		expect(wiring).toEqual({
 			controlMcp: null,
 			env: undefined,
+			resolveTurnPreamble: null,
 			systemPromptAppend: null,
 		});
+	});
+});
+
+// Pi's extension pulls the upkeep block itself before every turn. A runtime the
+// app drives over MCP has its system prompt fixed at open, so without a per-turn
+// hand-off it is never told what naming the session still owes — which is how
+// Claude sessions went their whole life without naming a branch.
+describe('agent-control wiring: the per-turn upkeep block', () => {
+	const setupWithNudge = () => {
+		const registry = createOriginRegistry();
+		const { resolveAgentControlEnv } = createAgentControlIntegration({
+			app: {
+				isPackaged: false,
+				getAppPath: () => process.cwd(),
+				getPath: () => '/tmp/userData',
+			} as never,
+			getServerUrl: () => SERVER_URL,
+			originRegistry: registry,
+			resolveWorkspaceCwd: () => CWD,
+		});
+		const asked: string[] = [];
+		return {
+			asked,
+			wire: (provider: 'claude' | 'pi', sessionId: string) =>
+				resolveAgentControlWiring({
+					parentSessionId: null,
+					provider,
+					resolveAgentControlEnv,
+					resolveSessionBriefNudge: async (id) => {
+						asked.push(id);
+						return 'UPKEEP';
+					},
+					sessionId,
+					workspaceId: WORKSPACE,
+				}),
+		};
+	};
+
+	it('hands Claude a resolver bound to its own session', async () => {
+		const { asked, wire } = setupWithNudge();
+
+		const wiring = wire('claude', 'claude-1');
+
+		expect(await wiring.resolveTurnPreamble?.()).toBe('UPKEEP');
+		expect(asked).toEqual(['claude-1']);
+	});
+
+	it('withholds it from Pi, whose extension fetches the block itself', () => {
+		const { wire } = setupWithNudge();
+
+		expect(wire('pi', 'pi-1').resolveTurnPreamble).toBeNull();
 	});
 });
 

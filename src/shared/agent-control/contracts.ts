@@ -184,12 +184,19 @@ export const SET_BRANCH_NAME_LIMITS = {
 export interface SetBranchNameArgs {
 	/** Kebab-case slug describing the work, e.g. `add-dark-mode`. */
 	name: string;
+	/**
+	 * Set only when the user asked for a different branch name in so many words.
+	 * It lifts the once-per-branch gate, which is otherwise the difference between
+	 * an agent naming unprompted work and one carrying out an instruction.
+	 */
+	userRequested?: boolean;
 }
 
 /**
- * Result of `setBranchName`. Naming is one-shot — a workspace the user (or an
- * earlier agent) already named reports `applied: false` rather than failing, so
- * the agent stops retrying instead of treating it as a transient fault.
+ * Result of `setBranchName`. Naming is one-shot unless the user asks again — a
+ * branch the user (or an earlier agent) already named reports `applied: false`
+ * rather than failing, so the agent stops retrying instead of treating it as a
+ * transient fault.
  */
 export interface SetBranchNameResult {
 	applied: boolean;
@@ -634,10 +641,15 @@ export interface SessionBriefNaming {
 	/** The tab still carries a title derived from the prompt, not chosen. */
 	titleNeeded: boolean;
 	branch: {
-		/** The workspace still has its generated placeholder name. */
+		/** The git branch still carries the name it was cut with. */
 		eligible: boolean;
 		/** The workspace's current git branch, or null when it has none. */
 		current: string | null;
+		/**
+		 * Whether naming the branch also retitles the workspace. False once the
+		 * user has titled it, at which point only the branch moves.
+		 */
+		namesWorkspace: boolean;
 	};
 	/** Turns have landed since the recorded summary was written. */
 	summaryStale: boolean;

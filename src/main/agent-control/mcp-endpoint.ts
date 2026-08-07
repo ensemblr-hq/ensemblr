@@ -115,8 +115,8 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		name: 'ensemblr_set_branch_name',
 		op: 'setBranchName',
 		description:
-			'Name the work: renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. "add-dark-mode"), keeping any `prefix/` segment of the current branch. One-shot — it applies only while the workspace still carries its generated placeholder name; once named it reports that and changes nothing, so call it at most once. This names the workspace and branch, not your terminal tab, which titles itself from your own session log.',
-		shape: { name: z.string() },
+			'Name the work: renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. "add-dark-mode"), keeping any `prefix/` segment of the current branch. Call it once, early, as soon as you know what the work is called. It applies while the git branch still carries the name it was cut with; a workspace the user has already titled keeps that title and only its branch moves. A reply saying nothing changed is a settled outcome, not a fault to retry — except when the USER asks for a different branch name in so many words, which is what userRequested: true is for. Renaming the branch any other way, `git branch -m` included, desyncs the workspace from git. This names the workspace and branch, not your terminal tab, which titles itself from your own session log.',
+		shape: { name: z.string(), userRequested: z.boolean().optional() },
 	},
 	{
 		name: 'ensemblr_set_summary',

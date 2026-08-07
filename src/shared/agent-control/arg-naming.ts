@@ -55,6 +55,8 @@ export const CANONICAL_ARG_KEYS = {
 		'Human-readable label of a UI surface or an artifact — a chat tab, a plan, a summary. Never `name`.',
 	tool: 'Name of the built-in tool a guarded call is about to use.',
 	turnId: 'Identifier of the conversation turn a tab is opened on.',
+	userRequested:
+		'Whether the user asked for this action in so many words, lifting a gate that otherwise only opens once.',
 	variant: 'Which kind of non-chat tab to open.',
 	wait: 'Block until the conversation being addressed goes idle.',
 	workspaceId: 'Identifier of an open workspace.',

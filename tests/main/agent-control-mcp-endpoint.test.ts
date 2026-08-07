@@ -37,6 +37,7 @@ const makeStubService = (
 		calls.push(command);
 		return { ok: true, data: { echoed: command.op, args: command.rawArgs } };
 	},
+	readSessionBriefNudge: async () => null,
 	releaseSession: () => {},
 });
 
