@@ -62,6 +62,7 @@ import {
 	createClaudeMcpRoster,
 	createClaudeModelLister,
 	createClaudePlanBridge,
+	createClaudeSlashCommands,
 } from './claude-agent';
 import { installClaudeToolApproval } from './claude-agent/claude-tool-approval-ipc.ts';
 import { createLocalCommandService } from './commands';
@@ -87,7 +88,7 @@ import {
 } from './linear';
 import { installApplicationMenu } from './menu';
 import { createOpenTargetService } from './open-target';
-import { createPiCliRpcAdapter } from './pi-agent';
+import { createPiCliRpcAdapter, resolvePiSlashCommands } from './pi-agent';
 import {
 	createPiExecutableService,
 	createPiReadinessService,
@@ -449,6 +450,14 @@ const agentProviderService = createAgentProviderService({
 			resolveBaseEnv: resolveAgentSpawnEnv,
 		}),
 		pi: createPiReadinessProbe({ piReadinessService }),
+	},
+	slashCommandCatalogs: {
+		claude: createClaudeSlashCommands({
+			resolveBaseEnv: resolveAgentSpawnEnv,
+			resolveExecutablePath: resolveClaudeExecutablePath,
+		}),
+		pi: async (cwd) =>
+			resolvePiSlashCommands(await piExecutableService.getSnapshot(), cwd),
 	},
 });
 const agentClient = createAgentClient({

@@ -18,6 +18,7 @@ import {
 } from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
 import { useMentionMatches } from '@/renderer/hooks/workbench-shell/composer/use-mention-matches';
 import { useSlashCommands } from '@/renderer/hooks/workbench-shell/composer/use-slash-commands';
+import { resolveComposerProvider } from '@/renderer/lib/workbench/composer';
 import {
 	attachPastedFiles,
 	getTransferFiles,
@@ -192,16 +193,20 @@ export function useComposerState({
 		autocomplete.kind === 'mention' ? autocomplete.query : '',
 	);
 
-	const slashCommands = useSlashCommands(composer.workspaceCwd);
+	const mentionOpen = autocomplete.kind === 'mention';
+	const slashOpen = autocomplete.kind === 'slash';
+
+	const slashCommands = useSlashCommands(
+		resolveComposerProvider(composer),
+		composer.workspaceCwd,
+		slashOpen,
+	);
 	const slashMatches = useFuzzyMatches(
 		slashCommands,
-		autocomplete.kind === 'slash' ? autocomplete.query : '',
+		slashOpen ? autocomplete.query : '',
 		(entry) => entry.command,
 		80,
 	);
-
-	const mentionOpen = autocomplete.kind === 'mention';
-	const slashOpen = autocomplete.kind === 'slash';
 
 	const updateAutocomplete = useCallback((nextValue: string, caret: number) => {
 		setAutocomplete(detectAutocomplete(nextValue, caret));

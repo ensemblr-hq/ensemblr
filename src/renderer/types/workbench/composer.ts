@@ -1,7 +1,7 @@
 import type {
-	PiSlashCommandSource,
-	PiSlashCommandSourceScope,
-} from '@/shared/ipc/contracts/agent-session';
+	AgentProviderSlashCommandScope,
+	AgentProviderSlashCommandSource,
+} from '@/shared/ipc/contracts/agent-provider';
 
 import type { ComposerModelOption } from './workspace';
 
@@ -28,10 +28,10 @@ export interface SlashCommandDescriptor {
 	/** Bare command name without the leading slash. */
 	command: string;
 	description: string;
-	/** Source category used to label project/user Pi resources in autocomplete. */
-	source: PiSlashCommandSource;
+	/** What registered the command; unset for a runtime that reports no provenance. */
+	source?: AgentProviderSlashCommandSource;
 	/** Scope used to rank project skills before global skills in autocomplete. */
-	sourceScope?: PiSlashCommandSourceScope;
+	sourceScope?: AgentProviderSlashCommandScope;
 	/** When true, command runs immediately on pick (no args expected). */
 	autoSubmit: boolean;
 }

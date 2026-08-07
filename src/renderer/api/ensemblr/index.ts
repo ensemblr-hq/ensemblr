@@ -18,7 +18,6 @@ export * from './invalidate-workspace-list-views';
 export * from './linear';
 export * from './navigation';
 export * from './open-targets';
-export * from './pi-slash-commands';
 export {
 	ensemblrQueryKeys,
 	getEnsemblrApi,

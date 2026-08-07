@@ -229,42 +229,24 @@ export function resolveFixtureAgentProviderMcpServers(
 			{
 				error: null,
 				name: 'plugin:playwright:playwright',
-				scope: 'dynamic',
 				status: 'connected',
 			},
-			{ error: null, name: 'nanobanana', scope: 'user', status: 'connected' },
+			{ error: null, name: 'nanobanana', status: 'connected' },
 			{
 				error: 'spawn npx ENOENT',
 				name: '@21st-dev/magic',
-				scope: 'user',
 				status: 'failed',
 			},
-			{ error: null, name: 'shadcn', scope: 'project', status: 'connected' },
+			{ error: null, name: 'shadcn', status: 'connected' },
 			{
 				error: 'connection refused (127.0.0.1:7317)',
 				name: 'fallow',
-				scope: 'project',
 				status: 'failed',
 			},
-			{
-				error: null,
-				name: 'claude.ai Linear',
-				scope: 'claudeai',
-				status: 'needs-auth',
-			},
-			{
-				error: null,
-				name: 'claude.ai Notion',
-				scope: 'claudeai',
-				status: 'needs-auth',
-			},
-			{
-				error: null,
-				name: 'claude.ai Figma',
-				scope: 'claudeai',
-				status: 'connected',
-			},
-			{ error: null, name: 'nocodb', scope: 'local', status: 'pending' },
+			{ error: null, name: 'claude.ai Linear', status: 'needs-auth' },
+			{ error: null, name: 'claude.ai Notion', status: 'needs-auth' },
+			{ error: null, name: 'claude.ai Figma', status: 'connected' },
+			{ error: null, name: 'nocodb', status: 'pending' },
 		],
 	};
 }

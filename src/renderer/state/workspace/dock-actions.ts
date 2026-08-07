@@ -8,7 +8,7 @@ import {
 	stopWorkspaceScript,
 } from '@/renderer/api/ensemblr/workspace-scripts';
 import { lastRunScriptAtomFamily } from '@/renderer/state/preferences';
-import { useConsumeDockTerminalRequests } from '@/renderer/state/workspace/terminal-requests';
+import { useProvideDockTerminal } from '@/renderer/state/workspace/terminal-requests';
 import type { WorkbenchRouteSearch } from '@/renderer/types/workbench';
 import type { WorkbenchDockActions } from '@/renderer/types/workbench-shell';
 import type {
@@ -72,6 +72,12 @@ export function useWorkspaceDockActions({
 		activeDockTabRef.current = activeDockTab;
 	});
 
+	/**
+	 * Spawns a dock terminal and focuses its tab, reporting a failed spawn as a
+	 * toast. Backs both the dock's own "New terminal" action and the requests
+	 * other surfaces queue when they need a real TTY.
+	 * @param options - Command to run and tab title; omitted for a login shell.
+	 */
 	const openTerminal = useCallback(
 		(options?: { command?: string; title?: string }) => {
 			void createTerminal(options)
@@ -92,7 +98,7 @@ export function useWorkspaceDockActions({
 		},
 		[createTerminal],
 	);
-	useConsumeDockTerminalRequests(workspaceId, openTerminal);
+	useProvideDockTerminal(workspaceId, openTerminal);
 
 	return useMemo<WorkbenchDockActions>(
 		() => ({

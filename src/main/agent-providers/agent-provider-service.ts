@@ -6,6 +6,7 @@ import { getAgentProviderDescriptor } from '../../shared/agent-provider.ts';
 import type {
 	AgentExecutablePathSnapshotWire,
 	ListAgentProviderMcpServersResult,
+	ListAgentProviderSlashCommandsResult,
 } from '../../shared/ipc/contracts/agent-provider';
 import type {
 	AgentExecutableResolution,
@@ -29,10 +30,20 @@ export interface CreateAgentProviderServiceOptions {
 		>
 	>;
 	probes: Record<AgentProviderId, AgentProviderReadinessProbe>;
+	/**
+	 * Per-runtime slash command readers. A runtime with none registered reports an
+	 * empty catalogue rather than another runtime's commands.
+	 */
+	slashCommandCatalogs?: Partial<
+		Record<
+			AgentProviderId,
+			(cwd: string) => Promise<ListAgentProviderSlashCommandsResult>
+		>
+	>;
 }
 
 /**
- * Builds the service behind the six provider-parameterized IPC channels. Every
+ * Builds the service behind the provider-parameterized IPC channels. Every
  * runtime is registered in the same two maps, so adding a third provider means
  * adding an executable service and a probe — never a branch in this module.
  * @param options - Per-provider executable services and readiness probes.
@@ -43,6 +54,7 @@ export function createAgentProviderService({
 	homeDirectory = homedir(),
 	mcpRosters = {},
 	probes,
+	slashCommandCatalogs = {},
 }: CreateAgentProviderServiceOptions): AgentProviderService {
 	const readSnapshot = async (
 		provider: AgentProviderId,
@@ -60,6 +72,12 @@ export function createAgentProviderService({
 		getReadiness: (provider) => probes[provider].probe(),
 		listMcpServers: async (provider, cwd) =>
 			(await mcpRosters[provider]?.(cwd)) ?? { error: null, servers: [] },
+		listSlashCommands: async (provider, cwd) =>
+			(await slashCommandCatalogs[provider]?.(cwd)) ?? {
+				commands: [],
+				error: null,
+				source: 'runtime',
+			},
 		resolveSettingsFilePath: (provider) => {
 			const { settingsFile } = getAgentProviderDescriptor(provider);
 

@@ -1,59 +1,66 @@
-import { atom, useAtom, useSetAtom } from 'jotai';
+import { atom, useSetAtom, useStore } from 'jotai';
 import { useCallback, useEffect } from 'react';
+import { toast } from 'sonner';
 
-/** A pending ask to open a dock terminal on a command, tagged for de-dup. */
-interface DockTerminalRequest {
-	command: string;
-	requestId: number;
-	title: string;
-	workspaceId: string;
-}
+/** Spawns a dock terminal on a command and focuses its tab. */
+type DockTerminalOpener = (request: { command: string; title: string }) => void;
 
 /**
- * The dock terminal a surface elsewhere in the workspace wants opened, or null
- * when none is pending. Surfaces that need a real TTY — an MCP server that has
- * to be authorised through the runtime's own prompt — set it; the workspace's
- * dock actions consume it, spawn the terminal, and focus its tab. The
- * incrementing `requestId` makes back-to-back asks for the same command distinct
- * so the consuming effect re-fires.
+ * Each mounted workspace's dock, keyed by workspace id. Surfaces that need a
+ * real TTY — an MCP server that has to be authorised through the runtime's own
+ * prompt — look their workspace up here and call it. Registering the opener
+ * rather than queueing a request means the ask either reaches a live dock now or
+ * fails now; it cannot sit pending and surprise the user by spawning a terminal
+ * when that workspace is next opened.
  */
-const dockTerminalRequestAtom = atom<DockTerminalRequest | null>(null);
+const dockTerminalOpenersAtom = atom<
+	Readonly<Record<string, DockTerminalOpener>>
+>({});
 
-/** Returns a stable callback that queues a dock terminal for a command. */
+/**
+ * Returns a stable callback that opens a dock terminal in one workspace,
+ * reporting a workspace with no mounted dock rather than dropping the ask.
+ */
 export function useRequestDockTerminal(): (request: {
 	command: string;
 	title: string;
 	workspaceId: string;
 }) => void {
-	const setRequest = useSetAtom(dockTerminalRequestAtom);
+	const store = useStore();
+
 	return useCallback(
 		(request: { command: string; title: string; workspaceId: string }) => {
-			setRequest((current) => ({
-				...request,
-				requestId: (current?.requestId ?? 0) + 1,
-			}));
+			const open = store.get(dockTerminalOpenersAtom)[request.workspaceId];
+			if (!open) {
+				toast.error('The terminal could not start.');
+				return;
+			}
+			open({ command: request.command, title: request.title });
 		},
-		[setRequest],
+		[store],
 	);
 }
 
 /**
- * Open the requested dock terminal when a pending request targets this
- * workspace, then clear it so it fires once.
- * @param workspaceId - Workspace whose dock is consuming requests.
+ * Registers this workspace's dock as the target for terminal requests aimed at
+ * it, for as long as the dock is mounted.
+ * @param workspaceId - Workspace whose dock is being offered.
  * @param open - Spawns the terminal and focuses its tab.
  */
-export function useConsumeDockTerminalRequests(
+export function useProvideDockTerminal(
 	workspaceId: string,
-	open: (request: { command: string; title: string }) => void,
+	open: DockTerminalOpener,
 ): void {
-	const [request, setRequest] = useAtom(dockTerminalRequestAtom);
+	const setOpeners = useSetAtom(dockTerminalOpenersAtom);
 
 	useEffect(() => {
-		if (request?.workspaceId !== workspaceId) {
-			return;
-		}
-		open({ command: request.command, title: request.title });
-		setRequest(null);
-	}, [open, request, setRequest, workspaceId]);
+		setOpeners((current) => ({ ...current, [workspaceId]: open }));
+
+		return () => {
+			setOpeners((current) => {
+				const { [workspaceId]: removed, ...rest } = current;
+				return rest;
+			});
+		};
+	}, [open, setOpeners, workspaceId]);
 }

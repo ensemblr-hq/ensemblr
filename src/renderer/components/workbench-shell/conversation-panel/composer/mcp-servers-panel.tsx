@@ -8,7 +8,13 @@ import {
 	TriangleAlertIcon,
 	XIcon,
 } from 'lucide-react';
-import { type ComponentType, useCallback, useState } from 'react';
+import {
+	type ComponentType,
+	type CSSProperties,
+	useCallback,
+	useMemo,
+	useState,
+} from 'react';
 
 import {
 	agentProviderExecutablePathQuery,
@@ -35,11 +41,20 @@ import type {
 	AgentProviderMcpStatus,
 	ListAgentProviderMcpServersResult,
 } from '@/shared/ipc/contracts/agent-provider';
+import { getRosterHeight } from './mcp-roster-height';
 
 const CLAUDE_DESCRIPTOR = getAgentProviderDescriptor('claude');
 
 /** Slash command that opens Claude Code's own MCP management screen. */
 const MCP_COMMAND = '/mcp';
+
+/**
+ * Geometry every roster row shares. An authorise row is a real `<button>` rather
+ * than a styled `Button`, so that both kinds of row are laid out by one class
+ * string and cannot drift apart on height, padding, or gap.
+ */
+const ROW_CLASSES =
+	'flex w-full items-center gap-2 rounded-md px-1 py-1 text-left';
 
 /** How each connection state reads: its icon, tint, and right-hand label. */
 const STATUS_PRESENTATION = {
@@ -93,19 +108,11 @@ function emptyRosterMessage(
 	return result?.error ?? 'No MCP servers are configured.';
 }
 
-/** Counts the servers the user can actually do something about. */
-function countUnhealthy(
-	servers: readonly AgentProviderMcpServerWire[],
-): number {
-	return servers.filter(
-		(server) => server.status === 'failed' || server.status === 'needs-auth',
-	).length;
-}
-
 /**
  * One MCP server row: status glyph, name, and the state on the right. A
- * `needs-auth` row's state is a button, because authorising is the one thing
- * Ensemblr can hand off to the runtime rather than only report.
+ * `needs-auth` row is the whole row rendered as a button, because authorising is
+ * the one thing Ensemblr can hand off to the runtime rather than only report,
+ * and the target should be the row the user is already reading.
  */
 function McpServerRow({
 	onAuthorize,
@@ -116,46 +123,43 @@ function McpServerRow({
 }) {
 	const presentation = STATUS_PRESENTATION[server.status];
 	const StatusIcon = presentation.icon;
-	const nameCell = (
-		<span className='flex min-w-0 items-center gap-2'>
+	const cells = (
+		<>
 			<StatusIcon className={cn('size-3.5 shrink-0', presentation.tint)} />
-			<span className='truncate text-foreground text-xs'>{server.name}</span>
-			{server.scope ? (
-				<span className='shrink-0 text-muted-foreground text-xxs'>
-					{server.scope}
+			<span className='min-w-0 flex-1 truncate text-foreground text-xs'>
+				{server.name}
+			</span>
+			{presentation.label ? (
+				<span className={cn('shrink-0 text-xxs', presentation.tint)}>
+					{presentation.label}
 				</span>
 			) : null}
-		</span>
+		</>
 	);
 
-	return (
-		<div className='flex items-center justify-between gap-2 rounded-md px-1 py-1'>
-			{server.error ? (
-				<Tooltip>
-					<TooltipTrigger asChild>{nameCell}</TooltipTrigger>
-					<TooltipContent>{server.error}</TooltipContent>
-				</Tooltip>
-			) : (
-				nameCell
+	const row = onAuthorize ? (
+		<button
+			aria-label={`Authorise ${server.name}`}
+			className={cn(
+				ROW_CLASSES,
+				'transition-colors hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50',
 			)}
-			{onAuthorize ? (
-				<Button
-					className='h-5 shrink-0 rounded-md px-1.5 text-xxs'
-					onClick={onAuthorize}
-					size='sm'
-					type='button'
-					variant='subtle'
-				>
-					{presentation.label}
-				</Button>
-			) : (
-				presentation.label && (
-					<span className={cn('shrink-0 text-xxs', presentation.tint)}>
-						{presentation.label}
-					</span>
-				)
-			)}
-		</div>
+			onClick={onAuthorize}
+			type='button'
+		>
+			{cells}
+		</button>
+	) : (
+		<div className={ROW_CLASSES}>{cells}</div>
+	);
+
+	return server.error ? (
+		<Tooltip>
+			<TooltipTrigger asChild>{row}</TooltipTrigger>
+			<TooltipContent>{server.error}</TooltipContent>
+		</Tooltip>
+	) : (
+		row
 	);
 }
 
@@ -200,7 +204,10 @@ export function McpServersPanel({
 		setOpen(false);
 	}, [executable?.resolvedPath, requestDockTerminal, workspaceId]);
 
-	const unhealthy = countUnhealthy(servers);
+	const scrollAreaStyle = useMemo<CSSProperties>(
+		() => ({ height: getRosterHeight(servers.length) }),
+		[servers.length],
+	);
 
 	return (
 		<Popover onOpenChange={setOpen} open={open}>
@@ -209,18 +216,13 @@ export function McpServersPanel({
 					<PopoverTrigger asChild>
 						<Button
 							aria-label='MCP servers'
-							className={cn(
-								'h-7 rounded-md px-2 font-medium',
-								unhealthy > 0 &&
-									'bg-status-warning/10 text-status-warning hover:bg-status-warning/15 hover:text-status-warning',
-							)}
+							className='h-7 rounded-md px-2 font-medium'
 							disabled={disabled}
 							size='sm'
 							type='button'
 							variant='subtle'
 						>
 							<PlugIcon className='size-3.5' />
-							{unhealthy > 0 ? <span>{unhealthy}</span> : null}
 						</Button>
 					</PopoverTrigger>
 				</TooltipTrigger>
@@ -250,7 +252,7 @@ export function McpServersPanel({
 						{isFetching ? 'Reading the MCP roster…' : emptyRosterMessage(data)}
 					</p>
 				) : (
-					<ScrollArea className='max-h-72 pr-3.5'>
+					<ScrollArea className='pr-3.5' style={scrollAreaStyle}>
 						<div className='flex flex-col'>
 							{servers.map((server) => (
 								<McpServerRow

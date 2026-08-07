@@ -42,7 +42,6 @@ function toWire(server: McpServerStatus): AgentProviderMcpServerWire {
 	return {
 		error: server.error ?? null,
 		name: server.name,
-		scope: server.scope ?? null,
 		status: server.status,
 	};
 }

@@ -34,6 +34,8 @@ export type {
 	ClaudePlanSubmittedEvent,
 } from './claude-plan-mode';
 export { detectPlanSubmission } from './claude-plan-mode';
+export type { CreateClaudeSlashCommandsOptions } from './claude-slash-commands';
+export { createClaudeSlashCommands } from './claude-slash-commands';
 export { toClaudeEffortLevel, toThinkingLevels } from './claude-thinking';
 // `claude-tool-approval-ipc.ts` is deliberately absent: it imports `electron`,
 // and this barrel is loaded by Vitest suites running under plain Node. main.ts

@@ -2,16 +2,12 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type { PiSlashCommandWire } from '../../shared/ipc/contracts/agent-session';
+import type {
+	AgentProviderSlashCommandWire,
+	ListAgentProviderSlashCommandsResult,
+} from '../../shared/ipc/contracts/agent-provider';
 import type { PiExecutableSnapshot } from '../pi-runtime';
 import { isExecutableReady } from '../pi-runtime/pi-executable.ts';
-
-/** Result of resolving live SDK commands or static fallback commands. */
-interface ResolvePiSlashCommandsResult {
-	commands: readonly PiSlashCommandWire[];
-	error: string | null;
-	source: 'sdk' | 'static';
-}
 
 /** Minimal shape of Pi's built-in command metadata. */
 interface SdkBuiltinSlashCommand {
@@ -98,7 +94,7 @@ const AUTO_SUBMIT_NAMES = new Set([
 export async function resolvePiSlashCommands(
 	executable: PiExecutableSnapshot,
 	cwd?: string,
-): Promise<ResolvePiSlashCommandsResult> {
+): Promise<ListAgentProviderSlashCommandsResult> {
 	if (!isExecutableReady(executable)) {
 		return {
 			commands: [],
@@ -123,7 +119,7 @@ export async function resolvePiSlashCommands(
 				normalizeWorkspaceCwd(cwd),
 			),
 			error: null,
-			source: 'sdk',
+			source: 'runtime',
 		};
 	} catch (cause) {
 		return {
@@ -146,7 +142,7 @@ export async function resolvePiSlashCommands(
 async function resolveLivePiSlashCommands(
 	packageRoot: string,
 	workspaceCwd: string,
-): Promise<PiSlashCommandWire[]> {
+): Promise<AgentProviderSlashCommandWire[]> {
 	const sdk = (await import(
 		pathToFileURL(path.join(packageRoot, 'dist', 'index.js')).href
 	)) as SdkModule;
@@ -341,7 +337,7 @@ function isSdkSlashCommandInfo(value: unknown): value is SdkSlashCommandInfo {
  */
 async function resolveStaticPiSlashCommands(
 	packageRoot: string,
-): Promise<PiSlashCommandWire[]> {
+): Promise<AgentProviderSlashCommandWire[]> {
 	const modulePath = path.join(
 		packageRoot,
 		'dist',

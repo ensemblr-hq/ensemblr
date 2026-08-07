@@ -32,6 +32,7 @@ let openedTargets: { targetId: string; workspacePath: string }[];
 let saved: { path: string; provider: string }[];
 let probed: string[];
 let rosterCalls: { cwd: string; provider: string }[];
+let slashCommandCalls: { cwd: string; provider: string }[];
 
 /** Builds an executable-service stub that records writes for one provider. */
 function createExecutableService(
@@ -107,6 +108,7 @@ beforeEach(() => {
 	saved = [];
 	probed = [];
 	rosterCalls = [];
+	slashCommandCalls = [];
 
 	const openTargetService = {
 		listTargets: async () => [],
@@ -131,18 +133,38 @@ beforeEach(() => {
 					rosterCalls.push({ cwd, provider: 'claude' });
 					return {
 						error: null,
-						servers: [
-							{
-								error: null,
-								name: 'linear',
-								scope: 'user',
-								status: 'needs-auth',
-							},
-						],
+						servers: [{ error: null, name: 'linear', status: 'needs-auth' }],
 					};
 				},
 			},
 			probes: { claude: createProbe('claude'), pi: createProbe('pi') },
+			slashCommandCatalogs: {
+				claude: async (cwd) => {
+					slashCommandCalls.push({ cwd, provider: 'claude' });
+					return {
+						commands: [
+							{ autoSubmit: false, command: 'review', description: 'Review' },
+						],
+						error: null,
+						source: 'runtime',
+					};
+				},
+				pi: async (cwd) => {
+					slashCommandCalls.push({ cwd, provider: 'pi' });
+					return {
+						commands: [
+							{
+								autoSubmit: true,
+								command: 'compact',
+								description: 'Compact',
+								source: 'builtin',
+							},
+						],
+						error: null,
+						source: 'static',
+					};
+				},
+			},
 		}),
 		openTargetService,
 	});
@@ -152,10 +174,11 @@ afterEach(() => {
 	rmSync(homeDirectory, { force: true, recursive: true });
 });
 
-test('registers exactly the seven parameterized provider channels', () => {
+test('registers exactly the eight parameterized provider channels', () => {
 	expect(handle.mock.calls.map(([channel]) => channel)).toEqual([
 		'ensemblr:get-agent-provider-readiness',
 		'ensemblr:list-agent-provider-mcp-servers',
+		'ensemblr:list-agent-provider-slash-commands',
 		'ensemblr:get-agent-provider-executable-path',
 		'ensemblr:set-agent-provider-executable-path',
 		'ensemblr:clear-agent-provider-executable-path',
@@ -196,12 +219,53 @@ test('the MCP roster routes to the runtime registered for that provider', async 
 	]);
 	expect(claude).toEqual({
 		error: null,
-		servers: [
-			{ error: null, name: 'linear', scope: 'user', status: 'needs-auth' },
-		],
+		servers: [{ error: null, name: 'linear', status: 'needs-auth' }],
 	});
 	// Pi registers no roster, so it reads as empty rather than as a failure.
 	expect(pi).toEqual({ error: null, servers: [] });
+});
+
+test('slash commands route to the runtime registered for that provider', async () => {
+	const claude = await invoke('ensemblr:list-agent-provider-slash-commands', {
+		cwd: '/workspaces/demo',
+		provider: 'claude',
+	});
+	const pi = await invoke('ensemblr:list-agent-provider-slash-commands', {
+		cwd: '/workspaces/demo',
+		provider: 'pi',
+	});
+
+	expect(slashCommandCalls).toEqual([
+		{ cwd: '/workspaces/demo', provider: 'claude' },
+		{ cwd: '/workspaces/demo', provider: 'pi' },
+	]);
+	expect(claude).toEqual({
+		commands: [{ autoSubmit: false, command: 'review', description: 'Review' }],
+		error: null,
+		source: 'runtime',
+	});
+	expect(pi).toEqual({
+		commands: [
+			{
+				autoSubmit: true,
+				command: 'compact',
+				description: 'Compact',
+				source: 'builtin',
+			},
+		],
+		error: null,
+		source: 'static',
+	});
+});
+
+test('slash commands reject a request with no workspace directory', async () => {
+	await expect(
+		invoke('ensemblr:list-agent-provider-slash-commands', {
+			cwd: '',
+			provider: 'claude',
+		}),
+	).rejects.toThrow();
+	expect(slashCommandCalls).toEqual([]);
 });
 
 test('the MCP roster rejects a request with no workspace directory', async () => {
@@ -224,6 +288,12 @@ test('every channel rejects an unknown provider id', async () => {
 
 	await expect(
 		invoke('ensemblr:list-agent-provider-mcp-servers', {
+			cwd: '/workspaces/demo',
+			provider: 'codex',
+		}),
+	).rejects.toThrow();
+	await expect(
+		invoke('ensemblr:list-agent-provider-slash-commands', {
 			cwd: '/workspaces/demo',
 			provider: 'codex',
 		}),

@@ -10,6 +10,7 @@ import type {
 	AgentExecutableSelectionWire,
 	AgentProviderReadinessWire,
 	ListAgentProviderMcpServersResult,
+	ListAgentProviderSlashCommandsResult,
 	OpenAgentProviderSettingsFileResult,
 } from '../../../shared/ipc/contracts/agent-provider';
 import type { AgentProviderService } from '../../agent-providers';
@@ -17,6 +18,7 @@ import type { OpenTargetService } from '../../open-target';
 import {
 	agentProviderRequestSchema,
 	listAgentProviderMcpServersRequestSchema,
+	listAgentProviderSlashCommandsRequestSchema,
 	openAgentProviderSettingsFileRequestSchema,
 	setAgentProviderExecutablePathRequestSchema,
 } from '../request-schemas.ts';
@@ -26,11 +28,12 @@ import { showDirectorySelectionDialog } from './dialog-helpers.ts';
 const EMPTY_SETTINGS_FILE_CONTENT = '{}\n';
 
 /**
- * Registers the provider-parameterized IPC handlers backing Settings →
- * Providers: readiness probing, the MCP roster, executable overrides, and
- * opening a runtime's own settings file. Every channel validates its `provider`
- * against the shared registry first — an unknown id is rejected, never coerced
- * to a default.
+ * Registers the provider-parameterized IPC handlers: readiness probing, the MCP
+ * roster, the slash command catalogue, executable overrides, and opening a
+ * runtime's own settings file. Every channel validates its `provider` against
+ * the shared registry first — an unknown id is rejected, never coerced to a
+ * default, which is what keeps a Claude Code chat from being served Pi's
+ * commands.
  * @param options - The provider service and the "Open in" target registry.
  */
 export function registerAgentProviderHandlers({
@@ -59,6 +62,19 @@ export function registerAgentProviderHandlers({
 				listAgentProviderMcpServersRequestSchema.parse(request);
 
 			return agentProviderService.listMcpServers(provider, cwd);
+		},
+	);
+
+	ipcMain.handle(
+		IPC_CHANNELS.listAgentProviderSlashCommands,
+		async (
+			_event,
+			request: unknown,
+		): Promise<ListAgentProviderSlashCommandsResult> => {
+			const { cwd, provider } =
+				listAgentProviderSlashCommandsRequestSchema.parse(request);
+
+			return agentProviderService.listSlashCommands(provider, cwd);
 		},
 	);
 

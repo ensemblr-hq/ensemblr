@@ -71,11 +71,6 @@ export interface AgentProviderMcpServerWire {
 	/** Failure detail the runtime attached, when the server did not connect. */
 	error: string | null;
 	name: string;
-	/**
-	 * Where the server is configured — `user`, `project`, `local`, `dynamic`
-	 * (plugin-supplied), `claudeai` (remote connector) — when the runtime says.
-	 */
-	scope: string | null;
 	status: AgentProviderMcpStatus;
 }
 
@@ -97,6 +92,54 @@ export interface ListAgentProviderMcpServersRequest {
 export interface ListAgentProviderMcpServersResult {
 	error: string | null;
 	servers: readonly AgentProviderMcpServerWire[];
+}
+
+/**
+ * What registered a slash command, used to group the composer's slash menu.
+ * Pi reports one of these for every command; Claude Code's SDK reports no
+ * provenance at all, so its commands carry none.
+ */
+export type AgentProviderSlashCommandSource =
+	| 'builtin'
+	| 'extension'
+	| 'prompt'
+	| 'skill';
+
+/** Scope of the resource that registered a slash command. */
+export type AgentProviderSlashCommandScope = 'project' | 'temporary' | 'user';
+
+/** IPC-safe slash command metadata shown in the composer autocomplete menu. */
+export interface AgentProviderSlashCommandWire {
+	/** When true, picking the command submits it immediately (it takes no args). */
+	autoSubmit: boolean;
+	/** Bare command name without the leading slash. */
+	command: string;
+	description: string;
+	source?: AgentProviderSlashCommandSource;
+	sourceScope?: AgentProviderSlashCommandScope;
+}
+
+/** Request for one runtime's slash commands as they resolve inside a workspace. */
+export interface ListAgentProviderSlashCommandsRequest {
+	/**
+	 * Workspace directory to resolve commands against. Project-scoped skills,
+	 * prompts, and plugin commands live under it, so a global lookup would miss
+	 * them.
+	 */
+	cwd: string;
+	provider: AgentProviderId;
+}
+
+/**
+ * One runtime's slash commands. `source` says whether the runtime itself
+ * answered (`runtime`) or the list came from a vendored catalogue after live
+ * discovery failed (`static`), which is what lets the caller tell "this runtime
+ * has no commands" from "we could not ask it".
+ */
+export interface ListAgentProviderSlashCommandsResult {
+	commands: readonly AgentProviderSlashCommandWire[];
+	error: string | null;
+	source: 'runtime' | 'static';
 }
 
 /**
@@ -180,6 +223,9 @@ export interface AgentProviderApi {
 	listAgentProviderMcpServers: (
 		request: ListAgentProviderMcpServersRequest,
 	) => Promise<ListAgentProviderMcpServersResult>;
+	listAgentProviderSlashCommands: (
+		request: ListAgentProviderSlashCommandsRequest,
+	) => Promise<ListAgentProviderSlashCommandsResult>;
 	openAgentProviderSettingsFile: (
 		request: OpenAgentProviderSettingsFileRequest,
 	) => Promise<OpenAgentProviderSettingsFileResult>;

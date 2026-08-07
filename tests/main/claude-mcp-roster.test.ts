@@ -85,7 +85,7 @@ describe('the Claude MCP roster is read against the workspace', () => {
 		expect(roster.capturedOptions[0]?.permissionMode).toBe('plan');
 	});
 
-	it('carries the scope and error the runtime reported', async () => {
+	it('carries the error the runtime reported', async () => {
 		const roster = createRoster([
 			[
 				server('linear', 'needs-auth', { scope: 'claudeai' }),
@@ -104,13 +104,11 @@ describe('the Claude MCP roster is read against the workspace', () => {
 				{
 					error: null,
 					name: 'linear',
-					scope: 'claudeai',
 					status: 'needs-auth',
 				},
 				{
 					error: 'connection refused',
 					name: 'fallow',
-					scope: 'project',
 					status: 'failed',
 				},
 			],

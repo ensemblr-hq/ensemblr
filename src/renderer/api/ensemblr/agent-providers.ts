@@ -61,6 +61,35 @@ export function agentProviderMcpServersQuery(
 }
 
 /**
+ * Query options for one agent runtime's slash commands, resolved inside a
+ * workspace so project-scoped skills, prompts, and commands are included.
+ * Discovery starts a child process, so the catalogue is held fresh for five
+ * minutes — long enough that opening the slash menu never pays for a probe.
+ * @param provider - Agent runtime whose commands the composer offers.
+ * @param cwd - Workspace directory the commands resolve against.
+ * @returns Query options for the slash command catalogue.
+ */
+export function agentProviderSlashCommandsQuery(
+	provider: AgentProviderId,
+	cwd: string,
+) {
+	return queryOptions({
+		enabled: cwd.length > 0,
+		queryFn: () =>
+			profileElectronIpcCall(
+				{
+					channel: IPC_CHANNELS.listAgentProviderSlashCommands,
+					usesDatabase: false,
+				},
+				() =>
+					getEnsemblrApi().listAgentProviderSlashCommands({ cwd, provider }),
+			),
+		queryKey: ensemblrQueryKeys.agentProviderSlashCommands(provider, cwd),
+		staleTime: 5 * 60_000,
+	});
+}
+
+/**
  * Query options for one agent runtime's executable override snapshot.
  * @param provider - Agent runtime whose executable to read.
  * @returns Query options for the executable path snapshot.
