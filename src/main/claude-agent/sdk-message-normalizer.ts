@@ -61,6 +61,9 @@ export function createSdkMessageNormalizer({
 	let status: AgentSessionStatus = 'starting';
 	let turnId: string | null = null;
 	let contextWindow = 0;
+	let contextTokens = 0;
+	let mainModel: string | null = null;
+	let reported: AgentContextUsage | null = null;
 
 	const at = (): string => now().toISOString();
 
@@ -78,16 +81,32 @@ export function createSdkMessageNormalizer({
 		role: 'agent' | 'tool' | 'user',
 	): AgentEvent => ({ at: at(), payload, role, turnId, type: 'message' });
 
-	const usageEvent = (usage: AgentContextUsage): AgentEvent => ({
-		at: at(),
-		type: 'context-usage',
-		usage,
-	});
+	/**
+	 * Emits a usage snapshot when the reading has actually moved. Stays silent
+	 * until the window is known, because a zero window renders as a gauge with no
+	 * denominator rather than as an unknown one, and the runtime only names the
+	 * window on its first `result`.
+	 * @returns One `context-usage` event, or nothing when there is no news.
+	 */
+	const reportUsage = (): readonly AgentEvent[] => {
+		if (contextTokens === 0 || contextWindow === 0) {
+			return [];
+		}
+		if (
+			reported?.contextWindow === contextWindow &&
+			reported.tokens === contextTokens
+		) {
+			return [];
+		}
+		reported = toUsage({ contextWindow, tokens: contextTokens });
+		return [{ at: at(), type: 'context-usage', usage: reported }];
+	};
 
 	const handleSystem = (
 		message: Extract<SDKMessage, { type: 'system' }>,
 	): readonly AgentEvent[] => {
 		if (message.subtype === 'init') {
+			mainModel = readString(message.model);
 			onDiscovery?.({
 				model: readModelMetadata(message.model),
 				sessionId: message.session_id,
@@ -97,12 +116,44 @@ export function createSdkMessageNormalizer({
 
 		if (message.subtype === 'compact_boundary') {
 			const tokens = message.compact_metadata?.post_tokens;
-			return typeof tokens === 'number'
-				? [usageEvent(toUsage({ contextWindow, tokens }))]
-				: [];
+			if (typeof tokens !== 'number') {
+				return [];
+			}
+			contextTokens = tokens;
+			return reportUsage();
 		}
 
 		return [];
+	};
+
+	/**
+	 * Seals one assistant turn and, for main-thread responses only, re-reads the
+	 * live occupancy from it. Subagent responses (`parent_tool_use_id` set) are
+	 * measured against their own window, so they never restate the user's.
+	 * @param message - The `assistant` SDK message.
+	 * @returns The seal and its tool calls, plus a usage snapshot when one is due.
+	 */
+	const handleAssistant = (
+		message: Extract<SDKMessage, { type: 'assistant' }>,
+	): readonly AgentEvent[] => {
+		const events = [
+			...transitionTo('streaming'),
+			...normalizeAssistant(message, messageEvent),
+		];
+
+		if (message.parent_tool_use_id !== null) {
+			return events;
+		}
+
+		mainModel = readString(message.message?.model) ?? mainModel;
+
+		const occupied = readContextTokens(message);
+		if (occupied === null) {
+			return events;
+		}
+
+		contextTokens = occupied;
+		return [...events, ...reportUsage()];
 	};
 
 	const handleResult = (
@@ -110,13 +161,9 @@ export function createSdkMessageNormalizer({
 	): readonly AgentEvent[] => {
 		const events: AgentEvent[] = [];
 
-		const totals = readUsageTotals(message.modelUsage);
-		if (totals) {
-			contextWindow = totals.contextWindow || contextWindow;
-			events.push(
-				usageEvent(toUsage({ contextWindow, tokens: totals.tokens })),
-			);
-		}
+		contextWindow =
+			readContextWindow(message.modelUsage, mainModel) || contextWindow;
+		events.push(...reportUsage());
 
 		if (message.subtype !== 'success') {
 			events.push({
@@ -143,10 +190,7 @@ export function createSdkMessageNormalizer({
 				case 'stream_event':
 					return normalizeStreamEvent(message, messageEvent);
 				case 'assistant':
-					return [
-						...transitionTo('streaming'),
-						...normalizeAssistant(message, messageEvent),
-					];
+					return handleAssistant(message);
 				case 'user':
 					return normalizeUser(message, messageEvent);
 				case 'result':
@@ -277,32 +321,62 @@ function normalizeUser(
 }
 
 /**
- * Sums the token counters the SDK reports per model. Multi-model turns (a
- * fallback kicked in, a subagent ran a cheaper model) fold onto the widest
- * window, which is the one the user's own conversation is bounded by.
+ * Reads the window the user's own conversation is bounded by, which is the main
+ * model's — `modelUsage` covers subagents, sidechains and compaction calls too,
+ * and is cumulative, so one wide-window subagent would otherwise pin the
+ * denominator for the rest of the session and halve the reported percentage.
+ * The widest entry is only a fallback for when the main model cannot be matched.
  * @param modelUsage - The `modelUsage` map off a `result` message.
- * @returns Summed tokens and the widest window, or null when nothing was reported.
+ * @param mainModel - Model id the main thread last answered on.
+ * @returns The main model's window, the widest reported one, or 0 for neither.
  */
-function readUsageTotals(
+function readContextWindow(
 	modelUsage: Extract<SDKMessage, { type: 'result' }>['modelUsage'],
-): { contextWindow: number; tokens: number } | null {
-	const entries = Object.values(modelUsage ?? {});
-	if (entries.length === 0) {
+	mainModel: string | null,
+): number {
+	const entries = Object.entries(modelUsage ?? {});
+	const main = entries.find(
+		([id, entry]) => id === mainModel || entry.canonicalModel === mainModel,
+	)?.[1];
+	if (main && (main.contextWindow ?? 0) > 0) {
+		return main.contextWindow;
+	}
+
+	let widest = 0;
+	for (const [, entry] of entries) {
+		widest = Math.max(widest, entry.contextWindow ?? 0);
+	}
+	return widest;
+}
+
+/**
+ * Reads how much of the window a response left occupied: its whole prompt —
+ * fresh, cache-written, and cache-read input, which is how the Messages API
+ * defines total input tokens — plus the text it just appended to the thread.
+ *
+ * Deliberately not `result.modelUsage`, whose counters are cumulative session
+ * totals kept for billing. Every turn re-reads the prompt cache, so summing
+ * `cacheReadInputTokens` across a session reports several times the window's
+ * worth of tokens within a handful of turns. One response's own usage is the
+ * only figure that describes the live conversation.
+ * @param message - The `assistant` SDK message.
+ * @returns Occupied tokens, or null when the response reported no usage.
+ */
+function readContextTokens(
+	message: Extract<SDKMessage, { type: 'assistant' }>,
+): number | null {
+	const usage = isRecord(message.message?.usage) ? message.message.usage : null;
+	if (!usage) {
 		return null;
 	}
 
-	let tokens = 0;
-	let contextWindow = 0;
-	for (const entry of entries) {
-		tokens +=
-			(entry.inputTokens ?? 0) +
-			(entry.outputTokens ?? 0) +
-			(entry.cacheReadInputTokens ?? 0) +
-			(entry.cacheCreationInputTokens ?? 0);
-		contextWindow = Math.max(contextWindow, entry.contextWindow ?? 0);
-	}
+	const occupied =
+		readTokenCount(usage.input_tokens) +
+		readTokenCount(usage.cache_creation_input_tokens) +
+		readTokenCount(usage.cache_read_input_tokens) +
+		readTokenCount(usage.output_tokens);
 
-	return { contextWindow, tokens };
+	return occupied > 0 ? occupied : null;
 }
 
 /**
@@ -396,6 +470,18 @@ function readBlocks(content: unknown): readonly Record<string, unknown>[] {
  */
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Reads a field as a usable token counter, treating absent and negative values
+ * as zero so a partial usage block still sums.
+ * @param value - Raw field value.
+ * @returns The count, or 0 when the field carries no usable number.
+ */
+function readTokenCount(value: unknown): number {
+	return typeof value === 'number' && Number.isFinite(value) && value > 0
+		? value
+		: 0;
 }
 
 /**

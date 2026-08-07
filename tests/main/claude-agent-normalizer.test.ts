@@ -294,20 +294,44 @@ test('the SDK echo of a typed prompt is dropped so it renders once, not twice', 
 	assert.deepEqual(messagePayloads(events), []);
 });
 
-test('a successful result reports context usage and returns the session to idle', () => {
-	const { normalize } = createNormalizer();
-	normalize(initMessage());
-	normalize({
-		message: { content: [{ text: 'done', type: 'text' }] },
+function assistantMessage(
+	usage: Record<string, number> | null,
+	overrides: Record<string, unknown> = {},
+): unknown {
+	return {
+		message: {
+			content: [{ text: 'done', type: 'text' }],
+			...(usage ? { usage } : {}),
+		},
 		parent_tool_use_id: null,
 		type: 'assistant',
-	});
+		...overrides,
+	};
+}
+
+function usageSnapshots(events: readonly AgentEvent[]): readonly unknown[] {
+	return events.flatMap((event) =>
+		event.type === 'context-usage' ? [event.usage] : [],
+	);
+}
+
+test('context usage measures the live thread, not the session billing totals', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	normalize(
+		assistantMessage({
+			cache_creation_input_tokens: 5,
+			cache_read_input_tokens: 100,
+			input_tokens: 1_000,
+			output_tokens: 395,
+		}),
+	);
 
 	const events = normalize({
 		modelUsage: {
 			'claude-opus-5': {
 				cacheCreationInputTokens: 5,
-				cacheReadInputTokens: 100,
+				cacheReadInputTokens: 4_200_000,
 				contextWindow: 200_000,
 				inputTokens: 1_000,
 				outputTokens: 395,
@@ -317,19 +341,183 @@ test('a successful result reports context usage and returns the session to idle'
 		type: 'result',
 	});
 
-	assert.deepEqual(events, [
-		{
-			at: NOW.toISOString(),
-			type: 'context-usage',
-			usage: { contextWindow: 200_000, percent: 0.75, tokens: 1_500 },
-		},
-		{
-			at: NOW.toISOString(),
-			previous: 'streaming',
-			status: 'idle',
-			type: 'status',
-		},
+	assert.deepEqual(usageSnapshots(events), [
+		{ contextWindow: 200_000, percent: 0.75, tokens: 1_500 },
 	]);
+	assert.deepEqual(
+		events.filter((event) => event.type === 'status'),
+		[
+			{
+				at: NOW.toISOString(),
+				previous: 'streaming',
+				status: 'idle',
+				type: 'status',
+			},
+		],
+	);
+});
+
+test('each response restates occupancy rather than adding to the last one', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	normalize({
+		modelUsage: { 'claude-opus-5': { contextWindow: 200_000 } },
+		subtype: 'success',
+		type: 'result',
+	});
+
+	const first = normalize(
+		assistantMessage({ cache_read_input_tokens: 20_000, output_tokens: 500 }),
+	);
+	const second = normalize(
+		assistantMessage({ cache_read_input_tokens: 25_000, output_tokens: 400 }),
+	);
+
+	assert.deepEqual(usageSnapshots(first), [
+		{ contextWindow: 200_000, percent: 10.25, tokens: 20_500 },
+	]);
+	assert.deepEqual(usageSnapshots(second), [
+		{ contextWindow: 200_000, percent: 12.7, tokens: 25_400 },
+	]);
+});
+
+test('a subagent response leaves the main thread occupancy alone', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	normalize({
+		modelUsage: { 'claude-opus-5': { contextWindow: 200_000 } },
+		subtype: 'success',
+		type: 'result',
+	});
+
+	const main = normalize(
+		assistantMessage({ input_tokens: 30_000, output_tokens: 1_000 }),
+	);
+	const subagent = normalize(
+		assistantMessage(
+			{ input_tokens: 900, output_tokens: 100 },
+			{ parent_tool_use_id: 'toolu_1' },
+		),
+	);
+
+	assert.deepEqual(usageSnapshots(main), [
+		{ contextWindow: 200_000, percent: 15.5, tokens: 31_000 },
+	]);
+	assert.deepEqual(usageSnapshots(subagent), []);
+});
+
+test('nothing is reported until the runtime has named a context window', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const beforeWindow = normalize(
+		assistantMessage({ cache_read_input_tokens: 120_000, output_tokens: 500 }),
+	);
+	const atResult = normalize({
+		modelUsage: { 'claude-opus-5': { contextWindow: 200_000 } },
+		subtype: 'success',
+		type: 'result',
+	});
+
+	assert.deepEqual(usageSnapshots(beforeWindow), []);
+	assert.deepEqual(usageSnapshots(atResult), [
+		{ contextWindow: 200_000, percent: 60.25, tokens: 120_500 },
+	]);
+});
+
+test('the window comes from the main model, not a wider subagent model', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	normalize(assistantMessage({ input_tokens: 100_000 }));
+
+	const events = normalize({
+		modelUsage: {
+			'claude-opus-5': { contextWindow: 200_000 },
+			'claude-opus-5[1m]': { contextWindow: 1_000_000 },
+		},
+		subtype: 'success',
+		type: 'result',
+	});
+
+	assert.deepEqual(usageSnapshots(events), [
+		{ contextWindow: 200_000, percent: 50, tokens: 100_000 },
+	]);
+});
+
+test('an unmatched main model falls back to the widest reported window', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage({ model: 'opusplan' }));
+	normalize(assistantMessage({ input_tokens: 100_000 }));
+
+	const events = normalize({
+		modelUsage: { 'claude-opus-5': { contextWindow: 200_000 } },
+		subtype: 'success',
+		type: 'result',
+	});
+
+	assert.deepEqual(usageSnapshots(events), [
+		{ contextWindow: 200_000, percent: 50, tokens: 100_000 },
+	]);
+});
+
+test('a mid-session model switch moves the window with the main thread', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	normalize({
+		message: {
+			content: [{ text: 'done', type: 'text' }],
+			model: 'claude-sonnet-5',
+			usage: { input_tokens: 100_000 },
+		},
+		parent_tool_use_id: null,
+		type: 'assistant',
+	});
+
+	const events = normalize({
+		modelUsage: {
+			'claude-opus-5': { contextWindow: 1_000_000 },
+			'claude-sonnet-5': { contextWindow: 200_000 },
+		},
+		subtype: 'success',
+		type: 'result',
+	});
+
+	assert.deepEqual(usageSnapshots(events), [
+		{ contextWindow: 200_000, percent: 50, tokens: 100_000 },
+	]);
+});
+
+test('an unchanged snapshot is not re-emitted at the end of the turn', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	normalize({
+		modelUsage: { 'claude-opus-5': { contextWindow: 200_000 } },
+		subtype: 'success',
+		type: 'result',
+	});
+	normalize(assistantMessage({ input_tokens: 10_000, output_tokens: 200 }));
+
+	const events = normalize({
+		modelUsage: { 'claude-opus-5': { contextWindow: 200_000 } },
+		subtype: 'success',
+		type: 'result',
+	});
+
+	assert.deepEqual(usageSnapshots(events), []);
+});
+
+test('a response reporting no usage leaves the gauge unreported', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+	normalize({
+		modelUsage: { 'claude-opus-5': { contextWindow: 200_000 } },
+		subtype: 'success',
+		type: 'result',
+	});
+
+	const events = normalize(assistantMessage(null));
+
+	assert.deepEqual(usageSnapshots(events), []);
 });
 
 test('a failed result also surfaces a recoverable error event', () => {
@@ -360,16 +548,9 @@ test('a failed result also surfaces a recoverable error event', () => {
 test('a compaction boundary reports usage against the last known window', () => {
 	const { normalize } = createNormalizer();
 	normalize(initMessage());
+	normalize(assistantMessage({ input_tokens: 150_000 }));
 	normalize({
-		modelUsage: {
-			'claude-opus-5': {
-				cacheCreationInputTokens: 0,
-				cacheReadInputTokens: 0,
-				contextWindow: 200_000,
-				inputTokens: 150_000,
-				outputTokens: 0,
-			},
-		},
+		modelUsage: { 'claude-opus-5': { contextWindow: 200_000 } },
 		subtype: 'success',
 		type: 'result',
 	});
