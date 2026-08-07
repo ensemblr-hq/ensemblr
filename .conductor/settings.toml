@@ -24,3 +24,7 @@ icon = "list-checks"
 [scripts.run.test]
 command = "./scripts/with-pinned-node.sh npm test"
 icon = "test-tube"
+
+[scripts.run.build]
+command = "./scripts/with-pinned-node.sh npm run package:unsigned && open out"
+icon = "hammer"
