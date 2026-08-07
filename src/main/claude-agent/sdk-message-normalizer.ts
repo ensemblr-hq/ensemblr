@@ -8,6 +8,7 @@ import type {
 	AgentModelMetadata,
 	AgentSessionStatus,
 } from '../agent-runtime/agent-types.ts';
+import { toolResultDetails } from './tool-result-details.ts';
 
 /** What the runtime told us about itself once its session was up. */
 export interface SdkSessionDiscovery {
@@ -294,6 +295,12 @@ function normalizeAssistant(
  * timeline keys user groups by event id and never merges them. Resuming a
  * session replays earlier user turns down this same path, which would duplicate
  * history Ensemblr already persists itself.
+ *
+ * The result travels in the `{ content, details }` envelope the timeline reads,
+ * with `details` carrying whatever `tool_use_result` describes structurally —
+ * an edit's patch, for one — that the text sent to the model leaves out. It is
+ * attached only to a lone result, since one message reports one tool's
+ * structured output however many results it batches.
  * @param message - The `user` SDK message.
  * @param messageEvent - Factory that stamps the current turn onto an event.
  * @returns Tool-result events, or nothing for a prompt echo.
@@ -306,13 +313,17 @@ function normalizeUser(
 	const toolResults = blocks.filter(
 		(block) => readString(block.type) === 'tool_result',
 	);
+	const details =
+		toolResults.length === 1
+			? toolResultDetails(message.tool_use_result)
+			: null;
 
 	return toolResults.map((block) =>
 		messageEvent(
 			{
 				isError: block.is_error === true,
 				kind: 'tool-result',
-				output: block.content,
+				output: { content: readBlocks(block.content), details },
 				toolCallId: readString(block.tool_use_id) ?? 'tool-call',
 			},
 			'tool',

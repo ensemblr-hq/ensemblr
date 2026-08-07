@@ -18,6 +18,7 @@ import {
 	ensemblrToolGlyph,
 	ensemblrToolLabel,
 } from './ensemblr-tool-presentation';
+import { parseNumberedFileBody } from './numbered-file-body';
 import { shellCommandTitle } from './shell-command-title';
 import { parseToolDiagnostics } from './tool-diagnostics';
 import {
@@ -280,7 +281,9 @@ function humanizeToolName(name: string): string {
 }
 
 /**
- * Reads a file and shows it with a gutter numbered from the requested offset.
+ * Reads a file and shows it with a gutter numbered from the tool's own numbering
+ * when it returned a numbered body — both the truer origin and the only way the
+ * row avoids two gutters — and from the requested start line otherwise.
  * @param part - The `read` tool part to project
  * @returns The row's title, badge, preview, and body
  */
@@ -302,21 +305,23 @@ function presentRead(part: DynamicToolUIPart): ToolPresenterResult {
 			tone: 'default',
 		};
 	}
-	const offset = numberField(
+	const requestedLine = numberField(
 		input,
 		'offset',
 		'start_line',
 		'startLine',
 		'line',
 	);
-	const lines = lineCount(text);
+	const numbered = parseNumberedFileBody(text);
+	const code = numbered?.code ?? text;
+	const lines = lineCount(code);
 	return {
 		badge: fileBadge(path),
 		body: {
-			code: text,
+			code,
 			kind: 'code',
 			language: languageFor(path),
-			startLine: (offset ?? 0) + 1,
+			startLine: numbered?.startLine ?? requestedLine ?? 1,
 		},
 		preview: missingPathPreview(path),
 		title: lines > 0 ? `Read ${lines} lines` : 'Read',
@@ -325,7 +330,29 @@ function presentRead(part: DynamicToolUIPart): ToolPresenterResult {
 }
 
 /**
- * Creates or overwrites a file; the body is the content that was written.
+ * Pairs the badge counts and body a unified patch renders as, so the two can
+ * never disagree about which change the row is describing.
+ * @param part - The file-writing tool part to project
+ * @returns The badge and body, or null when the result carried no patch
+ */
+function patchPresentation(
+	part: DynamicToolUIPart,
+): Pick<ToolPresenterResult, 'badge' | 'body'> | null {
+	const path = pathOf(inputOf(part));
+	const patch = stringField(outputOf(part)?.details ?? {}, 'patch');
+	if (patch === null) {
+		return null;
+	}
+	return {
+		badge: fileBadge(path, 'file', countPatchLines(patch)),
+		body: { kind: 'diff', language: languageFor(path), patch },
+	};
+}
+
+/**
+ * Creates or overwrites a file. An overwrite reports the patch it applied, so
+ * the row shows what changed rather than a whole file the reader has to diff by
+ * eye; a fresh file has no before side, and shows the content that was written.
  * @param part - The `write` tool part to project
  * @returns The row's title, badge, preview, and body
  */
@@ -337,9 +364,10 @@ function presentWrite(part: DynamicToolUIPart): ToolPresenterResult {
 		content.length > 0
 			? { additions: lineCount(content), deletions: null }
 			: null;
+	const applied = patchPresentation(part);
 	return {
-		badge: fileBadge(path, 'file', written),
-		body: {
+		badge: applied?.badge ?? fileBadge(path, 'file', written),
+		body: applied?.body ?? {
 			code: content,
 			kind: 'code',
 			language: languageFor(path),
@@ -360,12 +388,11 @@ function presentWrite(part: DynamicToolUIPart): ToolPresenterResult {
 function presentEdit(part: DynamicToolUIPart): ToolPresenterResult {
 	const path = pathOf(inputOf(part));
 	const output = outputOf(part);
-	const patch = stringField(output?.details ?? {}, 'patch');
+	const applied = patchPresentation(part);
 	return {
-		badge: fileBadge(path, 'file', patch ? countPatchLines(patch) : null),
-		body: patch
-			? { kind: 'diff', language: languageFor(path), patch }
-			: textBody(output?.text ?? '', 'text' as BundledLanguage),
+		badge: applied?.badge ?? fileBadge(path),
+		body:
+			applied?.body ?? textBody(output?.text ?? '', 'text' as BundledLanguage),
 		preview: missingPathPreview(path),
 		title: 'Edit',
 		tone: 'default',

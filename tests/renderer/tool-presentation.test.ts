@@ -38,11 +38,14 @@ const EDIT_PATCH =
 const MARKER_HEAVY_PATCH =
 	'--- docs/guide.md\n+++ docs/guide.md\n@@ -1,3 +1,3 @@\n # Guide\n----\n-Run with --verbose\n++++trace\n+Run with ++trace\n';
 
+const ABSOLUTE_PATH_PATCH =
+	'--- /repo/src/broken.ts\n+++ /repo/src/broken.ts\n@@ -1,3 +1,3 @@\n import { a } from "./a";\n-const x = "1";\n+const x = 1;\n';
+
 const STACK_TRACE_ERROR =
 	'TypeError: Cannot read properties of undefined\n    at resolve (/repo/src/a.ts:12:9)\n    at run (/repo/src/b.ts:44:3)';
 
 describe('presentToolCall', () => {
-	test('numbers a read body from the requested offset', () => {
+	test('numbers a read body from the requested line', () => {
 		const presentation = presentToolCall(
 			call('read', { offset: 25, path: 'src/app.tsx' }, { text: 'a\nb\nc\n' }),
 		);
@@ -55,7 +58,32 @@ describe('presentToolCall', () => {
 		expect(presentation.body).toMatchObject({
 			kind: 'code',
 			language: 'tsx',
-			startLine: 26,
+			startLine: 25,
+		});
+	});
+
+	test('numbers a read body from line one when no line was requested', () => {
+		const presentation = presentToolCall(
+			call('read', { path: 'src/app.tsx' }, { text: 'a\nb\n' }),
+		);
+
+		expect(presentation.body).toMatchObject({ kind: 'code', startLine: 1 });
+	});
+
+	test('numbers a read body from the gutter the tool returned', () => {
+		const presentation = presentToolCall(
+			call(
+				'read',
+				{ file_path: 'src/app.tsx', offset: 10 },
+				{ text: '10\tconst a = 1;\n11\tconst b = 2;\n' },
+			),
+		);
+
+		expect(presentation.title).toBe('Read 2 lines');
+		expect(presentation.body).toMatchObject({
+			code: 'const a = 1;\nconst b = 2;\n',
+			kind: 'code',
+			startLine: 10,
 		});
 	});
 
@@ -72,6 +100,25 @@ describe('presentToolCall', () => {
 			kind: 'diff',
 			language: 'typescript',
 			patch: EDIT_PATCH,
+		});
+		expect(presentation.badge).toMatchObject({ additions: 1, deletions: 1 });
+	});
+
+	test('reads a patch headed by an absolute path as one file diff', () => {
+		const presentation = presentToolCall(
+			call(
+				'edit',
+				{ file_path: '/repo/src/broken.ts' },
+				{
+					details: { patch: ABSOLUTE_PATH_PATCH },
+					text: 'The file has been updated.',
+				},
+			),
+		);
+
+		expect(presentation.body).toMatchObject({
+			kind: 'diff',
+			language: 'typescript',
 		});
 		expect(presentation.badge).toMatchObject({ additions: 1, deletions: 1 });
 	});
@@ -95,6 +142,44 @@ describe('presentToolCall', () => {
 
 		expect(presentation.badge).toMatchObject({
 			additions: 3,
+			deletions: null,
+		});
+	});
+
+	test('renders an overwrite as the diff its patch describes', () => {
+		const presentation = presentToolCall(
+			call(
+				'write',
+				{ content: 'const x = 1;\n', path: 'src/broken.ts' },
+				{ details: { patch: EDIT_PATCH }, text: 'The file has been updated.' },
+			),
+		);
+
+		expect(presentation.title).toBe('Write');
+		expect(presentation.body).toMatchObject({
+			kind: 'diff',
+			language: 'typescript',
+			patch: EDIT_PATCH,
+		});
+		expect(presentation.badge).toMatchObject({ additions: 1, deletions: 1 });
+	});
+
+	test('shows the written content when a write reports no patch', () => {
+		const presentation = presentToolCall(
+			call(
+				'write',
+				{ content: 'one\ntwo\n', path: 'src/new.ts' },
+				{ text: 'File created successfully.' },
+			),
+		);
+
+		expect(presentation.body).toMatchObject({
+			code: 'one\ntwo\n',
+			kind: 'code',
+			startLine: 1,
+		});
+		expect(presentation.badge).toMatchObject({
+			additions: 2,
 			deletions: null,
 		});
 	});
