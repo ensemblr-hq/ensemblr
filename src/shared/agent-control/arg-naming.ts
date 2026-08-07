@@ -24,6 +24,7 @@ export const CANONICAL_ARG_KEYS = {
 	chatTabId: 'Identifier of a chat tab in the workspace.',
 	command: 'Shell command a guarded tool call is about to run.',
 	commentBody: 'Markdown body of the comment a tab is opened on.',
+	commentIds: 'Ids of review comments an op acts on.',
 	comments: 'Batch of review comments to file against the diff.',
 	filePath:
 		'Workspace-relative path of a file, e.g. src/main/main.ts. Never `file` or `path`.',

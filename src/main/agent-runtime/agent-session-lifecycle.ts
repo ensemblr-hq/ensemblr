@@ -287,6 +287,7 @@ export function createAgentSessionLifecycle({
 
 		const acknowledgement = await active.agentRuntimeSession.submit({
 			modelOverride: request.model ?? undefined,
+			planMode: request.planMode ?? isPlanModeActive(request.sessionId),
 			prompt: request.prompt,
 			thinkingLevel: request.thinkingLevel ?? undefined,
 		});

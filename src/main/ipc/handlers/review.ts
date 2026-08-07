@@ -10,6 +10,7 @@ import type {
 } from '../../../shared/ipc/contracts/review-comments';
 import type { ReviewService } from '../../review';
 import {
+	reviewDeleteCommentRequestSchema,
 	reviewDeleteRequestSchema,
 	reviewListRequestSchema,
 	saveReviewCommentRequestSchema,
@@ -37,7 +38,7 @@ export function registerReviewHandlers({
 	ipcMain.handle(
 		IPC_CHANNELS.deleteReviewComment,
 		async (_event, raw: unknown): Promise<DeleteReviewCommentResult> =>
-			reviewService.deleteComment(reviewDeleteRequestSchema.parse(raw)),
+			reviewService.deleteComment(reviewDeleteCommentRequestSchema.parse(raw)),
 	);
 
 	ipcMain.handle(

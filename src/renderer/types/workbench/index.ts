@@ -20,6 +20,7 @@ export type {
 	FileOpenOptions,
 	ReviewFilePreviewOpener,
 	WorkspaceFileDiffOpener,
+	WorkspaceFileDiffOpenOptions,
 } from './file-preview';
 export type { FileTreeNode, FlatFileTreeRow } from './file-tree';
 export type { GithubRepoRef } from './github';

@@ -65,6 +65,7 @@ test('review comments support add, list, resolve, and delete', () => {
 		database,
 		id: comment.id,
 		status: 'resolved',
+		workspaceId: 'ws-1',
 	});
 	assert.equal(resolved?.status, 'resolved');
 	assert.equal(resolved?.body, 'Rename this function');
@@ -73,11 +74,59 @@ test('review comments support add, list, resolve, and delete', () => {
 		body: 'Rename to fetchUser',
 		database,
 		id: comment.id,
+		workspaceId: 'ws-1',
 	});
 	assert.equal(edited?.body, 'Rename to fetchUser');
 	assert.equal(edited?.status, 'resolved');
 
-	deleteReviewComment({ database, id: comment.id });
+	deleteReviewComment({ database, id: comment.id, workspaceId: 'ws-1' });
+	assert.equal(listReviewComments({ database, workspaceId: 'ws-1' }).length, 0);
+});
+
+test('updating a comment from another workspace changes nothing', () => {
+	const database = createTestDatabase();
+	const comment = insertReviewComment({
+		body: 'original',
+		database,
+		filePath: 'src/app.ts',
+		lineNumber: 4,
+		origin: 'user',
+		workspaceId: 'ws-1',
+	});
+
+	const stolen = updateReviewComment({
+		body: 'rewritten from ws-2',
+		database,
+		id: comment.id,
+		status: 'resolved',
+		workspaceId: 'ws-2',
+	});
+
+	assert.equal(stolen, null);
+	// Asserting the row itself, not just the return: a fix that only changed what
+	// the function returned would still have written the update.
+	const [row] = listReviewComments({ database, workspaceId: 'ws-1' });
+	assert.equal(row?.body, 'original');
+	assert.equal(row?.status, 'open');
+});
+
+test('deleting a comment from another workspace leaves it in place', () => {
+	const database = createTestDatabase();
+	const comment = insertReviewComment({
+		body: 'keep me',
+		database,
+		filePath: 'src/app.ts',
+		lineNumber: null,
+		origin: 'user',
+		workspaceId: 'ws-1',
+	});
+
+	deleteReviewComment({ database, id: comment.id, workspaceId: 'ws-2' });
+
+	assert.equal(listReviewComments({ database, workspaceId: 'ws-1' }).length, 1);
+
+	deleteReviewComment({ database, id: comment.id, workspaceId: 'ws-1' });
+
 	assert.equal(listReviewComments({ database, workspaceId: 'ws-1' }).length, 0);
 });
 
@@ -107,7 +156,12 @@ test('review comments are scoped per workspace and hide archived', () => {
 		origin: 'user',
 		workspaceId: 'ws-1',
 	});
-	updateReviewComment({ database, id: archived.id, status: 'archived' });
+	updateReviewComment({
+		database,
+		id: archived.id,
+		status: 'archived',
+		workspaceId: 'ws-1',
+	});
 
 	const listed = listReviewComments({ database, workspaceId: 'ws-1' });
 	assert.deepEqual(
@@ -177,6 +231,7 @@ test('review comments record and keep their author', () => {
 		database,
 		id: agentComment.id,
 		status: 'resolved',
+		workspaceId: 'ws-1',
 	});
 	assert.equal(resolved?.origin, 'agent');
 
@@ -190,7 +245,12 @@ test('review comments record and keep their author', () => {
 test('updates against missing rows return null', () => {
 	const database = createTestDatabase();
 	assert.equal(
-		updateReviewComment({ database, id: 'missing', status: 'resolved' }),
+		updateReviewComment({
+			database,
+			id: 'missing',
+			status: 'resolved',
+			workspaceId: 'ws-1',
+		}),
 		null,
 	);
 	assert.equal(

@@ -16,6 +16,11 @@ export {
 } from './board-status';
 export { installAgentControlBoardStatusSync } from './board-status-sync';
 export {
+	useDiffLineReveal,
+	useRequestDiffLineReveal,
+	useSettleDiffLineReveal,
+} from './diff-line-reveal';
+export {
 	getRunningDockActivityState,
 	usePublishWorkspaceDockActivity,
 } from './dock-activity';

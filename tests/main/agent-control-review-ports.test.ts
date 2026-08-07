@@ -85,9 +85,19 @@ const makeDeps = (
 		(request: {
 			body?: string;
 			filePath?: string;
+			id?: string;
 			lineNumber?: number | null;
 			origin?: ReviewCommentOrigin;
+			status?: string;
 		}) => {
+			if (request.id) {
+				return {
+					comment: commentRow({
+						id: request.id,
+						status: request.status as ReviewCommentWire['status'],
+					}),
+				};
+			}
 			saved.push({
 				body: request.body ?? '',
 				filePath: request.filePath ?? '',
@@ -135,6 +145,7 @@ const makeDeps = (
 		deps,
 		getFileDiff,
 		getStatus,
+		saveComment,
 		saved,
 	};
 };
@@ -414,5 +425,139 @@ describe('review port', () => {
 		expect(broadcastReviewCommentsChanged).toHaveBeenCalledWith({
 			workspaceId: 'ws',
 		});
+	});
+});
+
+describe('review port: resolving comments', () => {
+	it('resolves the ids the workspace actually owns', async () => {
+		const { deps, saveComment } = makeDeps({
+			comments: [commentRow({ id: 'c-1' }), commentRow({ id: 'c-2' })],
+		});
+
+		const result = await makeReviewPort(deps).resolveComments({
+			commentIds: ['c-1', 'c-2'],
+			workspaceId: 'ws',
+		});
+
+		expect(result.resolved).toBe(2);
+		expect(result.resolvedIds).toEqual(['c-1', 'c-2']);
+		expect(saveComment).toHaveBeenCalledWith({
+			id: 'c-1',
+			status: 'resolved',
+			workspaceId: 'ws',
+		});
+	});
+
+	// The invariant is about the call, not the answer: a port that asked the
+	// service to write a foreign id and merely reported it as missing would pass
+	// an assertion on the result alone.
+	it('never asks the service to write an id this workspace does not own', async () => {
+		const { deps, saveComment } = makeDeps({
+			comments: [commentRow({ id: 'c-1' })],
+		});
+
+		const result = await makeReviewPort(deps).resolveComments({
+			commentIds: ['c-1', 'c-from-another-workspace'],
+			workspaceId: 'ws',
+		});
+
+		expect(result.notFound).toEqual(['c-from-another-workspace']);
+		expect(saveComment).toHaveBeenCalledTimes(1);
+		expect(saveComment).not.toHaveBeenCalledWith(
+			expect.objectContaining({ id: 'c-from-another-workspace' }),
+		);
+	});
+
+	it('reports an already-resolved comment without writing it again', async () => {
+		const { deps, saveComment } = makeDeps({
+			comments: [commentRow({ id: 'c-1', status: 'resolved' })],
+		});
+
+		const result = await makeReviewPort(deps).resolveComments({
+			commentIds: ['c-1'],
+			workspaceId: 'ws',
+		});
+
+		expect(result.alreadyResolved).toEqual(['c-1']);
+		expect(result.resolved).toBe(0);
+		expect(saveComment).not.toHaveBeenCalled();
+	});
+
+	it('splits a mixed batch into its three buckets', async () => {
+		const { deps } = makeDeps({
+			comments: [
+				commentRow({ id: 'open-1' }),
+				commentRow({ id: 'done-1', status: 'resolved' }),
+			],
+		});
+
+		const result = await makeReviewPort(deps).resolveComments({
+			commentIds: ['open-1', 'done-1', 'ghost-1'],
+			workspaceId: 'ws',
+		});
+
+		expect(result.resolvedIds).toEqual(['open-1']);
+		expect(result.alreadyResolved).toEqual(['done-1']);
+		expect(result.notFound).toEqual(['ghost-1']);
+	});
+
+	// Re-running the cleanup step after a restart lands here. Turning it into an
+	// error would teach a model to stop doing the bookkeeping at all.
+	it('treats an all-unknown batch as a no-op, not a failure', async () => {
+		const { deps, broadcastReviewCommentsChanged } = makeDeps({ comments: [] });
+
+		const result = await makeReviewPort(deps).resolveComments({
+			commentIds: ['ghost-1', 'ghost-2'],
+			workspaceId: 'ws',
+		});
+
+		expect(result.resolved).toBe(0);
+		expect(result.notFound).toEqual(['ghost-1', 'ghost-2']);
+		expect(result.message).toContain('ensemblr_get_diff_comments');
+		expect(broadcastReviewCommentsChanged).not.toHaveBeenCalled();
+	});
+
+	it('announces a resolve so the panel closes the comment live', async () => {
+		const { deps, broadcastReviewCommentsChanged } = makeDeps({
+			comments: [commentRow({ id: 'c-1' })],
+		});
+
+		await makeReviewPort(deps).resolveComments({
+			commentIds: ['c-1'],
+			workspaceId: 'ws',
+		});
+
+		expect(broadcastReviewCommentsChanged).toHaveBeenCalledTimes(1);
+		expect(broadcastReviewCommentsChanged).toHaveBeenCalledWith({
+			workspaceId: 'ws',
+		});
+	});
+
+	it('counts a duplicated id once', async () => {
+		const { deps, saveComment } = makeDeps({
+			comments: [commentRow({ id: 'c-1' })],
+		});
+
+		const result = await makeReviewPort(deps).resolveComments({
+			commentIds: ['c-1', 'c-1', 'c-1'],
+			workspaceId: 'ws',
+		});
+
+		expect(result.resolved).toBe(1);
+		expect(saveComment).toHaveBeenCalledTimes(1);
+	});
+
+	// Archived rows fall out of `listComments` entirely, so they read as missing.
+	// Pinned so nobody "improves" it into a fourth bucket that leaks their
+	// existence back to the agent.
+	it('reads an archived comment as not found', async () => {
+		const { deps } = makeDeps({ comments: [] });
+
+		const result = await makeReviewPort(deps).resolveComments({
+			commentIds: ['archived-1'],
+			workspaceId: 'ws',
+		});
+
+		expect(result.notFound).toEqual(['archived-1']);
 	});
 });

@@ -249,6 +249,13 @@ export const TOOL_DEFS: readonly McpToolDef[] = [
 		},
 	},
 	{
+		name: 'ensemblr_resolve_diff_comments',
+		op: 'resolveDiffComments',
+		description:
+			"Mark review comments on this workspace's diff as resolved, by the ids ensemblr_get_diff_comments and ensemblr_add_diff_comments hand back. Resolve a comment in the same turn you make the fix it asked for, and batch a whole review pass into one call. Resolve only what you actually fixed: a comment you deferred or disagree with stays open, and you say so in your reply. This only ever resolves — it cannot reopen a comment the user closed, and an id that matches no open comment here is reported back rather than failing the call.",
+		shape: { commentIds: z.array(z.string()) },
+	},
+	{
 		name: 'ensemblr_list_models',
 		op: 'listModels',
 		description:

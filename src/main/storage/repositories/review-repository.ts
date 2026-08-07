@@ -83,35 +83,55 @@ export function insertReviewComment({
 	return toCommentWire(row);
 }
 
-/** Updates body/status of an existing comment; returns the fresh row. */
+/**
+ * Updates body/status of an existing comment; returns the fresh row, or null
+ * when no comment with that id belongs to the workspace.
+ *
+ * `workspaceId` is required rather than optional because comment ids travel:
+ * `addDiffComments` returns them to an agent, and `readConversation` replays
+ * another conversation's tool results across workspace boundaries by design. An
+ * optional scope is one a caller forgets, and forgetting it here lets an agent
+ * in one workspace rewrite a comment in another.
+ */
 export function updateReviewComment({
 	body,
 	database,
 	id,
 	status,
+	workspaceId,
 }: {
 	body?: string;
 	database: DatabaseSync;
 	id: string;
 	status?: ReviewCommentStatus;
+	workspaceId: string;
 }): ReviewCommentWire | null {
 	const row = database
 		.prepare(
-			`UPDATE comments SET body = COALESCE(?, body), status = COALESCE(?, status), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? RETURNING ${COMMENT_COLUMNS}`,
+			`UPDATE comments SET body = COALESCE(?, body), status = COALESCE(?, status), updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ? AND workspace_id = ? RETURNING ${COMMENT_COLUMNS}`,
 		)
-		.get(body ?? null, status ?? null, id) as CommentRowShape | undefined;
+		.get(body ?? null, status ?? null, id, workspaceId) as
+		| CommentRowShape
+		| undefined;
 	return row ? toCommentWire(row) : null;
 }
 
-/** Deletes a local review comment. */
+/**
+ * Deletes a local review comment belonging to the given workspace. Scoped for
+ * the same reason as {@link updateReviewComment}.
+ */
 export function deleteReviewComment({
 	database,
 	id,
+	workspaceId,
 }: {
 	database: DatabaseSync;
 	id: string;
+	workspaceId: string;
 }): void {
-	database.prepare(`DELETE FROM comments WHERE id = ?`).run(id);
+	database
+		.prepare(`DELETE FROM comments WHERE id = ? AND workspace_id = ?`)
+		.run(id, workspaceId);
 }
 
 /** Lists workspace review todos ordered by position then creation. */

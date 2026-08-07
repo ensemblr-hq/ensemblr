@@ -7,7 +7,10 @@ import {
 	type SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
-import { DEFAULT_PERMISSION_MODE } from '../../shared/permissions.ts';
+import {
+	DEFAULT_PERMISSION_MODE,
+	type PermissionMode,
+} from '../../shared/permissions.ts';
 import {
 	type AgentAdapter,
 	type AgentAdapterCreateSessionInput,
@@ -29,7 +32,7 @@ import {
 	buildCanUseTool,
 	type ClaudeApprovalGate,
 	type ClaudeCanUseTool,
-	resolveInitialPermissionSettings,
+	resolvePermissionSettings,
 } from './claude-permission-bridge.ts';
 import {
 	type ClaudePlanSubmittedEvent,
@@ -162,6 +165,11 @@ function createClaudeSession({
 	let activeQuery: Query | null = null;
 	let appliedModel = input.request.modelOverride?.trim() || null;
 	let appliedThinking = input.request.thinkingLevel?.trim() || null;
+	const permissionMode =
+		input.request.permissionMode ?? DEFAULT_PERMISSION_MODE;
+	// Null means "the SDK moved the permission mode behind our back", which makes
+	// the next turn re-assert whichever way the toggle is pointing.
+	let appliedPlanMode: boolean | null = input.request.planMode === true;
 	let currentTurnId: string | null = null;
 	let pendingEvents: readonly AgentEvent[] = [];
 	let hasSubscribed = false;
@@ -228,17 +236,26 @@ function createClaudeSession({
 	/**
 	 * Emits one normalized event and reports it as a plan submission when it is
 	 * one, so plan mode sees the exit through the same stream as the timeline.
+	 *
+	 * The applied-mode reset runs whether or not anyone is listening for the
+	 * submission: it is this session's own bookkeeping, and tying it to an
+	 * optional callback would leave a listener-less adapter re-using a stale mode
+	 * across the very transition it exists to catch.
 	 * @param event - The normalized event to deliver.
 	 */
 	const forward = (event: AgentEvent): void => {
 		emit(event);
-		if (!onPlanSubmitted) {
+		const submission = detectPlanSubmission(event);
+		if (!submission) {
 			return;
 		}
-		const submission = detectPlanSubmission(event);
-		if (submission) {
-			onPlanSubmitted({ agentSessionId, controlToken, submission });
-		}
+		// The SDK leaves plan mode as it runs its own `ExitPlanMode`, without
+		// telling the adapter and without landing on the workspace's baseline.
+		// Forgetting the applied value is what makes the next turn re-assert:
+		// Refine has to restore `plan`, and Approve has to restore the baseline
+		// rather than accept whatever the SDK picked.
+		appliedPlanMode = null;
+		onPlanSubmitted?.({ agentSessionId, controlToken, submission });
 	};
 
 	/**
@@ -379,11 +396,16 @@ function createClaudeSession({
 			await applyTurnSelection({
 				activeQuery,
 				appliedModel,
+				appliedPlanMode,
 				appliedThinking,
+				permissionMode,
 				request,
 			});
 			appliedModel = request.modelOverride?.trim() || appliedModel;
 			appliedThinking = request.thinkingLevel?.trim() || appliedThinking;
+			if (request.planMode !== undefined && !request.streamingBehavior) {
+				appliedPlanMode = request.planMode;
+			}
 
 			if (!continuesTurn) {
 				currentTurnId = turnId;
@@ -422,21 +444,33 @@ function createClaudeSession({
 }
 
 /**
- * Applies a per-turn model or thinking change before the prompt is pushed.
- * Mirrors the Pi adapter's `set_model`/`set_thinking_level` behaviour: only a
- * genuine change round-trips, and a mid-turn steer skips the switch entirely
- * because the runtime is already committed to a turn.
- * @param input - The live query, what is already applied, and the submission.
+ * Applies a per-turn model, thinking, or Plan Mode change before the prompt is
+ * pushed. Mirrors the Pi adapter's `set_model`/`set_thinking_level` behaviour:
+ * only a genuine change round-trips, and a mid-turn steer skips the switch
+ * entirely because the runtime is already committed to a turn.
+ *
+ * Plan Mode is re-asserted here rather than only at session open because
+ * Claude's own `ExitPlanMode` tool drops the live session out of plan mode the
+ * moment a plan is submitted. Ensemblr never sees that transition, so a chat
+ * whose toggle is still on would otherwise keep planning in the UI while the
+ * runtime had already been released to edit.
+ * @param input - The live query, what is already applied, the workspace
+ *   permission mode to fall back to, and the submission.
  */
 async function applyTurnSelection({
 	activeQuery,
 	appliedModel,
+	appliedPlanMode,
 	appliedThinking,
+	permissionMode,
 	request,
 }: {
 	activeQuery: Query | null;
 	appliedModel: string | null;
+	/** Null once the SDK has moved the mode itself, forcing a re-assert. */
+	appliedPlanMode: boolean | null;
 	appliedThinking: string | null;
+	permissionMode: PermissionMode;
 	request: AgentSubmitRequest;
 }): Promise<void> {
 	if (!activeQuery || request.streamingBehavior) {
@@ -452,6 +486,15 @@ async function applyTurnSelection({
 	if (thinking && thinking !== appliedThinking) {
 		const effort = toClaudeEffortLevel(thinking);
 		await activeQuery.applyFlagSettings({ effortLevel: effort });
+	}
+
+	const planMode = request.planMode;
+	if (planMode !== undefined && planMode !== appliedPlanMode) {
+		const { permissionMode: resolved } = resolvePermissionSettings({
+			mode: permissionMode,
+			planMode,
+		});
+		await activeQuery.setPermissionMode(resolved);
 	}
 }
 
@@ -475,7 +518,7 @@ function buildQueryOptions({
 }): Options {
 	const { metadata, request } = input;
 	const mode = request.permissionMode ?? DEFAULT_PERMISSION_MODE;
-	const permission = resolveInitialPermissionSettings({
+	const permission = resolvePermissionSettings({
 		mode,
 		planMode: request.planMode === true,
 	});

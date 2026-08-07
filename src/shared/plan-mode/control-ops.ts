@@ -42,6 +42,10 @@ const PLAN_MODE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 		'writeTerminal',
 		'`ensemblr_write_terminal` runs arbitrary commands in a shell',
 	],
+	[
+		'resolveDiffComments',
+		'`ensemblr_resolve_diff_comments` marks a review finding as fixed, and nothing has been fixed while `write` and `edit` are blocked — a comment resolved from here tells the user a change landed that does not exist',
+	],
 ]);
 
 /**

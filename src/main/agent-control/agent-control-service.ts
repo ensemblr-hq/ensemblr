@@ -33,6 +33,7 @@ import type {
 	PendingAgent,
 	ReadConversationArgs,
 	ReadTerminalOutputArgs,
+	ResolveDiffCommentsArgs,
 	SendFollowUpArgs,
 	SetBranchNameArgs,
 	SetNameArgs,
@@ -1161,9 +1162,10 @@ export function createAgentControlService({
 		} satisfies AgentControlConversationStatus);
 	};
 
-	// getWorkspaceDiff / getDiffComments / addDiffComments take their workspace
-	// from the origin rather than from an argument, so a cross-workspace read or
-	// write is unreachable by construction and there is nothing left to gate.
+	// getWorkspaceDiff / getDiffComments / addDiffComments / resolveDiffComments
+	// take their workspace from the origin rather than from an argument, so a
+	// cross-workspace read or write is unreachable by construction and there is
+	// nothing left to gate.
 	const opHandlers: Record<AgentControlOp, OpHandler> = {
 		addDiffComments: ({ args, origin }) =>
 			ports.review
@@ -1241,6 +1243,13 @@ export function createAgentControlService({
 		readTerminalOutput: ({ args }) =>
 			ports.terminals
 				.readOutput((args as ReadTerminalOutputArgs).terminalId)
+				.then(ok),
+		resolveDiffComments: ({ args, origin }) =>
+			ports.review
+				.resolveComments({
+					commentIds: (args as ResolveDiffCommentsArgs).commentIds,
+					workspaceId: origin.workspaceId,
+				})
 				.then(ok),
 		sendFollowUp: ({ args, origin }) =>
 			handleSendFollowUp(origin, args as SendFollowUpArgs),

@@ -48,7 +48,10 @@ import type {
 } from '@/renderer/types/workbench';
 import type { WorkspaceGitFailure } from '@/shared/ipc/contracts/workspace-git';
 
-import { useCommentPreviewOpener } from '../conversation-panel/file-preview-context';
+import {
+	useCommentPreviewOpener,
+	useWorkspaceFileDiffOpener,
+} from '../conversation-panel/file-preview-context';
 import { useReviewActions } from '../review-actions/review-actions-context';
 import { ChecksEmptyMessage, ChecksNoPullRequestState } from './empty-states';
 import { PrDetailsForm } from './pr-details-form';
@@ -462,6 +465,7 @@ function CommentsSection({
 }) {
 	const insertIntoComposer = useComposerInsert();
 	const openCommentPreview = useCommentPreviewOpener();
+	const openWorkspaceFileDiff = useWorkspaceFileDiffOpener();
 
 	const [hidden, setHidden] = useState(() => ({
 		ids: new Set<string>(),
@@ -484,6 +488,15 @@ function CommentsSection({
 			workspaceId: current.workspaceId,
 		}));
 	};
+	// Working-tree scope, left implicit: that is where local comments were
+	// authored and where a GitHub thread's line is most likely still live.
+	const jumpToLine = (comment: PullRequestCommentSummary) => {
+		const { line, path } = comment;
+		if (!openWorkspaceFileDiff || !path || line === undefined) {
+			return undefined;
+		}
+		return () => openWorkspaceFileDiff(path, undefined, { revealLine: line });
+	};
 
 	return (
 		<section className='flex min-w-0 flex-col gap-1.5'>
@@ -504,6 +517,7 @@ function CommentsSection({
 						key={comment.id}
 						onAddToChat={() => addCommentToChat(comment)}
 						onHide={() => hideComment(comment.id)}
+						onJumpToLine={jumpToLine(comment)}
 						onOpenPreview={
 							openCommentPreview
 								? (options) =>

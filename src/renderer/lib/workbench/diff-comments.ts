@@ -1,10 +1,6 @@
-import {
-	findChangeByNewLineNumber,
-	findChangeByOldLineNumber,
-	getChangeKey,
-	type HunkData,
-} from 'react-diff-view';
+import type { HunkData } from 'react-diff-view';
 
+import { resolveChangeKey } from '@/renderer/lib/diff/parse';
 import type { DiffComment } from '@/renderer/types/diff';
 import type { GithubCommentWire } from '@/shared/ipc/contracts/github';
 import type { ReviewCommentWire } from '@/shared/ipc/contracts/review-comments';
@@ -14,33 +10,6 @@ import { stripCommentMetadata } from './comment-body';
 export interface GroupedDiffComments {
 	byChangeKey: Map<string, DiffComment[]>;
 	unanchored: DiffComment[];
-}
-
-/**
- * Resolve the change key for a comment anchored to a file line, preferring the
- * requested side and falling back to the other so a comment still lands on a
- * context line whose numbering matches.
- * @param hunks - The file's parsed hunks
- * @param lineNumber - The 1-based line the comment targets
- * @param side - Which side the line number refers to
- * @returns The change key, or null when no change matches that line
- */
-function resolveChangeKey(
-	hunks: readonly HunkData[],
-	lineNumber: number,
-	side: 'new' | 'old',
-): string | null {
-	const mutableHunks = hunks as HunkData[];
-	const primary =
-		side === 'new'
-			? findChangeByNewLineNumber(mutableHunks, lineNumber)
-			: findChangeByOldLineNumber(mutableHunks, lineNumber);
-	const change =
-		primary ??
-		(side === 'new'
-			? findChangeByOldLineNumber(mutableHunks, lineNumber)
-			: findChangeByNewLineNumber(mutableHunks, lineNumber));
-	return change ? getChangeKey(change) : null;
 }
 
 /**

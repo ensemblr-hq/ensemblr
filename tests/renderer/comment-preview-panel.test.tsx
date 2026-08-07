@@ -6,11 +6,12 @@
  * summary, and shows the diff anchor and thread replies alongside it.
  */
 
-import { screen } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 
 import { CommentPreviewPanel } from '../../src/renderer/components/workbench-shell/conversation-panel/comment-preview-panel';
+import { WorkspaceFileDiffOpenerProvider } from '../../src/renderer/components/workbench-shell/conversation-panel/file-preview-context';
 import type { CommentPreviewPayload } from '../../src/renderer/types/workbench';
 import { renderWithProviders } from './support/dom';
 
@@ -81,4 +82,40 @@ test('a body-less comment says so instead of rendering blank', () => {
 	renderPanel({ ...COMMENT, body: '', replies: undefined });
 
 	expect(screen.getByText('No description')).toBeInTheDocument();
+});
+
+test('the diff anchor jumps to the line when an opener is available', () => {
+	const openWorkspaceFileDiff = vi.fn();
+
+	renderWithProviders(
+		<Provider store={createStore()}>
+			<WorkspaceFileDiffOpenerProvider value={openWorkspaceFileDiff}>
+				<CommentPreviewPanel comment={COMMENT} />
+			</WorkspaceFileDiffOpenerProvider>
+		</Provider>,
+	);
+
+	fireEvent.click(
+		screen.getByRole('button', {
+			name: /src\/app\/\(site\)\/cryptography\/page\.tsx:57/,
+		}),
+	);
+
+	expect(openWorkspaceFileDiff).toHaveBeenCalledWith(
+		'src/app/(site)/cryptography/page.tsx',
+		undefined,
+		{ revealLine: 57 },
+	);
+});
+
+// Rendered outside a workspace there is no diff to open, so the anchor stays
+// inert text rather than a control that does nothing.
+test('the diff anchor is inert with no opener in context', () => {
+	renderPanel();
+
+	expect(
+		screen.queryByRole('button', {
+			name: /src\/app\/\(site\)\/cryptography\/page\.tsx:57/,
+		}),
+	).toBeNull();
 });

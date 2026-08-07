@@ -109,6 +109,7 @@ export {
 	repositoryConfigRequestSchema,
 } from './request-schemas/repository-config.ts';
 export {
+	reviewDeleteCommentRequestSchema,
 	reviewDeleteRequestSchema,
 	reviewListRequestSchema,
 	saveReviewCommentRequestSchema,

@@ -6,6 +6,7 @@ import {
 	parseSingleFileDiff,
 	reconstructOldSource,
 	reconstructSideSources,
+	resolveChangeKey,
 	splitCombinedPatch,
 } from '../../src/renderer/lib/diff/parse';
 
@@ -92,5 +93,34 @@ describe('line-number accessors', () => {
 		expect(insert && newLineNumberOf(insert)).toBe(2);
 		expect(del && newLineNumberOf(del)).toBeNull();
 		expect(del && oldLineNumberOf(del)).toBe(2);
+	});
+});
+
+const RESOLVE_PATCH = `diff --git a/f.ts b/f.ts
+index 111..222 100644
+--- a/f.ts
++++ b/f.ts
+@@ -1,3 +1,4 @@
+ export const x = 1;
++export const y = 2;
+ const z = x + 1;
+ console.log(z);
+`;
+
+describe('resolveChangeKey', () => {
+	const hunks = parseSingleFileDiff(RESOLVE_PATCH)?.hunks ?? [];
+
+	test('resolves an inserted line on the side it was asked for', () => {
+		expect(resolveChangeKey(hunks, 2, 'new')).toBe('I2');
+	});
+
+	// A comment filed against the new side can still name a line that only exists
+	// on the old one, so the lookup falls back rather than losing the anchor.
+	test('falls back to the other side when the requested one misses', () => {
+		expect(resolveChangeKey(hunks, 1, 'old')).not.toBeNull();
+	});
+
+	test('returns null for a line no hunk covers', () => {
+		expect(resolveChangeKey(hunks, 999, 'new')).toBeNull();
 	});
 });

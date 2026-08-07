@@ -73,6 +73,8 @@ export interface SaveReviewCommentResult {
 /** Request to delete a local review comment by id. */
 export interface DeleteReviewCommentRequest {
 	id: string;
+	/** Scopes the delete, so an id alone cannot reach another workspace's comment. */
+	workspaceId: string;
 }
 
 /** Result of deleting a local review comment. */

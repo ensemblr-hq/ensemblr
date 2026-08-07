@@ -300,7 +300,7 @@ function WorkspaceFileTree({
 
 	const listBody = (
 		<div
-			className='h-full overflow-y-auto p-2.5'
+			className='sleek-scrollbar h-full overflow-y-auto p-2.5'
 			onContextMenuCapture={handleContextCapture}
 			ref={scrollRef}
 		>

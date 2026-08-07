@@ -6,6 +6,7 @@ import { describe, expect, test } from 'vitest';
 
 import { DiffViewer } from '../../src/renderer/components/diff-viewer/diff-viewer';
 import { TooltipProvider } from '../../src/renderer/components/ui/tooltip';
+import type { DiffLineReveal } from '../../src/renderer/types/diff';
 import { installLocalStorage } from './support/dom';
 
 const RENAME_ONLY_PATCH = `diff --git a/old-name.ts b/new-name.ts
@@ -26,7 +27,11 @@ index 111..222 100644
 `;
 
 /** Render DiffViewer inside the providers its toolbar and tooltips need. */
-function renderViewer(props: { fillHeight?: boolean; patch: string }) {
+function renderViewer(props: {
+	fillHeight?: boolean;
+	patch: string;
+	reveal?: DiffLineReveal | null;
+}) {
 	installLocalStorage();
 	const store = createStore();
 	return render(
@@ -36,6 +41,7 @@ function renderViewer(props: { fillHeight?: boolean; patch: string }) {
 					fillHeight={props.fillHeight}
 					filePath='new-name.ts'
 					patch={props.patch}
+					reveal={props.reveal}
 				/>
 			</TooltipProvider>
 		</Provider>,
@@ -64,6 +70,17 @@ describe('diff viewer scroll containers', () => {
 		expect(scroller?.className).toContain('min-h-0');
 		expect(scroller?.className).toContain('flex-1');
 		expect(scroller?.querySelector('pre')).not.toBeNull();
+	});
+
+	// The reveal scroll needs a ref on the pane, and hanging one off a fresh
+	// wrapper is exactly the mistake this file exists to catch.
+	test('adds no second scroller when a line is being revealed', () => {
+		const { container } = renderViewer({
+			patch: HUNK_PATCH,
+			reveal: { line: 1, requestId: 1, side: 'new' },
+		});
+
+		expect(container.querySelectorAll('.overflow-auto').length).toBe(1);
 	});
 
 	test('keeps a single scroll container around a parsed hunk table', () => {

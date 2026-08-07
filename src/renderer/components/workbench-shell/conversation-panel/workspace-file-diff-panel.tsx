@@ -32,6 +32,10 @@ import {
 	useComposerInsertToChat,
 	useRequestComposerFocus,
 } from '@/renderer/state/composer';
+import {
+	useDiffLineReveal,
+	useSettleDiffLineReveal,
+} from '@/renderer/state/workspace';
 import type { ChatTabWire } from '@/shared/ipc/contracts/chat-tab';
 import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 
@@ -89,8 +93,10 @@ export function WorkspaceFileDiffPanel({
 	);
 	const resolvedPath =
 		diff.data && !diff.data.error ? diff.data.path : (filePath ?? '');
-	const { data: fileData } = useQuery({
-		enabled: newSideIsWorkingTree && Boolean(resolvedPath && workspaceCwd),
+	const fullFileEnabled =
+		newSideIsWorkingTree && Boolean(resolvedPath && workspaceCwd);
+	const fullFile = useQuery({
+		enabled: fullFileEnabled,
 		queryFn: () =>
 			readWorkspaceFile({
 				path: resolvedPath,
@@ -99,6 +105,7 @@ export function WorkspaceFileDiffPanel({
 		queryKey: ensemblrQueryKeys.filePreview(workspaceCwd ?? '', resolvedPath),
 		staleTime: 10_000,
 	});
+	const fileData = fullFile.data;
 
 	const { onViewedChange, viewed } = useFileViewedMark({
 		filePath: resolvedPath,
@@ -106,6 +113,8 @@ export function WorkspaceFileDiffPanel({
 		workspaceCwd,
 		workspaceId,
 	});
+	const reveal = useDiffLineReveal(resolvedPath, workspaceId);
+	const settleReveal = useSettleDiffLineReveal();
 
 	const invalidateComments = () =>
 		queryClient.invalidateQueries({
@@ -134,7 +143,7 @@ export function WorkspaceFileDiffPanel({
 		onSuccess: invalidateComments,
 	});
 	const deleteMutation = useMutation({
-		mutationFn: (id: string) => deleteReviewComment({ id }),
+		mutationFn: (id: string) => deleteReviewComment({ id, workspaceId }),
 		onError: notifyCommentFailed,
 		onSuccess: invalidateComments,
 	});
@@ -178,6 +187,7 @@ export function WorkspaceFileDiffPanel({
 			commentsByChangeKey={commentsByChangeKey}
 			filePath={resolvedPath}
 			fullFileContent={fullFileContent}
+			fullFileContentPending={fullFileEnabled && !fullFile.isFetched}
 			headerActions={
 				<>
 					{diff.data.isTruncated ? (
@@ -210,8 +220,10 @@ export function WorkspaceFileDiffPanel({
 					resolveMutation.mutate({ id: local, resolved });
 				}
 			}}
+			onRevealSettled={settleReveal}
 			onViewedChange={onViewedChange}
 			patch={patch}
+			reveal={reveal}
 			viewed={viewed}
 		/>
 	);

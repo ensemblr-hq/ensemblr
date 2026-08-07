@@ -139,6 +139,7 @@ export function registerAgentSessionHandlers({
 				}
 				const acknowledgement = await agentSessionService.submitPrompt({
 					model: request.model ?? null,
+					planMode: request.planMode,
 					prompt: request.prompt,
 					...(provider ? { provider } : {}),
 					sessionId: request.sessionId,

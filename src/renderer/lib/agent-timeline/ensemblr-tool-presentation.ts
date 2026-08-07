@@ -98,6 +98,11 @@ const ENSEMBLR_TOOL_LABELS: Record<string, EnsemblrToolLabel> = {
 		object: 'review comments',
 		verb: ['Left', 'Leaving'],
 	},
+	ensemblr_resolve_diff_comments: {
+		glyph: 'message-square-text',
+		object: 'review comments',
+		verb: ['Resolved', 'Resolving'],
+	},
 	ensemblr_get_conversation_status: {
 		glyph: 'bot',
 		object: 'a sub-agent',

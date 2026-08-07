@@ -23,6 +23,7 @@ import type {
 	OpenTabVariant,
 	ReadConversationArgs,
 	ReadConversationResult,
+	ResolveDiffCommentsResult,
 	SessionBriefNaming,
 	SetBranchNameResult,
 	SetSummaryResult,
@@ -327,6 +328,10 @@ export interface ReviewPort {
 		workspaceId: string;
 		comments: readonly AgentDiffComment[];
 	}) => Promise<AddDiffCommentsResult>;
+	resolveComments: (input: {
+		workspaceId: string;
+		commentIds: readonly string[];
+	}) => Promise<ResolveDiffCommentsResult>;
 }
 
 /**

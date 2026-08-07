@@ -131,6 +131,13 @@ const makePorts = (
 			commentIds: ['c-1'],
 			message: 'Filed 1 review comment(s).',
 		}),
+		resolveComments: vi.fn().mockResolvedValue({
+			alreadyResolved: [],
+			message: 'Resolved 1 review comment(s).',
+			notFound: [],
+			resolved: 1,
+			resolvedIds: ['c-1'],
+		}),
 	},
 	permissions: { getMode: () => overrides.mode ?? 'workspace-trusted' },
 	confirm: { confirm: vi.fn().mockResolvedValue(overrides.confirm ?? true) },
@@ -1259,6 +1266,83 @@ describe('agent-control service: review', () => {
 			}),
 		]);
 		expect(results.every((result) => result.ok)).toBe(true);
+	});
+
+	it('resolves comments against the caller’s own workspace', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'resolveDiffComments',
+			token: 'tok-caller',
+			rawArgs: { commentIds: ['c-1', 'c-2'] },
+		});
+		expect(result.ok).toBe(true);
+		expect(ports.review.resolveComments).toHaveBeenCalledWith({
+			commentIds: ['c-1', 'c-2'],
+			workspaceId: 'ws',
+		});
+	});
+
+	// The strict schema is what makes the workspace unspoofable. This is the
+	// assertion that would have caught the unscoped UPDATE the repository used to
+	// run: even a caller that names another workspace never reaches the port.
+	it('refuses a resolve that tries to name its own workspace', async () => {
+		const ports = makePorts();
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'resolveDiffComments',
+			token: 'tok-caller',
+			rawArgs: { commentIds: ['c-1'], workspaceId: 'ws-other' },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('invalid-args');
+		}
+		expect(ports.review.resolveComments).not.toHaveBeenCalled();
+	});
+
+	it('blocks the resolve in read-only mode', async () => {
+		const ports = makePorts({ mode: 'read-only' });
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'resolveDiffComments',
+			token: 'tok-caller',
+			rawArgs: { commentIds: ['c-1'] },
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) {
+			expect(result.code).toBe('denied-permission');
+		}
+		expect(ports.review.resolveComments).not.toHaveBeenCalled();
+	});
+
+	// An implementer child fixing review comments is the most likely caller of
+	// this op in the whole app, so the sub-agent role must keep it.
+	it('leaves the resolve available to a spawned sub-agent', async () => {
+		const ports = makePorts({ spawnedSubAgent: true });
+		const { service } = setup({ ports });
+		const result = await service.invoke({
+			op: 'resolveDiffComments',
+			token: 'tok-caller',
+			rawArgs: { commentIds: ['c-1'] },
+		});
+		expect(result.ok).toBe(true);
+	});
+
+	// Resolving asserts "this is fixed", and `write`/`edit` are blocked while
+	// planning — so every resolve from Plan Mode is a false claim by construction.
+	it('refuses the resolve while planning, for either role', async () => {
+		for (const spawnedSubAgent of [false, true]) {
+			const ports = makePorts({ planning: true, spawnedSubAgent });
+			const { service } = setup({ ports });
+			const result = await service.invoke({
+				op: 'resolveDiffComments',
+				token: 'tok-caller',
+				rawArgs: { commentIds: ['c-1'] },
+			});
+			expect(result.ok).toBe(false);
+			expect(ports.review.resolveComments).not.toHaveBeenCalled();
+		}
 	});
 
 	it('reports a git failure as an internal error rather than an empty diff', async () => {

@@ -1,7 +1,14 @@
 import { useAtomValue } from 'jotai';
 import { PlusIcon } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import {
 	type ChangeData,
 	Decoration,
@@ -27,6 +34,7 @@ import {
 	oldLineNumberOf,
 	parseSingleFileDiff,
 	reconstructOldSource,
+	resolveChangeKey,
 } from '@/renderer/lib/diff/parse';
 import { languageForFilePath } from '@/renderer/lib/language-from-path';
 import { cn } from '@/renderer/lib/utils';
@@ -35,7 +43,11 @@ import {
 	diffShowWhitespaceAtom,
 	diffWordWrapAtom,
 } from '@/renderer/state/preferences';
-import type { DiffComment, DiffViewMode } from '@/renderer/types/diff';
+import type {
+	DiffComment,
+	DiffLineReveal,
+	DiffViewMode,
+} from '@/renderer/types/diff';
 import { DiffCommentThread } from './diff-comment-thread';
 import { DiffToolbar } from './diff-toolbar';
 import { renderDiffToken, useDiffTokens } from './shiki-tokenize';
@@ -61,13 +73,16 @@ export function DiffViewer({
 	fillHeight = true,
 	filePath,
 	fullFileContent,
+	fullFileContentPending = false,
 	headerActions,
 	language,
 	onAddComment,
 	onDeleteComment,
 	onResolveComment,
+	onRevealSettled,
 	onViewedChange,
 	patch,
+	reveal,
 	viewed,
 }: {
 	commentsByChangeKey?: ReadonlyMap<string, readonly DiffComment[]>;
@@ -76,15 +91,25 @@ export function DiffViewer({
 	filePath: string;
 	/** Current full file content, enabling the diff ↔ full-file toggle when set. */
 	fullFileContent?: string | null;
+	/**
+	 * Whether `fullFileContent` is still on its way. Separates "no source yet"
+	 * from "no source at all", which a `null` cannot say on its own and which a
+	 * pending reveal has to know before it gives up on reaching a line.
+	 */
+	fullFileContentPending?: boolean;
 	headerActions?: ReactNode;
 	language?: BundledLanguage;
 	/** When set, enables click-a-line commenting; omit for a read-only diff. */
 	onAddComment?: (input: AddCommentInput) => void;
 	onDeleteComment?: (id: string) => void;
 	onResolveComment?: (id: string, resolved: boolean) => void;
+	/** Reports a `reveal` as served or unreachable, so its owner can drop it. */
+	onRevealSettled?: (requestId: number) => void;
 	/** When set, the toolbar offers a Viewed marker; omit where nothing tracks it. */
 	onViewedChange?: (viewed: boolean) => void;
 	patch: string;
+	/** When set, scrolls to and flashes the requested line once per `requestId`. */
+	reveal?: DiffLineReveal | null;
 	viewed?: boolean;
 }) {
 	const [viewMode, setViewMode] = useFileScopedState<DiffViewMode>(
@@ -135,6 +160,16 @@ export function DiffViewer({
 		onResolveComment,
 	});
 
+	const revealed = useLineReveal({
+		canShowFile,
+		displayHunks,
+		fullFileContentPending,
+		onRevealSettled,
+		reveal,
+		setViewMode,
+		viewMode,
+	});
+
 	if (!file || baseHunks.length === 0) {
 		return (
 			<DiffViewerFrame
@@ -175,11 +210,110 @@ export function DiffViewer({
 				language={resolvedLanguage}
 				layout={layout}
 				onRequestComment={openComposer}
+				revealed={revealed}
 				widgets={widgets}
 				wordWrap={wordWrap}
 			/>
 		</DiffViewerFrame>
 	);
+}
+
+/** How long a revealed line stays flashed before the highlight is dropped. */
+const REVEAL_FLASH_MS = 1_600;
+
+/** A resolved reveal: the row to scroll to, tagged with the request that asked. */
+interface RevealedRow {
+	changeKey: string;
+	requestId: number;
+}
+
+/**
+ * Resolve a pending reveal to the change key of the row it lands on, escalating
+ * to full-file view once when the line falls outside the rendered hunks.
+ *
+ * Every input that can change the rendered row set is a dependency, so React
+ * re-runs this exactly when a retry could succeed — there is nothing to poll
+ * for. Two refs keyed on `requestId` bound the work: at most one escalation and
+ * one give-up per request, so a line that is nowhere in the file cannot loop.
+ * The `requestId` rides along with the key rather than being dropped once the
+ * key is known: a repeat jump to the same line resolves to the same key, and a
+ * consumer watching the key alone would see no change and never scroll again.
+ *
+ * Settling is reported to the caller as well as recorded here, because the refs
+ * are mount-scoped: without the report the request outlives the panel and the
+ * next mount of the same file replays the jump.
+ * @param input - The pending reveal, the rendered hunks, and the view-mode seam
+ * @returns The row to scroll to and flash, or null
+ */
+function useLineReveal({
+	canShowFile,
+	displayHunks,
+	fullFileContentPending,
+	onRevealSettled,
+	reveal,
+	setViewMode,
+	viewMode,
+}: {
+	canShowFile: boolean;
+	displayHunks: readonly HunkData[];
+	fullFileContentPending: boolean;
+	onRevealSettled?: (requestId: number) => void;
+	reveal?: DiffLineReveal | null;
+	setViewMode: (mode: DiffViewMode) => void;
+	viewMode: DiffViewMode;
+}): RevealedRow | null {
+	const [revealed, setRevealed] = useState<RevealedRow | null>(null);
+	const escalatedForRef = useRef<number | null>(null);
+	const settledForRef = useRef<number | null>(null);
+
+	useEffect(() => {
+		if (!reveal || settledForRef.current === reveal.requestId) {
+			return;
+		}
+		const settle = () => {
+			settledForRef.current = reveal.requestId;
+			onRevealSettled?.(reveal.requestId);
+		};
+		const changeKey = resolveChangeKey(displayHunks, reveal.line, reveal.side);
+		if (changeKey) {
+			settle();
+			setRevealed({ changeKey, requestId: reveal.requestId });
+			return;
+		}
+		if (viewMode === 'diff' && escalatedForRef.current !== reveal.requestId) {
+			// A comment can sit on a line the diff never touched, and only the whole
+			// file can place it. That source loads on its own query, which cannot
+			// even start until the diff's has resolved — so giving up before it
+			// arrives would make this escalation unreachable in the app.
+			if (fullFileContentPending) {
+				return;
+			}
+			if (canShowFile) {
+				escalatedForRef.current = reveal.requestId;
+				setViewMode('file');
+				return;
+			}
+		}
+		settle();
+	}, [
+		canShowFile,
+		displayHunks,
+		fullFileContentPending,
+		onRevealSettled,
+		reveal,
+		setViewMode,
+		viewMode,
+	]);
+
+	useEffect(() => {
+		if (!revealed) {
+			return;
+		}
+		const timer = setTimeout(() => setRevealed(null), REVEAL_FLASH_MS);
+		return () => clearTimeout(timer);
+	}, [revealed]);
+
+	return revealed;
 }
 
 /**
@@ -278,6 +412,9 @@ function hunkGapLabel(previous: HunkData, next: HunkData): string {
 /** Stable empty comment map so an omitted `commentsByChangeKey` keeps a fixed identity. */
 const EMPTY_COMMENTS: ReadonlyMap<string, readonly DiffComment[]> = new Map();
 
+/** Stable empty selection so an idle viewer keeps a fixed `selectedChanges` identity. */
+const EMPTY_SELECTION: string[] = [];
+
 /**
  * Highest line number either side of a diff reaches, which sizes the gutter to
  * its content so it grows only when line numbers do.
@@ -310,6 +447,7 @@ function DiffBody({
 	language,
 	layout,
 	onRequestComment,
+	revealed,
 	widgets,
 	wordWrap,
 }: {
@@ -319,9 +457,12 @@ function DiffBody({
 	language: BundledLanguage;
 	layout: 'split' | 'unified';
 	onRequestComment: (change: ChangeData | null) => void;
+	/** The row to scroll to and flash, or null. */
+	revealed: RevealedRow | null;
 	widgets: Record<string, ReactNode>;
 	wordWrap: boolean;
 }) {
+	const paneRef = useRef<HTMLDivElement>(null);
 	const showWhitespace = useAtomValue(diffShowWhitespaceAtom);
 	const tokens = useDiffTokens(hunks, language, showWhitespace);
 	// The gutter column is border-box, so it carries the shared 1ch of padding on
@@ -376,6 +517,29 @@ function DiffBody({
 	);
 	const renderGutter = commentingEnabled ? renderAddCommentGutter : undefined;
 
+	// react-diff-view stamps `data-change-key` on every gutter and code cell, so
+	// the row is addressable without a render hook of our own. Scoped to the pane
+	// because a page can mount several viewers and a change key carries no file.
+	// Instant rather than smooth: comment widgets resolve from their own queries
+	// and can push rows down after the first paint, which a running animation
+	// would fight; centring absorbs that drift instead.
+	useLayoutEffect(() => {
+		if (!revealed) {
+			return;
+		}
+		paneRef.current
+			?.querySelector(`[data-change-key="${revealed.changeKey}"]`)
+			?.closest('tr')
+			?.scrollIntoView({ block: 'center' });
+		// Keyed on the request, not the change key: jumping twice to the same line
+		// resolves to the same key, and watching the key alone would scroll once.
+	}, [revealed]);
+
+	const selectedChanges = useMemo(
+		() => (revealed ? [revealed.changeKey] : EMPTY_SELECTION),
+		[revealed],
+	);
+
 	return (
 		<div
 			className={cn(
@@ -383,6 +547,7 @@ function DiffBody({
 				CODE_SURFACE_CLASSES,
 				CODE_PANEL_TEXT_CLASSES,
 			)}
+			ref={paneRef}
 			style={{ '--ensemblr-gutter-ch': `${gutterWidthCh}ch` } as CSSProperties}
 		>
 			<Diff
@@ -394,6 +559,7 @@ function DiffBody({
 				optimizeSelection
 				renderGutter={renderGutter}
 				renderToken={renderDiffToken}
+				selectedChanges={selectedChanges}
 				tokens={tokens}
 				viewType={layout}
 				widgets={widgets}

@@ -108,6 +108,7 @@ a permission denial stays visible.
 | Move / read the workspace board | `ensemblr_set_workspace_status`, `ensemblr_get_workspace_status` |
 | Read the workspace diff | `ensemblr_get_workspace_diff` — call it with `stat: true` first, then read the whole diff or one `filePath` at a time |
 | Read / leave review comments | `ensemblr_get_diff_comments`, `ensemblr_add_diff_comments` (Ensemblr-local comments only; GitHub PR threads are not included) |
+| Close a comment you fixed | `ensemblr_resolve_diff_comments` — resolve in the same turn as the fix; resolve only what you actually fixed and say in your reply what you left open |
 | Pick a model for a child | `ensemblr_list_models` |
 | Surface work to the user | `ensemblr_focus_tab`, `ensemblr_focus_dock_tab`, `ensemblr_focus_panel` |
 | Tidy up | `ensemblr_close_tab` |

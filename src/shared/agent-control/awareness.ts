@@ -96,7 +96,31 @@ Keeping your own tab legible is your job, not the user's, and it is bookkeeping 
  * ceiling, and the cheap probe is what stands between a model and thousands of
  * characters of patch it did not need.
  */
-const REVIEW_INVENTORY = `- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.`;
+const REVIEW_INVENTORY_READS = `- Review: read this workspace's diff (\`ensemblr_get_workspace_diff\`) — call it with \`stat: true\` FIRST to see which files changed and how large the diff is, then read the whole thing, or one file at a time with \`filePath\`; read the review comments already on it (\`ensemblr_get_diff_comments\`); leave your own against a file and line (\`ensemblr_add_diff_comments\`), which the user reads in the Changes panel.`;
+
+/**
+ * The full review bullet, for every role outside Plan Mode. Plan Mode gets
+ * {@link REVIEW_INVENTORY_READS} instead, because `resolveDiffComments` is
+ * refused while planning and naming a tool it cannot call would only send it
+ * hunting for a refusal.
+ */
+const REVIEW_INVENTORY = `${REVIEW_INVENTORY_READS} Once you have fixed what a comment asked for, mark it resolved (\`ensemblr_resolve_diff_comments\`).`;
+
+/**
+ * The follow-through rule for an agent implementing against a review. Held in
+ * one place because the failure it prevents is identical for all three roles: a
+ * queue of comments the agent already addressed but never closed, which the user
+ * has to re-read line by line to find the two that are still open. The guardrail
+ * is the other half — an agent that resolves everything to clear the panel
+ * destroys the distinction the panel exists to carry, and does it invisibly.
+ *
+ * An inventory bullet is a tool list, and an obligation buried in one gets
+ * skimmed, so this states the behaviour separately from
+ * {@link REVIEW_INVENTORY} naming the tool.
+ */
+const REVIEW_FOLLOW_THROUGH = `Close the loop on a review you acted on. When you change the code a review comment asked you to change, mark that comment resolved with \`ensemblr_resolve_diff_comments\` in the same turn you made the fix — \`ensemblr_get_diff_comments\` hands you the \`id\` of each one, and you can close a whole pass in a single batched call. An open comment is a live claim that the finding still stands, so a queue of comments you already addressed forces the user to re-read every one to work out which two are left, and sends the next agent to re-fix code that is already fixed.
+
+Resolve only what you actually fixed. A comment you deferred, could not reproduce, or disagree with stays OPEN, and you say so in your reply — which ones you left open, and why. Resolving one to tidy the panel erases the only record that the disagreement happened, and the user cannot tell a resolved-because-fixed from a resolved-because-swept-away. Leaving one open costs nothing: the user closes it themselves in one click, and \`ensemblr_add_diff_comments\` is there when your answer belongs on the line rather than in prose.`;
 
 /** Everything a root may drive: the whole control surface. */
 const ORCHESTRATOR_INVENTORY = `- Conversations: open a chat tab and start a Pi sub-agent (\`ensemblr_start_conversation\`), steer one (\`ensemblr_send_follow_up\`), name your own tab (\`ensemblr_set_name\`), close a tab (\`ensemblr_close_tab\`).
@@ -135,7 +159,9 @@ What you can drive:
 ${inventory}
 ${legibility}
 
-Write every file path you mention in prose as its full path from the workspace root, in backticks — \`src/renderer/components/message.tsx\`, never a bare \`message.tsx\` or a trailing fragment like \`components/message.tsx\`. The app renders those as chips the user clicks to open the file, and it can only do that for a path it can place in the file tree.`;
+Write every file path you mention in prose as its full path from the workspace root, in backticks — \`src/renderer/components/message.tsx\`, never a bare \`message.tsx\` or a trailing fragment like \`components/message.tsx\`. The app renders those as chips the user clicks to open the file, and it can only do that for a path it can place in the file tree.
+
+${REVIEW_FOLLOW_THROUGH}`;
 
 /**
  * The closing etiquette bullets, held in one place so a change to scope, cleanup,
@@ -259,6 +285,8 @@ ${REVIEW_INVENTORY}
 
 Your tab names itself from your own session log, so you have no tab-naming tool and nothing to do about the title. Naming a tab, recording a session summary, putting a structured question to the user, and Plan Mode are native Pi-chat features — they are absent from your tool list by design, so do not go hunting for them.
 
+${REVIEW_FOLLOW_THROUGH}
+
 Do the work yourself by default — one agent in one thread is the right tool for almost every task. Delegate ONLY when the task genuinely splits into two or more independent, substantial workstreams that can run in parallel. Never spawn a helper for a single unit of work you could do in one pass. Do not tell the user to click; drive the app yourself.
 
 Split the work before you split the agents. A child cold-starts with nothing but its brief, so every fact two children both need is a repository read paid for twice — and that re-derivation is what makes a fan-out cost more context than doing the work inline. When the workstreams share a foundation — the same files, the same inventory, the same shape of the code — establish it once yourself, or with one scout child, and put the findings with full paths into every brief. Fan out cold only where the work is genuinely disjoint.
@@ -293,7 +321,7 @@ const PLAN_MODE_READ_BULLET = `- Read the repository: the \`read\` tool, and \`b
  * and the board available. Without it a planning agent reads a write op on its
  * allowed list as a contradiction and leaves it alone.
  */
-const PLAN_MODE_REVIEW = `${REVIEW_INVENTORY} All three stay available while planning — annotating a diff is planning output, not a change to the repository.`;
+const PLAN_MODE_REVIEW = `${REVIEW_INVENTORY_READS} All three stay available while planning — annotating a diff is planning output, not a change to the repository. Resolving one is not: \`ensemblr_resolve_diff_comments\` says a finding is fixed, and you have fixed nothing while planning, so it is refused here.`;
 
 /**
  * The inspect and board bullets. Naming stays available on purpose: it labels
@@ -364,7 +392,7 @@ ${PLAN_MODE_READ_BULLET}
 - Delegate reading: spawn a sub-agent to answer a question for you (\`ensemblr_start_conversation\`), block until your children settle (\`ensemblr_wait_for_agents\`), steer one (\`ensemblr_send_follow_up\`), read its report (\`ensemblr_get_last_message\`), close its tab (\`ensemblr_close_tab\`). See the fan-out section below.
 ${planModeInspectBullets(PLAN_MODE_ORCHESTRATOR_LEGIBILITY, PLAN_MODE_ORCHESTRATOR_BOARD)}
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, and \`ensemblr_write_terminal\` — anything that could change the repository or open a shell the read-only rules cannot reach. \`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. ${PLAN_MODE_ENFORCEMENT_TAIL}
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`, and \`ensemblr_resolve_diff_comments\` — anything that could change the repository, open a shell the read-only rules cannot reach, or claim a fix you have not made. \`ensemblr_send_follow_up\` reaches only a conversation that is itself planning, so it steers the investigators you spawned and is refused anywhere else. ${PLAN_MODE_ENFORCEMENT_TAIL}
 
 ${PLAN_MODE_UPKEEP_CLAUSE}
 
@@ -418,7 +446,7 @@ ${planModeInspectBullets(PLAN_MODE_SUBAGENT_LEGIBILITY, PLAN_MODE_SUBAGENT_BOARD
 
 You do not talk to the user. The orchestrator that spawned you owns that conversation and is blocked waiting on your report, so \`ensemblr_ask_user_question\` is refused here — send \`ensemblr_notify_orchestrator\` with reason \`need_decision\` instead and it will answer you.
 
-The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, and \`ensemblr_close_tab\` are refused here too. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. ${PLAN_MODE_ENFORCEMENT_TAIL}
+The rest is blocked while you plan: \`write\` and \`edit\`, any \`bash\` command that is not read-only, \`ensemblr_resolve_diff_comments\` (it claims a fix you have not made), and every tool that would hand the work to something else — \`ensemblr_start_conversation\`, \`ensemblr_send_follow_up\`, \`ensemblr_launch_harness\`, \`ensemblr_start_terminal\`, \`ensemblr_write_terminal\`. Being a spawned sub-agent blocks more, whatever the mode: the workspace's tabs and terminals outlive the question you were handed, so \`ensemblr_stop_terminal\`, \`ensemblr_open_tab\`, and \`ensemblr_close_tab\` are refused here too. \`ensemblr_exit_plan_mode\` is not yours to call either: submitting the plan belongs to the orchestrator, and a plan posted from here would put a review panel in a tab nobody is watching. ${PLAN_MODE_ENFORCEMENT_TAIL}
 
 ${PLAN_MODE_UPKEEP_CLAUSE}
 

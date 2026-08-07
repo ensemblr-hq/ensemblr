@@ -1,6 +1,9 @@
 import {
 	type ChangeData,
 	type FileData,
+	findChangeByNewLineNumber,
+	findChangeByOldLineNumber,
+	getChangeKey,
 	type HunkData,
 	isDelete,
 	isInsert,
@@ -198,4 +201,32 @@ export function newLineNumberOf(change: ChangeData): number | null {
 		return change.lineNumber;
 	}
 	return null;
+}
+
+/**
+ * Resolve the change key for a file line, preferring the requested side and
+ * falling back to the other so a line still lands on a context row whose
+ * numbering matches. The key is react-diff-view's own row identity, which is
+ * what both the inline comment widgets and the reveal scroll address rows by.
+ * @param hunks - The file's parsed hunks
+ * @param lineNumber - The 1-based line to resolve
+ * @param side - Which side the line number refers to
+ * @returns The change key, or null when no change matches that line
+ */
+export function resolveChangeKey(
+	hunks: readonly HunkData[],
+	lineNumber: number,
+	side: 'new' | 'old',
+): string | null {
+	const mutableHunks = hunks as HunkData[];
+	const primary =
+		side === 'new'
+			? findChangeByNewLineNumber(mutableHunks, lineNumber)
+			: findChangeByOldLineNumber(mutableHunks, lineNumber);
+	const change =
+		primary ??
+		(side === 'new'
+			? findChangeByOldLineNumber(mutableHunks, lineNumber)
+			: findChangeByNewLineNumber(mutableHunks, lineNumber));
+	return change ? getChangeKey(change) : null;
 }

@@ -11,8 +11,18 @@ export const reviewListRequestSchema = z.object({
 	workspaceId: z.string().min(1),
 });
 
-/** {@link import('../../../shared/ipc').DeleteReviewCommentRequest} and {@link import('../../../shared/ipc').DeleteReviewTodoRequest}. */
+/** {@link import('../../../shared/ipc').DeleteReviewTodoRequest}. */
 export const reviewDeleteRequestSchema = z.object({ id: z.string().min(1) });
+
+/**
+ * {@link import('../../../shared/ipc').DeleteReviewCommentRequest}. Kept apart
+ * from the todo schema because only comments carry the workspace scope the
+ * repository needs to stop an id reaching another workspace's row.
+ */
+export const reviewDeleteCommentRequestSchema = z.object({
+	id: z.string().min(1),
+	workspaceId: z.string().min(1),
+});
 
 /** {@link import('../../../shared/ipc').SaveReviewCommentRequest}. */
 export const saveReviewCommentRequestSchema = z.object({
