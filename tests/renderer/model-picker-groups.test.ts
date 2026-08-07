@@ -2,9 +2,14 @@ import { describe, expect, test } from 'vitest';
 
 import { buildModelGroups } from '../../src/renderer/lib/workbench/model-picker-groups';
 import type { ComposerModelOption } from '../../src/renderer/types/workbench';
+import type { AgentProviderId } from '../../src/shared/agent-provider';
 
-function model(id: string, provider: string): ComposerModelOption {
-	return { displayName: id, id, isDefault: false, provider };
+function model(
+	id: string,
+	provider: string,
+	agentProvider: AgentProviderId = 'pi',
+): ComposerModelOption {
+	return { agentProvider, displayName: id, id, isDefault: false, provider };
 }
 
 const OPTIONS: readonly ComposerModelOption[] = [
@@ -21,18 +26,20 @@ describe('buildModelGroups', () => {
 		]);
 
 		expect(groups[0]?.providerLabel).toBe('Favourites');
-		expect(groups[0]?.models.map((m) => m.id)).toEqual([
+		expect(groups[0]?.models.map((r) => r.model.id)).toEqual([
 			'google/gemini',
 			'anthropic/haiku',
 		]);
 		// Remaining provider groups exclude the favourited ids.
-		const rest = groups.slice(1).flatMap((g) => g.models.map((m) => m.id));
+		const rest = groups
+			.slice(1)
+			.flatMap((g) => g.models.map((r) => r.model.id));
 		expect(rest).toEqual(['anthropic/sonnet']);
 	});
 
 	test('favourites take the leading shortcut slots (flattened order)', () => {
 		const groups = buildModelGroups(OPTIONS, ['google/gemini']);
-		const ordered = groups.flatMap((g) => g.models.map((m) => m.id));
+		const ordered = groups.flatMap((g) => g.models.map((r) => r.model.id));
 		expect(ordered[0]).toBe('google/gemini');
 	});
 
@@ -50,7 +57,7 @@ describe('buildModelGroups', () => {
 
 	test('removes hidden ids from provider groups', () => {
 		const groups = buildModelGroups(OPTIONS, [], ['anthropic/haiku']);
-		const ids = groups.flatMap((g) => g.models.map((m) => m.id));
+		const ids = groups.flatMap((g) => g.models.map((r) => r.model.id));
 		expect(ids).toEqual(['anthropic/sonnet', 'google/gemini']);
 	});
 
@@ -60,7 +67,7 @@ describe('buildModelGroups', () => {
 			['anthropic/haiku'],
 			['anthropic/haiku'],
 		);
-		const ids = groups.flatMap((g) => g.models.map((m) => m.id));
+		const ids = groups.flatMap((g) => g.models.map((r) => r.model.id));
 		expect(ids).not.toContain('anthropic/haiku');
 		expect(groups.some((g) => g.providerLabel === 'Favourites')).toBe(false);
 	});

@@ -9,8 +9,8 @@ import {
 } from '@/shared/prompt-scaffolding';
 
 /**
- * Upper bound on inlined attachment content sent to Pi. Long `.context`
- * transcripts otherwise dominate the prompt and Pi tends to parrot the
+ * Upper bound on inlined attachment content sent to the agent. Long `.context`
+ * transcripts otherwise dominate the prompt and the agent tends to parrot the
  * content verbatim in its reply. Caller-side truncation keeps the prompt
  * focused while leaving a visible marker so the model knows context was
  * elided.
@@ -21,7 +21,7 @@ const ATTACHED_FILE_TAIL_CHARS = 5_000;
 /**
  * Extensions whose content is inlined verbatim in the prompt. Everything else
  * (images, pdf, office docs, archives, unknown binaries) is announced by path
- * with a placeholder so Pi inspects the saved file directly instead of the
+ * with a placeholder so the agent inspects the saved file directly instead of the
  * prompt being flooded with — or corrupted by — binary bytes.
  */
 const TEXT_INLINE_EXTENSIONS = new Set([
@@ -93,12 +93,12 @@ function truncateAttachmentContent(content: string): string {
 
 /**
  * Formats the selected @ mentions (workspace files + directories) into the
- * text payload that gets appended to the user's prompt when sent to Pi.
+ * text payload that gets appended to the user's prompt when sent to the agent.
  *
  * Reads text file mentions via IPC and inlines their content in a fenced
- * `<attached_file>` block. Image mentions use a placeholder so Pi sees the
+ * `<attached_file>` block. Image mentions use a placeholder so the agent sees the
  * saved workspace path without flooding the prompt with binary bytes.
- * Directories are surfaced as a separate header so Pi knows the user referenced
+ * Directories are surfaced as a separate header so the agent knows the user referenced
  * them without expecting inline content.
  *
  * Throws when a file read fails, so the caller can surface the error to the
@@ -168,7 +168,7 @@ function shouldInlineAsText(pathValue: string): boolean {
 
 /**
  * Formats large files referenced by absolute path (not copied into the
- * workspace) as a path-only section, so Pi opens each file directly rather than
+ * workspace) as a path-only section, so the agent opens each file directly rather than
  * receiving its bytes.
  */
 export function formatExternalAttachmentText(
@@ -189,7 +189,7 @@ export function formatExternalAttachmentText(
 
 /**
  * Reads each uploaded file as text and wraps it in the shared `<attached_file>`
- * envelope so Pi receives uploads alongside @ mentions. Falls back to a
+ * envelope so the agent receives uploads alongside @ mentions. Falls back to a
  * `[binary]` placeholder if a file cannot be decoded as text.
  */
 export async function formatUploadAttachmentText(

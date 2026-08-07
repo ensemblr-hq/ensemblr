@@ -15,7 +15,7 @@ import {
 	useDebugPanelToggle,
 	useRawFrames,
 } from '@/renderer/state/pi';
-import type { PiRawFrameKind } from '@/shared/ipc/contracts/pi-session';
+import type { PiRawFrameKind } from '@/shared/ipc/contracts/agent-session';
 
 /**
  * Temporary debug overlay that streams the raw JSONL frames Pi sends to/from

@@ -6,7 +6,7 @@ import type { ClosedChatTabEntryWire } from '@/shared/ipc/contracts/chat-tab';
 
 /**
  * Empty-state shown above the composer when a workspace has prior chats /
- * transcripts in `.context/` but no active Pi session in the current tab.
+ * transcripts in `.context/` but no active agent session in the current tab.
  * Lists each transcript as a chip the user can attach to the new chat.
  */
 export function NewChatEmptyState({

@@ -29,6 +29,30 @@ function metadataText(value: unknown): string | undefined {
 	return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
+/**
+ * Metadata key that held the native harness CLI session id before it was
+ * renamed to `harnessSessionId`. Read-only compatibility for pre-upgrade rows.
+ */
+const LEGACY_HARNESS_SESSION_ID_KEY = 'agentSessionId';
+
+/**
+ * Reads the native harness CLI session id off a restored tab's wire metadata.
+ * Rows persisted before the metadata key was renamed store it under
+ * `agentSessionId` — a name that now belongs to the tab's Ensemblr session FK —
+ * so that key is read for backwards compatibility but never written back,
+ * keeping a precise `--resume` instead of degrading to a cwd `--continue`.
+ * @param metadata - The restored tab's wire metadata record.
+ * @returns The harness session id, or undefined when the tab captured none.
+ */
+export function readHarnessSessionId(
+	metadata: Record<string, unknown>,
+): string | undefined {
+	return (
+		metadataText(metadata.harnessSessionId) ??
+		metadataText(metadata[LEGACY_HARNESS_SESSION_ID_KEY])
+	);
+}
+
 /** A terminal (harness) session tab, narrowed from the `SessionTabModel` union. */
 type TerminalSessionTab = Extract<SessionTabModel, { kind: 'terminal' }>;
 
@@ -46,32 +70,33 @@ export function isLiveTerminalTab(
 }
 
 /**
- * Finds an open terminal tab already attached to the given native session id, so
- * a restore focuses it instead of spawning a second PTY against one shared log.
+ * Finds an open terminal tab already attached to the given native harness session
+ * id, so a restore focuses it instead of spawning a second PTY against one shared
+ * log.
  * @param sessionTabs - The currently open tabs.
- * @param agentSessionId - The native session id to match, or undefined to skip.
+ * @param harnessSessionId - The harness CLI session id to match, or undefined to skip.
  * @param excludeId - The restored tab's id to exclude from the match.
  * @returns The matching open tab, or undefined when none is open.
  */
 function findOpenConversation(
 	sessionTabs: SessionTabModel[],
-	agentSessionId: string | undefined,
+	harnessSessionId: string | undefined,
 	excludeId: string,
 ): SessionTabModel | undefined {
-	if (!agentSessionId) {
+	if (!harnessSessionId) {
 		return undefined;
 	}
 	return sessionTabs.find(
 		(session) =>
 			isLiveTerminalTab(session) &&
-			session.agentSessionId === agentSessionId &&
+			session.harnessSessionId === harnessSessionId &&
 			session.id !== excludeId,
 	);
 }
 
 /**
  * Finds restart-orphaned duplicate terminal tabs: open tabs that share a
- * captured `agentSessionId` with an earlier tab in the strip. A restart can
+ * captured `harnessSessionId` with an earlier tab in the strip. A restart can
  * leave several open terminal tabs bound to one conversation (an earlier build
  * inserted a fresh tab on resume instead of repointing the existing one); only
  * the first occurrence should resume — the rest are stale copies that would each
@@ -87,13 +112,13 @@ export function findDuplicateTerminalTabIds(
 	const seenSessionIds = new Set<string>();
 	const duplicateIds: string[] = [];
 	for (const session of sessionTabs) {
-		if (!isLiveTerminalTab(session) || !session.agentSessionId) {
+		if (!isLiveTerminalTab(session) || !session.harnessSessionId) {
 			continue;
 		}
-		if (seenSessionIds.has(session.agentSessionId)) {
+		if (seenSessionIds.has(session.harnessSessionId)) {
 			duplicateIds.push(session.id);
 		} else {
-			seenSessionIds.add(session.agentSessionId);
+			seenSessionIds.add(session.harnessSessionId);
 		}
 	}
 	return duplicateIds;
@@ -134,9 +159,13 @@ export function resumeRestoredTerminalTab(
 ): void {
 	const { invalidate, selectTab, sessionTabs } = deps;
 	const harnessId = metadataText(tab.metadata.harnessId);
-	const agentSessionId = metadataText(tab.metadata.agentSessionId);
+	const harnessSessionId = readHarnessSessionId(tab.metadata);
 
-	const alreadyOpen = findOpenConversation(sessionTabs, agentSessionId, tab.id);
+	const alreadyOpen = findOpenConversation(
+		sessionTabs,
+		harnessSessionId,
+		tab.id,
+	);
 	if (alreadyOpen) {
 		void deps.closeTab(tab.id);
 		invalidate();
@@ -160,14 +189,14 @@ export function resumeRestoredTerminalTab(
 	// same-harness tab is already live, where two `--continue` processes could
 	// corrupt one shared log, so we spawn fresh instead.
 	const cwdContinue =
-		!agentSessionId && !hasLiveHarnessTab(sessionTabs, harnessId);
-	const fresh = !agentSessionId && !cwdContinue;
+		!harnessSessionId && !hasLiveHarnessTab(sessionTabs, harnessId);
+	const fresh = !harnessSessionId && !cwdContinue;
 	void api
 		.resumeAgentHarness({
 			chatTabId: tab.id,
 			fresh,
 			harnessId,
-			sessionId: agentSessionId,
+			sessionId: harnessSessionId,
 			workspaceId: deps.workspaceId,
 		})
 		.then((resumeResult) => {

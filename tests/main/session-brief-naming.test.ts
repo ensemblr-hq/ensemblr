@@ -1,21 +1,27 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-import { readSessionBriefNaming } from '../../src/main/pi-agent/naming/session-brief-naming.ts';
+import { readSessionBriefNaming } from '../../src/main/agent-runtime/naming/session-brief-naming.ts';
 
-const getChatTabByPiSessionId = vi.hoisted(() => vi.fn());
+const getChatTabByAgentSessionId = vi.hoisted(() => vi.fn());
 const getMainBranchForSession = vi.hoisted(() => vi.fn());
 const getMaxOrdinalForBranch = vi.hoisted(() => vi.fn());
 const selectWorkspaceWithRepositoryById = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
-	getChatTabByPiSessionId,
+	getChatTabByAgentSessionId,
 }));
-vi.mock('../../src/main/storage/repositories/pi-session-repository.ts', () => ({
-	getMainBranchForSession,
-}));
-vi.mock('../../src/main/storage/repositories/pi-event-repository.ts', () => ({
-	getMaxOrdinalForBranch,
-}));
+vi.mock(
+	'../../src/main/storage/repositories/agent-session-repository.ts',
+	() => ({
+		getMainBranchForSession,
+	}),
+);
+vi.mock(
+	'../../src/main/storage/repositories/agent-event-repository.ts',
+	() => ({
+		getMaxOrdinalForBranch,
+	}),
+);
 vi.mock('../../src/main/storage/repositories/workspace-repository.ts', () => ({
 	selectWorkspaceWithRepositoryById,
 }));
@@ -23,9 +29,9 @@ vi.mock('../../src/main/storage/repositories/workspace-repository.ts', () => ({
 const database = {} as never;
 
 const piCaller = {
+	hasChatTab: true,
 	isSubAgent: false,
 	sessionId: 'sess-1',
-	species: 'pi' as const,
 	workspaceId: 'ws-1',
 };
 
@@ -57,9 +63,9 @@ function read(
 		caller?:
 			| typeof piCaller
 			| {
+					hasChatTab: false;
 					isSubAgent: boolean;
 					sessionId: string;
-					species: 'harness';
 					workspaceId: string;
 			  };
 		database?: unknown;
@@ -76,19 +82,21 @@ function read(
 }
 
 beforeEach(() => {
-	getChatTabByPiSessionId.mockReset();
+	getChatTabByAgentSessionId.mockReset();
 	getMainBranchForSession.mockReset();
 	getMaxOrdinalForBranch.mockReset();
 	selectWorkspaceWithRepositoryById.mockReset();
 	selectWorkspaceWithRepositoryById.mockReturnValue(workspaceRow());
 	getMainBranchForSession.mockReturnValue({ id: 'branch-1', kind: 'main' });
 	getMaxOrdinalForBranch.mockReturnValue(12);
-	getChatTabByPiSessionId.mockReturnValue(tab({}));
+	getChatTabByAgentSessionId.mockReturnValue(tab({}));
 });
 
 describe('readSessionBriefNaming: title provenance', () => {
 	test('asks for a title while the tab carries the app-derived one', () => {
-		getChatTabByPiSessionId.mockReturnValue(tab({ titleProvenance: 'auto' }));
+		getChatTabByAgentSessionId.mockReturnValue(
+			tab({ titleProvenance: 'auto' }),
+		);
 
 		expect(read().titleNeeded).toBe(true);
 	});
@@ -98,13 +106,17 @@ describe('readSessionBriefNaming: title provenance', () => {
 	});
 
 	test('stops asking once the agent owns the title', () => {
-		getChatTabByPiSessionId.mockReturnValue(tab({ titleProvenance: 'agent' }));
+		getChatTabByAgentSessionId.mockReturnValue(
+			tab({ titleProvenance: 'agent' }),
+		);
 
 		expect(read().titleNeeded).toBe(false);
 	});
 
 	test('stops asking once the user owns the title', () => {
-		getChatTabByPiSessionId.mockReturnValue(tab({ titleProvenance: 'user' }));
+		getChatTabByAgentSessionId.mockReturnValue(
+			tab({ titleProvenance: 'user' }),
+		);
 
 		expect(read().titleNeeded).toBe(false);
 	});
@@ -116,7 +128,7 @@ describe('readSessionBriefNaming: summary staleness', () => {
 	});
 
 	test('treats a summary recorded on another branch as stale', () => {
-		getChatTabByPiSessionId.mockReturnValue(
+		getChatTabByAgentSessionId.mockReturnValue(
 			tab({ agentSummary: summaryMarker({ branchId: 'branch-other' }) }),
 		);
 
@@ -124,7 +136,7 @@ describe('readSessionBriefNaming: summary staleness', () => {
 	});
 
 	test('treats a summary older than the branch tip as stale', () => {
-		getChatTabByPiSessionId.mockReturnValue(
+		getChatTabByAgentSessionId.mockReturnValue(
 			tab({ agentSummary: summaryMarker({ capturedAtOrdinal: 11 }) }),
 		);
 		getMaxOrdinalForBranch.mockReturnValue(12);
@@ -133,7 +145,7 @@ describe('readSessionBriefNaming: summary staleness', () => {
 	});
 
 	test('treats a summary at the branch tip as current', () => {
-		getChatTabByPiSessionId.mockReturnValue(
+		getChatTabByAgentSessionId.mockReturnValue(
 			tab({ agentSummary: summaryMarker({ capturedAtOrdinal: 12 }) }),
 		);
 
@@ -141,7 +153,7 @@ describe('readSessionBriefNaming: summary staleness', () => {
 	});
 
 	test('treats a summary ahead of the branch tip as current', () => {
-		getChatTabByPiSessionId.mockReturnValue(
+		getChatTabByAgentSessionId.mockReturnValue(
 			tab({ agentSummary: summaryMarker({ capturedAtOrdinal: 20 }) }),
 		);
 
@@ -212,9 +224,9 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 	test('reports only branch upkeep for a harness caller', () => {
 		const brief = read({
 			caller: {
+				hasChatTab: false,
 				isSubAgent: false,
 				sessionId: 'harness-1',
-				species: 'harness',
 				workspaceId: 'ws-1',
 			},
 		});
@@ -224,11 +236,11 @@ describe('readSessionBriefNaming: callers without a chat tab', () => {
 			summaryStale: false,
 			titleNeeded: false,
 		});
-		expect(getChatTabByPiSessionId).not.toHaveBeenCalled();
+		expect(getChatTabByAgentSessionId).not.toHaveBeenCalled();
 	});
 
 	test('reports only branch upkeep when the caller has no tab', () => {
-		getChatTabByPiSessionId.mockReturnValue(null);
+		getChatTabByAgentSessionId.mockReturnValue(null);
 
 		expect(read()).toEqual({
 			branch: { current: 'psoldunov/bach', eligible: true },
@@ -274,7 +286,7 @@ describe('readSessionBriefNaming: degradation', () => {
 
 	test('does not share one brief object across calls', () => {
 		selectWorkspaceWithRepositoryById.mockReturnValue(undefined);
-		getChatTabByPiSessionId.mockReturnValue(null);
+		getChatTabByAgentSessionId.mockReturnValue(null);
 
 		const first = read();
 		first.titleNeeded = true;

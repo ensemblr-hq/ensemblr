@@ -12,6 +12,7 @@ export type { CheckpointRestoreTarget } from './checkpoint';
 export type {
 	GroupedOptions,
 	LinkedIssueComposerSeedInput,
+	ModelPickerRow,
 	SlashCommandDescriptor,
 	ThinkingBarStrength,
 } from './composer';

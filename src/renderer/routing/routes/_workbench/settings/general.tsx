@@ -97,7 +97,7 @@ function GeneralSettings() {
 				control={
 					<Switch checked={notifications} onCheckedChange={setNotifications} />
 				}
-				description='Get notified when Pi finishes working in a chat.'
+				description='Get notified when an agent finishes working in a chat.'
 				label='Desktop notifications'
 				modified={notifications !== DEFAULTS.desktopNotifications}
 				onReset={() => setNotifications(DEFAULTS.desktopNotifications)}
@@ -130,7 +130,7 @@ function GeneralSettings() {
 				control={
 					<Switch checked={caffeinate} onCheckedChange={setCaffeinate} />
 				}
-				description='Prevent your Mac from sleeping while Pi is actively working. Shuts off below 10% battery.'
+				description='Prevent your Mac from sleeping while an agent is actively working. Shuts off below 10% battery.'
 				label='Caffeinate while agents are running'
 				modified={caffeinate !== DEFAULTS.caffeinateWhileRunning}
 				onReset={() => setCaffeinate(DEFAULTS.caffeinateWhileRunning)}

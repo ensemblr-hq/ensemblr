@@ -24,22 +24,22 @@ import {
 } from '../../shared/agent-control.ts';
 import { findHarnessDefinition } from '../../shared/agents.ts';
 import type {
-	PiPersistedEnvelope,
-	PiWireMessagePayload,
-} from '../../shared/ipc/contracts/pi-session';
+	AgentPersistedEnvelope,
+	AgentWireMessagePayload,
+} from '../../shared/ipc/contracts/agent-session.ts';
 import type { CreateTerminalSessionResult } from '../../shared/ipc/contracts/terminal.ts';
 import type { PermissionMode } from '../../shared/permissions.ts';
 import { selectDefaultRunScript } from '../../shared/scripts.ts';
+import type { AgentSessionService } from '../agent-runtime/agent-session-service.ts';
+import {
+	applyBranchSlug,
+	BranchSlugRejected,
+} from '../agent-runtime/naming/apply-branch-slug.ts';
+import { readSessionBriefNaming } from '../agent-runtime/naming/session-brief-naming.ts';
 import type { HarnessDetectionService } from '../agents/index.ts';
 import type { ChatTabService } from '../chat-tabs/chat-tab-service.ts';
 import type { LocalCommandService } from '../commands';
 import type { AppSettingsService } from '../config';
-import {
-	applyBranchSlug,
-	BranchSlugRejected,
-} from '../pi-agent/naming/apply-branch-slug.ts';
-import { readSessionBriefNaming } from '../pi-agent/naming/session-brief-naming.ts';
-import type { PiSessionService } from '../pi-agent/pi-session-service.ts';
 import type { PiExecutableService } from '../pi-runtime';
 import {
 	presentPiModels,
@@ -57,20 +57,21 @@ import { listAllWorkspaceRows } from '../storage/repositories/workspace-reposito
 import type { TerminalService } from '../terminal';
 import type { WorkspaceGitService } from '../workspace-git';
 import type { BoardStatusStore } from './board-status-store.ts';
-import type {
-	AgentControlPorts,
-	AskPort,
-	BoardPort,
-	ConfirmPort,
-	ConversationPort,
-	FocusPort,
-	HarnessPort,
-	PlanModePort,
-	SessionNamingPort,
-	StartTerminalOutcome,
-	TabPort,
-	TerminalPort,
-	WorkspacePort,
+import {
+	type AgentControlPorts,
+	type AskPort,
+	type BoardPort,
+	type ConfirmPort,
+	type ConversationPort,
+	type FocusPort,
+	type HarnessPort,
+	originHasChatTab,
+	type PlanModePort,
+	type SessionNamingPort,
+	type StartTerminalOutcome,
+	type TabPort,
+	type TerminalPort,
+	type WorkspacePort,
 } from './ports.ts';
 import { makeDiffPort, makeReviewPort } from './review-ports.ts';
 import { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';
@@ -79,7 +80,7 @@ import { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';
 export interface PortAdapterDeps {
 	databaseService: EnsemblrDatabaseService;
 	chatTabService: ChatTabService;
-	piSessionService: PiSessionService;
+	agentSessionService: AgentSessionService;
 	terminalService: TerminalService;
 	scriptLifecycleService: ScriptLifecycleService;
 	harnessDetectionService: HarnessDetectionService;
@@ -222,7 +223,7 @@ function makeTabPort(deps: PortAdapterDeps): TabPort {
 				kind: tab.kind,
 				title: tab.title,
 				workspaceId: tab.workspaceId,
-				piSessionId: tab.piSessionId,
+				agentSessionId: tab.agentSessionId,
 			}));
 		},
 		resolveTabWorkspace: async (chatTabId) => workspaceOfTab(chatTabId),
@@ -230,7 +231,7 @@ function makeTabPort(deps: PortAdapterDeps): TabPort {
 }
 
 /**
- * Builds the Pi conversation port over the Pi session service. `piSessionId` on
+ * Builds the Pi conversation port over the Pi session service. `agentSessionId` on
  * the wire is the service's internal session id (stable across the runtime id).
  * @param deps - Adapter collaborators.
  * @returns The conversation port.
@@ -277,7 +278,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			return callerModel;
 		}
 		const recent = [
-			...deps.piSessionService.listSessionsForWorkspace(workspaceId),
+			...deps.agentSessionService.listSessionsForWorkspace(workspaceId),
 		]
 			.filter((session) => session.model && available.has(session.model))
 			.sort((a, b) => (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''))[0];
@@ -348,7 +349,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			if (!targetTabId) {
 				throw new Error('Failed to resolve a chat tab for the conversation.');
 			}
-			const snapshot = await deps.piSessionService.openSession({
+			const snapshot = await deps.agentSessionService.openSession({
 				chatTabId: targetTabId,
 				workspaceId,
 				workspaceCwd,
@@ -357,6 +358,10 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				initialPrompt: prompt,
 				executable,
 				parentSessionId,
+				// The registry below cannot be seeded until the session has an id, so
+				// a runtime that gates on its starting permission mode would miss the
+				// spawn entirely without the flag riding the open itself.
+				planMode,
 			});
 			// Registered before `submitPrompt` because the child can reach
 			// `before_agent_start` first.
@@ -364,7 +369,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				deps.planMode.activateForSpawn(snapshot.id);
 				deps.broadcastPlanMode({
 					chatTabId: targetTabId,
-					piSessionId: snapshot.id,
+					agentSessionId: snapshot.id,
 					planMode: true,
 					workspaceId,
 				});
@@ -375,7 +380,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			const markerApplied = writeSubAgentMarker(deps, targetTabId, 'subagent');
 			deps.broadcastTabsChanged({ workspaceId });
 			try {
-				await deps.piSessionService.submitPrompt({
+				await deps.agentSessionService.submitPrompt({
 					sessionId: snapshot.id,
 					prompt,
 					model: resolvedModel,
@@ -383,7 +388,7 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 				});
 			} catch (error) {
 				await rollbackConversation(deps, {
-					piSessionId: snapshot.id,
+					agentSessionId: snapshot.id,
 					openedTabId,
 					markedTabId: markerApplied ? targetTabId : null,
 					workspaceId,
@@ -393,36 +398,41 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			if (title) {
 				await applyConversationName(deps, {
 					name: title,
-					piSessionId: snapshot.id,
+					agentSessionId: snapshot.id,
 				});
 			}
 			deps.broadcastTabsChanged({ workspaceId });
-			return { chatTabId: targetTabId, piSessionId: snapshot.id };
+			return { chatTabId: targetTabId, agentSessionId: snapshot.id };
 		},
-		sendFollowUp: async ({ piSessionId, prompt }) => {
+		sendFollowUp: async ({ agentSessionId, prompt }) => {
 			const streaming =
-				deps.piSessionService.getSession(piSessionId)?.status === 'streaming';
-			await deps.piSessionService.submitPrompt({
-				sessionId: piSessionId,
+				deps.agentSessionService.getSession(agentSessionId)?.status ===
+				'streaming';
+			await deps.agentSessionService.submitPrompt({
+				sessionId: agentSessionId,
 				prompt,
 				streamingBehavior: streaming ? 'followUp' : undefined,
 			});
 		},
-		setName: async ({ piSessionId, name }) => {
-			const applied = await applyConversationName(deps, { name, piSessionId });
+		setName: async ({ agentSessionId, name }) => {
+			const applied = await applyConversationName(deps, {
+				name,
+				agentSessionId,
+			});
 			if (applied?.applied) {
 				const workspaceId =
-					deps.piSessionService.getSession(piSessionId)?.workspaceId;
+					deps.agentSessionService.getSession(agentSessionId)?.workspaceId;
 				if (workspaceId) {
 					deps.broadcastTabsChanged({ workspaceId });
 				}
 			}
 			return applied;
 		},
-		waitForIdle: async (piSessionId, timeoutMs) => {
+		waitForIdle: async (agentSessionId, timeoutMs) => {
 			const deadline = Date.now() + timeoutMs;
 			while (Date.now() < deadline) {
-				const status = deps.piSessionService.getSession(piSessionId)?.status;
+				const status =
+					deps.agentSessionService.getSession(agentSessionId)?.status;
 				if (!status || IDLE_STATUSES.has(status)) {
 					return 'completed';
 				}
@@ -430,45 +440,45 @@ function makeConversationPort(deps: PortAdapterDeps): ConversationPort {
 			}
 			return 'timeout';
 		},
-		getStatus: async (piSessionId) => {
-			const snapshot = deps.piSessionService.getSession(piSessionId);
+		getStatus: async (agentSessionId) => {
+			const snapshot = deps.agentSessionService.getSession(agentSessionId);
 			if (!snapshot) {
 				return null;
 			}
 			return {
-				piSessionId: snapshot.id,
+				agentSessionId: snapshot.id,
 				status: snapshot.status,
 				runtimeOpen: snapshot.runtimeOpen,
 			};
 		},
-		hasFinalMessage: async (piSessionId) => {
-			const snapshot = deps.piSessionService.getSession(piSessionId);
+		hasFinalMessage: async (agentSessionId) => {
+			const snapshot = deps.agentSessionService.getSession(agentSessionId);
 			if (!snapshot) {
 				return false;
 			}
 			return findFinalTurnText(deps, snapshot.branchId) !== null;
 		},
-		getLastMessage: async (piSessionId) => {
-			const snapshot = deps.piSessionService.getSession(piSessionId);
+		getLastMessage: async (agentSessionId) => {
+			const snapshot = deps.agentSessionService.getSession(agentSessionId);
 			if (!snapshot) {
 				return null;
 			}
 			return findFinalTurnText(deps, snapshot.branchId);
 		},
-		readTranscript: async ({ piSessionId, ...page }) => {
-			const snapshot = deps.piSessionService.getSession(piSessionId);
+		readTranscript: async ({ agentSessionId, ...page }) => {
+			const snapshot = deps.agentSessionService.getSession(agentSessionId);
 			return buildConversationTranscript({
 				events: snapshot
-					? deps.piSessionService.listEvents(snapshot.branchId)
+					? deps.agentSessionService.listEvents(snapshot.branchId)
 					: [],
-				piSessionId,
+				agentSessionId,
 				...page,
 			});
 		},
-		isSpawnedSubAgent: async (piSessionId) =>
-			readSubAgentMarker(deps, piSessionId),
-		resolveConversationWorkspace: async (piSessionId) =>
-			deps.piSessionService.getSession(piSessionId)?.workspaceId ?? null,
+		isSpawnedSubAgent: async (agentSessionId) =>
+			readSubAgentMarker(deps, agentSessionId),
+		resolveConversationWorkspace: async (agentSessionId) =>
+			deps.agentSessionService.getSession(agentSessionId)?.workspaceId ?? null,
 	};
 }
 
@@ -523,16 +533,16 @@ function writeSubAgentMarker(
  * Reads the sub-agent marker {@link writeSubAgentMarker} wrote, off the chat tab
  * bound to a Pi session.
  * @param deps - Adapter collaborators.
- * @param piSessionId - The session whose tab to inspect.
+ * @param agentSessionId - The session whose tab to inspect.
  * @returns True when the session's tab is stamped as hosting a spawned sub-agent.
  */
 function readSubAgentMarker(
 	deps: PortAdapterDeps,
-	piSessionId: string,
+	agentSessionId: string,
 ): boolean {
 	return isSessionTabMarkedSubAgent(
 		deps.databaseService.getConnection()?.database,
-		piSessionId,
+		agentSessionId,
 	);
 }
 
@@ -547,18 +557,18 @@ function readSubAgentMarker(
  */
 async function applyConversationName(
 	deps: PortAdapterDeps,
-	input: { piSessionId: string; name: string },
+	input: { agentSessionId: string; name: string },
 ): Promise<{ applied: boolean; chatTabId: string; title: string } | null> {
 	try {
-		return await deps.piSessionService.setSessionName({
+		return await deps.agentSessionService.setSessionName({
 			name: input.name,
 			provenance: 'agent',
-			sessionId: input.piSessionId,
+			sessionId: input.agentSessionId,
 		});
 	} catch (cause) {
 		console.warn('[agent-control] could not name a conversation tab.', {
 			cause: cause instanceof Error ? cause.message : String(cause),
-			piSessionId: input.piSessionId,
+			agentSessionId: input.agentSessionId,
 		});
 		return null;
 	}
@@ -577,25 +587,25 @@ async function applyConversationName(
 async function rollbackConversation(
 	deps: PortAdapterDeps,
 	target: {
-		piSessionId: string;
+		agentSessionId: string;
 		openedTabId: string | null;
 		markedTabId: string | null;
 		workspaceId: string;
 	},
 ): Promise<void> {
-	deps.planMode.releaseSession(target.piSessionId);
+	deps.planMode.releaseSession(target.agentSessionId);
 	if (target.markedTabId) {
 		writeSubAgentMarker(deps, target.markedTabId, null);
 	}
 	try {
-		await deps.piSessionService.stopSession({
-			sessionId: target.piSessionId,
+		await deps.agentSessionService.stopSession({
+			sessionId: target.agentSessionId,
 			reason: 'agent-control-start-failed',
 		});
 	} catch (cause) {
 		console.warn('[agent-control] could not stop a failed spawn.', {
 			cause: cause instanceof Error ? cause.message : String(cause),
-			piSessionId: target.piSessionId,
+			agentSessionId: target.agentSessionId,
 		});
 	}
 	if (target.openedTabId) {
@@ -639,7 +649,7 @@ function findFinalTurnText(
 ): string | null {
 	const turn: string[] = [];
 	let size = 0;
-	for (const payload of deps.piSessionService.iterateEventPayloadsDescending(
+	for (const payload of deps.agentSessionService.iterateEventPayloadsDescending(
 		branchId,
 	)) {
 		if (isTurnBoundary(payload)) {
@@ -673,14 +683,14 @@ function findFinalTurnText(
  * @returns True when the envelope is a user-role message.
  */
 function isTurnBoundary(
-	payload: PiPersistedEnvelope | null | undefined,
+	payload: AgentPersistedEnvelope | null | undefined,
 ): boolean {
 	return payload?.kind === 'message' && payload.role === 'user';
 }
 
 /**
  * Extracts the assistant's visible answer from a persisted Pi event envelope.
- * Persisted events are {@link PiPersistedEnvelope} tagged unions, so a completed
+ * Persisted events are {@link AgentPersistedEnvelope} tagged unions, so a completed
  * assistant turn is an `agent`-role `message` whose inner payload holds the
  * final text (as `message` parts or a standalone `text` payload). Reasoning
  * parts, tool calls, streaming deltas, and non-agent envelopes yield null, so a
@@ -689,7 +699,7 @@ function isTurnBoundary(
  * @returns The assistant text, or null when the event carries none.
  */
 function extractAssistantText(
-	payload: PiPersistedEnvelope | null | undefined,
+	payload: AgentPersistedEnvelope | null | undefined,
 ): string | null {
 	if (payload?.kind !== 'message' || payload.role !== 'agent') {
 		return null;
@@ -705,7 +715,7 @@ function extractAssistantText(
  * @param payload - The inner wire message payload of an agent envelope.
  * @returns The joined assistant text, possibly empty.
  */
-function messagePayloadText(payload: PiWireMessagePayload): string {
+function messagePayloadText(payload: AgentWireMessagePayload): string {
 	if (payload.kind === 'text') {
 		return payload.text;
 	}
@@ -895,7 +905,7 @@ function makeBoardPort(deps: PortAdapterDeps): BoardPort {
 /**
  * Builds the session-naming port over the workspace rename service, the naming
  * policy module, and the Pi session service. Naming policy itself lives in
- * `pi-agent/naming/`; this stays wiring — resolve the database and the user's
+ * `agent-runtime/naming/`; this stays wiring — resolve the database and the user's
  * setting, delegate, then broadcast whatever landed.
  * @param deps - Adapter collaborators.
  * @returns The session-naming port.
@@ -913,13 +923,13 @@ function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 		readBrief: async (origin) =>
 			readSessionBriefNaming({
 				caller: {
+					hasChatTab: originHasChatTab(origin),
 					isSubAgent:
 						resolveAgentRole(
 							readSubAgentMarker(deps, origin.sessionId),
 							origin.depth,
 						) === 'subagent',
 					sessionId: origin.sessionId,
-					species: origin.species,
 					workspaceId: origin.workspaceId,
 				},
 				database: deps.databaseService.getConnection()?.database,
@@ -940,8 +950,8 @@ function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 				renameWorkspace: deps.renameWorkspace,
 				workspaceId: origin.workspaceId,
 			});
-			if (result.applied && origin.species === 'pi') {
-				deps.piSessionService.appendWorkspaceRenamed(origin.sessionId);
+			if (result.applied && originHasChatTab(origin)) {
+				deps.agentSessionService.appendWorkspaceRenamed(origin.sessionId);
 			}
 			if (result.applied) {
 				deps.broadcastTabsChanged({ workspaceId: origin.workspaceId });
@@ -949,7 +959,7 @@ function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 			return result;
 		},
 		setSummary: async ({ origin, summary, title }) => {
-			const recorded = deps.piSessionService.setSessionSummary({
+			const recorded = deps.agentSessionService.setSessionSummary({
 				sessionId: origin.sessionId,
 				summary,
 				title,

@@ -1,5 +1,5 @@
 /**
- * Which Pi sessions are currently in Plan Mode. In-memory only: the renderer's
+ * Which agent sessions are currently in Plan Mode. In-memory only: the renderer's
  * per-chat `atomWithStorage` toggle is the durable source and re-sends
  * `planMode` on every open and submit, so a restart rebuilds this map from the
  * next prompt rather than from a database migration.
@@ -8,11 +8,11 @@
 /** Public surface of the plan-mode registry. */
 export interface PlanModeRegistry {
 	/** Turns Plan Mode on or off for a session; `false` drops the entry. */
-	setActive: (piSessionId: string, active: boolean) => void;
+	setActive: (agentSessionId: string, active: boolean) => void;
 	/** Whether a session is planning. Unknown sessions are not. */
-	isActive: (piSessionId: string) => boolean;
+	isActive: (agentSessionId: string) => boolean;
 	/** Forgets a session that ended, keeping the map bounded. */
-	release: (piSessionId: string) => void;
+	release: (agentSessionId: string) => void;
 }
 
 /**
@@ -24,18 +24,18 @@ export function createPlanModeRegistry(): PlanModeRegistry {
 
 	return {
 		/** Adds or removes the session from the planning set. */
-		setActive: (piSessionId, active) => {
+		setActive: (agentSessionId, active) => {
 			if (active) {
-				planning.add(piSessionId);
+				planning.add(agentSessionId);
 				return;
 			}
-			planning.delete(piSessionId);
+			planning.delete(agentSessionId);
 		},
 		/** Reports whether the session is planning. */
-		isActive: (piSessionId) => planning.has(piSessionId),
+		isActive: (agentSessionId) => planning.has(agentSessionId),
 		/** Drops the session's entry. */
-		release: (piSessionId) => {
-			planning.delete(piSessionId);
+		release: (agentSessionId) => {
+			planning.delete(agentSessionId);
 		},
 	};
 }

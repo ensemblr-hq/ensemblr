@@ -1,10 +1,10 @@
-import { isGracefulTermination } from '../../../shared/pi-rpc/process-exit.ts';
-import type { JsonlLineStream } from '../../pi-ipc';
+import { isGracefulTermination } from '../../../shared/process-exit.ts';
 import type {
-	PiAgentErrorCode,
-	PiAgentEvent,
-	PiAgentShutdownReason,
-} from '../pi-agent-types.ts';
+	AgentErrorCode,
+	AgentEvent,
+	AgentShutdownReason,
+} from '../../agent-runtime/agent-types.ts';
+import type { JsonlLineStream } from '../../pi-ipc';
 import type { KillTimer } from './kill-timer.ts';
 import type { RingBuffer } from './ring-buffer.ts';
 import type { ChildLike } from './spawn-env.ts';
@@ -41,16 +41,16 @@ export function bindChildStreams({
 	lineStream: JsonlLineStream;
 	stderrRing: RingBuffer;
 	killTimer: KillTimer;
-	emit: (event: PiAgentEvent) => void;
+	emit: (event: AgentEvent) => void;
 	emitError: (
-		code: PiAgentErrorCode,
+		code: AgentErrorCode,
 		message: string,
 		detail?: string,
 		recoverable?: boolean,
 	) => void;
-	getPendingShutdownReason: () => PiAgentShutdownReason | null;
+	getPendingShutdownReason: () => AgentShutdownReason | null;
 	now: () => Date;
-	finalizeShutdown: (reason: PiAgentShutdownReason) => void;
+	finalizeShutdown: (reason: AgentShutdownReason) => void;
 }): void {
 	child.stdout.on('data', (chunk: Buffer) => {
 		lineStream.feed(chunk);
@@ -113,8 +113,8 @@ export function bindChildStreams({
  */
 function classifyExit(
 	code: number | null,
-	pending: PiAgentShutdownReason | null,
-): PiAgentShutdownReason {
+	pending: AgentShutdownReason | null,
+): AgentShutdownReason {
 	if (pending) {
 		return pending;
 	}

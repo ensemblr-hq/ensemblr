@@ -14,7 +14,7 @@ import { clearEnsemblrApi, installEnsemblrApi } from './support/dom';
 
 /**
  * Builds a restored terminal (harness) tab wire row carrying the given metadata.
- * @param metadata - Harness metadata (harnessId, agentSessionId).
+ * @param metadata - Harness metadata (harnessId, harnessSessionId).
  * @returns A minimal terminal `ChatTabWire`.
  */
 function terminalTab(metadata: Record<string, unknown>): ChatTabWire {
@@ -26,7 +26,7 @@ function terminalTab(metadata: Record<string, unknown>): ChatTabWire {
 		kind: 'terminal',
 		metadata,
 		openedAt: '2026-07-20T10:00:00.000Z',
-		piSessionId: null,
+		agentSessionId: null,
 		position: 0,
 		title: 'Claude Code',
 		workspaceId: 'ws-1',
@@ -55,7 +55,7 @@ function makeDeps(overrides: Partial<RestoreTerminalTabDeps> = {}) {
 
 const OK_RESULT: LaunchAgentHarnessResult = {
 	diagnostics: [],
-	session: { agentSessionId: null } as LaunchAgentHarnessResult['session'],
+	session: { harnessSessionId: null } as LaunchAgentHarnessResult['session'],
 };
 
 afterEach(() => {
@@ -70,7 +70,7 @@ describe('resumeRestoredTerminalTab', () => {
 		const deps = makeDeps();
 
 		resumeRestoredTerminalTab(
-			terminalTab({ agentSessionId: 'claude-abc', harnessId: 'claude' }),
+			terminalTab({ harnessId: 'claude', harnessSessionId: 'claude-abc' }),
 			deps,
 		);
 
@@ -109,12 +109,12 @@ describe('resumeRestoredTerminalTab', () => {
 					chatTabId: 'tab-live',
 					harnessId: 'claude',
 					harnessLabel: 'Claude Code',
+					harnessSessionId: null,
 					id: 'tab-live',
 					isPreview: false,
 					isSubAgent: false,
 					kind: 'terminal',
 					label: 'Claude Code',
-					piSessionId: null,
 					status: 'working',
 					summary: '',
 					terminalId: 'pty-live',
@@ -140,16 +140,16 @@ describe('resumeRestoredTerminalTab', () => {
 		const deps = makeDeps({
 			sessionTabs: [
 				{
-					agentSessionId: 'claude-abc',
+					agentSessionId: null,
 					chatTabId: 'tab-open',
 					harnessId: 'claude',
 					harnessLabel: 'Claude Code',
+					harnessSessionId: 'claude-abc',
 					id: 'tab-open',
 					isPreview: false,
 					isSubAgent: false,
 					kind: 'terminal',
 					label: 'Claude Code',
-					piSessionId: null,
 					status: 'idle',
 					summary: '',
 					terminalId: 'pty-live',
@@ -159,7 +159,7 @@ describe('resumeRestoredTerminalTab', () => {
 		});
 
 		resumeRestoredTerminalTab(
-			terminalTab({ agentSessionId: 'claude-abc', harnessId: 'claude' }),
+			terminalTab({ harnessId: 'claude', harnessSessionId: 'claude-abc' }),
 			deps,
 		);
 
@@ -185,11 +185,11 @@ function terminalSessionTab(
 		chatTabId: over.id,
 		harnessId: 'claude',
 		harnessLabel: 'Claude Code',
+		harnessSessionId: null,
 		isPreview: false,
 		isSubAgent: false,
 		kind: 'terminal',
 		label: 'Claude Code',
-		piSessionId: null,
 		status: 'idle',
 		summary: '',
 		terminalId: 'pty',
@@ -220,7 +220,7 @@ describe('isLiveTerminalTab', () => {
 				isSubAgent: false,
 				kind: 'chat',
 				label: 'New chat',
-				piSessionId: null,
+				agentSessionId: null,
 				status: 'idle',
 				summary: '',
 				updatedLabel: '',
@@ -235,17 +235,17 @@ describe('findDuplicateTerminalTabIds', () => {
 			terminalSessionTab({
 				id: 'a',
 				terminalId: 'p1',
-				agentSessionId: 'sid-x',
+				harnessSessionId: 'sid-x',
 			}),
 			terminalSessionTab({
 				id: 'b',
 				terminalId: 'p2',
-				agentSessionId: 'sid-x',
+				harnessSessionId: 'sid-x',
 			}),
 			terminalSessionTab({
 				id: 'c',
 				terminalId: 'p3',
-				agentSessionId: 'sid-x',
+				harnessSessionId: 'sid-x',
 			}),
 		]);
 
@@ -254,10 +254,10 @@ describe('findDuplicateTerminalTabIds', () => {
 
 	test('keeps distinct conversations and never flags tabs without a captured id', () => {
 		const duplicates = findDuplicateTerminalTabIds([
-			terminalSessionTab({ id: 'a', agentSessionId: 'sid-x' }),
-			terminalSessionTab({ id: 'b', agentSessionId: 'sid-y' }),
-			terminalSessionTab({ id: 'c', agentSessionId: null }),
-			terminalSessionTab({ id: 'd', agentSessionId: null }),
+			terminalSessionTab({ id: 'a', harnessSessionId: 'sid-x' }),
+			terminalSessionTab({ id: 'b', harnessSessionId: 'sid-y' }),
+			terminalSessionTab({ id: 'c', harnessSessionId: null }),
+			terminalSessionTab({ id: 'd', harnessSessionId: null }),
 		]);
 
 		expect(duplicates).toEqual([]);
@@ -268,9 +268,13 @@ describe('findDuplicateTerminalTabIds', () => {
 			terminalSessionTab({
 				id: 'a',
 				terminalId: 'p1',
-				agentSessionId: 'sid-x',
+				harnessSessionId: 'sid-x',
 			}),
-			terminalSessionTab({ id: 'b', terminalId: '', agentSessionId: 'sid-x' }),
+			terminalSessionTab({
+				id: 'b',
+				terminalId: '',
+				harnessSessionId: 'sid-x',
+			}),
 			{
 				chatTabId: 'chat',
 				id: 'chat',
@@ -278,7 +282,7 @@ describe('findDuplicateTerminalTabIds', () => {
 				isSubAgent: false,
 				kind: 'chat',
 				label: 'New chat',
-				piSessionId: null,
+				agentSessionId: null,
 				status: 'idle',
 				summary: '',
 				updatedLabel: '',

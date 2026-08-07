@@ -13,6 +13,7 @@ import {
 	useAppSettingsSync,
 	useThemeEffect,
 } from '@/renderer/state/preferences';
+import { useToolApprovalSync } from '@/renderer/state/tool-approval';
 
 /** Root app component — delegates rendering to the active TanStack Router outlet. */
 export function App() {
@@ -21,6 +22,7 @@ export function App() {
 	useAppSettingsSync();
 	useConfigReloadSync();
 	useAskUserQuestionSync();
+	useToolApprovalSync();
 	usePlanReviewSync();
 	usePlanModeSync();
 

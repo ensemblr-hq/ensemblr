@@ -12,9 +12,9 @@ import type {
 const PREVIEW_METADATA_KEY = 'preview';
 
 /**
- * Tab kinds that may occupy the preview slot. Chat and terminal tabs own a Pi
- * session or a live PTY, so replacing one would discard work the user cannot
- * get back.
+ * Tab kinds that may occupy the preview slot. Chat and terminal tabs own an
+ * agent session or a live PTY, so replacing one would discard work the user
+ * cannot get back.
  */
 const PREVIEWABLE_KINDS: ReadonlySet<ChatTabKind> = new Set([
 	'diff',

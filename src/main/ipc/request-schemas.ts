@@ -17,12 +17,26 @@
  * pre-existing semantics — every chat-tab test and every clone/root/config
  * test must continue to pass. Any deviation is annotated in the owning module.
  */
+
+export {
+	agentProviderRequestSchema,
+	openAgentProviderSettingsFileRequestSchema,
+	setAgentProviderExecutablePathRequestSchema,
+} from './request-schemas/agent-provider.ts';
+export {
+	listAgentSessionEventsRequestSchema,
+	listAgentSessionsRequestSchema,
+	openAgentSessionRequestSchema,
+	stopAgentSessionRequestSchema,
+	submitAgentPromptRequestSchema,
+	writeForkSummaryRequestSchema,
+} from './request-schemas/agent-session.ts';
 export {
 	launchAgentHarnessRequestSchema,
 	resumeAgentHarnessRequestSchema,
 } from './request-schemas/agents.ts';
 export {
-	bindPiSessionToChatTabRequestSchema,
+	bindAgentSessionToChatTabRequestSchema,
 	closeChatTabRequestSchema,
 	listChatTabsRequestSchema,
 	listClosedChatTabsWithSummaryRequestSchema,
@@ -60,16 +74,6 @@ export {
 	listLinearIssuesRequestSchema,
 	updateLinearIssueRequestSchema,
 } from './request-schemas/linear.ts';
-export {
-	listPiSessionEventsRequestSchema,
-	listPiSessionsRequestSchema,
-	openPiSessionRequestSchema,
-	parseSetPiExecutablePathRequest,
-	setPiExecutablePathRequestSchema,
-	stopPiSessionRequestSchema,
-	submitPiPromptRequestSchema,
-	writeForkSummaryRequestSchema,
-} from './request-schemas/pi-session.ts';
 export {
 	archiveRepositoryRequestSchema,
 	archiveWorkspaceRequestSchema,

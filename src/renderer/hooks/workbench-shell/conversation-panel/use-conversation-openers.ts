@@ -3,7 +3,7 @@ import { useCallback, useMemo } from 'react';
 import {
 	createWorkspacePathResolver,
 	toWorkspaceLookupPath,
-} from '@/renderer/lib/pi';
+} from '@/renderer/lib/agent-timeline';
 import type { WorkspaceShellModel } from '@/renderer/types/workbench';
 
 /**

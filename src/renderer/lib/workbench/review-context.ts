@@ -5,8 +5,8 @@ import type {
 import { formatCommentLocation } from './comment-body';
 
 /**
- * Conservative payload cap for review context inserted into the Pi composer.
- * Pi does not report context usage ahead of submit, so blocks are truncated
+ * Conservative payload cap for review context inserted into the agent composer.
+ * The agent does not report context usage ahead of submit, so blocks are truncated
  * with an explicit marker instead of silently overflowing (ENS-053).
  */
 export const REVIEW_CONTEXT_CHAR_LIMIT = 24_000;
@@ -20,7 +20,7 @@ export function clampReviewContext(text: string): string {
 }
 
 /**
- * Formats one PR comment (GitHub or local) for Pi context, carrying the full
+ * Formats one PR comment (GitHub or local) for agent context, carrying the full
  * body and every thread reply rather than the row's one-line summary.
  */
 export function formatCommentContext(
@@ -64,8 +64,8 @@ function describeCommentSource(
 
 /**
  * Labels one comment inside the bulk block. The row summary is prose alone, so
- * without this the numbered lines carry no author and no file — Pi would be
- * handed a list it cannot attribute or act on.
+ * without this the numbered lines carry no author and no file — the agent would
+ * be handed a list it cannot attribute or act on.
  * @param comment - The comment being labelled
  * @param prNumber - The pull request the comment belongs to, when known
  * @returns The label that precedes the comment's summary
@@ -96,14 +96,14 @@ export function formatAllCommentsContext(
 	);
 }
 
-/** Formats a workspace todo for Pi context. */
+/** Formats a workspace todo for agent context. */
 export function formatTodoContext(todo: PullRequestTodoSummary): string {
 	return clampReviewContext(
 		`Workspace review todo: ${todo.label}\nPlease address this item.`,
 	);
 }
 
-/** Formats a unified file diff for Pi context. */
+/** Formats a unified file diff for agent context. */
 export function formatFileDiffContext({
 	filePath,
 	patch,

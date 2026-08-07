@@ -18,15 +18,16 @@ import {
  * @param database - Open SQLite connection, or null when unavailable.
  * @param workspaceId - Workspace whose open tabs to search.
  * @param terminalId - Live PTY id the tab's `metadata.terminalId` must match.
- * @param agentSessionId - Native harness session id to persist.
+ * @param harnessSessionId - Native harness CLI session id to persist. Distinct
+ * from the tab's Ensemblr `agentSessionId` column, which this never touches.
  */
 export function persistTerminalAgentSessionId({
-	agentSessionId,
+	harnessSessionId,
 	database,
 	terminalId,
 	workspaceId,
 }: {
-	agentSessionId: string;
+	harnessSessionId: string;
 	database: DatabaseSync | null;
 	terminalId: string;
 	workspaceId: string;
@@ -39,12 +40,12 @@ export function persistTerminalAgentSessionId({
 			candidate.kind === 'terminal' &&
 			candidate.metadata.terminalId === terminalId,
 	);
-	if (!tab || tab.metadata.agentSessionId === agentSessionId) {
+	if (!tab || tab.metadata.harnessSessionId === harnessSessionId) {
 		return;
 	}
 	setChatTabMetadata({
 		database,
 		id: tab.id,
-		metadata: { ...tab.metadata, agentSessionId },
+		metadata: { ...tab.metadata, harnessSessionId },
 	});
 }

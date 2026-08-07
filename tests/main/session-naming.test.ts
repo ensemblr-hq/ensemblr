@@ -5,18 +5,18 @@ import type { DatabaseSync } from 'node:sqlite';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterEach, describe, expect, test } from 'vitest';
 
-import { createSessionNaming } from '../../src/main/pi-agent/naming/session-naming.ts';
-import type { PiAgentSession } from '../../src/main/pi-agent/pi-agent-client.ts';
+import type { AgentSession } from '../../src/main/agent-runtime/agent-client.ts';
+import { createSessionNaming } from '../../src/main/agent-runtime/naming/session-naming.ts';
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
+import {
+	createAgentSession,
+	createTurn,
+} from '../../src/main/storage/repositories/agent-session-repository.ts';
 import {
 	getChatTabById,
 	openChatTab,
 	setChatTabMetadata,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
-import {
-	createPiSession,
-	createTurn,
-} from '../../src/main/storage/repositories/pi-session-repository.ts';
 
 interface Fixture {
 	branchId: string;
@@ -57,7 +57,7 @@ function openFixture(): Fixture {
 		)
 		.run();
 
-	const { mainBranch, session } = createPiSession({
+	const { mainBranch, session } = createAgentSession({
 		database,
 		input: {
 			cwd: '/tmp/ensemblr/n/ws',
@@ -66,7 +66,7 @@ function openFixture(): Fixture {
 			label: null,
 			metadata: {},
 			model: null,
-			piSessionId: 'native-n',
+			runtimeSessionId: 'native-n',
 			thinkingLevel: null,
 			workspaceId: 'ws-n',
 		},
@@ -75,7 +75,7 @@ function openFixture(): Fixture {
 		database,
 		input: {
 			kind: 'chat',
-			piSessionId: session.id,
+			agentSessionId: session.id,
 			title: 'New chat',
 			workspaceId: 'ws-n',
 		},
@@ -90,25 +90,25 @@ function openFixture(): Fixture {
 }
 
 /** A live-session stub that reports the given Pi session name via `get_state`. */
-function liveSessionWithName(sessionName: string | null): PiAgentSession {
+function liveSessionWithName(sessionName: string | null): AgentSession {
 	return {
 		getState: async () => ({ sessionName }),
-	} as unknown as PiAgentSession;
+	} as unknown as AgentSession;
 }
 
 /** A live-session stub whose `get_state` rejects, exercising the fallback path. */
-function liveSessionThatFailsState(): PiAgentSession {
+function liveSessionThatFailsState(): AgentSession {
 	return {
 		getState: async () => {
 			throw new Error('get_state unavailable');
 		},
-	} as unknown as PiAgentSession;
+	} as unknown as AgentSession;
 }
 
 function baseInput(
 	fixture: Fixture,
 	initialPrompt: string | null,
-	liveSession: PiAgentSession | null = null,
+	liveSession: AgentSession | null = null,
 ) {
 	return {
 		branchId: fixture.branchId,

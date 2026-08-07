@@ -88,8 +88,12 @@ export interface PiRpcSmokeSnapshot {
 	stdoutTruncated: boolean;
 }
 
-/** A single provider/model row parsed from `pi --list-models`. */
-export interface PiModelOption {
+/**
+ * A single provider/model row parsed from `pi --list-models`. This is the raw
+ * CLI parse result, not a picker entry — {@link presentPiModels} maps it onto
+ * the shared `AgentModelOption` the composer consumes.
+ */
+export interface PiProviderModelRow {
 	id: string;
 	model: string;
 	provider: string;
@@ -103,7 +107,7 @@ export interface PiProviderModelSnapshot {
 		message: string;
 	};
 	modelCount: number;
-	models: readonly PiModelOption[];
+	models: readonly PiProviderModelRow[];
 	providerCount: number;
 	result: LocalCommandResult | null;
 	status: PiReadinessStatus;

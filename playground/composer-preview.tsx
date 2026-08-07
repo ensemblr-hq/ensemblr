@@ -9,20 +9,44 @@ import type {
 	ComposerThinkingOption,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
+import type { AgentProviderId } from '@/shared/agent-provider';
 
 import { createPlaygroundQueryClient } from './playground-query-client.ts';
 import { ControlGroup, SceneSection, SceneToggle } from './scene-chrome.tsx';
 
 const WORKSPACE_CWD = '/Users/you/Projects/ensemblr';
 
+/**
+ * Two runtimes' models in one catalog, so the picker's provider pin has
+ * something to lock out. `provider` is the inference provider the picker groups
+ * by; `agentProvider` is the runtime the pin compares against.
+ */
 const MODELS: readonly ComposerModelOption[] = [
 	{
+		agentProvider: 'pi',
 		displayName: 'Opus 5',
 		id: 'claude-opus-5',
 		isDefault: true,
 		provider: 'anthropic',
 	},
-	{ displayName: 'Sonnet 5', id: 'claude-sonnet-5', provider: 'anthropic' },
+	{
+		agentProvider: 'pi',
+		displayName: 'Sonnet 5',
+		id: 'claude-sonnet-5',
+		provider: 'anthropic',
+	},
+	{
+		agentProvider: 'claude',
+		displayName: 'Claude Code — Opus 5',
+		id: 'claude-code/opus-5',
+		provider: 'claude-code',
+	},
+	{
+		agentProvider: 'claude',
+		displayName: 'Claude Code — Sonnet 5',
+		id: 'claude-code/sonnet-5',
+		provider: 'claude-code',
+	},
 ];
 
 const THINKING_LEVELS: readonly ComposerThinkingOption[] = [
@@ -74,6 +98,9 @@ export function ComposerScene() {
 	const [isHandingOff, setHandingOff] = useState(false);
 	const [isStreaming, setStreaming] = useState(false);
 	const [lastDecision, setLastDecision] = useState<string | null>(null);
+	const [lockedProvider, setLockedProvider] = useState<AgentProviderId | null>(
+		null,
+	);
 
 	const approve = useCallback(() => {
 		setPlanMode(false);
@@ -98,7 +125,9 @@ export function ComposerScene() {
 					isHandingOff={isHandingOff}
 					isStreaming={isStreaming}
 					lastDecision={lastDecision}
+					lockedProvider={lockedProvider}
 					onHandingOffChange={setHandingOff}
+					onLockedProviderChange={setLockedProvider}
 					onPlanModeChange={setPlanMode}
 					onPlanReviewChange={(enabled) => {
 						setPlanReview(enabled);
@@ -115,6 +144,7 @@ export function ComposerScene() {
 					<ComposerCase
 						chatTabId='playground-composer-live'
 						isStreaming={isStreaming}
+						lockedProvider={lockedProvider}
 						onPlanModeChange={setPlanMode}
 						planMode={planMode}
 						planReview={
@@ -180,6 +210,7 @@ function ComposerCase({
 	chatTabId,
 	isStreaming = false,
 	label,
+	lockedProvider = null,
 	onPlanModeChange,
 	planMode,
 	planReview,
@@ -187,11 +218,17 @@ function ComposerCase({
 	chatTabId: string;
 	isStreaming?: boolean;
 	label?: string;
+	lockedProvider?: AgentProviderId | null;
 	onPlanModeChange?: (planMode: boolean) => void;
 	planMode: boolean;
 	planReview?: React.ReactNode;
 }) {
-	const composer = useComposerStub({ isStreaming, onPlanModeChange, planMode });
+	const composer = useComposerStub({
+		isStreaming,
+		lockedProvider,
+		onPlanModeChange,
+		planMode,
+	});
 
 	return (
 		<div className='flex flex-col gap-1.5'>
@@ -220,22 +257,25 @@ function ComposerCase({
  */
 function useComposerStub({
 	isStreaming,
+	lockedProvider,
 	onPlanModeChange,
 	planMode,
 }: {
 	isStreaming: boolean;
+	lockedProvider: AgentProviderId | null;
 	onPlanModeChange?: (planMode: boolean) => void;
 	planMode: boolean;
 }): ComposerShellState {
 	return useMemo(
 		() => ({
-			activePiSessionId: 'playground-session',
+			activeAgentSessionId: 'playground-session',
 			availableModels: MODELS,
 			availableThinkingLevels: THINKING_LEVELS,
 			contextUsage: { maxTokens: 200_000, usedTokens: 48_000 },
 			disabled: false,
 			disabledReason: null,
 			isStreaming,
+			lockedProvider,
 			modelId: MODELS[0].id,
 			modelLabel: MODELS[0].displayName,
 			onModelChange: () => undefined,
@@ -250,7 +290,7 @@ function useComposerStub({
 			workspaceCwd: WORKSPACE_CWD,
 			workspaceFiles: WORKSPACE_FILES,
 		}),
-		[isStreaming, onPlanModeChange, planMode],
+		[isStreaming, lockedProvider, onPlanModeChange, planMode],
 	);
 }
 
@@ -260,7 +300,9 @@ function SceneControls({
 	isHandingOff,
 	isStreaming,
 	lastDecision,
+	lockedProvider,
 	onHandingOffChange,
+	onLockedProviderChange,
 	onPlanModeChange,
 	onPlanReviewChange,
 	onStreamingChange,
@@ -270,7 +312,9 @@ function SceneControls({
 	isHandingOff: boolean;
 	isStreaming: boolean;
 	lastDecision: string | null;
+	lockedProvider: AgentProviderId | null;
 	onHandingOffChange: (enabled: boolean) => void;
+	onLockedProviderChange: (provider: AgentProviderId | null) => void;
 	onPlanModeChange: (enabled: boolean) => void;
 	onPlanReviewChange: (enabled: boolean) => void;
 	onStreamingChange: (enabled: boolean) => void;
@@ -290,6 +334,23 @@ function SceneControls({
 				</ControlGroup>
 				<ControlGroup label='streaming'>
 					<OnOff isOn={isStreaming} onChange={onStreamingChange} />
+				</ControlGroup>
+				<ControlGroup label='provider pin'>
+					<SceneToggle
+						isActive={lockedProvider === null}
+						label='new chat'
+						onClick={() => onLockedProviderChange(null)}
+					/>
+					<SceneToggle
+						isActive={lockedProvider === 'pi'}
+						label='pi'
+						onClick={() => onLockedProviderChange('pi')}
+					/>
+					<SceneToggle
+						isActive={lockedProvider === 'claude'}
+						label='claude'
+						onClick={() => onLockedProviderChange('claude')}
+					/>
 				</ControlGroup>
 			</div>
 			<span className='font-mono text-muted-foreground text-xxs'>

@@ -8,8 +8,9 @@ import type { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
 import { openEnsemblrDatabase } from '../../src/main/storage/database.ts';
+import { createAgentSession } from '../../src/main/storage/repositories/agent-session-repository.ts';
 import {
-	bindPiSession,
+	bindAgentSession,
 	closeChatTab,
 	deleteChatTab,
 	getRuntimeState,
@@ -23,11 +24,10 @@ import {
 	restoreChatTab,
 	setRuntimeState,
 } from '../../src/main/storage/repositories/chat-tab-repository.ts';
-import { createPiSession } from '../../src/main/storage/repositories/pi-session-repository.ts';
 
 interface Fixture {
+	agentSessionId: string;
 	database: DatabaseSync;
-	piSessionId: string;
 	workspaceId: string;
 }
 
@@ -48,14 +48,14 @@ INSERT INTO workspaces (id, repository_id, slug, name, path)
 VALUES ('ws-tab', 'repo-tab', 'tab', 'Tab', '/tmp/ensemblr/tab/ws');
 `);
 
-	const { session } = createPiSession({
+	const { session } = createAgentSession({
 		database: connection.database,
 		input: { cwd: '/tmp/ensemblr/tab/ws', workspaceId: 'ws-tab' },
 	});
 
 	return {
 		database: connection.database,
-		piSessionId: session.id,
+		agentSessionId: session.id,
 		workspaceId: 'ws-tab',
 	};
 }
@@ -67,7 +67,7 @@ test('openChatTab assigns sequential positions to open tabs', (t) => {
 		database: fixture.database,
 		input: {
 			kind: 'chat',
-			piSessionId: fixture.piSessionId,
+			agentSessionId: fixture.agentSessionId,
 			title: 'Chat A',
 			workspaceId: fixture.workspaceId,
 		},
@@ -76,7 +76,7 @@ test('openChatTab assigns sequential positions to open tabs', (t) => {
 		database: fixture.database,
 		input: {
 			kind: 'chat',
-			piSessionId: fixture.piSessionId,
+			agentSessionId: fixture.agentSessionId,
 			title: 'Chat B',
 			workspaceId: fixture.workspaceId,
 		},
@@ -191,7 +191,7 @@ test('closeChatTab leaves the row but flags closed_at', (t) => {
 		database: fixture.database,
 		input: {
 			kind: 'chat',
-			piSessionId: fixture.piSessionId,
+			agentSessionId: fixture.agentSessionId,
 			title: 'Chat',
 			workspaceId: fixture.workspaceId,
 		},
@@ -208,7 +208,7 @@ test('closeChatTab leaves the row but flags closed_at', (t) => {
 	);
 });
 
-test('preview tabs can omit pi_session_id', (t) => {
+test('preview tabs can omit agent_session_id', (t) => {
 	const fixture = openFixture(t);
 
 	const tab = openChatTab({
@@ -221,7 +221,7 @@ test('preview tabs can omit pi_session_id', (t) => {
 	});
 
 	assert.equal(tab.kind, 'preview');
-	assert.equal(tab.piSessionId, null);
+	assert.equal(tab.agentSessionId, null);
 });
 
 test('reorderChatTabs reflects supplied id sequence', (t) => {
@@ -258,7 +258,7 @@ test('renameChatTab updates title only', (t) => {
 		database: fixture.database,
 		input: {
 			kind: 'chat',
-			piSessionId: fixture.piSessionId,
+			agentSessionId: fixture.agentSessionId,
 			title: 'Original',
 			workspaceId: fixture.workspaceId,
 		},
@@ -280,7 +280,7 @@ test('openChatTab defaults fullTitle to title when none is supplied', (t) => {
 		database: fixture.database,
 		input: {
 			kind: 'chat',
-			piSessionId: fixture.piSessionId,
+			agentSessionId: fixture.agentSessionId,
 			title: 'Short',
 			workspaceId: fixture.workspaceId,
 		},
@@ -297,7 +297,7 @@ test('openChatTab keeps a supplied fullTitle alongside the capped title', (t) =>
 		input: {
 			fullTitle: 'Migration Architect: Next.js App Router upgrade',
 			kind: 'chat',
-			piSessionId: fixture.piSessionId,
+			agentSessionId: fixture.agentSessionId,
 			title: 'Migration Architect: Next.js…',
 			workspaceId: fixture.workspaceId,
 		},
@@ -318,7 +318,7 @@ test('renameChatTab rewrites fullTitle so a stale one never survives', (t) => {
 		input: {
 			fullTitle: 'The original untruncated title',
 			kind: 'chat',
-			piSessionId: fixture.piSessionId,
+			agentSessionId: fixture.agentSessionId,
 			title: 'The original…',
 			workspaceId: fixture.workspaceId,
 		},
@@ -340,7 +340,7 @@ test('listOpenForWorkspace mirrors listOpenChatTabs', (t) => {
 		database: fixture.database,
 		input: {
 			kind: 'chat',
-			piSessionId: fixture.piSessionId,
+			agentSessionId: fixture.agentSessionId,
 			title: 'Alpha',
 			workspaceId: fixture.workspaceId,
 		},
@@ -349,7 +349,7 @@ test('listOpenForWorkspace mirrors listOpenChatTabs', (t) => {
 		database: fixture.database,
 		input: {
 			kind: 'chat',
-			piSessionId: fixture.piSessionId,
+			agentSessionId: fixture.agentSessionId,
 			title: 'Beta',
 			workspaceId: fixture.workspaceId,
 		},
@@ -447,7 +447,7 @@ test('markClosed is an alias for closeChatTab', (t) => {
 		database: fixture.database,
 		input: {
 			kind: 'chat',
-			piSessionId: fixture.piSessionId,
+			agentSessionId: fixture.agentSessionId,
 			title: 'Closing soon',
 			workspaceId: fixture.workspaceId,
 		},
@@ -485,7 +485,7 @@ test('deleteChatTab removes a tab without preserving closed history', (t) => {
 	);
 });
 
-test('bindPiSession attaches a pi session to a tab', (t) => {
+test('bindAgentSession attaches an agent session to a tab', (t) => {
 	const fixture = openFixture(t);
 
 	const tab = openChatTab({
@@ -496,14 +496,14 @@ test('bindPiSession attaches a pi session to a tab', (t) => {
 			workspaceId: fixture.workspaceId,
 		},
 	});
-	assert.equal(tab.piSessionId, null);
+	assert.equal(tab.agentSessionId, null);
 
-	const bound = bindPiSession({
+	const bound = bindAgentSession({
 		database: fixture.database,
 		id: tab.id,
-		piSessionId: fixture.piSessionId,
+		agentSessionId: fixture.agentSessionId,
 	});
-	assert.equal(bound?.piSessionId, fixture.piSessionId);
+	assert.equal(bound?.agentSessionId, fixture.agentSessionId);
 });
 
 test('runtime state upserts and is keyed by workspace', (t) => {
@@ -520,7 +520,7 @@ test('runtime state upserts and is keyed by workspace', (t) => {
 		database: fixture.database,
 		input: {
 			kind: 'chat',
-			piSessionId: fixture.piSessionId,
+			agentSessionId: fixture.agentSessionId,
 			title: 'Chat',
 			workspaceId: fixture.workspaceId,
 		},
@@ -529,11 +529,11 @@ test('runtime state upserts and is keyed by workspace', (t) => {
 	const set = setRuntimeState({
 		activeTabId: tab.id,
 		database: fixture.database,
-		lastActiveSessionId: fixture.piSessionId,
+		lastActiveSessionId: fixture.agentSessionId,
 		workspaceId: fixture.workspaceId,
 	});
 	assert.equal(set.activeTabId, tab.id);
-	assert.equal(set.lastActiveSessionId, fixture.piSessionId);
+	assert.equal(set.lastActiveSessionId, fixture.agentSessionId);
 
 	const cleared = setRuntimeState({
 		activeTabId: null,

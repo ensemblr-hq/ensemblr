@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { formatModelDisplayName } from '../../src/renderer/lib/pi/model-display-name';
+import { formatModelDisplayName } from '../../src/renderer/lib/agent-timeline/model-display-name';
 
 const H = '‑'; // non-breaking hyphen used to join GPT name parts
 

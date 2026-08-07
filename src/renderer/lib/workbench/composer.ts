@@ -6,6 +6,7 @@ import type {
 	SessionTabModel,
 	WorkspaceFileSummary,
 } from '@/renderer/types/workbench';
+import type { AgentProviderId } from '@/shared/agent-provider';
 import type { SetupDiagnosticsSnapshot } from '@/shared/ipc/contracts/setup';
 
 /**
@@ -25,17 +26,18 @@ export function showsComposer(session: SessionTabModel): boolean {
 
 /**
  * Computes the composer shell state from setup readiness, the active session,
- * and a Pi controller. Disables the composer while setup is not yet ready and
- * while Pi runtime checks fail. Sub-agent tabs never reach here — they render no
- * composer at all; see {@link showsComposer}.
+ * and an agent controller. Disables the composer while setup is not yet ready
+ * and while agent runtime checks fail. Sub-agent tabs never reach here — they
+ * render no composer at all; see {@link showsComposer}.
  */
 export function getComposerState({
 	activeSession,
-	activePiSessionId,
+	activeAgentSessionId,
 	availableModels,
 	availableThinkingLevels,
 	contextUsage,
 	isStreaming,
+	lockedProvider,
 	modelId,
 	onModelChange,
 	onPlanModeChange,
@@ -49,12 +51,13 @@ export function getComposerState({
 	workspaceCwd,
 	workspaceFiles,
 }: {
-	activePiSessionId: string | null;
+	activeAgentSessionId: string | null;
 	activeSession: SessionTabModel;
 	availableModels: readonly ComposerModelOption[];
 	availableThinkingLevels: readonly ComposerThinkingOption[];
 	contextUsage?: ComposerContextUsage | null;
 	isStreaming: boolean;
+	lockedProvider: AgentProviderId | null;
 	modelId: string | null;
 	onModelChange: (modelId: string) => void;
 	onPlanModeChange: (planMode: boolean) => void;
@@ -73,17 +76,18 @@ export function getComposerState({
 }): ComposerShellState {
 	const modelLabel =
 		availableModels.find((option) => option.id === modelId)?.displayName ??
-		'Pi model pending';
+		'Model pending';
 	const thinkingLabelText =
 		availableThinkingLevels.find((option) => option.id === thinkingLevel)
 			?.label ?? 'Thinking pending';
 
 	const base = {
-		activePiSessionId,
+		activeAgentSessionId,
 		availableModels,
 		availableThinkingLevels,
 		contextUsage: contextUsage ?? null,
 		isStreaming,
+		lockedProvider,
 		modelId,
 		modelLabel,
 		onModelChange,
@@ -103,7 +107,7 @@ export function getComposerState({
 			...base,
 			disabled: true,
 			disabledReason: setupError,
-			placeholder: 'Resolve setup diagnostics before starting a Pi turn.',
+			placeholder: 'Resolve setup diagnostics before starting an agent turn.',
 		};
 	}
 
@@ -130,7 +134,7 @@ export function getComposerState({
 		disabled: false,
 		disabledReason: null,
 		placeholder: planMode
-			? 'Describe what you want built — Pi will plan it with you before touching any files'
-			: `Ask Pi to continue ${activeSession.label.toLowerCase()}`,
+			? 'Describe what you want built — the agent will plan it with you before touching any files'
+			: `Ask the agent to continue ${activeSession.label.toLowerCase()}`,
 	};
 }

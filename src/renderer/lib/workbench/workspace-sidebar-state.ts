@@ -25,8 +25,8 @@ export function getWorkspaceSidebarState(
 		};
 	}
 
-	// Live Pi runtime activity takes top priority — the spinner is the most
-	// informative signal when a Pi session is mid-turn, even on workspaces
+	// Live agent runtime activity takes top priority — the spinner is the most
+	// informative signal when an agent session is mid-turn, even on workspaces
 	// with an open PR or pending checks. The flag is passed in by the caller
 	// instead of being derived from `workspace.status` so PR-priority
 	// semantics on cached fixtures stay intact.

@@ -7,6 +7,7 @@ import {
 	KeyboardIcon,
 	LayoutDashboardIcon,
 	LinkIcon,
+	PlugZapIcon,
 	PuzzleIcon,
 	SettingsIcon,
 	TerminalIcon,
@@ -100,6 +101,13 @@ export function CommandPalette() {
 			label: 'Settings · Models',
 			icon: BoxIcon,
 			run: go(() => navigate({ to: '/settings/models' })),
+		},
+		{
+			id: 'settings.providers',
+			label: 'Settings · Providers',
+			icon: PlugZapIcon,
+			keywords: ['claude', 'pi', 'agent', 'runtime'],
+			run: go(() => navigate({ to: '/settings/providers' })),
 		},
 		{
 			id: 'settings.environment',

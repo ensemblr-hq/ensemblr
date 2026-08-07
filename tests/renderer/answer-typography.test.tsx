@@ -8,7 +8,7 @@ import {
 	FilePreviewOpenerProvider,
 	WorkspacePathResolverProvider,
 } from '../../src/renderer/components/workbench-shell/conversation-panel/file-preview-context';
-import { createWorkspacePathResolver } from '../../src/renderer/lib/pi';
+import { createWorkspacePathResolver } from '../../src/renderer/lib/agent-timeline';
 import { appSettingsAtom } from '../../src/renderer/state/preferences';
 import type { WorkspaceFileSummary } from '../../src/renderer/types/workbench';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';

@@ -6,7 +6,7 @@ import {
 	presentReasoning,
 	presentSkillInvocation,
 	presentToolCall,
-} from '../../src/renderer/lib/pi/tool-presentation';
+} from '../../src/renderer/lib/agent-timeline/tool-presentation';
 
 function call(
 	toolName: string,

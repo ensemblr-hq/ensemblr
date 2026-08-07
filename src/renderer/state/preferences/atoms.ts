@@ -46,8 +46,8 @@ export const chatThinkingOverrideAtomFamily = atomFamily((chatTabId: string) =>
 
 /**
  * Whether a chat is in Plan Mode, keyed by chat-tab id. This is the durable record
- * of what the user chose: it rides every `openPiSession`/`submitPiPrompt` call into
- * the main-process registry, which keeps no persistence of its own.
+ * of what the user chose: it rides every `openAgentSession`/`submitAgentPrompt`
+ * call into the main-process registry, which keeps no persistence of its own.
  *
  * `null` means the user has never decided for this tab, and is deliberately
  * distinct from `false`. A spawned conversation inherits its parent's Plan Mode

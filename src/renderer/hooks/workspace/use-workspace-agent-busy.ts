@@ -14,9 +14,10 @@ interface WorkspaceAgentBusyState {
  * currently working, inferred from the braille spinner glyph the harness animates
  * in its OSC window title or, for spinner-less harnesses (Vibe), from the
  * main-process `agentBusy` flag derived from the session log. This is the
- * terminal-side analogue of `useWorkspacePiBusy`: it subscribes to terminal
- * lifecycle broadcasts (which carry `workspaceId` and the session `kind`) so an
- * inactive, non-focused sidebar row still lights up while its agent is busy.
+ * terminal-side analogue of `useWorkspaceAgentSessionBusy`: it subscribes to
+ * terminal lifecycle broadcasts (which carry `workspaceId` and the session
+ * `kind`) so an inactive, non-focused sidebar row still lights up while its
+ * agent is busy.
  *
  * Both signals are treated as authoritative levels, not decaying pulses: main
  * broadcasts a title change on every edge, and a harness leads its title with a

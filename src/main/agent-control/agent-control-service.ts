@@ -14,6 +14,7 @@ import type {
 	AskUserQuestionArgs,
 	CheckPlanModeToolArgs,
 	CloseTabArgs,
+	ControlAudience,
 	ConversationRef,
 	ExitPlanModeArgs,
 	FocusDockTabArgs,
@@ -63,10 +64,14 @@ import {
 	planModeControlOpDenial,
 	planModeFollowUpDenial,
 } from '../../shared/plan-mode.ts';
-import { BranchSlugRejected } from '../pi-agent/naming/apply-branch-slug.ts';
+import { BranchSlugRejected } from '../agent-runtime/naming/apply-branch-slug.ts';
 import type { Guardrails } from './guardrails.ts';
 import type { OriginRegistry } from './origin-registry.ts';
-import type { AgentControlOrigin, AgentControlPorts } from './ports.ts';
+import {
+	type AgentControlOrigin,
+	type AgentControlPorts,
+	originHasChatTab,
+} from './ports.ts';
 
 /** A single inbound control command, as handed over by either bridge. */
 export interface AgentControlCommand {
@@ -93,6 +98,15 @@ export interface AgentControlService {
 	invoke: (
 		command: AgentControlCommand,
 	) => Promise<AgentControlResult<unknown>>;
+	/**
+	 * Resolves who a token's caller is, for the bridges that shape a whole surface
+	 * to the caller rather than validating one call: the MCP tool list and the
+	 * playbook served alongside it. Identity stays the service's to resolve, so a
+	 * bridge never reaches into the origin registry itself. A token that resolves
+	 * to nothing reads as a harness root — the narrowest first-class-free surface,
+	 * and every call it goes on to make is refused anyway.
+	 */
+	describeAudience: (token: string) => Promise<ControlAudience>;
 	/**
 	 * Releases all per-session state (pending orchestrator signal, spawn
 	 * counters, origin token) when an agent session ends, keeping the in-memory
@@ -239,7 +253,12 @@ function stillRunning(
 	return settled.flatMap((entry) =>
 		entry.settled
 			? []
-			: [{ piSessionId: entry.agent.piSessionId, status: entry.agent.status }],
+			: [
+					{
+						agentSessionId: entry.agent.agentSessionId,
+						status: entry.agent.status,
+					},
+				],
 	);
 }
 
@@ -271,7 +290,7 @@ function emptyWait(defaulted: boolean): WaitForAgentsResult {
 	}
 	return {
 		...result,
-		note: 'No children are registered to this session. If you spawned children earlier and the app has restarted since, that lineage is gone and the default target cannot find them — wait again with their piSessionIds in `targets`, taken from the ensemblr_start_conversation results earlier in this conversation, or read a report directly with ensemblr_get_last_message.',
+		note: 'No children are registered to this session. If you spawned children earlier and the app has restarted since, that lineage is gone and the default target cannot find them — wait again with their agentSessionIds in `targets`, taken from the ensemblr_start_conversation results earlier in this conversation, or read a report directly with ensemblr_get_last_message.',
 	};
 }
 
@@ -286,7 +305,7 @@ function waitOutcome(outcome: {
 		return result;
 	}
 	const targets = result.pending
-		.map((entry) => `"${entry.piSessionId}"`)
+		.map((entry) => `"${entry.agentSessionId}"`)
 		.join(', ');
 	return {
 		...result,
@@ -331,14 +350,14 @@ export function createAgentControlService({
 	const signalsByChild = new Map<string, OrchestratorSignal>();
 
 	/**
-	 * Whether the caller is a Pi conversation that is currently planning. Plan Mode
-	 * is a native chat feature, so a harness caller is never planning however its
-	 * session id resolves.
+	 * Whether the caller is a chat conversation that is currently planning. Plan
+	 * Mode is a native chat-tab feature, so a caller without one is never planning
+	 * however its session id happens to resolve.
 	 * @param origin - Resolved caller identity.
 	 * @returns True when Plan Mode governs this caller's turn.
 	 */
 	const isPlanning = (origin: AgentControlOrigin): boolean =>
-		origin.species === 'pi' && ports.planMode.isActive(origin.sessionId);
+		originHasChatTab(origin) && ports.planMode.isActive(origin.sessionId);
 
 	/**
 	 * The caller's control-layer role. Prefers the sub-agent marker its spawn
@@ -452,14 +471,14 @@ export function createAgentControlService({
 	};
 
 	const waitIfRequested = async (
-		piSessionId: string,
+		agentSessionId: string,
 		wait: boolean | undefined,
 	): Promise<'completed' | 'timeout' | undefined> => {
 		if (!wait) {
 			return undefined;
 		}
 		return ports.conversations.waitForIdle(
-			piSessionId,
+			agentSessionId,
 			guardrails.waitTimeoutMs,
 		);
 	};
@@ -509,16 +528,16 @@ export function createAgentControlService({
 			planMode: isPlanning(origin),
 		});
 		guardrails.recordSpawn(origin.sessionId);
-		const result = await waitIfRequested(started.piSessionId, args.wait);
+		const result = await waitIfRequested(started.agentSessionId, args.wait);
 		return ok({ ...started, result });
 	};
 
 	/**
 	 * Names the caller's own conversation tab. A title the user chose outranks
 	 * the agent and is reported as settled rather than failed, so the agent reads
-	 * "leave it alone" instead of a fault worth retrying. Pi-only: a harness owns
-	 * a terminal tab whose title is derived from its own session log, so there is
-	 * nothing here for it to rename.
+	 * "leave it alone" instead of a fault worth retrying. Chat tabs only: a
+	 * harness owns a terminal tab whose title is derived from its own session log,
+	 * so there is nothing here for it to rename.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The requested title.
 	 * @returns The resulting title and whether the rename landed.
@@ -527,14 +546,14 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: SetNameArgs,
 	): Promise<AgentControlResult<unknown>> => {
-		if (origin.species !== 'pi') {
+		if (!originHasChatTab(origin)) {
 			return fail(
 				'denied-scope',
-				'Naming a tab is limited to native Pi conversations; your tab is named from your own session log.',
+				'Naming a tab is limited to native chat conversations; your tab is named from your own session log.',
 			);
 		}
 		const result = await ports.conversations.setName({
-			piSessionId: origin.sessionId,
+			agentSessionId: origin.sessionId,
 			name: args.title,
 		});
 		if (!result) {
@@ -583,9 +602,9 @@ export function createAgentControlService({
 	};
 
 	/**
-	 * Records what the conversation has covered so far. Restricted to Pi callers:
-	 * the summary belongs to the chat tab bound to the Pi session, and a harness
-	 * has no such tab.
+	 * Records what the conversation has covered so far. Restricted to callers with
+	 * a chat tab: the summary belongs to the tab bound to the calling session, and
+	 * a harness has no such tab.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The summary title and markdown body.
 	 * @returns The point in the conversation the summary now covers.
@@ -594,10 +613,10 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: SetSummaryArgs,
 	): Promise<AgentControlResult<unknown>> => {
-		if (origin.species !== 'pi') {
+		if (!originHasChatTab(origin)) {
 			return fail(
 				'denied-scope',
-				'Recording a session summary is limited to native Pi conversations.',
+				'Recording a session summary is limited to native chat conversations.',
 			);
 		}
 		return ok(
@@ -642,7 +661,7 @@ export function createAgentControlService({
 		args: SendFollowUpArgs,
 	): Promise<AgentControlResult<unknown>> => {
 		const owner = await ports.conversations.resolveConversationWorkspace(
-			args.piSessionId,
+			args.agentSessionId,
 		);
 		const scoped = outOfScope(owner, origin);
 		if (scoped) {
@@ -650,7 +669,7 @@ export function createAgentControlService({
 		}
 		if (isPlanning(origin)) {
 			const denial = planModeFollowUpDenial(
-				ports.planMode.isActive(args.piSessionId),
+				ports.planMode.isActive(args.agentSessionId),
 			);
 			if (denial) {
 				return fail('denied-scope', denial);
@@ -658,7 +677,7 @@ export function createAgentControlService({
 		}
 		if (args.wait) {
 			const deadlock = guardrails.evaluateWaitTarget(
-				args.piSessionId,
+				args.agentSessionId,
 				originRegistry.ancestorsOf(origin.sessionId),
 			);
 			if (!deadlock.ok) {
@@ -666,10 +685,10 @@ export function createAgentControlService({
 			}
 		}
 		await ports.conversations.sendFollowUp({
-			piSessionId: args.piSessionId,
+			agentSessionId: args.agentSessionId,
 			prompt: args.prompt,
 		});
-		const result = await waitIfRequested(args.piSessionId, args.wait);
+		const result = await waitIfRequested(args.agentSessionId, args.wait);
 		return ok({ result });
 	};
 
@@ -886,18 +905,19 @@ export function createAgentControlService({
 	 * for every target on every tick and reading a report means a synchronous
 	 * descending scan of its whole final turn on the main thread. The report is
 	 * fetched once, by {@link reportOn}, on the tick that returns.
-	 * @param piSessionId - The child to inspect.
+	 * @param agentSessionId - The child to inspect.
 	 * @returns The child's current state and whether it counts as settled.
 	 */
 	const settleTarget = async (
-		piSessionId: string,
+		agentSessionId: string,
 	): Promise<{ agent: WaitedAgent; settled: boolean }> => {
-		const status = (await ports.conversations.getStatus(piSessionId))?.status;
-		const signal = signalsByChild.get(piSessionId) ?? null;
+		const status = (await ports.conversations.getStatus(agentSessionId))
+			?.status;
+		const signal = signalsByChild.get(agentSessionId) ?? null;
 		const terminal = status === undefined || TERMINAL_STATUSES.has(status);
 		return {
 			agent: {
-				piSessionId,
+				agentSessionId,
 				status: status ?? 'unknown',
 				lastMessage: null,
 				reportTruncated: false,
@@ -920,12 +940,12 @@ export function createAgentControlService({
 		detail: WaitReportDetail,
 	): Promise<WaitedAgent> => {
 		const lastMessage = await ports.conversations.getLastMessage(
-			agent.piSessionId,
+			agent.agentSessionId,
 		);
 		if (detail === 'full') {
 			return { ...agent, lastMessage };
 		}
-		const brief = briefReport(lastMessage, agent.piSessionId);
+		const brief = briefReport(lastMessage, agent.agentSessionId);
 		return {
 			...agent,
 			lastMessage: brief.text,
@@ -948,7 +968,7 @@ export function createAgentControlService({
 			done.map((entry) => reportOn(entry.agent, detail)),
 		);
 		for (const entry of completed) {
-			signalsByChild.delete(entry.piSessionId);
+			signalsByChild.delete(entry.agentSessionId);
 		}
 		return completed;
 	};
@@ -1037,23 +1057,23 @@ export function createAgentControlService({
 	};
 
 	/**
-	 * Puts a questionnaire to the human. Restricted to Pi callers: the dialog is
-	 * rendered inside the chat tab bound to the asking Pi session, and a harness
-	 * has no such tab to host it.
+	 * Puts a questionnaire to the human. Restricted to callers with a chat tab:
+	 * the dialog is rendered inside the tab bound to the asking session, and a
+	 * harness has no such tab to host it.
 	 * @param origin - Resolved caller identity.
 	 * @param args - The validated questionnaire.
 	 * @param signal - Aborts when the asking turn ends, withdrawing the dialog.
-	 * @returns The user's answers, or a scope failure for non-Pi callers.
+	 * @returns The user's answers, or a scope failure for a caller with no tab.
 	 */
 	const handleAskUserQuestion = async (
 		origin: AgentControlOrigin,
 		args: AskUserQuestionArgs,
 		signal: AbortSignal | undefined,
 	): Promise<AgentControlResult<unknown>> => {
-		if (origin.species !== 'pi') {
+		if (!originHasChatTab(origin)) {
 			return fail(
 				'denied-scope',
-				'Asking the user is limited to native Pi conversations.',
+				'Asking the user is limited to native chat conversations.',
 			);
 		}
 		return ok(
@@ -1080,9 +1100,9 @@ export function createAgentControlService({
 	};
 
 	/**
-	 * Puts a finished plan to the human for review. Restricted to Pi callers that
-	 * are actually planning: the review panel is rendered inside the chat tab
-	 * bound to the planning Pi session, and without the second check any agent
+	 * Puts a finished plan to the human for review. Restricted to callers with a
+	 * chat tab that are actually planning: the review panel is rendered inside the
+	 * tab bound to the planning session, and without the second check any agent
 	 * could drop a file in `.context/plans/` and put a decision panel — whose
 	 * Approve button submits a prompt — in front of the user unprompted.
 	 *
@@ -1097,10 +1117,10 @@ export function createAgentControlService({
 		origin: AgentControlOrigin,
 		args: ExitPlanModeArgs,
 	): Promise<AgentControlResult<unknown>> => {
-		if (origin.species !== 'pi') {
+		if (!originHasChatTab(origin)) {
 			return fail(
 				'denied-scope',
-				'Plan Mode is limited to native Pi conversations.',
+				'Plan Mode is limited to native chat conversations.',
 			);
 		}
 		if (!ports.planMode.isActive(origin.sessionId)) {
@@ -1113,15 +1133,16 @@ export function createAgentControlService({
 	};
 
 	const readConversationStatus = async (
-		piSessionId: string,
+		agentSessionId: string,
 	): Promise<AgentControlResult<unknown>> => {
-		const status = await ports.conversations.getStatus(piSessionId);
+		const status = await ports.conversations.getStatus(agentSessionId);
 		if (!status) {
 			return ok(null);
 		}
 		return ok({
 			...status,
-			hasFinalMessage: await ports.conversations.hasFinalMessage(piSessionId),
+			hasFinalMessage:
+				await ports.conversations.hasFinalMessage(agentSessionId),
 		} satisfies AgentControlConversationStatus);
 	};
 
@@ -1151,7 +1172,7 @@ export function createAgentControlService({
 		focusTab: ({ args, origin }) =>
 			handleFocusTab(origin, args as FocusTabArgs),
 		getConversationStatus: ({ args }) =>
-			readConversationStatus((args as ConversationRef).piSessionId),
+			readConversationStatus((args as ConversationRef).agentSessionId),
 		getDiffComments: ({ args, origin }) =>
 			ports.review
 				.listComments({
@@ -1162,7 +1183,7 @@ export function createAgentControlService({
 		getLastMessage: async ({ args }) =>
 			ok({
 				message: await ports.conversations.getLastMessage(
-					(args as ConversationRef).piSessionId,
+					(args as ConversationRef).agentSessionId,
 				),
 			} satisfies GetLastMessageResult),
 		getSessionBrief: ({ origin }) => handleGetSessionBrief(origin),
@@ -1284,6 +1305,17 @@ export function createAgentControlService({
 		}
 	};
 
+	const describeAudience = async (token: string): Promise<ControlAudience> => {
+		const origin = originRegistry.resolveByToken(token);
+		if (!origin) {
+			return { hasChatTab: false, role: 'orchestrator' };
+		}
+		return {
+			hasChatTab: originHasChatTab(origin),
+			role: await resolveRole(origin),
+		};
+	};
+
 	const releaseSession = (sessionId: string): void => {
 		ports.ask.releaseSession(sessionId);
 		ports.planMode.releaseSession(sessionId);
@@ -1292,5 +1324,5 @@ export function createAgentControlService({
 		originRegistry.release(sessionId);
 	};
 
-	return { invoke, releaseSession };
+	return { describeAudience, invoke, releaseSession };
 }

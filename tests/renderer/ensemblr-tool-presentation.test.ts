@@ -6,11 +6,11 @@ import {
 	ensemblrToolGlyph,
 	ensemblrToolLabel,
 	isHiddenEnsemblrToolCall,
-} from '../../src/renderer/lib/pi/ensemblr-tool-presentation';
+} from '../../src/renderer/lib/agent-timeline/ensemblr-tool-presentation';
 import {
 	glyphForToolCall,
 	presentToolCall,
-} from '../../src/renderer/lib/pi/tool-presentation';
+} from '../../src/renderer/lib/agent-timeline/tool-presentation';
 
 const toolCall = (
 	toolName: string,

@@ -1,7 +1,8 @@
-import type {
-	ListPiModelsResult,
-	PiModelOptionWire,
-} from '../../shared/ipc/contracts/pi-session';
+import {
+	type AgentModelCatalog,
+	type AgentModelOption,
+	EMPTY_AGENT_MODEL_CATALOG,
+} from '../../shared/ipc/contracts/agent-models.ts';
 import type {
 	LocalCommandFailureCode,
 	LocalCommandResult,
@@ -12,8 +13,8 @@ import {
 	type PiExecutableSnapshot,
 } from './pi-executable.ts';
 import type {
-	PiModelOption,
 	PiProviderModelFailureCode,
+	PiProviderModelRow,
 	PiProviderModelSnapshot,
 } from './pi-runtime-types.ts';
 
@@ -27,27 +28,22 @@ const DEFAULT_THINKING_LEVELS = [
 ] as const;
 const DEFAULT_THINKING_LEVEL = 'medium';
 
-const EMPTY_PI_MODELS: ListPiModelsResult = {
-	defaultModelId: null,
-	defaultThinkingLevel: null,
-	models: [],
-};
-
 /**
  * Maps a {@link PiProviderModelSnapshot} to the renderer-facing wire shape used
- * by `IPC_CHANNELS.listPiModels`. Returns the empty result when the snapshot is
+ * by `IPC_CHANNELS.listAgentModels`. Returns the empty result when the snapshot is
  * unsuccessful or empty, so callers can pipe it straight through.
  */
 export function presentPiModels(
 	input: PiProviderModelSnapshot,
-): ListPiModelsResult {
+): AgentModelCatalog {
 	if (input.status !== 'success' || input.models.length === 0) {
-		return EMPTY_PI_MODELS;
+		return EMPTY_AGENT_MODEL_CATALOG;
 	}
-	const models: PiModelOptionWire[] = input.models.flatMap((row) =>
+	const models: AgentModelOption[] = input.models.flatMap((row) =>
 		row.model && row.provider
 			? [
 					{
+						agentProvider: 'pi' as const,
 						displayName: row.model,
 						id: row.id,
 						provider: row.provider,
@@ -57,7 +53,7 @@ export function presentPiModels(
 			: [],
 	);
 	if (models.length === 0) {
-		return EMPTY_PI_MODELS;
+		return EMPTY_AGENT_MODEL_CATALOG;
 	}
 	return {
 		defaultModelId: models[0]?.id ?? null,
@@ -170,11 +166,11 @@ export async function resolvePiProviderModels({
  */
 export function parsePiListModelsOutput(output: string): {
 	modelCount: number;
-	models: readonly PiModelOption[];
+	models: readonly PiProviderModelRow[];
 	providerCount: number;
 } {
 	const providers = new Set<string>();
-	const models: PiModelOption[] = [];
+	const models: PiProviderModelRow[] = [];
 	const seenIds = new Set<string>();
 
 	for (const line of output.split(/\r?\n/)) {

@@ -39,7 +39,7 @@ const makeDeps = (): PortAdapterDeps => {
 	return {
 		databaseService: { getConnection: () => ({ database: {} }) },
 		chatTabService: { openTab: vi.fn(() => ({ id: 'tab-1', metadata: {} })) },
-		piSessionService: {
+		agentSessionService: {
 			openSession,
 			submitPrompt: vi.fn(async () => ({})),
 			getSession: vi.fn(() => null),
@@ -134,7 +134,7 @@ describe('startConversation rollback on submit failure', () => {
 		const deps = {
 			databaseService: { getConnection: () => ({ database: {} }) },
 			chatTabService: { openTab, closeTab },
-			piSessionService: {
+			agentSessionService: {
 				openSession: vi.fn(async () => ({
 					id: 'pi-child',
 					status: 'starting',

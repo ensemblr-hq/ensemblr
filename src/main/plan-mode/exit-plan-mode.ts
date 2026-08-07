@@ -84,7 +84,7 @@ export function createPlanSubmission({
 	): Promise<string | null> => {
 		try {
 			return await planFileWriter.writePlanFile({
-				piSessionId: origin.sessionId,
+				agentSessionId: origin.sessionId,
 				plan: args.plan,
 				title: args.title,
 				workspaceCwd: origin.workspaceCwd,
@@ -104,7 +104,7 @@ export function createPlanSubmission({
 				return { planPath, summary: NO_RENDERER_SUMMARY };
 			}
 			broadcastReview({
-				piSessionId: origin.sessionId,
+				agentSessionId: origin.sessionId,
 				planPath,
 				requestId: createRequestId(),
 				title: args.title,

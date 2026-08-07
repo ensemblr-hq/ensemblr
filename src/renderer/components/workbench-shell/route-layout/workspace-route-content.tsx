@@ -20,8 +20,8 @@ import { configuredPreviewUrls } from '@/renderer/lib/workbench/preview-urls';
 import { isDockTab } from '@/renderer/lib/workbench/route-search';
 import { useRegisterCloseAction } from '@/renderer/state/close-action';
 import {
-	usePiComposerController,
-	useStopPiSession,
+	useAgentComposerController,
+	useStopAgentSession,
 } from '@/renderer/state/composer';
 import { repoSettingsOverrideAtomFamily } from '@/renderer/state/preferences';
 import {
@@ -121,9 +121,9 @@ export function WorkspaceRouteContent({
 	const repoOverrides = useAtomValue(
 		repoSettingsOverrideAtomFamily(activeProject.id),
 	);
-	const piComposer = usePiComposerController({
+	const agentComposer = useAgentComposerController({
 		chatTabId: activeSession.chatTabId,
-		currentPiSessionId: activeSession.piSessionId,
+		currentAgentSessionId: activeSession.agentSessionId,
 		masterPrompt: resolveActionPreference(
 			repoOverrides.actionPreferences?.general ?? '',
 			sharedActionPreference(settingsResolution, 'general'),
@@ -138,32 +138,32 @@ export function WorkspaceRouteContent({
 	// here because this is the one place holding both the registered close action
 	// and the composer's live streaming state.
 	const closeGuard = useCloseRunningChatGuard();
-	const stopPiSessionById = useStopPiSession(activeWorkspace.id);
+	const stopAgentSessionById = useStopAgentSession(activeWorkspace.id);
 	const stopFor = useCallback(
-		(targetId: string, piSessionId: string | null) => async () => {
+		(targetId: string, agentSessionId: string | null) => async () => {
 			// The active tab owns the live composer, so prefer its `onStop` (it also
 			// clears the composer's optimistic pending session). Background tabs have
 			// no live composer; cancel them by session id instead.
 			if (targetId === activeSession.id) {
-				await piComposer.onStop();
+				await agentComposer.onStop();
 				return;
 			}
-			if (piSessionId) {
-				await stopPiSessionById(piSessionId);
+			if (agentSessionId) {
+				await stopAgentSessionById(agentSessionId);
 			}
 		},
-		[activeSession.id, piComposer.onStop, stopPiSessionById],
+		[activeSession.id, agentComposer.onStop, stopAgentSessionById],
 	);
 	const requestActiveClose = useCallback(() => {
 		closeGuard.requestClose({
-			isRunning: piComposer.isStreaming,
+			isRunning: agentComposer.isStreaming,
 			onClose: sessionNavigation.closeActiveOrReset,
-			onStop: piComposer.onStop,
+			onStop: agentComposer.onStop,
 		});
 	}, [
 		closeGuard,
-		piComposer.isStreaming,
-		piComposer.onStop,
+		agentComposer.isStreaming,
+		agentComposer.onStop,
 		sessionNavigation.closeActiveOrReset,
 	]);
 	useRegisterCloseAction(requestActiveClose);
@@ -171,20 +171,20 @@ export function WorkspaceRouteContent({
 		(targetId: string) => {
 			const target = resolveRunningCloseTarget({
 				activeSessionId: activeSession.id,
-				isActiveStreaming: piComposer.isStreaming,
+				isActiveStreaming: agentComposer.isStreaming,
 				tabs: sessionNavigation.sessionTabs,
 				targetId,
 			});
 			closeGuard.requestClose({
 				isRunning: target.isRunning,
 				onClose: () => sessionNavigation.closeSessionTab(targetId),
-				onStop: stopFor(targetId, target.piSessionId),
+				onStop: stopFor(targetId, target.agentSessionId),
 			});
 		},
 		[
 			activeSession.id,
 			closeGuard,
-			piComposer.isStreaming,
+			agentComposer.isStreaming,
 			sessionNavigation,
 			stopFor,
 		],
@@ -194,22 +194,23 @@ export function WorkspaceRouteContent({
 		[requestTabClose, sessionNavigation],
 	);
 	const composer = getComposerState({
-		activePiSessionId: piComposer.activeSessionId,
+		activeAgentSessionId: agentComposer.activeSessionId,
 		activeSession,
-		availableModels: piComposer.availableModels,
-		availableThinkingLevels: piComposer.availableThinkingLevels,
-		contextUsage: piComposer.contextUsage,
-		isStreaming: piComposer.isStreaming,
-		modelId: piComposer.modelId,
-		onModelChange: piComposer.onModelChange,
-		onPlanModeChange: piComposer.onPlanModeChange,
-		onStop: piComposer.onStop,
-		onSubmit: piComposer.onSubmit,
-		onThinkingChange: piComposer.onThinkingChange,
-		planMode: piComposer.planMode,
+		availableModels: agentComposer.availableModels,
+		availableThinkingLevels: agentComposer.availableThinkingLevels,
+		contextUsage: agentComposer.contextUsage,
+		isStreaming: agentComposer.isStreaming,
+		lockedProvider: agentComposer.lockedProvider,
+		modelId: agentComposer.modelId,
+		onModelChange: agentComposer.onModelChange,
+		onPlanModeChange: agentComposer.onPlanModeChange,
+		onStop: agentComposer.onStop,
+		onSubmit: agentComposer.onSubmit,
+		onThinkingChange: agentComposer.onThinkingChange,
+		planMode: agentComposer.planMode,
 		setupDiagnostics: setupDiagnosticsState.setupDiagnostics,
 		setupError: setupDiagnosticsState.setupDiagnosticsError,
-		thinkingLevel: piComposer.thinkingLevel,
+		thinkingLevel: agentComposer.thinkingLevel,
 		workspaceCwd: activeWorkspace.pathLabel,
 		workspaceFiles: liveWorkspaceFiles,
 	});

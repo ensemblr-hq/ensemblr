@@ -1,17 +1,16 @@
 import type { DatabaseSync } from 'node:sqlite';
-
+import {
+	getAgentSessionBranchById,
+	getTurnById,
+	setBranchMetadata,
+} from '../storage/repositories/agent-session-repository.ts';
 import {
 	type CheckpointRow,
 	getCheckpointByTurnId,
-	getNextCheckpointInPiSession,
+	getNextCheckpointInAgentSession,
 	insertCheckpoint,
-	listCheckpointsForPiSession,
+	listCheckpointsForAgentSession,
 } from '../storage/repositories/index.ts';
-import {
-	getPiSessionBranchById,
-	getTurnById,
-	setBranchMetadata,
-} from '../storage/repositories/pi-session-repository.ts';
 import {
 	captureWorkspaceCheckpoint,
 	diffTrees,
@@ -21,7 +20,7 @@ import {
 } from './git-checkpoint.ts';
 
 /**
- * Capture port injected into the Pi session lifecycle. Runs before each user
+ * Capture port injected into the agent session lifecycle. Runs before each user
  * prompt reaches the runtime.
  *
  * Safety policy (ADR 0012): capture failure WARNS and continues — the prompt
@@ -34,7 +33,7 @@ interface CheckpointCaptureInput {
 	cwd: string;
 	database: DatabaseSync;
 	label: string;
-	piSessionId: string;
+	agentSessionId: string;
 	turnId: string;
 	workspaceId: string;
 }
@@ -61,7 +60,14 @@ export function checkpointRefFor({
 
 /** Creates the production capture port (git + SQLite). */
 export function createCheckpointCapture(): CheckpointCapturePort {
-	return async ({ cwd, database, label, piSessionId, turnId, workspaceId }) => {
+	return async ({
+		cwd,
+		database,
+		label,
+		agentSessionId,
+		turnId,
+		workspaceId,
+	}) => {
 		const ref = checkpointRefFor({ turnId, workspaceId });
 		try {
 			const captured = await captureWorkspaceCheckpoint({
@@ -76,7 +82,7 @@ export function createCheckpointCapture(): CheckpointCapturePort {
 					gitRef: captured.ref,
 					label,
 					metadata: { treeHash: captured.treeHash },
-					piSessionId,
+					agentSessionId,
 					turnId,
 					workspaceId,
 				},
@@ -116,15 +122,15 @@ export class CheckpointServiceError extends Error {
 	}
 }
 
-/** Lists checkpoints captured for a Pi session, oldest first. */
+/** Lists checkpoints captured for an agent session, oldest first. */
 export function listTurnCheckpoints({
 	database,
-	piSessionId,
+	agentSessionId,
 }: {
 	database: DatabaseSync;
-	piSessionId: string;
+	agentSessionId: string;
 }): readonly CheckpointRow[] {
-	return listCheckpointsForPiSession({ database, piSessionId });
+	return listCheckpointsForAgentSession({ database, agentSessionId });
 }
 
 /** A turn's git diff paired with the checkpoint it was computed against. */
@@ -252,7 +258,7 @@ function requireCheckpointForTurn({
 }
 
 /**
- * Find the checkpoint captured after the given one in the same Pi session.
+ * Find the checkpoint captured after the given one in the same agent session.
  * @returns The next checkpoint, or null when it is the latest or unlinked
  */
 function findNextCheckpoint({
@@ -262,13 +268,13 @@ function findNextCheckpoint({
 	checkpoint: CheckpointRow;
 	database: DatabaseSync;
 }): CheckpointRow | null {
-	if (!checkpoint.piSessionId) {
+	if (!checkpoint.agentSessionId) {
 		return null;
 	}
-	return getNextCheckpointInPiSession({
+	return getNextCheckpointInAgentSession({
 		checkpointId: checkpoint.id,
 		database,
-		piSessionId: checkpoint.piSessionId,
+		agentSessionId: checkpoint.agentSessionId,
 	});
 }
 
@@ -294,8 +300,8 @@ function recordEventTruncation({
 	const bounds = database
 		.prepare(
 			`SELECT
-				(SELECT MIN(ordinal) FROM pi_session_events WHERE turn_id = ?) AS turn_min,
-				(SELECT MAX(ordinal) FROM pi_session_events WHERE branch_id = ?) AS branch_max`,
+				(SELECT MIN(ordinal) FROM agent_session_events WHERE turn_id = ?) AS turn_min,
+				(SELECT MAX(ordinal) FROM agent_session_events WHERE branch_id = ?) AS branch_max`,
 		)
 		.get(turnId, turn.branchId) as {
 		branch_max: number | null;
@@ -305,7 +311,7 @@ function recordEventTruncation({
 		return;
 	}
 
-	const branch = getPiSessionBranchById({ database, id: turn.branchId });
+	const branch = getAgentSessionBranchById({ database, id: turn.branchId });
 	if (!branch) {
 		console.warn(
 			'[checkpoints] restore reverted files but branch is missing; timeline not truncated',

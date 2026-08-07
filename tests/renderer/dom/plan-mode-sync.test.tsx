@@ -18,8 +18,8 @@ const broadcast = (
 	chatTabId: string,
 	planMode: boolean,
 ): PlanModeChangedBroadcast => ({
+	agentSessionId: 'agent-child',
 	chatTabId,
-	piSessionId: 'pi-child',
 	planMode,
 	workspaceId: 'ws-1',
 });

@@ -1,10 +1,18 @@
 import type {
 	ComposerModelOption,
 	GroupedOptions,
+	ModelPickerRow,
 } from '@/renderer/types/workbench';
+import type { AgentProviderId } from '@/shared/agent-provider';
 
+/**
+ * Group labels keyed by a model's *inference* provider. `claude-code` and
+ * `openai-codex` are agent runtimes that also surface as provider ids; the
+ * plain vendor ids beside them must stay vendor-named, or a Pi chat running an
+ * Anthropic model lands in a group labelled after a runtime it is not using.
+ */
 const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
-	anthropic: 'Claude Code',
+	anthropic: 'Anthropic',
 	'claude-code': 'Claude Code',
 	codex: 'OpenAI Codex',
 	composer: 'Cursor',
@@ -14,7 +22,7 @@ const PROVIDER_DISPLAY_NAMES: Record<string, string> = {
 	cursor: 'Cursor',
 	gemini: 'Gemini',
 	google: 'Gemini',
-	openai: 'OpenAI Codex',
+	openai: 'OpenAI',
 	'openai-codex': 'OpenAI Codex',
 };
 
@@ -33,19 +41,34 @@ export function getProviderDisplayName(provider: string): string {
 		.join(' ');
 }
 
-/** Groups model options by provider while preserving source order. */
-function groupByProvider(
-	options: readonly ComposerModelOption[],
-): GroupedOptions[] {
+/**
+ * Wraps a model in a picker row, marking it locked when the chat is already
+ * pinned to a different agent runtime.
+ * @param model - Catalog entry to wrap.
+ * @param lockedProvider - Agent runtime the chat is pinned to, or null when new.
+ * @returns The row the picker renders.
+ */
+function toRow(
+	model: ComposerModelOption,
+	lockedProvider: AgentProviderId | null,
+): ModelPickerRow {
+	return {
+		locked: lockedProvider !== null && model.agentProvider !== lockedProvider,
+		model,
+	};
+}
+
+/** Groups picker rows by inference provider while preserving source order. */
+function groupByProvider(rows: readonly ModelPickerRow[]): GroupedOptions[] {
 	const groups = new Map<string, GroupedOptions>();
-	for (const option of options) {
-		const key = option.provider || 'other';
+	for (const row of rows) {
+		const key = row.model.provider || 'other';
 		const existing = groups.get(key);
 		if (existing) {
-			existing.models.push(option);
+			existing.models.push(row);
 		} else {
 			groups.set(key, {
-				models: [option],
+				models: [row],
 				provider: key,
 				providerLabel: getProviderDisplayName(key),
 			});
@@ -63,30 +86,43 @@ function groupByProvider(
  * `hiddenIds` are dropped from every group (favourites included), so hiding wins
  * over favouriting. Hidden models are absent from the list only — the picker
  * trigger still resolves the active model against the full `options` set.
+ *
+ * `lockedProvider` pins the chat to one agent runtime. Models belonging to any
+ * other runtime stay in their group and come back marked `locked`, so the picker
+ * greys them out instead of hiding them: a list that silently shrinks once a
+ * chat has a session reads as a bug rather than as a rule.
+ * @param options - The full model catalog to present.
+ * @param favouriteIds - Starred model ids, in the order they should be pinned.
+ * @param hiddenIds - Model ids the user hid in Settings → Models.
+ * @param lockedProvider - Agent runtime the chat is pinned to, or null when new.
+ * @returns The ordered picker groups, favourites first.
  */
 export function buildModelGroups(
 	options: readonly ComposerModelOption[],
 	favouriteIds: readonly string[],
 	hiddenIds: readonly string[] = [],
+	lockedProvider: AgentProviderId | null = null,
 ): GroupedOptions[] {
 	const favouriteSet = new Set(favouriteIds);
 	const hiddenSet = new Set(hiddenIds);
 	const byId = new Map(options.map((option) => [option.id, option]));
-	const favouriteModels = favouriteIds.flatMap((id) => {
+	const favouriteRows = favouriteIds.flatMap((id) => {
 		const option = byId.get(id);
-		return option && !hiddenSet.has(id) ? [option] : [];
+		return option && !hiddenSet.has(id) ? [toRow(option, lockedProvider)] : [];
 	});
 	const providerGroups = groupByProvider(
-		options.filter(
-			(option) => !favouriteSet.has(option.id) && !hiddenSet.has(option.id),
+		options.flatMap((option) =>
+			favouriteSet.has(option.id) || hiddenSet.has(option.id)
+				? []
+				: [toRow(option, lockedProvider)],
 		),
 	);
-	if (favouriteModels.length === 0) {
+	if (favouriteRows.length === 0) {
 		return providerGroups;
 	}
 	return [
 		{
-			models: favouriteModels,
+			models: favouriteRows,
 			provider: FAVOURITES_GROUP_KEY,
 			providerLabel: 'Favourites',
 		},

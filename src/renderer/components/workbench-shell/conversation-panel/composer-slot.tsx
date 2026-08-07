@@ -1,6 +1,7 @@
 /**
  * The bottom slot of a chat surface. Normally the composer; while an agent is
- * blocked on `ask_user_question` it becomes that questionnaire instead, so the
+ * blocked on `ask_user_question` it becomes that questionnaire instead, and
+ * while a Claude tool call is blocked on approval it becomes that card — so the
  * user answers where the agent asked rather than hunting for a dialog.
  *
  * A finished plan rides as the composer's own header instead of replacing it:
@@ -10,16 +11,22 @@
 import { useCallback } from 'react';
 
 import { AskUserQuestionCard } from '@/renderer/components/ask-user-question';
+import { ToolApprovalCard } from '@/renderer/components/tool-approval';
 import { usePlanReview } from '@/renderer/hooks/workbench-shell/conversation-panel/use-plan-review';
 import {
 	useAnswerUserQuestion,
 	usePendingAskUserQuestion,
 } from '@/renderer/state/ask-user-question';
+import {
+	useAnswerToolApproval,
+	usePendingToolApproval,
+} from '@/renderer/state/tool-approval';
 import type {
 	ComposerShellState,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
 import type { AskUserQuestionAnswer } from '@/shared/agent-control';
+import type { ToolApprovalDecision } from '@/shared/agent-tool-approval';
 import { ComposerPanel } from './composer-panel';
 import { PlanReviewPanel } from './plan-review-panel';
 
@@ -27,17 +34,17 @@ import { PlanReviewPanel } from './plan-review-panel';
 export function ComposerSlot({
 	chatTabId,
 	composer,
-	piSessionId,
+	agentSessionId,
 	seedText,
 	workspace,
 }: {
 	chatTabId: string;
 	composer: ComposerShellState;
-	piSessionId: string | null;
+	agentSessionId: string | null;
 	seedText?: string;
 	workspace: WorkspaceShellModel;
 }) {
-	const pendingQuestion = usePendingAskUserQuestion(piSessionId);
+	const pendingQuestion = usePendingAskUserQuestion(agentSessionId);
 	const answerUserQuestion = useAnswerUserQuestion();
 	const requestId = pendingQuestion?.requestId ?? null;
 	const finishQuestion = useCallback(
@@ -52,11 +59,27 @@ export function ComposerSlot({
 		[answerUserQuestion, requestId],
 	);
 
+	const pendingApproval = usePendingToolApproval(agentSessionId);
+	const answerToolApproval = useAnswerToolApproval();
+	const approvalRequestId = pendingApproval?.requestId ?? null;
+	const decideApproval = useCallback(
+		(decision: ToolApprovalDecision) => {
+			if (approvalRequestId !== null && agentSessionId !== null) {
+				answerToolApproval({
+					agentSessionId,
+					decision,
+					requestId: approvalRequestId,
+				});
+			}
+		},
+		[agentSessionId, answerToolApproval, approvalRequestId],
+	);
+
 	const plan = usePlanReview({
 		chatTabId,
 		onPlanModeChange: composer.onPlanModeChange,
 		onSubmit: composer.onSubmit,
-		piSessionId,
+		agentSessionId,
 		workspace,
 	});
 
@@ -66,6 +89,15 @@ export function ComposerSlot({
 				key={pendingQuestion.requestId}
 				onFinish={finishQuestion}
 				questions={pendingQuestion.questions}
+			/>
+		);
+	}
+	if (pendingApproval) {
+		return (
+			<ToolApprovalCard
+				key={pendingApproval.requestId}
+				onDecide={decideApproval}
+				request={pendingApproval}
 			/>
 		);
 	}

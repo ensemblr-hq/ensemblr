@@ -196,11 +196,12 @@ function renderWorkbench(
 							activeReviewTab={activeReviewTab}
 							activeWorkspace={activeWorkspace}
 							composer={getComposerState({
-								activePiSessionId: null,
+								activeAgentSessionId: null,
 								activeSession,
 								availableModels: [],
 								availableThinkingLevels: [],
 								isStreaming: false,
+								lockedProvider: null,
 								modelId: 'gpt-5.5',
 								onModelChange: () => undefined,
 								onPlanModeChange: () => undefined,
@@ -302,7 +303,7 @@ test('renders the Conductor-style workbench shell regions', () => {
 	expect(markup).toContain('Open app settings');
 	expect(markup).toContain('Open current workspace in VS Code');
 	expect(markup).toContain('Open current workspace app options');
-	expect(markup).toContain('Ask Pi to continue review shell');
+	expect(markup).toContain('Ask the agent to continue review shell');
 	expect(markup).toContain('Requires confirmation');
 	expect(markup).not.toContain('Open pull request menu');
 	expect(markup).not.toContain('Open workspace menu');

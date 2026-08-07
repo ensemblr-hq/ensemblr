@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAtom } from 'jotai';
 import { useMemo, useState } from 'react';
 
-import { piModelsQuery } from '@/renderer/api/ensemblr';
+import { agentModelsQuery } from '@/renderer/api/ensemblr';
 import { SettingsEmptyState } from '@/renderer/components/settings/settings-empty-state';
 import { Button } from '@/renderer/components/ui/button';
 import { Input } from '@/renderer/components/ui/input';
@@ -11,19 +11,17 @@ import { Spinner } from '@/renderer/components/ui/spinner';
 import { Switch } from '@/renderer/components/ui/switch';
 import { getProviderDisplayName } from '@/renderer/lib/workbench/model-picker-groups';
 import { hiddenModelsAtom } from '@/renderer/state/preferences';
-import type { PiModelOptionWire } from '@/shared/ipc/contracts/pi-session';
+import type { AgentModelOption } from '@/shared/ipc/contracts/agent-models';
 
 /** A provider and its catalog models, grouped for the model-visibility list. */
 interface ProviderGroup {
 	provider: string;
 	providerLabel: string;
-	models: PiModelOptionWire[];
+	models: AgentModelOption[];
 }
 
-/** Groups catalog models by provider, preserving Pi's listing order. */
-function groupByProvider(
-	models: readonly PiModelOptionWire[],
-): ProviderGroup[] {
+/** Groups catalog models by provider, preserving the catalog's listing order. */
+function groupByProvider(models: readonly AgentModelOption[]): ProviderGroup[] {
 	const groups = new Map<string, ProviderGroup>();
 	for (const model of models) {
 		const key = model.provider || 'other';
@@ -42,13 +40,13 @@ function groupByProvider(
 }
 
 /**
- * Curates which Pi models appear in the composer model picker. Toggling a model
+ * Curates which agent models appear in the composer model picker. Toggling a model
  * off records it in {@link hiddenModelsAtom} (inverse storage) — it stays
  * selectable as a default and never changes the active model; it's just dropped
  * from the picker list. Mirrors the self-fetching shape of the settings lists.
  */
 export function ModelVisibilityList() {
-	const { data, error, isLoading } = useQuery(piModelsQuery);
+	const { data, error, isLoading } = useQuery(agentModelsQuery);
 	const [hidden, setHidden] = useAtom(hiddenModelsAtom);
 	const [query, setQuery] = useState('');
 
@@ -73,7 +71,7 @@ export function ModelVisibilityList() {
 	if (isLoading) {
 		return (
 			<div className='flex items-center gap-2 py-6 text-muted-foreground text-sm'>
-				<Spinner className='size-4' /> Loading Pi models…
+				<Spinner className='size-4' /> Loading models…
 			</div>
 		);
 	}
@@ -81,16 +79,14 @@ export function ModelVisibilityList() {
 	if (error) {
 		return (
 			<div className='py-6 text-sm text-status-danger'>
-				Pi model discovery failed: {String(error)}.
+				Model discovery failed: {String(error)}.
 			</div>
 		);
 	}
 
 	if (models.length === 0) {
 		return (
-			<p className='py-6 text-muted-foreground text-sm'>
-				No Pi models available.
-			</p>
+			<p className='py-6 text-muted-foreground text-sm'>No models available.</p>
 		);
 	}
 

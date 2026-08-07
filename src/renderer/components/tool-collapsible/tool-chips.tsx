@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { ChatAttachmentChip } from '@/renderer/components/chat-attachment-chip';
-import { chipLabelForPath } from '@/renderer/lib/pi';
+import { chipLabelForPath } from '@/renderer/lib/agent-timeline';
 import { cn } from '@/renderer/lib/utils';
 import type {
 	ToolBadgeDescriptor,

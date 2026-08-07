@@ -10,7 +10,7 @@ vi.mock('../../src/main/pi-runtime/pi-provider-models.ts', () => ({
 
 vi.mock('../../src/main/storage/repositories/chat-tab-repository.ts', () => ({
 	getChatTabById: vi.fn(() => ({ id: 'tab-1', metadata: {} })),
-	getChatTabByPiSessionId: vi.fn(() => null),
+	getChatTabByAgentSessionId: vi.fn(() => null),
 	setChatTabMetadata: vi.fn(),
 }));
 
@@ -36,10 +36,10 @@ const makeDeps = () => {
 			openTab: vi.fn(() => ({ id: 'tab-1', metadata: {} })),
 			closeTab: vi.fn(),
 		},
-		piSessionService: {
+		agentSessionService: {
 			openSession: vi.fn(async () => {
 				calls.push('openSession');
-				return { id: 'pi-child', status: 'starting' };
+				return { id: 'agent-child', status: 'starting' };
 			}),
 			submitPrompt,
 			getSession: vi.fn(() => null),
@@ -90,7 +90,7 @@ describe('plan mode: spawn inheritance', () => {
 		await spawn(built.deps, true);
 
 		expect(built.activateForSpawn).toHaveBeenCalledTimes(1);
-		expect(built.activateForSpawn).toHaveBeenCalledWith('pi-child');
+		expect(built.activateForSpawn).toHaveBeenCalledWith('agent-child');
 	});
 
 	// The child is a separate process: it can reach `before_agent_start` and ask the
@@ -120,7 +120,7 @@ describe('plan mode: spawn inheritance', () => {
 
 		expect(built.broadcastPlanMode).toHaveBeenCalledWith({
 			chatTabId: 'tab-1',
-			piSessionId: 'pi-child',
+			agentSessionId: 'agent-child',
 			planMode: true,
 			workspaceId: 'ws',
 		});

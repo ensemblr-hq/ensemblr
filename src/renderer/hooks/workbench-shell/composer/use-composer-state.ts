@@ -80,7 +80,7 @@ export interface ComposerStateApi {
 	autocompleteKind: AutocompleteKind;
 	autocompleteTotal: number;
 	canSubmit: boolean;
-	/** True when a send is allowed even while Pi is working (steer / follow-up). */
+	/** True when a send is allowed even while the agent is working (steer / follow-up). */
 	canSend: boolean;
 	dismissAutocomplete: () => void;
 	externalAttachments: readonly ExternalAttachment[];
@@ -99,7 +99,7 @@ export interface ComposerStateApi {
 	hasContent: boolean;
 	insertText: (text: string) => void;
 	isStreaming: boolean;
-	/** Send the current draft to Pi as a follow-up (Cmd+J). */
+	/** Send the current draft to the agent as a follow-up (Cmd+J). */
 	queueCurrent: () => void;
 	mentionAttachments: readonly WorkspaceFileSummary[];
 	mentionMatches: readonly WorkspaceFileSummary[];
@@ -817,7 +817,7 @@ export function useComposerState({
 	// A normal (idle) send: enabled only when nothing is streaming.
 	const canSubmit = !composer.disabled && !isStreaming && hasContent;
 	// A send that is valid even mid-turn (steer / follow-up). Lets the composer
-	// keep showing an enabled Send button while Pi works so a drafted follow-up
+	// keep showing an enabled Send button while the agent works so a drafted follow-up
 	// is deliverable instead of being hidden behind the Stop button. Under the
 	// `block` follow-up mode a mid-turn send would only surface the blocked
 	// notice, so the button stays disabled rather than presenting an enabled

@@ -1,5 +1,5 @@
 import type { SlashCommandDescriptor } from '@/renderer/types/workbench';
-import type { PiSlashCommandSource } from '@/shared/ipc/contracts/pi-session';
+import type { PiSlashCommandSource } from '@/shared/ipc/contracts/agent-session';
 
 /** Source marker used for static fallback commands from Pi's TUI catalog. */
 const BUILTIN_SLASH_COMMAND_SOURCE = 'builtin' satisfies PiSlashCommandSource;

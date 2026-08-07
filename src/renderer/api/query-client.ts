@@ -1,7 +1,7 @@
 import { hashKey, QueryClient } from '@tanstack/react-query';
 
-import type { ListPiModelsResult } from '@/shared/ipc/contracts/pi-session';
-import { writeCachedPiModels } from './ensemblr/pi-models-cache';
+import type { AgentModelCatalog } from '@/shared/ipc/contracts/agent-models';
+import { writeCachedAgentModels } from './ensemblr/agent-models-cache';
 import { ensemblrQueryKeys } from './ensemblr-queries';
 
 /** Singleton TanStack Query client for the renderer, with conservative defaults. */
@@ -15,7 +15,7 @@ export const queryClient = new QueryClient({
 });
 
 seedQueryCacheFromInitialSnapshot();
-persistPiModelsOnUpdate();
+persistAgentModelsOnUpdate();
 
 /**
  * Seeds the query cache with the navigation/health snapshot the preload script
@@ -47,19 +47,19 @@ function seedQueryCacheFromInitialSnapshot(): void {
 }
 
 /**
- * Persists every successful Pi model catalog fetch (initial + background
+ * Persists every successful agent model catalog fetch (initial + background
  * refreshes) to localStorage so the next launch hydrates instantly. The cache
  * writer skips empty results, preserving the last-known-good catalog when `pi`
  * is momentarily unavailable.
  */
-function persistPiModelsOnUpdate(): void {
+function persistAgentModelsOnUpdate(): void {
 	// Compare each event against the models query's precomputed `queryHash`
 	// (TanStack stores it per query) so the cache-wide subscription filters on a
-	// cheap string compare, not a per-event serialisation. `writeCachedPiModels`
+	// cheap string compare, not a per-event serialisation. `writeCachedAgentModels`
 	// does read+serialise the cache, but only on a matched successful model
 	// update — rare, not once per unrelated cache event. The unsubscribe handle
 	// is intentionally dropped: this client is a process-lifetime singleton.
-	const modelsHash = hashKey(ensemblrQueryKeys.piModels());
+	const modelsHash = hashKey(ensemblrQueryKeys.agentModels());
 	queryClient.getQueryCache().subscribe((event) => {
 		if (event.type !== 'updated' || event.query.queryHash !== modelsHash) {
 			return;
@@ -68,6 +68,6 @@ function persistPiModelsOnUpdate(): void {
 		if (state.status !== 'success' || !state.data) {
 			return;
 		}
-		writeCachedPiModels(state.data as ListPiModelsResult);
+		writeCachedAgentModels(state.data as AgentModelCatalog);
 	});
 }

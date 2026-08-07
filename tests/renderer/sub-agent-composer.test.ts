@@ -19,13 +19,13 @@ const readySetup: SetupDiagnosticsSnapshot = {
 };
 
 const chatSession = (isSubAgent: boolean): SessionTabModel => ({
+	agentSessionId: 'agent-1',
 	chatTabId: 'tab-1',
 	id: 'tab-1',
 	isPreview: false,
 	isSubAgent,
 	kind: 'chat',
 	label: 'Astro inventory',
-	piSessionId: 'pi-1',
 	status: 'idle',
 	summary: '',
 	updatedLabel: 'Astro inventory',
@@ -40,11 +40,12 @@ const composerStateFor = (
 	} = {},
 ) =>
 	getComposerState({
-		activePiSessionId: 'pi-1',
+		activeAgentSessionId: 'agent-1',
 		activeSession: session,
 		availableModels: [],
 		availableThinkingLevels: [],
 		isStreaming: overrides.isStreaming ?? false,
+		lockedProvider: null,
 		modelId: 'gpt-5.5',
 		onModelChange: () => undefined,
 		onPlanModeChange: () => undefined,
@@ -77,7 +78,9 @@ describe('sub-agent composer', () => {
 
 		expect(composer.disabled).toBe(false);
 		expect(composer.disabledReason).toBeNull();
-		expect(composer.placeholder).toBe('Ask Pi to continue astro inventory');
+		expect(composer.placeholder).toBe(
+			'Ask the agent to continue astro inventory',
+		);
 	});
 
 	test('disables an ordinary chat tab’s composer on a setup blocker', () => {

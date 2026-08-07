@@ -2,7 +2,6 @@ import {
 	AlertCircleIcon,
 	CheckCircle2Icon,
 	CheckIcon,
-	ChevronRightIcon,
 	CircleDashedIcon,
 	ClipboardIcon,
 	ExternalLinkIcon,
@@ -13,13 +12,9 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 
+import { DiagnosticsLogCollapsible } from '@/renderer/components/diagnostics-log-collapsible';
 import { StatusBadge } from '@/renderer/components/status-badge';
 import { Button } from '@/renderer/components/ui/button';
-import {
-	Collapsible,
-	CollapsibleContent,
-	CollapsibleTrigger,
-} from '@/renderer/components/ui/collapsible';
 import { cn } from '@/renderer/lib/utils';
 import type {
 	SetupCheckSnapshot,
@@ -72,7 +67,7 @@ const REMEDIATION_ICON = {
 } satisfies Record<SetupRemediationActionKind, typeof RefreshCwIcon>;
 
 /** Left indent that aligns secondary content under the row title (icon + gap). */
-const CONTENT_INDENT = 'pl-[1.625rem]';
+const CONTENT_INDENT = 'pl-6.5';
 
 /** Single setup-check row: status icon, title, detail line, logs, remediations. */
 export function SetupCheckRow({
@@ -173,30 +168,7 @@ export function SetupCheckRow({
 				</div>
 			) : null}
 
-			{check.logs.length ? (
-				<Collapsible className={CONTENT_INDENT}>
-					<CollapsibleTrigger className='group inline-flex items-center gap-1 text-muted-foreground text-xs transition-colors hover:text-foreground'>
-						<ChevronRightIcon
-							aria-hidden='true'
-							className='size-3.5 transition-transform group-data-[state=open]:rotate-90'
-						/>
-						Diagnostics log
-					</CollapsibleTrigger>
-					<CollapsibleContent className='mt-1.5 flex flex-col gap-1 rounded-md border border-border bg-muted/40 px-2.5 py-2 text-xs'>
-						{check.logs.slice(0, 4).map((log) => (
-							<p
-								className='wrap-break-word text-muted-foreground leading-5'
-								key={`${log.label}-${log.text}`}
-							>
-								<span className='font-medium text-foreground'>{log.label}</span>
-								{': '}
-								{log.text}
-								{log.truncated ? ' (truncated)' : null}
-							</p>
-						))}
-					</CollapsibleContent>
-				</Collapsible>
-			) : null}
+			<DiagnosticsLogCollapsible className={CONTENT_INDENT} logs={check.logs} />
 		</div>
 	);
 }

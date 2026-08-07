@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
 	canSetTitle,
 	readTitleProvenance,
-} from '../../src/main/pi-agent/naming/title-provenance';
+} from '../../src/main/agent-runtime/naming/title-provenance';
 
 describe('readTitleProvenance', () => {
 	test('reads each producer back', () => {

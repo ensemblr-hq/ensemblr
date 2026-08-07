@@ -25,8 +25,8 @@ export interface CloseRunningChatGuard {
  * Gates tab closes that would silently cancel a running agent. Idle tabs close
  * straight through; a running tab is held until the user confirms, at which
  * point the agent is cancelled *before* the tab closes — closing the tab alone
- * leaves the Pi runtime streaming in the background, so the dialog's "Closing it
- * will stop the current Pi session" promise has to be made true here.
+ * leaves the agent runtime streaming in the background, so the dialog's "Closing
+ * it will stop the current agent session" promise has to be made true here.
  *
  * The decision and stop-then-close sequencing live in {@link planClose} and
  * {@link runConfirmedClose} (framework-free and unit-tested); this hook only

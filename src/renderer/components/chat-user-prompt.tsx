@@ -1,4 +1,7 @@
-import { chipLabelForPath, parsePromptAttachments } from '@/renderer/lib/pi';
+import {
+	chipLabelForPath,
+	parsePromptAttachments,
+} from '@/renderer/lib/agent-timeline';
 import { cn } from '@/renderer/lib/utils';
 import { ChatAttachmentChip } from './chat-attachment-chip';
 import { useFilePreviewOpener } from './workbench-shell/conversation-panel/file-preview-context';

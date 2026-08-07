@@ -48,10 +48,10 @@ const renderReview = () => {
 	const { result } = renderHook(
 		() =>
 			usePlanReview({
+				agentSessionId: SESSION_ID,
 				chatTabId: CHAT_TAB_ID,
 				onPlanModeChange,
 				onSubmit,
-				piSessionId: SESSION_ID,
 				workspace,
 			}),
 		{ wrapper },
@@ -63,7 +63,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	handOff.mockResolvedValue('tab-new');
 	pendingReview.current = {
-		piSessionId: SESSION_ID,
+		agentSessionId: SESSION_ID,
 		planPath: PLAN_PATH,
 		requestId: 'req-1',
 		title: 'Add Plan Mode',

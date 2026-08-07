@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { shellCommandTitle } from '../../src/renderer/lib/pi/shell-command-title';
+import { shellCommandTitle } from '../../src/renderer/lib/agent-timeline/shell-command-title';
 
 describe('shellCommandTitle', () => {
 	test('names the action for common file commands', () => {

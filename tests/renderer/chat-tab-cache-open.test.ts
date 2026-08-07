@@ -20,7 +20,7 @@ function createTab(id: string, position: number): ChatTabWire {
 		kind: 'chat',
 		metadata: {},
 		openedAt: `2026-07-11T00:00:0${position}.000Z`,
-		piSessionId: null,
+		agentSessionId: null,
 		position,
 		title: id,
 		workspaceId: WORKSPACE_ID,

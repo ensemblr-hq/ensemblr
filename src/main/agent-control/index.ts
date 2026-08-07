@@ -12,6 +12,12 @@ export {
 	createBoardStatusStore,
 } from './board-status-store.ts';
 export {
+	CONTROL_ROLE_ENV_KEY,
+	CONTROL_TOKEN_ENV_KEY,
+	CONTROL_URL_ENV_KEY,
+	envVarReference,
+} from './control-env-keys.ts';
+export {
 	type ControlServer,
 	startControlServer,
 } from './control-server.ts';
@@ -31,7 +37,12 @@ export {
 	type AgentControlIntegration,
 	createAgentControlIntegration,
 } from './main-integration.ts';
-export { handleMcpRequest, TOOL_DEFS } from './mcp-endpoint.ts';
+export {
+	handleMcpRequest,
+	type McpToolDef,
+	TOOL_DEFS,
+	toolDefsFor,
+} from './mcp-endpoint.ts';
 export {
 	createOriginRegistry,
 	type OriginRegistry,
@@ -41,19 +52,20 @@ export {
 	createAgentControlPorts,
 	type PortAdapterDeps,
 } from './port-adapters.ts';
-export type {
-	AgentControlEnvIdentity,
-	AgentControlEnvResolver,
-	AgentControlOrigin,
-	AgentControlPorts,
-	AgentSpecies,
-	ConfirmPort,
-	ConversationPort,
-	HarnessPort,
-	PermissionPort,
-	PlanModePort,
-	TabPort,
-	TerminalPort,
-	WorkspacePort,
+export {
+	type AgentControlEnvIdentity,
+	type AgentControlEnvResolver,
+	type AgentControlOrigin,
+	type AgentControlPorts,
+	type AgentSpecies,
+	type ConfirmPort,
+	type ConversationPort,
+	type HarnessPort,
+	originHasChatTab,
+	type PermissionPort,
+	type PlanModePort,
+	type TabPort,
+	type TerminalPort,
+	type WorkspacePort,
 } from './ports.ts';
 export { isSessionTabMarkedSubAgent } from './sub-agent-marker.ts';

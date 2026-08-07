@@ -1,7 +1,7 @@
 import type {
-	PiAgentMessagePart,
-	PiAgentMessagePayload,
-} from './pi-agent-types.ts';
+	AgentMessagePart,
+	AgentMessagePayload,
+} from '../agent-runtime/agent-types.ts';
 
 /**
  * Type guard for a known Pi wire message role.
@@ -39,7 +39,7 @@ export function extractMessageId(message: unknown): string | null {
 export function normalizeMessageEnd(
 	message: Record<string, unknown>,
 	wireRole: 'agent' | 'tool' | 'user',
-): PiAgentMessagePayload {
+): AgentMessagePayload {
 	if (message.role === 'custom') {
 		return normalizeCustomMessage(message);
 	}
@@ -56,7 +56,7 @@ export function normalizeMessageEnd(
  */
 function normalizeCustomMessage(
 	message: Record<string, unknown>,
-): PiAgentMessagePayload {
+): AgentMessagePayload {
 	const customType =
 		typeof message.customType === 'string' && message.customType.length > 0
 			? message.customType
@@ -73,19 +73,19 @@ function normalizeCustomMessage(
 
 /**
  * Projects Pi's `content: [{type:'text'|'thinking'|'toolCall', ...}]` array
- * into structured {@link PiAgentMessagePart} entries. Blocks we don't know how
+ * into structured {@link AgentMessagePart} entries. Blocks we don't know how
  * to interpret are skipped.
  */
 export function normalizeContentParts(
 	content: unknown,
-): readonly PiAgentMessagePart[] {
+): readonly AgentMessagePart[] {
 	if (typeof content === 'string') {
 		return content.length > 0 ? [{ kind: 'text', text: content }] : [];
 	}
 	if (!Array.isArray(content)) {
 		return [];
 	}
-	const parts: PiAgentMessagePart[] = [];
+	const parts: AgentMessagePart[] = [];
 	for (const block of content) {
 		const part = contentBlockToPart(block);
 		if (part) {
@@ -100,7 +100,7 @@ export function normalizeContentParts(
  * @param block - One entry from a Pi message `content[]` array
  * @returns The mapped part, or null for blocks that are not modelled
  */
-export function contentBlockToPart(block: unknown): PiAgentMessagePart | null {
+export function contentBlockToPart(block: unknown): AgentMessagePart | null {
 	if (!block || typeof block !== 'object') {
 		return null;
 	}
@@ -135,7 +135,7 @@ export function contentBlockToPart(block: unknown): PiAgentMessagePart | null {
  */
 export function normalizeToolExecutionFrame(
 	typed: Record<string, unknown>,
-): PiAgentMessagePayload {
+): AgentMessagePayload {
 	const toolCallId =
 		typeof typed.toolCallId === 'string' && typed.toolCallId.length > 0
 			? typed.toolCallId
@@ -170,7 +170,7 @@ export function normalizeToolExecutionFrame(
 export function normalizeLegacyMessageFrame(
 	typed: Record<string, unknown>,
 	wireRole: 'agent' | 'tool' | 'user',
-): PiAgentMessagePayload {
+): AgentMessagePayload {
 	const inner = readInnerPayload(typed);
 
 	if (wireRole === 'tool') {
@@ -217,7 +217,7 @@ function readInnerPayload(
 function normalizeLegacyToolFrame(
 	typed: Record<string, unknown>,
 	inner: Record<string, unknown>,
-): PiAgentMessagePayload {
+): AgentMessagePayload {
 	const toolCallId = readNonEmptyString(inner.toolCallId) ?? 'tool-call';
 	if (typed.type === 'tool_result') {
 		return {
@@ -254,8 +254,8 @@ function readLegacyToolName(inner: Record<string, unknown>): string {
  */
 function readLegacyParts(
 	inner: Record<string, unknown>,
-): readonly PiAgentMessagePart[] {
-	const parts: PiAgentMessagePart[] = Array.isArray(inner.content)
+): readonly AgentMessagePart[] {
+	const parts: AgentMessagePart[] = Array.isArray(inner.content)
 		? [...normalizeContentParts(inner.content)]
 		: [];
 	const reasoning =
@@ -284,7 +284,7 @@ function readNonEmptyString(value: unknown): string | null {
  * tagged-union payload, or `null` for non-message frames (status/error/etc).
  * Re-exported so unit tests can exercise it without spinning up the adapter.
  */
-export function normalizePiPayload(raw: unknown): PiAgentMessagePayload | null {
+export function normalizePiPayload(raw: unknown): AgentMessagePayload | null {
 	if (!raw || typeof raw !== 'object') {
 		return null;
 	}

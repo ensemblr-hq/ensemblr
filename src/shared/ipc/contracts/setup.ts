@@ -1,7 +1,13 @@
 /** Overall readiness of the setup diagnostics run. */
 export type SetupDiagnosticsStatus = 'blocked' | 'checking' | 'ready';
 /** Category a setup check belongs to. */
-export type SetupCheckGroupId = 'core' | 'github' | 'linear' | 'pi' | 'storage';
+export type SetupCheckGroupId =
+	| 'claude'
+	| 'core'
+	| 'github'
+	| 'linear'
+	| 'pi'
+	| 'storage';
 /** Identifier for an individual setup diagnostic check. */
 export type SetupCheckId =
 	| 'config'

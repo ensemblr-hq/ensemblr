@@ -9,15 +9,19 @@ import type {
 	ReviewCommentsChangedBroadcast,
 	TabsChangedBroadcast,
 } from '../../shared/agent-control';
+import type {
+	ToolApprovalClosedBroadcast,
+	ToolApprovalRequestedBroadcast,
+} from '../../shared/agent-tool-approval';
 import { IPC_CHANNELS } from '../../shared/ipc/channels';
+import type {
+	AgentSessionEventBroadcast,
+	PiRawFrameBroadcast,
+} from '../../shared/ipc/contracts/agent-session';
 import type { EnsemblrApi } from '../../shared/ipc/contracts/api';
 import type { AppSettingsChangedBroadcast } from '../../shared/ipc/contracts/app-settings';
 import type { CloneGithubRepositoryProgressEvent } from '../../shared/ipc/contracts/clone';
 import type { ConfigChangedBroadcast } from '../../shared/ipc/contracts/health';
-import type {
-	PiRawFrameBroadcast,
-	PiSessionEventBroadcast,
-} from '../../shared/ipc/contracts/pi-session';
 import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
@@ -37,10 +41,12 @@ type InvokeKey = Exclude<
 	| 'onCloseActiveTabRequest'
 	| 'onAskUserQuestion'
 	| 'onAskUserQuestionClosed'
+	| 'onAgentToolApprovalRequested'
+	| 'onAgentToolApprovalClosed'
 	| 'onExitPlanMode'
 	| 'onPlanModeChanged'
+	| 'onAgentSessionEvent'
 	| 'onPiRawFrame'
-	| 'onPiSessionEvent'
 	| 'onTerminalLifecycle'
 	| 'onTerminalOutput'
 	| 'onWorkspaceFilesChanged'
@@ -116,8 +122,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 		resumeAgentHarness: (request) => invoke('resumeAgentHarness', request),
 		listAgentHarnesses: () => invoke('listAgentHarnesses'),
 		archiveWorkspace: (request) => invoke('archiveWorkspace', request),
-		bindPiSessionToChatTab: (request) =>
-			invoke('bindPiSessionToChatTab', request),
+		bindAgentSessionToChatTab: (request) =>
+			invoke('bindAgentSessionToChatTab', request),
 		closeChatTab: (request) => invoke('closeChatTab', request),
 		closeWindow: () => invoke('closeWindow'),
 		commitWorkspaceChanges: (request) =>
@@ -174,9 +180,10 @@ export function createEnsemblrApi(): EnsemblrApi {
 		listChatTabs: (request) => invoke('listChatTabs', request),
 		listClosedChatTabsWithSummary: (request) =>
 			invoke('listClosedChatTabsWithSummary', request),
-		listPiModels: () => invoke('listPiModels'),
-		listPiSessionEvents: (request) => invoke('listPiSessionEvents', request),
-		listPiSessions: (request) => invoke('listPiSessions', request),
+		listAgentModels: () => invoke('listAgentModels'),
+		listAgentSessionEvents: (request) =>
+			invoke('listAgentSessionEvents', request),
+		listAgentSessions: (request) => invoke('listAgentSessions', request),
 		listEnvFiles: (request) => invoke('listEnvFiles', request),
 		listPiSlashCommands: (request) => invoke('listPiSlashCommands', request),
 		listRepositoryBranches: (request) =>
@@ -238,6 +245,18 @@ export function createEnsemblrApi(): EnsemblrApi {
 				listener,
 			),
 		answerUserQuestion: (reply) => invoke('answerUserQuestion', reply),
+		onAgentToolApprovalRequested: (listener) =>
+			subscribe<ToolApprovalRequestedBroadcast>(
+				IPC_CHANNELS.agentToolApprovalRequested,
+				listener,
+			),
+		onAgentToolApprovalClosed: (listener) =>
+			subscribe<ToolApprovalClosedBroadcast>(
+				IPC_CHANNELS.agentToolApprovalClosed,
+				listener,
+			),
+		agentToolApprovalAnswered: (reply) =>
+			invoke('agentToolApprovalAnswered', reply),
 		onExitPlanMode: (listener) =>
 			subscribe<ExitPlanModeBroadcast>(
 				IPC_CHANNELS.agentControlExitPlanMode,
@@ -250,10 +269,13 @@ export function createEnsemblrApi(): EnsemblrApi {
 			),
 		reportBoardStatus: (statusByWorkspaceId) =>
 			invoke('reportBoardStatus', statusByWorkspaceId),
+		onAgentSessionEvent: (listener) =>
+			subscribe<AgentSessionEventBroadcast>(
+				IPC_CHANNELS.agentSessionEvent,
+				listener,
+			),
 		onPiRawFrame: (listener) =>
 			subscribe<PiRawFrameBroadcast>(IPC_CHANNELS.piRawFrame, listener),
-		onPiSessionEvent: (listener) =>
-			subscribe<PiSessionEventBroadcast>(IPC_CHANNELS.piSessionEvent, listener),
 		onTerminalLifecycle: (listener) =>
 			subscribe<TerminalLifecycleBroadcast>(
 				IPC_CHANNELS.terminalLifecycle,
@@ -268,8 +290,8 @@ export function createEnsemblrApi(): EnsemblrApi {
 			),
 		openAppConfigFile: () => invoke('openAppConfigFile'),
 		openExternal: (url) => invoke('openExternal', url),
+		openAgentSession: (request) => invoke('openAgentSession', request),
 		openChatTab: (request) => invoke('openChatTab', request),
-		openPiSession: (request) => invoke('openPiSession', request),
 		openSettingsFileInTarget: (request) =>
 			invoke('openSettingsFileInTarget', request),
 		openWorkspaceInTarget: (request) =>
@@ -312,10 +334,18 @@ export function createEnsemblrApi(): EnsemblrApi {
 		selectCloneDestination: () => invoke('selectCloneDestination'),
 		selectEnvFile: () => invoke('selectEnvFile'),
 		selectLocalRepository: () => invoke('selectLocalRepository'),
-		selectPiExecutable: () => invoke('selectPiExecutable'),
-		getPiExecutablePath: () => invoke('getPiExecutablePath'),
-		setPiExecutablePath: (request) => invoke('setPiExecutablePath', request),
-		clearPiExecutablePath: () => invoke('clearPiExecutablePath'),
+		getAgentProviderReadiness: (request) =>
+			invoke('getAgentProviderReadiness', request),
+		getAgentProviderExecutablePath: (request) =>
+			invoke('getAgentProviderExecutablePath', request),
+		setAgentProviderExecutablePath: (request) =>
+			invoke('setAgentProviderExecutablePath', request),
+		clearAgentProviderExecutablePath: (request) =>
+			invoke('clearAgentProviderExecutablePath', request),
+		selectAgentProviderExecutable: (request) =>
+			invoke('selectAgentProviderExecutable', request),
+		openAgentProviderSettingsFile: (request) =>
+			invoke('openAgentProviderSettingsFile', request),
 		selectRootDirectory: () => invoke('selectRootDirectory'),
 		setEnvironmentVariable: (request) =>
 			invoke('setEnvironmentVariable', request),
@@ -323,9 +353,9 @@ export function createEnsemblrApi(): EnsemblrApi {
 		sharedRootAdoption: () => invoke('sharedRootAdoption'),
 		startCloneGithubRepository: (request) =>
 			invoke('startCloneGithubRepository', request),
-		stopPiSession: (request) => invoke('stopPiSession', request),
+		stopAgentSession: (request) => invoke('stopAgentSession', request),
 		stopWorkspaceScript: (request) => invoke('stopWorkspaceScript', request),
-		submitPiPrompt: (request) => invoke('submitPiPrompt', request),
+		submitAgentPrompt: (request) => invoke('submitAgentPrompt', request),
 		terminalSnapshot: (request) => invoke('terminalSnapshot', request),
 		unarchiveWorkspace: (request) => invoke('unarchiveWorkspace', request),
 		unsetEnvironmentVariable: (request) =>

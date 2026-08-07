@@ -4,17 +4,17 @@ import { describe, expect, test } from 'vitest';
 import {
 	eventsToUIMessages,
 	noticeMetadataOf,
-} from '../../src/renderer/lib/pi/event-to-ui-message';
+} from '../../src/renderer/lib/agent-timeline/event-to-ui-message';
 import type {
-	PiPersistedEnvelope,
-	PiSessionEventWire,
+	AgentPersistedEnvelope,
+	AgentSessionEventWire,
 } from '../../src/shared/ipc';
 
 function event(
-	overrides: Partial<PiSessionEventWire> & {
-		payload?: PiPersistedEnvelope | null;
+	overrides: Partial<AgentSessionEventWire> & {
+		payload?: AgentPersistedEnvelope | null;
 	},
-): PiSessionEventWire {
+): AgentSessionEventWire {
 	return {
 		branchId: 'branch-1',
 		createdAt: '2026-06-08T12:00:00.000Z',

@@ -6,26 +6,26 @@ import { createStore, Provider } from 'jotai';
 import type { PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { openPiSession, submitPiPrompt } = vi.hoisted(() => ({
-	openPiSession: vi.fn(),
-	submitPiPrompt: vi.fn(),
+const { openAgentSession, submitAgentPrompt } = vi.hoisted(() => ({
+	openAgentSession: vi.fn(),
+	submitAgentPrompt: vi.fn(),
 }));
 
 vi.mock('@/renderer/api/ensemblr-queries', async (importOriginal) => ({
 	...(await importOriginal<
 		typeof import('../../src/renderer/api/ensemblr-queries')
 	>()),
-	openPiSession,
-	submitPiPrompt,
+	openAgentSession,
+	submitAgentPrompt,
 }));
 
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr/query-keys';
-import { usePiComposerController } from '../../src/renderer/state/composer';
+import { useAgentComposerController } from '../../src/renderer/state/composer';
 import { usePlanModeSync } from '../../src/renderer/state/plan-mode';
 import { appSettingsAtom } from '../../src/renderer/state/preferences';
 import type { PlanModeChangedBroadcast } from '../../src/shared/agent-control';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
-import type { PiSessionSnapshotWire } from '../../src/shared/ipc/contracts/pi-session';
+import type { AgentSessionSnapshotWire } from '../../src/shared/ipc/contracts/agent-session';
 import {
 	clearEnsemblrApi,
 	createTestQueryClient,
@@ -39,7 +39,7 @@ const SESSION_ID = 'session-spawned-child';
 const MODEL = 'anthropic/claude-sonnet';
 
 /** An open, idle session, so submitting never has to open one first. */
-function createSession(): PiSessionSnapshotWire {
+function createSession(): AgentSessionSnapshotWire {
 	return {
 		branchId: 'branch-inherited',
 		closedAt: null,
@@ -49,8 +49,9 @@ function createSession(): PiSessionSnapshotWire {
 		label: null,
 		model: MODEL,
 		openedTabs: [],
-		piSessionId: SESSION_ID,
+		provider: 'pi',
 		runtimeOpen: true,
+		runtimeSessionId: SESSION_ID,
 		status: 'idle',
 		thinkingLevel: 'medium',
 		updatedAt: '2026-01-01T00:00:00.000Z',
@@ -69,7 +70,7 @@ function renderSpawnedChild() {
 		planMode?: (payload: PlanModeChangedBroadcast) => void;
 	} = {};
 	installEnsemblrApi({
-		onPiSessionEvent: () => () => undefined,
+		onAgentSessionEvent: () => () => undefined,
 		onPlanModeChanged: (listener: (p: PlanModeChangedBroadcast) => void) => {
 			listeners.planMode = listener;
 			return vi.fn();
@@ -77,7 +78,7 @@ function renderSpawnedChild() {
 	});
 
 	const client = createTestQueryClient();
-	client.setQueryData(ensemblrQueryKeys.piModels(), {
+	client.setQueryData(ensemblrQueryKeys.agentModels(), {
 		defaultModelId: MODEL,
 		defaultThinkingLevel: 'medium',
 		models: [
@@ -89,12 +90,18 @@ function renderSpawnedChild() {
 			},
 		],
 	});
-	client.setQueryData(ensemblrQueryKeys.piSessionsForWorkspace(WORKSPACE_ID), {
-		sessions: [createSession()],
-	});
-	client.setQueryData(ensemblrQueryKeys.piSessionEvents('branch-inherited'), {
-		events: [],
-	});
+	client.setQueryData(
+		ensemblrQueryKeys.agentSessionsForWorkspace(WORKSPACE_ID),
+		{
+			sessions: [createSession()],
+		},
+	);
+	client.setQueryData(
+		ensemblrQueryKeys.agentSessionEvents('branch-inherited'),
+		{
+			events: [],
+		},
+	);
 
 	const store = createStore();
 	store.set(appSettingsAtom, DEFAULT_APP_SETTINGS);
@@ -108,9 +115,9 @@ function renderSpawnedChild() {
 	const rendered = renderHook(
 		() => {
 			usePlanModeSync();
-			return usePiComposerController({
+			return useAgentComposerController({
 				chatTabId: CHILD_TAB_ID,
-				currentPiSessionId: SESSION_ID,
+				currentAgentSessionId: SESSION_ID,
 				workspaceCwd: '/tmp/workspace-inherited',
 				workspaceId: WORKSPACE_ID,
 			});
@@ -122,7 +129,7 @@ function renderSpawnedChild() {
 
 const inherit = (chatTabId: string): PlanModeChangedBroadcast => ({
 	chatTabId,
-	piSessionId: SESSION_ID,
+	agentSessionId: SESSION_ID,
 	planMode: true,
 	workspaceId: WORKSPACE_ID,
 });
@@ -131,8 +138,8 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	clearEnsemblrApi();
 	globalThis.localStorage?.clear();
-	openPiSession.mockResolvedValue({ session: createSession() });
-	submitPiPrompt.mockResolvedValue({});
+	openAgentSession.mockResolvedValue({ session: createSession() });
+	submitAgentPrompt.mockResolvedValue({});
 });
 
 describe('a spawned child that inherited Plan Mode', () => {
@@ -159,7 +166,7 @@ describe('a spawned child that inherited Plan Mode', () => {
 			await result.current.onSubmit('How does the registry key sessions?');
 		});
 
-		expect(submitPiPrompt).toHaveBeenCalledWith(
+		expect(submitAgentPrompt).toHaveBeenCalledWith(
 			expect.objectContaining({ planMode: true }),
 		);
 	});
@@ -179,7 +186,7 @@ describe('a spawned child that inherited Plan Mode', () => {
 			await result.current.onSubmit('Actually, go ahead and fix it.');
 		});
 
-		expect(submitPiPrompt).toHaveBeenCalledWith(
+		expect(submitAgentPrompt).toHaveBeenCalledWith(
 			expect.objectContaining({ planMode: false }),
 		);
 	});
@@ -205,8 +212,8 @@ describe('a chat the user has never decided for', () => {
 			await result.current.onSubmit('Just a question.');
 		});
 
-		expect(submitPiPrompt).toHaveBeenCalledTimes(1);
-		expect(submitPiPrompt.mock.calls[0][0]).not.toHaveProperty('planMode');
+		expect(submitAgentPrompt).toHaveBeenCalledTimes(1);
+		expect(submitAgentPrompt.mock.calls[0][0]).not.toHaveProperty('planMode');
 	});
 
 	it('opens a session without a planMode field at all', async () => {
@@ -216,7 +223,7 @@ describe('a chat the user has never decided for', () => {
 			await result.current.onSubmit('First message.');
 		});
 
-		for (const call of openPiSession.mock.calls) {
+		for (const call of openAgentSession.mock.calls) {
 			expect(call[0]).not.toHaveProperty('planMode');
 		}
 	});
@@ -231,7 +238,7 @@ describe('a chat the user has never decided for', () => {
 			await result.current.onSubmit('Go.');
 		});
 
-		expect(submitPiPrompt).toHaveBeenCalledWith(
+		expect(submitAgentPrompt).toHaveBeenCalledWith(
 			expect.objectContaining({ planMode: false }),
 		);
 	});

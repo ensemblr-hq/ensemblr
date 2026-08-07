@@ -95,8 +95,8 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 
 **Writes (own workspace):**
 - `spawnChatTab()` → `{ chatTabId }`
-- `startConversation({ chatTabId?, prompt, model?, thinkingLevel?, title?, wait? })` → `{ chatTabId, piSessionId, result? }` (a spawned tab is marked a sub-agent and tinted; `title` names it via Pi `/name`)
-- `sendFollowUp({ piSessionId, prompt, wait? })` → `{ result? }` (Pi steer/follow_up + submitPrompt)
+- `startConversation({ chatTabId?, prompt, model?, thinkingLevel?, title?, wait? })` → `{ chatTabId, agentSessionId, result? }` (a spawned tab is marked a sub-agent and tinted; `title` names it via Pi `/name`)
+- `sendFollowUp({ agentSessionId, prompt, wait? })` → `{ result? }` (Pi steer/follow_up + submitPrompt)
 - `setName({ title })` → `{ chatTabId, title }` — set the **caller's own** tab name via Pi `set_session_name`. Stamps `titleProvenance: 'agent'`; a title the user chose outranks it and the call reports `applied: false`
 - `setBranchName({ name })` → `{ applied, name, branchName, message }` — name the caller's **workspace and its git branch** together from one slug. One-shot: applies only while the workspace still carries its generated placeholder name, and reports `applied: false` rather than failing once it does not
 - `setSummary({ title, summary })` → `{ capturedAtOrdinal, message }` — record the caller's session summary. **Pi-only** (a harness origin owns no chat tab). Writes SQLite only; the summary queue projects it to `.context/sessions/` at the next turn boundary, so nothing materializes `.context/` mid-turn
@@ -120,7 +120,7 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 
 **Reads (cross-workspace):**
 - `listWorkspaces()`, `listTabs({ workspaceId? })`, `listTerminals({ workspaceId? })`
-- `getConversationStatus({ piSessionId })`, `getLastMessage({ piSessionId })`
+- `getConversationStatus({ agentSessionId })`, `getLastMessage({ agentSessionId })`
 - `readTerminalOutput({ terminalId })`
 
 **Reads (own workspace only):**
@@ -160,7 +160,7 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
 - Composed in `src/main/main.ts` (~285–484) alongside the other services; receives their handles.
 
 ### 3. Identity / session registry — `src/main/agent-control/origin-registry.ts`
-- At agent spawn, mint a per-session record: `{ token, piSessionId|harnessSessionId, workspaceId,
+- At agent spawn, mint a per-session record: `{ token, agentSessionId|harnessSessionId, workspaceId,
   parentSessionId, depth }`. Store in an in-memory registry keyed by token.
 - **Pi:** inject `token` + endpoint into the pi extension via spawn env (extend
   `src/main/pi-agent/cli-rpc/spawn-env.ts`); Pi's own session id is already known to the adapter,

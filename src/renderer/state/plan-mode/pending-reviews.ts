@@ -20,7 +20,10 @@ export function usePlanReviewSync(): void {
 	const setPending = useSetAtom(pendingPlanReviewsAtom);
 	useEffect(() => {
 		const unsubscribe = window.ensemblr?.onExitPlanMode((payload) => {
-			setPending((pending) => ({ ...pending, [payload.piSessionId]: payload }));
+			setPending((pending) => ({
+				...pending,
+				[payload.agentSessionId]: payload,
+			}));
 		});
 		return () => unsubscribe?.();
 	}, [setPending]);
@@ -28,30 +31,30 @@ export function usePlanReviewSync(): void {
 
 /**
  * Reads the plan a chat tab must put to the user, if any.
- * @param piSessionId - Session backing the chat tab, or null when it has none.
+ * @param agentSessionId - Session backing the chat tab, or null when it has none.
  * @returns The pending plan review, or null.
  */
 export function usePendingPlanReview(
-	piSessionId: string | null,
+	agentSessionId: string | null,
 ): ExitPlanModeBroadcast | null {
 	const pending = useAtomValue(pendingPlanReviewsAtom);
-	return piSessionId === null ? null : (pending[piSessionId] ?? null);
+	return agentSessionId === null ? null : (pending[agentSessionId] ?? null);
 }
 
 /**
  * Returns a callback that clears a chat's plan review once the user has acted
  * on it, so the panel disappears the moment they decide.
  */
-export function useDismissPlanReview(): (piSessionId: string) => void {
+export function useDismissPlanReview(): (agentSessionId: string) => void {
 	const setPending = useSetAtom(pendingPlanReviewsAtom);
 	return useCallback(
-		(piSessionId) => {
+		(agentSessionId) => {
 			setPending((pending) => {
-				if (!(piSessionId in pending)) {
+				if (!(agentSessionId in pending)) {
 					return pending;
 				}
 				const next = { ...pending };
-				delete next[piSessionId];
+				delete next[agentSessionId];
 				return next;
 			});
 		},

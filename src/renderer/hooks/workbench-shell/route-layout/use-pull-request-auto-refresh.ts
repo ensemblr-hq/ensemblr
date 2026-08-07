@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import {
 	refreshPullRequestSnapshot,
 	refreshPullRequestSnapshotUntilPresent,
-	subscribePiSessionEvents,
+	subscribeAgentSessionEvents,
 } from '@/renderer/api/ensemblr-queries';
 
 import {
@@ -23,7 +23,7 @@ interface RefreshInFlightRefs {
 
 /**
  * Starts a PR snapshot refresh when the matching refresh lane is available.
- * @param action - The refresh action classified from a Pi session event.
+ * @param action - The refresh action classified from an agent session event.
  * @param inFlight - Mutable in-flight flags for coalescing duplicate refreshes.
  * @param queryClient - Query cache to update with the fetched snapshot.
  * @param signal - Abort signal tied to the hook lifetime.
@@ -115,7 +115,7 @@ export function usePullRequestAutoRefresh({
 			return;
 		}
 		const controller = new AbortController();
-		const unsubscribe = subscribePiSessionEvents((broadcast) => {
+		const unsubscribe = subscribeAgentSessionEvents((broadcast) => {
 			if (broadcast.workspaceId !== workspaceId) {
 				return;
 			}

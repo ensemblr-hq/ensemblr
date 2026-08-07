@@ -20,6 +20,7 @@ import type { AgentControlOp } from './contracts.ts';
  * concept cannot reach a model.
  */
 export const CANONICAL_ARG_KEYS = {
+	agentSessionId: 'Identifier of an agent conversation.',
 	chatTabId: 'Identifier of a chat tab in the workspace.',
 	command: 'Shell command a guarded tool call is about to run.',
 	commentBody: 'Markdown body of the comment a tab is opened on.',
@@ -32,11 +33,10 @@ export const CANONICAL_ARG_KEYS = {
 	kind: 'Which of a fixed set of variants an op acts on.',
 	message: 'Prose addressed to a human or to the orchestrator.',
 	mode: 'How an op behaves across several targets.',
-	model: 'Identifier of the Pi model a conversation runs on.',
+	model: 'Identifier of the agent model a conversation runs on.',
 	name: 'Identity of a durable, addressable thing — the workspace and its git branch, a run script. Never the label of a tab or an artifact; that is `title`.',
 	ordinal: 'Position of a single transcript entry.',
 	panel: 'Which review panel to bring forward.',
-	piSessionId: 'Identifier of a Pi conversation.',
 	plan: 'Markdown plan handed to the user.',
 	prNumber: 'Number of the pull request a tab is opened on.',
 	prompt: 'Text submitted to a conversation as a turn.',

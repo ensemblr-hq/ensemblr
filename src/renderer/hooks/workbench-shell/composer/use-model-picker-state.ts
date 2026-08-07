@@ -11,6 +11,7 @@ import type {
 	ComposerModelOption,
 	GroupedOptions,
 } from '@/renderer/types/workbench';
+import type { AgentProviderId } from '@/shared/agent-provider';
 
 /** Everything the model picker needs to render its trigger and popover. */
 export interface ModelPickerState {
@@ -22,7 +23,10 @@ export interface ModelPickerState {
 	selectModel: (modelId: string) => void;
 	selected: ComposerModelOption | null;
 	setOpen: (next: boolean) => void;
-	/** Digit shortcut shown on each row, keyed by model id. */
+	/**
+	 * Digit shortcut shown on each row, keyed by model id. Rows locked out by the
+	 * chat's provider pin are absent, so a digit always selects something.
+	 */
 	shortcutIndexById: ReadonlyMap<string, number>;
 	toggleFavourite: (modelId: string) => void;
 }
@@ -31,6 +35,7 @@ export interface ModelPickerState {
  * Derives the model picker's open state, grouped options, favourites, and digit
  * shortcuts, and binds the shortcut hotkey while the popover is open.
  * @param controlledOpen - Open state when the caller controls the popover
+ * @param lockedProvider - Agent runtime the chat is pinned to, or null when new
  * @param onChange - Called with the model id the user picked
  * @param onOpenChange - Notified whenever the popover opens or closes
  * @param options - The model catalog to present
@@ -39,12 +44,14 @@ export interface ModelPickerState {
  */
 export function useModelPickerState({
 	controlledOpen,
+	lockedProvider,
 	onChange,
 	onOpenChange,
 	options,
 	value,
 }: {
 	controlledOpen: boolean | undefined;
+	lockedProvider: AgentProviderId | null;
 	onChange: (modelId: string) => void;
 	onOpenChange: ((open: boolean) => void) | undefined;
 	options: readonly ComposerModelOption[];
@@ -77,11 +84,14 @@ export function useModelPickerState({
 	);
 
 	const groups = useMemo(
-		() => buildModelGroups(options, favourites, hidden),
-		[options, favourites, hidden],
+		() => buildModelGroups(options, favourites, hidden, lockedProvider),
+		[options, favourites, hidden, lockedProvider],
 	);
 	const orderedShortcuts = useMemo(
-		() => groups.flatMap((group) => group.models),
+		() =>
+			groups.flatMap((group) =>
+				group.models.flatMap((row) => (row.locked ? [] : [row.model])),
+			),
 		[groups],
 	);
 	const shortcutIndexById = useMemo(

@@ -7,14 +7,16 @@ These instructions apply to everything under `src/main/`.
 - Keep `main.ts` as the Electron main-process entrypoint.
 - Organize implementation by main-process concern, not by renderer file type.
 - Use the established concern folders:
+  - `agent-runtime/` for the provider-neutral agent surface: adapter contract, `AgentClient`, and the agent session service, persistence, naming, and summaries.
   - `app/` for BrowserWindow creation and app lifecycle helpers.
+  - `claude-agent/` for the Claude Code adapter, a sibling of `pi-agent/`.
   - `commands/` for local process and shell execution.
   - `config/` for declarative config loading and settings resolution.
   - `environment/` for environment variable catalog and assembly.
   - `ipc/` for main-process IPC handler registration and request validation.
   - `menu/` for native Electron menus.
-  - `pi/` for Pi executable and readiness checks.
-  - `pi-agent/` for the `PiAgentClient` runtime boundary and adapters.
+  - `pi-runtime/` for Pi executable discovery and readiness checks.
+  - `pi-agent/` for the Pi CLI adapter: its RPC wire frames, payload normalizer, and slash commands.
   - `repository/` for repository registration, git probing, and lifecycle.
   - `root/` for managed root directory resolution and reconciliation.
   - `secrets/` for secret storage backends and metadata.

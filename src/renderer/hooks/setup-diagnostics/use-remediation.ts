@@ -1,6 +1,9 @@
 import { useNavigate } from '@tanstack/react-router';
 
-import { openAppConfigFile } from '@/renderer/api/ensemblr';
+import {
+	openAppConfigFile,
+	selectAgentProviderExecutable,
+} from '@/renderer/api/ensemblr';
 import { isPiExecutablePickerAction } from '@/renderer/lib/setup-diagnostics';
 import type {
 	SetupCheckSnapshot,
@@ -50,7 +53,7 @@ export function useGenericRemediation({
 				return;
 			case 'select-path':
 				if (isPiExecutablePickerAction(action, check)) {
-					await window.ensemblr?.selectPiExecutable();
+					await selectAgentProviderExecutable('pi');
 					onRetry?.();
 				}
 				return;
@@ -75,8 +78,10 @@ async function openSettingsTarget(
 			navigate({ to: '/settings/environment' });
 			return;
 		case 'linear':
-		case 'pi.providers':
 			navigate({ to: '/settings/integrations' });
+			return;
+		case 'pi.providers':
+			navigate({ to: '/settings/providers' });
 			return;
 		default:
 			return;

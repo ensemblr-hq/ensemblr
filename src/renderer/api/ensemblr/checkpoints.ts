@@ -10,19 +10,19 @@ import type {
 
 import { ensemblrQueryKeys, getEnsemblrApi } from './query-keys';
 
-/** Query options for the checkpoints captured across a Pi session's turns. */
-export function turnCheckpointsQuery(piSessionId: string | null) {
+/** Query options for the checkpoints captured across an agent session's turns. */
+export function turnCheckpointsQuery(agentSessionId: string | null) {
 	return queryOptions({
-		enabled: Boolean(piSessionId),
+		enabled: Boolean(agentSessionId),
 		queryFn: (): Promise<ListTurnCheckpointsResult> =>
 			profileElectronIpcCall(
 				{ channel: 'ensemblr:list-turn-checkpoints', usesDatabase: true },
 				() =>
 					getEnsemblrApi().listTurnCheckpoints({
-						piSessionId: piSessionId ?? '',
+						agentSessionId: agentSessionId ?? '',
 					}),
 			),
-		queryKey: ensemblrQueryKeys.checkpointsForSession(piSessionId ?? ''),
+		queryKey: ensemblrQueryKeys.checkpointsForSession(agentSessionId ?? ''),
 		staleTime: 5000,
 	});
 }

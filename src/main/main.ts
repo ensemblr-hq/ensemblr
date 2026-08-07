@@ -3,14 +3,15 @@ import path from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { parseAskUserQuestionReply } from '../shared/agent-control.ts';
+import type { AgentProviderId } from '../shared/agent-provider.ts';
 import { IPC_CHANNELS } from '../shared/ipc/channels';
-import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
-import type { ConfigChangedBroadcast } from '../shared/ipc/contracts/health';
 import type {
+	AgentSessionEventBroadcast,
 	PiRawFrameBroadcast,
 	PiRawFrameKind,
-	PiSessionEventBroadcast,
-} from '../shared/ipc/contracts/pi-session';
+} from '../shared/ipc/contracts/agent-session';
+import type { AppSettingsChangedBroadcast } from '../shared/ipc/contracts/app-settings';
+import type { ConfigChangedBroadcast } from '../shared/ipc/contracts/health';
 import type {
 	TerminalLifecycleBroadcast,
 	TerminalOutputBroadcast,
@@ -31,11 +32,37 @@ import {
 	isSessionTabMarkedSubAgent,
 	startControlServer,
 } from './agent-control';
+import {
+	createAgentProviderService,
+	createClaudeExecutableService,
+	createClaudeReadinessProbe,
+	createPiReadinessProbe,
+} from './agent-providers';
+import {
+	type AgentExecutableSnapshot,
+	createAgentClient,
+} from './agent-runtime';
+import { createAgentActivityMonitor } from './agent-runtime/agent-activity-monitor';
+import { createAgentSessionService } from './agent-runtime/agent-session-service';
+import {
+	electronIsAppFocused,
+	electronNotify,
+	electronPowerControls,
+} from './agent-runtime/electron-activity-bindings';
+import { readMacosBattery } from './agent-runtime/macos-battery';
+import { createSessionNaming } from './agent-runtime/naming/session-naming';
+import { createSessionSummaryWriter } from './agent-runtime/session-summary-writer';
 import { createHarnessDetectionService } from './agents';
 import { createMainWindow } from './app/main-window';
 import { createMainWindowStateStore } from './app/window-state';
 import { createChatTabService } from './chat-tabs/chat-tab-service.ts';
 import { persistTerminalAgentSessionId } from './chat-tabs/persist-terminal-agent-session.ts';
+import {
+	createClaudeAgentAdapter,
+	createClaudeModelLister,
+	createClaudePlanBridge,
+} from './claude-agent';
+import { installClaudeToolApproval } from './claude-agent/claude-tool-approval-ipc.ts';
 import { createLocalCommandService } from './commands';
 import {
 	createAppSettingsService,
@@ -59,17 +86,7 @@ import {
 } from './linear';
 import { installApplicationMenu } from './menu';
 import { createOpenTargetService } from './open-target';
-import { createCliRpcPiAgentAdapter, createPiAgentClient } from './pi-agent';
-import { createAgentActivityMonitor } from './pi-agent/agent-activity-monitor';
-import {
-	electronIsAppFocused,
-	electronNotify,
-	electronPowerControls,
-} from './pi-agent/electron-activity-bindings';
-import { readMacosBattery } from './pi-agent/macos-battery';
-import { createSessionNaming } from './pi-agent/naming/session-naming';
-import { createPiSessionService } from './pi-agent/pi-session-service';
-import { createSessionSummaryWriter } from './pi-agent/session-summary-writer';
+import { createPiCliRpcAdapter } from './pi-agent';
 import {
 	createPiExecutableService,
 	createPiReadinessService,
@@ -218,7 +235,7 @@ const configService = createEnsemblrConfigService(
 const appSettingsService = createAppSettingsService(
 	isDev ? { configPath: devConfigPath } : {},
 );
-// Drives the caffeinate power-blocker + "Pi finished" desktop notifications,
+// Drives the caffeinate power-blocker + "agent finished" desktop notifications,
 // gated live by the General settings in config.json.
 const agentActivityMonitor = createAgentActivityMonitor({
 	isAppFocused: electronIsAppFocused,
@@ -258,6 +275,11 @@ const piReadinessService = createPiReadinessService({
 	localCommandService,
 	piExecutableService,
 	rootDirectoryService,
+});
+const claudeExecutableService = createClaudeExecutableService({
+	databaseService,
+	localCommandService,
+	settingsResolutionService,
 });
 /**
  * Debug-only fan-out for raw Pi RPC frames. Pipes every JSONL line that
@@ -332,31 +354,96 @@ const {
 	/** Reads the control server's URL lazily, null until the server is listening. */
 	getServerUrl: () => agentControlServer?.url ?? null,
 	/** Reads the durable sub-agent marker so a resumed child keeps its playbook. */
-	isSpawnedSubAgent: (piSessionId) =>
+	isSpawnedSubAgent: (agentSessionId) =>
 		isSessionTabMarkedSubAgent(
 			databaseService.getConnection()?.database,
-			piSessionId,
+			agentSessionId,
 		),
 });
 
 /**
- * Base environment for every spawned Pi child. Uses the login-shell env (with
+ * Base environment every agent runtime spawns under — Pi's RPC child, Claude
+ * Code's SDK child, and the model lister alike. Uses the login-shell env (with
  * the user's PATH) so a packaged app launched from Finder — whose `process.env`
- * PATH is minimal — still lets pi find its runtime and tools instead of exiting
+ * PATH is minimal — still lets the runtime find its own tools instead of exiting
  * on startup and surfacing later as an EPIPE on the first prompt write. Memoized
  * inside `localCommandService`, so repeated opens do not re-spawn a shell.
  */
-const resolvePiSpawnEnv = async (): Promise<NodeJS.ProcessEnv> =>
+const resolveAgentSpawnEnv = async (): Promise<NodeJS.ProcessEnv> =>
 	(await localCommandService.getEnvironment()).env;
-const piAgentAdapter = createCliRpcPiAgentAdapter({
-	onRawFrame: broadcastRawFrame,
-	resolveBaseEnv: resolvePiSpawnEnv,
-});
-const piAgentClient = createPiAgentClient({
-	adapter: piAgentAdapter,
-	args: piControlExtensionPath
+const piAgentAdapter = createPiCliRpcAdapter({
+	baseArgs: piControlExtensionPath
 		? ['--mode', 'rpc', '-e', piControlExtensionPath]
 		: undefined,
+	onRawFrame: broadcastRawFrame,
+	resolveBaseEnv: resolveAgentSpawnEnv,
+});
+// Claude submits plans through its own `ExitPlanMode` tool rather than the
+// `ensemblr_exit_plan_mode` control op, so the bridge routes them into the same
+// review path. `planSubmission` is built further down and read lazily here,
+// because the plan service depends on the session service this adapter feeds.
+// The per-tool approval card `approval-required` raises. One call installs both
+// broadcasts, the answer channel, and the replay a reloaded window needs; the
+// adapter releases the seam on every shutdown path, so nothing else is wired.
+const claudeToolApproval = installClaudeToolApproval({ app, ipcMain });
+const claudeAgentAdapter = createClaudeAgentAdapter({
+	canUseTool: claudeToolApproval.gate,
+	onPlanSubmitted: createClaudePlanBridge({
+		/** Resolves a Claude session's control token back to its trusted origin. */
+		resolveOrigin: (token) => agentControlOriginRegistry.resolveByToken(token),
+		/** Saves the plan, posts it into the chat, and raises the review panel. */
+		submitPlan: (input) => planSubmission.submit(input),
+	}),
+	resolveBaseEnv: resolveAgentSpawnEnv,
+});
+/**
+ * Path to the `claude` binary a Claude session or model listing should run, or
+ * `null` when neither the user's override nor PATH produced one. Ensemblr does
+ * not ship the Agent SDK's per-platform runtime, so `null` means unavailable —
+ * never "let the SDK pick".
+ * @returns The resolved override or PATH hit, else `null`.
+ */
+const resolveClaudeExecutablePath = async (): Promise<string | null> =>
+	(await claudeExecutableService.getSnapshot()).path || null;
+const listClaudeModels = createClaudeModelLister({
+	resolveBaseEnv: resolveAgentSpawnEnv,
+	resolveExecutablePath: resolveClaudeExecutablePath,
+});
+/**
+ * Resolves the binary a non-Pi agent runtime launches, so the executable the
+ * Providers page reports is the one the session actually runs. Pi's own
+ * snapshot rides the open request, so it is not resolved again here.
+ *
+ * A runtime whose binary is missing reports an `error` snapshot rather than
+ * `null`: `null` states no opinion and lets the runtime pick, which would turn
+ * a missing install into an opaque spawn failure instead of a clear message.
+ * @param provider - Agent runtime about to open a session.
+ * @returns The executable to launch, or `null` when this runtime has no resolver.
+ */
+const resolveProviderExecutable = async (
+	provider: AgentProviderId,
+): Promise<AgentExecutableSnapshot | null> => {
+	if (provider !== 'claude') {
+		return null;
+	}
+	const path = await resolveClaudeExecutablePath();
+	return { command: path ?? '', status: path ? 'ok' : 'error' };
+};
+// Settings → Providers reads both runtimes through one surface: Pi's probe
+// adapts the existing readiness service, Claude's talks to the Agent SDK.
+const agentProviderService = createAgentProviderService({
+	executables: { claude: claudeExecutableService, pi: piExecutableService },
+	probes: {
+		claude: createClaudeReadinessProbe({
+			executableService: claudeExecutableService,
+			localCommandService,
+			resolveBaseEnv: resolveAgentSpawnEnv,
+		}),
+		pi: createPiReadinessProbe({ piReadinessService }),
+	},
+});
+const agentClient = createAgentClient({
+	adapters: { claude: claudeAgentAdapter, pi: piAgentAdapter },
 });
 const sessionSummaryWriter = createSessionSummaryWriter();
 const renameWorkspaceService = createRenameWorkspaceService({
@@ -375,11 +462,15 @@ const continueWorkspaceBranchService = createContinueWorkspaceBranchService({
 // with `ensemblr_set_name`. No model runs, so a slow provider cannot leave a tab
 // unlabeled; the provenance ladder makes it yield to any chosen title.
 const sessionNamingQueue = createSessionNaming();
-const piSessionService = createPiSessionService({
+// Declared here rather than beside the rest of the plan-mode wiring below,
+// because the session service reads it at open time to decide the permission
+// mode a Claude child starts under.
+const planModeRegistry = createPlanModeRegistry();
+const agentSessionService = createAgentSessionService({
 	databaseService,
-	/** Forwards a Pi session event to every window and the activity monitor. */
+	/** Forwards an agent session event to every window and the activity monitor. */
 	eventSink: ({ event, sessionId, workspaceId }) => {
-		const payload: PiSessionEventBroadcast = {
+		const payload: AgentSessionEventBroadcast = {
 			event: {
 				branchId: event.branchId,
 				createdAt: event.createdAt,
@@ -395,7 +486,7 @@ const piSessionService = createPiSessionService({
 		};
 		for (const window of BrowserWindow.getAllWindows()) {
 			if (!window.isDestroyed()) {
-				window.webContents.send(IPC_CHANNELS.piSessionEvent, payload);
+				window.webContents.send(IPC_CHANNELS.agentSessionEvent, payload);
 			}
 		}
 		agentActivityMonitor.handle({ event: payload.event, sessionId });
@@ -403,9 +494,15 @@ const piSessionService = createPiSessionService({
 			agentControlService?.releaseSession(sessionId);
 		}
 	},
-	piAgentClient,
+	agentClient,
+	/** Reports whether the chat behind this session has Plan Mode switched on. */
+	isPlanModeActive: (sessionId) => planModeRegistry.isActive(sessionId),
 	queueNaming: sessionNamingQueue,
 	resolveAgentControlEnv,
+	/** Reads the workspace permission mode each new agent session must honour. */
+	resolvePermissionMode: () =>
+		readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
+	resolveProviderExecutable,
 	/** Live sub-agents of a session, so stopping an orchestrator stops its children. */
 	resolveSpawnedChildren: (sessionId) =>
 		agentControlOriginRegistry.childrenOf(sessionId),
@@ -519,9 +616,9 @@ const workspaceFilesWatcher = createWorkspaceFilesWatcher({
 const terminalService = createTerminalService({
 	databaseService,
 	/** Persists a harness's native session id onto its tab for exact resume. */
-	onAgentSessionCaptured: ({ agentSessionId, terminalId, workspaceId }) =>
+	onAgentSessionCaptured: ({ harnessSessionId, terminalId, workspaceId }) =>
 		persistTerminalAgentSessionId({
-			agentSessionId,
+			harnessSessionId,
 			database: databaseService.getConnection()?.database ?? null,
 			terminalId,
 			workspaceId,
@@ -553,9 +650,9 @@ const harnessDetectionService = createHarnessDetectionService({
 const agentControlChatTabService = createChatTabService({
 	databaseService,
 	lookups: {
-		/** Reports whether a Pi session is still live before binding it to a tab. */
-		piSessionExists: ({ piSessionId }) =>
-			piSessionService.getSession(piSessionId) !== null,
+		/** Reports whether an agent session is still live before binding it to a tab. */
+		agentSessionExists: ({ agentSessionId }) =>
+			agentSessionService.getSession(agentSessionId) !== null,
 	},
 });
 const boardStatusStore: BoardStatusStore = createBoardStatusStore();
@@ -590,7 +687,6 @@ ipcMain.handle(
 		}
 	},
 );
-const planModeRegistry = createPlanModeRegistry();
 const planSubmission = createPlanSubmission({
 	/** Pushes a finished plan to every window; only the owning chat renders it. */
 	broadcastReview: (payload) =>
@@ -601,7 +697,7 @@ const planSubmission = createPlanSubmission({
 	planFileWriter: createPlanFileWriter(),
 	/** Posts the plan into the submitting chat's timeline so the user always sees it. */
 	postPlanMessage: ({ sessionId, plan }) =>
-		piSessionService.appendAgentMessage({ sessionId, text: plan }),
+		agentSessionService.appendAgentMessage({ sessionId, text: plan }),
 });
 agentControlService = createAgentControlService({
 	guardrails: agentControlGuardrails,
@@ -639,7 +735,7 @@ agentControlService = createAgentControlService({
 		harnessDetectionService,
 		localCommandService,
 		piExecutableService,
-		piSessionService,
+		agentSessionService,
 		// Both are stateless factories over services already constructed here, so
 		// the control layer builds its own rather than reaching into the IPC
 		// handlers that build theirs the same way.
@@ -648,7 +744,7 @@ agentControlService = createAgentControlService({
 		planMode: {
 			/** Saves the finished plan, surfaces the review, and ends the turn. */
 			exit: planSubmission.submit,
-			/** Reports whether the calling Pi session is still planning. */
+			/** Reports whether the calling agent session is still planning. */
 			isActive: planModeRegistry.isActive,
 			/** Starts a spawned child planning; narrowed to on-only on purpose. */
 			activateForSpawn: (sessionId) =>
@@ -785,6 +881,7 @@ app.whenReady().then(() => {
 		} satisfies ConfigChangedBroadcast);
 	});
 	ipcHandlersHandle = registerIpcHandlers({
+		agentProviderService,
 		appSettingsService,
 		archiveRepositoryService,
 		archiveWorkspaceService: archiveWorkspaceServiceWithScript,
@@ -804,13 +901,14 @@ app.whenReady().then(() => {
 		linearService,
 		listAllWorkspacesService,
 		listArchivedWorkspacesService,
+		listClaudeModels,
 		listWorkspaceFilesService,
 		localCommandService,
 		localRepositoryImportService,
 		localRepositoryRegistrationService,
 		openTargetService,
 		piExecutableService,
-		piSessionService,
+		agentSessionService,
 		planModeRegistry,
 		quickStartProjectService,
 		renameWorkspaceService,
@@ -836,15 +934,20 @@ let isShuttingDownAgents = false;
 // keeps orphaned `pi --mode rpc` processes from surviving app quit. `before-quit`
 // is synchronous, so defer the real quit until the async shutdown settles; a
 // bounded race guarantees a wedged child can never block quit indefinitely.
+//
+// The approval gate fails closed first, before that grace period: a Claude
+// session in approval-required mode can still issue tool calls while the race
+// plays out, and by then no window is left to put them to the user.
 app.on('before-quit', (event) => {
 	if (isShuttingDownAgents) {
 		return;
 	}
 	isShuttingDownAgents = true;
+	claudeToolApproval.shutdown();
 	event.preventDefault();
 	void (async () => {
 		await Promise.race([
-			Promise.allSettled([piAgentClient.shutdown()]),
+			Promise.allSettled([agentClient.shutdown()]),
 			new Promise((resolve) => setTimeout(resolve, 3000)),
 		]);
 		app.quit();
@@ -866,7 +969,11 @@ app.on('will-quit', () => {
 // a single-window workbench, not a menu-bar resident, so keeping the process (and
 // its Pi RPC children) alive with no windows just wastes resources and leaves a
 // stray Dock tile. `before-quit` still drives the graceful Pi shutdown.
+//
+// Losing the last window is itself the point of no return for the approval gate:
+// from here nobody can answer a prompt, so it denies rather than waits.
 app.on('window-all-closed', () => {
+	claudeToolApproval.shutdown();
 	app.quit();
 });
 

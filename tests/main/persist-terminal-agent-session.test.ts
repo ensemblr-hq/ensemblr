@@ -43,21 +43,21 @@ test('persists a captured session id onto the terminal tab backing the PTY', (t)
 		input: {
 			kind: 'terminal',
 			metadata: { harnessId: 'claude', terminalId: 'pty-1' },
-			piSessionId: null,
+			agentSessionId: null,
 			title: 'Claude Code',
 			workspaceId: WORKSPACE_ID,
 		},
 	});
 
 	persistTerminalAgentSessionId({
-		agentSessionId: 'session-abc',
+		harnessSessionId: 'session-abc',
 		database,
 		terminalId: 'pty-1',
 		workspaceId: WORKSPACE_ID,
 	});
 
 	assert.equal(
-		getChatTabById({ database, id: tab.id })?.metadata.agentSessionId,
+		getChatTabById({ database, id: tab.id })?.metadata.harnessSessionId,
 		'session-abc',
 	);
 });
@@ -69,21 +69,21 @@ test('does not touch a tab whose PTY id does not match', (t) => {
 		input: {
 			kind: 'terminal',
 			metadata: { harnessId: 'claude', terminalId: 'pty-1' },
-			piSessionId: null,
+			agentSessionId: null,
 			title: 'Claude Code',
 			workspaceId: WORKSPACE_ID,
 		},
 	});
 
 	persistTerminalAgentSessionId({
-		agentSessionId: 'session-abc',
+		harnessSessionId: 'session-abc',
 		database,
 		terminalId: 'pty-other',
 		workspaceId: WORKSPACE_ID,
 	});
 
 	assert.equal(
-		getChatTabById({ database, id: tab.id })?.metadata.agentSessionId,
+		getChatTabById({ database, id: tab.id })?.metadata.harnessSessionId,
 		undefined,
 	);
 });
@@ -91,7 +91,7 @@ test('does not touch a tab whose PTY id does not match', (t) => {
 test('is a no-op when the database is null', () => {
 	assert.doesNotThrow(() =>
 		persistTerminalAgentSessionId({
-			agentSessionId: 'session-abc',
+			harnessSessionId: 'session-abc',
 			database: null,
 			terminalId: 'pty-1',
 			workspaceId: WORKSPACE_ID,

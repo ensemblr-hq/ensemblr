@@ -25,7 +25,7 @@ const makePorts = (planningSessions: ReadonlySet<string>): AgentControlPorts =>
 		conversations: {
 			startConversation: vi
 				.fn()
-				.mockResolvedValue({ chatTabId: 't', piSessionId: 'pi-1' }),
+				.mockResolvedValue({ chatTabId: 't', agentSessionId: 'pi-1' }),
 			sendFollowUp: vi.fn().mockResolvedValue(undefined),
 			setName: vi.fn().mockResolvedValue({ chatTabId: 't', title: 'Named' }),
 			waitForIdle: vi.fn().mockResolvedValue('completed'),
@@ -281,7 +281,7 @@ describe('plan mode: sendFollowUp', () => {
 		});
 
 		const result = await invoke(service, 'sendFollowUp', {
-			piSessionId: TARGET_SESSION,
+			agentSessionId: TARGET_SESSION,
 			prompt: 'dig deeper',
 		});
 
@@ -295,7 +295,7 @@ describe('plan mode: sendFollowUp', () => {
 		const { ports, service } = setup({ planning: true });
 
 		const result = await invoke(service, 'sendFollowUp', {
-			piSessionId: TARGET_SESSION,
+			agentSessionId: TARGET_SESSION,
 			prompt: 'go implement this',
 		});
 
@@ -311,7 +311,7 @@ describe('plan mode: sendFollowUp', () => {
 		const { ports, service } = setup({ planning: false });
 
 		const result = await invoke(service, 'sendFollowUp', {
-			piSessionId: TARGET_SESSION,
+			agentSessionId: TARGET_SESSION,
 			prompt: 'go',
 		});
 
@@ -328,7 +328,7 @@ describe('plan mode: sendFollowUp', () => {
 		).mockResolvedValue('other-ws');
 
 		const result = await invoke(service, 'sendFollowUp', {
-			piSessionId: TARGET_SESSION,
+			agentSessionId: TARGET_SESSION,
 			prompt: 'go',
 		});
 
@@ -347,7 +347,7 @@ describe('plan mode: sendFollowUp', () => {
 		});
 
 		const result = await invoke(service, 'sendFollowUp', {
-			piSessionId: TARGET_SESSION,
+			agentSessionId: TARGET_SESSION,
 			prompt: 'go',
 		});
 

@@ -49,11 +49,26 @@ const APP_NAMES: Record<BuildChannel, string> = {
 // `node-addon-api` (needed by @electron/rebuild to recompile the native addon
 // against Electron's ABI). AutoUnpackNativesPlugin then unpacks the resulting
 // `.node` binary from the asar so it can be loaded at runtime.
-const PACKAGE_KEEP_EXACT = new Set(['/package.json', '/node_modules']);
+// The Claude Agent SDK is kept for the same reason: it is external (see
+// vite.main.config.mts), so `sdk.mjs` must exist on disk to be required.
+//
+// Its per-platform `claude-agent-sdk-<platform>` packages are deliberately NOT
+// kept — they carry a ~260 MB `claude` binary, and a user has to install and
+// authenticate the real `claude` CLI anyway (`claude /login`). First-class
+// Claude therefore requires the user's own binary, found on PATH or set as an
+// override. The trailing slash keeps the platform siblings out; the matching
+// KEEP_EXACT entries below hold the directories the slash prefix would drop.
+const PACKAGE_KEEP_EXACT = new Set([
+	'/package.json',
+	'/node_modules',
+	'/node_modules/@anthropic-ai',
+	'/node_modules/@anthropic-ai/claude-agent-sdk',
+]);
 const PACKAGE_KEEP_PREFIXES = [
 	'/.vite',
 	'/node_modules/node-pty',
 	'/node_modules/node-addon-api',
+	'/node_modules/@anthropic-ai/claude-agent-sdk/',
 ];
 
 const execFileAsync = promisify(execFile);
@@ -131,6 +146,9 @@ const config: ForgeConfig = {
 		// app.asar, the unpacked path points at a missing file, and every terminal
 		// spawn dies with "posix_spawnp failed." The plugin merges this `unpack` glob
 		// with its own `*.node` pattern (its existingUnpack handling).
+		//
+		// The Claude Agent SDK needs no equivalent: its per-platform binary is not
+		// packaged, and the user's own `claude` runs from outside the app.
 		asar: {
 			unpack: '**/node_modules/node-pty/build/Release/spawn-helper',
 		},

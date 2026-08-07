@@ -1,6 +1,6 @@
+import type { AgentErrorCode } from '../../agent-runtime/agent-types.ts';
 import type { JsonlLineStream } from '../../pi-ipc';
 import { createJsonlLineStream } from '../../pi-ipc/jsonl-line-stream.ts';
-import type { PiAgentErrorCode } from '../pi-agent-types.ts';
 
 /**
  * Builds the JSONL stream used to parse Pi RPC stdout. Each non-empty line is
@@ -21,7 +21,7 @@ export function createPiRpcLineStream({
 	onRawLine: (line: string) => void;
 	onFrame: (frame: unknown) => void;
 	emitError: (
-		code: PiAgentErrorCode,
+		code: AgentErrorCode,
 		message: string,
 		detail?: string,
 		recoverable?: boolean,

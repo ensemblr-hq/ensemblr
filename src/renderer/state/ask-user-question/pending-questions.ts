@@ -42,7 +42,10 @@ export function useAskUserQuestionSync(): void {
 	const setPending = useSetAtom(pendingAskUserQuestionsAtom);
 	useEffect(() => {
 		const unsubscribeAsk = window.ensemblr?.onAskUserQuestion((payload) => {
-			setPending((pending) => ({ ...pending, [payload.piSessionId]: payload }));
+			setPending((pending) => ({
+				...pending,
+				[payload.agentSessionId]: payload,
+			}));
 		});
 		const unsubscribeClosed = window.ensemblr?.onAskUserQuestionClosed(
 			({ requestId }) => {
@@ -58,14 +61,14 @@ export function useAskUserQuestionSync(): void {
 
 /**
  * Reads the questionnaire a chat tab must show, if any.
- * @param piSessionId - Session backing the chat tab, or null when it has none.
+ * @param agentSessionId - Session backing the chat tab, or null when it has none.
  * @returns The pending questionnaire, or null.
  */
 export function usePendingAskUserQuestion(
-	piSessionId: string | null,
+	agentSessionId: string | null,
 ): AskUserQuestionBroadcast | null {
 	const pending = useAtomValue(pendingAskUserQuestionsAtom);
-	return piSessionId === null ? null : (pending[piSessionId] ?? null);
+	return agentSessionId === null ? null : (pending[agentSessionId] ?? null);
 }
 
 /**

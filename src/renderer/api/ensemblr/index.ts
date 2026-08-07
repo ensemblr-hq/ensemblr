@@ -1,3 +1,5 @@
+export * from './agent-providers';
+export * from './agent-sessions';
 export * from './app-settings';
 export * from './archive';
 export {
@@ -16,7 +18,6 @@ export * from './invalidate-workspace-list-views';
 export * from './linear';
 export * from './navigation';
 export * from './open-targets';
-export * from './pi-sessions';
 export * from './pi-slash-commands';
 export {
 	ensemblrQueryKeys,

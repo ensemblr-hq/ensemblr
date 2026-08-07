@@ -58,6 +58,7 @@ export function ComposerControls({
 			<div className='flex min-w-0 items-center gap-1.5'>
 				<ModelPicker
 					disabled={pickersDisabled}
+					lockedProvider={composer.lockedProvider}
 					onChange={composer.onModelChange}
 					onOpenChange={onModelPickerOpenChange}
 					open={modelPickerOpen}
@@ -114,9 +115,10 @@ function showContextIndicator(
 }
 
 /**
- * The send / stop control and its tooltip. Stop shows only while Pi is working
- * AND there is nothing to send — the moment the user drafts a follow-up the
- * control becomes Send, so a live turn never hides the ability to steer.
+ * The send / stop control and its tooltip. Stop shows only while the agent
+ * is working AND there is nothing to send — the moment the user drafts a
+ * follow-up the control becomes Send, so a live turn never hides the ability
+ * to steer.
  */
 function SubmitControl({
 	composer,

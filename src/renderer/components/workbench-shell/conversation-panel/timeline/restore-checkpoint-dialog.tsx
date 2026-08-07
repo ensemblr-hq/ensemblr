@@ -38,8 +38,8 @@ export function RestoreCheckpointDialog({
 						<span className='block'>
 							Workspace files revert to the snapshot taken before “
 							{target?.label}”. Later messages in this chat are hidden from the
-							timeline, but Pi’s own session history is never modified — you can
-							keep prompting from the restored state.
+							timeline, but the agent’s own session history is never modified —
+							you can keep prompting from the restored state.
 						</span>
 						<span className='block'>
 							Files created after the snapshot that were never tracked stay in

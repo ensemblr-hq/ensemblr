@@ -5,6 +5,12 @@ import { createRoot } from 'react-dom/client';
 import { TooltipProvider } from '@/renderer/components/ui/tooltip';
 import '@/renderer/styles/index.css';
 
+import {
+	resolveFixtureAgentProviderExecutablePath,
+	resolveFixtureAgentProviderReadiness,
+	resolveFixtureOpenProviderSettingsFile,
+	resolveFixtureOpenTargets,
+} from './agent-provider-fixtures.ts';
 import { installPlaygroundBridge } from './bridge.ts';
 import { resolveFixtureMergeConflicts } from './conflicts-fixtures.ts';
 import { Playground } from './playground.tsx';
@@ -17,8 +23,12 @@ if (!rootElement) {
 }
 
 installPlaygroundBridge({
+	getAgentProviderExecutablePath: resolveFixtureAgentProviderExecutablePath,
+	getAgentProviderReadiness: resolveFixtureAgentProviderReadiness,
 	getWorkspaceGitStatus: resolveFixtureGitStatus,
 	getWorkspaceMergeConflicts: resolveFixtureMergeConflicts,
+	listWorkspaceOpenTargets: resolveFixtureOpenTargets,
+	openAgentProviderSettingsFile: resolveFixtureOpenProviderSettingsFile,
 });
 
 const queryClient = new QueryClient({

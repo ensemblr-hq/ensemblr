@@ -1,11 +1,11 @@
 import { containsPullRequestUrl, mentionsGhPrCreate } from '@/shared/github';
 import type {
-	PiPersistedEnvelope,
-	PiWireMessagePart,
-	PiWireMessagePayload,
-} from '@/shared/ipc/contracts/pi-message-payloads';
+	AgentPersistedEnvelope,
+	AgentWireMessagePart,
+	AgentWireMessagePayload,
+} from '@/shared/ipc/contracts/agent-message-payloads';
 
-/** The strongest PR-creation signal extractable from a persisted Pi event. */
+/** The strongest PR-creation signal extractable from a persisted agent event. */
 type PullRequestCreationSignal = 'create-command' | 'created-url';
 
 /**
@@ -59,7 +59,7 @@ function signalFromToolResultOutput(
  * @returns The part's PR-creation signal, or null when absent.
  */
 function signalFromMessagePart(
-	part: PiWireMessagePart,
+	part: AgentWireMessagePart,
 ): PullRequestCreationSignal | null {
 	if (part.kind === 'tool-call') {
 		return signalFromToolCallInput(part.input);
@@ -76,7 +76,7 @@ function signalFromMessagePart(
  * @returns A created-url signal when present, otherwise a create-command signal.
  */
 function signalFromMessageParts(
-	parts: readonly PiWireMessagePart[],
+	parts: readonly AgentWireMessagePart[],
 ): PullRequestCreationSignal | null {
 	let fallback: PullRequestCreationSignal | null = null;
 	for (const part of parts) {
@@ -97,7 +97,7 @@ function signalFromMessageParts(
  * @returns The payload's PR-creation signal, or null when absent.
  */
 function signalFromMessagePayload(
-	payload: PiWireMessagePayload,
+	payload: AgentWireMessagePayload,
 ): PullRequestCreationSignal | null {
 	if (payload.kind === 'tool-call') {
 		return signalFromToolCallInput(payload.input);
@@ -117,7 +117,7 @@ function signalFromMessagePayload(
  * @returns The event's PR-creation signal, or null when absent.
  */
 function pullRequestCreationSignal(
-	envelope: PiPersistedEnvelope,
+	envelope: AgentPersistedEnvelope,
 ): PullRequestCreationSignal | null {
 	if (envelope.kind !== 'message') {
 		return null;
@@ -134,7 +134,7 @@ function pullRequestCreationSignal(
  * @returns True when the event references creating a pull request.
  */
 export function isPullRequestCreationEvent(
-	envelope: PiPersistedEnvelope,
+	envelope: AgentPersistedEnvelope,
 ): boolean {
 	return pullRequestCreationSignal(envelope) !== null;
 }
@@ -147,7 +147,7 @@ export function isPullRequestCreationEvent(
  * @param envelope - The persisted session-event envelope from the broadcast.
  * @returns True when the event ends an agent turn.
  */
-export function isFinishedTurnEvent(envelope: PiPersistedEnvelope): boolean {
+export function isFinishedTurnEvent(envelope: AgentPersistedEnvelope): boolean {
 	return (
 		envelope.kind === 'status' &&
 		envelope.status === 'idle' &&
@@ -177,7 +177,7 @@ export type PullRequestRefreshAction =
  * @returns The action the hook should apply.
  */
 export function classifyPullRequestRefreshAction(
-	envelope: PiPersistedEnvelope,
+	envelope: AgentPersistedEnvelope,
 	prCreatedThisTurn: boolean,
 ): PullRequestRefreshAction {
 	const signal = pullRequestCreationSignal(envelope);

@@ -1,3 +1,6 @@
+import type { AgentModelOption } from '../../shared/ipc/contracts/agent-models';
+import type { AgentProviderService } from '../agent-providers';
+import type { AgentSessionService } from '../agent-runtime';
 import type { HarnessDetectionService } from '../agents/index.ts';
 import { createChatTabService } from '../chat-tabs/index.ts';
 import type { LocalCommandService } from '../commands/local-command';
@@ -14,7 +17,6 @@ import {
 } from '../github/index.ts';
 import type { LinearAuthService, LinearService } from '../linear';
 import type { OpenTargetService } from '../open-target';
-import type { PiSessionService } from '../pi-agent';
 import type { PiExecutableService } from '../pi-runtime';
 import type { PlanModeRegistry } from '../plan-mode';
 import type {
@@ -43,7 +45,7 @@ import type { EnsemblrRootDirectoryService } from '../root';
 import type { ScriptLifecycleService } from '../scripts';
 import type { SetupDiagnosticsService } from '../setup';
 import type { EnsemblrDatabaseService } from '../storage';
-import { getPiSessionById } from '../storage/repositories/pi-session-repository';
+import { getAgentSessionById } from '../storage/repositories/agent-session-repository';
 import { listActiveWorkspacePathRows } from '../storage/repositories/workspace-repository';
 import type { TerminalService } from '../terminal';
 import type {
@@ -51,6 +53,8 @@ import type {
 	WorkspaceFilesWatcher,
 } from '../workspace-files';
 import { createWorkspaceGitService } from '../workspace-git';
+import { registerAgentProviderHandlers } from './handlers/agent-provider';
+import { registerAgentSessionHandlers } from './handlers/agent-session';
 import { registerAgentHandlers } from './handlers/agents';
 import { registerAppSettingsHandlers } from './handlers/app-settings';
 import { registerChatTabHandlers } from './handlers/chat-tab';
@@ -63,7 +67,6 @@ import { registerLinearHandlers } from './handlers/linear';
 import { registerNavigationHandlers } from './handlers/navigation';
 import { registerOpenTargetHandlers } from './handlers/open-target';
 import { registerPiHandlers } from './handlers/pi';
-import { registerPiSessionHandlers } from './handlers/pi-session';
 import { registerRepositoryHandlers } from './handlers/repository';
 import { registerRepositoryConfigHandlers } from './handlers/repository-config';
 import { registerRepositorySettingsHandlers } from './handlers/repository-settings';
@@ -85,6 +88,7 @@ import {
 
 /** Dependency bundle wired into the renderer-facing IPC handlers. */
 interface RegisterIpcHandlersOptions {
+	agentProviderService: AgentProviderService;
 	appSettingsService: AppSettingsService;
 	archiveRepositoryService: ArchiveRepositoryService;
 	archiveWorkspaceService: ArchiveWorkspaceService;
@@ -108,6 +112,8 @@ interface RegisterIpcHandlersOptions {
 	linearService: LinearService;
 	listAllWorkspacesService: ListAllWorkspacesService;
 	listArchivedWorkspacesService: ListArchivedWorkspacesService;
+	/** Lists Claude Code's models for the merged composer catalog. */
+	listClaudeModels?: () => Promise<readonly AgentModelOption[]>;
 	listWorkspaceFilesService: ListWorkspaceFilesService;
 	localCommandService: LocalCommandService;
 	localRepositoryImportService: LocalRepositoryImportService;
@@ -116,7 +122,7 @@ interface RegisterIpcHandlersOptions {
 	onAppSettingsUpdated?: () => void;
 	openTargetService: OpenTargetService;
 	piExecutableService: PiExecutableService;
-	piSessionService: PiSessionService;
+	agentSessionService: AgentSessionService;
 	planModeRegistry: PlanModeRegistry;
 	quickStartProjectService: QuickStartProjectService;
 	renameWorkspaceService: RenameWorkspaceService;
@@ -146,6 +152,7 @@ export interface IpcHandlersHandle {
  * @returns A handle that tears down background workers on app quit.
  */
 export function registerIpcHandlers({
+	agentProviderService,
 	appSettingsService,
 	archiveRepositoryService,
 	archiveWorkspaceService,
@@ -165,6 +172,7 @@ export function registerIpcHandlers({
 	linearService,
 	listAllWorkspacesService,
 	listArchivedWorkspacesService,
+	listClaudeModels,
 	listWorkspaceFilesService,
 	localCommandService,
 	localRepositoryImportService,
@@ -172,7 +180,7 @@ export function registerIpcHandlers({
 	onAppSettingsUpdated,
 	openTargetService,
 	piExecutableService,
-	piSessionService,
+	agentSessionService,
 	planModeRegistry,
 	quickStartProjectService,
 	renameWorkspaceService,
@@ -239,10 +247,12 @@ export function registerIpcHandlers({
 		withPermissionGate,
 	});
 	registerPiHandlers({ piExecutableService });
-	registerPiSessionHandlers({
+	registerAgentProviderHandlers({ agentProviderService, openTargetService });
+	registerAgentSessionHandlers({
+		listClaudeModels,
 		localCommandService,
 		piExecutableService,
-		piSessionService,
+		agentSessionService,
 		planModeRegistry,
 		withPermissionGate,
 	});
@@ -250,12 +260,12 @@ export function registerIpcHandlers({
 		chatTabService: createChatTabService({
 			databaseService,
 			lookups: {
-				piSessionExists: ({ piSessionId }) => {
+				agentSessionExists: ({ agentSessionId }) => {
 					const database = databaseService.getConnection()?.database;
 					if (!database) {
 						return false;
 					}
-					return getPiSessionById({ database, id: piSessionId }) !== null;
+					return getAgentSessionById({ database, id: agentSessionId }) !== null;
 				},
 			},
 		}),

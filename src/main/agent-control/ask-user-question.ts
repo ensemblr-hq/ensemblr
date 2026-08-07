@@ -144,7 +144,7 @@ export function createAskUserQuestionCoordinator({
 		}
 		const requestId = createRequestId();
 		const broadcast: AskUserQuestionBroadcast = {
-			piSessionId: origin.sessionId,
+			agentSessionId: origin.sessionId,
 			questions,
 			requestId,
 			workspaceId: origin.workspaceId,

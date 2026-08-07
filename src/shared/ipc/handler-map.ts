@@ -17,11 +17,44 @@
  * Type-only file — no runtime export.
  */
 
+import type {
+	ToolApprovalClosedBroadcast,
+	ToolApprovalReply,
+	ToolApprovalRequestedBroadcast,
+} from '../agent-tool-approval';
 import type { IPC_CHANNELS } from './channels';
+import type { AgentModelCatalog } from './contracts/agent-models';
+import type {
+	AgentExecutablePathSnapshotWire,
+	AgentExecutableSelectionWire,
+	AgentProviderReadinessWire,
+	AgentProviderRequest,
+	OpenAgentProviderSettingsFileRequest,
+	OpenAgentProviderSettingsFileResult,
+	SetAgentProviderExecutablePathRequest,
+} from './contracts/agent-provider';
+import type {
+	AgentSessionEventBroadcast,
+	ListAgentSessionEventsRequest,
+	ListAgentSessionEventsResult,
+	ListAgentSessionsRequest,
+	ListAgentSessionsResult,
+	ListPiSlashCommandsRequest,
+	ListPiSlashCommandsResult,
+	OpenAgentSessionRequest,
+	OpenAgentSessionResult,
+	PiRawFrameBroadcast,
+	StopAgentSessionRequest,
+	StopAgentSessionResult,
+	SubmitAgentPromptRequest,
+	SubmitAgentPromptResult,
+	WriteForkSummaryRequest,
+	WriteForkSummaryResult,
+} from './contracts/agent-session';
 import type { AppSettingsChangedBroadcast } from './contracts/app-settings';
 import type {
-	BindPiSessionToTabRequest,
-	BindPiSessionToTabResult,
+	BindAgentSessionToTabRequest,
+	BindAgentSessionToTabResult,
 	CloseChatTabRequest,
 	CloseChatTabResult,
 	ListChatTabsRequest,
@@ -86,28 +119,6 @@ import type {
 	OpenTargetResult,
 	OpenWorkspaceInTargetRequest,
 } from './contracts/open-target';
-import type {
-	ListPiModelsResult,
-	ListPiSessionEventsRequest,
-	ListPiSessionEventsResult,
-	ListPiSessionsRequest,
-	ListPiSessionsResult,
-	ListPiSlashCommandsRequest,
-	ListPiSlashCommandsResult,
-	OpenPiSessionRequest,
-	OpenPiSessionResult,
-	PiExecutablePathSnapshot,
-	PiExecutableSelectionResult,
-	PiRawFrameBroadcast,
-	PiSessionEventBroadcast,
-	SetPiExecutablePathRequest,
-	StopPiSessionRequest,
-	StopPiSessionResult,
-	SubmitPiPromptRequest,
-	SubmitPiPromptResult,
-	WriteForkSummaryRequest,
-	WriteForkSummaryResult,
-} from './contracts/pi-session';
 import type {
 	QuickStartProjectRequest,
 	QuickStartProjectResult,
@@ -248,9 +259,25 @@ export interface IpcHandlerMap {
 		ArchiveWorkspaceRequest,
 		ArchiveWorkspaceResult
 	>;
-	[IPC_CHANNELS.bindPiSessionToChatTab]: IpcHandlerEntry<
-		BindPiSessionToTabRequest,
-		BindPiSessionToTabResult
+	[IPC_CHANNELS.bindAgentSessionToChatTab]: IpcHandlerEntry<
+		BindAgentSessionToTabRequest,
+		BindAgentSessionToTabResult
+	>;
+	[IPC_CHANNELS.agentSessionEvent]: IpcHandlerEntry<
+		void,
+		AgentSessionEventBroadcast
+	>;
+	[IPC_CHANNELS.agentToolApprovalAnswered]: IpcHandlerEntry<
+		ToolApprovalReply,
+		void
+	>;
+	[IPC_CHANNELS.agentToolApprovalClosed]: IpcHandlerEntry<
+		void,
+		ToolApprovalClosedBroadcast
+	>;
+	[IPC_CHANNELS.agentToolApprovalRequested]: IpcHandlerEntry<
+		void,
+		ToolApprovalRequestedBroadcast
 	>;
 	[IPC_CHANNELS.closeChatTab]: IpcHandlerEntry<
 		CloseChatTabRequest,
@@ -405,14 +432,14 @@ export interface IpcHandlerMap {
 		ListClosedChatTabsWithSummaryRequest,
 		ListClosedChatTabsWithSummaryResult
 	>;
-	[IPC_CHANNELS.listPiModels]: IpcHandlerEntry<void, ListPiModelsResult>;
-	[IPC_CHANNELS.listPiSessionEvents]: IpcHandlerEntry<
-		ListPiSessionEventsRequest,
-		ListPiSessionEventsResult
+	[IPC_CHANNELS.listAgentModels]: IpcHandlerEntry<void, AgentModelCatalog>;
+	[IPC_CHANNELS.listAgentSessionEvents]: IpcHandlerEntry<
+		ListAgentSessionEventsRequest,
+		ListAgentSessionEventsResult
 	>;
-	[IPC_CHANNELS.listPiSessions]: IpcHandlerEntry<
-		ListPiSessionsRequest,
-		ListPiSessionsResult
+	[IPC_CHANNELS.listAgentSessions]: IpcHandlerEntry<
+		ListAgentSessionsRequest,
+		ListAgentSessionsResult
 	>;
 	[IPC_CHANNELS.listPiSlashCommands]: IpcHandlerEntry<
 		ListPiSlashCommandsRequest | undefined,
@@ -455,6 +482,10 @@ export interface IpcHandlerMap {
 		OpenWorkspaceInTargetRequest,
 		OpenTargetResult
 	>;
+	[IPC_CHANNELS.openAgentSession]: IpcHandlerEntry<
+		OpenAgentSessionRequest,
+		OpenAgentSessionResult
+	>;
 	[IPC_CHANNELS.openChatTab]: IpcHandlerEntry<
 		OpenChatTabRequest,
 		OpenChatTabResult
@@ -463,12 +494,7 @@ export interface IpcHandlerMap {
 		PinChatTabRequest,
 		PinChatTabResult
 	>;
-	[IPC_CHANNELS.openPiSession]: IpcHandlerEntry<
-		OpenPiSessionRequest,
-		OpenPiSessionResult
-	>;
 	[IPC_CHANNELS.piRawFrame]: IpcHandlerEntry<void, PiRawFrameBroadcast>;
-	[IPC_CHANNELS.piSessionEvent]: IpcHandlerEntry<void, PiSessionEventBroadcast>;
 	[IPC_CHANNELS.quickStartProject]: IpcHandlerEntry<
 		QuickStartProjectRequest,
 		QuickStartProjectResult
@@ -546,21 +572,29 @@ export interface IpcHandlerMap {
 		void,
 		LocalRepositorySelectionResult
 	>;
-	[IPC_CHANNELS.selectPiExecutable]: IpcHandlerEntry<
-		void,
-		PiExecutableSelectionResult
+	[IPC_CHANNELS.getAgentProviderReadiness]: IpcHandlerEntry<
+		AgentProviderRequest,
+		AgentProviderReadinessWire
 	>;
-	[IPC_CHANNELS.getPiExecutablePath]: IpcHandlerEntry<
-		void,
-		PiExecutablePathSnapshot
+	[IPC_CHANNELS.selectAgentProviderExecutable]: IpcHandlerEntry<
+		AgentProviderRequest,
+		AgentExecutableSelectionWire
 	>;
-	[IPC_CHANNELS.setPiExecutablePath]: IpcHandlerEntry<
-		SetPiExecutablePathRequest,
-		PiExecutableSelectionResult
+	[IPC_CHANNELS.getAgentProviderExecutablePath]: IpcHandlerEntry<
+		AgentProviderRequest,
+		AgentExecutablePathSnapshotWire
 	>;
-	[IPC_CHANNELS.clearPiExecutablePath]: IpcHandlerEntry<
-		void,
-		PiExecutableSelectionResult
+	[IPC_CHANNELS.setAgentProviderExecutablePath]: IpcHandlerEntry<
+		SetAgentProviderExecutablePathRequest,
+		AgentExecutablePathSnapshotWire
+	>;
+	[IPC_CHANNELS.clearAgentProviderExecutablePath]: IpcHandlerEntry<
+		AgentProviderRequest,
+		AgentExecutablePathSnapshotWire
+	>;
+	[IPC_CHANNELS.openAgentProviderSettingsFile]: IpcHandlerEntry<
+		OpenAgentProviderSettingsFileRequest,
+		OpenAgentProviderSettingsFileResult
 	>;
 	[IPC_CHANNELS.selectRootDirectory]: IpcHandlerEntry<
 		void,
@@ -570,9 +604,9 @@ export interface IpcHandlerMap {
 		void,
 		SetupDiagnosticsSnapshot
 	>;
-	[IPC_CHANNELS.stopPiSession]: IpcHandlerEntry<
-		StopPiSessionRequest,
-		StopPiSessionResult
+	[IPC_CHANNELS.stopAgentSession]: IpcHandlerEntry<
+		StopAgentSessionRequest,
+		StopAgentSessionResult
 	>;
 	[IPC_CHANNELS.stopWorkspaceScript]: IpcHandlerEntry<
 		StopWorkspaceScriptRequest,
@@ -590,9 +624,9 @@ export interface IpcHandlerMap {
 		OpenRepositoryConfigFileRequest,
 		OpenRepositoryConfigFileResult
 	>;
-	[IPC_CHANNELS.submitPiPrompt]: IpcHandlerEntry<
-		SubmitPiPromptRequest,
-		SubmitPiPromptResult
+	[IPC_CHANNELS.submitAgentPrompt]: IpcHandlerEntry<
+		SubmitAgentPromptRequest,
+		SubmitAgentPromptResult
 	>;
 	[IPC_CHANNELS.settingsResolution]: IpcHandlerEntry<
 		SettingsResolutionRequest | undefined,

@@ -37,10 +37,10 @@ export function useCheckpointRestore(): {
 			description: `Files reverted to before “${target.label}”.`,
 		});
 		void queryClient.invalidateQueries({
-			queryKey: ensemblrQueryKeys.piSessionEvents(target.branchId),
+			queryKey: ensemblrQueryKeys.agentSessionEvents(target.branchId),
 		});
 		void queryClient.invalidateQueries({
-			queryKey: ensemblrQueryKeys.checkpointsForSession(target.piSessionId),
+			queryKey: ensemblrQueryKeys.checkpointsForSession(target.agentSessionId),
 		});
 		// Restore rewrites workspace files, so every cached diff/preview is stale.
 		void queryClient.invalidateQueries({

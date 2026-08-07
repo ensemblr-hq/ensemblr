@@ -66,7 +66,7 @@ export function createPlaceholderSession(
 		isPreview: false,
 		isSubAgent: false,
 		label: 'Workspace',
-		piSessionId: null,
+		agentSessionId: null,
 		status: 'idle',
 		summary: 'Workspace session placeholder.',
 		updatedLabel: 'loaded',
@@ -358,7 +358,7 @@ function createPlaceholderSessionFromSnapshot(
 		isPreview: false,
 		isSubAgent: false,
 		label: 'Workspace',
-		piSessionId: null,
+		agentSessionId: null,
 		status: 'idle',
 		summary:
 			'SQLite workspace record loaded. Agent sessions are not wired yet.',
@@ -368,7 +368,7 @@ function createPlaceholderSessionFromSnapshot(
 
 /**
  * Builds a landing summary for a SQLite-backed workspace navigation row.
- * Pi runtime + files-to-copy + setup-script data aren't wired into the
+ * Agent runtime + files-to-copy + setup-script data aren't wired into the
  * navigation snapshot yet, so values stay neutral until those integrations
  * land; the card still shows branch source and a copy/setup placeholder so the
  * new-workspace landing surface is never blank.
@@ -407,7 +407,7 @@ function createPlaceholderLandingSummary(
 		repositoryName: repository.name || repository.slug,
 		setupGuidance: {
 			detail:
-				'No setup script is configured for this repository. Add one to bootstrap dependencies before the first Pi turn.',
+				'No setup script is configured for this repository. Add one to bootstrap dependencies before the first agent turn.',
 			state: 'missing',
 		},
 		workspaceName: workspace.name || workspace.slug || branchName,

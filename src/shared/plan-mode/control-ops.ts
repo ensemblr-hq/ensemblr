@@ -27,7 +27,7 @@ import { planModeBlockReason } from './block-reason.ts';
  * cause named in the denial. A harness has no Plan Mode surface at all and
  * launches with permission prompts skipped, and a terminal is a raw shell the
  * read-only command classifier cannot see into, so neither can be made safe by
- * inheritance the way a spawned Pi conversation can.
+ * inheritance the way a spawned agent conversation can.
  */
 const PLAN_MODE_BLOCKED_OPS: ReadonlyMap<AgentControlOp, string> = new Map([
 	[

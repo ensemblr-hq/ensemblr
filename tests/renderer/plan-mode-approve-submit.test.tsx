@@ -6,17 +6,17 @@ import { createStore, Provider } from 'jotai';
 import type { PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { openPiSession, submitPiPrompt } = vi.hoisted(() => ({
-	openPiSession: vi.fn(),
-	submitPiPrompt: vi.fn(),
+const { openAgentSession, submitAgentPrompt } = vi.hoisted(() => ({
+	openAgentSession: vi.fn(),
+	submitAgentPrompt: vi.fn(),
 }));
 
 vi.mock('@/renderer/api/ensemblr-queries', async (importOriginal) => ({
 	...(await importOriginal<
 		typeof import('../../src/renderer/api/ensemblr-queries')
 	>()),
-	openPiSession,
-	submitPiPrompt,
+	openAgentSession,
+	submitAgentPrompt,
 }));
 
 vi.mock(
@@ -28,7 +28,7 @@ vi.mock(
 
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr/query-keys';
 import { usePlanReview } from '../../src/renderer/hooks/workbench-shell/conversation-panel/use-plan-review';
-import { usePiComposerController } from '../../src/renderer/state/composer';
+import { useAgentComposerController } from '../../src/renderer/state/composer';
 import { pendingPlanReviewsAtom } from '../../src/renderer/state/plan-mode/atoms';
 import {
 	appSettingsAtom,
@@ -36,7 +36,7 @@ import {
 } from '../../src/renderer/state/preferences';
 import type { WorkspaceShellModel } from '../../src/renderer/types/workbench';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
-import type { PiSessionSnapshotWire } from '../../src/shared/ipc/contracts/pi-session';
+import type { AgentSessionSnapshotWire } from '../../src/shared/ipc/contracts/agent-session';
 import { createTestQueryClient, installLocalStorage } from './support/dom';
 
 const CHAT_TAB_ID = 'chat-plan-approve';
@@ -50,7 +50,7 @@ const workspace = {
 } as WorkspaceShellModel;
 
 /** An open, idle session, so submitting never has to open one first. */
-function createSession(): PiSessionSnapshotWire {
+function createSession(): AgentSessionSnapshotWire {
 	return {
 		branchId: 'branch-plan-approve',
 		closedAt: null,
@@ -60,8 +60,9 @@ function createSession(): PiSessionSnapshotWire {
 		label: null,
 		model: MODEL,
 		openedTabs: [],
-		piSessionId: SESSION_ID,
+		provider: 'pi',
 		runtimeOpen: true,
+		runtimeSessionId: SESSION_ID,
 		status: 'idle',
 		thinkingLevel: 'medium',
 		updatedAt: '2026-01-01T00:00:00.000Z',
@@ -76,7 +77,7 @@ function createSession(): PiSessionSnapshotWire {
  */
 function renderPlanningChat(seedPlanMode?: boolean) {
 	const client = createTestQueryClient();
-	client.setQueryData(ensemblrQueryKeys.piModels(), {
+	client.setQueryData(ensemblrQueryKeys.agentModels(), {
 		defaultModelId: MODEL,
 		defaultThinkingLevel: 'medium',
 		models: [
@@ -88,11 +89,14 @@ function renderPlanningChat(seedPlanMode?: boolean) {
 			},
 		],
 	});
-	client.setQueryData(ensemblrQueryKeys.piSessionsForWorkspace(WORKSPACE_ID), {
-		sessions: [createSession()],
-	});
 	client.setQueryData(
-		ensemblrQueryKeys.piSessionEvents('branch-plan-approve'),
+		ensemblrQueryKeys.agentSessionsForWorkspace(WORKSPACE_ID),
+		{
+			sessions: [createSession()],
+		},
+	);
+	client.setQueryData(
+		ensemblrQueryKeys.agentSessionEvents('branch-plan-approve'),
 		{
 			events: [],
 		},
@@ -105,7 +109,7 @@ function renderPlanningChat(seedPlanMode?: boolean) {
 	}
 	store.set(pendingPlanReviewsAtom, {
 		[SESSION_ID]: {
-			piSessionId: SESSION_ID,
+			agentSessionId: SESSION_ID,
 			planPath: '.context/plans/20260728-1432-add-plan-mode.md',
 			requestId: 'req-1',
 			title: 'Add Plan Mode',
@@ -121,9 +125,9 @@ function renderPlanningChat(seedPlanMode?: boolean) {
 
 	return renderHook(
 		() => {
-			const composer = usePiComposerController({
+			const composer = useAgentComposerController({
 				chatTabId: CHAT_TAB_ID,
-				currentPiSessionId: SESSION_ID,
+				currentAgentSessionId: SESSION_ID,
 				workspaceCwd: '/tmp/workspace-plan-approve',
 				workspaceId: WORKSPACE_ID,
 			});
@@ -131,7 +135,7 @@ function renderPlanningChat(seedPlanMode?: boolean) {
 				chatTabId: CHAT_TAB_ID,
 				onPlanModeChange: composer.onPlanModeChange,
 				onSubmit: composer.onSubmit,
-				piSessionId: SESSION_ID,
+				agentSessionId: SESSION_ID,
 				workspace,
 			});
 			return { composer, plan };
@@ -145,8 +149,8 @@ function renderPlanningChat(seedPlanMode?: boolean) {
 beforeEach(() => {
 	vi.clearAllMocks();
 	installLocalStorage();
-	openPiSession.mockResolvedValue({ session: createSession() });
-	submitPiPrompt.mockResolvedValue({});
+	openAgentSession.mockResolvedValue({ session: createSession() });
+	submitAgentPrompt.mockResolvedValue({});
 });
 
 describe('approving a plan', () => {
@@ -165,8 +169,8 @@ describe('approving a plan', () => {
 			result.current.plan.approve();
 		});
 
-		expect(submitPiPrompt).toHaveBeenCalledTimes(1);
-		expect(submitPiPrompt).toHaveBeenCalledWith(
+		expect(submitAgentPrompt).toHaveBeenCalledTimes(1);
+		expect(submitAgentPrompt).toHaveBeenCalledWith(
 			expect.objectContaining({
 				planMode: false,
 				prompt: 'Approved — implement the plan.',
@@ -185,7 +189,7 @@ describe('approving a plan', () => {
 			result.current.plan.approve();
 		});
 
-		expect(submitPiPrompt).toHaveBeenCalledWith(
+		expect(submitAgentPrompt).toHaveBeenCalledWith(
 			expect.objectContaining({ planMode: false }),
 		);
 	});
@@ -203,7 +207,7 @@ describe('approving a plan', () => {
 			await result.current.composer.onSubmit('Tighten step 3.');
 		});
 
-		expect(submitPiPrompt).toHaveBeenCalledWith(
+		expect(submitAgentPrompt).toHaveBeenCalledWith(
 			expect.objectContaining({ planMode: true }),
 		);
 	});

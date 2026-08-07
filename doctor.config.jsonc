@@ -118,7 +118,7 @@
 					"src/main/open-target/detect-installed-targets.ts",
 					"src/main/environment/workspace-environment.ts",
 					"src/main/linear/linear-oauth-callback-server.ts",
-					"src/main/pi-agent/session/summary-queue.ts",
+					"src/main/agent-runtime/session/summary-queue.ts",
 					"src/main/repository/delete-repository.ts",
 					"src/main/repository/archive-lifecycle.ts",
 					"src/main/repository/archive-repository.ts",
@@ -357,8 +357,8 @@
 				"files": [
 					"src/main/checkpoints/checkpoint-service.ts",
 					"src/main/ipc/handlers/checkpoint.ts",
-					"src/main/pi-agent/pi-session-persistence.ts",
-					"src/main/pi-agent/session/chat-tab-plumbing.ts"
+					"src/main/agent-runtime/agent-session-persistence.ts",
+					"src/main/agent-runtime/session/chat-tab-plumbing.ts"
 				],
 				"rules": ["react-doctor/no-barrel-import"]
 			},

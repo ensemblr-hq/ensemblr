@@ -13,11 +13,11 @@ import {
 	type EnsemblrDatabaseService,
 	openEnsemblrDatabase,
 } from '../../../src/main/storage/database.ts';
-import { createPiSession } from '../../../src/main/storage/repositories/pi-session-repository.ts';
+import { createAgentSession } from '../../../src/main/storage/repositories/agent-session-repository.ts';
 
 export interface ChatTabServiceFixture {
+	agentSessionId: string;
 	connection: EnsemblrDatabaseConnection;
-	piSessionId: string;
 	service: ChatTabService;
 	workspaceId: string;
 }
@@ -54,7 +54,7 @@ INSERT INTO workspaces (id, repository_id, slug, name, path)
 VALUES ('${WORKSPACE_ID}', 'repo-tab-svc', 'tab-svc', 'TabSvc', '${CHAT_TAB_FIXTURE_WORKSPACE_CWD}');
 `);
 
-	const { session } = createPiSession({
+	const { session } = createAgentSession({
 		database: connection.database,
 		input: {
 			cwd: CHAT_TAB_FIXTURE_WORKSPACE_CWD,
@@ -80,13 +80,13 @@ VALUES ('${WORKSPACE_ID}', 'repo-tab-svc', 'tab-svc', 'TabSvc', '${CHAT_TAB_FIXT
 	const service = createChatTabService({
 		databaseService,
 		lookups: {
-			piSessionExists: ({ piSessionId }) => piSessionId === session.id,
+			agentSessionExists: ({ agentSessionId }) => agentSessionId === session.id,
 		},
 	});
 
 	return {
+		agentSessionId: session.id,
 		connection,
-		piSessionId: session.id,
 		service,
 		workspaceId: WORKSPACE_ID,
 	};

@@ -17,7 +17,7 @@ interface PlanReviewInput {
 	chatTabId: string;
 	onPlanModeChange: (planMode: boolean) => void;
 	onSubmit: (prompt: string) => Promise<void> | void;
-	piSessionId: string | null;
+	agentSessionId: string | null;
 	workspace: WorkspaceShellModel;
 }
 
@@ -44,14 +44,14 @@ export function usePlanReview({
 	chatTabId,
 	onPlanModeChange,
 	onSubmit,
-	piSessionId,
+	agentSessionId,
 	workspace,
 }: PlanReviewInput): PlanReview {
-	const review = usePendingPlanReview(piSessionId);
+	const review = usePendingPlanReview(agentSessionId);
 	const dismissPlanReview = useDismissPlanReview();
 	const requestComposerFocus = useRequestComposerFocus();
 	const { handOff, isHandingOff } = usePlanHandoff(workspace);
-	const reviewSessionId = review?.piSessionId ?? null;
+	const reviewSessionId = review?.agentSessionId ?? null;
 	const planPath = review?.planPath ?? null;
 	const planTitle = review?.title ?? null;
 

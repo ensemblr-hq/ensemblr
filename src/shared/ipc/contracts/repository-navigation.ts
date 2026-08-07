@@ -132,9 +132,9 @@ export interface ShellApi {
 		statusByWorkspaceId: Record<string, string>,
 	) => Promise<void>;
 	/**
-	 * Subscribes to agent questionnaires (a Pi agent called `askUserQuestion` and
+	 * Subscribes to agent questionnaires (an agent called `askUserQuestion` and
 	 * is blocked on the answer). Returns an unsubscribe function. The renderer
-	 * shows each one in the chat tab bound to the payload's Pi session.
+	 * shows each one in the chat tab bound to the payload's agent session.
 	 */
 	onAskUserQuestion: (
 		listener: (payload: AskUserQuestionBroadcast) => void,
@@ -149,9 +149,9 @@ export interface ShellApi {
 	/** Answers a pending questionnaire, unblocking the agent that asked it. */
 	answerUserQuestion: (reply: AskUserQuestionReply) => Promise<void>;
 	/**
-	 * Subscribes to finished agent plans (a Pi agent called `exitPlanMode` and
+	 * Subscribes to finished agent plans (an agent called `exitPlanMode` and
 	 * ended its turn). Returns an unsubscribe function. The renderer shows each
-	 * one in the chat tab bound to the payload's Pi session, and owns the
+	 * one in the chat tab bound to the payload's agent session, and owns the
 	 * decision from there — nothing is waiting on an answer.
 	 */
 	onExitPlanMode: (

@@ -15,11 +15,11 @@ export const BRIEF_REPORT_CHARS = 1_200;
 /**
  * Renders the pointer that tells the model where the rest of the report lives.
  * A boolean flag is not enough — models act on the wording.
- * @param piSessionId - The child whose report was shortened.
+ * @param agentSessionId - The child whose report was shortened.
  * @returns The sentence appended to the shortened report.
  */
-function fetchPointer(piSessionId: string): string {
-	return `… report shortened. Read it in full with ensemblr_get_last_message({ piSessionId: "${piSessionId}" }).`;
+function fetchPointer(agentSessionId: string): string {
+	return `… report shortened. Read it in full with ensemblr_get_last_message({ agentSessionId: "${agentSessionId}" }).`;
 }
 
 /** The smallest share of the budget a boundary may leave to be worth cutting on. */
@@ -57,13 +57,13 @@ export interface BriefReport {
  * recovers the rest. A report already inside the budget is returned untouched,
  * and so is a child that filed none.
  * @param report - The child's full report, or null when it filed none.
- * @param piSessionId - The child the report came from.
+ * @param agentSessionId - The child the report came from.
  * @param budget - Characters to keep; defaults to {@link BRIEF_REPORT_CHARS}.
  * @returns The text to hand the orchestrator, flagged when it was shortened.
  */
 export function briefReport(
 	report: string | null,
-	piSessionId: string,
+	agentSessionId: string,
 	budget: number = BRIEF_REPORT_CHARS,
 ): BriefReport {
 	if (report === null || report.length <= budget) {
@@ -71,7 +71,7 @@ export function briefReport(
 	}
 	const head = report.slice(0, cutPoint(report, budget)).trimEnd();
 	return {
-		text: `${head}\n\n${fetchPointer(piSessionId)}`,
+		text: `${head}\n\n${fetchPointer(agentSessionId)}`,
 		truncated: true,
 	};
 }

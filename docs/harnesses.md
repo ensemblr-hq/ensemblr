@@ -1,16 +1,35 @@
 # Agent Harnesses
 
-Ensemblr runs **Pi** as its first-party agent runtime (see [`pi/`](./pi/)), but it
-can also launch **third-party coding-agent CLIs** — "harnesses" — inside a
+Ensemblr runs two **first-class agent runtimes** on its native chat surface —
+**Pi** (see [`pi/`](./pi/)) and **Claude Code** (see
+[ADR 0042](./adr/0042-add-claude-code-as-a-second-first-class-agent-runtime.md)) —
+but it can also launch **third-party coding-agent CLIs** — "harnesses" — inside a
 workspace terminal tab. Each runs as its native TUI in a `node-pty` terminal,
 resumes its own conversations, and (for MCP-capable ones) gets
 [Ensemblr Control](./agent-control.md).
 
-The registry of launchable harnesses is
-`src/shared/agents/harness-registry.ts` — the single source of every launch
-command. The renderer only ever sends a harness **id**; the main process
-assembles the command from the registry, so a renderer value is never turned
-into free-text shell.
+The registry of launchable harnesses is `src/shared/agents.ts` — the single
+source of every launch command. The renderer only ever sends a harness **id**;
+the main process assembles the command from the registry, so a renderer value is
+never turned into free-text shell.
+
+## Harness Claude Code is not native Claude Code
+
+The two Claude paths are deliberately separate, and the difference is
+load-bearing:
+
+| | Harness `claude` tab | Native Claude chat |
+|---|---|---|
+| Transport | `claude` TUI in a `node-pty` terminal | `@anthropic-ai/claude-agent-sdk`, driven in-process from main |
+| Binary | your `claude`, found on `PATH` | your `claude`, from the Providers override or `PATH` — Ensemblr ships none (ADR 0042 §1) |
+| Surface | raw terminal | chat tab, structured timeline, tool cards, checkpoints, forking, summaries |
+| Species | `harness` | `claude` |
+| Permissions | always `--dangerously-skip-permissions` (see below) | honours the workspace permission mode, like Pi |
+| Playbook | `HARNESS_AWARENESS` | `ORCHESTRATOR_AWARENESS` / `SUBAGENT_AWARENESS` |
+| Control tools | no chat-tab tools | full `ensemblr_*` set over native MCP |
+
+Native Claude **never** inherits the harness's skip-permissions flag. Keep the
+two code paths visibly distinct so that default cannot leak across.
 
 ## Supported harnesses
 

@@ -8,14 +8,14 @@ import type {
 } from '@/renderer/types/workbench';
 
 import { NewChatEmptyState } from './new-chat-empty-state';
-import { PiSessionTimeline } from './timeline/timeline';
+import { AgentSessionTimeline } from './timeline/timeline';
 import { WorkspaceLandingCard } from './workspace-landing-card';
 
 /**
  * Scrollable timeline content shown above the composer.
  *
  * Three mutually-exclusive states:
- *   1. Active Pi session — render `PiSessionTimeline` with events.
+ *   1. Active agent session — render `AgentSessionTimeline` with events.
  *   2. No session, transcripts exist — render `NewChatEmptyState` with chips
  *      for each `.context/sessions` transcript.
  *   3. No session, no transcripts — render `WorkspaceLandingCard` (fresh
@@ -34,8 +34,8 @@ export function WorkspaceTimeline({
 	composer: ComposerShellState;
 	workspace: WorkspaceShellModel;
 }) {
-	const piSessionId =
-		activeSession.piSessionId ?? composer.activePiSessionId ?? null;
+	const agentSessionId =
+		activeSession.agentSessionId ?? composer.activeAgentSessionId ?? null;
 	const { data: transcriptsData } = useQuery(
 		listClosedChatTabsWithSummaryQuery(workspace.id),
 	);
@@ -46,11 +46,11 @@ export function WorkspaceTimeline({
 		(entry) => entry.summaryPath.length > 0,
 	);
 
-	if (piSessionId) {
+	if (agentSessionId) {
 		return (
 			<div className='flex min-h-0 flex-1 flex-col'>
-				<PiSessionTimeline
-					activePiSessionId={composer.activePiSessionId}
+				<AgentSessionTimeline
+					activeAgentSessionId={composer.activeAgentSessionId}
 					activeSession={activeSession}
 					workspace={workspace}
 				/>
