@@ -402,6 +402,142 @@ test('requirePlaceholderName renames a placeholder workspace and stamps renamedA
 	assert.equal(typeof metadata.renamedAt, 'string');
 });
 
+/** Reads the rename bookkeeping a workspace's metadata blob now carries. */
+function renameMetadata(
+	harness: Harness,
+	id: string,
+): { branchNamed?: unknown; renamedAt?: unknown } {
+	return JSON.parse(workspaceRow(harness, id)?.metadataJson ?? '{}') as {
+		branchNamed?: unknown;
+		renamedAt?: unknown;
+	};
+}
+
+test('a rename that moves the branch records the branch as named', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, { placeholderName: true });
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	await service.rename({ name: 'add-dark-mode', workspaceId: workspace.id });
+
+	assert.equal(renameMetadata(harness, workspace.id).branchNamed, true);
+});
+
+// Naming a branch the name it already carries is a settled outcome, not a
+// no-op: leaving the gate open has the upkeep nudge ask an agent for the same
+// name every turn, and every call report success.
+test('re-submitting a branch its own name settles the naming gate', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, { placeholderName: true });
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	const result = await service.rename({
+		branchName: workspace.branchName ?? undefined,
+		name: 'My Feature',
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.changed, true);
+	assert.equal(renameMetadata(harness, workspace.id).branchNamed, true);
+	assert.equal(workspaceRow(harness, workspace.id)?.name, 'My Feature');
+	assert.equal(
+		workspaceRow(harness, workspace.id)?.branchName,
+		workspace.branchName,
+	);
+});
+
+// The gate is separately the branch's and the name's, so a race that closes one
+// must narrow the rename rather than reject it or clobber the other.
+test('requirePlaceholderName moves the branch but keeps a title the user chose', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, {
+		branchNamed: false,
+		placeholderName: true,
+		renamedAt: '2026-06-08T11:00:00.000Z',
+	});
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	const result = await service.rename({
+		branchName: 'add-dark-mode',
+		name: 'agent-slug',
+		requirePlaceholderName: true,
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.workspace?.name, workspace.name);
+	assert.equal(result.workspace?.branchName, 'add-dark-mode');
+	assert.equal(workspaceRow(harness, workspace.id)?.name, workspace.name);
+});
+
+test('the auto-naming gate still opens for a workspace the user only retitled', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, {
+		branchNamed: false,
+		placeholderName: true,
+		renamedAt: '2026-06-08T11:00:00.000Z',
+	});
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	const result = await service.rename({
+		branchName: 'add-dark-mode',
+		name: workspace.name,
+		requirePlaceholderName: true,
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.changed, true);
+	assert.equal(result.workspace?.branchName, 'add-dark-mode');
+	assert.equal(branchExists(harness.repositoryPath, 'add-dark-mode'), true);
+	assert.equal(renameMetadata(harness, workspace.id).branchNamed, true);
+});
+
+// The gate closing between the caller's pre-flight read and the write is the
+// case `requirePlaceholderName` exists for, and it reports success without
+// having written so the caller can tell the two apart.
+test('requirePlaceholderName reports a blocked rename as unchanged', async (t) => {
+	const harness = createHarness(t);
+	const workspace = await seedWorkspace(harness, 'Bach');
+	setWorkspaceMetadata(harness, workspace.id, { branchNamed: true });
+	const service = createRenameWorkspaceService({
+		databaseService: harness.databaseService,
+		localCommandService: createLocalCommandService(),
+		now: fixedNow,
+	});
+
+	const result = await service.rename({
+		branchName: 'add-dark-mode',
+		name: 'agent-slug',
+		requirePlaceholderName: true,
+		workspaceId: workspace.id,
+	});
+
+	assert.equal(result.status, 'success');
+	assert.equal(result.changed, false);
+	assert.equal(workspaceRow(harness, workspace.id)?.name, workspace.name);
+});
+
 test('rename leaves an adopted branch alone and only moves the display name', async (t) => {
 	const harness = createHarness(t);
 	const workspace = await seedWorkspace(harness, 'Bach');

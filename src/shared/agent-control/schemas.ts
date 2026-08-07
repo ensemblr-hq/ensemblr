@@ -63,6 +63,7 @@ const setNameSchema = z.strictObject({
 
 const setBranchNameSchema = z.strictObject({
 	name: nonEmpty.max(SET_BRANCH_NAME_LIMITS.maxRawLength),
+	userRequested: z.boolean().optional(),
 });
 
 const setSummarySchema = z.strictObject({

@@ -3,29 +3,9 @@
  * a pure sibling helper is imported) so they unit-test under Vitest.
  */
 
-import { joinBranchName } from '../repository/branch-name.ts';
 import { firstContentLine } from './naming/first-content-line.ts';
 
 const BRANCH_NAME_MAX_LENGTH = 40;
-
-/**
- * Joins the prefix from the current branch with a new slug, preserving any
- * `prefix/` segment (e.g. `psoldunov/bach` → `psoldunov/add-dark-mode`). A
- * prefix-less branch (or a leading-slash edge case) becomes the bare slug.
- * Delegates the join to {@link joinBranchName} so creation and rename compose
- * names identically.
- * @param currentBranch - The workspace's existing branch name.
- * @param slug - The freshly-generated kebab-case slug.
- * @returns The renamed branch.
- */
-export function composeRenamedBranch(
-	currentBranch: string,
-	slug: string,
-): string {
-	const lastSlash = currentBranch.lastIndexOf('/');
-	const prefix = lastSlash > 0 ? currentBranch.slice(0, lastSlash) : '';
-	return joinBranchName(prefix, slug);
-}
 
 /**
  * Normalizes raw LLM output into a git-safe kebab-case slug. Takes the first
@@ -66,6 +46,8 @@ export function sanitizeBranchSlug(text: string): string | null {
 
 /** Workspace metadata fields consulted by the naming gate. */
 interface WorkspaceNamingMetadata {
+	adoptedBranch?: unknown;
+	branchNamed?: unknown;
 	placeholderName?: unknown;
 	renamedAt?: unknown;
 }
@@ -84,4 +66,27 @@ export function isWorkspaceNameable(
 	return (
 		metadata.placeholderName === true && typeof metadata.renamedAt !== 'string'
 	);
+}
+
+/**
+ * Reports whether the git branch still carries the generated name it was cut
+ * with, which is the state agent branch naming may overwrite.
+ *
+ * Tracked separately from the display name because the two move independently:
+ * a rename that only retitles a workspace leaves its branch on the generated
+ * slug, and gating on the display name alone retired the agent's one-shot for a
+ * branch nobody had named. A rename stamps `branchNamed` when it moves the
+ * branch or is handed one by name; a row predating that flag falls back to the
+ * display-name gate, which is what it was judged by when it was written.
+ * @param metadata - The workspace's parsed metadata.
+ * @returns True while the git branch has never been named.
+ */
+export function isBranchNameable(metadata: WorkspaceNamingMetadata): boolean {
+	if (metadata.adoptedBranch === true) {
+		return false;
+	}
+	if (typeof metadata.branchNamed === 'boolean') {
+		return !metadata.branchNamed;
+	}
+	return isWorkspaceNameable(metadata);
 }

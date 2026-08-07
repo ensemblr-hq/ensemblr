@@ -389,6 +389,14 @@ function createClaudeSession({
 				currentTurnId = turnId;
 				normalizer.setTurnId(turnId);
 			}
+			// Resolved before the emit so nothing awaits between recording the
+			// prompt and queueing it: two overlapping submits that yielded in
+			// between would reach the runtime in the opposite order to the one the
+			// transcript shows.
+			const runtimePrompt = await withTurnPreamble(
+				request.prompt,
+				input.request,
+			);
 			emit({
 				at: now().toISOString(),
 				payload: { kind: 'prompt', prompt: request.prompt },
@@ -398,7 +406,7 @@ function createClaudeSession({
 			});
 			patchMetadata({ status: 'streaming' });
 
-			promptQueue.push(toSdkUserMessage(request.prompt));
+			promptQueue.push(toSdkUserMessage(runtimePrompt));
 
 			const acknowledgement: AgentSubmitAcknowledgement = {
 				acceptedAt: now().toISOString(),
@@ -545,4 +553,29 @@ function toSdkUserMessage(prompt: string): SDKUserMessage {
 		parent_tool_use_id: null,
 		type: 'user',
 	};
+}
+
+/**
+ * Prefixes a prompt with the app's per-turn upkeep block, when there is one.
+ *
+ * The SDK fixes `systemPrompt` at session open, so live state — what naming this
+ * session still owes — has no other way in. It rides on the prompt the runtime
+ * receives and not on the one the app persisted a moment earlier, so the block
+ * never appears in the user's transcript. A resolver that throws is treated as
+ * nothing outstanding: the block is a reminder, and losing one is cheaper than
+ * failing the turn that carried it.
+ * @param prompt - The prompt the user submitted.
+ * @param request - The session's open request, carrying the resolver.
+ * @returns The prompt to hand the runtime.
+ */
+async function withTurnPreamble(
+	prompt: string,
+	request: { resolveTurnPreamble?: (() => Promise<string | null>) | null },
+): Promise<string> {
+	try {
+		const preamble = await request.resolveTurnPreamble?.();
+		return preamble ? `${preamble}\n\n${prompt}` : prompt;
+	} catch {
+		return prompt;
+	}
 }

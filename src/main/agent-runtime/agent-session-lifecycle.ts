@@ -24,6 +24,7 @@ import type {
 } from './agent-session-types.ts';
 import type { SessionNamingInput } from './naming/session-naming.ts';
 import type { ActiveSessionMap } from './session/active-session.ts';
+import type { SessionBriefNudgeResolver } from './session/agent-control-wiring.ts';
 import {
 	createRuntimeEventHandler,
 	type PersistRuntimeEventPort,
@@ -113,6 +114,8 @@ interface AgentSessionLifecycleOptions {
 	requireDatabase: () => DatabaseSync;
 	/** Injects the agent-control env (control URL + token) into each agent child. */
 	resolveAgentControlEnv?: AgentControlEnvResolver;
+	/** Renders the per-turn upkeep block for runtimes whose system prompt is fixed at open. */
+	resolveSessionBriefNudge?: SessionBriefNudgeResolver;
 	/** Reads the workspace permission mode each session must open under. */
 	resolvePermissionMode: () => PermissionMode;
 	/** Resolves the binary a non-Pi runtime should launch; see {@link ProviderExecutablePort}. */
@@ -170,6 +173,7 @@ export function createAgentSessionLifecycle({
 	resolveAgentControlEnv,
 	resolvePermissionMode,
 	resolveProviderExecutable,
+	resolveSessionBriefNudge,
 	resolveSpawnedChildren,
 	sessionSummaryWriter,
 }: AgentSessionLifecycleOptions): AgentSessionLifecycle {
@@ -200,6 +204,7 @@ export function createAgentSessionLifecycle({
 		resolveAgentControlEnv,
 		resolvePermissionMode,
 		resolveProviderExecutable,
+		resolveSessionBriefNudge,
 		subscribeToRuntime: ({ branchId, database, runtimeSession, sessionId }) =>
 			runtimeSession.subscribe((event) => {
 				runtimeEventHandler.handle({

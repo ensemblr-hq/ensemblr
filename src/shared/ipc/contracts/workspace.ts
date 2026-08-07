@@ -179,10 +179,12 @@ export interface RenameWorkspaceRequest {
 	branchName?: string;
 	name?: string;
 	/**
-	 * When true, the rename only proceeds while the workspace still carries its
-	 * auto-generated placeholder name and has not been renamed before. Used by
-	 * automatic branch-naming so a user rename that races the LLM suggestion is
-	 * never overwritten; the check runs inside the rename's critical section.
+	 * When true, the rename only proceeds while the git branch still carries the
+	 * name it was cut with, and the display name moves only while the workspace
+	 * still carries its auto-generated placeholder name. Used by automatic
+	 * naming so a user rename that races the LLM suggestion is never
+	 * overwritten; both checks run inside the rename's critical section, against
+	 * the freshly-read row rather than the caller's pre-flight one.
 	 */
 	requirePlaceholderName?: boolean;
 	workspaceId: string;
@@ -193,6 +195,14 @@ export type RenameWorkspaceStatus = 'failure' | 'success';
 
 /** Result of a rename-workspace request. */
 export interface RenameWorkspaceResult {
+	/**
+	 * Whether the request actually wrote. A request whose target state already
+	 * holds, or whose placeholder gate closed since the caller checked it,
+	 * succeeds without changing anything — and returns the same workspace a real
+	 * rename would, so the two are indistinguishable by `status` and `workspace`
+	 * alone.
+	 */
+	changed: boolean;
 	diagnostics: RenameWorkspaceDiagnostic[];
 	status: RenameWorkspaceStatus;
 	workspace: CreatedWorkspaceSnapshot | null;

@@ -44,7 +44,7 @@ What you can drive:
 - Ask the user: when a decision is genuinely theirs — ambiguous requirements, a fork in the approach, a destructive step — put it to them with \`ensemblr_ask_user_question\` (up to 4 questions, each with 2-6 concrete options) instead of guessing or stalling. It blocks until they answer or dismiss it, with no time limit — a question left overnight is still waiting in the morning — so never plan around it expiring or hedge an answer you have not been given. They can type their own answer instead of picking an option.
 - Keep the workspace legible: name your tab (\`ensemblr_set_name\`), name the workspace and its git branch together from one kebab-case slug (\`ensemblr_set_branch_name\`), and record what the conversation has covered (\`ensemblr_set_summary\`).
 
-Keeping the workspace legible is your job, not the user's, and it is bookkeeping — do it as part of your turn, without narrating it or asking permission. Name the tab on your first turn, before the work; refresh the summary at the end of every turn. Renaming the workspace and its git branch is the user's to allow, and they can turn it off, so reach for \`ensemblr_set_branch_name\` only when the upkeep reminder asks for it — unprompted it will refuse. The app tracks what is still outstanding and reminds you each turn, so follow the reminder when you see one: naming is one-shot per tab and per workspace, and the summary is what the tab is worth to you tomorrow.
+Keeping the workspace legible is your job, not the user's, and it is bookkeeping — do it as part of your turn, without narrating it or asking permission. Name the tab on your first turn, before the work; refresh the summary at the end of every turn. The app tracks what is still outstanding and reminds you each turn, so follow the reminder when you see one — it is live state, and it is what asks for the workspace and branch, because the user can switch that off and a standing line here could not see it. A reply saying nothing changed is a settled outcome, not a fault to retry. When the USER asks for a different branch name in so many words, \`ensemblr_set_branch_name\` with \`userRequested: true\` is how you give it to them — never \`git branch -m\`, which moves the branch behind the app and leaves the workspace pointing at one that no longer exists. Naming is one-shot per tab, and the summary is what the tab is worth to you tomorrow.
 
 Write every file path you mention in prose as its full path from the workspace root, in backticks — \`src/renderer/components/message.tsx\`, never a bare \`message.tsx\` or a trailing fragment like \`components/message.tsx\`. The app renders those as chips the user clicks to open the file, and it can only do that for a path it can place in the file tree.
 
@@ -608,8 +608,11 @@ export default function ensemblrControl(pi: ExtensionAPI): void {
 	tool(
 		'ensemblr_set_branch_name',
 		'setBranchName',
-		'Name the work: renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. "add-dark-mode"), keeping any `prefix/` segment of the current branch. One-shot — it applies only while the workspace still carries its generated placeholder name; once named it reports that and changes nothing, so call it at most once. This is the workspace and branch name, not the tab title (use ensemblr_set_name for that).',
-		Type.Object({ name: Type.String() }),
+		'Name the work: renames this workspace AND its git branch together from one kebab-case slug (2-5 words, e.g. "add-dark-mode"), keeping any `prefix/` segment of the current branch. Call it once, early, as soon as you know what the work is called. It applies while the git branch still carries the name it was cut with; a workspace the user has already titled keeps that title and only its branch moves. A reply saying nothing changed is a settled outcome, not a fault to retry — except when the USER asks for a different branch name in so many words, which is what userRequested: true is for. Renaming the branch any other way, `git branch -m` included, desyncs the workspace from git. This is the workspace and branch name, not the tab title (use ensemblr_set_name for that).',
+		Type.Object({
+			name: Type.String(),
+			userRequested: Type.Optional(Type.Boolean()),
+		}),
 	);
 	tool(
 		'ensemblr_set_summary',

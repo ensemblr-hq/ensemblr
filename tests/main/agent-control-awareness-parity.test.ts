@@ -566,11 +566,23 @@ describe('agent-control AWARENESS parity', () => {
 
 	it('defers branch naming to the upkeep block in both orchestrator playbooks', () => {
 		expect(ORCHESTRATOR_AWARENESS).toContain(
-			'only when the upkeep reminder asks for it',
+			'it is what asks for the workspace and branch',
 		);
 		expect(PLAN_MODE_ORCHESTRATOR_AWARENESS).toContain(
 			'If the upkeep block also asks for the workspace and branch',
 		);
+	});
+
+	// Deferring to the block is a routing rule, not a warning. Told the tool
+	// refuses when unprompted, an agent asked by the USER to rename a branch
+	// concludes the tool is closed to it and reaches for `git branch -m`, which
+	// moves the branch behind the app and desyncs the workspace row from git.
+	it('frames the branch tool as available rather than as one that refuses', () => {
+		expect(ORCHESTRATOR_AWARENESS).not.toContain('unprompted it will refuse');
+		expect(ORCHESTRATOR_AWARENESS).toContain('userRequested: true');
+		expect(ORCHESTRATOR_AWARENESS).toContain('git branch -m');
+		expect(HARNESS_AWARENESS).toContain('userRequested: true');
+		expect(HARNESS_AWARENESS).toContain('git branch -m');
 	});
 
 	// The workspace name describes the whole body of work, so `setBranchName`

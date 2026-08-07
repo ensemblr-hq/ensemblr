@@ -412,6 +412,7 @@ describe('agent-control port adapters: branch naming', () => {
 	const withNamingSetting = (renameWorkspaceOnBranch: boolean) => {
 		const { deps, broadcastTabsChanged } = makeDeps();
 		const renameWorkspace = vi.fn().mockResolvedValue({
+			changed: true,
 			diagnostics: [],
 			status: 'success',
 			workspace: {
@@ -445,6 +446,7 @@ describe('agent-control port adapters: branch naming', () => {
 		const result = await ports.sessionNaming.setBranchName({
 			origin,
 			slug: 'add-dark-mode',
+			userRequested: false,
 		});
 
 		expect(renameWorkspace).toHaveBeenCalledWith(
@@ -461,6 +463,7 @@ describe('agent-control port adapters: branch naming', () => {
 		const result = await ports.sessionNaming.setBranchName({
 			origin,
 			slug: 'add-dark-mode',
+			userRequested: false,
 		});
 
 		expect(renameWorkspace).not.toHaveBeenCalled();

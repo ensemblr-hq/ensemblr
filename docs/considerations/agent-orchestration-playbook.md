@@ -41,6 +41,16 @@ harness has no equivalent hook — so `HARNESS_AWARENESS` carries the branch-nam
 `ensemblr_set_branch_name` still enforces `git.renameWorkspaceOnBranch` on its own; the playbook's
 job is to frame a refusal as settled rather than as a fault worth retrying.
 
+### How each runtime receives the upkeep block
+
+Pi's extension pulls it over `getSessionBrief` on `before_agent_start`, which is why that op is
+absent from `TOOL_DEFS` — nothing reaches it over MCP. A first-class runtime the app drives over
+MCP has its system prompt fixed at session open, so `resolveAgentControlWiring` hands it a
+`resolveTurnPreamble` and the adapter prepends the block to each prompt the model receives, never to
+the one the app persisted. Adding a runtime that skips both leaves it holding
+`ensemblr_set_branch_name`, told to follow a reminder that never arrives — Claude shipped in exactly
+that state and never named a branch.
+
 ## Role
 
 You run inside Ensemblr and can drive the app itself. **Do the work yourself by default** — one agent
@@ -84,7 +94,7 @@ a permission denial stays visible.
 |---|---|
 | Delegate a subtask to a Pi sub-agent | `ensemblr_start_conversation` (fresh tab + `title`; keep its `agentSessionId`). While planning, the child inherits Plan Mode. |
 | Name your own tab | `ensemblr_set_name` (Pi chats only; the label goes in `title`, as it does everywhere) |
-| Name the workspace + git branch | `ensemblr_set_branch_name` (one-shot, placeholder names only; refuses unless the user enabled `git.renameWorkspaceOnBranch`, so call it only when the per-turn upkeep block asks) |
+| Name the workspace + git branch | `ensemblr_set_branch_name` (once per branch, while the branch still carries the name it was cut with; refuses unless the user enabled `git.renameWorkspaceOnBranch`. Pass `userRequested: true` when the user asks for a different branch name — never `git branch -m`) |
 | Record what the session covered | `ensemblr_set_summary` (every turn; Pi chats only) |
 | **Block until children settle** | `ensemblr_wait_for_agents` |
 | Steer / correct a child | `ensemblr_send_follow_up`. While planning, reaches only a target that is itself planning. |
@@ -330,7 +340,7 @@ the harness MCP surface.
 git branch, and that name describes the whole body of work rather than the one unit a child was
 handed — a sub-agent naming it would label the workspace after a fragment. Two places have to agree
 with the denial above: `readSessionBriefNaming`
-(`src/main/pi-agent/naming/session-brief-naming.ts`) withholds the branch bullet from a child, so the
+(`src/main/agent-runtime/naming/session-brief-naming.ts`) withholds the branch bullet from a child, so the
 upkeep block never asks for a call that would be refused, and both sub-agent playbooks name the tool
 only to say it is refused. `setWorkspaceStatus` is denied for the same reason and had gone the other
 way until this landed.

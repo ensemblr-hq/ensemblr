@@ -23,7 +23,7 @@ import { getMainBranchForSession } from '../../storage/repositories/agent-sessio
 import { getChatTabByAgentSessionId } from '../../storage/repositories/chat-tab-repository.ts';
 import { selectWorkspaceWithRepositoryById } from '../../storage/repositories/workspace-repository.ts';
 import { readAgentSummaryMarker } from '../agent-summary.ts';
-import { isWorkspaceNameable } from '../branch-name-slug.ts';
+import { isBranchNameable, isWorkspaceNameable } from '../branch-name-slug.ts';
 
 /**
  * The caller fields the brief consults, satisfied structurally by a resolved
@@ -47,7 +47,7 @@ export interface SessionBriefCaller {
  */
 function nothingOutstanding(): SessionBriefNaming {
 	return {
-		branch: { current: null, eligible: false },
+		branch: { current: null, eligible: false, namesWorkspace: false },
 		summaryStale: false,
 		titleNeeded: false,
 	};
@@ -118,9 +118,12 @@ export function readSessionBriefNaming({
 }
 
 /**
- * Reads a workspace's branch and whether the agent may still name it: the
- * workspace must still carry its generated placeholder name *and* the user must
- * not have turned workspace/branch naming off.
+ * Reads a workspace's branch and whether the agent may still name it: the git
+ * branch must still carry the name it was cut with *and* the user must not have
+ * turned workspace/branch naming off. Whether the workspace's own title moves
+ * with it is reported separately, because the two gates close independently — a
+ * workspace can hold a title the user chose over a branch nobody has named, and
+ * that title stays theirs while the branch is still the app's to name.
  * @param input - The open database, the naming-setting reader, and the workspace to read.
  * @returns The workspace's current branch and its naming eligibility.
  */
@@ -137,14 +140,13 @@ function readWorkspaceNaming({
 		| Record<string, unknown>
 		| undefined;
 	if (!row) {
-		return { current: null, eligible: false };
+		return { current: null, eligible: false, namesWorkspace: false };
 	}
-	const nameable =
-		isWorkspaceNameable(parseMetadata(String(row.metadataJson ?? ''))) &&
-		namingEnabled();
+	const metadata = parseMetadata(String(row.metadataJson ?? ''));
 	return {
 		current: typeof row.branchName === 'string' ? row.branchName : null,
-		eligible: nameable,
+		eligible: isBranchNameable(metadata) && namingEnabled(),
+		namesWorkspace: isWorkspaceNameable(metadata),
 	};
 }
 

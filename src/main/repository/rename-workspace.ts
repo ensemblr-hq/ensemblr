@@ -1,5 +1,5 @@
 import type { DatabaseSync } from 'node:sqlite';
-
+import { composeRenamedBranch } from '../../shared/branch-name.ts';
 import type {
 	CreatedWorkspaceSnapshot,
 	RenameWorkspaceDiagnostic,
@@ -7,6 +7,10 @@ import type {
 	RenameWorkspaceRequest,
 	RenameWorkspaceResult,
 } from '../../shared/ipc/contracts/workspace';
+import {
+	isBranchNameable,
+	isWorkspaceNameable,
+} from '../agent-runtime/branch-name-slug.ts';
 import type { LocalCommandService } from '../commands/local-command';
 import type { EnsemblrDatabaseService } from '../storage';
 import {
@@ -123,6 +127,7 @@ export function createRenameWorkspaceService({
 				: source.branchName;
 			const writeDiagnostic = await writeRenamedRow({
 				branchName: resolvedBranchName,
+				branchNamed: plan.branchNamed,
 				database,
 				localCommandService,
 				name: plan.nextName,
@@ -152,6 +157,7 @@ export function createRenameWorkspaceService({
 			};
 
 			return {
+				changed: true,
 				diagnostics: [],
 				status: 'success',
 				workspace,
@@ -161,12 +167,14 @@ export function createRenameWorkspaceService({
 }
 
 /**
- * What a validated rename request resolves to: the name and branch to write, a
- * request that changes nothing, or a diagnostic that rejects it.
+ * What a validated rename request resolves to: the name, branch, and naming
+ * bookkeeping to write, a request that changes nothing, or a diagnostic that
+ * rejects it.
  */
 type RenamePlan =
 	| {
 			kind: 'apply';
+			branchNamed: boolean;
 			isBranchChanging: boolean;
 			nextBranch: string | null;
 			nextName: string;
@@ -191,18 +199,21 @@ function planRename({
 	request: RenameWorkspaceRequest;
 	source: SourceWorkspace;
 }): RenamePlan {
-	// Race guard for automatic branch-naming: re-check the placeholder gate
-	// against the freshly-read row, synchronously before any await, so a user
-	// rename that landed since the caller's pre-flight check wins and this
-	// attempt no-ops instead of clobbering it.
-	if (
-		request.requirePlaceholderName &&
-		!placeholderRenameEligible(source.metadataJson)
-	) {
+	// Race guard for automatic naming: re-check both gates against the freshly-read
+	// row, synchronously before any await, so a user rename that landed since the
+	// caller's pre-flight check wins and this attempt no-ops or narrows instead of
+	// clobbering it. The gates are separate because the branch and the display name
+	// are separately the user's — one may still be the app's to set when the other
+	// is not.
+	const metadata = parseMetadata(source.metadataJson);
+	if (request.requirePlaceholderName && !isBranchNameable(metadata)) {
 		return { kind: 'no-op' };
 	}
 
-	const nextName = normalizeName(request.name, source.name);
+	const nextName =
+		request.requirePlaceholderName && !isWorkspaceNameable(metadata)
+			? source.name
+			: normalizeName(request.name, source.name);
 	const nameDiagnostic = validateWorkspaceName(nextName);
 	if (nameDiagnostic) {
 		return { diagnostic: nameDiagnostic, kind: 'reject' };
@@ -211,6 +222,7 @@ function planRename({
 	const isNameChanging = nextName !== source.name;
 	const branch = resolveNextBranch({
 		isNameChanging,
+		metadata,
 		nextName,
 		request,
 		source,
@@ -222,7 +234,16 @@ function planRename({
 	const nextBranch = branch.nextBranch;
 	const isBranchChanging =
 		nextBranch !== null && isBranchMoving(nextBranch, source);
-	if (!isBranchChanging && !isNameChanging) {
+	// Settled means someone picked this branch's name — by moving it, or by naming
+	// it explicitly and finding it already there. The second half matters: a slug
+	// composing to the branch it already has would otherwise write nothing, leave
+	// the gate open, and have the upkeep nudge ask for the same name every turn.
+	const wasBranchNamed = !isBranchNameable(metadata);
+	const branchNamed =
+		isBranchChanging ||
+		normalizeBranchName(request.branchName) !== null ||
+		wasBranchNamed;
+	if (!isBranchChanging && !isNameChanging && branchNamed === wasBranchNamed) {
 		return { kind: 'no-op' };
 	}
 
@@ -237,7 +258,7 @@ function planRename({
 		};
 	}
 
-	return { isBranchChanging, kind: 'apply', nextBranch, nextName };
+	return { branchNamed, isBranchChanging, kind: 'apply', nextBranch, nextName };
 }
 
 /**
@@ -245,28 +266,38 @@ function planRename({
  * otherwise a changing display name slugs into one, keeping the workspace label
  * and its branch in sync without an extra prompt.
  *
+ * The derived name keeps the branch's `prefix/` segment, so a rename that only
+ * changes the display name never quietly strips it. Deriving at all is a default
+ * for callers that say nothing about the branch; one with an opinion sends
+ * `branchName`, and the rename dialog does so as soon as the user touches that
+ * field.
+ *
  * An adopted branch may not move at all. The derived slug is dropped silently
  * because the caller never asked for it, but an explicit branch is refused —
  * reporting success while discarding what the user typed would close the rename
  * dialog on a change that never happened.
- * @param options - The request, the resolved name, and the stored row.
+ * @param options - The request, the resolved name, the parsed metadata, and the stored row.
  * @returns The branch to land on (null to keep the current one), or the
  * diagnostic that rejects the rename.
  */
 function resolveNextBranch({
 	isNameChanging,
+	metadata,
 	nextName,
 	request,
 	source,
 }: {
 	isNameChanging: boolean;
+	metadata: Record<string, unknown>;
 	nextName: string;
 	request: RenameWorkspaceRequest;
 	source: SourceWorkspace;
 }): { diagnostic: RenameWorkspaceDiagnostic } | { nextBranch: string | null } {
 	const explicitBranch = normalizeBranchName(request.branchName);
-	const requestedBranch =
-		explicitBranch ?? (isNameChanging ? toRenameSlug(nextName) : null);
+	const derivedBranch = isNameChanging
+		? composeRenamedBranch(source.branchName ?? '', toRenameSlug(nextName))
+		: null;
+	const requestedBranch = explicitBranch ?? derivedBranch;
 	const branchDiagnostic = requestedBranch
 		? validateBranchName(requestedBranch)
 		: null;
@@ -274,7 +305,7 @@ function resolveNextBranch({
 		return { diagnostic: branchDiagnostic };
 	}
 
-	if (!(source.branchName !== null && branchWasAdopted(source.metadataJson))) {
+	if (!(source.branchName !== null && branchWasAdopted(metadata))) {
 		return { nextBranch: requestedBranch };
 	}
 	return explicitBranch !== null && isBranchMoving(explicitBranch, source)
@@ -286,6 +317,7 @@ function resolveNextBranch({
  * Persist the renamed row, undoing an already-applied git branch rename when
  * the write fails so the branch and the database stay in agreement.
  * @param branchName - Branch the row should end on
+ * @param branchNamed - Whether the git branch now carries a chosen name rather than the one it was cut with
  * @param database - Open database handle
  * @param localCommandService - Command runner used for the rollback git call
  * @param name - Display name the row should end on
@@ -296,6 +328,7 @@ function resolveNextBranch({
  */
 async function writeRenamedRow({
 	branchName,
+	branchNamed,
 	database,
 	localCommandService,
 	name,
@@ -304,6 +337,7 @@ async function writeRenamedRow({
 	timestamp,
 }: {
 	branchName: string | null;
+	branchNamed: boolean;
 	database: DatabaseSync;
 	localCommandService: LocalCommandService;
 	name: string;
@@ -314,6 +348,7 @@ async function writeRenamedRow({
 	try {
 		updateWorkspaceRow({
 			branchName,
+			branchNamed,
 			database,
 			id: source.id,
 			metadataJson: source.metadataJson,
@@ -445,6 +480,7 @@ async function runBranchRename({
 /** Updates the `workspaces` row in a single transaction. */
 function updateWorkspaceRow({
 	branchName,
+	branchNamed,
 	database,
 	id,
 	metadataJson,
@@ -452,6 +488,7 @@ function updateWorkspaceRow({
 	timestamp,
 }: {
 	branchName: string | null;
+	branchNamed: boolean;
 	database: DatabaseSync;
 	id: string;
 	metadataJson: string;
@@ -463,7 +500,7 @@ function updateWorkspaceRow({
 			branchName,
 			database,
 			id,
-			metadataJson: bumpRenameMetadata(metadataJson, timestamp),
+			metadataJson: bumpRenameMetadata(metadataJson, timestamp, branchNamed),
 			name,
 			timestamp,
 		});
@@ -471,27 +508,14 @@ function updateWorkspaceRow({
 }
 
 /**
- * Tests whether a workspace still qualifies for an automatic placeholder
- * rename: it must carry the `placeholderName` flag and never have been renamed.
- * @param metadataJson - The workspace's stored metadata JSON.
- * @returns True when an auto rename may proceed.
- */
-function placeholderRenameEligible(metadataJson: string): boolean {
-	const metadata = parseMetadata(metadataJson);
-	return (
-		metadata.placeholderName === true && typeof metadata.renamedAt !== 'string'
-	);
-}
-
-/**
  * Reports whether the workspace took over a branch that already existed rather
  * than cutting its own. Such a branch predates the workspace and usually backs a
  * pull request, so renaming the workspace must leave the git branch alone.
- * @param metadataJson - The workspace's stored metadata blob.
+ * @param metadata - The workspace's parsed metadata blob.
  * @returns True when the branch was adopted.
  */
-function branchWasAdopted(metadataJson: string): boolean {
-	return parseMetadata(metadataJson).adoptedBranch === true;
+function branchWasAdopted(metadata: Record<string, unknown>): boolean {
+	return metadata.adoptedBranch === true;
 }
 
 /**
@@ -521,11 +545,24 @@ function adoptedBranchDiagnostic(
 	};
 }
 
-/** Stamps `metadata.renamedAt` so consumers can see when the rename happened. */
-function bumpRenameMetadata(metadataJson: string, timestamp: string): string {
+/**
+ * Stamps `metadata.renamedAt` so consumers can see when the rename happened,
+ * plus `metadata.branchNamed` so the auto-naming gate can tell a retitled
+ * workspace from one whose branch actually moved.
+ * @param metadataJson - The workspace's stored metadata JSON.
+ * @param timestamp - Rename timestamp to record.
+ * @param branchNamed - Whether the git branch now carries a chosen name.
+ * @returns The metadata blob to persist.
+ */
+function bumpRenameMetadata(
+	metadataJson: string,
+	timestamp: string,
+	branchNamed: boolean,
+): string {
 	const existing = parseMetadata(metadataJson);
 	const next = {
 		...existing,
+		branchNamed,
 		renamedAt: timestamp,
 	};
 	return JSON.stringify(next);
@@ -534,6 +571,7 @@ function bumpRenameMetadata(metadataJson: string, timestamp: string): string {
 /** Builds the standard failure shape for any rejected rename request. */
 function failure(diagnostic: RenameWorkspaceDiagnostic): RenameWorkspaceResult {
 	return {
+		changed: false,
 		diagnostics: [diagnostic],
 		status: 'failure',
 		workspace: null,
@@ -547,6 +585,7 @@ function noOpResult(
 ): RenameWorkspaceResult {
 	const timestamp = now().toISOString();
 	return {
+		changed: false,
 		diagnostics: [],
 		status: 'success',
 		workspace: {

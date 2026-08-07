@@ -521,6 +521,9 @@ const agentSessionService = createAgentSessionService({
 	resolvePermissionMode: () =>
 		readPermissionModeFromSnapshot(settingsResolutionService.resolve()),
 	resolveProviderExecutable,
+	/** Renders this turn's naming upkeep for runtimes the app prompts directly. */
+	resolveSessionBriefNudge: async (sessionId) =>
+		(await agentControlService?.readSessionBriefNudge(sessionId)) ?? null,
 	/** Live sub-agents of a session, so stopping an orchestrator stops its children. */
 	resolveSpawnedChildren: (sessionId) =>
 		agentControlOriginRegistry.childrenOf(sessionId),

@@ -34,10 +34,16 @@ const SUBAGENT_ROLE: AgentControlRole = 'subagent';
  */
 const NATIVE_MCP_PROVIDERS: ReadonlySet<AgentProviderId> = new Set(['claude']);
 
+/** Resolves the per-turn upkeep block for one agent session. */
+export type SessionBriefNudgeResolver = (
+	sessionId: string,
+) => Promise<string | null>;
+
 /** What the agent-control layer contributes to one session's open request. */
 export interface AgentControlWiring {
 	controlMcp: AgentControlMcpConfig | null;
 	env: Record<string, string> | undefined;
+	resolveTurnPreamble: (() => Promise<string | null>) | null;
 	systemPromptAppend: string | null;
 }
 
@@ -89,19 +95,27 @@ function readControlMcp(
  * The playbook is withheld whenever the endpoint is — a session that cannot
  * reach the control server holds none of the `ensemblr_*` tools the playbook
  * describes, and an inventory of absent tools only sends a model hunting.
- * @param input - Session identity, its runtime, and the env resolver.
- * @returns The env overlay plus the MCP endpoint and playbook, where they apply.
+ *
+ * The turn preamble rides alongside the playbook for the same runtimes and the
+ * same reason Pi does not need it: Pi's extension pulls the upkeep block itself
+ * before every turn, while a runtime the app drives over MCP has its system
+ * prompt fixed at session open and would otherwise never hear about naming the
+ * session still owes.
+ * @param input - Session identity, its runtime, the env resolver, and the upkeep-block resolver.
+ * @returns The env overlay plus the MCP endpoint, playbook, and turn preamble, where they apply.
  */
 export function resolveAgentControlWiring({
 	parentSessionId,
 	provider,
 	resolveAgentControlEnv,
+	resolveSessionBriefNudge,
 	sessionId,
 	workspaceId,
 }: {
 	parentSessionId: string | null;
 	provider: AgentProviderId;
 	resolveAgentControlEnv: AgentControlEnvResolver | undefined;
+	resolveSessionBriefNudge: SessionBriefNudgeResolver | undefined;
 	sessionId: string;
 	workspaceId: string;
 }): AgentControlWiring {
@@ -116,12 +130,20 @@ export function resolveAgentControlWiring({
 		? readControlMcp(env)
 		: null;
 	if (!controlMcp) {
-		return { controlMcp: null, env, systemPromptAppend: null };
+		return {
+			controlMcp: null,
+			env,
+			resolveTurnPreamble: null,
+			systemPromptAppend: null,
+		};
 	}
 
 	return {
 		controlMcp,
 		env,
+		resolveTurnPreamble: resolveSessionBriefNudge
+			? () => resolveSessionBriefNudge(sessionId)
+			: null,
 		systemPromptAppend: awarenessForAudience({
 			hasChatTab: true,
 			role: readControlRole(env),

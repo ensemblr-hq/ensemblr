@@ -10,7 +10,7 @@ function naming(
 	overrides: Partial<SessionBriefNaming> = {},
 ): SessionBriefNaming {
 	return {
-		branch: { current: null, eligible: false },
+		branch: { current: null, eligible: false, namesWorkspace: true },
 		summaryStale: false,
 		titleNeeded: false,
 		...overrides,
@@ -33,7 +33,13 @@ describe('buildSessionBriefNudge', () => {
 
 	test('names the branch tool and the current branch when still a placeholder', () => {
 		const nudge = buildSessionBriefNudge(
-			naming({ branch: { current: 'psoldunov/bach', eligible: true } }),
+			naming({
+				branch: {
+					current: 'psoldunov/bach',
+					eligible: true,
+					namesWorkspace: true,
+				},
+			}),
 		);
 
 		expect(nudge).toContain('ensemblr_set_branch_name');
@@ -44,7 +50,11 @@ describe('buildSessionBriefNudge', () => {
 	test('never raises the branch tool when the user turned naming off', () => {
 		const nudge = buildSessionBriefNudge(
 			naming({
-				branch: { current: 'psoldunov/bach', eligible: false },
+				branch: {
+					current: 'psoldunov/bach',
+					eligible: false,
+					namesWorkspace: true,
+				},
 				summaryStale: true,
 				titleNeeded: true,
 			}),
@@ -58,11 +68,46 @@ describe('buildSessionBriefNudge', () => {
 
 	test('omits the branch clause when the workspace has no branch', () => {
 		const nudge = buildSessionBriefNudge(
-			naming({ branch: { current: null, eligible: true } }),
+			naming({
+				branch: { current: null, eligible: true, namesWorkspace: true },
+			}),
 		);
 
 		expect(nudge).toContain('ensemblr_set_branch_name');
 		expect(nudge).not.toContain('sits on branch');
+	});
+
+	// A workspace the user has titled keeps that title; only its branch moves. A
+	// bullet still promising to rename the workspace would read as a clobber the
+	// agent has to decline.
+	test('asks for the branch alone once the user has titled the workspace', () => {
+		const nudge = buildSessionBriefNudge(
+			naming({
+				branch: {
+					current: 'psoldunov/bach',
+					eligible: true,
+					namesWorkspace: false,
+				},
+			}),
+		);
+
+		expect(nudge).toContain('ensemblr_set_branch_name');
+		expect(nudge).toContain('leaves the title the user chose alone');
+		expect(nudge).not.toContain('renames the workspace and the git branch');
+	});
+
+	test('warns the branch bullet off renaming the branch with git', () => {
+		const nudge = buildSessionBriefNudge(
+			naming({
+				branch: {
+					current: 'psoldunov/bach',
+					eligible: true,
+					namesWorkspace: true,
+				},
+			}),
+		);
+
+		expect(nudge).toContain('git branch -m');
 	});
 
 	test('names the summary tool when the record has fallen behind', () => {
@@ -92,7 +137,11 @@ describe('buildSessionBriefNudge', () => {
 		const nudge =
 			buildSessionBriefNudge(
 				naming({
-					branch: { current: 'psoldunov/bach', eligible: true },
+					branch: {
+						current: 'psoldunov/bach',
+						eligible: true,
+						namesWorkspace: true,
+					},
 					summaryStale: true,
 					titleNeeded: true,
 				}),
@@ -110,7 +159,11 @@ describe('buildSessionBriefNudge', () => {
 		const nudge =
 			buildSessionBriefNudge(
 				naming({
-					branch: { current: 'psoldunov/bach', eligible: true },
+					branch: {
+						current: 'psoldunov/bach',
+						eligible: true,
+						namesWorkspace: true,
+					},
 					summaryStale: true,
 					titleNeeded: true,
 				}),

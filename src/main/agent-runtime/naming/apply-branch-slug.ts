@@ -1,25 +1,38 @@
 /**
- * One-shot workspace + git-branch naming from a slug.
+ * Workspace + git-branch naming from a slug.
  *
  * Two callers reach it: the agent, through `ensemblr_set_branch_name`, and the
  * deterministic namer that runs when a session opens. Both go through the same
  * gate, so whichever lands first wins and the other reports "already named"
- * rather than clobbering it. The gate is deliberately conservative — a
- * workspace is nameable only while it still carries the generated placeholder
- * name, has never been renamed, and the user has left the "Let agents name the
- * workspace and branch" setting on — because the name is the user's the moment
- * they touch it, and turning the setting off means they never wanted the app to
- * touch it at all.
+ * rather than clobbering it. The gate is conservative by default — the branch
+ * must still carry the name it was cut with, and the user must have left the
+ * "Let agents name the workspace and branch" setting on — because turning the
+ * setting off means they never wanted the app to touch it at all.
+ *
+ * The display name and the branch are gated separately, because a workspace can
+ * hold a title the user chose over a branch nobody has named — a rename that is
+ * handed the branch it already has, or that only moves the title, leaves the
+ * branch on the name it was cut with. Such a workspace has its branch moved and
+ * its title left alone; the reverse, clobbering a name the user chose, never
+ * happens. The rename service re-checks both gates against the freshly-read row,
+ * so the decision made here from a pre-flight read cannot outrun a user rename.
+ *
+ * `userRequested` is the escape hatch for the one case the gate cannot see: the
+ * user asking, in so many words, for a different branch name. Without it an
+ * agent's only remaining move is `git branch -m`, which renames the branch
+ * behind the app's back and desyncs the workspace row from git, so every refusal
+ * here says not to.
  */
 
 import type { DatabaseSync } from 'node:sqlite';
 
 import type { SetBranchNameResult } from '../../../shared/agent-control.ts';
+import { composeRenamedBranch } from '../../../shared/branch-name.ts';
 import type { RenameWorkspaceService } from '../../repository';
 import { parseMetadata } from '../../repository/metadata.ts';
 import { selectWorkspaceWithRepositoryById } from '../../storage/repositories/workspace-repository.ts';
 import {
-	composeRenamedBranch,
+	isBranchNameable,
 	isWorkspaceNameable,
 	sanitizeBranchSlug,
 } from '../branch-name-slug.ts';
@@ -30,6 +43,10 @@ interface WorkspaceRenameTarget {
 	metadataJson: string;
 	name: string;
 }
+
+/** Closing line every no-op carries, so a refusal never reads as "use git". */
+const NEVER_USE_GIT =
+	'Do NOT rename the branch with `git branch -m`: that moves it behind the app and leaves the workspace pointing at a branch that no longer exists.';
 
 /** Raised when a slug cannot be applied for a reason the agent should act on. */
 export class BranchSlugRejected extends Error {
@@ -45,12 +62,10 @@ export class BranchSlugRejected extends Error {
 /**
  * Names a workspace and its git branch from one slug, keeping any `prefix/`
  * segment of the current branch. `namingEnabled` carries the user's resolved
- * `git.renameWorkspaceOnBranch` setting and is a hard gate: when it is off
- * nothing is renamed and the caller is told to stop, whatever the workspace's
- * placeholder state — the always-on agent preamble asks every agent to name its
- * branch, so this is the only thing standing between an opted-out user and a
- * renamed workspace.
- * @param input - The workspace to name, the raw slug, the user's naming setting, and the rename service.
+ * `git.renameWorkspaceOnBranch` setting and is a hard gate that `userRequested`
+ * does not lift: when it is off nothing is renamed and the caller is told to
+ * stop, whatever the workspace's placeholder state.
+ * @param input - The workspace to name, the raw slug, whether the user asked for this rename by name, the user's naming setting, and the rename service.
  * @returns Whether the name was applied, plus the resulting name and branch.
  * @throws {BranchSlugRejected} When the workspace is unknown, the slug is unusable, or the branch collides with an existing one.
  */
@@ -59,12 +74,14 @@ export async function applyBranchSlug({
 	name,
 	namingEnabled,
 	renameWorkspace,
+	userRequested = false,
 	workspaceId,
 }: {
 	database: DatabaseSync;
 	name: string;
 	namingEnabled: boolean;
 	renameWorkspace: RenameWorkspaceService['rename'];
+	userRequested?: boolean;
 	workspaceId: string;
 }): Promise<SetBranchNameResult> {
 	const target = readRenameTarget(database, workspaceId);
@@ -84,39 +101,51 @@ export async function applyBranchSlug({
 			`"${name}" has no usable branch-name characters. Use a kebab-case slug such as "add-dark-mode".`,
 		);
 	}
-	if (!isNameable(target)) {
+	const metadata = parseMetadata(target.metadataJson);
+	if (metadata.adoptedBranch === true) {
+		return branchAdopted(target);
+	}
+	if (!isBranchNameable(metadata) && !userRequested) {
 		return alreadyNamed(target);
 	}
 
+	const nextBranch = composeRenamedBranch(target.branchName ?? '', slug);
 	const result = await renameWorkspace({
-		branchName: composeRenamedBranch(target.branchName ?? '', slug),
-		name: slug,
-		requirePlaceholderName: true,
+		branchName: nextBranch,
+		name: isWorkspaceNameable(metadata) ? slug : target.name,
+		requirePlaceholderName: !userRequested,
 		workspaceId,
 	});
 	if (result.status !== 'success') {
 		throw new BranchSlugRejected(
 			'collision',
-			`Could not name the workspace "${slug}": ${result.diagnostics?.at(0)?.message ?? result.status}. Try a different slug.`,
+			`Could not name the branch "${nextBranch}": ${result.diagnostics?.at(0)?.message ?? result.status}. Try a different slug.`,
 		);
 	}
-	// The rename service returns the unchanged workspace when its own placeholder
-	// re-check blocks the write, so a raced-out attempt is indistinguishable from
-	// success by status alone.
-	if (result.workspace?.name !== slug) {
+	// The rename service reports success without writing when its own re-check of
+	// the naming gates closes them, so a raced-out attempt is indistinguishable
+	// from a real rename by status alone.
+	const named = result.changed ? result.workspace : null;
+	if (!named) {
 		return alreadyNamed(readRenameTarget(database, workspaceId) ?? target);
 	}
+	// Read off the written row rather than this call's pre-flight guess: the
+	// service narrows the rename to the branch alone when a user title landed in
+	// between, and the message has to describe what was actually written.
 	return {
 		applied: true,
-		branchName: result.workspace.branchName ?? null,
-		message: `Named the workspace "${slug}" and its git branch "${result.workspace.branchName ?? slug}". Naming is one-shot — a further call will report the workspace as already named.`,
-		name: slug,
+		branchName: named.branchName,
+		message:
+			named.name === target.name
+				? `Named the git branch "${named.branchName}". The workspace keeps the name "${named.name}", which is the user's to change in the rename dialog.`
+				: `Named the workspace "${named.name}" and its git branch "${named.branchName}". Naming is one-shot — a further call will report the branch as already named.`,
+		name: named.name,
 	};
 }
 
 /**
- * Builds the no-op result telling an agent the name is settled and to stop
- * retrying.
+ * Builds the no-op result telling an agent the branch is settled, and how to
+ * proceed when the user is the one asking for a different name.
  * @param target - The workspace as it stands, whose name and branch the message quotes.
  * @returns An unapplied result naming the workspace's existing state.
  */
@@ -125,15 +154,30 @@ function alreadyNamed(target: WorkspaceRenameTarget): SetBranchNameResult {
 	return {
 		applied: false,
 		branchName: target.branchName,
-		message: `This workspace is already named "${target.name}"${branch}, and the name is the user's to change. Nothing was changed — do not call this tool again in this session.`,
+		message: `This workspace is already named "${target.name}"${branch}, and the name is the user's to change. Nothing was changed — do not call this tool again unprompted. If the USER asked for a different branch name in so many words, call it once more with userRequested: true. ${NEVER_USE_GIT}`,
+		name: target.name,
+	};
+}
+
+/**
+ * Builds the no-op result for a workspace that took over a branch it did not
+ * cut. Such a branch usually backs a pull request, so nothing may move it.
+ * @param target - The workspace as it stands, left untouched.
+ * @returns An unapplied result naming the workspace's existing state.
+ */
+function branchAdopted(target: WorkspaceRenameTarget): SetBranchNameResult {
+	return {
+		applied: false,
+		branchName: target.branchName,
+		message: `This workspace took over the existing branch \`${target.branchName}\`, which may already back a pull request, so its branch cannot be renamed — by this tool or any other. Nothing was changed. ${NEVER_USE_GIT}`,
 		name: target.name,
 	};
 }
 
 /**
  * Builds the no-op result for a user who turned workspace/branch naming off.
- * Worded so an agent following the standing "name the branch on your first
- * turn" instruction learns the instruction does not apply here.
+ * Worded so an agent following the standing "name the branch" instruction learns
+ * the instruction does not apply here.
  * @param target - The workspace as it stands, left untouched.
  * @returns An unapplied result naming the workspace's existing state.
  */
@@ -142,18 +186,9 @@ function namingTurnedOff(target: WorkspaceRenameTarget): SetBranchNameResult {
 	return {
 		applied: false,
 		branchName: target.branchName,
-		message: `The user has turned off "Let agents name the workspace and branch", so this workspace keeps the name "${target.name}"${branch}. Nothing was changed — do not call this tool again in this session.`,
+		message: `The user has turned off "Let agents name the workspace and branch", so this workspace keeps the name "${target.name}"${branch}. Nothing was changed — do not call this tool again in this session, and do not work around it. ${NEVER_USE_GIT}`,
 		name: target.name,
 	};
-}
-
-/**
- * Applies the placeholder-name gate to a target read from the database.
- * @param target - The workspace's current name, branch, and metadata.
- * @returns True while the workspace still carries an untouched placeholder name.
- */
-function isNameable(target: WorkspaceRenameTarget): boolean {
-	return isWorkspaceNameable(parseMetadata(target.metadataJson));
 }
 
 /**

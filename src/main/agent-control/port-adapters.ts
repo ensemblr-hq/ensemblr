@@ -935,7 +935,7 @@ function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 				database: deps.databaseService.getConnection()?.database,
 				namingEnabled,
 			}),
-		setBranchName: async ({ origin, slug }) => {
+		setBranchName: async ({ origin, slug, userRequested }) => {
 			const database = deps.databaseService.getConnection()?.database;
 			if (!database) {
 				throw new BranchSlugRejected(
@@ -948,6 +948,7 @@ function makeSessionNamingPort(deps: PortAdapterDeps): SessionNamingPort {
 				name: slug,
 				namingEnabled: namingEnabled(),
 				renameWorkspace: deps.renameWorkspace,
+				userRequested,
 				workspaceId: origin.workspaceId,
 			});
 			if (result.applied && originHasChatTab(origin)) {

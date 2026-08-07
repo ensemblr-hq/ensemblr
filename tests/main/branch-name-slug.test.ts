@@ -1,15 +1,18 @@
 import { describe, expect, test } from 'vitest';
 
 import {
-	composeRenamedBranch,
+	isBranchNameable,
 	isWorkspaceNameable,
 	sanitizeBranchSlug,
 } from '../../src/main/agent-runtime/branch-name-slug';
 import {
 	branchNameFromRef,
-	joinBranchName,
 	nextContinuationBranchName,
 } from '../../src/main/repository/branch-name';
+import {
+	composeRenamedBranch,
+	joinBranchName,
+} from '../../src/shared/branch-name';
 
 describe('composeRenamedBranch', () => {
 	test('preserves a single-segment prefix', () => {
@@ -150,6 +153,56 @@ describe('isWorkspaceNameable', () => {
 		expect(isWorkspaceNameable({ placeholderName: true, renamedAt: 0 })).toBe(
 			true,
 		);
+	});
+});
+
+describe('isBranchNameable', () => {
+	test('accepts a branch that has never been renamed', () => {
+		expect(isBranchNameable({ placeholderName: true })).toBe(true);
+		expect(isBranchNameable({ branchNamed: false })).toBe(true);
+	});
+
+	test('rejects a branch a rename already moved', () => {
+		expect(isBranchNameable({ branchNamed: true })).toBe(false);
+	});
+
+	// The rename dialog retitles a workspace without moving its branch. Judging
+	// the branch by the display name retired the one-shot for a branch still
+	// carrying the slug it was cut with, which is what sent agents to
+	// `git branch -m` instead.
+	test('accepts the branch of a workspace the user retitled but never re-branched', () => {
+		expect(
+			isBranchNameable({
+				branchNamed: false,
+				placeholderName: true,
+				renamedAt: '2026-06-16T00:00:00Z',
+			}),
+		).toBe(true);
+	});
+
+	test('rejects an adopted branch, which may already back a pull request', () => {
+		expect(
+			isBranchNameable({ adoptedBranch: true, placeholderName: true }),
+		).toBe(false);
+	});
+
+	// Rows written before the flag existed were judged by the display name, and
+	// that is still the only signal they carry.
+	test('falls back to the display-name gate for a row predating the flag', () => {
+		expect(isBranchNameable({ placeholderName: true })).toBe(true);
+		expect(
+			isBranchNameable({
+				placeholderName: true,
+				renamedAt: '2026-06-16T00:00:00Z',
+			}),
+		).toBe(false);
+		expect(isBranchNameable({})).toBe(false);
+	});
+
+	test('reads only a strict boolean flag, never a truthy string', () => {
+		expect(
+			isBranchNameable({ branchNamed: 'true', placeholderName: true }),
+		).toBe(true);
 	});
 });
 
