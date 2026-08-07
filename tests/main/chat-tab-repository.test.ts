@@ -13,6 +13,7 @@ import {
 	bindAgentSession,
 	closeChatTab,
 	deleteChatTab,
+	getChatTabByAgentSessionId,
 	getRuntimeState,
 	listClosedForWorkspace,
 	listOpenChatTabs,
@@ -542,4 +543,208 @@ test('runtime state upserts and is keyed by workspace', (t) => {
 		workspaceId: fixture.workspaceId,
 	});
 	assert.equal(cleared.activeTabId, null);
+});
+
+test('bindAgentSession moves a session, clearing the tab that held it', (t) => {
+	const fixture = openFixture(t);
+
+	const first = openChatTab({
+		database: fixture.database,
+		input: {
+			agentSessionId: fixture.agentSessionId,
+			kind: 'chat',
+			title: 'First',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	const second = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Second',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	const bound = bindAgentSession({
+		database: fixture.database,
+		id: second.id,
+		agentSessionId: fixture.agentSessionId,
+	});
+
+	assert.equal(bound?.agentSessionId, fixture.agentSessionId);
+	const tabs = listOpenChatTabs({
+		database: fixture.database,
+		workspaceId: fixture.workspaceId,
+	});
+	assert.deepEqual(
+		tabs
+			.filter((tab) => tab.agentSessionId === fixture.agentSessionId)
+			.map((tab) => tab.id),
+		[second.id],
+	);
+	assert.equal(tabs.find((tab) => tab.id === first.id)?.agentSessionId, null);
+});
+
+test('rebinding a session to the tab already holding it is a no-op', (t) => {
+	const fixture = openFixture(t);
+
+	const tab = openChatTab({
+		database: fixture.database,
+		input: {
+			agentSessionId: fixture.agentSessionId,
+			kind: 'chat',
+			title: 'Only',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	const bound = bindAgentSession({
+		database: fixture.database,
+		id: tab.id,
+		agentSessionId: fixture.agentSessionId,
+	});
+
+	assert.equal(bound?.agentSessionId, fixture.agentSessionId);
+});
+
+test('bindAgentSession leaves an archived tab pointing at the moved session', (t) => {
+	const fixture = openFixture(t);
+
+	const archived = openChatTab({
+		database: fixture.database,
+		input: {
+			agentSessionId: fixture.agentSessionId,
+			kind: 'chat',
+			title: 'Archived',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	closeChatTab({ database: fixture.database, id: archived.id });
+	const resumed = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Resumed',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+
+	bindAgentSession({
+		database: fixture.database,
+		id: resumed.id,
+		agentSessionId: fixture.agentSessionId,
+	});
+
+	// An archived tab is not a second surface, so it keeps its history link; the
+	// restore path re-applies the one-surface rule if it ever reopens.
+	const stillArchived = listClosedForWorkspace({
+		database: fixture.database,
+		workspaceId: fixture.workspaceId,
+	}).find((tab) => tab.id === archived.id);
+	assert.equal(stillArchived?.agentSessionId, fixture.agentSessionId);
+});
+
+test('restoreChatTab detaches a session another open tab now holds', (t) => {
+	const fixture = openFixture(t);
+
+	const archived = openChatTab({
+		database: fixture.database,
+		input: {
+			agentSessionId: fixture.agentSessionId,
+			kind: 'chat',
+			title: 'Archived',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	closeChatTab({ database: fixture.database, id: archived.id });
+
+	const resumed = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Resumed',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	bindAgentSession({
+		database: fixture.database,
+		id: resumed.id,
+		agentSessionId: fixture.agentSessionId,
+	});
+
+	const restored = restoreChatTab({
+		database: fixture.database,
+		id: archived.id,
+	});
+
+	assert.equal(restored?.agentSessionId, null);
+	const tabs = listOpenChatTabs({
+		database: fixture.database,
+		workspaceId: fixture.workspaceId,
+	});
+	assert.deepEqual(
+		tabs
+			.filter((tab) => tab.agentSessionId === fixture.agentSessionId)
+			.map((tab) => tab.id),
+		[resumed.id],
+	);
+});
+
+test('restoreChatTab keeps a session no other open tab claims', (t) => {
+	const fixture = openFixture(t);
+
+	const archived = openChatTab({
+		database: fixture.database,
+		input: {
+			agentSessionId: fixture.agentSessionId,
+			kind: 'chat',
+			title: 'Archived',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	closeChatTab({ database: fixture.database, id: archived.id });
+
+	const restored = restoreChatTab({
+		database: fixture.database,
+		id: archived.id,
+	});
+
+	assert.equal(restored?.agentSessionId, fixture.agentSessionId);
+});
+
+test('getChatTabByAgentSessionId prefers the open tab over a closed one', (t) => {
+	const fixture = openFixture(t);
+
+	const stale = openChatTab({
+		database: fixture.database,
+		input: {
+			agentSessionId: fixture.agentSessionId,
+			kind: 'chat',
+			title: 'Stale',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	closeChatTab({ database: fixture.database, id: stale.id });
+
+	const live = openChatTab({
+		database: fixture.database,
+		input: {
+			kind: 'chat',
+			title: 'Live',
+			workspaceId: fixture.workspaceId,
+		},
+	});
+	// A legacy database can already hold the duplicate binding the bind path now
+	// prevents, so the lookup is exercised against one written behind its back.
+	fixture.database
+		.prepare(`UPDATE chat_tabs SET agent_session_id = ? WHERE id = ?`)
+		.run(fixture.agentSessionId, live.id);
+
+	const found = getChatTabByAgentSessionId({
+		agentSessionId: fixture.agentSessionId,
+		database: fixture.database,
+	});
+
+	assert.equal(found?.id, live.id);
 });

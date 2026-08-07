@@ -34,6 +34,7 @@ export type { ComposerSubmitRequest } from './composer-submit';
 export {
 	useComposerSubmit,
 	useComposerSubmitConsumer,
+	useDropComposerSubmits,
 } from './composer-submit';
 export type { OptimisticPrompt } from './optimistic-prompts';
 export { useOptimisticPrompts } from './optimistic-prompts';

@@ -124,6 +124,7 @@ export function WorkspaceRouteContent({
 	const agentComposer = useAgentComposerController({
 		chatTabId: activeSession.chatTabId,
 		currentAgentSessionId: activeSession.agentSessionId,
+		isResolvingChatTab: sessionNavigation.isResolvingActiveSession,
 		masterPrompt: resolveActionPreference(
 			repoOverrides.actionPreferences?.general ?? '',
 			sharedActionPreference(settingsResolution, 'general'),
