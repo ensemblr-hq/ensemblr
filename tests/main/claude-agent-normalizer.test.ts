@@ -242,7 +242,10 @@ test('a user message carrying tool_result blocks lands as tool-result, not prose
 		{
 			isError: false,
 			kind: 'tool-result',
-			output: '# Ensemblr',
+			output: {
+				content: [{ text: '# Ensemblr', type: 'text' }],
+				details: null,
+			},
 			toolCallId: 'toolu_1',
 		},
 	]);
@@ -275,8 +278,194 @@ test('a failing tool result carries isError', () => {
 		{
 			isError: true,
 			kind: 'tool-result',
-			output: 'ENOENT',
+			output: { content: [{ text: 'ENOENT', type: 'text' }], details: null },
 			toolCallId: 'toolu_2',
+		},
+	]);
+});
+
+test('an edit result carries the unified patch its structured hunks describe', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const events = normalize({
+		message: {
+			content: [
+				{
+					content: 'The file has been updated.',
+					is_error: false,
+					tool_use_id: 'toolu_3',
+					type: 'tool_result',
+				},
+			],
+		},
+		parent_tool_use_id: null,
+		tool_use_result: {
+			filePath: '/repo/src/broken.ts',
+			newString: 'const x = 1;',
+			oldString: 'const x = "1";',
+			structuredPatch: [
+				{
+					lines: [
+						' import { a } from "./a";',
+						'-const x = "1";',
+						'+const x = 1;',
+					],
+					newLines: 3,
+					newStart: 1,
+					oldLines: 3,
+					oldStart: 1,
+				},
+			],
+		},
+		type: 'user',
+	});
+
+	assert.deepEqual(messagePayloads(events), [
+		{
+			isError: false,
+			kind: 'tool-result',
+			output: {
+				content: [{ text: 'The file has been updated.', type: 'text' }],
+				details: {
+					patch:
+						'--- /repo/src/broken.ts\n+++ /repo/src/broken.ts\n@@ -1,3 +1,3 @@\n import { a } from "./a";\n-const x = "1";\n+const x = 1;\n',
+				},
+			},
+			toolCallId: 'toolu_3',
+		},
+	]);
+});
+
+test('a file the tool created carries no patch, since its card shows the content', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const events = normalize({
+		message: {
+			content: [
+				{
+					content: 'File created successfully at: /repo/src/new.ts',
+					is_error: false,
+					tool_use_id: 'toolu_5',
+					type: 'tool_result',
+				},
+			],
+		},
+		parent_tool_use_id: null,
+		tool_use_result: {
+			content: 'const x = 1;',
+			filePath: '/repo/src/new.ts',
+			structuredPatch: [
+				{
+					lines: ['+const x = 1;'],
+					newLines: 1,
+					newStart: 1,
+					oldLines: 0,
+					oldStart: 1,
+				},
+			],
+			type: 'create',
+		},
+		type: 'user',
+	});
+
+	assert.deepEqual(messagePayloads(events), [
+		{
+			isError: false,
+			kind: 'tool-result',
+			output: {
+				content: [
+					{
+						text: 'File created successfully at: /repo/src/new.ts',
+						type: 'text',
+					},
+				],
+				details: null,
+			},
+			toolCallId: 'toolu_5',
+		},
+	]);
+});
+
+test('a file the tool overwrote carries the patch its card renders as a diff', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const events = normalize({
+		message: {
+			content: [
+				{
+					content: 'The file has been updated.',
+					is_error: false,
+					tool_use_id: 'toolu_6',
+					type: 'tool_result',
+				},
+			],
+		},
+		parent_tool_use_id: null,
+		tool_use_result: {
+			content: 'const x = 1;',
+			filePath: '/repo/src/broken.ts',
+			structuredPatch: [
+				{
+					lines: ['-const x = "1";', '+const x = 1;'],
+					newLines: 1,
+					newStart: 1,
+					oldLines: 1,
+					oldStart: 1,
+				},
+			],
+			type: 'update',
+		},
+		type: 'user',
+	});
+
+	assert.deepEqual(messagePayloads(events), [
+		{
+			isError: false,
+			kind: 'tool-result',
+			output: {
+				content: [{ text: 'The file has been updated.', type: 'text' }],
+				details: {
+					patch:
+						'--- /repo/src/broken.ts\n+++ /repo/src/broken.ts\n@@ -1,1 +1,1 @@\n-const x = "1";\n+const x = 1;\n',
+				},
+			},
+			toolCallId: 'toolu_6',
+		},
+	]);
+});
+
+test('a structured result describing no hunks leaves the details empty', () => {
+	const { normalize } = createNormalizer();
+	normalize(initMessage());
+
+	const events = normalize({
+		message: {
+			content: [
+				{
+					content: 'Found 3 files',
+					is_error: false,
+					tool_use_id: 'toolu_4',
+					type: 'tool_result',
+				},
+			],
+		},
+		parent_tool_use_id: null,
+		tool_use_result: { durationMs: 12, filenames: ['a.ts'], numFiles: 1 },
+		type: 'user',
+	});
+
+	assert.deepEqual(messagePayloads(events), [
+		{
+			isError: false,
+			kind: 'tool-result',
+			output: {
+				content: [{ text: 'Found 3 files', type: 'text' }],
+				details: null,
+			},
+			toolCallId: 'toolu_4',
 		},
 	]);
 });
