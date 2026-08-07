@@ -119,11 +119,11 @@ test('leaves a chorded key press to the app', () => {
 	expect(onDecide).not.toHaveBeenCalled();
 });
 
-test('announces the pending approval to assistive technology', () => {
+test('announces the pending approval politely to assistive technology', () => {
 	renderCard();
 
 	const announcement = screen.getByRole('status');
 
-	expect(announcement).toHaveAttribute('aria-live', 'assertive');
+	expect(announcement).not.toHaveAttribute('aria-live', 'assertive');
 	expect(announcement).toHaveTextContent(/approval required for bash/i);
 });

@@ -135,7 +135,7 @@ export function ToolApprovalCard({
 				ref={shellRef}
 				tabIndex={-1}
 			>
-				<p aria-live='assertive' className='sr-only' role='status'>
+				<p className='sr-only' role='status'>
 					{`Approval required for ${request.toolName}.`}
 				</p>
 				<header className='flex items-start justify-between gap-3'>

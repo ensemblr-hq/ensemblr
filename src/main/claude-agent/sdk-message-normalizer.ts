@@ -221,19 +221,21 @@ function normalizeAssistant(
 
 	return [
 		messageEvent({ kind: 'message', parts, role: 'assistant' }, 'agent'),
-		...parts
-			.filter((part) => part.kind === 'tool-call')
-			.map((call) =>
-				messageEvent(
-					{
-						input: call.input,
-						kind: 'tool-call',
-						name: call.name,
-						toolCallId: call.toolCallId,
-					},
-					'tool',
-				),
-			),
+		...parts.flatMap((part) =>
+			part.kind === 'tool-call'
+				? [
+						messageEvent(
+							{
+								input: part.input,
+								kind: 'tool-call',
+								name: part.name,
+								toolCallId: part.toolCallId,
+							},
+							'tool',
+						),
+					]
+				: [],
+		),
 	];
 }
 

@@ -137,7 +137,10 @@ export function createClaudeReadinessProbe({
 }
 
 /**
- * Runs one full readiness pass: executable, version, then the session probe.
+ * Runs one full readiness pass: resolve the executable, then probe its version
+ * and open the session concurrently. Neither probe reads the other's result, and
+ * both spawn their own short-lived child, so racing them keeps the Providers
+ * page waiting on the slower one rather than on their sum.
  * @param input - Resolved dependencies and timeouts for this pass.
  * @returns The readiness snapshot for the wire.
  */
@@ -159,17 +162,15 @@ async function runClaudeProbe({
 	versionTimeoutMs: number;
 }): Promise<AgentProviderReadinessWire> {
 	const executable = await executableService.getSnapshot();
-	const versionResult = await runVersionProbe({
-		executable,
-		localCommandService,
-		versionTimeoutMs,
-	});
-	const session = await probeClaudeSession({
-		executablePath: executable.path,
-		queryFn,
-		resolveBaseEnv,
-		sessionTimeoutMs,
-	});
+	const [versionResult, session] = await Promise.all([
+		runVersionProbe({ executable, localCommandService, versionTimeoutMs }),
+		probeClaudeSession({
+			executablePath: executable.path,
+			queryFn,
+			resolveBaseEnv,
+			sessionTimeoutMs,
+		}),
+	]);
 	const checks = [
 		createExecutableCheck(executable),
 		createVersionCheck(executable, versionResult),
