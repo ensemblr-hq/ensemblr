@@ -48,7 +48,7 @@ This repository uses Biome instead of ESLint and Prettier.
 
 - Run `npm run check` before finishing changes that touch JavaScript, TypeScript, JSX, TSX, CSS, or JSON.
 - Use `npm run check:fix` to apply safe Biome fixes, including formatting and import organization.
-- Keep `npm run typecheck` as a separate verification step for TypeScript type errors. It checks two projects — the app (`tsconfig.json`) and dev scripts (`tsconfig.scripts.json`) — so `.ts` files under `scripts/` are type-checked even though `npx tsx`/`node` run them without checking.
+- Keep `npm run typecheck` as a separate verification step for TypeScript type errors. It checks three projects — the app (`tsconfig.json`), dev scripts (`tsconfig.scripts.json`), and tests (`tsconfig.tests.json`) — so `.ts` files under `scripts/` and `tests/` are type-checked even though `npx tsx`/`node` and Vitest run them without checking.
 - Do not add ESLint or Prettier configuration unless the user explicitly asks for it.
 
 ## Testing Policy
