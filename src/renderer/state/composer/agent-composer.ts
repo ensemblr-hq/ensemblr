@@ -173,10 +173,12 @@ export function useAgentComposerController({
 		(session) => session.id === currentAgentSessionId,
 	);
 
-	// Resolution order: explicit per-chat pick → persisted session model →
-	// Settings default → runtime-reported default → first available model. Existing
-	// chats keep their session model when the default changes; only fresh chats
-	// inherit the latest configured default.
+	// Both axes resolve the same way: explicit per-chat pick → persisted session
+	// value → Settings default → runtime-reported default. Existing chats keep what
+	// their session was started with when the default changes; only fresh chats
+	// inherit the latest configured default. The persisted rung matters most for a
+	// spawned sub-agent, which has no per-chat override of its own — without it the
+	// tab reports the user's default rather than what the child is really running.
 	const modelId =
 		chatModelOverride ??
 		persistedActiveSession?.model ??
@@ -186,6 +188,7 @@ export function useAgentComposerController({
 		null;
 	const thinkingLevel =
 		chatThinkingOverride ??
+		persistedActiveSession?.thinkingLevel ??
 		defaultThinkingLevel ??
 		models?.defaultThinkingLevel ??
 		null;
