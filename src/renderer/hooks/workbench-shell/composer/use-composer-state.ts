@@ -7,43 +7,17 @@ import {
 	type RefObject,
 	useCallback,
 	useEffect,
-	useMemo,
 	useRef,
-	useState,
 } from 'react';
-import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
+import { useComposerAttachments } from '@/renderer/hooks/workbench-shell/composer/use-composer-attachments';
+import { useComposerAutocomplete } from '@/renderer/hooks/workbench-shell/composer/use-composer-autocomplete';
+import { useComposerKeymap } from '@/renderer/hooks/workbench-shell/composer/use-composer-keymap';
+import { useComposerSubmit } from '@/renderer/hooks/workbench-shell/composer/use-composer-submit';
 import {
-	detectAutocomplete,
-	useFuzzyMatches,
-} from '@/renderer/hooks/workbench-shell/composer/use-autocomplete';
-import { useMentionMatches } from '@/renderer/hooks/workbench-shell/composer/use-mention-matches';
-import { useSlashCommands } from '@/renderer/hooks/workbench-shell/composer/use-slash-commands';
-import { resolveComposerProvider } from '@/renderer/lib/workbench/composer';
-import {
-	attachPastedFiles,
-	getTransferFiles,
-} from '@/renderer/lib/workbench/composer-attachments';
-import {
-	formatExternalAttachmentText,
-	formatMentionAttachmentText,
-	formatUploadAttachmentText,
-} from '@/renderer/lib/workbench/mention-payload';
-import {
-	composerExternalsAtomFamily,
-	composerMentionsAtomFamily,
-	composerUploadsAtomFamily,
 	composerValueAtomFamily,
-	useComposerAttachmentInbox,
 	useComposerInsertConsumer,
-	useComposerPrimedActionConsumer,
-	useComposerSubmitConsumer,
 } from '@/renderer/state/composer';
-import {
-	autoConvertLongTextAtom,
-	followUpBehaviorAtom,
-	sendShortcutAtom,
-} from '@/renderer/state/preferences';
-import type { KeymapBinding } from '@/renderer/types/keymap';
+import { sendShortcutAtom } from '@/renderer/state/preferences';
 import type {
 	AutocompleteKind,
 	AutocompleteState,
@@ -119,40 +93,6 @@ export interface ComposerStateApi {
 	value: string;
 }
 
-/** Default empty autocomplete state — caret outside any `@` or `/` token. */
-const EMPTY_AUTOCOMPLETE: AutocompleteState = {
-	kind: null,
-	query: '',
-	tokenStart: 0,
-	tokenEnd: 0,
-};
-
-/** Pasted text at or above this length is auto-converted into an attachment. */
-const PASTE_ATTACHMENT_THRESHOLD = 5_000;
-
-/**
- * Module-level so `useFuzzyMatches` keeps its memo across renders; an inline
- * arrow would be a fresh dependency every render and rescore the whole
- * catalogue on each keystroke.
- * @param entry - Slash command being scored.
- * @returns The text the fuzzy query is matched against.
- */
-function getSlashCommandKey(entry: SlashCommandDescriptor): string {
-	return entry.command;
-}
-
-/**
- * Steps the autocomplete highlight, clamping the stored index into the list
- * first so a list that shrank under it still steps from the row on screen.
- * @param stored - The index currently held in state, which may be out of range.
- * @param delta - How far to move, positive or negative.
- * @param total - How many rows the list currently offers.
- * @returns The index to highlight next.
- */
-function stepActiveIndex(stored: number, delta: number, total: number): number {
-	return (Math.min(stored, Math.max(0, total - 1)) + delta + total) % total;
-}
-
 /**
  * Owns the composer's local state machine: textarea value, mention + slash
  * autocomplete, chip lists for mentions and uploaded files, keymap bindings,
@@ -171,83 +111,31 @@ export function useComposerState({
 }: UseComposerStateArgs): ComposerStateApi {
 	const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 	const anchorRef = useRef<HTMLDivElement | null>(null);
-	const fileInputRef = useRef<HTMLInputElement | null>(null);
 
 	const [value, setValue] = useAtom(composerValueAtomFamily(chatTabId));
-	const [pending, setPending] = useState(false);
-	const [autocomplete, setAutocomplete] =
-		useState<AutocompleteState>(EMPTY_AUTOCOMPLETE);
-	const [activeIndex, setActiveIndex] = useState(0);
-	const [uploadAttachments, setUploadAttachments] = useAtom(
-		composerUploadsAtomFamily(chatTabId),
-	);
-	const [mentionAttachments, setMentionAttachments] = useAtom(
-		composerMentionsAtomFamily(chatTabId),
-	);
-	const [externalAttachments, setExternalAttachments] = useAtom(
-		composerExternalsAtomFamily(chatTabId),
-	);
-	const [attachmentError, setAttachmentError] = useState<string | null>(null);
-	const [blockedNotice, setBlockedNotice] = useState(false);
-
-	const autoConvertLong = useAtomValue(autoConvertLongTextAtom);
-	const followUp = useAtomValue(followUpBehaviorAtom);
-
-	// Drain externally-pushed attachments (transcript chips, etc.) into the
-	// composer's mention list. Dedup by path so re-clicking the same chip is
-	// a no-op.
-	const attachmentInbox = useComposerAttachmentInbox(chatTabId);
-	useEffect(() => {
-		if (attachmentInbox.pending.length === 0) {
-			return;
-		}
-		setMentionAttachments((prev) => {
-			const next = [...prev];
-			for (const file of attachmentInbox.pending) {
-				if (!next.some((existing) => existing.path === file.path)) {
-					next.push(file);
-				}
-			}
-			return next;
-		});
-		attachmentInbox.clear();
-	}, [attachmentInbox, setMentionAttachments]);
-
-	const mentionMatches = useMentionMatches(
-		composer.workspaceFiles,
-		autocomplete.kind === 'mention' ? autocomplete.query : '',
-	);
-
-	const mentionOpen = autocomplete.kind === 'mention';
-	const slashOpen = autocomplete.kind === 'slash';
-
-	const slashCatalogue = useSlashCommands(
-		resolveComposerProvider(composer),
-		composer.workspaceCwd,
-		slashOpen,
-	);
-	const slashMatches = useFuzzyMatches(
-		slashCatalogue.commands,
-		slashOpen ? autocomplete.query : '',
-		getSlashCommandKey,
-		80,
-	);
-
-	const updateAutocomplete = useCallback((nextValue: string, caret: number) => {
-		setAutocomplete(detectAutocomplete(nextValue, caret));
-		setActiveIndex(0);
-	}, []);
-
-	const handleChange = useCallback(
-		(event: ChangeEvent<HTMLTextAreaElement>) => {
-			const nextValue = event.target.value;
-			setValue(nextValue);
-			setBlockedNotice(false);
-			const caret = event.target.selectionStart ?? nextValue.length;
-			updateAutocomplete(nextValue, caret);
-		},
-		[updateAutocomplete, setValue],
-	);
+	const {
+		attachmentError,
+		externalAttachments,
+		fileInputRef,
+		handleAddAttachment,
+		handleDragOver,
+		handleDrop,
+		handleFileChange,
+		handlePaste,
+		hasChips,
+		mentionAttachments,
+		removeExternal,
+		removeMention,
+		removeUpload,
+		setAttachmentError,
+		setExternalAttachments,
+		setMentionAttachments,
+		setUploadAttachments,
+		uploadAttachments,
+	} = useComposerAttachments({
+		chatTabId,
+		workspaceCwd: composer.workspaceCwd,
+	});
 
 	const insertText = useCallback(
 		(text: string) => {
@@ -272,580 +160,94 @@ export function useComposerState({
 		}
 	}, [seedText, value, setValue]);
 
-	const handleSelect = useCallback(() => {
-		const textarea = textareaRef.current;
-		if (!textarea) {
-			return;
-		}
-		const caret = textarea.selectionStart ?? textarea.value.length;
-		updateAutocomplete(textarea.value, caret);
-	}, [updateAutocomplete]);
-
-	const dismissAutocomplete = useCallback(() => {
-		setAutocomplete(EMPTY_AUTOCOMPLETE);
-		setActiveIndex(0);
-	}, []);
-
-	const replaceToken = useCallback(
-		(insert: string, keepTrailingSpace = true) => {
-			const { tokenStart, tokenEnd } = autocomplete;
-			const before = value.slice(0, tokenStart);
-			const after = value.slice(tokenEnd);
-			const trailing = keepTrailingSpace ? ' ' : '';
-			const next = `${before}${insert}${trailing}${after}`;
-			setValue(next);
-			dismissAutocomplete();
-			requestAnimationFrame(() => {
-				const textarea = textareaRef.current;
-				if (!textarea) {
-					return;
-				}
-				const newCaret = before.length + insert.length + trailing.length;
-				textarea.focus();
-				textarea.setSelectionRange(newCaret, newCaret);
-			});
-		},
-		[autocomplete, dismissAutocomplete, value, setValue],
-	);
-
-	const submitText = useCallback(
-		async (
-			rawText: string,
-			mentions: readonly WorkspaceFileSummary[],
-			uploads: readonly File[],
-			externals: readonly ExternalAttachment[],
-			streamingBehavior?: 'steer' | 'followUp',
-		) => {
-			const trimmed = rawText.trim();
-			if (
-				composer.disabled ||
-				pending ||
-				(trimmed.length === 0 &&
-					mentions.length === 0 &&
-					uploads.length === 0 &&
-					externals.length === 0)
-			) {
-				return;
-			}
-			setPending(true);
-			setAttachmentError(null);
-			try {
-				const attachmentText = await formatMentionAttachmentText({
-					mentions,
-					workspaceCwd: composer.workspaceCwd,
-				});
-				const uploadText = await formatUploadAttachmentText(uploads);
-				const externalText = formatExternalAttachmentText(externals);
-				const payload = [attachmentText, uploadText, externalText, trimmed]
-					.filter(Boolean)
-					.join('\n\n');
-				// Clear the composer before awaiting onSubmit. onSubmit renders an
-				// optimistic prompt synchronously, so leaving the textarea populated
-				// during its async round-trip shows the prompt in two places at once.
-				setValue('');
-				setUploadAttachments([]);
-				setMentionAttachments([]);
-				setExternalAttachments([]);
-				try {
-					await composer.onSubmit(
-						payload,
-						streamingBehavior ? { streamingBehavior } : undefined,
-					);
-				} catch (cause) {
-					// Restore the unsent text so the user does not lose their input.
-					setValue(rawText);
-					setUploadAttachments([...uploads]);
-					setMentionAttachments([...mentions]);
-					setExternalAttachments([...externals]);
-					throw cause;
-				}
-			} catch (cause) {
-				setAttachmentError(
-					cause instanceof Error
-						? cause.message
-						: 'Failed to attach selected file.',
-				);
-			} finally {
-				setPending(false);
-			}
-		},
-		[
-			composer,
-			pending,
-			setValue,
-			setExternalAttachments,
-			setUploadAttachments,
-			setMentionAttachments,
-		],
-	);
-
-	/**
-	 * Applies a primed agent action drained by {@link useComposerPrimedActionConsumer}:
-	 * auto-submits it only when the action asked to and the composer holds no draft
-	 * — submitText clears the composer, so auto-submitting over a typed draft would
-	 * silently discard it — otherwise seeds the payload after any existing draft for
-	 * the user to send.
-	 */
-	const deliverPrimedAction = useCallback(
-		(payload: string, autoSubmit: boolean) => {
-			const hasDraft = value.trim().length > 0;
-			if (autoSubmit && !hasDraft) {
-				void submitText(payload, [], [], []);
-			} else {
-				setValue((current) =>
-					current.trim().length > 0
-						? `${current.trimEnd()}\n\n${payload}`
-						: payload,
-				);
-			}
-		},
-		[value, submitText, setValue],
-	);
-	useComposerPrimedActionConsumer(
+	const {
+		blockedNotice,
+		dispatchSubmit,
+		followUp,
+		handleSubmit,
+		pending,
+		queueCurrent,
+		setBlockedNotice,
+	} = useComposerSubmit({
 		chatTabId,
-		!composer.disabled && !pending,
-		deliverPrimedAction,
-	);
-
-	// Maps the Follow-up behavior setting onto Pi's native mid-turn delivery:
-	// `steer` → `steer` frame (injected after the current tool calls), `queue` →
-	// `follow_up` frame (delivered when the agent stops), `block` → dropped. When
-	// idle, every mode sends a normal prompt. Pi owns the queue, so there is no
-	// renderer-side hold to flush.
-	const dispatchSubmit = useCallback(
-		(
-			rawText: string,
-			mentions: readonly WorkspaceFileSummary[],
-			uploads: readonly File[],
-			externals: readonly ExternalAttachment[],
-		) => {
-			const empty =
-				rawText.trim().length === 0 &&
-				mentions.length === 0 &&
-				uploads.length === 0 &&
-				externals.length === 0;
-			if (composer.isStreaming && !empty) {
-				if (followUp === 'block') {
-					// Keep the draft and explain the no-op rather than eating the key.
-					setBlockedNotice(true);
-					return;
-				}
-				setBlockedNotice(false);
-				void submitText(
-					rawText,
-					mentions,
-					uploads,
-					externals,
-					followUp === 'steer' ? 'steer' : 'followUp',
-				);
-				return;
-			}
-			setBlockedNotice(false);
-			void submitText(rawText, mentions, uploads, externals);
+		composer,
+		draft: {
+			externals: externalAttachments,
+			mentions: mentionAttachments,
+			text: value,
+			uploads: uploadAttachments,
 		},
-		[composer.isStreaming, followUp, submitText],
-	);
+		setAttachmentError,
+		setExternalAttachments,
+		setMentionAttachments,
+		setUploadAttachments,
+		setValue,
+	});
 
-	const handleSubmit = useCallback(
-		() =>
-			dispatchSubmit(
-				value,
-				mentionAttachments,
-				uploadAttachments,
-				externalAttachments,
-			),
-		[
-			dispatchSubmit,
-			value,
-			mentionAttachments,
-			uploadAttachments,
-			externalAttachments,
-		],
-	);
-
-	// Drain auto-submit prompts queued from the Checks panel (commit & push,
-	// create PR). These bypass the textarea and go straight through the normal
-	// send pipeline so they respect the Follow-up behavior just like a manual
-	// send — the Checks panel hands the chore to the active tab's agent.
-	// Returns whether the prompt was accepted for delivery. The consumer keeps
-	// anything we reject and retries when this callback is recreated (composer
-	// enabled, send finished, streaming ended), so a chore queued while the
-	// composer is busy or mid-turn-blocked is held and sent once it is free
-	// rather than being dropped. Mirrors the drop conditions in `submitText` and
-	// `dispatchSubmit`.
-	const submitFromChannel = useCallback(
-		(text: string): boolean => {
-			if (composer.disabled || pending) {
-				return false;
-			}
-			if (
-				composer.isStreaming &&
-				text.trim().length > 0 &&
-				followUp === 'block'
-			) {
-				return false;
-			}
-			dispatchSubmit(text, [], [], []);
-			return true;
-		},
-		[
-			composer.disabled,
-			composer.isStreaming,
-			dispatchSubmit,
-			followUp,
-			pending,
-		],
-	);
-	useComposerSubmitConsumer(chatTabId, submitFromChannel);
-
-	// Cmd+J explicitly queues the current draft as a follow-up regardless of the
-	// Follow-up setting; when idle it just sends normally.
-	const queueCurrent = useCallback(() => {
-		void submitText(
-			value,
-			mentionAttachments,
-			uploadAttachments,
-			externalAttachments,
-			composer.isStreaming ? 'followUp' : undefined,
-		);
-	}, [
-		composer.isStreaming,
-		submitText,
-		value,
-		mentionAttachments,
-		uploadAttachments,
-		externalAttachments,
-	]);
-
-	/**
-	 * Persists pasted/dropped files via {@link attachPastedFiles}, then merges the
-	 * copied files onto the mention chips and the path-referenced ones onto the
-	 * external chips, de-duplicating by path so a repeated paste is a no-op.
-	 */
-	const handlePastedFiles = useCallback(
-		async (files: readonly File[]) => {
-			setAttachmentError(null);
-			const { error, savedExternals, savedFiles } = await attachPastedFiles(
-				files,
-				composer.workspaceCwd,
-			);
-			if (error) {
-				setAttachmentError(error);
-			}
-			if (savedFiles.length > 0) {
-				setMentionAttachments((prev) => {
-					const next = [...prev];
-					for (const file of savedFiles) {
-						if (!next.some((existing) => existing.path === file.path)) {
-							next.push(file);
-						}
-					}
-					return next;
-				});
-			}
-			if (savedExternals.length > 0) {
-				setExternalAttachments((prev) => {
-					const next = [...prev];
-					for (const external of savedExternals) {
-						if (
-							!next.some(
-								(existing) => existing.absolutePath === external.absolutePath,
-							)
-						) {
-							next.push(external);
-						}
-					}
-					return next;
-				});
-			}
-		},
-		[composer.workspaceCwd, setMentionAttachments, setExternalAttachments],
-	);
-
-	/** Handles file pastes and long-text paste conversion for the textarea. */
-	const handlePaste = useCallback(
-		(event: ReactClipboardEvent<HTMLTextAreaElement>) => {
-			const files = getTransferFiles(event.clipboardData);
-			if (files.length > 0) {
-				event.preventDefault();
-				void handlePastedFiles(files);
-				return;
-			}
-			if (!autoConvertLong) {
-				return;
-			}
-			const text = event.clipboardData.getData('text/plain');
-			if (text.length < PASTE_ATTACHMENT_THRESHOLD) {
-				return;
-			}
-			event.preventDefault();
-			const file = new File([text], 'pasted-text.txt', { type: 'text/plain' });
-			setUploadAttachments((prev) => [...prev, file]);
-			setAttachmentError(null);
-		},
-		[autoConvertLong, handlePastedFiles, setUploadAttachments],
-	);
-
-	/** Accepts files dropped onto the composer, saving them like a paste. */
-	const handleDrop = useCallback(
-		(event: ReactDragEvent<HTMLElement>) => {
-			const files = getTransferFiles(event.dataTransfer);
-			if (files.length === 0) {
-				return;
-			}
-			event.preventDefault();
-			void handlePastedFiles(files);
-		},
-		[handlePastedFiles],
-	);
-
-	/** Signals the composer as a valid drop target so `handleDrop` can fire. */
-	const handleDragOver = useCallback((event: ReactDragEvent<HTMLElement>) => {
-		if (Array.from(event.dataTransfer.types).includes('Files')) {
-			event.preventDefault();
-		}
-	}, []);
-
-	const onMentionSelect = useCallback(
-		(entry: WorkspaceFileSummary) => {
-			// Drop the @query token from textarea, push file onto chip list
-			setAttachmentError(null);
-			const { tokenStart, tokenEnd } = autocomplete;
-			const before = value.slice(0, tokenStart);
-			const after = value.slice(tokenEnd);
-			const nextValue = `${before.trimEnd()}${before.trimEnd().length > 0 ? ' ' : ''}${after.trimStart()}`;
-			setValue(nextValue);
-			setMentionAttachments((prev) => {
-				if (prev.some((existing) => existing.path === entry.path)) {
-					return prev;
-				}
-				return [...prev, entry];
-			});
-			dismissAutocomplete();
-			requestAnimationFrame(() => {
-				const textarea = textareaRef.current;
-				if (!textarea) {
-					return;
-				}
-				const newCaret = before.trimEnd().length + 1;
-				textarea.focus();
-				textarea.setSelectionRange(newCaret, newCaret);
-			});
-		},
-		[autocomplete, dismissAutocomplete, value, setValue, setMentionAttachments],
-	);
-
-	const onSlashSelect = useCallback(
-		(command: string, autoSubmit: boolean) => {
-			const { tokenStart, tokenEnd } = autocomplete;
-			const before = value.slice(0, tokenStart);
-			const after = value.slice(tokenEnd);
-			const slashText = `/${command}`;
-			if (
-				autoSubmit &&
-				before.trim().length === 0 &&
-				after.trim().length === 0
-			) {
-				dismissAutocomplete();
-				setValue('');
-				dispatchSubmit(
-					slashText,
-					mentionAttachments,
-					uploadAttachments,
-					externalAttachments,
-				);
-				return;
-			}
-			replaceToken(slashText);
-		},
-		[
-			autocomplete,
-			dismissAutocomplete,
-			dispatchSubmit,
-			externalAttachments,
-			mentionAttachments,
-			replaceToken,
-			uploadAttachments,
-			value,
-			setValue,
-		],
-	);
-
-	const autocompleteKind: AutocompleteKind = mentionOpen
-		? 'mention'
-		: slashOpen
-			? 'slash'
-			: null;
-	const autocompleteTotal =
-		autocompleteKind === 'mention'
-			? mentionMatches.length
-			: autocompleteKind === 'slash'
-				? slashMatches.length
-				: 0;
-	const autocompleteActive = autocompleteKind !== null && autocompleteTotal > 0;
-	// The list can shrink under a stored index — a slash catalogue refetch drops
-	// entries while the token is untouched — which would strand the highlight off
-	// the end and make Enter a silent no-op.
-	const safeActiveIndex = Math.min(
+	const {
 		activeIndex,
-		Math.max(0, autocompleteTotal - 1),
+		autocomplete,
+		autocompleteActive,
+		autocompleteKind,
+		autocompleteTotal,
+		confirmAutocomplete,
+		dismissAutocomplete,
+		handleSelect,
+		mentionMatches,
+		onMentionSelect,
+		onSlashSelect,
+		setActiveIndex,
+		slashLoading,
+		slashMatches,
+		stepActive,
+		updateAutocomplete,
+	} = useComposerAutocomplete({
+		composer,
+		onSubmitSlashCommand: (text) =>
+			dispatchSubmit({
+				externals: externalAttachments,
+				mentions: mentionAttachments,
+				text,
+				uploads: uploadAttachments,
+			}),
+		setAttachmentError,
+		setMentionAttachments,
+		setValue,
+		textareaRef,
+		value,
+	});
+
+	const handleChange = useCallback(
+		(event: ChangeEvent<HTMLTextAreaElement>) => {
+			const nextValue = event.target.value;
+			setValue(nextValue);
+			setBlockedNotice(false);
+			const caret = event.target.selectionStart ?? nextValue.length;
+			updateAutocomplete(nextValue, caret);
+		},
+		[updateAutocomplete, setValue, setBlockedNotice],
 	);
 
 	const sendShortcut = useAtomValue(sendShortcutAtom);
 
-	const keymapBindings = useMemo<readonly KeymapBinding<HTMLTextAreaElement>[]>(
-		() => [
-			[
-				'autocomplete.next',
-				() => {
-					if (!autocompleteActive) {
-						return false;
-					}
-					setActiveIndex((stored) =>
-						stepActiveIndex(stored, 1, autocompleteTotal),
-					);
-				},
-			],
-			[
-				'autocomplete.prev',
-				() => {
-					if (!autocompleteActive) {
-						return false;
-					}
-					setActiveIndex((stored) =>
-						stepActiveIndex(stored, -1, autocompleteTotal),
-					);
-				},
-			],
-			[
-				'autocomplete.confirm',
-				() => {
-					if (!autocompleteActive) {
-						return false;
-					}
-					if (autocompleteKind === 'mention') {
-						const match = mentionMatches[safeActiveIndex];
-						if (match) {
-							onMentionSelect(match);
-						}
-					} else {
-						const match = slashMatches[safeActiveIndex];
-						if (match) {
-							onSlashSelect(match.command, match.autoSubmit);
-						}
-					}
-				},
-			],
-			[
-				'autocomplete.dismiss',
-				() => {
-					if (autocompleteKind === null) {
-						return false;
-					}
-					dismissAutocomplete();
-				},
-			],
-			[
-				'composer.removeLastMention',
-				() => {
-					if (value.length !== 0 || mentionAttachments.length === 0) {
-						return false;
-					}
-					setMentionAttachments((prev) => prev.slice(0, -1));
-				},
-			],
-			[
-				'composer.submit',
-				(event) => {
-					if (event.nativeEvent.isComposing) {
-						return false;
-					}
-					// In "Cmd + Enter" mode a bare Enter inserts a newline instead
-					// (fall through to the textarea's native handling).
-					if (sendShortcut === 'mod+enter') {
-						return false;
-					}
-					void handleSubmit();
-				},
-			],
-			[
-				'composer.submitWithMod',
-				(event) => {
-					if (event.nativeEvent.isComposing) {
-						return false;
-					}
-					void handleSubmit();
-				},
-			],
-			[
-				'composer.queue',
-				() => {
-					queueCurrent();
-				},
-			],
-		],
-		[
-			autocompleteActive,
-			autocompleteKind,
-			autocompleteTotal,
-			dismissAutocomplete,
-			handleSubmit,
-			mentionAttachments.length,
-			mentionMatches,
-			onMentionSelect,
-			onSlashSelect,
-			queueCurrent,
-			safeActiveIndex,
-			sendShortcut,
-			slashMatches,
-			value.length,
-			setMentionAttachments,
-		],
-	);
+	const removeLastMention = useCallback(() => {
+		setMentionAttachments((prev) => prev.slice(0, -1));
+	}, [setMentionAttachments]);
 
-	const handleKeyDown = useKeymapHandler(keymapBindings);
-
-	const handleAddAttachment = useCallback(() => {
-		fileInputRef.current?.click();
-	}, []);
-
-	const handleFileChange = useCallback(
-		(event: ChangeEvent<HTMLInputElement>) => {
-			const files = event.target.files ? [...event.target.files] : [];
-			if (files.length > 0) {
-				setUploadAttachments((prev) => [...prev, ...files]);
-			}
-			event.target.value = '';
+	const handleKeyDown = useComposerKeymap({
+		autocompleteKind,
+		canConfirmAutocomplete: autocompleteActive,
+		canRemoveLastMention: value.length === 0 && mentionAttachments.length > 0,
+		onConfirmAutocomplete: confirmAutocomplete,
+		onDismissAutocomplete: dismissAutocomplete,
+		onQueue: queueCurrent,
+		onRemoveLastMention: removeLastMention,
+		onStepActiveIndex: stepActive,
+		onSubmit: () => {
+			void handleSubmit();
 		},
-		[setUploadAttachments],
-	);
-
-	const removeUpload = useCallback(
-		(index: number) => {
-			setUploadAttachments((prev) => prev.filter((_, idx) => idx !== index));
-		},
-		[setUploadAttachments],
-	);
-
-	const removeMention = useCallback(
-		(path: string) => {
-			setAttachmentError(null);
-			setMentionAttachments((prev) =>
-				prev.filter((entry) => entry.path !== path),
-			);
-		},
-		[setMentionAttachments],
-	);
-
-	const removeExternal = useCallback(
-		(absolutePath: string) => {
-			setAttachmentError(null);
-			setExternalAttachments((prev) =>
-				prev.filter((entry) => entry.absolutePath !== absolutePath),
-			);
-		},
-		[setExternalAttachments],
-	);
+		submitsOnBareEnter: sendShortcut !== 'mod+enter',
+	});
 
 	const isStreaming = composer.isStreaming || pending;
 	const hasContent =
@@ -866,13 +268,9 @@ export function useComposerState({
 		!pending &&
 		hasContent &&
 		!(composer.isStreaming && followUp === 'block');
-	const hasChips =
-		uploadAttachments.length > 0 ||
-		mentionAttachments.length > 0 ||
-		externalAttachments.length > 0;
 
 	return {
-		activeIndex: safeActiveIndex,
+		activeIndex,
 		anchorRef,
 		attachmentError,
 		blockedNotice,
@@ -908,7 +306,7 @@ export function useComposerState({
 		removeMention,
 		removeUpload,
 		setActiveIndex,
-		slashLoading: slashOpen && slashCatalogue.loading,
+		slashLoading,
 		slashMatches,
 		textareaRef,
 		uploadAttachments,

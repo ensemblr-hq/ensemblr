@@ -1,4 +1,3 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useAtom } from 'jotai';
 import {
 	EyeIcon,
@@ -7,22 +6,18 @@ import {
 	RefreshCwIcon,
 	SearchIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 
-import { workspaceGitStatusQuery } from '@/renderer/api/ensemblr';
 import { Button } from '@/renderer/components/ui/button';
 import { Tabs, TabsContent } from '@/renderer/components/ui/tabs';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
+import { useChangesSource } from '@/renderer/hooks/workbench-shell/review-files/use-changes-source';
+import { useDiscardChanges } from '@/renderer/hooks/workbench-shell/review-files/use-discard-changes';
 import { useReviewableChanges } from '@/renderer/hooks/workbench-shell/review-files/use-reviewable-changes';
 import { useWorkspaceConflicts } from '@/renderer/hooks/workbench-shell/review-files/use-workspace-conflicts';
 import { cn } from '@/renderer/lib/utils';
-import { mapGitStatusToReviewFiles } from '@/renderer/lib/workbench/review-files';
-import {
-	changesSourceByWorkspaceAtom,
-	changesViewModeAtom,
-} from '@/renderer/state/workspace';
+import { changesViewModeAtom } from '@/renderer/state/workspace';
 import type {
-	DiscardChangesTarget,
 	ReviewPanelTab,
 	WorkspaceShellModel,
 } from '@/renderer/types/workbench';
@@ -30,7 +25,6 @@ import type {
 	ChangesSource,
 	ChangesViewMode,
 } from '@/renderer/types/workbench-shell';
-import type { WorkspaceGitDiffScope } from '@/shared/ipc/contracts/workspace-git';
 import { ChecksPanel } from './checks-panel/checks-panel';
 import { useReviewActions } from './review-actions/review-actions-context';
 import { AllFilesList } from './review-files/all-files-list';
@@ -41,45 +35,6 @@ import {
 } from './review-files/changes-source-menu';
 import { DiscardChangesDialog } from './review-files/discard-changes-dialog';
 import { ReviewFileList } from './review-files/review-file-list';
-
-/** Resolves the active change source to the git diff scope a query needs. */
-function sourceToScope(
-	source: ChangesSource,
-	baseRef: string | null,
-): WorkspaceGitDiffScope {
-	if (source.kind === 'commit') {
-		return { commitHash: source.hash, kind: 'commit' };
-	}
-	// "All changes" means the whole branch — but it can only diff against a base
-	// when one is known; otherwise it degrades to the working-tree change set.
-	if (source.kind === 'all' && baseRef) {
-		return { baseRef, kind: 'branch' };
-	}
-	return { kind: 'working-tree' };
-}
-
-/** Empty-state copy tailored to the active change source. */
-function emptyStateForSource(source: ChangesSource): {
-	message: string;
-	title: string;
-} {
-	if (source.kind === 'uncommitted') {
-		return {
-			message: 'Everything here is committed.',
-			title: 'No uncommitted changes yet',
-		};
-	}
-	if (source.kind === 'commit') {
-		return {
-			message: `${source.shortHash} touched no files.`,
-			title: 'No changes in this commit',
-		};
-	}
-	return {
-		message: 'Changes on this branch appear here.',
-		title: 'No changes yet',
-	};
-}
 
 /** Tabbed review surface for files, changes, and checks. */
 export function ReviewPanel({
@@ -94,75 +49,26 @@ export function ReviewPanel({
 	const [changesViewMode, setChangesViewMode] = useAtom(changesViewModeAtom);
 	const [isFileSearchOpen, setIsFileSearchOpen] = useState(false);
 
-	// The Changes tab can show every branch change, only uncommitted edits, or a
-	// single commit — picked per workspace and persisted.
-	const [sourceMap, setSourceMap] = useAtom(changesSourceByWorkspaceAtom);
-	const storedSource = sourceMap[workspace.id];
-	const source = useMemo<ChangesSource>(
-		() => storedSource ?? { kind: 'all' },
-		[storedSource],
-	);
-	const setSource = useCallback(
-		(next: ChangesSource) => {
-			setSourceMap((current) => ({ ...current, [workspace.id]: next }));
-		},
-		[setSourceMap, workspace.id],
-	);
-
-	const baseRef = workspace.landingSummary?.branchSource.baseBranch ?? null;
-	const scope = useMemo(
-		() => sourceToScope(source, baseRef),
-		[source, baseRef],
-	);
-
 	// The Review action only makes sense when there's something to review, so gate
 	// it on the *whole* branch diff vs base — committed-on-branch and uncommitted
 	// edits alike — independent of the user's selected source. Shares the
 	// branch-scoped query key with the header/Checks Create PR action, so React
-	// Query dedupes it; when source is the default "all" + a known base it also
-	// matches `scope` below, adding no extra git read.
+	// Query dedupes it, adding no extra git read.
 	const canReview = useReviewableChanges(workspace);
 
 	const { paths: conflictPaths } = useWorkspaceConflicts(workspace);
 
-	// Source-aware status drives both the tab count and the file list. The
-	// working-tree scope reuses the live model's query (same key), so only the
-	// branch/commit views issue an extra git read — for the active workspace.
-	const { data: sourceStatusData, isLoading: isSourceStatusLoading } = useQuery(
-		{
-			...workspaceGitStatusQuery(workspace.pathLabel ?? null, scope),
-			placeholderData: keepPreviousData,
-		},
-	);
-	const statusData =
-		sourceStatusData && !sourceStatusData.error ? sourceStatusData : null;
-	// Until the source query resolves, the "all"/"uncommitted" views borrow the
-	// live model's already-loaded change set so rows don't blink away on every
-	// switch or first paint. A commit view has no model equivalent — it loads.
-	const useModelChanges = !statusData && source.kind !== 'commit';
-	const sourceFiles = useMemo(
-		() =>
-			statusData
-				? mapGitStatusToReviewFiles(statusData.files)
-				: useModelChanges
-					? workspace.reviewFiles
-					: [],
-		[statusData, useModelChanges, workspace.reviewFiles],
-	);
-	const changesCount = statusData
-		? statusData.summary.files
-		: useModelChanges
-			? workspace.changeSummary.files
-			: 0;
-
-	// Only working-tree (uncommitted) files revert cleanly. The live model's
-	// `reviewFiles` is exactly that set, so cross-reference it to decide which
-	// rows expose a Discard action regardless of the active source.
-	const discardablePaths = useMemo(
-		() => new Set(workspace.reviewFiles.map((file) => file.path)),
-		[workspace.reviewFiles],
-	);
-	const emptyState = useMemo(() => emptyStateForSource(source), [source]);
+	const {
+		changesCount,
+		discardablePaths,
+		emptyState,
+		isCommitLoading,
+		scope,
+		setSource,
+		source,
+		sourceError,
+		sourceFiles,
+	} = useChangesSource(workspace);
 
 	const reviewTabs: Array<{
 		count?: number;
@@ -190,49 +96,12 @@ export function ReviewPanel({
 	}, [onTabChange, setSource]);
 	useHotkey('changes.uncommitted', showUncommitted);
 
-	const [discardTarget, setDiscardTarget] =
-		useState<DiscardChangesTarget | null>(null);
-
-	// Route every discard through the confirm dialog rather than reverting
-	// inline: the git operation is irreversible, so it stays behind an explicit,
-	// cancelable step. A rename carries both its new path and `renamedFrom` so
-	// the original is restored alongside the new copy's removal.
-	const handleDiscardFile = useCallback(
-		(filePath: string) => {
-			const file = sourceFiles.find((entry) => entry.path === filePath);
-			const paths = file?.renamedFrom
-				? [filePath, file.renamedFrom]
-				: [filePath];
-			setDiscardTarget({ fileCount: 1, paths, title: filePath });
-		},
-		[sourceFiles],
-	);
-
-	// Discard every uncommitted change at once. Only working-tree files revert,
-	// so this always targets the live model's `reviewFiles` regardless of the
-	// active source view; renames contribute both paths.
-	const handleDiscardAll = useCallback(() => {
-		const uncommitted = workspace.reviewFiles;
-		if (uncommitted.length === 0) {
-			return;
-		}
-		const paths = uncommitted.flatMap((file) =>
-			file.renamedFrom ? [file.path, file.renamedFrom] : [file.path],
-		);
-		setDiscardTarget({
-			fileCount: uncommitted.length,
-			paths,
-			title: `all ${uncommitted.length} uncommitted ${
-				uncommitted.length === 1 ? 'change' : 'changes'
-			}`,
-		});
-	}, [workspace.reviewFiles]);
-
-	const handleDiscardDialogChange = useCallback((open: boolean) => {
-		if (!open) {
-			setDiscardTarget(null);
-		}
-	}, []);
+	const {
+		discardTarget,
+		handleDiscardAll,
+		handleDiscardDialogChange,
+		handleDiscardFile,
+	} = useDiscardChanges({ sourceFiles, workspace });
 
 	return (
 		<Tabs
@@ -283,13 +152,9 @@ export function ReviewPanel({
 					diffScope={scope}
 					discardablePaths={discardablePaths}
 					emptyState={emptyState}
-					error={
-						source.kind === 'commit'
-							? sourceStatusData?.error
-							: workspace.reviewFilesError
-					}
+					error={sourceError}
 					files={sourceFiles}
-					isLoading={source.kind === 'commit' && isSourceStatusLoading}
+					isLoading={isCommitLoading}
 					onDiscardFile={handleDiscardFile}
 					viewMode={changesViewMode}
 					workspaceId={workspace.id}

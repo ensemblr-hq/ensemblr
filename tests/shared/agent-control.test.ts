@@ -16,6 +16,11 @@ describe('agent-control op classification', () => {
 		expect(isWriteOp('getConversationStatus')).toBe(false);
 	});
 
+	it('marks resolving a review comment as a write, not a spawn', () => {
+		expect(isWriteOp('resolveDiffComments')).toBe(true);
+		expect(isSpawnOp('resolveDiffComments')).toBe(false);
+	});
+
 	it('marks resource-creating ops as spawns', () => {
 		expect(isSpawnOp('startConversation')).toBe(true);
 		expect(isSpawnOp('launchHarness')).toBe(true);
@@ -290,6 +295,62 @@ describe('validateArgs', () => {
 		expect(
 			validateArgs('addDiffComments', {
 				comments: Array.from({ length: 51 }, () => comment),
+			}).ok,
+		).toBe(false);
+	});
+});
+
+describe('resolveDiffComments args', () => {
+	it('accepts a batch of ids', () => {
+		expect(
+			validateArgs('resolveDiffComments', { commentIds: ['a', 'b'] }).ok,
+		).toBe(true);
+	});
+
+	it('rejects an empty batch and a blank id', () => {
+		expect(validateArgs('resolveDiffComments', { commentIds: [] }).ok).toBe(
+			false,
+		);
+		expect(validateArgs('resolveDiffComments', { commentIds: ['  '] }).ok).toBe(
+			false,
+		);
+	});
+
+	it('rejects a bare string where a batch belongs', () => {
+		expect(validateArgs('resolveDiffComments', { commentIds: 'a' }).ok).toBe(
+			false,
+		);
+	});
+
+	it('caps a runaway resolve batch at the same fifty', () => {
+		expect(
+			validateArgs('resolveDiffComments', {
+				commentIds: Array.from({ length: 50 }, (_, index) => `c-${index}`),
+			}).ok,
+		).toBe(true);
+		expect(
+			validateArgs('resolveDiffComments', {
+				commentIds: Array.from({ length: 51 }, (_, index) => `c-${index}`),
+			}).ok,
+		).toBe(false);
+	});
+
+	// The op only ever resolves. A caller reaching for `status` is asking for the
+	// reopen it deliberately does not offer, and the strict object says so.
+	it('rejects a status argument, so reopening stays impossible', () => {
+		expect(
+			validateArgs('resolveDiffComments', {
+				commentIds: ['a'],
+				status: 'resolved',
+			}).ok,
+		).toBe(false);
+	});
+
+	it('rejects a workspace the caller tried to name itself', () => {
+		expect(
+			validateArgs('resolveDiffComments', {
+				commentIds: ['a'],
+				workspaceId: 'ws-other',
 			}).ok,
 		).toBe(false);
 	});

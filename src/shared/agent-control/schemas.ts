@@ -193,6 +193,13 @@ const addDiffCommentsSchema = z.strictObject({
 		.max(DIFF_COMMENT_LIMITS.maxComments),
 });
 
+// Strict with no `status` key on purpose: this op only ever resolves, and a
+// caller reaching for `status` is asking for a reopen the tool deliberately
+// does not offer. Rejecting says so in one round trip.
+const resolveDiffCommentsSchema = z.strictObject({
+	commentIds: z.array(nonEmpty).min(1).max(DIFF_COMMENT_LIMITS.maxComments),
+});
+
 const waitForAgentsSchema = z.strictObject({
 	targets: z.array(nonEmpty).optional(),
 	mode: z.enum(['first', 'all']).optional(),
@@ -285,6 +292,7 @@ const AGENT_CONTROL_ARG_SCHEMAS = {
 	getWorkspaceDiff: getWorkspaceDiffSchema,
 	getDiffComments: getDiffCommentsSchema,
 	addDiffComments: addDiffCommentsSchema,
+	resolveDiffComments: resolveDiffCommentsSchema,
 	listWorkspaces: emptySchema,
 	listTabs: listTabsSchema,
 	listTerminals: listTerminalsSchema,

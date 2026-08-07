@@ -68,6 +68,7 @@ export function createReviewService({
 			deleteReviewComment({
 				database: requireReviewDatabase(),
 				id: request.id,
+				workspaceId: request.workspaceId,
 			});
 			return { ok: true };
 		},
@@ -102,9 +103,12 @@ export function createReviewService({
 					database,
 					id: request.id,
 					status: request.status,
+					workspaceId: request.workspaceId,
 				});
 				if (!updated) {
-					throw new Error('Review comment not found.');
+					throw new Error(
+						'Review comment not found, or it belongs to another workspace.',
+					);
 				}
 				return { comment: updated };
 			}

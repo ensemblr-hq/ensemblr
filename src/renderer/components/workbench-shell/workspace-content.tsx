@@ -4,11 +4,15 @@ import { useAgentActionRunner } from '@/renderer/hooks/workbench-shell/review-ac
 import { useDockController } from '@/renderer/hooks/workbench-shell/use-dock-controller';
 import { useRightSidebarController } from '@/renderer/hooks/workbench-shell/use-right-sidebar-controller';
 import { useRouteProfilerMount } from '@/renderer/lib/instrumentation';
-import { workspaceDirectoryRevealRequestAtom } from '@/renderer/state/workspace';
+import {
+	useRequestDiffLineReveal,
+	workspaceDirectoryRevealRequestAtom,
+} from '@/renderer/state/workspace';
 import type { WorkspaceMainContentState } from '@/renderer/types/components';
 import type {
 	FileOpenOptions,
 	PullRequestCommentSummary,
+	WorkspaceFileDiffOpenOptions,
 } from '@/renderer/types/workbench';
 import type {
 	SessionTabActions,
@@ -70,12 +74,22 @@ export function WorkspaceWorkbenchContent({
 		openFilePreviewTab,
 		openCommentPreviewTab,
 	} = sessionNavigation;
+	const requestDiffLineReveal = useRequestDiffLineReveal();
 	const openWorkspaceFileDiff = useCallback(
 		(
 			filePath: string,
 			scope?: WorkspaceGitDiffScope,
-			options?: FileOpenOptions,
+			options?: WorkspaceFileDiffOpenOptions,
 		) => {
+			// Queued before the tab resolves so the request is already waiting when
+			// the panel mounts; the viewer clears it once it has served or ruled it out.
+			if (options?.revealLine !== undefined) {
+				requestDiffLineReveal({
+					filePath,
+					line: options.revealLine,
+					workspaceId: activeWorkspace.id,
+				});
+			}
 			void openWorkspaceFileDiffTab({
 				filePath,
 				preview: options?.preview,
@@ -86,7 +100,12 @@ export function WorkspaceWorkbenchContent({
 				}
 			});
 		},
-		[onSessionTabChange, openWorkspaceFileDiffTab],
+		[
+			activeWorkspace.id,
+			onSessionTabChange,
+			openWorkspaceFileDiffTab,
+			requestDiffLineReveal,
+		],
 	);
 	const openReviewFilePreview = useCallback(
 		(filePath: string, options?: FileOpenOptions) => {

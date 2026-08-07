@@ -12,6 +12,17 @@ export interface DiffComment {
 	url?: string;
 }
 
+/**
+ * A one-shot request to scroll a diff to one of its lines and flash it. The
+ * `requestId` distinguishes repeat jumps to the same line, which would otherwise
+ * resolve to an identical change key and never re-fire.
+ */
+export interface DiffLineReveal {
+	line: number;
+	requestId: number;
+	side: 'new' | 'old';
+}
+
 /** Whether the viewer shows only the diff hunks or the whole expanded file. */
 export type DiffViewMode = 'diff' | 'file';
 

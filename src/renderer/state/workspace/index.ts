@@ -16,6 +16,11 @@ export {
 } from './board-status';
 export { installAgentControlBoardStatusSync } from './board-status-sync';
 export {
+	useDiffLineReveal,
+	useRequestDiffLineReveal,
+	useSettleDiffLineReveal,
+} from './diff-line-reveal';
+export {
 	getRunningDockActivityState,
 	usePublishWorkspaceDockActivity,
 } from './dock-activity';
@@ -46,8 +51,9 @@ export {
 } from './selection-atoms';
 export { readStoredWorkspaceSelection } from './selection-storage';
 export { resolveRunningCloseTarget } from './session-tab-close';
+export { formatRelativeClosedAt } from './session-tab-model-mappers';
 export { shouldSelectOnTabClick } from './session-tab-select';
-export { formatRelativeClosedAt, useSessionTabState } from './session-tabs';
+export { useSessionTabState } from './session-tabs';
 export {
 	collapsedProjectIdsAtom,
 	orderedProjectIdsAtom,

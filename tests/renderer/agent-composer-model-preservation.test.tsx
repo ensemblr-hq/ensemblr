@@ -8,7 +8,10 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { ensemblrQueryKeys } from '../../src/renderer/api/ensemblr/query-keys';
 import { useAgentComposerController } from '../../src/renderer/state/composer';
-import { appSettingsAtom } from '../../src/renderer/state/preferences';
+import {
+	appSettingsAtom,
+	chatThinkingOverrideAtomFamily,
+} from '../../src/renderer/state/preferences';
 import type { AgentProviderId } from '../../src/shared/agent-provider';
 import { DEFAULT_APP_SETTINGS } from '../../src/shared/config';
 import type { AgentModelCatalog } from '../../src/shared/ipc/contracts/agent-models';
@@ -89,10 +92,12 @@ function renderComposer(options?: {
 	currentAgentSessionId?: string;
 	withSession?: boolean;
 	defaultModel?: string;
+	defaultThinkingLevel?: string;
 	sessionProvider?: AgentProviderId;
 }) {
 	const withSession = options?.withSession ?? true;
 	const defaultModel = options?.defaultModel ?? ORIGINAL_MODEL;
+	const defaultThinkingLevel = options?.defaultThinkingLevel ?? null;
 	const client = createTestQueryClient();
 	client.setQueryData(ensemblrQueryKeys.agentModels(), CATALOG);
 	client.setQueryData(
@@ -114,6 +119,7 @@ function renderComposer(options?: {
 		models: {
 			...DEFAULT_APP_SETTINGS.models,
 			defaultModel,
+			defaultThinkingLevel,
 		},
 	});
 	const wrapper = ({ children }: PropsWithChildren) => (
@@ -186,6 +192,65 @@ describe('agent composer model preservation', () => {
 		});
 
 		expect(result.current.modelId).toBe(NEW_DEFAULT_MODEL);
+	});
+});
+
+describe('agent composer thinking-level preservation', () => {
+	// A spawned sub-agent has no per-chat override at all, so the persisted rung is
+	// the only thing standing between its status readout and the user's default.
+	test('reports the session’s persisted thinking level over the Settings default', () => {
+		const { result } = renderComposer({ defaultThinkingLevel: 'high' });
+
+		expect(result.current.thinkingLevel).toBe('medium');
+	});
+
+	test('keeps an active chat’s thinking level when the default changes', () => {
+		const { result, store } = renderComposer();
+		expect(result.current.thinkingLevel).toBe('medium');
+
+		act(() => {
+			store.set(appSettingsAtom, {
+				...store.get(appSettingsAtom),
+				models: {
+					...store.get(appSettingsAtom).models,
+					defaultThinkingLevel: 'xhigh',
+				},
+			});
+		});
+
+		expect(result.current.thinkingLevel).toBe('medium');
+	});
+
+	test('a fresh chat with no session inherits the Settings default thinking level', () => {
+		const { result } = renderComposer({
+			defaultThinkingLevel: 'xhigh',
+			withSession: false,
+		});
+
+		expect(result.current.thinkingLevel).toBe('xhigh');
+	});
+
+	test('falls back to the catalog default when nothing else is set', () => {
+		const { result } = renderComposer({ withSession: false });
+
+		expect(result.current.thinkingLevel).toBe(CATALOG.defaultThinkingLevel);
+	});
+
+	// The sub-agent case the persisted rung exists for. Every other test in this
+	// block would still pass if a sub-agent tab somehow carried an override, so
+	// pin both halves: empty override yields the session's level, and a set one
+	// still wins — which is what keeps the rung from swallowing a real pick.
+	test('resolves a tab that has no per-chat override at all', () => {
+		const { result, store } = renderComposer({ defaultThinkingLevel: 'high' });
+
+		expect(store.get(chatThinkingOverrideAtomFamily(CHAT_TAB_ID))).toBeNull();
+		expect(result.current.thinkingLevel).toBe('medium');
+
+		act(() => {
+			store.set(chatThinkingOverrideAtomFamily(CHAT_TAB_ID), 'xhigh');
+		});
+
+		expect(result.current.thinkingLevel).toBe('xhigh');
 	});
 });
 

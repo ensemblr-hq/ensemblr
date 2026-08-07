@@ -92,13 +92,20 @@ export function toClaudePermissionSettings(
 }
 
 /**
- * Resolves the permission mode a session starts in, letting an explicit plan-mode
+ * Resolves the permission settings for a session, letting an explicit plan-mode
  * toggle win over the workspace mode. A trusted workspace whose chat is in plan
  * mode still plans first — the toggle is the more specific intent.
+ *
+ * Called for the opening `query()` and again on every turn, because Claude's
+ * native `ExitPlanMode` drops the live session out of plan mode on its own. That
+ * is why turning the toggle off resolves back to the workspace mode's own
+ * baseline rather than a fixed `default`: a trusted chat would otherwise lose
+ * `bypassPermissions` and a read-only one would lose its gate the first time a
+ * plan was submitted.
  * @param input - Workspace permission mode and the chat's plan-mode toggle.
- * @returns The SDK permission settings for the opening `query()` call.
+ * @returns The SDK permission settings for this turn.
  */
-export function resolveInitialPermissionSettings({
+export function resolvePermissionSettings({
 	mode,
 	planMode,
 }: {

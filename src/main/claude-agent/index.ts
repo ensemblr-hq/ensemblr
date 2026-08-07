@@ -24,7 +24,7 @@ export type {
 export {
 	buildCanUseTool,
 	createPlaceholderCanUseTool,
-	resolveInitialPermissionSettings,
+	resolvePermissionSettings,
 	toClaudePermissionSettings,
 } from './claude-permission-bridge';
 export type { ClaudePlanBridgeOptions } from './claude-plan-bridge';

@@ -102,8 +102,9 @@ the exact argument shapes):
   conversation's status or last message.
 - **Board** — move the workspace across the dashboard board and read its status.
 - **Review** — read the workspace diff (`ensemblr_get_workspace_diff`), read the
-  review comments on it (`ensemblr_get_diff_comments`), and leave comments of
-  your own (`ensemblr_add_diff_comments`). All three act on the caller's own
+  review comments on it (`ensemblr_get_diff_comments`), leave comments of your
+  own (`ensemblr_add_diff_comments`), and close the ones you have fixed
+  (`ensemblr_resolve_diff_comments`). All four act on the caller's own
   workspace; none takes a workspace argument. See below.
 - **Ask the user** — put a multiple-choice question to the human and block until
   they answer. Pi-only: the questionnaire renders in the chat tab that asked, in
@@ -241,12 +242,26 @@ until the panel remounted. `addDiffComments` broadcasts on
 `ensemblr:agent-control-review-comments-changed`, which the renderer turns into a
 cache invalidation for that workspace, the same shape `tabsChanged` already uses.
 
-**All three survive both gates.** The two reads are reads, allowed in every
-permission mode. `addDiffComments` is a write and follows the mode like any other.
-Plan Mode leaves all three alone — a comment anchored to a line records what you
-found rather than changing it, the same argument that keeps naming and the board
-available while planning. A spawned sub-agent keeps all three too: a delegated
-reviewer filing comments is the point.
+**Three of the four survive both gates.** The two reads are reads, allowed in
+every permission mode. `addDiffComments` and `resolveDiffComments` are writes and
+follow the mode like any other. Plan Mode leaves the reads and `addDiffComments`
+alone — a comment anchored to a line records what you found rather than changing
+it, the same argument that keeps naming and the board available while planning.
+It refuses `resolveDiffComments`: resolving asserts a finding is fixed, and
+nothing is fixed while `write` and `edit` are blocked, so every resolve from Plan
+Mode would be a false claim. A spawned sub-agent keeps all four: a delegated
+reviewer filing comments is the point, and an implementer child closing the ones
+it fixed is the same argument.
+
+**Resolving is one-way and workspace-scoped.** `resolveDiffComments` only ever
+resolves — it cannot reopen a comment the user closed (that would reverse a human
+judgement with nothing in the UI to announce it) and it cannot archive one (which
+drops the comment out of every listing, a delete by another name). Ids that match
+no open comment on the caller's workspace come back in `notFound` rather than
+failing the call, and "no such id", "another workspace's id", and "archived" are
+deliberately merged into that one bucket so the op cannot be used as a
+cross-workspace id-existence oracle. The port lists the caller's own comments
+first and only writes ids in that set, so a foreign id never reaches the store.
 
 ## Orchestration in practice
 

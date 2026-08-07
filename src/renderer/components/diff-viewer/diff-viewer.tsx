@@ -1,13 +1,12 @@
 import { useAtomValue } from 'jotai';
 import { PlusIcon } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import {
 	type ChangeData,
 	Decoration,
 	Diff,
-	expandFromRawCode,
-	getChangeKey,
+	type expandFromRawCode,
 	Hunk,
 	type HunkData,
 } from 'react-diff-view';
@@ -22,32 +21,21 @@ import {
 	CodeViewerHeader,
 } from '@/renderer/components/code-surface';
 import { codeGutterDigits } from '@/renderer/lib/code';
-import {
-	newLineNumberOf,
-	oldLineNumberOf,
-	parseSingleFileDiff,
-	reconstructOldSource,
-} from '@/renderer/lib/diff/parse';
-import { languageForFilePath } from '@/renderer/lib/language-from-path';
+import { newLineNumberOf } from '@/renderer/lib/diff/parse';
 import { cn } from '@/renderer/lib/utils';
-import {
-	diffLayoutAtom,
-	diffShowWhitespaceAtom,
-	diffWordWrapAtom,
-} from '@/renderer/state/preferences';
-import type { DiffComment, DiffViewMode } from '@/renderer/types/diff';
-import { DiffCommentThread } from './diff-comment-thread';
+import { diffShowWhitespaceAtom } from '@/renderer/state/preferences';
+import type {
+	DiffComment,
+	DiffLineReveal,
+	DiffViewMode,
+} from '@/renderer/types/diff';
 import { DiffToolbar } from './diff-toolbar';
+import {
+	type AddCommentInput,
+	type RevealedRow,
+	useDiffViewerModel,
+} from './diff-viewer-model';
 import { renderDiffToken, useDiffTokens } from './shiki-tokenize';
-
-const EMPTY_HUNKS: HunkData[] = [];
-
-/** Details of the line a new comment is being added to. */
-interface AddCommentInput {
-	body: string;
-	changeKey: string;
-	lineNumber: number | null;
-}
 
 /**
  * Rich single-file diff viewer: parsed hunks with line-number gutters, Shiki
@@ -61,13 +49,16 @@ export function DiffViewer({
 	fillHeight = true,
 	filePath,
 	fullFileContent,
+	fullFileContentPending = false,
 	headerActions,
 	language,
 	onAddComment,
 	onDeleteComment,
 	onResolveComment,
+	onRevealSettled,
 	onViewedChange,
 	patch,
+	reveal,
 	viewed,
 }: {
 	commentsByChangeKey?: ReadonlyMap<string, readonly DiffComment[]>;
@@ -76,66 +67,56 @@ export function DiffViewer({
 	filePath: string;
 	/** Current full file content, enabling the diff ↔ full-file toggle when set. */
 	fullFileContent?: string | null;
+	/**
+	 * Whether `fullFileContent` is still on its way. Separates "no source yet"
+	 * from "no source at all", which a `null` cannot say on its own and which a
+	 * pending reveal has to know before it gives up on reaching a line.
+	 */
+	fullFileContentPending?: boolean;
 	headerActions?: ReactNode;
 	language?: BundledLanguage;
 	/** When set, enables click-a-line commenting; omit for a read-only diff. */
 	onAddComment?: (input: AddCommentInput) => void;
 	onDeleteComment?: (id: string) => void;
 	onResolveComment?: (id: string, resolved: boolean) => void;
+	/** Reports a `reveal` as served or unreachable, so its owner can drop it. */
+	onRevealSettled?: (requestId: number) => void;
 	/** When set, the toolbar offers a Viewed marker; omit where nothing tracks it. */
 	onViewedChange?: (viewed: boolean) => void;
 	patch: string;
+	/** When set, scrolls to and flashes the requested line once per `requestId`. */
+	reveal?: DiffLineReveal | null;
 	viewed?: boolean;
 }) {
-	const [viewMode, setViewMode] = useFileScopedState<DiffViewMode>(
+	const {
+		canShowFile,
+		commentingEnabled,
+		displayHunks,
+		file,
+		hasHunks,
+		layout,
+		openComposer,
+		resolvedLanguage,
+		revealed,
+		setViewMode,
+		viewMode,
+		widgets,
+		wordWrap,
+	} = useDiffViewerModel({
+		commentsByChangeKey,
 		filePath,
-		'diff',
-	);
-	const [activeComposerKey, setActiveComposerKey] = useFileScopedState<
-		string | null
-	>(filePath, null);
-	const layout = useAtomValue(diffLayoutAtom);
-	const wordWrap = useAtomValue(diffWordWrapAtom);
-
-	const file = useMemo(() => parseSingleFileDiff(patch), [patch]);
-	const resolvedLanguage = language ?? languageForFilePath(filePath);
-
-	const baseHunks = file?.hunks ?? EMPTY_HUNKS;
-	const canShowFile = Boolean(fullFileContent) && baseHunks.length > 0;
-
-	const displayHunks = useMemo(
-		() => expandHunksForViewMode({ baseHunks, fullFileContent, viewMode }),
-		[baseHunks, fullFileContent, viewMode],
-	);
-
-	const changeByKey = useMemo(
-		() => indexChangesByKey(displayHunks),
-		[displayHunks],
-	);
-
-	const commentingEnabled = Boolean(onAddComment);
-
-	const openComposer = useCallback(
-		(change: ChangeData | null) => {
-			if (!change || !commentingEnabled) {
-				return;
-			}
-			setActiveComposerKey(getChangeKey(change));
-		},
-		[commentingEnabled, setActiveComposerKey],
-	);
-
-	const widgets = useDiffWidgets({
-		activeComposerKey,
-		changeByKey,
-		commentsByChangeKey: commentsByChangeKey ?? EMPTY_COMMENTS,
+		fullFileContent,
+		fullFileContentPending,
+		language,
 		onAddComment,
-		onCloseComposer: () => setActiveComposerKey(null),
 		onDeleteComment,
 		onResolveComment,
+		onRevealSettled,
+		patch,
+		reveal,
 	});
 
-	if (!file || baseHunks.length === 0) {
+	if (!file || !hasHunks) {
 		return (
 			<DiffViewerFrame
 				fileModeDisabled
@@ -175,88 +156,12 @@ export function DiffViewer({
 				language={resolvedLanguage}
 				layout={layout}
 				onRequestComment={openComposer}
+				revealed={revealed}
 				widgets={widgets}
 				wordWrap={wordWrap}
 			/>
 		</DiffViewerFrame>
 	);
-}
-
-/**
- * Expand the parsed hunks to whole-file context while the viewer is in file
- * mode and the full source is available, falling back to the diff's own hunks
- * whenever the old source cannot be reconstructed.
- * @param baseHunks - Hunks parsed straight out of the patch
- * @param fullFileContent - Current full file content, when the caller has it
- * @param viewMode - Whether the viewer shows the diff or the whole file
- * @returns The hunks to render
- */
-function expandHunksForViewMode({
-	baseHunks,
-	fullFileContent,
-	viewMode,
-}: {
-	baseHunks: HunkData[];
-	fullFileContent: string | null | undefined;
-	viewMode: DiffViewMode;
-}): HunkData[] {
-	if (viewMode !== 'file' || !fullFileContent || baseHunks.length === 0) {
-		return baseHunks;
-	}
-	const oldSource = reconstructOldSource(fullFileContent, baseHunks);
-	if (!oldSource) {
-		return baseHunks;
-	}
-	const totalLines = oldSource.split('\n').length;
-	return expandFromRawCode(baseHunks, oldSource, 1, totalLines + 1);
-}
-
-/**
- * Index every change in the displayed hunks by its stable change key so widgets
- * and the comment composer can resolve a line without rescanning.
- * @param hunks - The hunks currently rendered
- * @returns Each change keyed by {@link getChangeKey}
- */
-function indexChangesByKey(
-	hunks: readonly HunkData[],
-): Map<string, ChangeData> {
-	const map = new Map<string, ChangeData>();
-	for (const hunk of hunks) {
-		for (const change of hunk.changes) {
-			map.set(getChangeKey(change), change);
-		}
-	}
-	return map;
-}
-
-/**
- * State remembered per file rather than per mount, reading back as `initial` for
- * any file that has not set it.
- *
- * The viewer is mounted once per panel and re-pointed at another file by prop
- * rather than remounted, so plain `useState` survives a tab switch. That leaks:
- * change keys are line numbers with no file in them, so a composer left open on
- * one file matches a real line on the next and reopens itself over the wrong
- * diff, and a `file` view mode carries onto a diff that may not offer it.
- *
- * Held against the path instead of reset on change so each file keeps the mode it
- * was last read in, and so the answer never depends on which files were visited
- * in between.
- * @param filePath - Path the stored value belongs to
- * @param initial - Value read for any file that has not set one
- * @returns The value held for `filePath`, and a setter that records against it
- */
-function useFileScopedState<T>(
-	filePath: string,
-	initial: T,
-): [T, (next: T) => void] {
-	const [byFile, setByFile] = useState<ReadonlyMap<string, T>>(() => new Map());
-	const setValue = useCallback(
-		(next: T) => setByFile((current) => new Map(current).set(filePath, next)),
-		[filePath],
-	);
-	const held = byFile.get(filePath);
-	return [held === undefined ? initial : held, setValue];
 }
 
 /**
@@ -275,8 +180,8 @@ function hunkGapLabel(previous: HunkData, next: HunkData): string {
 	return `${hidden} unchanged line${hidden === 1 ? '' : 's'}`;
 }
 
-/** Stable empty comment map so an omitted `commentsByChangeKey` keeps a fixed identity. */
-const EMPTY_COMMENTS: ReadonlyMap<string, readonly DiffComment[]> = new Map();
+/** Stable empty selection so an idle viewer keeps a fixed `selectedChanges` identity. */
+const EMPTY_SELECTION: string[] = [];
 
 /**
  * Highest line number either side of a diff reaches, which sizes the gutter to
@@ -310,6 +215,7 @@ function DiffBody({
 	language,
 	layout,
 	onRequestComment,
+	revealed,
 	widgets,
 	wordWrap,
 }: {
@@ -319,9 +225,12 @@ function DiffBody({
 	language: BundledLanguage;
 	layout: 'split' | 'unified';
 	onRequestComment: (change: ChangeData | null) => void;
+	/** The row to scroll to and flash, or null. */
+	revealed: RevealedRow | null;
 	widgets: Record<string, ReactNode>;
 	wordWrap: boolean;
 }) {
+	const paneRef = useRef<HTMLDivElement>(null);
 	const showWhitespace = useAtomValue(diffShowWhitespaceAtom);
 	const tokens = useDiffTokens(hunks, language, showWhitespace);
 	// The gutter column is border-box, so it carries the shared 1ch of padding on
@@ -376,6 +285,29 @@ function DiffBody({
 	);
 	const renderGutter = commentingEnabled ? renderAddCommentGutter : undefined;
 
+	// react-diff-view stamps `data-change-key` on every gutter and code cell, so
+	// the row is addressable without a render hook of our own. Scoped to the pane
+	// because a page can mount several viewers and a change key carries no file.
+	// Instant rather than smooth: comment widgets resolve from their own queries
+	// and can push rows down after the first paint, which a running animation
+	// would fight; centring absorbs that drift instead.
+	useLayoutEffect(() => {
+		if (!revealed) {
+			return;
+		}
+		paneRef.current
+			?.querySelector(`[data-change-key="${revealed.changeKey}"]`)
+			?.closest('tr')
+			?.scrollIntoView({ block: 'center' });
+		// Keyed on the request, not the change key: jumping twice to the same line
+		// resolves to the same key, and watching the key alone would scroll once.
+	}, [revealed]);
+
+	const selectedChanges = useMemo(
+		() => (revealed ? [revealed.changeKey] : EMPTY_SELECTION),
+		[revealed],
+	);
+
 	return (
 		<div
 			className={cn(
@@ -383,6 +315,7 @@ function DiffBody({
 				CODE_SURFACE_CLASSES,
 				CODE_PANEL_TEXT_CLASSES,
 			)}
+			ref={paneRef}
 			style={{ '--ensemblr-gutter-ch': `${gutterWidthCh}ch` } as CSSProperties}
 		>
 			<Diff
@@ -394,6 +327,7 @@ function DiffBody({
 				optimizeSelection
 				renderGutter={renderGutter}
 				renderToken={renderDiffToken}
+				selectedChanges={selectedChanges}
 				tokens={tokens}
 				viewType={layout}
 				widgets={widgets}
@@ -482,63 +416,4 @@ function DiffViewerFrame({
 			</div>
 		</div>
 	);
-}
-
-/**
- * Build the react-diff-view `widgets` map: an inline comment thread for every
- * change that has comments or an open composer.
- * @returns A map of change key to the thread element rendered under that line
- */
-function useDiffWidgets({
-	activeComposerKey,
-	changeByKey,
-	commentsByChangeKey,
-	onAddComment,
-	onCloseComposer,
-	onDeleteComment,
-	onResolveComment,
-}: {
-	activeComposerKey: string | null;
-	changeByKey: ReadonlyMap<string, ChangeData>;
-	commentsByChangeKey: ReadonlyMap<string, readonly DiffComment[]>;
-	onAddComment?: (input: AddCommentInput) => void;
-	onCloseComposer: () => void;
-	onDeleteComment?: (id: string) => void;
-	onResolveComment?: (id: string, resolved: boolean) => void;
-}): Record<string, ReactNode> {
-	return useMemo(() => {
-		const keys = new Set<string>(commentsByChangeKey.keys());
-		if (activeComposerKey) {
-			keys.add(activeComposerKey);
-		}
-		const widgets: Record<string, ReactNode> = {};
-		for (const key of keys) {
-			const change = changeByKey.get(key);
-			const lineNumber = change
-				? (newLineNumberOf(change) ?? oldLineNumberOf(change))
-				: null;
-			widgets[key] = (
-				<DiffCommentThread
-					comments={commentsByChangeKey.get(key) ?? []}
-					composerOpen={activeComposerKey === key}
-					onCloseComposer={onCloseComposer}
-					onDelete={(id) => onDeleteComment?.(id)}
-					onResolve={(id, resolved) => onResolveComment?.(id, resolved)}
-					onSubmit={(body) => {
-						onAddComment?.({ body, changeKey: key, lineNumber });
-						onCloseComposer();
-					}}
-				/>
-			);
-		}
-		return widgets;
-	}, [
-		activeComposerKey,
-		changeByKey,
-		commentsByChangeKey,
-		onAddComment,
-		onCloseComposer,
-		onDeleteComment,
-		onResolveComment,
-	]);
 }

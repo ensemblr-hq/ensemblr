@@ -37,6 +37,7 @@ export const AGENT_CONTROL_OPS = [
 	'getWorkspaceDiff',
 	'getDiffComments',
 	'addDiffComments',
+	'resolveDiffComments',
 	'listWorkspaces',
 	'listTabs',
 	'listTerminals',
@@ -102,6 +103,7 @@ const WRITE_OPS: ReadonlySet<AgentControlOp> = new Set([
 	'focusPanel',
 	'setWorkspaceStatus',
 	'addDiffComments',
+	'resolveDiffComments',
 ]);
 
 /**
@@ -747,10 +749,12 @@ export interface GetDiffCommentsResult {
 }
 
 /**
- * Upper bounds on an `addDiffComments` batch. The body cap matches
- * {@link SET_SUMMARY_LIMITS}: a review note that grows past it has stopped being
- * a comment on a line. The batch cap is a runaway guard — fifty notes is already
- * more than a human reviewer leaves on one pass.
+ * Upper bounds on a batch of review-comment work — both the notes
+ * `addDiffComments` files and the ids `resolveDiffComments` closes. The body cap
+ * matches {@link SET_SUMMARY_LIMITS}: a review note that grows past it has
+ * stopped being a comment on a line. The batch cap is a runaway guard — fifty
+ * notes is already more than a human reviewer leaves on one pass, and a resolve
+ * set cannot outgrow what the add path could have created.
  */
 export const DIFF_COMMENT_LIMITS = {
 	maxComments: 50,
@@ -778,6 +782,33 @@ export interface AddDiffCommentsArgs {
 export interface AddDiffCommentsResult {
 	added: number;
 	commentIds: readonly string[];
+	message: string;
+}
+
+/**
+ * Args for `resolveDiffComments`: close review comments on the caller's own
+ * workspace, by the ids `getDiffComments` and `addDiffComments` hand back.
+ *
+ * Resolve-only, with no status argument: reopening reverses a judgement the user
+ * made in the Changes panel with nothing in the UI to announce it, and archiving
+ * drops a comment out of every listing, which is a delete by another name. An
+ * agent that disagrees with a finding files a fresh comment carrying the reason.
+ */
+export interface ResolveDiffCommentsArgs {
+	commentIds: readonly string[];
+}
+
+/**
+ * Result of `resolveDiffComments`. `alreadyResolved` is split out so a re-run
+ * reads as a no-op rather than a failure; `notFound` deliberately merges "no such
+ * id", "belongs to another workspace", and "archived", because telling them apart
+ * would make the op a cross-workspace id-existence oracle.
+ */
+export interface ResolveDiffCommentsResult {
+	resolved: number;
+	resolvedIds: readonly string[];
+	alreadyResolved: readonly string[];
+	notFound: readonly string[];
 	message: string;
 }
 

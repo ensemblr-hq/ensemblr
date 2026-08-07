@@ -96,10 +96,11 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).toContain('ensemblr_set_workspace_status');
 		expect(names).toContain('ensemblr_get_workspace_status');
 		// The review ops act on the workspace's git worktree and its comment
-		// store, both of which a harness caller owns, so all three are served.
+		// store, both of which a harness caller owns, so all four are served.
 		expect(names).toContain('ensemblr_get_workspace_diff');
 		expect(names).toContain('ensemblr_get_diff_comments');
 		expect(names).toContain('ensemblr_add_diff_comments');
+		expect(names).toContain('ensemblr_resolve_diff_comments');
 		// Auditing a delegated conversation is a read over persisted events, so it
 		// is served to every origin that may read a report at all.
 		expect(names).toContain('ensemblr_read_conversation');
@@ -110,7 +111,7 @@ describe('agent-control MCP endpoint', () => {
 		expect(names).not.toContain('ensemblr_set_summary');
 		expect(names).not.toContain('ensemblr_ask_user_question');
 		expect(names).not.toContain('ensemblr_exit_plan_mode');
-		expect(tools).toHaveLength(29);
+		expect(tools).toHaveLength(30);
 		await client.close();
 	});
 

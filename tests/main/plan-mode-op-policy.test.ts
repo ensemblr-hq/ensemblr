@@ -53,6 +53,7 @@ const EXPECTED_DENIALS: Record<
 	openTab: [],
 	readConversation: [],
 	readTerminalOutput: [],
+	resolveDiffComments: ['orchestrator', 'subagent'],
 	sendFollowUp: 'conditional',
 	setBranchName: [],
 	setName: [],

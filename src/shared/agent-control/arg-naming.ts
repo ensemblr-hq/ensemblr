@@ -24,6 +24,7 @@ export const CANONICAL_ARG_KEYS = {
 	chatTabId: 'Identifier of a chat tab in the workspace.',
 	command: 'Shell command a guarded tool call is about to run.',
 	commentBody: 'Markdown body of the comment a tab is opened on.',
+	commentIds: 'Ids of review comments an op acts on.',
 	comments: 'Batch of review comments to file against the diff.',
 	filePath:
 		'Workspace-relative path of a file, e.g. src/main/main.ts. Never `file` or `path`.',
@@ -113,9 +114,13 @@ export function canonicalizeArgs(
 	if (!aliases || !isArgObject(rawArgs)) {
 		return rawArgs;
 	}
-	return Object.fromEntries(
-		Object.entries(rawArgs)
-			.filter(([key]) => !aliases[key] || !(aliases[key] in rawArgs))
-			.map(([key, value]) => [aliases[key] ?? key, value]),
-	);
+	const canonical: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(rawArgs)) {
+		const canonicalKey = aliases[key];
+		if (canonicalKey && canonicalKey in rawArgs) {
+			continue;
+		}
+		canonical[canonicalKey ?? key] = value;
+	}
+	return canonical;
 }

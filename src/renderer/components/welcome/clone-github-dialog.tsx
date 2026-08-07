@@ -1,11 +1,3 @@
-import { useQuery } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-
-import {
-	isEnsemblrApiAvailable,
-	rootDirectoryQuery,
-	selectCloneDestination,
-} from '@/renderer/api/ensemblr-queries';
 import { Button } from '@/renderer/components/ui/button';
 import {
 	Dialog,
@@ -15,18 +7,16 @@ import {
 } from '@/renderer/components/ui/dialog';
 import { Input } from '@/renderer/components/ui/input';
 import { Label } from '@/renderer/components/ui/label';
-import { useKeymapHandler } from '@/renderer/hooks/use-keymap-handler';
-import { useCloneFlow } from '@/renderer/hooks/welcome/use-clone-flow';
-import { useCloneRepoSearch } from '@/renderer/hooks/welcome/use-clone-repo-search';
-import { isUrlLikeInput, joinDestination } from '@/renderer/lib/welcome';
-import type { KeymapBinding } from '@/renderer/types/keymap';
+import {
+	RESULTS_LISTBOX_ID,
+	useCloneDialogForm,
+} from '@/renderer/hooks/welcome/use-clone-dialog-form';
 import type { CloneStage } from '@/renderer/types/welcome';
 
 import { CloneGithubDiagnostics } from './clone-github-diagnostics.tsx';
+import { CloneGithubLocationField } from './clone-github-location-field.tsx';
 import { CloneGithubProgressLog } from './clone-github-progress-log.tsx';
 import { CloneGithubRecentRepos } from './clone-github-recent-repos.tsx';
-
-const RESULTS_LISTBOX_ID = 'clone-github-repo-results';
 
 /** Modal for cloning a GitHub repository into the managed root. */
 export function CloneGithubDialog({
@@ -59,86 +49,26 @@ function CloneGithubDialogForm({
 }: {
 	onOpenChange: (open: boolean) => void;
 }) {
-	const { data: rootDirectoryData } = useQuery({
-		...rootDirectoryQuery,
-		enabled: isEnsemblrApiAvailable(),
-	});
-	const defaultParentPath = rootDirectoryData?.repositoriesPath ?? '';
-
-	const [url, setUrl] = useState('');
-	const [locationOverride, setLocationOverride] = useState<string | null>(null);
-
-	const { diagnostics, isBusy, logs, retry, stage, startClone } =
-		useCloneFlow();
-
-	useEffect(() => {
-		if (stage === 'success') {
-			onOpenChange(false);
-		}
-	}, [onOpenChange, stage]);
-
-	// Derive the shown location: user override if they touched it, else the
-	// managed default once the query resolves. Avoids a sync effect.
-	const location = locationOverride ?? defaultParentPath;
-	const trimmedUrl = url.trim();
-	// Only URL-like input is a clonable target; a bare search term keeps the
-	// primary action disabled so it can't kick off a doomed clone of the query.
-	const canClone =
-		!isBusy &&
-		trimmedUrl.length > 0 &&
-		isUrlLikeInput(trimmedUrl) &&
-		isEnsemblrApiAvailable();
-	const locationPlaceholder = defaultParentPath || 'Managed repos directory';
-
-	const handleBrowse = useCallback(async () => {
-		if (!isEnsemblrApiAvailable()) {
-			return;
-		}
-		const selection = await selectCloneDestination();
-		if (selection.canceled || !selection.path) {
-			return;
-		}
-		setLocationOverride(selection.path);
-	}, []);
-
-	const handleClone = useCallback(async () => {
-		if (!canClone) {
-			return;
-		}
-		const parentOverride = location.trim();
-		const destinationPath = parentOverride
-			? joinDestination(parentOverride, trimmedUrl)
-			: undefined;
-		await startClone(
-			destinationPath !== undefined
-				? { destinationPath, url: trimmedUrl }
-				: { url: trimmedUrl },
-		);
-	}, [canClone, location, startClone, trimmedUrl]);
-
-	const search = useCloneRepoSearch({
-		enabled: isEnsemblrApiAvailable(),
-		onSubmit: handleClone,
-		setUrl,
+	const {
+		activeDescendantId,
+		browseDisabled,
+		canClone,
+		canResetLocation,
+		diagnostics,
+		handleBrowse,
+		handleClone,
+		handleSubmitKey,
+		isBusy,
+		location,
+		locationPlaceholder,
+		logs,
+		resetLocation,
+		retry,
+		search,
+		setLocation,
+		stage,
 		url,
-	});
-	const activeDescendantId =
-		search.isSearching && search.highlightIndex >= 0
-			? `${RESULTS_LISTBOX_ID}-${search.highlightIndex}`
-			: undefined;
-
-	const submitBindings = useMemo<readonly KeymapBinding<HTMLInputElement>[]>(
-		() => [
-			[
-				'dialog.submit',
-				() => {
-					handleClone();
-				},
-			],
-		],
-		[handleClone],
-	);
-	const handleSubmitKey = useKeymapHandler(submitBindings);
+	} = useCloneDialogForm({ onOpenChange });
 
 	return (
 		<>
@@ -188,46 +118,17 @@ function CloneGithubDialogForm({
 					) : null}
 				</div>
 
-				<div className='flex flex-col gap-1.5'>
-					<Label className='text-xs' htmlFor='clone-github-location'>
-						Location
-					</Label>
-					<div className='flex gap-2'>
-						<Input
-							className='h-9 flex-1 font-mono text-xs'
-							disabled={isBusy}
-							id='clone-github-location'
-							onChange={(event) => {
-								setLocationOverride(event.target.value);
-							}}
-							onKeyDown={handleSubmitKey}
-							placeholder={locationPlaceholder}
-							value={location}
-						/>
-						<Button
-							className='h-9'
-							disabled={isBusy || !isEnsemblrApiAvailable()}
-							onClick={handleBrowse}
-							type='button'
-							variant='outline'
-						>
-							Browse
-						</Button>
-					</div>
-					{locationOverride !== null &&
-					defaultParentPath &&
-					location !== defaultParentPath ? (
-						<button
-							className='self-start text-muted-foreground text-xxs underline-offset-2 hover:underline'
-							onClick={() => {
-								setLocationOverride(null);
-							}}
-							type='button'
-						>
-							Reset to managed repos directory
-						</button>
-					) : null}
-				</div>
+				<CloneGithubLocationField
+					browseDisabled={browseDisabled}
+					canReset={canResetLocation}
+					disabled={isBusy}
+					onBrowse={handleBrowse}
+					onChange={setLocation}
+					onReset={resetLocation}
+					onSubmitKey={handleSubmitKey}
+					placeholder={locationPlaceholder}
+					value={location}
+				/>
 
 				{logs.length > 0 ? <CloneGithubProgressLog logs={logs} /> : null}
 

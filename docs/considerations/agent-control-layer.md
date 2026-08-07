@@ -117,6 +117,7 @@ Defined once in a shared contract (`src/shared/agent-control/`), consumed by bot
   writes (mode-gated) but not spawns (no quota/depth).
 
 - `addDiffComments({ comments: [{ filePath, lineNumber?, body }] })` → `{ added, commentIds, message }` — file review comments on the caller's **own** workspace diff. Rows land in the `comments` table with `origin: 'agent'`, stamped by the port rather than taken from the args, and render in the Changes panel. Takes no `workspaceId`, so a cross-workspace write is unreachable by construction
+- `resolveDiffComments({ commentIds })` → `{ resolved, resolvedIds, alreadyResolved, notFound, message }` — close the review comments the caller has fixed, so a review pass does not leave a queue of stale findings. Resolve-only: no reopen, no archive. The port lists the caller's own comments first and writes only ids in that set, so a foreign id lands in `notFound` without reaching the store; `notFound` merges "no such id", "another workspace's", and "archived" so the op is not an id-existence oracle. Unknown ids are reported rather than failing the call, because re-running the cleanup step after a restart is a legitimate no-op. Refused in Plan Mode — see below
 
 **Reads (cross-workspace):**
 - `listWorkspaces()`, `listTabs({ workspaceId? })`, `listTerminals({ workspaceId? })`

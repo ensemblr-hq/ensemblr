@@ -15,6 +15,7 @@ import type {
 	AgentDiffComment,
 	GetDiffCommentsResult,
 	GetWorkspaceDiffResult,
+	ResolveDiffCommentsResult,
 	ReviewCommentsChangedBroadcast,
 } from '../../shared/agent-control.ts';
 import {
@@ -274,6 +275,27 @@ function filedMessage(count: number): string {
 }
 
 /**
+ * Renders the acknowledgement an agent reads after resolving. A batch that
+ * matched nothing is reported as the no-op it is rather than an error, because
+ * re-running the cleanup step after a restart lands here and an error would
+ * teach a model to stop doing the bookkeeping at all.
+ * @param result - The partitioned outcome of the batch.
+ * @returns The message returned alongside the buckets.
+ */
+function resolvedMessage(
+	result: Omit<ResolveDiffCommentsResult, 'message'>,
+): string {
+	if (result.resolved === 0) {
+		const attempted = result.alreadyResolved.length + result.notFound.length;
+		return `Resolved nothing: ${attempted} id(s) were already resolved or matched no open comment on this workspace. Call \`ensemblr_get_diff_comments\` for the current ids.`;
+	}
+	const trailing = result.notFound.length
+		? ` ${result.notFound.length} id(s) matched no open comment on this workspace and were skipped.`
+		: '';
+	return `Resolved ${result.resolved} review comment(s); the user sees them close in the Changes panel. Say in your reply which comments you left open and why.${trailing}`;
+}
+
+/**
  * Builds the review-comment port over the review service.
  * @param deps - Port collaborators.
  * @returns The review port.
@@ -305,6 +327,52 @@ export function makeReviewPort(deps: ReviewPortDeps): ReviewPort {
 				commentIds: saved.map((comment) => comment.id),
 				message: filedMessage(saved.length),
 			} satisfies AddDiffCommentsResult;
+		},
+		resolveComments: async ({ workspaceId, commentIds }) => {
+			// The workspace's own comments are read first so every id is classified
+			// against that set: an id this workspace does not own never reaches the
+			// write path at all, rather than relying on the repository's scope to
+			// catch it. `listComments` already excludes archived rows, so those fall
+			// out as `notFound` — which is the answer they deserve.
+			const { comments } = deps.reviewService.listComments({ workspaceId });
+			const ownStatusById = new Map(
+				comments.map((comment) => [comment.id, comment.status]),
+			);
+
+			const resolvedIds: string[] = [];
+			const alreadyResolved: string[] = [];
+			const notFound: string[] = [];
+			for (const id of new Set(commentIds)) {
+				const status = ownStatusById.get(id);
+				if (status === undefined) {
+					notFound.push(id);
+					continue;
+				}
+				if (status === 'resolved') {
+					alreadyResolved.push(id);
+					continue;
+				}
+				deps.reviewService.saveComment({
+					id,
+					status: 'resolved',
+					workspaceId,
+				});
+				resolvedIds.push(id);
+			}
+
+			if (resolvedIds.length > 0) {
+				deps.broadcastReviewCommentsChanged({ workspaceId });
+			}
+			const buckets = {
+				alreadyResolved,
+				notFound,
+				resolved: resolvedIds.length,
+				resolvedIds,
+			};
+			return {
+				...buckets,
+				message: resolvedMessage(buckets),
+			} satisfies ResolveDiffCommentsResult;
 		},
 	};
 }

@@ -15,6 +15,7 @@ import type {
 	PullRequestCommentReplySummary,
 } from '@/renderer/types/workbench';
 import { ProviderMark } from '../checks-panel/provider-mark';
+import { useWorkspaceFileDiffOpener } from './file-preview-context';
 
 /**
  * Read-only preview of a single PR comment, opened as a main-surface `document`
@@ -28,15 +29,29 @@ export function CommentPreviewPanel({
 	comment: CommentPreviewPayload;
 }) {
 	const insertIntoComposer = useComposerInsert();
+	const openWorkspaceFileDiff = useWorkspaceFileDiffOpener();
 
 	const addToChat = useCallback(() => {
 		insertIntoComposer(formatCommentContext(comment, comment.prNumber));
 		toast.success('Comment added to chat.');
 	}, [comment, insertIntoComposer]);
 
+	const { line, path } = comment;
+	const jumpToLine = useCallback(() => {
+		if (openWorkspaceFileDiff && path && line !== undefined) {
+			openWorkspaceFileDiff(path, undefined, { revealLine: line });
+		}
+	}, [line, openWorkspaceFileDiff, path]);
+	const canJumpToLine =
+		Boolean(openWorkspaceFileDiff) && Boolean(path) && line !== undefined;
+
 	return (
 		<div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-			<CommentPreviewHeader comment={comment} onAddToChat={addToChat} />
+			<CommentPreviewHeader
+				comment={comment}
+				onAddToChat={addToChat}
+				onJumpToLine={canJumpToLine ? jumpToLine : undefined}
+			/>
 			<ScrollArea className='min-h-0 flex-1'>
 				<div className='flex flex-col gap-4 p-4 text-sm'>
 					<CommentMarkdown body={comment.body} />
@@ -53,9 +68,11 @@ export function CommentPreviewPanel({
 function CommentPreviewHeader({
 	comment,
 	onAddToChat,
+	onJumpToLine,
 }: {
 	comment: CommentPreviewPayload;
 	onAddToChat: () => void;
+	onJumpToLine?: () => void;
 }) {
 	return (
 		<div className='flex shrink-0 items-start justify-between gap-2 border-border border-b px-4 py-2.5'>
@@ -79,6 +96,7 @@ function CommentPreviewHeader({
 				<CommentMeta
 					createdAt={comment.createdAt}
 					location={formatCommentLocation(comment.path, comment.line)}
+					onJumpToLine={onJumpToLine}
 					replyCount={comment.replies?.length ?? 0}
 				/>
 			</div>
@@ -104,32 +122,71 @@ function CommentPreviewHeader({
 	);
 }
 
-/** Sub-header line carrying the comment's diff anchor, date, and reply count. */
+/**
+ * Sub-header line carrying the comment's diff anchor, date, and reply count. The
+ * anchor is the only actionable part, so it is split out of the joined line
+ * rather than making the whole run clickable.
+ */
 function CommentMeta({
 	createdAt,
 	location,
+	onJumpToLine,
 	replyCount,
 }: {
 	createdAt?: string;
 	location: string;
+	onJumpToLine?: () => void;
 	replyCount: number;
 }) {
-	const parts = [
-		location,
+	const trailing = [
 		createdAt ? formatRowDate(createdAt) : '',
 		replyCount > 0
 			? `${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`
 			: '',
 	].filter(Boolean);
 
-	if (parts.length === 0) {
+	if (!location && trailing.length === 0) {
 		return null;
 	}
 
 	return (
-		<span className='min-w-0 truncate font-mono text-muted-foreground text-xxs'>
-			{parts.join(' · ')}
+		<span className='flex min-w-0 items-center gap-1 font-mono text-muted-foreground text-xxs'>
+			<CommentLocation location={location} onJumpToLine={onJumpToLine} />
+			{trailing.length > 0 ? (
+				<span className='shrink-0 truncate'>
+					{location ? ' · ' : ''}
+					{trailing.join(' · ')}
+				</span>
+			) : null}
 		</span>
+	);
+}
+
+/**
+ * The comment's `path:line` anchor, actionable when the surrounding workspace
+ * can open the diff and inert text when it cannot.
+ */
+function CommentLocation({
+	location,
+	onJumpToLine,
+}: {
+	location: string;
+	onJumpToLine?: () => void;
+}) {
+	if (!location) {
+		return null;
+	}
+	if (!onJumpToLine) {
+		return <span className='min-w-0 truncate'>{location}</span>;
+	}
+	return (
+		<button
+			className='min-w-0 cursor-pointer truncate rounded-xs underline decoration-dotted underline-offset-2 hover:text-foreground'
+			onClick={onJumpToLine}
+			type='button'
+		>
+			{location}
+		</button>
 	);
 }
 

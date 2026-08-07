@@ -19,8 +19,14 @@ export interface FileOpenOptions {
 export type WorkspaceFileDiffOpener = (
 	filePath: string,
 	scope?: WorkspaceGitDiffScope,
-	options?: FileOpenOptions,
+	options?: WorkspaceFileDiffOpenOptions,
 ) => void;
+
+/** How a workspace file diff opens, plus where in the file it should land. */
+export interface WorkspaceFileDiffOpenOptions extends FileOpenOptions {
+	/** 1-based new-side line to scroll to and flash once the diff mounts. */
+	revealLine?: number;
+}
 
 /** Opens (or re-focuses) a read-only file preview tab from review surfaces. */
 export type ReviewFilePreviewOpener = (

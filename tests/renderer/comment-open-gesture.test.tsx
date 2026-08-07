@@ -112,3 +112,31 @@ test('the Checks panel forwards a double click as a permanent open', () => {
 		prNumber: 138,
 	});
 });
+
+test('a comment row offers a jump to its line in the diff', () => {
+	const onJumpToLine = vi.fn();
+	const onOpenPreview = vi.fn();
+
+	renderWithProviders(
+		<PullRequestCommentRow
+			comment={comment}
+			onJumpToLine={onJumpToLine}
+			onOpenPreview={onOpenPreview}
+		/>,
+	);
+
+	fireEvent.click(screen.getByRole('button', { name: /go to line/i }));
+
+	expect(onJumpToLine).toHaveBeenCalledTimes(1);
+	expect(onOpenPreview).not.toHaveBeenCalled();
+});
+
+// The Checks panel renders outside the diff opener in some surfaces, and a row
+// with nowhere to jump must show no control rather than a dead one.
+test('a comment row with no jump handler renders no jump control', () => {
+	renderWithProviders(
+		<PullRequestCommentRow comment={comment} onOpenPreview={vi.fn()} />,
+	);
+
+	expect(screen.queryByRole('button', { name: /go to line/i })).toBeNull();
+});

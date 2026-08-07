@@ -4,6 +4,7 @@ import {
 	CircleIcon,
 	ExternalLinkIcon,
 	EyeOffIcon,
+	FileDiffIcon,
 	LoaderCircleIcon,
 	MessageSquarePlusIcon,
 	TriangleAlertIcon,
@@ -220,20 +221,23 @@ export function ChecksActionRow({
 /**
  * Single PR comment row. Clicking the row opens a read-only preview tab into the
  * workspace's ephemeral preview slot, and double-clicking keeps that tab open;
- * hovering reveals Hide (session-only dismiss) and Add-to-chat actions. The
- * leading badge shows the comment author (falling back to the provider label),
- * and `detail` carries the comment's first line of prose, falling back to its
- * `path:line` location when the body has none.
+ * hovering reveals Go-to-line, Hide (session-only dismiss), and Add-to-chat
+ * actions. The leading badge shows the comment author (falling back to the
+ * provider label), and `detail` carries the comment's first line of prose,
+ * falling back to its `path:line` location when the body has none.
  */
 export function PullRequestCommentRow({
 	comment,
 	onAddToChat,
 	onHide,
+	onJumpToLine,
 	onOpenPreview,
 }: {
 	comment: WorkspaceShellModel['pullRequest']['comments'][number];
 	onAddToChat?: () => void;
 	onHide?: () => void;
+	/** Omitted, not disabled, when the comment carries no path and line to reach. */
+	onJumpToLine?: () => void;
 	onOpenPreview?: (options?: FileOpenOptions) => void;
 }) {
 	return (
@@ -269,6 +273,17 @@ export function PullRequestCommentRow({
 				) : null}
 			</button>
 			<div className='hidden shrink-0 items-center gap-0.5 group-hover:flex'>
+				{onJumpToLine ? (
+					<Button
+						className='size-6'
+						onClick={onJumpToLine}
+						size='icon-xs'
+						variant='ghost'
+					>
+						<FileDiffIcon />
+						<span className='sr-only'>Go to line in diff</span>
+					</Button>
+				) : null}
 				{onHide ? (
 					<Button
 						className='size-6'

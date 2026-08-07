@@ -41,6 +41,7 @@ import {
 	createNodePtyBackend,
 	type PtyBackend,
 	type PtyProcess,
+	type PtySpawnOptions,
 } from './pty-backend.ts';
 import {
 	deleteTerminalOutput,
@@ -300,6 +301,16 @@ interface TrackedSession {
 	snapshot: TerminalSessionSnapshot;
 	stopRequested: boolean;
 }
+
+/** Working directory, environment, and diagnostics a session launches with. */
+type AssembledWorkspaceEnvironment = Awaited<
+	ReturnType<WorkspaceEnvironmentService['assemble']>
+>;
+
+/** A step of {@link createTerminalService}'s create flow that may fail outright. */
+type SessionStep<TKey extends string, TValue> =
+	| ({ [K in TKey]: TValue } & { failure?: undefined })
+	| ({ [K in TKey]?: undefined } & { failure: TerminalDiagnostic });
 
 /**
  * How many trailing characters of run-script output to keep while hunting for a
@@ -879,43 +890,27 @@ export function createTerminalService({
 	}
 
 	/**
-	 * Assembles the workspace environment and spawns a PTY-backed terminal
-	 * session, returning setup diagnostics with the live session snapshot — or
-	 * diagnostics and a null session when the environment cannot be assembled.
-	 * @returns Setup diagnostics and the created session, or a null session on failure
+	 * Assembles the workspace environment a session launches in and layers the
+	 * agent-control variables on top, turning a known environment failure into a
+	 * diagnostic rather than letting it throw.
+	 * @param workspaceId - Workspace whose environment to assemble
+	 * @returns The assembled environment, or the diagnostic explaining why it is unavailable
 	 */
-	async function create({
-		cols = DEFAULT_COLS,
-		command,
-		harnessId,
-		kind = 'terminal',
-		restoredFromId,
-		resumed = false,
-		rows = DEFAULT_ROWS,
-		scriptName,
-		seedOutput,
-		title,
-		workspaceId,
-	}: CreateTerminalSessionOptions): Promise<CreateTerminalSessionResult> {
-		const diagnostics: TerminalDiagnostic[] = [];
-
-		let environment: Awaited<
-			ReturnType<WorkspaceEnvironmentService['assemble']>
-		>;
+	async function assembleSessionEnvironment(
+		workspaceId: string,
+	): Promise<SessionStep<'environment', AssembledWorkspaceEnvironment>> {
+		let assembled: AssembledWorkspaceEnvironment;
 
 		try {
-			environment = await workspaceEnvironmentService.assemble({ workspaceId });
+			assembled = await workspaceEnvironmentService.assemble({ workspaceId });
 		} catch (error) {
 			if (error instanceof WorkspaceEnvironmentError) {
 				return {
-					diagnostics: [
-						{
-							code: error.code,
-							message: error.message,
-							severity: 'error',
-						},
-					],
-					session: null,
+					failure: {
+						code: error.code,
+						message: error.message,
+						severity: 'error',
+					},
 				};
 			}
 
@@ -927,75 +922,83 @@ export function createTerminalService({
 			sessionId: `ws:${workspaceId}`,
 			species: 'harness',
 		});
-		if (controlEnv) {
-			Object.assign(environment.env, controlEnv);
-		}
 
-		for (const diagnostic of environment.diagnostics) {
-			diagnostics.push({
-				code: diagnostic.code,
-				message: diagnostic.message,
-				severity: diagnostic.severity,
-			});
-		}
+		return {
+			environment: controlEnv
+				? { ...assembled, env: { ...assembled.env, ...controlEnv } }
+				: assembled,
+		};
+	}
 
-		const normalizedCols = clampDimension(cols, DEFAULT_COLS);
-		const normalizedRows = clampDimension(rows, DEFAULT_ROWS);
-		const normalizedCommand = command?.trim() || null;
-		const shell = normalizedCommand ? scriptShell : defaultShell;
-		const args = buildShellArgs(normalizedCommand);
-		const commandLabel = normalizedCommand ?? shell;
-		const id = randomUUID();
-		const createdAt = now().toISOString();
-		const baseEnv = await resolveTerminalBaseEnv(resolveBaseEnv, diagnostics);
-		const env = mergeProcessEnvironment({
-			baseEnv,
-			kind,
-			overlay: environment.env,
-		});
-
-		let pty: PtyProcess;
-
+	/**
+	 * Spawns the PTY process backing a new session.
+	 * @param options - Shell file, arguments, working directory, environment, and window size
+	 * @returns The live PTY, or the diagnostic explaining why it could not start
+	 */
+	function spawnSessionPty(
+		options: PtySpawnOptions,
+	): SessionStep<'pty', PtyProcess> {
 		try {
-			pty = backend.spawn({
-				args,
-				cols: normalizedCols,
-				cwd: environment.cwd,
-				env,
-				file: shell,
-				rows: normalizedRows,
-			});
+			return { pty: backend.spawn(options) };
 		} catch (error) {
 			return {
-				diagnostics: [
-					...diagnostics,
-					{
-						code: 'spawn-failed',
-						message:
-							error instanceof Error
-								? error.message
-								: 'The terminal process could not be started.',
-						severity: 'error',
-					},
-				],
-				session: null,
+				failure: {
+					code: 'spawn-failed',
+					message:
+						error instanceof Error
+							? error.message
+							: 'The terminal process could not be started.',
+					severity: 'error',
+				},
 			};
 		}
+	}
 
-		const sessionLogSource =
-			kind === 'agent' ? harnessSessionLogSource(harnessId) : null;
-		const busyFromPtySpinner =
-			kind === 'agent' && harnessBusySource(harnessId) === 'pty-spinner';
-
-		const restored = Boolean(seedOutput);
-		const scrollback = buildSessionScrollback(seedOutput);
-
-		const session: TrackedSession = {
+	/**
+	 * Builds the in-memory record tracking a session whose PTY has just spawned,
+	 * seeding its snapshot and its restored scrollback.
+	 * @param options - Create inputs plus the resolved identity, dimensions, and PTY
+	 * @returns The tracked session, ready for stream wiring
+	 */
+	function buildTrackedSession({
+		commandLabel,
+		cols,
+		createdAt,
+		cwd,
+		harnessId,
+		id,
+		kind,
+		pty,
+		resumed,
+		rows,
+		scriptName,
+		seedOutput,
+		title,
+		workspaceId,
+	}: {
+		commandLabel: string;
+		cols: number;
+		createdAt: string;
+		cwd: string;
+		harnessId: string | undefined;
+		id: string;
+		kind: TerminalSessionKind;
+		pty: PtyProcess;
+		resumed: boolean;
+		rows: number;
+		scriptName: string | undefined;
+		seedOutput: string | undefined;
+		title: string | undefined;
+		workspaceId: string;
+	}): TrackedSession {
+		return {
 			agentBusyIdleTimer: null,
-			busyFromPtySpinner,
+			busyFromPtySpinner:
+				kind === 'agent' && harnessBusySource(harnessId) === 'pty-spinner',
 			sessionLogSince: resumed ? null : createdAt,
-			sessionLogSource,
-			cwd: environment.cwd,
+			sessionLogSource:
+				kind === 'agent' ? harnessSessionLogSource(harnessId) : null,
+			cwd,
 			dataSubscription: null,
 			exitSubscription: null,
 			exitWaiters: [],
@@ -1006,13 +1009,13 @@ export function createTerminalService({
 			titlePollTimer: null,
 			titleScanBuffer: '',
 			pty,
-			scrollback,
+			scrollback: buildSessionScrollback(seedOutput),
 			snapshot: {
 				agentBusy: false,
 				harnessSessionId: null,
 				agentFullTitle: null,
 				agentTitle: null,
-				cols: normalizedCols,
+				cols,
 				commandLabel,
 				createdAt,
 				endedAt: null,
@@ -1020,8 +1023,8 @@ export function createTerminalService({
 				id,
 				kind,
 				previewUrl: null,
-				restored,
-				rows: normalizedRows,
+				restored: Boolean(seedOutput),
+				rows,
 				scriptName: scriptName ?? null,
 				status: 'running',
 				title: title?.trim() || defaultTitle(kind),
@@ -1029,8 +1032,19 @@ export function createTerminalService({
 			},
 			stopRequested: false,
 		};
+	}
 
-		discardRestoredLog(environment.cwd, restoredFromId);
+	/**
+	 * Subscribes a freshly created session to its PTY's data and exit streams,
+	 * wiring output broadcasting, preview/title scanning, and finalization.
+	 * @param session - Session whose PTY streams to subscribe to
+	 * @param pty - The live PTY backing the session
+	 */
+	function attachSessionStreams(
+		session: TrackedSession,
+		pty: PtyProcess,
+	): void {
+		const { id, workspaceId } = session.snapshot;
 
 		session.dataSubscription = pty.onData((data) => {
 			session.outputSeq += 1;
@@ -1056,41 +1070,142 @@ export function createTerminalService({
 				finalizeSession(session, exitCode);
 			});
 		});
+	}
 
-		sessions.set(id, session);
-		startConversationInfoPolling(session);
-
+	/**
+	 * Records a newly created session in the terminal-session table. Persistence is
+	 * advisory: a write failure leaves the live session running.
+	 * @param session - The running session to persist
+	 * @param harnessId - Harness backing an agent session, when there is one
+	 * @param shell - Shell file the PTY spawned
+	 * @returns A warning diagnostic when the row could not be written, otherwise null
+	 */
+	function persistNewSession(
+		session: TrackedSession,
+		harnessId: string | undefined,
+		shell: string,
+	): TerminalDiagnostic | null {
 		const database = getDatabase();
 
-		if (database) {
-			try {
-				insertTerminalSessionRow({
-					cwd: environment.cwd,
-					database,
-					id,
-					metadataJson: JSON.stringify(
-						harnessId ? { harnessId, kind } : { kind },
-					),
-					shell,
-					status: 'running',
-					timestamp: createdAt,
-					title: session.snapshot.title,
-					workspaceId,
-				});
-			} catch {
-				diagnostics.push({
-					code: 'metadata-not-persisted',
-					message:
-						'The terminal session is running, but its metadata could not be saved.',
-					severity: 'warning',
-				});
-			}
+		if (!database) {
+			return null;
 		}
+
+		const { createdAt, id, kind, title, workspaceId } = session.snapshot;
+
+		try {
+			insertTerminalSessionRow({
+				cwd: session.cwd,
+				database,
+				id,
+				metadataJson: JSON.stringify(
+					harnessId ? { harnessId, kind } : { kind },
+				),
+				shell,
+				status: 'running',
+				timestamp: createdAt,
+				title,
+				workspaceId,
+			});
+			return null;
+		} catch {
+			return {
+				code: 'metadata-not-persisted',
+				message:
+					'The terminal session is running, but its metadata could not be saved.',
+				severity: 'warning',
+			};
+		}
+	}
+
+	/**
+	 * Assembles the workspace environment and spawns a PTY-backed terminal
+	 * session, returning setup diagnostics with the live session snapshot — or
+	 * diagnostics and a null session when the environment cannot be assembled.
+	 * @returns Setup diagnostics and the created session, or a null session on failure
+	 */
+	async function create({
+		cols = DEFAULT_COLS,
+		command,
+		harnessId,
+		kind = 'terminal',
+		restoredFromId,
+		resumed = false,
+		rows = DEFAULT_ROWS,
+		scriptName,
+		seedOutput,
+		title,
+		workspaceId,
+	}: CreateTerminalSessionOptions): Promise<CreateTerminalSessionResult> {
+		const assembly = await assembleSessionEnvironment(workspaceId);
+
+		if (assembly.failure) {
+			return { diagnostics: [assembly.failure], session: null };
+		}
+
+		const { environment } = assembly;
+		const diagnostics: TerminalDiagnostic[] = environment.diagnostics.map(
+			({ code, message, severity }) => ({ code, message, severity }),
+		);
+
+		const normalizedCols = clampDimension(cols, DEFAULT_COLS);
+		const normalizedRows = clampDimension(rows, DEFAULT_ROWS);
+		const normalizedCommand = command?.trim() || null;
+		const shell = normalizedCommand ? scriptShell : defaultShell;
+		const createdAt = now().toISOString();
+		const baseEnv = await resolveTerminalBaseEnv(resolveBaseEnv, diagnostics);
+
+		const spawned = spawnSessionPty({
+			args: buildShellArgs(normalizedCommand),
+			cols: normalizedCols,
+			cwd: environment.cwd,
+			env: mergeProcessEnvironment({
+				baseEnv,
+				kind,
+				overlay: environment.env,
+			}),
+			file: shell,
+			rows: normalizedRows,
+		});
+
+		if (spawned.failure) {
+			return {
+				diagnostics: [...diagnostics, spawned.failure],
+				session: null,
+			};
+		}
+
+		const session = buildTrackedSession({
+			commandLabel: normalizedCommand ?? shell,
+			cols: normalizedCols,
+			createdAt,
+			cwd: environment.cwd,
+			harnessId,
+			id: randomUUID(),
+			kind,
+			pty: spawned.pty,
+			resumed,
+			rows: normalizedRows,
+			scriptName,
+			seedOutput,
+			title,
+			workspaceId,
+		});
+
+		discardRestoredLog(environment.cwd, restoredFromId);
+		attachSessionStreams(session, spawned.pty);
+
+		sessions.set(session.snapshot.id, session);
+		startConversationInfoPolling(session);
+
+		const persistenceWarning = persistNewSession(session, harnessId, shell);
 
 		broadcastLifecycle(session);
 
 		return {
-			diagnostics,
+			diagnostics: persistenceWarning
+				? [...diagnostics, persistenceWarning]
+				: diagnostics,
 			session: { ...session.snapshot },
 		};
 	}

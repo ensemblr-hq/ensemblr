@@ -10,7 +10,10 @@ import {
 } from '@/renderer/components/ui/tooltip';
 import type { ComposerStateApi } from '@/renderer/hooks/workbench-shell/composer/use-composer-state';
 import { cn } from '@/renderer/lib/utils';
-import { resolveComposerProvider } from '@/renderer/lib/workbench/composer';
+import {
+	resolveComposerProvider,
+	showContextIndicator,
+} from '@/renderer/lib/workbench';
 import {
 	alwaysShowContextUsageAtom,
 	sendShortcutAtom,
@@ -108,24 +111,6 @@ export function ComposerControls({
 			</div>
 		</div>
 	);
-}
-
-/**
- * Decides whether the context gauge is worth showing. It is noise at low usage,
- * so by default it appears only past 70% of the window; the setting forces it on.
- * @param composer - Composer shell state carrying the current usage.
- * @param alwaysShow - The user's always-show-context preference.
- * @returns True when the gauge should render.
- */
-function showContextIndicator(
-	composer: ComposerShellState,
-	alwaysShow: boolean,
-): boolean {
-	const usage = composer.contextUsage;
-	if (!usage || usage.maxTokens <= 0) {
-		return alwaysShow;
-	}
-	return alwaysShow || (usage.usedTokens / usage.maxTokens) * 100 > 70;
 }
 
 /**

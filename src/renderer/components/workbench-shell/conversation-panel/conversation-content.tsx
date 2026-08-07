@@ -24,6 +24,7 @@ import {
 import { FilePreviewPanel } from './file-preview-panel';
 import { PiRawFramePanel } from './pi-raw-frame-panel';
 import { SessionTabs } from './session-tabs';
+import { SubAgentStatusPanel } from './sub-agent-status-panel';
 import { TurnDiffPanel } from './turn-diff-panel';
 import { WorkspaceFileDiffPanel } from './workspace-file-diff-panel';
 import { WorkspaceTimeline } from './workspace-timeline';
@@ -143,7 +144,9 @@ interface ChatTabBodyProps {
 
 /**
  * Renders a chat tab's timeline and composer under the path-resolution and
- * preview-opener context the conversation surface provides.
+ * preview-opener context the conversation surface provides. A tab that gets no
+ * composer is a spawned sub-agent's — the only case `showsComposer` refuses —
+ * so its runtime readout takes the slot the composer would have occupied.
  */
 function ChatTabBody({
 	activeSession,
@@ -175,7 +178,9 @@ function ChatTabBody({
 							)}
 							workspace={activeWorkspace}
 						/>
-					) : null}
+					) : (
+						<SubAgentStatusPanel composer={composer} />
+					)}
 				</TurnDiffOpenerProvider>
 			</FilePreviewOpenerProvider>
 		</WorkspacePathResolverProvider>

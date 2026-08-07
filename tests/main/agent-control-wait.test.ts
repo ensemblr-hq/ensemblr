@@ -97,7 +97,11 @@ const makePorts = (
 		getWorkspaceStatus: () => 'backlog',
 	},
 	diff: { readWorkspaceDiff: vi.fn() },
-	review: { listComments: vi.fn(), addComments: vi.fn() },
+	review: {
+		listComments: vi.fn(),
+		addComments: vi.fn(),
+		resolveComments: vi.fn(),
+	},
 	permissions: { getMode: () => 'workspace-trusted' },
 	confirm: { confirm: vi.fn().mockResolvedValue(true) },
 	ask: { ask: vi.fn(), releaseSession: vi.fn() },

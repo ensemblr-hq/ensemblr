@@ -119,7 +119,7 @@ export function ChangesOverflowMenu({
 					</DropdownMenuItem>
 				</div>
 				<DropdownMenuSeparator className='my-0' />
-				<div className='max-h-72 overflow-y-auto p-1'>
+				<div className='sleek-scrollbar max-h-72 overflow-y-auto p-1'>
 					{hasCommitFailure ? (
 						<div className='px-2 py-2 text-muted-foreground text-xs'>
 							Could not load commits.

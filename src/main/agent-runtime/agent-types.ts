@@ -213,6 +213,15 @@ export interface AgentSubmitRequest {
 	modelOverride?: string;
 	/** Thinking level to apply for this turn. Mirrors {@link modelOverride}. */
 	thinkingLevel?: string;
+	/**
+	 * Whether the chat's Plan Mode toggle is on for this turn. Re-sent every turn
+	 * because a runtime that owns its own plan mode can leave it without telling
+	 * Ensemblr — Claude's native `ExitPlanMode` does exactly that — so the toggle
+	 * has to be re-asserted rather than set once at session open. Runtimes whose
+	 * plan mode Ensemblr enforces itself (Pi, through the plan-mode registry)
+	 * ignore it.
+	 */
+	planMode?: boolean;
 	prompt: string;
 	/**
 	 * Mid-turn delivery mode. When set, the adapter uses its runtime's steer or

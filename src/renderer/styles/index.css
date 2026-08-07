@@ -811,6 +811,31 @@
 	background-color: var(--color-diff-deletion);
 }
 
+/*
+ * The flash on a line jumped to from a review comment. react-diff-view already
+ * ships `.diff-code-selected`/`.diff-gutter-selected` off these two custom
+ * properties, so re-hueing them is the whole highlight — and it re-hues with
+ * every theme for free. It sits here rather than as a Tailwind utility because
+ * the row tints above are unlayered and would otherwise win the cascade.
+ */
+.ensemblr-diff {
+	--diff-code-selected-background-color: color-mix(
+		in oklch,
+		var(--color-ring) 30%,
+		var(--ensemblr-code)
+	);
+	--diff-gutter-selected-background-color: color-mix(
+		in oklch,
+		var(--color-ring) 45%,
+		var(--ensemblr-code)
+	);
+}
+
+.ensemblr-diff .diff-code-selected,
+.ensemblr-diff .diff-gutter-selected {
+	transition: background-color 150ms ease-out;
+}
+
 .ensemblr-diff .diff-code-mark {
 	color: var(--color-muted-foreground);
 	opacity: 0.6;

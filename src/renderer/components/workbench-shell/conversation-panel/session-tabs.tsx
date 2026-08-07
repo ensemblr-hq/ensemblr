@@ -40,10 +40,8 @@ import {
 	TooltipTrigger,
 } from '@/renderer/components/ui/tooltip';
 import { useHotkey } from '@/renderer/hooks/use-hotkey';
-import {
-	areStringArraysEqual,
-	reconcileOrderedIdsByCanonicalSlot,
-} from '@/renderer/lib/ordered-ids';
+import { useSessionTabOrder } from '@/renderer/hooks/workbench-shell/conversation-panel/use-session-tab-order';
+import { useSessionTabShortcuts } from '@/renderer/hooks/workbench-shell/conversation-panel/use-session-tab-shortcuts';
 import { cn } from '@/renderer/lib/utils';
 import {
 	getWorkspaceFileIconNameForPath,
@@ -136,52 +134,21 @@ export function SessionTabs({
 	const requestComposerFocus = useRequestComposerFocus();
 	const [debugOpen, setDebugOpen] = useDebugPanelToggle();
 	const developerMode = useAtomValue(developerModeAtom);
-	const sessionIds = useMemo(
-		() => sessions.map((session) => session.id),
-		[sessions],
-	);
-	const sessionById = useMemo(
-		() => new Map(sessions.map((session) => [session.id, session] as const)),
-		[sessions],
-	);
 	const openChatTabCount = useMemo(
 		() =>
 			sessions.filter((candidate) => (candidate.kind ?? 'chat') === 'chat')
 				.length,
 		[sessions],
 	);
-	const [orderedSessionIds, setOrderedSessionIds] =
-		useState<string[]>(sessionIds);
-	const [prevSessionIds, setPrevSessionIds] = useState(sessionIds);
-	const [isDraggingTab, setIsDraggingTab] = useState(false);
-	const orderedSessionIdsRef = useRef(orderedSessionIds);
-	const canReorderTabs = sessionIds.length > 1;
-
-	useHotkey('tab.new', () => handleOpen());
-	useHotkey('tab.keepOpen', () => onSessionTabPin(activeSession.id));
-	useHotkey('tab.next', () => cycleTab(1));
-	useHotkey('tab.prev', () => cycleTab(-1));
-	useHotkey('tab.selectByIndex', (event) => {
-		const position = Number.parseInt(event.key, 10);
-		if (!Number.isNaN(position)) {
-			selectTabByPosition(position);
-		}
-	});
-
-	useEffect(() => {
-		orderedSessionIdsRef.current = orderedSessionIds;
-	}, [orderedSessionIds]);
-
-	if (prevSessionIds !== sessionIds) {
-		setPrevSessionIds(sessionIds);
-		setOrderedSessionIds((currentIds) => {
-			const nextIds = reconcileOrderedIdsByCanonicalSlot(
-				currentIds,
-				sessionIds,
-			);
-			return areStringArraysEqual(nextIds, currentIds) ? currentIds : nextIds;
-		});
-	}
+	const {
+		canReorderTabs,
+		handleReorder,
+		handleReorderEnd,
+		handleReorderStart,
+		isDraggingTab,
+		orderedSessionIds,
+		sessionById,
+	} = useSessionTabOrder({ onSessionTabsReorder, sessions });
 
 	useEffect(() => {
 		if (!developerMode && debugOpen) {
@@ -209,23 +176,6 @@ export function SessionTabs({
 			.finally(() => setIsOpening(false));
 	}
 
-	/** Hides hover-only controls while a tab is being reordered. */
-	function handleReorderStart() {
-		if (!canReorderTabs) {
-			return;
-		}
-		setIsDraggingTab(true);
-	}
-
-	/** Applies motion's in-drag order to local state while the user moves a tab. */
-	function handleReorder(nextIds: string[]) {
-		if (!canReorderTabs) {
-			return;
-		}
-		orderedSessionIdsRef.current = nextIds;
-		setOrderedSessionIds(nextIds);
-	}
-
 	/**
 	 * Switches to a tab and, when it is a chat tab, queues composer focus so
 	 * keyboard-driven tab switches land the caret in the composer.
@@ -239,47 +189,13 @@ export function SessionTabs({
 		}
 	}
 
-	/** Selects the tab `offset` positions from the active one, wrapping around. */
-	function cycleTab(offset: number) {
-		if (orderedSessionIds.length < 2) {
-			return;
-		}
-		const activeIndex = orderedSessionIds.indexOf(activeSession.id);
-		const base = activeIndex === -1 ? 0 : activeIndex;
-		const nextIndex =
-			(base + offset + orderedSessionIds.length) % orderedSessionIds.length;
-		selectSession(orderedSessionIds[nextIndex]);
-	}
-
-	/** Selects a tab by its 1-based position; `9` always jumps to the last tab. */
-	function selectTabByPosition(position: number) {
-		if (!orderedSessionIds.length) {
-			return;
-		}
-		const index = position === 9 ? orderedSessionIds.length - 1 : position - 1;
-		const targetId = orderedSessionIds[index];
-		if (targetId) {
-			selectSession(targetId);
-		}
-	}
-
-	/**
-	 * Commits the final dragged order to the workspace tab controller, naming the
-	 * tab the drag was pointed at so the controller can tell a deliberate
-	 * placement from a tab that was merely pushed aside.
-	 * @param draggedSessionId - Session id of the tab the user dragged
-	 */
-	function handleReorderEnd(draggedSessionId: string) {
-		setIsDraggingTab(false);
-		if (!canReorderTabs) {
-			return;
-		}
-		const nextIds = orderedSessionIdsRef.current;
-		if (areStringArraysEqual(nextIds, sessionIds)) {
-			return;
-		}
-		onSessionTabsReorder(nextIds, draggedSessionId);
-	}
+	useSessionTabShortcuts({
+		activeSessionId: activeSession.id,
+		onOpenTab: handleOpen,
+		onPinTab: onSessionTabPin,
+		onSelectSession: selectSession,
+		orderedSessionIds,
+	});
 
 	return (
 		<div className='flex h-10 shrink-0 items-center justify-between gap-3 border-border border-b bg-background pr-3'>
